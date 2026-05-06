@@ -24,6 +24,7 @@ import type {
   RateCard,
   Accessorial,
   LaneZone,
+  Terminal,
 } from '../db/schema.js';
 
 export interface CalcRequest {
@@ -48,6 +49,9 @@ export interface CalcRequest {
   /** Anchor port code used for drayage zone lookup. */
   pickupPortCode?: string;
   deliveryPortCode?: string;
+  /** Drayage: tenant terminal codes (when selected). Adds per-terminal surcharge. */
+  pickupTerminalCode?: string;
+  deliveryTerminalCode?: string;
   /** Codes of accessorials the user explicitly picked. */
   selectedAccessorialCodes?: string[];
   /** Free-form flags the AI / form might pass. */
@@ -236,7 +240,8 @@ export function calculate(
   cards: RateCard[],
   accessorialList: Accessorial[],
   zones: LaneZone[],
-  req: CalcRequest
+  req: CalcRequest,
+  terminals: Terminal[] = []
 ): CalcResult {
   const lines: CalcLine[] = [];
 
@@ -326,6 +331,26 @@ export function calculate(
     });
     acc += amt;
   }
+  // ── Terminal surcharges (drayage) ─────────────────────────────────
+  // Charged per leg when the user picked a specific terminal that the
+  // carrier has marked with a non-zero surcharge.
+  for (const [code, leg] of [
+    [req.pickupTerminalCode, 'pickup'],
+    [req.deliveryTerminalCode, 'delivery'],
+  ] as const) {
+    if (!code) continue;
+    const t = terminals.find((x) => x.enabled && x.code === code);
+    if (!t || !t.surcharge || t.surcharge <= 0) continue;
+    const amt = round2(t.surcharge);
+    lines.push({
+      name: `Terminal surcharge — ${t.name} (${leg})`,
+      amount: amt,
+      kind: 'accessorial',
+      code: 'terminal_surcharge',
+    });
+    acc += amt;
+  }
+
   const subtotalAccessorials = round2(acc);
 
   // ── Fuel surcharge ────────────────────────────────────────────────

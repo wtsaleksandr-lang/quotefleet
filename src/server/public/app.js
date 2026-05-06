@@ -649,6 +649,39 @@
   // ── helpers ────────────────────────────────────────────────────
   function showErr(c) { return function (err) { c.innerHTML = '<div class="notice error">' + (err.message || 'Failed') + '</div>'; }; }
 
+  // ── Trial banner ──────────────────────────────────────────────
+  function renderTrialBanner(trial, tenant) {
+    if (!trial) return;
+    var bar = document.getElementById('qf-trial-bar');
+    if (!bar) {
+      bar = document.createElement('div');
+      bar.id = 'qf-trial-bar';
+      document.body.insertBefore(bar, document.body.firstChild);
+    }
+    bar.style.cssText =
+      'padding:9px 18px; font-family: var(--font-mono); font-size:11.5px;' +
+      'letter-spacing:0.08em; text-transform:uppercase; text-align:center;' +
+      'border-bottom:1px solid var(--border); position:sticky; top:0; z-index:100;';
+    if (trial.status === 'trial') {
+      var color = trial.daysLeft <= 3 ? 'var(--warn)' : 'var(--accent)';
+      bar.style.background = 'var(--surface)';
+      bar.style.color = color;
+      var used = trial.leadsUsed + ' / ' + trial.leadsLimit + ' leads';
+      bar.innerHTML =
+        'Trial — ' + trial.daysLeft + ' day' + (trial.daysLeft === 1 ? '' : 's') + ' left · ' +
+        used + ' used &nbsp;·&nbsp; ' +
+        '<a href="/pricing" style="color: var(--accent); text-decoration: underline;">Upgrade →</a>';
+    } else if (trial.status === 'trial_expired') {
+      bar.style.background = 'var(--error-bg)';
+      bar.style.color = 'var(--error)';
+      bar.innerHTML =
+        'Trial ended — your widget is read-only. ' +
+        '<a href="/pricing" style="color: var(--error); text-decoration: underline;">Upgrade to keep capturing leads →</a>';
+    } else if (trial.status === 'paid') {
+      bar.remove();
+    }
+  }
+
   // ── boot ───────────────────────────────────────────────────────
   function boot() {
     api('/api/auth/me').then(function (r) {
@@ -660,9 +693,13 @@
       }
       state.me = r;
       $('#sb-tenant-name').textContent = (r.tenant && r.tenant.name) || r.user.name || r.user.email;
-      $('#sb-tenant-slug').textContent = (r.tenant && '/w/' + r.tenant.slug) || '';
+      $('#sb-tenant-slug').textContent =
+        (r.tenant && r.tenant.hostedUrl)
+          ? r.tenant.hostedUrl.replace(/^https?:\/\//, '').replace(/\/$/, '')
+          : (r.tenant && '/w/' + r.tenant.slug) || '';
       $('#loading').style.display = 'none';
       $('#app-shell').hidden = false;
+      renderTrialBanner(r.trial, r.tenant);
 
       $$('.sidebar [data-route]').forEach(function (b) {
         b.addEventListener('click', function () { go(b.dataset.route); });

@@ -108,6 +108,23 @@ export const sessions = pgTable('sessions', {
 });
 
 // ────────────────────────────────────────────────────────────────────
+// MAGIC LINKS — single-use email login tokens.
+// Created on POST /api/auth/magic-link/send, consumed on
+// GET /auth/magic/:token (sets a session cookie + redirects to /app).
+// ────────────────────────────────────────────────────────────────────
+export const magicLinks = pgTable('magic_links', {
+  token: text('token').primaryKey(),
+  userId: integer('user_id')
+    .notNull()
+    .references(() => users.id, { onDelete: 'cascade' }),
+  expiresAt: timestamp('expires_at', { mode: 'date' }).notNull(),
+  usedAt: timestamp('used_at', { mode: 'date' }),
+  /** Optional next-URL to redirect to after consume. */
+  redirectTo: text('redirect_to'),
+  createdAt: timestamp('created_at', { mode: 'date' }).notNull().defaultNow(),
+});
+
+// ────────────────────────────────────────────────────────────────────
 // RATE CARDS — one per equipment_type per tenant.
 // "service" is one of: 'drayage' | 'ftl' | 'ltl' | 'expedited' | 'hotshot'
 // "equipment" is one of: 'dryvan' | 'reefer' | 'flatbed' | 'step_deck' |

@@ -19,6 +19,8 @@ import {
   rateCards,
   accessorials,
   laneZones,
+  terminals,
+  ports,
   brandConfigs,
   leads,
   aiConfigs,
@@ -29,6 +31,7 @@ import { generateLeadReply } from '../../ai/replyAgent.js';
 import { leadChatTurn } from '../../ai/chatAgent.js';
 import { sendEmail } from '../../email/send.js';
 import { loadEnv } from '../../config.js';
+import { getTrialState } from '../trialGating.js';
 
 function generateLeadRef(): string {
   const yyyy = new Date().getFullYear();
@@ -36,31 +39,32 @@ function generateLeadRef(): string {
   return `QF-${yyyy}-${seq}`;
 }
 
+const LocationSchema = z.object({
+  address: z.string().optional(),
+  city: z.string().optional(),
+  state: z.string().optional(),
+  zip: z.string().optional(),
+  country: z.string().optional(),
+  portCode: z.string().optional(),
+  terminalCode: z.string().optional(),
+});
+
 const QuoteSchema = z.object({
   service: z.string(),
   equipment: z.string(),
-  pickup: z.object({
-    address: z.string().optional(),
-    city: z.string().optional(),
-    state: z.string().optional(),
-    zip: z.string().optional(),
-    country: z.string().optional(),
-    portCode: z.string().optional(),
-  }),
-  delivery: z.object({
-    address: z.string().optional(),
-    city: z.string().optional(),
-    state: z.string().optional(),
-    zip: z.string().optional(),
-    country: z.string().optional(),
-    portCode: z.string().optional(),
-  }),
+  pickup: LocationSchema,
+  delivery: LocationSchema,
   weightLbs: z.number().optional(),
   pieces: z.number().optional(),
   pickupDate: z.string().optional(),
   deliveryDate: z.string().optional(),
   commodity: z.string().optional(),
   notes: z.string().optional(),
+  /** Drayage extras — captured for the carrier's dispatcher to verify. */
+  oceanCarrier: z.string().optional(),
+  bookingNumber: z.string().optional(),
+  billOfLadingNumber: z.string().optional(),
+  containerNumbers: z.string().optional(),
   selectedAccessorialCodes: z.array(z.string()).optional(),
   flags: z
     .object({
@@ -89,14 +93,43 @@ async function getTenantBySlug(slug: string) {
   return rows[0] ?? null;
 }
 
+/**
+ * For drayage, the customer often selects a port — not a city/ZIP.
+ * In that case we resolve the pickup coordinates to the port's lat/lng
+ * so distance calculations still work. The original location object
+ * is unchanged (city/state/zip stay empty if not supplied).
+ */
+async function resolvePickupForDistance(loc: {
+  city?: string;
+  state?: string;
+  zip?: string;
+  country?: string;
+  portCode?: string;
+}): Promise<typeof loc & { lat?: number; lng?: number }> {
+  const hasLocation = !!(loc.zip || loc.city);
+  if (hasLocation || !loc.portCode) return loc;
+  const p = await db().select().from(ports).where(eq(ports.code, loc.portCode)).limit(1);
+  const port = p[0];
+  if (!port) return loc;
+  return {
+    ...loc,
+    city: loc.city ?? port.city,
+    state: loc.state ?? (port.state ?? undefined),
+    country: loc.country ?? port.country,
+    lat: port.lat,
+    lng: port.lng,
+  };
+}
+
 async function loadConfig(tenantId: number) {
-  const [cards, accs, zones, brand] = await Promise.all([
+  const [cards, accs, zones, terms, brand] = await Promise.all([
     db().select().from(rateCards).where(eq(rateCards.tenantId, tenantId)),
     db().select().from(accessorials).where(eq(accessorials.tenantId, tenantId)),
     db().select().from(laneZones).where(eq(laneZones.tenantId, tenantId)),
+    db().select().from(terminals).where(eq(terminals.tenantId, tenantId)),
     db().select().from(brandConfigs).where(eq(brandConfigs.tenantId, tenantId)).limit(1),
   ]);
-  return { cards, accs, zones, brand: brand[0] ?? null };
+  return { cards, accs, zones, terms, brand: brand[0] ?? null };
 }
 
 export function registerPublicRoutes(app: Express) {
@@ -156,7 +189,39 @@ export function registerPublicRoutes(app: Express) {
     if (!tenant || tenant.status !== 'active') {
       return res.status(404).json({ error: 'Tenant not found or inactive' });
     }
-    const { cards, accs, zones, brand } = await loadConfig(tenant.id);
+    const { cards, accs, zones, terms, brand } = await loadConfig(tenant.id);
+
+    // Ports relevant to drayage zones — only return ones that have at
+    // least one enabled lane-zone or terminal so the dropdown stays short.
+    const enabledZones = zones.filter((z) => z.enabled);
+    const enabledTerms = terms.filter((t) => t.enabled);
+    const portCodes = Array.from(new Set([
+      ...enabledZones.map((z) => z.anchorPortCode).filter((x): x is string => !!x),
+      ...enabledTerms.map((t) => t.portCode),
+    ]));
+    const portsRows = portCodes.length
+      ? await db().select().from(ports)
+      : [];
+    const drayagePorts = portsRows
+      .filter((p) => portCodes.includes(p.code))
+      .map((p) => ({ code: p.code, name: p.name, city: p.city, state: p.state, country: p.country }))
+      .sort((a, b) => a.name.localeCompare(b.name));
+
+    // Terminals grouped by portCode for drayage UI dropdowns.
+    const terminalsByPort: Record<string, Array<{ code: string; name: string; carrier: string | null; notes: string | null }>> = {};
+    for (const t of enabledTerms) {
+      if (!terminalsByPort[t.portCode]) terminalsByPort[t.portCode] = [];
+      terminalsByPort[t.portCode].push({
+        code: t.code,
+        name: t.name,
+        carrier: t.carrier ?? null,
+        notes: t.notes ?? null,
+      });
+    }
+    for (const k of Object.keys(terminalsByPort)) {
+      terminalsByPort[k].sort((a, b) => a.name.localeCompare(b.name));
+    }
+
     return res.json({
       tenant: {
         slug: tenant.slug,
@@ -174,7 +239,9 @@ export function registerPublicRoutes(app: Express) {
           description: a.description,
           appliesToServices: a.appliesToServices ?? null,
         })),
-      hasZones: zones.filter((z) => z.enabled).length > 0,
+      drayagePorts,
+      terminalsByPort,
+      hasZones: enabledZones.length > 0,
     });
   });
 
@@ -189,10 +256,12 @@ export function registerPublicRoutes(app: Express) {
       return res.status(400).json({ error: 'Invalid input', details: parse.error.flatten() });
     }
     const body = parse.data;
-    const { cards, accs, zones } = await loadConfig(tenant.id);
+    const { cards, accs, zones, terms } = await loadConfig(tenant.id);
 
-    // Distance
-    const dist = await distanceBetween(body.pickup, body.delivery);
+    // Distance — for drayage with a known port, fall back to the port's
+    // lat/lng when the user hasn't typed a pickup ZIP/city.
+    const pickupForDistance = await resolvePickupForDistance(body.pickup);
+    const dist = await distanceBetween(pickupForDistance, body.delivery);
     if ('error' in dist) {
       return res.status(400).json({ error: dist.error });
     }
@@ -217,10 +286,12 @@ export function registerPublicRoutes(app: Express) {
       deliveryLng: dist.destination.lng,
       pickupPortCode: body.pickup.portCode,
       deliveryPortCode: body.delivery.portCode,
+      pickupTerminalCode: body.pickup.terminalCode,
+      deliveryTerminalCode: body.delivery.terminalCode,
       selectedAccessorialCodes: body.selectedAccessorialCodes,
       flags: body.flags,
     };
-    const result = calculate(cards, accs, zones, calcReq);
+    const result = calculate(cards, accs, zones, calcReq, terms);
 
     return res.json({
       miles: dist.miles,
@@ -236,14 +307,23 @@ export function registerPublicRoutes(app: Express) {
     if (!tenant || tenant.status !== 'active') {
       return res.status(404).json({ error: 'Tenant not found' });
     }
+    // Trial gating — block free-tier tenants past trial / over quota.
+    const trial = await getTrialState(tenant);
+    if (!trial.acceptingLeads) {
+      return res.status(403).json({
+        error: trial.reason ?? 'This carrier is not currently accepting new quote requests.',
+        trialStatus: trial.status,
+      });
+    }
     const parse = LeadSchema.safeParse(req.body);
     if (!parse.success) {
       return res.status(400).json({ error: 'Invalid input', details: parse.error.flatten() });
     }
     const body = parse.data;
-    const { cards, accs, zones } = await loadConfig(tenant.id);
+    const { cards, accs, zones, terms } = await loadConfig(tenant.id);
 
-    const dist = await distanceBetween(body.pickup, body.delivery);
+    const pickupForDistance = await resolvePickupForDistance(body.pickup);
+    const dist = await distanceBetween(pickupForDistance, body.delivery);
     if ('error' in dist) return res.status(400).json({ error: dist.error });
 
     const calcReq: CalcRequest = {
@@ -266,10 +346,12 @@ export function registerPublicRoutes(app: Express) {
       deliveryLng: dist.destination.lng,
       pickupPortCode: body.pickup.portCode,
       deliveryPortCode: body.delivery.portCode,
+      pickupTerminalCode: body.pickup.terminalCode,
+      deliveryTerminalCode: body.delivery.terminalCode,
       selectedAccessorialCodes: body.selectedAccessorialCodes,
       flags: body.flags,
     };
-    const calc = calculate(cards, accs, zones, calcReq);
+    const calc = calculate(cards, accs, zones, calcReq, terms);
 
     const refId = generateLeadRef();
     const sourceUrl = req.headers.referer ?? null;
@@ -304,6 +386,12 @@ export function registerPublicRoutes(app: Express) {
         deliveryLng: dist.destination.lng,
         pickupDate: body.pickupDate,
         deliveryDate: body.deliveryDate,
+        pickupTerminalCode: body.pickup.terminalCode,
+        deliveryTerminalCode: body.delivery.terminalCode,
+        oceanCarrier: body.oceanCarrier,
+        bookingNumber: body.bookingNumber,
+        billOfLadingNumber: body.billOfLadingNumber,
+        containerNumbers: body.containerNumbers,
         weightLbs: body.weightLbs,
         pieces: body.pieces,
         commodity: body.commodity,

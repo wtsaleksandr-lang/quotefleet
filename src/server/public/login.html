@@ -29,24 +29,47 @@
       <h1 style="font-size: 28px; margin: 12px 0 6px 0; letter-spacing: -0.025em;">
         Welcome back
       </h1>
-      <p class="muted" style="margin: 0 0 28px 0; font-size: 14.5px;">
+      <p class="muted" style="margin: 0 0 22px 0; font-size: 14.5px;">
         Sign in to your tenant dashboard.
       </p>
 
-      <form id="login-form" style="display:flex; flex-direction:column; gap: 16px;">
-        <div class="field">
-          <label class="field-label required">Email</label>
-          <input class="input" type="email" name="email" required autofocus>
-        </div>
-        <div class="field">
-          <label class="field-label required">Password</label>
-          <input class="input" type="password" name="password" required>
-        </div>
-        <button class="btn btn-primary btn-lg btn-block" type="submit">
-          Sign in <span class="arr">→</span>
-        </button>
-        <div id="login-error" class="notice error hidden"></div>
-      </form>
+      <div class="tabs" style="margin-bottom: 18px;">
+        <button class="tab active" data-pane="link">Email link</button>
+        <button class="tab" data-pane="pwd">Password</button>
+      </div>
+
+      <!-- Magic link (default) -->
+      <div class="tab-pane active" id="pane-link">
+        <form id="magic-form" style="display:flex; flex-direction:column; gap: 16px;">
+          <div class="field">
+            <label class="field-label required">Email</label>
+            <input class="input" type="email" name="email" required autofocus placeholder="you@yourcompany.com">
+            <span class="field-hint">We'll email you a one-click sign-in link. Expires in 15 minutes.</span>
+          </div>
+          <button class="btn btn-primary btn-lg btn-block" type="submit">
+            Email me a sign-in link <span class="arr">→</span>
+          </button>
+          <div id="magic-msg" class="notice hidden"></div>
+        </form>
+      </div>
+
+      <!-- Password fallback -->
+      <div class="tab-pane" id="pane-pwd">
+        <form id="login-form" style="display:flex; flex-direction:column; gap: 16px;">
+          <div class="field">
+            <label class="field-label required">Email</label>
+            <input class="input" type="email" name="email" required>
+          </div>
+          <div class="field">
+            <label class="field-label required">Password</label>
+            <input class="input" type="password" name="password" required>
+          </div>
+          <button class="btn btn-primary btn-lg btn-block" type="submit">
+            Sign in <span class="arr">→</span>
+          </button>
+          <div id="login-error" class="notice error hidden"></div>
+        </form>
+      </div>
 
       <p class="muted-small" style="text-align:center; margin-top: 26px;">
         Don't have an account yet? <a href="/signup">Start your free trial →</a>
@@ -55,6 +78,60 @@
   </main>
 
   <script>
+    // Tab toggle
+    document.querySelectorAll('.tab').forEach(function (t) {
+      t.addEventListener('click', function () {
+        document.querySelectorAll('.tab').forEach(function (x) { x.classList.remove('active'); });
+        document.querySelectorAll('.tab-pane').forEach(function (x) { x.classList.remove('active'); });
+        t.classList.add('active');
+        var p = document.getElementById('pane-' + t.dataset.pane);
+        if (p) p.classList.add('active');
+      });
+    });
+
+    // Surface magic-link errors propagated as ?error=...
+    var qErr = new URLSearchParams(location.search).get('error');
+    if (qErr) {
+      var msg = document.getElementById('magic-msg');
+      msg.textContent = ({
+        'missing-token': 'Sign-in link is missing.',
+        'invalid-token': 'Sign-in link is invalid or expired. Request a new one.',
+        'link-used':     'That sign-in link was already used. Request a fresh one.',
+        'link-expired':  'Sign-in link has expired. Request a fresh one.',
+      })[qErr] || 'Sign-in failed — try again.';
+      msg.classList.remove('hidden'); msg.classList.add('error');
+    }
+
+    // Magic link send
+    document.getElementById('magic-form').addEventListener('submit', async function (e) {
+      e.preventDefault();
+      var msg = document.getElementById('magic-msg');
+      msg.classList.add('hidden');
+      var btn = e.target.querySelector('button[type=submit]');
+      btn.disabled = true; var old = btn.innerHTML; btn.innerHTML = 'Sending…';
+      try {
+        var res = await fetch('/api/auth/magic-link/send', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ email: e.target.email.value }),
+        });
+        if (res.ok) {
+          msg.textContent = '✓ Check your inbox — sign-in link sent. (If you don\'t see it in 60 seconds, check spam.)';
+          msg.classList.remove('hidden', 'error'); msg.classList.add('notice');
+        } else {
+          var j = await res.json();
+          msg.textContent = j.error || 'Send failed — try again.';
+          msg.classList.remove('hidden'); msg.classList.add('error');
+        }
+      } catch (ex) {
+        msg.textContent = 'Network error — try again.';
+        msg.classList.remove('hidden'); msg.classList.add('error');
+      } finally {
+        btn.disabled = false; btn.innerHTML = old;
+      }
+    });
+
+    // Password login (fallback)
     document.getElementById('login-form').addEventListener('submit', async function (e) {
       e.preventDefault();
       var fd = new FormData(e.target);

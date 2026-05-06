@@ -76,6 +76,8 @@
     equipment: null,
     quote: null, // last computed result
     selectedAccessorials: [],
+    pickupPortCode: '',
+    pickupTerminalCode: '',
   };
 
   function applyBrand(brand) {
@@ -110,10 +112,16 @@
     $('qf-submit-btn').addEventListener('click', onSubmit);
     $('qf-restart-btn').addEventListener('click', function () {
       state.quote = null;
+      state.pickupPortCode = '';
+      state.pickupTerminalCode = '';
       $('qf-result').style.display = 'none';
       ['qf-pickup-zip', 'qf-delivery-zip', 'qf-weight', 'qf-pickup-date',
+       'qf-booking',
        'qf-c-name', 'qf-c-email', 'qf-c-phone', 'qf-c-company', 'qf-c-notes']
-        .forEach(function (id) { $(id).value = ''; });
+        .forEach(function (id) { var el = $(id); if (el) el.value = ''; });
+      var oc = $('qf-ocean-carrier'); if (oc) oc.value = '';
+      var pp = $('qf-pickup-port'); if (pp) pp.value = '';
+      var pt = $('qf-pickup-terminal'); if (pt) pt.value = '';
       showStep('quote');
     });
   }
@@ -175,6 +183,62 @@
     sel.addEventListener('change', function () { state.equipment = sel.value; });
     // Filter accessorials to those that apply to this service
     renderAccessorials(state.config.accessorials);
+    // Drayage-aware: swap pickup UI (port + terminal) for the generic ZIP input.
+    var isDrayage = service === 'drayage';
+    var drayPickup = $('qf-drayage-pickup');
+    var defaultPickup = $('qf-default-pickup');
+    if (drayPickup) drayPickup.style.display = isDrayage ? '' : 'none';
+    if (defaultPickup) defaultPickup.style.display = isDrayage ? 'none' : '';
+    if (isDrayage) renderPorts();
+    autoResize();
+  }
+
+  function renderPorts() {
+    var sel = $('qf-pickup-port');
+    if (!sel) return;
+    var ports = (state.config && state.config.drayagePorts) || [];
+    sel.innerHTML = '';
+    if (ports.length === 0) {
+      // Fall back to allowing free-text — show the default pickup field.
+      var dp = $('qf-default-pickup'); if (dp) dp.style.display = '';
+      var dr = $('qf-drayage-pickup'); if (dr) dr.style.display = 'none';
+      return;
+    }
+    var first = document.createElement('option');
+    first.value = ''; first.textContent = '— Select a port —';
+    sel.appendChild(first);
+    ports.forEach(function (p) {
+      var opt = document.createElement('option');
+      opt.value = p.code;
+      opt.textContent = p.name + (p.state ? ', ' + p.state : '');
+      sel.appendChild(opt);
+    });
+    sel.value = state.pickupPortCode || '';
+    sel.onchange = function () {
+      state.pickupPortCode = sel.value;
+      renderTerminals();
+    };
+    renderTerminals();
+  }
+
+  function renderTerminals() {
+    var sel = $('qf-pickup-terminal');
+    if (!sel) return;
+    var port = state.pickupPortCode;
+    var byPort = (state.config && state.config.terminalsByPort) || {};
+    var list = port ? (byPort[port] || []) : [];
+    sel.innerHTML = '';
+    var dunno = document.createElement('option');
+    dunno.value = ''; dunno.textContent = "— I don't know yet —";
+    sel.appendChild(dunno);
+    list.forEach(function (t) {
+      var opt = document.createElement('option');
+      opt.value = t.code;
+      opt.textContent = t.name + (t.carrier ? '  (' + t.carrier + ')' : '');
+      sel.appendChild(opt);
+    });
+    sel.value = state.pickupTerminalCode || '';
+    sel.onchange = function () { state.pickupTerminalCode = sel.value; };
   }
 
   function renderAccessorials(list) {
@@ -223,13 +287,28 @@
   }
 
   function gatherQuoteRequest() {
+    var isDrayage = state.service === 'drayage';
+    var pickup;
+    if (isDrayage && state.pickupPortCode) {
+      pickup = {
+        portCode: state.pickupPortCode,
+        terminalCode: state.pickupTerminalCode || undefined,
+      };
+    } else {
+      pickup = parseLocation(($('qf-pickup-zip') && $('qf-pickup-zip').value) || '');
+    }
+    var delivery = parseLocation($('qf-delivery-zip').value);
+    var oceanEl = $('qf-ocean-carrier');
+    var bookingEl = $('qf-booking');
     return {
       service: state.service,
       equipment: state.equipment,
-      pickup: parseLocation($('qf-pickup-zip').value),
-      delivery: parseLocation($('qf-delivery-zip').value),
+      pickup: pickup,
+      delivery: delivery,
       weightLbs: $('qf-weight').value ? Number($('qf-weight').value) : undefined,
       pickupDate: $('qf-pickup-date').value || undefined,
+      oceanCarrier: oceanEl && oceanEl.value ? oceanEl.value : undefined,
+      bookingNumber: bookingEl && bookingEl.value ? bookingEl.value.trim() : undefined,
       selectedAccessorialCodes: state.selectedAccessorials.slice(),
       flags: {
         residential: $('qf-residential').checked,
@@ -244,7 +323,8 @@
     showError('qf-error', null);
     var req = gatherQuoteRequest();
     if (!req.equipment) { showError('qf-error', 'Please pick an equipment type.'); return; }
-    if (!req.pickup.zip && !req.pickup.city) { showError('qf-error', 'Please enter a pickup ZIP or city.'); return; }
+    var hasPickup = !!(req.pickup.zip || req.pickup.city || req.pickup.portCode);
+    if (!hasPickup) { showError('qf-error', 'Please pick a pickup port (drayage) or enter a ZIP / city.'); return; }
     if (!req.delivery.zip && !req.delivery.city) { showError('qf-error', 'Please enter a delivery ZIP or city.'); return; }
 
     var btn = $('qf-calc-btn');

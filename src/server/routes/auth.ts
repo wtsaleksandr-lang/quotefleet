@@ -19,7 +19,9 @@ import {
   terminals,
   aiConfigs,
   brandConfigs,
+  magicLinks,
 } from '../../db/schema.js';
+import { sendEmail } from '../../email/send.js';
 import {
   DEFAULT_RATE_CARDS,
   DEFAULT_ACCESSORIALS,
@@ -35,6 +37,7 @@ import {
   SESSION_COOKIE_NAME,
 } from '../../auth/session.js';
 import { loadEnv, defaultHostDomain } from '../../config.js';
+import { getTrialState, type TrialState } from '../trialGating.js';
 
 const RESERVED_SLUGS = new Set([
   'www', 'app', 'admin', 'api', 'mail', 'docs', 'help', 'status', 'static',
@@ -61,6 +64,16 @@ const SignupSchema = z.object({
 });
 
 const TRIAL_DAYS = 14;
+
+const MagicLinkSendSchema = z.object({
+  email: z.string().email(),
+  redirectTo: z.string().optional(),
+});
+
+/** Magic links live for 15 minutes. Long enough to switch devices,
+ *  short enough that a leaked link is mostly stale by the time anyone
+ *  notices. */
+const MAGIC_LINK_TTL_MS = 15 * 60 * 1000;
 
 const LoginSchema = z.object({
   email: z.string().email(),
@@ -289,6 +302,62 @@ export function registerAuthRoutes(app: Express) {
     return res.json({ ok: true, role: u.role, tenant });
   });
 
+  // ── Magic link: send ─────────────────────────────────────────────
+  // Always returns 200 (even on unknown email) — prevents email enumeration.
+  app.post('/api/auth/magic-link/send', async (req: Request, res: Response) => {
+    const parse = MagicLinkSendSchema.safeParse(req.body);
+    if (!parse.success) return res.status(400).json({ error: 'Invalid input' });
+    const { email, redirectTo } = parse.data;
+    const u = (await db().select().from(users).where(eq(users.email, email)).limit(1))[0];
+    if (!u) {
+      return res.json({ ok: true });
+    }
+    const token = nanoid(32);
+    const expiresAt = new Date(Date.now() + MAGIC_LINK_TTL_MS);
+    await db().insert(magicLinks).values({
+      token,
+      userId: u.id,
+      expiresAt,
+      redirectTo: redirectTo ?? null,
+    });
+    const env = loadEnv();
+    const base = env.PUBLIC_BASE_URL.replace(/\/$/, '');
+    const link = `${base}/auth/magic/${token}`;
+    try {
+      await sendEmail({
+        to: email,
+        subject: 'Your QuoteFleet sign-in link',
+        text:
+          `Click the link below to sign in to your QuoteFleet dashboard. ` +
+          `It expires in 15 minutes and can only be used once.\n\n` +
+          `${link}\n\n` +
+          `If you didn't request this, you can ignore the email.`,
+      });
+    } catch (err) {
+      console.warn('[magic-link] send failed:', err);
+    }
+    return res.json({ ok: true });
+  });
+
+  // ── Magic link: consume ─────────────────────────────────────────
+  // GET so it works as a plain link in email. Sets the cookie and
+  // redirects to /app (or to ?next=... if provided at send time).
+  app.get('/auth/magic/:token', async (req: Request, res: Response) => {
+    const token = String(req.params.token ?? '');
+    if (!token) return res.redirect('/login?error=missing-token');
+    const rows = await db().select().from(magicLinks).where(eq(magicLinks.token, token)).limit(1);
+    const row = rows[0];
+    if (!row) return res.redirect('/login?error=invalid-token');
+    if (row.usedAt) return res.redirect('/login?error=link-used');
+    if (row.expiresAt < new Date()) return res.redirect('/login?error=link-expired');
+    // Mark used + create session.
+    await db().update(magicLinks).set({ usedAt: new Date() }).where(eq(magicLinks.token, token));
+    await db().update(users).set({ lastLoginAt: new Date() }).where(eq(users.id, row.userId));
+    const sess = await createSession(row.userId);
+    setCookie(res, sess);
+    return res.redirect(row.redirectTo ?? '/app');
+  });
+
   app.post('/api/auth/logout', async (req: Request, res: Response) => {
     const token = req.cookies[SESSION_COOKIE_NAME];
     if (token) await destroySession(token);
@@ -312,6 +381,7 @@ export function registerAuthRoutes(app: Express) {
           trialEndsAt: Date | null;
         }
       | null = null;
+    let trial: TrialState | null = null;
     if (ctx.user.tenantId) {
       const t = await db().select().from(tenants).where(eq(tenants.id, ctx.user.tenantId)).limit(1);
       if (t[0]) {
@@ -327,6 +397,7 @@ export function registerAuthRoutes(app: Express) {
           plan: t[0].plan,
           trialEndsAt: t[0].trialEndsAt,
         };
+        trial = await getTrialState(t[0]);
       }
     }
     return res.json({
@@ -337,6 +408,7 @@ export function registerAuthRoutes(app: Express) {
         role: ctx.user.role,
       },
       tenant,
+      trial,
     });
   });
 }
