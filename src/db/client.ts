@@ -1,14 +1,11 @@
 /**
  * Drizzle client factory.
  *
- * Production: Neon serverless driver (HTTP — no persistent connections,
- * works on Replit's reserved-VM and serverless deployments).
- *
- * Local dev: same Neon driver — pointed at any Postgres URL. We don't
- * support local SQLite to keep the schema single-source-of-truth.
+ * Uses the standard `postgres` driver which works with Replit's built-in
+ * PostgreSQL as well as any external Postgres URL (Neon, Supabase, etc).
  */
-import { neon } from '@neondatabase/serverless';
-import { drizzle } from 'drizzle-orm/neon-http';
+import postgres from 'postgres';
+import { drizzle } from 'drizzle-orm/postgres-js';
 import * as schema from './schema.js';
 import { loadEnv } from '../config.js';
 
@@ -17,8 +14,8 @@ let cached: ReturnType<typeof drizzle<typeof schema>> | null = null;
 export function db() {
   if (cached) return cached;
   const env = loadEnv();
-  const sql = neon(env.DATABASE_URL);
-  cached = drizzle(sql, { schema });
+  const client = postgres(env.DATABASE_URL, { ssl: 'prefer' });
+  cached = drizzle(client, { schema });
   return cached;
 }
 

@@ -70,7 +70,7 @@ export function loadEnv(): Env {
 
   cached = {
     DATABASE_URL: need('DATABASE_URL'),
-    ANTHROPIC_API_KEY: need('ANTHROPIC_API_KEY'),
+    ANTHROPIC_API_KEY: opt('ANTHROPIC_API_KEY') ?? '',
     PUBLIC_BASE_URL: opt('PUBLIC_BASE_URL') ?? 'http://localhost:5000',
     SESSION_SECRET: sessionSecret,
     PORT: Number(opt('PORT') ?? 5000),

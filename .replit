@@ -22,13 +22,13 @@ args = "Start application"
 name = "Start application"
 author = "agent"
 
-[[workflows.workflow.tasks]]
-task = "shell.exec"
-args = "pnpm install && pnpm db:push && pnpm db:seed && pnpm start"
-waitForPort = 5000
-
 [workflows.workflow.metadata]
 outputType = "webview"
+
+[[workflows.workflow.tasks]]
+task = "shell.exec"
+args = "pnpm dev"
+waitForPort = 5000
 
 [[ports]]
 localPort = 5000
@@ -38,3 +38,7 @@ externalPort = 80
 deploymentTarget = "vm"
 run = ["sh", "-c", "pnpm start"]
 build = ["sh", "-c", "pnpm install && pnpm db:push && pnpm db:seed"]
+
+[agent]
+expertMode = true
+stack = "BEST_EFFORT_FALLBACK"

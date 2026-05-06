@@ -56,6 +56,9 @@ async function resolveApiKey(tenantId: number | null): Promise<string> {
       }
     }
   }
+  if (!env.ANTHROPIC_API_KEY) {
+    throw new Error('ANTHROPIC_API_KEY is not configured. Add it to Replit Secrets to enable AI features.');
+  }
   return env.ANTHROPIC_API_KEY;
 }
 
