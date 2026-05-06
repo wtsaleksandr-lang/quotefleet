@@ -25,13 +25,9 @@
 
   <main style="display:flex; align-items:center; justify-content:center; min-height: calc(100vh - 80px); padding: 48px 24px;">
     <div class="card elevated" style="width: 100%; max-width: 540px;">
-      <span class="tag">Start your free trial</span>
-      <h1 style="font-size: 28px; margin: 12px 0 6px 0; letter-spacing: -0.025em;">
-        Live on the web in 90 seconds
+      <h1 style="font-size: 28px; margin: 0 0 24px 0; letter-spacing: -0.025em;">
+        Start free
       </h1>
-      <p class="muted" style="margin: 0 0 28px 0; font-size: 14.5px;">
-        14 days free · no credit card · all features unlocked
-      </p>
 
       <form id="signup-form" style="display:flex; flex-direction:column; gap: 18px;">
         <div class="field">
@@ -40,39 +36,39 @@
         </div>
 
         <div class="field">
-          <label class="field-label required">Your hosted page URL</label>
+          <label class="field-label required">Your link</label>
           <div class="url-builder">
             <input class="input" name="slug" id="slug-input" placeholder="acme" autocomplete="off" required pattern="^[a-z0-9](?:[a-z0-9-]*[a-z0-9])?$" minlength="3" maxlength="30">
             <select class="select" name="hostDomain" id="host-input"></select>
           </div>
           <div class="url-builder-preview" id="url-preview">
-            Your hosted page will be: <span class="live">acme.quotefleet.app</span>
+            <span class="live">acme.quotefleet.app</span>
           </div>
-          <span class="field-hint" id="slug-hint">Lowercase letters, numbers, dashes. 3–30 chars.</span>
+          <span class="field-hint" id="slug-hint">Letters, numbers, dashes.</span>
         </div>
 
         <div class="grid-2">
           <div class="field">
-            <label class="field-label required">Your email</label>
+            <label class="field-label required">Email</label>
             <input class="input" type="email" name="email" required>
           </div>
           <div class="field">
             <label class="field-label required">Password</label>
-            <input class="input" type="password" name="password" minlength="6" required placeholder="6+ characters">
+            <input class="input" type="password" name="password" minlength="6" required>
           </div>
         </div>
 
         <div class="grid-2">
           <div class="field">
-            <label class="field-label">Country focus</label>
+            <label class="field-label">Where you operate</label>
             <select class="select" name="countryFocus">
-              <option value="US" selected>USA only</option>
-              <option value="CA">Canada only</option>
+              <option value="US" selected>USA</option>
+              <option value="CA">Canada</option>
               <option value="BOTH">USA + Canada</option>
             </select>
           </div>
           <div class="field">
-            <label class="field-label">Phone (optional)</label>
+            <label class="field-label">Phone</label>
             <input class="input" name="contactPhone" type="tel">
           </div>
         </div>
@@ -82,10 +78,6 @@
         </button>
         <div id="signup-error" class="notice error hidden"></div>
       </form>
-
-      <p class="muted-small" style="text-align:center; margin-top: 26px;">
-        By signing up you agree to our <a href="#">terms</a> &amp; <a href="#">privacy policy</a>.
-      </p>
     </div>
   </main>
 
@@ -122,16 +114,16 @@
     function checkSlug() {
       clearTimeout(slugTimer);
       var v = slugInput.value.trim();
-      if (!v) { hint.textContent = 'Lowercase letters, numbers, dashes. 3–30 chars.'; hint.className = 'field-hint'; return; }
+      if (!v) { hint.textContent = 'Letters, numbers, dashes.'; hint.className = 'field-hint'; return; }
       slugTimer = setTimeout(function () {
         fetch('/api/auth/check-slug?slug=' + encodeURIComponent(v))
           .then(function (r) { return r.json(); })
           .then(function (j) {
-            if (j.ok) { hint.textContent = '✓ Available — ' + v + '.' + hostInput.value + ' is yours.'; hint.className = 'field-hint ok'; }
-            else if (j.reason === 'taken') { hint.textContent = '✗ ' + v + ' is already taken — try another.'; hint.className = 'field-hint error'; }
-            else if (j.reason === 'reserved') { hint.textContent = '✗ ' + v + ' is reserved.'; hint.className = 'field-hint error'; }
-            else if (j.reason === 'format') { hint.textContent = '✗ Use lowercase letters, numbers, dashes only.'; hint.className = 'field-hint error'; }
-            else if (j.reason === 'length') { hint.textContent = '✗ Must be 3–30 characters.'; hint.className = 'field-hint error'; }
+            if (j.ok)                            { hint.textContent = '✓ Available'; hint.className = 'field-hint ok'; }
+            else if (j.reason === 'taken')       { hint.textContent = '✗ Already taken'; hint.className = 'field-hint error'; }
+            else if (j.reason === 'reserved')    { hint.textContent = '✗ Reserved'; hint.className = 'field-hint error'; }
+            else if (j.reason === 'format')      { hint.textContent = '✗ Letters, numbers, dashes only'; hint.className = 'field-hint error'; }
+            else if (j.reason === 'length')      { hint.textContent = '✗ 3–30 characters'; hint.className = 'field-hint error'; }
           })
           .catch(function () { /* silent */ });
       }, 350);

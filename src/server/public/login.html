@@ -25,13 +25,9 @@
 
   <main style="display:flex; align-items:center; justify-content:center; min-height: calc(100vh - 80px); padding: 48px 24px;">
     <div class="card elevated" style="width: 100%; max-width: 460px;">
-      <span class="tag">Sign in</span>
-      <h1 style="font-size: 28px; margin: 12px 0 6px 0; letter-spacing: -0.025em;">
-        Welcome back
+      <h1 style="font-size: 28px; margin: 0 0 22px 0; letter-spacing: -0.025em;">
+        Sign in
       </h1>
-      <p class="muted" style="margin: 0 0 22px 0; font-size: 14.5px;">
-        Sign in to your tenant dashboard.
-      </p>
 
       <div class="tabs" style="margin-bottom: 18px;">
         <button class="tab active" data-pane="link">Email link</button>
@@ -43,11 +39,10 @@
         <form id="magic-form" style="display:flex; flex-direction:column; gap: 16px;">
           <div class="field">
             <label class="field-label required">Email</label>
-            <input class="input" type="email" name="email" required autofocus placeholder="you@yourcompany.com">
-            <span class="field-hint">We'll email you a one-click sign-in link. Expires in 15 minutes.</span>
+            <input class="input" type="email" name="email" required autofocus>
           </div>
           <button class="btn btn-primary btn-lg btn-block" type="submit">
-            Email me a sign-in link <span class="arr">→</span>
+            Email me a link <span class="arr">→</span>
           </button>
           <div id="magic-msg" class="notice hidden"></div>
         </form>
@@ -71,8 +66,8 @@
         </form>
       </div>
 
-      <p class="muted-small" style="text-align:center; margin-top: 26px;">
-        Don't have an account yet? <a href="/signup">Start your free trial →</a>
+      <p class="muted-small" style="text-align:center; margin-top: 24px;">
+        New here? <a href="/signup">Start free →</a>
       </p>
     </div>
   </main>
@@ -94,11 +89,11 @@
     if (qErr) {
       var msg = document.getElementById('magic-msg');
       msg.textContent = ({
-        'missing-token': 'Sign-in link is missing.',
-        'invalid-token': 'Sign-in link is invalid or expired. Request a new one.',
-        'link-used':     'That sign-in link was already used. Request a fresh one.',
-        'link-expired':  'Sign-in link has expired. Request a fresh one.',
-      })[qErr] || 'Sign-in failed — try again.';
+        'missing-token': 'Link is missing.',
+        'invalid-token': 'Link is invalid or expired.',
+        'link-used':     'Link was already used.',
+        'link-expired':  'Link has expired.',
+      })[qErr] || 'Sign-in failed.';
       msg.classList.remove('hidden'); msg.classList.add('error');
     }
 
@@ -116,7 +111,7 @@
           body: JSON.stringify({ email: e.target.email.value }),
         });
         if (res.ok) {
-          msg.textContent = '✓ Check your inbox — sign-in link sent. (If you don\'t see it in 60 seconds, check spam.)';
+          msg.textContent = '✓ Check your inbox.';
           msg.classList.remove('hidden', 'error'); msg.classList.add('notice');
         } else {
           var j = await res.json();
