@@ -131,66 +131,79 @@ async function seedSuperAdmin() {
 async function seedDemoTenant() {
   const slug = 'demo';
   const existing = await db().select().from(tenants).where(eq(tenants.slug, slug)).limit(1);
+
+  let tenantId: number;
   if (existing[0]) {
-    console.log('[seed] Demo tenant already exists — skipping.');
-    return;
+    tenantId = existing[0].id;
+    console.log(`[seed] Demo tenant exists (id=${tenantId}) — repairing.`);
+    // Demo tenant pre-dates the trial system. With plan='free' AND a
+    // null trial_ends_at, the trial-gating layer treats it as expired
+    // (read-only), so the public lead endpoint 403s. The demo is meant
+    // to be a perpetual showcase — promote it to 'starter' so it's
+    // exempt from trial caps.
+    if (existing[0].plan === 'free' && !existing[0].trialEndsAt) {
+      await db()
+        .update(tenants)
+        .set({ plan: 'starter' })
+        .where(eq(tenants.id, tenantId));
+      console.log('[seed]   plan: free → starter (demo is exempt from trial limits)');
+    }
+  } else {
+    const embedToken = nanoid(24);
+    const [t] = await db()
+      .insert(tenants)
+      .values({
+        slug,
+        hostDomain: defaultHostDomain(),
+        name: 'Demo Drayage & Trucking',
+        contactEmail: 'demo@quotefleet.local',
+        contactPhone: '+1 555 555 0100',
+        countryFocus: 'US',
+        embedToken,
+        plan: 'starter', // demo is permanently active, not a trial
+        status: 'active',
+      })
+      .returning({ id: tenants.id });
+    if (!t) throw new Error('Failed to insert demo tenant');
+    tenantId = t.id;
+
+    await db().insert(aiConfigs).values({
+      tenantId,
+      systemPrompt: DEFAULT_AI_SYSTEM_PROMPT,
+      tone: 'professional',
+      autoReplyEnabled: true,
+      chatEnabled: true,
+      modelPreference: 'auto',
+    });
+    await db().insert(brandConfigs).values({
+      tenantId,
+      displayName: 'Demo Drayage & Trucking',
+      tagline: 'Instant quotes • Reliable trucks • Same-day dispatch',
+      primaryColor: '#2563eb',
+      accentColor: '#06b6d4',
+      ctaText: 'Get instant quote',
+      showPoweredBy: true,
+    });
+    for (const card of DEFAULT_RATE_CARDS) {
+      await db().insert(rateCards).values({ ...card, tenantId });
+    }
+    for (const a of DEFAULT_ACCESSORIALS) {
+      await db().insert(accessorials).values({ ...a, tenantId });
+    }
+    for (const z of generateDefaultLaneZones()) {
+      await db().insert(laneZones).values({ ...z, tenantId });
+    }
+    console.log(`[seed] Demo tenant created (id=${tenantId}, embed=${embedToken}).`);
   }
 
-  const embedToken = nanoid(24);
-  const [t] = await db()
-    .insert(tenants)
-    .values({
-      slug,
-      hostDomain: defaultHostDomain(),
-      name: 'Demo Drayage & Trucking',
-      contactEmail: 'demo@quotefleet.local',
-      contactPhone: '+1 555 555 0100',
-      countryFocus: 'US',
-      embedToken,
-      plan: 'free',
-      status: 'active',
-    })
-    .returning({ id: tenants.id });
-  if (!t) throw new Error('Failed to insert demo tenant');
-
-  // ai_config + brand_config
-  await db().insert(aiConfigs).values({
-    tenantId: t.id,
-    systemPrompt: DEFAULT_AI_SYSTEM_PROMPT,
-    tone: 'professional',
-    autoReplyEnabled: true,
-    chatEnabled: true,
-    modelPreference: 'auto',
-  });
-  await db().insert(brandConfigs).values({
-    tenantId: t.id,
-    displayName: 'Demo Drayage & Trucking',
-    tagline: 'Instant quotes • Reliable trucks • Same-day dispatch',
-    primaryColor: '#2563eb',
-    accentColor: '#06b6d4',
-    ctaText: 'Get instant quote',
-    showPoweredBy: true,
-  });
-
-  // Rate cards
-  for (const card of DEFAULT_RATE_CARDS) {
-    await db().insert(rateCards).values({ ...card, tenantId: t.id });
-  }
-  // Accessorials
-  for (const a of DEFAULT_ACCESSORIALS) {
-    await db().insert(accessorials).values({ ...a, tenantId: t.id });
-  }
-  // Lane zones
-  for (const z of generateDefaultLaneZones()) {
-    await db().insert(laneZones).values({ ...z, tenantId: t.id });
-  }
-  // Terminals (full set; carrier disables ones they don't serve later)
-  await seedTerminalsForTenant(t.id);
+  // Always (re-)seed terminals. seedTerminalsForTenant uses
+  // onConflictDoNothing on (tenant_id, code) so it's idempotent — fills
+  // gaps without duplicating existing rows.
+  await seedTerminalsForTenant(tenantId);
+  console.log(`[seed] Demo tenant terminals upserted (${TERMINALS_DATA.length} rows).`);
 
   const host = defaultHostDomain();
-  console.log(`[seed] Demo tenant created at https://${slug}.${host}/`);
-  console.log(`       Legacy widget URL still works: /w/${slug}`);
-  console.log(`       Embed token: ${embedToken}`);
+  console.log(`[seed] Demo widget: /w/${slug}  ·  ${slug}.${host}`);
 }
 
 async function main() {
