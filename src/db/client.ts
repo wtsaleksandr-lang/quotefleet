@@ -14,7 +14,8 @@ let cached: ReturnType<typeof drizzle<typeof schema>> | null = null;
 export function db() {
   if (cached) return cached;
   const env = loadEnv();
-  const client = postgres(env.DATABASE_URL, { ssl: 'prefer' });
+  // Let the URL's sslmode parameter control SSL — don't override it.
+  const client = postgres(env.DATABASE_URL);
   cached = drizzle(client, { schema });
   return cached;
 }
