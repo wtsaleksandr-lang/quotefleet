@@ -1,0 +1,31 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Super admin — QuoteFleet</title>
+  <link rel="stylesheet" href="/style.css">
+</head>
+<body>
+  <div class="app-shell" id="app-shell" hidden>
+    <aside class="sidebar">
+      <div class="brand-block">
+        <div class="name">QuoteFleet Admin</div>
+        <div class="sub">Super admin</div>
+      </div>
+      <button class="nav-item active" data-route="overview">📊 Overview</button>
+      <button class="nav-item" data-route="tenants">🏢 Tenants</button>
+      <button class="nav-item" id="switch-tenant">🔁 Open tenant view</button>
+      <a href="/" target="_blank">↗ Marketing site</a>
+      <button class="nav-item" id="logout">↩ Sign out</button>
+    </aside>
+    <main class="app-main">
+      <div id="page-content"></div>
+    </main>
+  </div>
+  <div id="loading" style="display:flex;align-items:center;justify-content:center;min-height:100vh;color:var(--muted);">
+    <div>Loading admin<span class="dots"></span></div>
+  </div>
+  <script src="/admin.js"></script>
+</body>
+</html>

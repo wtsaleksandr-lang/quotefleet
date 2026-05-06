@@ -1,0 +1,690 @@
+// QuoteFleet — tenant dashboard SPA. Vanilla JS.
+(function () {
+  'use strict';
+
+  function $(s, root) { return (root || document).querySelector(s); }
+  function $$(s, root) { return Array.from((root || document).querySelectorAll(s)); }
+  function el(tag, attrs, kids) {
+    var e = document.createElement(tag);
+    Object.keys(attrs || {}).forEach(function (k) {
+      if (k === 'class') e.className = attrs[k];
+      else if (k === 'text') e.textContent = attrs[k];
+      else if (k === 'html') e.innerHTML = attrs[k];
+      else if (k === 'on') Object.keys(attrs.on).forEach(function (ev) { e.addEventListener(ev, attrs.on[ev]); });
+      else if (k === 'style' && typeof attrs[k] === 'object') Object.assign(e.style, attrs[k]);
+      else e.setAttribute(k, attrs[k]);
+    });
+    (kids || []).forEach(function (k) { if (k) e.appendChild(typeof k === 'string' ? document.createTextNode(k) : k); });
+    return e;
+  }
+  function fmtMoney(n) {
+    if (typeof n !== 'number' || isNaN(n)) return '—';
+    return Number(n).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+  }
+  function fmtDate(d) {
+    if (!d) return '—';
+    return new Date(d).toLocaleString();
+  }
+  function api(path, opts) {
+    opts = opts || {};
+    opts.headers = Object.assign({ 'Content-Type': 'application/json' }, opts.headers || {});
+    if (opts.body && typeof opts.body !== 'string') opts.body = JSON.stringify(opts.body);
+    return fetch(path, opts).then(function (r) {
+      return r.json().then(function (j) {
+        if (!r.ok) throw new Error(j.error || ('HTTP ' + r.status));
+        return j;
+      });
+    });
+  }
+
+  var state = { me: null, route: null };
+
+  function setActiveNav(route) {
+    $$('.sidebar .nav-item').forEach(function (b) {
+      b.classList.toggle('active', b.dataset.route === route);
+    });
+  }
+
+  function go(route) {
+    state.route = route;
+    setActiveNav(route);
+    history.pushState({}, '', '/app/' + route);
+    var c = $('#page-content');
+    c.innerHTML = '<div class="muted">Loading…</div>';
+    if (route === 'overview') return renderOverview(c);
+    if (route === 'leads') return renderLeads(c);
+    if (route === 'rates') return renderRates(c);
+    if (route === 'accessorials') return renderAccessorials(c);
+    if (route === 'zones') return renderZones(c);
+    if (route === 'ai') return renderAi(c);
+    if (route === 'brand') return renderBrand(c);
+    if (route === 'embed') return renderEmbed(c);
+    if (route === 'audit') return renderAudit(c);
+  }
+
+  // ── Overview ──────────────────────────────────────────────────
+  function renderOverview(c) {
+    api('/api/tenant/overview').then(function (d) {
+      c.innerHTML = '';
+      c.appendChild(el('h1', { text: 'Overview' }));
+      c.appendChild(el('p', { class: 'page-sub', text: 'Welcome back to ' + (d.tenant.name || 'your dashboard') + '.' }));
+      var stats = el('div', { class: 'features', style: { margin: '0 0 24px 0' } });
+      [
+        ['Leads (all time)', d.stats.totalLeads],
+        ['New / unactioned', d.stats.newLeads],
+        ['Won', d.stats.wonLeads],
+        ['Avg. quote', '$' + fmtMoney(d.stats.avgQuote)],
+      ].forEach(function (s) {
+        var card = el('div', { class: 'feature' });
+        card.appendChild(el('div', { class: 'muted-small', text: s[0] }));
+        card.appendChild(el('div', { style: { fontSize: '28px', fontWeight: '800', letterSpacing: '-0.02em' }, text: String(s[1]) }));
+        stats.appendChild(card);
+      });
+      c.appendChild(stats);
+
+      c.appendChild(el('h2', { text: 'Recent leads' }));
+      if (!d.recentLeads.length) {
+        c.appendChild(el('p', { class: 'muted', text: 'No leads yet. Share your widget link to get your first.' }));
+      } else {
+        var tbl = el('table', { class: 'table' });
+        tbl.innerHTML =
+          '<thead><tr><th>Ref</th><th>Customer</th><th>Service</th><th>Lane</th><th style="text-align:right;">Total</th><th>When</th><th>Status</th></tr></thead><tbody></tbody>';
+        var tb = $('tbody', tbl);
+        d.recentLeads.forEach(function (l) {
+          tb.innerHTML += '<tr>' +
+            '<td><a href="/app/leads/' + encodeURIComponent(l.refId) + '" data-route="leads/' + encodeURIComponent(l.refId) + '">' + l.refId + '</a></td>' +
+            '<td>' + (l.customerName || '—') + '<br><span class="muted-small">' + (l.customerEmail || '') + '</span></td>' +
+            '<td>' + (l.service || '') + ' / ' + (l.equipment || '') + '</td>' +
+            '<td>' + (l.pickupCity || '?') + ' → ' + (l.deliveryCity || '?') + '<br><span class="muted-small">' + (l.distanceMiles ? Math.round(l.distanceMiles) + ' mi' : '') + '</span></td>' +
+            '<td style="text-align:right;font-variant-numeric:tabular-nums;">$' + fmtMoney(l.quotedTotal) + '</td>' +
+            '<td><span class="muted-small">' + fmtDate(l.createdAt) + '</span></td>' +
+            '<td><span class="badge ' + statusClass(l.status) + '">' + l.status + '</span></td>' +
+            '</tr>';
+        });
+        c.appendChild(tbl);
+      }
+
+      c.appendChild(el('h2', { text: 'Recent AI / manual edits', style: { marginTop: '32px' } }));
+      if (!d.audit.length) {
+        c.appendChild(el('p', { class: 'muted', text: 'No edits yet.' }));
+      } else {
+        var ul = el('div', { class: 'card' });
+        d.audit.forEach(function (a) {
+          ul.appendChild(el('div', {
+            class: 'card-row',
+            html: '<div><strong>' + a.action + '</strong> <span class="badge ' +
+              (a.actorKind === 'ai_agent' ? 'badge-info' : 'badge-muted') + '">' + a.actorKind +
+              '</span><br><span class="muted-small">' + (a.detailsJson && a.detailsJson.reason ? a.detailsJson.reason : '') + '</span></div>' +
+              '<span class="muted-small">' + fmtDate(a.createdAt) + '</span>',
+          }));
+        });
+        c.appendChild(ul);
+      }
+    }).catch(showErr(c));
+  }
+
+  function statusClass(s) {
+    return ({
+      new: 'badge-info', draft: 'badge-muted', replied: 'badge-info',
+      won: 'badge-success', lost: 'badge-error', spam: 'badge-error',
+    })[s] || 'badge-muted';
+  }
+
+  // ── Leads ─────────────────────────────────────────────────────
+  function renderLeads(c) {
+    var inner = location.pathname.split('/app/leads/')[1];
+    if (inner) return renderLeadDetail(c, inner);
+    api('/api/tenant/leads').then(function (d) {
+      c.innerHTML = '';
+      c.appendChild(el('h1', { text: 'Leads' }));
+      c.appendChild(el('p', { class: 'page-sub', text: d.leads.length + ' total' }));
+      if (!d.leads.length) {
+        c.appendChild(el('div', {
+          class: 'notice',
+          html: 'No leads yet. Copy your <a href="/app/embed">embed code</a> and add it to your website to start collecting quotes.',
+        }));
+        return;
+      }
+      var tbl = el('table', { class: 'table' });
+      tbl.innerHTML = '<thead><tr><th>Ref</th><th>Customer</th><th>Service</th><th>Lane</th><th style="text-align:right;">Total</th><th>Status</th><th>When</th></tr></thead><tbody></tbody>';
+      var tb = $('tbody', tbl);
+      d.leads.forEach(function (l) {
+        tb.appendChild(el('tr', {
+          on: { click: function () { go('leads/' + l.refId); } },
+          style: { cursor: 'pointer' },
+          html: '<td><strong>' + l.refId + '</strong></td>' +
+                '<td>' + (l.customerName || '—') + '<br><span class="muted-small">' + (l.customerEmail || '') + '</span></td>' +
+                '<td>' + (l.service || '') + ' / ' + (l.equipment || '') + '</td>' +
+                '<td>' + (l.pickupCity || '?') + ' → ' + (l.deliveryCity || '?') + '</td>' +
+                '<td style="text-align:right;">$' + fmtMoney(l.quotedTotal) + '</td>' +
+                '<td><span class="badge ' + statusClass(l.status) + '">' + l.status + '</span></td>' +
+                '<td><span class="muted-small">' + fmtDate(l.createdAt) + '</span></td>',
+        }));
+      });
+      c.appendChild(tbl);
+    }).catch(showErr(c));
+  }
+
+  function renderLeadDetail(c, refId) {
+    api('/api/tenant/leads/' + encodeURIComponent(refId)).then(function (d) {
+      var l = d.lead;
+      c.innerHTML = '';
+      c.appendChild(el('a', { href: '#', class: 'muted-small', text: '← Back to leads', on: { click: function (e) { e.preventDefault(); go('leads'); } } }));
+      c.appendChild(el('h1', { text: l.refId }));
+      var grid = el('div', { class: 'grid-2' });
+
+      var leftCard = el('div', { class: 'card' });
+      leftCard.appendChild(el('div', { class: 'card-title', text: 'Customer' }));
+      leftCard.innerHTML += '<div><strong>' + (l.customerName || '—') + '</strong></div>' +
+        '<div class="muted">' + (l.customerEmail || '') + '</div>' +
+        (l.customerPhone ? '<div class="muted">' + l.customerPhone + '</div>' : '') +
+        (l.customerCompany ? '<div class="muted">' + l.customerCompany + '</div>' : '');
+
+      var rightCard = el('div', { class: 'card' });
+      rightCard.appendChild(el('div', { class: 'card-title', text: 'Shipment' }));
+      rightCard.innerHTML += '<div><strong>' + (l.service || '') + '</strong> / ' + (l.equipment || '') + '</div>' +
+        '<div class="muted">' + (l.pickupCity || '?') + ', ' + (l.pickupState || '') + ' → ' + (l.deliveryCity || '?') + ', ' + (l.deliveryState || '') + '</div>' +
+        '<div class="muted">' + (l.distanceMiles ? Math.round(l.distanceMiles) + ' mi' : '') + (l.weightLbs ? ' · ' + l.weightLbs + ' lbs' : '') + '</div>' +
+        '<div class="muted">' + (l.pickupDate ? 'Pickup: ' + l.pickupDate : '') + '</div>';
+
+      grid.appendChild(leftCard);
+      grid.appendChild(rightCard);
+      c.appendChild(grid);
+
+      // Quote card
+      var quoteCard = el('div', { class: 'card', style: { marginTop: '14px' } });
+      quoteCard.appendChild(el('div', { class: 'card-title', text: 'Quote — $' + fmtMoney(l.quotedTotal) }));
+      var tbl = el('table', { class: 'table' });
+      tbl.innerHTML = '<thead><tr><th>Line</th><th style="text-align:right;">Amount</th></tr></thead><tbody></tbody>';
+      var tb = $('tbody', tbl);
+      (l.breakdownJson || []).forEach(function (b) {
+        tb.innerHTML += '<tr><td>' + b.name + '</td><td style="text-align:right;">$' + fmtMoney(b.amount) + '</td></tr>';
+      });
+      quoteCard.appendChild(tbl);
+      c.appendChild(quoteCard);
+
+      // Status / notes
+      var statusCard = el('div', { class: 'card', style: { marginTop: '14px' } });
+      statusCard.appendChild(el('div', { class: 'card-title', text: 'Status & notes' }));
+      statusCard.appendChild(el('div', { class: 'grid-2' }, [
+        (function () {
+          var f = el('div', { class: 'field' });
+          f.appendChild(el('label', { class: 'field-label', text: 'Status' }));
+          var sel = el('select', { class: 'select' });
+          ['draft', 'new', 'replied', 'won', 'lost', 'spam'].forEach(function (s) {
+            var o = document.createElement('option'); o.value = s; o.textContent = s; if (l.status === s) o.selected = true; sel.appendChild(o);
+          });
+          sel.addEventListener('change', function () { api('/api/tenant/leads/' + encodeURIComponent(l.refId), { method: 'PATCH', body: { status: sel.value } }).catch(alert); });
+          f.appendChild(sel);
+          return f;
+        })(),
+      ]));
+      statusCard.appendChild(el('div', { class: 'field', style: { marginTop: '12px' } }, [
+        el('label', { class: 'field-label', text: 'Internal notes' }),
+        (function () {
+          var ta = el('textarea', { class: 'textarea', placeholder: 'Notes for your team…' });
+          ta.value = l.notes || '';
+          ta.addEventListener('blur', function () { api('/api/tenant/leads/' + encodeURIComponent(l.refId), { method: 'PATCH', body: { notes: ta.value } }).catch(alert); });
+          return ta;
+        })(),
+      ]));
+      c.appendChild(statusCard);
+
+      // AI summary
+      if (l.aiSummary) {
+        var aiCard = el('div', { class: 'card', style: { marginTop: '14px' } });
+        aiCard.appendChild(el('div', { class: 'card-title', text: 'AI auto-reply (sent to customer)' }));
+        aiCard.appendChild(el('pre', { class: 'code', text: l.aiSummary }));
+        c.appendChild(aiCard);
+      }
+
+      // Conversation
+      if (d.conversations && d.conversations.length) {
+        var convCard = el('div', { class: 'card', style: { marginTop: '14px' } });
+        convCard.appendChild(el('div', { class: 'card-title', text: 'Customer chat (' + d.conversations.length + ' messages)' }));
+        var msgs = el('div', { class: 'chat-panel', style: { height: '320px' } });
+        var msgList = el('div', { class: 'chat-messages' });
+        d.conversations.forEach(function (m) {
+          msgList.appendChild(el('div', { class: 'chat-bubble ' + (m.role === 'assistant' ? 'assistant' : 'user'), text: m.content }));
+        });
+        msgs.appendChild(msgList);
+        convCard.appendChild(msgs);
+        c.appendChild(convCard);
+      }
+    }).catch(showErr(c));
+  }
+
+  // ── Rate cards ────────────────────────────────────────────────
+  function renderRates(c) {
+    api('/api/tenant/rate-cards').then(function (d) {
+      c.innerHTML = '';
+      c.appendChild(el('h1', { text: 'Rate cards' }));
+      c.appendChild(el('p', { class: 'page-sub', text: 'One row per service × equipment. Edit cells, blur to save.' }));
+      c.appendChild(el('div', { class: 'notice', html: 'Tip: ask the AI agent to bulk-update these → <a href="#" data-route="ai">open AI panel</a>' }));
+
+      var tbl = el('table', { class: 'table', style: { marginTop: '14px' } });
+      tbl.innerHTML =
+        '<thead><tr><th>Service</th><th>Equipment</th><th>Label</th>' +
+        '<th style="text-align:right;">$/mi</th><th style="text-align:right;">Min</th>' +
+        '<th style="text-align:right;">Flat</th><th style="text-align:right;">Fuel %</th>' +
+        '<th style="text-align:right;">Margin %</th><th>Enabled</th><th></th></tr></thead><tbody></tbody>';
+      var tb = $('tbody', tbl);
+      d.rateCards.forEach(function (r) { tb.appendChild(rateRow(r)); });
+      c.appendChild(tbl);
+
+      var addBtn = el('button', { class: 'btn btn-secondary', text: '+ Add rate card', style: { marginTop: '14px' } });
+      addBtn.addEventListener('click', function () {
+        api('/api/tenant/rate-cards', {
+          method: 'POST',
+          body: { service: 'ftl', equipment: 'dryvan', label: 'New rate', ratePerMile: 2.5 },
+        }).then(function () { renderRates(c); }).catch(alert);
+      });
+      c.appendChild(addBtn);
+    }).catch(showErr(c));
+  }
+
+  function rateRow(r) {
+    var tr = el('tr');
+    function inputCell(field, val, opts) {
+      var inp = el('input', { class: 'input', value: val == null ? '' : val });
+      if (opts && opts.type) inp.type = opts.type;
+      if (opts && opts.step) inp.step = opts.step;
+      inp.style.width = (opts && opts.w) || '90px';
+      if (opts && opts.right) inp.style.textAlign = 'right';
+      inp.addEventListener('blur', function () {
+        var v = inp.value;
+        if (opts && opts.type === 'number') v = v === '' ? null : Number(v);
+        api('/api/tenant/rate-cards/' + r.id, { method: 'PUT', body: (function () { var p = {}; p[field] = v; return p; })() }).catch(alert);
+      });
+      var td = el('td'); td.appendChild(inp); return td;
+    }
+    function selectCell(field, val, options) {
+      var sel = el('select', { class: 'select' });
+      sel.style.width = '120px';
+      options.forEach(function (o) { var op = document.createElement('option'); op.value = o; op.textContent = o; if (val === o) op.selected = true; sel.appendChild(op); });
+      sel.addEventListener('change', function () { var p = {}; p[field] = sel.value; api('/api/tenant/rate-cards/' + r.id, { method: 'PUT', body: p }).catch(alert); });
+      var td = el('td'); td.appendChild(sel); return td;
+    }
+    tr.appendChild(selectCell('service', r.service, ['drayage', 'ftl', 'ltl', 'expedited', 'hotshot']));
+    tr.appendChild(selectCell('equipment', r.equipment, [
+      'dryvan', 'reefer', 'flatbed', 'step_deck', 'conestoga',
+      'container_20', 'container_40', 'container_40hc', 'container_45',
+      'sprinter', 'box_truck', 'tractor_only', 'pallet']));
+    tr.appendChild(inputCell('label', r.label, { w: '160px' }));
+    tr.appendChild(inputCell('ratePerMile', r.ratePerMile, { type: 'number', step: '0.01', right: true, w: '80px' }));
+    tr.appendChild(inputCell('minimumCharge', r.minimumCharge, { type: 'number', step: '1', right: true, w: '80px' }));
+    tr.appendChild(inputCell('flatFee', r.flatFee, { type: 'number', step: '1', right: true, w: '80px' }));
+    tr.appendChild(inputCell('fuelSurchargePct', r.fuelSurchargePct, { type: 'number', step: '0.5', right: true, w: '70px' }));
+    tr.appendChild(inputCell('marginPct', r.marginPct, { type: 'number', step: '0.5', right: true, w: '70px' }));
+    var chk = el('input', { type: 'checkbox' });
+    chk.checked = r.enabled;
+    chk.addEventListener('change', function () { api('/api/tenant/rate-cards/' + r.id, { method: 'PUT', body: { enabled: chk.checked } }).catch(alert); });
+    tr.appendChild(el('td', null, [chk]));
+    var del = el('button', { class: 'btn btn-danger btn-sm', text: 'Delete' });
+    del.addEventListener('click', function () {
+      if (!confirm('Delete rate card "' + (r.label || r.equipment) + '"?')) return;
+      api('/api/tenant/rate-cards/' + r.id, { method: 'DELETE' }).then(function () { tr.remove(); }).catch(alert);
+    });
+    tr.appendChild(el('td', null, [del]));
+    return tr;
+  }
+
+  // ── Accessorials ──────────────────────────────────────────────
+  function renderAccessorials(c) {
+    api('/api/tenant/accessorials').then(function (d) {
+      c.innerHTML = '';
+      c.appendChild(el('h1', { text: 'Accessorials' }));
+      c.appendChild(el('p', { class: 'page-sub', text: 'Optional add-ons (chassis, liftgate, etc.) and auto-triggered fees (hazmat, overweight).' }));
+      var tbl = el('table', { class: 'table' });
+      tbl.innerHTML =
+        '<thead><tr><th>Code</th><th>Label</th><th>Kind</th>' +
+        '<th style="text-align:right;">Amount</th><th>Trigger</th><th>Enabled</th><th></th></tr></thead><tbody></tbody>';
+      var tb = $('tbody', tbl);
+      d.accessorials.forEach(function (a) { tb.appendChild(accRow(a)); });
+      c.appendChild(tbl);
+
+      var addBtn = el('button', { class: 'btn btn-secondary', text: '+ Add accessorial', style: { marginTop: '14px' } });
+      addBtn.addEventListener('click', function () {
+        api('/api/tenant/accessorials', {
+          method: 'POST',
+          body: { code: 'new_' + Math.random().toString(36).slice(2, 6), label: 'New accessorial', kind: 'flat', amount: 50, trigger: 'optional' },
+        }).then(function () { renderAccessorials(c); }).catch(alert);
+      });
+      c.appendChild(addBtn);
+    }).catch(showErr(c));
+  }
+  function accRow(a) {
+    var tr = el('tr');
+    function inputCell(field, val, opts) {
+      var inp = el('input', { class: 'input', value: val == null ? '' : val });
+      if (opts && opts.type) inp.type = opts.type; if (opts && opts.step) inp.step = opts.step;
+      inp.style.width = (opts && opts.w) || '120px';
+      if (opts && opts.right) inp.style.textAlign = 'right';
+      inp.addEventListener('blur', function () {
+        var v = inp.value; if (opts && opts.type === 'number') v = v === '' ? null : Number(v);
+        var p = {}; p[field] = v; api('/api/tenant/accessorials/' + a.id, { method: 'PUT', body: p }).catch(alert);
+      });
+      var td = el('td'); td.appendChild(inp); return td;
+    }
+    function selectCell(field, val, options) {
+      var sel = el('select', { class: 'select' });
+      sel.style.width = '140px';
+      options.forEach(function (o) { var op = document.createElement('option'); op.value = o; op.textContent = o; if (val === o) op.selected = true; sel.appendChild(op); });
+      sel.addEventListener('change', function () { var p = {}; p[field] = sel.value; api('/api/tenant/accessorials/' + a.id, { method: 'PUT', body: p }).catch(alert); });
+      var td = el('td'); td.appendChild(sel); return td;
+    }
+    tr.appendChild(inputCell('code', a.code, { w: '110px' }));
+    tr.appendChild(inputCell('label', a.label, { w: '180px' }));
+    tr.appendChild(selectCell('kind', a.kind, ['flat', 'per_mile', 'pct_of_base', 'per_day', 'per_hour']));
+    tr.appendChild(inputCell('amount', a.amount, { type: 'number', step: '0.5', right: true, w: '80px' }));
+    tr.appendChild(selectCell('trigger', a.trigger, ['optional', 'auto', 'auto_if_residential', 'auto_if_hazmat', 'auto_if_temp_controlled', 'auto_if_weight_over']));
+    var chk = el('input', { type: 'checkbox' });
+    chk.checked = a.enabled;
+    chk.addEventListener('change', function () { api('/api/tenant/accessorials/' + a.id, { method: 'PUT', body: { enabled: chk.checked } }).catch(alert); });
+    tr.appendChild(el('td', null, [chk]));
+    var del = el('button', { class: 'btn btn-danger btn-sm', text: 'Delete' });
+    del.addEventListener('click', function () {
+      if (!confirm('Delete accessorial?')) return;
+      api('/api/tenant/accessorials/' + a.id, { method: 'DELETE' }).then(function () { tr.remove(); }).catch(alert);
+    });
+    tr.appendChild(el('td', null, [del]));
+    return tr;
+  }
+
+  // ── Lane zones ────────────────────────────────────────────────
+  function renderZones(c) {
+    api('/api/tenant/lane-zones').then(function (d) {
+      c.innerHTML = '';
+      c.appendChild(el('h1', { text: 'Drayage zones' }));
+      c.appendChild(el('p', { class: 'page-sub', text: 'Flat-tariff pricing within a radius of an anchor port. Smallest matching zone wins.' }));
+      var tbl = el('table', { class: 'table' });
+      tbl.innerHTML = '<thead><tr><th>Label</th><th>Anchor</th><th>Radius (mi)</th><th>Flat $</th><th>Enabled</th><th></th></tr></thead><tbody></tbody>';
+      var tb = $('tbody', tbl);
+      d.laneZones.forEach(function (z) { tb.appendChild(zoneRow(z)); });
+      c.appendChild(tbl);
+      var addBtn = el('button', { class: 'btn btn-secondary', text: '+ Add zone', style: { marginTop: '14px' } });
+      addBtn.addEventListener('click', function () {
+        var label = prompt('Zone label, e.g. "Houston → 50mi":'); if (!label) return;
+        var port = prompt('Anchor port code (e.g. USHOU) or leave blank:') || null;
+        var radius = Number(prompt('Radius (miles):', '50') || 0);
+        var price = Number(prompt('Flat price (USD):', '500') || 0);
+        api('/api/tenant/lane-zones', { method: 'POST', body: { label: label, anchorPortCode: port, radiusMiles: radius, flatPrice: price } })
+          .then(function () { renderZones(c); }).catch(alert);
+      });
+      c.appendChild(addBtn);
+    }).catch(showErr(c));
+  }
+  function zoneRow(z) {
+    var tr = el('tr');
+    function inp(field, val, opts) {
+      var i = el('input', { class: 'input', value: val == null ? '' : val });
+      if (opts && opts.type) i.type = opts.type; if (opts && opts.right) i.style.textAlign = 'right';
+      i.style.width = (opts && opts.w) || '120px';
+      i.addEventListener('blur', function () { var v = i.value; if (opts && opts.type === 'number') v = Number(v); var p = {}; p[field] = v; api('/api/tenant/lane-zones/' + z.id, { method: 'PUT', body: p }).catch(alert); });
+      var td = el('td'); td.appendChild(i); return td;
+    }
+    tr.appendChild(inp('label', z.label, { w: '300px' }));
+    tr.appendChild(inp('anchorPortCode', z.anchorPortCode, { w: '90px' }));
+    tr.appendChild(inp('radiusMiles', z.radiusMiles, { type: 'number', right: true, w: '80px' }));
+    tr.appendChild(inp('flatPrice', z.flatPrice, { type: 'number', right: true, w: '90px' }));
+    var chk = el('input', { type: 'checkbox' }); chk.checked = z.enabled;
+    chk.addEventListener('change', function () { api('/api/tenant/lane-zones/' + z.id, { method: 'PUT', body: { enabled: chk.checked } }).catch(alert); });
+    tr.appendChild(el('td', null, [chk]));
+    var del = el('button', { class: 'btn btn-danger btn-sm', text: 'Delete' });
+    del.addEventListener('click', function () { if (!confirm('Delete zone?')) return; api('/api/tenant/lane-zones/' + z.id, { method: 'DELETE' }).then(function () { tr.remove(); }).catch(alert); });
+    tr.appendChild(el('td', null, [del]));
+    return tr;
+  }
+
+  // ── AI agent panel ────────────────────────────────────────────
+  function renderAi(c) {
+    Promise.all([
+      api('/api/tenant/ai-config'),
+      api('/api/ai/rate-chat'),
+    ]).then(function (out) {
+      var cfg = out[0].aiConfig; var hist = out[1].messages;
+      c.innerHTML = '';
+      c.appendChild(el('h1', { text: 'AI agent' }));
+      c.appendChild(el('p', { class: 'page-sub', text: 'Tune your rates by chatting in plain English. Try: "raise reefer minimums to $600 and add a $50 hazmat surcharge".' }));
+
+      var grid = el('div', { class: 'grid-2', style: { alignItems: 'start' } });
+
+      // Chat panel
+      var leftCol = el('div');
+      var chat = el('div', { class: 'chat-panel' });
+      var msgList = el('div', { class: 'chat-messages', id: 'rate-chat-msgs' });
+      hist.forEach(function (m) {
+        msgList.appendChild(el('div', { class: 'chat-bubble ' + (m.role === 'assistant' ? 'assistant' : 'user'), text: m.content }));
+      });
+      if (!hist.length) {
+        msgList.appendChild(el('div', { class: 'chat-bubble assistant', text: 'Hi — I can update your rate cards, accessorials, and lane zones. Tell me what to change.' }));
+      }
+      chat.appendChild(msgList);
+      var input = el('textarea', { class: 'textarea', rows: '2', placeholder: 'e.g. "raise dryvan rate to $2.65/mi and disable LTL"' });
+      var sendBtn = el('button', { class: 'btn btn-primary', text: 'Send' });
+      sendBtn.addEventListener('click', sendChat);
+      input.addEventListener('keydown', function (e) { if (e.key === 'Enter' && (e.metaKey || e.ctrlKey)) sendChat(); });
+      chat.appendChild(el('div', { class: 'chat-input-row' }, [input, sendBtn]));
+      leftCol.appendChild(chat);
+
+      function sendChat() {
+        var msg = input.value.trim(); if (!msg) return;
+        input.value = ''; sendBtn.disabled = true;
+        msgList.appendChild(el('div', { class: 'chat-bubble user', text: msg }));
+        msgList.scrollTop = msgList.scrollHeight;
+        var pending = el('div', { class: 'chat-bubble assistant', text: '…' });
+        msgList.appendChild(pending);
+        api('/api/ai/rate-chat', { method: 'POST', body: { message: msg } })
+          .then(function (r) {
+            sendBtn.disabled = false;
+            pending.textContent = r.reply || '(no reply)';
+            if (r.toolResults && r.toolResults.length) {
+              r.toolResults.forEach(function (t) {
+                var tag = el('div', { class: 'chat-bubble tool', text: '🛠 ' + t.tool + ': ' + t.result.message });
+                msgList.appendChild(tag);
+              });
+            }
+            msgList.scrollTop = msgList.scrollHeight;
+          })
+          .catch(function (err) { sendBtn.disabled = false; pending.textContent = 'Error: ' + err.message; });
+      }
+
+      // Right column: AI config form
+      var rightCol = el('div');
+      var cfgCard = el('div', { class: 'card' });
+      cfgCard.appendChild(el('div', { class: 'card-title', text: 'AI behaviour' }));
+      cfgCard.appendChild(el('div', { class: 'card-subtitle', text: 'Edits apply immediately.' }));
+
+      function renderField(label, child) {
+        return el('div', { class: 'field', style: { marginBottom: '12px' } }, [el('label', { class: 'field-label', text: label }), child]);
+      }
+      var promptTa = el('textarea', { class: 'textarea', rows: '8', placeholder: 'System prompt' });
+      promptTa.value = (cfg && cfg.systemPrompt) || '';
+      promptTa.addEventListener('blur', function () { api('/api/tenant/ai-config', { method: 'PUT', body: { systemPrompt: promptTa.value } }).catch(alert); });
+      cfgCard.appendChild(renderField('System prompt (your AI persona)', promptTa));
+
+      var toneSel = el('select', { class: 'select' });
+      ['professional', 'friendly', 'concise', 'enthusiastic'].forEach(function (t) { var o = document.createElement('option'); o.value = t; o.textContent = t; if ((cfg && cfg.tone) === t) o.selected = true; toneSel.appendChild(o); });
+      toneSel.addEventListener('change', function () { api('/api/tenant/ai-config', { method: 'PUT', body: { tone: toneSel.value } }).catch(alert); });
+      cfgCard.appendChild(renderField('Tone', toneSel));
+
+      function toggle(key, label, def) {
+        var wrap = el('label', { style: { display: 'flex', gap: '8px', alignItems: 'center', marginTop: '6px' } });
+        var c2 = el('input', { type: 'checkbox' }); c2.checked = (cfg && cfg[key] != null) ? !!cfg[key] : def;
+        c2.addEventListener('change', function () { var p = {}; p[key] = c2.checked; api('/api/tenant/ai-config', { method: 'PUT', body: p }).catch(alert); });
+        wrap.appendChild(c2); wrap.appendChild(el('span', { text: label })); return wrap;
+      }
+      cfgCard.appendChild(toggle('autoReplyEnabled', 'Auto-reply email to leads', true));
+      cfgCard.appendChild(toggle('chatEnabled', 'Customer-service chat after quote', true));
+
+      // BYO key
+      var keyCard = el('div', { class: 'card', style: { marginTop: '14px' } });
+      keyCard.appendChild(el('div', { class: 'card-title', text: 'Bring your own Anthropic key (optional)' }));
+      keyCard.appendChild(el('div', { class: 'card-subtitle', text: 'When set, your AI calls run on your account — separate billing, your usage limits.' }));
+      var keyInp = el('input', { class: 'input', placeholder: 'sk-ant-…', type: 'password' });
+      var keyBtn = el('button', { class: 'btn btn-secondary', text: 'Save key', style: { marginTop: '8px' } });
+      keyBtn.addEventListener('click', function () {
+        if (!keyInp.value) return;
+        api('/api/tenant/anthropic-key', { method: 'PUT', body: { apiKey: keyInp.value } })
+          .then(function () { keyInp.value = ''; alert('Key saved.'); }).catch(alert);
+      });
+      keyCard.appendChild(keyInp); keyCard.appendChild(keyBtn);
+      var clearBtn = el('button', { class: 'btn btn-ghost', text: 'Clear stored key', style: { marginTop: '8px' } });
+      clearBtn.addEventListener('click', function () { if (!confirm('Remove your Anthropic key?')) return; api('/api/tenant/anthropic-key', { method: 'DELETE' }).then(function () { alert('Cleared.'); }).catch(alert); });
+      keyCard.appendChild(clearBtn);
+
+      rightCol.appendChild(cfgCard);
+      rightCol.appendChild(keyCard);
+      grid.appendChild(leftCol); grid.appendChild(rightCol);
+      c.appendChild(grid);
+    }).catch(showErr(c));
+  }
+
+  // ── Brand ─────────────────────────────────────────────────────
+  function renderBrand(c) {
+    api('/api/tenant/brand').then(function (d) {
+      var b = d.brand || {};
+      c.innerHTML = '';
+      c.appendChild(el('h1', { text: 'Brand' }));
+      c.appendChild(el('p', { class: 'page-sub', text: 'Customise how the widget looks on your site.' }));
+      var card = el('div', { class: 'card' });
+      function field(label, key, opts) {
+        opts = opts || {};
+        var f = el('div', { class: 'field', style: { marginBottom: '12px' } });
+        f.appendChild(el('label', { class: 'field-label', text: label }));
+        var inp;
+        if (opts.textarea) inp = el('textarea', { class: 'textarea', rows: '3' });
+        else inp = el('input', { class: 'input', type: opts.type || 'text' });
+        inp.value = b[key] || '';
+        inp.addEventListener('blur', function () { var p = {}; p[key] = inp.value; api('/api/tenant/brand', { method: 'PUT', body: p }).catch(alert); });
+        f.appendChild(inp);
+        if (opts.hint) f.appendChild(el('span', { class: 'field-hint', text: opts.hint }));
+        return f;
+      }
+      card.appendChild(field('Display name', 'displayName'));
+      card.appendChild(field('Tagline', 'tagline'));
+      card.appendChild(el('div', { class: 'grid-2' }, [
+        field('Primary color', 'primaryColor', { hint: 'Hex code, e.g. #2563eb' }),
+        field('Accent color', 'accentColor', { hint: 'Hex code, e.g. #06b6d4' }),
+      ]));
+      card.appendChild(field('Logo URL', 'logoUrl', { hint: 'Hosted image URL — kept simple for MVP.' }));
+      card.appendChild(field('CTA button text', 'ctaText'));
+      card.appendChild(field('Footer note', 'footerNote', { textarea: true }));
+      var togWrap = el('label', { style: { display: 'flex', gap: '8px', alignItems: 'center', marginTop: '12px' } });
+      var tog = el('input', { type: 'checkbox' }); tog.checked = b.showPoweredBy !== false;
+      tog.addEventListener('change', function () { api('/api/tenant/brand', { method: 'PUT', body: { showPoweredBy: tog.checked } }).catch(alert); });
+      togWrap.appendChild(tog); togWrap.appendChild(el('span', { text: 'Show "Powered by QuoteFleet" footer' }));
+      card.appendChild(togWrap);
+      card.appendChild(field('Allowed domains (CSV, optional)', 'allowedDomains', { hint: 'e.g. acmeco.com,acmeco.ca — restricts widget to these origins.' }));
+      c.appendChild(card);
+    }).catch(showErr(c));
+  }
+
+  // ── Embed ─────────────────────────────────────────────────────
+  function renderEmbed(c) {
+    api('/api/tenant/embed').then(function (d) {
+      c.innerHTML = '';
+      c.appendChild(el('h1', { text: 'Embed code' }));
+      c.appendChild(el('p', { class: 'page-sub', text: 'Drop one line of HTML on any page of your website.' }));
+
+      var card = el('div', { class: 'card' });
+      card.appendChild(el('div', { class: 'card-title', text: 'Recommended — JS embed (auto-resize)' }));
+      var pre = el('div', { class: 'code', text: d.snippet });
+      card.appendChild(pre);
+      var copy = el('button', { class: 'btn btn-primary', text: 'Copy snippet', style: { marginTop: '8px' } });
+      copy.addEventListener('click', function () { navigator.clipboard.writeText(d.snippet).then(function () { copy.textContent = 'Copied ✓'; setTimeout(function () { copy.textContent = 'Copy snippet'; }, 1500); }); });
+      card.appendChild(copy);
+      c.appendChild(card);
+
+      var card2 = el('div', { class: 'card', style: { marginTop: '14px' } });
+      card2.appendChild(el('div', { class: 'card-title', text: 'Iframe-only (fallback)' }));
+      card2.appendChild(el('div', { class: 'code', text: d.iframeFallback }));
+      c.appendChild(card2);
+
+      var card3 = el('div', { class: 'card', style: { marginTop: '14px' } });
+      card3.appendChild(el('div', { class: 'card-title', text: 'Direct hosted link' }));
+      card3.innerHTML += '<p>Send your customers directly to:</p>';
+      card3.appendChild(el('div', { class: 'code', text: d.directLink }));
+      var openBtn = el('a', { href: d.directLink, target: '_blank', class: 'btn btn-secondary', text: 'Open public widget ↗', style: { marginTop: '8px', display: 'inline-flex' } });
+      card3.appendChild(openBtn);
+      c.appendChild(card3);
+
+      var card4 = el('div', { class: 'card', style: { marginTop: '14px' } });
+      card4.appendChild(el('div', { class: 'card-title', text: 'Regenerate embed token' }));
+      card4.appendChild(el('div', { class: 'card-subtitle', text: 'Existing embeds will stop working. Use only if your token leaked.' }));
+      var rg = el('button', { class: 'btn btn-danger', text: 'Regenerate token' });
+      rg.addEventListener('click', function () {
+        if (!confirm('Regenerate embed token? Existing embeds will break.')) return;
+        api('/api/tenant/regenerate-embed', { method: 'POST' }).then(function () { renderEmbed(c); }).catch(alert);
+      });
+      card4.appendChild(rg);
+      c.appendChild(card4);
+    }).catch(showErr(c));
+  }
+
+  // ── Audit log ─────────────────────────────────────────────────
+  function renderAudit(c) {
+    api('/api/tenant/audit').then(function (d) {
+      c.innerHTML = '';
+      c.appendChild(el('h1', { text: 'Audit log' }));
+      c.appendChild(el('p', { class: 'page-sub', text: 'Every change made by you, your team, or the AI agent.' }));
+      if (!d.audit.length) {
+        c.appendChild(el('p', { class: 'muted', text: 'No edits yet.' }));
+        return;
+      }
+      var tbl = el('table', { class: 'table' });
+      tbl.innerHTML = '<thead><tr><th>When</th><th>Action</th><th>By</th><th>Reason / details</th></tr></thead><tbody></tbody>';
+      var tb = $('tbody', tbl);
+      d.audit.forEach(function (a) {
+        var reason = (a.detailsJson && a.detailsJson.reason) ? a.detailsJson.reason : (a.detailsJson ? JSON.stringify(a.detailsJson).slice(0, 140) : '');
+        tb.innerHTML += '<tr><td><span class="muted-small">' + fmtDate(a.createdAt) + '</span></td>' +
+          '<td><strong>' + a.action + '</strong></td>' +
+          '<td><span class="badge ' + (a.actorKind === 'ai_agent' ? 'badge-info' : 'badge-muted') + '">' + a.actorKind + '</span></td>' +
+          '<td><span class="muted-small">' + reason + '</span></td></tr>';
+      });
+      c.appendChild(tbl);
+    }).catch(showErr(c));
+  }
+
+  // ── helpers ────────────────────────────────────────────────────
+  function showErr(c) { return function (err) { c.innerHTML = '<div class="notice error">' + (err.message || 'Failed') + '</div>'; }; }
+
+  // ── boot ───────────────────────────────────────────────────────
+  function boot() {
+    api('/api/auth/me').then(function (r) {
+      if (!r.user) { location.href = '/login'; return; }
+      if (r.user.role === 'super_admin' && !location.search.includes('mode=tenant')) {
+        // Super admin defaults to admin dashboard
+        location.href = '/admin';
+        return;
+      }
+      state.me = r;
+      $('#sb-tenant-name').textContent = (r.tenant && r.tenant.name) || r.user.name || r.user.email;
+      $('#sb-tenant-slug').textContent = (r.tenant && '/w/' + r.tenant.slug) || '';
+      $('#loading').style.display = 'none';
+      $('#app-shell').hidden = false;
+
+      $$('.sidebar [data-route]').forEach(function (b) {
+        b.addEventListener('click', function () { go(b.dataset.route); });
+      });
+      $('#sb-logout').addEventListener('click', function () {
+        api('/api/auth/logout', { method: 'POST' }).finally(function () { location.href = '/login'; });
+      });
+
+      // Route from URL
+      var initial = (location.pathname.split('/app/')[1] || 'overview').split('/')[0];
+      go(initial);
+    }).catch(function () { location.href = '/login'; });
+  }
+
+  document.addEventListener('click', function (e) {
+    var a = e.target.closest('a[data-route]');
+    if (a) { e.preventDefault(); go(a.dataset.route); }
+  });
+  window.addEventListener('popstate', function () {
+    var r = (location.pathname.split('/app/')[1] || 'overview').split('/')[0];
+    go(r);
+  });
+
+  boot();
+})();

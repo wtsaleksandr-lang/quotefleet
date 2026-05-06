@@ -1,0 +1,38 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Dashboard — QuoteFleet</title>
+  <link rel="stylesheet" href="/style.css">
+</head>
+<body>
+  <div class="app-shell" id="app-shell" hidden>
+    <aside class="sidebar">
+      <div class="brand-block">
+        <div class="name" id="sb-tenant-name">…</div>
+        <div class="sub" id="sb-tenant-slug">…</div>
+      </div>
+      <button class="nav-item active" data-route="overview">📊 Overview</button>
+      <button class="nav-item" data-route="leads">📥 Leads</button>
+      <button class="nav-item" data-route="rates">💰 Rate cards</button>
+      <button class="nav-item" data-route="accessorials">➕ Accessorials</button>
+      <button class="nav-item" data-route="zones">📍 Drayage zones</button>
+      <button class="nav-item" data-route="ai">🤖 AI agent</button>
+      <button class="nav-item" data-route="brand">🎨 Brand</button>
+      <button class="nav-item" data-route="embed">📋 Embed code</button>
+      <div class="group">Account</div>
+      <button class="nav-item" data-route="audit">📜 Audit log</button>
+      <a href="/" target="_blank">↗ View public widget</a>
+      <button class="nav-item" id="sb-logout">↩ Sign out</button>
+    </aside>
+    <main class="app-main">
+      <div id="page-content"></div>
+    </main>
+  </div>
+  <div id="loading" style="display:flex;align-items:center;justify-content:center;min-height:100vh;color:var(--muted);">
+    <div>Loading dashboard<span class="dots"></span></div>
+  </div>
+  <script src="/app.js"></script>
+</body>
+</html>

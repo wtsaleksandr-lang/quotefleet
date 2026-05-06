@@ -1,0 +1,33 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Quote follow-up — chat</title>
+  <link rel="stylesheet" href="/style.css">
+</head>
+<body style="background: var(--surface-2);">
+  <div style="max-width:680px; margin: 24px auto; padding: 0 16px;">
+    <div class="card" id="lead-card">
+      <div class="card-title" id="lead-title">Loading quote…</div>
+      <div class="card-subtitle" id="lead-subtitle"></div>
+      <div id="lead-breakdown"></div>
+    </div>
+    <div class="card" style="margin-top: 16px;">
+      <div class="card-title">Chat with our AI dispatcher</div>
+      <div class="card-subtitle">Ask about pickup, transit, equipment, accessorials. Replies are typically &lt; 30 seconds.</div>
+      <div class="chat-panel" style="height: 480px;">
+        <div class="chat-messages" id="chat-messages"></div>
+        <div class="chat-input-row">
+          <textarea id="chat-input" class="textarea" rows="2" placeholder="Type a question…"></textarea>
+          <button id="chat-send" class="btn btn-primary">Send</button>
+        </div>
+      </div>
+    </div>
+    <p class="muted-small" style="text-align:center; margin-top:18px;">
+      Powered by <a href="/">QuoteFleet</a>
+    </p>
+  </div>
+  <script src="/chat.js"></script>
+</body>
+</html>

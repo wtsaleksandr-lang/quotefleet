@@ -1,0 +1,119 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Get an instant freight quote</title>
+  <link rel="stylesheet" href="/widget-style.css">
+</head>
+<body>
+  <div class="qf-widget" id="qf-root">
+    <div class="qf-header" id="qf-header"><div class="brand-name">Loading…</div></div>
+    <div class="qf-tagline" id="qf-tagline"></div>
+
+    <!-- Step 1: shipment details -->
+    <div class="qf-step active" id="qf-step-quote">
+      <div class="qf-tabs" id="qf-services"></div>
+
+      <div class="qf-section-title">Equipment</div>
+      <select class="qf-select" id="qf-equipment"></select>
+
+      <div class="qf-section-title" style="margin-top:14px;">Pickup</div>
+      <div class="qf-grid">
+        <div class="qf-field qf-full">
+          <label>Pickup ZIP / city</label>
+          <input class="qf-input" id="qf-pickup-zip" placeholder="e.g. 90802 or Long Beach, CA" autocomplete="off">
+        </div>
+      </div>
+
+      <div class="qf-section-title" style="margin-top:14px;">Delivery</div>
+      <div class="qf-grid">
+        <div class="qf-field qf-full">
+          <label>Delivery ZIP / city</label>
+          <input class="qf-input" id="qf-delivery-zip" placeholder="e.g. 60606 or Chicago, IL" autocomplete="off">
+        </div>
+      </div>
+
+      <div class="qf-section-title" style="margin-top:14px;">Cargo</div>
+      <div class="qf-grid">
+        <div class="qf-field">
+          <label>Weight (lbs)</label>
+          <input class="qf-input" id="qf-weight" type="number" min="0" placeholder="e.g. 38000">
+        </div>
+        <div class="qf-field">
+          <label>Pickup date</label>
+          <input class="qf-input" id="qf-pickup-date" type="date">
+        </div>
+      </div>
+
+      <div class="qf-flags">
+        <label><input type="checkbox" id="qf-residential"> Residential delivery</label>
+        <label><input type="checkbox" id="qf-hazmat"> Hazmat</label>
+        <label><input type="checkbox" id="qf-temp"> Temp-controlled</label>
+      </div>
+
+      <div class="qf-section-title" style="margin-top:14px;">Add-ons (optional)</div>
+      <div class="qf-accessorials" id="qf-accessorials"></div>
+
+      <button class="qf-cta" id="qf-calc-btn">Calculate quote</button>
+      <div id="qf-error" class="qf-error" style="display:none;"></div>
+
+      <!-- Result preview -->
+      <div class="qf-result" id="qf-result" style="display:none;">
+        <div class="qf-section-title" style="margin:0 0 8px 0;">Estimated total</div>
+        <div class="total"><span class="currency">$</span><span id="qf-total">0</span></div>
+        <div class="meta" id="qf-meta"></div>
+        <div class="lines" id="qf-lines"></div>
+        <button class="qf-cta" id="qf-continue-btn" style="margin-top:14px;">Continue — get this quote in writing</button>
+      </div>
+    </div>
+
+    <!-- Step 2: contact form -->
+    <div class="qf-step" id="qf-step-contact">
+      <div class="qf-section-title">Almost done</div>
+      <p class="qf-tagline">We'll email this quote and our dispatcher will follow up. No spam.</p>
+
+      <div class="qf-grid">
+        <div class="qf-field qf-full">
+          <label>Your name</label>
+          <input class="qf-input" id="qf-c-name" placeholder="Jane Doe">
+        </div>
+        <div class="qf-field qf-full">
+          <label>Email</label>
+          <input class="qf-input" id="qf-c-email" type="email" placeholder="you@company.com">
+        </div>
+        <div class="qf-field">
+          <label>Phone</label>
+          <input class="qf-input" id="qf-c-phone" type="tel" placeholder="optional">
+        </div>
+        <div class="qf-field">
+          <label>Company</label>
+          <input class="qf-input" id="qf-c-company" placeholder="optional">
+        </div>
+        <div class="qf-field qf-full">
+          <label>Notes</label>
+          <textarea class="qf-input" id="qf-c-notes" rows="3" placeholder="Anything else we should know?"></textarea>
+        </div>
+      </div>
+
+      <button class="qf-cta" id="qf-submit-btn">Send me this quote</button>
+      <button class="qf-cta qf-secondary" id="qf-back-btn" style="margin-top:8px;">← Back</button>
+      <div id="qf-submit-error" class="qf-error" style="display:none;"></div>
+    </div>
+
+    <!-- Step 3: thanks -->
+    <div class="qf-step" id="qf-step-thanks">
+      <div class="qf-section-title">Quote sent</div>
+      <div class="qf-success" id="qf-thanks-msg"></div>
+      <p class="qf-tagline" id="qf-thanks-detail"></p>
+      <button class="qf-cta qf-secondary" id="qf-restart-btn">Get another quote</button>
+    </div>
+
+    <div class="qf-footer" id="qf-footer">
+      <span id="qf-powered" style="opacity:0.7;"></span>
+    </div>
+  </div>
+
+  <script src="/widget.js"></script>
+</body>
+</html>

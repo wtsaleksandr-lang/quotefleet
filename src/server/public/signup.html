@@ -1,0 +1,79 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Create your account — QuoteFleet</title>
+  <link rel="stylesheet" href="/style.css">
+</head>
+<body style="background: var(--surface-2);">
+  <main style="display:flex; align-items:center; justify-content:center; min-height:100vh; padding: 24px;">
+    <div class="card" style="width: 100%; max-width: 480px; padding: 32px;">
+      <a href="/" class="brand-mark" style="margin-bottom: 18px;">
+        <span class="logo"><svg viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2.5"><path d="M3 17h2a3 3 0 0 0 3-3V7H3z"/><path d="M14 7h6l1 4v6h-3"/><circle cx="7" cy="17" r="2"/><circle cx="17" cy="17" r="2"/></svg></span>
+        QuoteFleet
+      </a>
+      <h1 style="font-size: 22px; margin: 0 0 4px 0;">Start your free account</h1>
+      <p class="muted" style="margin: 0 0 24px 0;">Up and running in 90 seconds.</p>
+      <form id="signup-form" style="display:flex; flex-direction:column; gap: 14px;">
+        <div class="field">
+          <label class="field-label required">Company name</label>
+          <input class="input" name="companyName" placeholder="Acme Drayage" required>
+        </div>
+        <div class="field">
+          <label class="field-label required">Your email</label>
+          <input class="input" type="email" name="email" required>
+        </div>
+        <div class="field">
+          <label class="field-label required">Password</label>
+          <input class="input" type="password" name="password" minlength="6" required>
+          <span class="field-hint">6 characters minimum.</span>
+        </div>
+        <div class="field">
+          <label class="field-label">Country focus</label>
+          <select class="select" name="countryFocus">
+            <option value="US" selected>USA only</option>
+            <option value="CA">Canada only</option>
+            <option value="BOTH">USA + Canada</option>
+          </select>
+        </div>
+        <div class="field">
+          <label class="field-label">Phone (optional)</label>
+          <input class="input" name="contactPhone" type="tel">
+        </div>
+        <button class="btn btn-primary btn-lg" type="submit">Create account</button>
+        <div id="signup-error" class="notice error hidden"></div>
+      </form>
+      <p class="muted-small" style="text-align:center; margin-top: 20px;">
+        Already have an account? <a href="/login">Sign in →</a>
+      </p>
+    </div>
+  </main>
+  <script>
+    document.getElementById('signup-form').addEventListener('submit', async function (e) {
+      e.preventDefault();
+      var fd = new FormData(e.target);
+      var err = document.getElementById('signup-error');
+      err.classList.add('hidden');
+      var res = await fetch('/api/auth/signup', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          companyName: fd.get('companyName'),
+          email: fd.get('email'),
+          password: fd.get('password'),
+          countryFocus: fd.get('countryFocus') || 'US',
+          contactPhone: fd.get('contactPhone') || undefined,
+        }),
+      });
+      var j = await res.json();
+      if (!res.ok) {
+        err.textContent = j.error || 'Signup failed.';
+        err.classList.remove('hidden');
+        return;
+      }
+      location.href = '/app';
+    });
+  </script>
+</body>
+</html>

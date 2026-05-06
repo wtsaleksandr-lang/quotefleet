@@ -1,0 +1,13 @@
+# Normalize line endings to LF on checkin; let git decide on checkout.
+* text=auto eol=lf
+
+# Binary types — never normalize.
+*.png  binary
+*.jpg  binary
+*.jpeg binary
+*.gif  binary
+*.ico  binary
+*.pdf  binary
+
+# Lockfiles — keep as-is, mark as generated for diff folding.
+pnpm-lock.yaml linguist-generated=true -diff
