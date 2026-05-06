@@ -113,19 +113,28 @@ export function registerPublicRoutes(app: Express) {
       return res.status(500).send('// embed lookup failed');
     }
     if (!t[0]) return res.send('// invalid embed token');
+    // Look up the tenant's full row so we know its host_domain.
+    const tRow = await db().select().from(tenants).where(eq(tenants.embedToken, token)).limit(1);
+    const tenant = tRow[0];
+    if (!tenant) return res.send('// invalid embed token');
     const env = loadEnv();
-    const base = env.PUBLIC_BASE_URL.replace(/\/$/, '');
-    const slug = t[0].slug;
+    // Prefer the tenant's hosted subdomain (`<slug>.<host>`) — gives us
+    // a clean URL with no path. Fall back to `<base>/w/<slug>` if no
+    // host_domain (legacy tenants pre-migration).
+    const proto = env.PUBLIC_BASE_URL.startsWith('http://') ? 'http:' : 'https:';
+    const widgetUrl = tenant.hostDomain
+      ? `${proto}//${tenant.slug}.${tenant.hostDomain}/?embed=1`
+      : `${env.PUBLIC_BASE_URL.replace(/\/$/, '')}/w/${tenant.slug}?embed=1`;
     res.type('application/javascript').send(`
 (function(){
   var d=document, scripts=d.getElementsByTagName('script'),
       me=scripts[scripts.length-1],
       mount=me.parentNode;
   var div=d.createElement('div');
-  div.id='qf-widget-${slug}';
+  div.id='qf-widget-${tenant.slug}';
   div.style.cssText='width:100%;max-width:560px;margin:0 auto;';
   var ifr=d.createElement('iframe');
-  ifr.src='${base}/w/${slug}?embed=1';
+  ifr.src=${JSON.stringify(widgetUrl)};
   ifr.style.cssText='width:100%;border:0;display:block;min-height:660px;';
   ifr.setAttribute('loading','lazy');
   ifr.setAttribute('title','Instant freight quote');
@@ -134,7 +143,7 @@ export function registerPublicRoutes(app: Express) {
   mount.parentNode.insertBefore(div, mount);
   // Auto-resize via postMessage from the iframe.
   window.addEventListener('message', function(e){
-    if(!e || !e.data || e.data.qf!=='resize' || e.data.slug!=='${slug}') return;
+    if(!e || !e.data || e.data.qf!=='resize' || e.data.slug!==${JSON.stringify(tenant.slug)}) return;
     if (typeof e.data.h==='number') ifr.style.height=e.data.h+'px';
   });
 })();

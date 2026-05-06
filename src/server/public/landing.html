@@ -4,127 +4,360 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>QuoteFleet — Instant freight quote calculator for drayage & trucking carriers</title>
-  <meta name="description" content="Embeddable instant quote calculator + AI dispatcher for drayage and trucking companies in USA &amp; Canada. White-label, configurable in plain English.">
+  <meta name="description" content="Embeddable instant quote calculator + AI dispatcher for drayage and trucking carriers in USA &amp; Canada. White-label, plain-English configuration, deploys in minutes.">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="/style.css">
 </head>
 <body>
+  <!-- Top nav (minimal) -->
   <header class="topnav">
     <div class="topnav-inner">
       <a href="/" class="brand-mark">
-        <span class="logo"><svg viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2.5"><path d="M3 17h2a3 3 0 0 0 3-3V7H3z"/><path d="M14 7h6l1 4v6h-3"/><circle cx="7" cy="17" r="2"/><circle cx="17" cy="17" r="2"/></svg></span>
+        <span class="logo">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
+            <path d="M3 17h2a3 3 0 0 0 3-3V7H3z"/>
+            <path d="M14 7h6l1 4v6h-3"/>
+            <circle cx="7" cy="17" r="2"/>
+            <circle cx="17" cy="17" r="2"/>
+          </svg>
+        </span>
         QuoteFleet
       </a>
-      <a class="nav-link" href="#features">Features</a>
-      <a class="nav-link" href="#how">How it works</a>
-      <a class="nav-link" href="/pricing">Pricing</a>
       <span class="topnav-spacer"></span>
       <a class="nav-link" href="/login">Sign in</a>
-      <a class="btn btn-primary" href="/signup">Start free</a>
+      <a class="btn btn-primary always-show" href="/signup">
+        Start free <span class="arr">→</span>
+      </a>
     </div>
   </header>
 
+  <!-- Hero -->
   <section class="hero">
     <div class="container-narrow">
-      <h1>Instant freight quotes <span class="alt">on your website.</span></h1>
+      <span class="tag">Multi-tenant embeddable quote SaaS</span>
+      <h1>
+        Instant freight quotes,<br>
+        <span class="accent">on every carrier's website.</span>
+      </h1>
       <p class="lead">
-        An embeddable calculator + AI dispatcher built for drayage and trucking carriers
-        in USA and Canada. White-label, fully configurable in plain English. Your customers
-        get a quote in 5 seconds. You get qualified leads, auto-replied to and ready to book.
+        QuoteFleet is the embeddable instant-quote calculator + AI dispatcher built for
+        drayage and trucking carriers in USA &amp; Canada. Your customers get a quote in 5 seconds.
+        You wake up to qualified, auto-replied leads.
       </p>
       <div class="hero-cta">
-        <a class="btn btn-gradient btn-lg" href="/signup">Start free — no card</a>
-        <a class="btn btn-secondary btn-lg" href="/w/demo">See live demo</a>
+        <a class="btn btn-primary btn-lg" href="/signup">
+          Start 14-day trial <span class="arr">→</span>
+        </a>
+        <a class="btn btn-secondary btn-lg" href="/w/demo">
+          See live demo <span class="arr">→</span>
+        </a>
       </div>
-      <p class="muted-small" style="margin-top:18px;">
-        Free tier: 50 quotes/month. Paid plans start at $39/mo.
+      <div class="hero-meta">
+        <span>No credit card</span>
+        <span>Deploys in 5 minutes</span>
+        <span>USA &amp; Canada coverage</span>
+      </div>
+    </div>
+  </section>
+
+  <!-- Feature grid -->
+  <section class="section" id="features">
+    <div class="container">
+      <div class="section-head">
+        <span class="tag">What you get</span>
+        <h2>Everything a carrier needs to quote online</h2>
+        <p>
+          Pre-loaded with credible 2026 rate defaults for drayage, FTL, expedited and LTL.
+          Tune them by chatting with your dedicated AI agent in plain English.
+        </p>
+      </div>
+      <div class="features">
+        <div class="feature-card">
+          <div class="icon">
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="18" height="18" rx="3"/><path d="M3 12h18M12 3v18"/></svg>
+          </div>
+          <h3>One-line embed</h3>
+          <p>Paste a single &lt;script&gt; tag on your site, or share your hosted page URL. The widget inherits your brand colors and is mobile-perfect.</p>
+          <div class="stat">&lt; 30 KB · zero deps</div>
+        </div>
+        <div class="feature-card">
+          <div class="icon">
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>
+          </div>
+          <h3>Configured in plain English</h3>
+          <p>"Raise dryvan rates by 8%, add a $50 chassis-flip fee at LAX, disable LTL on weekends." Your dedicated AI agent does it. With audit log.</p>
+          <div class="stat">Zero spreadsheets</div>
+        </div>
+        <div class="feature-card">
+          <div class="icon">
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 11h2l3 9 4-13 3 7h6"/></svg>
+          </div>
+          <h3>$/mile + accessorials</h3>
+          <p>Drayage zone tariffs, mile-based linehaul, fuel surcharges, accessorials — exactly how you already price loads. No re-engineering required.</p>
+          <div class="stat">17 default accessorials</div>
+        </div>
+        <div class="feature-card">
+          <div class="icon">
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 16.92V21a1 1 0 0 1-1.11 1A19.88 19.88 0 0 1 2 4.18 1 1 0 0 1 3 3h4.09a1 1 0 0 1 1 .75l1 4-2.2 2.2a16 16 0 0 0 6 6L15.25 14a1 1 0 0 1 1-.25l4 1A1 1 0 0 1 22 16.92z"/></svg>
+          </div>
+          <h3>Auto-reply &amp; lead chat</h3>
+          <p>Every quote sends an instant branded email. Customers can chat with your AI dispatcher 24/7. You wake up to qualified, replied-to leads.</p>
+          <div class="stat">24/7 dispatch coverage</div>
+        </div>
+        <div class="feature-card">
+          <div class="icon">
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2L2 7l10 5 10-5-10-5z"/><path d="M2 17l10 5 10-5"/><path d="M2 12l10 5 10-5"/></svg>
+          </div>
+          <h3>Smart terminal selection</h3>
+          <p>Customers say "Chicago" — we show the 15 ramps, optionally capture the booking number, and let your dispatcher confirm before quoting firm.</p>
+          <div class="stat">100+ terminals seeded</div>
+        </div>
+        <div class="feature-card">
+          <div class="icon">
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>
+          </div>
+          <h3>Your data, your rates</h3>
+          <p>Your rate book is private. Bring your own Anthropic key. Lead PII never leaves your tenant. Audit log on every AI edit.</p>
+          <div class="stat">SOC-2-light architecture</div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- How it works -->
+  <section class="section" id="how" style="background: var(--surface);">
+    <div class="container">
+      <div class="section-head">
+        <span class="tag">How it works</span>
+        <h2>Live in three steps</h2>
+      </div>
+      <div class="features">
+        <div class="feature-card">
+          <div class="icon" style="background: var(--accent-soft); color: var(--accent); font-weight: 800; font-family: var(--font-mono);">01</div>
+          <h3>Sign up free</h3>
+          <p>Tell us your country focus and pick a subdomain. We auto-load realistic defaults: per-mile rates, port-zone tariffs, fuel surcharges, accessorials.</p>
+        </div>
+        <div class="feature-card">
+          <div class="icon" style="background: var(--accent-soft); color: var(--accent); font-weight: 800; font-family: var(--font-mono);">02</div>
+          <h3>Tune your rates</h3>
+          <p>Edit numbers manually, or just type to your AI agent: "we don't run flatbeds, raise reefer minimums to $600". Done in seconds, with audit log.</p>
+        </div>
+        <div class="feature-card">
+          <div class="icon" style="background: var(--accent-soft); color: var(--accent); font-weight: 800; font-family: var(--font-mono);">03</div>
+          <h3>Embed &amp; ship</h3>
+          <p>Copy one line of HTML, share your hosted page URL, or order white-glove install. Customers get quotes; you get leads with auto-replies sent.</p>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- Compare -->
+  <section class="section">
+    <div class="container">
+      <div class="section-head">
+        <span class="tag">Why us</span>
+        <h2>Built for the carriers who don't have time for SaaS demos</h2>
+        <p>DrayMaster, Tai, Quote Factory — all $300+/month, force a sales call, bury you in onboarding. QuoteFleet is the opposite.</p>
+      </div>
+      <table class="compare">
+        <thead>
+          <tr>
+            <th></th>
+            <th class="us">QuoteFleet</th>
+            <th>DrayMaster / Tai</th>
+            <th>TMX (legacy)</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td>Trial without credit card</td>
+            <td class="us">14 days free</td>
+            <td class="them">Demo-call gated</td>
+            <td class="them">Demo-call gated</td>
+          </tr>
+          <tr>
+            <td>Embed time</td>
+            <td class="us">5 minutes self-serve</td>
+            <td class="them">Multi-week onboarding</td>
+            <td class="them">Custom dev project</td>
+          </tr>
+          <tr>
+            <td>Rate adjustment</td>
+            <td class="us">Plain-English chat with AI</td>
+            <td class="them">Spreadsheets &amp; admin UI</td>
+            <td class="them">Phone call to support</td>
+          </tr>
+          <tr>
+            <td>Hosted page included</td>
+            <td class="us">slug.quotefleet.app</td>
+            <td class="them">Extra fee</td>
+            <td class="them">No</td>
+          </tr>
+          <tr>
+            <td>Auto-reply email + chat</td>
+            <td class="us">Built-in, AI-powered</td>
+            <td class="them">Email only, manual</td>
+            <td class="them">Manual</td>
+          </tr>
+          <tr>
+            <td>Starting price</td>
+            <td class="us">$79/mo</td>
+            <td class="them">$300+/mo</td>
+            <td class="them">$500+/mo</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+  </section>
+
+  <!-- Final CTA -->
+  <section class="section" style="text-align: center;">
+    <div class="container-narrow">
+      <span class="tag">Ready when you are</span>
+      <h2 style="font-size: 36px; margin: 14px 0 18px 0; letter-spacing: -0.025em;">
+        Get a working quote calculator in the time it takes to brew coffee.
+      </h2>
+      <p class="muted" style="font-size: 16px; margin-bottom: 32px;">
+        14 days free. No credit card. Cancel anytime. Bring your own AI key if you want.
       </p>
+      <a class="btn btn-primary btn-lg" href="/signup">
+        Start free trial <span class="arr">→</span>
+      </a>
     </div>
   </section>
 
-  <section class="container" id="features">
-    <div class="features">
-      <div class="feature">
-        <div class="icon">
-          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="18" height="18" rx="3"/><path d="M3 12h18M12 3v18"/></svg>
-        </div>
-        <h3>One-line embed</h3>
-        <p>Drop a single &lt;script&gt; tag on your site. The calculator inherits your brand colors and is mobile-perfect out of the box.</p>
-      </div>
-      <div class="feature">
-        <div class="icon">
-          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg>
-        </div>
-        <h3>Configured in plain English</h3>
-        <p>"Raise dryvan rates by 8%, add a $50 chassis-flip fee for LAX, and disable LTL on weekends." Your dedicated AI agent does it.</p>
-      </div>
-      <div class="feature">
-        <div class="icon">
-          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 11h2l3 9 4-13 3 7h6"/></svg>
-        </div>
-        <h3>$/mile + accessorials</h3>
-        <p>Drayage zone tariffs, mile-based linehaul, fuel surcharges, accessorials — exactly how you already price loads. No re-engineering.</p>
-      </div>
-      <div class="feature">
-        <div class="icon">
-          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 16.92V21a1 1 0 0 1-1.11 1A19.88 19.88 0 0 1 2 4.18 1 1 0 0 1 3 3h4.09a1 1 0 0 1 1 .75l1 4-2.2 2.2a16 16 0 0 0 6 6L15.25 14a1 1 0 0 1 1-.25l4 1A1 1 0 0 1 22 16.92z"/></svg>
-        </div>
-        <h3>Auto-reply + lead chat</h3>
-        <p>Every quote sends an instant branded email. Customers can chat with your AI dispatcher 24/7. You wake up to qualified, replied-to leads.</p>
-      </div>
-      <div class="feature">
-        <div class="icon">
-          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2L2 7l10 5 10-5-10-5z"/><path d="M2 17l10 5 10-5"/><path d="M2 12l10 5 10-5"/></svg>
-        </div>
-        <h3>USA & Canada coverage</h3>
-        <p>Pre-loaded with port-zone tariffs for LA/LB, NY/NJ, Savannah, Houston, Vancouver, Montreal, Halifax — and per-mile defaults you can tune.</p>
-      </div>
-      <div class="feature">
-        <div class="icon">
-          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>
-        </div>
-        <h3>Your data, your rates</h3>
-        <p>Your rate book is private. Optional bring-your-own Anthropic key. Lead PII never leaves your tenant. Audit log on every AI edit.</p>
-      </div>
-    </div>
-  </section>
+  <!-- Bottom dock nav (Effortel-style) -->
+  <button class="dock" id="qf-dock" aria-label="Site navigation"
+          style="border: 0; cursor: default;">
+    <a class="dock-item up" href="#top" title="Back to top" aria-label="Back to top">↑</a>
+    <button class="dock-item" data-tray="products">
+      Products <span class="plus">+</span>
+    </button>
+    <button class="dock-item" data-tray="solutions">
+      Solutions <span class="plus">+</span>
+    </button>
+    <button class="dock-item" data-tray="resources">
+      Resources <span class="plus">+</span>
+    </button>
+    <a class="dock-item" href="/pricing">Pricing</a>
+    <a class="dock-item cta" href="/signup">
+      Get started <span class="plus">→</span>
+    </a>
+  </button>
 
-  <section class="container" id="how" style="padding: 40px 24px;">
-    <div class="container-narrow" style="text-align:center;">
-      <h2 style="font-size: 28px; margin-bottom: 32px; letter-spacing: -0.02em;">How it works</h2>
+  <!-- Trays -->
+  <div class="dock-tray" id="tray-products">
+    <span class="tag">Products</span>
+    <div class="dock-tray-grid" style="margin-top: 16px;">
+      <a class="dock-tray-card" href="/w/demo">
+        <h4>Embeddable Quote Widget</h4>
+        <p>One-line script tag. Drayage, FTL, expedited, LTL. Your brand, your rates.</p>
+      </a>
+      <a class="dock-tray-card" href="#features">
+        <h4>AI Dispatcher</h4>
+        <p>Auto-replies to every lead, follows up on chat, drafts quotes for your team to confirm.</p>
+      </a>
+      <a class="dock-tray-card" href="#features">
+        <h4>Rate Tuning Agent</h4>
+        <p>Plain-English rate adjustments with audit log. "Raise dryvan 8%, disable weekend LTL."</p>
+      </a>
+      <a class="dock-tray-card" href="/signup">
+        <h4>Hosted Page</h4>
+        <p>Free subdomain at sign up: yourcompany.quotefleet.app — share anywhere.</p>
+      </a>
     </div>
-    <div class="features">
-      <div class="feature">
-        <strong style="color: var(--accent); font-size: 24px;">1.</strong>
-        <h3>Sign up free</h3>
-        <p>Tell us your country focus. We auto-load realistic defaults: per-mile rates by equipment, port zones, fuel surcharge, accessorials.</p>
-      </div>
-      <div class="feature">
-        <strong style="color: var(--accent); font-size: 24px;">2.</strong>
-        <h3>Tune your rates</h3>
-        <p>Edit numbers manually, or just type to your AI agent: "we don't run flatbeds, raise reefer minimums to $600". Done.</p>
-      </div>
-      <div class="feature">
-        <strong style="color: var(--accent); font-size: 24px;">3.</strong>
-        <h3>Embed & ship</h3>
-        <p>Copy one line of HTML. Paste it anywhere on your site. The widget instantly matches your colors. Customers get quotes; you get leads.</p>
-      </div>
-    </div>
-  </section>
+  </div>
 
-  <section style="background: var(--surface);  padding: 80px 24px; margin-top: 40px; border-top: 1px solid var(--border);">
-    <div class="container-narrow" style="text-align:center;">
-      <h2 style="font-size: 28px; margin-bottom: 16px; letter-spacing: -0.02em;">Built for the carriers who don't have time for SaaS demos</h2>
-      <p class="muted" style="font-size: 16px; max-width: 640px; margin: 0 auto 32px auto;">
-        DrayMaster, Tai, Quote Factory — they're all $300+/month, force a sales call, and bury you in onboarding.
-        QuoteFleet is the opposite: free to start, embed in 5 minutes, talk to AI when you need to change something.
-      </p>
-      <a class="btn btn-gradient btn-lg" href="/signup">Get started</a>
+  <div class="dock-tray" id="tray-solutions">
+    <span class="tag">Solutions</span>
+    <div class="dock-tray-grid" style="margin-top: 16px;">
+      <a class="dock-tray-card" href="/signup">
+        <h4>Drayage carriers</h4>
+        <p>Port + terminal selection, chassis splits, pre-pull, per-diem, PierPass — all built in.</p>
+      </a>
+      <a class="dock-tray-card" href="/signup">
+        <h4>Truckload carriers</h4>
+        <p>Per-mile + fuel surcharge + accessorials. National 2026 benchmarks pre-loaded.</p>
+      </a>
+      <a class="dock-tray-card" href="/signup">
+        <h4>Freight forwarders</h4>
+        <p>Quote your own customers without the carrier's pricing tools. Mark up your way.</p>
+      </a>
+      <a class="dock-tray-card" href="/signup">
+        <h4>3PL / Brokers</h4>
+        <p>Multi-modal — drayage + FTL + expedited in one calculator with one rate book.</p>
+      </a>
     </div>
-  </section>
+  </div>
 
-  <footer style="padding: 28px 24px; text-align:center; color: var(--muted); font-size: 13px;">
-    © <span id="year"></span> QuoteFleet · <a href="/pricing">Pricing</a> · <a href="/w/demo">Demo</a> · <a href="/login">Sign in</a>
+  <div class="dock-tray" id="tray-resources">
+    <span class="tag">Resources</span>
+    <div class="dock-tray-grid" style="margin-top: 16px;">
+      <a class="dock-tray-card" href="/w/demo">
+        <h4>Live demo</h4>
+        <p>Try the widget right now. No signup. Pretend you're a shipper getting a quote.</p>
+      </a>
+      <a class="dock-tray-card" href="/pricing">
+        <h4>Pricing</h4>
+        <p>Three plans, transparent pricing. Trial 14 days free. Annual saves 2 months.</p>
+      </a>
+      <a class="dock-tray-card" href="mailto:hello@quotefleet.app">
+        <h4>Contact</h4>
+        <p>Talk to the founder. Onboarding help. White-glove install. SLA questions.</p>
+      </a>
+      <a class="dock-tray-card" href="/login">
+        <h4>Sign in</h4>
+        <p>Existing customer? Sign in to your tenant dashboard.</p>
+      </a>
+    </div>
+  </div>
+
+  <footer class="site-footer">
+    © <span id="year"></span> QuoteFleet ·
+    <a href="/pricing">Pricing</a> ·
+    <a href="/w/demo">Demo</a> ·
+    <a href="/login">Sign in</a> ·
+    <a href="mailto:hello@quotefleet.app">Contact</a>
   </footer>
-  <script>document.getElementById('year').textContent = new Date().getFullYear();</script>
+
+  <script>
+    document.getElementById('year').textContent = new Date().getFullYear();
+
+    // Bottom-dock tray toggle.
+    var docksEl = document.getElementById('qf-dock');
+    var trayItems = docksEl.querySelectorAll('button[data-tray]');
+    var openTrayKey = null;
+    function closeTrays() {
+      ['products', 'solutions', 'resources'].forEach(function (k) {
+        var el = document.getElementById('tray-' + k);
+        if (el) el.classList.remove('open');
+        var btn = docksEl.querySelector('button[data-tray="' + k + '"]');
+        if (btn) btn.classList.remove('active');
+      });
+      openTrayKey = null;
+    }
+    trayItems.forEach(function (b) {
+      b.addEventListener('click', function (e) {
+        e.stopPropagation();
+        var k = b.getAttribute('data-tray');
+        if (openTrayKey === k) { closeTrays(); return; }
+        closeTrays();
+        var tray = document.getElementById('tray-' + k);
+        if (tray) tray.classList.add('open');
+        b.classList.add('active');
+        openTrayKey = k;
+      });
+    });
+    document.addEventListener('click', function (e) {
+      if (!openTrayKey) return;
+      var tray = document.getElementById('tray-' + openTrayKey);
+      if (tray && !tray.contains(e.target) && !docksEl.contains(e.target)) closeTrays();
+    });
+    document.addEventListener('keydown', function (e) {
+      if (e.key === 'Escape') closeTrays();
+    });
+  </script>
 </body>
 </html>

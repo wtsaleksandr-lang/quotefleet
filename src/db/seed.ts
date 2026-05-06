@@ -17,10 +17,12 @@ import {
   rateCards,
   accessorials,
   laneZones,
+  terminals,
   aiConfigs,
   brandConfigs,
 } from './schema.js';
 import { PORTS_DATA } from '../data/ports.js';
+import { TERMINALS_DATA, PORTS_INLAND } from '../data/terminals.js';
 import {
   DEFAULT_RATE_CARDS,
   DEFAULT_ACCESSORIALS,
@@ -28,10 +30,10 @@ import {
   DEFAULT_AI_SYSTEM_PROMPT,
 } from '../calc/defaults.js';
 import { hashPassword } from '../auth/password.js';
-import { loadEnv } from '../config.js';
+import { loadEnv, defaultHostDomain } from '../config.js';
 
 async function seedPorts() {
-  console.log('[seed] Upserting ports...');
+  console.log('[seed] Upserting ports + inland intermodal hubs...');
   for (const p of PORTS_DATA) {
     await db()
       .insert(ports)
@@ -47,7 +49,49 @@ async function seedPorts() {
       })
       .onConflictDoNothing();
   }
-  console.log(`[seed] ${PORTS_DATA.length} ports upserted.`);
+  // Inland intermodal hubs (Chicago, Memphis, etc.) are surfaced as
+  // synthetic "ports" so the widget treats them uniformly.
+  for (const p of PORTS_INLAND) {
+    await db()
+      .insert(ports)
+      .values({
+        code: p.code,
+        name: p.name,
+        city: p.city,
+        state: p.state,
+        country: p.country,
+        lat: p.lat,
+        lng: p.lng,
+        teuRank: p.teuRank,
+      })
+      .onConflictDoNothing();
+  }
+  console.log(
+    `[seed] ${PORTS_DATA.length + PORTS_INLAND.length} ports/hubs upserted.`
+  );
+}
+
+async function seedTerminalsForTenant(tenantId: number) {
+  let idx = 0;
+  for (const t of TERMINALS_DATA) {
+    await db()
+      .insert(terminals)
+      .values({
+        tenantId,
+        portCode: t.portCode,
+        code: t.code,
+        name: t.name,
+        carrier: t.carrier,
+        address: t.address,
+        lat: t.lat,
+        lng: t.lng,
+        notes: t.notes,
+        surcharge: 0,
+        enabled: true,
+        sortOrder: idx++,
+      })
+      .onConflictDoNothing();
+  }
 }
 
 async function seedSuperAdmin() {
@@ -97,6 +141,7 @@ async function seedDemoTenant() {
     .insert(tenants)
     .values({
       slug,
+      hostDomain: defaultHostDomain(),
       name: 'Demo Drayage & Trucking',
       contactEmail: 'demo@quotefleet.local',
       contactPhone: '+1 555 555 0100',
@@ -139,8 +184,12 @@ async function seedDemoTenant() {
   for (const z of generateDefaultLaneZones()) {
     await db().insert(laneZones).values({ ...z, tenantId: t.id });
   }
+  // Terminals (full set; carrier disables ones they don't serve later)
+  await seedTerminalsForTenant(t.id);
 
-  console.log(`[seed] Demo tenant created at /w/${slug}`);
+  const host = defaultHostDomain();
+  console.log(`[seed] Demo tenant created at https://${slug}.${host}/`);
+  console.log(`       Legacy widget URL still works: /w/${slug}`);
   console.log(`       Embed token: ${embedToken}`);
 }
 

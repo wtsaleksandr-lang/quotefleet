@@ -4,53 +4,84 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>Sign in — QuoteFleet</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="/style.css">
 </head>
-<body style="background: var(--surface-2);">
-  <main style="display:flex; align-items:center; justify-content:center; min-height:100vh; padding: 24px;">
-    <div class="card" style="width: 100%; max-width: 420px; padding: 32px;">
-      <a href="/" class="brand-mark" style="margin-bottom: 18px;">
-        <span class="logo"><svg viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2.5"><path d="M3 17h2a3 3 0 0 0 3-3V7H3z"/><path d="M14 7h6l1 4v6h-3"/><circle cx="7" cy="17" r="2"/><circle cx="17" cy="17" r="2"/></svg></span>
+<body>
+  <header class="topnav">
+    <div class="topnav-inner">
+      <a href="/" class="brand-mark">
+        <span class="logo">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M3 17h2a3 3 0 0 0 3-3V7H3z"/><path d="M14 7h6l1 4v6h-3"/><circle cx="7" cy="17" r="2"/><circle cx="17" cy="17" r="2"/></svg>
+        </span>
         QuoteFleet
       </a>
-      <h1 style="font-size: 22px; margin: 0 0 4px 0;">Welcome back</h1>
-      <p class="muted" style="margin: 0 0 24px 0;">Sign in to your dashboard.</p>
-      <form id="login-form" style="display:flex; flex-direction:column; gap: 14px;">
+      <span class="topnav-spacer"></span>
+      <a class="nav-link" href="/signup">New here?</a>
+    </div>
+  </header>
+
+  <main style="display:flex; align-items:center; justify-content:center; min-height: calc(100vh - 80px); padding: 48px 24px;">
+    <div class="card elevated" style="width: 100%; max-width: 460px;">
+      <span class="tag">Sign in</span>
+      <h1 style="font-size: 28px; margin: 12px 0 6px 0; letter-spacing: -0.025em;">
+        Welcome back
+      </h1>
+      <p class="muted" style="margin: 0 0 28px 0; font-size: 14.5px;">
+        Sign in to your tenant dashboard.
+      </p>
+
+      <form id="login-form" style="display:flex; flex-direction:column; gap: 16px;">
         <div class="field">
-          <label class="field-label">Email</label>
+          <label class="field-label required">Email</label>
           <input class="input" type="email" name="email" required autofocus>
         </div>
         <div class="field">
-          <label class="field-label">Password</label>
+          <label class="field-label required">Password</label>
           <input class="input" type="password" name="password" required>
         </div>
-        <button class="btn btn-primary btn-lg" type="submit">Sign in</button>
+        <button class="btn btn-primary btn-lg btn-block" type="submit">
+          Sign in <span class="arr">→</span>
+        </button>
         <div id="login-error" class="notice error hidden"></div>
       </form>
-      <p class="muted-small" style="text-align:center; margin-top: 20px;">
-        New here? <a href="/signup">Create a free account →</a>
+
+      <p class="muted-small" style="text-align:center; margin-top: 26px;">
+        Don't have an account yet? <a href="/signup">Start your free trial →</a>
       </p>
     </div>
   </main>
+
   <script>
     document.getElementById('login-form').addEventListener('submit', async function (e) {
       e.preventDefault();
       var fd = new FormData(e.target);
       var err = document.getElementById('login-error');
       err.classList.add('hidden');
-      var res = await fetch('/api/auth/login', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ email: fd.get('email'), password: fd.get('password') }),
-      });
-      var j = await res.json();
-      if (!res.ok) {
-        err.textContent = j.error || 'Sign-in failed.';
+      var btn = e.target.querySelector('button[type=submit]');
+      btn.disabled = true; var old = btn.innerHTML; btn.innerHTML = 'Signing in…';
+      try {
+        var res = await fetch('/api/auth/login', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ email: fd.get('email'), password: fd.get('password') }),
+        });
+        var j = await res.json();
+        if (!res.ok) {
+          err.textContent = j.error || 'Sign-in failed.';
+          err.classList.remove('hidden');
+          btn.disabled = false; btn.innerHTML = old;
+          return;
+        }
+        if (j.role === 'super_admin') location.href = '/admin';
+        else location.href = '/app';
+      } catch (ex) {
+        err.textContent = 'Network error — try again.';
         err.classList.remove('hidden');
-        return;
+        btn.disabled = false; btn.innerHTML = old;
       }
-      if (j.role === 'super_admin') location.href = '/admin';
-      else location.href = '/app';
     });
   </script>
 </body>

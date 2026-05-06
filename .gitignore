@@ -1,6 +1,7 @@
 node_modules/
 dist/
-data/
+# Runtime data dir (SQLite files, generated artifacts) — root only.
+/data/
 .env
 .env.local
 .DS_Store

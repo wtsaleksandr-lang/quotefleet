@@ -15,6 +15,7 @@ import { registerPublicRoutes } from './routes/public.js';
 import { registerTenantRoutes } from './routes/tenant.js';
 import { registerAdminRoutes } from './routes/admin.js';
 import { registerAiRoutes } from './routes/ai.js';
+import { hostInfoMiddleware } from './hostInfo.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
@@ -25,6 +26,7 @@ export function createApp(): express.Express {
   app.use(express.json({ limit: '2mb' }));
   app.use(express.urlencoded({ extended: true, limit: '2mb' }));
   app.use(cookieParser());
+  app.use(hostInfoMiddleware);
 
   // CORS for the embed widget. Always permissive on /api/public/*; tenants can
   // configure allowed_domains for stricter checks at the widget level.
@@ -56,7 +58,13 @@ export function createApp(): express.Express {
   app.use(express.static(publicDir, { index: false, extensions: ['html'] }));
 
   // Friendly URLs that map to specific HTML files.
-  app.get('/', (_req, res) => res.sendFile(resolve(publicDir, 'landing.html')));
+  // Root path is host-aware: `<slug>.<base>/` → widget; bare base → marketing.
+  app.get('/', (req, res) => {
+    if (req.tenantSubdomain) {
+      return res.sendFile(resolve(publicDir, 'widget.html'));
+    }
+    return res.sendFile(resolve(publicDir, 'landing.html'));
+  });
   app.get('/login', (_req, res) => res.sendFile(resolve(publicDir, 'login.html')));
   app.get('/signup', (_req, res) => res.sendFile(resolve(publicDir, 'signup.html')));
   app.get('/pricing', (_req, res) => res.sendFile(resolve(publicDir, 'pricing.html')));

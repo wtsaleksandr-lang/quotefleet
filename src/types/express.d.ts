@@ -9,6 +9,10 @@ declare global {
     interface Request {
       user?: User;
       tenant?: Tenant;
+      /** Bare base domain that matched HOST_DOMAINS, or null. */
+      hostBaseDomain?: string | null;
+      /** Subdomain (tenant slug candidate) when on `<sub>.<base>`. */
+      tenantSubdomain?: string;
     }
   }
 }

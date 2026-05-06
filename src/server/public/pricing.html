@@ -4,86 +4,148 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>Pricing — QuoteFleet</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="/style.css">
 </head>
 <body>
   <header class="topnav">
     <div class="topnav-inner">
       <a href="/" class="brand-mark">
-        <span class="logo"><svg viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2.5"><path d="M3 17h2a3 3 0 0 0 3-3V7H3z"/><path d="M14 7h6l1 4v6h-3"/><circle cx="7" cy="17" r="2"/><circle cx="17" cy="17" r="2"/></svg></span>
+        <span class="logo">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M3 17h2a3 3 0 0 0 3-3V7H3z"/><path d="M14 7h6l1 4v6h-3"/><circle cx="7" cy="17" r="2"/><circle cx="17" cy="17" r="2"/></svg>
+        </span>
         QuoteFleet
       </a>
       <span class="topnav-spacer"></span>
       <a class="nav-link" href="/login">Sign in</a>
-      <a class="btn btn-primary" href="/signup">Start free</a>
+      <a class="btn btn-primary always-show" href="/signup">
+        Start free <span class="arr">→</span>
+      </a>
     </div>
   </header>
-  <main class="container" style="padding: 48px 24px;">
-    <div style="text-align:center; margin-bottom: 32px;">
-      <h1 style="font-size: 36px; letter-spacing: -0.02em; margin-bottom: 8px;">Simple, fair pricing.</h1>
-      <p class="muted" style="font-size: 15px;">Start free. Upgrade when you outgrow it. Cancel anytime.</p>
+
+  <section class="hero" style="padding-bottom: 32px;">
+    <div class="container-narrow">
+      <span class="tag">Pricing</span>
+      <h1 style="font-size: 48px;">
+        Simple, fair, <span class="accent">honest pricing.</span>
+      </h1>
+      <p class="lead">
+        Start free for 14 days, no credit card. Upgrade when you outgrow it.
+        Cancel anytime. Annual saves 2 months.
+      </p>
     </div>
+  </section>
+
+  <main class="container" style="padding-bottom: 64px;">
     <div class="pricing">
       <div class="price-card">
-        <h3>Free</h3>
-        <div class="price">$0<span class="per"> /month</span></div>
+        <span class="tag">Free trial</span>
+        <h3 style="margin-top: 8px;">Trial</h3>
+        <div class="price">$0<span class="per"> · 14 days</span></div>
         <ul>
-          <li>1 calculator widget</li>
-          <li>50 quotes / month</li>
+          <li>1 hosted calculator</li>
+          <li>50 quotes during trial</li>
           <li>Default rate templates (USA + Canada)</li>
-          <li>AI auto-reply</li>
+          <li>AI auto-reply &amp; chat</li>
           <li>Lead inbox</li>
           <li>"Powered by QuoteFleet" footer</li>
         </ul>
-        <a class="btn btn-secondary btn-block" href="/signup">Start free</a>
+        <a class="btn btn-secondary btn-block" href="/signup">
+          Start free <span class="arr">→</span>
+        </a>
       </div>
+
       <div class="price-card featured">
-        <h3>Starter</h3>
-        <div class="price">$39<span class="per"> /month</span></div>
+        <span class="tag accent">Most popular</span>
+        <h3 style="margin-top: 8px;">Starter</h3>
+        <div class="price">$79<span class="per"> /month</span></div>
+        <ul>
+          <li>200 quotes / month</li>
+          <li>Hosted page + script embed</li>
+          <li>AI rate-adjuster (plain English)</li>
+          <li>Auto-reply email + lead chat</li>
+          <li>Remove "Powered by"</li>
+          <li>Email support · 1 user</li>
+        </ul>
+        <a class="btn btn-primary btn-block" href="/signup">
+          Start trial <span class="arr">→</span>
+        </a>
+      </div>
+
+      <div class="price-card">
+        <span class="tag">Pro</span>
+        <h3 style="margin-top: 8px;">Pro</h3>
+        <div class="price">$199<span class="per"> /month</span></div>
         <ul>
           <li>Unlimited quotes</li>
-          <li>Customer chat (AI dispatcher)</li>
-          <li>AI rate-adjuster (plain English)</li>
-          <li>Custom domain (subdomain)</li>
-          <li>Remove "Powered by"</li>
-          <li>Email support</li>
-        </ul>
-        <a class="btn btn-primary btn-block" href="/signup">Start free trial</a>
-      </div>
-      <div class="price-card">
-        <h3>Pro</h3>
-        <div class="price">$99<span class="per"> /month</span></div>
-        <ul>
-          <li>Everything in Starter</li>
-          <li>Bring your own Anthropic key</li>
-          <li>SMS/email lead routing</li>
+          <li>Custom domain (CNAME)</li>
+          <li>Bring-your-own Anthropic key</li>
+          <li>White-glove install (free)</li>
           <li>CSV exports + webhooks</li>
-          <li>Multi-user team accounts</li>
-          <li>Priority support</li>
+          <li>Up to 5 users</li>
         </ul>
-        <a class="btn btn-secondary btn-block" href="/signup">Start free trial</a>
+        <a class="btn btn-secondary btn-block" href="/signup">
+          Start trial <span class="arr">→</span>
+        </a>
       </div>
+
       <div class="price-card">
-        <h3>Enterprise</h3>
-        <div class="price">Custom</div>
+        <span class="tag">Fleet</span>
+        <h3 style="margin-top: 8px;">Fleet</h3>
+        <div class="price">$499<span class="per"> /month</span></div>
         <ul>
           <li>Everything in Pro</li>
           <li>Multi-tenant (broker / aggregator)</li>
-          <li>Dedicated environment</li>
           <li>SLA + SSO</li>
-          <li>Custom integrations (TMS, DAT, etc.)</li>
+          <li>TMS / DAT / Truckstop integrations</li>
+          <li>Dedicated environment option</li>
           <li>Onboarding workshop</li>
         </ul>
-        <a class="btn btn-secondary btn-block" href="mailto:hello@quotefleet.com">Talk to us</a>
+        <a class="btn btn-secondary btn-block" href="mailto:hello@quotefleet.app">
+          Talk to us <span class="arr">→</span>
+        </a>
       </div>
     </div>
-    <p class="muted-small" style="text-align:center;">
+    <p class="muted-small" style="text-align:center; margin-top: 32px;">
       All plans include the embeddable widget, default USA/Canada rate templates, lead capture,
-      mobile-responsive UI, and email notifications.
+      mobile-responsive UI, and notifications. Annual saves 2 months on every plan.
     </p>
   </main>
-  <footer style="padding: 28px 24px; text-align:center; color: var(--muted); font-size: 13px;">
-    © QuoteFleet · <a href="/">Home</a> · <a href="/login">Sign in</a>
+
+  <section class="section" style="background: var(--surface); margin-top: 0;">
+    <div class="container-narrow" style="text-align:center;">
+      <span class="tag">FAQ</span>
+      <h2 style="font-size: 30px; margin: 14px 0 36px 0;">Common questions</h2>
+      <div style="display:grid; gap: 16px; text-align:left;">
+        <div class="card">
+          <div class="card-title">Can I bring my own Anthropic API key?</div>
+          <p class="muted">Yes — on Pro and Fleet plans. Save costs and keep all AI calls under your account.</p>
+        </div>
+        <div class="card">
+          <div class="card-title">Do you charge for white-glove install?</div>
+          <p class="muted">Free on Pro and Fleet. $149 one-time on Starter. We can install on WordPress, Wix, Squarespace, or custom HTML.</p>
+        </div>
+        <div class="card">
+          <div class="card-title">What happens after the trial?</div>
+          <p class="muted">Your dashboard goes read-only. No charges, no surprises. Pick a plan whenever you're ready.</p>
+        </div>
+        <div class="card">
+          <div class="card-title">Can I use my own domain?</div>
+          <p class="muted">Yes — Pro and Fleet support custom domains via CNAME (e.g. <code style="font-family: var(--font-mono);">quote.yourcompany.com</code>).</p>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <footer class="site-footer">
+    © <span id="year"></span> QuoteFleet ·
+    <a href="/">Home</a> ·
+    <a href="/login">Sign in</a> ·
+    <a href="mailto:hello@quotefleet.app">Contact</a>
   </footer>
+  <script>document.getElementById('year').textContent = new Date().getFullYear();</script>
 </body>
 </html>

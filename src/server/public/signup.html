@@ -3,76 +3,191 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>Create your account — QuoteFleet</title>
+  <title>Start your trial — QuoteFleet</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="/style.css">
 </head>
-<body style="background: var(--surface-2);">
-  <main style="display:flex; align-items:center; justify-content:center; min-height:100vh; padding: 24px;">
-    <div class="card" style="width: 100%; max-width: 480px; padding: 32px;">
-      <a href="/" class="brand-mark" style="margin-bottom: 18px;">
-        <span class="logo"><svg viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2.5"><path d="M3 17h2a3 3 0 0 0 3-3V7H3z"/><path d="M14 7h6l1 4v6h-3"/><circle cx="7" cy="17" r="2"/><circle cx="17" cy="17" r="2"/></svg></span>
+<body>
+  <header class="topnav">
+    <div class="topnav-inner">
+      <a href="/" class="brand-mark">
+        <span class="logo">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M3 17h2a3 3 0 0 0 3-3V7H3z"/><path d="M14 7h6l1 4v6h-3"/><circle cx="7" cy="17" r="2"/><circle cx="17" cy="17" r="2"/></svg>
+        </span>
         QuoteFleet
       </a>
-      <h1 style="font-size: 22px; margin: 0 0 4px 0;">Start your free account</h1>
-      <p class="muted" style="margin: 0 0 24px 0;">Up and running in 90 seconds.</p>
-      <form id="signup-form" style="display:flex; flex-direction:column; gap: 14px;">
+      <span class="topnav-spacer"></span>
+      <a class="nav-link" href="/login">Already have an account?</a>
+    </div>
+  </header>
+
+  <main style="display:flex; align-items:center; justify-content:center; min-height: calc(100vh - 80px); padding: 48px 24px;">
+    <div class="card elevated" style="width: 100%; max-width: 540px;">
+      <span class="tag">Start your free trial</span>
+      <h1 style="font-size: 28px; margin: 12px 0 6px 0; letter-spacing: -0.025em;">
+        Live on the web in 90 seconds
+      </h1>
+      <p class="muted" style="margin: 0 0 28px 0; font-size: 14.5px;">
+        14 days free · no credit card · all features unlocked
+      </p>
+
+      <form id="signup-form" style="display:flex; flex-direction:column; gap: 18px;">
         <div class="field">
           <label class="field-label required">Company name</label>
           <input class="input" name="companyName" placeholder="Acme Drayage" required>
         </div>
+
         <div class="field">
-          <label class="field-label required">Your email</label>
-          <input class="input" type="email" name="email" required>
+          <label class="field-label required">Your hosted page URL</label>
+          <div class="url-builder">
+            <input class="input" name="slug" id="slug-input" placeholder="acme" autocomplete="off" required pattern="^[a-z0-9](?:[a-z0-9-]*[a-z0-9])?$" minlength="3" maxlength="30">
+            <select class="select" name="hostDomain" id="host-input"></select>
+          </div>
+          <div class="url-builder-preview" id="url-preview">
+            Your hosted page will be: <span class="live">acme.quotefleet.app</span>
+          </div>
+          <span class="field-hint" id="slug-hint">Lowercase letters, numbers, dashes. 3–30 chars.</span>
         </div>
-        <div class="field">
-          <label class="field-label required">Password</label>
-          <input class="input" type="password" name="password" minlength="6" required>
-          <span class="field-hint">6 characters minimum.</span>
+
+        <div class="grid-2">
+          <div class="field">
+            <label class="field-label required">Your email</label>
+            <input class="input" type="email" name="email" required>
+          </div>
+          <div class="field">
+            <label class="field-label required">Password</label>
+            <input class="input" type="password" name="password" minlength="6" required placeholder="6+ characters">
+          </div>
         </div>
-        <div class="field">
-          <label class="field-label">Country focus</label>
-          <select class="select" name="countryFocus">
-            <option value="US" selected>USA only</option>
-            <option value="CA">Canada only</option>
-            <option value="BOTH">USA + Canada</option>
-          </select>
+
+        <div class="grid-2">
+          <div class="field">
+            <label class="field-label">Country focus</label>
+            <select class="select" name="countryFocus">
+              <option value="US" selected>USA only</option>
+              <option value="CA">Canada only</option>
+              <option value="BOTH">USA + Canada</option>
+            </select>
+          </div>
+          <div class="field">
+            <label class="field-label">Phone (optional)</label>
+            <input class="input" name="contactPhone" type="tel">
+          </div>
         </div>
-        <div class="field">
-          <label class="field-label">Phone (optional)</label>
-          <input class="input" name="contactPhone" type="tel">
-        </div>
-        <button class="btn btn-primary btn-lg" type="submit">Create account</button>
+
+        <button class="btn btn-primary btn-lg btn-block" type="submit">
+          Create account <span class="arr">→</span>
+        </button>
         <div id="signup-error" class="notice error hidden"></div>
       </form>
-      <p class="muted-small" style="text-align:center; margin-top: 20px;">
-        Already have an account? <a href="/login">Sign in →</a>
+
+      <p class="muted-small" style="text-align:center; margin-top: 26px;">
+        By signing up you agree to our <a href="#">terms</a> &amp; <a href="#">privacy policy</a>.
       </p>
     </div>
   </main>
+
   <script>
-    document.getElementById('signup-form').addEventListener('submit', async function (e) {
+    var form = document.getElementById('signup-form');
+    var slugInput = document.getElementById('slug-input');
+    var hostInput = document.getElementById('host-input');
+    var preview = document.getElementById('url-preview').querySelector('.live');
+    var hint = document.getElementById('slug-hint');
+    var companyInput = form.querySelector('[name="companyName"]');
+
+    function slugify(s) {
+      return (s || '').toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)/g, '').slice(0, 30);
+    }
+    function refreshPreview() {
+      var s = slugInput.value.trim() || 'your-slug';
+      var h = hostInput.value || 'quotefleet.app';
+      preview.textContent = s + '.' + h;
+    }
+
+    // Auto-fill slug from company name until user touches the slug field.
+    var slugTouched = false;
+    slugInput.addEventListener('input', function () { slugTouched = true; refreshPreview(); checkSlug(); });
+    companyInput.addEventListener('input', function () {
+      if (!slugTouched) {
+        slugInput.value = slugify(companyInput.value);
+        refreshPreview(); checkSlug();
+      }
+    });
+    hostInput.addEventListener('change', refreshPreview);
+
+    // Debounced slug availability check.
+    var slugTimer = null;
+    function checkSlug() {
+      clearTimeout(slugTimer);
+      var v = slugInput.value.trim();
+      if (!v) { hint.textContent = 'Lowercase letters, numbers, dashes. 3–30 chars.'; hint.className = 'field-hint'; return; }
+      slugTimer = setTimeout(function () {
+        fetch('/api/auth/check-slug?slug=' + encodeURIComponent(v))
+          .then(function (r) { return r.json(); })
+          .then(function (j) {
+            if (j.ok) { hint.textContent = '✓ Available — ' + v + '.' + hostInput.value + ' is yours.'; hint.className = 'field-hint ok'; }
+            else if (j.reason === 'taken') { hint.textContent = '✗ ' + v + ' is already taken — try another.'; hint.className = 'field-hint error'; }
+            else if (j.reason === 'reserved') { hint.textContent = '✗ ' + v + ' is reserved.'; hint.className = 'field-hint error'; }
+            else if (j.reason === 'format') { hint.textContent = '✗ Use lowercase letters, numbers, dashes only.'; hint.className = 'field-hint error'; }
+            else if (j.reason === 'length') { hint.textContent = '✗ Must be 3–30 characters.'; hint.className = 'field-hint error'; }
+          })
+          .catch(function () { /* silent */ });
+      }, 350);
+    }
+
+    // Bootstrap host options from /api/auth/signup-options.
+    fetch('/api/auth/signup-options').then(function (r) { return r.json(); }).then(function (opts) {
+      hostInput.innerHTML = '';
+      (opts.hostDomains || ['quotefleet.app']).forEach(function (h) {
+        var o = document.createElement('option');
+        o.value = h; o.textContent = h;
+        if (h === opts.defaultHostDomain) o.selected = true;
+        hostInput.appendChild(o);
+      });
+      refreshPreview();
+    }).catch(function () {
+      // Fallback: just show one option so the form still works.
+      hostInput.innerHTML = '<option value="quotefleet.app">quotefleet.app</option>';
+      refreshPreview();
+    });
+
+    form.addEventListener('submit', async function (e) {
       e.preventDefault();
-      var fd = new FormData(e.target);
+      var fd = new FormData(form);
       var err = document.getElementById('signup-error');
       err.classList.add('hidden');
-      var res = await fetch('/api/auth/signup', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          companyName: fd.get('companyName'),
-          email: fd.get('email'),
-          password: fd.get('password'),
-          countryFocus: fd.get('countryFocus') || 'US',
-          contactPhone: fd.get('contactPhone') || undefined,
-        }),
-      });
-      var j = await res.json();
-      if (!res.ok) {
-        err.textContent = j.error || 'Signup failed.';
+      var btn = form.querySelector('button[type=submit]');
+      btn.disabled = true;
+      var oldText = btn.innerHTML; btn.innerHTML = 'Creating account…';
+      try {
+        var res = await fetch('/api/auth/signup', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            companyName: fd.get('companyName'),
+            slug: fd.get('slug'),
+            hostDomain: fd.get('hostDomain'),
+            email: fd.get('email'),
+            password: fd.get('password'),
+            countryFocus: fd.get('countryFocus') || 'US',
+            contactPhone: fd.get('contactPhone') || undefined,
+          }),
+        });
+        var j = await res.json();
+        if (!res.ok) {
+          err.textContent = j.error || 'Signup failed.';
+          err.classList.remove('hidden');
+          btn.disabled = false; btn.innerHTML = oldText;
+          return;
+        }
+        location.href = '/app';
+      } catch (ex) {
+        err.textContent = 'Network error — try again.';
         err.classList.remove('hidden');
-        return;
+        btn.disabled = false; btn.innerHTML = oldText;
       }
-      location.href = '/app';
     });
   </script>
 </body>

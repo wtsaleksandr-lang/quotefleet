@@ -13,6 +13,11 @@ export interface Env {
   SESSION_SECRET: string;
   PORT: number;
   HOST: string;
+  /** Comma-separated list of platform-owned host domains. The first
+   *  entry is the default for new signups. e.g.
+   *  "quotefleet.app,quotefleet.net,truckrate.online,your-quote.online"
+   *  — wildcard DNS for each routes `<slug>.<domain>` here. */
+  HOST_DOMAINS: string[];
   SUPER_ADMIN_EMAIL?: string;
   MAPBOX_TOKEN?: string;
   EIA_API_KEY?: string;
@@ -56,6 +61,13 @@ export function loadEnv(): Env {
     );
   }
 
+  const hostDomainsRaw = opt('HOST_DOMAINS') ?? 'quotefleet.app';
+  const hostDomains = hostDomainsRaw
+    .split(',')
+    .map((s) => s.trim().toLowerCase().replace(/^https?:\/\//, '').replace(/\/.*$/, ''))
+    .filter(Boolean);
+  if (hostDomains.length === 0) hostDomains.push('quotefleet.app');
+
   cached = {
     DATABASE_URL: need('DATABASE_URL'),
     ANTHROPIC_API_KEY: need('ANTHROPIC_API_KEY'),
@@ -63,6 +75,7 @@ export function loadEnv(): Env {
     SESSION_SECRET: sessionSecret,
     PORT: Number(opt('PORT') ?? 5000),
     HOST: opt('HOST') ?? '0.0.0.0',
+    HOST_DOMAINS: hostDomains,
     SUPER_ADMIN_EMAIL: opt('SUPER_ADMIN_EMAIL'),
     MAPBOX_TOKEN: opt('MAPBOX_TOKEN'),
     EIA_API_KEY: opt('EIA_API_KEY'),
@@ -73,4 +86,20 @@ export function loadEnv(): Env {
     SMTP_FROM: opt('SMTP_FROM'),
   };
   return cached;
+}
+
+/** Default host domain for new signups (first entry of HOST_DOMAINS). */
+export function defaultHostDomain(): string {
+  return loadEnv().HOST_DOMAINS[0] ?? 'quotefleet.app';
+}
+
+/** True if the given host (e.g. "astova.quotefleet.app") is on a
+ *  platform-owned domain. Returns the matching base domain if so. */
+export function matchHostDomain(host: string): string | null {
+  const h = (host || '').toLowerCase().split(':')[0]; // strip port
+  if (!h) return null;
+  for (const base of loadEnv().HOST_DOMAINS) {
+    if (h === base || h.endsWith('.' + base)) return base;
+  }
+  return null;
 }

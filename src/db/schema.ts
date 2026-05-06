@@ -36,8 +36,14 @@ export const tenants = pgTable(
   'tenants',
   {
     id: serial('id').primaryKey(),
-    /** URL-safe slug (used in /w/:slug widget URL and dashboards). */
+    /** URL-safe slug — also the subdomain. e.g. "astova" → astova.quotefleet.app. */
     slug: text('slug').notNull().unique(),
+    /** Which of the platform-owned host domains hosts this tenant.
+     *  e.g. "quotefleet.app", "quotefleet.net", "truckrate.online".
+     *  The full hosted URL is `<slug>.<hostDomain>`. */
+    hostDomain: text('host_domain').notNull().default('quotefleet.app'),
+    /** Optional custom domain (Pro tier). e.g. "quote.astova.com" mapped via CNAME. */
+    customDomain: text('custom_domain').unique(),
     /** Public company name shown in the calculator. */
     name: text('name').notNull(),
     /** Contact email for the tenant owner (notifications). */
@@ -52,6 +58,8 @@ export const tenants = pgTable(
     plan: text('plan').notNull().default('free'),
     /** Whether the tenant is active or suspended. */
     status: text('status').notNull().default('active'),
+    /** Trial end timestamp. Null = not on trial (paid or grandfathered). */
+    trialEndsAt: timestamp('trial_ends_at', { mode: 'date' }),
     /** Optional per-tenant Anthropic API key (encrypted). When set,
      *  overrides the platform default for that tenant's AI calls. */
     anthropicKeyEncrypted: text('anthropic_key_encrypted'),
@@ -59,7 +67,10 @@ export const tenants = pgTable(
     createdAt: timestamp('created_at', { mode: 'date' }).notNull().defaultNow(),
     updatedAt: timestamp('updated_at', { mode: 'date' }).notNull().defaultNow(),
   },
-  (t) => [uniqueIndex('tenants_slug_idx').on(t.slug)]
+  (t) => [
+    uniqueIndex('tenants_slug_idx').on(t.slug),
+    uniqueIndex('tenants_slug_host_idx').on(t.slug, t.hostDomain),
+  ]
 );
 
 // ────────────────────────────────────────────────────────────────────
@@ -168,6 +179,45 @@ export const accessorials = pgTable('accessorials', {
   createdAt: timestamp('created_at', { mode: 'date' }).notNull().defaultNow(),
   updatedAt: timestamp('updated_at', { mode: 'date' }).notNull().defaultNow(),
 });
+
+// ────────────────────────────────────────────────────────────────────
+// TERMINALS — tenant-scoped list of marine terminals / rail ramps the
+// carrier serves. Solves the "I don't know which terminal" problem:
+// the widget shows the tenant's terminals filtered by selected port,
+// always with an "I don't know yet" first option.
+//
+// Each terminal can carry a per-move surcharge (some are slower /
+// pricier than others — APM Pier 400 vs WBCT can differ by $150).
+// ────────────────────────────────────────────────────────────────────
+export const terminals = pgTable(
+  'terminals',
+  {
+    id: serial('id').primaryKey(),
+    tenantId: integer('tenant_id')
+      .notNull()
+      .references(() => tenants.id, { onDelete: 'cascade' }),
+    /** Reference to ports.code — anchors this terminal to a port/city. */
+    portCode: text('port_code').notNull(),
+    /** Stable internal code, e.g. "USLAX_APM_P400" or "CHI_BNSF_LPC". */
+    code: text('code').notNull(),
+    /** Display name shown in the dropdown. */
+    name: text('name').notNull(),
+    /** Optional steamship line / rail carrier this terminal serves. */
+    carrier: text('carrier'),
+    address: text('address'),
+    lat: doublePrecision('lat'),
+    lng: doublePrecision('lng'),
+    /** Per-move surcharge ($) when this specific terminal is picked. */
+    surcharge: doublePrecision('surcharge').notNull().default(0),
+    /** Optional note shown under the terminal name in the dropdown. */
+    notes: text('notes'),
+    enabled: boolean('enabled').notNull().default(true),
+    sortOrder: integer('sort_order').notNull().default(0),
+    createdAt: timestamp('created_at', { mode: 'date' }).notNull().defaultNow(),
+    updatedAt: timestamp('updated_at', { mode: 'date' }).notNull().defaultNow(),
+  },
+  (t) => [uniqueIndex('terminals_tenant_code_idx').on(t.tenantId, t.code)]
+);
 
 // ────────────────────────────────────────────────────────────────────
 // LANE ZONES — used for drayage where rates aren't a flat $/mile but
@@ -285,6 +335,18 @@ export const leads = pgTable(
 
     pickupDate: text('pickup_date'),
     deliveryDate: text('delivery_date'),
+
+    /** Drayage: terminal codes when known. Match `terminals.code`. */
+    pickupTerminalCode: text('pickup_terminal_code'),
+    deliveryTerminalCode: text('delivery_terminal_code'),
+    /** Drayage: ocean carrier (steamship line) name, e.g. "Maersk", "MSC". */
+    oceanCarrier: text('ocean_carrier'),
+    /** Drayage: booking number from the steamship line. */
+    bookingNumber: text('booking_number'),
+    /** Drayage: bill-of-lading or sea-waybill number. */
+    billOfLadingNumber: text('bill_of_lading_number'),
+    /** Drayage: container number(s) when known. */
+    containerNumbers: text('container_numbers'),
 
     weightLbs: doublePrecision('weight_lbs'),
     pieces: integer('pieces'),
@@ -431,6 +493,126 @@ export const ports = pgTable(
 );
 
 // ────────────────────────────────────────────────────────────────────
+// OUTREACH PROSPECTS — platform-level (no tenantId). Owners are the
+// super-admins running cold campaigns to acquire new tenants.
+//
+// We don't send mail from this DB — sending happens via Smartlead
+// (or Instantly), which has its own queueing, warmup, and reputation
+// management. We just track the prospect pipeline and statuses so you
+// have a single dashboard.
+//
+// Status flow: new → enriched → queued → sent → opened → replied →
+//              meeting → trial_started → subscribed → churned
+//              (or 'unqualified' / 'bounced' / 'unsubscribed')
+// ────────────────────────────────────────────────────────────────────
+export const outreachProspects = pgTable(
+  'outreach_prospects',
+  {
+    id: serial('id').primaryKey(),
+    /** Stable external ID from Smartlead / Instantly when synced. */
+    externalId: text('external_id'),
+    /** Which provider this prospect lives in. */
+    provider: text('provider').notNull().default('smartlead'),
+    /** Source of the lead — 'scrape:google_maps', 'manual', 'csv_upload', 'apollo_export'. */
+    source: text('source'),
+
+    // ── company ──────────────────────────────────────────────────
+    companyName: text('company_name'),
+    companyDomain: text('company_domain'),
+    companyPhone: text('company_phone'),
+    companyAddress: text('company_address'),
+    companyCity: text('company_city'),
+    companyState: text('company_state'),
+    companyCountry: text('company_country'),
+    /** Carrier sub-segment: drayage / FTL / LTL / 3PL / freight forwarder / etc. */
+    segment: text('segment'),
+    /** Estimated fleet size, employees, or revenue band. */
+    sizeBand: text('size_band'),
+    websiteUrl: text('website_url'),
+    /** What we found on their site (has-quote-tool? form-only? phone-only?). */
+    websiteSnapshotJson: jsonb('website_snapshot_json').$type<Record<string, unknown>>(),
+
+    // ── contact person ───────────────────────────────────────────
+    contactName: text('contact_name'),
+    contactTitle: text('contact_title'),
+    contactEmail: text('contact_email'),
+    contactPhone: text('contact_phone'),
+    contactLinkedin: text('contact_linkedin'),
+
+    // ── pipeline ─────────────────────────────────────────────────
+    status: text('status').notNull().default('new'),
+    /** ISO date strings of the most recent state transition. */
+    lastTouchedAt: timestamp('last_touched_at', { mode: 'date' }),
+    nextFollowupAt: timestamp('next_followup_at', { mode: 'date' }),
+    /** Free-form notes typed by the operator. */
+    notes: text('notes'),
+    /** When converted, link to the resulting tenant. */
+    convertedTenantId: integer('converted_tenant_id').references(() => tenants.id, {
+      onDelete: 'set null',
+    }),
+
+    /** Custom tags / lists, e.g. ["fmcsa-import", "nyc", "drayage"]. */
+    tags: jsonb('tags').$type<string[]>(),
+
+    createdAt: timestamp('created_at', { mode: 'date' }).notNull().defaultNow(),
+    updatedAt: timestamp('updated_at', { mode: 'date' }).notNull().defaultNow(),
+  },
+  (t) => [uniqueIndex('outreach_email_idx').on(t.contactEmail)]
+);
+
+// ────────────────────────────────────────────────────────────────────
+// OUTREACH CAMPAIGNS — campaign metadata mirrored from Smartlead.
+// ────────────────────────────────────────────────────────────────────
+export const outreachCampaigns = pgTable('outreach_campaigns', {
+  id: serial('id').primaryKey(),
+  /** Smartlead / Instantly campaign ID. */
+  externalId: text('external_id').notNull(),
+  provider: text('provider').notNull().default('smartlead'),
+  name: text('name').notNull(),
+  /** Sending domain used for this campaign — separate from the product brand. */
+  sendingDomain: text('sending_domain'),
+  /** Subject line + body templates (synced from provider for visibility). */
+  subjectLine: text('subject_line'),
+  bodyTemplate: text('body_template'),
+  status: text('status').notNull().default('draft'), // draft | warming | active | paused | done
+  /** Aggregate stats refreshed on a schedule. */
+  statsJson: jsonb('stats_json').$type<{
+    sent?: number;
+    opened?: number;
+    replied?: number;
+    meetings?: number;
+    bounced?: number;
+    unsubscribed?: number;
+    lastSyncedAt?: string;
+  }>(),
+  createdAt: timestamp('created_at', { mode: 'date' }).notNull().defaultNow(),
+  updatedAt: timestamp('updated_at', { mode: 'date' }).notNull().defaultNow(),
+});
+
+// ────────────────────────────────────────────────────────────────────
+// OUTREACH EVENTS — per-prospect activity log (sends, opens, replies).
+// Mirrored from Smartlead webhooks so the admin dashboard timeline is
+// fast to read without round-tripping the API.
+// ────────────────────────────────────────────────────────────────────
+export const outreachEvents = pgTable('outreach_events', {
+  id: serial('id').primaryKey(),
+  prospectId: integer('prospect_id')
+    .notNull()
+    .references(() => outreachProspects.id, { onDelete: 'cascade' }),
+  campaignId: integer('campaign_id').references(() => outreachCampaigns.id, {
+    onDelete: 'set null',
+  }),
+  /** 'sent' | 'opened' | 'clicked' | 'replied' | 'meeting_booked' |
+   *  'bounced' | 'unsubscribed' | 'note' | 'manual' */
+  eventType: text('event_type').notNull(),
+  /** Step in the campaign sequence (1 = initial, 2 = first followup, …). */
+  stepIndex: integer('step_index'),
+  /** Free-form payload (subject, body excerpt, link clicked, etc.). */
+  payloadJson: jsonb('payload_json').$type<Record<string, unknown>>(),
+  occurredAt: timestamp('occurred_at', { mode: 'date' }).notNull().defaultNow(),
+});
+
+// ────────────────────────────────────────────────────────────────────
 // PLATFORM SETTINGS — key/value store for app-wide config.
 // ────────────────────────────────────────────────────────────────────
 export const platformSettings = pgTable('platform_settings', {
@@ -453,9 +635,16 @@ export type Accessorial = typeof accessorials.$inferSelect;
 export type NewAccessorial = typeof accessorials.$inferInsert;
 export type LaneZone = typeof laneZones.$inferSelect;
 export type NewLaneZone = typeof laneZones.$inferInsert;
+export type Terminal = typeof terminals.$inferSelect;
+export type NewTerminal = typeof terminals.$inferInsert;
 export type AiConfig = typeof aiConfigs.$inferSelect;
 export type BrandConfig = typeof brandConfigs.$inferSelect;
 export type Lead = typeof leads.$inferSelect;
 export type NewLead = typeof leads.$inferInsert;
 export type Conversation = typeof conversations.$inferSelect;
 export type Port = typeof ports.$inferSelect;
+export type OutreachProspect = typeof outreachProspects.$inferSelect;
+export type NewOutreachProspect = typeof outreachProspects.$inferInsert;
+export type OutreachCampaign = typeof outreachCampaigns.$inferSelect;
+export type OutreachEvent = typeof outreachEvents.$inferSelect;
+export type NewOutreachEvent = typeof outreachEvents.$inferInsert;

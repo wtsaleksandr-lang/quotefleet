@@ -50,9 +50,23 @@
     return { city: s, country: 'US' };
   }
 
-  var slug = (location.pathname.split('/w/')[1] || '').split(/[/?]/)[0];
+  // Slug detection: works in three modes
+  //   1. Path-based:    /w/<slug>            (legacy iframe / direct link)
+  //   2. Subdomain:     <slug>.<host>/       (hosted page, embed iframe)
+  //   3. Override:      window.QF_TENANT_SLUG (custom embed)
+  var slug = (window.QF_TENANT_SLUG || '').toString();
   if (!slug) {
-    document.body.innerHTML = '<div class="qf-widget"><div class="qf-error">Missing tenant slug in URL.</div></div>';
+    var pathMatch = location.pathname.match(/^\/w\/([^/?#]+)/);
+    if (pathMatch) slug = pathMatch[1];
+  }
+  if (!slug) {
+    var hostParts = location.hostname.split('.');
+    if (hostParts.length >= 3 && hostParts[0] !== 'www') {
+      slug = hostParts[0];
+    }
+  }
+  if (!slug) {
+    document.body.innerHTML = '<div class="qf-widget"><div class="qf-error">Missing tenant slug — check the URL.</div></div>';
     return;
   }
 
