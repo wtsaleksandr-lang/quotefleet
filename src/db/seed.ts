@@ -6,6 +6,7 @@
  *    so the public widget at /w/demo works out of the box for testing.
  *
  * Safe to re-run — uses onConflictDoNothing for idempotency.
+ * Uses bulk inserts throughout to keep the build fast.
  */
 import { eq } from 'drizzle-orm';
 import { nanoid } from 'nanoid';
@@ -34,64 +35,51 @@ import { loadEnv, defaultHostDomain } from '../config.js';
 
 async function seedPorts() {
   console.log('[seed] Upserting ports + inland intermodal hubs...');
-  for (const p of PORTS_DATA) {
-    await db()
-      .insert(ports)
-      .values({
-        code: p.code,
-        name: p.name,
-        city: p.city,
-        state: p.state ?? null,
-        country: p.country,
-        lat: p.lat,
-        lng: p.lng,
-        teuRank: p.teuRank,
-      })
-      .onConflictDoNothing();
+  const allPorts = [
+    ...PORTS_DATA.map((p) => ({
+      code: p.code,
+      name: p.name,
+      city: p.city,
+      state: p.state ?? null,
+      country: p.country,
+      lat: p.lat,
+      lng: p.lng,
+      teuRank: p.teuRank,
+    })),
+    ...PORTS_INLAND.map((p) => ({
+      code: p.code,
+      name: p.name,
+      city: p.city,
+      state: p.state,
+      country: p.country,
+      lat: p.lat,
+      lng: p.lng,
+      teuRank: p.teuRank,
+    })),
+  ];
+  if (allPorts.length > 0) {
+    await db().insert(ports).values(allPorts).onConflictDoNothing();
   }
-  // Inland intermodal hubs (Chicago, Memphis, etc.) are surfaced as
-  // synthetic "ports" so the widget treats them uniformly.
-  for (const p of PORTS_INLAND) {
-    await db()
-      .insert(ports)
-      .values({
-        code: p.code,
-        name: p.name,
-        city: p.city,
-        state: p.state,
-        country: p.country,
-        lat: p.lat,
-        lng: p.lng,
-        teuRank: p.teuRank,
-      })
-      .onConflictDoNothing();
-  }
-  console.log(
-    `[seed] ${PORTS_DATA.length + PORTS_INLAND.length} ports/hubs upserted.`
-  );
+  console.log(`[seed] ${allPorts.length} ports/hubs upserted.`);
 }
 
 async function seedTerminalsForTenant(tenantId: number) {
-  let idx = 0;
-  for (const t of TERMINALS_DATA) {
-    await db()
-      .insert(terminals)
-      .values({
-        tenantId,
-        portCode: t.portCode,
-        code: t.code,
-        name: t.name,
-        carrier: t.carrier,
-        address: t.address,
-        lat: t.lat,
-        lng: t.lng,
-        notes: t.notes,
-        surcharge: 0,
-        enabled: true,
-        sortOrder: idx++,
-      })
-      .onConflictDoNothing();
-  }
+  if (TERMINALS_DATA.length === 0) return;
+  const rows = TERMINALS_DATA.map((t, idx) => ({
+    tenantId,
+    portCode: t.portCode,
+    code: t.code,
+    name: t.name,
+    carrier: t.carrier,
+    address: t.address,
+    lat: t.lat,
+    lng: t.lng,
+    notes: t.notes,
+    surcharge: 0,
+    enabled: true,
+    sortOrder: idx,
+  }));
+  await db().insert(terminals).values(rows).onConflictDoNothing();
 }
 
 async function seedSuperAdmin() {
@@ -136,11 +124,6 @@ async function seedDemoTenant() {
   if (existing[0]) {
     tenantId = existing[0].id;
     console.log(`[seed] Demo tenant exists (id=${tenantId}) — repairing.`);
-    // Demo tenant pre-dates the trial system. With plan='free' AND a
-    // null trial_ends_at, the trial-gating layer treats it as expired
-    // (read-only), so the public lead endpoint 403s. The demo is meant
-    // to be a perpetual showcase — promote it to 'starter' so it's
-    // exempt from trial caps.
     if (existing[0].plan === 'free' && !existing[0].trialEndsAt) {
       await db()
         .update(tenants)
@@ -160,7 +143,7 @@ async function seedDemoTenant() {
         contactPhone: '+1 555 555 0100',
         countryFocus: 'US',
         embedToken,
-        plan: 'starter', // demo is permanently active, not a trial
+        plan: 'starter',
         status: 'active',
       })
       .returning({ id: tenants.id });
@@ -184,21 +167,21 @@ async function seedDemoTenant() {
       ctaText: 'Get instant quote',
       showPoweredBy: true,
     });
-    for (const card of DEFAULT_RATE_CARDS) {
-      await db().insert(rateCards).values({ ...card, tenantId });
+
+    // Bulk insert rate cards, accessorials, lane zones
+    if (DEFAULT_RATE_CARDS.length > 0) {
+      await db().insert(rateCards).values(DEFAULT_RATE_CARDS.map((c) => ({ ...c, tenantId })));
     }
-    for (const a of DEFAULT_ACCESSORIALS) {
-      await db().insert(accessorials).values({ ...a, tenantId });
+    if (DEFAULT_ACCESSORIALS.length > 0) {
+      await db().insert(accessorials).values(DEFAULT_ACCESSORIALS.map((a) => ({ ...a, tenantId })));
     }
-    for (const z of generateDefaultLaneZones()) {
-      await db().insert(laneZones).values({ ...z, tenantId });
+    const zones = generateDefaultLaneZones();
+    if (zones.length > 0) {
+      await db().insert(laneZones).values(zones.map((z) => ({ ...z, tenantId })));
     }
     console.log(`[seed] Demo tenant created (id=${tenantId}, embed=${embedToken}).`);
   }
 
-  // Always (re-)seed terminals. seedTerminalsForTenant uses
-  // onConflictDoNothing on (tenant_id, code) so it's idempotent — fills
-  // gaps without duplicating existing rows.
   await seedTerminalsForTenant(tenantId);
   console.log(`[seed] Demo tenant terminals upserted (${TERMINALS_DATA.length} rows).`);
 
