@@ -18,6 +18,8 @@
  * shapes so applying changes is a straight DB upsert.
  */
 import Anthropic from '@anthropic-ai/sdk';
+import * as XLSX from 'xlsx';
+import { simpleParser, type Attachment } from 'mailparser';
 import { eq } from 'drizzle-orm';
 import { db } from '../db/client.js';
 import { tenants } from '../db/schema.js';
@@ -40,14 +42,12 @@ const SUPPORTED_TEXT_MIME = new Set([
   'application/json',
 ]);
 
-const UNSUPPORTED_NEEDS_LIB: Record<string, string> = {
-  'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet':
-    'Excel (.xlsx) parsing needs the `xlsx` package. For now: open in Excel, "Save As" → PDF, then re-upload.',
-  'application/vnd.ms-excel':
-    'Legacy Excel (.xls) parsing needs the `xlsx` package. For now: open in Excel, "Save As" → PDF, then re-upload.',
-  'message/rfc822':
-    '.eml parsing needs the `mailparser` package. For now: paste the email body and any rate-sheet attachment as separate uploads.',
-};
+const EXCEL_MIME = new Set([
+  'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet', // .xlsx
+  'application/vnd.ms-excel', // legacy .xls
+]);
+
+const EML_MIME = 'message/rfc822';
 
 const SYSTEM_PROMPT = `You are a freight-rate-sheet parser for a drayage/trucking carrier's quote calculator. The user uploads a rate sheet — image, PDF, or text — and you extract a structured representation.
 
@@ -143,9 +143,6 @@ export async function parseRateSheet(opts: {
   dataBase64: string;
 }): Promise<IngestResult> {
   const mt = opts.mimeType.toLowerCase();
-  if (UNSUPPORTED_NEEDS_LIB[mt]) {
-    throw new IngestUnsupportedError(mt, UNSUPPORTED_NEEDS_LIB[mt]);
-  }
 
   const apiKey = await resolveApiKey(opts.tenantId);
   const client = new Anthropic({ apiKey });
@@ -172,6 +169,26 @@ export async function parseRateSheet(opts: {
       },
       { type: 'text', text: `Filename: ${opts.filename}\nExtract the rate sheet into JSON per the spec.` },
     ];
+  } else if (EXCEL_MIME.has(mt)) {
+    // Convert .xlsx/.xls → CSV-formatted text. Pass each sheet to Claude
+    // labeled by sheet name. Claude reads tables natively from CSV.
+    const text = excelToText(opts.dataBase64);
+    if (text.length > 100_000) {
+      throw new Error('Spreadsheet too dense (>100KB after CSV conversion). Split into smaller sheets.');
+    }
+    userContent = [
+      { type: 'text', text: `Filename: ${opts.filename}\nThis is a spreadsheet rendered as CSV per sheet.\n\n${text}\n\nExtract the rate sheet into JSON per the spec.` },
+    ];
+  } else if (mt === EML_MIME) {
+    // .eml: extract the body + attachments. Each attachment recursed
+    // back through this function inline (PDF/image attachments are the
+    // common case — a forwarded carrier rate sheet).
+    const { content, attachmentBlocks } = await emlToContentBlocks(opts.dataBase64);
+    userContent = [
+      { type: 'text', text: `Filename: ${opts.filename}\nThis is an email message.\n\n--- BODY ---\n${content}\n--- END BODY ---\n` },
+      ...attachmentBlocks,
+      { type: 'text', text: 'Extract the rate sheet into JSON per the spec, drawing from the body AND any attachments above.' },
+    ];
   } else if (SUPPORTED_TEXT_MIME.has(mt)) {
     const decoded = Buffer.from(opts.dataBase64, 'base64').toString('utf8');
     if (decoded.length > 50000) {
@@ -181,7 +198,7 @@ export async function parseRateSheet(opts: {
       { type: 'text', text: `Filename: ${opts.filename}\n\n${decoded}\n\nExtract the rate sheet into JSON per the spec.` },
     ];
   } else {
-    throw new IngestUnsupportedError(mt, 'Supported types: PDF, PNG, JPEG, WEBP, GIF, plain text, CSV, HTML.');
+    throw new IngestUnsupportedError(mt, 'Supported types: PDF, PNG, JPEG, WEBP, GIF, plain text, CSV, HTML, Excel (.xlsx/.xls), email (.eml).');
   }
 
   const res = await client.messages.create({
@@ -216,4 +233,77 @@ export async function parseRateSheet(opts: {
   parsed.laneZones ??= [];
 
   return { parsed, raw: cleaned, modelUsed: model };
+}
+
+/* ────────────────────────────────────────────────────────────────── *
+ * Excel → CSV-text rendering
+ * ────────────────────────────────────────────────────────────────── */
+function excelToText(dataBase64: string): string {
+  const buf = Buffer.from(dataBase64, 'base64');
+  const wb = XLSX.read(buf, { type: 'buffer' });
+  const parts: string[] = [];
+  for (const sheetName of wb.SheetNames) {
+    const sheet = wb.Sheets[sheetName];
+    if (!sheet) continue;
+    const csv = XLSX.utils.sheet_to_csv(sheet, { blankrows: false });
+    if (csv.trim()) parts.push(`### Sheet: ${sheetName}\n${csv}`);
+  }
+  return parts.join('\n\n');
+}
+
+/* ────────────────────────────────────────────────────────────────── *
+ * .eml → body text + attachment content blocks
+ * ────────────────────────────────────────────────────────────────── */
+async function emlToContentBlocks(dataBase64: string): Promise<{
+  content: string;
+  attachmentBlocks: Anthropic.Messages.ContentBlockParam[];
+}> {
+  const buf = Buffer.from(dataBase64, 'base64');
+  const parsed = await simpleParser(buf);
+  const headerLine =
+    `Subject: ${parsed.subject ?? ''}\n` +
+    `From: ${(parsed.from?.text) ?? ''}\n` +
+    `To: ${(Array.isArray(parsed.to) ? parsed.to.map((t) => t.text).join(', ') : parsed.to?.text) ?? ''}\n` +
+    `Date: ${parsed.date?.toISOString() ?? ''}\n`;
+  const body = (parsed.text ?? parsed.html ?? '').toString().slice(0, 20_000);
+  const content = headerLine + '\n' + body;
+
+  const blocks: Anthropic.Messages.ContentBlockParam[] = [];
+  for (const att of parsed.attachments ?? []) {
+    const block = attachmentToBlock(att);
+    if (block) blocks.push(block);
+  }
+  return { content, attachmentBlocks: blocks };
+}
+
+function attachmentToBlock(att: Attachment): Anthropic.Messages.ContentBlockParam | null {
+  const mt = (att.contentType ?? '').toLowerCase();
+  const data = att.content?.toString('base64');
+  if (!data) return null;
+
+  if (mt === 'application/pdf') {
+    return {
+      type: 'document',
+      source: { type: 'base64', media_type: 'application/pdf', data },
+    };
+  }
+  if (SUPPORTED_VISION_MIME.has(mt)) {
+    return {
+      type: 'image',
+      source: { type: 'base64', media_type: mt as 'image/png' | 'image/jpeg' | 'image/webp' | 'image/gif', data },
+    };
+  }
+  if (EXCEL_MIME.has(mt)) {
+    const text = excelToText(data);
+    return { type: 'text', text: `--- ATTACHMENT (${att.filename ?? 'untitled'}) ---\n${text}\n--- END ATTACHMENT ---` };
+  }
+  if (SUPPORTED_TEXT_MIME.has(mt)) {
+    const txt = att.content!.toString('utf8').slice(0, 20_000);
+    return { type: 'text', text: `--- ATTACHMENT (${att.filename ?? 'untitled'}) ---\n${txt}\n--- END ATTACHMENT ---` };
+  }
+  // Unsupported attachment type — note its presence but skip content.
+  return {
+    type: 'text',
+    text: `[Skipped attachment "${att.filename ?? 'untitled'}" — unsupported type ${mt}.]`,
+  };
 }

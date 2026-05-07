@@ -14,6 +14,7 @@ import { z } from 'zod';
 import { db } from '../../db/client.js';
 import { tenants, leads, users, auditLog } from '../../db/schema.js';
 import { requireAuth, requireSuperAdmin } from '../middleware.js';
+import { runAggregatesNow } from '../../marketplace/cron.js';
 
 export function registerAdminRoutes(app: Express) {
   app.get('/api/admin/tenants', requireAuth, requireSuperAdmin, async (_req, res) => {
@@ -97,5 +98,12 @@ export function registerAdminRoutes(app: Express) {
       users: userCount[0]?.n ?? 0,
       leads: leadCount[0]?.n ?? 0,
     });
+  });
+
+  // Manually trigger marketplace-aggregate recomputation (also runs hourly).
+  app.post('/api/admin/marketplace/recompute-aggregates', requireAuth, requireSuperAdmin, async (_req, res) => {
+    const result = await runAggregatesNow();
+    if (!result.ok) return res.status(500).json(result);
+    return res.json(result);
   });
 }

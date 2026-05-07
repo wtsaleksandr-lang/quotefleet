@@ -57,6 +57,7 @@
     if (route === 'accessorials') return renderAccessorials(c);
     if (route === 'zones') return renderZones(c);
     if (route === 'ai') return renderAi(c);
+    if (route === 'ingest') return renderIngest(c);
     if (route === 'brand') return renderBrand(c);
     if (route === 'embed') return renderEmbed(c);
     if (route === 'audit') return renderAudit(c);
@@ -648,6 +649,284 @@
 
   // ── helpers ────────────────────────────────────────────────────
   function showErr(c) { return function (err) { c.innerHTML = '<div class="notice error">' + (err.message || 'Failed') + '</div>'; }; }
+
+  // ── AI Import (rate-sheet ingest) ─────────────────────────────
+  function renderIngest(c) {
+    c.innerHTML = '';
+    c.appendChild(el('h1', { text: 'AI import' }));
+    c.appendChild(el('p', { class: 'page-sub', text: 'Upload a rate sheet — PDF, image, Excel, email — and the AI extracts rate cards, accessorials, and lane zones for review.' }));
+
+    // ── Upload card ────────────────────────────────────────
+    var dropCard = el('div', { class: 'card', style: { padding: '14px 18px' } });
+    var drop = el('div', {
+      class: 'qf-dropzone',
+      style: {
+        border: '2px dashed var(--border-strong)',
+        borderRadius: '12px',
+        padding: '36px 20px',
+        textAlign: 'center',
+        cursor: 'pointer',
+        transition: 'border-color 0.15s, background 0.15s',
+        color: 'var(--muted)',
+      },
+      text: '',
+    });
+    drop.innerHTML = '<div style="font-size:18px; color:var(--ink); margin-bottom:6px;">Drop a rate sheet here</div>'
+      + '<div style="font-size:13px; color:var(--muted);">PDF · PNG · JPEG · Excel (.xlsx) · Email (.eml) · CSV · Up to 5 MB</div>'
+      + '<div style="margin-top:12px; font-family:var(--font-mono); font-size:11px; color:var(--muted-soft); letter-spacing:0.06em;">OR CLICK TO BROWSE</div>';
+    var fileInput = el('input', { type: 'file', style: { display: 'none' }, accept: '.pdf,.png,.jpg,.jpeg,.webp,.gif,.xlsx,.xls,.eml,.csv,.txt' });
+
+    drop.appendChild(fileInput);
+    drop.addEventListener('click', function () { fileInput.click(); });
+    drop.addEventListener('dragover', function (ev) { ev.preventDefault(); drop.style.background = 'var(--accent-soft)'; drop.style.borderColor = 'var(--accent)'; });
+    drop.addEventListener('dragleave', function () { drop.style.background = ''; drop.style.borderColor = 'var(--border-strong)'; });
+    drop.addEventListener('drop', function (ev) {
+      ev.preventDefault(); drop.style.background = ''; drop.style.borderColor = 'var(--border-strong)';
+      var f = ev.dataTransfer && ev.dataTransfer.files && ev.dataTransfer.files[0];
+      if (f) handleFile(f);
+    });
+    fileInput.addEventListener('change', function () {
+      if (fileInput.files && fileInput.files[0]) handleFile(fileInput.files[0]);
+    });
+
+    var statusBox = el('div', { style: { marginTop: '14px', minHeight: '24px' } });
+    dropCard.appendChild(drop);
+    dropCard.appendChild(statusBox);
+    c.appendChild(dropCard);
+
+    // ── Recent jobs list ────────────────────────────────
+    var listCard = el('div', { class: 'card', style: { marginTop: '20px', padding: '14px 18px' } });
+    listCard.appendChild(el('h2', { text: 'Recent uploads', style: { marginBottom: '12px' } }));
+    var listBody = el('div', {});
+    listCard.appendChild(listBody);
+    c.appendChild(listCard);
+
+    // ── Review pane (toggled when a job is selected) ────────
+    var reviewBox = el('div', { id: 'ingest-review', style: { marginTop: '20px' } });
+    c.appendChild(reviewBox);
+
+    refreshList();
+
+    function handleFile(file) {
+      if (file.size > 5 * 1024 * 1024) {
+        statusBox.innerHTML = '<div class="notice error">File is bigger than 5 MB — split it into smaller chunks.</div>';
+        return;
+      }
+      statusBox.innerHTML = '<div class="muted-small">Uploading <strong>' + escapeHtml(file.name) + '</strong>…</div>';
+      var reader = new FileReader();
+      reader.onload = function () {
+        var dataUrl = reader.result || '';
+        // strip "data:<mime>;base64," prefix
+        var idx = dataUrl.indexOf(',');
+        var b64 = idx >= 0 ? dataUrl.slice(idx + 1) : dataUrl;
+        api('/api/tenant/ingest', {
+          method: 'POST',
+          body: { filename: file.name, mimeType: file.type || 'application/octet-stream', dataBase64: b64 },
+        }).then(function (r) {
+          statusBox.innerHTML = '<div class="muted-small">Parsing <span class="dots"></span></div>';
+          pollJob(r.jobId, 0);
+        }).catch(function (err) {
+          statusBox.innerHTML = '<div class="notice error">' + escapeHtml(err.message || 'Upload failed') + '</div>';
+        });
+      };
+      reader.onerror = function () {
+        statusBox.innerHTML = '<div class="notice error">Could not read file.</div>';
+      };
+      reader.readAsDataURL(file);
+    }
+
+    function pollJob(jobId, attempt) {
+      if (attempt > 60) { statusBox.innerHTML = '<div class="notice warn">Still parsing — check back in a minute (job #' + jobId + ').</div>'; refreshList(); return; }
+      api('/api/tenant/ingest/' + jobId).then(function (r) {
+        var job = r.job;
+        if (job.status === 'parsing') {
+          setTimeout(function () { pollJob(jobId, attempt + 1); }, 1500);
+          return;
+        }
+        if (job.status === 'failed') {
+          statusBox.innerHTML = '<div class="notice error">Parse failed: ' + escapeHtml(job.errorMessage || 'unknown error') + '</div>';
+          refreshList();
+          return;
+        }
+        // ready_for_review
+        statusBox.innerHTML = '<div class="notice">Parsed — review below ↓</div>';
+        refreshList();
+        showReview(job);
+      }).catch(function (err) {
+        statusBox.innerHTML = '<div class="notice error">' + escapeHtml(err.message || 'Lost the job') + '</div>';
+      });
+    }
+
+    function refreshList() {
+      api('/api/tenant/ingest').then(function (r) {
+        listBody.innerHTML = '';
+        if (!r.jobs || !r.jobs.length) {
+          listBody.appendChild(el('div', { class: 'muted-small', text: 'No uploads yet.' }));
+          return;
+        }
+        var tbl = el('table', { class: 'table', style: { background: 'transparent' } });
+        var thead = el('thead', {}, [
+          el('tr', {}, [
+            el('th', { text: 'File' }),
+            el('th', { text: 'Status' }),
+            el('th', { text: 'When' }),
+            el('th', { text: '' }),
+          ]),
+        ]);
+        tbl.appendChild(thead);
+        var tbody = el('tbody', {});
+        r.jobs.forEach(function (j) {
+          var statusBadge = el('span', { class: 'badge ' + statusClass(j.status), text: j.status });
+          var openBtn = el('button', {
+            class: 'btn btn-ghost btn-sm',
+            text: j.status === 'ready_for_review' ? 'Review' : 'View',
+            on: { click: function () {
+              api('/api/tenant/ingest/' + j.id).then(function (r) { showReview(r.job); window.scrollTo(0, document.body.scrollHeight); });
+            } }
+          });
+          tbody.appendChild(el('tr', {}, [
+            el('td', { text: j.filename }),
+            el('td', {}, [statusBadge]),
+            el('td', { text: fmtDate(j.createdAt) }),
+            el('td', {}, [openBtn]),
+          ]));
+        });
+        tbl.appendChild(tbody);
+        listBody.appendChild(tbl);
+      }).catch(showErr(listBody));
+    }
+
+    function statusClass(s) {
+      if (s === 'applied') return 'badge-success';
+      if (s === 'ready_for_review') return 'badge-info';
+      if (s === 'failed') return 'badge-error';
+      if (s === 'rejected') return 'badge-muted';
+      return 'badge-muted';
+    }
+
+    function showReview(job) {
+      reviewBox.innerHTML = '';
+      var parsed = job.parsed || {};
+      var card = el('div', { class: 'card', style: { padding: '18px 22px' } });
+
+      card.appendChild(el('h2', { text: 'Review: ' + job.filename }));
+      if (parsed.summary) card.appendChild(el('p', { class: 'muted', text: parsed.summary, style: { marginBottom: '10px' } }));
+
+      if (parsed.confidence) {
+        var conf = parsed.confidence;
+        var badgeClass = conf === 'high' ? 'badge-success' : conf === 'medium' ? 'badge-warn' : 'badge-error';
+        card.appendChild(el('span', { class: 'badge ' + badgeClass, text: 'Confidence: ' + conf, style: { marginRight: '8px' } }));
+      }
+      if (parsed.warnings && parsed.warnings.length) {
+        var warn = el('div', { class: 'notice warn', style: { marginTop: '12px' } });
+        warn.innerHTML = '<strong>Warnings:</strong><ul style="margin:6px 0 0 18px;">' +
+          parsed.warnings.map(function (w) { return '<li>' + escapeHtml(String(w)) + '</li>'; }).join('') +
+          '</ul>';
+        card.appendChild(warn);
+      }
+
+      if (job.status !== 'ready_for_review') {
+        card.appendChild(el('div', { class: 'muted-small', style: { marginTop: '14px' }, text: 'Status: ' + job.status + '. No further action available.' }));
+        reviewBox.appendChild(card);
+        return;
+      }
+
+      // Editable selection per item type.
+      var rcSelections = renderItemList(card, 'Rate cards', parsed.rateCards || [], rateCardSummary);
+      var accSelections = renderItemList(card, 'Accessorials', parsed.accessorials || [], accSummary);
+      var lzSelections = renderItemList(card, 'Lane zones', parsed.laneZones || [], laneZoneSummary);
+
+      var actionRow = el('div', { style: { marginTop: '20px', display: 'flex', gap: '10px' } });
+      var applyBtn = el('button', {
+        class: 'btn btn-primary',
+        text: 'Apply selected',
+        on: { click: function () {
+          var body = {
+            rateCards: rcSelections.selected(),
+            accessorials: accSelections.selected(),
+            laneZones: lzSelections.selected(),
+          };
+          var total = body.rateCards.length + body.accessorials.length + body.laneZones.length;
+          if (total === 0) { alert('Tick at least one item to apply.'); return; }
+          if (!confirm('Apply ' + total + ' item(s) to your rate book?')) return;
+          applyBtn.disabled = true; applyBtn.textContent = 'Applying…';
+          api('/api/tenant/ingest/' + job.id + '/apply', {
+            method: 'POST', body: body,
+          }).then(function (r) {
+            reviewBox.innerHTML = '<div class="notice"><strong>Applied.</strong> ' +
+              r.inserted.rateCards + ' rate cards · ' +
+              r.inserted.accessorials + ' accessorials · ' +
+              r.inserted.laneZones + ' lane zones</div>';
+            refreshList();
+          }).catch(function (err) {
+            applyBtn.disabled = false; applyBtn.textContent = 'Apply selected';
+            alert(err.message || 'Apply failed.');
+          });
+        } }
+      });
+      var rejectBtn = el('button', {
+        class: 'btn btn-danger',
+        text: 'Reject',
+        on: { click: function () {
+          if (!confirm('Discard this parsed result?')) return;
+          api('/api/tenant/ingest/' + job.id + '/reject', { method: 'POST' }).then(function () {
+            reviewBox.innerHTML = '';
+            refreshList();
+          });
+        } }
+      });
+      actionRow.appendChild(applyBtn);
+      actionRow.appendChild(rejectBtn);
+      card.appendChild(actionRow);
+      reviewBox.appendChild(card);
+    }
+
+    function renderItemList(parent, title, items, summarize) {
+      var section = el('div', { style: { marginTop: '20px' } });
+      section.appendChild(el('h3', { text: title + ' (' + items.length + ')', style: { fontSize: '15px', marginBottom: '8px' } }));
+      if (!items.length) {
+        section.appendChild(el('div', { class: 'muted-small', text: '— none extracted —' }));
+        parent.appendChild(section);
+        return { selected: function () { return []; } };
+      }
+      var checks = [];
+      items.forEach(function (item, i) {
+        var wrap = el('label', { style: { display: 'flex', gap: '10px', padding: '8px 0', borderBottom: '1px solid var(--border)', cursor: 'pointer' } });
+        var cb = el('input', { type: 'checkbox', checked: 'checked', style: { marginTop: '3px' } });
+        var info = el('div', { style: { flex: '1' } });
+        info.innerHTML = summarize(item);
+        wrap.appendChild(cb); wrap.appendChild(info);
+        section.appendChild(wrap);
+        checks.push({ cb: cb, item: item });
+      });
+      parent.appendChild(section);
+      return {
+        selected: function () { return checks.filter(function (x) { return x.cb.checked; }).map(function (x) { return x.item; }); },
+      };
+    }
+
+    function rateCardSummary(c) {
+      var bits = [c.label || (c.equipment + ' / ' + c.service)];
+      if (c.ratePerMile != null) bits.push('$' + c.ratePerMile + '/mi');
+      if (c.minimumCharge != null) bits.push('min $' + c.minimumCharge);
+      if (c.fuelSurchargePct != null) bits.push(c.fuelSurchargePct + '% fuel');
+      return '<strong>' + escapeHtml(bits.shift()) + '</strong>'
+        + '<div class="muted-small">' + escapeHtml(bits.join(' · ')) + '</div>';
+    }
+    function accSummary(a) {
+      return '<strong>' + escapeHtml(a.label || a.code) + '</strong>'
+        + '<div class="muted-small">' + escapeHtml((a.kind || 'flat') + ' · $' + (a.amount ?? 0)) + '</div>';
+    }
+    function laneZoneSummary(z) {
+      return '<strong>' + escapeHtml(z.label || (z.anchorPortCode || z.anchorCity || 'zone')) + '</strong>'
+        + '<div class="muted-small">' + escapeHtml('within ' + (z.radiusMiles ?? '?') + ' mi · $' + (z.flatPrice ?? '?')) + '</div>';
+    }
+    function escapeHtml(s) {
+      return String(s == null ? '' : s).replace(/[&<>"']/g, function (m) {
+        return m === '&' ? '&amp;' : m === '<' ? '&lt;' : m === '>' ? '&gt;' : m === '"' ? '&quot;' : '&#39;';
+      });
+    }
+  }
 
   // ── Trial banner ──────────────────────────────────────────────
   function renderTrialBanner(trial, tenant) {

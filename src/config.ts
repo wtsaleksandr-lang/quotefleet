@@ -19,6 +19,7 @@ export interface Env {
    *  — wildcard DNS for each routes `<slug>.<domain>` here. */
   HOST_DOMAINS: string[];
   SUPER_ADMIN_EMAIL?: string;
+  GOOGLE_MAPS_API_KEY?: string;
   MAPBOX_TOKEN?: string;
   EIA_API_KEY?: string;
   SMTP_HOST?: string;
@@ -77,6 +78,7 @@ export function loadEnv(): Env {
     HOST: opt('HOST') ?? '0.0.0.0',
     HOST_DOMAINS: hostDomains,
     SUPER_ADMIN_EMAIL: opt('SUPER_ADMIN_EMAIL'),
+    GOOGLE_MAPS_API_KEY: opt('GOOGLE_MAPS_API_KEY'),
     MAPBOX_TOKEN: opt('MAPBOX_TOKEN'),
     EIA_API_KEY: opt('EIA_API_KEY'),
     SMTP_HOST: opt('SMTP_HOST'),

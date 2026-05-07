@@ -3,6 +3,7 @@
  */
 import { loadEnv } from '../config.js';
 import { createApp } from './app.js';
+import { startMarketplaceCron } from '../marketplace/cron.js';
 
 async function main() {
   const env = loadEnv();
@@ -11,6 +12,7 @@ async function main() {
     console.log(`[server] QuoteFleet listening on http://${env.HOST}:${env.PORT}`);
     console.log(`[server] Public base URL: ${env.PUBLIC_BASE_URL}`);
   });
+  startMarketplaceCron();
 }
 
 main().catch((err) => {
