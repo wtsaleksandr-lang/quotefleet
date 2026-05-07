@@ -25,6 +25,52 @@ import { db } from '../db/client.js';
 import { tenants } from '../db/schema.js';
 import { loadEnv } from '../config.js';
 import { decrypt } from '../auth/secrets.js';
+import { distanceBetween } from '../calc/distance.js';
+
+// Tool the model can call mid-parse to derive a per-mile rate from a
+// point-to-point total ("Long Beach → Phoenix, $1,200" → 380 mi).
+const TOOLS: Anthropic.Messages.Tool[] = [
+  {
+    name: 'geocode_distance',
+    description:
+      "Look up approximate road distance in miles between two USA/Canada locations. Use when the rate sheet shows a point-to-point total but no per-mile rate. Locations can be 'City, ST', a 5-digit ZIP, or a Canadian FSA. Returns { miles } or { error }.",
+    input_schema: {
+      type: 'object',
+      properties: {
+        origin: {
+          type: 'string',
+          description: 'Origin location, e.g. "Long Beach, CA" or "90802".',
+        },
+        destination: {
+          type: 'string',
+          description: 'Destination location, e.g. "Phoenix, AZ" or "85003".',
+        },
+      },
+      required: ['origin', 'destination'],
+    },
+  },
+];
+
+/** Parse a free-text location into the shape distanceBetween expects. */
+function parseFreeText(s: string): { city?: string; state?: string; zip?: string; country?: string } {
+  const t = s.trim();
+  if (/^\d{5}$/.test(t)) return { zip: t, country: 'US' };
+  if (/^[A-Z]\d[A-Z]/i.test(t)) return { zip: t.replace(/\s+/g, ''), country: 'CA' };
+  const parts = t.split(',').map((p) => p.trim()).filter(Boolean);
+  if (parts.length >= 2) return { city: parts[0], state: parts[1].slice(0, 2).toUpperCase(), country: 'US' };
+  return { city: t, country: 'US' };
+}
+
+async function execTool(name: string, input: Record<string, unknown>): Promise<unknown> {
+  if (name === 'geocode_distance') {
+    const origin = parseFreeText(String(input.origin ?? ''));
+    const destination = parseFreeText(String(input.destination ?? ''));
+    const r = await distanceBetween(origin, destination);
+    if ('error' in r) return { error: r.error };
+    return { miles: r.miles, source: r.source };
+  }
+  return { error: `Unknown tool ${name}` };
+}
 
 const SUPPORTED_VISION_MIME = new Set([
   'image/png',
@@ -49,68 +95,105 @@ const EXCEL_MIME = new Set([
 
 const EML_MIME = 'message/rfc822';
 
-const SYSTEM_PROMPT = `You are a freight-rate-sheet parser for a drayage/trucking carrier's quote calculator. The user uploads a rate sheet — image, PDF, or text — and you extract a structured representation.
+const SYSTEM_PROMPT = `You are a freight-rate-sheet parser for a drayage/trucking carrier's quote calculator. The user uploads a rate sheet — image, PDF, spreadsheet, email — and you extract a structured rate book.
 
-OUTPUT: a single JSON object with this exact shape, nothing else, no prose:
+OUTPUT: a single JSON object with this exact shape. Output ONLY the JSON — no prose, no backticks.
 
 {
-  "summary": "1-2 sentences describing what this sheet appears to be",
+  "summary": "1-2 sentence description",
   "confidence": "high" | "medium" | "low",
-  "warnings": ["short bullet about anything ambiguous or missing"],
+  "warnings": ["short bullets about anything ambiguous"],
+  "fscDetected": {
+    "present": boolean,
+    "appearsIncludedInLinehaul": boolean,
+    "valuePct": number | null,
+    "valuePerMile": number | null,
+    "notes": "what made you decide"
+  },
   "rateCards": [
     {
       "service": "drayage" | "ftl" | "ltl" | "expedited" | "hotshot",
       "equipment": "dryvan" | "reefer" | "flatbed" | "step_deck" | "conestoga"
                  | "container_20" | "container_40" | "container_40hc" | "container_45"
                  | "sprinter" | "box_truck" | "tractor_only" | "pallet",
-      "label": "human label like '53\\' Dry Van'",
+      "label": "e.g. 53' Dry Van",
       "ratePerMile": number | null,
       "minimumCharge": number | null,
       "flatFee": number | null,
       "fuelSurchargePct": number | null,
-      "marginPct": number | null
+      "marginPct": number | null,
+      "derivedFrom": null | {
+        "totalUsd": number,
+        "originAddress": "string",
+        "destinationAddress": "string",
+        "approxMiles": number,
+        "explanation": "how you computed ratePerMile"
+      }
     }
   ],
   "accessorials": [
     {
-      "code": "snake_case_code (e.g. chassis_split, prepull, detention, hazmat)",
+      "code": "snake_case",
       "label": "human label",
       "kind": "flat" | "per_mile" | "pct_of_base" | "per_hour" | "per_day",
       "amount": number,
-      "appliesToServices": ["drayage", "ftl", ...] | null
+      "appliesToServices": ["drayage","ftl",...] | null
     }
   ],
   "laneZones": [
     {
-      "label": "e.g. 'LAX/LGB → Local LA Basin (0-30 mi)'",
-      "anchorPortCode": "USLAX" | "USLGB" | "USNYC" | ... | null,
+      "label": "e.g. LAX/LGB → Local LA Basin (0-30 mi)",
+      "anchorPortCode": "USLAX" | null,
       "anchorCity": "Los Angeles" | null,
       "anchorState": "CA" | null,
       "radiusMiles": number,
       "flatPrice": number,
-      "equipmentScope": ["container_20", "container_40", ...]
+      "equipmentScope": ["container_20","container_40",...]
     }
   ]
 }
 
-RULES:
-- Use null for unknowns. Don't guess.
-- Currency: assume USD unless the sheet clearly says CAD.
-- If the sheet is ambiguous, lower the confidence and add to warnings.
-- If you can't find anything parseable, return all arrays empty and warnings explaining why.
-- Output ONLY the JSON. No backticks, no commentary.`;
+CRITICAL RULES:
+
+1. **FSC detection.** Many rate sheets quote a single "all-in" total that already includes Fuel Surcharge. You MUST decide whether the rate is base-only or all-in:
+   - If the sheet says "rate includes FSC", "all-in", "linehaul + fuel", "ATF", "all fuel surcharges included", or shows fuel as a separate column / added line → set fscDetected.present=true, fscDetected.appearsIncludedInLinehaul accordingly.
+   - If the sheet says "plus fuel", "+FSC", "fuel separate", "as quoted by DOE", or has an explicit FSC table → fsc is separate; set fuelSurchargePct/valuePct on the rate card.
+   - If the sheet shows a base rate AND an "all-in rate" both, prefer the BASE rate for ratePerMile and set fuelSurchargePct from the implied difference.
+   - If you can't decide, set fscDetected.present=null (i.e. omit the field) and add a warning "FSC handling unclear — assumed all-in".
+   - When the rate IS all-in and you set ratePerMile from it, set fuelSurchargePct to 0 (don't double-charge).
+
+2. **Per-mile derivation when only totals are given.** Many sheets show point-to-point totals like "Long Beach → Phoenix, $1,200" without a $/mile rate. You can call the geocode_distance tool to look up the road distance, then divide. Always populate derivedFrom with the inputs. If the tool isn't available or distance is unavailable, leave ratePerMile null and add a warning.
+
+3. **Currency.** Assume USD unless the sheet clearly says CAD; convert nothing — leave the value as-stated and add a warning.
+
+4. **Ambiguity.** Use null for unknowns. Don't guess. Lower the confidence and add to warnings instead of inventing numbers.
+
+5. **Duplicates.** If the sheet repeats the same rate in multiple places (e.g. summary + per-route), emit it once.
+
+6. **Unsupported scope.** If you find ocean rates, customs fees, brokerage commission percentages, or anything that isn't a domestic trucking rate / accessorial / lane zone — skip it and add a warning saying "skipped: <what>".
+
+Output the JSON object and nothing else.`;
 
 export interface IngestResult {
   parsed: {
     summary: string;
     confidence: 'high' | 'medium' | 'low';
     warnings: string[];
+    fscDetected?: {
+      present: boolean | null;
+      appearsIncludedInLinehaul: boolean | null;
+      valuePct: number | null;
+      valuePerMile: number | null;
+      notes: string;
+    };
     rateCards: Array<Record<string, unknown>>;
     accessorials: Array<Record<string, unknown>>;
     laneZones: Array<Record<string, unknown>>;
   };
   raw: string;
   modelUsed: string;
+  /** How many times the model called the geocode_distance tool. */
+  toolCalls: number;
 }
 
 export class IngestUnsupportedError extends Error {
@@ -201,20 +284,60 @@ export async function parseRateSheet(opts: {
     throw new IngestUnsupportedError(mt, 'Supported types: PDF, PNG, JPEG, WEBP, GIF, plain text, CSV, HTML, Excel (.xlsx/.xls), email (.eml).');
   }
 
-  const res = await client.messages.create({
-    model,
-    max_tokens: 4096,
-    system: SYSTEM_PROMPT,
-    messages: [{ role: 'user', content: userContent }],
-  });
+  // Multi-turn loop: model can call geocode_distance tool to derive
+  // per-mile from totals. Hard-cap at MAX_TURNS to prevent runaway loops.
+  const MAX_TURNS = 6;
+  const messages: Anthropic.Messages.MessageParam[] = [{ role: 'user', content: userContent }];
+  let toolCalls = 0;
+  let finalText = '';
 
-  const text = res.content
-    .filter((b): b is Anthropic.Messages.TextBlock => b.type === 'text')
-    .map((b) => b.text)
-    .join('\n');
+  for (let turn = 0; turn < MAX_TURNS; turn++) {
+    const res = await client.messages.create({
+      model,
+      max_tokens: 4096,
+      system: SYSTEM_PROMPT,
+      tools: TOOLS,
+      messages,
+    });
+
+    if (res.stop_reason === 'tool_use') {
+      const toolUses = res.content.filter(
+        (b): b is Anthropic.Messages.ToolUseBlock => b.type === 'tool_use'
+      );
+      // Append assistant message verbatim, then a user message with
+      // tool_result blocks for each tool call.
+      messages.push({ role: 'assistant', content: res.content });
+      const toolResults: Anthropic.Messages.ToolResultBlockParam[] = [];
+      for (const t of toolUses) {
+        toolCalls++;
+        try {
+          const out = await execTool(t.name, (t.input as Record<string, unknown>) ?? {});
+          toolResults.push({ type: 'tool_result', tool_use_id: t.id, content: JSON.stringify(out) });
+        } catch (err) {
+          toolResults.push({
+            type: 'tool_result',
+            tool_use_id: t.id,
+            content: JSON.stringify({ error: (err as Error).message }),
+            is_error: true,
+          });
+        }
+      }
+      messages.push({ role: 'user', content: toolResults });
+      continue;
+    }
+
+    // Terminal turn — text output expected.
+    finalText = res.content
+      .filter((b): b is Anthropic.Messages.TextBlock => b.type === 'text')
+      .map((b) => b.text)
+      .join('\n');
+    break;
+  }
+
+  if (!finalText) throw new Error('Model exhausted tool-use turns without producing JSON.');
 
   // Strip optional code fences (model sometimes adds them despite instructions)
-  const cleaned = text.replace(/^```(?:json)?\s*/i, '').replace(/```\s*$/i, '').trim();
+  const cleaned = finalText.replace(/^```(?:json)?\s*/i, '').replace(/```\s*$/i, '').trim();
   let parsed;
   try {
     parsed = JSON.parse(cleaned);
@@ -232,7 +355,7 @@ export async function parseRateSheet(opts: {
   parsed.accessorials ??= [];
   parsed.laneZones ??= [];
 
-  return { parsed, raw: cleaned, modelUsed: model };
+  return { parsed, raw: cleaned, modelUsed: model, toolCalls };
 }
 
 /* ────────────────────────────────────────────────────────────────── *

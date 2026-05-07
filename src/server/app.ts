@@ -8,6 +8,7 @@
 import express from 'express';
 import cookieParser from 'cookie-parser';
 import { resolve } from 'node:path';
+import { readFile } from 'node:fs/promises';
 import { fileURLToPath } from 'node:url';
 import { dirname } from 'node:path';
 import { registerAuthRoutes } from './routes/auth.js';
@@ -19,6 +20,7 @@ import { registerAutocompleteRoutes } from './routes/autocomplete.js';
 import { registerIngestRoutes } from './routes/ingest.js';
 import { registerMarketplaceRoutes } from './routes/marketplace.js';
 import { registerToolsRoutes } from './routes/tools.js';
+import { registerBillingRoutes, registerStripeWebhook } from './routes/billing.js';
 import { hostInfoMiddleware } from './hostInfo.js';
 
 const __filename = fileURLToPath(import.meta.url);
@@ -27,6 +29,12 @@ const __dirname = dirname(__filename);
 export function createApp(): express.Express {
   const app = express();
   app.set('trust proxy', 1);
+
+  // STRIPE WEBHOOK MUST come before the JSON body parser — Stripe's
+  // signature is verified against the raw bytes. Once express.json()
+  // runs, the original body is gone.
+  registerStripeWebhook(app);
+
   // Global body parser limit covers small JSON payloads. Per-route caps
   // override this — `/api/tenant/ingest` accepts up to 6MB (5MB binary
   // → ~6.7MB base64); `/api/public/chat/:refId` is capped per-route.
@@ -57,6 +65,7 @@ export function createApp(): express.Express {
   registerIngestRoutes(app);
   registerMarketplaceRoutes(app);
   registerToolsRoutes(app);
+  registerBillingRoutes(app);
 
   // Healthcheck.
   app.get('/healthz', (_req, res) => {
@@ -69,8 +78,24 @@ export function createApp(): express.Express {
   app.use(express.static(publicDir, { index: false, extensions: ['html'] }));
 
   // Friendly URLs that map to specific HTML files.
-  // Root path is host-aware: `<slug>.<base>/` → widget; bare base → marketing.
-  app.get('/', (req, res) => {
+  // Root path is host-aware: a tenant subdomain OR a verified custom
+  // domain serves the widget; bare base serves marketing.
+  app.get('/', (req, res, next) => {
+    // Custom-domain path: inject the resolved slug so widget.js can use
+    // it directly (the URL doesn't carry the slug — it's just the
+    // customer's own domain).
+    if (req.tenantCustomDomainSlug) {
+      const slug = req.tenantCustomDomainSlug.replace(/[^a-z0-9-]/gi, '');
+      const file = resolve(publicDir, 'widget.html');
+      // Read + transform: inject window.QF_TENANT_SLUG before /widget.js loads.
+      readFile(file, 'utf8')
+        .then((html) => {
+          const inject = `<script>window.QF_TENANT_SLUG=${JSON.stringify(slug)};</script>\n`;
+          res.type('html').send(html.replace('<script src="/widget.js"></script>', inject + '<script src="/widget.js"></script>'));
+        })
+        .catch(next);
+      return;
+    }
     if (req.tenantSubdomain) {
       return res.sendFile(resolve(publicDir, 'widget.html'));
     }

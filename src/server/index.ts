@@ -4,6 +4,7 @@
 import { loadEnv } from '../config.js';
 import { createApp } from './app.js';
 import { startMarketplaceCron } from '../marketplace/cron.js';
+import { startLifecycleEmailCron } from '../email/lifecycleCron.js';
 
 async function main() {
   const env = loadEnv();
@@ -13,6 +14,7 @@ async function main() {
     console.log(`[server] Public base URL: ${env.PUBLIC_BASE_URL}`);
   });
   startMarketplaceCron();
+  startLifecycleEmailCron();
 }
 
 main().catch((err) => {

@@ -3,63 +3,97 @@
  *
  * Each tenant has a subdomain on one of the platform-owned host domains
  * (configured in HOST_DOMAINS env var). When a request lands on
- * `<slug>.<base>` we want to:
- *   1. Resolve which tenant it is.
- *   2. Serve the widget HTML on `/`.
- *   3. Pass through everything else (chat, embed.js, API routes).
+ * `<slug>.<base>` we resolve the tenant from the subdomain.
  *
- * The bare base domain still serves marketing + login + dashboard.
+ * Pro tier: tenants can also map a custom domain (e.g. `quote.astova.com`)
+ * which CNAMEs to the platform. We look that up by exact host match
+ * against `tenants.custom_domain`. Domain claims must be verified first
+ * (TXT record check) — see /api/tenant/custom-domain endpoints.
  *
- * Pro tier (later): tenants can map their own domain — `quote.astova.com`
- * CNAMEs to the platform. Looked up via `tenants.custom_domain`.
+ * Custom-domain lookups are cached in-memory for 60s to keep the request
+ * path fast (one DB query on miss, free on hit).
  */
 import type { Request, Response, NextFunction } from 'express';
+import { eq } from 'drizzle-orm';
 import { matchHostDomain } from '../config.js';
-// `req.hostBaseDomain` and `req.tenantSubdomain` are augmented in
-// src/types/express.d.ts (alongside the existing `req.user` / `req.tenant`).
+import { db } from '../db/client.js';
+import { tenants } from '../db/schema.js';
+import { LruCache } from './lruCache.js';
+
+// `req.hostBaseDomain`, `req.tenantSubdomain`, `req.tenantCustomDomainSlug`
+// are augmented in src/types/express.d.ts (alongside `req.user` / `req.tenant`).
+
+const customDomainCache = new LruCache<string | null>(500, 60 * 1000);
+
+const RESERVED_SUBDOMAINS = new Set([
+  'app',
+  'admin',
+  'api',
+  'mail',
+  'docs',
+  'help',
+  'status',
+  'static',
+  'cdn',
+  'assets',
+]);
 
 /**
- * Parses the Host header and decorates `req` with `hostBaseDomain` and
- * `tenantSubdomain`. Mounted globally (before route handlers).
+ * Parses the Host header and decorates the request with one of:
+ *   - `tenantSubdomain` — the slug from `<slug>.<HOST_DOMAINS entry>`
+ *   - `tenantCustomDomainSlug` — slug looked up from `tenants.custom_domain`
  *
- * We strip a leading `www.` because some users (or DNS providers) add
- * it automatically and we don't want it treated as a tenant slug.
+ * Reserved/system subdomains and `www.` are treated as the bare site.
  */
-export function hostInfoMiddleware(
+export async function hostInfoMiddleware(
   req: Request,
   _res: Response,
   next: NextFunction
-): void {
+): Promise<void> {
   const rawHost = (req.headers.host || '').toLowerCase().split(':')[0];
   const baseDomain = matchHostDomain(rawHost);
   req.hostBaseDomain = baseDomain;
   req.tenantSubdomain = '';
+  req.tenantCustomDomainSlug = '';
 
-  if (!baseDomain || rawHost === baseDomain) return next();
+  // Path 1: platform-owned subdomain (`<slug>.quotefleet.app`).
+  if (baseDomain && rawHost !== baseDomain) {
+    const sub = rawHost.slice(0, rawHost.length - baseDomain.length - 1);
+    if (sub && sub !== 'www' && !RESERVED_SUBDOMAINS.has(sub) && !sub.includes('.')) {
+      req.tenantSubdomain = sub;
+      return next();
+    }
+  }
 
-  // Subdomain present on a platform-owned base domain.
-  const sub = rawHost.slice(0, rawHost.length - baseDomain.length - 1);
-  if (!sub) return next();
-  // Treat `www.<base>` as the bare site, not a tenant.
-  if (sub === 'www') return next();
-  // Reserved subdomains the platform might use directly.
-  const reserved = new Set([
-    'app',
-    'admin',
-    'api',
-    'mail',
-    'docs',
-    'help',
-    'status',
-    'static',
-    'cdn',
-    'assets',
-  ]);
-  if (reserved.has(sub)) return next();
-  // Multi-level (e.g. `staging.astova.quotefleet.app`) — only the deepest
-  // single-label subdomain is treated as the tenant.
-  if (sub.includes('.')) return next();
+  // Path 2: bare base domain — fall through to marketing site.
+  if (baseDomain && rawHost === baseDomain) return next();
 
-  req.tenantSubdomain = sub;
+  // Path 3: custom domain (`quote.astova.com`). Look up tenants.custom_domain.
+  if (rawHost) {
+    const cached = customDomainCache.get(rawHost);
+    if (cached !== undefined) {
+      if (cached) req.tenantCustomDomainSlug = cached;
+      return next();
+    }
+    try {
+      const row = await db()
+        .select({ slug: tenants.slug, customDomain: tenants.customDomain })
+        .from(tenants)
+        .where(eq(tenants.customDomain, rawHost))
+        .limit(1);
+      const slug = row[0]?.slug ?? null;
+      customDomainCache.set(rawHost, slug);
+      if (slug) req.tenantCustomDomainSlug = slug;
+    } catch (err) {
+      console.warn('[hostInfo] custom-domain lookup failed (non-fatal):', err);
+    }
+  }
+
   next();
+}
+
+/** Used elsewhere to fetch the resolved tenant slug regardless of which
+ *  routing path got us here. */
+export function effectiveTenantSlug(req: Request): string {
+  return req.tenantSubdomain || req.tenantCustomDomainSlug || '';
 }

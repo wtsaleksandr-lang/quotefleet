@@ -10,5 +10,6 @@ dist/
 .cache/
 sessions/
 logs/
-drizzle/
+# drizzle/ migration files ARE checked in. They're how prod schema changes
+# are applied (drizzle-kit migrate, not drizzle-kit push).
 .secrets/

@@ -21,6 +21,12 @@ export interface Env {
   SUPER_ADMIN_EMAIL?: string;
   GOOGLE_MAPS_API_KEY?: string;
   MAPBOX_TOKEN?: string;
+  STRIPE_SECRET_KEY?: string;
+  STRIPE_PUBLISHABLE_KEY?: string;
+  STRIPE_WEBHOOK_SECRET?: string;
+  STRIPE_PRICE_PRO_MONTHLY?: string;
+  RESEND_API_KEY?: string;
+  RESEND_FROM_EMAIL?: string;
   EIA_API_KEY?: string;
   SMTP_HOST?: string;
   SMTP_PORT?: number;
@@ -88,6 +94,12 @@ export function loadEnv(): Env {
     SUPER_ADMIN_EMAIL: opt('SUPER_ADMIN_EMAIL'),
     GOOGLE_MAPS_API_KEY: opt('GOOGLE_MAPS_API_KEY'),
     MAPBOX_TOKEN: opt('MAPBOX_TOKEN'),
+    STRIPE_SECRET_KEY: opt('STRIPE_SECRET_KEY'),
+    STRIPE_PUBLISHABLE_KEY: opt('STRIPE_PUBLISHABLE_KEY'),
+    STRIPE_WEBHOOK_SECRET: opt('STRIPE_WEBHOOK_SECRET'),
+    STRIPE_PRICE_PRO_MONTHLY: opt('STRIPE_PRICE_PRO_MONTHLY'),
+    RESEND_API_KEY: opt('RESEND_API_KEY'),
+    RESEND_FROM_EMAIL: opt('RESEND_FROM_EMAIL'),
     EIA_API_KEY: opt('EIA_API_KEY'),
     SMTP_HOST: opt('SMTP_HOST'),
     SMTP_PORT: opt('SMTP_PORT') ? Number(opt('SMTP_PORT')) : undefined,

@@ -68,6 +68,16 @@ export const tenants = pgTable(
     /** Optional MC# / DOT# — surfaced on the public marketplace profile. */
     mcNumber: text('mc_number'),
     dotNumber: text('dot_number'),
+    /** Stripe Customer ID — set on first checkout. */
+    stripeCustomerId: text('stripe_customer_id').unique(),
+    /** Active Stripe Subscription ID; null when on trial or cancelled. */
+    stripeSubscriptionId: text('stripe_subscription_id'),
+    /** When the current subscription period ends (mirrored from Stripe). */
+    subscriptionEndsAt: timestamp('subscription_ends_at', { mode: 'date' }),
+    /** Tracks one-shot lifecycle emails so the cron doesn't re-send.
+     *  Keys: 'welcome', 'day_7', 'day_12', 'day_14_expired', etc.
+     *  Values: ISO timestamp of when sent. */
+    lifecycleEmailsJson: jsonb('lifecycle_emails_json').$type<Record<string, string>>(),
     /** Optional per-tenant Anthropic API key (encrypted). When set,
      *  overrides the platform default for that tenant's AI calls. */
     anthropicKeyEncrypted: text('anthropic_key_encrypted'),

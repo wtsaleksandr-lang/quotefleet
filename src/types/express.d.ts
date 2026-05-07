@@ -13,6 +13,8 @@ declare global {
       hostBaseDomain?: string | null;
       /** Subdomain (tenant slug candidate) when on `<sub>.<base>`. */
       tenantSubdomain?: string;
+      /** Tenant slug resolved via tenants.custom_domain lookup. */
+      tenantCustomDomainSlug?: string;
     }
   }
 }

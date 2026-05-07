@@ -10,10 +10,14 @@
     "start": "node dist/server/index.js",
     "build": "tsc --project tsconfig.build.json",
     "typecheck": "tsc --noEmit",
+    "test": "vitest run",
+    "test:watch": "vitest",
     "db:push": "drizzle-kit push",
+    "db:generate": "drizzle-kit generate",
+    "db:migrate": "drizzle-kit migrate",
     "db:studio": "drizzle-kit studio",
     "db:seed": "tsx src/db/seed.ts",
-    "deploy:replit": "pnpm install && pnpm db:push && pnpm db:seed && pnpm start"
+    "deploy:replit": "pnpm install && pnpm db:migrate && pnpm db:seed && pnpm start"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.90.0",
@@ -30,6 +34,7 @@
     "nanoid": "^5.0.9",
     "nodemailer": "^6.9.16",
     "postgres": "^3.4.9",
+    "stripe": "^18.4.0",
     "tsx": "^4.21.0",
     "xlsx": "^0.18.5",
     "zod": "^4.3.6"
@@ -42,6 +47,7 @@
     "@types/node": "^25.6.0",
     "@types/nodemailer": "^6.4.16",
     "drizzle-kit": "^0.31.10",
-    "typescript": "^5.7.2"
+    "typescript": "^5.7.2",
+    "vitest": "^2.1.0"
   }
 }

@@ -45,10 +45,24 @@ import { requireAuth, requireTenant } from '../middleware.js';
 import { encrypt } from '../../auth/secrets.js';
 import { loadEnv } from '../../config.js';
 import { syncTenantToMarketplace } from '../../marketplace/sync.js';
+import { createHmac } from 'node:crypto';
 
 /** Fire-and-forget marketplace sync. Logs but never throws. */
 function bumpMarketplace(tenantId: number) {
   void syncTenantToMarketplace(tenantId);
+}
+
+/** Deterministic per-tenant verification token. Derived from
+ *  SESSION_SECRET so we don't need a separate persistence column —
+ *  always recoverable, never guessable from the outside. */
+function customDomainToken(tenantId: number): string {
+  return (
+    'qf-verify-' +
+    createHmac('sha256', loadEnv().SESSION_SECRET)
+      .update(`custom-domain:${tenantId}`)
+      .digest('hex')
+      .slice(0, 32)
+  );
 }
 
 export function registerTenantRoutes(app: Express) {
@@ -461,6 +475,91 @@ export function registerTenantRoutes(app: Express) {
       .update(brandConfigs)
       .set({ ...parse.data, updatedAt: new Date() })
       .where(eq(brandConfigs.tenantId, req.tenant!.id));
+    res.json({ ok: true });
+  });
+
+  // ── custom domain (Pro tier — `quote.acme.com` → tenant) ────────
+  // Two-step claim: (1) operator submits the domain; we return a TXT
+  // value they paste into their DNS. (2) operator hits "verify"; we
+  // resolve the TXT record server-side, and on match we set
+  // tenants.custom_domain. From then on hostInfoMiddleware routes the
+  // request to this tenant.
+  app.get('/api/tenant/custom-domain', requireAuth, requireTenant, (req, res) => {
+    res.json({
+      customDomain: req.tenant!.customDomain,
+      verificationToken: customDomainToken(req.tenant!.id),
+      verificationHost: req.tenant!.customDomain
+        ? `_qf-verify.${req.tenant!.customDomain}`
+        : null,
+    });
+  });
+
+  app.post('/api/tenant/custom-domain', requireAuth, requireTenant, async (req, res) => {
+    const Schema = z.object({
+      domain: z.string().min(3).max(120).regex(
+        /^(?!-)[A-Za-z0-9-]{1,63}(?<!-)(\.[A-Za-z0-9-]{1,63})+$/,
+        'Enter a domain like quote.yourcompany.com (no scheme, no path).'
+      ),
+    });
+    const parse = Schema.safeParse(req.body);
+    if (!parse.success) return res.status(400).json({ error: 'Invalid domain' });
+    const domain = parse.data.domain.toLowerCase().replace(/^(https?:\/\/)?/, '').replace(/\/.*$/, '');
+
+    // Reject if any other tenant has claimed it.
+    const owner = await db()
+      .select({ id: tenants.id, slug: tenants.slug })
+      .from(tenants)
+      .where(eq(tenants.customDomain, domain))
+      .limit(1);
+    if (owner[0] && owner[0].id !== req.tenant!.id) {
+      return res.status(409).json({ error: 'That domain is already claimed by another tenant.' });
+    }
+
+    // Save the request — verification flips it from claimed to live.
+    await db()
+      .update(tenants)
+      .set({ customDomain: domain, updatedAt: new Date() })
+      .where(eq(tenants.id, req.tenant!.id));
+    res.json({
+      ok: true,
+      domain,
+      verificationToken: customDomainToken(req.tenant!.id),
+      instructions: {
+        recordType: 'TXT',
+        host: `_qf-verify.${domain}`,
+        value: customDomainToken(req.tenant!.id),
+        cnameRecord: { host: domain, value: 'quote-fleet.replit.app', proxied: true },
+      },
+    });
+  });
+
+  app.post('/api/tenant/custom-domain/verify', requireAuth, requireTenant, async (req, res) => {
+    const t = req.tenant!;
+    if (!t.customDomain) return res.status(400).json({ error: 'No domain to verify.' });
+    const expected = customDomainToken(t.id);
+    try {
+      const resolver = await import('node:dns/promises');
+      const records = await resolver.resolveTxt(`_qf-verify.${t.customDomain}`).catch(() => []);
+      const flat = records.map((r) => r.join('').trim());
+      if (!flat.includes(expected)) {
+        return res.status(400).json({
+          error: 'TXT record not found yet. DNS can take 5–30 min after you add the record.',
+          expected,
+          found: flat,
+        });
+      }
+    } catch (err) {
+      return res.status(500).json({ error: 'DNS lookup failed: ' + (err as Error).message });
+    }
+    // Verified — already saved on POST, just confirm.
+    res.json({ ok: true, customDomain: t.customDomain });
+  });
+
+  app.delete('/api/tenant/custom-domain', requireAuth, requireTenant, async (req, res) => {
+    await db()
+      .update(tenants)
+      .set({ customDomain: null, updatedAt: new Date() })
+      .where(eq(tenants.id, req.tenant!.id));
     res.json({ ok: true });
   });
 
