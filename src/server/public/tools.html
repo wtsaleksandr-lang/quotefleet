@@ -44,6 +44,38 @@
     .typeahead-list.open { display: block; }
     .typeahead-list .item { padding: 9px 12px; font-size: 13px; cursor: pointer; border-bottom: 1px solid var(--border); }
     .typeahead-list .item:hover, .typeahead-list .item.active { background: var(--surface-2); color: var(--accent); }
+    /* Help tooltip — same pattern as the widget. Click/hover on a "?"
+       chip; bubble appears below. */
+    .tool-help {
+      display: inline-flex; align-items: center; justify-content: center;
+      width: 16px; height: 16px; margin-left: 6px;
+      border-radius: 999px; border: 1px solid var(--border-strong);
+      background: transparent; color: var(--muted);
+      font-size: 11px; font-weight: 700; cursor: pointer;
+      vertical-align: 1px; line-height: 1;
+      transition: background 0.15s, color 0.15s, border-color 0.15s;
+    }
+    .tool-help:hover, .tool-help.open {
+      background: var(--accent); color: var(--accent-ink); border-color: transparent;
+    }
+    .tool-tip-bubble {
+      position: absolute; z-index: 100;
+      max-width: 240px;
+      background: #0c1424; color: #fff;
+      padding: 9px 12px; border-radius: 8px;
+      font-size: 12.5px; line-height: 1.45;
+      box-shadow: 0 6px 24px rgba(0,0,0,0.4);
+      pointer-events: none;
+      opacity: 0; transform: translateY(4px);
+      transition: opacity 0.12s ease, transform 0.12s ease;
+    }
+    .tool-tip-bubble.show { opacity: 1; transform: translateY(0); }
+    .tool-tip-bubble::before {
+      content: ''; position: absolute; top: -5px;
+      left: var(--qf-tip-arrow, 12px);
+      width: 10px; height: 10px;
+      background: #0c1424; transform: rotate(45deg);
+    }
   </style>
 </head>
 <body>
@@ -78,12 +110,18 @@
   <main class="tool-shell">
     <div class="tool-card">
       <div class="field">
-        <label class="field-label">Service</label>
+        <label class="field-label">
+          Service
+          <span class="tool-help" data-tip="Drayage = port/rail container haul. Truckload = full trailer (53' dry van etc). LTL = pallets, less than truckload. Expedited = sprinter / box truck / hot shot for time-critical loads.">?</span>
+        </label>
         <div class="tool-row" id="qf-services"></div>
       </div>
 
       <div class="field" style="margin-top: 14px;">
-        <label class="field-label">Equipment</label>
+        <label class="field-label">
+          Equipment
+          <span class="tool-help" data-tip="The truck/container type. 53' Dry Van = standard enclosed; Reefer = refrigerated; Flatbed = open deck; Container 20'/40'/45' = ocean container drayage; Sprinter / Box Truck = small expedited.">?</span>
+        </label>
         <select class="select" id="qf-equipment"></select>
       </div>
 
@@ -102,15 +140,21 @@
 
       <div class="grid-2" style="margin-top: 14px;">
         <div class="field">
-          <label class="field-label">Weight (lbs)</label>
+          <label class="field-label">
+            Weight (lbs)
+            <span class="tool-help" data-tip="Total weight of cargo. Approximate is fine. Over 44,000 lbs may need an overweight permit.">?</span>
+          </label>
           <input class="input" id="qf-weight" type="number" min="0" placeholder="e.g. 38000">
         </div>
         <div class="field">
-          <label class="field-label">Add-ons</label>
+          <label class="field-label">
+            Add-ons
+            <span class="tool-help" data-tip="Click any add-on that applies. Residential = home delivery (not a warehouse). Hazmat = hazardous materials. Temp = needs refrigeration.">?</span>
+          </label>
           <div class="tool-row" id="qf-flags">
-            <span class="chip" data-flag="residential">Residential</span>
-            <span class="chip" data-flag="hazmat">Hazmat</span>
-            <span class="chip" data-flag="tempControlled">Temp-controlled</span>
+            <span class="chip" data-flag="residential" data-tip="Delivery to a home, not a warehouse / dock. Drivers may need a smaller truck.">Residential</span>
+            <span class="chip" data-flag="hazmat" data-tip="Cargo is classified hazardous (placards required). Adds a hazmat surcharge.">Hazmat</span>
+            <span class="chip" data-flag="tempControlled" data-tip="Cargo needs to stay cold/frozen. Requires a reefer trailer + daily power fee.">Temp-controlled</span>
           </div>
         </div>
       </div>
@@ -294,6 +338,57 @@
     }
 
     function escapeHtml(s) { return String(s == null ? '' : s).replace(/[&<>"']/g, function (m) { return ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[m]); }); }
+
+    // ── Tooltip system ────────────────────────────────────────────
+    (function () {
+      var bubble = document.createElement('div');
+      bubble.className = 'tool-tip-bubble';
+      document.body.appendChild(bubble);
+      var openFor = null;
+      function show(target) {
+        var text = target.getAttribute('data-tip') || target.title;
+        if (!text) return;
+        bubble.textContent = text;
+        var rect = target.getBoundingClientRect();
+        var bw = Math.min(240, document.body.clientWidth * 0.8);
+        bubble.style.maxWidth = bw + 'px';
+        var left = Math.max(8, Math.min(window.innerWidth - bw - 8, rect.left + rect.width / 2 - bw / 2));
+        var arrowX = Math.max(8, rect.left + rect.width / 2 - left - 5);
+        bubble.style.setProperty('--qf-tip-arrow', arrowX + 'px');
+        bubble.style.left = (left + window.scrollX) + 'px';
+        bubble.style.top = (rect.bottom + window.scrollY + 8) + 'px';
+        bubble.classList.add('show');
+        target.classList.add('open');
+        openFor = target;
+      }
+      function hide() {
+        bubble.classList.remove('show');
+        if (openFor) openFor.classList.remove('open');
+        openFor = null;
+      }
+      document.addEventListener('mouseover', function (e) {
+        var t = e.target.closest('[data-tip]');
+        if (t) show(t);
+      });
+      document.addEventListener('mouseout', function (e) {
+        var t = e.target.closest('[data-tip]');
+        if (!t) return;
+        if (e.relatedTarget && bubble.contains(e.relatedTarget)) return;
+        hide();
+      });
+      document.addEventListener('click', function (e) {
+        var t = e.target.closest('[data-tip]');
+        if (t) {
+          // Don't preventDefault on .chip — we want both tooltip + toggle.
+          if (openFor === t) hide(); else show(t);
+          return;
+        }
+        if (openFor) hide();
+      });
+      window.addEventListener('scroll', hide, true);
+      window.addEventListener('resize', hide);
+    })();
   </script>
+<script src="/marketing-chat.js" defer></script>
 </body>
 </html>

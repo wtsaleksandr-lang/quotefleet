@@ -94,6 +94,7 @@
     pickupTerminalCode: '',
     pickupResolved: null,   // typeahead-picked suggestion {lat,lng,city,state,zip,country}
     deliveryResolved: null,
+    refId: '',              // populated after lead submit; powers inline chat
   };
 
   function applyBrand(brand) {
@@ -127,17 +128,41 @@
     initTypeaheads();
     $('qf-back-btn').addEventListener('click', function () { showStep('quote'); });
     $('qf-submit-btn').addEventListener('click', onSubmit);
+    // ── Inline chat (post-submit) ─────────────────────────────
+    var chatOpenBtn = $('qf-chat-open-btn');
+    if (chatOpenBtn) {
+      chatOpenBtn.addEventListener('click', function () {
+        $('qf-chat-toggle').style.display = 'none';
+        $('qf-chat').style.display = 'block';
+        var input = $('qf-chat-input');
+        if (input) input.focus();
+        autoResize();
+      });
+    }
+    var chatSendBtn = $('qf-chat-send');
+    var chatInput = $('qf-chat-input');
+    if (chatSendBtn && chatInput) {
+      chatSendBtn.addEventListener('click', sendChatMessage);
+      chatInput.addEventListener('keydown', function (e) {
+        if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); sendChatMessage(); }
+      });
+    }
+
     $('qf-restart-btn').addEventListener('click', function () {
       state.quote = null;
       state.pickupPortCode = '';
       state.pickupTerminalCode = '';
+      state.refId = '';
+      var msgs = $('qf-chat-msgs'); if (msgs) msgs.innerHTML = '';
+      var ct = $('qf-chat-toggle'); if (ct) ct.style.display = '';
+      var ch = $('qf-chat'); if (ch) ch.style.display = 'none';
       $('qf-result').style.display = 'none';
       ['qf-pickup-zip', 'qf-delivery-zip', 'qf-weight', 'qf-pickup-date',
        'qf-booking',
        'qf-c-name', 'qf-c-email', 'qf-c-phone', 'qf-c-company', 'qf-c-notes']
         .forEach(function (id) { var el = $(id); if (el) el.value = ''; });
       var oc = $('qf-ocean-carrier'); if (oc) oc.value = '';
-      var pp = $('qf-pickup-port'); if (pp) pp.value = '';
+      var pp = $('qf-pickup-port-input'); if (pp) pp.value = '';
       var pt = $('qf-pickup-terminal'); if (pt) pt.value = '';
       showStep('quote');
     });
@@ -210,32 +235,126 @@
     autoResize();
   }
 
+  // Port picker — type-ahead over the carrier's served ports + city
+  // search across PORTS_DATA. We keep the matching code in
+  // state.pickupPortCode and the human label in the input.
   function renderPorts() {
-    var sel = $('qf-pickup-port');
-    if (!sel) return;
+    var input = $('qf-pickup-port-input');
+    var box = $('qf-pickup-port-suggestions');
+    if (!input || !box) return;
     var ports = (state.config && state.config.drayagePorts) || [];
-    sel.innerHTML = '';
     if (ports.length === 0) {
-      // Fall back to allowing free-text — show the default pickup field.
+      // No ports configured for this tenant — fall back to free-text pickup.
       var dp = $('qf-default-pickup'); if (dp) dp.style.display = '';
       var dr = $('qf-drayage-pickup'); if (dr) dr.style.display = 'none';
       return;
     }
-    var first = document.createElement('option');
-    first.value = ''; first.textContent = '— Select a port —';
-    sel.appendChild(first);
-    ports.forEach(function (p) {
-      var opt = document.createElement('option');
-      opt.value = p.code;
-      opt.textContent = p.name + (p.state ? ', ' + p.state : '');
-      sel.appendChild(opt);
-    });
-    sel.value = state.pickupPortCode || '';
-    sel.onchange = function () {
-      state.pickupPortCode = sel.value;
-      renderTerminals();
+
+    function close() { box.classList.remove('open'); box.innerHTML = ''; }
+    function render(list) {
+      box.innerHTML = '';
+      if (!list.length) { close(); return; }
+      list.slice(0, 10).forEach(function (p) {
+        var item = document.createElement('div');
+        item.className = 'qf-suggestion';
+        var label = p.name;
+        if (p.state) label += ', ' + p.state;
+        item.innerHTML = label + '<span class="meta">' + escapeHtml(p.code) + '</span>';
+        item.addEventListener('mousedown', function (e) {
+          e.preventDefault();
+          input.value = (p.state ? p.name + ', ' + p.state : p.name);
+          state.pickupPortCode = p.code;
+          close();
+          renderTerminals();
+        });
+        box.appendChild(item);
+      });
+      box.classList.add('open');
+    }
+
+    function filter(q) {
+      q = (q || '').toLowerCase().trim();
+      if (!q) return ports.slice(0, 10);
+      return ports.filter(function (p) {
+        return (
+          p.name.toLowerCase().includes(q) ||
+          (p.city || '').toLowerCase().includes(q) ||
+          p.code.toLowerCase().includes(q) ||
+          (p.state || '').toLowerCase().includes(q)
+        );
+      });
+    }
+
+    input.oninput = function () {
+      // User is editing — clear any previously selected port code until
+      // they pick a real suggestion.
+      state.pickupPortCode = '';
+      state.pickupTerminalCode = '';
+      render(filter(input.value));
     };
+    input.onfocus = function () { render(filter(input.value)); };
+    input.onblur = function () { setTimeout(close, 120); };
+    input.onkeydown = function (e) {
+      if (e.key === 'Escape') close();
+    };
+
+    // Pre-fill if a port code was already selected (e.g. on tab switch).
+    if (state.pickupPortCode) {
+      var pre = ports.find(function (p) { return p.code === state.pickupPortCode; });
+      if (pre) input.value = pre.name + (pre.state ? ', ' + pre.state : '');
+    } else {
+      input.value = '';
+    }
     renderTerminals();
+  }
+
+  function escapeHtml(s) {
+    return String(s == null ? '' : s).replace(/[&<>"']/g, function (m) {
+      return ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[m]);
+    });
+  }
+
+  // ── Inline chat helpers ──────────────────────────────────────
+  function appendChatBubble(role, text) {
+    var msgs = $('qf-chat-msgs');
+    if (!msgs) return null;
+    var b = document.createElement('div');
+    b.className = 'qf-chat-bubble ' + role;
+    b.textContent = text;
+    msgs.appendChild(b);
+    msgs.scrollTop = msgs.scrollHeight;
+    autoResize();
+    return b;
+  }
+
+  function sendChatMessage() {
+    if (!state.refId) return;
+    var input = $('qf-chat-input');
+    var msg = (input.value || '').trim();
+    if (!msg) return;
+    appendChatBubble('user', msg);
+    input.value = '';
+    var thinking = appendChatBubble('thinking', 'Thinking…');
+    var sendBtn = $('qf-chat-send');
+    if (sendBtn) sendBtn.disabled = true;
+
+    fetch('/api/public/chat/' + encodeURIComponent(state.refId), {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ message: msg }),
+    })
+      .then(function (r) { return r.json(); })
+      .then(function (resp) {
+        if (thinking) thinking.remove();
+        if (sendBtn) sendBtn.disabled = false;
+        if (resp.error) { appendChatBubble('assistant', 'Sorry — ' + resp.error); return; }
+        appendChatBubble('assistant', resp.reply || '(no reply)');
+      })
+      .catch(function () {
+        if (thinking) thinking.remove();
+        if (sendBtn) sendBtn.disabled = false;
+        appendChatBubble('assistant', 'Connection error. Try again in a moment.');
+      });
   }
 
   function renderTerminals() {
@@ -430,10 +549,10 @@
       .then(function (resp) {
         btn.disabled = false; btn.textContent = oldText;
         if (resp.error) { showError('qf-submit-error', resp.error); return; }
+        state.refId = resp.refId;
         $('qf-thanks-msg').textContent = 'Quote ' + resp.refId + ' — $' + fmtMoney(resp.total) + ' — sent to ' + email;
-        $('qf-thanks-detail').innerHTML =
-          'You can also <a href="' + (resp.chatUrl || '#') + '" target="_blank">chat with our AI dispatcher</a> ' +
-          'about pickup times, accessorials, or anything else.';
+        $('qf-thanks-detail').textContent =
+          'Have a question? Ask the AI assistant below — about transit time, accessorials, pickup readiness, anything.';
         showStep('thanks');
       })
       .catch(function (err) {
@@ -529,6 +648,68 @@
       items.forEach(function (el, i) { el.classList.toggle('active', i === activeIndex); });
     }
   }
+
+  // ── Help tooltips ─────────────────────────────────────────────
+  // Any element with data-tip="..." (or .qf-help with data-tip on it)
+  // shows a positioned bubble on hover (desktop) or tap (touch).
+  // One global bubble element re-used for every trigger.
+  function initTooltips() {
+    var bubble = document.createElement('div');
+    bubble.className = 'qf-tip-bubble';
+    document.body.appendChild(bubble);
+    var openFor = null;
+
+    function show(target) {
+      var text = target.getAttribute('data-tip') || target.title;
+      if (!text) return;
+      bubble.textContent = text;
+      var rect = target.getBoundingClientRect();
+      var bw = Math.min(240, document.body.clientWidth * 0.8);
+      bubble.style.maxWidth = bw + 'px';
+      // Place below the trigger by default; flip up if no room.
+      var left = Math.max(8, Math.min(window.innerWidth - bw - 8, rect.left + rect.width / 2 - bw / 2));
+      var arrowX = Math.max(8, rect.left + rect.width / 2 - left - 5);
+      bubble.style.setProperty('--qf-tip-arrow', arrowX + 'px');
+      bubble.style.left = (left + window.scrollX) + 'px';
+      bubble.style.top = (rect.bottom + window.scrollY + 8) + 'px';
+      bubble.classList.add('show');
+      target.classList.add('open');
+      openFor = target;
+    }
+    function hide() {
+      bubble.classList.remove('show');
+      if (openFor) openFor.classList.remove('open');
+      openFor = null;
+    }
+
+    // Delegate from document so tooltips on dynamically-added elements work.
+    document.addEventListener('mouseover', function (e) {
+      var t = e.target.closest('[data-tip]');
+      if (!t) return;
+      show(t);
+    });
+    document.addEventListener('mouseout', function (e) {
+      var t = e.target.closest('[data-tip]');
+      if (!t) return;
+      // Hide unless we're moving into the bubble itself.
+      if (e.relatedTarget && bubble.contains(e.relatedTarget)) return;
+      hide();
+    });
+    // Touch / click — toggle.
+    document.addEventListener('click', function (e) {
+      var t = e.target.closest('[data-tip]');
+      if (t) {
+        e.preventDefault();
+        if (openFor === t) hide();
+        else show(t);
+        return;
+      }
+      if (openFor) hide();
+    });
+    window.addEventListener('scroll', hide, true);
+    window.addEventListener('resize', hide);
+  }
+  initTooltips();
 
   // ── auto-resize iframe via postMessage ────────────────────────
   function autoResize() {

@@ -15,28 +15,44 @@
     <div class="qf-step active" id="qf-step-quote">
       <div class="qf-tabs" id="qf-services"></div>
 
-      <div class="qf-section-title">Equipment</div>
+      <div class="qf-section-title">
+        Equipment
+        <span class="qf-help" data-tip="The truck or container type. 53' Dry Van = standard enclosed trailer; Reefer = refrigerated; Flatbed = open deck; Container 20'/40'/45' = ocean container drayage.">?</span>
+      </div>
       <select class="qf-select" id="qf-equipment"></select>
 
       <!-- Drayage-specific pickup: port + terminal + booking. Visible only when service=drayage. -->
       <div class="qf-drayage-only" id="qf-drayage-pickup" style="display:none;">
-        <div class="qf-section-title" style="margin-top:14px;">Pickup port / terminal</div>
+        <div class="qf-section-title" style="margin-top:14px;">
+          Pickup port / terminal
+          <span class="qf-help" data-tip="Drayage starts at a marine terminal (LA, NY/NJ, Savannah…) or a rail ramp (Chicago BNSF, Memphis, etc.). If unsure of the exact terminal, pick the city — your dispatcher will confirm.">?</span>
+        </div>
         <div class="qf-grid">
-          <div class="qf-field qf-full">
+          <div class="qf-field qf-full qf-typeahead" id="qf-pickup-port-wrap">
             <label>Port / city</label>
-            <select class="qf-select" id="qf-pickup-port"></select>
+            <input class="qf-input" id="qf-pickup-port-input" placeholder="Type a port or city — Los Angeles, Long Beach, Savannah…" autocomplete="off">
+            <div class="qf-suggestions" id="qf-pickup-port-suggestions"></div>
           </div>
           <div class="qf-field qf-full">
-            <label>Terminal <span class="qf-tagline">(optional — pick "I don't know yet" if unsure)</span></label>
+            <label>
+              Terminal
+              <span class="qf-help" data-tip="The specific marine terminal (e.g. APM Pier 400) or rail ramp (e.g. BNSF Logistics Park). If you don't know, leave it as 'I don't know yet' — your dispatcher will check the booking.">?</span>
+            </label>
             <select class="qf-select" id="qf-pickup-terminal">
               <option value="">— I don't know yet —</option>
             </select>
           </div>
         </div>
-        <div class="qf-section-title" style="margin-top:14px;">Booking <span class="qf-tagline">(optional — helps your dispatcher confirm the terminal)</span></div>
+        <div class="qf-section-title" style="margin-top:14px;">
+          Booking
+          <span class="qf-help" data-tip="Optional. Your ocean carrier (Maersk, MSC, etc.) and the booking confirmation number from them. The booking confirmation usually names the loading or discharge terminal — saves your dispatcher a lookup.">?</span>
+        </div>
         <div class="qf-grid">
           <div class="qf-field">
-            <label>Ocean carrier</label>
+            <label>
+              Ocean carrier
+              <span class="qf-help" data-tip="The shipping line carrying your container — Maersk, MSC, CMA CGM, Hapag-Lloyd, ONE, etc. Pick 'Not sure' if you don't know yet.">?</span>
+            </label>
             <select class="qf-select" id="qf-ocean-carrier">
               <option value="">— Not sure —</option>
               <option>Maersk</option>
@@ -54,7 +70,10 @@
             </select>
           </div>
           <div class="qf-field">
-            <label>Booking #</label>
+            <label>
+              Booking #
+              <span class="qf-help" data-tip="On your booking confirmation from the ocean carrier — usually 8-12 letters/digits at the top. Example: SINI12345678 or MSCUNH123456. Optional.">?</span>
+            </label>
             <input class="qf-input" id="qf-booking" placeholder="e.g. SINI12345678" autocomplete="off">
           </div>
         </div>
@@ -84,7 +103,10 @@
       <div class="qf-section-title" style="margin-top:14px;">Cargo</div>
       <div class="qf-grid">
         <div class="qf-field">
-          <label>Weight (lbs)</label>
+          <label>
+            Weight (lbs)
+            <span class="qf-help" data-tip="Total weight of the cargo + container/pallet. Over 44,000 lbs may need an overweight permit (auto-applied). Approximate is fine.">?</span>
+          </label>
           <input class="qf-input" id="qf-weight" type="number" min="0" placeholder="e.g. 38000">
         </div>
         <div class="qf-field">
@@ -94,12 +116,24 @@
       </div>
 
       <div class="qf-flags">
-        <label><input type="checkbox" id="qf-residential"> Residential delivery</label>
-        <label><input type="checkbox" id="qf-hazmat"> Hazmat</label>
-        <label><input type="checkbox" id="qf-temp"> Temp-controlled</label>
+        <label>
+          <input type="checkbox" id="qf-residential"> Residential delivery
+          <span class="qf-help" data-tip="Delivery is to a home (not a business / dock / warehouse). Adds a residential-delivery fee — drivers can't always reach houses with full-size trailers.">?</span>
+        </label>
+        <label>
+          <input type="checkbox" id="qf-hazmat"> Hazmat
+          <span class="qf-help" data-tip="Cargo is classified hazardous (placards required). Adds a hazmat surcharge — only certain drivers + equipment qualify.">?</span>
+        </label>
+        <label>
+          <input type="checkbox" id="qf-temp"> Temp-controlled
+          <span class="qf-help" data-tip="Cargo needs to stay cold or frozen. Requires a refrigerated unit (reefer/genset) and adds a daily fee for the running power.">?</span>
+        </label>
       </div>
 
-      <div class="qf-section-title" style="margin-top:14px;">Add-ons (optional)</div>
+      <div class="qf-section-title" style="margin-top:14px;">
+        Add-ons (optional)
+        <span class="qf-help" data-tip="Extra services beyond a basic linehaul. Click any add-on to see what it covers and its price. Add only the ones you need.">?</span>
+      </div>
       <div class="qf-accessorials" id="qf-accessorials"></div>
 
       <button class="qf-cta" id="qf-calc-btn">Calculate quote</button>
@@ -148,12 +182,29 @@
       <div id="qf-submit-error" class="qf-error" style="display:none;"></div>
     </div>
 
-    <!-- Step 3: thanks -->
+    <!-- Step 3: thanks + inline chat -->
     <div class="qf-step" id="qf-step-thanks">
       <div class="qf-section-title">Quote sent</div>
       <div class="qf-success" id="qf-thanks-msg"></div>
       <p class="qf-tagline" id="qf-thanks-detail"></p>
-      <button class="qf-cta qf-secondary" id="qf-restart-btn">Get another quote</button>
+
+      <!-- Inline chat panel — opens on demand. Stays inside the widget
+           container so it ports cleanly across host sites. -->
+      <div class="qf-chat-toggle" id="qf-chat-toggle">
+        <button class="qf-cta" id="qf-chat-open-btn">💬 Ask a follow-up question</button>
+      </div>
+      <div class="qf-chat" id="qf-chat" style="display:none;">
+        <div class="qf-chat-msgs" id="qf-chat-msgs"></div>
+        <div class="qf-chat-input-row">
+          <input class="qf-input" id="qf-chat-input" placeholder="Ask about transit time, accessorials, anything…" autocomplete="off">
+          <button class="qf-cta qf-chat-send" id="qf-chat-send">Send</button>
+        </div>
+        <p class="qf-tagline" style="margin-top:8px; font-size:11.5px;">
+          AI assistant — answers about your quote, transit time, accessorials, equipment availability.
+        </p>
+      </div>
+
+      <button class="qf-cta qf-secondary" id="qf-restart-btn" style="margin-top: 14px;">Get another quote</button>
     </div>
 
     <div class="qf-footer" id="qf-footer">

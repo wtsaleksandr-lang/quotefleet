@@ -21,6 +21,7 @@ import { registerIngestRoutes } from './routes/ingest.js';
 import { registerMarketplaceRoutes } from './routes/marketplace.js';
 import { registerToolsRoutes } from './routes/tools.js';
 import { registerBillingRoutes, registerStripeWebhook } from './routes/billing.js';
+import { registerMarketingChatRoute } from './routes/marketingChat.js';
 import { hostInfoMiddleware } from './hostInfo.js';
 
 const __filename = fileURLToPath(import.meta.url);
@@ -66,6 +67,7 @@ export function createApp(): express.Express {
   registerMarketplaceRoutes(app);
   registerToolsRoutes(app);
   registerBillingRoutes(app);
+  registerMarketingChatRoute(app);
 
   // Healthcheck.
   app.get('/healthz', (_req, res) => {
