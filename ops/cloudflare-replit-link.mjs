@@ -68,7 +68,8 @@ const INCLUDE = (args.include ?? '').split(',').map((s) => s.trim().toLowerCase(
 
 if (!TOKEN) die('Set CF_API_TOKEN in env.');
 if (!TARGET) die('Pass --target <replit-host>  e.g. --target quote-fleet.replit.app');
-if (!ACCOUNT) die('Pass --account <cloudflare-account-id>');
+// --account is now optional: if omitted, the script lists every zone the
+// token can see (fine for a token that's already scoped to one account).
 
 const target = TARGET.replace(/^https?:\/\//, '').replace(/\/.*$/, '');
 const excludeSet = new Set([...DEFAULT_EXCLUDE, ...EXTRA_EXCLUDE]);
@@ -79,7 +80,7 @@ console.log(banner('Cloudflare → Replit linker'));
 console.log(`Mode:           ${DRY_RUN ? 'DRY RUN (inspect only)' : '*** WILL WRITE DNS RECORDS ***'}`);
 console.log(`Force:          ${FORCE ? 'YES (will overwrite IN_USE zones)' : 'no'}`);
 console.log(`Target host:    ${target}`);
-console.log(`Account:        ${ACCOUNT}`);
+console.log(`Account:        ${ACCOUNT ?? '(none — will list every zone the token can see)'}`);
 console.log(`Excluded:       ${[...excludeSet].join(', ') || '(none)'}`);
 console.log(`Include filter: ${includeSet ? [...includeSet].join(', ') : 'ALL zones in account'}`);
 console.log(`Log:            ${LOG_PATH}`);
@@ -229,8 +230,25 @@ async function listZones(accountId) {
   const out = [];
   let page = 1;
   while (true) {
-    const r = await cf(`/zones?account.id=${accountId}&per_page=50&page=${page}`);
+    const filter = accountId ? `&account.id=${accountId}` : '';
+    const r = await cf(`/zones?per_page=50&page=${page}${filter}`);
     if (!r.success) {
+      const err = (r.errors ?? [])[0] ?? {};
+      // Friendlier error — the raw Cloudflare message is opaque.
+      if (err.code === 70503 || /tag doesn't exist/i.test(err.message ?? '')) {
+        throw new Error(
+          `Cloudflare doesn't recognize the account ID "${accountId}". ` +
+          `Find the right one: open any zone in your dashboard, the URL is ` +
+          `dash.cloudflare.com/<ACCOUNT_ID>/<zone>. Or omit --account ` +
+          `entirely to list every zone the token can see.`
+        );
+      }
+      if (err.code === 9109 || /unauthorized/i.test(err.message ?? '')) {
+        throw new Error(
+          `Cloudflare token rejected: ${err.message}. The token needs ` +
+          `Zone:Read at minimum (Zone:Edit + DNS:Edit to write records).`
+        );
+      }
       throw new Error(`Zone list failed: ${JSON.stringify(r.errors)}`);
     }
     out.push(...r.result);
