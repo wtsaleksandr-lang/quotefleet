@@ -50,7 +50,13 @@ export async function hostInfoMiddleware(
   _res: Response,
   next: NextFunction
 ): Promise<void> {
-  const rawHost = (req.headers.host || '').toLowerCase().split(':')[0];
+  // When fronted by the CF Worker wildcard proxy, the original tenant
+  // hostname arrives in X-Original-Host (Worker rewrites Host to Replit's).
+  const rawHost = (
+    (req.headers['x-original-host'] as string) ||
+    req.headers.host ||
+    ''
+  ).toLowerCase().split(':')[0];
   const baseDomain = matchHostDomain(rawHost);
   req.hostBaseDomain = baseDomain;
   req.tenantSubdomain = '';
