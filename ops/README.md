@@ -1,7 +1,75 @@
-# Cloudflare migration runbook
+# Cloudflare ops runbooks
 
-Move ~20 domains from Namecheap → Cloudflare DNS to get free
-Universal SSL on each (covers `<domain>` AND `*.<domain>`).
+Two scripts in this folder:
+
+## `cloudflare-migrate.mjs` — Namecheap → Cloudflare DNS
+
+Move domains from Namecheap registrar's DNS to Cloudflare so they get
+free Universal SSL covering `<domain>` AND `*.<domain>`. Detailed
+runbook at the bottom of this file.
+
+## `cloudflare-replit-link.mjs` — Cloudflare → Replit deployment
+
+For zones already on Cloudflare, point them at the QuoteFleet Replit
+deployment by adding apex + wildcard CNAMEs (proxied, orange cloud).
+With proxy on, Cloudflare terminates SSL at the edge and forwards the
+`Host` header through to Replit unchanged — so QuoteFleet's multi-host
+middleware sees the right tenant slug, and you do NOT need to add each
+custom domain individually in Replit's deployment settings.
+
+```bash
+cd ops
+
+export CF_API_TOKEN="cfut_h3H3orGMsuAHwQF3gSJVTA4s901A47PmOa4FtsEX020bc75d"
+
+# 1. INSPECT (no writes). Tags every zone:
+#      SAFE             no apex record yet — safe to link
+#      ALREADY_LINKED   apex CNAMEs to your Replit URL already
+#      IN_USE           apex points elsewhere (LoadMode, wefixtrades, …)
+#                       script won't touch without --force
+node cloudflare-replit-link.mjs \
+  --account efa414704efefaa266c86d5d136d1e3a \
+  --target  quote-fleet.replit.app
+
+# 2. LINK ONLY THE FOUR HOST_DOMAINS (safest path — recommended):
+node cloudflare-replit-link.mjs \
+  --account efa414704efefaa266c86d5d136d1e3a \
+  --target  quote-fleet.replit.app \
+  --include quotefleet.app,quotefleet.net,truckrate.online,your-quote.online \
+  --do-it
+
+# 3. Or: link every SAFE zone (skips IN_USE so other apps stay alive):
+node cloudflare-replit-link.mjs \
+  --account efa414704efefaa266c86d5d136d1e3a \
+  --target  quote-fleet.replit.app \
+  --do-it
+
+# 4. Force-overwrite IN_USE zones (only after eyeballing the plan!):
+node cloudflare-replit-link.mjs \
+  --account efa414704efefaa266c86d5d136d1e3a \
+  --target  quote-fleet.replit.app \
+  --do-it --force
+```
+
+After the script runs, do these **once per linked zone** in the Cloudflare dashboard:
+
+1. SSL/TLS → Overview → mode = **Full** (Replit serves a valid `*.replit.app` cert)
+2. SSL/TLS → Edge Certificates → enable **Always Use HTTPS**
+
+Then update **Replit Secrets**:
+
+| Key | Value |
+|---|---|
+| `HOST_DOMAINS` | Comma-separated list of linked domains, e.g. `quotefleet.app,quotefleet.net,truckrate.online,your-quote.online` |
+
+Redeploy. The signup form's host dropdown now offers every linked domain.
+
+---
+
+## Migration runbook (Namecheap → Cloudflare)
+
+Move ~20 domains from Namecheap registrar's DNS to Cloudflare to get
+free Universal SSL on each (covers `<domain>` AND `*.<domain>`).
 
 ---
 
