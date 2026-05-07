@@ -90,7 +90,12 @@
       var grid = $('mp-results'); grid.className = 'mp-grid'; grid.innerHTML = '';
       $('mp-empty').classList.toggle('hidden', carriers.length > 0);
       carriers.forEach(function (c) {
-        var card = document.createElement('div'); card.className = 'mp-card';
+        var card = document.createElement('a');
+        card.className = 'mp-card';
+        card.style.display = 'block';
+        card.style.textDecoration = 'none';
+        card.style.color = 'inherit';
+        card.href = '/marketplace/carrier/' + encodeURIComponent(c.slug);
         var meta = (c.countryFocus || '') + (c.mcNumber ? ' · MC ' + c.mcNumber : '') + (c.dotNumber ? ' · DOT ' + c.dotNumber : '');
         card.innerHTML =
           '<h3>' + esc(c.displayName) + '</h3>' +

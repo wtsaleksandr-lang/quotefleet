@@ -1,0 +1,129 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Carrier — QuoteFleet marketplace</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="/style.css">
+  <style>
+    .mp-shell { max-width: 980px; margin: 0 auto; padding: 28px; }
+    .mp-card { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius-lg); padding: 24px 28px; }
+    .mp-meta { font-family: var(--font-mono); font-size: 12px; letter-spacing: 0.06em; text-transform: uppercase; color: var(--muted); }
+    .mp-grid-2 { display: grid; gap: 14px; grid-template-columns: 1fr 1fr; }
+    @media (max-width: 720px) { .mp-grid-2 { grid-template-columns: 1fr; } }
+    .rate-row { display: flex; justify-content: space-between; padding: 10px 0; border-bottom: 1px solid var(--border); font-size: 14px; }
+    .rate-row:last-child { border-bottom: 0; }
+    .rate-row .label { color: var(--ink-soft); }
+    .rate-row .val { font-family: var(--font-mono); color: var(--accent); }
+  </style>
+</head>
+<body>
+  <header class="topnav">
+    <div class="topnav-inner">
+      <a href="/" class="brand-mark">
+        <span class="logo"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M3 17h2a3 3 0 0 0 3-3V7H3z"/><path d="M14 7h6l1 4v6h-3"/><circle cx="7" cy="17" r="2"/><circle cx="17" cy="17" r="2"/></svg></span>
+        QuoteFleet
+      </a>
+      <span class="topnav-spacer"></span>
+      <a class="nav-link" href="/marketplace/">All carriers</a>
+      <a class="btn btn-primary always-show" href="/signup">List your company <span class="arr">→</span></a>
+    </div>
+  </header>
+
+  <main class="mp-shell">
+    <a class="muted-small" href="/marketplace/">← Back to marketplace</a>
+    <div id="loading" class="muted-small" style="margin-top: 18px;">Loading…</div>
+    <div id="content" style="display: none;">
+      <h1 id="c-name" style="font-size: 36px; margin: 14px 0 6px 0;"></h1>
+      <div class="mp-meta" id="c-meta"></div>
+      <div class="mp-grid-2" style="margin-top: 22px;">
+        <div class="mp-card">
+          <h2 style="font-size: 16px; margin: 0 0 14px 0;">Services &amp; equipment</h2>
+          <div id="c-services"></div>
+        </div>
+        <div class="mp-card">
+          <h2 style="font-size: 16px; margin: 0 0 14px 0;">Lane footprint</h2>
+          <div id="c-lanes"></div>
+        </div>
+      </div>
+      <div class="mp-card" style="margin-top: 20px;">
+        <h2 style="font-size: 16px; margin: 0 0 12px 0;">Current rates</h2>
+        <div id="c-rates"></div>
+      </div>
+      <div class="mp-card" style="margin-top: 20px; text-align: center;">
+        <p class="muted" style="margin-bottom: 14px;">Want to book? Contact this carrier directly — QuoteFleet takes a small commission per booked shipment, charged to the carrier on success.</p>
+        <a class="btn btn-primary" id="c-contact-link" href="#">Get a quote <span class="arr">→</span></a>
+      </div>
+    </div>
+    <div id="not-found" class="mp-card hidden" style="margin-top: 18px; text-align: center;">
+      <h2>Carrier not found</h2>
+      <p class="muted">This carrier hasn't opted in to the public marketplace, or the link is wrong.</p>
+      <a class="btn btn-secondary" href="/marketplace/">All carriers</a>
+    </div>
+  </main>
+
+  <footer class="site-footer">
+    © <span id="year"></span> QuoteFleet · <a href="/">Home</a> · <a href="/marketplace/">Marketplace</a> · <a href="/pricing">Pricing</a>
+  </footer>
+
+  <script>
+    document.getElementById('year').textContent = new Date().getFullYear();
+    var slug = decodeURIComponent(location.pathname.split('/marketplace/carrier/')[1] || '');
+    if (!slug) { document.getElementById('loading').textContent = 'No carrier in URL.'; }
+    else {
+      fetch('/api/marketplace/carrier/' + encodeURIComponent(slug))
+        .then(function (r) { if (!r.ok) throw new Error(); return r.json(); })
+        .then(function (j) { render(j); })
+        .catch(function () {
+          document.getElementById('loading').classList.add('hidden');
+          document.getElementById('not-found').classList.remove('hidden');
+        });
+    }
+
+    function render(j) {
+      document.getElementById('loading').classList.add('hidden');
+      document.getElementById('content').style.display = 'block';
+      var c = j.carrier;
+      document.title = c.displayName + ' — QuoteFleet marketplace';
+      document.getElementById('c-name').textContent = c.displayName;
+      var meta = c.countryFocus + (c.mcNumber ? ' · MC ' + c.mcNumber : '') + (c.dotNumber ? ' · DOT ' + c.dotNumber : '');
+      document.getElementById('c-meta').textContent = meta;
+      document.getElementById('c-contact-link').href = 'https://' + c.slug + '.quotefleet.app/';
+
+      var s = document.getElementById('c-services');
+      s.innerHTML = '<div class="rate-row"><span class="label">Services</span><span>' + esc((c.services || []).join(', ') || '—') + '</span></div>'
+        + '<div class="rate-row"><span class="label">Equipment</span><span>' + esc((c.equipment || []).join(', ') || '—') + '</span></div>';
+
+      var l = document.getElementById('c-lanes');
+      if (!j.lanes || j.lanes.length === 0) {
+        l.innerHTML = '<div class="muted-small">No specific lanes on file.</div>';
+      } else {
+        l.innerHTML = j.lanes.map(function (x) {
+          var lbl = x.anchorType === 'national' ? 'National' : (x.anchorType + ' ' + x.anchorCode);
+          var radius = x.radiusMiles ? ' · ' + x.radiusMiles + ' mi radius' : '';
+          return '<div class="rate-row"><span class="label">' + esc(lbl) + radius + '</span><span>' + esc((x.services || []).join(', ')) + '</span></div>';
+        }).join('');
+      }
+
+      var r = document.getElementById('c-rates');
+      if (!j.currentRates || j.currentRates.length === 0) {
+        r.innerHTML = '<div class="muted-small">Carrier hasn\'t published current rates publicly.</div>';
+      } else {
+        r.innerHTML = j.currentRates.map(function (x) {
+          var name = x.service + ' · ' + x.equipment + (x.laneAnchorCode ? ' (' + x.laneAnchorCode + ')' : '');
+          var val = x.laneFlatPrice
+            ? '$' + Number(x.laneFlatPrice).toFixed(0) + ' flat'
+            : x.ratePerMile
+            ? '$' + Number(x.ratePerMile).toFixed(2) + '/mi'
+            : '—';
+          return '<div class="rate-row"><span class="label">' + esc(name) + '</span><span class="val">' + esc(val) + '</span></div>';
+        }).join('');
+      }
+    }
+    function esc(s) { return String(s == null ? '' : s).replace(/[&<>"']/g, function (m) { return ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[m]); }); }
+  </script>
+</body>
+</html>

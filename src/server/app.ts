@@ -112,8 +112,13 @@ export function createApp(): express.Express {
   app.get('/chat/:refId', (_req, res) => res.sendFile(resolve(publicDir, 'chat.html')));
   // Public free SEO calculator. Indexable, no signup.
   app.get(['/tools', '/tools/'], (_req, res) => res.sendFile(resolve(publicDir, 'tools.html')));
-  // Public marketplace browser (placeholder until UI lands).
+  // Public marketplace browser.
   app.get(['/marketplace', '/marketplace/'], (_req, res) => res.sendFile(resolve(publicDir, 'marketplace.html')));
+  app.get('/marketplace/carrier/:slug', (_req, res) => res.sendFile(resolve(publicDir, 'marketplace-carrier.html')));
+  // Per-vertical landing pages (SEO).
+  app.get(['/for/brokers', '/for/brokers/'], (_req, res) => res.sendFile(resolve(publicDir, 'for-brokers.html')));
+  app.get(['/for/ltl', '/for/ltl/'], (_req, res) => res.sendFile(resolve(publicDir, 'for-ltl.html')));
+  app.get(['/for/forwarders', '/for/forwarders/'], (_req, res) => res.sendFile(resolve(publicDir, 'for-forwarders.html')));
 
   // 404
   app.use((_req, res) => {
