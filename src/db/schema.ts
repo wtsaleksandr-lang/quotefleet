@@ -60,6 +60,14 @@ export const tenants = pgTable(
     status: text('status').notNull().default('active'),
     /** Trial end timestamp. Null = not on trial (paid or grandfathered). */
     trialEndsAt: timestamp('trial_ends_at', { mode: 'date' }),
+    /** Marketplace exposure: carrier opts in to having their PUBLIC rate
+     *  profile (carrier name, locations, equipment, current rates) visible
+     *  to shippers/forwarders browsing the rates dashboard. Default OFF.
+     *  Anonymized benchmarks include all tenants regardless. */
+    marketplaceOptIn: boolean('marketplace_opt_in').notNull().default(false),
+    /** Optional MC# / DOT# — surfaced on the public marketplace profile. */
+    mcNumber: text('mc_number'),
+    dotNumber: text('dot_number'),
     /** Optional per-tenant Anthropic API key (encrypted). When set,
      *  overrides the platform default for that tenant's AI calls. */
     anthropicKeyEncrypted: text('anthropic_key_encrypted'),
@@ -629,6 +637,175 @@ export const outreachEvents = pgTable('outreach_events', {
   occurredAt: timestamp('occurred_at', { mode: 'date' }).notNull().defaultNow(),
 });
 
+// ════════════════════════════════════════════════════════════════════
+// MARKETPLACE — cross-tenant rate index.
+//
+// Two surfaces sit on top of these tables:
+//   - **Public marketplace** (browsable by shippers / forwarders): only
+//     shows tenants where `marketplaceOptIn = true`. They see carrier
+//     name, locations, equipment, current rates per lane.
+//   - **Anonymized benchmarks** (always-on, GDPR-safe): aggregated
+//     stats — median, P25, P75 per (lane, equipment) — computed across
+//     ALL tenants. No carrier names. Useful for the rate-tuning AI to
+//     answer "how does my $2.55/mi compare to the market?".
+//
+// Sync model: every UPDATE / INSERT on rate_cards / accessorials /
+// lane_zones / terminals fires `syncTenantToMarketplace(tenantId)`,
+// which upserts the carrier profile and snapshots its current rates.
+// See src/marketplace/sync.ts.
+// ════════════════════════════════════════════════════════════════════
+export const marketplaceCarriers = pgTable(
+  'marketplace_carriers',
+  {
+    /** 1:1 with tenants.id — also the PK. */
+    tenantId: integer('tenant_id')
+      .primaryKey()
+      .references(() => tenants.id, { onDelete: 'cascade' }),
+    /** Cached from tenants.name at last sync — denormalized so the public
+     *  view is fast even when joining many carriers. */
+    displayName: text('display_name').notNull(),
+    /** Country focus: 'US', 'CA', 'BOTH'. */
+    countryFocus: text('country_focus').notNull().default('US'),
+    mcNumber: text('mc_number'),
+    dotNumber: text('dot_number'),
+    /** Free-text description from the carrier's brand profile. */
+    summary: text('summary'),
+    /** Slug-or-URL of public profile page. */
+    publicSlug: text('public_slug').notNull(),
+    /** Equipment types the carrier offers (rolled up from rate_cards). */
+    equipmentJson: jsonb('equipment_json').$type<string[]>(),
+    /** Services the carrier offers (drayage / ftl / ltl / expedited / hotshot). */
+    servicesJson: jsonb('services_json').$type<string[]>(),
+    /** Whether this row is publicly visible. Mirrors tenants.marketplace_opt_in. */
+    visible: boolean('visible').notNull().default(false),
+    /** Last successful sync timestamp. */
+    lastSyncedAt: timestamp('last_synced_at', { mode: 'date' }).notNull().defaultNow(),
+    createdAt: timestamp('created_at', { mode: 'date' }).notNull().defaultNow(),
+  },
+  (t) => [uniqueIndex('marketplace_carriers_slug_idx').on(t.publicSlug)]
+);
+
+// Per-carrier lane footprint — anchored either at a port (drayage) or
+// a metro area (over-the-road). Computed from lane_zones + recent
+// quote-form pickup/delivery patterns.
+export const marketplaceLanes = pgTable(
+  'marketplace_lanes',
+  {
+    id: serial('id').primaryKey(),
+    tenantId: integer('tenant_id')
+      .notNull()
+      .references(() => tenants.id, { onDelete: 'cascade' }),
+    /** Anchor: 'port' | 'metro' | 'state' | 'national'. */
+    anchorType: text('anchor_type').notNull(),
+    /** PORTS_DATA.code for port anchors, USPS state code for state, etc. */
+    anchorCode: text('anchor_code').notNull(),
+    /** Inclusive radius from anchor in miles. */
+    radiusMiles: doublePrecision('radius_miles'),
+    /** Equipment scope (rolled up from any matching rate cards). */
+    equipmentJson: jsonb('equipment_json').$type<string[]>(),
+    /** Services this lane covers. */
+    servicesJson: jsonb('services_json').$type<string[]>(),
+    enabled: boolean('enabled').notNull().default(true),
+    updatedAt: timestamp('updated_at', { mode: 'date' }).notNull().defaultNow(),
+  },
+  (t) => [uniqueIndex('marketplace_lanes_idx').on(t.tenantId, t.anchorType, t.anchorCode)]
+);
+
+// Periodic snapshots of a carrier's rate book. Each material change
+// (rate edit, accessorial change, zone tariff edit) writes a new row.
+// Lets the marketplace dashboard show rate history + trend lines, and
+// gives the AI context like "rates at this carrier moved up 7% in 30 days."
+export const marketplaceRateSnapshots = pgTable(
+  'marketplace_rate_snapshots',
+  {
+    id: serial('id').primaryKey(),
+    tenantId: integer('tenant_id')
+      .notNull()
+      .references(() => tenants.id, { onDelete: 'cascade' }),
+    /** Service + equipment slot the snapshot describes. */
+    service: text('service').notNull(),
+    equipment: text('equipment').notNull(),
+    /** Snapshot of the rate card values at this point in time. */
+    ratePerMile: doublePrecision('rate_per_mile'),
+    minimumCharge: doublePrecision('minimum_charge'),
+    flatFee: doublePrecision('flat_fee'),
+    fuelSurchargePct: doublePrecision('fuel_surcharge_pct'),
+    /** Optional anchor (port/metro) — present when this snapshot is
+     *  scoped to a specific lane zone rather than a generic rate card. */
+    laneAnchorCode: text('lane_anchor_code'),
+    laneRadiusMiles: doublePrecision('lane_radius_miles'),
+    laneFlatPrice: doublePrecision('lane_flat_price'),
+    /** What triggered this snapshot — for audit. */
+    sourceKind: text('source_kind').notNull(), // 'rate_card_edit' | 'lane_zone_edit' | 'ai_ingest' | 'periodic'
+    sourceMeta: jsonb('source_meta').$type<Record<string, unknown>>(),
+    capturedAt: timestamp('captured_at', { mode: 'date' }).notNull().defaultNow(),
+  }
+);
+
+// Anonymized aggregates per (service, equipment, lane-anchor). Refreshed
+// on a schedule (e.g. nightly). Always queryable — no opt-in required.
+export const marketplaceAggregates = pgTable(
+  'marketplace_aggregates',
+  {
+    id: serial('id').primaryKey(),
+    service: text('service').notNull(),
+    equipment: text('equipment').notNull(),
+    /** Optional anchor — null means "national average". */
+    anchorType: text('anchor_type'),
+    anchorCode: text('anchor_code'),
+    /** Number of carriers in the sample. Suppressed display when < 5. */
+    sampleSize: integer('sample_size').notNull(),
+    /** $/mi statistics. */
+    p25RatePerMile: doublePrecision('p25_rate_per_mile'),
+    p50RatePerMile: doublePrecision('p50_rate_per_mile'),
+    p75RatePerMile: doublePrecision('p75_rate_per_mile'),
+    /** Minimum-charge statistics. */
+    p25Minimum: doublePrecision('p25_minimum'),
+    p50Minimum: doublePrecision('p50_minimum'),
+    p75Minimum: doublePrecision('p75_minimum'),
+    /** Flat-tariff statistics for drayage (when anchor is a port). */
+    p25FlatPrice: doublePrecision('p25_flat_price'),
+    p50FlatPrice: doublePrecision('p50_flat_price'),
+    p75FlatPrice: doublePrecision('p75_flat_price'),
+    computedAt: timestamp('computed_at', { mode: 'date' }).notNull().defaultNow(),
+  },
+  (t) => [
+    uniqueIndex('marketplace_aggregates_idx').on(t.service, t.equipment, t.anchorType, t.anchorCode),
+  ]
+);
+
+// File ingest jobs — the AI agent accepts a rate sheet (PDF / image /
+// Excel / .eml) and extracts structured rate data. The job stores the
+// raw input + the model's structured output until the user confirms or
+// rejects. Only on confirm do we apply the changes to rate_cards etc.
+export const ingestJobs = pgTable('ingest_jobs', {
+  id: serial('id').primaryKey(),
+  tenantId: integer('tenant_id')
+    .notNull()
+    .references(() => tenants.id, { onDelete: 'cascade' }),
+  userId: integer('user_id').references(() => users.id, { onDelete: 'set null' }),
+  /** Friendly file name for the dashboard. */
+  filename: text('filename').notNull(),
+  /** MIME type as detected. */
+  mimeType: text('mime_type'),
+  /** Size in bytes. */
+  sizeBytes: integer('size_bytes'),
+  /** Where the file is stored. We use base64-in-DB for MVP (small files
+   *  only). For production swap to object storage and store the URL. */
+  storageRef: text('storage_ref'),
+  /** Status: 'pending' | 'parsing' | 'ready_for_review' | 'applied' | 'rejected' | 'failed'. */
+  status: text('status').notNull().default('pending'),
+  /** What the model extracted. JSON mirroring NewRateCard / NewAccessorial / NewLaneZone shapes. */
+  parsedJson: jsonb('parsed_json').$type<Record<string, unknown>>(),
+  /** Human notes from the operator during review. */
+  reviewNotes: text('review_notes'),
+  /** Error message when status='failed'. */
+  errorMessage: text('error_message'),
+  appliedAt: timestamp('applied_at', { mode: 'date' }),
+  createdAt: timestamp('created_at', { mode: 'date' }).notNull().defaultNow(),
+  updatedAt: timestamp('updated_at', { mode: 'date' }).notNull().defaultNow(),
+});
+
 // ────────────────────────────────────────────────────────────────────
 // PLATFORM SETTINGS — key/value store for app-wide config.
 // ────────────────────────────────────────────────────────────────────
@@ -665,3 +842,12 @@ export type NewOutreachProspect = typeof outreachProspects.$inferInsert;
 export type OutreachCampaign = typeof outreachCampaigns.$inferSelect;
 export type OutreachEvent = typeof outreachEvents.$inferSelect;
 export type NewOutreachEvent = typeof outreachEvents.$inferInsert;
+export type MarketplaceCarrier = typeof marketplaceCarriers.$inferSelect;
+export type NewMarketplaceCarrier = typeof marketplaceCarriers.$inferInsert;
+export type MarketplaceLane = typeof marketplaceLanes.$inferSelect;
+export type NewMarketplaceLane = typeof marketplaceLanes.$inferInsert;
+export type MarketplaceRateSnapshot = typeof marketplaceRateSnapshots.$inferSelect;
+export type NewMarketplaceRateSnapshot = typeof marketplaceRateSnapshots.$inferInsert;
+export type MarketplaceAggregate = typeof marketplaceAggregates.$inferSelect;
+export type IngestJob = typeof ingestJobs.$inferSelect;
+export type NewIngestJob = typeof ingestJobs.$inferInsert;

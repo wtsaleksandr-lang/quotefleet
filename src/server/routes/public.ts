@@ -47,6 +47,9 @@ const LocationSchema = z.object({
   country: z.string().optional(),
   portCode: z.string().optional(),
   terminalCode: z.string().optional(),
+  /** Direct lat/lng from typeahead pick — skips geocoding when present. */
+  lat: z.number().optional(),
+  lng: z.number().optional(),
 });
 
 const QuoteSchema = z.object({

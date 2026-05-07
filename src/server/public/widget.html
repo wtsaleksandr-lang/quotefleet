@@ -64,18 +64,20 @@
       <div class="qf-non-drayage" id="qf-default-pickup">
         <div class="qf-section-title" style="margin-top:14px;">Pickup</div>
         <div class="qf-grid">
-          <div class="qf-field qf-full">
+          <div class="qf-field qf-full qf-typeahead" data-typeahead="locations" data-target="pickup">
             <label>Pickup ZIP / city</label>
             <input class="qf-input" id="qf-pickup-zip" placeholder="e.g. 90802 or Long Beach, CA" autocomplete="off">
+            <div class="qf-suggestions" id="qf-pickup-suggestions"></div>
           </div>
         </div>
       </div>
 
       <div class="qf-section-title" style="margin-top:14px;">Delivery</div>
       <div class="qf-grid">
-        <div class="qf-field qf-full">
+        <div class="qf-field qf-full qf-typeahead" data-typeahead="locations" data-target="delivery">
           <label>Delivery ZIP / city</label>
           <input class="qf-input" id="qf-delivery-zip" placeholder="e.g. 60606 or Chicago, IL" autocomplete="off">
+          <div class="qf-suggestions" id="qf-delivery-suggestions"></div>
         </div>
       </div>
 

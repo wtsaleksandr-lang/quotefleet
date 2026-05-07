@@ -23,6 +23,20 @@
     return n.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
   }
 
+  // Merge a typeahead-resolved suggestion with whatever is currently in
+  // the input (in case the user typed extra characters after picking).
+  function mergeLocation(resolved, currentText) {
+    if (!resolved) return parseLocation(currentText || '');
+    return {
+      city: resolved.city || undefined,
+      state: resolved.state || undefined,
+      zip: resolved.zip || undefined,
+      country: resolved.country || 'US',
+      lat: typeof resolved.lat === 'number' ? resolved.lat : undefined,
+      lng: typeof resolved.lng === 'number' ? resolved.lng : undefined,
+    };
+  }
+
   // Parse "City, ST" or "ZIP" or "City" — best-effort.
   function parseLocation(str) {
     if (!str) return {};
@@ -78,6 +92,8 @@
     selectedAccessorials: [],
     pickupPortCode: '',
     pickupTerminalCode: '',
+    pickupResolved: null,   // typeahead-picked suggestion {lat,lng,city,state,zip,country}
+    deliveryResolved: null,
   };
 
   function applyBrand(brand) {
@@ -108,6 +124,7 @@
 
     $('qf-calc-btn').addEventListener('click', onCalculate);
     $('qf-continue-btn').addEventListener('click', function () { showStep('contact'); });
+    initTypeaheads();
     $('qf-back-btn').addEventListener('click', function () { showStep('quote'); });
     $('qf-submit-btn').addEventListener('click', onSubmit);
     $('qf-restart-btn').addEventListener('click', function () {
@@ -294,10 +311,15 @@
         portCode: state.pickupPortCode,
         terminalCode: state.pickupTerminalCode || undefined,
       };
+    } else if (state.pickupResolved) {
+      // User picked a suggestion — use its precise coords + parsed parts.
+      pickup = mergeLocation(state.pickupResolved, $('qf-pickup-zip').value);
     } else {
       pickup = parseLocation(($('qf-pickup-zip') && $('qf-pickup-zip').value) || '');
     }
-    var delivery = parseLocation($('qf-delivery-zip').value);
+    var delivery = state.deliveryResolved
+      ? mergeLocation(state.deliveryResolved, $('qf-delivery-zip').value)
+      : parseLocation($('qf-delivery-zip').value);
     var oceanEl = $('qf-ocean-carrier');
     var bookingEl = $('qf-booking');
     return {
@@ -419,6 +441,93 @@
         showError('qf-submit-error', 'Network error — please try again.');
         console.error(err);
       });
+  }
+
+  // ── Type-ahead (location autocomplete, US/CA only) ────────────
+  // Server endpoint /api/public/autocomplete/locations proxies Mapbox.
+  // If Mapbox isn't configured, suggestions stay empty and the input
+  // accepts free text.
+  function initTypeaheads() {
+    var pickup = $('qf-pickup-zip');
+    var pickupBox = $('qf-pickup-suggestions');
+    var delivery = $('qf-delivery-zip');
+    var deliveryBox = $('qf-delivery-suggestions');
+    if (pickup && pickupBox) attachTypeahead(pickup, pickupBox, function (s) {
+      state.pickupResolved = s;
+    });
+    if (delivery && deliveryBox) attachTypeahead(delivery, deliveryBox, function (s) {
+      state.deliveryResolved = s;
+    });
+  }
+
+  function attachTypeahead(input, box, onPick) {
+    var debounceId = null;
+    var lastQuery = '';
+    var activeIndex = -1;
+
+    function close() {
+      box.classList.remove('open');
+      box.innerHTML = '';
+      activeIndex = -1;
+    }
+    function render(suggestions) {
+      box.innerHTML = '';
+      if (!suggestions.length) { close(); return; }
+      suggestions.forEach(function (s, i) {
+        var div = document.createElement('div');
+        div.className = 'qf-suggestion';
+        div.textContent = s.label;
+        if (s.zip || s.state) {
+          var meta = document.createElement('span');
+          meta.className = 'meta';
+          meta.textContent = [s.kind, s.country].filter(Boolean).join(' · ');
+          div.appendChild(meta);
+        }
+        div.addEventListener('mousedown', function (ev) {
+          ev.preventDefault(); // keep input focus
+          input.value = s.label;
+          if (typeof onPick === 'function') onPick(s);
+          close();
+        });
+        box.appendChild(div);
+      });
+      box.classList.add('open');
+    }
+    function fetchSuggestions(q) {
+      fetch('/api/public/autocomplete/locations?q=' + encodeURIComponent(q))
+        .then(function (r) { return r.json(); })
+        .then(function (j) {
+          if (input.value.trim() !== q) return; // race: input changed
+          render(j.suggestions || []);
+        })
+        .catch(function () { close(); });
+    }
+
+    input.addEventListener('input', function () {
+      var q = input.value.trim();
+      if (q === lastQuery) return;
+      lastQuery = q;
+      // Clear cached resolved location when user types
+      if (typeof onPick === 'function') onPick(null);
+      clearTimeout(debounceId);
+      if (q.length < 2) { close(); return; }
+      debounceId = setTimeout(function () { fetchSuggestions(q); }, 220);
+    });
+    input.addEventListener('keydown', function (e) {
+      if (!box.classList.contains('open')) return;
+      var items = Array.from(box.querySelectorAll('.qf-suggestion'));
+      if (e.key === 'ArrowDown') { e.preventDefault(); activeIndex = (activeIndex + 1) % items.length; updateActive(items); }
+      else if (e.key === 'ArrowUp') { e.preventDefault(); activeIndex = (activeIndex - 1 + items.length) % items.length; updateActive(items); }
+      else if (e.key === 'Enter' && activeIndex >= 0) {
+        e.preventDefault();
+        items[activeIndex].dispatchEvent(new MouseEvent('mousedown'));
+      } else if (e.key === 'Escape') { close(); }
+    });
+    input.addEventListener('blur', function () { setTimeout(close, 120); });
+
+    function updateActive(items) {
+      items.forEach(function (el, i) { el.classList.toggle('active', i === activeIndex); });
+    }
   }
 
   // ── auto-resize iframe via postMessage ────────────────────────

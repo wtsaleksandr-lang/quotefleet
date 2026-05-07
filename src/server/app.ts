@@ -15,6 +15,8 @@ import { registerPublicRoutes } from './routes/public.js';
 import { registerTenantRoutes } from './routes/tenant.js';
 import { registerAdminRoutes } from './routes/admin.js';
 import { registerAiRoutes } from './routes/ai.js';
+import { registerAutocompleteRoutes } from './routes/autocomplete.js';
+import { registerIngestRoutes } from './routes/ingest.js';
 import { hostInfoMiddleware } from './hostInfo.js';
 
 const __filename = fileURLToPath(import.meta.url);
@@ -46,6 +48,8 @@ export function createApp(): express.Express {
   registerTenantRoutes(app);
   registerAdminRoutes(app);
   registerAiRoutes(app);
+  registerAutocompleteRoutes(app);
+  registerIngestRoutes(app);
 
   // Healthcheck.
   app.get('/healthz', (_req, res) => {

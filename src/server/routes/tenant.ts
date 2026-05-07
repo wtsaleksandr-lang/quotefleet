@@ -44,6 +44,12 @@ import {
 import { requireAuth, requireTenant } from '../middleware.js';
 import { encrypt } from '../../auth/secrets.js';
 import { loadEnv } from '../../config.js';
+import { syncTenantToMarketplace } from '../../marketplace/sync.js';
+
+/** Fire-and-forget marketplace sync. Logs but never throws. */
+function bumpMarketplace(tenantId: number) {
+  void syncTenantToMarketplace(tenantId);
+}
 
 export function registerTenantRoutes(app: Express) {
   // ── overview ──────────────────────────────────────────────────
@@ -115,6 +121,7 @@ export function registerTenantRoutes(app: Express) {
       actorKind: 'user',
       detailsJson: { id, before: existing[0], patch: parse.data },
     });
+    bumpMarketplace(req.tenant!.id);
     res.json({ ok: true });
   });
 
@@ -144,6 +151,7 @@ export function registerTenantRoutes(app: Express) {
         notes: parse.data.notes ?? null,
       })
       .returning();
+    bumpMarketplace(req.tenant!.id);
     res.json({ ok: true, rateCard: row });
   });
 
@@ -152,6 +160,7 @@ export function registerTenantRoutes(app: Express) {
     await db()
       .delete(rateCards)
       .where(and(eq(rateCards.id, id), eq(rateCards.tenantId, req.tenant!.id)));
+    bumpMarketplace(req.tenant!.id);
     res.json({ ok: true });
   });
 
@@ -185,6 +194,7 @@ export function registerTenantRoutes(app: Express) {
       .update(accessorials)
       .set({ ...parse.data, updatedAt: new Date() })
       .where(and(eq(accessorials.id, id), eq(accessorials.tenantId, req.tenant!.id)));
+    bumpMarketplace(req.tenant!.id);
     res.json({ ok: true });
   });
 
@@ -207,6 +217,7 @@ export function registerTenantRoutes(app: Express) {
         sortOrder: parse.data.sortOrder ?? 0,
       })
       .returning();
+    bumpMarketplace(req.tenant!.id);
     res.json({ ok: true, accessorial: row });
   });
 
@@ -215,6 +226,7 @@ export function registerTenantRoutes(app: Express) {
     await db()
       .delete(accessorials)
       .where(and(eq(accessorials.id, id), eq(accessorials.tenantId, req.tenant!.id)));
+    bumpMarketplace(req.tenant!.id);
     res.json({ ok: true });
   });
 
@@ -248,6 +260,7 @@ export function registerTenantRoutes(app: Express) {
       .update(laneZones)
       .set({ ...parse.data, updatedAt: new Date() })
       .where(and(eq(laneZones.id, id), eq(laneZones.tenantId, req.tenant!.id)));
+    bumpMarketplace(req.tenant!.id);
     res.json({ ok: true });
   });
 
@@ -274,6 +287,7 @@ export function registerTenantRoutes(app: Express) {
         sortOrder: parse.data.sortOrder ?? 0,
       })
       .returning();
+    bumpMarketplace(req.tenant!.id);
     res.json({ ok: true, laneZone: row });
   });
 
@@ -282,6 +296,7 @@ export function registerTenantRoutes(app: Express) {
     await db()
       .delete(laneZones)
       .where(and(eq(laneZones.id, id), eq(laneZones.tenantId, req.tenant!.id)));
+    bumpMarketplace(req.tenant!.id);
     res.json({ ok: true });
   });
 
