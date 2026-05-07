@@ -33,8 +33,11 @@ export function registerAiRoutes(app: Express) {
       const out = await rateAgentTurn(req.tenant!.id, req.user!.id, message.trim());
       return res.json({ ok: true, ...out });
     } catch (err) {
+      // Don't leak Anthropic SDK / DB error internals to the client —
+      // they expose model names, organization IDs, schema details. Log
+      // the raw error server-side, return a generic message.
       console.error('[ai/rate-chat] error:', err);
-      return res.status(500).json({ error: (err as Error).message });
+      return res.status(500).json({ error: 'AI request failed. Try again or contact support.' });
     }
   });
 

@@ -25,6 +25,7 @@ import {
   leads,
   aiConfigs,
 } from '../../db/schema.js';
+import express from 'express';
 import { calculate, type CalcRequest } from '../../calc/engine.js';
 import { distanceBetween } from '../../calc/distance.js';
 import { generateLeadReply } from '../../ai/replyAgent.js';
@@ -32,6 +33,25 @@ import { leadChatTurn } from '../../ai/chatAgent.js';
 import { sendEmail } from '../../email/send.js';
 import { loadEnv } from '../../config.js';
 import { getTrialState } from '../trialGating.js';
+import { publicCalcLimiter, publicChatLimiter } from '../rateLimits.js';
+
+/** Returns true if the request's Origin/Referer host matches the
+ *  tenant's brand_configs.allowed_domains (CSV). Empty list = wide open
+ *  (default). Used by /api/public/{quote,lead,chat} to honor tenant
+ *  domain restrictions, the column the dashboard claims to enforce. */
+function originAllowed(allowedCsv: string | null | undefined, req: Request): boolean {
+  if (!allowedCsv || allowedCsv.trim() === '') return true;
+  const allowed = allowedCsv.split(',').map((s) => s.trim().toLowerCase()).filter(Boolean);
+  if (allowed.length === 0) return true;
+  const candidate = String(req.headers.origin ?? req.headers.referer ?? '');
+  if (!candidate) return false;
+  try {
+    const host = new URL(candidate).hostname.toLowerCase();
+    return allowed.some((a) => host === a || host.endsWith('.' + a));
+  } catch {
+    return false;
+  }
+}
 
 function generateLeadRef(): string {
   const yyyy = new Date().getFullYear();
@@ -249,10 +269,15 @@ export function registerPublicRoutes(app: Express) {
   });
 
   // ── compute a quote (no save) ─────────────────────────────────
-  app.post('/api/public/quote/:slug', async (req: Request, res: Response) => {
+  app.post('/api/public/quote/:slug', publicCalcLimiter, async (req: Request, res: Response) => {
     const tenant = await getTenantBySlug(String(req.params.slug));
     if (!tenant || tenant.status !== 'active') {
       return res.status(404).json({ error: 'Tenant not found' });
+    }
+    // Honor the carrier's allowedDomains brand setting.
+    const brand = (await db().select().from(brandConfigs).where(eq(brandConfigs.tenantId, tenant.id)).limit(1))[0];
+    if (!originAllowed(brand?.allowedDomains, req)) {
+      return res.status(403).json({ error: 'This widget is not authorized for the calling domain.' });
     }
     const parse = QuoteSchema.safeParse(req.body);
     if (!parse.success) {
@@ -305,10 +330,14 @@ export function registerPublicRoutes(app: Express) {
   });
 
   // ── submit lead (creates quote_request row + sends auto-reply) ─
-  app.post('/api/public/lead/:slug', async (req: Request, res: Response) => {
+  app.post('/api/public/lead/:slug', publicCalcLimiter, async (req: Request, res: Response) => {
     const tenant = await getTenantBySlug(String(req.params.slug));
     if (!tenant || tenant.status !== 'active') {
       return res.status(404).json({ error: 'Tenant not found' });
+    }
+    const brand = (await db().select().from(brandConfigs).where(eq(brandConfigs.tenantId, tenant.id)).limit(1))[0];
+    if (!originAllowed(brand?.allowedDomains, req)) {
+      return res.status(403).json({ error: 'This widget is not authorized for the calling domain.' });
     }
     // Trial gating — block free-tier tenants past trial / over quota.
     const trial = await getTrialState(tenant);
@@ -461,11 +490,18 @@ export function registerPublicRoutes(app: Express) {
   });
 
   // ── lead chat (customer follow-up) ─────────────────────────────
-  app.post('/api/public/chat/:refId', async (req: Request, res: Response) => {
+  // 8KB body cap on this route specifically — Anthropic input is per
+  // token, and a 2MB blob would cost ~$1.50 per call.
+  app.post(
+    '/api/public/chat/:refId',
+    publicChatLimiter,
+    express.json({ limit: '8kb' }),
+    async (req: Request, res: Response) => {
     const refId = String(req.params.refId ?? '');
     if (!refId) return res.status(400).json({ error: 'Missing refId' });
     const message = String(req.body?.message ?? '').trim();
     if (!message) return res.status(400).json({ error: 'Message is required' });
+    if (message.length > 2000) return res.status(400).json({ error: 'Message too long (2000 chars max).' });
     const rows = await db().select().from(leads).where(eq(leads.refId, refId)).limit(1);
     const lead = rows[0];
     if (!lead) return res.status(404).json({ error: 'Lead not found' });
@@ -479,8 +515,13 @@ export function registerPublicRoutes(app: Express) {
         .status(403)
         .json({ error: 'Customer chat is disabled. Please reply to the email instead.' });
     }
-    const reply = await leadChatTurn(lead.tenantId, lead.id, message);
-    return res.json({ ok: true, reply });
+    try {
+      const reply = await leadChatTurn(lead.tenantId, lead.id, message);
+      return res.json({ ok: true, reply });
+    } catch (err) {
+      console.error('[public.chat] AI failed:', err);
+      return res.status(503).json({ error: 'Chat is temporarily unavailable. Please try again in a minute.' });
+    }
   });
 
   app.get('/api/public/lead/:refId', async (req: Request, res: Response) => {

@@ -1,0 +1,299 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Free trucking + drayage rate calculator (USA &amp; Canada) — QuoteFleet</title>
+  <meta name="description" content="Free instant freight rate calculator for trucking carriers, brokers, and freight forwarders. USA &amp; Canada coverage — drayage, FTL, LTL, expedited. No signup required.">
+  <meta property="og:title" content="Free freight rate calculator — QuoteFleet">
+  <meta property="og:description" content="Get an instant per-mile freight rate estimate for any USA/Canada lane. Free, no signup. Drayage, FTL, LTL.">
+  <meta property="og:type" content="website">
+  <link rel="canonical" href="https://quotefleet.app/tools/">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="/style.css">
+  <script type="application/ld+json">
+  {
+    "@context": "https://schema.org",
+    "@type": "WebApplication",
+    "name": "QuoteFleet Free Rate Calculator",
+    "description": "Free instant trucking + drayage freight rate calculator for USA and Canada.",
+    "url": "https://quotefleet.app/tools/",
+    "applicationCategory": "BusinessApplication",
+    "operatingSystem": "Any",
+    "offers": { "@type": "Offer", "price": "0", "priceCurrency": "USD" }
+  }
+  </script>
+  <style>
+    .tool-shell { max-width: 880px; margin: 0 auto; padding: 28px; }
+    .tool-grid { display: grid; gap: 18px; grid-template-columns: 1fr; }
+    @media (min-width: 720px) { .tool-grid { grid-template-columns: 1fr 1fr; } }
+    .tool-card { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius-lg); padding: 22px; }
+    .tool-row { display: flex; gap: 10px; flex-wrap: wrap; margin-top: 6px; }
+    .chip { padding: 6px 12px; border-radius: var(--radius-btn); border: 1px solid var(--border-strong); cursor: pointer; font-size: 12px; font-family: var(--font-mono); letter-spacing: 0.06em; text-transform: uppercase; color: var(--ink-soft); background: var(--surface-2); }
+    .chip.active { border-color: var(--accent); color: var(--accent-ink); background: var(--accent); }
+    .res-total { font-size: 56px; font-weight: 800; letter-spacing: -0.04em; color: var(--ink); }
+    .res-line { display: flex; justify-content: space-between; padding: 8px 0; border-bottom: 1px solid var(--border); font-size: 14px; }
+    .res-line:last-child { border-bottom: 0; }
+    .res-line.total { font-weight: 700; color: var(--ink); border-top: 1px solid var(--accent); padding-top: 12px; margin-top: 6px; }
+    .benchmark { background: var(--accent-soft); border-radius: var(--radius); padding: 10px 12px; font-size: 13px; color: var(--accent); margin-top: 14px; }
+    .disclaimer { font-size: 12px; color: var(--muted); margin-top: 16px; line-height: 1.55; }
+    .typeahead-wrap { position: relative; }
+    .typeahead-list { position: absolute; top: 100%; left: 0; right: 0; z-index: 50; background: var(--surface); border: 1px solid var(--border-strong); border-radius: var(--radius); margin-top: 4px; max-height: 240px; overflow-y: auto; display: none; }
+    .typeahead-list.open { display: block; }
+    .typeahead-list .item { padding: 9px 12px; font-size: 13px; cursor: pointer; border-bottom: 1px solid var(--border); }
+    .typeahead-list .item:hover, .typeahead-list .item.active { background: var(--surface-2); color: var(--accent); }
+  </style>
+</head>
+<body>
+  <header class="topnav">
+    <div class="topnav-inner">
+      <a href="/" class="brand-mark">
+        <span class="logo">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M3 17h2a3 3 0 0 0 3-3V7H3z"/><path d="M14 7h6l1 4v6h-3"/><circle cx="7" cy="17" r="2"/><circle cx="17" cy="17" r="2"/></svg>
+        </span>
+        QuoteFleet
+      </a>
+      <span class="topnav-spacer"></span>
+      <a class="nav-link" href="/pricing">Pricing</a>
+      <a class="nav-link" href="/login">Sign in</a>
+      <a class="btn btn-primary always-show" href="/signup">
+        Free for carriers <span class="arr">→</span>
+      </a>
+    </div>
+  </header>
+
+  <section class="hero" style="padding-bottom: 28px;">
+    <div class="container-narrow">
+      <h1 style="font-size: 44px;">
+        Free freight rate calculator
+      </h1>
+      <p class="lead">
+        Drayage, full truckload, LTL, expedited — USA &amp; Canada. No signup.
+      </p>
+    </div>
+  </section>
+
+  <main class="tool-shell">
+    <div class="tool-card">
+      <div class="field">
+        <label class="field-label">Service</label>
+        <div class="tool-row" id="qf-services"></div>
+      </div>
+
+      <div class="field" style="margin-top: 14px;">
+        <label class="field-label">Equipment</label>
+        <select class="select" id="qf-equipment"></select>
+      </div>
+
+      <div class="grid-2" style="margin-top: 14px;">
+        <div class="field typeahead-wrap">
+          <label class="field-label required">Pickup</label>
+          <input class="input" id="qf-pickup" placeholder="ZIP or City, ST" autocomplete="off">
+          <div class="typeahead-list" id="qf-pickup-suggestions"></div>
+        </div>
+        <div class="field typeahead-wrap">
+          <label class="field-label required">Delivery</label>
+          <input class="input" id="qf-delivery" placeholder="ZIP or City, ST" autocomplete="off">
+          <div class="typeahead-list" id="qf-delivery-suggestions"></div>
+        </div>
+      </div>
+
+      <div class="grid-2" style="margin-top: 14px;">
+        <div class="field">
+          <label class="field-label">Weight (lbs)</label>
+          <input class="input" id="qf-weight" type="number" min="0" placeholder="e.g. 38000">
+        </div>
+        <div class="field">
+          <label class="field-label">Add-ons</label>
+          <div class="tool-row" id="qf-flags">
+            <span class="chip" data-flag="residential">Residential</span>
+            <span class="chip" data-flag="hazmat">Hazmat</span>
+            <span class="chip" data-flag="tempControlled">Temp-controlled</span>
+          </div>
+        </div>
+      </div>
+
+      <button class="btn btn-primary btn-lg btn-block" id="qf-calc" style="margin-top: 18px;">
+        Calculate <span class="arr">→</span>
+      </button>
+      <div id="qf-error" class="notice error hidden" style="margin-top: 14px;"></div>
+    </div>
+
+    <div class="tool-card hidden" id="qf-result-card" style="margin-top: 20px;">
+      <span class="tag">Estimated total</span>
+      <div class="res-total" style="margin-top: 8px;">$<span id="qf-total">0</span></div>
+      <div class="muted-small" id="qf-meta" style="margin-bottom: 14px;"></div>
+      <div id="qf-lines"></div>
+      <div class="benchmark hidden" id="qf-benchmark"></div>
+      <p class="disclaimer" id="qf-disclaimer"></p>
+    </div>
+
+    <div class="tool-card" style="margin-top: 20px; text-align: center;">
+      <span class="tag">For carriers</span>
+      <h3 style="margin: 12px 0 6px 0; font-size: 22px;">Want this on your own website?</h3>
+      <p class="muted" style="margin-bottom: 14px;">Get your own branded version, hosted page, lead inbox, and AI customer service agent. Free up to 30 leads / month.</p>
+      <a class="btn btn-primary" href="/signup">Start free <span class="arr">→</span></a>
+    </div>
+  </main>
+
+  <footer class="site-footer">
+    © <span id="year"></span> QuoteFleet ·
+    <a href="/">Home</a> ·
+    <a href="/pricing">Pricing</a> ·
+    <a href="/login">Sign in</a>
+  </footer>
+
+  <script>
+    document.getElementById('year').textContent = new Date().getFullYear();
+    var state = { service: null, equipment: null, flags: {}, pickupResolved: null, deliveryResolved: null };
+
+    fetch('/api/tools/config').then(function (r) { return r.json(); }).then(function (cfg) {
+      var sw = document.getElementById('qf-services');
+      var labels = { drayage: 'Drayage', ftl: 'Truckload', ltl: 'LTL', expedited: 'Expedited', hotshot: 'Hotshot' };
+      cfg.services.forEach(function (s, i) {
+        var c = document.createElement('span');
+        c.className = 'chip' + (i === 0 ? ' active' : '');
+        c.textContent = labels[s] || s;
+        c.dataset.service = s;
+        c.addEventListener('click', function () {
+          [].forEach.call(sw.querySelectorAll('.chip'), function (x) { x.classList.remove('active'); });
+          c.classList.add('active');
+          selectService(s, cfg.equipmentByService[s] || []);
+        });
+        sw.appendChild(c);
+      });
+      if (cfg.services[0]) selectService(cfg.services[0], cfg.equipmentByService[cfg.services[0]] || []);
+    });
+
+    function selectService(s, equip) {
+      state.service = s;
+      var sel = document.getElementById('qf-equipment');
+      sel.innerHTML = '';
+      equip.forEach(function (e) {
+        var o = document.createElement('option'); o.value = e.value; o.textContent = e.label; sel.appendChild(o);
+      });
+      state.equipment = equip[0] ? equip[0].value : null;
+      sel.onchange = function () { state.equipment = sel.value; };
+    }
+
+    [].forEach.call(document.querySelectorAll('#qf-flags .chip'), function (c) {
+      c.addEventListener('click', function () {
+        var f = c.dataset.flag;
+        state.flags[f] = !state.flags[f];
+        c.classList.toggle('active', state.flags[f]);
+      });
+    });
+
+    // Type-ahead — same provider as the embeddable widget
+    function attachTypeahead(input, box, onPick) {
+      var debounce, lastQ = '';
+      function close() { box.classList.remove('open'); box.innerHTML = ''; }
+      input.addEventListener('input', function () {
+        var q = input.value.trim();
+        if (q === lastQ) return; lastQ = q;
+        if (typeof onPick === 'function') onPick(null);
+        clearTimeout(debounce);
+        if (q.length < 2) { close(); return; }
+        debounce = setTimeout(function () {
+          fetch('/api/public/autocomplete/locations?q=' + encodeURIComponent(q))
+            .then(function (r) { return r.json(); })
+            .then(function (j) {
+              if (input.value.trim() !== q) return;
+              box.innerHTML = '';
+              (j.suggestions || []).forEach(function (s) {
+                var d = document.createElement('div'); d.className = 'item'; d.textContent = s.label;
+                d.addEventListener('mousedown', function (e) {
+                  e.preventDefault();
+                  input.value = s.label;
+                  if (typeof onPick === 'function') onPick(s);
+                  close();
+                });
+                box.appendChild(d);
+              });
+              if ((j.suggestions || []).length) box.classList.add('open');
+            });
+        }, 250);
+      });
+      input.addEventListener('blur', function () { setTimeout(close, 120); });
+    }
+    attachTypeahead(document.getElementById('qf-pickup'), document.getElementById('qf-pickup-suggestions'), function (s) { state.pickupResolved = s; });
+    attachTypeahead(document.getElementById('qf-delivery'), document.getElementById('qf-delivery-suggestions'), function (s) { state.deliveryResolved = s; });
+
+    function parseLoc(text, resolved) {
+      if (resolved) return {
+        city: resolved.city, state: resolved.state, zip: resolved.zip,
+        country: resolved.country || 'US', lat: resolved.lat, lng: resolved.lng,
+      };
+      // crude fallback parser
+      var t = (text || '').trim();
+      var zip = t.match(/^\d{5}$/);
+      if (zip) return { zip: t, country: 'US' };
+      var fsa = t.match(/^[A-Z]\d[A-Z]/i);
+      if (fsa) return { zip: t.replace(/\s+/g, ''), country: 'CA' };
+      var parts = t.split(',').map(function (p) { return p.trim(); });
+      if (parts.length >= 2) return { city: parts[0], state: parts[1].slice(0, 2).toUpperCase(), country: 'US' };
+      return { city: t, country: 'US' };
+    }
+
+    document.getElementById('qf-calc').addEventListener('click', function () {
+      var err = document.getElementById('qf-error');
+      err.classList.add('hidden');
+      var pickupText = document.getElementById('qf-pickup').value.trim();
+      var deliveryText = document.getElementById('qf-delivery').value.trim();
+      if (!pickupText || !deliveryText) { err.textContent = 'Pickup and delivery are required.'; err.classList.remove('hidden'); return; }
+      var btn = this;
+      btn.disabled = true; var old = btn.innerHTML; btn.innerHTML = 'Calculating…';
+      fetch('/api/tools/quote', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          service: state.service,
+          equipment: state.equipment,
+          pickup: parseLoc(pickupText, state.pickupResolved),
+          delivery: parseLoc(deliveryText, state.deliveryResolved),
+          weightLbs: document.getElementById('qf-weight').value ? Number(document.getElementById('qf-weight').value) : undefined,
+          flags: state.flags,
+        }),
+      }).then(function (r) { return r.json(); }).then(function (resp) {
+        btn.disabled = false; btn.innerHTML = old;
+        if (resp.error) { err.textContent = resp.error; err.classList.remove('hidden'); return; }
+        if (resp.result && resp.result.unsupported) { err.textContent = resp.result.unsupported.reason; err.classList.remove('hidden'); return; }
+        renderResult(resp);
+      }).catch(function () {
+        btn.disabled = false; btn.innerHTML = old;
+        err.textContent = 'Network error — try again.'; err.classList.remove('hidden');
+      });
+    });
+
+    function renderResult(resp) {
+      var card = document.getElementById('qf-result-card');
+      card.classList.remove('hidden');
+      document.getElementById('qf-total').textContent = (resp.result.total || 0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+      document.getElementById('qf-meta').textContent = Math.round(resp.miles) + ' mi · ' + state.service + ' · ' + state.equipment;
+      var lines = document.getElementById('qf-lines');
+      lines.innerHTML = '';
+      (resp.result.lines || []).forEach(function (l) {
+        var row = document.createElement('div'); row.className = 'res-line';
+        row.innerHTML = '<span>' + escapeHtml(l.name) + '</span><span>$' + Number(l.amount).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) + '</span>';
+        lines.appendChild(row);
+      });
+      var totalRow = document.createElement('div'); totalRow.className = 'res-line total';
+      totalRow.innerHTML = '<span>Total</span><span>$' + Number(resp.result.total).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) + '</span>';
+      lines.appendChild(totalRow);
+
+      var bm = document.getElementById('qf-benchmark');
+      if (resp.benchmark && resp.benchmark.p50RatePerMile) {
+        bm.textContent = 'Market median: $' + Number(resp.benchmark.p50RatePerMile).toFixed(2) + '/mi · sample of ' + resp.benchmark.sampleSize + ' carriers.';
+        bm.classList.remove('hidden');
+      } else {
+        bm.classList.add('hidden');
+      }
+      document.getElementById('qf-disclaimer').textContent = resp.disclaimer || '';
+    }
+
+    function escapeHtml(s) { return String(s == null ? '' : s).replace(/[&<>"']/g, function (m) { return ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[m]); }); }
+  </script>
+</body>
+</html>

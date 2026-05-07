@@ -51,10 +51,18 @@ function opt(key: string): string | undefined {
 export function loadEnv(): Env {
   if (cached) return cached;
 
-  // SESSION_SECRET — auto-generate if not set, but warn loudly. Stable
-  // across restarts only if you actually set it.
+  // SESSION_SECRET — required in production. Auto-generates only in
+  // development so a fresh checkout works; if the env says NODE_ENV is
+  // production we hard-fail. (Auto-generation in prod silently logs out
+  // every user on each restart and is hard to detect.)
   let sessionSecret = opt('SESSION_SECRET');
   if (!sessionSecret) {
+    if (process.env.NODE_ENV === 'production') {
+      throw new Error(
+        'SESSION_SECRET is required in production. Generate one with ' +
+          '`openssl rand -hex 32` and add it to Replit Secrets, then redeploy.'
+      );
+    }
     sessionSecret = randomBytes(32).toString('hex');
     console.warn(
       '[config] SESSION_SECRET not set — generated a random one. ' +

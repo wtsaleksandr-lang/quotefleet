@@ -1,0 +1,109 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Carrier marketplace — QuoteFleet</title>
+  <meta name="description" content="Find trucking carriers, brokers, and freight forwarders by lane, equipment, and service. Free for shippers — book directly with carriers.">
+  <link rel="canonical" href="https://quotefleet.app/marketplace/">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="/style.css">
+  <style>
+    .mp-shell { max-width: 1100px; margin: 0 auto; padding: 28px; }
+    .mp-filters { display: grid; gap: 12px; grid-template-columns: 1fr 1fr 1fr auto; margin-bottom: 22px; }
+    @media (max-width: 720px) { .mp-filters { grid-template-columns: 1fr 1fr; } }
+    .mp-grid { display: grid; gap: 16px; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); }
+    .mp-card { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius-lg); padding: 22px; }
+    .mp-card h3 { margin: 0 0 6px 0; font-size: 18px; }
+    .mp-meta { font-size: 12px; color: var(--muted); font-family: var(--font-mono); letter-spacing: 0.06em; text-transform: uppercase; margin-bottom: 10px; }
+    .mp-pills { display: flex; gap: 6px; flex-wrap: wrap; margin-top: 10px; }
+    .mp-pill { font-size: 11px; font-family: var(--font-mono); letter-spacing: 0.06em; text-transform: uppercase; padding: 3px 8px; background: var(--surface-2); border-radius: 4px; color: var(--ink-soft); }
+    .mp-empty { padding: 60px 24px; text-align: center; color: var(--muted); }
+  </style>
+</head>
+<body>
+  <header class="topnav">
+    <div class="topnav-inner">
+      <a href="/" class="brand-mark">
+        <span class="logo">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M3 17h2a3 3 0 0 0 3-3V7H3z"/><path d="M14 7h6l1 4v6h-3"/><circle cx="7" cy="17" r="2"/><circle cx="17" cy="17" r="2"/></svg>
+        </span>
+        QuoteFleet
+      </a>
+      <span class="topnav-spacer"></span>
+      <a class="nav-link" href="/tools/">Free calculator</a>
+      <a class="nav-link" href="/pricing">Pricing</a>
+      <a class="btn btn-primary always-show" href="/signup">List your company <span class="arr">→</span></a>
+    </div>
+  </header>
+
+  <section class="hero" style="padding-bottom: 30px;">
+    <div class="container-narrow">
+      <h1 style="font-size: 44px;">Carrier marketplace</h1>
+      <p class="lead">Find trucking carriers + freight forwarders by lane and service. Free for shippers and carriers — small commission per booked shipment.</p>
+    </div>
+  </section>
+
+  <main class="mp-shell">
+    <div class="mp-filters">
+      <select class="select" id="mp-service">
+        <option value="">All services</option>
+        <option value="ftl">Truckload (FTL)</option>
+        <option value="ltl">LTL</option>
+        <option value="drayage">Drayage</option>
+        <option value="expedited">Expedited</option>
+      </select>
+      <select class="select" id="mp-country">
+        <option value="">All countries</option>
+        <option value="US">USA</option>
+        <option value="CA">Canada</option>
+      </select>
+      <input class="input" id="mp-port" placeholder="Port code (e.g. USLAX)">
+      <button class="btn btn-primary" id="mp-search">Search <span class="arr">→</span></button>
+    </div>
+
+    <div id="mp-results"></div>
+    <div id="mp-empty" class="mp-empty hidden">No carriers match these filters yet. As more carriers opt in, the directory grows.</div>
+  </main>
+
+  <footer class="site-footer">
+    © <span id="year"></span> QuoteFleet · <a href="/">Home</a> · <a href="/pricing">Pricing</a> · <a href="/tools/">Free calculator</a>
+  </footer>
+
+  <script>
+    document.getElementById('year').textContent = new Date().getFullYear();
+    var $ = function (id) { return document.getElementById(id); };
+
+    function search() {
+      var qs = new URLSearchParams();
+      if ($('mp-service').value) qs.set('service', $('mp-service').value);
+      if ($('mp-country').value) qs.set('country', $('mp-country').value);
+      if ($('mp-port').value) qs.set('port', $('mp-port').value.trim().toUpperCase());
+      fetch('/api/marketplace/carriers?' + qs.toString())
+        .then(function (r) { return r.json(); })
+        .then(function (j) { render(j.carriers || []); })
+        .catch(function () { render([]); });
+    }
+    function render(carriers) {
+      var grid = $('mp-results'); grid.className = 'mp-grid'; grid.innerHTML = '';
+      $('mp-empty').classList.toggle('hidden', carriers.length > 0);
+      carriers.forEach(function (c) {
+        var card = document.createElement('div'); card.className = 'mp-card';
+        var meta = (c.countryFocus || '') + (c.mcNumber ? ' · MC ' + c.mcNumber : '') + (c.dotNumber ? ' · DOT ' + c.dotNumber : '');
+        card.innerHTML =
+          '<h3>' + esc(c.displayName) + '</h3>' +
+          '<div class="mp-meta">' + esc(meta) + '</div>' +
+          '<div class="mp-pills">' +
+            (c.services || []).map(function (s) { return '<span class="mp-pill">' + esc(s) + '</span>'; }).join('') +
+          '</div>';
+        grid.appendChild(card);
+      });
+    }
+    function esc(s) { return String(s == null ? '' : s).replace(/[&<>"']/g, function (m) { return ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[m]); }); }
+    $('mp-search').addEventListener('click', search);
+    search();
+  </script>
+</body>
+</html>

@@ -313,6 +313,39 @@ export function registerTenantRoutes(app: Express) {
     res.json({ leads: filtered });
   });
 
+  // CSV export of all leads — used by the dashboard's Export button. We
+  // stream a flat CSV with the columns dispatchers actually want. Drops
+  // the `breakdown_json` blob (use the lead-detail page for that).
+  app.get('/api/tenant/leads/export.csv', requireAuth, requireTenant, async (req, res) => {
+    const rows = await db()
+      .select()
+      .from(leads)
+      .where(eq(leads.tenantId, req.tenant!.id))
+      .orderBy(desc(leads.createdAt));
+    const cols = [
+      'refId', 'createdAt', 'status',
+      'customerName', 'customerEmail', 'customerPhone', 'customerCompany',
+      'service', 'equipment',
+      'pickupCity', 'pickupState', 'pickupZip', 'pickupCountry', 'pickupTerminalCode',
+      'deliveryCity', 'deliveryState', 'deliveryZip', 'deliveryCountry', 'deliveryTerminalCode',
+      'oceanCarrier', 'bookingNumber', 'billOfLadingNumber',
+      'pickupDate', 'deliveryDate',
+      'weightLbs', 'pieces', 'commodity',
+      'distanceMiles', 'quotedTotal', 'quotedCurrency',
+      'autoReplySent', 'sourceUrl', 'notes',
+    ] as const;
+    const esc = (v: unknown) => {
+      if (v == null) return '';
+      const s = v instanceof Date ? v.toISOString() : String(v);
+      return /[,\n"]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s;
+    };
+    const header = cols.join(',');
+    const body = rows.map((r) => cols.map((c) => esc((r as Record<string, unknown>)[c])).join(',')).join('\n');
+    res.setHeader('Content-Type', 'text/csv; charset=utf-8');
+    res.setHeader('Content-Disposition', `attachment; filename="quotefleet-leads-${new Date().toISOString().slice(0,10)}.csv"`);
+    res.send(header + '\n' + body);
+  });
+
   app.get('/api/tenant/leads/:refId', requireAuth, requireTenant, async (req, res) => {
     const refId = String(req.params.refId ?? '');
     const rows = await db()
@@ -428,6 +461,34 @@ export function registerTenantRoutes(app: Express) {
       .update(brandConfigs)
       .set({ ...parse.data, updatedAt: new Date() })
       .where(eq(brandConfigs.tenantId, req.tenant!.id));
+    res.json({ ok: true });
+  });
+
+  // ── marketplace opt-in (tenant settings) ──────────────────────
+  // Toggling this flips the carrier's PUBLIC visibility in the
+  // marketplace browser. Aggregated benchmarks include everyone
+  // regardless (they're anonymized).
+  app.get('/api/tenant/marketplace-settings', requireAuth, requireTenant, async (req, res) => {
+    res.json({
+      marketplaceOptIn: req.tenant!.marketplaceOptIn,
+      mcNumber: req.tenant!.mcNumber,
+      dotNumber: req.tenant!.dotNumber,
+    });
+  });
+
+  app.put('/api/tenant/marketplace-settings', requireAuth, requireTenant, async (req, res) => {
+    const Patch = z.object({
+      marketplaceOptIn: z.boolean().optional(),
+      mcNumber: z.string().max(20).nullable().optional(),
+      dotNumber: z.string().max(20).nullable().optional(),
+    });
+    const parse = Patch.safeParse(req.body);
+    if (!parse.success) return res.status(400).json({ error: 'Invalid input' });
+    await db()
+      .update(tenants)
+      .set({ ...parse.data, updatedAt: new Date() })
+      .where(eq(tenants.id, req.tenant!.id));
+    bumpMarketplace(req.tenant!.id);
     res.json({ ok: true });
   });
 

@@ -17,6 +17,8 @@ import { registerAdminRoutes } from './routes/admin.js';
 import { registerAiRoutes } from './routes/ai.js';
 import { registerAutocompleteRoutes } from './routes/autocomplete.js';
 import { registerIngestRoutes } from './routes/ingest.js';
+import { registerMarketplaceRoutes } from './routes/marketplace.js';
+import { registerToolsRoutes } from './routes/tools.js';
 import { hostInfoMiddleware } from './hostInfo.js';
 
 const __filename = fileURLToPath(import.meta.url);
@@ -25,8 +27,11 @@ const __dirname = dirname(__filename);
 export function createApp(): express.Express {
   const app = express();
   app.set('trust proxy', 1);
-  app.use(express.json({ limit: '2mb' }));
-  app.use(express.urlencoded({ extended: true, limit: '2mb' }));
+  // Global body parser limit covers small JSON payloads. Per-route caps
+  // override this — `/api/tenant/ingest` accepts up to 6MB (5MB binary
+  // → ~6.7MB base64); `/api/public/chat/:refId` is capped per-route.
+  app.use(express.json({ limit: '7mb' }));
+  app.use(express.urlencoded({ extended: true, limit: '7mb' }));
   app.use(cookieParser());
   app.use(hostInfoMiddleware);
 
@@ -50,6 +55,8 @@ export function createApp(): express.Express {
   registerAiRoutes(app);
   registerAutocompleteRoutes(app);
   registerIngestRoutes(app);
+  registerMarketplaceRoutes(app);
+  registerToolsRoutes(app);
 
   // Healthcheck.
   app.get('/healthz', (_req, res) => {
@@ -78,6 +85,10 @@ export function createApp(): express.Express {
   app.get('/admin/*splat', (_req, res) => res.sendFile(resolve(publicDir, 'admin.html')));
   app.get('/w/:slug', (_req, res) => res.sendFile(resolve(publicDir, 'widget.html')));
   app.get('/chat/:refId', (_req, res) => res.sendFile(resolve(publicDir, 'chat.html')));
+  // Public free SEO calculator. Indexable, no signup.
+  app.get(['/tools', '/tools/'], (_req, res) => res.sendFile(resolve(publicDir, 'tools.html')));
+  // Public marketplace browser (placeholder until UI lands).
+  app.get(['/marketplace', '/marketplace/'], (_req, res) => res.sendFile(resolve(publicDir, 'marketplace.html')));
 
   // 404
   app.use((_req, res) => {

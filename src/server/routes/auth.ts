@@ -38,6 +38,7 @@ import {
 } from '../../auth/session.js';
 import { loadEnv, defaultHostDomain } from '../../config.js';
 import { getTrialState, type TrialState } from '../trialGating.js';
+import { magicLinkLimiter, signupLimiter, loginLimiter } from '../rateLimits.js';
 
 const RESERVED_SLUGS = new Set([
   'www', 'app', 'admin', 'api', 'mail', 'docs', 'help', 'status', 'static',
@@ -133,7 +134,7 @@ export function registerAuthRoutes(app: Express) {
     return res.json({ ok: true });
   });
 
-  app.post('/api/auth/signup', async (req: Request, res: Response) => {
+  app.post('/api/auth/signup', signupLimiter, async (req: Request, res: Response) => {
     const parse = SignupSchema.safeParse(req.body);
     if (!parse.success) {
       return res.status(400).json({ error: 'Invalid input', details: parse.error.flatten() });
@@ -183,91 +184,118 @@ export function registerAuthRoutes(app: Express) {
 
     const trialEndsAt = new Date(Date.now() + TRIAL_DAYS * 24 * 60 * 60 * 1000);
     const embedToken = nanoid(24);
-    const [t] = await db()
-      .insert(tenants)
-      .values({
-        slug,
-        hostDomain,
-        name: companyName,
-        contactEmail: email,
-        contactPhone: contactPhone ?? null,
-        countryFocus,
-        embedToken,
-        plan: 'free',
-        status: 'active',
-        trialEndsAt,
-      })
-      .returning({ id: tenants.id });
-    if (!t) return res.status(500).json({ error: 'Failed to create tenant' });
-
-    // Default config rows.
-    await db().insert(aiConfigs).values({
-      tenantId: t.id,
-      systemPrompt: DEFAULT_AI_SYSTEM_PROMPT,
-      tone: 'professional',
-      autoReplyEnabled: true,
-      chatEnabled: true,
-    });
-    await db().insert(brandConfigs).values({
-      tenantId: t.id,
-      displayName: companyName,
-      tagline: 'Instant freight quotes',
-      primaryColor: '#2563eb',
-      accentColor: '#06b6d4',
-      ctaText: 'Get instant quote',
-      showPoweredBy: true,
-    });
-    for (const card of DEFAULT_RATE_CARDS) {
-      await db().insert(rateCards).values({ ...card, tenantId: t.id });
-    }
-    for (const a of DEFAULT_ACCESSORIALS) {
-      await db().insert(accessorials).values({ ...a, tenantId: t.id });
-    }
-    for (const z of generateDefaultLaneZones()) {
-      await db().insert(laneZones).values({ ...z, tenantId: t.id });
-    }
-    // Seed terminals — full set; tenant disables ones they don't serve.
-    let termIdx = 0;
-    for (const term of TERMINALS_DATA) {
-      await db().insert(terminals).values({
-        tenantId: t.id,
-        portCode: term.portCode,
-        code: term.code,
-        name: term.name,
-        carrier: term.carrier,
-        address: term.address,
-        lat: term.lat,
-        lng: term.lng,
-        notes: term.notes,
-        surcharge: 0,
-        enabled: true,
-        sortOrder: termIdx++,
-      });
-    }
-
-    // Owner user. Auto-promote to super_admin if email matches SUPER_ADMIN_EMAIL.
-    const isSuperAdmin = env.SUPER_ADMIN_EMAIL && email === env.SUPER_ADMIN_EMAIL;
     const passwordHash = await hashPassword(password);
-    const [u] = await db()
-      .insert(users)
-      .values({
-        tenantId: t.id,
-        email,
-        passwordHash,
-        role: isSuperAdmin ? 'super_admin' : 'tenant_owner',
-        name: companyName,
-      })
-      .returning({ id: users.id });
-    if (!u) return res.status(500).json({ error: 'Failed to create user' });
 
-    const token = await createSession(u.id);
+    // ATOMIC SIGNUP: tenant + ai_config + brand + rate cards + accessorials
+    // + lane zones + terminals + owner user — all-or-nothing. A failure
+    // halfway used to leave orphaned tenants with no login.
+    let result: { tenantId: number; userId: number };
+    try {
+      result = await db().transaction(async (tx) => {
+        const [t] = await tx
+          .insert(tenants)
+          .values({
+            slug,
+            hostDomain,
+            name: companyName,
+            contactEmail: email,
+            contactPhone: contactPhone ?? null,
+            countryFocus,
+            embedToken,
+            plan: 'free',
+            status: 'active',
+            trialEndsAt,
+          })
+          .returning({ id: tenants.id });
+        if (!t) throw new Error('tenant insert returned no row');
+
+        await tx.insert(aiConfigs).values({
+          tenantId: t.id,
+          systemPrompt: DEFAULT_AI_SYSTEM_PROMPT,
+          tone: 'professional',
+          autoReplyEnabled: true,
+          chatEnabled: true,
+        });
+        await tx.insert(brandConfigs).values({
+          tenantId: t.id,
+          displayName: companyName,
+          tagline: 'Instant freight quotes',
+          primaryColor: '#2563eb',
+          accentColor: '#06b6d4',
+          ctaText: 'Get instant quote',
+          showPoweredBy: true,
+        });
+        if (DEFAULT_RATE_CARDS.length > 0) {
+          await tx.insert(rateCards).values(
+            DEFAULT_RATE_CARDS.map((c) => ({ ...c, tenantId: t.id }))
+          );
+        }
+        if (DEFAULT_ACCESSORIALS.length > 0) {
+          await tx.insert(accessorials).values(
+            DEFAULT_ACCESSORIALS.map((a) => ({ ...a, tenantId: t.id }))
+          );
+        }
+        const zones = generateDefaultLaneZones();
+        if (zones.length > 0) {
+          await tx.insert(laneZones).values(zones.map((z) => ({ ...z, tenantId: t.id })));
+        }
+        if (TERMINALS_DATA.length > 0) {
+          await tx.insert(terminals).values(
+            TERMINALS_DATA.map((term, idx) => ({
+              tenantId: t.id,
+              portCode: term.portCode,
+              code: term.code,
+              name: term.name,
+              carrier: term.carrier,
+              address: term.address,
+              lat: term.lat,
+              lng: term.lng,
+              notes: term.notes,
+              surcharge: 0,
+              enabled: true,
+              sortOrder: idx,
+            }))
+          );
+        }
+
+        // Owner user. We do NOT auto-promote to super_admin here even
+        // when email matches SUPER_ADMIN_EMAIL — that would let anyone
+        // who guesses the operator's email and signs up first claim root.
+        // Super-admin is created by the seed script (once, before signups
+        // are accepted) or promoted manually later via SQL.
+        const [u] = await tx
+          .insert(users)
+          .values({
+            tenantId: t.id,
+            email,
+            passwordHash,
+            role: 'tenant_owner',
+            name: companyName,
+          })
+          .returning({ id: users.id });
+        if (!u) throw new Error('user insert returned no row');
+
+        return { tenantId: t.id, userId: u.id };
+      });
+    } catch (err) {
+      console.error('[auth.signup] transaction failed:', err);
+      // Slug-pick race: a concurrent signup may have grabbed our slug
+      // between the check above and the insert. Friendly 409.
+      const msg = err instanceof Error ? err.message : String(err);
+      if (/duplicate key|unique/i.test(msg) && /slug/i.test(msg)) {
+        return res.status(409).json({ error: `Slug "${slug}" was just taken — try another.` });
+      }
+      return res.status(500).json({ error: 'Failed to create account. Try again.' });
+    }
+
+    const token = await createSession(result.userId);
     setCookie(res, token);
 
     const proto = env.PUBLIC_BASE_URL.startsWith('http://') ? 'http:' : 'https:';
     return res.json({
       ok: true,
       tenant: {
-        id: t.id,
+        id: result.tenantId,
         slug,
         hostDomain,
         hostedUrl: `${proto}//${slug}.${hostDomain}/`,
@@ -275,11 +303,11 @@ export function registerAuthRoutes(app: Express) {
         embedToken,
         trialEndsAt,
       },
-      role: isSuperAdmin ? 'super_admin' : 'tenant_owner',
+      role: 'tenant_owner',
     });
   });
 
-  app.post('/api/auth/login', async (req: Request, res: Response) => {
+  app.post('/api/auth/login', loginLimiter, async (req: Request, res: Response) => {
     const parse = LoginSchema.safeParse(req.body);
     if (!parse.success) {
       return res.status(400).json({ error: 'Invalid input' });
@@ -304,7 +332,7 @@ export function registerAuthRoutes(app: Express) {
 
   // ── Magic link: send ─────────────────────────────────────────────
   // Always returns 200 (even on unknown email) — prevents email enumeration.
-  app.post('/api/auth/magic-link/send', async (req: Request, res: Response) => {
+  app.post('/api/auth/magic-link/send', magicLinkLimiter, async (req: Request, res: Response) => {
     const parse = MagicLinkSendSchema.safeParse(req.body);
     if (!parse.success) return res.status(400).json({ error: 'Invalid input' });
     const { email, redirectTo } = parse.data;

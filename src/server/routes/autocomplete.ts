@@ -21,6 +21,12 @@ import { tenants, terminals as terminalsTable } from '../../db/schema.js';
 import { PORTS_DATA } from '../../data/ports.js';
 import { PORTS_INLAND, TERMINALS_DATA, type TerminalRow } from '../../data/terminals.js';
 import { loadEnv } from '../../config.js';
+import { publicAutocompleteLimiter } from '../rateLimits.js';
+import { LruCache } from '../lruCache.js';
+
+// Cache provider results for 1 hour. 2,000 distinct queries fit
+// comfortably in memory and cover days of normal traffic.
+const locationCache = new LruCache<{ suggestions: AutocompleteSuggestion[] }>(2000, 60 * 60 * 1000);
 
 const ALL_PORTS = [
   ...PORTS_DATA.map((p) => ({ code: p.code, name: p.name, city: p.city, state: p.state ?? null, country: p.country })),
@@ -33,14 +39,29 @@ export function registerAutocompleteRoutes(app: Express) {
   //   1. GOOGLE_MAPS_API_KEY → Google Places Autocomplete (preferred)
   //   2. MAPBOX_TOKEN        → Mapbox Geocoding (fallback)
   //   3. neither             → empty results, widget accepts free text
-  app.get('/api/public/autocomplete/locations', async (req: Request, res: Response) => {
-    const q = String(req.query.q ?? '').trim();
+  // Rate-limited per-IP and LRU-cached for 1 hour to keep the Google bill
+  // down (Places autocomplete is ~$2.83/1k sessions; we cache `q` so a
+  // popular query costs once per hour).
+  app.get('/api/public/autocomplete/locations', publicAutocompleteLimiter, async (req: Request, res: Response) => {
+    const q = String(req.query.q ?? '').trim().toLowerCase();
     if (q.length < 2) return res.json({ suggestions: [] });
+
+    const cached = locationCache.get(q);
+    if (cached) return res.json({ ...cached, cached: true });
+
     const env = loadEnv();
     try {
-      if (env.GOOGLE_MAPS_API_KEY) return res.json(await googleAutocomplete(q, env.GOOGLE_MAPS_API_KEY));
-      if (env.MAPBOX_TOKEN) return res.json(await mapboxAutocomplete(q, env.MAPBOX_TOKEN));
-      return res.json({ suggestions: [], note: 'autocomplete-disabled' });
+      let result: { suggestions: AutocompleteSuggestion[]; provider?: string; note?: string };
+      if (env.GOOGLE_MAPS_API_KEY) {
+        result = await googleAutocomplete(q, env.GOOGLE_MAPS_API_KEY);
+      } else if (env.MAPBOX_TOKEN) {
+        result = await mapboxAutocomplete(q, env.MAPBOX_TOKEN);
+      } else {
+        return res.json({ suggestions: [], note: 'autocomplete-disabled' });
+      }
+      // Cache regardless of result count — empty is also a valid answer.
+      locationCache.set(q, { suggestions: result.suggestions });
+      return res.json(result);
     } catch (err) {
       console.warn('[autocomplete.locations] failed:', err);
       return res.json({ suggestions: [], note: 'autocomplete-error' });
