@@ -95,17 +95,28 @@ export function createApp(): express.Express {
 
   // Healthcheck. Pings DB so a disconnected app marks unhealthy and
   // platform load balancers can shed traffic instead of black-holing.
-  // Uses a real-table SELECT (not `select 1`) because the postgres-js
-  // driver under Drizzle's `.execute(sql`select 1`)` was rejecting in
-  // production while the same SQL worked in the workspace shell.
+  // Includes one retry — postgres-js sometimes hands out a stale/closed
+  // connection after the deploy's process has been idle; one quick
+  // re-attempt almost always succeeds. The error detail is included in
+  // the response body because /healthz is internal-only (no user PII).
   app.get('/healthz', async (_req, res) => {
-    try {
-      await db().select({ id: tenants.id }).from(tenants).limit(1);
-      res.json({ ok: true, time: new Date().toISOString(), db: 'up' });
-    } catch (err) {
-      console.error('[healthz] db ping failed:', err);
-      res.status(503).json({ ok: false, db: 'down', time: new Date().toISOString() });
+    const time = new Date().toISOString();
+    let lastErr: unknown = null;
+    for (let attempt = 1; attempt <= 2; attempt++) {
+      try {
+        await db().select({ id: tenants.id }).from(tenants).limit(1);
+        return res.json({ ok: true, time, db: 'up', attempt });
+      } catch (err) {
+        lastErr = err;
+        console.error(`[healthz] db ping failed (attempt ${attempt}):`, err);
+        if (attempt < 2) await new Promise((r) => setTimeout(r, 150));
+      }
     }
+    const detail =
+      lastErr instanceof Error
+        ? { name: lastErr.name, message: lastErr.message }
+        : { message: String(lastErr) };
+    res.status(503).json({ ok: false, db: 'down', time, error: detail });
   });
 
   // Static files. Resolved relative to project root (dist/src/server/app.js
