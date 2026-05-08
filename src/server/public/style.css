@@ -308,23 +308,36 @@ p { margin: 0; }
   .url-builder { grid-template-columns: 1fr; }
 }
 
-/* ── Tables ────────────────────────────────────────────────────── */
+/* ── Tables ──────────────────────────────────────────────────────
+   Compact sizing — earlier we had 12px row padding + 11px input padding
+   stacking up, which made the rate-card grid feel airy and forced lots
+   of vertical scroll for ~10 rows. Tighter padding + smaller in-cell
+   inputs lets the operator scan + edit ~16 rows at a time without
+   scrolling. */
 .table {
   width: 100%; border-collapse: collapse; font-size: 13.5px;
   background: var(--surface); border-radius: var(--radius-lg); overflow: hidden;
 }
 .table th, .table td {
-  text-align: left; padding: 12px 16px;
+  text-align: left; padding: 6px 12px;
   border-bottom: 1px solid var(--border);
   color: var(--ink-soft);
+  vertical-align: middle;
 }
 .table thead th {
   background: var(--surface-2);
   font-family: var(--font-mono);
   font-size: 11px; font-weight: 600; letter-spacing: 0.10em; text-transform: uppercase;
   color: var(--muted);
+  padding: 8px 12px;
 }
 .table tbody tr:hover { background: var(--surface-2); }
+/* Inside-table inputs: lighter padding so a row stays single-line height. */
+.table .input, .table .select, .table .textarea {
+  padding: 6px 10px;
+  font-size: 13px;
+  border-radius: 6px;
+}
 
 /* ── Badges ────────────────────────────────────────────────────── */
 .badge {

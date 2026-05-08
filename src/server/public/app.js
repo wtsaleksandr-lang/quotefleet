@@ -1046,26 +1046,41 @@
     }
   }
 
-  // Mobile sidebar toggle. Wired once on boot — clicking the hamburger
-  // opens the off-canvas sidebar; tapping a nav item or the backdrop
-  // (clicking outside the sidebar) closes it.
+  // Sidebar toggle — works at every width.
+  // - Mobile (<900px): hamburger slides the off-canvas sidebar in/out.
+  // - Desktop (>=900px): hamburger collapses the sidebar so the content
+  //   gets the full window width. Click again to bring it back.
   function wireMobileNav() {
     var toggle = document.getElementById('qf-mobile-nav-toggle');
     var shell = document.getElementById('app-shell');
     if (!toggle || !shell) return;
-    function setOpen(open) {
+    function isDesktop() { return window.innerWidth >= 901; }
+    function setOpenMobile(open) {
       shell.classList.toggle('qf-nav-open', open);
       toggle.setAttribute('aria-expanded', open ? 'true' : 'false');
       toggle.setAttribute('aria-label', open ? 'Close navigation menu' : 'Open navigation menu');
     }
-    toggle.addEventListener('click', function () { setOpen(!shell.classList.contains('qf-nav-open')); });
-    // Auto-close after picking a nav item.
-    $$('.sidebar .nav-item').forEach(function (b) {
-      b.addEventListener('click', function () { setOpen(false); });
+    function setCollapsedDesktop(collapsed) {
+      shell.classList.toggle('qf-nav-collapsed', collapsed);
+      toggle.setAttribute('aria-expanded', collapsed ? 'false' : 'true');
+      toggle.setAttribute('aria-label', collapsed ? 'Show sidebar' : 'Hide sidebar');
+    }
+    toggle.addEventListener('click', function () {
+      if (isDesktop()) {
+        setCollapsedDesktop(!shell.classList.contains('qf-nav-collapsed'));
+      } else {
+        setOpenMobile(!shell.classList.contains('qf-nav-open'));
+      }
     });
-    // Tap outside (anywhere in main) closes the drawer.
+    // Auto-close mobile drawer after picking a nav item.
+    $$('.sidebar .nav-item').forEach(function (b) {
+      b.addEventListener('click', function () {
+        if (!isDesktop()) setOpenMobile(false);
+      });
+    });
+    // Tap outside (anywhere in main) closes the mobile drawer.
     document.querySelector('.app-main').addEventListener('click', function () {
-      if (window.innerWidth <= 900) setOpen(false);
+      if (!isDesktop()) setOpenMobile(false);
     });
   }
 
