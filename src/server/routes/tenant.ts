@@ -594,12 +594,18 @@ export function registerTenantRoutes(app: Express) {
   // ── embed snippet ─────────────────────────────────────────────
   app.get('/api/tenant/embed', requireAuth, requireTenant, async (req, res) => {
     const env = loadEnv();
-    const base = env.PUBLIC_BASE_URL.replace(/\/$/, '');
+    const fallbackBase = env.PUBLIC_BASE_URL.replace(/\/$/, '');
     const t = req.tenant!;
+    // Prefer the tenant's chosen subdomain (slug.hostDomain). That's what
+    // they picked at signup, what their customers see, what their cert
+    // covers. Fall back to PUBLIC_BASE_URL only for legacy/unset hostDomain.
+    const base = t.hostDomain && t.slug
+      ? `https://${t.slug}.${t.hostDomain}`
+      : fallbackBase;
     const snippet = `<script src="${base}/embed.js?t=${t.embedToken}" defer></script>`;
-    const iframeFallback = `<iframe src="${base}/w/${t.slug}?embed=1" style="width:100%;max-width:560px;border:0;min-height:660px;" loading="lazy" title="Get a freight quote"></iframe>`;
-    const directLink = `${base}/w/${t.slug}`;
-    res.json({ snippet, iframeFallback, directLink, embedToken: t.embedToken, slug: t.slug });
+    const iframeFallback = `<iframe src="${base}/?embed=1" style="width:100%;max-width:560px;border:0;min-height:660px;" loading="lazy" title="Get a freight quote"></iframe>`;
+    const directLink = `${base}/`;
+    res.json({ snippet, iframeFallback, directLink, embedToken: t.embedToken, slug: t.slug, hostDomain: t.hostDomain });
   });
 
   app.post('/api/tenant/regenerate-embed', requireAuth, requireTenant, async (req, res) => {
