@@ -161,6 +161,7 @@ export function createApp(): express.Express {
   app.get('/login', (_req, res) => res.sendFile(resolve(publicDir, 'login.html')));
   app.get('/signup', (_req, res) => res.sendFile(resolve(publicDir, 'signup.html')));
   app.get('/pricing', (_req, res) => res.sendFile(resolve(publicDir, 'pricing.html')));
+  app.get('/security', (_req, res) => res.sendFile(resolve(publicDir, 'security.html')));
   app.get('/app', (_req, res) => res.sendFile(resolve(publicDir, 'app.html')));
   app.get('/app/*splat', (_req, res) => res.sendFile(resolve(publicDir, 'app.html')));
   app.get('/admin', (_req, res) => res.sendFile(resolve(publicDir, 'admin.html')));
