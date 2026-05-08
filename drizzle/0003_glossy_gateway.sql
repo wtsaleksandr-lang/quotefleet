@@ -1,0 +1,20 @@
+CREATE INDEX "accessorials_tenant_idx" ON "accessorials" USING btree ("tenant_id");--> statement-breakpoint
+CREATE INDEX "audit_log_tenant_created_idx" ON "audit_log" USING btree ("tenant_id","created_at");--> statement-breakpoint
+CREATE INDEX "conversations_tenant_lead_idx" ON "conversations" USING btree ("tenant_id","lead_id","created_at");--> statement-breakpoint
+CREATE INDEX "conversations_lead_idx" ON "conversations" USING btree ("lead_id");--> statement-breakpoint
+CREATE INDEX "ingest_jobs_tenant_status_idx" ON "ingest_jobs" USING btree ("tenant_id","status");--> statement-breakpoint
+CREATE INDEX "lane_zones_tenant_idx" ON "lane_zones" USING btree ("tenant_id");--> statement-breakpoint
+CREATE INDEX "leads_tenant_created_idx" ON "leads" USING btree ("tenant_id","created_at");--> statement-breakpoint
+CREATE INDEX "leads_tenant_status_idx" ON "leads" USING btree ("tenant_id","status");--> statement-breakpoint
+CREATE INDEX "magic_links_user_idx" ON "magic_links" USING btree ("user_id");--> statement-breakpoint
+CREATE INDEX "marketplace_lanes_tenant_idx" ON "marketplace_lanes" USING btree ("tenant_id");--> statement-breakpoint
+CREATE INDEX "marketplace_snapshots_tenant_captured_idx" ON "marketplace_rate_snapshots" USING btree ("tenant_id","captured_at");--> statement-breakpoint
+CREATE INDEX "outreach_events_prospect_occurred_idx" ON "outreach_events" USING btree ("prospect_id","occurred_at");--> statement-breakpoint
+CREATE INDEX "outreach_prospects_status_idx" ON "outreach_prospects" USING btree ("status");--> statement-breakpoint
+CREATE INDEX "rate_cards_tenant_idx" ON "rate_cards" USING btree ("tenant_id");--> statement-breakpoint
+CREATE INDEX "sessions_user_idx" ON "sessions" USING btree ("user_id");--> statement-breakpoint
+CREATE INDEX "sessions_expires_idx" ON "sessions" USING btree ("expires_at");--> statement-breakpoint
+CREATE INDEX "tenants_custom_domain_idx" ON "tenants" USING btree ("custom_domain");--> statement-breakpoint
+CREATE INDEX "tenants_embed_token_idx" ON "tenants" USING btree ("embed_token");--> statement-breakpoint
+CREATE INDEX "terminals_tenant_port_idx" ON "terminals" USING btree ("tenant_id","port_code");--> statement-breakpoint
+CREATE INDEX "users_tenant_idx" ON "users" USING btree ("tenant_id");

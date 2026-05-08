@@ -7,6 +7,7 @@
  * a plan that the user must confirm before tools are actually called.
  */
 import { eq, and } from 'drizzle-orm';
+import { z } from 'zod';
 import { db } from '../db/client.js';
 import {
   tenants,
@@ -20,6 +21,94 @@ import {
 } from '../db/schema.js';
 import { complete, type ChatToolDef } from './client.js';
 import { rateAdjusterSystemPrompt } from './prompts.js';
+
+// ─── Tool input validation ────────────────────────────────────────────
+// LLMs hallucinate. Without strict bounds on tool args a model could
+// (and occasionally will) write nonsense like ratePerMile=-50, kind="evil",
+// fuelSurchargePct=999. These schemas reject before the DB write — the
+// tool result returned to the model includes the validation error so the
+// model can apologize / retry with a sane number.
+const reasonField = z.string().min(1).max(500);
+const moneyField = z.number().finite().min(0).max(100_000); // $/mile or USD
+const pctField = z.number().finite().min(0).max(500);       // 0–500% (markup, fuel)
+const weightField = z.number().finite().min(0).max(200_000);
+const milesField = z.number().finite().min(0).max(20_000);
+const idField = z.number().int().positive();
+
+const ToolSchemas = {
+  list_rate_cards: z.object({}).strict().passthrough(),
+  list_accessorials: z.object({}).strict().passthrough(),
+  list_lane_zones: z.object({}).strict().passthrough(),
+  update_rate_card: z.object({
+    id: idField,
+    reason: reasonField,
+    ratePerMile: moneyField.optional(),
+    minimumCharge: moneyField.optional(),
+    flatFee: moneyField.optional(),
+    fuelSurchargePct: pctField.optional(),
+    marginPct: pctField.optional(),
+    maxWeightLbs: weightField.optional(),
+    maxMiles: milesField.optional(),
+    enabled: z.boolean().optional(),
+    label: z.string().max(160).optional(),
+    notes: z.string().max(2000).optional(),
+  }).passthrough(),
+  create_accessorial: z.object({
+    code: z.string().min(1).max(40).regex(/^[a-z0-9_]+$/, 'Lowercase letters, digits, underscore.'),
+    label: z.string().min(1).max(120),
+    description: z.string().max(500).optional(),
+    kind: z.enum(['flat', 'per_mile', 'pct_of_base', 'per_day', 'per_hour']),
+    amount: z.number().finite().min(0).max(100_000),
+    trigger: z.enum([
+      'optional',
+      'auto',
+      'auto_if_residential',
+      'auto_if_hazmat',
+      'auto_if_temp_controlled',
+      'auto_if_weight_over',
+    ]),
+    appliesToServices: z.array(z.string().max(40)).max(10).optional(),
+    reason: reasonField,
+  }).passthrough(),
+  update_accessorial: z.object({
+    id: idField,
+    reason: reasonField,
+    amount: z.number().finite().min(0).max(100_000).optional(),
+    kind: z.enum(['flat', 'per_mile', 'pct_of_base', 'per_day', 'per_hour']).optional(),
+    trigger: z.enum([
+      'optional',
+      'auto',
+      'auto_if_residential',
+      'auto_if_hazmat',
+      'auto_if_temp_controlled',
+      'auto_if_weight_over',
+    ]).optional(),
+    enabled: z.boolean().optional(),
+    label: z.string().max(120).optional(),
+    description: z.string().max(500).optional(),
+  }).passthrough(),
+  update_lane_zone: z.object({
+    id: idField,
+    reason: reasonField,
+    flatPrice: moneyField.optional(),
+    radiusMiles: milesField.optional(),
+    enabled: z.boolean().optional(),
+  }).passthrough(),
+} as const;
+
+function validateToolInput(name: string, input: Record<string, unknown>):
+  | { ok: true; data: Record<string, unknown> }
+  | { ok: false; message: string } {
+  const schema = (ToolSchemas as Record<string, z.ZodTypeAny | undefined>)[name];
+  if (!schema) return { ok: true, data: input };
+  const r = schema.safeParse(input);
+  if (r.success) return { ok: true, data: r.data as Record<string, unknown> };
+  const issues = r.error.issues
+    .slice(0, 5)
+    .map((i) => `${i.path.join('.') || '<root>'}: ${i.message}`)
+    .join('; ');
+  return { ok: false, message: `Invalid arguments for ${name} — ${issues}. Re-call the tool with corrected values.` };
+}
 
 const TOOLS: ChatToolDef[] = [
   {
@@ -143,8 +232,14 @@ async function execTool(
   tenantId: number,
   userId: number | null,
   name: string,
-  input: Record<string, unknown>
+  rawInput: Record<string, unknown>
 ): Promise<ToolCallResult> {
+  // Validate first — bounds-check every numeric field, enum-check kind/
+  // trigger, length-cap strings. A bad input is returned to the model so
+  // it can correct on the next turn instead of silently writing garbage.
+  const v = validateToolInput(name, rawInput);
+  if (!v.ok) return { ok: false, message: v.message };
+  const input = v.data;
   switch (name) {
     case 'list_rate_cards': {
       const rows = await db()

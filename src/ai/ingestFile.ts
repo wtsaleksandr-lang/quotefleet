@@ -292,13 +292,31 @@ export async function parseRateSheet(opts: {
   let finalText = '';
 
   for (let turn = 0; turn < MAX_TURNS; turn++) {
-    const res = await client.messages.create({
-      model,
-      max_tokens: 4096,
-      system: SYSTEM_PROMPT,
-      tools: TOOLS,
-      messages,
-    });
+    // Cache the static system prompt — it's ~1500 tokens and identical
+    // across every ingest call. Anthropic ephemeral cache (5-min TTL)
+    // makes subsequent calls within that window pay ~10% of the input
+    // cost on the system block.
+    const res = await client.messages.create(
+      {
+        model,
+        max_tokens: 4096,
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        system: [{ type: 'text', text: SYSTEM_PROMPT, cache_control: { type: 'ephemeral' } } as any],
+        tools: TOOLS,
+        messages,
+      },
+      { timeout: 60_000 }
+    );
+    // Per-call usage telemetry — same shape as ai/client.ts so a single
+    // grep over logs covers all AI cost centers.
+    try {
+      const u = res.usage;
+      console.log(
+        `[ai.usage] tenant=${opts.tenantId} model=${model} ` +
+          `in=${u.input_tokens ?? 0} out=${u.output_tokens ?? 0} ` +
+          `cache_read=${u.cache_read_input_tokens ?? 0} cache_create=${u.cache_creation_input_tokens ?? 0}`
+      );
+    } catch { /* swallow */ }
 
     if (res.stop_reason === 'tool_use') {
       const toolUses = res.content.filter(

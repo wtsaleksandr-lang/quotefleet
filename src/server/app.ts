@@ -11,8 +11,8 @@ import { resolve } from 'node:path';
 import { readFile } from 'node:fs/promises';
 import { fileURLToPath } from 'node:url';
 import { dirname } from 'node:path';
-import { sql } from 'drizzle-orm';
 import { db } from '../db/client.js';
+import { tenants } from '../db/schema.js';
 import { registerAuthRoutes } from './routes/auth.js';
 import { registerPublicRoutes } from './routes/public.js';
 import { registerTenantRoutes } from './routes/tenant.js';
@@ -95,9 +95,12 @@ export function createApp(): express.Express {
 
   // Healthcheck. Pings DB so a disconnected app marks unhealthy and
   // platform load balancers can shed traffic instead of black-holing.
+  // Uses a real-table SELECT (not `select 1`) because the postgres-js
+  // driver under Drizzle's `.execute(sql`select 1`)` was rejecting in
+  // production while the same SQL worked in the workspace shell.
   app.get('/healthz', async (_req, res) => {
     try {
-      await db().execute(sql`select 1 as ok`);
+      await db().select({ id: tenants.id }).from(tenants).limit(1);
       res.json({ ok: true, time: new Date().toISOString(), db: 'up' });
     } catch (err) {
       console.error('[healthz] db ping failed:', err);

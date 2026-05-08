@@ -8,29 +8,68 @@
 </head>
 <body>
   <div class="app-shell" id="app-shell" hidden>
-    <aside class="sidebar">
+    <button class="qf-mobile-nav-toggle" id="qf-mobile-nav-toggle" aria-label="Open navigation menu" aria-controls="qf-sidebar" aria-expanded="false" hidden>
+      <span aria-hidden="true">☰</span>
+    </button>
+    <aside class="sidebar" id="qf-sidebar">
       <div class="brand-block">
         <div class="name" id="sb-tenant-name">…</div>
         <div class="sub" id="sb-tenant-slug">…</div>
       </div>
-      <button class="nav-item active" data-route="overview">📊 Overview</button>
-      <button class="nav-item" data-route="leads">📥 Leads</button>
-      <button class="nav-item" data-route="rates">💰 Rate cards</button>
-      <button class="nav-item" data-route="accessorials">➕ Accessorials</button>
-      <button class="nav-item" data-route="zones">📍 Drayage zones</button>
-      <button class="nav-item" data-route="ai">🤖 AI agent</button>
-      <button class="nav-item" data-route="ingest">📤 AI import</button>
-      <button class="nav-item" data-route="brand">🎨 Brand</button>
-      <button class="nav-item" data-route="embed">📋 Embed code</button>
+      <button class="nav-item active" data-route="overview" aria-label="Overview"><span aria-hidden="true">📊</span> Overview</button>
+      <button class="nav-item" data-route="leads" aria-label="Leads"><span aria-hidden="true">📥</span> Leads</button>
+      <button class="nav-item" data-route="rates" aria-label="Rate cards"><span aria-hidden="true">💰</span> Rate cards</button>
+      <button class="nav-item" data-route="accessorials" aria-label="Accessorials"><span aria-hidden="true">➕</span> Accessorials</button>
+      <button class="nav-item" data-route="zones" aria-label="Drayage zones"><span aria-hidden="true">📍</span> Drayage zones</button>
+      <button class="nav-item" data-route="ai" aria-label="AI agent"><span aria-hidden="true">🤖</span> AI agent</button>
+      <button class="nav-item" data-route="ingest" aria-label="AI import"><span aria-hidden="true">📤</span> AI import</button>
+      <button class="nav-item" data-route="brand" aria-label="Brand"><span aria-hidden="true">🎨</span> Brand</button>
+      <button class="nav-item" data-route="embed" aria-label="Embed code"><span aria-hidden="true">📋</span> Embed code</button>
       <div class="group">Account</div>
-      <button class="nav-item" data-route="audit">📜 Audit log</button>
-      <a href="/" target="_blank">↗ View public widget</a>
-      <button class="nav-item" id="sb-logout">↩ Sign out</button>
+      <button class="nav-item" data-route="audit" aria-label="Audit log"><span aria-hidden="true">📜</span> Audit log</button>
+      <a href="/" target="_blank" rel="noopener" aria-label="View public widget">↗ View public widget</a>
+      <button class="nav-item" id="sb-logout" aria-label="Sign out">↩ Sign out</button>
     </aside>
     <main class="app-main">
       <div id="page-content"></div>
     </main>
   </div>
+  <style>
+    /* Mobile sidebar — collapse under 900px and surface a hamburger.
+       Sidebar still renders (so JS keeps working) but hides off-canvas;
+       user taps the hamburger to slide it in. */
+    .qf-mobile-nav-toggle {
+      position: fixed; top: 12px; left: 12px; z-index: 1001;
+      width: 44px; height: 44px; border-radius: 8px;
+      border: 1px solid var(--border-strong); background: var(--surface);
+      font-size: 22px; line-height: 44px; padding: 0; cursor: pointer;
+    }
+    @media (max-width: 900px) {
+      .qf-mobile-nav-toggle { display: block !important; }
+      .app-shell .sidebar {
+        position: fixed; top: 0; left: 0; bottom: 0;
+        width: 260px; max-width: 80vw;
+        transform: translateX(-100%); transition: transform 0.18s ease;
+        z-index: 1000; box-shadow: 4px 0 20px rgba(0,0,0,0.2);
+        overflow-y: auto;
+      }
+      .app-shell.qf-nav-open .sidebar { transform: translateX(0); }
+      .app-main { padding-top: 60px; }
+    }
+    /* Trial-expired lock — render is opt-in via body class. Disables
+       all editable inputs so a user with an expired trial cannot
+       accidentally make changes that won't actually save. */
+    body.qf-trial-locked .app-main input,
+    body.qf-trial-locked .app-main select,
+    body.qf-trial-locked .app-main textarea {
+      pointer-events: none; opacity: 0.55; cursor: not-allowed;
+    }
+    body.qf-trial-locked .app-main .btn-primary,
+    body.qf-trial-locked .app-main .btn-danger,
+    body.qf-trial-locked .app-main button[data-mutate] {
+      pointer-events: none; opacity: 0.55; cursor: not-allowed;
+    }
+  </style>
   <div id="loading" style="display:flex;align-items:center;justify-content:center;min-height:100vh;color:var(--muted);">
     <div>Loading dashboard<span class="dots"></span></div>
   </div>

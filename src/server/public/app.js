@@ -1036,9 +1036,37 @@
       bar.innerHTML =
         'Trial ended — your widget is read-only. ' +
         '<a href="/pricing" style="color: var(--error); text-decoration: underline;">Upgrade to keep capturing leads →</a>';
+      // Add the trial-locked body class so CSS disables every editable
+      // control inside .app-main. Keeps users from typing into a field
+      // whose backend write would fail anyway.
+      document.body.classList.add('qf-trial-locked');
     } else if (trial.status === 'paid') {
       bar.remove();
+      document.body.classList.remove('qf-trial-locked');
     }
+  }
+
+  // Mobile sidebar toggle. Wired once on boot — clicking the hamburger
+  // opens the off-canvas sidebar; tapping a nav item or the backdrop
+  // (clicking outside the sidebar) closes it.
+  function wireMobileNav() {
+    var toggle = document.getElementById('qf-mobile-nav-toggle');
+    var shell = document.getElementById('app-shell');
+    if (!toggle || !shell) return;
+    function setOpen(open) {
+      shell.classList.toggle('qf-nav-open', open);
+      toggle.setAttribute('aria-expanded', open ? 'true' : 'false');
+      toggle.setAttribute('aria-label', open ? 'Close navigation menu' : 'Open navigation menu');
+    }
+    toggle.addEventListener('click', function () { setOpen(!shell.classList.contains('qf-nav-open')); });
+    // Auto-close after picking a nav item.
+    $$('.sidebar .nav-item').forEach(function (b) {
+      b.addEventListener('click', function () { setOpen(false); });
+    });
+    // Tap outside (anywhere in main) closes the drawer.
+    document.querySelector('.app-main').addEventListener('click', function () {
+      if (window.innerWidth <= 900) setOpen(false);
+    });
   }
 
   // ── boot ───────────────────────────────────────────────────────
@@ -1059,6 +1087,10 @@
       $('#loading').style.display = 'none';
       $('#app-shell').hidden = false;
       renderTrialBanner(r.trial, r.tenant);
+      // Reveal the hamburger and wire its toggle now that the shell is visible.
+      var t = document.getElementById('qf-mobile-nav-toggle');
+      if (t) t.hidden = false;
+      wireMobileNav();
 
       $$('.sidebar [data-route]').forEach(function (b) {
         b.addEventListener('click', function () { go(b.dataset.route); });

@@ -27,6 +27,7 @@ import {
   jsonb,
   timestamp,
   uniqueIndex,
+  index,
 } from 'drizzle-orm/pg-core';
 
 // ────────────────────────────────────────────────────────────────────
@@ -92,6 +93,11 @@ export const tenants = pgTable(
   (t) => [
     uniqueIndex('tenants_slug_idx').on(t.slug),
     uniqueIndex('tenants_slug_host_idx').on(t.slug, t.hostDomain),
+    // hostInfo middleware looks up by custom_domain on every request to
+    // any host that doesn't match HOST_DOMAINS — needs an index.
+    index('tenants_custom_domain_idx').on(t.customDomain),
+    // embed.js loader hits this column on every iframe load.
+    index('tenants_embed_token_idx').on(t.embedToken),
   ]
 );
 
@@ -114,37 +120,51 @@ export const users = pgTable(
     createdAt: timestamp('created_at', { mode: 'date' }).notNull().defaultNow(),
     lastLoginAt: timestamp('last_login_at', { mode: 'date' }),
   },
-  (t) => [uniqueIndex('users_email_idx').on(t.email)]
+  (t) => [
+    uniqueIndex('users_email_idx').on(t.email),
+    index('users_tenant_idx').on(t.tenantId),
+  ]
 );
 
 // ────────────────────────────────────────────────────────────────────
 // SESSIONS — opaque cookie tokens.
 // ────────────────────────────────────────────────────────────────────
-export const sessions = pgTable('sessions', {
-  token: text('token').primaryKey(),
-  userId: integer('user_id')
-    .notNull()
-    .references(() => users.id, { onDelete: 'cascade' }),
-  expiresAt: timestamp('expires_at', { mode: 'date' }).notNull(),
-  createdAt: timestamp('created_at', { mode: 'date' }).notNull().defaultNow(),
-});
+export const sessions = pgTable(
+  'sessions',
+  {
+    token: text('token').primaryKey(),
+    userId: integer('user_id')
+      .notNull()
+      .references(() => users.id, { onDelete: 'cascade' }),
+    expiresAt: timestamp('expires_at', { mode: 'date' }).notNull(),
+    createdAt: timestamp('created_at', { mode: 'date' }).notNull().defaultNow(),
+  },
+  (t) => [
+    index('sessions_user_idx').on(t.userId),
+    index('sessions_expires_idx').on(t.expiresAt),
+  ]
+);
 
 // ────────────────────────────────────────────────────────────────────
 // MAGIC LINKS — single-use email login tokens.
 // Created on POST /api/auth/magic-link/send, consumed on
 // GET /auth/magic/:token (sets a session cookie + redirects to /app).
 // ────────────────────────────────────────────────────────────────────
-export const magicLinks = pgTable('magic_links', {
-  token: text('token').primaryKey(),
-  userId: integer('user_id')
-    .notNull()
-    .references(() => users.id, { onDelete: 'cascade' }),
-  expiresAt: timestamp('expires_at', { mode: 'date' }).notNull(),
-  usedAt: timestamp('used_at', { mode: 'date' }),
-  /** Optional next-URL to redirect to after consume. */
-  redirectTo: text('redirect_to'),
-  createdAt: timestamp('created_at', { mode: 'date' }).notNull().defaultNow(),
-});
+export const magicLinks = pgTable(
+  'magic_links',
+  {
+    token: text('token').primaryKey(),
+    userId: integer('user_id')
+      .notNull()
+      .references(() => users.id, { onDelete: 'cascade' }),
+    expiresAt: timestamp('expires_at', { mode: 'date' }).notNull(),
+    usedAt: timestamp('used_at', { mode: 'date' }),
+    /** Optional next-URL to redirect to after consume. */
+    redirectTo: text('redirect_to'),
+    createdAt: timestamp('created_at', { mode: 'date' }).notNull().defaultNow(),
+  },
+  (t) => [index('magic_links_user_idx').on(t.userId)]
+);
 
 // ────────────────────────────────────────────────────────────────────
 // RATE CARDS — one per equipment_type per tenant.
@@ -187,7 +207,9 @@ export const rateCards = pgTable('rate_cards', {
   lastAiEditReason: text('last_ai_edit_reason'),
   createdAt: timestamp('created_at', { mode: 'date' }).notNull().defaultNow(),
   updatedAt: timestamp('updated_at', { mode: 'date' }).notNull().defaultNow(),
-});
+}, (t) => [
+  index('rate_cards_tenant_idx').on(t.tenantId),
+]);
 
 // ────────────────────────────────────────────────────────────────────
 // ACCESSORIALS — extras added on top of base rate.
@@ -217,7 +239,9 @@ export const accessorials = pgTable('accessorials', {
   sortOrder: integer('sort_order').notNull().default(0),
   createdAt: timestamp('created_at', { mode: 'date' }).notNull().defaultNow(),
   updatedAt: timestamp('updated_at', { mode: 'date' }).notNull().defaultNow(),
-});
+}, (t) => [
+  index('accessorials_tenant_idx').on(t.tenantId),
+]);
 
 // ────────────────────────────────────────────────────────────────────
 // TERMINALS — tenant-scoped list of marine terminals / rail ramps the
@@ -255,7 +279,10 @@ export const terminals = pgTable(
     createdAt: timestamp('created_at', { mode: 'date' }).notNull().defaultNow(),
     updatedAt: timestamp('updated_at', { mode: 'date' }).notNull().defaultNow(),
   },
-  (t) => [uniqueIndex('terminals_tenant_code_idx').on(t.tenantId, t.code)]
+  (t) => [
+    uniqueIndex('terminals_tenant_code_idx').on(t.tenantId, t.code),
+    index('terminals_tenant_port_idx').on(t.tenantId, t.portCode),
+  ]
 );
 
 // ────────────────────────────────────────────────────────────────────
@@ -283,7 +310,9 @@ export const laneZones = pgTable('lane_zones', {
   sortOrder: integer('sort_order').notNull().default(0),
   createdAt: timestamp('created_at', { mode: 'date' }).notNull().defaultNow(),
   updatedAt: timestamp('updated_at', { mode: 'date' }).notNull().defaultNow(),
-});
+}, (t) => [
+  index('lane_zones_tenant_idx').on(t.tenantId),
+]);
 
 // ────────────────────────────────────────────────────────────────────
 // AI CONFIG — one per tenant. Stores the system prompt the tenant
@@ -424,7 +453,13 @@ export const leads = pgTable(
     createdAt: timestamp('created_at', { mode: 'date' }).notNull().defaultNow(),
     updatedAt: timestamp('updated_at', { mode: 'date' }).notNull().defaultNow(),
   },
-  (t) => [uniqueIndex('leads_ref_idx').on(t.refId)]
+  (t) => [
+    uniqueIndex('leads_ref_idx').on(t.refId),
+    // Dashboard list-by-tenant ordered by date is the hot read on this
+    // table. Composite index gives index-only scans for the common case.
+    index('leads_tenant_created_idx').on(t.tenantId, t.createdAt),
+    index('leads_tenant_status_idx').on(t.tenantId, t.status),
+  ]
 );
 
 // ────────────────────────────────────────────────────────────────────
@@ -448,7 +483,10 @@ export const conversations = pgTable('conversations', {
   /** Optional tool-use payload. */
   metadataJson: jsonb('metadata_json').$type<Record<string, unknown>>(),
   createdAt: timestamp('created_at', { mode: 'date' }).notNull().defaultNow(),
-});
+}, (t) => [
+  index('conversations_tenant_lead_idx').on(t.tenantId, t.leadId, t.createdAt),
+  index('conversations_lead_idx').on(t.leadId),
+]);
 
 // ────────────────────────────────────────────────────────────────────
 // DISTANCE CACHE — shared across all tenants. Key = (origin_key, dest_key)
@@ -507,7 +545,9 @@ export const auditLog = pgTable('audit_log', {
   /** Free-form details. */
   detailsJson: jsonb('details_json').$type<Record<string, unknown>>(),
   createdAt: timestamp('created_at', { mode: 'date' }).notNull().defaultNow(),
-});
+}, (t) => [
+  index('audit_log_tenant_created_idx').on(t.tenantId, t.createdAt),
+]);
 
 // ────────────────────────────────────────────────────────────────────
 // PORTS — read-only reference for drayage origin lookups (US/Canada).
@@ -596,7 +636,10 @@ export const outreachProspects = pgTable(
     createdAt: timestamp('created_at', { mode: 'date' }).notNull().defaultNow(),
     updatedAt: timestamp('updated_at', { mode: 'date' }).notNull().defaultNow(),
   },
-  (t) => [uniqueIndex('outreach_email_idx').on(t.contactEmail)]
+  (t) => [
+    uniqueIndex('outreach_email_idx').on(t.contactEmail),
+    index('outreach_prospects_status_idx').on(t.status),
+  ]
 );
 
 // ────────────────────────────────────────────────────────────────────
@@ -649,7 +692,9 @@ export const outreachEvents = pgTable('outreach_events', {
   /** Free-form payload (subject, body excerpt, link clicked, etc.). */
   payloadJson: jsonb('payload_json').$type<Record<string, unknown>>(),
   occurredAt: timestamp('occurred_at', { mode: 'date' }).notNull().defaultNow(),
-});
+}, (t) => [
+  index('outreach_events_prospect_occurred_idx').on(t.prospectId, t.occurredAt),
+]);
 
 // ════════════════════════════════════════════════════════════════════
 // MARKETPLACE — cross-tenant rate index.
@@ -722,7 +767,10 @@ export const marketplaceLanes = pgTable(
     enabled: boolean('enabled').notNull().default(true),
     updatedAt: timestamp('updated_at', { mode: 'date' }).notNull().defaultNow(),
   },
-  (t) => [uniqueIndex('marketplace_lanes_idx').on(t.tenantId, t.anchorType, t.anchorCode)]
+  (t) => [
+    uniqueIndex('marketplace_lanes_idx').on(t.tenantId, t.anchorType, t.anchorCode),
+    index('marketplace_lanes_tenant_idx').on(t.tenantId),
+  ]
 );
 
 // Periodic snapshots of a carrier's rate book. Each material change
@@ -753,7 +801,10 @@ export const marketplaceRateSnapshots = pgTable(
     sourceKind: text('source_kind').notNull(), // 'rate_card_edit' | 'lane_zone_edit' | 'ai_ingest' | 'periodic'
     sourceMeta: jsonb('source_meta').$type<Record<string, unknown>>(),
     capturedAt: timestamp('captured_at', { mode: 'date' }).notNull().defaultNow(),
-  }
+  },
+  (t) => [
+    index('marketplace_snapshots_tenant_captured_idx').on(t.tenantId, t.capturedAt),
+  ]
 );
 
 // Anonymized aggregates per (service, equipment, lane-anchor). Refreshed
@@ -818,7 +869,9 @@ export const ingestJobs = pgTable('ingest_jobs', {
   appliedAt: timestamp('applied_at', { mode: 'date' }),
   createdAt: timestamp('created_at', { mode: 'date' }).notNull().defaultNow(),
   updatedAt: timestamp('updated_at', { mode: 'date' }).notNull().defaultNow(),
-});
+}, (t) => [
+  index('ingest_jobs_tenant_status_idx').on(t.tenantId, t.status),
+]);
 
 // ────────────────────────────────────────────────────────────────────
 // PLATFORM SETTINGS — key/value store for app-wide config.
