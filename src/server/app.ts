@@ -162,6 +162,23 @@ export function createApp(): express.Express {
   app.get('/signup', (_req, res) => res.sendFile(resolve(publicDir, 'signup.html')));
   app.get('/pricing', (_req, res) => res.sendFile(resolve(publicDir, 'pricing.html')));
   app.get('/security', (_req, res) => res.sendFile(resolve(publicDir, 'security.html')));
+  app.get('/dpa', (_req, res) => res.sendFile(resolve(publicDir, 'dpa.html')));
+  // RFC 9116 vulnerability disclosure manifest. Plain-text, served at
+  // the well-known path so security researchers' tooling can find it.
+  // Expires 2 years out so we remember to refresh.
+  app.get('/.well-known/security.txt', (_req, res) => {
+    res.type('text/plain').send(
+      [
+        'Contact: mailto:security@quotefleet.app',
+        'Expires: 2027-12-31T23:59:59.000Z',
+        'Preferred-Languages: en',
+        'Canonical: https://quotefleet.app/.well-known/security.txt',
+        'Policy: https://quotefleet.app/security',
+        'Acknowledgments: https://quotefleet.app/security#acknowledgments',
+        '',
+      ].join('\n')
+    );
+  });
   app.get('/app', (_req, res) => res.sendFile(resolve(publicDir, 'app.html')));
   app.get('/app/*splat', (_req, res) => res.sendFile(resolve(publicDir, 'app.html')));
   app.get('/admin', (_req, res) => res.sendFile(resolve(publicDir, 'admin.html')));

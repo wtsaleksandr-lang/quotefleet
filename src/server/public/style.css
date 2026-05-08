@@ -415,6 +415,62 @@ p { margin: 0; }
 }
 .qf-filter-row .input { font-size: 12px; }
 
+/* ── Compliance trust strip ─────────────────────────────────────
+   Shown on landing + repeated in footer + a thin variant under the
+   header CTA. We deliberately use generic shield/lock icons (NOT
+   official AICPA / ISO logos) — those marks cannot lawfully be shown
+   without an active attestation. The chip text itself carries the
+   "live" vs "in progress" status; tooltip on hover explains. */
+.qf-trust { background: linear-gradient(180deg, transparent, var(--surface-2)); }
+.qf-trust-link { display: inline-block; text-decoration: none; color: var(--ink); margin-bottom: 12px; }
+.qf-trust-headline {
+  display: inline-flex; align-items: center; gap: 8px;
+  font-size: 14px; color: var(--ink-soft);
+  font-family: var(--font-mono); letter-spacing: 0.04em;
+}
+.qf-trust-headline svg { color: var(--accent); }
+.qf-trust-row {
+  display: flex; flex-wrap: wrap; justify-content: center; gap: 8px;
+  margin: 6px 0 10px;
+}
+.qf-trust-chip {
+  display: inline-flex; align-items: center; gap: 6px;
+  padding: 5px 11px; border-radius: 999px;
+  font-family: var(--font-mono); font-size: 11px;
+  letter-spacing: 0.04em; text-transform: uppercase;
+  border: 1px solid var(--border-strong);
+  background: var(--surface);
+  color: var(--muted);
+  cursor: help;
+}
+.qf-trust-chip.live { color: var(--success); border-color: rgba(52, 211, 153, 0.3); }
+.qf-trust-chip.live svg { color: var(--success); }
+.qf-trust-chip.wip { color: var(--muted); border-style: dashed; }
+.qf-trust-foot { font-size: 12.5px; color: var(--muted); margin-top: 6px; }
+.qf-trust-foot a { color: var(--accent); }
+
+/* Subtle mini-strip directly under the top nav. One-line, scrollable
+   horizontally on narrow screens. Not a section — just a thin band. */
+.qf-trust-mini {
+  border-bottom: 1px solid var(--border);
+  background: var(--bg);
+}
+.qf-trust-mini-inner {
+  max-width: 1200px; margin: 0 auto;
+  padding: 6px 28px;
+  display: flex; align-items: center; gap: 6px;
+  overflow-x: auto; white-space: nowrap;
+  font-family: var(--font-mono); font-size: 10.5px;
+  letter-spacing: 0.06em; text-transform: uppercase;
+  color: var(--muted);
+}
+.qf-trust-mini-inner svg { color: var(--accent); flex-shrink: 0; }
+.qf-trust-mini-inner a { color: var(--muted); text-decoration: none; }
+.qf-trust-mini-inner a:hover { color: var(--ink); }
+.qf-trust-mini-sep { color: var(--border-strong); }
+.qf-trust-mini-tag { color: var(--success); }
+.qf-trust-mini-tag.wip { color: var(--muted); border-bottom: 1px dashed var(--border-strong); padding-bottom: 1px; }
+
 /* ── Badges ────────────────────────────────────────────────────── */
 .badge {
   display: inline-block;
