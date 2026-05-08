@@ -402,38 +402,128 @@
   }
 
   // ── Rate cards ────────────────────────────────────────────────
+  // Service tabs on the rate cards page. The first tab is "All" (every
+  // row); each subsequent tab filters to one service. Rendered count
+  // shown in tab label so the operator sees at a glance where they have
+  // data. Tab + per-column filter choice persists in localStorage.
+  var SERVICES = ['drayage', 'ftl', 'ltl', 'expedited', 'hotshot'];
+  function getRatesView() {
+    try { return JSON.parse(localStorage.getItem('qf-rates-view') || '{}'); }
+    catch (e) { return {}; }
+  }
+  function setRatesView(v) {
+    try { localStorage.setItem('qf-rates-view', JSON.stringify(v)); } catch (e) {}
+  }
+
   function renderRates(c) {
     api('/api/tenant/rate-cards').then(function (d) {
       c.innerHTML = '';
       c.appendChild(el('h1', { text: 'Rate cards' }));
       c.appendChild(el('p', { class: 'page-sub', text: 'One row per service × equipment. Edit cells, blur to save.' }));
       c.appendChild(el('div', { class: 'notice', html: 'Tip: ask the AI agent to bulk-update these → <a href="#" data-route="ai">open AI panel</a>' }));
-      // Drayage gets its own per-port-per-radius pricing on a different page.
-      // Surface that link if any rate card on this page is `service=drayage`.
       var hasDrayage = (d.rateCards || []).some(function (r) { return r.service === 'drayage'; });
       if (hasDrayage) {
         c.appendChild(el('div', {
           class: 'notice',
           style: { marginTop: '8px' },
-          html: 'For drayage you also need to configure <strong>per-port flat tariffs</strong> (e.g. LAX → 50mi zone = $475). Set those on <a href="#" data-route="zones">Drayage zones →</a>. For per-terminal surcharges (APM Pier 400 vs WBCT etc.) use the <em>terminals</em> table — UI coming soon.'
+          html: 'For drayage you also need to configure <strong>per-port flat tariffs</strong> (e.g. LAX → 50mi zone = $475). Set those on <a href="#" data-route="zones">Drayage zones →</a>.'
         }));
       }
 
-      var tbl = el('table', { class: 'table', style: { marginTop: '14px' } });
-      tbl.innerHTML =
-        '<thead><tr><th>Service</th><th>Equipment</th><th>Label</th>' +
-        '<th style="text-align:right;">$/mi</th><th style="text-align:right;">Min</th>' +
-        '<th style="text-align:right;">Flat</th><th style="text-align:right;">Fuel %</th>' +
-        '<th style="text-align:right;">Margin %</th><th>Enabled</th><th></th></tr></thead><tbody></tbody>';
-      var tb = $('tbody', tbl);
-      d.rateCards.forEach(function (r) { tb.appendChild(rateRow(r)); });
+      // ── Service tabs ─────────────────────────────────────────────
+      var view = getRatesView();
+      var activeTab = view.tab || 'all';
+      var tabsBar = el('div', { class: 'qf-tabs' });
+      function tab(id, labelText, count) {
+        var b = el('button', { class: 'qf-tab' + (activeTab === id ? ' active' : ''), text: labelText + ' (' + count + ')' });
+        b.addEventListener('click', function () {
+          view.tab = id; setRatesView(view); renderRates(c);
+        });
+        return b;
+      }
+      tabsBar.appendChild(tab('all', 'All', d.rateCards.length));
+      SERVICES.forEach(function (s) {
+        var n = d.rateCards.filter(function (r) { return r.service === s; }).length;
+        tabsBar.appendChild(tab(s, s.charAt(0).toUpperCase() + s.slice(1), n));
+      });
+      c.appendChild(tabsBar);
+
+      // Filter rows by active service tab.
+      var rows = activeTab === 'all'
+        ? d.rateCards
+        : d.rateCards.filter(function (r) { return r.service === activeTab; });
+
+      var tbl = el('table', { class: 'table', style: { marginTop: '12px' } });
+      var thead = el('thead');
+      thead.innerHTML =
+        '<tr><th data-col="service">Service</th><th data-col="equipment">Equipment</th><th data-col="label">Label</th>' +
+        '<th data-col="ratePerMile" style="text-align:right;">$/mi</th><th data-col="minimumCharge" style="text-align:right;">Min</th>' +
+        '<th data-col="flatFee" style="text-align:right;">Flat</th><th data-col="fuelSurchargePct" style="text-align:right;">Fuel %</th>' +
+        '<th data-col="marginPct" style="text-align:right;">Margin %</th><th data-col="enabled">Enabled</th><th></th></tr>';
+      // ── Per-column filter row ─────────────────────────────────────
+      // Light-touch: a small input under each header that filters the
+      // currently rendered rows. Pure client-side, instant feedback.
+      var filterTr = el('tr', { class: 'qf-filter-row' });
+      var filterCols = ['service', 'equipment', 'label', 'ratePerMile', 'minimumCharge', 'flatFee', 'fuelSurchargePct', 'marginPct', 'enabled'];
+      var filters = view.filters || {};
+      filterCols.forEach(function (col) {
+        var th = el('th', { style: { padding: '4px 8px' } });
+        var inp = el('input', {
+          class: 'input',
+          placeholder: '⌕',
+          value: filters[col] || '',
+          style: { padding: '4px 8px', fontSize: '12px', width: '100%' },
+        });
+        inp.addEventListener('input', function () {
+          filters[col] = inp.value;
+          view.filters = filters;
+          setRatesView(view);
+          applyFilters();
+        });
+        th.appendChild(inp);
+        filterTr.appendChild(th);
+      });
+      filterTr.appendChild(el('th'));
+      thead.appendChild(filterTr);
+      tbl.appendChild(thead);
+
+      var tb = el('tbody');
+      tbl.appendChild(tb);
+      rows.forEach(function (r) {
+        var tr = rateRow(r);
+        // Tag each <tr> with its source data so we can text-match for filtering.
+        tr.dataset.row = JSON.stringify({
+          service: r.service, equipment: r.equipment, label: r.label || '',
+          ratePerMile: r.ratePerMile, minimumCharge: r.minimumCharge,
+          flatFee: r.flatFee, fuelSurchargePct: r.fuelSurchargePct,
+          marginPct: r.marginPct, enabled: r.enabled ? 'yes' : 'no',
+        });
+        tb.appendChild(tr);
+      });
+
+      function applyFilters() {
+        var active = Object.keys(filters).filter(function (k) { return (filters[k] || '').trim() !== ''; });
+        $$('tr', tb).forEach(function (tr) {
+          var data; try { data = JSON.parse(tr.dataset.row || '{}'); } catch (e) { data = {}; }
+          var hide = active.some(function (k) {
+            var f = (filters[k] || '').toLowerCase().trim();
+            var v = String(data[k] == null ? '' : data[k]).toLowerCase();
+            return v.indexOf(f) === -1;
+          });
+          tr.style.display = hide ? 'none' : '';
+        });
+      }
+      applyFilters();
       c.appendChild(tbl);
 
+      // ── Add row ──────────────────────────────────────────────────
       var addBtn = el('button', { class: 'btn btn-secondary', text: '+ Add rate card', style: { marginTop: '14px' } });
       addBtn.addEventListener('click', function () {
+        // If a service tab is active, default the new row to that service.
+        var svc = activeTab !== 'all' ? activeTab : 'ftl';
         api('/api/tenant/rate-cards', {
           method: 'POST',
-          body: { service: 'ftl', equipment: 'dryvan', label: 'New rate', ratePerMile: 2.5 },
+          body: { service: svc, equipment: 'dryvan', label: 'New rate', ratePerMile: 2.5 },
         }).then(function () { renderRates(c); }).catch(toastErr);
       });
       c.appendChild(addBtn);
