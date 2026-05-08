@@ -33,7 +33,7 @@ import { leadChatTurn } from '../../ai/chatAgent.js';
 import { sendEmail } from '../../email/send.js';
 import { loadEnv } from '../../config.js';
 import { getTrialState } from '../trialGating.js';
-import { publicCalcLimiter, publicChatLimiter } from '../rateLimits.js';
+import { publicCalcLimiter, publicChatLimiter, publicLeadLimiter } from '../rateLimits.js';
 
 /** Returns true if the request's Origin/Referer host matches the
  *  tenant's brand_configs.allowed_domains (CSV). Empty list = wide open
@@ -161,17 +161,15 @@ export function registerPublicRoutes(app: Express) {
     res.type('application/javascript');
     const token = String(req.query.t ?? '');
     if (!token) return res.status(400).send('// missing ?t=<token>');
-    let t: { slug: string }[] = [];
+    // Single SELECT — earlier we did 2 round-trips for slug then full row.
+    let tenant: typeof tenants.$inferSelect | undefined;
     try {
-      t = await db().select({ slug: tenants.slug }).from(tenants).where(eq(tenants.embedToken, token)).limit(1);
+      const rows = await db().select().from(tenants).where(eq(tenants.embedToken, token)).limit(1);
+      tenant = rows[0];
     } catch (err) {
       console.warn('[embed.js] DB lookup failed:', (err as Error).message);
       return res.status(500).send('// embed lookup failed');
     }
-    if (!t[0]) return res.send('// invalid embed token');
-    // Look up the tenant's full row so we know its host_domain.
-    const tRow = await db().select().from(tenants).where(eq(tenants.embedToken, token)).limit(1);
-    const tenant = tRow[0];
     if (!tenant) return res.send('// invalid embed token');
     const env = loadEnv();
     // Prefer the tenant's hosted subdomain (`<slug>.<host>`) — gives us
@@ -330,7 +328,7 @@ export function registerPublicRoutes(app: Express) {
   });
 
   // ── submit lead (creates quote_request row + sends auto-reply) ─
-  app.post('/api/public/lead/:slug', publicCalcLimiter, async (req: Request, res: Response) => {
+  app.post('/api/public/lead/:slug', publicLeadLimiter, async (req: Request, res: Response) => {
     const tenant = await getTenantBySlug(String(req.params.slug));
     if (!tenant || tenant.status !== 'active') {
       return res.status(404).json({ error: 'Tenant not found' });
@@ -524,7 +522,7 @@ export function registerPublicRoutes(app: Express) {
     }
   });
 
-  app.get('/api/public/lead/:refId', async (req: Request, res: Response) => {
+  app.get('/api/public/lead/:refId', publicChatLimiter, async (req: Request, res: Response) => {
     const refId = String(req.params.refId ?? '');
     if (!refId) return res.status(400).json({ error: 'Missing refId' });
     const rows = await db().select().from(leads).where(eq(leads.refId, refId)).limit(1);

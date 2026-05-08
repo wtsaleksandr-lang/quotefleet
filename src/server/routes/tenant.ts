@@ -41,7 +41,7 @@ import {
   auditLog,
   conversations,
 } from '../../db/schema.js';
-import { requireAuth, requireTenant } from '../middleware.js';
+import { requireAuth, requireTenant, requireOwner } from '../middleware.js';
 import { encrypt } from '../../auth/secrets.js';
 import { loadEnv } from '../../config.js';
 import { syncTenantToMarketplace } from '../../marketplace/sync.js';
@@ -317,25 +317,33 @@ export function registerTenantRoutes(app: Express) {
   // ── leads ─────────────────────────────────────────────────────
   app.get('/api/tenant/leads', requireAuth, requireTenant, async (req, res) => {
     const status = (req.query.status as string | undefined) ?? undefined;
+    // Push the status filter into the SQL query — earlier we filtered in
+    // JS *after* a 200-row LIMIT, so a tenant with >200 leads could ask
+    // for `?status=won` and get 0 hits even with wins beyond the window.
+    const baseWhere = eq(leads.tenantId, req.tenant!.id);
+    const where = status ? and(baseWhere, eq(leads.status, status)) : baseWhere;
     const rows = await db()
       .select()
       .from(leads)
-      .where(eq(leads.tenantId, req.tenant!.id))
+      .where(where)
       .orderBy(desc(leads.createdAt))
       .limit(200);
-    const filtered = status ? rows.filter((l) => l.status === status) : rows;
-    res.json({ leads: filtered });
+    res.json({ leads: rows });
   });
 
   // CSV export of all leads — used by the dashboard's Export button. We
   // stream a flat CSV with the columns dispatchers actually want. Drops
   // the `breakdown_json` blob (use the lead-detail page for that).
+  // Hard cap at 50K rows to keep memory bounded; if a tenant has more,
+  // they can paginate by month with ?since=YYYY-MM-DD.
   app.get('/api/tenant/leads/export.csv', requireAuth, requireTenant, async (req, res) => {
+    const MAX_EXPORT_ROWS = 50_000;
     const rows = await db()
       .select()
       .from(leads)
       .where(eq(leads.tenantId, req.tenant!.id))
-      .orderBy(desc(leads.createdAt));
+      .orderBy(desc(leads.createdAt))
+      .limit(MAX_EXPORT_ROWS);
     const cols = [
       'refId', 'createdAt', 'status',
       'customerName', 'customerEmail', 'customerPhone', 'customerCompany',
@@ -426,7 +434,10 @@ export function registerTenantRoutes(app: Express) {
   });
 
   // ── tenant Anthropic key ──────────────────────────────────────
-  app.put('/api/tenant/anthropic-key', requireAuth, requireTenant, async (req, res) => {
+  // Owner-only: a non-owner staff account must NOT be able to overwrite
+  // a tenant's BYO key (would let them swap in their own & bill the
+  // tenant, or wipe the key to force fallback to platform key).
+  app.put('/api/tenant/anthropic-key', requireAuth, requireOwner, requireTenant, async (req, res) => {
     const { apiKey } = req.body ?? {};
     if (typeof apiKey !== 'string' || !apiKey.startsWith('sk-ant-')) {
       return res.status(400).json({ error: 'Provide a valid sk-ant-... key' });
@@ -438,7 +449,7 @@ export function registerTenantRoutes(app: Express) {
     res.json({ ok: true });
   });
 
-  app.delete('/api/tenant/anthropic-key', requireAuth, requireTenant, async (req, res) => {
+  app.delete('/api/tenant/anthropic-key', requireAuth, requireOwner, requireTenant, async (req, res) => {
     await db()
       .update(tenants)
       .set({ anthropicKeyEncrypted: null, updatedAt: new Date() })
@@ -494,7 +505,7 @@ export function registerTenantRoutes(app: Express) {
     });
   });
 
-  app.post('/api/tenant/custom-domain', requireAuth, requireTenant, async (req, res) => {
+  app.post('/api/tenant/custom-domain', requireAuth, requireOwner, requireTenant, async (req, res) => {
     const Schema = z.object({
       domain: z.string().min(3).max(120).regex(
         /^(?!-)[A-Za-z0-9-]{1,63}(?<!-)(\.[A-Za-z0-9-]{1,63})+$/,
@@ -533,7 +544,7 @@ export function registerTenantRoutes(app: Express) {
     });
   });
 
-  app.post('/api/tenant/custom-domain/verify', requireAuth, requireTenant, async (req, res) => {
+  app.post('/api/tenant/custom-domain/verify', requireAuth, requireOwner, requireTenant, async (req, res) => {
     const t = req.tenant!;
     if (!t.customDomain) return res.status(400).json({ error: 'No domain to verify.' });
     const expected = customDomainToken(t.id);

@@ -37,7 +37,10 @@ externalPort = 80
 [deployment]
 deploymentTarget = "vm"
 run = ["sh", "-c", "pnpm start"]
-build = ["sh", "-c", "pnpm install --frozen-lockfile && pnpm build"]
+# Build runs migrations + seed before compiling, so a fresh deploy on a
+# new Postgres database boots into a working schema instead of a 500.
+# The seed script is idempotent (existing demo tenant is left alone).
+build = ["sh", "-c", "pnpm install --frozen-lockfile && pnpm db:migrate && pnpm db:seed && pnpm build"]
 
 [agent]
 expertMode = true

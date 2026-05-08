@@ -85,3 +85,24 @@ export async function requireSuperAdmin(
   }
   next();
 }
+
+/**
+ * Owner-or-super-admin guard. Use on tenant settings that should not be
+ * editable by lower-privileged staff accounts (Anthropic key, billing,
+ * embed regen, custom domain, etc.). Must be chained AFTER requireAuth.
+ */
+export async function requireOwner(
+  req: Request,
+  res: Response,
+  next: NextFunction
+): Promise<void> {
+  if (!req.user) {
+    res.status(401).json({ error: 'Unauthorized' });
+    return;
+  }
+  if (req.user.role !== 'tenant_owner' && req.user.role !== 'super_admin') {
+    res.status(403).json({ error: 'Owner-only' });
+    return;
+  }
+  next();
+}

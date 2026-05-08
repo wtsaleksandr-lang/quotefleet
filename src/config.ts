@@ -18,6 +18,20 @@ export interface Env {
    *  "quotefleet.app,quotefleet.net,truckrate.online,your-quote.online"
    *  — wildcard DNS for each routes `<slug>.<domain>` here. */
   HOST_DOMAINS: string[];
+  /** Shared secret between the Cloudflare Worker that fronts wildcard
+   *  subdomains and this app. The Worker sets `X-Worker-Auth: <secret>`;
+   *  hostInfo middleware refuses to trust `X-Original-Host` unless it
+   *  matches. If unset, we fall back to trusting the header (legacy
+   *  behavior) but log a warning — production deployments MUST set this. */
+  WORKER_AUTH_SECRET?: string;
+  /** Soft global daily spend cap on the platform Anthropic key, in USD.
+   *  When usage telemetry exceeds this, marketing chat + AI endpoints
+   *  short-circuit with a 503 instead of running another API call.
+   *  Per-tenant caps live on `tenants.aiDailyUsdCap`. */
+  AI_DAILY_USD_CAP?: number;
+  /** If set, errors are reported here. Off by default to keep the dev
+   *  loop cheap. */
+  SENTRY_DSN?: string;
   SUPER_ADMIN_EMAIL?: string;
   GOOGLE_MAPS_API_KEY?: string;
   MAPBOX_TOKEN?: string;
@@ -91,6 +105,9 @@ export function loadEnv(): Env {
     PORT: Number(opt('PORT') ?? 5000),
     HOST: opt('HOST') ?? '0.0.0.0',
     HOST_DOMAINS: hostDomains,
+    WORKER_AUTH_SECRET: opt('WORKER_AUTH_SECRET'),
+    AI_DAILY_USD_CAP: opt('AI_DAILY_USD_CAP') ? Number(opt('AI_DAILY_USD_CAP')) : undefined,
+    SENTRY_DSN: opt('SENTRY_DSN'),
     SUPER_ADMIN_EMAIL: opt('SUPER_ADMIN_EMAIL'),
     GOOGLE_MAPS_API_KEY: opt('GOOGLE_MAPS_API_KEY'),
     MAPBOX_TOKEN: opt('MAPBOX_TOKEN'),

@@ -63,6 +63,9 @@
             Sign in <span class="arr">→</span>
           </button>
           <div id="login-error" class="notice error hidden"></div>
+          <p class="muted-small" style="text-align:center; margin-top: 4px;">
+            Forgot password? <a href="#" id="forgot-link">Email me a sign-in link instead →</a>
+          </p>
         </form>
       </div>
 
@@ -97,7 +100,25 @@
       msg.classList.remove('hidden'); msg.classList.add('error');
     }
 
-    // Magic link send
+    // "Forgot password?" link → switch to magic-link tab + focus the email
+    var forgotLink = document.getElementById('forgot-link');
+    if (forgotLink) {
+      forgotLink.addEventListener('click', function (ev) {
+        ev.preventDefault();
+        var t = document.querySelector('.tab[data-pane="link"]');
+        if (t) t.click();
+        var emailInput = document.querySelector('#magic-form input[name="email"]');
+        if (emailInput) {
+          var pwdEmail = document.querySelector('#login-form input[name="email"]');
+          if (pwdEmail && pwdEmail.value) emailInput.value = pwdEmail.value;
+          emailInput.focus();
+        }
+      });
+    }
+
+    // Magic link send. After a successful send we put the button into a
+    // 30s cooldown so users don't pound the resend button (and inflate
+    // our SMTP/AWS costs).
     document.getElementById('magic-form').addEventListener('submit', async function (e) {
       e.preventDefault();
       var msg = document.getElementById('magic-msg');
@@ -111,8 +132,21 @@
           body: JSON.stringify({ email: e.target.email.value }),
         });
         if (res.ok) {
-          msg.textContent = '✓ Check your inbox.';
+          msg.textContent = '✓ Check your inbox. Link expires in 15 minutes.';
           msg.classList.remove('hidden', 'error'); msg.classList.add('notice');
+          // 30s cooldown
+          var seconds = 30;
+          btn.innerHTML = 'Resend in ' + seconds + 's';
+          var iv = setInterval(function () {
+            seconds--;
+            if (seconds <= 0) {
+              clearInterval(iv);
+              btn.disabled = false; btn.innerHTML = old;
+            } else {
+              btn.innerHTML = 'Resend in ' + seconds + 's';
+            }
+          }, 1000);
+          return;
         } else {
           var j = await res.json();
           msg.textContent = j.error || 'Send failed — try again.';
@@ -121,9 +155,8 @@
       } catch (ex) {
         msg.textContent = 'Network error — try again.';
         msg.classList.remove('hidden'); msg.classList.add('error');
-      } finally {
-        btn.disabled = false; btn.innerHTML = old;
       }
+      btn.disabled = false; btn.innerHTML = old;
     });
 
     // Password login (fallback)

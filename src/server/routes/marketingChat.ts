@@ -85,17 +85,37 @@ export function registerMarketingChatRoute(app: Express) {
           ...(parse.data.history ?? []).map((m) => ({ role: m.role, content: m.content })),
           { role: 'user' as const, content: parse.data.message },
         ];
-        const r = await c.messages.create({
-          model: 'claude-haiku-4-5-20251001',
-          max_tokens: 600,
-          system: SYSTEM_PROMPT,
-          messages,
-        });
+        // 30s timeout — default SDK is 10min which would tie up Express
+        // handlers on Anthropic-side hangs.
+        const r = await c.messages.create(
+          {
+            model: 'claude-haiku-4-5-20251001',
+            max_tokens: 600,
+            // Wrap the system prompt for ephemeral prompt caching. The
+            // prompt is fully static and >1k tokens — caching reduces
+            // input cost ~90% on subsequent calls within the 5-minute
+            // TTL, which is exactly the marketing-chat traffic pattern.
+            // eslint-disable-next-line @typescript-eslint/no-explicit-any
+            system: [{ type: 'text', text: SYSTEM_PROMPT, cache_control: { type: 'ephemeral' } } as any],
+            messages,
+          },
+          { timeout: 30_000 }
+        );
         const text = r.content
           .filter((b): b is Anthropic.Messages.TextBlock => b.type === 'text')
           .map((b) => b.text)
           .join('\n')
           .trim();
+        // One-line usage telemetry — same format as ai/client.ts so
+        // grep over logs gives one cost view across all AI paths.
+        try {
+          const u = r.usage;
+          console.log(
+            `[ai.usage] tenant=marketing model=claude-haiku-4-5-20251001 ` +
+              `in=${u.input_tokens ?? 0} out=${u.output_tokens ?? 0} ` +
+              `cache_read=${u.cache_read_input_tokens ?? 0} cache_create=${u.cache_creation_input_tokens ?? 0}`
+          );
+        } catch { /* swallow */ }
         return res.json({ ok: true, reply: text });
       } catch (err) {
         console.error('[marketing-chat] error:', err);

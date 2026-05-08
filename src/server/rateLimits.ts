@@ -20,7 +20,7 @@ import rateLimit, { type RateLimitRequestHandler } from 'express-rate-limit';
 
 const minutes = (n: number) => n * 60 * 1000;
 
-/** /api/public/quote/:slug, /api/public/lead/:slug — costly per-call.
+/** /api/public/quote/:slug — costly per-call (calls Anthropic and DB).
  *  30 / IP / minute is generous for a real customer typing quotes,
  *  brutal for a bot loop. */
 export const publicCalcLimiter: RateLimitRequestHandler = rateLimit({
@@ -29,6 +29,18 @@ export const publicCalcLimiter: RateLimitRequestHandler = rateLimit({
   standardHeaders: 'draft-7',
   legacyHeaders: false,
   message: { error: 'Too many requests. Slow down and try again in a minute.' },
+});
+
+/** /api/public/lead/:slug — submitting a lead triggers an Anthropic
+ *  auto-reply call AND an SMTP send to the tenant's notification email.
+ *  Real users submit one or two leads, never 30/min. Tighter cap to
+ *  prevent inbox-flood + Anthropic spend. */
+export const publicLeadLimiter: RateLimitRequestHandler = rateLimit({
+  windowMs: minutes(1),
+  limit: 5,
+  standardHeaders: 'draft-7',
+  legacyHeaders: false,
+  message: { error: 'Too many lead submissions. Please wait a minute.' },
 });
 
 /** /api/public/chat/:refId — also per-call AI cost. Tighter cap because

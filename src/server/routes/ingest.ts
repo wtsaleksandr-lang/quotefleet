@@ -144,75 +144,76 @@ export function registerIngestRoutes(app: Express) {
         .limit(1)
     )[0];
     if (!job) return res.status(404).json({ error: 'Job not found' });
-    if (job.status !== 'ready_for_review' && job.status !== 'parsing') {
-      return res.status(409).json({ error: `Job status is "${job.status}", cannot apply.` });
+    // Only allow apply when the parse has finished. Earlier we let
+    // 'parsing' through, which meant operators could apply an empty
+    // draft and the row would be marked 'applied' before parsing even
+    // completed (no retry path then).
+    if (job.status !== 'ready_for_review') {
+      return res.status(409).json({ error: `Job status is "${job.status}", cannot apply. Wait for the parse to finish or upload again.` });
     }
 
     const tenantId = req.tenant!.id;
-    let inserted = { rateCards: 0, accessorials: 0, laneZones: 0 };
+    const inserted = { rateCards: 0, accessorials: 0, laneZones: 0 };
 
-    for (const c of parse.data.rateCards ?? []) {
-      try {
-        await db().insert(rateCards).values({
-          tenantId,
-          service: String(c.service ?? 'ftl'),
-          equipment: String(c.equipment ?? 'dryvan'),
-          label: c.label != null ? String(c.label) : null,
-          ratePerMile: Number(c.ratePerMile ?? 0),
-          minimumCharge: Number(c.minimumCharge ?? 0),
-          flatFee: Number(c.flatFee ?? 0),
-          fuelSurchargePct: Number(c.fuelSurchargePct ?? 0),
-          marginPct: Number(c.marginPct ?? 0),
-          enabled: true,
-          notes: 'Imported from rate-sheet ingest job #' + id,
-          lastAiEditAt: new Date(),
-          lastAiEditReason: 'rate-sheet ingest',
-        });
-        inserted.rateCards++;
-      } catch (err) {
-        console.warn('[ingest.apply] rateCard insert failed:', err);
-      }
+    // Wrap every insert + the status flip in one transaction so a failure
+    // halfway leaves the job in 'ready_for_review' (retryable) instead
+    // of half-applied + marked done (which was the previous bug).
+    try {
+      await db().transaction(async (tx) => {
+        for (const c of parse.data.rateCards ?? []) {
+          await tx.insert(rateCards).values({
+            tenantId,
+            service: String(c.service ?? 'ftl'),
+            equipment: String(c.equipment ?? 'dryvan'),
+            label: c.label != null ? String(c.label) : null,
+            ratePerMile: Number(c.ratePerMile ?? 0),
+            minimumCharge: Number(c.minimumCharge ?? 0),
+            flatFee: Number(c.flatFee ?? 0),
+            fuelSurchargePct: Number(c.fuelSurchargePct ?? 0),
+            marginPct: Number(c.marginPct ?? 0),
+            enabled: true,
+            notes: 'Imported from rate-sheet ingest job #' + id,
+            lastAiEditAt: new Date(),
+            lastAiEditReason: 'rate-sheet ingest',
+          });
+          inserted.rateCards++;
+        }
+        for (const a of parse.data.accessorials ?? []) {
+          await tx.insert(accessorials).values({
+            tenantId,
+            code: String(a.code ?? 'misc'),
+            label: String(a.label ?? a.code ?? 'Accessorial'),
+            kind: String(a.kind ?? 'flat'),
+            amount: Number(a.amount ?? 0),
+            trigger: 'optional',
+            appliesToServices: Array.isArray(a.appliesToServices) ? (a.appliesToServices as string[]) : undefined,
+            enabled: true,
+          });
+          inserted.accessorials++;
+        }
+        for (const z of parse.data.laneZones ?? []) {
+          await tx.insert(laneZones).values({
+            tenantId,
+            label: String(z.label ?? 'Imported zone'),
+            anchorPortCode: z.anchorPortCode != null ? String(z.anchorPortCode) : null,
+            anchorCity: z.anchorCity != null ? String(z.anchorCity) : null,
+            anchorState: z.anchorState != null ? String(z.anchorState) : null,
+            radiusMiles: Number(z.radiusMiles ?? 0),
+            flatPrice: Number(z.flatPrice ?? 0),
+            equipmentScope: Array.isArray(z.equipmentScope) ? (z.equipmentScope as string[]) : undefined,
+            enabled: true,
+          });
+          inserted.laneZones++;
+        }
+        await tx
+          .update(ingestJobs)
+          .set({ status: 'applied', appliedAt: new Date(), updatedAt: new Date() })
+          .where(eq(ingestJobs.id, id));
+      });
+    } catch (err) {
+      console.error('[ingest.apply] transaction failed:', err);
+      return res.status(500).json({ error: 'Apply failed — nothing was changed. Try again.' });
     }
-    for (const a of parse.data.accessorials ?? []) {
-      try {
-        await db().insert(accessorials).values({
-          tenantId,
-          code: String(a.code ?? 'misc'),
-          label: String(a.label ?? a.code ?? 'Accessorial'),
-          kind: String(a.kind ?? 'flat'),
-          amount: Number(a.amount ?? 0),
-          trigger: 'optional',
-          appliesToServices: Array.isArray(a.appliesToServices) ? (a.appliesToServices as string[]) : undefined,
-          enabled: true,
-        });
-        inserted.accessorials++;
-      } catch (err) {
-        console.warn('[ingest.apply] accessorial insert failed:', err);
-      }
-    }
-    for (const z of parse.data.laneZones ?? []) {
-      try {
-        await db().insert(laneZones).values({
-          tenantId,
-          label: String(z.label ?? 'Imported zone'),
-          anchorPortCode: z.anchorPortCode != null ? String(z.anchorPortCode) : null,
-          anchorCity: z.anchorCity != null ? String(z.anchorCity) : null,
-          anchorState: z.anchorState != null ? String(z.anchorState) : null,
-          radiusMiles: Number(z.radiusMiles ?? 0),
-          flatPrice: Number(z.flatPrice ?? 0),
-          equipmentScope: Array.isArray(z.equipmentScope) ? (z.equipmentScope as string[]) : undefined,
-          enabled: true,
-        });
-        inserted.laneZones++;
-      } catch (err) {
-        console.warn('[ingest.apply] laneZone insert failed:', err);
-      }
-    }
-
-    await db()
-      .update(ingestJobs)
-      .set({ status: 'applied', appliedAt: new Date(), updatedAt: new Date() })
-      .where(eq(ingestJobs.id, id));
 
     void syncTenantToMarketplace(tenantId);
 

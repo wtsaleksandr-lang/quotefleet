@@ -28,6 +28,31 @@
     });
   }
 
+  // SAFE row helper — every cell value goes through textContent (via el), so
+  // tenant-controlled fields cannot inject HTML. Cells can be:
+  //   - a string  → wrapped as a text node
+  //   - a DOM node → appended verbatim
+  function row(tbody, cells, opts) {
+    var tr = el('tr', opts || {});
+    cells.forEach(function (c) {
+      var td = document.createElement('td');
+      if (c == null) {
+        // empty cell
+      } else if (typeof c === 'string' || typeof c === 'number') {
+        td.textContent = String(c);
+      } else if (Array.isArray(c)) {
+        c.forEach(function (n) { td.appendChild(typeof n === 'string' ? document.createTextNode(n) : n); });
+      } else {
+        td.appendChild(c);
+      }
+      tr.appendChild(td);
+    });
+    tbody.appendChild(tr);
+    return tr;
+  }
+  function badge(text, kind) { return el('span', { class: 'badge ' + (kind || 'badge-muted'), text: String(text || '') }); }
+  function muted(text) { return el('span', { class: 'muted-small', text: String(text || '') }); }
+
   var state = { route: null };
 
   function setActive(r) { $$('.sidebar [data-route]').forEach(function (b) { b.classList.toggle('active', b.dataset.route === r); }); }
@@ -64,22 +89,29 @@
       c.appendChild(grid);
       c.appendChild(el('h2', { text: 'Recent tenants' }));
       var tbl = el('table', { class: 'table' });
-      tbl.innerHTML = '<thead><tr><th>Slug</th><th>Name</th><th>Plan</th><th>Status</th><th>Country</th><th>Leads</th><th>Created</th></tr></thead><tbody></tbody>';
-      var tb = tbl.querySelector('tbody');
+      tbl.appendChild(el('thead', { html: '<tr><th>Slug</th><th>Name</th><th>Plan</th><th>Status</th><th>Country</th><th>Leads</th><th>Created</th></tr>' }));
+      var tb = el('tbody');
+      tbl.appendChild(tb);
       ts.tenants.slice(0, 25).forEach(function (t) {
-        var tr = el('tr', { style: { cursor: 'pointer' }, on: { click: function () { go('tenants/' + t.slug); } } });
-        tr.innerHTML =
-          '<td><strong>' + t.slug + '</strong></td>' +
-          '<td>' + t.name + '<br><span class="muted-small">' + t.contactEmail + '</span></td>' +
-          '<td><span class="badge badge-info">' + t.plan + '</span></td>' +
-          '<td><span class="badge ' + (t.status === 'active' ? 'badge-success' : 'badge-error') + '">' + t.status + '</span></td>' +
-          '<td>' + t.countryFocus + '</td>' +
-          '<td>' + t.leadCount + '</td>' +
-          '<td><span class="muted-small">' + fmtDate(t.createdAt) + '</span></td>';
-        tb.appendChild(tr);
+        var nameCell = el('div');
+        nameCell.appendChild(document.createTextNode(t.name || ''));
+        nameCell.appendChild(el('br'));
+        nameCell.appendChild(muted(t.contactEmail));
+        row(tb, [
+          el('strong', { text: t.slug || '' }),
+          nameCell,
+          badge(t.plan, 'badge-info'),
+          badge(t.status, t.status === 'active' ? 'badge-success' : 'badge-error'),
+          t.countryFocus,
+          String(t.leadCount),
+          muted(fmtDate(t.createdAt)),
+        ], { style: { cursor: 'pointer' }, on: { click: function () { go('tenants/' + encodeURIComponent(t.slug)); } } });
       });
       c.appendChild(tbl);
-    }).catch(function (err) { c.innerHTML = '<div class="notice error">' + err.message + '</div>'; });
+    }).catch(function (err) {
+      c.innerHTML = '';
+      c.appendChild(el('div', { class: 'notice error', text: err.message }));
+    });
   }
 
   function renderTenants(c) {
@@ -88,22 +120,29 @@
       c.appendChild(el('h1', { text: 'All tenants' }));
       c.appendChild(el('p', { class: 'page-sub', text: d.tenants.length + ' tenants on this platform' }));
       var tbl = el('table', { class: 'table' });
-      tbl.innerHTML = '<thead><tr><th>Slug</th><th>Name</th><th>Plan</th><th>Status</th><th>Country</th><th>Leads</th><th>Created</th></tr></thead><tbody></tbody>';
-      var tb = tbl.querySelector('tbody');
+      tbl.appendChild(el('thead', { html: '<tr><th>Slug</th><th>Name</th><th>Plan</th><th>Status</th><th>Country</th><th>Leads</th><th>Created</th></tr>' }));
+      var tb = el('tbody');
+      tbl.appendChild(tb);
       d.tenants.forEach(function (t) {
-        var tr = el('tr', { style: { cursor: 'pointer' }, on: { click: function () { go('tenants/' + t.slug); } } });
-        tr.innerHTML =
-          '<td><strong>' + t.slug + '</strong></td>' +
-          '<td>' + t.name + '<br><span class="muted-small">' + t.contactEmail + '</span></td>' +
-          '<td><span class="badge badge-info">' + t.plan + '</span></td>' +
-          '<td><span class="badge ' + (t.status === 'active' ? 'badge-success' : 'badge-error') + '">' + t.status + '</span></td>' +
-          '<td>' + t.countryFocus + '</td>' +
-          '<td>' + t.leadCount + '</td>' +
-          '<td><span class="muted-small">' + fmtDate(t.createdAt) + '</span></td>';
-        tb.appendChild(tr);
+        var nameCell = el('div');
+        nameCell.appendChild(document.createTextNode(t.name || ''));
+        nameCell.appendChild(el('br'));
+        nameCell.appendChild(muted(t.contactEmail));
+        row(tb, [
+          el('strong', { text: t.slug || '' }),
+          nameCell,
+          badge(t.plan, 'badge-info'),
+          badge(t.status, t.status === 'active' ? 'badge-success' : 'badge-error'),
+          t.countryFocus,
+          String(t.leadCount),
+          muted(fmtDate(t.createdAt)),
+        ], { style: { cursor: 'pointer' }, on: { click: function () { go('tenants/' + encodeURIComponent(t.slug)); } } });
       });
       c.appendChild(tbl);
-    }).catch(function (err) { c.innerHTML = '<div class="notice error">' + err.message + '</div>'; });
+    }).catch(function (err) {
+      c.innerHTML = '';
+      c.appendChild(el('div', { class: 'notice error', text: err.message }));
+    });
   }
 
   function renderTenantDetail(c, slug) {
@@ -111,7 +150,7 @@
       var t = d.tenant;
       c.innerHTML = '';
       c.appendChild(el('a', { href: '#', class: 'muted-small', text: '← All tenants', on: { click: function (e) { e.preventDefault(); go('tenants'); } } }));
-      c.appendChild(el('h1', { text: t.name + ' (' + t.slug + ')' }));
+      c.appendChild(el('h1', { text: (t.name || '') + ' (' + (t.slug || '') + ')' }));
 
       var card = el('div', { class: 'card' });
       card.appendChild(el('div', { class: 'card-title', text: 'Manage' }));
@@ -123,10 +162,10 @@
         if (options) {
           inp = el('select', { class: 'select' });
           options.forEach(function (o) { var op = document.createElement('option'); op.value = o; op.textContent = o; if (t[key] === o) op.selected = true; inp.appendChild(op); });
-          inp.addEventListener('change', function () { var p = {}; p[key] = inp.value; api('/api/admin/tenants/' + slug, { method: 'PATCH', body: p }).catch(alert); });
+          inp.addEventListener('change', function () { var p = {}; p[key] = inp.value; api('/api/admin/tenants/' + encodeURIComponent(slug), { method: 'PATCH', body: p }).catch(function (e) { alert(e.message); }); });
         } else {
           inp = el('input', { class: 'input', value: t[key] || '' });
-          inp.addEventListener('blur', function () { var p = {}; p[key] = inp.value; api('/api/admin/tenants/' + slug, { method: 'PATCH', body: p }).catch(alert); });
+          inp.addEventListener('blur', function () { var p = {}; p[key] = inp.value; api('/api/admin/tenants/' + encodeURIComponent(slug), { method: 'PATCH', body: p }).catch(function (e) { alert(e.message); }); });
         }
         f.appendChild(inp);
         return f;
@@ -141,31 +180,52 @@
 
       c.appendChild(el('h2', { text: 'Users (' + d.users.length + ')', style: { marginTop: '20px' } }));
       var ut = el('table', { class: 'table' });
-      ut.innerHTML = '<thead><tr><th>Email</th><th>Name</th><th>Role</th><th>Last login</th></tr></thead><tbody></tbody>';
-      var utb = ut.querySelector('tbody');
+      ut.appendChild(el('thead', { html: '<tr><th>Email</th><th>Name</th><th>Role</th><th>Last login</th></tr>' }));
+      var utb = el('tbody');
+      ut.appendChild(utb);
       d.users.forEach(function (u) {
-        utb.innerHTML += '<tr><td>' + u.email + '</td><td>' + (u.name || '—') + '</td><td><span class="badge badge-muted">' + u.role + '</span></td><td>' + fmtDate(u.lastLoginAt) + '</td></tr>';
+        row(utb, [
+          u.email || '',
+          u.name || '—',
+          badge(u.role, 'badge-muted'),
+          fmtDate(u.lastLoginAt),
+        ]);
       });
       c.appendChild(ut);
 
       c.appendChild(el('h2', { text: 'Recent leads (' + d.leads.length + ')', style: { marginTop: '20px' } }));
       var lt = el('table', { class: 'table' });
-      lt.innerHTML = '<thead><tr><th>Ref</th><th>Customer</th><th>Service</th><th>Total</th><th>When</th></tr></thead><tbody></tbody>';
-      var ltb = lt.querySelector('tbody');
+      lt.appendChild(el('thead', { html: '<tr><th>Ref</th><th>Customer</th><th>Service</th><th>Total</th><th>When</th></tr>' }));
+      var ltb = el('tbody');
+      lt.appendChild(ltb);
       d.leads.forEach(function (l) {
-        ltb.innerHTML += '<tr><td>' + l.refId + '</td><td>' + (l.customerName || '') + '</td><td>' + l.service + '</td><td>$' + (l.quotedTotal || 0) + '</td><td><span class="muted-small">' + fmtDate(l.createdAt) + '</span></td></tr>';
+        row(ltb, [
+          l.refId || '',
+          l.customerName || '',
+          l.service || '',
+          '$' + (l.quotedTotal || 0),
+          muted(fmtDate(l.createdAt)),
+        ]);
       });
       c.appendChild(lt);
 
       c.appendChild(el('h2', { text: 'Audit (' + d.audit.length + ')', style: { marginTop: '20px' } }));
       var at = el('table', { class: 'table' });
-      at.innerHTML = '<thead><tr><th>When</th><th>Action</th><th>By</th></tr></thead><tbody></tbody>';
-      var atb = at.querySelector('tbody');
+      at.appendChild(el('thead', { html: '<tr><th>When</th><th>Action</th><th>By</th></tr>' }));
+      var atb = el('tbody');
+      at.appendChild(atb);
       d.audit.forEach(function (a) {
-        atb.innerHTML += '<tr><td><span class="muted-small">' + fmtDate(a.createdAt) + '</span></td><td>' + a.action + '</td><td>' + a.actorKind + '</td></tr>';
+        row(atb, [
+          muted(fmtDate(a.createdAt)),
+          a.action || '',
+          a.actorKind || '',
+        ]);
       });
       c.appendChild(at);
-    }).catch(function (err) { c.innerHTML = '<div class="notice error">' + err.message + '</div>'; });
+    }).catch(function (err) {
+      c.innerHTML = '';
+      c.appendChild(el('div', { class: 'notice error', text: err.message }));
+    });
   }
 
   function boot() {

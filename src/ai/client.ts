@@ -62,6 +62,11 @@ async function resolveApiKey(tenantId: number | null): Promise<string> {
   return env.ANTHROPIC_API_KEY;
 }
 
+/** Per-call timeout. SDK default is 10 minutes — way too long; a hung
+ *  request would hold an Express handler indefinitely. 30s covers
+ *  even slow Sonnet runs with a comfortable margin. */
+const ANTHROPIC_TIMEOUT_MS = 30_000;
+
 export async function complete(opts: {
   tenantId: number | null;
   system: string;
@@ -69,15 +74,23 @@ export async function complete(opts: {
   maxTokens?: number;
   model?: string;
   tools?: ChatToolDef[];
+  /** Mark the system prompt for ephemeral prompt caching (5-minute TTL).
+   *  Use when the system prompt is mostly static and >1024 tokens. */
+  cacheSystem?: boolean;
 }): Promise<ChatCompletion> {
   const apiKey = await resolveApiKey(opts.tenantId);
-  const client = new Anthropic({ apiKey });
+  const client = new Anthropic({ apiKey, timeout: ANTHROPIC_TIMEOUT_MS });
 
   const model = opts.model ?? DEFAULT_MODEL;
+  // System block: optionally wrapped in a cache_control structure.
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const system: any = opts.cacheSystem
+    ? [{ type: 'text', text: opts.system, cache_control: { type: 'ephemeral' } }]
+    : opts.system;
   const res = await client.messages.create({
     model,
     max_tokens: opts.maxTokens ?? 1024,
-    system: opts.system,
+    system,
     messages: opts.messages.map((m) => ({ role: m.role, content: m.content })),
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     tools: opts.tools as any,
@@ -95,6 +108,20 @@ export async function complete(opts: {
       });
     }
   }
+  // One-line usage log so we can grep cost data even before a real
+  // observability stack is wired up. Volume is small; switch to a DB
+  // table when per-tenant budgeting lands.
+  try {
+    const u = (res as unknown as { usage?: { input_tokens?: number; output_tokens?: number; cache_read_input_tokens?: number; cache_creation_input_tokens?: number } }).usage;
+    if (u) {
+      console.log(
+        `[ai.usage] tenant=${opts.tenantId ?? 'platform'} model=${model} ` +
+          `in=${u.input_tokens ?? 0} out=${u.output_tokens ?? 0} ` +
+          `cache_read=${u.cache_read_input_tokens ?? 0} cache_create=${u.cache_creation_input_tokens ?? 0}`
+      );
+    }
+  } catch { /* never fail the request because of telemetry */ }
+
   return { text, toolUses, stopReason: res.stop_reason ?? '' };
 }
 

@@ -37,6 +37,49 @@
     });
   }
 
+  // ── Toast helper ──────────────────────────────────────────────
+  // Replaces native alert() and silent .then() — gives users visible
+  // feedback for save actions. Auto-dismisses after 2.5s for success,
+  // 5s for error. Stacks vertically in the corner.
+  function ensureToastRoot() {
+    var t = document.getElementById('qf-toasts');
+    if (t) return t;
+    t = document.createElement('div');
+    t.id = 'qf-toasts';
+    t.style.cssText = 'position:fixed;right:18px;bottom:18px;z-index:10000;display:flex;flex-direction:column;gap:8px;pointer-events:none;';
+    document.body.appendChild(t);
+    return t;
+  }
+  function toast(msg, kind) {
+    var root = ensureToastRoot();
+    var bg = kind === 'error' ? '#b91c1c' : (kind === 'warn' ? '#b45309' : '#059669');
+    var node = document.createElement('div');
+    node.textContent = msg;
+    node.style.cssText =
+      'background:' + bg + ';color:#fff;padding:10px 14px;border-radius:8px;' +
+      'box-shadow:0 4px 16px rgba(0,0,0,0.25);font-size:13px;font-weight:500;' +
+      'pointer-events:auto;max-width:340px;opacity:0;transform:translateY(8px);' +
+      'transition:opacity 0.18s ease, transform 0.18s ease;';
+    root.appendChild(node);
+    requestAnimationFrame(function () { node.style.opacity = '1'; node.style.transform = 'translateY(0)'; });
+    var ttl = kind === 'error' ? 5000 : 2500;
+    setTimeout(function () {
+      node.style.opacity = '0'; node.style.transform = 'translateY(8px)';
+      setTimeout(function () { if (node.parentNode) node.parentNode.removeChild(node); }, 250);
+    }, ttl);
+  }
+  function toastErr(err) { toast(err && err.message ? err.message : String(err || 'Error'), 'error'); }
+  function toastOk(msg) { toast(msg || 'Saved', 'success'); }
+  // Wrap a save promise so blur-handlers get visible feedback.
+  function saved(p, okMsg) {
+    return p.then(function (r) { toastOk(okMsg); return r; }, function (e) { toastErr(e); throw e; });
+  }
+  // Expose to inline handlers + future use.
+  window.qfToast = toast;
+  window.qfToastErr = toastErr;
+  window.qfToastOk = toastOk;
+  window.qfSaved = saved;
+
   var state = { me: null, route: null };
 
   function setActiveNav(route) {
@@ -215,7 +258,7 @@
           ['draft', 'new', 'replied', 'won', 'lost', 'spam'].forEach(function (s) {
             var o = document.createElement('option'); o.value = s; o.textContent = s; if (l.status === s) o.selected = true; sel.appendChild(o);
           });
-          sel.addEventListener('change', function () { api('/api/tenant/leads/' + encodeURIComponent(l.refId), { method: 'PATCH', body: { status: sel.value } }).catch(alert); });
+          sel.addEventListener('change', function () { api('/api/tenant/leads/' + encodeURIComponent(l.refId), { method: 'PATCH', body: { status: sel.value } }).catch(toastErr); });
           f.appendChild(sel);
           return f;
         })(),
@@ -225,7 +268,7 @@
         (function () {
           var ta = el('textarea', { class: 'textarea', placeholder: 'Notes for your team…' });
           ta.value = l.notes || '';
-          ta.addEventListener('blur', function () { api('/api/tenant/leads/' + encodeURIComponent(l.refId), { method: 'PATCH', body: { notes: ta.value } }).catch(alert); });
+          ta.addEventListener('blur', function () { api('/api/tenant/leads/' + encodeURIComponent(l.refId), { method: 'PATCH', body: { notes: ta.value } }).catch(toastErr); });
           return ta;
         })(),
       ]));
@@ -278,7 +321,7 @@
         api('/api/tenant/rate-cards', {
           method: 'POST',
           body: { service: 'ftl', equipment: 'dryvan', label: 'New rate', ratePerMile: 2.5 },
-        }).then(function () { renderRates(c); }).catch(alert);
+        }).then(function () { renderRates(c); }).catch(toastErr);
       });
       c.appendChild(addBtn);
     }).catch(showErr(c));
@@ -295,7 +338,7 @@
       inp.addEventListener('blur', function () {
         var v = inp.value;
         if (opts && opts.type === 'number') v = v === '' ? null : Number(v);
-        api('/api/tenant/rate-cards/' + r.id, { method: 'PUT', body: (function () { var p = {}; p[field] = v; return p; })() }).catch(alert);
+        api('/api/tenant/rate-cards/' + r.id, { method: 'PUT', body: (function () { var p = {}; p[field] = v; return p; })() }).catch(toastErr);
       });
       var td = el('td'); td.appendChild(inp); return td;
     }
@@ -303,7 +346,7 @@
       var sel = el('select', { class: 'select' });
       sel.style.width = '120px';
       options.forEach(function (o) { var op = document.createElement('option'); op.value = o; op.textContent = o; if (val === o) op.selected = true; sel.appendChild(op); });
-      sel.addEventListener('change', function () { var p = {}; p[field] = sel.value; api('/api/tenant/rate-cards/' + r.id, { method: 'PUT', body: p }).catch(alert); });
+      sel.addEventListener('change', function () { var p = {}; p[field] = sel.value; api('/api/tenant/rate-cards/' + r.id, { method: 'PUT', body: p }).catch(toastErr); });
       var td = el('td'); td.appendChild(sel); return td;
     }
     tr.appendChild(selectCell('service', r.service, ['drayage', 'ftl', 'ltl', 'expedited', 'hotshot']));
@@ -319,12 +362,12 @@
     tr.appendChild(inputCell('marginPct', r.marginPct, { type: 'number', step: '0.5', right: true, w: '70px' }));
     var chk = el('input', { type: 'checkbox' });
     chk.checked = r.enabled;
-    chk.addEventListener('change', function () { api('/api/tenant/rate-cards/' + r.id, { method: 'PUT', body: { enabled: chk.checked } }).catch(alert); });
+    chk.addEventListener('change', function () { api('/api/tenant/rate-cards/' + r.id, { method: 'PUT', body: { enabled: chk.checked } }).catch(toastErr); });
     tr.appendChild(el('td', null, [chk]));
     var del = el('button', { class: 'btn btn-danger btn-sm', text: 'Delete' });
     del.addEventListener('click', function () {
       if (!confirm('Delete rate card "' + (r.label || r.equipment) + '"?')) return;
-      api('/api/tenant/rate-cards/' + r.id, { method: 'DELETE' }).then(function () { tr.remove(); }).catch(alert);
+      api('/api/tenant/rate-cards/' + r.id, { method: 'DELETE' }).then(function () { tr.remove(); }).catch(toastErr);
     });
     tr.appendChild(el('td', null, [del]));
     return tr;
@@ -349,7 +392,7 @@
         api('/api/tenant/accessorials', {
           method: 'POST',
           body: { code: 'new_' + Math.random().toString(36).slice(2, 6), label: 'New accessorial', kind: 'flat', amount: 50, trigger: 'optional' },
-        }).then(function () { renderAccessorials(c); }).catch(alert);
+        }).then(function () { renderAccessorials(c); }).catch(toastErr);
       });
       c.appendChild(addBtn);
     }).catch(showErr(c));
@@ -363,7 +406,7 @@
       if (opts && opts.right) inp.style.textAlign = 'right';
       inp.addEventListener('blur', function () {
         var v = inp.value; if (opts && opts.type === 'number') v = v === '' ? null : Number(v);
-        var p = {}; p[field] = v; api('/api/tenant/accessorials/' + a.id, { method: 'PUT', body: p }).catch(alert);
+        var p = {}; p[field] = v; api('/api/tenant/accessorials/' + a.id, { method: 'PUT', body: p }).catch(toastErr);
       });
       var td = el('td'); td.appendChild(inp); return td;
     }
@@ -371,7 +414,7 @@
       var sel = el('select', { class: 'select' });
       sel.style.width = '140px';
       options.forEach(function (o) { var op = document.createElement('option'); op.value = o; op.textContent = o; if (val === o) op.selected = true; sel.appendChild(op); });
-      sel.addEventListener('change', function () { var p = {}; p[field] = sel.value; api('/api/tenant/accessorials/' + a.id, { method: 'PUT', body: p }).catch(alert); });
+      sel.addEventListener('change', function () { var p = {}; p[field] = sel.value; api('/api/tenant/accessorials/' + a.id, { method: 'PUT', body: p }).catch(toastErr); });
       var td = el('td'); td.appendChild(sel); return td;
     }
     tr.appendChild(inputCell('code', a.code, { w: '110px' }));
@@ -381,12 +424,12 @@
     tr.appendChild(selectCell('trigger', a.trigger, ['optional', 'auto', 'auto_if_residential', 'auto_if_hazmat', 'auto_if_temp_controlled', 'auto_if_weight_over']));
     var chk = el('input', { type: 'checkbox' });
     chk.checked = a.enabled;
-    chk.addEventListener('change', function () { api('/api/tenant/accessorials/' + a.id, { method: 'PUT', body: { enabled: chk.checked } }).catch(alert); });
+    chk.addEventListener('change', function () { api('/api/tenant/accessorials/' + a.id, { method: 'PUT', body: { enabled: chk.checked } }).catch(toastErr); });
     tr.appendChild(el('td', null, [chk]));
     var del = el('button', { class: 'btn btn-danger btn-sm', text: 'Delete' });
     del.addEventListener('click', function () {
       if (!confirm('Delete accessorial?')) return;
-      api('/api/tenant/accessorials/' + a.id, { method: 'DELETE' }).then(function () { tr.remove(); }).catch(alert);
+      api('/api/tenant/accessorials/' + a.id, { method: 'DELETE' }).then(function () { tr.remove(); }).catch(toastErr);
     });
     tr.appendChild(el('td', null, [del]));
     return tr;
@@ -410,7 +453,7 @@
         var radius = Number(prompt('Radius (miles):', '50') || 0);
         var price = Number(prompt('Flat price (USD):', '500') || 0);
         api('/api/tenant/lane-zones', { method: 'POST', body: { label: label, anchorPortCode: port, radiusMiles: radius, flatPrice: price } })
-          .then(function () { renderZones(c); }).catch(alert);
+          .then(function () { renderZones(c); }).catch(toastErr);
       });
       c.appendChild(addBtn);
     }).catch(showErr(c));
@@ -421,7 +464,7 @@
       var i = el('input', { class: 'input', value: val == null ? '' : val });
       if (opts && opts.type) i.type = opts.type; if (opts && opts.right) i.style.textAlign = 'right';
       i.style.width = (opts && opts.w) || '120px';
-      i.addEventListener('blur', function () { var v = i.value; if (opts && opts.type === 'number') v = Number(v); var p = {}; p[field] = v; api('/api/tenant/lane-zones/' + z.id, { method: 'PUT', body: p }).catch(alert); });
+      i.addEventListener('blur', function () { var v = i.value; if (opts && opts.type === 'number') v = Number(v); var p = {}; p[field] = v; api('/api/tenant/lane-zones/' + z.id, { method: 'PUT', body: p }).catch(toastErr); });
       var td = el('td'); td.appendChild(i); return td;
     }
     tr.appendChild(inp('label', z.label, { w: '300px' }));
@@ -429,10 +472,10 @@
     tr.appendChild(inp('radiusMiles', z.radiusMiles, { type: 'number', right: true, w: '80px' }));
     tr.appendChild(inp('flatPrice', z.flatPrice, { type: 'number', right: true, w: '90px' }));
     var chk = el('input', { type: 'checkbox' }); chk.checked = z.enabled;
-    chk.addEventListener('change', function () { api('/api/tenant/lane-zones/' + z.id, { method: 'PUT', body: { enabled: chk.checked } }).catch(alert); });
+    chk.addEventListener('change', function () { api('/api/tenant/lane-zones/' + z.id, { method: 'PUT', body: { enabled: chk.checked } }).catch(toastErr); });
     tr.appendChild(el('td', null, [chk]));
     var del = el('button', { class: 'btn btn-danger btn-sm', text: 'Delete' });
-    del.addEventListener('click', function () { if (!confirm('Delete zone?')) return; api('/api/tenant/lane-zones/' + z.id, { method: 'DELETE' }).then(function () { tr.remove(); }).catch(alert); });
+    del.addEventListener('click', function () { if (!confirm('Delete zone?')) return; api('/api/tenant/lane-zones/' + z.id, { method: 'DELETE' }).then(function () { tr.remove(); }).catch(toastErr); });
     tr.appendChild(el('td', null, [del]));
     return tr;
   }
@@ -501,18 +544,18 @@
       }
       var promptTa = el('textarea', { class: 'textarea', rows: '8', placeholder: 'System prompt' });
       promptTa.value = (cfg && cfg.systemPrompt) || '';
-      promptTa.addEventListener('blur', function () { api('/api/tenant/ai-config', { method: 'PUT', body: { systemPrompt: promptTa.value } }).catch(alert); });
+      promptTa.addEventListener('blur', function () { api('/api/tenant/ai-config', { method: 'PUT', body: { systemPrompt: promptTa.value } }).catch(toastErr); });
       cfgCard.appendChild(renderField('System prompt (your AI persona)', promptTa));
 
       var toneSel = el('select', { class: 'select' });
       ['professional', 'friendly', 'concise', 'enthusiastic'].forEach(function (t) { var o = document.createElement('option'); o.value = t; o.textContent = t; if ((cfg && cfg.tone) === t) o.selected = true; toneSel.appendChild(o); });
-      toneSel.addEventListener('change', function () { api('/api/tenant/ai-config', { method: 'PUT', body: { tone: toneSel.value } }).catch(alert); });
+      toneSel.addEventListener('change', function () { api('/api/tenant/ai-config', { method: 'PUT', body: { tone: toneSel.value } }).catch(toastErr); });
       cfgCard.appendChild(renderField('Tone', toneSel));
 
       function toggle(key, label, def) {
         var wrap = el('label', { style: { display: 'flex', gap: '8px', alignItems: 'center', marginTop: '6px' } });
         var c2 = el('input', { type: 'checkbox' }); c2.checked = (cfg && cfg[key] != null) ? !!cfg[key] : def;
-        c2.addEventListener('change', function () { var p = {}; p[key] = c2.checked; api('/api/tenant/ai-config', { method: 'PUT', body: p }).catch(alert); });
+        c2.addEventListener('change', function () { var p = {}; p[key] = c2.checked; api('/api/tenant/ai-config', { method: 'PUT', body: p }).catch(toastErr); });
         wrap.appendChild(c2); wrap.appendChild(el('span', { text: label })); return wrap;
       }
       cfgCard.appendChild(toggle('autoReplyEnabled', 'Auto-reply email to leads', true));
@@ -527,11 +570,11 @@
       keyBtn.addEventListener('click', function () {
         if (!keyInp.value) return;
         api('/api/tenant/anthropic-key', { method: 'PUT', body: { apiKey: keyInp.value } })
-          .then(function () { keyInp.value = ''; alert('Key saved.'); }).catch(alert);
+          .then(function () { keyInp.value = ''; alert('Key saved.'); }).catch(toastErr);
       });
       keyCard.appendChild(keyInp); keyCard.appendChild(keyBtn);
       var clearBtn = el('button', { class: 'btn btn-ghost', text: 'Clear stored key', style: { marginTop: '8px' } });
-      clearBtn.addEventListener('click', function () { if (!confirm('Remove your Anthropic key?')) return; api('/api/tenant/anthropic-key', { method: 'DELETE' }).then(function () { alert('Cleared.'); }).catch(alert); });
+      clearBtn.addEventListener('click', function () { if (!confirm('Remove your Anthropic key?')) return; api('/api/tenant/anthropic-key', { method: 'DELETE' }).then(function () { alert('Cleared.'); }).catch(toastErr); });
       keyCard.appendChild(clearBtn);
 
       rightCol.appendChild(cfgCard);
@@ -557,7 +600,7 @@
         if (opts.textarea) inp = el('textarea', { class: 'textarea', rows: '3' });
         else inp = el('input', { class: 'input', type: opts.type || 'text' });
         inp.value = b[key] || '';
-        inp.addEventListener('blur', function () { var p = {}; p[key] = inp.value; api('/api/tenant/brand', { method: 'PUT', body: p }).catch(alert); });
+        inp.addEventListener('blur', function () { var p = {}; p[key] = inp.value; api('/api/tenant/brand', { method: 'PUT', body: p }).catch(toastErr); });
         f.appendChild(inp);
         if (opts.hint) f.appendChild(el('span', { class: 'field-hint', text: opts.hint }));
         return f;
@@ -573,7 +616,7 @@
       card.appendChild(field('Footer note', 'footerNote', { textarea: true }));
       var togWrap = el('label', { style: { display: 'flex', gap: '8px', alignItems: 'center', marginTop: '12px' } });
       var tog = el('input', { type: 'checkbox' }); tog.checked = b.showPoweredBy !== false;
-      tog.addEventListener('change', function () { api('/api/tenant/brand', { method: 'PUT', body: { showPoweredBy: tog.checked } }).catch(alert); });
+      tog.addEventListener('change', function () { api('/api/tenant/brand', { method: 'PUT', body: { showPoweredBy: tog.checked } }).catch(toastErr); });
       togWrap.appendChild(tog); togWrap.appendChild(el('span', { text: 'Show "Powered by QuoteFleet" footer' }));
       card.appendChild(togWrap);
       card.appendChild(field('Allowed domains (CSV, optional)', 'allowedDomains', { hint: 'e.g. acmeco.com,acmeco.ca — restricts widget to these origins.' }));
@@ -588,12 +631,49 @@
       c.appendChild(el('h1', { text: 'Embed code' }));
       c.appendChild(el('p', { class: 'page-sub', text: 'Drop one line of HTML on any page of your website.' }));
 
-      var card = el('div', { class: 'card' });
+      // Preview card — show the live widget so brand changes are visible
+      // without opening a new tab. Sandbox attribute on the iframe limits
+      // what the embedded page can do (no top-nav, no popups).
+      var preview = el('div', { class: 'card' });
+      preview.appendChild(el('div', { class: 'card-title', text: 'Live preview' }));
+      preview.appendChild(el('div', { class: 'card-subtitle', text: 'This is exactly what your customers see at ' + (d.directLink || '') }));
+      var iframe = el('iframe', {
+        src: (d.directLink || '/') + (d.directLink && d.directLink.indexOf('?') > -1 ? '&' : '?') + 'embed=1&preview=1',
+        style: {
+          width: '100%',
+          height: '680px',
+          border: '1px solid var(--border)',
+          borderRadius: 'var(--radius)',
+          marginTop: '8px',
+          background: '#fff',
+        },
+        loading: 'lazy',
+        title: 'QuoteFleet widget preview',
+      });
+      preview.appendChild(iframe);
+      var openBtn0 = el('a', {
+        href: d.directLink || '#',
+        target: '_blank',
+        rel: 'noopener',
+        class: 'btn btn-secondary',
+        text: 'Open in new tab ↗',
+        style: { marginTop: '10px', display: 'inline-flex' },
+      });
+      preview.appendChild(openBtn0);
+      c.appendChild(preview);
+
+      var card = el('div', { class: 'card', style: { marginTop: '14px' } });
       card.appendChild(el('div', { class: 'card-title', text: 'Recommended — JS embed (auto-resize)' }));
       var pre = el('div', { class: 'code', text: d.snippet });
       card.appendChild(pre);
       var copy = el('button', { class: 'btn btn-primary', text: 'Copy snippet', style: { marginTop: '8px' } });
-      copy.addEventListener('click', function () { navigator.clipboard.writeText(d.snippet).then(function () { copy.textContent = 'Copied ✓'; setTimeout(function () { copy.textContent = 'Copy snippet'; }, 1500); }); });
+      copy.addEventListener('click', function () {
+        navigator.clipboard.writeText(d.snippet).then(function () {
+          copy.textContent = 'Copied ✓';
+          toastOk('Copied to clipboard');
+          setTimeout(function () { copy.textContent = 'Copy snippet'; }, 1500);
+        });
+      });
       card.appendChild(copy);
       c.appendChild(card);
 
@@ -616,7 +696,7 @@
       var rg = el('button', { class: 'btn btn-danger', text: 'Regenerate token' });
       rg.addEventListener('click', function () {
         if (!confirm('Regenerate embed token? Existing embeds will break.')) return;
-        api('/api/tenant/regenerate-embed', { method: 'POST' }).then(function () { renderEmbed(c); }).catch(alert);
+        api('/api/tenant/regenerate-embed', { method: 'POST' }).then(function () { renderEmbed(c); }).catch(toastErr);
       });
       card4.appendChild(rg);
       c.appendChild(card4);

@@ -59,10 +59,23 @@ const SignupSchema = z.object({
   /** Which platform-owned host to put this tenant on. */
   hostDomain: z.string().optional(),
   email: z.string().email(),
-  password: z.string().min(6).max(200),
+  /** Min 10 chars; bumped from 6 after security audit. */
+  password: z.string().min(10).max(200),
   countryFocus: z.enum(['US', 'CA', 'BOTH']).default('US'),
   contactPhone: z.string().optional(),
 });
+
+/** Returns true if `path` is safe to use as a relative redirect target.
+ *  Refuses absolute URLs, scheme-less protocol-relative ('//evil'), and
+ *  anything that's not strictly under the platform's own origin. */
+function isSafeRelativeRedirect(path: string | null | undefined): boolean {
+  if (!path) return false;
+  if (typeof path !== 'string') return false;
+  if (!path.startsWith('/')) return false;
+  if (path.startsWith('//')) return false;
+  if (path.startsWith('/\\')) return false;
+  return true;
+}
 
 const TRIAL_DAYS = 14;
 
@@ -92,9 +105,15 @@ function slugify(s: string): string {
 
 function setCookie(res: Response, token: string) {
   const env = loadEnv();
-  const isHttps = (env.PUBLIC_BASE_URL ?? '').startsWith('https://');
+  const isHttps =
+    (env.PUBLIC_BASE_URL ?? '').startsWith('https://') ||
+    process.env.NODE_ENV === 'production';
   res.cookie(SESSION_COOKIE_NAME, token, {
     httpOnly: true,
+    // Lax (not Strict) so magic-link emails opened from a browser still
+    // arrive logged-in on first hop. Wildcard *.<host-domain> means a
+    // compromised tenant subdomain is "same site" — combine with CSRF
+    // origin checks on state-changing endpoints.
     sameSite: 'lax',
     secure: isHttps,
     maxAge: 30 * 24 * 60 * 60 * 1000,
@@ -336,6 +355,9 @@ export function registerAuthRoutes(app: Express) {
     const parse = MagicLinkSendSchema.safeParse(req.body);
     if (!parse.success) return res.status(400).json({ error: 'Invalid input' });
     const { email, redirectTo } = parse.data;
+    // Refuse absolute / protocol-relative redirect targets (open-redirect
+    // phishing). Only same-origin relative paths under '/' are stored.
+    const safeRedirect = isSafeRelativeRedirect(redirectTo) ? redirectTo! : null;
     const u = (await db().select().from(users).where(eq(users.email, email)).limit(1))[0];
     if (!u) {
       return res.json({ ok: true });
@@ -346,7 +368,7 @@ export function registerAuthRoutes(app: Express) {
       token,
       userId: u.id,
       expiresAt,
-      redirectTo: redirectTo ?? null,
+      redirectTo: safeRedirect,
     });
     const env = loadEnv();
     const base = env.PUBLIC_BASE_URL.replace(/\/$/, '');
@@ -383,7 +405,10 @@ export function registerAuthRoutes(app: Express) {
     await db().update(users).set({ lastLoginAt: new Date() }).where(eq(users.id, row.userId));
     const sess = await createSession(row.userId);
     setCookie(res, sess);
-    return res.redirect(row.redirectTo ?? '/app');
+    // Re-validate the stored redirectTo on consumption — defense in depth
+    // in case a stale row was written before the validation was added.
+    const dest = isSafeRelativeRedirect(row.redirectTo) ? row.redirectTo! : '/app';
+    return res.redirect(dest);
   });
 
   app.post('/api/auth/logout', async (req: Request, res: Response) => {

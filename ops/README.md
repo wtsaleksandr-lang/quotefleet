@@ -20,7 +20,7 @@ custom domain individually in Replit's deployment settings.
 ```bash
 cd ops
 
-export CF_API_TOKEN="cfut_h3H3orGMsuAHwQF3gSJVTA4s901A47PmOa4FtsEX020bc75d"
+export CF_API_TOKEN="$CF_API_TOKEN"   # set in your shell, do NOT paste literal tokens here
 
 # 1. INSPECT (no writes). Tags every zone:
 #      SAFE             no apex record yet — safe to link
@@ -87,8 +87,7 @@ Cloudflare's API is open. Namecheap's is not — they require IP allowlisting.
 
 ## 2. Get a Cloudflare API token with the right scopes
 
-The token you provided (`cfut_h3H3...`) — verify it has the scopes the
-script needs. If not, create a new one:
+Mint a new token at https://dash.cloudflare.com/profile/api-tokens with:
 
 1. https://dash.cloudflare.com/profile/api-tokens → "Create Token" → "Custom token"
 2. Permissions:
@@ -109,9 +108,9 @@ dashboard sidebar of any zone, or via `GET /accounts`).
 ```bash
 cd /home/user/ops    # or wherever you put cloudflare-migrate.mjs
 
-export CF_API_TOKEN="cfut_h3H3orGMsuAHwQF3gSJVTA4s901A47PmOa4FtsEX020bc75d"
-export NC_API_KEY="7df9f14e2ec54170a5512bd6dc39a1e7"
-export NC_USER="ewoio"
+export CF_API_TOKEN="$CF_API_TOKEN"   # set in your shell, do NOT paste literal tokens here
+export NC_API_KEY="$NC_API_KEY"       # set in shell or use `read -s NC_API_KEY`
+export NC_USER="$NC_USER"             # your Namecheap username
 # Get your Cloudflare account ID: dashboard sidebar of any zone, or
 # leave CF_ACCOUNT_ID unset and the script will list your accounts.
 

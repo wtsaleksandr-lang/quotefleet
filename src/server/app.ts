@@ -11,6 +11,8 @@ import { resolve } from 'node:path';
 import { readFile } from 'node:fs/promises';
 import { fileURLToPath } from 'node:url';
 import { dirname } from 'node:path';
+import { sql } from 'drizzle-orm';
+import { db } from '../db/client.js';
 import { registerAuthRoutes } from './routes/auth.js';
 import { registerPublicRoutes } from './routes/public.js';
 import { registerTenantRoutes } from './routes/tenant.js';
@@ -30,6 +32,28 @@ const __dirname = dirname(__filename);
 export function createApp(): express.Express {
   const app = express();
   app.set('trust proxy', 1);
+  // Don't advertise Express version. Tiny but free hardening.
+  app.disable('x-powered-by');
+
+  // Security headers. Lightweight hand-rolled set (avoid bringing in
+  // `helmet` as a new dep just to set five headers). Strict but does
+  // not break the embedded widget — script-src needs 'unsafe-inline'
+  // for the small bootstrap injected by /widget.html, and frame-src is
+  // open so tenants can iframe their own embed onto third-party sites.
+  app.use((_req, res, next) => {
+    res.setHeader('X-Content-Type-Options', 'nosniff');
+    res.setHeader('X-Frame-Options', 'SAMEORIGIN');
+    res.setHeader('Referrer-Policy', 'strict-origin-when-cross-origin');
+    res.setHeader(
+      'Permissions-Policy',
+      'geolocation=(), microphone=(), camera=(), payment=()'
+    );
+    res.setHeader(
+      'Strict-Transport-Security',
+      'max-age=31536000; includeSubDomains'
+    );
+    next();
+  });
 
   // STRIPE WEBHOOK MUST come before the JSON body parser — Stripe's
   // signature is verified against the raw bytes. Once express.json()
@@ -69,9 +93,16 @@ export function createApp(): express.Express {
   registerBillingRoutes(app);
   registerMarketingChatRoute(app);
 
-  // Healthcheck.
-  app.get('/healthz', (_req, res) => {
-    res.json({ ok: true, time: new Date().toISOString() });
+  // Healthcheck. Pings DB so a disconnected app marks unhealthy and
+  // platform load balancers can shed traffic instead of black-holing.
+  app.get('/healthz', async (_req, res) => {
+    try {
+      await db().execute(sql`select 1 as ok`);
+      res.json({ ok: true, time: new Date().toISOString(), db: 'up' });
+    } catch (err) {
+      console.error('[healthz] db ping failed:', err);
+      res.status(503).json({ ok: false, db: 'down', time: new Date().toISOString() });
+    }
   });
 
   // Static files. Resolved relative to project root (dist/src/server/app.js
@@ -125,6 +156,16 @@ export function createApp(): express.Express {
   // 404
   app.use((_req, res) => {
     res.status(404).json({ error: 'Not found' });
+  });
+
+  // Centralized 500 handler — never leak a stack trace to the client.
+  // (Express 5 picks up 4-arg signatures as error handlers.)
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
+  app.use((err: unknown, req: express.Request, res: express.Response, _next: express.NextFunction) => {
+    const reqId = (req as unknown as { id?: string }).id ?? '-';
+    console.error(`[err] ${req.method} ${req.path} reqId=${reqId}:`, err);
+    if (res.headersSent) return;
+    res.status(500).json({ error: 'Internal server error' });
   });
 
   return app;
