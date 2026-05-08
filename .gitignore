@@ -4,6 +4,7 @@ dist/
 /data/
 .env
 .env.local
+.worker-auth-secret.txt
 .DS_Store
 *.log
 .replit-cache/
