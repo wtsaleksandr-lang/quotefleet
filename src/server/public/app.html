@@ -5,6 +5,17 @@
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>Dashboard — QuoteFleet</title>
   <link rel="stylesheet" href="/style.css">
+  <script>
+    // Theme bootstrap — runs before any paint to avoid flash of wrong
+    // theme. Reads localStorage; falls back to system preference; default dark.
+    (function () {
+      try {
+        var saved = localStorage.getItem('qf-theme');
+        var theme = saved || (window.matchMedia && window.matchMedia('(prefers-color-scheme: light)').matches ? 'light' : 'dark');
+        if (theme === 'light') document.documentElement.setAttribute('data-theme', 'light');
+      } catch (e) { /* ignore */ }
+    })();
+  </script>
 </head>
 <body>
   <div class="app-shell" id="app-shell" hidden>
@@ -26,8 +37,13 @@
       <button class="nav-item" data-route="brand" aria-label="Brand"><span aria-hidden="true">🎨</span> Brand</button>
       <button class="nav-item" data-route="embed" aria-label="Embed code"><span aria-hidden="true">📋</span> Embed code</button>
       <div class="group">Account</div>
+      <button class="nav-item" data-route="account" aria-label="Account"><span aria-hidden="true">👤</span> Account</button>
       <button class="nav-item" data-route="audit" aria-label="Audit log"><span aria-hidden="true">📜</span> Audit log</button>
       <a href="/" target="_blank" rel="noopener" aria-label="View public widget">↗ View public widget</a>
+      <button class="qf-theme-toggle" id="qf-theme-toggle" aria-label="Toggle light/dark theme">
+        <span id="qf-theme-icon" aria-hidden="true">🌙</span>
+        <span id="qf-theme-label">Dark</span>
+      </button>
       <button class="nav-item" id="sb-logout" aria-label="Sign out">↩ Sign out</button>
     </aside>
     <main class="app-main">

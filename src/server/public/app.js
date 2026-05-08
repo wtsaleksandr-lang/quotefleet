@@ -104,6 +104,109 @@
     if (route === 'brand') return renderBrand(c);
     if (route === 'embed') return renderEmbed(c);
     if (route === 'audit') return renderAudit(c);
+    if (route === 'account') return renderAccount(c);
+  }
+
+  // ── Theme toggle ──────────────────────────────────────────────
+  function wireThemeToggle() {
+    var btn = document.getElementById('qf-theme-toggle');
+    var icon = document.getElementById('qf-theme-icon');
+    var label = document.getElementById('qf-theme-label');
+    if (!btn) return;
+    function paint() {
+      var isLight = document.documentElement.getAttribute('data-theme') === 'light';
+      icon.textContent = isLight ? '☀️' : '🌙';
+      label.textContent = isLight ? 'Light' : 'Dark';
+      btn.setAttribute('aria-label', 'Switch to ' + (isLight ? 'dark' : 'light') + ' theme');
+    }
+    paint();
+    btn.addEventListener('click', function () {
+      var isLight = document.documentElement.getAttribute('data-theme') === 'light';
+      if (isLight) {
+        document.documentElement.removeAttribute('data-theme');
+        try { localStorage.setItem('qf-theme', 'dark'); } catch (e) {}
+      } else {
+        document.documentElement.setAttribute('data-theme', 'light');
+        try { localStorage.setItem('qf-theme', 'light'); } catch (e) {}
+      }
+      paint();
+    });
+  }
+
+  // ── Account page ──────────────────────────────────────────────
+  // Lets the user change name / email / phone / password and sign out
+  // every other session. All endpoints under /api/auth/* (server-side
+  // additions in routes/auth.ts).
+  function renderAccount(c) {
+    api('/api/auth/me').then(function (r) {
+      if (!r.user) { location.href = '/login'; return; }
+      c.innerHTML = '';
+      c.appendChild(el('h1', { text: 'Account' }));
+      c.appendChild(el('p', { class: 'page-sub', text: 'Profile, password, and session management.' }));
+
+      // Profile card
+      var pCard = el('div', { class: 'card' });
+      pCard.appendChild(el('div', { class: 'card-title', text: 'Profile' }));
+      function profileRow(labelText, key, type) {
+        var f = el('div', { class: 'field', style: { marginBottom: '12px' } });
+        f.appendChild(el('label', { class: 'field-label', text: labelText }));
+        var inp = el('input', { class: 'input', value: r.user[key] || (r.tenant && r.tenant[key]) || '', type: type || 'text' });
+        inp.dataset.key = key;
+        f.appendChild(inp);
+        return f;
+      }
+      pCard.appendChild(profileRow('Name', 'name'));
+      pCard.appendChild(profileRow('Email', 'email', 'email'));
+      var saveProfile = el('button', { class: 'btn btn-primary', text: 'Save profile', style: { marginTop: '8px' } });
+      saveProfile.addEventListener('click', function () {
+        var body = {};
+        $$('input[data-key]', pCard).forEach(function (i) { body[i.dataset.key] = i.value; });
+        saved(api('/api/auth/profile', { method: 'PUT', body: body }), 'Profile saved');
+      });
+      pCard.appendChild(saveProfile);
+      c.appendChild(pCard);
+
+      // Password card
+      var pwd = el('div', { class: 'card', style: { marginTop: '14px' } });
+      pwd.appendChild(el('div', { class: 'card-title', text: 'Change password' }));
+      function pwdField(labelText, name) {
+        var f = el('div', { class: 'field', style: { marginBottom: '12px' } });
+        f.appendChild(el('label', { class: 'field-label', text: labelText }));
+        var inp = el('input', { class: 'input', type: 'password', autocomplete: 'new-password' });
+        inp.dataset.name = name;
+        f.appendChild(inp);
+        return f;
+      }
+      pwd.appendChild(pwdField('Current password', 'current'));
+      pwd.appendChild(pwdField('New password (10+ chars)', 'next'));
+      pwd.appendChild(pwdField('Confirm new password', 'confirm'));
+      var pwdBtn = el('button', { class: 'btn btn-primary', text: 'Update password', style: { marginTop: '8px' } });
+      pwdBtn.addEventListener('click', function () {
+        var fields = {};
+        $$('input[data-name]', pwd).forEach(function (i) { fields[i.dataset.name] = i.value; });
+        if (!fields.current || !fields.next) return toastErr({ message: 'Both current and new password required.' });
+        if (fields.next !== fields.confirm) return toastErr({ message: 'New password and confirmation do not match.' });
+        if (fields.next.length < 10) return toastErr({ message: 'New password must be at least 10 characters.' });
+        saved(
+          api('/api/auth/password', { method: 'PUT', body: { current: fields.current, next: fields.next } }),
+          'Password updated. You stay signed in here.'
+        ).then(function () { $$('input[data-name]', pwd).forEach(function (i) { i.value = ''; }); });
+      });
+      pwd.appendChild(pwdBtn);
+      c.appendChild(pwd);
+
+      // Sessions card
+      var sess = el('div', { class: 'card', style: { marginTop: '14px' } });
+      sess.appendChild(el('div', { class: 'card-title', text: 'Active sessions' }));
+      sess.appendChild(el('p', { class: 'muted', style: { marginTop: 0 }, text: 'Sign out from every device, including this one. You will be returned to the login page.' }));
+      var soa = el('button', { class: 'btn btn-danger', text: 'Sign out everywhere' });
+      soa.addEventListener('click', function () {
+        if (!confirm('Sign out of every device including this one?')) return;
+        api('/api/auth/sign-out-all', { method: 'POST' }).finally(function () { location.href = '/login'; });
+      });
+      sess.appendChild(soa);
+      c.appendChild(sess);
+    }).catch(showErr(c));
   }
 
   // ── Overview ──────────────────────────────────────────────────
@@ -305,6 +408,16 @@
       c.appendChild(el('h1', { text: 'Rate cards' }));
       c.appendChild(el('p', { class: 'page-sub', text: 'One row per service × equipment. Edit cells, blur to save.' }));
       c.appendChild(el('div', { class: 'notice', html: 'Tip: ask the AI agent to bulk-update these → <a href="#" data-route="ai">open AI panel</a>' }));
+      // Drayage gets its own per-port-per-radius pricing on a different page.
+      // Surface that link if any rate card on this page is `service=drayage`.
+      var hasDrayage = (d.rateCards || []).some(function (r) { return r.service === 'drayage'; });
+      if (hasDrayage) {
+        c.appendChild(el('div', {
+          class: 'notice',
+          style: { marginTop: '8px' },
+          html: 'For drayage you also need to configure <strong>per-port flat tariffs</strong> (e.g. LAX → 50mi zone = $475). Set those on <a href="#" data-route="zones">Drayage zones →</a>. For per-terminal surcharges (APM Pier 400 vs WBCT etc.) use the <em>terminals</em> table — UI coming soon.'
+        }));
+      }
 
       var tbl = el('table', { class: 'table', style: { marginTop: '14px' } });
       tbl.innerHTML =
@@ -1106,6 +1219,7 @@
       var t = document.getElementById('qf-mobile-nav-toggle');
       if (t) t.hidden = false;
       wireMobileNav();
+      wireThemeToggle();
 
       $$('.sidebar [data-route]').forEach(function (b) {
         b.addEventListener('click', function () { go(b.dataset.route); });

@@ -60,6 +60,50 @@
   --font-mono: 'JetBrains Mono', ui-monospace, 'SF Mono', Menlo, Consolas, monospace;
 }
 
+/* ── Light theme — opted in by setting data-theme="light" on <html>.
+   Toggle lives in the dashboard sidebar; choice persists to localStorage.
+   Only color tokens flip — radius / shadow / typography stay identical
+   so layout is pixel-stable across themes.  */
+html[data-theme="light"] {
+  --bg:           #F7F8FA;
+  --surface:      #FFFFFF;
+  --surface-2:    #F1F3F6;
+  --surface-3:    #E5E7EB;
+  --border:        #E5E7EB;
+  --border-strong: #CBD0D6;
+  --ink:        #0B0F14;
+  --ink-soft:   #1E2530;
+  --muted:      #5A6470;
+  --muted-soft: #8F98A4;
+  --accent:        #0EA5B7;
+  --accent-strong: #086675;
+  --accent-soft:   rgba(14, 165, 183, 0.10);
+  --accent-ink:    #FFFFFF;
+  --accent-2:      #3E5FFF;
+  --accent-2-soft: rgba(62, 95, 255, 0.08);
+  --success:    #059669;
+  --success-bg: rgba(5, 150, 105, 0.10);
+  --warn:       #B45309;
+  --warn-bg:    rgba(180, 83, 9, 0.10);
+  --error:      #B91C1C;
+  --error-bg:   rgba(185, 28, 28, 0.10);
+  --shadow-sm: 0 1px 2px rgba(15, 23, 42, 0.06);
+  --shadow-md: 0 8px 24px -8px rgba(15, 23, 42, 0.10), 0 2px 6px rgba(15, 23, 42, 0.05);
+  --shadow-lg: 0 24px 60px -16px rgba(15, 23, 42, 0.18);
+  --glow-cyan: 0 0 0 1px rgba(14, 165, 183, 0.18), 0 8px 32px -8px rgba(14, 165, 183, 0.15);
+}
+/* Theme-toggle button in the sidebar — small, low-key, lives next to nav. */
+.qf-theme-toggle {
+  display: inline-flex; align-items: center; gap: 8px;
+  width: 100%; padding: 8px 12px; margin-top: 6px;
+  border: 1px solid var(--border); border-radius: 8px;
+  background: transparent; color: var(--muted);
+  font-size: 12px; font-family: var(--font-mono); letter-spacing: 0.06em;
+  text-transform: uppercase; cursor: pointer;
+  transition: background 0.15s, color 0.15s, border-color 0.15s;
+}
+.qf-theme-toggle:hover { background: var(--surface-2); color: var(--ink); border-color: var(--border-strong); }
+
 /* ── Reset ─────────────────────────────────────────────────────── */
 * { box-sizing: border-box; }
 html, body { height: 100%; }

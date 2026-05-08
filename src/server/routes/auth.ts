@@ -13,6 +13,7 @@ import { db } from '../../db/client.js';
 import {
   tenants,
   users,
+  sessions,
   rateCards,
   accessorials,
   laneZones,
@@ -414,6 +415,78 @@ export function registerAuthRoutes(app: Express) {
   app.post('/api/auth/logout', async (req: Request, res: Response) => {
     const token = req.cookies[SESSION_COOKIE_NAME];
     if (token) await destroySession(token);
+    clearCookie(res);
+    return res.json({ ok: true });
+  });
+
+  // ── Profile updates ─────────────────────────────────────────────
+  // The Account page in the dashboard uses these to let the user
+  // change their name / contact email / phone, change their password,
+  // and sign out of every other session.
+  const ProfileSchema = z.object({
+    name: z.string().min(1).max(120).optional(),
+    email: z.string().email().max(200).optional(),
+    contactPhone: z.string().max(50).nullable().optional(),
+  });
+  app.put('/api/auth/profile', async (req: Request, res: Response) => {
+    const token = req.cookies[SESSION_COOKIE_NAME];
+    const ctx = await lookupSession(token);
+    if (!ctx) return res.status(401).json({ error: 'Unauthorized' });
+    const parse = ProfileSchema.safeParse(req.body);
+    if (!parse.success) return res.status(400).json({ error: 'Invalid input' });
+    const update: Record<string, unknown> = {};
+    if (parse.data.name !== undefined) update.name = parse.data.name;
+    if (parse.data.email !== undefined && parse.data.email !== ctx.user.email) {
+      // Refuse if a different user already has the new email.
+      const taken = await db()
+        .select({ id: users.id })
+        .from(users)
+        .where(eq(users.email, parse.data.email))
+        .limit(1);
+      if (taken[0] && taken[0].id !== ctx.user.id) {
+        return res.status(409).json({ error: 'That email is already in use.' });
+      }
+      update.email = parse.data.email;
+    }
+    if (Object.keys(update).length > 0) {
+      await db().update(users).set(update).where(eq(users.id, ctx.user.id));
+    }
+    if (parse.data.contactPhone !== undefined && ctx.user.tenantId) {
+      await db()
+        .update(tenants)
+        .set({ contactPhone: parse.data.contactPhone, updatedAt: new Date() })
+        .where(eq(tenants.id, ctx.user.tenantId));
+    }
+    return res.json({ ok: true });
+  });
+
+  // Password change — requires the current password (defence vs cookie
+  // theft / shared workstation). Min length 10 enforced server-side.
+  const PasswordSchema = z.object({
+    current: z.string().min(1),
+    next: z.string().min(10).max(200),
+  });
+  app.put('/api/auth/password', async (req: Request, res: Response) => {
+    const token = req.cookies[SESSION_COOKIE_NAME];
+    const ctx = await lookupSession(token);
+    if (!ctx) return res.status(401).json({ error: 'Unauthorized' });
+    const parse = PasswordSchema.safeParse(req.body);
+    if (!parse.success) return res.status(400).json({ error: 'New password must be at least 10 characters.' });
+    const ok = await verifyPassword(parse.data.current, ctx.user.passwordHash);
+    if (!ok) return res.status(403).json({ error: 'Current password does not match.' });
+    const newHash = await hashPassword(parse.data.next);
+    await db().update(users).set({ passwordHash: newHash }).where(eq(users.id, ctx.user.id));
+    return res.json({ ok: true });
+  });
+
+  // Sign out every session for this user (including the current one).
+  // Useful after a suspected leak of the session cookie or to revoke
+  // access from a shared computer.
+  app.post('/api/auth/sign-out-all', async (req: Request, res: Response) => {
+    const token = req.cookies[SESSION_COOKIE_NAME];
+    const ctx = await lookupSession(token);
+    if (!ctx) return res.status(401).json({ error: 'Unauthorized' });
+    await db().delete(sessions).where(eq(sessions.userId, ctx.user.id));
     clearCookie(res);
     return res.json({ ok: true });
   });
