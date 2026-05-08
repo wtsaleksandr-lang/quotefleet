@@ -48,6 +48,11 @@ const RESERVED_SLUGS = new Set([
   'auth', 'oauth', 'embed', 'widget', 'chat', 'webhook', 'webhooks',
 ]);
 
+/** Current DPA version published at /dpa. Bumped when the DPA's
+ *  substantive terms change; existing tenants are forced to re-accept
+ *  before their next billing event when the version differs. */
+export const CURRENT_DPA_VERSION = '1.0';
+
 const SignupSchema = z.object({
   companyName: z.string().min(1).max(120),
   /** URL slug → also the subdomain. 3-30 chars, [a-z0-9-]. */
@@ -64,6 +69,13 @@ const SignupSchema = z.object({
   password: z.string().min(10).max(200),
   countryFocus: z.enum(['US', 'CA', 'BOTH']).default('US'),
   contactPhone: z.string().optional(),
+  /** Required: ticked the DPA + Security-policy checkbox on the signup
+   *  form. Server refuses signup without it; we record acceptance time
+   *  + version on the tenant row so legal can prove consent. */
+  dpaAccepted: z.literal(true, {
+    message: 'You must accept the Data Processing Addendum to create an account.',
+  }),
+  dpaVersion: z.string().min(1).max(20),
 });
 
 /** Returns true if `path` is safe to use as a relative redirect target.
@@ -225,6 +237,10 @@ export function registerAuthRoutes(app: Express) {
             plan: 'free',
             status: 'active',
             trialEndsAt,
+            // Stamp DPA consent so we can prove later when + which
+            // version of the DPA the tenant accepted.
+            dpaAcceptedAt: new Date(),
+            dpaVersion: parse.data.dpaVersion,
           })
           .returning({ id: tenants.id });
         if (!t) throw new Error('tenant insert returned no row');

@@ -37,12 +37,12 @@ export const tenants = pgTable(
   'tenants',
   {
     id: serial('id').primaryKey(),
-    /** URL-safe slug — also the subdomain. e.g. "astova" → astova.quotefleet.app. */
+    /** URL-safe slug — also the subdomain. e.g. "astova" → astova.quotefleet.net. */
     slug: text('slug').notNull().unique(),
     /** Which of the platform-owned host domains hosts this tenant.
-     *  e.g. "quotefleet.app", "quotefleet.net", "truckrate.online".
+     *  e.g. "quotefleet.net", "truckrate.net", "drayrate.online".
      *  The full hosted URL is `<slug>.<hostDomain>`. */
-    hostDomain: text('host_domain').notNull().default('quotefleet.app'),
+    hostDomain: text('host_domain').notNull().default('quotefleet.net'),
     /** Optional custom domain (Pro tier). e.g. "quote.astova.com" mapped via CNAME. */
     customDomain: text('custom_domain').unique(),
     /** When the operator's TXT-based ownership proof for `customDomain`
@@ -86,6 +86,13 @@ export const tenants = pgTable(
     /** Optional per-tenant Anthropic API key (encrypted). When set,
      *  overrides the platform default for that tenant's AI calls. */
     anthropicKeyEncrypted: text('anthropic_key_encrypted'),
+    /** When (and which version of) the Data Processing Addendum was
+     *  accepted by the tenant owner. Required at signup. We force re-
+     *  acceptance if `dpaVersion` differs from the current published
+     *  version (lets us update the DPA without breaking existing
+     *  contracts — they re-accept on next login or before next charge). */
+    dpaAcceptedAt: timestamp('dpa_accepted_at', { mode: 'date' }),
+    dpaVersion: text('dpa_version'),
     /** Created timestamp. */
     createdAt: timestamp('created_at', { mode: 'date' }).notNull().defaultNow(),
     updatedAt: timestamp('updated_at', { mode: 'date' }).notNull().defaultNow(),

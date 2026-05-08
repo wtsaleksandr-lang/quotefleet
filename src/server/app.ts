@@ -169,12 +169,12 @@ export function createApp(): express.Express {
   app.get('/.well-known/security.txt', (_req, res) => {
     res.type('text/plain').send(
       [
-        'Contact: mailto:security@quotefleet.app',
+        'Contact: mailto:security@quotefleet.net',
         'Expires: 2027-12-31T23:59:59.000Z',
         'Preferred-Languages: en',
-        'Canonical: https://quotefleet.app/.well-known/security.txt',
-        'Policy: https://quotefleet.app/security',
-        'Acknowledgments: https://quotefleet.app/security#acknowledgments',
+        'Canonical: https://quotefleet.net/.well-known/security.txt',
+        'Policy: https://quotefleet.net/security',
+        'Acknowledgments: https://quotefleet.net/security#acknowledgments',
         '',
       ].join('\n')
     );

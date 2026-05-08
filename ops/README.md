@@ -35,7 +35,7 @@ node cloudflare-replit-link.mjs \
 node cloudflare-replit-link.mjs \
   --account efa414704efefaa266c86d5d136d1e3a \
   --target  quote-fleet.replit.app \
-  --include quotefleet.app,quotefleet.net,truckrate.online,your-quote.online \
+  --include quotefleet.net,truckrate.online,your-quote.online \
   --do-it
 
 # 3. Or: link every SAFE zone (skips IN_USE so other apps stay alive):
@@ -60,7 +60,7 @@ Then update **Replit Secrets**:
 
 | Key | Value |
 |---|---|
-| `HOST_DOMAINS` | Comma-separated list of linked domains, e.g. `quotefleet.app,quotefleet.net,truckrate.online,your-quote.online` |
+| `HOST_DOMAINS` | Comma-separated list of linked domains, e.g. `quotefleet.net,truckrate.online,your-quote.online` |
 
 Redeploy. The signup form's host dropdown now offers every linked domain.
 
@@ -131,7 +131,7 @@ This lists every Namecheap domain and shows a planned action per row:
 [skip ] medicine.recipes                 excluded by user
 [skip ] snorezaway.com                   excluded by user
 [reuse] loadmode.app                     already on Cloudflare
-[add  ] quotefleet.app                   will create zone
+[add  ] quotefleet.net                   will create zone
 [add  ] quotefleet.net                   will create zone
 ...
 ```

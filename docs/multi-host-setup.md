@@ -13,7 +13,7 @@ This doc covers what you (the platform operator) need to do at the registrar and
 In your `.env` (or Replit Secrets):
 
 ```
-HOST_DOMAINS=quotefleet.app,quotefleet.net,truckrate.online,your-quote.online
+HOST_DOMAINS=quotefleet.net,truckrate.online,your-quote.online
 ```
 
 The first entry is the **default** — used for new signups when the customer doesn't pick one.
@@ -30,7 +30,7 @@ You said these are available:
 
 | Domain | Notes | Approx. price (Cloudflare Registrar) |
 |---|---|---|
-| `quotefleet.app` | The default — main brand | ~$14/yr (`.app` is a Google TLD, HSTS-required so HTTPS only — fine for us) |
+| `quotefleet.net` | The default — main brand | ~$14/yr (`.app` is a Google TLD, HSTS-required so HTTPS only — fine for us) |
 | `quotefleet.net` | Brand variant | ~$10/yr |
 | `truckrate.online` | Generic / per-customer choice | ~$2-3/yr first year |
 | `your-quote.online` | Generic / per-customer choice | ~$2-3/yr first year |
@@ -72,7 +72,7 @@ You need a cert that covers `*.<domain>` and `<domain>` for each entry in `HOST_
 **Option B — Caddy in front of Replit.** Run a tiny VPS ($5/mo on Hetzner / DO) with Caddy reverse-proxying to your Replit URL. Caddy handles ACME wildcard via DNS-01:
 
 ```caddyfile
-*.quotefleet.app, quotefleet.app {
+*.quotefleet.net, quotefleet.net {
   tls {
     dns cloudflare {env.CF_API_TOKEN}
   }
@@ -82,7 +82,7 @@ You need a cert that covers `*.<domain>` and `<domain>` for each entry in `HOST_
 
 Repeat the block for each base domain. Caddy auto-renews.
 
-**Option C — Replit Reserved VM** with custom domain feature. Replit handles TLS automatically once you add `*.quotefleet.app` and verify ownership.
+**Option C — Replit Reserved VM** with custom domain feature. Replit handles TLS automatically once you add `*.quotefleet.net` and verify ownership.
 
 ---
 
@@ -92,27 +92,27 @@ Once DNS + TLS are live:
 
 ```bash
 # Should return the marketing landing page
-curl -sI https://quotefleet.app/ | head -1
+curl -sI https://quotefleet.net/ | head -1
 
 # Should return the demo tenant's widget
-curl -sI https://demo.quotefleet.app/ | head -1
+curl -sI https://demo.quotefleet.net/ | head -1
 
 # Same demo tenant on a different brand
 curl -sI https://demo.truckrate.online/ | head -1
 
 # A non-existent slug should still resolve (widget loads, then errors with 404 from API)
-curl -s https://nope.quotefleet.app/ | head -10
+curl -s https://nope.quotefleet.net/ | head -10
 ```
 
-The server logs will show `host=demo.quotefleet.app subdomain=demo baseDomain=quotefleet.app` for each subdomain request.
+The server logs will show `host=demo.quotefleet.net subdomain=demo baseDomain=quotefleet.net` for each subdomain request.
 
 ---
 
 ## 6. Cookie scope (gotcha)
 
-Session cookies are set with `path=/` and **no domain** — so they're tied to the host that set them. That's intentional: a logged-in tenant on `acme.quotefleet.app` doesn't accidentally share a session with another tenant on the same base domain. The dashboard at `quotefleet.app/app` runs in its own cookie scope from the bare domain.
+Session cookies are set with `path=/` and **no domain** — so they're tied to the host that set them. That's intentional: a logged-in tenant on `acme.quotefleet.net` doesn't accidentally share a session with another tenant on the same base domain. The dashboard at `quotefleet.net/app` runs in its own cookie scope from the bare domain.
 
-If you ever want a single sign-on across `<slug>.quotefleet.app` and `quotefleet.app/app`, set the cookie domain to `.quotefleet.app` — but **don't do that across base domains** (you can't share a cookie between `quotefleet.app` and `truckrate.online` even if you wanted to; browsers prevent it).
+If you ever want a single sign-on across `<slug>.quotefleet.net` and `quotefleet.net/app`, set the cookie domain to `.quotefleet.net` — but **don't do that across base domains** (you can't share a cookie between `quotefleet.net` and `truckrate.online` even if you wanted to; browsers prevent it).
 
 ---
 
@@ -121,7 +121,7 @@ If you ever want a single sign-on across `<slug>.quotefleet.app` and `quotefleet
 The `tenants.custom_domain` column is in the schema but not wired into routing yet. When you build the Pro feature:
 
 1. Tenant adds `quote.astova.com` in dashboard.
-2. Verify they CNAMEd it to `<slug>.quotefleet.app`.
+2. Verify they CNAMEd it to `<slug>.quotefleet.net`.
 3. Cloudflare for SaaS (free up to 100 hostnames) handles per-customer TLS automatically.
 4. Add a check in `hostInfo.ts` — if the host doesn't match `HOST_DOMAINS`, look up `tenants.custom_domain` and resolve.
 
@@ -140,7 +140,7 @@ staging, dev, public, private, auth, oauth, embed, widget, chat,
 webhook, webhooks
 ```
 
-Add to both lists if you spin up any new platform-level subdomains (e.g. if you host docs at `docs.quotefleet.app`).
+Add to both lists if you spin up any new platform-level subdomains (e.g. if you host docs at `docs.quotefleet.net`).
 
 ---
 

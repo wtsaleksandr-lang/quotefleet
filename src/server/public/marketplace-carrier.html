@@ -91,7 +91,7 @@
       document.getElementById('c-name').textContent = c.displayName;
       var meta = c.countryFocus + (c.mcNumber ? ' · MC ' + c.mcNumber : '') + (c.dotNumber ? ' · DOT ' + c.dotNumber : '');
       document.getElementById('c-meta').textContent = meta;
-      document.getElementById('c-contact-link').href = 'https://' + c.slug + '.quotefleet.app/';
+      document.getElementById('c-contact-link').href = 'https://' + c.slug + '.quotefleet.net/';
 
       var s = document.getElementById('c-services');
       s.innerHTML = '<div class="rate-row"><span class="label">Services</span><span>' + esc((c.services || []).join(', ') || '—') + '</span></div>'

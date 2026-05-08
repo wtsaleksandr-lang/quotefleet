@@ -138,7 +138,7 @@
       '<input class="qf-mc-input" id="qf-mc-input" placeholder="Ask about pricing, features, signup…" autocomplete="off">' +
       '<button class="qf-mc-send" id="qf-mc-send">Send</button>' +
     '</div>' +
-    '<div class="qf-mc-foot">AI may make mistakes. For specifics: hello@quotefleet.app</div>';
+    '<div class="qf-mc-foot">AI may make mistakes. For specifics: hello@quotefleet.net</div>';
   document.body.appendChild(panel);
 
   // ── State + handlers ────────────────────────────────────────────

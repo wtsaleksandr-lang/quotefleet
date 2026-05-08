@@ -3,7 +3,7 @@
  *
  * Cold outreach runs on Smartlead (smartlead.ai), not on the platform's
  * transactional mail. Why: deliverability. Sending cold email from
- * `quotefleet.app` would torch the same domain we use for magic-links
+ * `quotefleet.net` would torch the same domain we use for magic-links
  * and password resets. Smartlead handles its own warmup, DKIM/SPF/DMARC,
  * inbox rotation, and reputation monitoring.
  *

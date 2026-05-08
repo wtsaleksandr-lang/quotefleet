@@ -11,7 +11,7 @@ A drayage or trucking carrier signs up. We instantly load realistic per-mile rat
 They paste **one line of HTML** on their website:
 
 ```html
-<script src="https://yourquotefleet.app/embed.js?t=YOUR_TOKEN" defer></script>
+<script src="https://quotefleet.net/embed.js?t=YOUR_TOKEN" defer></script>
 ```
 
 Visitors to their site get a polished, branded quote calculator. They fill in pickup, delivery, equipment, weight, accessorials → instant price + line-item breakdown. If they enter their email, the lead lands in the carrier's dashboard, and the AI dispatcher sends an auto-reply email and offers chat-style follow-up.

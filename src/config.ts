@@ -15,7 +15,7 @@ export interface Env {
   HOST: string;
   /** Comma-separated list of platform-owned host domains. The first
    *  entry is the default for new signups. e.g.
-   *  "quotefleet.app,quotefleet.net,truckrate.online,your-quote.online"
+   *  "quotefleet.net,truckrate.online,your-quote.online"
    *  — wildcard DNS for each routes `<slug>.<domain>` here. */
   HOST_DOMAINS: string[];
   /** Shared secret between the Cloudflare Worker that fronts wildcard
@@ -90,12 +90,12 @@ export function loadEnv(): Env {
     );
   }
 
-  const hostDomainsRaw = opt('HOST_DOMAINS') ?? 'quotefleet.app';
+  const hostDomainsRaw = opt('HOST_DOMAINS') ?? 'quotefleet.net';
   const hostDomains = hostDomainsRaw
     .split(',')
     .map((s) => s.trim().toLowerCase().replace(/^https?:\/\//, '').replace(/\/.*$/, ''))
     .filter(Boolean);
-  if (hostDomains.length === 0) hostDomains.push('quotefleet.app');
+  if (hostDomains.length === 0) hostDomains.push('quotefleet.net');
 
   cached = {
     DATABASE_URL: need('DATABASE_URL'),
@@ -129,10 +129,10 @@ export function loadEnv(): Env {
 
 /** Default host domain for new signups (first entry of HOST_DOMAINS). */
 export function defaultHostDomain(): string {
-  return loadEnv().HOST_DOMAINS[0] ?? 'quotefleet.app';
+  return loadEnv().HOST_DOMAINS[0] ?? 'quotefleet.net';
 }
 
-/** True if the given host (e.g. "astova.quotefleet.app") is on a
+/** True if the given host (e.g. "astova.quotefleet.net") is on a
  *  platform-owned domain. Returns the matching base domain if so. */
 export function matchHostDomain(host: string): string | null {
   const h = (host || '').toLowerCase().split(':')[0]; // strip port

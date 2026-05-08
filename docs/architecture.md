@@ -86,11 +86,11 @@ Postgres via Drizzle ORM + Neon HTTP driver. Drizzle's `db:push` handles schema 
 ```
 ┌──────────────────────────────────────────────────────────────┐
 │  Customer's website                                          │
-│   <script src="quotefleet.app/embed.js?t=..." defer></script>│
+│   <script src="quotefleet.net/embed.js?t=..." defer></script>│
 │           │                                                  │
 │           ▼                                                  │
 │   ┌──────────────────────────────┐                          │
-│   │ <iframe src="quotefleet.app/  │                          │
+│   │ <iframe src="quotefleet.net/  │                          │
 │   │  w/<slug>?embed=1">           │                          │
 │   │  (the calculator widget)      │                          │
 │   └──────────────┬───────────────┘                          │

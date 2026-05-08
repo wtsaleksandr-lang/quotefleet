@@ -2,13 +2,13 @@
 
 > The QuoteFleet platform itself never sends cold mail. We push prospects to **Smartlead**, which handles sending, warmup, deliverability, and webhook events back. The platform is the *CRM* — pipeline, statuses, notes, conversion attribution.
 
-This separation is critical: cold outreach from `quotefleet.app` would torch the same domain we use for magic-links and password resets. Smartlead runs on a separate sending domain.
+This separation is critical: cold outreach from `quotefleet.net` would torch the same domain we use for magic-links and password resets. Smartlead runs on a separate sending domain.
 
 ---
 
 ## 1. Sending domain — set this up first
 
-**Never send cold from `quotefleet.app`.** Buy a separate domain for outreach.
+**Never send cold from `quotefleet.net`.** Buy a separate domain for outreach.
 
 Recommended name pattern: `<brand>mail.com`, `try-<brand>.com`, or just a generic-sounding domain that ties back to a real LLC. Examples:
 
@@ -152,7 +152,7 @@ Versus a 6-week build of your own scraper + sender: ~$15K of your time and a gua
 
 ## 9. Don't do this
 
-- Don't send from `quotefleet.app` or any subdomain that handles transactional mail.
+- Don't send from `quotefleet.net` or any subdomain that handles transactional mail.
 - Don't try to process 1,000+ sends/day from a single inbox.
 - Don't reuse "warmed" sending inboxes for new campaigns without re-warming.
 - Don't ignore replies — Smartlead surfaces them; the AI assistant can draft responses but a human should review until you have ~50 sent replies of muscle memory.

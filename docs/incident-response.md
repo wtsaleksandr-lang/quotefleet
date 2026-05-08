@@ -5,7 +5,7 @@
 
 **Last updated:** 2026-05-08
 **Owner:** wts.aleksandr@gmail.com
-**Security inbox:** security@quotefleet.app
+**Security inbox:** security@quotefleet.net
 
 ---
 
@@ -101,7 +101,7 @@ Within the **first 15 minutes** of any P0/P1:
 |---|---|---|---|
 | Reporting customer | Within 15 min of acknowledgement | Reply to original ticket / DM | On-call |
 | All affected tenants | If P0/P1 lasting >30 min | Email blast (use mailmerge against `tenants.contact_email` filtered to affected) | On-call |
-| Public status | Once status page exists (TODO) | status.quotefleet.app | On-call |
+| Public status | Once status page exists (TODO) | status.quotefleet.net | On-call |
 | Internal team | As needed | Slack / WhatsApp | On-call |
 
 **Template for customer comms (P0/P1):**
@@ -162,7 +162,7 @@ What actually broke and why.
 
 ## 8. Vulnerability reports from external researchers
 
-Emails to `security@quotefleet.app` are reports under our published policy
+Emails to `security@quotefleet.net` are reports under our published policy
 (`/security` page, RFC-9116 `/.well-known/security.txt`).
 
 1. **Acknowledge within 48 hrs** — even if just "received, investigating"

@@ -42,7 +42,7 @@
             <select class="select" name="hostDomain" id="host-input"></select>
           </div>
           <div class="url-builder-preview" id="url-preview">
-            <span class="live">acme.quotefleet.app</span>
+            <span class="live">acme.quotefleet.net</span>
           </div>
           <span class="field-hint" id="slug-hint">Letters, numbers, dashes.</span>
         </div>
@@ -73,7 +73,21 @@
           </div>
         </div>
 
-        <button class="btn btn-primary btn-lg btn-block" type="submit">
+        <!-- DPA acceptance — required by signup endpoint. Recorded with
+             current DPA version (qf-dpa-version meta) into tenants.dpaAcceptedAt
+             + tenants.dpaVersion at account creation. -->
+        <label style="display:flex; gap:10px; align-items:flex-start; padding:10px 12px; background:var(--surface-2); border:1px solid var(--border); border-radius:8px; cursor:pointer; font-size:13.5px; line-height:1.55;">
+          <input type="checkbox" id="dpa-accept" name="dpaAccept" required style="margin-top:3px; flex-shrink:0;">
+          <span>
+            I have read and agree to the
+            <a href="/security" target="_blank" rel="noopener">Security policy</a>,
+            <a href="/dpa" target="_blank" rel="noopener">Data Processing Addendum (v1.0)</a>,
+            and confirm that QuoteFleet may process customer data on my behalf
+            under those terms.
+          </span>
+        </label>
+
+        <button class="btn btn-primary btn-lg btn-block" type="submit" id="signup-submit" disabled>
           Create account <span class="arr">→</span>
         </button>
         <div id="signup-error" class="notice error hidden"></div>
@@ -100,7 +114,7 @@
     }
     function refreshPreview() {
       var s = slugInput.value.trim() || 'your-slug';
-      var h = hostInput.value || 'quotefleet.app';
+      var h = hostInput.value || 'quotefleet.net';
       preview.textContent = s + '.' + h;
     }
 
@@ -138,7 +152,7 @@
     // Bootstrap host options from /api/auth/signup-options.
     fetch('/api/auth/signup-options').then(function (r) { return r.json(); }).then(function (opts) {
       hostInput.innerHTML = '';
-      (opts.hostDomains || ['quotefleet.app']).forEach(function (h) {
+      (opts.hostDomains || ['quotefleet.net']).forEach(function (h) {
         var o = document.createElement('option');
         o.value = h; o.textContent = h;
         if (h === opts.defaultHostDomain) o.selected = true;
@@ -147,15 +161,27 @@
       refreshPreview();
     }).catch(function () {
       // Fallback: just show one option so the form still works.
-      hostInput.innerHTML = '<option value="quotefleet.app">quotefleet.app</option>';
+      hostInput.innerHTML = '<option value="quotefleet.net">quotefleet.net</option>';
       refreshPreview();
     });
+
+    // Enable submit only once the DPA checkbox is ticked.
+    var dpa = document.getElementById('dpa-accept');
+    var submit = document.getElementById('signup-submit');
+    function syncSubmit() { submit.disabled = !dpa.checked; }
+    dpa.addEventListener('change', syncSubmit);
+    syncSubmit();
 
     form.addEventListener('submit', async function (e) {
       e.preventDefault();
       var fd = new FormData(form);
       var err = document.getElementById('signup-error');
       err.classList.add('hidden');
+      if (!dpa.checked) {
+        err.textContent = 'Please accept the Security policy and DPA to continue.';
+        err.classList.remove('hidden');
+        return;
+      }
       var btn = form.querySelector('button[type=submit]');
       btn.disabled = true;
       var oldText = btn.innerHTML; btn.innerHTML = 'Creating account…';
@@ -171,6 +197,8 @@
             password: fd.get('password'),
             countryFocus: fd.get('countryFocus') || 'US',
             contactPhone: fd.get('contactPhone') || undefined,
+            dpaAccepted: true,
+            dpaVersion: '1.0',
           }),
         });
         var j = await res.json();

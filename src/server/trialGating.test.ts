@@ -10,7 +10,7 @@ const now = new Date('2026-05-01T00:00:00Z');
 const baseT: Tenant = {
   id: 1,
   slug: 'acme',
-  hostDomain: 'quotefleet.app',
+  hostDomain: 'quotefleet.net',
   customDomain: null,
   name: 'Acme',
   contactEmail: 'a@b.c',

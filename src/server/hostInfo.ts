@@ -93,7 +93,7 @@ export async function hostInfoMiddleware(
   req.tenantSubdomain = '';
   req.tenantCustomDomainSlug = '';
 
-  // Path 1: platform-owned subdomain (`<slug>.quotefleet.app`).
+  // Path 1: platform-owned subdomain (`<slug>.quotefleet.net`).
   if (baseDomain && rawHost !== baseDomain) {
     const sub = rawHost.slice(0, rawHost.length - baseDomain.length - 1);
     if (sub && sub !== 'www' && !RESERVED_SUBDOMAINS.has(sub) && !sub.includes('.')) {
