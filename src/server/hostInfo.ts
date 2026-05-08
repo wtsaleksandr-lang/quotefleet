@@ -14,7 +14,7 @@
  * path fast (one DB query on miss, free on hit).
  */
 import type { Request, Response, NextFunction } from 'express';
-import { eq } from 'drizzle-orm';
+import { and, eq, isNotNull } from 'drizzle-orm';
 import { loadEnv, matchHostDomain } from '../config.js';
 import { db } from '../db/client.js';
 import { tenants } from '../db/schema.js';
@@ -113,10 +113,19 @@ export async function hostInfoMiddleware(
       return next();
     }
     try {
+      // Only route a custom domain if its TXT-based ownership claim has
+      // been verified — `customDomainVerifiedAt` non-null. An unverified
+      // claim is just a request waiting on DNS, NOT a permission to
+      // serve the operator's site as them.
       const row = await db()
-        .select({ slug: tenants.slug, customDomain: tenants.customDomain })
+        .select({ slug: tenants.slug })
         .from(tenants)
-        .where(eq(tenants.customDomain, rawHost))
+        .where(
+          and(
+            eq(tenants.customDomain, rawHost),
+            isNotNull(tenants.customDomainVerifiedAt)
+          )
+        )
         .limit(1);
       const slug = row[0]?.slug ?? null;
       customDomainCache.set(rawHost, slug);

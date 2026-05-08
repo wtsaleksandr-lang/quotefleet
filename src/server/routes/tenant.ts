@@ -527,9 +527,11 @@ export function registerTenantRoutes(app: Express) {
     }
 
     // Save the request — verification flips it from claimed to live.
+    // Explicitly null the verifiedAt so a re-claim after a previous
+    // success requires the operator to re-prove ownership.
     await db()
       .update(tenants)
-      .set({ customDomain: domain, updatedAt: new Date() })
+      .set({ customDomain: domain, customDomainVerifiedAt: null, updatedAt: new Date() })
       .where(eq(tenants.id, req.tenant!.id));
     res.json({
       ok: true,
@@ -562,14 +564,19 @@ export function registerTenantRoutes(app: Express) {
     } catch (err) {
       return res.status(500).json({ error: 'DNS lookup failed: ' + (err as Error).message });
     }
-    // Verified — already saved on POST, just confirm.
-    res.json({ ok: true, customDomain: t.customDomain });
-  });
-
-  app.delete('/api/tenant/custom-domain', requireAuth, requireTenant, async (req, res) => {
+    // Flip the verifiedAt timestamp — until this is non-null, the
+    // hostInfo middleware refuses to route requests for this domain.
     await db()
       .update(tenants)
-      .set({ customDomain: null, updatedAt: new Date() })
+      .set({ customDomainVerifiedAt: new Date(), updatedAt: new Date() })
+      .where(eq(tenants.id, t.id));
+    res.json({ ok: true, customDomain: t.customDomain, verifiedAt: new Date() });
+  });
+
+  app.delete('/api/tenant/custom-domain', requireAuth, requireOwner, requireTenant, async (req, res) => {
+    await db()
+      .update(tenants)
+      .set({ customDomain: null, customDomainVerifiedAt: null, updatedAt: new Date() })
       .where(eq(tenants.id, req.tenant!.id));
     res.json({ ok: true });
   });

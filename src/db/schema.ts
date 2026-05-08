@@ -44,6 +44,10 @@ export const tenants = pgTable(
     hostDomain: text('host_domain').notNull().default('quotefleet.app'),
     /** Optional custom domain (Pro tier). e.g. "quote.astova.com" mapped via CNAME. */
     customDomain: text('custom_domain').unique(),
+    /** When the operator's TXT-based ownership proof for `customDomain`
+     *  was confirmed. Until this is non-null, hostInfo middleware refuses
+     *  to route the domain — prevents an unverified claim from going live. */
+    customDomainVerifiedAt: timestamp('custom_domain_verified_at', { mode: 'date' }),
     /** Public company name shown in the calculator. */
     name: text('name').notNull(),
     /** Contact email for the tenant owner (notifications). */

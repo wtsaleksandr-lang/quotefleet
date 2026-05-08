@@ -15,6 +15,13 @@
       "when": 1778169694729,
       "tag": "0001_stripe_lifecycle",
       "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "7",
+      "when": 1778218388556,
+      "tag": "0002_redundant_starjammers",
+      "breakpoints": true
     }
   ]
 }
