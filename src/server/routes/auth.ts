@@ -23,6 +23,7 @@ import {
   magicLinks,
 } from '../../db/schema.js';
 import { sendEmail } from '../../email/send.js';
+import { magicLinkEmail } from '../../email/templates.js';
 import {
   DEFAULT_RATE_CARDS,
   DEFAULT_ACCESSORIALS,
@@ -390,16 +391,23 @@ export function registerAuthRoutes(app: Express) {
     const env = loadEnv();
     const base = env.PUBLIC_BASE_URL.replace(/\/$/, '');
     const link = `${base}/auth/magic/${token}`;
+    const tpl = magicLinkEmail({ link, email, ttlMinutes: 15 });
     try {
-      await sendEmail({
+      const result = await sendEmail({
         to: email,
-        subject: 'Your QuoteFleet sign-in link',
-        text:
-          `Click the link below to sign in to your QuoteFleet dashboard. ` +
-          `It expires in 15 minutes and can only be used once.\n\n` +
-          `${link}\n\n` +
-          `If you didn't request this, you can ignore the email.`,
+        subject: tpl.subject,
+        text: tpl.text,
+        html: tpl.html,
       });
+      // If we fell through to the stdout fallback in dev, log loudly so
+      // operators notice — the email was NOT actually delivered.
+      if (result.logged) {
+        console.warn(
+          `[magic-link] delivered to STDOUT only — no email provider configured. ` +
+            `Set RESEND_API_KEY (preferred) or SMTP_HOST/USER/PASS in env to actually send. ` +
+            `Recipient: ${email}, link: ${link}`
+        );
+      }
     } catch (err) {
       console.warn('[magic-link] send failed:', err);
     }
