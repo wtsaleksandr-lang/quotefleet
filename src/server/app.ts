@@ -95,28 +95,38 @@ export function createApp(): express.Express {
 
   // Healthcheck. Pings DB so a disconnected app marks unhealthy and
   // platform load balancers can shed traffic instead of black-holing.
-  // Includes one retry — postgres-js sometimes hands out a stale/closed
-  // connection after the deploy's process has been idle; one quick
-  // re-attempt almost always succeeds. The error detail is included in
-  // the response body because /healthz is internal-only (no user PII).
+  // Returns full error detail because /healthz is internal-only.
   app.get('/healthz', async (_req, res) => {
     const time = new Date().toISOString();
-    let lastErr: unknown = null;
-    for (let attempt = 1; attempt <= 2; attempt++) {
-      try {
-        await db().select({ id: tenants.id }).from(tenants).limit(1);
-        return res.json({ ok: true, time, db: 'up', attempt });
-      } catch (err) {
-        lastErr = err;
-        console.error(`[healthz] db ping failed (attempt ${attempt}):`, err);
-        if (attempt < 2) await new Promise((r) => setTimeout(r, 150));
-      }
+    try {
+      const r = await db().select({ id: tenants.id }).from(tenants).limit(1);
+      return res.json({ ok: true, time, db: 'up', tenantsRows: r.length });
+    } catch (err) {
+      console.error('[healthz] db ping failed:', err);
+      // postgres-js wraps the underlying pg error in a generic
+      // "Failed query: …" envelope. Drill into .cause / .severity /
+      // .code to surface what's actually wrong (auth fail, DB unreachable,
+      // missing table, etc.).
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const e = err as any;
+      const detail = {
+        name: e?.name,
+        message: e?.message,
+        code: e?.code,
+        severity: e?.severity,
+        causeName: e?.cause?.name,
+        causeMessage: e?.cause?.message,
+        causeCode: e?.cause?.code,
+        errno: e?.errno,
+        syscall: e?.syscall,
+        hostname: e?.hostname,
+        // Sanity-check the env so we can see if DATABASE_URL is even set
+        dbUrlSet: !!process.env.DATABASE_URL,
+        dbUrlScheme: (process.env.DATABASE_URL || '').split(':')[0],
+        dbUrlHasHost: /@[^/]+\//.test(process.env.DATABASE_URL || ''),
+      };
+      res.status(503).json({ ok: false, db: 'down', time, error: detail });
     }
-    const detail =
-      lastErr instanceof Error
-        ? { name: lastErr.name, message: lastErr.message }
-        : { message: String(lastErr) };
-    res.status(503).json({ ok: false, db: 'down', time, error: detail });
   });
 
   // Static files. Resolved relative to project root (dist/src/server/app.js
