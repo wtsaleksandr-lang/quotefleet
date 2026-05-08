@@ -6,5 +6,5 @@
     "moduleResolution": "NodeNext",
     "outDir": "./dist"
   },
-  "exclude": ["node_modules", ".archive-legacy", "dist", "data", "src/db/seed.ts"]
+  "exclude": ["node_modules", ".archive-legacy", "dist", "data", "src/db/seed.ts", "**/*.test.ts", "**/*.spec.ts"]
 }
