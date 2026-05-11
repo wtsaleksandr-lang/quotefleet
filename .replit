@@ -2,6 +2,7 @@ modules = ["nodejs-20", "web"]
 
 [nix]
 channel = "stable-25_05"
+packages = ["doppler"]
 
 [env]
 NODE_ENV = "production"
@@ -36,8 +37,11 @@ externalPort = 80
 
 [deployment]
 deploymentTarget = "vm"
-run = ["sh", "-c", "pnpm start"]
-build = ["sh", "-c", "pnpm install --frozen-lockfile && pnpm build"]
+run = ["sh", "-c", "doppler run -- pnpm start"]
+# Build runs migrations + seed before compiling, so a fresh deploy on a
+# new Postgres database boots into a working schema instead of a 500.
+# The seed script is idempotent (existing demo tenant is left alone).
+build = ["sh", "-c", "pnpm install --frozen-lockfile && doppler run -- pnpm db:migrate && doppler run -- pnpm db:seed && pnpm build"]
 
 [agent]
 expertMode = true
