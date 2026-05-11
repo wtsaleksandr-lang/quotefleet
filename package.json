@@ -21,7 +21,6 @@
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.90.0",
-    "@neondatabase/serverless": "^1.1.0",
     "bcryptjs": "^2.4.3",
     "cookie-parser": "^1.4.7",
     "dayjs": "^1.11.20",
@@ -35,7 +34,6 @@
     "nodemailer": "^6.9.16",
     "postgres": "^3.4.9",
     "stripe": "^18.4.0",
-    "tsx": "^4.21.0",
     "xlsx": "^0.18.5",
     "zod": "^4.3.6"
   },
@@ -47,6 +45,7 @@
     "@types/node": "^25.6.0",
     "@types/nodemailer": "^6.4.16",
     "drizzle-kit": "^0.31.10",
+    "tsx": "^4.21.0",
     "typescript": "^5.7.2",
     "vitest": "^2.1.0"
   }
