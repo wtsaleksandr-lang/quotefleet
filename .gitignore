@@ -14,3 +14,9 @@ logs/
 # drizzle/ migration files ARE checked in. They're how prod schema changes
 # are applied (drizzle-kit migrate, not drizzle-kit push).
 .secrets/
+
+# Playwright (Q9)
+/test-results/
+/playwright-report/
+/blob-report/
+/playwright/.cache/
