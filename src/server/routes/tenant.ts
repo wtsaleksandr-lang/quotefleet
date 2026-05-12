@@ -41,7 +41,12 @@ import {
   auditLog,
   conversations,
 } from '../../db/schema.js';
-import { requireAuth, requireTenant, requireOwner } from '../middleware.js';
+import { requireAuth, requireTenant, requireOwner, requirePlan } from '../middleware.js';
+
+/** Plan tiers for feature gating. Source of truth: tenants.plan column,
+ *  default 'free'. Order from cheapest → most expensive. */
+const PAID_PLANS = ['starter', 'pro', 'enterprise'] as const;
+const PRO_PLANS = ['pro', 'enterprise'] as const;
 import { encrypt } from '../../auth/secrets.js';
 import { loadEnv } from '../../config.js';
 import { syncTenantToMarketplace } from '../../marketplace/sync.js';
@@ -437,25 +442,39 @@ export function registerTenantRoutes(app: Express) {
   // Owner-only: a non-owner staff account must NOT be able to overwrite
   // a tenant's BYO key (would let them swap in their own & bill the
   // tenant, or wipe the key to force fallback to platform key).
-  app.put('/api/tenant/anthropic-key', requireAuth, requireOwner, requireTenant, async (req, res) => {
-    const { apiKey } = req.body ?? {};
-    if (typeof apiKey !== 'string' || !apiKey.startsWith('sk-ant-')) {
-      return res.status(400).json({ error: 'Provide a valid sk-ant-... key' });
+  app.put(
+    '/api/tenant/anthropic-key',
+    requireAuth,
+    requireOwner,
+    requireTenant,
+    requirePlan(...PRO_PLANS),
+    async (req, res) => {
+      const { apiKey } = req.body ?? {};
+      if (typeof apiKey !== 'string' || !apiKey.startsWith('sk-ant-')) {
+        return res.status(400).json({ error: 'Provide a valid sk-ant-... key' });
+      }
+      await db()
+        .update(tenants)
+        .set({ anthropicKeyEncrypted: encrypt(apiKey), updatedAt: new Date() })
+        .where(eq(tenants.id, req.tenant!.id));
+      res.json({ ok: true });
     }
-    await db()
-      .update(tenants)
-      .set({ anthropicKeyEncrypted: encrypt(apiKey), updatedAt: new Date() })
-      .where(eq(tenants.id, req.tenant!.id));
-    res.json({ ok: true });
-  });
+  );
 
-  app.delete('/api/tenant/anthropic-key', requireAuth, requireOwner, requireTenant, async (req, res) => {
-    await db()
-      .update(tenants)
-      .set({ anthropicKeyEncrypted: null, updatedAt: new Date() })
-      .where(eq(tenants.id, req.tenant!.id));
-    res.json({ ok: true });
-  });
+  app.delete(
+    '/api/tenant/anthropic-key',
+    requireAuth,
+    requireOwner,
+    requireTenant,
+    requirePlan(...PRO_PLANS),
+    async (req, res) => {
+      await db()
+        .update(tenants)
+        .set({ anthropicKeyEncrypted: null, updatedAt: new Date() })
+        .where(eq(tenants.id, req.tenant!.id));
+      res.json({ ok: true });
+    }
+  );
 
   // ── brand ─────────────────────────────────────────────────────
   app.get('/api/tenant/brand', requireAuth, requireTenant, async (req, res) => {
@@ -482,9 +501,26 @@ export function registerTenantRoutes(app: Express) {
   app.put('/api/tenant/brand', requireAuth, requireTenant, async (req, res) => {
     const parse = BrandPatch.safeParse(req.body);
     if (!parse.success) return res.status(400).json({ error: 'Invalid input' });
+    // Plan-gate the logoUrl field. Colors / tagline / display name stay
+    // available to free tenants so they can still personalize the embed
+    // a bit during trial. Custom logo is a paid-tier perk.
+    const patch = parse.data;
+    const settingLogo = Object.prototype.hasOwnProperty.call(patch, 'logoUrl') && patch.logoUrl != null && patch.logoUrl !== '';
+    if (
+      settingLogo &&
+      req.user?.role !== 'super_admin' &&
+      !(PAID_PLANS as readonly string[]).includes(req.tenant!.plan)
+    ) {
+      return res.status(403).json({
+        error: 'plan_upgrade_required',
+        required: [...PAID_PLANS],
+        current: req.tenant!.plan,
+        field: 'logoUrl',
+      });
+    }
     await db()
       .update(brandConfigs)
-      .set({ ...parse.data, updatedAt: new Date() })
+      .set({ ...patch, updatedAt: new Date() })
       .where(eq(brandConfigs.tenantId, req.tenant!.id));
     res.json({ ok: true });
   });
@@ -505,7 +541,7 @@ export function registerTenantRoutes(app: Express) {
     });
   });
 
-  app.post('/api/tenant/custom-domain', requireAuth, requireOwner, requireTenant, async (req, res) => {
+  app.post('/api/tenant/custom-domain', requireAuth, requireOwner, requireTenant, requirePlan(...PRO_PLANS), async (req, res) => {
     const Schema = z.object({
       domain: z.string().min(3).max(120).regex(
         /^(?!-)[A-Za-z0-9-]{1,63}(?<!-)(\.[A-Za-z0-9-]{1,63})+$/,
@@ -546,7 +582,7 @@ export function registerTenantRoutes(app: Express) {
     });
   });
 
-  app.post('/api/tenant/custom-domain/verify', requireAuth, requireOwner, requireTenant, async (req, res) => {
+  app.post('/api/tenant/custom-domain/verify', requireAuth, requireOwner, requireTenant, requirePlan(...PRO_PLANS), async (req, res) => {
     const t = req.tenant!;
     if (!t.customDomain) return res.status(400).json({ error: 'No domain to verify.' });
     const expected = customDomainToken(t.id);
