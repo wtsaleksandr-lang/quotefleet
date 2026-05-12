@@ -24,6 +24,8 @@
  *   GET    /api/tenant/embed              — embed snippet
  *   POST   /api/tenant/regenerate-embed   — regenerate embed token
  *   GET    /api/tenant/audit              — recent AI/manual edits
+ *   GET    /api/tenant/callbacks          — callback inbox
+ *   PATCH  /api/tenant/callbacks/:id      — update status / notes
  */
 import type { Express, Request, Response } from 'express';
 import { eq, desc, and } from 'drizzle-orm';
@@ -40,6 +42,7 @@ import {
   leads,
   auditLog,
   conversations,
+  callbackRequests,
 } from '../../db/schema.js';
 import { requireAuth, requireTenant, requireOwner, requirePlan } from '../middleware.js';
 
@@ -496,6 +499,9 @@ export function registerTenantRoutes(app: Express) {
     footerNote: z.string().nullable().optional(),
     showPoweredBy: z.boolean().optional(),
     allowedDomains: z.string().nullable().optional(),
+    requireEmail: z.boolean().optional(),
+    requirePhone: z.boolean().optional(),
+    showQuoteBeforeContact: z.boolean().optional(),
   });
 
   app.put('/api/tenant/brand', requireAuth, requireTenant, async (req, res) => {
@@ -522,6 +528,61 @@ export function registerTenantRoutes(app: Express) {
       .update(brandConfigs)
       .set({ ...patch, updatedAt: new Date() })
       .where(eq(brandConfigs.tenantId, req.tenant!.id));
+    res.json({ ok: true });
+  });
+
+  // ── callback inbox ─────────────────────────────────────────────
+  // Default list returns the open + in_progress queue with a small cap;
+  // ?status= and ?limit= let the dashboard show other states. Newest first.
+  app.get('/api/tenant/callbacks', requireAuth, requireTenant, async (req, res) => {
+    const status = typeof req.query.status === 'string' ? req.query.status : undefined;
+    const limitRaw = Number(req.query.limit ?? 100);
+    const limit = Math.min(Math.max(Number.isFinite(limitRaw) ? limitRaw : 100, 1), 500);
+    const where = status
+      ? and(eq(callbackRequests.tenantId, req.tenant!.id), eq(callbackRequests.status, status))
+      : eq(callbackRequests.tenantId, req.tenant!.id);
+    const rows = await db()
+      .select()
+      .from(callbackRequests)
+      .where(where)
+      .orderBy(desc(callbackRequests.createdAt))
+      .limit(limit);
+    res.json({ callbacks: rows });
+  });
+
+  const CallbackPatch = z.object({
+    status: z.enum(['open', 'in_progress', 'completed', 'no_answer', 'cancelled']).optional(),
+    notes: z.string().max(4000).nullable().optional(),
+    assignedToUserId: z.number().int().nullable().optional(),
+  });
+
+  app.patch('/api/tenant/callbacks/:id', requireAuth, requireTenant, async (req, res) => {
+    const id = Number(req.params.id);
+    if (!Number.isFinite(id)) return res.status(400).json({ error: 'Invalid id' });
+    const parse = CallbackPatch.safeParse(req.body);
+    if (!parse.success) return res.status(400).json({ error: 'Invalid input' });
+
+    // Confirm the row belongs to this tenant before updating.
+    const existing = await db()
+      .select()
+      .from(callbackRequests)
+      .where(and(eq(callbackRequests.id, id), eq(callbackRequests.tenantId, req.tenant!.id)))
+      .limit(1);
+    if (!existing[0]) return res.status(404).json({ error: 'Callback not found' });
+
+    const patch: Record<string, unknown> = { ...parse.data, updatedAt: new Date() };
+    // Stamp completedAt when the row transitions to a terminal status.
+    if (
+      parse.data.status &&
+      ['completed', 'no_answer', 'cancelled'].includes(parse.data.status) &&
+      !existing[0].completedAt
+    ) {
+      patch.completedAt = new Date();
+    }
+    await db()
+      .update(callbackRequests)
+      .set(patch)
+      .where(eq(callbackRequests.id, id));
     res.json({ ok: true });
   });
 

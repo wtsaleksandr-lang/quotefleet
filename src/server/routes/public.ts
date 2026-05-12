@@ -7,6 +7,7 @@
  *   POST /api/public/quote/:slug         — compute a quote (no DB write)
  *   POST /api/public/lead/:slug          — submit lead with contact info
  *   POST /api/public/chat/:refId         — chat with AI about a lead
+ *   POST /api/public/callback/:refId     — request a human callback
  *   GET  /api/public/lead/:refId         — read lead (for chat page)
  */
 import type { Express, Request, Response } from 'express';
@@ -24,6 +25,7 @@ import {
   brandConfigs,
   leads,
   aiConfigs,
+  callbackRequests,
 } from '../../db/schema.js';
 import express from 'express';
 import { calculate, type CalcRequest } from '../../calc/engine.js';
@@ -104,9 +106,12 @@ const QuoteSchema = z.object({
     .optional(),
 });
 
+// Email/phone are optional at the schema layer because the brand config
+// decides whether they're required. The route handler enforces presence
+// based on brand.requireEmail / brand.requirePhone.
 const LeadSchema = QuoteSchema.extend({
   customerName: z.string().min(1),
-  customerEmail: z.string().email(),
+  customerEmail: z.string().email().optional().or(z.literal('')),
   customerPhone: z.string().optional(),
   customerCompany: z.string().optional(),
 });
@@ -350,6 +355,20 @@ export function registerPublicRoutes(app: Express) {
       return res.status(400).json({ error: 'Invalid input', details: parse.error.flatten() });
     }
     const body = parse.data;
+
+    // Carrier-controlled contact requirements (brand_configs flags).
+    // Default behavior preserves the original "email required" rule.
+    const requireEmail = brand?.requireEmail ?? true;
+    const requirePhone = brand?.requirePhone ?? false;
+    if (requireEmail && !body.customerEmail) {
+      return res.status(400).json({ error: 'Email is required for this carrier.' });
+    }
+    if (requirePhone && !body.customerPhone) {
+      return res.status(400).json({ error: 'Phone number is required for this carrier.' });
+    }
+    if (!body.customerEmail && !body.customerPhone) {
+      return res.status(400).json({ error: 'Please provide an email or phone so we can reach you.' });
+    }
     const { cards, accs, zones, terms } = await loadConfig(tenant.id);
 
     const pickupForDistance = await resolvePickupForDistance(body.pickup);
@@ -451,7 +470,8 @@ export function registerPublicRoutes(app: Express) {
         .from(aiConfigs)
         .where(eq(aiConfigs.tenantId, tenant.id))
         .limit(1);
-      if (ai[0]?.autoReplyEnabled && row) {
+      // Auto-reply only when we actually have an email to send to.
+      if (ai[0]?.autoReplyEnabled && row && body.customerEmail) {
         const aiBody = await generateLeadReply(tenant.id, row.id);
         await sendEmail({
           to: body.customerEmail,
@@ -463,12 +483,17 @@ export function registerPublicRoutes(app: Express) {
           .set({ autoReplySent: true, autoReplyAt: new Date(), aiSummary: aiBody })
           .where(eq(leads.id, row.id));
       }
-      // Notify tenant.
+      // Notify tenant. Show whichever contact channel we have.
+      const contactLine = body.customerEmail
+        ? `<${body.customerEmail}>`
+        : body.customerPhone
+          ? `(${body.customerPhone})`
+          : '(no contact info provided)';
       await sendEmail({
         to: tenant.contactEmail,
         subject: `New lead ${refId} ($${calc.total.toFixed(2)}) — ${body.customerName}`,
         text:
-          `New quote request from ${body.customerName} <${body.customerEmail}>.\n` +
+          `New quote request from ${body.customerName} ${contactLine}.\n` +
           `Lane: ${body.pickup.city ?? '?'} → ${body.delivery.city ?? '?'} (${dist.miles} mi)\n` +
           `Equipment: ${body.equipment}\n` +
           `Total: $${calc.total.toFixed(2)}\n\n` +
@@ -521,6 +546,97 @@ export function registerPublicRoutes(app: Express) {
       return res.status(503).json({ error: 'Chat is temporarily unavailable. Please try again in a minute.' });
     }
   });
+
+  // ── callback request — visitor asks a human to call them back ──
+  // Two creation paths share this endpoint:
+  //   - manual button click: triggerSource = 'visitor_button'
+  //   - AI chat escalation: triggerSource = 'chat_escalation' + aiContext
+  // Rate-limited via the chat limiter (same shape: per-refId small POST).
+  const CallbackSchema = z.object({
+    customerName: z.string().min(1).max(120),
+    customerPhone: z.string().min(5).max(40),
+    customerEmail: z.string().email().optional().or(z.literal('')),
+    customerCompany: z.string().max(160).optional(),
+    preferredTime: z.string().max(160).optional(),
+    topic: z.string().max(500).optional(),
+    triggerSource: z.enum(['visitor_button', 'chat_escalation']).optional(),
+    aiContext: z
+      .object({
+        reason: z.string().max(500).optional(),
+        messages: z
+          .array(z.object({ role: z.string().max(20), content: z.string().max(2000) }))
+          .max(20)
+          .optional(),
+      })
+      .optional(),
+  });
+
+  app.post(
+    '/api/public/callback/:refId',
+    publicChatLimiter,
+    express.json({ limit: '16kb' }),
+    async (req: Request, res: Response) => {
+      const refId = String(req.params.refId ?? '');
+      if (!refId) return res.status(400).json({ error: 'Missing refId' });
+      const parse = CallbackSchema.safeParse(req.body);
+      if (!parse.success) {
+        return res.status(400).json({ error: 'Invalid input', details: parse.error.flatten() });
+      }
+      const body = parse.data;
+      const leadRows = await db().select().from(leads).where(eq(leads.refId, refId)).limit(1);
+      const lead = leadRows[0];
+      if (!lead) return res.status(404).json({ error: 'Lead not found' });
+
+      const [row] = await db()
+        .insert(callbackRequests)
+        .values({
+          tenantId: lead.tenantId,
+          leadId: lead.id,
+          leadRefId: lead.refId,
+          customerName: body.customerName,
+          customerPhone: body.customerPhone,
+          customerEmail: body.customerEmail || lead.customerEmail || null,
+          customerCompany: body.customerCompany || lead.customerCompany || null,
+          preferredTime: body.preferredTime ?? null,
+          topic: body.topic ?? null,
+          triggerSource: body.triggerSource ?? 'visitor_button',
+          aiContextJson: body.aiContext ?? null,
+        })
+        .returning();
+
+      // Notify tenant — best-effort, don't fail the request if email errors.
+      try {
+        const tenantRow = await db()
+          .select()
+          .from(tenants)
+          .where(eq(tenants.id, lead.tenantId))
+          .limit(1);
+        const tenant = tenantRow[0];
+        if (tenant) {
+          const lines = [
+            `${body.customerName} requested a callback for quote ${refId}.`,
+            `Phone: ${body.customerPhone}`,
+            body.customerEmail ? `Email: ${body.customerEmail}` : '',
+            body.preferredTime ? `Preferred time: ${body.preferredTime}` : '',
+            body.topic ? `\nTopic:\n${body.topic}` : '',
+            body.triggerSource === 'chat_escalation'
+              ? `\n(Escalated from AI chat${body.aiContext?.reason ? ` — ${body.aiContext.reason}` : ''}.)`
+              : '',
+            `\nOpen in dashboard: ${loadEnv().PUBLIC_BASE_URL}/app/callbacks/${row?.id ?? ''}`,
+          ].filter(Boolean);
+          await sendEmail({
+            to: tenant.contactEmail,
+            subject: `📞 Callback requested — ${body.customerName} (quote ${refId})`,
+            text: lines.join('\n'),
+          });
+        }
+      } catch (err) {
+        console.warn('[public/callback] notify failed (non-fatal):', err);
+      }
+
+      return res.json({ ok: true, id: row?.id });
+    }
+  );
 
   app.get('/api/public/lead/:refId', publicChatLimiter, async (req: Request, res: Response) => {
     const refId = String(req.params.refId ?? '');

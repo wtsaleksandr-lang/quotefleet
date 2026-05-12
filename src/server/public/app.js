@@ -105,6 +105,7 @@
     if (route === 'embed') return renderEmbed(c);
     if (route === 'audit') return renderAudit(c);
     if (route === 'account') return renderAccount(c);
+    if (route === 'callbacks') return renderCallbacks(c);
   }
 
   // ── Theme toggle ──────────────────────────────────────────────
@@ -398,6 +399,86 @@
         convCard.appendChild(msgs);
         c.appendChild(convCard);
       }
+    }).catch(showErr(c));
+  }
+
+  // ── Callbacks ─────────────────────────────────────────────────
+  // Inbox of human-callback requests. Defaults to "needs attention"
+  // (open + in_progress). Operator can flip status / add notes inline.
+  var CALLBACK_STATUSES = ['open', 'in_progress', 'completed', 'no_answer', 'cancelled'];
+  function renderCallbacks(c) {
+    api('/api/tenant/callbacks').then(function (d) {
+      c.innerHTML = '';
+      c.appendChild(el('h1', { text: 'Callbacks' }));
+      var open = (d.callbacks || []).filter(function (cb) { return cb.status === 'open'; });
+      c.appendChild(el('p', {
+        class: 'page-sub',
+        text: open.length + ' open · ' + (d.callbacks || []).length + ' total',
+      }));
+      if (!d.callbacks || !d.callbacks.length) {
+        c.appendChild(el('div', {
+          class: 'notice',
+          text: "No callback requests yet. They'll appear here when a visitor taps 'Ask for a callback' on a quote.",
+        }));
+        return;
+      }
+      var tbl = el('table', { class: 'table' });
+      tbl.innerHTML = '<thead><tr>' +
+        '<th>Customer</th><th>Phone</th><th>Quote</th><th>Topic / preferred time</th>' +
+        '<th>Status</th><th>When</th><th></th></tr></thead><tbody></tbody>';
+      var tb = $('tbody', tbl);
+      d.callbacks.forEach(function (cb) {
+        var row = el('tr', {});
+        var topicLine = (cb.topic || '').slice(0, 80);
+        if (cb.preferredTime) topicLine = topicLine ? topicLine + ' · ' + cb.preferredTime : cb.preferredTime;
+        row.innerHTML =
+          '<td><strong>' + (cb.customerName || '—') + '</strong>' +
+            (cb.customerCompany ? '<br><span class="muted-small">' + cb.customerCompany + '</span>' : '') + '</td>' +
+          '<td><a href="tel:' + encodeURIComponent(cb.customerPhone) + '">' + cb.customerPhone + '</a>' +
+            (cb.customerEmail ? '<br><span class="muted-small">' + cb.customerEmail + '</span>' : '') + '</td>' +
+          '<td>' + (cb.leadRefId ? '<a href="/app/leads/' + encodeURIComponent(cb.leadRefId) + '" data-route="leads/' + encodeURIComponent(cb.leadRefId) + '">' + cb.leadRefId + '</a>' : '<span class="muted-small">—</span>') + '</td>' +
+          '<td><span class="muted-small">' + (topicLine || '—') + '</span>' +
+            (cb.triggerSource === 'chat_escalation' ? '<br><span class="badge">from chat</span>' : '') + '</td>' +
+          '<td></td>' +
+          '<td><span class="muted-small">' + fmtDate(cb.createdAt) + '</span></td>' +
+          '<td></td>';
+        // Status select.
+        var statusCell = row.children[4];
+        var sel = el('select', { class: 'select' });
+        CALLBACK_STATUSES.forEach(function (s) {
+          var o = document.createElement('option'); o.value = s; o.textContent = s; if (cb.status === s) o.selected = true; sel.appendChild(o);
+        });
+        sel.addEventListener('change', function () {
+          api('/api/tenant/callbacks/' + cb.id, { method: 'PATCH', body: { status: sel.value } })
+            .then(function () { setTimeout(function () { renderCallbacks(c); }, 80); })
+            .catch(toastErr);
+        });
+        statusCell.appendChild(sel);
+        // Notes toggle.
+        var actCell = row.children[6];
+        var notesBtn = el('button', { class: 'btn-link', text: cb.notes ? 'Edit notes' : 'Add notes' });
+        notesBtn.addEventListener('click', function () {
+          var current = cb.notes || '';
+          var next = window.prompt('Notes — call outcome, follow-ups, etc.', current);
+          if (next === null || next === current) return;
+          api('/api/tenant/callbacks/' + cb.id, { method: 'PATCH', body: { notes: next } })
+            .then(function () { cb.notes = next; notesBtn.textContent = next ? 'Edit notes' : 'Add notes'; })
+            .catch(toastErr);
+        });
+        actCell.appendChild(notesBtn);
+        tb.appendChild(row);
+        // Optional notes preview row.
+        if (cb.notes) {
+          var noteRow = el('tr', {
+            html: '<td colspan="7" class="muted-small" style="padding:6px 12px 12px 12px;">📝 ' +
+              cb.notes.replace(/[<>&]/g, function (ch) {
+                return { '<': '&lt;', '>': '&gt;', '&': '&amp;' }[ch];
+              }) + '</td>',
+          });
+          tb.appendChild(noteRow);
+        }
+      });
+      c.appendChild(tbl);
     }).catch(showErr(c));
   }
 
@@ -824,6 +905,46 @@
       card.appendChild(togWrap);
       card.appendChild(field('Allowed domains (CSV, optional)', 'allowedDomains', { hint: 'e.g. acmeco.com,acmeco.ca — restricts widget to these origins.' }));
       c.appendChild(card);
+
+      // ── Lead capture controls ───────────────────────────────────
+      var capture = el('div', { class: 'card', style: { marginTop: '14px' } });
+      capture.appendChild(el('div', { class: 'card-title', text: 'Lead capture' }));
+      capture.appendChild(el('div', { class: 'card-subtitle', text: 'Choose what contact info the customer must provide before you receive a lead.' }));
+      function toggleRow(label, key, defaultVal, hint) {
+        var wrap = el('label', { style: { display: 'flex', gap: '10px', alignItems: 'flex-start', padding: '10px 0', borderTop: '1px solid var(--border)' } });
+        var cb = el('input', { type: 'checkbox', style: { marginTop: '3px' } });
+        cb.checked = (b[key] !== undefined && b[key] !== null) ? !!b[key] : defaultVal;
+        cb.addEventListener('change', function () {
+          var p = {}; p[key] = cb.checked;
+          api('/api/tenant/brand', { method: 'PUT', body: p }).catch(toastErr);
+        });
+        wrap.appendChild(cb);
+        var txt = el('div', {}, [
+          el('div', { text: label, style: { fontWeight: '600' } }),
+          el('div', { class: 'field-hint', text: hint, style: { marginTop: '2px' } }),
+        ]);
+        wrap.appendChild(txt);
+        return wrap;
+      }
+      capture.appendChild(toggleRow(
+        'Require email',
+        'requireEmail',
+        true,
+        'When ON, the widget will not submit a lead without an email address.'
+      ));
+      capture.appendChild(toggleRow(
+        'Require phone',
+        'requirePhone',
+        false,
+        'When ON, the widget will not submit a lead without a phone number. Useful for carriers who prefer to call back.'
+      ));
+      capture.appendChild(toggleRow(
+        'Show price before contact info',
+        'showQuoteBeforeContact',
+        false,
+        'When ON, the customer sees the quoted price first; contact details are asked only when they click "Claim this quote".'
+      ));
+      c.appendChild(capture);
     }).catch(showErr(c));
   }
 
@@ -1247,6 +1368,28 @@
       bar.remove();
       document.body.classList.remove('qf-trial-locked');
     }
+    function setCollapsedDesktop(collapsed) {
+      shell.classList.toggle('qf-nav-collapsed', collapsed);
+      toggle.setAttribute('aria-expanded', collapsed ? 'false' : 'true');
+      toggle.setAttribute('aria-label', collapsed ? 'Show sidebar' : 'Hide sidebar');
+    }
+    toggle.addEventListener('click', function () {
+      if (isDesktop()) {
+        setCollapsedDesktop(!shell.classList.contains('qf-nav-collapsed'));
+      } else {
+        setOpenMobile(!shell.classList.contains('qf-nav-open'));
+      }
+    });
+    // Auto-close mobile drawer after picking a nav item.
+    $$('.sidebar .nav-item').forEach(function (b) {
+      b.addEventListener('click', function () {
+        if (!isDesktop()) setOpenMobile(false);
+      });
+    });
+    // Tap outside (anywhere in main) closes the mobile drawer.
+    document.querySelector('.app-main').addEventListener('click', function () {
+      if (!isDesktop()) setOpenMobile(false);
+    });
   }
 
   // Sidebar toggle — works at every width.

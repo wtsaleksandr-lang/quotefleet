@@ -102,6 +102,53 @@
     var root = document.documentElement;
     if (brand.primaryColor) root.style.setProperty('--w-primary', brand.primaryColor);
     if (brand.accentColor) root.style.setProperty('--w-accent', brand.accentColor);
+    applyContactRules(brand);
+  }
+
+  // Default behavior preserves the "email required, phone optional" UX
+  // when brand_configs hasn't been written yet.
+  function getContactRules() {
+    var b = (state.config && state.config.brand) || {};
+    return {
+      requireEmail: b.requireEmail !== false,
+      requirePhone: b.requirePhone === true,
+      showQuoteBeforeContact: b.showQuoteBeforeContact === true,
+    };
+  }
+
+  // Adjust contact-step labels, placeholders, HTML5 required attributes,
+  // and the "continue" CTA copy to match the carrier's brand settings.
+  function applyContactRules(brand) {
+    var rules = {
+      requireEmail: brand.requireEmail !== false,
+      requirePhone: brand.requirePhone === true,
+      showQuoteBeforeContact: brand.showQuoteBeforeContact === true,
+    };
+    var emailLabel = $('qf-c-email-label');
+    var emailInput = $('qf-c-email');
+    var phoneLabel = $('qf-c-phone-label');
+    var phoneInput = $('qf-c-phone');
+    if (emailLabel) emailLabel.textContent = rules.requireEmail ? 'Email' : 'Email (optional)';
+    if (emailInput) {
+      if (rules.requireEmail) emailInput.setAttribute('required', 'required');
+      else emailInput.removeAttribute('required');
+    }
+    if (phoneLabel) phoneLabel.textContent = rules.requirePhone ? 'Phone' : 'Phone (optional)';
+    if (phoneInput) {
+      if (rules.requirePhone) {
+        phoneInput.setAttribute('required', 'required');
+        phoneInput.setAttribute('placeholder', '(555) 555-1234');
+      } else {
+        phoneInput.removeAttribute('required');
+        phoneInput.setAttribute('placeholder', 'optional');
+      }
+    }
+    var contBtn = $('qf-continue-btn');
+    if (contBtn) {
+      contBtn.textContent = rules.showQuoteBeforeContact
+        ? 'Claim this quote →'
+        : 'Continue — get this quote in writing';
+    }
   }
 
   function init() {
@@ -148,6 +195,33 @@
       });
     }
 
+    // ── Callback request (post-submit) ────────────────────────
+    var cbOpen = $('qf-callback-open-btn');
+    var cbForm = $('qf-callback-form');
+    var cbCancel = $('qf-cb-cancel-btn');
+    var cbSend = $('qf-cb-send-btn');
+    if (cbOpen && cbForm) {
+      cbOpen.addEventListener('click', function () {
+        cbOpen.style.display = 'none';
+        cbForm.style.display = 'block';
+        // Pre-fill phone if the lead included one.
+        var phoneIn = $('qf-cb-phone');
+        var leadPhone = $('qf-c-phone') && $('qf-c-phone').value;
+        if (phoneIn && leadPhone && !phoneIn.value) phoneIn.value = leadPhone;
+        if (phoneIn) phoneIn.focus();
+        autoResize();
+      });
+    }
+    if (cbCancel && cbForm && cbOpen) {
+      cbCancel.addEventListener('click', function () {
+        cbForm.style.display = 'none';
+        cbOpen.style.display = '';
+        showCallbackError(null);
+        autoResize();
+      });
+    }
+    if (cbSend) cbSend.addEventListener('click', sendCallbackRequest);
+
     $('qf-restart-btn').addEventListener('click', function () {
       state.quote = null;
       state.pickupPortCode = '';
@@ -156,6 +230,16 @@
       var msgs = $('qf-chat-msgs'); if (msgs) msgs.innerHTML = '';
       var ct = $('qf-chat-toggle'); if (ct) ct.style.display = '';
       var ch = $('qf-chat'); if (ch) ch.style.display = 'none';
+      // Reset callback request widgets.
+      var cbBtn = $('qf-callback-open-btn'); if (cbBtn) cbBtn.style.display = '';
+      var cbForm = $('qf-callback-form'); if (cbForm) cbForm.style.display = 'none';
+      var cbSendBtn = $('qf-cb-send-btn'); if (cbSendBtn) cbSendBtn.style.display = '';
+      var cbCancelBtn = $('qf-cb-cancel-btn'); if (cbCancelBtn) cbCancelBtn.style.display = '';
+      var cbSuccess = $('qf-cb-success'); if (cbSuccess) cbSuccess.style.display = 'none';
+      ['qf-cb-phone', 'qf-cb-time', 'qf-cb-topic'].forEach(function (id) {
+        var el = $(id); if (el) { el.value = ''; el.disabled = false; }
+      });
+      showCallbackError(null);
       $('qf-result').style.display = 'none';
       ['qf-pickup-zip', 'qf-delivery-zip', 'qf-weight', 'qf-pickup-date',
        'qf-booking',
@@ -357,6 +441,66 @@
       });
   }
 
+  function showCallbackError(msg) {
+    var e = $('qf-cb-error');
+    if (!e) return;
+    if (msg) { e.textContent = msg; e.style.display = 'block'; }
+    else { e.style.display = 'none'; e.textContent = ''; }
+  }
+
+  function sendCallbackRequest() {
+    if (!state.refId) return;
+    showCallbackError(null);
+    var phoneEl = $('qf-cb-phone');
+    var timeEl = $('qf-cb-time');
+    var topicEl = $('qf-cb-topic');
+    var phone = (phoneEl && phoneEl.value || '').trim();
+    if (phone.length < 5) { showCallbackError('Please enter a phone number we can call.'); return; }
+
+    var name = ($('qf-c-name') && $('qf-c-name').value || '').trim() || 'Customer';
+    var email = ($('qf-c-email') && $('qf-c-email').value || '').trim();
+    var company = ($('qf-c-company') && $('qf-c-company').value || '').trim();
+
+    var btn = $('qf-cb-send-btn');
+    var oldText = btn ? btn.textContent : '';
+    if (btn) { btn.disabled = true; btn.innerHTML = '<span class="qf-spinner"></span> &nbsp; Sending…'; }
+
+    fetch('/api/public/callback/' + encodeURIComponent(state.refId), {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        customerName: name,
+        customerPhone: phone,
+        customerEmail: email || undefined,
+        customerCompany: company || undefined,
+        preferredTime: (timeEl && timeEl.value || '').trim() || undefined,
+        topic: (topicEl && topicEl.value || '').trim() || undefined,
+        triggerSource: 'visitor_button',
+      }),
+    })
+      .then(function (r) { return r.json(); })
+      .then(function (resp) {
+        if (btn) { btn.disabled = false; btn.textContent = oldText; }
+        if (resp.error) { showCallbackError(resp.error); return; }
+        var success = $('qf-cb-success');
+        if (success) {
+          success.textContent = '✓ Got it. We\'ll call ' + phone + ' soon.';
+          success.style.display = 'block';
+        }
+        // Hide form inputs but keep success visible.
+        ['qf-cb-phone', 'qf-cb-time', 'qf-cb-topic'].forEach(function (id) {
+          var el = $(id); if (el) el.disabled = true;
+        });
+        if (btn) btn.style.display = 'none';
+        var cancel = $('qf-cb-cancel-btn'); if (cancel) cancel.style.display = 'none';
+        autoResize();
+      })
+      .catch(function () {
+        if (btn) { btn.disabled = false; btn.textContent = oldText; }
+        showCallbackError('Connection error. Try again in a moment.');
+      });
+  }
+
   function renderTerminals() {
     var sel = $('qf-pickup-terminal');
     if (!sel) return;
@@ -521,17 +665,29 @@
   function onSubmit(e) {
     e && e.preventDefault();
     showError('qf-submit-error', null);
+    var rules = getContactRules();
     var name = $('qf-c-name').value.trim();
     var email = $('qf-c-email').value.trim();
+    var phone = $('qf-c-phone').value.trim();
     if (!name) { showError('qf-submit-error', 'Please enter your name.'); return; }
-    if (!email || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
-      showError('qf-submit-error', 'Please enter a valid email.'); return;
+    if (rules.requireEmail) {
+      if (!email || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+        showError('qf-submit-error', 'Please enter a valid email.'); return;
+      }
+    } else if (email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+      showError('qf-submit-error', 'That email looks invalid — clear it or fix the format.'); return;
+    }
+    if (rules.requirePhone && !phone) {
+      showError('qf-submit-error', 'Please enter a phone number.'); return;
+    }
+    if (!email && !phone) {
+      showError('qf-submit-error', 'Please leave an email or a phone so we can reach you.'); return;
     }
 
     var req = gatherQuoteRequest();
     req.customerName = name;
-    req.customerEmail = email;
-    req.customerPhone = $('qf-c-phone').value.trim() || undefined;
+    req.customerEmail = email || undefined;
+    req.customerPhone = phone || undefined;
     req.customerCompany = $('qf-c-company').value.trim() || undefined;
     req.notes = $('qf-c-notes').value.trim() || undefined;
 
@@ -550,7 +706,9 @@
         btn.disabled = false; btn.textContent = oldText;
         if (resp.error) { showError('qf-submit-error', resp.error); return; }
         state.refId = resp.refId;
-        $('qf-thanks-msg').textContent = 'Quote ' + resp.refId + ' — $' + fmtMoney(resp.total) + ' — sent to ' + email;
+        var sentTo = email || phone || '';
+        $('qf-thanks-msg').textContent = 'Quote ' + resp.refId + ' — $' + fmtMoney(resp.total) +
+          (sentTo ? ' — sent to ' + sentTo : '');
         $('qf-thanks-detail').textContent =
           'Have a question? Ask the AI assistant below — about transit time, accessorials, pickup readiness, anything.';
         showStep('thanks');

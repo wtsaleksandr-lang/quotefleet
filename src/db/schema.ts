@@ -365,6 +365,16 @@ export const brandConfigs = pgTable('brand_configs', {
   showPoweredBy: boolean('show_powered_by').notNull().default(true),
   /** Allowed origins for the embed (CSV of domains). Empty = any. */
   allowedDomains: text('allowed_domains'),
+  /** When true, customer must enter an email to submit a quote.
+   *  Default true preserves the original required-email behavior. */
+  requireEmail: boolean('require_email').notNull().default(true),
+  /** When true, customer must enter a phone number to submit a quote.
+   *  Default false — most carriers accept email-only inquiries. */
+  requirePhone: boolean('require_phone').notNull().default(false),
+  /** When true, the widget shows the calculated price BEFORE asking for
+   *  contact info (the contact step is moved to the "claim quote" CTA).
+   *  Default false preserves the standard contact-then-quote flow. */
+  showQuoteBeforeContact: boolean('show_quote_before_contact').notNull().default(false),
   updatedAt: timestamp('updated_at', { mode: 'date' }).notNull().defaultNow(),
 });
 
@@ -466,6 +476,76 @@ export const leads = pgTable(
     // table. Composite index gives index-only scans for the common case.
     index('leads_tenant_created_idx').on(t.tenantId, t.createdAt),
     index('leads_tenant_status_idx').on(t.tenantId, t.status),
+  ]
+);
+
+// ────────────────────────────────────────────────────────────────────
+// CALLBACK REQUESTS — when a visitor wants a human to call them back.
+//
+// Two creation paths:
+//   1. Visitor clicks "Request a callback" in the post-quote chat UI.
+//      (`leadId` is set, source = 'chat_escalation' or 'visitor_button')
+//   2. AI assistant escalates because it can't resolve a question,
+//      it surfaced a non-standard accessorial, or visitor explicitly
+//      asked for a human. (source = 'chat_escalation', `aiContext`
+//      captures the convo snippet that triggered the escalation.)
+//
+// Lifecycle: open → in_progress → completed | no_answer | cancelled.
+// Tenant gets an email notification on creation; the inbox lives at
+// /app/callbacks.
+// ────────────────────────────────────────────────────────────────────
+export const callbackRequests = pgTable(
+  'callback_requests',
+  {
+    id: serial('id').primaryKey(),
+    tenantId: integer('tenant_id')
+      .notNull()
+      .references(() => tenants.id, { onDelete: 'cascade' }),
+    /** Linked lead when one exists (post-quote callback). Null for
+     *  visitor-initiated callbacks that happen before quote submit. */
+    leadId: integer('lead_id').references(() => leads.id, { onDelete: 'set null' }),
+    /** Denormalized lead refId for ops convenience (logs, emails). */
+    leadRefId: text('lead_ref_id'),
+
+    customerName: text('customer_name').notNull(),
+    customerPhone: text('customer_phone').notNull(),
+    customerEmail: text('customer_email'),
+    customerCompany: text('customer_company'),
+
+    /** Free-form preferred time, e.g. "weekday afternoons PT". */
+    preferredTime: text('preferred_time'),
+    /** What they want to discuss. */
+    topic: text('topic'),
+
+    /** Where the request came from:
+     *  'visitor_button' — tapped the "Request a callback" CTA
+     *  'chat_escalation' — AI tool-called request_callback during chat
+     *  'human'           — operator entered it manually */
+    triggerSource: text('trigger_source').notNull().default('visitor_button'),
+
+    /** Snapshot of the chat conversation that led to the escalation
+     *  (when triggerSource = 'chat_escalation'). Useful so the human
+     *  doesn't have to re-ask what the AI already covered. */
+    aiContextJson: jsonb('ai_context_json').$type<{
+      messages?: Array<{ role: string; content: string }>;
+      reason?: string;
+    }>(),
+
+    /** Lifecycle. */
+    status: text('status').notNull().default('open'),
+    assignedToUserId: integer('assigned_to_user_id').references(() => users.id, {
+      onDelete: 'set null',
+    }),
+    /** Operator notes (call outcome, follow-ups, etc.). */
+    notes: text('notes'),
+    completedAt: timestamp('completed_at', { mode: 'date' }),
+
+    createdAt: timestamp('created_at', { mode: 'date' }).notNull().defaultNow(),
+    updatedAt: timestamp('updated_at', { mode: 'date' }).notNull().defaultNow(),
+  },
+  (t) => [
+    index('callback_tenant_status_idx').on(t.tenantId, t.status, t.createdAt),
+    index('callback_lead_idx').on(t.leadId),
   ]
 );
 
@@ -909,6 +989,8 @@ export type AiConfig = typeof aiConfigs.$inferSelect;
 export type BrandConfig = typeof brandConfigs.$inferSelect;
 export type Lead = typeof leads.$inferSelect;
 export type NewLead = typeof leads.$inferInsert;
+export type CallbackRequest = typeof callbackRequests.$inferSelect;
+export type NewCallbackRequest = typeof callbackRequests.$inferInsert;
 export type Conversation = typeof conversations.$inferSelect;
 export type Port = typeof ports.$inferSelect;
 export type OutreachProspect = typeof outreachProspects.$inferSelect;
