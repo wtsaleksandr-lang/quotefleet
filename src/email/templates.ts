@@ -18,7 +18,7 @@
 
 const BRAND = {
   name: 'QuoteFleet',
-  operator: 'MR Commerce & Trade',
+  operator: 'MR Holdings & Trade LLC',
   primary: '#0EA5B7',          // accent-strong from light theme
   primaryDark: '#086675',
   ink: '#0B0F14',
@@ -120,7 +120,7 @@ export function magicLinkEmail(opts: {
     `It expires in ${ttl} minutes and can be used only once:\n\n` +
     `${opts.link}\n\n` +
     `If you didn't request this email, you can ignore it — no one can sign in without clicking the link.\n\n` +
-    `— QuoteFleet (a product of MR Commerce & Trade)\n` +
+    `— QuoteFleet (a product of MR Holdings & Trade LLC)\n` +
     `https://quotefleet.net`;
 
   const inner = `
