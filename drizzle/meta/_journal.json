@@ -36,6 +36,20 @@
       "when": 1778259832992,
       "tag": "0004_adorable_doctor_strange",
       "breakpoints": true
+    },
+    {
+      "idx": 5,
+      "version": "7",
+      "when": 1778572800000,
+      "tag": "0005_brand_contact_toggles",
+      "breakpoints": true
+    },
+    {
+      "idx": 6,
+      "version": "7",
+      "when": 1778572800001,
+      "tag": "0006_callback_requests",
+      "breakpoints": true
     }
   ]
 }

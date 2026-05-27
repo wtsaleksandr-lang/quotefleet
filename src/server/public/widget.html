@@ -159,12 +159,12 @@
           <label>Your name</label>
           <input class="qf-input" id="qf-c-name" placeholder="Jane Doe">
         </div>
-        <div class="qf-field qf-full">
-          <label>Email</label>
+        <div class="qf-field qf-full" id="qf-c-email-wrap">
+          <label id="qf-c-email-label">Email</label>
           <input class="qf-input" id="qf-c-email" type="email" placeholder="you@company.com">
         </div>
-        <div class="qf-field">
-          <label>Phone</label>
+        <div class="qf-field" id="qf-c-phone-wrap">
+          <label id="qf-c-phone-label">Phone</label>
           <input class="qf-input" id="qf-c-phone" type="tel" placeholder="optional">
         </div>
         <div class="qf-field">
@@ -202,6 +202,32 @@
         <p class="qf-tagline" style="margin-top:8px; font-size:11.5px;">
           AI assistant — answers about your quote, transit time, accessorials, equipment availability.
         </p>
+      </div>
+
+      <!-- Callback request — secondary path when the visitor would
+           rather speak to a human than chat. -->
+      <div class="qf-callback" id="qf-callback" style="margin-top: 14px;">
+        <button class="qf-cta qf-secondary" id="qf-callback-open-btn">📞 Ask for a callback</button>
+        <div class="qf-callback-form" id="qf-callback-form" style="display:none; margin-top:10px;">
+          <div class="qf-grid">
+            <div class="qf-field qf-full">
+              <label>Phone</label>
+              <input class="qf-input" id="qf-cb-phone" type="tel" placeholder="(555) 555-1234">
+            </div>
+            <div class="qf-field qf-full">
+              <label>When's a good time? (optional)</label>
+              <input class="qf-input" id="qf-cb-time" placeholder="e.g. weekday afternoons, after 2pm CT">
+            </div>
+            <div class="qf-field qf-full">
+              <label>What would you like to discuss? (optional)</label>
+              <textarea class="qf-input" id="qf-cb-topic" rows="2" placeholder="e.g. need pickup tomorrow, want to confirm accessorials"></textarea>
+            </div>
+          </div>
+          <button class="qf-cta" id="qf-cb-send-btn" style="margin-top:10px;">Request callback</button>
+          <button class="qf-cta qf-secondary" id="qf-cb-cancel-btn" style="margin-top:6px;">Cancel</button>
+          <div id="qf-cb-error" class="qf-error" style="display:none;"></div>
+          <div id="qf-cb-success" class="qf-success" style="display:none;"></div>
+        </div>
       </div>
 
       <button class="qf-cta qf-secondary" id="qf-restart-btn" style="margin-top: 14px;">Get another quote</button>
