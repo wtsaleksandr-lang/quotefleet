@@ -778,16 +778,112 @@
       var tb = $('tbody', tbl);
       d.laneZones.forEach(function (z) { tb.appendChild(zoneRow(z)); });
       c.appendChild(tbl);
+      // Inline add-zone form. Replaces 4 stacked window.prompt() dialogs
+      // (which violated the title-in-field + top-left help-cue UI rule and
+      // had no dark-mode contrast). Hidden until the user clicks + Add zone.
       var addBtn = el('button', { class: 'btn btn-secondary', text: '+ Add zone', style: { marginTop: '14px' } });
+
+      var form = el('div', {
+        class: 'add-zone-form',
+        style: {
+          display: 'none',
+          marginTop: '14px',
+          padding: '14px',
+          border: '1px solid var(--border)',
+          borderRadius: '8px',
+          background: 'var(--surface-2, var(--surface))',
+        },
+      });
+      var grid = el('div', { class: 'grid-2', style: { gap: '14px' } });
+
+      function newField(labelText, hintText, inputOpts) {
+        var f = el('div', { class: 'field', style: { gap: '2px' } });
+        var labelRow = el('div', {
+          style: { display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', gap: '12px' },
+        });
+        labelRow.appendChild(el('label', { class: 'field-label', text: labelText }));
+        if (hintText) {
+          labelRow.appendChild(el('span', {
+            class: 'field-hint',
+            text: hintText,
+            style: { fontSize: '11px' },
+          }));
+        }
+        f.appendChild(labelRow);
+        var i = el('input', { class: 'input' });
+        if (inputOpts && inputOpts.type) i.type = inputOpts.type;
+        if (inputOpts && inputOpts.step) i.step = inputOpts.step;
+        if (inputOpts && inputOpts.placeholder) i.placeholder = inputOpts.placeholder;
+        if (inputOpts && inputOpts.value != null) i.value = inputOpts.value;
+        f.appendChild(i);
+        return { field: f, input: i };
+      }
+
+      var labelF = newField('Zone label', '⌘/Ctrl+Enter to save', { placeholder: 'Houston → 50mi' });
+      var portF = newField('Anchor port', 'Optional', { placeholder: 'USHOU' });
+      var radiusF = newField('Radius (miles)', null, { type: 'number', step: '1', value: '50' });
+      var priceF = newField('Flat price (USD)', null, { type: 'number', step: '1', value: '500' });
+      grid.appendChild(labelF.field);
+      grid.appendChild(portF.field);
+      grid.appendChild(radiusF.field);
+      grid.appendChild(priceF.field);
+      form.appendChild(grid);
+
+      var actions = el('div', {
+        style: { display: 'flex', gap: '8px', marginTop: '12px', justifyContent: 'flex-end' },
+      });
+      var cancelBtn = el('button', { class: 'btn btn-secondary', text: 'Cancel' });
+      var saveBtn = el('button', { class: 'btn btn-primary', text: 'Save zone' });
+      actions.appendChild(cancelBtn);
+      actions.appendChild(saveBtn);
+      form.appendChild(actions);
+
+      function resetForm() {
+        labelF.input.value = '';
+        portF.input.value = '';
+        radiusF.input.value = '50';
+        priceF.input.value = '500';
+      }
+      function closeForm() {
+        form.style.display = 'none';
+        addBtn.style.display = '';
+      }
+      function submitForm() {
+        var label = labelF.input.value.trim();
+        if (!label) { labelF.input.focus(); return; }
+        var port = portF.input.value.trim() || null;
+        var radius = Number(radiusF.input.value || 0);
+        var price = Number(priceF.input.value || 0);
+        api('/api/tenant/lane-zones', {
+          method: 'POST',
+          body: { label: label, anchorPortCode: port, radiusMiles: radius, flatPrice: price },
+        }).then(function () {
+          resetForm();
+          closeForm();
+          renderZones(c);
+        }).catch(toastErr);
+      }
+      saveBtn.addEventListener('click', submitForm);
+      cancelBtn.addEventListener('click', function () { resetForm(); closeForm(); });
+      [labelF.input, portF.input, radiusF.input, priceF.input].forEach(function (inp) {
+        inp.addEventListener('keydown', function (ev) {
+          if ((ev.metaKey || ev.ctrlKey) && ev.key === 'Enter') {
+            ev.preventDefault();
+            submitForm();
+          } else if (ev.key === 'Escape') {
+            ev.preventDefault();
+            closeForm();
+          }
+        });
+      });
+
       addBtn.addEventListener('click', function () {
-        var label = prompt('Zone label, e.g. "Houston → 50mi":'); if (!label) return;
-        var port = prompt('Anchor port code (e.g. USHOU) or leave blank:') || null;
-        var radius = Number(prompt('Radius (miles):', '50') || 0);
-        var price = Number(prompt('Flat price (USD):', '500') || 0);
-        api('/api/tenant/lane-zones', { method: 'POST', body: { label: label, anchorPortCode: port, radiusMiles: radius, flatPrice: price } })
-          .then(function () { renderZones(c); }).catch(toastErr);
+        form.style.display = '';
+        addBtn.style.display = 'none';
+        labelF.input.focus();
       });
       c.appendChild(addBtn);
+      c.appendChild(form);
     }).catch(showErr(c));
   }
   function zoneRow(z) {
