@@ -454,29 +454,77 @@
             .catch(toastErr);
         });
         statusCell.appendChild(sel);
-        // Notes toggle.
+        // Notes editor — inline expandable textarea. Replaces the old
+        // window.prompt() flow (which violated the title-in-field +
+        // top-left help-cue UI rule and offered no dark-mode contrast).
         var actCell = row.children[6];
-        var notesBtn = el('button', { class: 'btn-link', text: cb.notes ? 'Edit notes' : 'Add notes' });
-        notesBtn.addEventListener('click', function () {
-          var current = cb.notes || '';
-          var next = window.prompt('Notes — call outcome, follow-ups, etc.', current);
-          if (next === null || next === current) return;
-          api('/api/tenant/callbacks/' + cb.id, { method: 'PATCH', body: { notes: next } })
-            .then(function () { cb.notes = next; notesBtn.textContent = next ? 'Edit notes' : 'Add notes'; })
-            .catch(toastErr);
+        var notesBtn = el('button', {
+          class: 'btn-link',
+          text: cb.notes ? 'Edit notes' : 'Add notes',
         });
         actCell.appendChild(notesBtn);
         tb.appendChild(row);
-        // Optional notes preview row.
-        if (cb.notes) {
-          var noteRow = el('tr', {
-            html: '<td colspan="7" class="muted-small" style="padding:6px 12px 12px 12px;">📝 ' +
-              cb.notes.replace(/[<>&]/g, function (ch) {
-                return { '<': '&lt;', '>': '&gt;', '&': '&amp;' }[ch];
-              }) + '</td>',
-          });
-          tb.appendChild(noteRow);
+
+        // Editor row — always present in DOM, hidden until expanded so
+        // the show/hide is a CSS toggle (no re-render flicker on save).
+        // 2px gap to the row above is the project's UI-rule baseline.
+        var editorTr = el('tr', { class: 'callback-notes-editor' });
+        var editorTd = el('td', {
+          colspan: '7',
+          style: { padding: '2px 12px 12px 12px' },
+        });
+        var field = el('div', { class: 'field', style: { gap: '2px' } });
+        var labelRow = el('div', {
+          style: {
+            display: 'flex',
+            justifyContent: 'space-between',
+            alignItems: 'baseline',
+            gap: '12px',
+          },
+        });
+        labelRow.appendChild(el('label', { class: 'field-label', text: 'Notes' }));
+        labelRow.appendChild(el('span', {
+          class: 'field-hint',
+          text: 'Visible only to your team · ⌘/Ctrl+Enter to save',
+          style: { fontSize: '11px' },
+        }));
+        field.appendChild(labelRow);
+        var ta = el('textarea', {
+          class: 'textarea',
+          rows: '3',
+          placeholder: 'Call outcome, follow-ups, etc.',
+        });
+        ta.value = cb.notes || '';
+        field.appendChild(ta);
+        editorTd.appendChild(field);
+        editorTr.appendChild(editorTd);
+        editorTr.style.display = cb.notes ? '' : 'none';
+        tb.appendChild(editorTr);
+
+        function saveNotes() {
+          var next = ta.value;
+          if (next === (cb.notes || '')) return;
+          api('/api/tenant/callbacks/' + cb.id, { method: 'PATCH', body: { notes: next } })
+            .then(function () {
+              cb.notes = next;
+              notesBtn.textContent = next ? 'Edit notes' : 'Add notes';
+              toastOk();
+            })
+            .catch(toastErr);
         }
+        ta.addEventListener('blur', saveNotes);
+        ta.addEventListener('keydown', function (ev) {
+          if ((ev.metaKey || ev.ctrlKey) && ev.key === 'Enter') {
+            ev.preventDefault();
+            saveNotes();
+            ta.blur();
+          }
+        });
+        notesBtn.addEventListener('click', function () {
+          var hidden = editorTr.style.display === 'none';
+          editorTr.style.display = hidden ? '' : 'none';
+          if (hidden) ta.focus();
+        });
       });
       c.appendChild(tbl);
     }).catch(showErr(c));
