@@ -100,27 +100,24 @@
 
   function renderDetails(data) {
     var s = data.shipment || {};
-    var flags = {
-      Overweight: s.weightLbs && Number(s.weightLbs) > 44000,
-      Hazmat: (s.accessorialCodes || []).indexOf('hazmat') >= 0,
-      Reefer: /reefer|refrigerated/i.test(String(s.equipment || '')),
-    };
+    var codes = s.accessorialCodes || [];
     var rows = [
-      ['Service', titleize(s.service)],
-      ['Equipment', titleize(s.equipment)],
-      ['Commodity', s.commodity],
-      ['Weight', s.weightLbs ? Number(s.weightLbs).toLocaleString('en-US') + ' lb' : 'Not specified'],
-      ['Pickup Date', s.pickupDate || 'Not specified'],
-      ['Delivery Date', s.deliveryDate || 'Not specified'],
+      ['Shipment Type', titleize(s.equipment || s.service)],
       ['Steamship Line', s.oceanCarrier || 'Not specified'],
-      ['Booking #', s.bookingNumber || 'Not specified'],
-      ['B/L #', s.billOfLadingNumber || 'Not specified'],
-      ['Container #', s.containerNumbers || 'Not specified'],
-      ['Overweight', bool(flags.Overweight)],
-      ['Hazardous', bool(flags.Hazmat)],
-      ['Refrigerated / Reefer', bool(flags.Reefer)],
-      ['Notes', s.notes || '—'],
+      ['Overweight', bool(s.weightLbs && Number(s.weightLbs) > 44000)],
+      ['Tri-axle', bool(codes.indexOf('tri_axle') >= 0 || codes.indexOf('triaxle') >= 0)],
+      ['Hazardous', bool(codes.indexOf('hazmat') >= 0)],
+      ['Refrigerated / Reefer', bool(/reefer|refrigerated/i.test(String(s.equipment || '')) || codes.indexOf('reefer') >= 0)],
     ];
+    if (s.pickupDate) rows.push(['Pickup Date', s.pickupDate]);
+    if (s.deliveryDate) rows.push(['Delivery Date', s.deliveryDate]);
+    if (s.commodity) rows.push(['Commodity', s.commodity]);
+    if (s.weightLbs) rows.push(['Weight', Number(s.weightLbs).toLocaleString('en-US') + ' lb']);
+    if (s.bookingNumber) rows.push(['Booking #', s.bookingNumber]);
+    if (s.billOfLadingNumber) rows.push(['B/L #', s.billOfLadingNumber]);
+    if (s.containerNumbers) rows.push(['Container #', s.containerNumbers]);
+    if (s.notes) rows.push(['Notes', s.notes]);
+
     var dl = $('qdoc-details');
     dl.innerHTML = '';
     rows.forEach(function (r) {
@@ -233,7 +230,7 @@
     $('qdoc-print').onclick = function () { window.print(); };
     $('qdoc-pdf').onclick = function () { window.print(); };
     $('qdoc-email').onclick = function () {
-      var subject = 'Quote ' + data.quote.refId + ' from ' + (data.brand.displayName || data.tenant.name);
+      var subject = 'Quote ' + data.quote.refId + ' from ' + ((data.brand && data.brand.displayName) || data.tenant.name);
       var body = 'View quote ' + data.quote.refId + ': ' + (data.quote.quoteUrl || location.href) + '\n\nEstimated total: ' + money(data.quote.total, data.quote.currency);
       location.href = 'mailto:?subject=' + encodeURIComponent(subject) + '&body=' + encodeURIComponent(body);
     };
