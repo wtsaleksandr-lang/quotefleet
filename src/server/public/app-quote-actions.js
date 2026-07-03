@@ -7,6 +7,14 @@
   function chatUrl(refId) {
     return '/chat/' + encodeURIComponent(refId);
   }
+  function escapeHtml(value) {
+    return String(value || '')
+      .replace(/&/g, '&amp;')
+      .replace(/</g, '&lt;')
+      .replace(/>/g, '&gt;')
+      .replace(/"/g, '&quot;')
+      .replace(/'/g, '&#39;');
+  }
   function copyText(text) {
     if (navigator.clipboard && navigator.clipboard.writeText) {
       return navigator.clipboard.writeText(text);
@@ -33,9 +41,9 @@
         card.innerHTML = '' +
           '<div class="card-title">Quote email preview</div>' +
           '<div class="card-subtitle">Template only. It does not send email yet.</div>' +
-          '<div class="field"><label class="field-label">To</label><input class="input" readonly value="' + (data.to || '') + '"></div>' +
-          '<div class="field" style="margin-top:10px;"><label class="field-label">Subject</label><input class="input" readonly value="' + data.subject.replace(/"/g, '&quot;') + '"></div>' +
-          '<div class="field" style="margin-top:10px;"><label class="field-label">Plain text</label><textarea class="textarea" rows="8" readonly>' + data.text + '</textarea></div>' +
+          '<div class="field"><label class="field-label">To</label><input class="input" readonly value="' + escapeHtml(data.to) + '"></div>' +
+          '<div class="field" style="margin-top:10px;"><label class="field-label">Subject</label><input class="input" readonly value="' + escapeHtml(data.subject) + '"></div>' +
+          '<div class="field" style="margin-top:10px;"><label class="field-label">Plain text</label><textarea class="textarea" rows="8" readonly>' + escapeHtml(data.text) + '</textarea></div>' +
           '<div class="field" style="margin-top:10px;"><label class="field-label">HTML preview</label><iframe style="width:100%;height:360px;border:1px solid var(--border);border-radius:8px;background:white;"></iframe></div>';
         (anchor || page.querySelector('.qf-quote-actions') || page.querySelector('h1')).insertAdjacentElement('afterend', card);
         card.querySelector('iframe').srcdoc = data.html;
