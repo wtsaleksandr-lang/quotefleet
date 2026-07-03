@@ -12,6 +12,7 @@ const baseT: Tenant = {
   slug: 'acme',
   hostDomain: 'quotefleet.net',
   customDomain: null,
+  customDomainVerifiedAt: null,
   name: 'Acme',
   contactEmail: 'a@b.c',
   contactPhone: null,
@@ -28,6 +29,8 @@ const baseT: Tenant = {
   subscriptionEndsAt: null,
   lifecycleEmailsJson: null,
   anthropicKeyEncrypted: null,
+  dpaAcceptedAt: null,
+  dpaVersion: null,
   createdAt: now,
   updatedAt: now,
 };
