@@ -4,6 +4,7 @@ import { db } from '../../db/client.js';
 import { tenants, brandConfigs, leads, accessorials } from '../../db/schema.js';
 import { loadEnv } from '../../config.js';
 import { publicChatLimiter } from '../rateLimits.js';
+import { loadCarrierProfile } from './carrierProfile.js';
 
 const QUOTE_VALIDITY_DAYS = 30;
 
@@ -116,10 +117,11 @@ export function registerQuoteDocRoutes(app: Express) {
     const lead = leadRows[0];
     if (!lead) return res.status(404).json({ error: 'Quote not found' });
 
-    const [tenantRows, brandRows, accessorialRows] = await Promise.all([
+    const [tenantRows, brandRows, accessorialRows, carrierProfile] = await Promise.all([
       db().select().from(tenants).where(eq(tenants.id, lead.tenantId)).limit(1),
       db().select().from(brandConfigs).where(eq(brandConfigs.tenantId, lead.tenantId)).limit(1),
       db().select().from(accessorials).where(eq(accessorials.tenantId, lead.tenantId)),
+      loadCarrierProfile(lead.tenantId),
     ]);
     const tenant = tenantRows[0];
     if (!tenant || tenant.status !== 'active') return res.status(404).json({ error: 'Carrier not found' });
@@ -158,6 +160,7 @@ export function registerQuoteDocRoutes(app: Express) {
         mcNumber: tenant.mcNumber,
         dotNumber: tenant.dotNumber,
       },
+      carrierProfile,
       brand: brandRows[0] ?? null,
       customer: {
         name: lead.customerName,
@@ -198,7 +201,7 @@ export function registerQuoteDocRoutes(app: Express) {
           appliesToServices: a.appliesToServices ?? null,
         })),
       issuedBy: {
-        name: tenant.name,
+        name: String(carrierProfile.quoteContactName || tenant.name),
         email: tenant.contactEmail,
         phone: tenant.contactPhone,
       },
