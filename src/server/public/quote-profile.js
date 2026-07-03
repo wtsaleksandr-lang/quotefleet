@@ -11,15 +11,21 @@
     s.textContent = text;
     return s;
   }
-  function mailLine(label, value, hrefPrefix) {
+  function linkLine(value, href) {
     var s = document.createElement('span');
     s.className = 'qdoc-line';
-    if (label) s.appendChild(document.createTextNode(label));
     var a = document.createElement('a');
-    a.href = hrefPrefix + value;
+    a.href = href;
     a.textContent = value;
+    a.target = '_blank';
+    a.rel = 'noopener';
     s.appendChild(a);
     return s;
+  }
+  function websiteHref(value) {
+    var v = String(value || '').trim();
+    if (!v) return '';
+    return /^https?:\/\//i.test(v) ? v : 'https://' + v;
   }
   function compact(arr) {
     return arr.map(function (x) { return String(x || '').trim(); }).filter(Boolean);
@@ -44,7 +50,7 @@
           profile.scac ? 'SCAC: ' + profile.scac : '',
         ]).join('   ');
         if (ids) carrierDetails.appendChild(line(ids));
-        if (profile.websiteUrl) carrierDetails.appendChild(mailLine('', profile.websiteUrl, ''));
+        if (profile.websiteUrl) carrierDetails.appendChild(linkLine(profile.websiteUrl, websiteHref(profile.websiteUrl)));
       }
     }
     var issued = document.getElementById('qdoc-issued-by');
