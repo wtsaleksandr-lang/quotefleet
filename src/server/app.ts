@@ -23,6 +23,19 @@ import { hostInfoMiddleware } from './hostInfo.js';
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
 
+function allowsExternalFraming(req: express.Request): boolean {
+  const path = req.path;
+  return (
+    path === '/embed.js' ||
+    path === '/widget.html' ||
+    path.startsWith('/w/') ||
+    path.startsWith('/quote/') ||
+    path.startsWith('/chat/') ||
+    path.startsWith('/api/public/') ||
+    (path === '/' && !!(req.tenantSubdomain || req.tenantCustomDomainSlug))
+  );
+}
+
 export function createApp(): express.Express {
   const app = express();
   app.set('trust proxy', 1);
@@ -30,7 +43,6 @@ export function createApp(): express.Express {
 
   app.use((_req, res, next) => {
     res.setHeader('X-Content-Type-Options', 'nosniff');
-    res.setHeader('X-Frame-Options', 'SAMEORIGIN');
     res.setHeader('Referrer-Policy', 'strict-origin-when-cross-origin');
     res.setHeader('Permissions-Policy', 'geolocation=(), microphone=(), camera=(), payment=()');
     res.setHeader('Strict-Transport-Security', 'max-age=31536000; includeSubDomains');
@@ -43,6 +55,16 @@ export function createApp(): express.Express {
   app.use(express.urlencoded({ extended: true, limit: '7mb' }));
   app.use(cookieParser());
   app.use(hostInfoMiddleware);
+
+  // Dashboard/admin/auth pages should not be framed. Public widget, quote,
+  // and chat pages must be frameable because customers embed the widget and
+  // may open quote/chat views from third-party carrier websites.
+  app.use((req, res, next) => {
+    if (!allowsExternalFraming(req)) {
+      res.setHeader('X-Frame-Options', 'SAMEORIGIN');
+    }
+    next();
+  });
 
   app.use((req, res, next) => {
     if (req.path.startsWith('/api/public/') || req.path === '/embed.js') {
