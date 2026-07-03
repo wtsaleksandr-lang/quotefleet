@@ -5,6 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <title>QuoteFleet Quote Preview</title>
   <link rel="stylesheet" href="/quote.css" />
+  <link rel="stylesheet" href="/quote-polish.css" />
 </head>
 <body>
   <main class="qdoc-shell">
@@ -20,10 +21,14 @@
 
       <header class="qdoc-header">
         <div class="qdoc-carrier">
-          <div style="width:76px;height:56px;border-radius:8px;background:#111827;color:#fff;display:grid;place-items:center;font-weight:900;font-size:22px;">QF</div>
+          <div style="width:72px;height:56px;border-radius:8px;background:#111827;color:#fff;display:grid;place-items:center;font-weight:900;font-size:22px;">QF</div>
           <div>
             <h1>JTM Logistics Inc</h1>
-            <p>12161 South Central Avenue Alsip, IL 60803<br>+1 312-898-2848 &nbsp; tarek@example.com<br>MC: 1379848 &nbsp;&nbsp; US DOT: 3817099 &nbsp;&nbsp; SCAC: JLAG</p>
+            <div class="qdoc-carrier-details">
+              <span class="qdoc-line">12161 South Central Avenue Alsip, IL 60803</span>
+              <span class="qdoc-line">+1 312-898-2848 &nbsp; <a href="mailto:tarek@example.com">tarek@example.com</a></span>
+              <span class="qdoc-line">MC: 1379848 &nbsp;&nbsp; US DOT: 3817099 &nbsp;&nbsp; SCAC: JLAG</span>
+            </div>
           </div>
         </div>
         <div class="qdoc-summary-box">
@@ -35,20 +40,9 @@
       </header>
 
       <section class="qdoc-route-card">
-        <div class="qdoc-location">
-          <span>Pickup</span>
-          <strong>Roselle, IL</strong>
-          <small>60172</small>
-        </div>
-        <div class="qdoc-route-line">
-          <i></i><b></b><i class="end"></i>
-          <span>61 miles round trip</span>
-        </div>
-        <div class="qdoc-location right">
-          <span>Delivery</span>
-          <strong>CSX - Chicago 59th Street</strong>
-          <small>60636</small>
-        </div>
+        <div class="qdoc-location"><span>Pickup</span><strong>Roselle, IL</strong><small>60172</small></div>
+        <div class="qdoc-route-line"><i></i><b></b><i class="end"></i><span>61 miles round trip</span></div>
+        <div class="qdoc-location right"><span>Delivery</span><strong>CSX - Chicago 59th Street</strong><small>60636</small></div>
       </section>
 
       <section class="qdoc-grid">
@@ -68,7 +62,6 @@
           </section>
 
           <section class="qdoc-panel qdoc-map-panel">
-            <h2>Route Map</h2>
             <div class="qdoc-map-wrap">
               <div class="qdoc-map-fallback">
                 <strong>Route map preview</strong>
@@ -89,11 +82,7 @@
             <div class="qdoc-price-row"><span>Toll Charge</span><strong>$12.30</strong></div>
             <div class="qdoc-price-row"><span>Chassis Rental<small>$40.00/day, 2 day minimum</small></span><strong>$80.00</strong></div>
           </div>
-          <div class="qdoc-total-box">
-            <span>Estimated Total</span>
-            <strong>$371.11</strong>
-            <small>Includes the line items shown above.</small>
-          </div>
+          <div class="qdoc-total-box"><span>Estimated Total</span><strong>$371.11</strong><small>Includes the line items shown above.</small></div>
         </aside>
       </section>
 
@@ -110,7 +99,7 @@
       </section>
 
       <footer class="qdoc-footer">
-        <div><strong>Quote issued by:</strong> JTM Logistics Inc · tarek@example.com · +1 312-898-2848</div>
+        <div><strong>Quote issued by:</strong> JTM Logistics Inc · <a href="mailto:tarek@example.com">tarek@example.com</a> · +1 312-898-2848</div>
         <p>Quote is based on the details provided. Final charges may change if shipment details, accessorials, appointment conditions, terminal fees, or route requirements change.</p>
         <p class="qdoc-print-link">Questions? Open this quote online: /quote/QF-DEMO-84638931</p>
         <div class="qdoc-powered">Powered by <strong>QuoteFleet</strong></div>
