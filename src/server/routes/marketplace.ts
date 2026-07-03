@@ -1,25 +1,3 @@
-/**
- * PUBLIC marketplace API. Reads from `marketplace_*` tables.
- *
- *   GET /api/marketplace/carriers
- *     ?service=drayage|ftl|ltl|expedited|hotshot
- *     ?country=US|CA
- *     ?port=USLAX
- *     → list of opted-in carriers (paginated). Returns name, location,
- *       services + equipment, MC#, DOT#. NO rates inline (use /carrier/:slug).
- *
- *   GET /api/marketplace/carrier/:slug
- *     → full carrier profile + their CURRENT rate snapshots.
- *
- *   GET /api/marketplace/benchmarks
- *     ?service=ftl ?equipment=dryvan ?port=USLAX
- *     → anonymized P25/P50/P75 across ALL carriers (opted-in or not),
- *       with sample size. Rendered as "your $2.55/mi vs national
- *       median $2.30 (P25 $2.10, P75 $2.55, sample N=42)".
- *
- *   GET /api/marketplace/aggregates
- *     → bulk dump of all aggregates for the dashboards.
- */
 import type { Express, Request, Response } from 'express';
 import { eq, and, desc, sql } from 'drizzle-orm';
 import { db } from '../../db/client.js';
@@ -31,12 +9,37 @@ import {
 } from '../../db/schema.js';
 import { publicAutocompleteLimiter } from '../rateLimits.js';
 
-// Aggregates with sample size below this are suppressed from the public
-// API to prevent triangulation back to specific carriers.
 const MIN_SAMPLE_FOR_PUBLIC = 5;
 
+function confidence(sampleSize: number): 'low' | 'medium' | 'high' {
+  if (sampleSize >= 25) return 'high';
+  if (sampleSize >= 10) return 'medium';
+  return 'low';
+}
+
+function visibleAggregate(r: typeof marketplaceAggregates.$inferSelect) {
+  return {
+    service: r.service,
+    equipment: r.equipment,
+    anchorType: r.anchorType,
+    anchorCode: r.anchorCode,
+    sampleSize: r.sampleSize,
+    confidence: confidence(r.sampleSize),
+    minSample: MIN_SAMPLE_FOR_PUBLIC,
+    p25RatePerMile: r.p25RatePerMile,
+    p50RatePerMile: r.p50RatePerMile,
+    p75RatePerMile: r.p75RatePerMile,
+    p25Minimum: r.p25Minimum,
+    p50Minimum: r.p50Minimum,
+    p75Minimum: r.p75Minimum,
+    p25FlatPrice: r.p25FlatPrice,
+    p50FlatPrice: r.p50FlatPrice,
+    p75FlatPrice: r.p75FlatPrice,
+    computedAt: r.computedAt,
+  };
+}
+
 export function registerMarketplaceRoutes(app: Express) {
-  // ── carrier directory ───────────────────────────────────────────
   app.get('/api/marketplace/carriers', publicAutocompleteLimiter, async (req: Request, res: Response) => {
     const service = req.query.service ? String(req.query.service).toLowerCase() : null;
     const country = req.query.country ? String(req.query.country).toUpperCase() : null;
@@ -44,16 +47,12 @@ export function registerMarketplaceRoutes(app: Express) {
     const page = Math.max(1, parseInt(String(req.query.page ?? '1'), 10) || 1);
     const perPage = Math.min(50, Math.max(5, parseInt(String(req.query.perPage ?? '20'), 10) || 20));
 
-    // Visible carriers only. Service / country filter applied in JS;
-    // jsonb array containment varies by Postgres version.
     const rows = await db().select().from(marketplaceCarriers).where(eq(marketplaceCarriers.visible, true));
 
     let filtered = rows;
     if (country) filtered = filtered.filter((r) => r.countryFocus === country || r.countryFocus === 'BOTH');
     if (service) filtered = filtered.filter((r) => (r.servicesJson ?? []).includes(service));
 
-    // If a port filter is given, intersect with marketplace_lanes so
-    // we only return carriers serving that anchor.
     if (port) {
       const tenantsAtPort = await db()
         .select({ tenantId: marketplaceLanes.tenantId })
@@ -83,7 +82,6 @@ export function registerMarketplaceRoutes(app: Express) {
     });
   });
 
-  // ── single carrier with current rate snapshots ───────────────────
   app.get('/api/marketplace/carrier/:slug', publicAutocompleteLimiter, async (req: Request, res: Response) => {
     const slug = String(req.params.slug ?? '').toLowerCase().trim();
     const row = (
@@ -91,8 +89,6 @@ export function registerMarketplaceRoutes(app: Express) {
     )[0];
     if (!row || !row.visible) return res.status(404).json({ error: 'Carrier not listed.' });
 
-    // Current rate snapshots = latest per (service, equipment, lane_anchor).
-    // For a small N (1-10s of rates per tenant) we just pull recent and dedupe in JS.
     const snapshots = await db()
       .select()
       .from(marketplaceRateSnapshots)
@@ -142,9 +138,6 @@ export function registerMarketplaceRoutes(app: Express) {
     });
   });
 
-  // ── anonymized benchmarks ────────────────────────────────────────
-  // Public, no auth, no opt-in required because aggregates are anonymized.
-  // Suppress aggregates with sample size < 5.
   app.get('/api/marketplace/benchmarks', publicAutocompleteLimiter, async (req: Request, res: Response) => {
     const service = req.query.service ? String(req.query.service).toLowerCase() : null;
     const equipment = req.query.equipment ? String(req.query.equipment).toLowerCase() : null;
@@ -153,48 +146,34 @@ export function registerMarketplaceRoutes(app: Express) {
     let rows = await db().select().from(marketplaceAggregates);
     if (service) rows = rows.filter((r) => r.service === service);
     if (equipment) rows = rows.filter((r) => r.equipment === equipment);
-    if (port) {
-      rows = rows.filter((r) => r.anchorType === 'port' && r.anchorCode === port);
-    }
+    if (port) rows = rows.filter((r) => r.anchorType === 'port' && r.anchorCode === port);
     const visible = rows.filter((r) => r.sampleSize >= MIN_SAMPLE_FOR_PUBLIC);
 
     return res.json({
-      benchmarks: visible.map((r) => ({
-        service: r.service,
-        equipment: r.equipment,
-        anchorType: r.anchorType,
-        anchorCode: r.anchorCode,
-        sampleSize: r.sampleSize,
-        p25RatePerMile: r.p25RatePerMile,
-        p50RatePerMile: r.p50RatePerMile,
-        p75RatePerMile: r.p75RatePerMile,
-        p25Minimum: r.p25Minimum,
-        p50Minimum: r.p50Minimum,
-        p75Minimum: r.p75Minimum,
-        p25FlatPrice: r.p25FlatPrice,
-        p50FlatPrice: r.p50FlatPrice,
-        p75FlatPrice: r.p75FlatPrice,
-        computedAt: r.computedAt,
-      })),
+      benchmarks: visible.map(visibleAggregate),
       suppressed: rows.length - visible.length,
       minSample: MIN_SAMPLE_FOR_PUBLIC,
+      confidenceLegend: {
+        low: '5-9 samples',
+        medium: '10-24 samples',
+        high: '25+ samples',
+      },
     });
   });
 
-  // Convenience: bulk dump for the in-app dashboard chart.
   app.get('/api/marketplace/aggregates', publicAutocompleteLimiter, async (_req, res) => {
     const rows = await db()
-      .select({
-        service: marketplaceAggregates.service,
-        equipment: marketplaceAggregates.equipment,
-        anchorType: marketplaceAggregates.anchorType,
-        anchorCode: marketplaceAggregates.anchorCode,
-        sampleSize: marketplaceAggregates.sampleSize,
-        p50RatePerMile: marketplaceAggregates.p50RatePerMile,
-        p50FlatPrice: marketplaceAggregates.p50FlatPrice,
-      })
+      .select()
       .from(marketplaceAggregates)
       .where(sql`${marketplaceAggregates.sampleSize} >= ${MIN_SAMPLE_FOR_PUBLIC}`);
-    res.json({ aggregates: rows, minSample: MIN_SAMPLE_FOR_PUBLIC });
+    res.json({
+      aggregates: rows.map(visibleAggregate),
+      minSample: MIN_SAMPLE_FOR_PUBLIC,
+      confidenceLegend: {
+        low: '5-9 samples',
+        medium: '10-24 samples',
+        high: '25+ samples',
+      },
+    });
   });
 }
