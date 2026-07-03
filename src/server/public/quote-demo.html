@@ -1,0 +1,109 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>QuoteFleet Quote Preview</title>
+  <link rel="stylesheet" href="/quote.css" />
+  <link rel="stylesheet" href="/quote-polish.css" />
+</head>
+<body>
+  <main class="qdoc-shell">
+    <article class="qdoc">
+      <nav class="qdoc-actions no-print" aria-label="Quote actions">
+        <button type="button" onclick="alert('Demo only')">Email</button>
+        <button type="button" onclick="navigator.clipboard&&navigator.clipboard.writeText(location.href)">Copy Link</button>
+        <button type="button" onclick="window.print()">Print</button>
+        <button type="button" onclick="window.print()">Save PDF</button>
+        <a class="qdoc-action-primary" href="#">Open Chat</a>
+        <button type="button">Request Callback</button>
+      </nav>
+
+      <header class="qdoc-header">
+        <div class="qdoc-carrier">
+          <div style="width:72px;height:56px;border-radius:8px;background:#111827;color:#fff;display:grid;place-items:center;font-weight:900;font-size:22px;">QF</div>
+          <div>
+            <h1>JTM Logistics Inc</h1>
+            <div class="qdoc-carrier-details">
+              <span class="qdoc-line">12161 South Central Avenue Alsip, IL 60803</span>
+              <span class="qdoc-line">+1 312-898-2848 &nbsp; <a href="mailto:tarek@example.com">tarek@example.com</a></span>
+              <span class="qdoc-line">MC: 1379848 &nbsp;&nbsp; US DOT: 3817099 &nbsp;&nbsp; SCAC: JLAG</span>
+            </div>
+          </div>
+        </div>
+        <div class="qdoc-summary-box">
+          <div><span>Quote</span><strong>QF-DEMO-84638931</strong></div>
+          <div><span>Generated</span><strong>07/03/2026</strong></div>
+          <div><span>Expires</span><strong>08/02/2026</strong></div>
+          <div><span>Total</span><strong>$371.11</strong></div>
+        </div>
+      </header>
+
+      <section class="qdoc-route-card">
+        <div class="qdoc-location"><span>Pickup</span><strong>Roselle, IL</strong><small>60172</small></div>
+        <div class="qdoc-route-line"><i></i><b></b><i class="end"></i><span>61 miles round trip</span></div>
+        <div class="qdoc-location right"><span>Delivery</span><strong>CSX - Chicago 59th Street</strong><small>60636</small></div>
+      </section>
+
+      <section class="qdoc-grid">
+        <div class="qdoc-left">
+          <section class="qdoc-panel">
+            <h2>Quote Details</h2>
+            <dl class="qdoc-detail-list">
+              <dt>Shipment Type</dt><dd>Export international 40ft</dd>
+              <dt>Steamship Line</dt><dd>Not specified</dd>
+              <dt>Overweight</dt><dd>No</dd>
+              <dt>Tri-axle</dt><dd>No</dd>
+              <dt>Hazardous</dt><dd>No</dd>
+              <dt>Refrigerated / Reefer</dt><dd>No</dd>
+            </dl>
+          </section>
+
+          <section class="qdoc-panel qdoc-map-panel">
+            <div class="qdoc-map-wrap">
+              <div class="qdoc-map-fallback">
+                <strong>Route map preview</strong>
+                <span>Live quote pages use Google or Mapbox static maps when configured.</span>
+              </div>
+            </div>
+          </section>
+        </div>
+
+        <aside class="qdoc-right qdoc-panel">
+          <h2>Pricing Details</h2>
+          <div class="qdoc-price-lines">
+            <div class="qdoc-price-heading">Drayage / Linehaul</div>
+            <div class="qdoc-price-row"><span>Drayage</span><strong>$196.35</strong></div>
+            <div class="qdoc-price-heading">Fuel</div>
+            <div class="qdoc-price-row"><span>Fuel Surcharge<small>42.00% through 08/01/2026</small></span><strong>$82.46</strong></div>
+            <div class="qdoc-price-heading">Accessorials</div>
+            <div class="qdoc-price-row"><span>Toll Charge</span><strong>$12.30</strong></div>
+            <div class="qdoc-price-row"><span>Chassis Rental<small>$40.00/day, 2 day minimum</small></span><strong>$80.00</strong></div>
+          </div>
+          <div class="qdoc-total-box"><span>Estimated Total</span><strong>$371.11</strong><small>Includes the line items shown above.</small></div>
+        </aside>
+      </section>
+
+      <section class="qdoc-panel qdoc-accessorial-panel">
+        <h2>Accessorial Charges That May Apply</h2>
+        <div class="qdoc-accessorials">
+          <div class="qdoc-accessorial included"><strong>Chassis Rental</strong><span>$40.00 / day</span><small>Included/selected on this quote</small></div>
+          <div class="qdoc-accessorial"><strong>Pre-Pull</strong><span>$150.00</span><small>May apply if required</small></div>
+          <div class="qdoc-accessorial"><strong>Yard Storage</strong><span>$50.00 / day</span><small>May apply if required</small></div>
+          <div class="qdoc-accessorial"><strong>Chassis Split</strong><span>$75.00</span><small>May apply if required</small></div>
+          <div class="qdoc-accessorial"><strong>Reefer</strong><span>$200.00</span><small>May apply if required</small></div>
+          <div class="qdoc-accessorial"><strong>Tri-axle</strong><span>Custom</span><small>May apply if overweight</small></div>
+        </div>
+      </section>
+
+      <footer class="qdoc-footer">
+        <div><strong>Quote issued by:</strong> JTM Logistics Inc · <a href="mailto:tarek@example.com">tarek@example.com</a> · +1 312-898-2848</div>
+        <p>Quote is based on the details provided. Final charges may change if shipment details, accessorials, appointment conditions, terminal fees, or route requirements change.</p>
+        <p class="qdoc-print-link">Questions? Open this quote online: /quote/QF-DEMO-84638931</p>
+        <div class="qdoc-powered">Powered by <strong>QuoteFleet</strong></div>
+      </footer>
+    </article>
+  </main>
+  <script src="/quote-polish.js"></script>
+</body>
+</html>
