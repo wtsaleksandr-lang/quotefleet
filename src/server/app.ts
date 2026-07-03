@@ -19,6 +19,7 @@ import { registerBillingRoutes, registerStripeWebhook } from './routes/billing.j
 import { registerMarketingChatRoute } from './routes/marketingChat.js';
 import { registerQuoteDocRoutes } from './routes/quoteDoc.js';
 import { registerQuoteActivityRoutes } from './routes/quoteActivity.js';
+import { registerCarrierProfileRoutes } from './routes/carrierProfile.js';
 import { hostInfoMiddleware } from './hostInfo.js';
 
 const __filename = fileURLToPath(import.meta.url);
@@ -57,9 +58,6 @@ export function createApp(): express.Express {
   app.use(cookieParser());
   app.use(hostInfoMiddleware);
 
-  // Dashboard/admin/auth pages should not be framed. Public widget, quote,
-  // and chat pages must be frameable because customers embed the widget and
-  // may open quote/chat views from third-party carrier websites.
   app.use((req, res, next) => {
     if (!allowsExternalFraming(req)) {
       res.setHeader('X-Frame-Options', 'SAMEORIGIN');
@@ -90,6 +88,7 @@ export function createApp(): express.Express {
   registerMarketingChatRoute(app);
   registerQuoteDocRoutes(app);
   registerQuoteActivityRoutes(app);
+  registerCarrierProfileRoutes(app);
 
   app.get('/healthz', async (_req, res) => {
     const time = new Date().toISOString();
