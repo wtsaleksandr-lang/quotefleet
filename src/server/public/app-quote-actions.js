@@ -17,6 +17,31 @@
   function looksLikeRef(text) {
     return /^QF[-A-Z0-9_]+/i.test(String(text || '').trim());
   }
+  function showEmailPreview(refId, anchor) {
+    var page = document.getElementById('page-content');
+    if (!page) return;
+    var old = page.querySelector('[data-qf-email-preview]');
+    if (old) { old.remove(); return; }
+    fetch('/api/public/quote-email-preview/' + encodeURIComponent(refId))
+      .then(function (r) { return r.json(); })
+      .then(function (data) {
+        if (data.error) throw new Error(data.error);
+        var card = document.createElement('div');
+        card.className = 'card';
+        card.dataset.qfEmailPreview = '1';
+        card.style.marginTop = '14px';
+        card.innerHTML = '' +
+          '<div class="card-title">Quote email preview</div>' +
+          '<div class="card-subtitle">Template only. It does not send email yet.</div>' +
+          '<div class="field"><label class="field-label">To</label><input class="input" readonly value="' + (data.to || '') + '"></div>' +
+          '<div class="field" style="margin-top:10px;"><label class="field-label">Subject</label><input class="input" readonly value="' + data.subject.replace(/"/g, '&quot;') + '"></div>' +
+          '<div class="field" style="margin-top:10px;"><label class="field-label">Plain text</label><textarea class="textarea" rows="8" readonly>' + data.text + '</textarea></div>' +
+          '<div class="field" style="margin-top:10px;"><label class="field-label">HTML preview</label><iframe style="width:100%;height:360px;border:1px solid var(--border);border-radius:8px;background:white;"></iframe></div>';
+        (anchor || page.querySelector('.qf-quote-actions') || page.querySelector('h1')).insertAdjacentElement('afterend', card);
+        card.querySelector('iframe').srcdoc = data.html;
+      })
+      .catch(function (err) { if (window.qfToastErr) window.qfToastErr(err); });
+  }
 
   function enhanceLeadDetail() {
     var path = location.pathname;
@@ -34,11 +59,15 @@
     bar.innerHTML = '' +
       '<a class="primary" target="_blank" rel="noopener" href="' + quoteUrl(refId) + '">Open hosted quote</a>' +
       '<a target="_blank" rel="noopener" href="' + chatUrl(refId) + '">Open customer chat</a>' +
-      '<button type="button">Copy quote link</button>';
-    bar.querySelector('button').addEventListener('click', function () {
+      '<button type="button" data-copy>Copy quote link</button>' +
+      '<button type="button" data-email-preview>Email preview</button>';
+    bar.querySelector('[data-copy]').addEventListener('click', function () {
       copyText(url).then(function () {
         if (window.qfToastOk) window.qfToastOk('Quote link copied');
       });
+    });
+    bar.querySelector('[data-email-preview]').addEventListener('click', function () {
+      showEmailPreview(refId, bar);
     });
     h1.insertAdjacentElement('afterend', bar);
   }
