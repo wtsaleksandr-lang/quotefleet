@@ -18,6 +18,7 @@ import { registerToolsRoutes } from './routes/tools.js';
 import { registerBillingRoutes, registerStripeWebhook } from './routes/billing.js';
 import { registerMarketingChatRoute } from './routes/marketingChat.js';
 import { registerQuoteDocRoutes } from './routes/quoteDoc.js';
+import { registerQuoteActivityRoutes } from './routes/quoteActivity.js';
 import { hostInfoMiddleware } from './hostInfo.js';
 
 const __filename = fileURLToPath(import.meta.url);
@@ -88,6 +89,7 @@ export function createApp(): express.Express {
   registerBillingRoutes(app);
   registerMarketingChatRoute(app);
   registerQuoteDocRoutes(app);
+  registerQuoteActivityRoutes(app);
 
   app.get('/healthz', async (_req, res) => {
     const time = new Date().toISOString();
