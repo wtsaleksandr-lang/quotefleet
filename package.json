@@ -19,6 +19,7 @@
     "db:migrate": "drizzle-kit migrate",
     "db:studio": "drizzle-kit studio",
     "db:seed": "tsx src/db/seed.ts",
+    "accessorials:seed": "tsx scripts/seed-accessorial-library.ts",
     "deploy:replit": "pnpm install && pnpm db:migrate && pnpm db:seed && pnpm start"
   },
   "dependencies": {
