@@ -46,6 +46,13 @@ function arr(row: Row, names: string[]): string[] | undefined {
   return v.split(/[;,]/).map((x) => x.trim()).filter(Boolean);
 }
 
+function nullableNumber(row: Row, names: string[]): number | null {
+  const v = key(row, names);
+  if (v == null || v === '') return null;
+  const n = Number(String(v).replace(/[$,%]/g, '').trim());
+  return Number.isFinite(n) ? n : null;
+}
+
 function workbookRows(filePath: string): Record<string, Row[]> {
   const wb = XLSX.readFile(filePath);
   const out: Record<string, Row[]> = {};
@@ -80,21 +87,19 @@ async function upsertRateCards(tenantId: number, rows: Row[]) {
     const patch = {
       service,
       equipment,
-      label: str(row, ['label', 'name'], undefined as unknown as string) || null,
+      label: str(row, ['label', 'name']) || null,
       ratePerMile: num(row, ['ratePerMile', 'rate_per_mile', 'rpm'], 0),
       minimumCharge: num(row, ['minimumCharge', 'minimum_charge', 'minimum', 'min'], 0),
       flatFee: num(row, ['flatFee', 'flat_fee', 'flat'], 0),
       fuelSurchargePct: num(row, ['fuelSurchargePct', 'fuel_surcharge_pct', 'fuel'], 0),
       marginPct: num(row, ['marginPct', 'margin_pct', 'margin'], 0),
-      maxWeightLbs: key(row, ['maxWeightLbs', 'max_weight_lbs']) === '' ? null : num(row, ['maxWeightLbs', 'max_weight_lbs'], NaN),
-      maxMiles: key(row, ['maxMiles', 'max_miles']) === '' ? null : num(row, ['maxMiles', 'max_miles'], NaN),
+      maxWeightLbs: nullableNumber(row, ['maxWeightLbs', 'max_weight_lbs']),
+      maxMiles: nullableNumber(row, ['maxMiles', 'max_miles']),
       enabled: bool(row, ['enabled', 'active'], true),
       sortOrder: num(row, ['sortOrder', 'sort_order'], 0),
-      notes: str(row, ['notes'], '') || null,
+      notes: str(row, ['notes']) || null,
       updatedAt: new Date(),
     };
-    if (!Number.isFinite(patch.maxWeightLbs as number)) patch.maxWeightLbs = null;
-    if (!Number.isFinite(patch.maxMiles as number)) patch.maxMiles = null;
     const existing = await db()
       .select({ id: rateCards.id })
       .from(rateCards)
@@ -121,7 +126,7 @@ async function upsertAccessorials(tenantId: number, rows: Row[]) {
     const patch = {
       code,
       label,
-      description: str(row, ['description', 'desc'], '') || null,
+      description: str(row, ['description', 'desc']) || null,
       kind: str(row, ['kind', 'type'], 'flat'),
       amount: num(row, ['amount', 'rate', 'price'], 0),
       trigger: str(row, ['trigger'], 'optional'),
@@ -154,9 +159,9 @@ async function upsertLaneZones(tenantId: number, rows: Row[]) {
     if (!label) continue;
     const patch = {
       label,
-      anchorPortCode: str(row, ['anchorPortCode', 'anchor_port_code', 'portCode', 'port_code'], '') || null,
-      anchorCity: str(row, ['anchorCity', 'anchor_city', 'city'], '') || null,
-      anchorState: str(row, ['anchorState', 'anchor_state', 'state'], '') || null,
+      anchorPortCode: str(row, ['anchorPortCode', 'anchor_port_code', 'portCode', 'port_code']) || null,
+      anchorCity: str(row, ['anchorCity', 'anchor_city', 'city']) || null,
+      anchorState: str(row, ['anchorState', 'anchor_state', 'state']) || null,
       radiusMiles: num(row, ['radiusMiles', 'radius_miles', 'radius'], 0),
       flatPrice: num(row, ['flatPrice', 'flat_price', 'price'], 0),
       equipmentScope: arr(row, ['equipmentScope', 'equipment_scope', 'equipment']),
