@@ -28,6 +28,7 @@ describe('public static page smoke checks', () => {
     expect(html).toContain('/landing-s-polish.css');
     expect(html).toContain('/landing-motion.js');
     expect(html).toContain('data-reveal');
+    expect(html).toContain("document.documentElement.classList.add('js')");
     expect(html).not.toContain('/for/forwarders');
     expect(html).not.toContain('/for/brokers');
     expect(html).not.toContain('/for/ltl');
@@ -35,6 +36,13 @@ describe('public static page smoke checks', () => {
     expect(html).not.toContain('quote desk');
     expect(html).not.toContain('freight quote leads');
     expect(html).not.toContain('Private rates by default');
+  });
+
+  it('landing reveal CSS keeps content visible without JavaScript', async () => {
+    const css = await file('landing-s-polish.css');
+    expect(css).toContain('.js [data-reveal]');
+    expect(css).toContain('.js [data-reveal].is-visible');
+    expect(css).not.toContain('\n[data-reveal] {');
   });
 
   it('landing page includes social metadata', async () => {
