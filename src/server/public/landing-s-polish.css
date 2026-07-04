@@ -1,4 +1,4 @@
-/* Phase S: tighter sharing/follow-up visual polish layered over the visual homepage. */
+/* Phase S/T/U: tighter sharing/follow-up visual polish layered over the visual homepage. */
 .hero h1 {
   max-width: 560px;
 }
@@ -27,6 +27,15 @@
   content: '✓';
   color: var(--success);
   font-weight: 900;
+}
+[data-reveal] {
+  opacity: 0;
+  transform: translateY(18px);
+  transition: opacity .55s ease, transform .55s ease;
+}
+[data-reveal].is-visible {
+  opacity: 1;
+  transform: translateY(0);
 }
 .scheduler-section {
   background: #0f1319;
@@ -125,6 +134,10 @@
     animation-iteration-count: 1 !important;
     scroll-behavior: auto !important;
     transition-duration: .01ms !important;
+  }
+  [data-reveal] {
+    opacity: 1 !important;
+    transform: none !important;
   }
 }
 @media (max-width: 980px) {
