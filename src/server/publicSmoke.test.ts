@@ -30,7 +30,9 @@ describe('public static page smoke checks', () => {
     expect(html).not.toContain('/for/brokers');
     expect(html).not.toContain('/for/ltl');
     expect(html).not.toContain('simple-dock');
-    expect(html).not.toContain('Private rates by default</p>');
+    expect(html).not.toContain('quote desk');
+    expect(html).not.toContain('freight quote leads');
+    expect(html).not.toContain('Private rates by default');
   });
 
   it('landing page includes social metadata', async () => {
