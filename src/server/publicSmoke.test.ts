@@ -40,6 +40,16 @@ describe('public static page smoke checks', () => {
     expect(html).toContain('/og.svg');
   });
 
+  it('social preview matches current light setup message', async () => {
+    const svg = await file('og.svg');
+    expect(svg).toContain('Start sharing live rates');
+    expect(svg).toContain('No website changes');
+    expect(svg).toContain('Share by link');
+    expect(svg).toContain('Send PDFs');
+    expect(svg).not.toContain('Instant quote desk');
+    expect(svg).not.toContain('Private rates by default');
+  });
+
   it('widget loads required scripts and controls', async () => {
     const html = await file('widget.html');
     expect(html).toContain('/widget.js');
