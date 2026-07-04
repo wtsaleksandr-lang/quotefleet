@@ -18,10 +18,14 @@ describe('public static page smoke checks', () => {
     expect(html).toContain('Add to email signature');
     expect(html).toContain('Optional AI chat');
     expect(html).toContain('Send branded PDF');
+    expect(html).toContain('Schedule follow-ups');
+    expect(html).toContain('Follow-up reminders');
+    expect(html).toContain('Do not let a warm quote go cold.');
     expect(html).toContain('No contracts');
     expect(html).toContain('/w/demo');
     expect(html).toContain('/signup');
     expect(html).toContain('/security');
+    expect(html).toContain('/landing-s-polish.css');
     expect(html).not.toContain('/for/forwarders');
     expect(html).not.toContain('/for/brokers');
     expect(html).not.toContain('/for/ltl');
