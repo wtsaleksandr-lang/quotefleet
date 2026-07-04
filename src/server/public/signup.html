@@ -12,12 +12,7 @@
 <body>
   <header class="topnav">
     <div class="topnav-inner">
-      <a href="/" class="brand-mark">
-        <span class="logo">
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M3 17h2a3 3 0 0 0 3-3V7H3z"/><path d="M14 7h6l1 4v6h-3"/><circle cx="7" cy="17" r="2"/><circle cx="17" cy="17" r="2"/></svg>
-        </span>
-        QuoteFleet
-      </a>
+      <a href="/" class="brand-mark"><span class="logo"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M3 17h2a3 3 0 0 0 3-3V7H3z"/><path d="M14 7h6l1 4v6h-3"/><circle cx="7" cy="17" r="2"/><circle cx="17" cy="17" r="2"/></svg></span>QuoteFleet</a>
       <span class="topnav-spacer"></span>
       <a class="nav-link" href="/login">Already have an account?</a>
     </div>
@@ -25,78 +20,18 @@
 
   <main style="display:flex; align-items:center; justify-content:center; min-height: calc(100vh - 80px); padding: 48px 24px;">
     <div class="card elevated" style="width: 100%; max-width: 540px;">
-      <h1 style="font-size: 28px; margin: 0 0 24px 0; letter-spacing: -0.025em;">
-        Start free
-      </h1>
+      <h1 style="font-size: 28px; margin: 0 0 8px 0; letter-spacing: -0.025em;">Start free</h1>
+      <p class="muted-small" style="margin:0 0 24px;">Create your quote desk, then tune rates before going live.</p>
 
       <form id="signup-form" style="display:flex; flex-direction:column; gap: 18px;">
-        <div class="field">
-          <label class="field-label required">Company name</label>
-          <input class="input" name="companyName" placeholder="Acme Drayage" required>
-        </div>
-
-        <div class="field">
-          <label class="field-label required">Your link</label>
-          <div class="url-builder">
-            <input class="input" name="slug" id="slug-input" placeholder="acme" autocomplete="off" required pattern="^[a-z0-9](?:[a-z0-9-]*[a-z0-9])?$" minlength="3" maxlength="30">
-            <select class="select" name="hostDomain" id="host-input"></select>
-          </div>
-          <div class="url-builder-preview" id="url-preview">
-            <span class="live">acme.quotefleet.net</span>
-          </div>
-          <span class="field-hint" id="slug-hint">Letters, numbers, dashes.</span>
-        </div>
-
-        <div class="grid-2">
-          <div class="field">
-            <label class="field-label required">Email</label>
-            <input class="input" type="email" name="email" required>
-          </div>
-          <div class="field">
-            <label class="field-label required">Password</label>
-            <input class="input" type="password" name="password" minlength="6" required>
-          </div>
-        </div>
-
-        <div class="grid-2">
-          <div class="field">
-            <label class="field-label">Where you operate</label>
-            <select class="select" name="countryFocus">
-              <option value="US" selected>USA</option>
-              <option value="CA">Canada</option>
-              <option value="BOTH">USA + Canada</option>
-            </select>
-          </div>
-          <div class="field">
-            <label class="field-label">Phone</label>
-            <input class="input" name="contactPhone" type="tel">
-          </div>
-        </div>
-
-        <!-- DPA acceptance — required by signup endpoint. Recorded with
-             current DPA version (qf-dpa-version meta) into tenants.dpaAcceptedAt
-             + tenants.dpaVersion at account creation. -->
-        <label style="display:flex; gap:10px; align-items:flex-start; padding:10px 12px; background:var(--surface-2); border:1px solid var(--border); border-radius:8px; cursor:pointer; font-size:13.5px; line-height:1.55;">
-          <input type="checkbox" id="dpa-accept" name="dpaAccept" required style="margin-top:3px; flex-shrink:0;">
-          <span>
-            I have read and agree to the
-            <a href="/security" target="_blank" rel="noopener">Security policy</a>,
-            <a href="/dpa" target="_blank" rel="noopener">Data Processing Addendum (v1.0)</a>,
-            and confirm that QuoteFleet may process customer data on my behalf
-            under those terms.
-          </span>
-        </label>
-
-        <button class="btn btn-primary btn-lg btn-block" type="submit" id="signup-submit" disabled>
-          Create account <span class="arr">→</span>
-        </button>
+        <div class="field"><label class="field-label required">Company name</label><input class="input" name="companyName" placeholder="Acme Drayage" required></div>
+        <div class="field"><label class="field-label required">Your link</label><div class="url-builder"><input class="input" name="slug" id="slug-input" placeholder="acme" autocomplete="off" required pattern="^[a-z0-9](?:[a-z0-9-]*[a-z0-9])?$" minlength="3" maxlength="30"><select class="select" name="hostDomain" id="host-input"></select></div><div class="url-builder-preview" id="url-preview"><span class="live">acme.quotefleet.net</span></div><span class="field-hint" id="slug-hint">Letters, numbers, dashes.</span></div>
+        <div class="grid-2"><div class="field"><label class="field-label required">Email</label><input class="input" type="email" name="email" required></div><div class="field"><label class="field-label required">Password</label><input class="input" type="password" name="password" minlength="10" required><span class="field-hint">Minimum 10 characters.</span></div></div>
+        <div class="grid-2"><div class="field"><label class="field-label">Where you operate</label><select class="select" name="countryFocus"><option value="US" selected>USA</option><option value="CA">Canada</option><option value="BOTH">USA + Canada</option></select></div><div class="field"><label class="field-label">Phone</label><input class="input" name="contactPhone" type="tel"></div></div>
+        <label style="display:flex; gap:10px; align-items:flex-start; padding:10px 12px; background:var(--surface-2); border:1px solid var(--border); border-radius:8px; cursor:pointer; font-size:13.5px; line-height:1.55;"><input type="checkbox" id="dpa-accept" name="dpaAccept" required style="margin-top:3px; flex-shrink:0;"><span>I have read and agree to the <a href="/security" target="_blank" rel="noopener">Security policy</a>, <a href="/dpa" target="_blank" rel="noopener">Data Processing Addendum (v1.0)</a>, and confirm that QuoteFleet may process customer data on my behalf under those terms.</span></label>
+        <button class="btn btn-primary btn-lg btn-block" type="submit" id="signup-submit" disabled>Create account <span class="arr">→</span></button>
         <div id="signup-error" class="notice error hidden"></div>
-        <p class="muted-small" style="text-align:center; margin-top: 14px; line-height: 1.55;">
-          🔒 Your rates are private by default. Marketplace exposure is opt-in,
-          aggregated benchmarks are anonymized, and we never share your pricing
-          with brokers or shippers without your explicit consent.
-          <a href="/security" target="_blank" rel="noopener">Read the full policy →</a>
-        </p>
+        <p class="muted-small" style="text-align:center; margin-top: 14px; line-height: 1.55;">Your rates are private by default. Marketplace exposure is opt-in and benchmarks are anonymized. <a href="/security" target="_blank" rel="noopener">Read the full policy →</a></p>
       </form>
     </div>
   </main>
@@ -108,114 +43,61 @@
     var preview = document.getElementById('url-preview').querySelector('.live');
     var hint = document.getElementById('slug-hint');
     var companyInput = form.querySelector('[name="companyName"]');
-
-    function slugify(s) {
-      return (s || '').toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)/g, '').slice(0, 30);
-    }
-    function refreshPreview() {
-      var s = slugInput.value.trim() || 'your-slug';
-      var h = hostInput.value || 'quotefleet.net';
-      preview.textContent = s + '.' + h;
-    }
-
-    // Auto-fill slug from company name until user touches the slug field.
+    var dpa = document.getElementById('dpa-accept');
+    var submit = document.getElementById('signup-submit');
+    function slugify(s) { return (s || '').toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)/g, '').slice(0, 30); }
+    function refreshPreview() { var s = slugInput.value.trim() || 'your-slug'; var h = hostInput.value || 'quotefleet.net'; preview.textContent = s + '.' + h; }
     var slugTouched = false;
     slugInput.addEventListener('input', function () { slugTouched = true; refreshPreview(); checkSlug(); });
-    companyInput.addEventListener('input', function () {
-      if (!slugTouched) {
-        slugInput.value = slugify(companyInput.value);
-        refreshPreview(); checkSlug();
-      }
-    });
+    companyInput.addEventListener('input', function () { if (!slugTouched) { slugInput.value = slugify(companyInput.value); refreshPreview(); checkSlug(); } });
     hostInput.addEventListener('change', refreshPreview);
-
-    // Debounced slug availability check.
     var slugTimer = null;
     function checkSlug() {
       clearTimeout(slugTimer);
       var v = slugInput.value.trim();
       if (!v) { hint.textContent = 'Letters, numbers, dashes.'; hint.className = 'field-hint'; return; }
       slugTimer = setTimeout(function () {
-        fetch('/api/auth/check-slug?slug=' + encodeURIComponent(v))
-          .then(function (r) { return r.json(); })
-          .then(function (j) {
-            if (j.ok)                            { hint.textContent = '✓ Available'; hint.className = 'field-hint ok'; }
-            else if (j.reason === 'taken')       { hint.textContent = '✗ Already taken'; hint.className = 'field-hint error'; }
-            else if (j.reason === 'reserved')    { hint.textContent = '✗ Reserved'; hint.className = 'field-hint error'; }
-            else if (j.reason === 'format')      { hint.textContent = '✗ Letters, numbers, dashes only'; hint.className = 'field-hint error'; }
-            else if (j.reason === 'length')      { hint.textContent = '✗ 3–30 characters'; hint.className = 'field-hint error'; }
-          })
-          .catch(function () { /* silent */ });
+        fetch('/api/auth/check-slug?slug=' + encodeURIComponent(v)).then(function (r) { return r.json(); }).then(function (j) {
+          if (j.ok) { hint.textContent = '✓ Available'; hint.className = 'field-hint ok'; }
+          else if (j.reason === 'taken') { hint.textContent = '✗ Already taken'; hint.className = 'field-hint error'; }
+          else if (j.reason === 'reserved') { hint.textContent = '✗ Reserved'; hint.className = 'field-hint error'; }
+          else if (j.reason === 'format') { hint.textContent = '✗ Letters, numbers, dashes only'; hint.className = 'field-hint error'; }
+          else if (j.reason === 'length') { hint.textContent = '✗ 3–30 characters'; hint.className = 'field-hint error'; }
+        }).catch(function () {});
       }, 350);
     }
-
-    // Bootstrap host options from /api/auth/signup-options.
     fetch('/api/auth/signup-options').then(function (r) { return r.json(); }).then(function (opts) {
       hostInput.innerHTML = '';
-      (opts.hostDomains || ['quotefleet.net']).forEach(function (h) {
-        var o = document.createElement('option');
-        o.value = h; o.textContent = h;
-        if (h === opts.defaultHostDomain) o.selected = true;
-        hostInput.appendChild(o);
-      });
+      (opts.hostDomains || ['quotefleet.net']).forEach(function (h) { var o = document.createElement('option'); o.value = h; o.textContent = h; if (h === opts.defaultHostDomain) o.selected = true; hostInput.appendChild(o); });
       refreshPreview();
-    }).catch(function () {
-      // Fallback: just show one option so the form still works.
-      hostInput.innerHTML = '<option value="quotefleet.net">quotefleet.net</option>';
-      refreshPreview();
-    });
-
-    // Enable submit only once the DPA checkbox is ticked.
-    var dpa = document.getElementById('dpa-accept');
-    var submit = document.getElementById('signup-submit');
+    }).catch(function () { hostInput.innerHTML = '<option value="quotefleet.net">quotefleet.net</option>'; refreshPreview(); });
     function syncSubmit() { submit.disabled = !dpa.checked; }
-    dpa.addEventListener('change', syncSubmit);
-    syncSubmit();
-
+    dpa.addEventListener('change', syncSubmit); syncSubmit();
+    function bestError(j) {
+      if (!j) return 'Signup failed.';
+      if (j.error && j.error !== 'Invalid input') return j.error;
+      var details = j.details && j.details.fieldErrors;
+      if (details) {
+        if (details.password && details.password[0]) return 'Password must be at least 10 characters.';
+        if (details.email && details.email[0]) return 'Please enter a valid email.';
+        if (details.slug && details.slug[0]) return 'Your link can use lowercase letters, numbers, and dashes only.';
+        if (details.dpaAccepted && details.dpaAccepted[0]) return 'Please accept the Security policy and DPA to continue.';
+      }
+      return j.error || 'Signup failed. Please check the fields and try again.';
+    }
     form.addEventListener('submit', async function (e) {
       e.preventDefault();
-      var fd = new FormData(form);
-      var err = document.getElementById('signup-error');
-      err.classList.add('hidden');
-      if (!dpa.checked) {
-        err.textContent = 'Please accept the Security policy and DPA to continue.';
-        err.classList.remove('hidden');
-        return;
-      }
-      var btn = form.querySelector('button[type=submit]');
-      btn.disabled = true;
-      var oldText = btn.innerHTML; btn.innerHTML = 'Creating account…';
+      var fd = new FormData(form); var err = document.getElementById('signup-error'); err.classList.add('hidden');
+      if (!dpa.checked) { err.textContent = 'Please accept the Security policy and DPA to continue.'; err.classList.remove('hidden'); return; }
+      submit.disabled = true; var oldText = submit.innerHTML; submit.innerHTML = 'Creating account…';
       try {
-        var res = await fetch('/api/auth/signup', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            companyName: fd.get('companyName'),
-            slug: fd.get('slug'),
-            hostDomain: fd.get('hostDomain'),
-            email: fd.get('email'),
-            password: fd.get('password'),
-            countryFocus: fd.get('countryFocus') || 'US',
-            contactPhone: fd.get('contactPhone') || undefined,
-            dpaAccepted: true,
-            dpaVersion: '1.0',
-          }),
-        });
+        var res = await fetch('/api/auth/signup', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ companyName: fd.get('companyName'), slug: fd.get('slug'), hostDomain: fd.get('hostDomain'), email: fd.get('email'), password: fd.get('password'), countryFocus: fd.get('countryFocus') || 'US', contactPhone: fd.get('contactPhone') || undefined, dpaAccepted: true, dpaVersion: '1.0' }) });
         var j = await res.json();
-        if (!res.ok) {
-          err.textContent = j.error || 'Signup failed.';
-          err.classList.remove('hidden');
-          btn.disabled = false; btn.innerHTML = oldText;
-          return;
-        }
+        if (!res.ok) { err.textContent = bestError(j); err.classList.remove('hidden'); submit.disabled = false; submit.innerHTML = oldText; syncSubmit(); return; }
         location.href = '/app';
-      } catch (ex) {
-        err.textContent = 'Network error — try again.';
-        err.classList.remove('hidden');
-        btn.disabled = false; btn.innerHTML = oldText;
-      }
+      } catch (ex) { err.textContent = 'Network error — try again.'; err.classList.remove('hidden'); submit.disabled = false; submit.innerHTML = oldText; syncSubmit(); }
     });
   </script>
-<script src="/marketing-chat.js" defer></script>
+  <script src="/marketing-chat.js" defer></script>
 </body>
 </html>
