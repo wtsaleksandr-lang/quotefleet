@@ -6,6 +6,7 @@
   <title>QuoteFleet Quote</title>
   <link rel="stylesheet" href="/quote.css" />
   <link rel="stylesheet" href="/quote-polish.css" />
+  <link rel="stylesheet" href="/quote-print.css" />
 </head>
 <body>
   <main class="qdoc-shell">
@@ -20,6 +21,7 @@
         <a id="qdoc-chat" class="qdoc-action-primary" href="#">Open Chat</a>
         <button id="qdoc-callback-open" type="button">Request Callback</button>
       </nav>
+      <div class="qdoc-print-hint no-print">For a clean PDF, use Save PDF or Print and choose “Save as PDF”. Quote links remain live for follow-up and activity tracking.</div>
 
       <section id="qdoc-callback" class="qdoc-callback no-print" hidden>
         <div><strong>Request a callback</strong><p>Send your phone number and the carrier will follow up.</p></div>
@@ -31,47 +33,17 @@
       </section>
 
       <header class="qdoc-header">
-        <div class="qdoc-carrier">
-          <img id="qdoc-logo" class="qdoc-logo" alt="Carrier logo" hidden />
-          <div>
-            <h1 id="qdoc-carrier-name">Carrier</h1>
-            <div id="qdoc-carrier-details" class="qdoc-carrier-details"></div>
-          </div>
-        </div>
-        <div class="qdoc-summary-box">
-          <div><span>Quote</span><strong id="qdoc-ref">—</strong></div>
-          <div><span>Generated</span><strong id="qdoc-generated">—</strong></div>
-          <div><span>Expires</span><strong id="qdoc-expires">—</strong></div>
-          <div><span>Total</span><strong id="qdoc-top-total">—</strong></div>
-        </div>
+        <div class="qdoc-carrier"><img id="qdoc-logo" class="qdoc-logo" alt="Carrier logo" hidden /><div><h1 id="qdoc-carrier-name">Carrier</h1><div id="qdoc-carrier-details" class="qdoc-carrier-details"></div></div></div>
+        <div class="qdoc-summary-box"><div><span>Quote</span><strong id="qdoc-ref">—</strong></div><div><span>Generated</span><strong id="qdoc-generated">—</strong></div><div><span>Expires</span><strong id="qdoc-expires">—</strong></div><div><span>Total</span><strong id="qdoc-top-total">—</strong></div></div>
       </header>
 
-      <section class="qdoc-route-card">
-        <div class="qdoc-location"><span>Pickup</span><strong id="qdoc-pickup-title">—</strong><small id="qdoc-pickup-subtitle"></small></div>
-        <div class="qdoc-route-line"><i></i><b></b><i class="end"></i><span id="qdoc-miles">—</span></div>
-        <div class="qdoc-location right"><span>Delivery</span><strong id="qdoc-delivery-title">—</strong><small id="qdoc-delivery-subtitle"></small></div>
-      </section>
+      <section class="qdoc-route-card"><div class="qdoc-location"><span>Pickup</span><strong id="qdoc-pickup-title">—</strong><small id="qdoc-pickup-subtitle"></small></div><div class="qdoc-route-line"><i></i><b></b><i class="end"></i><span id="qdoc-miles">—</span></div><div class="qdoc-location right"><span>Delivery</span><strong id="qdoc-delivery-title">—</strong><small id="qdoc-delivery-subtitle"></small></div></section>
 
-      <section class="qdoc-grid">
-        <div class="qdoc-left">
-          <section class="qdoc-panel"><h2>Quote Details</h2><dl id="qdoc-details" class="qdoc-detail-list"></dl></section>
-          <section class="qdoc-panel qdoc-map-panel"><div id="qdoc-map-wrap" class="qdoc-map-wrap"><img id="qdoc-map" alt="Route map" hidden /><div id="qdoc-map-fallback" class="qdoc-map-fallback"><strong>Route map unavailable</strong><span>The quote is still valid; map keys may not be configured.</span></div></div></section>
-        </div>
-        <aside class="qdoc-right qdoc-panel">
-          <h2>Pricing Details</h2>
-          <div id="qdoc-price-lines" class="qdoc-price-lines"></div>
-          <div class="qdoc-total-box"><span>Estimated Total</span><strong id="qdoc-grand-total">—</strong><small id="qdoc-total-note">Includes the line items shown above.</small></div>
-        </aside>
-      </section>
+      <section class="qdoc-grid"><div class="qdoc-left"><section class="qdoc-panel"><h2>Quote Details</h2><dl id="qdoc-details" class="qdoc-detail-list"></dl></section><section class="qdoc-panel qdoc-map-panel"><div id="qdoc-map-wrap" class="qdoc-map-wrap"><img id="qdoc-map" alt="Route map" hidden /><div id="qdoc-map-fallback" class="qdoc-map-fallback"><strong>Route map unavailable</strong><span>The quote is still valid; map keys may not be configured.</span></div></div></section></div><aside class="qdoc-right qdoc-panel"><h2>Pricing Details</h2><div id="qdoc-price-lines" class="qdoc-price-lines"></div><div class="qdoc-total-box"><span>Estimated Total</span><strong id="qdoc-grand-total">—</strong><small id="qdoc-total-note">Includes the line items shown above.</small></div></aside></section>
 
       <section class="qdoc-panel qdoc-accessorial-panel"><h2>Accessorial Charges That May Apply</h2><div id="qdoc-accessorials" class="qdoc-accessorials"></div></section>
       <section id="qdoc-ai-summary" class="qdoc-note-panel" hidden></section>
-      <footer class="qdoc-footer">
-        <div><strong>Quote issued by:</strong> <span id="qdoc-issued-by">—</span></div>
-        <p>Quote is based on the details provided. Final charges may change if shipment details, accessorials, appointment conditions, terminal fees, or route requirements change.</p>
-        <p class="qdoc-print-link">Questions? Open this quote online: <span id="qdoc-print-url"></span></p>
-        <div class="qdoc-powered">Powered by <strong>QuoteFleet</strong></div>
-      </footer>
+      <footer class="qdoc-footer"><div><strong>Quote issued by:</strong> <span id="qdoc-issued-by">—</span></div><p>Quote is based on the details provided. Final charges may change if shipment details, accessorials, appointment conditions, terminal fees, or route requirements change.</p><p class="qdoc-print-link">Questions? Open this quote online: <span id="qdoc-print-url"></span></p><div class="qdoc-powered">Powered by <strong>QuoteFleet</strong></div></footer>
     </article>
   </main>
   <script src="/quote.js"></script>
