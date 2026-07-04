@@ -26,6 +26,8 @@ describe('public static page smoke checks', () => {
     expect(html).toContain('/signup');
     expect(html).toContain('/security');
     expect(html).toContain('/landing-s-polish.css');
+    expect(html).toContain('/landing-motion.js');
+    expect(html).toContain('data-reveal');
     expect(html).not.toContain('/for/forwarders');
     expect(html).not.toContain('/for/brokers');
     expect(html).not.toContain('/for/ltl');
@@ -50,6 +52,14 @@ describe('public static page smoke checks', () => {
     expect(svg).toContain('Send PDFs');
     expect(svg).not.toContain('Instant quote desk');
     expect(svg).not.toContain('Private rates by default');
+  });
+
+  it('homepage motion helper is safe and optional', async () => {
+    const js = await file('landing-motion.js');
+    expect(js).toContain('IntersectionObserver');
+    expect(js).toContain('prefers-reduced-motion');
+    expect(js).toContain('data-reveal');
+    expect(js).toContain('is-visible');
   });
 
   it('widget loads required scripts and controls', async () => {
