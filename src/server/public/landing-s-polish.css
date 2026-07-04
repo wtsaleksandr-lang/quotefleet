@@ -1,4 +1,4 @@
-/* Phase S/T/U: tighter sharing/follow-up visual polish layered over the visual homepage. */
+/* Phase S/T/U/V: tighter sharing/follow-up visual polish layered over the visual homepage. */
 .hero h1 {
   max-width: 560px;
 }
@@ -28,12 +28,13 @@
   color: var(--success);
   font-weight: 900;
 }
-[data-reveal] {
+.js [data-reveal] {
   opacity: 0;
   transform: translateY(18px);
   transition: opacity .55s ease, transform .55s ease;
 }
-[data-reveal].is-visible {
+.js [data-reveal].is-visible,
+.no-js [data-reveal] {
   opacity: 1;
   transform: translateY(0);
 }
@@ -135,7 +136,7 @@
     scroll-behavior: auto !important;
     transition-duration: .01ms !important;
   }
-  [data-reveal] {
+  .js [data-reveal] {
     opacity: 1 !important;
     transform: none !important;
   }
