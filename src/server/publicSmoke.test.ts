@@ -9,19 +9,24 @@ async function file(name: string) {
 }
 
 describe('public static page smoke checks', () => {
-  it('landing page has premium conversion CTAs and no placeholder footer links', async () => {
+  it('landing page has simple visual-first positioning and no placeholder links', async () => {
     const html = await file('landing.html');
+    expect(html).toContain('Start sharing live rates in one day.');
+    expect(html).toContain('No website changes needed. No heavy setup.');
+    expect(html).toContain('For trucking service providers');
+    expect(html).toContain('acmetrucking.yourquote.net');
+    expect(html).toContain('Add to email signature');
+    expect(html).toContain('Optional AI chat');
+    expect(html).toContain('Send branded PDF');
+    expect(html).toContain('No contracts');
     expect(html).toContain('/w/demo');
     expect(html).toContain('/signup');
-    expect(html).toContain('/pricing');
     expect(html).toContain('/security');
-    expect(html).toContain('No customer account required');
-    expect(html).toContain('No card required');
-    expect(html).toContain('Acme Drayage quote desk');
     expect(html).not.toContain('/for/forwarders');
     expect(html).not.toContain('/for/brokers');
     expect(html).not.toContain('/for/ltl');
     expect(html).not.toContain('simple-dock');
+    expect(html).not.toContain('Private rates by default</p>');
   });
 
   it('landing page includes social metadata', async () => {
