@@ -9,12 +9,26 @@ async function file(name: string) {
 }
 
 describe('public static page smoke checks', () => {
-  it('landing page has primary conversion routes', async () => {
+  it('landing page has premium conversion CTAs and no placeholder footer links', async () => {
     const html = await file('landing.html');
     expect(html).toContain('/w/demo');
     expect(html).toContain('/signup');
     expect(html).toContain('/pricing');
-    expect(html).toContain('/marketplace/');
+    expect(html).toContain('/security');
+    expect(html).toContain('No customer account required');
+    expect(html).toContain('No card required');
+    expect(html).toContain('Acme Drayage quote desk');
+    expect(html).not.toContain('/for/forwarders');
+    expect(html).not.toContain('/for/brokers');
+    expect(html).not.toContain('/for/ltl');
+    expect(html).not.toContain('simple-dock');
+  });
+
+  it('landing page includes social metadata', async () => {
+    const html = await file('landing.html');
+    expect(html).toContain('property="og:title"');
+    expect(html).toContain('name="twitter:card"');
+    expect(html).toContain('/og.svg');
   });
 
   it('widget loads required scripts and controls', async () => {
