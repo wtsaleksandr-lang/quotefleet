@@ -30,7 +30,9 @@ describe('public static page smoke checks', () => {
     expect(html).not.toContain('/for/brokers');
     expect(html).not.toContain('/for/ltl');
     expect(html).not.toContain('simple-dock');
-    expect(html).not.toContain('Private rates by default</p>');
+    expect(html).not.toContain('quote desk');
+    expect(html).not.toContain('freight quote leads');
+    expect(html).not.toContain('Private rates by default');
   });
 
   it('landing page includes social metadata', async () => {
@@ -38,6 +40,16 @@ describe('public static page smoke checks', () => {
     expect(html).toContain('property="og:title"');
     expect(html).toContain('name="twitter:card"');
     expect(html).toContain('/og.svg');
+  });
+
+  it('social preview matches current light setup message', async () => {
+    const svg = await file('og.svg');
+    expect(svg).toContain('Start sharing live rates');
+    expect(svg).toContain('No website changes');
+    expect(svg).toContain('Share by link');
+    expect(svg).toContain('Send PDFs');
+    expect(svg).not.toContain('Instant quote desk');
+    expect(svg).not.toContain('Private rates by default');
   });
 
   it('widget loads required scripts and controls', async () => {
