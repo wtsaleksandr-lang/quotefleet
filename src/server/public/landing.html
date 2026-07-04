@@ -12,22 +12,17 @@
   <link rel="stylesheet" href="/landing-conversion.css">
 </head>
 <body class="landing-v2">
-  <header class="topnav">
-    <div class="topnav-inner">
-      <a href="/" class="brand-mark">
-        <span class="logo">
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
-            <path d="M3 17h2a3 3 0 0 0 3-3V7H3z"/>
-            <path d="M14 7h6l1 4v6h-3"/>
-            <circle cx="7" cy="17" r="2"/>
-            <circle cx="17" cy="17" r="2"/>
-          </svg>
-        </span>
+  <header class="topnav" style="position:sticky;top:0;z-index:60;background:rgba(10,12,14,.82);backdrop-filter:blur(18px);border-bottom:1px solid rgba(255,255,255,.08);">
+    <div class="topnav-inner" style="max-width:1200px;margin:0 auto;gap:16px;">
+      <a href="/" class="brand-mark" aria-label="QuoteFleet home">
+        <span class="logo"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M3 17h2a3 3 0 0 0 3-3V7H3z"/><path d="M14 7h6l1 4v6h-3"/><circle cx="7" cy="17" r="2"/><circle cx="17" cy="17" r="2"/></svg></span>
         QuoteFleet
       </a>
       <span class="topnav-spacer"></span>
-      <a class="nav-link" href="/pricing">Pricing</a>
+      <a class="nav-link" href="/w/demo">Demo</a>
       <a class="nav-link" href="/marketplace/">Marketplace</a>
+      <a class="nav-link" href="/pricing">Pricing</a>
+      <a class="nav-link" href="/security">Security</a>
       <a class="nav-link" href="/login">Sign in</a>
       <a class="btn btn-primary always-show" href="/signup">Start free <span class="arr">→</span></a>
     </div>
@@ -42,213 +37,42 @@
     </div>
   </div>
 
-  <section class="hero">
-    <div class="hero-grid">
-      <div>
-        <div class="eyebrow">Website quote desk for carriers</div>
-        <h1>Turn your trucking website into an instant quote desk.</h1>
-        <p class="lead">Quote drayage, FTL, LTL, accessorials, and terminal-based moves from your own rates — then send a branded quote link your customer can open, print, chat from, or request a callback on.</p>
-        <div class="hero-proof">
-          <span><b>No card</b> 14-day trial</span>
-          <span><b>One link</b> or script tag</span>
-          <span><b>Private</b> rates by default</span>
-        </div>
-        <div class="hero-cta">
-          <a class="btn btn-primary btn-lg" href="/signup">Start free <span class="arr">→</span></a>
-          <a class="btn btn-secondary btn-lg" href="/w/demo">View live demo <span class="arr">→</span></a>
-        </div>
-        <p class="micro-copy">Built for carriers, brokers, freight forwarders, and LTL teams that still quote too much by email.</p>
-      </div>
+  <section class="hero"><div class="hero-grid"><div>
+    <div class="eyebrow">Website quote desk for carriers</div>
+    <h1>Turn your trucking website into an instant quote desk.</h1>
+    <p class="lead">Quote drayage, FTL, LTL, accessorials, and terminal-based moves from your own rates — then send a branded quote link your customer can open, print, chat from, or request a callback on.</p>
+    <div class="hero-proof"><span><b>No card</b> 14-day trial</span><span><b>One link</b> or script tag</span><span><b>Private</b> rates by default</span></div>
+    <div class="hero-cta"><a class="btn btn-primary btn-lg" href="/signup">Start free <span class="arr">→</span></a><a class="btn btn-secondary btn-lg" href="/w/demo">View live demo <span class="arr">→</span></a></div>
+    <p class="micro-copy">Built for carriers, brokers, freight forwarders, and LTL teams that still quote too much by email.</p>
+  </div><div class="product-preview" aria-label="QuoteFleet product preview"><div class="product-frame"><div class="product-bar"><span class="product-dot"></span><span class="product-dot"></span><span class="product-dot"></span><span class="product-url">yourcompany.quotefleet.net</span></div><div class="product-body"><div class="mock-widget"><h3>JTM Logistics quote desk</h3><p>Customer enters lane, equipment, and freight details.</p><div class="mock-fields"><div class="mock-input">Pickup: CSX Chicago 59th</div><div class="mock-input">Delivery: Roselle, IL</div><div class="mock-input">40 ft container</div><div class="mock-input">Chassis rental</div></div><div class="mock-result"><div><span>Estimated total</span><strong>$371.11</strong></div><a>Get quote</a></div></div><div class="mock-quote"><div class="mock-quote-top"><b>Hosted quote QF-84638931</b><span>Viewed 3x</span></div><div class="mock-line"><span>Drayage + fuel</span><strong>$278.81</strong></div><div class="mock-line"><span>Chassis rental</span><strong>$80.00</strong></div><div class="mock-line"><span>Toll</span><strong>$12.30</strong></div><div class="mock-actions"><span>PDF</span><span>Chat</span><span>Callback</span></div></div></div></div></div></div></section>
 
-      <div class="product-preview" aria-label="QuoteFleet product preview">
-        <div class="product-frame">
-          <div class="product-bar"><span class="product-dot"></span><span class="product-dot"></span><span class="product-dot"></span><span class="product-url">yourcompany.quotefleet.net</span></div>
-          <div class="product-body">
-            <div class="mock-widget">
-              <h3>JTM Logistics quote desk</h3>
-              <p>Customer enters lane, equipment, and freight details.</p>
-              <div class="mock-fields">
-                <div class="mock-input">Pickup: CSX Chicago 59th</div>
-                <div class="mock-input">Delivery: Roselle, IL</div>
-                <div class="mock-input">40 ft container</div>
-                <div class="mock-input">Chassis rental</div>
-              </div>
-              <div class="mock-result"><div><span>Estimated total</span><strong>$371.11</strong></div><a>Get quote</a></div>
-            </div>
-            <div class="mock-quote">
-              <div class="mock-quote-top"><b>Hosted quote QF-84638931</b><span>Viewed 3x</span></div>
-              <div class="mock-line"><span>Drayage + fuel</span><strong>$278.81</strong></div>
-              <div class="mock-line"><span>Chassis rental</span><strong>$80.00</strong></div>
-              <div class="mock-line"><span>Toll</span><strong>$12.30</strong></div>
-              <div class="mock-actions"><span>PDF</span><span>Chat</span><span>Callback</span></div>
-            </div>
-          </div>
-        </div>
-      </div>
+  <section class="section" id="outcomes"><div class="container"><div class="section-head"><span class="section-kicker">What it improves</span><h2>Stop losing website leads to slow manual quoting.</h2><p>QuoteFleet gives prospects a quote experience that feels instant, branded, and organized — while your team keeps full control of rates and follow-up.</p></div><div class="outcome-grid"><div class="outcome-card"><strong>Capture more quote requests</strong><p>Turn anonymous website visitors into leads with a calculator they can use immediately.</p></div><div class="outcome-card"><strong>Respond before competitors</strong><p>Give a price range or written quote link while other carriers are still checking spreadsheets.</p></div><div class="outcome-card"><strong>Keep rates private</strong><p>Your tariffs stay inside your account. Public marketplace exposure is optional.</p></div><div class="outcome-card"><strong>Send branded quote links</strong><p>Every submitted quote gets a clean hosted page built for email, print, and PDF.</p></div><div class="outcome-card"><strong>Track customer interest</strong><p>See quote views, copy-link clicks, PDF saves, chat opens, and callback actions.</p></div><div class="outcome-card"><strong>Import existing rates</strong><p>Start from your current rate sheet, zones, accessorials, terminals, and lane rules.</p></div></div></div></section>
+
+  <section class="section" style="background:var(--surface);"><div class="container"><div class="follow-card"><div><span class="section-kicker">After the quote</span><h2>Every quote becomes a sales follow-up page.</h2><p style="color:var(--muted);margin-top:12px;font-size:16px;">A basic calculator stops at the price. QuoteFleet keeps the conversation moving with a hosted quote page, customer actions, and dashboard activity.</p></div><div class="follow-list"><span>Branded hosted quote page</span><span>PDF-ready quote layout</span><span>Customer chat from quote</span><span>Callback request button</span><span>Quote view tracking</span><span>Email preview template</span></div></div></div></section>
+
+  <section class="section"><div class="container"><div class="section-head"><span class="section-kicker">Before / after</span><h2>The difference your customer feels.</h2></div><div class="before-after"><div class="ba-card"><h3>Before QuoteFleet</h3><ul><li>Customer emails a lane and waits.</li><li>Dispatcher checks rate sheets manually.</li><li>Quote follow-up happens in scattered emails.</li><li>No clear signal that the customer viewed the quote.</li></ul></div><div class="ba-card after"><h3>After QuoteFleet</h3><ul><li>Customer gets an instant quote flow on your website.</li><li>Rates, accessorials, and zones calculate automatically.</li><li>Customer receives a branded quote link.</li><li>Your dashboard shows views, PDF saves, chat, and callbacks.</li></ul></div></div></div></section>
+
+  <section class="section" style="background:var(--surface);"><div class="container"><div class="section-head"><span class="section-kicker">How it works</span><h2>Live fast, then tune deeper.</h2></div><div class="setup-strip"><div class="setup-step"><small>01</small><strong>Create account</strong><p>Pick your carrier slug and brand the quote desk.</p></div><div class="setup-step"><small>02</small><strong>Load rates</strong><p>Edit manually or import rate cards, lane zones, and accessorials.</p></div><div class="setup-step"><small>03</small><strong>Share or embed</strong><p>Use your hosted page or add one script tag to your site.</p></div><div class="setup-step"><small>04</small><strong>Follow up</strong><p>Track quote views, chat, callback requests, and next steps.</p></div></div></div></section>
+
+  <section class="section"><div class="container"><div class="section-head"><span class="section-kicker">Why not a form?</span><h2>QuoteFleet is closer to a sales desk than a contact form.</h2></div><table class="compare clean"><thead><tr><th></th><th class="us">QuoteFleet</th><th>Generic web form</th><th>Legacy quote tools</th></tr></thead><tbody><tr><td>Website quote experience</td><td class="us">Instant calculator + hosted quote</td><td class="them">Message only</td><td class="them">Usually gated by sales</td></tr><tr><td>Rate ownership</td><td class="us">Private carrier-controlled rates</td><td class="them">No pricing logic</td><td class="them">Often locked behind support</td></tr><tr><td>Customer follow-up</td><td class="us">Quote link, chat, callback, activity</td><td class="them">Manual email</td><td class="them">Workflow varies</td></tr><tr><td>Setup path</td><td class="us">Hosted link or script tag</td><td class="them">Custom form work</td><td class="them">Implementation project</td></tr><tr><td>Best fit</td><td class="us">Carriers that want more inbound quotes</td><td class="them">Simple contact collection</td><td class="them">Large enterprise operations</td></tr></tbody></table></div></section>
+
+  <section class="section" style="background:var(--surface);"><div class="container"><div class="market-box"><div><span class="section-kicker">Optional marketplace</span><h2>Keep rates private, or opt in for public exposure.</h2><p style="color:var(--muted);margin-top:10px;max-width:720px;">The marketplace is optional. Carriers can stay private, or opt in later so shippers and forwarders can discover capacity by lane. Public benchmarks are anonymized and sample-gated.</p></div><a class="btn btn-secondary btn-lg" href="/marketplace/">View marketplace <span class="arr">→</span></a></div></div></section>
+
+  <section class="section" id="faq"><div class="container"><div class="section-head"><span class="section-kicker">FAQ</span><h2>Common objections, answered.</h2></div><div class="faq-grid"><div class="faq-item"><strong>Will my rates be public?</strong><p>No. Rates are private by default. Marketplace exposure is opt-in.</p></div><div class="faq-item"><strong>Do customers need an account?</strong><p>No. Customers submit quotes directly from your website or hosted quote page.</p></div><div class="faq-item"><strong>Can I use my own rates?</strong><p>Yes. Edit rates in the dashboard or import rate cards, zones, and accessorials.</p></div><div class="faq-item"><strong>Does it replace my TMS?</strong><p>No. It captures and quotes inbound website leads before they become manual work.</p></div><div class="faq-item"><strong>Can I embed it on my existing site?</strong><p>Yes. Use the hosted link or add the script tag to your current website.</p></div><div class="faq-item"><strong>What about security?</strong><p>QuoteFleet uses encrypted transport and keeps sensitive carrier settings private. Full policy is available on the security page.</p></div></div></div></section>
+
+  <section class="section"><div class="container"><div class="final-cta-card"><h2>Ready to quote from your website?</h2><p>Start with a hosted link, tune your rates, then embed the quote desk when you are ready.</p><a class="btn btn-primary btn-lg" href="/signup">Start free <span class="arr">→</span></a><a class="btn btn-secondary btn-lg" href="/w/demo" style="margin-left:10px;">View live demo <span class="arr">→</span></a><p class="micro-copy">14-day trial · No card required · Paid plans from $49/mo</p></div></div></section>
+
+  <nav class="simple-dock" aria-label="Quick navigation"><a href="/w/demo">Demo</a><a href="/pricing">Pricing</a><a href="/marketplace/">Marketplace</a><a href="/security">Security</a><a class="cta" href="/signup">Start free</a></nav>
+
+  <footer class="site-footer" style="text-align:left;padding:54px 28px 34px;border-top:1px solid var(--border);">
+    <div style="max-width:1200px;margin:0 auto;display:grid;grid-template-columns:1.2fr repeat(4,1fr);gap:28px;">
+      <div><a href="/" class="brand-mark"><span class="logo"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M3 17h2a3 3 0 0 0 3-3V7H3z"/><path d="M14 7h6l1 4v6h-3"/><circle cx="7" cy="17" r="2"/><circle cx="17" cy="17" r="2"/></svg></span>QuoteFleet</a><p style="margin-top:12px;max-width:360px;color:var(--muted);font-size:14px;line-height:1.6;">Instant quote widget, hosted quote pages, and follow-up tools for trucking and drayage carriers.</p></div>
+      <div><strong style="color:var(--ink);font-size:12px;text-transform:uppercase;letter-spacing:.12em;">Product</strong><a href="/w/demo">Demo widget</a><a href="/pricing">Pricing</a><a href="/marketplace/">Marketplace</a><a href="/login">Dashboard login</a></div>
+      <div><strong style="color:var(--ink);font-size:12px;text-transform:uppercase;letter-spacing:.12em;">Use cases</strong><a href="/for/forwarders">Forwarders</a><a href="/for/brokers">Brokers</a><a href="/for/ltl">LTL teams</a><a href="/w/demo">Drayage carriers</a></div>
+      <div><strong style="color:var(--ink);font-size:12px;text-transform:uppercase;letter-spacing:.12em;">Trust</strong><a href="/security">Security</a><a href="/dpa">DPA</a><a href="/.well-known/security.txt">security.txt</a><a href="mailto:security@quotefleet.net">Report security issue</a></div>
+      <div><strong style="color:var(--ink);font-size:12px;text-transform:uppercase;letter-spacing:.12em;">Company</strong><a href="mailto:hello@quotefleet.net">Contact</a><a href="/signup">Start free</a><a href="/login">Sign in</a></div>
     </div>
-  </section>
-
-  <section class="section" id="outcomes">
-    <div class="container">
-      <div class="section-head">
-        <span class="section-kicker">What it improves</span>
-        <h2>Stop losing website leads to slow manual quoting.</h2>
-        <p>QuoteFleet gives prospects a quote experience that feels instant, branded, and organized — while your team keeps full control of rates and follow-up.</p>
-      </div>
-      <div class="outcome-grid">
-        <div class="outcome-card"><strong>Capture more quote requests</strong><p>Turn anonymous website visitors into leads with a calculator they can use immediately.</p></div>
-        <div class="outcome-card"><strong>Respond before competitors</strong><p>Give a price range or written quote link while other carriers are still checking spreadsheets.</p></div>
-        <div class="outcome-card"><strong>Keep rates private</strong><p>Your tariffs stay inside your account. Public marketplace exposure is optional.</p></div>
-        <div class="outcome-card"><strong>Send branded quote links</strong><p>Every submitted quote gets a clean hosted page built for email, print, and PDF.</p></div>
-        <div class="outcome-card"><strong>Track customer interest</strong><p>See quote views, copy-link clicks, PDF saves, chat opens, and callback actions.</p></div>
-        <div class="outcome-card"><strong>Import existing rates</strong><p>Start from your current rate sheet, zones, accessorials, terminals, and lane rules.</p></div>
-      </div>
-    </div>
-  </section>
-
-  <section class="section" style="background:var(--surface);">
-    <div class="container">
-      <div class="follow-card">
-        <div>
-          <span class="section-kicker">After the quote</span>
-          <h2>Every quote becomes a sales follow-up page.</h2>
-          <p style="color:var(--muted);margin-top:12px;font-size:16px;">A basic calculator stops at the price. QuoteFleet keeps the conversation moving with a hosted quote page, customer actions, and dashboard activity.</p>
-        </div>
-        <div class="follow-list">
-          <span>Branded hosted quote page</span>
-          <span>PDF-ready quote layout</span>
-          <span>Customer chat from quote</span>
-          <span>Callback request button</span>
-          <span>Quote view tracking</span>
-          <span>Email preview template</span>
-        </div>
-      </div>
-    </div>
-  </section>
-
-  <section class="section">
-    <div class="container">
-      <div class="section-head">
-        <span class="section-kicker">Before / after</span>
-        <h2>The difference your customer feels.</h2>
-      </div>
-      <div class="before-after">
-        <div class="ba-card">
-          <h3>Before QuoteFleet</h3>
-          <ul>
-            <li>Customer emails a lane and waits.</li>
-            <li>Dispatcher checks rate sheets manually.</li>
-            <li>Quote follow-up happens in scattered emails.</li>
-            <li>No clear signal that the customer viewed the quote.</li>
-          </ul>
-        </div>
-        <div class="ba-card after">
-          <h3>After QuoteFleet</h3>
-          <ul>
-            <li>Customer gets an instant quote flow on your website.</li>
-            <li>Rates, accessorials, and zones calculate automatically.</li>
-            <li>Customer receives a branded quote link.</li>
-            <li>Your dashboard shows views, PDF saves, chat, and callbacks.</li>
-          </ul>
-        </div>
-      </div>
-    </div>
-  </section>
-
-  <section class="section" style="background:var(--surface);">
-    <div class="container">
-      <div class="section-head">
-        <span class="section-kicker">How it works</span>
-        <h2>Live fast, then tune deeper.</h2>
-      </div>
-      <div class="setup-strip">
-        <div class="setup-step"><small>01</small><strong>Create account</strong><p>Pick your carrier slug and brand the quote desk.</p></div>
-        <div class="setup-step"><small>02</small><strong>Load rates</strong><p>Edit manually or import rate cards, lane zones, and accessorials.</p></div>
-        <div class="setup-step"><small>03</small><strong>Share or embed</strong><p>Use your hosted page or add one script tag to your site.</p></div>
-        <div class="setup-step"><small>04</small><strong>Follow up</strong><p>Track quote views, chat, callback requests, and next steps.</p></div>
-      </div>
-    </div>
-  </section>
-
-  <section class="section">
-    <div class="container">
-      <div class="section-head">
-        <span class="section-kicker">Why not a form?</span>
-        <h2>QuoteFleet is closer to a sales desk than a contact form.</h2>
-      </div>
-      <table class="compare clean">
-        <thead><tr><th></th><th class="us">QuoteFleet</th><th>Generic web form</th><th>Legacy quote tools</th></tr></thead>
-        <tbody>
-          <tr><td>Website quote experience</td><td class="us">Instant calculator + hosted quote</td><td class="them">Message only</td><td class="them">Usually gated by sales</td></tr>
-          <tr><td>Rate ownership</td><td class="us">Private carrier-controlled rates</td><td class="them">No pricing logic</td><td class="them">Often locked behind support</td></tr>
-          <tr><td>Customer follow-up</td><td class="us">Quote link, chat, callback, activity</td><td class="them">Manual email</td><td class="them">Workflow varies</td></tr>
-          <tr><td>Setup path</td><td class="us">Hosted link or script tag</td><td class="them">Custom form work</td><td class="them">Implementation project</td></tr>
-          <tr><td>Best fit</td><td class="us">Carriers that want more inbound quotes</td><td class="them">Simple contact collection</td><td class="them">Large enterprise operations</td></tr>
-        </tbody>
-      </table>
-    </div>
-  </section>
-
-  <section class="section" style="background:var(--surface);">
-    <div class="container">
-      <div class="market-box">
-        <div>
-          <span class="section-kicker">Optional marketplace</span>
-          <h2>Keep rates private, or opt in for public exposure.</h2>
-          <p style="color:var(--muted);margin-top:10px;max-width:720px;">The marketplace is optional. Carriers can stay private, or opt in later so shippers and forwarders can discover capacity by lane. Public benchmarks are anonymized and sample-gated.</p>
-        </div>
-        <a class="btn btn-secondary btn-lg" href="/marketplace/">View marketplace <span class="arr">→</span></a>
-      </div>
-    </div>
-  </section>
-
-  <section class="section" id="faq">
-    <div class="container">
-      <div class="section-head">
-        <span class="section-kicker">FAQ</span>
-        <h2>Common objections, answered.</h2>
-      </div>
-      <div class="faq-grid">
-        <div class="faq-item"><strong>Will my rates be public?</strong><p>No. Rates are private by default. Marketplace exposure is opt-in.</p></div>
-        <div class="faq-item"><strong>Do customers need an account?</strong><p>No. Customers submit quotes directly from your website or hosted quote page.</p></div>
-        <div class="faq-item"><strong>Can I use my own rates?</strong><p>Yes. Edit rates in the dashboard or import rate cards, zones, and accessorials.</p></div>
-        <div class="faq-item"><strong>Does it replace my TMS?</strong><p>No. It captures and quotes inbound website leads before they become manual work.</p></div>
-        <div class="faq-item"><strong>Can I embed it on my existing site?</strong><p>Yes. Use the hosted link or add the script tag to your current website.</p></div>
-        <div class="faq-item"><strong>What about security?</strong><p>QuoteFleet uses encrypted transport and keeps sensitive carrier settings private. Full policy is available on the security page.</p></div>
-      </div>
-    </div>
-  </section>
-
-  <section class="section">
-    <div class="container">
-      <div class="final-cta-card">
-        <h2>Ready to quote from your website?</h2>
-        <p>Start with a hosted link, tune your rates, then embed the quote desk when you are ready.</p>
-        <a class="btn btn-primary btn-lg" href="/signup">Start free <span class="arr">→</span></a>
-        <a class="btn btn-secondary btn-lg" href="/w/demo" style="margin-left:10px;">View live demo <span class="arr">→</span></a>
-        <p class="micro-copy">14-day trial · No card required · Paid plans from $49/mo</p>
-      </div>
-    </div>
-  </section>
-
-  <nav class="simple-dock" aria-label="Quick navigation">
-    <a href="/w/demo">Demo</a>
-    <a href="/pricing">Pricing</a>
-    <a href="/marketplace/">Marketplace</a>
-    <a href="/security">Security</a>
-    <a class="cta" href="/signup">Start free</a>
-  </nav>
-
-  <footer class="site-footer">
-    © <span id="year"></span> QuoteFleet ·
-    <a href="/pricing">Pricing</a> ·
-    <a href="/security">Security</a> ·
-    <a href="/dpa">DPA</a> ·
-    <a href="/.well-known/security.txt">security.txt</a> ·
-    <a href="/w/demo">Demo</a> ·
-    <a href="/login">Sign in</a> ·
-    <a href="mailto:hello@quotefleet.net">Contact</a>
-    <div style="margin-top:10px;font-size:11.5px;color:var(--muted);opacity:.8;">QuoteFleet is a product of <strong>MR Holdings &amp; Trade LLC</strong>.</div>
+    <div style="max-width:1200px;margin:32px auto 0;padding-top:18px;border-top:1px solid var(--border);display:flex;justify-content:space-between;gap:18px;flex-wrap:wrap;color:var(--muted);font-size:12px;"><span>© <span id="year"></span> QuoteFleet. All rights reserved.</span><span>QuoteFleet is a product of <strong style="color:var(--ink-soft);">MR Holdings &amp; Trade LLC</strong>.</span></div>
   </footer>
 
   <script>document.getElementById('year').textContent = new Date().getFullYear();</script>
