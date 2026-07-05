@@ -123,6 +123,20 @@ describe('public static page smoke checks', () => {
     expect(css).toContain('.qf-setup-table-wrap');
   });
 
+  it('dashboard loads brand page editor UX layer', async () => {
+    const html = await file('app.html');
+    const js = await file('brand-editor.js');
+    const css = await file('brand-editor.css');
+    expect(html).toContain('/brand-editor.css');
+    expect(html).toContain('/brand-editor.js');
+    expect(js).toContain('Brand page editor');
+    expect(js).toContain('Make the calculator look like your company.');
+    expect(js).toContain('qf-brand-editor');
+    expect(js).toContain('Brand setup checklist');
+    expect(css).toContain('Phase AC: make brand setup feel like a customer page editor');
+    expect(css).toContain('.qf-brand-page-mock');
+  });
+
   it('landing page includes social metadata', async () => {
     const html = await file('landing.html');
     expect(html).toContain('property="og:title"');
