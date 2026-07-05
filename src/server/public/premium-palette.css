@@ -1,0 +1,70 @@
+/* QuoteFleet premium logistics palette.
+   Industry tone: midnight navy, steel gray, route teal, and signal amber. */
+:root {
+  --bg: #0B1117;
+  --surface: #121A22;
+  --surface-2: #18232E;
+  --surface-3: #243140;
+  --border: rgba(143, 159, 178, 0.16);
+  --border-strong: rgba(163, 178, 197, 0.28);
+  --ink: #F7FAFC;
+  --ink-soft: #D7E0EA;
+  --muted: #8FA0B2;
+  --muted-soft: #607184;
+  --accent: #26D0B2;
+  --accent-strong: #16A894;
+  --accent-soft: rgba(38, 208, 178, 0.12);
+  --accent-ink: #031A18;
+  --accent-2: #F5A524;
+  --accent-2-soft: rgba(245, 165, 36, 0.13);
+  --success: #36C98B;
+  --success-bg: rgba(54, 201, 139, 0.12);
+  --warn: #F5A524;
+  --warn-bg: rgba(245, 165, 36, 0.14);
+  --error: #F97373;
+  --error-bg: rgba(249, 115, 115, 0.12);
+  --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.34);
+  --shadow-md: 0 16px 42px -24px rgba(0, 0, 0, 0.85), 0 1px 0 rgba(255, 255, 255, 0.03) inset;
+  --shadow-lg: 0 32px 90px -42px rgba(0, 0, 0, 0.95);
+  --glow-cyan: 0 0 0 1px rgba(38, 208, 178, 0.28), 0 18px 54px -28px rgba(38, 208, 178, 0.55);
+}
+html[data-theme="light"] {
+  --bg: #F3F6F8;
+  --surface: #FFFFFF;
+  --surface-2: #EEF3F6;
+  --surface-3: #E0E8EE;
+  --border: rgba(16, 35, 48, 0.10);
+  --border-strong: rgba(16, 35, 48, 0.20);
+  --ink: #0E1A24;
+  --ink-soft: #243645;
+  --muted: #687887;
+  --muted-soft: #98A6B3;
+  --accent: #0F9F8C;
+  --accent-strong: #08786B;
+  --accent-soft: rgba(15, 159, 140, 0.11);
+  --accent-ink: #FFFFFF;
+  --accent-2: #B66D00;
+  --accent-2-soft: rgba(182, 109, 0, 0.10);
+  --success: #14875A;
+  --success-bg: rgba(20, 135, 90, 0.10);
+  --warn: #9A5B00;
+  --warn-bg: rgba(154, 91, 0, 0.11);
+  --error: #B42335;
+  --error-bg: rgba(180, 35, 53, 0.10);
+}
+body {
+  background: radial-gradient(circle at 12% -10%, rgba(38, 208, 178, 0.08), transparent 34rem), radial-gradient(circle at 86% 8%, rgba(245, 165, 36, 0.06), transparent 30rem), var(--bg);
+}
+.btn-primary {
+  background: linear-gradient(135deg, var(--accent), var(--accent-strong));
+  border-color: rgba(38, 208, 178, 0.42);
+  box-shadow: 0 12px 30px -18px rgba(38, 208, 178, 0.85);
+}
+.btn-primary:hover {
+  background: linear-gradient(135deg, #34E3C4, var(--accent-strong));
+  border-color: var(--accent);
+}
+.site-logo,
+.brand-mark .logo {
+  background: linear-gradient(135deg, var(--accent), var(--accent-2));
+}
