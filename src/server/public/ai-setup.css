@@ -1,0 +1,146 @@
+/* Phase AD: safer, clearer AI setup UX. */
+.qf-ai-setup {
+  margin: 0 0 18px;
+  border: 1px solid var(--border);
+  border-radius: 22px;
+  background: linear-gradient(135deg, rgba(38,208,178,.08), rgba(245,165,36,.05)), var(--surface);
+  box-shadow: var(--shadow-md);
+  overflow: hidden;
+}
+.qf-ai-top {
+  display: flex;
+  justify-content: space-between;
+  gap: 18px;
+  align-items: flex-start;
+  padding: 18px;
+  border-bottom: 1px solid var(--border);
+}
+.qf-ai-kicker {
+  color: var(--accent-2);
+  font: 700 11px var(--font-mono);
+  letter-spacing: .12em;
+  text-transform: uppercase;
+  margin-bottom: 6px;
+}
+.qf-ai-setup h2 {
+  margin: 0;
+  font-size: 24px;
+  letter-spacing: -.035em;
+}
+.qf-ai-setup p {
+  margin: 7px 0 0;
+  color: var(--muted);
+  max-width: 700px;
+}
+.qf-ai-actions {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: 8px;
+}
+.qf-ai-actions button {
+  border: 1px solid var(--border-strong);
+  border-radius: 999px;
+  padding: 9px 12px;
+  background: rgba(255,255,255,.035);
+  color: var(--ink-soft);
+  font-weight: 750;
+  cursor: pointer;
+}
+.qf-ai-actions button:hover {
+  border-color: var(--accent);
+  color: var(--ink);
+}
+.qf-ai-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 10px;
+  padding: 16px;
+}
+.qf-ai-card {
+  border: 1px solid var(--border);
+  border-radius: 17px;
+  background: rgba(255,255,255,.025);
+  padding: 13px;
+}
+.qf-ai-card span {
+  display: block;
+  color: var(--accent-2);
+  font: 700 10px var(--font-mono);
+  letter-spacing: .09em;
+  text-transform: uppercase;
+  margin-bottom: 7px;
+}
+.qf-ai-card strong {
+  display: block;
+  color: var(--ink);
+  margin-bottom: 6px;
+}
+.qf-ai-card p {
+  margin: 0;
+  color: var(--muted);
+  font-size: 13px;
+  line-height: 1.45;
+}
+.qf-ai-safety {
+  margin: 0 0 18px;
+  border: 1px dashed var(--border-strong);
+  border-radius: 16px;
+  padding: 13px 14px;
+  color: var(--ink-soft);
+  background: rgba(255,255,255,.022);
+}
+.qf-ai-safety b { color: var(--accent); }
+.qf-ai-chat-mock {
+  margin: 0 0 18px;
+  border: 1px solid var(--border);
+  border-radius: 20px;
+  background: linear-gradient(180deg, rgba(255,255,255,.025), rgba(255,255,255,.01)), var(--surface);
+  padding: 14px;
+}
+.qf-ai-chat-mock strong {
+  color: var(--ink);
+  display: block;
+  margin-bottom: 10px;
+}
+.qf-ai-bubbles {
+  display: grid;
+  gap: 8px;
+}
+.qf-ai-bubble {
+  max-width: 760px;
+  border: 1px solid var(--border);
+  border-radius: 15px;
+  padding: 10px 12px;
+  color: var(--ink-soft);
+  background: rgba(255,255,255,.025);
+  font-size: 13px;
+  line-height: 1.45;
+}
+.qf-ai-bubble.customer {
+  margin-left: auto;
+  background: rgba(38,208,178,.08);
+  border-color: rgba(38,208,178,.22);
+}
+.qf-ai-bubble.agent {
+  margin-right: auto;
+}
+.qf-ai-bubble.agent::before,
+.qf-ai-bubble.customer::before {
+  display: block;
+  margin-bottom: 4px;
+  font: 700 10px var(--font-mono);
+  letter-spacing: .08em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+.qf-ai-bubble.customer::before { content: 'Customer'; }
+.qf-ai-bubble.agent::before { content: 'AI assistant'; color: var(--accent); }
+@media (max-width: 980px) {
+  .qf-ai-top { display: grid; }
+  .qf-ai-actions { justify-content: flex-start; }
+  .qf-ai-grid { grid-template-columns: 1fr 1fr; }
+}
+@media (max-width: 640px) {
+  .qf-ai-grid { grid-template-columns: 1fr; }
+}
