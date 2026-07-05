@@ -40,9 +40,29 @@ describe('public static page smoke checks', () => {
 
   it('landing reveal CSS keeps content visible without JavaScript', async () => {
     const css = await file('landing-s-polish.css');
+    expect(css).toContain("@import url('/premium-palette.css')");
     expect(css).toContain('.js [data-reveal]');
     expect(css).toContain('.js [data-reveal].is-visible');
     expect(css).not.toContain('\n[data-reveal] {');
+  });
+
+  it('premium palette uses logistics SaaS colors', async () => {
+    const css = await file('premium-palette.css');
+    expect(css).toContain('--bg: #0B1117');
+    expect(css).toContain('--accent: #26D0B2');
+    expect(css).toContain('--accent-2: #F5A524');
+    expect(css).toContain('midnight navy');
+  });
+
+  it('dashboard loads premium calculator-editing polish', async () => {
+    const html = await file('app.html');
+    const css = await file('dashboard-polish.css');
+    expect(html).toContain('/premium-palette.css');
+    expect(html).toContain('/dashboard-polish.css');
+    expect(css).toContain('Dashboard polish for calculator setup screens');
+    expect(css).toContain('data-route="rates"');
+    expect(css).toContain('.qf-tab.active');
+    expect(css).toContain('.qf-filter-row th');
   });
 
   it('landing page includes social metadata', async () => {
