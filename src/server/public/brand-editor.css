@@ -1,0 +1,168 @@
+/* Phase AC: make brand setup feel like a customer page editor. */
+.qf-brand-editor {
+  margin: 0 0 18px;
+  border: 1px solid var(--border);
+  border-radius: 22px;
+  background: linear-gradient(135deg, rgba(38,208,178,.08), rgba(245,165,36,.05)), var(--surface);
+  box-shadow: var(--shadow-md);
+  overflow: hidden;
+}
+.qf-brand-editor-top {
+  display: flex;
+  justify-content: space-between;
+  gap: 18px;
+  align-items: flex-start;
+  padding: 18px;
+  border-bottom: 1px solid var(--border);
+}
+.qf-brand-kicker {
+  color: var(--accent-2);
+  font: 700 11px var(--font-mono);
+  letter-spacing: .12em;
+  text-transform: uppercase;
+  margin-bottom: 6px;
+}
+.qf-brand-editor h2 {
+  margin: 0;
+  font-size: 24px;
+  letter-spacing: -.035em;
+}
+.qf-brand-editor p {
+  margin: 7px 0 0;
+  color: var(--muted);
+  max-width: 680px;
+}
+.qf-brand-actions {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: 8px;
+}
+.qf-brand-actions button,
+.qf-brand-actions a {
+  border: 1px solid var(--border-strong);
+  border-radius: 999px;
+  padding: 9px 12px;
+  background: rgba(255,255,255,.035);
+  color: var(--ink-soft);
+  font-weight: 750;
+  text-decoration: none;
+  cursor: pointer;
+}
+.qf-brand-actions button:hover,
+.qf-brand-actions a:hover {
+  border-color: var(--accent);
+  color: var(--ink);
+}
+.qf-brand-editor-body {
+  display: grid;
+  grid-template-columns: .9fr 1.1fr;
+  gap: 16px;
+  padding: 16px;
+}
+.qf-brand-checklist,
+.qf-brand-preview {
+  border: 1px solid var(--border);
+  border-radius: 18px;
+  background: rgba(255,255,255,.025);
+  padding: 14px;
+}
+.qf-brand-checklist strong,
+.qf-brand-preview strong {
+  display: block;
+  color: var(--ink);
+  margin-bottom: 10px;
+}
+.qf-brand-checklist ul {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+  display: grid;
+  gap: 8px;
+}
+.qf-brand-checklist li {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  gap: 9px;
+  align-items: start;
+  color: var(--ink-soft);
+  font-size: 13px;
+}
+.qf-brand-checklist li::before {
+  content: '✓';
+  width: 22px;
+  height: 22px;
+  display: grid;
+  place-items: center;
+  border-radius: 999px;
+  background: var(--accent-soft);
+  color: var(--accent);
+  font-weight: 900;
+}
+.qf-brand-page-mock {
+  border: 1px solid rgba(255,255,255,.09);
+  border-radius: 20px;
+  background: linear-gradient(180deg, #15202a, #0d141c);
+  overflow: hidden;
+}
+.qf-brand-page-top {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 14px;
+  border-bottom: 1px solid rgba(255,255,255,.08);
+}
+.qf-brand-logo {
+  width: 36px;
+  height: 36px;
+  border-radius: 12px;
+  background: linear-gradient(135deg, var(--accent), var(--accent-2));
+}
+.qf-brand-page-top strong { color: #fff; display: block; }
+.qf-brand-page-top small { color: #8fa0b2; }
+.qf-brand-page-chip {
+  align-self: center;
+  color: var(--accent);
+  border: 1px solid rgba(38,208,178,.28);
+  border-radius: 999px;
+  padding: 5px 8px;
+  font: 700 10px var(--font-mono);
+}
+.qf-brand-page-body { padding: 14px; }
+.qf-brand-page-body h3 {
+  margin: 0 0 7px;
+  color: #fff;
+  font-size: 21px;
+  letter-spacing: -.035em;
+}
+.qf-brand-page-body p { color: #aebdcc; margin-bottom: 12px; }
+.qf-brand-page-fields {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+}
+.qf-brand-page-fields span {
+  border: 1px solid rgba(255,255,255,.09);
+  border-radius: 12px;
+  padding: 10px;
+  color: #d7e0ea;
+  background: rgba(255,255,255,.035);
+  font-size: 12px;
+}
+.qf-brand-publish-tip {
+  margin: 0 0 18px;
+  border: 1px dashed var(--border-strong);
+  border-radius: 16px;
+  padding: 13px 14px;
+  color: var(--ink-soft);
+  background: rgba(255,255,255,.022);
+}
+.qf-brand-publish-tip b { color: var(--accent); }
+@media (max-width: 900px) {
+  .qf-brand-editor-top,
+  .qf-brand-editor-body { display: grid; grid-template-columns: 1fr; }
+  .qf-brand-actions { justify-content: flex-start; }
+}
+@media (max-width: 520px) {
+  .qf-brand-page-fields { grid-template-columns: 1fr; }
+}
