@@ -109,6 +109,20 @@ describe('public static page smoke checks', () => {
     expect(css).toContain('.qf-builder-stats');
   });
 
+  it('dashboard loads accessorial and zone builder UX layer', async () => {
+    const html = await file('app.html');
+    const js = await file('setup-builder.js');
+    const css = await file('setup-builder.css');
+    expect(html).toContain('/setup-builder.css');
+    expect(html).toContain('/setup-builder.js');
+    expect(js).toContain('Charge builder');
+    expect(js).toContain('Zone builder');
+    expect(js).toContain('Add the charges customers usually ask about.');
+    expect(js).toContain('Build local zones for faster drayage pricing.');
+    expect(css).toContain('Phase AB: builder UX for accessorials and zones');
+    expect(css).toContain('.qf-setup-table-wrap');
+  });
+
   it('landing page includes social metadata', async () => {
     const html = await file('landing.html');
     expect(html).toContain('property="og:title"');
