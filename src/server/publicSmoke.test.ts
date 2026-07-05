@@ -65,6 +65,22 @@ describe('public static page smoke checks', () => {
     expect(css).toContain('.qf-filter-row th');
   });
 
+  it('dashboard loads short interactive setup UX', async () => {
+    const html = await file('app.html');
+    const js = await file('dashboard-setup.js');
+    const css = await file('dashboard-setup.css');
+    const todo = await readFile(resolve(process.cwd(), 'docs/product-todo.md'), 'utf8');
+    expect(html).toContain('/dashboard-setup.css');
+    expect(html).toContain('/dashboard-setup.js');
+    expect(js).toContain('Calculator setup');
+    expect(js).toContain('Get your rate page ready');
+    expect(js).toContain('qf-setup-panel');
+    expect(js).toContain('qf-setup-empty');
+    expect(css).toContain('Phase Y: short interactive calculator setup UX');
+    expect(todo).toContain('Phase 1 — Calculator setup dashboard UX');
+    expect(todo).toContain('Phase 7 — Premium SaaS polish');
+  });
+
   it('landing page includes social metadata', async () => {
     const html = await file('landing.html');
     expect(html).toContain('property="og:title"');
