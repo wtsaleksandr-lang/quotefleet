@@ -95,6 +95,20 @@ describe('public static page smoke checks', () => {
     expect(css).toContain('.qf-preview-phone');
   });
 
+  it('dashboard loads rate builder UX layer', async () => {
+    const html = await file('app.html');
+    const js = await file('rate-builder.js');
+    const css = await file('rate-builder.css');
+    expect(html).toContain('/rate-builder.css');
+    expect(html).toContain('/rate-builder.js');
+    expect(js).toContain('Rate builder');
+    expect(js).toContain('Start with one simple rate card.');
+    expect(js).toContain('qf-builder-hero');
+    expect(js).toContain('qf-rate-table-wrap');
+    expect(css).toContain('Phase AA: make rate cards feel like a calculator builder');
+    expect(css).toContain('.qf-builder-stats');
+  });
+
   it('landing page includes social metadata', async () => {
     const html = await file('landing.html');
     expect(html).toContain('property="og:title"');
