@@ -1,0 +1,169 @@
+/* Phase AA: make rate cards feel like a calculator builder, not a spreadsheet. */
+.qf-builder-hero {
+  margin: 0 0 18px;
+  border: 1px solid var(--border);
+  border-radius: 22px;
+  background: linear-gradient(135deg, rgba(38,208,178,.09), rgba(245,165,36,.05)), var(--surface);
+  box-shadow: var(--shadow-md);
+  padding: 18px;
+}
+.qf-builder-hero-top {
+  display: flex;
+  justify-content: space-between;
+  gap: 18px;
+  align-items: flex-start;
+}
+.qf-builder-kicker {
+  color: var(--accent-2);
+  font: 700 11px var(--font-mono);
+  letter-spacing: .12em;
+  text-transform: uppercase;
+  margin-bottom: 6px;
+}
+.qf-builder-hero h2 {
+  margin: 0;
+  font-size: 24px;
+  letter-spacing: -.035em;
+}
+.qf-builder-hero p {
+  margin: 7px 0 0;
+  color: var(--muted);
+  max-width: 680px;
+}
+.qf-builder-actions {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: 8px;
+}
+.qf-builder-actions button {
+  border: 1px solid var(--border-strong);
+  border-radius: 999px;
+  padding: 9px 12px;
+  background: rgba(255,255,255,.035);
+  color: var(--ink-soft);
+  font-weight: 750;
+  cursor: pointer;
+}
+.qf-builder-actions button:hover {
+  border-color: var(--accent);
+  color: var(--ink);
+}
+.qf-builder-stats {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 10px;
+  margin-top: 16px;
+}
+.qf-builder-stat {
+  border: 1px solid var(--border);
+  border-radius: 16px;
+  padding: 12px;
+  background: rgba(255,255,255,.025);
+}
+.qf-builder-stat span {
+  display: block;
+  color: var(--muted);
+  font-size: 12px;
+  margin-bottom: 5px;
+}
+.qf-builder-stat strong {
+  color: var(--ink);
+  font-size: 20px;
+  letter-spacing: -.035em;
+}
+.qf-builder-guide {
+  margin: 0 0 18px;
+  border: 1px solid var(--border);
+  border-radius: 18px;
+  background: rgba(255,255,255,.025);
+  padding: 14px;
+}
+.qf-builder-guide strong {
+  display: block;
+  color: var(--ink);
+  margin-bottom: 8px;
+}
+.qf-builder-guide ol {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 8px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.qf-builder-guide li {
+  border: 1px solid var(--border);
+  border-radius: 14px;
+  padding: 10px;
+  color: var(--ink-soft);
+  font-size: 13px;
+}
+.qf-builder-guide li::before {
+  content: attr(data-step);
+  display: inline-grid;
+  place-items: center;
+  width: 22px;
+  height: 22px;
+  border-radius: 999px;
+  background: var(--accent-soft);
+  color: var(--accent);
+  font: 800 11px var(--font-mono);
+  margin-right: 7px;
+}
+.qf-rate-table-wrap {
+  position: relative;
+}
+.qf-rate-table-wrap::before {
+  content: 'Rate builder';
+  position: absolute;
+  top: -12px;
+  left: 18px;
+  padding: 4px 8px;
+  border-radius: 999px;
+  background: var(--surface);
+  color: var(--accent-2);
+  border: 1px solid var(--border);
+  font: 700 10px var(--font-mono);
+  letter-spacing: .08em;
+  text-transform: uppercase;
+  z-index: 2;
+}
+.qf-rate-table-wrap .table {
+  margin-top: 16px;
+}
+.qf-rate-table-wrap tbody tr {
+  transition: background .16s ease, box-shadow .16s ease;
+}
+.qf-rate-table-wrap tbody tr:hover {
+  box-shadow: inset 3px 0 0 var(--accent);
+}
+.qf-rate-table-wrap td:first-child,
+.qf-rate-table-wrap th:first-child {
+  padding-left: 18px;
+}
+.qf-rate-save-note {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  margin-left: 8px;
+  color: var(--muted);
+  font-size: 12px;
+}
+.qf-rate-save-note::before {
+  content: '';
+  width: 7px;
+  height: 7px;
+  border-radius: 999px;
+  background: var(--success);
+  box-shadow: 0 0 0 4px var(--success-bg);
+}
+@media (max-width: 900px) {
+  .qf-builder-hero-top { display: grid; }
+  .qf-builder-actions { justify-content: flex-start; }
+  .qf-builder-stats { grid-template-columns: 1fr 1fr; }
+  .qf-builder-guide ol { grid-template-columns: 1fr; }
+}
+@media (max-width: 540px) {
+  .qf-builder-stats { grid-template-columns: 1fr; }
+}
