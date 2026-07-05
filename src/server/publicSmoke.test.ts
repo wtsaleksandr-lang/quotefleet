@@ -137,6 +137,20 @@ describe('public static page smoke checks', () => {
     expect(css).toContain('.qf-brand-page-mock');
   });
 
+  it('dashboard loads safer AI setup UX layer', async () => {
+    const html = await file('app.html');
+    const js = await file('ai-setup.js');
+    const css = await file('ai-setup.css');
+    expect(html).toContain('/ai-setup.css');
+    expect(html).toContain('/ai-setup.js');
+    expect(js).toContain('AI setup');
+    expect(js).toContain('Give the assistant clear rules before customers use it.');
+    expect(js).toContain('Do not promise');
+    expect(js).toContain('Safety rule');
+    expect(css).toContain('Phase AD: safer, clearer AI setup UX');
+    expect(css).toContain('.qf-ai-card');
+  });
+
   it('landing page includes social metadata', async () => {
     const html = await file('landing.html');
     expect(html).toContain('property="og:title"');
