@@ -1,4 +1,6 @@
-/* Phase S/T/U/V: tighter sharing/follow-up visual polish layered over the visual homepage. */
+@import url('/premium-palette.css');
+
+/* Phase S/T/U/V/X: tighter sharing/follow-up visual polish layered over the visual homepage. */
 .hero h1 {
   max-width: 560px;
 }
