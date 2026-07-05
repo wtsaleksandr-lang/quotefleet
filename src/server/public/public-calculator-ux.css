@@ -1,0 +1,88 @@
+/* Phase AE: customer-facing calculator UX polish. */
+.qf-trust-strip {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 7px;
+  margin: 0 0 16px;
+}
+.qf-trust-strip span {
+  border: 1px solid var(--w-border);
+  border-radius: 999px;
+  background: #f8fafc;
+  color: var(--w-muted);
+  padding: 7px 9px;
+  font-size: 11.5px;
+  font-weight: 750;
+  text-align: center;
+  white-space: nowrap;
+}
+.qf-mini-stepper {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 6px;
+  margin: 0 0 16px;
+}
+.qf-mini-stepper span {
+  border-radius: 10px;
+  background: #f1f4f9;
+  color: var(--w-muted);
+  padding: 8px 9px;
+  font-size: 11.5px;
+  font-weight: 800;
+  text-align: center;
+}
+.qf-mini-stepper span:first-child {
+  background: rgba(37,99,235,.09);
+  color: var(--w-primary);
+}
+.qf-customer-note {
+  border: 1px solid #dbeafe;
+  border-radius: 12px;
+  background: linear-gradient(135deg, #f8fbff, #eff6ff);
+  color: #334155;
+  padding: 11px 12px;
+  margin: 12px 0 0;
+  font-size: 12.5px;
+  line-height: 1.45;
+}
+.qf-result-actions {
+  display: grid;
+  grid-template-columns: 1.2fr .8fr;
+  gap: 8px;
+  margin-top: 14px;
+}
+.qf-result-actions .qf-cta { margin-top: 0; }
+.qf-result-actions .qf-secondary {
+  border-style: dashed;
+  color: var(--w-primary);
+}
+.qf-result .qf-customer-note {
+  margin-top: 12px;
+  border-color: #bae6fd;
+  background: linear-gradient(135deg, #f0f9ff, #ecfeff);
+}
+.qf-contact-head {
+  border: 1px solid var(--w-border);
+  border-radius: 12px;
+  background: #f8fafc;
+  padding: 12px;
+  margin-bottom: 14px;
+}
+.qf-contact-head .qf-section-title { margin-bottom: 4px; }
+.qf-contact-head p { margin: 0; }
+.qf-thanks-actions {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+  margin-top: 12px;
+}
+.qf-thanks-actions .qf-chat-toggle { margin: 0; }
+.qf-thanks-actions .qf-chat-toggle button { margin-top: 0; height: 100%; }
+@media (max-width: 640px) {
+  .qf-trust-strip { grid-template-columns: 1fr; gap: 6px; }
+  .qf-trust-strip span { border-radius: 10px; }
+  .qf-mini-stepper { grid-template-columns: 1fr; }
+  .qf-result-actions { grid-template-columns: 1fr; }
+  .qf-thanks-actions { grid-template-columns: 1fr; }
+  .qf-result .total { font-size: 32px; }
+}
