@@ -1,0 +1,154 @@
+/* Phase Z: lightweight customer calculator preview inside dashboard. */
+.qf-preview-card {
+  margin: 0 0 22px;
+  border: 1px solid var(--border);
+  border-radius: 22px;
+  background: linear-gradient(135deg, rgba(38,208,178,.08), rgba(245,165,36,.04)), var(--surface);
+  box-shadow: var(--shadow-md);
+  overflow: hidden;
+}
+.qf-preview-top {
+  display: flex;
+  justify-content: space-between;
+  gap: 18px;
+  align-items: flex-start;
+  padding: 18px 20px;
+  border-bottom: 1px solid var(--border);
+}
+.qf-preview-kicker {
+  color: var(--accent-2);
+  font: 700 11px var(--font-mono);
+  letter-spacing: .12em;
+  text-transform: uppercase;
+  margin-bottom: 6px;
+}
+.qf-preview-top h2 {
+  margin: 0;
+  font-size: 22px;
+  letter-spacing: -.035em;
+}
+.qf-preview-top p {
+  margin: 6px 0 0;
+  color: var(--muted);
+  max-width: 620px;
+}
+.qf-preview-actions {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+}
+.qf-preview-actions a,
+.qf-preview-actions button {
+  border: 1px solid var(--border-strong);
+  border-radius: 999px;
+  padding: 9px 12px;
+  background: rgba(255,255,255,.035);
+  color: var(--ink-soft);
+  text-decoration: none;
+  font-weight: 750;
+  cursor: pointer;
+}
+.qf-preview-actions a:hover,
+.qf-preview-actions button:hover {
+  color: var(--ink);
+  border-color: var(--accent);
+}
+.qf-preview-body {
+  display: grid;
+  grid-template-columns: .85fr 1.15fr;
+  gap: 16px;
+  padding: 16px;
+}
+.qf-preview-url {
+  border: 1px solid var(--border);
+  border-radius: 16px;
+  padding: 14px;
+  background: rgba(255,255,255,.025);
+}
+.qf-preview-url span {
+  display: block;
+  color: var(--muted);
+  font-size: 12px;
+  margin-bottom: 6px;
+}
+.qf-preview-url code {
+  color: var(--accent);
+  font-family: var(--font-mono);
+  overflow-wrap: anywhere;
+}
+.qf-preview-phone {
+  border: 1px solid var(--border);
+  border-radius: 24px;
+  padding: 12px;
+  background: #081017;
+  box-shadow: inset 0 0 0 1px rgba(255,255,255,.04);
+}
+.qf-preview-screen {
+  border-radius: 18px;
+  background: linear-gradient(180deg, #16212b, #0f171f);
+  border: 1px solid rgba(255,255,255,.08);
+  padding: 14px;
+}
+.qf-preview-brand {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  align-items: center;
+  margin-bottom: 12px;
+}
+.qf-preview-logo {
+  width: 34px;
+  height: 34px;
+  border-radius: 12px;
+  background: linear-gradient(135deg, var(--accent), var(--accent-2));
+}
+.qf-preview-brand strong { color: #fff; display: block; }
+.qf-preview-brand small { color: #8fa0b2; }
+.qf-preview-pill {
+  color: var(--accent);
+  border: 1px solid rgba(38,208,178,.28);
+  border-radius: 999px;
+  padding: 5px 8px;
+  font: 700 10px var(--font-mono);
+}
+.qf-preview-fields {
+  display: grid;
+  gap: 8px;
+}
+.qf-preview-field {
+  border: 1px solid rgba(255,255,255,.09);
+  border-radius: 12px;
+  padding: 10px;
+  color: #d7e0ea;
+  background: rgba(255,255,255,.035);
+  font-size: 12px;
+}
+.qf-preview-result {
+  margin-top: 10px;
+  border-radius: 14px;
+  padding: 12px;
+  background: rgba(38,208,178,.12);
+  border: 1px solid rgba(38,208,178,.25);
+  display: flex;
+  justify-content: space-between;
+  color: #fff;
+}
+.qf-preview-mini-actions {
+  display: flex;
+  gap: 7px;
+  flex-wrap: wrap;
+  margin-top: 10px;
+}
+.qf-preview-mini-actions span {
+  border: 1px solid rgba(255,255,255,.10);
+  border-radius: 999px;
+  padding: 6px 8px;
+  color: #d7e0ea;
+  font-size: 11px;
+}
+@media (max-width: 900px) {
+  .qf-preview-top,
+  .qf-preview-body { grid-template-columns: 1fr; display: grid; }
+  .qf-preview-actions { justify-content: flex-start; }
+}

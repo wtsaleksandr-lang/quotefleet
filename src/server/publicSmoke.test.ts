@@ -81,6 +81,20 @@ describe('public static page smoke checks', () => {
     expect(todo).toContain('Phase 7 — Premium SaaS polish');
   });
 
+  it('dashboard loads customer calculator preview layer', async () => {
+    const html = await file('app.html');
+    const js = await file('dashboard-preview.js');
+    const css = await file('dashboard-preview.css');
+    expect(html).toContain('/dashboard-preview.css');
+    expect(html).toContain('/dashboard-preview.js');
+    expect(js).toContain('Customer preview');
+    expect(js).toContain('See what customers open from your link.');
+    expect(js).toContain('qf-preview-card');
+    expect(js).toContain('Copy link');
+    expect(css).toContain('Phase Z: lightweight customer calculator preview');
+    expect(css).toContain('.qf-preview-phone');
+  });
+
   it('landing page includes social metadata', async () => {
     const html = await file('landing.html');
     expect(html).toContain('property="og:title"');
