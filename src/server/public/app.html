@@ -11,10 +11,9 @@
   <link rel="stylesheet" href="/dashboard-preview.css">
   <link rel="stylesheet" href="/rate-builder.css">
   <link rel="stylesheet" href="/setup-builder.css">
+  <link rel="stylesheet" href="/brand-editor.css">
   <link rel="stylesheet" href="/app-quote-actions.css">
   <script>
-    // Theme bootstrap — runs before any paint to avoid flash of wrong
-    // theme. Reads localStorage; falls back to system preference; default dark.
     (function () {
       try {
         var saved = localStorage.getItem('qf-theme');
@@ -26,14 +25,9 @@
 </head>
 <body>
   <div class="app-shell" id="app-shell" hidden>
-    <button class="qf-mobile-nav-toggle" id="qf-mobile-nav-toggle" aria-label="Open navigation menu" aria-controls="qf-sidebar" aria-expanded="false" hidden>
-      <span aria-hidden="true">☰</span>
-    </button>
+    <button class="qf-mobile-nav-toggle" id="qf-mobile-nav-toggle" aria-label="Open navigation menu" aria-controls="qf-sidebar" aria-expanded="false" hidden><span aria-hidden="true">☰</span></button>
     <aside class="sidebar" id="qf-sidebar">
-      <div class="brand-block">
-        <div class="name" id="sb-tenant-name">…</div>
-        <div class="sub" id="sb-tenant-slug">…</div>
-      </div>
+      <div class="brand-block"><div class="name" id="sb-tenant-name">…</div><div class="sub" id="sb-tenant-slug">…</div></div>
       <button class="nav-item active" data-route="overview" aria-label="Overview"><span aria-hidden="true">📊</span> Overview</button>
       <button class="nav-item" data-route="leads" aria-label="Leads"><span aria-hidden="true">📥</span> Leads</button>
       <button class="nav-item" data-route="callbacks" aria-label="Callbacks"><span aria-hidden="true">📞</span> Callbacks</button>
@@ -48,15 +42,10 @@
       <button class="nav-item" data-route="account" aria-label="Account"><span aria-hidden="true">👤</span> Account</button>
       <button class="nav-item" data-route="audit" aria-label="Audit log"><span aria-hidden="true">📜</span> Audit log</button>
       <a href="/" target="_blank" rel="noopener" aria-label="View public widget">↗ View public widget</a>
-      <button class="qf-theme-toggle" id="qf-theme-toggle" aria-label="Toggle light/dark theme">
-        <span id="qf-theme-icon" aria-hidden="true">🌙</span>
-        <span id="qf-theme-label">Dark</span>
-      </button>
+      <button class="qf-theme-toggle" id="qf-theme-toggle" aria-label="Toggle light/dark theme"><span id="qf-theme-icon" aria-hidden="true">🌙</span><span id="qf-theme-label">Dark</span></button>
       <button class="nav-item" id="sb-logout" aria-label="Sign out">↩ Sign out</button>
     </aside>
-    <main class="app-main">
-      <div id="page-content"></div>
-    </main>
+    <main class="app-main"><div id="page-content"></div></main>
   </div>
   <style>
     .qf-mobile-nav-toggle { position: fixed; top: 12px; left: 12px; z-index: 1001; width: 40px; height: 40px; border-radius: 8px; border: 1px solid var(--border-strong); background: var(--surface); font-size: 20px; line-height: 38px; padding: 0; cursor: pointer; color: var(--ink); transition: background 0.15s ease; }
@@ -66,14 +55,13 @@
     body.qf-trial-locked .app-main input, body.qf-trial-locked .app-main select, body.qf-trial-locked .app-main textarea { pointer-events: none; opacity: 0.55; cursor: not-allowed; }
     body.qf-trial-locked .app-main .btn-primary, body.qf-trial-locked .app-main .btn-danger, body.qf-trial-locked .app-main button[data-mutate] { pointer-events: none; opacity: 0.55; cursor: not-allowed; }
   </style>
-  <div id="loading" style="display:flex;align-items:center;justify-content:center;min-height:100vh;color:var(--muted);">
-    <div>Loading dashboard<span class="dots"></span></div>
-  </div>
+  <div id="loading" style="display:flex;align-items:center;justify-content:center;min-height:100vh;color:var(--muted);"><div>Loading dashboard<span class="dots"></span></div></div>
   <script src="/app.js"></script>
   <script src="/dashboard-setup.js"></script>
   <script src="/dashboard-preview.js"></script>
   <script src="/rate-builder.js"></script>
   <script src="/setup-builder.js"></script>
+  <script src="/brand-editor.js"></script>
   <script src="/app-quote-actions.js"></script>
   <script src="/app-quote-activity.js"></script>
   <script src="/app-accessorial-tools.js"></script>
