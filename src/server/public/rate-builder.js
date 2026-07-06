@@ -14,6 +14,24 @@
     return Array.from(content.querySelectorAll('tbody tr'));
   }
 
+  function rowText(row) {
+    return (row.textContent || '').replace(/\s+/g, ' ').trim().toLowerCase();
+  }
+
+  function hasMoney(row) {
+    return /\$\s?\d|cad\s?\d|usd\s?\d|\d+\.\d{2}/i.test(row.textContent || '');
+  }
+
+  function isDisabled(row) {
+    return /inactive|disabled|draft|hidden|paused|off/i.test(row.textContent || '');
+  }
+
+  function hasSetupGap(row) {
+    const text = rowText(row);
+    if (!text) return false;
+    return !hasMoney(row) || /missing|incomplete|blank|not set|tbd|todo/i.test(text);
+  }
+
   function tableWrap() {
     const table = content.querySelector('.table');
     if (!table || table.closest('.qf-rate-table-wrap')) return;
@@ -32,6 +50,14 @@
     if (text.includes('reefer')) types.push('Reefer');
     if (text.includes('hazmat')) types.push('Hazmat');
     return types.length ? types.join(', ') : 'Add service types';
+  }
+
+  function scanStats() {
+    const list = rows();
+    const disabled = list.filter(isDisabled).length;
+    const gaps = list.filter((row) => !isDisabled(row) && hasSetupGap(row)).length;
+    const ready = Math.max(0, list.length - disabled - gaps);
+    return { total: list.length, disabled, gaps, ready };
   }
 
   function hero() {
@@ -85,6 +111,62 @@
     if (heroCard && heroCard.nextSibling) heroCard.parentNode.insertBefore(card, heroCard.nextSibling);
   }
 
+  function scanPanel() {
+    if (route() !== 'rates' || content.querySelector('.qf-rate-scan')) return;
+    const stats = scanStats();
+    const card = document.createElement('section');
+    card.className = 'qf-rate-scan';
+    card.innerHTML = `
+      <div>
+        <div class="qf-builder-kicker">Rate health</div>
+        <h3>Scan pricing gaps before sharing.</h3>
+        <p>Use this as a quick checklist for cards that still need a base price, extra charges, or visibility review.</p>
+      </div>
+      <div class="qf-rate-scan-stats">
+        <button type="button" data-rate-scan="all"><span>Total</span><strong>${stats.total}</strong></button>
+        <button type="button" data-rate-scan="gap"><span>Needs price</span><strong>${stats.gaps}</strong></button>
+        <button type="button" data-rate-scan="disabled"><span>Disabled/draft</span><strong>${stats.disabled}</strong></button>
+        <button type="button" data-rate-scan="ready"><span>Looks ready</span><strong>${stats.ready}</strong></button>
+      </div>`;
+    card.addEventListener('click', (event) => {
+      const btn = event.target.closest('[data-rate-scan]');
+      if (!btn) return;
+      filterRows(btn.dataset.rateScan);
+    });
+    const guideCard = content.querySelector('.qf-builder-guide');
+    if (guideCard && guideCard.nextSibling) guideCard.parentNode.insertBefore(card, guideCard.nextSibling);
+  }
+
+  function decorateRows() {
+    rows().forEach((row) => {
+      row.classList.remove('qf-rate-row-gap', 'qf-rate-row-disabled', 'qf-rate-row-ready');
+      const disabled = isDisabled(row);
+      const gap = !disabled && hasSetupGap(row);
+      row.classList.add(disabled ? 'qf-rate-row-disabled' : gap ? 'qf-rate-row-gap' : 'qf-rate-row-ready');
+      if (!row.querySelector('.qf-rate-row-status')) {
+        const cell = row.querySelector('td:last-child');
+        if (cell) {
+          const tag = document.createElement('span');
+          tag.className = 'qf-rate-row-status';
+          cell.appendChild(tag);
+        }
+      }
+      const tag = row.querySelector('.qf-rate-row-status');
+      if (tag) tag.textContent = disabled ? 'Review visibility' : gap ? 'Needs price' : 'Ready';
+    });
+  }
+
+  function filterRows(mode = 'all') {
+    rows().forEach((row) => {
+      const show = mode === 'all' ||
+        (mode === 'gap' && row.classList.contains('qf-rate-row-gap')) ||
+        (mode === 'disabled' && row.classList.contains('qf-rate-row-disabled')) ||
+        (mode === 'ready' && row.classList.contains('qf-rate-row-ready'));
+      row.hidden = !show;
+    });
+    content.querySelectorAll('[data-rate-scan]').forEach((btn) => btn.classList.toggle('active', btn.dataset.rateScan === mode));
+  }
+
   function saveNote() {
     if (route() !== 'rates' || content.querySelector('.qf-rate-save-note')) return;
     const buttons = Array.from(content.querySelectorAll('button'));
@@ -100,7 +182,9 @@
     if (route() !== 'rates') return;
     hero();
     guide();
+    scanPanel();
     tableWrap();
+    decorateRows();
     saveNote();
   }
 
