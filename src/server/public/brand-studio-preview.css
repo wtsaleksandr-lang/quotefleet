@@ -1,0 +1,98 @@
+/* Phase AS: Brand Studio preview polish */
+.qf-brand-studio-preview {
+  border: 1px solid var(--border);
+  border-radius: 18px;
+  background: linear-gradient(135deg, rgba(59, 130, 246, 0.09), rgba(6, 182, 212, 0.07));
+  padding: 18px;
+  margin-top: 14px;
+  box-shadow: var(--shadow-soft, 0 12px 32px rgba(15, 23, 42, 0.08));
+}
+.qf-brand-preview-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 12px;
+}
+.qf-brand-preview-head span {
+  color: var(--accent);
+  font-size: 11px;
+  font-weight: 850;
+  letter-spacing: 0.07em;
+  text-transform: uppercase;
+}
+.qf-brand-preview-head strong {
+  font-size: 16px;
+  letter-spacing: -0.02em;
+}
+.qf-brand-preview-card {
+  border: 1px solid rgba(15, 23, 42, 0.09);
+  border-radius: 16px;
+  background: #fff;
+  padding: 16px;
+  max-width: 520px;
+}
+.qf-brand-preview-top {
+  display: flex;
+  align-items: center;
+  gap: 11px;
+  margin-bottom: 14px;
+}
+.qf-brand-preview-top img,
+.qf-brand-preview-logo {
+  width: 38px;
+  height: 38px;
+  border-radius: 10px;
+  object-fit: contain;
+  background: color-mix(in srgb, var(--qf-brand-primary, #2563eb) 12%, #fff);
+  border: 1px solid color-mix(in srgb, var(--qf-brand-primary, #2563eb) 24%, #fff);
+}
+.qf-brand-preview-logo {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--qf-brand-primary, #2563eb);
+  font-weight: 900;
+}
+.qf-brand-preview-top b {
+  display: block;
+  font-size: 15px;
+}
+.qf-brand-preview-top small {
+  display: block;
+  color: var(--muted);
+  font-size: 12px;
+  margin-top: 2px;
+}
+.qf-brand-preview-route {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+  margin-bottom: 10px;
+}
+.qf-brand-preview-route span {
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  color: var(--muted);
+  padding: 10px;
+  font-size: 12px;
+}
+.qf-brand-preview-card button {
+  width: 100%;
+  border: 0;
+  border-radius: 11px;
+  background: var(--qf-brand-primary, #2563eb);
+  color: #fff;
+  padding: 11px 14px;
+  font-weight: 850;
+}
+.qf-brand-preview-card p {
+  margin: 10px 0 0;
+  color: var(--muted);
+  font-size: 12px;
+}
+@media (max-width: 720px) {
+  .qf-brand-preview-head { display: block; }
+  .qf-brand-preview-head strong { display: block; margin-top: 3px; }
+  .qf-brand-preview-route { grid-template-columns: 1fr; }
+}
