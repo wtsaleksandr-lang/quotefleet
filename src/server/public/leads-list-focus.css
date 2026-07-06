@@ -1,0 +1,118 @@
+/* Phase AI: leads list focus and scanning polish. */
+.qf-leads-focus {
+  margin: 0 0 16px;
+  border: 1px solid var(--border);
+  border-radius: 20px;
+  background: linear-gradient(135deg, rgba(38,208,178,.08), rgba(255,255,255,.018)), var(--surface);
+  box-shadow: var(--shadow-sm);
+  padding: 14px;
+}
+.qf-leads-focus-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 14px;
+  margin-bottom: 12px;
+}
+.qf-leads-focus-kicker {
+  color: var(--accent-2);
+  font: 800 11px var(--font-mono);
+  letter-spacing: .12em;
+  text-transform: uppercase;
+  margin-bottom: 5px;
+}
+.qf-leads-focus h2 {
+  margin: 0;
+  font-size: 20px;
+  letter-spacing: -.03em;
+}
+.qf-leads-focus p {
+  margin: 5px 0 0;
+  color: var(--muted);
+}
+.qf-leads-focus button {
+  border: 1px solid var(--border-strong);
+  border-radius: 999px;
+  background: rgba(255,255,255,.035);
+  color: var(--ink-soft);
+  padding: 8px 11px;
+  font-weight: 760;
+  cursor: pointer;
+}
+.qf-leads-focus button:hover {
+  border-color: var(--accent);
+  color: var(--ink);
+}
+.qf-leads-focus-grid {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 8px;
+}
+.qf-leads-focus-card {
+  border: 1px solid var(--border);
+  border-radius: 15px;
+  background: rgba(255,255,255,.024);
+  padding: 11px;
+}
+.qf-leads-focus-card span {
+  display: block;
+  color: var(--muted);
+  font-size: 11px;
+  margin-bottom: 4px;
+}
+.qf-leads-focus-card strong {
+  color: var(--ink);
+  font-size: 18px;
+  letter-spacing: -.03em;
+}
+.qf-leads-focus-card b {
+  display: block;
+  margin-top: 4px;
+  color: var(--accent-2);
+  font-size: 11px;
+}
+.qf-leads-toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  margin: 0 0 10px;
+}
+.qf-leads-filter {
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  background: rgba(255,255,255,.025);
+  color: var(--ink-soft);
+  padding: 7px 10px;
+  font-weight: 740;
+  cursor: pointer;
+}
+.qf-leads-filter.is-active,
+.qf-leads-filter:hover {
+  border-color: var(--accent);
+  color: var(--ink);
+  background: rgba(38,208,178,.09);
+}
+tr.qf-lead-hot-row {
+  outline: 1px solid rgba(245,165,36,.28);
+  outline-offset: -1px;
+  background: rgba(245,165,36,.045);
+}
+tr.qf-lead-hidden {
+  display: none;
+}
+.qf-leads-empty-filter {
+  margin: 0 0 12px;
+  border: 1px dashed var(--border-strong);
+  border-radius: 14px;
+  padding: 11px 12px;
+  color: var(--muted);
+  background: rgba(255,255,255,.018);
+}
+@media (max-width: 900px) {
+  .qf-leads-focus-grid { grid-template-columns: 1fr 1fr; }
+}
+@media (max-width: 640px) {
+  .qf-leads-focus-head { display: grid; }
+  .qf-leads-focus-grid { grid-template-columns: 1fr; }
+}
