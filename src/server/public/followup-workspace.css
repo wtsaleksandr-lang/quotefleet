@@ -1,0 +1,136 @@
+/* Phase AH: follow-up and activity workspace polish. */
+.qf-followup-workspace {
+  margin: 0 0 18px;
+  border: 1px solid var(--border);
+  border-radius: 22px;
+  background: linear-gradient(135deg, rgba(38,208,178,.08), rgba(245,165,36,.05)), var(--surface);
+  box-shadow: var(--shadow-md);
+  overflow: hidden;
+}
+.qf-followup-top {
+  display: flex;
+  justify-content: space-between;
+  gap: 18px;
+  align-items: flex-start;
+  padding: 18px;
+  border-bottom: 1px solid var(--border);
+}
+.qf-followup-kicker {
+  color: var(--accent-2);
+  font: 700 11px var(--font-mono);
+  letter-spacing: .12em;
+  text-transform: uppercase;
+  margin-bottom: 6px;
+}
+.qf-followup-top h2 {
+  margin: 0;
+  font-size: 24px;
+  letter-spacing: -.035em;
+}
+.qf-followup-top p {
+  margin: 7px 0 0;
+  color: var(--muted);
+  max-width: 720px;
+}
+.qf-followup-actions {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: 8px;
+}
+.qf-followup-actions button {
+  border: 1px solid var(--border-strong);
+  border-radius: 999px;
+  padding: 9px 12px;
+  background: rgba(255,255,255,.035);
+  color: var(--ink-soft);
+  font-weight: 750;
+  cursor: pointer;
+}
+.qf-followup-actions button:hover {
+  border-color: var(--accent);
+  color: var(--ink);
+}
+.qf-followup-grid {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 10px;
+  padding: 16px;
+}
+.qf-followup-card {
+  border: 1px solid var(--border);
+  border-radius: 17px;
+  background: rgba(255,255,255,.025);
+  padding: 13px;
+}
+.qf-followup-card span {
+  display: block;
+  color: var(--muted);
+  font-size: 12px;
+  margin-bottom: 5px;
+}
+.qf-followup-card strong {
+  color: var(--ink);
+  font-size: 18px;
+  letter-spacing: -.03em;
+}
+.qf-followup-board {
+  margin: 0 0 18px;
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 10px;
+}
+.qf-followup-column {
+  border: 1px solid var(--border);
+  border-radius: 18px;
+  background: rgba(255,255,255,.022);
+  padding: 12px;
+}
+.qf-followup-column h3 {
+  margin: 0 0 10px;
+  color: var(--ink);
+  font-size: 14px;
+  letter-spacing: -.02em;
+}
+.qf-followup-item {
+  display: grid;
+  gap: 4px;
+  border: 1px solid var(--border);
+  border-radius: 14px;
+  padding: 10px;
+  background: var(--surface);
+  margin-bottom: 8px;
+}
+.qf-followup-item strong {
+  color: var(--ink);
+  font-size: 13px;
+}
+.qf-followup-item span {
+  color: var(--muted);
+  font-size: 12px;
+  line-height: 1.35;
+}
+.qf-followup-item small {
+  color: var(--accent-2);
+  font: 700 10px var(--font-mono);
+  letter-spacing: .07em;
+  text-transform: uppercase;
+}
+.qf-followup-tip {
+  margin: 0 0 18px;
+  border: 1px dashed var(--border-strong);
+  border-radius: 16px;
+  padding: 13px 14px;
+  color: var(--ink-soft);
+  background: rgba(255,255,255,.022);
+}
+.qf-followup-tip b { color: var(--accent); }
+@media (max-width: 1000px) {
+  .qf-followup-grid { grid-template-columns: 1fr 1fr; }
+  .qf-followup-board { grid-template-columns: 1fr; }
+}
+@media (max-width: 640px) {
+  .qf-followup-top { display: grid; }
+  .qf-followup-actions { justify-content: flex-start; }
+  .qf-followup-grid { grid-template-columns: 1fr; }
+}
