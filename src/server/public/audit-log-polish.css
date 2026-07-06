@@ -1,0 +1,26 @@
+/* Phase AQ: audit log scanner polish */
+.qf-audit-polish {
+  border: 1px solid var(--border);
+  border-radius: 18px;
+  background: linear-gradient(135deg, rgba(59, 130, 246, 0.10), rgba(245, 158, 11, 0.08));
+  padding: 18px;
+  margin: 0 0 18px;
+  box-shadow: var(--shadow-soft, 0 12px 32px rgba(15, 23, 42, 0.08));
+}
+.qf-audit-head { display: flex; align-items: flex-start; justify-content: space-between; gap: 16px; margin-bottom: 14px; }
+.qf-audit-head h2 { margin: 0 0 4px; font-size: 20px; letter-spacing: -0.02em; }
+.qf-audit-head p { margin: 0; color: var(--muted); }
+.qf-audit-status { display: inline-flex; border-radius: 999px; padding: 7px 11px; border: 1px solid rgba(59, 130, 246, 0.32); background: rgba(59, 130, 246, 0.10); color: var(--accent); font-size: 12px; font-weight: 800; white-space: nowrap; }
+.qf-audit-metrics { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 10px; margin: 14px 0; }
+.qf-audit-metrics button { border: 1px solid var(--border); border-radius: 14px; background: var(--surface); padding: 12px; text-align: left; cursor: pointer; color: inherit; }
+.qf-audit-metrics button.active, .qf-audit-metrics button:hover { border-color: rgba(59, 130, 246, 0.42); background: rgba(59, 130, 246, 0.08); }
+.qf-audit-metrics strong { display: block; margin-bottom: 3px; font-size: 21px; letter-spacing: -0.03em; }
+.qf-audit-metrics span { color: var(--muted); font-size: 12px; font-weight: 700; }
+.qf-audit-tip { margin-top: 12px; padding: 10px 12px; border-radius: 12px; border: 1px solid rgba(245, 158, 11, 0.28); background: rgba(245, 158, 11, 0.08); color: var(--muted); font-size: 12px; }
+.qf-audit-tag { display: inline-flex; align-items: center; margin-left: 8px; border-radius: 999px; padding: 3px 7px; font-size: 10px; font-weight: 800; letter-spacing: 0.02em; text-transform: uppercase; border: 1px solid rgba(100, 116, 139, 0.25); color: var(--muted); background: rgba(100, 116, 139, 0.08); }
+.qf-audit-tag.security { border-color: rgba(239, 68, 68, 0.28); color: #b91c1c; background: rgba(239, 68, 68, 0.08); }
+.qf-audit-tag.ai { border-color: rgba(59, 130, 246, 0.32); color: var(--accent); background: rgba(59, 130, 246, 0.08); }
+.qf-audit-tag.change { border-color: rgba(16, 185, 129, 0.32); color: #047857; background: rgba(16, 185, 129, 0.08); }
+.table.qf-audit-filtered tbody tr[hidden] { display: none; }
+@media (max-width: 760px) { .qf-audit-head { display: block; } .qf-audit-status { margin-top: 10px; } .qf-audit-metrics { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+@media (max-width: 520px) { .qf-audit-metrics { grid-template-columns: 1fr; } }
