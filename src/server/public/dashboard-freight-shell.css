@@ -1,0 +1,172 @@
+/* Phase AV: lighter premium freight dashboard shell */
+html[data-theme="light"] {
+  --bg: #f6f9ff;
+  --surface: #ffffff;
+  --surface-2: #eef7ff;
+  --surface-3: #dbeafe;
+  --border: #d9e7ff;
+  --border-strong: #b8cff5;
+  --ink: #0f172a;
+  --ink-soft: #1f2937;
+  --muted: #536174;
+  --muted-soft: #8a96a8;
+  --accent: #3b22f4;
+  --accent-strong: #2917c9;
+  --accent-soft: rgba(59, 34, 244, 0.08);
+  --accent-ink: #ffffff;
+  --accent-2: #38bdf8;
+  --accent-2-soft: rgba(56, 189, 248, 0.12);
+  --shadow-md: 0 16px 42px rgba(37, 34, 99, 0.08), 0 2px 8px rgba(15, 23, 42, 0.04);
+  --shadow-lg: 0 28px 80px rgba(37, 34, 99, 0.12);
+}
+
+html[data-theme="light"] body {
+  background:
+    radial-gradient(circle at 12% -10%, rgba(56, 189, 248, 0.18), transparent 34%),
+    linear-gradient(180deg, #ffffff 0%, #f6f9ff 100%);
+}
+
+html[data-theme="light"] .app-shell {
+  background: transparent;
+  grid-template-columns: 268px 1fr;
+}
+
+html[data-theme="light"] .sidebar {
+  margin: 14px 0 14px 14px;
+  height: calc(100vh - 28px);
+  border: 1px solid rgba(184, 207, 245, 0.72);
+  border-radius: 24px;
+  background: rgba(255, 255, 255, 0.92);
+  box-shadow: 0 24px 70px rgba(37, 34, 99, 0.09);
+  backdrop-filter: blur(18px);
+}
+
+html[data-theme="light"] .sidebar .brand-block {
+  margin: 0 12px 12px;
+  padding: 16px 14px 18px;
+  border-bottom: 1px solid rgba(184, 207, 245, 0.62);
+}
+
+html[data-theme="light"] .sidebar .brand-block .name {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font-size: 17px;
+}
+
+html[data-theme="light"] .sidebar .brand-block .name::before {
+  content: 'QF';
+  width: 34px;
+  height: 34px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 11px;
+  background: linear-gradient(135deg, #3b22f4, #5b7cff);
+  color: #fff;
+  font-size: 12px;
+  font-weight: 950;
+  letter-spacing: -0.04em;
+  box-shadow: 0 10px 22px rgba(59, 34, 244, 0.20);
+}
+
+html[data-theme="light"] .sidebar .brand-block .sub {
+  padding-left: 44px;
+  color: #6b7280;
+}
+
+html[data-theme="light"] .sidebar a,
+html[data-theme="light"] .sidebar button {
+  width: calc(100% - 20px);
+  margin: 3px 10px;
+  padding: 10px 12px;
+  border-radius: 14px;
+  border-left: 0;
+  color: #596579;
+  font-family: var(--font-sans);
+  letter-spacing: 0;
+  text-transform: none;
+  font-size: 13.5px;
+}
+
+html[data-theme="light"] .sidebar a:hover,
+html[data-theme="light"] .sidebar button:hover {
+  background: #eef7ff;
+  color: #111827;
+}
+
+html[data-theme="light"] .sidebar a.active,
+html[data-theme="light"] .sidebar button.active {
+  background: linear-gradient(135deg, rgba(59, 34, 244, 0.10), rgba(56, 189, 248, 0.12));
+  color: #3b22f4;
+  box-shadow: inset 0 0 0 1px rgba(59, 34, 244, 0.14);
+}
+
+html[data-theme="light"] .sidebar .group {
+  padding: 18px 22px 6px;
+  color: #8a96a8;
+  letter-spacing: 0.08em;
+}
+
+html[data-theme="light"] .qf-theme-toggle {
+  border-radius: 14px;
+  background: #f7fbff;
+  border-color: rgba(184, 207, 245, 0.72);
+}
+
+html[data-theme="light"] .app-main {
+  max-width: none;
+  padding: 34px 42px 42px;
+}
+
+html[data-theme="light"] .app-main h1 {
+  font-size: 30px;
+  letter-spacing: -0.04em;
+}
+
+html[data-theme="light"] .app-main .page-sub {
+  max-width: 760px;
+  color: #5f6b7d;
+}
+
+html[data-theme="light"] .card,
+html[data-theme="light"] .chat-panel,
+html[data-theme="light"] .table,
+html[data-theme="light"] .compare,
+html[data-theme="light"] .price-card,
+html[data-theme="light"] .feature-card {
+  border-color: rgba(184, 207, 245, 0.68);
+  background: rgba(255, 255, 255, 0.94);
+  box-shadow: 0 18px 46px rgba(37, 34, 99, 0.06);
+  border-radius: 20px;
+}
+
+html[data-theme="light"] .btn-primary {
+  background: #3b22f4;
+  border-color: #3b22f4;
+  color: #fff;
+  box-shadow: 0 12px 26px rgba(59, 34, 244, 0.18);
+}
+
+html[data-theme="light"] .btn-primary:hover {
+  background: #2917c9;
+  border-color: #2917c9;
+}
+
+html[data-theme="light"] .btn-secondary,
+html[data-theme="light"] .btn-ghost {
+  background: #eef7ff;
+  border-color: rgba(184, 207, 245, 0.78);
+  color: #111827;
+}
+
+@media (max-width: 900px) {
+  html[data-theme="light"] .sidebar {
+    margin: 0;
+    height: 100vh;
+    border-radius: 0 22px 22px 0;
+  }
+  html[data-theme="light"] .app-main {
+    padding: 72px 18px 28px;
+  }
+}
