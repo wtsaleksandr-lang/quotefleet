@@ -12,6 +12,7 @@ This index points to the low-risk support and maintenance docs that help keep au
 - `docs/product-todo.md` — product improvement phases and backlog notes.
 - `docs/dashboard-asset-map.md` — dashboard asset load order and layer responsibilities.
 - `docs/homepage-maintenance.md` — homepage copy and layout maintenance notes.
+- `docs/accessibility-polish-checklist.md` — low-risk accessibility checks for frontend support passes.
 
 ## How to use this index
 

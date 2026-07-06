@@ -17,5 +17,6 @@ describe('support docs index', () => {
     expect(doc).toContain('docs/product-todo.md');
     expect(doc).toContain('docs/dashboard-asset-map.md');
     expect(doc).toContain('docs/homepage-maintenance.md');
+    expect(doc).toContain('docs/accessibility-polish-checklist.md');
   });
 });
