@@ -50,6 +50,12 @@ Avoid these unless the change is explicitly requested and very small:
 6. Commit directly to `main` only for clearly safe documentation, test, or isolated UI/CSS cleanup when PR creation is blocked or unavailable.
 7. Skip any file that looks recently changed or conflict-prone.
 
+## Manual triggers
+
+When the user manually says to proceed or continue, the assistant may start the next safe task immediately. It does not need to wait for the next scheduled hourly automation run.
+
+Manual triggers do not expand the allowed scope. The same low-risk-only boundaries still apply unless the user explicitly authorizes a broader task.
+
 ## Good examples
 
 - Add a documentation note for a dashboard UX layer.
