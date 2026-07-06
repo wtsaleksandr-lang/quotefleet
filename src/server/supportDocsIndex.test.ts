@@ -14,6 +14,7 @@ describe('support docs index', () => {
     expect(doc).toContain('QuoteFleet support docs index');
     expect(doc).toContain('docs/automation-safe-scope.md');
     expect(doc).toContain('docs/automation-runbook.md');
+    expect(doc).toContain('docs/support-pr-review-checklist.md');
     expect(doc).toContain('docs/product-todo.md');
     expect(doc).toContain('docs/dashboard-asset-map.md');
     expect(doc).toContain('docs/homepage-maintenance.md');
