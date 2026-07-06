@@ -17,6 +17,7 @@
   loadAsset('link', { rel: 'stylesheet', href: '/audit-log-polish.css' });
   loadAsset('link', { rel: 'stylesheet', href: '/launch-panel.css' });
   loadAsset('link', { rel: 'stylesheet', href: '/overview-command-center.css' });
+  loadAsset('link', { rel: 'stylesheet', href: '/brand-studio-preview.css' });
   window.addEventListener('load', () => loadAsset('script', { src: '/followup-workspace.js' }));
   window.addEventListener('load', () => loadAsset('script', { src: '/lead-crm-polish.js' }));
   window.addEventListener('load', () => loadAsset('script', { src: '/leads-list-focus.js' }));
@@ -27,6 +28,7 @@
   window.addEventListener('load', () => loadAsset('script', { src: '/audit-log-polish.js' }));
   window.addEventListener('load', () => loadAsset('script', { src: '/launch-panel.js' }));
   window.addEventListener('load', () => loadAsset('script', { src: '/overview-command-center.js' }));
+  window.addEventListener('load', () => loadAsset('script', { src: '/brand-studio-preview.js' }));
 
   function toast(message, tone = 'success', title = 'QuoteFleet') {
     let stack = document.querySelector('.qf-toast-stack');
