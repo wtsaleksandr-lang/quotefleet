@@ -1,4 +1,15 @@
 (() => {
+  function loadAsset(tag, attrs) {
+    const selector = attrs.href ? `${tag}[href="${attrs.href}"]` : `${tag}[src="${attrs.src}"]`;
+    if (document.querySelector(selector)) return;
+    const el = document.createElement(tag);
+    Object.entries(attrs).forEach(([key, value]) => el.setAttribute(key, value));
+    document.head.appendChild(el);
+  }
+
+  loadAsset('link', { rel: 'stylesheet', href: '/followup-workspace.css' });
+  window.addEventListener('load', () => loadAsset('script', { src: '/followup-workspace.js' }));
+
   function toast(message, tone = 'success', title = 'QuoteFleet') {
     let stack = document.querySelector('.qf-toast-stack');
     if (!stack) {
