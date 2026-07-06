@@ -1,0 +1,146 @@
+/* Phase AF: premium SaaS polish for dashboard feedback, loading, and modal groundwork. */
+#loading {
+  background: radial-gradient(circle at 20% 0%, rgba(38,208,178,.10), transparent 32rem), var(--bg) !important;
+}
+#loading > div {
+  min-width: 260px;
+  border: 1px solid var(--border);
+  border-radius: 20px;
+  background: linear-gradient(180deg, rgba(255,255,255,.035), rgba(255,255,255,.012)), var(--surface);
+  color: var(--ink-soft);
+  padding: 18px;
+  box-shadow: var(--shadow-md);
+  font-weight: 750;
+}
+#loading > div::before {
+  content: '';
+  display: block;
+  height: 8px;
+  width: 100%;
+  border-radius: 999px;
+  margin-bottom: 14px;
+  background: linear-gradient(90deg, rgba(38,208,178,.16), rgba(245,165,36,.16), rgba(38,208,178,.16));
+  background-size: 220% 100%;
+  animation: qf-skeleton 1.3s ease-in-out infinite;
+}
+.qf-toast-stack {
+  position: fixed;
+  right: 18px;
+  bottom: 18px;
+  z-index: 3000;
+  display: grid;
+  gap: 10px;
+  max-width: min(360px, calc(100vw - 28px));
+}
+.qf-toast {
+  border: 1px solid var(--border-strong);
+  border-left: 4px solid var(--accent);
+  border-radius: 15px;
+  background: linear-gradient(180deg, rgba(255,255,255,.045), rgba(255,255,255,.018)), var(--surface);
+  color: var(--ink-soft);
+  box-shadow: var(--shadow-lg);
+  padding: 12px 13px;
+  transform: translateY(8px);
+  opacity: 0;
+  animation: qf-toast-in .18s ease forwards;
+}
+.qf-toast strong {
+  display: block;
+  color: var(--ink);
+  margin-bottom: 2px;
+}
+.qf-toast small {
+  color: var(--muted);
+}
+.qf-toast.success { border-left-color: var(--success); }
+.qf-toast.warn { border-left-color: var(--accent-2); }
+.qf-toast.error { border-left-color: var(--error); }
+.qf-modal-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 2800;
+  display: none;
+  place-items: center;
+  padding: 18px;
+  background: rgba(3, 8, 14, .68);
+  backdrop-filter: blur(8px);
+}
+.qf-modal-backdrop.is-open { display: grid; }
+.qf-modal-card {
+  width: min(520px, 100%);
+  border: 1px solid var(--border-strong);
+  border-radius: 22px;
+  background: linear-gradient(180deg, rgba(255,255,255,.045), rgba(255,255,255,.018)), var(--surface);
+  color: var(--ink-soft);
+  box-shadow: var(--shadow-lg);
+  padding: 20px;
+}
+.qf-modal-card h3 {
+  color: var(--ink);
+  margin: 0 0 8px;
+  letter-spacing: -.035em;
+}
+.qf-modal-card p {
+  color: var(--muted);
+  margin: 0 0 16px;
+}
+.qf-modal-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+.qf-action-row {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+}
+.app-main button:not(.nav-item):not(.qf-mobile-nav-toggle),
+.app-main .btn-primary,
+.app-main .btn-danger {
+  transition: transform .15s ease, border-color .15s ease, box-shadow .15s ease, opacity .15s ease;
+}
+.app-main button:not(.nav-item):not(.qf-mobile-nav-toggle):hover {
+  transform: translateY(-1px);
+}
+.app-main button[disabled],
+.app-main button.is-loading {
+  opacity: .62;
+  cursor: progress !important;
+  transform: none !important;
+}
+.app-main .table tbody tr {
+  transition: background .15s ease, box-shadow .15s ease;
+}
+.qf-page-skeleton {
+  display: grid;
+  gap: 12px;
+  margin-top: 14px;
+}
+.qf-page-skeleton span {
+  height: 14px;
+  border-radius: 999px;
+  background: linear-gradient(90deg, rgba(255,255,255,.05), rgba(255,255,255,.12), rgba(255,255,255,.05));
+  background-size: 220% 100%;
+  animation: qf-skeleton 1.3s ease-in-out infinite;
+}
+.qf-page-skeleton span:nth-child(1) { width: 62%; }
+.qf-page-skeleton span:nth-child(2) { width: 88%; }
+.qf-page-skeleton span:nth-child(3) { width: 74%; }
+@keyframes qf-skeleton {
+  0% { background-position: 0% 50%; }
+  100% { background-position: -220% 50%; }
+}
+@keyframes qf-toast-in {
+  to { transform: translateY(0); opacity: 1; }
+}
+@media (max-width: 700px) {
+  .qf-toast-stack { left: 14px; right: 14px; bottom: 14px; }
+  .qf-modal-actions { justify-content: stretch; }
+  .qf-modal-actions button { flex: 1 1 auto; }
+}
+@media (prefers-reduced-motion: reduce) {
+  #loading > div::before,
+  .qf-page-skeleton span,
+  .qf-toast { animation: none; }
+}
