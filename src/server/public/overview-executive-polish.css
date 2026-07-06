@@ -1,0 +1,120 @@
+/* Phase AW: overview executive summary polish */
+.qf-overview-executive .qf-overview-original-title,
+.qf-overview-executive .qf-overview-original-subtitle {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+}
+
+.qf-overview-hero {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 18px;
+  align-items: center;
+  margin: 0 0 18px;
+  padding: 24px;
+  border: 1px solid rgba(184, 207, 245, 0.72);
+  border-radius: 26px;
+  background:
+    radial-gradient(circle at 12% 0%, rgba(56, 189, 248, 0.18), transparent 34%),
+    linear-gradient(135deg, #ffffff 0%, #f4fbff 56%, #f5f2ff 100%);
+  box-shadow: 0 22px 60px rgba(37, 34, 99, 0.08);
+}
+
+.qf-overview-hero-copy span {
+  display: block;
+  color: var(--accent, #3b22f4);
+  font-size: 11px;
+  font-weight: 900;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  margin-bottom: 7px;
+}
+
+.qf-overview-hero-copy strong {
+  display: block;
+  color: var(--ink, #0f172a);
+  font-size: clamp(30px, 4vw, 46px);
+  line-height: 1;
+  letter-spacing: -0.055em;
+}
+
+.qf-overview-hero-copy p {
+  max-width: 760px;
+  margin: 12px 0 0;
+  color: var(--muted, #536174);
+  font-size: 15px;
+}
+
+.qf-overview-hero-actions {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: 10px;
+}
+
+.qf-overview-stat-grid {
+  grid-template-columns: repeat(4, minmax(180px, 1fr));
+  margin-bottom: 24px !important;
+}
+
+.qf-overview-stat {
+  position: relative;
+  min-height: 128px;
+  padding: 18px !important;
+  border-color: rgba(184, 207, 245, 0.72) !important;
+  border-radius: 22px !important;
+  background: rgba(255, 255, 255, 0.94) !important;
+  box-shadow: 0 16px 42px rgba(37, 34, 99, 0.06) !important;
+  overflow: hidden;
+}
+
+.qf-overview-stat::after {
+  content: '';
+  position: absolute;
+  inset: auto -30px -46px auto;
+  width: 110px;
+  height: 110px;
+  border-radius: 999px;
+  background: rgba(56, 189, 248, 0.12);
+}
+
+.qf-overview-stat-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 34px;
+  height: 34px;
+  margin-bottom: 12px;
+  border-radius: 12px;
+  background: linear-gradient(135deg, rgba(59, 34, 244, 0.12), rgba(56, 189, 248, 0.16));
+  color: var(--accent, #3b22f4);
+  font-weight: 900;
+}
+
+.qf-overview-stat[data-qf-tone='attention'] .qf-overview-stat-icon {
+  background: rgba(245, 158, 11, 0.12);
+  color: #b45309;
+}
+
+.qf-overview-stat[data-qf-tone='success'] .qf-overview-stat-icon {
+  background: rgba(5, 150, 105, 0.12);
+  color: #059669;
+}
+
+.qf-overview-stat[data-qf-tone='money'] .qf-overview-stat-icon {
+  background: rgba(59, 34, 244, 0.12);
+  color: #3b22f4;
+}
+
+@media (max-width: 980px) {
+  .qf-overview-hero,
+  .qf-overview-stat-grid {
+    grid-template-columns: 1fr;
+  }
+  .qf-overview-hero-actions {
+    justify-content: flex-start;
+  }
+}
