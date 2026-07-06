@@ -1,0 +1,126 @@
+/* Phase AN: AI import readiness and safer apply polish. */
+.qf-import-readiness {
+  margin: 0 0 18px;
+  border: 1px solid var(--border);
+  border-radius: 22px;
+  background: linear-gradient(135deg, rgba(38,208,178,.08), rgba(245,165,36,.05)), var(--surface);
+  box-shadow: var(--shadow-md);
+  overflow: hidden;
+}
+.qf-import-readiness-top {
+  display: flex;
+  justify-content: space-between;
+  gap: 18px;
+  align-items: flex-start;
+  padding: 18px;
+  border-bottom: 1px solid var(--border);
+}
+.qf-import-kicker {
+  color: var(--accent-2);
+  font: 700 11px var(--font-mono);
+  letter-spacing: .12em;
+  text-transform: uppercase;
+  margin-bottom: 6px;
+}
+.qf-import-readiness h2 {
+  margin: 0;
+  font-size: 24px;
+  letter-spacing: -.035em;
+}
+.qf-import-readiness p {
+  margin: 7px 0 0;
+  color: var(--muted);
+  max-width: 720px;
+}
+.qf-import-actions {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: 8px;
+}
+.qf-import-actions button {
+  border: 1px solid var(--border-strong);
+  border-radius: 999px;
+  padding: 9px 12px;
+  background: rgba(255,255,255,.035);
+  color: var(--ink-soft);
+  font-weight: 750;
+  cursor: pointer;
+}
+.qf-import-actions button:hover,
+.qf-import-actions button.is-active {
+  border-color: var(--accent);
+  color: var(--ink);
+}
+.qf-import-grid {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 10px;
+  padding: 16px;
+}
+.qf-import-card {
+  border: 1px solid var(--border);
+  border-radius: 17px;
+  background: rgba(255,255,255,.025);
+  padding: 13px;
+}
+.qf-import-card span {
+  display: block;
+  color: var(--muted);
+  font-size: 12px;
+  margin-bottom: 5px;
+}
+.qf-import-card strong {
+  color: var(--ink);
+  font-size: 18px;
+  letter-spacing: -.03em;
+}
+.qf-import-checklist {
+  margin: 0 0 18px;
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 10px;
+}
+.qf-import-step {
+  border: 1px solid var(--border);
+  border-radius: 17px;
+  padding: 13px;
+  background: rgba(255,255,255,.022);
+}
+.qf-import-step small {
+  display: block;
+  color: var(--accent-2);
+  font: 700 10px var(--font-mono);
+  letter-spacing: .08em;
+  text-transform: uppercase;
+  margin-bottom: 6px;
+}
+.qf-import-step strong {
+  display: block;
+  color: var(--ink);
+  margin-bottom: 5px;
+}
+.qf-import-step span {
+  color: var(--muted);
+  font-size: 13px;
+  line-height: 1.45;
+}
+.qf-import-safe-apply {
+  margin: 12px 0 4px;
+  border: 1px dashed var(--border-strong);
+  border-radius: 15px;
+  padding: 12px 13px;
+  color: var(--ink-soft);
+  background: rgba(255,255,255,.022);
+}
+.qf-import-safe-apply b { color: var(--accent); }
+tr.qf-import-row-focus { outline: 2px solid rgba(245,165,36,.38); outline-offset: -2px; }
+@media (max-width: 1000px) {
+  .qf-import-grid { grid-template-columns: 1fr 1fr; }
+  .qf-import-checklist { grid-template-columns: 1fr; }
+}
+@media (max-width: 640px) {
+  .qf-import-readiness-top { display: grid; }
+  .qf-import-actions { justify-content: flex-start; }
+  .qf-import-grid { grid-template-columns: 1fr; }
+}
