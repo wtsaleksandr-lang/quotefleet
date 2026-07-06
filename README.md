@@ -4,7 +4,7 @@ Embeddable instant quote widget, hosted quote pages, marketplace benchmarking, a
 
 ## Product summary
 
-QuoteFleet helps a carrier turn its website into an instant quote desk.
+QuoteFleet helps a carrier share a hosted branded rate page that customers can open anytime.
 
 A customer enters lane, equipment, weight, and add-ons. QuoteFleet calculates from the carrier's own rate cards, lane zones, and accessorials, then creates a branded quote experience with follow-up actions.
 
@@ -88,6 +88,21 @@ pnpm accessorials:seed
 pnpm rates:import -- --tenant-slug=demo --file=/path/to/rates.xlsx
 pnpm quotes:recent
 ```
+
+## Support workflow
+
+Low-risk support passes use the reusable `automation/support-work` branch.
+
+Before support work, check:
+
+- `docs/support-docs-index.md`
+- `docs/automation-runbook.md`
+- `docs/support-pr-review-checklist.md`
+- `docs/quote-copy-rules.md`
+
+Support changes should stay limited to docs, smoke tests, copy polish, accessibility notes, or isolated frontend-only polish. Avoid product logic, quote calculation, API behavior, database schema, authentication, payments, AI workflow behavior, and active product-work files.
+
+After a clean support PR is merged, reset `automation/support-work` to latest `main` so the branch does not drift.
 
 ## Important public routes
 
