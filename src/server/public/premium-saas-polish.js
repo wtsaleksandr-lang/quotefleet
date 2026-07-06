@@ -8,7 +8,9 @@
   }
 
   loadAsset('link', { rel: 'stylesheet', href: '/followup-workspace.css' });
+  loadAsset('link', { rel: 'stylesheet', href: '/lead-crm-polish.css' });
   window.addEventListener('load', () => loadAsset('script', { src: '/followup-workspace.js' }));
+  window.addEventListener('load', () => loadAsset('script', { src: '/lead-crm-polish.js' }));
 
   function toast(message, tone = 'success', title = 'QuoteFleet') {
     let stack = document.querySelector('.qf-toast-stack');
