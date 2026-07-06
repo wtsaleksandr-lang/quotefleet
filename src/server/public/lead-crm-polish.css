@@ -1,0 +1,93 @@
+/* Phase AI: lead detail CRM polish. */
+.qf-lead-crm-bar {
+  margin: 12px 0 14px;
+  border: 1px solid var(--border);
+  border-radius: 20px;
+  background: linear-gradient(135deg, rgba(38,208,178,.08), rgba(255,255,255,.025)), var(--surface);
+  box-shadow: var(--shadow-sm);
+  padding: 14px;
+}
+.qf-lead-crm-top {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 16px;
+}
+.qf-lead-crm-kicker {
+  color: var(--accent-2);
+  font: 700 11px var(--font-mono);
+  letter-spacing: .1em;
+  text-transform: uppercase;
+  margin-bottom: 5px;
+}
+.qf-lead-crm-bar h2 {
+  margin: 0;
+  font-size: 20px;
+  letter-spacing: -.03em;
+}
+.qf-lead-crm-bar p {
+  margin: 6px 0 0;
+  color: var(--muted);
+  max-width: 720px;
+}
+.qf-lead-crm-pills {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: 8px;
+}
+.qf-lead-crm-pill {
+  border: 1px solid var(--border-strong);
+  border-radius: 999px;
+  padding: 7px 10px;
+  background: rgba(255,255,255,.035);
+  color: var(--ink-soft);
+  font-size: 12px;
+  font-weight: 800;
+  white-space: nowrap;
+}
+.qf-lead-crm-pill strong {
+  color: var(--ink);
+}
+.qf-lead-crm-actions {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 8px;
+  margin-top: 12px;
+}
+.qf-lead-crm-action {
+  border: 1px solid var(--border);
+  border-radius: 15px;
+  background: rgba(255,255,255,.025);
+  padding: 10px;
+  color: var(--ink-soft);
+  min-height: 74px;
+}
+.qf-lead-crm-action b {
+  display: block;
+  color: var(--ink);
+  margin-bottom: 4px;
+  font-size: 13px;
+}
+.qf-lead-crm-action span {
+  color: var(--muted);
+  font-size: 12px;
+  line-height: 1.35;
+}
+.qf-lead-crm-suggestion {
+  margin-top: 10px;
+  border: 1px dashed var(--border-strong);
+  border-radius: 14px;
+  padding: 10px 11px;
+  color: var(--ink-soft);
+  background: rgba(255,255,255,.02);
+}
+.qf-lead-crm-suggestion b { color: var(--accent); }
+@media (max-width: 900px) {
+  .qf-lead-crm-top { display: grid; }
+  .qf-lead-crm-pills { justify-content: flex-start; }
+  .qf-lead-crm-actions { grid-template-columns: 1fr 1fr; }
+}
+@media (max-width: 560px) {
+  .qf-lead-crm-actions { grid-template-columns: 1fr; }
+}
