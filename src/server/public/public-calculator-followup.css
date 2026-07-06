@@ -1,0 +1,48 @@
+/* Phase AR: public calculator follow-up choices */
+.qf-followup-choice-panel {
+  border: 1px solid rgba(37, 99, 235, 0.18);
+  border-radius: 14px;
+  background: linear-gradient(135deg, #f8fbff, #eff6ff);
+  padding: 13px;
+  margin-top: 13px;
+}
+.qf-followup-choice-head span {
+  display: block;
+  color: var(--w-primary);
+  font-size: 11px;
+  font-weight: 850;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+}
+.qf-followup-choice-head strong {
+  display: block;
+  margin-top: 2px;
+  font-size: 14px;
+  letter-spacing: -0.01em;
+}
+.qf-followup-choice-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+  margin-top: 10px;
+}
+.qf-followup-choice-grid div {
+  border: 1px solid var(--w-border);
+  border-radius: 12px;
+  background: #fff;
+  padding: 10px;
+}
+.qf-followup-choice-grid b {
+  display: block;
+  font-size: 12.5px;
+  margin-bottom: 3px;
+}
+.qf-followup-choice-grid small {
+  display: block;
+  color: var(--w-muted);
+  font-size: 11.5px;
+  line-height: 1.35;
+}
+@media (max-width: 640px) {
+  .qf-followup-choice-grid { grid-template-columns: 1fr; }
+}
