@@ -1,0 +1,105 @@
+/* Phase AX: lead queue search and premium list polish */
+.qf-lead-searchbar {
+  display: grid;
+  grid-template-columns: minmax(260px, 1fr) minmax(260px, 0.8fr) auto;
+  gap: 12px;
+  align-items: center;
+  margin: 0 0 12px;
+  padding: 14px;
+  border: 1px solid rgba(184, 207, 245, 0.72);
+  border-radius: 20px;
+  background: linear-gradient(135deg, #ffffff 0%, #f4fbff 62%, #f5f2ff 100%);
+  box-shadow: 0 14px 36px rgba(37, 34, 99, 0.06);
+}
+
+.qf-lead-searchbar strong {
+  display: block;
+  color: var(--ink, #0f172a);
+  font-size: 15px;
+  letter-spacing: -0.02em;
+}
+
+.qf-lead-searchbar div span,
+.qf-lead-searchbar label span {
+  display: block;
+  color: var(--muted, #536174);
+  font-size: 12px;
+}
+
+.qf-lead-searchbar label {
+  display: grid;
+  gap: 5px;
+}
+
+.qf-lead-searchbar input {
+  width: 100%;
+  border: 1px solid rgba(184, 207, 245, 0.86);
+  border-radius: 999px;
+  background: #fff;
+  color: var(--ink, #0f172a);
+  padding: 10px 13px;
+  font-size: 13.5px;
+  outline: none;
+}
+
+.qf-lead-searchbar input:focus {
+  border-color: var(--accent, #3b22f4);
+  box-shadow: 0 0 0 4px rgba(59, 34, 244, 0.10);
+}
+
+.qf-lead-search-count {
+  justify-self: end;
+  border: 1px solid rgba(59, 34, 244, 0.16);
+  border-radius: 999px;
+  background: rgba(59, 34, 244, 0.07);
+  color: var(--accent, #3b22f4);
+  padding: 8px 11px;
+  font-size: 12px;
+  white-space: nowrap;
+}
+
+.qf-lead-search-hidden {
+  display: none !important;
+}
+
+.qf-lead-search-empty {
+  margin: 0 0 12px;
+  border: 1px dashed rgba(184, 207, 245, 0.9);
+  border-radius: 16px;
+  padding: 12px 14px;
+  color: var(--muted, #536174);
+  background: rgba(255, 255, 255, 0.72);
+}
+
+html[data-theme="light"] .qf-leads-focus {
+  border-color: rgba(184, 207, 245, 0.72);
+  background: linear-gradient(135deg, #ffffff 0%, #f4fbff 62%, #f5f2ff 100%);
+  box-shadow: 0 16px 42px rgba(37, 34, 99, 0.06);
+}
+
+html[data-theme="light"] .qf-leads-focus-card,
+html[data-theme="light"] .qf-leads-filter {
+  border-color: rgba(184, 207, 245, 0.74);
+  background: rgba(255, 255, 255, 0.85);
+}
+
+html[data-theme="light"] .qf-leads-filter.is-active,
+html[data-theme="light"] .qf-leads-filter:hover {
+  border-color: rgba(59, 34, 244, 0.28);
+  background: rgba(59, 34, 244, 0.08);
+  color: var(--accent, #3b22f4);
+}
+
+html[data-theme="light"] tr.qf-lead-hot-row {
+  outline-color: rgba(245, 158, 11, 0.30);
+  background: rgba(245, 158, 11, 0.055);
+}
+
+@media (max-width: 900px) {
+  .qf-lead-searchbar {
+    grid-template-columns: 1fr;
+  }
+  .qf-lead-search-count {
+    justify-self: start;
+  }
+}
