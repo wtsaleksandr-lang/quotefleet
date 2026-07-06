@@ -10,9 +10,11 @@
   loadAsset('link', { rel: 'stylesheet', href: '/followup-workspace.css' });
   loadAsset('link', { rel: 'stylesheet', href: '/lead-crm-polish.css' });
   loadAsset('link', { rel: 'stylesheet', href: '/leads-list-focus.css' });
+  loadAsset('link', { rel: 'stylesheet', href: '/drayage-zone-polish.css' });
   window.addEventListener('load', () => loadAsset('script', { src: '/followup-workspace.js' }));
   window.addEventListener('load', () => loadAsset('script', { src: '/lead-crm-polish.js' }));
   window.addEventListener('load', () => loadAsset('script', { src: '/leads-list-focus.js' }));
+  window.addEventListener('load', () => loadAsset('script', { src: '/drayage-zone-polish.js' }));
 
   function toast(message, tone = 'success', title = 'QuoteFleet') {
     let stack = document.querySelector('.qf-toast-stack');
