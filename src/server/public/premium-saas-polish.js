@@ -9,8 +9,10 @@
 
   loadAsset('link', { rel: 'stylesheet', href: '/followup-workspace.css' });
   loadAsset('link', { rel: 'stylesheet', href: '/lead-crm-polish.css' });
+  loadAsset('link', { rel: 'stylesheet', href: '/leads-list-focus.css' });
   window.addEventListener('load', () => loadAsset('script', { src: '/followup-workspace.js' }));
   window.addEventListener('load', () => loadAsset('script', { src: '/lead-crm-polish.js' }));
+  window.addEventListener('load', () => loadAsset('script', { src: '/leads-list-focus.js' }));
 
   function toast(message, tone = 'success', title = 'QuoteFleet') {
     let stack = document.querySelector('.qf-toast-stack');
