@@ -12,11 +12,13 @@
   loadAsset('link', { rel: 'stylesheet', href: '/leads-list-focus.css' });
   loadAsset('link', { rel: 'stylesheet', href: '/drayage-zone-polish.css' });
   loadAsset('link', { rel: 'stylesheet', href: '/ai-import-polish.css' });
+  loadAsset('link', { rel: 'stylesheet', href: '/share-readiness.css' });
   window.addEventListener('load', () => loadAsset('script', { src: '/followup-workspace.js' }));
   window.addEventListener('load', () => loadAsset('script', { src: '/lead-crm-polish.js' }));
   window.addEventListener('load', () => loadAsset('script', { src: '/leads-list-focus.js' }));
   window.addEventListener('load', () => loadAsset('script', { src: '/drayage-zone-polish.js' }));
   window.addEventListener('load', () => loadAsset('script', { src: '/ai-import-polish.js' }));
+  window.addEventListener('load', () => loadAsset('script', { src: '/share-readiness.js' }));
 
   function toast(message, tone = 'success', title = 'QuoteFleet') {
     let stack = document.querySelector('.qf-toast-stack');
