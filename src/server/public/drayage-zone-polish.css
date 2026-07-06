@@ -1,0 +1,118 @@
+/* Phase AM: drayage zone coverage and readiness polish. */
+.qf-zone-health {
+  margin: 0 0 18px;
+  border: 1px solid var(--border);
+  border-radius: 22px;
+  background: linear-gradient(135deg, rgba(38, 208, 178, .08), rgba(93, 139, 255, .06)), var(--surface);
+  box-shadow: var(--shadow-md);
+  overflow: hidden;
+}
+.qf-zone-health-head {
+  display: flex;
+  justify-content: space-between;
+  gap: 16px;
+  align-items: flex-start;
+  padding: 17px 18px;
+  border-bottom: 1px solid var(--border);
+}
+.qf-zone-health-kicker {
+  color: var(--accent-2);
+  font: 700 11px var(--font-mono);
+  letter-spacing: .12em;
+  text-transform: uppercase;
+  margin-bottom: 6px;
+}
+.qf-zone-health h2 {
+  margin: 0;
+  font-size: 22px;
+  letter-spacing: -.035em;
+}
+.qf-zone-health p {
+  margin: 6px 0 0;
+  color: var(--muted);
+  max-width: 720px;
+}
+.qf-zone-health-actions {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: 8px;
+}
+.qf-zone-health-actions button {
+  border: 1px solid var(--border-strong);
+  border-radius: 999px;
+  padding: 8px 11px;
+  background: rgba(255,255,255,.035);
+  color: var(--ink-soft);
+  font-weight: 750;
+  cursor: pointer;
+}
+.qf-zone-health-actions button:hover,
+.qf-zone-health-actions button.is-active {
+  border-color: var(--accent);
+  color: var(--ink);
+  background: rgba(38,208,178,.1);
+}
+.qf-zone-health-grid {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 10px;
+  padding: 16px;
+}
+.qf-zone-health-card {
+  border: 1px solid var(--border);
+  border-radius: 16px;
+  background: rgba(255,255,255,.025);
+  padding: 12px;
+}
+.qf-zone-health-card span {
+  display: block;
+  color: var(--muted);
+  font-size: 12px;
+  margin-bottom: 5px;
+}
+.qf-zone-health-card strong {
+  color: var(--ink);
+  font-size: 20px;
+  letter-spacing: -.035em;
+}
+.qf-zone-status {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  margin-top: 6px;
+  border-radius: 999px;
+  padding: 4px 8px;
+  font-size: 11px;
+  font-weight: 800;
+  letter-spacing: .01em;
+  border: 1px solid var(--border);
+  color: var(--ink-soft);
+  background: rgba(255,255,255,.035);
+}
+.qf-zone-status.needs-price,
+.qf-zone-status.needs-radius,
+.qf-zone-status.missing-anchor { border-color: rgba(245,165,36,.45); color: var(--accent-2); }
+.qf-zone-status.disabled { opacity: .75; }
+.qf-zone-status.ready { border-color: rgba(38,208,178,.45); color: var(--accent); }
+tr.qf-zone-needs-price,
+tr.qf-zone-needs-radius,
+tr.qf-zone-missing-anchor { outline: 1px solid rgba(245,165,36,.35); outline-offset: -1px; }
+tr.qf-zone-hidden-by-filter { display: none; }
+.qf-zone-note {
+  margin: 0 0 16px;
+  border: 1px dashed var(--border-strong);
+  border-radius: 16px;
+  padding: 12px 13px;
+  color: var(--ink-soft);
+  background: rgba(255,255,255,.022);
+}
+.qf-zone-note b { color: var(--accent); }
+@media (max-width: 1000px) {
+  .qf-zone-health-grid { grid-template-columns: 1fr 1fr; }
+}
+@media (max-width: 680px) {
+  .qf-zone-health-head { display: grid; }
+  .qf-zone-health-actions { justify-content: flex-start; }
+  .qf-zone-health-grid { grid-template-columns: 1fr; }
+}
