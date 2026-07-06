@@ -15,12 +15,13 @@
 
   function accountSignals() {
     const profile = findCardByTitle('Profile');
+    const password = findCardByTitle('Change password');
     const sessions = findCardByTitle('Active sessions');
     const name = profile ? text(profile, 'input[data-key="name"]') : '';
     const email = profile ? text(profile, 'input[data-key="email"]') : '';
     return {
       hasProfile: Boolean(name && email),
-      hasSecurity: Boolean(document.querySelector('.card-title')?.textContent || sessions),
+      hasSecurity: Boolean(password && password.querySelector('input[type="password"]')),
       hasSessionControl: Boolean(sessions && sessions.querySelector('.btn-danger')),
     };
   }
