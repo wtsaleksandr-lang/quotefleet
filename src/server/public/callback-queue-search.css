@@ -1,0 +1,108 @@
+/* Phase AZ: callback queue search and premium light polish */
+.qf-callback-searchbar {
+  display: grid;
+  grid-template-columns: minmax(260px, 1fr) minmax(260px, 0.8fr) auto;
+  gap: 12px;
+  align-items: center;
+  margin: 0 0 14px;
+  padding: 14px;
+  border: 1px solid rgba(184, 207, 245, 0.72);
+  border-radius: 20px;
+  background: linear-gradient(135deg, #ffffff 0%, #f6fbff 58%, #fff8ed 100%);
+  box-shadow: 0 14px 36px rgba(37, 34, 99, 0.06);
+}
+
+.qf-callback-searchbar strong {
+  display: block;
+  color: var(--ink, #0f172a);
+  font-size: 15px;
+  letter-spacing: -0.02em;
+}
+
+.qf-callback-searchbar div span,
+.qf-callback-searchbar label span {
+  display: block;
+  color: var(--muted, #536174);
+  font-size: 12px;
+}
+
+.qf-callback-searchbar label {
+  display: grid;
+  gap: 5px;
+}
+
+.qf-callback-searchbar input {
+  width: 100%;
+  border: 1px solid rgba(184, 207, 245, 0.86);
+  border-radius: 999px;
+  background: #fff;
+  color: var(--ink, #0f172a);
+  padding: 10px 13px;
+  font-size: 13.5px;
+  outline: none;
+}
+
+.qf-callback-searchbar input:focus {
+  border-color: var(--accent, #3b22f4);
+  box-shadow: 0 0 0 4px rgba(59, 34, 244, 0.10);
+}
+
+.qf-callback-search-count {
+  justify-self: end;
+  border: 1px solid rgba(245, 158, 11, 0.28);
+  border-radius: 999px;
+  background: rgba(245, 158, 11, 0.10);
+  color: #92400e;
+  padding: 8px 11px;
+  font-size: 12px;
+  white-space: nowrap;
+}
+
+.qf-callback-search-hidden {
+  display: none !important;
+}
+
+.qf-callback-search-empty {
+  margin: 0 0 12px;
+  border: 1px dashed rgba(184, 207, 245, 0.9);
+  border-radius: 16px;
+  padding: 12px 14px;
+  color: var(--muted, #536174);
+  background: rgba(255, 255, 255, 0.72);
+}
+
+html[data-theme="light"] .qf-callback-command,
+html[data-theme="light"] .qf-callback-card {
+  border-color: rgba(184, 207, 245, 0.72);
+  background: linear-gradient(135deg, #ffffff 0%, #f6fbff 60%, #fff8ed 100%);
+  box-shadow: 0 16px 42px rgba(37, 34, 99, 0.06);
+}
+
+html[data-theme="light"] .qf-callback-metric,
+html[data-theme="light"] .qf-callback-chip,
+html[data-theme="light"] .qf-callback-step b,
+html[data-theme="light"] .qf-callback-note {
+  border-color: rgba(184, 207, 245, 0.74);
+  background: rgba(255, 255, 255, 0.84);
+}
+
+html[data-theme="light"] .qf-callback-actions button {
+  border-color: rgba(184, 207, 245, 0.84);
+  background: rgba(255, 255, 255, 0.86);
+  color: var(--ink, #0f172a);
+}
+
+html[data-theme="light"] .qf-callback-actions button:hover {
+  border-color: rgba(59, 34, 244, 0.28);
+  background: rgba(59, 34, 244, 0.08);
+  color: var(--accent, #3b22f4);
+}
+
+@media (max-width: 900px) {
+  .qf-callback-searchbar {
+    grid-template-columns: 1fr;
+  }
+  .qf-callback-search-count {
+    justify-self: start;
+  }
+}
