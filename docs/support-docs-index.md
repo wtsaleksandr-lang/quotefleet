@@ -6,6 +6,7 @@ This index points to the low-risk support and maintenance docs that help keep au
 
 - `docs/automation-safe-scope.md` — defines what automated passes may and may not touch.
 - `docs/automation-runbook.md` — checklist for scheduled or manually triggered automation runs.
+- `docs/support-pr-review-checklist.md` — review checklist for low-risk support pull requests.
 
 ## Product and UX maintenance
 
