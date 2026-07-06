@@ -7,7 +7,7 @@ Use this note for scheduled or manual automation passes. It complements `docs/au
 1. Confirm the task is low risk.
 2. Avoid shared product files.
 3. Check for open PRs in the same area.
-4. Prefer a new branch.
+4. Start from the latest `main` on `automation/support-work`.
 5. Pick one small task only.
 
 ## Safe task types
@@ -23,9 +23,11 @@ Prefer isolated work:
 
 Skip work that changes product logic, routes, database files, auth, payment, AI behavior, or quote calculation.
 
-## Branch names
+## Branch name
 
-Use short names:
+Scheduled support work uses `automation/support-work` so each pass has a predictable review branch.
+
+For manual one-off support work, short names are preferred:
 
 - `docs/<topic>`
 - `tests/<topic>`
@@ -43,11 +45,11 @@ Each automation PR should state:
 - whether a smoke test was added
 - what manual development should avoid while the PR is open
 
-## Direct commit rule
+## Main branch rule
 
-Direct commits to `main` should be limited to clearly safe documentation, test, or isolated UI/CSS cleanup when branch or PR creation is blocked or unavailable.
+Scheduled automation work should stay on `automation/support-work` and move toward `main` only through a pull request.
 
-When unsure, stop and summarize instead of forcing a change.
+When a branch or PR cannot be prepared safely, stop and summarize instead of forcing a change.
 
 ## Handoff format
 
