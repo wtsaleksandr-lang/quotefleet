@@ -1,5 +1,15 @@
 (function () {
   'use strict';
+  function loadAsset(tag, attrs) {
+    var selector = attrs.href ? tag + '[href="' + attrs.href + '"]' : tag + '[src="' + attrs.src + '"]';
+    if (document.querySelector(selector)) return;
+    var node = document.createElement(tag);
+    Object.keys(attrs).forEach(function (key) { node.setAttribute(key, attrs[key]); });
+    document.head.appendChild(node);
+  }
+  loadAsset('link', { rel: 'stylesheet', href: '/callback-queue-polish.css' });
+  window.addEventListener('load', function () { loadAsset('script', { src: '/callback-queue-polish.js' }); });
+
   function fmt(value) {
     if (!value) return '—';
     var d = new Date(value);
@@ -34,7 +44,7 @@
       var active = !/^No$/.test(item[1]);
       return '<div class="qf-activity-step ' + (active ? 'is-active' : '') + '">' +
         '<span aria-hidden="true"></span><div><strong>' + item[0] + '</strong><small>' + item[1] + '</small></div><em>' + fmt(item[2]) + '</em>' +
-      '</div>';
+        '</div>';
     }).join('');
   }
   function render(refId, data) {
