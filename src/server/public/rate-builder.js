@@ -137,6 +137,28 @@
     if (guideCard && guideCard.nextSibling) guideCard.parentNode.insertBefore(card, guideCard.nextSibling);
   }
 
+  function savePanel() {
+    if (route() !== 'rates' || content.querySelector('.qf-rate-save-panel')) return;
+    const card = document.createElement('section');
+    card.className = 'qf-rate-save-panel';
+    card.innerHTML = `
+      <div>
+        <div class="qf-builder-kicker">Save states</div>
+        <strong>Inline edits save when you leave a field.</strong>
+        <p>Use Duplicate to copy a similar service/equipment row. Duplicates are created as disabled drafts so they do not publish by accident.</p>
+      </div>
+      <div class="qf-rate-live" role="status" aria-live="polite">Ready for edits</div>`;
+    const scan = content.querySelector('.qf-rate-scan');
+    if (scan && scan.nextSibling) scan.parentNode.insertBefore(card, scan.nextSibling);
+  }
+
+  function liveStatus(text, mode) {
+    const live = content.querySelector('.qf-rate-live');
+    if (!live) return;
+    live.textContent = text;
+    live.dataset.mode = mode || 'idle';
+  }
+
   function decorateRows() {
     rows().forEach((row) => {
       row.classList.remove('qf-rate-row-gap', 'qf-rate-row-disabled', 'qf-rate-row-ready');
@@ -178,13 +200,104 @@
     save.insertAdjacentElement('afterend', note);
   }
 
+  function readRateRow(row) {
+    const selects = Array.from(row.querySelectorAll('select'));
+    const inputs = Array.from(row.querySelectorAll('input.input'));
+    const enabled = row.querySelector('input[type="checkbox"]');
+    function num(index) {
+      const value = inputs[index] && inputs[index].value !== '' ? Number(inputs[index].value) : 0;
+      return Number.isFinite(value) ? value : 0;
+    }
+    const service = selects[0] ? selects[0].value : 'ftl';
+    const equipment = selects[1] ? selects[1].value : 'dryvan';
+    const label = inputs[0] && inputs[0].value ? inputs[0].value.trim() : service + ' ' + equipment;
+    return {
+      service,
+      equipment,
+      label: label + ' copy',
+      ratePerMile: num(1),
+      minimumCharge: num(2),
+      flatFee: num(3),
+      fuelSurchargePct: num(4),
+      marginPct: num(5),
+      enabled: false,
+    };
+  }
+
+  function duplicateRate(row, button) {
+    const body = readRateRow(row);
+    const old = button.textContent;
+    button.disabled = true;
+    button.textContent = 'Copying…';
+    liveStatus('Copying rate card…', 'saving');
+    fetch('/api/tenant/rate-cards', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(body),
+    })
+      .then((res) => res.json().then((json) => {
+        if (!res.ok) throw new Error(json.error || 'Could not duplicate rate card');
+        return json;
+      }))
+      .then(() => {
+        if (window.qfToastOk) window.qfToastOk('Rate card duplicated as disabled draft');
+        liveStatus('Duplicated as disabled draft', 'saved');
+        setTimeout(() => go('rates'), 250);
+      })
+      .catch((err) => {
+        if (window.qfToastErr) window.qfToastErr(err);
+        liveStatus('Duplicate failed', 'error');
+        button.disabled = false;
+        button.textContent = old;
+      });
+  }
+
+  function duplicateActions() {
+    if (route() !== 'rates') return;
+    rows().forEach((row) => {
+      if (row.querySelector('.qf-rate-duplicate-btn')) return;
+      const cell = row.querySelector('td:last-child');
+      if (!cell) return;
+      const btn = document.createElement('button');
+      btn.type = 'button';
+      btn.className = 'btn btn-secondary btn-sm qf-rate-duplicate-btn';
+      btn.textContent = 'Duplicate';
+      btn.addEventListener('click', (event) => {
+        event.preventDefault();
+        duplicateRate(row, btn);
+      });
+      cell.insertBefore(btn, cell.firstChild);
+    });
+  }
+
+  function wireSaveFeedback() {
+    if (content.dataset.qfRateSaveFeedback === '1') return;
+    content.dataset.qfRateSaveFeedback = '1';
+    content.addEventListener('change', (event) => {
+      if (route() !== 'rates') return;
+      if (!event.target.closest('.qf-rate-table-wrap')) return;
+      liveStatus('Saving change…', 'saving');
+      setTimeout(() => liveStatus('Saved a moment ago', 'saved'), 700);
+    }, true);
+    content.addEventListener('blur', (event) => {
+      if (route() !== 'rates') return;
+      if (!event.target.closest('.qf-rate-table-wrap')) return;
+      if (!event.target.matches('input, select')) return;
+      liveStatus('Saving change…', 'saving');
+      setTimeout(() => liveStatus('Saved a moment ago', 'saved'), 700);
+    }, true);
+  }
+
   function enhance() {
     if (route() !== 'rates') return;
     hero();
     guide();
     scanPanel();
+    savePanel();
     tableWrap();
     decorateRows();
+    duplicateActions();
+    wireSaveFeedback();
     saveNote();
   }
 
