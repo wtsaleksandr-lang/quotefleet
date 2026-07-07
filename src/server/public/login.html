@@ -24,10 +24,11 @@
   </header>
 
   <main style="display:flex; align-items:center; justify-content:center; min-height: calc(100vh - 80px); padding: 48px 24px;">
-    <div class="card elevated" style="width: 100%; max-width: 460px;">
-      <h1 style="font-size: 28px; margin: 0 0 22px 0; letter-spacing: -0.025em;">
+    <div class="card elevated" style="width: 100%; max-width: 480px;">
+      <h1 style="font-size: 28px; margin: 0 0 10px 0; letter-spacing: -0.025em;">
         Sign in
       </h1>
+      <p class="muted-small" style="margin:0 0 18px; line-height:1.5;">Use an email link for the safest sign-in, or use your password if email delivery is not available.</p>
 
       <div class="tabs" style="margin-bottom: 18px;">
         <button class="tab active" data-pane="link">Email link</button>
@@ -36,46 +37,58 @@
 
       <!-- Magic link (default) -->
       <div class="tab-pane active" id="pane-link">
-        <form id="magic-form" style="display:flex; flex-direction:column; gap: 16px;">
+        <form id="magic-form" style="display:flex; flex-direction:column; gap: 16px;" novalidate>
           <div class="field">
             <label class="field-label required">Email</label>
-            <input class="input" type="email" name="email" required autofocus>
+            <input class="input" type="email" name="email" required autofocus autocomplete="email" inputmode="email" autocapitalize="none" spellcheck="false">
+            <span class="field-hint">We always show the same confirmation message to protect account privacy.</span>
           </div>
           <button class="btn btn-primary btn-lg btn-block" type="submit">
             Email me a link <span class="arr">→</span>
           </button>
-          <div id="magic-msg" class="notice hidden"></div>
+          <div id="magic-msg" class="notice hidden" role="status"></div>
         </form>
       </div>
 
       <!-- Password fallback -->
       <div class="tab-pane" id="pane-pwd">
-        <form id="login-form" style="display:flex; flex-direction:column; gap: 16px;">
+        <form id="login-form" style="display:flex; flex-direction:column; gap: 16px;" novalidate>
           <div class="field">
             <label class="field-label required">Email</label>
-            <input class="input" type="email" name="email" required>
+            <input class="input" type="email" name="email" required autocomplete="email" inputmode="email" autocapitalize="none" spellcheck="false">
           </div>
           <div class="field">
             <label class="field-label required">Password</label>
-            <input class="input" type="password" name="password" required>
+            <input class="input" type="password" name="password" required autocomplete="current-password">
           </div>
           <button class="btn btn-primary btn-lg btn-block" type="submit">
             Sign in <span class="arr">→</span>
           </button>
-          <div id="login-error" class="notice error hidden"></div>
-          <p class="muted-small" style="text-align:center; margin-top: 4px;">
-            Forgot password? <a href="#" id="forgot-link">Email me a sign-in link instead →</a>
+          <div id="login-error" class="notice error hidden" role="alert"></div>
+          <p class="muted-small" style="text-align:center; margin-top: 4px; line-height:1.5;">
+            Password not working? <a href="#" id="forgot-link">Email me a sign-in link instead →</a>
           </p>
         </form>
       </div>
 
-      <p class="muted-small" style="text-align:center; margin-top: 24px;">
+      <div class="notice" style="margin-top: 18px; line-height:1.5;">Security note: sign-in links expire after 15 minutes and can be used once.</div>
+      <p class="muted-small" style="text-align:center; margin-top: 20px;">
         New here? <a href="/signup">Start free →</a>
       </p>
     </div>
   </main>
 
   <script>
+    function normalizeEmail(s) { return (s || '').trim().toLowerCase(); }
+    function copyEmailToForms(email) {
+      document.querySelectorAll('input[type="email"]').forEach(function (input) {
+        if (!input.value && email) input.value = email;
+      });
+    }
+    document.querySelectorAll('input[type="email"]').forEach(function (input) {
+      input.addEventListener('blur', function () { input.value = normalizeEmail(input.value); copyEmailToForms(input.value); });
+    });
+
     // Tab toggle
     document.querySelectorAll('.tab').forEach(function (t) {
       t.addEventListener('click', function () {
@@ -92,11 +105,11 @@
     if (qErr) {
       var msg = document.getElementById('magic-msg');
       msg.textContent = ({
-        'missing-token': 'Link is missing.',
-        'invalid-token': 'Link is invalid or expired.',
-        'link-used':     'Link was already used.',
-        'link-expired':  'Link has expired.',
-      })[qErr] || 'Sign-in failed.';
+        'missing-token': 'Link is missing. Request a fresh sign-in link.',
+        'invalid-token': 'Link is invalid or expired. Request a fresh sign-in link.',
+        'link-used':     'Link was already used. Request a fresh sign-in link.',
+        'link-expired':  'Link has expired. Request a fresh sign-in link.',
+      })[qErr] || 'Sign-in failed. Request a fresh sign-in link.';
       msg.classList.remove('hidden'); msg.classList.add('error');
     }
 
@@ -110,31 +123,36 @@
         var emailInput = document.querySelector('#magic-form input[name="email"]');
         if (emailInput) {
           var pwdEmail = document.querySelector('#login-form input[name="email"]');
-          if (pwdEmail && pwdEmail.value) emailInput.value = pwdEmail.value;
+          if (pwdEmail && pwdEmail.value) emailInput.value = normalizeEmail(pwdEmail.value);
           emailInput.focus();
         }
       });
     }
 
     // Magic link send. After a successful send we put the button into a
-    // 30s cooldown so users don't pound the resend button (and inflate
-    // our SMTP/AWS costs).
+    // 30s cooldown so users don't pound the resend button.
     document.getElementById('magic-form').addEventListener('submit', async function (e) {
       e.preventDefault();
       var msg = document.getElementById('magic-msg');
       msg.classList.add('hidden');
+      var email = normalizeEmail(e.target.email.value);
+      e.target.email.value = email;
+      if (!email || email.indexOf('@') < 1) {
+        msg.textContent = 'Please enter a valid email address.';
+        msg.classList.remove('hidden'); msg.classList.add('error');
+        return;
+      }
       var btn = e.target.querySelector('button[type=submit]');
       btn.disabled = true; var old = btn.innerHTML; btn.innerHTML = 'Sending…';
       try {
         var res = await fetch('/api/auth/magic-link/send', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ email: e.target.email.value }),
+          body: JSON.stringify({ email: email }),
         });
         if (res.ok) {
-          msg.textContent = '✓ Check your inbox. Link expires in 15 minutes.';
+          msg.textContent = '✓ If that email exists, a link is on the way. Link expires in 15 minutes.';
           msg.classList.remove('hidden', 'error'); msg.classList.add('notice');
-          // 30s cooldown
           var seconds = 30;
           btn.innerHTML = 'Resend in ' + seconds + 's';
           var iv = setInterval(function () {
@@ -165,17 +183,24 @@
       var fd = new FormData(e.target);
       var err = document.getElementById('login-error');
       err.classList.add('hidden');
+      var email = normalizeEmail(fd.get('email'));
+      var password = String(fd.get('password') || '');
+      if (!email || email.indexOf('@') < 1 || !password) {
+        err.textContent = 'Enter your email and password, or use the email-link sign-in option.';
+        err.classList.remove('hidden');
+        return;
+      }
       var btn = e.target.querySelector('button[type=submit]');
       btn.disabled = true; var old = btn.innerHTML; btn.innerHTML = 'Signing in…';
       try {
         var res = await fetch('/api/auth/login', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ email: fd.get('email'), password: fd.get('password') }),
+          body: JSON.stringify({ email: email, password: password }),
         });
         var j = await res.json();
         if (!res.ok) {
-          err.textContent = j.error || 'Sign-in failed.';
+          err.textContent = 'Invalid email or password. You can also request a one-time email link.';
           err.classList.remove('hidden');
           btn.disabled = false; btn.innerHTML = old;
           return;

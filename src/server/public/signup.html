@@ -19,18 +19,20 @@
   </header>
 
   <main style="display:flex; align-items:center; justify-content:center; min-height: calc(100vh - 80px); padding: 48px 24px;">
-    <div class="card elevated" style="width: 100%; max-width: 540px;">
+    <div class="card elevated" style="width: 100%; max-width: 560px;">
       <h1 style="font-size: 28px; margin: 0 0 8px 0; letter-spacing: -0.025em;">Start free</h1>
-      <p class="muted-small" style="margin:0 0 24px;">Create your quote desk, then tune rates before going live.</p>
+      <p class="muted-small" style="margin:0 0 20px;">Create your quote desk, then tune rates before going live.</p>
+      <div class="notice" style="margin-bottom:18px; line-height:1.5;">Launch-safe setup: your public calculator stays private until you choose to share the hosted link.</div>
 
-      <form id="signup-form" style="display:flex; flex-direction:column; gap: 18px;">
-        <div class="field"><label class="field-label required">Company name</label><input class="input" name="companyName" placeholder="Acme Drayage" required></div>
-        <div class="field"><label class="field-label required">Your link</label><div class="url-builder"><input class="input" name="slug" id="slug-input" placeholder="acme" autocomplete="off" required pattern="^[a-z0-9](?:[a-z0-9-]*[a-z0-9])?$" minlength="3" maxlength="30"><select class="select" name="hostDomain" id="host-input"></select></div><div class="url-builder-preview" id="url-preview"><span class="live">acme.quotefleet.net</span></div><span class="field-hint" id="slug-hint">Letters, numbers, dashes.</span></div>
-        <div class="grid-2"><div class="field"><label class="field-label required">Email</label><input class="input" type="email" name="email" required></div><div class="field"><label class="field-label required">Password</label><input class="input" type="password" name="password" minlength="10" required><span class="field-hint">Minimum 10 characters.</span></div></div>
-        <div class="grid-2"><div class="field"><label class="field-label">Where you operate</label><select class="select" name="countryFocus"><option value="US" selected>USA</option><option value="CA">Canada</option><option value="BOTH">USA + Canada</option></select></div><div class="field"><label class="field-label">Phone</label><input class="input" name="contactPhone" type="tel"></div></div>
+      <form id="signup-form" style="display:flex; flex-direction:column; gap: 18px;" novalidate>
+        <div class="field"><label class="field-label required">Company name</label><input class="input" name="companyName" placeholder="Acme Drayage" autocomplete="organization" required maxlength="120"></div>
+        <div class="field"><label class="field-label required">Your link</label><div class="url-builder"><input class="input" name="slug" id="slug-input" placeholder="acme" autocomplete="off" autocapitalize="none" spellcheck="false" required pattern="^[a-z0-9](?:[a-z0-9-]*[a-z0-9])?$" minlength="3" maxlength="30"><select class="select" name="hostDomain" id="host-input" aria-label="Host domain"></select></div><div class="url-builder-preview" id="url-preview"><span class="live">acme.quotefleet.net</span></div><span class="field-hint" id="slug-hint">Letters, numbers, dashes. No spaces.</span></div>
+        <div class="grid-2"><div class="field"><label class="field-label required">Email</label><input class="input" type="email" name="email" required autocomplete="email" inputmode="email" autocapitalize="none" spellcheck="false"></div><div class="field"><label class="field-label required">Phone</label><input class="input" name="contactPhone" type="tel" autocomplete="tel" placeholder="For account recovery"></div></div>
+        <div class="grid-2"><div class="field"><label class="field-label required">Password</label><input class="input" type="password" name="password" id="password-input" minlength="10" maxlength="200" autocomplete="new-password" required><span class="field-hint" id="password-hint">Minimum 10 characters. Use a unique password.</span></div><div class="field"><label class="field-label required">Confirm password</label><input class="input" type="password" name="confirmPassword" id="confirm-password-input" minlength="10" maxlength="200" autocomplete="new-password" required><span class="field-hint" id="confirm-hint">Re-enter the same password.</span></div></div>
+        <div class="field"><label class="field-label">Where you operate</label><select class="select" name="countryFocus"><option value="US" selected>USA</option><option value="CA">Canada</option><option value="BOTH">USA + Canada</option></select></div>
         <label style="display:flex; gap:10px; align-items:flex-start; padding:10px 12px; background:var(--surface-2); border:1px solid var(--border); border-radius:8px; cursor:pointer; font-size:13.5px; line-height:1.55;"><input type="checkbox" id="dpa-accept" name="dpaAccept" required style="margin-top:3px; flex-shrink:0;"><span>I have read and agree to the <a href="/security" target="_blank" rel="noopener">Security policy</a>, <a href="/dpa" target="_blank" rel="noopener">Data Processing Addendum (v1.0)</a>, and confirm that QuoteFleet may process customer data on my behalf under those terms.</span></label>
         <button class="btn btn-primary btn-lg btn-block" type="submit" id="signup-submit" disabled>Create account <span class="arr">→</span></button>
-        <div id="signup-error" class="notice error hidden"></div>
+        <div id="signup-error" class="notice error hidden" role="alert"></div>
         <p class="muted-small" style="text-align:center; margin-top: 14px; line-height: 1.55;">Your rates are private by default. Marketplace exposure is opt-in and benchmarks are anonymized. <a href="/security" target="_blank" rel="noopener">Read the full policy →</a></p>
       </form>
     </div>
@@ -43,35 +45,61 @@
     var preview = document.getElementById('url-preview').querySelector('.live');
     var hint = document.getElementById('slug-hint');
     var companyInput = form.querySelector('[name="companyName"]');
+    var emailInput = form.querySelector('[name="email"]');
+    var passwordInput = document.getElementById('password-input');
+    var confirmInput = document.getElementById('confirm-password-input');
+    var passwordHint = document.getElementById('password-hint');
+    var confirmHint = document.getElementById('confirm-hint');
     var dpa = document.getElementById('dpa-accept');
     var submit = document.getElementById('signup-submit');
+    var slugOk = false;
     function slugify(s) { return (s || '').toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)/g, '').slice(0, 30); }
+    function normalizeEmail(s) { return (s || '').trim().toLowerCase(); }
     function refreshPreview() { var s = slugInput.value.trim() || 'your-slug'; var h = hostInput.value || 'quotefleet.net'; preview.textContent = s + '.' + h; }
+    function setHint(node, text, cls) { node.textContent = text; node.className = 'field-hint' + (cls ? ' ' + cls : ''); }
     var slugTouched = false;
-    slugInput.addEventListener('input', function () { slugTouched = true; refreshPreview(); checkSlug(); });
-    companyInput.addEventListener('input', function () { if (!slugTouched) { slugInput.value = slugify(companyInput.value); refreshPreview(); checkSlug(); } });
+    slugInput.addEventListener('input', function () { slugTouched = true; slugInput.value = slugify(slugInput.value); refreshPreview(); checkSlug(); syncSubmit(); });
+    companyInput.addEventListener('input', function () { if (!slugTouched) { slugInput.value = slugify(companyInput.value); refreshPreview(); checkSlug(); syncSubmit(); } });
     hostInput.addEventListener('change', refreshPreview);
+    emailInput.addEventListener('blur', function () { emailInput.value = normalizeEmail(emailInput.value); syncSubmit(); });
     var slugTimer = null;
     function checkSlug() {
       clearTimeout(slugTimer);
+      slugOk = false;
       var v = slugInput.value.trim();
-      if (!v) { hint.textContent = 'Letters, numbers, dashes.'; hint.className = 'field-hint'; return; }
+      if (!v) { setHint(hint, 'Letters, numbers, dashes. No spaces.'); syncSubmit(); return; }
+      if (v.length < 3 || v.length > 30) { setHint(hint, '✗ 3–30 characters', 'error'); syncSubmit(); return; }
+      if (!/^[a-z0-9](?:[a-z0-9-]*[a-z0-9])?$/.test(v)) { setHint(hint, '✗ Letters, numbers, dashes only', 'error'); syncSubmit(); return; }
       slugTimer = setTimeout(function () {
         fetch('/api/auth/check-slug?slug=' + encodeURIComponent(v)).then(function (r) { return r.json(); }).then(function (j) {
-          if (j.ok) { hint.textContent = '✓ Available'; hint.className = 'field-hint ok'; }
-          else if (j.reason === 'taken') { hint.textContent = '✗ Already taken'; hint.className = 'field-hint error'; }
-          else if (j.reason === 'reserved') { hint.textContent = '✗ Reserved'; hint.className = 'field-hint error'; }
-          else if (j.reason === 'format') { hint.textContent = '✗ Letters, numbers, dashes only'; hint.className = 'field-hint error'; }
-          else if (j.reason === 'length') { hint.textContent = '✗ 3–30 characters'; hint.className = 'field-hint error'; }
-        }).catch(function () {});
+          if (j.ok) { slugOk = true; setHint(hint, '✓ Available', 'ok'); }
+          else if (j.reason === 'taken') { setHint(hint, '✗ Already taken', 'error'); }
+          else if (j.reason === 'reserved') { setHint(hint, '✗ Reserved', 'error'); }
+          else if (j.reason === 'format') { setHint(hint, '✗ Letters, numbers, dashes only', 'error'); }
+          else if (j.reason === 'length') { setHint(hint, '✗ 3–30 characters', 'error'); }
+          else { setHint(hint, '✗ Not available', 'error'); }
+          syncSubmit();
+        }).catch(function () { setHint(hint, 'We will re-check this when you submit.'); syncSubmit(); });
       }, 350);
     }
+    function checkPassword() {
+      var p = passwordInput.value || '';
+      var c = confirmInput.value || '';
+      var strongEnough = p.length >= 10;
+      setHint(passwordHint, strongEnough ? '✓ Meets minimum length' : 'Minimum 10 characters. Use a unique password.', strongEnough ? 'ok' : '');
+      if (!c) setHint(confirmHint, 'Re-enter the same password.');
+      else if (p !== c) setHint(confirmHint, '✗ Passwords do not match', 'error');
+      else setHint(confirmHint, '✓ Passwords match', 'ok');
+      return strongEnough && p === c;
+    }
+    passwordInput.addEventListener('input', function () { checkPassword(); syncSubmit(); });
+    confirmInput.addEventListener('input', function () { checkPassword(); syncSubmit(); });
     fetch('/api/auth/signup-options').then(function (r) { return r.json(); }).then(function (opts) {
       hostInput.innerHTML = '';
       (opts.hostDomains || ['quotefleet.net']).forEach(function (h) { var o = document.createElement('option'); o.value = h; o.textContent = h; if (h === opts.defaultHostDomain) o.selected = true; hostInput.appendChild(o); });
       refreshPreview();
     }).catch(function () { hostInput.innerHTML = '<option value="quotefleet.net">quotefleet.net</option>'; refreshPreview(); });
-    function syncSubmit() { submit.disabled = !dpa.checked; }
+    function syncSubmit() { submit.disabled = !(dpa.checked && form.companyName.value.trim() && normalizeEmail(emailInput.value) && checkPassword() && slugInput.value.trim().length >= 3); }
     dpa.addEventListener('change', syncSubmit); syncSubmit();
     function bestError(j) {
       if (!j) return 'Signup failed.';
@@ -88,10 +116,12 @@
     form.addEventListener('submit', async function (e) {
       e.preventDefault();
       var fd = new FormData(form); var err = document.getElementById('signup-error'); err.classList.add('hidden');
+      emailInput.value = normalizeEmail(emailInput.value);
+      if (!checkPassword()) { err.textContent = 'Please confirm your password and use at least 10 characters.'; err.classList.remove('hidden'); return; }
       if (!dpa.checked) { err.textContent = 'Please accept the Security policy and DPA to continue.'; err.classList.remove('hidden'); return; }
       submit.disabled = true; var oldText = submit.innerHTML; submit.innerHTML = 'Creating account…';
       try {
-        var res = await fetch('/api/auth/signup', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ companyName: fd.get('companyName'), slug: fd.get('slug'), hostDomain: fd.get('hostDomain'), email: fd.get('email'), password: fd.get('password'), countryFocus: fd.get('countryFocus') || 'US', contactPhone: fd.get('contactPhone') || undefined, dpaAccepted: true, dpaVersion: '1.0' }) });
+        var res = await fetch('/api/auth/signup', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ companyName: String(fd.get('companyName') || '').trim(), slug: slugInput.value.trim(), hostDomain: fd.get('hostDomain'), email: normalizeEmail(fd.get('email')), password: fd.get('password'), countryFocus: fd.get('countryFocus') || 'US', contactPhone: fd.get('contactPhone') || undefined, dpaAccepted: true, dpaVersion: '1.0' }) });
         var j = await res.json();
         if (!res.ok) { err.textContent = bestError(j); err.classList.remove('hidden'); submit.disabled = false; submit.innerHTML = oldText; syncSubmit(); return; }
         location.href = '/app';
