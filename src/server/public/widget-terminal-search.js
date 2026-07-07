@@ -6,6 +6,11 @@
     return (opt.textContent || '').replace(/^—\s*/, '').replace(/\s*—$/, '').trim();
   }
 
+  function optionTokens(opt) {
+    if (!opt) return '';
+    return [opt.value || '', labelForOption(opt)].join(' ').toLowerCase();
+  }
+
   function install() {
     var select = document.getElementById('qf-pickup-terminal');
     if (!select || select.dataset.searchInstalled === '1') return;
@@ -16,14 +21,22 @@
     field.classList.add('qf-terminal-search-field', 'qf-typeahead');
 
     var input = document.createElement('input');
-    input.className = 'qf-input';
+    input.className = 'qf-input qf-terminal-search-input';
     input.id = 'qf-pickup-terminal-search';
     input.autocomplete = 'off';
     input.placeholder = "I don't know yet";
+    input.setAttribute('role', 'combobox');
+    input.setAttribute('aria-autocomplete', 'list');
+    input.setAttribute('aria-expanded', 'false');
+    input.setAttribute('aria-controls', 'qf-pickup-terminal-suggestions');
 
     var box = document.createElement('div');
-    box.className = 'qf-suggestions';
+    box.className = 'qf-suggestions qf-terminal-suggestions';
     box.id = 'qf-pickup-terminal-suggestions';
+
+    var help = document.createElement('div');
+    help.className = 'qf-terminal-search-help';
+    help.textContent = 'Start typing the terminal name, carrier, or code. Leave blank if you are not sure.';
 
     select.style.position = 'absolute';
     select.style.left = '-9999px';
@@ -33,6 +46,7 @@
 
     select.insertAdjacentElement('beforebegin', input);
     input.insertAdjacentElement('afterend', box);
+    box.insertAdjacentElement('afterend', help);
 
     function options() {
       return Array.from(select.options || []);
@@ -47,6 +61,7 @@
     function close() {
       box.classList.remove('open');
       box.innerHTML = '';
+      input.setAttribute('aria-expanded', 'false');
     }
 
     function choose(opt) {
@@ -56,38 +71,49 @@
       close();
     }
 
-    function render() {
-      var q = input.value.trim().toLowerCase();
-      var opts = options();
-      box.innerHTML = '';
-      if (opts.length <= 1) {
-        var empty = document.createElement('div');
-        empty.className = 'qf-suggestion';
-        empty.textContent = 'Select a pickup port first';
-        box.appendChild(empty);
-        box.classList.add('open');
-        return;
+    function addItem(text, opt, metaText) {
+      var item = document.createElement('div');
+      item.className = 'qf-suggestion qf-terminal-suggestion';
+      item.textContent = text;
+      if (metaText) {
+        var meta = document.createElement('span');
+        meta.className = 'meta';
+        meta.textContent = metaText;
+        item.appendChild(meta);
       }
-      opts.filter(function (opt) {
-        if (!opt.value) return true;
-        return !q || labelForOption(opt).toLowerCase().includes(q) || opt.value.toLowerCase().includes(q);
-      }).slice(0, 12).forEach(function (opt) {
-        var item = document.createElement('div');
-        item.className = 'qf-suggestion';
-        item.textContent = opt.value ? labelForOption(opt) : "I don't know yet";
-        if (opt.value) {
-          var meta = document.createElement('span');
-          meta.className = 'meta';
-          meta.textContent = opt.value;
-          item.appendChild(meta);
-        }
+      if (opt) {
         item.addEventListener('mousedown', function (ev) {
           ev.preventDefault();
           choose(opt);
         });
-        box.appendChild(item);
+      }
+      box.appendChild(item);
+    }
+
+    function render() {
+      var q = input.value.trim().toLowerCase();
+      var opts = options();
+      var unknown = opts.find(function (opt) { return !opt.value; });
+      var searchable = opts.filter(function (opt) { return !!opt.value; });
+      var matches = searchable.filter(function (opt) {
+        return !q || optionTokens(opt).indexOf(q) >= 0;
       });
+
+      box.innerHTML = '';
+      if (opts.length <= 1) {
+        addItem('Select a pickup port first', null, 'Port required');
+      } else {
+        if (!q && unknown) addItem("I don't know yet", unknown, 'Dispatcher will confirm');
+        if (q && !matches.length) {
+          addItem('No matching terminal found', null, 'Try carrier, code, or leave blank');
+          if (unknown) addItem("I don't know yet", unknown, 'Use this if unsure');
+        }
+        matches.slice(0, 12).forEach(function (opt) {
+          addItem(labelForOption(opt), opt, opt.value);
+        });
+      }
       box.classList.add('open');
+      input.setAttribute('aria-expanded', 'true');
     }
 
     input.addEventListener('focus', render);
@@ -95,7 +121,7 @@
     input.addEventListener('keydown', function (ev) {
       if (ev.key === 'Escape') close();
       if (ev.key === 'Enter') {
-        var first = box.querySelector('.qf-suggestion');
+        var first = box.querySelector('.qf-terminal-suggestion');
         if (first) {
           ev.preventDefault();
           first.dispatchEvent(new MouseEvent('mousedown'));
@@ -105,7 +131,10 @@
     input.addEventListener('blur', function () { setTimeout(close, 140); });
     select.addEventListener('change', syncInput);
 
-    new MutationObserver(syncInput).observe(select, { childList: true });
+    new MutationObserver(function () {
+      syncInput();
+      if (box.classList.contains('open')) render();
+    }).observe(select, { childList: true });
     syncInput();
   }
 
