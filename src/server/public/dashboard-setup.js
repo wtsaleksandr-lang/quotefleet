@@ -13,48 +13,41 @@
   };
 
   const routeCoach = {
-    rates: {
-      title: 'Start with your most common lane.',
-      text: 'Add one reliable base rate first. You can layer accessorials and drayage zones after the first rate card is saved.',
-      next: 'Next: add common extra charges.',
-      primary: ['Add accessorials', 'accessorials'],
-      secondary: ['Import rates', 'ingest'],
-    },
-    accessorials: {
-      title: 'Add charges customers ask about.',
-      text: 'Start with chassis, residential, liftgate, hazmat, storage, detention, and reefer-related charges. Keep labels customer friendly.',
-      next: 'Next: add drayage zones if you quote port work.',
-      primary: ['Add zones', 'zones'],
-      secondary: ['Back to rates', 'rates'],
-    },
-    zones: {
-      title: 'Set up local port pricing.',
-      text: 'Use zones for common port/ramp radius pricing. If you do not quote drayage, you can skip this step and publish the link.',
-      next: 'Next: brand the customer page.',
-      primary: ['Brand page', 'brand'],
-      secondary: ['Back to accessorials', 'accessorials'],
-    },
-    brand: {
-      title: 'Make the page feel like your company.',
-      text: 'Check logo, display name, colors, contact requirements, and the customer-facing headline before sharing the link.',
-      next: 'Next: set AI guardrails or publish the link.',
-      primary: ['AI setup', 'ai'],
-      secondary: ['Public link', 'embed'],
-    },
-    ai: {
-      title: 'Keep AI helpful and safe.',
-      text: 'Add company rules, services offered, what AI should not promise, and when it should suggest a human callback.',
-      next: 'Next: copy the public link.',
-      primary: ['Public link', 'embed'],
-      secondary: ['Brand page', 'brand'],
-    },
-    embed: {
-      title: 'Share the rate page where customers already are.',
-      text: 'Copy the hosted link into email signatures, messages, ads, or your website. Do one live test before sending traffic.',
-      next: 'Next: send a test quote and review it in Leads.',
-      primary: ['Open leads', 'leads'],
-      secondary: ['Preview page', 'overview'],
-    },
+    rates: { title: 'Start with your most common lane.', text: 'Add one reliable base rate first. You can layer accessorials and drayage zones after the first rate card is saved.', next: 'Next: add common extra charges.', primary: ['Add accessorials', 'accessorials'], secondary: ['Import rates', 'ingest'] },
+    accessorials: { title: 'Add charges customers ask about.', text: 'Start with chassis, residential, liftgate, hazmat, storage, detention, and reefer-related charges. Keep labels customer friendly.', next: 'Next: add drayage zones if you quote port work.', primary: ['Add zones', 'zones'], secondary: ['Back to rates', 'rates'] },
+    zones: { title: 'Set up local port pricing.', text: 'Use zones for common port/ramp radius pricing. If you do not quote drayage, you can skip this step and publish the link.', next: 'Next: brand the customer page.', primary: ['Brand page', 'brand'], secondary: ['Back to accessorials', 'accessorials'] },
+    brand: { title: 'Make the page feel like your company.', text: 'Check logo, display name, colors, contact requirements, and the customer-facing headline before sharing the link.', next: 'Next: set AI guardrails or publish the link.', primary: ['AI setup', 'ai'], secondary: ['Public link', 'embed'] },
+    ai: { title: 'Keep AI helpful and safe.', text: 'Answer the onboarding questions below so the calculator assistant follows the carrier rules instead of guessing.', next: 'Next: copy the public link.', primary: ['Public link', 'embed'], secondary: ['Brand page', 'brand'] },
+    embed: { title: 'Share the rate page where customers already are.', text: 'Copy the hosted link into email signatures, messages, ads, or your website. Do one live test before sending traffic.', next: 'Next: send a test quote and review it in Leads.', primary: ['Open leads', 'leads'], secondary: ['Preview page', 'overview'] },
+  };
+
+  const onboardingQuestions = {
+    rates: [
+      { id: 'primaryService', q: 'Which service should the calculator quote first?', options: ['FTL dry van', 'LTL', 'Drayage', 'Reefer', 'Hotshot'] },
+      { id: 'pricingModel', q: 'How do you usually price that service?', options: ['Rate per mile', 'Flat lane price', 'Minimum charge plus mileage', 'Zone tariff', 'Manual review first'] },
+    ],
+    accessorials: [
+      { id: 'commonCharges', q: 'Which extra charges should customers see most often?', options: ['Liftgate', 'Residential', 'Hazmat', 'Chassis', 'Storage / detention'] },
+      { id: 'chargeStyle', q: 'How should extra charges be explained?', options: ['Plain customer language', 'Dispatcher terminology', 'Short labels only', 'Show only when selected'] },
+    ],
+    zones: [
+      { id: 'drayageScope', q: 'Do you quote port or rail ramp work?', options: ['Marine terminals', 'Rail ramps', 'Both port and rail', 'Not right now'] },
+      { id: 'zoneMethod', q: 'How do you want zones organized?', options: ['By port code', 'By city radius', 'By terminal', 'By customer lane'] },
+    ],
+    brand: [
+      { id: 'brandVoice', q: 'What should the customer page sound like?', options: ['Professional', 'Friendly', 'Fast and direct', 'Premium / enterprise'] },
+      { id: 'contactRules', q: 'What contact info should be required?', options: ['Email required', 'Phone required', 'Email or phone', 'Both email and phone'] },
+    ],
+    ai: [
+      { id: 'aiServices', q: 'What should the AI agent say your company offers?', options: ['FTL and LTL', 'Drayage', 'Reefer / temp-control', 'Local delivery', 'Warehousing support'] },
+      { id: 'aiLimits', q: 'What must the AI agent never promise?', options: ['Final price', 'Pickup time', 'Equipment availability', 'Customs or terminal release', 'Delivery date'] },
+      { id: 'aiHandoff', q: 'When should AI route the customer to your team?', options: ['Customer asks for firm quote', 'Missing shipment details', 'Hazmat or temp-control', 'Port or terminal issue', 'Anything complex'] },
+      { id: 'aiTone', q: 'What tone should the AI agent use?', options: ['Professional', 'Friendly', 'Concise', 'Very detailed', 'Dispatcher-style'] },
+    ],
+    embed: [
+      { id: 'shareWhere', q: 'Where will customers find this calculator?', options: ['Website', 'Email signature', 'Sales messages', 'Google/ads landing page', 'Customer portal'] },
+      { id: 'launchTest', q: 'What should be tested before sharing?', options: ['Mobile quote flow', 'Written quote request', 'Callback request', 'AI question flow', 'Print quote output'] },
+    ],
   };
 
   function go(route) {
@@ -67,15 +60,7 @@
     return (location.pathname.split('/app/')[1] || 'overview').split('/')[0] || 'overview';
   }
 
-  function hasTableRows() {
-    return content.querySelectorAll('tbody tr').length > 0;
-  }
-
-  function isProbablyDone(route) {
-    if (route === 'rates' || route === 'accessorials' || route === 'zones') return hasTableRows();
-    if (route === 'brand' || route === 'ai' || route === 'embed') return true;
-    return false;
-  }
+  function hasTableRows() { return content.querySelectorAll('tbody tr').length > 0; }
 
   function estimateProgress() {
     const route = currentRoute();
@@ -89,6 +74,17 @@
     return Math.max(1, Math.min(6, done));
   }
 
+  function getAnswers(route) {
+    try { return JSON.parse(localStorage.getItem('qf-onboarding-' + route) || '{}'); }
+    catch (_err) { return {}; }
+  }
+
+  function saveAnswer(route, id, value) {
+    const answers = getAnswers(route);
+    answers[id] = value;
+    try { localStorage.setItem('qf-onboarding-' + route, JSON.stringify(answers)); } catch (_err) {}
+  }
+
   function setupPanel() {
     if (content.querySelector('.qf-setup-panel')) return;
     const done = estimateProgress();
@@ -96,44 +92,21 @@
     panel.className = 'qf-setup-panel';
     panel.style.setProperty('--qf-setup-pct', Math.round(done / 6 * 100) + '%');
     panel.innerHTML = `
-      <div class="qf-setup-head">
-        <div>
-          <div class="qf-setup-kicker">Calculator setup</div>
-          <h2>Get your rate page ready in a few focused steps.</h2>
-          <p>Start with rates, add the charges customers ask about, then publish your branded link.</p>
-        </div>
-        <div class="qf-setup-meter">
-          <span class="qf-setup-score">${done}/6</span>
-          <small>setup areas touched</small>
-          <div class="qf-setup-bar"><span></span></div>
-        </div>
-      </div>
+      <div class="qf-setup-head"><div><div class="qf-setup-kicker">Calculator setup</div><h2>Get your rate page ready in a few focused steps.</h2><p>Start with rates, add the charges customers ask about, then publish your branded link.</p></div><div class="qf-setup-meter"><span class="qf-setup-score">${done}/6</span><small>setup areas touched</small><div class="qf-setup-bar"><span></span></div></div></div>
       <div class="qf-setup-steps"></div>
       <div class="qf-setup-launch-note"><strong>Launch order:</strong> rates first, then accessorials, optional zones, brand, AI guardrails, and finally the public link.</div>
-      <div class="qf-quick-actions">
-        <button type="button" data-go="rates">Edit rates</button>
-        <button type="button" data-go="accessorials">Add charges</button>
-        <button type="button" data-go="brand">Brand page</button>
-        <button type="button" data-go="embed">Share link</button>
-      </div>`;
-
+      <div class="qf-quick-actions"><button type="button" data-go="rates">Edit rates</button><button type="button" data-go="accessorials">Add charges</button><button type="button" data-go="brand">Brand page</button><button type="button" data-go="embed">Share link</button></div>`;
     const steps = panel.querySelector('.qf-setup-steps');
     setupRoutes.forEach((route, index) => {
       const [title, text] = routeLabels[route];
-      const doneClass = index < done ? ' is-done' : '';
       const item = document.createElement('button');
       item.type = 'button';
-      item.className = 'qf-setup-step' + doneClass;
+      item.className = 'qf-setup-step' + (index < done ? ' is-done' : '');
       item.dataset.go = route;
       item.innerHTML = `<span class="qf-setup-dot">${index < done ? '✓' : index + 1}</span><span><strong>${title}</strong><small>${text}</small></span>`;
       steps.appendChild(item);
     });
-
-    panel.addEventListener('click', (event) => {
-      const target = event.target.closest('[data-go]');
-      if (target) go(target.dataset.go);
-    });
-
+    panel.addEventListener('click', (event) => { const target = event.target.closest('[data-go]'); if (target) go(target.dataset.go); });
     const first = content.querySelector('h1');
     if (first && first.nextSibling) first.parentNode.insertBefore(panel, first.nextSibling.nextSibling || first.nextSibling);
     else content.prepend(panel);
@@ -145,30 +118,11 @@
     if (!copy) return;
     const coach = document.createElement('section');
     coach.className = 'qf-setup-coach';
-    coach.innerHTML = `
-      <div>
-        <span>Current setup step</span>
-        <strong>${copy.title}</strong>
-        <p>${copy.text}</p>
-      </div>
-      <div class="qf-setup-coach-next">
-        <small>${copy.next}</small>
-        <div class="qf-empty-actions">
-          <button type="button" data-go="${copy.primary[1]}">${copy.primary[0]}</button>
-          <button type="button" data-go="${copy.secondary[1]}">${copy.secondary[0]}</button>
-        </div>
-      </div>`;
-    coach.addEventListener('click', (event) => {
-      const target = event.target.closest('[data-go]');
-      if (target) go(target.dataset.go);
-    });
+    coach.innerHTML = `<div><span>Current setup step</span><strong>${copy.title}</strong><p>${copy.text}</p></div><div class="qf-setup-coach-next"><small>${copy.next}</small><div class="qf-empty-actions"><button type="button" data-go="${copy.primary[1]}">${copy.primary[0]}</button><button type="button" data-go="${copy.secondary[1]}">${copy.secondary[0]}</button></div></div>`;
+    coach.addEventListener('click', (event) => { const target = event.target.closest('[data-go]'); if (target) go(target.dataset.go); });
     const sub = content.querySelector('.page-sub');
     if (sub && sub.nextSibling) sub.parentNode.insertBefore(coach, sub.nextSibling);
-    else {
-      const h1 = content.querySelector('h1');
-      if (h1 && h1.nextSibling) h1.parentNode.insertBefore(coach, h1.nextSibling);
-      else content.prepend(coach);
-    }
+    else content.prepend(coach);
   }
 
   function emptyState(route) {
@@ -183,24 +137,61 @@
     box.className = 'qf-setup-empty';
     box.innerHTML = `<strong>${copy[0]}</strong><p>${copy[1]}</p><div class="qf-setup-empty-checks"><span>Start small</span><span>Save once</span><span>Test a quote</span></div><div class="qf-empty-actions"></div>`;
     const actions = box.querySelector('.qf-empty-actions');
-    copy[2].forEach(([label, target]) => {
-      const btn = document.createElement('button');
-      btn.type = 'button';
-      btn.textContent = label;
-      btn.dataset.go = target;
-      actions.appendChild(btn);
-    });
-    box.addEventListener('click', (event) => {
-      const target = event.target.closest('[data-go]');
-      if (target) go(target.dataset.go);
-    });
+    copy[2].forEach(([label, target]) => { const btn = document.createElement('button'); btn.type = 'button'; btn.textContent = label; btn.dataset.go = target; actions.appendChild(btn); });
+    box.addEventListener('click', (event) => { const target = event.target.closest('[data-go]'); if (target) go(target.dataset.go); });
     const coach = content.querySelector('.qf-setup-coach');
     if (coach && coach.nextSibling) coach.parentNode.insertBefore(box, coach.nextSibling);
-    else {
-      const sub = content.querySelector('.page-sub');
-      if (sub && sub.nextSibling) sub.parentNode.insertBefore(box, sub.nextSibling);
-      else content.prepend(box);
-    }
+    else content.prepend(box);
+  }
+
+  function buildSummary(route) {
+    const answers = getAnswers(route);
+    const questions = onboardingQuestions[route] || [];
+    return questions.map((item) => item.q + ' ' + (answers[item.id] || 'Not answered yet')).join('\n');
+  }
+
+  function applyAiAnswers() {
+    const prompt = Array.from(content.querySelectorAll('textarea')).find((field) => /system prompt/i.test(field.closest('.field')?.textContent || '')) || content.querySelector('textarea');
+    if (!prompt) return;
+    const block = 'AI agent onboarding answers:\n' + buildSummary('ai') + '\n\nRules: never guarantee final rate, equipment availability, pickup time, delivery date, customs release, terminal status, or dispatch confirmation. Suggest callback or written quote when the request needs human review.';
+    prompt.value = prompt.value.trim() ? prompt.value.trim() + '\n\n' + block : block;
+    prompt.dispatchEvent(new Event('blur', { bubbles: true }));
+    if (window.qfToastOk) window.qfToastOk('AI onboarding answers added');
+  }
+
+  function onboardingPanel(route) {
+    if (!setupRoutes.includes(route) || content.querySelector('.qf-onboarding-panel')) return;
+    const questions = onboardingQuestions[route] || [];
+    if (!questions.length) return;
+    const answers = getAnswers(route);
+    const panel = document.createElement('section');
+    panel.className = 'qf-onboarding-panel';
+    panel.innerHTML = `<div class="qf-onboarding-head"><div><div class="qf-setup-kicker">Guided onboarding</div><h3>${route === 'ai' ? 'Train this customer AI agent.' : 'Answer a few setup questions.'}</h3><p>Pick a quick answer or write a custom answer. Your choices stay in this browser as setup guidance.</p></div>${route === 'ai' ? '<button type="button" class="qf-onboarding-apply">Apply to AI prompt</button>' : ''}</div><div class="qf-onboarding-list"></div>`;
+    const list = panel.querySelector('.qf-onboarding-list');
+    questions.forEach((item) => {
+      const card = document.createElement('div');
+      card.className = 'qf-onboarding-question';
+      card.dataset.question = item.id;
+      card.innerHTML = `<strong>${item.q}</strong><div class="qf-onboarding-options"></div><div class="qf-onboarding-custom"><input class="input" placeholder="Custom answer"><button type="button">Save custom</button></div><small>${answers[item.id] ? 'Selected: ' + answers[item.id] : 'No answer selected yet.'}</small>`;
+      const opts = card.querySelector('.qf-onboarding-options');
+      item.options.forEach((option) => {
+        const btn = document.createElement('button');
+        btn.type = 'button';
+        btn.textContent = option;
+        btn.className = answers[item.id] === option ? 'is-selected' : '';
+        btn.addEventListener('click', () => { saveAnswer(route, item.id, option); panel.remove(); onboardingPanel(route); });
+        opts.appendChild(btn);
+      });
+      const input = card.querySelector('input');
+      const customBtn = card.querySelector('.qf-onboarding-custom button');
+      customBtn.addEventListener('click', () => { const value = input.value.trim(); if (!value) return; saveAnswer(route, item.id, value); panel.remove(); onboardingPanel(route); });
+      list.appendChild(card);
+    });
+    const apply = panel.querySelector('.qf-onboarding-apply');
+    if (apply) apply.addEventListener('click', applyAiAnswers);
+    const coach = content.querySelector('.qf-setup-coach');
+    if (coach && coach.nextSibling) coach.parentNode.insertBefore(panel, coach.nextSibling);
+    else content.prepend(panel);
   }
 
   function enhance() {
@@ -215,15 +206,13 @@
         h1.parentNode.insertBefore(label, h1);
       }
       setupCoach(route);
+      onboardingPanel(route);
       emptyState(route);
     }
   }
 
   let timer;
-  const observer = new MutationObserver(() => {
-    clearTimeout(timer);
-    timer = setTimeout(enhance, 80);
-  });
+  const observer = new MutationObserver(() => { clearTimeout(timer); timer = setTimeout(enhance, 80); });
   observer.observe(content, { childList: true, subtree: false });
   window.addEventListener('popstate', () => setTimeout(enhance, 80));
   setTimeout(enhance, 300);
