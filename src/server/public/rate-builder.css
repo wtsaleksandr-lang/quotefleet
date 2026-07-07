@@ -236,6 +236,65 @@
   background: var(--success);
   box-shadow: 0 0 0 4px var(--success-bg);
 }
+
+/* Phase BG: rate save states and duplicate action. */
+.qf-rate-save-panel {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 14px;
+  align-items: center;
+  margin: 0 0 18px;
+  border: 1px solid var(--border);
+  border-radius: 18px;
+  background: rgba(255,255,255,.024);
+  padding: 14px;
+}
+.qf-rate-save-panel strong {
+  display: block;
+  color: var(--ink);
+  font-size: 17px;
+  margin-bottom: 5px;
+}
+.qf-rate-save-panel p {
+  color: var(--muted);
+  margin: 0;
+  line-height: 1.45;
+}
+.qf-rate-live {
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  padding: 8px 11px;
+  color: var(--muted);
+  background: var(--surface);
+  font-size: 12px;
+  font-weight: 850;
+  white-space: nowrap;
+}
+.qf-rate-live[data-mode="saving"] {
+  border-color: rgba(245,165,36,.45);
+  color: var(--accent-2);
+}
+.qf-rate-live[data-mode="saved"] {
+  border-color: rgba(38,208,178,.42);
+  color: var(--success);
+}
+.qf-rate-live[data-mode="error"] {
+  border-color: rgba(239,68,68,.48);
+  color: var(--danger);
+}
+.qf-rate-duplicate-btn {
+  margin-right: 6px;
+  border-style: dashed !important;
+}
+.qf-rate-duplicate-btn:disabled {
+  opacity: .65;
+  cursor: progress;
+}
+html[data-theme="light"] .qf-rate-save-panel {
+  border-color: rgba(184, 207, 245, 0.72);
+  background: linear-gradient(135deg, #ffffff 0%, #f4fbff 62%, #eefaff 100%);
+  box-shadow: 0 12px 34px rgba(37, 34, 99, 0.05);
+}
 @media (max-width: 1000px) {
   .qf-rate-scan { grid-template-columns: 1fr; }
 }
@@ -245,6 +304,8 @@
   .qf-builder-stats { grid-template-columns: 1fr 1fr; }
   .qf-builder-guide ol { grid-template-columns: 1fr; }
   .qf-rate-scan-stats { grid-template-columns: 1fr 1fr; }
+  .qf-rate-save-panel { grid-template-columns: 1fr; }
+  .qf-rate-live { justify-self: start; }
 }
 @media (max-width: 540px) {
   .qf-builder-stats,
