@@ -108,6 +108,66 @@ tr.qf-zone-hidden-by-filter { display: none; }
   background: rgba(255,255,255,.022);
 }
 .qf-zone-note b { color: var(--accent); }
+
+/* Phase BC: premium light-mode drayage zone refinement. */
+html[data-theme="light"] .qf-zone-health {
+  border-color: rgba(184, 207, 245, 0.72);
+  background:
+    radial-gradient(circle at 12% 0%, rgba(56, 189, 248, 0.18), transparent 34%),
+    linear-gradient(135deg, #ffffff 0%, #f4fbff 62%, #eefaff 100%);
+  box-shadow: 0 16px 42px rgba(37, 34, 99, 0.06);
+}
+
+html[data-theme="light"] .qf-zone-health-head {
+  border-bottom-color: rgba(184, 207, 245, 0.68);
+}
+
+html[data-theme="light"] .qf-zone-health-kicker {
+  color: var(--accent, #3b22f4);
+  font-family: var(--font-sans);
+  font-weight: 900;
+  letter-spacing: 0.08em;
+}
+
+html[data-theme="light"] .qf-zone-health-card,
+html[data-theme="light"] .qf-zone-status,
+html[data-theme="light"] .qf-zone-note {
+  border-color: rgba(184, 207, 245, 0.74);
+  background: rgba(255, 255, 255, 0.84);
+}
+
+html[data-theme="light"] .qf-zone-health-actions button {
+  border-color: rgba(184, 207, 245, 0.84);
+  background: rgba(255, 255, 255, 0.86);
+  color: var(--ink, #0f172a);
+}
+
+html[data-theme="light"] .qf-zone-health-actions button:hover,
+html[data-theme="light"] .qf-zone-health-actions button.is-active {
+  border-color: rgba(59, 34, 244, 0.28);
+  background: rgba(59, 34, 244, 0.08);
+  color: var(--accent, #3b22f4);
+}
+
+html[data-theme="light"] tr.qf-zone-needs-price,
+html[data-theme="light"] tr.qf-zone-needs-radius,
+html[data-theme="light"] tr.qf-zone-missing-anchor {
+  outline-color: rgba(245, 158, 11, 0.30);
+  background: rgba(245, 158, 11, 0.04);
+}
+
+html[data-theme="light"] .qf-zone-status.ready {
+  border-color: rgba(5, 150, 105, 0.28);
+  color: #059669;
+}
+
+html[data-theme="light"] .qf-zone-status.needs-price,
+html[data-theme="light"] .qf-zone-status.needs-radius,
+html[data-theme="light"] .qf-zone-status.missing-anchor {
+  border-color: rgba(245, 158, 11, 0.34);
+  color: #b45309;
+}
+
 @media (max-width: 1000px) {
   .qf-zone-health-grid { grid-template-columns: 1fr 1fr; }
 }
