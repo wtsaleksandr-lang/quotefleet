@@ -9,11 +9,14 @@ async function read(path: string) {
 }
 
 describe('automation runbook', () => {
-  it('keeps scheduled support work on the automation branch and PR path', async () => {
+  it('keeps support work on the reusable automation branch and PR path', async () => {
     const doc = await read('docs/automation-runbook.md');
 
     expect(doc).toContain('automation/support-work');
     expect(doc).toContain('move toward `main` only through a pull request');
+    expect(doc).toContain('Reset `automation/support-work` to latest `main`');
+    expect(doc).toContain('Avoid creating one-off support branches');
+    expect(doc).toContain('Cleanup checklist');
     expect(doc).toContain('stop and summarize instead of forcing a change');
   });
 });
