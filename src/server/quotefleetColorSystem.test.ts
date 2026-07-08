@@ -19,6 +19,11 @@ describe('QuoteFleet global color system', () => {
     expect(css).toContain('--qf-color-card-dark: #22282A');
     expect(css).toContain('--qf-color-card-light: #E4EDF1');
     expect(css).toContain('--qf-color-muted: #B1C5CE');
+    expect(css).toContain('--qf-color-warm-card: #F3EDDF');
+    expect(css).toContain('--qf-color-warm-muted: #EFE7D8');
+    expect(css).toContain('--qf-color-neutral-card: #E6E3E0');
+    expect(css).toContain('--qf-color-neutral-card-hover: #D4CFC9');
+    expect(css).toContain('--qf-color-light-text: #1E1E1E');
     expect(css).toContain('border-color: var(--qf-color-white) !important;');
     expect(css).toContain('border-color: var(--qf-color-accent) !important;');
   });
