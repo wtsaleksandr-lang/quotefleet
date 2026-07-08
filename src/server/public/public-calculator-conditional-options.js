@@ -222,6 +222,7 @@
   loadStylesheet('/public-calculator-brand-preview.css');
   loadStylesheet('/maersk-radius-system.css');
   loadStylesheet('/quotefleet-color-system.css');
+  loadStylesheet('/public-calculator-no-gradients.css');
   simplifyHeader();
   document.addEventListener('change', (event) => {
     if (event.target && ['qf-equipment', 'qf-hazmat'].includes(event.target.id)) sync();
