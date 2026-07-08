@@ -1,26 +1,26 @@
+@import url('/quotefleet-color-system.css');
+
 /* Phase BQ: WeFixTrades-style skin for secondary public pages. */
 .qf-public-wft {
   --accent: #0d3cfc;
   --accent-ink: #ffffff;
   --accent-soft: rgba(13,60,252,.14);
-  --qf-wft-bg: #0b1110;
-  --qf-wft-panel: #111817;
-  --qf-wft-panel-2: #151c1b;
+  --qf-wft-bg: #181D1F;
+  --qf-wft-panel: #22282A;
+  --qf-wft-panel-2: #22282A;
   --qf-wft-line: rgba(255,255,255,.12);
   --qf-wft-line-strong: rgba(255,255,255,.22);
-  --qf-wft-text: #f5fcff;
-  --qf-wft-muted: rgba(245,252,255,.68);
-  --qf-wft-faint: rgba(245,252,255,.46);
-  --qf-wft-blue: #0d3cfc;
-  --qf-wft-cream: #f3eee6;
+  --qf-wft-text: #FFFFFF;
+  --qf-wft-muted: #B1C5CE;
+  --qf-wft-faint: rgba(177,197,206,.74);
+  --qf-wft-blue: #0D3CFC;
+  --qf-wft-cream: #E4EDF1;
   --qf-wft-radius: 8px;
-  background:
-    radial-gradient(circle at 18% -8%, rgba(13,60,252,.16), transparent 26%),
-    linear-gradient(180deg, #0b1110 0%, #0c1212 48%, #0a0f0f 100%);
+  background: #181D1F;
   color: var(--qf-wft-muted);
 }
 .qf-public-wft .topnav {
-  background: rgba(12,17,18,.94);
+  background: #22282A;
   border-bottom: 1px solid var(--qf-wft-line-strong);
   backdrop-filter: blur(14px);
 }
@@ -43,7 +43,7 @@
 .qf-public-wft .brand-mark .logo svg { display: none; }
 .qf-public-wft .brand-mark .logo::before {
   content: 'QF';
-  color: #f5fcff;
+  color: #FFFFFF;
   font: 900 9px/1 var(--font-mono);
 }
 .qf-public-wft .brand-mark .logo::after {
@@ -65,29 +65,27 @@
   text-transform: uppercase;
 }
 .qf-public-wft .btn-primary {
-  background: var(--qf-wft-cream);
-  color: #171b1d;
-  border-color: var(--qf-wft-cream);
+  background: #0D3CFC;
+  color: #FFFFFF;
+  border-color: #0D3CFC;
   box-shadow: none;
   border-radius: 4px;
 }
-.qf-public-wft .btn-primary .arr { color: #171b1d; }
+.qf-public-wft .btn-primary:hover { border-color: #FFFFFF; }
+.qf-public-wft .btn-primary .arr { color: #FFFFFF; }
 .qf-public-wft .btn-secondary {
-  background: rgba(255,255,255,.03);
-  border-color: var(--qf-wft-line-strong);
-  color: var(--qf-wft-text);
+  background: #FFFFFF;
+  border-color: #FFFFFF;
+  color: #0D3CFC;
   border-radius: 4px;
 }
+.qf-public-wft .btn-secondary:hover { border-color: #0D3CFC; }
 .qf-public-wft .hero {
   padding-top: 58px;
   padding-bottom: 34px;
 }
 .qf-public-wft .hero::before {
-  background:
-    radial-gradient(ellipse 50% 34% at 50% 12%, rgba(13,60,252,.16), transparent 68%),
-    linear-gradient(rgba(255,255,255,.018) 1px, transparent 1px),
-    linear-gradient(90deg, rgba(255,255,255,.018) 1px, transparent 1px);
-  background-size: auto, 28px 28px, 28px 28px;
+  background: radial-gradient(ellipse 50% 34% at 50% 12%, rgba(13,60,252,.16), transparent 68%);
 }
 .qf-public-wft .hero h1,
 .qf-public-wft .support-shell h1,
@@ -114,7 +112,7 @@
 .qf-public-wft .sec-shell .ct-card,
 .qf-public-wft .sec-shell .footer-note,
 .qf-public-wft main.container > div[style*="text-align: center"] {
-  background: rgba(17,24,23,.92) !important;
+  background: #22282A !important;
   border: 1px solid var(--qf-wft-line) !important;
   border-radius: var(--qf-wft-radius) !important;
   box-shadow: 0 28px 70px -55px rgba(0,0,0,.85), inset 0 1px 0 rgba(255,255,255,.04) !important;
@@ -154,9 +152,9 @@
 .qf-public-wft .support-pill,
 .qf-public-wft .sec-shell .pill,
 .qf-public-wft .tag {
-  color: var(--qf-wft-faint) !important;
-  background: rgba(255,255,255,.04) !important;
-  border: 1px solid var(--qf-wft-line) !important;
+  color: #FFFFFF !important;
+  background: rgba(13,60,252,.16) !important;
+  border: 1px solid rgba(13,60,252,.42) !important;
 }
 .qf-public-wft .support-table th,
 .qf-public-wft .support-table td {
@@ -166,15 +164,15 @@
   background: rgba(255,255,255,.04) !important;
 }
 .qf-public-wft .site-footer {
-  background: #22282a;
+  background: #22282A;
   border-top: 1px solid var(--qf-wft-line);
-  color: rgba(255,255,255,.55);
+  color: #B1C5CE;
 }
 .qf-public-wft .site-footer a {
-  color: #9aaeff;
+  color: #FFFFFF;
 }
 .qf-public-wft .site-footer a:hover {
-  color: #fff;
+  color: #FFFFFF;
 }
 @media (max-width: 760px) {
   .qf-public-wft .hero h1,
