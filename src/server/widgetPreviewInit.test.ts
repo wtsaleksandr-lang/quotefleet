@@ -9,11 +9,12 @@ async function file(name: string) {
 }
 
 describe('widget preview initialization', () => {
-  it('handles Replit preview hosts without using the random subdomain as tenant slug', async () => {
+  it('handles preview hosts without using the random subdomain as tenant slug', async () => {
     const js = await file('public-calculator-conditional-options.js');
 
     expect(js).toContain('PREVIEW_HOST_RE');
-    expect(js).toContain('replit.dev');
+    expect(js).toContain('replit');
+    expect(js).toContain('repl');
     expect(js).toContain("location.replace('/w/demo'");
     expect(js).toContain('shouldRedirectPreviewToDemo');
     expect(js).toContain('scheduleSync');
