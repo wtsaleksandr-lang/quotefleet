@@ -1,0 +1,134 @@
+/* Phase BY: global Maersk-style radius system.
+   Reference: restrained radius, squared-off cards/buttons, pill shape only for true tags. */
+:root {
+  --radius: 8px;
+  --radius-lg: 8px;
+  --radius-xl: 8px;
+  --radius-btn: 4px;
+  --radius-control: 6px;
+  --radius-card: 8px;
+  --radius-panel: 8px;
+  --radius-pill: 999px;
+  --qf-maersk-radius-card: 8px;
+  --qf-maersk-radius-control: 6px;
+  --qf-maersk-radius-button: 4px;
+}
+
+.card,
+.price-card,
+.support-card,
+.support-note,
+.support-table,
+.ct-card,
+.footer-note,
+.qf-panel,
+.qf-card,
+.app-card,
+.metric-card,
+.rate-card,
+.lead-card,
+.tool-card,
+.mp-card,
+.mp-empty,
+.feature-card,
+.final-cta-card,
+.compare-card,
+.pdf-card,
+.scheduler-card,
+.chat-demo,
+.faq-item,
+.simple-step,
+.table,
+.notice,
+.tabs,
+.modal,
+.drawer,
+.dropdown,
+.popover {
+  border-radius: var(--qf-maersk-radius-card) !important;
+}
+
+.btn,
+button.btn,
+.btn-primary,
+.btn-secondary,
+.btn-ghost,
+.btn-danger,
+.qf-cta,
+.qf-chat-send,
+.qf-mc-send,
+button[type="submit"] {
+  border-radius: var(--qf-maersk-radius-button) !important;
+}
+
+.input,
+.select,
+.textarea,
+input:not([type="checkbox"]):not([type="radio"]):not([type="range"]),
+select,
+textarea,
+.url-builder-preview,
+.typeahead-list,
+.qf-input,
+.qf-select,
+.qf-suggestions,
+.qf-chat,
+.qf-chat-input-row input,
+.qf-mc-input {
+  border-radius: var(--qf-maersk-radius-control) !important;
+}
+
+.badge,
+.tag,
+.pill,
+.chip,
+.mp-pill,
+.qf-help,
+.qf-mc-bubble,
+.qf-trust-chip {
+  border-radius: var(--radius-pill) !important;
+}
+
+.brand-mark .logo,
+.site-logo,
+.qf-demo-logo-slot,
+.qf-header img,
+.qf-brand-mark,
+.logo {
+  border-radius: var(--qf-maersk-radius-control) !important;
+}
+
+.qf-tabs,
+.qf-options-panel,
+.qf-booking-card,
+.qf-oog-panel,
+.qf-conditional-panel,
+.qf-result,
+.qf-chat,
+.qf-demo-brand-card,
+.qf-demo-brand-editor,
+.qf-demo-logo-upload {
+  border-radius: var(--qf-maersk-radius-card) !important;
+}
+
+.qf-tabs button,
+.qf-acc-chip,
+.qf-flags label,
+.qf-demo-brand-editor-head button {
+  border-radius: var(--qf-maersk-radius-button) !important;
+}
+
+.qf-chat-bubble,
+.qf-mc-bubble-msg {
+  border-radius: var(--qf-maersk-radius-card) !important;
+}
+
+.qf-chat-bubble.user,
+.qf-mc-bubble-msg.user {
+  border-bottom-right-radius: var(--qf-maersk-radius-button) !important;
+}
+
+.qf-chat-bubble.assistant,
+.qf-mc-bubble-msg.assistant {
+  border-bottom-left-radius: var(--qf-maersk-radius-button) !important;
+}
