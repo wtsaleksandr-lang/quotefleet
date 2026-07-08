@@ -1,0 +1,133 @@
+/* Phase BW: remove teal/cyan leftovers from auth pages. */
+body.qf-auth-wft {
+  --accent: #0d3cfc !important;
+  --accent-ink: #ffffff !important;
+  --accent-soft: rgba(13,60,252,.14) !important;
+  --primary: #0d3cfc !important;
+  --surface: #151a1c !important;
+  --surface-2: #242426 !important;
+  --ink: #f5fcff !important;
+  --ink-soft: rgba(245,252,255,.76) !important;
+  --muted: rgba(245,252,255,.55) !important;
+  --border: rgba(255,255,255,.12) !important;
+  --border-strong: rgba(255,255,255,.20) !important;
+  background: #111314 !important;
+  color: #f5fcff !important;
+}
+
+body.qf-auth-wft .topnav {
+  background: #151a1c !important;
+  border-bottom: 1px solid rgba(255,255,255,.12) !important;
+  box-shadow: none !important;
+}
+
+body.qf-auth-wft .brand-mark,
+body.qf-auth-wft .nav-link {
+  color: #f5fcff !important;
+}
+
+body.qf-auth-wft .logo {
+  background: transparent !important;
+  border: 1px solid rgba(255,255,255,.30) !important;
+  color: #f5fcff !important;
+  box-shadow: none !important;
+}
+
+body.qf-auth-wft .card.elevated {
+  background: #151a1c !important;
+  border: 1px solid rgba(255,255,255,.14) !important;
+  border-radius: 16px !important;
+  box-shadow: 0 28px 70px -55px rgba(0,0,0,.85), inset 0 1px 0 rgba(255,255,255,.04) !important;
+}
+
+body.qf-auth-wft h1 {
+  color: #f5fcff !important;
+  letter-spacing: -.045em !important;
+}
+
+body.qf-auth-wft .muted-small,
+body.qf-auth-wft .field-hint {
+  color: rgba(245,252,255,.55) !important;
+}
+
+body.qf-auth-wft .field-label {
+  color: rgba(245,252,255,.62) !important;
+}
+
+body.qf-auth-wft .notice {
+  background: rgba(13,60,252,.11) !important;
+  border: 1px solid rgba(13,60,252,.34) !important;
+  color: rgba(245,252,255,.88) !important;
+  border-radius: 12px !important;
+}
+
+body.qf-auth-wft .notice.error,
+body.qf-auth-wft .field-hint.error {
+  color: #ffd7d7 !important;
+  border-color: rgba(255,105,105,.38) !important;
+  background: rgba(255,105,105,.10) !important;
+}
+
+body.qf-auth-wft .field-hint.ok {
+  color: #9aaeff !important;
+}
+
+body.qf-auth-wft .input,
+body.qf-auth-wft .select,
+body.qf-auth-wft .url-builder-preview {
+  background: #242426 !important;
+  border-color: rgba(255,255,255,.14) !important;
+  color: #f5fcff !important;
+}
+
+body.qf-auth-wft .input:focus,
+body.qf-auth-wft .select:focus {
+  border-color: #0d3cfc !important;
+  box-shadow: 0 0 0 3px rgba(13,60,252,.22) !important;
+}
+
+body.qf-auth-wft .url-builder-preview .live,
+body.qf-auth-wft a {
+  color: #9aaeff !important;
+}
+
+body.qf-auth-wft .tabs {
+  background: #242426 !important;
+  border-color: rgba(255,255,255,.12) !important;
+}
+
+body.qf-auth-wft .tab {
+  color: rgba(245,252,255,.70) !important;
+}
+
+body.qf-auth-wft .tab.active {
+  background: #0d3cfc !important;
+  color: #ffffff !important;
+}
+
+body.qf-auth-wft .btn-primary,
+body.qf-auth-wft .btn-primary:disabled {
+  background: #0d3cfc !important;
+  border-color: #0d3cfc !important;
+  color: #ffffff !important;
+  box-shadow: none !important;
+}
+
+body.qf-auth-wft .btn-primary:disabled {
+  opacity: .46 !important;
+}
+
+body.qf-auth-wft label[style*="background:var(--surface-2)"] {
+  background: #242426 !important;
+  border-color: rgba(255,255,255,.14) !important;
+}
+
+body.qf-auth-wft .qf-mc-bubble {
+  background: #0d3cfc !important;
+  color: #ffffff !important;
+}
+
+body.qf-auth-wft .qf-mc-bubble.open {
+  background: #242426 !important;
+  color: #9aaeff !important;
+}
