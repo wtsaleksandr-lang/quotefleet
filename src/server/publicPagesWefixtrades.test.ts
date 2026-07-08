@@ -9,10 +9,11 @@ async function file(name: string) {
 }
 
 describe('WeFixTrades-style secondary public pages', () => {
-  it('mounts the shared public page skin on pricing, support, and security', async () => {
+  it('mounts the shared public page skin on pricing, support, security, and DPA', async () => {
     const pricing = await file('pricing.html');
     const support = await file('support.html');
     const security = await file('security.html');
+    const dpa = await file('dpa.html');
 
     expect(pricing).toContain('/public-pages-wefixtrades.css');
     expect(pricing).toContain('qf-public-wft');
@@ -20,6 +21,8 @@ describe('WeFixTrades-style secondary public pages', () => {
     expect(support).toContain('qf-public-wft');
     expect(security).toContain('/public-pages-wefixtrades.css');
     expect(security).toContain('qf-public-wft');
+    expect(dpa).toContain('/public-pages-wefixtrades.css');
+    expect(dpa).toContain('qf-public-wft');
   });
 
   it('keeps the shared public page skin available', async () => {
@@ -30,5 +33,6 @@ describe('WeFixTrades-style secondary public pages', () => {
     expect(css).toContain('.price-card.featured');
     expect(css).toContain('.support-card');
     expect(css).toContain('.sec-shell');
+    expect(css).toContain('.dpa-shell');
   });
 });
