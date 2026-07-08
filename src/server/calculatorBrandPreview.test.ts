@@ -14,7 +14,9 @@ describe('calculator brand preview polish', () => {
 
     expect(js).toContain('qf-demo-brand-preview-v1');
     expect(js).toContain('Customize demo branding');
+    expect(js).toContain('toggleBrandEditor');
     expect(js).toContain('qf-demo-logo-slot');
+    expect(js).toContain('Brand preview');
     expect(js).toContain('USDOT');
     expect(js).toContain('MC #');
     expect(js).toContain('FUTURE_CHARGE_RE');
@@ -26,7 +28,8 @@ describe('calculator brand preview polish', () => {
     const css = await file('public-calculator-brand-preview.css');
 
     expect(css).toContain('Phase BO');
-    expect(css).toContain('.qf-demo-brand-editor');
+    expect(css).toContain('.qf-demo-logo-slot em');
+    expect(css).toContain('.qf-demo-brand-editor[hidden]');
     expect(css).toContain('.qf-demo-brand-card');
     expect(css).toContain('.qf-acc-chip.active');
     expect(css).toContain('grid-template-columns: repeat(3, minmax(0, 1fr))');
