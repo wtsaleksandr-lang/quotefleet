@@ -1,0 +1,184 @@
+/* Phase BO: demo branding preview and cleaner add-on controls. */
+body.qf-app-calculator .qf-options-panel .qf-flags,
+body.qf-app-calculator .qf-options-panel .qf-accessorials {
+  display: grid !important;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 10px !important;
+  margin: 0 12px 12px !important;
+}
+
+body.qf-app-calculator .qf-options-panel .qf-flags label,
+body.qf-app-calculator .qf-options-panel .qf-acc-chip {
+  width: 100% !important;
+  min-height: 46px !important;
+  display: inline-flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  gap: 7px !important;
+  border: 1px solid var(--qf-app-border) !important;
+  border-radius: var(--qf-app-radius-control) !important;
+  background: var(--qf-app-card) !important;
+  color: #1f2937 !important;
+  padding: 10px 12px !important;
+  font-size: 12.5px !important;
+  font-weight: 760 !important;
+  line-height: 1.2 !important;
+  white-space: normal !important;
+  text-align: center !important;
+  box-shadow: none !important;
+}
+
+body.qf-app-calculator .qf-options-panel .qf-acc-chip.active {
+  background: var(--w-primary) !important;
+  border-color: var(--w-primary) !important;
+  color: #ffffff !important;
+}
+
+body.qf-app-calculator .qf-options-panel .qf-flags label:has(input:checked) {
+  border-color: var(--w-primary) !important;
+  color: var(--w-primary) !important;
+  background: color-mix(in srgb, var(--w-primary) 9%, white) !important;
+}
+
+body.qf-demo-brand-preview .qf-header {
+  align-items: center !important;
+  margin-bottom: 10px !important;
+}
+
+body.qf-demo-brand-preview .qf-demo-logo-slot {
+  flex: 0 0 auto;
+  width: 46px;
+  height: 46px;
+  border-radius: 17px;
+  border: 1px dashed #aab6c6;
+  background-color: #ffffff;
+  background-position: center;
+  background-size: cover;
+  background-repeat: no-repeat;
+  color: #64748b;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 5px;
+  font-size: 9.5px;
+  font-weight: 850;
+  line-height: 1.05;
+  text-align: center;
+  box-shadow: 0 8px 18px -16px rgba(15,23,42,.48);
+}
+
+body.qf-demo-brand-preview .qf-header .brand-name {
+  font-size: 18px !important;
+  letter-spacing: -0.035em;
+}
+
+.qf-demo-brand-card,
+.qf-demo-brand-editor {
+  border: 1px solid rgba(203, 213, 225, .92);
+  border-radius: var(--qf-app-radius-card, 20px);
+  background: #ffffff;
+  box-shadow: none;
+}
+
+.qf-demo-brand-card {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 7px 10px;
+  margin: 0 0 10px;
+  padding: 12px;
+}
+
+.qf-demo-brand-card span {
+  min-width: 0;
+  color: #475569;
+  font-size: 12px;
+  font-weight: 680;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.qf-demo-brand-card span::before {
+  content: '';
+  display: inline-block;
+  width: 6px;
+  height: 6px;
+  margin-right: 7px;
+  border-radius: 999px;
+  background: var(--w-primary);
+  vertical-align: 1px;
+}
+
+.qf-demo-brand-editor {
+  margin: 0 0 14px;
+  overflow: hidden;
+}
+
+.qf-demo-brand-editor summary {
+  list-style: none;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  padding: 12px 14px;
+  cursor: pointer;
+  color: #1f2937;
+  font-weight: 850;
+}
+
+.qf-demo-brand-editor summary::-webkit-details-marker { display: none; }
+
+.qf-demo-brand-editor summary small {
+  color: #94a3b8;
+  font-size: 10px;
+  font-weight: 900;
+  letter-spacing: .08em;
+  text-transform: uppercase;
+}
+
+.qf-demo-brand-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
+  padding: 0 12px 12px;
+}
+
+.qf-demo-brand-grid label {
+  display: grid;
+  gap: 5px;
+  color: #475569;
+  font-size: 11.5px;
+  font-weight: 760;
+}
+
+.qf-demo-logo-upload {
+  grid-column: 1 / -1;
+  min-height: 48px;
+  align-items: center;
+  border: 1px dashed #b8c2d0;
+  border-radius: var(--qf-app-radius-control, 15px);
+  padding: 11px 12px;
+  background: #f8fafc;
+}
+
+.qf-demo-logo-upload input {
+  font-size: 12px;
+}
+
+@media (max-width: 640px) {
+  body.qf-app-calculator .qf-options-panel .qf-flags,
+  body.qf-app-calculator .qf-options-panel .qf-accessorials,
+  .qf-demo-brand-card,
+  .qf-demo-brand-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+@media (max-width: 390px) {
+  body.qf-app-calculator .qf-options-panel .qf-flags,
+  body.qf-app-calculator .qf-options-panel .qf-accessorials,
+  .qf-demo-brand-card,
+  .qf-demo-brand-grid {
+    grid-template-columns: 1fr;
+  }
+}
