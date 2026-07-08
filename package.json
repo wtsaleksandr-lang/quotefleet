@@ -22,6 +22,7 @@
     "accessorials:seed": "tsx scripts/seed-accessorial-library.ts",
     "rates:import": "tsx scripts/import-rates.ts",
     "quotes:recent": "tsx scripts/list-recent-quotes.ts",
+    "prod:check": "tsx scripts/check-production-readiness.ts",
     "deploy:replit": "pnpm install && pnpm db:migrate && pnpm db:seed && pnpm start"
   },
   "dependencies": {
