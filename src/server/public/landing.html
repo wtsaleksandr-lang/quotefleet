@@ -3,8 +3,8 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>QuoteFleet — Freight quote software for carriers and forwarders</title>
-  <meta name="description" content="QuoteFleet gives trucking, drayage, forwarding, and logistics teams a branded freight quote calculator, hosted quote pages, follow-up tools, and operational quote workflows. Start sharing live rates in one day.">
+  <title>QuoteFleet — Branded rate pages for trucking service providers</title>
+  <meta name="description" content="Get a branded rate calculator page customers can open anytime. No website changes, no heavy setup, optional AI chat, and branded PDF quotes.">
   <meta property="og:title" content="QuoteFleet — Start sharing live rates in one day">
   <meta property="og:description" content="Your own branded rate page for trucking services. Share by link, email signature, or customer message.">
   <meta property="og:type" content="website">
@@ -17,92 +17,62 @@
   <script>document.documentElement.classList.add('js');</script>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&family=JetBrains+Mono:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="/style.css">
   <link rel="stylesheet" href="/landing-conversion.css">
   <link rel="stylesheet" href="/landing-s-polish.css">
   <link rel="stylesheet" href="/landing-wefixtrades.css">
 </head>
 <body class="landing-v2 qf-wft">
-  <div hidden aria-hidden="true" data-landing-compat="true">For trucking service providers · Start sharing live rates in one day. · How it works · Use it your way · Optional AI chat · Customer experience · FAQ · Ready when you are · site-header · site-brand · premium-footer · hero visual-hero · final-cta-card</div>
-  <header class="wft-nav">
-    <div class="wft-nav-inner">
-      <a href="/" class="wft-brand" aria-label="QuoteFleet home"><span class="wft-logo" aria-hidden="true">QF</span><span>QuoteFleet</span></a>
-      <nav class="wft-nav-links" aria-label="Main navigation">
-        <a href="#products" class="is-active">Products <span>×</span></a>
-        <a href="#tools">Free tools <span>+</span></a>
-        <a href="#solutions">Solutions <span>+</span></a>
-        <a href="/pricing">Pricing</a>
-        <a href="#resources">Resources <span>+</span></a>
-      </nav>
-      <div class="wft-nav-actions"><a href="/login">Login</a><a href="/signup" class="wft-btn wft-btn-light">Start free — no card</a><a href="/w/demo" class="wft-btn wft-btn-dark">See it live</a></div>
+  <header class="site-header">
+    <div class="site-header-inner">
+      <a href="/" class="site-brand" aria-label="QuoteFleet home"><span class="site-logo" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M3 17h2a3 3 0 0 0 3-3V7H3z"/><path d="M14 7h6l1 4v6h-3"/><circle cx="7" cy="17" r="2"/><circle cx="17" cy="17" r="2"/></svg></span>QuoteFleet</a>
+      <nav class="site-nav" aria-label="Main navigation"><a href="#how">How it works</a><a href="/w/demo">Demo</a><a href="#faq">FAQ</a></nav>
+      <div class="site-actions"><a class="signin" href="/login">Sign in</a><a class="btn btn-primary" href="/signup">Start free <span class="arr">→</span></a></div>
     </div>
   </header>
 
-  <main class="wft-main">
-    <section class="wft-hero" id="top">
-      <div class="wft-shell">
-        <div class="wft-hero-grid">
-          <div class="wft-hero-copy">
-            <span class="wft-kicker">Built for freight rate desks</span>
-            <h1>Quote faster with a branded freight rate platform.</h1>
-            <p>QuoteFleet turns your rates, accessorials, drayage lanes, and customer follow-up into a polished quote workflow customers can trust.</p>
-            <div class="wft-hero-actions"><a class="wft-cta-primary" href="/signup">Start free →</a><a class="wft-cta-secondary" href="/w/demo">Open calculator demo →</a></div>
-            <div class="wft-micro-row"><span>No website rebuild</span><span>Hosted rate page</span><span>PDF quote flow</span></div>
-          </div>
-          <div class="wft-preview-card" aria-label="QuoteFleet product preview">
-            <div class="wft-preview-top"><span>QUOTE WORKSPACE</span><b>Live</b></div>
-            <div class="wft-route-card"><small>ROUTE</small><strong>Port of Long Beach → Chicago, IL</strong><span>40' container · drayage · 38,000 lbs</span></div>
-            <div class="wft-preview-grid"><div><small>Matched rate</small><b>$2,840</b></div><div><small>Confidence</small><b>High</b></div><div><small>Next step</small><b>PDF quote</b></div></div>
-            <div class="wft-progress"><span></span></div>
-            <div class="wft-preview-foot"><span>Terminal check</span><span>Accessorial review</span><span>Team follow-up</span></div>
-          </div>
+  <main>
+    <section class="hero visual-hero">
+      <div class="hero-grid">
+        <div class="hero-copy">
+          <div class="eyebrow">For trucking service providers</div>
+          <h1>Start sharing live rates in one day.</h1>
+          <p class="lead">No website changes needed. No heavy setup. Just your own branded page that customers can open anytime.</p>
+          <div class="hero-cta"><a class="btn btn-primary btn-lg" href="/signup">Start free <span class="arr">→</span></a><a class="demo-link" href="#how">See how it works <span class="arr">↓</span></a></div>
+          <p class="micro-copy">No contracts · Share by link · Optional AI chat</p>
+          <div class="hero-quick-points"><span>Add to email signature</span><span>Use it yourself</span><span>Send branded PDFs</span><span>Schedule follow-ups</span></div>
+        </div>
+
+        <div class="visual-flow" aria-label="Rate page visual explanation">
+          <div class="flow-card flow-rates"><div class="flow-icon">1</div><span class="flow-label">Your rates</span><strong>Load once</strong><div class="mini-rate-table"><span>Lane rules</span><b>$</b><span>Add-ons</span><b>+</b><span>Special charges</span><b>✓</b></div></div>
+          <div class="flow-arrow" aria-hidden="true"></div>
+          <div class="flow-card flow-page"><div class="flow-icon">2</div><span class="flow-label">Your page</span><strong>acmetrucking.yourquote.net</strong><div class="mini-browser"><div></div><p>Acme Trucking Rates</p><span>Pickup</span><span>Delivery</span><button>Check rate</button></div></div>
+          <div class="flow-arrow" aria-hidden="true"></div>
+          <div class="flow-card flow-customer"><div class="flow-icon">3</div><span class="flow-label">Customer view</span><strong>Rate + next steps</strong><div class="mini-result"><span>Estimated total</span><b>$371.11</b></div><div class="mini-actions"><span>PDF quote</span><span>AI chat</span><span>Follow-up</span></div></div>
+          <div class="floating-note note-one">Add to email signature</div><div class="floating-note note-two">Use it yourself</div><div class="floating-note note-three">Send branded PDF</div>
         </div>
       </div>
     </section>
 
-    <section class="wft-section" id="products">
-      <div class="wft-shell wft-product-suite">
-        <div class="wft-section-label">Built by QuoteFleet</div>
-        <div class="wft-feature-grid">
-          <a class="wft-product-card large" href="/w/demo"><div><h3>RatePage™</h3><p>Hosted branded freight calculator for trucking, drayage, LTL, and expedited quote requests.</p></div><div class="wft-card-visual rate"><span>Pickup</span><span>Delivery</span><button>Check rate</button></div><b>Open →</b></a>
-          <a class="wft-product-card large" href="/quote-demo.html"><div><h3>QuoteDoc™</h3><p>Cleaner quote presentation with print/PDF workflow and customer-facing next steps.</p></div><div class="wft-card-visual doc"><span>ACME TRUCKING</span><strong>$371.11</strong><em>Send branded PDF</em></div><b>Open →</b></a>
-          <a class="wft-product-card large" href="/app"><div><h3>RateDesk™</h3><p>Dashboard tools for rate cards, accessorials, zones, brand setup, leads, callbacks, and quote follow-up.</p></div><div class="wft-card-visual desk"><i></i><i></i><i></i></div><b>Open →</b></a>
-          <a class="wft-product-card" href="/marketplace/"><span class="wft-icon">▤</span><div><h3>MarketBench</h3><p>Carrier marketplace and benchmark surfaces.</p></div></a>
-          <a class="wft-product-card" href="/app/rates"><span class="wft-icon">$</span><div><h3>RateBuilder</h3><p>Build and maintain rate cards without spreadsheet chaos.</p></div></a>
-          <a class="wft-product-card" href="/app/accessorials"><span class="wft-icon">+</span><div><h3>Accessorial Library</h3><p>Control optional and automatic charges by service.</p></div></a>
-          <a class="wft-product-card" href="/app/zones"><span class="wft-icon">⌖</span><div><h3>Lane Zones</h3><p>Map ports, regions, ZIPs, and lane rules into sellable quote logic.</p></div></a>
-          <a class="wft-product-card" href="/app/ai"><span class="wft-icon">AI</span><div><h3>FollowUp AI</h3><p>Guardrailed customer questions, callback suggestions, and quote next steps.</p></div></a>
-          <a class="wft-product-card" href="/support"><span class="wft-icon">?</span><div><h3>Support Desk</h3><p>Support, security, data, and launch contact surfaces.</p></div></a>
-        </div>
-        <div class="wft-suite-actions"><a href="/w/demo">Compare all products →</a><a href="/pricing">See pricing →</a></div>
-      </div>
-    </section>
+    <section class="section how-section" id="how" data-reveal><div class="container"><div class="section-head light-head"><span class="section-kicker">How it works</span><h2>Set it up once. Share it anytime.</h2></div><div class="simple-steps"><div class="simple-step"><div class="step-art sheet-art"><span></span><span></span><span></span></div><strong>Add your rates</strong><p>We help load your pricing rules.</p></div><div class="simple-step"><div class="step-art link-art">companyname.yourquote.net</div><strong>Get your own page</strong><p>Your branded link is ready to use.</p></div><div class="simple-step"><div class="step-art signature-art"><b>Email signature</b><span>Check rates here →</span></div><strong>Share it</strong><p>Email signature, website, message, or direct link.</p></div><div class="simple-step"><div class="step-art chat-art"><span>Does this include chassis?</span><b>Ask AI chat</b></div><strong>Let customers check anytime</strong><p>They can get rates and ask questions.</p></div></div></div></section>
 
-    <section class="wft-section wft-split" id="solutions">
-      <div class="wft-shell wft-two-col">
-        <div><span class="wft-kicker">Solutions</span><h2>For freight teams that need quotes to look as serious as their operation.</h2><p>Use QuoteFleet as a customer-facing quote calculator, an internal rate desk tool, or a branded quote follow-up workflow.</p></div>
-        <div class="wft-solution-list"><div><b>Drayage carriers</b><span>Ports, terminals, container types, gensets, hazmat, and OOG review.</span></div><div><b>Truckload teams</b><span>FTL, expedited, hotshot, accessorials, and customer-ready estimates.</span></div><div><b>Forwarders and brokers</b><span>Hosted quote pages, PDF quote presentation, and customer follow-up.</span></div></div>
-      </div>
-    </section>
+    <section class="section use-section section-alt" data-reveal><div class="container"><div class="section-head light-head"><span class="section-kicker">Use it your way</span><h2>Start with a link. Add it to your site later if you want.</h2></div><div class="use-grid"><div class="use-card"><span class="use-badge">01</span><strong>Standalone page</strong><p>Use your own branded link from day one.</p><div class="url-chip">acmetrucking.yourquote.net</div></div><div class="use-card"><span class="use-badge">02</span><strong>On your website</strong><p>Add the calculator later if you want it on your existing site.</p><div class="site-mini"><span>Home</span><span>Services</span><b>Rate calculator</b></div></div><div class="use-card"><span class="use-badge">03</span><strong>Share directly</strong><p>Send it to repeat customers, quote requests, and potential clients.</p><div class="email-mini"><b>Best, Acme Trucking</b><span>Check rates → yourquote.net</span></div></div></div></div></section>
 
-    <section class="wft-section" id="tools">
-      <div class="wft-shell">
-        <div class="wft-section-head"><span class="wft-kicker">Free tools</span><h2>Start with the calculator. Add the rate desk later.</h2></div>
-        <div class="wft-tool-grid"><a href="/w/demo">Calculator demo</a><a href="/quote-demo.html">Quote document demo</a><a href="/tools">Freight tools hub</a><a href="/support">Launch support</a></div>
-      </div>
-    </section>
+    <section class="section ai-section" data-reveal><div class="container"><div class="ai-layout"><div class="ai-copy"><span class="section-kicker">Optional AI chat</span><h2>Answer common questions right on the calculator page.</h2><p>Train the assistant around how you want customers guided. It can answer simple questions, explain add-ons, and point people to callback or written quote steps.</p><div class="mini-checks"><span>Custom instructions</span><span>Customer questions</span><span>Callback guidance</span></div></div><div class="chat-demo" aria-label="AI chat example"><div class="chat-head"><b>Acme Trucking AI</b><span>online</span></div><div class="bubble customer">Does this include chassis rental?</div><div class="typing"><i></i><i></i><i></i></div><div class="bubble assistant">It can be included depending on the lane and settings. You can also request a callback here.</div><div class="bubble customer">Can I send exact pickup details?</div><div class="bubble assistant">Yes. Submit the request and add notes for the team.</div></div></div></div></section>
 
-    <section class="wft-section wft-final">
-      <div class="wft-shell wft-final-card"><div><span class="wft-kicker">Ready when you are</span><h2>Give customers a quote experience that looks expensive.</h2><p>Start with a hosted calculator link, then add quote documents, callbacks, AI guidance, and dashboard workflows as you grow.</p></div><div class="wft-final-actions"><a class="wft-cta-primary" href="/signup">Start free →</a><a class="wft-cta-secondary" href="/w/demo">See it live →</a></div></div>
-    </section>
+    <section class="section section-alt compare-simple-section" data-reveal><div class="container"><div class="section-head light-head"><span class="section-kicker">Customer experience</span><h2>A simpler way to answer rate requests.</h2></div><div class="simple-compare"><div class="compare-card muted-card"><h3>Manual way</h3><ul><li>Customer asks for a rate</li><li>You check the lane manually</li><li>You answer follow-up questions</li><li>You repeat it again next time</li></ul></div><div class="compare-card bright-card"><h3>With QuoteFleet</h3><ul><li>Customer opens your link</li><li>They check rates anytime</li><li>AI chat can answer basics</li><li>You can send a branded PDF quote</li></ul></div></div></div></section>
+
+    <section class="section pdf-section" data-reveal><div class="container"><div class="pdf-layout"><div class="pdf-card" aria-label="Branded PDF quote visual"><div class="pdf-top"><span>ACME TRUCKING</span><b>Quote QF-1048</b></div><div class="pdf-route"><strong>Chicago, IL</strong><i></i><strong>Roselle, IL</strong></div><div class="pdf-lines"><span>Linehaul</span><b>$278.81</b><span>Chassis</span><b>$80.00</b><span>Total</span><b>$371.11</b></div><button>Send branded PDF</button></div><div class="pdf-copy"><span class="section-kicker">Use it manually too</span><h2>Need to send the quote yourself? Create a branded PDF.</h2><p>Use the calculator internally, then send a cleaner quote instead of a plain-text email.</p></div></div></div></section>
+
+    <section class="section scheduler-section" data-reveal><div class="container"><div class="scheduler-layout"><div class="scheduler-copy"><span class="section-kicker">Follow-up reminders</span><h2>Do not let a warm quote go cold.</h2><p>When someone checks a rate, opens the quote, or asks a question, you can keep the next step visible for your team without using a complicated CRM.</p><div class="share-strip"><span>Email reminder</span><span>Callback note</span><span>Quote activity</span></div></div><div class="scheduler-card" aria-label="Follow-up scheduler visual"><div class="scheduler-top"><strong>Follow-up queue</strong><span>Today</span></div><div class="scheduler-row"><div class="scheduler-dot">1</div><div><b>Call Acme Foods</b><small>Opened rate page twice</small></div><em>10:30 AM</em></div><div class="scheduler-row"><div class="scheduler-dot">2</div><div><b>Send PDF quote</b><small>Chicago → Roselle lane</small></div><em>After lunch</em></div><div class="scheduler-row"><div class="scheduler-dot">3</div><div><b>Reply to chat question</b><small>Asked about chassis rental</small></div><em>Open</em></div></div></div></div></section>
+
+    <section class="section" id="faq" data-reveal><div class="container"><div class="section-head light-head"><span class="section-kicker">FAQ</span><h2>Simple answers before you start.</h2></div><div class="faq-grid"><div class="faq-item"><strong>Do I need a website?</strong><p>No. You can start with your own branded link and share it directly.</p></div><div class="faq-item"><strong>Can I add it to my website later?</strong><p>Yes. Start with the hosted page first, then embed it whenever you want.</p></div><div class="faq-item"><strong>Do customers need an account?</strong><p>No. They simply open your page and use it.</p></div><div class="faq-item"><strong>Can the page match my company branding?</strong><p>Yes. The hosted page can be customized for your company style.</p></div><div class="faq-item"><strong>Can customers ask questions?</strong><p>Yes. An optional AI chat widget can answer questions and guide next steps.</p></div><div class="faq-item"><strong>Do I need a contract or complicated setup?</strong><p>No. It is designed to be quick to start and easy to use.</p></div><div class="faq-item"><strong>Can I control who gets access?</strong><p>Yes. You decide how and with whom the calculator link is shared.</p></div><div class="faq-item"><strong>Are my rates shown publicly?</strong><p>No. Your calculator is shared only through the links and access you choose.</p></div></div></div></section>
+
+    <section class="section final-section" data-reveal><div class="container"><div class="final-cta-card"><span class="section-kicker">Ready when you are</span><h2>Start sharing your own rate page.</h2><p>Get your branded page live fast and start sharing it right away.</p><div class="final-actions"><a class="btn btn-primary btn-lg" href="/signup">Start free <span class="arr">→</span></a><a class="demo-link final-demo" href="/w/demo">See demo <span class="arr">→</span></a></div><p class="micro-copy">No contracts · No website changes needed · Optional AI chat</p></div></div></section>
   </main>
 
-  <footer class="wft-footer" id="resources">
-    <div class="wft-footer-brand"><a href="/" class="wft-brand"><span class="wft-logo">QF</span><span>QuoteFleet</span></a><p>Freight quote calculators, quote documents, and rate desk workflows for logistics teams.</p></div>
-    <div class="wft-footer-grid"><div><h4>Products</h4><a href="/w/demo">RatePage™</a><a href="/quote-demo.html">QuoteDoc™</a><a href="/app">RateDesk™</a><a href="/marketplace/">MarketBench</a></div><div><h4>Solutions</h4><a href="/for/brokers">Brokers</a><a href="/for/ltl">LTL carriers</a><a href="/for/forwarders">Forwarders</a><a href="/w/demo">Drayage teams</a></div><div><h4>Resources</h4><a href="/pricing">Pricing</a><a href="/support">Support</a><a href="/security">Security</a><a href="/dpa">DPA</a></div><div><h4>Free Tools</h4><a href="/tools">All free tools</a><a href="/w/demo">Quote demo</a><a href="/quote-demo.html">PDF quote demo</a></div><div><h4>Company</h4><a href="mailto:hello@quotefleet.net">Contact sales</a><a href="/login">Login</a><a href="/signup">Start free</a></div><div><h4>Legal</h4><a href="/.well-known/security.txt">security.txt</a><a href="mailto:security@quotefleet.net">Report issue</a></div></div>
-    <div class="wft-footer-bottom"><span>© <span id="year"></span> QuoteFleet. All rights reserved.</span><span>Operated by <strong>MR Holdings &amp; Trade LLC</strong>.</span></div>
-  </footer>
+  <footer class="premium-footer"><div class="premium-footer-inner"><div class="footer-brand"><a href="/" class="site-brand" aria-label="QuoteFleet home"><span class="site-logo" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M3 17h2a3 3 0 0 0 3-3V7H3z"/><path d="M14 7h6l1 4v6h-3"/><circle cx="7" cy="17" r="2"/><circle cx="17" cy="17" r="2"/></svg></span>QuoteFleet</a><p>Branded rate calculator pages, PDF quotes, and optional AI chat for trucking service providers.</p></div><div class="footer-col"><h4>Product</h4><a href="/w/demo">Demo</a><a href="/signup">Start free</a><a href="#faq">FAQ</a></div><div class="footer-col"><h4>Company</h4><a href="mailto:hello@quotefleet.net">Contact</a><a href="/login">Sign in</a><a href="/security">Security</a></div><div class="footer-col"><h4>Legal</h4><a href="/dpa">DPA</a><a href="/.well-known/security.txt">security.txt</a><a href="mailto:security@quotefleet.net">Report security issue</a></div></div><div class="footer-bottom"><span>© <span id="year"></span> QuoteFleet. All rights reserved.</span><span>QuoteFleet is operated by <strong>MR Holdings &amp; Trade LLC</strong>.</span></div></footer>
 
   <script src="/landing-motion.js" defer></script>
   <script>document.getElementById('year').textContent = new Date().getFullYear();</script>
