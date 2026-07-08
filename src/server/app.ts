@@ -40,9 +40,10 @@ function allowsExternalFraming(req: express.Request): boolean {
 
 function applyPageSkin(html: string, extraCss: string[], bodyClass: string): string {
   const styles = extraCss.map((href) => `  <link rel="stylesheet" href="${href}">`).join('\n');
+  const classes = ['qf-public-wft', bodyClass].filter(Boolean).join(' ');
   return html
     .replace('<link rel="stylesheet" href="/style.css">', `<link rel="stylesheet" href="/style.css">\n  <link rel="stylesheet" href="/public-pages-wefixtrades.css">\n${styles}`)
-    .replace('<body>', `<body class="qf-public-wft ${bodyClass}">`);
+    .replace('<body>', `<body class="${classes}">`);
 }
 
 function applyDpaPageSkin(html: string): string {
