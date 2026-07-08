@@ -1,0 +1,126 @@
+/* Phase BT: WeFixTrades-style skin for tools and marketplace public pages. */
+.qf-public-wft.qf-tools-marketplace .hero {
+  text-align: left;
+  padding: 58px 28px 34px;
+}
+
+.qf-public-wft.qf-tools-marketplace .hero .container-narrow {
+  max-width: 980px;
+}
+
+.qf-public-wft.qf-tools-marketplace .hero h1 {
+  max-width: 860px;
+  color: var(--qf-wft-text);
+  font-size: clamp(38px, 5.8vw, 64px) !important;
+  font-weight: 900;
+  line-height: 1;
+  letter-spacing: -.055em;
+}
+
+.qf-public-wft.qf-tools-marketplace .hero p.lead {
+  margin-left: 0;
+  color: var(--qf-wft-muted);
+}
+
+.qf-public-wft.qf-tools-marketplace .tool-shell,
+.qf-public-wft.qf-tools-marketplace .mp-shell {
+  position: relative;
+  z-index: 1;
+}
+
+.qf-public-wft.qf-tools-marketplace .tool-card,
+.qf-public-wft.qf-tools-marketplace .mp-card,
+.qf-public-wft.qf-tools-marketplace .mp-empty,
+.qf-public-wft.qf-tools-marketplace #qf-result-card {
+  background: rgba(17,24,23,.92) !important;
+  border: 1px solid var(--qf-wft-line) !important;
+  border-radius: var(--qf-wft-radius) !important;
+  box-shadow: 0 28px 70px -55px rgba(0,0,0,.85), inset 0 1px 0 rgba(255,255,255,.04) !important;
+}
+
+.qf-public-wft.qf-tools-marketplace .mp-card {
+  transition: transform .16s ease, border-color .16s ease, background .16s ease;
+}
+
+.qf-public-wft.qf-tools-marketplace .mp-card:hover {
+  transform: translateY(-2px);
+  border-color: var(--qf-wft-line-strong) !important;
+  background: rgba(21,29,28,.96) !important;
+}
+
+.qf-public-wft.qf-tools-marketplace .field-label,
+.qf-public-wft.qf-tools-marketplace .mp-meta,
+.qf-public-wft.qf-tools-marketplace .tag {
+  color: var(--qf-wft-faint) !important;
+}
+
+.qf-public-wft.qf-tools-marketplace .input,
+.qf-public-wft.qf-tools-marketplace .select,
+.qf-public-wft.qf-tools-marketplace .typeahead-list {
+  background: rgba(255,255,255,.035) !important;
+  border-color: var(--qf-wft-line) !important;
+  color: var(--qf-wft-text) !important;
+  border-radius: 12px !important;
+}
+
+.qf-public-wft.qf-tools-marketplace .input:focus,
+.qf-public-wft.qf-tools-marketplace .select:focus {
+  border-color: var(--qf-wft-blue) !important;
+  box-shadow: 0 0 0 3px rgba(13,60,252,.22) !important;
+}
+
+.qf-public-wft.qf-tools-marketplace .chip,
+.qf-public-wft.qf-tools-marketplace .mp-pill {
+  border-radius: 10px !important;
+  border: 1px solid var(--qf-wft-line) !important;
+  background: rgba(255,255,255,.04) !important;
+  color: var(--qf-wft-muted) !important;
+}
+
+.qf-public-wft.qf-tools-marketplace .chip.active {
+  background: var(--qf-wft-cream) !important;
+  border-color: var(--qf-wft-cream) !important;
+  color: #171b1d !important;
+}
+
+.qf-public-wft.qf-tools-marketplace .res-total,
+.qf-public-wft.qf-tools-marketplace .res-line.total,
+.qf-public-wft.qf-tools-marketplace .mp-card h3,
+.qf-public-wft.qf-tools-marketplace #c-name,
+.qf-public-wft.qf-tools-marketplace .mp-card h2 {
+  color: var(--qf-wft-text) !important;
+}
+
+.qf-public-wft.qf-tools-marketplace .res-line,
+.qf-public-wft.qf-tools-marketplace .rate-row,
+.qf-public-wft.qf-tools-marketplace .disclaimer,
+.qf-public-wft.qf-tools-marketplace .muted,
+.qf-public-wft.qf-tools-marketplace .muted-small {
+  color: var(--qf-wft-muted) !important;
+  border-color: var(--qf-wft-line) !important;
+}
+
+.qf-public-wft.qf-tools-marketplace .rate-row .val,
+.qf-public-wft.qf-tools-marketplace .benchmark {
+  color: var(--qf-wft-text) !important;
+}
+
+.qf-public-wft.qf-tools-marketplace .benchmark {
+  background: rgba(13,60,252,.16) !important;
+  border: 1px solid rgba(13,60,252,.25);
+}
+
+.qf-public-wft.qf-tools-marketplace .tool-tip-bubble {
+  background: #22282a !important;
+  border: 1px solid var(--qf-wft-line);
+}
+
+.qf-public-wft.qf-tools-marketplace .tool-tip-bubble::before {
+  background: #22282a !important;
+}
+
+@media (max-width: 720px) {
+  .qf-public-wft.qf-tools-marketplace .mp-filters {
+    grid-template-columns: 1fr !important;
+  }
+}
