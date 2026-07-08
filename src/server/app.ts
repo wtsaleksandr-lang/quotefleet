@@ -123,6 +123,7 @@ export function createApp(): express.Express {
   app.get('/login', (_req, res) => res.sendFile(resolve(publicDir, 'login.html')));
   app.get('/signup', (_req, res) => res.sendFile(resolve(publicDir, 'signup.html')));
   app.get('/pricing', (_req, res) => res.sendFile(resolve(publicDir, 'pricing.html')));
+  app.get('/support', (_req, res) => res.sendFile(resolve(publicDir, 'support.html')));
   app.get('/security', (_req, res) => res.sendFile(resolve(publicDir, 'security.html')));
   app.get('/dpa', (_req, res) => res.sendFile(resolve(publicDir, 'dpa.html')));
   app.get('/.well-known/security.txt', (_req, res) => {
