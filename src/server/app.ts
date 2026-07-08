@@ -90,30 +90,14 @@ export function createApp(): express.Express {
   registerQuoteActivityRoutes(app);
   registerCarrierProfileRoutes(app);
 
-  app.get('/healthz', async (_req, res) => {
+  app.get(['/healthz', '/api/health'], async (_req, res) => {
     const time = new Date().toISOString();
     try {
-      const r = await db().select({ id: tenants.id }).from(tenants).limit(1);
-      return res.json({ ok: true, time, db: 'up', tenantsRows: r.length });
+      await db().select({ id: tenants.id }).from(tenants).limit(1);
+      return res.json({ ok: true, status: 'up', db: 'up', time });
     } catch (err) {
-      console.error('[healthz] db ping failed:', err);
-      const e = err as any;
-      const detail = {
-        name: e?.name,
-        message: e?.message,
-        code: e?.code,
-        severity: e?.severity,
-        causeName: e?.cause?.name,
-        causeMessage: e?.cause?.message,
-        causeCode: e?.cause?.code,
-        errno: e?.errno,
-        syscall: e?.syscall,
-        hostname: e?.hostname,
-        dbUrlSet: !!process.env.DATABASE_URL,
-        dbUrlScheme: (process.env.DATABASE_URL || '').split(':')[0],
-        dbUrlHasHost: /@[^/]+\//.test(process.env.DATABASE_URL || ''),
-      };
-      res.status(503).json({ ok: false, db: 'down', time, error: detail });
+      console.error('[health] db ping failed:', err);
+      return res.status(503).json({ ok: false, status: 'down', db: 'down', time });
     }
   });
 
