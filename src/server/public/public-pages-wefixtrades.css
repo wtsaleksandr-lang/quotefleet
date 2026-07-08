@@ -13,7 +13,7 @@
   --qf-wft-faint: rgba(245,252,255,.46);
   --qf-wft-blue: #0d3cfc;
   --qf-wft-cream: #f3eee6;
-  --qf-wft-radius: 16px;
+  --qf-wft-radius: 8px;
   background:
     radial-gradient(circle at 18% -8%, rgba(13,60,252,.16), transparent 26%),
     linear-gradient(180deg, #0b1110 0%, #0c1212 48%, #0a0f0f 100%);
@@ -36,7 +36,7 @@
   position: relative;
   background: transparent;
   border: 2px solid #dfe9f2;
-  border-radius: 5px;
+  border-radius: 4px;
   box-shadow: none;
   color: transparent;
 }
@@ -69,14 +69,14 @@
   color: #171b1d;
   border-color: var(--qf-wft-cream);
   box-shadow: none;
-  border-radius: 10px;
+  border-radius: 4px;
 }
 .qf-public-wft .btn-primary .arr { color: #171b1d; }
 .qf-public-wft .btn-secondary {
   background: rgba(255,255,255,.03);
   border-color: var(--qf-wft-line-strong);
   color: var(--qf-wft-text);
-  border-radius: 10px;
+  border-radius: 4px;
 }
 .qf-public-wft .hero {
   padding-top: 58px;
