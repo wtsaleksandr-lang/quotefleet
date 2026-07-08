@@ -38,6 +38,15 @@ function allowsExternalFraming(req: express.Request): boolean {
   );
 }
 
+function applyDpaPageSkin(html: string): string {
+  return html
+    .replace(
+      '<link rel="stylesheet" href="/style.css">',
+      '<link rel="stylesheet" href="/style.css">\n  <link rel="stylesheet" href="/public-pages-wefixtrades.css">\n  <link rel="stylesheet" href="/dpa-wefixtrades.css">',
+    )
+    .replace('<body>', '<body class="qf-public-wft">');
+}
+
 export function createApp(): express.Express {
   const app = express();
   app.set('trust proxy', 1);
@@ -102,6 +111,11 @@ export function createApp(): express.Express {
   });
 
   const publicDir = resolve(process.cwd(), 'src/server/public');
+  app.get('/dpa', (_req, res, next) => {
+    readFile(resolve(publicDir, 'dpa.html'), 'utf8')
+      .then((html) => res.type('html').send(applyDpaPageSkin(html)))
+      .catch(next);
+  });
   app.use(express.static(publicDir, { index: false, extensions: ['html'] }));
 
   app.get('/', (req, res, next) => {
@@ -125,7 +139,6 @@ export function createApp(): express.Express {
   app.get('/pricing', (_req, res) => res.sendFile(resolve(publicDir, 'pricing.html')));
   app.get('/support', (_req, res) => res.sendFile(resolve(publicDir, 'support.html')));
   app.get('/security', (_req, res) => res.sendFile(resolve(publicDir, 'security.html')));
-  app.get('/dpa', (_req, res) => res.sendFile(resolve(publicDir, 'dpa.html')));
   app.get('/.well-known/security.txt', (_req, res) => {
     res.type('text/plain').send([
       'Contact: mailto:security@quotefleet.net',
