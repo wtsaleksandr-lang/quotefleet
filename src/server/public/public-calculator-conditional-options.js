@@ -1,16 +1,30 @@
 (() => {
   function $(id) { return document.getElementById(id); }
-  function loadStylesheet() {
-    if (document.querySelector('link[href="/public-calculator-mobile-cleanup.css"]')) return;
+  function loadStylesheet(href) {
+    if (document.querySelector('link[href="' + href + '"]')) return;
     const link = document.createElement('link');
     link.rel = 'stylesheet';
-    link.href = '/public-calculator-mobile-cleanup.css';
+    link.href = href;
     document.head.appendChild(link);
+  }
+  function simplifyHeader() {
+    document.body.classList.add('qf-app-calculator');
+    const header = $('qf-header');
+    const name = header && header.querySelector('.brand-name');
+    if (name) {
+      const current = (name.textContent || '').trim();
+      if (!current || /^demo\b/i.test(current) || /drayage\s*&\s*trucking/i.test(current)) {
+        name.textContent = 'Instant rate';
+      }
+    }
+    const tagline = $('qf-tagline');
+    if (tagline) tagline.textContent = '';
   }
   function isReefer(value, label) {
     return /reefer|refrigerated/i.test(String(value || '') + ' ' + String(label || ''));
   }
   function sync() {
+    simplifyHeader();
     const equipment = $('qf-equipment');
     const genset = $('qf-genset-panel');
     const hazmat = $('qf-hazmat');
@@ -29,11 +43,14 @@
       if (window.parent && window.parent !== window) window.parent.postMessage({ type: 'QF_WIDGET_HEIGHT', height: document.documentElement.scrollHeight }, '*');
     } catch (_) {}
   }
-  loadStylesheet();
+  loadStylesheet('/public-calculator-mobile-cleanup.css');
+  loadStylesheet('/public-calculator-app-style.css');
+  simplifyHeader();
   document.addEventListener('change', (event) => {
     if (event.target && ['qf-equipment', 'qf-hazmat'].includes(event.target.id)) sync();
   });
   new MutationObserver(sync).observe(document.body, { childList: true, subtree: true });
-  setTimeout(sync, 250);
+  setTimeout(sync, 100);
+  setTimeout(sync, 450);
   setTimeout(sync, 900);
 })();
