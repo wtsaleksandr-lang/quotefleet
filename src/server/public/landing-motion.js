@@ -1,4 +1,12 @@
 (() => {
+  const cleanupHref = '/landing-wefixtrades-cleanup.css';
+  if (!document.querySelector('link[href="' + cleanupHref + '"]')) {
+    const link = document.createElement('link');
+    link.rel = 'stylesheet';
+    link.href = cleanupHref;
+    document.head.appendChild(link);
+  }
+
   const reduceMotion = window.matchMedia?.('(prefers-reduced-motion: reduce)').matches;
   const items = document.querySelectorAll('[data-reveal]');
   if (!items.length) return;
