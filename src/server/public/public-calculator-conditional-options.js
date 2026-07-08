@@ -1,6 +1,19 @@
 (() => {
   const DEMO_BRAND_KEY = 'qf-demo-brand-preview-v1';
   const FUTURE_CHARGE_RE = /\bdetention\b|\blayover\b|\btonu\b|truck ordered|waiting time|wait time/i;
+  const PREVIEW_HOST_RE = /(^localhost$|\.localhost$|\.replit\.dev$|\.repl\.co$|\.picard\.replit\.dev$)/i;
+
+  function shouldRedirectPreviewToDemo() {
+    if (window.QF_TENANT_SLUG) return false;
+    if (/^\/w\//i.test(location.pathname)) return false;
+    if (!PREVIEW_HOST_RE.test(location.hostname)) return false;
+    return true;
+  }
+
+  if (shouldRedirectPreviewToDemo()) {
+    location.replace('/w/demo' + location.search + location.hash);
+    return;
+  }
 
   function $(id) { return document.getElementById(id); }
   function loadStylesheet(href) {
@@ -50,16 +63,16 @@
     const data = readBrand();
     const header = $('qf-header');
     const name = header && header.querySelector('.brand-name');
-    if (name) name.textContent = data.name || 'Your company name';
+    if (name && name.textContent !== (data.name || 'Your company name')) name.textContent = data.name || 'Your company name';
     if (header) {
       header.querySelectorAll('img').forEach((img) => img.style.display = 'none');
       const slot = ensureLogoSlot(header);
       if (data.logo) {
-        slot.textContent = '';
-        slot.style.backgroundImage = 'url(' + data.logo + ')';
+        if (slot.textContent) slot.textContent = '';
+        if (slot.style.backgroundImage !== 'url("' + data.logo + '")') slot.style.backgroundImage = 'url(' + data.logo + ')';
       } else {
-        slot.textContent = 'Your logo';
-        slot.style.backgroundImage = '';
+        if (slot.textContent !== 'Your logo') slot.textContent = 'Your logo';
+        if (slot.style.backgroundImage) slot.style.backgroundImage = '';
       }
     }
     renderBrandTrust(data);
@@ -75,12 +88,13 @@
       header.insertAdjacentElement('afterend', card);
     }
     const mcText = [data.usdot, data.mc].filter(Boolean).join(' · ');
-    card.innerHTML = [
+    const nextHtml = [
       data.phone ? '<span>' + escapeHtml(data.phone) + '</span>' : '',
       data.email ? '<span>' + escapeHtml(data.email) + '</span>' : '',
       data.address ? '<span>' + escapeHtml(data.address) + '</span>' : '',
       mcText ? '<span>' + escapeHtml(mcText) + '</span>' : '',
     ].filter(Boolean).join('');
+    if (card.innerHTML !== nextHtml) card.innerHTML = nextHtml;
   }
   function ensureBrandEditor(data) {
     if (document.querySelector('.qf-demo-brand-editor')) return;
@@ -144,7 +158,7 @@
       if (!current) name.textContent = 'Instant rate';
     }
     const tagline = $('qf-tagline');
-    if (tagline) tagline.textContent = '';
+    if (tagline && tagline.textContent) tagline.textContent = '';
     applyDemoBrand();
   }
   function isReefer(value, label) {
@@ -169,6 +183,10 @@
     }
     postHeight();
   }
+  function scheduleSync() {
+    clearTimeout(scheduleSync.timer);
+    scheduleSync.timer = setTimeout(sync, 60);
+  }
   function postHeight() {
     try {
       if (window.parent && window.parent !== window) window.parent.postMessage({ type: 'QF_WIDGET_HEIGHT', height: document.documentElement.scrollHeight }, '*');
@@ -184,7 +202,7 @@
   document.addEventListener('change', (event) => {
     if (event.target && ['qf-equipment', 'qf-hazmat'].includes(event.target.id)) sync();
   });
-  new MutationObserver(sync).observe(document.body, { childList: true, subtree: true });
+  new MutationObserver(scheduleSync).observe(document.body, { childList: true, subtree: true });
   setTimeout(sync, 100);
   setTimeout(sync, 450);
   setTimeout(sync, 900);
