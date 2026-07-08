@@ -11,6 +11,10 @@ body.qf-auth-wft {
   --muted: rgba(245,252,255,.55) !important;
   --border: rgba(255,255,255,.12) !important;
   --border-strong: rgba(255,255,255,.20) !important;
+  --radius: 8px !important;
+  --radius-lg: 8px !important;
+  --radius-xl: 8px !important;
+  --radius-btn: 4px !important;
   background: #111314 !important;
   color: #f5fcff !important;
 }
@@ -30,13 +34,14 @@ body.qf-auth-wft .logo {
   background: transparent !important;
   border: 1px solid rgba(255,255,255,.30) !important;
   color: #f5fcff !important;
+  border-radius: 6px !important;
   box-shadow: none !important;
 }
 
 body.qf-auth-wft .card.elevated {
   background: #151a1c !important;
   border: 1px solid rgba(255,255,255,.14) !important;
-  border-radius: 16px !important;
+  border-radius: 8px !important;
   box-shadow: 0 28px 70px -55px rgba(0,0,0,.85), inset 0 1px 0 rgba(255,255,255,.04) !important;
 }
 
@@ -58,7 +63,7 @@ body.qf-auth-wft .notice {
   background: rgba(13,60,252,.11) !important;
   border: 1px solid rgba(13,60,252,.34) !important;
   color: rgba(245,252,255,.88) !important;
-  border-radius: 12px !important;
+  border-radius: 8px !important;
 }
 
 body.qf-auth-wft .notice.error,
@@ -78,6 +83,7 @@ body.qf-auth-wft .url-builder-preview {
   background: #242426 !important;
   border-color: rgba(255,255,255,.14) !important;
   color: #f5fcff !important;
+  border-radius: 6px !important;
 }
 
 body.qf-auth-wft .input:focus,
@@ -94,10 +100,12 @@ body.qf-auth-wft a {
 body.qf-auth-wft .tabs {
   background: #242426 !important;
   border-color: rgba(255,255,255,.12) !important;
+  border-radius: 8px !important;
 }
 
 body.qf-auth-wft .tab {
   color: rgba(245,252,255,.70) !important;
+  border-radius: 4px !important;
 }
 
 body.qf-auth-wft .tab.active {
@@ -110,6 +118,7 @@ body.qf-auth-wft .btn-primary:disabled {
   background: #0d3cfc !important;
   border-color: #0d3cfc !important;
   color: #ffffff !important;
+  border-radius: 4px !important;
   box-shadow: none !important;
 }
 
@@ -120,6 +129,7 @@ body.qf-auth-wft .btn-primary:disabled {
 body.qf-auth-wft label[style*="background:var(--surface-2)"] {
   background: #242426 !important;
   border-color: rgba(255,255,255,.14) !important;
+  border-radius: 8px !important;
 }
 
 body.qf-auth-wft .qf-mc-bubble {

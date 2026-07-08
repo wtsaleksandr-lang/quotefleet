@@ -16,7 +16,7 @@ body.qf-app-calculator .qf-options-panel .qf-acc-chip {
   justify-content: center !important;
   gap: 7px !important;
   border: 1px solid var(--qf-app-border) !important;
-  border-radius: var(--qf-app-radius-control) !important;
+  border-radius: var(--qf-app-radius-button) !important;
   background: var(--qf-app-card) !important;
   color: #1f2937 !important;
   padding: 10px 12px !important;
@@ -50,7 +50,7 @@ body.qf-demo-brand-preview .qf-demo-logo-slot {
   flex: 0 0 auto;
   width: 46px;
   height: 46px;
-  border-radius: 17px;
+  border-radius: var(--qf-app-radius-control, 6px);
   border: 1px dashed #aab6c6;
   background-color: #ffffff;
   background-position: center;
@@ -100,7 +100,7 @@ body.qf-demo-brand-preview .qf-header .brand-name {
 .qf-demo-brand-card,
 .qf-demo-brand-editor {
   border: 1px solid rgba(203, 213, 225, .92);
-  border-radius: var(--qf-app-radius-card, 20px);
+  border-radius: var(--qf-app-radius-card, 8px);
   background: #ffffff;
   box-shadow: none;
 }
@@ -161,7 +161,7 @@ body.qf-demo-brand-preview .qf-header .brand-name {
   width: 27px;
   height: 27px;
   border: 1px solid #d6dee8;
-  border-radius: 999px;
+  border-radius: var(--qf-app-radius-button, 4px);
   background: #f8fafc;
   color: #64748b;
   font-size: 17px;
@@ -189,7 +189,7 @@ body.qf-demo-brand-preview .qf-header .brand-name {
   min-height: 48px;
   align-items: center;
   border: 1px dashed #b8c2d0;
-  border-radius: var(--qf-app-radius-control, 15px);
+  border-radius: var(--qf-app-radius-control, 6px);
   padding: 11px 12px;
   background: #f8fafc;
 }

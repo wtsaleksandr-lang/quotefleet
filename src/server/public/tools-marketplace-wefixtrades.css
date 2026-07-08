@@ -60,7 +60,7 @@
   background: rgba(255,255,255,.035) !important;
   border-color: var(--qf-wft-line) !important;
   color: var(--qf-wft-text) !important;
-  border-radius: 12px !important;
+  border-radius: 6px !important;
 }
 
 .qf-public-wft.qf-tools-marketplace .input:focus,
@@ -71,7 +71,7 @@
 
 .qf-public-wft.qf-tools-marketplace .chip,
 .qf-public-wft.qf-tools-marketplace .mp-pill {
-  border-radius: 10px !important;
+  border-radius: 999px !important;
   border: 1px solid var(--qf-wft-line) !important;
   background: rgba(255,255,255,.04) !important;
   color: var(--qf-wft-muted) !important;
@@ -108,11 +108,13 @@
 .qf-public-wft.qf-tools-marketplace .benchmark {
   background: rgba(13,60,252,.16) !important;
   border: 1px solid rgba(13,60,252,.25);
+  border-radius: 8px !important;
 }
 
 .qf-public-wft.qf-tools-marketplace .tool-tip-bubble {
   background: #22282a !important;
   border: 1px solid var(--qf-wft-line);
+  border-radius: 8px !important;
 }
 
 .qf-public-wft.qf-tools-marketplace .tool-tip-bubble::before {

@@ -48,7 +48,7 @@
 .qf-vertical-wft .feature-card {
   min-height: 178px;
   border: 1px solid rgba(255,255,255,.12);
-  border-radius: 16px;
+  border-radius: 8px;
   background: rgba(17,24,23,.92);
   box-shadow: 0 28px 70px -55px rgba(0,0,0,.85), inset 0 1px 0 rgba(255,255,255,.04);
   padding: 20px;
@@ -74,12 +74,12 @@
   color: #f3eee6;
   background: rgba(255,255,255,.07);
   border: 1px solid rgba(255,255,255,.12);
-  border-radius: 7px;
+  border-radius: 4px;
   padding: 1px 5px;
 }
 .qf-vertical-wft .section[style*="text-align: center"] .container-narrow {
   border: 1px solid rgba(255,255,255,.12);
-  border-radius: 22px;
+  border-radius: 8px;
   background: rgba(17,24,23,.92);
   padding: 34px 24px;
   box-shadow: 0 28px 70px -55px rgba(0,0,0,.85), inset 0 1px 0 rgba(255,255,255,.04);
