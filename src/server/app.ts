@@ -38,13 +38,19 @@ function allowsExternalFraming(req: express.Request): boolean {
   );
 }
 
-function applyDpaPageSkin(html: string): string {
+function applyPageSkin(html: string, extraCss: string[], bodyClass: string): string {
+  const styles = extraCss.map((href) => `  <link rel="stylesheet" href="${href}">`).join('\n');
   return html
-    .replace(
-      '<link rel="stylesheet" href="/style.css">',
-      '<link rel="stylesheet" href="/style.css">\n  <link rel="stylesheet" href="/public-pages-wefixtrades.css">\n  <link rel="stylesheet" href="/dpa-wefixtrades.css">',
-    )
-    .replace('<body>', '<body class="qf-public-wft">');
+    .replace('<link rel="stylesheet" href="/style.css">', `<link rel="stylesheet" href="/style.css">\n  <link rel="stylesheet" href="/public-pages-wefixtrades.css">\n${styles}`)
+    .replace('<body>', `<body class="qf-public-wft ${bodyClass}">`);
+}
+
+function applyDpaPageSkin(html: string): string {
+  return applyPageSkin(html, ['/dpa-wefixtrades.css'], '');
+}
+
+function applyToolsMarketplaceSkin(html: string): string {
+  return applyPageSkin(html, ['/tools-marketplace-wefixtrades.css'], 'qf-tools-marketplace');
 }
 
 export function createApp(): express.Express {
@@ -116,6 +122,21 @@ export function createApp(): express.Express {
       .then((html) => res.type('html').send(applyDpaPageSkin(html)))
       .catch(next);
   });
+  app.get(['/tools', '/tools/'], (_req, res, next) => {
+    readFile(resolve(publicDir, 'tools.html'), 'utf8')
+      .then((html) => res.type('html').send(applyToolsMarketplaceSkin(html)))
+      .catch(next);
+  });
+  app.get(['/marketplace', '/marketplace/'], (_req, res, next) => {
+    readFile(resolve(publicDir, 'marketplace.html'), 'utf8')
+      .then((html) => res.type('html').send(applyToolsMarketplaceSkin(html)))
+      .catch(next);
+  });
+  app.get('/marketplace/carrier/:slug', (_req, res, next) => {
+    readFile(resolve(publicDir, 'marketplace-carrier.html'), 'utf8')
+      .then((html) => res.type('html').send(applyToolsMarketplaceSkin(html)))
+      .catch(next);
+  });
   app.use(express.static(publicDir, { index: false, extensions: ['html'] }));
 
   app.get('/', (req, res, next) => {
@@ -157,9 +178,6 @@ export function createApp(): express.Express {
   app.get('/w/:slug', (_req, res) => res.sendFile(resolve(publicDir, 'widget.html')));
   app.get('/chat/:refId', (_req, res) => res.sendFile(resolve(publicDir, 'chat.html')));
   app.get('/quote/:refId', (_req, res) => res.sendFile(resolve(publicDir, 'quote.html')));
-  app.get(['/tools', '/tools/'], (_req, res) => res.sendFile(resolve(publicDir, 'tools.html')));
-  app.get(['/marketplace', '/marketplace/'], (_req, res) => res.sendFile(resolve(publicDir, 'marketplace.html')));
-  app.get('/marketplace/carrier/:slug', (_req, res) => res.sendFile(resolve(publicDir, 'marketplace-carrier.html')));
   app.get(['/for/brokers', '/for/brokers/'], (_req, res) => res.sendFile(resolve(publicDir, 'for-brokers.html')));
   app.get(['/for/ltl', '/for/ltl/'], (_req, res) => res.sendFile(resolve(publicDir, 'for-ltl.html')));
   app.get(['/for/forwarders', '/for/forwarders/'], (_req, res) => res.sendFile(resolve(publicDir, 'for-forwarders.html')));
