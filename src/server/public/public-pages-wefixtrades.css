@@ -1,5 +1,8 @@
 /* Phase BQ: WeFixTrades-style skin for secondary public pages. */
 .qf-public-wft {
+  --accent: #0d3cfc;
+  --accent-ink: #ffffff;
+  --accent-soft: rgba(13,60,252,.14);
   --qf-wft-bg: #0b1110;
   --qf-wft-panel: #111817;
   --qf-wft-panel-2: #151c1b;
@@ -168,7 +171,7 @@
   color: rgba(255,255,255,.55);
 }
 .qf-public-wft .site-footer a {
-  color: rgba(255,255,255,.68);
+  color: #9aaeff;
 }
 .qf-public-wft .site-footer a:hover {
   color: #fff;

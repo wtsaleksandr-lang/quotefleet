@@ -1,11 +1,14 @@
 (() => {
-  const cleanupHref = '/landing-wefixtrades-cleanup.css';
-  if (!document.querySelector('link[href="' + cleanupHref + '"]')) {
+  function loadStylesheet(href) {
+    if (document.querySelector('link[href="' + href + '"]')) return;
     const link = document.createElement('link');
     link.rel = 'stylesheet';
-    link.href = cleanupHref;
+    link.href = href;
     document.head.appendChild(link);
   }
+
+  loadStylesheet('/landing-wefixtrades-cleanup.css');
+  loadStylesheet('/public-blue-fixes.css');
 
   const reduceMotion = window.matchMedia?.('(prefers-reduced-motion: reduce)').matches;
   const items = document.querySelectorAll('[data-reveal]');
