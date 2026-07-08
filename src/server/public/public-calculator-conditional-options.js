@@ -220,6 +220,7 @@
   loadStylesheet('/public-calculator-mobile-cleanup.css');
   loadStylesheet('/public-calculator-app-style.css');
   loadStylesheet('/public-calculator-brand-preview.css');
+  loadStylesheet('/maersk-radius-system.css');
   simplifyHeader();
   document.addEventListener('change', (event) => {
     if (event.target && ['qf-equipment', 'qf-hazmat'].includes(event.target.id)) sync();
