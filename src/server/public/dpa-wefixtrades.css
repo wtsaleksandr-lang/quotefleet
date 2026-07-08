@@ -1,0 +1,72 @@
+/* Phase BS: DPA visual alignment without changing legal copy. */
+.qf-public-wft .dpa-shell {
+  position: relative;
+  z-index: 1;
+}
+
+.qf-public-wft .dpa-shell h1 {
+  color: var(--qf-wft-text);
+  font-weight: 900;
+  letter-spacing: -.055em;
+}
+
+.qf-public-wft .dpa-shell h2,
+.qf-public-wft .dpa-shell .meta-strip strong,
+.qf-public-wft .dpa-shell table th {
+  color: var(--qf-wft-text) !important;
+}
+
+.qf-public-wft .dpa-shell p,
+.qf-public-wft .dpa-shell li,
+.qf-public-wft .dpa-shell h3,
+.qf-public-wft .dpa-shell table td,
+.qf-public-wft .dpa-shell .meta-strip,
+.qf-public-wft .dpa-shell .sig,
+.qf-public-wft .dpa-shell .footer-note {
+  color: var(--qf-wft-muted) !important;
+}
+
+.qf-public-wft .dpa-shell .meta-strip,
+.qf-public-wft .dpa-shell .sig-block,
+.qf-public-wft .dpa-shell .footer-note {
+  background: rgba(17,24,23,.92) !important;
+  border: 1px solid var(--qf-wft-line) !important;
+  border-radius: var(--qf-wft-radius) !important;
+  box-shadow: 0 28px 70px -55px rgba(0,0,0,.85), inset 0 1px 0 rgba(255,255,255,.04) !important;
+}
+
+.qf-public-wft .dpa-shell table {
+  overflow: hidden;
+  border-radius: var(--qf-wft-radius) !important;
+  background: rgba(17,24,23,.92) !important;
+}
+
+.qf-public-wft .dpa-shell table th,
+.qf-public-wft .dpa-shell table td {
+  border-color: var(--qf-wft-line) !important;
+}
+
+.qf-public-wft .dpa-shell table th {
+  background: rgba(255,255,255,.04) !important;
+}
+
+.qf-public-wft .dpa-shell a {
+  color: var(--qf-wft-text) !important;
+}
+
+.qf-public-wft .dpa-shell .download {
+  background: var(--qf-wft-cream) !important;
+  color: #171b1d !important;
+  border-color: var(--qf-wft-cream) !important;
+  border-radius: 10px !important;
+  font-weight: 800;
+}
+
+@media (max-width: 760px) {
+  .qf-public-wft .dpa-shell {
+    padding-inline: 18px;
+  }
+  .qf-public-wft .dpa-shell h1 {
+    font-size: 38px !important;
+  }
+}
