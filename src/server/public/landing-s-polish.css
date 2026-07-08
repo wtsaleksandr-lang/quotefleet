@@ -131,6 +131,117 @@
   transform: translateY(-3px);
   border-color: rgba(155,247,255,.34);
 }
+
+/* Phase BL: serious CargoWise/Ship4wd-style landing brand polish. */
+.landing-v2 {
+  --accent: #3fb8c5;
+  --accent-strong: #2596a6;
+  --accent-soft: rgba(63, 184, 197, 0.10);
+  --accent-ink: #061316;
+  --success: #22c55e;
+  background:
+    radial-gradient(ellipse 70% 38% at 50% -6%, rgba(63, 184, 197, .10), transparent 64%),
+    linear-gradient(180deg, #0a1018 0%, #0d1219 45%, #0b0f15 100%);
+}
+.landing-v2 .site-header {
+  background: rgba(8, 13, 19, 0.92);
+  border-bottom-color: rgba(148, 163, 184, 0.14);
+}
+.landing-v2 .site-logo {
+  position: relative;
+  overflow: hidden;
+  background: linear-gradient(135deg, #101923 0%, #172434 100%);
+  border: 1px solid rgba(148, 163, 184, 0.28);
+  color: #e5f6f8;
+  box-shadow: inset 0 1px 0 rgba(255,255,255,.08), 0 12px 28px -22px rgba(63,184,197,.55);
+}
+.landing-v2 .site-logo::before {
+  content: '';
+  position: absolute;
+  inset: 6px 5px auto;
+  height: 2px;
+  border-radius: 999px;
+  background: linear-gradient(90deg, transparent, #3fb8c5, transparent);
+  opacity: .9;
+}
+.landing-v2 .site-logo::after {
+  content: 'QF';
+  position: relative;
+  z-index: 1;
+  font: 900 11px/1 var(--font-mono);
+  letter-spacing: -0.04em;
+}
+.landing-v2 .site-logo svg {
+  display: none;
+}
+.landing-v2 .site-brand {
+  letter-spacing: -0.025em;
+}
+.landing-v2 .hero::before {
+  background:
+    radial-gradient(ellipse 56% 40% at 72% 18%, rgba(63,184,197,.10), transparent 68%),
+    radial-gradient(ellipse 44% 30% at 20% 18%, rgba(59, 130, 246, .07), transparent 72%);
+}
+.landing-v2 .eyebrow,
+.landing-v2 .section-kicker {
+  color: #76cfd8;
+}
+.landing-v2 .eyebrow {
+  border-color: rgba(118, 207, 216, .20);
+  background: rgba(118, 207, 216, .055);
+}
+.landing-v2 .btn-primary {
+  background: linear-gradient(135deg, #3fb8c5 0%, #2ea3b0 100%);
+  border-color: rgba(118, 207, 216, .55);
+  box-shadow: 0 18px 42px -28px rgba(63,184,197,.78), inset 0 1px 0 rgba(255,255,255,.18);
+}
+.landing-v2 .btn-primary:hover {
+  background: linear-gradient(135deg, #359eaa 0%, #277f8d 100%);
+  border-color: rgba(118, 207, 216, .70);
+  box-shadow: 0 20px 46px -28px rgba(63,184,197,.84), inset 0 1px 0 rgba(255,255,255,.18);
+}
+.landing-v2 .demo-link,
+.landing-v2 a {
+  color: #76cfd8;
+}
+.landing-v2 .hero-quick-points span,
+.landing-v2 .flow-card,
+.landing-v2 .scheduler-card,
+.landing-v2 .share-strip span {
+  border-color: rgba(148, 163, 184, .18);
+}
+.landing-v2 .flow-card {
+  background: linear-gradient(180deg, rgba(17,25,35,.96), rgba(10,15,22,.98));
+  box-shadow: 0 24px 60px -40px rgba(0,0,0,.76), inset 0 1px 0 rgba(255,255,255,.045);
+}
+.landing-v2 .flow-card:hover {
+  border-color: rgba(118, 207, 216, .30);
+}
+.landing-v2 .flow-icon,
+.landing-v2 .scheduler-dot {
+  background: rgba(63,184,197,.10);
+  color: #76cfd8;
+}
+.landing-v2 .mini-rate-table b,
+.landing-v2 .scheduler-top span,
+.landing-v2 .mini-actions span,
+.landing-v2 .mini-checks span {
+  color: #76cfd8;
+}
+.landing-v2 .mini-browser div,
+.landing-v2 .mini-browser button,
+.landing-v2 .pdf-card button {
+  background: #3fb8c5;
+  color: #061316;
+}
+.landing-v2 .mini-result {
+  border-color: rgba(118,207,216,.20);
+  background: rgba(63,184,197,.07);
+}
+.landing-v2 .flow-arrow {
+  background: linear-gradient(90deg, rgba(63,184,197,.12), rgba(118,207,216,.70));
+}
+
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after {
     animation-duration: .01ms !important;
