@@ -148,16 +148,14 @@
   border-bottom-color: rgba(148, 163, 184, 0.14);
 }
 .landing-v2 .site-logo {
+  position: relative;
+  overflow: hidden;
   background: linear-gradient(135deg, #101923 0%, #172434 100%);
   border: 1px solid rgba(148, 163, 184, 0.28);
   color: #e5f6f8;
   box-shadow: inset 0 1px 0 rgba(255,255,255,.08), 0 12px 28px -22px rgba(63,184,197,.55);
 }
-.landing-v2 .site-logo-qf {
-  position: relative;
-  overflow: hidden;
-}
-.landing-v2 .site-logo-qf::before {
+.landing-v2 .site-logo::before {
   content: '';
   position: absolute;
   inset: 6px 5px auto;
@@ -166,11 +164,15 @@
   background: linear-gradient(90deg, transparent, #3fb8c5, transparent);
   opacity: .9;
 }
-.landing-v2 .site-logo-qf span {
+.landing-v2 .site-logo::after {
+  content: 'QF';
   position: relative;
   z-index: 1;
   font: 900 11px/1 var(--font-mono);
   letter-spacing: -0.04em;
+}
+.landing-v2 .site-logo svg {
+  display: none;
 }
 .landing-v2 .site-brand {
   letter-spacing: -0.025em;
@@ -238,10 +240,6 @@
 }
 .landing-v2 .flow-arrow {
   background: linear-gradient(90deg, rgba(63,184,197,.12), rgba(118,207,216,.70));
-}
-.landing-v2 .premium-footer .site-logo svg,
-.landing-v2 .site-header .site-logo svg {
-  display: none;
 }
 
 @media (prefers-reduced-motion: reduce) {
