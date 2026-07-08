@@ -13,8 +13,8 @@
   <div class="qf-widget" id="qf-root">
     <div class="qf-header" id="qf-header"><div class="brand-name">Loading…</div></div>
     <div class="qf-tagline" id="qf-tagline"></div>
-    <div class="qf-trust-strip" aria-label="Quote process"><span>Fast estimate</span><span>Written quote</span><span>Team follow-up</span></div>
-    <div class="qf-mini-stepper" aria-label="Calculator stages"><span>Details</span><span>Estimate</span><span>Written quote</span></div>
+    <div class="qf-trust-strip" aria-label="Quote process"><span>Fast estimate</span><span>Written quote option</span><span>Team follow-up</span></div>
+    <div class="qf-mini-stepper" aria-label="Calculator steps"><span>1. Details</span><span>2. Estimate</span><span>3. Written quote</span></div>
     <div class="qf-step active" id="qf-step-quote">
       <div class="qf-tabs" id="qf-services"></div>
       <div class="qf-section-title qf-title-inline">Equipment <span class="qf-help" data-tip="The truck or container type. Dry Van = standard enclosed trailer; Reefer = refrigerated; Flatbed = open deck; 20'/40'/45' = ocean container drayage. Open top and flat rack may need oversize details.">?</span></div>
@@ -65,7 +65,7 @@
         <div class="qf-accessorials" id="qf-accessorials"></div>
       </details>
       <div class="qf-customer-note">This estimate helps you move faster. Final rate, equipment availability, and pickup timing are confirmed by the team when you request the quote in writing.</div>
-      <button class="qf-cta" id="qf-calc-btn">Get instant estimate</button><div id="qf-error" class="qf-error" style="display:none;"></div>
+      <button class="qf-cta" id="qf-calc-btn">Calculate estimate</button><div id="qf-error" class="qf-error" style="display:none;"></div>
       <div class="qf-result" id="qf-result" style="display:none;"><div class="qf-section-title" style="margin:0 0 8px 0;">Estimated total</div><div class="total"><span class="currency">$</span><span id="qf-total">0</span></div><div class="meta" id="qf-meta"></div><div class="lines" id="qf-lines"></div><div class="qf-customer-note">Looks good? Get it in writing so the team can confirm details and follow up.</div><div class="qf-result-actions"><button class="qf-cta" id="qf-continue-btn">Get written quote</button><button class="qf-cta qf-secondary" type="button" onclick="document.getElementById('qf-step-thanks')?.scrollIntoView({behavior:'smooth'});">Ask question later</button></div></div>
     </div>
     <div class="qf-step" id="qf-step-contact"><div class="qf-contact-head"><div class="qf-section-title">Almost done</div><p class="qf-tagline">Send your details and the team can email this quote, confirm availability, and follow up if anything needs clarification. No spam.</p></div><div class="qf-grid"><div class="qf-field qf-full"><label>Your name</label><input class="qf-input" id="qf-c-name" placeholder="Jane Doe"></div><div class="qf-field"><label id="qf-c-email-label">Email</label><input class="qf-input" id="qf-c-email" type="email" placeholder="you@company.com"></div><div class="qf-field"><label id="qf-c-phone-label">Phone (optional)</label><input class="qf-input" id="qf-c-phone" placeholder="optional"></div><div class="qf-field qf-full"><label>Company</label><input class="qf-input" id="qf-c-company" placeholder="Company name"></div><div class="qf-field qf-full"><label>Notes</label><textarea class="qf-input" id="qf-c-notes" rows="3" placeholder="Pickup hours, loading details, reference number…"></textarea></div></div><button class="qf-cta" id="qf-submit-btn">Send written quote request</button><button class="qf-cta qf-secondary" id="qf-back-btn" style="margin-top:8px;">Back</button><div id="qf-submit-error" class="qf-error" style="display:none;"></div></div>
