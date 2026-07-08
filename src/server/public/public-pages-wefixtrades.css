@@ -87,24 +87,29 @@
   background-size: auto, 28px 28px, 28px 28px;
 }
 .qf-public-wft .hero h1,
-.qf-public-wft .support-shell h1 {
+.qf-public-wft .support-shell h1,
+.qf-public-wft .sec-shell h1 {
   color: var(--qf-wft-text);
   font-weight: 900;
   letter-spacing: -.055em;
 }
 .qf-public-wft .container,
-.qf-public-wft .support-shell {
+.qf-public-wft .support-shell,
+.qf-public-wft .sec-shell {
   position: relative;
   z-index: 1;
 }
 .qf-public-wft .pricing,
-.qf-public-wft .support-grid {
+.qf-public-wft .support-grid,
+.qf-public-wft .sec-shell .card-row {
   gap: 10px;
 }
 .qf-public-wft .price-card,
 .qf-public-wft .support-card,
 .qf-public-wft .support-note,
 .qf-public-wft .support-table,
+.qf-public-wft .sec-shell .ct-card,
+.qf-public-wft .sec-shell .footer-note,
 .qf-public-wft main.container > div[style*="text-align: center"] {
   background: rgba(17,24,23,.92) !important;
   border: 1px solid var(--qf-wft-line) !important;
@@ -118,11 +123,15 @@
 .qf-public-wft .price-card h3,
 .qf-public-wft .support-card h3,
 .qf-public-wft .support-shell h2,
+.qf-public-wft .sec-shell h2,
+.qf-public-wft .sec-shell .lead-line,
+.qf-public-wft .sec-shell .ct-card h4,
 .qf-public-wft main.container h3 {
   color: var(--qf-wft-text) !important;
 }
 .qf-public-wft .price,
-.qf-public-wft .support-card a {
+.qf-public-wft .support-card a,
+.qf-public-wft .sec-shell a {
   color: var(--qf-wft-text) !important;
 }
 .qf-public-wft .price .per,
@@ -131,10 +140,16 @@
 .qf-public-wft .support-shell li,
 .qf-public-wft .support-card p,
 .qf-public-wft .support-table td,
-.qf-public-wft .support-table th {
+.qf-public-wft .support-table th,
+.qf-public-wft .sec-shell p,
+.qf-public-wft .sec-shell li,
+.qf-public-wft .sec-shell .ct-card p,
+.qf-public-wft .sec-shell h3,
+.qf-public-wft .sec-shell .footer-note {
   color: var(--qf-wft-muted) !important;
 }
 .qf-public-wft .support-pill,
+.qf-public-wft .sec-shell .pill,
 .qf-public-wft .tag {
   color: var(--qf-wft-faint) !important;
   background: rgba(255,255,255,.04) !important;
@@ -160,6 +175,8 @@
 }
 @media (max-width: 760px) {
   .qf-public-wft .hero h1,
-  .qf-public-wft .support-shell h1 { font-size: 38px !important; }
-  .qf-public-wft .support-shell { padding-inline: 18px; }
+  .qf-public-wft .support-shell h1,
+  .qf-public-wft .sec-shell h1 { font-size: 38px !important; }
+  .qf-public-wft .support-shell,
+  .qf-public-wft .sec-shell { padding-inline: 18px; }
 }
