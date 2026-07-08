@@ -104,6 +104,15 @@ Support changes should stay limited to docs, smoke tests, copy polish, accessibi
 
 After a clean support PR is merged, reset `automation/support-work` to latest `main` so the branch does not drift.
 
+## Production launch operations
+
+Before real public traffic, review:
+
+- `docs/launch-qa-matrix.md` — freight scenario QA and manual launch sign-off.
+- `docs/production-launch-ops.md` — monitoring, backups, incident process, support workflow, terms/privacy, and data-retention checklist.
+
+Production launch should have assigned owners for monitoring, backups, support, legal/customer notices, billing/account decisions, and incident response.
+
 ## Important public routes
 
 | Route | Purpose |
