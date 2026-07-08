@@ -1,0 +1,278 @@
+/* Phase BN: app-style calculator shell inspired by modern logistics mobile UI. */
+:root {
+  --qf-app-bg: #d9dcdf;
+  --qf-app-shell: #e9ebee;
+  --qf-app-card: #ffffff;
+  --qf-app-card-soft: #f6f7f9;
+  --qf-app-border: #d3dbe7;
+  --qf-app-text: #111827;
+  --qf-app-muted: #5f6b7d;
+  --qf-app-radius-shell: 26px;
+  --qf-app-radius-card: 20px;
+  --qf-app-radius-control: 15px;
+  --qf-app-radius-button: 18px;
+  --qf-app-shadow: 0 18px 42px -34px rgba(15, 23, 42, .55);
+}
+
+body.qf-app-calculator {
+  background: var(--qf-app-bg) !important;
+  padding: 14px !important;
+}
+
+body.qf-app-calculator .qf-widget {
+  max-width: 620px;
+  background: var(--qf-app-shell) !important;
+  border: 1px solid rgba(255,255,255,.72) !important;
+  border-radius: var(--qf-app-radius-shell) !important;
+  box-shadow: var(--qf-app-shadow) !important;
+  padding: 18px !important;
+  color: var(--qf-app-text);
+}
+
+body.qf-app-calculator .qf-header {
+  align-items: center;
+  gap: 10px;
+  min-height: 38px;
+  margin: 0 0 14px !important;
+  padding: 0 2px;
+}
+
+body.qf-app-calculator .qf-brand-mark {
+  display: none !important;
+}
+
+body.qf-app-calculator .qf-header img {
+  width: 36px;
+  height: 36px;
+  max-height: none;
+  border-radius: 13px;
+  object-fit: cover;
+  background: var(--qf-app-card);
+  box-shadow: 0 8px 18px -14px rgba(15,23,42,.45);
+}
+
+body.qf-app-calculator .qf-header .brand-name {
+  color: var(--qf-app-text);
+  font-size: 18px;
+  font-weight: 850;
+  letter-spacing: -0.035em;
+  line-height: 1.1;
+}
+
+body.qf-app-calculator .qf-tagline,
+body.qf-app-calculator .qf-trust-strip,
+body.qf-app-calculator .qf-mini-stepper {
+  display: none !important;
+}
+
+body.qf-app-calculator .qf-tabs {
+  display: grid !important;
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+  gap: 4px !important;
+  overflow: visible !important;
+  margin: 0 0 18px !important;
+  padding: 5px !important;
+  border: 1px solid #c9d6e8;
+  border-radius: 22px !important;
+  background: #dfe7f2 !important;
+}
+
+body.qf-app-calculator .qf-tabs button {
+  min-width: 0 !important;
+  width: 100%;
+  border-radius: 17px !important;
+  padding: 10px 5px !important;
+  color: #516077 !important;
+  font-size: 12px !important;
+  font-weight: 760 !important;
+  letter-spacing: -0.015em;
+  box-shadow: none !important;
+}
+
+body.qf-app-calculator .qf-tabs button.active {
+  background: var(--qf-app-card) !important;
+  color: var(--w-primary) !important;
+  box-shadow: 0 10px 22px -18px rgba(15,23,42,.65) !important;
+}
+
+body.qf-app-calculator .qf-section-title {
+  color: #1f2937 !important;
+  font-size: 12px !important;
+  font-weight: 850 !important;
+  letter-spacing: .075em !important;
+  margin: 16px 0 8px !important;
+}
+
+body.qf-app-calculator .qf-field label {
+  color: #334155;
+  font-size: 12px;
+  font-weight: 760;
+}
+
+body.qf-app-calculator .qf-input,
+body.qf-app-calculator .qf-select {
+  min-height: 48px;
+  border: 1px solid var(--qf-app-border) !important;
+  border-radius: var(--qf-app-radius-control) !important;
+  background: var(--qf-app-card) !important;
+  color: var(--qf-app-text) !important;
+  box-shadow: none !important;
+}
+
+body.qf-app-calculator .qf-input:focus,
+body.qf-app-calculator .qf-select:focus {
+  border-color: var(--w-primary) !important;
+  box-shadow: 0 0 0 4px color-mix(in srgb, var(--w-primary) 16%, transparent) !important;
+}
+
+body.qf-app-calculator .qf-input::placeholder {
+  color: #87909d;
+}
+
+body.qf-app-calculator .qf-field-hint {
+  color: var(--qf-app-muted) !important;
+  font-size: 12px;
+}
+
+body.qf-app-calculator #qf-step-quote > .qf-customer-note {
+  display: none !important;
+}
+
+body.qf-app-calculator .qf-options-panel,
+body.qf-app-calculator .qf-booking-card,
+body.qf-app-calculator .qf-oog-panel,
+body.qf-app-calculator .qf-conditional-panel,
+body.qf-app-calculator .qf-result,
+body.qf-app-calculator .qf-chat {
+  border: 1px solid rgba(203, 213, 225, .92) !important;
+  border-radius: var(--qf-app-radius-card) !important;
+  background: var(--qf-app-card) !important;
+  box-shadow: none !important;
+}
+
+body.qf-app-calculator .qf-options-panel summary {
+  padding: 14px 15px !important;
+  color: #1f2937 !important;
+  font-weight: 850;
+}
+
+body.qf-app-calculator .qf-options-panel summary::after {
+  width: auto !important;
+  height: auto !important;
+  border-radius: 0 !important;
+  background: transparent !important;
+  color: var(--w-primary) !important;
+  font-size: 18px;
+  line-height: 1;
+}
+
+body.qf-app-calculator .qf-flags label,
+body.qf-app-calculator .qf-acc-chip {
+  border: 1px solid var(--qf-app-border) !important;
+  border-radius: 15px !important;
+  background: var(--qf-app-card) !important;
+  color: #344054 !important;
+  box-shadow: none !important;
+}
+
+body.qf-app-calculator .qf-flags label {
+  padding: 11px 12px;
+}
+
+body.qf-app-calculator input[type="checkbox"] {
+  accent-color: var(--w-primary);
+}
+
+body.qf-app-calculator .qf-acc-chip.active {
+  background: var(--w-primary) !important;
+  border-color: var(--w-primary) !important;
+  color: #fff !important;
+}
+
+body.qf-app-calculator .qf-help {
+  border-radius: 999px;
+  background: #eef2f6;
+  color: #64748b;
+}
+
+body.qf-app-calculator .qf-cta {
+  min-height: 52px;
+  border-radius: var(--qf-app-radius-button) !important;
+  background: var(--w-primary) !important;
+  color: #fff !important;
+  box-shadow: 0 16px 30px -22px color-mix(in srgb, var(--w-primary) 62%, #111827) !important;
+  position: relative;
+  overflow: hidden;
+}
+
+body.qf-app-calculator .qf-cta:hover {
+  background: var(--w-primary-hover) !important;
+  transform: translateY(-1px);
+}
+
+body.qf-app-calculator .qf-cta:disabled {
+  background: color-mix(in srgb, var(--w-primary) 74%, #9ca3af) !important;
+  cursor: progress;
+}
+
+body.qf-app-calculator .qf-cta:disabled::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(110deg, transparent 0%, rgba(255,255,255,.18) 45%, transparent 70%);
+  animation: qf-processing-sweep 1.1s linear infinite;
+}
+
+@keyframes qf-processing-sweep {
+  from { transform: translateX(-100%); }
+  to { transform: translateX(100%); }
+}
+
+body.qf-app-calculator .qf-cta.qf-secondary {
+  background: var(--qf-app-card) !important;
+  color: var(--w-primary) !important;
+  border: 1px solid var(--qf-app-border) !important;
+  box-shadow: none !important;
+}
+
+body.qf-app-calculator .qf-result .total {
+  color: var(--qf-app-text) !important;
+}
+
+body.qf-app-calculator .qf-result .qf-customer-note {
+  display: block !important;
+  border-radius: 15px !important;
+  background: var(--qf-app-card-soft) !important;
+  border-color: var(--qf-app-border) !important;
+}
+
+body.qf-app-calculator .qf-suggestions {
+  border-radius: var(--qf-app-radius-control) !important;
+  border-color: var(--qf-app-border) !important;
+  box-shadow: 0 18px 34px -22px rgba(15,23,42,.42) !important;
+}
+
+body.qf-app-calculator .qf-error,
+body.qf-app-calculator .qf-success {
+  border-radius: var(--qf-app-radius-control) !important;
+}
+
+@media (max-width: 640px) {
+  body.qf-app-calculator {
+    padding: 10px 8px !important;
+  }
+  body.qf-app-calculator .qf-widget {
+    border-radius: 24px !important;
+    padding: 16px !important;
+  }
+  body.qf-app-calculator .qf-header .brand-name {
+    font-size: 17px;
+  }
+  body.qf-app-calculator .qf-tabs button {
+    font-size: 11px !important;
+    padding: 10px 3px !important;
+  }
+  body.qf-app-calculator .qf-grid {
+    gap: 11px !important;
+  }
+}
