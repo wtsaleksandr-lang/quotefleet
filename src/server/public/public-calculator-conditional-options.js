@@ -1,5 +1,12 @@
 (() => {
   function $(id) { return document.getElementById(id); }
+  function loadStylesheet() {
+    if (document.querySelector('link[href="/public-calculator-mobile-cleanup.css"]')) return;
+    const link = document.createElement('link');
+    link.rel = 'stylesheet';
+    link.href = '/public-calculator-mobile-cleanup.css';
+    document.head.appendChild(link);
+  }
   function isReefer(value, label) {
     return /reefer|refrigerated/i.test(String(value || '') + ' ' + String(label || ''));
   }
@@ -22,6 +29,7 @@
       if (window.parent && window.parent !== window) window.parent.postMessage({ type: 'QF_WIDGET_HEIGHT', height: document.documentElement.scrollHeight }, '*');
     } catch (_) {}
   }
+  loadStylesheet();
   document.addEventListener('change', (event) => {
     if (event.target && ['qf-equipment', 'qf-hazmat'].includes(event.target.id)) sync();
   });
