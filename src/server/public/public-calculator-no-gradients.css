@@ -1,0 +1,137 @@
+/* Phase CB: final calculator color enforcement, no gradients.
+   The quote tool must use the global QuoteFleet palette only. */
+body.qf-app-calculator {
+  --w-primary: #0D3CFC;
+  --w-primary-hover: #0B32D4;
+  --qf-app-bg: #181D1F;
+  --qf-app-shell: #22282A;
+  --qf-app-card: #E6E3E0;
+  --qf-app-card-soft: #F3EDDF;
+  --qf-app-border: rgba(13,60,252,.22);
+  --qf-app-text: #1E1E1E;
+  --qf-app-muted: #4F6670;
+  background: #181D1F !important;
+  background-image: none !important;
+}
+
+body.qf-app-calculator .qf-widget {
+  background: #22282A !important;
+  background-image: none !important;
+  border-color: rgba(255,255,255,.12) !important;
+  color: #FFFFFF !important;
+}
+
+body.qf-app-calculator .qf-header,
+body.qf-app-calculator .qf-header *,
+body.qf-app-calculator .qf-section-title,
+body.qf-app-calculator .qf-field label,
+body.qf-app-calculator .qf-field-hint {
+  background-image: none !important;
+}
+
+body.qf-app-calculator .qf-header .brand-name,
+body.qf-app-calculator .qf-section-title {
+  color: #FFFFFF !important;
+}
+
+body.qf-app-calculator .qf-field label,
+body.qf-app-calculator .qf-field-hint {
+  color: #B1C5CE !important;
+}
+
+body.qf-app-calculator .qf-tabs,
+body.qf-app-calculator .qf-tabs button,
+body.qf-app-calculator .qf-input,
+body.qf-app-calculator .qf-select,
+body.qf-app-calculator .qf-options-panel,
+body.qf-app-calculator .qf-booking-card,
+body.qf-app-calculator .qf-oog-panel,
+body.qf-app-calculator .qf-conditional-panel,
+body.qf-app-calculator .qf-result,
+body.qf-app-calculator .qf-chat,
+body.qf-app-calculator .qf-suggestions,
+body.qf-app-calculator .qf-demo-brand-card,
+body.qf-app-calculator .qf-demo-brand-editor,
+body.qf-app-calculator .qf-demo-logo-upload,
+body.qf-app-calculator .qf-options-panel .qf-flags label,
+body.qf-app-calculator .qf-options-panel .qf-acc-chip,
+body.qf-app-calculator .qf-flags label,
+body.qf-app-calculator .qf-acc-chip {
+  background: #E6E3E0 !important;
+  background-image: none !important;
+  border-color: rgba(13,60,252,.22) !important;
+  color: #1E1E1E !important;
+}
+
+body.qf-app-calculator .qf-result *,
+body.qf-app-calculator .qf-chat *,
+body.qf-app-calculator .qf-options-panel *,
+body.qf-app-calculator .qf-booking-card *,
+body.qf-app-calculator .qf-oog-panel *,
+body.qf-app-calculator .qf-conditional-panel *,
+body.qf-app-calculator .qf-demo-brand-card *,
+body.qf-app-calculator .qf-demo-brand-editor * {
+  background-image: none !important;
+}
+
+body.qf-app-calculator .qf-input:hover,
+body.qf-app-calculator .qf-select:hover,
+body.qf-app-calculator .qf-tabs button:hover,
+body.qf-app-calculator .qf-options-panel .qf-flags label:hover,
+body.qf-app-calculator .qf-options-panel .qf-acc-chip:hover,
+body.qf-app-calculator .qf-flags label:hover,
+body.qf-app-calculator .qf-acc-chip:hover {
+  background: #D4CFC9 !important;
+  background-image: none !important;
+}
+
+body.qf-app-calculator .qf-tabs button.active,
+body.qf-app-calculator .qf-cta.qf-secondary,
+body.qf-app-calculator .qf-result .qf-customer-note,
+body.qf-app-calculator .qf-help {
+  background: #FFFFFF !important;
+  background-image: none !important;
+  border-color: #FFFFFF !important;
+  color: #0D3CFC !important;
+}
+
+body.qf-app-calculator .qf-cta,
+body.qf-app-calculator .qf-acc-chip.active,
+body.qf-app-calculator .qf-options-panel .qf-acc-chip.active,
+body.qf-app-calculator .qf-demo-logo-slot em,
+body.qf-app-calculator .qf-chat-bubble.user,
+body.qf-app-calculator .qf-chat-send {
+  background: #0D3CFC !important;
+  background-image: none !important;
+  border: 1px solid #0D3CFC !important;
+  color: #FFFFFF !important;
+}
+
+body.qf-app-calculator .qf-cta:hover,
+body.qf-app-calculator .qf-chat-send:hover {
+  border-color: #FFFFFF !important;
+}
+
+body.qf-app-calculator .qf-cta.qf-secondary:hover {
+  border-color: #0D3CFC !important;
+}
+
+body.qf-app-calculator .qf-cta:disabled::after {
+  display: none !important;
+  content: none !important;
+  background: none !important;
+  background-image: none !important;
+  animation: none !important;
+}
+
+body.qf-app-calculator .qf-error {
+  background: #F3EDDF !important;
+  background-image: none !important;
+  color: #1E1E1E !important;
+}
+
+body.qf-app-calculator .qf-success {
+  background: #E4EDF1 !important;
+  background-image: none !important;
+  color: #1E1E1E !important;
+}
