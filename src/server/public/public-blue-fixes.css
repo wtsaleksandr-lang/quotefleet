@@ -68,12 +68,3 @@ body.qf-public-wft .qf-mc-input:focus,
 body.qf-auth-wft .qf-mc-input:focus {
   border-color: #0d3cfc !important;
 }
-
-body.qf-wft [style*="#5EEAD4"],
-body.qf-wft [style*="#5eead4"],
-body.qf-public-wft [style*="#5EEAD4"],
-body.qf-public-wft [style*="#5eead4"],
-body.qf-auth-wft [style*="#5EEAD4"],
-body.qf-auth-wft [style*="#5eead4"] {
-  color: #9aaeff !important;
-}
