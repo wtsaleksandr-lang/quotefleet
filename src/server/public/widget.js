@@ -59,6 +59,54 @@
     return { city: s, country: 'US' };
   }
 
+  function hasPostalCode(raw, parsed) {
+    var s = (raw || '').trim();
+    return !!(parsed && parsed.zip) || /\b\d{5}(?:-\d{4})?\b/.test(s) || /\b[A-Z]\d[A-Z][ -]?\d[A-Z]\d\b/i.test(s);
+  }
+
+  function normalizeEquipmentLabel(label, service) {
+    var text = String(label || '').trim();
+    if (service === 'drayage') text = text.replace(/\s*\((drayage|container drayage)\)\s*/ig, '').replace(/\s+drayage\s*/ig, ' ');
+    return text.replace(/\s+/g, ' ').trim();
+  }
+
+  function equipmentValueMatches(value, needles) {
+    var v = String(value || '').toLowerCase();
+    return needles.some(function (n) { return v.indexOf(n) >= 0; });
+  }
+
+  function withDrayageEquipmentDefaults(list) {
+    var next = (list || []).slice();
+    function addIfMissing(value, label, needles) {
+      var exists = next.some(function (item) { return equipmentValueMatches(item.value || item.label, needles); });
+      if (!exists) next.push({ value: value, label: label });
+    }
+    addIfMissing('container_20_reefer', "20' Reefer container", ['20', 'reefer']);
+    addIfMissing('container_40_reefer', "40' Reefer container", ['40', 'reefer']);
+    addIfMissing('container_40_open_top', "40' Open top container", ['open top', 'opentop']);
+    addIfMissing('container_40_flat_rack', "40' Flat rack", ['flat rack', 'flatrack']);
+    return next;
+  }
+
+  function isOpenTopOrFlatRack(value) {
+    var v = String(value || '').toLowerCase().replace(/[\s_-]+/g, ' ');
+    return v.indexOf('open top') >= 0 || v.indexOf('opentop') >= 0 || v.indexOf('flat rack') >= 0 || v.indexOf('flatrack') >= 0;
+  }
+
+  function syncOogPanel() {
+    var panel = $('qf-oog-panel');
+    var check = $('qf-oog-check');
+    var fields = $('qf-oog-fields');
+    if (!panel) return;
+    var show = state.service === 'drayage' && isOpenTopOrFlatRack(state.equipment);
+    panel.style.display = show ? '' : 'none';
+    if (!show) {
+      if (check) check.checked = false;
+      if (fields) fields.style.display = 'none';
+    }
+    autoResize();
+  }
+
   var slug = (window.QF_TENANT_SLUG || '').toString();
   if (!slug) {
     var pathMatch = location.pathname.match(/^\/w\/([^/?#]+)/);
@@ -152,6 +200,9 @@
     $('qf-back-btn').addEventListener('click', function () { showStep('quote'); });
     $('qf-submit-btn').addEventListener('click', onSubmit);
 
+    var oogCheck = $('qf-oog-check');
+    if (oogCheck) oogCheck.addEventListener('change', function () { var fields = $('qf-oog-fields'); if (fields) fields.style.display = oogCheck.checked ? '' : 'none'; autoResize(); });
+
     var chatOpenBtn = $('qf-chat-open-btn');
     if (chatOpenBtn) {
       chatOpenBtn.addEventListener('click', function () {
@@ -212,8 +263,10 @@
       ['qf-cb-phone', 'qf-cb-time', 'qf-cb-topic'].forEach(function (id) { var el = $(id); if (el) { el.value = ''; el.disabled = false; } });
       showCallbackError(null);
       $('qf-result').style.display = 'none';
-      ['qf-pickup-zip', 'qf-delivery-zip', 'qf-weight', 'qf-booking', 'qf-c-name', 'qf-c-email', 'qf-c-phone', 'qf-c-company', 'qf-c-notes']
+      ['qf-pickup-zip', 'qf-delivery-zip', 'qf-weight', 'qf-booking', 'qf-c-name', 'qf-c-email', 'qf-c-phone', 'qf-c-company', 'qf-c-notes', 'qf-oog-length', 'qf-oog-width', 'qf-oog-height', 'qf-oog-weight', 'qf-oog-notes']
         .forEach(function (id) { var el = $(id); if (el) el.value = ''; });
+      var oog = $('qf-oog-check'); if (oog) oog.checked = false;
+      var oogFields = $('qf-oog-fields'); if (oogFields) oogFields.style.display = 'none';
       var oc = $('qf-ocean-carrier'); if (oc) oc.value = '';
       var pp = $('qf-pickup-port-input'); if (pp) pp.value = '';
       var pt = $('qf-pickup-terminal'); if (pt) pt.value = '';
@@ -236,7 +289,7 @@
   function renderServices(services) {
     var wrap = $('qf-services'); wrap.innerHTML = '';
     if (!services.length) { $('qf-error').style.display = 'block'; $('qf-error').textContent = 'No services configured. Contact us directly.'; return; }
-    var labels = { drayage: 'Drayage', ftl: 'Truckload', ltl: 'LTL', expedited: 'Expedited', hotshot: 'Hotshot' };
+    var labels = { drayage: 'Drayage', ftl: 'FTL', ltl: 'LTL', expedited: 'Expedite', hotshot: 'Hotshot' };
     services.forEach(function (s, i) {
       var btn = el('button', { class: i === 0 ? 'active' : '', text: labels[s] || s, on: { click: function () { selectService(s); } } });
       btn.dataset.service = s;
@@ -249,11 +302,12 @@
     state.service = service;
     $$('#qf-services button').forEach(function (b) { b.classList.toggle('active', b.dataset.service === service); });
     var equip = state.config.equipmentByService[service] || [];
+    if (service === 'drayage') equip = withDrayageEquipmentDefaults(equip);
     var sel = $('qf-equipment');
     sel.innerHTML = '';
-    equip.forEach(function (e) { var opt = document.createElement('option'); opt.value = e.value; opt.textContent = e.label || e.value; sel.appendChild(opt); });
+    equip.forEach(function (e) { var opt = document.createElement('option'); opt.value = e.value; opt.textContent = normalizeEquipmentLabel(e.label || e.value, service); sel.appendChild(opt); });
     state.equipment = equip[0] ? equip[0].value : null;
-    sel.onchange = function () { state.equipment = sel.value; };
+    sel.onchange = function () { state.equipment = sel.value; syncOogPanel(); };
     renderAccessorials(state.config.accessorials);
     var isDrayage = service === 'drayage';
     var drayPickup = $('qf-drayage-pickup');
@@ -261,6 +315,7 @@
     if (drayPickup) drayPickup.style.display = isDrayage ? '' : 'none';
     if (defaultPickup) defaultPickup.style.display = isDrayage ? 'none' : '';
     if (isDrayage) renderPorts();
+    syncOogPanel();
     autoResize();
   }
 
@@ -373,7 +428,8 @@
     if (isDrayage && state.pickupPortCode) pickup = { portCode: state.pickupPortCode, terminalCode: state.pickupTerminalCode || undefined };
     else if (state.pickupResolved) pickup = mergeLocation(state.pickupResolved, $('qf-pickup-zip').value);
     else pickup = parseLocation(($('qf-pickup-zip') && $('qf-pickup-zip').value) || '');
-    var delivery = state.deliveryResolved ? mergeLocation(state.deliveryResolved, $('qf-delivery-zip').value) : parseLocation($('qf-delivery-zip').value);
+    var deliveryText = $('qf-delivery-zip').value;
+    var delivery = state.deliveryResolved ? mergeLocation(state.deliveryResolved, deliveryText) : parseLocation(deliveryText);
     var oceanEl = $('qf-ocean-carrier'); var bookingEl = $('qf-booking'); var pickupDateEl = $('qf-pickup-date');
     var req = {
       service: state.service,
@@ -385,7 +441,19 @@
       bookingNumber: bookingEl && bookingEl.value ? bookingEl.value.trim() : undefined,
       selectedAccessorialCodes: state.selectedAccessorials.slice(),
       flags: { residential: $('qf-residential').checked, hazmat: $('qf-hazmat').checked, tempControlled: $('qf-temp').checked },
+      meta: {},
     };
+    if (hasPostalCode(deliveryText, delivery)) req.meta.deliveryZipConfirmed = true;
+    var oogCheck = $('qf-oog-check');
+    if (oogCheck && oogCheck.checked) {
+      req.meta.oversize = {
+        length: ($('qf-oog-length') && $('qf-oog-length').value || '').trim() || undefined,
+        width: ($('qf-oog-width') && $('qf-oog-width').value || '').trim() || undefined,
+        height: ($('qf-oog-height') && $('qf-oog-height').value || '').trim() || undefined,
+        weight: ($('qf-oog-weight') && $('qf-oog-weight').value || '').trim() || undefined,
+        notes: ($('qf-oog-notes') && $('qf-oog-notes').value || '').trim() || undefined,
+      };
+    }
     if (pickupDateEl && pickupDateEl.value) req.pickupDate = pickupDateEl.value;
     return req;
   }
@@ -394,8 +462,14 @@
     e && e.preventDefault(); showError('qf-error', null); var req = gatherQuoteRequest();
     if (!req.equipment) { showError('qf-error', 'Please pick an equipment type.'); return; }
     var hasPickup = !!(req.pickup.zip || req.pickup.city || req.pickup.portCode);
-    if (!hasPickup) { showError('qf-error', 'Please pick a pickup port (drayage) or enter a ZIP / city.'); return; }
-    if (!req.delivery.zip && !req.delivery.city) { showError('qf-error', 'Please enter a delivery ZIP or city.'); return; }
+    if (!hasPickup) { showError('qf-error', 'Please pick a pickup port (drayage) or enter a pickup ZIP/postal code.'); return; }
+    if (!req.delivery.zip && !req.delivery.city) { showError('qf-error', 'Please enter a delivery ZIP/postal code.'); return; }
+    if (!hasPostalCode($('qf-delivery-zip').value, req.delivery)) { showError('qf-error', 'Please enter a delivery ZIP/postal code for a more accurate rate. City-only delivery can change the price in large metro areas.'); return; }
+    var oogCheck = $('qf-oog-check');
+    if (isOpenTopOrFlatRack(req.equipment) && oogCheck && oogCheck.checked) {
+      var hasDims = ($('qf-oog-height').value || $('qf-oog-width').value || $('qf-oog-length').value || $('qf-oog-notes').value || '').trim();
+      if (!hasDims) { showError('qf-error', 'Please add oversize dimensions or notes for open top / flat rack review.'); return; }
+    }
     var btn = $('qf-calc-btn'); var oldText = btn.textContent; btn.disabled = true; btn.innerHTML = '<span class="qf-spinner"></span> &nbsp; Calculating…';
     fetch('/api/public/quote/' + slug, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(req) })
       .then(function (r) { return r.json(); })
@@ -406,7 +480,7 @@
   function renderResult(resp) {
     var r = resp.result;
     $('qf-total').textContent = fmtMoney(r.total);
-    $('qf-meta').textContent = 'Approx. ' + Math.round(resp.miles) + ' mi · ' + (state.service || 'truck') + ' · ' + (state.equipment || '');
+    $('qf-meta').textContent = 'Approx. ' + Math.round(resp.miles) + ' mi · ' + (state.service || 'truck') + ' · ' + normalizeEquipmentLabel(state.equipment || '', state.service);
     var lines = $('qf-lines'); lines.innerHTML = '';
     r.lines.forEach(function (l) { var row = el('div', { class: 'line' }, [el('span', { class: 'name', text: l.name }), el('span', { class: 'amt', text: '$' + fmtMoney(l.amount) })]); lines.appendChild(row); });
     var totalRow = el('div', { class: 'line total-row' }, [el('span', { class: 'name', text: 'Total' }), el('span', { class: 'amt', text: '$' + fmtMoney(r.total) })]);
@@ -418,93 +492,97 @@
     e && e.preventDefault(); showError('qf-submit-error', null); var rules = getContactRules();
     var name = $('qf-c-name').value.trim(); var email = $('qf-c-email').value.trim(); var phone = $('qf-c-phone').value.trim();
     if (!name) { showError('qf-submit-error', 'Please enter your name.'); return; }
-    if (rules.requireEmail) { if (!email || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) { showError('qf-submit-error', 'Please enter a valid email.'); return; } }
-    else if (email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) { showError('qf-submit-error', 'That email looks invalid — clear it or fix the format.'); return; }
+    if (rules.requireEmail) { if (!email || !/^\S+@\S+\.\S+$/.test(email)) { showError('qf-submit-error', 'Please enter a valid email.'); return; } }
+    else if (email && !/^\S+@\S+\.\S+$/.test(email)) { showError('qf-submit-error', 'That email looks invalid — clear it or fix the format.'); return; }
     if (rules.requirePhone && !phone) { showError('qf-submit-error', 'Please enter a phone number.'); return; }
-    if (!email && !phone) { showError('qf-submit-error', 'Please leave an email or a phone so we can reach you.'); return; }
     var req = gatherQuoteRequest();
-    req.customerName = name; req.customerEmail = email || undefined; req.customerPhone = phone || undefined; req.customerCompany = $('qf-c-company').value.trim() || undefined; req.notes = $('qf-c-notes').value.trim() || undefined;
+    var payload = { quoteRequest: req, customerName: name, customerEmail: email || undefined, customerPhone: phone || undefined, customerCompany: $('qf-c-company').value.trim() || undefined, notes: $('qf-c-notes').value.trim() || undefined, sourceUrl: location.href };
     var btn = $('qf-submit-btn'); var oldText = btn.textContent; btn.disabled = true; btn.innerHTML = '<span class="qf-spinner"></span> &nbsp; Sending…';
-    fetch('/api/public/lead/' + slug, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(req) })
+    fetch('/api/public/lead/' + slug, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) })
       .then(function (r) { return r.json(); })
-      .then(function (resp) { btn.disabled = false; btn.textContent = oldText; if (resp.error) { showError('qf-submit-error', resp.error); return; } state.refId = resp.refId; var sentTo = email || phone || ''; $('qf-thanks-msg').textContent = 'Quote ' + resp.refId + ' — $' + fmtMoney(resp.total) + (sentTo ? ' — sent to ' + sentTo : ''); $('qf-thanks-detail').textContent = 'Have a question? Ask the AI assistant below — about transit time, accessorials, pickup readiness, anything.'; showStep('thanks'); })
+      .then(function (resp) {
+        btn.disabled = false; btn.textContent = oldText;
+        if (resp.error) { showError('qf-submit-error', resp.error); return; }
+        state.refId = resp.refId || '';
+        $('qf-thanks-msg').textContent = 'Thanks — your quote request was sent.';
+        $('qf-thanks-detail').textContent = resp.refId ? 'Reference: ' + resp.refId + '. You can now ask a question or request a callback.' : 'You can now ask a question or request a callback.';
+        showStep('thanks');
+      })
       .catch(function (err) { btn.disabled = false; btn.textContent = oldText; showError('qf-submit-error', 'Network error — please try again.'); console.error(err); });
   }
 
   function initTypeaheads() {
-    var pickup = $('qf-pickup-zip'); var pickupBox = $('qf-pickup-suggestions'); var delivery = $('qf-delivery-zip'); var deliveryBox = $('qf-delivery-suggestions');
-    if (pickup && pickupBox) attachTypeahead(pickup, pickupBox, function (s) { state.pickupResolved = s; });
-    if (delivery && deliveryBox) attachTypeahead(delivery, deliveryBox, function (s) { state.deliveryResolved = s; });
-  }
-
-  function attachTypeahead(input, box, onPick) {
-    var debounceId = null; var lastQuery = ''; var activeIndex = -1;
-    function close() { box.classList.remove('open'); box.innerHTML = ''; activeIndex = -1; }
-    function render(suggestions) {
-      box.innerHTML = ''; if (!suggestions.length) { close(); return; }
-      suggestions.forEach(function (s, i) {
-        var div = document.createElement('div'); div.className = 'qf-suggestion'; div.textContent = s.label;
-        if (s.zip || s.state) { var meta = document.createElement('span'); meta.className = 'meta'; meta.textContent = [s.kind, s.country].filter(Boolean).join(' · '); div.appendChild(meta); }
-        div.addEventListener('mousedown', function (ev) { ev.preventDefault(); input.value = s.label; if (typeof onPick === 'function') onPick(s); close(); });
-        box.appendChild(div);
+    $$('[data-typeahead="locations"]').forEach(function (wrap) {
+      var target = wrap.getAttribute('data-target');
+      var input = target === 'pickup' ? $('qf-pickup-zip') : $('qf-delivery-zip');
+      var box = target === 'pickup' ? $('qf-pickup-suggestions') : $('qf-delivery-suggestions');
+      var timer = null;
+      function close() { box.classList.remove('open'); box.innerHTML = ''; }
+      function render(items) {
+        box.innerHTML = '';
+        if (!items.length) { close(); return; }
+        items.slice(0, 8).forEach(function (item) {
+          var div = document.createElement('div'); div.className = 'qf-suggestion';
+          var label = [item.city, item.state, item.zip].filter(Boolean).join(', ');
+          div.innerHTML = escapeHtml(label || item.label || '') + '<span class="meta">' + escapeHtml(item.country || 'US') + '</span>';
+          div.addEventListener('mousedown', function (ev) { ev.preventDefault(); input.value = label; if (target === 'pickup') state.pickupResolved = item; else state.deliveryResolved = item; close(); });
+          box.appendChild(div);
+        });
+        box.classList.add('open');
+      }
+      input.addEventListener('input', function () {
+        if (target === 'pickup') state.pickupResolved = null; else state.deliveryResolved = null;
+        clearTimeout(timer);
+        var q = input.value.trim();
+        if (q.length < 2) { close(); return; }
+        timer = setTimeout(function () {
+          fetch('/api/tools/places?q=' + encodeURIComponent(q))
+            .then(function (r) { return r.json(); })
+            .then(function (resp) { render(resp.items || []); })
+            .catch(close);
+        }, 180);
       });
-      box.classList.add('open');
-    }
-    function fetchSuggestions(q) { fetch('/api/public/autocomplete/locations?q=' + encodeURIComponent(q)).then(function (r) { return r.json(); }).then(function (j) { if (input.value.trim() !== q) return; render(j.suggestions || []); }).catch(function () { close(); }); }
-    input.addEventListener('input', function () { var q = input.value.trim(); if (q === lastQuery) return; lastQuery = q; if (typeof onPick === 'function') onPick(null); clearTimeout(debounceId); if (q.length < 2) { close(); return; } debounceId = setTimeout(function () { fetchSuggestions(q); }, 220); });
-    input.addEventListener('keydown', function (e) { if (!box.classList.contains('open')) return; var items = Array.from(box.querySelectorAll('.qf-suggestion')); if (e.key === 'ArrowDown') { e.preventDefault(); activeIndex = (activeIndex + 1) % items.length; updateActive(items); } else if (e.key === 'ArrowUp') { e.preventDefault(); activeIndex = (activeIndex - 1 + items.length) % items.length; updateActive(items); } else if (e.key === 'Enter' && activeIndex >= 0) { e.preventDefault(); items[activeIndex].dispatchEvent(new MouseEvent('mousedown')); } else if (e.key === 'Escape') { close(); } });
-    input.addEventListener('blur', function () { setTimeout(close, 120); });
-    function updateActive(items) { items.forEach(function (node, i) { node.classList.toggle('active', i === activeIndex); }); }
+      input.addEventListener('blur', function () { setTimeout(close, 130); });
+      input.addEventListener('keydown', function (e) { if (e.key === 'Escape') close(); });
+    });
+
+    document.addEventListener('click', function (e) {
+      var help = e.target.closest('.qf-help');
+      if (!help) { closeTip(); return; }
+      e.preventDefault(); e.stopPropagation(); showTip(help);
+    });
+    window.addEventListener('resize', closeTip);
+    window.addEventListener('scroll', closeTip, true);
   }
 
-  function initTooltips() {
-    var bubble = document.createElement('div');
-    bubble.className = 'qf-tip-bubble';
-    document.body.appendChild(bubble);
-    var openFor = null;
-    function show(target) {
-      var text = target.getAttribute('data-tip') || target.title;
-      if (!text) return;
-      bubble.textContent = text;
-      var rect = target.getBoundingClientRect();
-      var bw = Math.min(240, document.body.clientWidth * 0.86);
-      bubble.style.maxWidth = bw + 'px';
-      var left = Math.max(8, Math.min(window.innerWidth - bw - 8, rect.left + rect.width / 2 - bw / 2));
-      var arrowX = Math.max(8, rect.left + rect.width / 2 - left - 5);
-      bubble.style.setProperty('--qf-tip-arrow', arrowX + 'px');
-      bubble.style.left = (left + window.scrollX) + 'px';
-      bubble.style.top = (rect.bottom + window.scrollY + 8) + 'px';
-      bubble.classList.add('show');
-      target.classList.add('open');
-      openFor = target;
-    }
-    function hide() { bubble.classList.remove('show'); if (openFor) openFor.classList.remove('open'); openFor = null; }
-    document.addEventListener('mouseover', function (e) { if (e.pointerType && e.pointerType !== 'mouse') return; var t = e.target.closest('[data-tip]'); if (t) show(t); });
-    document.addEventListener('mouseout', function (e) { var t = e.target.closest('[data-tip]'); if (!t) return; if (e.relatedTarget && bubble.contains(e.relatedTarget)) return; hide(); });
-    document.addEventListener('pointerdown', function (e) {
-      var t = e.target.closest('[data-tip]');
-      if (!t) return;
-      e.preventDefault();
-      e.stopPropagation();
-      if (openFor === t) hide(); else show(t);
-    }, true);
-    document.addEventListener('click', function (e) {
-      var t = e.target.closest('[data-tip]');
-      if (t) { e.preventDefault(); e.stopPropagation(); return; }
-      if (openFor) hide();
-    }, true);
-    window.addEventListener('scroll', hide, true);
-    window.addEventListener('resize', hide);
+  var tipEl = null;
+  function closeTip() { if (tipEl) { tipEl.remove(); tipEl = null; $$('.qf-help.open').forEach(function (h) { h.classList.remove('open'); }); } }
+  function showTip(help) {
+    var text = help.getAttribute('data-tip');
+    if (!text) return;
+    var wasOpen = help.classList.contains('open');
+    closeTip();
+    if (wasOpen) return;
+    help.classList.add('open');
+    tipEl = document.createElement('div');
+    tipEl.className = 'qf-tip-bubble';
+    tipEl.textContent = text;
+    document.body.appendChild(tipEl);
+    var r = help.getBoundingClientRect();
+    var maxW = Math.min(260, window.innerWidth - 20);
+    tipEl.style.maxWidth = maxW + 'px';
+    var tw = tipEl.offsetWidth;
+    var left = Math.max(10, Math.min(window.innerWidth - tw - 10, r.left + r.width / 2 - tw / 2));
+    var top = r.bottom + 8;
+    tipEl.style.left = left + 'px';
+    tipEl.style.top = top + 'px';
+    tipEl.style.setProperty('--qf-tip-arrow', Math.max(12, Math.min(tw - 18, r.left + r.width / 2 - left - 5)) + 'px');
+    requestAnimationFrame(function () { if (tipEl) tipEl.classList.add('show'); });
   }
-  initTooltips();
 
   function autoResize() {
-    if (window.parent === window) return;
-    var h = document.body.scrollHeight + 24;
-    window.parent.postMessage({ qf: 'resize', slug: slug, h: h }, '*');
+    try { if (window.parent && window.parent !== window) window.parent.postMessage({ type: 'QF_WIDGET_HEIGHT', height: document.documentElement.scrollHeight }, '*'); } catch (_) { }
   }
-  window.addEventListener('resize', autoResize);
-  setInterval(autoResize, 800);
 
   init();
 })();
