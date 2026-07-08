@@ -1,7 +1,8 @@
 /* Phase BZ: QuoteFleet global color system.
    Core palette from product direction:
    accent #0D3CFC, white #FFFFFF, dark background #181D1F,
-   dark cards #22282A, light cards #E4EDF1, muted text #B1C5CE. */
+   dark cards #22282A, light cards #E4EDF1, muted text #B1C5CE.
+   Alternate light surfaces: #F3EDDF, #EFE7D8, #E6E3E0, hover #D4CFC9, text #1E1E1E. */
 :root {
   --qf-color-accent: #0D3CFC;
   --qf-color-white: #FFFFFF;
@@ -9,6 +10,11 @@
   --qf-color-card-dark: #22282A;
   --qf-color-card-light: #E4EDF1;
   --qf-color-muted: #B1C5CE;
+  --qf-color-warm-card: #F3EDDF;
+  --qf-color-warm-muted: #EFE7D8;
+  --qf-color-neutral-card: #E6E3E0;
+  --qf-color-neutral-card-hover: #D4CFC9;
+  --qf-color-light-text: #1E1E1E;
   --accent: #0D3CFC;
   --accent-strong: #0B32D4;
   --accent-soft: rgba(13, 60, 252, .14);
@@ -105,6 +111,7 @@ body.qf-auth-wft main {
   background: var(--qf-color-bg) !important;
 }
 
+/* Dark cards: blue buttons / white text. */
 body.qf-wft .how-section,
 body.qf-wft .site-footer,
 body.qf-public-wft .support-card,
@@ -135,13 +142,30 @@ body.qf-public-wft.qf-tools-marketplace #qf-result-card {
   color: var(--qf-color-white) !important;
 }
 
+/* Warm light marketing cards: blue text/action details and dark readable copy. */
 body.qf-wft .flow-rates,
 body.qf-wft .step-art,
 body.qf-wft .site-mini,
 body.qf-wft .email-mini,
 body.qf-wft .url-chip,
 body.qf-wft .share-strip span,
-body.qf-wft .mini-checks span,
+body.qf-wft .mini-checks span {
+  background: var(--qf-color-warm-card) !important;
+  border-color: var(--qf-color-warm-muted) !important;
+  color: var(--qf-color-light-text) !important;
+}
+
+body.qf-wft .flow-rates *,
+body.qf-wft .step-art *,
+body.qf-wft .site-mini *,
+body.qf-wft .email-mini *,
+body.qf-wft .url-chip *,
+body.qf-wft .share-strip span *,
+body.qf-wft .mini-checks span * {
+  color: var(--qf-color-light-text) !important;
+}
+
+/* Neutral grey cards/controls: blue buttons, hover to #D4CFC9. */
 body.qf-auth-wft .input,
 body.qf-auth-wft .select,
 body.qf-auth-wft .url-builder-preview,
@@ -150,16 +174,18 @@ body.qf-public-wft.qf-tools-marketplace .select,
 body.qf-public-wft.qf-tools-marketplace .typeahead-list,
 body.qf-public-wft.qf-tools-marketplace .chip,
 body.qf-public-wft.qf-tools-marketplace .mp-pill {
-  background: var(--qf-color-card-light) !important;
+  background: var(--qf-color-neutral-card) !important;
   border-color: rgba(13,60,252,.22) !important;
-  color: #181D1F !important;
+  color: var(--qf-color-light-text) !important;
 }
 
-body.qf-wft .flow-rates *,
-body.qf-wft .step-art *,
-body.qf-wft .site-mini *,
-body.qf-wft .email-mini *,
-body.qf-wft .url-chip *,
+body.qf-auth-wft .input:hover,
+body.qf-auth-wft .select:hover,
+body.qf-public-wft.qf-tools-marketplace .chip:hover,
+body.qf-public-wft.qf-tools-marketplace .mp-pill:hover {
+  background: var(--qf-color-neutral-card-hover) !important;
+}
+
 body.qf-auth-wft .input,
 body.qf-auth-wft .select,
 body.qf-auth-wft .url-builder-preview,
@@ -167,9 +193,10 @@ body.qf-public-wft.qf-tools-marketplace .input,
 body.qf-public-wft.qf-tools-marketplace .select,
 body.qf-public-wft.qf-tools-marketplace .chip,
 body.qf-public-wft.qf-tools-marketplace .mp-pill {
-  color: #181D1F !important;
+  color: var(--qf-color-light-text) !important;
 }
 
+/* Blue buttons: white border on hover. */
 body.qf-wft .btn-primary,
 body.qf-wft .btn-lg.btn-primary,
 body.qf-wft .final-actions .btn-primary,
@@ -200,6 +227,7 @@ body.qf-auth-wft .qf-mc-send:hover {
   border-color: var(--qf-color-white) !important;
 }
 
+/* White buttons: blue border on hover. */
 body.qf-wft .btn-secondary,
 body.qf-wft .demo-link.final-demo,
 body.qf-public-wft .btn-secondary,
@@ -238,10 +266,10 @@ body.qf-app-calculator {
   --w-primary-hover: #0B32D4;
   --qf-app-bg: #181D1F;
   --qf-app-shell: #22282A;
-  --qf-app-card: #E4EDF1;
-  --qf-app-card-soft: #FFFFFF;
+  --qf-app-card: #E6E3E0;
+  --qf-app-card-soft: #F3EDDF;
   --qf-app-border: rgba(13,60,252,.20);
-  --qf-app-text: #181D1F;
+  --qf-app-text: #1E1E1E;
   --qf-app-muted: #4F6670;
   background: var(--qf-color-bg) !important;
 }
@@ -274,9 +302,17 @@ body.qf-app-calculator .qf-demo-brand-card,
 body.qf-app-calculator .qf-demo-brand-editor,
 body.qf-app-calculator .qf-options-panel .qf-flags label,
 body.qf-app-calculator .qf-options-panel .qf-acc-chip {
-  background: var(--qf-color-card-light) !important;
+  background: var(--qf-color-neutral-card) !important;
   border-color: rgba(13,60,252,.20) !important;
-  color: #181D1F !important;
+  color: var(--qf-color-light-text) !important;
+}
+
+body.qf-app-calculator .qf-input:hover,
+body.qf-app-calculator .qf-select:hover,
+body.qf-app-calculator .qf-tabs button:hover,
+body.qf-app-calculator .qf-options-panel .qf-flags label:hover,
+body.qf-app-calculator .qf-options-panel .qf-acc-chip:hover {
+  background: var(--qf-color-neutral-card-hover) !important;
 }
 
 body.qf-app-calculator .qf-tabs button.active,
@@ -293,7 +329,7 @@ body.qf-app-calculator .qf-demo-brand-card span,
 body.qf-app-calculator .qf-demo-brand-editor-head strong,
 body.qf-app-calculator .qf-demo-brand-grid label,
 body.qf-app-calculator .qf-result .total {
-  color: #181D1F !important;
+  color: var(--qf-color-light-text) !important;
 }
 
 body.qf-app-calculator .qf-help {
@@ -306,4 +342,6 @@ html[data-theme="light"] {
   --accent-strong: #0B32D4;
   --accent-soft: rgba(13,60,252,.12);
   --accent-ink: #FFFFFF;
+  --surface-3: #E6E3E0;
+  --ink: #1E1E1E;
 }
