@@ -1,7 +1,10 @@
+@import url('/quotefleet-color-system.css');
+
 /* Phase BR: WeFixTrades-style vertical/product pages. */
 .qf-vertical-wft .hero {
   text-align: left;
   padding: 76px 28px 58px;
+  background: #181D1F;
 }
 .qf-vertical-wft .hero .container-narrow {
   max-width: 980px;
@@ -12,22 +15,24 @@
   line-height: .98;
   font-weight: 900;
   letter-spacing: -.06em;
+  color: #FFFFFF;
 }
 .qf-vertical-wft .hero h1 .accent {
-  color: #f5fcff;
+  color: #FFFFFF;
   background: none;
   -webkit-text-fill-color: currentColor;
 }
 .qf-vertical-wft .hero p.lead {
   max-width: 740px;
   margin-left: 0;
-  color: rgba(245,252,255,.70);
+  color: #B1C5CE;
 }
 .qf-vertical-wft .hero-cta {
   justify-content: flex-start;
 }
 .qf-vertical-wft .section {
   padding: 42px 28px;
+  background: #181D1F;
 }
 .qf-vertical-wft .section-head {
   text-align: left;
@@ -35,7 +40,7 @@
 }
 .qf-vertical-wft .section-head h2,
 .qf-vertical-wft .section h2 {
-  color: #f5fcff;
+  color: #FFFFFF;
   font-size: clamp(30px, 4.2vw, 48px);
   font-weight: 900;
   letter-spacing: -.045em;
@@ -49,7 +54,7 @@
   min-height: 178px;
   border: 1px solid rgba(255,255,255,.12);
   border-radius: 8px;
-  background: rgba(17,24,23,.92);
+  background: #22282A;
   box-shadow: 0 28px 70px -55px rgba(0,0,0,.85), inset 0 1px 0 rgba(255,255,255,.04);
   padding: 20px;
   transition: transform .16s ease, border-color .16s ease, background .16s ease;
@@ -57,30 +62,30 @@
 .qf-vertical-wft .feature-card:hover {
   transform: translateY(-2px);
   border-color: rgba(255,255,255,.24);
-  background: rgba(21,29,28,.96);
+  background: #22282A;
 }
 .qf-vertical-wft .feature-card h3 {
-  color: #f5fcff;
+  color: #FFFFFF;
   font-size: 17px;
   letter-spacing: -.02em;
 }
 .qf-vertical-wft .feature-card p {
-  color: rgba(245,252,255,.68);
+  color: #B1C5CE;
   font-size: 13.5px;
   line-height: 1.45;
   margin-top: 8px;
 }
 .qf-vertical-wft code {
-  color: #f3eee6;
-  background: rgba(255,255,255,.07);
-  border: 1px solid rgba(255,255,255,.12);
+  color: #181D1F;
+  background: #E4EDF1;
+  border: 1px solid rgba(13,60,252,.22);
   border-radius: 4px;
   padding: 1px 5px;
 }
 .qf-vertical-wft .section[style*="text-align: center"] .container-narrow {
   border: 1px solid rgba(255,255,255,.12);
   border-radius: 8px;
-  background: rgba(17,24,23,.92);
+  background: #22282A;
   padding: 34px 24px;
   box-shadow: 0 28px 70px -55px rgba(0,0,0,.85), inset 0 1px 0 rgba(255,255,255,.04);
 }

@@ -19,14 +19,15 @@ describe('public auth blue accent cleanup', () => {
     expect(signup).toContain('qf-auth-wft');
   });
 
-  it('uses blue instead of teal on auth, footer, and chat overrides', async () => {
+  it('uses brand blue instead of teal on auth, footer, and chat overrides', async () => {
     const authCss = await file('public-auth-wefixtrades.css');
     const blueFixes = await file('public-blue-fixes.css');
     const landingMotion = await file('landing-motion.js');
     const publicCss = await file('public-pages-wefixtrades.css');
 
     expect(authCss).toContain('Phase BW');
-    expect(authCss).toContain('--accent: #0d3cfc');
+    expect(authCss).toContain('--accent: #0D3CFC');
+    expect(authCss).toContain('/quotefleet-color-system.css');
     expect(authCss).toContain('.qf-mc-bubble');
     expect(authCss).not.toContain('#5EEAD4');
     expect(authCss).not.toContain('#5eead4');
@@ -38,6 +39,8 @@ describe('public auth blue accent cleanup', () => {
     expect(blueFixes).not.toContain('#5eead4');
 
     expect(landingMotion).toContain('/public-blue-fixes.css');
+    expect(landingMotion).toContain('/quotefleet-color-system.css');
     expect(publicCss).toContain('--accent: #0d3cfc');
+    expect(publicCss).toContain('--qf-wft-blue: #0D3CFC');
   });
 });

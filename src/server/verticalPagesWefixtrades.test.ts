@@ -22,8 +22,12 @@ describe('WeFixTrades-style vertical public pages', () => {
     const css = await file('vertical-pages-wefixtrades.css');
 
     expect(css).toContain('Phase BR');
+    expect(css).toContain('/quotefleet-color-system.css');
     expect(css).toContain('.qf-vertical-wft .feature-card');
     expect(css).toContain('.qf-vertical-wft .hero h1');
-    expect(css).toContain('rgba(17,24,23,.92)');
+    expect(css).toContain('#181D1F');
+    expect(css).toContain('#22282A');
+    expect(css).toContain('#E4EDF1');
+    expect(css).toContain('#B1C5CE');
   });
 });

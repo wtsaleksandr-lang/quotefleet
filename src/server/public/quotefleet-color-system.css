@@ -1,0 +1,347 @@
+/* Phase BZ: QuoteFleet global color system.
+   Core palette from product direction:
+   accent #0D3CFC, white #FFFFFF, dark background #181D1F,
+   dark cards #22282A, light cards #E4EDF1, muted text #B1C5CE.
+   Alternate light surfaces: #F3EDDF, #EFE7D8, #E6E3E0, hover #D4CFC9, text #1E1E1E. */
+:root {
+  --qf-color-accent: #0D3CFC;
+  --qf-color-white: #FFFFFF;
+  --qf-color-bg: #181D1F;
+  --qf-color-card-dark: #22282A;
+  --qf-color-card-light: #E4EDF1;
+  --qf-color-muted: #B1C5CE;
+  --qf-color-warm-card: #F3EDDF;
+  --qf-color-warm-muted: #EFE7D8;
+  --qf-color-neutral-card: #E6E3E0;
+  --qf-color-neutral-card-hover: #D4CFC9;
+  --qf-color-light-text: #1E1E1E;
+  --accent: #0D3CFC;
+  --accent-strong: #0B32D4;
+  --accent-soft: rgba(13, 60, 252, .14);
+  --accent-ink: #FFFFFF;
+  --bg: #181D1F;
+  --surface: #22282A;
+  --surface-2: #22282A;
+  --surface-3: #E4EDF1;
+  --ink: #FFFFFF;
+  --ink-soft: #FFFFFF;
+  --muted: #B1C5CE;
+  --muted-soft: rgba(177,197,206,.72);
+  --border: rgba(255,255,255,.12);
+  --border-strong: rgba(255,255,255,.22);
+}
+
+body.qf-wft,
+body.qf-public-wft,
+body.qf-auth-wft {
+  background: var(--qf-color-bg) !important;
+  color: var(--qf-color-white) !important;
+}
+
+body.qf-wft::before {
+  background:
+    radial-gradient(circle at 20% -10%, rgba(13,60,252,.16), transparent 32%),
+    linear-gradient(rgba(255,255,255,.010) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(255,255,255,.010) 1px, transparent 1px) !important;
+}
+
+body.qf-wft .site-header,
+body.qf-wft .topnav,
+body.qf-public-wft .topnav,
+body.qf-auth-wft .topnav,
+body.qf-wft .premium-footer,
+body.qf-public-wft .site-footer {
+  background: var(--qf-color-card-dark) !important;
+  border-color: rgba(255,255,255,.12) !important;
+}
+
+body.qf-wft h1,
+body.qf-wft h2,
+body.qf-wft h3,
+body.qf-wft h4,
+body.qf-public-wft h1,
+body.qf-public-wft h2,
+body.qf-public-wft h3,
+body.qf-public-wft h4,
+body.qf-auth-wft h1,
+body.qf-auth-wft h2,
+body.qf-auth-wft h3,
+body.qf-auth-wft h4,
+body.qf-wft .site-brand,
+body.qf-wft .brand-mark,
+body.qf-public-wft .brand-mark,
+body.qf-auth-wft .brand-mark {
+  color: var(--qf-color-white) !important;
+}
+
+body.qf-wft p,
+body.qf-wft .lead,
+body.qf-wft .micro-copy,
+body.qf-wft .muted,
+body.qf-wft .muted-small,
+body.qf-public-wft p,
+body.qf-public-wft li,
+body.qf-public-wft .muted,
+body.qf-public-wft .muted-small,
+body.qf-auth-wft .muted-small,
+body.qf-auth-wft .field-hint,
+body.qf-auth-wft .field-label {
+  color: var(--qf-color-muted) !important;
+}
+
+body.qf-wft a,
+body.qf-public-wft a,
+body.qf-auth-wft a,
+body.qf-wft .footer-col a,
+body.qf-wft .footer-bottom a {
+  color: var(--qf-color-white) !important;
+}
+
+body.qf-wft a:hover,
+body.qf-public-wft a:hover,
+body.qf-auth-wft a:hover {
+  color: var(--qf-color-white) !important;
+}
+
+body.qf-wft .section,
+body.qf-wft .hero,
+body.qf-wft .final-section,
+body.qf-public-wft .hero,
+body.qf-auth-wft main {
+  background: var(--qf-color-bg) !important;
+}
+
+/* Dark cards: blue buttons / white text. */
+body.qf-wft .how-section,
+body.qf-wft .site-footer,
+body.qf-public-wft .support-card,
+body.qf-public-wft .support-note,
+body.qf-public-wft .support-table,
+body.qf-public-wft .price-card,
+body.qf-public-wft .sec-shell .ct-card,
+body.qf-public-wft .sec-shell .footer-note,
+body.qf-auth-wft .card.elevated,
+body.qf-wft .visual-flow,
+body.qf-wft .flow-page,
+body.qf-wft .flow-customer,
+body.qf-wft .simple-step,
+body.qf-wft .final-cta-card,
+body.qf-wft .feature-card,
+body.qf-wft .use-card,
+body.qf-wft .faq-item,
+body.qf-wft .compare-card,
+body.qf-wft .pdf-card,
+body.qf-wft .scheduler-card,
+body.qf-wft .chat-demo,
+body.qf-public-wft.qf-tools-marketplace .tool-card,
+body.qf-public-wft.qf-tools-marketplace .mp-card,
+body.qf-public-wft.qf-tools-marketplace .mp-empty,
+body.qf-public-wft.qf-tools-marketplace #qf-result-card {
+  background: var(--qf-color-card-dark) !important;
+  border-color: rgba(255,255,255,.12) !important;
+  color: var(--qf-color-white) !important;
+}
+
+/* Warm light marketing cards: blue text/action details and dark readable copy. */
+body.qf-wft .flow-rates,
+body.qf-wft .step-art,
+body.qf-wft .site-mini,
+body.qf-wft .email-mini,
+body.qf-wft .url-chip,
+body.qf-wft .share-strip span,
+body.qf-wft .mini-checks span {
+  background: var(--qf-color-warm-card) !important;
+  border-color: var(--qf-color-warm-muted) !important;
+  color: var(--qf-color-light-text) !important;
+}
+
+body.qf-wft .flow-rates *,
+body.qf-wft .step-art *,
+body.qf-wft .site-mini *,
+body.qf-wft .email-mini *,
+body.qf-wft .url-chip *,
+body.qf-wft .share-strip span *,
+body.qf-wft .mini-checks span * {
+  color: var(--qf-color-light-text) !important;
+}
+
+/* Neutral grey cards/controls: blue buttons, hover to #D4CFC9. */
+body.qf-auth-wft .input,
+body.qf-auth-wft .select,
+body.qf-auth-wft .url-builder-preview,
+body.qf-public-wft.qf-tools-marketplace .input,
+body.qf-public-wft.qf-tools-marketplace .select,
+body.qf-public-wft.qf-tools-marketplace .typeahead-list,
+body.qf-public-wft.qf-tools-marketplace .chip,
+body.qf-public-wft.qf-tools-marketplace .mp-pill {
+  background: var(--qf-color-neutral-card) !important;
+  border-color: rgba(13,60,252,.22) !important;
+  color: var(--qf-color-light-text) !important;
+}
+
+body.qf-auth-wft .input:hover,
+body.qf-auth-wft .select:hover,
+body.qf-public-wft.qf-tools-marketplace .chip:hover,
+body.qf-public-wft.qf-tools-marketplace .mp-pill:hover {
+  background: var(--qf-color-neutral-card-hover) !important;
+}
+
+body.qf-auth-wft .input,
+body.qf-auth-wft .select,
+body.qf-auth-wft .url-builder-preview,
+body.qf-public-wft.qf-tools-marketplace .input,
+body.qf-public-wft.qf-tools-marketplace .select,
+body.qf-public-wft.qf-tools-marketplace .chip,
+body.qf-public-wft.qf-tools-marketplace .mp-pill {
+  color: var(--qf-color-light-text) !important;
+}
+
+/* Blue buttons: white border on hover. */
+body.qf-wft .btn-primary,
+body.qf-wft .btn-lg.btn-primary,
+body.qf-wft .final-actions .btn-primary,
+body.qf-auth-wft .btn-primary,
+body.qf-public-wft .btn-primary,
+body.qf-public-wft.qf-tools-marketplace .chip.active,
+body.qf-app-calculator .qf-cta,
+body.qf-app-calculator .qf-acc-chip.active,
+body.qf-app-calculator .qf-options-panel .qf-acc-chip.active,
+body.qf-app-calculator .qf-demo-logo-slot em,
+body.qf-wft .qf-mc-send,
+body.qf-public-wft .qf-mc-send,
+body.qf-auth-wft .qf-mc-send {
+  background: var(--qf-color-accent) !important;
+  border: 1px solid var(--qf-color-accent) !important;
+  color: var(--qf-color-white) !important;
+}
+
+body.qf-wft .btn-primary:hover,
+body.qf-wft .btn-lg.btn-primary:hover,
+body.qf-wft .final-actions .btn-primary:hover,
+body.qf-auth-wft .btn-primary:hover,
+body.qf-public-wft .btn-primary:hover,
+body.qf-app-calculator .qf-cta:hover,
+body.qf-wft .qf-mc-send:hover,
+body.qf-public-wft .qf-mc-send:hover,
+body.qf-auth-wft .qf-mc-send:hover {
+  border-color: var(--qf-color-white) !important;
+}
+
+/* White buttons: blue border on hover. */
+body.qf-wft .btn-secondary,
+body.qf-wft .demo-link.final-demo,
+body.qf-public-wft .btn-secondary,
+body.qf-app-calculator .qf-cta.qf-secondary,
+body.qf-wft .flow-page .mini-browser button,
+body.qf-wft .flow-customer .mini-actions span {
+  background: var(--qf-color-white) !important;
+  border: 1px solid var(--qf-color-white) !important;
+  color: var(--qf-color-accent) !important;
+}
+
+body.qf-wft .btn-secondary:hover,
+body.qf-wft .demo-link.final-demo:hover,
+body.qf-public-wft .btn-secondary:hover,
+body.qf-app-calculator .qf-cta.qf-secondary:hover,
+body.qf-wft .flow-page .mini-browser button:hover,
+body.qf-wft .flow-customer .mini-actions span:hover {
+  border-color: var(--qf-color-accent) !important;
+}
+
+body.qf-wft .eyebrow,
+body.qf-wft .section-kicker,
+body.qf-wft .tag,
+body.qf-wft .flow-label,
+body.qf-wft .use-badge,
+body.qf-public-wft .support-pill,
+body.qf-public-wft .sec-shell .pill,
+body.qf-public-wft .tag {
+  color: var(--qf-color-white) !important;
+  background: rgba(13,60,252,.16) !important;
+  border-color: rgba(13,60,252,.42) !important;
+}
+
+body.qf-app-calculator {
+  --w-primary: #0D3CFC;
+  --w-primary-hover: #0B32D4;
+  --qf-app-bg: #181D1F;
+  --qf-app-shell: #22282A;
+  --qf-app-card: #E6E3E0;
+  --qf-app-card-soft: #F3EDDF;
+  --qf-app-border: rgba(13,60,252,.20);
+  --qf-app-text: #1E1E1E;
+  --qf-app-muted: #4F6670;
+  background: var(--qf-color-bg) !important;
+}
+
+body.qf-app-calculator .qf-widget {
+  background: var(--qf-color-card-dark) !important;
+  border-color: rgba(255,255,255,.12) !important;
+}
+
+body.qf-app-calculator .qf-header .brand-name,
+body.qf-app-calculator .qf-section-title {
+  color: var(--qf-color-white) !important;
+}
+
+body.qf-app-calculator .qf-field label,
+body.qf-app-calculator .qf-field-hint {
+  color: var(--qf-color-muted) !important;
+}
+
+body.qf-app-calculator .qf-tabs,
+body.qf-app-calculator .qf-input,
+body.qf-app-calculator .qf-select,
+body.qf-app-calculator .qf-options-panel,
+body.qf-app-calculator .qf-booking-card,
+body.qf-app-calculator .qf-oog-panel,
+body.qf-app-calculator .qf-conditional-panel,
+body.qf-app-calculator .qf-result,
+body.qf-app-calculator .qf-chat,
+body.qf-app-calculator .qf-demo-brand-card,
+body.qf-app-calculator .qf-demo-brand-editor,
+body.qf-app-calculator .qf-options-panel .qf-flags label,
+body.qf-app-calculator .qf-options-panel .qf-acc-chip {
+  background: var(--qf-color-neutral-card) !important;
+  border-color: rgba(13,60,252,.20) !important;
+  color: var(--qf-color-light-text) !important;
+}
+
+body.qf-app-calculator .qf-input:hover,
+body.qf-app-calculator .qf-select:hover,
+body.qf-app-calculator .qf-tabs button:hover,
+body.qf-app-calculator .qf-options-panel .qf-flags label:hover,
+body.qf-app-calculator .qf-options-panel .qf-acc-chip:hover {
+  background: var(--qf-color-neutral-card-hover) !important;
+}
+
+body.qf-app-calculator .qf-tabs button.active,
+body.qf-app-calculator .qf-cta.qf-secondary,
+body.qf-app-calculator .qf-result .qf-customer-note {
+  background: var(--qf-color-white) !important;
+  color: var(--qf-color-accent) !important;
+  border-color: var(--qf-color-white) !important;
+}
+
+body.qf-app-calculator .qf-tabs button,
+body.qf-app-calculator .qf-options-panel summary,
+body.qf-app-calculator .qf-demo-brand-card span,
+body.qf-app-calculator .qf-demo-brand-editor-head strong,
+body.qf-app-calculator .qf-demo-brand-grid label,
+body.qf-app-calculator .qf-result .total {
+  color: var(--qf-color-light-text) !important;
+}
+
+body.qf-app-calculator .qf-help {
+  background: var(--qf-color-white) !important;
+  color: var(--qf-color-accent) !important;
+}
+
+html[data-theme="light"] {
+  --accent: #0D3CFC;
+  --accent-strong: #0B32D4;
+  --accent-soft: rgba(13,60,252,.12);
+  --accent-ink: #FFFFFF;
+  --surface-3: #E6E3E0;
+  --ink: #1E1E1E;
+}
