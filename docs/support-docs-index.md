@@ -20,7 +20,8 @@ This index points to the low-risk support, maintenance, and launch-readiness doc
 
 - `docs/launch-qa-matrix.md` — freight scenario QA matrix for launch readiness.
 - `docs/production-launch-ops.md` — production monitoring, backups, incident, support, terms/privacy, and retention checklist.
+- `docs/claude-code-production-handoff.md` — credential-blocked production launch handoff for the next engineering agent.
 
 ## How to use this index
 
-Before starting support work, check the automation scope and runbook first. Before editing dashboard or homepage assets, check the related maintenance note so existing load order and copy rules are preserved. Before public launch, review the launch QA matrix and production operations checklist so business, support, and data-handling gaps are tracked before real customer traffic.
+Before starting support work, check the automation scope and runbook first. Before editing dashboard or homepage assets, check the related maintenance note so existing load order and copy rules are preserved. Before public launch, review the launch QA matrix, production operations checklist, and Claude Code handoff so business, support, credential, and data-handling gaps are tracked before real customer traffic.

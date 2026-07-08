@@ -87,6 +87,9 @@ pnpm db:seed
 pnpm accessorials:seed
 pnpm rates:import -- --tenant-slug=demo --file=/path/to/rates.xlsx
 pnpm quotes:recent
+pnpm prod:check -- --target=pilot
+pnpm prod:check -- --target=public-launch
+pnpm prod:check -- --target=paid-launch
 ```
 
 ## Support workflow
@@ -110,6 +113,7 @@ Before real public traffic, review:
 
 - `docs/launch-qa-matrix.md` — freight scenario QA and manual launch sign-off.
 - `docs/production-launch-ops.md` — monitoring, backups, incident process, support workflow, terms/privacy, and data-retention checklist.
+- `docs/claude-code-production-handoff.md` — credential-blocked production handoff for SMTP, DNS, backups, monitoring, Stripe, and legal pages.
 
 Production launch should have assigned owners for monitoring, backups, support, legal/customer notices, billing/account decisions, and incident response.
 
@@ -145,10 +149,12 @@ scripts/
   seed-accessorial-library.ts
   import-rates.ts
   list-recent-quotes.ts
+  check-production-readiness.ts
 docs/
   deploy-replit.md
   rate-import-template.md
   architecture.md
+  claude-code-production-handoff.md
 ```
 
 ## Replit deployment checklist
