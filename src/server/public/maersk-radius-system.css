@@ -44,7 +44,25 @@
 .modal,
 .drawer,
 .dropdown,
-.popover {
+.popover,
+body.qf-wft .visual-flow,
+body.qf-wft .flow-card,
+body.qf-wft .simple-step,
+body.qf-wft .final-cta-card,
+body.qf-wft .step-art,
+body.qf-wft .site-mini,
+body.qf-wft .email-mini,
+body.qf-wft .url-chip,
+body.qf-wft .share-strip span,
+body.qf-wft .mini-checks span,
+body.qf-wft .premium-footer,
+body.qf-auth-wft .card.elevated,
+body.qf-public-wft .price-card,
+body.qf-public-wft .support-card,
+body.qf-public-wft .support-note,
+body.qf-public-wft .support-table,
+body.qf-public-wft .sec-shell .ct-card,
+body.qf-public-wft .sec-shell .footer-note {
   border-radius: var(--qf-maersk-radius-card) !important;
 }
 
@@ -57,7 +75,12 @@ button.btn,
 .qf-cta,
 .qf-chat-send,
 .qf-mc-send,
-button[type="submit"] {
+button[type="submit"],
+body.qf-wft .btn-primary,
+body.qf-wft .btn-secondary,
+body.qf-auth-wft .btn-primary,
+body.qf-public-wft .btn-primary,
+body.qf-public-wft .btn-secondary {
   border-radius: var(--qf-maersk-radius-button) !important;
 }
 
@@ -74,7 +97,10 @@ textarea,
 .qf-suggestions,
 .qf-chat,
 .qf-chat-input-row input,
-.qf-mc-input {
+.qf-mc-input,
+body.qf-auth-wft .input,
+body.qf-auth-wft .select,
+body.qf-auth-wft .url-builder-preview {
   border-radius: var(--qf-maersk-radius-control) !important;
 }
 
@@ -94,7 +120,11 @@ textarea,
 .qf-demo-logo-slot,
 .qf-header img,
 .qf-brand-mark,
-.logo {
+.logo,
+body.qf-wft .site-logo,
+body.qf-wft .logo,
+body.qf-auth-wft .logo,
+body.qf-public-wft .brand-mark .logo {
   border-radius: var(--qf-maersk-radius-control) !important;
 }
 
@@ -107,14 +137,30 @@ textarea,
 .qf-chat,
 .qf-demo-brand-card,
 .qf-demo-brand-editor,
-.qf-demo-logo-upload {
+.qf-demo-logo-upload,
+body.qf-app-calculator .qf-widget,
+body.qf-app-calculator .qf-tabs,
+body.qf-app-calculator .qf-options-panel,
+body.qf-app-calculator .qf-booking-card,
+body.qf-app-calculator .qf-oog-panel,
+body.qf-app-calculator .qf-conditional-panel,
+body.qf-app-calculator .qf-result,
+body.qf-app-calculator .qf-chat,
+body.qf-app-calculator .qf-demo-brand-card,
+body.qf-app-calculator .qf-demo-brand-editor {
   border-radius: var(--qf-maersk-radius-card) !important;
 }
 
 .qf-tabs button,
 .qf-acc-chip,
 .qf-flags label,
-.qf-demo-brand-editor-head button {
+.qf-demo-brand-editor-head button,
+body.qf-app-calculator .qf-tabs button,
+body.qf-app-calculator .qf-acc-chip,
+body.qf-app-calculator .qf-flags label,
+body.qf-app-calculator .qf-cta,
+body.qf-app-calculator .qf-options-panel .qf-flags label,
+body.qf-app-calculator .qf-options-panel .qf-acc-chip {
   border-radius: var(--qf-maersk-radius-button) !important;
 }
 
