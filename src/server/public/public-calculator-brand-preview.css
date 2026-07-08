@@ -46,6 +46,7 @@ body.qf-demo-brand-preview .qf-header {
 }
 
 body.qf-demo-brand-preview .qf-demo-logo-slot {
+  position: relative;
   flex: 0 0 auto;
   width: 46px;
   height: 46px;
@@ -65,6 +66,30 @@ body.qf-demo-brand-preview .qf-demo-logo-slot {
   line-height: 1.05;
   text-align: center;
   box-shadow: 0 8px 18px -16px rgba(15,23,42,.48);
+  cursor: pointer;
+}
+
+body.qf-demo-brand-preview .qf-demo-logo-slot:hover,
+body.qf-demo-brand-preview .qf-demo-logo-slot:focus-visible {
+  border-color: var(--w-primary);
+  outline: none;
+  box-shadow: 0 0 0 4px color-mix(in srgb, var(--w-primary) 14%, transparent), 0 8px 18px -16px rgba(15,23,42,.48);
+}
+
+body.qf-demo-brand-preview .qf-demo-logo-slot em {
+  position: absolute;
+  right: -5px;
+  bottom: -5px;
+  width: 20px;
+  height: 20px;
+  display: grid;
+  place-items: center;
+  border-radius: 999px;
+  background: var(--w-primary);
+  color: #ffffff;
+  font-style: normal;
+  font-size: 11px;
+  border: 2px solid #ffffff;
 }
 
 body.qf-demo-brand-preview .qf-header .brand-name {
@@ -114,26 +139,34 @@ body.qf-demo-brand-preview .qf-header .brand-name {
   overflow: hidden;
 }
 
-.qf-demo-brand-editor summary {
-  list-style: none;
+.qf-demo-brand-editor[hidden] {
+  display: none !important;
+}
+
+.qf-demo-brand-editor-head {
   display: flex;
   align-items: center;
   justify-content: space-between;
   gap: 10px;
-  padding: 12px 14px;
-  cursor: pointer;
-  color: #1f2937;
-  font-weight: 850;
+  padding: 12px 14px 8px;
 }
 
-.qf-demo-brand-editor summary::-webkit-details-marker { display: none; }
+.qf-demo-brand-editor-head strong {
+  color: #1f2937;
+  font-size: 13px;
+  letter-spacing: -0.01em;
+}
 
-.qf-demo-brand-editor summary small {
-  color: #94a3b8;
-  font-size: 10px;
-  font-weight: 900;
-  letter-spacing: .08em;
-  text-transform: uppercase;
+.qf-demo-brand-editor-head button {
+  width: 27px;
+  height: 27px;
+  border: 1px solid #d6dee8;
+  border-radius: 999px;
+  background: #f8fafc;
+  color: #64748b;
+  font-size: 17px;
+  line-height: 1;
+  cursor: pointer;
 }
 
 .qf-demo-brand-grid {

@@ -50,12 +50,33 @@
   function ensureLogoSlot(header) {
     let slot = header.querySelector('.qf-demo-logo-slot');
     if (!slot) {
-      slot = document.createElement('span');
+      slot = document.createElement('button');
+      slot.type = 'button';
       slot.className = 'qf-demo-logo-slot';
-      slot.setAttribute('aria-hidden', 'true');
+      slot.setAttribute('aria-label', 'Customize demo branding');
+      slot.addEventListener('click', toggleBrandEditor);
       header.insertBefore(slot, header.firstChild);
     }
     return slot;
+  }
+  function renderLogoSlot(slot, data) {
+    const nextHtml = data.logo ? '<em aria-hidden="true">✎</em>' : '<span>Your logo</span><em aria-hidden="true">✎</em>';
+    if (slot.innerHTML !== nextHtml) slot.innerHTML = nextHtml;
+    const nextBg = data.logo ? 'url(' + data.logo + ')' : '';
+    if (slot.style.backgroundImage !== nextBg) slot.style.backgroundImage = nextBg;
+  }
+  function toggleBrandEditor() {
+    const data = readBrand();
+    ensureBrandEditor(data);
+    const editor = document.querySelector('.qf-demo-brand-editor');
+    if (!editor) return;
+    const isOpen = !editor.hidden;
+    editor.hidden = isOpen;
+    document.body.classList.toggle('qf-demo-brand-editor-open', !isOpen);
+    if (isOpen) return;
+    const first = editor.querySelector('[data-demo-brand="name"]');
+    if (first) setTimeout(() => first.focus(), 40);
+    postHeight();
   }
   function applyDemoBrand() {
     if (!isDemoExperience()) return;
@@ -67,13 +88,7 @@
     if (header) {
       header.querySelectorAll('img').forEach((img) => img.style.display = 'none');
       const slot = ensureLogoSlot(header);
-      if (data.logo) {
-        if (slot.textContent) slot.textContent = '';
-        if (slot.style.backgroundImage !== 'url("' + data.logo + '")') slot.style.backgroundImage = 'url(' + data.logo + ')';
-      } else {
-        if (slot.textContent !== 'Your logo') slot.textContent = 'Your logo';
-        if (slot.style.backgroundImage) slot.style.backgroundImage = '';
-      }
+      renderLogoSlot(slot, data);
     }
     renderBrandTrust(data);
     ensureBrandEditor(data);
@@ -100,9 +115,10 @@
     if (document.querySelector('.qf-demo-brand-editor')) return;
     const anchor = document.querySelector('.qf-demo-brand-card') || $('qf-header');
     if (!anchor) return;
-    const editor = document.createElement('details');
+    const editor = document.createElement('div');
     editor.className = 'qf-demo-brand-editor';
-    editor.innerHTML = '<summary><span>✎ Customize demo branding</span><small>preview only</small></summary>' +
+    editor.hidden = true;
+    editor.innerHTML = '<div class="qf-demo-brand-editor-head"><strong>Brand preview</strong><button type="button" data-demo-brand-close aria-label="Close branding editor">×</button></div>' +
       '<div class="qf-demo-brand-grid">' +
       '<label>Company name<input class="qf-input" data-demo-brand="name" placeholder="Your company name"></label>' +
       '<label>Phone<input class="qf-input" data-demo-brand="phone" placeholder="(555) 555-1234"></label>' +
@@ -116,6 +132,12 @@
     Object.keys(data).forEach((key) => {
       const input = editor.querySelector('[data-demo-brand="' + key + '"]');
       if (input) input.value = data[key] || '';
+    });
+    const close = editor.querySelector('[data-demo-brand-close]');
+    if (close) close.addEventListener('click', () => {
+      editor.hidden = true;
+      document.body.classList.remove('qf-demo-brand-editor-open');
+      postHeight();
     });
     editor.addEventListener('input', (event) => {
       const key = event.target && event.target.getAttribute('data-demo-brand');
