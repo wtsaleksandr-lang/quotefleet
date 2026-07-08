@@ -1,0 +1,123 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Support — QuoteFleet</title>
+  <meta name="description" content="How to contact QuoteFleet support and what details to include for quote, account, billing, security, and data requests.">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="/style.css">
+  <style>
+    .support-shell { max-width: 940px; margin: 0 auto; padding: 48px 28px 80px; }
+    .support-shell h1 { font-size: 44px; line-height: 1.05; letter-spacing: -0.03em; margin: 0 0 12px; }
+    .support-shell h2 { font-size: 22px; letter-spacing: -0.02em; margin: 34px 0 10px; }
+    .support-shell p { color: var(--ink-soft); font-size: 15.5px; line-height: 1.65; }
+    .support-shell ul { color: var(--ink-soft); font-size: 15px; line-height: 1.65; padding-left: 22px; }
+    .support-pill { display: inline-block; padding: 4px 10px; border-radius: 999px; font-family: var(--font-mono); font-size: 11px; letter-spacing: .08em; text-transform: uppercase; color: var(--accent); background: var(--accent-soft); border: 1px solid rgba(155,247,255,.18); }
+    .support-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 14px; margin-top: 18px; }
+    .support-card { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius-lg); padding: 18px; }
+    .support-card h3 { margin: 0 0 6px; font-size: 16px; }
+    .support-card p { margin: 0 0 10px; font-size: 13.5px; color: var(--muted); }
+    .support-card a { font-weight: 800; }
+    .support-note { margin-top: 20px; padding: 14px; border: 1px dashed var(--border-strong); border-radius: 16px; color: var(--ink-soft); background: rgba(255,255,255,.025); }
+    .support-table { width: 100%; border-collapse: collapse; margin-top: 14px; overflow: hidden; border-radius: 14px; }
+    .support-table th, .support-table td { border: 1px solid var(--border); padding: 12px; text-align: left; vertical-align: top; color: var(--ink-soft); font-size: 14px; }
+    .support-table th { color: var(--ink); background: rgba(255,255,255,.035); }
+    @media (max-width: 760px) { .support-grid { grid-template-columns: 1fr; } .support-shell h1 { font-size: 34px; } }
+  </style>
+</head>
+<body>
+  <header class="topnav">
+    <div class="topnav-inner">
+      <a href="/" class="brand-mark">
+        <span class="logo">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M3 17h2a3 3 0 0 0 3-3V7H3z"/><path d="M14 7h6l1 4v6h-3"/><circle cx="7" cy="17" r="2"/><circle cx="17" cy="17" r="2"/></svg>
+        </span>
+        QuoteFleet
+      </a>
+      <span class="topnav-spacer"></span>
+      <a class="nav-link" href="/pricing">Pricing</a>
+      <a class="nav-link" href="/security">Security</a>
+      <a class="nav-link" href="/login">Sign in</a>
+      <a class="btn btn-primary" href="/signup">Start free <span class="arr">→</span></a>
+    </div>
+  </header>
+
+  <main class="support-shell">
+    <span class="support-pill">Support</span>
+    <h1 style="margin-top:14px;">How can we help?</h1>
+    <p>
+      Use this page to route account, quote setup, billing, security, and data requests to the right place.
+      For the fastest help, include your company name, tenant link, quote reference ID, lead reference ID,
+      and screenshots when relevant. Do not send passwords, secret API keys, database URLs, or payment card details.
+    </p>
+
+    <div class="support-grid">
+      <div class="support-card">
+        <h3>General support</h3>
+        <p>Account setup, rate-card import, public calculator questions, or dashboard issues.</p>
+        <a href="mailto:support@quotefleet.net">support@quotefleet.net</a>
+      </div>
+      <div class="support-card">
+        <h3>Security reports</h3>
+        <p>Vulnerability disclosure, suspicious access, data isolation concerns, or security questions.</p>
+        <a href="mailto:security@quotefleet.net">security@quotefleet.net</a>
+      </div>
+      <div class="support-card">
+        <h3>Legal and data requests</h3>
+        <p>DPA, privacy, export, deletion, correction, or data-processing questions.</p>
+        <a href="mailto:legal@quotefleet.net">legal@quotefleet.net</a>
+      </div>
+      <div class="support-card">
+        <h3>Sales and launch help</h3>
+        <p>Carrier onboarding, pilot launch review, setup review, or production readiness planning.</p>
+        <a href="mailto:hello@quotefleet.net">hello@quotefleet.net</a>
+      </div>
+    </div>
+
+    <div class="support-note">
+      <strong>Important:</strong> QuoteFleet support will never ask for your password or full secret keys. If a support request needs access to a tenant account, use the dashboard, a temporary test tenant, or a non-secret screenshot.
+    </div>
+
+    <h2>What to include</h2>
+    <table class="support-table">
+      <thead>
+        <tr><th>Request type</th><th>Helpful details</th></tr>
+      </thead>
+      <tbody>
+        <tr><td>Quote or lead issue</td><td>Tenant link, quote reference ID, lane, equipment, accessorials, and what result you expected.</td></tr>
+        <tr><td>Rate setup issue</td><td>Service, equipment, rate card label, accessorial code, zone name, and whether the issue affects public quotes.</td></tr>
+        <tr><td>Login or signup issue</td><td>Email used, company name, tenant slug, browser/device, and approximate time.</td></tr>
+        <tr><td>Data request</td><td>Company name, authorized requester name, tenant slug, and requested action such as export, correction, or deletion.</td></tr>
+        <tr><td>Security issue</td><td>Route affected, impact, reproduction steps, and whether customer data may be involved.</td></tr>
+      </tbody>
+    </table>
+
+    <h2>Expected response targets</h2>
+    <ul>
+      <li>Urgent availability, security, or data exposure issue: same-day operator review.</li>
+      <li>Account access, billing, or production quote-flow issue: 1 business day.</li>
+      <li>Setup help, rate import, or general product question: 1–2 business days.</li>
+    </ul>
+
+    <h2>More resources</h2>
+    <ul>
+      <li><a href="/security">Security and data confidentiality</a></li>
+      <li><a href="/dpa">Data Processing Addendum</a></li>
+      <li><a href="/.well-known/security.txt">security.txt</a></li>
+      <li><a href="/login">Sign in to your dashboard</a></li>
+    </ul>
+  </main>
+
+  <footer class="site-footer">
+    © <span id="year"></span> QuoteFleet ·
+    <a href="/pricing">Pricing</a> ·
+    <a href="/security">Security</a> ·
+    <a href="/support">Support</a> ·
+    <a href="/login">Sign in</a>
+  </footer>
+  <script>document.getElementById('year').textContent = new Date().getFullYear();</script>
+</body>
+</html>
