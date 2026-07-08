@@ -26,7 +26,12 @@ describe('WeFixTrades-style secondary public pages', () => {
     const css = await file('public-pages-wefixtrades.css');
 
     expect(css).toContain('Phase BQ');
-    expect(css).toContain('--qf-wft-blue: #0d3cfc');
+    expect(css).toContain('/quotefleet-color-system.css');
+    expect(css).toContain('--qf-wft-blue: #0D3CFC');
+    expect(css).toContain('#181D1F');
+    expect(css).toContain('#22282A');
+    expect(css).toContain('#E4EDF1');
+    expect(css).toContain('#B1C5CE');
     expect(css).toContain('.price-card.featured');
     expect(css).toContain('.support-card');
     expect(css).toContain('.sec-shell');
