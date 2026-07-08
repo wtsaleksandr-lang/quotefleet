@@ -19,9 +19,10 @@ describe('safe DPA visual alignment', () => {
     const dpa = await publicFile('dpa.html');
 
     expect(app).toContain('applyDpaPageSkin');
+    expect(app).toContain('applyPageSkin');
     expect(app).toContain('/public-pages-wefixtrades.css');
     expect(app).toContain('/dpa-wefixtrades.css');
-    expect(app).toContain('<body class="qf-public-wft">');
+    expect(app).toContain('qf-public-wft');
     expect(app.indexOf("app.get('/dpa'")).toBeLessThan(app.indexOf('express.static'));
 
     expect(dpa).toContain('The Processor will notify the Controller of any intended addition or replacement of a Sub-processor');
