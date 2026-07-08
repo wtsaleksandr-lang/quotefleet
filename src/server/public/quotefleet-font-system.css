@@ -1,0 +1,107 @@
+/* Phase CA: QuoteFleet global font system.
+   Main UI: Satoshi variable font with Inter/system fallbacks.
+   Mono accents: Et Nono / DN Mono with JetBrains Mono/system fallbacks.
+   Font binaries are expected to be self-hosted under /fonts/. */
+@font-face {
+  font-family: 'Satoshi';
+  src: url('/fonts/Satoshi-Variable.woff2') format('woff2-variations'),
+       url('/fonts/Satoshi-Variable.woff2') format('woff2');
+  font-weight: 300 900;
+  font-style: normal;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: 'Satoshi';
+  src: url('/fonts/Satoshi-VariableItalic.woff2') format('woff2-variations'),
+       url('/fonts/Satoshi-VariableItalic.woff2') format('woff2');
+  font-weight: 300 900;
+  font-style: italic;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: 'Et Nono';
+  src: url('/fonts/EtNono-Regular.woff2') format('woff2');
+  font-weight: 400 800;
+  font-style: normal;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: 'DN Mono';
+  src: url('/fonts/DNMono-Regular.woff2') format('woff2');
+  font-weight: 400 800;
+  font-style: normal;
+  font-display: swap;
+}
+
+:root {
+  --font-sans: 'Satoshi', 'Inter', system-ui, -apple-system, 'Segoe UI', Roboto, Arial, sans-serif;
+  --font-mono: 'Et Nono', 'DN Mono', 'JetBrains Mono', ui-monospace, 'SF Mono', SFMono-Regular, Menlo, Consolas, monospace;
+  --qf-font-sans: var(--font-sans);
+  --qf-font-mono: var(--font-mono);
+}
+
+body,
+button,
+input,
+select,
+textarea {
+  font-family: var(--qf-font-sans);
+}
+
+h1,
+h2,
+h3,
+h4,
+h5,
+h6,
+.site-brand,
+.brand-mark,
+.brand-name,
+.price,
+.total,
+.res-total,
+.metric-value {
+  font-family: var(--qf-font-sans);
+}
+
+.eyebrow,
+.section-kicker,
+.tag,
+.badge,
+.pill,
+.chip,
+.field-label,
+.qf-section-title,
+.qf-title-muted,
+.qf-theme-toggle,
+.nav-link,
+.signin,
+.price .per,
+.mp-meta,
+.rate-row .label,
+.footer-col h4,
+.footer-bottom,
+code,
+kbd,
+pre {
+  font-family: var(--qf-font-mono);
+}
+
+code,
+kbd,
+pre {
+  font-variant-ligatures: none;
+}
+
+/* Embedded quote tool intentionally keeps Inter/system fallback for portability. */
+body.qf-app-calculator,
+body.qf-app-calculator button,
+body.qf-app-calculator input,
+body.qf-app-calculator select,
+body.qf-app-calculator textarea,
+body.qf-app-calculator .qf-widget {
+  font-family: 'Inter', system-ui, -apple-system, 'Segoe UI', Roboto, Arial, sans-serif;
+}
