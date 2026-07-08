@@ -14,9 +14,18 @@ describe('QuoteFleet global font system', () => {
 
     expect(css).toContain('Phase CA');
     expect(css).toContain("font-family: 'Satoshi'");
-    expect(css).toContain("/fonts/Satoshi-Variable.woff2");
+    expect(css).toContain('/fonts/Satoshi-Variable.woff2');
     expect(css).toContain("--font-sans: 'Satoshi', 'Inter', system-ui, -apple-system, 'Segoe UI', Roboto, Arial, sans-serif");
     expect(css).toContain("--font-mono: 'Et Nono', 'DN Mono', 'JetBrains Mono'");
+  });
+
+  it('forces homepage hero and section headings to the Satoshi stack', async () => {
+    const css = await file('quotefleet-font-system.css');
+
+    expect(css).toContain('body.qf-wft .hero h1');
+    expect(css).toContain('body.qf-wft .section h2');
+    expect(css).toContain('body.qf-wft .final-cta-card h2');
+    expect(css).toContain('font-family: var(--qf-font-sans) !important;');
   });
 
   it('uses Et Nono / DN Mono for accent text and keeps the quote widget on Inter fallback', async () => {

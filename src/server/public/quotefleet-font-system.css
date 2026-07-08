@@ -67,6 +67,18 @@ h6,
   font-family: var(--qf-font-sans);
 }
 
+body.qf-wft .hero h1,
+body.qf-wft .section h2,
+body.qf-wft .final-cta-card h2,
+body.qf-wft .pdf-copy h2,
+body.qf-wft .scheduler-copy h2,
+body.qf-public-wft h1,
+body.qf-public-wft h2,
+body.qf-auth-wft h1,
+body.qf-auth-wft h2 {
+  font-family: var(--qf-font-sans) !important;
+}
+
 .eyebrow,
 .section-kicker,
 .tag,
@@ -88,6 +100,17 @@ code,
 kbd,
 pre {
   font-family: var(--qf-font-mono);
+}
+
+body.qf-wft .eyebrow,
+body.qf-wft .section-kicker,
+body.qf-wft .tag,
+body.qf-wft .use-badge,
+body.qf-wft .flow-label,
+body.qf-wft .site-nav a,
+body.qf-wft .signin,
+body.qf-wft .footer-col h4 {
+  font-family: var(--qf-font-mono) !important;
 }
 
 code,
