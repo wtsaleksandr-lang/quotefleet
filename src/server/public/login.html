@@ -8,8 +8,9 @@
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="/style.css">
+  <link rel="stylesheet" href="/public-auth-wefixtrades.css">
 </head>
-<body>
+<body class="qf-auth-wft">
   <header class="topnav">
     <div class="topnav-inner">
       <a href="/" class="brand-mark">
@@ -35,7 +36,6 @@
         <button class="tab" data-pane="pwd">Password</button>
       </div>
 
-      <!-- Magic link (default) -->
       <div class="tab-pane active" id="pane-link">
         <form id="magic-form" style="display:flex; flex-direction:column; gap: 16px;" novalidate>
           <div class="field">
@@ -50,7 +50,6 @@
         </form>
       </div>
 
-      <!-- Password fallback -->
       <div class="tab-pane" id="pane-pwd">
         <form id="login-form" style="display:flex; flex-direction:column; gap: 16px;" novalidate>
           <div class="field">
@@ -88,8 +87,6 @@
     document.querySelectorAll('input[type="email"]').forEach(function (input) {
       input.addEventListener('blur', function () { input.value = normalizeEmail(input.value); copyEmailToForms(input.value); });
     });
-
-    // Tab toggle
     document.querySelectorAll('.tab').forEach(function (t) {
       t.addEventListener('click', function () {
         document.querySelectorAll('.tab').forEach(function (x) { x.classList.remove('active'); });
@@ -99,8 +96,6 @@
         if (p) p.classList.add('active');
       });
     });
-
-    // Surface magic-link errors propagated as ?error=...
     var qErr = new URLSearchParams(location.search).get('error');
     if (qErr) {
       var msg = document.getElementById('magic-msg');
@@ -112,8 +107,6 @@
       })[qErr] || 'Sign-in failed. Request a fresh sign-in link.';
       msg.classList.remove('hidden'); msg.classList.add('error');
     }
-
-    // "Forgot password?" link → switch to magic-link tab + focus the email
     var forgotLink = document.getElementById('forgot-link');
     if (forgotLink) {
       forgotLink.addEventListener('click', function (ev) {
@@ -128,9 +121,6 @@
         }
       });
     }
-
-    // Magic link send. After a successful send we put the button into a
-    // 30s cooldown so users don't pound the resend button.
     document.getElementById('magic-form').addEventListener('submit', async function (e) {
       e.preventDefault();
       var msg = document.getElementById('magic-msg');
@@ -176,8 +166,6 @@
       }
       btn.disabled = false; btn.innerHTML = old;
     });
-
-    // Password login (fallback)
     document.getElementById('login-form').addEventListener('submit', async function (e) {
       e.preventDefault();
       var fd = new FormData(e.target);
