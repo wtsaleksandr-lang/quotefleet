@@ -1,0 +1,286 @@
+/* Phase BU: remove teal/green leftovers and simplify public landing visuals. */
+body.qf-wft {
+  --accent: #0d3cfc !important;
+  --accent-ink: #ffffff !important;
+  --accent-soft: rgba(13,60,252,.14) !important;
+  --primary: #0d3cfc !important;
+  --qf-wft-blue: #0d3cfc !important;
+  --qf-wft-blue-2: #2456ff !important;
+  --qf-wft-bg: #0b1110 !important;
+  --qf-wft-panel: #111817 !important;
+  --qf-wft-panel-2: #151c1b !important;
+  --qf-wft-line: rgba(255,255,255,.12) !important;
+  --qf-wft-line-strong: rgba(255,255,255,.20) !important;
+  background: #0b1110 !important;
+}
+
+body.qf-wft::before {
+  background:
+    radial-gradient(circle at 18% -8%, rgba(13,60,252,.14), transparent 28%),
+    radial-gradient(circle at 88% 6%, rgba(13,60,252,.08), transparent 24%),
+    linear-gradient(rgba(255,255,255,.014) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(255,255,255,.014) 1px, transparent 1px) !important;
+  background-size: auto, auto, 30px 30px, 30px 30px !important;
+  opacity: .72 !important;
+}
+
+body.qf-wft .site-header,
+body.qf-wft .topnav {
+  background: rgba(11,17,16,.96) !important;
+  border-bottom: 1px solid rgba(255,255,255,.12) !important;
+}
+
+body.qf-wft .site-brand,
+body.qf-wft .brand-mark {
+  color: #f5fcff !important;
+}
+
+body.qf-wft .site-logo,
+body.qf-wft .logo {
+  background: transparent !important;
+  border: 1px solid rgba(255,255,255,.28) !important;
+  color: #f5fcff !important;
+  box-shadow: none !important;
+}
+
+body.qf-wft .nav-link,
+body.qf-wft .signin,
+body.qf-wft .demo-link {
+  color: rgba(245,252,255,.72) !important;
+}
+
+body.qf-wft .nav-link:hover,
+body.qf-wft .signin:hover,
+body.qf-wft .demo-link:hover {
+  color: #ffffff !important;
+}
+
+body.qf-wft .btn-primary,
+body.qf-wft .btn-lg.btn-primary,
+body.qf-wft .final-actions .btn-primary {
+  background: #0d3cfc !important;
+  border-color: #0d3cfc !important;
+  color: #ffffff !important;
+  box-shadow: none !important;
+}
+
+body.qf-wft .btn-primary .arr,
+body.qf-wft .btn-lg.btn-primary .arr {
+  color: #ffffff !important;
+}
+
+body.qf-wft .btn-secondary,
+body.qf-wft .demo-link.final-demo {
+  background: rgba(255,255,255,.03) !important;
+  border-color: rgba(255,255,255,.16) !important;
+  color: #f5fcff !important;
+}
+
+body.qf-wft .eyebrow,
+body.qf-wft .section-kicker,
+body.qf-wft .tag,
+body.qf-wft .flow-label,
+body.qf-wft .use-badge {
+  color: #8ea2ff !important;
+  background: rgba(13,60,252,.12) !important;
+  border-color: rgba(13,60,252,.28) !important;
+}
+
+body.qf-wft .hero {
+  padding-top: 52px !important;
+  padding-bottom: 54px !important;
+}
+
+body.qf-wft .hero-grid {
+  grid-template-columns: minmax(0, .9fr) minmax(360px, .78fr) !important;
+  gap: 36px !important;
+  align-items: center !important;
+}
+
+body.qf-wft .hero h1 {
+  max-width: 640px !important;
+  font-size: clamp(48px, 6.6vw, 76px) !important;
+  line-height: .94 !important;
+  letter-spacing: -.07em !important;
+  color: #f5fcff !important;
+}
+
+body.qf-wft .hero .lead,
+body.qf-wft .hero p,
+body.qf-wft .micro-copy {
+  max-width: 560px !important;
+  color: rgba(245,252,255,.62) !important;
+}
+
+body.qf-wft .hero-quick-points {
+  display: none !important;
+}
+
+body.qf-wft .floating-note,
+body.qf-wft .flow-arrow {
+  display: none !important;
+}
+
+body.qf-wft .visual-flow {
+  min-height: auto !important;
+  display: grid !important;
+  grid-template-columns: 1fr !important;
+  gap: 10px !important;
+  border: 1px solid rgba(255,255,255,.12) !important;
+  border-radius: 22px !important;
+  background: rgba(17,24,23,.92) !important;
+  padding: 14px !important;
+  box-shadow: 0 28px 70px -55px rgba(0,0,0,.85), inset 0 1px 0 rgba(255,255,255,.04) !important;
+}
+
+body.qf-wft .flow-card {
+  position: static !important;
+  width: auto !important;
+  min-height: 0 !important;
+  border: 1px solid rgba(255,255,255,.11) !important;
+  background: rgba(255,255,255,.035) !important;
+  border-radius: 16px !important;
+  box-shadow: none !important;
+  padding: 16px !important;
+}
+
+body.qf-wft .flow-icon {
+  background: rgba(13,60,252,.16) !important;
+  color: #8ea2ff !important;
+}
+
+body.qf-wft .flow-card strong,
+body.qf-wft .mini-result b,
+body.qf-wft .mini-browser p {
+  color: #f5fcff !important;
+}
+
+body.qf-wft .mini-rate-table b,
+body.qf-wft .mini-browser button,
+body.qf-wft .mini-actions span {
+  color: #ffffff !important;
+}
+
+body.qf-wft .mini-rate-table b,
+body.qf-wft .mini-actions span {
+  background: rgba(13,60,252,.18) !important;
+  border-color: rgba(13,60,252,.30) !important;
+}
+
+body.qf-wft .mini-browser button {
+  background: #0d3cfc !important;
+  border-color: #0d3cfc !important;
+}
+
+body.qf-wft .mini-result {
+  border-color: rgba(13,60,252,.35) !important;
+  background: rgba(13,60,252,.10) !important;
+}
+
+body.qf-wft .section {
+  padding-top: 40px !important;
+  padding-bottom: 44px !important;
+}
+
+body.qf-wft .section-head,
+body.qf-wft .light-head {
+  max-width: 900px !important;
+}
+
+body.qf-wft .section-head h2,
+body.qf-wft .section h2,
+body.qf-wft .final-cta-card h2 {
+  color: #f5fcff !important;
+  letter-spacing: -.055em !important;
+}
+
+body.qf-wft .simple-steps,
+body.qf-wft .use-grid,
+body.qf-wft .faq-grid {
+  gap: 10px !important;
+}
+
+body.qf-wft .simple-step,
+body.qf-wft .use-card,
+body.qf-wft .compare-card,
+body.qf-wft .pdf-card,
+body.qf-wft .scheduler-card,
+body.qf-wft .chat-demo,
+body.qf-wft .faq-item,
+body.qf-wft .final-cta-card {
+  background: rgba(17,24,23,.92) !important;
+  border: 1px solid rgba(255,255,255,.12) !important;
+  border-radius: 16px !important;
+  box-shadow: 0 28px 70px -55px rgba(0,0,0,.85), inset 0 1px 0 rgba(255,255,255,.04) !important;
+}
+
+body.qf-wft .simple-step:hover,
+body.qf-wft .use-card:hover,
+body.qf-wft .faq-item:hover {
+  border-color: rgba(255,255,255,.22) !important;
+  transform: translateY(-2px);
+}
+
+body.qf-wft .step-art,
+body.qf-wft .site-mini,
+body.qf-wft .email-mini,
+body.qf-wft .url-chip,
+body.qf-wft .share-strip span,
+body.qf-wft .mini-checks span {
+  background: rgba(255,255,255,.035) !important;
+  border-color: rgba(255,255,255,.11) !important;
+  color: rgba(245,252,255,.72) !important;
+}
+
+body.qf-wft .sheet-art span,
+body.qf-wft .scheduler-dot,
+body.qf-wft .chat-head span {
+  background: #0d3cfc !important;
+  color: #ffffff !important;
+}
+
+body.qf-wft .pdf-card button,
+body.qf-wft .final-actions .btn-primary {
+  background: #0d3cfc !important;
+  border-color: #0d3cfc !important;
+}
+
+body.qf-wft .bubble.assistant,
+body.qf-wft .bubble.customer {
+  background: rgba(255,255,255,.045) !important;
+  border-color: rgba(255,255,255,.12) !important;
+  color: #f5fcff !important;
+}
+
+body.qf-wft .typing i {
+  background: #0d3cfc !important;
+}
+
+body.qf-wft .site-footer,
+body.qf-wft .premium-footer {
+  background: #22282a !important;
+  border-top: 1px solid rgba(255,255,255,.12) !important;
+}
+
+body.qf-wft [style*="color: var(--accent)"],
+body.qf-wft [style*="color:var(--accent)"] {
+  color: #0d3cfc !important;
+}
+
+@media (max-width: 980px) {
+  body.qf-wft .hero-grid {
+    grid-template-columns: 1fr !important;
+  }
+  body.qf-wft .visual-flow {
+    max-width: 560px;
+  }
+}
+
+@media (max-width: 640px) {
+  body.qf-wft .hero h1 {
+    font-size: 44px !important;
+  }
+  body.qf-wft .visual-flow {
+    display: none !important;
+  }
+}
