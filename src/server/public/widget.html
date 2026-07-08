@@ -33,6 +33,10 @@
           <div class="qf-field-hint">Oversize details help the team review permits, routing, and equipment. They do not replace final carrier confirmation.</div>
         </div>
       </div>
+      <div class="qf-conditional-panel" id="qf-genset-panel" style="display:none;">
+        <label class="qf-oog-toggle"><input type="checkbox" id="qf-genset"> <span>Genset required for reefer container</span></label>
+        <div class="qf-field-hint">Select this if the refrigerated container needs powered temperature control during pickup, waiting time, or delivery.</div>
+      </div>
       <div class="qf-drayage-only" id="qf-drayage-pickup" style="display:none;">
         <div class="qf-section-title qf-title-inline" style="margin-top:14px;">Pickup port / terminal <span class="qf-help" data-tip="Drayage starts at a marine terminal or rail ramp. If you are unsure of the exact terminal, pick the port/city and your dispatcher will confirm.">?</span></div>
         <div class="qf-grid">
@@ -54,6 +58,10 @@
       <details class="qf-options-panel">
         <summary><span>Shipment options & add-ons</span><small>optional</small></summary>
         <div class="qf-flags"><label><input type="checkbox" id="qf-residential"> <span>Residential</span><span class="qf-help" data-tip="Delivery is to a home, not a business, dock, or warehouse. Residential delivery may require a surcharge.">?</span></label><label><input type="checkbox" id="qf-hazmat"> <span>Hazmat</span><span class="qf-help" data-tip="Cargo is classified hazardous and may require placards, eligible drivers, and carrier approval.">?</span></label><label><input type="checkbox" id="qf-temp"> <span>Temp-control</span><span class="qf-help" data-tip="Cargo needs a refrigerated or temperature-controlled unit.">?</span></label></div>
+        <div class="qf-conditional-panel qf-hazmat-panel" id="qf-hazmat-panel" style="display:none;">
+          <div class="qf-field"><label>Hazmat class</label><select class="qf-select" id="qf-hazmat-class"><option value="">Select class</option><option>Class 1 — Explosives</option><option>Class 2 — Gases</option><option>Class 3 — Flammable liquids</option><option>Class 4 — Flammable solids</option><option>Class 5 — Oxidizers / organic peroxides</option><option>Class 6 — Toxic / infectious substances</option><option>Class 7 — Radioactive material</option><option>Class 8 — Corrosives</option><option>Class 9 — Miscellaneous dangerous goods</option></select></div>
+          <div class="qf-field-hint">Hazmat class helps determine carrier eligibility, placards, routing, and approval requirements.</div>
+        </div>
         <div class="qf-accessorials" id="qf-accessorials"></div>
       </details>
       <div class="qf-customer-note">This estimate helps you move faster. Final rate, equipment availability, and pickup timing are confirmed by the team when you request the quote in writing.</div>
@@ -69,5 +77,6 @@
   <script src="/public-calculator-result.js"></script>
   <script src="/public-calculator-followup.js"></script>
   <script src="/widget-terminal-search.js"></script>
+  <script src="/public-calculator-conditional-options.js"></script>
 </body>
 </html>
