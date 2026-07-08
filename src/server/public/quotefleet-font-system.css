@@ -67,6 +67,26 @@ h6,
   font-family: var(--qf-font-sans);
 }
 
+body.qf-wft {
+  --qf-wft-sans: var(--qf-font-sans) !important;
+  --qf-wft-mono: var(--qf-font-mono) !important;
+  font-family: var(--qf-font-sans) !important;
+}
+
+body.qf-wft *,
+body.qf-wft .site-header,
+body.qf-wft .site-header *,
+body.qf-wft .hero,
+body.qf-wft .hero *,
+body.qf-wft .section,
+body.qf-wft .section *,
+body.qf-wft .visual-flow,
+body.qf-wft .visual-flow *,
+body.qf-wft .premium-footer,
+body.qf-wft .premium-footer * {
+  font-family: var(--qf-font-sans) !important;
+}
+
 body.qf-wft .hero h1,
 body.qf-wft .section h2,
 body.qf-wft .final-cta-card h2,
@@ -109,7 +129,11 @@ body.qf-wft .use-badge,
 body.qf-wft .flow-label,
 body.qf-wft .site-nav a,
 body.qf-wft .signin,
-body.qf-wft .footer-col h4 {
+body.qf-wft .footer-col h4,
+body.qf-wft .footer-bottom,
+body.qf-wft code,
+body.qf-wft kbd,
+body.qf-wft pre {
   font-family: var(--qf-font-mono) !important;
 }
 

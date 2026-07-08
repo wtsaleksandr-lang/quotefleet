@@ -19,6 +19,21 @@ describe('QuoteFleet global font system', () => {
     expect(css).toContain("--font-mono: 'Et Nono', 'DN Mono', 'JetBrains Mono'");
   });
 
+  it('forces the entire homepage to the Satoshi stack', async () => {
+    const css = await file('quotefleet-font-system.css');
+
+    expect(css).toContain('body.qf-wft {');
+    expect(css).toContain('--qf-wft-sans: var(--qf-font-sans) !important;');
+    expect(css).toContain('--qf-wft-mono: var(--qf-font-mono) !important;');
+    expect(css).toContain('body.qf-wft *');
+    expect(css).toContain('body.qf-wft .site-header *');
+    expect(css).toContain('body.qf-wft .hero *');
+    expect(css).toContain('body.qf-wft .section *');
+    expect(css).toContain('body.qf-wft .visual-flow *');
+    expect(css).toContain('body.qf-wft .premium-footer *');
+    expect(css).toContain('font-family: var(--qf-font-sans) !important;');
+  });
+
   it('forces homepage hero and section headings to the Satoshi stack', async () => {
     const css = await file('quotefleet-font-system.css');
 
