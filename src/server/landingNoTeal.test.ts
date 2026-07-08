@@ -19,13 +19,19 @@ describe('landing WeFixTrades cleanup skin', () => {
   it('forces blue contrast and removes noisy teal/green landing artifacts', async () => {
     const css = await file('landing-wefixtrades-cleanup.css');
 
-    expect(css).toContain('Phase BU');
+    expect(css).toContain('Phase BV');
     expect(css).toContain('--accent: #0d3cfc');
     expect(css).toContain('--qf-wft-blue: #0d3cfc');
+    expect(css).toContain('--qf-wft-bg: #1f2628');
+    expect(css).toContain('--qf-wft-cream: #e7e2dc');
     expect(css).toContain('.hero-quick-points');
+    expect(css).toContain('.use-section');
+    expect(css).toContain('.ai-section');
+    expect(css).toContain('.compare-simple-section');
     expect(css).toContain('display: none !important');
     expect(css).toContain('.floating-note');
     expect(css).toContain('.visual-flow');
+    expect(css).toContain('.flow-rates');
     expect(css).not.toContain('#59ff75');
     expect(css).not.toContain('#0bd477');
   });
