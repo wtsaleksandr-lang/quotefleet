@@ -11,6 +11,7 @@
   loadStylesheet('/public-blue-fixes.css');
   loadStylesheet('/maersk-radius-system.css');
   loadStylesheet('/quotefleet-color-system.css');
+  loadStylesheet('/landing-home-fixes.css');
 
   const reduceMotion = window.matchMedia?.('(prefers-reduced-motion: reduce)').matches;
   const items = document.querySelectorAll('[data-reveal]');
