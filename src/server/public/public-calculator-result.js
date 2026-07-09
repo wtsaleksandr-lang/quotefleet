@@ -49,8 +49,12 @@
   function buildGuide() {
     const result = document.getElementById('qf-result');
     if (!result || result.style.display === 'none') return;
-    buildPrintSummary();
+    // Bail BEFORE mutating if the guide already exists. buildPrintSummary()
+    // rewrites DOM, and this runs from a MutationObserver watching the body
+    // subtree — calling it unconditionally re-triggered the observer on every
+    // pass, pegging the CPU and crashing the widget after each quote.
     if (result.querySelector(`.${PANEL_CLASS}`)) return;
+    buildPrintSummary();
 
     const meta = text('qf-meta');
     const total = text('qf-total');

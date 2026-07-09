@@ -356,14 +356,9 @@ export async function parseRateSheet(opts: {
 
   // Strip optional code fences (model sometimes adds them despite instructions)
   const cleaned = finalText.replace(/^```(?:json)?\s*/i, '').replace(/```\s*$/i, '').trim();
-  let parsed;
-  try {
-    parsed = JSON.parse(cleaned);
-  } catch (err) {
-    throw new Error(
-      `Model returned non-JSON output. First 200 chars: ${cleaned.slice(0, 200)}`
-    );
-  }
+  // parseModelJson returns a generic object; the shape is validated/defaulted
+  // just below, matching the previous `JSON.parse` (any) behavior.
+  const parsed = parseModelJson(cleaned) as IngestResult['parsed'];
 
   // Defensive defaults so callers can rely on shape.
   parsed.summary ??= '';
@@ -374,6 +369,54 @@ export async function parseRateSheet(opts: {
   parsed.laneZones ??= [];
 
   return { parsed, raw: cleaned, modelUsed: model, toolCalls };
+}
+
+/**
+ * Parse the model's JSON answer, tolerating a prose preamble/suffix.
+ *
+ * Despite the "output ONLY JSON" instruction, Sonnet occasionally wraps the
+ * object in a sentence of reasoning ("No point-to-point totals are present…
+ * { … }"). A bare JSON.parse of the whole string then throws and the whole
+ * ingest job fails. We first try a direct parse, then fall back to extracting
+ * the outermost brace-balanced object and parsing that.
+ */
+export function parseModelJson(cleaned: string): Record<string, unknown> {
+  try {
+    return JSON.parse(cleaned);
+  } catch {
+    /* fall through to extraction */
+  }
+  const start = cleaned.indexOf('{');
+  if (start !== -1) {
+    // Walk forward tracking brace depth (ignoring braces inside strings) to
+    // find the matching close for the first '{'.
+    let depth = 0;
+    let inStr = false;
+    let esc = false;
+    for (let i = start; i < cleaned.length; i++) {
+      const ch = cleaned[i];
+      if (inStr) {
+        if (esc) esc = false;
+        else if (ch === '\\') esc = true;
+        else if (ch === '"') inStr = false;
+        continue;
+      }
+      if (ch === '"') inStr = true;
+      else if (ch === '{') depth++;
+      else if (ch === '}') {
+        depth--;
+        if (depth === 0) {
+          const candidate = cleaned.slice(start, i + 1);
+          try {
+            return JSON.parse(candidate);
+          } catch {
+            break;
+          }
+        }
+      }
+    }
+  }
+  throw new Error(`Model returned non-JSON output. First 200 chars: ${cleaned.slice(0, 200)}`);
 }
 
 /* ────────────────────────────────────────────────────────────────── *

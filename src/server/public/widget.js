@@ -496,7 +496,18 @@
     else if (email && !/^\S+@\S+\.\S+$/.test(email)) { showError('qf-submit-error', 'That email looks invalid — clear it or fix the format.'); return; }
     if (rules.requirePhone && !phone) { showError('qf-submit-error', 'Please enter a phone number.'); return; }
     var req = gatherQuoteRequest();
-    var payload = { quoteRequest: req, customerName: name, customerEmail: email || undefined, customerPhone: phone || undefined, customerCompany: $('qf-c-company').value.trim() || undefined, notes: $('qf-c-notes').value.trim() || undefined, sourceUrl: location.href };
+    // Flatten the customer fields onto the quote request. The server's
+    // LeadSchema extends QuoteSchema (service/equipment/pickup/delivery at
+    // the top level) — sending them nested under `quoteRequest` made every
+    // lead submission fail validation with HTTP 400. `sourceUrl` is derived
+    // server-side from the Referer header, so it isn't sent here.
+    var payload = Object.assign({}, req, {
+      customerName: name,
+      customerEmail: email || undefined,
+      customerPhone: phone || undefined,
+      customerCompany: $('qf-c-company').value.trim() || undefined,
+      notes: $('qf-c-notes').value.trim() || req.notes || undefined,
+    });
     var btn = $('qf-submit-btn'); var oldText = btn.textContent; btn.disabled = true; btn.innerHTML = '<span class="qf-spinner"></span> &nbsp; Sending…';
     fetch('/api/public/lead/' + slug, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) })
       .then(function (r) { return r.json(); })
@@ -536,9 +547,9 @@
         var q = input.value.trim();
         if (q.length < 2) { close(); return; }
         timer = setTimeout(function () {
-          fetch('/api/tools/places?q=' + encodeURIComponent(q))
+          fetch('/api/public/autocomplete/locations?q=' + encodeURIComponent(q))
             .then(function (r) { return r.json(); })
-            .then(function (resp) { render(resp.items || []); })
+            .then(function (resp) { render(resp.suggestions || resp.items || []); })
             .catch(close);
         }, 180);
       });
