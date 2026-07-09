@@ -30,8 +30,9 @@
     <div class="site-header-inner">
       <a href="/" class="site-brand" aria-label="QuoteFleet home"><span class="site-logo" aria-hidden="true"><svg class="qf-route-logo" viewBox="0 0 28 28" fill="none" aria-hidden="true"><path d="M4.5 18.5 11 12 15.5 14.5 22.5 7.5" stroke="#6E8BFF" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/><circle cx="4.5" cy="18.5" r="2.4" fill="#6E8BFF"/><circle cx="22.5" cy="7.5" r="3" fill="#0D3CFC"/></svg></span>QuoteFleet</a>
       <nav class="site-nav" aria-label="Main navigation"><a href="#how">How it works</a><a href="/w/demo">Demo</a><a href="#faq">FAQ</a></nav>
-      <div class="site-actions"><a class="signin" href="/login">Sign in</a><a class="btn btn-secondary" href="/w/demo">View demo <span class="arr">→</span></a></div>
+      <div class="site-actions"><a class="signin" href="/login">Sign in</a><a class="btn btn-secondary" href="/w/demo">View demo <span class="arr">→</span></a><button type="button" class="site-burger" id="site-burger" aria-label="Open menu" aria-expanded="false" aria-controls="site-mobile-menu"><svg class="ico-open" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><line x1="4" y1="7" x2="20" y2="7"/><line x1="4" y1="12" x2="20" y2="12"/><line x1="4" y1="17" x2="20" y2="17"/></svg><svg class="ico-close" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><line x1="6" y1="6" x2="18" y2="18"/><line x1="18" y1="6" x2="6" y2="18"/></svg></button></div>
     </div>
+    <div class="site-mobile-menu" id="site-mobile-menu" hidden><a href="#how">How it works</a><a href="/w/demo">Demo</a><a href="#faq">FAQ</a><a href="/login">Sign in</a></div>
   </header>
 
   <main>
@@ -98,5 +99,26 @@
   <script src="/vendor/topojson-client.min.js" defer></script>
   <script src="/quotefleet-rates-globe.js" defer></script>
   <script>document.getElementById('year').textContent = new Date().getFullYear();</script>
+  <script>
+  (function () {
+    var b = document.getElementById('site-burger');
+    var m = document.getElementById('site-mobile-menu');
+    if (!b || !m) return;
+    function set(open) {
+      b.setAttribute('aria-expanded', open ? 'true' : 'false');
+      b.setAttribute('aria-label', open ? 'Close menu' : 'Open menu');
+      if (open) m.removeAttribute('hidden'); else m.setAttribute('hidden', '');
+    }
+    b.addEventListener('click', function (e) {
+      e.stopPropagation();
+      set(b.getAttribute('aria-expanded') !== 'true');
+    });
+    m.addEventListener('click', function (e) { if (e.target.closest('a')) set(false); });
+    document.addEventListener('click', function (e) {
+      if (!m.hasAttribute('hidden') && !m.contains(e.target) && !b.contains(e.target)) set(false);
+    });
+    document.addEventListener('keydown', function (e) { if (e.key === 'Escape') set(false); });
+  })();
+  </script>
 </body>
 </html>

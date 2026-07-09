@@ -32,30 +32,20 @@
   font-weight: 900;
   letter-spacing: -0.035em;
 }
+/* Unified minimal rising-rate-line mark (matches landing header/footer).
+ * Render the inline SVG bare; drop the old "QF + check" monogram badge. */
 .qf-public-wft .brand-mark .logo {
   position: relative;
   background: transparent;
-  border: 2px solid #dfe9f2;
-  border-radius: 4px;
+  border: none;
+  border-radius: 0;
   box-shadow: none;
-  color: transparent;
 }
-.qf-public-wft .brand-mark .logo svg { display: none; }
-.qf-public-wft .brand-mark .logo::before {
-  content: 'QF';
-  color: #FFFFFF;
-  font: 900 9px/1 var(--font-mono);
-}
+.qf-public-wft .brand-mark .logo svg { display: block; width: 26px; height: 26px; }
+.qf-public-wft .brand-mark .logo::before,
 .qf-public-wft .brand-mark .logo::after {
-  content: '';
-  position: absolute;
-  width: 17px;
-  height: 8px;
-  border-left: 3px solid var(--qf-wft-blue);
-  border-bottom: 3px solid var(--qf-wft-blue);
-  transform: rotate(-45deg);
-  right: -5px;
-  top: 2px;
+  content: none;
+  display: none;
 }
 .qf-public-wft .nav-link,
 .qf-public-wft .signin {

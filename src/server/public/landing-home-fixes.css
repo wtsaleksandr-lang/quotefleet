@@ -311,3 +311,76 @@ body.qf-wft .chat-art {
     min-height: 112px !important;
   }
 }
+
+/* ── Mobile nav — hamburger + dropdown panel (WFT mobile-nav pattern) ─────
+ * Desktop keeps the inline nav links + Sign in. Below 640px those collapse
+ * into a hamburger that opens a glass panel with every link + Sign in so the
+ * links (and Sign in) stay reachable on mobile. */
+body.qf-wft .site-burger {
+  display: none;
+}
+body.qf-wft .site-mobile-menu {
+  display: none;
+}
+
+@media (max-width: 640px) {
+  body.qf-wft .site-burger {
+    display: inline-flex !important;
+    align-items: center;
+    justify-content: center;
+    width: 40px;
+    height: 40px;
+    padding: 0;
+    background: transparent;
+    border: 1px solid rgba(255, 255, 255, 0.14);
+    border-radius: 10px;
+    color: #F9F9F9;
+    cursor: pointer;
+    flex: none;
+  }
+  body.qf-wft .site-burger svg {
+    width: 20px;
+    height: 20px;
+    display: block;
+  }
+  body.qf-wft .site-burger .ico-close {
+    display: none;
+  }
+  body.qf-wft .site-burger[aria-expanded="true"] .ico-open {
+    display: none;
+  }
+  body.qf-wft .site-burger[aria-expanded="true"] .ico-close {
+    display: block;
+  }
+
+  body.qf-wft .site-mobile-menu:not([hidden]) {
+    display: flex !important;
+    flex-direction: column;
+    gap: 2px;
+    margin: 8px 0 0;
+    padding: 8px;
+    border-radius: 14px;
+    background: rgba(24, 29, 31, 0.94);
+    backdrop-filter: blur(24px) saturate(1.2);
+    -webkit-backdrop-filter: blur(24px) saturate(1.2);
+    border: 1px solid rgba(255, 255, 255, 0.10);
+    box-shadow: 0 12px 28px rgba(0, 0, 0, 0.32);
+  }
+  body.qf-wft .site-mobile-menu a {
+    font-family: "JetBrains Mono", ui-monospace, monospace;
+    font-size: 13px;
+    font-weight: 500;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    color: rgba(249, 249, 249, 0.82);
+    text-decoration: none;
+    padding: 12px 14px;
+    border-radius: 10px;
+    transition: color 0.15s ease, background 0.15s ease;
+  }
+  body.qf-wft .site-mobile-menu a:hover,
+  body.qf-wft .site-mobile-menu a:focus-visible {
+    color: #6E8BFF;
+    background: rgba(255, 255, 255, 0.04);
+  }
+}
