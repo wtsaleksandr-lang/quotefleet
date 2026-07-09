@@ -152,15 +152,15 @@ export function createApp(): express.Express {
         .catch(next);
       return;
     }
-    if (req.tenantSubdomain) return res.sendFile(resolve(publicDir, 'widget.html'));
-    return res.sendFile(resolve(publicDir, 'landing.html'));
+    if (req.tenantSubdomain) return res.sendFile('widget.html', { root: publicDir });
+    return res.sendFile('landing.html', { root: publicDir });
   });
 
-  app.get('/login', (_req, res) => res.sendFile(resolve(publicDir, 'login.html')));
-  app.get('/signup', (_req, res) => res.sendFile(resolve(publicDir, 'signup.html')));
-  app.get('/pricing', (_req, res) => res.sendFile(resolve(publicDir, 'pricing.html')));
-  app.get('/support', (_req, res) => res.sendFile(resolve(publicDir, 'support.html')));
-  app.get('/security', (_req, res) => res.sendFile(resolve(publicDir, 'security.html')));
+  app.get('/login', (_req, res) => res.sendFile('login.html', { root: publicDir }));
+  app.get('/signup', (_req, res) => res.sendFile('signup.html', { root: publicDir }));
+  app.get('/pricing', (_req, res) => res.sendFile('pricing.html', { root: publicDir }));
+  app.get('/support', (_req, res) => res.sendFile('support.html', { root: publicDir }));
+  app.get('/security', (_req, res) => res.sendFile('security.html', { root: publicDir }));
   app.get('/.well-known/security.txt', (_req, res) => {
     res.type('text/plain').send([
       'Contact: mailto:security@quotefleet.net',
@@ -172,16 +172,16 @@ export function createApp(): express.Express {
       '',
     ].join('\n'));
   });
-  app.get('/app', (_req, res) => res.sendFile(resolve(publicDir, 'app.html')));
-  app.get('/app/*splat', (_req, res) => res.sendFile(resolve(publicDir, 'app.html')));
-  app.get('/admin', (_req, res) => res.sendFile(resolve(publicDir, 'admin.html')));
-  app.get('/admin/*splat', (_req, res) => res.sendFile(resolve(publicDir, 'admin.html')));
-  app.get('/w/:slug', (_req, res) => res.sendFile(resolve(publicDir, 'widget.html')));
-  app.get('/chat/:refId', (_req, res) => res.sendFile(resolve(publicDir, 'chat.html')));
-  app.get('/quote/:refId', (_req, res) => res.sendFile(resolve(publicDir, 'quote.html')));
-  app.get(['/for/brokers', '/for/brokers/'], (_req, res) => res.sendFile(resolve(publicDir, 'for-brokers.html')));
-  app.get(['/for/ltl', '/for/ltl/'], (_req, res) => res.sendFile(resolve(publicDir, 'for-ltl.html')));
-  app.get(['/for/forwarders', '/for/forwarders/'], (_req, res) => res.sendFile(resolve(publicDir, 'for-forwarders.html')));
+  app.get('/app', (_req, res) => res.sendFile('app.html', { root: publicDir }));
+  app.get('/app/*splat', (_req, res) => res.sendFile('app.html', { root: publicDir }));
+  app.get('/admin', (_req, res) => res.sendFile('admin.html', { root: publicDir }));
+  app.get('/admin/*splat', (_req, res) => res.sendFile('admin.html', { root: publicDir }));
+  app.get('/w/:slug', (_req, res) => res.sendFile('widget.html', { root: publicDir }));
+  app.get('/chat/:refId', (_req, res) => res.sendFile('chat.html', { root: publicDir }));
+  app.get('/quote/:refId', (_req, res) => res.sendFile('quote.html', { root: publicDir }));
+  app.get(['/for/brokers', '/for/brokers/'], (_req, res) => res.sendFile('for-brokers.html', { root: publicDir }));
+  app.get(['/for/ltl', '/for/ltl/'], (_req, res) => res.sendFile('for-ltl.html', { root: publicDir }));
+  app.get(['/for/forwarders', '/for/forwarders/'], (_req, res) => res.sendFile('for-forwarders.html', { root: publicDir }));
 
   app.use((_req, res) => res.status(404).json({ error: 'Not found' }));
   app.use((err: unknown, req: express.Request, res: express.Response, _next: express.NextFunction) => {
