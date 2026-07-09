@@ -155,6 +155,45 @@ describe('public static page smoke checks', () => {
     expect(css).toContain('.qf-ai-card');
   });
 
+  it('landing page mounts the free rates database globe with self-hosted libs', async () => {
+    const html = await file('landing.html');
+    // Section + copy
+    expect(html).toContain('id="rates-database"');
+    expect(html).toContain('qf-globe-section');
+    expect(html).toContain('id="qf-globe-canvas"');
+    expect(html).toContain('Free rates database');
+    expect(html).toContain('Drag to explore the network');
+    // Qualitative, honest stats (no fabricated counts)
+    expect(html).toContain('US + Canada');
+    expect(html).toContain('Every service type');
+    expect(html).toContain('Always free');
+    // Self-hosted vendor scripts + module + stylesheet wired (no runtime CDN)
+    expect(html).toContain('/vendor/globe.gl.min.js');
+    expect(html).toContain('/vendor/topojson-client.min.js');
+    expect(html).toContain('/quotefleet-rates-globe.js');
+    expect(html).toContain('/quotefleet-rates-globe.css');
+  });
+
+  it('rates globe module is self-hosted, lazy, reduced-motion aware and teal-free', async () => {
+    const js = await file('quotefleet-rates-globe.js');
+    const css = await file('quotefleet-rates-globe.css');
+    // Self-hosted land data, no CDN fetch at runtime
+    expect(js).toContain('/vendor/land-110m.json');
+    expect(js).not.toContain('jsdelivr');
+    expect(js).not.toContain('cdn.');
+    expect(js).not.toContain('unpkg');
+    // Lazy init + reduced motion
+    expect(js).toContain('IntersectionObserver');
+    expect(js).toContain('prefers-reduced-motion');
+    // QuoteFleet blue, not WeFixTrades cyan/teal
+    expect(js).toContain('#0d3cfc');
+    expect(js).not.toContain('102,232,250');
+    expect(css).not.toContain('102,232,250');
+    expect(css).not.toContain('#26D0B2');
+    expect(css).not.toContain('#59ff75');
+    expect(css).not.toContain('#0bd477');
+  });
+
   it('landing page includes social metadata', async () => {
     const html = await file('landing.html');
     expect(html).toContain('property="og:title"');
