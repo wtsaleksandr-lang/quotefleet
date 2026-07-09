@@ -1,0 +1,251 @@
+/* ============================================================
+   Final CTA card — redesign
+   Scoped to the landing final-cta card. Loaded last so it wins
+   the cascade over landing-conversion / s-polish.
+   Brand: accent #0D3CFC, accent-on-dark #6E8BFF, cream #E6E3E0,
+   hairline rgba(255,255,255,.12). No teal.
+   ============================================================ */
+
+body.qf-wft .final-cta-card.qf-final-cta {
+  text-align: center;
+  padding: clamp(40px, 5vw, 60px) clamp(24px, 4vw, 52px);
+}
+
+/* ── Clean kicker: mono uppercase #6E8BFF with a short leading rule ── */
+body.qf-wft .qf-final-cta .qf-cta-kicker {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  padding: 0 !important;
+  border: 0 !important;
+  background: none !important;
+  color: #6E8BFF !important;
+  font-family: var(--font-mono);
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: .14em;
+  text-transform: uppercase;
+  margin: 0 0 18px;
+}
+body.qf-wft .qf-final-cta .qf-cta-kicker::before {
+  content: "";
+  width: 26px;
+  height: 1.5px;
+  border-radius: 2px;
+  background: linear-gradient(90deg, rgba(110,139,255,0), #6E8BFF);
+}
+
+/* ── Title → subtitle rhythm ── */
+body.qf-wft .qf-final-cta h2 {
+  margin: 0;
+}
+body.qf-wft .qf-final-cta .qf-cta-sub {
+  max-width: 560px;
+  margin: 20px auto 0;
+  color: rgba(245,252,255,.68);
+  font-size: 17px;
+  line-height: 1.6;
+}
+body.qf-wft .qf-final-cta .final-actions {
+  justify-content: center;
+  margin-top: 30px;
+}
+
+/* ── Secondary CTA: cream, matching the header "View demo" treatment ── */
+body.qf-wft .qf-final-cta .qf-cta-secondary {
+  background: #E6E3E0;
+  border: 1px solid #E6E3E0;
+  color: #1E1E1E;
+  border-radius: 10px;
+  box-shadow: none;
+  transition: background .16s ease, transform .16s ease, box-shadow .16s ease;
+}
+body.qf-wft .qf-final-cta .qf-cta-secondary .arr { color: #1E1E1E; }
+body.qf-wft .qf-final-cta .qf-cta-secondary:hover {
+  background: #D4CFC9;
+  border-color: #D4CFC9;
+  transform: translateY(-1px);
+  box-shadow: 0 4px 14px rgba(0,0,0,.18);
+}
+
+/* ============================================================
+   Trust badges — 5 square tiles with hover/tap popover
+   ============================================================ */
+body.qf-wft .qf-trust-badges {
+  list-style: none;
+  margin: 40px 0 0;
+  padding: 0;
+  width: 100%;
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 14px;
+}
+body.qf-wft .qf-badge {
+  position: relative;
+  margin: 0;
+  padding: 0;
+  flex: 0 1 148px;
+  max-width: 168px;
+}
+
+body.qf-wft .qf-badge-tile {
+  width: 100%;
+  min-height: 118px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+  padding: 20px 12px;
+  border: 1px solid rgba(255,255,255,.12);
+  border-radius: 14px;
+  background: rgba(255,255,255,.035);
+  color: #f5fcff;
+  font-family: var(--font-sans);
+  cursor: pointer;
+  text-align: center;
+  transition: border-color .18s ease, background .18s ease, transform .18s ease;
+}
+body.qf-wft .qf-badge-tile:hover,
+body.qf-wft .qf-badge-tile:focus-visible {
+  border-color: rgba(110,139,255,.5);
+  background: rgba(110,139,255,.08);
+  transform: translateY(-2px);
+  outline: none;
+}
+body.qf-wft .qf-badge-ico {
+  display: inline-flex;
+  width: 40px;
+  height: 40px;
+  align-items: center;
+  justify-content: center;
+  border-radius: 10px;
+  background: rgba(110,139,255,.1);
+  border: 1px solid rgba(110,139,255,.22);
+}
+body.qf-wft .qf-badge-ico svg {
+  width: 22px;
+  height: 22px;
+  stroke: #ffffff;
+  stroke-width: 2;
+  fill: none;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+body.qf-wft .qf-badge-label {
+  font-size: 12.5px;
+  font-weight: 600;
+  line-height: 1.3;
+  letter-spacing: -.005em;
+  color: #f5fcff;
+}
+
+/* ── Popover ── */
+body.qf-wft .qf-badge-pop {
+  position: absolute;
+  left: 50%;
+  bottom: calc(100% + 14px);
+  width: 240px;
+  transform: translateX(-50%) translateY(8px);
+  padding: 14px 16px;
+  border: 1px solid rgba(255,255,255,.14);
+  border-radius: 14px;
+  background: rgba(24,29,31,.92);
+  -webkit-backdrop-filter: blur(14px) saturate(140%);
+  backdrop-filter: blur(14px) saturate(140%);
+  box-shadow: 0 24px 60px -30px rgba(0,0,0,.9), inset 0 1px 0 rgba(255,255,255,.05);
+  opacity: 0;
+  visibility: hidden;
+  pointer-events: none;
+  z-index: 20;
+  transition: opacity .2s ease, transform .2s ease, visibility .2s;
+}
+body.qf-wft .qf-badge-pop p {
+  margin: 0;
+  color: rgba(245,252,255,.82) !important;
+  font-size: 13px;
+  line-height: 1.5;
+  text-align: left;
+  font-weight: 400;
+}
+body.qf-wft .qf-badge-pop::after {
+  content: "";
+  position: absolute;
+  left: 50%;
+  top: 100%;
+  width: 12px;
+  height: 12px;
+  margin-left: -6px;
+  margin-top: -6px;
+  background: rgba(24,29,31,.92);
+  border-right: 1px solid rgba(255,255,255,.14);
+  border-bottom: 1px solid rgba(255,255,255,.14);
+  transform: rotate(45deg);
+}
+body.qf-wft .qf-badge:hover .qf-badge-pop,
+body.qf-wft .qf-badge-tile:focus-visible + .qf-badge-pop,
+body.qf-wft .qf-badge.is-open .qf-badge-pop {
+  opacity: 1;
+  visibility: visible;
+  transform: translateX(-50%) translateY(0);
+}
+
+/* ── Tablet reflow ── */
+@media (max-width: 860px) {
+  body.qf-wft .qf-badge { flex: 0 1 140px; }
+}
+
+/* ── Mobile: 2–3 per row, tap reveals inline benefit (no fragile popover) ── */
+@media (max-width: 640px) {
+  body.qf-wft .qf-trust-badges { gap: 10px; }
+  body.qf-wft .qf-badge {
+    flex: 0 1 calc(50% - 5px);
+    max-width: none;
+  }
+  body.qf-wft .qf-badge-tile {
+    min-height: 104px;
+    padding: 16px 8px;
+    gap: 10px;
+  }
+  body.qf-wft .qf-badge-label { font-size: 11.5px; }
+
+  /* Popover becomes an inline expandable panel below the tile. */
+  body.qf-wft .qf-badge-pop {
+    position: static;
+    width: auto;
+    transform: none;
+    margin: 8px 0 0;
+    display: none;
+    opacity: 1;
+    visibility: visible;
+    pointer-events: auto;
+    backdrop-filter: none;
+    -webkit-backdrop-filter: none;
+    box-shadow: none;
+  }
+  body.qf-wft .qf-badge-pop::after { display: none; }
+  body.qf-wft .qf-badge:hover .qf-badge-pop { display: none; }
+
+  /* Tapped badge expands to a full-width accordion row so its benefit reads cleanly. */
+  body.qf-wft .qf-badge.is-open { flex-basis: 100%; }
+  body.qf-wft .qf-badge.is-open .qf-badge-tile {
+    flex-direction: row;
+    justify-content: flex-start;
+    gap: 12px;
+    min-height: 0;
+    padding: 14px 16px;
+    border-color: rgba(110,139,255,.5);
+    background: rgba(110,139,255,.08);
+  }
+  body.qf-wft .qf-badge.is-open .qf-badge-pop {
+    display: block;
+    position: static;
+    left: auto;
+    bottom: auto;
+    transform: none;
+    width: 100%;
+    text-align: left;
+  }
+  body.qf-wft .qf-badge.is-open .qf-badge-pop p { text-align: left; }
+}
