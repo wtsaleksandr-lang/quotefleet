@@ -427,15 +427,18 @@ export function registerPublicRoutes(app: Express) {
         service: body.service,
         equipment: body.equipment,
         pickupAddress: body.pickup.address,
-        pickupCity: body.pickup.city,
-        pickupState: body.pickup.state,
+        // When the customer enters only a ZIP/port, backfill city/state from
+        // the geocoded point so the dashboard lane shows "Long Beach → Chicago"
+        // instead of "? → ?".
+        pickupCity: body.pickup.city ?? dist.origin.city,
+        pickupState: body.pickup.state ?? dist.origin.state,
         pickupZip: body.pickup.zip,
         pickupCountry: body.pickup.country ?? 'US',
         pickupLat: dist.origin.lat,
         pickupLng: dist.origin.lng,
         deliveryAddress: body.delivery.address,
-        deliveryCity: body.delivery.city,
-        deliveryState: body.delivery.state,
+        deliveryCity: body.delivery.city ?? dist.destination.city,
+        deliveryState: body.delivery.state ?? dist.destination.state,
         deliveryZip: body.delivery.zip,
         deliveryCountry: body.delivery.country ?? 'US',
         deliveryLat: dist.destination.lat,
