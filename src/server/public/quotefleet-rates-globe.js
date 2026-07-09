@@ -25,7 +25,7 @@
   var GLOW_RGB = "110,139,255";           // #6E8BFF — arcs / rings / glows (readable on dark)
   var SITE_BG = "#161616";                // page near-black
   var LAND_DATA_URL = "/vendor/land-110m.json";
-  var CYCLE_INTERVAL = 3500;
+  var CYCLE_INTERVAL = 2000;              // churn one active card every ~2s
 
   // Dot texture settings (match WFT)
   var TEX_W = 2048;
@@ -215,7 +215,9 @@
     controls.dampingFactor = 0.15;
     controls.enableDamping = true;
 
-    globe.pointOfView({ lat: 38, lng: -98, altitude: 2.6 });
+    // Slightly tighter than the WFT 2.6 so several rate cards read at once,
+    // while still leaving room to grab-and-drag within the NA clamp.
+    globe.pointOfView({ lat: 38, lng: -98, altitude: 2.35 });
 
     requestAnimationFrame(function () {
       var center = controls.getAzimuthalAngle();
@@ -226,25 +228,28 @@
       controls.update();
     });
 
-    // ── Arcs: every contributing city → central hub (rates streaming in) ──
-    var arcs = MARKERS.map(function (m) {
-      return {
-        startLat: m.location[0],
-        startLng: m.location[1],
-        endLat: HUB.location[0],
-        endLng: HUB.location[1]
-      };
-    });
+    // ── Arcs / beams: one per ACTIVE city → central hub (set in paintActive) ─
+    // Each active rate card fires a matching bright beam that "draws in" toward
+    // the Kansas City database hub, so it reads as that rate streaming into the
+    // shared database. start = city, end = hub → the dash pulse flows into it.
+    // Arcs are lifted HIGH off the surface because globe.gl renders the HTML
+    // marker overlay on top of the WebGL scene — surface-hugging arcs would be
+    // occluded by the dense marker cluster; a tall altitude puts the beams in
+    // the open space above North America where the convergence reads clearly.
     globe
-      .arcsData(arcs)
       .arcColor(function () {
-        return ["rgba(" + GLOW_RGB + ",0.10)", "rgba(" + GLOW_RGB + ",0.6)"];
+        return ["rgba(" + GLOW_RGB + ",0.6)", "rgba(" + GLOW_RGB + ",1)"];
       })
-      .arcDashLength(0.4)
-      .arcDashGap(0.25)
-      .arcDashAnimateTime(reduceMotion ? 0 : 3000)
-      .arcStroke(0.5)
-      .arcsTransitionDuration(0);
+      .arcAltitude(0.34)
+      // Near-solid glowing beams (thin sweeping gap) so they read clearly in
+      // any still frame, not just mid-dash. Short transition = new beams settle
+      // to full brightness fast when the active set churns.
+      .arcDashLength(0.9)
+      .arcDashGap(0.08)
+      .arcDashInitialGap(function (d) { return d.gap; })
+      .arcDashAnimateTime(reduceMotion ? 0 : 2000)
+      .arcStroke(1.9)
+      .arcsTransitionDuration(reduceMotion ? 0 : 350);
 
     // ── Rings: persistent pulse at hub + pulse at active marker ──────────
     globe
@@ -308,49 +313,110 @@
       });
 
     // ── Active-marker state ──────────────────────────────────────────────
-    var activeIndex = 0;
+    // Several rate cards are visible at once and the set churns one card at a
+    // time every CYCLE_INTERVAL, so modals fade in/out on a staggered schedule
+    // and it reads as many rates streaming in across the map.
+    var ACTIVE_COUNT = 4;                 // concurrent cards
+    var activeSet = [];                   // indices into MARKERS (== allMarkers idx)
     var timer = null;
 
-    function paintActive() {
-      // Rings: hub always pulses; active contributor also pulses.
-      var rings = [{ lat: HUB.location[0], lng: HUB.location[1] }];
-      if (activeIndex != null && activeIndex >= 0 && activeIndex !== HUB_IDX) {
-        rings.push({
-          lat: allMarkers[activeIndex].location[0],
-          lng: allMarkers[activeIndex].location[1]
-        });
+    // Spotlight only far "rim" cities as active — their beams are long and
+    // clearly converge on the central hub across open space, whereas short
+    // central arcs get lost behind the cluster. Central cities still render as
+    // dim network dots. (All markers remain clickable.)
+    var FAR_POOL = [];
+    MARKERS.forEach(function (m, i) {
+      var dLat = m.location[0] - HUB.location[0];
+      var dLng = m.location[1] - HUB.location[1];
+      if (dLat * dLat + dLng * dLng > 200) FAR_POOL.push(i); // ~14°+ from hub
+    });
+
+    // Keep concurrent cards spread out so they don't stack into a wall.
+    function tooClose(idx, others) {
+      var a = MARKERS[idx].location;
+      for (var k = 0; k < others.length; k++) {
+        if (others[k] === HUB_IDX) continue;
+        var b = MARKERS[others[k]].location;
+        var dLat = a[0] - b[0];
+        var dLng = a[1] - b[1];
+        if (dLat * dLat + dLng * dLng < 110) return true; // ~10.5° min separation
       }
+      return false;
+    }
+
+    function pickNew(exclude) {
+      var svc = exclude.map(function (i) { return MARKERS[i].service; });
+      for (var t = 0; t < 40; t++) {
+        var c = FAR_POOL[Math.floor(Math.random() * FAR_POOL.length)];
+        if (exclude.indexOf(c) !== -1) continue;
+        if (svc.indexOf(MARKERS[c].service) !== -1) continue; // no duplicate service
+        if (tooClose(c, exclude)) continue;
+        return c;
+      }
+      for (var k = 0; k < FAR_POOL.length; k++) {
+        if (exclude.indexOf(FAR_POOL[k]) === -1) return FAR_POOL[k];
+      }
+      return FAR_POOL[0];
+    }
+
+    function seedActive() {
+      activeSet = [];
+      var target = Math.min(ACTIVE_COUNT, MARKERS.length);
+      while (activeSet.length < target) activeSet.push(pickNew(activeSet));
+    }
+
+    function paintActive() {
+      // Rings pulse at the hub and every active contributor.
+      var rings = [{ lat: HUB.location[0], lng: HUB.location[1] }];
+      activeSet.forEach(function (i) {
+        rings.push({ lat: MARKERS[i].location[0], lng: MARKERS[i].location[1] });
+      });
       globe.ringsData(rings);
+
+      // One beam per active city, streaming into the hub (staggered dash phase).
+      globe.arcsData(
+        activeSet.map(function (i, n) {
+          return {
+            startLat: MARKERS[i].location[0],
+            startLng: MARKERS[i].location[1],
+            endLat: HUB.location[0],
+            endLng: HUB.location[1],
+            gap: (n * 0.23) % 1
+          };
+        })
+      );
 
       container.querySelectorAll(".qfg-circle").forEach(function (el) {
         var i = Number(el.dataset.idx);
-        el.classList.toggle("active", i === activeIndex);
+        el.classList.toggle("active", activeSet.indexOf(i) !== -1);
       });
       container.querySelectorAll(".qfg-card").forEach(function (el) {
         var i = Number(el.dataset.idx);
-        el.classList.toggle("active", i === activeIndex);
+        el.classList.toggle("active", activeSet.indexOf(i) !== -1);
       });
     }
 
+    // Click activates a marker's card (adds it to the visible set).
     function setActive(idx) {
-      activeIndex = idx;
+      if (idx === HUB_IDX) return;
+      if (activeSet.indexOf(idx) === -1) {
+        activeSet.push(idx);
+        if (activeSet.length > ACTIVE_COUNT) activeSet.shift();
+      }
       paintActive();
-      startCycle();
     }
 
     function startCycle() {
       if (reduceMotion) return;
       if (timer) clearInterval(timer);
       timer = setInterval(function () {
-        var next;
-        do {
-          next = Math.floor(Math.random() * MARKERS.length);
-        } while (next === activeIndex && MARKERS.length > 1);
-        activeIndex = next;
+        activeSet.shift();                     // retire the oldest card
+        activeSet.push(pickNew(activeSet));    // stream in a fresh, spread-out one
         paintActive();
       }, CYCLE_INTERVAL);
     }
 
+    seedActive();
     paintActive();
     startCycle();
 

@@ -187,34 +187,46 @@
   position: relative;
 }
 
+/* Inactive nodes are small dim dots (network texture) so they don't occlude
+   the beams; active nodes bloom into full glowing icon markers. */
 .qfg-circle {
-  width: 40px;
-  height: 40px;
+  width: 15px;
+  height: 15px;
   border-radius: 50%;
-  background: rgba(110, 139, 255, 0.1);
-  border: 1.5px solid rgba(110, 139, 255, 0.45);
+  background: rgba(110, 139, 255, 0.12);
+  border: 1px solid rgba(110, 139, 255, 0.3);
   display: flex;
   align-items: center;
   justify-content: center;
-  transition: all 0.35s ease;
+  transition: width 0.35s ease, height 0.35s ease, background 0.35s ease,
+    border-color 0.35s ease, box-shadow 0.35s ease;
   backdrop-filter: blur(4px);
   -webkit-backdrop-filter: blur(4px);
   position: relative;
 }
+.qfg-circle svg {
+  opacity: 0;
+  transition: opacity 0.3s ease;
+}
 .qfg-circle::after {
   content: "";
   position: absolute;
-  inset: -4px;
+  inset: -3px;
   border-radius: 50%;
-  border: 1px solid rgba(110, 139, 255, 0.12);
+  border: 1px solid rgba(110, 139, 255, 0.1);
 }
 .qfg-circle.active {
+  width: 40px;
+  height: 40px;
   background: rgba(110, 139, 255, 0.22);
-  border-color: #0d3cfc;
-  box-shadow: 0 0 20px rgba(110, 139, 255, 0.4);
-  transform: scale(1.15);
+  border: 1.5px solid #0d3cfc;
+  box-shadow: 0 0 22px rgba(110, 139, 255, 0.5);
+}
+.qfg-circle.active svg {
+  opacity: 1;
 }
 .qfg-circle.active::after {
+  inset: -4px;
   border-color: rgba(110, 139, 255, 0.3);
   animation: qfg-ping 2s ease-out infinite;
 }
@@ -234,6 +246,7 @@
 .qfg-marker--hub .qfg-circle svg {
   width: 18px;
   height: 18px;
+  opacity: 1;
 }
 
 @keyframes qfg-ping {
