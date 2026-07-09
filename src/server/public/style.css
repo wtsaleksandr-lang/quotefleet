@@ -8,35 +8,79 @@
    Used for: landing, login, signup, pricing, app dashboard, admin,
    chat. The embedded widget keeps its own light theme — see
    widget-style.css.
+
+   Restyled to the WeFixTrades (DOSS) design language: warm near-black
+   canvas, self-hosted Satoshi, brand blue accent (#0D3CFC / #6E8BFF on
+   dark), cream CTA buttons, hairline borders. See wefixtrades tokens.ts.
    ─────────────────────────────────────────────────────────────── */
+
+/* ── Self-hosted Satoshi (copied from the WeFixTrades repo, same-origin
+   under /fonts). font-display: swap keeps FOUT, never FOIT. */
+@font-face {
+  font-family: "Satoshi";
+  font-style: normal; font-weight: 300; font-display: swap;
+  src: url("/fonts/satoshi-300.woff2") format("woff2");
+}
+@font-face {
+  font-family: "Satoshi";
+  font-style: normal; font-weight: 400; font-display: swap;
+  src: url("/fonts/satoshi-400.woff2") format("woff2");
+}
+@font-face {
+  font-family: "Satoshi";
+  font-style: normal; font-weight: 500; font-display: swap;
+  src: url("/fonts/satoshi-500.woff2") format("woff2");
+}
+@font-face {
+  font-family: "Satoshi";
+  font-style: normal; font-weight: 700; font-display: swap;
+  src: url("/fonts/satoshi-700.woff2") format("woff2");
+}
+@font-face {
+  font-family: "Satoshi";
+  font-style: normal; font-weight: 900; font-display: swap;
+  src: url("/fonts/satoshi-900.woff2") format("woff2");
+}
+
 :root {
-  /* Backgrounds — layered dark slate (Effortel's actual values) */
-  --bg:           #141415;
-  --surface:      #1B2123;
-  --surface-2:    #2A2A2D;
-  --surface-3:    #3E3F42;
+  /* Backgrounds — WeFixTrades DOSS dark canvas (warm near-black). */
+  --bg:           #161616;   /* mkt.bgBase — true near-black page bg */
+  --surface:      #1C1C1C;   /* mkt.bgElevated — cards, tiles */
+  --surface-2:    #22282A;   /* mkt.n800 — nav card, footer, raised */
+  --surface-3:    #2E3638;   /* mkt.surfaceAlt — hovers, higher surfaces */
 
-  /* Borders */
-  --border:        #2A2A2D;
-  --border-strong: #3E3F42;
+  /* Borders — hairline scale (warm gray, low opacity). */
+  --border:        rgba(133, 128, 123, 0.18);   /* mkt.hairline */
+  --border-strong: rgba(133, 128, 123, 0.32);   /* mkt.hairlineStrong */
 
-  /* Text */
-  --ink:        #FFFFFF;       /* headings / strong */
-  --ink-soft:   #ECECEE;       /* body */
-  --muted:      #909192;       /* secondary */
-  --muted-soft: #696A6D;       /* very subtle */
+  /* Text — warm grays, never pure white/black (DOSS fg ramp). */
+  --ink:        #F9F9F9;       /* headings / strong — mkt.fg */
+  --ink-soft:   #E7E4E0;       /* body — warm near-white */
+  --muted:      #A39E99;       /* secondary — mkt.fgSecondary */
+  --muted-soft: #78736E;       /* very subtle — mkt.fgTertiary */
 
-  /* Cyan accent (Effortel CTA color) — bright, almost mint. */
-  --accent:        #9BF7FF;
-  --accent-strong: #5BD9E6;
-  --accent-soft:   rgba(155, 247, 255, 0.10);
-  --accent-ink:    #07232A;     /* dark text on cyan buttons */
+  /* Brand accent — blue. On dark, ACCENT-AS-TEXT uses the AA-safe lighter
+     step #6E8BFF (mkt.accentOnDark); solid brand-blue fills use --accent-fill. */
+  --accent:        #6E8BFF;                    /* mkt.accentOnDark — links, eyebrows, stats on dark */
+  --accent-strong: #93A9FF;                    /* brighter hover for accent text */
+  --accent-soft:   rgba(13, 60, 252, 0.12);    /* tint bg for chips / icons / notices */
+  --accent-fill:   #0D3CFC;                    /* mkt.accent — solid brand-blue fill */
+  --accent-ink:    #1E1E1E;                    /* dark text on cream / light accent fills */
 
-  /* Secondary accent — Effortel's electric cobalt blue. */
-  --accent-2:      #3E5FFF;
-  --accent-2-soft: rgba(62, 95, 255, 0.10);
+  /* Secondary accent — brand blue (retired the old cobalt #3E5FFF). */
+  --accent-2:      #0D3CFC;
+  --accent-2-soft: rgba(13, 60, 252, 0.10);
 
-  /* Status */
+  /* Cream CTA — WeFixTrades primary button (warm off-white). */
+  --cta-bg:              #E6E3E0;               /* mkt.ctaBg */
+  --cta-bg-hover:        #D4CFC9;               /* mkt.ctaBgHover */
+  --cta-text:            #1E1E1E;               /* mkt.ctaText */
+  --cta-sec-text:        #F9F9F9;               /* ghost/outline label */
+  --cta-sec-border:      rgba(224, 220, 216, 0.5);
+  --cta-sec-border-hover:rgba(224, 220, 216, 0.9);
+  --cta-sec-bg-hover:    rgba(230, 227, 224, 0.06);
+
+  /* Status (kept semantic; greens/reds hold on dark). */
   --success:    #34D399;
   --success-bg: rgba(52, 211, 153, 0.12);
   --warn:       #F59E0B;
@@ -48,16 +92,16 @@
   --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.4);
   --shadow-md: 0 8px 24px -8px rgba(0, 0, 0, 0.5), 0 2px 6px rgba(0, 0, 0, 0.3);
   --shadow-lg: 0 24px 60px -16px rgba(0, 0, 0, 0.6);
-  --glow-cyan: 0 0 0 1px rgba(155, 247, 255, 0.2), 0 8px 32px -8px rgba(155, 247, 255, 0.18);
+  --glow-cyan: 0 0 0 1px rgba(13, 60, 252, 0.28), 0 8px 32px -8px rgba(13, 60, 252, 0.22);
 
-  --radius:    8px;
-  --radius-lg: 12px;
-  --radius-xl: 16px;
-  --radius-btn: 6px;
+  --radius:    12px;
+  --radius-lg: 16px;
+  --radius-xl: 20px;
+  --radius-btn: 10px;
   --radius-pill: 999px;
 
-  --font-sans: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, system-ui, sans-serif;
-  --font-mono: 'JetBrains Mono', ui-monospace, 'SF Mono', Menlo, Consolas, monospace;
+  --font-sans: 'Satoshi', 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, system-ui, sans-serif;
+  --font-mono: 'DM Mono', 'JetBrains Mono', ui-monospace, 'SF Mono', Menlo, Consolas, monospace;
 }
 
 /* ── Light theme — opted in by setting data-theme="light" on <html>.
@@ -75,12 +119,23 @@ html[data-theme="light"] {
   --ink-soft:   #1E2530;
   --muted:      #5A6470;
   --muted-soft: #8F98A4;
-  --accent:        #0EA5B7;
-  --accent-strong: #086675;
-  --accent-soft:   rgba(14, 165, 183, 0.10);
+  /* On light surfaces the brand blue reads as itself (no lightened step). */
+  --accent:        #0D3CFC;
+  --accent-strong: #0B34D6;
+  --accent-soft:   rgba(13, 60, 252, 0.08);
+  --accent-fill:   #0D3CFC;
   --accent-ink:    #FFFFFF;
-  --accent-2:      #3E5FFF;
-  --accent-2-soft: rgba(62, 95, 255, 0.08);
+  --accent-2:      #0D3CFC;
+  --accent-2-soft: rgba(13, 60, 252, 0.08);
+  /* Light dashboard: primary CTA uses solid brand blue (cream lacks contrast
+     on a white surface). Ghost secondary stays outlined. */
+  --cta-bg:              #0D3CFC;
+  --cta-bg-hover:        #0B34D6;
+  --cta-text:            #FFFFFF;
+  --cta-sec-text:        #0B0F14;
+  --cta-sec-border:      rgba(11, 15, 20, 0.18);
+  --cta-sec-border-hover:rgba(11, 15, 20, 0.34);
+  --cta-sec-bg-hover:    rgba(13, 60, 252, 0.06);
   --success:    #059669;
   --success-bg: rgba(5, 150, 105, 0.10);
   --warn:       #B45309;
@@ -90,7 +145,7 @@ html[data-theme="light"] {
   --shadow-sm: 0 1px 2px rgba(15, 23, 42, 0.06);
   --shadow-md: 0 8px 24px -8px rgba(15, 23, 42, 0.10), 0 2px 6px rgba(15, 23, 42, 0.05);
   --shadow-lg: 0 24px 60px -16px rgba(15, 23, 42, 0.18);
-  --glow-cyan: 0 0 0 1px rgba(14, 165, 183, 0.18), 0 8px 32px -8px rgba(14, 165, 183, 0.15);
+  --glow-cyan: 0 0 0 1px rgba(13, 60, 252, 0.18), 0 8px 32px -8px rgba(13, 60, 252, 0.15);
 }
 /* Theme-toggle button in the sidebar — small, low-key, lives next to nav. */
 .qf-theme-toggle {
@@ -150,67 +205,74 @@ p { margin: 0; }
 /* ── Tag — bracketed monospace small-caps label.
      Use: <span class="tag">[ Recognized as the best MVNE globally ]</span>
    ─────────────────────────────────────────────────────────────── */
+/* Eyebrow — WeFixTrades style: mono uppercase, letter-spaced, brand accent
+   on dark (#6E8BFF). No brackets (that was the old Effortel treatment). */
 .tag {
   display: inline-block;
   font-family: var(--font-mono);
-  font-size: 11.5px;
-  letter-spacing: 0.16em;
+  font-size: 12px;
+  letter-spacing: 0.14em;
   text-transform: uppercase;
-  color: var(--muted);
+  color: var(--accent);
   padding: 4px 0;
 }
-.tag::before { content: '[\00A0\00A0'; color: var(--muted-soft); }
-.tag::after  { content: '\00A0\00A0]'; color: var(--muted-soft); }
 .tag.accent { color: var(--accent); }
+.tag.muted  { color: var(--muted); }
 
 /* ── Top nav (minimal — most navigation lives in the bottom dock) ── */
 .topnav {
   position: sticky; top: 0; z-index: 60;
-  background: rgba(20, 20, 21, 0.78);
-  backdrop-filter: blur(14px) saturate(140%);
-  -webkit-backdrop-filter: blur(14px) saturate(140%);
+  background: rgba(34, 40, 42, 0.72);
+  backdrop-filter: blur(30px) saturate(1.2);
+  -webkit-backdrop-filter: blur(30px) saturate(1.2);
   border-bottom: 1px solid var(--border);
 }
 .topnav-inner {
-  max-width: 1200px; margin: 0 auto; padding: 16px 28px;
-  display: flex; align-items: center; gap: 26px;
+  max-width: 1280px; margin: 0 auto; padding: 14px 28px;
+  display: flex; align-items: center; gap: 24px;
 }
 .brand-mark {
   display: inline-flex; align-items: center; gap: 10px;
-  font-weight: 700; font-size: 16px; letter-spacing: -0.01em;
+  font-weight: 700; font-size: 17px; letter-spacing: -0.02em;
   color: var(--ink);
 }
 .brand-mark:hover { color: var(--ink); }
 .brand-mark .logo {
   width: 30px; height: 30px;
-  background: linear-gradient(135deg, var(--accent) 0%, var(--accent-strong) 100%);
-  border-radius: 8px;
+  background: var(--accent-fill);
+  border-radius: 9px;
   display: inline-flex; align-items: center; justify-content: center;
-  color: var(--accent-ink);
-  box-shadow: 0 2px 12px rgba(155, 247, 255, 0.35);
+  color: #FFFFFF;
+  box-shadow: 0 2px 14px rgba(13, 60, 252, 0.40);
 }
 .brand-mark .logo svg { width: 18px; height: 18px; }
 .topnav-spacer { flex: 1; }
 .topnav a.nav-link {
   color: var(--muted);
-  font-size: 13px; font-weight: 600;
-  letter-spacing: 0.06em; text-transform: uppercase;
+  font-size: 13px; font-weight: 500;
+  letter-spacing: 0.05em; text-transform: uppercase;
   font-family: var(--font-mono);
+  transition: color 0.15s ease;
 }
 .topnav a.nav-link:hover { color: var(--ink); }
 .topnav a.nav-link.active { color: var(--ink); }
+/* Nav CTA cluster — cream primary + ghost secondary, WeFixTrades spacing. */
+.topnav .btn { padding: 8px 18px; font-size: 13px; }
 @media (max-width: 720px) {
   .topnav a.nav-link:not(.always-show) { display: none; }
+  /* Ghost secondary hands off to the bottom dock on mobile so the bar
+     stays uncrowded at 375px. */
+  .topnav .btn-secondary { display: none; }
 }
 
 /* ── Buttons ───────────────────────────────────────────────────── */
 .btn {
   display: inline-flex; align-items: center; justify-content: center; gap: 8px;
-  padding: 12px 18px;
-  font-size: 13px; font-weight: 600;
-  font-family: var(--font-mono);
-  letter-spacing: 0.08em;
-  text-transform: uppercase;
+  padding: 11px 20px;
+  font-size: 14px; font-weight: 600;
+  font-family: var(--font-sans);
+  letter-spacing: 0;
+  text-transform: none;
   border-radius: var(--radius-btn);
   border: 1px solid transparent;
   white-space: nowrap;
@@ -224,33 +286,41 @@ p { margin: 0; }
 }
 .btn:hover .arr { transform: translateX(3px); }
 
+/* Primary — WeFixTrades cream CTA (warm off-white fill, dark ink). */
 .btn-primary {
-  background: var(--accent); color: var(--accent-ink);
-  border-color: var(--accent);
-  box-shadow: 0 2px 14px rgba(155, 247, 255, 0.25);
+  background: var(--cta-bg); color: var(--cta-text);
+  border-color: var(--cta-bg);
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.10);
 }
-.btn-primary .arr { color: var(--accent-ink); }
+.btn-primary .arr { color: var(--cta-text); }
 .btn-primary:hover {
-  background: var(--accent-strong); border-color: var(--accent-strong);
-  box-shadow: 0 4px 22px rgba(155, 247, 255, 0.4);
+  background: var(--cta-bg-hover); border-color: var(--cta-bg-hover);
+  transform: translateY(-1px);
+  box-shadow:
+    inset 0 0 0 1.5px rgba(13, 60, 252, 0.45),
+    0 4px 14px rgba(13, 60, 252, 0.18),
+    0 1px 3px rgba(0, 0, 0, 0.10);
 }
-.btn-primary:active { transform: translateY(1px); }
-.btn-primary:disabled { opacity: 0.5; cursor: not-allowed; box-shadow: none; }
+.btn-primary:active { transform: translateY(0) scale(0.985); }
+.btn-primary:disabled { opacity: 0.5; cursor: not-allowed; box-shadow: none; transform: none; }
 
+/* Secondary — ghost / outline (transparent, hairline border, light label). */
 .btn-secondary {
-  background: var(--surface-2); color: var(--ink);
-  border-color: var(--border-strong);
+  background: transparent; color: var(--cta-sec-text);
+  border-color: var(--cta-sec-border);
 }
-.btn-secondary .arr { color: var(--ink); }
+.btn-secondary .arr { color: var(--cta-sec-text); }
 .btn-secondary:hover {
-  background: var(--surface-3); border-color: var(--accent-strong); color: var(--ink);
+  background: var(--cta-sec-bg-hover);
+  border-color: var(--cta-sec-border-hover);
+  color: var(--cta-sec-text);
 }
 
 .btn-ghost {
   background: transparent; color: var(--ink-soft);
-  border-color: var(--border-strong);
+  border-color: var(--cta-sec-border);
 }
-.btn-ghost:hover { background: var(--surface-2); color: var(--ink); }
+.btn-ghost:hover { background: var(--cta-sec-bg-hover); border-color: var(--cta-sec-border-hover); color: var(--ink); }
 
 .btn-danger {
   background: transparent; color: var(--error); border-color: var(--border-strong);
@@ -281,7 +351,7 @@ p { margin: 0; }
 .card.elevated { box-shadow: var(--shadow-md); }
 .card.glow {
   box-shadow: var(--glow-cyan);
-  border-color: rgba(155, 247, 255, 0.25);
+  border-color: rgba(13, 60, 252, 0.30);
 }
 .card-title {
   font-size: 16px; font-weight: 700; margin: 0 0 4px 0;
@@ -516,8 +586,8 @@ p { margin: 0; }
   content: '';
   position: absolute; inset: 0; pointer-events: none;
   background:
-    radial-gradient(ellipse 60% 50% at 50% 35%, rgba(155, 247, 255, 0.10), transparent 70%),
-    radial-gradient(ellipse 30% 20% at 50% 70%, rgba(62, 95, 255, 0.06), transparent 70%);
+    radial-gradient(ellipse 60% 50% at 50% 35%, rgba(13, 60, 252, 0.12), transparent 70%),
+    radial-gradient(ellipse 30% 20% at 50% 70%, rgba(13, 60, 252, 0.07), transparent 70%);
 }
 .hero > * { position: relative; }
 .hero .tag { margin-bottom: 22px; }
@@ -527,7 +597,15 @@ p { margin: 0; }
   color: var(--ink);
 }
 .hero h1 .accent {
-  background: linear-gradient(135deg, var(--accent) 0%, var(--accent-2) 100%);
+  /* AA-safe accent span on dark — stays in the #6E8BFF→#93A9FF range so the
+     headline word never drops below contrast (brand-blue #0D3CFC as text on
+     near-black fails AA). */
+  background: linear-gradient(135deg, #93A9FF 0%, var(--accent) 100%);
+  -webkit-background-clip: text; background-clip: text;
+  -webkit-text-fill-color: transparent;
+}
+html[data-theme="light"] .hero h1 .accent {
+  background: linear-gradient(135deg, var(--accent-fill) 0%, #3E5FFF 100%);
   -webkit-background-clip: text; background-clip: text;
   -webkit-text-fill-color: transparent;
 }
@@ -586,8 +664,8 @@ p { margin: 0; }
 }
 .feature-card:hover {
   transform: translateY(-3px);
-  border-color: rgba(155, 247, 255, 0.30);
-  box-shadow: 0 12px 32px -16px rgba(155, 247, 255, 0.25);
+  border-color: rgba(13, 60, 252, 0.35);
+  box-shadow: 0 12px 32px -16px rgba(13, 60, 252, 0.30);
 }
 .feature-card .icon {
   width: 38px; height: 38px; border-radius: 10px;
@@ -655,10 +733,10 @@ p { margin: 0; }
 .dock-item:hover { background: rgba(255, 255, 255, 0.04); color: var(--ink); }
 .dock-item.active { background: var(--surface-3); color: var(--ink); }
 .dock-item.cta {
-  background: var(--accent); color: var(--accent-ink);
+  background: var(--cta-bg); color: var(--cta-text);
   margin-left: 4px;
 }
-.dock-item.cta:hover { background: var(--accent-strong); }
+.dock-item.cta:hover { background: var(--cta-bg-hover); }
 .dock-item .plus { font-weight: 800; opacity: 0.7; }
 .dock-item.up {
   width: 36px; padding: 9px 0; justify-content: center; color: var(--ink);
@@ -727,15 +805,15 @@ p { margin: 0; }
   position: relative;
 }
 .price-card.featured {
-  border-color: rgba(155, 247, 255, 0.35);
+  border-color: rgba(13, 60, 252, 0.40);
   box-shadow: var(--glow-cyan);
 }
 .price-card.featured::after {
   content: 'Most popular';
   position: absolute; top: -10px; left: 50%; transform: translateX(-50%);
-  background: var(--accent); color: var(--accent-ink);
+  background: var(--accent-fill); color: #FFFFFF;
   font-family: var(--font-mono); font-size: 10.5px;
-  padding: 4px 12px; border-radius: 4px;
+  padding: 4px 12px; border-radius: 999px;
   font-weight: 700; letter-spacing: 0.08em; text-transform: uppercase;
 }
 .price-card h3 { margin: 0; font-size: 16px; color: var(--ink); }
@@ -828,7 +906,7 @@ p { margin: 0; }
   font-size: 13.5px; line-height: 1.55; white-space: pre-wrap;
 }
 .chat-bubble.user {
-  align-self: flex-end; background: var(--accent); color: var(--accent-ink);
+  align-self: flex-end; background: var(--accent-fill); color: #FFFFFF;
   border-bottom-right-radius: 4px;
 }
 .chat-bubble.assistant {
@@ -860,7 +938,7 @@ p { margin: 0; }
   padding: 12px 16px; border-radius: 10px;
   background: var(--accent-soft); color: var(--accent);
   font-size: 13.5px;
-  border: 1px solid rgba(155, 247, 255, 0.20);
+  border: 1px solid rgba(13, 60, 252, 0.22);
 }
 .notice.warn  { background: var(--warn-bg);  color: var(--warn);  border-color: rgba(245, 158, 11, 0.20); }
 .notice.error { background: var(--error-bg); color: var(--error); border-color: rgba(248, 113, 113, 0.20); }
@@ -876,16 +954,27 @@ p { margin: 0; }
   60%, 100% { content: '...'; }
 }
 
-/* ── Footer ────────────────────────────────────────────────────── */
+/* ── Footer — WeFixTrades dark surface (#22282a), warm muted links,
+   hairline top border. Copy uses Satoshi; the legal/compliance strip keeps
+   the mono treatment for the small-caps utility look. ─────────────── */
 .site-footer {
-  padding: 36px 28px 100px;
+  padding: 44px 28px 104px;
   border-top: 1px solid var(--border);
-  margin-top: 60px;
-  font-family: var(--font-mono);
-  font-size: 11.5px;
-  letter-spacing: 0.10em; text-transform: uppercase;
-  color: var(--muted);
+  background: var(--surface-2);
+  margin-top: 72px;
+  font-family: var(--font-sans);
+  font-size: 12.5px;
+  letter-spacing: 0.02em; text-transform: none;
+  line-height: 1.7;
+  color: rgba(255, 255, 255, 0.55);
   text-align: center;
 }
-.site-footer a { color: var(--muted); margin: 0 10px; }
-.site-footer a:hover { color: var(--accent); }
+.site-footer a {
+  color: rgba(255, 255, 255, 0.62);
+  margin: 0 9px;
+  text-decoration: none;
+  transition: color 0.15s ease;
+}
+.site-footer a:hover { color: var(--ink); }
+/* Company / product line + any explicitly muted note stays subtler. */
+.site-footer strong { color: rgba(255, 255, 255, 0.78); font-weight: 600; }
