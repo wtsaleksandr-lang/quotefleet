@@ -149,8 +149,17 @@ body.qf-wft .flow-arrow {
 
 body.qf-wft .visual-flow {
   min-height: 0 !important;
-  display: grid !important;
-  grid-template-columns: 1fr !important;
+  /* Force a single vertical stack. The base landing-conversion grid defines
+     `grid-template-areas: "rates arrow1 page" / "rates arrow2 customer"`;
+     overriding only the columns left those 2D areas in effect, so cards
+     landed on a broken hybrid grid. Flex column + area reset removes it. */
+  display: flex !important;
+  flex-direction: column !important;
+  align-items: stretch !important;
+  justify-content: flex-start !important;
+  grid-template-columns: none !important;
+  grid-template-areas: none !important;
+  grid-template-rows: none !important;
   gap: 14px !important;
   border: 1px solid rgba(255,255,255,.16) !important;
   border-radius: 24px !important;
@@ -161,11 +170,55 @@ body.qf-wft .visual-flow {
 
 body.qf-wft .flow-card {
   position: static !important;
-  width: auto !important;
+  /* Neutralize the earlier landing-home-fixes 2-column grid: it placed both
+     .mini-result and .mini-actions into a single `grid-area: content`, which
+     stacked them in the same cell (overlap). A simple vertical flex column
+     lays the card contents out in DOM order with no collisions. */
+  display: flex !important;
+  flex-direction: column !important;
+  align-items: stretch !important;
+  gap: 8px !important;
+  grid-template-columns: none !important;
+  grid-template-areas: none !important;
+  grid-template-rows: none !important;
+  width: 100% !important;
   min-height: 0 !important;
   border-radius: 18px !important;
   box-shadow: none !important;
-  padding: 18px !important;
+  padding: 20px !important;
+  /* Settle the base softRise animation so the hero cards paint immediately
+     (they are a static illustration, not an above-the-fold reveal). */
+  animation: none !important;
+  opacity: 1 !important;
+  transform: none !important;
+}
+
+body.qf-wft .flow-card > .flow-icon,
+body.qf-wft .flow-card > .flow-label,
+body.qf-wft .flow-card > strong,
+body.qf-wft .flow-card > .mini-rate-table,
+body.qf-wft .flow-card > .mini-browser,
+body.qf-wft .flow-card > .mini-result,
+body.qf-wft .flow-card > .mini-actions {
+  grid-area: auto !important;
+  align-self: stretch !important;
+}
+
+body.qf-wft .flow-card > .flow-icon { margin: 0 0 6px !important; }
+
+/* The page card's URL must never break mid-word; the card is wide enough for
+   one line, so pin it and drop the inherited overflow-wrap: anywhere. */
+body.qf-wft .flow-page > strong {
+  white-space: nowrap !important;
+  overflow-wrap: normal !important;
+  word-break: normal !important;
+  font-size: 17px !important;
+  letter-spacing: -0.02em !important;
+}
+
+body.qf-wft .flow-card > strong {
+  overflow-wrap: normal !important;
+  word-break: normal !important;
 }
 
 body.qf-wft .flow-rates {
@@ -198,10 +251,17 @@ body.qf-wft .flow-rates b {
   color: #111516 !important;
 }
 
-body.qf-wft .flow-card strong,
+body.qf-wft .flow-page strong,
+body.qf-wft .flow-customer strong,
 body.qf-wft .mini-result b,
 body.qf-wft .mini-browser p {
   color: #f5fcff !important;
+}
+
+/* Cream "Your rates" card keeps dark ink on its strong (Load once) — the
+   generic light .flow-card strong above must not override it. */
+body.qf-wft .flow-rates strong {
+  color: #111516 !important;
 }
 
 body.qf-wft .mini-browser,
