@@ -14,7 +14,7 @@
   align-items: flex-start;
 }
 .qf-builder-kicker {
-  color: var(--accent-2);
+  color: var(--accent);
   font: 700 11px var(--font-mono);
   letter-spacing: .12em;
   text-transform: uppercase;
@@ -178,7 +178,7 @@
   padding: 4px 8px;
   border-radius: 999px;
   background: var(--surface);
-  color: var(--accent-2);
+  color: var(--accent);
   border: 1px solid var(--border);
   font: 700 10px var(--font-mono);
   letter-spacing: .08em;
@@ -187,6 +187,12 @@
 }
 .qf-rate-table-wrap .table {
   margin-top: 6px;
+  /* Rate cards carry more columns ($/MI, MIN, FLAT, FUEL%, MARGIN%, ENABLED +
+     actions) than the other grids. Let the table grow to its natural width so
+     the wrap's overflow-x actually scrolls, instead of compressing columns and
+     clipping the Duplicate/Delete/NEEDS PRICE action cell at the right edge. */
+  width: max-content;
+  min-width: 100%;
 }
 /* Last cell holds Duplicate + Delete + the status badge. Let them wrap
    cleanly and stay right-aligned inside the cell so "NEEDS PRICE" never

@@ -63,6 +63,12 @@
     .qf-mobile-nav-toggle:hover { background: var(--surface-2); }
     @media (min-width: 901px) { .app-shell.qf-nav-collapsed .sidebar { display: none; } .app-shell.qf-nav-collapsed .app-main { margin-left: 0; } }
     @media (max-width: 900px) { .app-shell .sidebar { position: fixed; top: 0; left: 0; bottom: 0; width: 260px; max-width: 80vw; transform: translateX(-100%); transition: transform 0.18s ease; z-index: 1000; box-shadow: 4px 0 20px rgba(0,0,0,0.2); overflow-y: auto; } .app-shell.qf-nav-open .sidebar { transform: translateX(0); } .app-main { padding-top: 60px; } }
+    /* Trial bar spans full width and its text is centered; at mobile the fixed
+       hamburger (left:12px, 40px wide) sits over the banner's left edge. Pad
+       both sides symmetrically past the toggle so the centered text never tucks
+       under the hamburger (clipping the leading "TRI"). !important beats the
+       inline padding set in app.js. */
+    @media (max-width: 900px) { #qf-trial-bar { padding-left: 60px !important; padding-right: 60px !important; } }
     body.qf-trial-locked .app-main input, body.qf-trial-locked .app-main select, body.qf-trial-locked .app-main textarea { pointer-events: none; opacity: 0.55; cursor: not-allowed; }
     body.qf-trial-locked .app-main .btn-primary, body.qf-trial-locked .app-main .btn-danger, body.qf-trial-locked .app-main button[data-mutate] { pointer-events: none; opacity: 0.55; cursor: not-allowed; }
   </style>

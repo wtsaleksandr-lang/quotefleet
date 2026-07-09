@@ -14,7 +14,7 @@
   gap: 16px;
 }
 .qf-lead-crm-kicker {
-  color: var(--accent-2);
+  color: var(--accent);
   font: 700 11px var(--font-mono);
   letter-spacing: .1em;
   text-transform: uppercase;
