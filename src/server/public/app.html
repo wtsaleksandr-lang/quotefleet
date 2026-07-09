@@ -26,11 +26,12 @@
   <link rel="stylesheet" href="/quotefleet-color-system.css">
   <script>
     (function () {
-      try {
-        var saved = localStorage.getItem('qf-theme');
-        var theme = saved || (window.matchMedia && window.matchMedia('(prefers-color-scheme: light)').matches ? 'light' : 'dark');
-        if (theme === 'light') document.documentElement.setAttribute('data-theme', 'light');
-      } catch (e) { /* ignore */ }
+      // Authed dashboard is LOCKED to the dark brand theme so it always
+      // matches the (always-dark) public marketing site. We no longer
+      // follow the OS prefers-color-scheme, which would otherwise give
+      // light-mode-OS users a light dashboard — a jarring brand break.
+      // The polished light-theme CSS is retained for a future opt-in.
+      try { document.documentElement.removeAttribute('data-theme'); } catch (e) { /* ignore */ }
     })();
   </script>
 </head>
@@ -53,7 +54,6 @@
       <button class="nav-item" data-route="account" aria-label="Account"><span aria-hidden="true">👤</span> Account</button>
       <button class="nav-item" data-route="audit" aria-label="Audit log"><span aria-hidden="true">📜</span> Audit log</button>
       <a href="/" target="_blank" rel="noopener" aria-label="View public widget">↗ View public widget</a>
-      <button class="qf-theme-toggle" id="qf-theme-toggle" aria-label="Toggle light/dark theme"><span id="qf-theme-icon" aria-hidden="true">🌙</span><span id="qf-theme-label">Dark</span></button>
       <button class="nav-item" id="sb-logout" aria-label="Sign out">↩ Sign out</button>
     </aside>
     <main class="app-main"><div id="page-content"></div></main>
