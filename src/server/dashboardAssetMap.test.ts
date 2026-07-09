@@ -30,9 +30,12 @@ describe('dashboard asset map', () => {
 
   it('keeps app asset load order intentional', async () => {
     const html = await readFile(resolve(publicDir, 'app.html'), 'utf8');
+    // premium-palette.css was removed from the dashboard: its teal light/dark
+    // theme overrode style.css's WeFixTrades tokens on /app + /admin. The
+    // dashboard now shares style.css's palette with the public site.
+    expect(html).not.toContain('/premium-palette.css');
     expectOrdered(html, [
       '/style.css',
-      '/premium-palette.css',
       '/dashboard-polish.css',
       '/dashboard-setup.css',
       '/dashboard-preview.css',

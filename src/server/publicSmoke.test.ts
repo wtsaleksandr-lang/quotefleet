@@ -57,7 +57,9 @@ describe('public static page smoke checks', () => {
   it('dashboard loads premium calculator-editing polish', async () => {
     const html = await file('app.html');
     const css = await file('dashboard-polish.css');
-    expect(html).toContain('/premium-palette.css');
+    // premium-palette.css was removed from the dashboard (its teal theme
+    // overrode the shared WeFixTrades palette on /app + /admin).
+    expect(html).not.toContain('/premium-palette.css');
     expect(html).toContain('/dashboard-polish.css');
     expect(css).toContain('Dashboard polish for calculator setup screens');
     expect(css).toContain('data-route="rates"');

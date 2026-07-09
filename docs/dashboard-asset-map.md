@@ -6,9 +6,12 @@ This dashboard currently uses small layered CSS/JS files instead of one large re
 
 `src/server/public/app.html` should load dashboard CSS in this order:
 
-1. `/style.css` — base app styles and shared UI primitives.
-2. `/premium-palette.css` — premium logistics color tokens.
-3. `/dashboard-polish.css` — general dashboard visual polish.
+1. `/style.css` — base app styles, shared UI primitives, AND the single source
+   of truth for color tokens (the WeFixTrades dark palette + light theme shared
+   with the public site). REMOVED: `/premium-palette.css` — its teal logistics
+   theme overrode style.css and made the dashboard render teal/pale-blue; the
+   dashboard now inherits the same palette as the public pages.
+2. `/dashboard-polish.css` — general dashboard visual polish.
 4. `/dashboard-setup.css` — overview setup progress panel and setup empty states.
 5. `/dashboard-preview.css` — customer calculator preview card.
 6. `/rate-builder.css` — `/app/rates` builder layer.

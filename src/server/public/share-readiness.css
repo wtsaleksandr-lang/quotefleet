@@ -3,7 +3,7 @@
   margin: 0 0 18px;
   border: 1px solid var(--border);
   border-radius: 22px;
-  background: linear-gradient(135deg, rgba(38,208,178,.08), rgba(99,102,241,.06)), var(--surface);
+  background: linear-gradient(135deg, rgba(13, 60, 252,.08), rgba(99,102,241,.06)), var(--surface);
   box-shadow: var(--shadow-md);
   overflow: hidden;
 }
@@ -94,7 +94,7 @@
 }
 .qf-share-status.warn {
   color: #f5a524;
-  background: rgba(245,165,36,.12);
+  background: rgba(13, 60, 252,.12);
 }
 .qf-share-flow {
   display: grid;

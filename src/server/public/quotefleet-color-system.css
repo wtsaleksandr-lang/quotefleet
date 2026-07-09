@@ -17,20 +17,13 @@
   --qf-color-neutral-card: #E6E3E0;
   --qf-color-neutral-card-hover: #D4CFC9;
   --qf-color-light-text: #1E1E1E;
-  --accent: #0D3CFC;
-  --accent-strong: #0B32D4;
-  --accent-soft: rgba(13, 60, 252, .14);
-  --accent-ink: #FFFFFF;
-  --bg: #181D1F;
-  --surface: #22282A;
-  --surface-2: #22282A;
-  --surface-3: #E4EDF1;
-  --ink: #FFFFFF;
-  --ink-soft: #FFFFFF;
-  --muted: #B1C5CE;
-  --muted-soft: rgba(177,197,206,.72);
-  --border: rgba(255,255,255,.12);
-  --border-strong: rgba(255,255,255,.22);
+  /* Standard design tokens (--bg/--surface/--accent/--ink/--muted/--border …)
+     are intentionally NOT redefined here. The dashboard (/app, /admin) and the
+     public site share ONE source of truth: style.css's WeFixTrades token set
+     (warm near-black #161616 canvas, #0D3CFC fill / #6E8BFF on-dark accent,
+     cream CTA, warm text, hairline borders, full light-theme block). Keeping
+     the --qf-color-* palette above lets the legacy marketing / calculator
+     rules below resolve without hijacking the shared token cascade. */
 }
 
 body.qf-wft,
@@ -339,11 +332,7 @@ body.qf-app-calculator .qf-help {
   color: var(--qf-color-accent) !important;
 }
 
-html[data-theme="light"] {
-  --accent: #0D3CFC;
-  --accent-strong: #0B32D4;
-  --accent-soft: rgba(13,60,252,.12);
-  --accent-ink: #FFFFFF;
-  --surface-3: #E6E3E0;
-  --ink: #1E1E1E;
-}
+/* Light theme is fully governed by style.css's html[data-theme="light"] block
+   (the same warm WeFixTrades light palette the public site uses). No overrides
+   here — they previously left --bg/--surface/--muted unset, which let the old
+   teal premium-palette light theme bleed onto the dashboard. */

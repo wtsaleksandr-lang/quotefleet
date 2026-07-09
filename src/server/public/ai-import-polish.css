@@ -3,7 +3,7 @@
   margin: 0 0 18px;
   border: 1px solid var(--border);
   border-radius: 22px;
-  background: linear-gradient(135deg, rgba(38,208,178,.08), rgba(245,165,36,.05)), var(--surface);
+  background: linear-gradient(135deg, rgba(13, 60, 252,.08), rgba(13, 60, 252,.05)), var(--surface);
   box-shadow: var(--shadow-md);
   overflow: hidden;
 }
@@ -114,7 +114,7 @@
   background: rgba(255,255,255,.022);
 }
 .qf-import-safe-apply b { color: var(--accent); }
-tr.qf-import-row-focus { outline: 2px solid rgba(245,165,36,.38); outline-offset: -2px; }
+tr.qf-import-row-focus { outline: 2px solid rgba(13, 60, 252,.38); outline-offset: -2px; }
 @media (max-width: 1000px) {
   .qf-import-grid { grid-template-columns: 1fr 1fr; }
   .qf-import-checklist { grid-template-columns: 1fr; }

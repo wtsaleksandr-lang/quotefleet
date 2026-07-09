@@ -3,7 +3,7 @@
   margin: 0 0 18px;
   border: 1px solid var(--border);
   border-radius: 22px;
-  background: linear-gradient(135deg, rgba(38, 208, 178, .08), rgba(93, 139, 255, .06)), var(--surface);
+  background: linear-gradient(135deg, rgba(13, 60, 252, .08), rgba(93, 139, 255, .06)), var(--surface);
   box-shadow: var(--shadow-md);
   overflow: hidden;
 }
@@ -51,7 +51,7 @@
 .qf-zone-health-actions button.is-active {
   border-color: var(--accent);
   color: var(--ink);
-  background: rgba(38,208,178,.1);
+  background: rgba(13, 60, 252,.1);
 }
 .qf-zone-health-grid {
   display: grid;
@@ -92,12 +92,12 @@
 }
 .qf-zone-status.needs-price,
 .qf-zone-status.needs-radius,
-.qf-zone-status.missing-anchor { border-color: rgba(245,165,36,.45); color: var(--accent-2); }
+.qf-zone-status.missing-anchor { border-color: rgba(13, 60, 252,.45); color: var(--accent-2); }
 .qf-zone-status.disabled { opacity: .75; }
-.qf-zone-status.ready { border-color: rgba(38,208,178,.45); color: var(--accent); }
+.qf-zone-status.ready { border-color: rgba(13, 60, 252,.45); color: var(--accent); }
 tr.qf-zone-needs-price,
 tr.qf-zone-needs-radius,
-tr.qf-zone-missing-anchor { outline: 1px solid rgba(245,165,36,.35); outline-offset: -1px; }
+tr.qf-zone-missing-anchor { outline: 1px solid rgba(13, 60, 252,.35); outline-offset: -1px; }
 tr.qf-zone-hidden-by-filter { display: none; }
 .qf-zone-note {
   margin: 0 0 16px;

@@ -3,7 +3,7 @@
   margin: 12px 0 14px;
   border: 1px solid var(--border);
   border-radius: 20px;
-  background: linear-gradient(135deg, rgba(38,208,178,.08), rgba(255,255,255,.025)), var(--surface);
+  background: linear-gradient(135deg, rgba(13, 60, 252,.08), rgba(255,255,255,.025)), var(--surface);
   box-shadow: var(--shadow-sm);
   padding: 14px;
 }

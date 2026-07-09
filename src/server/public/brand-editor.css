@@ -3,7 +3,7 @@
   margin: 0 0 18px;
   border: 1px solid var(--border);
   border-radius: 22px;
-  background: linear-gradient(135deg, rgba(38,208,178,.08), rgba(245,165,36,.05)), var(--surface);
+  background: linear-gradient(135deg, rgba(13, 60, 252,.08), rgba(13, 60, 252,.05)), var(--surface);
   box-shadow: var(--shadow-md);
   overflow: hidden;
 }
@@ -119,11 +119,11 @@
   background: linear-gradient(135deg, var(--accent), var(--accent-2));
 }
 .qf-brand-page-top strong { color: #fff; display: block; }
-.qf-brand-page-top small { color: #8fa0b2; }
+.qf-brand-page-top small { color: #A39E99; }
 .qf-brand-page-chip {
   align-self: center;
   color: var(--accent);
-  border: 1px solid rgba(38,208,178,.28);
+  border: 1px solid rgba(13, 60, 252,.28);
   border-radius: 999px;
   padding: 5px 8px;
   font: 700 10px var(--font-mono);
@@ -145,7 +145,7 @@
   border: 1px solid rgba(255,255,255,.09);
   border-radius: 12px;
   padding: 10px;
-  color: #d7e0ea;
+  color: #E7E4E0;
   background: rgba(255,255,255,.035);
   font-size: 12px;
 }
