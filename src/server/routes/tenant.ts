@@ -46,11 +46,13 @@ import {
 } from '../../db/schema.js';
 import { requireAuth, requireTenant, requireOwner, requirePlan } from '../middleware.js';
 
-/** Plan tiers for feature gating. Source of truth: tenants.plan column,
- *  default 'free'. Order from cheapest → most expensive. */
-const PAID_PLANS = ['starter', 'pro', 'enterprise'] as const;
-const PRO_PLANS = ['pro', 'enterprise'] as const;
+/** Plan tiers for feature gating, expressed as EFFECTIVE plans (see
+ *  src/server/plans.ts). Trial tenants resolve to 'pro' and pass every
+ *  gate; that is intentional (all-inclusive trial). */
+const CORE_PLANS = ['vital', 'pro'] as const; // branded quotes, core features
+const PRO_PLANS = ['pro'] as const; // AI, PDF, automation, custom domain, analytics
 import { encrypt } from '../../auth/secrets.js';
+import { effectivePlan } from '../plans.js';
 import { loadEnv } from '../../config.js';
 import { syncTenantToMarketplace } from '../../marketplace/sync.js';
 import { createHmac } from 'node:crypto';
@@ -508,19 +510,19 @@ export function registerTenantRoutes(app: Express) {
     const parse = BrandPatch.safeParse(req.body);
     if (!parse.success) return res.status(400).json({ error: 'Invalid input' });
     // Plan-gate the logoUrl field. Colors / tagline / display name stay
-    // available to free tenants so they can still personalize the embed
-    // a bit during trial. Custom logo is a paid-tier perk.
+    // available to everyone. Branded quotes (custom logo) are a Vital+
+    // perk — trial tenants qualify via effectivePlan → 'pro'.
     const patch = parse.data;
     const settingLogo = Object.prototype.hasOwnProperty.call(patch, 'logoUrl') && patch.logoUrl != null && patch.logoUrl !== '';
     if (
       settingLogo &&
       req.user?.role !== 'super_admin' &&
-      !(PAID_PLANS as readonly string[]).includes(req.tenant!.plan)
+      !(CORE_PLANS as readonly string[]).includes(effectivePlan(req.tenant!))
     ) {
       return res.status(403).json({
         error: 'plan_upgrade_required',
-        required: [...PAID_PLANS],
-        current: req.tenant!.plan,
+        required: [...CORE_PLANS],
+        current: effectivePlan(req.tenant!),
         field: 'logoUrl',
       });
     }

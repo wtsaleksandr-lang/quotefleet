@@ -116,7 +116,7 @@ function makeWelcome(t: Tenant): LifecycleEmail {
       `1. Sign in and tweak your default rate cards (or upload your existing rate sheet under "AI import").\n` +
       `2. Upload your logo + brand colors so the widget matches your site.\n` +
       `3. Drop the embed snippet on your website (in /app → Embed code) or just share your hosted page link.\n\n` +
-      `You're on a 14-day trial — 30 leads / 25 quote previews. No credit card required.\n\n` +
+      `You're on your 14-day all-inclusive trial — every Pro feature unlocked, unlimited quotes and leads. When it ends we bill the plan you picked (Vital $14.80/mo or Pro $34.80/mo); cancel anytime.\n\n` +
       `If you get stuck, reply to this email. I read everything.\n\n` +
       `— QuoteFleet\n`,
   };
@@ -134,7 +134,7 @@ function makeDay7(t: Tenant): LifecycleEmail {
       `• Have you tuned your rate cards yet? The defaults are within ~15% of market, but yours will be tighter.\n` +
       `• Want a hand? Reply to this email and I'll personally walk you through anything.\n\n` +
       `Dashboard:  ${base}/login\n\n` +
-      `Trial ends in 7 days. Pro is $49/mo when you're ready (${base}/pricing).\n\n` +
+      `Trial ends in 7 days, then your plan starts — Vital $14.80/mo or Pro $34.80/mo (${base}/pricing). Manage or switch plans anytime from your dashboard.\n\n` +
       `— QuoteFleet\n`,
   };
 }
@@ -146,10 +146,10 @@ function makeDay12(t: Tenant): LifecycleEmail {
     subject: `Your QuoteFleet trial ends in 2 days`,
     body:
       `Hi,\n\n` +
-      `Your trial wraps up in 2 days. After that, your hosted page stays live but no new leads can be captured until you upgrade to Pro.\n\n` +
-      `Pro is $49/mo. Unlimited quotes, unlimited leads, removes the "Powered by QuoteFleet" badge, includes the AI ingest + replies.\n\n` +
-      `Upgrade in one click: ${base}/app  →  Upgrade button at the top.\n\n` +
-      `Or pick a different plan: ${base}/pricing\n\n` +
+      `Your trial wraps up in 2 days. If you've added a card, your plan starts automatically with no interruption. If not, your hosted page stays live but new leads pause until you choose a plan.\n\n` +
+      `Vital is $14.80/mo (hosted page, widget, unlimited quotes, lead inbox, branded quotes). Pro is $34.80/mo — everything in Vital plus AI auto-reply & 24/7 chat, branded PDF quotes, automation, custom domain, and analytics.\n\n` +
+      `Choose or manage your plan: ${base}/app  →  Plan settings.\n\n` +
+      `Compare plans: ${base}/pricing\n\n` +
       `Reply if you have questions — happy to extend the trial if you need a few extra days.\n\n` +
       `— QuoteFleet\n`,
   };
@@ -162,8 +162,8 @@ function makeExpired(t: Tenant): LifecycleEmail {
     subject: `Your QuoteFleet trial has ended`,
     body:
       `Hi,\n\n` +
-      `Your 14-day trial just ended. Your hosted page is still live, but new leads return a "not accepting requests" message until you upgrade.\n\n` +
-      `Pro is $49/mo: ${base}/app\n\n` +
+      `Your 14-day trial just ended. Your hosted page is still live, but new leads return a "not accepting requests" message until you choose a plan.\n\n` +
+      `Vital $14.80/mo or Pro $34.80/mo — pick one in one click: ${base}/app\n\n` +
       `Or, if QuoteFleet wasn't the right fit, just reply and let me know what missed — useful even if it's a no.\n\n` +
       `— QuoteFleet\n`,
   };

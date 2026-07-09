@@ -1,35 +1,30 @@
 /**
- * Trial gating — quota + expiry enforcement for free-tier tenants.
+ * Trial / plan state for a tenant — drives whether the public lead
+ * endpoint accepts new leads and what the dashboard banner shows.
  *
- * Rules:
- *   - `plan === 'free'` AND `trial_ends_at` in the past
- *       → tenant is read-only. Block /api/public/lead/<slug>.
- *   - `plan === 'free'` AND trial active AND lead count >= TRIAL_LEAD_LIMIT
- *       → trial quota exceeded. Block.
- *   - Any paid plan → no checks here.
+ * New two-tier model (see src/server/plans.ts):
+ *   - Trialing (trialEndsAt in the future) → all-inclusive, accepting
+ *     leads. NO lead cap.
+ *   - Paid (effective plan 'vital' or 'pro', trial over) → accepting
+ *     leads, unlimited.
+ *   - 'free' with the trial ended (never subscribed / cancelled) →
+ *     read-only: the public lead endpoint is blocked and the dashboard
+ *     mutation gate applies.
  *
- * Quote *previews* (the calculator) are NOT counted — visitors can keep
- * computing quotes against a tenant indefinitely; only `lead` submissions
- * count against the quota. That matches what the carrier actually cares
- * about: how many qualified leads landed in their inbox.
+ * There is NO 25-lead / 30-leads-per-month quota anymore — after the trial
+ * the tenant is a paying Vital/Pro customer (or cancelled). Quote previews
+ * (the calculator) were never counted and still aren't.
  */
-import { count } from 'drizzle-orm';
-import { eq, and, gte } from 'drizzle-orm';
-import { db } from '../db/client.js';
-import { leads, type Tenant } from '../db/schema.js';
-
-export const TRIAL_LEAD_LIMIT = 25;
-export const PAID_FREE_LEAD_LIMIT = 0; // post-trial free = read-only
+import { type Tenant } from '../db/schema.js';
+import { effectivePlan, isTrialing } from './plans.js';
 
 export interface TrialState {
   /** 'trial' | 'trial_expired' | 'paid' | 'unknown' */
   status: 'trial' | 'trial_expired' | 'paid' | 'unknown';
   /** Whether this tenant can accept new leads right now. */
   acceptingLeads: boolean;
-  /** Number of leads consumed against the quota. */
-  leadsUsed: number;
-  /** Quota limit — null if unlimited (paid). */
-  leadsLimit: number | null;
+  /** Effective plan powering feature access ('free' | 'vital' | 'pro'). */
+  plan: 'free' | 'vital' | 'pro';
   /** Days remaining in trial — only meaningful when status === 'trial'. */
   daysLeft: number;
   /** ISO date when trial ends (or null). */
@@ -44,66 +39,40 @@ function daysBetween(from: Date, to: Date): number {
 
 export async function getTrialState(tenant: Tenant): Promise<TrialState> {
   const now = new Date();
-  const isFree = tenant.plan === 'free';
+  const isActive = tenant.status === 'active';
   const trialEnd = tenant.trialEndsAt ?? null;
+  const eff = effectivePlan(tenant);
 
-  if (!isFree) {
+  // Inside the 14-day all-inclusive trial.
+  if (isTrialing(tenant)) {
+    return {
+      status: 'trial',
+      acceptingLeads: isActive,
+      plan: eff, // 'pro' during trial
+      daysLeft: trialEnd ? daysBetween(now, trialEnd) : 0,
+      trialEndsAt: trialEnd ? trialEnd.toISOString() : null,
+      reason: isActive ? undefined : 'Tenant is suspended.',
+    };
+  }
+
+  // Paying Vital/Pro tenant — unlimited, no cap.
+  if (eff !== 'free') {
     return {
       status: 'paid',
-      acceptingLeads: tenant.status === 'active',
-      leadsUsed: 0,
-      leadsLimit: null,
+      acceptingLeads: isActive,
+      plan: eff,
       daysLeft: 0,
       trialEndsAt: trialEnd ? trialEnd.toISOString() : null,
     };
   }
 
-  // Lead count — all-time for this tenant. Trial limit is small enough
-  // that we don't bother windowing it; once they convert to paid the
-  // counter resets implicitly (limit becomes null).
-  const cnt = await db()
-    .select({ n: count() })
-    .from(leads)
-    .where(eq(leads.tenantId, tenant.id));
-  const leadsUsed = Number(cnt[0]?.n ?? 0);
-
-  const trialActive = trialEnd != null && trialEnd > now;
-
-  if (trialActive) {
-    const limit = TRIAL_LEAD_LIMIT;
-    const accepting = leadsUsed < limit && tenant.status === 'active';
-    return {
-      status: 'trial',
-      acceptingLeads: accepting,
-      leadsUsed,
-      leadsLimit: limit,
-      daysLeft: daysBetween(now, trialEnd),
-      trialEndsAt: trialEnd.toISOString(),
-      reason: !accepting
-        ? leadsUsed >= limit
-          ? `Trial limit of ${limit} leads reached — upgrade to keep capturing.`
-          : 'Tenant is suspended.'
-        : undefined,
-    };
-  }
-
-  // Trial expired (or never started, treat as expired-on-free).
+  // Free: trial ended and never subscribed / cancelled → read-only.
   return {
     status: 'trial_expired',
     acceptingLeads: false,
-    leadsUsed,
-    leadsLimit: 0,
+    plan: 'free',
     daysLeft: 0,
     trialEndsAt: trialEnd ? trialEnd.toISOString() : null,
-    reason: 'Trial has ended. Upgrade to a paid plan to keep capturing leads.',
+    reason: 'Your trial has ended. Choose a plan to keep capturing leads.',
   };
-}
-
-/** Helper: count leads created since a given date for a tenant. */
-export async function leadsSince(tenantId: number, since: Date): Promise<number> {
-  const c = await db()
-    .select({ n: count() })
-    .from(leads)
-    .where(and(eq(leads.tenantId, tenantId), gte(leads.createdAt, since)));
-  return Number(c[0]?.n ?? 0);
 }

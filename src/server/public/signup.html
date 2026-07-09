@@ -21,9 +21,9 @@
 
   <main style="display:flex; align-items:center; justify-content:center; min-height: calc(100vh - 80px); padding: 48px 24px;">
     <div class="card elevated" style="width: 100%; max-width: 560px;">
-      <h1 style="font-size: 28px; margin: 0 0 8px 0; letter-spacing: -0.025em;">Start free</h1>
+      <h1 style="font-size: 28px; margin: 0 0 8px 0; letter-spacing: -0.025em;">Start your 14-day trial</h1>
       <p class="muted-small" style="margin:0 0 20px;">Create your quote desk, then tune rates before going live.</p>
-      <div class="notice" style="margin-bottom:18px; line-height:1.5;">Launch-safe setup: your public calculator stays private until you choose to share the hosted link.</div>
+      <div class="notice" style="margin-bottom:18px; line-height:1.5;">14-day all-inclusive trial — every Pro feature unlocked. Card required (validated at $0, not charged today); we bill the plan you pick when the trial ends. Cancel anytime.</div>
 
       <form id="signup-form" style="display:flex; flex-direction:column; gap: 18px;" novalidate>
         <div class="field"><label class="field-label required">Company name</label><input class="input" name="companyName" placeholder="Acme Drayage" autocomplete="organization" required maxlength="120"></div>
@@ -31,8 +31,22 @@
         <div class="grid-2"><div class="field"><label class="field-label required">Email</label><input class="input" type="email" name="email" required autocomplete="email" inputmode="email" autocapitalize="none" spellcheck="false"></div><div class="field"><label class="field-label required">Phone</label><input class="input" name="contactPhone" type="tel" autocomplete="tel" placeholder="For account recovery"></div></div>
         <div class="grid-2"><div class="field"><label class="field-label required">Password</label><input class="input" type="password" name="password" id="password-input" minlength="10" maxlength="200" autocomplete="new-password" required><span class="field-hint" id="password-hint">Minimum 10 characters. Use a unique password.</span></div><div class="field"><label class="field-label required">Confirm password</label><input class="input" type="password" name="confirmPassword" id="confirm-password-input" minlength="10" maxlength="200" autocomplete="new-password" required><span class="field-hint" id="confirm-hint">Re-enter the same password.</span></div></div>
         <div class="field"><label class="field-label">Where you operate</label><select class="select" name="countryFocus"><option value="US" selected>USA</option><option value="CA">Canada</option><option value="BOTH">USA + Canada</option></select></div>
+        <div class="field">
+          <label class="field-label required">Choose your plan</label>
+          <div id="plan-choice" style="display:flex; flex-direction:column; gap:10px;">
+            <label class="plan-opt" data-plan="vital" style="display:flex; gap:10px; align-items:flex-start; padding:12px 14px; background:var(--surface-2); border:1px solid var(--border); border-radius:8px; cursor:pointer;">
+              <input type="radio" name="plan" value="vital" style="margin-top:3px; flex-shrink:0;">
+              <span style="line-height:1.5;"><strong>Vital — $14.80/mo</strong><br><small class="muted">Hosted quote page, embeddable widget, unlimited quotes, lead inbox, branded quotes, follow-up reminders.</small></span>
+            </label>
+            <label class="plan-opt" data-plan="pro" style="display:flex; gap:10px; align-items:flex-start; padding:12px 14px; background:var(--surface-2); border:1px solid var(--border); border-radius:8px; cursor:pointer;">
+              <input type="radio" name="plan" value="pro" checked style="margin-top:3px; flex-shrink:0;">
+              <span style="line-height:1.5;"><strong>Pro — $34.80/mo</strong><br><small class="muted">Everything in Vital plus AI auto-reply &amp; 24/7 chat, branded PDF quotes, full automation, custom domain, analytics, priority support.</small></span>
+            </label>
+          </div>
+          <span class="field-hint">Your 14-day trial is all-inclusive either way — you can switch plans anytime.</span>
+        </div>
         <label style="display:flex; gap:10px; align-items:flex-start; padding:10px 12px; background:var(--surface-2); border:1px solid var(--border); border-radius:8px; cursor:pointer; font-size:13.5px; line-height:1.55;"><input type="checkbox" id="dpa-accept" name="dpaAccept" required style="margin-top:3px; flex-shrink:0;"><span>I have read and agree to the <a href="/security" target="_blank" rel="noopener">Security policy</a>, <a href="/dpa" target="_blank" rel="noopener">Data Processing Addendum (v1.0)</a>, and confirm that QuoteFleet may process customer data on my behalf under those terms.</span></label>
-        <button class="btn btn-primary btn-lg btn-block" type="submit" id="signup-submit" disabled>Create account <span class="arr">→</span></button>
+        <button class="btn btn-primary btn-lg btn-block" type="submit" id="signup-submit" disabled>Start 14-day trial <span class="arr">→</span></button>
         <div id="signup-error" class="notice error hidden" role="alert"></div>
         <p class="muted-small" style="text-align:center; margin-top: 14px; line-height: 1.55;">Your rates are private by default. Marketplace exposure is opt-in and benchmarks are anonymized. <a href="/security" target="_blank" rel="noopener">Read the full policy →</a></p>
       </form>
@@ -102,6 +116,26 @@
     }).catch(function () { hostInput.innerHTML = '<option value="quotefleet.net">quotefleet.net</option>'; refreshPreview(); });
     function syncSubmit() { submit.disabled = !(dpa.checked && form.companyName.value.trim() && normalizeEmail(emailInput.value) && checkPassword() && slugInput.value.trim().length >= 3); }
     dpa.addEventListener('change', syncSubmit); syncSubmit();
+    // Selected-plan visual highlight + ?plan= prefill from the pricing page.
+    function selectedPlan() { var r = form.querySelector('input[name="plan"]:checked'); return r ? r.value : 'vital'; }
+    function paintPlan() {
+      Array.prototype.forEach.call(document.querySelectorAll('#plan-choice .plan-opt'), function (opt) {
+        var on = opt.getAttribute('data-plan') === selectedPlan();
+        opt.style.borderColor = on ? 'var(--accent)' : 'var(--border)';
+        opt.style.boxShadow = on ? '0 0 0 1px var(--accent)' : 'none';
+      });
+    }
+    Array.prototype.forEach.call(document.querySelectorAll('input[name="plan"]'), function (r) { r.addEventListener('change', paintPlan); });
+    (function preselectFromQuery() {
+      try {
+        var want = new URLSearchParams(location.search).get('plan');
+        if (want === 'vital' || want === 'pro') {
+          var radio = form.querySelector('input[name="plan"][value="' + want + '"]');
+          if (radio) radio.checked = true;
+        }
+      } catch (e) { /* no-op */ }
+      paintPlan();
+    })();
     function bestError(j) {
       if (!j) return 'Signup failed.';
       if (j.error && j.error !== 'Invalid input') return j.error;
@@ -122,9 +156,12 @@
       if (!dpa.checked) { err.textContent = 'Please accept the Security policy and DPA to continue.'; err.classList.remove('hidden'); return; }
       submit.disabled = true; var oldText = submit.innerHTML; submit.innerHTML = 'Creating account…';
       try {
-        var res = await fetch('/api/auth/signup', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ companyName: String(fd.get('companyName') || '').trim(), slug: slugInput.value.trim(), hostDomain: fd.get('hostDomain'), email: normalizeEmail(fd.get('email')), password: fd.get('password'), countryFocus: fd.get('countryFocus') || 'US', contactPhone: fd.get('contactPhone') || undefined, dpaAccepted: true, dpaVersion: '1.0' }) });
+        var res = await fetch('/api/auth/signup', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ companyName: String(fd.get('companyName') || '').trim(), slug: slugInput.value.trim(), hostDomain: fd.get('hostDomain'), email: normalizeEmail(fd.get('email')), password: fd.get('password'), plan: selectedPlan(), countryFocus: fd.get('countryFocus') || 'US', contactPhone: fd.get('contactPhone') || undefined, dpaAccepted: true, dpaVersion: '1.0' }) });
         var j = await res.json();
         if (!res.ok) { err.textContent = bestError(j); err.classList.remove('hidden'); submit.disabled = false; submit.innerHTML = oldText; syncSubmit(); return; }
+        // Card-required trial: if the server started a Stripe Checkout session,
+        // redirect there to add the card ($0 validation); otherwise go to /app.
+        if (j.checkoutUrl) { submit.innerHTML = 'Redirecting to secure checkout…'; location.href = j.checkoutUrl; return; }
         location.href = '/app';
       } catch (ex) { err.textContent = 'Network error — try again.'; err.classList.remove('hidden'); submit.disabled = false; submit.innerHTML = oldText; syncSubmit(); }
     });

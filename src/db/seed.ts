@@ -127,9 +127,9 @@ async function seedDemoTenant() {
     if (existing[0].plan === 'free' && !existing[0].trialEndsAt) {
       await db()
         .update(tenants)
-        .set({ plan: 'starter' })
+        .set({ plan: 'pro' })
         .where(eq(tenants.id, tenantId));
-      console.log('[seed]   plan: free → starter (demo is exempt from trial limits)');
+      console.log('[seed]   plan: free → pro (demo shows every feature, incl. AI)');
     }
   } else {
     const embedToken = nanoid(24);
@@ -143,7 +143,7 @@ async function seedDemoTenant() {
         contactPhone: '+1 555 555 0100',
         countryFocus: 'US',
         embedToken,
-        plan: 'starter',
+        plan: 'pro',
         status: 'active',
       })
       .returning({ id: tenants.id });

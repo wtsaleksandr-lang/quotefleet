@@ -14,7 +14,9 @@ describe('signin UI smoke coverage', () => {
     expect(signup).toContain('autocomplete="organization"');
     expect(signup).toContain('Confirm');
     expect(signup).toContain('normalizeEmail');
-    expect(signup).toContain('Launch-safe setup');
+    // Two-tier signup: plan chooser + card-required all-inclusive trial copy.
+    expect(signup).toContain('14-day all-inclusive trial');
+    expect(signup).toContain('name="plan"');
   });
 
   it('keeps login guidance mounted', async () => {
