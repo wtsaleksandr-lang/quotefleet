@@ -1,0 +1,151 @@
+/* ============================================================================
+   QuoteFleet — Customize panel (Wave 2)
+   The rebuilt /app/brand surface: a single-purpose "Customize your calculator"
+   page (theme presets, accent, font, logo, name/tagline) beside a live widget
+   preview. Dark dashboard brand: #161616 page / #1C1C1C surface, cobalt
+   #0D3CFC / periwinkle #6E8BFF accent, cream #E6E3E0, hairline borders. No teal.
+   ========================================================================== */
+
+/* ── De-clutter: suppress legacy injected noise on THIS page only ──────────
+   The dashboard enhancement scripts inject readiness checklists, "answer a few
+   setup questions" chips, preview mocks, share panels and the accessorial
+   scanner. The JS injectors are guarded to skip the brand route; these scoped
+   rules are a belt-and-suspenders net so nothing leaks above the controls even
+   if an injector is loaded another way. Scoped to the customize page via :has()
+   so other routes are untouched. */
+#page-content:has(.qf-customize) .qf-brand-editor,
+#page-content:has(.qf-customize) .qf-brand-publish-tip,
+#page-content:has(.qf-customize) .qf-brand-studio-preview,
+#page-content:has(.qf-customize) .qf-onboarding-panel,
+#page-content:has(.qf-customize) .qf-setup-coach,
+#page-content:has(.qf-customize) .qf-setup-kicker-inline,
+#page-content:has(.qf-customize) .qf-share-readiness,
+#page-content:has(.qf-customize) .qf-share-tip,
+#page-content:has(.qf-customize) .qf-preview-card,
+#page-content:has(.qf-customize) .qf-dashboard-preview,
+#page-content:has(.qf-customize) .qf-acc-tools {
+  display: none !important;
+}
+
+/* ── Page shell ───────────────────────────────────────────────────────── */
+.qf-customize h1 { margin: 0 0 4px; }
+.qf-customize .page-sub { margin: 0 0 18px; color: var(--muted); }
+
+.qf-cz-layout {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 0.92fr);
+  gap: 18px;
+  align-items: start;
+}
+.qf-cz-controls { display: flex; flex-direction: column; gap: 14px; min-width: 0; }
+.qf-cz-preview-col { position: sticky; top: 18px; min-width: 0; }
+
+/* ── Sections (cards) ─────────────────────────────────────────────────── */
+.qf-cz-section { padding: 16px 16px 18px; }
+.qf-cz-section-title {
+  font-size: 14px; font-weight: 600; color: var(--ink);
+  letter-spacing: -0.01em; margin-bottom: 4px;
+}
+.qf-cz-hint { font-size: 12.5px; color: var(--muted); line-height: 1.45; }
+.qf-cz-section > .qf-cz-hint { margin-bottom: 12px; }
+
+.qf-cz-field { display: flex; flex-direction: column; gap: 6px; margin-top: 12px; }
+.qf-cz-field:first-of-type { margin-top: 10px; }
+.qf-cz-label { font-size: 12.5px; font-weight: 600; color: var(--ink-soft); }
+.qf-cz-field .qf-cz-hint { margin-top: 2px; }
+
+/* ── Theme preset cards ───────────────────────────────────────────────── */
+.qf-cz-preset-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 10px;
+}
+.qf-cz-preset {
+  display: flex; flex-direction: column; gap: 8px;
+  padding: 8px; border: 1px solid var(--border);
+  border-radius: var(--radius); background: var(--surface-2);
+  cursor: pointer; text-align: left; transition: border-color .14s ease, transform .1s ease;
+}
+.qf-cz-preset:hover { border-color: var(--border-strong); }
+.qf-cz-preset:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+.qf-cz-preset.is-selected { border-color: var(--accent-fill); box-shadow: 0 0 0 1px var(--accent-fill); }
+.qf-cz-preset-swatch {
+  position: relative; height: 46px; border-radius: 8px;
+  border: 1px solid var(--border); overflow: hidden;
+}
+.qf-cz-preset-surface {
+  position: absolute; left: 8px; right: 8px; bottom: 8px; top: 14px;
+  border-radius: 5px;
+}
+.qf-cz-preset-accent {
+  position: absolute; right: 9px; bottom: 9px; width: 16px; height: 16px;
+  border-radius: 5px; box-shadow: 0 1px 3px rgba(0,0,0,.35);
+}
+.qf-cz-preset-name { font-size: 12.5px; font-weight: 600; color: var(--ink); }
+
+/* ── Accent swatches ──────────────────────────────────────────────────── */
+.qf-cz-accent-row { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
+.qf-cz-swatch {
+  width: 30px; height: 30px; border-radius: 8px; padding: 0;
+  border: 1px solid var(--border-strong); cursor: pointer;
+  position: relative; transition: transform .1s ease, box-shadow .12s ease;
+}
+.qf-cz-swatch:hover { transform: translateY(-1px); }
+.qf-cz-swatch:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+.qf-cz-swatch.is-selected { box-shadow: 0 0 0 2px var(--bg), 0 0 0 4px var(--accent-fill); }
+.qf-cz-swatch-default,
+.qf-cz-swatch-custom {
+  width: auto; height: 30px; padding: 0 12px; gap: 7px;
+  display: inline-flex; align-items: center; font-size: 12px; font-weight: 600;
+  color: var(--ink-soft); background: var(--surface-2);
+}
+.qf-cz-swatch-custom input[type="color"] {
+  width: 18px; height: 18px; padding: 0; border: none; background: none;
+  border-radius: 5px; cursor: pointer;
+}
+.qf-cz-swatch-custom input[type="color"]::-webkit-color-swatch-wrapper { padding: 0; }
+.qf-cz-swatch-custom input[type="color"]::-webkit-color-swatch { border: none; border-radius: 4px; }
+
+/* ── Font select ──────────────────────────────────────────────────────── */
+.qf-cz-select { max-width: 320px; }
+
+/* ── Logo dropzone ────────────────────────────────────────────────────── */
+.qf-cz-dropzone {
+  display: flex; flex-direction: column; align-items: center; gap: 6px;
+  padding: 22px 16px; text-align: center;
+  border: 1px dashed var(--border-strong); border-radius: var(--radius);
+  background: var(--surface-2); transition: border-color .14s ease, background .14s ease;
+}
+.qf-cz-dropzone.is-drag { border-color: var(--accent-fill); background: var(--accent-soft); }
+.qf-cz-dropzone-title { font-size: 13px; font-weight: 600; color: var(--ink); }
+.qf-cz-file { display: none; }
+.qf-cz-pick { margin-top: 6px; }
+.qf-cz-logo-current { display: flex; align-items: center; gap: 12px; margin-top: 12px; flex-wrap: wrap; }
+.qf-cz-logo-img {
+  max-height: 56px; max-width: 180px; border-radius: 8px;
+  background: var(--surface-3); padding: 6px; border: 1px solid var(--border);
+}
+
+/* ── Live preview ─────────────────────────────────────────────────────── */
+.qf-cz-preview { padding: 14px; }
+.qf-cz-preview-head { display: flex; align-items: center; justify-content: space-between; margin-bottom: 10px; }
+.qf-cz-preview-title { font-size: 14px; font-weight: 600; color: var(--ink); }
+.qf-cz-preview-open { font-size: 12.5px; font-weight: 600; color: var(--accent); text-decoration: none; }
+.qf-cz-preview-open:hover { color: var(--accent-strong); text-decoration: underline; }
+.qf-cz-frame-wrap {
+  border: 1px solid var(--border); border-radius: var(--radius);
+  overflow: hidden; background: #fff;
+}
+.qf-cz-frame { display: block; width: 100%; height: 620px; border: 0; }
+.qf-cz-preview-note { margin-top: 10px; font-size: 12px; color: var(--muted); line-height: 1.45; }
+
+/* ── Responsive: stack + un-stick preview ─────────────────────────────── */
+@media (max-width: 900px) {
+  .qf-cz-layout { grid-template-columns: minmax(0, 1fr); }
+  .qf-cz-preview-col { position: static; order: -1; }
+  .qf-cz-frame { height: 520px; }
+  .qf-cz-preset-grid { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+}
+@media (max-width: 480px) {
+  .qf-cz-preset-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+}

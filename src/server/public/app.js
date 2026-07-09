@@ -1012,83 +1012,252 @@
     }).catch(showErr(c));
   }
 
-  // ── Brand ─────────────────────────────────────────────────────
+  // ── Customize (rebuilt Brand surface — Wave 2) ─────────────────
+  // A single-purpose "Customize your calculator" page: theme presets, accent,
+  // font, logo upload, name/tagline — beside a LIVE preview of the tenant's
+  // real widget (/w/<slug>). Every change is debounce-saved via the brand PUT
+  // then the preview iframe reloads to reflect it. The legacy readiness /
+  // setup-question / preview-mock / scanner injectors are suppressed on this
+  // route (see de-clutter guards in dashboard-setup.js, share-readiness.js,
+  // dashboard-preview.js, brand-editor.js, brand-studio-preview.js and the
+  // scoped rules in customize-panel.css).
   function renderBrand(c) {
+    var slug = (state.me && state.me.tenant && state.me.tenant.slug) || '';
     api('/api/tenant/brand').then(function (d) {
       var b = d.brand || {};
+      var presets = d.presets || [];
+      var fonts = d.fonts || [];
       c.innerHTML = '';
-      c.appendChild(el('h1', { text: 'Brand' }));
-      c.appendChild(el('p', { class: 'page-sub', text: 'Customise how the widget looks on your site.' }));
-      var card = el('div', { class: 'card' });
-      function field(label, key, opts) {
-        opts = opts || {};
-        var f = el('div', { class: 'field', style: { marginBottom: '12px' } });
-        f.appendChild(el('label', { class: 'field-label', text: label }));
-        var inp;
-        if (opts.textarea) inp = el('textarea', { class: 'textarea', rows: '3' });
-        else inp = el('input', { class: 'input', type: opts.type || 'text' });
-        inp.value = b[key] || '';
-        inp.addEventListener('blur', function () { var p = {}; p[key] = inp.value; api('/api/tenant/brand', { method: 'PUT', body: p }).catch(toastErr); });
+
+      var root = el('div', { class: 'qf-customize', 'data-qf-customize': '1' });
+      c.appendChild(root);
+      root.appendChild(el('h1', { text: 'Customize your calculator' }));
+      root.appendChild(el('p', { class: 'page-sub', text: 'Pick a look, add your logo, and watch your live calculator update on the right.' }));
+
+      var layout = el('div', { class: 'qf-cz-layout' });
+      var controls = el('div', { class: 'qf-cz-controls' });
+      var previewCol = el('div', { class: 'qf-cz-preview-col' });
+      layout.appendChild(controls);
+      layout.appendChild(previewCol);
+      root.appendChild(layout);
+
+      // ── save queue (debounced) + preview reload ─────────────────
+      function kv(k, v) { var o = {}; o[k] = v; return o; }
+      function previewSrc() { return '/w/' + encodeURIComponent(slug); }
+      var iframe = null;
+      var pending = {}, saveTimer = null, previewTimer = null;
+      function reloadPreview() {
+        clearTimeout(previewTimer);
+        previewTimer = setTimeout(function () {
+          if (!iframe) return;
+          var base = previewSrc();
+          iframe.src = base + (base.indexOf('?') > -1 ? '&' : '?') + '_t=' + Date.now();
+        }, 250);
+      }
+      function flush() {
+        if (!Object.keys(pending).length) return;
+        var body = pending; pending = {};
+        api('/api/tenant/brand', { method: 'PUT', body: body })
+          .then(function () { reloadPreview(); })
+          .catch(function (e) {
+            if (e && e.status === 403) toast('A custom logo is a Core/Vital feature — upgrade to add your own logo.', 'warn');
+            else toastErr(e);
+          });
+      }
+      function queueSave(patch, immediate) {
+        Object.assign(pending, patch);
+        clearTimeout(saveTimer);
+        saveTimer = setTimeout(flush, immediate ? 0 : 450);
+      }
+
+      // ── live preview column ─────────────────────────────────────
+      var pcard = el('div', { class: 'card qf-cz-preview' });
+      pcard.appendChild(el('div', { class: 'qf-cz-preview-head' }, [
+        el('span', { class: 'qf-cz-preview-title', text: 'Live preview' }),
+        el('a', { href: previewSrc(), target: '_blank', rel: 'noopener', class: 'qf-cz-preview-open', text: 'Open ↗' }),
+      ]));
+      var frameWrap = el('div', { class: 'qf-cz-frame-wrap' });
+      iframe = el('iframe', { class: 'qf-cz-frame', src: previewSrc(), title: 'Your live calculator', loading: 'lazy' });
+      frameWrap.appendChild(iframe);
+      pcard.appendChild(frameWrap);
+      pcard.appendChild(el('div', { class: 'qf-cz-preview-note', text: 'This is exactly what your customers see. It updates as you make changes.' }));
+      previewCol.appendChild(pcard);
+
+      // ── Your company (name + tagline) ───────────────────────────
+      function textField(label, key, val, hint) {
+        var f = el('div', { class: 'qf-cz-field' });
+        f.appendChild(el('label', { class: 'qf-cz-label', text: label }));
+        var inp = el('input', { class: 'input', type: 'text' });
+        inp.value = val || '';
+        inp.addEventListener('input', function () { queueSave(kv(key, inp.value)); });
+        inp.addEventListener('blur', function () { queueSave(kv(key, inp.value), true); });
         f.appendChild(inp);
-        if (opts.hint) f.appendChild(el('span', { class: 'field-hint', text: opts.hint }));
+        if (hint) f.appendChild(el('div', { class: 'qf-cz-hint', text: hint }));
         return f;
       }
-      card.appendChild(field('Display name', 'displayName'));
-      card.appendChild(field('Tagline', 'tagline'));
-      card.appendChild(el('div', { class: 'grid-2' }, [
-        field('Primary color', 'primaryColor', { hint: 'Hex code, e.g. #2563eb' }),
-        field('Accent color', 'accentColor', { hint: 'Hex code, e.g. #06b6d4' }),
-      ]));
-      card.appendChild(field('Logo URL', 'logoUrl', { hint: 'Hosted image URL — kept simple for MVP.' }));
-      card.appendChild(field('CTA button text', 'ctaText'));
-      card.appendChild(field('Footer note', 'footerNote', { textarea: true }));
-      var togWrap = el('label', { style: { display: 'flex', gap: '8px', alignItems: 'center', marginTop: '12px' } });
-      var tog = el('input', { type: 'checkbox' }); tog.checked = b.showPoweredBy !== false;
-      tog.addEventListener('change', function () { api('/api/tenant/brand', { method: 'PUT', body: { showPoweredBy: tog.checked } }).catch(toastErr); });
-      togWrap.appendChild(tog); togWrap.appendChild(el('span', { text: 'Show "Powered by QuoteFleet" footer' }));
-      card.appendChild(togWrap);
-      card.appendChild(field('Allowed domains (CSV, optional)', 'allowedDomains', { hint: 'e.g. acmeco.com,acmeco.ca — restricts widget to these origins.' }));
-      c.appendChild(card);
+      var company = el('div', { class: 'card qf-cz-section' });
+      company.appendChild(el('div', { class: 'qf-cz-section-title', text: 'Your company' }));
+      company.appendChild(textField('Company name', 'displayName', b.displayName, 'Shown above your calculator.'));
+      company.appendChild(textField('Tagline', 'tagline', b.tagline, 'One short line under your name.'));
+      controls.appendChild(company);
 
-      // ── Lead capture controls ───────────────────────────────────
-      var capture = el('div', { class: 'card', style: { marginTop: '14px' } });
-      capture.appendChild(el('div', { class: 'card-title', text: 'Lead capture' }));
-      capture.appendChild(el('div', { class: 'card-subtitle', text: 'Choose what contact info the customer must provide before you receive a lead.' }));
-      function toggleRow(label, key, defaultVal, hint) {
-        var wrap = el('label', { style: { display: 'flex', gap: '10px', alignItems: 'flex-start', padding: '10px 0', borderTop: '1px solid var(--border)' } });
-        var cb = el('input', { type: 'checkbox', style: { marginTop: '3px' } });
-        cb.checked = (b[key] !== undefined && b[key] !== null) ? !!b[key] : defaultVal;
-        cb.addEventListener('change', function () {
-          var p = {}; p[key] = cb.checked;
-          api('/api/tenant/brand', { method: 'PUT', body: p }).catch(toastErr);
+      // ── Theme presets ───────────────────────────────────────────
+      var themeSec = el('div', { class: 'card qf-cz-section' });
+      themeSec.appendChild(el('div', { class: 'qf-cz-section-title', text: 'Theme' }));
+      themeSec.appendChild(el('div', { class: 'qf-cz-hint', text: 'A curated look — sets the background, surfaces, and default accent.' }));
+      var grid = el('div', { class: 'qf-cz-preset-grid' });
+      var currentPreset = b.themePreset || 'midnight';
+      presets.forEach(function (p) {
+        var on = p.id === currentPreset;
+        var btn = el('button', { type: 'button', class: 'qf-cz-preset' + (on ? ' is-selected' : ''), 'data-preset': p.id, 'aria-pressed': on ? 'true' : 'false', title: p.description || p.label });
+        var sw = el('div', { class: 'qf-cz-preset-swatch', style: { background: p.bg } });
+        sw.appendChild(el('div', { class: 'qf-cz-preset-surface', style: { background: p.surface } }));
+        sw.appendChild(el('div', { class: 'qf-cz-preset-accent', style: { background: p.accent } }));
+        btn.appendChild(sw);
+        btn.appendChild(el('div', { class: 'qf-cz-preset-name', text: p.label }));
+        btn.addEventListener('click', function () {
+          currentPreset = p.id;
+          $$('.qf-cz-preset', grid).forEach(function (n) {
+            var sel = n.getAttribute('data-preset') === p.id;
+            n.classList.toggle('is-selected', sel);
+            n.setAttribute('aria-pressed', sel ? 'true' : 'false');
+          });
+          queueSave({ themePreset: p.id }, true);
         });
-        wrap.appendChild(cb);
-        var txt = el('div', {}, [
-          el('div', { text: label, style: { fontWeight: '600' } }),
-          el('div', { class: 'field-hint', text: hint, style: { marginTop: '2px' } }),
-        ]);
-        wrap.appendChild(txt);
-        return wrap;
+        grid.appendChild(btn);
+      });
+      themeSec.appendChild(grid);
+      controls.appendChild(themeSec);
+
+      // ── Accent color ────────────────────────────────────────────
+      var accentSec = el('div', { class: 'card qf-cz-section' });
+      accentSec.appendChild(el('div', { class: 'qf-cz-section-title', text: 'Accent color' }));
+      accentSec.appendChild(el('div', { class: 'qf-cz-hint', text: 'Your buttons and highlights. Keep "Theme default" to match the preset.' }));
+      var accentRow = el('div', { class: 'qf-cz-accent-row' });
+      // Curated accent options — brand cobalt/periwinkle first. No teal.
+      var ACCENTS = ['#0D3CFC', '#6E8BFF', '#2563EB', '#059669', '#D14343', '#F59E0B', '#7C3AED'];
+      var currentAccent = b.accentOverride || null; // null = theme default
+      var colorInput = null;
+      function paintAccent() {
+        $$('.qf-cz-swatch', accentRow).forEach(function (n) {
+          var v = n.getAttribute('data-accent');
+          var sel = (v === '__default__' && !currentAccent) ||
+            (!!v && v !== '__default__' && !!currentAccent && v.toLowerCase() === currentAccent.toLowerCase());
+          n.classList.toggle('is-selected', sel);
+        });
+        if (colorInput && currentAccent) colorInput.value = currentAccent;
       }
-      capture.appendChild(toggleRow(
-        'Require email',
-        'requireEmail',
-        true,
-        'When ON, the widget will not submit a lead without an email address.'
-      ));
-      capture.appendChild(toggleRow(
-        'Require phone',
-        'requirePhone',
-        false,
-        'When ON, the widget will not submit a lead without a phone number. Useful for carriers who prefer to call back.'
-      ));
-      capture.appendChild(toggleRow(
-        'Show price before contact info',
-        'showQuoteBeforeContact',
-        false,
-        'When ON, the customer sees the quoted price first; contact details are asked only when they click "Claim this quote".'
-      ));
-      c.appendChild(capture);
+      var defChip = el('button', { type: 'button', class: 'qf-cz-swatch qf-cz-swatch-default', 'data-accent': '__default__', title: 'Use the theme accent' });
+      defChip.appendChild(el('span', { text: 'Theme default' }));
+      defChip.addEventListener('click', function () { currentAccent = null; paintAccent(); queueSave({ accentOverride: null }, true); });
+      accentRow.appendChild(defChip);
+      ACCENTS.forEach(function (hex) {
+        var sw = el('button', { type: 'button', class: 'qf-cz-swatch', 'data-accent': hex, title: hex, style: { background: hex } });
+        sw.addEventListener('click', function () { currentAccent = hex; paintAccent(); queueSave({ accentOverride: hex }, true); });
+        accentRow.appendChild(sw);
+      });
+      var customWrap = el('label', { class: 'qf-cz-swatch qf-cz-swatch-custom', title: 'Pick a custom color' });
+      colorInput = el('input', { type: 'color', value: currentAccent || '#0D3CFC' });
+      colorInput.addEventListener('input', function () { currentAccent = colorInput.value; paintAccent(); queueSave({ accentOverride: colorInput.value }); });
+      customWrap.appendChild(colorInput);
+      customWrap.appendChild(el('span', { text: 'Custom' }));
+      accentRow.appendChild(customWrap);
+      accentSec.appendChild(accentRow);
+      controls.appendChild(accentSec);
+      paintAccent();
+
+      // ── Font ────────────────────────────────────────────────────
+      var fontSec = el('div', { class: 'card qf-cz-section' });
+      fontSec.appendChild(el('div', { class: 'qf-cz-section-title', text: 'Font' }));
+      var sel = el('select', { class: 'input qf-cz-select' });
+      var curFont = b.fontFamily || 'satoshi';
+      fonts.forEach(function (f) {
+        var opt = el('option', { value: f.id, text: f.label + (f.id === 'satoshi' ? ' (default)' : '') });
+        if (f.id === curFont) opt.selected = true;
+        sel.appendChild(opt);
+      });
+      sel.addEventListener('change', function () { queueSave({ fontFamily: sel.value }, true); });
+      fontSec.appendChild(sel);
+      controls.appendChild(fontSec);
+
+      // ── Logo (drag-drop + client downscale to a small data-URL) ──
+      var logoSec = el('div', { class: 'card qf-cz-section' });
+      logoSec.appendChild(el('div', { class: 'qf-cz-section-title', text: 'Logo' }));
+      logoSec.appendChild(el('div', { class: 'qf-cz-hint', text: 'Drop an image or choose a file. We shrink it automatically so your page loads fast.' }));
+
+      var logoPreview = el('div', { class: 'qf-cz-logo-current' });
+      function paintLogo(url) {
+        logoPreview.innerHTML = '';
+        if (url) {
+          logoPreview.appendChild(el('img', { class: 'qf-cz-logo-img', src: url, alt: 'Current logo' }));
+          var rm = el('button', { type: 'button', class: 'btn btn-secondary qf-cz-logo-remove', text: 'Remove logo' });
+          rm.addEventListener('click', function () { queueSave({ logoUrl: null }, true); paintLogo(''); });
+          logoPreview.appendChild(rm);
+        } else {
+          logoPreview.appendChild(el('span', { class: 'qf-cz-hint', text: 'No logo yet.' }));
+        }
+      }
+
+      function processLogo(file) {
+        return new Promise(function (resolve, reject) {
+          var reader = new FileReader();
+          reader.onerror = reject;
+          reader.onload = function () {
+            var src = String(reader.result || '');
+            // SVG is already tiny + vector — keep as-is (canvas would rasterize).
+            if (file.type === 'image/svg+xml') { resolve(src); return; }
+            var img = new Image();
+            img.onload = function () {
+              var max = 256;
+              var scale = Math.min(1, max / Math.max(img.width || max, img.height || max));
+              var w = Math.max(1, Math.round((img.width || max) * scale));
+              var h = Math.max(1, Math.round((img.height || max) * scale));
+              var canvas = document.createElement('canvas');
+              canvas.width = w; canvas.height = h;
+              var ctx = canvas.getContext('2d');
+              ctx.drawImage(img, 0, 0, w, h);
+              var out = '';
+              try { out = canvas.toDataURL('image/webp', 0.85); } catch (_e) { out = ''; }
+              if (!out || out.indexOf('data:image/webp') !== 0) out = canvas.toDataURL('image/png');
+              resolve(out);
+            };
+            img.onerror = reject;
+            img.src = src;
+          };
+          reader.readAsDataURL(file);
+        });
+      }
+
+      function handleFile(file) {
+        if (!file || !/^image\//.test(file.type)) { toast('Please choose an image file.', 'warn'); return; }
+        processLogo(file).then(function (dataUrl) {
+          if (dataUrl.length > 150 * 1024) { toast('That image is too large even after shrinking. Try a simpler logo.', 'warn'); return; }
+          queueSave({ logoUrl: dataUrl }, true);
+          paintLogo(dataUrl);
+        }).catch(function () { toast('Could not read that image.', 'error'); });
+      }
+
+      var drop = el('div', { class: 'qf-cz-dropzone', tabindex: '0' });
+      drop.appendChild(el('div', { class: 'qf-cz-dropzone-title', text: 'Drag & drop your logo here' }));
+      drop.appendChild(el('div', { class: 'qf-cz-hint', text: 'PNG, JPG, SVG or WebP' }));
+      var fileInput = el('input', { type: 'file', accept: 'image/*', class: 'qf-cz-file' });
+      var pickBtn = el('button', { type: 'button', class: 'btn btn-secondary qf-cz-pick', text: 'Choose file' });
+      pickBtn.addEventListener('click', function () { fileInput.click(); });
+      drop.appendChild(pickBtn);
+      drop.appendChild(fileInput);
+      fileInput.addEventListener('change', function () { if (fileInput.files && fileInput.files[0]) handleFile(fileInput.files[0]); });
+      ['dragover', 'dragenter'].forEach(function (ev) { drop.addEventListener(ev, function (e) { e.preventDefault(); drop.classList.add('is-drag'); }); });
+      ['dragleave', 'dragend'].forEach(function (ev) { drop.addEventListener(ev, function (e) { e.preventDefault(); drop.classList.remove('is-drag'); }); });
+      drop.addEventListener('drop', function (e) {
+        e.preventDefault();
+        drop.classList.remove('is-drag');
+        var dt = e.dataTransfer;
+        if (dt && dt.files && dt.files[0]) handleFile(dt.files[0]);
+      });
+      logoSec.appendChild(drop);
+      logoSec.appendChild(logoPreview);
+      controls.appendChild(logoSec);
+      paintLogo(b.logoUrl || '');
     }).catch(showErr(c));
   }
 

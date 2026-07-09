@@ -85,7 +85,8 @@
 
   function enhance() {
     const route = currentRoute();
-    if (['overview', 'rates', 'accessorials', 'zones', 'brand', 'ai', 'embed'].includes(route)) previewCard();
+    // 'brand' omitted: the Customize panel (Wave 2) has its own live preview.
+    if (['overview', 'rates', 'accessorials', 'zones', 'ai', 'embed'].includes(route)) previewCard();
   }
 
   let timer;

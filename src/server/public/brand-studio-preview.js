@@ -43,6 +43,10 @@
   }
 
   function mount() {
+    // Wave 2: the brand route is the dedicated "Customize" panel with its own
+    // live widget preview, so this legacy "live brand feel" mock is retired.
+    return;
+    // eslint-disable-next-line no-unreachable
     if (!location.pathname.startsWith('/app/brand')) return;
     const page = document.querySelector('#page-content');
     const card = page && page.querySelector('.card');
