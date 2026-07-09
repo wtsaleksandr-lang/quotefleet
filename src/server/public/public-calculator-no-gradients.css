@@ -3,22 +3,40 @@
 body.qf-app-calculator {
   --w-primary: #0D3CFC;
   --w-primary-hover: #0B32D4;
-  --qf-app-bg: #181D1F;
-  --qf-app-shell: #22282A;
+  --qf-app-bg: #161616;
+  --qf-app-shell: #181D1F;
+  --qf-app-panel: #1C1C1C;
   --qf-app-card: #E6E3E0;
   --qf-app-card-soft: #F3EDDF;
-  --qf-app-border: rgba(13,60,252,.22);
+  --qf-app-border: rgba(255,255,255,.12);
+  --qf-app-accent-on-dark: #6E8BFF;
   --qf-app-text: #1E1E1E;
   --qf-app-muted: #4F6670;
-  background: #181D1F !important;
+  background: #161616 !important;
   background-image: none !important;
 }
 
+/* Clean, flat, on-brand card shell — a single crisp dark surface lifted one
+   step off the page, hairline border, consistent 8px radius, restrained shadow.
+   No gradient washes. */
 body.qf-app-calculator .qf-widget {
-  background: #22282A !important;
+  background: #181D1F !important;
   background-image: none !important;
-  border-color: rgba(255,255,255,.12) !important;
+  border: 1px solid rgba(255,255,255,.12) !important;
+  border-radius: 8px !important;
+  box-shadow: 0 24px 60px -32px rgba(0,0,0,.75) !important;
   color: #FFFFFF !important;
+}
+
+/* Kill the light-theme pseudo-element overlays (white / blue / cyan corner
+   washes from public-calculator-ux.css) that bled over the dark shell and
+   produced the muddy gray-blue gradient at the corners. */
+body.qf-app-calculator .qf-widget::before,
+body.qf-app-calculator .qf-widget::after {
+  content: none !important;
+  background: none !important;
+  background-image: none !important;
+  box-shadow: none !important;
 }
 
 body.qf-app-calculator .qf-header,
@@ -134,4 +152,41 @@ body.qf-app-calculator .qf-success {
   background: #E4EDF1 !important;
   background-image: none !important;
   color: #1E1E1E !important;
+}
+
+/* --- Header polish --------------------------------------------------------
+   "INSTANT FREIGHT ESTIMATE" pill: restyle the light-theme blue pill
+   (.brand-name::after) to a subtle on-brand chip with the accent-on-dark blue
+   so it reads clearly against the dark shell. */
+body.qf-app-calculator .qf-header .brand-name::after {
+  background: rgba(110,139,255,.10) !important;
+  border: 1px solid rgba(110,139,255,.34) !important;
+  color: #6E8BFF !important;
+}
+
+/* Logo slot: hairline border to match the shell instead of the light-blue
+   dashed frame. */
+body.qf-app-calculator .qf-demo-logo-slot {
+  border-color: rgba(255,255,255,.28) !important;
+  box-shadow: none !important;
+}
+
+/* --- Contact bar ----------------------------------------------------------
+   Reskin the demo contact card (phone / email / address / USDOT·MC) from the
+   loud cream panel to a quiet dark brand panel so cream is reserved for the
+   interactive input fields. Hairline border, light text, accent bullets. */
+body.qf-app-calculator .qf-demo-brand-card {
+  background: #1C1C1C !important;
+  background-image: none !important;
+  border: 1px solid rgba(255,255,255,.12) !important;
+  color: #C9D4DA !important;
+}
+body.qf-app-calculator .qf-demo-brand-card * {
+  background-image: none !important;
+}
+body.qf-app-calculator .qf-demo-brand-card span {
+  color: #C9D4DA !important;
+}
+body.qf-app-calculator .qf-demo-brand-card span::before {
+  background: #6E8BFF !important;
 }

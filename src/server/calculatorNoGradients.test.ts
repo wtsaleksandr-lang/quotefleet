@@ -22,8 +22,8 @@ describe('calculator global color enforcement without gradients', () => {
     const css = await file('public-calculator-no-gradients.css');
 
     expect(css).toContain('Phase CB');
+    expect(css).toContain('background: #161616 !important');
     expect(css).toContain('background: #181D1F !important');
-    expect(css).toContain('background: #22282A !important');
     expect(css).toContain('background: #E6E3E0 !important');
     expect(css).toContain('background: #D4CFC9 !important');
     expect(css).toContain('background: #0D3CFC !important');
