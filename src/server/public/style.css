@@ -446,6 +446,13 @@ p { margin: 0; }
   padding: 8px 12px;
 }
 .table tbody tr:hover { background: var(--surface-2); }
+/* Mobile: wide multi-column tables scroll inside their own box instead of
+   forcing the page wider than the viewport. Lives here (shared base) so the
+   admin shell — which doesn't load dashboard-polish.css — is covered too.
+   Mirrors the app dashboard's 900px rule. */
+@media (max-width: 900px) {
+  .table { display: block; overflow-x: auto; -webkit-overflow-scrolling: touch; }
+}
 /* Inside-table inputs: lighter padding so a row stays single-line height. */
 .table .input, .table .select, .table .textarea {
   padding: 6px 10px;
