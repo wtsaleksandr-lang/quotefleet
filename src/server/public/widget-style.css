@@ -116,6 +116,17 @@ body {
 .qf-suggestion:hover, .qf-suggestion.active { background: rgba(37, 99, 235, 0.06); color: var(--w-primary); }
 .qf-suggestion .meta { display: block; font-size: 11.5px; color: var(--w-muted); margin-top: 1px; }
 
+/* Custom branded <select> replacement (rounded, themeable dropdown). The button
+   reuses .qf-input styling; the panel reuses .qf-suggestions so it matches the
+   widget's other dropdowns exactly. The real <select> stays in the DOM hidden. */
+.qf-cs { position: relative; }
+.qf-cs .qf-cs-native { position: absolute; left: -9999px; top: 0; width: 1px; height: 1px; opacity: 0; pointer-events: none; }
+.qf-cs-btn { display: flex; align-items: center; justify-content: space-between; gap: 8px; width: 100%; text-align: left; cursor: pointer; font: inherit; line-height: 1.3; -webkit-appearance: none; appearance: none; }
+.qf-cs-label { flex: 1 1 auto; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.qf-cs-chev { flex: 0 0 auto; font-size: 12px; opacity: .75; transition: transform .15s ease; }
+.qf-cs-btn[aria-expanded="true"] .qf-cs-chev { transform: rotate(180deg); }
+.qf-cs-opt[aria-selected="true"] { font-weight: 800; color: var(--w-primary); }
+
 .qf-help { display: inline-flex; align-items: center; justify-content: center; width: 14px; height: 14px; min-width: 14px; margin-left: 4px; border-radius: 999px; border: 1px solid #dbe1ea; background: #f8fafc; color: #8a94a6; font-size: 9px; font-weight: 750; cursor: pointer; user-select: none; vertical-align: 1px; line-height: 1; transition: background 0.12s, color 0.12s, border-color 0.12s; touch-action: manipulation; }
 .qf-help:hover, .qf-help.open { background: #eef2f7; color: #5f6c80; border-color: #cfd7e3; }
 .qf-tip-bubble { position: absolute; z-index: 100; max-width: 240px; background: #0c1424; color: #fff; padding: 9px 12px; border-radius: 8px; font-size: 12.5px; line-height: 1.45; box-shadow: 0 6px 24px rgba(0, 0, 0, 0.20); pointer-events: none; opacity: 0; transform: translateY(4px); transition: opacity 0.12s ease, transform 0.12s ease; }

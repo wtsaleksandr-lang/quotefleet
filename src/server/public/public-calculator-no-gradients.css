@@ -190,3 +190,29 @@ body.qf-app-calculator .qf-demo-brand-card span {
 body.qf-app-calculator .qf-demo-brand-card span::before {
   background: #6E8BFF !important;
 }
+
+/* --- Drayage & conditional sub-panels -------------------------------------
+   These panels (booking details, oversize/OOG, genset/hazmat) wrap labeled
+   inputs. They were cream while their headings/labels/hints use the dark-shell
+   text colors, so text was barely visible on cream. Reskin them to quiet dark
+   brand panels (like the contact bar): the cream inputs inside stand out and
+   every label, hint and heading reads clearly. */
+body.qf-app-calculator .qf-booking-card,
+body.qf-app-calculator .qf-oog-panel,
+body.qf-app-calculator .qf-conditional-panel {
+  background: #1C1C1C !important;
+  background-image: none !important;
+  border: 1px solid rgba(255,255,255,.12) !important;
+  color: #E6E3E0 !important;
+}
+body.qf-app-calculator .qf-booking-card .qf-section-title,
+body.qf-app-calculator .qf-oog-panel strong,
+body.qf-app-calculator .qf-conditional-panel strong {
+  color: #FFFFFF !important;
+}
+body.qf-app-calculator .qf-booking-card .qf-field-hint,
+body.qf-app-calculator .qf-oog-panel .qf-field-hint,
+body.qf-app-calculator .qf-conditional-panel .qf-field-hint,
+body.qf-app-calculator .qf-oog-panel #qf-oog-help {
+  color: #9FB2BB !important;
+}
