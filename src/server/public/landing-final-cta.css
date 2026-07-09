@@ -185,15 +185,39 @@ body.qf-wft .qf-badge.is-open .qf-badge-pop {
   body.qf-wft .qf-badge { flex: 0 1 calc(33.333% - 7px); }
 }
 
-/* ── Mobile: 2 per row, tap reveals inline benefit (no fragile popover) ── */
+/* ── Mobile: exactly 2 rows (3 + 2), tap reveals inline benefit ── */
 @media (max-width: 640px) {
-  body.qf-wft .qf-trust-badges { gap: 10px; }
+  /* Trim the card's heavy horizontal padding so the badge row has room. */
+  body.qf-wft .final-cta-card.qf-final-cta {
+    padding-left: 18px !important;
+    padding-right: 18px !important;
+  }
+  /* Break the badge row out to the card edges to reclaim width. */
+  body.qf-wft .qf-trust-badges {
+    gap: 8px;
+    width: auto;
+    margin-left: -18px;
+    margin-right: -18px;
+  }
   body.qf-wft .qf-badge {
-    flex: 0 1 calc(50% - 5px);
+    flex: 0 1 calc(33.333% - 6px);
   }
   body.qf-wft .qf-badge-tile {
-    padding: 12px 12px;
-    gap: 9px;
+    padding: 10px 7px;
+    gap: 6px;
+  }
+  body.qf-wft .qf-badge-ico {
+    width: 26px;
+    height: 26px;
+    border-radius: 7px;
+  }
+  body.qf-wft .qf-badge-ico svg {
+    width: 16px;
+    height: 16px;
+  }
+  body.qf-wft .qf-badge-label {
+    font-size: 11px;
+    line-height: 1.15;
   }
 
   /* Popover becomes an inline expandable panel below the tile. */
@@ -216,6 +240,7 @@ body.qf-wft .qf-badge.is-open .qf-badge-pop {
   /* Tapped badge expands to a full-width accordion row so its benefit reads cleanly. */
   body.qf-wft .qf-badge.is-open { flex-basis: 100%; }
   body.qf-wft .qf-badge.is-open .qf-badge-tile {
+    height: auto;
     justify-content: flex-start;
     border-color: rgba(110,139,255,.5);
     background: rgba(110,139,255,.08);
