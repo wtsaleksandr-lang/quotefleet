@@ -62,16 +62,12 @@
 
   function hasTableRows() { return content.querySelectorAll('tbody tr').length > 0; }
 
-  function estimateProgress() {
-    const route = currentRoute();
-    let done = 1;
-    if (route === 'rates' && hasTableRows()) done = 2;
-    if (route === 'accessorials' && hasTableRows()) done = 3;
-    if (route === 'zones' && hasTableRows()) done = 4;
-    if (route === 'brand') done = 4;
-    if (route === 'ai') done = 5;
-    if (route === 'embed') done = 6;
-    return Math.max(1, Math.min(6, done));
+  // A setup area counts as "ready" once the operator has saved at least one
+  // guided answer for it. This is a real, incrementing client-side signal —
+  // the old estimateProgress() never matched the overview route so the meter
+  // was frozen at 1/6 forever.
+  function doneRoutes() {
+    return setupRoutes.filter((route) => Object.keys(getAnswers(route)).length > 0);
   }
 
   function getAnswers(route) {
@@ -87,25 +83,42 @@
 
   function setupPanel() {
     if (content.querySelector('.qf-setup-panel')) return;
-    const done = estimateProgress();
+    const total = setupRoutes.length;
+    const done = doneRoutes();
+    const count = done.length;
+    const complete = count >= total;
+    const nextRoute = setupRoutes.find((route) => !done.includes(route)) || 'embed';
+    const nextTitle = routeLabels[nextRoute][0];
     const panel = document.createElement('section');
-    panel.className = 'qf-setup-panel';
-    panel.style.setProperty('--qf-setup-pct', Math.round(done / 6 * 100) + '%');
-    panel.innerHTML = `
-      <div class="qf-setup-head"><div><div class="qf-setup-kicker">Calculator setup</div><h2>Get your rate page ready in a few focused steps.</h2><p>Start with rates, add the charges customers ask about, then publish your branded link.</p></div><div class="qf-setup-meter"><span class="qf-setup-score">${done}/6</span><small>setup areas touched</small><div class="qf-setup-bar"><span></span></div></div></div>
-      <div class="qf-setup-steps"></div>
-      <div class="qf-setup-launch-note"><strong>Launch order:</strong> rates first, then accessorials, optional zones, brand, AI guardrails, and finally the public link.</div>
-      <div class="qf-quick-actions"><button type="button" data-go="rates">Edit rates</button><button type="button" data-go="accessorials">Add charges</button><button type="button" data-go="brand">Brand page</button><button type="button" data-go="embed">Share link</button></div>`;
-    const steps = panel.querySelector('.qf-setup-steps');
-    setupRoutes.forEach((route, index) => {
-      const [title, text] = routeLabels[route];
-      const item = document.createElement('button');
-      item.type = 'button';
-      item.className = 'qf-setup-step' + (index < done ? ' is-done' : '');
-      item.dataset.go = route;
-      item.innerHTML = `<span class="qf-setup-dot">${index < done ? '✓' : index + 1}</span><span><strong>${title}</strong><small>${text}</small></span>`;
-      steps.appendChild(item);
-    });
+    panel.className = 'qf-setup-panel' + (complete ? ' is-complete' : '');
+    panel.style.setProperty('--qf-setup-pct', Math.round(count / total * 100) + '%');
+    if (complete) {
+      panel.innerHTML = `
+        <div class="qf-setup-live">
+          <div class="qf-setup-live-badge"><span class="qf-setup-live-dot">✓</span>You're live</div>
+          <h2>Your rate page is ready to share.</h2>
+          <p>All ${total} setup areas are ready. Copy your public link and start collecting quotes — you can keep refining rates any time.</p>
+          <div class="qf-quick-actions"><button type="button" class="is-primary" data-go="embed">Share your link</button><button type="button" data-go="brand">Fine-tune brand</button><button type="button" data-go="rates">Edit rates</button></div>
+        </div>`;
+    } else {
+      panel.innerHTML = `
+        <div class="qf-setup-head"><div><div class="qf-setup-kicker">Calculator setup</div><h2>Get your rate page ready in a few focused steps.</h2><p>Start with rates, add the charges customers ask about, then publish your branded link.</p></div><div class="qf-setup-meter"><span class="qf-setup-score">${count}<small>/${total}</small></span><small>setup areas ready</small><div class="qf-setup-bar" role="progressbar" aria-valuenow="${count}" aria-valuemin="0" aria-valuemax="${total}"><span></span></div></div></div>
+        <div class="qf-setup-steps"></div>
+        <div class="qf-setup-launch-note"><strong>Next up:</strong> ${nextTitle}. Launch order — rates, accessorials, optional zones, brand, AI guardrails, then the public link.</div>
+        <div class="qf-quick-actions"><button type="button" class="is-primary" data-go="${nextRoute}">Continue: ${nextTitle}</button><button type="button" data-go="rates">Edit rates</button><button type="button" data-go="brand">Brand page</button><button type="button" data-go="embed">Share link</button></div>`;
+      const steps = panel.querySelector('.qf-setup-steps');
+      setupRoutes.forEach((route, index) => {
+        const [title, text] = routeLabels[route];
+        const isDone = done.includes(route);
+        const isCurrent = !isDone && route === nextRoute;
+        const item = document.createElement('button');
+        item.type = 'button';
+        item.className = 'qf-setup-step' + (isDone ? ' is-done' : (isCurrent ? ' is-current' : ''));
+        item.dataset.go = route;
+        item.innerHTML = `<span class="qf-setup-dot">${isDone ? '✓' : index + 1}</span><span><strong>${title}</strong><small>${text}</small></span>`;
+        steps.appendChild(item);
+      });
+    }
     panel.addEventListener('click', (event) => { const target = event.target.closest('[data-go]'); if (target) go(target.dataset.go); });
     const first = content.querySelector('h1');
     if (first && first.nextSibling) first.parentNode.insertBefore(panel, first.nextSibling.nextSibling || first.nextSibling);
