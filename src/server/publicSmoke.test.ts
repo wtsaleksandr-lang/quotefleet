@@ -161,12 +161,12 @@ describe('public static page smoke checks', () => {
     expect(html).toContain('id="rates-database"');
     expect(html).toContain('qf-globe-section');
     expect(html).toContain('id="qf-globe-canvas"');
-    expect(html).toContain('Free rates database');
-    expect(html).toContain('Drag to explore the network');
-    // Qualitative, honest stats (no fabricated counts)
-    expect(html).toContain('US + Canada');
-    expect(html).toContain('Every service type');
-    expect(html).toContain('Always free');
+    expect(html).toContain('Free market rate data');
+    expect(html).toContain('Drag to explore live rate activity');
+    // Qualitative, honest stats (no fabricated counts); de-risked framing
+    expect(html).toContain('Fully anonymous');
+    expect(html).toContain('Every lane &amp; equipment');
+    expect(html).toContain('Free forever');
     // Self-hosted vendor scripts + module + stylesheet wired (no runtime CDN)
     expect(html).toContain('/vendor/globe.gl.min.js');
     expect(html).toContain('/vendor/topojson-client.min.js');

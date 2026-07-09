@@ -1,52 +1,170 @@
 /* Phase CC: final homepage cleanup based on visual review. */
-body.qf-wft .site-actions {
-  display: inline-flex !important;
-  align-items: center !important;
-  gap: 12px !important;
+
+/* landing-wefixtrades.css does `all: unset` on body.qf-wft .hero and .section,
+ * which resets their display to `inline`. On narrow (mobile) widths that made
+ * the lighter how-section background bleed up the left edge of the hero as a
+ * stray vertical strip. Restore proper block flow so sections stack cleanly. */
+body.qf-wft .hero,
+body.qf-wft .section {
+  display: block !important;
 }
 
-body.qf-wft .site-actions .btn-secondary {
-  display: inline-flex !important;
-  min-height: 38px !important;
-  align-items: center !important;
-  justify-content: center !important;
-  background: #FFFFFF !important;
-  border: 1px solid #FFFFFF !important;
-  color: #0D3CFC !important;
+/* ── WeFixTrades-matched site header ────────────────────────────────────
+ * Replicates the WFT marketing nav design language: a floating glass card
+ * pinned to the top, mono utility nav links, a cream primary CTA, a bare
+ * minimal logo mark (no busy icon), and a clean top-left eyebrow kicker. */
+
+/* Floating glass nav card (matches WFT .mkt-nav-bar). landing-wefixtrades.css
+ * does `all: unset` on body.qf-wft .site-header, so we re-establish it here. */
+body.qf-wft .site-header {
+  display: block !important;
+  position: sticky !important;
+  top: 0 !important;
+  z-index: 70 !important;
+  background: transparent !important;
+  border: none !important;
   box-shadow: none !important;
-  font-weight: 850 !important;
+  backdrop-filter: none !important;
+  padding: 12px 20px 0 !important;
 }
 
-body.qf-wft .site-actions .btn-secondary:hover {
-  border-color: #0D3CFC !important;
+body.qf-wft .site-header-inner {
+  max-width: 1200px !important;
+  margin: 0 auto !important;
+  padding: 10px 22px !important;
+  gap: 24px !important;
+  border-radius: 14px !important;
+  background: rgba(24, 29, 31, 0.72) !important;
+  backdrop-filter: blur(24px) saturate(1.2) !important;
+  -webkit-backdrop-filter: blur(24px) saturate(1.2) !important;
+  border: 1px solid rgba(255, 255, 255, 0.10) !important;
+  box-shadow: 0 6px 20px rgba(0, 0, 0, 0.18) !important;
+}
+
+/* Bare minimal logo mark — no cream box, no busy truck icon */
+body.qf-wft .site-brand {
+  gap: 9px !important;
+  color: #FAFAFA !important;
+  font-weight: 800 !important;
+  letter-spacing: -0.03em !important;
+  font-size: 19px !important;
 }
 
 body.qf-wft .site-logo {
-  width: 34px !important;
-  height: 34px !important;
+  width: auto !important;
+  height: auto !important;
   position: relative !important;
-  display: inline-grid !important;
+  display: inline-flex !important;
+  align-items: center !important;
   place-items: center !important;
   overflow: visible !important;
-  border-radius: 6px !important;
-  border: 1px solid rgba(255,255,255,.22) !important;
-  background: #E6E3E0 !important;
-  color: #0D3CFC !important;
+  border: none !important;
+  border-radius: 0 !important;
+  background: transparent !important;
   box-shadow: none !important;
 }
 
 body.qf-wft .site-logo svg.qf-route-logo {
   display: block !important;
-  width: 25px !important;
-  height: 25px !important;
-  color: #0D3CFC !important;
-  stroke: currentColor !important;
+  width: 28px !important;
+  height: 28px !important;
 }
 
 body.qf-wft .site-logo::before,
 body.qf-wft .site-logo::after {
   content: none !important;
   display: none !important;
+}
+
+/* Nav links — WFT mono utility treatment (matches the .qf-public-wft topnav
+ * links + WFT's mono nav), no pill hover backgrounds. */
+body.qf-wft .site-nav {
+  gap: 4px !important;
+}
+
+body.qf-wft .site-nav a,
+body.qf-wft .site-actions .signin {
+  font-family: "JetBrains Mono", ui-monospace, monospace !important;
+  font-size: 12px !important;
+  font-weight: 500 !important;
+  text-transform: uppercase !important;
+  letter-spacing: 0.06em !important;
+  color: rgba(249, 249, 249, 0.72) !important;
+  background: transparent !important;
+  border-radius: 8px !important;
+  padding: 8px 12px !important;
+  transition: color 0.15s ease !important;
+}
+
+body.qf-wft .site-nav a:hover,
+body.qf-wft .site-actions .signin:hover {
+  color: #6E8BFF !important;
+  background: transparent !important;
+}
+
+/* Right-hand action cluster */
+body.qf-wft .site-actions {
+  display: inline-flex !important;
+  align-items: center !important;
+  gap: 14px !important;
+}
+
+/* "View demo" — WFT cream primary CTA (cream fill, dark text) */
+body.qf-wft .site-actions .btn-secondary {
+  display: inline-flex !important;
+  min-height: 40px !important;
+  align-items: center !important;
+  justify-content: center !important;
+  gap: 8px !important;
+  background: #E6E3E0 !important;
+  border: 1px solid #E6E3E0 !important;
+  color: #1E1E1E !important;
+  border-radius: 10px !important;
+  padding: 9px 18px !important;
+  font-family: "Inter", system-ui, sans-serif !important;
+  font-size: 13px !important;
+  font-weight: 600 !important;
+  letter-spacing: 0 !important;
+  box-shadow: none !important;
+  transition: background 0.16s ease, transform 0.16s ease, box-shadow 0.16s ease !important;
+}
+
+body.qf-wft .site-actions .btn-secondary .arr {
+  color: #1E1E1E !important;
+}
+
+body.qf-wft .site-actions .btn-secondary:hover {
+  background: #D4CFC9 !important;
+  border-color: #D4CFC9 !important;
+  transform: translateY(-1px) !important;
+  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.18) !important;
+}
+
+/* ── Hero eyebrow — clean top-left kicker (drop the heavy bordered pill) ── */
+body.qf-wft .hero-copy .eyebrow {
+  display: inline-flex !important;
+  align-items: center !important;
+  gap: 10px !important;
+  border: none !important;
+  background: transparent !important;
+  padding: 0 !important;
+  margin-bottom: 22px !important;
+  color: #6E8BFF !important;
+  font-family: "JetBrains Mono", ui-monospace, monospace !important;
+  font-size: 11px !important;
+  font-weight: 600 !important;
+  letter-spacing: 0.16em !important;
+  text-transform: uppercase !important;
+}
+
+body.qf-wft .hero-copy .eyebrow::before {
+  content: "" !important;
+  display: inline-block !important;
+  flex: none !important;
+  width: 18px !important;
+  height: 1.5px !important;
+  border-radius: 2px !important;
+  background: #6E8BFF !important;
 }
 
 body.qf-wft .hero-grid {
