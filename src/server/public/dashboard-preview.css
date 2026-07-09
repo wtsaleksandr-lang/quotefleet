@@ -16,7 +16,7 @@
   border-bottom: 1px solid var(--border);
 }
 .qf-preview-kicker {
-  color: var(--accent-2);
+  color: var(--accent);
   font: 700 11px var(--font-mono);
   letter-spacing: .12em;
   text-transform: uppercase;

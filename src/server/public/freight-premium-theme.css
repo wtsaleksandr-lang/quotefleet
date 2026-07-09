@@ -122,11 +122,16 @@ body {
   border-color: rgba(59, 34, 244, 0.28);
 }
 
+/* These are DASHBOARD components (launch panel, share/publish readiness, brand
+   studio preview) — they do not exist in the customer widget. This stylesheet
+   is injected onto the dashboard by premium-saas-polish.js, so the old white
+   gradient here leaked light cards onto the dark dashboard. Re-skin to the dark
+   surface tokens to match the rest of the dashboard. */
 .qf-brand-studio-preview,
 .qf-launch-panel,
 .qf-share-readiness {
-  border-color: rgba(147, 197, 253, 0.55);
-  background: linear-gradient(135deg, #ffffff 0%, #f0fbff 52%, #f4f0ff 100%);
+  border-color: var(--border);
+  background: linear-gradient(135deg, rgba(13, 60, 252, 0.08), rgba(93, 139, 255, 0.06)), var(--surface);
 }
 
 .qf-brand-preview-card {

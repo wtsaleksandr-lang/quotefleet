@@ -15,7 +15,7 @@
   margin-bottom: 12px;
 }
 .qf-leads-focus-kicker {
-  color: var(--accent-2);
+  color: var(--accent);
   font: 800 11px var(--font-mono);
   letter-spacing: .12em;
   text-transform: uppercase;
