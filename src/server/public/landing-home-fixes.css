@@ -1,0 +1,185 @@
+/* Phase CC: final homepage cleanup based on visual review. */
+body.qf-wft .site-actions .btn-primary {
+  display: none !important;
+}
+
+body.qf-wft .site-logo {
+  width: 30px !important;
+  height: 30px !important;
+  position: relative !important;
+  display: inline-grid !important;
+  place-items: center !important;
+  overflow: visible !important;
+  border-radius: 6px !important;
+  border: 1px solid rgba(255,255,255,.22) !important;
+  background: #E6E3E0 !important;
+  color: #0D3CFC !important;
+}
+
+body.qf-wft .site-logo svg {
+  display: none !important;
+}
+
+body.qf-wft .site-logo::before {
+  content: '';
+  width: 5px;
+  height: 5px;
+  border-radius: 999px;
+  background: #0D3CFC;
+  box-shadow: 9px -7px 0 #0D3CFC, 19px 2px 0 #0D3CFC;
+  transform: translateX(-7px) translateY(4px);
+}
+
+body.qf-wft .site-logo::after {
+  content: '';
+  position: absolute;
+  left: 8px;
+  top: 12px;
+  width: 17px;
+  height: 8px;
+  border-top: 2px solid #0D3CFC;
+  border-right: 2px solid #0D3CFC;
+  border-radius: 0 8px 0 0;
+  transform: rotate(-16deg);
+}
+
+body.qf-wft .hero-grid {
+  width: min(1280px, calc(100vw - 56px)) !important;
+  grid-template-columns: minmax(0, 1.08fr) minmax(460px, .92fr) !important;
+  gap: clamp(46px, 5.5vw, 86px) !important;
+}
+
+body.qf-wft .hero-copy {
+  max-width: 820px !important;
+}
+
+body.qf-wft .hero h1 {
+  max-width: 860px !important;
+  font-size: clamp(48px, 5.9vw, 78px) !important;
+  line-height: 1.03 !important;
+  letter-spacing: -.052em !important;
+  text-wrap: balance;
+}
+
+body.qf-wft .hero .lead {
+  max-width: 660px !important;
+}
+
+body.qf-wft .visual-flow {
+  width: 100% !important;
+  max-width: 560px !important;
+  justify-self: stretch !important;
+  padding: 22px !important;
+  gap: 18px !important;
+}
+
+body.qf-wft .flow-card {
+  display: grid !important;
+  grid-template-columns: 62px minmax(0, 1fr) !important;
+  grid-template-areas:
+    'icon label'
+    'icon title'
+    'content content' !important;
+  column-gap: 16px !important;
+  row-gap: 7px !important;
+  padding: 22px !important;
+}
+
+body.qf-wft .flow-icon {
+  grid-area: icon;
+  width: 54px !important;
+  height: 54px !important;
+  min-width: 54px !important;
+  display: inline-grid !important;
+  place-items: center !important;
+  font-size: 18px !important;
+  font-weight: 900 !important;
+}
+
+body.qf-wft .flow-label {
+  grid-area: label;
+  align-self: end;
+}
+
+body.qf-wft .flow-card strong {
+  grid-area: title;
+  min-width: 0 !important;
+  overflow-wrap: anywhere;
+}
+
+body.qf-wft .mini-rate-table,
+body.qf-wft .mini-browser,
+body.qf-wft .mini-result,
+body.qf-wft .mini-actions {
+  grid-area: content;
+  width: 100% !important;
+  min-width: 0 !important;
+}
+
+body.qf-wft .how-section .container {
+  width: min(1280px, calc(100vw - 56px)) !important;
+}
+
+body.qf-wft .simple-steps {
+  gap: 22px !important;
+  grid-template-columns: repeat(4, minmax(230px, 1fr)) !important;
+}
+
+body.qf-wft .simple-step {
+  padding: 28px !important;
+  min-height: 250px !important;
+}
+
+body.qf-wft .step-art {
+  width: 100% !important;
+  min-height: 112px !important;
+  padding: 18px !important;
+  display: flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+}
+
+body.qf-wft .link-art,
+body.qf-wft .signature-art,
+body.qf-wft .chat-art {
+  overflow-wrap: anywhere !important;
+  white-space: normal !important;
+  text-align: center !important;
+}
+
+@media (max-width: 1080px) {
+  body.qf-wft .hero-grid {
+    grid-template-columns: 1fr !important;
+  }
+
+  body.qf-wft .visual-flow {
+    max-width: 720px !important;
+    justify-self: start !important;
+  }
+}
+
+@media (max-width: 980px) {
+  body.qf-wft .simple-steps {
+    grid-template-columns: repeat(2, minmax(240px, 1fr)) !important;
+  }
+}
+
+@media (max-width: 640px) {
+  body.qf-wft .hero h1 {
+    font-size: 42px !important;
+    line-height: 1.05 !important;
+    letter-spacing: -.04em !important;
+  }
+
+  body.qf-wft .site-nav {
+    display: none !important;
+  }
+
+  body.qf-wft .simple-steps {
+    grid-template-columns: 1fr !important;
+  }
+
+  body.qf-wft .step-art {
+    min-height: 100px !important;
+  }
+}
