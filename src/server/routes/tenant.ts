@@ -53,6 +53,7 @@ const CORE_PLANS = ['vital', 'pro'] as const; // branded quotes, core features
 const PRO_PLANS = ['pro'] as const; // AI, PDF, automation, custom domain, analytics
 import { encrypt } from '../../auth/secrets.js';
 import { effectivePlan } from '../plans.js';
+import { WIDGET_PRESETS, WIDGET_FONTS, WIDGET_PRESET_LIST } from '../widgetThemes.js';
 import { loadEnv } from '../../config.js';
 import { syncTenantToMarketplace } from '../../marketplace/sync.js';
 import { DEFAULT_AI_SYSTEM_PROMPT } from '../../calc/defaults.js';
@@ -534,13 +535,34 @@ export function registerTenantRoutes(app: Express) {
   );
 
   // ── brand ─────────────────────────────────────────────────────
+  // The GET also returns the theming OPTION lists (curated presets + fonts)
+  // straight from widgetThemes.ts so the dashboard "Customize" panel renders
+  // real swatches/labels without hard-coding palettes on the client — one
+  // source of truth for the theme engine.
+  const PRESET_IDS = Object.keys(WIDGET_PRESETS) as [string, ...string[]];
+  const FONT_IDS = Object.keys(WIDGET_FONTS) as [string, ...string[]];
+  // Max encoded logo length. Logos are stored as data-URLs in logoUrl (there
+  // is no blob store); the client downscales + caps at ~150KB, so 220K chars
+  // is comfortable headroom while still rejecting an un-shrunk upload.
+  const MAX_LOGO_CHARS = 220_000;
+
   app.get('/api/tenant/brand', requireAuth, requireTenant, async (req, res) => {
     const row = await db()
       .select()
       .from(brandConfigs)
       .where(eq(brandConfigs.tenantId, req.tenant!.id))
       .limit(1);
-    res.json({ brand: row[0] ?? null });
+    const presets = WIDGET_PRESET_LIST.map((p) => ({
+      id: p.id,
+      label: p.label,
+      description: p.description,
+      mode: p.mode,
+      bg: p.palette.pageBg,
+      surface: p.palette.surface,
+      accent: p.palette.accent,
+    }));
+    const fonts = Object.values(WIDGET_FONTS).map((f) => ({ id: f.id, label: f.label }));
+    res.json({ brand: row[0] ?? null, presets, fonts });
   });
 
   const BrandPatch = z.object({
@@ -548,7 +570,7 @@ export function registerTenantRoutes(app: Express) {
     tagline: z.string().nullable().optional(),
     primaryColor: z.string().optional(),
     accentColor: z.string().optional(),
-    logoUrl: z.string().nullable().optional(),
+    logoUrl: z.string().max(MAX_LOGO_CHARS).nullable().optional(),
     ctaText: z.string().optional(),
     footerNote: z.string().nullable().optional(),
     showPoweredBy: z.boolean().optional(),
@@ -556,6 +578,16 @@ export function registerTenantRoutes(app: Express) {
     requireEmail: z.boolean().optional(),
     requirePhone: z.boolean().optional(),
     showQuoteBeforeContact: z.boolean().optional(),
+    // Wave 2 theming fields (validated against the theme engine's allowed
+    // lists). accentOverride is a #RRGGBB hex or null (null = use the preset
+    // accent). See src/server/widgetThemes.ts.
+    themePreset: z.enum(PRESET_IDS).optional(),
+    fontFamily: z.enum(FONT_IDS).optional(),
+    accentOverride: z
+      .string()
+      .regex(/^#[0-9a-fA-F]{6}$/, 'accentOverride must be a #RRGGBB hex')
+      .nullable()
+      .optional(),
   });
 
   app.put('/api/tenant/brand', requireAuth, requireTenant, async (req, res) => {

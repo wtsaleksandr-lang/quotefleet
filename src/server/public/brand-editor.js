@@ -2,6 +2,11 @@
   const content = document.getElementById('page-content');
   if (!content) return;
 
+  // Wave 2: the brand route is now the dedicated "Customize" panel (rendered by
+  // app.js#renderBrand), which owns the whole surface. This legacy editor
+  // (checklist + page mock) is retired so it no longer clutters that page.
+  return;
+
   function route() {
     return (location.pathname.split('/app/')[1] || 'overview').split('/')[0] || 'overview';
   }

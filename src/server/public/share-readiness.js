@@ -94,6 +94,10 @@
   }
 
   function enhance() {
+    // The brand route is the dedicated "Customize" panel (Wave 2) — its own
+    // single-purpose surface, so skip the publish-readiness checklist there.
+    // The embed route keeps it.
+    if (route() === 'brand') return;
     if (!routeCopy[route()]) return;
     readiness();
     tip();
