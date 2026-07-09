@@ -28,6 +28,50 @@ function getTransport() {
   return cachedTransport;
 }
 
+/**
+ * RFC 2047 "encoded-word" for email `Subject` headers.
+ *
+ * A subject with emoji/arrows (e.g. `New freight lead → Long Beach, CA ✓`,
+ * `📞 Callback requested`) contains code points above U+00FF. Putting such
+ * a string verbatim into an HTTP header — which the Resend JSON API turns
+ * the subject into downstream — throws a `ByteString` conversion error, so
+ * the best-effort notification is silently dropped and the carrier never
+ * hears about the lead. The fix: pre-encode to the pure-ASCII
+ * `=?UTF-8?B?<base64>?=` form, which every mail client decodes back to the
+ * original.
+ *
+ * Chunked on whole-character boundaries so each encoded-word stays within
+ * RFC 2047's 75-char limit and no multi-byte UTF-8 sequence is split
+ * across words. Pure-ASCII subjects are returned untouched.
+ *
+ * NOTE: only the Resend path needs this — nodemailer (SMTP) auto-encodes
+ * UTF-8 subjects itself, and feeding it a pre-encoded word is unnecessary.
+ */
+export function encodeEmailSubject(subject: string): string {
+  // Pure ASCII → nothing to encode.
+  // eslint-disable-next-line no-control-regex
+  if (/^[\x00-\x7F]*$/.test(subject)) return subject;
+
+  const MAX_BYTES = 45; // 45 UTF-8 bytes → 60 base64 chars; +12 wrapper = 72 ≤ 75
+  const words: string[] = [];
+  let buf: number[] = [];
+  const flush = () => {
+    if (buf.length) {
+      words.push('=?UTF-8?B?' + Buffer.from(buf).toString('base64') + '?=');
+      buf = [];
+    }
+  };
+  for (const ch of subject) {
+    // Iterating a string yields whole code points, so a character is never
+    // split across two encoded-words.
+    const b = Buffer.from(ch, 'utf8');
+    if (buf.length && buf.length + b.length > MAX_BYTES) flush();
+    for (const x of b) buf.push(x);
+  }
+  flush();
+  return words.join(' ');
+}
+
 export interface EmailIn {
   to: string;
   subject: string;
@@ -59,7 +103,9 @@ export async function sendEmail(msg: EmailIn): Promise<EmailOut> {
         body: JSON.stringify({
           from: msg.from ?? env.RESEND_FROM_EMAIL ?? 'QuoteFleet <onboarding@resend.dev>',
           to: [msg.to],
-          subject: msg.subject,
+          // RFC 2047-encode so non-Latin1 subjects (emoji/arrows) don't
+          // throw a ByteString error in the header path downstream.
+          subject: encodeEmailSubject(msg.subject),
           text: msg.text,
           html: msg.html,
           reply_to: msg.replyTo,

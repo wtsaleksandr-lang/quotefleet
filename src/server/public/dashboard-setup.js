@@ -62,12 +62,40 @@
 
   function hasTableRows() { return content.querySelectorAll('tbody tr').length > 0; }
 
-  // A setup area counts as "ready" once the operator has saved at least one
-  // guided answer for it. This is a real, incrementing client-side signal —
-  // the old estimateProgress() never matched the overview route so the meter
-  // was frozen at 1/6 forever.
-  function doneRoutes() {
-    return setupRoutes.filter((route) => Object.keys(getAnswers(route)).length > 0);
+  // ── real-config progress ──────────────────────────────────────
+  // The setup meter reflects the tenant's ACTUAL saved configuration
+  // (fetched from the server), not per-browser guided answers — so a
+  // tenant who set up rates/brand/AI through the real UI no longer reads
+  // 0/6, and the meter is consistent across devices. The guided Q&A
+  // below stays as the walkthrough.
+  //
+  // rates/accessorials/zones ship with working seed defaults at signup,
+  // so those areas read "ready" out of the box; brand and AI only count
+  // once customized beyond the seed; zones can also be "explicitly
+  // skipped" and the public-link step is a local viewed/copied signal.
+  const STATUS_FLAG = { zones: 'qf-zones-skipped', embed: 'qf-embed-viewed' };
+  function localFlag(key) { try { return localStorage.getItem(key) === '1'; } catch (_e) { return false; } }
+  function setLocalFlag(key) { try { localStorage.setItem(key, '1'); } catch (_e) {} }
+
+  function fetchSetupStatus() {
+    return fetch('/api/tenant/setup-status', { headers: { Accept: 'application/json' } })
+      .then((r) => (r.ok ? r.json() : null))
+      .catch(() => null);
+  }
+
+  // Merge server real-state with the two inherently client-side signals:
+  // zones "explicitly skipped" and the public link being "viewed/copied".
+  function doneFromStatus(status) {
+    status = status || {};
+    const zonesSkipped = localFlag(STATUS_FLAG.zones) || getAnswers('zones').drayageScope === 'Not right now';
+    return {
+      rates: !!status.rates,
+      accessorials: !!status.accessorials,
+      zones: !!status.zones || zonesSkipped,
+      brand: !!status.brand,
+      ai: !!status.ai,
+      embed: localFlag(STATUS_FLAG.embed),
+    };
   }
 
   function getAnswers(route) {
@@ -83,8 +111,16 @@
 
   function setupPanel() {
     if (content.querySelector('.qf-setup-panel')) return;
+    fetchSetupStatus().then((status) => {
+      if (currentRoute() !== 'overview') return;
+      if (content.querySelector('.qf-setup-panel')) return;
+      renderSetupPanel(doneFromStatus(status));
+    });
+  }
+
+  function renderSetupPanel(doneMap) {
     const total = setupRoutes.length;
-    const done = doneRoutes();
+    const done = setupRoutes.filter((route) => doneMap[route]);
     const count = done.length;
     const complete = count >= total;
     const nextRoute = setupRoutes.find((route) => !done.includes(route)) || 'embed';
@@ -209,6 +245,9 @@
 
   function enhance() {
     const route = currentRoute();
+    // Visiting the public-link page counts as "viewed/copied" — the last
+    // guided-setup step and the trigger for the "You're live" state.
+    if (route === 'embed') setLocalFlag(STATUS_FLAG.embed);
     if (route === 'overview') setupPanel();
     if (setupRoutes.includes(route)) {
       const h1 = content.querySelector('h1');

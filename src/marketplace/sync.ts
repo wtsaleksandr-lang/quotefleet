@@ -120,36 +120,64 @@ async function recomputeLanes(
     if (z.radiusMiles > e.radius) e.radius = z.radiusMiles;
   }
   for (const [code, v] of byPort) {
-    await db().insert(marketplaceLanes).values({
-      tenantId,
-      anchorType: 'port',
-      anchorCode: code,
-      radiusMiles: v.radius,
-      equipmentJson: [...v.equip],
-      servicesJson: [...v.services],
-      enabled: true,
-      updatedAt: new Date(),
-    });
+    await db()
+      .insert(marketplaceLanes)
+      .values({
+        tenantId,
+        anchorType: 'port',
+        anchorCode: code,
+        radiusMiles: v.radius,
+        equipmentJson: [...v.equip],
+        servicesJson: [...v.services],
+        enabled: true,
+        updatedAt: new Date(),
+      })
+      // The unique index is (tenant_id, anchor_type, anchor_code). Two
+      // fire-and-forget syncs can interleave (delete/insert), so a
+      // concurrent re-insert must upsert instead of throwing.
+      .onConflictDoUpdate({
+        target: [marketplaceLanes.tenantId, marketplaceLanes.anchorType, marketplaceLanes.anchorCode],
+        set: {
+          radiusMiles: v.radius,
+          equipmentJson: [...v.equip],
+          servicesJson: [...v.services],
+          enabled: true,
+          updatedAt: new Date(),
+        },
+      });
   }
 
-  // 2. National fallback for any service the carrier has at least one
-  //    enabled rate card for. Tells the marketplace browser "this carrier
-  //    accepts X service nationally" before anchor-specific lanes.
+  // 2. National fallback for the services the carrier has at least one
+  //    enabled rate card for. The unique index anchors national lanes at
+  //    ('national','US'), so ALL services must roll up into ONE row —
+  //    a row per service collided on the unique constraint and spammed
+  //    the log on every multi-service tenant. equipment/services are
+  //    aggregated across every enabled card.
   const services = Array.from(new Set(enabledCards.map((c) => c.service)));
-  for (const svc of services) {
-    const equip = Array.from(
-      new Set(enabledCards.filter((c) => c.service === svc).map((c) => c.equipment))
-    );
-    await db().insert(marketplaceLanes).values({
-      tenantId,
-      anchorType: 'national',
-      anchorCode: 'US', // future: split by countryFocus
-      radiusMiles: null,
-      equipmentJson: equip,
-      servicesJson: [svc],
-      enabled: true,
-      updatedAt: new Date(),
-    });
+  if (services.length > 0) {
+    const equip = Array.from(new Set(enabledCards.map((c) => c.equipment)));
+    await db()
+      .insert(marketplaceLanes)
+      .values({
+        tenantId,
+        anchorType: 'national',
+        anchorCode: 'US', // future: split by countryFocus
+        radiusMiles: null,
+        equipmentJson: equip,
+        servicesJson: services,
+        enabled: true,
+        updatedAt: new Date(),
+      })
+      .onConflictDoUpdate({
+        target: [marketplaceLanes.tenantId, marketplaceLanes.anchorType, marketplaceLanes.anchorCode],
+        set: {
+          radiusMiles: null,
+          equipmentJson: equip,
+          servicesJson: services,
+          enabled: true,
+          updatedAt: new Date(),
+        },
+      });
   }
 }
 

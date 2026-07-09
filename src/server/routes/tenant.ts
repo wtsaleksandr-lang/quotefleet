@@ -55,7 +55,15 @@ import { encrypt } from '../../auth/secrets.js';
 import { effectivePlan } from '../plans.js';
 import { loadEnv } from '../../config.js';
 import { syncTenantToMarketplace } from '../../marketplace/sync.js';
+import { DEFAULT_AI_SYSTEM_PROMPT } from '../../calc/defaults.js';
 import { createHmac } from 'node:crypto';
+
+/** Seed defaults stamped at signup (see routes/auth.ts + calc/defaults.ts).
+ *  Used to tell a genuinely-customized brand/AI config apart from the
+ *  out-of-the-box seed so the guided-setup meter only credits real work. */
+const SEED_BRAND_PRIMARY = '#2563eb';
+const SEED_BRAND_ACCENT = '#06b6d4';
+const SEED_BRAND_TAGLINE = 'Instant freight quotes';
 
 /** Fire-and-forget marketplace sync. Logs but never throws. */
 function bumpMarketplace(tenantId: number) {
@@ -96,6 +104,50 @@ export function registerTenantRoutes(app: Express) {
           : 0,
     };
     return res.json({ tenant: req.tenant, stats, recentLeads: recent, audit });
+  });
+
+  // ── guided-setup status ───────────────────────────────────────
+  // Reports REAL, account-level configuration state for the 6 guided
+  // setup areas so the dashboard progress meter reflects actual data
+  // instead of per-browser localStorage answers. Notes:
+  //   - rates/accessorials/zones ship with working seed defaults at
+  //     signup, so ">=1 row" == "this area is ready to quote".
+  //   - brand/AI are compared against the seed so the meter only credits
+  //     a genuine customization (otherwise every fresh tenant would read
+  //     as fully branded / AI-tuned on day one).
+  //   - the public-link (embed) step is an inherently client-side
+  //     "viewed/copied" signal and is merged in on the client.
+  app.get('/api/tenant/setup-status', requireAuth, requireTenant, async (req, res) => {
+    const tid = req.tenant!.id;
+    const [rc, ac, lz, brandRow, aiRow] = await Promise.all([
+      db().select({ id: rateCards.id }).from(rateCards).where(eq(rateCards.tenantId, tid)),
+      db().select({ id: accessorials.id }).from(accessorials).where(eq(accessorials.tenantId, tid)),
+      db().select({ id: laneZones.id }).from(laneZones).where(eq(laneZones.tenantId, tid)),
+      db().select().from(brandConfigs).where(eq(brandConfigs.tenantId, tid)).limit(1),
+      db().select().from(aiConfigs).where(eq(aiConfigs.tenantId, tid)).limit(1),
+    ]);
+
+    const brand = brandRow[0];
+    const tenantName = (req.tenant!.name ?? '').trim();
+    const brandConfigured =
+      !!brand &&
+      ((!!brand.logoUrl && brand.logoUrl.trim() !== '') ||
+        (!!brand.displayName && brand.displayName.trim() !== '' && brand.displayName.trim() !== tenantName) ||
+        brand.primaryColor !== SEED_BRAND_PRIMARY ||
+        brand.accentColor !== SEED_BRAND_ACCENT ||
+        (!!brand.tagline && brand.tagline.trim() !== '' && brand.tagline.trim() !== SEED_BRAND_TAGLINE));
+
+    const ai = aiRow[0];
+    const aiConfigured =
+      !!ai && ai.systemPrompt.trim() !== '' && ai.systemPrompt.trim() !== DEFAULT_AI_SYSTEM_PROMPT.trim();
+
+    return res.json({
+      rates: rc.length > 0,
+      accessorials: ac.length > 0,
+      zones: lz.length > 0,
+      brand: brandConfigured,
+      ai: aiConfigured,
+    });
   });
 
   // ── rate cards ────────────────────────────────────────────────
