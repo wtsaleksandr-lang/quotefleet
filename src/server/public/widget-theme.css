@@ -1,0 +1,38 @@
+/* QuoteFleet widget — self-hosted font faces + theme font application.
+   Loaded by the widget only (public-calculator-conditional-options.js).
+   Binaries live under /fonts (Satoshi) and /vendor/fonts (Inter, Sora).
+   NO CDN / external requests — everything is same-origin.
+
+   Colours are driven entirely by the --w-* custom properties that
+   public-calculator-no-gradients.css consumes; this file only owns the
+   typography axis so the tenant's chosen font applies to the widget. */
+
+/* ── Satoshi (default) ─────────────────────────────────────────── */
+@font-face { font-family:'Satoshi'; font-style:normal; font-weight:300; font-display:swap; src:url('/fonts/satoshi-300.woff2') format('woff2'); }
+@font-face { font-family:'Satoshi'; font-style:normal; font-weight:400; font-display:swap; src:url('/fonts/satoshi-400.woff2') format('woff2'); }
+@font-face { font-family:'Satoshi'; font-style:normal; font-weight:500; font-display:swap; src:url('/fonts/satoshi-500.woff2') format('woff2'); }
+@font-face { font-family:'Satoshi'; font-style:normal; font-weight:700; font-display:swap; src:url('/fonts/satoshi-700.woff2') format('woff2'); }
+@font-face { font-family:'Satoshi'; font-style:normal; font-weight:900; font-display:swap; src:url('/fonts/satoshi-900.woff2') format('woff2'); }
+
+/* ── Inter ─────────────────────────────────────────────────────── */
+@font-face { font-family:'Inter'; font-style:normal; font-weight:400; font-display:swap; src:url('/vendor/fonts/inter-400.woff2') format('woff2'); }
+@font-face { font-family:'Inter'; font-style:normal; font-weight:500; font-display:swap; src:url('/vendor/fonts/inter-500.woff2') format('woff2'); }
+@font-face { font-family:'Inter'; font-style:normal; font-weight:700; font-display:swap; src:url('/vendor/fonts/inter-700.woff2') format('woff2'); }
+
+/* ── Sora (contrasting geometric sans) ─────────────────────────── */
+@font-face { font-family:'Sora'; font-style:normal; font-weight:400; font-display:swap; src:url('/vendor/fonts/sora-400.woff2') format('woff2'); }
+@font-face { font-family:'Sora'; font-style:normal; font-weight:600; font-display:swap; src:url('/vendor/fonts/sora-600.woff2') format('woff2'); }
+@font-face { font-family:'Sora'; font-style:normal; font-weight:700; font-display:swap; src:url('/vendor/fonts/sora-700.woff2') format('woff2'); }
+
+/* Apply the resolved theme font. --w-font is set at runtime by
+   widget.js#applyTheme; the fallback keeps the widget on Satoshi if the
+   theme payload never arrives. Inputs/buttons don't inherit font-family,
+   so they're named explicitly. */
+body.qf-app-calculator,
+body.qf-app-calculator .qf-widget,
+body.qf-app-calculator input,
+body.qf-app-calculator select,
+body.qf-app-calculator textarea,
+body.qf-app-calculator button {
+  font-family: var(--w-font, 'Satoshi', 'Inter', system-ui, -apple-system, 'Segoe UI', Roboto, Arial, sans-serif);
+}

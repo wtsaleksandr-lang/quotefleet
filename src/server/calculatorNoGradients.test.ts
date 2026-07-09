@@ -22,11 +22,14 @@ describe('calculator global color enforcement without gradients', () => {
     const css = await file('public-calculator-no-gradients.css');
 
     expect(css).toContain('Phase CB');
-    expect(css).toContain('background: #161616 !important');
-    expect(css).toContain('background: #181D1F !important');
-    expect(css).toContain('background: #E6E3E0 !important');
-    expect(css).toContain('background: #D4CFC9 !important');
-    expect(css).toContain('background: #0D3CFC !important');
+    // Wave-1 theming: colours are now driven by --w-* custom properties whose
+    // FALLBACKS are the original Midnight values, so an absent theme payload
+    // still renders the current approved widget. Assert the token+fallback form.
+    expect(css).toContain('background: var(--w-page-bg, #161616) !important');
+    expect(css).toContain('background: var(--w-surface, #181D1F) !important');
+    expect(css).toContain('background: var(--w-input-bg, #E6E3E0) !important');
+    expect(css).toContain('background: var(--w-input-bg-hover, #D4CFC9) !important');
+    expect(css).toContain('background: var(--w-accent, #0D3CFC) !important');
     expect(css).toContain('background-image: none !important');
     expect(css).toContain('body.qf-app-calculator .qf-result');
     expect(css).toContain('body.qf-app-calculator .qf-cta:disabled::after');

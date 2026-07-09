@@ -1,36 +1,43 @@
 /* Phase CB: final calculator color enforcement, no gradients.
-   The quote tool must use the global QuoteFleet palette only. */
+   The quote tool must use the global QuoteFleet palette only.
+
+   THEMING (Wave 1): every colour below is now driven by a --w-* custom
+   property whose FALLBACK is the original Midnight value. So:
+     - No theme payload  → fallbacks render → the current approved widget,
+       unchanged, pixel-for-pixel.
+     - A preset/accent    → widget.js sets the --w-* variables → the whole
+       widget re-skins from this one layer.
+   Token contract + values: src/server/widgetThemes.ts. NO teal. */
 body.qf-app-calculator {
-  --w-primary: #0D3CFC;
-  --w-primary-hover: #0B32D4;
-  --qf-app-bg: #161616;
-  --qf-app-shell: #181D1F;
-  --qf-app-panel: #1C1C1C;
-  --qf-app-card: #E6E3E0;
-  --qf-app-card-soft: #F3EDDF;
-  --qf-app-border: rgba(255,255,255,.12);
-  --qf-app-accent-on-dark: #6E8BFF;
-  --qf-app-text: #1E1E1E;
-  --qf-app-muted: #4F6670;
-  background: #161616 !important;
+  --w-primary: var(--w-accent, #0D3CFC);
+  --w-primary-hover: var(--w-accent-hover, #0B32D4);
+  --qf-app-bg: var(--w-page-bg, #161616);
+  --qf-app-shell: var(--w-surface, #181D1F);
+  --qf-app-panel: var(--w-surface-2, #1C1C1C);
+  --qf-app-card: var(--w-input-bg, #E6E3E0);
+  --qf-app-card-soft: var(--w-error-bg, #F3EDDF);
+  --qf-app-border: var(--w-border, rgba(255,255,255,.12));
+  --qf-app-accent-on-dark: var(--w-accent-on-surface, #6E8BFF);
+  --qf-app-text: var(--w-input-text, #1E1E1E);
+  --qf-app-muted: var(--w-muted, #4F6670);
+  background: var(--w-page-bg, #161616) !important;
   background-image: none !important;
 }
 
-/* Clean, flat, on-brand card shell — a single crisp dark surface lifted one
+/* Clean, flat, on-brand card shell — a single crisp surface lifted one
    step off the page, hairline border, consistent 8px radius, restrained shadow.
    No gradient washes. */
 body.qf-app-calculator .qf-widget {
-  background: #181D1F !important;
+  background: var(--w-surface, #181D1F) !important;
   background-image: none !important;
-  border: 1px solid rgba(255,255,255,.12) !important;
+  border: 1px solid var(--w-border, rgba(255,255,255,.12)) !important;
   border-radius: 8px !important;
   box-shadow: 0 24px 60px -32px rgba(0,0,0,.75) !important;
-  color: #FFFFFF !important;
+  color: var(--w-text, #FFFFFF) !important;
 }
 
 /* Kill the light-theme pseudo-element overlays (white / blue / cyan corner
-   washes from public-calculator-ux.css) that bled over the dark shell and
-   produced the muddy gray-blue gradient at the corners. */
+   washes from public-calculator-ux.css) that bled over the shell. */
 body.qf-app-calculator .qf-widget::before,
 body.qf-app-calculator .qf-widget::after {
   content: none !important;
@@ -49,12 +56,12 @@ body.qf-app-calculator .qf-field-hint {
 
 body.qf-app-calculator .qf-header .brand-name,
 body.qf-app-calculator .qf-section-title {
-  color: #FFFFFF !important;
+  color: var(--w-text, #FFFFFF) !important;
 }
 
 body.qf-app-calculator .qf-field label,
 body.qf-app-calculator .qf-field-hint {
-  color: #B1C5CE !important;
+  color: var(--w-muted, #B1C5CE) !important;
 }
 
 body.qf-app-calculator .qf-tabs,
@@ -75,10 +82,10 @@ body.qf-app-calculator .qf-options-panel .qf-flags label,
 body.qf-app-calculator .qf-options-panel .qf-acc-chip,
 body.qf-app-calculator .qf-flags label,
 body.qf-app-calculator .qf-acc-chip {
-  background: #E6E3E0 !important;
+  background: var(--w-input-bg, #E6E3E0) !important;
   background-image: none !important;
-  border-color: rgba(13,60,252,.22) !important;
-  color: #1E1E1E !important;
+  border-color: var(--w-input-border, rgba(13,60,252,.22)) !important;
+  color: var(--w-input-text, #1E1E1E) !important;
 }
 
 body.qf-app-calculator .qf-result *,
@@ -99,7 +106,7 @@ body.qf-app-calculator .qf-options-panel .qf-flags label:hover,
 body.qf-app-calculator .qf-options-panel .qf-acc-chip:hover,
 body.qf-app-calculator .qf-flags label:hover,
 body.qf-app-calculator .qf-acc-chip:hover {
-  background: #D4CFC9 !important;
+  background: var(--w-input-bg-hover, #D4CFC9) !important;
   background-image: none !important;
 }
 
@@ -107,10 +114,10 @@ body.qf-app-calculator .qf-tabs button.active,
 body.qf-app-calculator .qf-cta.qf-secondary,
 body.qf-app-calculator .qf-result .qf-customer-note,
 body.qf-app-calculator .qf-help {
-  background: #FFFFFF !important;
+  background: var(--w-accent-surface, #FFFFFF) !important;
   background-image: none !important;
-  border-color: #FFFFFF !important;
-  color: #0D3CFC !important;
+  border-color: var(--w-accent-surface-border, var(--w-accent-surface, #FFFFFF)) !important;
+  color: var(--w-accent, #0D3CFC) !important;
 }
 
 body.qf-app-calculator .qf-cta,
@@ -119,19 +126,20 @@ body.qf-app-calculator .qf-options-panel .qf-acc-chip.active,
 body.qf-app-calculator .qf-demo-logo-slot em,
 body.qf-app-calculator .qf-chat-bubble.user,
 body.qf-app-calculator .qf-chat-send {
-  background: #0D3CFC !important;
+  background: var(--w-accent, #0D3CFC) !important;
   background-image: none !important;
-  border: 1px solid #0D3CFC !important;
-  color: #FFFFFF !important;
+  border: 1px solid var(--w-accent, #0D3CFC) !important;
+  color: var(--w-accent-text, #FFFFFF) !important;
 }
 
 body.qf-app-calculator .qf-cta:hover,
 body.qf-app-calculator .qf-chat-send:hover {
-  border-color: #FFFFFF !important;
+  background: var(--w-accent-hover, #0B32D4) !important;
+  border-color: var(--w-accent-surface, #FFFFFF) !important;
 }
 
 body.qf-app-calculator .qf-cta.qf-secondary:hover {
-  border-color: #0D3CFC !important;
+  border-color: var(--w-accent, #0D3CFC) !important;
 }
 
 body.qf-app-calculator .qf-cta:disabled::after {
@@ -143,76 +151,70 @@ body.qf-app-calculator .qf-cta:disabled::after {
 }
 
 body.qf-app-calculator .qf-error {
-  background: #F3EDDF !important;
+  background: var(--w-error-bg, #F3EDDF) !important;
   background-image: none !important;
-  color: #1E1E1E !important;
+  color: var(--w-error-text, #1E1E1E) !important;
 }
 
 body.qf-app-calculator .qf-success {
-  background: #E4EDF1 !important;
+  background: var(--w-success-bg, #E4EDF1) !important;
   background-image: none !important;
-  color: #1E1E1E !important;
+  color: var(--w-success-text, #1E1E1E) !important;
 }
 
 /* --- Header polish --------------------------------------------------------
-   "INSTANT FREIGHT ESTIMATE" pill: restyle the light-theme blue pill
-   (.brand-name::after) to a subtle on-brand chip with the accent-on-dark blue
-   so it reads clearly against the dark shell. */
+   "INSTANT FREIGHT ESTIMATE" pill: a subtle on-brand chip in the
+   accent-on-surface colour so it reads against the shell. */
 body.qf-app-calculator .qf-header .brand-name::after {
-  background: rgba(110,139,255,.10) !important;
-  border: 1px solid rgba(110,139,255,.34) !important;
-  color: #6E8BFF !important;
+  background: var(--w-accent-pill-bg, rgba(110,139,255,.10)) !important;
+  border: 1px solid var(--w-accent-pill-border, rgba(110,139,255,.34)) !important;
+  color: var(--w-accent-on-surface, #6E8BFF) !important;
 }
 
-/* Logo slot: hairline border to match the shell instead of the light-blue
-   dashed frame. */
+/* Logo slot: hairline border to match the shell. */
 body.qf-app-calculator .qf-demo-logo-slot {
-  border-color: rgba(255,255,255,.28) !important;
+  border-color: var(--w-border, rgba(255,255,255,.28)) !important;
   box-shadow: none !important;
 }
 
 /* --- Contact bar ----------------------------------------------------------
-   Reskin the demo contact card (phone / email / address / USDOT·MC) from the
-   loud cream panel to a quiet dark brand panel so cream is reserved for the
-   interactive input fields. Hairline border, light text, accent bullets. */
+   Demo contact card (phone / email / address / USDOT·MC): a quiet brand panel
+   so the interactive cream inputs stay the only bright surface. */
 body.qf-app-calculator .qf-demo-brand-card {
-  background: #1C1C1C !important;
+  background: var(--w-surface-2, #1C1C1C) !important;
   background-image: none !important;
-  border: 1px solid rgba(255,255,255,.12) !important;
-  color: #C9D4DA !important;
+  border: 1px solid var(--w-border, rgba(255,255,255,.12)) !important;
+  color: var(--w-contact-text, #C9D4DA) !important;
 }
 body.qf-app-calculator .qf-demo-brand-card * {
   background-image: none !important;
 }
 body.qf-app-calculator .qf-demo-brand-card span {
-  color: #C9D4DA !important;
+  color: var(--w-contact-text, #C9D4DA) !important;
 }
 body.qf-app-calculator .qf-demo-brand-card span::before {
-  background: #6E8BFF !important;
+  background: var(--w-accent-on-surface, #6E8BFF) !important;
 }
 
 /* --- Drayage & conditional sub-panels -------------------------------------
-   These panels (booking details, oversize/OOG, genset/hazmat) wrap labeled
-   inputs. They were cream while their headings/labels/hints use the dark-shell
-   text colors, so text was barely visible on cream. Reskin them to quiet dark
-   brand panels (like the contact bar): the cream inputs inside stand out and
-   every label, hint and heading reads clearly. */
+   Booking details, oversize/OOG, genset/hazmat: quiet brand panels so the
+   cream inputs inside stand out and labels/hints read clearly. */
 body.qf-app-calculator .qf-booking-card,
 body.qf-app-calculator .qf-oog-panel,
 body.qf-app-calculator .qf-conditional-panel {
-  background: #1C1C1C !important;
+  background: var(--w-surface-2, #1C1C1C) !important;
   background-image: none !important;
-  border: 1px solid rgba(255,255,255,.12) !important;
-  color: #E6E3E0 !important;
+  border: 1px solid var(--w-border, rgba(255,255,255,.12)) !important;
+  color: var(--w-surface-2-text, #E6E3E0) !important;
 }
 body.qf-app-calculator .qf-booking-card .qf-section-title,
 body.qf-app-calculator .qf-oog-panel strong,
 body.qf-app-calculator .qf-conditional-panel strong {
-  color: #FFFFFF !important;
+  color: var(--w-text, #FFFFFF) !important;
 }
 body.qf-app-calculator .qf-booking-card .qf-field-hint,
 body.qf-app-calculator .qf-oog-panel .qf-field-hint,
 body.qf-app-calculator .qf-conditional-panel .qf-field-hint,
 body.qf-app-calculator .qf-oog-panel #qf-oog-help {
-  color: #9FB2BB !important;
+  color: var(--w-muted-2, #9FB2BB) !important;
 }

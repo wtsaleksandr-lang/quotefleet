@@ -358,6 +358,14 @@ export const brandConfigs = pgTable('brand_configs', {
   tagline: text('tagline'),
   primaryColor: text('primary_color').notNull().default('#2563eb'),
   accentColor: text('accent_color').notNull().default('#06b6d4'),
+  /** Widget theming (Wave 1). A curated preset drives every widget colour;
+   *  an optional accent override supersedes the preset accent; a self-hosted
+   *  font is chosen from WIDGET_FONTS. Existing rows default to Midnight +
+   *  Satoshi, which reproduces the current widget look exactly. See
+   *  src/server/widgetThemes.ts. */
+  themePreset: text('theme_preset').notNull().default('midnight'),
+  accentOverride: text('accent_override'),
+  fontFamily: text('font_family').notNull().default('satoshi'),
   /** Optional logo URL. */
   logoUrl: text('logo_url'),
   /** Optional CTA button text override. */

@@ -217,6 +217,7 @@
   function escapeHtml(s) {
     return String(s == null ? '' : s).replace(/[&<>"']/g, (m) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[m]));
   }
+  loadStylesheet('/widget-theme.css');
   loadStylesheet('/public-calculator-mobile-cleanup.css');
   loadStylesheet('/public-calculator-app-style.css');
   loadStylesheet('/public-calculator-brand-preview.css');
