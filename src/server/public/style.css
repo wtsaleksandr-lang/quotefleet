@@ -238,14 +238,13 @@ p { margin: 0; }
 }
 .brand-mark:hover { color: var(--ink); }
 .brand-mark .logo {
-  width: 30px; height: 30px;
-  background: var(--accent-fill);
-  border-radius: 9px;
+  width: auto; height: auto;
+  background: transparent;
+  border-radius: 0;
   display: inline-flex; align-items: center; justify-content: center;
-  color: #FFFFFF;
-  box-shadow: 0 2px 14px rgba(13, 60, 252, 0.40);
+  box-shadow: none;
 }
-.brand-mark .logo svg { width: 18px; height: 18px; }
+.brand-mark .logo svg { width: 26px; height: 26px; display: block; }
 .topnav-spacer { flex: 1; }
 .topnav a.nav-link {
   color: var(--muted);

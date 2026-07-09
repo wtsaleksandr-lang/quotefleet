@@ -28,10 +28,11 @@
 <body class="landing-v2 qf-wft">
   <header class="site-header">
     <div class="site-header-inner">
-      <a href="/" class="site-brand" aria-label="QuoteFleet home"><span class="site-logo" aria-hidden="true"><svg class="qf-route-logo" viewBox="0 0 32 32" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><rect x="4.5" y="17" width="8" height="6" rx="1.5"/><path d="M12.5 20h4.5l3-4h4.5a3 3 0 0 1 3 3v4h-4"/><path d="M16 20h7"/><circle cx="9" cy="25" r="2"/><circle cx="23" cy="25" r="2"/><path d="M6 9h5l4 4h4"/><circle cx="6" cy="9" r="1.7"/><circle cx="19" cy="13" r="1.7"/></svg></span>QuoteFleet</a>
+      <a href="/" class="site-brand" aria-label="QuoteFleet home"><span class="site-logo" aria-hidden="true"><svg class="qf-route-logo" viewBox="0 0 28 28" fill="none" aria-hidden="true"><path d="M4.5 18.5 11 12 15.5 14.5 22.5 7.5" stroke="#6E8BFF" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/><circle cx="4.5" cy="18.5" r="2.4" fill="#6E8BFF"/><circle cx="22.5" cy="7.5" r="3" fill="#0D3CFC"/></svg></span>QuoteFleet</a>
       <nav class="site-nav" aria-label="Main navigation"><a href="#how">How it works</a><a href="/w/demo">Demo</a><a href="#faq">FAQ</a></nav>
-      <div class="site-actions"><a class="signin" href="/login">Sign in</a><a class="btn btn-secondary" href="/w/demo">View demo <span class="arr">→</span></a></div>
+      <div class="site-actions"><a class="signin" href="/login">Sign in</a><a class="btn btn-secondary" href="/w/demo">View demo <span class="arr">→</span></a><button type="button" class="site-burger" id="site-burger" aria-label="Open menu" aria-expanded="false" aria-controls="site-mobile-menu"><svg class="ico-open" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><line x1="4" y1="7" x2="20" y2="7"/><line x1="4" y1="12" x2="20" y2="12"/><line x1="4" y1="17" x2="20" y2="17"/></svg><svg class="ico-close" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><line x1="6" y1="6" x2="18" y2="18"/><line x1="18" y1="6" x2="6" y2="18"/></svg></button></div>
     </div>
+    <div class="site-mobile-menu" id="site-mobile-menu" hidden><a href="#how">How it works</a><a href="/w/demo">Demo</a><a href="#faq">FAQ</a><a href="/login">Sign in</a></div>
   </header>
 
   <main>
@@ -61,18 +62,18 @@
 
     <section class="qf-globe-section" id="rates-database" data-reveal>
       <div class="qf-globe-head">
-        <span class="qf-globe-eyebrow">Free rates database</span>
-        <h2>Every rate, <span class="qf-globe-accent">anonymously</span> shared. Always free.</h2>
-        <p>Each rate a carrier quotes on QuoteFleet is anonymously added to a shared, open rates database &mdash; like DAT, but free for everyone. See what drayage, dry van, reefer, flatbed and every other service type is going for in each region across the US and Canada, in real time.</p>
+        <span class="qf-globe-eyebrow">Free market rate data</span>
+        <h2>Know the <span class="qf-globe-accent">going rate</span> before you quote.</h2>
+        <p>Every quote that runs through QuoteFleet feeds an anonymous, aggregated view of the freight market &mdash; never company names, never anyone's individual rates. What comes back is the real going rate for each lane and equipment type across the US and Canada, so you can price with confidence and stop leaving money on the table. It's the kind of rate intelligence big brokers pay for &mdash; free for every carrier.</p>
       </div>
       <div class="qf-globe-viewport">
         <div class="qf-globe-center"><div id="qf-globe-canvas"></div></div>
       </div>
-      <p class="qf-globe-hint"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><path d="M2 12h20M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"/></svg>Drag to explore the network</p>
+      <p class="qf-globe-hint"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><path d="M2 12h20M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"/></svg>Drag to explore live rate activity</p>
       <div class="qf-globe-stats">
-        <div class="qf-globe-stat"><b>US + Canada</b><span>every major freight region</span></div>
-        <div class="qf-globe-stat"><b>Every service type</b><span>drayage to intermodal</span></div>
-        <div class="qf-globe-stat"><b>Always free</b><span>anonymous &amp; open to all</span></div>
+        <div class="qf-globe-stat"><b>Fully anonymous</b><span>no names, no individual rates</span></div>
+        <div class="qf-globe-stat"><b>Every lane &amp; equipment</b><span>drayage to intermodal</span></div>
+        <div class="qf-globe-stat"><b>Free forever</b><span>for every carrier</span></div>
       </div>
     </section>
 
@@ -91,12 +92,33 @@
     <section class="section final-section" data-reveal><div class="container"><div class="final-cta-card"><span class="section-kicker">Ready when you are</span><h2>Start sharing your own rate page.</h2><p>Get your branded page live fast and start sharing it right away.</p><div class="final-actions"><a class="btn btn-primary btn-lg" href="/signup">Start free <span class="arr">→</span></a><a class="demo-link final-demo" href="/w/demo">See demo <span class="arr">→</span></a></div><p class="micro-copy">No contracts · No website changes needed · Optional AI chat</p></div></div></section>
   </main>
 
-  <footer class="premium-footer"><div class="premium-footer-inner"><div class="footer-brand"><a href="/" class="site-brand" aria-label="QuoteFleet home"><span class="site-logo" aria-hidden="true"><svg class="qf-route-logo" viewBox="0 0 32 32" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><rect x="4.5" y="17" width="8" height="6" rx="1.5"/><path d="M12.5 20h4.5l3-4h4.5a3 3 0 0 1 3 3v4h-4"/><path d="M16 20h7"/><circle cx="9" cy="25" r="2"/><circle cx="23" cy="25" r="2"/><path d="M6 9h5l4 4h4"/><circle cx="6" cy="9" r="1.7"/><circle cx="19" cy="13" r="1.7"/></svg></span>QuoteFleet</a><p>Branded rate calculator pages, PDF quotes, and optional AI chat for trucking service providers.</p></div><div class="footer-col"><h4>Product</h4><a href="/w/demo">Demo</a><a href="/signup">Start free</a><a href="#faq">FAQ</a></div><div class="footer-col"><h4>Company</h4><a href="mailto:hello@quotefleet.net">Contact</a><a href="/login">Sign in</a><a href="/security">Security</a></div><div class="footer-col"><h4>Legal</h4><a href="/dpa">DPA</a><a href="/.well-known/security.txt">security.txt</a><a href="mailto:security@quotefleet.net">Report security issue</a></div></div><div class="footer-bottom"><span>© <span id="year"></span> QuoteFleet. All rights reserved.</span><span>QuoteFleet is operated by <strong>MR Holdings &amp; Trade LLC</strong>.</span></div></footer>
+  <footer class="premium-footer"><div class="premium-footer-inner"><div class="footer-brand"><a href="/" class="site-brand" aria-label="QuoteFleet home"><span class="site-logo" aria-hidden="true"><svg class="qf-route-logo" viewBox="0 0 28 28" fill="none" aria-hidden="true"><path d="M4.5 18.5 11 12 15.5 14.5 22.5 7.5" stroke="#6E8BFF" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/><circle cx="4.5" cy="18.5" r="2.4" fill="#6E8BFF"/><circle cx="22.5" cy="7.5" r="3" fill="#0D3CFC"/></svg></span>QuoteFleet</a><p>Branded rate calculator pages, PDF quotes, and optional AI chat for trucking service providers.</p></div><div class="footer-col"><h4>Product</h4><a href="/w/demo">Demo</a><a href="/signup">Start free</a><a href="#faq">FAQ</a></div><div class="footer-col"><h4>Company</h4><a href="mailto:hello@quotefleet.net">Contact</a><a href="/login">Sign in</a><a href="/security">Security</a></div><div class="footer-col"><h4>Legal</h4><a href="/dpa">DPA</a><a href="/.well-known/security.txt">security.txt</a><a href="mailto:security@quotefleet.net">Report security issue</a></div></div><div class="footer-bottom"><span>© <span id="year"></span> QuoteFleet. All rights reserved.</span><span>QuoteFleet is operated by <strong>MR Holdings &amp; Trade LLC</strong>.</span></div></footer>
 
   <script src="/landing-motion.js" defer></script>
   <script src="/vendor/globe.gl.min.js" defer></script>
   <script src="/vendor/topojson-client.min.js" defer></script>
   <script src="/quotefleet-rates-globe.js" defer></script>
   <script>document.getElementById('year').textContent = new Date().getFullYear();</script>
+  <script>
+  (function () {
+    var b = document.getElementById('site-burger');
+    var m = document.getElementById('site-mobile-menu');
+    if (!b || !m) return;
+    function set(open) {
+      b.setAttribute('aria-expanded', open ? 'true' : 'false');
+      b.setAttribute('aria-label', open ? 'Close menu' : 'Open menu');
+      if (open) m.removeAttribute('hidden'); else m.setAttribute('hidden', '');
+    }
+    b.addEventListener('click', function (e) {
+      e.stopPropagation();
+      set(b.getAttribute('aria-expanded') !== 'true');
+    });
+    m.addEventListener('click', function (e) { if (e.target.closest('a')) set(false); });
+    document.addEventListener('click', function (e) {
+      if (!m.hasAttribute('hidden') && !m.contains(e.target) && !b.contains(e.target)) set(false);
+    });
+    document.addEventListener('keydown', function (e) { if (e.key === 'Escape') set(false); });
+  })();
+  </script>
 </body>
 </html>
