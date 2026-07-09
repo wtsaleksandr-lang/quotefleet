@@ -134,11 +134,27 @@
     refId: '',
   };
 
+  // Apply the FULL resolved theme (preset + optional accent override + font)
+  // the server computed in /api/public/widget/:slug. Every --w-* custom
+  // property is set on the document root; the widget CSS (notably
+  // public-calculator-no-gradients.css) reads them, so the whole widget
+  // re-skins from this one call. Legacy brand.primaryColor/accentColor are
+  // intentionally NOT applied here — the theme engine owns colour now.
+  function applyTheme(theme) {
+    if (!theme || !theme.tokens) return;
+    var root = document.documentElement;
+    Object.keys(theme.tokens).forEach(function (k) {
+      root.style.setProperty(k, theme.tokens[k]);
+    });
+    var font = theme.tokens['--w-font'];
+    if (font) {
+      root.style.setProperty('--w-font', font);
+      document.body.style.fontFamily = font;
+    }
+  }
+
   function applyBrand(brand) {
     if (!brand) return;
-    var root = document.documentElement;
-    if (brand.primaryColor) root.style.setProperty('--w-primary', brand.primaryColor);
-    if (brand.accentColor) root.style.setProperty('--w-accent', brand.accentColor);
     applyContactRules(brand);
   }
 
@@ -186,6 +202,7 @@
       .then(function (cfg) {
         if (cfg.error) { $('qf-root').innerHTML = '<div class="qf-error">' + cfg.error + '</div>'; return; }
         state.config = cfg;
+        applyTheme(cfg.theme);
         applyBrand(cfg.brand);
         renderHeader(cfg);
         renderServices(cfg.services);

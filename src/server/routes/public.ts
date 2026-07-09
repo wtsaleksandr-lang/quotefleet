@@ -37,6 +37,7 @@ import { loadEnv } from '../../config.js';
 import { getTrialState } from '../trialGating.js';
 import { canUseProFeature } from '../plans.js';
 import { publicCalcLimiter, publicChatLimiter, publicLeadLimiter } from '../rateLimits.js';
+import { resolveWidgetTheme } from '../widgetThemes.js';
 
 /** Returns true if the request's Origin/Referer host matches the
  *  tenant's brand_configs.allowed_domains (CSV). Empty list = wide open
@@ -262,6 +263,9 @@ export function registerPublicRoutes(app: Express) {
         countryFocus: tenant.countryFocus,
       },
       brand: brand ?? null,
+      // Fully-resolved widget theme (preset + optional accent override +
+      // font). widget.js#applyTheme writes tokens.* onto the document root.
+      theme: resolveWidgetTheme(brand ?? null),
       services: Array.from(new Set(cards.filter((c) => c.enabled).map((c) => c.service))),
       equipmentByService: groupBy(cards.filter((c) => c.enabled), 'service', 'equipment', 'label'),
       accessorials: accs
