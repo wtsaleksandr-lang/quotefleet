@@ -31,7 +31,7 @@
     if (opts.body && typeof opts.body !== 'string') opts.body = JSON.stringify(opts.body);
     return fetch(path, opts).then(function (r) {
       return r.json().then(function (j) {
-        if (!r.ok) throw new Error(j.error || ('HTTP ' + r.status));
+        if (!r.ok) { var err = new Error(j.error || ('HTTP ' + r.status)); err.status = r.status; throw err; }
         return j;
       });
     });
@@ -1513,28 +1513,6 @@
       bar.remove();
       document.body.classList.remove('qf-trial-locked');
     }
-    function setCollapsedDesktop(collapsed) {
-      shell.classList.toggle('qf-nav-collapsed', collapsed);
-      toggle.setAttribute('aria-expanded', collapsed ? 'false' : 'true');
-      toggle.setAttribute('aria-label', collapsed ? 'Show sidebar' : 'Hide sidebar');
-    }
-    toggle.addEventListener('click', function () {
-      if (isDesktop()) {
-        setCollapsedDesktop(!shell.classList.contains('qf-nav-collapsed'));
-      } else {
-        setOpenMobile(!shell.classList.contains('qf-nav-open'));
-      }
-    });
-    // Auto-close mobile drawer after picking a nav item.
-    $$('.sidebar .nav-item').forEach(function (b) {
-      b.addEventListener('click', function () {
-        if (!isDesktop()) setOpenMobile(false);
-      });
-    });
-    // Tap outside (anywhere in main) closes the mobile drawer.
-    document.querySelector('.app-main').addEventListener('click', function () {
-      if (!isDesktop()) setOpenMobile(false);
-    });
   }
 
   // Sidebar toggle — works at every width.
@@ -1609,7 +1587,13 @@
       // Route from URL
       var initial = (location.pathname.split('/app/')[1] || 'overview').split('/')[0];
       go(initial);
-    }).catch(function () { location.href = '/login'; });
+    }).catch(function (e) {
+      // Only bounce to /login on a genuine auth failure (401). Any other
+      // thrown error (e.g. a rendering bug) must NOT masquerade as logout —
+      // surface it instead of locking the tenant out of the dashboard.
+      if (e && e.status === 401) { location.href = '/login'; return; }
+      console.error('[boot] dashboard init failed', e);
+    });
   }
 
   document.addEventListener('click', function (e) {
