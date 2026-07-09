@@ -167,11 +167,13 @@
 }
 .qf-rate-table-wrap {
   position: relative;
+  padding-top: 16px; /* room for the pill so overflow-x clipping never eats it */
+  overflow-x: auto;  /* wide grid scrolls in-place instead of spilling past the page edge */
 }
 .qf-rate-table-wrap::before {
   content: 'Rate builder';
   position: absolute;
-  top: -12px;
+  top: 2px;
   left: 18px;
   padding: 4px 8px;
   border-radius: 999px;
@@ -184,7 +186,18 @@
   z-index: 2;
 }
 .qf-rate-table-wrap .table {
-  margin-top: 16px;
+  margin-top: 6px;
+}
+/* Last cell holds Duplicate + Delete + the status badge. Let them wrap
+   cleanly and stay right-aligned inside the cell so "NEEDS PRICE" never
+   spills over the row edge (desktop or mobile 375). */
+.qf-rate-table-wrap tbody td:last-child {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 6px;
+  min-width: 96px;
 }
 .qf-rate-table-wrap tbody tr {
   transition: background .16s ease, box-shadow .16s ease, opacity .16s ease;
@@ -208,7 +221,7 @@
 }
 .qf-rate-row-status {
   display: inline-flex;
-  margin-left: 8px;
+  margin-left: 0;
   padding: 4px 7px;
   border: 1px solid var(--border);
   border-radius: 999px;
@@ -283,7 +296,7 @@
   color: var(--danger);
 }
 .qf-rate-duplicate-btn {
-  margin-right: 6px;
+  margin-right: 0;
   border-style: dashed !important;
 }
 .qf-rate-duplicate-btn:disabled {

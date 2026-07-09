@@ -118,3 +118,56 @@
     justify-content: flex-start;
   }
 }
+
+/* ── Overview declutter ──────────────────────────────────────────────
+   Several independent overlay scripts (executive hero, KPI stats, setup
+   onboarding, customer preview, follow-up workspace, command queue,
+   recent-leads grid) inject themselves into #page-content in a racy,
+   non-deterministic order — which is why the "Overview" hero used to land
+   at the BOTTOM. Rather than coordinate every mount point, we decouple the
+   *visual* order from DOM insertion order with flex `order`, and collapse
+   the per-band margins into a single consistent gap for tight vertical
+   rhythm. Scoped to the overview only via :has(> .qf-overview-hero); that
+   hero exists exclusively while the overview route is mounted, so this
+   never leaks onto other routes (whose leftover body classes persist). */
+#page-content:has(> .qf-overview-hero) {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  align-items: stretch;
+}
+#page-content:has(> .qf-overview-hero) > * { order: 90; margin-top: 0; margin-bottom: 0; }
+#page-content:has(> .qf-overview-hero) > .qf-overview-hero        { order: 1; }
+#page-content:has(> .qf-overview-hero) > .features               { order: 2; }
+#page-content:has(> .qf-overview-hero) > .qf-setup-panel         { order: 3; }
+#page-content:has(> .qf-overview-hero) > .qf-preview-card        { order: 4; }
+#page-content:has(> .qf-overview-hero) > .qf-overview-command    { order: 5; }
+#page-content:has(> .qf-overview-hero) > .qf-overview-workgrid   { order: 6; }
+#page-content:has(> .qf-overview-hero) > .qf-followup-workspace  { order: 7; }
+#page-content:has(> .qf-overview-hero) > .qf-followup-board      { order: 8; }
+#page-content:has(> .qf-overview-hero) > .qf-followup-tip        { order: 9; }
+
+/* Tighten the hero and KPI cards so the first screen reads calm, not loud. */
+#page-content:has(> .qf-overview-hero) > .qf-overview-hero { padding: 20px 24px; }
+.qf-overview-hero-copy strong { font-size: clamp(28px, 3.2vw, 38px); }
+.qf-overview-stat { min-height: 108px; }
+.qf-overview-stat::after { width: 92px; height: 92px; inset: auto -26px -40px auto; }
+
+/* Dark palette: the base hero/stat rules hardcode cream/white surfaces that
+   only suit the light dashboard, so on the (default) dark theme they read as
+   light cards floating on #181D1F. Re-point them at surface tokens for dark. */
+html:not([data-theme="light"]) .qf-overview-hero {
+  border-color: var(--border);
+  background:
+    radial-gradient(circle at 12% 0%, rgba(110, 139, 255, 0.14), transparent 36%),
+    linear-gradient(135deg, rgba(13, 60, 252, 0.10), rgba(13, 60, 252, 0.04)), var(--surface);
+  box-shadow: var(--shadow-md);
+}
+html:not([data-theme="light"]) .qf-overview-stat {
+  border-color: var(--border) !important;
+  background: var(--surface) !important;
+  box-shadow: var(--shadow-sm) !important;
+}
+html:not([data-theme="light"]) .qf-overview-stat::after {
+  background: rgba(110, 139, 255, 0.10);
+}

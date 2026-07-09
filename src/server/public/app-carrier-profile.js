@@ -43,14 +43,20 @@
   function install() {
     var page = document.getElementById('page-content');
     if (!page || !pageIsBrand() || page.querySelector('[data-qf-carrier-profile]')) return;
+    // Reserve the guard synchronously — append the (empty) card BEFORE the
+    // async fetch resolves. Otherwise the MutationObserver fires again while
+    // the fetch is still in flight, the guard selector finds nothing, and a
+    // second (third, …) card mounts. Populate the card once data arrives.
+    var card = document.createElement('div');
+    card.className = 'card';
+    card.dataset.qfCarrierProfile = '1';
+    card.style.marginTop = '14px';
+    page.appendChild(card);
     fetch('/api/tenant/carrier-profile')
       .then(function (r) { return r.json(); })
       .then(function (data) {
+        if (!card.isConnected) return;
         var profile = data.profile || {};
-        var card = document.createElement('div');
-        card.className = 'card';
-        card.dataset.qfCarrierProfile = '1';
-        card.style.marginTop = '14px';
         card.innerHTML = '<div class="card-title">Carrier profile for quotes</div><div class="card-subtitle">Shown on hosted quotes and email previews.</div>';
         var grid = document.createElement('div');
         grid.className = 'grid-2';
@@ -73,9 +79,8 @@
           }).catch(function (err) { if (window.qfToastErr) window.qfToastErr(err); });
         });
         card.appendChild(save);
-        page.appendChild(card);
       })
-      .catch(function () {});
+      .catch(function () { card.remove(); });
   }
   document.addEventListener('DOMContentLoaded', function () {
     var root = document.getElementById('page-content') || document.body;
