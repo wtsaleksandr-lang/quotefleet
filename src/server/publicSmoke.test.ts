@@ -40,7 +40,9 @@ describe('public static page smoke checks', () => {
 
   it('landing reveal CSS keeps content visible without JavaScript', async () => {
     const css = await file('landing-s-polish.css');
-    expect(css).toContain("@import url('/premium-palette.css')");
+    // premium-palette.css import removed: its retired teal logistics theme was
+    // re-injecting teal at :root; the landing runs on the style.css brand palette.
+    expect(css).not.toContain("@import url('/premium-palette.css')");
     expect(css).toContain('.js [data-reveal]');
     expect(css).toContain('.js [data-reveal].is-visible');
     expect(css).not.toContain('\n[data-reveal] {');
