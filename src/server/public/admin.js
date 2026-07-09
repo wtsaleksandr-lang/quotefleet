@@ -171,7 +171,7 @@
         return f;
       }
       card.appendChild(el('div', { class: 'grid-2' }, [
-        field('Plan', 'plan', ['free', 'starter', 'pro', 'enterprise']),
+        field('Plan', 'plan', ['free', 'vital', 'pro']),
         field('Status', 'status', ['active', 'suspended', 'churned']),
       ]));
       card.appendChild(field('Display name', 'name'));
@@ -237,8 +237,37 @@
         b.addEventListener('click', function () { go(b.dataset.route); });
       });
       $('#switch-tenant').addEventListener('click', function () {
-        var slug = prompt('Tenant slug to view (will use the tenant dashboard, scoped to that tenant):');
-        if (slug) location.href = '/app?mode=tenant&slug=' + encodeURIComponent(slug);
+        var btn = this;
+        // Inline slug entry (replaces window.prompt) — matches the app's
+        // inline-edit pattern: input + Go, submit on Enter, cancel on Escape
+        // / blur. Avoids the blocking browser prompt() dialog.
+        function open(slug) {
+          slug = (slug || '').trim().toLowerCase();
+          if (slug) location.href = '/app?mode=tenant&slug=' + encodeURIComponent(slug);
+        }
+        var input = el('input', {
+          class: 'input',
+          type: 'text',
+          placeholder: 'tenant slug…',
+          autocomplete: 'off',
+          spellcheck: 'false',
+          style: { flex: '1', minWidth: '0' },
+        });
+        var goBtn = el('button', { class: 'btn btn-primary', type: 'button', text: 'Go' });
+        var box = el('div', {
+          class: 'nav-item',
+          style: { display: 'flex', gap: '6px', alignItems: 'center' },
+        }, [input, goBtn]);
+        var restored = false;
+        function restore() { if (restored) return; restored = true; box.replaceWith(btn); }
+        goBtn.addEventListener('click', function () { open(input.value); });
+        input.addEventListener('keydown', function (ev) {
+          if (ev.key === 'Enter') { ev.preventDefault(); open(input.value); }
+          else if (ev.key === 'Escape') { ev.preventDefault(); restore(); }
+        });
+        input.addEventListener('blur', function () { setTimeout(restore, 120); });
+        btn.replaceWith(box);
+        input.focus();
       });
       $('#logout').addEventListener('click', function () {
         api('/api/auth/logout', { method: 'POST' }).finally(function () { location.href = '/login'; });

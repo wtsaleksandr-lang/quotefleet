@@ -35,6 +35,7 @@ import { leadChatTurn } from '../../ai/chatAgent.js';
 import { sendEmail } from '../../email/send.js';
 import { loadEnv } from '../../config.js';
 import { getTrialState } from '../trialGating.js';
+import { canUseProFeature } from '../plans.js';
 import { publicCalcLimiter, publicChatLimiter, publicLeadLimiter } from '../rateLimits.js';
 
 /** Returns true if the request's Origin/Referer host matches the
@@ -56,8 +57,14 @@ function originAllowed(allowedCsv: string | null | undefined, req: Request): boo
 }
 
 function generateLeadRef(): string {
+  // The refId doubles as the lookup key for the PUBLIC, unauthenticated
+  // chat/quote/read endpoints (`/chat/:refId`, `/api/public/lead/:refId`,
+  // …). A short 6-char code is enumerable — an attacker could brute-force
+  // the space and scrape customer PII. A 21-char nanoid (~125 bits) makes
+  // the ref unguessable while keeping a single key across the dashboard,
+  // hosted quote page, chat page, and emails (no separate token to wire).
   const yyyy = new Date().getFullYear();
-  const seq = nanoid(6).toUpperCase();
+  const seq = nanoid(21);
   return `QF-${yyyy}-${seq}`;
 }
 
@@ -470,8 +477,11 @@ export function registerPublicRoutes(app: Express) {
         .from(aiConfigs)
         .where(eq(aiConfigs.tenantId, tenant.id))
         .limit(1);
-      // Auto-reply only when we actually have an email to send to.
-      if (ai[0]?.autoReplyEnabled && row && body.customerEmail) {
+      // Auto-reply only when we actually have an email to send to AND the
+      // tenant's plan includes AI (Pro-only; granted to everyone during the
+      // trial via effectivePlan → 'pro'). Vital tenants post-trial get the
+      // lead + notification but no AI-written reply.
+      if (ai[0]?.autoReplyEnabled && canUseProFeature(tenant) && row && body.customerEmail) {
         const aiBody = await generateLeadReply(tenant.id, row.id);
         await sendEmail({
           to: body.customerEmail,
@@ -528,12 +538,16 @@ export function registerPublicRoutes(app: Express) {
     const rows = await db().select().from(leads).where(eq(leads.refId, refId)).limit(1);
     const lead = rows[0];
     if (!lead) return res.status(404).json({ error: 'Lead not found' });
+    // AI 24-7 customer chat is Pro-only (all tenants get it during trial).
+    const chatTenant = (
+      await db().select().from(tenants).where(eq(tenants.id, lead.tenantId)).limit(1)
+    )[0];
     const ai = await db()
       .select()
       .from(aiConfigs)
       .where(eq(aiConfigs.tenantId, lead.tenantId))
       .limit(1);
-    if (!ai[0]?.chatEnabled) {
+    if (!ai[0]?.chatEnabled || !chatTenant || !canUseProFeature(chatTenant)) {
       return res
         .status(403)
         .json({ error: 'Customer chat is disabled. Please reply to the email instead.' });

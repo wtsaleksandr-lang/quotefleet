@@ -41,6 +41,8 @@ import {
 import { loadEnv, defaultHostDomain } from '../../config.js';
 import { getTrialState, type TrialState } from '../trialGating.js';
 import { magicLinkLimiter, signupLimiter, loginLimiter } from '../rateLimits.js';
+import { createTrialCheckoutSession, billingConfigured } from './billing.js';
+import { parsePaidPlan } from '../plans.js';
 
 const RESERVED_SLUGS = new Set([
   'www', 'app', 'admin', 'api', 'mail', 'docs', 'help', 'status', 'static',
@@ -68,6 +70,11 @@ const SignupSchema = z.object({
   email: z.string().email(),
   /** Min 10 chars; bumped from 6 after security audit. */
   password: z.string().min(10).max(200),
+  /** Selected subscription tier — the card-required 14-day trial is
+   *  all-inclusive regardless; this is what Stripe auto-bills at trial end.
+   *  Optional here (defaults to Vital) so the API stays lenient; the signup
+   *  form always sends an explicit choice. */
+  plan: z.enum(['vital', 'pro']).optional(),
   countryFocus: z.enum(['US', 'CA', 'BOTH']).default('US'),
   contactPhone: z.string().optional(),
   /** Required: ticked the DPA + Security-policy checkbox on the signup
@@ -328,6 +335,29 @@ export function registerAuthRoutes(app: Express) {
     const token = await createSession(result.userId);
     setCookie(res, token);
 
+    // Card-required trial: if billing is configured, open a Stripe Checkout
+    // session (subscription mode, 14-day trial, $0 card validation) for the
+    // selected tier and hand the client its URL to redirect to. If billing
+    // is NOT configured (dev / not yet wired), we degrade gracefully — the
+    // account is created on a trial and the client just lands on /app.
+    const selectedPlan = parsePaidPlan(parse.data.plan);
+    let checkoutUrl: string | null = null;
+    if (billingConfigured()) {
+      try {
+        const t = (
+          await db().select().from(tenants).where(eq(tenants.id, result.tenantId)).limit(1)
+        )[0];
+        if (t) {
+          const session = await createTrialCheckoutSession({ tenant: t, plan: selectedPlan });
+          checkoutUrl = session.url;
+        }
+      } catch (err) {
+        // Don't fail signup if Checkout creation hiccups — the tenant can
+        // add a card from the dashboard. Log and continue to /app.
+        console.error('[auth.signup] checkout session creation failed:', err);
+      }
+    }
+
     const proto = env.PUBLIC_BASE_URL.startsWith('http://') ? 'http:' : 'https:';
     return res.json({
       ok: true,
@@ -340,6 +370,10 @@ export function registerAuthRoutes(app: Express) {
         embedToken,
         trialEndsAt,
       },
+      plan: selectedPlan,
+      // When present the client should redirect here to add a card before
+      // the trial starts; otherwise go straight to /app.
+      checkoutUrl,
       role: 'tenant_owner',
     });
   });

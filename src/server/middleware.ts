@@ -15,6 +15,7 @@ import { eq } from 'drizzle-orm';
 import { db } from '../db/client.js';
 import { tenants } from '../db/schema.js';
 import { lookupSession, SESSION_COOKIE_NAME } from '../auth/session.js';
+import { effectivePlan } from './plans.js';
 
 /** HTTP methods considered mutations for trial-expiry enforcement.
  *  GETs (and HEAD/OPTIONS) stay readable so an expired tenant can still
@@ -127,12 +128,13 @@ export async function requireTenant(
  * Gate a route to one of the listed billing plans. Must be chained
  * AFTER requireTenant so `req.tenant` is populated.
  *
- *   app.put('/api/tenant/api-key',
- *     requireAuth, requireTenant, requirePlan('pro', 'enterprise'),
+ *   app.put('/api/tenant/custom-domain',
+ *     requireAuth, requireTenant, requirePlan('pro'),
  *     handler);
  *
- * Returns 403 `{ error: 'plan_upgrade_required', required: [...] }`
- * when the tenant's current plan isn't in the allow-list.
+ * Gates on the tenant's EFFECTIVE plan, so a tenant inside the 14-day
+ * all-inclusive trial (effectivePlan → 'pro') passes Pro gates. Returns 403
+ * `{ error: 'plan_upgrade_required', required: [...] }` otherwise.
  */
 export function requirePlan(...plans: string[]) {
   const allowed = new Set(plans);
@@ -146,11 +148,14 @@ export function requirePlan(...plans: string[]) {
       next();
       return;
     }
-    if (!allowed.has(req.tenant.plan)) {
+    // Gate on the tenant's EFFECTIVE plan, so a tenant inside the 14-day
+    // all-inclusive trial (effectivePlan → 'pro') passes Pro gates and gets
+    // to taste the paid features.
+    if (!allowed.has(effectivePlan(req.tenant))) {
       res.status(403).json({
         error: 'plan_upgrade_required',
         required: [...allowed],
-        current: req.tenant.plan,
+        current: effectivePlan(req.tenant),
       });
       return;
     }

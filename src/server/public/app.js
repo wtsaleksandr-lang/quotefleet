@@ -1493,17 +1493,18 @@
       var color = trial.daysLeft <= 3 ? 'var(--warn)' : 'var(--accent)';
       bar.style.background = 'var(--surface)';
       bar.style.color = color;
-      var used = trial.leadsUsed + ' / ' + trial.leadsLimit + ' leads';
+      // All-inclusive trial: every Pro feature unlocked, no lead cap.
       bar.innerHTML =
         'Trial — ' + trial.daysLeft + ' day' + (trial.daysLeft === 1 ? '' : 's') + ' left · ' +
-        used + ' used &nbsp;·&nbsp; ' +
-        '<a href="/pricing" style="color: var(--accent); text-decoration: underline;">Upgrade →</a>';
+        'all features unlocked &nbsp;·&nbsp; ' +
+        '<a href="/pricing" style="color: var(--accent); text-decoration: underline;">Manage plan →</a>';
+      document.body.classList.remove('qf-trial-locked');
     } else if (trial.status === 'trial_expired') {
       bar.style.background = 'var(--error-bg)';
       bar.style.color = 'var(--error)';
       bar.innerHTML =
         'Trial ended — your widget is read-only. ' +
-        '<a href="/pricing" style="color: var(--error); text-decoration: underline;">Upgrade to keep capturing leads →</a>';
+        '<a href="/pricing" style="color: var(--error); text-decoration: underline;">Choose a plan to keep capturing leads →</a>';
       // Add the trial-locked body class so CSS disables every editable
       // control inside .app-main. Keeps users from typing into a field
       // whose backend write would fail anyway.

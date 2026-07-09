@@ -59,7 +59,10 @@ export const tenants = pgTable(
     countryFocus: text('country_focus').notNull().default('US'),
     /** Random unguessable token used in <script src="...embed.js?t=..."> */
     embedToken: text('embed_token').notNull().unique(),
-    /** Plan: 'free', 'starter', 'pro', 'enterprise'. */
+    /** Billed/selected tier: 'free' | 'vital' | 'pro'. Feature access is
+     *  computed from this via src/server/plans.ts (a trialing tenant gets
+     *  Pro regardless). Legacy 'starter'/'enterprise' rows normalize to
+     *  Vital/Pro in code. */
     plan: text('plan').notNull().default('free'),
     /** Whether the tenant is active or suspended. */
     status: text('status').notNull().default('active'),
