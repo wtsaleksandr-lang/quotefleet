@@ -300,6 +300,12 @@
     $('qf-tagline').textContent = tagline;
     if (cfg.brand && cfg.brand.showPoweredBy) $('qf-powered').innerHTML = 'Powered by <a href="' + location.origin + '" target="_blank">QuoteFleet</a>';
     else $('qf-powered').textContent = '';
+    var noteEl = $('qf-footer-note');
+    if (noteEl) {
+      var note = cfg.brand && cfg.brand.footerNote ? String(cfg.brand.footerNote).trim() : '';
+      if (note) { noteEl.textContent = note; noteEl.style.display = ''; }
+      else { noteEl.textContent = ''; noteEl.style.display = 'none'; }
+    }
     if (cfg.brand && cfg.brand.ctaText) $('qf-calc-btn').textContent = cfg.brand.ctaText;
   }
 
