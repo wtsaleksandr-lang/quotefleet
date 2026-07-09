@@ -1263,7 +1263,9 @@
 
   // ── Embed ─────────────────────────────────────────────────────
   function renderEmbed(c) {
-    api('/api/tenant/embed').then(function (d) {
+    Promise.all([api('/api/tenant/embed'), api('/api/tenant/brand')]).then(function (results) {
+      var d = results[0];
+      var b = (results[1] && results[1].brand) || {};
       c.innerHTML = '';
       c.appendChild(el('h1', { text: 'Embed code' }));
       c.appendChild(el('p', { class: 'page-sub', text: 'Drop one line of HTML on any page of your website.' }));
@@ -1298,6 +1300,131 @@
       });
       preview.appendChild(openBtn0);
       c.appendChild(preview);
+
+      // ── Widget settings ─────────────────────────────────────────
+      // These map 1:1 onto brand_configs columns and save via
+      // PUT /api/tenant/brand (the same endpoint the Customize page uses).
+      // Appearance (theme/accent/font/logo/company) lives on Customize and
+      // is intentionally NOT duplicated here — this page owns behaviour + copy.
+      function saveBrand(patch) {
+        return api('/api/tenant/brand', { method: 'PUT', body: patch });
+      }
+      // A labelled text/textarea input that saves on blur (only when changed).
+      function settingField(label, key, opts) {
+        opts = opts || {};
+        var f = el('div', { class: 'field', style: { marginBottom: '12px' } });
+        f.appendChild(el('label', { class: 'field-label', text: label }));
+        var inp = opts.textarea
+          ? el('textarea', { class: 'textarea', rows: '2' })
+          : el('input', { class: 'input', type: 'text' });
+        if (opts.placeholder) inp.setAttribute('placeholder', opts.placeholder);
+        inp.value = (b[key] != null ? b[key] : '');
+        inp.addEventListener('blur', function () {
+          var next = inp.value;
+          if (next === (b[key] != null ? b[key] : '')) return; // no change
+          var p = {}; p[key] = next;
+          saveBrand(p).then(function () { b[key] = next; toastOk('Saved'); }).catch(toastErr);
+        });
+        f.appendChild(inp);
+        if (opts.hint) f.appendChild(el('span', { class: 'field-hint', text: opts.hint }));
+        return f;
+      }
+      // A toggle row (label + description + checkbox) that saves on change.
+      function settingToggle(label, key, defaultVal, hint, gate) {
+        var wrap = el('label', {
+          style: {
+            display: 'flex', gap: '12px', alignItems: 'flex-start',
+            padding: '12px 0', borderTop: '1px solid var(--border)',
+            cursor: gate && !gate.allowed ? 'not-allowed' : 'pointer',
+          },
+        });
+        var cb = el('input', { type: 'checkbox', style: { marginTop: '3px', flex: '0 0 auto' } });
+        cb.checked = (b[key] !== undefined && b[key] !== null) ? !!b[key] : defaultVal;
+        cb.addEventListener('change', function () {
+          var next = cb.checked;
+          var p = {}; p[key] = next;
+          saveBrand(p).then(function () { b[key] = next; toastOk('Saved'); }).catch(function (e) {
+            cb.checked = !next; // revert on failure
+            if (e && e.status === 403 && gate) toast(gate.upgradeMsg, 'warn');
+            else toastErr(e);
+          });
+        });
+        var txt = el('div', { style: { flex: '1 1 auto' } }, [
+          el('div', { text: label, style: { fontWeight: '600' } }),
+          hint ? el('div', { class: 'field-hint', text: hint, style: { marginTop: '2px' } }) : null,
+        ]);
+        wrap.appendChild(cb);
+        wrap.appendChild(txt);
+        return wrap;
+      }
+
+      // Plan gate for the "Powered by" badge (removing it is a Vital+ perk;
+      // trialing tenants resolve to Pro and pass). Mirrors the backend gate.
+      var meTenant = (state.me && state.me.tenant) || {};
+      var meTrial = (state.me && state.me.trial) || null;
+      var meRole = (state.me && state.me.user && state.me.user.role) || '';
+      var hasCore =
+        meRole === 'super_admin' ||
+        (meTrial && meTrial.status === 'trial') ||
+        meTenant.plan === 'vital' ||
+        meTenant.plan === 'pro';
+
+      // Card 1 — Lead capture & copy.
+      var lc = el('div', { class: 'card', style: { marginTop: '14px' } });
+      lc.appendChild(el('div', { class: 'card-title', text: 'Widget settings — lead capture & copy' }));
+      lc.appendChild(el('div', { class: 'card-subtitle', text: 'Control what contact details a customer must provide and the copy shown on your widget.' }));
+      lc.appendChild(settingToggle(
+        'Require email',
+        'requireEmail',
+        true,
+        'When on, a lead cannot be submitted without an email address.'
+      ));
+      lc.appendChild(settingToggle(
+        'Require phone',
+        'requirePhone',
+        false,
+        'When on, a lead cannot be submitted without a phone number. Useful if you prefer to call back.'
+      ));
+      lc.appendChild(settingToggle(
+        'Show price before asking for contact info',
+        'showQuoteBeforeContact',
+        false,
+        'When on, the customer sees the quoted price first; contact details are asked only when they click “Claim this quote”.'
+      ));
+      // Powered-by toggle (plan-gated: removing the badge needs Vital+).
+      lc.appendChild(settingToggle(
+        'Show “Powered by QuoteFleet” footer',
+        'showPoweredBy',
+        true,
+        hasCore
+          ? 'Turn off to remove QuoteFleet branding from the bottom of your widget.'
+          : 'Removing the QuoteFleet badge is a Vital plan feature — upgrade to hide it.',
+        { allowed: hasCore, upgradeMsg: 'Removing the “Powered by” badge is a Vital feature — upgrade to hide it.' }
+      ));
+      // Copy fields sit below the toggles, separated by a hairline.
+      var copyWrap = el('div', { style: { marginTop: '14px', paddingTop: '14px', borderTop: '1px solid var(--border)' } });
+      copyWrap.appendChild(settingField('CTA button text', 'ctaText', {
+        placeholder: 'Get instant quote',
+        hint: 'The label on your widget’s main call-to-action button.',
+      }));
+      copyWrap.appendChild(settingField('Footer note', 'footerNote', {
+        textarea: true,
+        placeholder: 'e.g. Quotes are estimates — final pricing confirmed by our team.',
+        hint: 'Optional line shown under the widget (e.g. a disclaimer or hours).',
+      }));
+      lc.appendChild(copyWrap);
+      c.appendChild(lc);
+
+      // Card 2 — Embedding (allowed domains). Sits just above the snippet
+      // because it governs where that snippet is allowed to run.
+      var emb = el('div', { class: 'card', style: { marginTop: '14px' } });
+      emb.appendChild(el('div', { class: 'card-title', text: 'Widget settings — embedding' }));
+      emb.appendChild(el('div', { class: 'card-subtitle', text: 'Restrict which websites are allowed to load your widget. Leave blank to allow any site.' }));
+      emb.appendChild(settingField('Allowed domains', 'allowedDomains', {
+        placeholder: 'acmeco.com, acmeco.ca',
+        hint: 'Comma-separated list of domains permitted to embed the widget. Blank = no restriction.',
+      }));
+      c.appendChild(emb);
 
       var card = el('div', { class: 'card', style: { marginTop: '14px' } });
       card.appendChild(el('div', { class: 'card-title', text: 'Recommended — JS embed (auto-resize)' }));

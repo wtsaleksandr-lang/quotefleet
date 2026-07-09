@@ -597,17 +597,29 @@ export function registerTenantRoutes(app: Express) {
     // available to everyone. Branded quotes (custom logo) are a Vital+
     // perk — trial tenants qualify via effectivePlan → 'pro'.
     const patch = parse.data;
+    const hasCore =
+      req.user?.role === 'super_admin' ||
+      (CORE_PLANS as readonly string[]).includes(effectivePlan(req.tenant!));
     const settingLogo = Object.prototype.hasOwnProperty.call(patch, 'logoUrl') && patch.logoUrl != null && patch.logoUrl !== '';
-    if (
-      settingLogo &&
-      req.user?.role !== 'super_admin' &&
-      !(CORE_PLANS as readonly string[]).includes(effectivePlan(req.tenant!))
-    ) {
+    if (settingLogo && !hasCore) {
       return res.status(403).json({
         error: 'plan_upgrade_required',
         required: [...CORE_PLANS],
         current: effectivePlan(req.tenant!),
         field: 'logoUrl',
+      });
+    }
+    // Removing the "Powered by QuoteFleet" badge is a Vital+ perk (same
+    // branded-widget tier as the custom logo). Free tenants may turn it
+    // back ON but not OFF. Trial tenants resolve to 'pro' and pass.
+    const removingBadge =
+      Object.prototype.hasOwnProperty.call(patch, 'showPoweredBy') && patch.showPoweredBy === false;
+    if (removingBadge && !hasCore) {
+      return res.status(403).json({
+        error: 'plan_upgrade_required',
+        required: [...CORE_PLANS],
+        current: effectivePlan(req.tenant!),
+        field: 'showPoweredBy',
       });
     }
     await db()
