@@ -3,7 +3,7 @@
   margin: 0 0 16px;
   border: 1px solid var(--border);
   border-radius: 20px;
-  background: linear-gradient(135deg, rgba(38,208,178,.08), rgba(255,255,255,.018)), var(--surface);
+  background: linear-gradient(135deg, rgba(13, 60, 252,.08), rgba(255,255,255,.018)), var(--surface);
   box-shadow: var(--shadow-sm);
   padding: 14px;
 }
@@ -91,12 +91,12 @@
 .qf-leads-filter:hover {
   border-color: var(--accent);
   color: var(--ink);
-  background: rgba(38,208,178,.09);
+  background: rgba(13, 60, 252,.09);
 }
 tr.qf-lead-hot-row {
-  outline: 1px solid rgba(245,165,36,.28);
+  outline: 1px solid rgba(13, 60, 252,.28);
   outline-offset: -1px;
-  background: rgba(245,165,36,.045);
+  background: rgba(13, 60, 252,.045);
 }
 tr.qf-lead-hidden {
   display: none;

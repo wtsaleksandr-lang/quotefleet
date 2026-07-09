@@ -4,7 +4,7 @@
   border: 1px solid var(--border);
   border-radius: 22px;
   overflow: hidden;
-  background: linear-gradient(135deg, rgba(245,165,36,.10), rgba(38,208,178,.055)), var(--surface);
+  background: linear-gradient(135deg, rgba(13, 60, 252,.10), rgba(13, 60, 252,.055)), var(--surface);
   box-shadow: var(--shadow-md);
 }
 .qf-callback-command__top {
@@ -149,8 +149,8 @@
 }
 .qf-callback-note b { color: var(--accent-2); }
 .qf-callback-highlight {
-  outline: 2px solid rgba(245,165,36,.35);
-  box-shadow: 0 0 0 4px rgba(245,165,36,.08);
+  outline: 2px solid rgba(13, 60, 252,.35);
+  box-shadow: 0 0 0 4px rgba(13, 60, 252,.08);
 }
 @media (max-width: 1000px) {
   .qf-callback-scoreboard { grid-template-columns: 1fr 1fr; }

@@ -1,6 +1,6 @@
 /* Phase AF: premium SaaS polish for dashboard feedback, loading, and modal groundwork. */
 #loading {
-  background: radial-gradient(circle at 20% 0%, rgba(38,208,178,.10), transparent 32rem), var(--bg) !important;
+  background: radial-gradient(circle at 20% 0%, rgba(13, 60, 252,.10), transparent 32rem), var(--bg) !important;
 }
 #loading > div {
   min-width: 260px;
@@ -19,7 +19,7 @@
   width: 100%;
   border-radius: 999px;
   margin-bottom: 14px;
-  background: linear-gradient(90deg, rgba(38,208,178,.16), rgba(245,165,36,.16), rgba(38,208,178,.16));
+  background: linear-gradient(90deg, rgba(13, 60, 252,.16), rgba(13, 60, 252,.16), rgba(13, 60, 252,.16));
   background-size: 220% 100%;
   animation: qf-skeleton 1.3s ease-in-out infinite;
 }

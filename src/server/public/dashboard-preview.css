@@ -3,7 +3,7 @@
   margin: 0 0 22px;
   border: 1px solid var(--border);
   border-radius: 22px;
-  background: linear-gradient(135deg, rgba(38,208,178,.08), rgba(245,165,36,.04)), var(--surface);
+  background: linear-gradient(135deg, rgba(13, 60, 252,.08), rgba(13, 60, 252,.04)), var(--surface);
   box-shadow: var(--shadow-md);
   overflow: hidden;
 }
@@ -104,10 +104,10 @@
   background: linear-gradient(135deg, var(--accent), var(--accent-2));
 }
 .qf-preview-brand strong { color: #fff; display: block; }
-.qf-preview-brand small { color: #8fa0b2; }
+.qf-preview-brand small { color: #A39E99; }
 .qf-preview-pill {
   color: var(--accent);
-  border: 1px solid rgba(38,208,178,.28);
+  border: 1px solid rgba(13, 60, 252,.28);
   border-radius: 999px;
   padding: 5px 8px;
   font: 700 10px var(--font-mono);
@@ -120,7 +120,7 @@
   border: 1px solid rgba(255,255,255,.09);
   border-radius: 12px;
   padding: 10px;
-  color: #d7e0ea;
+  color: #E7E4E0;
   background: rgba(255,255,255,.035);
   font-size: 12px;
 }
@@ -128,8 +128,8 @@
   margin-top: 10px;
   border-radius: 14px;
   padding: 12px;
-  background: rgba(38,208,178,.12);
-  border: 1px solid rgba(38,208,178,.25);
+  background: rgba(13, 60, 252,.12);
+  border: 1px solid rgba(13, 60, 252,.25);
   display: flex;
   justify-content: space-between;
   color: #fff;
@@ -144,7 +144,7 @@
   border: 1px solid rgba(255,255,255,.10);
   border-radius: 999px;
   padding: 6px 8px;
-  color: #d7e0ea;
+  color: #E7E4E0;
   font-size: 11px;
 }
 @media (max-width: 900px) {

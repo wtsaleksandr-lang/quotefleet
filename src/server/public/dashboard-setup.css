@@ -3,7 +3,7 @@
   margin: 0 0 22px;
   border: 1px solid var(--border);
   border-radius: 22px;
-  background: linear-gradient(135deg, rgba(38, 208, 178, 0.10), rgba(245, 165, 36, 0.05)), var(--surface);
+  background: linear-gradient(135deg, rgba(13, 60, 252, 0.10), rgba(13, 60, 252, 0.05)), var(--surface);
   box-shadow: var(--shadow-md);
   overflow: hidden;
 }
@@ -80,8 +80,8 @@
 }
 .qf-setup-step:hover {
   transform: translateY(-2px);
-  border-color: rgba(38, 208, 178, .36);
-  background: rgba(38, 208, 178, .055);
+  border-color: rgba(13, 60, 252, .36);
+  background: rgba(13, 60, 252, .055);
 }
 .qf-setup-step.is-done { border-color: rgba(54, 201, 139, .28); }
 .qf-setup-dot {
@@ -167,7 +167,7 @@
   margin: 0 0 16px;
   border: 1px solid var(--border);
   border-radius: 20px;
-  background: linear-gradient(135deg, rgba(93,139,255,.075), rgba(38,208,178,.045)), var(--surface);
+  background: linear-gradient(135deg, rgba(93,139,255,.075), rgba(13, 60, 252,.045)), var(--surface);
   box-shadow: var(--shadow-sm);
   overflow: hidden;
 }

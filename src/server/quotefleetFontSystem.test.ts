@@ -14,9 +14,16 @@ describe('QuoteFleet global font system', () => {
 
     expect(css).toContain('Phase CA');
     expect(css).toContain("font-family: 'Satoshi'");
-    expect(css).toContain('/fonts/Satoshi-Variable.woff2');
+    // Satoshi is loaded from the discrete weight files that actually exist on
+    // disk (satoshi-300..900.woff2) — the old Satoshi-Variable/EtNono/DNMono
+    // references 404'd and dropped the dashboard to system fonts.
+    expect(css).toContain('/fonts/satoshi-400.woff2');
+    expect(css).toContain('/fonts/satoshi-700.woff2');
+    expect(css).not.toContain('Satoshi-Variable.woff2');
+    expect(css).not.toContain('EtNono');
+    expect(css).not.toContain('DNMono');
     expect(css).toContain("--font-sans: 'Satoshi', 'Inter', system-ui, -apple-system, 'Segoe UI', Roboto, Arial, sans-serif");
-    expect(css).toContain("--font-mono: 'Et Nono', 'DN Mono', 'JetBrains Mono'");
+    expect(css).toContain("--font-mono: 'DM Mono', 'JetBrains Mono'");
   });
 
   it('forces the entire homepage to the Satoshi stack', async () => {

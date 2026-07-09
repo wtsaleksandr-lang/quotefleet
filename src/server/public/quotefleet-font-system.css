@@ -1,44 +1,40 @@
 /* Phase CA: QuoteFleet global font system.
-   Main UI: Satoshi variable font with Inter/system fallbacks.
-   Mono accents: Et Nono / DN Mono with JetBrains Mono/system fallbacks.
-   Font binaries are expected to be self-hosted under /fonts/. */
+   Main UI: self-hosted Satoshi (discrete weights) with Inter/system fallbacks.
+   Mono accents: system monospace stack (no custom mono binaries are shipped).
+   Satoshi binaries are self-hosted under /fonts/ — only the discrete weight
+   files satoshi-300..900.woff2 exist, so the @font-face rules below match the
+   files actually on disk (previously they pointed at variable / custom-mono
+   binaries that don't exist → dashboard font 404s + system-font fallback).
+   Mirrors how style.css loads Satoshi for the public site. */
 @font-face {
   font-family: 'Satoshi';
-  src: url('/fonts/Satoshi-Variable.woff2') format('woff2-variations'),
-       url('/fonts/Satoshi-Variable.woff2') format('woff2');
-  font-weight: 300 900;
-  font-style: normal;
-  font-display: swap;
+  font-style: normal; font-weight: 300; font-display: swap;
+  src: url('/fonts/satoshi-300.woff2') format('woff2');
 }
-
 @font-face {
   font-family: 'Satoshi';
-  src: url('/fonts/Satoshi-VariableItalic.woff2') format('woff2-variations'),
-       url('/fonts/Satoshi-VariableItalic.woff2') format('woff2');
-  font-weight: 300 900;
-  font-style: italic;
-  font-display: swap;
+  font-style: normal; font-weight: 400; font-display: swap;
+  src: url('/fonts/satoshi-400.woff2') format('woff2');
 }
-
 @font-face {
-  font-family: 'Et Nono';
-  src: url('/fonts/EtNono-Regular.woff2') format('woff2');
-  font-weight: 400 800;
-  font-style: normal;
-  font-display: swap;
+  font-family: 'Satoshi';
+  font-style: normal; font-weight: 500; font-display: swap;
+  src: url('/fonts/satoshi-500.woff2') format('woff2');
 }
-
 @font-face {
-  font-family: 'DN Mono';
-  src: url('/fonts/DNMono-Regular.woff2') format('woff2');
-  font-weight: 400 800;
-  font-style: normal;
-  font-display: swap;
+  font-family: 'Satoshi';
+  font-style: normal; font-weight: 700; font-display: swap;
+  src: url('/fonts/satoshi-700.woff2') format('woff2');
+}
+@font-face {
+  font-family: 'Satoshi';
+  font-style: normal; font-weight: 900; font-display: swap;
+  src: url('/fonts/satoshi-900.woff2') format('woff2');
 }
 
 :root {
   --font-sans: 'Satoshi', 'Inter', system-ui, -apple-system, 'Segoe UI', Roboto, Arial, sans-serif;
-  --font-mono: 'Et Nono', 'DN Mono', 'JetBrains Mono', ui-monospace, 'SF Mono', SFMono-Regular, Menlo, Consolas, monospace;
+  --font-mono: 'DM Mono', 'JetBrains Mono', ui-monospace, 'SF Mono', SFMono-Regular, Menlo, Consolas, monospace;
   --qf-font-sans: var(--font-sans);
   --qf-font-mono: var(--font-mono);
 }

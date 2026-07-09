@@ -3,7 +3,7 @@
   margin: 0 0 18px;
   border: 1px solid var(--border);
   border-radius: 22px;
-  background: linear-gradient(135deg, rgba(38,208,178,.09), rgba(245,165,36,.05)), var(--surface);
+  background: linear-gradient(135deg, rgba(13, 60, 252,.09), rgba(13, 60, 252,.05)), var(--surface);
   box-shadow: var(--shadow-md);
   padding: 18px;
 }
@@ -271,11 +271,11 @@
   white-space: nowrap;
 }
 .qf-rate-live[data-mode="saving"] {
-  border-color: rgba(245,165,36,.45);
+  border-color: rgba(13, 60, 252,.45);
   color: var(--accent-2);
 }
 .qf-rate-live[data-mode="saved"] {
-  border-color: rgba(38,208,178,.42);
+  border-color: rgba(13, 60, 252,.42);
   color: var(--success);
 }
 .qf-rate-live[data-mode="error"] {
