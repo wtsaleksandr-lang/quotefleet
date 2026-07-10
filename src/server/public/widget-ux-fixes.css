@@ -1,0 +1,133 @@
+/* QuoteFleet widget — UX fix pass (help cues, add-on toggles, options fold, LTL dims).
+   Loaded after the base widget stylesheets and the app-calculator overrides so
+   these rules win. Colours stay owned by the theme/contrast engine — this file
+   only touches layout, sizing, positioning, and motion. */
+
+/* ── 1 + 2. Help cues: smaller, subtler glyph. Hit box stays >=24px (WCAG). ── */
+.qf-help {
+  font-size: 8px;
+}
+.qf-help::before {
+  width: 12px;
+  height: 12px;
+}
+
+/* Section-label cues (Equipment, Cargo, Size & handling, Pickup port, Booking…)
+   pushed to the top-right of their title row instead of hugging the label. */
+.qf-title-inline .qf-help {
+  margin-left: auto;
+}
+
+/* ── 2 + 3. Add-on buttons: cue anchored to the top-right corner. The visible
+   glyph is small; the 24px hit box overhangs the corner slightly, which is fine
+   for a target. Reserve right padding so centred text never slides under it. */
+#qf-options .qf-flags label,
+#qf-options .qf-accessorials .qf-acc-chip {
+  position: relative;
+  padding-right: var(--space-3);
+}
+#qf-options .qf-flags label > .qf-help,
+#qf-options .qf-accessorials .qf-acc-chip > .qf-help {
+  position: absolute;
+  top: 0;
+  right: 0;
+  margin: 0;
+  width: var(--tap-min);
+  height: var(--tap-min);
+  min-width: var(--tap-min);
+}
+
+/* ── 5. Remove the visible checkbox from add-on flag buttons. The <input> stays
+   in the DOM (label click still toggles it, logic + hazmat panel unaffected),
+   it is just no longer painted. Selected state = outlined/tinted button. */
+#qf-options .qf-flags label > input[type="checkbox"] {
+  display: none;
+}
+#qf-options .qf-flags label:has(> input[type="checkbox"]:checked) {
+  border-color: var(--w-primary) !important;
+  background: color-mix(in srgb, var(--w-primary) 10%, transparent) !important;
+  color: var(--w-primary) !important;
+  font-weight: 800;
+}
+
+/* ── 6. Premium fold / unfold for "Shipment options & add-ons". Grid-rows
+   0fr -> 1fr height glide + opacity fade, ease-out. Body is never display:none
+   (we replaced <details> with a div), so the transition always runs. */
+.qf-options-summary {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-1);
+  width: 100%;
+  padding: var(--space-1-5) var(--space-2);
+  border: 0;
+  background: transparent;
+  color: var(--w-fg);
+  font-size: 13px;
+  font-weight: 800;
+  text-align: left;
+  cursor: pointer;
+  font-family: inherit;
+}
+.qf-options-caret {
+  flex: 0 0 auto;
+  width: 10px;
+  height: 10px;
+  border-right: 2px solid var(--w-primary);
+  border-bottom: 2px solid var(--w-primary);
+  transform: rotate(45deg);
+  transition: transform 0.24s cubic-bezier(0.22, 1, 0.36, 1);
+  margin-right: var(--space-0-5);
+}
+.qf-options-panel:not(.qf-collapsed) .qf-options-caret {
+  transform: rotate(-135deg);
+}
+.qf-options-body {
+  display: grid;
+  grid-template-rows: 0fr;
+  opacity: 0;
+  transition: grid-template-rows 0.28s cubic-bezier(0.22, 1, 0.36, 1),
+              opacity 0.22s ease;
+}
+.qf-options-panel:not(.qf-collapsed) .qf-options-body {
+  grid-template-rows: 1fr;
+  opacity: 1;
+}
+.qf-options-inner {
+  overflow: hidden;
+  min-height: 0;
+  padding: 0 var(--space-2) var(--space-2);
+}
+@media (prefers-reduced-motion: reduce) {
+  .qf-options-body { transition: none; }
+  .qf-options-caret { transition: none; }
+}
+
+/* ── 1. Help tooltip anchored directly above (or below as fallback) its cue,
+   with the little arrow pointing at the icon. JS toggles .above / .below. */
+.qf-tip-bubble.above::before {
+  top: auto;
+  bottom: -4px;
+}
+.qf-tip-bubble.below::before {
+  top: -4px;
+  bottom: auto;
+}
+
+/* ── 4. Autocomplete dropdown: keyboard-highlighted row. ── */
+.qf-suggestions .qf-suggestion.qf-active,
+.qf-suggestions .qf-suggestion:hover {
+  background: color-mix(in srgb, var(--w-primary) 10%, transparent);
+}
+
+/* ── 7. LTL Length / Width / Height on a single row at normal widget widths.
+   ID selector beats the base + 640px `.qf-grid { 1fr }` rule. Stacks only on
+   very narrow phones. */
+#qf-ltl-panel .qf-grid {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+@media (max-width: 360px) {
+  #qf-ltl-panel .qf-grid {
+    grid-template-columns: 1fr;
+  }
+}

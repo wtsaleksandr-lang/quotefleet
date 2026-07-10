@@ -239,6 +239,7 @@
 
     $('qf-calc-btn').addEventListener('click', onCalculate);
     $('qf-continue-btn').addEventListener('click', function () { showStep('contact'); });
+    initOptionsPanel();
     initTypeaheads();
     $('qf-back-btn').addEventListener('click', function () { showStep('quote'); });
     $('qf-submit-btn').addEventListener('click', onSubmit);
@@ -521,13 +522,49 @@
     sel.onchange = function () { state.pickupTerminalCode = sel.value; };
   }
 
+  // Fallback one-line explanations for add-ons whose config row ships without a
+  // description, so EVERY add-on button carries a help cue (task: consistency).
+  var ACCESSORIAL_HELP = {
+    driver_assist: 'Driver helps load or unload the freight by hand.',
+    extra_stop: 'An additional pickup or delivery stop on the same run.',
+    tarping: 'Cargo must be covered and secured with tarps on an open deck.',
+    scale_ticket: 'Certified scale ticket or weight verification.',
+    bonded_move: 'Bonded / in-bond handling or customs-controlled delivery.',
+    weekend_after_hours: 'Pickup or delivery outside normal business hours.',
+    redelivery: 'Second delivery attempt after the receiver was unavailable.',
+    limited_access: 'Pickup or delivery at a limited-access location (site, school, farm).',
+    sort_and_segregate: 'Driver must sort, count, or separate the freight on delivery.',
+    lumper: 'Warehouse lumper or third-party unloading fee.',
+    extra_straps_chains: 'Additional straps or chains beyond standard securement.',
+    oversize_permit: 'Permit required because cargo exceeds legal dimensions.',
+  };
+  function accessorialTip(a) {
+    return (a && a.description) || ACCESSORIAL_HELP[a && a.code] || ('Optional add-on: ' + ((a && a.label) || 'extra service') + '.');
+  }
+
   function renderAccessorials(list) {
     var wrap = $('qf-accessorials'); wrap.innerHTML = '';
     var visible = (list || []).filter(function (a) { if (!a.appliesToServices || a.appliesToServices.length === 0) return true; return a.appliesToServices.indexOf(state.service) >= 0; });
     if (!visible.length) { wrap.appendChild(el('span', { class: 'qf-tagline', text: 'No optional add-ons for this service.' })); return; }
     visible.forEach(function (a) {
-      var chip = el('button', { class: 'qf-acc-chip' + (state.selectedAccessorials.indexOf(a.code) >= 0 ? ' active' : ''), text: a.label, title: a.description || '', on: { click: function (ev) { ev.preventDefault(); var i = state.selectedAccessorials.indexOf(a.code); if (i >= 0) state.selectedAccessorials.splice(i, 1); else state.selectedAccessorials.push(a.code); chip.classList.toggle('active'); } } });
+      var chip = el('button', { class: 'qf-acc-chip' + (state.selectedAccessorials.indexOf(a.code) >= 0 ? ' active' : ''), on: { click: function (ev) { ev.preventDefault(); if (ev.target && ev.target.closest && ev.target.closest('.qf-help')) return; var i = state.selectedAccessorials.indexOf(a.code); if (i >= 0) state.selectedAccessorials.splice(i, 1); else state.selectedAccessorials.push(a.code); chip.classList.toggle('active'); } } }, [
+        el('span', { class: 'qf-acc-label', text: a.label }),
+        el('span', { class: 'qf-help', 'data-tip': accessorialTip(a), text: '?' }),
+      ]);
       wrap.appendChild(chip);
+    });
+  }
+
+  function initOptionsPanel() {
+    var summary = $('qf-options-summary');
+    var panel = $('qf-options');
+    if (!summary || !panel) return;
+    summary.addEventListener('click', function () {
+      var collapsed = panel.classList.toggle('qf-collapsed');
+      summary.setAttribute('aria-expanded', String(!collapsed));
+      autoResize();
+      // Settle the iframe height once the height transition finishes.
+      setTimeout(autoResize, 320);
     });
   }
 
@@ -687,19 +724,37 @@
       var input = target === 'pickup' ? $('qf-pickup-zip') : $('qf-delivery-zip');
       var box = target === 'pickup' ? $('qf-pickup-suggestions') : $('qf-delivery-suggestions');
       var timer = null;
-      function close() { box.classList.remove('open'); box.innerHTML = ''; }
+      var current = []; // items currently rendered
+      var activeIndex = -1;
+      function close() { box.classList.remove('open'); box.innerHTML = ''; current = []; activeIndex = -1; }
+      function labelFor(item) { return [item.city, item.state, item.zip].filter(Boolean).join(', ') || item.label || ''; }
+      function choose(item) {
+        input.value = labelFor(item);
+        if (target === 'pickup') state.pickupResolved = item; else state.deliveryResolved = item;
+        close();
+      }
+      function highlight(next) {
+        var rows = box.querySelectorAll('.qf-suggestion');
+        if (!rows.length) return;
+        activeIndex = (next + rows.length) % rows.length;
+        rows.forEach(function (row, i) { row.classList.toggle('qf-active', i === activeIndex); });
+        rows[activeIndex].scrollIntoView({ block: 'nearest' });
+      }
       function render(items) {
-        box.innerHTML = '';
-        if (!items.length) { close(); return; }
-        items.slice(0, 8).forEach(function (item) {
-          var div = document.createElement('div'); div.className = 'qf-suggestion';
-          var label = [item.city, item.state, item.zip].filter(Boolean).join(', ');
-          div.innerHTML = escapeHtml(label || item.label || '') + '<span class="meta">' + escapeHtml(item.country || 'US') + '</span>';
-          div.addEventListener('mousedown', function (ev) { ev.preventDefault(); input.value = label; if (target === 'pickup') state.pickupResolved = item; else state.deliveryResolved = item; close(); });
+        box.innerHTML = ''; current = items.slice(0, 8); activeIndex = -1;
+        if (!current.length) { close(); return; }
+        current.forEach(function (item, i) {
+          var div = document.createElement('div'); div.className = 'qf-suggestion'; div.setAttribute('role', 'option');
+          div.innerHTML = escapeHtml(labelFor(item)) + '<span class="meta">' + escapeHtml(item.country || 'US') + '</span>';
+          div.addEventListener('mousedown', function (ev) { ev.preventDefault(); choose(item); });
+          div.addEventListener('mousemove', function () { highlight(i); });
           box.appendChild(div);
         });
         box.classList.add('open');
       }
+      input.setAttribute('role', 'combobox');
+      input.setAttribute('aria-autocomplete', 'list');
+      input.setAttribute('aria-expanded', 'false');
       input.addEventListener('input', function () {
         if (target === 'pickup') state.pickupResolved = null; else state.deliveryResolved = null;
         clearTimeout(timer);
@@ -708,12 +763,24 @@
         timer = setTimeout(function () {
           fetch(withGrant('/api/public/autocomplete/locations?q=' + encodeURIComponent(q)))
             .then(function (r) { return r.json(); })
-            .then(function (resp) { render(resp.suggestions || resp.items || []); })
+            .then(function (resp) { render(resp.suggestions || resp.items || []); input.setAttribute('aria-expanded', box.classList.contains('open') ? 'true' : 'false'); })
             .catch(close);
         }, 180);
       });
       input.addEventListener('blur', function () { setTimeout(close, 130); });
-      input.addEventListener('keydown', function (e) { if (e.key === 'Escape') close(); });
+      input.addEventListener('keydown', function (e) {
+        var open = box.classList.contains('open') && current.length;
+        if (e.key === 'Escape') { close(); return; }
+        if (!open) return;
+        if (e.key === 'ArrowDown') { e.preventDefault(); highlight(activeIndex + 1); }
+        else if (e.key === 'ArrowUp') { e.preventDefault(); highlight(activeIndex - 1); }
+        else if (e.key === 'Enter') { if (activeIndex >= 0 && current[activeIndex]) { e.preventDefault(); choose(current[activeIndex]); } }
+      });
+    });
+    // Close any open suggestion dropdown on an outside click.
+    document.addEventListener('click', function (e) {
+      if (e.target && e.target.closest && e.target.closest('.qf-typeahead')) return;
+      $$('.qf-suggestions.open').forEach(function (b) { b.classList.remove('open'); b.innerHTML = ''; });
     });
 
     document.addEventListener('click', function (e) {
@@ -742,11 +809,18 @@
     var maxW = Math.min(260, window.innerWidth - 20);
     tipEl.style.maxWidth = maxW + 'px';
     var tw = tipEl.offsetWidth;
-    var left = Math.max(10, Math.min(window.innerWidth - tw - 10, r.left + r.width / 2 - tw / 2));
-    var top = r.bottom + 8;
-    tipEl.style.left = left + 'px';
-    tipEl.style.top = top + 'px';
-    tipEl.style.setProperty('--qf-tip-arrow', Math.max(12, Math.min(tw - 18, r.left + r.width / 2 - left - 5)) + 'px');
+    var th = tipEl.offsetHeight;
+    var iconCenter = r.left + r.width / 2;
+    var left = Math.max(10, Math.min(window.innerWidth - tw - 10, iconCenter - tw / 2));
+    // Anchor the bubble directly ABOVE the "?" cue (arrow pointing down at it);
+    // only fall back to below if there isn't room above.
+    var gap = 10;
+    var above = (r.top - th - gap) >= 6;
+    var top = above ? (r.top - th - gap) : (r.bottom + gap);
+    tipEl.classList.add(above ? 'above' : 'below');
+    tipEl.style.left = (left + window.scrollX) + 'px';
+    tipEl.style.top = (top + window.scrollY) + 'px';
+    tipEl.style.setProperty('--qf-tip-arrow', Math.max(12, Math.min(tw - 18, iconCenter - left - 5)) + 'px');
     requestAnimationFrame(function () { if (tipEl) tipEl.classList.add('show'); });
   }
 
