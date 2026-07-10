@@ -4,7 +4,7 @@ import { z } from 'zod';
 import { db } from '../../db/client.js';
 import { auditLog, leads, tenants } from '../../db/schema.js';
 import { requireAuth, requireTenant } from '../middleware.js';
-import { publicChatLimiter } from '../rateLimits.js';
+import { publicDocLimiter } from '../rateLimits.js';
 
 const QuoteEventSchema = z.object({
   event: z.enum([
@@ -59,7 +59,7 @@ function summarizeEvents(events: Array<typeof auditLog.$inferSelect>) {
 }
 
 export function registerQuoteActivityRoutes(app: Express) {
-  app.post('/api/public/quote-activity/:refId', publicChatLimiter, async (req: Request, res: Response) => {
+  app.post('/api/public/quote-activity/:refId', publicDocLimiter, async (req: Request, res: Response) => {
     const refId = String(req.params.refId ?? '').trim();
     if (!refId) return res.status(400).json({ error: 'Missing refId' });
 

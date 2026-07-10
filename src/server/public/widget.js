@@ -294,6 +294,7 @@
       var cbSendBtn = $('qf-cb-send-btn'); if (cbSendBtn) cbSendBtn.style.display = '';
       var cbCancelBtn = $('qf-cb-cancel-btn'); if (cbCancelBtn) cbCancelBtn.style.display = '';
       var cbSuccess = $('qf-cb-success'); if (cbSuccess) cbSuccess.style.display = 'none';
+      var viewQuoteBtn = $('qf-view-quote'); if (viewQuoteBtn) viewQuoteBtn.style.display = 'none';
       ['qf-cb-phone', 'qf-cb-time', 'qf-cb-topic'].forEach(function (id) { var el = $(id); if (el) { el.value = ''; el.disabled = false; } });
       showCallbackError(null);
       $('qf-result').style.display = 'none';
@@ -567,6 +568,13 @@
     $('qf-total').textContent = fmtMoney(r.total);
     var serviceLabel = SERVICE_LABELS[state.service] || (state.service ? titleizeWord(state.service) : 'Truck');
     $('qf-meta').textContent = 'Approx. ' + Math.round(resp.miles) + ' mi · ' + serviceLabel + ' · ' + friendlyEquipmentLabel();
+    var eta = $('qf-eta');
+    if (eta) {
+      if (resp.transit && resp.transit.text) {
+        eta.textContent = 'Est. transit: ' + resp.transit.text + ' — estimate only, not guaranteed';
+        eta.style.display = '';
+      } else { eta.textContent = ''; eta.style.display = 'none'; }
+    }
     var lines = $('qf-lines'); lines.innerHTML = '';
     r.lines.forEach(function (l) { var row = el('div', { class: 'line' }, [el('span', { class: 'name', text: l.name }), el('span', { class: 'amt', text: '$' + fmtMoney(l.amount) })]); lines.appendChild(row); });
     var totalRow = el('div', { class: 'line total-row' }, [el('span', { class: 'name', text: 'Total' }), el('span', { class: 'amt', text: '$' + fmtMoney(r.total) })]);
@@ -602,7 +610,18 @@
         if (resp.error) { showError('qf-submit-error', resp.error); return; }
         state.refId = resp.refId || '';
         $('qf-thanks-msg').textContent = 'Thanks — your quote request was sent.';
-        $('qf-thanks-detail').textContent = resp.refId ? 'Reference: ' + resp.refId + '. You can now ask a question or request a callback.' : 'You can now ask a question or request a callback.';
+        $('qf-thanks-detail').textContent = resp.refId ? 'Reference: ' + resp.refId + '. Open your full quote below, or ask a question / request a callback.' : 'You can now ask a question or request a callback.';
+        // Link the customer straight to the polished hosted quote (opens in a
+        // new tab since the widget is often embedded in an iframe).
+        var viewBtn = $('qf-view-quote');
+        if (viewBtn) {
+          if (resp.refId) {
+            viewBtn.href = resp.quoteUrl || (location.origin + '/quote/' + encodeURIComponent(resp.refId));
+            viewBtn.style.display = '';
+          } else {
+            viewBtn.style.display = 'none';
+          }
+        }
         showStep('thanks');
       })
       .catch(function (err) { btn.disabled = false; btn.textContent = oldText; showError('qf-submit-error', 'Network error — please try again.'); console.error(err); });

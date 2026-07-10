@@ -329,7 +329,7 @@
             '<td>' + (l.pickupCity || '?') + ' → ' + (l.deliveryCity || '?') + '<br><span class="muted-small">' + (l.distanceMiles ? Math.round(l.distanceMiles) + ' mi' : '') + '</span></td>' +
             '<td style="text-align:right;font-variant-numeric:tabular-nums;">$' + fmtMoney(l.quotedTotal) + '</td>' +
             '<td><span class="muted-small">' + fmtDate(l.createdAt) + '</span></td>' +
-            '<td><span class="badge ' + statusClass(l.status) + '">' + l.status + '</span></td>' +
+            '<td><span class="badge ' + statusClass(l.status) + '">' + statusLabel(l.status) + '</span></td>' +
             '</tr>';
         });
         c.appendChild(tbl);
@@ -357,8 +357,18 @@
   function statusClass(s) {
     return ({
       new: 'badge-info', draft: 'badge-muted', replied: 'badge-info',
-      won: 'badge-success', lost: 'badge-error', spam: 'badge-error',
+      booking_requested: 'badge-success', won: 'badge-success',
+      lost: 'badge-error', spam: 'badge-error',
     })[s] || 'badge-muted';
+  }
+
+  var LEAD_STATUSES = ['draft', 'new', 'replied', 'booking_requested', 'won', 'lost', 'spam'];
+  function statusLabel(s) {
+    return ({
+      booking_requested: 'Booking requested',
+      new: 'New', draft: 'Draft', replied: 'Replied',
+      won: 'Won', lost: 'Lost', spam: 'Spam',
+    })[s] || s;
   }
 
   // ── Leads ─────────────────────────────────────────────────────
@@ -388,7 +398,7 @@
                 '<td>' + (l.service || '') + ' / ' + (l.equipment || '') + '</td>' +
                 '<td>' + (l.pickupCity || '?') + ' → ' + (l.deliveryCity || '?') + '</td>' +
                 '<td style="text-align:right;">$' + fmtMoney(l.quotedTotal) + '</td>' +
-                '<td><span class="badge ' + statusClass(l.status) + '">' + l.status + '</span></td>' +
+                '<td><span class="badge ' + statusClass(l.status) + '">' + statusLabel(l.status) + '</span></td>' +
                 '<td><span class="muted-small">' + fmtDate(l.createdAt) + '</span></td>',
         }));
       });
@@ -442,8 +452,8 @@
           var f = el('div', { class: 'field' });
           f.appendChild(el('label', { class: 'field-label', text: 'Status' }));
           var sel = el('select', { class: 'select' });
-          ['draft', 'new', 'replied', 'won', 'lost', 'spam'].forEach(function (s) {
-            var o = document.createElement('option'); o.value = s; o.textContent = s; if (l.status === s) o.selected = true; sel.appendChild(o);
+          LEAD_STATUSES.forEach(function (s) {
+            var o = document.createElement('option'); o.value = s; o.textContent = statusLabel(s); if (l.status === s) o.selected = true; sel.appendChild(o);
           });
           sel.addEventListener('change', function () { api('/api/tenant/leads/' + encodeURIComponent(l.refId), { method: 'PATCH', body: { status: sel.value } }).catch(toastErr); });
           f.appendChild(sel);

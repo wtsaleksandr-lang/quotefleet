@@ -53,6 +53,19 @@ export const publicChatLimiter: RateLimitRequestHandler = rateLimit({
   message: { error: 'Too many chat messages. Pause for a minute.' },
 });
 
+/** Hosted quote-doc reads + view/activity beacons (`/api/public/quote-doc/:refId`,
+ *  `/api/public/quote-email-preview/:refId`, `/api/public/quote-activity/:refId`).
+ *  These are cheap DB reads / audit inserts with NO AI cost, so they must NOT
+ *  share the tight chat limiter — a transient chat 429 was blanking the entire
+ *  rendered quote. Generous cap that still stops a scrape loop. */
+export const publicDocLimiter: RateLimitRequestHandler = rateLimit({
+  windowMs: minutes(1),
+  limit: 120,
+  standardHeaders: 'draft-7',
+  legacyHeaders: false,
+  message: { error: 'Too many requests. Slow down and try again in a minute.' },
+});
+
 /** /api/public/autocomplete/* — cheap per call but Google/Mapbox bills.
  *  120/min/IP is plenty for type-ahead with debounce. */
 export const publicAutocompleteLimiter: RateLimitRequestHandler = rateLimit({
