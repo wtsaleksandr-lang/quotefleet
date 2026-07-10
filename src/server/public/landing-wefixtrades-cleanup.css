@@ -627,3 +627,63 @@ body.qf-wft .qf-trust-operator strong {
     justify-content: center !important;
   }
 }
+
+/* ── Real product marketing imagery (replaces the old CSS mockups) ─────
+   Hero device cluster + feature-section product shots. The screenshots
+   inside these composites are the REAL captured product UI; only the
+   backdrops are generated. Kept on-brand (deep navy, #0d3cfc blue). */
+body.qf-wft .visual-flow.qf-hero-media {
+  background: none !important;
+  border: 0 !important;
+  box-shadow: none !important;
+  padding: 0 !important;
+  display: block !important;
+  overflow: visible !important;
+}
+body.qf-wft .visual-flow.qf-hero-media > img {
+  display: block !important;
+  width: 100% !important;
+  height: auto !important;
+  border-radius: 20px !important;
+  box-shadow: 0 40px 90px -46px rgba(0,0,0,.85) !important;
+}
+/* Preserve the original clean mobile hero: hide the hero device cluster on
+   phones (mobile users still see real imagery in the showcase band below). */
+@media (max-width: 640px) {
+  body.qf-wft .visual-flow.qf-hero-media { display: none !important; }
+}
+body.qf-wft .qf-feature-media {
+  display: block !important;
+  width: 100% !important;
+  height: auto !important;
+  border-radius: 18px !important;
+  border: 1px solid rgba(255,255,255,.08) !important;
+  box-shadow: 0 34px 80px -48px rgba(0,0,0,.85) !important;
+}
+
+/* Product showcase band (visible) — real quote page + dashboard. */
+body.qf-wft .qf-showcase-section {
+  padding: clamp(64px, 8vw, 116px) 28px !important;
+  background: #181d1f !important;
+}
+body.qf-wft .qf-showcase-section .container {
+  width: min(1180px, calc(100vw - 56px)) !important;
+  margin: 0 auto !important;
+}
+body.qf-wft .qf-showcase-grid {
+  display: grid !important;
+  grid-template-columns: 1fr 1fr !important;
+  gap: clamp(24px, 3vw, 44px) !important;
+  margin-top: clamp(34px, 4vw, 56px) !important;
+  align-items: start !important;
+}
+body.qf-wft .qf-showcase-item { margin: 0 !important; }
+body.qf-wft .qf-showcase-item figcaption {
+  margin-top: 16px !important;
+  color: rgba(245,252,255,.62) !important;
+  font-size: 15px !important;
+  line-height: 1.5 !important;
+}
+@media (max-width: 760px) {
+  body.qf-wft .qf-showcase-grid { grid-template-columns: 1fr !important; gap: 30px !important; }
+}
