@@ -629,9 +629,10 @@ body.qf-wft .qf-trust-operator strong {
 }
 
 /* ── Real product marketing imagery (replaces the old CSS mockups) ─────
-   Hero device cluster + feature-section product shots. The screenshots
-   inside these composites are the REAL captured product UI; only the
-   backdrops are generated. Kept on-brand (deep navy, #0d3cfc blue). */
+   Hero device cluster + feature-section product shots. These are the REAL
+   captured product UI in clean device frames on a TRANSPARENT background —
+   no generated scene behind them — so they sit directly on the landing's
+   own dark surface with no box or grey letterboxing. On-brand navy/#0d3cfc. */
 body.qf-wft .visual-flow.qf-hero-media {
   background: none !important;
   border: 0 !important;
@@ -644,8 +645,9 @@ body.qf-wft .visual-flow.qf-hero-media > img {
   display: block !important;
   width: 100% !important;
   height: auto !important;
-  border-radius: 20px !important;
-  box-shadow: 0 40px 90px -46px rgba(0,0,0,.85) !important;
+  /* Frame corners + depth are baked into the transparent PNG. */
+  border-radius: 0 !important;
+  box-shadow: none !important;
 }
 /* Preserve the original clean mobile hero: hide the hero device cluster on
    phones (mobile users still see real imagery in the showcase band below). */
@@ -656,9 +658,13 @@ body.qf-wft .qf-feature-media {
   display: block !important;
   width: 100% !important;
   height: auto !important;
-  border-radius: 18px !important;
-  border: 1px solid rgba(255,255,255,.08) !important;
-  box-shadow: 0 34px 80px -48px rgba(0,0,0,.85) !important;
+  /* Transparent PNG with a browser frame already rounded; no box/border.
+     drop-shadow (not box-shadow) hugs the frame's alpha so it grounds on
+     the dark band without drawing a rectangle around the image. */
+  border-radius: 0 !important;
+  border: 0 !important;
+  box-shadow: none !important;
+  filter: drop-shadow(0 30px 52px rgba(0,0,0,.5)) !important;
 }
 
 /* Product showcase band (visible) — real quote page + dashboard. */
