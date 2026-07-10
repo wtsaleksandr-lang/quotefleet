@@ -29,6 +29,7 @@ import {
   uniqueIndex,
   index,
 } from 'drizzle-orm/pg-core';
+import type { LtlConfig } from '../calc/freightClass.js';
 
 // ────────────────────────────────────────────────────────────────────
 // TENANTS — one per customer company.
@@ -250,6 +251,12 @@ export const rateCards = pgTable('rate_cards', {
   maxWeightLbs: doublePrecision('max_weight_lbs'),
   /** Optional max miles — if quote exceeds this, AI flags "out of service area". */
   maxMiles: doublePrecision('max_miles'),
+  /**
+   * LTL only: class + weight-break rate model. When null, the engine uses
+   * DEFAULT_LTL_CONFIG so LTL still prices credibly. Ignored for non-LTL
+   * services (which use the per-mile ratePerMile / lane-zone paths).
+   */
+  ltlConfig: jsonb('ltl_config').$type<LtlConfig>(),
   /** Whether this rate card is currently visible/usable. */
   enabled: boolean('enabled').notNull().default(true),
   /** Display order in the widget. */
@@ -492,6 +499,20 @@ export const leads = pgTable(
     pieces: integer('pieces'),
     commodity: text('commodity'),
     notes: text('notes'),
+
+    // ─── LTL size/weight rating ───────────────────────────────────
+    /** Shipment dimensions (inches) — used to derive freight class. */
+    lengthIn: doublePrecision('length_in'),
+    widthIn: doublePrecision('width_in'),
+    heightIn: doublePrecision('height_in'),
+    /** Derived NMFC freight class (e.g. 70). */
+    freightClass: doublePrecision('freight_class'),
+    /** Derived density in lb/ft³ that produced the class. */
+    densityPcf: doublePrecision('density_pcf'),
+    /** LTL: freight on pallets (vs loose / floor-loaded). */
+    palletized: boolean('palletized'),
+    /** LTL: loaded/unloaded at a dock (false ⇒ liftgate service). */
+    loadedFromDock: boolean('loaded_from_dock'),
 
     /** Selected accessorials (codes, e.g. ["liftgate","residential"]). */
     accessorialCodes: jsonb('accessorial_codes').$type<string[]>(),

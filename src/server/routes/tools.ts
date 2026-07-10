@@ -44,6 +44,7 @@ const PLATFORM_RATE_CARDS: RateCard[] = DEFAULT_RATE_CARDS.map((c, i) => ({
   marginPct: c.marginPct ?? 0,
   maxWeightLbs: c.maxWeightLbs ?? null,
   maxMiles: c.maxMiles ?? null,
+  ltlConfig: c.ltlConfig ?? null,
   enabled: true,
   sortOrder: c.sortOrder ?? 0,
   notes: null,

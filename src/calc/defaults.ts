@@ -10,6 +10,7 @@
  * widget produces a credible quote on day 1.
  */
 import type { NewRateCard, NewAccessorial, NewLaneZone } from '../db/schema.js';
+import { DEFAULT_LTL_CONFIG } from './freightClass.js';
 
 export const DEFAULT_RATE_CARDS: Omit<NewRateCard, 'tenantId'>[] = [
   // ─── Truckload (FTL) ──────────────────────────────────────────────
@@ -185,20 +186,23 @@ export const DEFAULT_RATE_CARDS: Omit<NewRateCard, 'tenantId'>[] = [
     enabled: true,
     sortOrder: 130,
   },
-  // ─── LTL (LIGHT) ─────────────────────────────────────────────────
-  // Rough approximation — real LTL is class+lane-based. The widget
-  // surfaces this as "approximate" and asks for shipper details.
+  // ─── LTL (size/weight rated) ─────────────────────────────────────
+  // Real LTL is priced by NMFC freight class (density) + weight break, NOT
+  // distance alone. The engine derives the class from weight + dimensions
+  // and rates per hundredweight using ltlConfig below. ratePerMile is unused
+  // for LTL (distance sensitivity lives in ltlConfig.distanceFactorPer1000Mi).
   {
     service: 'ltl',
     equipment: 'pallet',
-    label: 'LTL Pallet (4-foot pallet, ≤2000 lbs)',
-    ratePerMile: 0.85,
+    label: 'LTL Freight (palletized, size/weight rated)',
+    ratePerMile: 0,
     minimumCharge: 125,
     flatFee: 50,
     fuelSurchargePct: 35,
     marginPct: 15,
-    maxWeightLbs: 2000,
+    maxWeightLbs: 20000,
     maxMiles: 2500,
+    ltlConfig: DEFAULT_LTL_CONFIG,
     enabled: true,
     sortOrder: 200,
   },
@@ -378,6 +382,30 @@ export const DEFAULT_ACCESSORIALS: Omit<NewAccessorial, 'tenantId'>[] = [
     appliesToServices: ['ltl', 'expedited'],
     enabled: true,
     sortOrder: 230,
+  },
+  {
+    code: 'ltl_no_dock',
+    label: 'Liftgate / No-dock service',
+    description:
+      'Pickup or delivery is not at a loading dock (residential or limited-access), so the driver needs a liftgate to reach the ground.',
+    kind: 'flat',
+    amount: 95,
+    trigger: 'auto_if_no_dock',
+    appliesToServices: ['ltl'],
+    enabled: true,
+    sortOrder: 225,
+  },
+  {
+    code: 'ltl_loose_handling',
+    label: 'Loose / Floor-loaded Handling',
+    description:
+      'Freight is not palletized (hand-stacked / floor-loaded), which takes longer to load and unload.',
+    kind: 'flat',
+    amount: 60,
+    trigger: 'auto_if_loose',
+    appliesToServices: ['ltl'],
+    enabled: true,
+    sortOrder: 235,
   },
   {
     code: 'appointment',

@@ -169,6 +169,13 @@ export function registerTenantRoutes(app: Express) {
     res.json({ rateCards: rows });
   });
 
+  const LtlConfigSchema = z.object({
+    baseRatePerCwt: z.number(),
+    classRates: z.record(z.string(), z.number()),
+    weightBreaks: z.array(z.object({ minLbs: z.number(), rateFactor: z.number() })),
+    distanceFactorPer1000Mi: z.number(),
+  });
+
   const RateCardPatch = z.object({
     service: z.string().optional(),
     equipment: z.string().optional(),
@@ -180,6 +187,7 @@ export function registerTenantRoutes(app: Express) {
     marginPct: z.number().optional(),
     maxWeightLbs: z.number().nullable().optional(),
     maxMiles: z.number().nullable().optional(),
+    ltlConfig: LtlConfigSchema.nullable().optional(),
     enabled: z.boolean().optional(),
     sortOrder: z.number().optional(),
     notes: z.string().nullable().optional(),

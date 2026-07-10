@@ -140,6 +140,19 @@
     if (s.deliveryDate) rows.push(['Delivery Date', s.deliveryDate]);
     if (s.commodity) rows.push(['Commodity', s.commodity]);
     if (s.weightLbs) rows.push(['Weight', Number(s.weightLbs).toLocaleString('en-US') + ' lb']);
+    // LTL size/weight rating — the basis behind the class-aware price.
+    if (s.service === 'ltl') {
+      if (s.lengthIn && s.widthIn && s.heightIn) {
+        rows.push(['Dimensions', Math.round(s.lengthIn) + ' × ' + Math.round(s.widthIn) + ' × ' + Math.round(s.heightIn) + ' in']);
+      }
+      if (s.freightClass != null) {
+        var fc = 'Class ' + s.freightClass;
+        if (s.densityPcf) fc += ' (' + Number(s.densityPcf).toFixed(1) + ' lb/ft³)';
+        rows.push(['Freight Class', fc]);
+      }
+      if (s.palletized != null) rows.push(['Palletized', bool(!!s.palletized)]);
+      if (s.loadedFromDock != null) rows.push(['Dock Loading', s.loadedFromDock ? 'Dock' : 'No dock (liftgate)']);
+    }
     if (s.bookingNumber) rows.push(['Booking #', s.bookingNumber]);
     if (s.billOfLadingNumber) rows.push(['B/L #', s.billOfLadingNumber]);
     if (s.containerNumbers) rows.push(['Container #', s.containerNumbers]);
