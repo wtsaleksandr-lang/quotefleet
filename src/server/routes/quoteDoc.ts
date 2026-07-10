@@ -7,10 +7,9 @@ import { publicDocLimiter } from '../rateLimits.js';
 import { loadCarrierProfile } from './carrierProfile.js';
 import { customerFacingLines } from '../../calc/engine.js';
 import { estimateTransit } from '../../calc/transit.js';
+import { getRouteMap, buildStaticMapUrl, type LatLng } from '../routeMap.js';
 
 const QUOTE_VALIDITY_DAYS = 30;
-
-type LatLng = { lat: number; lng: number };
 
 function addDays(date: Date, days: number): Date {
   return new Date(date.getTime() + days * 24 * 60 * 60 * 1000);
@@ -41,21 +40,23 @@ function leadLaneText(lead: typeof leads.$inferSelect): string {
   return `${pickup} → ${delivery}`;
 }
 
-function routeMapUrl(origin?: LatLng, destination?: LatLng): string | null {
+type RouteMapResult = { url: string; distanceMiles: number | null };
+
+/**
+ * Resolve the hosted-quote route map. Prefers Google Directions (a real road
+ * route drawn with `path=enc:` + green/red A·B markers, cached per lane); if
+ * no Google key is present, falls back to a Mapbox straight-line overlay.
+ * Returns null only when there's genuinely no usable geometry.
+ */
+async function routeMapUrl(origin?: LatLng, destination?: LatLng): Promise<RouteMapResult | null> {
   if (!origin || !destination) return null;
   const env = loadEnv();
 
   if (env.GOOGLE_MAPS_API_KEY) {
-    const params = new URLSearchParams({
-      size: '900x360',
-      scale: '2',
-      maptype: 'roadmap',
-      key: env.GOOGLE_MAPS_API_KEY,
-    });
-    params.append('markers', `color:blue|label:A|${origin.lat},${origin.lng}`);
-    params.append('markers', `color:red|label:B|${destination.lat},${destination.lng}`);
-    params.append('path', `color:0x2563ebff|weight:4|${origin.lat},${origin.lng}|${destination.lat},${destination.lng}`);
-    return `https://maps.googleapis.com/maps/api/staticmap?${params.toString()}`;
+    const route = await getRouteMap(origin, destination, env.GOOGLE_MAPS_API_KEY);
+    if (route) return { url: route.url, distanceMiles: route.distanceMiles };
+    // No route resolved but key exists — draw a straight-line static map.
+    return { url: buildStaticMapUrl(env.GOOGLE_MAPS_API_KEY, origin, destination, null), distanceMiles: null };
   }
 
   if (env.MAPBOX_TOKEN) {
@@ -79,7 +80,10 @@ function routeMapUrl(origin?: LatLng, destination?: LatLng): string | null {
       `pin-s-a+2563eb(${origin.lng},${origin.lat})`,
       `pin-s-b+ef4444(${destination.lng},${destination.lat})`,
     ].join(',');
-    return `https://api.mapbox.com/styles/v1/mapbox/streets-v12/static/${overlay}/auto/900x360@2x?access_token=${encodeURIComponent(env.MAPBOX_TOKEN)}`;
+    return {
+      url: `https://api.mapbox.com/styles/v1/mapbox/streets-v12/static/${overlay}/auto/900x360@2x?access_token=${encodeURIComponent(env.MAPBOX_TOKEN)}`,
+      distanceMiles: null,
+    };
   }
 
   return null;
@@ -145,10 +149,16 @@ export function registerQuoteDocRoutes(app: Express) {
     const base = env.PUBLIC_BASE_URL.replace(/\/$/, '');
     const pickup = locationBlock('pickup', lead);
     const delivery = locationBlock('delivery', lead);
-    const mapImageUrl = routeMapUrl(
+    const routeMap = await routeMapUrl(
       pickup.lat != null && pickup.lng != null ? { lat: pickup.lat, lng: pickup.lng } : undefined,
       delivery.lat != null && delivery.lng != null ? { lat: delivery.lat, lng: delivery.lng } : undefined
     );
+    const mapImageUrl = routeMap?.url ?? null;
+    // Prefer the driving distance the route returned; fall back to the lane's
+    // stored estimate so the caption still reads a mileage.
+    const mapDistanceMiles =
+      routeMap?.distanceMiles ??
+      (typeof lead.distanceMiles === 'number' ? Math.round(lead.distanceMiles) : null);
 
     return res.json({
       quote: {
@@ -192,6 +202,7 @@ export function registerQuoteDocRoutes(app: Express) {
         pickup,
         delivery,
         mapImageUrl,
+        mapDistanceMiles,
       },
       shipment: {
         service: lead.service,

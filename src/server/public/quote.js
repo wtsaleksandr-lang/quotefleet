@@ -213,17 +213,25 @@
     var img = $('qdoc-map');
     var fallback = $('qdoc-map-fallback');
     var wrap = $('qdoc-map-wrap');
+    var caption = $('qdoc-map-caption');
     if (data.lane.mapImageUrl) {
       img.src = data.lane.mapImageUrl;
       img.hidden = false;
       fallback.hidden = true;
       if (wrap) wrap.classList.remove('is-empty');
+      if (caption) {
+        var miles = data.lane.mapDistanceMiles;
+        caption.textContent =
+          'Estimated route' + (miles != null ? ' · ' + Number(miles).toLocaleString('en-US') + ' mi' : '');
+        caption.hidden = false;
+      }
     } else {
       img.hidden = true;
       fallback.hidden = false;
       // Soften + shrink the fallback so a missing map reads as a compact note,
       // not a big unfinished gray void.
       if (wrap) wrap.classList.add('is-empty');
+      if (caption) caption.hidden = true;
     }
   }
 
