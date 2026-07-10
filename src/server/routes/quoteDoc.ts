@@ -3,9 +3,10 @@ import { eq } from 'drizzle-orm';
 import { db } from '../../db/client.js';
 import { tenants, brandConfigs, leads, accessorials, rateCards } from '../../db/schema.js';
 import { loadEnv } from '../../config.js';
-import { publicChatLimiter } from '../rateLimits.js';
+import { publicDocLimiter } from '../rateLimits.js';
 import { loadCarrierProfile } from './carrierProfile.js';
 import { customerFacingLines } from '../../calc/engine.js';
+import { estimateTransit } from '../../calc/transit.js';
 
 const QUOTE_VALIDITY_DAYS = 30;
 
@@ -110,7 +111,7 @@ function locationBlock(prefix: 'pickup' | 'delivery', lead: typeof leads.$inferS
 }
 
 export function registerQuoteDocRoutes(app: Express) {
-  app.get('/api/public/quote-doc/:refId', publicChatLimiter, async (req: Request, res: Response) => {
+  app.get('/api/public/quote-doc/:refId', publicDocLimiter, async (req: Request, res: Response) => {
     const refId = String(req.params.refId ?? '').trim();
     if (!refId) return res.status(400).json({ error: 'Missing refId' });
 
@@ -159,6 +160,9 @@ export function registerQuoteDocRoutes(app: Express) {
         currency: lead.quotedCurrency || 'USD',
         total: lead.quotedTotal ?? 0,
         distanceMiles: lead.distanceMiles,
+        // Estimated transit window (days) derived from lane distance + service.
+        // Shown as an estimate on the hosted quote; null when distance unknown.
+        transit: estimateTransit(lead.distanceMiles, lead.service),
         // Customer-facing: fold the carrier's margin into the linehaul line so
         // it's never shown on the hosted quote. The stored breakdownJson keeps
         // the raw margin line for the carrier's internal dashboard view; the
@@ -225,7 +229,7 @@ export function registerQuoteDocRoutes(app: Express) {
     });
   });
 
-  app.get('/api/public/quote-email-preview/:refId', publicChatLimiter, async (req: Request, res: Response) => {
+  app.get('/api/public/quote-email-preview/:refId', publicDocLimiter, async (req: Request, res: Response) => {
     const refId = String(req.params.refId ?? '').trim();
     if (!refId) return res.status(400).json({ error: 'Missing refId' });
 

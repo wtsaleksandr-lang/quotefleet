@@ -460,7 +460,7 @@ export function registerTenantRoutes(app: Express) {
   app.patch('/api/tenant/leads/:refId', requireAuth, requireTenant, async (req, res) => {
     const refId = String(req.params.refId ?? '');
     const Patch = z.object({
-      status: z.enum(['draft', 'new', 'replied', 'won', 'lost', 'spam']).optional(),
+      status: z.enum(['draft', 'new', 'replied', 'booking_requested', 'won', 'lost', 'spam']).optional(),
       notes: z.string().optional(),
     });
     const parse = Patch.safeParse(req.body);

@@ -29,6 +29,7 @@ import {
 } from '../../db/schema.js';
 import express from 'express';
 import { calculate, customerFacingLines, type CalcRequest } from '../../calc/engine.js';
+import { estimateTransit } from '../../calc/transit.js';
 import { distanceBetween } from '../../calc/distance.js';
 import { generateLeadReply } from '../../ai/replyAgent.js';
 import { leadChatTurn } from '../../ai/chatAgent.js';
@@ -375,6 +376,9 @@ export function registerPublicRoutes(app: Express) {
       origin: dist.origin,
       destination: dist.destination,
       result: customerResult,
+      // Estimated transit window (days) from distance + service. Shown on the
+      // calc result as an estimate; null when distance is unknown.
+      transit: estimateTransit(dist.miles, body.service),
     });
   });
 
@@ -557,6 +561,7 @@ export function registerPublicRoutes(app: Express) {
       console.warn('[public/lead] notify failed (non-fatal):', err);
     }
 
+    const publicBase = loadEnv().PUBLIC_BASE_URL.replace(/\/$/, '');
     return res.json({
       ok: true,
       refId,
@@ -565,7 +570,11 @@ export function registerPublicRoutes(app: Express) {
       // raw breakdown with the margin line is persisted in breakdownJson above
       // for the carrier's internal dashboard view.
       breakdown: customerFacingLines(calc.lines),
-      chatUrl: `${loadEnv().PUBLIC_BASE_URL}/chat/${refId}`,
+      // Link the customer straight to the polished hosted quote after submit —
+      // the widget surfaces this as a "View your full quote" primary action so
+      // /quote/:ref is no longer orphaned from the funnel.
+      quoteUrl: `${publicBase}/quote/${encodeURIComponent(refId)}`,
+      chatUrl: `${publicBase}/chat/${refId}`,
     });
   });
 
@@ -703,6 +712,87 @@ export function registerPublicRoutes(app: Express) {
       }
 
       return res.json({ ok: true, id: row?.id });
+    }
+  );
+
+  // ── accept quote / request booking ─────────────────────────────
+  // A ready shipper accepts the hosted quote → we mark the lead
+  // `booking_requested` (surfaces in the dashboard leads queue with its own
+  // badge) and best-effort email the carrier. Idempotent: re-accepting a lead
+  // that's already booking_requested/won just re-confirms without downgrading.
+  const AcceptSchema = z.object({
+    customerName: z.string().max(120).optional(),
+    customerEmail: z.string().email().optional().or(z.literal('')),
+    preferredDate: z.string().max(120).optional(),
+    note: z.string().max(1000).optional(),
+  });
+
+  app.post(
+    '/api/public/accept/:refId',
+    publicChatLimiter,
+    express.json({ limit: '16kb' }),
+    async (req: Request, res: Response) => {
+      const refId = String(req.params.refId ?? '');
+      if (!refId) return res.status(400).json({ error: 'Missing refId' });
+      const parse = AcceptSchema.safeParse(req.body ?? {});
+      if (!parse.success) {
+        return res.status(400).json({ error: 'Invalid input', details: parse.error.flatten() });
+      }
+      const body = parse.data;
+      const leadRows = await db().select().from(leads).where(eq(leads.refId, refId)).limit(1);
+      const lead = leadRows[0];
+      if (!lead) return res.status(404).json({ error: 'Lead not found' });
+      const acceptTenant = (
+        await db().select().from(tenants).where(eq(tenants.id, lead.tenantId)).limit(1)
+      )[0];
+      // Private-calculator gate — accepting a quote requires a grant too.
+      if (acceptTenant && !(await enforceTenantAccess(acceptTenant, req, res))) return;
+
+      // Never downgrade a lead the carrier already marked won.
+      const nextStatus = lead.status === 'won' ? 'won' : 'booking_requested';
+      // Append the customer's booking note without clobbering dispatcher notes.
+      const bookingNote = [
+        body.preferredDate ? `Requested pickup/date: ${body.preferredDate}` : '',
+        body.note ? `Customer note: ${body.note}` : '',
+      ].filter(Boolean).join('\n');
+      const mergedNotes = [lead.notes, bookingNote ? `[Booking request] ${bookingNote}` : '']
+        .filter(Boolean)
+        .join('\n')
+        .slice(0, 4000) || null;
+
+      await db()
+        .update(leads)
+        .set({ status: nextStatus, notes: mergedNotes, updatedAt: new Date() })
+        .where(eq(leads.id, lead.id));
+
+      // Notify the carrier — best-effort, don't fail the request if email errors.
+      try {
+        if (acceptTenant) {
+          const contactLine = lead.customerEmail
+            ? `<${lead.customerEmail}>`
+            : lead.customerPhone
+              ? `(${lead.customerPhone})`
+              : '(no contact info on file)';
+          const lines = [
+            `${lead.customerName || 'A customer'} accepted quote ${refId} and requested booking.`,
+            `Contact: ${contactLine}`,
+            `Total: $${Number(lead.quotedTotal ?? 0).toFixed(2)}`,
+            `Lane: ${lead.pickupCity ?? '?'} → ${lead.deliveryCity ?? '?'}`,
+            body.preferredDate ? `Requested pickup/date: ${body.preferredDate}` : '',
+            body.note ? `Note: ${body.note}` : '',
+            `\nOpen in dashboard: ${loadEnv().PUBLIC_BASE_URL}/app/leads/${refId}`,
+          ].filter(Boolean);
+          await sendEmail({
+            to: acceptTenant.contactEmail,
+            subject: `✅ Booking requested — ${lead.customerName || 'customer'} accepted quote ${refId}`,
+            text: lines.join('\n'),
+          });
+        }
+      } catch (err) {
+        console.warn('[public/accept] notify failed (non-fatal):', err);
+      }
+
+      return res.json({ ok: true, status: nextStatus });
     }
   );
 

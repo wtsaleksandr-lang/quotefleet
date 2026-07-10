@@ -35,12 +35,23 @@
 
       <header class="qdoc-header">
         <div class="qdoc-carrier"><img id="qdoc-logo" class="qdoc-logo" alt="Carrier logo" hidden /><div><h1 id="qdoc-carrier-name">Carrier</h1><div id="qdoc-carrier-details" class="qdoc-carrier-details"></div></div></div>
-        <div class="qdoc-summary-box"><div><span>Quote</span><strong id="qdoc-ref">—</strong></div><div><span>Generated</span><strong id="qdoc-generated">—</strong></div><div><span>Expires</span><strong id="qdoc-expires">—</strong></div><div><span>Total</span><strong id="qdoc-top-total">—</strong></div></div>
+        <div class="qdoc-summary-box"><div><span>Quote</span><strong id="qdoc-ref">—</strong></div><div><span>Generated</span><strong id="qdoc-generated">—</strong></div><div><span>Expires</span><strong id="qdoc-expires">—</strong></div><div id="qdoc-transit-row" hidden><span>Est. transit</span><strong id="qdoc-transit">—</strong></div><div><span>Total</span><strong id="qdoc-top-total">—</strong></div></div>
       </header>
 
       <section class="qdoc-route-card"><div class="qdoc-location"><span>Pickup</span><strong id="qdoc-pickup-title">—</strong><small id="qdoc-pickup-subtitle"></small></div><div class="qdoc-route-line"><i></i><b></b><i class="end"></i><span id="qdoc-miles">—</span></div><div class="qdoc-location right"><span>Delivery</span><strong id="qdoc-delivery-title">—</strong><small id="qdoc-delivery-subtitle"></small></div></section>
 
-      <section class="qdoc-grid"><div class="qdoc-left"><section class="qdoc-panel"><h2>Quote Details</h2><dl id="qdoc-details" class="qdoc-detail-list"></dl></section><section class="qdoc-panel qdoc-map-panel"><div id="qdoc-map-wrap" class="qdoc-map-wrap"><img id="qdoc-map" alt="Route map" hidden /><div id="qdoc-map-fallback" class="qdoc-map-fallback"><strong>Route map unavailable</strong><span>The quote is still valid; map keys may not be configured.</span></div></div></section></div><aside class="qdoc-right qdoc-panel"><h2>Pricing Details</h2><div id="qdoc-price-lines" class="qdoc-price-lines"></div><div class="qdoc-total-box"><span>Estimated Total</span><strong id="qdoc-grand-total">—</strong><small id="qdoc-total-note">Includes the line items shown above.</small></div></aside></section>
+      <section class="qdoc-grid"><div class="qdoc-left"><section class="qdoc-panel"><h2>Quote Details</h2><dl id="qdoc-details" class="qdoc-detail-list"></dl></section><section class="qdoc-panel qdoc-map-panel"><div id="qdoc-map-wrap" class="qdoc-map-wrap"><img id="qdoc-map" alt="Route map" hidden /><div id="qdoc-map-fallback" class="qdoc-map-fallback"><strong>Route map unavailable</strong><span>The quote is still valid; map keys may not be configured.</span></div></div></section></div><aside class="qdoc-right qdoc-panel"><h2>Pricing Details</h2><div id="qdoc-price-lines" class="qdoc-price-lines"></div><div class="qdoc-total-box"><span>Estimated Total</span><strong id="qdoc-grand-total">—</strong><small id="qdoc-total-note">Includes the line items shown above.</small></div>
+        <section class="qdoc-book no-print">
+          <div class="qdoc-book-copy"><strong>Ready to move this load?</strong><span>Accept this rate and the carrier will confirm pickup details with you.</span></div>
+          <button id="qdoc-accept-open" type="button" class="qdoc-book-btn">Accept quote / Request booking</button>
+          <div id="qdoc-accept" class="qdoc-accept" hidden>
+            <label>Requested pickup date <small>(optional)</small><input id="qdoc-accept-date" type="text" placeholder="e.g. Mon Jun 24, or ASAP" /></label>
+            <label>Anything to add? <small>(optional)</small><input id="qdoc-accept-note" type="text" placeholder="Loading hours, reference #, special handling…" /></label>
+            <div class="qdoc-accept-actions"><button id="qdoc-accept-send" type="button">Confirm booking request</button><button id="qdoc-accept-cancel" type="button" class="ghost">Cancel</button></div>
+            <p id="qdoc-accept-msg" class="qdoc-accept-msg"></p>
+          </div>
+        </section>
+        </aside></section>
 
       <section class="qdoc-panel qdoc-accessorial-panel"><h2>Accessorial Charges That May Apply</h2><div id="qdoc-accessorials" class="qdoc-accessorials"></div></section>
       <section id="qdoc-ai-summary" class="qdoc-note-panel" hidden></section>

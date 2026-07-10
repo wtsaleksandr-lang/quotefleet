@@ -70,6 +70,11 @@
       logo.src = brand.logoUrl;
       logo.hidden = false;
     }
+    // With no logo the hidden <img> drops out of the carrier grid, collapsing
+    // the name into the fixed logo column (mid-word wrapping). Switch to a
+    // single-column layout so the name uses the full width.
+    var carrierEl = document.querySelector('.qdoc-carrier');
+    if (carrierEl) carrierEl.classList.toggle('qdoc-carrier--nologo', !brand.logoUrl);
 
     var displayName = brand.displayName || data.tenant.name;
     text('qdoc-carrier-name', displayName);
@@ -85,6 +90,15 @@
     text('qdoc-expires', date(data.quote.expiresAt));
     text('qdoc-top-total', money(data.quote.total, data.quote.currency));
     text('qdoc-grand-total', money(data.quote.total, data.quote.currency));
+    var transitRow = $('qdoc-transit-row');
+    if (transitRow) {
+      if (data.quote.transit && data.quote.transit.text) {
+        text('qdoc-transit', data.quote.transit.text);
+        transitRow.hidden = false;
+      } else {
+        transitRow.hidden = true;
+      }
+    }
     text('qdoc-pickup-title', data.lane.pickup.title);
     text('qdoc-pickup-subtitle', data.lane.pickup.subtitle || data.lane.pickup.zip || '');
     text('qdoc-delivery-title', data.lane.delivery.title);
@@ -185,13 +199,18 @@
   function renderMap(data) {
     var img = $('qdoc-map');
     var fallback = $('qdoc-map-fallback');
+    var wrap = $('qdoc-map-wrap');
     if (data.lane.mapImageUrl) {
       img.src = data.lane.mapImageUrl;
       img.hidden = false;
       fallback.hidden = true;
+      if (wrap) wrap.classList.remove('is-empty');
     } else {
       img.hidden = true;
       fallback.hidden = false;
+      // Soften + shrink the fallback so a missing map reads as a compact note,
+      // not a big unfinished gray void.
+      if (wrap) wrap.classList.add('is-empty');
     }
   }
 
@@ -266,6 +285,58 @@
       $('qdoc-callback-msg').textContent = '';
     };
     $('qdoc-callback-send').onclick = function () { sendCallback(data); };
+
+    var acceptOpen = $('qdoc-accept-open');
+    var acceptBox = $('qdoc-accept');
+    if (acceptOpen && acceptBox) {
+      acceptOpen.onclick = function () {
+        acceptBox.hidden = !acceptBox.hidden;
+        if (!acceptBox.hidden) { var d = $('qdoc-accept-date'); if (d) d.focus(); }
+      };
+      var acceptCancel = $('qdoc-accept-cancel');
+      if (acceptCancel) acceptCancel.onclick = function () {
+        acceptBox.hidden = true;
+        var m = $('qdoc-accept-msg'); if (m) { m.textContent = ''; m.className = 'qdoc-accept-msg'; }
+      };
+      var acceptSend = $('qdoc-accept-send');
+      if (acceptSend) acceptSend.onclick = function () { sendAccept(data); };
+    }
+  }
+
+  function sendAccept(data) {
+    var msg = $('qdoc-accept-msg');
+    var btn = $('qdoc-accept-send');
+    var dateEl = $('qdoc-accept-date');
+    var noteEl = $('qdoc-accept-note');
+    if (msg) { msg.textContent = 'Sending…'; msg.className = 'qdoc-accept-msg'; }
+    if (btn) btn.disabled = true;
+    fetch('/api/public/accept/' + encodeURIComponent(data.quote.refId), {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        customerName: (data.customer && data.customer.name) || undefined,
+        customerEmail: (data.customer && data.customer.email) || undefined,
+        preferredDate: (dateEl && dateEl.value.trim()) || undefined,
+        note: (noteEl && noteEl.value.trim()) || undefined,
+      }),
+    })
+      .then(function (r) { return r.json().then(function (j) { return { ok: r.ok, body: j }; }); })
+      .then(function (res) {
+        if (!res.ok || (res.body && res.body.error)) throw new Error((res.body && res.body.error) || 'Could not submit your booking request.');
+        // Replace the whole CTA block with a clear confirmation.
+        var book = document.querySelector('.qdoc-book');
+        if (book) {
+          book.innerHTML = '';
+          var ok = document.createElement('div');
+          ok.className = 'qdoc-book-confirmed';
+          ok.innerHTML = '<strong>✓ Booking requested</strong><span>The carrier has been notified and will confirm pickup details with you shortly.</span>';
+          book.appendChild(ok);
+        }
+      })
+      .catch(function (err) {
+        if (btn) btn.disabled = false;
+        if (msg) { msg.textContent = err.message || 'Could not submit your booking request.'; msg.className = 'qdoc-accept-msg error'; }
+      });
   }
 
   function sendCallback(data) {
