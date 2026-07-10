@@ -122,10 +122,17 @@ body {
   background: linear-gradient(135deg, var(--qdoc-primary), #1e40af);
   border-radius: 14px;
   box-shadow: 0 16px 38px -26px rgba(37,99,235,.7);
+  /* The blue gradient is dark, so every label on it must be white.
+     quote-polish.css darkens these for a light box; restore white here
+     (the box this file paints is always the deep-blue accent). */
+  color: #fff;
 }
+.qdoc-total-box span { color: #fff; opacity: .92; }
 .qdoc-total-box strong {
   font-size: 32px;
+  color: #fff;
 }
+.qdoc-total-box small { color: #fff; opacity: .85; }
 .qdoc-accessorials {
   gap: 9px;
 }
