@@ -23,6 +23,10 @@
     return n.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
   }
 
+  function titleizeWord(s) {
+    return String(s || '').replace(/[_-]+/g, ' ').replace(/\b\w/g, function (c) { return c.toUpperCase(); }).trim();
+  }
+
   function mergeLocation(resolved, currentText) {
     if (!resolved) return parseLocation(currentText || '');
     return {
@@ -545,10 +549,24 @@
       .catch(function (err) { btn.disabled = false; btn.textContent = oldText; showError('qf-error', 'Network error — please try again.'); console.error(err); });
   }
 
+  var SERVICE_LABELS = { drayage: 'Drayage', ftl: 'FTL', ltl: 'LTL', expedited: 'Expedite', hotshot: 'Hotshot' };
+  function friendlyEquipmentLabel() {
+    // Prefer the exact human label shown in the equipment dropdown; fall back
+    // to normalizing the raw value so the estimate meta never shows a raw code
+    // like "container_40" or "dry_van".
+    var sel = $('qf-equipment');
+    if (sel && sel.options && sel.selectedIndex >= 0 && sel.options[sel.selectedIndex]) {
+      var t = (sel.options[sel.selectedIndex].textContent || '').trim();
+      if (t) return t;
+    }
+    return normalizeEquipmentLabel(state.equipment || '', state.service);
+  }
+
   function renderResult(resp) {
     var r = resp.result;
     $('qf-total').textContent = fmtMoney(r.total);
-    $('qf-meta').textContent = 'Approx. ' + Math.round(resp.miles) + ' mi · ' + (state.service || 'truck') + ' · ' + normalizeEquipmentLabel(state.equipment || '', state.service);
+    var serviceLabel = SERVICE_LABELS[state.service] || (state.service ? titleizeWord(state.service) : 'Truck');
+    $('qf-meta').textContent = 'Approx. ' + Math.round(resp.miles) + ' mi · ' + serviceLabel + ' · ' + friendlyEquipmentLabel();
     var lines = $('qf-lines'); lines.innerHTML = '';
     r.lines.forEach(function (l) { var row = el('div', { class: 'line' }, [el('span', { class: 'name', text: l.name }), el('span', { class: 'amt', text: '$' + fmtMoney(l.amount) })]); lines.appendChild(row); });
     var totalRow = el('div', { class: 'line total-row' }, [el('span', { class: 'name', text: 'Total' }), el('span', { class: 'amt', text: '$' + fmtMoney(r.total) })]);

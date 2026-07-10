@@ -24,13 +24,19 @@
     document.head.appendChild(link);
   }
   function readBrand() {
+    // Contact fields start EMPTY so the demo trust card shows only real values
+    // the prospect types (renderBrandTrust filters falsy). Previously these
+    // held literal placeholders ("Phone number", "Company address", "USDOT #",
+    // a fake dispatch@ email) that rendered as if the carrier's page were
+    // broken. The editor inputs keep their own placeholder="" hints. Only the
+    // company name keeps a default, since it's the header title slot.
     const fallback = {
       name: 'Your company name',
-      phone: 'Phone number',
-      email: 'dispatch@yourcompany.com',
-      address: 'Company address',
-      usdot: 'USDOT #',
-      mc: 'MC #',
+      phone: '',
+      email: '',
+      address: '',
+      usdot: '',
+      mc: '',
       logo: '',
     };
     try {

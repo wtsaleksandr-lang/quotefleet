@@ -28,7 +28,7 @@ import {
   callbackRequests,
 } from '../../db/schema.js';
 import express from 'express';
-import { calculate, type CalcRequest } from '../../calc/engine.js';
+import { calculate, customerFacingLines, type CalcRequest } from '../../calc/engine.js';
 import { distanceBetween } from '../../calc/distance.js';
 import { generateLeadReply } from '../../ai/replyAgent.js';
 import { leadChatTurn } from '../../ai/chatAgent.js';
@@ -361,11 +361,20 @@ export function registerPublicRoutes(app: Express) {
     };
     const result = calculate(cards, accs, zones, calcReq, terms);
 
+    // Customer-facing surface: never expose the carrier's margin line, and
+    // don't ship the raw margin figure over the wire. The grand total is
+    // unchanged — margin is folded into the linehaul line for display.
+    const customerResult = {
+      ...result,
+      margin: 0,
+      lines: customerFacingLines(result.lines),
+    };
+
     return res.json({
       miles: dist.miles,
       origin: dist.origin,
       destination: dist.destination,
-      result,
+      result: customerResult,
     });
   });
 
@@ -552,7 +561,10 @@ export function registerPublicRoutes(app: Express) {
       ok: true,
       refId,
       total: calc.total,
-      breakdown: calc.lines,
+      // Customer-facing: margin folded into linehaul (total unchanged). The
+      // raw breakdown with the margin line is persisted in breakdownJson above
+      // for the carrier's internal dashboard view.
+      breakdown: customerFacingLines(calc.lines),
       chatUrl: `${loadEnv().PUBLIC_BASE_URL}/chat/${refId}`,
     });
   });

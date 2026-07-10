@@ -1,10 +1,11 @@
 import type { Express, Request, Response } from 'express';
 import { eq } from 'drizzle-orm';
 import { db } from '../../db/client.js';
-import { tenants, brandConfigs, leads, accessorials } from '../../db/schema.js';
+import { tenants, brandConfigs, leads, accessorials, rateCards } from '../../db/schema.js';
 import { loadEnv } from '../../config.js';
 import { publicChatLimiter } from '../rateLimits.js';
 import { loadCarrierProfile } from './carrierProfile.js';
+import { customerFacingLines } from '../../calc/engine.js';
 
 const QUOTE_VALIDITY_DAYS = 30;
 
@@ -117,14 +118,25 @@ export function registerQuoteDocRoutes(app: Express) {
     const lead = leadRows[0];
     if (!lead) return res.status(404).json({ error: 'Quote not found' });
 
-    const [tenantRows, brandRows, accessorialRows, carrierProfile] = await Promise.all([
+    const [tenantRows, brandRows, accessorialRows, rateCardRows, carrierProfile] = await Promise.all([
       db().select().from(tenants).where(eq(tenants.id, lead.tenantId)).limit(1),
       db().select().from(brandConfigs).where(eq(brandConfigs.tenantId, lead.tenantId)).limit(1),
       db().select().from(accessorials).where(eq(accessorials.tenantId, lead.tenantId)),
+      db().select().from(rateCards).where(eq(rateCards.tenantId, lead.tenantId)),
       loadCarrierProfile(lead.tenantId),
     ]);
     const tenant = tenantRows[0];
     if (!tenant || tenant.status !== 'active') return res.status(404).json({ error: 'Carrier not found' });
+
+    // Friendly equipment label — same human name the widget's equipment
+    // dropdown shows (from the carrier's own rate card), so the hosted quote
+    // reads "40' Standard Container" instead of the raw code "container_40".
+    const equipmentCard = rateCardRows.find(
+      (c) => c.service === lead.service && c.equipment === lead.equipment
+    );
+    const equipmentLabel = equipmentCard?.label
+      ? equipmentCard.label.replace(/\s*\(drayage\)\s*/i, ' ').replace(/\s{2,}/g, ' ').trim()
+      : null;
 
     const createdAt = lead.createdAt instanceof Date ? lead.createdAt : new Date(lead.createdAt);
     const expiresAt = addDays(createdAt, QUOTE_VALIDITY_DAYS);
@@ -147,7 +159,11 @@ export function registerQuoteDocRoutes(app: Express) {
         currency: lead.quotedCurrency || 'USD',
         total: lead.quotedTotal ?? 0,
         distanceMiles: lead.distanceMiles,
-        breakdown: lead.breakdownJson ?? [],
+        // Customer-facing: fold the carrier's margin into the linehaul line so
+        // it's never shown on the hosted quote. The stored breakdownJson keeps
+        // the raw margin line for the carrier's internal dashboard view; the
+        // grand total (lead.quotedTotal) is unchanged.
+        breakdown: customerFacingLines(lead.breakdownJson as Parameters<typeof customerFacingLines>[0]),
         aiSummary: lead.aiSummary,
         quoteUrl: `${base}/quote/${encodeURIComponent(lead.refId)}`,
         chatUrl: `${base}/chat/${encodeURIComponent(lead.refId)}`,
@@ -176,6 +192,7 @@ export function registerQuoteDocRoutes(app: Express) {
       shipment: {
         service: lead.service,
         equipment: lead.equipment,
+        equipmentLabel,
         pickupDate: lead.pickupDate,
         deliveryDate: lead.deliveryDate,
         oceanCarrier: lead.oceanCarrier,

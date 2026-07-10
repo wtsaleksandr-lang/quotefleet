@@ -13,7 +13,7 @@
  *   - unsupported equipment → friendly error
  */
 import { describe, it, expect } from 'vitest';
-import { calculate, type CalcRequest } from './engine.js';
+import { calculate, customerFacingLines, type CalcRequest } from './engine.js';
 import type { RateCard, Accessorial, LaneZone, Terminal } from '../db/schema.js';
 
 const now = new Date('2026-01-01T00:00:00Z');
@@ -194,5 +194,69 @@ describe('calculate', () => {
       ]
     `);
     expect(r.total).toBe(1267.75);
+  });
+
+  it('Distance guard — per-mile lane beyond card.maxMiles is unsupported', () => {
+    // Drayage card capped at 300 mi; a 2,066-mi "drayage" must NOT silently
+    // price at $4.50/mi ($12k) — it should flag as out of range.
+    const dr = rateCard({ service: 'drayage', equipment: 'container_40', ratePerMile: 4.5, maxMiles: 300 });
+    const r = calculate([dr], [], [], req({ service: 'drayage', equipment: 'container_40', miles: 2066 }));
+    expect(r.unsupported).toBeDefined();
+    expect(r.unsupported?.reason).toMatch(/beyond|range|custom quote/i);
+    expect(r.total).toBe(0);
+  });
+
+  it('Distance guard — within maxMiles still prices normally', () => {
+    const dr = rateCard({ service: 'drayage', equipment: 'container_40', ratePerMile: 4.5, maxMiles: 300 });
+    const r = calculate([dr], [], [], req({ service: 'drayage', equipment: 'container_40', miles: 120 }));
+    expect(r.unsupported).toBeUndefined();
+    expect(r.total).toBeGreaterThan(0);
+  });
+
+  it('Distance guard — a matched lane-zone flat tariff is exempt from maxMiles', () => {
+    // req.miles here is the anchor→delivery distance used for radius matching,
+    // which is small; the guard must never fire on a zone match.
+    const dr = rateCard({ service: 'drayage', equipment: 'container_40', ratePerMile: 4.5, maxMiles: 300 });
+    const r = calculate([dr], [], [laneZone({})], req({ service: 'drayage', equipment: 'container_40', miles: 22, pickupPortCode: 'USLAX' }));
+    expect(r.unsupported).toBeUndefined();
+    expect(r.subtotalLinehaul).toBe(425);
+  });
+});
+
+describe('customerFacingLines — margin is never shown to the customer', () => {
+  it('drops the margin line and folds its amount into linehaul (sum unchanged)', () => {
+    const r = calculate([rateCard({ marginPct: 12 })], [], [], req({ miles: 500 }));
+    // Engine output KEEPS margin (internal/admin view).
+    expect(r.lines.some((l) => l.kind === 'margin')).toBe(true);
+    const internalSum = r.lines.reduce((s, l) => s + l.amount, 0);
+
+    const customer = customerFacingLines(r.lines);
+    // No margin line, and the literal word "margin" appears nowhere.
+    expect(customer.some((l) => l.kind === 'margin')).toBe(false);
+    expect(customer.some((l) => /margin/i.test(String(l.name)))).toBe(false);
+    // Displayed line items still sum to the same grand total.
+    const customerSum = customer.reduce((s, l) => s + (l.amount || 0), 0);
+    expect(Math.round(customerSum * 100) / 100).toBe(Math.round(internalSum * 100) / 100);
+    expect(Math.round(customerSum * 100) / 100).toBe(r.total);
+    // The engine's own lines were not mutated.
+    expect(r.lines.some((l) => l.kind === 'margin')).toBe(true);
+  });
+
+  it('works on persisted breakdownJson-shaped rows', () => {
+    const stored = [
+      { name: 'Linehaul (500 mi × $2.50/mi)', amount: 1250, kind: 'linehaul' },
+      { name: 'Fuel surcharge (22.0% of linehaul)', amount: 275, kind: 'fuel' },
+      { name: 'Margin (12.0%)', amount: 183, kind: 'margin' },
+    ];
+    const customer = customerFacingLines(stored);
+    expect(customer.some((l) => l.kind === 'margin')).toBe(false);
+    const linehaul = customer.find((l) => l.kind === 'linehaul');
+    expect(linehaul?.amount).toBe(1433); // 1250 + 183 folded in
+    expect(customer.reduce((s, l) => s + (l.amount || 0), 0)).toBe(1708);
+  });
+
+  it('is a no-op when there is no margin line', () => {
+    const stored = [{ name: 'Linehaul', amount: 1000, kind: 'linehaul' }];
+    expect(customerFacingLines(stored)).toEqual(stored);
   });
 });
