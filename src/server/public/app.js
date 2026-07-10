@@ -705,66 +705,191 @@
     return tr;
   }
 
-  // ── Accessorials ──────────────────────────────────────────────
+  // ── Add-ons (accessorials) ────────────────────────────────────
+  // Stupid-simple editor. All the technical jargon (raw `code`, the internal
+  // `kind`/`trigger` enums, SCAC-ish fields) is hidden behind plain-English
+  // labels. The data model + quote logic are untouched: we still store the
+  // real enum values and auto-derive a `code` from the name on create.
+  var ADDON_KINDS = [
+    { value: 'flat', label: 'Flat fee ($)', unit: '$' },
+    { value: 'per_hour', label: 'Per hour', unit: '$/hr' },
+    { value: 'per_day', label: 'Per day', unit: '$/day' },
+    { value: 'per_mile', label: 'Per mile', unit: '$/mi' },
+    { value: 'pct_of_base', label: '% of base rate', unit: '%' },
+  ];
+  var ADDON_TRIGGERS = [
+    { value: 'optional', label: 'Customer can add it' },
+    { value: 'auto', label: 'Always applied' },
+    { value: 'auto_if_hazmat', label: 'Auto for hazmat' },
+    { value: 'auto_if_weight_over', label: 'Auto over a weight' },
+    { value: 'auto_if_residential', label: 'Auto for residential' },
+    { value: 'auto_if_temp_controlled', label: 'Auto for temp-controlled' },
+  ];
+  function addonUnit(kind) {
+    for (var i = 0; i < ADDON_KINDS.length; i++) if (ADDON_KINDS[i].value === kind) return ADDON_KINDS[i].unit;
+    return '$';
+  }
+  function slugifyCode(name) {
+    return String(name || '').toLowerCase().trim()
+      .replace(/[^a-z0-9]+/g, '_').replace(/^_+|_+$/g, '').slice(0, 40) || 'addon';
+  }
+  function uniqueCode(base, taken) {
+    var code = base, n = 2;
+    while (taken.indexOf(code) >= 0) { code = base + '_' + n; n++; }
+    return code;
+  }
+  function friendlySelect(options, current, onChange) {
+    var sel = el('select', { class: 'select qf-addon-select' });
+    options.forEach(function (o) {
+      var op = document.createElement('option');
+      op.value = o.value; op.textContent = o.label;
+      if (current === o.value) op.selected = true;
+      sel.appendChild(op);
+    });
+    sel.addEventListener('change', function () { onChange(sel.value); });
+    return sel;
+  }
+
   function renderAccessorials(c) {
     api('/api/tenant/accessorials').then(function (d) {
+      var list = d.accessorials || [];
       c.innerHTML = '';
-      c.appendChild(el('h1', { text: 'Accessorials' }));
-      c.appendChild(el('p', { class: 'page-sub', text: 'Optional add-ons (chassis, liftgate, etc.) and auto-triggered fees (hazmat, overweight).' }));
-      var tbl = el('table', { class: 'table' });
-      tbl.innerHTML =
-        '<thead><tr><th>Code</th><th>Label</th><th>Kind</th>' +
-        '<th style="text-align:right;">Amount</th><th>Trigger</th><th>Enabled</th><th></th></tr></thead><tbody></tbody>';
-      var tb = $('tbody', tbl);
-      d.accessorials.forEach(function (a) { tb.appendChild(accRow(a)); });
-      c.appendChild(tbl);
+      var root = el('div', { class: 'qf-addons', 'data-qf-addons': '1' });
+      c.appendChild(root);
+      root.appendChild(el('h1', { text: 'Add-ons' }));
+      root.appendChild(el('p', { class: 'page-sub', text: 'Extra charges customers can add to a shipment — or that apply automatically. Set a price and choose when each one applies.' }));
 
-      var addBtn = el('button', { class: 'btn btn-secondary', text: '+ Add accessorial', style: { marginTop: '14px' } });
+      // ── Add-an-add-on: prominent button that reveals a simple form ──
+      var addBar = el('div', { class: 'qf-addons-addbar' });
+      var addBtn = el('button', { class: 'qf-addons-add-btn', type: 'button', text: '+ Add an add-on' });
+      addBar.appendChild(addBtn);
+      root.appendChild(addBar);
+
+      var form = el('div', { class: 'qf-addons-form', hidden: 'hidden' });
+      var fName = el('input', { class: 'input', type: 'text', placeholder: 'e.g. Liftgate service' });
+      var fPrice = el('input', { class: 'input', type: 'number', step: '0.5', min: '0', placeholder: '0' });
+      var fKind = friendlySelect(ADDON_KINDS, 'flat', function () { fUnit.textContent = addonUnit(fKind.value); });
+      var fTrigger = friendlySelect(ADDON_TRIGGERS, 'optional', function () {});
+      var fUnit = el('span', { class: 'qf-addon-unit', text: '$' });
+      form.appendChild(fieldWrap('Name', fName));
+      var priceWrap = el('div', { class: 'qf-addon-pricewrap' }, [fUnit, fPrice]);
+      form.appendChild(fieldWrap('Price', priceWrap));
+      form.appendChild(fieldWrap("How it's charged", fKind));
+      form.appendChild(fieldWrap('When it applies', fTrigger));
+      var formActions = el('div', { class: 'qf-addons-form-actions' });
+      var saveBtn = el('button', { class: 'btn btn-primary btn-sm', type: 'button', text: 'Add' });
+      var cancelBtn = el('button', { class: 'btn btn-secondary btn-sm', type: 'button', text: 'Cancel' });
+      formActions.appendChild(saveBtn); formActions.appendChild(cancelBtn);
+      form.appendChild(formActions);
+      root.appendChild(form);
+
+      function closeForm() { form.hidden = true; fName.value = ''; fPrice.value = ''; }
       addBtn.addEventListener('click', function () {
-        api('/api/tenant/accessorials', {
-          method: 'POST',
-          body: { code: 'new_' + Math.random().toString(36).slice(2, 6), label: 'New accessorial', kind: 'flat', amount: 50, trigger: 'optional' },
-        }).then(function () { renderAccessorials(c); }).catch(toastErr);
+        form.hidden = !form.hidden;
+        if (!form.hidden) fName.focus();
       });
-      c.appendChild(addBtn);
+      cancelBtn.addEventListener('click', closeForm);
+      saveBtn.addEventListener('click', function () {
+        var name = fName.value.trim();
+        if (!name) { fName.focus(); return; }
+        var taken = list.map(function (x) { return x.code; });
+        var body = {
+          code: uniqueCode(slugifyCode(name), taken),
+          label: name,
+          kind: fKind.value,
+          amount: fPrice.value === '' ? 0 : Number(fPrice.value),
+          trigger: fTrigger.value,
+        };
+        api('/api/tenant/accessorials', { method: 'POST', body: body })
+          .then(function () { toastOk('Add-on added'); renderAccessorials(c); })
+          .catch(toastErr);
+      });
+
+      // ── List of the tenant's add-ons ────────────────────────────
+      var listWrap = el('div', { class: 'qf-addons-list' });
+      if (!list.length) {
+        listWrap.appendChild(el('div', { class: 'qf-addons-empty', text: 'No add-ons yet. Use “+ Add an add-on” to create your first one.' }));
+      } else {
+        list.forEach(function (a) { listWrap.appendChild(addonCard(a, c)); });
+      }
+      root.appendChild(listWrap);
     }).catch(showErr(c));
   }
-  function accRow(a) {
-    var tr = el('tr');
-    function inputCell(field, val, opts) {
-      var inp = el('input', { class: 'input', value: val == null ? '' : val });
-      if (opts && opts.type) inp.type = opts.type; if (opts && opts.step) inp.step = opts.step;
-      inp.style.width = (opts && opts.w) || '120px';
-      if (opts && opts.right) inp.style.textAlign = 'right';
-      inp.addEventListener('blur', function () {
-        var v = inp.value; if (opts && opts.type === 'number') v = v === '' ? null : Number(v);
-        var p = {}; p[field] = v; api('/api/tenant/accessorials/' + a.id, { method: 'PUT', body: p }).catch(toastErr);
-      });
-      var td = el('td'); td.appendChild(inp); return td;
-    }
-    function selectCell(field, val, options) {
-      var sel = el('select', { class: 'select' });
-      sel.style.width = '140px';
-      options.forEach(function (o) { var op = document.createElement('option'); op.value = o; op.textContent = o; if (val === o) op.selected = true; sel.appendChild(op); });
-      sel.addEventListener('change', function () { var p = {}; p[field] = sel.value; api('/api/tenant/accessorials/' + a.id, { method: 'PUT', body: p }).catch(toastErr); });
-      var td = el('td'); td.appendChild(sel); return td;
-    }
-    tr.appendChild(inputCell('code', a.code, { w: '110px' }));
-    tr.appendChild(inputCell('label', a.label, { w: '180px' }));
-    tr.appendChild(selectCell('kind', a.kind, ['flat', 'per_mile', 'pct_of_base', 'per_day', 'per_hour']));
-    tr.appendChild(inputCell('amount', a.amount, { type: 'number', step: '0.5', right: true, w: '80px' }));
-    tr.appendChild(selectCell('trigger', a.trigger, ['optional', 'auto', 'auto_if_residential', 'auto_if_hazmat', 'auto_if_temp_controlled', 'auto_if_weight_over']));
-    var chk = el('input', { type: 'checkbox' });
-    chk.checked = a.enabled;
-    chk.addEventListener('change', function () { api('/api/tenant/accessorials/' + a.id, { method: 'PUT', body: { enabled: chk.checked } }).catch(toastErr); });
-    tr.appendChild(el('td', null, [chk]));
-    var del = el('button', { class: 'btn btn-danger btn-sm', text: 'Delete' });
-    del.addEventListener('click', function () {
-      if (!confirm('Delete accessorial?')) return;
-      api('/api/tenant/accessorials/' + a.id, { method: 'DELETE' }).then(function () { tr.remove(); }).catch(toastErr);
+
+  function fieldWrap(label, control) {
+    var f = el('div', { class: 'qf-addon-field' });
+    f.appendChild(el('label', { class: 'qf-addon-flabel', text: label }));
+    f.appendChild(control);
+    return f;
+  }
+
+  function addonCard(a, c) {
+    var card = el('div', { class: 'qf-addon-card' });
+    function save(patch) { return api('/api/tenant/accessorials/' + a.id, { method: 'PUT', body: patch }).catch(toastErr); }
+
+    // Top row: name · price · on/off · delete
+    var top = el('div', { class: 'qf-addon-top' });
+    var name = el('input', { class: 'input qf-addon-name', type: 'text', value: a.label || '' });
+    name.addEventListener('blur', function () { if (name.value.trim() !== (a.label || '')) { a.label = name.value.trim(); save({ label: a.label }); } });
+
+    var unit = el('span', { class: 'qf-addon-unit', text: addonUnit(a.kind) });
+    var price = el('input', { class: 'input qf-addon-price', type: 'number', step: '0.5', min: '0', value: a.amount == null ? '' : a.amount });
+    price.addEventListener('blur', function () {
+      var v = price.value === '' ? 0 : Number(price.value);
+      if (v !== a.amount) { a.amount = v; save({ amount: v }); }
     });
-    tr.appendChild(el('td', null, [del]));
-    return tr;
+    var priceBox = el('div', { class: 'qf-addon-pricebox' }, [unit, price]);
+
+    var toggle = el('label', { class: 'qf-addon-toggle', title: 'Show this add-on in quotes' });
+    var chk = el('input', { type: 'checkbox' });
+    chk.checked = !!a.enabled;
+    var toggleTxt = el('span', { text: chk.checked ? 'On' : 'Off' });
+    chk.addEventListener('change', function () { toggleTxt.textContent = chk.checked ? 'On' : 'Off'; save({ enabled: chk.checked }); });
+    toggle.appendChild(chk); toggle.appendChild(toggleTxt);
+
+    var del = el('button', { class: 'qf-addon-del', type: 'button', title: 'Delete add-on', 'aria-label': 'Delete add-on', text: '✕' });
+    del.addEventListener('click', function () {
+      if (!confirm('Delete “' + (a.label || 'this add-on') + '”?')) return;
+      api('/api/tenant/accessorials/' + a.id, { method: 'DELETE' })
+        .then(function () { card.remove(); toastOk('Add-on removed'); })
+        .catch(toastErr);
+    });
+
+    top.appendChild(name);
+    top.appendChild(priceBox);
+    top.appendChild(toggle);
+    top.appendChild(del);
+    card.appendChild(top);
+
+    // Bottom row: how charged · when applies · (weight threshold)
+    var bottom = el('div', { class: 'qf-addon-bottom' });
+    var kindSel = friendlySelect(ADDON_KINDS, a.kind, function (v) {
+      a.kind = v; unit.textContent = addonUnit(v); save({ kind: v });
+    });
+    var weightWrap = el('div', { class: 'qf-addon-weight', hidden: 'hidden' });
+    var weightInp = el('input', { class: 'input', type: 'number', min: '0', step: '500', placeholder: 'e.g. 42000' });
+    var initialWeight = a.conditionJson && typeof a.conditionJson.weightLbsOver === 'number' ? a.conditionJson.weightLbsOver : '';
+    weightInp.value = initialWeight;
+    weightWrap.appendChild(el('span', { class: 'qf-addon-weight-lbl', text: 'Apply when weight is over' }));
+    weightWrap.appendChild(weightInp);
+    weightWrap.appendChild(el('span', { class: 'qf-addon-weight-unit', text: 'lbs' }));
+    weightInp.addEventListener('blur', function () {
+      var v = weightInp.value === '' ? null : Number(weightInp.value);
+      var cond = v == null ? null : { weightLbsOver: v };
+      a.conditionJson = cond; save({ conditionJson: cond });
+    });
+    function syncWeight(trig) { weightWrap.hidden = trig !== 'auto_if_weight_over'; }
+    var trigSel = friendlySelect(ADDON_TRIGGERS, a.trigger, function (v) {
+      a.trigger = v; syncWeight(v); save({ trigger: v });
+    });
+    syncWeight(a.trigger);
+
+    bottom.appendChild(fieldWrap("How it's charged", kindSel));
+    bottom.appendChild(fieldWrap('When it applies', trigSel));
+    bottom.appendChild(weightWrap);
+    card.appendChild(bottom);
+
+    return card;
   }
 
   // ── Lane zones ────────────────────────────────────────────────

@@ -85,6 +85,9 @@
 
   function enhance() {
     const route = currentRoute();
+    // The dedicated stupid-simple Add-ons editor owns its own surface — no
+    // injected customer-preview card there.
+    if (content.querySelector('[data-qf-addons]')) return;
     // 'brand' omitted: the Customize panel (Wave 2) has its own live preview.
     if (['overview', 'rates', 'accessorials', 'zones', 'ai', 'embed'].includes(route)) previewCard();
   }

@@ -145,6 +145,9 @@
 
   function install() {
     var page = document.getElementById('page-content');
+    // The Add-ons page (app.js#renderAccessorials) is a dedicated stupid-simple
+    // editor that owns its own surface — never inject the scanner clutter there.
+    if (page && page.querySelector('[data-qf-addons]')) return;
     if (!page || !pageIsAccessorials() || page.querySelector('[data-qf-acc-tools]')) return;
     var table = page.querySelector('table');
     if (!table) return;
