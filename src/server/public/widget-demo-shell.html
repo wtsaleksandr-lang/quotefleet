@@ -6,6 +6,9 @@
   <title>QuoteFleet — live calculator demo</title>
   <meta name="description" content="Try the QuoteFleet branded rate calculator live — switch between desktop and mobile, light and dark.">
   <link rel="stylesheet" href="/style.css">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
   <link rel="icon" href="/favicon.ico" sizes="any">
   <link rel="icon" type="image/png" sizes="32x32" href="/brand/favicon-32.png">
   <link rel="icon" type="image/png" sizes="16x16" href="/brand/favicon-16.png">
@@ -33,10 +36,12 @@
       padding-left: 12px;
       border-left: 1px solid rgba(148,163,184,.28);
       color: #9fb0c9;
+      font-family: var(--font-mono, 'JetBrains Mono', ui-monospace, 'SF Mono', Menlo, Consolas, monospace);
       font-weight: 500;
-      font-size: 12.5px;
-      letter-spacing: .005em;
+      font-size: 11px;
+      letter-spacing: .01em;
       line-height: 1.4;
+      white-space: nowrap;
     }
     @media (max-width: 380px) {
       .qfd-tag { border-left: 0; padding-left: 0; }
@@ -129,7 +134,7 @@
   <div class="qfd-wrap">
     <div class="qfd-head">
       <a class="qfd-brand" href="/"><img src="/brand/mark-keys.png" alt="QuoteFleet" width="28" height="30" decoding="async">QuoteFleet</a>
-      <span class="qfd-tag">Smart freight quote software</span>
+      <span class="qfd-tag">Instant Rates. Higher Conversions.</span>
     </div>
 
     <div class="qfd-toolbar">
