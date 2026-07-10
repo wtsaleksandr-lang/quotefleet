@@ -52,6 +52,9 @@
 
   function mount() {
     var root = one('#page-content');
+    // The dedicated stupid-simple Add-ons editor owns its own surface — never
+    // inject the legacy search bar there.
+    if (root && root.querySelector('[data-qf-addons]')) return;
     if (!root || !isAccessorials() || root.dataset.qfAccessorialSearch === '1') return;
     var table = one('table', root);
     var list = rows(root);

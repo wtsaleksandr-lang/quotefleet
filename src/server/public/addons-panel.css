@@ -1,0 +1,132 @@
+/* ============================================================================
+   QuoteFleet — Add-ons panel (stupid-simple accessorials editor)
+   The rebuilt /app/accessorials surface: plain-English add/edit/remove of
+   shipment extras. No raw code / kind / trigger jargon. Dark dashboard brand:
+   #161616 page / #1C1C1C surface, cobalt #0D3CFC / periwinkle #6E8BFF accent,
+   cream #E6E3E0, hairline borders. No teal.
+   ========================================================================== */
+
+/* ── De-clutter: suppress legacy injected noise on THIS page only ──────────
+   Belt-and-suspenders net (the JS injectors are also guarded) so the scanner,
+   search bar, readiness checklist and setup chips never leak onto the Add-ons
+   editor. Scoped via :has() so other routes are untouched. */
+#page-content:has(.qf-addons) .qf-acc-tools,
+#page-content:has(.qf-addons) .qf-accessorial-searchbar,
+#page-content:has(.qf-addons) .qf-onboarding-panel,
+#page-content:has(.qf-addons) .qf-setup-coach,
+#page-content:has(.qf-addons) .qf-setup-kicker-inline,
+#page-content:has(.qf-addons) .qf-setup-empty,
+#page-content:has(.qf-addons) .qf-preview-card,
+#page-content:has(.qf-addons) .qf-dashboard-preview,
+#page-content:has(.qf-addons) .qf-setup-builder,
+#page-content:has(.qf-addons) .qf-setup-builder-tip {
+  display: none !important;
+}
+
+/* ── Page shell ───────────────────────────────────────────────────────── */
+.qf-addons h1 { margin: 0 0 4px; }
+.qf-addons .page-sub { margin: 0 0 18px; color: var(--muted); max-width: 62ch; }
+
+/* ── Add-an-add-on button + reveal form ───────────────────────────────── */
+.qf-addons-addbar { margin-bottom: 14px; }
+.qf-addons-add-btn {
+  display: inline-flex; align-items: center; gap: 6px;
+  padding: 10px 16px; font-size: 14px; font-weight: 600;
+  color: #fff; background: var(--accent-fill);
+  border: 1px solid var(--accent-fill); border-radius: var(--radius);
+  cursor: pointer; transition: filter .14s ease, transform .1s ease;
+}
+.qf-addons-add-btn:hover { filter: brightness(1.08); }
+.qf-addons-add-btn:active { transform: translateY(1px); }
+.qf-addons-add-btn:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+
+.qf-addons-form {
+  display: grid; grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px 16px; padding: 16px; margin-bottom: 18px;
+  background: var(--surface); border: 1px solid var(--border-strong);
+  border-radius: var(--radius);
+}
+.qf-addons-form[hidden] { display: none; }
+.qf-addons-form-actions {
+  grid-column: 1 / -1; display: flex; gap: 8px; margin-top: 2px;
+}
+
+/* ── Field wrapper (label above control) ──────────────────────────────── */
+.qf-addon-field { display: flex; flex-direction: column; gap: 6px; min-width: 0; }
+.qf-addon-flabel { font-size: 12.5px; font-weight: 600; color: var(--ink-soft); }
+
+/* ── Add-on cards ─────────────────────────────────────────────────────── */
+.qf-addons-list { display: flex; flex-direction: column; gap: 12px; }
+.qf-addons-empty {
+  padding: 22px 18px; text-align: center; color: var(--muted);
+  font-size: 13.5px; background: var(--surface);
+  border: 1px dashed var(--border-strong); border-radius: var(--radius);
+}
+.qf-addon-card {
+  padding: 14px 16px; background: var(--surface);
+  border: 1px solid var(--border); border-radius: var(--radius);
+  transition: border-color .14s ease;
+}
+.qf-addon-card:hover { border-color: var(--border-strong); }
+
+.qf-addon-top {
+  display: flex; align-items: center; gap: 12px; flex-wrap: wrap;
+}
+.qf-addon-name {
+  flex: 1 1 220px; min-width: 0; font-weight: 600; font-size: 14px;
+}
+.qf-addon-pricebox {
+  display: inline-flex; align-items: center; gap: 6px;
+  flex: 0 0 auto;
+}
+.qf-addon-unit { font-size: 12.5px; color: var(--muted); min-width: 34px; }
+.qf-addon-price { width: 96px; text-align: right; }
+
+.qf-addon-toggle {
+  display: inline-flex; align-items: center; gap: 6px;
+  font-size: 12.5px; font-weight: 600; color: var(--ink-soft);
+  cursor: pointer; user-select: none;
+}
+.qf-addon-toggle input { width: 15px; height: 15px; accent-color: var(--accent-fill); cursor: pointer; }
+
+.qf-addon-del {
+  margin-left: auto; flex: 0 0 auto;
+  width: 30px; height: 30px; line-height: 1; font-size: 14px;
+  display: inline-flex; align-items: center; justify-content: center;
+  color: var(--muted); background: transparent;
+  border: 1px solid var(--border); border-radius: 8px; cursor: pointer;
+  transition: color .14s ease, border-color .14s ease, background .14s ease;
+}
+.qf-addon-del:hover { color: var(--error); border-color: var(--error); background: rgba(209, 67, 67, 0.08); }
+.qf-addon-del:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+
+.qf-addon-bottom {
+  display: flex; align-items: flex-end; gap: 16px; flex-wrap: wrap;
+  margin-top: 12px; padding-top: 12px; border-top: 1px solid var(--border);
+}
+.qf-addon-bottom .qf-addon-field { flex: 0 1 220px; }
+.qf-addon-select { width: 100%; }
+
+/* ── Weight-threshold field (only shown for "Auto over a weight") ──────── */
+.qf-addon-weight {
+  display: flex; align-items: center; gap: 8px;
+  font-size: 12.5px; color: var(--ink-soft);
+}
+.qf-addon-weight[hidden] { display: none; }
+.qf-addon-weight-lbl { font-weight: 600; }
+.qf-addon-weight input { width: 110px; }
+.qf-addon-weight-unit { color: var(--muted); }
+.qf-addon-pricewrap { display: inline-flex; align-items: center; gap: 6px; }
+.qf-addon-pricewrap input { flex: 1 1 auto; }
+
+/* ── Mobile (≤560px) ──────────────────────────────────────────────────── */
+@media (max-width: 560px) {
+  .qf-addons-form { grid-template-columns: minmax(0, 1fr); }
+  .qf-addon-top { align-items: stretch; }
+  .qf-addon-name { flex: 1 1 100%; }
+  .qf-addon-pricebox { flex: 1 1 auto; }
+  .qf-addon-price { flex: 1 1 auto; width: auto; }
+  .qf-addon-del { margin-left: 0; }
+  .qf-addon-bottom .qf-addon-field { flex: 1 1 100%; }
+  .qf-addon-weight { flex: 1 1 100%; flex-wrap: wrap; }
+}

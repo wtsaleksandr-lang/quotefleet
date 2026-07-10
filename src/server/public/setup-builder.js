@@ -89,6 +89,9 @@
   }
 
   function enhance() {
+    // The dedicated stupid-simple Add-ons editor owns its own surface — never
+    // inject the "Charge builder" card / tip / table-wrap there.
+    if (content.querySelector('[data-qf-addons]')) return;
     if (!configs[route()]) return;
     builder();
     tip();
