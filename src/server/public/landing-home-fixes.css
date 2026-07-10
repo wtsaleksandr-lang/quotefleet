@@ -384,3 +384,20 @@ body.qf-wft .site-mobile-menu {
     background: rgba(255, 255, 255, 0.04);
   }
 }
+
+/* ── Hero honest expectation + price anchor (persona-audit P2) ──────────
+ * Small, subtle line under the primary CTA that sets an honest trial
+ * expectation (card required) and anchors the price without a full table.
+ * Reuses .micro-copy muted styling; only the /pricing link is accented. */
+body.qf-wft .hero-trial-note {
+  margin-top: 12px;
+}
+body.qf-wft .hero-trial-note a {
+  color: var(--accent);
+  font-weight: 700;
+  text-decoration: none;
+}
+body.qf-wft .hero-trial-note a:hover {
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}

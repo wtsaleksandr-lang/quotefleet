@@ -61,6 +61,12 @@
   border-color: var(--qf-wft-line) !important;
   color: var(--qf-wft-text) !important;
   border-radius: 6px !important;
+  /* Dark native chrome: select arrow + number spinners render light. */
+  color-scheme: dark;
+}
+
+.qf-public-wft.qf-tools-marketplace .input::placeholder {
+  color: var(--qf-wft-faint) !important;
 }
 
 .qf-public-wft.qf-tools-marketplace .input:focus,
