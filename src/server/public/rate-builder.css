@@ -330,3 +330,66 @@ html[data-theme="light"] .qf-rate-save-panel {
   .qf-builder-stats,
   .qf-rate-scan-stats { grid-template-columns: 1fr; }
 }
+
+/* ── Mobile reflow: the wide rate grid becomes one stacked card per row ──
+   Each <td> turns into a labelled field line (label via ::before from the
+   cell's data-label). No horizontal scroll; every input/select/checkbox and
+   the Duplicate/Delete actions stay fully usable and inline-save intact.
+   Desktop (>640px) keeps the original scrollable table untouched. */
+@media (max-width: 640px) {
+  .qf-rate-table-wrap { overflow-x: visible; padding-top: 0; }
+  .qf-rate-table-wrap::before { display: none; }
+  .qf-rate-table-wrap .table { width: 100%; min-width: 0; margin-top: 0; }
+  .qf-rate-table-wrap thead { display: none; } /* headers + per-column filter row */
+  .qf-rate-table-wrap table,
+  .qf-rate-table-wrap tbody { display: block; width: 100%; }
+  .qf-rate-table-wrap tbody tr {
+    display: block;
+    border: 1px solid var(--border);
+    border-radius: 14px;
+    background: var(--surface);
+    padding: 4px 13px 8px;
+    margin-bottom: 12px;
+    box-shadow: none;
+  }
+  .qf-rate-table-wrap tbody tr[hidden] { display: none; }
+  .qf-rate-table-wrap tbody td {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    min-width: 0;
+    padding: 9px 0;
+    border-bottom: 1px solid var(--border);
+  }
+  .qf-rate-table-wrap tbody td::before {
+    content: attr(data-label);
+    flex: 0 0 auto;
+    color: var(--muted);
+    font: 700 11px var(--font-mono);
+    letter-spacing: .05em;
+    text-transform: uppercase;
+  }
+  .qf-rate-table-wrap tbody td .input,
+  .qf-rate-table-wrap tbody td select {
+    width: auto !important;
+    flex: 1 1 auto;
+    min-width: 0;
+    text-align: left !important;
+  }
+  .qf-rate-table-wrap tbody td input[type="checkbox"] {
+    width: 20px;
+    height: 20px;
+    flex: 0 0 auto;
+  }
+  /* Actions cell (Duplicate + Delete + status badge) — full-width button row. */
+  .qf-rate-table-wrap tbody td:last-child {
+    border-bottom: 0;
+    justify-content: flex-start;
+    flex-wrap: wrap;
+    gap: 8px;
+    padding-top: 11px;
+  }
+  .qf-rate-table-wrap tbody td:last-child::before { display: none; }
+  .qf-rate-table-wrap tbody td:last-child .btn { flex: 1 1 auto; }
+}

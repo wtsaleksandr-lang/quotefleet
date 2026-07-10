@@ -666,6 +666,8 @@
 
   function rateRow(r) {
     var tr = el('tr');
+    // data-label drives the mobile card reflow (rate-builder.css ≤640px):
+    // each cell's column header is shown as an inline label via ::before.
     function inputCell(field, val, opts) {
       var inp = el('input', { class: 'input', value: val == null ? '' : val });
       if (opts && opts.type) inp.type = opts.type;
@@ -677,30 +679,34 @@
         if (opts && opts.type === 'number') v = v === '' ? null : Number(v);
         api('/api/tenant/rate-cards/' + r.id, { method: 'PUT', body: (function () { var p = {}; p[field] = v; return p; })() }).catch(toastErr);
       });
-      var td = el('td'); td.appendChild(inp); return td;
+      var td = el('td'); td.appendChild(inp);
+      if (opts && opts.label) td.dataset.label = opts.label;
+      return td;
     }
-    function selectCell(field, val, options) {
+    function selectCell(field, val, options, label) {
       var sel = el('select', { class: 'select' });
       sel.style.width = '120px';
       options.forEach(function (o) { var op = document.createElement('option'); op.value = o; op.textContent = o; if (val === o) op.selected = true; sel.appendChild(op); });
       sel.addEventListener('change', function () { var p = {}; p[field] = sel.value; api('/api/tenant/rate-cards/' + r.id, { method: 'PUT', body: p }).catch(toastErr); });
-      var td = el('td'); td.appendChild(sel); return td;
+      var td = el('td'); td.appendChild(sel);
+      if (label) td.dataset.label = label;
+      return td;
     }
-    tr.appendChild(selectCell('service', r.service, ['drayage', 'ftl', 'ltl', 'expedited', 'hotshot']));
+    tr.appendChild(selectCell('service', r.service, ['drayage', 'ftl', 'ltl', 'expedited', 'hotshot'], 'Service'));
     tr.appendChild(selectCell('equipment', r.equipment, [
       'dryvan', 'reefer', 'flatbed', 'step_deck', 'conestoga',
       'container_20', 'container_40', 'container_40hc', 'container_45',
-      'sprinter', 'box_truck', 'tractor_only', 'pallet']));
-    tr.appendChild(inputCell('label', r.label, { w: '160px' }));
-    tr.appendChild(inputCell('ratePerMile', r.ratePerMile, { type: 'number', step: '0.01', right: true, w: '80px' }));
-    tr.appendChild(inputCell('minimumCharge', r.minimumCharge, { type: 'number', step: '1', right: true, w: '80px' }));
-    tr.appendChild(inputCell('flatFee', r.flatFee, { type: 'number', step: '1', right: true, w: '80px' }));
-    tr.appendChild(inputCell('fuelSurchargePct', r.fuelSurchargePct, { type: 'number', step: '0.5', right: true, w: '70px' }));
-    tr.appendChild(inputCell('marginPct', r.marginPct, { type: 'number', step: '0.5', right: true, w: '70px' }));
+      'sprinter', 'box_truck', 'tractor_only', 'pallet'], 'Equipment'));
+    tr.appendChild(inputCell('label', r.label, { w: '160px', label: 'Label' }));
+    tr.appendChild(inputCell('ratePerMile', r.ratePerMile, { type: 'number', step: '0.01', right: true, w: '80px', label: '$/mi' }));
+    tr.appendChild(inputCell('minimumCharge', r.minimumCharge, { type: 'number', step: '1', right: true, w: '80px', label: 'Min' }));
+    tr.appendChild(inputCell('flatFee', r.flatFee, { type: 'number', step: '1', right: true, w: '80px', label: 'Flat' }));
+    tr.appendChild(inputCell('fuelSurchargePct', r.fuelSurchargePct, { type: 'number', step: '0.5', right: true, w: '70px', label: 'Fuel %' }));
+    tr.appendChild(inputCell('marginPct', r.marginPct, { type: 'number', step: '0.5', right: true, w: '70px', label: 'Margin %' }));
     var chk = el('input', { type: 'checkbox' });
     chk.checked = r.enabled;
     chk.addEventListener('change', function () { api('/api/tenant/rate-cards/' + r.id, { method: 'PUT', body: { enabled: chk.checked } }).catch(toastErr); });
-    tr.appendChild(el('td', null, [chk]));
+    tr.appendChild(el('td', { 'data-label': 'Enabled' }, [chk]));
     var del = el('button', { class: 'btn btn-danger btn-sm', text: 'Delete' });
     del.addEventListener('click', function () {
       if (!confirm('Delete rate card "' + (r.label || r.equipment) + '"?')) return;
@@ -1018,20 +1024,23 @@
   }
   function zoneRow(z) {
     var tr = el('tr');
+    // data-label drives the mobile card reflow (setup-builder.css ≤640px).
     function inp(field, val, opts) {
       var i = el('input', { class: 'input', value: val == null ? '' : val });
       if (opts && opts.type) i.type = opts.type; if (opts && opts.right) i.style.textAlign = 'right';
       i.style.width = (opts && opts.w) || '120px';
       i.addEventListener('blur', function () { var v = i.value; if (opts && opts.type === 'number') v = Number(v); var p = {}; p[field] = v; api('/api/tenant/lane-zones/' + z.id, { method: 'PUT', body: p }).catch(toastErr); });
-      var td = el('td'); td.appendChild(i); return td;
+      var td = el('td'); td.appendChild(i);
+      if (opts && opts.label) td.dataset.label = opts.label;
+      return td;
     }
-    tr.appendChild(inp('label', z.label, { w: '300px' }));
-    tr.appendChild(inp('anchorPortCode', z.anchorPortCode, { w: '90px' }));
-    tr.appendChild(inp('radiusMiles', z.radiusMiles, { type: 'number', right: true, w: '80px' }));
-    tr.appendChild(inp('flatPrice', z.flatPrice, { type: 'number', right: true, w: '90px' }));
+    tr.appendChild(inp('label', z.label, { w: '300px', label: 'Label' }));
+    tr.appendChild(inp('anchorPortCode', z.anchorPortCode, { w: '90px', label: 'Anchor' }));
+    tr.appendChild(inp('radiusMiles', z.radiusMiles, { type: 'number', right: true, w: '80px', label: 'Radius (mi)' }));
+    tr.appendChild(inp('flatPrice', z.flatPrice, { type: 'number', right: true, w: '90px', label: 'Flat $' }));
     var chk = el('input', { type: 'checkbox' }); chk.checked = z.enabled;
     chk.addEventListener('change', function () { api('/api/tenant/lane-zones/' + z.id, { method: 'PUT', body: { enabled: chk.checked } }).catch(toastErr); });
-    tr.appendChild(el('td', null, [chk]));
+    tr.appendChild(el('td', { 'data-label': 'Enabled' }, [chk]));
     var del = el('button', { class: 'btn btn-danger btn-sm', text: 'Delete' });
     del.addEventListener('click', function () { if (!confirm('Delete zone?')) return; api('/api/tenant/lane-zones/' + z.id, { method: 'DELETE' }).then(function () { tr.remove(); }).catch(toastErr); });
     tr.appendChild(el('td', null, [del]));
@@ -2045,7 +2054,7 @@
       bar.innerHTML =
         'Trial — ' + trial.daysLeft + ' day' + (trial.daysLeft === 1 ? '' : 's') + ' left · ' +
         'all features unlocked &nbsp;·&nbsp; ' +
-        '<a href="/pricing" style="color: var(--accent); text-decoration: underline;">Manage plan →</a>';
+        '<a href="/pricing" style="color: var(--accent); text-decoration: underline; display: inline-block; padding: 11px 8px; margin: -11px 0; line-height: 1;">Manage plan →</a>';
       document.body.classList.remove('qf-trial-locked');
     } else if (trial.status === 'trial_expired') {
       bar.style.background = 'var(--error-bg)';
@@ -2071,12 +2080,25 @@
     var toggle = document.getElementById('qf-mobile-nav-toggle');
     var shell = document.getElementById('app-shell');
     if (!toggle || !shell) return;
+    // Scrim: a semi-opaque backdrop behind the open off-canvas drawer that
+    // dims the page and closes the drawer on tap (Escape also closes).
+    var scrim = document.getElementById('qf-nav-scrim');
+    if (!scrim) {
+      scrim = document.createElement('div');
+      scrim.id = 'qf-nav-scrim';
+      scrim.className = 'qf-nav-scrim';
+      shell.appendChild(scrim);
+    }
     function isDesktop() { return window.innerWidth >= 901; }
     function setOpenMobile(open) {
       shell.classList.toggle('qf-nav-open', open);
       toggle.setAttribute('aria-expanded', open ? 'true' : 'false');
       toggle.setAttribute('aria-label', open ? 'Close navigation menu' : 'Open navigation menu');
     }
+    scrim.addEventListener('click', function () { setOpenMobile(false); });
+    document.addEventListener('keydown', function (e) {
+      if (e.key === 'Escape' && shell.classList.contains('qf-nav-open')) setOpenMobile(false);
+    });
     function setCollapsedDesktop(collapsed) {
       shell.classList.toggle('qf-nav-collapsed', collapsed);
       toggle.setAttribute('aria-expanded', collapsed ? 'false' : 'true');
