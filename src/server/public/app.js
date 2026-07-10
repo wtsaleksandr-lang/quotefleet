@@ -80,6 +80,48 @@
   window.qfToastOk = toastOk;
   window.qfSaved = saved;
 
+  // ── Billing portal ────────────────────────────────────────────
+  // Opens the Stripe Customer Portal (manage card / cancel) via the
+  // already-built GET /api/billing/portal. Degrades gracefully when
+  // Stripe isn't configured (503) or the tenant has no Stripe customer
+  // yet (404 — e.g. a trial that never entered a card): we route them to
+  // the pricing page to start/choose a plan instead of dead-ending.
+  function openBillingPortal() {
+    api('/api/billing/portal').then(function (r) {
+      if (r && r.url) { window.location.href = r.url; return; }
+      toast('Billing portal is unavailable right now.', 'warn');
+    }).catch(function (e) {
+      if (e && (e.status === 503 || e.status === 404)) {
+        toast(e.message || 'Manage your plan from the pricing page.', 'warn');
+        window.location.href = '/pricing';
+        return;
+      }
+      toastErr(e);
+    });
+  }
+  window.qfOpenBillingPortal = openBillingPortal;
+
+  // ── Sidebar new-item badges ───────────────────────────────────
+  // Subtle brand-blue pills on Leads / Callbacks showing unactioned
+  // counts, so a dispatcher living in the portal sees a hot lead without
+  // waiting on email. Fed by /api/tenant/overview (newLeads +
+  // pendingCallbacks); refreshed on boot and whenever those routes open.
+  function setNavBadge(route, count) {
+    var b = document.querySelector('.sidebar [data-route="' + route + '"] .qf-nav-badge');
+    if (!b) return;
+    var n = Number(count) || 0;
+    if (n > 0) { b.textContent = n > 99 ? '99+' : String(n); b.hidden = false; }
+    else { b.textContent = ''; b.hidden = true; }
+  }
+  function refreshNavBadges() {
+    api('/api/tenant/overview').then(function (d) {
+      if (!d || !d.stats) return;
+      setNavBadge('leads', d.stats.newLeads || 0);
+      setNavBadge('callbacks', d.stats.pendingCallbacks || 0);
+    }).catch(function () { /* non-fatal — badges are a hint, not a blocker */ });
+  }
+  window.qfRefreshNavBadges = refreshNavBadges;
+
   var state = { me: null, route: null };
 
   function setActiveNav(route) {
@@ -92,6 +134,7 @@
     state.route = route;
     setActiveNav(route);
     history.pushState({}, '', '/app/' + route);
+    if (route === 'overview' || route === 'leads' || route === 'callbacks') refreshNavBadges();
     var c = $('#page-content');
     c.innerHTML = '<div class="muted">Loading…</div>';
     if (route === 'overview') return renderOverview(c);
@@ -249,6 +292,22 @@
         });
         coCard.appendChild(saveCo);
       }).catch(function () { coLoading.textContent = 'Could not load company details.'; });
+
+      // ── Plan & billing card ─────────────────────────────────────
+      // In-app subscription management: opens the Stripe Customer Portal
+      // (change card / cancel) via GET /api/billing/portal. A subscriber
+      // no longer has to leave for the public pricing page to cancel.
+      var billCard = el('div', { class: 'card', style: { marginTop: '14px' } });
+      billCard.appendChild(el('div', { class: 'card-title', text: 'Plan & billing' }));
+      var planLabel = (r.tenant && r.tenant.plan) || 'free';
+      billCard.appendChild(el('p', {
+        class: 'muted', style: { marginTop: 0 },
+        text: 'Current plan: ' + planLabel + '. Update your card, change plan, or cancel anytime — no phone call needed.',
+      }));
+      var billBtn = el('button', { class: 'btn btn-primary', text: 'Manage billing' });
+      billBtn.addEventListener('click', function () { openBillingPortal(); });
+      billCard.appendChild(billBtn);
+      c.appendChild(billCard);
 
       // Password card
       var pwd = el('div', { class: 'card', style: { marginTop: '14px' } });
@@ -2142,7 +2201,9 @@
       bar.innerHTML =
         'Trial — ' + trial.daysLeft + ' day' + (trial.daysLeft === 1 ? '' : 's') + ' left · ' +
         'all features unlocked &nbsp;·&nbsp; ' +
-        '<a href="/pricing" style="color: var(--accent); text-decoration: underline; display: inline-block; padding: 11px 8px; margin: -11px 0; line-height: 1;">Manage plan →</a>';
+        '<a href="/pricing" data-manage-billing style="color: var(--accent); text-decoration: underline; display: inline-block; padding: 11px 8px; margin: -11px 0; line-height: 1;">Manage plan →</a>';
+      var mb = bar.querySelector('[data-manage-billing]');
+      if (mb) mb.addEventListener('click', function (e) { e.preventDefault(); openBillingPortal(); });
       document.body.classList.remove('qf-trial-locked');
     } else if (trial.status === 'trial_expired') {
       bar.style.background = 'var(--error-bg)';
@@ -2221,6 +2282,21 @@
         return;
       }
       state.me = r;
+      // Single source of truth for "the URL a customer opens" — the canonical
+      // hosted widget URL (<slug>.<hostDomain>) exactly as the Embed page and
+      // the live widget use it. Every dashboard customer-link display / Copy /
+      // Open reads this, so nothing invents a fake `…yourquote.net` domain.
+      (function () {
+        var t = r.tenant;
+        var hosted = t && t.hostedUrl;
+        var url = hosted
+          ? hosted
+          : (t ? new URL('/w/' + encodeURIComponent(t.slug), location.origin).toString() : '');
+        var host = hosted
+          ? hosted.replace(/^https?:\/\//, '').replace(/\/$/, '')
+          : (t ? t.slug : '');
+        window.__qfWidget = { url: url, host: host, slug: t ? t.slug : '' };
+      })();
       $('#sb-tenant-name').textContent = (r.tenant && r.tenant.name) || r.user.name || r.user.email;
       $('#sb-tenant-slug').textContent =
         (r.tenant && r.tenant.hostedUrl)
@@ -2241,6 +2317,8 @@
       $('#sb-logout').addEventListener('click', function () {
         api('/api/auth/logout', { method: 'POST' }).finally(function () { location.href = '/login'; });
       });
+
+      refreshNavBadges();
 
       // Route from URL
       var initial = (location.pathname.split('/app/')[1] || 'overview').split('/')[0];

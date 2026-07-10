@@ -39,7 +39,10 @@
     const copy = routeCopy[current];
     if (!copy || content.querySelector('.qf-share-readiness')) return;
 
-    const directLink = '/w/' + encodeURIComponent(tenantSlug());
+    // Canonical customer link (hosted <slug>.<hostDomain>), shared across the
+    // dashboard via window.__qfWidget. Never a fake `…yourquote.net`.
+    const directLink = (window.__qfWidget && window.__qfWidget.url)
+      || new URL('/w/' + encodeURIComponent(tenantSlug()), window.location.origin).toString();
     const hasPreview = !!content.querySelector('iframe[title="QuoteFleet widget preview"]');
     const hasCode = hasValue('.code');
     const hasBrandFields = current === 'brand' || hasValue('input, textarea');

@@ -883,6 +883,26 @@ html[data-theme="light"] .hero h1 .accent {
   background: var(--surface-2); color: var(--accent);
   border-left-color: var(--accent);
 }
+/* New-item count pill on Leads / Callbacks nav — subtle brand-blue,
+   readable in both themes. Pushed to the row's right edge. */
+.sidebar .nav-item .qf-nav-badge {
+  margin-left: auto;
+  min-width: 18px;
+  height: 18px;
+  padding: 0 6px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 9px;
+  background: var(--accent-fill);
+  color: #fff;
+  font-family: var(--font-mono);
+  font-size: 10.5px;
+  font-weight: 700;
+  letter-spacing: 0;
+  line-height: 1;
+}
+.sidebar .nav-item .qf-nav-badge[hidden] { display: none; }
 .sidebar .group {
   font-family: var(--font-mono);
   font-size: 10px; color: var(--muted-soft);

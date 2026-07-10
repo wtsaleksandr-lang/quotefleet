@@ -23,22 +23,30 @@
     link.href = href;
     document.head.appendChild(link);
   }
-  function readBrand() {
-    // Contact fields start EMPTY so the demo trust card shows only real values
-    // the prospect types (renderBrandTrust filters falsy). Previously these
-    // held literal placeholders ("Phone number", "Company address", "USDOT #",
-    // a fake dispatch@ email) that rendered as if the carrier's page were
-    // broken. The editor inputs keep their own placeholder="" hints. Only the
-    // company name keeps a default, since it's the header title slot.
-    const fallback = {
-      name: 'Your company name',
-      phone: '',
-      email: '',
-      address: '',
-      usdot: '',
-      mc: '',
-      logo: '',
+  // Defaults for the "brand it yourself" preview come from the carrier's REAL
+  // resolved widget config (exposed by widget.js as window.QF_WIDGET_CONFIG),
+  // so the demo opens on a credible, filled-in sample carrier (name, logo,
+  // phone, dispatch email, address, USDOT/MC) instead of blank "Your company
+  // name" / "Your logo" placeholders that read as an unconfigured shell. Any
+  // value the prospect types is saved to localStorage and overrides the
+  // default.
+  function configDefaults() {
+    const cfg = (typeof window !== 'undefined' && window.QF_WIDGET_CONFIG) || {};
+    const b = cfg.brand || {};
+    const c = cfg.contact || {};
+    const t = cfg.tenant || {};
+    return {
+      name: b.displayName || t.name || 'Your company name',
+      phone: c.phone || '',
+      email: c.email || '',
+      address: c.address || '',
+      usdot: c.dotNumber || '',
+      mc: c.mcNumber || '',
+      logo: b.logoUrl || '',
     };
+  }
+  function readBrand() {
+    const fallback = configDefaults();
     try {
       return Object.assign(fallback, JSON.parse(localStorage.getItem(DEMO_BRAND_KEY) || '{}'));
     } catch (_) {
@@ -68,8 +76,14 @@
   function renderLogoSlot(slot, data) {
     const nextHtml = data.logo ? '<em aria-hidden="true">✎</em>' : '<span>Your logo</span><em aria-hidden="true">✎</em>';
     if (slot.innerHTML !== nextHtml) slot.innerHTML = nextHtml;
-    const nextBg = data.logo ? 'url(' + data.logo + ')' : '';
-    if (slot.style.backgroundImage !== nextBg) slot.style.backgroundImage = nextBg;
+    // Paint the logo via a CSS custom property (not a direct background-image):
+    // `public-calculator-no-gradients.css` forces `.qf-header * { background-image:
+    // none !important }`, which would otherwise wipe a direct inline background.
+    // A dedicated higher-specificity rule reads this var (see brand-preview.css).
+    const nextBg = data.logo ? 'url("' + data.logo + '")' : '';
+    if (slot.style.getPropertyValue('--qf-demo-logo-img') !== nextBg) {
+      slot.style.setProperty('--qf-demo-logo-img', nextBg);
+    }
   }
   function toggleBrandEditor() {
     const data = readBrand();
@@ -96,6 +110,11 @@
       const slot = ensureLogoSlot(header);
       renderLogoSlot(slot, data);
     }
+    // The demo trust card below the header now carries the (real) contact
+    // details, so hide the widget's own contact block to avoid showing the
+    // same phone/email/address/authority twice.
+    const contactBox = $('qf-contact');
+    if (contactBox) contactBox.style.display = 'none';
     renderBrandTrust(data);
     ensureBrandEditor(data);
   }

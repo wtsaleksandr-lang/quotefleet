@@ -25,8 +25,16 @@
     document.querySelector('.sidebar [data-route="' + target + '"]')?.click();
   }
 
-  function publicPath() {
-    return '/w/' + encodeURIComponent(tenantSlug());
+  // Canonical customer link (hosted <slug>.<hostDomain>), shared across the
+  // dashboard via window.__qfWidget. Never a fake `…yourquote.net`.
+  function widget() {
+    const w = window.__qfWidget;
+    if (w && w.url) return { url: w.url, host: w.host };
+    const slug = tenantSlug();
+    return {
+      url: new URL('/w/' + encodeURIComponent(slug), window.location.origin).toString(),
+      host: slug,
+    };
   }
 
   function editor() {
@@ -44,7 +52,7 @@
         <div class="qf-brand-actions">
           <button type="button" data-brand-go="rates">Rates</button>
           <button type="button" data-brand-go="ai">AI setup</button>
-          <a href="${publicPath()}" target="_blank" rel="noopener">Open page</a>
+          <a href="${widget().url}" target="_blank" rel="noopener">Open page</a>
         </div>
       </div>
       <div class="qf-brand-editor-body">
@@ -62,7 +70,7 @@
           <strong>Customer page preview</strong>
           <div class="qf-brand-page-mock" aria-label="Branded page preview">
             <div class="qf-brand-page-top">
-              <div style="display:flex;gap:10px;align-items:center"><div class="qf-brand-logo"></div><div><strong>${name}</strong><small>${tenantSlug()}.yourquote.net</small></div></div>
+              <div style="display:flex;gap:10px;align-items:center"><div class="qf-brand-logo"></div><div><strong>${name}</strong><small>${widget().host}</small></div></div>
               <span class="qf-brand-page-chip">BRANDED</span>
             </div>
             <div class="qf-brand-page-body">

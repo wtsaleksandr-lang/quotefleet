@@ -11,8 +11,16 @@
     return value && value !== '…' ? value : 'your-company';
   }
 
-  function publicPath() {
-    return '/w/' + encodeURIComponent(slug());
+  // Canonical customer link (hosted <slug>.<hostDomain>), shared across the
+  // dashboard via window.__qfWidget. Never a fake `…yourquote.net`.
+  function widget() {
+    const w = window.__qfWidget;
+    if (w && w.url) return { url: w.url, host: w.host };
+    const s = slug();
+    return {
+      url: new URL('/w/' + encodeURIComponent(s), window.location.origin).toString(),
+      host: s,
+    };
   }
 
   function go(target) {
@@ -20,7 +28,7 @@
   }
 
   async function copyPublicLink() {
-    const url = new URL(publicPath(), window.location.origin).toString();
+    const url = widget().url;
     try {
       await navigator.clipboard.writeText(url);
       window.qfToast?.('Calculator link copied.', 'success', 'Ready to share');
@@ -41,7 +49,7 @@
           <p>Start with the public link, then add it to email signatures, saved replies, messages, and your website when ready.</p>
         </div>
         <div class="qf-launch-actions">
-          <a href="${publicPath()}" target="_blank" rel="noopener">Open calculator</a>
+          <a href="${widget().url}" target="_blank" rel="noopener">Open calculator</a>
           <button type="button" data-launch-copy>Copy link</button>
           <button type="button" data-launch-go="brand">Brand page</button>
         </div>
