@@ -58,7 +58,9 @@ import { WIDGET_PRESETS, WIDGET_FONTS, WIDGET_PRESET_LIST } from '../widgetTheme
 import { loadEnv } from '../../config.js';
 import { makePreviewGrant, PREVIEW_GRANT_PARAM, PREVIEW_GRANT_TTL_MS } from '../access.js';
 import { syncTenantToMarketplace } from '../../marketplace/sync.js';
-import { DEFAULT_AI_SYSTEM_PROMPT } from '../../calc/defaults.js';
+import { DEFAULT_AI_SYSTEM_PROMPT, AUTO_FSC_DEFAULTS } from '../../calc/defaults.js';
+import { getDieselPrice, asOfLabel } from '../../eia/dieselPrice.js';
+import { autoFscPerMile } from '../../calc/fuelSurcharge.js';
 import { createHmac } from 'node:crypto';
 
 /** Seed defaults stamped at signup (see routes/auth.ts + calc/defaults.ts).
@@ -820,6 +822,54 @@ export function registerTenantRoutes(app: Express) {
       .where(eq(tenants.id, req.tenant!.id));
     bumpMarketplace(req.tenant!.id);
     res.json({ ok: true });
+  });
+
+  // ── fuel-surcharge mode (auto EIA diesel vs manual per-card %) ──
+  // 'manual' (default) → each rate card's fixed fuel_surcharge_pct is used.
+  // 'auto' → surcharge derived weekly from the EIA national diesel price via
+  // the standard DOE-index formula. The response also carries the current
+  // national diesel price + resulting $/mile so the dashboard can show the
+  // live basis read-only.
+  app.get('/api/tenant/fsc-settings', requireAuth, requireTenant, async (req, res) => {
+    const diesel = await getDieselPrice();
+    const perMileUsd = autoFscPerMile({
+      dieselUsdPerGal: diesel.usdPerGal,
+      pegUsdPerGal: AUTO_FSC_DEFAULTS.pegUsdPerGal,
+      mpg: AUTO_FSC_DEFAULTS.mpg,
+    });
+    res.json({
+      mode: req.tenant!.fscMode === 'auto' ? 'auto' : 'manual',
+      diesel: {
+        usdPerGal: Math.round(diesel.usdPerGal * 1000) / 1000,
+        asOf: diesel.asOf,
+        asOfLabel: asOfLabel(diesel.asOf),
+        source: diesel.source,
+        stale: diesel.stale,
+      },
+      formula: {
+        pegUsdPerGal: AUTO_FSC_DEFAULTS.pegUsdPerGal,
+        mpg: AUTO_FSC_DEFAULTS.mpg,
+        perMileUsd,
+      },
+    });
+  });
+
+  app.put('/api/tenant/fsc-settings', requireAuth, requireTenant, async (req, res) => {
+    const Patch = z.object({ mode: z.enum(['manual', 'auto']) });
+    const parse = Patch.safeParse(req.body);
+    if (!parse.success) return res.status(400).json({ error: 'Invalid input' });
+    await db()
+      .update(tenants)
+      .set({ fscMode: parse.data.mode, updatedAt: new Date() })
+      .where(eq(tenants.id, req.tenant!.id));
+    await db().insert(auditLog).values({
+      tenantId: req.tenant!.id,
+      userId: req.user!.id,
+      action: 'fsc.mode.update',
+      actorKind: 'user',
+      detailsJson: { mode: parse.data.mode },
+    });
+    res.json({ ok: true, mode: parse.data.mode });
   });
 
   // ── embed snippet ─────────────────────────────────────────────

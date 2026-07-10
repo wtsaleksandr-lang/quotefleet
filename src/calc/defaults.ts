@@ -12,6 +12,31 @@
 import type { NewRateCard, NewAccessorial, NewLaneZone } from '../db/schema.js';
 import { DEFAULT_LTL_CONFIG } from './freightClass.js';
 
+/**
+ * Automatic fuel-surcharge defaults.
+ *
+ * Used when a tenant opts into `fscMode = 'auto'` — the surcharge is derived
+ * from the EIA weekly national diesel price with the standard DOE-index model
+ * (see src/calc/fuelSurcharge.ts). These are sensible, defensible industry
+ * defaults; a peg of $1.25/gal and 6.0 mpg reproduce the classic
+ * "+$0.01/mile per $0.06 over peg" carrier FSC table.
+ */
+export const AUTO_FSC_DEFAULTS = {
+  /** Base/peg diesel price ($/gal). Surcharge is $0 at or below this. */
+  pegUsdPerGal: 1.25,
+  /** Assumed truck fuel economy (mi/gal). */
+  mpg: 6.0,
+  /**
+   * Last-resort national average diesel price ($/gal) used only when BOTH
+   * the live EIA fetch and the cached value are unavailable — so a quote
+   * never breaks. Roughly the 2026 national average; refreshed in-band the
+   * moment EIA responds.
+   */
+  fallbackDieselUsdPerGal: 3.9,
+  /** Refresh the cached EIA price when it is older than this many days. */
+  refreshAfterDays: 7,
+} as const;
+
 export const DEFAULT_RATE_CARDS: Omit<NewRateCard, 'tenantId'>[] = [
   // ─── Truckload (FTL) ──────────────────────────────────────────────
   {

@@ -28,6 +28,7 @@ const baseT: Tenant = {
   plan: 'free',
   status: 'active',
   accessMode: 'public',
+  fscMode: 'manual',
   trialEndsAt: inFuture,
   marketplaceOptIn: false,
   mcNumber: null,

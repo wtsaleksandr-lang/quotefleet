@@ -21,6 +21,7 @@ import {
 import { requireAuth, requireTenant } from '../middleware.js';
 import { rateAgentTurn } from '../../ai/rateAgent.js';
 import { calculate, type CalcRequest } from '../../calc/engine.js';
+import { resolveFscForTenant, asOfLabel } from '../../eia/dieselPrice.js';
 import { distanceBetween } from '../../calc/distance.js';
 
 export function registerAiRoutes(app: Express) {
@@ -110,7 +111,13 @@ export function registerAiRoutes(app: Express) {
       deliveryPortCode: parse.data.delivery.portCode,
       selectedAccessorialCodes: parse.data.selectedAccessorialCodes,
     };
-    const result = calculate(cards, accs, zones, calcReq);
+    const fscCtx = await resolveFscForTenant(req.tenant!);
+    const result = calculate(cards, accs, zones, calcReq, [], {
+      mode: fscCtx.mode,
+      perMileUsd: fscCtx.perMileUsd,
+      dieselUsd: fscCtx.dieselUsd,
+      asOfLabel: fscCtx.asOf ? asOfLabel(fscCtx.asOf) : undefined,
+    });
     res.json({ miles: dist.miles, origin: dist.origin, destination: dist.destination, result });
   });
 }

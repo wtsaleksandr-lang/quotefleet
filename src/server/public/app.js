@@ -696,12 +696,80 @@
     try { localStorage.setItem('qf-rates-view', JSON.stringify(v)); } catch (e) {}
   }
 
+  // ── Fuel-surcharge mode card (auto EIA diesel vs manual per-card %) ──
+  function buildFscCard() {
+    var card = el('div', { class: 'card', style: { marginTop: '14px' } });
+    card.appendChild(el('div', { class: 'card-title', text: 'Fuel surcharge' }));
+    var body = el('div');
+    card.appendChild(body);
+    body.appendChild(el('p', { class: 'muted', text: 'Loading fuel surcharge settings…' }));
+
+    function segButton(label, active, onClick) {
+      var b = el('button', {
+        class: 'btn ' + (active ? 'btn-primary' : 'btn-secondary') + ' btn-sm',
+        text: label,
+        style: { marginRight: '8px' },
+      });
+      b.addEventListener('click', onClick);
+      return b;
+    }
+
+    function paint(data) {
+      body.innerHTML = '';
+      var mode = data.mode === 'auto' ? 'auto' : 'manual';
+      var seg = el('div', { style: { display: 'flex', flexWrap: 'wrap', gap: '0', marginBottom: '10px' } });
+      seg.appendChild(segButton('Automatic — updates weekly', mode === 'auto', function () { setMode('auto'); }));
+      seg.appendChild(segButton('Set my own %', mode === 'manual', function () { setMode('manual'); }));
+      body.appendChild(seg);
+
+      var d = data.diesel || {};
+      var f = data.formula || {};
+      if (mode === 'auto') {
+        var priceTxt = (typeof d.usdPerGal === 'number')
+          ? '$' + d.usdPerGal.toFixed(2) + '/gal'
+          : 'unavailable';
+        var wk = d.asOfLabel ? ' (wk of ' + d.asOfLabel + ')' : '';
+        var perMi = (typeof f.perMileUsd === 'number') ? '$' + f.perMileUsd.toFixed(2) + '/mi' : '—';
+        body.appendChild(el('p', { style: { margin: '0 0 6px' }, html:
+          'Fuel surcharge follows the <strong>national average diesel price</strong> from the U.S. EIA. ' +
+          'Current national average: <strong>' + priceTxt + '</strong>' + wk + ' → surcharge <strong>' + perMi + '</strong>.' }));
+        body.appendChild(el('p', { class: 'muted', style: { margin: '0 0 4px', fontSize: '13px' }, text:
+          'Formula: ($diesel − $' + (f.pegUsdPerGal != null ? f.pegUsdPerGal.toFixed(2) : '1.25') + ' base) ÷ ' + (f.mpg != null ? f.mpg : '6.0') + ' mpg. Refreshes weekly from EIA. Your per-card Fuel % is ignored while auto is on.' }));
+        if (d.stale) {
+          body.appendChild(el('div', { class: 'notice', style: { marginTop: '6px' }, text:
+            'Using the last saved diesel price (live update pending). Quotes still work.' }));
+        }
+      } else {
+        body.appendChild(el('p', { style: { margin: '0 0 4px' }, text:
+          'Each rate card uses its own fixed Fuel % (the column in the table below). Switch to Automatic to track the national diesel price weekly.' }));
+      }
+    }
+
+    function setMode(mode) {
+      api('/api/tenant/fsc-settings', { method: 'PUT', body: { mode: mode } })
+        .then(function () { toastOk(mode === 'auto' ? 'Automatic fuel surcharge on' : 'Manual fuel surcharge on'); return load(); })
+        .catch(toastErr);
+    }
+
+    function load() {
+      return api('/api/tenant/fsc-settings').then(paint).catch(function (e) {
+        body.innerHTML = '';
+        body.appendChild(el('p', { class: 'muted', text: 'Could not load fuel surcharge settings.' }));
+        throw e;
+      });
+    }
+
+    load().catch(function () {});
+    return card;
+  }
+
   function renderRates(c) {
     api('/api/tenant/rate-cards').then(function (d) {
       c.innerHTML = '';
       c.appendChild(el('h1', { text: 'Rate cards' }));
       c.appendChild(el('p', { class: 'page-sub', text: 'One row per service × equipment. Edit cells, blur to save.' }));
       c.appendChild(el('div', { class: 'notice', html: 'Tip: ask the AI agent to bulk-update these → <a href="#" data-route="ai">open AI panel</a>' }));
+      c.appendChild(buildFscCard());
       var hasDrayage = (d.rateCards || []).some(function (r) { return r.service === 'drayage'; });
       if (hasDrayage) {
         c.appendChild(el('div', {

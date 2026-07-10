@@ -1,0 +1,1 @@
+ALTER TABLE "tenants" ADD COLUMN "fsc_mode" text DEFAULT 'manual' NOT NULL;
