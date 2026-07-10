@@ -160,34 +160,27 @@ body.qf-wft .mini-checks span * {
   color: var(--qf-color-light-text) !important;
 }
 
-/* Neutral grey cards/controls: blue buttons, hover to #D4CFC9. */
+/* Neutral grey cards/controls: blue buttons, hover to #D4CFC9.
+   Auth pages (login/signup) keep the deliberately-light card controls.
+   The dark public tool pages (/tools, /marketplace, /marketplace-carrier)
+   are styled dark by tools-marketplace-wefixtrades.css — cream controls
+   clashed with their dark theme, so they're intentionally excluded here. */
 body.qf-auth-wft .input,
 body.qf-auth-wft .select,
-body.qf-auth-wft .url-builder-preview,
-body.qf-public-wft.qf-tools-marketplace .input,
-body.qf-public-wft.qf-tools-marketplace .select,
-body.qf-public-wft.qf-tools-marketplace .typeahead-list,
-body.qf-public-wft.qf-tools-marketplace .chip,
-body.qf-public-wft.qf-tools-marketplace .mp-pill {
+body.qf-auth-wft .url-builder-preview {
   background: var(--qf-color-neutral-card) !important;
   border-color: rgba(13,60,252,.22) !important;
   color: var(--qf-color-light-text) !important;
 }
 
 body.qf-auth-wft .input:hover,
-body.qf-auth-wft .select:hover,
-body.qf-public-wft.qf-tools-marketplace .chip:hover,
-body.qf-public-wft.qf-tools-marketplace .mp-pill:hover {
+body.qf-auth-wft .select:hover {
   background: var(--qf-color-neutral-card-hover) !important;
 }
 
 body.qf-auth-wft .input,
 body.qf-auth-wft .select,
-body.qf-auth-wft .url-builder-preview,
-body.qf-public-wft.qf-tools-marketplace .input,
-body.qf-public-wft.qf-tools-marketplace .select,
-body.qf-public-wft.qf-tools-marketplace .chip,
-body.qf-public-wft.qf-tools-marketplace .mp-pill {
+body.qf-auth-wft .url-builder-preview {
   color: var(--qf-color-light-text) !important;
 }
 
