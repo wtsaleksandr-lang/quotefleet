@@ -65,7 +65,7 @@ import { createHmac } from 'node:crypto';
  *  Used to tell a genuinely-customized brand/AI config apart from the
  *  out-of-the-box seed so the guided-setup meter only credits real work. */
 const SEED_BRAND_PRIMARY = '#2563eb';
-const SEED_BRAND_ACCENT = '#06b6d4';
+const SEED_BRAND_ACCENT = '#6E8BFF';
 const SEED_BRAND_TAGLINE = 'Instant freight quotes';
 
 /** Fire-and-forget marketplace sync. Logs but never throws. */

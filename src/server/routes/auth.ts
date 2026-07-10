@@ -265,7 +265,7 @@ export function registerAuthRoutes(app: Express) {
           displayName: companyName,
           tagline: 'Instant freight quotes',
           primaryColor: '#2563eb',
-          accentColor: '#06b6d4',
+          accentColor: '#6E8BFF',
           ctaText: 'Get instant quote',
           showPoweredBy: true,
         });

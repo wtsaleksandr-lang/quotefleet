@@ -20,7 +20,7 @@ describe('premium quote document polish', () => {
     expect(html.indexOf('/quote-print.css')).toBeGreaterThan(html.indexOf('/quote-premium.css'));
     expect(html).toContain('Preparing quote');
     expect(css).toContain('Phase AG: premium quote/PDF experience polish');
-    expect(css).toContain('--qdoc-primary: #0F9F8C');
+    expect(css).toContain('--qdoc-primary: #2563eb');
     expect(css).toContain('.qdoc-actions::before');
     expect(css).toContain('@media print');
   });

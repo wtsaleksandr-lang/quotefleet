@@ -163,7 +163,7 @@ async function seedDemoTenant() {
       displayName: 'Demo Drayage & Trucking',
       tagline: 'Instant quotes • Reliable trucks • Same-day dispatch',
       primaryColor: '#2563eb',
-      accentColor: '#06b6d4',
+      accentColor: '#6E8BFF',
       ctaText: 'Get instant quote',
       showPoweredBy: true,
     });
