@@ -24,22 +24,22 @@
     }
     .qfd-wrap { max-width: 1040px; margin: 0 auto; padding: 24px 20px 56px; }
 
-    /* Brand — top-left */
+    /* Brand lockup — logo + name + a subtle selling tagline (demo page only).
+       Tagline color #9fb0c9 on the dark shell ≈ 8:1 contrast (WCAG AA/AAA). */
+    .qfd-head { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; }
     .qfd-brand { display: inline-flex; align-items: center; gap: 10px; color: #f2f5fb; font-weight: 700; font-size: 17px; letter-spacing: -0.02em; text-decoration: none; }
     .qfd-brand img { height: 28px; width: auto; display: block; }
-
-    /* Title — single line, left, no subtitle */
-    .qfd-title {
-      margin: 18px 0 0;
-      text-align: left;
-      font-weight: 800;
-      letter-spacing: -0.03em;
-      color: #f4f7fc;
-      font-size: clamp(15px, 4.4vw, 34px);
-      white-space: nowrap;
-      max-width: 100%;
-      overflow: hidden;
-      text-overflow: clip;
+    .qfd-tag {
+      padding-left: 12px;
+      border-left: 1px solid rgba(148,163,184,.28);
+      color: #9fb0c9;
+      font-weight: 500;
+      font-size: 12.5px;
+      letter-spacing: .005em;
+      line-height: 1.4;
+    }
+    @media (max-width: 380px) {
+      .qfd-tag { border-left: 0; padding-left: 0; }
     }
 
     /* Toolbar — compact icon-only toggles, single row, right-aligned to the
@@ -127,8 +127,10 @@
 </head>
 <body class="qfd-body">
   <div class="qfd-wrap">
-    <a class="qfd-brand" href="/"><img src="/brand/mark-keys.png" alt="QuoteFleet" width="28" height="30" decoding="async">QuoteFleet</a>
-    <h1 class="qfd-title">Your branded rate calculator — live.</h1>
+    <div class="qfd-head">
+      <a class="qfd-brand" href="/"><img src="/brand/mark-keys.png" alt="QuoteFleet" width="28" height="30" decoding="async">QuoteFleet</a>
+      <span class="qfd-tag">Smart freight quote software</span>
+    </div>
 
     <div class="qfd-toolbar">
       <div class="qfd-seg" id="qfd-device-seg" role="group" aria-label="Device preview">
