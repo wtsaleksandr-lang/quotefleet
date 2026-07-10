@@ -84,6 +84,11 @@
   }
 
   function enhance() {
+    // De-clutter: the "Launch workspace" panel is retired from the Embed page —
+    // it buried the real embed snippet + Widget-settings cards. Injector kept
+    // (imported by app.html) but neutralised. See renderEmbed + embed-panel.css.
+    return;
+    // eslint-disable-next-line no-unreachable
     if (route() !== 'embed') return;
     panel();
     steps();

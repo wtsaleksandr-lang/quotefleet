@@ -31,6 +31,21 @@ export const ACCESS_COOKIE_PREFIX = 'qf_acc_';
 /** Grant lifetime — 30 days, matching the login-session TTL. */
 export const ACCESS_TTL_MS = 30 * 24 * 60 * 60 * 1000;
 
+/**
+ * Owner-preview grant — the authenticated dashboard mints one so the tenant
+ * owner can preview their OWN calculator in the live-preview iframes even when
+ * the calculator is private. It rides in the URL (`?pk=`) so it survives the
+ * cross-origin hop to the widget host (the dashboard's auth cookie does not).
+ *
+ * Same HMAC scheme as the access cookie (so it's tenant-scoped + unforgeable),
+ * but SHORT-lived: it grants nobody lasting access, only a ~30-min preview
+ * window. It is NOT a public/shareable link — the value verifies only for the
+ * tenant it was minted for, which only that tenant's owner can request.
+ */
+export const PREVIEW_GRANT_PARAM = 'pk';
+/** Owner-preview grant lifetime — 30 minutes. */
+export const PREVIEW_GRANT_TTL_MS = 30 * 60 * 1000;
+
 export function accessCookieName(tenantId: number): string {
   return ACCESS_COOKIE_PREFIX + tenantId;
 }
@@ -70,6 +85,25 @@ export function verifyAccessCookieValue(
 export function hasValidAccessCookie(tenantId: number, req: Request): boolean {
   const raw = (req.cookies ?? {})[accessCookieName(tenantId)];
   return verifyAccessCookieValue(tenantId, raw);
+}
+
+/** Mint a signed, tenant-scoped, short-lived owner-preview grant. Reuses the
+ *  access-cookie HMAC scheme — only useful to the owner of `tenantId`. */
+export function makePreviewGrant(tenantId: number): string {
+  return makeAccessCookieValue(tenantId, PREVIEW_GRANT_TTL_MS);
+}
+
+/** Read the owner-preview grant from the request query (`?pk=`). */
+export function previewGrantFromReq(req: Request): string {
+  const q = req.query?.[PREVIEW_GRANT_PARAM];
+  return typeof q === 'string' && q.trim() ? q.trim() : '';
+}
+
+/** True if the request carries a valid, unexpired signed preview grant for the
+ *  tenant. Signature-verified + tenant-scoped: a grant minted for tenant A can
+ *  never unlock tenant B's private widget. */
+export function hasValidPreviewGrant(tenantId: number, req: Request): boolean {
+  return verifyAccessCookieValue(tenantId, previewGrantFromReq(req));
 }
 
 /** Extract an invite token from the request (`?key=` or `:token` path param). */
@@ -118,6 +152,10 @@ export async function tenantAccessAllowed(
 ): Promise<boolean> {
   if (tenant.accessMode !== 'private') return true;
   if (hasValidAccessCookie(tenant.id, req)) return true;
+  // Signed owner-preview grant (`?pk=`) — lets the tenant owner preview their
+  // OWN private calculator (and its rate/quote APIs) from the dashboard iframe.
+  // Tenant-scoped + short-lived; forgeable only with SESSION_SECRET.
+  if (hasValidPreviewGrant(tenant.id, req)) return true;
   const token = accessTokenFromReq(req);
   if (token && (await lookup(tenant.id, token))) return true;
   return false;
@@ -159,17 +197,19 @@ export async function consumeAccessToken(tenantId: number, token: string): Promi
   return !!rows[0];
 }
 
-/** Set the signed, httpOnly, tenant-scoped access cookie on the response. */
-export function setAccessCookie(res: Response, tenantId: number): void {
+/** Set the signed, httpOnly, tenant-scoped access cookie on the response.
+ *  `ttlMs` defaults to the full grant lifetime; pass a shorter value for a
+ *  time-boxed grant (e.g. the owner-preview window). */
+export function setAccessCookie(res: Response, tenantId: number, ttlMs: number = ACCESS_TTL_MS): void {
   const env = loadEnv();
   const isHttps =
     (env.PUBLIC_BASE_URL ?? '').startsWith('https://') ||
     process.env.NODE_ENV === 'production';
-  res.cookie(accessCookieName(tenantId), makeAccessCookieValue(tenantId), {
+  res.cookie(accessCookieName(tenantId), makeAccessCookieValue(tenantId, ttlMs), {
     httpOnly: true,
     sameSite: 'lax',
     secure: isHttps,
-    maxAge: ACCESS_TTL_MS,
+    maxAge: ttlMs,
     path: '/',
   });
 }
