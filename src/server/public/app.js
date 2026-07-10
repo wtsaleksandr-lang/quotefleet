@@ -1388,9 +1388,10 @@
 
   // ── Embed ─────────────────────────────────────────────────────
   function renderEmbed(c) {
-    Promise.all([api('/api/tenant/embed'), api('/api/tenant/brand')]).then(function (results) {
+    Promise.all([api('/api/tenant/embed'), api('/api/tenant/brand'), api('/api/tenant/access')]).then(function (results) {
       var d = results[0];
       var b = (results[1] && results[1].brand) || {};
+      var access = results[2] || { accessMode: 'public', links: [] };
       c.innerHTML = '';
       c.appendChild(el('h1', { text: 'Embed code' }));
       c.appendChild(el('p', { class: 'page-sub', text: 'Drop one line of HTML on any page of your website.' }));
@@ -1551,6 +1552,11 @@
       }));
       c.appendChild(emb);
 
+      // Card 2b — Access (public vs private invite-only calculator).
+      var accCard = el('div', { class: 'card', style: { marginTop: '14px' } });
+      c.appendChild(accCard);
+      renderAccessCard(accCard, access);
+
       var card = el('div', { class: 'card', style: { marginTop: '14px' } });
       card.appendChild(el('div', { class: 'card-title', text: 'Recommended — JS embed (auto-resize)' }));
       var pre = el('div', { class: 'code', text: d.snippet });
@@ -1590,6 +1596,98 @@
       card4.appendChild(rg);
       c.appendChild(card4);
     }).catch(showErr(c));
+  }
+
+  // ── Access control card (public vs private invite-only) ────────
+  function renderAccessCard(card, access) {
+    card.innerHTML = '';
+    card.appendChild(el('div', { class: 'card-title', text: 'Widget settings — access' }));
+    card.appendChild(el('div', { class: 'card-subtitle', text: 'Choose who can open your rate calculator.' }));
+
+    var mode = access.accessMode === 'private' ? 'private' : 'public';
+
+    function optionRow(value, title, desc) {
+      var wrap = el('label', { style: { display: 'flex', gap: '12px', alignItems: 'flex-start', padding: '12px 0', borderTop: '1px solid var(--border)', cursor: 'pointer' } });
+      var r = el('input', { type: 'radio', name: 'qf-access-mode', style: { marginTop: '3px', flex: '0 0 auto' } });
+      r.value = value; r.checked = (mode === value);
+      r.addEventListener('change', function () {
+        if (!r.checked) return;
+        api('/api/tenant/access', { method: 'PUT', body: { accessMode: value } }).then(function () {
+          access.accessMode = value; toastOk('Saved'); renderAccessCard(card, access);
+        }).catch(function (e) { r.checked = (mode === value); toastErr(e); });
+      });
+      var txt = el('div', { style: { flex: '1 1 auto' } }, [
+        el('div', { text: title, style: { fontWeight: '600' } }),
+        el('div', { class: 'field-hint', text: desc, style: { marginTop: '2px' } }),
+      ]);
+      wrap.appendChild(r); wrap.appendChild(txt);
+      return wrap;
+    }
+    card.appendChild(optionRow('public', 'Public', 'Anyone with your link can open the calculator and get a quote.'));
+    card.appendChild(optionRow('private', 'Private — invite only', 'Only people you invite (via a unique link) can open the calculator. Everyone else sees a locked page.'));
+
+    if (mode !== 'private') return;
+
+    var sec = el('div', { style: { marginTop: '14px', paddingTop: '14px', borderTop: '1px solid var(--border)' } });
+    sec.appendChild(el('div', { text: 'Invite links', style: { fontWeight: '600', marginBottom: '4px' } }));
+    sec.appendChild(el('div', { class: 'field-hint', text: 'Create one link per customer. Share it privately. Revoke any time — it stops working immediately.' }));
+
+    var list = el('div', { style: { marginTop: '12px' } });
+    sec.appendChild(list);
+
+    function fmtDate(s) { if (!s) return 'never'; try { return new Date(s).toLocaleDateString(); } catch (e) { return 'never'; } }
+
+    function renderList() {
+      list.innerHTML = '';
+      var links = access.links || [];
+      if (!links.length) {
+        list.appendChild(el('div', { class: 'field-hint', text: 'No invite links yet. Create one below.' }));
+      }
+      links.forEach(function (l) {
+        var row = el('div', { style: { border: '1px solid var(--border)', borderRadius: '10px', padding: '12px', marginBottom: '8px', opacity: l.active ? '1' : '0.55' } });
+        var head = el('div', { style: { display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '8px', flexWrap: 'wrap' } });
+        head.appendChild(el('div', { text: l.label + (l.active ? '' : ' (revoked)'), style: { fontWeight: '600' } }));
+        head.appendChild(el('div', { class: 'field-hint', text: 'Opened ' + (l.useCount || 0) + '× · last ' + fmtDate(l.lastUsedAt) }));
+        row.appendChild(head);
+        var urlRow = el('div', { style: { display: 'flex', gap: '8px', marginTop: '8px', alignItems: 'center', flexWrap: 'wrap' } });
+        var urlBox = el('input', { class: 'input', type: 'text', style: { flex: '1 1 220px', fontSize: '12px' } });
+        urlBox.value = l.url; urlBox.readOnly = true;
+        urlRow.appendChild(urlBox);
+        if (l.active) {
+          var copyBtn = el('button', { class: 'btn btn-secondary', text: 'Copy' });
+          copyBtn.addEventListener('click', function () { navigator.clipboard.writeText(l.url).then(function () { copyBtn.textContent = 'Copied ✓'; toastOk('Copied'); setTimeout(function () { copyBtn.textContent = 'Copy'; }, 1500); }); });
+          urlRow.appendChild(copyBtn);
+          var revBtn = el('button', { class: 'btn btn-danger', text: 'Revoke' });
+          revBtn.addEventListener('click', function () {
+            if (!confirm('Revoke "' + l.label + '"? This link will stop working immediately.')) return;
+            api('/api/tenant/access/links/' + l.id + '/revoke', { method: 'POST' }).then(function () {
+              l.active = false; toastOk('Revoked'); renderList();
+            }).catch(toastErr);
+          });
+          urlRow.appendChild(revBtn);
+        }
+        row.appendChild(urlRow);
+        list.appendChild(row);
+      });
+    }
+    renderList();
+
+    var createRow = el('div', { style: { display: 'flex', gap: '8px', marginTop: '12px', flexWrap: 'wrap' } });
+    var nameInp = el('input', { class: 'input', type: 'text', placeholder: 'Customer or company name', style: { flex: '1 1 220px' } });
+    var createBtn = el('button', { class: 'btn btn-primary', text: '+ Create invite link' });
+    createBtn.addEventListener('click', function () {
+      var label = (nameInp.value || '').trim();
+      if (!label) { toast('Enter a name for the link', 'warn'); nameInp.focus(); return; }
+      createBtn.disabled = true;
+      api('/api/tenant/access/links', { method: 'POST', body: { label: label } }).then(function (r) {
+        access.links = access.links || [];
+        access.links.unshift(r.link);
+        nameInp.value = ''; createBtn.disabled = false; toastOk('Invite link created'); renderList();
+      }).catch(function (e) { createBtn.disabled = false; toastErr(e); });
+    });
+    createRow.appendChild(nameInp); createRow.appendChild(createBtn);
+    sec.appendChild(createRow);
+    card.appendChild(sec);
   }
 
   // ── Audit log ─────────────────────────────────────────────────

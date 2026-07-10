@@ -38,6 +38,7 @@ import { getTrialState } from '../trialGating.js';
 import { canUseProFeature } from '../plans.js';
 import { publicCalcLimiter, publicChatLimiter, publicLeadLimiter } from '../rateLimits.js';
 import { resolveWidgetTheme } from '../widgetThemes.js';
+import { enforceTenantAccess } from '../access.js';
 
 /** Returns true if the request's Origin/Referer host matches the
  *  tenant's brand_configs.allowed_domains (CSV). Empty list = wide open
@@ -223,6 +224,9 @@ export function registerPublicRoutes(app: Express) {
     if (!tenant || tenant.status !== 'active') {
       return res.status(404).json({ error: 'Tenant not found or inactive' });
     }
+    // Private-calculator gate — a private tenant's rates are not fetchable
+    // without a valid access grant (invite cookie/token).
+    if (!(await enforceTenantAccess(tenant, req, res))) return;
     const { cards, accs, zones, terms, brand } = await loadConfig(tenant.id);
 
     // Ports relevant to drayage zones — only return ones that have at
@@ -288,6 +292,8 @@ export function registerPublicRoutes(app: Express) {
     if (!tenant || tenant.status !== 'active') {
       return res.status(404).json({ error: 'Tenant not found' });
     }
+    // Private-calculator gate — no grant, no quote (rates stay locked).
+    if (!(await enforceTenantAccess(tenant, req, res))) return;
     // Honor the carrier's allowedDomains brand setting.
     const brand = (await db().select().from(brandConfigs).where(eq(brandConfigs.tenantId, tenant.id)).limit(1))[0];
     if (!originAllowed(brand?.allowedDomains, req)) {
@@ -349,6 +355,8 @@ export function registerPublicRoutes(app: Express) {
     if (!tenant || tenant.status !== 'active') {
       return res.status(404).json({ error: 'Tenant not found' });
     }
+    // Private-calculator gate — reject lead submissions without a grant.
+    if (!(await enforceTenantAccess(tenant, req, res))) return;
     const brand = (await db().select().from(brandConfigs).where(eq(brandConfigs.tenantId, tenant.id)).limit(1))[0];
     if (!originAllowed(brand?.allowedDomains, req)) {
       return res.status(403).json({ error: 'This widget is not authorized for the calling domain.' });
@@ -549,6 +557,8 @@ export function registerPublicRoutes(app: Express) {
     const chatTenant = (
       await db().select().from(tenants).where(eq(tenants.id, lead.tenantId)).limit(1)
     )[0];
+    // Private-calculator gate — follow-up chat also requires a grant.
+    if (chatTenant && !(await enforceTenantAccess(chatTenant, req, res))) return;
     const ai = await db()
       .select()
       .from(aiConfigs)
@@ -607,6 +617,11 @@ export function registerPublicRoutes(app: Express) {
       const leadRows = await db().select().from(leads).where(eq(leads.refId, refId)).limit(1);
       const lead = leadRows[0];
       if (!lead) return res.status(404).json({ error: 'Lead not found' });
+      // Private-calculator gate — callback requests require a grant too.
+      const cbTenant = (
+        await db().select().from(tenants).where(eq(tenants.id, lead.tenantId)).limit(1)
+      )[0];
+      if (cbTenant && !(await enforceTenantAccess(cbTenant, req, res))) return;
 
       const [row] = await db()
         .insert(callbackRequests)
@@ -666,6 +681,9 @@ export function registerPublicRoutes(app: Express) {
     const lead = rows[0];
     if (!lead) return res.status(404).json({ error: 'Lead not found' });
     const t = await db().select().from(tenants).where(eq(tenants.id, lead.tenantId)).limit(1);
+    // Private-calculator gate — a private tenant's lead/quote data is not
+    // readable without a grant.
+    if (t[0] && !(await enforceTenantAccess(t[0], req, res))) return;
     const brand = await db()
       .select()
       .from(brandConfigs)

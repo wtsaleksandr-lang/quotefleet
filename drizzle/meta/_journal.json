@@ -57,6 +57,13 @@
       "when": 1778572800002,
       "tag": "0007_widget_theming",
       "breakpoints": true
+    },
+    {
+      "idx": 8,
+      "version": "7",
+      "when": 1778572800003,
+      "tag": "0008_calculator_access",
+      "breakpoints": true
     }
   ]
 }

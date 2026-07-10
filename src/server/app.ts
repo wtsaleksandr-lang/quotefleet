@@ -4,8 +4,16 @@ import { resolve } from 'node:path';
 import { readFile } from 'node:fs/promises';
 import { fileURLToPath } from 'node:url';
 import { dirname } from 'node:path';
+import { eq } from 'drizzle-orm';
 import { db } from '../db/client.js';
-import { tenants } from '../db/schema.js';
+import { tenants, brandConfigs } from '../db/schema.js';
+import {
+  accessTokenFromReq,
+  consumeAccessToken,
+  hasValidAccessCookie,
+  setAccessCookie,
+  renderGatePage,
+} from './access.js';
 import { registerAuthRoutes } from './routes/auth.js';
 import { registerPublicRoutes } from './routes/public.js';
 import { registerTenantRoutes } from './routes/tenant.js';
@@ -118,6 +126,71 @@ export function createApp(): express.Express {
   });
 
   const publicDir = resolve(process.cwd(), 'src/server/public');
+
+  // Serve the widget shell, optionally injecting the tenant slug (custom-
+  // domain path, where there's no slug in the URL for widget.js to read).
+  function sendWidgetHtml(
+    res: express.Response,
+    next: express.NextFunction,
+    injectSlug: string | null
+  ) {
+    if (!injectSlug) return res.sendFile('widget.html', { root: publicDir });
+    readFile(resolve(publicDir, 'widget.html'), 'utf8')
+      .then((html) => {
+        const inject = `<script>window.QF_TENANT_SLUG=${JSON.stringify(injectSlug)};</script>\n`;
+        res
+          .type('html')
+          .send(html.replace('<script src="/widget.js"></script>', inject + '<script src="/widget.js"></script>'));
+      })
+      .catch(next);
+  }
+
+  // Access-aware widget page. For a PRIVATE tenant, an invite token (`?key=`)
+  // is consumed → signed cookie set → redirect to the clean URL; a valid
+  // existing cookie passes straight through; otherwise the branded gate page
+  // is served (no calculator, no rates). PUBLIC tenants are unaffected.
+  async function serveWidgetPage(
+    req: express.Request,
+    res: express.Response,
+    next: express.NextFunction,
+    slug: string,
+    injectSlug: boolean
+  ) {
+    try {
+      const rows = await db().select().from(tenants).where(eq(tenants.slug, slug)).limit(1);
+      const tenant = rows[0];
+      // Unknown tenant or public mode → serve the widget as before (widget.js
+      // surfaces its own "tenant not found" state for missing slugs).
+      if (!tenant || tenant.accessMode !== 'private') {
+        return sendWidgetHtml(res, next, injectSlug ? slug : null);
+      }
+      // Private tenant. Consume an invite token if present.
+      const token = accessTokenFromReq(req);
+      if (token && (await consumeAccessToken(tenant.id, token))) {
+        setAccessCookie(res, tenant.id);
+        // Strip ?key= so the token doesn't linger in the URL / referer.
+        const u = new URL(req.originalUrl, 'http://local');
+        u.searchParams.delete('key');
+        const qs = u.searchParams.toString();
+        return res.redirect(u.pathname + (qs ? `?${qs}` : ''));
+      }
+      // Valid existing grant → serve the calculator.
+      if (hasValidAccessCookie(tenant.id, req)) {
+        return sendWidgetHtml(res, next, injectSlug ? slug : null);
+      }
+      // No grant → branded private gate page.
+      const brand =
+        (await db()
+          .select()
+          .from(brandConfigs)
+          .where(eq(brandConfigs.tenantId, tenant.id))
+          .limit(1))[0] ?? null;
+      return res.type('html').send(renderGatePage(tenant, brand));
+    } catch (err) {
+      return next(err);
+    }
+  }
+
   app.get('/dpa', (_req, res, next) => {
     readFile(resolve(publicDir, 'dpa.html'), 'utf8')
       .then((html) => res.type('html').send(applyDpaPageSkin(html)))
@@ -143,16 +216,11 @@ export function createApp(): express.Express {
   app.get('/', (req, res, next) => {
     if (req.tenantCustomDomainSlug) {
       const slug = req.tenantCustomDomainSlug.replace(/[^a-z0-9-]/gi, '');
-      const file = resolve(publicDir, 'widget.html');
-      readFile(file, 'utf8')
-        .then((html) => {
-          const inject = `<script>window.QF_TENANT_SLUG=${JSON.stringify(slug)};</script>\n`;
-          res.type('html').send(html.replace('<script src="/widget.js"></script>', inject + '<script src="/widget.js"></script>'));
-        })
-        .catch(next);
-      return;
+      return void serveWidgetPage(req, res, next, slug, true);
     }
-    if (req.tenantSubdomain) return res.sendFile('widget.html', { root: publicDir });
+    if (req.tenantSubdomain) {
+      return void serveWidgetPage(req, res, next, req.tenantSubdomain, false);
+    }
     return res.sendFile('landing.html', { root: publicDir });
   });
 
@@ -176,7 +244,7 @@ export function createApp(): express.Express {
   app.get('/app/*splat', (_req, res) => res.sendFile('app.html', { root: publicDir }));
   app.get('/admin', (_req, res) => res.sendFile('admin.html', { root: publicDir }));
   app.get('/admin/*splat', (_req, res) => res.sendFile('admin.html', { root: publicDir }));
-  app.get('/w/:slug', (_req, res) => res.sendFile('widget.html', { root: publicDir }));
+  app.get('/w/:slug', (req, res, next) => void serveWidgetPage(req, res, next, String(req.params.slug), false));
   app.get('/chat/:refId', (_req, res) => res.sendFile('chat.html', { root: publicDir }));
   app.get('/quote/:refId', (_req, res) => res.sendFile('quote.html', { root: publicDir }));
   app.get(['/for/brokers', '/for/brokers/'], (_req, res) => res.sendFile('for-brokers.html', { root: publicDir }));
