@@ -22,7 +22,7 @@
     const tagline = value('Tagline', 'Get an instant freight quote');
     const cta = value('CTA button text', 'Calculate estimate');
     const primary = safeColor(value('Primary color'), '#2563eb');
-    const accent = safeColor(value('Accent color'), '#06b6d4');
+    const accent = safeColor(value('Accent color'), '#6E8BFF');
     const logoUrl = value('Logo URL');
 
     panel.innerHTML = `

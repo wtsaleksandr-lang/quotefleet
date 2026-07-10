@@ -287,9 +287,43 @@ body.qf-wft .use-section,
 body.qf-wft .ai-section,
 body.qf-wft .compare-simple-section,
 body.qf-wft .pdf-section,
-body.qf-wft .scheduler-section,
-body.qf-wft #faq {
+body.qf-wft .scheduler-section {
   display: none !important;
+}
+
+/* FAQ restored: it was previously hidden while the header/mobile nav still
+   linked to #faq (dead anchors). It answers the buyer's core objections, so
+   it stays visible and on-brand. */
+body.qf-wft #faq {
+  display: block !important;
+  padding: clamp(72px, 8vw, 116px) 28px !important;
+  background: #1f2628 !important;
+}
+
+body.qf-wft #faq .container {
+  width: min(1180px, calc(100vw - 56px)) !important;
+  margin: 0 auto !important;
+}
+
+body.qf-wft .faq-grid {
+  gap: 14px !important;
+}
+
+body.qf-wft .faq-item {
+  background: #151a1c !important;
+  border: 1px solid rgba(255,255,255,.13) !important;
+  border-radius: 18px !important;
+  box-shadow: none !important;
+  padding: 22px !important;
+}
+
+body.qf-wft .faq-item:hover {
+  border-color: rgba(255,255,255,.24) !important;
+}
+
+body.qf-wft .faq-item p {
+  color: rgba(245,252,255,.66) !important;
+  line-height: 1.55 !important;
 }
 
 body.qf-wft .how-section {
@@ -433,5 +467,163 @@ body.qf-wft [style*="color:var(--accent)"] {
   }
   body.qf-wft .simple-steps {
     grid-template-columns: 1fr !important;
+  }
+}
+
+/* ---- Trust / credibility section (real guarantees only, no fake proof) ---- */
+body.qf-wft .qf-trust-section {
+  padding: clamp(82px, 9vw, 128px) 28px !important;
+  background: #22282a !important;
+}
+
+body.qf-wft .qf-trust-section .container {
+  width: min(1180px, calc(100vw - 56px)) !important;
+  margin: 0 auto !important;
+}
+
+body.qf-wft .qf-trust-lead {
+  max-width: 720px !important;
+  margin-top: 14px !important;
+  color: rgba(245,252,255,.68) !important;
+  font-size: clamp(15px, 1.5vw, 18px) !important;
+  line-height: 1.6 !important;
+}
+
+body.qf-wft .qf-trust-grid {
+  list-style: none !important;
+  margin: 0 !important;
+  padding: 0 !important;
+  display: grid !important;
+  grid-template-columns: repeat(4, minmax(0, 1fr)) !important;
+  gap: 14px !important;
+}
+
+body.qf-wft .qf-trust-card {
+  display: flex !important;
+  flex-direction: column !important;
+  align-items: flex-start !important;
+  gap: 10px !important;
+  background: #151a1c !important;
+  border: 1px solid rgba(255,255,255,.13) !important;
+  border-radius: 18px !important;
+  padding: 22px !important;
+}
+
+body.qf-wft .qf-trust-card:hover {
+  border-color: rgba(255,255,255,.24) !important;
+}
+
+body.qf-wft .qf-trust-ico {
+  display: inline-flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  width: 40px !important;
+  height: 40px !important;
+  border-radius: 11px !important;
+  background: rgba(13,60,252,.16) !important;
+  color: #9aaeff !important;
+}
+
+body.qf-wft .qf-trust-ico svg {
+  width: 20px !important;
+  height: 20px !important;
+}
+
+body.qf-wft .qf-trust-card strong {
+  color: #f5fcff !important;
+  font-size: 16px !important;
+  letter-spacing: -0.01em !important;
+}
+
+body.qf-wft .qf-trust-card p {
+  margin: 0 !important;
+  color: rgba(245,252,255,.66) !important;
+  font-size: 14px !important;
+  line-height: 1.5 !important;
+}
+
+body.qf-wft .qf-trust-security {
+  margin-top: 16px !important;
+  display: flex !important;
+  flex-wrap: wrap !important;
+  align-items: center !important;
+  justify-content: space-between !important;
+  gap: 20px !important;
+  background: #151a1c !important;
+  border: 1px solid rgba(255,255,255,.14) !important;
+  border-radius: 20px !important;
+  padding: clamp(22px, 3vw, 32px) !important;
+}
+
+body.qf-wft .qf-trust-security-copy {
+  max-width: 640px !important;
+}
+
+body.qf-wft .qf-trust-security-copy strong {
+  display: block !important;
+  color: #f5fcff !important;
+  font-size: clamp(16px, 1.6vw, 19px) !important;
+  letter-spacing: -0.02em !important;
+  margin-bottom: 8px !important;
+}
+
+body.qf-wft .qf-trust-security-copy p {
+  margin: 0 !important;
+  color: rgba(245,252,255,.66) !important;
+  line-height: 1.55 !important;
+}
+
+body.qf-wft .qf-trust-security-actions {
+  display: flex !important;
+  flex-wrap: wrap !important;
+  gap: 12px !important;
+}
+
+body.qf-wft .qf-trust-security-actions .btn-secondary {
+  background: rgba(255,255,255,.03) !important;
+  border: 1px solid rgba(255,255,255,.16) !important;
+  color: #f5fcff !important;
+  white-space: nowrap !important;
+}
+
+body.qf-wft .qf-trust-security-actions .btn-secondary:hover {
+  border-color: rgba(255,255,255,.30) !important;
+}
+
+body.qf-wft .qf-trust-operator {
+  margin: 16px 0 0 !important;
+  color: rgba(245,252,255,.5) !important;
+  font-size: 13px !important;
+}
+
+body.qf-wft .qf-trust-operator strong {
+  color: rgba(245,252,255,.72) !important;
+  font-weight: 600 !important;
+}
+
+@media (max-width: 980px) {
+  body.qf-wft .qf-trust-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
+  }
+}
+
+@media (max-width: 640px) {
+  body.qf-wft .qf-trust-section {
+    padding: 60px 18px !important;
+  }
+  body.qf-wft .qf-trust-section .container {
+    width: min(100%, calc(100vw - 36px)) !important;
+  }
+  body.qf-wft .qf-trust-grid {
+    grid-template-columns: 1fr !important;
+  }
+  body.qf-wft .qf-trust-security {
+    flex-direction: column !important;
+    align-items: flex-start !important;
+  }
+  body.qf-wft .qf-trust-security-actions .btn-secondary {
+    width: 100% !important;
+    text-align: center !important;
+    justify-content: center !important;
   }
 }

@@ -423,7 +423,7 @@ body {
 .qf-cta {
   min-height: 48px;
   border-radius: 15px;
-  background: linear-gradient(135deg, #1d4ed8 0%, #2563eb 55%, #06b6d4 125%);
+  background: linear-gradient(135deg, #1d4ed8 0%, #2563eb 55%, #6E8BFF 125%);
   box-shadow: 0 18px 36px -24px rgba(37, 99, 235, 0.85), inset 0 1px 0 rgba(255, 255, 255, 0.28);
   letter-spacing: -0.01em;
 }
