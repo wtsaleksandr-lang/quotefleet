@@ -52,10 +52,12 @@ html[data-theme="light"] .sidebar .brand-block .name {
   align-items: center;
   gap: 10px;
   font-size: 17px;
+  min-width: 0;
 }
 
 html[data-theme="light"] .sidebar .brand-block .name::before {
   content: 'QF';
+  flex-shrink: 0;
   width: 34px;
   height: 34px;
   display: inline-flex;
