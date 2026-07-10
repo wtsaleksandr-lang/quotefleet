@@ -1,0 +1,37 @@
+{
+  "$comment": "Canonical spacing/clickability source of truth for QuoteFleet. Mirrors WeFixTrades. See design-guardrails spec (2026-07-10). The --space-* CSS custom properties in src/server/public/style.css and widget-style.css are generated from these numbers; keep them in sync. The 8px-grid ramp below is the ONLY allowed set of spacing values — anything off it (7,9,10,11,13,14,18,22,26,28,...) is a guard violation (scripts/check-spacing.mjs).",
+  "base": 4,
+  "ramp": {
+    "space-0": 0,
+    "space-0-5": 4,
+    "space-1": 8,
+    "space-1-5": 12,
+    "space-2": 16,
+    "space-3": 24,
+    "space-4": 32,
+    "space-6": 48,
+    "space-7-5": 60,
+    "space-10": 80,
+    "space-15": 120
+  },
+  "allowed": [0, 4, 8, 12, 16, 24, 32, 48, 60, 80, 120],
+  "semantic": {
+    "space-outer-margin": { "mobile": 16, "desktop": 32 },
+    "space-gutter": { "mobile": 16, "desktop": 24 },
+    "space-section": { "mobile": 24, "desktop": 80 },
+    "space-card-padding": { "mobile": 16, "desktop": 24 },
+    "label-gap": { "min": 8, "max": 16 }
+  },
+  "clickability": {
+    "tap-min": 24,
+    "tap-target": 44,
+    "tap-gap": 8,
+    "tap-gap-preferred": 12,
+    "dense-grid-exemption": "rate-card / in-cell grids may render < 44px but MUST hold the >=24px floor and >=8px gaps"
+  },
+  "typography": {
+    "line-height-body-min": 1.4,
+    "line-height-body-max": 1.6,
+    "line-height-tight": "1.05-1.2 (display/headings, large-text exempt)"
+  }
+}

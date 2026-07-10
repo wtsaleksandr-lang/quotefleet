@@ -1,0 +1,116 @@
+# CONTRAST-2 (QF) baseline — existing hardcoded color violations.
+# Tolerated by check-hardcoded-colors.mjs. To clear: use a theme token
+# (var(--*)) or wrap in a [data-theme=...] scope, then delete the line.
+# Format: <file>:<line>:<col>\t<snippet>
+src/server/public/addons-panel.css:35:3	color: #fff
+src/server/public/app-quote-actions.css:1:636	color:#fff
+src/server/public/brand-editor.css:121:29	color: #fff
+src/server/public/brand-editor.css:134:3	color: #fff
+src/server/public/brand-studio-preview.css:31:3	background: #fff
+src/server/public/brand-studio-preview.css:85:3	color: #fff
+src/server/public/customize-panel.css:173:21	background: #fff
+src/server/public/dashboard-preview.css:106:28	color: #fff
+src/server/public/dashboard-preview.css:135:3	color: #fff
+src/server/public/dashboard-setup.css:274:3	color: #fff
+src/server/public/freight-premium-theme.css:39:3	color: #fff
+src/server/public/freight-premium-theme.css:69:3	background: #ffffff
+src/server/public/freight-premium-theme.css:115:3	background: #ffffff
+src/server/public/freight-premium-theme.css:144:3	color: #fff
+src/server/public/landing-s-polish.css:198:3	color: #ffffff
+src/server/public/landing-s-polish.css:239:3	color: #ffffff
+src/server/public/landing-wefixtrades-cleanup.css:65:3	color: #ffffff
+src/server/public/landing-wefixtrades-cleanup.css:73:3	color: #ffffff
+src/server/public/landing-wefixtrades-cleanup.css:79:3	color: #ffffff
+src/server/public/landing-wefixtrades-cleanup.css:244:3	color: #ffffff
+src/server/public/landing-wefixtrades-cleanup.css:276:3	color: #ffffff
+src/server/public/landing-wefixtrades-cleanup.css:281:3	color: #ffffff
+src/server/public/landing-wefixtrades-cleanup.css:401:3	color: #ffffff
+src/server/public/landing-wefixtrades-cleanup.css:426:3	color: #ffffff
+src/server/public/landing-wefixtrades.css:264:3	color: #fff
+src/server/public/landing-wefixtrades.css:480:3	color: #fff
+src/server/public/landing-wefixtrades.css:525:3	color: #fff
+src/server/public/public-auth-wefixtrades.css:21:3	color: #FFFFFF
+src/server/public/public-auth-wefixtrades.css:32:3	color: #FFFFFF
+src/server/public/public-auth-wefixtrades.css:38:3	color: #FFFFFF
+src/server/public/public-auth-wefixtrades.css:51:3	color: #FFFFFF
+src/server/public/public-auth-wefixtrades.css:64:3	color: #FFFFFF
+src/server/public/public-auth-wefixtrades.css:76:3	color: #FFFFFF
+src/server/public/public-auth-wefixtrades.css:96:3	color: #FFFFFF
+src/server/public/public-auth-wefixtrades.css:112:3	color: #FFFFFF
+src/server/public/public-auth-wefixtrades.css:119:3	color: #FFFFFF
+src/server/public/public-auth-wefixtrades.css:125:3	border-color: #FFFFFF
+src/server/public/public-auth-wefixtrades.css:141:3	color: #FFFFFF
+src/server/public/public-auth-wefixtrades.css:146:3	color: #FFFFFF
+src/server/public/public-blue-fixes.css:22:3	color: #ffffff
+src/server/public/public-blue-fixes.css:39:3	color: #ffffff
+src/server/public/public-blue-fixes.css:63:3	color: #ffffff
+src/server/public/public-calculator-app-style.css:189:3	color: #fff
+src/server/public/public-calculator-app-style.css:202:3	color: #fff
+src/server/public/public-calculator-brand-preview.css:34:3	color: #ffffff
+src/server/public/public-calculator-brand-preview.css:63:3	background-color: #ffffff
+src/server/public/public-calculator-brand-preview.css:97:3	color: #ffffff
+src/server/public/public-calculator-brand-preview.css:112:3	background: #ffffff
+src/server/public/public-calculator-followup.css:32:3	background: #fff
+src/server/public/public-calculator-ux.css:355:3	background: #ffffff
+src/server/public/public-calculator-ux.css:378:3	background: #ffffff
+src/server/public/public-calculator-ux.css:383:3	background: #ffffff
+src/server/public/public-calculator-ux.css:441:3	background: #ffffff
+src/server/public/public-calculator-ux.css:524:5	background: #ffffff
+src/server/public/public-pages-wefixtrades.css:59:3	color: #FFFFFF
+src/server/public/public-pages-wefixtrades.css:64:37	border-color: #FFFFFF
+src/server/public/public-pages-wefixtrades.css:65:36	color: #FFFFFF
+src/server/public/public-pages-wefixtrades.css:67:3	background: #FFFFFF
+src/server/public/public-pages-wefixtrades.css:68:3	border-color: #FFFFFF
+src/server/public/public-pages-wefixtrades.css:145:3	color: #FFFFFF
+src/server/public/public-pages-wefixtrades.css:162:3	color: #FFFFFF
+src/server/public/public-pages-wefixtrades.css:165:3	color: #FFFFFF
+src/server/public/quote-demo.html:24:83	color:#fff
+src/server/public/quote-polish.css:1:487	color:#fff
+src/server/public/quote-polish.css:1:556	background:#fff
+src/server/public/quote-polish.css:1:2494	background:#fff
+src/server/public/quote-polish.css:1:3351	background:#fff
+src/server/public/quote-polish.css:1:3517	background:#fff
+src/server/public/quote-polish.css:1:3935	color:#fff
+src/server/public/quote-polish.css:1:4046	background:#fff
+src/server/public/quote-polish.css:1:4633	background:#fff
+src/server/public/quote-polish.css:1:4649	color:#000
+src/server/public/quote-premium.css:76:3	background: #fff
+src/server/public/quote-premium.css:128:3	color: #fff
+src/server/public/quote-premium.css:130:24	color: #fff
+src/server/public/quote-premium.css:133:3	color: #fff
+src/server/public/quote-premium.css:135:25	color: #fff
+src/server/public/quote-premium.css:170:10	background: #fff
+src/server/public/quote-premium.css:172:18	background: #fff
+src/server/public/quote-premium.css:173:21	background: #fff
+src/server/public/quote-premium.css:173:50	color: #000
+src/server/public/quote-print.css:3:10	background: #fff
+src/server/public/quote-print.css:9:7	color: #000
+src/server/public/quote.css:1:811	background:#fff
+src/server/public/quote.css:1:1053	color:#fff
+src/server/public/quote.css:1:2313	background:#fff
+src/server/public/quote.css:1:3790	background:#fff
+src/server/public/quote.css:1:5297	background:#fff
+src/server/public/quote.css:1:5649	color:#fff
+src/server/public/quote.css:1:6252	background:#fff
+src/server/public/quote.css:1:8032	color:#fff
+src/server/public/quote.css:1:8684	color:#fff
+src/server/public/quote.css:1:8812	background:#fff
+src/server/public/quote.css:1:9541	background:#fff
+src/server/public/quote.css:1:10103	background:#fff
+src/server/public/quote.css:1:10119	color:#000
+src/server/public/style.css:854:35	color: #FFFFFF
+src/server/public/style.css:923:3	color: #fff
+src/server/public/style.css:969:57	color: #FFFFFF
+src/server/public/tools.html:64:28	color: #fff
+src/server/public/vertical-pages-wefixtrades.css:18:3	color: #FFFFFF
+src/server/public/vertical-pages-wefixtrades.css:21:3	color: #FFFFFF
+src/server/public/vertical-pages-wefixtrades.css:43:3	color: #FFFFFF
+src/server/public/vertical-pages-wefixtrades.css:68:3	color: #FFFFFF
+src/server/public/widget-style.css:117:3	background: white
+src/server/public/widget-style.css:125:26	background: white
+src/server/public/widget-style.css:128:241	background: white
+src/server/public/widget-style.css:138:231	color: white
+src/server/public/widget-style.css:141:24	background: white
+src/server/public/widget-style.css:183:117	color: white
+src/server/public/widget-style.css:213:91	color: #fff
+src/server/public/widget-style.css:220:85	color: #fff

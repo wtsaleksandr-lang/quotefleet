@@ -37,5 +37,8 @@ jobs:
       - name: Typecheck
         run: pnpm typecheck
 
+      - name: Design guards (spacing + hardcoded colors)
+        run: pnpm check:guards
+
       - name: Unit tests
         run: pnpm test

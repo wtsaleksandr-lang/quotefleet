@@ -68,10 +68,10 @@ body.qf-app-calculator .qf-mini-stepper {
 body.qf-app-calculator .qf-tabs {
   display: grid !important;
   grid-template-columns: repeat(5, minmax(0, 1fr));
-  gap: 4px !important;
+  gap: var(--tap-gap) !important;
   overflow: visible !important;
-  margin: 0 0 18px !important;
-  padding: 5px !important;
+  margin: 0 0 var(--space-2) !important;
+  padding: var(--space-0-5) !important;
   border: 1px solid #c9d6e8;
   border-radius: var(--qf-app-radius-card) !important;
   background: #dfe7f2 !important;
