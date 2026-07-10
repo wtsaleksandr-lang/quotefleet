@@ -401,7 +401,7 @@ export const brandConfigs = pgTable('brand_configs', {
   displayName: text('display_name'), // shown above calculator
   tagline: text('tagline'),
   primaryColor: text('primary_color').notNull().default('#2563eb'),
-  accentColor: text('accent_color').notNull().default('#06b6d4'),
+  accentColor: text('accent_color').notNull().default('#6E8BFF'),
   /** Widget theming (Wave 1). A curated preset drives every widget colour;
    *  an optional accent override supersedes the preset accent; a self-hosted
    *  font is chosen from WIDGET_FONTS. Existing rows default to Midnight +
