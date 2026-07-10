@@ -18,6 +18,7 @@
   <style>
     .qfd-body {
       margin: 0;
+      position: relative;
       min-height: 100vh;
       color: var(--ink, #e7ecf3);
       font-family: var(--font-sans, "Satoshi", system-ui, sans-serif);
@@ -25,7 +26,16 @@
         radial-gradient(ellipse 70% 40% at 50% -8%, rgba(13,60,252,.12), transparent 64%),
         linear-gradient(180deg, #0a1018 0%, #0d1219 45%, #0b0f15 100%);
     }
-    .qfd-wrap { max-width: 1040px; margin: 0 auto; padding: 24px 20px 56px; }
+    /* Subtle dashed "canvas" grid — reinforces the software/tool feel. Kept
+       faint and masked so it fades out behind the calculator content. */
+    .qfd-body::before {
+      content: ''; position: fixed; inset: 0; z-index: 0; pointer-events: none;
+      background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='34' height='34'%3E%3Cpath d='M34 0H0V34' fill='none' stroke='%23a8b6cc' stroke-opacity='0.16' stroke-width='1' stroke-dasharray='3 6'/%3E%3C/svg%3E");
+      background-size: 34px 34px;
+      -webkit-mask-image: radial-gradient(ellipse 120% 80% at 50% 0%, #000 0%, rgba(0,0,0,.5) 52%, transparent 82%);
+              mask-image: radial-gradient(ellipse 120% 80% at 50% 0%, #000 0%, rgba(0,0,0,.5) 52%, transparent 82%);
+    }
+    .qfd-wrap { position: relative; z-index: 1; max-width: 1040px; margin: 0 auto; padding: 24px 20px 56px; }
 
     /* Brand lockup — logo + name + a subtle selling tagline (demo page only).
        Tagline color #9fb0c9 on the dark shell ≈ 8:1 contrast (WCAG AA/AAA). */
