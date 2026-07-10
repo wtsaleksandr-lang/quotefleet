@@ -131,7 +131,15 @@
     justify-content: flex-start;
     padding: 11px 12px;
     font-size: 13px;
+    min-height: 44px; /* comfortable tap row wrapping the small checkbox */
   }
+  /* Enlarge the actual checkbox hit area on touch (was 14px). */
+  .qf-flags input[type="checkbox"],
+  .qf-oog-toggle input[type="checkbox"] {
+    width: 20px;
+    height: 20px;
+  }
+  .qf-oog-toggle { min-height: 44px; }
   .qf-accessorials {
     display: grid;
     grid-template-columns: 1fr 1fr;

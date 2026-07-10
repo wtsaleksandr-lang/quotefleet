@@ -108,3 +108,64 @@
   .qf-setup-builder-actions { justify-content: flex-start; }
   .qf-setup-builder-cards { grid-template-columns: 1fr; }
 }
+
+/* ── Mobile reflow: the zone builder grid becomes one stacked card per row ──
+   Each <td> becomes a labelled field line (label via ::before from data-label).
+   No horizontal scroll; every input/checkbox + Delete stays usable and the
+   inline status badge wraps cleanly. Desktop (>640px) is unchanged. */
+@media (max-width: 640px) {
+  .qf-setup-table-wrap { padding-top: 4px; }
+  .qf-setup-table-wrap::before { display: none; }
+  .qf-setup-table-wrap .table { margin-top: 0; width: 100%; min-width: 0; }
+  .qf-setup-table-wrap thead { display: none; }
+  .qf-setup-table-wrap table,
+  .qf-setup-table-wrap tbody { display: block; width: 100%; }
+  .qf-setup-table-wrap tbody tr {
+    display: block;
+    border: 1px solid var(--border);
+    border-radius: 14px;
+    background: var(--surface);
+    padding: 4px 13px 8px;
+    margin-bottom: 12px;
+    box-shadow: none;
+  }
+  .qf-setup-table-wrap tbody tr.qf-zone-hidden-by-filter { display: none; }
+  .qf-setup-table-wrap tbody td {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    flex-wrap: wrap;
+    gap: 10px 12px;
+    min-width: 0;
+    padding: 9px 0;
+    border-bottom: 1px solid var(--border);
+  }
+  .qf-setup-table-wrap tbody td::before {
+    content: attr(data-label);
+    flex: 0 0 auto;
+    color: var(--muted);
+    font: 700 11px var(--font-mono);
+    letter-spacing: .05em;
+    text-transform: uppercase;
+  }
+  .qf-setup-table-wrap tbody td .input {
+    width: auto !important;
+    flex: 1 1 auto;
+    min-width: 0;
+    text-align: left !important;
+  }
+  .qf-setup-table-wrap tbody td input[type="checkbox"] {
+    width: 20px;
+    height: 20px;
+    flex: 0 0 auto;
+  }
+  /* Status badge is appended into the Label cell — let it drop to its own line. */
+  .qf-setup-table-wrap tbody td .qf-zone-status { flex-basis: 100%; }
+  .qf-setup-table-wrap tbody td:last-child {
+    border-bottom: 0;
+    justify-content: flex-start;
+    padding-top: 11px;
+  }
+  .qf-setup-table-wrap tbody td:last-child::before { display: none; }
+  .qf-setup-table-wrap tbody td:last-child .btn { flex: 1 1 auto; }
+}

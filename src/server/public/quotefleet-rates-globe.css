@@ -319,8 +319,8 @@
     padding: 8px 10px;
     border-radius: 10px;
   }
-  .qfg-card__stat { font-size: 11px; }
-  .qfg-card__label { font-size: 9px; }
+  .qfg-card__stat { font-size: 12px; }
+  .qfg-card__label { font-size: 11px; }
   .qf-globe-stats { gap: 18px; }
 }
 

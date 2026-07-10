@@ -865,7 +865,7 @@ html[data-theme="light"] .hero h1 .accent {
   margin-bottom: 14px;
 }
 .sidebar .brand-block .name { font-weight: 700; font-size: 16px; color: var(--ink); }
-.sidebar .brand-block .sub { font-size: 11.5px; color: var(--muted); margin-top: 4px; }
+.sidebar .brand-block .sub { font-size: 11.5px; color: var(--muted); margin-top: 4px; max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .sidebar a, .sidebar button {
   display: flex; align-items: center; gap: 10px;
   padding: 10px 20px;
