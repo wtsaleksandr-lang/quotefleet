@@ -38,6 +38,7 @@ import { getTrialState } from '../trialGating.js';
 import { canUseProFeature } from '../plans.js';
 import { publicCalcLimiter, publicChatLimiter, publicLeadLimiter } from '../rateLimits.js';
 import { resolveWidgetTheme } from '../widgetThemes.js';
+import { loadCarrierProfile } from './carrierProfile.js';
 import { enforceTenantAccess } from '../access.js';
 
 /** Returns true if the request's Origin/Referer host matches the
@@ -228,6 +229,24 @@ export function registerPublicRoutes(app: Express) {
     // without a valid access grant (invite cookie/token).
     if (!(await enforceTenantAccess(tenant, req, res))) return;
     const { cards, accs, zones, terms, brand } = await loadConfig(tenant.id);
+    // Carrier contact block shown in the widget header — same source of
+    // truth as the hosted quote (tenant.contactPhone/Email/mc/dot +
+    // carrier-profile address). Assembled here so widget.js just renders.
+    const carrierProfile = await loadCarrierProfile(tenant.id);
+    const cp = carrierProfile as Record<string, string | null | undefined>;
+    const addressParts = [
+      cp.addressLine1,
+      cp.addressLine2,
+      [cp.city, cp.state, cp.postalCode].map((s) => (s ?? '').trim()).filter(Boolean).join(', '),
+      cp.country,
+    ].map((s) => (s ?? '').trim()).filter(Boolean);
+    const contact = {
+      phone: tenant.contactPhone || null,
+      email: tenant.contactEmail || null,
+      address: addressParts.length ? addressParts.join(' · ') : null,
+      mcNumber: tenant.mcNumber || null,
+      dotNumber: tenant.dotNumber || null,
+    };
 
     // Ports relevant to drayage zones — only return ones that have at
     // least one enabled lane-zone or terminal so the dropdown stays short.
@@ -266,6 +285,7 @@ export function registerPublicRoutes(app: Express) {
         name: tenant.name,
         countryFocus: tenant.countryFocus,
       },
+      contact,
       brand: brand ?? null,
       // Fully-resolved widget theme (preset + optional accent override +
       // font). widget.js#applyTheme writes tokens.* onto the document root.

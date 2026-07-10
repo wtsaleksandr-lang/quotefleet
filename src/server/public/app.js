@@ -140,9 +140,12 @@
   }
 
   // ── Account page ──────────────────────────────────────────────
-  // Lets the user change name / email / phone / password and sign out
-  // every other session. All endpoints under /api/auth/* (server-side
-  // additions in routes/auth.ts).
+  // Profile: name / login email / phone (phone → tenant.contactPhone via
+  // /api/auth/profile). Company details: the customer-facing contact block
+  // shown on the widget + hosted quotes — dispatch email (tenant.contactEmail),
+  // company address (carrier-profile store), USDOT + MC (marketplace-settings).
+  // Then password + sessions. Consolidates fields that used to be scattered
+  // across the Brand "Carrier profile" card and marketplace settings.
   function renderAccount(c) {
     api('/api/auth/me').then(function (r) {
       if (!r.user) { location.href = '/login'; return; }
@@ -163,14 +166,89 @@
       }
       pCard.appendChild(profileRow('Name', 'name'));
       pCard.appendChild(profileRow('Email', 'email', 'email'));
+      // Phone → tenant.contactPhone (also shown to customers on the widget
+      // + hosted quotes; see the Company details card below).
+      pCard.appendChild(profileRow('Phone', 'contactPhone', 'tel'));
       var saveProfile = el('button', { class: 'btn btn-primary', text: 'Save profile', style: { marginTop: '8px' } });
       saveProfile.addEventListener('click', function () {
         var body = {};
-        $$('input[data-key]', pCard).forEach(function (i) { body[i.dataset.key] = i.value; });
+        $$('input[data-key]', pCard).forEach(function (i) {
+          var v = i.value.trim();
+          // contactPhone is nullable; send null (not '') so clearing it works.
+          body[i.dataset.key] = i.dataset.key === 'contactPhone' ? (v || null) : v;
+        });
         saved(api('/api/auth/profile', { method: 'PUT', body: body }), 'Profile saved');
       });
       pCard.appendChild(saveProfile);
       c.appendChild(pCard);
+
+      // ── Company details card ────────────────────────────────────
+      // One clear home for the contact details customers see on the
+      // calculator + quotes. Wires to the existing stores (no parallel
+      // copy): dispatch email → tenant.contactEmail (/api/auth/profile),
+      // address → carrier-profile, USDOT/MC → marketplace-settings.
+      var coCard = el('div', { class: 'card', style: { marginTop: '14px' } });
+      coCard.appendChild(el('div', { class: 'card-title', text: 'Company details' }));
+      coCard.appendChild(el('p', {
+        class: 'muted', style: { marginTop: 0 },
+        text: 'Shown to your customers on your calculator and quotes. Your phone (set in Profile above) appears here too.',
+      }));
+      var coLoading = el('p', { class: 'muted-small', text: 'Loading…' });
+      coCard.appendChild(coLoading);
+      c.appendChild(coCard);
+
+      Promise.all([
+        api('/api/tenant/carrier-profile').catch(function () { return { profile: {} }; }),
+        api('/api/tenant/marketplace-settings').catch(function () { return {}; }),
+      ]).then(function (res2) {
+        var profile = (res2[0] && res2[0].profile) || {};
+        var mkt = res2[1] || {};
+        coLoading.remove();
+
+        function coField(labelText, key, value, type) {
+          var f = el('div', { class: 'field', style: { marginBottom: '12px' } });
+          f.appendChild(el('label', { class: 'field-label', text: labelText }));
+          var inp = el('input', { class: 'input', value: value || '', type: type || 'text' });
+          inp.dataset.co = key;
+          f.appendChild(inp);
+          return f;
+        }
+
+        coCard.appendChild(coField('Dispatch email', 'contactEmail', (r.tenant && r.tenant.contactEmail) || '', 'email'));
+
+        var addrGrid = el('div', { class: 'grid-2', style: { gap: '12px' } });
+        addrGrid.appendChild(coField('Address line 1', 'addressLine1', profile.addressLine1));
+        addrGrid.appendChild(coField('Address line 2', 'addressLine2', profile.addressLine2));
+        addrGrid.appendChild(coField('City', 'city', profile.city));
+        addrGrid.appendChild(coField('State / province', 'state', profile.state));
+        addrGrid.appendChild(coField('Postal / ZIP code', 'postalCode', profile.postalCode));
+        addrGrid.appendChild(coField('Country', 'country', profile.country));
+        coCard.appendChild(addrGrid);
+
+        var idGrid = el('div', { class: 'grid-2', style: { gap: '12px' } });
+        idGrid.appendChild(coField('USDOT number', 'dotNumber', mkt.dotNumber));
+        idGrid.appendChild(coField('MC number', 'mcNumber', mkt.mcNumber));
+        coCard.appendChild(idGrid);
+
+        var saveCo = el('button', { class: 'btn btn-primary', text: 'Save company details', style: { marginTop: '8px' } });
+        saveCo.addEventListener('click', function () {
+          var vals = {};
+          $$('input[data-co]', coCard).forEach(function (i) { vals[i.dataset.co] = i.value.trim() || null; });
+          saveCo.disabled = true;
+          Promise.all([
+            api('/api/auth/profile', { method: 'PUT', body: { contactEmail: vals.contactEmail } }),
+            api('/api/tenant/carrier-profile', { method: 'PUT', body: {
+              addressLine1: vals.addressLine1, addressLine2: vals.addressLine2,
+              city: vals.city, state: vals.state, postalCode: vals.postalCode, country: vals.country,
+            } }),
+            api('/api/tenant/marketplace-settings', { method: 'PUT', body: {
+              dotNumber: vals.dotNumber, mcNumber: vals.mcNumber,
+            } }),
+          ]).then(function () { toastOk('Company details saved'); }, function (e) { toastErr(e); })
+            .then(function () { saveCo.disabled = false; });
+        });
+        coCard.appendChild(saveCo);
+      }).catch(function () { coLoading.textContent = 'Could not load company details.'; });
 
       // Password card
       var pwd = el('div', { class: 'card', style: { marginTop: '14px' } });

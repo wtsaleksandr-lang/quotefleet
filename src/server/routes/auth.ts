@@ -484,7 +484,12 @@ export function registerAuthRoutes(app: Express) {
   const ProfileSchema = z.object({
     name: z.string().min(1).max(120).optional(),
     email: z.string().email().max(200).optional(),
+    // Tenant-level customer-facing contact fields. `contactPhone` +
+    // `contactEmail` are what render on the widget and hosted quotes
+    // (see quoteDoc.ts / quote-profile.js). They live on the tenant row,
+    // NOT the user row — `email` above is the owner's *login* email.
     contactPhone: z.string().max(50).nullable().optional(),
+    contactEmail: z.string().email().max(200).nullable().optional(),
   });
   app.put('/api/auth/profile', async (req: Request, res: Response) => {
     const token = req.cookies[SESSION_COOKIE_NAME];
@@ -509,11 +514,17 @@ export function registerAuthRoutes(app: Express) {
     if (Object.keys(update).length > 0) {
       await db().update(users).set(update).where(eq(users.id, ctx.user.id));
     }
-    if (parse.data.contactPhone !== undefined && ctx.user.tenantId) {
-      await db()
-        .update(tenants)
-        .set({ contactPhone: parse.data.contactPhone, updatedAt: new Date() })
-        .where(eq(tenants.id, ctx.user.tenantId));
+    // Tenant-level contact fields (shown to customers on the widget +
+    // hosted quotes). Only touch the ones actually provided so partial
+    // saves from the Account "Company details" card don't clobber siblings.
+    if (ctx.user.tenantId) {
+      const tenantUpdate: Record<string, unknown> = {};
+      if (parse.data.contactPhone !== undefined) tenantUpdate.contactPhone = parse.data.contactPhone;
+      if (parse.data.contactEmail !== undefined) tenantUpdate.contactEmail = parse.data.contactEmail;
+      if (Object.keys(tenantUpdate).length > 0) {
+        tenantUpdate.updatedAt = new Date();
+        await db().update(tenants).set(tenantUpdate).where(eq(tenants.id, ctx.user.tenantId));
+      }
     }
     return res.json({ ok: true });
   });
@@ -560,6 +571,8 @@ export function registerAuthRoutes(app: Express) {
           hostDomain: string;
           hostedUrl: string;
           name: string;
+          contactEmail: string | null;
+          contactPhone: string | null;
           embedToken: string;
           plan: string;
           trialEndsAt: Date | null;
@@ -577,6 +590,8 @@ export function registerAuthRoutes(app: Express) {
           hostDomain: t[0].hostDomain,
           hostedUrl: `${proto}//${t[0].slug}.${t[0].hostDomain}/`,
           name: t[0].name,
+          contactEmail: t[0].contactEmail ?? null,
+          contactPhone: t[0].contactPhone ?? null,
           embedToken: t[0].embedToken,
           plan: t[0].plan,
           trialEndsAt: t[0].trialEndsAt,

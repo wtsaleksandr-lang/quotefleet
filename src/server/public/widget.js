@@ -217,6 +217,7 @@
         applyTheme(cfg.theme);
         applyBrand(cfg.brand);
         renderHeader(cfg);
+        renderContact(cfg.contact);
         renderServices(cfg.services);
         renderAccessorials(cfg.accessorials);
         autoResize();
@@ -319,6 +320,38 @@
       else { noteEl.textContent = ''; noteEl.style.display = 'none'; }
     }
     if (cfg.brand && cfg.brand.ctaText) $('qf-calc-btn').textContent = cfg.brand.ctaText;
+  }
+
+  // Carrier contact block under the header — same details customers see on
+  // the hosted quote. Only rendered when the carrier has filled them in
+  // (Account → Company details / Profile phone), so an empty profile stays
+  // clean.
+  function renderContact(contact) {
+    var box = $('qf-contact');
+    if (!box) return;
+    box.innerHTML = '';
+    if (!contact) { box.style.display = 'none'; return; }
+    var rows = [];
+    function iconRow(label, value, href) {
+      var row = el('span', { class: 'qf-contact-item' });
+      row.appendChild(el('span', { class: 'qf-contact-label', text: label }));
+      if (href) {
+        row.appendChild(el('a', { class: 'qf-contact-value', href: href, text: value }));
+      } else {
+        row.appendChild(el('span', { class: 'qf-contact-value', text: value }));
+      }
+      return row;
+    }
+    if (contact.phone) rows.push(iconRow('Phone', contact.phone, 'tel:' + contact.phone.replace(/[^+0-9]/g, '')));
+    if (contact.email) rows.push(iconRow('Email', contact.email, 'mailto:' + contact.email));
+    if (contact.address) rows.push(iconRow('Address', contact.address));
+    var ids = [];
+    if (contact.dotNumber) ids.push('USDOT ' + contact.dotNumber);
+    if (contact.mcNumber) ids.push('MC ' + contact.mcNumber);
+    if (ids.length) rows.push(iconRow('Authority', ids.join(' · ')));
+    if (!rows.length) { box.style.display = 'none'; return; }
+    rows.forEach(function (r) { box.appendChild(r); });
+    box.style.display = '';
   }
 
   function renderServices(services) {

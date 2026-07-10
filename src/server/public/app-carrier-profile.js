@@ -1,14 +1,12 @@
 (function () {
   'use strict';
 
+  // Company contact + address moved to Account → Company details (one
+  // clear home for what customers see). This card keeps only the
+  // quote-document presentation fields. The carrier-profile PUT merges,
+  // so saving here never wipes the address set on the Account page.
   var FIELDS = [
     ['quoteContactName', 'Quote contact name'],
-    ['addressLine1', 'Address line 1'],
-    ['addressLine2', 'Address line 2'],
-    ['city', 'City'],
-    ['state', 'State / province'],
-    ['postalCode', 'Postal / ZIP code'],
-    ['country', 'Country'],
     ['scac', 'SCAC'],
     ['websiteUrl', 'Website URL'],
   ];
@@ -57,7 +55,7 @@
       .then(function (data) {
         if (!card.isConnected) return;
         var profile = data.profile || {};
-        card.innerHTML = '<div class="card-title">Carrier profile for quotes</div><div class="card-subtitle">Shown on hosted quotes and email previews.</div>';
+        card.innerHTML = '<div class="card-title">Quote document details</div><div class="card-subtitle">Contact name, SCAC and website shown on hosted quotes. Company phone, email and address live in Account → Company details.</div>';
         var grid = document.createElement('div');
         grid.className = 'grid-2';
         grid.style.gap = '12px';
