@@ -1,0 +1,896 @@
+# SPACING-1 baseline — existing spacing / tap-target / line-height debt.
+# Each entry is tolerated by check-spacing.mjs. To clear an entry: snap the
+# value onto the 8px ramp (design-tokens/spacing.json) or bump the tap box
+# to >=24px, then delete the matching line and re-run `pnpm check:spacing`.
+# Format: <file>:<line>\t<kind>\t<snippet>
+src/server/public/accessorial-search.css:103	spacing	padding: 8px 11px
+src/server/public/accessorial-search.css:112	spacing	gap: 10px
+src/server/public/accessorial-search.css:149	spacing	padding: 8px 10px
+src/server/public/accessorial-search.css:167	spacing	padding: 3px 7px
+src/server/public/accessorial-search.css:30	spacing	gap: 5px
+src/server/public/accessorial-search.css:39	spacing	padding: 10px 13px
+src/server/public/accessorial-search.css:55	spacing	padding: 8px 11px
+src/server/public/accessorial-search.css:6	spacing	margin: 0 0 14px
+src/server/public/accessorial-search.css:68	spacing	padding: 12px 14px
+src/server/public/accessorial-search.css:7	spacing	padding: 14px
+src/server/public/accessorial-search.css:74	spacing	margin: 0 0 14px
+src/server/public/accessorial-search.css:85	spacing	gap: 14px
+src/server/public/accessorial-search.css:86	spacing	margin-bottom: 14px
+src/server/public/accessorial-search.css:95	spacing	margin-bottom: 5px
+src/server/public/account-readiness.css:102	spacing	margin-top: 10px
+src/server/public/account-readiness.css:15	spacing	margin-bottom: 14px
+src/server/public/account-readiness.css:32	spacing	gap: 7px
+src/server/public/account-readiness.css:34	spacing	padding: 7px 11px
+src/server/public/account-readiness.css:5	spacing	padding: 18px
+src/server/public/account-readiness.css:52	spacing	gap: 10px
+src/server/public/account-readiness.css:53	spacing	margin: 14px 0
+src/server/public/account-readiness.css:6	spacing	margin: 0 0 18px
+src/server/public/account-readiness.css:73	line-height	line-height: 1.35
+src/server/public/account-readiness.css:88	spacing	padding: 10px 12px
+src/server/public/addons-panel.css:119	spacing	gap: 6px
+src/server/public/addons-panel.css:28	spacing	margin: 0 0 18px
+src/server/public/addons-panel.css:31	spacing	margin-bottom: 14px
+src/server/public/addons-panel.css:33	spacing	gap: 6px
+src/server/public/addons-panel.css:33	spacing	padding: 10px 16px
+src/server/public/addons-panel.css:45	spacing	margin-bottom: 18px
+src/server/public/addons-panel.css:51	spacing	margin-top: 2px
+src/server/public/addons-panel.css:55	spacing	gap: 6px
+src/server/public/addons-panel.css:60	spacing	padding: 22px 18px
+src/server/public/addons-panel.css:65	spacing	padding: 14px 16px
+src/server/public/addons-panel.css:79	spacing	gap: 6px
+src/server/public/addons-panel.css:86	spacing	gap: 6px
+src/server/public/addons-panel.css:94	line-height	line-height: 1
+src/server/public/ai-import-polish.css:100	spacing	margin-bottom: 5px
+src/server/public/ai-import-polish.css:111	spacing	padding: 12px 13px
+src/server/public/ai-import-polish.css:12	spacing	gap: 18px
+src/server/public/ai-import-polish.css:14	spacing	padding: 18px
+src/server/public/ai-import-polish.css:2	spacing	margin: 0 0 18px
+src/server/public/ai-import-polish.css:22	spacing	margin-bottom: 6px
+src/server/public/ai-import-polish.css:30	spacing	margin: 7px 0 0
+src/server/public/ai-import-polish.css:43	spacing	padding: 9px 12px
+src/server/public/ai-import-polish.css:57	spacing	gap: 10px
+src/server/public/ai-import-polish.css:64	spacing	padding: 13px
+src/server/public/ai-import-polish.css:70	spacing	margin-bottom: 5px
+src/server/public/ai-import-polish.css:78	spacing	margin: 0 0 18px
+src/server/public/ai-import-polish.css:81	spacing	gap: 10px
+src/server/public/ai-import-polish.css:86	spacing	padding: 13px
+src/server/public/ai-import-polish.css:95	spacing	margin-bottom: 6px
+src/server/public/ai-setup.css:103	spacing	margin-bottom: 10px
+src/server/public/ai-setup.css:113	spacing	padding: 10px 12px
+src/server/public/ai-setup.css:12	spacing	gap: 18px
+src/server/public/ai-setup.css:14	spacing	padding: 18px
+src/server/public/ai-setup.css:193	spacing	gap: 14px
+src/server/public/ai-setup.css:195	spacing	margin: 0 0 18px
+src/server/public/ai-setup.css:199	spacing	padding: 14px
+src/server/public/ai-setup.css:2	spacing	margin: 0 0 18px
+src/server/public/ai-setup.css:205	spacing	margin-bottom: 5px
+src/server/public/ai-setup.css:22	spacing	margin-bottom: 6px
+src/server/public/ai-setup.css:223	spacing	padding: 9px 11px
+src/server/public/ai-setup.css:30	spacing	margin: 7px 0 0
+src/server/public/ai-setup.css:43	spacing	padding: 9px 12px
+src/server/public/ai-setup.css:56	spacing	gap: 10px
+src/server/public/ai-setup.css:63	spacing	padding: 13px
+src/server/public/ai-setup.css:71	spacing	margin-bottom: 7px
+src/server/public/ai-setup.css:76	spacing	margin-bottom: 6px
+src/server/public/ai-setup.css:85	spacing	margin: 0 0 18px
+src/server/public/ai-setup.css:88	spacing	padding: 13px 14px
+src/server/public/ai-setup.css:94	spacing	margin: 0 0 18px
+src/server/public/ai-setup.css:98	spacing	padding: 14px
+src/server/public/app-quote-actions.css:1	spacing	gap: 14px
+src/server/public/app-quote-actions.css:1	spacing	gap: 5px
+src/server/public/app-quote-actions.css:1	spacing	gap: 9px
+src/server/public/app-quote-actions.css:1	spacing	margin-bottom: 5px
+src/server/public/app-quote-actions.css:1	spacing	margin-top: 14px
+src/server/public/app-quote-actions.css:1	spacing	margin-top: 2px
+src/server/public/app-quote-actions.css:1	spacing	margin: 0 0 14px
+src/server/public/app-quote-actions.css:1	spacing	margin: 13px 0
+src/server/public/app-quote-actions.css:1	spacing	margin: 3px 0
+src/server/public/app-quote-actions.css:1	spacing	margin: 5px 0 0
+src/server/public/app-quote-actions.css:1	spacing	margin: 8px 0 18px
+src/server/public/app-quote-actions.css:1	spacing	padding: 10px
+src/server/public/app-quote-actions.css:1	spacing	padding: 10px 12px
+src/server/public/app-quote-actions.css:1	spacing	padding: 12px 14px
+src/server/public/app-quote-actions.css:1	spacing	padding: 2px 6px
+src/server/public/app-quote-actions.css:1	spacing	padding: 3px 7px
+src/server/public/app-quote-actions.css:1	spacing	padding: 6px 10px
+src/server/public/app-quote-actions.css:1	spacing	padding: 7px 10px
+src/server/public/app-quote-actions.css:1	spacing	padding: 9px 10px
+src/server/public/audit-log-polish.css:10	spacing	margin-bottom: 14px
+src/server/public/audit-log-polish.css:13	spacing	padding: 7px 11px
+src/server/public/audit-log-polish.css:14	spacing	gap: 10px
+src/server/public/audit-log-polish.css:14	spacing	margin: 14px 0
+src/server/public/audit-log-polish.css:17	spacing	margin-bottom: 3px
+src/server/public/audit-log-polish.css:19	spacing	padding: 10px 12px
+src/server/public/audit-log-polish.css:20	spacing	padding: 3px 7px
+src/server/public/audit-log-polish.css:25	spacing	margin-top: 10px
+src/server/public/audit-log-polish.css:5	spacing	padding: 18px
+src/server/public/audit-log-polish.css:6	spacing	margin: 0 0 18px
+src/server/public/brand-editor.css:111	spacing	padding: 14px
+src/server/public/brand-editor.css:12	spacing	gap: 18px
+src/server/public/brand-editor.css:127	spacing	padding: 5px 8px
+src/server/public/brand-editor.css:131	spacing	padding: 14px
+src/server/public/brand-editor.css:132	spacing	margin: 0 0 7px
+src/server/public/brand-editor.css:14	spacing	padding: 18px
+src/server/public/brand-editor.css:146	spacing	padding: 10px
+src/server/public/brand-editor.css:152	spacing	margin: 0 0 18px
+src/server/public/brand-editor.css:155	spacing	padding: 13px 14px
+src/server/public/brand-editor.css:2	spacing	margin: 0 0 18px
+src/server/public/brand-editor.css:22	spacing	margin-bottom: 6px
+src/server/public/brand-editor.css:30	spacing	margin: 7px 0 0
+src/server/public/brand-editor.css:44	spacing	padding: 9px 12px
+src/server/public/brand-editor.css:67	spacing	padding: 14px
+src/server/public/brand-editor.css:73	spacing	margin-bottom: 10px
+src/server/public/brand-editor.css:85	spacing	gap: 9px
+src/server/public/brand-studio-preview.css:37	spacing	gap: 11px
+src/server/public/brand-studio-preview.css:38	spacing	margin-bottom: 14px
+src/server/public/brand-studio-preview.css:5	spacing	padding: 18px
+src/server/public/brand-studio-preview.css:6	spacing	margin-top: 14px
+src/server/public/brand-studio-preview.css:64	spacing	margin-top: 2px
+src/server/public/brand-studio-preview.css:70	spacing	margin-bottom: 10px
+src/server/public/brand-studio-preview.css:76	spacing	padding: 10px
+src/server/public/brand-studio-preview.css:85	spacing	padding: 11px 14px
+src/server/public/brand-studio-preview.css:89	spacing	margin: 10px 0 0
+src/server/public/brand-studio-preview.css:96	spacing	margin-top: 3px
+src/server/public/callback-queue-polish.css:100	spacing	padding: 10px 0
+src/server/public/callback-queue-polish.css:12	spacing	gap: 18px
+src/server/public/callback-queue-polish.css:123	spacing	margin-top: 2px
+src/server/public/callback-queue-polish.css:124	line-height	line-height: 1.35
+src/server/public/callback-queue-polish.css:13	spacing	padding: 18px
+src/server/public/callback-queue-polish.css:134	spacing	padding: 8px 10px
+src/server/public/callback-queue-polish.css:144	spacing	padding: 11px 12px
+src/server/public/callback-queue-polish.css:2	spacing	margin: 0 0 18px
+src/server/public/callback-queue-polish.css:21	spacing	margin-bottom: 6px
+src/server/public/callback-queue-polish.css:30	spacing	margin: 7px 0 0
+src/server/public/callback-queue-polish.css:44	spacing	padding: 9px 12px
+src/server/public/callback-queue-polish.css:57	spacing	gap: 10px
+src/server/public/callback-queue-polish.css:63	spacing	padding: 13px
+src/server/public/callback-queue-polish.css:68	spacing	margin-bottom: 5px
+src/server/public/callback-queue-polish.css:82	spacing	margin: 0 0 18px
+src/server/public/callback-queue-polish.css:88	spacing	padding: 14px
+src/server/public/callback-queue-polish.css:91	spacing	margin: 0 0 10px
+src/server/public/callback-queue-polish.css:99	spacing	gap: 10px
+src/server/public/callback-queue-search.css:30	spacing	gap: 5px
+src/server/public/callback-queue-search.css:39	spacing	padding: 10px 13px
+src/server/public/callback-queue-search.css:55	spacing	padding: 8px 11px
+src/server/public/callback-queue-search.css:6	spacing	margin: 0 0 14px
+src/server/public/callback-queue-search.css:68	spacing	padding: 12px 14px
+src/server/public/callback-queue-search.css:7	spacing	padding: 14px
+src/server/public/customize-panel.css:115	spacing	padding: 8px 13px
+src/server/public/customize-panel.css:131	spacing	gap: 7px
+src/server/public/customize-panel.css:131	spacing	padding: 6px 12px 6px 8px
+src/server/public/customize-panel.css:150	spacing	gap: 6px
+src/server/public/customize-panel.css:150	spacing	padding: 22px 16px
+src/server/public/customize-panel.css:158	spacing	margin-top: 6px
+src/server/public/customize-panel.css:162	spacing	padding: 6px
+src/server/public/customize-panel.css:166	spacing	padding: 14px
+src/server/public/customize-panel.css:167	spacing	margin-bottom: 10px
+src/server/public/customize-panel.css:176	spacing	margin-top: 10px
+src/server/public/customize-panel.css:32	spacing	margin: 0 0 18px
+src/server/public/customize-panel.css:36	spacing	gap: 18px
+src/server/public/customize-panel.css:40	spacing	gap: 14px
+src/server/public/customize-panel.css:41	spacing	top: 18px
+src/server/public/customize-panel.css:44	spacing	padding: 16px 16px 18px
+src/server/public/customize-panel.css:52	spacing	gap: 6px
+src/server/public/customize-panel.css:53	spacing	margin-top: 10px
+src/server/public/customize-panel.css:55	spacing	margin-top: 2px
+src/server/public/customize-panel.css:60	spacing	gap: 10px
+src/server/public/customize-panel.css:77	spacing	top: 14px
+src/server/public/customize-panel.css:81	spacing	bottom: 9px
+src/server/public/customize-panel.css:81	spacing	right: 9px
+src/server/public/customize-panel.css:98	spacing	gap: 7px
+src/server/public/dashboard-freight-shell.css:107	spacing	padding: 18px 22px 6px
+src/server/public/dashboard-freight-shell.css:120	spacing	padding: 34px 42px 42px
+src/server/public/dashboard-freight-shell.css:171	spacing	padding: 72px 18px 28px
+src/server/public/dashboard-freight-shell.css:34	spacing	margin: 14px 0 14px 14px
+src/server/public/dashboard-freight-shell.css:45	spacing	padding: 16px 14px 18px
+src/server/public/dashboard-freight-shell.css:52	spacing	gap: 10px
+src/server/public/dashboard-freight-shell.css:75	spacing	padding-left: 44px
+src/server/public/dashboard-freight-shell.css:82	spacing	margin: 3px 10px
+src/server/public/dashboard-freight-shell.css:83	spacing	padding: 10px 12px
+src/server/public/dashboard-polish.css:13	spacing	margin: 0 14px 14px
+src/server/public/dashboard-polish.css:136	tap	width: 18px
+src/server/public/dashboard-polish.css:137	tap	height: 18px
+src/server/public/dashboard-polish.css:14	spacing	padding: 14px 14px 16px
+src/server/public/dashboard-polish.css:159	spacing	padding: 72px 18px 32px
+src/server/public/dashboard-polish.css:26	spacing	margin: 2px 10px
+src/server/public/dashboard-polish.css:30	spacing	padding: 10px 12px
+src/server/public/dashboard-polish.css:53	spacing	padding: 38px 42px 56px
+src/server/public/dashboard-polish.css:58	spacing	margin-bottom: 6px
+src/server/public/dashboard-polish.css:62	spacing	margin-bottom: 22px
+src/server/public/dashboard-polish.css:71	spacing	margin-bottom: 14px
+src/server/public/dashboard-polish.css:86	spacing	padding: 20px
+src/server/public/dashboard-polish.css:99	spacing	padding: 9px 13px
+src/server/public/dashboard-preview.css:111	spacing	padding: 5px 8px
+src/server/public/dashboard-preview.css:12	spacing	gap: 18px
+src/server/public/dashboard-preview.css:121	spacing	padding: 10px
+src/server/public/dashboard-preview.css:127	spacing	margin-top: 10px
+src/server/public/dashboard-preview.css:138	spacing	gap: 7px
+src/server/public/dashboard-preview.css:14	spacing	padding: 18px 20px
+src/server/public/dashboard-preview.css:140	spacing	margin-top: 10px
+src/server/public/dashboard-preview.css:145	spacing	padding: 6px 8px
+src/server/public/dashboard-preview.css:2	spacing	margin: 0 0 22px
+src/server/public/dashboard-preview.css:22	spacing	margin-bottom: 6px
+src/server/public/dashboard-preview.css:30	spacing	margin: 6px 0 0
+src/server/public/dashboard-preview.css:44	spacing	padding: 9px 12px
+src/server/public/dashboard-preview.css:65	spacing	padding: 14px
+src/server/public/dashboard-preview.css:72	spacing	margin-bottom: 6px
+src/server/public/dashboard-preview.css:90	spacing	padding: 14px
+src/server/public/dashboard-setup.css:100	spacing	padding: 0 14px 16px
+src/server/public/dashboard-setup.css:105	spacing	padding: 9px 12px
+src/server/public/dashboard-setup.css:116	spacing	padding: 18px
+src/server/public/dashboard-setup.css:12	spacing	gap: 18px
+src/server/public/dashboard-setup.css:122	spacing	margin-bottom: 5px
+src/server/public/dashboard-setup.css:13	spacing	padding: 20px
+src/server/public/dashboard-setup.css:130	spacing	margin: 0 14px 13px
+src/server/public/dashboard-setup.css:133	spacing	padding: 11px 12px
+src/server/public/dashboard-setup.css:141	spacing	gap: 14px
+src/server/public/dashboard-setup.css:159	spacing	margin: 7px 0 0
+src/server/public/dashboard-setup.css:161	spacing	margin-top: 9px
+src/server/public/dashboard-setup.css:162	spacing	gap: 7px
+src/server/public/dashboard-setup.css:163	spacing	padding: 5px 8px
+src/server/public/dashboard-setup.css:183	spacing	margin: 6px 0 0
+src/server/public/dashboard-setup.css:188	spacing	padding: 8px 10px
+src/server/public/dashboard-setup.css:195	spacing	padding: 9px 12px
+src/server/public/dashboard-setup.css:2	spacing	margin: 0 0 22px
+src/server/public/dashboard-setup.css:200	spacing	gap: 10px
+src/server/public/dashboard-setup.css:200	spacing	padding: 14px
+src/server/public/dashboard-setup.css:201	spacing	padding: 13px
+src/server/public/dashboard-setup.css:202	spacing	margin-bottom: 9px
+src/server/public/dashboard-setup.css:203	spacing	gap: 7px
+src/server/public/dashboard-setup.css:204	spacing	margin-top: 10px
+src/server/public/dashboard-setup.css:21	spacing	margin-bottom: 6px
+src/server/public/dashboard-setup.css:254	spacing	padding: 22px
+src/server/public/dashboard-setup.css:257	spacing	gap: 7px
+src/server/public/dashboard-setup.css:258	spacing	padding: 5px 11px 5px 7px
+src/server/public/dashboard-setup.css:29	spacing	margin: 7px 0 0
+src/server/public/dashboard-setup.css:47	spacing	margin-top: 10px
+src/server/public/dashboard-setup.css:62	spacing	gap: 10px
+src/server/public/dashboard-setup.css:63	spacing	padding: 14px
+src/server/public/dashboard-setup.css:69	spacing	gap: 10px
+src/server/public/dashboard-setup.css:71	spacing	padding: 13px
+src/server/public/dashboard-setup.css:99	line-height	line-height: 1.35
+src/server/public/dashboard-setup.css:99	spacing	margin-top: 3px
+src/server/public/dpa-wefixtrades.css:66	spacing	padding-inline: 18px
+src/server/public/drayage-zone-polish.css:105	spacing	padding: 12px 13px
+src/server/public/drayage-zone-polish.css:14	spacing	padding: 17px 18px
+src/server/public/drayage-zone-polish.css:2	spacing	margin: 0 0 18px
+src/server/public/drayage-zone-polish.css:22	spacing	margin-bottom: 6px
+src/server/public/drayage-zone-polish.css:30	spacing	margin: 6px 0 0
+src/server/public/drayage-zone-polish.css:43	spacing	padding: 8px 11px
+src/server/public/drayage-zone-polish.css:58	spacing	gap: 10px
+src/server/public/drayage-zone-polish.css:71	spacing	margin-bottom: 5px
+src/server/public/drayage-zone-polish.css:81	spacing	gap: 5px
+src/server/public/drayage-zone-polish.css:82	spacing	margin-top: 6px
+src/server/public/embed-launch-studio.css:13	spacing	gap: 14px
+src/server/public/embed-launch-studio.css:14	spacing	margin-bottom: 14px
+src/server/public/embed-launch-studio.css:26	spacing	margin-top: 3px
+src/server/public/embed-launch-studio.css:33	spacing	gap: 10px
+src/server/public/embed-launch-studio.css:5	spacing	padding: 18px
+src/server/public/embed-panel.css:35	spacing	margin: 0 0 18px
+src/server/public/followup-workspace.css:110	line-height	line-height: 1.35
+src/server/public/followup-workspace.css:119	spacing	margin: 0 0 18px
+src/server/public/followup-workspace.css:12	spacing	gap: 18px
+src/server/public/followup-workspace.css:122	spacing	padding: 13px 14px
+src/server/public/followup-workspace.css:14	spacing	padding: 18px
+src/server/public/followup-workspace.css:2	spacing	margin: 0 0 18px
+src/server/public/followup-workspace.css:22	spacing	margin-bottom: 6px
+src/server/public/followup-workspace.css:30	spacing	margin: 7px 0 0
+src/server/public/followup-workspace.css:43	spacing	padding: 9px 12px
+src/server/public/followup-workspace.css:56	spacing	gap: 10px
+src/server/public/followup-workspace.css:63	spacing	padding: 13px
+src/server/public/followup-workspace.css:69	spacing	margin-bottom: 5px
+src/server/public/followup-workspace.css:77	spacing	margin: 0 0 18px
+src/server/public/followup-workspace.css:80	spacing	gap: 10px
+src/server/public/followup-workspace.css:89	spacing	margin: 0 0 10px
+src/server/public/followup-workspace.css:99	spacing	padding: 10px
+src/server/public/freight-premium-theme.css:27	spacing	margin-bottom: 10px
+src/server/public/landing-conversion.css:102	spacing	margin-bottom: 18px
+src/server/public/landing-conversion.css:116	spacing	margin: 20px 0 0
+src/server/public/landing-conversion.css:122	spacing	gap: 14px
+src/server/public/landing-conversion.css:123	spacing	margin-top: 26px
+src/server/public/landing-conversion.css:131	spacing	padding: 10px 2px
+src/server/public/landing-conversion.css:147	spacing	gap: 14px
+src/server/public/landing-conversion.css:157	spacing	padding: 18px
+src/server/public/landing-conversion.css:186	spacing	margin-bottom: 14px
+src/server/public/landing-conversion.css:20	spacing	gap: 18px
+src/server/public/landing-conversion.css:204	spacing	gap: 9px
+src/server/public/landing-conversion.css:226	spacing	padding: 9px 10px
+src/server/public/landing-conversion.css:243	spacing	gap: 7px
+src/server/public/landing-conversion.css:25	spacing	gap: 10px
+src/server/public/landing-conversion.css:250	spacing	padding: 6px 8px
+src/server/public/landing-conversion.css:264	spacing	right: -2px
+src/server/public/landing-conversion.css:280	spacing	padding: 8px 10px
+src/server/public/landing-conversion.css:287	spacing	bottom: 28px
+src/server/public/landing-conversion.css:288	spacing	bottom: 52px
+src/server/public/landing-conversion.css:290	spacing	padding: 70px 24px
+src/server/public/landing-conversion.css:293	spacing	margin: 0 auto 34px
+src/server/public/landing-conversion.css:294	spacing	margin: 10px 0 0
+src/server/public/landing-conversion.css:305	line-height	line-height: 1.65
+src/server/public/landing-conversion.css:312	spacing	gap: 14px
+src/server/public/landing-conversion.css:324	spacing	padding: 20px
+src/server/public/landing-conversion.css:333	spacing	margin: 12px 0 6px
+src/server/public/landing-conversion.css:348	spacing	gap: 7px
+src/server/public/landing-conversion.css:391	spacing	gap: 7px
+src/server/public/landing-conversion.css:399	spacing	padding: 6px 9px
+src/server/public/landing-conversion.css:407	spacing	gap: 30px
+src/server/public/landing-conversion.css:413	spacing	margin: 10px 0 0
+src/server/public/landing-conversion.css:419	spacing	margin-top: 18px
+src/server/public/landing-conversion.css:425	spacing	padding: 18px
+src/server/public/landing-conversion.css:433	spacing	margin-bottom: 14px
+src/server/public/landing-conversion.css:439	spacing	padding: 10px 12px
+src/server/public/landing-conversion.css:441	spacing	margin-top: 10px
+src/server/public/landing-conversion.css:448	spacing	gap: 5px
+src/server/public/landing-conversion.css:448	spacing	padding: 10px 2px 2px
+src/server/public/landing-conversion.css:465	spacing	gap: 10px
+src/server/public/landing-conversion.css:466	spacing	gap: 9px
+src/server/public/landing-conversion.css:475	spacing	gap: 10px
+src/server/public/landing-conversion.css:497	spacing	padding: 42px 28px
+src/server/public/landing-conversion.css:507	spacing	padding: 54px 24px 34px
+src/server/public/landing-conversion.css:522	spacing	padding: 5px 0
+src/server/public/landing-conversion.css:525	spacing	margin: 34px auto 0
+src/server/public/landing-conversion.css:527	spacing	padding-top: 18px
+src/server/public/landing-conversion.css:530	spacing	gap: 18px
+src/server/public/landing-conversion.css:54	spacing	padding: 8px 10px
+src/server/public/landing-conversion.css:553	spacing	gap: 10px
+src/server/public/landing-conversion.css:553	spacing	padding: 10px 16px
+src/server/public/landing-conversion.css:559	spacing	padding: 8px 10px
+src/server/public/landing-conversion.css:560	spacing	padding: 42px 18px 34px
+src/server/public/landing-conversion.css:561	spacing	gap: 26px
+src/server/public/landing-conversion.css:566	spacing	gap: 10px
+src/server/public/landing-conversion.css:571	spacing	padding: 15px
+src/server/public/landing-conversion.css:574	spacing	padding: 48px 18px
+src/server/public/landing-conversion.css:590	spacing	padding: 18px
+src/server/public/landing-conversion.css:594	spacing	padding: 42px 18px 28px
+src/server/public/landing-conversion.css:66	spacing	padding: 72px 24px 50px
+src/server/public/landing-conversion.css:82	spacing	gap: 46px
+src/server/public/landing-conversion.css:98	spacing	padding: 7px 10px
+src/server/public/landing-final-cta.css:10	spacing	padding: clamp(40px, 5vw, 60px) clamp(24px, 4vw, 52px)
+src/server/public/landing-final-cta.css:138	spacing	padding: 14px 16px
+src/server/public/landing-final-cta.css:166	spacing	margin-left: -6px
+src/server/public/landing-final-cta.css:167	spacing	margin-top: -6px
+src/server/public/landing-final-cta.css:191	spacing	padding-left: 18px
+src/server/public/landing-final-cta.css:192	spacing	padding-right: 18px
+src/server/public/landing-final-cta.css:198	spacing	margin-left: -18px
+src/server/public/landing-final-cta.css:199	spacing	margin-right: -18px
+src/server/public/landing-final-cta.css:205	spacing	padding: 10px 7px
+src/server/public/landing-final-cta.css:206	spacing	gap: 6px
+src/server/public/landing-final-cta.css:22	spacing	margin: 20px auto 0
+src/server/public/landing-final-cta.css:29	spacing	margin-top: 30px
+src/server/public/landing-final-cta.css:61	spacing	margin: 38px 0 0
+src/server/public/landing-final-cta.css:67	spacing	gap: 10px
+src/server/public/landing-final-cta.css:85	spacing	gap: 9px
+src/server/public/landing-final-cta.css:86	spacing	padding: 11px 12px
+src/server/public/landing-home-fixes.css:108	spacing	gap: 14px
+src/server/public/landing-home-fixes.css:122	spacing	padding: 9px 18px
+src/server/public/landing-home-fixes.css:146	spacing	gap: 10px
+src/server/public/landing-home-fixes.css:150	spacing	margin-bottom: 22px
+src/server/public/landing-home-fixes.css:172	spacing	gap: clamp(50px, 5.8vw, 92px)
+src/server/public/landing-home-fixes.css:196	spacing	gap: 20px
+src/server/public/landing-home-fixes.css:206	spacing	column-gap: 18px
+src/server/public/landing-home-fixes.css:248	spacing	gap: 26px
+src/server/public/landing-home-fixes.css:260	spacing	padding: 22px
+src/server/public/landing-home-fixes.css:27	spacing	padding: 12px 20px 0
+src/server/public/landing-home-fixes.css:33	spacing	padding: 10px 22px
+src/server/public/landing-home-fixes.css:358	spacing	gap: 2px
+src/server/public/landing-home-fixes.css:376	spacing	padding: 12px 14px
+src/server/public/landing-home-fixes.css:45	spacing	gap: 9px
+src/server/public/landing-s-polish.css:106	spacing	padding: 5px 8px
+src/server/public/landing-s-polish.css:119	spacing	padding: 10px
+src/server/public/landing-s-polish.css:14	spacing	margin-top: 18px
+src/server/public/landing-s-polish.css:161	spacing	inset: 6px 5px auto
+src/server/public/landing-s-polish.css:20	spacing	gap: 7px
+src/server/public/landing-s-polish.css:25	spacing	padding: 9px 10px
+src/server/public/landing-s-polish.css:265	spacing	padding-top: 34px
+src/server/public/landing-s-polish.css:49	spacing	gap: 30px
+src/server/public/landing-s-polish.css:53	spacing	margin: 10px 0 0
+src/server/public/landing-s-polish.css:61	line-height	line-height: 1.65
+src/server/public/landing-s-polish.css:68	spacing	padding: 18px
+src/server/public/landing-s-polish.css:85	spacing	padding: 11px 0
+src/server/public/landing-wefixtrades-cleanup.css:108	spacing	gap: clamp(42px, 6vw, 78px)
+src/server/public/landing-wefixtrades-cleanup.css:118	spacing	margin-top: 18px
+src/server/public/landing-wefixtrades-cleanup.css:127	spacing	margin-top: 20px
+src/server/public/landing-wefixtrades-cleanup.css:134	spacing	margin-top: 34px
+src/server/public/landing-wefixtrades-cleanup.css:135	spacing	gap: 18px
+src/server/public/landing-wefixtrades-cleanup.css:139	spacing	margin-top: 18px
+src/server/public/landing-wefixtrades-cleanup.css:162	spacing	gap: 14px
+src/server/public/landing-wefixtrades-cleanup.css:166	spacing	padding: 18px
+src/server/public/landing-wefixtrades-cleanup.css:187	spacing	padding: 20px
+src/server/public/landing-wefixtrades-cleanup.css:207	spacing	margin: 0 0 6px
+src/server/public/landing-wefixtrades-cleanup.css:298	spacing	padding: clamp(72px, 8vw, 116px) 28px
+src/server/public/landing-wefixtrades-cleanup.css:308	spacing	gap: 14px
+src/server/public/landing-wefixtrades-cleanup.css:316	spacing	padding: 22px
+src/server/public/landing-wefixtrades-cleanup.css:329	spacing	padding: clamp(82px, 9vw, 128px) 28px
+src/server/public/landing-wefixtrades-cleanup.css:342	spacing	margin: 0 0 34px
+src/server/public/landing-wefixtrades-cleanup.css:357	spacing	gap: 14px
+src/server/public/landing-wefixtrades-cleanup.css:405	spacing	padding: clamp(82px, 9vw, 128px) 28px
+src/server/public/landing-wefixtrades-cleanup.css:414	spacing	padding: clamp(34px, 5vw, 58px)
+src/server/public/landing-wefixtrades-cleanup.css:432	spacing	padding-top: 54px
+src/server/public/landing-wefixtrades-cleanup.css:454	spacing	padding: 54px 18px 74px
+src/server/public/landing-wefixtrades-cleanup.css:474	spacing	padding: clamp(82px, 9vw, 128px) 28px
+src/server/public/landing-wefixtrades-cleanup.css:485	spacing	margin-top: 14px
+src/server/public/landing-wefixtrades-cleanup.css:497	spacing	gap: 14px
+src/server/public/landing-wefixtrades-cleanup.css:504	spacing	gap: 10px
+src/server/public/landing-wefixtrades-cleanup.css:508	spacing	padding: 22px
+src/server/public/landing-wefixtrades-cleanup.css:550	spacing	gap: 20px
+src/server/public/landing-wefixtrades-cleanup.css:554	spacing	padding: clamp(22px, 3vw, 32px)
+src/server/public/landing-wefixtrades-cleanup.css:611	spacing	padding: 60px 18px
+src/server/public/landing-wefixtrades-cleanup.css:671	spacing	padding: clamp(64px, 8vw, 116px) 28px
+src/server/public/landing-wefixtrades-cleanup.css:681	spacing	gap: clamp(24px, 3vw, 44px)
+src/server/public/landing-wefixtrades-cleanup.css:682	spacing	margin-top: clamp(34px, 4vw, 56px)
+src/server/public/landing-wefixtrades-cleanup.css:694	spacing	gap: 30px
+src/server/public/landing-wefixtrades-cleanup.css:99	spacing	padding: clamp(72px, 8vw, 116px) 28px clamp(78px, 8vw, 118px)
+src/server/public/landing-wefixtrades.css:114	spacing	padding: 9px 10px
+src/server/public/landing-wefixtrades.css:134	spacing	padding: 10px 15px
+src/server/public/landing-wefixtrades.css:167	spacing	padding: 0 20px
+src/server/public/landing-wefixtrades.css:171	spacing	padding: 52px 0 36px
+src/server/public/landing-wefixtrades.css:177	spacing	gap: 22px
+src/server/public/landing-wefixtrades.css:192	spacing	padding: clamp(28px, 5vw, 52px)
+src/server/public/landing-wefixtrades.css:199	spacing	gap: 7px
+src/server/public/landing-wefixtrades.css:212	spacing	margin: 14px 0 0
+src/server/public/landing-wefixtrades.css:242	spacing	gap: 10px
+src/server/public/landing-wefixtrades.css:243	spacing	margin-top: 26px
+src/server/public/landing-wefixtrades.css:264	spacing	padding: 0 22px
+src/server/public/landing-wefixtrades.css:270	spacing	padding: 0 18px
+src/server/public/landing-wefixtrades.css:286	spacing	margin-top: 22px
+src/server/public/landing-wefixtrades.css:293	spacing	padding: 7px 10px
+src/server/public/landing-wefixtrades.css:300	spacing	padding: 18px
+src/server/public/landing-wefixtrades.css:302	spacing	gap: 14px
+src/server/public/landing-wefixtrades.css:334	spacing	padding: 14px
+src/server/public/landing-wefixtrades.css:341	spacing	margin: 7px 0 4px
+src/server/public/landing-wefixtrades.css:377	spacing	padding: 42px 0
+src/server/public/landing-wefixtrades.css:381	spacing	padding: 10px
+src/server/public/landing-wefixtrades.css:387	spacing	padding: 0 0 9px 4px
+src/server/public/landing-wefixtrades.css:400	spacing	gap: 14px
+src/server/public/landing-wefixtrades.css:422	spacing	margin: 0 0 5px
+src/server/public/landing-wefixtrades.css:432	line-height	line-height: 1.35
+src/server/public/landing-wefixtrades.css:458	spacing	padding: 14px
+src/server/public/landing-wefixtrades.css:471	spacing	padding: 10px
+src/server/public/landing-wefixtrades.css:481	spacing	padding: 11px
+src/server/public/landing-wefixtrades.css:488	spacing	gap: 10px
+src/server/public/landing-wefixtrades.css:503	spacing	gap: 10px
+src/server/public/landing-wefixtrades.css:518	spacing	gap: 10px
+src/server/public/landing-wefixtrades.css:519	spacing	margin-top: 14px
+src/server/public/landing-wefixtrades.css:532	spacing	gap: 28px
+src/server/public/landing-wefixtrades.css:538	spacing	gap: 10px
+src/server/public/landing-wefixtrades.css:544	spacing	padding: 18px
+src/server/public/landing-wefixtrades.css:555	spacing	margin-top: 5px
+src/server/public/landing-wefixtrades.css:567	spacing	gap: 10px
+src/server/public/landing-wefixtrades.css:576	spacing	padding: 20px
+src/server/public/landing-wefixtrades.css:58	spacing	gap: 18px
+src/server/public/landing-wefixtrades.css:59	spacing	padding: 0 14px
+src/server/public/landing-wefixtrades.css:592	spacing	padding: 38px 24px 18px
+src/server/public/landing-wefixtrades.css:612	spacing	padding: 28px 0
+src/server/public/landing-wefixtrades.css:617	spacing	padding-left: 22px
+src/server/public/landing-wefixtrades.css:633	spacing	padding: 5px 0
+src/server/public/landing-wefixtrades.css:642	spacing	padding-top: 14px
+src/server/public/landing-wefixtrades.css:65	spacing	gap: 9px
+src/server/public/landing-wefixtrades.css:675	spacing	padding: 10px 12px
+src/server/public/landing-wefixtrades.css:676	spacing	padding-top: 26px
+src/server/public/landing-wefixtrades.css:92	spacing	right: -5px
+src/server/public/landing-wefixtrades.css:93	spacing	top: 2px
+src/server/public/launch-panel.css:1	spacing	gap: 10px
+src/server/public/launch-panel.css:1	spacing	gap: 18px
+src/server/public/launch-panel.css:1	spacing	margin-bottom: 5px
+src/server/public/launch-panel.css:1	spacing	margin-bottom: 6px
+src/server/public/launch-panel.css:1	spacing	margin-bottom: 9px
+src/server/public/launch-panel.css:1	spacing	margin: 0 0 18px
+src/server/public/launch-panel.css:1	spacing	margin: 7px 0 0
+src/server/public/launch-panel.css:1	spacing	padding: 13px
+src/server/public/launch-panel.css:1	spacing	padding: 13px 14px
+src/server/public/launch-panel.css:1	spacing	padding: 18px
+src/server/public/launch-panel.css:1	spacing	padding: 9px 12px
+src/server/public/lead-crm-polish.css:2	spacing	margin: 12px 0 14px
+src/server/public/lead-crm-polish.css:20	spacing	margin-bottom: 5px
+src/server/public/lead-crm-polish.css:28	spacing	margin: 6px 0 0
+src/server/public/lead-crm-polish.css:41	spacing	padding: 7px 10px
+src/server/public/lead-crm-polish.css:61	spacing	padding: 10px
+src/server/public/lead-crm-polish.css:7	spacing	padding: 14px
+src/server/public/lead-crm-polish.css:74	line-height	line-height: 1.35
+src/server/public/lead-crm-polish.css:77	spacing	margin-top: 10px
+src/server/public/lead-crm-polish.css:80	spacing	padding: 10px 11px
+src/server/public/lead-detail-command.css:21	spacing	margin-bottom: 6px
+src/server/public/lead-detail-command.css:3	spacing	padding: 18px
+src/server/public/lead-detail-command.css:33	line-height	line-height: 1
+src/server/public/lead-detail-command.css:39	spacing	margin: 10px 0 0
+src/server/public/lead-detail-command.css:55	spacing	padding: 8px 11px
+src/server/public/lead-detail-command.css:75	spacing	gap: 10px
+src/server/public/lead-detail-command.css:89	spacing	margin-bottom: 5px
+src/server/public/lead-queue-search.css:30	spacing	gap: 5px
+src/server/public/lead-queue-search.css:39	spacing	padding: 10px 13px
+src/server/public/lead-queue-search.css:55	spacing	padding: 8px 11px
+src/server/public/lead-queue-search.css:68	spacing	padding: 12px 14px
+src/server/public/lead-queue-search.css:7	spacing	padding: 14px
+src/server/public/leads-list-focus.css:107	spacing	padding: 11px 12px
+src/server/public/leads-list-focus.css:13	spacing	gap: 14px
+src/server/public/leads-list-focus.css:21	spacing	margin-bottom: 5px
+src/server/public/leads-list-focus.css:29	spacing	margin: 5px 0 0
+src/server/public/leads-list-focus.css:37	spacing	padding: 8px 11px
+src/server/public/leads-list-focus.css:54	spacing	padding: 11px
+src/server/public/leads-list-focus.css:7	spacing	padding: 14px
+src/server/public/leads-list-focus.css:78	spacing	margin: 0 0 10px
+src/server/public/leads-list-focus.css:85	spacing	padding: 7px 10px
+src/server/public/overview-command-center.css:10	spacing	margin: 0 0 26px
+src/server/public/overview-command-center.css:11	spacing	padding: 20px
+src/server/public/overview-command-center.css:19	spacing	margin: 0 0 6px
+src/server/public/overview-command-center.css:2	spacing	gap: 14px
+src/server/public/overview-command-center.css:42	spacing	gap: 10px
+src/server/public/overview-command-center.css:53	spacing	padding: 14px
+src/server/public/overview-command-center.css:67	line-height	line-height: 1
+src/server/public/overview-command-center.css:8	spacing	gap: 18px
+src/server/public/overview-command-center.css:82	spacing	gap: 18px
+src/server/public/overview-executive-polish.css:13	spacing	gap: 18px
+src/server/public/overview-executive-polish.css:15	spacing	margin: 0 0 18px
+src/server/public/overview-executive-polish.css:151	spacing	padding: 20px 24px
+src/server/public/overview-executive-polish.css:154	spacing	inset: auto -26px -40px auto
+src/server/public/overview-executive-polish.css:32	spacing	margin-bottom: 7px
+src/server/public/overview-executive-polish.css:54	spacing	gap: 10px
+src/server/public/overview-executive-polish.css:65	spacing	padding: 18px
+src/server/public/overview-executive-polish.css:76	spacing	inset: auto -30px -46px auto
+src/server/public/premium-saas-polish.css:10	spacing	padding: 18px
+src/server/public/premium-saas-polish.css:117	spacing	margin-top: 14px
+src/server/public/premium-saas-polish.css:138	spacing	bottom: 14px
+src/server/public/premium-saas-polish.css:138	spacing	left: 14px
+src/server/public/premium-saas-polish.css:138	spacing	right: 14px
+src/server/public/premium-saas-polish.css:20	spacing	margin-bottom: 14px
+src/server/public/premium-saas-polish.css:27	spacing	right: 18px
+src/server/public/premium-saas-polish.css:28	spacing	bottom: 18px
+src/server/public/premium-saas-polish.css:31	spacing	gap: 10px
+src/server/public/premium-saas-polish.css:41	spacing	padding: 12px 13px
+src/server/public/premium-saas-polish.css:49	spacing	margin-bottom: 2px
+src/server/public/premium-saas-polish.css:63	spacing	padding: 18px
+src/server/public/premium-saas-polish.css:75	spacing	padding: 20px
+src/server/public/public-calculator-app-style.css:153	spacing	padding: 14px 15px
+src/server/public/public-calculator-app-style.css:165	line-height	line-height: 1
+src/server/public/public-calculator-app-style.css:178	spacing	padding: 11px 12px
+src/server/public/public-calculator-app-style.css:18	spacing	padding: 14px
+src/server/public/public-calculator-app-style.css:261	spacing	padding: 10px 8px
+src/server/public/public-calculator-app-style.css:27	spacing	padding: 18px
+src/server/public/public-calculator-app-style.css:272	spacing	padding: 10px 3px
+src/server/public/public-calculator-app-style.css:275	spacing	gap: 11px
+src/server/public/public-calculator-app-style.css:33	spacing	gap: 10px
+src/server/public/public-calculator-app-style.css:35	spacing	margin: 0 0 14px
+src/server/public/public-calculator-app-style.css:36	spacing	padding: 0 2px
+src/server/public/public-calculator-app-style.css:83	spacing	padding: 10px 5px
+src/server/public/public-calculator-brand-preview.css:118	spacing	gap: 7px 10px
+src/server/public/public-calculator-brand-preview.css:119	spacing	margin: 0 0 10px
+src/server/public/public-calculator-brand-preview.css:138	spacing	margin-right: 7px
+src/server/public/public-calculator-brand-preview.css:145	spacing	margin: 0 0 14px
+src/server/public/public-calculator-brand-preview.css:157	spacing	gap: 10px
+src/server/public/public-calculator-brand-preview.css:158	spacing	padding: 12px 14px 8px
+src/server/public/public-calculator-brand-preview.css:16	spacing	gap: 7px
+src/server/public/public-calculator-brand-preview.css:182	spacing	gap: 10px
+src/server/public/public-calculator-brand-preview.css:188	spacing	gap: 5px
+src/server/public/public-calculator-brand-preview.css:200	spacing	padding: 11px 12px
+src/server/public/public-calculator-brand-preview.css:21	spacing	padding: 10px 12px
+src/server/public/public-calculator-brand-preview.css:44	spacing	margin-bottom: 10px
+src/server/public/public-calculator-brand-preview.css:5	spacing	gap: 10px
+src/server/public/public-calculator-brand-preview.css:70	spacing	padding: 5px
+src/server/public/public-calculator-brand-preview.css:88	spacing	right: -5px
+src/server/public/public-calculator-brand-preview.css:89	spacing	bottom: -5px
+src/server/public/public-calculator-followup.css:18	spacing	margin-top: 2px
+src/server/public/public-calculator-followup.css:26	spacing	margin-top: 10px
+src/server/public/public-calculator-followup.css:32	spacing	padding: 10px
+src/server/public/public-calculator-followup.css:37	spacing	margin-bottom: 3px
+src/server/public/public-calculator-followup.css:43	line-height	line-height: 1.35
+src/server/public/public-calculator-followup.css:5	spacing	padding: 13px
+src/server/public/public-calculator-followup.css:6	spacing	margin-top: 13px
+src/server/public/public-calculator-mobile-cleanup.css:104	spacing	gap: 9px
+src/server/public/public-calculator-mobile-cleanup.css:119	spacing	padding-bottom: 2px
+src/server/public/public-calculator-mobile-cleanup.css:123	spacing	padding: 20px 16px
+src/server/public/public-calculator-mobile-cleanup.css:128	spacing	padding: 9px 5px
+src/server/public/public-calculator-mobile-cleanup.css:131	spacing	padding: 11px 12px
+src/server/public/public-calculator-mobile-cleanup.css:146	spacing	gap: 7px
+src/server/public/public-calculator-mobile-cleanup.css:16	spacing	gap: 6px
+src/server/public/public-calculator-mobile-cleanup.css:21	spacing	padding-inline: 6px
+src/server/public/public-calculator-mobile-cleanup.css:30	spacing	padding-inline: 7px
+src/server/public/public-calculator-mobile-cleanup.css:38	spacing	margin-top: 13px
+src/server/public/public-calculator-mobile-cleanup.css:4	spacing	gap: 7px
+src/server/public/public-calculator-mobile-cleanup.css:48	spacing	gap: 10px
+src/server/public/public-calculator-mobile-cleanup.css:51	spacing	padding: 13px 14px
+src/server/public/public-calculator-mobile-cleanup.css:84	spacing	padding: 13px
+src/server/public/public-calculator-mobile-cleanup.css:9	spacing	padding-inline: 6px
+src/server/public/public-calculator-mobile-cleanup.css:90	spacing	margin-bottom: 9px
+src/server/public/public-calculator-no-gradients.css:166	spacing	padding: 14px 16px
+src/server/public/public-calculator-ux.css:101	spacing	gap: 7px
+src/server/public/public-calculator-ux.css:102	spacing	margin-top: 10px
+src/server/public/public-calculator-ux.css:109	spacing	padding: 8px 7px
+src/server/public/public-calculator-ux.css:119	spacing	margin-bottom: 14px
+src/server/public/public-calculator-ux.css:12	spacing	padding: 7px 9px
+src/server/public/public-calculator-ux.css:140	spacing	padding-right: 36px
+src/server/public/public-calculator-ux.css:146	spacing	top: 38px
+src/server/public/public-calculator-ux.css:158	spacing	gap: 10px
+src/server/public/public-calculator-ux.css:166	spacing	padding: 3px 7px
+src/server/public/public-calculator-ux.css:171	spacing	margin-top: 6px
+src/server/public/public-calculator-ux.css:174	line-height	line-height: 1.35
+src/server/public/public-calculator-ux.css:181	spacing	gap: 6px
+src/server/public/public-calculator-ux.css:182	spacing	margin-top: 11px
+src/server/public/public-calculator-ux.css:190	line-height	line-height: 1.35
+src/server/public/public-calculator-ux.css:200	spacing	padding-bottom: 10px
+src/server/public/public-calculator-ux.css:21	spacing	gap: 6px
+src/server/public/public-calculator-ux.css:217	spacing	margin-bottom: 6px
+src/server/public/public-calculator-ux.css:221	spacing	margin-top: 14px
+src/server/public/public-calculator-ux.css:222	spacing	padding-top: 10px
+src/server/public/public-calculator-ux.css:261	spacing	inset: 1px
+src/server/public/public-calculator-ux.css:270	spacing	margin-bottom: 6px
+src/server/public/public-calculator-ux.css:271	spacing	padding: 2px 2px 0
+src/server/public/public-calculator-ux.css:28	spacing	padding: 8px 9px
+src/server/public/public-calculator-ux.css:302	spacing	margin-bottom: 15px
+src/server/public/public-calculator-ux.css:306	spacing	margin: 2px 0 14px
+src/server/public/public-calculator-ux.css:318	spacing	margin-right: 5px
+src/server/public/public-calculator-ux.css:333	spacing	padding: 9px 10px
+src/server/public/public-calculator-ux.css:394	spacing	padding: 9px 8px
+src/server/public/public-calculator-ux.css:4	spacing	gap: 7px
+src/server/public/public-calculator-ux.css:42	spacing	padding: 11px 12px
+src/server/public/public-calculator-ux.css:452	spacing	padding: 20px
+src/server/public/public-calculator-ux.css:458	spacing	top: 15px
+src/server/public/public-calculator-ux.css:463	spacing	padding: 5px 9px
+src/server/public/public-calculator-ux.css:489	spacing	padding: 8px 10px
+src/server/public/public-calculator-ux.css:492	spacing	padding: 7px 0
+src/server/public/public-calculator-ux.css:496	spacing	padding-top: 10px
+src/server/public/public-calculator-ux.css:51	spacing	margin-top: 14px
+src/server/public/public-calculator-ux.css:511	spacing	padding: 11px 13px
+src/server/public/public-calculator-ux.css:560	spacing	padding: 9px
+src/server/public/public-calculator-ux.css:561	spacing	padding: 18px
+src/server/public/public-calculator-ux.css:562	spacing	gap: 7px
+src/server/public/public-calculator-ux.css:564	spacing	gap: 6px
+src/server/public/public-calculator-ux.css:570	spacing	margin-bottom: 10px
+src/server/public/public-calculator-ux.css:572	spacing	margin-top: 6px
+src/server/public/public-calculator-ux.css:64	spacing	margin-top: 13px
+src/server/public/public-calculator-ux.css:74	spacing	gap: 10px
+src/server/public/public-calculator-ux.css:85	spacing	padding: 5px 8px
+src/server/public/public-pages-wefixtrades.css:172	spacing	padding-inline: 18px
+src/server/public/public-pages-wefixtrades.css:28	spacing	padding-block: 9px
+src/server/public/public-pages-wefixtrades.css:73	spacing	padding-top: 58px
+src/server/public/public-pages-wefixtrades.css:74	spacing	padding-bottom: 34px
+src/server/public/public-pages-wefixtrades.css:95	spacing	gap: 10px
+src/server/public/quote-polish.css:1	line-height	line-height: 1
+src/server/public/quote-polish.css:1	spacing	gap: 18px
+src/server/public/quote-polish.css:1	spacing	gap: 22px
+src/server/public/quote-polish.css:1	spacing	gap: 3px
+src/server/public/quote-polish.css:1	spacing	gap: 3px 12px
+src/server/public/quote-polish.css:1	spacing	gap: 6px
+src/server/public/quote-polish.css:1	spacing	margin-bottom: 5px
+src/server/public/quote-polish.css:1	spacing	margin-bottom: 6px
+src/server/public/quote-polish.css:1	spacing	padding: 10px 12px
+src/server/public/quote-polish.css:1	spacing	padding: 10px 8px
+src/server/public/quote-polish.css:1	spacing	padding: 3px 7px
+src/server/public/quote-polish.css:1	spacing	padding: 5px 4px
+src/server/public/quote-polish.css:1	spacing	padding: 5px 8px
+src/server/public/quote-polish.css:1	spacing	padding: 6px 10px
+src/server/public/quote-polish.css:1	spacing	padding: 6px 8px
+src/server/public/quote-polish.css:1	spacing	padding: 6px 9px
+src/server/public/quote-polish.css:1	spacing	padding: 8px 8px 7px
+src/server/public/quote-premium.css:118	spacing	padding: 9px 10px
+src/server/public/quote-premium.css:136	spacing	gap: 9px
+src/server/public/quote-premium.css:149	spacing	padding: 14px
+src/server/public/quote-premium.css:15	spacing	padding-top: 18px
+src/server/public/quote-premium.css:166	spacing	margin: 0 0 2px
+src/server/public/quote-premium.css:167	spacing	padding: 14px
+src/server/public/quote-premium.css:24	spacing	padding: 18px
+src/server/public/quote-premium.css:29	spacing	padding: 10px
+src/server/public/quote-premium.css:46	spacing	padding: 8px 11px
+src/server/public/quote-premium.css:68	spacing	padding: 18px 0 16px
+src/server/public/quote-premium.css:77	spacing	padding: 6px
+src/server/public/quote-print.css:12	spacing	margin: 0 0 10px
+src/server/public/quote-print.css:13	spacing	padding: 8px 10px
+src/server/public/quote.css:1	line-height	line-height: 1
+src/server/public/quote.css:1	line-height	line-height: 1.15
+src/server/public/quote.css:1	line-height	line-height: 1.3
+src/server/public/quote.css:1	line-height	line-height: 1.35
+src/server/public/quote.css:1	spacing	gap: 11px
+src/server/public/quote.css:1	spacing	gap: 14px
+src/server/public/quote.css:1	spacing	gap: 3px
+src/server/public/quote.css:1	spacing	gap: 3px 8px
+src/server/public/quote.css:1	spacing	gap: 5px
+src/server/public/quote.css:1	spacing	gap: 6px
+src/server/public/quote.css:1	spacing	gap: 7px
+src/server/public/quote.css:1	spacing	gap: 9px
+src/server/public/quote.css:1	spacing	margin-bottom: 10px
+src/server/public/quote.css:1	spacing	margin-top: 10px
+src/server/public/quote.css:1	spacing	margin-top: 14px
+src/server/public/quote.css:1	spacing	margin-top: 2px
+src/server/public/quote.css:1	spacing	margin-top: 3px
+src/server/public/quote.css:1	spacing	margin-top: 9px
+src/server/public/quote.css:1	spacing	margin: 0 0 3px
+src/server/public/quote.css:1	spacing	margin: 0 0 5px
+src/server/public/quote.css:1	spacing	margin: 0 0 6px
+src/server/public/quote.css:1	spacing	margin: 2px 0 0
+src/server/public/quote.css:1	spacing	margin: 9px 0
+src/server/public/quote.css:1	spacing	padding-top: 10px
+src/server/public/quote.css:1	spacing	padding: 0 10px 24px
+src/server/public/quote.css:1	spacing	padding: 10px
+src/server/public/quote.css:1	spacing	padding: 11px 12px
+src/server/public/quote.css:1	spacing	padding: 11px 14px
+src/server/public/quote.css:1	spacing	padding: 12px 10px
+src/server/public/quote.css:1	spacing	padding: 13px 14px
+src/server/public/quote.css:1	spacing	padding: 14px
+src/server/public/quote.css:1	spacing	padding: 2px 6px
+src/server/public/quote.css:1	spacing	padding: 6px
+src/server/public/quote.css:1	spacing	padding: 6px 10px
+src/server/public/quote.css:1	spacing	padding: 6px 4px
+src/server/public/quote.css:1	spacing	padding: 6px 9px
+src/server/public/quote.css:1	spacing	padding: 7px 8px
+src/server/public/quote.css:1	spacing	padding: 7px 9px
+src/server/public/quote.css:1	spacing	padding: 8px 10px
+src/server/public/quote.css:1	spacing	padding: 9px
+src/server/public/quote.css:1	spacing	top: 20px
+src/server/public/quotefleet-rates-globe.css:137	spacing	gap: 7px
+src/server/public/quotefleet-rates-globe.css:153	spacing	gap: clamp(20px, 4vw, 52px)
+src/server/public/quotefleet-rates-globe.css:155	spacing	margin: 28px auto 0
+src/server/public/quotefleet-rates-globe.css:212	spacing	inset: -3px
+src/server/public/quotefleet-rates-globe.css:266	spacing	padding: 10px 12px
+src/server/public/quotefleet-rates-globe.css:285	line-height	line-height: 1.35
+src/server/public/quotefleet-rates-globe.css:286	spacing	margin-bottom: 3px
+src/server/public/quotefleet-rates-globe.css:294	line-height	line-height: 1.3
+src/server/public/quotefleet-rates-globe.css:318	spacing	padding: 8px 10px
+src/server/public/quotefleet-rates-globe.css:324	spacing	gap: 18px
+src/server/public/quotefleet-rates-globe.css:44	spacing	gap: 6px
+src/server/public/quotefleet-rates-globe.css:54	spacing	margin-bottom: 18px
+src/server/public/quotefleet-rates-globe.css:9	spacing	padding: clamp(56px, 6vw, 88px) 0 clamp(40px, 5vw, 64px)
+src/server/public/rate-builder.css:111	spacing	margin-right: 7px
+src/server/public/rate-builder.css:114	spacing	margin: 0 0 18px
+src/server/public/rate-builder.css:117	spacing	gap: 14px
+src/server/public/rate-builder.css:12	spacing	gap: 18px
+src/server/public/rate-builder.css:122	spacing	padding: 14px
+src/server/public/rate-builder.css:131	spacing	margin: 7px 0 0
+src/server/public/rate-builder.css:143	spacing	gap: 5px
+src/server/public/rate-builder.css:150	spacing	padding: 11px
+src/server/public/rate-builder.css:175	spacing	top: 2px
+src/server/public/rate-builder.css:176	spacing	left: 18px
+src/server/public/rate-builder.css:188	spacing	margin-top: 6px
+src/server/public/rate-builder.css:2	spacing	margin: 0 0 18px
+src/server/public/rate-builder.css:20	spacing	margin-bottom: 6px
+src/server/public/rate-builder.css:204	spacing	gap: 6px
+src/server/public/rate-builder.css:225	spacing	padding-left: 18px
+src/server/public/rate-builder.css:230	spacing	padding: 4px 7px
+src/server/public/rate-builder.css:244	spacing	gap: 7px
+src/server/public/rate-builder.css:262	spacing	gap: 14px
+src/server/public/rate-builder.css:264	spacing	margin: 0 0 18px
+src/server/public/rate-builder.css:268	spacing	padding: 14px
+src/server/public/rate-builder.css:274	spacing	margin-bottom: 5px
+src/server/public/rate-builder.css:28	spacing	margin: 7px 0 0
+src/server/public/rate-builder.css:284	spacing	padding: 8px 11px
+src/server/public/rate-builder.css:350	spacing	padding: 4px 13px 8px
+src/server/public/rate-builder.css:361	spacing	padding: 9px 0
+src/server/public/rate-builder.css:380	tap	width: 20px
+src/server/public/rate-builder.css:381	tap	height: 20px
+src/server/public/rate-builder.css:390	spacing	padding-top: 11px
+src/server/public/rate-builder.css:41	spacing	padding: 9px 12px
+src/server/public/rate-builder.css:54	spacing	gap: 10px
+src/server/public/rate-builder.css:67	spacing	margin-bottom: 5px
+src/server/public/rate-builder.css:7	spacing	padding: 18px
+src/server/public/rate-builder.css:75	spacing	margin: 0 0 18px
+src/server/public/rate-builder.css:79	spacing	padding: 14px
+src/server/public/rate-builder.css:97	spacing	padding: 10px
+src/server/public/rate-card-search.css:30	spacing	gap: 5px
+src/server/public/rate-card-search.css:39	spacing	padding: 10px 13px
+src/server/public/rate-card-search.css:55	spacing	padding: 8px 11px
+src/server/public/rate-card-search.css:6	spacing	margin: 0 0 14px
+src/server/public/rate-card-search.css:68	spacing	padding: 12px 14px
+src/server/public/rate-card-search.css:7	spacing	padding: 14px
+src/server/public/setup-builder.css:12	spacing	gap: 18px
+src/server/public/setup-builder.css:127	spacing	padding: 4px 13px 8px
+src/server/public/setup-builder.css:137	spacing	gap: 10px 12px
+src/server/public/setup-builder.css:139	spacing	padding: 9px 0
+src/server/public/setup-builder.css:157	tap	width: 20px
+src/server/public/setup-builder.css:158	tap	height: 20px
+src/server/public/setup-builder.css:166	spacing	padding-top: 11px
+src/server/public/setup-builder.css:2	spacing	margin: 0 0 18px
+src/server/public/setup-builder.css:20	spacing	margin-bottom: 6px
+src/server/public/setup-builder.css:28	spacing	margin: 7px 0 0
+src/server/public/setup-builder.css:41	spacing	padding: 9px 12px
+src/server/public/setup-builder.css:54	spacing	gap: 10px
+src/server/public/setup-builder.css:67	spacing	margin-bottom: 5px
+src/server/public/setup-builder.css:7	spacing	padding: 18px
+src/server/public/setup-builder.css:75	spacing	margin: 0 0 18px
+src/server/public/setup-builder.css:78	spacing	padding: 13px 14px
+src/server/public/setup-builder.css:92	spacing	left: 18px
+src/server/public/share-readiness.css:114	spacing	margin-bottom: 9px
+src/server/public/share-readiness.css:117	spacing	margin: 0 0 18px
+src/server/public/share-readiness.css:12	spacing	gap: 18px
+src/server/public/share-readiness.css:14	spacing	padding: 18px
+src/server/public/share-readiness.css:2	spacing	margin: 0 0 18px
+src/server/public/share-readiness.css:22	spacing	margin-bottom: 6px
+src/server/public/share-readiness.css:30	spacing	margin: 7px 0 0
+src/server/public/share-readiness.css:44	spacing	padding: 9px 12px
+src/server/public/share-readiness.css:68	spacing	padding: 13px
+src/server/public/share-readiness.css:75	spacing	margin-bottom: 5px
+src/server/public/share-readiness.css:85	spacing	gap: 6px
+src/server/public/share-readiness.css:87	spacing	padding: 6px 9px
+src/server/public/style.css:1005	spacing	margin: 20px 0
+src/server/public/style.css:1020	spacing	padding: 44px 28px 104px
+src/server/public/style.css:1023	spacing	margin-top: 72px
+src/server/public/style.css:1027	line-height	line-height: 1.7
+src/server/public/style.css:1033	spacing	margin: 0 9px
+src/server/public/style.css:178	spacing	margin-top: 6px
+src/server/public/style.css:192	tap	height: 16px
+src/server/public/style.css:192	tap	width: 16px
+src/server/public/style.css:236	spacing	padding: 0 28px
+src/server/public/style.css:237	spacing	padding: 0 28px
+src/server/public/style.css:265	spacing	padding: 14px 28px
+src/server/public/style.css:269	spacing	gap: 10px
+src/server/public/style.css:293	spacing	padding: 8px 18px
+src/server/public/style.css:303	spacing	padding: 11px 20px
+src/server/public/style.css:363	spacing	padding: 7px 12px
+src/server/public/style.css:364	spacing	padding: 14px 26px
+src/server/public/style.css:371	spacing	padding: 9px 16px
+src/server/public/style.css:378	spacing	padding: 26px
+src/server/public/style.css:383	spacing	padding: 16px 18px
+src/server/public/style.css:394	spacing	margin: 0 0 18px 0
+src/server/public/style.css:397	spacing	padding: 11px 0
+src/server/public/style.css:403	spacing	gap: 6px
+src/server/public/style.css:412	spacing	padding: 11px 14px
+src/server/public/style.css:432	spacing	gap: 14px
+src/server/public/style.css:433	spacing	gap: 14px
+src/server/public/style.css:441	spacing	gap: 10px
+src/server/public/style.css:449	spacing	padding: 10px 14px
+src/server/public/style.css:469	spacing	padding: 6px 12px
+src/server/public/style.css:490	spacing	padding: 6px 10px
+src/server/public/style.css:498	spacing	margin: 14px 0 0 0
+src/server/public/style.css:503	spacing	padding: 8px 14px
+src/server/public/style.css:510	spacing	margin-bottom: -1px
+src/server/public/style.css:543	spacing	margin: 6px 0 10px
+src/server/public/style.css:547	spacing	gap: 6px
+src/server/public/style.css:547	spacing	padding: 5px 11px
+src/server/public/style.css:559	spacing	margin-top: 6px
+src/server/public/style.css:569	spacing	padding: 6px 28px
+src/server/public/style.css:571	spacing	gap: 6px
+src/server/public/style.css:582	spacing	padding-bottom: 1px
+src/server/public/style.css:586	spacing	padding: 3px 8px
+src/server/public/style.css:601	spacing	margin-bottom: 22px
+src/server/public/style.css:604	spacing	padding: 11px 18px
+src/server/public/style.css:619	spacing	padding: 96px 28px 80px
+src/server/public/style.css:633	spacing	margin-bottom: 22px
+src/server/public/style.css:635	spacing	margin: 0 0 22px 0
+src/server/public/style.css:654	spacing	margin: 0 auto 38px auto
+src/server/public/style.css:657	spacing	margin-top: 30px
+src/server/public/style.css:659	spacing	gap: 28px
+src/server/public/style.css:665	spacing	padding: 64px 22px 56px
+src/server/public/style.css:671	spacing	padding: 72px 0
+src/server/public/style.css:675	spacing	margin-bottom: 14px
+src/server/public/style.css:678	spacing	margin-bottom: 14px
+src/server/public/style.css:686	spacing	gap: 18px
+src/server/public/style.css:692	spacing	padding: 28px 26px
+src/server/public/style.css:713	spacing	margin-bottom: 18px
+src/server/public/style.css:723	spacing	gap: 6px
+src/server/public/style.css:732	spacing	padding: 14px 18px
+src/server/public/style.css:757	spacing	padding: 6px
+src/server/public/style.css:762	spacing	gap: 6px
+src/server/public/style.css:762	spacing	padding: 9px 16px
+src/server/public/style.css:782	spacing	padding: 9px 0
+src/server/public/style.css:788	spacing	bottom: 86px
+src/server/public/style.css:794	spacing	padding: 26px
+src/server/public/style.css:801	spacing	gap: 14px
+src/server/public/style.css:810	spacing	padding: 18px 20px
+src/server/public/style.css:832	spacing	padding: 7px 10px
+src/server/public/style.css:838	spacing	gap: 22px
+src/server/public/style.css:843	spacing	padding: 32px 28px
+src/server/public/style.css:853	spacing	top: -10px
+src/server/public/style.css:861	spacing	margin: 14px 0
+src/server/public/style.css:865	spacing	margin: 0 0 22px 0
+src/server/public/style.css:867	spacing	padding: 7px 0
+src/server/public/style.css:868	spacing	gap: 10px
+src/server/public/style.css:881	spacing	padding: 18px 0
+src/server/public/style.css:887	spacing	padding: 6px 20px 18px 20px
+src/server/public/style.css:889	spacing	margin-bottom: 14px
+src/server/public/style.css:895	spacing	gap: 10px
+src/server/public/style.css:895	spacing	padding: 10px 20px
+src/server/public/style.css:916	spacing	padding: 0 6px
+src/server/public/style.css:934	spacing	padding: 18px 20px 8px 20px
+src/server/public/style.css:937	spacing	padding: 32px 36px
+src/server/public/style.css:944	spacing	margin: 0 0 14px 0
+src/server/public/style.css:946	spacing	margin: 0 0 26px 0
+src/server/public/style.css:950	spacing	padding: 22px
+src/server/public/style.css:957	spacing	padding: 18px
+src/server/public/style.css:964	spacing	padding: 11px 15px
+src/server/public/style.css:993	spacing	padding: 14px
+src/server/public/tools-marketplace-wefixtrades.css:3	spacing	padding: 58px 28px 34px
+src/server/public/vertical-pages-wefixtrades.css:33	spacing	padding: 42px 28px
+src/server/public/vertical-pages-wefixtrades.css:5	spacing	padding: 76px 28px 58px
+src/server/public/vertical-pages-wefixtrades.css:50	spacing	gap: 10px
+src/server/public/vertical-pages-wefixtrades.css:58	spacing	padding: 20px
+src/server/public/vertical-pages-wefixtrades.css:82	spacing	padding: 1px 5px
+src/server/public/vertical-pages-wefixtrades.css:88	spacing	padding: 34px 24px
+src/server/public/vertical-pages-wefixtrades.css:96	spacing	padding-top: 46px
+src/server/public/widget-style.css:198	spacing	left: -9999px
+src/server/public/widget-style.css:215	spacing	top: -5px

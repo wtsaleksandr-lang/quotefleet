@@ -90,3 +90,35 @@ describe('ensureReadable', () => {
     expect(passes(out, '#F3EEE4', WCAG.NORMAL)).toBe(true);
   });
 });
+
+// Design-guardrails: assert the shipped widget/site token pairs read at the
+// right WCAG level so the design system's default colours can't silently
+// regress. Numbers are the literal token values from widget-style.css /
+// style.css. See design-guardrails-spec (2026-07-10) section D.3.
+describe('design token contrast pairs', () => {
+  // [foreground, background, level, label]
+  const pairs: Array<[string, string, number, string]> = [
+    // Widget (light surface) — body / muted / primary CTA.
+    ['#0c1424', '#ffffff', WCAG.NORMAL, 'widget body fg on --w-bg'],
+    ['#5a6478', '#ffffff', WCAG.NORMAL, 'widget --w-muted on --w-bg'],
+    ['#ffffff', '#2563eb', WCAG.NORMAL, 'white on widget --w-primary CTA'],
+    ['#b91c1c', '#fee2e2', WCAG.NORMAL, 'widget --w-error on error bg'],
+    ['#15803d', '#dcfce7', WCAG.NORMAL, 'widget --w-success on success bg'],
+    // Site (dark canvas) — headings / body / muted / accent-as-text.
+    ['#F9F9F9', '#161616', WCAG.NORMAL, 'site --ink on --bg'],
+    ['#E7E4E0', '#161616', WCAG.NORMAL, 'site --ink-soft on --bg'],
+    ['#A39E99', '#161616', WCAG.NORMAL, 'site --muted on --bg'],
+    ['#6E8BFF', '#161616', WCAG.LARGE, 'site --accent (link/eyebrow) on --bg'],
+    ['#1E1E1E', '#E6E3E0', WCAG.NORMAL, 'site cream CTA text on --cta-bg'],
+    // Site (light theme) — body / accent / CTA.
+    ['#1E2530', '#F7F8FA', WCAG.NORMAL, 'light --ink-soft on light --bg'],
+    ['#FFFFFF', '#0D3CFC', WCAG.NORMAL, 'light CTA white on brand blue'],
+  ];
+
+  for (const [fg, bg, level, label] of pairs) {
+    it(`${label} passes at ${level}:1`, () => {
+      const r = contrastRatio(fg, bg);
+      expect(r, `${fg} on ${bg} = ${r.toFixed(2)}`).toBeGreaterThanOrEqual(level);
+    });
+  }
+});

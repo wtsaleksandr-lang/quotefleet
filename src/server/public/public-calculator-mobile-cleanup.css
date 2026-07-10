@@ -22,7 +22,7 @@
   padding-inline: 6px;
 }
 .qf-tabs {
-  gap: 3px;
+  gap: var(--tap-gap);
   overflow-x: visible;
 }
 .qf-tabs button {
@@ -133,11 +133,12 @@
     font-size: 13px;
     min-height: 44px; /* comfortable tap row wrapping the small checkbox */
   }
-  /* Enlarge the actual checkbox hit area on touch (was 14px). */
+  /* Enlarge the actual checkbox hit area on touch to the WCAG 2.2 floor
+     (was 14px, then 20px — still below the 24px SC 2.5.8 minimum). */
   .qf-flags input[type="checkbox"],
   .qf-oog-toggle input[type="checkbox"] {
-    width: 20px;
-    height: 20px;
+    width: var(--tap-min);
+    height: var(--tap-min);
   }
   .qf-oog-toggle { min-height: 44px; }
   .qf-accessorials {
