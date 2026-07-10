@@ -212,6 +212,25 @@ describe('public static page smoke checks', () => {
     expect(html).not.toContain('qf-route-logo');
   });
 
+  it('demo showcase shell frames the live widget with device + theme toggles', async () => {
+    const html = await file('widget-demo-shell.html');
+    // device + theme toggle controls
+    expect(html).toContain('id="qfd-desktop"');
+    expect(html).toContain('id="qfd-mobile"');
+    expect(html).toContain('id="qfd-dark"');
+    expect(html).toContain('id="qfd-light"');
+    // frames the RAW widget (no recursion into the shell) and maps themes to presets
+    expect(html).toContain('/w/demo?raw=1');
+    expect(html).toContain("dark: 'midnight'");
+    expect(html).toContain("light: 'cream'");
+  });
+
+  it('widget client forwards a demo preset override to the config endpoint', async () => {
+    const js = await file('widget.js');
+    expect(js).toContain("get('preset')");
+    expect(js).toContain("'preset=' + encodeURIComponent(themePreset)");
+  });
+
   it('web manifest points at the generated brand icons', async () => {
     const manifest = JSON.parse(await file('site.webmanifest'));
     expect(manifest.icons.map((i: { src: string }) => i.src)).toContain('/brand/icon-512.png');

@@ -256,7 +256,15 @@ export function createApp(): express.Express {
   app.get('/app/*splat', (_req, res) => res.sendFile('app.html', { root: publicDir }));
   app.get('/admin', (_req, res) => res.sendFile('admin.html', { root: publicDir }));
   app.get('/admin/*splat', (_req, res) => res.sendFile('admin.html', { root: publicDir }));
-  app.get('/w/:slug', (req, res, next) => void serveWidgetPage(req, res, next, String(req.params.slug), false));
+  // The public "demo" slug gets a showcase shell that frames the live widget
+  // with device (desktop/mobile) + theme (light/dark) toggles. The shell's
+  // iframe re-requests /w/demo?raw=1 to serve the bare widget (no recursion).
+  app.get('/w/:slug', (req, res, next) => {
+    if (req.params.slug === 'demo' && req.query.raw === undefined) {
+      return res.sendFile('widget-demo-shell.html', { root: publicDir });
+    }
+    return void serveWidgetPage(req, res, next, String(req.params.slug), false);
+  });
   app.get('/chat/:refId', (_req, res) => res.sendFile('chat.html', { root: publicDir }));
   app.get('/quote/:refId', (_req, res) => res.sendFile('quote.html', { root: publicDir }));
   app.get(['/for/brokers', '/for/brokers/'], (_req, res) => res.sendFile('for-brokers.html', { root: publicDir }));

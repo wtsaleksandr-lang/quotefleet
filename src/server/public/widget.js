@@ -217,8 +217,16 @@
     if (contBtn) contBtn.textContent = rules.showQuoteBeforeContact ? 'Claim this quote →' : 'Continue — get this quote in writing';
   }
 
+  // Demo-only light/dark preset override, forwarded to the config endpoint so
+  // the /w/demo showcase toggle can preview the widget in another theme. Absent
+  // for real embeds → the tenant's saved theme is used.
+  var themePreset = '';
+  try { themePreset = new URLSearchParams(location.search).get('preset') || ''; } catch (e) {}
+
   function init() {
-    fetch(withGrant('/api/public/widget/' + slug))
+    var cfgUrl = '/api/public/widget/' + slug;
+    if (themePreset) cfgUrl += (cfgUrl.indexOf('?') > -1 ? '&' : '?') + 'preset=' + encodeURIComponent(themePreset);
+    fetch(withGrant(cfgUrl))
       .then(function (r) { return r.json(); })
       .then(function (cfg) {
         if (cfg.error) { $('qf-root').innerHTML = '<div class="qf-error">' + cfg.error + '</div>'; return; }

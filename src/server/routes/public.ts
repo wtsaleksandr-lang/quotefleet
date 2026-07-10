@@ -39,7 +39,7 @@ import { loadEnv } from '../../config.js';
 import { getTrialState } from '../trialGating.js';
 import { canUseProFeature } from '../plans.js';
 import { publicCalcLimiter, publicChatLimiter, publicLeadLimiter } from '../rateLimits.js';
-import { resolveWidgetTheme } from '../widgetThemes.js';
+import { resolveWidgetTheme, WIDGET_PRESETS } from '../widgetThemes.js';
 import { loadCarrierProfile } from './carrierProfile.js';
 import { enforceTenantAccess } from '../access.js';
 
@@ -314,7 +314,14 @@ export function registerPublicRoutes(app: Express) {
       brand: brand ?? null,
       // Fully-resolved widget theme (preset + optional accent override +
       // font). widget.js#applyTheme writes tokens.* onto the document root.
-      theme: resolveWidgetTheme(brand ?? null),
+      // A `?preset=` override (used only by the /w/demo showcase's light/dark
+      // toggle) swaps the preset while keeping the tenant's accent/font — a
+      // read-only visual switch, never persisted.
+      theme: resolveWidgetTheme(
+        typeof req.query.preset === 'string' && WIDGET_PRESETS[req.query.preset]
+          ? { ...(brand ?? {}), themePreset: req.query.preset }
+          : brand ?? null,
+      ),
       services: Array.from(new Set(cards.filter((c) => c.enabled).map((c) => c.service))),
       equipmentByService: groupBy(cards.filter((c) => c.enabled), 'service', 'equipment', 'label'),
       accessorials: accs

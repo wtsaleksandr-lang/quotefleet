@@ -29,7 +29,10 @@ const BASELINE_FILE = "scripts/color-violations-baseline.txt";
 const WRITE_BASELINE = process.argv.includes("--write-baseline");
 
 // Files exempt entirely (brand-locked assets / effects). Add sparingly.
-const ALLOWLIST = new Set([]);
+// widget-demo-shell.html is a bespoke marketing surface (phone bezel, browser
+// chrome, brand-blue toggles); its few raw colors are white-on-brand-blue
+// (WCAG-safe by design) and one-off physical-object styling, not theme tokens.
+const ALLOWLIST = new Set(["src/server/public/widget-demo-shell.html"]);
 const ALLOWLIST_PREFIXES = [];
 
 const toRel = (p) => relative(ROOT, p).replace(/\\/g, "/");

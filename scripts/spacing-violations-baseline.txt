@@ -359,19 +359,19 @@ src/server/public/landing-final-cta.css:61	spacing	margin: 38px 0 0
 src/server/public/landing-final-cta.css:67	spacing	gap: 10px
 src/server/public/landing-final-cta.css:85	spacing	gap: 9px
 src/server/public/landing-final-cta.css:86	spacing	padding: 11px 12px
-src/server/public/landing-home-fixes.css:108	spacing	gap: 14px
-src/server/public/landing-home-fixes.css:122	spacing	padding: 9px 18px
-src/server/public/landing-home-fixes.css:146	spacing	gap: 10px
-src/server/public/landing-home-fixes.css:150	spacing	margin-bottom: 22px
-src/server/public/landing-home-fixes.css:172	spacing	gap: clamp(50px, 5.8vw, 92px)
-src/server/public/landing-home-fixes.css:196	spacing	gap: 20px
-src/server/public/landing-home-fixes.css:206	spacing	column-gap: 18px
-src/server/public/landing-home-fixes.css:248	spacing	gap: 26px
-src/server/public/landing-home-fixes.css:260	spacing	padding: 22px
+src/server/public/landing-home-fixes.css:109	spacing	gap: 14px
+src/server/public/landing-home-fixes.css:123	spacing	padding: 9px 18px
+src/server/public/landing-home-fixes.css:147	spacing	gap: 10px
+src/server/public/landing-home-fixes.css:151	spacing	margin-bottom: 22px
+src/server/public/landing-home-fixes.css:173	spacing	gap: clamp(50px, 5.8vw, 92px)
+src/server/public/landing-home-fixes.css:197	spacing	gap: 20px
+src/server/public/landing-home-fixes.css:207	spacing	column-gap: 18px
+src/server/public/landing-home-fixes.css:249	spacing	gap: 26px
+src/server/public/landing-home-fixes.css:261	spacing	padding: 22px
 src/server/public/landing-home-fixes.css:27	spacing	padding: 12px 20px 0
 src/server/public/landing-home-fixes.css:33	spacing	padding: 10px 22px
-src/server/public/landing-home-fixes.css:358	spacing	gap: 2px
-src/server/public/landing-home-fixes.css:376	spacing	padding: 12px 14px
+src/server/public/landing-home-fixes.css:359	spacing	gap: 2px
+src/server/public/landing-home-fixes.css:377	spacing	padding: 12px 14px
 src/server/public/landing-home-fixes.css:45	spacing	gap: 9px
 src/server/public/landing-s-polish.css:106	spacing	padding: 5px 8px
 src/server/public/landing-s-polish.css:119	spacing	padding: 10px
@@ -789,36 +789,36 @@ src/server/public/share-readiness.css:68	spacing	padding: 13px
 src/server/public/share-readiness.css:75	spacing	margin-bottom: 5px
 src/server/public/share-readiness.css:85	spacing	gap: 6px
 src/server/public/share-readiness.css:87	spacing	padding: 6px 9px
-src/server/public/style.css:1020	spacing	padding: 44px 28px 104px
-src/server/public/style.css:1023	spacing	margin-top: 72px
+src/server/public/style.css:1022	spacing	padding: 44px 28px 104px
+src/server/public/style.css:1025	spacing	margin-top: 72px
 src/server/public/style.css:178	spacing	margin-top: 6px
 src/server/public/style.css:192	tap	height: 16px
 src/server/public/style.css:192	tap	width: 16px
-src/server/public/style.css:469	spacing	padding: 6px 12px
-src/server/public/style.css:490	spacing	padding: 6px 10px
-src/server/public/style.css:498	spacing	margin: 14px 0 0 0
-src/server/public/style.css:503	spacing	padding: 8px 14px
-src/server/public/style.css:510	spacing	margin-bottom: -1px
-src/server/public/style.css:582	spacing	padding-bottom: 1px
-src/server/public/style.css:619	spacing	padding: 96px 28px 80px
-src/server/public/style.css:654	spacing	margin: 0 auto 38px auto
-src/server/public/style.css:665	spacing	padding: 64px 22px 56px
-src/server/public/style.css:671	spacing	padding: 72px 0
-src/server/public/style.css:788	spacing	bottom: 86px
-src/server/public/style.css:881	spacing	padding: 18px 0
-src/server/public/style.css:887	spacing	padding: 6px 20px 18px 20px
-src/server/public/style.css:889	spacing	margin-bottom: 14px
-src/server/public/style.css:895	spacing	gap: 10px
-src/server/public/style.css:895	spacing	padding: 10px 20px
-src/server/public/style.css:916	spacing	padding: 0 6px
-src/server/public/style.css:934	spacing	padding: 18px 20px 8px 20px
-src/server/public/style.css:937	spacing	padding: 32px 36px
-src/server/public/style.css:944	spacing	margin: 0 0 14px 0
-src/server/public/style.css:946	spacing	margin: 0 0 26px 0
-src/server/public/style.css:950	spacing	padding: 22px
-src/server/public/style.css:957	spacing	padding: 18px
-src/server/public/style.css:964	spacing	padding: 11px 15px
-src/server/public/style.css:993	spacing	padding: 14px
+src/server/public/style.css:471	spacing	padding: 6px 12px
+src/server/public/style.css:492	spacing	padding: 6px 10px
+src/server/public/style.css:500	spacing	margin: 14px 0 0 0
+src/server/public/style.css:505	spacing	padding: 8px 14px
+src/server/public/style.css:512	spacing	margin-bottom: -1px
+src/server/public/style.css:584	spacing	padding-bottom: 1px
+src/server/public/style.css:621	spacing	padding: 96px 28px 80px
+src/server/public/style.css:656	spacing	margin: 0 auto 38px auto
+src/server/public/style.css:667	spacing	padding: 64px 22px 56px
+src/server/public/style.css:673	spacing	padding: 72px 0
+src/server/public/style.css:790	spacing	bottom: 86px
+src/server/public/style.css:883	spacing	padding: 18px 0
+src/server/public/style.css:889	spacing	padding: 6px 20px 18px 20px
+src/server/public/style.css:891	spacing	margin-bottom: 14px
+src/server/public/style.css:897	spacing	gap: 10px
+src/server/public/style.css:897	spacing	padding: 10px 20px
+src/server/public/style.css:918	spacing	padding: 0 6px
+src/server/public/style.css:936	spacing	padding: 18px 20px 8px 20px
+src/server/public/style.css:939	spacing	padding: 32px 36px
+src/server/public/style.css:946	spacing	margin: 0 0 14px 0
+src/server/public/style.css:948	spacing	margin: 0 0 26px 0
+src/server/public/style.css:952	spacing	padding: 22px
+src/server/public/style.css:959	spacing	padding: 18px
+src/server/public/style.css:966	spacing	padding: 11px 15px
+src/server/public/style.css:995	spacing	padding: 14px
 src/server/public/tools-marketplace-wefixtrades.css:3	spacing	padding: 58px 28px 34px
 src/server/public/vertical-pages-wefixtrades.css:33	spacing	padding: 42px 28px
 src/server/public/vertical-pages-wefixtrades.css:5	spacing	padding: 76px 28px 58px

@@ -64,7 +64,7 @@ src/server/public/public-pages-wefixtrades.css:68:3	border-color: #FFFFFF
 src/server/public/public-pages-wefixtrades.css:145:3	color: #FFFFFF
 src/server/public/public-pages-wefixtrades.css:162:3	color: #FFFFFF
 src/server/public/public-pages-wefixtrades.css:165:3	color: #FFFFFF
-src/server/public/quote-demo.html:24:83	color:#fff
+src/server/public/quote-demo.html:33:83	color:#fff
 src/server/public/quote-polish.css:1:487	color:#fff
 src/server/public/quote-polish.css:1:556	background:#fff
 src/server/public/quote-polish.css:1:2494	background:#fff
@@ -98,9 +98,9 @@ src/server/public/quote.css:1:9043	background:#fff
 src/server/public/quote.css:1:9772	background:#fff
 src/server/public/quote.css:1:10334	background:#fff
 src/server/public/quote.css:1:10350	color:#000
-src/server/public/style.css:854:35	color: #FFFFFF
-src/server/public/style.css:923:3	color: #fff
-src/server/public/style.css:969:57	color: #FFFFFF
+src/server/public/style.css:856:35	color: #FFFFFF
+src/server/public/style.css:925:3	color: #fff
+src/server/public/style.css:971:57	color: #FFFFFF
 src/server/public/tools.html:64:28	color: #fff
 src/server/public/vertical-pages-wefixtrades.css:18:3	color: #FFFFFF
 src/server/public/vertical-pages-wefixtrades.css:21:3	color: #FFFFFF
