@@ -57,7 +57,14 @@ export function registerCarrierProfileRoutes(app: Express) {
   app.put('/api/tenant/carrier-profile', requireAuth, requireTenant, async (req: Request, res: Response) => {
     const parsed = CarrierProfileSchema.safeParse(req.body ?? {});
     if (!parsed.success) return res.status(400).json({ error: 'Invalid input', details: parsed.error.flatten() });
-    const profile = normalize(parsed.data);
+    // MERGE with the existing profile rather than replacing it. The
+    // profile is now edited from two disjoint places — the Account
+    // "Company details" card (address) and the Brand "Carrier profile"
+    // card (quote-doc fields) — so a partial PUT from either must not
+    // wipe the other's keys. Only keys actually present in the request
+    // (already narrowed by the zod schema) overwrite stored values.
+    const existing = await loadCarrierProfile(req.tenant!.id);
+    const profile = { ...existing, ...normalize(parsed.data) };
     await db()
       .insert(platformSettings)
       .values({ key: keyForTenant(req.tenant!.id), value: JSON.stringify(profile), updatedAt: new Date() })

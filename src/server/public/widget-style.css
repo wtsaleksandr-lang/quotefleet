@@ -40,7 +40,35 @@ body {
 .qf-header { display: flex; align-items: center; gap: 12px; margin-bottom: 8px; }
 .qf-header img { max-height: 32px; }
 .qf-header .brand-name { font-size: 16px; font-weight: 800; letter-spacing: -0.01em; }
-.qf-tagline { font-size: 13px; color: var(--w-muted); margin-bottom: 18px; }
+.qf-tagline { font-size: 13px; color: var(--w-muted); margin-bottom: 14px; }
+/* Carrier contact block — hairline-bordered, wraps cleanly on mobile. */
+.qf-contact {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px 18px;
+  padding: 10px 12px;
+  margin-bottom: 16px;
+  border: 1px solid var(--w-border);
+  border-radius: 10px;
+  font-size: 12.5px;
+  line-height: 1.4;
+}
+.qf-contact-item { display: inline-flex; align-items: baseline; gap: 6px; min-width: 0; }
+.qf-contact-label {
+  font-size: 10px;
+  font-weight: 800;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  /* Theme-aware muted token (set by resolveWidgetTheme per preset). */
+  color: var(--w-muted, var(--w-fg));
+  flex: 0 0 auto;
+}
+/* --w-contact-text is the purpose-built, per-preset contact colour (light
+   presets use a dark value, dark presets a light one) so this reads in
+   every widget theme — the legacy --w-fg is not updated at runtime. */
+.qf-contact-value { color: var(--w-contact-text, var(--w-text, var(--w-fg))); overflow-wrap: anywhere; }
+a.qf-contact-value { color: var(--w-accent-on-surface, var(--w-primary)); text-decoration: none; }
+a.qf-contact-value:hover { text-decoration: underline; }
 .qf-step { display: none; }
 .qf-step.active { display: block; }
 
