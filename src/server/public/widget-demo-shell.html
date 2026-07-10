@@ -29,8 +29,8 @@
 
     /* Brand lockup — logo + name + a subtle selling tagline (demo page only).
        Tagline color #9fb0c9 on the dark shell ≈ 8:1 contrast (WCAG AA/AAA). */
-    .qfd-head { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; }
-    .qfd-brand { display: inline-flex; align-items: center; gap: 10px; color: #f2f5fb; font-weight: 700; font-size: 17px; letter-spacing: -0.02em; text-decoration: none; }
+    .qfd-head { display: flex; align-items: center; gap: 12px; }
+    .qfd-brand { display: inline-flex; align-items: center; gap: 10px; color: #f2f5fb; font-weight: 700; font-size: 17px; letter-spacing: -0.02em; text-decoration: none; flex-shrink: 0; }
     .qfd-brand img { height: 28px; width: auto; display: block; }
     .qfd-tag {
       padding-left: 12px;
@@ -41,11 +41,12 @@
       font-size: 11px;
       letter-spacing: .01em;
       line-height: 1.4;
-      white-space: nowrap;
+      min-width: 0;
     }
-    @media (max-width: 380px) {
-      .qfd-tag { border-left: 0; padding-left: 0; }
-    }
+    /* On phones the tagline stays to the RIGHT of the brand but breaks into
+       two lines so it stays legible instead of shrinking. */
+    .qfd-br { display: none; }
+    @media (max-width: 560px) { .qfd-br { display: inline; } }
 
     /* Toolbar — compact icon-only toggles, single row, right-aligned to the
        calculator card's edge (matches the card's max-width so it tracks the
@@ -58,19 +59,19 @@
     }
     .qfd-wrap.is-mobile .qfd-toolbar { max-width: 390px; }
     .qfd-seg {
-      display: inline-flex; padding: 3px; gap: 2px;
+      display: inline-flex; padding: 2px; gap: 2px;
       background: rgba(148,163,184,.10);
       border: 1px solid rgba(148,163,184,.16);
-      border-radius: 999px;
+      border-radius: 9px;
     }
     .qfd-seg[hidden] { display: none; }
     .qfd-seg button {
       appearance: none; border: 0; cursor: pointer; background: transparent;
-      color: #8b97a8; padding: 7px 12px; border-radius: 999px;
+      color: #8b97a8; padding: 5px 9px; border-radius: 6px;
       display: inline-flex; align-items: center; justify-content: center;
       transition: background .16s ease, color .16s ease, box-shadow .16s ease;
     }
-    .qfd-seg button svg { width: 15px; height: 15px; display: block; }
+    .qfd-seg button svg { width: 11px; height: 11px; display: block; }
     .qfd-seg button[aria-pressed="true"] {
       background: rgba(255,255,255,.12);
       color: #f4f7fc;
@@ -134,7 +135,7 @@
   <div class="qfd-wrap">
     <div class="qfd-head">
       <a class="qfd-brand" href="/"><img src="/brand/mark-keys.png" alt="QuoteFleet" width="28" height="30" decoding="async">QuoteFleet</a>
-      <span class="qfd-tag">Instant Rates. Higher Conversions.</span>
+      <span class="qfd-tag">Instant Rates. <br class="qfd-br">Higher Conversions.</span>
     </div>
 
     <div class="qfd-toolbar">
