@@ -73,6 +73,11 @@ export const tenants = pgTable(
      *  can reach the calculator or its rate/quote APIs). DEFAULT 'public'
      *  keeps every existing tenant unchanged. Enforced in src/server/access.ts. */
     accessMode: text('access_mode').notNull().default('public'),
+    /** Fuel-surcharge mode: 'manual' (default — each rate card's fixed
+     *  fuel_surcharge_pct is used, original behavior) or 'auto' (surcharge
+     *  is derived weekly from the EIA national diesel price via the standard
+     *  DOE-index formula). Opt-in; existing tenants stay on 'manual'. */
+    fscMode: text('fsc_mode').notNull().default('manual'),
     /** Trial end timestamp. Null = not on trial (paid or grandfathered). */
     trialEndsAt: timestamp('trial_ends_at', { mode: 'date' }),
     /** Marketplace exposure: carrier opts in to having their PUBLIC rate

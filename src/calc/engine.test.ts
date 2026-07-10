@@ -99,6 +99,39 @@ describe('calculate', () => {
     expect(r.total).toBe(580.72);
   });
 
+  it('Auto FSC — EIA-derived $/mile replaces the card fixed %', () => {
+    // diesel $4.05 → (4.05−1.25)/6 = $0.4667/mi. 500 mi → $233.33 fuel.
+    // (vs manual 22% of $1,250 = $275.)
+    const r = calculate(
+      [rateCard({})], [], [],
+      req({ miles: 500 }),
+      [],
+      { mode: 'auto', perMileUsd: 0.4667, dieselUsd: 4.05, asOfLabel: '07/07' }
+    );
+    expect(r.fuelSurcharge).toBeCloseTo(233.35, 1);
+    const fuelLine = r.lines.find((l) => l.kind === 'fuel');
+    expect(fuelLine?.name).toContain('national avg diesel $4.05/gal');
+    expect(fuelLine?.name).toContain('wk of 07/07');
+    // margin 12% of (1250 + 233.35) recomputes off the new fuel figure.
+    expect(r.margin).toBeCloseTo(178.0, 0);
+  });
+
+  it('Manual FSC (default) — card % is used when no fsc arg / mode manual', () => {
+    const noArg = calculate([rateCard({})], [], [], req({ miles: 500 }));
+    const manual = calculate([rateCard({})], [], [], req({ miles: 500 }), [], { mode: 'manual', perMileUsd: 0.4667 });
+    expect(noArg.fuelSurcharge).toBe(275); // 22% of 1250
+    expect(manual.fuelSurcharge).toBe(275); // manual ignores perMileUsd
+    expect(manual.lines.find((l) => l.kind === 'fuel')?.name).toContain('22.0% of linehaul');
+  });
+
+  it('Auto FSC — a diesel price at/below peg yields $0 fuel (no line)', () => {
+    const r = calculate([rateCard({})], [], [], req({ miles: 500 }), [], {
+      mode: 'auto', perMileUsd: 0, dieselUsd: 1.2, asOfLabel: '07/07',
+    });
+    expect(r.fuelSurcharge).toBe(0);
+    expect(r.lines.find((l) => l.kind === 'fuel')).toBeUndefined();
+  });
+
   it('Auto-triggered residential accessorial', () => {
     const acc = accessorial({
       code: 'residential', label: 'Residential', kind: 'flat', amount: 85,

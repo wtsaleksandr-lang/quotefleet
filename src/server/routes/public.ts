@@ -28,7 +28,8 @@ import {
   callbackRequests,
 } from '../../db/schema.js';
 import express from 'express';
-import { calculate, customerFacingLines, type CalcRequest } from '../../calc/engine.js';
+import { calculate, customerFacingLines, type CalcRequest, type FscOptions } from '../../calc/engine.js';
+import { resolveFscForTenant, asOfLabel } from '../../eia/dieselPrice.js';
 import { estimateTransit } from '../../calc/transit.js';
 import { distanceBetween } from '../../calc/distance.js';
 import { generateLeadReply } from '../../ai/replyAgent.js';
@@ -175,6 +176,23 @@ async function loadConfig(tenantId: number) {
     db().select().from(brandConfigs).where(eq(brandConfigs.tenantId, tenantId)).limit(1),
   ]);
   return { cards, accs, zones, terms, brand: brand[0] ?? null };
+}
+
+/**
+ * Build the calc-engine fuel-surcharge options for a tenant. For 'manual'
+ * tenants this returns `{ mode: 'manual' }` (engine uses each card's fixed %).
+ * For 'auto' it loads the cached EIA diesel price and maps it to $/mile.
+ * Never throws — degrades to manual so a quote is never blocked.
+ */
+async function fscOptionsForTenant(tenant: typeof tenants.$inferSelect): Promise<FscOptions> {
+  const ctx = await resolveFscForTenant(tenant);
+  if (ctx.mode !== 'auto') return { mode: 'manual' };
+  return {
+    mode: 'auto',
+    perMileUsd: ctx.perMileUsd,
+    dieselUsd: ctx.dieselUsd,
+    asOfLabel: ctx.asOf ? asOfLabel(ctx.asOf) : undefined,
+  };
 }
 
 export function registerPublicRoutes(app: Express) {
@@ -369,7 +387,8 @@ export function registerPublicRoutes(app: Express) {
       selectedAccessorialCodes: body.selectedAccessorialCodes,
       flags: body.flags,
     };
-    const result = calculate(cards, accs, zones, calcReq, terms);
+    const fsc = await fscOptionsForTenant(tenant);
+    const result = calculate(cards, accs, zones, calcReq, terms, fsc);
 
     // Customer-facing surface: never expose the carrier's margin line, and
     // don't ship the raw margin figure over the wire. The grand total is
@@ -464,7 +483,8 @@ export function registerPublicRoutes(app: Express) {
       selectedAccessorialCodes: body.selectedAccessorialCodes,
       flags: body.flags,
     };
-    const calc = calculate(cards, accs, zones, calcReq, terms);
+    const fsc = await fscOptionsForTenant(tenant);
+    const calc = calculate(cards, accs, zones, calcReq, terms, fsc);
 
     const refId = generateLeadRef();
     const sourceUrl = req.headers.referer ?? null;

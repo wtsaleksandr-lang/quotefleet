@@ -264,12 +264,30 @@ function applyAccessorial(
   }
 }
 
+/**
+ * Automatic fuel-surcharge context. When `mode === 'auto'` and a per-mile
+ * surcharge is supplied, the engine applies an EIA-diesel-derived fuel line
+ * ($/mile × miles) INSTEAD of each card's fixed fuelSurchargePct. When
+ * `mode === 'manual'` (or this arg is omitted), the original per-card
+ * percentage model is used unchanged.
+ */
+export interface FscOptions {
+  mode: 'manual' | 'auto';
+  /** Surcharge dollars per mile (auto mode). */
+  perMileUsd?: number;
+  /** National avg diesel price used, for the honest quote-line label. */
+  dieselUsd?: number;
+  /** Short date label (e.g. "07/07") of the diesel price. */
+  asOfLabel?: string;
+}
+
 export function calculate(
   cards: RateCard[],
   accessorialList: Accessorial[],
   zones: LaneZone[],
   req: CalcRequest,
-  terminals: Terminal[] = []
+  terminals: Terminal[] = [],
+  fsc?: FscOptions
 ): CalcResult {
   const lines: CalcLine[] = [];
 
@@ -453,8 +471,29 @@ export function calculate(
   const subtotalAccessorials = round2(acc);
 
   // ── Fuel surcharge ────────────────────────────────────────────────
+  // Auto mode (tenant opted in): apply the EIA-diesel-derived surcharge as a
+  // $/mile add — the industry-standard DOE-index model — labelled with its
+  // honest basis. Manual mode: each card's fixed % of linehaul (original).
   let fuel = 0;
-  if (card && card.fuelSurchargePct > 0) {
+  if (fsc?.mode === 'auto') {
+    // Auto mode OWNS the fuel line — it must never fall through to the card's
+    // fixed %. A diesel price at/below the peg legitimately yields $0 fuel.
+    const autoPerMile = Math.max(0, fsc.perMileUsd ?? 0);
+    if (autoPerMile > 0 && subtotalLinehaul > 0 && req.miles > 0) {
+      fuel = round2(autoPerMile * req.miles);
+      if (fuel > 0) {
+        const basis =
+          typeof fsc.dieselUsd === 'number' && fsc.dieselUsd > 0
+            ? `national avg diesel $${fsc.dieselUsd.toFixed(2)}/gal${fsc.asOfLabel ? `, wk of ${fsc.asOfLabel}` : ''} — $${autoPerMile.toFixed(2)}/mi`
+            : `$${autoPerMile.toFixed(2)}/mi`;
+        lines.push({
+          name: `Fuel surcharge (${basis})`,
+          amount: fuel,
+          kind: 'fuel',
+        });
+      }
+    }
+  } else if (card && card.fuelSurchargePct > 0) {
     fuel = round2(subtotalLinehaul * (card.fuelSurchargePct / 100));
     lines.push({
       name: `Fuel surcharge (${card.fuelSurchargePct.toFixed(1)}% of linehaul)`,
