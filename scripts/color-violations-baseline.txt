@@ -92,12 +92,12 @@ src/server/public/quote.css:1:3790	background:#fff
 src/server/public/quote.css:1:5297	background:#fff
 src/server/public/quote.css:1:5649	color:#fff
 src/server/public/quote.css:1:6252	background:#fff
-src/server/public/quote.css:1:8032	color:#fff
-src/server/public/quote.css:1:8684	color:#fff
-src/server/public/quote.css:1:8812	background:#fff
-src/server/public/quote.css:1:9541	background:#fff
-src/server/public/quote.css:1:10103	background:#fff
-src/server/public/quote.css:1:10119	color:#000
+src/server/public/quote.css:1:8263	color:#fff
+src/server/public/quote.css:1:8915	color:#fff
+src/server/public/quote.css:1:9043	background:#fff
+src/server/public/quote.css:1:9772	background:#fff
+src/server/public/quote.css:1:10334	background:#fff
+src/server/public/quote.css:1:10350	color:#000
 src/server/public/style.css:854:35	color: #FFFFFF
 src/server/public/style.css:923:3	color: #fff
 src/server/public/style.css:969:57	color: #FFFFFF

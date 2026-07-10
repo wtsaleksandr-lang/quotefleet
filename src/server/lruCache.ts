@@ -34,4 +34,8 @@ export class LruCache<V> {
       if (oldest !== undefined) this.map.delete(oldest);
     }
   }
+
+  clear(): void {
+    this.map.clear();
+  }
 }
