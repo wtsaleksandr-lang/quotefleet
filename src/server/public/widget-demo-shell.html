@@ -41,12 +41,18 @@
       font-size: 11px;
       letter-spacing: .01em;
       line-height: 1.4;
-      min-width: 0;
+      white-space: nowrap;
     }
-    /* On phones the tagline stays to the RIGHT of the brand but breaks into
-       two lines so it stays legible instead of shrinking. */
-    .qfd-br { display: none; }
-    @media (max-width: 560px) { .qfd-br { display: inline; } }
+    /* Phones: keep the tagline on ONE line to the right of the brand by
+       tightening the whole header — smaller logo/wordmark, tighter gaps,
+       less side padding — rather than stacking it. */
+    @media (max-width: 560px) {
+      .qfd-wrap { padding: 20px 12px 48px; }
+      .qfd-brand { gap: 6px; font-size: 14.5px; }
+      .qfd-brand img { height: 22px; }
+      .qfd-head { gap: 7px; }
+      .qfd-tag { padding-left: 7px; font-size: 10px; letter-spacing: 0; }
+    }
 
     /* Toolbar — compact icon-only toggles, single row, right-aligned to the
        calculator card's edge (matches the card's max-width so it tracks the
@@ -135,7 +141,7 @@
   <div class="qfd-wrap">
     <div class="qfd-head">
       <a class="qfd-brand" href="/"><img src="/brand/mark-keys.png" alt="QuoteFleet" width="28" height="30" decoding="async">QuoteFleet</a>
-      <span class="qfd-tag">Instant Rates. <br class="qfd-br">Higher Conversions.</span>
+      <span class="qfd-tag">Instant Rates. Higher Conversions.</span>
     </div>
 
     <div class="qfd-toolbar">
