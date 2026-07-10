@@ -27,6 +27,7 @@ const baseT: Tenant = {
   embedToken: 'tok',
   plan: 'free',
   status: 'active',
+  accessMode: 'public',
   trialEndsAt: inFuture,
   marketplaceOptIn: false,
   mcNumber: null,

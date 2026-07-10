@@ -66,6 +66,12 @@ export const tenants = pgTable(
     plan: text('plan').notNull().default('free'),
     /** Whether the tenant is active or suspended. */
     status: text('status').notNull().default('active'),
+    /** Calculator access mode: 'public' (anyone with the link can get a
+     *  quote — the original behavior) or 'private' (invite-only; only
+     *  visitors holding a valid access_links token / signed access cookie
+     *  can reach the calculator or its rate/quote APIs). DEFAULT 'public'
+     *  keeps every existing tenant unchanged. Enforced in src/server/access.ts. */
+    accessMode: text('access_mode').notNull().default('public'),
     /** Trial end timestamp. Null = not on trial (paid or grandfathered). */
     trialEndsAt: timestamp('trial_ends_at', { mode: 'date' }),
     /** Marketplace exposure: carrier opts in to having their PUBLIC rate
@@ -174,6 +180,44 @@ export const magicLinks = pgTable(
     createdAt: timestamp('created_at', { mode: 'date' }).notNull().defaultNow(),
   },
   (t) => [index('magic_links_user_idx').on(t.userId)]
+);
+
+// ────────────────────────────────────────────────────────────────────
+// ACCESS LINKS — per-customer invite links for a PRIVATE calculator.
+//
+// When a tenant sets `tenants.access_mode = 'private'`, the calculator
+// (`/w/:slug`, the hosted subdomain, and every public rate/quote API)
+// is locked. The tenant creates one named link per customer; opening
+// `…/?key=<token>` validates the token, drops a signed access cookie,
+// and lets that visitor use the calculator. Revoking a link (active =
+// false) stops it working immediately. No customer accounts.
+//
+// Token is a 32-char nanoid (~190 bits) — unguessable, so a leaked
+// token is the only exposure and it's individually revocable.
+// ────────────────────────────────────────────────────────────────────
+export const accessLinks = pgTable(
+  'access_links',
+  {
+    id: serial('id').primaryKey(),
+    tenantId: integer('tenant_id')
+      .notNull()
+      .references(() => tenants.id, { onDelete: 'cascade' }),
+    /** Cryptographically-random invite token (nanoid(32)). Unique. */
+    token: text('token').notNull().unique(),
+    /** Human label — the customer / company this link was issued to. */
+    label: text('label').notNull(),
+    /** Revocable switch. false = link no longer grants access. */
+    active: boolean('active').notNull().default(true),
+    createdAt: timestamp('created_at', { mode: 'date' }).notNull().defaultNow(),
+    /** Last time this link was opened (grant issued). */
+    lastUsedAt: timestamp('last_used_at', { mode: 'date' }),
+    /** How many times the link has been opened. */
+    useCount: integer('use_count').notNull().default(0),
+  },
+  (t) => [
+    uniqueIndex('access_links_token_idx').on(t.token),
+    index('access_links_tenant_idx').on(t.tenantId),
+  ]
 );
 
 // ────────────────────────────────────────────────────────────────────
@@ -988,6 +1032,8 @@ export type NewTenant = typeof tenants.$inferInsert;
 export type User = typeof users.$inferSelect;
 export type NewUser = typeof users.$inferInsert;
 export type Session = typeof sessions.$inferSelect;
+export type AccessLink = typeof accessLinks.$inferSelect;
+export type NewAccessLink = typeof accessLinks.$inferInsert;
 export type RateCard = typeof rateCards.$inferSelect;
 export type NewRateCard = typeof rateCards.$inferInsert;
 export type Accessorial = typeof accessorials.$inferSelect;

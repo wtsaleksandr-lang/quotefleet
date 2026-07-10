@@ -23,6 +23,7 @@ import { PORTS_INLAND, TERMINALS_DATA, type TerminalRow } from '../../data/termi
 import { loadEnv } from '../../config.js';
 import { publicAutocompleteLimiter } from '../rateLimits.js';
 import { LruCache } from '../lruCache.js';
+import { enforceTenantAccess } from '../access.js';
 
 // Cache provider results for 1 hour. 2,000 distinct queries fit
 // comfortably in memory and cover days of normal traffic.
@@ -102,6 +103,9 @@ export function registerAutocompleteRoutes(app: Express) {
       // are excluded.
       const t = (await db().select().from(tenants).where(eq(tenants.slug, slug)).limit(1))[0];
       if (!t) return res.json({ suggestions: [] });
+      // Private-calculator gate — a private tenant's terminal list is
+      // tenant business data; require a grant to enumerate it.
+      if (!(await enforceTenantAccess(t, req, res))) return;
       const rows = await db().select().from(terminalsTable).where(eq(terminalsTable.tenantId, t.id));
       pool = rows
         .filter((r) => r.enabled)

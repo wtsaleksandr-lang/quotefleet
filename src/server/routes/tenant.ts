@@ -43,6 +43,7 @@ import {
   auditLog,
   conversations,
   callbackRequests,
+  accessLinks,
 } from '../../db/schema.js';
 import { requireAuth, requireTenant, requireOwner, requirePlan } from '../middleware.js';
 
@@ -830,6 +831,96 @@ export function registerTenantRoutes(app: Express) {
       .set({ embedToken: newToken, updatedAt: new Date() })
       .where(eq(tenants.id, req.tenant!.id));
     res.json({ ok: true, embedToken: newToken });
+  });
+
+  // ── access control (public vs private invite-only calculator) ──────
+  // Available on every plan (trial included) — locking a calculator is a
+  // security control, not a paywalled perk. Invite links are the ONLY way
+  // to reach a private calculator + its rate/quote APIs (enforced in
+  // src/server/access.ts + routes/public.ts).
+
+  /** The base URL the tenant's customers open — mirrors /api/tenant/embed. */
+  function tenantWidgetBase(t: typeof tenants.$inferSelect): string {
+    const env = loadEnv();
+    return t.hostDomain && t.slug
+      ? `https://${t.slug}.${t.hostDomain}`
+      : env.PUBLIC_BASE_URL.replace(/\/$/, '');
+  }
+  function inviteUrl(t: typeof tenants.$inferSelect, token: string): string {
+    return `${tenantWidgetBase(t)}/?key=${token}`;
+  }
+
+  app.get('/api/tenant/access', requireAuth, requireTenant, async (req, res) => {
+    const t = req.tenant!;
+    const links = await db()
+      .select()
+      .from(accessLinks)
+      .where(eq(accessLinks.tenantId, t.id))
+      .orderBy(desc(accessLinks.createdAt));
+    res.json({
+      accessMode: t.accessMode,
+      links: links.map((l) => ({
+        id: l.id,
+        label: l.label,
+        url: inviteUrl(t, l.token),
+        active: l.active,
+        useCount: l.useCount,
+        lastUsedAt: l.lastUsedAt,
+        createdAt: l.createdAt,
+      })),
+    });
+  });
+
+  app.put('/api/tenant/access', requireAuth, requireTenant, async (req, res) => {
+    const Schema = z.object({ accessMode: z.enum(['public', 'private']) });
+    const parse = Schema.safeParse(req.body);
+    if (!parse.success) return res.status(400).json({ error: 'Invalid input' });
+    await db()
+      .update(tenants)
+      .set({ accessMode: parse.data.accessMode, updatedAt: new Date() })
+      .where(eq(tenants.id, req.tenant!.id));
+    res.json({ ok: true, accessMode: parse.data.accessMode });
+  });
+
+  app.post('/api/tenant/access/links', requireAuth, requireTenant, async (req, res) => {
+    const Schema = z.object({ label: z.string().trim().min(1).max(120) });
+    const parse = Schema.safeParse(req.body);
+    if (!parse.success) {
+      return res.status(400).json({ error: 'A name for the invite link is required.' });
+    }
+    const t = req.tenant!;
+    // 32-char nanoid → ~190 bits of entropy. Unguessable.
+    const token = nanoid(32);
+    const [row] = await db()
+      .insert(accessLinks)
+      .values({ tenantId: t.id, token, label: parse.data.label })
+      .returning();
+    res.json({
+      ok: true,
+      link: row
+        ? {
+            id: row.id,
+            label: row.label,
+            url: inviteUrl(t, row.token),
+            active: row.active,
+            useCount: row.useCount,
+            lastUsedAt: row.lastUsedAt,
+            createdAt: row.createdAt,
+          }
+        : null,
+    });
+  });
+
+  app.post('/api/tenant/access/links/:id/revoke', requireAuth, requireTenant, async (req, res) => {
+    const id = Number(req.params.id);
+    if (!Number.isInteger(id)) return res.status(400).json({ error: 'Invalid id' });
+    const updated = await db()
+      .update(accessLinks)
+      .set({ active: false })
+      .where(and(eq(accessLinks.id, id), eq(accessLinks.tenantId, req.tenant!.id)))
+      .returning({ id: accessLinks.id });
+    if (!updated[0]) return res.status(404).json({ error: 'Link not found' });
+    res.json({ ok: true });
   });
 
   // ── audit ─────────────────────────────────────────────────────
