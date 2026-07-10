@@ -126,9 +126,12 @@ body.qf-app-calculator .qf-options-panel .qf-acc-chip.active,
 body.qf-app-calculator .qf-demo-logo-slot em,
 body.qf-app-calculator .qf-chat-bubble.user,
 body.qf-app-calculator .qf-chat-send {
-  background: var(--w-accent, #0D3CFC) !important;
+  /* Accent fill for text-bearing surfaces = the WCAG-hardened solid accent
+     (equals --w-accent for well-chosen accents). Text = the paired,
+     guaranteed-readable foreground. */
+  background: var(--w-accent-solid, var(--w-accent, #0D3CFC)) !important;
   background-image: none !important;
-  border: 1px solid var(--w-accent, #0D3CFC) !important;
+  border: 1px solid var(--w-accent-solid, var(--w-accent, #0D3CFC)) !important;
   color: var(--w-accent-text, #FFFFFF) !important;
 }
 
@@ -150,6 +153,63 @@ body.qf-app-calculator .qf-cta:disabled::after {
   animation: none !important;
 }
 
+/* --- "Estimated total" box (the reported dark-on-blue bug) ----------------
+   A prominent accent-filled band. Its foreground (--w-total-text) is computed
+   server-side by the WCAG contrast engine to read on ANY accent: white on
+   cobalt #0D3CFC, dark ink on a yellow accent, etc. (src/server/color/contrast.ts).
+   This is the LAST-loaded layer, so it wins over the legacy .qf-result .total
+   colour rule in quotefleet-color-system.css. */
+body.qf-app-calculator .qf-total-box {
+  background: var(--w-accent-solid, var(--w-accent, #0D3CFC)) !important;
+  background-image: none !important;
+  border: 1px solid var(--w-accent-solid, var(--w-accent, #0D3CFC)) !important;
+  border-radius: 10px !important;
+  padding: 14px 16px !important;
+  margin-bottom: 12px !important;
+}
+body.qf-app-calculator .qf-total-box .qf-section-title,
+body.qf-app-calculator .qf-total-box .total,
+body.qf-app-calculator .qf-total-box .total .currency {
+  color: var(--w-total-text, #FFFFFF) !important;
+}
+
+/* --- Per-tenant CTA hover effects (accent-aware) --------------------------
+   body[data-qf-cta-hover] selects the style; the attribute selector lifts
+   specificity above the default .qf-cta:hover above so the chosen effect wins.
+   All reuse the contrast-computed accent tokens. 'none' still shows a focus
+   ring (see .qf-cta:focus-visible in widget-style.css). */
+body.qf-app-calculator[data-qf-cta-hover="none"] .qf-cta:not(.qf-secondary):hover {
+  background: var(--w-accent-solid, var(--w-accent, #0D3CFC)) !important;
+  border-color: var(--w-accent-solid, var(--w-accent, #0D3CFC)) !important;
+  transform: none !important;
+  box-shadow: none !important;
+}
+body.qf-app-calculator[data-qf-cta-hover="border"] .qf-cta:not(.qf-secondary):hover {
+  background: var(--w-accent-hover, #0B32D4) !important;
+  border-color: var(--w-accent-surface, #FFFFFF) !important;
+  transform: none !important;
+}
+body.qf-app-calculator[data-qf-cta-hover="lift"] .qf-cta:not(.qf-secondary):hover {
+  background: var(--w-accent-hover, #0B32D4) !important;
+  border-color: var(--w-accent-hover, #0B32D4) !important;
+  transform: translateY(-2px) !important;
+  box-shadow: 0 12px 26px -8px rgba(0,0,0,.5) !important;
+}
+body.qf-app-calculator[data-qf-cta-hover="glow"] .qf-cta:not(.qf-secondary):hover {
+  background: var(--w-accent-hover, #0B32D4) !important;
+  border-color: var(--w-accent, #0D3CFC) !important;
+  transform: none !important;
+  box-shadow: 0 0 0 4px color-mix(in srgb, var(--w-accent, #0D3CFC) 34%, transparent),
+              0 8px 22px -6px color-mix(in srgb, var(--w-accent, #0D3CFC) 55%, transparent) !important;
+}
+body.qf-app-calculator[data-qf-cta-hover="fill"] .qf-cta:not(.qf-secondary):hover {
+  background: var(--w-accent-hover, #0B32D4) !important;
+  border-color: var(--w-accent-hover, #0B32D4) !important;
+  transform: none !important;
+  box-shadow: none !important;
+  filter: saturate(1.08) !important;
+}
+
 body.qf-app-calculator .qf-error {
   background: var(--w-error-bg, #F3EDDF) !important;
   background-image: none !important;
@@ -168,7 +228,9 @@ body.qf-app-calculator .qf-success {
 body.qf-app-calculator .qf-header .brand-name::after {
   background: var(--w-accent-pill-bg, rgba(110,139,255,.10)) !important;
   border: 1px solid var(--w-accent-pill-border, rgba(110,139,255,.34)) !important;
-  color: var(--w-accent-on-surface, #6E8BFF) !important;
+  /* Pill label uses the WCAG-computed on-surface foreground so it always
+     reads against the shell — even under a light custom accent. */
+  color: var(--w-pill-text, var(--w-accent-on-surface, #6E8BFF)) !important;
 }
 
 /* Logo slot: hairline border to match the shell. */

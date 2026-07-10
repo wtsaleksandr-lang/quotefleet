@@ -131,6 +131,29 @@ a.qf-contact-value:hover { text-decoration: underline; }
 .qf-result .line .name { color: var(--w-muted); }
 .qf-result .line.total-row .name, .qf-result .line.total-row .amt { color: var(--w-fg); }
 
+/* Accent-filled "Estimated total" box. The foreground (--w-total-text) is
+   computed server-side by the WCAG contrast engine to read on ANY accent —
+   white on cobalt, dark on yellow, etc. See src/server/widgetThemes.ts. */
+.qf-total-box {
+  background: var(--w-accent-solid, var(--w-accent, var(--w-primary, #0D3CFC)));
+  border-radius: 12px;
+  padding: 14px 16px;
+  margin-bottom: 12px;
+}
+.qf-total-box .qf-section-title { color: var(--w-total-text, #fff); opacity: .92; }
+.qf-total-box .total { color: var(--w-total-text, #fff); margin-bottom: 0; }
+.qf-total-box .total .currency { color: var(--w-total-text, #fff); opacity: .82; }
+
+/* ── CTA hover effects (per-tenant, accent-aware) ────────────────────────
+   The active style is chosen by body[data-qf-cta-hover]. All reuse the
+   contrast-computed accent tokens; 'none' keeps an accessible focus ring. */
+.qf-cta:focus-visible { outline: 2px solid var(--w-accent, var(--w-primary)); outline-offset: 2px; }
+body[data-qf-cta-hover="none"] .qf-cta:not(.qf-secondary):hover { background: var(--w-primary); transform: none; box-shadow: 0 1px 0 rgba(255,255,255,0.15) inset; }
+body[data-qf-cta-hover="border"] .qf-cta:not(.qf-secondary):hover { background: var(--w-primary-hover); box-shadow: 0 0 0 2px var(--w-accent-surface, #fff) inset; transform: none; }
+body[data-qf-cta-hover="lift"] .qf-cta:not(.qf-secondary):hover { background: var(--w-primary-hover); transform: translateY(-2px); box-shadow: 0 12px 26px -8px rgba(15,23,42,0.45); }
+body[data-qf-cta-hover="glow"] .qf-cta:not(.qf-secondary):hover { background: var(--w-primary-hover); transform: none; box-shadow: 0 0 0 4px color-mix(in srgb, var(--w-accent, var(--w-primary)) 32%, transparent), 0 8px 22px -6px color-mix(in srgb, var(--w-accent, var(--w-primary)) 55%, transparent); }
+body[data-qf-cta-hover="fill"] .qf-cta:not(.qf-secondary):hover { background: var(--w-primary-hover); transform: none; box-shadow: none; filter: saturate(1.08); }
+
 .qf-error { background: #fee2e2; color: var(--w-error); border-radius: 8px; padding: 10px 14px; font-size: 13px; margin-top: 12px; }
 .qf-success { background: #dcfce7; color: var(--w-success); border-radius: 8px; padding: 10px 14px; font-size: 13px; margin-top: 12px; }
 .qf-footer { margin-top: 14px; font-size: 11.5px; color: var(--w-muted); text-align: center; }

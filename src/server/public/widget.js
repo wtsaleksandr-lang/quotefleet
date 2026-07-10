@@ -167,6 +167,11 @@
       root.style.setProperty('--w-font', font);
       document.body.style.fontFamily = font;
     }
+    // Per-tenant CTA hover effect (border | lift | glow | fill | none). The
+    // widget CSS keys off this attribute; default 'border' preserves the
+    // long-standing border-on-hover look. See widgetThemes.ts CTA_HOVER_STYLES.
+    var hover = theme.ctaHover || 'border';
+    document.body.setAttribute('data-qf-cta-hover', hover);
   }
 
   function applyBrand(brand) {

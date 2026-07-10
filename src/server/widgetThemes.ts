@@ -40,6 +40,10 @@ export interface WidgetThemeTokens {
   '--w-contact-text': string;
   '--w-border': string;
   '--w-accent': string;
+  /** Accent fill for TEXT-bearing accent surfaces (CTA, total box, active
+   *  chip). Equals `--w-accent` for well-chosen accents; minimally hardened
+   *  only when no foreground could otherwise clear WCAG on the raw accent. */
+  '--w-accent-solid': string;
   '--w-accent-hover': string;
   '--w-accent-text': string;
   '--w-accent-surface': string;
@@ -47,6 +51,13 @@ export interface WidgetThemeTokens {
   '--w-accent-on-surface': string;
   '--w-accent-pill-bg': string;
   '--w-accent-pill-border': string;
+  // WCAG-computed foregrounds for background-dependent surfaces (contrast
+  // engine guarantees these pass against their actual fill — see
+  // src/server/color/contrast.ts).
+  /** Text/number on the accent-filled "Estimated total" box. */
+  '--w-total-text': string;
+  /** Text on the accent pill / on-surface accent labels (vs the shell). */
+  '--w-pill-text': string;
   '--w-error-bg': string;
   '--w-error-text': string;
   '--w-success-bg': string;
@@ -96,65 +107,23 @@ export interface WidgetPreset {
   palette: PresetPalette;
 }
 
-// ── small color helpers (pure, no deps) ─────────────────────────────
-function clamp(n: number): number {
-  return Math.max(0, Math.min(255, Math.round(n)));
-}
+// ── colour maths — delegated to the WCAG contrast engine ────────────
+// One source of truth for luminance / ratio / readable-foreground picking
+// so the widget, the customize preview and the tests all agree. See
+// src/server/color/contrast.ts.
+import {
+  WCAG,
+  mix,
+  darken,
+  lighten,
+  rgba,
+  pickForeground,
+  ensureReadable,
+  accessibleOnAccent,
+  passes,
+} from './color/contrast.js';
 
-function hexToRgb(hex: string): { r: number; g: number; b: number } | null {
-  const m = /^#?([0-9a-f]{6})$/i.exec(hex.trim());
-  if (!m) return null;
-  const int = parseInt(m[1], 16);
-  return { r: (int >> 16) & 255, g: (int >> 8) & 255, b: int & 255 };
-}
-
-function rgbToHex(r: number, g: number, b: number): string {
-  return '#' + [r, g, b].map((v) => clamp(v).toString(16).padStart(2, '0')).join('');
-}
-
-/** Mix `hex` toward `target` (default white) by `amount` (0..1). */
-function mix(hex: string, amount: number, target = { r: 255, g: 255, b: 255 }): string {
-  const c = hexToRgb(hex);
-  if (!c) return hex;
-  return rgbToHex(
-    c.r + (target.r - c.r) * amount,
-    c.g + (target.g - c.g) * amount,
-    c.b + (target.b - c.b) * amount,
-  );
-}
-
-const BLACK = { r: 0, g: 0, b: 0 };
-const darken = (hex: string, amount: number) => mix(hex, amount, BLACK);
-const lighten = (hex: string, amount: number) => mix(hex, amount);
-
-/** Relative luminance (WCAG). */
-function luminance(hex: string): number {
-  const c = hexToRgb(hex);
-  if (!c) return 0;
-  const chan = (v: number) => {
-    const s = v / 255;
-    return s <= 0.03928 ? s / 12.92 : Math.pow((s + 0.055) / 1.055, 2.4);
-  };
-  return 0.2126 * chan(c.r) + 0.7152 * chan(c.g) + 0.0722 * chan(c.b);
-}
-
-function contrast(a: string, b: string): number {
-  const la = luminance(a);
-  const lb = luminance(b);
-  return (Math.max(la, lb) + 0.05) / (Math.min(la, lb) + 0.05);
-}
-
-/** Choose the more-readable of white / near-black text for `bg`. */
-function readableText(bg: string): string {
-  return contrast('#ffffff', bg) >= contrast('#141414', bg) ? '#FFFFFF' : '#141414';
-}
-
-/** rgba() string from a hex + alpha. */
-function rgba(hex: string, alpha: number): string {
-  const c = hexToRgb(hex);
-  if (!c) return hex;
-  return `rgba(${c.r},${c.g},${c.b},${alpha})`;
-}
+const HEX6_RE = /^#[0-9a-fA-F]{6}$/;
 
 // ── Fonts (self-hosted, no CDN at runtime) ──────────────────────────
 export interface WidgetFont {
@@ -394,10 +363,52 @@ export const WIDGET_PRESETS: Record<string, WidgetPreset> = Object.fromEntries(
 
 export const WIDGET_PRESET_LIST: WidgetPreset[] = PRESETS_RAW;
 
+// ── CTA hover-effect options ────────────────────────────────────────
+// Per-tenant hover treatment for the primary CTA. Default `border` = the
+// long-standing clean border-wrap on hover; the rest are subtle premium
+// alternatives. All are accent-aware (they reuse the contrast-computed
+// --w-* tokens) and keep an accessible focus ring regardless.
+export const CTA_HOVER_STYLES = ['border', 'lift', 'glow', 'fill', 'none'] as const;
+export type CtaHover = (typeof CTA_HOVER_STYLES)[number];
+export const DEFAULT_CTA_HOVER: CtaHover = 'border';
+
+function normalizeCtaHover(v: string | null | undefined): CtaHover {
+  return (CTA_HOVER_STYLES as readonly string[]).includes(v ?? '')
+    ? (v as CtaHover)
+    : DEFAULT_CTA_HOVER;
+}
+
 // ── Token assembly ──────────────────────────────────────────────────
-function buildTokens(p: PresetPalette, fontStack: string): WidgetThemeTokens {
+// `fontColor` is an optional tenant text-colour override (a #RRGGBB hex, or
+// null for "Auto"). It is applied ONLY on surfaces where it still clears the
+// WCAG bar; any surface it would fail on (e.g. the accent-filled total box)
+// falls back to the contrast-engine's auto colour — so nothing ever renders
+// below threshold.
+function buildTokens(
+  p: PresetPalette,
+  fontStack: string,
+  fontColor: string | null,
+): WidgetThemeTokens {
   const accentSurfaceBorder =
     p.mode === 'light' ? 'rgba(20,16,10,.14)' : p.accentSurface;
+
+  // Accent-filled TEXT surfaces (CTA, total box, active chip): a guaranteed
+  // readable {fill, text} pair. `solid` is the accent, hardened only if no
+  // pure foreground could clear 4.5:1 on the raw accent (rare borderline hues).
+  const onAccent = accessibleOnAccent(p.accent, WCAG.NORMAL);
+  const autoAccentText = onAccent.text;
+  const autoTotalText = onAccent.text;
+  // Pill / on-surface accent labels render over the shell surface.
+  const autoPillText = ensureReadable(p.accentOnSurface, p.surface, { level: WCAG.NORMAL });
+
+  const fc = fontColor && HEX6_RE.test(fontColor) ? fontColor : null;
+  const text = fc && passes(fc, p.surface, WCAG.NORMAL) ? fc : p.text;
+  // A tenant font colour is only honoured on the accent fill if IT passes on
+  // the (hardened) solid fill — else the engine's auto colour wins there.
+  const accentText = fc && passes(fc, onAccent.bg, WCAG.NORMAL) ? fc : autoAccentText;
+  const totalText = fc && passes(fc, onAccent.bg, WCAG.NORMAL) ? fc : autoTotalText;
+  const pillText = fc && passes(fc, p.surface, WCAG.NORMAL) ? fc : autoPillText;
+
   return {
     '--w-page-bg': p.pageBg,
     '--w-surface': p.surface,
@@ -407,19 +418,22 @@ function buildTokens(p: PresetPalette, fontStack: string): WidgetThemeTokens {
     '--w-input-bg-hover': p.inputBgHover,
     '--w-input-text': p.inputText,
     '--w-input-border': p.inputBorder,
-    '--w-text': p.text,
+    '--w-text': text,
     '--w-muted': p.muted,
     '--w-muted-2': p.muted2,
     '--w-contact-text': p.contactText,
     '--w-border': p.border,
     '--w-accent': p.accent,
+    '--w-accent-solid': onAccent.bg,
     '--w-accent-hover': p.accentHover,
-    '--w-accent-text': p.accentText,
+    '--w-accent-text': accentText,
     '--w-accent-surface': p.accentSurface,
     '--w-accent-surface-border': accentSurfaceBorder,
     '--w-accent-on-surface': p.accentOnSurface,
     '--w-accent-pill-bg': rgba(p.accentOnSurface, 0.1),
     '--w-accent-pill-border': rgba(p.accentOnSurface, 0.34),
+    '--w-total-text': totalText,
+    '--w-pill-text': pillText,
     '--w-error-bg': p.errorBg,
     '--w-error-text': p.errorText,
     '--w-success-bg': p.successBg,
@@ -434,12 +448,18 @@ function buildTokens(p: PresetPalette, fontStack: string): WidgetThemeTokens {
  * Apply a custom accent hex over a palette. Supersedes the preset accent
  * (fill, hover, text-on-accent, tint surfaces, on-surface variant, pill).
  * All other tokens (bg / inputs / text / borders) are untouched.
+ *
+ * text-on-accent + on-surface are now computed by the WCAG engine so ANY
+ * accent — yellow, cream, red, navy — carries readable labels automatically.
  */
 function applyAccentOverride(p: PresetPalette, hex: string): PresetPalette {
   const accent = hex;
   const accentHover = darken(accent, 0.14);
-  const accentText = readableText(accent);
-  const onSurface = p.mode === 'light' ? accent : lighten(accent, 0.32);
+  const accentText = pickForeground(accent, { level: WCAG.NORMAL });
+  // On-surface accent variant: keep the preset's direction (darker in light
+  // themes, lighter in dark themes) then guarantee it reads on the shell.
+  const baseOnSurface = p.mode === 'light' ? accent : lighten(accent, 0.32);
+  const onSurface = ensureReadable(baseOnSurface, p.surface, { level: WCAG.NORMAL });
   const accentSurface = p.mode === 'light' ? mix(accent, 0.86) : '#FFFFFF';
   return {
     ...p,
@@ -458,6 +478,10 @@ export interface ResolvedWidgetTheme {
   font: string;
   fontStack: string;
   accentOverride: string | null;
+  /** Applied tenant text-colour: 'auto' (engine-picked) or a #RRGGBB hex. */
+  fontColor: string;
+  /** Per-tenant CTA hover effect. */
+  ctaHover: CtaHover;
   tokens: WidgetThemeTokens;
 }
 
@@ -466,6 +490,10 @@ export interface BrandThemeInput {
   themePreset?: string | null;
   accentOverride?: string | null;
   fontFamily?: string | null;
+  /** Optional tenant text-colour override ('auto' or a #RRGGBB hex). */
+  fontColor?: string | null;
+  /** Per-tenant CTA hover effect (border | lift | glow | fill | none). */
+  ctaHover?: string | null;
   /** Legacy column — used only as an accent override when set to a real
    *  non-default value and no explicit accentOverride is present. */
   primaryColor?: string | null;
@@ -493,12 +521,48 @@ export function resolveWidgetTheme(brand: BrandThemeInput | null | undefined): R
   let palette = preset.palette;
   if (accentOverride) palette = applyAccentOverride(palette, accentOverride);
 
+  // Tenant font-colour override: 'auto'/null → engine picks per surface.
+  const fontColor =
+    brand?.fontColor && brand.fontColor !== 'auto' ? normalizeHex(brand.fontColor) : null;
+  const ctaHover = normalizeCtaHover(brand?.ctaHover);
+
   return {
     preset: presetId,
     mode: preset.mode,
     font: fontId,
     fontStack: font.stack,
     accentOverride,
-    tokens: buildTokens(palette, font.stack),
+    fontColor: fontColor ?? 'auto',
+    ctaHover,
+    tokens: buildTokens(palette, font.stack, fontColor),
   };
+}
+
+/**
+ * The curated font-colour swatches the customize panel MAY offer, filtered at
+ * runtime to those that clear WCAG against the currently-selected background
+ * (and, where relevant, the accent fill). Exposed so the panel + server agree
+ * on the option universe. 'auto' is always available and is the default.
+ */
+export const FONT_COLOR_SWATCHES: Array<{ id: string; label: string; hex: string }> = [
+  { id: 'white', label: 'White', hex: '#FFFFFF' },
+  { id: 'charcoal', label: 'Charcoal', hex: '#141414' },
+  { id: 'ink', label: 'Ink', hex: '#1E1E1E' },
+  { id: 'light-gray', label: 'Light gray', hex: '#E6E3E0' },
+  { id: 'slate', label: 'Slate', hex: '#334155' },
+  { id: 'cream', label: 'Cream', hex: '#F5F1E8' },
+];
+
+/**
+ * Given a background (and optional accent fill), return the subset of curated
+ * font colours that pass WCAG AA on ALL supplied surfaces — i.e. the colours
+ * the panel is allowed to show for that background. Deterministic; mirrors the
+ * client-side filter used for instant feedback.
+ */
+export function safeFontColors(
+  surfaces: string[],
+  level: number = WCAG.NORMAL,
+): Array<{ id: string; label: string; hex: string }> {
+  const real = surfaces.filter((s) => HEX6_RE.test(s));
+  return FONT_COLOR_SWATCHES.filter((sw) => real.every((bg) => passes(sw.hex, bg, level)));
 }

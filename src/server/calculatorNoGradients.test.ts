@@ -29,7 +29,9 @@ describe('calculator global color enforcement without gradients', () => {
     expect(css).toContain('background: var(--w-surface, #181D1F) !important');
     expect(css).toContain('background: var(--w-input-bg, #E6E3E0) !important');
     expect(css).toContain('background: var(--w-input-bg-hover, #D4CFC9) !important');
-    expect(css).toContain('background: var(--w-accent, #0D3CFC) !important');
+    // Accent-filled TEXT surfaces use the WCAG-hardened solid accent (falls
+    // back through --w-accent → the Midnight cobalt).
+    expect(css).toContain('background: var(--w-accent-solid, var(--w-accent, #0D3CFC)) !important');
     expect(css).toContain('background-image: none !important');
     expect(css).toContain('body.qf-app-calculator .qf-result');
     expect(css).toContain('body.qf-app-calculator .qf-cta:disabled::after');
