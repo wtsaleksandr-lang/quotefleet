@@ -198,17 +198,24 @@ describe('public static page smoke checks', () => {
     const html = await file('landing.html');
     expect(html).toContain('property="og:title"');
     expect(html).toContain('name="twitter:card"');
-    expect(html).toContain('/og.svg');
+    expect(html).toContain('/brand/og-image-1200x630.png');
   });
 
-  it('social preview matches current light setup message', async () => {
-    const svg = await file('og.svg');
-    expect(svg).toContain('Start sharing live rates');
-    expect(svg).toContain('No website changes');
-    expect(svg).toContain('Share by link');
-    expect(svg).toContain('Send PDFs');
-    expect(svg).not.toContain('Instant quote desk');
-    expect(svg).not.toContain('Private rates by default');
+  it('landing page wires the brand favicon + manifest', async () => {
+    const html = await file('landing.html');
+    expect(html).toContain('rel="icon" href="/favicon.ico"');
+    expect(html).toContain('/brand/favicon-32.png');
+    expect(html).toContain('rel="apple-touch-icon"');
+    expect(html).toContain('rel="manifest" href="/site.webmanifest"');
+    // brand mark image replaces the old inline route SVG
+    expect(html).toContain('/brand/mark-keys.png');
+    expect(html).not.toContain('qf-route-logo');
+  });
+
+  it('web manifest points at the generated brand icons', async () => {
+    const manifest = JSON.parse(await file('site.webmanifest'));
+    expect(manifest.icons.map((i: { src: string }) => i.src)).toContain('/brand/icon-512.png');
+    expect(manifest.icons.some((i: { purpose: string }) => i.purpose === 'maskable')).toBe(true);
   });
 
   it('homepage motion helper is safe and optional', async () => {

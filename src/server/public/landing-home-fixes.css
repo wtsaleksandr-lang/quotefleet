@@ -64,10 +64,11 @@ body.qf-wft .site-logo {
   box-shadow: none !important;
 }
 
-body.qf-wft .site-logo svg.qf-route-logo {
+body.qf-wft .site-logo svg.qf-route-logo,
+body.qf-wft .site-logo .qf-brand-mark {
   display: block !important;
-  width: 28px !important;
-  height: 28px !important;
+  width: auto !important;
+  height: 30px !important;
 }
 
 body.qf-wft .site-logo::before,

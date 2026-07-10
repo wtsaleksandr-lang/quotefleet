@@ -20,10 +20,10 @@ describe('homepage final cleanup styles', () => {
     expect(html).toContain('/landing-home-fixes.css');
   });
 
-  it('uses a real route logo svg and keeps a non-duplicate header CTA', async () => {
+  it('uses the brand mark image and keeps a non-duplicate header CTA', async () => {
     const html = await file('landing.html');
 
-    expect(html).toContain('qf-route-logo');
+    expect(html).toContain('/brand/mark-keys.png');
     expect(html).toContain('View demo <span class="arr">→</span>');
     expect(html).toContain('<a class="btn btn-primary btn-lg" href="/signup">Start free');
     expect(html).not.toContain('<a class="btn btn-primary" href="/signup">Start free');

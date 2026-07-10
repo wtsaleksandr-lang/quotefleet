@@ -279,6 +279,8 @@ p { margin: 0; }
   box-shadow: none;
 }
 .brand-mark .logo svg { width: 26px; height: 26px; display: block; }
+.qf-brand-mark { display: block; height: 26px; width: auto; }
+.brand-mark .logo .qf-brand-mark { height: 26px; width: auto; }
 .topnav-spacer { flex: 1; }
 .topnav a.nav-link {
   color: var(--muted);
