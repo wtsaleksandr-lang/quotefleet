@@ -159,6 +159,15 @@ html[data-theme="light"] {
 }
 .qf-theme-toggle:hover { background: var(--surface-2); color: var(--ink); border-color: var(--border-strong); }
 
+/* Lucide-style inline line icons — inherit currentColor so they track the
+   theme + active/hover state. One consistent 18px weight across the shell. */
+.qf-ico { width: 18px; height: 18px; flex: 0 0 auto; display: inline-block; vertical-align: middle; }
+.sidebar .qf-ico { opacity: 0.92; }
+.qf-theme-toggle #qf-theme-icon { display: inline-flex; align-items: center; }
+.qf-theme-toggle .qf-ico { width: 16px; height: 16px; }
+.qf-tool-ico { display: inline-flex; align-items: center; vertical-align: -3px; }
+.qf-tool-ico .qf-ico { width: 15px; height: 15px; }
+
 /* ── Reset ─────────────────────────────────────────────────────── */
 * { box-sizing: border-box; }
 html, body { height: 100%; }
