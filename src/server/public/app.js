@@ -1430,7 +1430,37 @@
       var b = d.brand || {};
       var presets = d.presets || [];
       var fonts = d.fonts || [];
+      var ctaHovers = d.ctaHovers || [{ id: 'border' }, { id: 'lift' }, { id: 'glow' }, { id: 'fill' }, { id: 'none' }];
+      var fontColorOpts = d.fontColors || [];
+      var presetsById = {};
+      presets.forEach(function (p) { presetsById[p.id] = p; });
       c.innerHTML = '';
+
+      // ── client-side WCAG mirror (matches src/server/color/contrast.ts) ──
+      // Used only to filter which font-colour swatches are OFFERED for the
+      // currently-selected background — the server re-computes + guarantees the
+      // applied colour, so this is a UX convenience, not the source of truth.
+      function _lin(v) { v /= 255; return v <= 0.03928 ? v / 12.92 : Math.pow((v + 0.055) / 1.055, 2.4); }
+      function _lum(hex) {
+        var m = /^#?([0-9a-f]{6})$/i.exec(String(hex || '').trim());
+        if (!m) return null;
+        var n = parseInt(m[1], 16);
+        return 0.2126 * _lin((n >> 16) & 255) + 0.7152 * _lin((n >> 8) & 255) + 0.0722 * _lin(n & 255);
+      }
+      function wcagRatio(a, bg) {
+        var la = _lum(a), lb = _lum(bg);
+        if (la == null || lb == null) return 0;
+        return (Math.max(la, lb) + 0.05) / (Math.min(la, lb) + 0.05);
+      }
+      function wcagPasses(fg, bg, level) { return wcagRatio(fg, bg) >= (level || 4.5) - 1e-9; }
+      // The main text backgrounds for the currently-selected theme.
+      function currentTextSurfaces() {
+        var p = presetsById[currentPreset] || presetsById.midnight || {};
+        return [p.bg, p.surface].filter(function (s) { return /^#?[0-9a-f]{6}$/i.test(String(s || '')); });
+      }
+      // Re-assigned once the Text-color section is built; called on theme/accent
+      // change so the offered swatches update dynamically.
+      var repaintFontColors = function () {};
 
       var root = el('div', { class: 'qf-customize', 'data-qf-customize': '1' });
       c.appendChild(root);
@@ -1526,6 +1556,7 @@
             n.setAttribute('aria-pressed', sel ? 'true' : 'false');
           });
           queueSave({ themePreset: p.id }, true);
+          repaintFontColors();
         });
         grid.appendChild(btn);
       });
@@ -1552,16 +1583,16 @@
       }
       var defChip = el('button', { type: 'button', class: 'qf-cz-swatch qf-cz-swatch-default', 'data-accent': '__default__', title: 'Use the theme accent' });
       defChip.appendChild(el('span', { text: 'Theme default' }));
-      defChip.addEventListener('click', function () { currentAccent = null; paintAccent(); queueSave({ accentOverride: null }, true); });
+      defChip.addEventListener('click', function () { currentAccent = null; paintAccent(); queueSave({ accentOverride: null }, true); repaintFontColors(); });
       accentRow.appendChild(defChip);
       ACCENTS.forEach(function (hex) {
         var sw = el('button', { type: 'button', class: 'qf-cz-swatch', 'data-accent': hex, title: hex, style: { background: hex } });
-        sw.addEventListener('click', function () { currentAccent = hex; paintAccent(); queueSave({ accentOverride: hex }, true); });
+        sw.addEventListener('click', function () { currentAccent = hex; paintAccent(); queueSave({ accentOverride: hex }, true); repaintFontColors(); });
         accentRow.appendChild(sw);
       });
       var customWrap = el('label', { class: 'qf-cz-swatch qf-cz-swatch-custom', title: 'Pick a custom color' });
       colorInput = el('input', { type: 'color', value: currentAccent || '#0D3CFC' });
-      colorInput.addEventListener('input', function () { currentAccent = colorInput.value; paintAccent(); queueSave({ accentOverride: colorInput.value }); });
+      colorInput.addEventListener('input', function () { currentAccent = colorInput.value; paintAccent(); queueSave({ accentOverride: colorInput.value }); repaintFontColors(); });
       customWrap.appendChild(colorInput);
       customWrap.appendChild(el('span', { text: 'Custom' }));
       accentRow.appendChild(customWrap);
@@ -1582,6 +1613,86 @@
       sel.addEventListener('change', function () { queueSave({ fontFamily: sel.value }, true); });
       fontSec.appendChild(sel);
       controls.appendChild(fontSec);
+
+      // ── Button hover effect ─────────────────────────────────────
+      var HOVER_LABELS = { border: 'Border', lift: 'Lift', glow: 'Glow', fill: 'Fill', none: 'None' };
+      var HOVER_HINTS = {
+        border: 'A clean border wraps the button.',
+        lift: 'Gently lifts with a soft shadow.',
+        glow: 'A soft accent glow.',
+        fill: 'A subtle fill / shade shift.',
+        none: 'No hover change (keeps focus ring).',
+      };
+      var hoverSec = el('div', { class: 'card qf-cz-section' });
+      hoverSec.appendChild(el('div', { class: 'qf-cz-section-title', text: 'Button hover' }));
+      hoverSec.appendChild(el('div', { class: 'qf-cz-hint', text: 'How your main button reacts on hover. All stay subtle and on-brand.' }));
+      var hoverRow = el('div', { class: 'qf-cz-hover-row' });
+      var currentHover = b.ctaHover || 'border';
+      ctaHovers.forEach(function (h) {
+        var id = h.id || h;
+        var on = id === currentHover;
+        var chip = el('button', { type: 'button', class: 'qf-cz-hover-chip' + (on ? ' is-selected' : ''), 'data-hover': id, 'aria-pressed': on ? 'true' : 'false', title: HOVER_HINTS[id] || id });
+        chip.appendChild(el('span', { class: 'qf-cz-hover-name', text: (HOVER_LABELS[id] || id) + (id === 'border' ? ' (default)' : '') }));
+        chip.addEventListener('click', function () {
+          currentHover = id;
+          $$('.qf-cz-hover-chip', hoverRow).forEach(function (n) {
+            var s = n.getAttribute('data-hover') === id;
+            n.classList.toggle('is-selected', s);
+            n.setAttribute('aria-pressed', s ? 'true' : 'false');
+          });
+          queueSave({ ctaHover: id }, true);
+        });
+        hoverRow.appendChild(chip);
+      });
+      hoverSec.appendChild(hoverRow);
+      controls.appendChild(hoverSec);
+
+      // ── Text color (background-aware, WCAG-limited) ──────────────
+      // Only colours that clear WCAG AA against the CURRENT theme background
+      // are offered; the set updates whenever the theme/accent changes.
+      // "Auto" (the contrast engine's safe pick) is the default. The server
+      // re-validates per surface and falls back to auto anywhere a colour
+      // would drop below threshold — so nothing ever renders unreadable.
+      var textSec = el('div', { class: 'card qf-cz-section' });
+      textSec.appendChild(el('div', { class: 'qf-cz-section-title', text: 'Text color' }));
+      textSec.appendChild(el('div', { class: 'qf-cz-hint', text: 'Only readable choices for your background are shown. Auto is recommended.' }));
+      var textRow = el('div', { class: 'qf-cz-textcolor-row' });
+      textSec.appendChild(textRow);
+      var currentFontColor = (b.fontColor && b.fontColor !== 'auto') ? String(b.fontColor).toLowerCase() : 'auto';
+      repaintFontColors = function () {
+        textRow.innerHTML = '';
+        var surfaces = currentTextSurfaces();
+        // "Auto (recommended)" — always available, always safe.
+        var autoOn = currentFontColor === 'auto';
+        var autoChip = el('button', { type: 'button', class: 'qf-cz-textcolor qf-cz-textcolor-auto' + (autoOn ? ' is-selected' : ''), 'data-fontcolor': 'auto', 'aria-pressed': autoOn ? 'true' : 'false', title: 'Auto — a readable colour is picked for you' });
+        autoChip.appendChild(el('span', { class: 'qf-cz-textcolor-dot', style: { background: 'linear-gradient(135deg,#fff 50%,#141414 50%)' } }));
+        autoChip.appendChild(el('span', { text: 'Auto (recommended)' }));
+        autoChip.addEventListener('click', function () { currentFontColor = 'auto'; repaintFontColors(); queueSave({ fontColor: 'auto' }, true); });
+        textRow.appendChild(autoChip);
+        // Curated swatches, filtered to those passing WCAG on ALL text surfaces.
+        var offered = fontColorOpts.filter(function (sw) {
+          return surfaces.every(function (bg) { return wcagPasses(sw.hex, bg, 4.5); });
+        });
+        var stillValid = false;
+        offered.forEach(function (sw) {
+          var on = currentFontColor === String(sw.hex).toLowerCase();
+          if (on) stillValid = true;
+          var chip = el('button', { type: 'button', class: 'qf-cz-textcolor' + (on ? ' is-selected' : ''), 'data-fontcolor': sw.hex, 'aria-pressed': on ? 'true' : 'false', title: sw.label });
+          chip.appendChild(el('span', { class: 'qf-cz-textcolor-dot', style: { background: sw.hex } }));
+          chip.appendChild(el('span', { text: sw.label }));
+          chip.addEventListener('click', function () { currentFontColor = String(sw.hex).toLowerCase(); repaintFontColors(); queueSave({ fontColor: sw.hex }, true); });
+          textRow.appendChild(chip);
+        });
+        // If the previously-chosen colour no longer passes the new background,
+        // snap back to Auto (and persist) so we never keep an unreadable pick.
+        if (currentFontColor !== 'auto' && !stillValid) {
+          currentFontColor = 'auto';
+          queueSave({ fontColor: 'auto' }, true);
+          repaintFontColors();
+        }
+      };
+      repaintFontColors();
+      controls.appendChild(textSec);
 
       // ── Logo (drag-drop + client downscale to a small data-URL) ──
       var logoSec = el('div', { class: 'card qf-cz-section' });

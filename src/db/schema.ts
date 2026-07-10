@@ -442,6 +442,14 @@ export const brandConfigs = pgTable('brand_configs', {
    *  contact info (the contact step is moved to the "claim quote" CTA).
    *  Default false preserves the standard contact-then-quote flow. */
   showQuoteBeforeContact: boolean('show_quote_before_contact').notNull().default(false),
+  /** Per-tenant CTA hover effect: border (default) | lift | glow | fill | none.
+   *  Default 'border' preserves the long-standing border-on-hover behaviour.
+   *  See CTA_HOVER_STYLES in src/server/widgetThemes.ts. */
+  ctaHover: text('cta_hover').notNull().default('border'),
+  /** Tenant text/font colour: 'auto' (WCAG engine picks a safe foreground per
+   *  surface) or a #RRGGBB hex that is only applied where it passes WCAG.
+   *  Default 'auto' leaves existing tenants unchanged. */
+  fontColor: text('font_color').notNull().default('auto'),
   updatedAt: timestamp('updated_at', { mode: 'date' }).notNull().defaultNow(),
 });
 

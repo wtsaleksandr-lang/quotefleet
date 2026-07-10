@@ -54,7 +54,13 @@ const CORE_PLANS = ['vital', 'pro'] as const; // branded quotes, core features
 const PRO_PLANS = ['pro'] as const; // AI, PDF, automation, custom domain, analytics
 import { encrypt } from '../../auth/secrets.js';
 import { effectivePlan } from '../plans.js';
-import { WIDGET_PRESETS, WIDGET_FONTS, WIDGET_PRESET_LIST } from '../widgetThemes.js';
+import {
+  WIDGET_PRESETS,
+  WIDGET_FONTS,
+  WIDGET_PRESET_LIST,
+  CTA_HOVER_STYLES,
+  FONT_COLOR_SWATCHES,
+} from '../widgetThemes.js';
 import { loadEnv } from '../../config.js';
 import { makePreviewGrant, PREVIEW_GRANT_PARAM, PREVIEW_GRANT_TTL_MS } from '../access.js';
 import { syncTenantToMarketplace } from '../../marketplace/sync.js';
@@ -582,7 +588,11 @@ export function registerTenantRoutes(app: Express) {
       accent: p.palette.accent,
     }));
     const fonts = Object.values(WIDGET_FONTS).map((f) => ({ id: f.id, label: f.label }));
-    res.json({ brand: row[0] ?? null, presets, fonts });
+    // Option universes for the Customize panel's "Button hover" + "Text color"
+    // controls. The panel filters fontColors to the WCAG-safe subset for the
+    // currently-selected background client-side (mirrors safeFontColors).
+    const ctaHovers = CTA_HOVER_STYLES.map((id) => ({ id }));
+    res.json({ brand: row[0] ?? null, presets, fonts, ctaHovers, fontColors: FONT_COLOR_SWATCHES });
   });
 
   const BrandPatch = z.object({
@@ -607,6 +617,14 @@ export function registerTenantRoutes(app: Express) {
       .string()
       .regex(/^#[0-9a-fA-F]{6}$/, 'accentOverride must be a #RRGGBB hex')
       .nullable()
+      .optional(),
+    // Wave 3 — contrast engine + CTA hover. ctaHover is one of the curated
+    // styles; fontColor is 'auto' or a #RRGGBB hex (applied only where it
+    // passes WCAG — see resolveWidgetTheme / buildTokens).
+    ctaHover: z.enum([...CTA_HOVER_STYLES] as [string, ...string[]]).optional(),
+    fontColor: z
+      .string()
+      .regex(/^(auto|#[0-9a-fA-F]{6})$/, "fontColor must be 'auto' or a #RRGGBB hex")
       .optional(),
   });
 
