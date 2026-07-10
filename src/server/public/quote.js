@@ -54,6 +54,12 @@
     $('qdoc-loading').hidden = true;
     $('qdoc').hidden = false;
 
+    // Expose the service so downstream polish (quote-polish.js) can keep
+    // pricing labels service-aware — no drayage terminology on FTL/LTL.
+    var svc = (data.shipment && data.shipment.service) || '';
+    var qdocEl = $('qdoc');
+    if (qdocEl) qdocEl.dataset.service = svc;
+
     var brand = data.brand || {};
     var root = document.documentElement;
     if (brand.primaryColor) root.style.setProperty('--qdoc-primary', brand.primaryColor);
@@ -101,14 +107,21 @@
   function renderDetails(data) {
     var s = data.shipment || {};
     var codes = s.accessorialCodes || [];
+    var isDrayage = s.service === 'drayage';
     var rows = [
-      ['Shipment Type', titleize(s.equipment || s.service)],
-      ['Steamship Line', s.oceanCarrier || 'Not specified'],
-      ['Overweight', bool(s.weightLbs && Number(s.weightLbs) > 44000)],
-      ['Tri-axle', bool(codes.indexOf('tri_axle') >= 0 || codes.indexOf('triaxle') >= 0)],
+      ['Shipment Type', s.equipmentLabel || titleize(s.equipment || s.service)],
       ['Hazardous', bool(codes.indexOf('hazmat') >= 0)],
       ['Refrigerated / Reefer', bool(/reefer|refrigerated/i.test(String(s.equipment || '')) || codes.indexOf('reefer') >= 0)],
     ];
+    // Drayage-only fields — never leak ocean/container terminology onto an
+    // FTL / LTL / expedite / hotshot quote.
+    if (isDrayage) {
+      rows.splice(1, 0,
+        ['Steamship Line', s.oceanCarrier || 'Not specified'],
+        ['Overweight', bool(s.weightLbs && Number(s.weightLbs) > 44000)],
+        ['Tri-axle', bool(codes.indexOf('tri_axle') >= 0 || codes.indexOf('triaxle') >= 0)]
+      );
+    }
     if (s.pickupDate) rows.push(['Pickup Date', s.pickupDate]);
     if (s.deliveryDate) rows.push(['Delivery Date', s.deliveryDate]);
     if (s.commodity) rows.push(['Commodity', s.commodity]);
@@ -131,11 +144,12 @@
     var wrap = $('qdoc-price-lines');
     wrap.innerHTML = '';
     var lines = data.quote.breakdown || [];
+    // Generic, service-neutral headings. Margin is folded into the linehaul
+    // line server-side (customerFacingLines) and never rendered to customers.
     var groups = [
-      ['Drayage / Linehaul', byKind(lines, 'linehaul').concat(byKind(lines, 'minimum'))],
+      ['Line Haul', byKind(lines, 'linehaul').concat(byKind(lines, 'minimum'))],
       ['Accessorials', byKind(lines, 'accessorial')],
       ['Fuel', byKind(lines, 'fuel')],
-      ['Margin', byKind(lines, 'margin')],
       ['Notes', byKind(lines, 'note')],
     ];
     groups.forEach(function (group) {

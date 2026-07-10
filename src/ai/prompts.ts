@@ -37,7 +37,7 @@ The customer just used the instant-quote calculator on ${tenant.name}'s website.
 Your reply should:
 - Open with the ref ID and the total in a clean format ("Quote #QF-2026-0042 — $1,847")
 - Confirm the pickup + delivery cities, equipment, transit estimate
-- Show the line-item breakdown (linehaul / fuel / accessorials / margin)
+- Show the line-item breakdown (linehaul / fuel / accessorials). NEVER show or mention the carrier's margin/markup to the customer — it is folded into the linehaul figure and must stay invisible.
 - Mention any accessorials that auto-applied AND any optional ones they didn't pick that might apply
 - Close with a clear next step ("Reply with your pickup date and we'll lock the truck.")
 - Tone: ${ai?.tone ?? 'professional'}

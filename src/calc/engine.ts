@@ -266,6 +266,31 @@ export function calculate(
     };
   }
 
+  // ── Distance sanity guard ─────────────────────────────────────────
+  // Each rate card carries a maxMiles ceiling (e.g. drayage = 300 mi). It
+  // was previously only AI metadata and never enforced, so a per-mile
+  // fall-through would silently price a 2,000-mi "drayage" lane at
+  // $4.50/mi ≈ $12k — an absurd number that destroys quote credibility.
+  // A lane-zone flat tariff (short-haul drayage inside its radius) is
+  // exempt; this only guards the per-mile card path.
+  if (!zone && card && typeof card.maxMiles === 'number' && card.maxMiles > 0 && req.miles > card.maxMiles) {
+    return {
+      request: req,
+      lines: [],
+      subtotalLinehaul: 0,
+      subtotalAccessorials: 0,
+      fuelSurcharge: 0,
+      margin: 0,
+      total: 0,
+      currency: 'USD',
+      unsupported: {
+        reason:
+          `This lane is about ${Math.round(req.miles)} miles, beyond the ${Math.round(card.maxMiles)}-mile range for ${req.service.toUpperCase()} ${req.equipment}. ` +
+          `Please contact us for a custom quote${req.service === 'drayage' ? ' or choose a truckload (FTL) service for long-haul lanes' : ''}.`,
+      },
+    };
+  }
+
   // ── Linehaul ──────────────────────────────────────────────────────
   let linehaul = 0;
   if (zone) {
@@ -388,4 +413,43 @@ export function calculate(
     total,
     currency: 'USD',
   };
+}
+
+/** Minimal shape shared by CalcLine and the persisted breakdownJson rows. */
+type BreakdownLine = { name?: string; amount?: number; kind?: string; note?: string; code?: string };
+
+/**
+ * Customer-facing view of a price breakdown.
+ *
+ * The carrier's profit margin must NEVER be shown to their customer — it
+ * exposes their markup and invites them to negotiate it away or go direct.
+ * This folds every `margin`-kind line's amount into the base linehaul (or
+ * minimum) line and drops the margin lines, so the displayed line items
+ * still sum to the SAME grand total (the total is computed independently
+ * and is never changed by this function).
+ *
+ * Internal/admin surfaces (the dashboard lead detail, the rate-card config
+ * where margin % is SET, the admin preview) keep the raw lines with the
+ * margin line intact — only customer-facing surfaces (widget calc result,
+ * hosted quote, customer auto-reply email) call this.
+ *
+ * Returns fresh line objects; the input array/objects are never mutated.
+ */
+export function customerFacingLines<T extends BreakdownLine>(lines: T[] | null | undefined): T[] {
+  const src = Array.isArray(lines) ? lines : [];
+  const marginTotal = round2(
+    src.filter((l) => l && l.kind === 'margin').reduce((sum, l) => sum + (Number(l.amount) || 0), 0)
+  );
+  const visible = src.filter((l) => l && l.kind !== 'margin').map((l) => ({ ...l }));
+  if (marginTotal === 0) return visible;
+  const target =
+    visible.find((l) => l.kind === 'linehaul') ?? visible.find((l) => l.kind === 'minimum');
+  if (target) {
+    target.amount = round2((Number(target.amount) || 0) + marginTotal);
+  } else {
+    // No base line to absorb into (shouldn't happen when margin exists) —
+    // surface it as a neutral "Line haul" charge rather than leaking margin.
+    visible.unshift({ name: 'Line haul', amount: marginTotal, kind: 'linehaul' } as T);
+  }
+  return visible;
 }

@@ -9,6 +9,7 @@ import { db } from '../db/client.js';
 import { tenants, aiConfigs, leads, type Tenant, type Lead } from '../db/schema.js';
 import { complete } from './client.js';
 import { leadReplySystemPrompt } from './prompts.js';
+import { customerFacingLines } from '../calc/engine.js';
 
 export async function generateLeadReply(
   tenantId: number,
@@ -69,10 +70,13 @@ function leadSummary(l: Lead): string {
     lines.push(`Accessorials selected: ${l.accessorialCodes.join(', ')}`);
   }
   lines.push(`Quoted total: $${l.quotedTotal?.toFixed(2) ?? '?'}`);
-  if (l.breakdownJson && l.breakdownJson.length) {
+  // Customer-facing email: fold the carrier's margin into linehaul so the
+  // reply never exposes their markup (total is unchanged).
+  const customerBreakdown = customerFacingLines(l.breakdownJson as Parameters<typeof customerFacingLines>[0]);
+  if (customerBreakdown.length) {
     lines.push('Breakdown:');
-    for (const item of l.breakdownJson) {
-      lines.push(`  - ${item.name}: $${item.amount.toFixed(2)}`);
+    for (const item of customerBreakdown) {
+      lines.push(`  - ${item.name}: $${(Number(item.amount) || 0).toFixed(2)}`);
     }
   }
   if (l.notes) lines.push(`Notes: ${l.notes}`);
