@@ -90,14 +90,20 @@ export function registerTenantRoutes(app: Express) {
   // ── overview ──────────────────────────────────────────────────
   app.get('/api/tenant/overview', requireAuth, requireTenant, async (req: Request, res: Response) => {
     const tid = req.tenant!.id;
-    const [recent, allLeads, audit] = await Promise.all([
+    const [recent, allLeads, audit, openCallbacks] = await Promise.all([
       db().select().from(leads).where(eq(leads.tenantId, tid)).orderBy(desc(leads.createdAt)).limit(20),
       db().select().from(leads).where(eq(leads.tenantId, tid)),
       db().select().from(auditLog).where(eq(auditLog.tenantId, tid)).orderBy(desc(auditLog.createdAt)).limit(10),
+      db()
+        .select({ id: callbackRequests.id })
+        .from(callbackRequests)
+        .where(and(eq(callbackRequests.tenantId, tid), eq(callbackRequests.status, 'open'))),
     ]);
     const stats = {
       totalLeads: allLeads.length,
       newLeads: allLeads.filter((l) => l.status === 'new').length,
+      // Unactioned callback requests — feeds the sidebar Callbacks badge.
+      pendingCallbacks: openCallbacks.length,
       wonLeads: allLeads.filter((l) => l.status === 'won').length,
       avgQuote:
         allLeads.length > 0

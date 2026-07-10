@@ -12,12 +12,22 @@
     return name && name !== '…' ? name : 'Your company';
   }
 
-  function publicPath() {
-    return '/w/' + encodeURIComponent(tenantSlug());
+  // The ONE canonical customer link — the hosted widget URL (<slug>.<hostDomain>)
+  // exactly as the Embed page + live widget use it. Published by app.js boot as
+  // window.__qfWidget. Falls back to the same-origin /w/:slug only if that
+  // hasn't loaded yet (never a fake `…yourquote.net`).
+  function widget() {
+    const w = window.__qfWidget;
+    if (w && w.url) return { url: w.url, host: w.host };
+    const slug = tenantSlug();
+    return {
+      url: new URL('/w/' + encodeURIComponent(slug), window.location.origin).toString(),
+      host: slug,
+    };
   }
 
   async function copyLink() {
-    const url = new URL(publicPath(), window.location.origin).toString();
+    const url = widget().url;
     try {
       await navigator.clipboard.writeText(url);
       const ev = new CustomEvent('qf:toast', { detail: { message: 'Calculator link copied.' } });
@@ -29,7 +39,6 @@
 
   function previewCard() {
     if (content.querySelector('.qf-preview-card')) return;
-    const slug = tenantSlug();
     const name = tenantName();
     const card = document.createElement('section');
     card.className = 'qf-preview-card';
@@ -41,7 +50,7 @@
           <p>Use this as a quick preview while you edit rates, charges, zones, brand, or AI settings.</p>
         </div>
         <div class="qf-preview-actions">
-          <a href="${publicPath()}" target="_blank" rel="noopener">Open calculator</a>
+          <a href="${widget().url}" target="_blank" rel="noopener">Open calculator</a>
           <button type="button" data-copy-preview>Copy link</button>
           <button type="button" data-go-preview="embed">Share setup</button>
         </div>
@@ -49,7 +58,7 @@
       <div class="qf-preview-body">
         <div class="qf-preview-url">
           <span>Your customer link</span>
-          <code>${slug}.yourquote.net</code>
+          <code>${widget().host}</code>
         </div>
         <div class="qf-preview-phone" aria-label="Calculator preview mockup">
           <div class="qf-preview-screen">

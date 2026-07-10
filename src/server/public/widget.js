@@ -218,6 +218,10 @@
       .then(function (cfg) {
         if (cfg.error) { $('qf-root').innerHTML = '<div class="qf-error">' + cfg.error + '</div>'; return; }
         state.config = cfg;
+        // Expose the resolved brand + contact so the /w/demo "brand it
+        // yourself" preview can default to the carrier's REAL identity
+        // instead of blank "Your company name" placeholders.
+        try { window.QF_WIDGET_CONFIG = cfg; } catch (e) { /* ignore */ }
         applyTheme(cfg.theme);
         applyBrand(cfg.brand);
         renderHeader(cfg);

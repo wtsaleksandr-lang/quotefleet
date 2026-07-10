@@ -45,6 +45,14 @@ body.qf-demo-brand-preview .qf-header {
   margin-bottom: 10px !important;
 }
 
+/* Paint the (real) carrier logo the demo preview stored in --qf-demo-logo-img.
+   Higher specificity + !important beats `.qf-header * { background-image:none
+   !important }` from public-calculator-no-gradients.css, which would otherwise
+   leave the logo slot an empty white box. */
+body.qf-app-calculator .qf-header .qf-demo-logo-slot {
+  background-image: var(--qf-demo-logo-img, none) !important;
+}
+
 body.qf-demo-brand-preview .qf-demo-logo-slot {
   position: relative;
   flex: 0 0 auto;
