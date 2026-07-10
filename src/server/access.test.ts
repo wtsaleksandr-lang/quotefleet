@@ -106,6 +106,56 @@ describe('tenantAccessAllowed', () => {
   });
 });
 
+describe('owner-preview grant (?pk=)', () => {
+  it('round-trips a valid preview grant for the right tenant', async () => {
+    const { makePreviewGrant, hasValidPreviewGrant } = await import('./access.js');
+    const req = reqWith({ query: { pk: makePreviewGrant(PRIVATE.id) } });
+    expect(hasValidPreviewGrant(PRIVATE.id, req)).toBe(true);
+  });
+
+  it('a grant minted for tenant A does NOT unlock tenant B', async () => {
+    const { makePreviewGrant, hasValidPreviewGrant } = await import('./access.js');
+    // Grant is for PRIVATE (42); present it while checking tenant 999.
+    const req = reqWith({ query: { pk: makePreviewGrant(PRIVATE.id) } });
+    expect(hasValidPreviewGrant(999, req)).toBe(false);
+  });
+
+  it('rejects a tampered preview grant', async () => {
+    const { makePreviewGrant, hasValidPreviewGrant } = await import('./access.js');
+    const v = makePreviewGrant(PRIVATE.id);
+    const tampered = v.slice(0, -1) + (v.slice(-1) === 'a' ? 'b' : 'a');
+    const req = reqWith({ query: { pk: tampered } });
+    expect(hasValidPreviewGrant(PRIVATE.id, req)).toBe(false);
+  });
+
+  it('rejects an expired preview grant', async () => {
+    // makeAccessCookieValue with a negative TTL is already in the past; the
+    // preview grant uses the same signer, so verify rejects it.
+    const { makeAccessCookieValue, hasValidPreviewGrant } = await import('./access.js');
+    const req = reqWith({ query: { pk: makeAccessCookieValue(PRIVATE.id, -1000) } });
+    expect(hasValidPreviewGrant(PRIVATE.id, req)).toBe(false);
+  });
+
+  it('rejects a missing / empty grant param', async () => {
+    const { hasValidPreviewGrant } = await import('./access.js');
+    expect(hasValidPreviewGrant(PRIVATE.id, reqWith())).toBe(false);
+    expect(hasValidPreviewGrant(PRIVATE.id, reqWith({ query: { pk: '' } }))).toBe(false);
+  });
+
+  it('tenantAccessAllowed ALLOWS a private tenant with a valid own-tenant grant', async () => {
+    const { tenantAccessAllowed, makePreviewGrant } = await import('./access.js');
+    const req = reqWith({ query: { pk: makePreviewGrant(PRIVATE.id) } });
+    expect(await tenantAccessAllowed(PRIVATE, req, tokenRevoked)).toBe(true);
+  });
+
+  it('tenantAccessAllowed DENIES a private tenant when the grant is for another tenant', async () => {
+    const { tenantAccessAllowed, makePreviewGrant } = await import('./access.js');
+    // Valid grant, but minted for tenant 999 — must not open PRIVATE (42).
+    const req = reqWith({ query: { pk: makePreviewGrant(999) } });
+    expect(await tenantAccessAllowed(PRIVATE, req, tokenRevoked)).toBe(false);
+  });
+});
+
 describe('enforceTenantAccess (HTTP guard)', () => {
   function fakeRes() {
     const out: { code: number; body: unknown } = { code: 200, body: null };

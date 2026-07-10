@@ -8,6 +8,11 @@
   }
 
   function mount() {
+    // De-clutter: the Launch-workspace studio is retired from the Embed page.
+    // It reparented the real Live-preview + JS-embed cards into its own grid,
+    // burying them; the page now renders those cards directly. Neutralised.
+    return;
+    // eslint-disable-next-line no-unreachable
     if (!location.pathname.startsWith('/app/embed')) return;
     const page = document.querySelector('#page-content');
     if (!page || page.querySelector(`.${PANEL_CLASS}`)) return;

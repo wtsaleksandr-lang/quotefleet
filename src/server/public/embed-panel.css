@@ -1,0 +1,35 @@
+/* ============================================================================
+   QuoteFleet — Embed panel de-clutter
+   The /app/embed surface: the embed snippet + install instructions, the three
+   Widget-settings cards (lead-capture & copy, embedding, access), and ONE live
+   preview. Dark dashboard brand: #161616 page / #1C1C1C surface, cobalt
+   #0D3CFC / periwinkle #6E8BFF accent, cream #E6E3E0, hairline borders. No teal.
+   ========================================================================== */
+
+/* ── De-clutter: suppress legacy injected noise on THIS page only ──────────
+   The dashboard enhancement scripts inject a "Launch workspace" studio, launch
+   steps/notes, an "answer a few setup questions" coach, a Ready-to-share panel
+   and a preview-publish mock — all of which buried the real content far down
+   the page. The two embed-specific injectors (embed-launch-studio.js,
+   launch-panel.js) are neutralised in JS; these scoped rules are a
+   belt-and-suspenders net for the shared additive injectors (setup coach,
+   share-readiness, preview mock). Scoped to the embed page via :has() so other
+   routes are untouched. Mirrors customize-panel.css + addons-panel.css. */
+#page-content:has(.qf-embed) .qf-embed-launch-studio,
+#page-content:has(.qf-embed) .qf-launch-panel,
+#page-content:has(.qf-embed) .qf-launch-steps,
+#page-content:has(.qf-embed) .qf-launch-note,
+#page-content:has(.qf-embed) .qf-setup-coach,
+#page-content:has(.qf-embed) .qf-setup-kicker-inline,
+#page-content:has(.qf-embed) .qf-setup-empty,
+#page-content:has(.qf-embed) .qf-onboarding-panel,
+#page-content:has(.qf-embed) .qf-share-readiness,
+#page-content:has(.qf-embed) .qf-share-tip,
+#page-content:has(.qf-embed) .qf-preview-card,
+#page-content:has(.qf-embed) .qf-dashboard-preview {
+  display: none !important;
+}
+
+/* ── Page shell ───────────────────────────────────────────────────────── */
+.qf-embed h1 { margin: 0 0 4px; }
+.qf-embed .page-sub { margin: 0 0 18px; color: var(--muted); max-width: 62ch; }

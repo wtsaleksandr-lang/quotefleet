@@ -56,6 +56,7 @@ import { encrypt } from '../../auth/secrets.js';
 import { effectivePlan } from '../plans.js';
 import { WIDGET_PRESETS, WIDGET_FONTS, WIDGET_PRESET_LIST } from '../widgetThemes.js';
 import { loadEnv } from '../../config.js';
+import { makePreviewGrant, PREVIEW_GRANT_PARAM, PREVIEW_GRANT_TTL_MS } from '../access.js';
 import { syncTenantToMarketplace } from '../../marketplace/sync.js';
 import { DEFAULT_AI_SYSTEM_PROMPT } from '../../calc/defaults.js';
 import { createHmac } from 'node:crypto';
@@ -831,6 +832,29 @@ export function registerTenantRoutes(app: Express) {
       .set({ embedToken: newToken, updatedAt: new Date() })
       .where(eq(tenants.id, req.tenant!.id));
     res.json({ ok: true, embedToken: newToken });
+  });
+
+  // ── owner live-preview URL ─────────────────────────────────────
+  // Mints a short-lived, signed, tenant-scoped preview grant so the
+  // authenticated owner can preview their OWN calculator in the dashboard
+  // live-preview iframes even when the calculator is PRIVATE. The grant rides
+  // in the URL (`?pk=`) because the widget is served from a different origin
+  // (subdomain) that the dashboard's auth cookie does not reach. It verifies
+  // only for THIS tenant (HMAC over the tenant id) and expires in ~30 min, so
+  // it can never expose another tenant's private widget and is not a
+  // shareable public link. (`tenantWidgetBase` is hoisted from below.)
+  app.get('/api/tenant/preview-url', requireAuth, requireTenant, async (req, res) => {
+    const t = req.tenant!;
+    const grant = makePreviewGrant(t.id);
+    // Build the preview on the PLATFORM origin (PUBLIC_BASE_URL) rather than the
+    // tenant's customer subdomain: this is an owner preview shown inside the
+    // dashboard, so same-origin keeps it robust (no third-party-cookie hop) and
+    // testable. `/w/:slug` serves the identical widget on this host. The signed
+    // grant is still what unlocks a PRIVATE calculator — the dashboard LOGIN
+    // session does not, since the gate checks the access grant, not auth.
+    const base = loadEnv().PUBLIC_BASE_URL.replace(/\/$/, '');
+    const previewUrl = `${base}/w/${encodeURIComponent(t.slug)}?${PREVIEW_GRANT_PARAM}=${encodeURIComponent(grant)}`;
+    res.json({ previewUrl, expiresInMs: PREVIEW_GRANT_TTL_MS });
   });
 
   // ── access control (public vs private invite-only calculator) ──────

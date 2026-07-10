@@ -121,6 +121,18 @@
     return;
   }
 
+  // Owner live-preview grant (`?pk=`). Minted by the dashboard so the tenant's
+  // OWN private calculator renders inside the live-preview iframe. It rides on
+  // every public API call because the widget host is a different origin than
+  // the dashboard, so the access cookie can't follow. Absent for real
+  // customers → harmless no-op.
+  var previewGrant = '';
+  try { previewGrant = new URLSearchParams(location.search).get('pk') || ''; } catch (e) {}
+  function withGrant(url) {
+    if (!previewGrant) return url;
+    return url + (url.indexOf('?') > -1 ? '&' : '?') + 'pk=' + encodeURIComponent(previewGrant);
+  }
+
   var state = {
     config: null,
     service: null,
@@ -197,7 +209,7 @@
   }
 
   function init() {
-    fetch('/api/public/widget/' + slug)
+    fetch(withGrant('/api/public/widget/' + slug))
       .then(function (r) { return r.json(); })
       .then(function (cfg) {
         if (cfg.error) { $('qf-root').innerHTML = '<div class="qf-error">' + cfg.error + '</div>'; return; }
@@ -391,7 +403,7 @@
     var input = $('qf-chat-input'); var msg = (input.value || '').trim(); if (!msg) return;
     appendChatBubble('user', msg); input.value = '';
     var thinking = appendChatBubble('thinking', 'Thinking…'); var sendBtn = $('qf-chat-send'); if (sendBtn) sendBtn.disabled = true;
-    fetch('/api/public/chat/' + encodeURIComponent(state.refId), { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ message: msg }) })
+    fetch(withGrant('/api/public/chat/' + encodeURIComponent(state.refId)), { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ message: msg }) })
       .then(function (r) { return r.json(); })
       .then(function (resp) { if (thinking) thinking.remove(); if (sendBtn) sendBtn.disabled = false; if (resp.error) { appendChatBubble('assistant', 'Sorry — ' + resp.error); return; } appendChatBubble('assistant', resp.reply || '(no reply)'); })
       .catch(function () { if (thinking) thinking.remove(); if (sendBtn) sendBtn.disabled = false; appendChatBubble('assistant', 'Connection error. Try again in a moment.'); });
@@ -410,7 +422,7 @@
     var company = ($('qf-c-company') && $('qf-c-company').value || '').trim();
     var btn = $('qf-cb-send-btn'); var oldText = btn ? btn.textContent : '';
     if (btn) { btn.disabled = true; btn.innerHTML = '<span class="qf-spinner"></span> &nbsp; Sending…'; }
-    fetch('/api/public/callback/' + encodeURIComponent(state.refId), { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ customerName: name, customerPhone: phone, customerEmail: email || undefined, customerCompany: company || undefined, preferredTime: (timeEl && timeEl.value || '').trim() || undefined, topic: (topicEl && topicEl.value || '').trim() || undefined, triggerSource: 'visitor_button' }) })
+    fetch(withGrant('/api/public/callback/' + encodeURIComponent(state.refId)), { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ customerName: name, customerPhone: phone, customerEmail: email || undefined, customerCompany: company || undefined, preferredTime: (timeEl && timeEl.value || '').trim() || undefined, topic: (topicEl && topicEl.value || '').trim() || undefined, triggerSource: 'visitor_button' }) })
       .then(function (r) { return r.json(); })
       .then(function (resp) {
         if (btn) { btn.disabled = false; btn.textContent = oldText; }
@@ -494,7 +506,7 @@
       if (!hasDims) { showError('qf-error', 'Please add oversize dimensions or notes for open top / flat rack review.'); return; }
     }
     var btn = $('qf-calc-btn'); var oldText = btn.textContent; btn.disabled = true; btn.innerHTML = '<span class="qf-spinner"></span> &nbsp; Calculating…';
-    fetch('/api/public/quote/' + slug, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(req) })
+    fetch(withGrant('/api/public/quote/' + slug), { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(req) })
       .then(function (r) { return r.json(); })
       .then(function (resp) { btn.disabled = false; btn.textContent = oldText; if (resp.error) { showError('qf-error', resp.error); return; } if (resp.result && resp.result.unsupported) { showError('qf-error', resp.result.unsupported.reason); return; } state.quote = resp; renderResult(resp); })
       .catch(function (err) { btn.disabled = false; btn.textContent = oldText; showError('qf-error', 'Network error — please try again.'); console.error(err); });
@@ -532,7 +544,7 @@
       notes: $('qf-c-notes').value.trim() || req.notes || undefined,
     });
     var btn = $('qf-submit-btn'); var oldText = btn.textContent; btn.disabled = true; btn.innerHTML = '<span class="qf-spinner"></span> &nbsp; Sending…';
-    fetch('/api/public/lead/' + slug, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) })
+    fetch(withGrant('/api/public/lead/' + slug), { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) })
       .then(function (r) { return r.json(); })
       .then(function (resp) {
         btn.disabled = false; btn.textContent = oldText;
@@ -570,7 +582,7 @@
         var q = input.value.trim();
         if (q.length < 2) { close(); return; }
         timer = setTimeout(function () {
-          fetch('/api/public/autocomplete/locations?q=' + encodeURIComponent(q))
+          fetch(withGrant('/api/public/autocomplete/locations?q=' + encodeURIComponent(q)))
             .then(function (r) { return r.json(); })
             .then(function (resp) { render(resp.suggestions || resp.items || []); })
             .catch(close);

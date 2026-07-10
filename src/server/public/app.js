@@ -1148,7 +1148,11 @@
   // scoped rules in customize-panel.css).
   function renderBrand(c) {
     var slug = (state.me && state.me.tenant && state.me.tenant.slug) || '';
-    api('/api/tenant/brand').then(function (d) {
+    // Fetch a signed owner-preview URL alongside the brand config so the live
+    // preview renders the REAL calculator even when the tenant is private.
+    Promise.all([api('/api/tenant/brand'), api('/api/tenant/preview-url')]).then(function (results) {
+      var d = results[0];
+      var previewUrl = (results[1] && results[1].previewUrl) || ('/w/' + encodeURIComponent(slug));
       var b = d.brand || {};
       var presets = d.presets || [];
       var fonts = d.fonts || [];
@@ -1168,7 +1172,7 @@
 
       // ── save queue (debounced) + preview reload ─────────────────
       function kv(k, v) { var o = {}; o[k] = v; return o; }
-      function previewSrc() { return '/w/' + encodeURIComponent(slug); }
+      function previewSrc() { return previewUrl; }
       var iframe = null;
       var pending = {}, saveTimer = null, previewTimer = null;
       function reloadPreview() {
@@ -1388,11 +1392,24 @@
 
   // ── Embed ─────────────────────────────────────────────────────
   function renderEmbed(c) {
-    Promise.all([api('/api/tenant/embed'), api('/api/tenant/brand'), api('/api/tenant/access')]).then(function (results) {
+    Promise.all([
+      api('/api/tenant/embed'),
+      api('/api/tenant/brand'),
+      api('/api/tenant/access'),
+      api('/api/tenant/preview-url'),
+    ]).then(function (results) {
       var d = results[0];
       var b = (results[1] && results[1].brand) || {};
       var access = results[2] || { accessMode: 'public', links: [] };
+      var previewUrl = (results[3] && results[3].previewUrl) || (d.directLink || '/');
       c.innerHTML = '';
+      // De-clutter marker — the scoped :has() net in embed-panel.css hides the
+      // legacy injected clutter (launch workspace, setup coach, share-readiness,
+      // preview-publish mock) on this page only; the JS injectors are also
+      // guarded to skip /app/embed. Same pattern as Customize + Add-ons.
+      var root = el('div', { class: 'qf-embed', 'data-qf-embed': '1' });
+      c.appendChild(root);
+      c = root;
       c.appendChild(el('h1', { text: 'Embed code' }));
       c.appendChild(el('p', { class: 'page-sub', text: 'Drop one line of HTML on any page of your website.' }));
 
@@ -1402,8 +1419,12 @@
       var preview = el('div', { class: 'card' });
       preview.appendChild(el('div', { class: 'card-title', text: 'Live preview' }));
       preview.appendChild(el('div', { class: 'card-subtitle', text: 'This is exactly what your customers see at ' + (d.directLink || '') }));
+      // Point at the signed owner-preview URL (same as Customize) so the real
+      // calculator renders here even for a PRIVATE tenant — and so the frame is
+      // never blank (the bare directLink root serves the landing page, not the
+      // widget, on hosts without a subdomain).
       var iframe = el('iframe', {
-        src: (d.directLink || '/') + (d.directLink && d.directLink.indexOf('?') > -1 ? '&' : '?') + 'embed=1&preview=1',
+        src: previewUrl + (previewUrl.indexOf('?') > -1 ? '&' : '?') + 'embed=1&preview=1',
         style: {
           width: '100%',
           height: '680px',
@@ -1591,7 +1612,7 @@
       var rg = el('button', { class: 'btn btn-danger', text: 'Regenerate token' });
       rg.addEventListener('click', function () {
         if (!confirm('Regenerate embed token? Existing embeds will break.')) return;
-        api('/api/tenant/regenerate-embed', { method: 'POST' }).then(function () { renderEmbed(c); }).catch(toastErr);
+        api('/api/tenant/regenerate-embed', { method: 'POST' }).then(function () { go('embed'); }).catch(toastErr);
       });
       card4.appendChild(rg);
       c.appendChild(card4);

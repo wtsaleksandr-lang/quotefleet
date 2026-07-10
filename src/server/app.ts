@@ -11,6 +11,8 @@ import {
   accessTokenFromReq,
   consumeAccessToken,
   hasValidAccessCookie,
+  hasValidPreviewGrant,
+  PREVIEW_GRANT_TTL_MS,
   setAccessCookie,
   renderGatePage,
 } from './access.js';
@@ -173,6 +175,16 @@ export function createApp(): express.Express {
         u.searchParams.delete('key');
         const qs = u.searchParams.toString();
         return res.redirect(u.pathname + (qs ? `?${qs}` : ''));
+      }
+      // Signed owner-preview grant (`?pk=`, minted by the dashboard for the
+      // tenant's OWN calculator). Serve the real widget and drop a matching
+      // short-lived cookie so same-origin API calls pass. The grant also stays
+      // in the iframe URL so widget.js can forward it to the public API across
+      // origins (third-party-cookie safe). Never redirect-stripped, unlike the
+      // one-shot invite token, because the SPA needs to keep reading it.
+      if (hasValidPreviewGrant(tenant.id, req)) {
+        setAccessCookie(res, tenant.id, PREVIEW_GRANT_TTL_MS);
+        return sendWidgetHtml(res, next, injectSlug ? slug : null);
       }
       // Valid existing grant → serve the calculator.
       if (hasValidAccessCookie(tenant.id, req)) {
