@@ -302,8 +302,9 @@
       ['qf-cb-phone', 'qf-cb-time', 'qf-cb-topic'].forEach(function (id) { var el = $(id); if (el) { el.value = ''; el.disabled = false; } });
       showCallbackError(null);
       $('qf-result').style.display = 'none';
-      ['qf-pickup-zip', 'qf-delivery-zip', 'qf-weight', 'qf-booking', 'qf-c-name', 'qf-c-email', 'qf-c-phone', 'qf-c-company', 'qf-c-notes', 'qf-oog-length', 'qf-oog-width', 'qf-oog-height', 'qf-oog-weight', 'qf-oog-notes']
+      ['qf-pickup-zip', 'qf-delivery-zip', 'qf-weight', 'qf-booking', 'qf-c-name', 'qf-c-email', 'qf-c-phone', 'qf-c-company', 'qf-c-notes', 'qf-oog-length', 'qf-oog-width', 'qf-oog-height', 'qf-oog-weight', 'qf-oog-notes', 'qf-ltl-length', 'qf-ltl-width', 'qf-ltl-height']
         .forEach(function (id) { var el = $(id); if (el) el.value = ''; });
+      var ltlClassBox = $('qf-ltl-class'); if (ltlClassBox) { ltlClassBox.style.display = 'none'; ltlClassBox.innerHTML = ''; }
       var oog = $('qf-oog-check'); if (oog) oog.checked = false;
       var oogFields = $('qf-oog-fields'); if (oogFields) oogFields.style.display = 'none';
       var oc = $('qf-ocean-carrier'); if (oc) oc.value = '';
@@ -363,6 +364,34 @@
     box.style.display = '';
   }
 
+  // ── LTL freight-class estimate (client-side mirror of the server scale) ──
+  var LTL_DENSITY_SCALE = [[50, 50], [35, 55], [30, 60], [22.5, 65], [15, 70], [13.5, 77.5], [12, 85], [10.5, 92.5], [9, 100], [8, 110], [7, 125], [6, 150], [5, 175], [4, 200], [3, 250], [2, 300], [1, 400], [0, 500]];
+  function ltlClientClass(w, l, wd, h) {
+    if (!(w > 0 && l > 0 && wd > 0 && h > 0)) return null;
+    var cf = (l * wd * h) / 1728;
+    if (cf <= 0) return null;
+    var d = w / cf;
+    for (var i = 0; i < LTL_DENSITY_SCALE.length; i++) { if (d >= LTL_DENSITY_SCALE[i][0]) return { cls: LTL_DENSITY_SCALE[i][1], pcf: d, cf: cf }; }
+    return { cls: 500, pcf: d, cf: cf };
+  }
+  function updateLtlClassReadout() {
+    var box = $('qf-ltl-class'); if (!box) return;
+    if (state.service !== 'ltl') { box.style.display = 'none'; return; }
+    var r = ltlClientClass(Number($('qf-weight').value), Number($('qf-ltl-length').value), Number($('qf-ltl-width').value), Number($('qf-ltl-height').value));
+    if (!r) { box.style.display = 'none'; box.innerHTML = ''; autoResize(); return; }
+    box.innerHTML = 'Estimated freight class <strong>' + r.cls + '</strong> &middot; ' + r.pcf.toFixed(1) + ' lb/ft&sup3;';
+    box.style.display = ''; autoResize();
+  }
+  function syncLtlPanel() {
+    var panel = $('qf-ltl-panel'); if (!panel) return;
+    var isLtl = state.service === 'ltl';
+    panel.style.display = isLtl ? '' : 'none';
+    if (isLtl) {
+      ['qf-weight', 'qf-ltl-length', 'qf-ltl-width', 'qf-ltl-height'].forEach(function (id) { var e = $(id); if (e) e.oninput = updateLtlClassReadout; });
+      updateLtlClassReadout();
+    }
+  }
+
   function renderServices(services) {
     var wrap = $('qf-services'); wrap.innerHTML = '';
     if (!services.length) { $('qf-error').style.display = 'block'; $('qf-error').textContent = 'No services configured. Contact us directly.'; return; }
@@ -393,6 +422,7 @@
     if (defaultPickup) defaultPickup.style.display = isDrayage ? 'none' : '';
     if (isDrayage) renderPorts();
     syncOogPanel();
+    syncLtlPanel();
     autoResize();
   }
 
@@ -520,6 +550,15 @@
       flags: { residential: $('qf-residential').checked, hazmat: $('qf-hazmat').checked, tempControlled: $('qf-temp').checked },
       meta: {},
     };
+    if (state.service === 'ltl') {
+      var ltlL = Number($('qf-ltl-length').value), ltlW = Number($('qf-ltl-width').value), ltlH = Number($('qf-ltl-height').value);
+      if (ltlL > 0) req.lengthIn = ltlL;
+      if (ltlW > 0) req.widthIn = ltlW;
+      if (ltlH > 0) req.heightIn = ltlH;
+      var palEl = $('qf-ltl-palletized'), dockEl = $('qf-ltl-dock');
+      if (palEl) req.flags.palletized = !!palEl.checked;
+      if (dockEl) req.flags.loadedFromDock = !!dockEl.checked;
+    }
     if (hasPostalCode(deliveryText, delivery)) req.meta.deliveryZipConfirmed = true;
     var oogCheck = $('qf-oog-check');
     if (oogCheck && oogCheck.checked) {
@@ -542,6 +581,10 @@
     if (!hasPickup) { showError('qf-error', 'Please pick a pickup port (drayage) or enter a pickup ZIP/postal code.'); return; }
     if (!req.delivery.zip && !req.delivery.city) { showError('qf-error', 'Please enter a delivery ZIP/postal code.'); return; }
     if (!hasPostalCode($('qf-delivery-zip').value, req.delivery)) { showError('qf-error', 'Please enter a delivery ZIP/postal code for a more accurate rate. City-only delivery can change the price in large metro areas.'); return; }
+    if (req.service === 'ltl') {
+      if (!(req.weightLbs > 0)) { showError('qf-error', 'Enter the shipment weight (lbs) — LTL is priced by weight and size.'); return; }
+      if (!(req.lengthIn > 0 && req.widthIn > 0 && req.heightIn > 0)) { showError('qf-error', 'Enter length, width, and height (inches) so we can determine the freight class.'); return; }
+    }
     var oogCheck = $('qf-oog-check');
     if (isOpenTopOrFlatRack(req.equipment) && oogCheck && oogCheck.checked) {
       var hasDims = ($('qf-oog-height').value || $('qf-oog-width').value || $('qf-oog-length').value || $('qf-oog-notes').value || '').trim();
@@ -571,7 +614,9 @@
     var r = resp.result;
     $('qf-total').textContent = fmtMoney(r.total);
     var serviceLabel = SERVICE_LABELS[state.service] || (state.service ? titleizeWord(state.service) : 'Truck');
-    $('qf-meta').textContent = 'Approx. ' + Math.round(resp.miles) + ' mi · ' + serviceLabel + ' · ' + friendlyEquipmentLabel();
+    var metaText = 'Approx. ' + Math.round(resp.miles) + ' mi · ' + serviceLabel + ' · ' + friendlyEquipmentLabel();
+    if (r.ltl && r.ltl.freightClass) metaText += ' · Class ' + r.ltl.freightClass;
+    $('qf-meta').textContent = metaText;
     var eta = $('qf-eta');
     if (eta) {
       if (resp.transit && resp.transit.text) {

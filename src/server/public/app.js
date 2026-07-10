@@ -808,7 +808,49 @@
         }).then(function () { renderRates(c); }).catch(toastErr);
       });
       c.appendChild(addBtn);
+
+      // ── LTL pricing (class + weight aware) ───────────────────────
+      if (activeTab === 'all' || activeTab === 'ltl') {
+        (d.rateCards || []).filter(function (r) { return r.service === 'ltl'; }).forEach(function (r) {
+          c.appendChild(ltlPricingEditor(r));
+        });
+      }
     }).catch(showErr(c));
+  }
+
+  // Standard class multipliers used as the default when a card has no saved
+  // ltlConfig yet (mirrors src/calc/freightClass.ts DEFAULT_LTL_CONFIG).
+  var LTL_DEFAULT_CONFIG = {
+    baseRatePerCwt: 14,
+    classRates: { '50': 0.55, '55': 0.6, '60': 0.65, '65': 0.7, '70': 0.75, '77.5': 0.8, '85': 0.85, '92.5': 0.92, '100': 1.0, '110': 1.1, '125': 1.25, '150': 1.5, '175': 1.75, '200': 2.0, '250': 2.35, '300': 2.7, '400': 3.1, '500': 3.5 },
+    weightBreaks: [{ minLbs: 0, rateFactor: 1.0 }, { minLbs: 500, rateFactor: 0.85 }, { minLbs: 1000, rateFactor: 0.72 }, { minLbs: 2000, rateFactor: 0.6 }, { minLbs: 5000, rateFactor: 0.5 }, { minLbs: 10000, rateFactor: 0.42 }, { minLbs: 20000, rateFactor: 0.36 }],
+    distanceFactorPer1000Mi: 0.8,
+  };
+
+  function ltlPricingEditor(r) {
+    var cfg = r.ltlConfig || LTL_DEFAULT_CONFIG;
+    var wrap = el('div', { class: 'card', style: { marginTop: '18px', padding: '16px' } });
+    wrap.appendChild(el('h2', { text: 'LTL pricing — ' + (r.label || 'LTL'), style: { margin: '0 0 4px', fontSize: '15px' } }));
+    wrap.appendChild(el('p', { class: 'page-sub', style: { margin: '0 0 12px' }, text: 'LTL is rated by freight class (derived from weight ÷ size) and weight break — not distance alone. Set the base rate per hundredweight (100 lb) at class 100; class multipliers and weight breaks use standard defaults.' }));
+
+    function saveCfg(patch) {
+      var next = Object.assign({}, cfg, patch);
+      cfg = next;
+      api('/api/tenant/rate-cards/' + r.id, { method: 'PUT', body: { ltlConfig: next } }).catch(toastErr);
+    }
+    function numRow(label, hint, value, onSave, step) {
+      var row = el('div', { style: { display: 'flex', alignItems: 'center', gap: '10px', margin: '8px 0' } });
+      var inp = el('input', { class: 'input', value: value, style: { width: '110px', textAlign: 'right' } });
+      inp.type = 'number'; inp.step = step || '0.01';
+      inp.addEventListener('blur', function () { var v = inp.value === '' ? 0 : Number(inp.value); if (Number.isFinite(v)) onSave(v); });
+      var labelWrap = el('div', {}, [el('div', { text: label, style: { fontWeight: '650', fontSize: '13px' } }), el('div', { text: hint, class: 'page-sub', style: { margin: '2px 0 0', fontSize: '12px' } })]);
+      row.appendChild(inp); row.appendChild(labelWrap);
+      return row;
+    }
+    wrap.appendChild(numRow('Base rate ($/cwt)', 'Dollars per 100 lb at freight class 100.', cfg.baseRatePerCwt, function (v) { saveCfg({ baseRatePerCwt: v }); }));
+    wrap.appendChild(numRow('Distance factor', 'Linehaul multiplier = 1 + (miles ÷ 1000) × this.', cfg.distanceFactorPer1000Mi, function (v) { saveCfg({ distanceFactorPer1000Mi: v }); }, '0.05'));
+    wrap.appendChild(el('div', { class: 'notice', style: { marginTop: '10px' }, html: 'Class multipliers (50–500) and weight breaks use standard NMFC-style defaults. <strong>Editing those individually is coming soon</strong> — ask the AI agent to adjust them for now.' }));
+    return wrap;
   }
 
   function rateRow(r) {

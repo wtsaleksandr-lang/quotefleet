@@ -26,6 +26,12 @@ import type {
   LaneZone,
   Terminal,
 } from '../db/schema.js';
+import {
+  estimateFreightClass,
+  ltlLinehaul,
+  DEFAULT_LTL_CONFIG,
+  type FreightClassEstimate,
+} from './freightClass.js';
 
 export interface CalcRequest {
   service: string; // 'drayage' | 'ftl' | 'ltl' | ...
@@ -33,6 +39,12 @@ export interface CalcRequest {
   miles: number;
   weightLbs?: number;
   pieces?: number;
+  /** LTL: shipment dimensions (inches) — required to derive freight class. */
+  lengthIn?: number;
+  widthIn?: number;
+  heightIn?: number;
+  /** LTL: explicit freight class override (skips density calc when set). */
+  freightClass?: number;
   /** ZIP / city / lat-lng — used for zone matching only. */
   pickupCity?: string;
   pickupState?: string;
@@ -65,6 +77,10 @@ export interface CalcRequest {
     storageDays?: number;
     detentionHours?: number;
     layoverDays?: number;
+    /** LTL: freight is palletized (vs loose / floor-loaded). */
+    palletized?: boolean;
+    /** LTL: pickup/delivery is at a loading dock (false ⇒ liftgate needed). */
+    loadedFromDock?: boolean;
   };
 }
 
@@ -87,6 +103,8 @@ export interface CalcResult {
   currency: 'USD';
   /** Set when no rate card / lane zone matches the request. */
   unsupported?: { reason: string };
+  /** LTL only: the size/weight rating basis behind the price (credibility). */
+  ltl?: FreightClassEstimate & { classSource: 'derived' | 'override' };
 }
 
 function round2(n: number): number {
@@ -195,6 +213,16 @@ function autoTriggered(
       out.push(a);
       continue;
     }
+    // LTL: pickup/delivery is NOT at a dock → liftgate / limited-access service.
+    if (a.trigger === 'auto_if_no_dock' && req.flags?.loadedFromDock === false) {
+      out.push(a);
+      continue;
+    }
+    // LTL: loose / floor-loaded (not palletized) → extra handling.
+    if (a.trigger === 'auto_if_loose' && req.flags?.palletized === false) {
+      out.push(a);
+      continue;
+    }
     if (
       a.trigger === 'auto_if_weight_over' &&
       a.conditionJson &&
@@ -293,6 +321,7 @@ export function calculate(
 
   // ── Linehaul ──────────────────────────────────────────────────────
   let linehaul = 0;
+  let ltlRating: (FreightClassEstimate & { classSource: 'derived' | 'override' }) | undefined;
   if (zone) {
     linehaul = zone.flatPrice;
     lines.push({
@@ -300,6 +329,51 @@ export function calculate(
       amount: linehaul,
       kind: 'linehaul',
       note: `Flat tariff applies because pickup/delivery is within ${zone.radiusMiles} mi of ${zone.anchorPortCode ?? zone.anchorCity ?? 'anchor'}.`,
+    });
+  } else if (card && req.service === 'ltl') {
+    // ── LTL: class + weight-break pricing (NOT distance-only) ─────────
+    // A 1,200-lb and a 40,000-lb LTL load must never price the same. We
+    // derive the NMFC freight class from density (weight ÷ L×W×H) and rate
+    // per hundredweight with class + weight-break factors.
+    const est = estimateFreightClass({
+      weightLbs: req.weightLbs,
+      lengthIn: req.lengthIn,
+      widthIn: req.widthIn,
+      heightIn: req.heightIn,
+    });
+    const freightClass =
+      typeof req.freightClass === 'number' && req.freightClass > 0
+        ? req.freightClass
+        : est?.freightClass ?? 100;
+    if (est) {
+      ltlRating = { ...est, classSource: req.freightClass ? 'override' : 'derived' };
+    } else if (typeof req.freightClass === 'number' && req.freightClass > 0) {
+      ltlRating = {
+        freightClass,
+        densityPcf: 0,
+        cubicFeet: 0,
+        chargeableWeightLbs: Math.max(0, Number(req.weightLbs) || 0),
+        classSource: 'override',
+      };
+    }
+    const cfg = card.ltlConfig ?? DEFAULT_LTL_CONFIG;
+    linehaul = round2(
+      ltlLinehaul(cfg, {
+        weightLbs: req.weightLbs ?? 0,
+        freightClass,
+        miles: req.miles,
+        minimumCharge: card.minimumCharge,
+        flatFee: card.flatFee,
+      })
+    );
+    const wLbl = req.weightLbs ? `${Math.round(req.weightLbs).toLocaleString('en-US')} lb` : 'weight n/a';
+    lines.push({
+      name: `Line haul (LTL — class ${freightClass}, ${wLbl})`,
+      amount: linehaul,
+      kind: 'linehaul',
+      note: est
+        ? `Freight class ${freightClass} from density ${est.densityPcf} lb/ft³ (${est.cubicFeet} ft³). Rated per hundredweight with weight-break + distance.`
+        : `Freight class ${freightClass}. Add dimensions for a density-based class.`,
     });
   } else if (card) {
     const computed = req.miles * card.ratePerMile + card.flatFee;
@@ -412,6 +486,7 @@ export function calculate(
     margin,
     total,
     currency: 'USD',
+    ...(ltlRating ? { ltl: ltlRating } : {}),
   };
 }
 

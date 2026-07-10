@@ -23,6 +23,7 @@ function rateCard(o: Partial<RateCard>): RateCard {
     id: 1, tenantId: 1, service: 'ftl', equipment: 'dryvan',
     label: null, ratePerMile: 2.5, minimumCharge: 350, flatFee: 0,
     fuelSurchargePct: 22, marginPct: 12, maxWeightLbs: null, maxMiles: null,
+    ltlConfig: null,
     enabled: true, sortOrder: 0, notes: null,
     lastAiEditAt: null, lastAiEditReason: null,
     createdAt: now, updatedAt: now,
@@ -194,6 +195,46 @@ describe('calculate', () => {
       ]
     `);
     expect(r.total).toBe(1267.75);
+  });
+
+  it('LTL — weight drives price (1,200 lb ≠ 40,000 lb) and class is surfaced', () => {
+    const ltlCard = rateCard({ service: 'ltl', equipment: 'pallet', ratePerMile: 0, minimumCharge: 125, flatFee: 50, fuelSurchargePct: 0, marginPct: 0 });
+    const dims = { lengthIn: 48, widthIn: 40, heightIn: 48 };
+    const light = calculate([ltlCard], [], [], req({ service: 'ltl', equipment: 'pallet', miles: 600, weightLbs: 1200, ...dims }));
+    const heavy = calculate([ltlCard], [], [], req({ service: 'ltl', equipment: 'pallet', miles: 600, weightLbs: 40000, ...dims }));
+    expect(light.unsupported).toBeUndefined();
+    expect(heavy.total).toBeGreaterThan(light.total);
+    // Freight class is computed from density and exposed for the UI.
+    expect(light.ltl?.freightClass).toBeGreaterThan(0);
+    expect(light.ltl?.classSource).toBe('derived');
+    expect(light.lines.find((l) => l.kind === 'linehaul')?.name).toMatch(/class/i);
+  });
+
+  it('LTL — dimensions change density → class → price (same weight)', () => {
+    const ltlCard = rateCard({ service: 'ltl', equipment: 'pallet', ratePerMile: 0, minimumCharge: 125, flatFee: 50, fuelSurchargePct: 0, marginPct: 0 });
+    const dense = calculate([ltlCard], [], [], req({ service: 'ltl', equipment: 'pallet', miles: 600, weightLbs: 2000, lengthIn: 40, widthIn: 40, heightIn: 40 }));
+    const bulky = calculate([ltlCard], [], [], req({ service: 'ltl', equipment: 'pallet', miles: 600, weightLbs: 2000, lengthIn: 80, widthIn: 60, heightIn: 60 }));
+    // Bulky = lower density = higher class = higher price.
+    expect(bulky.ltl!.freightClass).toBeGreaterThan(dense.ltl!.freightClass);
+    expect(bulky.total).toBeGreaterThan(dense.total);
+  });
+
+  it('LTL — no dock auto-adds liftgate; loose auto-adds handling', () => {
+    const ltlCard = rateCard({ service: 'ltl', equipment: 'pallet', ratePerMile: 0, minimumCharge: 125, flatFee: 50, fuelSurchargePct: 0, marginPct: 0 });
+    const noDock = accessorial({ code: 'ltl_no_dock', label: 'Liftgate / No-dock', kind: 'flat', amount: 95, trigger: 'auto_if_no_dock', appliesToServices: ['ltl'] });
+    const loose = accessorial({ code: 'ltl_loose_handling', label: 'Loose Handling', kind: 'flat', amount: 60, trigger: 'auto_if_loose', appliesToServices: ['ltl'] });
+    const r = calculate([ltlCard], [noDock, loose], [], req({ service: 'ltl', equipment: 'pallet', miles: 400, weightLbs: 1000, lengthIn: 48, widthIn: 40, heightIn: 48, flags: { loadedFromDock: false, palletized: false } }));
+    expect(r.lines.find((l) => l.code === 'ltl_no_dock')?.amount).toBe(95);
+    expect(r.lines.find((l) => l.code === 'ltl_loose_handling')?.amount).toBe(60);
+  });
+
+  it('LTL — dock + palletized do NOT add the auto accessorials', () => {
+    const ltlCard = rateCard({ service: 'ltl', equipment: 'pallet', ratePerMile: 0, minimumCharge: 125, flatFee: 50 });
+    const noDock = accessorial({ code: 'ltl_no_dock', label: 'Liftgate', kind: 'flat', amount: 95, trigger: 'auto_if_no_dock', appliesToServices: ['ltl'] });
+    const loose = accessorial({ code: 'ltl_loose_handling', label: 'Loose', kind: 'flat', amount: 60, trigger: 'auto_if_loose', appliesToServices: ['ltl'] });
+    const r = calculate([ltlCard], [noDock, loose], [], req({ service: 'ltl', equipment: 'pallet', miles: 400, weightLbs: 1000, lengthIn: 48, widthIn: 40, heightIn: 48, flags: { loadedFromDock: true, palletized: true } }));
+    expect(r.lines.find((l) => l.code === 'ltl_no_dock')).toBeUndefined();
+    expect(r.lines.find((l) => l.code === 'ltl_loose_handling')).toBeUndefined();
   });
 
   it('Distance guard — per-mile lane beyond card.maxMiles is unsupported', () => {
