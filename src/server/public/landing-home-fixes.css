@@ -295,16 +295,32 @@ body.qf-wft .chat-art {
     letter-spacing: -.04em !important;
   }
 
-  /* Spread the header across the full width on mobile — the floating pill was
-     inset 20px + padded 22px, pulling the logo and burger toward the center.
-     Tighten both so the brand hugs the left edge and the actions the right. */
-  body.qf-wft .site-header {
-    padding: 12px 8px 0 !important;
+  /* Mobile header = a full-width Apple-style frosted glass BAR, not a floating
+     pill. Drop the inner card (bg/border/radius/shadow) and move the frosted
+     glass onto the full-width sticky bar; sit it flush at the top (higher) with
+     the brand hugging the left edge and the actions the right. */
+  /* .landing-v2 raises specificity above the site-wide color-system rule
+     (body.qf-wft .site-header { background: var(--qf-color-card-dark) }, loaded
+     later via @import) so the translucent frosted background actually wins. */
+  body.qf-wft.landing-v2 .site-header {
+    padding: 0 !important;
+    background: rgba(18, 22, 26, 0.66) !important;
+    backdrop-filter: blur(22px) saturate(1.7) !important;
+    -webkit-backdrop-filter: blur(22px) saturate(1.7) !important;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.08) !important;
   }
-  body.qf-wft .site-header-inner {
-    padding: 8px 16px !important;
+  body.qf-wft.landing-v2 .site-header-inner {
+    max-width: none !important;
+    margin: 0 !important;
+    padding: 12px 16px !important;
     gap: 12px !important;
     justify-content: space-between !important;
+    background: transparent !important;
+    border: 0 !important;
+    border-radius: 0 !important;
+    box-shadow: none !important;
+    backdrop-filter: none !important;
+    -webkit-backdrop-filter: none !important;
   }
 
   body.qf-wft .site-nav {
