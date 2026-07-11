@@ -91,9 +91,12 @@ body.qf-auth-wft .select:focus {
   box-shadow: 0 0 0 3px rgba(13,60,252,.22) !important;
 }
 
-body.qf-auth-wft .url-builder-preview .live,
 body.qf-auth-wft a {
   color: #FFFFFF !important;
+}
+/* Slug preview sits on the LIGHT #E4EDF1 chip — must NOT be white. */
+body.qf-auth-wft .url-builder-preview .live {
+  color: #0D3CFC !important;
 }
 
 body.qf-auth-wft .tabs {
@@ -129,11 +132,17 @@ body.qf-auth-wft .btn-primary:disabled {
   opacity: .46 !important;
 }
 
-body.qf-auth-wft label[style*="background:var(--surface-2)"] {
+/* Plan selection cards: force the dark surface so the light title/price/desc
+   text reads. (Target the .plan-opt class directly — the old
+   [style*="background:var(--surface-2)"] selector failed because browsers
+   normalize the inline style attribute, leaving light text on a light card.) */
+body.qf-auth-wft .plan-opt {
   background: #22282A !important;
   border-color: rgba(255,255,255,.14) !important;
   border-radius: 8px !important;
 }
+body.qf-auth-wft .plan-opt strong { color: #FFFFFF !important; }
+body.qf-auth-wft .plan-opt .muted { color: #B1C5CE !important; }
 
 body.qf-auth-wft .qf-mc-bubble,
 body.qf-auth-wft .qf-mc-send {
