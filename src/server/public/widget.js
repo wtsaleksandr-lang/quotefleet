@@ -565,15 +565,41 @@
 
   function initOptionsPanel() {
     var summary = $('qf-options-summary');
-    var panel = $('qf-options');
-    if (!summary || !panel) return;
-    summary.addEventListener('click', function () {
-      var collapsed = panel.classList.toggle('qf-collapsed');
-      summary.setAttribute('aria-expanded', String(!collapsed));
-      autoResize();
-      // Settle the iframe height once the height transition finishes.
-      setTimeout(autoResize, 320);
-    });
+    var modal = $('qf-options-modal');
+    if (!summary || !modal) return;
+    var countEl = $('qf-options-count');
+    var card = modal.querySelector('.qf-modal-card');
+
+    function updateCount() {
+      var n = 0;
+      ['qf-residential', 'qf-hazmat', 'qf-temp'].forEach(function (id) { var c = $(id); if (c && c.checked) n++; });
+      n += (state.selectedAccessorials ? state.selectedAccessorials.length : 0);
+      if (!countEl) return;
+      if (n > 0) { countEl.textContent = n + ' selected'; countEl.hidden = false; }
+      else { countEl.hidden = true; }
+    }
+
+    function openModal() {
+      modal.hidden = false;
+      document.body.classList.add('qf-modal-open');
+      summary.setAttribute('aria-expanded', 'true');
+      if (card) card.scrollTop = 0;
+    }
+    function closeModal() {
+      modal.hidden = true;
+      document.body.classList.remove('qf-modal-open');
+      summary.setAttribute('aria-expanded', 'false');
+      updateCount();
+      summary.focus();
+    }
+
+    summary.addEventListener('click', openModal);
+    modal.querySelectorAll('[data-qf-close]').forEach(function (el) { el.addEventListener('click', closeModal); });
+    document.addEventListener('keydown', function (e) { if (e.key === 'Escape' && !modal.hidden) closeModal(); });
+    // Flags fire 'change'; accessorial chips are buttons — recount after their click handler runs.
+    modal.addEventListener('change', updateCount);
+    modal.addEventListener('click', function () { setTimeout(updateCount, 0); });
+    updateCount();
   }
 
   function showStep(name) { ['quote', 'contact', 'thanks'].forEach(function (n) { var s = $('qf-step-' + n); if (s) s.classList.toggle('active', n === name); }); autoResize(); }

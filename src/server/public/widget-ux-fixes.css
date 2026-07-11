@@ -50,9 +50,9 @@
   font-weight: 800;
 }
 
-/* ── 6. Premium fold / unfold for "Shipment options & add-ons". Grid-rows
-   0fr -> 1fr height glide + opacity fade, ease-out. Body is never display:none
-   (we replaced <details> with a div), so the transition always runs. */
+/* ── 6. "Shipment options & add-ons" opens a popup modal (was an inline fold).
+   The long Drayage add-ons list overflowed the form and left a blank gap on
+   collapse, so the list now lives in a scrollable overlay dialog. */
 .qf-options-summary {
   display: flex;
   align-items: center;
@@ -76,31 +76,104 @@
   border-right: 2px solid var(--w-primary);
   border-bottom: 2px solid var(--w-primary);
   transform: rotate(45deg);
-  transition: transform 0.24s cubic-bezier(0.22, 1, 0.36, 1);
   margin-right: var(--space-0-5);
 }
-.qf-options-panel:not(.qf-collapsed) .qf-options-caret {
-  transform: rotate(-135deg);
+/* Live "N selected" pill on the trigger. */
+.qf-options-count {
+  margin-left: auto;
+  flex: 0 0 auto;
+  padding: 2px var(--space-1);
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--w-primary) 16%, transparent);
+  color: var(--w-primary);
+  font-size: 11px;
+  font-weight: 800;
+  white-space: nowrap;
 }
-.qf-options-body {
-  display: grid;
-  grid-template-rows: 0fr;
-  opacity: 0;
-  transition: grid-template-rows 0.28s cubic-bezier(0.22, 1, 0.36, 1),
-              opacity 0.22s ease;
+
+/* ── Modal overlay: bottom sheet on mobile, centered dialog on wider screens. */
+.qf-modal[hidden] { display: none; }
+.qf-modal {
+  position: fixed;
+  inset: 0;
+  z-index: 2147483000;
+  display: flex;
+  align-items: flex-end;
+  justify-content: center;
 }
-.qf-options-panel:not(.qf-collapsed) .qf-options-body {
-  grid-template-rows: 1fr;
-  opacity: 1;
+.qf-modal-scrim {
+  position: absolute;
+  inset: 0;
+  background: rgba(8, 12, 18, 0.55);
+  backdrop-filter: blur(3px);
+  -webkit-backdrop-filter: blur(3px);
 }
-.qf-options-inner {
-  overflow: hidden;
+.qf-modal-card {
+  position: relative;
+  z-index: 1;
+  width: 100%;
+  max-width: 520px;
+  max-height: 86vh;
+  display: flex;
+  flex-direction: column;
+  background: var(--w-bg);
+  color: var(--w-fg);
+  border: 1px solid var(--w-border);
+  border-bottom: 0;
+  border-radius: 20px 20px 0 0;
+  box-shadow: 0 -24px 60px rgba(0, 0, 0, 0.42);
+  animation: qf-modal-rise 0.22s cubic-bezier(0.22, 1, 0.36, 1);
+}
+@keyframes qf-modal-rise { from { transform: translateY(14px); opacity: 0; } to { transform: none; opacity: 1; } }
+.qf-modal-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-1);
+  padding: var(--space-2);
+  border-bottom: 1px solid var(--w-border);
+}
+.qf-modal-head strong { font-size: 15px; font-weight: 800; }
+.qf-modal-x {
+  flex: 0 0 auto;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  appearance: none;
+  border: 0;
+  background: transparent;
+  color: var(--w-fg);
+  font-size: 24px;
+  cursor: pointer;
+  border-radius: 8px;
+  opacity: 0.7;
+}
+.qf-modal-x:hover { opacity: 1; }
+.qf-modal-body {
+  overflow-y: auto;
+  -webkit-overflow-scrolling: touch;
+  flex: 1 1 auto;
   min-height: 0;
-  padding: 0 var(--space-2) var(--space-2);
+}
+.qf-modal-body .qf-options-inner {
+  min-height: 0;
+  padding: var(--space-2);
+}
+.qf-modal-foot {
+  padding: var(--space-2);
+  border-top: 1px solid var(--w-border);
+}
+.qf-modal-done { width: 100%; }
+body.qf-modal-open { overflow: hidden; }
+@media (min-width: 560px) {
+  .qf-modal { align-items: center; }
+  .qf-modal-card { border-bottom: 1px solid var(--w-border); border-radius: 20px; box-shadow: 0 24px 70px rgba(0, 0, 0, 0.42); }
+  @keyframes qf-modal-rise { from { transform: translateY(8px) scale(0.98); opacity: 0; } to { transform: none; opacity: 1; } }
 }
 @media (prefers-reduced-motion: reduce) {
-  .qf-options-body { transition: none; }
-  .qf-options-caret { transition: none; }
+  .qf-modal-card { animation: none; }
 }
 
 /* ── 1. Help tooltip anchored directly above (or below as fallback) its cue,
