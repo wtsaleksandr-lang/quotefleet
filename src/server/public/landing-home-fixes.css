@@ -437,19 +437,40 @@ body.qf-wft .hero-trial-note a:hover {
   text-underline-offset: 3px;
 }
 
-/* How-it-works step illustrations: real product screenshots (crops). Fill the
-   framed box, top-aligned, fixed height so all four align. */
+/* How-it-works step illustrations: real product screenshots shown IN FULL
+   (no crop). The image fills the card width at its natural aspect ratio so
+   nothing is cut off; the framed box just rounds the corners. */
 body.qf-wft .step-art.step-shot {
   padding: 0 !important;
   min-height: 0 !important;
-  height: 120px !important;
+  height: auto !important;
   overflow: hidden !important;
   display: block !important;
+  border-radius: 12px !important;
+  background: transparent !important;
+  border: 0 !important;
 }
 body.qf-wft .step-art.step-shot img {
   width: 100% !important;
-  height: 100% !important;
-  object-fit: cover !important;
-  object-position: top center !important;
+  height: auto !important;
+  object-fit: contain !important;
   display: block !important;
+}
+
+/* Mobile: let the how-it-works cards use the full screen width so the
+   screenshots read large instead of a narrow ~70% column. */
+@media (max-width: 640px) {
+  body.qf-wft #how.section {
+    padding-left: 12px !important;
+    padding-right: 12px !important;
+  }
+  body.qf-wft #how .container {
+    max-width: 100% !important;
+    padding-left: 0 !important;
+    padding-right: 0 !important;
+  }
+  body.qf-wft #how .simple-step {
+    padding: 12px !important;
+    min-height: 0 !important;
+  }
 }
