@@ -436,3 +436,20 @@ body.qf-wft .hero-trial-note a:hover {
   text-decoration: underline;
   text-underline-offset: 3px;
 }
+
+/* How-it-works step illustrations: real product screenshots (crops). Fill the
+   framed box, top-aligned, fixed height so all four align. */
+body.qf-wft .step-art.step-shot {
+  padding: 0 !important;
+  min-height: 0 !important;
+  height: 120px !important;
+  overflow: hidden !important;
+  display: block !important;
+}
+body.qf-wft .step-art.step-shot img {
+  width: 100% !important;
+  height: 100% !important;
+  object-fit: cover !important;
+  object-position: top center !important;
+  display: block !important;
+}
