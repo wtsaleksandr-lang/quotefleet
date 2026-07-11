@@ -695,31 +695,30 @@ body.qf-wft .qf-feature-row.is-reverse { grid-template-columns: 2fr 3fr !importa
 body.qf-wft .qf-feature-row.is-reverse .qf-feat-media { grid-column: 2 !important; grid-row: 1 !important; }
 body.qf-wft .qf-feature-row.is-reverse .qf-feature-copy { grid-column: 1 !important; grid-row: 1 !important; }
 body.qf-wft .qf-feat-media { display: flex !important; justify-content: center !important; }
-body.qf-wft .qf-feat-media--device {
-  align-items: center !important;
-  padding: 48px 24px !important;
-  border-radius: 24px !important;
-  border: 1px solid rgba(148,163,184,.12) !important;
-  background:
-    radial-gradient(ellipse 80% 55% at 50% 22%, rgba(13,60,252,.18), transparent 70%),
-    linear-gradient(180deg, #12171d, #0d1116) !important;
-}
 body.qf-wft .qf-shot {
   display: block !important; width: 100% !important; height: auto !important;
   filter: drop-shadow(0 34px 66px rgba(0,0,0,.55)) !important;
 }
-body.qf-wft .qf-phone {
-  width: 100% !important; max-width: 300px !important;
-  border-radius: 40px !important; padding: 8px !important;
-  background: #0f151d !important;
-  border: 1px solid rgba(148,163,184,.22) !important;
-  box-shadow: 0 44px 100px -48px rgba(0,0,0,.9), inset 0 1px 0 rgba(255,255,255,.06) !important;
+/* Desktop browser frame around the live calculator loop (matches the shots). */
+body.qf-wft .qf-browser {
+  width: 100% !important; border-radius: 14px !important; overflow: hidden !important;
+  border: 1px solid rgba(148,163,184,.18) !important; background: #0d1219 !important;
+  filter: drop-shadow(0 34px 66px rgba(0,0,0,.55)) !important;
 }
-body.qf-wft .qf-phone-screen {
-  display: block !important; width: 100% !important; height: auto !important;
-  aspect-ratio: 390 / 844; border-radius: 32px !important;
-  background: #0b0f15 !important; object-fit: cover !important;
+body.qf-wft .qf-browser-bar {
+  display: flex !important; align-items: center !important; gap: 8px !important;
+  padding: 12px 16px !important; background: rgba(255,255,255,.03) !important;
+  border-bottom: 1px solid rgba(148,163,184,.14) !important;
 }
+body.qf-wft .qf-browser-dots { display: inline-flex !important; gap: 8px !important; }
+body.qf-wft .qf-browser-dots i { width: 10px !important; height: 10px !important; border-radius: 999px !important; background: #35404f !important; }
+body.qf-wft .qf-browser-url {
+  flex: 1 !important; font: 500 12px/1 var(--font-mono, ui-monospace, monospace) !important;
+  color: #8b97a8 !important; background: rgba(148,163,184,.08) !important;
+  padding: 8px 12px !important; border-radius: 999px !important;
+  white-space: nowrap !important; overflow: hidden !important; text-overflow: ellipsis !important;
+}
+body.qf-wft .qf-browser-vid { display: block !important; width: 100% !important; height: auto !important; background: #0b0f15 !important; }
 body.qf-wft .qf-feature-copy h3 {
   margin: 0 !important; font-size: clamp(22px, 2.3vw, 30px) !important;
   letter-spacing: -0.02em !important; color: #f5fcff !important; line-height: 1.15 !important;
@@ -738,5 +737,4 @@ body.qf-wft .qf-feature-copy p {
   body.qf-wft .qf-feature-row.is-reverse .qf-feature-copy { grid-column: 1 !important; }
   body.qf-wft .qf-feature-row.is-reverse .qf-feat-media { grid-row: 1 !important; }
   body.qf-wft .qf-feature-copy { padding: 0 24px !important; }
-  body.qf-wft .qf-phone { max-width: 280px !important; margin: 0 auto !important; }
 }
