@@ -691,5 +691,15 @@ body.qf-wft .qf-showcase-item figcaption {
   line-height: 1.5 !important;
 }
 @media (max-width: 760px) {
-  body.qf-wft .qf-showcase-grid { grid-template-columns: 1fr !important; gap: 30px !important; }
+  /* Full-bleed the product screenshots on mobile so they're not tiny — text
+     keeps side padding, the images run edge to edge. */
+  body.qf-wft .qf-showcase-section { padding-left: 0 !important; padding-right: 0 !important; }
+  body.qf-wft .qf-showcase-section .container { width: 100% !important; }
+  body.qf-wft .qf-showcase-section .section-head { padding: 0 24px !important; }
+  body.qf-wft .qf-showcase-grid {
+    grid-template-columns: 1fr !important;
+    gap: 32px !important;
+    padding: 0 8px !important;
+  }
+  body.qf-wft .qf-showcase-item figcaption { padding: 0 16px !important; }
 }
