@@ -370,8 +370,8 @@ src/server/public/landing-home-fixes.css:249	spacing	gap: 26px
 src/server/public/landing-home-fixes.css:261	spacing	padding: 22px
 src/server/public/landing-home-fixes.css:27	spacing	padding: 12px 20px 0
 src/server/public/landing-home-fixes.css:33	spacing	padding: 10px 22px
-src/server/public/landing-home-fixes.css:359	spacing	gap: 2px
-src/server/public/landing-home-fixes.css:377	spacing	padding: 12px 14px
+src/server/public/landing-home-fixes.css:371	spacing	gap: 2px
+src/server/public/landing-home-fixes.css:389	spacing	padding: 12px 14px
 src/server/public/landing-home-fixes.css:45	spacing	gap: 9px
 src/server/public/landing-s-polish.css:106	spacing	padding: 5px 8px
 src/server/public/landing-s-polish.css:119	spacing	padding: 10px

@@ -295,6 +295,18 @@ body.qf-wft .chat-art {
     letter-spacing: -.04em !important;
   }
 
+  /* Spread the header across the full width on mobile — the floating pill was
+     inset 20px + padded 22px, pulling the logo and burger toward the center.
+     Tighten both so the brand hugs the left edge and the actions the right. */
+  body.qf-wft .site-header {
+    padding: 12px 8px 0 !important;
+  }
+  body.qf-wft .site-header-inner {
+    padding: 8px 16px !important;
+    gap: 12px !important;
+    justify-content: space-between !important;
+  }
+
   body.qf-wft .site-nav {
     display: none !important;
   }
