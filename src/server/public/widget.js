@@ -785,10 +785,13 @@
         else if (e.key === 'Enter') { if (activeIndex >= 0 && current[activeIndex]) { e.preventDefault(); choose(current[activeIndex]); } }
       });
     });
-    // Close any open suggestion dropdown on an outside click.
+    // Close any open suggestion dropdown on an outside click. Exclude the custom
+    // <select> panels (.qf-cs-panel) — they share the .qf-suggestions class but
+    // own their open/close (widget-custom-select.js); otherwise the bubbling
+    // click that opens one immediately strips its .open and empties it.
     document.addEventListener('click', function (e) {
       if (e.target && e.target.closest && e.target.closest('.qf-typeahead')) return;
-      $$('.qf-suggestions.open').forEach(function (b) { b.classList.remove('open'); b.innerHTML = ''; });
+      $$('.qf-suggestions.open:not(.qf-cs-panel)').forEach(function (b) { b.classList.remove('open'); b.innerHTML = ''; });
     });
 
     document.addEventListener('click', function (e) {
