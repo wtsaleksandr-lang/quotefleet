@@ -246,9 +246,15 @@ body.qf-wft .how-section .container {
   max-width: 1440px !important;
 }
 
-body.qf-wft .simple-steps {
-  gap: 26px !important;
-  grid-template-columns: repeat(4, minmax(280px, 1fr)) !important;
+/* Desktop/tablet: 2×2 grid so each how-it-works screenshot renders large and
+   complete. Scoped to min-width 641px so it never overrides the mobile 1-col
+   rule below (media queries don't add specificity; landing-v2 would win). */
+@media (min-width: 641px) {
+  body.qf-wft.landing-v2 .simple-steps {
+    gap: 26px !important;
+    grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
+    align-items: start !important;
+  }
 }
 
 body.qf-wft .simple-step {
