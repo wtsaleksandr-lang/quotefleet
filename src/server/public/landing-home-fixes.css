@@ -295,6 +295,12 @@ body.qf-wft .chat-art {
     letter-spacing: -.04em !important;
   }
 
+  /* Pull the hero up so the eyebrow sits right under the header bar (was a big
+     dead gap). .landing-v2 out-specifies the base/mobile hero padding rules. */
+  body.qf-wft.landing-v2 .hero {
+    padding-top: 16px !important;
+  }
+
   /* Mobile header = a full-width Apple-style frosted glass BAR, not a floating
      pill. Drop the inner card (bg/border/radius/shadow) and move the frosted
      glass onto the full-width sticky bar; sit it flush at the top (higher) with

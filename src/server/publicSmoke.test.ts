@@ -11,12 +11,12 @@ async function file(name: string) {
 describe('public static page smoke checks', () => {
   it('landing page has simple visual-first positioning and no placeholder links', async () => {
     const html = await file('landing.html');
-    expect(html).toContain('Start sharing live rates in one day.');
-    expect(html).toContain('No website changes needed. No heavy setup.');
+    expect(html).toContain('Win more loads with instant freight quotes.');
+    expect(html).toContain('Stop losing loads to slow, manual quoting.');
     expect(html).toContain('For trucking service providers');
     expect(html).toContain('acmetrucking.yourquote.net');
     expect(html).toContain('Add to email signature');
-    expect(html).toContain('Optional AI chat');
+    expect(html).toContain('Instant lead capture');
     expect(html).toContain('Send branded PDF');
     expect(html).toContain('Schedule follow-ups');
     expect(html).toContain('Follow-up reminders');
