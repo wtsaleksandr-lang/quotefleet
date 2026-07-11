@@ -121,16 +121,37 @@
     }
     .qfd-lock { width: 11px; height: 11px; flex-shrink: 0; opacity: .7; }
     .qfd-url span { overflow: hidden; text-overflow: ellipsis; }
-    .qfd-frame { display: block; width: 100%; height: 820px; border: 0; background: transparent; }
+    /* Height is auto-sized in JS from the widget's reported content height, so
+       there is NO inner scrollbar — the page scrolls as one surface. This is
+       just the pre-load fallback. */
+    .qfd-frame { display: block; width: 100%; height: 560px; border: 0; background: transparent; }
 
-    /* Mobile mode — phone bezel */
+    /* Desktop preview of the phone (device toggle → Mobile): phone bezel. */
     .qfd-stage.is-mobile .qfd-device {
       max-width: 390px; border-radius: 40px;
       border: 10px solid #0f151d;
       box-shadow: 0 40px 90px -46px rgba(0,0,0,.9), 0 0 0 1px rgba(148,163,184,.20), inset 0 1px 0 rgba(255,255,255,.05);
     }
     .qfd-stage.is-mobile .qfd-chrome { display: none; }
-    .qfd-stage.is-mobile .qfd-frame { height: 780px; }
+
+    /* On a REAL phone the desktop mockup is dropped — the widget shows directly
+       at its natural (auto-sized) height, so there's a single page scroll and
+       no nested container. A minimal centered address bar keeps the branded
+       "your own page" cue; the traffic-lights and the device toggle are hidden. */
+    @media (max-width: 768px) {
+      #qfd-device-seg { display: none !important; }
+      .qfd-toolbar { max-width: 100%; }
+      .qfd-device {
+        max-width: 100%; border-radius: 14px;
+        box-shadow: 0 24px 60px -46px rgba(0,0,0,.8);
+      }
+      .qfd-chrome { padding: 9px 12px; justify-content: center; }
+      .qfd-chrome .qfd-dot { display: none; }
+      .qfd-url {
+        margin-left: 0; flex: 0 1 auto; justify-content: center;
+        background: transparent; padding: 2px 6px;
+      }
+    }
 
     .qfd-foot { text-align: center; margin-top: 26px; }
     .qfd-cta {
@@ -197,7 +218,6 @@
       var frame = document.getElementById('qfd-frame');
       var stage = document.getElementById('qfd-stage');
       var wrap = document.querySelector('.qfd-wrap');
-      var deviceSeg = document.getElementById('qfd-device-seg');
       var THEME = { dark: 'midnight', light: 'cream' };
       var state = { device: 'desktop', theme: 'dark' };
 
@@ -226,17 +246,25 @@
       document.getElementById('qfd-dark').addEventListener('click', function () { setTheme('dark'); });
       document.getElementById('qfd-light').addEventListener('click', function () { setTheme('light'); });
 
-      // On a phone-sized screen there's no point offering a desktop frame —
-      // default to the mobile view and hide the device toggle entirely. The
-      // theme toggle stays. Re-evaluates if the viewport crosses the breakpoint.
-      var mq = window.matchMedia('(max-width: 768px)');
-      function applyViewport(isMobile) {
-        deviceSeg.hidden = isMobile;
-        setDevice(isMobile ? 'mobile' : 'desktop');
+      // Auto-size the iframe to the widget's own content height so there is NO
+      // inner scrollbar — the widget reports its height via postMessage on every
+      // change (QF_WIDGET_HEIGHT). The whole page then scrolls as one surface,
+      // on desktop and mobile alike. (The real-phone / desktop split — mockup vs
+      // direct widget, and hiding the device toggle — is handled in CSS via the
+      // 768px media query, which is more reliable than a JS viewport check.)
+      var MINH = 560;
+      function setH(h) {
+        if (h && isFinite(h)) frame.style.height = Math.max(MINH, Math.ceil(h)) + 'px';
       }
-      if (mq.addEventListener) mq.addEventListener('change', function (e) { applyViewport(e.matches); });
-      else if (mq.addListener) mq.addListener(function (e) { applyViewport(e.matches); });
-      applyViewport(mq.matches);
+      // Same-origin: size immediately on load so there's no fallback-height flash.
+      frame.addEventListener('load', function () {
+        try { setH(frame.contentDocument.documentElement.scrollHeight); } catch (e) { /* ignore */ }
+      });
+      // And keep in sync as the widget grows/shrinks (add-ons, results, chat).
+      window.addEventListener('message', function (e) {
+        var d = e.data;
+        if (d && d.type === 'QF_WIDGET_HEIGHT') setH(d.height);
+      });
     })();
   </script>
 </body>
