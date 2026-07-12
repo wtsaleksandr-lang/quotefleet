@@ -480,3 +480,51 @@ body.qf-wft .step-art.step-shot img {
     min-height: 0 !important;
   }
 }
+
+/* ── Mobile: consistent full-width containers + a proper footer. Every home/
+   landing container uses ~92% of the screen (uniform 16px gutters); the final
+   CTA card fills the width instead of floating narrow; the footer stops hugging
+   the left edge and its link columns sit in a 2-col grid, not a broken left
+   stack. Scoped to .landing-v2 so it out-specifies the per-section rules. ──── */
+@media (max-width: 640px) {
+  body.qf-wft.landing-v2 .section {
+    padding-left: 16px !important;
+    padding-right: 16px !important;
+  }
+  body.qf-wft.landing-v2 .section > .container,
+  body.qf-wft.landing-v2 .final-section > .container {
+    width: 100% !important;
+    max-width: 100% !important;
+    padding-left: 0 !important;
+    padding-right: 0 !important;
+  }
+  /* Final CTA card fills the width (was a narrow floating card ~73%). */
+  body.qf-wft.landing-v2 .final-cta-card.qf-final-cta {
+    width: 100% !important;
+    max-width: 100% !important;
+    margin-left: 0 !important;
+    margin-right: 0 !important;
+  }
+  /* Footer: pad off the screen edge + 2-column link grid (brand spans both).
+     The inner was full-viewport-wide and overflowed the footer's padding,
+     clipping the © line — so pad the inner directly with border-box. */
+  body.qf-wft.landing-v2 .premium-footer {
+    padding-left: 0 !important;
+    padding-right: 0 !important;
+  }
+  body.qf-wft.landing-v2 .premium-footer-inner,
+  body.qf-wft.landing-v2 .footer-bottom {
+    width: 100% !important;
+    max-width: 100% !important;
+    box-sizing: border-box !important;
+    padding-left: 16px !important;
+    padding-right: 16px !important;
+  }
+  body.qf-wft.landing-v2 .premium-footer-inner {
+    grid-template-columns: 1fr 1fr !important;
+    gap: 24px 16px !important;
+  }
+  body.qf-wft.landing-v2 .footer-brand {
+    grid-column: 1 / -1 !important;
+  }
+}
