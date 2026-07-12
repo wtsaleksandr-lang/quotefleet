@@ -285,7 +285,6 @@ body.qf-wft .mini-actions span {
 
 body.qf-wft .use-section,
 body.qf-wft .ai-section,
-body.qf-wft .compare-simple-section,
 body.qf-wft .pdf-section,
 body.qf-wft .scheduler-section {
   display: none !important;
@@ -737,4 +736,122 @@ body.qf-wft .qf-feature-copy p {
   body.qf-wft .qf-feature-row.is-reverse .qf-feature-copy { grid-column: 1 !important; }
   body.qf-wft .qf-feature-row.is-reverse .qf-feat-media { grid-row: 1 !important; }
   body.qf-wft .qf-feature-copy { padding: 0 24px !important; }
+}
+
+/* ── "Get set up in minutes" tutorial: 2×2 numbered steps, each a looping
+   product screen-capture in a browser frame (reuses .qf-browser). ─────────── */
+body.qf-wft .qf-setup-section {
+  padding: clamp(48px, 8vw, 80px) 28px !important;
+  background: #12161d !important;
+}
+body.qf-wft .qf-setup-section .container {
+  width: min(1180px, calc(100vw - 56px)) !important;
+  margin: 0 auto !important;
+}
+body.qf-wft .qf-setup-steps {
+  display: grid !important;
+  grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
+  gap: clamp(24px, 3vw, 48px) !important;
+  margin-top: clamp(32px, 5vw, 48px) !important;
+  align-items: start !important;
+}
+body.qf-wft .qf-setup-step {
+  display: flex !important;
+  flex-direction: column !important;
+  gap: 16px !important;
+}
+body.qf-wft .qf-setup-copy {
+  display: flex !important;
+  gap: 16px !important;
+  align-items: flex-start !important;
+}
+body.qf-wft .qf-setup-num {
+  flex: 0 0 auto !important;
+  width: 32px !important;
+  height: 32px !important;
+  border-radius: 999px !important;
+  display: inline-flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  background: var(--accent, #0d3cfc) !important;
+  color: #f5fcff !important;
+  font-weight: 800 !important;
+  font-size: 15px !important;
+}
+body.qf-wft .qf-setup-text h3 {
+  margin: 0 !important;
+  font-size: clamp(19px, 1.8vw, 23px) !important;
+  letter-spacing: -0.02em !important;
+  color: #f5fcff !important;
+  line-height: 1.2 !important;
+}
+body.qf-wft .qf-setup-text p {
+  margin: 8px 0 0 !important;
+  color: rgba(245, 252, 255, .66) !important;
+  font-size: 15px !important;
+  line-height: 1.55 !important;
+}
+@media (max-width: 760px) {
+  body.qf-wft .qf-setup-section {
+    padding-left: 16px !important;
+    padding-right: 16px !important;
+  }
+  body.qf-wft .qf-setup-section .container { width: 100% !important; }
+  body.qf-wft .qf-setup-steps { grid-template-columns: 1fr !important; }
+}
+
+/* ── Before / after: manual quoting (slow, cold) vs an instant branded link.
+   Timestamps carry the story — hours on the left, seconds on the right. ───── */
+body.qf-wft .qf-ba-grid {
+  display: grid !important;
+  grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
+  gap: clamp(16px, 3vw, 24px) !important;
+  margin-top: clamp(24px, 4vw, 48px) !important;
+  align-items: start !important;
+}
+body.qf-wft .qf-ba-card {
+  border-radius: 16px !important;
+  border: 1px solid rgba(148, 163, 184, .14) !important;
+  padding: clamp(16px, 3vw, 24px) !important;
+  display: flex !important;
+  flex-direction: column !important;
+  gap: 12px !important;
+}
+body.qf-wft .qf-ba-before { background: rgba(255, 255, 255, .02) !important; }
+body.qf-wft .qf-ba-after {
+  background: rgba(13, 60, 252, .06) !important;
+  border-color: rgba(52, 211, 153, .34) !important;
+}
+body.qf-wft .qf-ba-head {
+  display: flex !important; align-items: baseline !important;
+  gap: 8px !important; margin-bottom: 4px !important; flex-wrap: wrap !important;
+}
+body.qf-wft .qf-ba-tag {
+  font-size: 15px !important; font-weight: 800 !important;
+  color: #f5fcff !important; letter-spacing: -0.01em !important;
+}
+body.qf-wft .qf-ba-sub {
+  font-size: 12px !important; color: rgba(245, 252, 255, .5) !important;
+  text-transform: uppercase !important; letter-spacing: .08em !important;
+}
+body.qf-wft .qf-ba-row { display: flex !important; gap: 12px !important; align-items: baseline !important; }
+body.qf-wft .qf-ba-time {
+  flex: 0 0 auto !important; width: 60px !important;
+  font: 600 11px/1.5 var(--font-mono, ui-monospace, monospace) !important;
+  color: rgba(245, 252, 255, .42) !important;
+}
+body.qf-wft .qf-ba-msg { font-size: 14px !important; line-height: 1.5 !important; color: rgba(245, 252, 255, .82) !important; }
+body.qf-wft .qf-ba-msg b { font-weight: 700 !important; color: rgba(245, 252, 255, .55) !important; margin-right: 8px !important; }
+body.qf-wft .qf-ba-before .qf-ba-msg { color: rgba(245, 252, 255, .58) !important; }
+body.qf-wft .qf-ba-out {
+  margin-top: 8px !important; padding-top: 12px !important;
+  border-top: 1px solid rgba(148, 163, 184, .12) !important;
+  font-size: 14px !important; font-weight: 700 !important;
+}
+body.qf-wft .qf-ba-out-bad { color: #f19d9d !important; }
+body.qf-wft .qf-ba-out-bad::before { content: "\2715  "; }
+body.qf-wft .qf-ba-out-good { color: #4fd6a0 !important; }
+body.qf-wft .qf-ba-out-good::before { content: "\2713  "; }
+@media (max-width: 760px) {
+  body.qf-wft .qf-ba-grid { grid-template-columns: 1fr !important; }
 }

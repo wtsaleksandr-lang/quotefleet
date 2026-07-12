@@ -24,8 +24,8 @@ src/server/public/landing-wefixtrades-cleanup.css:79:3	color: #ffffff
 src/server/public/landing-wefixtrades-cleanup.css:244:3	color: #ffffff
 src/server/public/landing-wefixtrades-cleanup.css:276:3	color: #ffffff
 src/server/public/landing-wefixtrades-cleanup.css:281:3	color: #ffffff
-src/server/public/landing-wefixtrades-cleanup.css:401:3	color: #ffffff
-src/server/public/landing-wefixtrades-cleanup.css:426:3	color: #ffffff
+src/server/public/landing-wefixtrades-cleanup.css:400:3	color: #ffffff
+src/server/public/landing-wefixtrades-cleanup.css:425:3	color: #ffffff
 src/server/public/landing-wefixtrades.css:264:3	color: #fff
 src/server/public/landing-wefixtrades.css:480:3	color: #fff
 src/server/public/landing-wefixtrades.css:525:3	color: #fff
