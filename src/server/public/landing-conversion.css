@@ -594,3 +594,30 @@
   .premium-footer { padding: 42px 18px 28px; }
   .footer-bottom { display: grid; font-size: 11.5px; }
 }
+
+/* ── Footer brand lockup — feature the FULL logo (calculator + truck). ──────
+   The white-outline full logo (logo-full-ondark.png) is built for the dark
+   footer, so the truck reads clearly; the nav keeps its compact mark. The
+   anchor keeps .site-brand so the existing footer light-ink rule colors the
+   wordmark (no new hardcoded color); a distinct .qf-footer-logo class avoids
+   the nav mark's 30px sizing. Scoped under body.qf-wft to beat the nav rules. */
+body.qf-wft .footer-brand .qf-footer-brand {
+  flex-direction: column !important;
+  align-items: flex-start !important;
+  gap: 12px !important;
+  white-space: normal !important;
+}
+.footer-brand .qf-footer-logo {
+  display: block;
+  width: 168px;
+  height: auto;
+  max-width: 100%;
+}
+.footer-brand .qf-footer-wordmark {
+  font-size: 20px;
+  font-weight: 850;
+  letter-spacing: -0.02em;
+}
+@media (max-width: 720px) {
+  .footer-brand .qf-footer-logo { width: 148px; }
+}
