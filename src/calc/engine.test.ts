@@ -15,6 +15,7 @@
 import { describe, it, expect } from 'vitest';
 import { calculate, customerFacingLines, type CalcRequest } from './engine.js';
 import type { RateCard, Accessorial, LaneZone, Terminal } from '../db/schema.js';
+import { getSeedTemplate, type FreightVertical } from './seedTemplates.js';
 
 const now = new Date('2026-01-01T00:00:00Z');
 
@@ -295,6 +296,40 @@ describe('calculate', () => {
     expect(r.unsupported).toBeUndefined();
     expect(r.subtotalLinehaul).toBe(425);
   });
+});
+
+describe('seed-template verticals — each computes a real quote with its default set', () => {
+  // Hydrate the (Omit<_, 'tenantId'>) seed rows into full engine rows.
+  function cardsFor(v: FreightVertical): RateCard[] {
+    return getSeedTemplate(v).rateCards.map((c) => rateCard(c as Partial<RateCard>));
+  }
+  function accsFor(v: FreightVertical): Accessorial[] {
+    return getSeedTemplate(v).accessorials.map((a, i) => accessorial({ ...(a as Partial<Accessorial>), id: i + 1 }));
+  }
+
+  const cases: Array<{ v: FreightVertical; req: Partial<CalcRequest>; flatAcc: string }> = [
+    { v: 'dryvan_ftl', req: { service: 'ftl', equipment: 'dryvan', miles: 500 }, flatAcc: 'lumper' },
+    { v: 'reefer', req: { service: 'ftl', equipment: 'reefer', miles: 500, flags: { tempControlled: true } }, flatAcc: 'reefer_precool' },
+    { v: 'flatbed', req: { service: 'ftl', equipment: 'flatbed', miles: 500 }, flatAcc: 'tarping' },
+    { v: 'hotshot', req: { service: 'hotshot', equipment: 'flatbed', miles: 300 }, flatAcc: 'expedite_fee' },
+    { v: 'ltl', req: { service: 'ltl', equipment: 'pallet', miles: 400, weightLbs: 1500, lengthIn: 48, widthIn: 40, heightIn: 48 }, flatAcc: 'reweigh_reclass' },
+  ];
+
+  for (const { v, req: r, flatAcc } of cases) {
+    it(`${v}: prices a valid quote and applies a selected default accessorial`, () => {
+      const cards = cardsFor(v);
+      const accs = accsFor(v);
+      const base = calculate(cards, accs, [], req(r));
+      expect(base.unsupported, `${v} should price`).toBeUndefined();
+      expect(base.total).toBeGreaterThan(0);
+
+      // Selecting a flat default accessorial adds its amount to the quote.
+      const picked = accs.find((a) => a.code === flatAcc)!;
+      const withAcc = calculate(cards, accs, [], req({ ...r, selectedAccessorialCodes: [flatAcc] }));
+      expect(withAcc.lines.find((l) => l.code === flatAcc)?.amount).toBe(picked.amount);
+      expect(withAcc.subtotalAccessorials).toBeGreaterThanOrEqual(picked.amount);
+    });
+  }
 });
 
 describe('customerFacingLines — margin is never shown to the customer', () => {
