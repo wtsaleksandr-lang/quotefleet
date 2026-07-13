@@ -40,6 +40,7 @@ import { getTrialState } from '../trialGating.js';
 import { canUseProFeature } from '../plans.js';
 import { publicCalcLimiter, publicChatLimiter, publicLeadLimiter } from '../rateLimits.js';
 import { resolveWidgetTheme, WIDGET_PRESETS } from '../widgetThemes.js';
+import { resolveQuoteDisclaimer } from '../quoteDisclaimer.js';
 import { loadCarrierProfile } from './carrierProfile.js';
 import { enforceTenantAccess } from '../access.js';
 
@@ -313,6 +314,9 @@ export function registerPublicRoutes(app: Express) {
         countryFocus: tenant.countryFocus,
       },
       contact,
+      // Terms shown at the bottom of the widget result card. Resolves to the
+      // carrier's own text when set, else the platform default.
+      disclaimer: resolveQuoteDisclaimer(tenant.quoteDisclaimer),
       brand: brand ?? null,
       // Fully-resolved widget theme (preset + optional accent override +
       // font). widget.js#applyTheme writes tokens.* onto the document root.

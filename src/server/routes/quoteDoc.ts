@@ -6,6 +6,7 @@ import { loadEnv } from '../../config.js';
 import { publicDocLimiter } from '../rateLimits.js';
 import { loadCarrierProfile } from './carrierProfile.js';
 import { customerFacingLines } from '../../calc/engine.js';
+import { resolveQuoteDisclaimer } from '../quoteDisclaimer.js';
 import { estimateTransit } from '../../calc/transit.js';
 import { getRouteMap, buildStaticMapUrl, type LatLng } from '../routeMap.js';
 
@@ -179,6 +180,9 @@ export function registerQuoteDocRoutes(app: Express) {
         // grand total (lead.quotedTotal) is unchanged.
         breakdown: customerFacingLines(lead.breakdownJson as Parameters<typeof customerFacingLines>[0]),
         aiSummary: lead.aiSummary,
+        // Terms shown at the bottom of the hosted + printable quote. Resolves
+        // to the carrier's own text when set, else the platform default.
+        disclaimer: resolveQuoteDisclaimer(tenant.quoteDisclaimer),
         quoteUrl: `${base}/quote/${encodeURIComponent(lead.refId)}`,
         chatUrl: `${base}/chat/${encodeURIComponent(lead.refId)}`,
       },

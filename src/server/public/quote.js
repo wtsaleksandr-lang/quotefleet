@@ -107,6 +107,15 @@
     text('qdoc-issued-by', [displayName, data.issuedBy.email, data.issuedBy.phone].filter(Boolean).join(' · '));
     text('qdoc-print-url', data.quote.quoteUrl || location.href);
 
+    // Terms / disclaimer — small print at the bottom of the quote (prints too).
+    // Server resolves the carrier's own text or the platform default.
+    var termsPanel = $('qdoc-terms-panel');
+    if (termsPanel) {
+      var terms = (data.quote && data.quote.disclaimer) || '';
+      if (terms) { text('qdoc-terms', terms); termsPanel.hidden = false; }
+      else termsPanel.hidden = true;
+    }
+
     var chat = $('qdoc-chat');
     chat.href = data.quote.chatUrl || ('/chat/' + encodeURIComponent(data.quote.refId));
 
