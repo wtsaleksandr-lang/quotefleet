@@ -27,8 +27,13 @@ describe('landing WeFixTrades cleanup skin', () => {
     expect(css).toContain('.hero-quick-points');
     expect(css).toContain('.use-section');
     expect(css).toContain('.ai-section');
-    expect(css).toContain('.compare-simple-section');
+    expect(css).toContain('.pdf-section');
+    expect(css).toContain('.scheduler-section');
     expect(css).toContain('display: none !important');
+    // The before/after section (.compare-simple-section, "Stop losing loads to
+    // slow quotes") is now an intentional, VISIBLE feature — the cleanup skin
+    // must never hide it. Guard that it stays out of the display:none block.
+    expect(css).not.toContain('.compare-simple-section');
     expect(css).toContain('.floating-note');
     expect(css).toContain('.visual-flow');
     expect(css).toContain('.flow-rates');
