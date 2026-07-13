@@ -22,6 +22,7 @@ const baseT: Tenant = {
   customDomainVerifiedAt: null,
   name: 'Acme',
   contactEmail: 'a@b.c',
+  publicContactEmail: null,
   contactPhone: null,
   countryFocus: 'US',
   embedToken: 'tok',

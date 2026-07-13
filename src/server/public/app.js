@@ -185,7 +185,7 @@
   // ── Account page ──────────────────────────────────────────────
   // Profile: name / login email / phone (phone → tenant.contactPhone via
   // /api/auth/profile). Company details: the customer-facing contact block
-  // shown on the widget + hosted quotes — dispatch email (tenant.contactEmail),
+  // shown on the widget + hosted quotes — public contact email (tenant.publicContactEmail),
   // company address (carrier-profile store), USDOT + MC (marketplace-settings).
   // Then password + sessions. Consolidates fields that used to be scattered
   // across the Brand "Carrier profile" card and marketplace settings.
@@ -228,7 +228,7 @@
       // ── Company details card ────────────────────────────────────
       // One clear home for the contact details customers see on the
       // calculator + quotes. Wires to the existing stores (no parallel
-      // copy): dispatch email → tenant.contactEmail (/api/auth/profile),
+      // copy): public contact email → tenant.publicContactEmail (/api/auth/profile),
       // address → carrier-profile, USDOT/MC → marketplace-settings.
       var coCard = el('div', { class: 'card', style: { marginTop: '14px' } });
       coCard.appendChild(el('div', { class: 'card-title', text: 'Company details' }));
@@ -257,7 +257,16 @@
           return f;
         }
 
-        coCard.appendChild(coField('Dispatch email', 'contactEmail', (r.tenant && r.tenant.contactEmail) || '', 'email'));
+        // Public, opt-in contact email — bound to tenant.publicContactEmail, NOT
+        // the private owner/login email. Blank = the email row is hidden from
+        // customers on the calculator + quotes (we never expose the login email).
+        var emailField = coField('Public contact email', 'publicContactEmail', (r.tenant && r.tenant.publicContactEmail) || '', 'email');
+        emailField.appendChild(el('span', {
+          class: 'muted-small',
+          style: { display: 'block', marginTop: '4px' },
+          text: 'Optional — shown to customers on your calculator and quotes. Leave blank to hide it.',
+        }));
+        coCard.appendChild(emailField);
 
         var addrGrid = el('div', { class: 'grid-2', style: { gap: '12px' } });
         addrGrid.appendChild(coField('Address line 1', 'addressLine1', profile.addressLine1));
@@ -279,7 +288,7 @@
           $$('input[data-co]', coCard).forEach(function (i) { vals[i.dataset.co] = i.value.trim() || null; });
           saveCo.disabled = true;
           Promise.all([
-            api('/api/auth/profile', { method: 'PUT', body: { contactEmail: vals.contactEmail } }),
+            api('/api/auth/profile', { method: 'PUT', body: { publicContactEmail: vals.publicContactEmail } }),
             api('/api/tenant/carrier-profile', { method: 'PUT', body: {
               addressLine1: vals.addressLine1, addressLine2: vals.addressLine2,
               city: vals.city, state: vals.state, postalCode: vals.postalCode, country: vals.country,

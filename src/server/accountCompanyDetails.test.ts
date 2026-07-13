@@ -25,20 +25,33 @@ describe('account phone + company details consolidation', () => {
     // Address -> carrier-profile, dispatch email -> profile, USDOT/MC -> marketplace-settings.
     expect(app).toContain("api('/api/tenant/carrier-profile'");
     expect(app).toContain("api('/api/tenant/marketplace-settings'");
-    expect(app).toContain("coField('Dispatch email', 'contactEmail'");
+    // Public, opt-in email — bound to publicContactEmail, never the login email.
+    expect(app).toContain("coField('Public contact email', 'publicContactEmail'");
     expect(app).toContain("coField('USDOT number', 'dotNumber'");
     expect(app).toContain("coField('MC number', 'mcNumber'");
     expect(app).toContain("coField('Address line 1', 'addressLine1'");
   });
 
-  it('profile route accepts + persists tenant contactEmail and contactPhone', async () => {
+  it('profile route accepts + persists the opt-in public email and contactPhone', async () => {
     const auth = await route('auth.ts');
-    expect(auth).toContain('contactEmail: z.string().email().max(200).nullable().optional()');
-    expect(auth).toContain('tenantUpdate.contactEmail = parse.data.contactEmail');
+    expect(auth).toContain('publicContactEmail: z.string().email().max(200).nullable().optional()');
+    expect(auth).toContain('tenantUpdate.publicContactEmail = parse.data.publicContactEmail');
     expect(auth).toContain('tenantUpdate.contactPhone = parse.data.contactPhone');
     // /api/auth/me exposes them so the Account page can prefill.
-    expect(auth).toContain('contactEmail: t[0].contactEmail ?? null');
+    expect(auth).toContain('publicContactEmail: t[0].publicContactEmail ?? null');
     expect(auth).toContain('contactPhone: t[0].contactPhone ?? null');
+  });
+
+  it('never exposes the private login email on public surfaces', async () => {
+    // Widget contact block + hosted quote doc must use the opt-in public email,
+    // hiding the row when unset — they must NOT fall back to tenant.contactEmail.
+    const publicRoute = await route('public.ts');
+    expect(publicRoute).toContain('email: tenant.publicContactEmail || null');
+    expect(publicRoute).not.toContain('email: tenant.contactEmail || null');
+
+    const quoteDoc = await route('quoteDoc.ts');
+    expect(quoteDoc).toContain('contactEmail: tenant.publicContactEmail ?? null');
+    expect(quoteDoc).not.toContain('contactEmail: tenant.contactEmail,');
   });
 
   it('carrier-profile PUT merges instead of replacing (split editors are safe)', async () => {
@@ -59,7 +72,7 @@ describe('account phone + company details consolidation', () => {
     const publicRoute = await route('public.ts');
     expect(publicRoute).toContain('contact,');
     expect(publicRoute).toContain('phone: tenant.contactPhone || null');
-    expect(publicRoute).toContain('email: tenant.contactEmail || null');
+    expect(publicRoute).toContain('email: tenant.publicContactEmail || null');
 
     const html = await pub('widget.html');
     expect(html).toContain('id="qf-contact"');

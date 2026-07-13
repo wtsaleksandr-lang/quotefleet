@@ -267,7 +267,9 @@ export function registerPublicRoutes(app: Express) {
     ].map((s) => (s ?? '').trim()).filter(Boolean);
     const contact = {
       phone: tenant.contactPhone || null,
-      email: tenant.contactEmail || null,
+      // PUBLIC surface — only the opt-in publicContactEmail, never the private
+      // owner/login contactEmail. Null when unset so the email row is hidden.
+      email: tenant.publicContactEmail || null,
       address: addressParts.length ? addressParts.join(' · ') : null,
       mcNumber: tenant.mcNumber || null,
       dotNumber: tenant.dotNumber || null,

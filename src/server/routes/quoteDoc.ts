@@ -185,7 +185,10 @@ export function registerQuoteDocRoutes(app: Express) {
       tenant: {
         name: tenant.name,
         slug: tenant.slug,
-        contactEmail: tenant.contactEmail,
+        // Public hosted quote — expose only the opt-in publicContactEmail, never
+        // the private owner/login contactEmail. Null when unset → row hidden by
+        // the renderer (quote.js / quote-profile.js drop falsy contact values).
+        contactEmail: tenant.publicContactEmail ?? null,
         contactPhone: tenant.contactPhone,
         mcNumber: tenant.mcNumber,
         dotNumber: tenant.dotNumber,
@@ -241,7 +244,8 @@ export function registerQuoteDocRoutes(app: Express) {
         })),
       issuedBy: {
         name: String(carrierProfile.quoteContactName || tenant.name),
-        email: tenant.contactEmail,
+        // Public — opt-in publicContactEmail only, never the login contactEmail.
+        email: tenant.publicContactEmail ?? null,
         phone: tenant.contactPhone,
       },
     });
@@ -283,7 +287,7 @@ export function registerQuoteDocRoutes(app: Express) {
       '',
       `View quote: ${quoteUrl}`,
       '',
-      tenant.contactEmail ? `Questions: ${tenant.contactEmail}` : '',
+      tenant.publicContactEmail ? `Questions: ${tenant.publicContactEmail}` : '',
       tenant.contactPhone ? `Phone: ${tenant.contactPhone}` : '',
     ].filter(Boolean).join('\n');
 

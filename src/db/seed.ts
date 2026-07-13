@@ -138,6 +138,10 @@ const DEMO_LOGO_URL =
 export const DEMO_PROFILE = {
   name: 'Harbor Link Logistics',
   contactEmail: 'dispatch@harborlinklogistics.com',
+  // Opt-in public email the demo carrier chose to show customers. Set explicitly
+  // (a real business address, not a login) so the demo's public quote renders a
+  // contact email — exercising the "publicContactEmail is set" path.
+  publicContactEmail: 'dispatch@harborlinklogistics.com',
   contactPhone: '+1 (562) 555-0184',
   countryFocus: 'US',
   mcNumber: '748213',
@@ -173,6 +177,7 @@ async function applyDemoProfile(tenantId: number) {
     .set({
       name: DEMO_PROFILE.name,
       contactEmail: DEMO_PROFILE.contactEmail,
+      publicContactEmail: DEMO_PROFILE.publicContactEmail,
       contactPhone: DEMO_PROFILE.contactPhone,
       countryFocus: DEMO_PROFILE.countryFocus,
       mcNumber: DEMO_PROFILE.mcNumber,
@@ -224,6 +229,7 @@ async function seedDemoTenant() {
         hostDomain: defaultHostDomain(),
         name: DEMO_PROFILE.name,
         contactEmail: DEMO_PROFILE.contactEmail,
+        publicContactEmail: DEMO_PROFILE.publicContactEmail,
         contactPhone: DEMO_PROFILE.contactPhone,
         countryFocus: DEMO_PROFILE.countryFocus,
         mcNumber: DEMO_PROFILE.mcNumber,

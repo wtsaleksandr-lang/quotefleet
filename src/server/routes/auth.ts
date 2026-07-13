@@ -338,8 +338,12 @@ export function registerAuthRoutes(app: Express) {
     // Card-required trial: if billing is configured, open a Stripe Checkout
     // session (subscription mode, 14-day trial, $0 card validation) for the
     // selected tier and hand the client its URL to redirect to. If billing
-    // is NOT configured (dev / not yet wired), we degrade gracefully — the
-    // account is created on a trial and the client just lands on /app.
+    // is NOT configured (dev / not yet wired — the current prod state), we
+    // degrade gracefully — the account is created on a trial and the client
+    // just lands on /app. NOTE: while billing is unconfigured, signup is
+    // card-free, so the signup/pricing copy says "no credit card required"
+    // (src/server/public/signup.html, pricing.html). When billing is turned
+    // on, restore the card field + card copy together so they stay accurate.
     const selectedPlan = parsePaidPlan(parse.data.plan);
     let checkoutUrl: string | null = null;
     if (billingConfigured()) {
@@ -484,11 +488,17 @@ export function registerAuthRoutes(app: Express) {
   const ProfileSchema = z.object({
     name: z.string().min(1).max(120).optional(),
     email: z.string().email().max(200).optional(),
-    // Tenant-level customer-facing contact fields. `contactPhone` +
-    // `contactEmail` are what render on the widget and hosted quotes
-    // (see quoteDoc.ts / quote-profile.js). They live on the tenant row,
-    // NOT the user row — `email` above is the owner's *login* email.
+    // Tenant-level contact fields on the tenant row (NOT the user row —
+    // `email` above is the owner's *login* email).
+    //   • contactPhone — customer-facing phone (widget + hosted quotes).
+    //   • publicContactEmail — OPT-IN customer-facing email (widget + hosted
+    //     quotes). Nullable; when unset the email row is hidden on public
+    //     surfaces. This is what the Account "Company details" card edits.
+    //   • contactEmail — PRIVATE owner/login email (notifications only). Kept
+    //     in the schema for API back-compat, but the UI no longer edits it and
+    //     it is never rendered publicly.
     contactPhone: z.string().max(50).nullable().optional(),
+    publicContactEmail: z.string().email().max(200).nullable().optional(),
     contactEmail: z.string().email().max(200).nullable().optional(),
   });
   app.put('/api/auth/profile', async (req: Request, res: Response) => {
@@ -520,6 +530,7 @@ export function registerAuthRoutes(app: Express) {
     if (ctx.user.tenantId) {
       const tenantUpdate: Record<string, unknown> = {};
       if (parse.data.contactPhone !== undefined) tenantUpdate.contactPhone = parse.data.contactPhone;
+      if (parse.data.publicContactEmail !== undefined) tenantUpdate.publicContactEmail = parse.data.publicContactEmail;
       if (parse.data.contactEmail !== undefined) tenantUpdate.contactEmail = parse.data.contactEmail;
       if (Object.keys(tenantUpdate).length > 0) {
         tenantUpdate.updatedAt = new Date();
@@ -572,6 +583,7 @@ export function registerAuthRoutes(app: Express) {
           hostedUrl: string;
           name: string;
           contactEmail: string | null;
+          publicContactEmail: string | null;
           contactPhone: string | null;
           embedToken: string;
           plan: string;
@@ -591,6 +603,7 @@ export function registerAuthRoutes(app: Express) {
           hostedUrl: `${proto}//${t[0].slug}.${t[0].hostDomain}/`,
           name: t[0].name,
           contactEmail: t[0].contactEmail ?? null,
+          publicContactEmail: t[0].publicContactEmail ?? null,
           contactPhone: t[0].contactPhone ?? null,
           embedToken: t[0].embedToken,
           plan: t[0].plan,

@@ -32,7 +32,12 @@
     <div class="card elevated" style="width: 100%; max-width: 560px;">
       <h1 style="font-size: 28px; margin: 0 0 8px 0; letter-spacing: -0.025em;">Start your 14-day trial</h1>
       <p class="muted-small" style="margin:0 0 20px;">Create your quote desk, then tune rates before going live.</p>
-      <div class="notice" style="margin-bottom:18px; line-height:1.5;">14-day all-inclusive trial — every Pro feature unlocked. Card required (validated at $0, not charged today); we bill the plan you pick when the trial ends. Cancel anytime.</div>
+      <!-- Copy reflects current reality: billing is NOT configured on prod, so
+           signup completes card-free (see src/server/routes/auth.ts — Stripe
+           Checkout only runs when billingConfigured()). If/when billing is turned
+           on, restore the card language ("card validated at $0") alongside the
+           card field so the copy matches the flow again. -->
+      <div class="notice" style="margin-bottom:18px; line-height:1.5;">14-day all-inclusive trial — every Pro feature unlocked. No credit card required. Cancel anytime.</div>
 
       <form id="signup-form" style="display:flex; flex-direction:column; gap: 18px;" novalidate>
         <div class="field"><label class="field-label required" for="companyName">Company name</label><input class="input" id="companyName" name="companyName" placeholder="Acme Drayage" autocomplete="organization" required maxlength="120"></div>
@@ -170,8 +175,9 @@
         var res = await fetch('/api/auth/signup', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ companyName: String(fd.get('companyName') || '').trim(), slug: slugInput.value.trim(), hostDomain: fd.get('hostDomain'), email: normalizeEmail(fd.get('email')), password: fd.get('password'), plan: selectedPlan(), countryFocus: fd.get('countryFocus') || 'US', contactPhone: fd.get('contactPhone') || undefined, dpaAccepted: true, dpaVersion: '1.0' }) });
         var j = await res.json();
         if (!res.ok) { err.textContent = bestError(j); err.classList.remove('hidden'); submit.disabled = false; submit.innerHTML = oldText; syncSubmit(); return; }
-        // Card-required trial: if the server started a Stripe Checkout session,
-        // redirect there to add the card ($0 validation); otherwise go to /app.
+        // If billing is configured the server returns a Stripe Checkout URL to
+        // add a card ($0 validation); redirect there. On prod billing is NOT
+        // configured, so checkoutUrl is absent and signup is card-free → /app.
         if (j.checkoutUrl) { submit.innerHTML = 'Redirecting to secure checkout…'; location.href = j.checkoutUrl; return; }
         location.href = '/app';
       } catch (ex) { err.textContent = 'Network error — try again.'; err.classList.remove('hidden'); submit.disabled = false; submit.innerHTML = oldText; syncSubmit(); }
