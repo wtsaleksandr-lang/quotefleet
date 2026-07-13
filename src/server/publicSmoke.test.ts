@@ -207,8 +207,8 @@ describe('public static page smoke checks', () => {
     expect(html).toContain('/brand/favicon-32.png');
     expect(html).toContain('rel="apple-touch-icon"');
     expect(html).toContain('rel="manifest" href="/site.webmanifest"');
-    // brand mark image replaces the old inline route SVG
-    expect(html).toContain('/brand/mark-keys.png');
+    // brand mark image replaces the old inline route SVG (white-outline on-dark variant)
+    expect(html).toContain('/brand/mark-keys-ondark.png');
     expect(html).not.toContain('qf-route-logo');
   });
 
