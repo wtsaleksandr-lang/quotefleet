@@ -10,8 +10,14 @@ import {
   isSeedPristine,
   listVerticalOptions,
   DEFAULT_SEED_COUNTS,
+  CATALOG_ACCESSORIALS,
   type ExistingSeedRows,
 } from './seedTemplates.js';
+
+/** Amount lookup for a vertical's selected accessorial, by code. */
+function accAmount(vertical: Parameters<typeof getSeedTemplate>[0], code: string): number | undefined {
+  return getSeedTemplate(vertical).accessorials.find((a) => a.code === code)?.amount ?? undefined;
+}
 
 /** Build the untouched signup-seed rows exactly as auth.ts stamps them. */
 function pristineRows(): ExistingSeedRows {
@@ -107,68 +113,101 @@ describe('seedTemplates — vertical selection', () => {
     expectAcc('residential', 'flat', 150, 'auto_if_residential');
   });
 
-  it('dryvan_ftl: single dry-van card, 5 universal accessorials, no zones, per-mile', () => {
+  it('dryvan_ftl: dry-van card @ $2.55/mi, sensible default accessorial set, no zones, per-mile', () => {
     const t = getSeedTemplate('dryvan_ftl');
     expect(t.rateCards.length).toBe(1);
-    expect(t.rateCards[0]).toMatchObject({ service: 'ftl', equipment: 'dryvan' });
+    expect(t.rateCards[0]).toMatchObject({ service: 'ftl', equipment: 'dryvan', ratePerMile: 2.55 });
     expect(t.accessorials.map((a) => a.code).sort()).toEqual(
-      ['detention', 'extra_stop', 'hazmat', 'layover', 'tonu'].sort()
+      ['detention', 'driver_assist', 'extra_stop', 'hazmat', 'layover', 'lumper', 'redelivery', 'scale_ticket', 'tonu'].sort()
     );
+    // representative editable-default amounts
+    expect(accAmount('dryvan_ftl', 'detention')).toBe(75);
+    expect(accAmount('dryvan_ftl', 'lumper')).toBe(150);
+    expect(accAmount('dryvan_ftl', 'redelivery')).toBe(175);
     expect(t.laneZones.length).toBe(0);
     expect(t.pricingMode).toBe('per_mile');
   });
 
-  it('reefer: reefer card + genset, no zones, per-mile', () => {
+  it('reefer: reefer card @ $2.95/mi + reefer-specific handling, no zones, per-mile', () => {
     const t = getSeedTemplate('reefer');
     expect(t.rateCards.length).toBe(1);
-    expect(t.rateCards[0]).toMatchObject({ service: 'ftl', equipment: 'reefer' });
-    expect(t.accessorials.map((a) => a.code)).toContain('reefer_genset');
+    expect(t.rateCards[0]).toMatchObject({ service: 'ftl', equipment: 'reefer', ratePerMile: 2.95 });
+    expect(t.accessorials.map((a) => a.code).sort()).toEqual(
+      ['detention', 'driver_assist', 'extra_stop', 'layover', 'reefer_genset', 'reefer_monitoring', 'reefer_precool', 'reefer_washout', 'tonu'].sort()
+    );
+    expect(accAmount('reefer', 'reefer_genset')).toBe(75);
+    expect(accAmount('reefer', 'reefer_precool')).toBe(50);
+    expect(accAmount('reefer', 'reefer_washout')).toBe(50);
     expect(t.laneZones.length).toBe(0);
     expect(t.pricingMode).toBe('per_mile');
   });
 
-  it('flatbed: flatbed+step_deck+conestoga, tarping+overweight, no zones, per-mile', () => {
+  it('flatbed: flatbed+step_deck+conestoga @ $3.25/mi base, open-deck accessorials, no zones, per-mile', () => {
     const t = getSeedTemplate('flatbed');
     expect(t.rateCards.map((c) => c.equipment).sort()).toEqual(
       ['conestoga', 'flatbed', 'step_deck'].sort()
     );
-    const codes = t.accessorials.map((a) => a.code);
-    expect(codes).toContain('tarping');
-    expect(codes).toContain('overweight');
+    const flatbedCard = t.rateCards.find((c) => c.equipment === 'flatbed');
+    expect(flatbedCard?.ratePerMile).toBe(3.25);
+    expect(t.accessorials.map((a) => a.code).sort()).toEqual(
+      ['coil_rack', 'detention', 'driver_assist', 'extra_straps_chains', 'layover', 'oversize_permit', 'overweight', 'pilot_car', 'tarping', 'tonu'].sort()
+    );
+    expect(accAmount('flatbed', 'tarping')).toBe(100);
+    expect(accAmount('flatbed', 'oversize_permit')).toBe(250);
+    expect(accAmount('flatbed', 'coil_rack')).toBe(75);
     expect(t.laneZones.length).toBe(0);
     expect(t.pricingMode).toBe('per_mile');
   });
 
-  it('hotshot: hotshot+sprinter+box_truck, liftgate, no zones, per-mile', () => {
+  it('hotshot: hotshot+sprinter+box_truck, expedite/waiting set, no zones, per-mile', () => {
     const t = getSeedTemplate('hotshot');
     expect(t.rateCards.map((c) => c.equipment).sort()).toEqual(
       ['box_truck', 'flatbed', 'sprinter'].sort()
     );
-    expect(t.accessorials.map((a) => a.code)).toContain('liftgate');
+    const hotshotCard = t.rateCards.find((c) => c.service === 'hotshot');
+    expect(hotshotCard?.ratePerMile).toBe(2.6);
+    expect(t.accessorials.map((a) => a.code).sort()).toEqual(
+      ['detention', 'driver_wait_delivery', 'driver_wait_pickup', 'expedite_fee', 'extra_stop', 'liftgate', 'tonu', 'weekend_after_hours'].sort()
+    );
+    expect(accAmount('hotshot', 'expedite_fee')).toBe(150);
+    expect(accAmount('hotshot', 'weekend_after_hours')).toBe(175);
     expect(t.laneZones.length).toBe(0);
     expect(t.pricingMode).toBe('per_mile');
   });
 
-  it('ltl: class-rated card, 6 LTL accessorials, no zones, min+mileage', () => {
+  it('ltl: class-rated card (min $125), full LTL accessorial set, no zones, min+mileage', () => {
     const t = getSeedTemplate('ltl');
     expect(t.rateCards.length).toBe(1);
-    expect(t.rateCards[0]).toMatchObject({ service: 'ltl' });
+    expect(t.rateCards[0]).toMatchObject({ service: 'ltl', minimumCharge: 125 });
     expect(t.accessorials.map((a) => a.code).sort()).toEqual(
-      ['appointment', 'inside_delivery', 'liftgate', 'ltl_loose_handling', 'ltl_no_dock', 'residential'].sort()
+      ['appointment', 'delivery_notification', 'inside_delivery', 'liftgate', 'limited_access', 'ltl_no_dock', 'overlength', 'residential', 'reweigh_reclass', 'sort_and_segregate'].sort()
     );
+    expect(accAmount('ltl', 'liftgate')).toBe(95);
+    expect(accAmount('ltl', 'reweigh_reclass')).toBe(45);
+    expect(accAmount('ltl', 'overlength')).toBe(95);
     expect(t.laneZones.length).toBe(0);
     expect(t.pricingMode).toBe('min_mileage');
   });
 
-  it('every selected row is a real default row (no invented numbers)', () => {
+  it('every selected row is a real catalog row (no invented numbers)', () => {
     for (const v of FREIGHT_VERTICALS) {
       const t = getSeedTemplate(v);
       for (const c of t.rateCards) {
         expect(DEFAULT_RATE_CARDS).toContainEqual(c);
       }
       for (const a of t.accessorials) {
-        expect(DEFAULT_ACCESSORIALS).toContainEqual(a);
+        // Accessorials may come from either DEFAULT_ACCESSORIALS or the
+        // EXPANDED_ACCESSORIAL_LIBRARY — both merged into CATALOG_ACCESSORIALS.
+        expect(CATALOG_ACCESSORIALS).toContainEqual(a);
       }
+    }
+  });
+
+  it('every non-drayage vertical selects a sensible 8-10 accessorial default set', () => {
+    for (const v of ['dryvan_ftl', 'reefer', 'ltl', 'hotshot', 'flatbed'] as const) {
+      const n = getSeedTemplate(v).accessorials.length;
+      expect(n, `${v} accessorial count`).toBeGreaterThanOrEqual(8);
+      expect(n, `${v} accessorial count`).toBeLessThanOrEqual(10);
     }
   });
 });

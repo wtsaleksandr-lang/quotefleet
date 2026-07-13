@@ -8,10 +8,13 @@
  * of the everything-included default deck (13 rate cards, 35 accessorials, 39
  * port zones) that every tenant gets at signup.
  *
- * NOTE (Phase 2 — awaits Alex's freight sign-off): the exact per-vertical
- * numbers and which accessorials default-ON are still the raw signup-seed
- * values. The MAPPING (which cards / accessorials / zones belong to each
- * vertical) is what's encoded here; the tuned per-vertical pricing comes later.
+ * Per-vertical defaults: drayage carries the real AccessAir schedule (#110);
+ * dry-van, reefer, LTL, hotshot, and flatbed each carry a sensible
+ * industry-standard default rate card + accessorial selection. Every number is
+ * a CARRIER-EDITABLE starting point — carriers re-price in the dashboard / AI
+ * chat. Accessorials are SELECTED (by `code`) from the shared catalog
+ * (DEFAULT_ACCESSORIALS + EXPANDED_ACCESSORIAL_LIBRARY); no per-vertical
+ * numbers are invented here.
  */
 import type { NewRateCard, NewAccessorial, NewLaneZone } from '../db/schema.js';
 import {
@@ -19,6 +22,21 @@ import {
   DEFAULT_ACCESSORIALS,
   generateDefaultLaneZones,
 } from './defaults.js';
+import { EXPANDED_ACCESSORIAL_LIBRARY } from './accessorialLibrary.js';
+
+/**
+ * The full accessorial catalog a template may select from: the signup-seed
+ * defaults PLUS the expanded add-on library. Deduped by `code` (DEFAULT wins),
+ * exactly like the accessorials:seed script — every tenant is seeded with both,
+ * so a vertical template can default-select from either.
+ */
+export const CATALOG_ACCESSORIALS: Omit<NewAccessorial, 'tenantId'>[] = (() => {
+  const byCode = new Map<string, Omit<NewAccessorial, 'tenantId'>>();
+  for (const a of [...DEFAULT_ACCESSORIALS, ...EXPANDED_ACCESSORIAL_LIBRARY]) {
+    if (!byCode.has(a.code)) byCode.set(a.code, a);
+  }
+  return [...byCode.values()];
+})();
 
 /** The six freight verticals the wizard offers. */
 export type FreightVertical =
@@ -109,8 +127,14 @@ const VERTICAL_SPECS: Record<FreightVertical, VerticalSpec> = {
     label: 'Dry-Van FTL',
     blurb: 'Full truckloads in a 53′ dry van, priced by the mile.',
     rateCardKeys: [{ service: 'ftl', equipment: 'dryvan' }],
-    // universal minus driver_assist (detention/layover/TONU/extra-stop/hazmat)
-    accessorialCodes: ['detention', 'layover', 'tonu', 'extra_stop', 'hazmat'],
+    // Sensible dry-van FTL default set — every accessorial is a CARRIER-EDITABLE
+    // industry-standard starting point (same convention as the drayage schedule
+    // in defaults.ts). Universal detention/layover/TONU + extra-stop, driver
+    // assist, lumper, hazmat, redelivery, and reweigh (scale ticket).
+    accessorialCodes: [
+      'detention', 'layover', 'tonu', 'extra_stop', 'driver_assist',
+      'lumper', 'hazmat', 'redelivery', 'scale_ticket',
+    ],
     includeAllZones: false,
     pricingMode: 'per_mile',
   },
@@ -119,10 +143,12 @@ const VERTICAL_SPECS: Record<FreightVertical, VerticalSpec> = {
     label: 'Reefer / Temp-controlled',
     blurb: 'Refrigerated truckloads with genset, priced by the mile.',
     rateCardKeys: [{ service: 'ftl', equipment: 'reefer' }],
-    // universal (6) + reefer genset
+    // Reefer default set (carrier-editable industry defaults): the core OTR set
+    // PLUS reefer-specific handling — genset, pre-cool, washout, and temp
+    // monitoring. Reefer/genset auto-applies on the temp-controlled toggle.
     accessorialCodes: [
-      'detention', 'layover', 'tonu', 'driver_assist', 'extra_stop', 'hazmat',
-      'reefer_genset',
+      'detention', 'layover', 'tonu', 'extra_stop', 'driver_assist',
+      'reefer_genset', 'reefer_precool', 'reefer_washout', 'reefer_monitoring',
     ],
     includeAllZones: false,
     pricingMode: 'per_mile',
@@ -132,10 +158,13 @@ const VERTICAL_SPECS: Record<FreightVertical, VerticalSpec> = {
     label: 'LTL / Partial',
     blurb: 'Less-than-truckload, class-rated with a minimum plus mileage.',
     rateCardKeys: [{ service: 'ltl', equipment: 'pallet' }],
-    // LTL / last-mile residential set
+    // LTL / last-mile default set (carrier-editable industry defaults): liftgate,
+    // residential, inside delivery, appointment, limited access, delivery
+    // notification, sort & segregate, no-dock liftgate, reweigh/reclass, overlength.
     accessorialCodes: [
       'liftgate', 'residential', 'inside_delivery', 'appointment',
-      'ltl_no_dock', 'ltl_loose_handling',
+      'limited_access', 'delivery_notification', 'sort_and_segregate',
+      'ltl_no_dock', 'reweigh_reclass', 'overlength',
     ],
     includeAllZones: false,
     pricingMode: 'min_mileage',
@@ -149,10 +178,12 @@ const VERTICAL_SPECS: Record<FreightVertical, VerticalSpec> = {
       { service: 'expedited', equipment: 'sprinter' },
       { service: 'expedited', equipment: 'box_truck' },
     ],
-    // universal (6) + liftgate
+    // Hotshot / expedited default set (carrier-editable industry defaults):
+    // expedite/rush premium, after-hours/weekend, pickup & delivery waiting time,
+    // liftgate, extra stop, detention, TONU.
     accessorialCodes: [
-      'detention', 'layover', 'tonu', 'driver_assist', 'extra_stop', 'hazmat',
-      'liftgate',
+      'detention', 'tonu', 'extra_stop', 'liftgate', 'weekend_after_hours',
+      'driver_wait_pickup', 'driver_wait_delivery', 'expedite_fee',
     ],
     includeAllZones: false,
     pricingMode: 'per_mile',
@@ -166,10 +197,13 @@ const VERTICAL_SPECS: Record<FreightVertical, VerticalSpec> = {
       { service: 'ftl', equipment: 'step_deck' },
       { service: 'ftl', equipment: 'conestoga' },
     ],
-    // universal (6) + tarping + overweight
+    // Flatbed / open-deck default set (carrier-editable industry defaults):
+    // tarping, overweight, oversize permit, pilot car/escort, extra straps &
+    // chains, coil rack, plus universal detention/layover/TONU/driver-assist.
     accessorialCodes: [
-      'detention', 'layover', 'tonu', 'driver_assist', 'extra_stop', 'hazmat',
-      'tarping', 'overweight',
+      'detention', 'layover', 'tonu', 'driver_assist', 'tarping',
+      'overweight', 'oversize_permit', 'pilot_car', 'extra_straps_chains',
+      'coil_rack',
     ],
     includeAllZones: false,
     pricingMode: 'per_mile',
@@ -225,7 +259,7 @@ export function getSeedTemplate(vertical: FreightVertical): SeedTemplate {
   ).map((c) => ({ ...c }));
 
   const wantCodes = new Set(spec.accessorialCodes);
-  const accessorials = DEFAULT_ACCESSORIALS.filter((a) => wantCodes.has(a.code)).map((a) => ({
+  const accessorials = CATALOG_ACCESSORIALS.filter((a) => wantCodes.has(a.code)).map((a) => ({
     ...a,
   }));
 

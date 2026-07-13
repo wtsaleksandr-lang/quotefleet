@@ -118,11 +118,13 @@ export const EXPANDED_ACCESSORIAL_LIBRARY: Omit<NewAccessorial, 'tenantId'>[] = 
   {
     code: 'reefer_monitoring',
     label: 'Reefer Monitoring',
-    description: 'Temperature monitoring/checks while reefer container is in custody.',
+    description: 'Temperature monitoring/checks while the reefer is in custody (container yard or over-the-road).',
     kind: 'per_day',
     amount: 35,
     trigger: 'optional',
-    appliesToServices: ['drayage'],
+    // Broadened to over-the-road reefer FTL as well — the reefer onboarding
+    // template offers temp-monitoring as an editable default add-on.
+    appliesToServices: ['drayage', 'ftl'],
     enabled: true,
     sortOrder: 115,
   },
@@ -369,5 +371,78 @@ export const EXPANDED_ACCESSORIAL_LIBRARY: Omit<NewAccessorial, 'tenantId'>[] = 
     appliesToServices: ['ftl', 'ltl', 'expedited'],
     enabled: true,
     sortOrder: 680,
+  },
+
+  // ── Vertical-default add-ons (dry-van / reefer / flatbed / hotshot / LTL) ──
+  // Standard per-vertical accessorials that the onboarding seed templates
+  // default-select but which the shared catalog above didn't yet carry. Every
+  // amount is an EDITABLE, industry-default STARTING POINT — carriers re-price
+  // these per lane / customer in the dashboard or AI chat, same convention as
+  // the drayage schedule in defaults.ts.
+  {
+    code: 'reefer_precool',
+    label: 'Reefer Pre-Cool',
+    description: 'Pre-cool the trailer to the set temperature before loading. Editable default.',
+    kind: 'flat',
+    amount: 50,
+    trigger: 'optional',
+    appliesToServices: ['ftl', 'drayage'],
+    enabled: true,
+    sortOrder: 320,
+  },
+  {
+    code: 'reefer_washout',
+    label: 'Reefer Washout',
+    description: 'Trailer washout between temperature-controlled loads (food-grade / allergen). Editable default.',
+    kind: 'flat',
+    amount: 50,
+    trigger: 'optional',
+    appliesToServices: ['ftl', 'drayage'],
+    enabled: true,
+    sortOrder: 322,
+  },
+  {
+    code: 'coil_rack',
+    label: 'Coil Rack / Special Securement',
+    description: 'Coil rack or specialized securement for steel coils and similar loads. Editable default.',
+    kind: 'flat',
+    amount: 75,
+    trigger: 'optional',
+    appliesToServices: ['ftl'],
+    enabled: true,
+    sortOrder: 540,
+  },
+  {
+    code: 'expedite_fee',
+    label: 'Expedite / Rush Fee',
+    description: 'Premium for guaranteed / same-day / team-driver expedited service. Editable default.',
+    kind: 'flat',
+    amount: 150,
+    trigger: 'optional',
+    appliesToServices: ['hotshot', 'expedited'],
+    enabled: true,
+    sortOrder: 480,
+  },
+  {
+    code: 'reweigh_reclass',
+    label: 'Reweigh / Reclass',
+    description: 'Carrier re-weighs or re-classes the shipment when the declared weight/class is wrong. Editable default.',
+    kind: 'flat',
+    amount: 45,
+    trigger: 'optional',
+    appliesToServices: ['ltl'],
+    enabled: true,
+    sortOrder: 245,
+  },
+  {
+    code: 'overlength',
+    label: 'Overlength Freight',
+    description: 'Handling surcharge for freight over standard length (typically 8 ft+). Editable default.',
+    kind: 'flat',
+    amount: 95,
+    trigger: 'optional',
+    appliesToServices: ['ltl', 'ftl'],
+    enabled: true,
+    sortOrder: 248,
   },
 ];
