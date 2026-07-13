@@ -23,7 +23,7 @@ describe('homepage final cleanup styles', () => {
   it('uses the brand mark image and keeps a non-duplicate header CTA', async () => {
     const html = await file('landing.html');
 
-    expect(html).toContain('/brand/mark-keys.png');
+    expect(html).toContain('/brand/mark-keys-ondark.png');
     expect(html).toContain('View demo <span class="arr">→</span>');
     expect(html).toContain('<a class="btn btn-primary btn-lg" href="/signup">Start free');
     expect(html).not.toContain('<a class="btn btn-primary" href="/signup">Start free');
