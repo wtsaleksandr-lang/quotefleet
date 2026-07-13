@@ -283,7 +283,7 @@ src/server/public/followup-workspace.css:77	spacing	margin: 0 0 18px
 src/server/public/followup-workspace.css:80	spacing	gap: 10px
 src/server/public/followup-workspace.css:89	spacing	margin: 0 0 10px
 src/server/public/followup-workspace.css:99	spacing	padding: 10px
-src/server/public/freight-premium-theme.css:27	spacing	margin-bottom: 10px
+src/server/public/freight-premium-theme.css:45	spacing	margin-bottom: 10px
 src/server/public/landing-conversion.css:102	spacing	margin-bottom: 18px
 src/server/public/landing-conversion.css:116	spacing	margin: 20px 0 0
 src/server/public/landing-conversion.css:122	spacing	gap: 14px

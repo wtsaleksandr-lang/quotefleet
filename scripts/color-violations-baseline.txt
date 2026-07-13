@@ -12,10 +12,10 @@ src/server/public/customize-panel.css:173:21	background: #fff
 src/server/public/dashboard-preview.css:106:28	color: #fff
 src/server/public/dashboard-preview.css:135:3	color: #fff
 src/server/public/dashboard-setup.css:274:3	color: #fff
-src/server/public/freight-premium-theme.css:39:3	color: #fff
-src/server/public/freight-premium-theme.css:69:3	background: #ffffff
-src/server/public/freight-premium-theme.css:115:3	background: #ffffff
-src/server/public/freight-premium-theme.css:144:3	color: #fff
+src/server/public/freight-premium-theme.css:57:3	color: #fff
+src/server/public/freight-premium-theme.css:87:3	background: #ffffff
+src/server/public/freight-premium-theme.css:133:3	background: #ffffff
+src/server/public/freight-premium-theme.css:162:3	color: #fff
 src/server/public/landing-s-polish.css:198:3	color: #ffffff
 src/server/public/landing-s-polish.css:239:3	color: #ffffff
 src/server/public/landing-wefixtrades-cleanup.css:65:3	color: #ffffff
