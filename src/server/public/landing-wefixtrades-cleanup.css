@@ -855,3 +855,99 @@ body.qf-wft .qf-ba-out-good::before { content: "\2713  "; }
 @media (max-width: 760px) {
   body.qf-wft .qf-ba-grid { grid-template-columns: 1fr !important; }
 }
+
+/* ── "Everything included" differentiators (Phase EI) ─────────────────────
+   Surfaces the real paid features most freight-quote tools lack — 24/7 AI
+   chat, branded PDF quotes, and automated follow-ups — in ONE tight,
+   scannable band. Reuses the trust-card visual language (dark #151a1c card,
+   hairline border, blue-tint icon tile) so it reads as native to the page.
+   Placed after the before/after proof, before the rate-database globe. The
+   legacy .ai/.pdf/.scheduler-section mockup blocks stay hidden; this band is
+   the on-brand, consolidated way those features are now surfaced. */
+body.qf-wft .qf-included-section {
+  padding: clamp(80px, 9vw, 120px) 24px !important;
+  background: #1f2628 !important;
+}
+body.qf-wft .qf-included-section .container {
+  width: min(1180px, calc(100vw - 56px)) !important;
+  margin: 0 auto !important;
+}
+body.qf-wft .qf-included-section .section-head p {
+  max-width: 720px !important;
+  margin-top: 12px !important;
+  color: rgba(245,252,255,.68) !important;
+  font-size: clamp(15px, 1.5vw, 18px) !important;
+  line-height: 1.6 !important;
+}
+body.qf-wft .qf-included-grid {
+  list-style: none !important;
+  margin: 32px 0 0 !important;
+  padding: 0 !important;
+  display: grid !important;
+  grid-template-columns: repeat(3, minmax(0, 1fr)) !important;
+  gap: 16px !important;
+}
+body.qf-wft .qf-included-card {
+  display: flex !important;
+  flex-direction: column !important;
+  align-items: flex-start !important;
+  gap: 12px !important;
+  background: #151a1c !important;
+  border: 1px solid rgba(255,255,255,.13) !important;
+  border-radius: 18px !important;
+  padding: 24px !important;
+}
+body.qf-wft .qf-included-card:hover {
+  border-color: rgba(255,255,255,.24) !important;
+}
+body.qf-wft .qf-included-ico {
+  display: inline-flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  width: 44px !important;
+  height: 44px !important;
+  border-radius: 12px !important;
+  background: rgba(13,60,252,.16) !important;
+  color: #9aaeff !important;
+}
+body.qf-wft .qf-included-ico svg {
+  width: 22px !important;
+  height: 22px !important;
+}
+body.qf-wft .qf-included-card strong {
+  color: #f5fcff !important;
+  font-size: 17px !important;
+  letter-spacing: -0.01em !important;
+}
+body.qf-wft .qf-included-card p {
+  margin: 0 !important;
+  color: rgba(245,252,255,.66) !important;
+  font-size: 14px !important;
+  line-height: 1.5 !important;
+}
+body.qf-wft .qf-included-tag {
+  margin-top: 4px !important;
+  display: inline-flex !important;
+  align-items: center !important;
+  padding: 4px 12px !important;
+  border-radius: 999px !important;
+  background: rgba(13,60,252,.16) !important;
+  border: 1px solid rgba(13,60,252,.32) !important;
+  color: #9aaeff !important;
+  font-size: 12px !important;
+  font-weight: 600 !important;
+  letter-spacing: .01em !important;
+}
+@media (max-width: 900px) {
+  body.qf-wft .qf-included-grid {
+    grid-template-columns: 1fr !important;
+  }
+}
+@media (max-width: 640px) {
+  body.qf-wft .qf-included-section {
+    padding: 60px 16px !important;
+  }
+  body.qf-wft .qf-included-section .container {
+    width: min(100%, calc(100vw - 32px)) !important;
+  }
+}
