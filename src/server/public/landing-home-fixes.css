@@ -528,3 +528,14 @@ body.qf-wft .step-art.step-shot img {
     grid-column: 1 / -1 !important;
   }
 }
+
+/* ── Mobile: showcase section-head breathing room. The "See it in action"
+   heading ("Built for trucking, by people who know it.") sat tight against the
+   paragraph below it at 375px because .section-head h2 ships margin-bottom:0.
+   Add an 8px-ramp gap under the heading so the intro copy reads as its own
+   block. Desktop is unaffected. ─────────────────────────────────────────── */
+@media (max-width: 560px) {
+  body.qf-wft.landing-v2 .qf-showcase-section .section-head h2 {
+    margin-bottom: 16px !important;
+  }
+}

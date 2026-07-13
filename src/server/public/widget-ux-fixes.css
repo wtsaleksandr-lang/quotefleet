@@ -50,6 +50,19 @@
   font-weight: 800;
 }
 
+/* ── Add-ons modal: keep the 3-up flag labels on ONE line at desktop. Inside
+   the popup dialog each flag carries a visible checkbox AND a help "?" chip, so
+   in a 520px card the ~156px columns clipped "Residential" to "Reside…" and
+   wrapped "Temp-control" to two lines. Trim the label side padding to the 8px
+   ramp and keep the text single-line; the dialog itself widens to 600px at
+   ≥560px (below). Mobile stacks these 1-per-row (≤640px) and is untouched. */
+#qf-options-modal .qf-flags label {
+  padding: 12px 8px;
+}
+#qf-options-modal .qf-flags label span:not(.qf-help) {
+  white-space: nowrap;
+}
+
 /* ── 6. "Shipment options & add-ons" opens a popup modal (was an inline fold).
    The long Drayage add-ons list overflowed the form and left a blank gap on
    collapse, so the list now lives in a scrollable overlay dialog. */
@@ -169,7 +182,7 @@
 body.qf-modal-open { overflow: hidden; }
 @media (min-width: 560px) {
   .qf-modal { align-items: center; }
-  .qf-modal-card { border-bottom: 1px solid var(--w-border); border-radius: 20px; box-shadow: 0 24px 70px rgba(0, 0, 0, 0.42); }
+  .qf-modal-card { max-width: 600px; border-bottom: 1px solid var(--w-border); border-radius: 20px; box-shadow: 0 24px 70px rgba(0, 0, 0, 0.42); }
   @keyframes qf-modal-rise { from { transform: translateY(8px) scale(0.98); opacity: 0; } to { transform: none; opacity: 1; } }
 }
 @media (prefers-reduced-motion: reduce) {

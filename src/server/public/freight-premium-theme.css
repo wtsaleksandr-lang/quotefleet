@@ -7,6 +7,24 @@
   --w-primary: #3b22f4;
   --w-primary-hover: #2917c9;
   --w-accent: #9ee8ff;
+  /* Paired, WCAG-hardened accent foregrounds for this LIGHT accent. The widget
+     runtime (public-calculator-no-gradients.css) paints the total box, CTA,
+     secondary button, result note and help chips from these tokens. Because
+     --w-accent (#9ee8ff) is a light cyan, white text on it is illegible
+     (1.36:1); so the text-bearing accent FILL resolves to the dark indigo brand
+     (#3b22f4) with white text, and the accent SURFACE (secondary / note / help /
+     active tab) is a deep navy that carries the light-cyan --w-accent as text.
+     Every one of these is also emitted by the server theme engine
+     (src/server/widgetThemes.ts), so when a tenant theme IS applied its inline
+     values override these — this block only governs the un-themed fallback. */
+  --w-accent-solid: #3b22f4;
+  --w-accent-hover: #2917c9;
+  --w-accent-text: #ffffff;
+  --w-total-text: #ffffff;
+  --w-accent-surface: #16223c;
+  --w-accent-surface-border: rgba(158, 232, 255, 0.42);
+  --w-accent-on-surface: #3b22f4;
+  --w-pill-text: #3b22f4;
   --w-radius: 20px;
   --w-shadow: 0 24px 70px rgba(37, 34, 99, 0.10), 0 2px 10px rgba(15, 23, 42, 0.05);
 }
