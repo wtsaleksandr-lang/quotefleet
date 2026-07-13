@@ -40,16 +40,16 @@
       </h1>
       <p class="muted-small" style="margin:0 0 18px; line-height:1.5;">Use an email link for the safest sign-in, or use your password if email delivery is not available.</p>
 
-      <div class="tabs" style="margin-bottom: 18px;">
-        <button class="tab active" data-pane="link">Email link</button>
-        <button class="tab" data-pane="pwd">Password</button>
+      <div class="tabs" style="margin-bottom: 18px;" role="tablist" aria-label="Sign-in method">
+        <button class="tab active" data-pane="link" id="tab-link" type="button" role="tab" aria-selected="true" aria-controls="pane-link">Email link</button>
+        <button class="tab" data-pane="pwd" id="tab-pwd" type="button" role="tab" aria-selected="false" aria-controls="pane-pwd">Password</button>
       </div>
 
-      <div class="tab-pane active" id="pane-link">
+      <div class="tab-pane active" id="pane-link" role="tabpanel" aria-labelledby="tab-link">
         <form id="magic-form" style="display:flex; flex-direction:column; gap: 16px;" novalidate>
           <div class="field">
-            <label class="field-label required">Email</label>
-            <input class="input" type="email" name="email" required autofocus autocomplete="email" inputmode="email" autocapitalize="none" spellcheck="false">
+            <label class="field-label required" for="magic-email">Email</label>
+            <input class="input" id="magic-email" type="email" name="email" required autofocus autocomplete="email" inputmode="email" autocapitalize="none" spellcheck="false">
             <span class="field-hint">We always show the same confirmation message to protect account privacy.</span>
           </div>
           <button class="btn btn-primary btn-lg btn-block" type="submit">
@@ -59,15 +59,15 @@
         </form>
       </div>
 
-      <div class="tab-pane" id="pane-pwd">
+      <div class="tab-pane" id="pane-pwd" role="tabpanel" aria-labelledby="tab-pwd">
         <form id="login-form" style="display:flex; flex-direction:column; gap: 16px;" novalidate>
           <div class="field">
-            <label class="field-label required">Email</label>
-            <input class="input" type="email" name="email" required autocomplete="email" inputmode="email" autocapitalize="none" spellcheck="false">
+            <label class="field-label required" for="login-email">Email</label>
+            <input class="input" id="login-email" type="email" name="email" required autocomplete="email" inputmode="email" autocapitalize="none" spellcheck="false">
           </div>
           <div class="field">
-            <label class="field-label required">Password</label>
-            <input class="input" type="password" name="password" required autocomplete="current-password">
+            <label class="field-label required" for="login-password">Password</label>
+            <input class="input" id="login-password" type="password" name="password" required autocomplete="current-password">
           </div>
           <button class="btn btn-primary btn-lg btn-block" type="submit">
             Sign in <span class="arr">→</span>
@@ -98,9 +98,10 @@
     });
     document.querySelectorAll('.tab').forEach(function (t) {
       t.addEventListener('click', function () {
-        document.querySelectorAll('.tab').forEach(function (x) { x.classList.remove('active'); });
+        document.querySelectorAll('.tab').forEach(function (x) { x.classList.remove('active'); x.setAttribute('aria-selected', 'false'); });
         document.querySelectorAll('.tab-pane').forEach(function (x) { x.classList.remove('active'); });
         t.classList.add('active');
+        t.setAttribute('aria-selected', 'true');
         var p = document.getElementById('pane-' + t.dataset.pane);
         if (p) p.classList.add('active');
       });

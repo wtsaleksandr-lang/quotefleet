@@ -35,11 +35,11 @@
       <div class="notice" style="margin-bottom:18px; line-height:1.5;">14-day all-inclusive trial — every Pro feature unlocked. Card required (validated at $0, not charged today); we bill the plan you pick when the trial ends. Cancel anytime.</div>
 
       <form id="signup-form" style="display:flex; flex-direction:column; gap: 18px;" novalidate>
-        <div class="field"><label class="field-label required">Company name</label><input class="input" name="companyName" placeholder="Acme Drayage" autocomplete="organization" required maxlength="120"></div>
-        <div class="field"><label class="field-label required">Your link</label><div class="url-builder"><input class="input" name="slug" id="slug-input" placeholder="acme" autocomplete="off" autocapitalize="none" spellcheck="false" required pattern="^[a-z0-9](?:[a-z0-9-]*[a-z0-9])?$" minlength="3" maxlength="30"><select class="select" name="hostDomain" id="host-input" aria-label="Host domain"></select></div><div class="url-builder-preview" id="url-preview"><span class="live">acme.quotefleet.net</span></div><span class="field-hint" id="slug-hint">Letters, numbers, dashes. No spaces.</span></div>
-        <div class="grid-2"><div class="field"><label class="field-label required">Email</label><input class="input" type="email" name="email" required autocomplete="email" inputmode="email" autocapitalize="none" spellcheck="false"></div><div class="field"><label class="field-label required">Phone</label><input class="input" name="contactPhone" type="tel" autocomplete="tel" placeholder="For account recovery"></div></div>
-        <div class="grid-2"><div class="field"><label class="field-label required">Password</label><input class="input" type="password" name="password" id="password-input" minlength="10" maxlength="200" autocomplete="new-password" required><span class="field-hint" id="password-hint">Minimum 10 characters. Use a unique password.</span></div><div class="field"><label class="field-label required">Confirm password</label><input class="input" type="password" name="confirmPassword" id="confirm-password-input" minlength="10" maxlength="200" autocomplete="new-password" required><span class="field-hint" id="confirm-hint">Re-enter the same password.</span></div></div>
-        <div class="field"><label class="field-label">Where you operate</label><select class="select" name="countryFocus"><option value="US" selected>USA</option><option value="CA">Canada</option><option value="BOTH">USA + Canada</option></select></div>
+        <div class="field"><label class="field-label required" for="companyName">Company name</label><input class="input" id="companyName" name="companyName" placeholder="Acme Drayage" autocomplete="organization" required maxlength="120"></div>
+        <div class="field"><label class="field-label required" for="slug-input">Your link</label><div class="url-builder"><input class="input" name="slug" id="slug-input" placeholder="acme" autocomplete="off" autocapitalize="none" spellcheck="false" required pattern="^[a-z0-9](?:[a-z0-9-]*[a-z0-9])?$" minlength="3" maxlength="30"><select class="select" name="hostDomain" id="host-input" aria-label="Host domain"></select></div><div class="url-builder-preview" id="url-preview"><span class="live">acme.quotefleet.net</span></div><span class="field-hint" id="slug-hint">Letters, numbers, dashes. No spaces.</span></div>
+        <div class="grid-2"><div class="field"><label class="field-label required" for="email">Email</label><input class="input" id="email" type="email" name="email" required autocomplete="email" inputmode="email" autocapitalize="none" spellcheck="false"></div><div class="field"><label class="field-label" for="contactPhone">Phone</label><input class="input" id="contactPhone" name="contactPhone" type="tel" autocomplete="tel" placeholder="For account recovery"></div></div>
+        <div class="grid-2"><div class="field"><label class="field-label required" for="password-input">Password</label><input class="input" type="password" name="password" id="password-input" minlength="10" maxlength="200" autocomplete="new-password" required><span class="field-hint" id="password-hint">Minimum 10 characters. Use a unique password.</span></div><div class="field"><label class="field-label required" for="confirm-password-input">Confirm password</label><input class="input" type="password" name="confirmPassword" id="confirm-password-input" minlength="10" maxlength="200" autocomplete="new-password" required><span class="field-hint" id="confirm-hint">Re-enter the same password.</span></div></div>
+        <div class="field"><label class="field-label" for="countryFocus">Where you operate</label><select class="select" id="countryFocus" name="countryFocus"><option value="US" selected>USA</option><option value="CA">Canada</option><option value="BOTH">USA + Canada</option></select></div>
         <div class="field">
           <label class="field-label required">Choose your plan</label>
           <div id="plan-choice" style="display:flex; flex-direction:column; gap:10px;">
@@ -54,7 +54,7 @@
           </div>
           <span class="field-hint">Your 14-day trial is all-inclusive either way — you can switch plans anytime.</span>
         </div>
-        <label style="display:flex; gap:10px; align-items:flex-start; padding:10px 12px; background:var(--surface-2); border:1px solid var(--border); border-radius:8px; cursor:pointer; font-size:13.5px; line-height:1.55;"><input type="checkbox" id="dpa-accept" name="dpaAccept" required style="margin-top:3px; flex-shrink:0;"><span>I have read and agree to the <a href="/security" target="_blank" rel="noopener">Security policy</a>, <a href="/dpa" target="_blank" rel="noopener">Data Processing Addendum (v1.0)</a>, and confirm that QuoteFleet may process customer data on my behalf under those terms.</span></label>
+        <label class="consent-opt" style="display:flex; gap:10px; align-items:flex-start; padding:10px 12px; background:var(--surface-2); border:1px solid var(--border); border-radius:8px; cursor:pointer; font-size:13.5px; line-height:1.55;"><input type="checkbox" id="dpa-accept" name="dpaAccept" required style="margin-top:3px; flex-shrink:0;"><span>I have read and agree to the <a href="/security" target="_blank" rel="noopener">Security policy</a>, <a href="/dpa" target="_blank" rel="noopener">Data Processing Addendum (v1.0)</a>, and confirm that QuoteFleet may process customer data on my behalf under those terms.</span></label>
         <button class="btn btn-primary btn-lg btn-block" type="submit" id="signup-submit" disabled>Start 14-day trial <span class="arr">→</span></button>
         <div id="signup-error" class="notice error hidden" role="alert"></div>
         <p class="muted-small" style="text-align:center; margin-top: 14px; line-height: 1.55;">Your rates are private by default. Marketplace exposure is opt-in and benchmarks are anonymized. <a href="/security" target="_blank" rel="noopener">Read the full policy →</a></p>
@@ -79,12 +79,14 @@
     var slugOk = false;
     function slugify(s) { return (s || '').toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)/g, '').slice(0, 30); }
     function normalizeEmail(s) { return (s || '').trim().toLowerCase(); }
+    function validEmail(s) { return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(s || ''); }
     function refreshPreview() { var s = slugInput.value.trim() || 'your-slug'; var h = hostInput.value || 'quotefleet.net'; preview.textContent = s + '.' + h; }
     function setHint(node, text, cls) { node.textContent = text; node.className = 'field-hint' + (cls ? ' ' + cls : ''); }
     var slugTouched = false;
     slugInput.addEventListener('input', function () { slugTouched = true; slugInput.value = slugify(slugInput.value); refreshPreview(); checkSlug(); syncSubmit(); });
     companyInput.addEventListener('input', function () { if (!slugTouched) { slugInput.value = slugify(companyInput.value); refreshPreview(); checkSlug(); syncSubmit(); } });
     hostInput.addEventListener('change', refreshPreview);
+    emailInput.addEventListener('input', syncSubmit);
     emailInput.addEventListener('blur', function () { emailInput.value = normalizeEmail(emailInput.value); syncSubmit(); });
     var slugTimer = null;
     function checkSlug() {
@@ -123,7 +125,7 @@
       (opts.hostDomains || ['quotefleet.net']).forEach(function (h) { var o = document.createElement('option'); o.value = h; o.textContent = h; if (h === opts.defaultHostDomain) o.selected = true; hostInput.appendChild(o); });
       refreshPreview();
     }).catch(function () { hostInput.innerHTML = '<option value="quotefleet.net">quotefleet.net</option>'; refreshPreview(); });
-    function syncSubmit() { submit.disabled = !(dpa.checked && form.companyName.value.trim() && normalizeEmail(emailInput.value) && checkPassword() && slugInput.value.trim().length >= 3); }
+    function syncSubmit() { submit.disabled = !(dpa.checked && form.companyName.value.trim() && validEmail(normalizeEmail(emailInput.value)) && checkPassword() && slugInput.value.trim().length >= 3); }
     dpa.addEventListener('change', syncSubmit); syncSubmit();
     // Selected-plan visual highlight + ?plan= prefill from the pricing page.
     function selectedPlan() { var r = form.querySelector('input[name="plan"]:checked'); return r ? r.value : 'vital'; }

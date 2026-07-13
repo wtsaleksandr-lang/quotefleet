@@ -154,3 +154,14 @@ body.qf-auth-wft .qf-mc-bubble.open {
   background: #22282A !important;
   color: #FFFFFF !important;
 }
+
+/* Legal-consent (DPA/Security) checkbox row: same dark-surface treatment as
+   .plan-opt. The inline background:var(--surface-2) resolves to the LIGHT
+   chip (#E4EDF1); with white ink that was ~1.19:1 (unreadable). Forcing the
+   dark card surface restores the site's white-on-dark text/link contrast. */
+body.qf-auth-wft .consent-opt {
+  background: #22282A !important;
+  border-color: rgba(255,255,255,.14) !important;
+  color: var(--ink) !important;
+}
+body.qf-auth-wft .consent-opt a { color: var(--ink) !important; text-decoration: underline; }

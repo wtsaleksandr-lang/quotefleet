@@ -114,6 +114,20 @@
       text-align: center;
       font-family: var(--font-mono, monospace); letter-spacing: 0.06em; text-transform: uppercase;
     }
+
+    /* Narrow viewports: raise the launcher (and its panel) so it clears
+       full-width primary CTAs like "Start 14-day trial" on the pricing cards,
+       and respect the iOS home-indicator safe area. Desktop position is
+       untouched. */
+    @media (max-width: 480px) {
+      .qf-mc-bubble {
+        bottom: calc(84px + env(safe-area-inset-bottom, 0px));
+      }
+      .qf-mc-panel {
+        bottom: calc(152px + env(safe-area-inset-bottom, 0px));
+        max-height: min(560px, calc(100vh - 172px));
+      }
+    }
   `;
   var style = document.createElement('style');
   style.textContent = css;
