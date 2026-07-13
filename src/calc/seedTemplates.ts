@@ -5,7 +5,7 @@
  * `defaults.ts` — it invents no new rate/accessorial/zone numbers. The wizard
  * lets a new trucker pick the ONE vertical they actually run, and the
  * apply-endpoint reseeds their tenant with just that vertical's subset instead
- * of the everything-included default deck (13 rate cards, 20 accessorials, 39
+ * of the everything-included default deck (13 rate cards, 35 accessorials, 39
  * port zones) that every tenant gets at signup.
  *
  * NOTE (Phase 2 — awaits Alex's freight sign-off): the exact per-vertical
@@ -85,11 +85,21 @@ const VERTICAL_SPECS: Record<FreightVertical, VerticalSpec> = {
       { service: 'drayage', equipment: 'container_40hc' },
       { service: 'drayage', equipment: 'container_45' },
     ],
-    // universal (6) + drayage-specific (7)
+    // Real port-drayage accessorial set (Alex's AccessAir schedule,
+    // reconciled across two live quotes). Shared/universal codes + the
+    // drayage-specific real ones from DEFAULT_ACCESSORIALS.
     accessorialCodes: [
-      'detention', 'layover', 'tonu', 'driver_assist', 'extra_stop', 'hazmat',
-      'chassis_split', 'prepull', 'storage', 'drop_hook', 'pier_pass',
-      'overweight', 'reefer_genset',
+      // shared / universal
+      'detention', 'detention_terminal', 'layover', 'tonu', 'driver_assist',
+      'residential', 'drop_hook', 'pier_pass', 'toll_pass_through',
+      // chassis
+      'chassis_rental', 'chassis_split', 'chassis_positioning',
+      'chassis_return', 'flip_fee', 'triaxle',
+      // moves / storage
+      'prepull', 'stop_off', 'wait_time', 'storage', 'reefer_storage',
+      // conditional / fees
+      'hazmat_flat', 'in_bond', 'overweight', 'reefer_flat', 'reefer_genset',
+      'rail_terminal_surcharge', 'weekend_fee',
     ],
     includeAllZones: true,
     pricingMode: 'zone',
