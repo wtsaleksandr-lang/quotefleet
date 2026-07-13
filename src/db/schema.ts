@@ -106,6 +106,19 @@ export const tenants = pgTable(
      *  Keys: 'welcome', 'day_7', 'day_12', 'day_14_expired', etc.
      *  Values: ISO timestamp of when sent. */
     lifecycleEmailsJson: jsonb('lifecycle_emails_json').$type<Record<string, string>>(),
+    /** Post-signup guided-onboarding record. Null until the trucker finishes
+     *  (or skips) the wizard. `needsOnboarding` on /api/auth/me is derived as
+     *  (completedAt == null && !skipped) — a server flag, so the wizard survives
+     *  a billing/Stripe redirect (localStorage would not). `freightVertical` +
+     *  `pricingMode` also feed the AI context. Additive, no signup backfill —
+     *  existing tenants read null and simply never see the wizard. */
+    onboardingJson: jsonb('onboarding_json').$type<{
+      completedAt: string | null;
+      skipped: boolean;
+      freightVertical?: string;
+      pricingMode?: string;
+      mainLane?: { from: string | null; to: string | null };
+    }>(),
     /** Optional per-tenant Anthropic API key (encrypted). When set,
      *  overrides the platform default for that tenant's AI calls. */
     anthropicKeyEncrypted: text('anthropic_key_encrypted'),

@@ -2552,7 +2552,14 @@
 
       // Route from URL
       var initial = (location.pathname.split('/app/')[1] || 'overview').split('/')[0];
-      go(initial);
+      // Post-signup guided onboarding: gated by the SERVER flag (survives the
+      // billing/Stripe hop). Show the wizard overlay instead of routing; it
+      // hands control back via onDone once finished or skipped.
+      if (r.tenant && r.tenant.needsOnboarding && window.QFOnboardingWizard) {
+        window.QFOnboardingWizard.open({ me: r, onDone: function () { go(initial); } });
+      } else {
+        go(initial);
+      }
     }).catch(function (e) {
       // Only bounce to /login on a genuine auth failure (401). Any other
       // thrown error (e.g. a rendering bug) must NOT masquerade as logout —

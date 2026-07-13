@@ -588,6 +588,7 @@ export function registerAuthRoutes(app: Express) {
           embedToken: string;
           plan: string;
           trialEndsAt: Date | null;
+          needsOnboarding: boolean;
         }
       | null = null;
     let trial: TrialState | null = null;
@@ -608,6 +609,12 @@ export function registerAuthRoutes(app: Express) {
           embedToken: t[0].embedToken,
           plan: t[0].plan,
           trialEndsAt: t[0].trialEndsAt,
+          // Server-side gate for the post-signup guided wizard. True until the
+          // trucker finishes OR skips it. A server flag (not localStorage) so
+          // it survives the billing/Stripe redirect after signup.
+          needsOnboarding:
+            (t[0].onboardingJson?.completedAt ?? null) == null &&
+            !t[0].onboardingJson?.skipped,
         };
         trial = await getTrialState(t[0]);
       }
