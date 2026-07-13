@@ -65,6 +65,13 @@ import { loadEnv } from '../../config.js';
 import { makePreviewGrant, PREVIEW_GRANT_PARAM, PREVIEW_GRANT_TTL_MS } from '../access.js';
 import { syncTenantToMarketplace } from '../../marketplace/sync.js';
 import { DEFAULT_AI_SYSTEM_PROMPT, AUTO_FSC_DEFAULTS } from '../../calc/defaults.js';
+import {
+  FREIGHT_VERTICALS,
+  PRICING_MODES,
+  getSeedTemplate,
+  isSeedPristine,
+  type FreightVertical,
+} from '../../calc/seedTemplates.js';
 import { getDieselPrice, asOfLabel } from '../../eia/dieselPrice.js';
 import { autoFscPerMile } from '../../calc/fuelSurcharge.js';
 import { createHmac } from 'node:crypto';
@@ -1038,5 +1045,151 @@ export function registerTenantRoutes(app: Express) {
       .orderBy(desc(auditLog.createdAt))
       .limit(100);
     res.json({ audit: rows });
+  });
+
+  // ── post-signup guided onboarding ──────────────────────────────
+  // The wizard (src/server/public/onboarding-wizard.js) posts here on FINISH
+  // or SKIP. On finish we reseed the tenant with the picked freight vertical's
+  // subset — but ONLY when the tenant's rows are still the untouched signup
+  // seed (isSeedPristine). If the trucker already customized rates, we NEVER
+  // delete their data: we just stamp pricing/lane/brand + completedAt.
+  const HEX = /^#[0-9a-fA-F]{6}$/;
+  const OnboardingApply = z.object({
+    skip: z.boolean().optional(),
+    freightVertical: z.enum([...FREIGHT_VERTICALS] as [FreightVertical, ...FreightVertical[]]).optional(),
+    pricingMode: z.enum([...PRICING_MODES] as [string, ...string[]]).optional(),
+    mainLane: z
+      .object({
+        from: z.string().max(160).nullable().optional(),
+        to: z.string().max(160).nullable().optional(),
+      })
+      .nullable()
+      .optional(),
+    brand: z
+      .object({
+        primaryColor: z.string().regex(HEX).optional(),
+        accentColor: z.string().regex(HEX).optional(),
+        logoUrl: z.string().max(MAX_LOGO_CHARS).nullable().optional(),
+      })
+      .nullable()
+      .optional(),
+  });
+
+  app.post('/api/tenant/onboarding/apply', requireAuth, requireTenant, async (req, res) => {
+    const parse = OnboardingApply.safeParse(req.body);
+    if (!parse.success) return res.status(400).json({ error: 'Invalid input' });
+    const body = parse.data;
+    const tid = req.tenant!.id;
+
+    // SKIP — no reseed, no brand change. Just mark it skipped so the gate
+    // stops firing. Leave completedAt null so a later real completion still
+    // counts as "completed" if we ever re-open the flow.
+    if (body.skip) {
+      await db()
+        .update(tenants)
+        .set({
+          onboardingJson: { completedAt: null, skipped: true },
+          updatedAt: new Date(),
+        })
+        .where(eq(tenants.id, tid));
+      return res.json({ ok: true, skipped: true, reseeded: false });
+    }
+
+    if (!body.freightVertical) {
+      return res.status(400).json({ error: 'freightVertical is required to finish onboarding' });
+    }
+    const template = getSeedTemplate(body.freightVertical);
+    const pricingMode = body.pricingMode ?? template.pricingMode;
+
+    // Read the current seed rows + the tenant's existing onboarding record to
+    // decide whether a reseed is safe.
+    const [existingRates, existingAcc, existingZones, tenantRow] = await Promise.all([
+      db().select().from(rateCards).where(eq(rateCards.tenantId, tid)),
+      db().select().from(accessorials).where(eq(accessorials.tenantId, tid)),
+      db().select().from(laneZones).where(eq(laneZones.tenantId, tid)),
+      db().select().from(tenants).where(eq(tenants.id, tid)).limit(1),
+    ]);
+
+    const alreadyCompleted = (tenantRow[0]?.onboardingJson?.completedAt ?? null) != null;
+    const pristine = isSeedPristine({
+      rateCards: existingRates.map((c) => ({
+        service: c.service,
+        equipment: c.equipment,
+        ratePerMile: c.ratePerMile,
+        minimumCharge: c.minimumCharge,
+        flatFee: c.flatFee,
+      })),
+      accessorials: existingAcc.map((a) => ({ code: a.code, amount: a.amount, enabled: a.enabled })),
+      laneZones: existingZones.map((z) => ({ anchorPortCode: z.anchorPortCode, flatPrice: z.flatPrice })),
+    });
+
+    // Only reseed on the FIRST run over an untouched seed. A tenant who edited
+    // rates, or already completed onboarding once, keeps every row.
+    const doReseed = !alreadyCompleted && pristine;
+
+    await db().transaction(async (tx) => {
+      if (doReseed) {
+        await tx.delete(rateCards).where(eq(rateCards.tenantId, tid));
+        await tx.delete(accessorials).where(eq(accessorials.tenantId, tid));
+        await tx.delete(laneZones).where(eq(laneZones.tenantId, tid));
+        if (template.rateCards.length > 0) {
+          await tx.insert(rateCards).values(template.rateCards.map((c) => ({ ...c, tenantId: tid })));
+        }
+        if (template.accessorials.length > 0) {
+          await tx
+            .insert(accessorials)
+            .values(template.accessorials.map((a) => ({ ...a, tenantId: tid })));
+        }
+        if (template.laneZones.length > 0) {
+          await tx.insert(laneZones).values(template.laneZones.map((z) => ({ ...z, tenantId: tid })));
+        }
+      }
+
+      // Brand: colors are free for everyone; a custom logo is a Vital+ perk, so
+      // only apply logoUrl when the plan allows (never 403 the whole wizard —
+      // silently skip the logo instead).
+      if (body.brand) {
+        const brandPatch: Record<string, unknown> = {};
+        if (body.brand.primaryColor) brandPatch.primaryColor = body.brand.primaryColor;
+        if (body.brand.accentColor) brandPatch.accentColor = body.brand.accentColor;
+        const hasCore =
+          req.user?.role === 'super_admin' ||
+          (CORE_PLANS as readonly string[]).includes(effectivePlan(req.tenant!));
+        if (hasCore && Object.prototype.hasOwnProperty.call(body.brand, 'logoUrl')) {
+          brandPatch.logoUrl = body.brand.logoUrl ?? null;
+        }
+        if (Object.keys(brandPatch).length > 0) {
+          brandPatch.updatedAt = new Date();
+          await tx.update(brandConfigs).set(brandPatch).where(eq(brandConfigs.tenantId, tid));
+        }
+      }
+
+      await tx
+        .update(tenants)
+        .set({
+          onboardingJson: {
+            completedAt: new Date().toISOString(),
+            skipped: false,
+            freightVertical: body.freightVertical,
+            pricingMode,
+            mainLane: body.mainLane
+              ? { from: body.mainLane.from ?? null, to: body.mainLane.to ?? null }
+              : undefined,
+          },
+          updatedAt: new Date(),
+        })
+        .where(eq(tenants.id, tid));
+
+      await tx.insert(auditLog).values({
+        tenantId: tid,
+        userId: req.user!.id,
+        action: 'onboarding.apply',
+        actorKind: 'user',
+        detailsJson: { freightVertical: body.freightVertical, pricingMode, reseeded: doReseed },
+      });
+    });
+
+    bumpMarketplace(tid);
+    res.json({ ok: true, skipped: false, reseeded: doReseed, freightVertical: body.freightVertical, pricingMode });
   });
 }

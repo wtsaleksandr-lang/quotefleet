@@ -1,0 +1,286 @@
+/* ─────────────────────────────────────────────────────────────────────────
+   Post-signup guided onboarding wizard — full-bleed overlay.
+
+   Mobile-first, ≤2-3 decisions per screen, all colors via theme tokens
+   (var(--*)) so it themes light/dark for free and passes the color + spacing
+   guards. Spacing uses the 8px ramp via var(--space-*).
+   ───────────────────────────────────────────────────────────────────────── */
+
+.qf-ob-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 2000;
+  display: flex;
+  align-items: stretch;
+  justify-content: center;
+  background: var(--bg);
+  overflow-y: auto;
+  -webkit-overflow-scrolling: touch;
+}
+
+.qf-ob-shell {
+  width: 100%;
+  max-width: 640px;
+  margin: 0 auto;
+  display: flex;
+  flex-direction: column;
+  min-height: 100%;
+  padding: var(--space-3) var(--space-2);
+}
+
+/* ── header: progress + skip ─────────────────────────────────────────────── */
+.qf-ob-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-2);
+  margin-bottom: var(--space-3);
+}
+
+.qf-ob-brand {
+  display: flex;
+  align-items: center;
+  gap: var(--space-1);
+  font-weight: 700;
+  color: var(--ink);
+  font-size: 15px;
+}
+
+.qf-ob-skip {
+  appearance: none;
+  border: 1px solid var(--border);
+  background: transparent;
+  color: var(--muted);
+  border-radius: var(--radius-pill);
+  padding: var(--space-1) var(--space-2);
+  min-height: 36px;
+  font-size: 13px;
+  cursor: pointer;
+  transition: color 0.15s ease, border-color 0.15s ease;
+}
+.qf-ob-skip:hover {
+  color: var(--ink);
+  border-color: var(--border-strong);
+}
+
+.qf-ob-progress {
+  display: flex;
+  gap: var(--space-1);
+  margin-bottom: var(--space-3);
+}
+.qf-ob-progress span {
+  flex: 1 1 0;
+  height: 4px;
+  border-radius: var(--radius-pill);
+  background: var(--surface-2);
+  transition: background 0.2s ease;
+}
+.qf-ob-progress span.is-active {
+  background: var(--accent);
+}
+
+/* ── step body ───────────────────────────────────────────────────────────── */
+.qf-ob-body {
+  flex: 1 1 auto;
+}
+.qf-ob-kicker {
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--accent);
+  margin-bottom: var(--space-1);
+}
+.qf-ob-title {
+  font-size: 24px;
+  line-height: 1.25;
+  font-weight: 800;
+  color: var(--ink);
+  margin: 0 0 var(--space-1) 0;
+}
+.qf-ob-sub {
+  font-size: 14px;
+  line-height: 1.5;
+  color: var(--muted);
+  margin: 0 0 var(--space-3) 0;
+}
+
+/* ── option cards (vertical + pricing) ───────────────────────────────────── */
+.qf-ob-cards {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: var(--space-1-5);
+}
+@media (min-width: 560px) {
+  .qf-ob-cards.is-two { grid-template-columns: 1fr 1fr; }
+}
+
+.qf-ob-card {
+  display: block;
+  width: 100%;
+  text-align: left;
+  appearance: none;
+  cursor: pointer;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  padding: var(--space-2);
+  min-height: 44px;
+  transition: border-color 0.15s ease, background 0.15s ease, box-shadow 0.15s ease;
+  color: var(--ink);
+}
+.qf-ob-card:hover {
+  border-color: var(--border-strong);
+  background: var(--surface-2);
+}
+.qf-ob-card.is-selected {
+  border-color: var(--accent);
+  box-shadow: 0 0 0 1px var(--accent);
+  background: var(--accent-soft);
+}
+.qf-ob-card-title {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-1);
+  font-size: 15px;
+  font-weight: 700;
+  color: var(--ink);
+}
+.qf-ob-card-blurb {
+  font-size: 13px;
+  line-height: 1.5;
+  color: var(--muted);
+  margin-top: var(--space-0-5);
+}
+.qf-ob-check {
+  flex: 0 0 auto;
+  width: 20px;
+  height: 20px;
+  border-radius: var(--radius-pill);
+  border: 1px solid var(--border-strong);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--accent-ink);
+  font-size: 12px;
+}
+.qf-ob-card.is-selected .qf-ob-check {
+  background: var(--accent);
+  border-color: var(--accent);
+}
+
+/* ── lane + brand inputs ─────────────────────────────────────────────────── */
+.qf-ob-field {
+  margin-bottom: var(--space-2);
+}
+.qf-ob-field label {
+  display: block;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--ink);
+  margin-bottom: var(--space-0-5);
+}
+.qf-ob-input {
+  width: 100%;
+  box-sizing: border-box;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-btn);
+  color: var(--ink);
+  padding: var(--space-1-5);
+  min-height: 44px;
+  font-size: 15px;
+  transition: border-color 0.15s ease;
+}
+.qf-ob-input:focus {
+  outline: none;
+  border-color: var(--accent);
+}
+.qf-ob-input::placeholder { color: var(--muted-soft); }
+
+.qf-ob-lane {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: var(--space-1-5);
+}
+@media (min-width: 480px) {
+  .qf-ob-lane { grid-template-columns: 1fr auto 1fr; align-items: end; }
+}
+.qf-ob-lane-arrow {
+  display: none;
+  color: var(--muted);
+  padding-bottom: var(--space-1-5);
+  font-size: 18px;
+}
+@media (min-width: 480px) {
+  .qf-ob-lane-arrow { display: block; }
+}
+
+.qf-ob-swatches {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-1);
+}
+.qf-ob-swatch {
+  width: 40px;
+  height: 40px;
+  border-radius: var(--radius-pill);
+  border: 1px solid var(--border);
+  cursor: pointer;
+  padding: 0;
+  transition: transform 0.12s ease, box-shadow 0.12s ease;
+}
+.qf-ob-swatch:hover { transform: scale(1.08); }
+.qf-ob-swatch.is-selected {
+  box-shadow: 0 0 0 2px var(--bg), 0 0 0 4px var(--accent);
+}
+
+/* ── footer nav ──────────────────────────────────────────────────────────── */
+.qf-ob-foot {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-2);
+  margin-top: var(--space-3);
+  padding-top: var(--space-2);
+  border-top: 1px solid var(--border);
+  position: sticky;
+  bottom: 0;
+  background: var(--bg);
+}
+.qf-ob-btn {
+  appearance: none;
+  cursor: pointer;
+  border-radius: var(--radius-btn);
+  padding: var(--space-1-5) var(--space-3);
+  min-height: 44px;
+  font-size: 15px;
+  font-weight: 600;
+  transition: background 0.15s ease, border-color 0.15s ease, opacity 0.15s ease;
+}
+.qf-ob-btn-back {
+  border: 1px solid var(--border);
+  background: transparent;
+  color: var(--ink);
+}
+.qf-ob-btn-back:hover { border-color: var(--border-strong); }
+.qf-ob-btn-next {
+  border: 1px solid var(--cta-bg);
+  background: var(--cta-bg);
+  color: var(--cta-text);
+}
+.qf-ob-btn-next:hover { background: var(--cta-bg-hover); border-color: var(--cta-bg-hover); }
+.qf-ob-btn:disabled { opacity: 0.5; cursor: not-allowed; }
+
+.qf-ob-error {
+  color: var(--error);
+  font-size: 13px;
+  line-height: 1.5;
+  margin-top: var(--space-1);
+}
+
+@media (max-width: 380px) {
+  .qf-ob-title { font-size: 20px; }
+  .qf-ob-shell { padding: var(--space-2) var(--space-1-5); }
+}

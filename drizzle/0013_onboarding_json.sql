@@ -1,0 +1,11 @@
+-- Post-signup guided-onboarding record for the tenant. Holds the trucker's
+-- wizard answers + completion state:
+--   { completedAt, skipped, freightVertical, pricingMode, mainLane:{from,to} }
+--
+-- `needsOnboarding` on /api/auth/me is derived server-side from this column
+-- (completedAt == null && !skipped) so the wizard survives a billing/Stripe
+-- redirect. The apply-endpoint (POST /api/tenant/onboarding/apply) writes it.
+--
+-- Nullable, no default, no backfill — existing tenants read null and simply
+-- never see the wizard. Idempotent so it's safe to re-run on deploy.
+ALTER TABLE "tenants" ADD COLUMN IF NOT EXISTS "onboarding_json" jsonb;
