@@ -539,3 +539,115 @@ body.qf-wft .step-art.step-shot img {
     margin-bottom: 16px !important;
   }
 }
+
+/* ── How it works — 4 stacked full-width step cards (uniform, video-ready) ───
+   Before: `.simple-steps` was a 2×2/4-col grid of `.simple-step` cards whose
+   `.step-art.step-shot` images rendered at their NATURAL aspect (height:auto),
+   so screenshots of different ratios (2.57 / 1.98 / 2.19 / 1.57) produced
+   random card heights and a misaligned grid — exactly what Alex flagged.
+   After: one full-width card per step, stacked vertically, each with a
+   FIXED-ASPECT media slot (identical size across all four → cards align) plus a
+   numbered plain-language explanation. The media slot holds an <img> today and
+   accepts a <video autoplay loop muted playsinline> later with ZERO layout
+   change (both are positioned identically inside `.hiw-media`). The extra
+   `.hiw-*` classes out-specify the earlier `.simple-step(s)` grid rules. ───── */
+body.qf-wft.landing-v2 .simple-steps.hiw-stack {
+  display: flex !important;
+  flex-direction: column !important;
+  grid-template-columns: none !important;
+  gap: 16px !important;
+  list-style: none !important;
+  margin: 0 !important;
+  padding: 0 !important;
+  align-items: stretch !important;
+}
+body.qf-wft.landing-v2 .simple-step.hiw-card {
+  display: grid !important;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr) !important;
+  align-items: center !important;
+  gap: 32px !important;
+  width: 100% !important;
+  min-height: 0 !important;
+  padding: 24px !important;
+}
+/* Uniform, video-ready media slot — same box for every step. */
+body.qf-wft.landing-v2 .hiw-card .hiw-media {
+  position: relative !important;
+  width: 100% !important;
+  aspect-ratio: 16 / 10 !important;
+  border-radius: 16px !important;
+  overflow: hidden !important;
+  background: rgba(255, 255, 255, .035) !important;
+  border: 1px solid rgba(255, 255, 255, .11) !important;
+  display: flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  gap: 8px !important;
+}
+body.qf-wft.landing-v2 .hiw-card .hiw-media > img,
+body.qf-wft.landing-v2 .hiw-card .hiw-media > video {
+  position: absolute !important;
+  inset: 0 !important;
+  width: 100% !important;
+  height: 100% !important;
+  object-fit: contain !important;
+  display: block !important;
+}
+/* Step-1 branded placeholder panel (no signup screenshot exists yet — a clean
+   branded box, not an empty frame; swappable for the signup loop later). */
+body.qf-wft.landing-v2 .hiw-card .hiw-media-ph {
+  flex-direction: column !important;
+  color: var(--accent) !important;
+}
+body.qf-wft.landing-v2 .hiw-ph-ico {
+  width: 48px !important;
+  height: 48px !important;
+}
+body.qf-wft.landing-v2 .hiw-ph-cap {
+  font-family: var(--font-mono) !important;
+  font-size: 13px !important;
+  letter-spacing: .04em !important;
+  text-transform: uppercase !important;
+  color: var(--ink-soft) !important;
+}
+body.qf-wft.landing-v2 .hiw-card .hiw-body {
+  display: flex !important;
+  flex-direction: column !important;
+  align-items: flex-start !important;
+  gap: 8px !important;
+}
+body.qf-wft.landing-v2 .hiw-card .hiw-num {
+  display: inline-flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  width: 32px !important;
+  height: 32px !important;
+  border-radius: 999px !important;
+  background: rgba(110, 139, 255, .14) !important;
+  border: 1px solid rgba(110, 139, 255, .42) !important;
+  color: var(--accent) !important;
+  font-family: var(--font-mono) !important;
+  font-size: 15px !important;
+  font-weight: 700 !important;
+}
+body.qf-wft.landing-v2 .hiw-card .hiw-body strong {
+  margin: 4px 0 0 !important;
+  font-size: 20px !important;
+}
+body.qf-wft.landing-v2 .hiw-card .hiw-body p {
+  margin: 0 !important;
+  font-size: 15px !important;
+  line-height: 1.55 !important;
+  max-width: 46ch !important;
+}
+/* Mobile: media on top, copy below, clean full-width stack at 375px. */
+@media (max-width: 640px) {
+  body.qf-wft.landing-v2 .simple-step.hiw-card {
+    grid-template-columns: 1fr !important;
+    gap: 16px !important;
+    padding: 16px !important;
+  }
+  body.qf-wft.landing-v2 .hiw-card .hiw-body p {
+    max-width: none !important;
+  }
+}
