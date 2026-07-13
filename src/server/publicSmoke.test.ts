@@ -210,6 +210,9 @@ describe('public static page smoke checks', () => {
     // brand mark image replaces the old inline route SVG (white-outline on-dark variant)
     expect(html).toContain('/brand/mark-keys-ondark.png');
     expect(html).not.toContain('qf-route-logo');
+    // footer features the FULL logo lockup (calculator + truck, white-outline on-dark)
+    expect(html).toContain('/brand/logo-full-ondark.png');
+    expect(html).toContain('class="qf-footer-logo"');
   });
 
   it('demo showcase shell frames the live widget with device + theme toggles', async () => {
