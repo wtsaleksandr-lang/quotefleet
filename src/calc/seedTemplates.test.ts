@@ -48,16 +48,63 @@ describe('seedTemplates — vertical selection', () => {
     expect(listVerticalOptions().map((o) => o.vertical)).toEqual(FREIGHT_VERTICALS);
   });
 
-  it('drayage: 4 container cards, universal+drayage accessorials, all 39 zones, zone tariff', () => {
+  it('drayage: 4 container cards, real drayage accessorial schedule, all 39 zones, zone tariff', () => {
     const t = getSeedTemplate('drayage');
     expect(t.rateCards.map((c) => c.equipment).sort()).toEqual([
       'container_20', 'container_40', 'container_40hc', 'container_45',
     ]);
     expect(t.rateCards.every((c) => c.service === 'drayage')).toBe(true);
-    expect(t.accessorials.length).toBe(13);
-    expect(t.accessorials.map((a) => a.code)).toContain('chassis_split');
+    // Real AccessAir schedule reconciled across two live quotes.
+    expect(t.accessorials.length).toBe(27);
+    const codes = t.accessorials.map((a) => a.code);
+    expect(codes).toContain('chassis_split');
+    expect(codes).toContain('flip_fee');
+    expect(codes).toContain('triaxle');
+    expect(codes).toContain('rail_terminal_surcharge');
+    expect(codes).toContain('weekend_fee');
+    expect(codes).toContain('reefer_storage');
+    expect(codes).toContain('detention_terminal');
+    // toggle-driven conditional surcharges
+    expect(codes).toContain('hazmat_flat');
+    expect(codes).toContain('reefer_flat');
+    expect(codes).toContain('overweight');
     expect(t.laneZones.length).toBe(39);
     expect(t.pricingMode).toBe('zone');
+  });
+
+  it('drayage: exact real rates + units + triggers (Alex’s reconciled schedule)', () => {
+    const byCode = new Map(getSeedTemplate('drayage').accessorials.map((a) => [a.code, a]));
+    const expectAcc = (code: string, kind: string, amount: number, trigger: string) => {
+      const a = byCode.get(code);
+      expect(a, `missing accessorial ${code}`).toBeDefined();
+      expect(a!.kind, `${code} kind`).toBe(kind);
+      expect(a!.amount, `${code} amount`).toBe(amount);
+      expect(a!.trigger, `${code} trigger`).toBe(trigger);
+    };
+    // Chassis
+    expectAcc('chassis_rental', 'per_day', 40, 'optional');
+    expectAcc('chassis_split', 'flat', 100, 'optional');
+    expectAcc('chassis_positioning', 'flat', 0, 'optional');
+    expectAcc('chassis_return', 'flat', 0, 'optional');
+    expectAcc('flip_fee', 'flat', 200, 'optional');
+    expectAcc('triaxle', 'per_day', 85, 'optional');
+    // Moves / storage
+    expectAcc('prepull', 'flat', 145, 'optional');
+    expectAcc('stop_off', 'flat', 150, 'optional');
+    expectAcc('wait_time', 'flat', 150, 'optional');
+    expectAcc('storage', 'per_day', 45, 'optional');
+    expectAcc('reefer_storage', 'per_day', 95, 'optional');
+    expectAcc('detention_terminal', 'per_hour', 100, 'optional');
+    expectAcc('rail_terminal_surcharge', 'flat', 195, 'optional');
+    expectAcc('weekend_fee', 'flat', 250, 'optional');
+    expectAcc('toll_pass_through', 'flat', 0, 'optional');
+    // Conditional / toggle-driven auto surcharges
+    expectAcc('hazmat_flat', 'flat', 250, 'auto_if_hazmat');
+    expectAcc('reefer_flat', 'flat', 250, 'auto_if_temp_controlled');
+    expectAcc('in_bond', 'flat', 250, 'optional');
+    expectAcc('overweight', 'flat', 200, 'auto_if_weight_over');
+    // Universal reconciled value
+    expectAcc('residential', 'flat', 150, 'auto_if_residential');
   });
 
   it('dryvan_ftl: single dry-van card, 5 universal accessorials, no zones, per-mile', () => {

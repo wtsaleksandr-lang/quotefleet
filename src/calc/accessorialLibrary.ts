@@ -6,20 +6,16 @@ import type { NewAccessorial } from '../db/schema.js';
  * These are seeded as tenant-owned rows so every carrier can enable/disable,
  * rename, and re-price them. Amounts are only starting defaults — carriers
  * should tune them to their own terminals, equipment, and customer tariffs.
+ *
+ * NOTE: the core real-drayage schedule (chassis rental/split/positioning,
+ * flip, triaxle, pre-pull, wait time, hazardous, in-bond, reefer, tolls,
+ * yard/reefer storage, weekend, rail-terminal, detention) now lives in
+ * DEFAULT_ACCESSORIALS (defaults.ts) so it seeds to every tenant + the
+ * drayage onboarding template. Codes must stay UNIQUE across both files —
+ * the accessorials:seed script merges them and dedupes by `code`.
  */
 export const EXPANDED_ACCESSORIAL_LIBRARY: Omit<NewAccessorial, 'tenantId'>[] = [
   // ── Drayage / container-specific ──────────────────────────────────
-  {
-    code: 'chassis_rental',
-    label: 'Chassis Rental',
-    description: 'Daily chassis rental charged when chassis is needed for the move.',
-    kind: 'per_day',
-    amount: 40,
-    trigger: 'optional',
-    appliesToServices: ['drayage'],
-    enabled: true,
-    sortOrder: 101,
-  },
   {
     code: 'chassis_reposition',
     label: 'Chassis Repositioning',
@@ -30,17 +26,6 @@ export const EXPANDED_ACCESSORIAL_LIBRARY: Omit<NewAccessorial, 'tenantId'>[] = 
     appliesToServices: ['drayage'],
     enabled: true,
     sortOrder: 102,
-  },
-  {
-    code: 'chassis_flip',
-    label: 'Chassis Flip',
-    description: 'Flip or lift required to transfer container/chassis setup.',
-    kind: 'flat',
-    amount: 150,
-    trigger: 'optional',
-    appliesToServices: ['drayage'],
-    enabled: true,
-    sortOrder: 103,
   },
   {
     code: 'empty_return_split',
@@ -96,28 +81,6 @@ export const EXPANDED_ACCESSORIAL_LIBRARY: Omit<NewAccessorial, 'tenantId'>[] = 
     appliesToServices: ['drayage', 'ftl', 'hotshot'],
     enabled: true,
     sortOrder: 108,
-  },
-  {
-    code: 'tri_axle',
-    label: 'Tri-axle Chassis',
-    description: 'Tri-axle chassis required for heavy container moves.',
-    kind: 'flat',
-    amount: 250,
-    trigger: 'optional',
-    appliesToServices: ['drayage'],
-    enabled: true,
-    sortOrder: 109,
-  },
-  {
-    code: 'bonded_move',
-    label: 'Bonded / In-bond Move',
-    description: 'Bonded move, in-bond handling, or customs-controlled delivery support.',
-    kind: 'flat',
-    amount: 150,
-    trigger: 'optional',
-    appliesToServices: ['drayage', 'ftl'],
-    enabled: true,
-    sortOrder: 111,
   },
   {
     code: 'terminal_fee',
@@ -209,17 +172,6 @@ export const EXPANDED_ACCESSORIAL_LIBRARY: Omit<NewAccessorial, 'tenantId'>[] = 
   },
 
   // ── Universal trucking extras ─────────────────────────────────────
-  {
-    code: 'toll_pass_through',
-    label: 'Tolls',
-    description: 'Tolls, bridges, tunnels, or road charges.',
-    kind: 'flat',
-    amount: 0,
-    trigger: 'optional',
-    appliesToServices: ['drayage', 'ftl', 'ltl', 'expedited', 'hotshot'],
-    enabled: false,
-    sortOrder: 410,
-  },
   {
     code: 'redelivery',
     label: 'Redelivery',
@@ -320,5 +272,102 @@ export const EXPANDED_ACCESSORIAL_LIBRARY: Omit<NewAccessorial, 'tenantId'>[] = 
     appliesToServices: ['ftl', 'hotshot'],
     enabled: false,
     sortOrder: 530,
+  },
+
+  // ── Delivery / location-type services ─────────────────────────────
+  // Trucking/drayage-relevant "additional services" (from Alex's carrier
+  // service menu). Air/ocean-forwarding-only services (airline, Amazon FBA,
+  // ocean CFS, TSA, alcohol-license) are intentionally excluded. The prices
+  // below are EDITABLE STARTING DEFAULTS — carriers set their real numbers
+  // per location/customer (many are "quote on request"). The schema has no
+  // pickup-vs-delivery scope yet, so these are flat location surcharges;
+  // per-leg (pickup vs delivery) scoping is a future enhancement.
+  {
+    code: 'construction_site',
+    label: 'Construction Site',
+    description: 'Delivery/pickup at an active construction site. Editable default.',
+    kind: 'flat',
+    amount: 75,
+    trigger: 'optional',
+    appliesToServices: ['ftl', 'ltl', 'expedited', 'hotshot', 'drayage'],
+    enabled: true,
+    sortOrder: 610,
+  },
+  {
+    code: 'delivery_notification',
+    label: 'Delivery Notification',
+    description: 'Call-ahead / appointment notification before delivery. Editable default.',
+    kind: 'flat',
+    amount: 15,
+    trigger: 'optional',
+    appliesToServices: ['ftl', 'ltl', 'expedited', 'hotshot', 'drayage'],
+    enabled: true,
+    sortOrder: 620,
+  },
+  {
+    code: 'military_base',
+    label: 'Military Base',
+    description: 'Delivery/pickup at a military base (gate/escort handling). Editable default.',
+    kind: 'flat',
+    amount: 50,
+    trigger: 'optional',
+    appliesToServices: ['ftl', 'ltl', 'expedited', 'hotshot', 'drayage'],
+    enabled: true,
+    sortOrder: 630,
+  },
+  {
+    code: 'school',
+    label: 'School',
+    description: 'Delivery/pickup at a school or university. Editable default.',
+    kind: 'flat',
+    amount: 50,
+    trigger: 'optional',
+    appliesToServices: ['ftl', 'ltl', 'expedited', 'hotshot'],
+    enabled: true,
+    sortOrder: 640,
+  },
+  {
+    code: 'trade_show',
+    label: 'Trade Show',
+    description: 'Delivery/pickup at a convention or trade-show venue. Editable default.',
+    kind: 'flat',
+    amount: 150,
+    trigger: 'optional',
+    appliesToServices: ['ftl', 'ltl', 'expedited', 'hotshot'],
+    enabled: true,
+    sortOrder: 650,
+  },
+  {
+    code: 'hotel',
+    label: 'Hotel',
+    description: 'Delivery/pickup at a hotel or resort. Editable default.',
+    kind: 'flat',
+    amount: 75,
+    trigger: 'optional',
+    appliesToServices: ['ftl', 'ltl', 'expedited', 'hotshot'],
+    enabled: true,
+    sortOrder: 660,
+  },
+  {
+    code: 'protect_from_freeze',
+    label: 'Protect from Freeze',
+    description: 'Freight must be kept above freezing in transit. Editable default.',
+    kind: 'flat',
+    amount: 75,
+    trigger: 'optional',
+    appliesToServices: ['ftl', 'ltl', 'expedited', 'drayage'],
+    enabled: true,
+    sortOrder: 670,
+  },
+  {
+    code: 'fragile_handling',
+    label: 'Fragile — Limited Handling',
+    description: 'Fragile freight requiring careful / limited handling. Editable default.',
+    kind: 'flat',
+    amount: 50,
+    trigger: 'optional',
+    appliesToServices: ['ftl', 'ltl', 'expedited'],
+    enabled: true,
+    sortOrder: 680,
   },
 ];

@@ -155,6 +155,12 @@ export const DEFAULT_RATE_CARDS: Omit<NewRateCard, 'tenantId'>[] = [
   // ─── Drayage ─────────────────────────────────────────────────────
   // ratePerMile defaults are conservative — the lane_zones below
   // override with flat-tariff pricing within radius of major ports.
+  //
+  // fuelSurchargePct: drayage FSC is a VARIABLE percent of the base that
+  // carriers reset by lane/period — Alex's real quotes showed 34% and
+  // 52.3%. ~32% is a sensible day-1 default; it stays carrier/period
+  // configurable per rate card (and can be driven from EIA diesel via the
+  // tenant's auto-FSC mode).
   {
     service: 'drayage',
     equipment: 'container_20',
@@ -162,7 +168,7 @@ export const DEFAULT_RATE_CARDS: Omit<NewRateCard, 'tenantId'>[] = [
     ratePerMile: 4.50,
     minimumCharge: 350,
     flatFee: 50, // chassis split usually built in
-    fuelSurchargePct: 18,
+    fuelSurchargePct: 32,
     marginPct: 12,
     maxWeightLbs: 44000,
     maxMiles: 300,
@@ -176,7 +182,7 @@ export const DEFAULT_RATE_CARDS: Omit<NewRateCard, 'tenantId'>[] = [
     ratePerMile: 4.50,
     minimumCharge: 400,
     flatFee: 50,
-    fuelSurchargePct: 18,
+    fuelSurchargePct: 32,
     marginPct: 12,
     maxWeightLbs: 44000,
     maxMiles: 300,
@@ -190,7 +196,7 @@ export const DEFAULT_RATE_CARDS: Omit<NewRateCard, 'tenantId'>[] = [
     ratePerMile: 4.50,
     minimumCharge: 400,
     flatFee: 50,
-    fuelSurchargePct: 18,
+    fuelSurchargePct: 32,
     marginPct: 12,
     maxWeightLbs: 44000,
     maxMiles: 300,
@@ -204,7 +210,7 @@ export const DEFAULT_RATE_CARDS: Omit<NewRateCard, 'tenantId'>[] = [
     ratePerMile: 4.85,
     minimumCharge: 450,
     flatFee: 75,
-    fuelSurchargePct: 18,
+    fuelSurchargePct: 32,
     marginPct: 12,
     maxWeightLbs: 44000,
     maxMiles: 300,
@@ -248,7 +254,7 @@ export const DEFAULT_ACCESSORIALS: Omit<NewAccessorial, 'tenantId'>[] = [
   {
     code: 'layover',
     label: 'Layover',
-    description: 'Driver is held overnight — typically $250-$400.',
+    description: 'Driver is held overnight — typically applies on lanes over ~500 miles round trip.',
     kind: 'per_day',
     amount: 350,
     trigger: 'optional',
@@ -282,6 +288,9 @@ export const DEFAULT_ACCESSORIALS: Omit<NewAccessorial, 'tenantId'>[] = [
     kind: 'flat',
     amount: 75,
     trigger: 'optional',
+    // Over-the-road only — drayage uses its own `stop_off` ($150) below so a
+    // drayage tenant sees exactly one stop charge, not two overlapping ones.
+    appliesToServices: ['ftl', 'ltl', 'expedited', 'hotshot'],
     enabled: true,
     sortOrder: 50,
   },
@@ -292,42 +301,185 @@ export const DEFAULT_ACCESSORIALS: Omit<NewAccessorial, 'tenantId'>[] = [
     kind: 'pct_of_base',
     amount: 18, // 18% surcharge by default
     trigger: 'auto_if_hazmat',
+    // Over-the-road only — drayage prices hazardous as a flat $250 fee
+    // (`hazmat_flat` below), matching real port-drayage tariffs.
+    appliesToServices: ['ftl', 'ltl', 'expedited', 'hotshot'],
     enabled: true,
     sortOrder: 60,
   },
   // ── Drayage-specific ─────────────────────────────────────────────
+  // Rates below are the REAL port-drayage accessorial schedule Alex runs
+  // in his AccessAir system, reconciled across TWO real quotes (Houston
+  // port + Farmington NM → UP Santa Teresa rail, 2026). Where the two
+  // quotes disagree we take the MORE DETAILED 2nd-quote number and note
+  // the condition. Every value here is a CARRIER-EDITABLE starting point —
+  // real rates vary by lane, terminal, and period; carriers re-price in
+  // the dashboard / AI chat.
+  {
+    code: 'chassis_rental',
+    label: 'Chassis Rental',
+    description: 'Daily chassis rental while the chassis is out (1-day minimum; some lanes 2-day).',
+    kind: 'per_day',
+    amount: 40,
+    trigger: 'optional',
+    appliesToServices: ['drayage'],
+    enabled: true,
+    sortOrder: 105,
+  },
   {
     code: 'chassis_split',
-    label: 'Chassis Split / Pickup',
-    description: 'Trucker has to pull a chassis from a different yard.',
+    label: 'Chassis Split (per occurrence)',
+    description: 'Trucker has to pull a chassis from a different yard than the container. Charged per occurrence.',
     kind: 'flat',
-    amount: 175,
+    amount: 100,
     trigger: 'optional',
     appliesToServices: ['drayage'],
     enabled: true,
     sortOrder: 110,
   },
   {
-    code: 'prepull',
-    label: 'Prepull',
-    description: 'Pre-pull container from terminal to yard before delivery.',
+    code: 'flip_fee',
+    label: 'Flip Fee',
+    description: 'Flip / lift to transfer the container between chassis or reposition it.',
     kind: 'flat',
-    amount: 175,
+    amount: 200,
+    trigger: 'optional',
+    appliesToServices: ['drayage'],
+    enabled: true,
+    sortOrder: 111,
+  },
+  {
+    code: 'chassis_positioning',
+    label: 'Chassis Positioning (Front-End)',
+    description: 'Repositioning the chassis into place before the pickup leg. Editable — often $0 or lane-variable.',
+    kind: 'flat',
+    amount: 0,
+    trigger: 'optional',
+    appliesToServices: ['drayage'],
+    enabled: true,
+    sortOrder: 112,
+  },
+  {
+    code: 'chassis_return',
+    label: 'Chassis Return (Back-End)',
+    description: 'Returning the chassis after the empty is dropped. Editable — often $0 or lane-variable.',
+    kind: 'flat',
+    amount: 0,
+    trigger: 'optional',
+    appliesToServices: ['drayage'],
+    enabled: true,
+    sortOrder: 114,
+  },
+  {
+    code: 'triaxle',
+    label: 'Triaxle (4+ axles / heavy)',
+    description: 'Triaxle chassis required for heavy container moves — applies to loads over ~37,550 lbs / 4+ axles.',
+    kind: 'per_day',
+    amount: 85,
+    trigger: 'optional',
+    appliesToServices: ['drayage'],
+    enabled: true,
+    sortOrder: 116,
+  },
+  {
+    code: 'prepull',
+    label: 'Pre Pull',
+    description: 'Pre-pull container from terminal to yard before delivery. Applies if the container is not delivered same trip.',
+    kind: 'flat',
+    amount: 145,
     trigger: 'optional',
     appliesToServices: ['drayage'],
     enabled: true,
     sortOrder: 120,
   },
   {
+    code: 'stop_off',
+    label: 'Stop-Off',
+    description: 'Per additional stop on a drayage move.',
+    kind: 'flat',
+    amount: 150,
+    trigger: 'optional',
+    appliesToServices: ['drayage'],
+    enabled: true,
+    sortOrder: 122,
+  },
+  {
+    code: 'wait_time',
+    label: 'Wait Time (after 2 free hours)',
+    // The engine's `per_hour` kind has no free-hour threshold, so this is
+    // modelled as a flat charge that applies once wait exceeds the 2 free
+    // hours. `freeHours` is carried for AI/UX context. See report: a true
+    // metered "$150/hr after 2 free" needs an engine change (out of scope).
+    description: 'Driver wait time charged as a flat fee once the 2 free hours are exceeded.',
+    kind: 'flat',
+    amount: 150,
+    trigger: 'optional',
+    conditionJson: { freeHours: 2 },
+    appliesToServices: ['drayage'],
+    enabled: true,
+    sortOrder: 124,
+  },
+  {
+    code: 'detention_terminal',
+    // Distinct from universal `detention` ($75/hr after 2 free): this is the
+    // heavier drayage detention at the consignee / marine or rail terminal.
+    label: 'Detention at Consignee/Terminal (after 1 free hour)',
+    description: 'Driver detained at the consignee, marine terminal, or rail ramp — charged per hour after 1 free hour.',
+    kind: 'per_hour',
+    amount: 100,
+    trigger: 'optional',
+    conditionJson: { freeHours: 1 },
+    appliesToServices: ['drayage'],
+    enabled: true,
+    sortOrder: 126,
+  },
+  {
     code: 'storage',
-    label: 'Yard Storage',
-    description: 'Per day after first 24 hr in our yard.',
+    label: 'Yard Storage (per night)',
+    description: 'Per night after the first 24 hr in our yard; also applies to empties if unable to return.',
     kind: 'per_day',
-    amount: 65,
+    amount: 45,
     trigger: 'optional',
     appliesToServices: ['drayage'],
     enabled: true,
     sortOrder: 130,
+  },
+  {
+    code: 'reefer_storage',
+    label: 'Reefer Full Storage',
+    description: 'Per-day storage for a loaded/plugged reefer container held in the yard.',
+    kind: 'per_day',
+    amount: 95,
+    trigger: 'optional',
+    appliesToServices: ['drayage'],
+    enabled: true,
+    sortOrder: 132,
+  },
+  {
+    code: 'rail_terminal_surcharge',
+    label: 'Rail Terminal Surcharge',
+    description: 'Surcharge for pickup/delivery at a rail ramp / intermodal terminal.',
+    kind: 'flat',
+    amount: 195,
+    trigger: 'optional',
+    appliesToServices: ['drayage'],
+    enabled: true,
+    sortOrder: 134,
+  },
+  {
+    code: 'weekend_fee',
+    // Both real quotes list a weekend charge on more than one leg (delivery,
+    // pull-out, empty-return). The schema has no pickup-vs-delivery scope, so
+    // it's ONE flat "Weekend Fee" for now — per-leg weekend variants are a
+    // future enhancement gated on that scope (see report).
+    label: 'Weekend Fee',
+    description: 'Weekend delivery, pull-out, or empty-return move.',
+    kind: 'flat',
+    amount: 250,
+    trigger: 'optional',
+    appliesToServices: ['drayage'],
+    enabled: true,
+    sortOrder: 136,
   },
   {
     code: 'drop_hook',
@@ -352,11 +504,42 @@ export const DEFAULT_ACCESSORIALS: Omit<NewAccessorial, 'tenantId'>[] = [
     sortOrder: 150,
   },
   {
-    code: 'overweight',
-    label: 'Overweight Permit',
-    description: 'Cargo + container > 44,000 lbs requires special permit.',
+    code: 'hazmat_flat',
+    label: 'Hazardous',
+    // Auto-applied by the shipment "hazardous = yes" toggle (engine
+    // `auto_if_hazmat` reads req.flags.hazmat), matching the real quotes'
+    // conditional Hazardous Charge. Drayage-scoped so it never doubles with
+    // the OTR percentage `hazmat`.
+    description: 'Flat fee for hazardous-materials container moves. Auto-applied when the shipment is marked hazardous.',
     kind: 'flat',
-    amount: 175,
+    amount: 250,
+    trigger: 'auto_if_hazmat',
+    appliesToServices: ['drayage'],
+    enabled: true,
+    sortOrder: 155,
+  },
+  {
+    code: 'in_bond',
+    label: 'In-Bond',
+    description: 'Customs in-bond move — charged per container.',
+    kind: 'flat',
+    amount: 250,
+    trigger: 'optional',
+    appliesToServices: ['drayage', 'ftl'],
+    enabled: true,
+    sortOrder: 157,
+  },
+  {
+    code: 'overweight',
+    label: 'Overweight',
+    // Auto-applied when cargo+container exceeds the weight threshold (engine
+    // `auto_if_weight_over`), matching the quotes' conditional Overweight
+    // Charge. NOTE: the engine keys this off req.weightLbs, not a standalone
+    // "overweight = yes" toggle — see report (a manual toggle would need an
+    // engine flag).
+    description: 'Overweight container/permit surcharge. Auto-applied when weight exceeds the threshold.',
+    kind: 'flat',
+    amount: 200,
     trigger: 'auto_if_weight_over',
     conditionJson: { weightLbsOver: 44000 },
     appliesToServices: ['drayage', 'ftl'],
@@ -364,15 +547,39 @@ export const DEFAULT_ACCESSORIALS: Omit<NewAccessorial, 'tenantId'>[] = [
     sortOrder: 160,
   },
   {
+    code: 'reefer_flat',
+    label: 'Reefer (Refrigerated)',
+    // Auto-applied by the shipment "reefer = yes" toggle (engine
+    // `auto_if_temp_controlled` reads req.flags.tempControlled).
+    description: 'Flat handling fee for refrigerated container moves. Auto-applied when the shipment is marked refrigerated.',
+    kind: 'flat',
+    amount: 250,
+    trigger: 'auto_if_temp_controlled',
+    appliesToServices: ['drayage'],
+    enabled: true,
+    sortOrder: 165,
+  },
+  {
     code: 'reefer_genset',
     label: 'Reefer / Genset',
-    description: 'Refrigerated container needs running genset.',
+    description: 'Refrigerated container needs a running genset (per day).',
     kind: 'per_day',
     amount: 75,
     trigger: 'auto_if_temp_controlled',
     appliesToServices: ['drayage', 'ftl'],
     enabled: true,
     sortOrder: 170,
+  },
+  {
+    code: 'toll_pass_through',
+    label: 'Tolls',
+    description: 'Tolls / bridge / road charges passed through. Editable per lane.',
+    kind: 'flat',
+    amount: 0,
+    trigger: 'optional',
+    appliesToServices: ['drayage', 'ftl', 'ltl', 'expedited', 'hotshot'],
+    enabled: true,
+    sortOrder: 175,
   },
   // ── LTL / Last-mile residential ──────────────────────────────────
   {
@@ -388,12 +595,14 @@ export const DEFAULT_ACCESSORIALS: Omit<NewAccessorial, 'tenantId'>[] = [
   },
   {
     code: 'residential',
-    label: 'Residential Delivery',
-    description: 'Delivery to a residential address.',
+    label: 'Residential Fee',
+    // Universal — a residential pickup/delivery on any service. Auto-applied
+    // by the residential toggle; $150 reconciled from Alex's real quotes.
+    description: 'Pickup or delivery at a residential address.',
     kind: 'flat',
-    amount: 85,
+    amount: 150,
     trigger: 'auto_if_residential',
-    appliesToServices: ['ltl', 'expedited'],
+    appliesToServices: ['ltl', 'expedited', 'ftl', 'hotshot', 'drayage'],
     enabled: true,
     sortOrder: 220,
   },
