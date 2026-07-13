@@ -557,7 +557,7 @@
     visible.forEach(function (a) {
       var chip = el('button', { class: 'qf-acc-chip' + (state.selectedAccessorials.indexOf(a.code) >= 0 ? ' active' : ''), on: { click: function (ev) { ev.preventDefault(); if (ev.target && ev.target.closest && ev.target.closest('.qf-help')) return; var i = state.selectedAccessorials.indexOf(a.code); if (i >= 0) state.selectedAccessorials.splice(i, 1); else state.selectedAccessorials.push(a.code); chip.classList.toggle('active'); } } }, [
         el('span', { class: 'qf-acc-label', text: a.label }),
-        el('span', { class: 'qf-help', 'data-tip': accessorialTip(a), text: '?' }),
+        el('span', { class: 'qf-help', 'data-tip': accessorialTip(a), text: '?', role: 'button', tabindex: '0', 'aria-expanded': 'false', 'aria-label': 'More information', 'data-qf-help-ready': '1' }),
       ]);
       wrap.appendChild(chip);
     });
@@ -825,12 +825,39 @@
       if (!help) { closeTip(); return; }
       e.preventDefault(); e.stopPropagation(); showTip(help);
     });
+    // Keyboard parity: help cues are focusable buttons, so Enter/Space toggles
+    // the tip just like a tap/click (mobile has no hover, so click/tap is the
+    // only pointer trigger — see the click handler above).
+    document.addEventListener('keydown', function (e) {
+      if (e.key !== 'Enter' && e.key !== ' ' && e.key !== 'Spacebar') return;
+      var help = e.target && e.target.closest ? e.target.closest('.qf-help') : null;
+      if (!help) return;
+      e.preventDefault(); e.stopPropagation(); showTip(help);
+    });
+    // Promote every cue already in the static markup to a real button. Cues
+    // rendered later (accessorial chips) get the same attributes at creation.
+    $$('.qf-help').forEach(enhanceHelpCue);
     window.addEventListener('resize', closeTip);
     window.addEventListener('scroll', closeTip, true);
   }
 
+  // Make a "?" help cue keyboard-operable and screen-reader-friendly without
+  // changing its markup: role=button + tabindex so it can be focused/activated,
+  // aria-expanded reflecting whether its tip is open.
+  function enhanceHelpCue(h) {
+    if (!h || h.dataset.qfHelpReady) return;
+    h.dataset.qfHelpReady = '1';
+    h.setAttribute('role', 'button');
+    h.setAttribute('tabindex', '0');
+    h.setAttribute('aria-expanded', 'false');
+    if (!h.getAttribute('aria-label')) h.setAttribute('aria-label', 'More information');
+  }
+
   var tipEl = null;
-  function closeTip() { if (tipEl) { tipEl.remove(); tipEl = null; $$('.qf-help.open').forEach(function (h) { h.classList.remove('open'); }); } }
+  function closeTip() {
+    if (tipEl) { tipEl.remove(); tipEl = null; }
+    $$('.qf-help.open').forEach(function (h) { h.classList.remove('open'); h.setAttribute('aria-expanded', 'false'); h.removeAttribute('aria-describedby'); });
+  }
   function showTip(help) {
     var text = help.getAttribute('data-tip');
     if (!text) return;
@@ -838,9 +865,13 @@
     closeTip();
     if (wasOpen) return;
     help.classList.add('open');
+    help.setAttribute('aria-expanded', 'true');
     tipEl = document.createElement('div');
     tipEl.className = 'qf-tip-bubble';
+    tipEl.id = 'qf-tip-active';
+    tipEl.setAttribute('role', 'tooltip');
     tipEl.textContent = text;
+    help.setAttribute('aria-describedby', 'qf-tip-active');
     document.body.appendChild(tipEl);
     var r = help.getBoundingClientRect();
     var maxW = Math.min(260, window.innerWidth - 20);

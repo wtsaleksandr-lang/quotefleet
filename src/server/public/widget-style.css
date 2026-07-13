@@ -210,7 +210,7 @@ body[data-qf-cta-hover="fill"] .qf-cta:not(.qf-secondary):hover { background: va
 .qf-help::before { content: ''; position: absolute; z-index: -1; left: 50%; top: 50%; width: 16px; height: 16px; transform: translate(-50%, -50%); border-radius: 999px; border: 1px solid #dbe1ea; background: #f8fafc; transition: background 0.12s, border-color 0.12s; }
 .qf-help:hover, .qf-help.open { color: #5f6c80; }
 .qf-help:hover::before, .qf-help.open::before { background: #eef2f7; border-color: #cfd7e3; }
-.qf-tip-bubble { position: absolute; z-index: 100; max-width: 240px; background: #0c1424; color: #fff; padding: var(--space-1) var(--space-1-5); border-radius: 8px; font-size: 12.5px; line-height: 1.45; box-shadow: 0 6px 24px rgba(0, 0, 0, 0.20); pointer-events: none; opacity: 0; transform: translateY(4px); transition: opacity 0.12s ease, transform 0.12s ease; }
+.qf-tip-bubble { position: absolute; z-index: 2147483600; max-width: 240px; background: #0c1424; color: #fff; padding: var(--space-1) var(--space-1-5); border-radius: 8px; font-size: 12.5px; line-height: 1.45; box-shadow: 0 6px 24px rgba(0, 0, 0, 0.20); pointer-events: none; opacity: 0; transform: translateY(4px); transition: opacity 0.12s ease, transform 0.12s ease; }
 .qf-tip-bubble.show { opacity: 1; transform: translateY(0); }
 .qf-tip-bubble::before { content: ''; position: absolute; top: -5px; left: var(--qf-tip-arrow, 12px); width: 10px; height: 10px; background: #0c1424; transform: rotate(45deg); }
 
