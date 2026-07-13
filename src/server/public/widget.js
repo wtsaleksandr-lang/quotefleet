@@ -657,8 +657,8 @@
     if (!hasPickup) { showError('qf-error', 'Please pick a pickup port (drayage) or enter a pickup ZIP/postal code.'); return; }
     if (!req.delivery.zip && !req.delivery.city) { showError('qf-error', 'Please enter a delivery ZIP/postal code.'); return; }
     if (!hasPostalCode($('qf-delivery-zip').value, req.delivery)) { showError('qf-error', 'Please enter a delivery ZIP/postal code for a more accurate rate. City-only delivery can change the price in large metro areas.'); return; }
+    if (!(req.weightLbs > 0)) { showError('qf-error', req.service === 'ltl' ? 'Enter the shipment weight (lbs) — LTL is priced by weight and size.' : 'Enter the load weight (lbs).'); return; }
     if (req.service === 'ltl') {
-      if (!(req.weightLbs > 0)) { showError('qf-error', 'Enter the shipment weight (lbs) — LTL is priced by weight and size.'); return; }
       if (!(req.lengthIn > 0 && req.widthIn > 0 && req.heightIn > 0)) { showError('qf-error', 'Enter length, width, and height (inches) so we can determine the freight class.'); return; }
     }
     var oogCheck = $('qf-oog-check');
