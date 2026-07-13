@@ -39,6 +39,7 @@ import {
   SESSION_COOKIE_NAME,
 } from '../../auth/session.js';
 import { loadEnv, defaultHostDomain } from '../../config.js';
+import { DEFAULT_QUOTE_DISCLAIMER } from '../quoteDisclaimer.js';
 import { getTrialState, type TrialState } from '../trialGating.js';
 import { magicLinkLimiter, signupLimiter, loginLimiter } from '../rateLimits.js';
 import { createTrialCheckoutSession, billingConfigured } from './billing.js';
@@ -500,6 +501,9 @@ export function registerAuthRoutes(app: Express) {
     contactPhone: z.string().max(50).nullable().optional(),
     publicContactEmail: z.string().email().max(200).nullable().optional(),
     contactEmail: z.string().email().max(200).nullable().optional(),
+    //   • quoteDisclaimer — customer-facing terms shown at the bottom of every
+    //     quote. Nullable; when null/blank the platform default is rendered.
+    quoteDisclaimer: z.string().max(4000).nullable().optional(),
   });
   app.put('/api/auth/profile', async (req: Request, res: Response) => {
     const token = req.cookies[SESSION_COOKIE_NAME];
@@ -531,6 +535,7 @@ export function registerAuthRoutes(app: Express) {
       const tenantUpdate: Record<string, unknown> = {};
       if (parse.data.contactPhone !== undefined) tenantUpdate.contactPhone = parse.data.contactPhone;
       if (parse.data.publicContactEmail !== undefined) tenantUpdate.publicContactEmail = parse.data.publicContactEmail;
+      if (parse.data.quoteDisclaimer !== undefined) tenantUpdate.quoteDisclaimer = parse.data.quoteDisclaimer;
       if (parse.data.contactEmail !== undefined) tenantUpdate.contactEmail = parse.data.contactEmail;
       if (Object.keys(tenantUpdate).length > 0) {
         tenantUpdate.updatedAt = new Date();
@@ -585,6 +590,8 @@ export function registerAuthRoutes(app: Express) {
           contactEmail: string | null;
           publicContactEmail: string | null;
           contactPhone: string | null;
+          quoteDisclaimer: string | null;
+          defaultQuoteDisclaimer: string;
           embedToken: string;
           plan: string;
           trialEndsAt: Date | null;
@@ -606,6 +613,11 @@ export function registerAuthRoutes(app: Express) {
           contactEmail: t[0].contactEmail ?? null,
           publicContactEmail: t[0].publicContactEmail ?? null,
           contactPhone: t[0].contactPhone ?? null,
+          // Raw override (null = using the default) + the default text itself so
+          // the Account "Quote disclaimer" textarea can prefill and show the
+          // default as its placeholder.
+          quoteDisclaimer: t[0].quoteDisclaimer ?? null,
+          defaultQuoteDisclaimer: DEFAULT_QUOTE_DISCLAIMER,
           embedToken: t[0].embedToken,
           plan: t[0].plan,
           trialEndsAt: t[0].trialEndsAt,

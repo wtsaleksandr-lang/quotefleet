@@ -23,6 +23,7 @@ const baseT: Tenant = {
   name: 'Acme',
   contactEmail: 'a@b.c',
   publicContactEmail: null,
+  quoteDisclaimer: null,
   contactPhone: null,
   countryFocus: 'US',
   embedToken: 'tok',

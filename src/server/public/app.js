@@ -268,6 +268,26 @@
         }));
         coCard.appendChild(emailField);
 
+        // Quote disclaimer / terms — bound to tenant.quoteDisclaimer via
+        // /api/auth/profile. Shown at the bottom of every quote (widget result,
+        // hosted quote, printable/PDF). Blank = the platform default is used;
+        // the default is shown as the placeholder so they see what they'd get.
+        var discField = el('div', { class: 'field', style: { marginBottom: '12px' } });
+        discField.appendChild(el('label', { class: 'field-label', text: 'Quote disclaimer' }));
+        var discInput = el('textarea', {
+          class: 'input', rows: '6',
+          placeholder: (r.tenant && r.tenant.defaultQuoteDisclaimer) || '',
+        });
+        discInput.value = (r.tenant && r.tenant.quoteDisclaimer) || '';
+        discInput.dataset.coDisc = '1';
+        discField.appendChild(discInput);
+        discField.appendChild(el('span', {
+          class: 'muted-small',
+          style: { display: 'block', marginTop: '4px' },
+          text: 'Shown at the bottom of every quote — leave blank to use the default. Edit it to add your own terms (per-diem, steamship-line, lane-specific clauses).',
+        }));
+        coCard.appendChild(discField);
+
         var addrGrid = el('div', { class: 'grid-2', style: { gap: '12px' } });
         addrGrid.appendChild(coField('Address line 1', 'addressLine1', profile.addressLine1));
         addrGrid.appendChild(coField('Address line 2', 'addressLine2', profile.addressLine2));
@@ -286,9 +306,13 @@
         saveCo.addEventListener('click', function () {
           var vals = {};
           $$('input[data-co]', coCard).forEach(function (i) { vals[i.dataset.co] = i.value.trim() || null; });
+          // The disclaimer is a textarea (not [data-co]); collect it separately.
+          // Blank → null so clearing it falls back to the platform default.
+          var discEl = coCard.querySelector('textarea[data-co-disc]');
+          var quoteDisclaimer = discEl ? (discEl.value.trim() || null) : undefined;
           saveCo.disabled = true;
           Promise.all([
-            api('/api/auth/profile', { method: 'PUT', body: { publicContactEmail: vals.publicContactEmail } }),
+            api('/api/auth/profile', { method: 'PUT', body: { publicContactEmail: vals.publicContactEmail, quoteDisclaimer: quoteDisclaimer } }),
             api('/api/tenant/carrier-profile', { method: 'PUT', body: {
               addressLine1: vals.addressLine1, addressLine2: vals.addressLine2,
               city: vals.city, state: vals.state, postalCode: vals.postalCode, country: vals.country,

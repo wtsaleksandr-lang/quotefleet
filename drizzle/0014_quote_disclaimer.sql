@@ -1,0 +1,11 @@
+-- Per-tenant quote disclaimer / terms, shown at the bottom of every quote
+-- (widget result card, hosted quote page, and printable/PDF quote).
+--
+-- Nullable, no default, no backfill: existing tenants read null and render the
+-- platform DEFAULT_QUOTE_DISCLAIMER at quote-render time (see
+-- src/server/quoteDisclaimer.ts). A carrier can set their own text in
+-- Account → Company details; blank falls back to the default. Render-time
+-- fallback means there is nothing to backfill.
+--
+-- Idempotent (ADD COLUMN IF NOT EXISTS) so it's safe to re-run on deploy.
+ALTER TABLE "tenants" ADD COLUMN IF NOT EXISTS "quote_disclaimer" text;

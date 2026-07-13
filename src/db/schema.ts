@@ -62,6 +62,12 @@ export const tenants = pgTable(
      *  explicitly in Account → Company details. When null, the email row is
      *  omitted from public surfaces (we never fall back to `contactEmail`). */
     publicContactEmail: text('public_contact_email'),
+    /** Optional per-tenant quote disclaimer / terms shown at the BOTTOM of
+     *  every quote (widget result, hosted quote page, printable/PDF). Nullable:
+     *  null or blank → the platform DEFAULT_QUOTE_DISCLAIMER is rendered (see
+     *  src/server/quoteDisclaimer.ts); non-empty → the carrier's own text. The
+     *  carrier edits it in Account → Company details. */
+    quoteDisclaimer: text('quote_disclaimer'),
     /** Phone number (optional). */
     contactPhone: text('contact_phone'),
     /** Country focus — 'US', 'CA', or 'BOTH'. Drives rate defaults. */

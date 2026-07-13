@@ -704,7 +704,22 @@
     r.lines.forEach(function (l) { var row = el('div', { class: 'line' }, [el('span', { class: 'name', text: l.name }), el('span', { class: 'amt', text: '$' + fmtMoney(l.amount) })]); lines.appendChild(row); });
     var totalRow = el('div', { class: 'line total-row' }, [el('span', { class: 'name', text: 'Total' }), el('span', { class: 'amt', text: '$' + fmtMoney(r.total) })]);
     lines.appendChild(totalRow);
+    renderDisclaimer();
     $('qf-result').style.display = 'block'; autoResize();
+  }
+
+  // Terms / disclaimer shown at the bottom of the result card. The server
+  // resolves the carrier's own text (or the platform default) into
+  // cfg.disclaimer, so this just renders whatever string it's given.
+  function renderDisclaimer() {
+    var box = $('qf-disclaimer');
+    if (!box) return;
+    var d = (state.config && state.config.disclaimer) || '';
+    box.innerHTML = '';
+    if (!d) { box.style.display = 'none'; return; }
+    box.appendChild(el('span', { class: 'qf-disclaimer-title', text: 'Terms' }));
+    box.appendChild(el('p', { class: 'qf-disclaimer-text', text: d }));
+    box.style.display = 'block';
   }
 
   function onSubmit(e) {
