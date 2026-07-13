@@ -41,7 +41,10 @@ describe('homepage final cleanup styles', () => {
     expect(css).toContain('max-width: 620px !important;');
     expect(css).toContain('width: 58px !important;');
     expect(css).toContain('width: min(1440px, calc(100vw - 56px)) !important;');
-    expect(css).toContain('grid-template-columns: repeat(4, minmax(280px, 1fr))');
+    // How-it-works / under-hero step containers were redesigned to a 2×2 grid so
+    // each full-width product screenshot renders large and complete (was a 4-col
+    // row of narrow cards). Pin the current desktop grid rule.
+    expect(css).toContain('grid-template-columns: repeat(2, minmax(0, 1fr))');
     expect(css).toContain('min-height: 138px !important;');
   });
 });
