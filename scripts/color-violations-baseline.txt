@@ -113,5 +113,5 @@ src/server/public/widget-style.css:128:241	background: white
 src/server/public/widget-style.css:138:231	color: white
 src/server/public/widget-style.css:141:24	background: white
 src/server/public/widget-style.css:183:117	color: white
-src/server/public/widget-style.css:213:91	color: #fff
+src/server/public/widget-style.css:213:98	color: #fff
 src/server/public/widget-style.css:220:85	color: #fff
