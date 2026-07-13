@@ -12,6 +12,7 @@
   loadStylesheet('/maersk-radius-system.css');
   loadStylesheet('/quotefleet-color-system.css');
   loadStylesheet('/landing-home-fixes.css');
+  loadStylesheet('/landing-hero-redesign.css');
 
   const reduceMotion = window.matchMedia?.('(prefers-reduced-motion: reduce)').matches;
   const items = document.querySelectorAll('[data-reveal]');

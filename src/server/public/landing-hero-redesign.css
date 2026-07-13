@@ -1,0 +1,171 @@
+/* ─────────────────────────────────────────────────────────────────────────
+   Phase HR — Hero redesign (loaded LAST, after landing-home-fixes, so these
+   overrides win). Four annotated fixes from Alex:
+     1. Lift the eyebrow higher (top-align the copy, tighten the rhythm).
+     2. Premium H1 typeface — self-hosted Bricolage Grotesque display face.
+     3. Remove the fake browser chrome; show ONE large, legible widget.
+     4. Align the "See how it works" link with the "Start free" button.
+   Desktop = title beside media. Mobile (<=640px) = title -> media -> subtitle,
+   full-width, eyebrow top-left. All spacing on the 8px ramp; no raw #fff/#000.
+   ───────────────────────────────────────────────────────────────────────── */
+
+/* Fix 2 — premium display face for the hero headline. Bricolage Grotesque is a
+   contemporary display grotesque (SIL OFL, free). Self-hosted, latin subset,
+   variable (opsz + wght), so one small woff2 covers the whole weight range. */
+@font-face {
+  font-family: 'Bricolage Grotesque';
+  font-style: normal;
+  font-weight: 200 800;
+  font-display: swap;
+  src: url('/fonts/bricolage-grotesque-latin.woff2') format('woff2');
+}
+
+/* ── Fix 1 — lift the eyebrow: top-align the copy against the tall media so the
+   kicker sits high in the hero, with an intentional gap down to the H1. ── */
+body.qf-wft .hero-grid {
+  align-items: start !important;
+  grid-template-columns: minmax(0, 0.95fr) minmax(0, 1.2fr) !important;
+  gap: clamp(48px, 5vw, 80px) !important;
+}
+
+body.qf-wft .hero-copy {
+  align-self: start !important;
+  padding-top: 4px !important;
+}
+
+body.qf-wft .hero-copy .eyebrow {
+  margin-top: 0 !important;
+  margin-bottom: 24px !important;
+}
+
+/* ── Fix 2 — apply the premium face to the headline. Bricolage is an editorial
+   display grotesque, so it wants looser tracking than the old Satoshi -.075em.
+   optical-sizing + kerning keep it crisp and readable at every size. ── */
+body.qf-wft .hero h1 {
+  font-family: 'Bricolage Grotesque', 'Satoshi', system-ui, -apple-system, 'Segoe UI', sans-serif !important;
+  font-weight: 700 !important;
+  font-optical-sizing: auto;
+  letter-spacing: -0.028em !important;
+  line-height: 1.0 !important;
+  margin-top: 0 !important;
+  text-rendering: optimizeLegibility;
+  -webkit-font-smoothing: antialiased;
+}
+
+/* ── Fix 3 — bigger, clean widget. The browser chrome (traffic-light dots +
+   fake address bar) was baked into the old cluster PNG; qf-hero-widget.png is
+   the same product capture with that chrome removed and the top corners
+   rounded into a clean app frame on a transparent background. Enlarge it and
+   ground it with a soft drop-shadow that hugs the frame's alpha (no box). ── */
+body.qf-wft .visual-flow.qf-hero-media {
+  max-width: 820px !important;
+  width: 100% !important;
+  justify-self: stretch !important;
+}
+
+body.qf-wft .visual-flow.qf-hero-media > img {
+  width: 100% !important;
+  height: auto !important;
+  border: 0 !important;
+  border-radius: 0 !important;
+  background: none !important;
+  box-shadow: none !important;
+  filter: drop-shadow(0 32px 60px rgba(0, 0, 0, 0.55)) !important;
+}
+
+/* ── Fix 4 — align "See how it works" with the "Start free" button. Center both
+   on the row's cross axis and match the link's optical height to the button so
+   their text baselines line up cleanly. ── */
+body.qf-wft .hero-cta {
+  align-items: center !important;
+  gap: 24px !important;
+}
+
+body.qf-wft .hero-cta .demo-link {
+  display: inline-flex !important;
+  align-items: center !important;
+  align-self: center !important;
+  gap: 8px !important;
+  padding: 0 !important;
+  line-height: 1.1 !important;
+}
+
+body.qf-wft .hero-cta .demo-link .arr {
+  display: inline-flex !important;
+  align-items: center !important;
+}
+
+/* ─────────────────────────────────────────────────────────────────────────
+   Mobile (<=640px): title -> media -> subtitle, full-width, eyebrow top-left.
+   display:contents promotes the copy's children into the hero-grid flex flow
+   so the media can be ordered between the H1 and the lead without moving DOM.
+   ───────────────────────────────────────────────────────────────────────── */
+@media (max-width: 640px) {
+  body.qf-wft .hero {
+    text-align: left !important;
+  }
+
+  body.qf-wft .hero-grid {
+    display: flex !important;
+    flex-direction: column !important;
+    align-items: stretch !important;
+    gap: 16px !important;
+    width: min(92%, calc(100vw - 32px)) !important;
+  }
+
+  body.qf-wft .hero-copy {
+    display: contents !important;
+  }
+
+  body.qf-wft .hero-copy .eyebrow {
+    order: 1;
+    margin: 0 0 4px !important;
+    margin-left: 0 !important;
+    margin-right: auto !important;
+    text-align: left !important;
+    white-space: nowrap !important;
+  }
+
+  body.qf-wft .hero h1 {
+    order: 2;
+    margin: 0 !important;
+    max-width: 100% !important;
+    text-align: left !important;
+    font-size: clamp(34px, 9vw, 44px) !important;
+    line-height: 1.04 !important;
+  }
+
+  /* The widget sits directly under the headline, full-width and legible. */
+  body.qf-wft .visual-flow.qf-hero-media {
+    order: 3;
+    display: block !important;
+    max-width: 100% !important;
+    width: 100% !important;
+    margin: 8px 0 !important;
+  }
+
+  body.qf-wft .hero .lead {
+    order: 4;
+    margin: 0 !important;
+    max-width: 100% !important;
+    text-align: left !important;
+  }
+
+  body.qf-wft .hero-cta {
+    order: 5;
+    margin-top: 8px !important;
+    align-items: stretch !important;
+  }
+
+  body.qf-wft .hero-cta .demo-link {
+    align-self: center !important;
+    justify-content: center !important;
+    padding: 8px 0 !important;
+  }
+
+  body.qf-wft .hero .micro-copy,
+  body.qf-wft .hero .hero-trial-note {
+    order: 6;
+    text-align: left !important;
+  }
+}
