@@ -52,8 +52,16 @@ export const tenants = pgTable(
     customDomainVerifiedAt: timestamp('custom_domain_verified_at', { mode: 'date' }),
     /** Public company name shown in the calculator. */
     name: text('name').notNull(),
-    /** Contact email for the tenant owner (notifications). */
+    /** PRIVATE owner/login email — seeded from the signup login email and used
+     *  ONLY for internal notifications (quote alerts, lifecycle, Stripe customer
+     *  email). NEVER render this on any public/customer-facing surface: doing so
+     *  leaks the operator's login address. Use `publicContactEmail` for that. */
     contactEmail: text('contact_email').notNull(),
+    /** OPT-IN public contact email shown to customers on the calculator widget +
+     *  hosted quotes. Nullable and NOT seeded at signup — the carrier sets it
+     *  explicitly in Account → Company details. When null, the email row is
+     *  omitted from public surfaces (we never fall back to `contactEmail`). */
+    publicContactEmail: text('public_contact_email'),
     /** Phone number (optional). */
     contactPhone: text('contact_phone'),
     /** Country focus — 'US', 'CA', or 'BOTH'. Drives rate defaults. */

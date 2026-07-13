@@ -29,7 +29,7 @@ PRODUCT
 PRICING (two plans — both start with a 14-day all-inclusive trial)
 - Vital: $14.80/month — hosted quote page, embeddable widget, unlimited quotes, lead capture/inbox, branded quotes (logo + colors), basic follow-up reminders.
 - Pro: $34.80/month — everything in Vital PLUS AI auto-reply & 24/7 customer chat, branded PDF quotes, full follow-up automation, custom domain, analytics, priority support.
-- Trial: 14 days, all-inclusive (every Pro feature unlocked whichever plan you pick). A card is required up front (validated at $0, not charged during the trial); we bill the plan you chose when the trial ends. Cancel anytime; switch between Vital and Pro anytime.
+- Trial: 14 days, all-inclusive (every Pro feature unlocked whichever plan you pick). No credit card required to start — you add billing and pick your plan when you're ready. Cancel anytime; switch between Vital and Pro anytime.
 - Custom: contact sales for multi-company / SSO / TMS integration / API.
 - Marketplace (where shippers find carriers): FREE, we take a small commission per booked shipment.
 

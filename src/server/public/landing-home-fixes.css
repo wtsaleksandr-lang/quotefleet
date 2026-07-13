@@ -428,7 +428,7 @@ body.qf-wft .site-mobile-menu {
 
 /* ── Hero honest expectation + price anchor (persona-audit P2) ──────────
  * Small, subtle line under the primary CTA that sets an honest trial
- * expectation (card required) and anchors the price without a full table.
+ * expectation (free trial, no credit card) and anchors the price without a full table.
  * Reuses .micro-copy muted styling; only the /pricing link is accented. */
 body.qf-wft .hero-trial-note {
   margin-top: 12px;
