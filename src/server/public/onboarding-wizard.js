@@ -2,16 +2,19 @@
    Post-signup guided onboarding wizard (client).
 
    A full-bleed overlay shown once, right after signup, gated by the SERVER
-   flag `tenant.needsOnboarding` (set in app.js boot). Four short steps:
+   flag `tenant.needsOnboarding` (set in app.js boot). Five short steps:
      1. What do you haul?   → freight vertical  (seeds the calculator)
      2. How do you price?   → pricing mode
      3. Main lane           → from / to
      4. Brand (optional)    → primary color / accent
+     5. Confirm top 3 rates → tweak headline prices + copy the share link
 
-   On FINISH it POSTs /api/tenant/onboarding/apply (reseeds the tenant with the
-   picked vertical's subset when the seed is still pristine), then closes and
-   hands control back to the dashboard. "Skip for now" posts { skip:true } and
-   falls straight through to the dashboard.
+   Leaving step 4 (brand) POSTs /api/tenant/onboarding/apply (reseeds the tenant
+   with the picked vertical's subset when the seed is still pristine); on success
+   it GETs /api/tenant/rate-cards (after the reseed ran) and shows the top-3
+   confirm step. Step 5 "Finish" PUTs any edited rate rows, then closes and hands
+   control back to the dashboard. "Skip for now" posts { skip:true } and falls
+   straight through to the dashboard.
 
    Exposes window.QFOnboardingWizard.open({ me, onDone }).
    ───────────────────────────────────────────────────────────────────────── */
@@ -59,9 +62,28 @@
       laneFrom: '',
       laneTo: '',
       brandColor: null,
+      rates: null,
+      ratesLoaded: false,
       submitting: false
     };
-    var STEPS = 4;
+    var STEPS = 5;
+
+    // Which of ratePerMile / flatFee / minimumCharge is the "headline" price for
+    // a seeded row — the first non-zero wins so we never surface an editable 0
+    // that isn't actually part of this vertical's pricing model.
+    var PRICE_FIELDS = ['ratePerMile', 'flatFee', 'minimumCharge'];
+    var PRICE_FIELD_LABELS = { ratePerMile: '$ / mile', flatFee: 'Flat fee', minimumCharge: 'Minimum' };
+    function primaryPriceField(row) {
+      for (var i = 0; i < PRICE_FIELDS.length; i++) {
+        if (Number(row[PRICE_FIELDS[i]])) return PRICE_FIELDS[i];
+      }
+      return 'ratePerMile';
+    }
+    function rowName(row) {
+      if (row.label) return row.label;
+      var s = row.service || 'Rate';
+      return row.equipment ? s + ' · ' + row.equipment : s;
+    }
 
     var overlay = el('div', 'qf-ob-overlay');
     overlay.id = 'qf-ob-overlay';
@@ -129,7 +151,7 @@
       body.innerHTML = '';
 
       if (state.step === 0) {
-        body.appendChild(el('div', 'qf-ob-kicker', 'Step 1 of 4'));
+        body.appendChild(el('div', 'qf-ob-kicker', 'Step 1 of 5'));
         body.appendChild(el('h1', 'qf-ob-title', 'What do you haul most?'));
         body.appendChild(el('p', 'qf-ob-sub', 'Pick your main freight so we tailor the calculator to it — you can add the others later.'));
         var grid = el('div', 'qf-ob-cards is-two');
@@ -142,7 +164,7 @@
         });
         body.appendChild(grid);
       } else if (state.step === 1) {
-        body.appendChild(el('div', 'qf-ob-kicker', 'Step 2 of 4'));
+        body.appendChild(el('div', 'qf-ob-kicker', 'Step 2 of 5'));
         body.appendChild(el('h1', 'qf-ob-title', 'How do you price it?'));
         body.appendChild(el('p', 'qf-ob-sub', 'This sets your default. You can fine-tune every rate afterward.'));
         var pgrid = el('div', 'qf-ob-cards is-two');
@@ -154,7 +176,7 @@
         });
         body.appendChild(pgrid);
       } else if (state.step === 2) {
-        body.appendChild(el('div', 'qf-ob-kicker', 'Step 3 of 4'));
+        body.appendChild(el('div', 'qf-ob-kicker', 'Step 3 of 5'));
         body.appendChild(el('h1', 'qf-ob-title', 'Your main lane?'));
         body.appendChild(el('p', 'qf-ob-sub', 'Optional — the lane you run most. It helps us pre-tune examples. Skip either field if unsure.'));
         var lane = el('div', 'qf-ob-lane');
@@ -179,7 +201,7 @@
         lane.appendChild(toWrap);
         body.appendChild(lane);
       } else if (state.step === 3) {
-        body.appendChild(el('div', 'qf-ob-kicker', 'Step 4 of 4'));
+        body.appendChild(el('div', 'qf-ob-kicker', 'Step 4 of 5'));
         body.appendChild(el('h1', 'qf-ob-title', 'Make it yours'));
         body.appendChild(el('p', 'qf-ob-sub', 'Optional — pick a brand color for your customer-facing calculator. You can refine the full brand later.'));
         var field = el('div', 'qf-ob-field');
@@ -195,6 +217,82 @@
         });
         field.appendChild(sw);
         body.appendChild(field);
+      } else if (state.step === 4) {
+        body.appendChild(el('div', 'qf-ob-kicker', 'Step 5 of 5'));
+        body.appendChild(el('h1', 'qf-ob-title', 'Confirm your top 3 rates'));
+        body.appendChild(el('p', 'qf-ob-sub', 'These seeded from your pick. Tweak the headline price on each, then copy your calculator link to share it.'));
+
+        var rows = state.rates || [];
+        if (rows.length === 0) {
+          body.appendChild(el('p', 'qf-ob-sub', 'No rates to confirm yet — you can add them from the dashboard.'));
+        }
+        var list = el('div', 'qf-ob-rates');
+        rows.forEach(function (row) {
+          var fieldKey = row.__field || primaryPriceField(row);
+          row.__field = fieldKey;
+          var rowEl = el('div', 'qf-ob-rate-row');
+
+          var name = el('div', 'qf-ob-rate-name');
+          name.appendChild(el('span', 'qf-ob-rate-label', rowName(row)));
+          name.appendChild(el('span', 'qf-ob-rate-unit', PRICE_FIELD_LABELS[fieldKey] || fieldKey));
+          rowEl.appendChild(name);
+
+          var priceWrap = el('div', 'qf-ob-rate-price');
+          priceWrap.appendChild(el('span', 'qf-ob-rate-money', '$'));
+          var price = el('input', 'qf-ob-input');
+          price.type = 'number';
+          price.min = '0';
+          price.step = 'any';
+          price.inputMode = 'decimal';
+          price.value = row[fieldKey] != null ? row[fieldKey] : 0;
+          price.setAttribute('aria-label', rowName(row) + ' ' + (PRICE_FIELD_LABELS[fieldKey] || fieldKey));
+          price.addEventListener('input', function () {
+            var n = parseFloat(price.value);
+            row[fieldKey] = isNaN(n) ? 0 : n;
+            row.__dirty = true;
+          });
+          priceWrap.appendChild(price);
+          rowEl.appendChild(priceWrap);
+          list.appendChild(rowEl);
+        });
+        body.appendChild(list);
+
+        // Share link (copy-to-clipboard). Prefer the hosted vanity URL; fall
+        // back to the generic /w/<slug> embed route if it's not present.
+        var me = opts.me || {};
+        var t = me.tenant || {};
+        var link = t.hostedUrl || new URL('/w/' + encodeURIComponent(t.slug || ''), location.origin).toString();
+
+        var copyField = el('div', 'qf-ob-field');
+        copyField.appendChild(el('label', null, 'Your calculator link'));
+        var copyRow = el('div', 'qf-ob-copyrow');
+        var linkIn = el('input', 'qf-ob-input');
+        linkIn.type = 'text';
+        linkIn.readOnly = true;
+        linkIn.value = link;
+        copyRow.appendChild(linkIn);
+        var copyBtn = el('button', 'qf-ob-copy-btn', 'Copy link');
+        copyBtn.type = 'button';
+        copyBtn.addEventListener('click', function () {
+          var done = function () {
+            try { localStorage.setItem('qf-embed-viewed', '1'); } catch (e) {}
+            copyBtn.textContent = 'Copied ✓';
+            setTimeout(function () { copyBtn.textContent = 'Copy link'; }, 1500);
+          };
+          if (navigator.clipboard && navigator.clipboard.writeText) {
+            navigator.clipboard.writeText(link).then(done, function () {
+              linkIn.focus(); linkIn.select(); done();
+            });
+          } else {
+            // Graceful fallback when the async Clipboard API is unavailable.
+            linkIn.focus(); linkIn.select();
+            try { document.execCommand('copy'); } catch (e) {}
+            done();
+          }
+        });
+        copyRow.appendChild(copyBtn);
+        copyField.appendChild(copyRow);
+        body.appendChild(copyField);
       }
 
       // gate Continue on the required steps
@@ -205,8 +303,13 @@
     }
 
     function onNext() {
+      if (state.submitting) return;
+      // Leaving the brand step (step 4 of 5): commit the setup, then load the
+      // reseeded rate cards and advance to the confirm-rates step.
+      if (state.step === 3) { applyAndLoadRates(); return; }
       if (state.step < STEPS - 1) { state.step++; render(); return; }
-      finish(false);
+      // Confirm-rates step: persist any edits, then finish.
+      finishRates();
     }
 
     function showError(msg) {
@@ -215,28 +318,99 @@
       body.appendChild(el('div', 'qf-ob-error', msg));
     }
 
+    // Step 4 → 5: POST the setup, then GET the (reseeded) rate cards. The rate
+    // fetch MUST run AFTER apply so the pristine-seed reseed has already run.
+    function applyAndLoadRates() {
+      if (state.submitting) return;
+      state.submitting = true;
+      nextBtn.disabled = true;
+      skipBtn.disabled = true;
+
+      var payload = {
+        freightVertical: state.vertical,
+        pricingMode: state.pricing,
+        mainLane: { from: state.laneFrom.trim() || null, to: state.laneTo.trim() || null }
+      };
+      if (state.brandColor) payload.brand = { primaryColor: state.brandColor };
+
+      fetch('/api/tenant/onboarding/apply', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
+        body: JSON.stringify(payload)
+      })
+        .then(function (r) {
+          if (!r.ok) throw new Error('apply failed (' + r.status + ')');
+          return r.json().catch(function () { return {}; });
+        })
+        .then(function () {
+          return fetch('/api/tenant/rate-cards', { headers: { Accept: 'application/json' } });
+        })
+        .then(function (r) {
+          if (!r.ok) throw new Error('rate-cards load failed (' + r.status + ')');
+          return r.json();
+        })
+        .then(function (data) {
+          var rows = (data && data.rateCards) || [];
+          rows.sort(function (a, b) { return (a.sortOrder || 0) - (b.sortOrder || 0); });
+          state.rates = rows.slice(0, 3);
+          state.ratesLoaded = true;
+          state.submitting = false;
+          skipBtn.disabled = false;
+          state.step = 4;
+          render();
+        })
+        .catch(function () {
+          state.submitting = false;
+          nextBtn.disabled = false;
+          skipBtn.disabled = false;
+          showError('Something went wrong saving your setup. Please try again, or Skip for now.');
+        });
+    }
+
+    // Step 5 "Finish": PUT only the rows whose headline price was edited (never
+    // delete a row — that would flip setup-status.rates back to false), then
+    // close and hand control to the dashboard.
+    function finishRates() {
+      if (state.submitting) return;
+      state.submitting = true;
+      nextBtn.disabled = true;
+      skipBtn.disabled = true;
+
+      var puts = (state.rates || [])
+        .filter(function (row) { return row.__dirty && row.__field; })
+        .map(function (row) {
+          var patch = {};
+          patch[row.__field] = Number(row[row.__field]) || 0;
+          return fetch('/api/tenant/rate-cards/' + row.id, {
+            method: 'PUT',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(patch)
+          }).then(function (r) {
+            if (!r.ok) throw new Error('save failed (' + r.status + ')');
+          });
+        });
+
+      Promise.all(puts)
+        .then(function () { close(); onDone(); })
+        .catch(function () {
+          state.submitting = false;
+          nextBtn.disabled = false;
+          skipBtn.disabled = false;
+          showError('Couldn’t save your rate edits. Please try again, or Skip for now.');
+        });
+    }
+
+    // Skip from any step: record the skip and fall straight through.
     function finish(skip) {
       if (state.submitting) return;
       state.submitting = true;
       nextBtn.disabled = true;
       skipBtn.disabled = true;
 
-      var payload;
-      if (skip) {
-        payload = { skip: true };
-      } else {
-        payload = {
-          freightVertical: state.vertical,
-          pricingMode: state.pricing,
-          mainLane: { from: state.laneFrom.trim() || null, to: state.laneTo.trim() || null }
-        };
-        if (state.brandColor) payload.brand = { primaryColor: state.brandColor };
-      }
-
       fetch('/api/tenant/onboarding/apply', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
-        body: JSON.stringify(payload)
+        body: JSON.stringify({ skip: !!skip })
       })
         .then(function (r) {
           if (!r.ok) throw new Error('apply failed (' + r.status + ')');

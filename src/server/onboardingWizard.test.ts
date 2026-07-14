@@ -29,6 +29,44 @@ describe('onboarding wizard — client overlay', () => {
     expect(css).toContain('.qf-ob-card');
   });
 
+  it('adds the confirm-top-3-rates finish step (step 5 of 5)', async () => {
+    const js = await pub('onboarding-wizard.js');
+    const css = await pub('onboarding-wizard.css');
+
+    // The wizard now runs five steps.
+    expect(js).toContain('var STEPS = 5');
+    expect(js).toContain('Step 5 of 5');
+    expect(js).toContain('Confirm your top 3 rates');
+    // No stale "of 4" kicker strings survive the extension.
+    expect(js).not.toContain('of 4');
+
+    // Rates are fetched AFTER apply (so the reseed has run) and capped at 3 by
+    // sortOrder.
+    expect(js).toContain('/api/tenant/rate-cards');
+    expect(js).toContain('.slice(0, 3)');
+    expect(js).toContain('sortOrder');
+
+    // The primary price field is picked from the non-zero candidate.
+    expect(js).toContain("'ratePerMile', 'flatFee', 'minimumCharge'");
+
+    // Edits persist via a PUT of the single changed field on Finish; rows are
+    // never deleted (which would flip setup-status.rates back to false).
+    expect(js).toContain("method: 'PUT'");
+    expect(js).not.toContain("method: 'DELETE'");
+
+    // Copy-link control copies the hosted URL and marks the embed as viewed.
+    expect(js).toContain('hostedUrl');
+    expect(js).toContain('navigator.clipboard');
+    expect(js).toContain('Copy link');
+    expect(js).toContain('qf-embed-viewed');
+
+    // Scoped styles for the new step.
+    expect(css).toContain('.qf-ob-rate-row');
+    expect(css).toContain('.qf-ob-rate-price');
+    expect(css).toContain('.qf-ob-copyrow');
+    expect(css).toContain('.qf-ob-copy-btn');
+  });
+
   it('is loaded + gated in the dashboard shell', async () => {
     const html = await pub('app.html');
     const appjs = await pub('app.js');
@@ -54,5 +92,17 @@ describe('onboarding wizard — server apply endpoint', () => {
     const auth = await readFile(resolve(routesDir, 'auth.ts'), 'utf8');
     expect(auth).toContain('needsOnboarding');
     expect(auth).toContain('onboardingJson');
+  });
+
+  it('reuses the existing rate-card GET (subset by sortOrder) + partial PUT', async () => {
+    const tenant = await readFile(resolve(routesDir, 'tenant.ts'), 'utf8');
+    // GET returns the tenant's rate cards ordered by sortOrder — the confirm
+    // step slices the top 3 from this.
+    expect(tenant).toContain("app.get('/api/tenant/rate-cards'");
+    expect(tenant).toContain('orderBy(rateCards.sortOrder)');
+    // PUT is a partial update (spreads only the provided fields), so editing one
+    // price never changes the row COUNT — setup-status.rates stays true.
+    expect(tenant).toContain("app.put('/api/tenant/rate-cards/:id'");
+    expect(tenant).toContain('...parse.data');
   });
 });
