@@ -70,6 +70,32 @@ body.qf-wft .visual-flow.qf-hero-media > img {
   filter: drop-shadow(0 32px 60px rgba(0, 0, 0, 0.55)) !important;
 }
 
+/* ── Composite hero mockup (desktop right side). One large laptop+phone-on-rock
+   render. Its rectangular edges are feathered into the hero background with a
+   4-edge alpha mask (two intersecting linear gradients) so there are NO hard
+   lines — the image dissolves into the hero and reads as one piece. No hard
+   drop-shadow (the fade IS the edge treatment). Mobile keeps the existing
+   widget image; the composite is desktop-only. ── */
+html body.qf-wft .visual-flow.qf-hero-media > .qf-hero-img-mobile { display: none !important; }
+html body.qf-wft .visual-flow.qf-hero-media > .qf-hero-img-desktop {
+  display: block !important;
+  width: 100% !important;
+  height: auto !important;
+  border: 0 !important;
+  border-radius: 0 !important;
+  background: none !important;
+  box-shadow: none !important;
+  filter: none !important;
+  -webkit-mask-image:
+    linear-gradient(to right,  transparent 0%, var(--ink) 13%, var(--ink) 87%, transparent 100%),
+    linear-gradient(to bottom, transparent 0%, var(--ink) 11%, var(--ink) 89%, transparent 100%);
+  -webkit-mask-composite: source-in;
+  mask-image:
+    linear-gradient(to right,  transparent 0%, var(--ink) 13%, var(--ink) 87%, transparent 100%),
+    linear-gradient(to bottom, transparent 0%, var(--ink) 11%, var(--ink) 89%, transparent 100%);
+  mask-composite: intersect;
+}
+
 /* ── Fix 4 — align the CTA row flush under the eyebrow/H1/lead (left edge), and
    vertically-center "See how it works" against the "Start free" button. The base
    rule (style.css) is `inline-flex; justify-content:center`, which pushed the row
@@ -149,6 +175,14 @@ body.qf-wft .hero-cta .demo-link .arr {
     max-width: 100% !important;
     width: 100% !important;
     margin: 8px 0 !important;
+  }
+
+  /* Mobile keeps the compact widget; the desktop composite is hidden here. */
+  html body.qf-wft .visual-flow.qf-hero-media > .qf-hero-img-desktop { display: none !important; }
+  html body.qf-wft .visual-flow.qf-hero-media > .qf-hero-img-mobile {
+    display: block !important;
+    width: 100% !important;
+    height: auto !important;
   }
 
   body.qf-wft .hero .lead {
