@@ -9,16 +9,9 @@
    full-width, eyebrow top-left. All spacing on the 8px ramp; no raw #fff/#000.
    ───────────────────────────────────────────────────────────────────────── */
 
-/* Fix 2 — premium display face for the hero headline. Bricolage Grotesque is a
-   contemporary display grotesque (SIL OFL, free). Self-hosted, latin subset,
-   variable (opsz + wght), so one small woff2 covers the whole weight range. */
-@font-face {
-  font-family: 'Bricolage Grotesque';
-  font-style: normal;
-  font-weight: 200 800;
-  font-display: swap;
-  src: url('/fonts/bricolage-grotesque-latin.woff2') format('woff2');
-}
+/* Fix 2 — premium display face for the hero headline. Uses the site's global
+   self-hosted Satoshi (weight 900), already declared via @font-face in style.css
+   and quotefleet-font-system.css — no separate face needed here. */
 
 /* ── Fix 1 — lift the eyebrow: top-align the copy against the tall media so the
    kicker sits high in the hero, with an intentional gap down to the H1. ── */
@@ -38,15 +31,19 @@ body.qf-wft .hero-copy .eyebrow {
   margin-bottom: 24px !important;
 }
 
-/* ── Fix 2 — apply the premium face to the headline. Bricolage is an editorial
-   display grotesque, so it wants looser tracking than the old Satoshi -.075em.
-   optical-sizing + kerning keep it crisp and readable at every size. ── */
-body.qf-wft .hero h1 {
-  font-family: 'Bricolage Grotesque', 'Satoshi', system-ui, -apple-system, 'Segoe UI', sans-serif !important;
-  font-weight: 700 !important;
+/* ── Fix 2 — apply the site's premium Satoshi face to the headline at its
+   heaviest self-hosted weight (900). Trim the desktop size from 84px down to
+   ~68px so the title wraps to fewer, tighter lines while staying bold. The
+   `html` prefix lifts specificity above landing-wefixtrades-cleanup.css's
+   `body.qf-wft .hero h1 { font-size: clamp(...84px) !important }`, which
+   landing-motion.js injects AFTER this sheet's static <link>. ── */
+html body.qf-wft .hero h1 {
+  font-family: 'Satoshi', system-ui, -apple-system, 'Segoe UI', sans-serif !important;
+  font-weight: 900 !important;
+  font-size: clamp(44px, 5.2vw, 68px) !important;
   font-optical-sizing: auto;
-  letter-spacing: -0.028em !important;
-  line-height: 1.0 !important;
+  letter-spacing: -0.035em !important;
+  line-height: 1.02 !important;
   margin-top: 0 !important;
   text-rendering: optimizeLegibility;
   -webkit-font-smoothing: antialiased;
@@ -73,11 +70,17 @@ body.qf-wft .visual-flow.qf-hero-media > img {
   filter: drop-shadow(0 32px 60px rgba(0, 0, 0, 0.55)) !important;
 }
 
-/* ── Fix 4 — align "See how it works" with the "Start free" button. Center both
-   on the row's cross axis and match the link's optical height to the button so
-   their text baselines line up cleanly. ── */
+/* ── Fix 4 — align the CTA row flush under the eyebrow/H1/lead (left edge), and
+   vertically-center "See how it works" against the "Start free" button. The base
+   rule (style.css) is `inline-flex; justify-content:center`, which pushed the row
+   ~92px right of the copy; force flex-start + full-width so its left edge = h1.x. ── */
 body.qf-wft .hero-cta {
+  display: flex !important;
+  width: 100% !important;
+  justify-content: flex-start !important;
   align-items: center !important;
+  margin-left: 0 !important;
+  margin-right: 0 !important;
   gap: 24px !important;
 }
 
@@ -126,17 +129,21 @@ body.qf-wft .hero-cta .demo-link .arr {
     white-space: nowrap !important;
   }
 
-  body.qf-wft .hero h1 {
+  html body.qf-wft .hero h1 {
     order: 2;
     margin: 0 !important;
     max-width: 100% !important;
     text-align: left !important;
-    font-size: clamp(34px, 9vw, 44px) !important;
+    font-size: clamp(34px, 9vw, 40px) !important;
     line-height: 1.04 !important;
   }
 
-  /* The widget sits directly under the headline, full-width and legible. */
-  body.qf-wft .visual-flow.qf-hero-media {
+  /* The widget sits directly under the headline, full-width and legible.
+     `html body` specificity bump so this out-cascades landing-wefixtrades-
+     cleanup.css's equal-specificity `display:none` rule (which JS-injects after
+     this now-static <link>), mirroring the .hero h1 fix — keeps the mobile
+     widget visible as it was before the static-link change. */
+  html body.qf-wft .visual-flow.qf-hero-media {
     order: 3;
     display: block !important;
     max-width: 100% !important;
@@ -151,16 +158,21 @@ body.qf-wft .hero-cta .demo-link .arr {
     text-align: left !important;
   }
 
+  /* Stack the button and the demo-link vertically: full-width button, then the
+     link directly beneath it, left-aligned to the button's left edge with a tidy
+     gap — no 68px drop, no center indent. */
   body.qf-wft .hero-cta {
     order: 5;
     margin-top: 8px !important;
+    flex-direction: column !important;
     align-items: stretch !important;
+    gap: 12px !important;
   }
 
   body.qf-wft .hero-cta .demo-link {
-    align-self: center !important;
-    justify-content: center !important;
-    padding: 8px 0 !important;
+    align-self: flex-start !important;
+    justify-content: flex-start !important;
+    padding: 4px 0 !important;
   }
 
   body.qf-wft .hero .micro-copy,

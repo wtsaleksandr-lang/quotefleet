@@ -12,7 +12,8 @@
   loadStylesheet('/maersk-radius-system.css');
   loadStylesheet('/quotefleet-color-system.css');
   loadStylesheet('/landing-home-fixes.css');
-  loadStylesheet('/landing-hero-redesign.css');
+  /* landing-hero-redesign.css is now a static <link> in landing.html's <head>
+     (loads reliably, no FOUC) — no longer injected here. */
 
   const reduceMotion = window.matchMedia?.('(prefers-reduced-motion: reduce)').matches;
   const items = document.querySelectorAll('[data-reveal]');
