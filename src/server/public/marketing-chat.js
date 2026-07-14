@@ -22,7 +22,7 @@
       position: fixed; right: 20px; bottom: 20px;
       width: 56px; height: 56px;
       border-radius: 50%;
-      background: var(--accent, #5EEAD4);
+      background: var(--accent, #0D3CFC);
       color: var(--accent-ink, #07232A);
       border: 0; cursor: pointer;
       display: flex; align-items: center; justify-content: center;
@@ -32,7 +32,7 @@
       font-size: 24px; line-height: 1;
     }
     .qf-mc-bubble:hover { transform: translateY(-2px); box-shadow: 0 10px 30px rgba(0,0,0,0.35); }
-    .qf-mc-bubble.open { background: var(--surface-2, #2A2A2D); color: var(--accent, #5EEAD4); }
+    .qf-mc-bubble.open { background: var(--surface-2, #2A2A2D); color: var(--accent, #0D3CFC); }
 
     .qf-mc-panel {
       position: fixed; right: 20px; bottom: 90px;
@@ -57,8 +57,8 @@
     }
     .qf-mc-head .dot {
       width: 8px; height: 8px; border-radius: 50%;
-      background: var(--accent, #5EEAD4);
-      box-shadow: 0 0 8px var(--accent, #5EEAD4);
+      background: var(--accent, #0D3CFC);
+      box-shadow: 0 0 8px var(--accent, #0D3CFC);
     }
     .qf-mc-head .title { font-weight: 700; color: var(--ink, #fff); font-size: 15px; }
     .qf-mc-head .sub { font-size: 11px; color: var(--muted, #909192); margin-top: 2px;
@@ -75,7 +75,7 @@
     }
     .qf-mc-bubble-msg.user {
       align-self: flex-end;
-      background: var(--accent, #5EEAD4); color: var(--accent-ink, #07232A);
+      background: var(--accent, #0D3CFC); color: var(--accent-ink, #07232A);
       border-bottom-right-radius: 4px;
     }
     .qf-mc-bubble-msg.assistant {
@@ -98,10 +98,10 @@
       border: 1px solid var(--border-strong, #3E3F42); border-radius: 8px;
       font-size: 13.5px; font-family: inherit;
     }
-    .qf-mc-input:focus { outline: 0; border-color: var(--accent, #5EEAD4); }
+    .qf-mc-input:focus { outline: 0; border-color: var(--accent, #0D3CFC); }
     .qf-mc-send {
       padding: 8px 14px;
-      background: var(--accent, #5EEAD4); color: var(--accent-ink, #07232A);
+      background: var(--accent, #0D3CFC); color: var(--accent-ink, #07232A);
       border: 0; border-radius: 8px; cursor: pointer;
       font-size: 12px; font-weight: 700;
       letter-spacing: 0.06em; text-transform: uppercase;
