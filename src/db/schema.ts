@@ -112,6 +112,12 @@ export const tenants = pgTable(
      *  Keys: 'welcome', 'day_7', 'day_12', 'day_14_expired', etc.
      *  Values: ISO timestamp of when sent. */
     lifecycleEmailsJson: jsonb('lifecycle_emails_json').$type<Record<string, string>>(),
+    /** When the last WEEKLY performance digest was sent to this tenant. The
+     *  weekly-digest cron (src/email/weeklyDigestCron.ts) skips any tenant sent
+     *  within the last 6 days — the double-send guard across ticks/restarts.
+     *  Null = never sent. Additive, no backfill (existing tenants read null and
+     *  simply become eligible on the next Monday tick). */
+    lastWeeklyDigestAt: timestamp('last_weekly_digest_at', { mode: 'date' }),
     /** Marketing/lifecycle email opt-out (CAN-SPAM / CASL). Set true when a
      *  tenant clicks the tokenized unsubscribe link (GET/POST /unsubscribe).
      *  The lifecycle cron SKIPS any tenant with this true. Transactional email

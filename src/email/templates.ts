@@ -458,6 +458,85 @@ export function lifecycleDay12Email(opts: {
   });
 }
 
+/* ── Weekly performance digest (tenant-facing, recurring) ──────────────── */
+
+/** One big-number stat tile. `delta` (optional) renders a small +N / −N chip
+ *  under the value, colored green for a gain and muted for flat/down. */
+function statTile(opts: { value: string; label: string; delta?: string; deltaUp?: boolean }): string {
+  const deltaHtml = opts.delta
+    ? `<div style="margin-top:6px;font-size:12px;font-weight:600;color:${opts.deltaUp ? '#0E7C3A' : BRAND.mutedSoft};">${escape(opts.delta)}</div>`
+    : '';
+  return `<td width="33%" valign="top" style="padding:16px 12px;text-align:center;">
+    <div style="font-size:32px;line-height:1.1;font-weight:700;letter-spacing:-0.02em;color:${BRAND.primary};">${escape(opts.value)}</div>
+    <div style="margin-top:4px;font-size:12px;line-height:1.4;color:${BRAND.muted};">${escape(opts.label)}</div>
+    ${deltaHtml}
+  </td>`;
+}
+
+/** A row of big-number stat tiles (email-safe table). */
+function statGrid(tiles: string[]): string {
+  return `<table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0" style="margin:0 0 20px 0;border:1px solid ${BRAND.border};border-radius:10px;background:${BRAND.bg};">
+    <tr>${tiles.join('')}</tr>
+  </table>`;
+}
+
+export function weeklyDigestEmail(opts: {
+  companyName: string;
+  /** Human date range, e.g. "Jul 7 – Jul 14". */
+  dateRange: string;
+  quotes: number;
+  /** Week-over-week quote delta; omit to hide the chip. */
+  quotesDelta?: number;
+  conversions: number;
+  conversionPct: number;
+  callbacks: number;
+  autoReplies: number;
+  chatConversations: number;
+  views: number;
+  pdfSaves: number;
+  dashboardUrl: string;
+  unsubscribeUrl?: string;
+}): string {
+  const deltaChip =
+    opts.quotesDelta != null && opts.quotesDelta !== 0
+      ? { delta: `${opts.quotesDelta > 0 ? '+' : ''}${opts.quotesDelta} vs last week`, deltaUp: opts.quotesDelta > 0 }
+      : {};
+
+  const secondaryRows: Array<[string, string | null]> = [
+    ['Auto-replies sent', opts.autoReplies > 0 ? String(opts.autoReplies) : null],
+    ['Chat conversations', opts.chatConversations > 0 ? String(opts.chatConversations) : null],
+    ['Quote page views', opts.views > 0 ? String(opts.views) : null],
+    ['PDF quotes saved', opts.pdfSaves > 0 ? String(opts.pdfSaves) : null],
+  ];
+
+  const inner =
+    eyebrow('Weekly recap') +
+    heading('Your week on QuoteFleet') +
+    paragraph(`Here's how <strong style="color:${BRAND.ink};">${escape(opts.companyName)}</strong> did over the last 7 days (${escape(opts.dateRange)}).`) +
+    statGrid([
+      statTile({ value: String(opts.quotes), label: 'Quotes requested', ...deltaChip }),
+      statTile({ value: String(opts.conversions), label: `Booked / won (${opts.conversionPct}%)` }),
+      statTile({ value: String(opts.callbacks), label: 'Callbacks requested' }),
+    ]) +
+    detailBox(secondaryRows) +
+    // TODO(phase2): real email OPENS + link CLICKS need an ESP (Resend/SES)
+    // open+click webhook we don't ingest yet. Show a clearly-labeled
+    // placeholder rather than fabricating numbers.
+    `<table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0" style="margin:0 0 20px 0;border:1px dashed ${BRAND.border};border-radius:8px;background:${BRAND.card};">
+      <tr><td style="padding:10px 14px;font-size:13px;color:${BRAND.mutedSoft};">
+        <span style="color:${BRAND.muted};">Emails opened / links clicked:</span> <strong style="color:${BRAND.mutedSoft};">coming soon</strong>
+      </td></tr>
+    </table>` +
+    ctaButton('View your dashboard', opts.dashboardUrl) +
+    paragraph(`See the full breakdown — every lead, chat, and callback — in your analytics dashboard.`);
+
+  return shell({
+    preheader: `${opts.quotes} quote${opts.quotes === 1 ? '' : 's'} this week — your QuoteFleet recap`,
+    inner,
+    unsubscribeUrl: opts.unsubscribeUrl,
+  });
+}
+
 export function lifecycleExpiredEmail(opts: {
   appUrl: string;
   unsubscribeUrl?: string;

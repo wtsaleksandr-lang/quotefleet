@@ -5,6 +5,7 @@ import { loadEnv } from '../config.js';
 import { createApp } from './app.js';
 import { startMarketplaceCron } from '../marketplace/cron.js';
 import { startLifecycleEmailCron } from '../email/lifecycleCron.js';
+import { startWeeklyDigestCron } from '../email/weeklyDigestCron.js';
 import { startFuelSurchargeCron } from '../eia/dieselPrice.js';
 
 async function main() {
@@ -16,6 +17,7 @@ async function main() {
   });
   startMarketplaceCron();
   startLifecycleEmailCron();
+  startWeeklyDigestCron();
   startFuelSurchargeCron();
 }
 
