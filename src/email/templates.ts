@@ -55,6 +55,9 @@ function shell(opts: {
    *  notifications) which are CAN-SPAM/CASL-exempt and must always send. */
   unsubscribeUrl?: string;
 }): string {
+  // Marketing/lifecycle emails pass an unsubscribeUrl; transactional don't.
+  // That presence is our single signal for the fuller (legal) footer.
+  const isMarketing = opts.unsubscribeUrl != null && opts.unsubscribeUrl !== '';
   return `<!doctype html>
 <html lang="en">
 <head>
@@ -97,36 +100,38 @@ function shell(opts: {
             ${opts.inner}
           </td>
         </tr>
-        <!-- Footer -->
+        <!-- Footer — quiet, evenly-spaced, one muted token throughout.
+             Marketing (has unsubscribeUrl): adds the legal entity + postal
+             address line and the unsubscribe line (CAN-SPAM/CASL). Transactional
+             omits both; those aren't legally required and only add clutter. -->
         <tr>
-          <td style="padding:18px 32px 22px 32px;border-top:1px solid ${BRAND.border};font-size:12px;color:${BRAND.muted};line-height:1.55;">
-            ${opts.footerNote ?? ''}
-            <div style="margin-top:12px;">
-              <a href="${BRAND.supportUrl}" style="color:${BRAND.primary};font-weight:600;text-decoration:none;">Questions? Chat with us&nbsp;→</a>
+          <td style="padding:18px 32px 22px 32px;border-top:1px solid ${BRAND.border};font-size:12px;color:${BRAND.muted};line-height:1.55;text-align:left;">
+            ${opts.footerNote ? `<div style="margin:0 0 14px 0;">${opts.footerNote}</div>` : ''}
+            <div>
+              <a href="${BRAND.supportUrl}" style="color:${BRAND.primary};text-decoration:none;">Questions? Chat with us&nbsp;→</a>
             </div>
             <div style="margin-top:10px;">
-              Reach us anytime at
-              <a href="mailto:${BRAND.support}" style="color:${BRAND.muted};text-decoration:underline;">${escape(BRAND.support)}</a>.
-              <br>— The ${escape(BRAND.name)} Team
-            </div>
-            <div style="margin-top:12px;color:${BRAND.mutedSoft};">
-              ${escape(BRAND.name)} is operated by <strong style="color:${BRAND.inkSoft};">${escape(BRAND.operator)}</strong>.
-              <br>
-              <span style="color:${BRAND.mutedSoft};">${escape(BRAND.postalAddress)}</span>
-              <br>
-              <a href="https://quotefleet.net/security" style="color:${BRAND.muted};text-decoration:underline;">Security</a> ·
-              <a href="https://quotefleet.net/dpa" style="color:${BRAND.muted};text-decoration:underline;">DPA</a> ·
-              <a href="mailto:legal@quotefleet.net" style="color:${BRAND.muted};text-decoration:underline;">legal@quotefleet.net</a>
-            </div>${opts.unsubscribeUrl ? `
-            <div style="margin-top:12px;color:${BRAND.mutedSoft};">
+              <a href="mailto:${BRAND.support}" style="color:${BRAND.muted};text-decoration:underline;">${escape(BRAND.support)}</a>
+              &nbsp;·&nbsp; The ${escape(BRAND.name)} Team
+            </div>${isMarketing ? `
+            <div style="margin-top:10px;">
+              ${escape(BRAND.postalAddress)}
+            </div>` : ''}
+            <div style="margin-top:10px;">
+              <a href="https://quotefleet.net/security" style="color:${BRAND.muted};text-decoration:underline;">Security</a>
+              &nbsp;·&nbsp;
+              <a href="https://quotefleet.net/dpa" style="color:${BRAND.muted};text-decoration:underline;">DPA</a>
+            </div>${isMarketing ? `
+            <div style="margin-top:10px;">
               You're receiving QuoteFleet product updates because you started a trial.
-              <a href="${escape(opts.unsubscribeUrl)}" style="color:${BRAND.muted};text-decoration:underline;">Unsubscribe from product updates</a>.
+              <a href="${escape(opts.unsubscribeUrl!)}" style="color:${BRAND.muted};text-decoration:underline;">Unsubscribe from product updates</a>.
               You'll still get essential account emails like sign-in links.
             </div>` : ''}
           </td>
         </tr>
-      </table>
-      <!-- Outer footer -->
+      </table>${isMarketing ? '' : `
+      <!-- Outer received-note — transactional only; marketing carries its own
+           "why you got this" in the unsubscribe line above. -->
       <table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0" style="max-width:560px;margin-top:14px;">
         <tr>
           <td align="center" style="font-size:11px;color:${BRAND.mutedSoft};line-height:1.5;">
@@ -134,7 +139,7 @@ function shell(opts: {
             If that wasn't you, ignore this email — no action will be taken.
           </td>
         </tr>
-      </table>
+      </table>`}
     </td>
   </tr>
 </table>
