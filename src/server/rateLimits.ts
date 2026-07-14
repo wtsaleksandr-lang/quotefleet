@@ -76,6 +76,25 @@ export const publicAutocompleteLimiter: RateLimitRequestHandler = rateLimit({
   message: { error: 'Too many autocomplete requests. Slow down.' },
 });
 
+/** /api/tenant/quote-doc/send/:refId — authed owner action that sends the
+ *  carrier-branded quote email to the lead's stored customer address. Real use
+ *  is a click or two per lead, so a tight per-tenant+refId cap plus the
+ *  in-handler resend cooldown stops a double-click / hammer loop from spamming
+ *  the customer's inbox or the mail provider. Keyed by tenant+refId (falls back
+ *  to IP) so one noisy quote can't exhaust another's budget. */
+export const quoteEmailSendLimiter: RateLimitRequestHandler = rateLimit({
+  windowMs: minutes(15),
+  limit: 5,
+  standardHeaders: 'draft-7',
+  legacyHeaders: false,
+  keyGenerator: (req) => {
+    const tenantId = req.tenant?.id;
+    const refId = typeof req.params?.refId === 'string' ? req.params.refId : '';
+    return tenantId ? `qdoc-send:${tenantId}:${refId}` : `qdoc-send-ip:${req.ip}`;
+  },
+  message: { error: 'Too many send attempts for this quote. Try again in a few minutes.' },
+});
+
 /** /api/auth/magic-link/send — anti-email-bomb. */
 export const magicLinkLimiter: RateLimitRequestHandler = rateLimit({
   windowMs: minutes(60),

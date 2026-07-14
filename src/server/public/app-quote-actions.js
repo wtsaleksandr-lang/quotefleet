@@ -34,19 +34,53 @@
       .then(function (r) { return r.json(); })
       .then(function (data) {
         if (data.error) throw new Error(data.error);
+        var hasEmail = !!(data.to && String(data.to).trim());
         var card = document.createElement('div');
         card.className = 'card';
         card.dataset.qfEmailPreview = '1';
         card.style.marginTop = '14px';
         card.innerHTML = '' +
-          '<div class="card-title">Quote email preview</div>' +
-          '<div class="card-subtitle">Template only. It does not send email yet.</div>' +
-          '<div class="field"><label class="field-label">To</label><input class="input" readonly value="' + escapeHtml(data.to) + '"></div>' +
+          '<div class="card-title">Email this quote to the customer</div>' +
+          '<div class="card-subtitle">This is the exact document your customer receives. It is sent only to the customer email on this lead.</div>' +
+          '<div class="field"><label class="field-label">To</label><input class="input" readonly value="' + escapeHtml(hasEmail ? data.to : 'No customer email on this lead') + '"></div>' +
           '<div class="field" style="margin-top:10px;"><label class="field-label">Subject</label><input class="input" readonly value="' + escapeHtml(data.subject) + '"></div>' +
           '<div class="field" style="margin-top:10px;"><label class="field-label">Plain text</label><textarea class="textarea" rows="8" readonly>' + escapeHtml(data.text) + '</textarea></div>' +
-          '<div class="field" style="margin-top:10px;"><label class="field-label">HTML preview</label><iframe style="width:100%;height:360px;border:1px solid var(--border);border-radius:8px;background:white;"></iframe></div>';
+          '<div class="field" style="margin-top:10px;"><label class="field-label">HTML preview</label><iframe style="width:100%;height:360px;border:1px solid var(--border);border-radius:8px;background:white;"></iframe></div>' +
+          '<div class="qf-quote-actions" style="margin-top:12px;align-items:center;">' +
+          '<button type="button" class="primary" data-email-send' + (hasEmail ? '' : ' disabled') + '>Send to customer</button>' +
+          '<span data-email-send-status style="font-size:13px;color:var(--muted, #64748b);">' +
+          (hasEmail ? '' : 'Add a customer email to this lead first.') + '</span>' +
+          '</div>';
         (anchor || page.querySelector('.qf-quote-actions') || page.querySelector('h1')).insertAdjacentElement('afterend', card);
         card.querySelector('iframe').srcdoc = data.html;
+
+        var sendBtn = card.querySelector('[data-email-send]');
+        var status = card.querySelector('[data-email-send-status]');
+        if (sendBtn && hasEmail) {
+          sendBtn.addEventListener('click', function () {
+            sendBtn.disabled = true;
+            status.textContent = 'Sending…';
+            fetch('/api/tenant/quote-doc/send/' + encodeURIComponent(refId), {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              credentials: 'same-origin',
+            })
+              .then(function (r) { return r.json().then(function (b) { return { ok: r.ok, body: b }; }); })
+              .then(function (res) {
+                if (!res.ok || !res.body || res.body.error) {
+                  throw new Error((res.body && (res.body.message || res.body.error)) || 'Send failed');
+                }
+                status.textContent = 'Sent to ' + (res.body.to || data.to);
+                sendBtn.textContent = 'Sent';
+                if (window.qfToastOk) window.qfToastOk('Quote emailed to the customer');
+              })
+              .catch(function (err) {
+                sendBtn.disabled = false;
+                status.textContent = (err && err.message) || 'Send failed';
+                if (window.qfToastErr) window.qfToastErr(err);
+              });
+          });
+        }
       })
       .catch(function (err) { if (window.qfToastErr) window.qfToastErr(err); });
   }
@@ -68,7 +102,7 @@
       '<a class="primary" target="_blank" rel="noopener" href="' + quoteUrl(refId) + '">Open hosted quote</a>' +
       '<a target="_blank" rel="noopener" href="' + chatUrl(refId) + '">Open customer chat</a>' +
       '<button type="button" data-copy>Copy quote link</button>' +
-      '<button type="button" data-email-preview>Email preview</button>';
+      '<button type="button" data-email-preview>Email quote to customer</button>';
     bar.querySelector('[data-copy]').addEventListener('click', function () {
       copyText(url).then(function () {
         if (window.qfToastOk) window.qfToastOk('Quote link copied');
