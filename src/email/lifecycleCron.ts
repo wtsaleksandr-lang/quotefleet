@@ -22,6 +22,12 @@ import { eq, isNotNull, and } from 'drizzle-orm';
 import { db } from '../db/client.js';
 import { tenants, type Tenant } from '../db/schema.js';
 import { sendEmail } from './send.js';
+import {
+  lifecycleWelcomeEmail,
+  lifecycleDay7Email,
+  lifecycleDay12Email,
+  lifecycleExpiredEmail,
+} from './templates.js';
 import { loadEnv } from '../config.js';
 
 const TICK_MS = 10 * 60 * 1000; // 10 min
@@ -72,6 +78,7 @@ interface LifecycleEmail {
   key: string;
   subject: string;
   body: string;
+  html: string;
 }
 
 function decideNextEmail(t: Tenant): LifecycleEmail | null {
@@ -116,9 +123,10 @@ function makeWelcome(t: Tenant): LifecycleEmail {
       `1. Sign in and tweak your default rate cards (or upload your existing rate sheet under "AI import").\n` +
       `2. Upload your logo + brand colors so the widget matches your site.\n` +
       `3. Drop the embed snippet on your website (in /app → Embed code) or just share your hosted page link.\n\n` +
-      `You're on your 14-day all-inclusive trial — every Pro feature unlocked, unlimited quotes and leads. When it ends we bill the plan you picked (Vital $14.80/mo or Pro $34.80/mo); cancel anytime.\n\n` +
+      `You're on your 14-day all-inclusive trial — every Pro feature unlocked, unlimited quotes and leads. When it ends, you choose whether to continue on Vital ($14.80/mo) or Pro ($34.80/mo) — cancel anytime.\n\n` +
       `If you get stuck, reply to this email. I read everything.\n\n` +
       `— QuoteFleet\n`,
+    html: lifecycleWelcomeEmail({ hostedUrl: hosted, loginUrl: `${base}/login` }),
   };
 }
 
@@ -136,6 +144,7 @@ function makeDay7(t: Tenant): LifecycleEmail {
       `Dashboard:  ${base}/login\n\n` +
       `Trial ends in 7 days, then your plan starts — Vital $14.80/mo or Pro $34.80/mo (${base}/pricing). Manage or switch plans anytime from your dashboard.\n\n` +
       `— QuoteFleet\n`,
+    html: lifecycleDay7Email({ loginUrl: `${base}/login`, pricingUrl: `${base}/pricing` }),
   };
 }
 
@@ -152,6 +161,7 @@ function makeDay12(t: Tenant): LifecycleEmail {
       `Compare plans: ${base}/pricing\n\n` +
       `Reply if you have questions — happy to extend the trial if you need a few extra days.\n\n` +
       `— QuoteFleet\n`,
+    html: lifecycleDay12Email({ appUrl: `${base}/app`, pricingUrl: `${base}/pricing` }),
   };
 }
 
@@ -166,6 +176,7 @@ function makeExpired(t: Tenant): LifecycleEmail {
       `Vital $14.80/mo or Pro $34.80/mo — pick one in one click: ${base}/app\n\n` +
       `Or, if QuoteFleet wasn't the right fit, just reply and let me know what missed — useful even if it's a no.\n\n` +
       `— QuoteFleet\n`,
+    html: lifecycleExpiredEmail({ appUrl: `${base}/app` }),
   };
 }
 
@@ -176,6 +187,7 @@ async function sendOne(t: Tenant, email: LifecycleEmail): Promise<boolean> {
       to: t.contactEmail,
       subject: email.subject,
       text: email.body,
+      html: email.html,
     });
     if (!out.ok) {
       console.error(`[email] lifecycle ${email.key} send FAILED (tenant ${t.id}): ${out.error ?? 'unknown error'}`);

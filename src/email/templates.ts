@@ -19,8 +19,8 @@
 const BRAND = {
   name: 'QuoteFleet',
   operator: 'MR Holdings & Trade LLC',
-  primary: '#0EA5B7',          // accent-strong from light theme
-  primaryDark: '#086675',
+  primary: '#0D3CFC',          // brand blue (retired teal #0EA5B7)
+  primaryDark: '#0A2FCB',
   ink: '#0B0F14',
   inkSoft: '#1E2530',
   muted: '#5A6470',
@@ -28,6 +28,14 @@ const BRAND = {
   border: '#E5E7EB',
   bg: '#F7F8FA',
   card: '#FFFFFF',
+  support: 'support@quotefleet.net',
+  supportUrl: 'https://quotefleet.net/support',
+  // Absolute HTTPS logo — the QF icon (colored calculator squares) reads on
+  // any background (light card or a dark-mode-inverted client). Lives at
+  // src/server/public/brand/mark-keys.png → served at /brand/mark-keys.png.
+  logoIcon: 'https://quotefleet.net/brand/mark-keys.png',
+  logoW: 30,
+  logoH: 32,
 };
 
 /** Wraps content in the standard QuoteFleet email shell. Renders the
@@ -43,6 +51,8 @@ function shell(opts: {
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <meta name="x-apple-disable-message-reformatting">
+<meta name="color-scheme" content="light dark">
+<meta name="supported-color-schemes" content="light dark">
 <title>${escape(BRAND.name)}</title>
 </head>
 <body style="margin:0;padding:0;background:${BRAND.bg};font-family:'Inter','Helvetica Neue',Arial,sans-serif;color:${BRAND.ink};-webkit-font-smoothing:antialiased;">
@@ -55,8 +65,17 @@ function shell(opts: {
       <table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0" style="max-width:560px;background:${BRAND.card};border:1px solid ${BRAND.border};border-radius:12px;overflow:hidden;">
         <!-- Header / brand -->
         <tr>
-          <td style="padding:28px 32px 20px 32px;border-bottom:1px solid ${BRAND.border};">
-            <span style="font-size:18px;font-weight:700;letter-spacing:-0.01em;color:${BRAND.ink};">${escape(BRAND.name)}</span>
+          <td style="padding:24px 32px 18px 32px;border-bottom:1px solid ${BRAND.border};">
+            <table role="presentation" cellspacing="0" cellpadding="0" border="0">
+              <tr>
+                <td valign="middle" style="padding-right:10px;">
+                  <img src="${BRAND.logoIcon}" width="${BRAND.logoW}" height="${BRAND.logoH}" alt="${escape(BRAND.name)}" style="display:block;border:0;outline:none;text-decoration:none;">
+                </td>
+                <td valign="middle">
+                  <span style="font-size:19px;font-weight:700;letter-spacing:-0.01em;color:${BRAND.ink};">${escape(BRAND.name)}</span>
+                </td>
+              </tr>
+            </table>
           </td>
         </tr>
         <!-- Body -->
@@ -69,7 +88,15 @@ function shell(opts: {
         <tr>
           <td style="padding:18px 32px 22px 32px;border-top:1px solid ${BRAND.border};font-size:12px;color:${BRAND.muted};line-height:1.55;">
             ${opts.footerNote ?? ''}
-            <div style="margin-top:8px;">
+            <div style="margin-top:12px;">
+              <a href="${BRAND.supportUrl}" style="color:${BRAND.primary};font-weight:600;text-decoration:none;">Questions? Chat with us&nbsp;→</a>
+            </div>
+            <div style="margin-top:10px;">
+              Reach us anytime at
+              <a href="mailto:${BRAND.support}" style="color:${BRAND.muted};text-decoration:underline;">${escape(BRAND.support)}</a>.
+              <br>— The ${escape(BRAND.name)} Team
+            </div>
+            <div style="margin-top:12px;color:${BRAND.mutedSoft};">
               ${escape(BRAND.name)} is operated by <strong style="color:${BRAND.inkSoft};">${escape(BRAND.operator)}</strong>.
               <br>
               <a href="https://quotefleet.net/security" style="color:${BRAND.muted};text-decoration:underline;">Security</a> ·
@@ -171,4 +198,252 @@ export function magicLinkEmail(opts: {
       footerNote,
     }),
   };
+}
+
+/* ──────────────────────────────────────────────────────────────────────
+ * Shared content building blocks — used by every transactional template
+ * below so they stay brand-consistent (blue accent, same spacing scale,
+ * Outlook-safe buttons). All values that could be dynamic are escaped.
+ * ────────────────────────────────────────────────────────────────────── */
+
+/** Small mono uppercase eyebrow above the headline. */
+function eyebrow(label: string): string {
+  return `<p style="margin:0 0 8px 0;font-size:13px;font-family:'JetBrains Mono','SF Mono',Menlo,Consolas,monospace;letter-spacing:0.06em;text-transform:uppercase;color:${BRAND.muted};">${escape(label)}</p>`;
+}
+
+/** Page headline. */
+function heading(text: string): string {
+  return `<h1 style="margin:0 0 14px 0;font-size:24px;line-height:1.2;letter-spacing:-0.02em;color:${BRAND.ink};font-weight:700;">${escape(text)}</h1>`;
+}
+
+/** Body paragraph. `html` is trusted markup already assembled by the
+ *  caller (escape dynamic pieces before passing them in). */
+function paragraph(html: string): string {
+  return `<p style="margin:0 0 16px 0;font-size:15px;line-height:1.6;color:${BRAND.inkSoft};">${html}</p>`;
+}
+
+/** Outlook-safe, table-wrapped primary CTA button. */
+function ctaButton(label: string, href: string): string {
+  return `
+    <table role="presentation" cellspacing="0" cellpadding="0" border="0" style="margin:4px 0 22px 0;">
+      <tr>
+        <td align="center" bgcolor="${BRAND.primary}" style="border-radius:8px;background:${BRAND.primary};">
+          <a href="${escape(href)}" style="display:inline-block;padding:13px 28px;font-size:15px;font-weight:600;letter-spacing:-0.005em;color:#FFFFFF;background:${BRAND.primary};text-decoration:none;border-radius:8px;">${escape(label)} →</a>
+        </td>
+      </tr>
+    </table>`;
+}
+
+/** Bordered label/value detail box. Rows with an empty value are skipped. */
+function detailBox(rows: Array<[string, string | null | undefined]>): string {
+  const visible = rows.filter(([, v]) => v != null && String(v).trim() !== '');
+  if (!visible.length) return '';
+  const cells = visible
+    .map(([label, value], i) => {
+      const border = i < visible.length - 1 ? `border-bottom:1px solid ${BRAND.border};` : '';
+      return `<tr><td style="padding:10px 14px;font-size:14px;color:${BRAND.inkSoft};${border}"><span style="color:${BRAND.muted};">${escape(label)}:</span> <strong style="color:${BRAND.ink};">${escape(String(value))}</strong></td></tr>`;
+    })
+    .join('');
+  return `<table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0" style="margin:0 0 20px 0;border:1px solid ${BRAND.border};border-radius:8px;overflow:hidden;background:${BRAND.bg};">${cells}</table>`;
+}
+
+/** Renders a block of plain text (e.g. an AI-written reply) into safe,
+ *  brand-styled paragraphs — blank lines become paragraph breaks, single
+ *  newlines become <br>. Every character is escaped. */
+function plainTextToParagraphs(text: string): string {
+  return String(text ?? '')
+    .split(/\n{2,}/)
+    .map((block) => block.trim())
+    .filter(Boolean)
+    .map((block) => paragraph(escape(block).replace(/\n/g, '<br>')))
+    .join('');
+}
+
+/* ── Lead auto-reply (customer-facing, AI-written) ─────────────────────── */
+export function leadAutoReplyEmail(opts: {
+  aiBody: string;
+  refId: string;
+  quoteUrl?: string;
+}): string {
+  const inner =
+    eyebrow(`Quote ${opts.refId}`) +
+    heading('Thanks for your request') +
+    plainTextToParagraphs(opts.aiBody) +
+    (opts.quoteUrl ? ctaButton('View your quote', opts.quoteUrl) : '');
+  return shell({
+    preheader: `Your quote ${opts.refId} — details inside`,
+    inner,
+  });
+}
+
+/* ── Lead notification (carrier-facing) ────────────────────────────────── */
+export function leadNotificationEmail(opts: {
+  refId: string;
+  total: string;
+  customerName: string;
+  contactLine: string;
+  laneFrom: string;
+  laneTo: string;
+  miles?: number | string | null;
+  equipment?: string | null;
+  dashboardUrl: string;
+}): string {
+  const inner =
+    eyebrow('New lead') +
+    heading(`New quote request — ${opts.total}`) +
+    paragraph(`<strong style="color:${BRAND.ink};">${escape(opts.customerName)}</strong> ${escape(opts.contactLine)} just requested a quote.`) +
+    detailBox([
+      ['Quote', opts.refId],
+      ['Total', opts.total],
+      ['Lane', `${opts.laneFrom} → ${opts.laneTo}${opts.miles ? ` (${opts.miles} mi)` : ''}`],
+      ['Equipment', opts.equipment ?? null],
+    ]) +
+    ctaButton('View in dashboard', opts.dashboardUrl);
+  return shell({
+    preheader: `${opts.customerName} — ${opts.laneFrom} → ${opts.laneTo} — ${opts.total}`,
+    inner,
+  });
+}
+
+/* ── Callback requested (carrier-facing) ───────────────────────────────── */
+export function callbackRequestedEmail(opts: {
+  refId: string;
+  customerName: string;
+  phone: string;
+  email?: string | null;
+  preferredTime?: string | null;
+  topic?: string | null;
+  escalationNote?: string | null;
+  dashboardUrl: string;
+}): string {
+  const inner =
+    eyebrow('Callback requested') +
+    heading(`${opts.customerName} wants a call`) +
+    paragraph(`They requested a callback for quote <strong style="color:${BRAND.ink};">${escape(opts.refId)}</strong>.`) +
+    detailBox([
+      ['Phone', opts.phone],
+      ['Email', opts.email ?? null],
+      ['Preferred time', opts.preferredTime ?? null],
+      ['Topic', opts.topic ?? null],
+    ]) +
+    (opts.escalationNote ? paragraph(`<em style="color:${BRAND.muted};">${escape(opts.escalationNote)}</em>`) : '') +
+    ctaButton('Open in dashboard', opts.dashboardUrl);
+  return shell({
+    preheader: `${opts.customerName} requested a callback — ${opts.phone}`,
+    inner,
+  });
+}
+
+/* ── Booking accepted (carrier-facing) ─────────────────────────────────── */
+export function bookingAcceptedEmail(opts: {
+  refId: string;
+  customerName: string;
+  contactLine: string;
+  total: string;
+  laneFrom: string;
+  laneTo: string;
+  preferredDate?: string | null;
+  note?: string | null;
+  dashboardUrl: string;
+}): string {
+  const inner =
+    eyebrow('Booking requested') +
+    heading(`${opts.customerName} accepted the quote`) +
+    paragraph(`Quote <strong style="color:${BRAND.ink};">${escape(opts.refId)}</strong> was accepted and a booking was requested.`) +
+    detailBox([
+      ['Contact', opts.contactLine],
+      ['Total', opts.total],
+      ['Lane', `${opts.laneFrom} → ${opts.laneTo}`],
+      ['Requested date', opts.preferredDate ?? null],
+      ['Note', opts.note ?? null],
+    ]) +
+    ctaButton('View in dashboard', opts.dashboardUrl);
+  return shell({
+    preheader: `${opts.customerName} accepted quote ${opts.refId} — ${opts.total}`,
+    inner,
+  });
+}
+
+/* ── Lifecycle emails (tenant-facing) ──────────────────────────────────── */
+export function lifecycleWelcomeEmail(opts: {
+  hostedUrl: string;
+  loginUrl: string;
+}): string {
+  const inner =
+    eyebrow('Welcome aboard') +
+    heading('Your QuoteFleet account is ready') +
+    paragraph('Welcome to QuoteFleet. Everything is set up and waiting for you.') +
+    detailBox([
+      ['Your hosted quote page', opts.hostedUrl],
+      ['Your dashboard', opts.loginUrl],
+    ]) +
+    paragraph('Three things to do in the next 10 minutes:') +
+    paragraph(
+      `1. Sign in and tweak your default rate cards (or upload your rate sheet under <strong style="color:${BRAND.ink};">AI import</strong>).<br>` +
+        `2. Upload your logo + brand colors so the widget matches your site.<br>` +
+        `3. Drop the embed snippet on your website (/app → Embed code) or share your hosted page link.`
+    ) +
+    ctaButton('Open your dashboard', opts.loginUrl) +
+    paragraph(`You're on your 14-day all-inclusive trial — every Pro feature unlocked, unlimited quotes and leads. When it ends, you choose whether to continue on Vital ($14.80/mo) or Pro ($34.80/mo) — cancel anytime.`);
+  return shell({
+    preheader: 'Your QuoteFleet account is ready — 3 quick steps to go live',
+    inner,
+  });
+}
+
+export function lifecycleDay7Email(opts: {
+  loginUrl: string;
+  pricingUrl: string;
+}): string {
+  const inner =
+    eyebrow('Halfway check') +
+    heading("You're 7 days into your trial") +
+    paragraph('Quick check-in — here are the highest-leverage things left to do:') +
+    paragraph(
+      `• <strong style="color:${BRAND.ink};">Embed the widget</strong> on your site — 30 seconds, one &lt;script&gt; tag from /app → Embed code.<br>` +
+        `• <strong style="color:${BRAND.ink};">Tune your rate cards</strong> — the defaults are within ~15% of market, but yours will be tighter.<br>` +
+        `• Want a hand? Just reply to this email and we'll personally walk you through anything.`
+    ) +
+    ctaButton('Open your dashboard', opts.loginUrl) +
+    paragraph(`Your trial ends in 7 days, then your plan starts — Vital $14.80/mo or Pro $34.80/mo. <a href="${escape(opts.pricingUrl)}" style="color:${BRAND.primary};text-decoration:underline;">Compare plans</a>. Manage or switch anytime from your dashboard.`);
+  return shell({
+    preheader: "You're halfway through your QuoteFleet trial — 2 quick wins left",
+    inner,
+  });
+}
+
+export function lifecycleDay12Email(opts: {
+  appUrl: string;
+  pricingUrl: string;
+}): string {
+  const inner =
+    eyebrow('2 days left') +
+    heading('Your trial ends in 2 days') +
+    paragraph('If you\'ve added a card, your plan starts automatically with no interruption. If not, your hosted page stays live but new leads pause until you choose a plan.') +
+    paragraph(
+      `<strong style="color:${BRAND.ink};">Vital — $14.80/mo:</strong> hosted page, widget, unlimited quotes, lead inbox, branded quotes.<br>` +
+        `<strong style="color:${BRAND.ink};">Pro — $34.80/mo:</strong> everything in Vital plus AI auto-reply &amp; 24/7 chat, branded PDF quotes, automation, custom domain, and analytics.`
+    ) +
+    ctaButton('Choose your plan', opts.appUrl) +
+    paragraph(`<a href="${escape(opts.pricingUrl)}" style="color:${BRAND.primary};text-decoration:underline;">Compare plans</a> · Reply if you have questions — happy to extend the trial if you need a few extra days.`);
+  return shell({
+    preheader: 'Your QuoteFleet trial ends in 2 days — pick a plan to stay live',
+    inner,
+  });
+}
+
+export function lifecycleExpiredEmail(opts: {
+  appUrl: string;
+}): string {
+  const inner =
+    eyebrow('Trial ended') +
+    heading('Your 14-day trial has ended') +
+    paragraph('Your hosted page is still live, but new leads now return a "not accepting requests" message until you choose a plan.') +
+    paragraph('Vital $14.80/mo or Pro $34.80/mo — pick one in a single click.') +
+    ctaButton('Choose your plan', opts.appUrl) +
+    paragraph("Or, if QuoteFleet wasn't the right fit, just reply and let us know what missed — useful even if it's a no.");
+  return shell({
+    preheader: 'Your QuoteFleet trial ended — reactivate in one click',
+    inner,
+  });
 }

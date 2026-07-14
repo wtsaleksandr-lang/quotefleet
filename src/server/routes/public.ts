@@ -35,6 +35,12 @@ import { distanceBetween } from '../../calc/distance.js';
 import { generateLeadReply } from '../../ai/replyAgent.js';
 import { leadChatTurn } from '../../ai/chatAgent.js';
 import { sendEmail } from '../../email/send.js';
+import {
+  leadAutoReplyEmail,
+  leadNotificationEmail,
+  callbackRequestedEmail,
+  bookingAcceptedEmail,
+} from '../../email/templates.js';
 import { loadEnv } from '../../config.js';
 import { getTrialState } from '../trialGating.js';
 import { canUseProFeature } from '../plans.js';
@@ -583,10 +589,12 @@ export function registerPublicRoutes(app: Express) {
       // lead + notification but no AI-written reply.
       if (ai[0]?.autoReplyEnabled && canUseProFeature(tenant) && row && body.customerEmail) {
         const aiBody = await generateLeadReply(tenant.id, row.id);
+        const quoteUrl = `${loadEnv().PUBLIC_BASE_URL.replace(/\/$/, '')}/quote/${encodeURIComponent(refId)}`;
         const arResult = await sendEmail({
           to: body.customerEmail,
           subject: `Quote ${refId} — ${tenant.name}`,
           text: aiBody,
+          html: leadAutoReplyEmail({ aiBody, refId, quoteUrl }),
         });
         if (!arResult.ok) {
           console.error(`[email] lead auto-reply send FAILED (lead ${refId}): ${arResult.error ?? 'unknown error'}`);
@@ -611,6 +619,17 @@ export function registerPublicRoutes(app: Express) {
           `Equipment: ${body.equipment}\n` +
           `Total: $${calc.total.toFixed(2)}\n\n` +
           `View in dashboard: ${loadEnv().PUBLIC_BASE_URL}/app/leads/${refId}`,
+        html: leadNotificationEmail({
+          refId,
+          total: `$${calc.total.toFixed(2)}`,
+          customerName: body.customerName,
+          contactLine,
+          laneFrom: body.pickup.city ?? '?',
+          laneTo: body.delivery.city ?? '?',
+          miles: dist.miles,
+          equipment: body.equipment,
+          dashboardUrl: `${loadEnv().PUBLIC_BASE_URL.replace(/\/$/, '')}/app/leads/${refId}`,
+        }),
       });
       if (!notifyResult.ok) {
         console.error(`[email] lead notification send FAILED (lead ${refId}): ${notifyResult.error ?? 'unknown error'}`);
@@ -763,6 +782,19 @@ export function registerPublicRoutes(app: Express) {
             to: tenant.contactEmail,
             subject: `📞 Callback requested — ${body.customerName} (quote ${refId})`,
             text: lines.join('\n'),
+            html: callbackRequestedEmail({
+              refId,
+              customerName: body.customerName,
+              phone: body.customerPhone,
+              email: body.customerEmail || null,
+              preferredTime: body.preferredTime || null,
+              topic: body.topic || null,
+              escalationNote:
+                body.triggerSource === 'chat_escalation'
+                  ? `Escalated from AI chat${body.aiContext?.reason ? ` — ${body.aiContext.reason}` : ''}.`
+                  : null,
+              dashboardUrl: `${loadEnv().PUBLIC_BASE_URL.replace(/\/$/, '')}/app/callbacks/${row?.id ?? ''}`,
+            }),
           });
           if (!cbResult.ok) {
             console.error(`[email] callback notification send FAILED (quote ${refId}): ${cbResult.error ?? 'unknown error'}`);
@@ -847,6 +879,17 @@ export function registerPublicRoutes(app: Express) {
             to: acceptTenant.contactEmail,
             subject: `✅ Booking requested — ${lead.customerName || 'customer'} accepted quote ${refId}`,
             text: lines.join('\n'),
+            html: bookingAcceptedEmail({
+              refId,
+              customerName: lead.customerName || 'A customer',
+              contactLine,
+              total: `$${Number(lead.quotedTotal ?? 0).toFixed(2)}`,
+              laneFrom: lead.pickupCity ?? '?',
+              laneTo: lead.deliveryCity ?? '?',
+              preferredDate: body.preferredDate || null,
+              note: body.note || null,
+              dashboardUrl: `${loadEnv().PUBLIC_BASE_URL.replace(/\/$/, '')}/app/leads/${refId}`,
+            }),
           });
           if (!acceptResult.ok) {
             console.error(`[email] booking-accepted notification send FAILED (quote ${refId}): ${acceptResult.error ?? 'unknown error'}`);
