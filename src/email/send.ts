@@ -86,13 +86,24 @@ export interface EmailOut {
   logged?: boolean;
   provider?: 'resend' | 'smtp' | 'stdout';
   id?: string;
+  /** Set only when ok:false — a human-readable summary of why every
+   *  configured provider failed (never contains secret values). */
+  error?: string;
 }
 
 export async function sendEmail(msg: EmailIn): Promise<EmailOut> {
   const env = loadEnv();
 
+  // Tracks whether a REAL provider (Resend/SMTP) was configured and attempted,
+  // and the last failure reason. If a provider was configured but every attempt
+  // failed we must FAIL LOUDLY (ok:false + error) rather than silently pretend
+  // success via the stdout dev fallback. `errors` never holds a secret value.
+  let providerAttempted = false;
+  const errors: string[] = [];
+
   // 1. Resend
   if (env.RESEND_API_KEY) {
+    providerAttempted = true;
     try {
       const r = await fetch('https://api.resend.com/emails', {
         method: 'POST',
@@ -113,13 +124,18 @@ export async function sendEmail(msg: EmailIn): Promise<EmailOut> {
       });
       if (!r.ok) {
         const body = await r.text();
-        console.warn(`[email] resend HTTP ${r.status}: ${body.slice(0, 200)}`);
-        return { ok: false, provider: 'resend' };
+        // A provider HTTP failure (bad/expired key, 4xx/5xx) must FALL THROUGH
+        // to the next provider — mirror how a thrown exception falls through —
+        // instead of returning immediately and skipping the SMTP fallback.
+        console.error(`[email] resend failed ${r.status}: ${body.slice(0, 300)}`);
+        errors.push(`resend HTTP ${r.status}`);
+      } else {
+        const j = (await r.json()) as { id?: string };
+        return { ok: true, provider: 'resend', id: j.id };
       }
-      const j = (await r.json()) as { id?: string };
-      return { ok: true, provider: 'resend', id: j.id };
     } catch (err) {
-      console.warn('[email] resend failed:', err);
+      console.error('[email] resend failed (exception):', err);
+      errors.push(`resend threw: ${err instanceof Error ? err.message : String(err)}`);
       // fall through to SMTP / stdout
     }
   }
@@ -127,18 +143,32 @@ export async function sendEmail(msg: EmailIn): Promise<EmailOut> {
   // 2. SMTP
   const t = getTransport();
   if (t) {
-    await t.sendMail({
-      from: msg.from ?? env.SMTP_FROM ?? 'noreply@quotefleet.com',
-      to: msg.to,
-      subject: msg.subject,
-      text: msg.text,
-      html: msg.html,
-      replyTo: msg.replyTo,
-    });
-    return { ok: true, provider: 'smtp' };
+    providerAttempted = true;
+    try {
+      await t.sendMail({
+        from: msg.from ?? env.SMTP_FROM ?? 'noreply@quotefleet.com',
+        to: msg.to,
+        subject: msg.subject,
+        text: msg.text,
+        html: msg.html,
+        replyTo: msg.replyTo,
+      });
+      return { ok: true, provider: 'smtp' };
+    } catch (err) {
+      console.error('[email] smtp failed:', err);
+      errors.push(`smtp threw: ${err instanceof Error ? err.message : String(err)}`);
+      // fall through to stdout / final failure
+    }
   }
 
-  // 3. Stdout fallback
+  // 3a. A provider WAS configured but every attempt failed → fail loudly.
+  if (providerAttempted) {
+    const error = errors.join('; ') || 'all providers failed';
+    console.error(`[email] all providers failed for send to <${msg.to}>: ${error}`);
+    return { ok: false, error };
+  }
+
+  // 3b. Stdout fallback — only when NO real provider is configured (dev).
   console.log('────── EMAIL (no provider configured — logged only) ──────');
   console.log(`To:      ${msg.to}`);
   console.log(`Subject: ${msg.subject}`);

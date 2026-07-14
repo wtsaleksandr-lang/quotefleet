@@ -4,7 +4,15 @@
  * `ByteString` error in the Resend header path, silently dropping the
  * best-effort notification so the carrier never heard about the lead.
  */
-import { describe, it, expect, beforeAll } from 'vitest';
+import { describe, it, expect, beforeAll, vi } from 'vitest';
+
+// Inject a fake SMTP transport so we can prove the Resend→SMTP fallthrough
+// without a real network. `mockSendMail` is hoisted so the vi.mock factory
+// (also hoisted) can close over it.
+const { mockSendMail } = vi.hoisted(() => ({ mockSendMail: vi.fn() }));
+vi.mock('nodemailer', () => ({
+  default: { createTransport: () => ({ sendMail: mockSendMail }) },
+}));
 
 // send.ts imports config.js — give it the minimum env so the module loads
 // cleanly in isolation.
@@ -69,5 +77,61 @@ describe('encodeEmailSubject', () => {
       if (word.startsWith('=?')) expect(word.length).toBeLessThanOrEqual(75);
     }
     expect(decodeRfc2047(out)).toBe(subject);
+  });
+});
+
+/**
+ * Fail-fast hardening: a provider HTTP failure (bad/expired key) must FALL
+ * THROUGH to the next provider instead of early-returning and skipping the
+ * SMTP fallback — and sendEmail must return ok:false ONLY when every
+ * configured transport fails. Paradigm: injectable/behavioral — global.fetch
+ * is stubbed and nodemailer is mocked (see vi.mock above), so we assert real
+ * runtime behavior rather than static content.
+ */
+describe('sendEmail provider fallthrough', () => {
+  beforeAll(() => {
+    // Both a Resend key and full SMTP creds are configured, so the precedence
+    // is Resend → SMTP. loadEnv() caches on first call; set before any send.
+    process.env.RESEND_API_KEY = 're_test_key';
+    process.env.SMTP_HOST = 'smtp.example.com';
+    process.env.SMTP_USER = 'user@example.com';
+    process.env.SMTP_PASS = 'unused-in-mock';
+  });
+
+  it('falls through Resend HTTP failure to SMTP (does not early-return on !ok)', async () => {
+    // Resend returns a non-2xx (e.g. expired key). Pre-fix this early-returned
+    // {ok:false} and never reached SMTP.
+    global.fetch = vi.fn(async () => ({
+      ok: false,
+      status: 401,
+      text: async () => 'unauthorized',
+    })) as unknown as typeof fetch;
+    mockSendMail.mockReset();
+    mockSendMail.mockResolvedValue({});
+
+    const { sendEmail } = await import('./send.js');
+    const out = await sendEmail({ to: 'x@y.com', subject: 'hi', text: 'body' });
+
+    // Proof of fallthrough: SMTP was attempted and succeeded.
+    expect(mockSendMail).toHaveBeenCalledTimes(1);
+    expect(out.ok).toBe(true);
+    expect(out.provider).toBe('smtp');
+  });
+
+  it('returns ok:false with an error only when ALL transports fail', async () => {
+    global.fetch = vi.fn(async () => ({
+      ok: false,
+      status: 500,
+      text: async () => 'server error',
+    })) as unknown as typeof fetch;
+    mockSendMail.mockReset();
+    mockSendMail.mockRejectedValue(new Error('smtp down'));
+
+    const { sendEmail } = await import('./send.js');
+    const out = await sendEmail({ to: 'x@y.com', subject: 'hi', text: 'body' });
+
+    expect(mockSendMail).toHaveBeenCalledTimes(1);
+    expect(out.ok).toBe(false);
+    expect(out.error).toBeTruthy();
   });
 });

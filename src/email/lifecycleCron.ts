@@ -177,7 +177,10 @@ async function sendOne(t: Tenant, email: LifecycleEmail): Promise<boolean> {
       subject: email.subject,
       text: email.body,
     });
-    if (!out.ok) return false;
+    if (!out.ok) {
+      console.error(`[email] lifecycle ${email.key} send FAILED (tenant ${t.id}): ${out.error ?? 'unknown error'}`);
+      return false;
+    }
     const updated = { ...(t.lifecycleEmailsJson ?? {}), [email.key]: new Date().toISOString() };
     await db()
       .update(tenants)

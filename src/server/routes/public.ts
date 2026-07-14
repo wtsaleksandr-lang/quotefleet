@@ -583,11 +583,14 @@ export function registerPublicRoutes(app: Express) {
       // lead + notification but no AI-written reply.
       if (ai[0]?.autoReplyEnabled && canUseProFeature(tenant) && row && body.customerEmail) {
         const aiBody = await generateLeadReply(tenant.id, row.id);
-        await sendEmail({
+        const arResult = await sendEmail({
           to: body.customerEmail,
           subject: `Quote ${refId} — ${tenant.name}`,
           text: aiBody,
         });
+        if (!arResult.ok) {
+          console.error(`[email] lead auto-reply send FAILED (lead ${refId}): ${arResult.error ?? 'unknown error'}`);
+        }
         await db()
           .update(leads)
           .set({ autoReplySent: true, autoReplyAt: new Date(), aiSummary: aiBody })
@@ -599,7 +602,7 @@ export function registerPublicRoutes(app: Express) {
         : body.customerPhone
           ? `(${body.customerPhone})`
           : '(no contact info provided)';
-      await sendEmail({
+      const notifyResult = await sendEmail({
         to: tenant.contactEmail,
         subject: `New lead ${refId} ($${calc.total.toFixed(2)}) — ${body.customerName}`,
         text:
@@ -609,6 +612,9 @@ export function registerPublicRoutes(app: Express) {
           `Total: $${calc.total.toFixed(2)}\n\n` +
           `View in dashboard: ${loadEnv().PUBLIC_BASE_URL}/app/leads/${refId}`,
       });
+      if (!notifyResult.ok) {
+        console.error(`[email] lead notification send FAILED (lead ${refId}): ${notifyResult.error ?? 'unknown error'}`);
+      }
     } catch (err) {
       console.warn('[public/lead] notify failed (non-fatal):', err);
     }
@@ -753,11 +759,14 @@ export function registerPublicRoutes(app: Express) {
               : '',
             `\nOpen in dashboard: ${loadEnv().PUBLIC_BASE_URL}/app/callbacks/${row?.id ?? ''}`,
           ].filter(Boolean);
-          await sendEmail({
+          const cbResult = await sendEmail({
             to: tenant.contactEmail,
             subject: `📞 Callback requested — ${body.customerName} (quote ${refId})`,
             text: lines.join('\n'),
           });
+          if (!cbResult.ok) {
+            console.error(`[email] callback notification send FAILED (quote ${refId}): ${cbResult.error ?? 'unknown error'}`);
+          }
         }
       } catch (err) {
         console.warn('[public/callback] notify failed (non-fatal):', err);
@@ -834,11 +843,14 @@ export function registerPublicRoutes(app: Express) {
             body.note ? `Note: ${body.note}` : '',
             `\nOpen in dashboard: ${loadEnv().PUBLIC_BASE_URL}/app/leads/${refId}`,
           ].filter(Boolean);
-          await sendEmail({
+          const acceptResult = await sendEmail({
             to: acceptTenant.contactEmail,
             subject: `✅ Booking requested — ${lead.customerName || 'customer'} accepted quote ${refId}`,
             text: lines.join('\n'),
           });
+          if (!acceptResult.ok) {
+            console.error(`[email] booking-accepted notification send FAILED (quote ${refId}): ${acceptResult.error ?? 'unknown error'}`);
+          }
         }
       } catch (err) {
         console.warn('[public/accept] notify failed (non-fatal):', err);

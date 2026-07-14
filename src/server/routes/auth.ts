@@ -446,6 +446,11 @@ export function registerAuthRoutes(app: Express) {
             `Set RESEND_API_KEY (preferred) or SMTP_HOST/USER/PASS in env to actually send. ` +
             `Recipient: ${email}, link: ${link}`
         );
+      } else if (!result.ok) {
+        // A configured provider failed — surface it loudly so a dead key can't
+        // silently kill 100% of logins. Keep the same {ok:true} privacy
+        // response to the client below (no user-facing change).
+        console.error(`[email] magic-link send FAILED for user: ${result.error ?? 'unknown error'}`);
       }
     } catch (err) {
       console.warn('[magic-link] send failed:', err);
