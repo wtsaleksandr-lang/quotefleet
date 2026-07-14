@@ -175,3 +175,83 @@ body.qf-auth-wft .consent-opt {
   color: var(--ink) !important;
 }
 body.qf-auth-wft .consent-opt a { color: var(--ink) !important; text-decoration: underline; }
+
+/* Selected plan card: DS = 1–2px accent outline + faint tint, never a bright
+   fill. The :has() rule out-specifies the base .plan-opt (dark surface) above,
+   and its !important beats the cosmetic inline styles set by paintPlan(). The
+   accent-soft tint is translucent, so it composites over the dark card. */
+body.qf-auth-wft .plan-opt:has(input:checked) {
+  border-color: var(--accent) !important;
+  background: var(--accent-soft) !important;
+  box-shadow: 0 0 0 1px var(--accent) !important;
+}
+
+/* Inline "Compare plans" expander — keeps form momentum (no modal). Compact,
+   token-driven, theme-aware; the scroll wrapper guarantees no page overflow at
+   375px. Closed by default. */
+body.qf-auth-wft .qf-plan-compare {
+  margin-top: 4px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  overflow: hidden;
+}
+body.qf-auth-wft .qf-plan-compare > summary {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 12px 16px;
+  cursor: pointer;
+  list-style: none;
+  font-size: 13.5px;
+  font-weight: 600;
+  color: var(--muted);
+}
+body.qf-auth-wft .qf-plan-compare > summary::-webkit-details-marker { display: none; }
+body.qf-auth-wft .qf-cmp-caret {
+  transition: transform .15s ease;
+  font-size: 12px;
+  color: var(--muted);
+}
+body.qf-auth-wft .qf-plan-compare[open] > summary .qf-cmp-caret { transform: rotate(180deg); }
+body.qf-auth-wft .qf-cmp-scroll {
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+  border-top: 1px solid var(--border);
+}
+body.qf-auth-wft .qf-cmp-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 12.5px;
+  line-height: 1.4;
+}
+body.qf-auth-wft .qf-cmp-table th,
+body.qf-auth-wft .qf-cmp-table td {
+  padding: 8px 12px;
+  text-align: center;
+  border-bottom: 1px solid var(--border);
+  white-space: nowrap;
+}
+body.qf-auth-wft .qf-cmp-table thead th {
+  color: var(--ink);
+  font-weight: 700;
+  vertical-align: top;
+}
+body.qf-auth-wft .qf-cmp-price {
+  display: block;
+  margin-top: 4px;
+  font-size: 11px;
+  font-weight: 500;
+  color: var(--muted);
+}
+body.qf-auth-wft .qf-cmp-table tbody th[scope="row"] {
+  text-align: left;
+  font-weight: 500;
+  color: var(--ink-soft);
+  white-space: normal;
+  width: 100%;
+}
+body.qf-auth-wft .qf-cmp-table td.yes { color: var(--accent); font-weight: 700; }
+body.qf-auth-wft .qf-cmp-table td.no { color: var(--muted); }
+body.qf-auth-wft .qf-cmp-table tbody tr:last-child th,
+body.qf-auth-wft .qf-cmp-table tbody tr:last-child td { border-bottom: 0; }

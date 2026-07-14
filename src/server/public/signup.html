@@ -59,9 +59,38 @@
           </div>
           <span class="field-hint">Your 14-day trial is all-inclusive either way — you can switch plans anytime.</span>
           <span class="field-hint qf-usd-note" data-usd-note hidden></span>
+          <details class="qf-plan-compare">
+            <summary>Compare plans<span class="qf-cmp-caret" aria-hidden="true">▾</span></summary>
+            <div class="qf-cmp-scroll">
+              <table class="qf-cmp-table">
+                <thead>
+                  <tr>
+                    <th scope="col">Feature</th>
+                    <th scope="col">Vital<span class="qf-cmp-price"><span class="qf-price" data-usd="14.80">$14.80</span>/mo</span></th>
+                    <th scope="col">Pro<span class="qf-cmp-price"><span class="qf-price" data-usd="34.80">$34.80</span>/mo</span></th>
+                  </tr>
+                </thead>
+                <tbody>
+                  <tr><th scope="row">Hosted quote page</th><td class="yes" aria-label="Included">✓</td><td class="yes" aria-label="Included">✓</td></tr>
+                  <tr><th scope="row">Embeddable widget</th><td class="yes" aria-label="Included">✓</td><td class="yes" aria-label="Included">✓</td></tr>
+                  <tr><th scope="row">Unlimited quotes</th><td class="yes" aria-label="Included">✓</td><td class="yes" aria-label="Included">✓</td></tr>
+                  <tr><th scope="row">Lead inbox</th><td class="yes" aria-label="Included">✓</td><td class="yes" aria-label="Included">✓</td></tr>
+                  <tr><th scope="row">Branded quotes</th><td class="yes" aria-label="Included">✓</td><td class="yes" aria-label="Included">✓</td></tr>
+                  <tr><th scope="row">Follow-up reminders</th><td class="yes" aria-label="Included">✓</td><td class="yes" aria-label="Included">✓</td></tr>
+                  <tr><th scope="row">AI auto-reply &amp; 24/7 chat</th><td class="no" aria-label="Not included">–</td><td class="yes" aria-label="Included">✓</td></tr>
+                  <tr><th scope="row">Branded PDF quotes</th><td class="no" aria-label="Not included">–</td><td class="yes" aria-label="Included">✓</td></tr>
+                  <tr><th scope="row">Full automation</th><td class="no" aria-label="Not included">–</td><td class="yes" aria-label="Included">✓</td></tr>
+                  <tr><th scope="row">Custom domain</th><td class="no" aria-label="Not included">–</td><td class="yes" aria-label="Included">✓</td></tr>
+                  <tr><th scope="row">Analytics</th><td class="no" aria-label="Not included">–</td><td class="yes" aria-label="Included">✓</td></tr>
+                  <tr><th scope="row">Priority support</th><td class="no" aria-label="Not included">–</td><td class="yes" aria-label="Included">✓</td></tr>
+                </tbody>
+              </table>
+            </div>
+          </details>
         </div>
         <label class="consent-opt" style="display:flex; gap:10px; align-items:flex-start; padding:10px 12px; background:var(--surface-2); border:1px solid var(--border); border-radius:8px; cursor:pointer; font-size:13.5px; line-height:1.55;"><input type="checkbox" id="dpa-accept" name="dpaAccept" required style="margin-top:3px; flex-shrink:0;"><span>I have read and agree to the <a href="/security" target="_blank" rel="noopener">Security policy</a>, <a href="/dpa" target="_blank" rel="noopener">Data Processing Addendum (v1.0)</a>, and confirm that QuoteFleet may process customer data on my behalf under those terms.</span></label>
         <button class="btn btn-primary btn-lg btn-block" type="submit" id="signup-submit" disabled>Start 14-day trial <span class="arr">→</span></button>
+        <p class="muted-small qf-cta-reassure" style="text-align:center; margin:-8px 0 0;">No credit card required · Cancel anytime</p>
         <div id="signup-error" class="notice error hidden" role="alert"></div>
         <p class="muted-small" style="text-align:center; margin-top: 14px; line-height: 1.55;">Your rates are private by default. Marketplace exposure is opt-in and benchmarks are anonymized. <a href="/security" target="_blank" rel="noopener">Read the full policy →</a></p>
       </form>
