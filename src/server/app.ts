@@ -30,6 +30,7 @@ import { registerMarketingChatRoute } from './routes/marketingChat.js';
 import { registerQuoteDocRoutes } from './routes/quoteDoc.js';
 import { registerQuoteActivityRoutes } from './routes/quoteActivity.js';
 import { registerCarrierProfileRoutes } from './routes/carrierProfile.js';
+import { registerUnsubscribeRoutes } from './routes/unsubscribe.js';
 import { hostInfoMiddleware } from './hostInfo.js';
 
 const __filename = fileURLToPath(import.meta.url);
@@ -115,6 +116,7 @@ export function createApp(): express.Express {
   registerQuoteDocRoutes(app);
   registerQuoteActivityRoutes(app);
   registerCarrierProfileRoutes(app);
+  registerUnsubscribeRoutes(app);
 
   app.get(['/healthz', '/api/health'], async (_req, res) => {
     const time = new Date().toISOString();

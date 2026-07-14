@@ -112,6 +112,12 @@ export const tenants = pgTable(
      *  Keys: 'welcome', 'day_7', 'day_12', 'day_14_expired', etc.
      *  Values: ISO timestamp of when sent. */
     lifecycleEmailsJson: jsonb('lifecycle_emails_json').$type<Record<string, string>>(),
+    /** Marketing/lifecycle email opt-out (CAN-SPAM / CASL). Set true when a
+     *  tenant clicks the tokenized unsubscribe link (GET/POST /unsubscribe).
+     *  The lifecycle cron SKIPS any tenant with this true. Transactional email
+     *  (sign-in links, lead/callback/booking alerts) ignores this flag and
+     *  always sends. Default false; existing tenants read false. */
+    marketingOptOut: boolean('marketing_opt_out').notNull().default(false),
     /** Post-signup guided-onboarding record. Null until the trucker finishes
      *  (or skips) the wizard. `needsOnboarding` on /api/auth/me is derived as
      *  (completedAt == null && !skipped) — a server flag, so the wizard survives

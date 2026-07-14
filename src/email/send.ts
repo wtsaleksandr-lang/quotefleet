@@ -79,6 +79,26 @@ export interface EmailIn {
   html?: string;
   replyTo?: string;
   from?: string;
+  /** MARKETING/LIFECYCLE ONLY: when set, sendEmail attaches RFC 2369 /
+   *  RFC 8058 unsubscribe headers (`List-Unsubscribe` +
+   *  `List-Unsubscribe-Post`) on both the Resend and SMTP paths. Transactional
+   *  callers omit it — those emails are compliance-exempt and carry no
+   *  unsubscribe header. The mailto fallback is fixed; only the tokenized HTTP
+   *  URL varies per tenant. */
+  listUnsubscribeUrl?: string;
+}
+
+/** Fixed mailbox for the mailto: arm of List-Unsubscribe. */
+const UNSUBSCRIBE_MAILTO = 'mailto:unsubscribe@quotefleet.net';
+
+/** Build the List-Unsubscribe header pair for a marketing send, or null when
+ *  no unsubscribe URL was supplied (transactional email → no headers). */
+function unsubscribeHeaders(url: string | undefined): Record<string, string> | null {
+  if (!url) return null;
+  return {
+    'List-Unsubscribe': `<${url}>, <${UNSUBSCRIBE_MAILTO}>`,
+    'List-Unsubscribe-Post': 'List-Unsubscribe=One-Click',
+  };
 }
 
 export interface EmailOut {
@@ -93,6 +113,9 @@ export interface EmailOut {
 
 export async function sendEmail(msg: EmailIn): Promise<EmailOut> {
   const env = loadEnv();
+
+  // Present only for marketing/lifecycle sends; null for transactional email.
+  const listHeaders = unsubscribeHeaders(msg.listUnsubscribeUrl);
 
   // Tracks whether a REAL provider (Resend/SMTP) was configured and attempted,
   // and the last failure reason. If a provider was configured but every attempt
@@ -120,6 +143,8 @@ export async function sendEmail(msg: EmailIn): Promise<EmailOut> {
           text: msg.text,
           html: msg.html,
           reply_to: msg.replyTo,
+          // Marketing/lifecycle only — omitted (undefined) for transactional.
+          ...(listHeaders ? { headers: listHeaders } : {}),
         }),
       });
       if (!r.ok) {
@@ -152,6 +177,8 @@ export async function sendEmail(msg: EmailIn): Promise<EmailOut> {
         text: msg.text,
         html: msg.html,
         replyTo: msg.replyTo,
+        // Marketing/lifecycle only — omitted for transactional sends.
+        ...(listHeaders ? { headers: listHeaders } : {}),
       });
       return { ok: true, provider: 'smtp' };
     } catch (err) {

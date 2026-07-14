@@ -135,3 +135,76 @@ describe('sendEmail provider fallthrough', () => {
     expect(out.error).toBeTruthy();
   });
 });
+
+/**
+ * CAN-SPAM / CASL: marketing/lifecycle sends must carry List-Unsubscribe +
+ * List-Unsubscribe-Post (RFC 8058 one-click); transactional sends must NOT.
+ * Behavioral — inspect the actual Resend JSON body / nodemailer args, not
+ * static template content. Relies on the env set by the fallthrough describe
+ * (RESEND_API_KEY + SMTP creds cached in loadEnv).
+ */
+describe('List-Unsubscribe header (marketing vs transactional)', () => {
+  it('attaches both unsubscribe headers on the Resend body for a marketing send', async () => {
+    const captured: Array<Record<string, unknown>> = [];
+    global.fetch = vi.fn(async (_url: unknown, init: { body: string }) => {
+      captured.push(JSON.parse(init.body));
+      return { ok: true, status: 200, json: async () => ({ id: 'e1' }) };
+    }) as unknown as typeof fetch;
+
+    const { sendEmail } = await import('./send.js');
+    const out = await sendEmail({
+      to: 'x@y.com',
+      subject: 'lifecycle',
+      text: 'body',
+      listUnsubscribeUrl: 'https://quotefleet.net/unsubscribe?token=1.abc',
+    });
+
+    expect(out.ok).toBe(true);
+    const headers = captured[0].headers as Record<string, string>;
+    expect(headers['List-Unsubscribe']).toBe(
+      '<https://quotefleet.net/unsubscribe?token=1.abc>, <mailto:unsubscribe@quotefleet.net>'
+    );
+    expect(headers['List-Unsubscribe-Post']).toBe('List-Unsubscribe=One-Click');
+  });
+
+  it('does NOT attach any unsubscribe header for a transactional send', async () => {
+    const captured: Array<Record<string, unknown>> = [];
+    global.fetch = vi.fn(async (_url: unknown, init: { body: string }) => {
+      captured.push(JSON.parse(init.body));
+      return { ok: true, status: 200, json: async () => ({ id: 'e2' }) };
+    }) as unknown as typeof fetch;
+
+    const { sendEmail } = await import('./send.js');
+    await sendEmail({ to: 'x@y.com', subject: 'magic link', text: 'body' });
+
+    expect(captured[0].headers).toBeUndefined();
+  });
+
+  it('carries the unsubscribe headers through to the SMTP path when Resend fails', async () => {
+    global.fetch = vi.fn(async () => ({
+      ok: false,
+      status: 401,
+      text: async () => 'unauthorized',
+    })) as unknown as typeof fetch;
+    mockSendMail.mockReset();
+    let smtpArgs: { headers?: Record<string, string> } = {};
+    mockSendMail.mockImplementation(async (a: { headers?: Record<string, string> }) => {
+      smtpArgs = a;
+      return {};
+    });
+
+    const { sendEmail } = await import('./send.js');
+    const out = await sendEmail({
+      to: 'x@y.com',
+      subject: 'lifecycle',
+      text: 'body',
+      listUnsubscribeUrl: 'https://quotefleet.net/unsubscribe?token=2.def',
+    });
+
+    expect(out.provider).toBe('smtp');
+    expect(smtpArgs.headers?.['List-Unsubscribe']).toContain(
+      '<https://quotefleet.net/unsubscribe?token=2.def>'
+    );
+    expect(smtpArgs.headers?.['List-Unsubscribe-Post']).toBe('List-Unsubscribe=One-Click');
+  });
+});

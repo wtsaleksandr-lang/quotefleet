@@ -28,6 +28,7 @@ import {
   lifecycleDay12Email,
   lifecycleExpiredEmail,
 } from './templates.js';
+import { unsubscribeUrl } from './unsubscribe.js';
 import { loadEnv } from '../config.js';
 
 const TICK_MS = 10 * 60 * 1000; // 10 min
@@ -49,7 +50,10 @@ export function startLifecycleEmailCron(): void {
   );
 }
 
-async function runOnce(reason: string): Promise<void> {
+/** One cron tick — scan trialing tenants and send any due lifecycle email,
+ *  skipping tenants who opted out of marketing. Exported for tests (the cron
+ *  itself drives it on a timer via startLifecycleEmailCron). */
+export async function runOnce(reason: string): Promise<void> {
   const t0 = Date.now();
   let sent = 0;
   try {
@@ -61,6 +65,10 @@ async function runOnce(reason: string): Promise<void> {
       .where(and(eq(tenants.plan, 'free'), isNotNull(tenants.trialEndsAt)));
 
     for (const t of rows) {
+      // CAN-SPAM / CASL: a tenant who unsubscribed from product updates gets
+      // NO further lifecycle/marketing email. (Transactional email — sign-in
+      // links, lead alerts — bypasses this cron entirely and still sends.)
+      if (t.marketingOptOut) continue;
       const next = decideNextEmail(t);
       if (!next) continue;
       const ok = await sendOne(t, next);
@@ -79,6 +87,9 @@ interface LifecycleEmail {
   subject: string;
   body: string;
   html: string;
+  /** Tokenized unsubscribe URL for this tenant — drives both the visible
+   *  footer link (baked into `html`) and the List-Unsubscribe header. */
+  listUnsubscribeUrl: string;
 }
 
 function decideNextEmail(t: Tenant): LifecycleEmail | null {
@@ -110,9 +121,11 @@ function publicBaseUrl(): string {
 
 function makeWelcome(t: Tenant): LifecycleEmail {
   const base = publicBaseUrl();
+  const unsub = unsubscribeUrl(base, t.id);
   const hosted = `https://${t.slug}.${t.hostDomain}/`;
   return {
     key: 'welcome',
+    listUnsubscribeUrl: unsub,
     subject: `Welcome to QuoteFleet, ${t.name}`,
     body:
       `Hi,\n\n` +
@@ -126,14 +139,16 @@ function makeWelcome(t: Tenant): LifecycleEmail {
       `You're on your 14-day all-inclusive trial — every Pro feature unlocked, unlimited quotes and leads. When it ends, you choose whether to continue on Vital ($14.80/mo) or Pro ($34.80/mo) — cancel anytime.\n\n` +
       `If you get stuck, reply to this email. I read everything.\n\n` +
       `— QuoteFleet\n`,
-    html: lifecycleWelcomeEmail({ hostedUrl: hosted, loginUrl: `${base}/login` }),
+    html: lifecycleWelcomeEmail({ hostedUrl: hosted, loginUrl: `${base}/login`, unsubscribeUrl: unsub }),
   };
 }
 
 function makeDay7(t: Tenant): LifecycleEmail {
   const base = publicBaseUrl();
+  const unsub = unsubscribeUrl(base, t.id);
   return {
     key: 'day_7',
+    listUnsubscribeUrl: unsub,
     subject: `${t.name} — your QuoteFleet halfway check`,
     body:
       `Hi,\n\n` +
@@ -144,14 +159,16 @@ function makeDay7(t: Tenant): LifecycleEmail {
       `Dashboard:  ${base}/login\n\n` +
       `Trial ends in 7 days, then your plan starts — Vital $14.80/mo or Pro $34.80/mo (${base}/pricing). Manage or switch plans anytime from your dashboard.\n\n` +
       `— QuoteFleet\n`,
-    html: lifecycleDay7Email({ loginUrl: `${base}/login`, pricingUrl: `${base}/pricing` }),
+    html: lifecycleDay7Email({ loginUrl: `${base}/login`, pricingUrl: `${base}/pricing`, unsubscribeUrl: unsub }),
   };
 }
 
 function makeDay12(t: Tenant): LifecycleEmail {
   const base = publicBaseUrl();
+  const unsub = unsubscribeUrl(base, t.id);
   return {
     key: 'day_12',
+    listUnsubscribeUrl: unsub,
     subject: `Your QuoteFleet trial ends in 2 days`,
     body:
       `Hi,\n\n` +
@@ -161,14 +178,16 @@ function makeDay12(t: Tenant): LifecycleEmail {
       `Compare plans: ${base}/pricing\n\n` +
       `Reply if you have questions — happy to extend the trial if you need a few extra days.\n\n` +
       `— QuoteFleet\n`,
-    html: lifecycleDay12Email({ appUrl: `${base}/app`, pricingUrl: `${base}/pricing` }),
+    html: lifecycleDay12Email({ appUrl: `${base}/app`, pricingUrl: `${base}/pricing`, unsubscribeUrl: unsub }),
   };
 }
 
 function makeExpired(t: Tenant): LifecycleEmail {
   const base = publicBaseUrl();
+  const unsub = unsubscribeUrl(base, t.id);
   return {
     key: 'day_14_expired',
+    listUnsubscribeUrl: unsub,
     subject: `Your QuoteFleet trial has ended`,
     body:
       `Hi,\n\n` +
@@ -176,7 +195,7 @@ function makeExpired(t: Tenant): LifecycleEmail {
       `Vital $14.80/mo or Pro $34.80/mo — pick one in one click: ${base}/app\n\n` +
       `Or, if QuoteFleet wasn't the right fit, just reply and let me know what missed — useful even if it's a no.\n\n` +
       `— QuoteFleet\n`,
-    html: lifecycleExpiredEmail({ appUrl: `${base}/app` }),
+    html: lifecycleExpiredEmail({ appUrl: `${base}/app`, unsubscribeUrl: unsub }),
   };
 }
 
@@ -186,8 +205,16 @@ async function sendOne(t: Tenant, email: LifecycleEmail): Promise<boolean> {
     const out = await sendEmail({
       to: t.contactEmail,
       subject: email.subject,
-      text: email.body,
+      // Plain-text parity: the HTML footer and List-Unsubscribe header both
+      // carry the opt-out; text-only clients need it spelled out too.
+      text:
+        email.body +
+        `\n---\nYou're receiving QuoteFleet product updates because you started a trial. ` +
+        `Unsubscribe: ${email.listUnsubscribeUrl}\n` +
+        `You'll still receive essential account emails like sign-in links.\n`,
       html: email.html,
+      // Marketing/lifecycle send → attach List-Unsubscribe headers.
+      listUnsubscribeUrl: email.listUnsubscribeUrl,
     });
     if (!out.ok) {
       console.error(`[email] lifecycle ${email.key} send FAILED (tenant ${t.id}): ${out.error ?? 'unknown error'}`);

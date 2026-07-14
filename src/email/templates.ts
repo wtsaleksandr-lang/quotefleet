@@ -19,6 +19,11 @@
 const BRAND = {
   name: 'QuoteFleet',
   operator: 'MR Holdings & Trade LLC',
+  // PHYSICAL POSTAL ADDRESS — legally required in the footer of every
+  // marketing/lifecycle email under CAN-SPAM (US) and CASL (Canada).
+  // TODO(compliance): REPLACE THIS PLACEHOLDER with the real registered
+  // mailing address BEFORE any lifecycle/marketing email is sent at scale.
+  postalAddress: 'MR Holdings & Trade LLC · [POSTAL ADDRESS — set before sending marketing email]',
   primary: '#0D3CFC',          // brand blue (retired teal #0EA5B7)
   primaryDark: '#0A2FCB',
   ink: '#0B0F14',
@@ -44,6 +49,11 @@ function shell(opts: {
   preheader: string;
   inner: string;
   footerNote?: string;
+  /** Marketing/lifecycle emails ONLY: renders a visible "Unsubscribe from
+   *  product updates" link in the footer pointing at this tokenized URL.
+   *  Omitted for transactional emails (magic-link, lead/callback/booking
+   *  notifications) which are CAN-SPAM/CASL-exempt and must always send. */
+  unsubscribeUrl?: string;
 }): string {
   return `<!doctype html>
 <html lang="en">
@@ -68,11 +78,14 @@ function shell(opts: {
           <td style="padding:24px 32px 18px 32px;border-bottom:1px solid ${BRAND.border};">
             <table role="presentation" cellspacing="0" cellpadding="0" border="0">
               <tr>
-                <td valign="middle" style="padding-right:10px;">
-                  <img src="${BRAND.logoIcon}" width="${BRAND.logoW}" height="${BRAND.logoH}" alt="${escape(BRAND.name)}" style="display:block;border:0;outline:none;text-decoration:none;">
-                </td>
                 <td valign="middle">
-                  <span style="font-size:19px;font-weight:700;letter-spacing:-0.01em;color:${BRAND.ink};">${escape(BRAND.name)}</span>
+                  <!-- Logo + wordmark wrapped together in one anchor so tapping
+                       the brand opens the site. Inline-block + vertical-align
+                       keeps the img/span on one line in every major client. -->
+                  <a href="https://quotefleet.net" style="text-decoration:none;display:inline-block;">
+                    <img src="${BRAND.logoIcon}" width="${BRAND.logoW}" height="${BRAND.logoH}" alt="${escape(BRAND.name)}" style="display:inline-block;vertical-align:middle;border:0;outline:none;text-decoration:none;margin-right:10px;">
+                    <span style="font-size:19px;font-weight:700;letter-spacing:-0.01em;color:${BRAND.ink};vertical-align:middle;">${escape(BRAND.name)}</span>
+                  </a>
                 </td>
               </tr>
             </table>
@@ -99,10 +112,17 @@ function shell(opts: {
             <div style="margin-top:12px;color:${BRAND.mutedSoft};">
               ${escape(BRAND.name)} is operated by <strong style="color:${BRAND.inkSoft};">${escape(BRAND.operator)}</strong>.
               <br>
+              <span style="color:${BRAND.mutedSoft};">${escape(BRAND.postalAddress)}</span>
+              <br>
               <a href="https://quotefleet.net/security" style="color:${BRAND.muted};text-decoration:underline;">Security</a> ·
               <a href="https://quotefleet.net/dpa" style="color:${BRAND.muted};text-decoration:underline;">DPA</a> ·
               <a href="mailto:legal@quotefleet.net" style="color:${BRAND.muted};text-decoration:underline;">legal@quotefleet.net</a>
-            </div>
+            </div>${opts.unsubscribeUrl ? `
+            <div style="margin-top:12px;color:${BRAND.mutedSoft};">
+              You're receiving QuoteFleet product updates because you started a trial.
+              <a href="${escape(opts.unsubscribeUrl)}" style="color:${BRAND.muted};text-decoration:underline;">Unsubscribe from product updates</a>.
+              You'll still get essential account emails like sign-in links.
+            </div>` : ''}
           </td>
         </tr>
       </table>
@@ -368,6 +388,7 @@ export function bookingAcceptedEmail(opts: {
 export function lifecycleWelcomeEmail(opts: {
   hostedUrl: string;
   loginUrl: string;
+  unsubscribeUrl?: string;
 }): string {
   const inner =
     eyebrow('Welcome aboard') +
@@ -388,12 +409,14 @@ export function lifecycleWelcomeEmail(opts: {
   return shell({
     preheader: 'Your QuoteFleet account is ready — 3 quick steps to go live',
     inner,
+    unsubscribeUrl: opts.unsubscribeUrl,
   });
 }
 
 export function lifecycleDay7Email(opts: {
   loginUrl: string;
   pricingUrl: string;
+  unsubscribeUrl?: string;
 }): string {
   const inner =
     eyebrow('Halfway check') +
@@ -409,12 +432,14 @@ export function lifecycleDay7Email(opts: {
   return shell({
     preheader: "You're halfway through your QuoteFleet trial — 2 quick wins left",
     inner,
+    unsubscribeUrl: opts.unsubscribeUrl,
   });
 }
 
 export function lifecycleDay12Email(opts: {
   appUrl: string;
   pricingUrl: string;
+  unsubscribeUrl?: string;
 }): string {
   const inner =
     eyebrow('2 days left') +
@@ -429,11 +454,13 @@ export function lifecycleDay12Email(opts: {
   return shell({
     preheader: 'Your QuoteFleet trial ends in 2 days — pick a plan to stay live',
     inner,
+    unsubscribeUrl: opts.unsubscribeUrl,
   });
 }
 
 export function lifecycleExpiredEmail(opts: {
   appUrl: string;
+  unsubscribeUrl?: string;
 }): string {
   const inner =
     eyebrow('Trial ended') +
@@ -445,5 +472,6 @@ export function lifecycleExpiredEmail(opts: {
   return shell({
     preheader: 'Your QuoteFleet trial ended — reactivate in one click',
     inner,
+    unsubscribeUrl: opts.unsubscribeUrl,
   });
 }

@@ -1,0 +1,13 @@
+-- Marketing / lifecycle email opt-out flag (CAN-SPAM / CASL compliance).
+--
+-- Set true when a tenant clicks the tokenized unsubscribe link served at
+-- GET/POST /unsubscribe (see src/server/routes/unsubscribe.ts). The lifecycle
+-- email cron (src/email/lifecycleCron.ts) skips any tenant with this true.
+-- Transactional email (sign-in links, lead/callback/booking alerts) ignores
+-- this flag and always sends — those are compliance-exempt.
+--
+-- NOT NULL DEFAULT false with a backfill baked into ADD COLUMN: every existing
+-- tenant reads false (still opted in), which is correct — they signed up for
+-- product updates. Idempotent (ADD COLUMN IF NOT EXISTS) so it's safe to
+-- re-run on deploy.
+ALTER TABLE "tenants" ADD COLUMN IF NOT EXISTS "marketing_opt_out" boolean DEFAULT false NOT NULL;

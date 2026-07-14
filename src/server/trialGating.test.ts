@@ -39,6 +39,7 @@ const baseT: Tenant = {
   stripeSubscriptionId: null,
   subscriptionEndsAt: null,
   lifecycleEmailsJson: null,
+  marketingOptOut: false,
   onboardingJson: null,
   anthropicKeyEncrypted: null,
   dpaAcceptedAt: null,
