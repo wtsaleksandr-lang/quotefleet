@@ -10,7 +10,6 @@ import { loadCarrierProfile } from './carrierProfile.js';
 import { customerFacingLines } from '../../calc/engine.js';
 import { resolveQuoteDisclaimer } from '../quoteDisclaimer.js';
 import { estimateTransit } from '../../calc/transit.js';
-import { getRouteMap, buildStaticMapUrl, type LatLng } from '../routeMap.js';
 
 const QUOTE_VALIDITY_DAYS = 30;
 
@@ -89,6 +88,13 @@ export function buildQuoteDocEmail(
 
   const accent = '#0D3CFC';
   const preheader = `${carrierName} — quote ${lead.refId} · ${total}`;
+  // Route snapshot via the server-side proxy (Maps key never in the markup).
+  // Only when both endpoints have coordinates; otherwise omit cleanly.
+  const hasCoords =
+    lead.pickupLat != null && lead.pickupLng != null && lead.deliveryLat != null && lead.deliveryLng != null;
+  const mapImg = hasCoords
+    ? '<img src="' + esc(quoteMapProxyUrl(base, lead.refId)) + '" width="100%" alt="Route from ' + esc(lead.pickupCity || 'pickup') + ' to ' + esc(lead.deliveryCity || 'delivery') + '" style="display:block;width:100%;max-width:572px;border:1px solid #d9e1ec;border-radius:8px;margin:0 0 16px;">'
+    : '';
   const html = [
     '<!doctype html><html lang="en"><head>',
     '<meta charset="utf-8">',
@@ -113,6 +119,7 @@ export function buildQuoteDocEmail(
     '<tr><td style="padding:10px 12px;border-bottom:1px solid #e5eaf1;font-size:14px;"><b>Lane:</b> ' + esc(lane) + '</td></tr>',
     '<tr><td style="padding:10px 12px;font-size:14px;"><b>Service:</b> ' + esc(service || '—') + '</td></tr>',
     '</table>',
+    mapImg,
     '<table role="presentation" cellspacing="0" cellpadding="0" border="0" style="margin:0 0 12px;"><tr>',
     '<td align="center" bgcolor="' + accent + '" style="border-radius:7px;background:' + accent + ';">',
     '<a href="' + esc(quoteUrl) + '" style="display:inline-block;background:' + accent + ';color:#fff;text-decoration:none;font-weight:bold;padding:11px 20px;border-radius:7px;font-size:15px;">View hosted quote →</a>',
@@ -230,53 +237,15 @@ export async function sendQuoteDocEmail(params: { tenantId: number; refId: strin
   };
 }
 
-type RouteMapResult = { url: string; distanceMiles: number | null };
-
 /**
- * Resolve the hosted-quote route map. Prefers Google Directions (a real road
- * route drawn with `path=enc:` + green/red A·B markers, cached per lane); if
- * no Google key is present, falls back to a Mapbox straight-line overlay.
- * Returns null only when there's genuinely no usable geometry.
+ * Absolute URL of the server-side route-map PROXY for a quote. The proxy
+ * (GET /api/public/quote-map/:refId.png) resolves the lane + renders the Google
+ * Static Map entirely server-side, so the Maps API key is NEVER exposed to the
+ * browser (it used to be leaked here as a raw keyed static-map URL). Callers
+ * gate on coordinates being present before using it.
  */
-async function routeMapUrl(origin?: LatLng, destination?: LatLng): Promise<RouteMapResult | null> {
-  if (!origin || !destination) return null;
-  const env = loadEnv();
-
-  if (env.GOOGLE_MAPS_API_KEY) {
-    const route = await getRouteMap(origin, destination, env.GOOGLE_MAPS_API_KEY);
-    if (route) return { url: route.url, distanceMiles: route.distanceMiles };
-    // No route resolved but key exists — draw a straight-line static map.
-    return { url: buildStaticMapUrl(env.GOOGLE_MAPS_API_KEY, origin, destination, null), distanceMiles: null };
-  }
-
-  if (env.MAPBOX_TOKEN) {
-    const line = {
-      type: 'Feature',
-      properties: {
-        stroke: '#2563eb',
-        'stroke-width': 4,
-        'stroke-opacity': 0.75,
-      },
-      geometry: {
-        type: 'LineString',
-        coordinates: [
-          [origin.lng, origin.lat],
-          [destination.lng, destination.lat],
-        ],
-      },
-    };
-    const overlay = [
-      `geojson(${encodeURIComponent(JSON.stringify(line))})`,
-      `pin-s-a+2563eb(${origin.lng},${origin.lat})`,
-      `pin-s-b+ef4444(${destination.lng},${destination.lat})`,
-    ].join(',');
-    return {
-      url: `https://api.mapbox.com/styles/v1/mapbox/streets-v12/static/${overlay}/auto/900x360@2x?access_token=${encodeURIComponent(env.MAPBOX_TOKEN)}`,
-      distanceMiles: null,
-    };
-  }
-
-  return null;
+export function quoteMapProxyUrl(base: string, refId: string): string {
+  return `${base.replace(/\/$/, '')}/api/public/quote-map/${encodeURIComponent(refId)}.png`;
 }
 
 function locationBlock(prefix: 'pickup' | 'delivery', lead: typeof leads.$inferSelect) {
@@ -339,16 +308,14 @@ export function registerQuoteDocRoutes(app: Express) {
     const base = env.PUBLIC_BASE_URL.replace(/\/$/, '');
     const pickup = locationBlock('pickup', lead);
     const delivery = locationBlock('delivery', lead);
-    const routeMap = await routeMapUrl(
-      pickup.lat != null && pickup.lng != null ? { lat: pickup.lat, lng: pickup.lng } : undefined,
-      delivery.lat != null && delivery.lng != null ? { lat: delivery.lat, lng: delivery.lng } : undefined
-    );
-    const mapImageUrl = routeMap?.url ?? null;
-    // Prefer the driving distance the route returned; fall back to the lane's
-    // stored estimate so the caption still reads a mileage.
+    // Route snapshot via the server-side proxy (key stays server-side). Only
+    // emit it when we actually have both endpoints' coordinates — otherwise the
+    // proxy would 404 and quote.js shows its own "map unavailable" fallback.
+    const hasCoords =
+      pickup.lat != null && pickup.lng != null && delivery.lat != null && delivery.lng != null;
+    const mapImageUrl = hasCoords ? quoteMapProxyUrl(base, lead.refId) : null;
     const mapDistanceMiles =
-      routeMap?.distanceMiles ??
-      (typeof lead.distanceMiles === 'number' ? Math.round(lead.distanceMiles) : null);
+      typeof lead.distanceMiles === 'number' ? Math.round(lead.distanceMiles) : null;
 
     return res.json({
       quote: {

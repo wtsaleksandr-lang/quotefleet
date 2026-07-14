@@ -797,5 +797,5 @@ src/server/public/style.css:994	spacing	padding: 11px 15px
 src/server/public/tools-marketplace-wefixtrades.css:3	spacing	padding: 58px 28px 34px
 src/server/public/vertical-pages-wefixtrades.css:33	spacing	padding: 42px 28px
 src/server/public/vertical-pages-wefixtrades.css:5	spacing	padding: 76px 28px 58px
-src/server/public/widget-style.css:198	spacing	left: -9999px
-src/server/public/widget-style.css:215	spacing	top: -5px
+src/server/public/widget-style.css:200	spacing	left: -9999px
+src/server/public/widget-style.css:217	spacing	top: -5px

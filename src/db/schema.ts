@@ -744,6 +744,28 @@ export const geocodeCache = pgTable(
 );
 
 // ────────────────────────────────────────────────────────────────────
+// ROUTE-MAP CACHE — persisted rendered PNG for the quote route snapshot.
+// Key = `${laneCacheKey}|${theme}` (rounded origin+dest coords + light|dark).
+// Stores the fetched Google Static Maps PNG as base64 so redeploys and
+// multi-instance never re-bill the Directions/Static APIs for the same lane.
+// Shared across all tenants (the lane geometry is not tenant-specific).
+// ────────────────────────────────────────────────────────────────────
+export const routeMapCache = pgTable(
+  'route_map_cache',
+  {
+    id: serial('id').primaryKey(),
+    /** `${laneCacheKey}|light` or `${laneCacheKey}|dark`. */
+    cacheKey: text('cache_key').notNull(),
+    /** Base64-encoded PNG bytes of the rendered static map. */
+    pngBase64: text('png_base64').notNull(),
+    /** 'route' = real road polyline; 'straight' = straight-line fallback. */
+    kind: text('kind').notNull().default('route'),
+    createdAt: timestamp('created_at', { mode: 'date' }).notNull().defaultNow(),
+  },
+  (t) => [uniqueIndex('route_map_cache_idx').on(t.cacheKey)]
+);
+
+// ────────────────────────────────────────────────────────────────────
 // AUDIT LOG — record every AI agent action that changes data.
 // ────────────────────────────────────────────────────────────────────
 export const auditLog = pgTable('audit_log', {

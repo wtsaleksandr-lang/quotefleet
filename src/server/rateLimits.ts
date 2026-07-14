@@ -66,6 +66,20 @@ export const publicDocLimiter: RateLimitRequestHandler = rateLimit({
   message: { error: 'Too many requests. Slow down and try again in a minute.' },
 });
 
+/** /api/public/quote-map/:refId.png — public route-snapshot proxy. It's
+ *  refId-gated (only serves maps for a REAL lead's stored coords — no arbitrary
+ *  coordinate input), the PNG is persisted in route_map_cache so a hit never
+ *  re-bills Google, and the browser caches it for a week. A quote page loads it
+ *  once (plus any email/widget render), so a generous cap still stops a scrape
+ *  loop from hammering the Static Maps API on cold (uncached) lanes. */
+export const quoteMapLimiter: RateLimitRequestHandler = rateLimit({
+  windowMs: minutes(1),
+  limit: 60,
+  standardHeaders: 'draft-7',
+  legacyHeaders: false,
+  message: { error: 'Too many map requests. Slow down and try again in a minute.' },
+});
+
 /** /api/public/autocomplete/* — cheap per call but Google/Mapbox bills.
  *  120/min/IP is plenty for type-ahead with debounce. */
 export const publicAutocompleteLimiter: RateLimitRequestHandler = rateLimit({

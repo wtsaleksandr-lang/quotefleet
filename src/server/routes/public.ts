@@ -578,6 +578,15 @@ export function registerPublicRoutes(app: Express) {
     // Auto-reply email + tenant notification — best-effort, don't fail
     // the request if it errors.
     try {
+      // Route-snapshot map via the server-side proxy (Maps key never leaves the
+      // server). Only when both endpoints geocoded, so the proxy won't 404.
+      const emailBase = loadEnv().PUBLIC_BASE_URL.replace(/\/$/, '');
+      const hasMapCoords =
+        typeof dist.origin?.lat === 'number' && typeof dist.origin?.lng === 'number' &&
+        typeof dist.destination?.lat === 'number' && typeof dist.destination?.lng === 'number';
+      const mapUrl = hasMapCoords
+        ? `${emailBase}/api/public/quote-map/${encodeURIComponent(refId)}.png`
+        : undefined;
       const ai = await db()
         .select()
         .from(aiConfigs)
@@ -594,7 +603,7 @@ export function registerPublicRoutes(app: Express) {
           to: body.customerEmail,
           subject: `Quote ${refId} — ${tenant.name}`,
           text: aiBody,
-          html: leadAutoReplyEmail({ aiBody, refId, quoteUrl }),
+          html: leadAutoReplyEmail({ aiBody, refId, quoteUrl, mapUrl }),
         });
         if (!arResult.ok) {
           console.error(`[email] lead auto-reply send FAILED (lead ${refId}): ${arResult.error ?? 'unknown error'}`);
@@ -629,6 +638,7 @@ export function registerPublicRoutes(app: Express) {
           miles: dist.miles,
           equipment: body.equipment,
           dashboardUrl: `${loadEnv().PUBLIC_BASE_URL.replace(/\/$/, '')}/app/leads/${refId}`,
+          mapUrl,
         }),
       });
       if (!notifyResult.ok) {

@@ -25,10 +25,32 @@ export type RouteMap = {
   kind: 'route' | 'straight';
 };
 
+/** Light (default) or dark day/night styling for the static map. */
+export type MapTheme = 'light' | 'dark';
+
+/** Normalize any caller input to a valid theme (default light). */
+export function normalizeTheme(raw: unknown): MapTheme {
+  return raw === 'dark' ? 'dark' : 'light';
+}
+
 // Brand blue route line (no teal). #0D3CFC.
 const ROUTE_COLOR = '0x0D3CFCff';
 const ORIGIN_COLOR = '0x16a34a'; // green — origin (A)
 const DEST_COLOR = '0xef4444'; // red — destination (B)
+
+// Google Static Maps "night" style — dark geometry/water/roads with legible
+// muted labels. Applied ONLY when theme=dark; the cobalt route line + green/red
+// A·B markers are drawn on top (markers/path are unaffected by `style`).
+const DARK_STYLES: string[] = [
+  'element:geometry|color:0x1f2733',
+  'element:labels.text.fill|color:0x9aa4b2',
+  'element:labels.text.stroke|color:0x1f2733',
+  'feature:water|element:geometry|color:0x0f1620',
+  'feature:road|element:geometry|color:0x2a3342',
+  'feature:road|element:labels.text.fill|color:0x8b95a5',
+  'feature:administrative|element:geometry|color:0x3a4557',
+  'feature:landscape|element:geometry|color:0x232c3a',
+];
 
 // Retina-sized to balance the left-column panel (img renders ~210px tall,
 // object-fit:cover). 640 is the free-tier max width; scale:2 = 1280px.
@@ -58,7 +80,8 @@ export function buildStaticMapUrl(
   apiKey: string,
   origin: LatLng,
   destination: LatLng,
-  encodedPolyline?: string | null
+  encodedPolyline?: string | null,
+  theme: MapTheme = 'light'
 ): string {
   const params = new URLSearchParams({
     size: MAP_SIZE,
@@ -69,6 +92,10 @@ export function buildStaticMapUrl(
   // Subtle, official-looking style: drop POI + transit clutter.
   params.append('style', 'feature:poi|visibility:off');
   params.append('style', 'feature:transit|visibility:off');
+  // Day/night: layer the dark geometry/water/label rules on top for theme=dark.
+  if (theme === 'dark') {
+    for (const s of DARK_STYLES) params.append('style', s);
+  }
   // Green origin (A), red destination (B).
   params.append('markers', `color:${ORIGIN_COLOR}|label:A|${origin.lat},${origin.lng}`);
   params.append('markers', `color:${DEST_COLOR}|label:B|${destination.lat},${destination.lng}`);
@@ -140,25 +167,28 @@ export async function getRouteMap(
   origin: LatLng | undefined,
   destination: LatLng | undefined,
   apiKey: string | undefined,
+  theme: MapTheme = 'light',
   fetchImpl: typeof fetch = fetch
 ): Promise<RouteMap | null> {
   if (!origin || !destination || !apiKey) return null;
 
-  const key = laneCacheKey(origin, destination);
+  // Cache key includes the theme so light/dark render to distinct entries and
+  // never serve each other's styled URL.
+  const key = `${laneCacheKey(origin, destination)}|${theme}`;
   const cached = routeCache.get(key);
   if (cached) return cached;
 
   const directions = await fetchDirections(origin, destination, apiKey, fetchImpl);
   const result: RouteMap = directions
     ? {
-        url: buildStaticMapUrl(apiKey, origin, destination, directions.polyline),
+        url: buildStaticMapUrl(apiKey, origin, destination, directions.polyline, theme),
         distanceMiles: directions.distanceMeters
           ? Math.round(directions.distanceMeters / METERS_PER_MILE)
           : null,
         kind: 'route',
       }
     : {
-        url: buildStaticMapUrl(apiKey, origin, destination, null),
+        url: buildStaticMapUrl(apiKey, origin, destination, null, theme),
         distanceMiles: null,
         kind: 'straight',
       };

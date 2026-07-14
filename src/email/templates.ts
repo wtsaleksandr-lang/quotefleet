@@ -272,6 +272,14 @@ function detailBox(rows: Array<[string, string | null | undefined]>): string {
   return `<table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0" style="margin:0 0 20px 0;border:1px solid ${BRAND.border};border-radius:8px;overflow:hidden;background:${BRAND.bg};">${cells}</table>`;
 }
 
+/** Route-snapshot map image. `url` is the ABSOLUTE server-side proxy URL
+ *  (GET /api/public/quote-map/:refId.png) — the Google Maps API key is
+ *  resolved server-side and never appears in the markup. Email-safe: a plain
+ *  <img> with fixed max-width + reserved rounded frame. */
+function routeMapImage(url: string): string {
+  return `<img src="${escape(url)}" width="100%" alt="Route map" style="display:block;width:100%;max-width:496px;border:1px solid ${BRAND.border};border-radius:8px;margin:0 0 20px 0;">`;
+}
+
 /** Renders a block of plain text (e.g. an AI-written reply) into safe,
  *  brand-styled paragraphs — blank lines become paragraph breaks, single
  *  newlines become <br>. Every character is escaped. */
@@ -289,10 +297,13 @@ export function leadAutoReplyEmail(opts: {
   aiBody: string;
   refId: string;
   quoteUrl?: string;
+  /** Absolute route-map proxy URL; rendered under the heading when present. */
+  mapUrl?: string;
 }): string {
   const inner =
     eyebrow(`Quote ${opts.refId}`) +
     heading('Thanks for your request') +
+    (opts.mapUrl ? routeMapImage(opts.mapUrl) : '') +
     plainTextToParagraphs(opts.aiBody) +
     (opts.quoteUrl ? ctaButton('View your quote', opts.quoteUrl) : '');
   return shell({
@@ -312,6 +323,8 @@ export function leadNotificationEmail(opts: {
   miles?: number | string | null;
   equipment?: string | null;
   dashboardUrl: string;
+  /** Absolute route-map proxy URL; rendered under the lane details when present. */
+  mapUrl?: string;
 }): string {
   const inner =
     eyebrow('New lead') +
@@ -323,6 +336,7 @@ export function leadNotificationEmail(opts: {
       ['Lane', `${opts.laneFrom} → ${opts.laneTo}${opts.miles ? ` (${opts.miles} mi)` : ''}`],
       ['Equipment', opts.equipment ?? null],
     ]) +
+    (opts.mapUrl ? routeMapImage(opts.mapUrl) : '') +
     ctaButton('View in dashboard', opts.dashboardUrl);
   return shell({
     preheader: `${opts.customerName} — ${opts.laneFrom} → ${opts.laneTo} — ${opts.total}`,

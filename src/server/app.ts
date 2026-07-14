@@ -28,6 +28,7 @@ import { registerToolsRoutes } from './routes/tools.js';
 import { registerBillingRoutes, registerStripeWebhook } from './routes/billing.js';
 import { registerMarketingChatRoute } from './routes/marketingChat.js';
 import { registerQuoteDocRoutes } from './routes/quoteDoc.js';
+import { registerQuoteMapRoutes } from './routes/quoteMap.js';
 import { registerQuoteActivityRoutes } from './routes/quoteActivity.js';
 import { registerCarrierProfileRoutes } from './routes/carrierProfile.js';
 import { registerUnsubscribeRoutes } from './routes/unsubscribe.js';
@@ -114,6 +115,7 @@ export function createApp(): express.Express {
   registerBillingRoutes(app);
   registerMarketingChatRoute(app);
   registerQuoteDocRoutes(app);
+  registerQuoteMapRoutes(app);
   registerQuoteActivityRoutes(app);
   registerCarrierProfileRoutes(app);
   registerUnsubscribeRoutes(app);

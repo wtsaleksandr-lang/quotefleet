@@ -146,6 +146,8 @@ a.qf-contact-value:hover { text-decoration: underline; }
 .qf-result .total .currency { font-size: 18px; color: var(--w-muted); margin-right: var(--space-0-5); font-weight: 600; }
 .qf-result .meta { font-size: 13px; color: var(--w-muted); margin-bottom: var(--space-1); }
 .qf-result .qf-eta { display: inline-flex; align-items: center; font-size: 12.5px; font-weight: 700; color: #0D3CFC; background: rgba(13,60,252,0.08); border: 1px solid rgba(13,60,252,0.18); border-radius: 999px; padding: var(--space-0-5) var(--space-1-5); margin: 0 0 var(--space-1-5); }
+.qf-route-map { display: block; width: 100%; aspect-ratio: 640 / 272; object-fit: cover; border: 1px solid var(--w-border); border-radius: var(--w-radius); margin-top: var(--space-1-5); }
+.qf-route-map[hidden] { display: none; }
 .qf-view-quote { display: block; text-align: center; text-decoration: none; margin-bottom: var(--space-1-5); }
 .qf-result .lines { font-size: 13px; display: flex; flex-direction: column; gap: var(--space-0-5); }
 .qf-result .line { display: flex; justify-content: space-between; gap: var(--space-1); padding: var(--space-0-5) 0; border-bottom: 1px dashed rgba(15,23,42,0.07); }

@@ -89,7 +89,7 @@ describe('getRouteMap', () => {
       status: 'OK',
       routes: [{ overview_polyline: { points: POLY }, legs: [{ distance: { value: 3_218_688 } }] }],
     });
-    const res = await getRouteMap(LA, CHI, KEY, f);
+    const res = await getRouteMap(LA, CHI, KEY, 'light', f);
     expect(res?.kind).toBe('route');
     expect(res?.distanceMiles).toBe(2000); // 3,218,688 m ≈ 2000 mi
     expect(new URL(res!.url).searchParams.get('path')).toBe(`color:0x0D3CFCff|weight:4|enc:${POLY}`);
@@ -97,7 +97,7 @@ describe('getRouteMap', () => {
 
   it('falls back to a straight line when Directions fails', async () => {
     const f = mockFetch({ status: 'NOT_FOUND' });
-    const res = await getRouteMap(LA, CHI, KEY, f);
+    const res = await getRouteMap(LA, CHI, KEY, 'light', f);
     expect(res?.kind).toBe('straight');
     expect(res?.distanceMiles).toBeNull();
     expect(new URL(res!.url).searchParams.get('path')).toBe(
@@ -110,9 +110,56 @@ describe('getRouteMap', () => {
       status: 'OK',
       routes: [{ overview_polyline: { points: POLY }, legs: [{ distance: { value: 100_000 } }] }],
     });
-    await getRouteMap(LA, CHI, KEY, f);
-    await getRouteMap(LA, CHI, KEY, f);
+    await getRouteMap(LA, CHI, KEY, 'light', f);
+    await getRouteMap(LA, CHI, KEY, 'light', f);
     expect((f as unknown as ReturnType<typeof vi.fn>)).toHaveBeenCalledTimes(1);
+  });
+
+  it('theme is part of the cache key — light and dark each re-fetch once', async () => {
+    const f = mockFetch({
+      status: 'OK',
+      routes: [{ overview_polyline: { points: POLY }, legs: [{ distance: { value: 100_000 } }] }],
+    });
+    await getRouteMap(LA, CHI, KEY, 'light', f);
+    await getRouteMap(LA, CHI, KEY, 'dark', f);
+    // Different theme → different cache entry → a second upstream call.
+    expect((f as unknown as ReturnType<typeof vi.fn>)).toHaveBeenCalledTimes(2);
+    // A repeat of the SAME theme is served from cache (still 2 total).
+    await getRouteMap(LA, CHI, KEY, 'dark', f);
+    expect((f as unknown as ReturnType<typeof vi.fn>)).toHaveBeenCalledTimes(2);
+  });
+
+  it('dark theme applies night geometry/water styles; light does not', async () => {
+    const f = mockFetch({
+      status: 'OK',
+      routes: [{ overview_polyline: { points: POLY }, legs: [{ distance: { value: 100_000 } }] }],
+    });
+    const dark = await getRouteMap(LA, CHI, KEY, 'dark', f);
+    const styles = new URL(dark!.url).searchParams.getAll('style');
+    expect(styles).toContain('feature:water|element:geometry|color:0x0f1620');
+    expect(styles).toContain('element:geometry|color:0x1f2733');
+    // POI/transit still dropped, cobalt route + A/B markers unaffected.
+    expect(styles).toContain('feature:poi|visibility:off');
+    expect(new URL(dark!.url).searchParams.get('path')).toBe(`color:0x0D3CFCff|weight:4|enc:${POLY}`);
+
+    __clearRouteCache();
+    const light = await getRouteMap(LA, CHI, KEY, 'light', f);
+    const lightStyles = new URL(light!.url).searchParams.getAll('style');
+    expect(lightStyles).not.toContain('feature:water|element:geometry|color:0x0f1620');
+    expect(lightStyles).toEqual(['feature:poi|visibility:off', 'feature:transit|visibility:off']);
+  });
+});
+
+describe('buildStaticMapUrl theme', () => {
+  it('defaults to light (no dark styles) and adds them for dark', () => {
+    const light = new URL(buildStaticMapUrl(KEY, LA, CHI, POLY));
+    expect(light.searchParams.getAll('style')).toEqual([
+      'feature:poi|visibility:off',
+      'feature:transit|visibility:off',
+    ]);
+    const dark = new URL(buildStaticMapUrl(KEY, LA, CHI, POLY, 'dark'));
+    expect(dark.searchParams.getAll('style').length).toBeGreaterThan(2);
+    expect(dark.searchParams.getAll('style')).toContain('feature:road|element:geometry|color:0x2a3342');
   });
 });
 

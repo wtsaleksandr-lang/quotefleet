@@ -762,6 +762,20 @@
             viewBtn.style.display = 'none';
           }
         }
+        // Route-snapshot map — populate ONLY now that a lead (refId) exists, via
+        // the server-side proxy (Maps key never reaches the browser). Hidden
+        // until it loads; if the proxy 404s (e.g. no coordinates) it stays
+        // hidden rather than showing a broken image.
+        var mapImg = $('qf-route-map');
+        if (mapImg) {
+          if (resp.refId) {
+            mapImg.onload = function () { mapImg.hidden = false; };
+            mapImg.onerror = function () { mapImg.hidden = true; };
+            mapImg.src = location.origin + '/api/public/quote-map/' + encodeURIComponent(resp.refId) + '.png';
+          } else {
+            mapImg.hidden = true;
+          }
+        }
         showStep('thanks');
       })
       .catch(function (err) { btn.disabled = false; btn.textContent = oldText; showError('qf-submit-error', 'Network error — please try again.'); console.error(err); });
