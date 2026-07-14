@@ -159,7 +159,21 @@ export function createApp(): express.Express {
     injectSlug: boolean
   ) {
     try {
-      const rows = await db().select().from(tenants).where(eq(tenants.slug, slug)).limit(1);
+      // Select ONLY the columns the public widget/gate path needs (all present
+      // since 0000_init), never `SELECT *`. This is the customer-facing entry
+      // point: it must not 500 if the deployed DB is behind on a migration that
+      // added a tenants column (e.g. public_contact_email / quote_disclaimer).
+      // Scoping the select keeps the widget immune to that schema drift.
+      const rows = await db()
+        .select({
+          id: tenants.id,
+          slug: tenants.slug,
+          name: tenants.name,
+          accessMode: tenants.accessMode,
+        })
+        .from(tenants)
+        .where(eq(tenants.slug, slug))
+        .limit(1);
       const tenant = rows[0];
       // Unknown tenant or public mode → serve the widget as before (widget.js
       // surfaces its own "tenant not found" state for missing slugs).
