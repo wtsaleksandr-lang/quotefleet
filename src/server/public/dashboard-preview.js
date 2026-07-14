@@ -97,8 +97,11 @@
     // The dedicated stupid-simple Add-ons editor owns its own surface — no
     // injected customer-preview card there.
     if (content.querySelector('[data-qf-addons]')) return;
-    // 'brand' omitted: the Customize panel (Wave 2) has its own live preview.
-    if (['overview', 'rates', 'accessorials', 'zones', 'ai', 'embed'].includes(route)) previewCard();
+    // The customer-preview phone mockup only belongs on the Overview and the
+    // Public-link (embed) surfaces. Editor surfaces (rates/accessorials/zones/
+    // ai) own their own layout and stay table/form-first — no injected mockup.
+    // 'brand' also omitted: the Customize panel (Wave 2) has its own live preview.
+    if (['overview', 'embed'].includes(route)) previewCard();
   }
 
   let timer;

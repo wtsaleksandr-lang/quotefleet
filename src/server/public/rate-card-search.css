@@ -1,15 +1,14 @@
 /* Phase BA: rate card search and premium light polish */
 .qf-rate-searchbar {
   display: grid;
-  grid-template-columns: minmax(260px, 1fr) minmax(260px, 0.8fr) auto;
+  grid-template-columns: minmax(260px, 1fr) auto;
   gap: 12px;
   align-items: center;
-  margin: 0 0 14px;
-  padding: 14px;
+  margin: 8px 0 12px;
+  padding: 12px;
   border: 1px solid var(--border);
-  border-radius: 20px;
-  background: linear-gradient(135deg, rgba(13, 60, 252, 0.08), rgba(93, 139, 255, 0.06)), var(--surface);
-  box-shadow: var(--shadow-md);
+  border-radius: 16px;
+  background: rgba(255,255,255,.024);
 }
 
 .qf-rate-searchbar strong {
@@ -71,16 +70,15 @@
   background: rgba(255, 255, 255, 0.025);
 }
 
-html[data-theme="light"] .qf-builder-hero,
-html[data-theme="light"] .qf-builder-guide,
-html[data-theme="light"] .qf-rate-scan {
+html[data-theme="light"] .qf-builder-hero {
+  border-bottom-color: rgba(184, 207, 245, 0.72);
+}
+html[data-theme="light"] .qf-rate-searchbar {
   border-color: rgba(184, 207, 245, 0.72);
-  background: linear-gradient(135deg, #ffffff 0%, #f4fbff 62%, #f5f2ff 100%);
+  background: #ffffff;
   box-shadow: 0 16px 42px rgba(37, 34, 99, 0.06);
 }
 
-html[data-theme="light"] .qf-builder-stat,
-html[data-theme="light"] .qf-builder-guide li,
 html[data-theme="light"] .qf-rate-scan-stats button,
 html[data-theme="light"] .qf-rate-row-status {
   border-color: rgba(184, 207, 245, 0.74);

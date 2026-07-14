@@ -1,34 +1,34 @@
-/* Phase AA: make rate cards feel like a calculator builder, not a spreadsheet. */
+/* Phase AA: make rate cards feel like a calculator builder, not a spreadsheet.
+   Declutter pass: one compact header + a table-first layout. Sections are
+   separated by 1px hairlines (var(--border), matching .divider) instead of
+   large whitespace gaps — DS Rule §1 (no whitespace-as-separator). */
 .qf-builder-hero {
-  margin: 0 0 18px;
-  border: 1px solid var(--border);
-  border-radius: 22px;
-  background: linear-gradient(135deg, rgba(13, 60, 252,.09), rgba(13, 60, 252,.05)), var(--surface);
-  box-shadow: var(--shadow-md);
-  padding: 18px;
+  margin: 0 0 8px;
+  padding: 0 0 8px;
+  border-bottom: 1px solid var(--border);
 }
 .qf-builder-hero-top {
   display: flex;
   justify-content: space-between;
-  gap: 18px;
+  gap: 16px;
+  align-items: center;
+}
+.qf-builder-hero-lead {
+  display: flex;
   align-items: flex-start;
+  gap: 8px;
 }
 .qf-builder-kicker {
   color: var(--accent);
   font: 700 11px var(--font-mono);
   letter-spacing: .12em;
   text-transform: uppercase;
-  margin-bottom: 6px;
+  margin-bottom: 4px;
 }
 .qf-builder-hero h2 {
   margin: 0;
-  font-size: 24px;
+  font-size: 20px;
   letter-spacing: -.035em;
-}
-.qf-builder-hero p {
-  margin: 7px 0 0;
-  color: var(--muted);
-  max-width: 680px;
 }
 .qf-builder-actions {
   display: flex;
@@ -39,7 +39,7 @@
 .qf-builder-actions button {
   border: 1px solid var(--border-strong);
   border-radius: 999px;
-  padding: 9px 12px;
+  padding: 8px 12px;
   background: rgba(255,255,255,.035);
   color: var(--ink-soft);
   font-weight: 750;
@@ -49,89 +49,58 @@
   border-color: var(--accent);
   color: var(--ink);
 }
-.qf-builder-stats {
-  display: grid;
-  grid-template-columns: repeat(4, 1fr);
-  gap: 10px;
-  margin-top: 16px;
+/* ── Single help-cue pattern: a top-left `?` disclosure. Reused for every
+   section header on the rate page so there is exactly one help affordance. */
+.qf-help-cue {
+  position: relative;
+  flex: 0 0 auto;
 }
-.qf-builder-stat {
-  border: 1px solid var(--border);
-  border-radius: 16px;
-  padding: 12px;
-  background: rgba(255,255,255,.025);
-}
-.qf-builder-stat span {
-  display: block;
-  color: var(--muted);
-  font-size: 12px;
-  margin-bottom: 5px;
-}
-.qf-builder-stat strong {
-  color: var(--ink);
-  font-size: 20px;
-  letter-spacing: -.035em;
-}
-.qf-builder-guide {
-  margin: 0 0 18px;
-  border: 1px solid var(--border);
-  border-radius: 18px;
-  background: rgba(255,255,255,.025);
-  padding: 14px;
-}
-.qf-builder-guide strong {
-  display: block;
-  color: var(--ink);
-  margin-bottom: 8px;
-}
-.qf-builder-guide ol {
-  display: grid;
-  grid-template-columns: repeat(3, 1fr);
-  gap: 8px;
-  margin: 0;
-  padding: 0;
-  list-style: none;
-}
-.qf-builder-guide li {
-  border: 1px solid var(--border);
-  border-radius: 14px;
-  padding: 10px;
-  color: var(--ink-soft);
-  font-size: 13px;
-}
-.qf-builder-guide li::before {
-  content: attr(data-step);
+.qf-help-cue > summary {
   display: inline-grid;
   place-items: center;
-  width: 22px;
-  height: 22px;
+  width: 24px;
+  height: 24px;
   border-radius: 999px;
-  background: var(--accent-soft);
-  color: var(--accent);
-  font: 800 11px var(--font-mono);
-  margin-right: 7px;
-}
-.qf-rate-scan {
-  margin: 0 0 18px;
-  display: grid;
-  grid-template-columns: minmax(220px, 1fr) minmax(320px, 1.25fr);
-  gap: 14px;
-  align-items: stretch;
-  border: 1px solid var(--border);
-  border-radius: 18px;
-  background: rgba(255,255,255,.024);
-  padding: 14px;
-}
-.qf-rate-scan h3 {
-  margin: 0;
-  color: var(--ink);
-  font-size: 18px;
-  letter-spacing: -.03em;
-}
-.qf-rate-scan p {
-  margin: 7px 0 0;
+  border: 1px solid var(--border-strong);
+  background: var(--surface);
   color: var(--muted);
-  line-height: 1.45;
+  font: 750 12px var(--font-mono);
+  cursor: pointer;
+  list-style: none;
+  user-select: none;
+}
+.qf-help-cue > summary::-webkit-details-marker { display: none; }
+.qf-help-cue[open] > summary,
+.qf-help-cue > summary:hover {
+  border-color: var(--accent);
+  color: var(--accent);
+}
+.qf-help-cue-body {
+  position: absolute;
+  top: 32px;
+  left: 0;
+  z-index: 5;
+  width: 300px;
+  max-width: 80vw;
+  border: 1px solid var(--border);
+  border-radius: 16px;
+  background: var(--surface);
+  box-shadow: var(--shadow-md);
+  padding: 12px;
+}
+.qf-help-cue-body strong { display: block; color: var(--ink); margin-bottom: 8px; }
+.qf-help-cue-body ol { margin: 0; padding-left: 16px; color: var(--ink-soft); font-size: 13px; }
+.qf-help-cue-body p { margin: 8px 0 0; color: var(--muted); font-size: 13px; line-height: 1.5; }
+/* Compact inline hint links replace the old accent-on-accent .notice tips. */
+.qf-rate-hint {
+  margin: 8px 0 0;
+  color: var(--muted);
+  font-size: 13px;
+}
+.qf-rate-hint a { color: var(--accent); }
+.qf-rate-scan {
+  margin: 8px 0;
+  display: block;
 }
 .qf-rate-scan-stats {
   display: grid;
@@ -239,45 +208,13 @@
 }
 .qf-rate-row-gap .qf-rate-row-status { color: var(--warning); }
 .qf-rate-row-ready .qf-rate-row-status { color: var(--success); }
-.qf-rate-save-note {
-  display: inline-flex;
-  align-items: center;
-  gap: 7px;
-  margin-left: 8px;
-  color: var(--muted);
-  font-size: 12px;
-}
-.qf-rate-save-note::before {
-  content: '';
-  width: 7px;
-  height: 7px;
-  border-radius: 999px;
-  background: var(--success);
-  box-shadow: 0 0 0 4px var(--success-bg);
-}
-
-/* Phase BG: rate save states and duplicate action. */
+/* Phase BG: rate save states and duplicate action.
+   Declutter pass: the panel is now just the live-status chip, flush against
+   the header rhythm (no card chrome). */
 .qf-rate-save-panel {
-  display: grid;
-  grid-template-columns: minmax(0, 1fr) auto;
-  gap: 14px;
+  display: flex;
   align-items: center;
-  margin: 0 0 18px;
-  border: 1px solid var(--border);
-  border-radius: 18px;
-  background: rgba(255,255,255,.024);
-  padding: 14px;
-}
-.qf-rate-save-panel strong {
-  display: block;
-  color: var(--ink);
-  font-size: 17px;
-  margin-bottom: 5px;
-}
-.qf-rate-save-panel p {
-  color: var(--muted);
-  margin: 0;
-  line-height: 1.45;
+  margin: 8px 0;
 }
 .qf-rate-live {
   border: 1px solid var(--border);
@@ -309,25 +246,48 @@
   opacity: .65;
   cursor: progress;
 }
-html[data-theme="light"] .qf-rate-save-panel {
-  border-color: rgba(184, 207, 245, 0.72);
-  background: linear-gradient(135deg, #ffffff 0%, #f4fbff 62%, #eefaff 100%);
-  box-shadow: 0 12px 34px rgba(37, 34, 99, 0.05);
+/* ── Fuel-surcharge segment toggle: selected = scoped outline+tint, NOT a
+   global solid .btn-primary fill (mirrors the compliant scan-chip selected
+   style above). Scoped to .qf-fsc-seg so .btn-primary is untouched globally. */
+.qf-fsc-seg.is-active {
+  border-color: var(--accent);
+  color: var(--accent);
+  background: var(--accent-soft);
+  box-shadow: inset 0 0 0 1px var(--accent-soft);
 }
-@media (max-width: 1000px) {
-  .qf-rate-scan { grid-template-columns: 1fr; }
+/* ── Disclosure summaries (FSC explanation + LTL editor body). */
+.qf-fsc-details > summary,
+.qf-ltl-details > summary {
+  cursor: pointer;
+  color: var(--ink-soft);
+  font-weight: 650;
+  font-size: 13px;
+  list-style: none;
+  display: flex;
+  align-items: center;
+  gap: 8px;
 }
+.qf-fsc-details > summary::-webkit-details-marker,
+.qf-ltl-details > summary::-webkit-details-marker { display: none; }
+.qf-fsc-details > summary::before,
+.qf-ltl-details > summary::before {
+  content: '▸';
+  color: var(--muted);
+  font-size: 11px;
+}
+.qf-fsc-details[open] > summary::before,
+.qf-ltl-details[open] > summary::before { content: '▾'; }
+.qf-ltl-details > summary > span { color: var(--ink); }
 @media (max-width: 900px) {
   .qf-builder-hero-top { display: grid; }
   .qf-builder-actions { justify-content: flex-start; }
-  .qf-builder-stats { grid-template-columns: 1fr 1fr; }
-  .qf-builder-guide ol { grid-template-columns: 1fr; }
   .qf-rate-scan-stats { grid-template-columns: 1fr 1fr; }
-  .qf-rate-save-panel { grid-template-columns: 1fr; }
   .qf-rate-live { justify-self: start; }
+  /* Fuel-surcharge segmented buttons: guarantee a >=44px HIG tap height on
+     touch/mobile (desktop btn-sm height is untouched — this is scoped here). */
+  .qf-fsc-seg { min-height: 44px; }
 }
 @media (max-width: 540px) {
-  .qf-builder-stats,
   .qf-rate-scan-stats { grid-template-columns: 1fr; }
 }
 
@@ -340,7 +300,7 @@ html[data-theme="light"] .qf-rate-save-panel {
   .qf-rate-table-wrap { overflow-x: visible; padding-top: 0; }
   .qf-rate-table-wrap::before { display: none; }
   .qf-rate-table-wrap .table { width: 100%; min-width: 0; margin-top: 0; }
-  .qf-rate-table-wrap thead { display: none; } /* headers + per-column filter row */
+  .qf-rate-table-wrap thead { display: none; } /* column headers become inline data-labels */
   .qf-rate-table-wrap table,
   .qf-rate-table-wrap tbody { display: block; width: 100%; }
   .qf-rate-table-wrap tbody tr {

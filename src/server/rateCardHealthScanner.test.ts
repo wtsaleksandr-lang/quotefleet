@@ -13,8 +13,11 @@ describe('rate-card health scanner polish', () => {
     const helper = await file('rate-builder.js');
     const css = await file('rate-builder.css');
 
-    expect(helper).toContain('Rate health');
-    expect(helper).toContain('Scan pricing gaps before sharing.');
+    // Declutter pass: the scan panel is now chips-only — the "Rate health"
+    // kicker + "Scan pricing gaps…" header prose were removed. The status
+    // chips, row classification, and quick filter behaviour all remain.
+    expect(helper).not.toContain('Rate health');
+    expect(helper).not.toContain('Scan pricing gaps before sharing.');
     expect(helper).toContain('Needs price');
     expect(helper).toContain('Disabled/draft');
     expect(helper).toContain('qf-rate-row-gap');

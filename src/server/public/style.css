@@ -519,14 +519,6 @@ p { margin: 0; }
   background: var(--surface);
 }
 
-/* Per-column filter row inside a table. Sub-header strip with tiny inputs. */
-.qf-filter-row th {
-  background: var(--bg) !important;
-  padding: 4px 8px !important;
-  border-bottom: 1px solid var(--border-strong);
-}
-.qf-filter-row .input { font-size: 12px; }
-
 /* ── Compliance trust strip ─────────────────────────────────────
    Shown on landing + repeated in footer + a thin variant under the
    header CTA. We deliberately use generic shield/lock icons (NOT

@@ -738,8 +738,10 @@
     body.appendChild(el('p', { class: 'muted', text: 'Loading fuel surcharge settings…' }));
 
     function segButton(label, active, onClick) {
+      // Selected = scoped outline+tint (.qf-fsc-seg.is-active), NOT a global
+      // solid .btn-primary fill — mirrors the compliant scan-chip selected style.
       var b = el('button', {
-        class: 'btn ' + (active ? 'btn-primary' : 'btn-secondary') + ' btn-sm',
+        class: 'btn btn-secondary btn-sm qf-fsc-seg' + (active ? ' is-active' : ''),
         text: label,
         style: { marginRight: '8px' },
       });
@@ -763,11 +765,15 @@
           : 'unavailable';
         var wk = d.asOfLabel ? ' (wk of ' + d.asOfLabel + ')' : '';
         var perMi = (typeof f.perMileUsd === 'number') ? '$' + f.perMileUsd.toFixed(2) + '/mi' : '—';
-        body.appendChild(el('p', { style: { margin: '0 0 6px' }, html:
+        // Explanatory prose tucked behind a disclosure to keep the card compact.
+        var det = el('details', { class: 'qf-fsc-details' });
+        det.appendChild(el('summary', { text: 'How automatic fuel surcharge works' }));
+        det.appendChild(el('p', { style: { margin: '8px 0 0' }, html:
           'Fuel surcharge follows the <strong>national average diesel price</strong> from the U.S. EIA. ' +
           'Current national average: <strong>' + priceTxt + '</strong>' + wk + ' → surcharge <strong>' + perMi + '</strong>.' }));
-        body.appendChild(el('p', { class: 'muted', style: { margin: '0 0 4px', fontSize: '13px' }, text:
+        det.appendChild(el('p', { class: 'muted', style: { margin: '4px 0 0', fontSize: '13px' }, text:
           'Formula: ($diesel − $' + (f.pegUsdPerGal != null ? f.pegUsdPerGal.toFixed(2) : '1.25') + ' base) ÷ ' + (f.mpg != null ? f.mpg : '6.0') + ' mpg. Refreshes weekly from EIA. Your per-card Fuel % is ignored while auto is on.' }));
+        body.appendChild(det);
         if (d.stale) {
           body.appendChild(el('div', { class: 'notice', style: { marginTop: '6px' }, text:
             'Using the last saved diesel price (live update pending). Quotes still work.' }));
@@ -800,15 +806,15 @@
     api('/api/tenant/rate-cards').then(function (d) {
       c.innerHTML = '';
       c.appendChild(el('h1', { text: 'Rate cards' }));
-      c.appendChild(el('p', { class: 'page-sub', text: 'One row per service × equipment. Edit cells, blur to save.' }));
-      c.appendChild(el('div', { class: 'notice', html: 'Tip: ask the AI agent to bulk-update these → <a href="#" data-route="ai">open AI panel</a>' }));
+      // Page-sub prose folded into the rate-builder header help cue.
+      // AI-tip demoted from an accent-on-accent .notice to a compact inline link.
+      c.appendChild(el('p', { class: 'qf-rate-hint', html: 'Ask the AI agent to bulk-update rates — <a href="#" data-route="ai">open AI panel</a>' }));
       c.appendChild(buildFscCard());
       var hasDrayage = (d.rateCards || []).some(function (r) { return r.service === 'drayage'; });
       if (hasDrayage) {
-        c.appendChild(el('div', {
-          class: 'notice',
-          style: { marginTop: '8px' },
-          html: 'For drayage you also need to configure <strong>per-port flat tariffs</strong> (e.g. LAX → 50mi zone = $475). Set those on <a href="#" data-route="zones">Drayage zones →</a>.'
+        c.appendChild(el('p', {
+          class: 'qf-rate-hint',
+          html: 'Drayage also needs <strong>per-port flat tariffs</strong> (e.g. LAX → 50mi zone = $475) — <a href="#" data-route="zones">set drayage zones</a>.'
         }));
       }
 
@@ -842,60 +848,16 @@
         '<th data-col="ratePerMile" style="text-align:right;">$/mi</th><th data-col="minimumCharge" style="text-align:right;">Min</th>' +
         '<th data-col="flatFee" style="text-align:right;">Flat</th><th data-col="fuelSurchargePct" style="text-align:right;">Fuel %</th>' +
         '<th data-col="marginPct" style="text-align:right;">Margin %</th><th data-col="enabled">Enabled</th><th></th></tr>';
-      // ── Per-column filter row ─────────────────────────────────────
-      // Light-touch: a small input under each header that filters the
-      // currently rendered rows. Pure client-side, instant feedback.
-      var filterTr = el('tr', { class: 'qf-filter-row' });
-      var filterCols = ['service', 'equipment', 'label', 'ratePerMile', 'minimumCharge', 'flatFee', 'fuelSurchargePct', 'marginPct', 'enabled'];
-      var filters = view.filters || {};
-      filterCols.forEach(function (col) {
-        var th = el('th', { style: { padding: '4px 8px' } });
-        var inp = el('input', {
-          class: 'input',
-          placeholder: '⌕',
-          value: filters[col] || '',
-          style: { padding: '4px 8px', fontSize: '12px', width: '100%' },
-        });
-        inp.addEventListener('input', function () {
-          filters[col] = inp.value;
-          view.filters = filters;
-          setRatesView(view);
-          applyFilters();
-        });
-        th.appendChild(inp);
-        filterTr.appendChild(th);
-      });
-      filterTr.appendChild(el('th'));
-      thead.appendChild(filterTr);
       tbl.appendChild(thead);
 
       var tb = el('tbody');
       tbl.appendChild(tb);
       rows.forEach(function (r) {
-        var tr = rateRow(r);
-        // Tag each <tr> with its source data so we can text-match for filtering.
-        tr.dataset.row = JSON.stringify({
-          service: r.service, equipment: r.equipment, label: r.label || '',
-          ratePerMile: r.ratePerMile, minimumCharge: r.minimumCharge,
-          flatFee: r.flatFee, fuelSurchargePct: r.fuelSurchargePct,
-          marginPct: r.marginPct, enabled: r.enabled ? 'yes' : 'no',
-        });
-        tb.appendChild(tr);
+        tb.appendChild(rateRow(r));
       });
-
-      function applyFilters() {
-        var active = Object.keys(filters).filter(function (k) { return (filters[k] || '').trim() !== ''; });
-        $$('tr', tb).forEach(function (tr) {
-          var data; try { data = JSON.parse(tr.dataset.row || '{}'); } catch (e) { data = {}; }
-          var hide = active.some(function (k) {
-            var f = (filters[k] || '').toLowerCase().trim();
-            var v = String(data[k] == null ? '' : data[k]).toLowerCase();
-            return v.indexOf(f) === -1;
-          });
-          tr.style.display = hide ? 'none' : '';
-        });
-      }
-      applyFilters();
+      // Row visibility is now driven only by the single text search
+      // (qf-rate-search-hidden) and the status-chip filter (row.hidden); both
+      // compose as AND. No inline style.display here so they never fight.
       c.appendChild(tbl);
 
       // ── Add row ──────────────────────────────────────────────────
@@ -930,9 +892,15 @@
 
   function ltlPricingEditor(r) {
     var cfg = r.ltlConfig || LTL_DEFAULT_CONFIG;
-    var wrap = el('div', { class: 'card', style: { marginTop: '18px', padding: '16px' } });
-    wrap.appendChild(el('h2', { text: 'LTL pricing — ' + (r.label || 'LTL'), style: { margin: '0 0 4px', fontSize: '15px' } }));
-    wrap.appendChild(el('p', { class: 'page-sub', style: { margin: '0 0 12px' }, text: 'LTL is rated by freight class (derived from weight ÷ size) and weight break — not distance alone. Set the base rate per hundredweight (100 lb) at class 100; class multipliers and weight breaks use standard defaults.' }));
+    var wrap = el('div', { class: 'card', style: { marginTop: '16px', padding: '16px' } });
+    // Whole editor body collapses behind a disclosure (CLOSED by default) so
+    // the rate table stays the focus; the summary carries the card title.
+    var det = el('details', { class: 'qf-ltl-details' });
+    var sum = el('summary');
+    sum.appendChild(el('span', { text: 'LTL pricing — ' + (r.label || 'LTL'), style: { fontWeight: '700', fontSize: '15px' } }));
+    det.appendChild(sum);
+    var body = el('div', { class: 'qf-ltl-details-body' });
+    body.appendChild(el('p', { class: 'page-sub', style: { margin: '8px 0 12px' }, text: 'LTL is rated by freight class (derived from weight ÷ size) and weight break — not distance alone. Set the base rate per hundredweight (100 lb) at class 100; class multipliers and weight breaks use standard defaults.' }));
 
     function saveCfg(patch) {
       var next = Object.assign({}, cfg, patch);
@@ -940,17 +908,19 @@
       api('/api/tenant/rate-cards/' + r.id, { method: 'PUT', body: { ltlConfig: next } }).catch(toastErr);
     }
     function numRow(label, hint, value, onSave, step) {
-      var row = el('div', { style: { display: 'flex', alignItems: 'center', gap: '10px', margin: '8px 0' } });
+      var row = el('div', { style: { display: 'flex', alignItems: 'center', gap: '8px', margin: '8px 0' } });
       var inp = el('input', { class: 'input', value: value, style: { width: '110px', textAlign: 'right' } });
       inp.type = 'number'; inp.step = step || '0.01';
       inp.addEventListener('blur', function () { var v = inp.value === '' ? 0 : Number(inp.value); if (Number.isFinite(v)) onSave(v); });
-      var labelWrap = el('div', {}, [el('div', { text: label, style: { fontWeight: '650', fontSize: '13px' } }), el('div', { text: hint, class: 'page-sub', style: { margin: '2px 0 0', fontSize: '12px' } })]);
+      var labelWrap = el('div', {}, [el('div', { text: label, style: { fontWeight: '650', fontSize: '13px' } }), el('div', { text: hint, class: 'page-sub', style: { margin: '4px 0 0', fontSize: '12px' } })]);
       row.appendChild(inp); row.appendChild(labelWrap);
       return row;
     }
-    wrap.appendChild(numRow('Base rate ($/cwt)', 'Dollars per 100 lb at freight class 100.', cfg.baseRatePerCwt, function (v) { saveCfg({ baseRatePerCwt: v }); }));
-    wrap.appendChild(numRow('Distance factor', 'Linehaul multiplier = 1 + (miles ÷ 1000) × this.', cfg.distanceFactorPer1000Mi, function (v) { saveCfg({ distanceFactorPer1000Mi: v }); }, '0.05'));
-    wrap.appendChild(el('div', { class: 'notice', style: { marginTop: '10px' }, html: 'Class multipliers (50–500) and weight breaks use standard NMFC-style defaults. <strong>Editing those individually is coming soon</strong> — ask the AI agent to adjust them for now.' }));
+    body.appendChild(numRow('Base rate ($/cwt)', 'Dollars per 100 lb at freight class 100.', cfg.baseRatePerCwt, function (v) { saveCfg({ baseRatePerCwt: v }); }));
+    body.appendChild(numRow('Distance factor', 'Linehaul multiplier = 1 + (miles ÷ 1000) × this.', cfg.distanceFactorPer1000Mi, function (v) { saveCfg({ distanceFactorPer1000Mi: v }); }, '0.05'));
+    body.appendChild(el('div', { class: 'notice', style: { marginTop: '8px' }, html: 'Class multipliers (50–500) and weight breaks use standard NMFC-style defaults. <strong>Editing those individually is coming soon</strong> — ask the AI agent to adjust them for now.' }));
+    det.appendChild(body);
+    wrap.appendChild(det);
     return wrap;
   }
 

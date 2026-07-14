@@ -62,11 +62,9 @@
 
     var section = document.createElement('section');
     section.className = 'qf-rate-searchbar';
-    section.innerHTML = '<div><strong>Rate card control</strong><span>Search by service, equipment, lane, status, price, or notes.</span></div><label><span>Search rate cards</span><input type="search" placeholder="Search service, lane, equipment, price…"></label><b class="qf-rate-search-count">' + list.length + ' visible</b>';
+    section.innerHTML = '<label><span>Search rate cards</span><input type="search" placeholder="Search service, lane, equipment, price…"></label><b class="qf-rate-search-count">' + list.length + ' visible</b>';
 
-    var scan = one('.qf-rate-scan', root);
-    if (scan) scan.insertAdjacentElement('afterend', section);
-    else table.insertAdjacentElement('beforebegin', section);
+    table.insertAdjacentElement('beforebegin', section);
 
     var input = one('input', section);
     input.addEventListener('input', function () { applySearch(root, input.value); });

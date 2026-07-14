@@ -68,47 +68,42 @@
     card.className = 'qf-builder-hero';
     card.innerHTML = `
       <div class="qf-builder-hero-top">
-        <div>
-          <div class="qf-builder-kicker">Rate builder</div>
-          <h2>${built ? 'Your calculator has rate cards.' : 'Start with one simple rate card.'}</h2>
-          <p>${built ? 'Keep common services organized so customers can check rates without waiting for a manual email.' : 'Add the service you quote most often first. You can add lanes, equipment, and extra rules later.'}</p>
+        <div class="qf-builder-hero-lead">
+          <details class="qf-help-cue">
+            <summary aria-label="Setup help" title="Setup help">?</summary>
+            <div class="qf-help-cue-body">
+              <strong>Simple setup path</strong>
+              <ol>
+                <li>Add your base service and rate.</li>
+                <li>Add common extra charges.</li>
+                <li>Preview and share your customer calculator.</li>
+              </ol>
+              <p>One row per service × equipment. Edit any cell and click away (blur) to save.</p>
+            </div>
+          </details>
+          <div>
+            <div class="qf-builder-kicker">Rate builder</div>
+            <h2>${built ? 'Your calculator has rate cards.' : 'Start with one simple rate card.'}</h2>
+          </div>
         </div>
         <div class="qf-builder-actions">
           <button type="button" data-rate-go="accessorials">Add charges</button>
           <button type="button" data-rate-go="zones">Add zones</button>
           <button type="button" data-rate-go="embed">Share calculator</button>
         </div>
-      </div>
-      <div class="qf-builder-stats">
-        <div class="qf-builder-stat"><span>Rate cards</span><strong>${count}</strong></div>
-        <div class="qf-builder-stat"><span>Services detected</span><strong>${detectServiceTypes()}</strong></div>
-        <div class="qf-builder-stat"><span>Next setup</span><strong>${built ? 'Charges' : 'Base rate'}</strong></div>
-        <div class="qf-builder-stat"><span>Customer output</span><strong>PDF + link</strong></div>
       </div>`;
     card.addEventListener('click', (event) => {
       const btn = event.target.closest('[data-rate-go]');
       if (btn) go(btn.dataset.rateGo);
     });
+    // Anchor to the page <h1> ("Rate cards"), the one stable top-of-page
+    // element. Do NOT anchor to .page-sub: the top subtitle was renamed to
+    // .qf-rate-hint, so the only remaining .page-sub lives inside the LTL
+    // editor's collapsed <details>, which would bury the hero/scan/save panels.
     const h1 = content.querySelector('h1');
-    const sub = content.querySelector('.page-sub');
-    if (sub && sub.nextSibling) sub.parentNode.insertBefore(card, sub.nextSibling);
-    else if (h1 && h1.nextSibling) h1.parentNode.insertBefore(card, h1.nextSibling);
+    if (h1 && h1.nextSibling) h1.parentNode.insertBefore(card, h1.nextSibling);
+    else if (h1) h1.parentNode.appendChild(card);
     else content.prepend(card);
-  }
-
-  function guide() {
-    if (route() !== 'rates' || content.querySelector('.qf-builder-guide')) return;
-    const card = document.createElement('section');
-    card.className = 'qf-builder-guide';
-    card.innerHTML = `
-      <strong>Simple setup path</strong>
-      <ol>
-        <li data-step="1">Add your base service and rate.</li>
-        <li data-step="2">Add common extra charges.</li>
-        <li data-step="3">Preview and share your customer calculator.</li>
-      </ol>`;
-    const heroCard = content.querySelector('.qf-builder-hero');
-    if (heroCard && heroCard.nextSibling) heroCard.parentNode.insertBefore(card, heroCard.nextSibling);
   }
 
   function scanPanel() {
@@ -117,11 +112,6 @@
     const card = document.createElement('section');
     card.className = 'qf-rate-scan';
     card.innerHTML = `
-      <div>
-        <div class="qf-builder-kicker">Rate health</div>
-        <h3>Scan pricing gaps before sharing.</h3>
-        <p>Use this as a quick checklist for cards that still need a base price, extra charges, or visibility review.</p>
-      </div>
       <div class="qf-rate-scan-stats">
         <button type="button" data-rate-scan="all"><span>Total</span><strong>${stats.total}</strong></button>
         <button type="button" data-rate-scan="gap"><span>Needs price</span><strong>${stats.gaps}</strong></button>
@@ -133,8 +123,8 @@
       if (!btn) return;
       filterRows(btn.dataset.rateScan);
     });
-    const guideCard = content.querySelector('.qf-builder-guide');
-    if (guideCard && guideCard.nextSibling) guideCard.parentNode.insertBefore(card, guideCard.nextSibling);
+    const heroCard = content.querySelector('.qf-builder-hero');
+    if (heroCard && heroCard.nextSibling) heroCard.parentNode.insertBefore(card, heroCard.nextSibling);
   }
 
   function savePanel() {
@@ -142,11 +132,6 @@
     const card = document.createElement('section');
     card.className = 'qf-rate-save-panel';
     card.innerHTML = `
-      <div>
-        <div class="qf-builder-kicker">Save states</div>
-        <strong>Inline edits save when you leave a field.</strong>
-        <p>Use Duplicate to copy a similar service/equipment row. Duplicates are created as disabled drafts so they do not publish by accident.</p>
-      </div>
       <div class="qf-rate-live" role="status" aria-live="polite">Ready for edits</div>`;
     const scan = content.querySelector('.qf-rate-scan');
     if (scan && scan.nextSibling) scan.parentNode.insertBefore(card, scan.nextSibling);
@@ -187,17 +172,6 @@
       row.hidden = !show;
     });
     content.querySelectorAll('[data-rate-scan]').forEach((btn) => btn.classList.toggle('active', btn.dataset.rateScan === mode));
-  }
-
-  function saveNote() {
-    if (route() !== 'rates' || content.querySelector('.qf-rate-save-note')) return;
-    const buttons = Array.from(content.querySelectorAll('button'));
-    const save = buttons.find((btn) => /save|update|add/i.test(btn.textContent || ''));
-    if (!save) return;
-    const note = document.createElement('span');
-    note.className = 'qf-rate-save-note';
-    note.textContent = 'Changes save to this calculator';
-    save.insertAdjacentElement('afterend', note);
   }
 
   function readRateRow(row) {
@@ -291,14 +265,12 @@
   function enhance() {
     if (route() !== 'rates') return;
     hero();
-    guide();
     scanPanel();
     savePanel();
     tableWrap();
     decorateRows();
     duplicateActions();
     wireSaveFeedback();
-    saveNote();
   }
 
   let timer;

@@ -158,6 +158,7 @@ html[data-theme="light"] .qf-filter-row th {
 @media (max-width: 900px) {
   .app-main { padding: 72px 18px 32px; }
   .qf-tabs { overflow-x: auto; flex-wrap: nowrap; }
-  .qf-tab { flex: 0 0 auto; }
+  /* Service tabs: >=44px HIG tap height on touch/mobile (desktop untouched). */
+  .qf-tab { flex: 0 0 auto; min-height: 44px; display: inline-flex; align-items: center; }
   .table { display: block; overflow-x: auto; }
 }

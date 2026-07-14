@@ -249,12 +249,13 @@
     // guided-setup step and the trigger for the "You're live" state.
     if (route === 'embed') setLocalFlag(STATUS_FLAG.embed);
     if (route === 'overview') setupPanel();
-    // The brand route is now the dedicated "Customize" panel (Wave 2), and the
-    // accessorials route is now the dedicated "Add-ons" panel — both own their
-    // own layout, so do NOT inject the setup kicker / coach / onboarding
-    // questions there. They stay in setupRoutes so the Overview meter still
-    // counts them as setup areas.
-    if (setupRoutes.includes(route) && route !== 'brand' && route !== 'accessorials') {
+    // The brand route is now the dedicated "Customize" panel (Wave 2), the
+    // accessorials route is the dedicated "Add-ons" panel, and the rates route
+    // is now the decluttered table-first rate builder — each owns its own
+    // layout, so do NOT inject the setup kicker / coach / onboarding questions
+    // there. They stay in setupRoutes so the Overview meter still counts them
+    // as setup areas.
+    if (setupRoutes.includes(route) && route !== 'brand' && route !== 'accessorials' && route !== 'rates') {
       const h1 = content.querySelector('h1');
       if (h1 && !content.querySelector('.qf-setup-kicker-inline')) {
         const label = document.createElement('div');

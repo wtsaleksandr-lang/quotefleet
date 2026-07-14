@@ -717,47 +717,24 @@ src/server/public/quotefleet-rates-globe.css:324	spacing	gap: 18px
 src/server/public/quotefleet-rates-globe.css:44	spacing	gap: 6px
 src/server/public/quotefleet-rates-globe.css:54	spacing	margin-bottom: 18px
 src/server/public/quotefleet-rates-globe.css:9	spacing	padding: clamp(56px, 6vw, 88px) 0 clamp(40px, 5vw, 64px)
-src/server/public/rate-builder.css:111	spacing	margin-right: 7px
-src/server/public/rate-builder.css:114	spacing	margin: 0 0 18px
-src/server/public/rate-builder.css:117	spacing	gap: 14px
-src/server/public/rate-builder.css:12	spacing	gap: 18px
-src/server/public/rate-builder.css:122	spacing	padding: 14px
-src/server/public/rate-builder.css:131	spacing	margin: 7px 0 0
-src/server/public/rate-builder.css:143	spacing	gap: 5px
-src/server/public/rate-builder.css:150	spacing	padding: 11px
-src/server/public/rate-builder.css:175	spacing	top: 2px
-src/server/public/rate-builder.css:176	spacing	left: 18px
-src/server/public/rate-builder.css:188	spacing	margin-top: 6px
-src/server/public/rate-builder.css:2	spacing	margin: 0 0 18px
-src/server/public/rate-builder.css:20	spacing	margin-bottom: 6px
-src/server/public/rate-builder.css:204	spacing	gap: 6px
-src/server/public/rate-builder.css:225	spacing	padding-left: 18px
-src/server/public/rate-builder.css:230	spacing	padding: 4px 7px
-src/server/public/rate-builder.css:244	spacing	gap: 7px
-src/server/public/rate-builder.css:262	spacing	gap: 14px
-src/server/public/rate-builder.css:264	spacing	margin: 0 0 18px
-src/server/public/rate-builder.css:268	spacing	padding: 14px
-src/server/public/rate-builder.css:274	spacing	margin-bottom: 5px
-src/server/public/rate-builder.css:28	spacing	margin: 7px 0 0
-src/server/public/rate-builder.css:284	spacing	padding: 8px 11px
-src/server/public/rate-builder.css:350	spacing	padding: 4px 13px 8px
-src/server/public/rate-builder.css:361	spacing	padding: 9px 0
-src/server/public/rate-builder.css:380	tap	width: 20px
-src/server/public/rate-builder.css:381	tap	height: 20px
-src/server/public/rate-builder.css:390	spacing	padding-top: 11px
-src/server/public/rate-builder.css:41	spacing	padding: 9px 12px
-src/server/public/rate-builder.css:54	spacing	gap: 10px
-src/server/public/rate-builder.css:67	spacing	margin-bottom: 5px
-src/server/public/rate-builder.css:7	spacing	padding: 18px
-src/server/public/rate-builder.css:75	spacing	margin: 0 0 18px
-src/server/public/rate-builder.css:79	spacing	padding: 14px
-src/server/public/rate-builder.css:97	spacing	padding: 10px
-src/server/public/rate-card-search.css:30	spacing	gap: 5px
-src/server/public/rate-card-search.css:39	spacing	padding: 10px 13px
-src/server/public/rate-card-search.css:55	spacing	padding: 8px 11px
-src/server/public/rate-card-search.css:6	spacing	margin: 0 0 14px
-src/server/public/rate-card-search.css:68	spacing	padding: 12px 14px
-src/server/public/rate-card-search.css:7	spacing	padding: 14px
+src/server/public/rate-builder.css:112	spacing	gap: 5px
+src/server/public/rate-builder.css:119	spacing	padding: 11px
+src/server/public/rate-builder.css:144	spacing	top: 2px
+src/server/public/rate-builder.css:145	spacing	left: 18px
+src/server/public/rate-builder.css:157	spacing	margin-top: 6px
+src/server/public/rate-builder.css:173	spacing	gap: 6px
+src/server/public/rate-builder.css:194	spacing	padding-left: 18px
+src/server/public/rate-builder.css:199	spacing	padding: 4px 7px
+src/server/public/rate-builder.css:221	spacing	padding: 8px 11px
+src/server/public/rate-builder.css:310	spacing	padding: 4px 13px 8px
+src/server/public/rate-builder.css:321	spacing	padding: 9px 0
+src/server/public/rate-builder.css:340	tap	width: 20px
+src/server/public/rate-builder.css:341	tap	height: 20px
+src/server/public/rate-builder.css:350	spacing	padding-top: 11px
+src/server/public/rate-card-search.css:29	spacing	gap: 5px
+src/server/public/rate-card-search.css:38	spacing	padding: 10px 13px
+src/server/public/rate-card-search.css:54	spacing	padding: 8px 11px
+src/server/public/rate-card-search.css:67	spacing	padding: 12px 14px
 src/server/public/setup-builder.css:12	spacing	gap: 18px
 src/server/public/setup-builder.css:127	spacing	padding: 4px 13px 8px
 src/server/public/setup-builder.css:137	spacing	gap: 10px 12px
@@ -787,8 +764,8 @@ src/server/public/share-readiness.css:68	spacing	padding: 13px
 src/server/public/share-readiness.css:75	spacing	margin-bottom: 5px
 src/server/public/share-readiness.css:85	spacing	gap: 6px
 src/server/public/share-readiness.css:87	spacing	padding: 6px 9px
-src/server/public/style.css:1022	spacing	padding: 44px 28px 104px
-src/server/public/style.css:1025	spacing	margin-top: 72px
+src/server/public/style.css:1014	spacing	padding: 44px 28px 104px
+src/server/public/style.css:1017	spacing	margin-top: 72px
 src/server/public/style.css:178	spacing	margin-top: 6px
 src/server/public/style.css:192	tap	height: 16px
 src/server/public/style.css:192	tap	width: 16px
@@ -797,26 +774,26 @@ src/server/public/style.css:492	spacing	padding: 6px 10px
 src/server/public/style.css:500	spacing	margin: 14px 0 0 0
 src/server/public/style.css:505	spacing	padding: 8px 14px
 src/server/public/style.css:512	spacing	margin-bottom: -1px
-src/server/public/style.css:584	spacing	padding-bottom: 1px
-src/server/public/style.css:621	spacing	padding: 96px 28px 80px
-src/server/public/style.css:656	spacing	margin: 0 auto 38px auto
-src/server/public/style.css:667	spacing	padding: 64px 22px 56px
-src/server/public/style.css:673	spacing	padding: 72px 0
-src/server/public/style.css:790	spacing	bottom: 86px
-src/server/public/style.css:883	spacing	padding: 18px 0
-src/server/public/style.css:889	spacing	padding: 6px 20px 18px 20px
-src/server/public/style.css:891	spacing	margin-bottom: 14px
-src/server/public/style.css:897	spacing	gap: 10px
-src/server/public/style.css:897	spacing	padding: 10px 20px
-src/server/public/style.css:918	spacing	padding: 0 6px
-src/server/public/style.css:936	spacing	padding: 18px 20px 8px 20px
-src/server/public/style.css:939	spacing	padding: 32px 36px
-src/server/public/style.css:946	spacing	margin: 0 0 14px 0
-src/server/public/style.css:948	spacing	margin: 0 0 26px 0
-src/server/public/style.css:952	spacing	padding: 22px
-src/server/public/style.css:959	spacing	padding: 18px
-src/server/public/style.css:966	spacing	padding: 11px 15px
-src/server/public/style.css:995	spacing	padding: 14px
+src/server/public/style.css:576	spacing	padding-bottom: 1px
+src/server/public/style.css:613	spacing	padding: 96px 28px 80px
+src/server/public/style.css:648	spacing	margin: 0 auto 38px auto
+src/server/public/style.css:659	spacing	padding: 64px 22px 56px
+src/server/public/style.css:665	spacing	padding: 72px 0
+src/server/public/style.css:782	spacing	bottom: 86px
+src/server/public/style.css:875	spacing	padding: 18px 0
+src/server/public/style.css:881	spacing	padding: 6px 20px 18px 20px
+src/server/public/style.css:883	spacing	margin-bottom: 14px
+src/server/public/style.css:889	spacing	gap: 10px
+src/server/public/style.css:889	spacing	padding: 10px 20px
+src/server/public/style.css:910	spacing	padding: 0 6px
+src/server/public/style.css:928	spacing	padding: 18px 20px 8px 20px
+src/server/public/style.css:931	spacing	padding: 32px 36px
+src/server/public/style.css:938	spacing	margin: 0 0 14px 0
+src/server/public/style.css:940	spacing	margin: 0 0 26px 0
+src/server/public/style.css:944	spacing	padding: 22px
+src/server/public/style.css:951	spacing	padding: 18px
+src/server/public/style.css:958	spacing	padding: 11px 15px
+src/server/public/style.css:987	spacing	padding: 14px
 src/server/public/tools-marketplace-wefixtrades.css:3	spacing	padding: 58px 28px 34px
 src/server/public/vertical-pages-wefixtrades.css:33	spacing	padding: 42px 28px
 src/server/public/vertical-pages-wefixtrades.css:5	spacing	padding: 76px 28px 58px

@@ -110,7 +110,11 @@ describe('public static page smoke checks', () => {
     expect(js).toContain('qf-builder-hero');
     expect(js).toContain('qf-rate-table-wrap');
     expect(css).toContain('Phase AA: make rate cards feel like a calculator builder');
-    expect(css).toContain('.qf-builder-stats');
+    // Declutter pass: the 4-stat tile block is gone; the compact header now
+    // carries a single top-left `?` help-cue disclosure instead.
+    expect(css).not.toContain('.qf-builder-stats');
+    expect(css).toContain('.qf-help-cue');
+    expect(js).toContain('qf-help-cue');
   });
 
   it('dashboard loads accessorial and zone builder UX layer', async () => {
