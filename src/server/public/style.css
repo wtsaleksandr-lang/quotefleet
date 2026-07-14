@@ -300,6 +300,42 @@ p { margin: 0; }
   .topnav .btn-secondary { display: none; }
 }
 
+/* ── Display-currency switch (marketing nav) ───────────────────────
+   Injected by currency.js into .site-actions (landing) or .topnav-inner
+   (pricing/signup/tools). Display only — billing stays USD. Tokens only,
+   theme-aware; native select arrow keeps it OS/theme-consistent. */
+.qf-currency-switch {
+  font-family: var(--font-mono);
+  font-size: 12px;
+  line-height: 1.4;
+  color: var(--muted);
+  background: var(--surface-2);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-btn);
+  padding: var(--space-0-5) var(--space-1);
+  cursor: pointer;
+  transition: color 0.15s ease, border-color 0.15s ease;
+}
+.qf-currency-switch:hover { color: var(--ink); border-color: var(--border-strong); }
+.qf-currency-switch:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+.qf-currency-switch option { color: var(--ink); background: var(--surface); }
+
+/* Footer-mounted currency control (mobile ≤720px) — compact + labeled so the
+ * switch stays visible/usable without crowding the mobile header row. */
+.qf-currency-footer {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-1);
+  margin-top: var(--space-2);
+  font-family: var(--font-mono);
+  font-size: 12px;
+  color: var(--muted);
+}
+.qf-currency-footer-label { color: var(--muted); }
+
+/* "Billed in USD" note — small, muted, shown only for non-USD. */
+.qf-usd-note { font-size: 13px; color: var(--muted); }
+
 /* ── Buttons ───────────────────────────────────────────────────── */
 .btn {
   display: inline-flex; align-items: center; justify-content: center; gap: 8px;

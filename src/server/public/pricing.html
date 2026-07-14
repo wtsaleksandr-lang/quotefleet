@@ -49,7 +49,7 @@
     <div class="pricing pricing-2up" style="max-width: 760px; margin: 0 auto;">
       <div class="price-card">
         <h3>Vital</h3>
-        <div class="price">$14.80<span class="per"> / mo</span></div>
+        <div class="price"><span class="qf-price" data-usd="14.80">$14.80</span><span class="per"> / mo</span></div>
         <p class="muted-small" style="margin: 0 0 14px 0;">Everything you need to quote, capture, and follow up.</p>
         <ul>
           <li>Hosted quote page + embeddable widget</li>
@@ -67,7 +67,7 @@
 
       <div class="price-card featured">
         <h3>Pro</h3>
-        <div class="price">$34.80<span class="per"> / mo</span></div>
+        <div class="price"><span class="qf-price" data-usd="34.80">$34.80</span><span class="per"> / mo</span></div>
         <p class="muted-small" style="margin: 0 0 14px 0;">Everything in Vital, plus AI and automation working for you 24/7.</p>
         <ul>
           <li><strong>Everything in Vital</strong></li>
@@ -83,6 +83,8 @@
         </a>
       </div>
     </div>
+
+    <p class="muted qf-usd-note" data-usd-note hidden style="text-align:center; font-size: 13px; margin: 12px auto 0; max-width: 620px;"></p>
 
     <p class="muted" style="text-align:center; font-size: 14px; margin: 20px auto 0; max-width: 620px;">
       Your trial is all-inclusive — every Pro feature is unlocked for 14 days, whichever plan you pick.
@@ -107,5 +109,6 @@
   </footer>
   <script>document.getElementById('year').textContent = new Date().getFullYear();</script>
 <script src="/marketing-chat.js" defer></script>
+<script src="/currency.js" defer></script>
 </body>
 </html>

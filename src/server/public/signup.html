@@ -50,14 +50,15 @@
           <div id="plan-choice" style="display:flex; flex-direction:column; gap:10px;">
             <label class="plan-opt" data-plan="vital" style="display:flex; gap:10px; align-items:flex-start; padding:12px 14px; background:var(--surface-2); border:1px solid var(--border); border-radius:8px; cursor:pointer;">
               <input type="radio" name="plan" value="vital" style="margin-top:3px; flex-shrink:0;">
-              <span style="line-height:1.5;"><strong>Vital — $14.80/mo</strong><br><small class="muted">Hosted quote page, embeddable widget, unlimited quotes, lead inbox, branded quotes, follow-up reminders.</small></span>
+              <span style="line-height:1.5;"><strong>Vital — <span class="qf-price" data-usd="14.80">$14.80</span>/mo</strong><br><small class="muted">Hosted quote page, embeddable widget, unlimited quotes, lead inbox, branded quotes, follow-up reminders.</small></span>
             </label>
             <label class="plan-opt" data-plan="pro" style="display:flex; gap:10px; align-items:flex-start; padding:12px 14px; background:var(--surface-2); border:1px solid var(--border); border-radius:8px; cursor:pointer;">
               <input type="radio" name="plan" value="pro" checked style="margin-top:3px; flex-shrink:0;">
-              <span style="line-height:1.5;"><strong>Pro — $34.80/mo</strong><br><small class="muted">Everything in Vital plus AI auto-reply &amp; 24/7 chat, branded PDF quotes, full automation, custom domain, analytics, priority support.</small></span>
+              <span style="line-height:1.5;"><strong>Pro — <span class="qf-price" data-usd="34.80">$34.80</span>/mo</strong><br><small class="muted">Everything in Vital plus AI auto-reply &amp; 24/7 chat, branded PDF quotes, full automation, custom domain, analytics, priority support.</small></span>
             </label>
           </div>
           <span class="field-hint">Your 14-day trial is all-inclusive either way — you can switch plans anytime.</span>
+          <span class="field-hint qf-usd-note" data-usd-note hidden></span>
         </div>
         <label class="consent-opt" style="display:flex; gap:10px; align-items:flex-start; padding:10px 12px; background:var(--surface-2); border:1px solid var(--border); border-radius:8px; cursor:pointer; font-size:13.5px; line-height:1.55;"><input type="checkbox" id="dpa-accept" name="dpaAccept" required style="margin-top:3px; flex-shrink:0;"><span>I have read and agree to the <a href="/security" target="_blank" rel="noopener">Security policy</a>, <a href="/dpa" target="_blank" rel="noopener">Data Processing Addendum (v1.0)</a>, and confirm that QuoteFleet may process customer data on my behalf under those terms.</span></label>
         <button class="btn btn-primary btn-lg btn-block" type="submit" id="signup-submit" disabled>Start 14-day trial <span class="arr">→</span></button>
@@ -184,5 +185,6 @@
     });
   </script>
   <script src="/marketing-chat.js" defer></script>
+<script src="/currency.js" defer></script>
 </body>
 </html>
