@@ -100,14 +100,24 @@ body.qf-auth-wft .url-builder-preview .live {
 }
 
 body.qf-auth-wft .tabs {
+  display: flex !important;
+  gap: 4px !important;
+  padding: 4px !important;
   background: #E4EDF1 !important;
-  border-color: rgba(13,60,252,.22) !important;
-  border-radius: 8px !important;
+  border: 0 !important;
+  border-radius: 10px !important;
+  align-items: stretch !important;
 }
 
+/* Each segment fills half the pill (no empty grey on the right) with centered
+   text; border:0 removes the base underline-tab `border-bottom`, so the active
+   blue pill has an equal grey inset on ALL sides (no line at the bottom only). */
 body.qf-auth-wft .tab {
+  flex: 1 1 0 !important;
+  text-align: center !important;
   color: #181D1F !important;
-  border-radius: 4px !important;
+  border: 0 !important;
+  border-radius: 6px !important;
 }
 
 body.qf-auth-wft .tab.active {
