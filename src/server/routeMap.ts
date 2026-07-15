@@ -197,6 +197,13 @@ export async function getRouteMap(
   return result;
 }
 
+/** Read-only peek at the lane cache. Lets the widget's preview PNG endpoint
+ *  serve a map that a prior route-preview call already generated + cached, so
+ *  it never renders an arbitrary map on demand. Key is `${laneCacheKey}|${theme}`. */
+export function peekRouteMap(key: string): RouteMap | undefined {
+  return routeCache.get(key);
+}
+
 // Test-only: clear the lane cache between cases.
 export function __clearRouteCache(): void {
   routeCache.clear();

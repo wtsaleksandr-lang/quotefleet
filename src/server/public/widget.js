@@ -249,6 +249,7 @@
     $('qf-continue-btn').addEventListener('click', function () { showStep('contact'); });
     initOptionsPanel();
     initTypeaheads();
+    initRouteMapCard();
     $('qf-back-btn').addEventListener('click', function () { showStep('quote'); });
     $('qf-submit-btn').addEventListener('click', onSubmit);
 
@@ -443,6 +444,7 @@
     if (drayPickup) drayPickup.style.display = isDrayage ? '' : 'none';
     if (defaultPickup) defaultPickup.style.display = isDrayage ? 'none' : '';
     if (isDrayage) renderPorts();
+    scheduleRouteMap();
     syncOogPanel();
     syncLtlPanel();
     autoResize();
@@ -789,6 +791,95 @@
       .catch(function (err) { btn.disabled = false; btn.textContent = oldText; showError('qf-submit-error', 'Network error — please try again.'); console.error(err); });
   }
 
+  // ── Live route-map card ───────────────────────────────────────────────
+  // As soon as pickup + delivery are both entered/selected, fetch a preview
+  // (distance, transit, and a static route map) and reveal the map card. Reuses
+  // the same location objects the quote compute builds.
+  function currentPickupLoc() {
+    if (state.service === 'drayage' && state.pickupPortCode) return { portCode: state.pickupPortCode, terminalCode: state.pickupTerminalCode || undefined };
+    var t = ($('qf-pickup-zip') && $('qf-pickup-zip').value) || '';
+    return state.pickupResolved ? mergeLocation(state.pickupResolved, t) : parseLocation(t);
+  }
+  function currentDeliveryLoc() {
+    var t = ($('qf-delivery-zip') && $('qf-delivery-zip').value) || '';
+    return state.deliveryResolved ? mergeLocation(state.deliveryResolved, t) : parseLocation(t);
+  }
+  function isDarkMapTheme() {
+    try {
+      var host = document.querySelector('.qf-widget') || document.body;
+      var m = getComputedStyle(host).backgroundColor.match(/\d+(\.\d+)?/g);
+      if (!m || m.length < 3) return false;
+      return (0.299 * +m[0] + 0.587 * +m[1] + 0.114 * +m[2]) / 255 < 0.5;
+    } catch (e) { return false; }
+  }
+  var mapReqSeq = 0, mapDebounce = null;
+  function scheduleRouteMap() {
+    if (mapDebounce) clearTimeout(mapDebounce);
+    mapDebounce = setTimeout(maybeShowRouteMap, 400);
+  }
+  function maybeShowRouteMap() {
+    var card = $('qf-map-card'); if (!card) return;
+    var pickup = currentPickupLoc(), delivery = currentDeliveryLoc();
+    var hasP = pickup && (pickup.zip || pickup.city || pickup.portCode);
+    var hasD = delivery && (delivery.zip || delivery.city);
+    if (!hasP || !hasD) { card.hidden = true; autoResize(); return; }
+    var seq = ++mapReqSeq;
+    fetch(withGrant('/api/public/route-preview/' + slug), {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ pickup: pickup, delivery: delivery, service: state.service, theme: isDarkMapTheme() ? 'dark' : 'light' })
+    }).then(function (r) { return r.json(); }).then(function (resp) {
+      if (seq !== mapReqSeq) return;
+      if (!resp || !resp.ok) { card.hidden = true; autoResize(); return; }
+      renderRouteMap(resp);
+    }).catch(function () { if (seq === mapReqSeq) { card.hidden = true; autoResize(); } });
+  }
+  function renderRouteMap(resp) {
+    var card = $('qf-map-card'); if (!card) return;
+    var dEl = $('qf-map-distance'); if (dEl) dEl.textContent = (resp.miles != null) ? (Number(resp.miles).toLocaleString() + ' mi') : '—';
+    var tEl = $('qf-map-transit'); if (tEl) tEl.textContent = (resp.transit && resp.transit.text) ? resp.transit.text : '—';
+    var img = $('qf-map-img'), mimg = $('qf-map-modal-img'), canvas = $('qf-map-open');
+    if (resp.mapUrl) {
+      if (canvas) canvas.style.display = '';
+      if (img) img.src = resp.mapUrl;
+      if (mimg) mimg.src = resp.mapUrl;
+    } else {
+      // No map image (e.g. maps key not configured yet) — hide the image area
+      // and keep just the distance/transit strip so the card never shows an
+      // empty canvas.
+      if (canvas) canvas.style.display = 'none';
+      if (img) img.removeAttribute('src');
+    }
+    card.hidden = false;
+    autoResize();
+  }
+  function initRouteMapCard() {
+    var open = $('qf-map-open'), modal = $('qf-map-modal');
+    ['qf-pickup-zip', 'qf-delivery-zip'].forEach(function (id) {
+      var el = $(id);
+      if (el) { el.addEventListener('change', scheduleRouteMap); el.addEventListener('blur', function () { setTimeout(scheduleRouteMap, 160); }); }
+    });
+    if (!open || !modal) return;
+    var vp = $('qf-map-viewport'), mimg = $('qf-map-modal-img');
+    var scale = 1, tx = 0, ty = 0, dragging = false, sx = 0, sy = 0;
+    function apply() { if (mimg) mimg.style.transform = 'translate(' + tx + 'px,' + ty + 'px) scale(' + scale + ')'; }
+    function reset() { scale = 1; tx = 0; ty = 0; apply(); }
+    open.addEventListener('click', function () { modal.hidden = false; reset(); });
+    function closeModal() { modal.hidden = true; }
+    var x = $('qf-map-modal-x'), bd = $('qf-map-modal-close');
+    if (x) x.addEventListener('click', closeModal);
+    if (bd) bd.addEventListener('click', closeModal);
+    var zi = $('qf-map-zoom-in'), zo = $('qf-map-zoom-out');
+    if (zi) zi.addEventListener('click', function () { scale = Math.min(4, scale + 0.4); apply(); });
+    if (zo) zo.addEventListener('click', function () { scale = Math.max(1, scale - 0.4); if (scale === 1) { tx = 0; ty = 0; } apply(); });
+    if (vp) {
+      vp.addEventListener('pointerdown', function (e) { dragging = true; sx = e.clientX - tx; sy = e.clientY - ty; if (vp.setPointerCapture) vp.setPointerCapture(e.pointerId); });
+      vp.addEventListener('pointermove', function (e) { if (!dragging) return; tx = e.clientX - sx; ty = e.clientY - sy; apply(); });
+      vp.addEventListener('pointerup', function () { dragging = false; });
+      vp.addEventListener('wheel', function (e) { e.preventDefault(); scale = Math.min(4, Math.max(1, scale + (e.deltaY < 0 ? 0.3 : -0.3))); if (scale === 1) { tx = 0; ty = 0; } apply(); }, { passive: false });
+    }
+    document.addEventListener('keydown', function (e) { if (e.key === 'Escape' && modal && !modal.hidden) closeModal(); });
+  }
+
   function initTypeaheads() {
     $$('[data-typeahead="locations"]').forEach(function (wrap) {
       var target = wrap.getAttribute('data-target');
@@ -803,6 +894,7 @@
         input.value = labelFor(item);
         if (target === 'pickup') state.pickupResolved = item; else state.deliveryResolved = item;
         close();
+        scheduleRouteMap();
       }
       function highlight(next) {
         var rows = box.querySelectorAll('.qf-suggestion');

@@ -44,7 +44,8 @@ import {
 import { loadEnv } from '../../config.js';
 import { getTrialState } from '../trialGating.js';
 import { canUseProFeature } from '../plans.js';
-import { publicCalcLimiter, publicChatLimiter, publicLeadLimiter } from '../rateLimits.js';
+import { publicCalcLimiter, publicChatLimiter, publicLeadLimiter, quoteMapLimiter } from '../rateLimits.js';
+import { getRouteMap, laneCacheKey, normalizeTheme, peekRouteMap } from '../routeMap.js';
 import { resolveWidgetTheme, WIDGET_PRESETS } from '../widgetThemes.js';
 import { resolveQuoteDisclaimer } from '../quoteDisclaimer.js';
 import { loadCarrierProfile } from './carrierProfile.js';
@@ -437,6 +438,59 @@ export function registerPublicRoutes(app: Express) {
       // calc result as an estimate; null when distance is unknown.
       transit: estimateTransit(dist.miles, body.service),
     });
+  });
+
+  // ── live route-map preview (widget map card) ──────────────────────────
+  // Resolves pickup + delivery to coords + distance + transit and pre-renders
+  // the static route map, so the widget shows a map card the moment both
+  // addresses are entered — before any lead exists. Reuses the same
+  // distance/transit/map pipeline as the quote compute. The PNG itself is
+  // served by GET /api/public/route-map.png from cache (only lanes generated
+  // here — no arbitrary map generation on demand).
+  app.post('/api/public/route-preview/:slug', publicCalcLimiter, async (req: Request, res: Response) => {
+    const tenant = await getTenantBySlug(String(req.params.slug));
+    if (!tenant || tenant.status !== 'active') return res.status(404).json({ ok: false });
+    if (!(await enforceTenantAccess(tenant, req, res))) return;
+    const body = (req.body ?? {}) as { pickup?: unknown; delivery?: unknown; service?: string; theme?: unknown };
+    if (!body.pickup || !body.delivery) return res.json({ ok: false });
+    try {
+      const pickupForDistance = await resolvePickupForDistance(body.pickup as Parameters<typeof resolvePickupForDistance>[0]);
+      const dist = await distanceBetween(pickupForDistance, body.delivery as Parameters<typeof distanceBetween>[1]);
+      if ('error' in dist) return res.json({ ok: false });
+      const theme = normalizeTheme(body.theme);
+      const rm = await getRouteMap(dist.origin, dist.destination, loadEnv().GOOGLE_MAPS_API_KEY, theme);
+      const lane = laneCacheKey(dist.origin, dist.destination);
+      return res.json({
+        ok: true,
+        miles: dist.miles ?? null,
+        transit: estimateTransit(dist.miles, body.service),
+        origin: dist.origin,
+        destination: dist.destination,
+        mapUrl: rm ? `/api/public/route-map.png?lane=${encodeURIComponent(lane)}&theme=${theme}` : null,
+      });
+    } catch {
+      return res.json({ ok: false });
+    }
+  });
+
+  // Serve a preview map PNG from the lane cache (populated by route-preview).
+  // 404 when the lane wasn't pre-generated, so this can't be used to mint
+  // arbitrary maps. Key stays server-side; the browser only ever sees PNG bytes.
+  app.get('/api/public/route-map.png', quoteMapLimiter, async (req: Request, res: Response) => {
+    const lane = typeof req.query.lane === 'string' ? req.query.lane : '';
+    const theme = normalizeTheme(req.query.theme);
+    if (!lane) return res.status(400).end();
+    const rm = peekRouteMap(`${lane}|${theme}`);
+    if (!rm) return res.status(404).end();
+    try {
+      const img = await fetch(rm.url);
+      if (!img.ok) return res.status(502).end();
+      res.setHeader('content-type', 'image/png');
+      res.setHeader('cache-control', 'public, max-age=86400');
+      return res.end(Buffer.from(await img.arrayBuffer()));
+    } catch {
+      return res.status(502).end();
+    }
   });
 
   // ── submit lead (creates quote_request row + sends auto-reply) ─

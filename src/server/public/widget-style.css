@@ -291,3 +291,27 @@ body[data-qf-cta-hover="fill"] .qf-cta:not(.qf-secondary):hover { background: va
 @media (max-width: 640px) {
   .qf-addr-row { gap: var(--space-1); }
 }
+
+/* Live route-map card + tap-to-expand zoom/pan modal (Alex: map under the
+   addresses). Tokens + numeric rgba only (no #fff/#000); appended at EOF to
+   keep the line-numbered baselines stable. */
+.qf-map-card { margin-top: var(--space-2); border: 1px solid var(--w-border); border-radius: 12px; overflow: hidden; background: var(--w-bg); }
+.qf-map-canvas { display: block; width: 100%; border: 0; padding: 0; margin: 0; background: var(--w-bg); cursor: zoom-in; position: relative; font-size: 0; }
+.qf-map-img { display: block; width: 100%; height: auto; }
+.qf-map-img:not([src]) { display: none; }
+.qf-map-expand { position: absolute; right: var(--space-1); bottom: var(--space-1); font-size: 11px; font-weight: 650; color: rgba(255,255,255,0.96); background: rgba(15,23,42,0.72); padding: var(--space-0-5) var(--space-1); border-radius: 8px; line-height: 1.4; }
+.qf-map-meta { display: flex; gap: var(--space-3); padding: var(--space-1-5); border-top: 1px solid var(--w-border); }
+.qf-map-stat { display: flex; flex-direction: column; gap: var(--space-0-5); }
+.qf-map-stat-label { font-size: 11px; font-weight: 650; color: var(--w-muted); letter-spacing: 0.02em; }
+.qf-map-stat-val { font-size: 15px; font-weight: 750; color: var(--w-fg); }
+.qf-map-modal { position: fixed; inset: 0; z-index: 1000; display: flex; align-items: center; justify-content: center; }
+.qf-map-modal[hidden] { display: none; }
+.qf-map-modal-backdrop { position: absolute; inset: 0; background: rgba(15,23,42,0.6); }
+.qf-map-modal-panel { position: relative; width: min(92vw, 720px); max-height: 88vh; background: var(--w-bg); border-radius: 14px; overflow: hidden; box-shadow: 0 20px 60px rgba(15,23,42,0.35); display: flex; flex-direction: column; }
+.qf-map-modal-head { display: flex; align-items: center; justify-content: space-between; padding: var(--space-1-5) var(--space-2); border-bottom: 1px solid var(--w-border); font-weight: 750; color: var(--w-fg); }
+.qf-map-modal-x { border: 0; background: transparent; font-size: 18px; cursor: pointer; color: var(--w-muted); display: flex; align-items: center; justify-content: center; padding: var(--space-0-5); }
+.qf-map-viewport { position: relative; overflow: hidden; touch-action: none; cursor: grab; background: var(--w-bg); flex: 1; min-height: 320px; }
+.qf-map-viewport:active { cursor: grabbing; }
+.qf-map-modal-img { display: block; width: 100%; height: auto; transform-origin: center center; will-change: transform; user-select: none; }
+.qf-map-zoom { position: absolute; right: var(--space-2); bottom: var(--space-2); display: flex; gap: var(--space-1); }
+.qf-map-zoom button { width: 44px; height: 44px; border-radius: 10px; border: 1px solid var(--w-border); background: var(--w-bg); color: var(--w-fg); font-size: 20px; cursor: pointer; display: flex; align-items: center; justify-content: center; }

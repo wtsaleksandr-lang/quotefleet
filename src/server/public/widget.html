@@ -67,6 +67,24 @@
         <div class="qf-non-drayage qf-addr-col" id="qf-default-pickup"><div class="qf-section-title" style="margin-top:14px;">Pickup</div><div class="qf-field qf-typeahead" data-typeahead="locations" data-target="pickup"><label>ZIP / postal code</label><input class="qf-input" id="qf-pickup-zip" placeholder="e.g. 90802 or M5V 2T6" autocomplete="off"><div class="qf-suggestions" id="qf-pickup-suggestions"></div><div class="qf-field-hint">ZIP/postal code gives a more accurate rate than city only.</div></div></div>
         <div class="qf-addr-col" id="qf-default-delivery"><div class="qf-section-title" style="margin-top:14px;">Delivery</div><div class="qf-field qf-typeahead" data-typeahead="locations" data-target="delivery"><label>ZIP / postal code required</label><input class="qf-input" id="qf-delivery-zip" placeholder="e.g. 60606 or 11222" autocomplete="off"><div class="qf-suggestions" id="qf-delivery-suggestions"></div><div class="qf-field-hint">Please use ZIP/postal code when possible. Large cities can price differently by zone.</div></div></div>
       </div>
+      <div class="qf-map-card" id="qf-map-card" hidden>
+        <button type="button" class="qf-map-canvas" id="qf-map-open" aria-label="Open full route map">
+          <img class="qf-map-img" id="qf-map-img" alt="Route from pickup to delivery">
+          <span class="qf-map-expand" aria-hidden="true">Tap to expand</span>
+        </button>
+        <div class="qf-map-meta">
+          <div class="qf-map-stat"><span class="qf-map-stat-label">Distance</span><span class="qf-map-stat-val" id="qf-map-distance">—</span></div>
+          <div class="qf-map-stat"><span class="qf-map-stat-label">Est. transit</span><span class="qf-map-stat-val" id="qf-map-transit">—</span></div>
+        </div>
+      </div>
+      <div class="qf-map-modal" id="qf-map-modal" hidden>
+        <div class="qf-map-modal-backdrop" id="qf-map-modal-close" aria-hidden="true"></div>
+        <div class="qf-map-modal-panel">
+          <div class="qf-map-modal-head"><span>Route map</span><button type="button" class="qf-map-modal-x" id="qf-map-modal-x" aria-label="Close map">✕</button></div>
+          <div class="qf-map-viewport" id="qf-map-viewport"><img class="qf-map-modal-img" id="qf-map-modal-img" alt="Route from pickup to delivery" draggable="false"></div>
+          <div class="qf-map-zoom"><button type="button" id="qf-map-zoom-out" aria-label="Zoom out">−</button><button type="button" id="qf-map-zoom-in" aria-label="Zoom in">+</button></div>
+        </div>
+      </div>
       <div class="qf-section-title qf-title-inline" style="margin-top:14px;">Cargo <span class="qf-help" data-tip="Approximate weight is fine. Very heavy shipments may need overweight equipment or permits.">?</span></div><div class="qf-grid"><div class="qf-field qf-full"><label>Weight (lbs)</label><input class="qf-input" id="qf-weight" type="number" min="1" placeholder="e.g. 38000"></div></div>
       <div class="qf-ltl-panel" id="qf-ltl-panel" style="display:none;">
         <div class="qf-section-title qf-title-inline" style="margin-top:14px;">Size &amp; handling <span class="qf-help" data-tip="LTL is priced by freight class, which comes from your shipment's density (weight ÷ size). Enter the footprint of the whole shipment — pallet dimensions and stacked height — so we can estimate the class and a size/weight-aware rate.">?</span></div>
