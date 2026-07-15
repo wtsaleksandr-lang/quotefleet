@@ -328,7 +328,6 @@
       // Clear the resolved addresses, the address line, and the map card.
       state.pickupResolved = null; state.deliveryResolved = null;
       var mapCard = $('qf-map-card'); if (mapCard) mapCard.hidden = true;
-      renderRouteAddresses();
       showStep('quote');
     });
   }
@@ -816,23 +815,10 @@
   function currentDeliveryLoc() {
     return locFromResolved(state.deliveryResolved, ($('qf-delivery-zip') && $('qf-delivery-zip').value) || '');
   }
-  // Subtle "selected addresses" line shown above the map — resolved labels, else
-  // the typed text. Green dot = pickup (A), red dot = delivery (B).
-  function renderRouteAddresses() {
-    var el = $('qf-route-addr'); if (!el) return;
-    function lbl(resolved, id) {
-      if (resolved && resolved.label) return resolved.label;
-      return (($(id) && $(id).value) || '').trim();
-    }
-    var p = lbl(state.pickupResolved, 'qf-pickup-zip');
-    var d = lbl(state.deliveryResolved, 'qf-delivery-zip');
-    if (!p && !d) { el.hidden = true; el.innerHTML = ''; autoResize(); return; }
-    function row(cls, addr) {
-      return '<span class="qf-ra-pt"><span class="qf-ra-dot ' + cls + '" aria-hidden="true"></span><span class="qf-ra-txt">' + escapeHtml(addr) + '</span></span>';
-    }
-    el.innerHTML = (p ? row('qf-ra-a', p) : '') + (d ? row('qf-ra-b', d) : '');
-    el.hidden = false;
-    autoResize();
+  // Address label for the map overlay — the resolved full address, else typed text.
+  function addrLabel(resolved, id) {
+    if (resolved && resolved.label) return resolved.label;
+    return (($(id) && $(id).value) || '').trim() || '—';
   }
   function isDarkMapTheme() {
     try {
@@ -865,20 +851,16 @@
   }
   function renderRouteMap(resp) {
     var card = $('qf-map-card'); if (!card) return;
+    // The addresses + stats live over the map now, so a card with no map image
+    // has nothing to show — hide it (rare now the maps key is live).
+    if (!resp.mapUrl) { card.hidden = true; autoResize(); return; }
     var dEl = $('qf-map-distance'); if (dEl) dEl.textContent = (resp.miles != null) ? (Number(resp.miles).toLocaleString() + ' mi') : '—';
     var tEl = $('qf-map-transit'); if (tEl) tEl.textContent = (resp.transit && resp.transit.text) ? resp.transit.text : '—';
-    var img = $('qf-map-img'), mimg = $('qf-map-modal-img'), canvas = $('qf-map-open');
-    if (resp.mapUrl) {
-      if (canvas) canvas.style.display = '';
-      if (img) img.src = resp.mapUrl;
-      if (mimg) mimg.src = resp.mapUrl;
-    } else {
-      // No map image (e.g. maps key not configured yet) — hide the image area
-      // and keep just the distance/transit strip so the card never shows an
-      // empty canvas.
-      if (canvas) canvas.style.display = 'none';
-      if (img) img.removeAttribute('src');
-    }
+    var pu = $('qf-map-pickup'); if (pu) pu.textContent = addrLabel(state.pickupResolved, 'qf-pickup-zip');
+    var de = $('qf-map-delivery'); if (de) de.textContent = addrLabel(state.deliveryResolved, 'qf-delivery-zip');
+    var img = $('qf-map-img'), mimg = $('qf-map-modal-img');
+    if (img) img.src = resp.mapUrl;
+    if (mimg) mimg.src = resp.mapUrl;
     card.hidden = false;
     autoResize();
   }
@@ -925,7 +907,6 @@
         input.value = item.label || labelFor(item);
         if (target === 'pickup') state.pickupResolved = item; else state.deliveryResolved = item;
         close();
-        renderRouteAddresses();
         scheduleRouteMap();
       }
       function highlight(next) {
@@ -955,7 +936,6 @@
       input.setAttribute('aria-expanded', 'false');
       input.addEventListener('input', function () {
         if (target === 'pickup') state.pickupResolved = null; else state.deliveryResolved = null;
-        renderRouteAddresses();
         clearTimeout(timer);
         var q = input.value.trim();
         if (q.length < 2) { close(); return; }

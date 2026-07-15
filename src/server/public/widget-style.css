@@ -299,7 +299,7 @@ body[data-qf-cta-hover="fill"] .qf-cta:not(.qf-secondary):hover { background: va
 .qf-map-canvas { display: block; width: 100%; border: 0; padding: 0; margin: 0; background: var(--w-bg); cursor: zoom-in; position: relative; font-size: 0; }
 .qf-map-img { display: block; width: 100%; height: auto; }
 .qf-map-img:not([src]) { display: none; }
-.qf-map-expand { position: absolute; right: var(--space-1); top: var(--space-1); display: flex; align-items: center; justify-content: center; width: 28px; height: 28px; color: rgba(255,255,255,0.95); background: rgba(15,23,42,0.55); border-radius: 8px; }
+.qf-map-expand { position: absolute; right: var(--space-1); bottom: var(--space-1); display: flex; align-items: center; justify-content: center; width: 28px; height: 28px; color: rgba(255,255,255,0.95); background: rgba(15,23,42,0.55); border-radius: 8px; }
 /* Distance + transit embedded over the map (Alex): bottom gradient bar. */
 .qf-map-overlay { position: absolute; left: 0; right: 0; bottom: 0; display: flex; align-items: center; gap: var(--space-2); padding: var(--space-3) var(--space-1-5) var(--space-1-5); background: linear-gradient(rgba(15,23,42,0), rgba(15,23,42,0.82)); text-align: left; }
 .qf-map-ov-stat { display: flex; flex-direction: column; }
@@ -320,13 +320,12 @@ body[data-qf-cta-hover="fill"] .qf-cta:not(.qf-secondary):hover { background: va
 
 /* Full-address autosuggest: bold primary line + muted secondary line. */
 .qf-sugg-main { display: block; font-size: 13.5px; font-weight: 650; color: var(--w-fg); }
-/* Subtle "selected addresses" line above the map (Alex). Small, muted; the
-   dots match the A/B map markers (home green / coral-red). */
-.qf-route-addr { display: flex; flex-direction: column; gap: var(--space-0-5); margin-top: var(--space-2); }
-.qf-route-addr[hidden] { display: none; }
-.qf-route-addr:not([hidden]) + .qf-map-card { margin-top: var(--space-1); }
-.qf-ra-pt { display: flex; align-items: center; gap: var(--space-1); min-width: 0; }
-.qf-ra-dot { width: 8px; height: 8px; border-radius: 999px; flex: 0 0 auto; }
-.qf-ra-a { background: #36c98b; }
-.qf-ra-b { background: #f97373; }
-.qf-ra-txt { font-size: 11.5px; color: var(--w-muted); line-height: 1.45; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; min-width: 0; }
+/* Selected addresses embedded over the top of the map (Alex): two columns side
+   by side (in line on every viewport), ellipsis-truncated. Dots match the A/B
+   markers (home green / coral-red). */
+.qf-map-addr { position: absolute; left: 0; right: 0; top: 0; display: flex; gap: var(--space-2); padding: var(--space-1-5) var(--space-1-5) var(--space-3); background: linear-gradient(rgba(15,23,42,0.85), rgba(15,23,42,0)); }
+.qf-ma-pt { display: flex; align-items: center; gap: var(--space-1); flex: 1 1 0; min-width: 0; }
+.qf-ma-dot { width: 8px; height: 8px; border-radius: 999px; flex: 0 0 auto; }
+.qf-ma-a { background: #36c98b; }
+.qf-ma-b { background: #f97373; }
+.qf-ma-txt { font-size: 11px; font-weight: 600; color: rgba(255,255,255,0.96); line-height: 1.45; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; min-width: 0; }
