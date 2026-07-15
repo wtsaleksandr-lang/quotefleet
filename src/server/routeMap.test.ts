@@ -24,10 +24,10 @@ describe('buildStaticMapUrl', () => {
     const url = new URL(buildStaticMapUrl(KEY, LA, CHI, POLY));
     const path = url.searchParams.get('path');
     expect(path).toBe(`color:0x0D3CFCff|weight:4|enc:${POLY}`);
-    // Mellow effortel markers: teal origin (A), clay-rose destination (B).
+    // Home-palette markers: green origin (A), coral-red destination (B).
     const markers = url.searchParams.getAll('markers');
-    expect(markers[0]).toBe(`color:0x3d5a5e|label:A|${LA.lat},${LA.lng}`);
-    expect(markers[1]).toBe(`color:0xb5766a|label:B|${CHI.lat},${CHI.lng}`);
+    expect(markers[0]).toBe(`color:0x36c98b|label:A|${LA.lat},${LA.lng}`);
+    expect(markers[1]).toBe(`color:0xf97373|label:B|${CHI.lat},${CHI.lng}`);
     expect(url.searchParams.get('maptype')).toBe('roadmap');
     expect(url.searchParams.get('scale')).toBe('2');
     expect(url.searchParams.get('key')).toBe(KEY);

@@ -35,11 +35,10 @@ export function normalizeTheme(raw: unknown): MapTheme {
 
 // Brand blue route line (no teal). #0D3CFC.
 const ROUTE_COLOR = '0x0D3CFCff';
-// Mellow effortel-palette markers (Alex): muted teal pickup + muted clay-rose
-// destination — desaturated to sit with the grayscale base, dark enough for the
-// white A/B labels to stay legible.
-const ORIGIN_COLOR = '0x3d5a5e'; // effortel accent teal — origin/pickup (A)
-const DEST_COLOR = '0xb5766a'; // mellow clay-rose — destination (B)
+// A/B markers reuse the home page's premium-palette shades (premium-palette.css:
+// --success / --error): green pickup, coral-red destination.
+const ORIGIN_COLOR = '0x36c98b'; // home success green — origin/pickup (A)
+const DEST_COLOR = '0xf97373'; // home error red — destination (B)
 
 // Google Static Maps "night" style — dark geometry/water/roads with legible
 // muted labels. Applied ONLY when theme=dark; the cobalt route line + green/red
