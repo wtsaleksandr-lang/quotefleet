@@ -311,8 +311,10 @@ body[data-qf-cta-hover="fill"] .qf-cta:not(.qf-secondary):hover { background: va
 .qf-map-modal-backdrop { position: absolute; inset: 0; background: rgba(15,23,42,0.6); }
 .qf-map-modal-panel { position: relative; width: min(92vw, 720px); max-height: 88vh; background: var(--w-bg); border-radius: 14px; overflow: hidden; box-shadow: 0 20px 60px rgba(15,23,42,0.35); display: flex; flex-direction: column; }
 .qf-map-modal-head { display: flex; align-items: center; justify-content: space-between; padding: var(--space-1-5) var(--space-2); border-bottom: 1px solid var(--w-border); font-weight: 750; color: var(--w-fg); }
-.qf-map-modal-x { border: 0; background: transparent; font-size: 18px; cursor: pointer; color: var(--w-muted); display: flex; align-items: center; justify-content: center; padding: var(--space-0-5); }
+.qf-map-modal-x { position: absolute; top: var(--space-1); right: var(--space-1); z-index: 3; display: flex; align-items: center; justify-content: center; width: 32px; height: 32px; border: 0; border-radius: 999px; background: rgba(15,23,42,0.6); color: rgba(255,255,255,0.95); font-size: 15px; cursor: pointer; }
 .qf-map-viewport { position: relative; overflow: hidden; touch-action: none; cursor: grab; background: var(--w-bg); }
+/* Reserve room in the modal's top address bar so the close button never overlaps it. */
+.qf-map-viewport .qf-map-addr { padding-right: var(--space-6); }
 .qf-map-viewport:active { cursor: grabbing; }
 .qf-map-modal-img { display: block; width: 100%; height: auto; transform-origin: center center; will-change: transform; user-select: none; }
 .qf-map-zoom { position: absolute; right: var(--space-2); bottom: var(--space-2); display: flex; gap: var(--space-1); }

@@ -909,6 +909,9 @@
     var tEl = $('qf-map-transit'); if (tEl) tEl.textContent = (resp.transit && resp.transit.text) ? resp.transit.text : '—';
     var pu = $('qf-map-pickup'); if (pu) pu.textContent = addrLabel(state.pickupResolved, 'qf-pickup-zip');
     var de = $('qf-map-delivery'); if (de) de.textContent = addrLabel(state.deliveryResolved, 'qf-delivery-zip');
+    // Mirror the same distance/transit + addresses onto the expanded modal map.
+    var mm = { 'qf-map-m-distance': dEl, 'qf-map-m-transit': tEl, 'qf-map-m-pickup': pu, 'qf-map-m-delivery': de };
+    Object.keys(mm).forEach(function (id) { var t = $(id); if (t && mm[id]) t.textContent = mm[id].textContent; });
     var img = $('qf-map-img'), mimg = $('qf-map-modal-img');
     if (img) img.src = resp.mapUrl;
     if (mimg) mimg.src = resp.mapUrl;
