@@ -318,7 +318,8 @@ body[data-qf-cta-hover="fill"] .qf-cta:not(.qf-secondary):hover { background: va
 .qf-map-viewport:active { cursor: grabbing; }
 .qf-map-modal-img { display: block; width: 100%; height: auto; transform-origin: center center; will-change: transform; user-select: none; }
 .qf-map-zoom { position: absolute; right: var(--space-2); bottom: var(--space-2); display: flex; gap: var(--space-1); }
-.qf-map-zoom button { width: 44px; height: 44px; border-radius: 10px; border: 1px solid var(--w-border); background: var(--w-bg); color: var(--w-fg); font-size: 20px; cursor: pointer; display: flex; align-items: center; justify-content: center; }
+/* Apple-style frosted-glass zoom controls — smaller, translucent, blurred. */
+.qf-map-zoom button { width: 36px; height: 36px; border-radius: 11px; border: 1px solid rgba(255,255,255,0.55); background: rgba(255,255,255,0.5); backdrop-filter: blur(12px) saturate(1.5); -webkit-backdrop-filter: blur(12px) saturate(1.5); color: #0c1424; font-size: 18px; cursor: pointer; display: flex; align-items: center; justify-content: center; box-shadow: 0 2px 8px rgba(15,23,42,0.2); }
 
 /* Full-address autosuggest: bold primary line + muted secondary line. */
 .qf-sugg-main { display: block; font-size: 13.5px; font-weight: 650; color: var(--w-fg); }
@@ -354,3 +355,6 @@ body[data-qf-cta-hover="fill"] .qf-cta:not(.qf-secondary):hover { background: va
   .qf-timeline .qf-tl-fill { width: 100%; }
   .qf-timeline .qf-tl-truck { left: 100%; }
 }
+
+/* Single shared hint under the pickup/delivery fields (Alex: one, smaller). */
+.qf-addr-hint { margin-top: var(--space-1); font-size: 11px; line-height: 1.4; color: var(--w-muted); }

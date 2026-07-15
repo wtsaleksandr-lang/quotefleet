@@ -247,6 +247,13 @@
 
     $('qf-calc-btn').addEventListener('click', onCalculate);
     $('qf-continue-btn').addEventListener('click', function () { showStep('contact'); });
+    // "Edit details" on the result — scroll back up to the form so the user can
+    // change anything and re-calculate (the form stays live below the estimate).
+    var editBtn = $('qf-edit-btn');
+    if (editBtn) editBtn.addEventListener('click', function () {
+      var t = $('qf-services') || $('qf-equipment') || document.querySelector('.qf-widget');
+      if (t && t.scrollIntoView) t.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    });
     initOptionsPanel();
     initTypeaheads();
     initRouteMapCard();
