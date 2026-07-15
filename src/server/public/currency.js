@@ -20,41 +20,32 @@
   var STORAGE_KEY = "qf-currency";
   var BASE = "USD";
 
-  /* Static FX table — USD base. Approximate; update periodically. */
+  /* Static FX table — USD base. Approximate; update periodically.
+   * We only serve US + Canada today, so only USD/CAD are offered (Alex,
+   * 2026-07-15). Other currencies were removed from the switch + geo detection. */
   var FX = {
     USD: 1,
-    CAD: 1.37,
-    EUR: 0.92,
-    GBP: 0.79,
-    AUD: 1.52
+    CAD: 1.37
   };
 
   /* Symbol + display order. Symbols are fixed here (not locale-derived) so the
    * shown symbol is deterministic regardless of the viewer's browser locale. */
   var META = {
     USD: { symbol: "$",   label: "USD" },
-    CAD: { symbol: "CA$", label: "CAD" },
-    EUR: { symbol: "€",  label: "EUR" }, /* € */
-    GBP: { symbol: "£",  label: "GBP" }, /* £ */
-    AUD: { symbol: "A$",  label: "AUD" }
+    CAD: { symbol: "CA$", label: "CAD" }
   };
-  var ORDER = ["USD", "CAD", "EUR", "GBP", "AUD"];
+  var ORDER = ["USD", "CAD"];
 
-  /* Region / language → default currency for geo detection. */
+  /* Region → default currency for geo detection. Only CAD is auto-detected;
+   * every other region (and all language heuristics) fall back to USD. */
   var CAD_REGIONS = ["CA"];
-  var GBP_REGIONS = ["GB", "UK"];
-  var AUD_REGIONS = ["AU"];
-  var EUR_REGIONS = ["AT", "BE", "CY", "DE", "EE", "ES", "FI", "FR", "GR",
-    "IE", "IT", "LT", "LU", "LV", "MT", "NL", "PT", "SI", "SK", "HR"];
-  var EUR_LANGS = ["de", "fr", "it", "nl", "pt", "es", "el", "ga", "et",
-    "fi", "sl", "sk", "lv", "lt", "mt", "hr"];
 
   function isValid(code) {
     return typeof code === "string" && Object.prototype.hasOwnProperty.call(FX, code);
   }
 
-  /* Best-effort default from navigator.language(s). Defaults to USD on any
-   * uncertainty. Region wins over language (so fr-CA → CAD, not EUR). */
+  /* Best-effort default from navigator.language(s). Only Canada resolves to
+   * CAD (region wins, so fr-CA → CAD); everything else defaults to USD. */
   function geoDefault() {
     var nav = (typeof navigator !== "undefined") ? navigator : {};
     var langs = (nav.languages && nav.languages.length)
@@ -64,18 +55,8 @@
       var raw = langs[i];
       if (!raw) continue;
       var parts = String(raw).split("-");
-      var lang = parts[0].toLowerCase();
       var region = parts.length > 1 ? parts[parts.length - 1].toUpperCase() : "";
-      if (region) {
-        if (CAD_REGIONS.indexOf(region) >= 0) return "CAD";
-        if (GBP_REGIONS.indexOf(region) >= 0) return "GBP";
-        if (AUD_REGIONS.indexOf(region) >= 0) return "AUD";
-        if (region === "US") return "USD";
-        if (EUR_REGIONS.indexOf(region) >= 0) return "EUR";
-        /* Unknown region — fall through to language heuristic below. */
-      }
-      if (lang === "en") return "USD";
-      if (EUR_LANGS.indexOf(lang) >= 0) return "EUR";
+      if (region && CAD_REGIONS.indexOf(region) >= 0) return "CAD";
     }
     return "USD";
   }
