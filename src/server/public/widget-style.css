@@ -281,3 +281,13 @@ body[data-qf-cta-hover="fill"] .qf-cta:not(.qf-secondary):hover { background: va
   line-height: 1.5;
   color: var(--w-muted);
 }
+
+/* Pickup + Delivery side-by-side (Alex: keep on one line, both viewports).
+   Flex (not grid) so when the Drayage service hides #qf-default-pickup, the
+   delivery column flexes to full width automatically. Appended at EOF to keep
+   the line-numbered spacing/color baselines stable. */
+.qf-addr-row { display: flex; gap: var(--space-1-5); align-items: flex-start; }
+.qf-addr-col { flex: 1 1 0; min-width: 0; }
+@media (max-width: 640px) {
+  .qf-addr-row { gap: var(--space-1); }
+}
