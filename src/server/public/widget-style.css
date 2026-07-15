@@ -329,3 +329,26 @@ body[data-qf-cta-hover="fill"] .qf-cta:not(.qf-secondary):hover { background: va
 .qf-ma-a { background: #36c98b; }
 .qf-ma-b { background: #f97373; }
 .qf-ma-txt { font-size: 10px; font-weight: 400; color: rgba(255,255,255,0.92); line-height: 1.45; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; min-width: 0; }
+
+/* Reveal moment — transit timeline with a gliding truck (on the fixed light
+   result card, so colours are fixed to read there). Appended at EOF. */
+.qf-timeline { margin: var(--space-2) 0 var(--space-1); opacity: 0; transform: translateY(6px); transition: opacity .45s ease, transform .45s ease; }
+.qf-timeline[hidden] { display: none; }
+.qf-timeline.show { opacity: 1; transform: none; }
+.qf-tl-row { display: flex; align-items: center; gap: var(--space-1); }
+.qf-tl-dot { width: 10px; height: 10px; border-radius: 999px; flex: 0 0 auto; }
+.qf-tl-a { background: #36c98b; }
+.qf-tl-b { background: #f97373; }
+.qf-tl-bar { position: relative; flex: 1; height: 3px; border-radius: 999px; background: rgba(15,23,42,.12); }
+.qf-tl-fill { position: absolute; left: 0; top: 0; height: 100%; width: 0; border-radius: 999px; background: linear-gradient(90deg, #36c98b, #0D3CFC); transition: width 1.25s ease; }
+.qf-tl-truck { position: absolute; top: 50%; left: 0; transform: translate(-50%, -50%); color: #0D3CFC; transition: left 1.25s ease; }
+.qf-timeline.show .qf-tl-fill { width: 100%; }
+.qf-timeline.show .qf-tl-truck { left: 100%; }
+.qf-tl-labels { display: flex; justify-content: space-between; align-items: center; gap: var(--space-1); margin-top: var(--space-1); font-size: 11px; color: #5a6478; }
+.qf-tl-mid { font-weight: 700; color: #0c1424; }
+@media (prefers-reduced-motion: reduce) {
+  .qf-timeline { opacity: 1; transform: none; }
+  .qf-tl-fill, .qf-tl-truck, .qf-timeline { transition: none; }
+  .qf-timeline .qf-tl-fill { width: 100%; }
+  .qf-timeline .qf-tl-truck { left: 100%; }
+}

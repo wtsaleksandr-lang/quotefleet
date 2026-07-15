@@ -724,9 +724,24 @@
     return normalizeEquipmentLabel(state.equipment || '', state.service);
   }
 
+  // Count a number up to its final value (ease-out cubic) for the price reveal.
+  function animateNumber(node, to, fmt, dur) {
+    if (!node) return;
+    var reduce = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+    if (reduce || !window.requestAnimationFrame) { node.textContent = fmt(to); return; }
+    var start = null;
+    function step(ts) {
+      if (start === null) start = ts;
+      var p = Math.min(1, (ts - start) / dur);
+      node.textContent = fmt(to * (1 - Math.pow(1 - p, 3)));
+      if (p < 1) requestAnimationFrame(step); else node.textContent = fmt(to);
+    }
+    requestAnimationFrame(step);
+  }
+
   function renderResult(resp) {
     var r = resp.result;
-    $('qf-total').textContent = fmtMoney(r.total);
+    animateNumber($('qf-total'), r.total, fmtMoney, 750);
     var serviceLabel = SERVICE_LABELS[state.service] || (state.service ? titleizeWord(state.service) : 'Truck');
     var metaText = 'Approx. ' + Math.round(resp.miles) + ' mi · ' + serviceLabel + ' · ' + friendlyEquipmentLabel();
     if (r.ltl && r.ltl.freightClass) metaText += ' · Class ' + r.ltl.freightClass;
@@ -743,7 +758,18 @@
     var totalRow = el('div', { class: 'line total-row' }, [el('span', { class: 'name', text: 'Total' }), el('span', { class: 'amt', text: '$' + fmtMoney(r.total) })]);
     lines.appendChild(totalRow);
     renderDisclaimer();
-    $('qf-result').style.display = 'block'; autoResize();
+    $('qf-result').style.display = 'block';
+    // Reveal the transit timeline — the truck glides from pickup to delivery.
+    var tl = $('qf-timeline');
+    if (tl) {
+      var mid = $('qf-tl-mid');
+      if (mid) mid.textContent = (resp.transit && resp.transit.text) ? resp.transit.text : 'In transit';
+      tl.hidden = false;
+      tl.classList.remove('show');
+      void tl.offsetWidth; // reflow so the width/translate transition runs
+      tl.classList.add('show');
+    }
+    autoResize();
   }
 
   // Terms / disclaimer shown at the bottom of the result card. The server
