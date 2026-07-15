@@ -1745,13 +1745,25 @@
         });
       }
 
+      function saveLogo(dataUrl) {
+        if (dataUrl.length > 150 * 1024) { toast('That image is too large even after shrinking. Try a simpler logo.', 'warn'); return; }
+        queueSave({ logoUrl: dataUrl }, true);
+        paintLogo(dataUrl);
+      }
       function handleFile(file) {
         if (!file || !/^image\//.test(file.type)) { toast('Please choose an image file.', 'warn'); return; }
-        processLogo(file).then(function (dataUrl) {
-          if (dataUrl.length > 150 * 1024) { toast('That image is too large even after shrinking. Try a simpler logo.', 'warn'); return; }
-          queueSave({ logoUrl: dataUrl }, true);
-          paintLogo(dataUrl);
-        }).catch(function () { toast('Could not read that image.', 'error'); });
+        // SVG is vector — keep as-is (nothing to crop). Raster images open the
+        // zoom/crop editor so the carrier can frame their logo before saving.
+        if (file.type === 'image/svg+xml' || !window.QFLogoCropper) {
+          processLogo(file).then(saveLogo).catch(function () { toast('Could not read that image.', 'error'); });
+          return;
+        }
+        var reader = new FileReader();
+        reader.onerror = function () { toast('Could not read that image.', 'error'); };
+        reader.onload = function () {
+          window.QFLogoCropper.open(String(reader.result || ''), saveLogo);
+        };
+        reader.readAsDataURL(file);
       }
 
       var drop = el('div', { class: 'qf-cz-dropzone', tabindex: '0' });
