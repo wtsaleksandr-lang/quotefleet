@@ -458,7 +458,8 @@ export function registerPublicRoutes(app: Express) {
       const dist = await distanceBetween(pickupForDistance, body.delivery as Parameters<typeof distanceBetween>[1]);
       if ('error' in dist) return res.json({ ok: false });
       const theme = normalizeTheme(body.theme);
-      const rm = await getRouteMap(dist.origin, dist.destination, loadEnv().GOOGLE_MAPS_API_KEY, theme);
+      // Grayscale base map (premium look) for the widget's map card.
+      const rm = await getRouteMap(dist.origin, dist.destination, loadEnv().GOOGLE_MAPS_API_KEY, theme, undefined, true);
       const lane = laneCacheKey(dist.origin, dist.destination);
       return res.json({
         ok: true,
@@ -480,7 +481,8 @@ export function registerPublicRoutes(app: Express) {
     const lane = typeof req.query.lane === 'string' ? req.query.lane : '';
     const theme = normalizeTheme(req.query.theme);
     if (!lane) return res.status(400).end();
-    const rm = peekRouteMap(`${lane}|${theme}`);
+    // Widget preview maps are always grayscale (the '|g' cache variant).
+    const rm = peekRouteMap(`${lane}|${theme}|g`);
     if (!rm) return res.status(404).end();
     try {
       const img = await fetch(rm.url);

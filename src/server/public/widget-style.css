@@ -299,11 +299,13 @@ body[data-qf-cta-hover="fill"] .qf-cta:not(.qf-secondary):hover { background: va
 .qf-map-canvas { display: block; width: 100%; border: 0; padding: 0; margin: 0; background: var(--w-bg); cursor: zoom-in; position: relative; font-size: 0; }
 .qf-map-img { display: block; width: 100%; height: auto; }
 .qf-map-img:not([src]) { display: none; }
-.qf-map-expand { position: absolute; right: var(--space-1); bottom: var(--space-1); font-size: 11px; font-weight: 650; color: rgba(255,255,255,0.96); background: rgba(15,23,42,0.72); padding: var(--space-0-5) var(--space-1); border-radius: 8px; line-height: 1.4; }
-.qf-map-meta { display: flex; gap: var(--space-3); padding: var(--space-1-5); border-top: 1px solid var(--w-border); }
-.qf-map-stat { display: flex; flex-direction: column; gap: var(--space-0-5); }
-.qf-map-stat-label { font-size: 11px; font-weight: 650; color: var(--w-muted); letter-spacing: 0.02em; }
-.qf-map-stat-val { font-size: 15px; font-weight: 750; color: var(--w-fg); }
+.qf-map-expand { position: absolute; right: var(--space-1); top: var(--space-1); font-size: 11px; font-weight: 650; color: rgba(255,255,255,0.96); background: rgba(15,23,42,0.72); padding: var(--space-0-5) var(--space-1); border-radius: 8px; line-height: 1.4; }
+/* Distance + transit embedded over the map (Alex): bottom gradient bar. */
+.qf-map-overlay { position: absolute; left: 0; right: 0; bottom: 0; display: flex; align-items: center; gap: var(--space-2); padding: var(--space-3) var(--space-1-5) var(--space-1-5); background: linear-gradient(rgba(15,23,42,0), rgba(15,23,42,0.82)); text-align: left; }
+.qf-map-ov-stat { display: flex; flex-direction: column; }
+.qf-map-ov-val { font-size: 15px; font-weight: 750; color: rgba(255,255,255,0.98); line-height: 1.4; }
+.qf-map-ov-lbl { font-size: 10px; font-weight: 600; letter-spacing: 0.04em; text-transform: uppercase; color: rgba(255,255,255,0.72); line-height: 1.4; }
+.qf-map-ov-div { width: 1px; align-self: stretch; margin: var(--space-0-5) 0; background: rgba(255,255,255,0.28); }
 .qf-map-modal { position: fixed; inset: 0; z-index: 1000; display: flex; align-items: center; justify-content: center; }
 .qf-map-modal[hidden] { display: none; }
 .qf-map-modal-backdrop { position: absolute; inset: 0; background: rgba(15,23,42,0.6); }

@@ -81,7 +81,8 @@ export function buildStaticMapUrl(
   origin: LatLng,
   destination: LatLng,
   encodedPolyline?: string | null,
-  theme: MapTheme = 'light'
+  theme: MapTheme = 'light',
+  grayscale = false
 ): string {
   const params = new URLSearchParams({
     size: MAP_SIZE,
@@ -95,6 +96,12 @@ export function buildStaticMapUrl(
   // Day/night: layer the dark geometry/water/label rules on top for theme=dark.
   if (theme === 'dark') {
     for (const s of DARK_STYLES) params.append('style', s);
+  }
+  // Grayscale base map (premium look) — desaturates the map geometry only. The
+  // A/B markers + brand-blue route are overlays drawn on top, so they stay
+  // colored and pop against the neutral base.
+  if (grayscale) {
+    params.append('style', 'saturation:-100');
   }
   // Green origin (A), red destination (B).
   params.append('markers', `color:${ORIGIN_COLOR}|label:A|${origin.lat},${origin.lng}`);
@@ -168,27 +175,28 @@ export async function getRouteMap(
   destination: LatLng | undefined,
   apiKey: string | undefined,
   theme: MapTheme = 'light',
-  fetchImpl: typeof fetch = fetch
+  fetchImpl: typeof fetch = fetch,
+  grayscale = false
 ): Promise<RouteMap | null> {
   if (!origin || !destination || !apiKey) return null;
 
-  // Cache key includes the theme so light/dark render to distinct entries and
-  // never serve each other's styled URL.
-  const key = `${laneCacheKey(origin, destination)}|${theme}`;
+  // Cache key includes the theme + grayscale flag so light/dark/gray render to
+  // distinct entries and never serve each other's styled URL.
+  const key = `${laneCacheKey(origin, destination)}|${theme}${grayscale ? '|g' : ''}`;
   const cached = routeCache.get(key);
   if (cached) return cached;
 
   const directions = await fetchDirections(origin, destination, apiKey, fetchImpl);
   const result: RouteMap = directions
     ? {
-        url: buildStaticMapUrl(apiKey, origin, destination, directions.polyline, theme),
+        url: buildStaticMapUrl(apiKey, origin, destination, directions.polyline, theme, grayscale),
         distanceMiles: directions.distanceMeters
           ? Math.round(directions.distanceMeters / METERS_PER_MILE)
           : null,
         kind: 'route',
       }
     : {
-        url: buildStaticMapUrl(apiKey, origin, destination, null, theme),
+        url: buildStaticMapUrl(apiKey, origin, destination, null, theme, grayscale),
         distanceMiles: null,
         kind: 'straight',
       };

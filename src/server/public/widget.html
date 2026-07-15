@@ -28,8 +28,16 @@
     <div class="qf-mini-stepper" aria-label="Calculator steps"><span>1. Details</span><span>2. Estimate</span><span>3. Written quote</span></div>
     <div class="qf-step active" id="qf-step-quote">
       <div class="qf-tabs" id="qf-services"></div>
-      <div class="qf-section-title qf-title-inline">Equipment <span class="qf-help" data-tip="The truck or container type. Dry Van = standard enclosed trailer; Reefer = refrigerated; Flatbed = open deck; 20'/40'/45' = ocean container drayage. Open top and flat rack may need oversize details.">?</span></div>
-      <select class="qf-select" id="qf-equipment"></select>
+      <div class="qf-addr-row">
+        <div class="qf-addr-col">
+          <div class="qf-section-title qf-title-inline">Equipment <span class="qf-help" data-tip="The truck or container type. Dry Van = standard enclosed trailer; Reefer = refrigerated; Flatbed = open deck; 20'/40'/45' = ocean container drayage. Open top and flat rack may need oversize details.">?</span></div>
+          <div class="qf-field"><select class="qf-select" id="qf-equipment"></select></div>
+        </div>
+        <div class="qf-addr-col">
+          <div class="qf-section-title qf-title-inline">Weight (lbs) <span class="qf-help" data-tip="Approximate weight is fine. Very heavy shipments may need overweight equipment or permits.">?</span></div>
+          <div class="qf-field"><input class="qf-input" id="qf-weight" type="number" min="1" placeholder="e.g. 38000"></div>
+        </div>
+      </div>
       <div class="qf-oog-panel" id="qf-oog-panel" style="display:none;">
         <div class="qf-oog-head"><strong>Oversize details</strong><span id="qf-oog-help">Needed for permit and equipment review.</span></div>
         <label class="qf-oog-toggle"><input type="checkbox" id="qf-oog-check"> <span>This shipment is oversized / out of gauge</span></label>
@@ -70,12 +78,13 @@
       <div class="qf-map-card" id="qf-map-card" hidden>
         <button type="button" class="qf-map-canvas" id="qf-map-open" aria-label="Open full route map">
           <img class="qf-map-img" id="qf-map-img" alt="Route from pickup to delivery">
-          <span class="qf-map-expand" aria-hidden="true">Tap to expand</span>
+          <span class="qf-map-overlay">
+            <span class="qf-map-ov-stat"><span class="qf-map-ov-val" id="qf-map-distance">—</span><span class="qf-map-ov-lbl">Distance</span></span>
+            <span class="qf-map-ov-div" aria-hidden="true"></span>
+            <span class="qf-map-ov-stat"><span class="qf-map-ov-val" id="qf-map-transit">—</span><span class="qf-map-ov-lbl">Est. transit</span></span>
+          </span>
+          <span class="qf-map-expand" aria-hidden="true">Expand</span>
         </button>
-        <div class="qf-map-meta">
-          <div class="qf-map-stat"><span class="qf-map-stat-label">Distance</span><span class="qf-map-stat-val" id="qf-map-distance">—</span></div>
-          <div class="qf-map-stat"><span class="qf-map-stat-label">Est. transit</span><span class="qf-map-stat-val" id="qf-map-transit">—</span></div>
-        </div>
       </div>
       <div class="qf-map-modal" id="qf-map-modal" hidden>
         <div class="qf-map-modal-backdrop" id="qf-map-modal-close" aria-hidden="true"></div>
@@ -85,7 +94,6 @@
           <div class="qf-map-zoom"><button type="button" id="qf-map-zoom-out" aria-label="Zoom out">−</button><button type="button" id="qf-map-zoom-in" aria-label="Zoom in">+</button></div>
         </div>
       </div>
-      <div class="qf-section-title qf-title-inline" style="margin-top:14px;">Cargo <span class="qf-help" data-tip="Approximate weight is fine. Very heavy shipments may need overweight equipment or permits.">?</span></div><div class="qf-grid"><div class="qf-field qf-full"><label>Weight (lbs)</label><input class="qf-input" id="qf-weight" type="number" min="1" placeholder="e.g. 38000"></div></div>
       <div class="qf-ltl-panel" id="qf-ltl-panel" style="display:none;">
         <div class="qf-section-title qf-title-inline" style="margin-top:14px;">Size &amp; handling <span class="qf-help" data-tip="LTL is priced by freight class, which comes from your shipment's density (weight ÷ size). Enter the footprint of the whole shipment — pallet dimensions and stacked height — so we can estimate the class and a size/weight-aware rate.">?</span></div>
         <div class="qf-grid">
