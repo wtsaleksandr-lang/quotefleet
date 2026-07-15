@@ -397,7 +397,7 @@ src/server/public/landing-wefixtrades-cleanup.css:207	spacing	margin: 0 0 6px
 src/server/public/landing-wefixtrades-cleanup.css:297	spacing	padding: clamp(72px, 8vw, 116px) 28px
 src/server/public/landing-wefixtrades-cleanup.css:307	spacing	gap: 14px
 src/server/public/landing-wefixtrades-cleanup.css:315	spacing	padding: 22px
-src/server/public/landing-wefixtrades-cleanup.css:328	spacing	padding: clamp(82px, 9vw, 128px) 28px
+src/server/public/landing-wefixtrades-cleanup.css:328	spacing	padding: clamp(32px, 5vw, 48px) 28px clamp(80px, 8vw, 120px)
 src/server/public/landing-wefixtrades-cleanup.css:341	spacing	margin: 0 0 34px
 src/server/public/landing-wefixtrades-cleanup.css:356	spacing	gap: 14px
 src/server/public/landing-wefixtrades-cleanup.css:404	spacing	padding: clamp(82px, 9vw, 128px) 28px
@@ -414,7 +414,7 @@ src/server/public/landing-wefixtrades-cleanup.css:553	spacing	padding: clamp(22p
 src/server/public/landing-wefixtrades-cleanup.css:610	spacing	padding: 60px 18px
 src/server/public/landing-wefixtrades-cleanup.css:670	spacing	padding: clamp(64px, 8vw, 116px) 28px
 src/server/public/landing-wefixtrades-cleanup.css:743	spacing	padding: clamp(48px, 8vw, 80px) 28px
-src/server/public/landing-wefixtrades-cleanup.css:99	spacing	padding: clamp(72px, 8vw, 116px) 28px clamp(78px, 8vw, 118px)
+src/server/public/landing-wefixtrades-cleanup.css:99	spacing	padding: clamp(80px, 8vw, 120px) 28px clamp(32px, 4vw, 48px)
 src/server/public/landing-wefixtrades.css:114	spacing	padding: 9px 10px
 src/server/public/landing-wefixtrades.css:134	spacing	padding: 10px 15px
 src/server/public/landing-wefixtrades.css:167	spacing	padding: 0 20px

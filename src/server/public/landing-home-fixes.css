@@ -593,23 +593,8 @@ body.qf-wft.landing-v2 .hiw-card .hiw-media > video {
   object-fit: contain !important;
   display: block !important;
 }
-/* Step-1 branded placeholder panel (no signup screenshot exists yet — a clean
-   branded box, not an empty frame; swappable for the signup loop later). */
-body.qf-wft.landing-v2 .hiw-card .hiw-media-ph {
-  flex-direction: column !important;
-  color: var(--accent) !important;
-}
-body.qf-wft.landing-v2 .hiw-ph-ico {
-  width: 48px !important;
-  height: 48px !important;
-}
-body.qf-wft.landing-v2 .hiw-ph-cap {
-  font-family: var(--font-mono) !important;
-  font-size: 13px !important;
-  letter-spacing: .04em !important;
-  text-transform: uppercase !important;
-  color: var(--ink-soft) !important;
-}
+/* Step 1 now shows a real signup screenshot (marketing/how/signup.webp); the
+   old .hiw-media-ph placeholder panel + caption were removed from the markup. */
 body.qf-wft.landing-v2 .hiw-card .hiw-body {
   display: flex !important;
   flex-direction: column !important;
