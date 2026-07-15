@@ -56,7 +56,7 @@ const DARK_STYLES: string[] = [
 
 // Retina-sized to balance the left-column panel (img renders ~210px tall,
 // object-fit:cover). 640 is the free-tier max width; scale:2 = 1280px.
-const MAP_SIZE = '640x272';
+const MAP_SIZE = '640x360';
 const MAP_SCALE = '2';
 
 // Lane cache: key = rounded origin+destination. 24h TTL, 500 lanes.

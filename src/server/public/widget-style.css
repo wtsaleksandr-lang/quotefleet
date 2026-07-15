@@ -146,7 +146,7 @@ a.qf-contact-value:hover { text-decoration: underline; }
 .qf-result .total .currency { font-size: 18px; color: var(--w-muted); margin-right: var(--space-0-5); font-weight: 600; }
 .qf-result .meta { font-size: 13px; color: var(--w-muted); margin-bottom: var(--space-1); }
 .qf-result .qf-eta { display: inline-flex; align-items: center; font-size: 12.5px; font-weight: 700; color: #0D3CFC; background: rgba(13,60,252,0.08); border: 1px solid rgba(13,60,252,0.18); border-radius: 999px; padding: var(--space-0-5) var(--space-1-5); margin: 0 0 var(--space-1-5); }
-.qf-route-map { display: block; width: 100%; aspect-ratio: 640 / 272; object-fit: cover; border: 1px solid var(--w-border); border-radius: var(--w-radius); margin-top: var(--space-1-5); }
+.qf-route-map { display: block; width: 100%; aspect-ratio: 640 / 360; object-fit: cover; border: 1px solid var(--w-border); border-radius: var(--w-radius); margin-top: var(--space-1-5); }
 .qf-route-map[hidden] { display: none; }
 .qf-view-quote { display: block; text-align: center; text-decoration: none; margin-bottom: var(--space-1-5); }
 .qf-result .lines { font-size: 13px; display: flex; flex-direction: column; gap: var(--space-0-5); }
@@ -312,7 +312,7 @@ body[data-qf-cta-hover="fill"] .qf-cta:not(.qf-secondary):hover { background: va
 .qf-map-modal-panel { position: relative; width: min(92vw, 720px); max-height: 88vh; background: var(--w-bg); border-radius: 14px; overflow: hidden; box-shadow: 0 20px 60px rgba(15,23,42,0.35); display: flex; flex-direction: column; }
 .qf-map-modal-head { display: flex; align-items: center; justify-content: space-between; padding: var(--space-1-5) var(--space-2); border-bottom: 1px solid var(--w-border); font-weight: 750; color: var(--w-fg); }
 .qf-map-modal-x { border: 0; background: transparent; font-size: 18px; cursor: pointer; color: var(--w-muted); display: flex; align-items: center; justify-content: center; padding: var(--space-0-5); }
-.qf-map-viewport { position: relative; overflow: hidden; touch-action: none; cursor: grab; background: var(--w-bg); flex: 1; min-height: 320px; }
+.qf-map-viewport { position: relative; overflow: hidden; touch-action: none; cursor: grab; background: var(--w-bg); }
 .qf-map-viewport:active { cursor: grabbing; }
 .qf-map-modal-img { display: block; width: 100%; height: auto; transform-origin: center center; will-change: transform; user-select: none; }
 .qf-map-zoom { position: absolute; right: var(--space-2); bottom: var(--space-2); display: flex; gap: var(--space-1); }
