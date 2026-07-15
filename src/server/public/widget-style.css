@@ -299,7 +299,7 @@ body[data-qf-cta-hover="fill"] .qf-cta:not(.qf-secondary):hover { background: va
 .qf-map-canvas { display: block; width: 100%; border: 0; padding: 0; margin: 0; background: var(--w-bg); cursor: zoom-in; position: relative; font-size: 0; }
 .qf-map-img { display: block; width: 100%; height: auto; }
 .qf-map-img:not([src]) { display: none; }
-.qf-map-expand { position: absolute; right: var(--space-1); top: var(--space-1); font-size: 11px; font-weight: 650; color: rgba(255,255,255,0.96); background: rgba(15,23,42,0.72); padding: var(--space-0-5) var(--space-1); border-radius: 8px; line-height: 1.4; }
+.qf-map-expand { position: absolute; right: var(--space-1); top: var(--space-1); display: flex; align-items: center; justify-content: center; width: 28px; height: 28px; color: rgba(255,255,255,0.95); background: rgba(15,23,42,0.55); border-radius: 8px; }
 /* Distance + transit embedded over the map (Alex): bottom gradient bar. */
 .qf-map-overlay { position: absolute; left: 0; right: 0; bottom: 0; display: flex; align-items: center; gap: var(--space-2); padding: var(--space-3) var(--space-1-5) var(--space-1-5); background: linear-gradient(rgba(15,23,42,0), rgba(15,23,42,0.82)); text-align: left; }
 .qf-map-ov-stat { display: flex; flex-direction: column; }
