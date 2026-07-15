@@ -1,0 +1,416 @@
+/* ─────────────────────────────────────────────────────────────────────────
+   Hero phone mockup — MOBILE ONLY. Replaces the old stretched static image
+   (qf-hero-phone.webp, 1168×3063 ≈ 1:2.62) with a realistically-proportioned
+   phone frame (locked 9:19.5) containing a swipeable, auto-animating calc loop
+   — one slide per trucking mode (FTL · Expedite · Hotshot · Drayage · LTL).
+   Desktop keeps the composite webp; this component is hidden ≥ 641px.
+   All colours scoped as tokens on .qf-phone; loaded LAST so it wins.
+   ───────────────────────────────────────────────────────────────────────── */
+
+.qf-phone {
+  /* Light "product" surface pops against the dark hero (Apple-style mockup). */
+  --pz-bezel: #0b0d12;
+  --pz-bezel-edge: rgba(255, 255, 255, 0.10);
+  --pz-screen: #f7f9fc;
+  --pz-ink: #0b1220;
+  --pz-muted: #5a6b84;
+  --pz-faint: #8595ac;
+  --pz-line: #e7edf5;
+  --pz-chip: #eef2f8;
+  --pz-chip-edge: #e0e7f1;
+  --pz-accent: #0d3cfc;
+  --pz-accent-soft: rgba(13, 60, 252, 0.10);
+  --pz-accent-edge: rgba(13, 60, 252, 0.22);
+  --pz-card: #ffffff;
+  --pz-card-edge: #edf1f7;
+
+  display: none; /* desktop: hidden (composite shows). Mobile MQ turns it on. */
+}
+
+/* ── Desktop / mobile visibility handoff. Mirrors the img toggle in
+   landing-hero-redesign.css so the composite owns desktop, the phone owns
+   mobile. `html body` bumps specificity above cleanup.css injected rules. ── */
+html body.qf-wft .visual-flow.qf-hero-media > .qf-phone { display: none; }
+
+@media (max-width: 640px) {
+  html body.qf-wft .visual-flow.qf-hero-media > .qf-hero-img-mobile { display: none !important; }
+  html body.qf-wft .visual-flow.qf-hero-media > .qf-phone {
+    display: block;
+    order: 3;
+    margin: 4px auto 0;
+  }
+}
+
+/* ── Device frame — realistic proportions, aspect-locked. ── */
+.qf-phone__frame {
+  position: relative;
+  width: 100%;
+  max-width: 288px;
+  margin: 0 auto;
+  aspect-ratio: 9 / 19.5;
+  background: var(--pz-bezel);
+  border: 1px solid var(--pz-bezel-edge);
+  border-radius: 42px;
+  padding: 10px;
+  box-shadow:
+    0 2px 2px rgba(0, 0, 0, 0.4) inset,
+    0 30px 60px -28px rgba(0, 0, 0, 0.75),
+    0 0 0 2px rgba(0, 0, 0, 0.35);
+}
+
+/* Dynamic-island pill. */
+.qf-phone__island {
+  position: absolute;
+  top: 18px;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 78px;
+  height: 22px;
+  background: #05070b;
+  border-radius: 12px;
+  z-index: 6;
+}
+
+/* ── Screen — clips the swipe track; scroll-snap carousel lives here. ── */
+.qf-phone__screen {
+  position: relative;
+  height: 100%;
+  border-radius: 33px;
+  background: var(--pz-screen);
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+}
+
+/* Single status bar (screen chrome, above the track). */
+.qf-phone__statusbar {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 30px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0 22px;
+  font: 700 11px/1 'Inter', system-ui, sans-serif;
+  color: var(--pz-ink);
+  z-index: 4;
+  pointer-events: none;
+}
+.qf-phone__statusbar svg { display: block; color: var(--pz-ink); }
+
+.qf-phone__track {
+  display: flex;
+  flex: 1 1 auto;
+  overflow-x: auto;
+  overflow-y: hidden;
+  scroll-snap-type: x mandatory;
+  scroll-behavior: smooth;
+  -webkit-overflow-scrolling: touch;
+  scrollbar-width: none;
+}
+.qf-phone__track::-webkit-scrollbar { display: none; }
+
+.qf-slide {
+  flex: 0 0 100%;
+  scroll-snap-align: center;
+  scroll-snap-stop: always;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  padding: 34px 16px 26px;
+  gap: 11px;
+}
+
+/* ── Status bar (baked, subtle) ── */
+.qf-slide__status {
+  position: absolute;
+  top: 12px;
+  left: 20px;
+  right: 20px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  font: 600 11px/1 'Inter', system-ui, sans-serif;
+  color: var(--pz-faint);
+  z-index: 4;
+}
+.qf-slide__status svg { display: block; }
+
+/* ── Brand header row ── */
+.qf-slide__head {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.qf-slide__logo {
+  width: 30px;
+  height: 30px;
+  flex: none;
+  border-radius: 8px;
+  background: var(--pz-accent);
+  color: var(--pz-card);
+  display: grid;
+  place-items: center;
+  font: 800 12px/1 'Inter', system-ui, sans-serif;
+  letter-spacing: -0.02em;
+}
+.qf-slide__brand { min-width: 0; }
+.qf-slide__co {
+  font: 700 12.5px/1.15 'Inter', system-ui, sans-serif;
+  color: var(--pz-ink);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.qf-slide__mode {
+  display: inline-block;
+  margin-top: 3px;
+  padding: 2px 7px;
+  border-radius: 100px;
+  background: var(--pz-accent-soft);
+  border: 1px solid var(--pz-accent-edge);
+  color: var(--pz-accent);
+  font: 800 8.5px/1.3 'Inter', system-ui, sans-serif;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+/* ── Route strip ── */
+.qf-slide__route {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 8px 10px;
+  border-radius: 10px;
+  background: var(--pz-card);
+  border: 1px solid var(--pz-card-edge);
+  font: 700 12px/1 'Inter', system-ui, sans-serif;
+  color: var(--pz-ink);
+}
+.qf-slide__route .qf-zip { letter-spacing: 0.01em; }
+.qf-slide__route .qf-arrow {
+  flex: 1 1 auto;
+  height: 1px;
+  background: repeating-linear-gradient(90deg, var(--pz-chip-edge) 0 4px, transparent 4px 8px);
+  position: relative;
+}
+.qf-slide__route .qf-arrow::after {
+  content: '';
+  position: absolute;
+  right: -1px;
+  top: 50%;
+  width: 5px;
+  height: 5px;
+  border-top: 1.5px solid var(--pz-faint);
+  border-right: 1.5px solid var(--pz-faint);
+  transform: translateY(-50%) rotate(45deg);
+}
+
+/* ── Spec chips ── */
+.qf-slide__chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+.qf-chip {
+  padding: 4px 9px;
+  border-radius: 100px;
+  background: var(--pz-chip);
+  border: 1px solid var(--pz-chip-edge);
+  color: var(--pz-muted);
+  font: 600 10.5px/1.2 'Inter', system-ui, sans-serif;
+  white-space: nowrap;
+}
+
+.qf-slide__divider {
+  height: 1px;
+  background: var(--pz-line);
+  margin: 2px 0;
+}
+
+/* ── Rate block (the animated centrepiece) ── */
+.qf-slide__ratewrap { position: relative; }
+.qf-slide__ratelabel {
+  font: 700 9px/1 'Inter', system-ui, sans-serif;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--pz-faint);
+  margin-bottom: 4px;
+}
+.qf-slide__rate {
+  font: 800 30px/1 'Inter', system-ui, sans-serif;
+  letter-spacing: -0.03em;
+  color: var(--pz-ink);
+  font-variant-numeric: tabular-nums;
+}
+.qf-slide__rate .qf-rate-cents {
+  font-size: 17px;
+  color: var(--pz-muted);
+}
+
+/* "Calculating…" shimmer overlay — sits over the rate until the count resolves */
+.qf-slide__calc {
+  position: absolute;
+  inset: 14px 0 0 0;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font: 700 12px/1 'Inter', system-ui, sans-serif;
+  color: var(--pz-muted);
+  background: var(--pz-screen);
+  opacity: 0;
+  pointer-events: none;
+}
+.qf-slide__calc .qf-calc-bar {
+  flex: 1 1 auto;
+  height: 8px;
+  border-radius: 100px;
+  background: linear-gradient(90deg, var(--pz-chip) 0%, var(--pz-accent-soft) 50%, var(--pz-chip) 100%);
+  background-size: 200% 100%;
+}
+
+/* ── Line items ── */
+.qf-slide__lines {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.qf-line {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  font: 600 11.5px/1.2 'Inter', system-ui, sans-serif;
+  color: var(--pz-muted);
+}
+.qf-line span:last-child {
+  color: var(--pz-ink);
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+}
+
+/* ── Total row ── */
+.qf-slide__total {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 10px 12px;
+  border-radius: 12px;
+  background: var(--pz-accent-soft);
+  border: 1px solid var(--pz-accent-edge);
+}
+.qf-slide__total b {
+  font: 700 11px/1 'Inter', system-ui, sans-serif;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--pz-accent);
+}
+.qf-slide__total strong {
+  font: 800 17px/1 'Inter', system-ui, sans-serif;
+  letter-spacing: -0.02em;
+  color: var(--pz-accent);
+  font-variant-numeric: tabular-nums;
+}
+
+/* ── Primary CTA (decorative — mirrors the real widget's action button) ── */
+.qf-slide__cta {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  height: 40px;
+  border-radius: 12px;
+  background: var(--pz-accent);
+  color: var(--pz-card);
+  font: 800 13px/1 'Inter', system-ui, sans-serif;
+  letter-spacing: -0.01em;
+  box-shadow: 0 8px 18px -8px var(--pz-accent);
+}
+.qf-slide__cta svg { display: block; }
+
+.qf-slide__foot {
+  font: 500 8.5px/1.3 'Inter', system-ui, sans-serif;
+  color: var(--pz-faint);
+  text-align: center;
+  padding-top: 2px;
+}
+
+/* ── Dots (mode indicator, tappable) ── */
+.qf-phone__dots {
+  position: absolute;
+  bottom: 8px;
+  left: 0;
+  right: 0;
+  display: flex;
+  justify-content: center;
+  gap: 5px;
+  z-index: 5;
+}
+.qf-phone__dot {
+  width: 6px;
+  height: 6px;
+  padding: 0;
+  border: 0;
+  border-radius: 100px;
+  background: var(--pz-chip-edge);
+  cursor: pointer;
+  transition: width 0.25s ease, background 0.25s ease;
+}
+.qf-phone__dot.is-on {
+  width: 18px;
+  background: var(--pz-accent);
+}
+
+/* ─────────────────────────────────────────────────────────────────────────
+   Animation — reveal elements are held hidden, then staggered in when the
+   slide's animation is (re)started via .is-playing. Gated on html.js so a
+   no-JS render shows the full final state (static + swipeable).
+   ───────────────────────────────────────────────────────────────────────── */
+html.js .qf-slide .qf-reveal { opacity: 0; }
+
+html.js .qf-slide.is-playing .qf-reveal {
+  animation: qfp-rise 0.5s cubic-bezier(0.22, 1, 0.36, 1) both;
+  animation-delay: var(--d, 0s);
+}
+
+/* rate + calc choreography */
+html.js .qf-slide .qf-slide__rate { opacity: 0; }
+html.js .qf-slide.is-playing .qf-slide__rate {
+  animation: qfp-pop 0.45s cubic-bezier(0.22, 1, 0.36, 1) both;
+  animation-delay: 1.15s;
+}
+html.js .qf-slide.is-playing .qf-slide__calc {
+  animation: qfp-calc 1.15s ease both;
+}
+html.js .qf-slide.is-playing .qf-slide__calc .qf-calc-bar {
+  animation: qfp-shimmer 0.9s linear infinite;
+}
+
+@keyframes qfp-rise {
+  from { opacity: 0; transform: translateY(9px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+@keyframes qfp-pop {
+  0%   { opacity: 0; transform: scale(0.92); }
+  60%  { opacity: 1; transform: scale(1.02); }
+  100% { opacity: 1; transform: scale(1); }
+}
+@keyframes qfp-calc {
+  0%   { opacity: 1; }
+  82%  { opacity: 1; }
+  100% { opacity: 0; }
+}
+@keyframes qfp-shimmer {
+  from { background-position: 200% 0; }
+  to   { background-position: -200% 0; }
+}
+
+/* Reduced motion — no auto-motion; every element shows its resting state. */
+@media (prefers-reduced-motion: reduce) {
+  html.js .qf-slide .qf-reveal,
+  html.js .qf-slide .qf-slide__rate { opacity: 1 !important; animation: none !important; }
+  html.js .qf-slide .qf-slide__calc { display: none; }
+  .qf-phone__track { scroll-behavior: auto; }
+}

@@ -26,6 +26,8 @@
   <link rel="stylesheet" href="/quotefleet-rates-globe.css">
   <link rel="stylesheet" href="/landing-final-cta.css">
   <link rel="stylesheet" href="/landing-hero-redesign.css">
+  <link rel="stylesheet" href="/landing-hero-phone.css">
+  <script defer src="/landing-hero-phone.js"></script>
   <link rel="icon" href="/favicon.ico" sizes="any">
   <link rel="icon" type="image/png" sizes="32x32" href="/brand/favicon-32.png">
   <link rel="icon" type="image/png" sizes="16x16" href="/brand/favicon-16.png">
@@ -58,7 +60,84 @@
 
         <div class="visual-flow qf-hero-media" aria-label="QuoteFleet branded rate calculator on desktop and mobile">
           <img class="qf-hero-img-desktop" src="/marketing/qf-hero-composite.webp" width="1254" height="1254" fetchpriority="high" decoding="async" alt="QuoteFleet branded freight rate calculator shown on a laptop and phone">
-          <img class="qf-hero-img-mobile" src="/marketing/qf-hero-phone.webp" width="1168" height="3063" loading="lazy" decoding="async" alt="QuoteFleet branded freight rate calculator on a phone, showing an instant quote of $7,188.15">
+          <div class="qf-phone" aria-label="QuoteFleet quoting freight instantly — swipe through trucking modes">
+            <div class="qf-phone__frame">
+              <span class="qf-phone__island" aria-hidden="true"></span>
+              <div class="qf-phone__screen">
+                <div class="qf-phone__statusbar" aria-hidden="true"><span>9:41</span><svg width="46" height="12" viewBox="0 0 46 12" fill="currentColor"><rect x="0" y="7" width="3" height="5" rx="1"/><rect x="5" y="5" width="3" height="7" rx="1"/><rect x="10" y="3" width="3" height="9" rx="1"/><rect x="15" y="1" width="3" height="11" rx="1"/><path d="M22 4.5c2.8-2.6 7.2-2.6 10 0l-1.4 1.5c-2-1.9-5.2-1.9-7.2 0z"/><circle cx="27" cy="9" r="1.4"/><rect x="34" y="2" width="9" height="8" rx="2" fill="none" stroke="currentColor" stroke-width="1.2"/><rect x="35.5" y="3.5" width="5" height="5" rx="1"/><rect x="44" y="4.5" width="1.5" height="3" rx="0.75"/></svg></div>
+                <div class="qf-phone__track">
+
+                  <div class="qf-slide" data-mode="FTL">
+                    <div class="qf-slide__head qf-reveal" style="--d:.03s"><span class="qf-slide__logo">HL</span><span class="qf-slide__brand"><span class="qf-slide__co">Harbor Link Logistics</span><span class="qf-slide__mode">FTL</span></span></div>
+                    <div class="qf-slide__route qf-reveal" style="--d:.12s"><span class="qf-zip">90802</span><span class="qf-arrow"></span><span class="qf-zip">60606</span></div>
+                    <div class="qf-slide__chips qf-reveal" style="--d:.22s"><span class="qf-chip">53&prime; Dry Van</span><span class="qf-chip">38,000 lb</span></div>
+                    <div class="qf-slide__divider qf-reveal" style="--d:.30s"></div>
+                    <div class="qf-slide__ratewrap"><div class="qf-slide__ratelabel qf-reveal" style="--d:.30s">Estimated rate</div><div class="qf-slide__rate" data-total="3404">$3,404</div><div class="qf-slide__calc"><span>Calculating rate&hellip;</span><span class="qf-calc-bar"></span></div></div>
+                    <div class="qf-slide__lines"><div class="qf-line qf-reveal" style="--d:1.30s"><span>Linehaul</span><span>$2,940</span></div><div class="qf-line qf-reveal" style="--d:1.40s"><span>Fuel surcharge</span><span>$404</span></div><div class="qf-line qf-reveal" style="--d:1.50s"><span>Accessorials</span><span>$60</span></div></div>
+                    <div class="qf-slide__total qf-reveal" style="--d:1.66s"><b>Total estimate</b><strong>$3,404</strong></div>
+                    <div class="qf-slide__cta qf-reveal" style="--d:1.74s" aria-hidden="true">Get instant quote <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14M13 6l6 6-6 6"/></svg></div>
+                    <div class="qf-slide__foot qf-reveal" style="--d:1.86s">Estimate &middot; final rate confirmed in writing</div>
+                  </div>
+
+                  <div class="qf-slide" data-mode="Expedite">
+                    <div class="qf-slide__head qf-reveal" style="--d:.03s"><span class="qf-slide__logo">HL</span><span class="qf-slide__brand"><span class="qf-slide__co">Harbor Link Logistics</span><span class="qf-slide__mode">Expedite</span></span></div>
+                    <div class="qf-slide__route qf-reveal" style="--d:.12s"><span class="qf-zip">48226</span><span class="qf-arrow"></span><span class="qf-zip">43215</span></div>
+                    <div class="qf-slide__chips qf-reveal" style="--d:.22s"><span class="qf-chip">Sprinter Van</span><span class="qf-chip">1,900 lb</span><span class="qf-chip">Direct</span></div>
+                    <div class="qf-slide__divider qf-reveal" style="--d:.30s"></div>
+                    <div class="qf-slide__ratewrap"><div class="qf-slide__ratelabel qf-reveal" style="--d:.30s">Estimated rate</div><div class="qf-slide__rate" data-total="1238">$1,238</div><div class="qf-slide__calc"><span>Calculating rate&hellip;</span><span class="qf-calc-bar"></span></div></div>
+                    <div class="qf-slide__lines"><div class="qf-line qf-reveal" style="--d:1.30s"><span>Linehaul</span><span>$1,020</span></div><div class="qf-line qf-reveal" style="--d:1.40s"><span>Fuel surcharge</span><span>$128</span></div><div class="qf-line qf-reveal" style="--d:1.50s"><span>After-hours</span><span>$90</span></div></div>
+                    <div class="qf-slide__total qf-reveal" style="--d:1.66s"><b>Total estimate</b><strong>$1,238</strong></div>
+                    <div class="qf-slide__cta qf-reveal" style="--d:1.74s" aria-hidden="true">Get instant quote <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14M13 6l6 6-6 6"/></svg></div>
+                    <div class="qf-slide__foot qf-reveal" style="--d:1.86s">Estimate &middot; final rate confirmed in writing</div>
+                  </div>
+
+                  <div class="qf-slide" data-mode="Hotshot">
+                    <div class="qf-slide__head qf-reveal" style="--d:.03s"><span class="qf-slide__logo">HL</span><span class="qf-slide__brand"><span class="qf-slide__co">Harbor Link Logistics</span><span class="qf-slide__mode">Hotshot</span></span></div>
+                    <div class="qf-slide__route qf-reveal" style="--d:.12s"><span class="qf-zip">77002</span><span class="qf-arrow"></span><span class="qf-zip">75201</span></div>
+                    <div class="qf-slide__chips qf-reveal" style="--d:.22s"><span class="qf-chip">40&prime; Gooseneck</span><span class="qf-chip">11,500 lb</span></div>
+                    <div class="qf-slide__divider qf-reveal" style="--d:.30s"></div>
+                    <div class="qf-slide__ratewrap"><div class="qf-slide__ratelabel qf-reveal" style="--d:.30s">Estimated rate</div><div class="qf-slide__rate" data-total="1127">$1,127</div><div class="qf-slide__calc"><span>Calculating rate&hellip;</span><span class="qf-calc-bar"></span></div></div>
+                    <div class="qf-slide__lines"><div class="qf-line qf-reveal" style="--d:1.30s"><span>Linehaul</span><span>$915</span></div><div class="qf-line qf-reveal" style="--d:1.40s"><span>Fuel surcharge</span><span>$142</span></div><div class="qf-line qf-reveal" style="--d:1.50s"><span>Tarp &amp; strap</span><span>$70</span></div></div>
+                    <div class="qf-slide__total qf-reveal" style="--d:1.66s"><b>Total estimate</b><strong>$1,127</strong></div>
+                    <div class="qf-slide__cta qf-reveal" style="--d:1.74s" aria-hidden="true">Get instant quote <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14M13 6l6 6-6 6"/></svg></div>
+                    <div class="qf-slide__foot qf-reveal" style="--d:1.86s">Estimate &middot; final rate confirmed in writing</div>
+                  </div>
+
+                  <div class="qf-slide" data-mode="Drayage">
+                    <div class="qf-slide__head qf-reveal" style="--d:.03s"><span class="qf-slide__logo">HL</span><span class="qf-slide__brand"><span class="qf-slide__co">Harbor Link Logistics</span><span class="qf-slide__mode">Drayage</span></span></div>
+                    <div class="qf-slide__route qf-reveal" style="--d:.12s"><span class="qf-zip">Port of LB</span><span class="qf-arrow"></span><span class="qf-zip">92335</span></div>
+                    <div class="qf-slide__chips qf-reveal" style="--d:.22s"><span class="qf-chip">40&prime; Container</span><span class="qf-chip">Chassis incl.</span></div>
+                    <div class="qf-slide__divider qf-reveal" style="--d:.30s"></div>
+                    <div class="qf-slide__ratewrap"><div class="qf-slide__ratelabel qf-reveal" style="--d:.30s">Estimated rate</div><div class="qf-slide__rate" data-total="655">$655</div><div class="qf-slide__calc"><span>Calculating rate&hellip;</span><span class="qf-calc-bar"></span></div></div>
+                    <div class="qf-slide__lines"><div class="qf-line qf-reveal" style="--d:1.30s"><span>Drayage</span><span>$385</span></div><div class="qf-line qf-reveal" style="--d:1.40s"><span>Chassis</span><span>$175</span></div><div class="qf-line qf-reveal" style="--d:1.50s"><span>Fuel surcharge</span><span>$95</span></div></div>
+                    <div class="qf-slide__total qf-reveal" style="--d:1.66s"><b>Total estimate</b><strong>$655</strong></div>
+                    <div class="qf-slide__cta qf-reveal" style="--d:1.74s" aria-hidden="true">Get instant quote <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14M13 6l6 6-6 6"/></svg></div>
+                    <div class="qf-slide__foot qf-reveal" style="--d:1.86s">Estimate &middot; final rate confirmed in writing</div>
+                  </div>
+
+                  <div class="qf-slide" data-mode="LTL">
+                    <div class="qf-slide__head qf-reveal" style="--d:.03s"><span class="qf-slide__logo">HL</span><span class="qf-slide__brand"><span class="qf-slide__co">Harbor Link Logistics</span><span class="qf-slide__mode">LTL</span></span></div>
+                    <div class="qf-slide__route qf-reveal" style="--d:.12s"><span class="qf-zip">30301</span><span class="qf-arrow"></span><span class="qf-zip">37201</span></div>
+                    <div class="qf-slide__chips qf-reveal" style="--d:.22s"><span class="qf-chip">6 pallets</span><span class="qf-chip">Class 70</span><span class="qf-chip">4,800 lb</span></div>
+                    <div class="qf-slide__divider qf-reveal" style="--d:.30s"></div>
+                    <div class="qf-slide__ratewrap"><div class="qf-slide__ratelabel qf-reveal" style="--d:.30s">Estimated rate</div><div class="qf-slide__rate" data-total="685">$685</div><div class="qf-slide__calc"><span>Calculating rate&hellip;</span><span class="qf-calc-bar"></span></div></div>
+                    <div class="qf-slide__lines"><div class="qf-line qf-reveal" style="--d:1.30s"><span>Linehaul</span><span>$498</span></div><div class="qf-line qf-reveal" style="--d:1.40s"><span>Fuel surcharge</span><span>$92</span></div><div class="qf-line qf-reveal" style="--d:1.50s"><span>Liftgate</span><span>$95</span></div></div>
+                    <div class="qf-slide__total qf-reveal" style="--d:1.66s"><b>Total estimate</b><strong>$685</strong></div>
+                    <div class="qf-slide__cta qf-reveal" style="--d:1.74s" aria-hidden="true">Get instant quote <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14M13 6l6 6-6 6"/></svg></div>
+                    <div class="qf-slide__foot qf-reveal" style="--d:1.86s">Estimate &middot; final rate confirmed in writing</div>
+                  </div>
+
+                </div>
+                <div class="qf-phone__dots" role="tablist" aria-label="Trucking mode">
+                  <button type="button" class="qf-phone__dot is-on" data-mode="FTL"></button>
+                  <button type="button" class="qf-phone__dot" data-mode="Expedite"></button>
+                  <button type="button" class="qf-phone__dot" data-mode="Hotshot"></button>
+                  <button type="button" class="qf-phone__dot" data-mode="Drayage"></button>
+                  <button type="button" class="qf-phone__dot" data-mode="LTL"></button>
+                </div>
+              </div>
+            </div>
+          </div>
         </div>
       </div>
     </section>
