@@ -126,16 +126,34 @@
        just the pre-load fallback. */
     .qfd-frame { display: block; width: 100%; height: 560px; border: 0; background: transparent; }
 
-    /* Desktop preview of the phone (device toggle → Mobile): phone bezel with a
-       REAL fixed phone viewport (412×780 outer, ≈392×760 inner → ~2:1, a true
-       phone aspect, not the old over-elongated ~2.7:1 strip). overflow:hidden
-       (inherited) clips the iframe's native scrollbar so scrolling happens
-       cleanly INSIDE the frame. */
+    /* Mobile preview (device toggle → Mobile): matches the landing hero's phone
+       mockup — realistic 9:19.5 proportions, dynamic-island + status bar in a
+       top strip, deep rounded bezel. The live widget iframe fills the screen
+       below the strip; overflow:hidden (base .qfd-device) clips the corners +
+       the iframe's native scrollbar so scrolling stays cleanly inside. */
     .qfd-stage.is-mobile .qfd-device {
-      max-width: 412px; height: 780px; border-radius: 40px;
-      border: 10px solid #0f151d;
-      box-shadow: 0 40px 90px -46px rgba(0,0,0,.9), 0 0 0 1px rgba(148,163,184,.20), inset 0 1px 0 rgba(255,255,255,.05);
+      box-sizing: border-box;
+      max-width: 360px; height: auto;
+      aspect-ratio: 9 / 19.5;
+      position: relative;
+      padding-top: 28px;
+      border: 12px solid #0b0d12;
+      border-radius: 48px;
+      background: #0b0d12;
+      box-shadow: 0 40px 90px -44px rgba(0,0,0,.92), 0 0 0 1px rgba(148,163,184,.18), inset 0 1px 0 rgba(255,255,255,.06);
     }
+    /* Dynamic island + status bar — only in the mobile bezel's top strip. */
+    .qfd-island, .qfd-mstatus { display: none; }
+    .qfd-stage.is-mobile .qfd-island {
+      display: block; position: absolute; top: 3px; left: 50%; transform: translateX(-50%);
+      width: 84px; height: 22px; background: #05070b; border-radius: 12px; z-index: 6;
+    }
+    .qfd-stage.is-mobile .qfd-mstatus {
+      display: flex; position: absolute; top: 6px; left: 0; right: 0; padding: 0 22px;
+      height: 18px; align-items: center; justify-content: space-between;
+      font: 700 11px/1 Inter, system-ui, sans-serif; color: #fff; z-index: 5; pointer-events: none;
+    }
+    .qfd-stage.is-mobile .qfd-mstatus svg { display: block; }
     /* Fill the fixed bezel and push the iframe's own scrollbar into the 20px of
        overhang that the device's overflow:hidden clips → internal scroll, no
        visible scrollbar. Overrides the JS-set inline height (suppressed in JS). */
@@ -210,6 +228,8 @@
 
     <div class="qfd-stage" id="qfd-stage">
       <div class="qfd-device">
+        <span class="qfd-island" aria-hidden="true"></span>
+        <div class="qfd-mstatus" aria-hidden="true"><span>9:41</span><svg width="44" height="12" viewBox="0 0 46 12" fill="currentColor"><rect x="0" y="7" width="3" height="5" rx="1"/><rect x="5" y="5" width="3" height="7" rx="1"/><rect x="10" y="3" width="3" height="9" rx="1"/><rect x="15" y="1" width="3" height="11" rx="1"/><path d="M22 4.5c2.8-2.6 7.2-2.6 10 0l-1.4 1.5c-2-1.9-5.2-1.9-7.2 0z"/><circle cx="27" cy="9" r="1.4"/><rect x="34" y="2" width="9" height="8" rx="2" fill="none" stroke="currentColor" stroke-width="1.2"/><rect x="35.5" y="3.5" width="5" height="5" rx="1"/><rect x="44" y="4.5" width="1.5" height="3" rx="0.75"/></svg></div>
         <div class="qfd-chrome">
           <span class="qfd-dot"></span><span class="qfd-dot"></span><span class="qfd-dot"></span>
           <span class="qfd-url" id="qfd-url"><svg class="qfd-lock" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="4" y="11" width="16" height="10" rx="2"/><path d="M8 11V7a4 4 0 0 1 8 0v4"/></svg><span>yourcompany.quotefleet.net</span>
