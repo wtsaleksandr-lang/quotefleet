@@ -216,23 +216,31 @@
   line-height: 1.5;
 }
 
-/* ── 4. Total unfold ── */
+/* ── 4. Total unfold ──
+   The total box's background varies by carrier theme (cobalt with white text,
+   or a light surface with dark text). So EVERYTHING injected here inherits the
+   box's own text colour via currentColor — it always contrasts, never dark-on-
+   dark. Emphasis is by opacity/weight, never a hardcoded colour. */
 .qf-total-toggle {
   cursor: pointer;
   display: inline-flex;
   align-items: center;
   gap: 4px;
-  color: var(--qfi-primary) !important;
-  font-weight: 600;
+  color: inherit !important;
+  opacity: 0.92;
+  font-weight: 700;
+  text-decoration: underline;
+  text-underline-offset: 2px;
   user-select: none;
 }
-.qf-total-caret { transition: transform 0.18s ease; display: inline-block; }
+.qf-total-caret { transition: transform 0.18s ease; display: inline-block; text-decoration: none; }
 .qf-total-toggle.is-open .qf-total-caret { transform: rotate(90deg); }
 .qf-total-recap {
   grid-column: 1 / -1;
   margin-top: 10px;
   padding-top: 10px;
-  border-top: 1px dashed var(--qfi-line);
+  border-top: 1px dashed currentColor;
+  color: inherit;
   text-align: left;
 }
 .qf-total-recap-row {
@@ -241,17 +249,17 @@
   justify-content: space-between;
   padding: 3px 0;
   font-size: 13px;
-  color: var(--qfi-muted);
+  color: inherit;
 }
-.qf-total-recap-row strong { color: var(--qfi-ink); font-variant-numeric: tabular-nums; }
+.qf-total-recap-row span { opacity: 0.82; }
+.qf-total-recap-row strong { color: inherit; font-variant-numeric: tabular-nums; }
 .qf-total-recap-sum {
   margin-top: 4px;
   padding-top: 8px;
-  border-top: 1px solid var(--qfi-line);
+  border-top: 1px solid currentColor;
   font-weight: 700;
 }
-.qf-total-recap-sum span,
-.qf-total-recap-sum strong { color: var(--qfi-ink); }
+.qf-total-recap-sum span { opacity: 1; }
 
 @media (prefers-reduced-motion: reduce) {
   .qf-mapm-backdrop,

@@ -922,7 +922,25 @@
   }
 
   function autoResize() {
-    try { if (window.parent && window.parent !== window) window.parent.postMessage({ type: 'QF_WIDGET_HEIGHT', height: document.documentElement.scrollHeight }, '*'); } catch (_) { }
+    try {
+      if (!(window.parent && window.parent !== window)) return;
+      // Report the ACTUAL content height (the #qf-root container's bottom in
+      // document space), not documentElement.scrollHeight. The latter can latch
+      // tall — once the host iframe is sized up (e.g. options modal / chat), a
+      // body that fills the iframe keeps reporting the inflated viewport height
+      // and never shrinks back, leaving a big blank strip under the widget. The
+      // fixed options modal lives OUTSIDE #qf-root, so it's correctly excluded.
+      var root = document.getElementById('qf-root');
+      var height;
+      if (root && root.getBoundingClientRect) {
+        var rect = root.getBoundingClientRect();
+        var padB = parseFloat((window.getComputedStyle && getComputedStyle(document.body).paddingBottom) || '0') || 0;
+        height = Math.ceil(rect.top + (window.pageYOffset || 0) + rect.height + padB);
+      } else {
+        height = document.documentElement.scrollHeight;
+      }
+      window.parent.postMessage({ type: 'QF_WIDGET_HEIGHT', height: height }, '*');
+    } catch (_) { }
   }
 
   init();

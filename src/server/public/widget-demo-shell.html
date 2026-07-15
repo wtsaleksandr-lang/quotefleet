@@ -270,9 +270,18 @@
         if (state.device === 'mobile') return;
         if (h && isFinite(h)) frame.style.height = Math.max(MINH, Math.ceil(h)) + 'px';
       }
-      // Same-origin: size immediately on load so there's no fallback-height flash.
+      // Same-origin: size immediately on load so there's no fallback-height
+      // flash. Measure the widget's #qf-root content height (not the document
+      // scrollHeight, which can be inflated) to match what autoResize reports.
       frame.addEventListener('load', function () {
-        try { setH(frame.contentDocument.documentElement.scrollHeight); } catch (e) { /* ignore */ }
+        try {
+          var doc = frame.contentDocument;
+          var root = doc && doc.getElementById('qf-root');
+          var h = root
+            ? root.getBoundingClientRect().top + root.getBoundingClientRect().height
+            : doc.documentElement.scrollHeight;
+          setH(h);
+        } catch (e) { /* ignore */ }
       });
       // And keep in sync as the widget grows/shrinks (add-ons, results, chat).
       window.addEventListener('message', function (e) {
