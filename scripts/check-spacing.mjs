@@ -89,7 +89,7 @@ const INTERACTIVE_PATTERNS = [
 ];
 
 // Selectors whose line-height is display/decorative and therefore exempt.
-const LH_SKIP = /h[1-6]\b|hero|title|\.tag\b|badge|chip|stepper|\.total|price|currency|brand|font-mono|\bcode\b|spinner|\.arr\b|\.dots\b|eyebrow|\.qf-cs|\.qf-ltl|\.field-label|\.group\b|thead|\bth\b|\.qf-eta\b|\.qf-flags\s+label|\.qf-help\b|keyframes|\.logo\b|\.qf-mini-stepper|\.qf-trust/i;
+const LH_SKIP = /h[1-6]\b|hero|title|\.tag\b|badge|chip|stepper|\.total|price|currency|brand|font-mono|\bcode\b|spinner|\.arr\b|\.dots\b|eyebrow|\.qf-cs|\.qf-ltl|\.field-label|\.group\b|thead|\bth\b|\.qf-eta\b|\.qf-flags\s+label|\.qf-help\b|keyframes|\.logo\b|\.qf-mini-stepper|\.qf-trust|\.qf-ba-stat\b/i;
 
 const toRel = (p) => relative(ROOT, p).replace(/\\/g, "/");
 
