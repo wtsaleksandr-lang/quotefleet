@@ -163,8 +163,11 @@ body.qf-wft .hero-cta .demo-link .arr {
     margin: 0 !important;
     max-width: 100% !important;
     text-align: left !important;
-    font-size: clamp(34px, 9vw, 40px) !important;
-    line-height: 1.04 !important;
+    /* Sized to wrap to exactly 2 lines on mobile (was clamp(34px,9vw,40px),
+       which broke to 3). text-wrap:balance evens the two lines. */
+    font-size: clamp(25px, 6.9vw, 31px) !important;
+    line-height: 1.08 !important;
+    text-wrap: balance !important;
   }
 
   /* The widget sits directly under the headline, full-width and legible.
