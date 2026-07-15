@@ -36,9 +36,9 @@ describe('resolveWidgetTheme', () => {
     expect(t.accentOverride).toBeNull();
     // Byte-exact Midnight values — must match the CSS fallbacks in
     // public-calculator-no-gradients.css so existing tenants see zero change.
-    expect(t.tokens['--w-page-bg']).toBe('#161616');
-    expect(t.tokens['--w-surface']).toBe('#181D1F');
-    expect(t.tokens['--w-surface-2']).toBe('#1C1C1C');
+    expect(t.tokens['--w-page-bg']).toBe('#13181A');
+    expect(t.tokens['--w-surface']).toBe('#1E2528');
+    expect(t.tokens['--w-surface-2']).toBe('#262E31');
     expect(t.tokens['--w-input-bg']).toBe('#E6E3E0');
     expect(t.tokens['--w-input-text']).toBe('#1E1E1E');
     expect(t.tokens['--w-accent']).toBe('#0D3CFC');
@@ -55,7 +55,7 @@ describe('resolveWidgetTheme', () => {
   it('resolves the Cream light theme with dark text', () => {
     const t = resolveWidgetTheme({ themePreset: 'cream' });
     expect(t.mode).toBe('light');
-    expect(t.tokens['--w-text']).toBe('#241F16');
+    expect(t.tokens['--w-text']).toBe('#232A2C');
     expect(t.tokens['--w-accent']).toBe('#0D3CFC');
     // Light theme gives the "accent chip" a visible hairline border.
     expect(t.tokens['--w-accent-surface-border']).not.toBe(t.tokens['--w-accent-surface']);

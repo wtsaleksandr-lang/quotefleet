@@ -11,16 +11,16 @@
 body.qf-app-calculator {
   --w-primary: var(--w-accent, #0D3CFC);
   --w-primary-hover: var(--w-accent-hover, #0B32D4);
-  --qf-app-bg: var(--w-page-bg, #161616);
-  --qf-app-shell: var(--w-surface, #181D1F);
-  --qf-app-panel: var(--w-surface-2, #1C1C1C);
+  --qf-app-bg: var(--w-page-bg, #13181A);
+  --qf-app-shell: var(--w-surface, #1E2528);
+  --qf-app-panel: var(--w-surface-2, #262E31);
   --qf-app-card: var(--w-input-bg, #E6E3E0);
   --qf-app-card-soft: var(--w-error-bg, #F3EDDF);
   --qf-app-border: var(--w-border, rgba(255,255,255,.12));
   --qf-app-accent-on-dark: var(--w-accent-on-surface, #6E8BFF);
   --qf-app-text: var(--w-input-text, #1E1E1E);
   --qf-app-muted: var(--w-muted, #4F6670);
-  background: var(--w-page-bg, #161616) !important;
+  background: var(--w-page-bg, #13181A) !important;
   background-image: none !important;
 }
 
@@ -28,7 +28,7 @@ body.qf-app-calculator {
    step off the page, hairline border, consistent 8px radius, restrained shadow.
    No gradient washes. */
 body.qf-app-calculator .qf-widget {
-  background: var(--w-surface, #181D1F) !important;
+  background: var(--w-surface, #1E2528) !important;
   background-image: none !important;
   border: 1px solid var(--w-border, rgba(255,255,255,.12)) !important;
   border-radius: 8px !important;
@@ -243,7 +243,7 @@ body.qf-app-calculator .qf-demo-logo-slot {
    Demo contact card (phone / email / address / USDOT·MC): a quiet brand panel
    so the interactive cream inputs stay the only bright surface. */
 body.qf-app-calculator .qf-demo-brand-card {
-  background: var(--w-surface-2, #1C1C1C) !important;
+  background: var(--w-surface-2, #262E31) !important;
   background-image: none !important;
   border: 1px solid var(--w-border, rgba(255,255,255,.12)) !important;
   color: var(--w-contact-text, #C9D4DA) !important;
@@ -264,7 +264,7 @@ body.qf-app-calculator .qf-demo-brand-card span::before {
 body.qf-app-calculator .qf-booking-card,
 body.qf-app-calculator .qf-oog-panel,
 body.qf-app-calculator .qf-conditional-panel {
-  background: var(--w-surface-2, #1C1C1C) !important;
+  background: var(--w-surface-2, #262E31) !important;
   background-image: none !important;
   border: 1px solid var(--w-border, rgba(255,255,255,.12)) !important;
   color: var(--w-surface-2-text, #E6E3E0) !important;
