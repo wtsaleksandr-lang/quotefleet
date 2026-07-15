@@ -656,6 +656,22 @@ src/server/public/public-calculator-ux.css:572	spacing	margin-top: 6px
 src/server/public/public-calculator-ux.css:64	spacing	margin-top: 13px
 src/server/public/public-calculator-ux.css:74	spacing	gap: 10px
 src/server/public/public-calculator-ux.css:85	spacing	padding: 5px 8px
+src/server/public/quote-interactive.css:125	line-height	line-height: 1
+src/server/public/quote-interactive.css:151	spacing	bottom: 64px
+src/server/public/quote-interactive.css:154	spacing	gap: 6px
+src/server/public/quote-interactive.css:164	line-height	line-height: 1
+src/server/public/quote-interactive.css:194	spacing	margin-left: 7px
+src/server/public/quote-interactive.css:209	spacing	margin: 6px 0 2px
+src/server/public/quote-interactive.css:21	spacing	margin-left: 6px
+src/server/public/quote-interactive.css:210	spacing	padding: 8px 10px
+src/server/public/quote-interactive.css:232	spacing	margin-top: 10px
+src/server/public/quote-interactive.css:233	spacing	padding-top: 10px
+src/server/public/quote-interactive.css:241	spacing	padding: 3px 0
+src/server/public/quote-interactive.css:37	spacing	padding: 10px 12px
+src/server/public/quote-interactive.css:51	spacing	right: 10px
+src/server/public/quote-interactive.css:52	spacing	bottom: 10px
+src/server/public/quote-interactive.css:55	spacing	gap: 6px
+src/server/public/quote-interactive.css:56	spacing	padding: 6px 10px
 src/server/public/quote-polish.css:1	line-height	line-height: 1
 src/server/public/quote-polish.css:1	spacing	gap: 18px
 src/server/public/quote-polish.css:1	spacing	gap: 22px

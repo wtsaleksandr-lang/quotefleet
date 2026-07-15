@@ -125,6 +125,11 @@
     renderAccessorials(data);
     renderAiSummary(data);
     wireActions(data);
+
+    // Progressive interactive enhancements (quote-interactive.js) — transit
+    // conditions note, tap-to-explore map modal, line-item explanations, and
+    // the total unfold. Guarded so the quote still renders if it's absent.
+    if (window.qfQuoteEnhance) window.qfQuoteEnhance(data);
   }
 
   function renderDetails(data) {

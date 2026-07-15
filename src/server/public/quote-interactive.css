@@ -1,0 +1,261 @@
+/* Hosted-quote interactive enhancements (see quote-interactive.js).
+   Screen-only chrome — the print stylesheet + .no-print keep the PDF clean.
+   Colours route through the quote's brand tokens (--qdoc-primary/-accent) with
+   cobalt fallbacks so they match each carrier's theme. */
+
+:root {
+  --qfi-primary: var(--qdoc-primary, #0d3cfc);
+  --qfi-white: #fff;
+  --qfi-ink: #0b1220;
+  --qfi-muted: #5a6b84;
+  --qfi-line: #e7edf5;
+  --qfi-soft: rgba(13, 60, 252, 0.08);
+}
+
+/* ── 1. Transit info + note ── */
+.qf-info-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 16px;
+  height: 16px;
+  margin-left: 6px;
+  padding: 0;
+  border: 0;
+  border-radius: 100px;
+  background: var(--qfi-soft);
+  color: var(--qfi-primary);
+  font: 700 10px/1 Georgia, 'Times New Roman', serif;
+  font-style: italic;
+  cursor: pointer;
+  vertical-align: middle;
+  transition: background 0.15s ease;
+}
+.qf-info-btn:hover,
+.qf-info-btn.is-open { background: var(--qfi-primary); color: var(--qfi-white); }
+.qf-transit-note {
+  margin: 8px 0 0;
+  padding: 10px 12px;
+  border: 1px solid var(--qfi-line);
+  border-left: 3px solid var(--qfi-primary);
+  border-radius: 8px;
+  background: var(--qfi-soft);
+  color: var(--qfi-muted);
+  font-size: 12.5px;
+  line-height: 1.5;
+}
+
+/* ── 2. Map tap affordance + modal ── */
+.qf-map-tappable { cursor: pointer; position: relative; }
+.qf-map-cue {
+  position: absolute;
+  right: 10px;
+  bottom: 10px;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 10px;
+  border-radius: 100px;
+  background: rgba(11, 18, 32, 0.72);
+  color: var(--qfi-white);
+  font-size: 11.5px;
+  font-weight: 600;
+  pointer-events: none;
+  opacity: 0.95;
+  transition: opacity 0.15s ease;
+}
+.qf-map-cue-ic { font-size: 13px; }
+.qf-map-tappable:hover .qf-map-cue { opacity: 1; }
+
+.qf-mapm-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 9999;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 16px;
+  background: rgba(6, 10, 18, 0.66);
+  opacity: 0;
+  transition: opacity 0.18s ease;
+  -webkit-backdrop-filter: blur(2px);
+  backdrop-filter: blur(2px);
+}
+.qf-mapm-backdrop.is-open { opacity: 1; }
+.qf-mapm-panel {
+  display: flex;
+  flex-direction: column;
+  width: min(920px, 100%);
+  height: min(640px, 92vh);
+  background: var(--qfi-white);
+  border-radius: 16px;
+  overflow: hidden;
+  box-shadow: 0 40px 90px -30px rgba(0, 0, 0, 0.6);
+  transform: translateY(8px) scale(0.99);
+  transition: transform 0.2s ease;
+}
+.qf-mapm-backdrop.is-open .qf-mapm-panel { transform: none; }
+.qf-mapm-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 12px 16px;
+  border-bottom: 1px solid var(--qfi-line);
+}
+.qf-mapm-lane {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+  font-size: 13.5px;
+  font-weight: 700;
+  color: var(--qfi-ink);
+}
+.qf-mapm-lane span { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.qf-mapm-arrow { color: var(--qfi-primary); flex: none; }
+.qf-mapm-close {
+  flex: none;
+  width: 32px;
+  height: 32px;
+  border: 0;
+  border-radius: 8px;
+  background: #eef2f8;
+  color: var(--qfi-ink);
+  font-size: 20px;
+  line-height: 1;
+  cursor: pointer;
+}
+.qf-mapm-close:hover { background: #e2e8f2; }
+.qf-mapm-stage {
+  position: relative;
+  flex: 1 1 auto;
+  overflow: hidden;
+  background: #eef2f7;
+  touch-action: none;
+  cursor: grab;
+}
+.qf-mapm-stage:active { cursor: grabbing; }
+.qf-mapm-img {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  transform-origin: center center;
+  transition: transform 0.05s linear;
+  user-select: none;
+  -webkit-user-drag: none;
+}
+.qf-mapm-controls {
+  position: absolute;
+  right: 16px;
+  bottom: 64px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.qf-mapm-zbtn {
+  width: 36px;
+  height: 36px;
+  border: 1px solid var(--qfi-line);
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.96);
+  color: var(--qfi-ink);
+  font-size: 20px;
+  line-height: 1;
+  cursor: pointer;
+  box-shadow: 0 2px 6px rgba(11, 18, 32, 0.15);
+}
+.qf-mapm-zbtn:hover { background: var(--qfi-white); border-color: var(--qfi-primary); }
+.qf-mapm-foot {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 12px 16px;
+  border-top: 1px solid var(--qfi-line);
+}
+.qf-mapm-hint { font-size: 12px; color: var(--qfi-muted); }
+.qf-mapm-open {
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--qfi-primary);
+  text-decoration: none;
+  white-space: nowrap;
+}
+.qf-mapm-open:hover { text-decoration: underline; }
+
+/* ── 3. Line-item explanations ── */
+.qf-exp-toggle {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 15px;
+  height: 15px;
+  margin-left: 7px;
+  padding: 0;
+  border: 1px solid var(--qfi-line);
+  border-radius: 100px;
+  background: var(--qfi-white);
+  color: var(--qfi-muted);
+  font: 700 9px/1 'Inter', system-ui, sans-serif;
+  cursor: pointer;
+  vertical-align: middle;
+  transition: all 0.15s ease;
+}
+.qf-exp-toggle:hover,
+.qf-exp-toggle.is-open { background: var(--qfi-primary); border-color: var(--qfi-primary); color: var(--qfi-white); }
+.qf-exp-body {
+  grid-column: 1 / -1;
+  margin: 6px 0 2px;
+  padding: 8px 10px;
+  border-radius: 8px;
+  background: #f5f8fc;
+  color: var(--qfi-muted);
+  font-size: 12px;
+  line-height: 1.5;
+}
+
+/* ── 4. Total unfold ── */
+.qf-total-toggle {
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  color: var(--qfi-primary) !important;
+  font-weight: 600;
+  user-select: none;
+}
+.qf-total-caret { transition: transform 0.18s ease; display: inline-block; }
+.qf-total-toggle.is-open .qf-total-caret { transform: rotate(90deg); }
+.qf-total-recap {
+  grid-column: 1 / -1;
+  margin-top: 10px;
+  padding-top: 10px;
+  border-top: 1px dashed var(--qfi-line);
+  text-align: left;
+}
+.qf-total-recap-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 3px 0;
+  font-size: 13px;
+  color: var(--qfi-muted);
+}
+.qf-total-recap-row strong { color: var(--qfi-ink); font-variant-numeric: tabular-nums; }
+.qf-total-recap-sum {
+  margin-top: 4px;
+  padding-top: 8px;
+  border-top: 1px solid var(--qfi-line);
+  font-weight: 700;
+}
+.qf-total-recap-sum span,
+.qf-total-recap-sum strong { color: var(--qfi-ink); }
+
+@media (prefers-reduced-motion: reduce) {
+  .qf-mapm-backdrop,
+  .qf-mapm-panel,
+  .qf-mapm-img,
+  .qf-total-caret { transition: none; }
+}
