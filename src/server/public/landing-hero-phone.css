@@ -246,6 +246,29 @@ html body.qf-wft .visual-flow.qf-hero-media > .qf-phone { display: none; }
   border-radius: 100px;
   background: var(--pz-accent);
 }
+/* Transit-time pill (top-right) — hints the hosted quote's transit estimate. */
+.qf-map-eta {
+  position: absolute;
+  right: 6px;
+  top: 6px;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 2px 7px;
+  border-radius: 100px;
+  background: rgba(11, 18, 32, 0.72);
+  color: var(--pz-card);
+  font: 700 9.5px/1.25 'Inter', system-ui, sans-serif;
+}
+.qf-map-eta::before {
+  content: '';
+  width: 8px;
+  height: 8px;
+  border: 1.4px solid currentColor;
+  border-radius: 100px;
+  box-sizing: border-box;
+  position: relative;
+}
 
 /* ── Spec chips ── */
 .qf-slide__chips {

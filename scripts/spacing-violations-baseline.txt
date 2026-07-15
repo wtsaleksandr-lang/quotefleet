@@ -371,15 +371,18 @@ src/server/public/landing-hero-phone.css:202	spacing	right: -1px
 src/server/public/landing-hero-phone.css:228	spacing	left: 6px
 src/server/public/landing-hero-phone.css:229	spacing	bottom: 6px
 src/server/public/landing-hero-phone.css:233	spacing	padding: 2px 7px
-src/server/public/landing-hero-phone.css:253	spacing	gap: 6px
-src/server/public/landing-hero-phone.css:256	spacing	padding: 4px 9px
-src/server/public/landing-hero-phone.css:268	spacing	margin: 2px 0
-src/server/public/landing-hero-phone.css:294	spacing	inset: 14px 0 0 0
-src/server/public/landing-hero-phone.css:316	spacing	gap: 6px
-src/server/public/landing-hero-phone.css:336	spacing	padding: 10px 12px
-src/server/public/landing-hero-phone.css:359	spacing	gap: 6px
-src/server/public/landing-hero-phone.css:374	spacing	padding-top: 2px
-src/server/public/landing-hero-phone.css:385	spacing	gap: 5px
+src/server/public/landing-hero-phone.css:251	spacing	right: 6px
+src/server/public/landing-hero-phone.css:252	spacing	top: 6px
+src/server/public/landing-hero-phone.css:256	spacing	padding: 2px 7px
+src/server/public/landing-hero-phone.css:276	spacing	gap: 6px
+src/server/public/landing-hero-phone.css:279	spacing	padding: 4px 9px
+src/server/public/landing-hero-phone.css:291	spacing	margin: 2px 0
+src/server/public/landing-hero-phone.css:317	spacing	inset: 14px 0 0 0
+src/server/public/landing-hero-phone.css:339	spacing	gap: 6px
+src/server/public/landing-hero-phone.css:359	spacing	padding: 10px 12px
+src/server/public/landing-hero-phone.css:382	spacing	gap: 6px
+src/server/public/landing-hero-phone.css:397	spacing	padding-top: 2px
+src/server/public/landing-hero-phone.css:408	spacing	gap: 5px
 src/server/public/landing-hero-phone.css:53	spacing	padding: 10px
 src/server/public/landing-hero-phone.css:63	spacing	top: 18px
 src/server/public/landing-hero-phone.css:94	spacing	padding: 0 22px
