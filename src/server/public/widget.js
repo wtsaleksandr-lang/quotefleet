@@ -325,6 +325,10 @@
       var oc = $('qf-ocean-carrier'); if (oc) oc.value = '';
       var pp = $('qf-pickup-port-input'); if (pp) pp.value = '';
       var pt = $('qf-pickup-terminal'); if (pt) pt.value = '';
+      // Clear the resolved addresses, the address line, and the map card.
+      state.pickupResolved = null; state.deliveryResolved = null;
+      var mapCard = $('qf-map-card'); if (mapCard) mapCard.hidden = true;
+      renderRouteAddresses();
       showStep('quote');
     });
   }
@@ -795,14 +799,40 @@
   // As soon as pickup + delivery are both entered/selected, fetch a preview
   // (distance, transit, and a static route map) and reveal the map card. Reuses
   // the same location objects the quote compute builds.
+  function locFromResolved(resolved, text) {
+    if (!resolved) return parseLocation(text || '');
+    var loc = mergeLocation(resolved, text);
+    // A precise street address was picked → geocode by the full address so the
+    // map pin lands on the exact spot (mergeLocation only keeps the ZIP centroid).
+    var lbl = resolved.label || '';
+    var precise = /^\s*\d/.test(lbl) || resolved.kind === 'street_address' || resolved.kind === 'premise' || resolved.kind === 'subpremise';
+    if (precise && lbl) { loc.address = lbl; loc.zip = undefined; }
+    return loc;
+  }
   function currentPickupLoc() {
     if (state.service === 'drayage' && state.pickupPortCode) return { portCode: state.pickupPortCode, terminalCode: state.pickupTerminalCode || undefined };
-    var t = ($('qf-pickup-zip') && $('qf-pickup-zip').value) || '';
-    return state.pickupResolved ? mergeLocation(state.pickupResolved, t) : parseLocation(t);
+    return locFromResolved(state.pickupResolved, ($('qf-pickup-zip') && $('qf-pickup-zip').value) || '');
   }
   function currentDeliveryLoc() {
-    var t = ($('qf-delivery-zip') && $('qf-delivery-zip').value) || '';
-    return state.deliveryResolved ? mergeLocation(state.deliveryResolved, t) : parseLocation(t);
+    return locFromResolved(state.deliveryResolved, ($('qf-delivery-zip') && $('qf-delivery-zip').value) || '');
+  }
+  // Subtle "selected addresses" line shown above the map — resolved labels, else
+  // the typed text. Green dot = pickup (A), red dot = delivery (B).
+  function renderRouteAddresses() {
+    var el = $('qf-route-addr'); if (!el) return;
+    function lbl(resolved, id) {
+      if (resolved && resolved.label) return resolved.label;
+      return (($(id) && $(id).value) || '').trim();
+    }
+    var p = lbl(state.pickupResolved, 'qf-pickup-zip');
+    var d = lbl(state.deliveryResolved, 'qf-delivery-zip');
+    if (!p && !d) { el.hidden = true; el.innerHTML = ''; autoResize(); return; }
+    function row(cls, addr) {
+      return '<span class="qf-ra-pt"><span class="qf-ra-dot ' + cls + '" aria-hidden="true"></span><span class="qf-ra-txt">' + escapeHtml(addr) + '</span></span>';
+    }
+    el.innerHTML = (p ? row('qf-ra-a', p) : '') + (d ? row('qf-ra-b', d) : '');
+    el.hidden = false;
+    autoResize();
   }
   function isDarkMapTheme() {
     try {
@@ -891,9 +921,11 @@
       function close() { box.classList.remove('open'); box.innerHTML = ''; current = []; activeIndex = -1; }
       function labelFor(item) { return [item.city, item.state, item.zip].filter(Boolean).join(', ') || item.label || ''; }
       function choose(item) {
-        input.value = labelFor(item);
+        // Show the full selected address in the field (scrolls if long).
+        input.value = item.label || labelFor(item);
         if (target === 'pickup') state.pickupResolved = item; else state.deliveryResolved = item;
         close();
+        renderRouteAddresses();
         scheduleRouteMap();
       }
       function highlight(next) {
@@ -908,7 +940,10 @@
         if (!current.length) { close(); return; }
         current.forEach(function (item, i) {
           var div = document.createElement('div'); div.className = 'qf-suggestion'; div.setAttribute('role', 'option');
-          div.innerHTML = escapeHtml(labelFor(item)) + '<span class="meta">' + escapeHtml(item.country || 'US') + '</span>';
+          // Full-address suggestion: bold primary line + muted secondary line.
+          var main = item.mainText || labelFor(item);
+          var sec = item.secondaryText || (item.mainText ? '' : (item.country || 'US'));
+          div.innerHTML = '<span class="qf-sugg-main">' + escapeHtml(main) + '</span>' + (sec ? '<span class="meta">' + escapeHtml(sec) + '</span>' : '');
           div.addEventListener('mousedown', function (ev) { ev.preventDefault(); choose(item); });
           div.addEventListener('mousemove', function () { highlight(i); });
           box.appendChild(div);
@@ -920,6 +955,7 @@
       input.setAttribute('aria-expanded', 'false');
       input.addEventListener('input', function () {
         if (target === 'pickup') state.pickupResolved = null; else state.deliveryResolved = null;
+        renderRouteAddresses();
         clearTimeout(timer);
         var q = input.value.trim();
         if (q.length < 2) { close(); return; }

@@ -317,3 +317,16 @@ body[data-qf-cta-hover="fill"] .qf-cta:not(.qf-secondary):hover { background: va
 .qf-map-modal-img { display: block; width: 100%; height: auto; transform-origin: center center; will-change: transform; user-select: none; }
 .qf-map-zoom { position: absolute; right: var(--space-2); bottom: var(--space-2); display: flex; gap: var(--space-1); }
 .qf-map-zoom button { width: 44px; height: 44px; border-radius: 10px; border: 1px solid var(--w-border); background: var(--w-bg); color: var(--w-fg); font-size: 20px; cursor: pointer; display: flex; align-items: center; justify-content: center; }
+
+/* Full-address autosuggest: bold primary line + muted secondary line. */
+.qf-sugg-main { display: block; font-size: 13.5px; font-weight: 650; color: var(--w-fg); }
+/* Subtle "selected addresses" line above the map (Alex). Small, muted; the
+   dots match the A/B map markers (home green / coral-red). */
+.qf-route-addr { display: flex; flex-direction: column; gap: var(--space-0-5); margin-top: var(--space-2); }
+.qf-route-addr[hidden] { display: none; }
+.qf-route-addr:not([hidden]) + .qf-map-card { margin-top: var(--space-1); }
+.qf-ra-pt { display: flex; align-items: center; gap: var(--space-1); min-width: 0; }
+.qf-ra-dot { width: 8px; height: 8px; border-radius: 999px; flex: 0 0 auto; }
+.qf-ra-a { background: #36c98b; }
+.qf-ra-b { background: #f97373; }
+.qf-ra-txt { font-size: 11.5px; color: var(--w-muted); line-height: 1.45; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; min-width: 0; }

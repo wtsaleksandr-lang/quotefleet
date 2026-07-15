@@ -147,6 +147,10 @@ export function registerAutocompleteRoutes(app: Express) {
 
 interface AutocompleteSuggestion {
   label: string;
+  /** Google structured formatting — bold primary line + muted secondary line
+   *  in the dropdown (e.g. "1450 Pier F Ave" / "Long Beach, CA 90802, USA"). */
+  mainText?: string | null;
+  secondaryText?: string | null;
   city: string | null;
   state: string | null;
   country: string | null;
@@ -195,6 +199,8 @@ async function googleAutocomplete(q: string, apiKey: string): Promise<{ suggesti
     const zip = zipMatch ? zipMatch[1].replace(/\s+/g, '') : null;
     return {
       label: p.description,
+      mainText: p.structured_formatting?.main_text ?? null,
+      secondaryText: p.structured_formatting?.secondary_text ?? null,
       city,
       state,
       country,
