@@ -100,13 +100,15 @@
   }
 
   /* Format a USD base amount into the active currency string.
-   * USD → "$14.80"; non-USD → "≈ CA$20.28" (2 decimals, ≈ prefix). */
+   * USD is exact ("$14.80", 2 decimals). Non-USD is an approximate converted
+   * figure, so round it to a whole number for a cleaner read ("≈ CA$20", no
+   * cents). The "≈" prefix already signals it is not the exact charge. */
   function format(usdAmount, code) {
     var rate = FX[code] || 1;
     var meta = META[code] || META[BASE];
     var value = (parseFloat(usdAmount) * rate);
     if (!isFinite(value)) value = parseFloat(usdAmount) || 0;
-    var amount = value.toFixed(2);
+    var amount = (code === BASE) ? value.toFixed(2) : String(Math.round(value));
     var prefix = (code === BASE) ? "" : "≈ "; /* ≈ */
     return prefix + meta.symbol + amount;
   }

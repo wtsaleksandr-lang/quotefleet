@@ -134,11 +134,14 @@ body.qf-wft .hero-cta .demo-link .arr {
     text-align: left !important;
   }
 
-  body.qf-wft .hero-grid {
+  /* `html body` specificity bump so this actually wins the mobile hero gap over
+     landing-wefixtrades-cleanup.css's equal-specificity `gap: clamp(42px…)`
+     (JS-injected after this static sheet). 24px = a clean, intentional rhythm. */
+  html body.qf-wft .hero-grid {
     display: flex !important;
     flex-direction: column !important;
     align-items: stretch !important;
-    gap: 16px !important;
+    gap: 24px !important;
     width: min(92%, calc(100vw - 32px)) !important;
   }
 
@@ -172,9 +175,9 @@ body.qf-wft .hero-cta .demo-link .arr {
   html body.qf-wft .visual-flow.qf-hero-media {
     order: 3;
     display: block !important;
-    max-width: 100% !important;
+    max-width: 320px !important;
     width: 100% !important;
-    margin: 8px 0 !important;
+    margin: 4px auto !important;
   }
 
   /* Mobile keeps the compact widget; the desktop composite is hidden here. */
@@ -183,33 +186,50 @@ body.qf-wft .hero-cta .demo-link .arr {
     display: block !important;
     width: 100% !important;
     height: auto !important;
+    /* The phone mockup already carries a baked-in grounding shadow, so drop the
+       base 60px blur drop-shadow here (it added visual dead space + doubled up). */
+    filter: none !important;
   }
 
-  body.qf-wft .hero .lead {
+  /* `html body` bump to zero out cleanup.css's `margin-top: 20px` on the lead,
+     which otherwise stacks on top of the grid gap and bloats the space under
+     the hero phone. The 24px grid gap alone is the intended breathing room. */
+  html body.qf-wft .hero .lead {
     order: 4;
     margin: 0 !important;
     max-width: 100% !important;
     text-align: left !important;
   }
 
-  /* Stack the button and the demo-link vertically: full-width button, then the
-     link directly beneath it, left-aligned to the button's left edge with a tidy
-     gap — no 68px drop, no center indent. */
+  /* CTA reading order on mobile: button → trust microcopy → "See how it works".
+     Promote the button + demo-link out of .hero-cta with display:contents so all
+     three read as direct siblings in the hero flex flow, letting the trust line
+     (order 6-7) sit between the button (5) and the demo-link (8). */
   body.qf-wft .hero-cta {
+    display: contents !important;
+  }
+
+  body.qf-wft .hero-cta .btn-primary {
     order: 5;
+    width: 100% !important;
     margin-top: 8px !important;
-    flex-direction: column !important;
-    align-items: stretch !important;
-    gap: 12px !important;
   }
 
   body.qf-wft .hero-cta .demo-link {
+    order: 8;
     align-self: flex-start !important;
     justify-content: flex-start !important;
     padding: 4px 0 !important;
+    margin-top: 4px !important;
   }
 
-  body.qf-wft .hero .micro-copy,
+  /* Trust/reassurance lines land after the button and before the demo-link.
+     .hero-trial-note is also a .micro-copy, so its rule follows to win the tie. */
+  body.qf-wft .hero .micro-copy {
+    order: 7;
+    text-align: left !important;
+  }
+
   body.qf-wft .hero .hero-trial-note {
     order: 6;
     text-align: left !important;
