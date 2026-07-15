@@ -223,14 +223,14 @@ body.qf-app-calculator .qf-success {
 }
 
 /* --- Header polish --------------------------------------------------------
-   "INSTANT FREIGHT ESTIMATE" pill: a subtle on-brand chip in the
-   accent-on-surface colour so it reads against the shell. */
+   "INSTANT FREIGHT ESTIMATE" pill — Alex: our branded blue. Solid cobalt pill
+   so it reads clearly on both the dark and light shells. */
 body.qf-app-calculator .qf-header .brand-name::after {
-  background: var(--w-accent-pill-bg, rgba(110,139,255,.10)) !important;
-  border: 1px solid var(--w-accent-pill-border, rgba(110,139,255,.34)) !important;
-  /* Pill label uses the WCAG-computed on-surface foreground so it always
-     reads against the shell — even under a light custom accent. */
-  color: var(--w-pill-text, var(--w-accent-on-surface, #6E8BFF)) !important;
+  background: #0D3CFC !important;
+  border: 1px solid #0D3CFC !important;
+  /* White label reads on the cobalt pill in both the dark and light shells
+     (was the WCAG on-surface accent; Alex wants the full branded blue). */
+  color: rgb(255,255,255) !important;
 }
 
 /* Logo slot: hairline border to match the shell. */
