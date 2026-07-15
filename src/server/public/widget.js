@@ -332,10 +332,35 @@
     });
   }
 
+  // Two-letter monogram from a business name: first letters of the first two
+  // words ("Oakland Trucks" -> "OT"), or the first two letters of a single word.
+  function brandInitials(name) {
+    var parts = String(name || '').trim().split(/[\s.,-]+/).filter(Boolean);
+    if (!parts.length) return 'Q';
+    if (parts.length === 1) return parts[0].slice(0, 2).toUpperCase();
+    return (parts[0].charAt(0) + parts[1].charAt(0)).toUpperCase();
+  }
+  // Auto-generated initials logo (rounded brand-blue tile) as an inline SVG data
+  // URI — used when the carrier hasn't uploaded their own logo.
+  function initialsLogo(name, bg) {
+    var ini = brandInitials(name);
+    var fill = /^#[0-9a-fA-F]{3,8}$/.test(bg || '') ? bg : '#0D3CFC';
+    var svg = "<svg xmlns='http://www.w3.org/2000/svg' width='96' height='96' viewBox='0 0 96 96'>" +
+      "<rect width='96' height='96' rx='22' fill='" + fill + "'/>" +
+      "<text x='48' y='48' dy='.35em' text-anchor='middle' font-family='Satoshi,Inter,system-ui,sans-serif' font-size='40' font-weight='800' fill='#ffffff'>" + ini + "</text></svg>";
+    return 'data:image/svg+xml;utf8,' + encodeURIComponent(svg);
+  }
+
   function renderHeader(cfg) {
     var h = $('qf-header'); h.innerHTML = '';
-    if (cfg.brand && cfg.brand.logoUrl) h.appendChild(el('img', { src: cfg.brand.logoUrl, alt: cfg.tenant.name }));
     var name = (cfg.brand && cfg.brand.displayName) || cfg.tenant.name;
+    if (cfg.brand && cfg.brand.logoUrl) {
+      h.appendChild(el('img', { src: cfg.brand.logoUrl, alt: name }));
+    } else {
+      // No custom logo → auto-generate a 2-letter initials tile from the name.
+      var bg = (cfg.brand && (cfg.brand.primaryColor || cfg.brand.accentColor)) || '#0D3CFC';
+      h.appendChild(el('img', { src: initialsLogo(name, bg), alt: name, class: 'qf-brand-initials' }));
+    }
     h.appendChild(el('div', { class: 'brand-name', text: name }));
     var tagline = (cfg.brand && cfg.brand.tagline) || 'Get an instant freight quote';
     $('qf-tagline').textContent = tagline;
