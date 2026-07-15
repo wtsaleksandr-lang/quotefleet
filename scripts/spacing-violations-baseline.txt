@@ -561,18 +561,18 @@ src/server/public/premium-saas-polish.css:41	spacing	padding: 12px 13px
 src/server/public/premium-saas-polish.css:49	spacing	margin-bottom: 2px
 src/server/public/premium-saas-polish.css:63	spacing	padding: 18px
 src/server/public/premium-saas-polish.css:75	spacing	padding: 20px
-src/server/public/public-calculator-app-style.css:153	spacing	padding: 14px 15px
-src/server/public/public-calculator-app-style.css:165	line-height	line-height: 1
-src/server/public/public-calculator-app-style.css:178	spacing	padding: 11px 12px
+src/server/public/public-calculator-app-style.css:161	spacing	padding: 14px 15px
+src/server/public/public-calculator-app-style.css:173	line-height	line-height: 1
 src/server/public/public-calculator-app-style.css:18	spacing	padding: 14px
-src/server/public/public-calculator-app-style.css:261	spacing	padding: 10px 8px
+src/server/public/public-calculator-app-style.css:186	spacing	padding: 11px 12px
+src/server/public/public-calculator-app-style.css:269	spacing	padding: 10px 8px
 src/server/public/public-calculator-app-style.css:27	spacing	padding: 18px
-src/server/public/public-calculator-app-style.css:272	spacing	padding: 10px 3px
-src/server/public/public-calculator-app-style.css:275	spacing	gap: 11px
-src/server/public/public-calculator-app-style.css:33	spacing	gap: 10px
-src/server/public/public-calculator-app-style.css:35	spacing	margin: 0 0 14px
-src/server/public/public-calculator-app-style.css:36	spacing	padding: 0 2px
-src/server/public/public-calculator-app-style.css:83	spacing	padding: 10px 5px
+src/server/public/public-calculator-app-style.css:280	spacing	padding: 10px 3px
+src/server/public/public-calculator-app-style.css:283	spacing	gap: 11px
+src/server/public/public-calculator-app-style.css:41	spacing	gap: 10px
+src/server/public/public-calculator-app-style.css:43	spacing	margin: 0 0 14px
+src/server/public/public-calculator-app-style.css:44	spacing	padding: 0 2px
+src/server/public/public-calculator-app-style.css:91	spacing	padding: 10px 5px
 src/server/public/public-calculator-brand-preview.css:126	spacing	margin: 0 0 10px
 src/server/public/public-calculator-brand-preview.css:144	spacing	margin-right: 7px
 src/server/public/public-calculator-brand-preview.css:151	spacing	margin: 0 0 14px

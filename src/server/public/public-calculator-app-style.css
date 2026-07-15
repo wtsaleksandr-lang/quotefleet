@@ -29,6 +29,14 @@ body.qf-app-calculator .qf-widget {
   color: var(--qf-app-text);
 }
 
+/* Demo shell only: the widget-demo-shell tags this iframe's body with
+   .qfd-embed-fill so the calculator fills its device frame edge-to-edge
+   (no dead side-gap). Scoped by the extra class → real customer embeds keep
+   the centered 620px cap above. */
+body.qf-app-calculator.qfd-embed-fill .qf-widget {
+  max-width: none;
+}
+
 body.qf-app-calculator .qf-header {
   align-items: center;
   gap: 10px;

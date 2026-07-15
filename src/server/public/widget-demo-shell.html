@@ -276,6 +276,9 @@
       frame.addEventListener('load', function () {
         try {
           var doc = frame.contentDocument;
+          // Let the calculator fill the device frame edge-to-edge (removes the
+          // ~34px dead side-gap from its default centered 620px cap). Demo-only.
+          if (doc && doc.body) doc.body.classList.add('qfd-embed-fill');
           var root = doc && doc.getElementById('qf-root');
           var h = root
             ? root.getBoundingClientRect().top + root.getBoundingClientRect().height

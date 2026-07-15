@@ -45,8 +45,8 @@ src/server/public/public-auth-wefixtrades.css:165:3	color: #FFFFFF
 src/server/public/public-blue-fixes.css:22:3	color: #ffffff
 src/server/public/public-blue-fixes.css:39:3	color: #ffffff
 src/server/public/public-blue-fixes.css:63:3	color: #ffffff
-src/server/public/public-calculator-app-style.css:189:3	color: #fff
-src/server/public/public-calculator-app-style.css:202:3	color: #fff
+src/server/public/public-calculator-app-style.css:197:3	color: #fff
+src/server/public/public-calculator-app-style.css:210:3	color: #fff
 src/server/public/public-calculator-brand-preview.css:34:3	color: #ffffff
 src/server/public/public-calculator-brand-preview.css:63:3	background-color: #ffffff
 src/server/public/public-calculator-brand-preview.css:97:3	color: #ffffff
