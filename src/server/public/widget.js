@@ -368,6 +368,14 @@
     }
     if (contact.phone) rows.push(iconRow('Phone', contact.phone, 'tel:' + contact.phone.replace(/[^+0-9]/g, '')));
     if (contact.email) rows.push(iconRow('Email', contact.email, 'mailto:' + contact.email));
+    if (contact.chat) {
+      var chatRow = el('span', { class: 'qf-contact-item' });
+      chatRow.appendChild(el('span', { class: 'qf-contact-label', text: 'Chat' }));
+      var chatLink = el('a', { class: 'qf-contact-value qf-contact-chat', href: 'mailto:' + contact.chat });
+      chatLink.innerHTML = '<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 11.5a8.38 8.38 0 0 1-.9 3.8 8.5 8.5 0 0 1-7.6 4.7 8.38 8.38 0 0 1-3.8-.9L3 21l1.9-5.7a8.38 8.38 0 0 1-.9-3.8 8.5 8.5 0 0 1 4.7-7.6 8.38 8.38 0 0 1 3.8-.9h.5a8.48 8.48 0 0 1 8 8v.5z"></path></svg> Chat with us';
+      chatRow.appendChild(chatLink);
+      rows.push(chatRow);
+    }
     if (contact.address) rows.push(iconRow('Address', contact.address));
     var ids = [];
     if (contact.dotNumber) ids.push('USDOT ' + contact.dotNumber);

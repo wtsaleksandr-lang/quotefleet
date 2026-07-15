@@ -280,7 +280,17 @@ export function registerPublicRoutes(app: Express) {
       address: addressParts.length ? addressParts.join(' · ') : null,
       mcNumber: tenant.mcNumber || null,
       dotNumber: tenant.dotNumber || null,
+      // "Chat with us" affordance target (a mailto address). Null hides it.
+      chat: null as string | null,
     };
+
+    // Demo showcase only (reserved `demo` slug): seed a dummy public email and a
+    // "Chat with us" affordance so the demo company card fully demonstrates the
+    // contact block. Real tenants are untouched — their contact stays as saved.
+    if (tenant.slug === 'demo') {
+      if (!contact.email) contact.email = 'quotes@harborlinklogistics.com';
+      contact.chat = contact.email;
+    }
 
     // Ports relevant to drayage zones — only return ones that have at
     // least one enabled lane-zone or terminal so the dropdown stays short.
