@@ -112,7 +112,7 @@
     }
     .qfd-dot { width: 10px; height: 10px; border-radius: 999px; background: #35404f; }
     .qfd-url {
-      margin-left: 10px; flex: 1; min-width: 0;
+      margin-left: 10px; flex: 0 1 auto; max-width: 360px; min-width: 0;
       display: inline-flex; align-items: center; gap: 7px;
       font: 500 11.5px/1 var(--font-mono, ui-monospace, monospace);
       color: #8b97a8; background: rgba(148,163,184,.08);
@@ -126,11 +126,22 @@
        just the pre-load fallback. */
     .qfd-frame { display: block; width: 100%; height: 560px; border: 0; background: transparent; }
 
-    /* Desktop preview of the phone (device toggle → Mobile): phone bezel. */
+    /* Desktop preview of the phone (device toggle → Mobile): phone bezel with a
+       REAL fixed phone viewport (412×780 outer, ≈392×760 inner → ~2:1, a true
+       phone aspect, not the old over-elongated ~2.7:1 strip). overflow:hidden
+       (inherited) clips the iframe's native scrollbar so scrolling happens
+       cleanly INSIDE the frame. */
     .qfd-stage.is-mobile .qfd-device {
-      max-width: 390px; border-radius: 40px;
+      max-width: 412px; height: 780px; border-radius: 40px;
       border: 10px solid #0f151d;
       box-shadow: 0 40px 90px -46px rgba(0,0,0,.9), 0 0 0 1px rgba(148,163,184,.20), inset 0 1px 0 rgba(255,255,255,.05);
+    }
+    /* Fill the fixed bezel and push the iframe's own scrollbar into the 20px of
+       overhang that the device's overflow:hidden clips → internal scroll, no
+       visible scrollbar. Overrides the JS-set inline height (suppressed in JS). */
+    .qfd-stage.is-mobile .qfd-frame {
+      height: 100% !important;
+      width: calc(100% + 20px) !important;
     }
     .qfd-stage.is-mobile .qfd-chrome { display: none; }
 
@@ -254,6 +265,9 @@
       // 768px media query, which is more reliable than a JS viewport check.)
       var MINH = 560;
       function setH(h) {
+        // In mobile mode the device has a FIXED phone viewport (CSS 780px) and
+        // the iframe scrolls internally — don't override that with content height.
+        if (state.device === 'mobile') return;
         if (h && isFinite(h)) frame.style.height = Math.max(MINH, Math.ceil(h)) + 'px';
       }
       // Same-origin: size immediately on load so there's no fallback-height flash.

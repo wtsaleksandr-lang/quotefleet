@@ -113,10 +113,17 @@ body.qf-demo-brand-preview .qf-header .brand-name {
   box-shadow: none;
 }
 
+/* Content-sized wrapping row (not a rigid 2-col grid). The NAP details vary
+   wildly in length — a long street address next to a short phone forced the
+   old `repeat(2, 1fr)` grid to truncate the address ("…Long Beac…") and leave
+   a wide empty cell. Flex-wrap packs each item to its content and wraps the
+   long one instead of clipping it, at every demo width (desktop ~640–688px
+   widget column and the 392px mobile frame alike). */
 .qf-demo-brand-card {
-  display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 7px 10px;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 8px 16px;
   margin: 0 0 10px;
   padding: 12px;
 }
@@ -126,9 +133,8 @@ body.qf-demo-brand-preview .qf-header .brand-name {
   color: #475569;
   font-size: 12px;
   font-weight: 680;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
+  white-space: normal;
+  overflow-wrap: anywhere;
 }
 
 .qf-demo-brand-card span::before {

@@ -546,16 +546,15 @@ src/server/public/public-calculator-app-style.css:33	spacing	gap: 10px
 src/server/public/public-calculator-app-style.css:35	spacing	margin: 0 0 14px
 src/server/public/public-calculator-app-style.css:36	spacing	padding: 0 2px
 src/server/public/public-calculator-app-style.css:83	spacing	padding: 10px 5px
-src/server/public/public-calculator-brand-preview.css:118	spacing	gap: 7px 10px
-src/server/public/public-calculator-brand-preview.css:119	spacing	margin: 0 0 10px
-src/server/public/public-calculator-brand-preview.css:138	spacing	margin-right: 7px
-src/server/public/public-calculator-brand-preview.css:145	spacing	margin: 0 0 14px
-src/server/public/public-calculator-brand-preview.css:157	spacing	gap: 10px
-src/server/public/public-calculator-brand-preview.css:158	spacing	padding: 12px 14px 8px
+src/server/public/public-calculator-brand-preview.css:126	spacing	margin: 0 0 10px
+src/server/public/public-calculator-brand-preview.css:144	spacing	margin-right: 7px
+src/server/public/public-calculator-brand-preview.css:151	spacing	margin: 0 0 14px
 src/server/public/public-calculator-brand-preview.css:16	spacing	gap: 7px
-src/server/public/public-calculator-brand-preview.css:182	spacing	gap: 10px
-src/server/public/public-calculator-brand-preview.css:188	spacing	gap: 5px
-src/server/public/public-calculator-brand-preview.css:200	spacing	padding: 11px 12px
+src/server/public/public-calculator-brand-preview.css:163	spacing	gap: 10px
+src/server/public/public-calculator-brand-preview.css:164	spacing	padding: 12px 14px 8px
+src/server/public/public-calculator-brand-preview.css:188	spacing	gap: 10px
+src/server/public/public-calculator-brand-preview.css:194	spacing	gap: 5px
+src/server/public/public-calculator-brand-preview.css:206	spacing	padding: 11px 12px
 src/server/public/public-calculator-brand-preview.css:21	spacing	padding: 10px 12px
 src/server/public/public-calculator-brand-preview.css:44	spacing	margin-bottom: 10px
 src/server/public/public-calculator-brand-preview.css:5	spacing	gap: 10px
