@@ -301,6 +301,9 @@ body.qf-modal-open { overflow: hidden; }
 .qf-wt-unit button {
   appearance: none;
   -webkit-appearance: none;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
   border: 0;
   background: transparent;
   color: var(--w-muted);
@@ -309,7 +312,6 @@ body.qf-modal-open { overflow: hidden; }
   font-weight: 700;
   text-transform: none;
   letter-spacing: 0;
-  line-height: 1;
   padding: 4px 8px;
   min-height: 24px;
   border-radius: 6px;
