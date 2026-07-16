@@ -332,9 +332,9 @@
       var oc = $('qf-ocean-carrier'); if (oc) oc.value = '';
       var pp = $('qf-pickup-port-input'); if (pp) pp.value = '';
       var pt = $('qf-pickup-terminal'); if (pt) pt.value = '';
-      // Clear the resolved addresses, the address line, and the map card.
+      // Clear the resolved addresses and revert the map card to the base map.
       state.pickupResolved = null; state.deliveryResolved = null;
-      var mapCard = $('qf-map-card'); if (mapCard) mapCard.hidden = true;
+      showBaseMap();
       showStep('quote');
     });
   }
@@ -896,22 +896,25 @@
     var pickup = currentPickupLoc(), delivery = currentDeliveryLoc();
     var hasP = pickup && (pickup.zip || pickup.city || pickup.portCode);
     var hasD = delivery && (delivery.zip || delivery.city);
-    if (!hasP || !hasD) { card.hidden = true; autoResize(); return; }
+    if (!hasP || !hasD) { showBaseMap(); autoResize(); return; }
     var seq = ++mapReqSeq;
     fetch(withGrant('/api/public/route-preview/' + slug), {
       method: 'POST', headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ pickup: pickup, delivery: delivery, service: state.service, theme: isDarkMapTheme() ? 'dark' : 'light' })
     }).then(function (r) { return r.json(); }).then(function (resp) {
       if (seq !== mapReqSeq) return;
-      if (!resp || !resp.ok) { card.hidden = true; autoResize(); return; }
+      if (!resp || !resp.ok) { showBaseMap(); autoResize(); return; }
       renderRouteMap(resp);
-    }).catch(function () { if (seq === mapReqSeq) { card.hidden = true; autoResize(); } });
+    }).catch(function () { if (seq === mapReqSeq) { showBaseMap(); autoResize(); } });
   }
   function renderRouteMap(resp) {
     var card = $('qf-map-card'); if (!card) return;
-    // The addresses + stats live over the map now, so a card with no map image
-    // has nothing to show — hide it (rare now the maps key is live).
-    if (!resp.mapUrl) { card.hidden = true; autoResize(); return; }
+    // No routed map (rare, maps key live) → fall back to the North America base
+    // map rather than hiding the card, so the slot never collapses.
+    if (!resp.mapUrl) { showBaseMap(); autoResize(); return; }
+    // Route mode: drop the pre-input base state so overlays + expand return.
+    card.classList.remove('qf-map-base');
+    var routeImg = $('qf-map-img'); if (routeImg) routeImg.alt = 'Route from pickup to delivery';
     var dEl = $('qf-map-distance'); if (dEl) dEl.textContent = (resp.miles != null) ? (Number(resp.miles).toLocaleString() + ' mi') : '—';
     var tEl = $('qf-map-transit'); if (tEl) tEl.textContent = (resp.transit && resp.transit.text) ? resp.transit.text : '—';
     var pu = $('qf-map-pickup'); if (pu) pu.textContent = addrLabel(state.pickupResolved, 'qf-pickup-zip');
@@ -925,18 +928,38 @@
     card.hidden = false;
     autoResize();
   }
+  function mapThemeParam() { return isDarkMapTheme() ? 'dark' : 'light'; }
+  // Pre-input state: show a North America base map in the card before any address
+  // is entered (Alex: "use a map, without a specific route, just point on North
+  // America"). The .qf-map-base class hides the route overlays + expand and shows
+  // a hint; renderRouteMap() removes it and swaps in the real routed lane.
+  function showBaseMap() {
+    var card = $('qf-map-card'); if (!card) return;
+    var url = withGrant('/api/public/base-map.png?theme=' + mapThemeParam());
+    var img = $('qf-map-img'), mimg = $('qf-map-modal-img');
+    if (img) { img.src = url; img.alt = 'Map of North America'; }
+    if (mimg) { mimg.src = url; mimg.alt = 'Map of North America'; }
+    ['qf-map-distance', 'qf-map-transit', 'qf-map-pickup', 'qf-map-delivery',
+     'qf-map-m-distance', 'qf-map-m-transit', 'qf-map-m-pickup', 'qf-map-m-delivery'
+    ].forEach(function (id) { var el = $(id); if (el) el.textContent = '—'; });
+    card.classList.add('qf-map-base');
+    card.hidden = false;
+  }
   function initRouteMapCard() {
     var open = $('qf-map-open'), modal = $('qf-map-modal');
+    var card = $('qf-map-card');
     ['qf-pickup-zip', 'qf-delivery-zip'].forEach(function (id) {
       var el = $(id);
       if (el) { el.addEventListener('change', scheduleRouteMap); el.addEventListener('blur', function () { setTimeout(scheduleRouteMap, 160); }); }
     });
+    // Show the North America base map immediately on load.
+    showBaseMap();
     if (!open || !modal) return;
     var vp = $('qf-map-viewport'), mimg = $('qf-map-modal-img');
     var scale = 1, tx = 0, ty = 0, dragging = false, sx = 0, sy = 0;
     function apply() { if (mimg) mimg.style.transform = 'translate(' + tx + 'px,' + ty + 'px) scale(' + scale + ')'; }
     function reset() { scale = 1; tx = 0; ty = 0; apply(); }
-    open.addEventListener('click', function () { modal.hidden = false; reset(); });
+    open.addEventListener('click', function () { if (card && card.classList.contains('qf-map-base')) return; modal.hidden = false; reset(); });
     function closeModal() { modal.hidden = true; }
     var x = $('qf-map-modal-x'), bd = $('qf-map-modal-close');
     if (x) x.addEventListener('click', closeModal);

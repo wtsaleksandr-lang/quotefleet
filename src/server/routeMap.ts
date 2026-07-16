@@ -118,6 +118,38 @@ export function buildStaticMapUrl(
   return `https://maps.googleapis.com/maps/api/staticmap?${params.toString()}`;
 }
 
+// ── North America base map (no route) ──────────────────────────────────────
+// The widget's map card shows this the moment it loads — before any address is
+// entered — then swaps to the real routed lane once pickup + delivery resolve.
+// A single deterministic map (fixed center/zoom, no markers or path), styled
+// identically to the route maps so the swap reads as a zoom-in, not a change.
+const BASE_MAP_CENTER = '44,-97'; // frames the contiguous US + southern Canada + N. Mexico
+const BASE_MAP_ZOOM = '3';
+
+export function buildBaseMapUrl(
+  apiKey: string,
+  theme: MapTheme = 'light',
+  grayscale = true
+): string {
+  const params = new URLSearchParams({
+    size: MAP_SIZE,
+    scale: MAP_SCALE,
+    maptype: 'roadmap',
+    center: BASE_MAP_CENTER,
+    zoom: BASE_MAP_ZOOM,
+    key: apiKey,
+  });
+  params.append('style', 'feature:poi|visibility:off');
+  params.append('style', 'feature:transit|visibility:off');
+  if (theme === 'dark') {
+    for (const s of DARK_STYLES) params.append('style', s);
+  }
+  if (grayscale) {
+    params.append('style', 'saturation:-100');
+  }
+  return `https://maps.googleapis.com/maps/api/staticmap?${params.toString()}`;
+}
+
 type DirectionsResult = { polyline: string; distanceMeters: number } | null;
 
 /**

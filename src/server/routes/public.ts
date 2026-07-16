@@ -45,7 +45,7 @@ import { loadEnv } from '../../config.js';
 import { getTrialState } from '../trialGating.js';
 import { canUseProFeature } from '../plans.js';
 import { publicCalcLimiter, publicChatLimiter, publicLeadLimiter, quoteMapLimiter } from '../rateLimits.js';
-import { getRouteMap, laneCacheKey, normalizeTheme, peekRouteMap } from '../routeMap.js';
+import { buildBaseMapUrl, getRouteMap, laneCacheKey, normalizeTheme, peekRouteMap } from '../routeMap.js';
 import { resolveWidgetTheme, WIDGET_PRESETS } from '../widgetThemes.js';
 import { resolveQuoteDisclaimer } from '../quoteDisclaimer.js';
 import { loadCarrierProfile } from './carrierProfile.js';
@@ -471,6 +471,34 @@ export function registerPublicRoutes(app: Express) {
       });
     } catch {
       return res.json({ ok: false });
+    }
+  });
+
+  // North America base map for the widget's pre-input map card. A single
+  // deterministic map (no user coordinates), grayscale + themed, cached in
+  // memory per theme so it costs at most one Static Maps call per theme per
+  // process. Key stays server-side; the browser only ever sees PNG bytes.
+  const baseMapCache = new Map<string, Buffer>();
+  app.get('/api/public/base-map.png', quoteMapLimiter, async (req: Request, res: Response) => {
+    const theme = normalizeTheme(req.query.theme);
+    const cached = baseMapCache.get(theme);
+    if (cached) {
+      res.setHeader('content-type', 'image/png');
+      res.setHeader('cache-control', 'public, max-age=86400');
+      return res.end(cached);
+    }
+    const key = loadEnv().GOOGLE_MAPS_API_KEY;
+    if (!key) return res.status(404).end();
+    try {
+      const img = await fetch(buildBaseMapUrl(key, theme, true));
+      if (!img.ok) return res.status(502).end();
+      const buf = Buffer.from(await img.arrayBuffer());
+      baseMapCache.set(theme, buf);
+      res.setHeader('content-type', 'image/png');
+      res.setHeader('cache-control', 'public, max-age=86400');
+      return res.end(buf);
+    } catch {
+      return res.status(502).end();
     }
   });
 
