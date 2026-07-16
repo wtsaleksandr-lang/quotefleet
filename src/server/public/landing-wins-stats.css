@@ -1,0 +1,171 @@
+/* ============================================================
+   landing-wins-stats.css — "Why carriers win" stat section.
+   Loaded LAST on landing.html. Dark page (body.qf-wft).
+   NOTE: var(--accent) computes to cobalt #0d3cfc on this page
+   (landing-wefixtrades-cleanup.css !important) which fails 4.5:1
+   as text on the dark background — so this section carries its
+   own periwinkle token for accent text and marks.
+   ============================================================ */
+
+body.qf-wft .qf-wins-section {
+  --wins-accent: #6E8BFF;            /* light periwinkle — 6:1 on the page bg */
+  --wins-accent-soft: rgba(110, 139, 255, 0.12);
+  --wins-accent-line: rgba(110, 139, 255, 0.55);
+}
+
+/* ── Head ──────────────────────────────────────────────────── */
+.qf-wins-section .qf-wins-head { max-width: 760px; }
+.qf-wins-sub {
+  color: var(--muted);
+  font-size: 16px;
+  line-height: 1.55;
+  margin: 12px 0 0;
+}
+
+/* ── Row 1: big cited stat blocks ─────────────────────────── */
+.qf-wins-stats {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 32px;
+  margin-top: 48px;
+}
+.qf-wins-stat {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  padding-left: 24px;
+  border-left: 2px solid var(--wins-accent-line);
+}
+.qf-wins-hero {
+  font-family: 'Satoshi', 'Inter', system-ui, sans-serif;
+  font-size: clamp(52px, 5.4vw, 68px);
+  font-weight: 700;
+  letter-spacing: -0.02em;
+  line-height: 1em;
+  color: var(--wins-accent);
+  margin: 0;
+}
+.qf-wins-unit {
+  font-size: 0.4em;
+  font-weight: 600;
+  letter-spacing: 0;
+  color: var(--ink-soft);
+  margin-left: 4px;
+}
+.qf-wins-claim {
+  color: var(--ink-soft);
+  font-size: 15.5px;
+  line-height: 1.55;
+  margin: 0;
+  max-width: 34ch;
+}
+.qf-wins-src {
+  color: var(--muted);
+  font-size: 13px;
+  font-style: italic;
+  line-height: 1.5;
+  margin: 0;
+  margin-top: auto;
+}
+
+/* ── Footnote strip (4th cited stat) ──────────────────────── */
+.qf-wins-note {
+  margin: 32px 0 0;
+  padding: 16px 24px;
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  background: var(--wins-accent-soft);
+  color: var(--ink-soft);
+  font-size: 15px;
+  line-height: 1.55;
+}
+.qf-wins-note b { color: var(--ink); font-weight: 700; }
+.qf-wins-note-src { color: var(--muted); font-style: italic; white-space: nowrap; }
+
+/* ── Row 2: "with QuoteFleet" KPI cards ───────────────────── */
+.qf-wins-cards-title {
+  margin: 60px 0 0;
+  font-family: 'Satoshi', 'Inter', system-ui, sans-serif;
+  font-size: 22px;
+  font-weight: 600;
+  letter-spacing: -0.01em;
+  color: var(--ink);
+}
+.qf-wins-cards {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 24px;
+  margin-top: 24px;
+}
+.qf-wins-card {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  padding: 24px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 16px;
+  min-width: 0;
+}
+.qf-wins-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  align-self: flex-start;
+  padding: 4px 12px;
+  border-radius: 999px;
+  background: var(--wins-accent-soft);
+  border: 1px solid rgba(110, 139, 255, 0.30);
+  color: var(--wins-accent);
+  font-size: 12.5px;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+}
+.qf-wins-card h4 {
+  margin: 0;
+  font-family: 'Satoshi', 'Inter', system-ui, sans-serif;
+  font-size: 18px;
+  font-weight: 600;
+  color: var(--ink);
+}
+.qf-wins-card > p {
+  margin: 0;
+  color: var(--ink-soft);
+  font-size: 14.5px;
+  line-height: 1.55;
+}
+.qf-wins-fig { margin-top: auto; padding-top: 12px; }
+.qf-wins-svg { display: block; width: 100%; height: auto; }
+
+/* ── SVG marks (graphics may use brand color; text stays light) */
+.qf-wins-svg .w-grid { stroke: rgba(143, 159, 178, 0.20); stroke-width: 1; }
+.qf-wins-svg .w-line {
+  stroke: rgba(110, 139, 255, 0.45);
+  stroke-width: 2;
+  fill: none;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+.qf-wins-svg .w-line-hot { stroke: var(--wins-accent); }
+.qf-wins-svg .w-wash { fill: rgba(110, 139, 255, 0.10); }
+.qf-wins-svg .w-dot { fill: var(--wins-accent); stroke: var(--surface); stroke-width: 2; }
+.qf-wins-svg .w-dot-soft { fill: rgba(110, 139, 255, 0.45); stroke: var(--surface); stroke-width: 2; }
+.qf-wins-svg .w-bar-a { fill: var(--wins-accent); }
+.qf-wins-svg .w-bar-b { fill: rgba(143, 159, 178, 0.28); }
+.qf-wins-svg .w-txt {
+  fill: var(--muted);
+  font-family: 'Inter', system-ui, sans-serif;
+  font-size: 11px;
+}
+.qf-wins-svg .w-txt-strong { fill: var(--ink-soft); font-weight: 600; }
+
+/* ── Responsive ───────────────────────────────────────────── */
+@media (max-width: 960px) {
+  .qf-wins-stats { grid-template-columns: 1fr; gap: 24px; margin-top: 32px; }
+  .qf-wins-cards { grid-template-columns: 1fr; }
+  .qf-wins-hero { font-size: 52px; }
+  .qf-wins-claim { max-width: 52ch; }
+  .qf-wins-cards-title { margin-top: 48px; }
+  .qf-wins-note { padding: 16px; }
+  .qf-wins-note-src { white-space: normal; }
+}

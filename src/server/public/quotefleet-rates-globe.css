@@ -43,7 +43,7 @@
   display: inline-flex;
   align-items: center;
   gap: 6px;
-  color: var(--accent, #6e8bff);
+  color: #6E8BFF; /* was var(--accent): computes cobalt #0d3cfc on qf-wft — 2.6:1 */
   font-family: var(--font-mono, "JetBrains Mono", monospace);
   font-size: 11px;
   letter-spacing: 0.16em;
@@ -65,7 +65,7 @@
 }
 
 .qf-globe-head h2 .qf-globe-accent {
-  color: var(--accent, #6e8bff);
+  color: #6E8BFF; /* was var(--accent): computes cobalt on qf-wft — failed contrast */
 }
 
 .qf-globe-head p {
@@ -166,7 +166,7 @@
 .qf-globe-stat b {
   font-size: clamp(18px, 2vw, 24px);
   font-weight: 800;
-  color: var(--accent, #6e8bff);
+  color: #6E8BFF; /* was var(--accent): computes cobalt on qf-wft — failed contrast */
   letter-spacing: -0.01em;
 }
 .qf-globe-stat span {
@@ -291,7 +291,7 @@
 .qfg-card__label {
   font-size: 10px;
   font-weight: 400;
-  color: rgba(255, 255, 255, 0.4);
+  color: rgba(255, 255, 255, 0.58); /* was 0.4 — 3.8:1 */
   line-height: 1.3;
   letter-spacing: 0.02em;
 }

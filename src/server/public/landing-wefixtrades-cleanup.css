@@ -838,7 +838,7 @@ body.qf-wft .qf-ba-row { display: flex !important; gap: 12px !important; align-i
 body.qf-wft .qf-ba-time {
   flex: 0 0 auto !important; width: 60px !important;
   font: 600 11px/1.5 var(--font-mono, ui-monospace, monospace) !important;
-  color: rgba(245, 252, 255, .42) !important;
+  color: rgba(245, 252, 255, .58) !important; /* was .42 — 3.9:1 */
 }
 body.qf-wft .qf-ba-msg { font-size: 14px !important; line-height: 1.5 !important; color: rgba(245, 252, 255, .82) !important; }
 body.qf-wft .qf-ba-msg b { font-weight: 700 !important; color: rgba(245, 252, 255, .55) !important; margin-right: 8px !important; }
@@ -920,7 +920,7 @@ body.qf-wft .qf-ba-proof-src {
   max-width: 620px !important;
   font-size: 12px !important;
   line-height: 1.5 !important;
-  color: rgba(245, 252, 255, .46) !important;
+  color: rgba(245, 252, 255, .58) !important; /* was .46 — 4.46:1 */
 }
 @media (max-width: 560px) {
   body.qf-wft .qf-ba-stats { grid-template-columns: 1fr 1fr !important; }

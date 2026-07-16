@@ -14,7 +14,7 @@
   --pz-screen: #f7f9fc;
   --pz-ink: #0b1220;
   --pz-muted: #5a6b84;
-  --pz-faint: #8595ac;
+  --pz-faint: #61718A; /* was #8595ac — 2.9:1 on the light screen */
   --pz-line: #e7edf5;
   --pz-chip: #eef2f8;
   --pz-chip-edge: #e0e7f1;

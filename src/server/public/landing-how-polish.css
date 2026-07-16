@@ -38,3 +38,30 @@
     font-size: 14px !important;
   }
 }
+
+/* ── Contrast fix: step-number pills ─────────────────────────────────────────
+   .hiw-num used color: var(--accent), which computes to cobalt #0d3cfc on this
+   page (body.qf-wft token in landing-wefixtrades-cleanup.css, !important) —
+   ~2.8:1 on the dark background. Number goes light periwinkle (>=4.5:1); the
+   subtle accent wash + ring from landing-home-fixes.css stay as-is. */
+body.qf-wft.landing-v2 .hiw-card .hiw-num {
+  color: #9aaeff !important;
+}
+
+/* ── Media normalization: all four slots share the same horizontal frame ─────
+   The slot is already a uniform 16/10 box, but object-fit: contain let the
+   portrait step-2 clip render as a tall pillar-boxed phone. Fill the frame
+   instead, and tune the portrait clip so the price/total area stays visible. */
+body.qf-wft.landing-v2 .hiw-card .hiw-media > img,
+body.qf-wft.landing-v2 .hiw-card .hiw-media > video {
+  object-fit: cover !important;
+  object-position: 50% 50%;
+}
+/* Step 2's 1.28:1 quote clip in the 1.6:1 slot crops ~20% of its height.
+   The clip's key content is the filled form + the "Get instant quote" CTA at
+   the bottom (no price/total frame exists in this clip) — bias the crop down
+   so the CTA stays in frame; only the top dropdown (already clipped in the
+   source) loses a slice. */
+body.qf-wft.landing-v2 .hiw-card .hiw-media > video[poster*="qf-flow-quote"] {
+  object-position: 50% 62% !important;
+}
