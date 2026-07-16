@@ -458,8 +458,8 @@ export function registerPublicRoutes(app: Express) {
       const dist = await distanceBetween(pickupForDistance, body.delivery as Parameters<typeof distanceBetween>[1]);
       if ('error' in dist) return res.json({ ok: false });
       const theme = normalizeTheme(body.theme);
-      // Grayscale base map (premium look) for the widget's map card.
-      const rm = await getRouteMap(dist.origin, dist.destination, loadEnv().GOOGLE_MAPS_API_KEY, theme, undefined, true);
+      // Branded route map (highlighted roads) for the widget's map card.
+      const rm = await getRouteMap(dist.origin, dist.destination, loadEnv().GOOGLE_MAPS_API_KEY, theme);
       const lane = laneCacheKey(dist.origin, dist.destination);
       return res.json({
         ok: true,
@@ -475,9 +475,9 @@ export function registerPublicRoutes(app: Express) {
   });
 
   // North America base map for the widget's pre-input map card. A single
-  // deterministic map (no user coordinates), grayscale + themed, cached in
-  // memory per theme so it costs at most one Static Maps call per theme per
-  // process. Key stays server-side; the browser only ever sees PNG bytes.
+  // deterministic map (no user coordinates), branded + themed (highlighted
+  // roads), cached in memory per theme so it costs at most one Static Maps call
+  // per theme per process. Key stays server-side; the browser only sees PNG bytes.
   const baseMapCache = new Map<string, Buffer>();
   app.get('/api/public/base-map.png', quoteMapLimiter, async (req: Request, res: Response) => {
     const theme = normalizeTheme(req.query.theme);
@@ -490,7 +490,7 @@ export function registerPublicRoutes(app: Express) {
     const key = loadEnv().GOOGLE_MAPS_API_KEY;
     if (!key) return res.status(404).end();
     try {
-      const img = await fetch(buildBaseMapUrl(key, theme, true));
+      const img = await fetch(buildBaseMapUrl(key, theme));
       if (!img.ok) return res.status(502).end();
       const buf = Buffer.from(await img.arrayBuffer());
       baseMapCache.set(theme, buf);
@@ -509,8 +509,7 @@ export function registerPublicRoutes(app: Express) {
     const lane = typeof req.query.lane === 'string' ? req.query.lane : '';
     const theme = normalizeTheme(req.query.theme);
     if (!lane) return res.status(400).end();
-    // Widget preview maps are always grayscale (the '|g' cache variant).
-    const rm = peekRouteMap(`${lane}|${theme}|g`);
+    const rm = peekRouteMap(`${lane}|${theme}`);
     if (!rm) return res.status(404).end();
     try {
       const img = await fetch(rm.url);

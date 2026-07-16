@@ -136,30 +136,31 @@ describe('getRouteMap', () => {
     });
     const dark = await getRouteMap(LA, CHI, KEY, 'dark', f);
     const styles = new URL(dark!.url).searchParams.getAll('style');
-    expect(styles).toContain('feature:water|element:geometry|color:0x0f1620');
-    expect(styles).toContain('element:geometry|color:0x1f2733');
-    // POI/transit still dropped, cobalt route + A/B markers unaffected.
+    expect(styles).toContain('feature:water|element:geometry|color:0x070c18');
+    expect(styles).toContain('element:geometry|color:0x0f1629');
+    // Highlighted highways (cobalt-tinted), POI/transit dropped, cobalt route unaffected.
+    expect(styles).toContain('feature:road.highway|element:geometry|color:0x3f5cc0');
     expect(styles).toContain('feature:poi|visibility:off');
     expect(new URL(dark!.url).searchParams.get('path')).toBe(`color:0x0D3CFCff|weight:4|enc:${POLY}`);
 
     __clearRouteCache();
     const light = await getRouteMap(LA, CHI, KEY, 'light', f);
     const lightStyles = new URL(light!.url).searchParams.getAll('style');
-    expect(lightStyles).not.toContain('feature:water|element:geometry|color:0x0f1620');
-    expect(lightStyles).toEqual(['feature:poi|visibility:off', 'feature:transit|visibility:off']);
+    // Light theme has its own branded style (not the dark navy water).
+    expect(lightStyles).not.toContain('feature:water|element:geometry|color:0x070c18');
+    expect(lightStyles).toContain('feature:road.highway|element:geometry|color:0x9fbcf3');
   });
 });
 
 describe('buildStaticMapUrl theme', () => {
-  it('defaults to light (no dark styles) and adds them for dark', () => {
+  it('applies the light branded style by default and the dark one for dark', () => {
     const light = new URL(buildStaticMapUrl(KEY, LA, CHI, POLY));
-    expect(light.searchParams.getAll('style')).toEqual([
-      'feature:poi|visibility:off',
-      'feature:transit|visibility:off',
-    ]);
+    const lightStyles = light.searchParams.getAll('style');
+    expect(lightStyles).toContain('feature:poi|visibility:off');
+    expect(lightStyles).toContain('feature:road.highway|element:geometry|color:0x9fbcf3');
     const dark = new URL(buildStaticMapUrl(KEY, LA, CHI, POLY, 'dark'));
     expect(dark.searchParams.getAll('style').length).toBeGreaterThan(2);
-    expect(dark.searchParams.getAll('style')).toContain('feature:road|element:geometry|color:0x2a3342');
+    expect(dark.searchParams.getAll('style')).toContain('feature:road.highway|element:geometry|color:0x3f5cc0');
   });
 });
 

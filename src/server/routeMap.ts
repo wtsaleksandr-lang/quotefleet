@@ -40,19 +40,50 @@ const ROUTE_COLOR = '0x0D3CFCff';
 const ORIGIN_COLOR = '0x36c98b'; // home success green — origin/pickup (A)
 const DEST_COLOR = '0xf97373'; // home error red — destination (B)
 
-// Google Static Maps "night" style — dark geometry/water/roads with legible
-// muted labels. Applied ONLY when theme=dark; the cobalt route line + green/red
-// A·B markers are drawn on top (markers/path are unaffected by `style`).
+// ── Branded map styles ─────────────────────────────────────────────────────
+// Premium on-brand styling with HIGHLIGHTED ROADS (arterials + cobalt-tinted
+// highways) on a navy (dark) / clean (light) base — replaces the old flat
+// grayscale look. Both sets include the POI/transit hide rules; the cobalt
+// route line + green/red A·B markers draw on top (unaffected by `style`).
 const DARK_STYLES: string[] = [
-  'element:geometry|color:0x1f2733',
-  'element:labels.text.fill|color:0x9aa4b2',
-  'element:labels.text.stroke|color:0x1f2733',
-  'feature:water|element:geometry|color:0x0f1620',
-  'feature:road|element:geometry|color:0x2a3342',
-  'feature:road|element:labels.text.fill|color:0x8b95a5',
-  'feature:administrative|element:geometry|color:0x3a4557',
-  'feature:landscape|element:geometry|color:0x232c3a',
+  'element:geometry|color:0x0f1629',
+  'element:labels.text.fill|color:0xaab6d4',
+  'element:labels.text.stroke|color:0x0b1018',
+  'feature:administrative|element:geometry|color:0x2a3557',
+  'feature:administrative.country|element:geometry.stroke|color:0x3d4d7a',
+  'feature:administrative.province|element:geometry.stroke|color:0x2a3557',
+  'feature:landscape|element:geometry|color:0x131b30',
+  'feature:poi|visibility:off',
+  'feature:transit|visibility:off',
+  'feature:water|element:geometry|color:0x070c18',
+  'feature:water|element:labels.text.fill|color:0x40608a',
+  'feature:road|element:geometry|color:0x283560',
+  'feature:road|element:labels.text.fill|color:0x8ea0cc',
+  'feature:road.arterial|element:geometry|color:0x33447e',
+  'feature:road.highway|element:geometry|color:0x3f5cc0',
+  'feature:road.highway|element:geometry.stroke|color:0x1c2848',
 ];
+const LIGHT_STYLES: string[] = [
+  'element:geometry|color:0xeef2fa',
+  'element:labels.text.fill|color:0x55617d',
+  'element:labels.text.stroke|color:0xffffff',
+  'feature:administrative|element:geometry|color:0xc7d2e8',
+  'feature:administrative.country|element:geometry.stroke|color:0xa8b7d8',
+  'feature:administrative.province|element:geometry.stroke|color:0xc7d2e8',
+  'feature:landscape|element:geometry|color:0xe7ecf6',
+  'feature:poi|visibility:off',
+  'feature:transit|visibility:off',
+  'feature:water|element:geometry|color:0xc2d4f0',
+  'feature:water|element:labels.text.fill|color:0x7f9bc4',
+  'feature:road|element:geometry|color:0xffffff',
+  'feature:road|element:labels.text.fill|color:0x6a7796',
+  'feature:road.arterial|element:geometry|color:0xdae3f6',
+  'feature:road.highway|element:geometry|color:0x9fbcf3',
+  'feature:road.highway|element:geometry.stroke|color:0x6f97e6',
+];
+function themeStyles(theme: MapTheme): string[] {
+  return theme === 'dark' ? DARK_STYLES : LIGHT_STYLES;
+}
 
 // Retina-sized to balance the left-column panel (img renders ~210px tall,
 // object-fit:cover). 640 is the free-tier max width; scale:2 = 1280px.
@@ -83,8 +114,7 @@ export function buildStaticMapUrl(
   origin: LatLng,
   destination: LatLng,
   encodedPolyline?: string | null,
-  theme: MapTheme = 'light',
-  grayscale = false
+  theme: MapTheme = 'light'
 ): string {
   const params = new URLSearchParams({
     size: MAP_SIZE,
@@ -92,19 +122,9 @@ export function buildStaticMapUrl(
     maptype: 'roadmap',
     key: apiKey,
   });
-  // Subtle, official-looking style: drop POI + transit clutter.
-  params.append('style', 'feature:poi|visibility:off');
-  params.append('style', 'feature:transit|visibility:off');
-  // Day/night: layer the dark geometry/water/label rules on top for theme=dark.
-  if (theme === 'dark') {
-    for (const s of DARK_STYLES) params.append('style', s);
-  }
-  // Grayscale base map (premium look) — desaturates the map geometry only. The
-  // A/B markers + brand-blue route are overlays drawn on top, so they stay
-  // colored and pop against the neutral base.
-  if (grayscale) {
-    params.append('style', 'saturation:-100');
-  }
+  // Branded style with highlighted roads (navy for dark, clean for light). The
+  // A/B markers + brand-blue route are overlays drawn on top, so they pop.
+  for (const s of themeStyles(theme)) params.append('style', s);
   // Green origin (A), red destination (B).
   params.append('markers', `color:${ORIGIN_COLOR}|label:A|${origin.lat},${origin.lng}`);
   params.append('markers', `color:${DEST_COLOR}|label:B|${destination.lat},${destination.lng}`);
@@ -126,11 +146,7 @@ export function buildStaticMapUrl(
 const BASE_MAP_CENTER = '44,-97'; // frames the contiguous US + southern Canada + N. Mexico
 const BASE_MAP_ZOOM = '3';
 
-export function buildBaseMapUrl(
-  apiKey: string,
-  theme: MapTheme = 'light',
-  grayscale = true
-): string {
+export function buildBaseMapUrl(apiKey: string, theme: MapTheme = 'light'): string {
   const params = new URLSearchParams({
     size: MAP_SIZE,
     scale: MAP_SCALE,
@@ -139,14 +155,7 @@ export function buildBaseMapUrl(
     zoom: BASE_MAP_ZOOM,
     key: apiKey,
   });
-  params.append('style', 'feature:poi|visibility:off');
-  params.append('style', 'feature:transit|visibility:off');
-  if (theme === 'dark') {
-    for (const s of DARK_STYLES) params.append('style', s);
-  }
-  if (grayscale) {
-    params.append('style', 'saturation:-100');
-  }
+  for (const s of themeStyles(theme)) params.append('style', s);
   return `https://maps.googleapis.com/maps/api/staticmap?${params.toString()}`;
 }
 
@@ -209,28 +218,27 @@ export async function getRouteMap(
   destination: LatLng | undefined,
   apiKey: string | undefined,
   theme: MapTheme = 'light',
-  fetchImpl: typeof fetch = fetch,
-  grayscale = false
+  fetchImpl: typeof fetch = fetch
 ): Promise<RouteMap | null> {
   if (!origin || !destination || !apiKey) return null;
 
-  // Cache key includes the theme + grayscale flag so light/dark/gray render to
-  // distinct entries and never serve each other's styled URL.
-  const key = `${laneCacheKey(origin, destination)}|${theme}${grayscale ? '|g' : ''}`;
+  // Cache key includes the theme so light/dark render to distinct entries and
+  // never serve each other's styled URL.
+  const key = `${laneCacheKey(origin, destination)}|${theme}`;
   const cached = routeCache.get(key);
   if (cached) return cached;
 
   const directions = await fetchDirections(origin, destination, apiKey, fetchImpl);
   const result: RouteMap = directions
     ? {
-        url: buildStaticMapUrl(apiKey, origin, destination, directions.polyline, theme, grayscale),
+        url: buildStaticMapUrl(apiKey, origin, destination, directions.polyline, theme),
         distanceMiles: directions.distanceMeters
           ? Math.round(directions.distanceMeters / METERS_PER_MILE)
           : null,
         kind: 'route',
       }
     : {
-        url: buildStaticMapUrl(apiKey, origin, destination, null, theme, grayscale),
+        url: buildStaticMapUrl(apiKey, origin, destination, null, theme),
         distanceMiles: null,
         kind: 'straight',
       };
