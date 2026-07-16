@@ -1,0 +1,61 @@
+/* landing-badges.css — scannable benefit chips for the hero + the refined band.
+   One shared .qf-chip component drives both rows so they stay visually identical.
+
+   Dark page only (body.qf-wft): light, high-contrast text on a hairline surface,
+   and a periwinkle (#6E8BFF) check. This page forces --accent to cobalt
+   (#0d3cfc), which fails contrast on the dark bg — so the accent here is the
+   readable on-dark periwinkle, never var(--accent). Loaded LAST. */
+
+/* ── Shared chip ──────────────────────────────────────────────────────────── */
+body.qf-wft .qf-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 12px;
+  border: 1px solid rgba(245, 252, 255, 0.14);
+  background: rgba(245, 252, 255, 0.04);
+  border-radius: 999px;
+  font-size: 13px;
+  font-weight: 500;
+  line-height: 1.4;
+  letter-spacing: -0.01em;
+  color: rgba(245, 252, 255, 0.92);
+  white-space: nowrap;
+}
+
+body.qf-wft .qf-chip-ico {
+  width: 14px;
+  height: 14px;
+  flex: 0 0 auto;
+  color: #6E8BFF; /* periwinkle check — readable accent, not the forced cobalt */
+}
+
+/* ── Hero benefit pills (left-aligned, under the CTA/trial line) ───────────── */
+body.qf-wft .qf-hero-pills {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 24px;
+  max-width: 520px;
+}
+
+/* ── Refined-band badges (centered under the short line) ───────────────────── */
+body.qf-wft .qf-refined-badges {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 8px;
+  margin-top: 24px;
+}
+
+@media (max-width: 640px) {
+  /* On mobile, .hero-copy is display:contents and every hero child gets an
+     explicit order (eyebrow 1 … demo-link 8). Without an order the pills
+     default to 0 and float above the H1. Place them last, under the CTA
+     cluster, so they read as a supporting scannable row — never above the H1. */
+  body.qf-wft .qf-hero-pills {
+    order: 9;
+    margin-top: 16px;
+  }
+  body.qf-wft .qf-refined-badges { margin-top: 16px; }
+}
