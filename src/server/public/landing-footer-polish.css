@@ -100,3 +100,22 @@ body.qf-wft .qf-trust-operator strong {
   body.qf-wft .premium-footer .footer-brand .qf-footer-logo { height: 52px; }
   body.qf-wft .qf-footer-trustbar { gap: 8px 16px; }
 }
+
+/* ── Subtle hover feedback on footer links (Alex). The links render light, so a
+   colour lift is invisible — use a faint, offset underline that fades in, plus a
+   gentle dim on the brand lockup. Trust-strip claims aren't links, so they don't
+   react. ── */
+body.qf-wft .premium-footer a {
+  text-decoration-color: rgba(255, 255, 255, 0);
+  transition: opacity 0.16s ease, text-decoration-color 0.16s ease;
+}
+body.qf-wft .premium-footer .footer-col a:hover,
+body.qf-wft .premium-footer .footer-bottom a:hover {
+  text-decoration: underline;
+  text-underline-offset: 3px;
+  text-decoration-color: rgba(255, 255, 255, 0.5);
+}
+body.qf-wft .premium-footer .qf-footer-brand:hover,
+body.qf-wft .premium-footer .qf-footer-wordmark:hover {
+  opacity: 0.8;
+}
