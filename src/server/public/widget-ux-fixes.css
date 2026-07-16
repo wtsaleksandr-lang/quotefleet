@@ -3,13 +3,14 @@
    these rules win. Colours stay owned by the theme/contrast engine — this file
    only touches layout, sizing, positioning, and motion. */
 
-/* ── 1 + 2. Help cues: smaller, subtler glyph. Hit box stays >=24px (WCAG). ── */
+/* ── 1 + 2. Help cues: smaller, subtler glyph (Alex: -20%). Hit box stays
+   >=24px (WCAG) — only the visible glyph + ring shrink. ── */
 .qf-help {
-  font-size: 8px;
+  font-size: 6.5px;
 }
 .qf-help::before {
-  width: 12px;
-  height: 12px;
+  width: 9.5px;
+  height: 9.5px;
 }
 
 /* Section-label cues (Equipment, Cargo, Size & handling, Pickup port, Booking…)
