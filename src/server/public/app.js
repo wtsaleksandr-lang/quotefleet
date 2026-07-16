@@ -870,7 +870,16 @@
       // Page-sub prose folded into the rate-builder header help cue.
       // AI-tip demoted from an accent-on-accent .notice to a compact inline link.
       c.appendChild(el('p', { class: 'qf-rate-hint', html: 'Ask the AI agent to bulk-update rates — <a href="#" data-route="ai">open AI panel</a>' }));
-      c.appendChild(buildFscCard());
+      // Fuel surcharge is a power setting (it was the first thing a first-timer
+      // saw). Fold it into a collapsed panel so the rate table leads.
+      var fscDetails = el('details', { class: 'qf-fsc-advanced', style: { marginBottom: '16px' } });
+      var fscSum = el('summary', { style: { cursor: 'pointer', fontWeight: '700', fontSize: '13px', color: 'var(--ink)', padding: '10px 12px', borderRadius: '10px', background: 'var(--surface)', border: '1px solid var(--border)', userSelect: 'none' } });
+      fscSum.appendChild(el('span', { text: 'Fuel surcharge settings' }));
+      fscSum.appendChild(el('span', { style: { color: 'var(--muted)', fontWeight: '500', fontSize: '12px', marginLeft: '6px' }, text: '— automatic weekly, or set your own %' }));
+      fscDetails.appendChild(fscSum);
+      var fscBody = buildFscCard(); fscBody.style.marginTop = '8px';
+      fscDetails.appendChild(fscBody);
+      c.appendChild(fscDetails);
       var hasDrayage = (d.rateCards || []).some(function (r) { return r.service === 'drayage'; });
       if (hasDrayage) {
         c.appendChild(el('p', {
@@ -919,7 +928,16 @@
       // Row visibility is now driven only by the single text search
       // (qf-rate-search-hidden) and the status-chip filter (row.hidden); both
       // compose as AND. No inline style.display here so they never fight.
-      c.appendChild(tbl);
+      if (d.rateCards.length) {
+        c.appendChild(tbl);
+      } else {
+        // 0 rate cards used to render a bare header row (looked broken). Show a
+        // friendly empty-state that ties into the modes explanation up top.
+        var emptyRates = el('div', { class: 'card', style: { marginTop: '12px', padding: '28px 20px', textAlign: 'center' } });
+        emptyRates.appendChild(el('div', { style: { fontSize: '15px', fontWeight: '800' }, text: 'No rate cards yet' }));
+        emptyRates.appendChild(el('div', { class: 'muted-small', style: { margin: '6px auto 0', maxWidth: '440px', lineHeight: '1.5' }, text: 'Add your first lane below. Each service you set up here becomes a trucking mode customers can pick in your calculator.' }));
+        c.appendChild(emptyRates);
+      }
 
       // ── Add row ──────────────────────────────────────────────────
       var addBtn = el('button', { class: 'btn btn-secondary', text: '+ Add rate card', style: { marginTop: '14px' } });
