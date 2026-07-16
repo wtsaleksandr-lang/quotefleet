@@ -1431,11 +1431,11 @@
       keyBtn.addEventListener('click', function () {
         if (!keyInp.value) return;
         api('/api/tenant/anthropic-key', { method: 'PUT', body: { apiKey: keyInp.value } })
-          .then(function () { keyInp.value = ''; alert('Key saved.'); }).catch(toastErr);
+          .then(function () { keyInp.value = ''; toastOk('Key saved'); }).catch(toastErr);
       });
       keyCard.appendChild(keyInp); keyCard.appendChild(keyBtn);
       var clearBtn = el('button', { class: 'btn btn-ghost', text: 'Clear stored key', style: { marginTop: '8px' } });
-      clearBtn.addEventListener('click', function () { if (!confirm('Remove your Anthropic key?')) return; api('/api/tenant/anthropic-key', { method: 'DELETE' }).then(function () { alert('Cleared.'); }).catch(toastErr); });
+      clearBtn.addEventListener('click', function () { if (!confirm('Remove your Anthropic key?')) return; api('/api/tenant/anthropic-key', { method: 'DELETE' }).then(function () { toastOk('Key cleared'); }).catch(toastErr); });
       keyCard.appendChild(clearBtn);
 
       rightCol.appendChild(cfgCard);
@@ -2366,7 +2366,7 @@
             laneZones: lzSelections.selected(),
           };
           var total = body.rateCards.length + body.accessorials.length + body.laneZones.length;
-          if (total === 0) { alert('Tick at least one item to apply.'); return; }
+          if (total === 0) { toastErr({ message: 'Tick at least one item to apply.' }); return; }
           if (!confirm('Apply ' + total + ' item(s) to your rate book?')) return;
           applyBtn.disabled = true; applyBtn.textContent = 'Applying…';
           api('/api/tenant/ingest/' + job.id + '/apply', {
@@ -2379,7 +2379,7 @@
             refreshList();
           }).catch(function (err) {
             applyBtn.disabled = false; applyBtn.textContent = 'Apply selected';
-            alert(err.message || 'Apply failed.');
+            toastErr({ message: err.message || 'Apply failed.' });
           });
         } }
       });
