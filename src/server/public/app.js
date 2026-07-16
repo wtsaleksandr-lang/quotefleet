@@ -806,6 +806,37 @@
     api('/api/tenant/rate-cards').then(function (d) {
       c.innerHTML = '';
       c.appendChild(el('h1', { text: 'Rate cards' }));
+
+      // Make the rate-cards -> calculator-modes link explicit (Alex): a carrier's
+      // calculator only offers a trucking mode when they have >=1 ENABLED rate
+      // card for it. Show which modes are live right now, and why.
+      var liveModes = SERVICES.filter(function (s) {
+        return (d.rateCards || []).some(function (r) { return r.service === s && r.enabled; });
+      });
+      var modesNote = el('div', { class: 'qf-modes-note', style: {
+        margin: '6px 0 16px', padding: '12px 14px', border: '1px solid var(--border)',
+        borderRadius: '12px', background: 'var(--surface)'
+      } });
+      modesNote.appendChild(el('div', {
+        style: { fontSize: '13px', color: 'var(--ink-soft, var(--ink))', lineHeight: '1.5' },
+        html: 'Your calculator offers a trucking mode <strong>only when you have at least one enabled rate card for it</strong>. Add or enable a card to offer a mode; disable a mode’s cards to hide it from customers.'
+      }));
+      var modesRow = el('div', { style: { display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: '8px', marginTop: '10px' } });
+      var MODE_LABELS = { ftl: 'FTL', ltl: 'LTL', expedited: 'Expedite', hotshot: 'Hotshot', drayage: 'Drayage' };
+      if (liveModes.length) {
+        modesRow.appendChild(el('span', { style: { fontSize: '12px', fontWeight: '700', color: 'var(--muted)' }, text: 'Live in your calculator now:' }));
+        liveModes.forEach(function (s) {
+          modesRow.appendChild(el('span', {
+            style: { display: 'inline-flex', padding: '4px 10px', borderRadius: '999px', background: 'color-mix(in srgb, var(--accent) 12%, transparent)', color: 'var(--accent)', fontSize: '12px', fontWeight: '700' },
+            text: MODE_LABELS[s] || (s.charAt(0).toUpperCase() + s.slice(1))
+          }));
+        });
+      } else {
+        modesRow.appendChild(el('span', { style: { fontSize: '12.5px', color: 'var(--muted)' }, text: 'No modes are live yet — add and enable a rate card below to start offering quotes.' }));
+      }
+      modesNote.appendChild(modesRow);
+      c.appendChild(modesNote);
+
       // Page-sub prose folded into the rate-builder header help cue.
       // AI-tip demoted from an accent-on-accent .notice to a compact inline link.
       c.appendChild(el('p', { class: 'qf-rate-hint', html: 'Ask the AI agent to bulk-update rates — <a href="#" data-route="ai">open AI panel</a>' }));
