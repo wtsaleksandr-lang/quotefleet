@@ -1,0 +1,102 @@
+/* ─────────────────────────────────────────────────────────────────────────
+   Footer polish — loaded LAST so it wins. Alex's asks:
+     • Brand lockup: logo LEFT, wordmark + tagline to its RIGHT (was stacked
+       vertically below the logo).
+     • Legal / operator copy subtle + smaller; the registered LLC name is no
+       longer bold-highlighted — it reads as quiet fine print.
+     • A supportable trust strip (all four claims are genuinely true).
+   Selectors carry `.premium-footer` for specificity over the earlier footer
+   rules; spacing stays on the 8px ramp; colors use style.css tokens.
+   ───────────────────────────────────────────────────────────────────────── */
+
+/* ── Brand lockup: horizontal. Logo left; wordmark stacked over the tagline to
+   its right. Overrides the earlier column-stack + 168px logo rules. ── */
+body.qf-wft .premium-footer .footer-brand {
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  gap: 16px;
+}
+body.qf-wft .premium-footer .qf-footer-brand {
+  flex: 0 0 auto;
+  display: inline-flex;
+  align-items: center;
+  margin: 0;
+}
+body.qf-wft .premium-footer .footer-brand .qf-footer-logo {
+  width: auto;
+  height: 60px;
+  max-width: 100%;
+}
+body.qf-wft .premium-footer .qf-footer-brandtext {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  min-width: 0;
+}
+body.qf-wft .premium-footer .qf-footer-wordmark {
+  font-size: 19px;
+  font-weight: 850;
+  letter-spacing: -0.02em;
+  /* !important: the global `a { color: var(--accent) }` (and a JS-injected
+     cleanup sheet that loads after this static link) otherwise tint the
+     wordmark blue; keep it white to match the nav brand. */
+  color: var(--ink) !important;
+  text-decoration: none;
+}
+body.qf-wft .premium-footer .footer-brand .qf-footer-tagline {
+  margin: 0;
+  max-width: 340px;
+  font-size: 13px;
+  line-height: 1.55;
+  color: var(--muted);
+}
+
+/* ── Supportable trust strip. Honest claims only: Stripe is the payment
+   processor, the site is served over TLS, a GDPR/CCPA DPA is published, and
+   every tenant is isolated at the database. ── */
+body.qf-wft .qf-footer-trustbar {
+  max-width: 1120px;
+  margin: 32px auto 0;
+  padding: 16px 0 0;
+  border-top: 1px solid var(--border);
+  list-style: none;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px 24px;
+}
+body.qf-wft .qf-footer-trustbar li {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 12px;
+  color: var(--muted);
+}
+body.qf-wft .qf-footer-trustbar svg {
+  width: 15px;
+  height: 15px;
+  flex: 0 0 auto;
+  opacity: 0.85;
+}
+
+/* ── Legal / operator copy: subtle + smaller. No bold emphasis on the entity. ── */
+body.qf-wft .premium-footer .footer-bottom {
+  font-size: 11.5px;
+}
+body.qf-wft .premium-footer .footer-bottom .qf-foot-operator,
+body.qf-wft .premium-footer .footer-bottom strong {
+  color: var(--muted);
+  font-weight: 400;
+}
+
+/* Match the in-page operator line above the footer — quiet fine print, no bold. */
+body.qf-wft .qf-trust-operator strong {
+  font-weight: 400 !important;
+  color: rgba(245, 252, 255, 0.5) !important;
+}
+
+@media (max-width: 720px) {
+  body.qf-wft .premium-footer .footer-brand { gap: 12px; }
+  body.qf-wft .premium-footer .footer-brand .qf-footer-logo { height: 52px; }
+  body.qf-wft .qf-footer-trustbar { gap: 8px 16px; }
+}
