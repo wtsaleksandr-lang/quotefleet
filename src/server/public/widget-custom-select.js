@@ -39,6 +39,10 @@
   // Flat rack: a container base with fixed/collapsible end posts (no wheels — it
   // rides on a chassis), which sets it apart from the wheeled trailer flats.
   var IC_FLATRACK = SVG_HEAD + '<path d="M2.5 15.5h19"/><path d="M4.5 15.5V10M19.5 15.5V10"/><path d="M3.4 10h2.2M18.4 10h2.2"/></svg>';
+  // Hotshot: a pickup (dually) towing a flat trailer — distinct from a full flatbed.
+  var IC_HOTSHOT = SVG_HEAD + '<rect x="2" y="9.5" width="4.5" height="4.5" rx="0.6"/><path d="M6.5 14v-1.6h2.4V14"/><path d="M9 14h12.5"/><circle cx="4.2" cy="16.4" r="1.3"/><circle cx="14" cy="16.4" r="1.3"/><circle cx="18" cy="16.4" r="1.3"/></svg>';
+  // LTL: a box/load on a pallet (LTL ships palletized freight).
+  var IC_PALLET = SVG_HEAD + '<rect x="6" y="7" width="12" height="6" rx="0.5"/><path d="M3.5 15.5h17M3.5 18h17"/><path d="M5 15.5v2.5M12 15.5v2.5M19 15.5v2.5"/></svg>';
   var IC_VAN = SVG_HEAD + '<rect x="2.5" y="6.5" width="15" height="9.5" rx="1"/><circle cx="6.5" cy="18.5" r="1.5"/><circle cx="13.5" cy="18.5" r="1.5"/></svg>';
   var IC_TRUCK = SVG_HEAD + '<path d="M2.5 7h9.5v8.5h-9.5z"/><path d="M12 10h3.6l2.9 2.9v2.6H12z"/><circle cx="6" cy="17.5" r="1.5"/><circle cx="15.5" cy="17.5" r="1.5"/></svg>';
   function equipIconSvg(label) {
@@ -49,14 +53,21 @@
     if (/flat.?rack|flatrack/.test(t)) return IC_FLATRACK;
     if (/step.?deck|drop.?deck|lowboy|rgn/.test(t)) return IC_STEPDECK;
     if (/conestoga|curtain|roll.?tarp/.test(t)) return IC_CONESTOGA;
+    // Hotshot / gooseneck BEFORE flatbed (the hotshot label contains "flatbed").
+    if (/hotshot|hot ?shot|goose.?neck|dually/.test(t)) return IC_HOTSHOT;
     if (/flat.?bed|flatbed|flat.?deck|\bflat\b/.test(t)) return IC_FLAT;
-    // Containers, sized. High-cube => taller; 45' is always high-cube.
-    var hc = /high.?cube|hi.?cube|highcube|\bhc\b/.test(t);
-    if (/(^|\D)45(\D|$)/.test(t)) return IC_C45HC;
-    if (/(^|\D)40(\D|$)/.test(t)) return hc ? IC_C40HC : IC_C40;
-    if (/(^|\D)20(\D|$)/.test(t)) return IC_C20;
-    if (/container|intermodal|drayage|chassis|ocean/.test(t)) return IC_C40;
-    if (/dry.?van|sprinter|cargo|\bvan\b|straight|box/.test(t)) return IC_VAN;
+    if (/\bltl\b|pallet|less.?than.?truck/.test(t)) return IC_PALLET;
+    // Containers, sized — only when the label actually says container/HC/etc., so
+    // a "40' Gooseneck" or "48' Flatbed" never gets mistaken for a container.
+    if (/container|high.?cube|hi.?cube|highcube|\bhc\b|intermodal|chassis|\bteu\b|drayage|ocean/.test(t)) {
+      var hc = /high.?cube|hi.?cube|highcube|\bhc\b/.test(t);
+      if (/(^|\D)45(\D|$)/.test(t)) return IC_C45HC;
+      if (/(^|\D)40(\D|$)/.test(t)) return hc ? IC_C40HC : IC_C40;
+      if (/(^|\D)20(\D|$)/.test(t)) return IC_C20;
+      return IC_C40;
+    }
+    if (/box.?truck|straight.?truck/.test(t)) return IC_TRUCK;
+    if (/dry.?van|sprinter|cargo|\bvan\b|straight|\bbox\b/.test(t)) return IC_VAN;
     return IC_TRUCK;
   }
   function makeIcon(label) {
