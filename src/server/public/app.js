@@ -122,6 +122,26 @@
   }
   window.qfRefreshNavBadges = refreshNavBadges;
 
+  // ── Drayage-zones nav visibility ──────────────────────────────
+  // Progressive nav: "Drayage zones" only matters when the tenant has at
+  // least one drayage rate card, so the nav item stays hidden otherwise.
+  // Fails OPEN (leaves it visible) if the check can't run. Called on boot
+  // and re-run from renderRates after add / delete / service change so
+  // enabling drayage reveals the nav without a reload. Pass the already
+  // loaded rate-card array to skip the refetch.
+  function syncZonesNav(cards) {
+    var btn = document.querySelector('.sidebar [data-route="zones"]');
+    if (!btn) return;
+    var p = Array.isArray(cards)
+      ? Promise.resolve(cards)
+      : api('/api/tenant/rate-cards').then(function (d) { return (d && d.rateCards) || []; });
+    p.then(function (list) {
+      var hasDrayage = (list || []).some(function (r) { return r.service === 'drayage'; });
+      btn.style.display = hasDrayage ? '' : 'none';
+    }).catch(function () { btn.style.display = ''; });
+  }
+  window.qfSyncZonesNav = syncZonesNav;
+
   var state = { me: null, route: null };
 
   function setActiveNav(route) {
@@ -145,6 +165,7 @@
     if (route === 'ai') return renderAi(c);
     if (route === 'ingest') return renderIngest(c);
     if (route === 'brand') return renderBrand(c);
+    if (route === 'widget-settings') return renderWidgetSettings(c);
     if (route === 'embed') return renderEmbed(c);
     if (route === 'audit') return renderAudit(c);
     if (route === 'account') return renderAccount(c);
@@ -957,6 +978,10 @@
           c.appendChild(ltlPricingEditor(r));
         });
       }
+
+      // Adding a drayage card should reveal the Drayage-zones nav item
+      // without a reload (add re-renders this page, so this covers it).
+      syncZonesNav(d.rateCards || []);
     }).catch(showErr(c));
   }
 
@@ -1026,7 +1051,12 @@
       var sel = el('select', { class: 'select' });
       sel.style.width = '120px';
       options.forEach(function (o) { var op = document.createElement('option'); op.value = o; op.textContent = o; if (val === o) op.selected = true; sel.appendChild(op); });
-      sel.addEventListener('change', function () { var p = {}; p[field] = sel.value; api('/api/tenant/rate-cards/' + r.id, { method: 'PUT', body: p }).catch(toastErr); });
+      sel.addEventListener('change', function () {
+        var p = {}; p[field] = sel.value;
+        api('/api/tenant/rate-cards/' + r.id, { method: 'PUT', body: p })
+          .then(function () { if (field === 'service') syncZonesNav(); })
+          .catch(toastErr);
+      });
       var td = el('td'); td.appendChild(sel);
       if (label) td.dataset.label = label;
       return td;
@@ -1049,7 +1079,7 @@
     var del = el('button', { class: 'btn btn-danger btn-sm', text: 'Delete' });
     del.addEventListener('click', function () {
       if (!confirm('Delete rate card "' + (r.label || r.equipment) + '"?')) return;
-      api('/api/tenant/rate-cards/' + r.id, { method: 'DELETE' }).then(function () { tr.remove(); }).catch(toastErr);
+      api('/api/tenant/rate-cards/' + r.id, { method: 'DELETE' }).then(function () { tr.remove(); syncZonesNav(); }).catch(toastErr);
     });
     tr.appendChild(el('td', null, [del]));
     return tr;
@@ -1916,7 +1946,105 @@
   }
 
   // ── Embed ─────────────────────────────────────────────────────
-  function renderEmbed(c) {
+  // ── Shared widget-page helpers (Embed code + Widget settings) ──
+  // The brand-backed settings map 1:1 onto brand_configs columns and save
+  // via PUT /api/tenant/brand (the same endpoint the Customize page uses).
+  // Appearance (theme/accent/font/logo/company) lives on Customize and is
+  // intentionally NOT duplicated here — these pages own behaviour + copy.
+  function saveBrandPatch(patch) {
+    return api('/api/tenant/brand', { method: 'PUT', body: patch });
+  }
+  // A labelled text/textarea input that saves on blur (only when changed).
+  // `b` is the loaded brand object; saves write back into it so later blurs
+  // diff against the fresh value.
+  function brandSettingField(b, label, key, opts) {
+    opts = opts || {};
+    var f = el('div', { class: 'field', style: { marginBottom: '12px' } });
+    f.appendChild(el('label', { class: 'field-label', text: label }));
+    var inp = opts.textarea
+      ? el('textarea', { class: 'textarea', rows: '2' })
+      : el('input', { class: 'input', type: 'text' });
+    if (opts.placeholder) inp.setAttribute('placeholder', opts.placeholder);
+    inp.value = (b[key] != null ? b[key] : '');
+    inp.addEventListener('blur', function () {
+      var next = inp.value;
+      if (next === (b[key] != null ? b[key] : '')) return; // no change
+      var p = {}; p[key] = next;
+      saveBrandPatch(p).then(function () { b[key] = next; toastOk('Saved'); }).catch(toastErr);
+    });
+    f.appendChild(inp);
+    if (opts.hint) f.appendChild(el('span', { class: 'field-hint', text: opts.hint }));
+    return f;
+  }
+  // A toggle row (label + description + checkbox) that saves on change.
+  function brandSettingToggle(b, label, key, defaultVal, hint, gate) {
+    var wrap = el('label', {
+      style: {
+        display: 'flex', gap: '12px', alignItems: 'flex-start',
+        padding: '12px 0', borderTop: '1px solid var(--border)',
+        cursor: gate && !gate.allowed ? 'not-allowed' : 'pointer',
+      },
+    });
+    var cb = el('input', { type: 'checkbox', style: { marginTop: '3px', flex: '0 0 auto' } });
+    cb.checked = (b[key] !== undefined && b[key] !== null) ? !!b[key] : defaultVal;
+    cb.addEventListener('change', function () {
+      var next = cb.checked;
+      var p = {}; p[key] = next;
+      saveBrandPatch(p).then(function () { b[key] = next; toastOk('Saved'); }).catch(function (e) {
+        cb.checked = !next; // revert on failure
+        if (e && e.status === 403 && gate) toast(gate.upgradeMsg, 'warn');
+        else toastErr(e);
+      });
+    });
+    var txt = el('div', { style: { flex: '1 1 auto' } }, [
+      el('div', { text: label, style: { fontWeight: '600' } }),
+      hint ? el('div', { class: 'field-hint', text: hint, style: { marginTop: '2px' } }) : null,
+    ]);
+    wrap.appendChild(cb);
+    wrap.appendChild(txt);
+    return wrap;
+  }
+  // Preview card — show the live widget so brand changes are visible
+  // without opening a new tab. Points at the signed owner-preview URL
+  // (same as Customize) so the real calculator renders here even for a
+  // PRIVATE tenant — and so the frame is never blank (the bare directLink
+  // root serves the landing page, not the widget, on hosts without a
+  // subdomain).
+  function buildWidgetPreviewCard(directLink, previewUrl) {
+    var preview = el('div', { class: 'card' });
+    preview.appendChild(el('div', { class: 'card-title', text: 'Live preview' }));
+    preview.appendChild(el('div', { class: 'card-subtitle', text: 'This is exactly what your customers see at ' + (directLink || '') }));
+    var iframe = el('iframe', {
+      src: previewUrl + (previewUrl.indexOf('?') > -1 ? '&' : '?') + 'embed=1&preview=1',
+      style: {
+        width: '100%',
+        height: '680px',
+        border: '1px solid var(--border)',
+        borderRadius: 'var(--radius)',
+        marginTop: '8px',
+        background: '#fff',
+      },
+      loading: 'lazy',
+      title: 'QuoteFleet widget preview',
+    });
+    preview.appendChild(iframe);
+    var openBtn0 = el('a', {
+      href: directLink || '#',
+      target: '_blank',
+      rel: 'noopener',
+      class: 'btn btn-secondary',
+      text: 'Open in new tab ↗',
+      style: { marginTop: '10px', display: 'inline-flex' },
+    });
+    preview.appendChild(openBtn0);
+    return preview;
+  }
+
+  // ── Widget settings page ────────────────────────────────────────
+  // Split out of the Embed page (portal simplification): Embed code keeps
+  // the install artifacts (snippet / hosted link / advanced); this page
+  // owns what the calculator asks for and who can open it.
+  function renderWidgetSettings(c) {
     Promise.all([
       api('/api/tenant/embed'),
       api('/api/tenant/brand'),
@@ -1928,107 +2056,15 @@
       var access = results[2] || { accessMode: 'public', links: [] };
       var previewUrl = (results[3] && results[3].previewUrl) || (d.directLink || '/');
       c.innerHTML = '';
-      // De-clutter marker — the scoped :has() net in embed-panel.css hides the
-      // legacy injected clutter (launch workspace, setup coach, share-readiness,
-      // preview-publish mock) on this page only; the JS injectors are also
-      // guarded to skip /app/embed. Same pattern as Customize + Add-ons.
+      // Same de-clutter marker as the Embed page — the scoped :has() net in
+      // embed-panel.css suppresses legacy injected clutter + shell styling.
       var root = el('div', { class: 'qf-embed', 'data-qf-embed': '1' });
       c.appendChild(root);
       c = root;
-      c.appendChild(el('h1', { text: 'Embed code' }));
-      c.appendChild(el('p', { class: 'page-sub', text: 'Drop one line of HTML on any page of your website.' }));
+      c.appendChild(el('h1', { text: 'Widget settings' }));
+      c.appendChild(el('p', { class: 'page-sub', text: 'What your calculator asks for and who can open it.' }));
 
-      // Preview card — show the live widget so brand changes are visible
-      // without opening a new tab. Sandbox attribute on the iframe limits
-      // what the embedded page can do (no top-nav, no popups).
-      var preview = el('div', { class: 'card' });
-      preview.appendChild(el('div', { class: 'card-title', text: 'Live preview' }));
-      preview.appendChild(el('div', { class: 'card-subtitle', text: 'This is exactly what your customers see at ' + (d.directLink || '') }));
-      // Point at the signed owner-preview URL (same as Customize) so the real
-      // calculator renders here even for a PRIVATE tenant — and so the frame is
-      // never blank (the bare directLink root serves the landing page, not the
-      // widget, on hosts without a subdomain).
-      var iframe = el('iframe', {
-        src: previewUrl + (previewUrl.indexOf('?') > -1 ? '&' : '?') + 'embed=1&preview=1',
-        style: {
-          width: '100%',
-          height: '680px',
-          border: '1px solid var(--border)',
-          borderRadius: 'var(--radius)',
-          marginTop: '8px',
-          background: '#fff',
-        },
-        loading: 'lazy',
-        title: 'QuoteFleet widget preview',
-      });
-      preview.appendChild(iframe);
-      var openBtn0 = el('a', {
-        href: d.directLink || '#',
-        target: '_blank',
-        rel: 'noopener',
-        class: 'btn btn-secondary',
-        text: 'Open in new tab ↗',
-        style: { marginTop: '10px', display: 'inline-flex' },
-      });
-      preview.appendChild(openBtn0);
-      c.appendChild(preview);
-
-      // ── Widget settings ─────────────────────────────────────────
-      // These map 1:1 onto brand_configs columns and save via
-      // PUT /api/tenant/brand (the same endpoint the Customize page uses).
-      // Appearance (theme/accent/font/logo/company) lives on Customize and
-      // is intentionally NOT duplicated here — this page owns behaviour + copy.
-      function saveBrand(patch) {
-        return api('/api/tenant/brand', { method: 'PUT', body: patch });
-      }
-      // A labelled text/textarea input that saves on blur (only when changed).
-      function settingField(label, key, opts) {
-        opts = opts || {};
-        var f = el('div', { class: 'field', style: { marginBottom: '12px' } });
-        f.appendChild(el('label', { class: 'field-label', text: label }));
-        var inp = opts.textarea
-          ? el('textarea', { class: 'textarea', rows: '2' })
-          : el('input', { class: 'input', type: 'text' });
-        if (opts.placeholder) inp.setAttribute('placeholder', opts.placeholder);
-        inp.value = (b[key] != null ? b[key] : '');
-        inp.addEventListener('blur', function () {
-          var next = inp.value;
-          if (next === (b[key] != null ? b[key] : '')) return; // no change
-          var p = {}; p[key] = next;
-          saveBrand(p).then(function () { b[key] = next; toastOk('Saved'); }).catch(toastErr);
-        });
-        f.appendChild(inp);
-        if (opts.hint) f.appendChild(el('span', { class: 'field-hint', text: opts.hint }));
-        return f;
-      }
-      // A toggle row (label + description + checkbox) that saves on change.
-      function settingToggle(label, key, defaultVal, hint, gate) {
-        var wrap = el('label', {
-          style: {
-            display: 'flex', gap: '12px', alignItems: 'flex-start',
-            padding: '12px 0', borderTop: '1px solid var(--border)',
-            cursor: gate && !gate.allowed ? 'not-allowed' : 'pointer',
-          },
-        });
-        var cb = el('input', { type: 'checkbox', style: { marginTop: '3px', flex: '0 0 auto' } });
-        cb.checked = (b[key] !== undefined && b[key] !== null) ? !!b[key] : defaultVal;
-        cb.addEventListener('change', function () {
-          var next = cb.checked;
-          var p = {}; p[key] = next;
-          saveBrand(p).then(function () { b[key] = next; toastOk('Saved'); }).catch(function (e) {
-            cb.checked = !next; // revert on failure
-            if (e && e.status === 403 && gate) toast(gate.upgradeMsg, 'warn');
-            else toastErr(e);
-          });
-        });
-        var txt = el('div', { style: { flex: '1 1 auto' } }, [
-          el('div', { text: label, style: { fontWeight: '600' } }),
-          hint ? el('div', { class: 'field-hint', text: hint, style: { marginTop: '2px' } }) : null,
-        ]);
-        wrap.appendChild(cb);
-        wrap.appendChild(txt);
-        return wrap;
-      }
+      c.appendChild(buildWidgetPreviewCard(d.directLink, previewUrl));
 
       // Plan gate for the "Powered by" badge (removing it is a Vital+ perk;
       // trialing tenants resolve to Pro and pass). Mirrors the backend gate.
@@ -2043,28 +2079,28 @@
 
       // Card 1 — Lead capture & copy.
       var lc = el('div', { class: 'card', style: { marginTop: '14px' } });
-      lc.appendChild(el('div', { class: 'card-title', text: 'Widget settings — lead capture & copy' }));
+      lc.appendChild(el('div', { class: 'card-title', text: 'Lead capture & copy' }));
       lc.appendChild(el('div', { class: 'card-subtitle', text: 'Control what contact details a customer must provide and the copy shown on your widget.' }));
-      lc.appendChild(settingToggle(
+      lc.appendChild(brandSettingToggle(b,
         'Require email',
         'requireEmail',
         true,
         'When on, a lead cannot be submitted without an email address.'
       ));
-      lc.appendChild(settingToggle(
+      lc.appendChild(brandSettingToggle(b,
         'Require phone',
         'requirePhone',
         false,
         'When on, a lead cannot be submitted without a phone number. Useful if you prefer to call back.'
       ));
-      lc.appendChild(settingToggle(
+      lc.appendChild(brandSettingToggle(b,
         'Show price before asking for contact info',
         'showQuoteBeforeContact',
         false,
         'When on, the customer sees the quoted price first; contact details are asked only when they click “Claim this quote”.'
       ));
       // Powered-by toggle (plan-gated: removing the badge needs Vital+).
-      lc.appendChild(settingToggle(
+      lc.appendChild(brandSettingToggle(b,
         'Show “Powered by QuoteFleet” footer',
         'showPoweredBy',
         true,
@@ -2075,11 +2111,11 @@
       ));
       // Copy fields sit below the toggles, separated by a hairline.
       var copyWrap = el('div', { style: { marginTop: '14px', paddingTop: '14px', borderTop: '1px solid var(--border)' } });
-      copyWrap.appendChild(settingField('CTA button text', 'ctaText', {
+      copyWrap.appendChild(brandSettingField(b, 'CTA button text', 'ctaText', {
         placeholder: 'Get instant quote',
         hint: 'The label on your widget’s main call-to-action button.',
       }));
-      copyWrap.appendChild(settingField('Footer note', 'footerNote', {
+      copyWrap.appendChild(brandSettingField(b, 'Footer note', 'footerNote', {
         textarea: true,
         placeholder: 'e.g. Quotes are estimates — final pricing confirmed by our team.',
         hint: 'Optional line shown under the widget (e.g. a disclaimer or hours).',
@@ -2087,21 +2123,48 @@
       lc.appendChild(copyWrap);
       c.appendChild(lc);
 
-      // Card 2 — Embedding (allowed domains). Sits just above the snippet
-      // because it governs where that snippet is allowed to run.
+      // Card 2 — Access (public vs private invite-only calculator).
+      var accCard = el('div', { class: 'card', style: { marginTop: '14px' } });
+      c.appendChild(accCard);
+      renderAccessCard(accCard, access);
+    }).catch(showErr(c));
+  }
+
+  function renderEmbed(c) {
+    Promise.all([
+      api('/api/tenant/embed'),
+      api('/api/tenant/brand'),
+      api('/api/tenant/preview-url'),
+    ]).then(function (results) {
+      var d = results[0];
+      var b = (results[1] && results[1].brand) || {};
+      var previewUrl = (results[2] && results[2].previewUrl) || (d.directLink || '/');
+      c.innerHTML = '';
+      // De-clutter marker — the scoped :has() net in embed-panel.css hides the
+      // legacy injected clutter (launch workspace, setup coach, share-readiness,
+      // preview-publish mock) on this page only; the JS injectors are also
+      // guarded to skip /app/embed. Same pattern as Customize + Add-ons.
+      var root = el('div', { class: 'qf-embed', 'data-qf-embed': '1' });
+      c.appendChild(root);
+      c = root;
+      c.appendChild(el('h1', { text: 'Embed code' }));
+      c.appendChild(el('p', { class: 'page-sub', text: 'Drop one line of HTML on any page of your website.' }));
+
+      c.appendChild(buildWidgetPreviewCard(d.directLink, previewUrl));
+
+      // Lead capture / copy / access moved to the Widget settings page
+      // (renderWidgetSettings) — this page keeps the install artifacts only.
+
+      // Embedding (allowed domains) — lives in the Advanced expander
+      // because it governs where the snippet is allowed to run.
       var emb = el('div', { class: 'card', style: { marginTop: '14px' } });
       emb.appendChild(el('div', { class: 'card-title', text: 'Widget settings — embedding' }));
       emb.appendChild(el('div', { class: 'card-subtitle', text: 'Restrict which websites are allowed to load your widget. Leave blank to allow any site.' }));
-      emb.appendChild(settingField('Allowed domains', 'allowedDomains', {
+      emb.appendChild(brandSettingField(b, 'Allowed domains', 'allowedDomains', {
         placeholder: 'acmeco.com, acmeco.ca',
         hint: 'Comma-separated list of domains permitted to embed the widget. Blank = no restriction.',
       }));
       // NOTE: emb is re-parented into the Advanced expander at the end.
-
-      // Card 2b — Access (public vs private invite-only calculator).
-      var accCard = el('div', { class: 'card', style: { marginTop: '14px' } });
-      c.appendChild(accCard);
-      renderAccessCard(accCard, access);
 
       var card = el('div', { class: 'card', style: { marginTop: '14px' } });
       card.appendChild(el('div', { class: 'card-title', text: 'Recommended — JS embed (auto-resize)' }));
@@ -2168,7 +2231,7 @@
   // ── Access control card (public vs private invite-only) ────────
   function renderAccessCard(card, access) {
     card.innerHTML = '';
-    card.appendChild(el('div', { class: 'card-title', text: 'Widget settings — access' }));
+    card.appendChild(el('div', { class: 'card-title', text: 'Access' }));
     card.appendChild(el('div', { class: 'card-subtitle', text: 'Choose who can open your rate calculator.' }));
 
     var mode = access.accessMode === 'private' ? 'private' : 'public';
@@ -2701,6 +2764,7 @@
       });
 
       refreshNavBadges();
+      syncZonesNav();
 
       // Route from URL
       var initial = (location.pathname.split('/app/')[1] || 'overview').split('/')[0];
