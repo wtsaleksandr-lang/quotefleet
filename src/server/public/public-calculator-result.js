@@ -49,15 +49,28 @@
   function buildGuide() {
     const result = document.getElementById('qf-result');
     if (!result || result.style.display === 'none') return;
-    // Bail BEFORE mutating if the guide already exists. buildPrintSummary()
-    // rewrites DOM, and this runs from a MutationObserver watching the body
-    // subtree — calling it unconditionally re-triggered the observer on every
-    // pass, pegging the CPU and crashing the widget after each quote.
-    if (result.querySelector(`.${PANEL_CLASS}`)) return;
-    buildPrintSummary();
 
     const meta = text('qf-meta');
     const total = text('qf-total');
+    // Never render a "$0" card: #qf-total counts up from 0 (widget.js
+    // animateNumber, ~750ms) and this fires from a MutationObserver mid-count.
+    // Wait for a real, non-zero total before building.
+    if (!parseFloat(total.replace(/[^0-9.]/g, ''))) return;
+
+    // If the guide already exists, keep its total in sync as the count-up
+    // finishes (or the customer re-quotes). Guarded on change so we don't
+    // re-trigger the observer in a loop. buildPrintSummary() is intentionally
+    // NOT called here (it rewrites DOM and would re-arm the observer) —
+    // printQuote() rebuilds the print summary fresh on demand.
+    const existing = result.querySelector(`.${PANEL_CLASS}`);
+    if (existing) {
+      const strong = existing.querySelector('.qf-result-guide-head strong');
+      const want = '$' + total;
+      if (strong && strong.textContent !== want) strong.textContent = want;
+      return;
+    }
+    buildPrintSummary();
+
     const service = meta.split('·')[1]?.trim() || 'freight move';
 
     const guide = document.createElement('div');
