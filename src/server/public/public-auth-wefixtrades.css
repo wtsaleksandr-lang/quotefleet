@@ -2,7 +2,7 @@
 
 /* Phase BW: remove teal/cyan leftovers from auth pages. */
 body.qf-auth-wft {
-  --accent: #0D3CFC !important;
+  --accent: #6E8BFF !important; /* on-dark TEXT/glyph accent (accentOnDark); was cobalt #0D3CFC → failed WCAG (~2.2:1) on dark card. Solid cobalt button fills below stay hardcoded. */
   --accent-ink: #FFFFFF !important;
   --accent-soft: rgba(13,60,252,.14) !important;
   --primary: #0D3CFC !important;

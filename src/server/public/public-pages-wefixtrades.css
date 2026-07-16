@@ -2,7 +2,7 @@
 
 /* Phase BQ: WeFixTrades-style skin for secondary public pages. */
 .qf-public-wft {
-  --accent: #0d3cfc;
+  --accent: #6E8BFF; /* on-dark TEXT/link accent (accentOnDark); was cobalt #0D3CFC → failed WCAG (~2.5:1) on dark. Solid cobalt button fills below stay hardcoded. */
   --accent-ink: #ffffff;
   --accent-soft: rgba(13,60,252,.14);
   --qf-wft-bg: #181D1F;
