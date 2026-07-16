@@ -450,3 +450,26 @@ body { padding-left: var(--space-0-5); padding-right: var(--space-0-5); }
 .qf-widget .qf-contact-value { font-weight: 400; }
 .qf-widget .qf-demo-brand-card { font-size: 13px; }
 .qf-widget .qf-demo-brand-card span { font-weight: 400; font-size: 11px; }
+
+/* ── Equipment | Weight row alignment (Alex). The Weight title row carries the
+   lbs/kg toggle, making it taller than the Equipment title — so the two field
+   boxes started at different heights. Each column becomes a flex column whose
+   field is pushed to the bottom, so both boxes share a baseline no matter how
+   tall their title rows are. ── */
+#qf-equip-weight-row .qf-addr-col {
+  display: flex;
+  flex-direction: column;
+}
+#qf-equip-weight-row .qf-addr-col .qf-field {
+  margin-top: auto;
+}
+#qf-equip-weight-row .qf-section-title {
+  display: flex;
+  align-items: center;
+  min-height: 24px;
+}
+/* The base .qf-addr-row uses align-items:flex-start, so the two columns don't
+   stretch and margin-top:auto had nothing to push against — stretch THIS row. */
+#qf-equip-weight-row {
+  align-items: stretch;
+}
