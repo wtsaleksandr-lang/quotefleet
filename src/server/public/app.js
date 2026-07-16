@@ -2096,7 +2096,7 @@
         placeholder: 'acmeco.com, acmeco.ca',
         hint: 'Comma-separated list of domains permitted to embed the widget. Blank = no restriction.',
       }));
-      c.appendChild(emb);
+      // NOTE: emb is re-parented into the Advanced expander at the end.
 
       // Card 2b — Access (public vs private invite-only calculator).
       var accCard = el('div', { class: 'card', style: { marginTop: '14px' } });
@@ -2121,7 +2121,7 @@
       var card2 = el('div', { class: 'card', style: { marginTop: '14px' } });
       card2.appendChild(el('div', { class: 'card-title', text: 'Iframe-only (fallback)' }));
       card2.appendChild(el('div', { class: 'code', text: d.iframeFallback }));
-      c.appendChild(card2);
+      // NOTE: card2 is re-parented into the Advanced expander at the end.
 
       var card3 = el('div', { class: 'card', style: { marginTop: '14px' } });
       card3.appendChild(el('div', { class: 'card-title', text: 'Direct hosted link' }));
@@ -2140,7 +2140,28 @@
         api('/api/tenant/regenerate-embed', { method: 'POST' }).then(function () { go('embed'); }).catch(toastErr);
       });
       card4.appendChild(rg);
-      c.appendChild(card4);
+
+      // ── Advanced (collapsed by default) ──────────────────────────
+      // Power-user settings folded behind one expander to keep the
+      // default surface focused on preview + snippet + hosted link.
+      // Re-parent the already-built cards (moves nodes; preserves their
+      // listeners + input state) into a <details>.
+      var adv = el('details', { style: { marginTop: '16px' } });
+      var sum = el('summary', {
+        style: {
+          cursor: 'pointer', fontWeight: '700', fontSize: '13px', color: 'var(--ink)',
+          padding: '10px 12px', borderRadius: '10px', background: 'var(--surface)',
+          border: '1px solid var(--border)', userSelect: 'none',
+        },
+      });
+      sum.appendChild(el('span', { text: 'Advanced' }));
+      sum.appendChild(el('span', {
+        style: { color: 'var(--muted)', fontWeight: '500', fontSize: '12px', marginLeft: '6px' },
+        text: '— allowed domains, iframe fallback, regenerate token',
+      }));
+      adv.appendChild(sum);
+      [emb, card2, card4].forEach(function (sec) { adv.appendChild(sec); });
+      c.appendChild(adv);
     }).catch(showErr(c));
   }
 
