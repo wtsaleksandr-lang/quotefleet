@@ -1838,7 +1838,13 @@
       pickBtn.addEventListener('click', function () { fileInput.click(); });
       drop.appendChild(pickBtn);
       drop.appendChild(fileInput);
-      fileInput.addEventListener('change', function () { if (fileInput.files && fileInput.files[0]) handleFile(fileInput.files[0]); });
+      fileInput.addEventListener('change', function () {
+        if (fileInput.files && fileInput.files[0]) handleFile(fileInput.files[0]);
+        // Reset so re-picking the SAME file (e.g. after Remove, or after
+        // cancelling the crop) still fires `change` — otherwise switching back
+        // to a previously-chosen logo silently does nothing.
+        fileInput.value = '';
+      });
       ['dragover', 'dragenter'].forEach(function (ev) { drop.addEventListener(ev, function (e) { e.preventDefault(); drop.classList.add('is-drag'); }); });
       ['dragleave', 'dragend'].forEach(function (ev) { drop.addEventListener(ev, function (e) { e.preventDefault(); drop.classList.remove('is-drag'); }); });
       drop.addEventListener('drop', function (e) {
