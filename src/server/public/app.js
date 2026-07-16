@@ -1728,6 +1728,25 @@
       repaintFontColors();
       controls.appendChild(textSec);
 
+      // Fold the fine-tuning (accent, font, button hover, text colour) into a
+      // collapsed "Advanced appearance" panel so the default surface stays simple
+      // (Alex): theme preset, logo, and name/tagline are all a carrier needs to
+      // pick a look. Re-parenting keeps every section's listeners + state intact.
+      var advDetails = el('details', { class: 'qf-cz-advanced', style: { marginTop: '4px' } });
+      var advSummary = el('summary', { class: 'qf-cz-adv-summary', style: {
+        cursor: 'pointer', fontWeight: '700', fontSize: '13px', color: 'var(--ink)',
+        padding: '10px 12px', borderRadius: '10px', background: 'var(--surface)',
+        border: '1px solid var(--border)', userSelect: 'none'
+      } });
+      advSummary.appendChild(el('span', { text: 'Advanced appearance' }));
+      advSummary.appendChild(el('span', { style: { color: 'var(--muted)', fontWeight: '500', fontSize: '12px', marginLeft: '6px' }, text: '— accent, font, hover, text colour' }));
+      advDetails.appendChild(advSummary);
+      [accentSec, fontSec, hoverSec, textSec].forEach(function (s) {
+        s.style.marginTop = '8px';
+        advDetails.appendChild(s); // appendChild re-parents out of `controls`
+      });
+      controls.appendChild(advDetails);
+
       // ── Logo (drag-drop + client downscale to a small data-URL) ──
       var logoSec = el('div', { class: 'card qf-cz-section' });
       logoSec.appendChild(el('div', { class: 'qf-cz-section-title', text: 'Logo' }));
