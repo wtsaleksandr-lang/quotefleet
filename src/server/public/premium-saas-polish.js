@@ -7,27 +7,25 @@
     document.head.appendChild(el);
   }
 
-  loadAsset('link', { rel: 'stylesheet', href: '/followup-workspace.css' });
-  loadAsset('link', { rel: 'stylesheet', href: '/lead-crm-polish.css' });
-  loadAsset('link', { rel: 'stylesheet', href: '/leads-list-focus.css' });
-  loadAsset('link', { rel: 'stylesheet', href: '/drayage-zone-polish.css' });
-  loadAsset('link', { rel: 'stylesheet', href: '/ai-import-polish.css' });
-  loadAsset('link', { rel: 'stylesheet', href: '/share-readiness.css' });
-  loadAsset('link', { rel: 'stylesheet', href: '/account-readiness.css' });
-  loadAsset('link', { rel: 'stylesheet', href: '/audit-log-polish.css' });
-  loadAsset('link', { rel: 'stylesheet', href: '/launch-panel.css' });
-  loadAsset('link', { rel: 'stylesheet', href: '/overview-command-center.css' });
-  loadAsset('link', { rel: 'stylesheet', href: '/brand-studio-preview.css' });
+  // Kept: freight-premium-theme.css is LIVE — it themes the public widget
+  // (widget.html links it directly, and its selectors — .qf-widget, .qf-header,
+  // .qf-result, .qf-select, :root/body vars — are produced by widget.js and the
+  // live public-calculator-* scripts).
   loadAsset('link', { rel: 'stylesheet', href: '/freight-premium-theme.css' });
   // Retired (portal simplification, Alex): ALL of the injected JS "polish" panels
   // that layered coach / builder / preview / readiness / activity-workspace UI on
   // top of the clean core pages (e.g. followup-workspace injected a full mock
   // activity board over the Overview). Every one was decorative (no API/state), so
-  // removing them loses no functionality. The CSS above stays loaded and simply
-  // has no panels left to style. Retired scripts:
+  // removing them loses no functionality. Retired scripts:
   //   followup-workspace, lead-crm-polish, leads-list-focus, drayage-zone-polish,
   //   ai-import-polish, audit-log-polish, share-readiness, account-readiness,
   //   launch-panel, overview-command-center, brand-studio-preview, freight-brand-refresh
+  // Their now-dead companion stylesheets are no longer loaded either (every selector
+  // was namespaced to the retired panels; verified against all live app/widget code):
+  //   followup-workspace.css, lead-crm-polish.css, leads-list-focus.css,
+  //   drayage-zone-polish.css, ai-import-polish.css, share-readiness.css,
+  //   account-readiness.css, audit-log-polish.css, launch-panel.css,
+  //   overview-command-center.css, brand-studio-preview.css
 
   function toast(message, tone = 'success', title = 'QuoteFleet') {
     let stack = document.querySelector('.qf-toast-stack');
