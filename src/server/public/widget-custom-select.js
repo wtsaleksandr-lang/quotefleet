@@ -31,13 +31,25 @@
     '<g stroke="#3f5cc0" stroke-width="1.3" fill="none"><path d="M13 9.7v4.6"/><path d="M11 10.9l4 2.2"/><path d="M15 10.9l-4 2.2"/></g></svg>';
   var IC_OPENTOP = SVG_HEAD + '<path d="M2.5 8v8.5M21.5 8v8.5M2.5 16.5h19"/><path d="M2.5 8h19" stroke-dasharray="2.4 2.4"/></svg>';
   var IC_FLAT = SVG_HEAD + '<path d="M2 13.5h20M4.5 13.5V11M19.5 13.5V11"/><circle cx="7" cy="17" r="1.5"/><circle cx="16" cy="17" r="1.5"/></svg>';
+  // Step deck (drop deck): two-level profile — low rear deck, raised front over
+  // the gooseneck; wheels only under the low deck.
+  var IC_STEPDECK = SVG_HEAD + '<path d="M2.5 15h10v-4h7.5"/><circle cx="6" cy="17.2" r="1.4"/><circle cx="9.5" cy="17.2" r="1.4"/></svg>';
+  // Conestoga: flat deck under a rolling-tarp canopy (the arched cover).
+  var IC_CONESTOGA = SVG_HEAD + '<path d="M3.5 15.5h17"/><path d="M4.5 15.5v-3.5a7.5 7.5 0 0 1 15 0v3.5"/><circle cx="7.5" cy="17.5" r="1.4"/><circle cx="16.5" cy="17.5" r="1.4"/></svg>';
+  // Flat rack: a container base with fixed/collapsible end posts (no wheels — it
+  // rides on a chassis), which sets it apart from the wheeled trailer flats.
+  var IC_FLATRACK = SVG_HEAD + '<path d="M2.5 15.5h19"/><path d="M4.5 15.5V10M19.5 15.5V10"/><path d="M3.4 10h2.2M18.4 10h2.2"/></svg>';
   var IC_VAN = SVG_HEAD + '<rect x="2.5" y="6.5" width="15" height="9.5" rx="1"/><circle cx="6.5" cy="18.5" r="1.5"/><circle cx="13.5" cy="18.5" r="1.5"/></svg>';
   var IC_TRUCK = SVG_HEAD + '<path d="M2.5 7h9.5v8.5h-9.5z"/><path d="M12 10h3.6l2.9 2.9v2.6H12z"/><circle cx="6" cy="17.5" r="1.5"/><circle cx="15.5" cy="17.5" r="1.5"/></svg>';
   function equipIconSvg(label) {
     var t = (label || '').toLowerCase();
     if (/reefer|refriger|genset/.test(t)) return IC_REEFER;
     if (/open.?top/.test(t)) return IC_OPENTOP;
-    if (/flat.?rack|flatbed|flat.?bed|flat.?deck|step.?deck|conestoga|lowboy/.test(t)) return IC_FLAT;
+    // Flat family, each distinct. Order matters: "flat rack" contains "flat".
+    if (/flat.?rack|flatrack/.test(t)) return IC_FLATRACK;
+    if (/step.?deck|drop.?deck|lowboy|rgn/.test(t)) return IC_STEPDECK;
+    if (/conestoga|curtain|roll.?tarp/.test(t)) return IC_CONESTOGA;
+    if (/flat.?bed|flatbed|flat.?deck|\bflat\b/.test(t)) return IC_FLAT;
     // Containers, sized. High-cube => taller; 45' is always high-cube.
     var hc = /high.?cube|hi.?cube|highcube|\bhc\b/.test(t);
     if (/(^|\D)45(\D|$)/.test(t)) return IC_C45HC;
