@@ -28,7 +28,7 @@
     <div class="qf-mini-stepper" aria-label="Calculator steps"><span>1. Details</span><span>2. Estimate</span><span>3. Written quote</span></div>
     <div class="qf-step active" id="qf-step-quote">
       <div class="qf-tabs" id="qf-services"></div>
-      <div class="qf-addr-row">
+      <div class="qf-addr-row" id="qf-equip-weight-row">
         <div class="qf-addr-col">
           <div class="qf-section-title qf-title-inline">Equipment <span class="qf-help" data-tip="The truck or container type. Dry Van = standard enclosed trailer; Reefer = refrigerated; Flatbed = open deck; 20'/40'/45' = ocean container drayage. Open top and flat rack may need oversize details.">?</span></div>
           <div class="qf-field"><select class="qf-select" id="qf-equipment"></select></div>
@@ -99,18 +99,16 @@
         </div>
       </div>
       <div class="qf-ltl-panel" id="qf-ltl-panel" style="display:none;">
-        <div class="qf-section-title qf-title-inline" style="margin-top:14px;">Size &amp; handling <span class="qf-help" data-tip="LTL is priced by freight class, which comes from your shipment's density (weight ÷ size). Enter the footprint of the whole shipment — pallet dimensions and stacked height — so we can estimate the class and a size/weight-aware rate.">?</span></div>
-        <div class="qf-grid">
-          <div class="qf-field"><label>Length (in)</label><input class="qf-input" id="qf-ltl-length" type="number" min="0" inputmode="decimal" placeholder="e.g. 48"></div>
-          <div class="qf-field"><label>Width (in)</label><input class="qf-input" id="qf-ltl-width" type="number" min="0" inputmode="decimal" placeholder="e.g. 40"></div>
-          <div class="qf-field"><label>Height (in)</label><input class="qf-input" id="qf-ltl-height" type="number" min="0" inputmode="decimal" placeholder="e.g. 48"></div>
+        <div class="qf-section-title qf-title-inline" style="margin-top:16px;">Freight details <span class="qf-help" data-tip="LTL is priced by freight class, which comes from each item's density (weight ÷ size). Add every commodity with its quantity, dimensions, and weight — we compute the class and a size/weight-aware rate. Final class is confirmed by the team.">?</span></div>
+        <div class="qf-ltl-items" id="qf-ltl-items"></div>
+        <button type="button" class="qf-ltl-add" id="qf-ltl-add"><span aria-hidden="true">＋</span> Add item</button>
+        <div class="qf-ltl-summary" id="qf-ltl-summary" aria-live="polite">
+          <div class="qf-ltl-sum-cell"><span class="qf-ltl-sum-lbl">Weight</span><span class="qf-ltl-sum-val" id="qf-ltl-sum-weight">—</span></div>
+          <div class="qf-ltl-sum-cell"><span class="qf-ltl-sum-lbl">Pieces</span><span class="qf-ltl-sum-val" id="qf-ltl-sum-pieces">0</span></div>
+          <div class="qf-ltl-sum-cell"><span class="qf-ltl-sum-lbl">Freight class</span><span class="qf-ltl-sum-val" id="qf-ltl-sum-class">—</span></div>
+          <div class="qf-ltl-sum-cell"><span class="qf-ltl-sum-lbl">Stacking</span><span class="qf-ltl-sum-val" id="qf-ltl-sum-stack">Stackable</span></div>
         </div>
-        <div class="qf-ltl-class" id="qf-ltl-class" style="display:none;"></div>
-        <div class="qf-flags qf-ltl-flags">
-          <label><input type="checkbox" id="qf-ltl-palletized" checked> <span>Palletized</span><span class="qf-help" data-tip="Freight is on pallets or skids. Loose / floor-loaded freight takes longer to handle and may add a handling fee.">?</span></label>
-          <label><input type="checkbox" id="qf-ltl-dock" checked> <span>Loaded from a dock</span><span class="qf-help" data-tip="Pickup and delivery are at a loading dock. If there is no dock (residential or limited-access), a liftgate is needed and a fee applies.">?</span></label>
-        </div>
-        <div class="qf-field-hint">Dimensions and weight determine the freight class, which drives the LTL rate. Final class is confirmed by the team.</div>
+        <div class="qf-ltl-remark" id="qf-ltl-remark"></div>
       </div>
       <div class="qf-options-panel" id="qf-options">
         <button type="button" class="qf-options-summary" id="qf-options-summary" aria-haspopup="dialog" aria-expanded="false"><span>Shipment options &amp; <span style="white-space:nowrap">add-ons</span></span><span class="qf-options-count" id="qf-options-count" hidden></span><span class="qf-options-caret" aria-hidden="true"></span></button>

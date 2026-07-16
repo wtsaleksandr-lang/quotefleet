@@ -143,6 +143,7 @@
     equipment: null,
     weightUnit: 'lbs',
     quote: null,
+    ltlItems: [],
     selectedAccessorials: [],
     pickupPortCode: '',
     pickupTerminalCode: '',
@@ -255,6 +256,8 @@
       var t = $('qf-services') || $('qf-equipment') || document.querySelector('.qf-widget');
       if (t && t.scrollIntoView) t.scrollIntoView({ behavior: 'smooth', block: 'start' });
     });
+    var ltlAdd = $('qf-ltl-add');
+    if (ltlAdd) ltlAdd.addEventListener('click', function () { state.ltlItems.push(newLtlItem()); renderLtlItems(); updateLtlSummary(); });
     initOptionsPanel();
     initTypeaheads();
     initRouteMapCard();
@@ -326,9 +329,10 @@
       ['qf-cb-phone', 'qf-cb-time', 'qf-cb-topic'].forEach(function (id) { var el = $(id); if (el) { el.value = ''; el.disabled = false; } });
       showCallbackError(null);
       $('qf-result').style.display = 'none';
-      ['qf-pickup-zip', 'qf-delivery-zip', 'qf-weight', 'qf-booking', 'qf-c-name', 'qf-c-email', 'qf-c-phone', 'qf-c-company', 'qf-c-notes', 'qf-oog-length', 'qf-oog-width', 'qf-oog-height', 'qf-oog-weight', 'qf-oog-notes', 'qf-ltl-length', 'qf-ltl-width', 'qf-ltl-height']
+      ['qf-pickup-zip', 'qf-delivery-zip', 'qf-weight', 'qf-booking', 'qf-c-name', 'qf-c-email', 'qf-c-phone', 'qf-c-company', 'qf-c-notes', 'qf-oog-length', 'qf-oog-width', 'qf-oog-height', 'qf-oog-weight', 'qf-oog-notes']
         .forEach(function (id) { var el = $(id); if (el) el.value = ''; });
-      var ltlClassBox = $('qf-ltl-class'); if (ltlClassBox) { ltlClassBox.style.display = 'none'; ltlClassBox.innerHTML = ''; }
+      state.ltlItems = [];
+      if (state.service === 'ltl') { renderLtlItems(); updateLtlSummary(); }
       var oog = $('qf-oog-check'); if (oog) oog.checked = false;
       var oogFields = $('qf-oog-fields'); if (oogFields) oogFields.style.display = 'none';
       var oc = $('qf-ocean-carrier'); if (oc) oc.value = '';
@@ -459,22 +463,109 @@
       });
     });
   }
-  function updateLtlClassReadout() {
-    var box = $('qf-ltl-class'); if (!box) return;
-    if (state.service !== 'ltl') { box.style.display = 'none'; return; }
-    var r = ltlClientClass(weightLbs() || 0, Number($('qf-ltl-length').value), Number($('qf-ltl-width').value), Number($('qf-ltl-height').value));
-    if (!r) { box.style.display = 'none'; box.innerHTML = ''; autoResize(); return; }
-    box.innerHTML = 'Estimated freight class <strong>' + r.cls + '</strong> &middot; ' + r.pcf.toFixed(1) + ' lb/ft&sup3;';
-    box.style.display = ''; autoResize();
+  // Map a density (lb/ft³) to an NMFC freight class using the same scale as
+  // ltlClientClass — factored out so the LTL summary can aggregate ALL items
+  // into one density and read the class off the same table.
+  function ltlClassFromDensity(d) {
+    if (!(d > 0)) return null;
+    for (var i = 0; i < LTL_DENSITY_SCALE.length; i++) { if (d >= LTL_DENSITY_SCALE[i][0]) return LTL_DENSITY_SCALE[i][1]; }
+    return 500;
   }
-  function syncLtlPanel() {
-    var panel = $('qf-ltl-panel'); if (!panel) return;
-    var isLtl = state.service === 'ltl';
-    panel.style.display = isLtl ? '' : 'none';
-    if (isLtl) {
-      ['qf-weight', 'qf-ltl-length', 'qf-ltl-width', 'qf-ltl-height'].forEach(function (id) { var e = $(id); if (e) e.oninput = updateLtlClassReadout; });
-      updateLtlClassReadout();
+  var LB_PER_KG = 2.2046226, IN_PER_CM = 1 / 2.54;
+  function newLtlItem() { return { commodity: '', freightType: 'General', qty: '1', length: '', width: '', height: '', dimUnit: 'in', weight: '', wtUnit: 'lb' }; }
+  function ensureLtlItem() { if (!state.ltlItems.length) state.ltlItems.push(newLtlItem()); }
+  // Per-item + aggregate LTL math, all normalized to inches + pounds. cubicFt is
+  // summed across items (each item's footprint × its quantity); the aggregate
+  // freight class comes from totalWeight ÷ totalCubicFt.
+  function ltlTotals() {
+    var totWt = 0, totPieces = 0, totCf = 0, maxDims = { l: 0, w: 0, h: 0 }, maxVol = -1, valid = 0;
+    state.ltlItems.forEach(function (it) {
+      var qty = Math.max(0, Number(it.qty) || 0);
+      var toIn = it.dimUnit === 'cm' ? IN_PER_CM : 1;
+      var l = (Number(it.length) || 0) * toIn, w = (Number(it.width) || 0) * toIn, h = (Number(it.height) || 0) * toIn;
+      var wLbs = (Number(it.weight) || 0) * (it.wtUnit === 'kg' ? LB_PER_KG : 1);
+      if (qty > 0) { totWt += wLbs; totPieces += qty; }
+      if (l > 0 && w > 0 && h > 0 && qty > 0) {
+        totCf += (l * w * h / 1728) * qty;
+        var vol = l * w * h;
+        if (vol > maxVol) { maxVol = vol; maxDims = { l: l, w: w, h: h }; }
+        if (wLbs > 0) valid++;
+      }
+    });
+    var density = totCf > 0 ? totWt / totCf : 0;
+    return { weightLbs: Math.round(totWt), pieces: totPieces, cubicFt: totCf, density: density, cls: ltlClassFromDensity(density), maxDims: maxDims, validItems: valid };
+  }
+  function updateLtlSummary() {
+    if (state.service !== 'ltl') return;
+    var t = ltlTotals();
+    var kg = Math.round(t.weightLbs / LB_PER_KG);
+    var wEl = $('qf-ltl-sum-weight'); if (wEl) wEl.textContent = t.weightLbs > 0 ? (t.weightLbs.toLocaleString() + ' lb / ' + kg.toLocaleString() + ' kg') : '—';
+    var pEl = $('qf-ltl-sum-pieces'); if (pEl) pEl.textContent = t.pieces > 0 ? String(t.pieces) : '0';
+    var cEl = $('qf-ltl-sum-class'); if (cEl) cEl.textContent = t.cls ? ('Class ' + t.cls) : '—';
+    autoResize();
+  }
+  // Rebuild the item rows from state.ltlItems. Only called on add/remove (not on
+  // keystroke) so typing never steals focus; per-field input handlers write back
+  // to the item object and refresh the summary in place.
+  function renderLtlItems() {
+    var host = $('qf-ltl-items'); if (!host) return;
+    ensureLtlItem();
+    host.innerHTML = '';
+    var multi = state.ltlItems.length > 1;
+    var FREIGHT_TYPES = ['General', 'Fragile', 'Hazardous', 'Temperature-controlled'];
+    state.ltlItems.forEach(function (item, idx) {
+      function bind(inp, key) { inp.value = item[key] != null ? item[key] : ''; inp.addEventListener('input', function () { item[key] = inp.value; updateLtlSummary(); }); inp.addEventListener('change', function () { item[key] = inp.value; updateLtlSummary(); }); return inp; }
+      function numField(key, ph) {
+        var inp = el('input', { class: 'qf-input', type: 'number', min: '0', inputmode: 'decimal', placeholder: ph, 'aria-label': ph });
+        return el('div', { class: 'qf-field' }, [bind(inp, key)]);
+      }
+      function unitField(key, opts) {
+        var sel = el('select', { class: 'qf-select' });
+        opts.forEach(function (o) { var op = document.createElement('option'); op.value = o; op.textContent = o; sel.appendChild(op); });
+        return el('div', { class: 'qf-field qf-ltl-unit' }, [bind(sel, key)]);
+      }
+      var commodity = el('input', { class: 'qf-input', type: 'text', placeholder: 'Commodity (e.g. furniture)', 'aria-label': 'Commodity description' });
+      var ftype = el('select', { class: 'qf-select', 'aria-label': 'Freight type' });
+      FREIGHT_TYPES.forEach(function (o) { var op = document.createElement('option'); op.value = o; op.textContent = o; ftype.appendChild(op); });
+      var rowA = el('div', { class: 'qf-ltl-row-a' }, [
+        el('div', { class: 'qf-field qf-ltl-commodity' }, [bind(commodity, 'commodity')]),
+        el('div', { class: 'qf-field qf-ltl-ftype' }, [bind(ftype, 'freightType')]),
+      ]);
+      var dims = el('div', { class: 'qf-ltl-dims' }, [numField('length', 'Length'), numField('width', 'Width'), numField('height', 'Height'), unitField('dimUnit', ['in', 'cm'])]);
+      var wt = el('div', { class: 'qf-ltl-wt' }, [numField('weight', 'Combined wt.'), unitField('wtUnit', ['lb', 'kg'])]);
+      var rowB = el('div', { class: 'qf-ltl-row-b' }, [
+        el('div', { class: 'qf-field qf-ltl-qty' }, [bind(el('input', { class: 'qf-input', type: 'number', min: '1', inputmode: 'numeric', placeholder: 'Qty', 'aria-label': 'Quantity' }), 'qty')]),
+        dims, wt,
+      ]);
+      var group = el('div', { class: 'qf-ltl-item' }, [rowA, rowB]);
+      if (multi) {
+        var x = el('button', { class: 'qf-ltl-remove', type: 'button', 'aria-label': 'Remove item', title: 'Remove item', text: '✕', on: { click: function () { state.ltlItems.splice(idx, 1); renderLtlItems(); updateLtlSummary(); } } });
+        group.appendChild(x);
+      }
+      host.appendChild(group);
+    });
+    var remark = $('qf-ltl-remark');
+    if (remark) {
+      var contact = (state.config && state.config.contact) || {};
+      var how = contact.phone ? ('call ' + contact.phone) : (contact.email ? ('email ' + contact.email) : 'contact us');
+      remark.textContent = 'Rates provided are based on stackable freight. If you have freight that is non-stackable, please ' + how + ' for a quote.';
     }
+    autoResize();
+  }
+  // Kept as an alias so the shared weight-unit toggle handler stays valid; in
+  // LTL mode weight now comes from the item rows, so it just refreshes the summary.
+  function updateLtlClassReadout() { updateLtlSummary(); }
+  function syncLtlPanel() {
+    var panel = $('qf-ltl-panel');
+    var isLtl = state.service === 'ltl';
+    // LTL is priced by class from size + weight, so the carrier-truck equipment
+    // picker and the single top-line weight field don't apply — hide the whole
+    // equipment/weight row in LTL and restore it for every other service.
+    var equipRow = $('qf-equip-weight-row');
+    if (equipRow) equipRow.style.display = isLtl ? 'none' : '';
+    if (!panel) return;
+    panel.style.display = isLtl ? '' : 'none';
+    if (isLtl) { ensureLtlItem(); renderLtlItems(); updateLtlSummary(); }
   }
 
   function renderServices(services) {
@@ -699,13 +790,32 @@
       meta: {},
     };
     if (state.service === 'ltl') {
-      var ltlL = Number($('qf-ltl-length').value), ltlW = Number($('qf-ltl-width').value), ltlH = Number($('qf-ltl-height').value);
-      if (ltlL > 0) req.lengthIn = ltlL;
-      if (ltlW > 0) req.widthIn = ltlW;
-      if (ltlH > 0) req.heightIn = ltlH;
-      var palEl = $('qf-ltl-palletized'), dockEl = $('qf-ltl-dock');
-      if (palEl) req.flags.palletized = !!palEl.checked;
-      if (dockEl) req.flags.loadedFromDock = !!dockEl.checked;
+      // Item-based LTL: aggregate every commodity row into the SAME payload the
+      // server already expects. weightLbs = total pounds; length/width/height =
+      // the LARGEST single item's footprint (inches) so existing server checks
+      // pass; equipment is fixed (not user-selectable in LTL). The per-item
+      // breakdown + computed class ride under the flexible meta object.
+      var t = ltlTotals();
+      req.equipment = state.equipment || 'ltl_pallet';
+      if (t.weightLbs > 0) req.weightLbs = t.weightLbs;
+      if (t.maxDims.l > 0) req.lengthIn = Math.round(t.maxDims.l);
+      if (t.maxDims.w > 0) req.widthIn = Math.round(t.maxDims.w);
+      if (t.maxDims.h > 0) req.heightIn = Math.round(t.maxDims.h);
+      req.flags.palletized = true;
+      req.flags.loadedFromDock = true;
+      req.meta.ltlClass = t.cls || undefined;
+      req.meta.ltlItems = state.ltlItems.map(function (it) {
+        var toIn = it.dimUnit === 'cm' ? IN_PER_CM : 1;
+        return {
+          commodity: (it.commodity || '').trim() || undefined,
+          freightType: it.freightType || 'General',
+          quantity: Math.max(0, Number(it.qty) || 0),
+          lengthIn: Math.round((Number(it.length) || 0) * toIn) || undefined,
+          widthIn: Math.round((Number(it.width) || 0) * toIn) || undefined,
+          heightIn: Math.round((Number(it.height) || 0) * toIn) || undefined,
+          weightLbs: Math.round((Number(it.weight) || 0) * (it.wtUnit === 'kg' ? LB_PER_KG : 1)) || undefined,
+        };
+      });
     }
     if (hasPostalCode(deliveryText, delivery)) req.meta.deliveryZipConfirmed = true;
     var oogCheck = $('qf-oog-check');
@@ -729,9 +839,13 @@
     if (!hasPickup) { showError('qf-error', 'Please pick a pickup port (drayage) or enter a pickup ZIP/postal code.'); return; }
     if (!req.delivery.zip && !req.delivery.city) { showError('qf-error', 'Please enter a delivery ZIP/postal code.'); return; }
     if (!hasPostalCode($('qf-delivery-zip').value, req.delivery)) { showError('qf-error', 'Please enter a delivery ZIP/postal code for a more accurate rate. City-only delivery can change the price in large metro areas.'); return; }
-    if (!(req.weightLbs > 0)) { showError('qf-error', req.service === 'ltl' ? 'Enter the shipment weight (lbs) — LTL is priced by weight and size.' : 'Enter the load weight (lbs).'); return; }
     if (req.service === 'ltl') {
-      if (!(req.lengthIn > 0 && req.widthIn > 0 && req.heightIn > 0)) { showError('qf-error', 'Enter length, width, and height (inches) so we can determine the freight class.'); return; }
+      var lt = ltlTotals();
+      if (lt.validItems < 1) { showError('qf-error', 'Add at least one item with its weight and length / width / height so we can determine the freight class.'); return; }
+    }
+    if (!(req.weightLbs > 0)) { showError('qf-error', req.service === 'ltl' ? 'Enter the shipment weight — LTL is priced by weight and size.' : 'Enter the load weight (lbs).'); return; }
+    if (req.service === 'ltl') {
+      if (!(req.lengthIn > 0 && req.widthIn > 0 && req.heightIn > 0)) { showError('qf-error', 'Enter length, width, and height for each item so we can determine the freight class.'); return; }
     }
     var oogCheck = $('qf-oog-check');
     if (isOpenTopOrFlatRack(req.equipment) && oogCheck && oogCheck.checked) {

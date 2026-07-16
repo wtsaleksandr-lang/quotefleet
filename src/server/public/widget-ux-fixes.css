@@ -322,3 +322,85 @@ body.qf-modal-open { overflow: hidden; }
   color: var(--w-primary);
   box-shadow: 0 1px 2px rgba(0, 0, 0, 0.12);
 }
+
+/* ── LTL item-based freight form (commodity · dims · weight · class) ──────
+   Reuses .qf-field/.qf-input/.qf-select chrome so every field is theme-aware
+   in both the midnight-dark and cream-light presets; this block only lays out
+   the item rows, the add button, and the live summary strip. Spacing uses the
+   8px ramp tokens; no literal black/white colors. Appended at EOF so the
+   line-based spacing baseline never renumbers. */
+.qf-ltl-items { display: block; }
+.qf-ltl-item {
+  position: relative;
+  border: 1px solid var(--w-border);
+  border-radius: 12px;
+  padding: var(--space-1-5);
+  margin-top: var(--space-1-5);
+  background: color-mix(in srgb, var(--w-fg) 3%, transparent);
+}
+.qf-ltl-remove {
+  position: absolute;
+  top: var(--space-1);
+  right: var(--space-1);
+  width: 24px;
+  height: 24px;
+  min-width: 24px;
+  min-height: 24px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0;
+  border: 1px solid var(--w-border);
+  border-radius: 999px;
+  background: var(--w-bg);
+  color: var(--w-muted);
+  font-size: 12px;
+  line-height: 1;
+  cursor: pointer;
+  transition: color 0.15s, border-color 0.15s, background 0.15s;
+}
+.qf-ltl-remove:hover { color: var(--w-primary); border-color: var(--w-primary); background: rgba(37, 99, 235, 0.08); }
+
+.qf-ltl-row-a { display: grid; grid-template-columns: 1.6fr 1fr; gap: var(--space-1); }
+.qf-ltl-row-b { display: flex; flex-wrap: wrap; align-items: flex-end; gap: var(--space-1); margin-top: var(--space-1); }
+.qf-ltl-qty { flex: 0 1 68px; min-width: 0; }
+.qf-ltl-dims { flex: 1 1 240px; min-width: 0; display: grid; grid-template-columns: 1fr 1fr 1fr 68px; gap: var(--space-1); }
+.qf-ltl-wt { flex: 1 1 170px; min-width: 0; display: grid; grid-template-columns: 1fr 68px; gap: var(--space-1); }
+.qf-ltl-unit .qf-select { padding-left: var(--space-1); padding-right: var(--space-1); text-align: center; }
+.qf-ltl-row-a .qf-field, .qf-ltl-row-b .qf-field { gap: 0; }
+
+/* Full-width dashed "add item" affordance. */
+.qf-ltl-add {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--space-1);
+  width: 100%;
+  margin-top: var(--space-1-5);
+  padding: var(--space-1-5);
+  font-size: 13px;
+  font-weight: 750;
+  border: 1px dashed var(--w-border);
+  border-radius: 12px;
+  background: transparent;
+  color: var(--w-primary);
+  cursor: pointer;
+  transition: border-color 0.15s, background 0.15s;
+}
+.qf-ltl-add:hover { border-color: var(--w-primary); background: rgba(37, 99, 235, 0.06); }
+.qf-ltl-add span { font-size: 16px; font-weight: 800; line-height: 1; }
+
+/* Live summary strip — weight (both units) · pieces · computed class · stacking. */
+.qf-ltl-summary {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-1-5);
+  margin-top: var(--space-2);
+  padding-top: var(--space-1-5);
+  border-top: 1px solid var(--w-border);
+}
+.qf-ltl-sum-cell { display: flex; flex-direction: column; gap: var(--space-0-5); flex: 1 1 auto; min-width: 0; }
+.qf-ltl-sum-lbl { font-size: 10.5px; font-weight: 800; text-transform: uppercase; letter-spacing: 0.06em; color: var(--w-muted); }
+.qf-ltl-sum-val { font-size: 14px; font-weight: 800; color: var(--w-text, var(--w-fg)); overflow-wrap: anywhere; }
+#qf-ltl-sum-class { color: var(--w-primary); }
+.qf-ltl-remark { margin-top: var(--space-1-5); font-size: 11.5px; line-height: 1.5; color: var(--w-muted); }
