@@ -57,25 +57,29 @@
         <div class="qf-field-hint">Select this if the refrigerated container needs powered temperature control during pickup, waiting time, or delivery.</div>
       </div>
       <div class="qf-drayage-only" id="qf-drayage-pickup" style="display:none;">
-        <div class="qf-section-title qf-title-inline" style="margin-top:14px;">Pickup port / terminal <span class="qf-help" data-tip="Drayage starts at a marine terminal or rail ramp. If you are unsure of the exact terminal, pick the port/city and your dispatcher will confirm.">?</span></div>
-        <div class="qf-grid">
-          <div class="qf-field qf-full qf-typeahead" id="qf-pickup-port-wrap"><label>Port or ramp city</label><input class="qf-input" id="qf-pickup-port-input" placeholder="Type a port — Los Angeles, Long Beach, Savannah…" autocomplete="off"><div class="qf-suggestions" id="qf-pickup-port-suggestions"></div></div>
-          <div class="qf-field qf-full"><label>Terminal <span class="qf-help" data-tip="The specific marine terminal or rail ramp. If you don't know, leave it as 'I don't know yet' and your dispatcher will check the booking.">?</span></label><select class="qf-select" id="qf-pickup-terminal"><option value="">— I don't know yet —</option></select></div>
-        </div>
-        <div class="qf-booking-card">
-          <div class="qf-section-title qf-title-inline" style="margin-top:0;">Booking details <span class="qf-title-muted">optional</span><span class="qf-help" data-tip="Optional. Carrier, booking number, or container number can help the team verify terminal, equipment, vessel arrival, and pickup requirements faster when tracking data is available.">?</span></div>
-          <div class="qf-grid">
-            <div class="qf-field"><label>Ocean carrier</label><select class="qf-select" id="qf-ocean-carrier"><option value="">— Not sure —</option><option>Maersk</option><option>MSC</option><option>CMA CGM</option><option>Hapag-Lloyd</option><option>ONE</option><option>Evergreen</option><option>COSCO / OOCL</option><option>Yang Ming</option><option>HMM</option><option>ZIM</option><option>Matson</option><option>Other</option></select></div>
-            <div class="qf-field"><label>Booking or container #</label><input class="qf-input" id="qf-booking" placeholder="Optional — e.g. SINI12345678" autocomplete="off"></div>
+        <div class="qf-addr-row" id="qf-drayage-row">
+          <div class="qf-addr-col" id="qf-drayage-left">
+            <div class="qf-section-title qf-addr-title">Pickup port <span class="qf-help" data-tip="Drayage starts at a marine terminal or rail ramp. If you are unsure of the exact terminal, pick the port/city and your dispatcher will confirm.">?</span></div>
+            <div class="qf-field qf-typeahead" id="qf-pickup-port-wrap"><input class="qf-input" id="qf-pickup-port-input" placeholder="Type a port — Los Angeles, Long Beach…" autocomplete="off"><div class="qf-suggestions" id="qf-pickup-port-suggestions"></div></div>
+            <div class="qf-field"><div class="qf-section-title qf-addr-title">Terminal <span class="qf-help" data-tip="The specific marine terminal or rail ramp. If you don't know, leave it as 'I don't know yet' and your dispatcher will check the booking.">?</span></div><select class="qf-select" id="qf-pickup-terminal" aria-label="Terminal"><option value="">— I don't know yet —</option></select></div>
           </div>
-          <div class="qf-field-hint">If a tracking integration is connected later, this can help match terminal, container type, and ETA. Manual details are still used unless confirmed.</div>
+        </div>
+        <div class="qf-booking-fold" id="qf-booking-fold">
+          <button type="button" class="qf-options-summary qf-booking-summary" id="qf-booking-summary" aria-expanded="false" aria-controls="qf-booking-body"><span>Booking details <span class="qf-title-muted">optional</span> <span class="qf-help" data-tip="Optional. Carrier, booking number, or container number can help the team verify terminal, equipment, vessel arrival, and pickup requirements faster when tracking data is available.">?</span></span><span class="qf-options-caret" aria-hidden="true"></span></button>
+          <div class="qf-booking-card" id="qf-booking-body" hidden>
+            <div class="qf-grid">
+              <div class="qf-field"><label>Ocean carrier</label><select class="qf-select" id="qf-ocean-carrier"><option value="">— Not sure —</option><option>Maersk</option><option>MSC</option><option>CMA CGM</option><option>Hapag-Lloyd</option><option>ONE</option><option>Evergreen</option><option>COSCO / OOCL</option><option>Yang Ming</option><option>HMM</option><option>ZIM</option><option>Matson</option><option>Other</option></select></div>
+              <div class="qf-field"><label>Booking or container #</label><input class="qf-input" id="qf-booking" placeholder="Optional — e.g. SINI12345678" autocomplete="off"></div>
+            </div>
+            <div class="qf-field-hint">If a tracking integration is connected later, this can help match terminal, container type, and ETA. Manual details are still used unless confirmed.</div>
+          </div>
         </div>
       </div>
-      <div class="qf-addr-row">
+      <div class="qf-addr-row" id="qf-default-addr-row">
         <div class="qf-non-drayage qf-addr-col" id="qf-default-pickup"><div class="qf-section-title qf-addr-title">Pickup</div><div class="qf-field qf-typeahead" data-typeahead="locations" data-target="pickup"><input class="qf-input" id="qf-pickup-zip" placeholder="City, ZIP, or address" aria-label="Pickup — city, ZIP, or address" autocomplete="off"><div class="qf-suggestions" id="qf-pickup-suggestions"></div></div></div>
         <div class="qf-addr-col" id="qf-default-delivery"><div class="qf-section-title qf-addr-title">Delivery</div><div class="qf-field qf-typeahead" data-typeahead="locations" data-target="delivery"><input class="qf-input" id="qf-delivery-zip" placeholder="City, ZIP, or address" aria-label="Delivery — city, ZIP, or address" autocomplete="off"><div class="qf-suggestions" id="qf-delivery-suggestions"></div></div></div>
       </div>
-      <div class="qf-addr-hint">Type a city, ZIP, or address, then pick a suggestion — a ZIP or full address gives the most accurate rate.</div>
+      <div class="qf-addr-hint" id="qf-addr-hint">Type a city, ZIP, or address, then pick a suggestion — a ZIP or full address gives the most accurate rate.</div>
       <div class="qf-map-card" id="qf-map-card" hidden>
         <button type="button" class="qf-map-canvas" id="qf-map-open" aria-label="Open full route map">
           <img class="qf-map-img" id="qf-map-img" alt="Route from pickup to delivery">

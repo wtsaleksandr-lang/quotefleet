@@ -487,3 +487,39 @@ html { scrollbar-width: thin; scrollbar-color: rgba(135, 138, 150, 0.38) transpa
   border-radius: 8px;
 }
 ::-webkit-scrollbar-thumb:hover { background-color: rgba(135, 138, 150, 0.6); }
+
+/* ── Drayage compact layout (Alex: less scrolling, no stretched calculator).
+   Pickup-port column stacks port + terminal, and the delivery column is moved
+   in beside it (JS re-parent) so both share one .qf-addr-row. Give the two
+   stacked fields in the left column an 8px gap. ── */
+#qf-drayage-left .qf-field + .qf-field { margin-top: var(--space-1); }
+
+/* Balance the two drayage columns. The left column is taller (Pickup port +
+   Terminal + terminal helper); the right column only carries the Delivery field
+   + its hint, so a tall void opened under Delivery. Stretch the row and let the
+   delivery helper hint settle to the column bottom — it lines up with the left
+   column's terminal helper so both columns end together and the void is gone,
+   while the hint stays the delivery field's helper (no filler added). Scoped to
+   #qf-drayage-row so FTL/Expedite/Hotshot/LTL address rows are untouched. */
+#qf-drayage-row { align-items: stretch; }
+#qf-drayage-row #qf-default-delivery { display: flex; flex-direction: column; }
+#qf-drayage-row #qf-default-delivery .qf-addr-hint { margin-top: auto; }
+
+/* Booking details is now a collapsed expander matching the "Shipment options"
+   summary. The reused .qf-options-summary is transparent, so give the trigger
+   the same light rounded-bar surface the .qf-options-panel provides (matches
+   the "Shipment options & add-ons" bar) — otherwise its dark --w-fg text sits
+   on the dark page with no contrast. Caret points down when collapsed (base
+   rotate(45deg)) and flips up when expanded. */
+.qf-booking-fold { margin-top: var(--space-1-5); }
+.qf-booking-summary {
+  margin-top: 0;
+  border: 1px solid rgba(148, 163, 184, 0.26);
+  border-radius: 16px;
+  background: rgba(255, 255, 255, 0.72);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.86), 0 12px 26px -24px rgba(15, 23, 42, 0.42);
+}
+.qf-booking-summary .qf-options-caret { transition: transform 0.15s ease; }
+.qf-booking-summary[aria-expanded="true"] .qf-options-caret { transform: rotate(-135deg); }
+.qf-booking-fold .qf-booking-card[hidden] { display: none; }
+.qf-booking-fold .qf-booking-card { margin-top: var(--space-1); }

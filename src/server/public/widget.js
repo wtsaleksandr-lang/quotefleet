@@ -259,6 +259,16 @@
     var ltlAdd = $('qf-ltl-add');
     if (ltlAdd) ltlAdd.addEventListener('click', function () { state.ltlItems.push(newLtlItem()); renderLtlItems(); updateLtlSummary(); });
     initOptionsPanel();
+    var bookingSummary = $('qf-booking-summary');
+    var bookingBody = $('qf-booking-body');
+    if (bookingSummary && bookingBody) {
+      bookingSummary.addEventListener('click', function () {
+        var willOpen = bookingBody.hidden;
+        bookingBody.hidden = !willOpen;
+        bookingSummary.setAttribute('aria-expanded', willOpen ? 'true' : 'false');
+        autoResize();
+      });
+    }
     initTypeaheads();
     initRouteMapCard();
     initWeightUnit();
@@ -600,10 +610,44 @@
     if (drayPickup) drayPickup.style.display = isDrayage ? '' : 'none';
     if (defaultPickup) defaultPickup.style.display = isDrayage ? 'none' : '';
     if (isDrayage) renderPorts();
+    // renderPorts() may fall back to the default (non-drayage) layout when no
+    // ports are configured — so read the resolved display, not just `service`.
+    var drayActive = isDrayage && drayPickup && drayPickup.style.display !== 'none';
+    placeDeliveryColumn(drayActive);
+    placeAddrHint(drayActive);
+    if (defaultPickup) defaultPickup.style.display = drayActive ? 'none' : '';
     scheduleRouteMap();
     syncOogPanel();
     syncLtlPanel();
     autoResize();
+  }
+
+  // Move the SAME delivery column node between the drayage two-column row and
+  // its original shared address row — never clone, so its typeahead listeners
+  // survive. In drayage it sits beside the pickup-port column; otherwise it
+  // returns to its home next to the default pickup field.
+  function placeDeliveryColumn(intoDrayage) {
+    var delivery = $('qf-default-delivery');
+    if (!delivery) return;
+    var target = intoDrayage ? $('qf-drayage-row') : $('qf-default-addr-row');
+    if (target && delivery.parentNode !== target) target.appendChild(delivery);
+  }
+
+  // Keep the address hint attached to the field it describes. In drayage the
+  // delivery column moves into the two-column row, so the hint moves with it —
+  // appended inside the delivery column, directly under the delivery field
+  // (this also fills the void beside the taller port+terminal column). For all
+  // other modes it returns to its full-width home just below the shared row.
+  function placeAddrHint(intoDrayage) {
+    var hint = $('qf-addr-hint');
+    if (!hint) return;
+    if (intoDrayage) {
+      var delivery = $('qf-default-delivery');
+      if (delivery && hint.parentNode !== delivery) delivery.appendChild(hint);
+    } else {
+      var defRow = $('qf-default-addr-row');
+      if (defRow && hint.previousElementSibling !== defRow) defRow.insertAdjacentElement('afterend', hint);
+    }
   }
 
   function renderPorts() {
