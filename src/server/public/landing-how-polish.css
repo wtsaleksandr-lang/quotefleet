@@ -1,0 +1,40 @@
+/* ── How it works — horizontal desktop relayout ──────────────────────────────
+   Desktop (≥900px): the four .hiw-card steps sit side-by-side in ONE row
+   (equal columns, equal heights), and WITHIN each card the media slot sits on
+   TOP with the numbered copy BELOW it (single-column card grid — overrides the
+   media-left / text-right 2-col card layout from landing-home-fixes.css).
+   Below 900px nothing here applies, so tablet/mobile keep their existing
+   stacked behavior exactly as before. Loaded LAST so equal-specificity
+   !important rules win over landing-home-fixes.css. ─────────────────────── */
+@media (min-width: 900px) {
+  body.qf-wft.landing-v2 .simple-steps.hiw-stack {
+    display: grid !important;
+    grid-template-columns: repeat(4, minmax(0, 1fr)) !important;
+    grid-auto-rows: 1fr;
+    gap: 16px !important;
+    align-items: stretch !important;
+  }
+  body.qf-wft.landing-v2 .simple-step.hiw-card {
+    grid-template-columns: minmax(0, 1fr) !important;
+    grid-template-rows: auto 1fr;
+    align-items: start !important;
+    align-content: start;
+    gap: 16px !important;
+    padding: 16px !important;
+    height: 100%;
+    min-width: 0;
+  }
+  /* Media stays the uniform fixed-aspect slot; just make sure it can never
+     exceed its (narrower) column. */
+  body.qf-wft.landing-v2 .hiw-card .hiw-media {
+    max-width: 100% !important;
+  }
+  /* Narrower column → let copy use the full card width and size down a hair. */
+  body.qf-wft.landing-v2 .hiw-card .hiw-body strong {
+    font-size: 17px !important;
+  }
+  body.qf-wft.landing-v2 .hiw-card .hiw-body p {
+    max-width: none !important;
+    font-size: 14px !important;
+  }
+}
