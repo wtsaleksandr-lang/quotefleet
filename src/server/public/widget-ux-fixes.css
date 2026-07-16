@@ -220,37 +220,38 @@ body.qf-modal-open { overflow: hidden; }
 }
 
 /* ── Pre-input map card: North America base map. Before pickup + delivery are
-   entered, the card shows a continental base map instead of collapsing. The
-   route overlays (addresses, distance/transit) + the expand affordance have
-   nothing to show in this state, so hide them and show a quiet hint. Once both
-   addresses resolve, JS removes .qf-map-base and the real routed lane + overlays
-   return. ── */
+   entered, the card shows a continental base map (full-strength, same grayscale
+   style as the routed lane) instead of collapsing. The route overlays
+   (addresses, distance/transit) + the expand affordance have nothing to show in
+   this state, so hide them. Once both addresses resolve, JS removes .qf-map-base
+   and the real routed lane + overlays return. ── */
 .qf-map-card.qf-map-base .qf-map-addr,
 .qf-map-card.qf-map-base .qf-map-overlay,
 .qf-map-card.qf-map-base .qf-map-expand {
   display: none;
 }
 .qf-map-card.qf-map-base .qf-map-canvas {
-  position: relative;
   cursor: default;
 }
-.qf-map-card.qf-map-base .qf-map-img {
-  opacity: 0.9;
+
+/* ── Top card (company name + contact block) + the "Instant freight estimate"
+   badge: smaller and lighter weight (Alex). The company name was 19px/900, the
+   badge 10px/850, the contact labels 800 — all read too heavy/large. ── */
+/* !important: the app/demo context injects `body.qf-app-calculator …
+   .brand-name { font-size:18px; font-weight:850 }` AFTER this static sheet, so
+   only !important (not specificity/order) reliably wins here. */
+.qf-header .brand-name {
+  font-size: 16px !important;
+  font-weight: 600 !important;
 }
-.qf-map-card.qf-map-base .qf-map-canvas::after {
-  content: "Enter pickup & delivery to map your lane";
-  position: absolute;
-  left: 50%;
-  bottom: 12px;
-  transform: translateX(-50%);
-  padding: 8px 12px;
-  border-radius: 999px;
-  background: rgba(12, 20, 36, 0.62);
-  color: rgba(255, 255, 255, 0.95);
-  font-size: 11.5px;
-  font-weight: 600;
-  white-space: nowrap;
-  -webkit-backdrop-filter: blur(6px);
-  backdrop-filter: blur(6px);
-  pointer-events: none;
+.qf-header .brand-name::after {
+  font-size: 9px !important; /* was 10px — ~10% smaller */
+  font-weight: 600 !important; /* was 850 — not bold */
+}
+.qf-contact {
+  font-size: 12px !important;
+}
+.qf-contact-label {
+  font-size: 9px !important;
+  font-weight: 600 !important;
 }
