@@ -1406,12 +1406,12 @@
       var promptTa = el('textarea', { class: 'textarea', rows: '8', placeholder: 'System prompt' });
       promptTa.value = (cfg && cfg.systemPrompt) || '';
       promptTa.addEventListener('blur', function () { api('/api/tenant/ai-config', { method: 'PUT', body: { systemPrompt: promptTa.value } }).catch(toastErr); });
-      cfgCard.appendChild(renderField('System prompt (your AI persona)', promptTa));
+      var promptField = renderField('System prompt (your AI persona)', promptTa);
 
       var toneSel = el('select', { class: 'select' });
       ['professional', 'friendly', 'concise', 'enthusiastic'].forEach(function (t) { var o = document.createElement('option'); o.value = t; o.textContent = t; if ((cfg && cfg.tone) === t) o.selected = true; toneSel.appendChild(o); });
       toneSel.addEventListener('change', function () { api('/api/tenant/ai-config', { method: 'PUT', body: { tone: toneSel.value } }).catch(toastErr); });
-      cfgCard.appendChild(renderField('Tone', toneSel));
+      var toneField = renderField('Tone', toneSel);
 
       function toggle(key, label, def) {
         var wrap = el('label', { style: { display: 'flex', gap: '8px', alignItems: 'center', marginTop: '6px' } });
@@ -1438,8 +1438,22 @@
       clearBtn.addEventListener('click', function () { if (!confirm('Remove your Anthropic key?')) return; api('/api/tenant/anthropic-key', { method: 'DELETE' }).then(function () { toastOk('Key cleared'); }).catch(toastErr); });
       keyCard.appendChild(clearBtn);
 
+      // Fold the power-user settings (persona prompt, tone, bring-your-own key)
+      // into a collapsed "Advanced" panel (Alex). Default view = the AI chat +
+      // the two behaviour toggles, which is all most carriers touch.
+      var aiAdv = el('details', { class: 'qf-ai-advanced', style: { marginTop: '12px' } });
+      var aiAdvSum = el('summary', { style: { cursor: 'pointer', fontWeight: '700', fontSize: '13px', color: 'var(--ink)', padding: '10px 12px', borderRadius: '10px', background: 'var(--surface)', border: '1px solid var(--border)', userSelect: 'none' } });
+      aiAdvSum.appendChild(el('span', { text: 'Advanced' }));
+      aiAdvSum.appendChild(el('span', { style: { color: 'var(--muted)', fontWeight: '500', fontSize: '12px', marginLeft: '6px' }, text: '— AI persona, tone, and your own API key' }));
+      aiAdv.appendChild(aiAdvSum);
+      promptField.style.marginTop = '10px';
+      keyCard.style.marginTop = '10px';
+      aiAdv.appendChild(promptField);
+      aiAdv.appendChild(toneField);
+      aiAdv.appendChild(keyCard);
+      cfgCard.appendChild(aiAdv);
+
       rightCol.appendChild(cfgCard);
-      rightCol.appendChild(keyCard);
       grid.appendChild(leftCol); grid.appendChild(rightCol);
       c.appendChild(grid);
     }).catch(showErr(c));
