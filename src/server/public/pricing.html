@@ -9,6 +9,87 @@
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="/style.css">
   <link rel="stylesheet" href="/public-pages-wefixtrades.css">
+  <style>
+    /* Pricing-page polish (scoped to this page; loaded after the linked sheets
+       so these win the cascade). Colors use rgba()/tokens — no raw #fff/#000. */
+
+    /* Plan cards: equal-height flex columns (the grid stretches both to the
+       same height) with the CTA pinned to the bottom via margin-top:auto, so
+       both "Start 14-day trial" buttons share one baseline no matter how many
+       feature bullets each plan lists. Also react to hover (bright border +
+       subtle lift). */
+    .qf-public-wft .price-card {
+      display: flex;
+      flex-direction: column;
+      transition: border-color 0.18s ease, transform 0.18s ease, box-shadow 0.18s ease;
+    }
+    .qf-public-wft .price-card .btn-block { margin-top: auto; }
+    .qf-public-wft .price-card:hover {
+      border-color: rgba(255, 255, 255, 0.7) !important;
+      transform: translateY(-4px);
+    }
+    .qf-public-wft .price-card.featured:hover {
+      border-color: rgba(255, 255, 255, 0.7) !important;
+    }
+
+    /* Vital CTA hover: base rule left the label near-white on a white fill
+       (invisible). Invert to a filled accent button on hover so the label
+       stays clearly readable — matching the Pro button's hover quality.
+       !important so it wins over the linked-sheet hover rule. */
+    .qf-public-wft .btn-secondary:hover {
+      background: var(--accent-fill) !important;
+      border-color: rgba(255, 255, 255, 0.7) !important;
+      color: rgba(255, 255, 255, 1) !important;
+    }
+    .qf-public-wft .btn-secondary:hover .arr { color: rgba(255, 255, 255, 1) !important; }
+
+    /* FAQ accordion */
+    .qf-faq { max-width: 760px; margin: 48px auto 0; }
+    .qf-faq h2 {
+      color: var(--qf-wft-text);
+      font-size: 24px; font-weight: 800; letter-spacing: -0.03em;
+      text-align: center; margin: 0 0 24px 0;
+    }
+    .qf-faq-item {
+      border: 1px solid var(--qf-wft-line);
+      border-radius: 12px;
+      background: rgba(255, 255, 255, 0.03);
+      margin: 0 0 12px 0;
+      padding: 0 16px;
+      transition: border-color 0.18s ease;
+    }
+    .qf-faq-item:hover { border-color: var(--qf-wft-line-strong); }
+    .qf-faq-item summary {
+      cursor: pointer; list-style: none;
+      padding: 16px 0;
+      font-size: 15px; font-weight: 600; line-height: 1.5;
+      color: var(--qf-wft-text);
+      display: flex; align-items: center; justify-content: space-between; gap: 12px;
+    }
+    .qf-faq-item summary::-webkit-details-marker { display: none; }
+    .qf-faq-item summary::after {
+      content: '+';
+      font-size: 22px; font-weight: 400; line-height: 1;
+      color: var(--qf-wft-muted); flex-shrink: 0;
+    }
+    .qf-faq-item[open] summary::after { content: '\2212'; }
+    .qf-faq-a { padding: 0 0 16px 0; }
+    .qf-faq-a p {
+      margin: 0; font-size: 14px; line-height: 1.6;
+      color: var(--qf-wft-muted);
+    }
+
+    /* No cobalt TEXT on the dark bg. Inline content links (e.g. "Talk to us")
+       default to var(--accent) = cobalt, which is hard to read here — render
+       them as an underlined light tone instead. Filled-accent BACKGROUNDS
+       (Pro CTA, "Most popular" badge, Vital's white button) are untouched. */
+    .qf-public-wft main a:not(.btn) {
+      color: var(--qf-wft-text);
+      text-decoration: underline;
+      text-underline-offset: 2px;
+    }
+    .qf-public-wft main a:not(.btn):hover { color: var(--qf-wft-muted); }
+  </style>
   <link rel="icon" href="/favicon.ico" sizes="any">
   <link rel="icon" type="image/png" sizes="32x32" href="/brand/favicon-32.png">
   <link rel="icon" type="image/png" sizes="16x16" href="/brand/favicon-16.png">
@@ -49,7 +130,7 @@
     <div class="pricing pricing-2up" style="max-width: 760px; margin: 0 auto;">
       <div class="price-card">
         <h3>Vital</h3>
-        <div class="price"><span class="qf-price" data-usd="14.80">$14.80</span><span class="per"> / mo</span></div>
+        <div class="price">$14.80<span class="per"> / mo</span></div>
         <p class="muted-small" style="margin: 0 0 14px 0;">Everything you need to quote, capture, and follow up.</p>
         <ul>
           <li>Hosted quote page + embeddable widget</li>
@@ -58,7 +139,6 @@
           <li>Branded quotes (your logo &amp; colors)</li>
           <li>Basic follow-up reminders</li>
           <li>USA &amp; Canada rates</li>
-          <li>Marketplace opt-in (free)</li>
         </ul>
         <a class="btn btn-secondary btn-block" href="/signup?plan=vital">
           Start 14-day trial <span class="arr">→</span>
@@ -67,7 +147,7 @@
 
       <div class="price-card featured">
         <h3>Pro</h3>
-        <div class="price"><span class="qf-price" data-usd="34.80">$34.80</span><span class="per"> / mo</span></div>
+        <div class="price">$34.80<span class="per"> / mo</span></div>
         <p class="muted-small" style="margin: 0 0 14px 0;">Everything in Vital, plus AI and automation working for you 24/7.</p>
         <ul>
           <li><strong>Everything in Vital</strong></li>
@@ -84,21 +164,57 @@
       </div>
     </div>
 
-    <p class="muted qf-usd-note" data-usd-note hidden style="text-align:center; font-size: 13px; margin: 12px auto 0; max-width: 620px;"></p>
-
     <p class="muted" style="text-align:center; font-size: 14px; margin: 20px auto 0; max-width: 620px;">
       Your trial is all-inclusive — every Pro feature is unlocked for 14 days, whichever plan you pick.
       At trial end we bill the plan you chose. Switch between Vital and Pro anytime.
       Need multi-company, API, or white-glove setup? <a href="mailto:hello@quotefleet.net">Talk to us</a>.
     </p>
 
-    <div style="text-align: center; margin-top: 32px; padding: 24px; background: var(--surface); border-radius: var(--radius-lg);">
-      <span class="tag">Marketplace</span>
-      <h3 style="margin: 12px 0 8px 0; font-size: 22px;">Free for everyone — we take a small commission per booked shipment.</h3>
-      <p class="muted" style="font-size: 14.5px; max-width: 560px; margin: 0 auto;">
-        Carriers opt in to be visible. Shippers find capacity by lane, contact you, you book. No subscription either side.
-      </p>
-    </div>
+    <section class="qf-faq">
+      <h2>Questions, answered</h2>
+
+      <details class="qf-faq-item">
+        <summary>Is the trial really free?</summary>
+        <div class="qf-faq-a">
+          <p>Yes. Every plan opens with a full 14-day trial that unlocks every Pro feature — AI replies, automation, branded quotes, all of it. No credit card to begin, and you can cancel anytime before it ends.</p>
+        </div>
+      </details>
+
+      <details class="qf-faq-item">
+        <summary>Do I need a credit card to sign up?</summary>
+        <div class="qf-faq-a">
+          <p>No card to get started — just your email. You explore QuoteFleet in full first. A card is only ever kept on file so your service continues seamlessly if you decide to stay, and you can add it whenever you're ready.</p>
+        </div>
+      </details>
+
+      <details class="qf-faq-item">
+        <summary>Can I cancel anytime?</summary>
+        <div class="qf-faq-a">
+          <p>Anytime, in one click from your dashboard — no emails to send, no one to call. Cancel before the trial ends and you're never charged a cent.</p>
+        </div>
+      </details>
+
+      <details class="qf-faq-item">
+        <summary>Are quotes really unlimited?</summary>
+        <div class="qf-faq-a">
+          <p>Send as many quotes as you like on either plan. There are no per-quote fees and no monthly caps — quote every lead, every time, without watching a meter.</p>
+        </div>
+      </details>
+
+      <details class="qf-faq-item">
+        <summary>What's the difference between Vital and Pro?</summary>
+        <div class="qf-faq-a">
+          <p>Vital gives you everything to quote, capture leads, and follow up. Pro adds the automation that works while you don't: AI auto-reply with 24/7 customer chat, branded PDF quotes, full follow-up automation, your own custom domain, analytics, and priority support.</p>
+        </div>
+      </details>
+
+      <details class="qf-faq-item">
+        <summary>Will I get any surprise charges?</summary>
+        <div class="qf-faq-a">
+          <p>Never. Your plan is one simple monthly price — no per-quote charges, no hidden add-ons. You're only billed when your trial ends, on the plan you chose, and you can switch between Vital and Pro whenever you like.</p>
+        </div>
+      </details>
+    </section>
   </main>
 
   <footer class="site-footer">
@@ -113,6 +229,5 @@
   </footer>
   <script>document.getElementById('year').textContent = new Date().getFullYear();</script>
 <script src="/marketing-chat.js" defer></script>
-<script src="/currency.js" defer></script>
 </body>
 </html>
