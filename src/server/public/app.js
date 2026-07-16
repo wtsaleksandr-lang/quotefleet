@@ -1247,12 +1247,19 @@
     api('/api/tenant/lane-zones').then(function (d) {
       c.innerHTML = '';
       c.appendChild(el('h1', { text: 'Drayage zones' }));
-      c.appendChild(el('p', { class: 'page-sub', text: 'Flat-tariff pricing within a radius of an anchor port. Smallest matching zone wins.' }));
-      var tbl = el('table', { class: 'table' });
-      tbl.innerHTML = '<thead><tr><th>Label</th><th>Anchor</th><th>Radius (mi)</th><th>Flat $</th><th>Enabled</th><th></th></tr></thead><tbody></tbody>';
-      var tb = $('tbody', tbl);
-      d.laneZones.forEach(function (z) { tb.appendChild(zoneRow(z)); });
-      c.appendChild(tbl);
+      c.appendChild(el('p', { class: 'page-sub', text: 'Flat prices for pulling containers within a radius of a port. Only needed if you quote drayage / port-rail work — you can skip this otherwise.' }));
+      if (d.laneZones.length) {
+        var tbl = el('table', { class: 'table' });
+        tbl.innerHTML = '<thead><tr><th>Label</th><th>Port</th><th>Radius (mi)</th><th>Flat $</th><th>Enabled</th><th></th></tr></thead><tbody></tbody>';
+        var tb = $('tbody', tbl);
+        d.laneZones.forEach(function (z) { tb.appendChild(zoneRow(z)); });
+        c.appendChild(tbl);
+      } else {
+        var emptyZ = el('div', { class: 'card', style: { padding: '24px 20px', textAlign: 'center' } });
+        emptyZ.appendChild(el('div', { style: { fontSize: '15px', fontWeight: '800' }, text: 'No zones yet' }));
+        emptyZ.appendChild(el('div', { class: 'muted-small', style: { margin: '6px auto 0', maxWidth: '460px', lineHeight: '1.5' }, text: 'Zones set flat drayage prices by distance from a port (e.g. Houston port → 50 mi = $475). You only need them if you quote port / rail container moves — otherwise you can skip this page.' }));
+        c.appendChild(emptyZ);
+      }
       // Inline add-zone form. Replaces 4 stacked window.prompt() dialogs
       // (which violated the title-in-field + top-left help-cue UI rule and
       // had no dark-mode contrast). Hidden until the user clicks + Add zone.
@@ -1295,7 +1302,7 @@
       }
 
       var labelF = newField('Zone label', '⌘/Ctrl+Enter to save', { placeholder: 'Houston → 50mi' });
-      var portF = newField('Anchor port', 'Optional', { placeholder: 'USHOU' });
+      var portF = newField('Nearest port', 'Optional', { placeholder: 'e.g. Houston, TX or USHOU' });
       var radiusF = newField('Radius (miles)', null, { type: 'number', step: '1', value: '50' });
       var priceF = newField('Flat price (USD)', null, { type: 'number', step: '1', value: '500' });
       grid.appendChild(labelF.field);
