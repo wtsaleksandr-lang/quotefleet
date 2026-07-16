@@ -530,6 +530,45 @@ export const DEFAULT_ACCESSORIALS: Omit<NewAccessorial, 'tenantId'>[] = [
     sortOrder: 157,
   },
   {
+    // Competitor-parity accessorial. Default price is an editable placeholder —
+    // each carrier tunes it in the portal.
+    code: 'liquor',
+    label: 'Liquor / Alcohol (bonded)',
+    description: 'Bonded/licensed handling for alcohol or spirits container moves.',
+    kind: 'flat',
+    amount: 150,
+    trigger: 'optional',
+    appliesToServices: ['drayage', 'ftl'],
+    enabled: true,
+    sortOrder: 158,
+  },
+  {
+    // Promoted from the expanded library into the default seed so new drayage
+    // tenants get "Scale Light/Heavy" parity out of the box (competitor checkbox).
+    code: 'scale_ticket',
+    label: 'Scale Ticket',
+    description: 'Certified scale ticket or weight check.',
+    kind: 'flat',
+    amount: 35,
+    trigger: 'optional',
+    appliesToServices: ['drayage', 'ftl', 'hotshot'],
+    enabled: true,
+    sortOrder: 108,
+  },
+  {
+    // Promoted from the expanded library into the default seed (competitor rate
+    // note: port terminal congestion may apply).
+    code: 'port_congestion',
+    label: 'Port Congestion Surcharge',
+    description: 'Surcharge for unusually slow terminal conditions or congestion.',
+    kind: 'flat',
+    amount: 75,
+    trigger: 'optional',
+    appliesToServices: ['drayage'],
+    enabled: true,
+    sortOrder: 113,
+  },
+  {
     code: 'overweight',
     label: 'Overweight',
     // Auto-applied when cargo+container exceeds the weight threshold (engine
@@ -569,6 +608,19 @@ export const DEFAULT_ACCESSORIALS: Omit<NewAccessorial, 'tenantId'>[] = [
     appliesToServices: ['drayage', 'ftl'],
     enabled: true,
     sortOrder: 170,
+  },
+  {
+    code: 'reefer_monitoring',
+    label: 'Reefer Monitoring',
+    description: 'Temperature monitoring/checks while the reefer is in custody (container yard or over-the-road).',
+    kind: 'per_day',
+    amount: 35,
+    trigger: 'optional',
+    // Over-the-road reefer FTL as well — the reefer onboarding template offers
+    // temp-monitoring as an editable default add-on.
+    appliesToServices: ['drayage', 'ftl'],
+    enabled: true,
+    sortOrder: 172,
   },
   {
     code: 'toll_pass_through',

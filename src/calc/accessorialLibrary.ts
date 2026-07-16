@@ -71,17 +71,8 @@ export const EXPANDED_ACCESSORIAL_LIBRARY: Omit<NewAccessorial, 'tenantId'>[] = 
     enabled: true,
     sortOrder: 107,
   },
-  {
-    code: 'scale_ticket',
-    label: 'Scale Ticket',
-    description: 'Certified scale ticket or weight check.',
-    kind: 'flat',
-    amount: 35,
-    trigger: 'optional',
-    appliesToServices: ['drayage', 'ftl', 'hotshot'],
-    enabled: true,
-    sortOrder: 108,
-  },
+  // scale_ticket promoted into DEFAULT_ACCESSORIALS (src/calc/defaults.ts) so it
+  // seeds to every new tenant; kept unique across both files per the invariant.
   {
     code: 'terminal_fee',
     label: 'Terminal Fee',
@@ -93,17 +84,7 @@ export const EXPANDED_ACCESSORIAL_LIBRARY: Omit<NewAccessorial, 'tenantId'>[] = 
     enabled: true,
     sortOrder: 112,
   },
-  {
-    code: 'port_congestion',
-    label: 'Port Congestion Surcharge',
-    description: 'Surcharge for unusually slow terminal conditions or congestion.',
-    kind: 'flat',
-    amount: 75,
-    trigger: 'optional',
-    appliesToServices: ['drayage'],
-    enabled: true,
-    sortOrder: 113,
-  },
+  // port_congestion promoted into DEFAULT_ACCESSORIALS (src/calc/defaults.ts).
   {
     code: 'weekend_after_hours',
     label: 'Weekend / After-hours',
@@ -115,19 +96,9 @@ export const EXPANDED_ACCESSORIAL_LIBRARY: Omit<NewAccessorial, 'tenantId'>[] = 
     enabled: true,
     sortOrder: 114,
   },
-  {
-    code: 'reefer_monitoring',
-    label: 'Reefer Monitoring',
-    description: 'Temperature monitoring/checks while the reefer is in custody (container yard or over-the-road).',
-    kind: 'per_day',
-    amount: 35,
-    trigger: 'optional',
-    // Broadened to over-the-road reefer FTL as well — the reefer onboarding
-    // template offers temp-monitoring as an editable default add-on.
-    appliesToServices: ['drayage', 'ftl'],
-    enabled: true,
-    sortOrder: 115,
-  },
+  // NOTE: `reefer_monitoring` moved to DEFAULT_ACCESSORIALS (defaults.ts) so it
+  // seeds to every new tenant — not just tenants that run the accessorials:seed
+  // library script. Codes must stay UNIQUE across both files; do not re-add here.
   {
     code: 'genset_fuel',
     label: 'Genset Fuel / Runtime',
