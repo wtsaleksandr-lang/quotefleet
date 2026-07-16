@@ -24,12 +24,14 @@
   window.addEventListener('load', () => loadAsset('script', { src: '/leads-list-focus.js' }));
   window.addEventListener('load', () => loadAsset('script', { src: '/drayage-zone-polish.js' }));
   window.addEventListener('load', () => loadAsset('script', { src: '/ai-import-polish.js' }));
-  window.addEventListener('load', () => loadAsset('script', { src: '/share-readiness.js' }));
-  window.addEventListener('load', () => loadAsset('script', { src: '/account-readiness.js' }));
+  // Retired (portal simplification): decorative "readiness" panels.
+  //   /share-readiness.js, /account-readiness.js
   window.addEventListener('load', () => loadAsset('script', { src: '/audit-log-polish.js' }));
-  window.addEventListener('load', () => loadAsset('script', { src: '/launch-panel.js' }));
-  window.addEventListener('load', () => loadAsset('script', { src: '/overview-command-center.js' }));
-  window.addEventListener('load', () => loadAsset('script', { src: '/brand-studio-preview.js' }));
+  // Retired (portal simplification, Alex): these injected "readiness / command-
+  // center / preview / launch" panels on top of the clean core pages. All were
+  // decorative (no API/state), so removing them loses no functionality — the CSS
+  // above stays loaded and simply no longer has panels to style.
+  //   /launch-panel.js, /overview-command-center.js, /brand-studio-preview.js
   window.addEventListener('load', () => loadAsset('script', { src: '/freight-brand-refresh.js' }));
 
   function toast(message, tone = 'success', title = 'QuoteFleet') {
