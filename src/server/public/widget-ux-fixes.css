@@ -333,15 +333,28 @@ body.qf-modal-open { overflow: hidden; }
 .qf-ltl-item {
   position: relative;
   border: 1px solid var(--w-border);
-  border-radius: 12px;
-  padding: var(--space-1-5);
-  margin-top: var(--space-1-5);
+  border-radius: 10px;
+  padding: var(--space-1);
+  margin-top: var(--space-1);
   background: color-mix(in srgb, var(--w-fg) 3%, transparent);
+}
+/* Compact, light field chrome — override the base 44px glossy .qf-input so the
+   item grid reads as a thin, dense form (thinner border, no gloss shadow,
+   shorter rows, lighter value text) rather than chunky boxes. */
+.qf-widget .qf-ltl-item .qf-input,
+.qf-widget .qf-ltl-item .qf-select {
+  min-height: 32px;
+  padding: var(--space-0-5) var(--space-1);
+  font-size: 12px;
+  font-weight: 500;
+  border-radius: 7px;
+  border-color: var(--w-border);
+  box-shadow: none;
 }
 .qf-ltl-remove {
   position: absolute;
-  top: var(--space-1);
-  right: var(--space-1);
+  top: var(--space-0-5);
+  right: var(--space-0-5);
   width: 24px;
   height: 24px;
   min-width: 24px;
@@ -354,53 +367,86 @@ body.qf-modal-open { overflow: hidden; }
   border-radius: 999px;
   background: var(--w-bg);
   color: var(--w-muted);
-  font-size: 12px;
+  font-size: 11px;
   line-height: 1;
   cursor: pointer;
   transition: color 0.15s, border-color 0.15s, background 0.15s;
 }
-.qf-ltl-remove:hover { color: var(--w-primary); border-color: var(--w-primary); background: rgba(37, 99, 235, 0.08); }
+.qf-ltl-remove:hover { color: var(--w-text, var(--w-fg)); border-color: var(--w-muted); background: color-mix(in srgb, var(--w-fg) 8%, transparent); }
 
-.qf-ltl-row-a { display: grid; grid-template-columns: 1.6fr 1fr; gap: var(--space-1); }
-.qf-ltl-row-b { display: flex; flex-wrap: wrap; align-items: flex-end; gap: var(--space-1); margin-top: var(--space-1); }
-.qf-ltl-qty { flex: 0 1 68px; min-width: 0; }
-.qf-ltl-dims { flex: 1 1 240px; min-width: 0; display: grid; grid-template-columns: 1fr 1fr 1fr 68px; gap: var(--space-1); }
-.qf-ltl-wt { flex: 1 1 170px; min-width: 0; display: grid; grid-template-columns: 1fr 68px; gap: var(--space-1); }
-.qf-ltl-unit .qf-select { padding-left: var(--space-1); padding-right: var(--space-1); text-align: center; }
+.qf-ltl-row-a { display: grid; grid-template-columns: 1.6fr 1fr; gap: var(--space-0-5); }
+.qf-ltl-row-b { display: flex; flex-wrap: wrap; align-items: flex-end; gap: var(--space-0-5); margin-top: var(--space-0-5); }
+/* Qty now lives INSIDE the dims grid as its first (narrow) cell, and both grids
+   span the full row width, so nothing ever wraps to a half-empty line. */
+.qf-ltl-dims { flex: 1 1 100%; min-width: 0; display: grid; grid-template-columns: 48px 1fr 1fr 1fr 48px; gap: var(--space-0-5); }
+.qf-ltl-wt { flex: 1 1 100%; min-width: 0; display: grid; grid-template-columns: 1fr 56px; gap: var(--space-0-5); }
+.qf-ltl-qty { min-width: 0; }
+.qf-ltl-unit .qf-select { padding-left: var(--space-0-5); padding-right: var(--space-0-5); text-align: center; }
 .qf-ltl-row-a .qf-field, .qf-ltl-row-b .qf-field { gap: 0; }
 
-/* Full-width dashed "add item" affordance. */
+/* Full-width dashed "add item" affordance — light + short, neutral text. */
 .qf-ltl-add {
   display: flex;
   align-items: center;
   justify-content: center;
   gap: var(--space-1);
   width: 100%;
-  margin-top: var(--space-1-5);
-  padding: var(--space-1-5);
-  font-size: 13px;
-  font-weight: 750;
+  margin-top: var(--space-1);
+  padding: var(--space-1);
+  font-size: 12.5px;
+  font-weight: 600;
   border: 1px dashed var(--w-border);
-  border-radius: 12px;
+  border-radius: 8px;
   background: transparent;
-  color: var(--w-primary);
+  color: var(--w-muted);
   cursor: pointer;
-  transition: border-color 0.15s, background 0.15s;
+  transition: color 0.15s, border-color 0.15s, background 0.15s;
 }
-.qf-ltl-add:hover { border-color: var(--w-primary); background: rgba(37, 99, 235, 0.06); }
-.qf-ltl-add span { font-size: 16px; font-weight: 800; line-height: 1; }
+.qf-ltl-add:hover { color: var(--w-text, var(--w-fg)); border-color: var(--w-muted); background: color-mix(in srgb, var(--w-fg) 4%, transparent); }
+.qf-ltl-add span { font-size: 14px; font-weight: 700; line-height: 1; }
 
-/* Live summary strip — weight (both units) · pieces · computed class · stacking. */
+/* Live summary strip — weight (both units) · pieces · computed class · stacking.
+   All values use the theme foreground token (light on dark, dark on cream) —
+   no cobalt TEXT over the midnight background. */
 .qf-ltl-summary {
   display: flex;
   flex-wrap: wrap;
   gap: var(--space-1-5);
-  margin-top: var(--space-2);
-  padding-top: var(--space-1-5);
+  margin-top: var(--space-1-5);
+  padding-top: var(--space-1);
   border-top: 1px solid var(--w-border);
 }
 .qf-ltl-sum-cell { display: flex; flex-direction: column; gap: var(--space-0-5); flex: 1 1 auto; min-width: 0; }
-.qf-ltl-sum-lbl { font-size: 10.5px; font-weight: 800; text-transform: uppercase; letter-spacing: 0.06em; color: var(--w-muted); }
-.qf-ltl-sum-val { font-size: 14px; font-weight: 800; color: var(--w-text, var(--w-fg)); overflow-wrap: anywhere; }
-#qf-ltl-sum-class { color: var(--w-primary); }
-.qf-ltl-remark { margin-top: var(--space-1-5); font-size: 11.5px; line-height: 1.5; color: var(--w-muted); }
+.qf-ltl-sum-lbl { font-size: 10px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.06em; color: var(--w-muted); }
+.qf-ltl-sum-val { font-size: 13px; font-weight: 650; color: var(--w-text, var(--w-fg)); overflow-wrap: anywhere; }
+.qf-ltl-remark { margin-top: var(--space-1); font-size: 11px; line-height: 1.5; color: var(--w-muted); }
+
+/* ── Owner mobile refinements (whole widget, all modes) ──────────────────── */
+
+/* (1) Collapse the gap under the service tabs. The Pickup/Delivery title spacing
+   lives on .qf-addr-title now (was an inline 14px); in LTL the equipment/weight
+   row is hidden, so also tighten the tabs' bottom margin and drop the title's
+   top margin — fields sit right under the tabs. */
+.qf-widget .qf-addr-title { margin-top: var(--space-1-5); }
+/* id + !important so these beat the demo "app calculator" sheets that load
+   after this file and set .qf-tabs / .qf-section-title margins with !important. */
+#qf-root.qf-ltl-mode #qf-services { margin-bottom: var(--space-1-5) !important; }
+#qf-root.qf-ltl-mode .qf-addr-title { margin-top: 0 !important; }
+
+/* (2) Smaller in-field titles (placeholders) + values across the widget. */
+.qf-widget .qf-input,
+.qf-widget .qf-select { font-size: 12px; }
+
+/* (3) Use more horizontal width — trim the outer side padding so long
+   placeholders ("City, ZIP, or address") stop getting cropped. id + !important
+   to beat the demo app-style shell padding (18px !important). */
+#qf-root { padding-left: var(--space-1-5) !important; padding-right: var(--space-1-5) !important; }
+body { padding-left: var(--space-0-5); padding-right: var(--space-0-5); }
+
+/* (4) Company / contact card: lighter (normal weight) + ~1px smaller. Covers the
+   production #qf-contact card AND the demo brand-trust card. The MC/USDOT labels
+   are added in JS (renderContact already labels; renderBrandTrust now does too). */
+.qf-widget .qf-contact { font-size: 11px !important; }
+.qf-widget .qf-contact-value { font-weight: 400; }
+.qf-widget .qf-demo-brand-card { font-size: 13px; }
+.qf-widget .qf-demo-brand-card span { font-weight: 400; font-size: 11px; }

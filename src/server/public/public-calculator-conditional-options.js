@@ -127,7 +127,7 @@
       card.className = 'qf-demo-brand-card';
       header.insertAdjacentElement('afterend', card);
     }
-    const mcText = [data.usdot, data.mc].filter(Boolean).join(' · ');
+    const mcText = [data.usdot ? 'USDOT ' + data.usdot : '', data.mc ? 'MC ' + data.mc : ''].filter(Boolean).join(' · ');
     const nextHtml = [
       data.phone ? '<span>' + escapeHtml(data.phone) + '</span>' : '',
       data.email ? '<span>' + escapeHtml(data.email) + '</span>' : '',

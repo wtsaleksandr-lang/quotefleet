@@ -531,12 +531,12 @@
         el('div', { class: 'qf-field qf-ltl-commodity' }, [bind(commodity, 'commodity')]),
         el('div', { class: 'qf-field qf-ltl-ftype' }, [bind(ftype, 'freightType')]),
       ]);
-      var dims = el('div', { class: 'qf-ltl-dims' }, [numField('length', 'Length'), numField('width', 'Width'), numField('height', 'Height'), unitField('dimUnit', ['in', 'cm'])]);
+      // Row B is two full-width grids so it never leaves blank gaps on mobile:
+      // [Qty | L | W | H | in/cm] on one line, [Combined wt. | lb/kg] below.
+      var qtyField = el('div', { class: 'qf-field qf-ltl-qty' }, [bind(el('input', { class: 'qf-input', type: 'number', min: '1', inputmode: 'numeric', placeholder: 'Qty', 'aria-label': 'Quantity' }), 'qty')]);
+      var dims = el('div', { class: 'qf-ltl-dims' }, [qtyField, numField('length', 'Length'), numField('width', 'Width'), numField('height', 'Height'), unitField('dimUnit', ['in', 'cm'])]);
       var wt = el('div', { class: 'qf-ltl-wt' }, [numField('weight', 'Combined wt.'), unitField('wtUnit', ['lb', 'kg'])]);
-      var rowB = el('div', { class: 'qf-ltl-row-b' }, [
-        el('div', { class: 'qf-field qf-ltl-qty' }, [bind(el('input', { class: 'qf-input', type: 'number', min: '1', inputmode: 'numeric', placeholder: 'Qty', 'aria-label': 'Quantity' }), 'qty')]),
-        dims, wt,
-      ]);
+      var rowB = el('div', { class: 'qf-ltl-row-b' }, [dims, wt]);
       var group = el('div', { class: 'qf-ltl-item' }, [rowA, rowB]);
       if (multi) {
         var x = el('button', { class: 'qf-ltl-remove', type: 'button', 'aria-label': 'Remove item', title: 'Remove item', text: '✕', on: { click: function () { state.ltlItems.splice(idx, 1); renderLtlItems(); updateLtlSummary(); } } });
@@ -563,6 +563,9 @@
     // equipment/weight row in LTL and restore it for every other service.
     var equipRow = $('qf-equip-weight-row');
     if (equipRow) equipRow.style.display = isLtl ? 'none' : '';
+    // Mark LTL mode on the root so CSS can collapse the now-empty gap the hidden
+    // equipment/weight row would otherwise leave under the service tabs.
+    var root = $('qf-root'); if (root) root.classList.toggle('qf-ltl-mode', isLtl);
     if (!panel) return;
     panel.style.display = isLtl ? '' : 'none';
     if (isLtl) { ensureLtlItem(); renderLtlItems(); updateLtlSummary(); }
