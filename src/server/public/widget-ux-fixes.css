@@ -473,3 +473,17 @@ body { padding-left: var(--space-0-5); padding-right: var(--space-0-5); }
 #qf-equip-weight-row {
   align-items: stretch;
 }
+
+/* ── Subtle, premium-minimal scrollbar (Alex — like Claude's chat). Thin, no
+   visible track, translucent rounded thumb that darkens slightly on hover.
+   A neutral gray reads well on BOTH the midnight (dark) and cream (light)
+   widget themes. This sheet loads only on the widget document, so the global
+   scrollbar selectors don't leak to the portal/marketing pages. ── */
+html { scrollbar-width: thin; scrollbar-color: rgba(135, 138, 150, 0.38) transparent; }
+::-webkit-scrollbar { width: 8px; height: 8px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb {
+  background-color: rgba(135, 138, 150, 0.38);
+  border-radius: 8px;
+}
+::-webkit-scrollbar-thumb:hover { background-color: rgba(135, 138, 150, 0.6); }
