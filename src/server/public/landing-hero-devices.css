@@ -1,0 +1,41 @@
+/* ─────────────────────────────────────────────────────────────────────────
+   Hero device composite — the single ready-made laptop + phone render.
+   Replaces the old desktop composite image AND the animated CSS phone with one
+   transparent-background WebP (1600×1046, 1.53:1 landscape) that already shows
+   both devices. Loaded LAST so it out-cascades the earlier hero sheets
+   (landing-hero-redesign / -phone / -polish) and the JS-injected cleanup sheet.
+   `html body.qf-wft` specificity bump beats those equal-specificity rules.
+   ───────────────────────────────────────────────────────────────────────── */
+
+/* Desktop — large landscape focal image, full width of the media column, with
+   a soft drop-shadow that grounds the transparent PNG on the dark hero. The
+   filter never affects the layout box, so it can't create horizontal scroll. */
+html body.qf-wft .visual-flow.qf-hero-media > .qf-hero-devices {
+  display: block !important;
+  width: 100% !important;
+  height: auto !important;
+  max-width: 100% !important;
+  border: 0 !important;
+  border-radius: 0 !important;
+  background: none !important;
+  box-shadow: none !important;
+  -webkit-mask-image: none !important;
+  mask-image: none !important;
+  filter: drop-shadow(0 32px 60px rgba(0, 0, 0, 0.5)) !important;
+}
+
+/* Mobile (≤640px) — the hero reflows to a single column (title → media → lead).
+   The composite scales down to the full width of its container. Landscape, so
+   a full-width render reads well here; the grid is min(92%, 100vw−32px) wide,
+   which keeps it inside the viewport (no horizontal page overflow). */
+@media (max-width: 640px) {
+  html body.qf-wft .visual-flow.qf-hero-media {
+    max-width: none !important;
+  }
+  html body.qf-wft .visual-flow.qf-hero-media > .qf-hero-devices {
+    display: block !important;
+    width: 100% !important;
+    height: auto !important;
+    filter: drop-shadow(0 12px 24px rgba(0, 0, 0, 0.45)) !important;
+  }
+}
