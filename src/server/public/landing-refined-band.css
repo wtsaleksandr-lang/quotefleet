@@ -1,0 +1,32 @@
+/* Craftsmanship band under the hero (Alex). Quiet, centered, premium. Dark page
+   (body.qf-wft) only. The accent eyebrow uses the readable on-dark periwinkle,
+   never this page's forced cobalt --accent (which fails contrast on dark). */
+body.qf-wft .qf-refined-band {
+  padding: 60px 24px;
+  text-align: center;
+}
+body.qf-wft .qf-refined-inner {
+  max-width: 860px;
+  margin: 0 auto;
+}
+body.qf-wft .qf-refined-eyebrow {
+  font-family: 'JetBrains Mono', ui-monospace, monospace;
+  text-transform: uppercase;
+  letter-spacing: 0.16em;
+  font-size: 12px;
+  font-weight: 600;
+  color: #6E8BFF;
+  margin: 0 0 16px 0;
+}
+body.qf-wft .qf-refined-line {
+  font-size: 26px;
+  line-height: 1.5;
+  font-weight: 500;
+  letter-spacing: -0.01em;
+  color: var(--ink);
+  margin: 0;
+}
+@media (max-width: 640px) {
+  body.qf-wft .qf-refined-band { padding: 48px 24px; }
+  body.qf-wft .qf-refined-line { font-size: 20px; }
+}
