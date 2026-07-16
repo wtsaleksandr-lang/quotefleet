@@ -141,6 +141,7 @@
     config: null,
     service: null,
     equipment: null,
+    weightUnit: 'lbs',
     quote: null,
     selectedAccessorials: [],
     pickupPortCode: '',
@@ -257,6 +258,7 @@
     initOptionsPanel();
     initTypeaheads();
     initRouteMapCard();
+    initWeightUnit();
     $('qf-back-btn').addEventListener('click', function () { showStep('quote'); });
     $('qf-submit-btn').addEventListener('click', onSubmit);
 
@@ -432,10 +434,35 @@
     for (var i = 0; i < LTL_DENSITY_SCALE.length; i++) { if (d >= LTL_DENSITY_SCALE[i][0]) return { cls: LTL_DENSITY_SCALE[i][1], pcf: d, cf: cf }; }
     return { cls: 500, pcf: d, cf: cf };
   }
+  // Weight the user typed, converted to POUNDS — the unit the quote + LTL-class
+  // math expect. The lbs/kg toggle flips state.weightUnit; kg is converted here
+  // so a metric input never distorts the rate. Returns null when empty/invalid.
+  function weightLbs() {
+    var el = $('qf-weight'); var v = el ? Number(el.value) : NaN;
+    if (!v || !isFinite(v) || v <= 0) return null;
+    return Math.round(state.weightUnit === 'kg' ? v * 2.2046226 : v);
+  }
+  function initWeightUnit() {
+    var wrap = $('qf-wt-unit'); if (!wrap) return;
+    var btns = Array.prototype.slice.call(wrap.querySelectorAll('button'));
+    btns.forEach(function (btn) {
+      btn.addEventListener('click', function () {
+        state.weightUnit = btn.getAttribute('data-unit') === 'kg' ? 'kg' : 'lbs';
+        btns.forEach(function (b) {
+          var on = b === btn;
+          b.classList.toggle('is-on', on);
+          b.setAttribute('aria-pressed', on ? 'true' : 'false');
+        });
+        var inp = $('qf-weight');
+        if (inp) inp.placeholder = state.weightUnit === 'kg' ? 'e.g. 17000' : 'e.g. 38000';
+        updateLtlClassReadout();
+      });
+    });
+  }
   function updateLtlClassReadout() {
     var box = $('qf-ltl-class'); if (!box) return;
     if (state.service !== 'ltl') { box.style.display = 'none'; return; }
-    var r = ltlClientClass(Number($('qf-weight').value), Number($('qf-ltl-length').value), Number($('qf-ltl-width').value), Number($('qf-ltl-height').value));
+    var r = ltlClientClass(weightLbs() || 0, Number($('qf-ltl-length').value), Number($('qf-ltl-width').value), Number($('qf-ltl-height').value));
     if (!r) { box.style.display = 'none'; box.innerHTML = ''; autoResize(); return; }
     box.innerHTML = 'Estimated freight class <strong>' + r.cls + '</strong> &middot; ' + r.pcf.toFixed(1) + ' lb/ft&sup3;';
     box.style.display = ''; autoResize();
@@ -664,7 +691,7 @@
       equipment: state.equipment,
       pickup: pickup,
       delivery: delivery,
-      weightLbs: $('qf-weight').value ? Number($('qf-weight').value) : undefined,
+      weightLbs: weightLbs() || undefined,
       oceanCarrier: oceanEl && oceanEl.value ? oceanEl.value : undefined,
       bookingNumber: bookingEl && bookingEl.value ? bookingEl.value.trim() : undefined,
       selectedAccessorialCodes: state.selectedAccessorials.slice(),
