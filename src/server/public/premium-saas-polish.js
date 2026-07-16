@@ -19,20 +19,15 @@
   loadAsset('link', { rel: 'stylesheet', href: '/overview-command-center.css' });
   loadAsset('link', { rel: 'stylesheet', href: '/brand-studio-preview.css' });
   loadAsset('link', { rel: 'stylesheet', href: '/freight-premium-theme.css' });
-  window.addEventListener('load', () => loadAsset('script', { src: '/followup-workspace.js' }));
-  window.addEventListener('load', () => loadAsset('script', { src: '/lead-crm-polish.js' }));
-  window.addEventListener('load', () => loadAsset('script', { src: '/leads-list-focus.js' }));
-  window.addEventListener('load', () => loadAsset('script', { src: '/drayage-zone-polish.js' }));
-  window.addEventListener('load', () => loadAsset('script', { src: '/ai-import-polish.js' }));
-  // Retired (portal simplification): decorative "readiness" panels.
-  //   /share-readiness.js, /account-readiness.js
-  window.addEventListener('load', () => loadAsset('script', { src: '/audit-log-polish.js' }));
-  // Retired (portal simplification, Alex): these injected "readiness / command-
-  // center / preview / launch" panels on top of the clean core pages. All were
-  // decorative (no API/state), so removing them loses no functionality — the CSS
-  // above stays loaded and simply no longer has panels to style.
-  //   /launch-panel.js, /overview-command-center.js, /brand-studio-preview.js
-  window.addEventListener('load', () => loadAsset('script', { src: '/freight-brand-refresh.js' }));
+  // Retired (portal simplification, Alex): ALL of the injected JS "polish" panels
+  // that layered coach / builder / preview / readiness / activity-workspace UI on
+  // top of the clean core pages (e.g. followup-workspace injected a full mock
+  // activity board over the Overview). Every one was decorative (no API/state), so
+  // removing them loses no functionality. The CSS above stays loaded and simply
+  // has no panels left to style. Retired scripts:
+  //   followup-workspace, lead-crm-polish, leads-list-focus, drayage-zone-polish,
+  //   ai-import-polish, audit-log-polish, share-readiness, account-readiness,
+  //   launch-panel, overview-command-center, brand-studio-preview, freight-brand-refresh
 
   function toast(message, tone = 'success', title = 'QuoteFleet') {
     let stack = document.querySelector('.qf-toast-stack');

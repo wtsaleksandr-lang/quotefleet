@@ -387,10 +387,40 @@
 
   // ── Overview ──────────────────────────────────────────────────
   function renderOverview(c) {
-    api('/api/tenant/overview').then(function (d) {
+    Promise.all([
+      api('/api/tenant/overview'),
+      api('/api/tenant/setup-status').catch(function () { return {}; }),
+    ]).then(function (res) {
+      var d = res[0], setup = res[1] || {};
       c.innerHTML = '';
       c.appendChild(el('h1', { text: 'Overview' }));
       c.appendChild(el('p', { class: 'page-sub', text: 'Welcome back to ' + (d.tenant.name || 'your dashboard') + '.' }));
+
+      // Setup checklist — one clear "what to do next" card (replaces the old
+      // injected coach panels). Shows until the essentials (rates + brand) are
+      // done; brand-new tenants still get the full guided wizard at first login.
+      var steps = [
+        { label: 'Set your rates', hint: 'Add at least one rate card — this powers every quote.', route: 'rates', done: !!setup.rates },
+        { label: 'Customize your look', hint: 'Add your logo, name, and colors so it feels like your company.', route: 'brand', done: !!setup.brand },
+        { label: 'Share your calculator', hint: 'Copy your link or embed code and put it in front of customers.', route: 'embed', done: false },
+      ];
+      if (!(setup.rates && setup.brand)) {
+        var chk = el('div', { class: 'card', style: { margin: '0 0 24px', padding: '18px 20px' } });
+        chk.appendChild(el('div', { style: { fontSize: '16px', fontWeight: '800', letterSpacing: '-0.01em' }, text: 'Get your calculator live' }));
+        chk.appendChild(el('div', { class: 'muted-small', style: { margin: '2px 0 14px' }, text: 'Three quick steps and you can start quoting customers.' }));
+        steps.forEach(function (st, i) {
+          var row = el('a', { href: '#', 'data-route': st.route, style: { display: 'flex', gap: '12px', alignItems: 'flex-start', padding: '10px 0', textDecoration: 'none', color: 'inherit', borderTop: i ? '1px solid var(--border)' : '0' } });
+          var mark = el('span', { style: { flex: '0 0 auto', width: '24px', height: '24px', borderRadius: '999px', display: 'inline-flex', alignItems: 'center', justifyContent: 'center', fontSize: '13px', fontWeight: '800', background: st.done ? 'var(--accent)' : 'transparent', color: st.done ? '#ffffff' : 'var(--muted)', border: st.done ? '0' : '1px solid var(--border)' }, text: st.done ? '✓' : String(i + 1) });
+          var txt = el('div', {});
+          txt.appendChild(el('div', { style: { fontWeight: '700', fontSize: '14px', color: st.done ? 'var(--muted)' : 'var(--ink)', textDecoration: st.done ? 'line-through' : 'none' }, text: st.label }));
+          txt.appendChild(el('div', { class: 'muted-small', style: { marginTop: '1px' }, text: st.hint }));
+          row.appendChild(mark); row.appendChild(txt);
+          if (!st.done) row.appendChild(el('span', { style: { marginLeft: 'auto', alignSelf: 'center', color: 'var(--accent)', fontWeight: '700', fontSize: '13px', whiteSpace: 'nowrap' }, text: 'Go →' }));
+          chk.appendChild(row);
+        });
+        c.appendChild(chk);
+      }
+
       var stats = el('div', { class: 'features', style: { margin: '0 0 24px 0' } });
       [
         ['Leads (all time)', d.stats.totalLeads],
