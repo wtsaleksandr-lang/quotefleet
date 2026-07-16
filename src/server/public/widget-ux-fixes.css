@@ -255,3 +255,34 @@ body.qf-modal-open { overflow: hidden; }
   font-size: 9px !important;
   font-weight: 600 !important;
 }
+
+/* ── Equipment dropdown: a container/trailer icon next to each type (Alex).
+   .qf-cs-ico-row is set by widget-custom-select.js on both the selected-value
+   button label and each option row. ── */
+.qf-cs-ico-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+}
+.qf-cs-ico-row .qf-cs-txt {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.qf-cs-ico {
+  flex: 0 0 auto;
+  display: inline-flex;
+  width: 16px;
+  height: 16px;
+  opacity: 0.8;
+}
+.qf-cs-ico svg {
+  width: 16px;
+  height: 16px;
+}
+/* Selected option already goes brand-colored + bold; let its icon follow. */
+.qf-cs-opt[aria-selected="true"] .qf-cs-ico {
+  opacity: 1;
+}
