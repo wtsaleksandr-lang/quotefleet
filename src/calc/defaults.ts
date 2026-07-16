@@ -246,7 +246,7 @@ export const DEFAULT_ACCESSORIALS: Omit<NewAccessorial, 'tenantId'>[] = [
     label: 'Detention (over free time)',
     description: 'Per-hour charge after 2 hr free at pickup or delivery.',
     kind: 'per_hour',
-    amount: 75,
+    amount: 99,
     trigger: 'optional',
     enabled: true,
     sortOrder: 10,

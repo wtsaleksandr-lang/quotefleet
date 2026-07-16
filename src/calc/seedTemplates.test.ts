@@ -121,7 +121,7 @@ describe('seedTemplates — vertical selection', () => {
       ['detention', 'driver_assist', 'extra_stop', 'hazmat', 'layover', 'lumper', 'redelivery', 'scale_ticket', 'tonu'].sort()
     );
     // representative editable-default amounts
-    expect(accAmount('dryvan_ftl', 'detention')).toBe(75);
+    expect(accAmount('dryvan_ftl', 'detention')).toBe(99);
     expect(accAmount('dryvan_ftl', 'lumper')).toBe(150);
     expect(accAmount('dryvan_ftl', 'redelivery')).toBe(175);
     expect(t.laneZones.length).toBe(0);
