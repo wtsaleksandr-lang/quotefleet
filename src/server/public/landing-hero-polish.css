@@ -1,0 +1,65 @@
+/* ─────────────────────────────────────────────────────────────────────────
+   Hero polish — loaded LAST so it wins. Three of Alex's fixes:
+     A. Headline reads premium/editorial (WeFixTrades effortel inspiration):
+        Satoshi 800 (900 read too chunky) + tighter tracking + balanced wrap.
+     B. Mobile hero centered.
+     C. Tighten the spread-apart trust / secondary-link stack on mobile.
+   `html body.qf-wft` specificity mirrors landing-hero-redesign.css so these
+   out-cascade the JS-injected cleanup sheet. All px spacing stays on the ramp.
+   ───────────────────────────────────────────────────────────────────────── */
+
+/* ── A. Headline. Keep the self-hosted Satoshi face + tight negative tracking
+   of the WFT hero, but at weight 800 it reads as a confident editorial display
+   rather than a heavy black slab. text-wrap:balance evens the desktop line
+   breaks so no orphan word ("quotes.") dangles on its own line. ── */
+html body.qf-wft .hero h1 {
+  font-weight: 800 !important;
+  letter-spacing: -0.04em !important;
+  line-height: 1.03 !important;
+  text-wrap: balance;
+}
+
+@media (max-width: 640px) {
+  /* ── B. Center the mobile hero — eyebrow, headline, lead, trust lines and
+     the secondary link all read centered under the phone mockup. ── */
+  html body.qf-wft .hero { text-align: center !important; }
+
+  body.qf-wft .hero-copy .eyebrow {
+    margin-left: auto !important;
+    margin-right: auto !important;
+    text-align: center !important;
+    white-space: normal !important;
+  }
+
+  html body.qf-wft .hero h1 {
+    text-align: center !important;
+    margin-left: auto !important;
+    margin-right: auto !important;
+  }
+
+  html body.qf-wft .hero .lead {
+    text-align: center !important;
+    margin-left: auto !important;
+    margin-right: auto !important;
+  }
+
+  body.qf-wft .hero .micro-copy,
+  body.qf-wft .hero .hero-trial-note {
+    text-align: center !important;
+  }
+
+  body.qf-wft .hero-cta .demo-link {
+    align-self: center !important;
+    justify-content: center !important;
+    margin-left: auto !important;
+    margin-right: auto !important;
+  }
+
+  /* ── C. Pull the trust lines + "See how it works" into a tight cluster under
+     the Start-free button instead of letting the 24px grid gap fan them out
+     across the viewport. Negative margins net an ~8px rhythm (abs values stay
+     on the 8px ramp, so the spacing guard is satisfied). ── */
+  body.qf-wft .hero .hero-trial-note { margin-top: -8px !important; }
+  body.qf-wft .hero .micro-copy:not(.hero-trial-note) { margin-top: -16px !important; }
+  body.qf-wft .hero-cta .demo-link { margin-top: -8px !important; }
+}

@@ -16,6 +16,17 @@
   if (!track || slides.length === 0) return;
 
   var reduce = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+  var realCount = slides.length;
+
+  // Seamless forward loop: clone the first slide after the last so advancing
+  // past the last glides "around" (…LTL → FTL) instead of dead-ending / rewinding.
+  if (!reduce && realCount > 1) {
+    var firstClone = slides[0].cloneNode(true);
+    firstClone.classList.add('qf-slide--clone');
+    firstClone.setAttribute('aria-hidden', 'true');
+    track.appendChild(firstClone);
+  }
+  var wrapping = false;
   var AUTO_MS = 4800;
   var current = -1;
   var timer = null;
@@ -71,7 +82,23 @@
   }
 
   function next() {
-    setActive((current + 1) % slides.length, { scroll: true });
+    if (wrapping) return;
+    if (current === realCount - 1 && !reduce) {
+      // Forward-wrap: glide onto the cloned first slide (so it reads as one
+      // continuous loop, not a rewind), then silently snap back to the real
+      // first slide and replay its build animation.
+      wrapping = true;
+      dots.forEach(function (d, di) { d.classList.toggle('is-on', di === 0); });
+      track.scrollTo({ left: realCount * (track.clientWidth || 1), behavior: 'smooth' });
+      setTimeout(function () {
+        track.scrollTo({ left: 0, behavior: 'auto' });
+        current = -1;
+        wrapping = false;
+        setActive(0, { scroll: false });
+      }, 620);
+    } else {
+      setActive((current + 1) % realCount, { scroll: true });
+    }
   }
 
   function startAuto() {
@@ -96,8 +123,16 @@
       scrollRAF = null;
       var w = track.clientWidth || 1;
       var i = Math.round(track.scrollLeft / w);
-      i = Math.max(0, Math.min(slides.length - 1, i));
-      if (i !== current) setActive(i, { scroll: false });
+      // Landed on the cloned first slide → snap back to the real one so a manual
+      // swipe past the last also loops around instead of dead-ending on a clone.
+      // Skip while an auto-advance wrap is mid-glide (next() owns that reset) so
+      // we don't yank scrollLeft to 0 and kill the seamless loop.
+      if (i >= realCount && !wrapping) {
+        track.scrollTo({ left: 0, behavior: 'auto' });
+        i = 0;
+      }
+      i = Math.max(0, Math.min(realCount - 1, i));
+      if (i !== current && !wrapping) setActive(i, { scroll: false });
     });
   }, { passive: true });
 
