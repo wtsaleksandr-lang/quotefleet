@@ -101,6 +101,64 @@
   }
   window.qfOpenBillingPortal = openBillingPortal;
 
+  // ── Motion helpers ────────────────────────────────────────────
+  // Single source of truth for the reduced-motion preference so every
+  // animated flow (count-ups, reveals, staged copy) degrades the same way.
+  function prefersReducedMotion() {
+    return !!(window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches);
+  }
+  // Animate a number from 0 → target inside a text node. Snaps instantly
+  // under reduced-motion. Eased with cubic ease-out so it decelerates.
+  function countUp(node, target, duration) {
+    target = Number(target) || 0;
+    if (!node) return;
+    if (prefersReducedMotion() || !window.requestAnimationFrame || duration <= 0) {
+      node.textContent = String(target); return;
+    }
+    var start = null;
+    function frame(ts) {
+      if (start === null) start = ts;
+      var t = Math.min(1, (ts - start) / duration);
+      var eased = 1 - Math.pow(1 - t, 3);
+      node.textContent = String(Math.round(eased * target));
+      if (t < 1) requestAnimationFrame(frame);
+      else node.textContent = String(target);
+    }
+    requestAnimationFrame(frame);
+  }
+
+  // ── In-app confirm modal ──────────────────────────────────────
+  // Drop-in replacement for native confirm(): reuses the existing
+  // .qf-modal component so destructive/commit prompts match the app's
+  // look instead of the OS chrome. Options: title, body, confirmText,
+  // cancelText, danger (bool), onConfirm, onCancel.
+  function showConfirmModal(opts) {
+    opts = opts || {};
+    var backdrop = el('div', { class: 'qf-modal-backdrop is-open' });
+    var card = el('div', { class: 'qf-modal-card', role: 'dialog', 'aria-modal': 'true' });
+    card.appendChild(el('h3', { text: opts.title || 'Are you sure?' }));
+    if (opts.body) card.appendChild(el('p', { text: opts.body }));
+    var actions = el('div', { class: 'qf-modal-actions' });
+    var cancelBtn = el('button', { class: 'btn', text: opts.cancelText || 'Cancel' });
+    var okBtn = el('button', { class: 'btn ' + (opts.danger ? 'btn-danger' : 'btn-primary'), text: opts.confirmText || 'Confirm' });
+    var keydown;
+    function close() {
+      backdrop.remove();
+      if (keydown) document.removeEventListener('keydown', keydown);
+    }
+    cancelBtn.addEventListener('click', function () { close(); if (opts.onCancel) opts.onCancel(); });
+    okBtn.addEventListener('click', function () { close(); if (opts.onConfirm) opts.onConfirm(); });
+    actions.appendChild(cancelBtn);
+    actions.appendChild(okBtn);
+    card.appendChild(actions);
+    backdrop.appendChild(card);
+    backdrop.addEventListener('click', function (ev) { if (ev.target === backdrop) { close(); if (opts.onCancel) opts.onCancel(); } });
+    keydown = function (ev) { if (ev.key === 'Escape') { close(); if (opts.onCancel) opts.onCancel(); } };
+    document.addEventListener('keydown', keydown);
+    document.body.appendChild(backdrop);
+    setTimeout(function () { try { okBtn.focus(); } catch (e) { /* noop */ } }, 30);
+  }
+
   // ── Sidebar new-item badges ───────────────────────────────────
   // Subtle brand-blue pills on Leads / Callbacks showing unactioned
   // counts, so a dispatcher living in the portal sees a hot lead without
@@ -2913,14 +2971,54 @@
 
     // Reassuring processing state shown while the parse job runs. Theme-aware
     // spinner (token colors, no literal #fff/#000) + the filename being read.
+    // The subtitle cycles through staged microcopy (see startStages) and 3
+    // shimmer skeleton rows preview the shape of the rate cards to come.
     function processingHtml(name) {
       return '<div class="qf-ingest-processing" role="status" aria-live="polite">'
         + '<div class="qf-ingest-spinner" aria-hidden="true"></div>'
         + '<div class="qf-ingest-processing-copy">'
         + '<div class="qf-ingest-processing-title">Reading your rate sheet… '
         + '<span class="qf-ingest-file">' + escapeHtml(name) + '</span></div>'
-        + '<div class="qf-ingest-processing-sub">Extracting rate cards, accessorials, and zones</div>'
-        + '</div></div>';
+        + '<div class="qf-ingest-processing-sub" data-ingest-stage>Reading your rate sheet…</div>'
+        + '</div></div>'
+        + '<div class="qf-ingest-skeleton" aria-hidden="true">'
+        + '<div class="qf-ingest-skeleton-row"><span class="qf-skel-line qf-skel-title"></span><span class="qf-skel-line qf-skel-meta"></span></div>'
+        + '<div class="qf-ingest-skeleton-row"><span class="qf-skel-line qf-skel-title"></span><span class="qf-skel-line qf-skel-meta"></span></div>'
+        + '<div class="qf-ingest-skeleton-row"><span class="qf-skel-line qf-skel-title"></span><span class="qf-skel-line qf-skel-meta"></span></div>'
+        + '</div>';
+    }
+
+    // Cycle the processing subtitle through timed stages so the wait feels
+    // like real progress, not a frozen spinner. Frontend-driven (independent
+    // of backend poll cadence); lands on a calm final line if parsing runs
+    // long. aria-live on the container announces each stage.
+    var stageTimer = null;
+    var STAGES = [
+      'Reading your rate sheet…',
+      'Pulling out rate cards…',
+      'Checking fuel surcharges & accessorials…',
+      'Auto-quoting sample lanes to verify…',
+    ];
+    var STAGE_FINAL = 'Still working — large sheets take a moment…';
+    function startStages() {
+      stopStages();
+      var i = 0;
+      stageTimer = setInterval(function () {
+        var sub = statusBox.querySelector('[data-ingest-stage]');
+        if (!sub) { stopStages(); return; }
+        i += 1;
+        var next = i < STAGES.length ? STAGES[i] : STAGE_FINAL;
+        // Cross-fade the line: fade out, swap text, fade back in.
+        sub.classList.add('is-swapping');
+        setTimeout(function () {
+          var s2 = statusBox.querySelector('[data-ingest-stage]');
+          if (s2) { s2.textContent = next; s2.classList.remove('is-swapping'); }
+        }, prefersReducedMotion() ? 0 : 200);
+        if (i >= STAGES.length) stopStages(); // hold on the final calm line
+      }, 2600);
+    }
+    function stopStages() {
+      if (stageTimer) { clearInterval(stageTimer); stageTimer = null; }
     }
 
     function handleFile(file) {
@@ -2940,6 +3038,7 @@
           body: { filename: file.name, mimeType: file.type || 'application/octet-stream', dataBase64: b64 },
         }).then(function (r) {
           statusBox.innerHTML = processingHtml(file.name);
+          startStages();
           pollJob(r.jobId, 0);
         }).catch(function (err) {
           statusBox.innerHTML = '<div class="notice error">' + escapeHtml(err.message || 'Upload failed') + '</div>';
@@ -2952,7 +3051,7 @@
     }
 
     function pollJob(jobId, attempt) {
-      if (attempt > 60) { statusBox.innerHTML = '<div class="notice warn">Still parsing — check back in a minute (job #' + jobId + ').</div>'; refreshList(); return; }
+      if (attempt > 60) { stopStages(); statusBox.innerHTML = '<div class="notice warn">Still parsing — check back in a minute (job #' + jobId + ').</div>'; refreshList(); return; }
       api('/api/tenant/ingest/' + jobId).then(function (r) {
         var job = r.job;
         if (job.status === 'parsing') {
@@ -2960,15 +3059,18 @@
           return;
         }
         if (job.status === 'failed') {
+          stopStages();
           statusBox.innerHTML = '<div class="notice error">Parse failed: ' + escapeHtml(job.errorMessage || 'unknown error') + '</div>';
           refreshList();
           return;
         }
         // ready_for_review
+        stopStages();
         statusBox.innerHTML = '<div class="notice">Parsed — review below ↓</div>';
         refreshList();
-        showReview(job);
+        showReview(job, true); // animate the reveal on the live poll path
       }).catch(function (err) {
+        stopStages();
         statusBox.innerHTML = '<div class="notice error">' + escapeHtml(err.message || 'Lost the job') + '</div>';
       });
     }
@@ -3008,7 +3110,11 @@
           ]));
         });
         tbl.appendChild(tbody);
-        listBody.appendChild(tbl);
+        // Wrap in a horizontal-scroll container so the date column can't wrap
+        // to 3 lines or clip at 375px — it scrolls instead of overflowing.
+        var scroll = el('div', { class: 'qf-table-scroll' });
+        scroll.appendChild(tbl);
+        listBody.appendChild(scroll);
       }).catch(showErr(listBody));
     }
 
@@ -3020,10 +3126,11 @@
       return 'badge-muted';
     }
 
-    function showReview(job) {
+    function showReview(job, animate) {
       reviewBox.innerHTML = '';
       var parsed = job.parsed || {};
-      var card = el('div', { class: 'card', style: { padding: '18px 22px' } });
+      var doAnim = animate && !prefersReducedMotion();
+      var card = el('div', { class: 'card' + (doAnim ? ' qf-reveal-in' : ''), style: { padding: '18px 22px' } });
 
       card.appendChild(el('h2', { text: 'Review: ' + job.filename }));
       if (parsed.summary) card.appendChild(el('p', { class: 'muted', text: parsed.summary, style: { marginBottom: '10px' } }));
@@ -3056,19 +3163,25 @@
       card.appendChild(autocheck);
       api('/api/tenant/ingest/' + job.id + '/autocheck').then(function (r) {
         autocheck.className = 'qf-autocheck';
+        var totalN = Number(r.total) || 0;
         if (r.flaggedCount > 0) {
           var items = (r.flagged || []).map(function (f) {
             return '<li>' + escapeHtml(f.label) + ' — ' + escapeHtml(f.reason) + '</li>';
           }).join('');
           autocheck.classList.add('qf-autocheck-flag');
-          autocheck.innerHTML = '<div class="qf-autocheck-line"><strong>We auto-quoted ' + r.total + ' sample lanes</strong> — '
+          autocheck.innerHTML = '<div class="qf-autocheck-line"><strong>We auto-quoted <span data-count-total>' + (doAnim ? '0' : totalN) + '</span> sample lanes</strong> — '
             + r.clean + ' clean, ' + r.flaggedCount + ' to look at:</div>'
             + '<ul class="qf-autocheck-list">' + items + '</ul>';
         } else {
           autocheck.classList.add('qf-autocheck-ok');
-          autocheck.innerHTML = '<span class="qf-autocheck-tick" aria-hidden="true">✓</span>'
-            + '<span>We auto-quoted ' + r.total + ' sample lanes with your rates — all computed cleanly. '
+          // Green tick draws itself in (SVG stroke) on the animated poll path.
+          autocheck.innerHTML = checkmarkSvg(doAnim)
+            + '<span>We auto-quoted <span data-count-total>' + (doAnim ? '0' : totalN) + '</span> sample lanes with your rates — all computed cleanly. '
             + 'You can apply now, or try a lane yourself first.</span>';
+        }
+        if (doAnim) {
+          var counter = autocheck.querySelector('[data-count-total]');
+          countUp(counter, totalN, 700);
         }
       }).catch(function () {
         // Auto-check is a bonus; never block the review if it fails.
@@ -3117,19 +3230,27 @@
           };
           var total = body.rateCards.length + body.accessorials.length + body.laneZones.length;
           if (total === 0) { toastErr({ message: 'Tick at least one item to apply.' }); return; }
-          if (!confirm('Apply ' + total + ' item(s) to your rate book?')) return;
-          applyBtn.disabled = true; applyBtn.textContent = 'Applying…';
-          api('/api/tenant/ingest/' + job.id + '/apply', {
-            method: 'POST', body: body,
-          }).then(function (r) {
-            reviewBox.innerHTML = '<div class="notice"><strong>Applied.</strong> ' +
-              r.inserted.rateCards + ' rate cards · ' +
-              r.inserted.accessorials + ' accessorials · ' +
-              r.inserted.laneZones + ' lane zones</div>';
-            refreshList();
-          }).catch(function (err) {
-            applyBtn.disabled = false; applyBtn.textContent = 'Apply selected';
-            toastErr({ message: err.message || 'Apply failed.' });
+          var noun = total === 1 ? 'item' : 'items';
+          showConfirmModal({
+            title: 'Apply to your rate book?',
+            body: 'This adds ' + total + ' ' + noun + ' to your live rate book. You can edit or remove them later.',
+            confirmText: 'Apply ' + total + ' ' + noun,
+            cancelText: 'Cancel',
+            onConfirm: function () {
+              applyBtn.disabled = true; applyBtn.textContent = 'Applying…';
+              api('/api/tenant/ingest/' + job.id + '/apply', {
+                method: 'POST', body: body,
+              }).then(function (r) {
+                reviewBox.innerHTML = '<div class="notice"><strong>Applied.</strong> ' +
+                  r.inserted.rateCards + ' rate cards · ' +
+                  r.inserted.accessorials + ' accessorials · ' +
+                  r.inserted.laneZones + ' lane zones</div>';
+                refreshList();
+              }).catch(function (err) {
+                applyBtn.disabled = false; applyBtn.textContent = 'Apply selected';
+                toastErr({ message: err.message || 'Apply failed.' });
+              });
+            },
           });
         } }
       });
@@ -3137,10 +3258,18 @@
         class: 'btn btn-danger',
         text: 'Reject',
         on: { click: function () {
-          if (!confirm('Discard this parsed result?')) return;
-          api('/api/tenant/ingest/' + job.id + '/reject', { method: 'POST' }).then(function () {
-            reviewBox.innerHTML = '';
-            refreshList();
+          showConfirmModal({
+            title: 'Discard this parsed result?',
+            body: 'The extracted rate cards, accessorials, and lane zones will be discarded. You can re-upload the sheet anytime.',
+            confirmText: 'Discard',
+            cancelText: 'Keep reviewing',
+            danger: true,
+            onConfirm: function () {
+              api('/api/tenant/ingest/' + job.id + '/reject', { method: 'POST' }).then(function () {
+                reviewBox.innerHTML = '';
+                refreshList();
+              }).catch(function (err) { toastErr({ message: err.message || 'Could not discard.' }); });
+            },
           });
         } }
       });
@@ -3158,6 +3287,30 @@
       actionRow.appendChild(testHint);
       card.appendChild(actionRow);
       reviewBox.appendChild(card);
+
+      // Bring the freshly-parsed card into view. Smooth-scroll on the poll
+      // path so the user actually sees the result appear below the fold.
+      // Under reduced-motion we keep the scroll but skip the reveal/stagger.
+      if (animate) {
+        try { card.scrollIntoView({ behavior: prefersReducedMotion() ? 'auto' : 'smooth', block: 'start' }); } catch (e) { card.scrollIntoView(); }
+      }
+      if (doAnim) {
+        // Staggered reveal of the extracted-item sections.
+        var sections = card.querySelectorAll('.qf-review-section');
+        for (var s = 0; s < sections.length; s++) {
+          sections[s].classList.add('qf-reveal-row');
+          sections[s].style.animationDelay = (80 + s * 90) + 'ms';
+        }
+      }
+    }
+
+    // Inline SVG checkmark that draws its stroke in when `animate` is set.
+    // Uses currentColor (inherits the success token) — no literal colors.
+    function checkmarkSvg(animate) {
+      return '<svg class="qf-check-draw' + (animate ? ' is-animating' : '') + '" viewBox="0 0 24 24" width="18" height="18" aria-hidden="true">'
+        + '<circle class="qf-check-circle" cx="12" cy="12" r="10" fill="none" stroke="currentColor" stroke-width="2"></circle>'
+        + '<path class="qf-check-path" d="M6.5 12.5 L10.5 16.5 L17.5 8.5" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"></path>'
+        + '</svg>';
     }
 
     // ── "Test your rates" modal ─────────────────────────────────────
@@ -3286,7 +3439,7 @@
     }
 
     function renderItemList(parent, title, items, summarize) {
-      var section = el('div', { style: { marginTop: '20px' } });
+      var section = el('div', { class: 'qf-review-section', style: { marginTop: '20px' } });
       section.appendChild(el('h3', { text: title + ' (' + items.length + ')', style: { fontSize: '15px', marginBottom: '8px' } }));
       if (!items.length) {
         section.appendChild(el('div', { class: 'muted-small', text: '— none extracted —' }));

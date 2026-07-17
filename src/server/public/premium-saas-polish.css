@@ -248,3 +248,99 @@
 @media (max-width: 560px) {
   .qf-test-grid { grid-template-columns: 1fr; }
 }
+
+/* ── AI import: staged microcopy (cross-fade the processing subtitle) ── */
+.qf-ingest-processing-sub {
+  transition: opacity .2s ease, transform .2s ease;
+}
+.qf-ingest-processing-sub.is-swapping {
+  opacity: 0;
+  transform: translateY(-3px);
+}
+
+/* ── AI import: skeleton preview of the parsed rate cards ────────────── */
+/* Reuses the qf-skeleton shimmer keyframe. Token-mixed base stays visible
+   in both light and dark themes (no literal colors). */
+.qf-ingest-skeleton {
+  display: grid;
+  gap: 12px;
+  margin-top: 12px;
+}
+.qf-ingest-skeleton-row {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 16px;
+  border: 1px solid var(--border);
+  border-radius: 14px;
+  background: var(--surface-2);
+}
+.qf-skel-line {
+  display: block;
+  height: 12px;
+  border-radius: 999px;
+  background: linear-gradient(90deg,
+    color-mix(in srgb, var(--ink) 6%, transparent),
+    color-mix(in srgb, var(--ink) 16%, transparent),
+    color-mix(in srgb, var(--ink) 6%, transparent));
+  background-size: 220% 100%;
+  animation: qf-skeleton 1.3s ease-in-out infinite;
+}
+.qf-skel-title { width: 46%; height: 14px; }
+.qf-skel-meta { width: 72%; }
+.qf-ingest-skeleton-row:nth-child(2) .qf-skel-line { animation-delay: .15s; }
+.qf-ingest-skeleton-row:nth-child(3) .qf-skel-line { animation-delay: .3s; }
+
+/* ── AI import: animated review reveal ──────────────────────────────── */
+.qf-reveal-in {
+  animation: qf-review-reveal .42s cubic-bezier(.22, .61, .36, 1) both;
+}
+.qf-reveal-row {
+  opacity: 0;
+  animation: qf-review-reveal .4s cubic-bezier(.22, .61, .36, 1) both;
+}
+@keyframes qf-review-reveal {
+  from { opacity: 0; transform: translateY(10px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+/* ── AI import: self-drawing confidence checkmark ───────────────────── */
+.qf-check-draw {
+  flex: none;
+  transform: translateY(1px); /* optical align to text baseline (not a spacing prop) */
+  color: var(--success);
+}
+.qf-check-draw .qf-check-circle { opacity: .4; }
+.qf-check-draw .qf-check-path { stroke-dasharray: 24; stroke-dashoffset: 0; }
+.qf-check-draw.is-animating .qf-check-circle {
+  stroke-dasharray: 64;
+  stroke-dashoffset: 64;
+  animation: qf-check-circle .4s ease-out forwards;
+}
+.qf-check-draw.is-animating .qf-check-path {
+  stroke-dashoffset: 24;
+  animation: qf-check-path .35s .28s ease-out forwards;
+}
+@keyframes qf-check-circle { to { stroke-dashoffset: 0; } }
+@keyframes qf-check-path { to { stroke-dashoffset: 0; } }
+
+/* ── AI import: Recent-uploads table — no clip/wrap at 375px ─────────── */
+.qf-table-scroll {
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+}
+.qf-table-scroll .table th,
+.qf-table-scroll .table td { white-space: nowrap; }
+
+@media (prefers-reduced-motion: reduce) {
+  .qf-skel-line,
+  .qf-reveal-in,
+  .qf-reveal-row,
+  .qf-check-draw.is-animating .qf-check-circle,
+  .qf-check-draw.is-animating .qf-check-path { animation: none !important; }
+  .qf-reveal-in,
+  .qf-reveal-row { opacity: 1 !important; transform: none !important; }
+  .qf-ingest-processing-sub { transition: none !important; }
+  .qf-check-draw.is-animating .qf-check-circle { stroke-dashoffset: 0 !important; }
+  .qf-check-draw.is-animating .qf-check-path { stroke-dashoffset: 0 !important; }
+}
