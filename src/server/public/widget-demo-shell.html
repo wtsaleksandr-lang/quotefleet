@@ -234,7 +234,7 @@
           <span class="qfd-dot"></span><span class="qfd-dot"></span><span class="qfd-dot"></span>
           <span class="qfd-url" id="qfd-url"><svg class="qfd-lock" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="4" y="11" width="16" height="10" rx="2"/><path d="M8 11V7a4 4 0 0 1 8 0v4"/></svg><span>yourcompany.quotefleet.net</span>
         </div>
-        <iframe class="qfd-frame" id="qfd-frame" title="Live QuoteFleet calculator demo" src="/w/demo?raw=1&amp;preset=midnight" loading="eager"></iframe>
+        <iframe class="qfd-frame" id="qfd-frame" title="Live QuoteFleet calculator demo" src="/w/demo?raw=1&amp;preset=midnight&amp;mapStyle=branded&amp;mapTheme=light" loading="eager"></iframe>
       </div>
     </div>
 
@@ -250,6 +250,15 @@
       var stage = document.getElementById('qfd-stage');
       var wrap = document.querySelector('.qfd-wrap');
       var THEME = { dark: 'midnight', light: 'cream' };
+      // Owner's pick: each theme version pins a DIFFERENT map, deliberately
+      // contrasted against the calculator (demo-only overrides, honored solely
+      // on the ?raw=1 showcase path — real tenant embeds are unaffected).
+      //   dark calculator  → pale-blue BRANDED map in its LIGHT theme
+      //   light calculator → Uber-style DARK_ROUTES map (theme-independent)
+      var MAP = {
+        dark: '&mapStyle=branded&mapTheme=light',
+        light: '&mapStyle=dark_routes',
+      };
       var state = { device: 'desktop', theme: 'dark' };
 
       function press(id, on) {
@@ -268,8 +277,9 @@
         state.theme = t;
         press('qfd-dark', t === 'dark');
         press('qfd-light', t === 'light');
-        // Reload the widget with the chosen preset (config re-resolves theme).
-        frame.src = '/w/demo?raw=1&preset=' + encodeURIComponent(THEME[t]);
+        // Reload the widget with the chosen preset (config re-resolves theme)
+        // plus this version's pinned map style/theme override.
+        frame.src = '/w/demo?raw=1&preset=' + encodeURIComponent(THEME[t]) + (MAP[t] || '');
       }
 
       document.getElementById('qfd-desktop').addEventListener('click', function () { setDevice('desktop'); });

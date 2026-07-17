@@ -234,6 +234,22 @@
     return (s === 'grayscale' || s === 'standard' || s === 'soft' || s === 'dark_routes' || s === 'satellite') ? s : 'branded';
   }
 
+  // DEMO-ONLY map overrides (?mapStyle= / ?mapTheme=). The /w/demo showcase pins
+  // a specific map look + theme per version, deliberately contrasted against the
+  // calculator. STRICTLY scoped to the raw-widget showcase path: only read when
+  // ?raw=1 is present, so real tenant embeds keep resolving their own saved
+  // mapStyle and following the widget theme. normMapStyle guards bad values.
+  var demoMapStyleOverride = '';
+  var demoMapThemeOverride = '';
+  try {
+    var _qs = new URLSearchParams(location.search);
+    if (_qs.get('raw') === '1') {
+      demoMapStyleOverride = _qs.get('mapStyle') || '';
+      var mt = _qs.get('mapTheme') || '';
+      if (mt === 'light' || mt === 'dark') demoMapThemeOverride = mt;
+    }
+  } catch (e) { /* ignore */ }
+
   function init() {
     var cfgUrl = '/api/public/widget/' + slug;
     if (themePreset) cfgUrl += (cfgUrl.indexOf('?') > -1 ? '&' : '?') + 'preset=' + encodeURIComponent(themePreset);
@@ -242,7 +258,7 @@
       .then(function (cfg) {
         if (cfg.error) { $('qf-root').innerHTML = '<div class="qf-error">' + cfg.error + '</div>'; return; }
         state.config = cfg;
-        brandMapStyle = normMapStyle(cfg.brand && cfg.brand.mapStyle);
+        brandMapStyle = normMapStyle(demoMapStyleOverride || (cfg.brand && cfg.brand.mapStyle));
         // Expose the resolved brand + contact so the /w/demo "brand it
         // yourself" preview can default to the carrier's REAL identity
         // instead of blank "Your company name" placeholders.
@@ -1351,6 +1367,13 @@
       return (0.299 * +m[0] + 0.587 * +m[1] + 0.114 * +m[2]) / 255 < 0.5;
     } catch (e) { return false; }
   }
+  // Map theme (light/dark day-night styling). Normally follows the calculator's
+  // own background; the demo showcase can pin it via ?raw=1&mapTheme= so a map
+  // can be contrasted against the calculator (e.g. a LIGHT branded map under a
+  // DARK calculator). Override is demo-scoped (see demoMapThemeOverride).
+  function resolvedMapTheme() {
+    return demoMapThemeOverride || (isDarkMapTheme() ? 'dark' : 'light');
+  }
   var mapReqSeq = 0, mapDebounce = null;
   function scheduleRouteMap() {
     if (mapDebounce) clearTimeout(mapDebounce);
@@ -1365,7 +1388,7 @@
     var seq = ++mapReqSeq;
     fetch(withGrant('/api/public/route-preview/' + slug), {
       method: 'POST', headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ pickup: pickup, delivery: delivery, service: state.service, theme: isDarkMapTheme() ? 'dark' : 'light', style: brandMapStyle })
+      body: JSON.stringify({ pickup: pickup, delivery: delivery, service: state.service, theme: resolvedMapTheme(), style: brandMapStyle })
     }).then(function (r) { return r.json(); }).then(function (resp) {
       if (seq !== mapReqSeq) return;
       if (!resp || !resp.ok) { showBaseMap(); autoResize(); return; }
@@ -1399,7 +1422,7 @@
     card.hidden = false;
     autoResize();
   }
-  function mapThemeParam() { return isDarkMapTheme() ? 'dark' : 'light'; }
+  function mapThemeParam() { return resolvedMapTheme(); }
   // Pre-input state: show a North America base map in the card before any address
   // is entered (Alex: "use a map, without a specific route, just point on North
   // America"). The .qf-map-base class hides the route overlays + expand and shows

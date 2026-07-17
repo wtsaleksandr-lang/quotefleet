@@ -461,7 +461,7 @@ export function registerPublicRoutes(app: Express) {
     const tenant = await getTenantBySlug(String(req.params.slug));
     if (!tenant || tenant.status !== 'active') return res.status(404).json({ ok: false });
     if (!(await enforceTenantAccess(tenant, req, res))) return;
-    const body = (req.body ?? {}) as { pickup?: unknown; delivery?: unknown; service?: string; theme?: unknown };
+    const body = (req.body ?? {}) as { pickup?: unknown; delivery?: unknown; service?: string; theme?: unknown; style?: unknown };
     if (!body.pickup || !body.delivery) return res.json({ ok: false });
     try {
       const pickupForDistance = await resolvePickupForDistance(body.pickup as Parameters<typeof resolvePickupForDistance>[0]);
@@ -473,7 +473,15 @@ export function registerPublicRoutes(app: Express) {
       const previewBrand = (
         await db().select().from(brandConfigs).where(eq(brandConfigs.tenantId, tenant.id)).limit(1)
       )[0];
-      const mapStyle = resolveMapStyle(previewBrand?.mapStyle);
+      // DEMO-SCOPED override: the reserved `demo` tenant's /w/demo showcase pins a
+      // specific map style per theme version (contrasted against the calculator)
+      // by passing `style` on the preview request. Every REAL tenant stays
+      // server-authoritative from its own saved brand.mapStyle — the client-sent
+      // style is ignored for them. resolveMapStyle guards bad values → 'branded'.
+      const mapStyle =
+        tenant.slug === 'demo' && body.style !== undefined
+          ? resolveMapStyle(body.style)
+          : resolveMapStyle(previewBrand?.mapStyle);
       // Route map for the widget's map card, rendered in the tenant's map style.
       const rm = await getRouteMap(dist.origin, dist.destination, loadEnv().GOOGLE_MAPS_API_KEY, theme, undefined, mapStyle);
       const lane = laneCacheKey(dist.origin, dist.destination);
