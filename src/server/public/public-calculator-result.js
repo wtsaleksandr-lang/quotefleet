@@ -67,6 +67,11 @@
       const strong = existing.querySelector('.qf-result-guide-head strong');
       const want = '$' + total;
       if (strong && strong.textContent !== want) strong.textContent = want;
+      // Also keep the service chip in sync — otherwise re-quoting a different
+      // service (e.g. FTL -> LTL) leaves the guide showing the old service.
+      const svcSpan = existing.querySelectorAll('.qf-result-mini-grid span')[1];
+      const svcWant = meta.split('·')[1]?.trim() || 'freight move';
+      if (svcSpan && svcSpan.textContent !== svcWant) svcSpan.textContent = svcWant;
       return;
     }
     buildPrintSummary();

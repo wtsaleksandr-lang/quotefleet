@@ -488,7 +488,12 @@
   // summed across items (each item's footprint × its quantity); the aggregate
   // freight class comes from totalWeight ÷ totalCubicFt.
   function ltlTotals() {
-    var totWt = 0, totPieces = 0, totCf = 0, maxDims = { l: 0, w: 0, h: 0 }, maxVol = -1, valid = 0;
+    // totWt = every item's weight (summary + payload). densWt = only the weight
+    // of items that ALSO have full L/W/H, so the aggregate density (and freight
+    // class) is computed from weight and volume that actually match. Counting a
+    // dimensionless item's weight in the density numerator without its volume
+    // inflated density and produced a wrongly-cheap class.
+    var totWt = 0, densWt = 0, totPieces = 0, totCf = 0, maxDims = { l: 0, w: 0, h: 0 }, maxVol = -1, valid = 0;
     state.ltlItems.forEach(function (it) {
       var qty = Math.max(0, Number(it.qty) || 0);
       var toIn = it.dimUnit === 'cm' ? IN_PER_CM : 1;
@@ -497,12 +502,13 @@
       if (qty > 0) { totWt += wLbs; totPieces += qty; }
       if (l > 0 && w > 0 && h > 0 && qty > 0) {
         totCf += (l * w * h / 1728) * qty;
+        densWt += wLbs;
         var vol = l * w * h;
         if (vol > maxVol) { maxVol = vol; maxDims = { l: l, w: w, h: h }; }
         if (wLbs > 0) valid++;
       }
     });
-    var density = totCf > 0 ? totWt / totCf : 0;
+    var density = totCf > 0 ? densWt / totCf : 0;
     return { weightLbs: Math.round(totWt), pieces: totPieces, cubicFt: totCf, density: density, cls: ltlClassFromDensity(density), maxDims: maxDims, validItems: valid };
   }
   function updateLtlSummary() {
