@@ -1388,7 +1388,10 @@
     var mm = { 'qf-map-m-distance': dEl, 'qf-map-m-transit': tEl, 'qf-map-m-pickup': pu, 'qf-map-m-delivery': de };
     Object.keys(mm).forEach(function (id) { var t = $(id); if (t && mm[id]) t.textContent = mm[id].textContent; });
     var img = $('qf-map-img'), mimg = $('qf-map-modal-img');
-    if (img) img.src = resp.mapUrl;
+    // Re-report height once the map image actually loads: it has height:auto, so
+    // the card grows only after the bitmap arrives — without this the host iframe
+    // stays sized to the pre-image height and shows an inner scrollbar.
+    if (img) { img.onload = autoResize; img.src = resp.mapUrl; }
     if (mimg) mimg.src = resp.mapUrl;
     card.hidden = false;
     autoResize();
@@ -1402,7 +1405,9 @@
     var card = $('qf-map-card'); if (!card) return;
     var url = withGrant('/api/public/base-map.png?theme=' + mapThemeParam() + '&style=' + brandMapStyle);
     var img = $('qf-map-img'), mimg = $('qf-map-modal-img');
-    if (img) { img.src = url; img.alt = 'Map of North America'; }
+    // height:auto image → re-report height on load so the host iframe expands to
+    // fit the base map instead of leaving an inner scrollbar (see renderRouteMap).
+    if (img) { img.onload = autoResize; img.src = url; img.alt = 'Map of North America'; }
     if (mimg) { mimg.src = url; mimg.alt = 'Map of North America'; }
     ['qf-map-distance', 'qf-map-transit', 'qf-map-pickup', 'qf-map-delivery',
      'qf-map-m-distance', 'qf-map-m-transit', 'qf-map-m-pickup', 'qf-map-m-delivery'
