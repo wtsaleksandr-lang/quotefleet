@@ -91,6 +91,20 @@ export function loadEnv(): Env {
     );
   }
 
+  // Loud guard: BYPASS_TRIAL_ENFORCEMENT disables ALL trial/plan gating
+  // (see server/middleware.ts). Harmless in dev/test, catastrophic in prod
+  // where it would hand out free unlimited access. Warn — don't change the
+  // flag's behavior.
+  if (
+    process.env.NODE_ENV === 'production' &&
+    (process.env.BYPASS_TRIAL_ENFORCEMENT === '1' ||
+      process.env.BYPASS_TRIAL_ENFORCEMENT === 'true')
+  ) {
+    console.warn(
+      '[SECURITY] BYPASS_TRIAL_ENFORCEMENT is ON in production — all trial/plan gating is disabled'
+    );
+  }
+
   const hostDomainsRaw = opt('HOST_DOMAINS') ?? 'quotefleet.net';
   const hostDomains = hostDomainsRaw
     .split(',')
