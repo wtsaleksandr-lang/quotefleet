@@ -99,9 +99,9 @@ src/server/public/quote.css:1:9043	background:#fff
 src/server/public/quote.css:1:9772	background:#fff
 src/server/public/quote.css:1:10334	background:#fff
 src/server/public/quote.css:1:10350	color:#000
-src/server/public/style.css:884:35	color: #FFFFFF
-src/server/public/style.css:953:3	color: #fff
-src/server/public/style.css:999:57	color: #FFFFFF
+src/server/public/style.css:894:35	color: #FFFFFF
+src/server/public/style.css:963:3	color: #fff
+src/server/public/style.css:1009:57	color: #FFFFFF
 src/server/public/tools.html:64:28	color: #fff
 src/server/public/vertical-pages-wefixtrades.css:18:3	color: #FFFFFF
 src/server/public/vertical-pages-wefixtrades.css:21:3	color: #FFFFFF
