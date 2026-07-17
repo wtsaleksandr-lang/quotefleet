@@ -761,6 +761,8 @@ export function registerPublicRoutes(app: Express) {
           total: `$${calc.total.toFixed(2)}`,
           customerName: body.customerName,
           contactLine,
+          customerEmail: body.customerEmail || null,
+          customerPhone: body.customerPhone || null,
           laneFrom: body.pickup.city ?? '?',
           laneTo: body.delivery.city ?? '?',
           miles: dist.miles,

@@ -109,15 +109,12 @@ function shell(opts: {
     : `
             ${opts.footerNote ? `<div style="margin:0 0 14px 0;">${opts.footerNote}</div>` : ''}
             <div>
-              <a href="${BRAND.supportUrl}" style="color:${BRAND.primary};text-decoration:none;">Questions? Chat with us&nbsp;→</a>
+              <a href="${BRAND.supportUrl}" style="color:${BRAND.primary};text-decoration:none;font-size:13px;">Questions? Chat with us&nbsp;→</a>
             </div>
             <div style="margin-top:10px;">
               <a href="mailto:${BRAND.support}" style="color:${BRAND.muted};text-decoration:underline;">${escape(BRAND.support)}</a>
               &nbsp;·&nbsp; The ${escape(BRAND.name)} Team
-            </div>${isMarketing ? `
-            <div style="margin-top:10px;">
-              ${escape(BRAND.postalAddress)}
-            </div>` : ''}
+            </div>
             <div style="margin-top:10px;">
               <a href="https://quotefleet.net/security" style="color:${BRAND.muted};text-decoration:underline;">Security</a>
               &nbsp;·&nbsp;
@@ -127,6 +124,9 @@ function shell(opts: {
               You're receiving QuoteFleet product updates because you started a trial.
               <a href="${escape(opts.unsubscribeUrl!)}" style="color:${BRAND.muted};text-decoration:underline;">Unsubscribe from product updates</a>.
               You'll still get essential account emails like sign-in links.
+            </div>
+            <div style="margin-top:12px;font-size:11px;color:${BRAND.mutedSoft};">
+              ${escape(BRAND.postalAddress)}
             </div>` : ''}`;
   return `<!doctype html>
 <html lang="en">
@@ -163,7 +163,7 @@ function shell(opts: {
              address line and the unsubscribe line (CAN-SPAM/CASL). Transactional
              omits both; those aren't legally required and only add clutter. -->
         <tr>
-          <td style="padding:18px 32px 22px 32px;border-top:1px solid ${BRAND.border};font-size:12px;color:${BRAND.muted};line-height:1.55;text-align:left;">${footerBody}
+          <td style="padding:18px 32px 22px 32px;border-top:1px solid ${BRAND.border};font-size:11px;color:${BRAND.muted};line-height:1.55;text-align:left;">${footerBody}
           </td>
         </tr>
       </table>${isMarketing ? '' : `
@@ -296,14 +296,49 @@ function ctaButton(label: string, href: string): string {
     </table>`;
 }
 
-/** Bordered label/value detail box. Rows with an empty value are skipped. */
+/** Sanitizes a phone string into a dial-safe `tel:` href value — strips every
+ *  non-digit except a single leading `+` (kept for international numbers). */
+function telHref(phone: string): string {
+  const cleaned = String(phone ?? '').replace(/[^\d+]/g, '');
+  // Drop any '+' that isn't the very first character.
+  return 'tel:' + cleaned.replace(/(?!^)\+/g, '');
+}
+
+/** Primary filled CTA plus up to two smaller secondary/outline buttons in a
+ *  row (they wrap → stack on narrow screens). Email-safe: the primary is a
+ *  table (Outlook), the secondaries are inline-block anchors that wrap. */
+function ctaActions(
+  primary: { label: string; href: string },
+  secondaries: Array<{ label: string; href: string }>,
+): string {
+  const secs = secondaries
+    .map(
+      (s) =>
+        `<a href="${escape(s.href)}" style="display:inline-block;padding:10px 20px;font-size:13px;font-weight:600;letter-spacing:-0.005em;color:${BRAND.primary};background:${BRAND.card};border:1px solid ${BRAND.border};border-radius:8px;text-decoration:none;margin:0 8px 8px 0;">${escape(s.label)}</a>`,
+    )
+    .join('');
+  const secBlock = secs ? `<div style="margin:0 0 22px 0;">${secs}</div>` : '';
+  return `
+    <table role="presentation" cellspacing="0" cellpadding="0" border="0" style="margin:4px 0 ${secs ? '12px' : '22px'} 0;">
+      <tr>
+        <td align="center" bgcolor="${BRAND.primary}" style="border-radius:8px;background:${BRAND.primary};">
+          <a href="${escape(primary.href)}" style="display:inline-block;padding:13px 28px;font-size:15px;font-weight:600;letter-spacing:-0.005em;color:#FFFFFF;background:${BRAND.primary};text-decoration:none;border-radius:8px;">${escape(primary.label)} →</a>
+        </td>
+      </tr>
+    </table>${secBlock}`;
+}
+
+/** Bordered 2-column detail table. Left cell = label (muted, top-aligned),
+ *  right cell = value (bold ink) — so every value left-aligns in its own
+ *  column and long values wrap gracefully. Rows with an empty value are
+ *  skipped. Client-safe: two `<td>`s per `<tr>`, per-row bottom border. */
 function detailBox(rows: Array<[string, string | null | undefined]>): string {
   const visible = rows.filter(([, v]) => v != null && String(v).trim() !== '');
   if (!visible.length) return '';
   const cells = visible
     .map(([label, value], i) => {
       const border = i < visible.length - 1 ? `border-bottom:1px solid ${BRAND.border};` : '';
-      return `<tr><td style="padding:10px 14px;font-size:14px;color:${BRAND.inkSoft};${border}"><span style="color:${BRAND.muted};">${escape(label)}:</span> <strong style="color:${BRAND.ink};">${escape(String(value))}</strong></td></tr>`;
+      return `<tr><td width="40%" valign="top" style="padding:10px 14px;font-size:14px;line-height:1.5;color:${BRAND.muted};${border}">${escape(label)}</td><td valign="top" style="padding:10px 14px;font-size:14px;line-height:1.5;font-weight:700;color:${BRAND.ink};word-break:break-word;${border}">${escape(String(value))}</td></tr>`;
     })
     .join('');
   return `<table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0" style="margin:0 0 20px 0;border:1px solid ${BRAND.border};border-radius:8px;overflow:hidden;background:${BRAND.bg};">${cells}</table>`;
@@ -361,6 +396,10 @@ export function leadNotificationEmail(opts: {
   total: string;
   customerName: string;
   contactLine: string;
+  /** Customer contact channels — when present, render "Email"/"Call" CTAs
+   *  alongside the primary dashboard button. */
+  customerEmail?: string | null;
+  customerPhone?: string | null;
   laneFrom: string;
   laneTo: string;
   miles?: number | string | null;
@@ -380,7 +419,13 @@ export function leadNotificationEmail(opts: {
       ['Equipment', opts.equipment ?? null],
     ]) +
     (opts.mapUrl ? routeMapImage(opts.mapUrl) : '') +
-    ctaButton('View in dashboard', opts.dashboardUrl);
+    ctaActions(
+      { label: 'View in dashboard', href: opts.dashboardUrl },
+      [
+        ...(opts.customerEmail ? [{ label: `Email ${opts.customerName}`, href: `mailto:${opts.customerEmail}` }] : []),
+        ...(opts.customerPhone ? [{ label: `Call ${opts.customerName}`, href: telHref(opts.customerPhone) }] : []),
+      ],
+    );
   return shell({
     preheader: `${opts.customerName} — ${opts.laneFrom} → ${opts.laneTo} — ${opts.total}`,
     inner,
@@ -409,7 +454,13 @@ export function callbackRequestedEmail(opts: {
       ['Topic', opts.topic ?? null],
     ]) +
     (opts.escalationNote ? paragraph(`<em style="color:${BRAND.muted};">${escape(opts.escalationNote)}</em>`) : '') +
-    ctaButton('Open in dashboard', opts.dashboardUrl);
+    ctaActions(
+      { label: 'Open in dashboard', href: opts.dashboardUrl },
+      [
+        ...(opts.email ? [{ label: `Email ${opts.customerName}`, href: `mailto:${opts.email}` }] : []),
+        ...(opts.phone ? [{ label: `Call ${opts.customerName}`, href: telHref(opts.phone) }] : []),
+      ],
+    );
   return shell({
     preheader: `${opts.customerName} requested a callback — ${opts.phone}`,
     inner,
@@ -586,14 +637,6 @@ export function weeklyDigestEmail(opts: {
       statTile({ value: String(opts.callbacks), label: 'Callbacks requested' }),
     ]) +
     detailBox(secondaryRows) +
-    // TODO(phase2): real email OPENS + link CLICKS need an ESP (Resend/SES)
-    // open+click webhook we don't ingest yet. Show a clearly-labeled
-    // placeholder rather than fabricating numbers.
-    `<table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0" style="margin:0 0 20px 0;border:1px dashed ${BRAND.border};border-radius:8px;background:${BRAND.card};">
-      <tr><td style="padding:10px 14px;font-size:13px;color:${BRAND.mutedSoft};">
-        <span style="color:${BRAND.muted};">Emails opened / links clicked:</span> <strong style="color:${BRAND.mutedSoft};">coming soon</strong>
-      </td></tr>
-    </table>` +
     ctaButton('View your dashboard', opts.dashboardUrl) +
     paragraph(`See the full breakdown — every lead, chat, and callback — in your analytics dashboard.`);
 
