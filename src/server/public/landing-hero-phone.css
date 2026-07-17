@@ -41,6 +41,57 @@ html body.qf-wft .visual-flow.qf-hero-media > .qf-phone { display: none; }
   }
 }
 
+/* ─────────────────────────────────────────────────────────────────────────
+   Hero video phone — repurposed bezel for the new hero device pair. Reuses the
+   retired `.qf-phone__frame` look (dark bezel, dynamic island, rounded screen)
+   but wraps a single looping product <video> and shows on BOTH desktop + mobile
+   (the phone frame is positioned by landing-hero-devices.css). Bezel colour
+   tokens re-declared here since `.qf-hero-vphone` is outside the `.qf-phone`
+   scope. No #fff/#000 literals — rgba() + dark hex only.
+   ───────────────────────────────────────────────────────────────────────── */
+.qf-hero-vphone {
+  --pz-bezel: #0b0d12;
+  --pz-bezel-edge: rgba(255, 255, 255, 0.10);
+  --pz-screen: #f7f9fc;
+}
+.qf-hero-vphone__frame {
+  position: relative;
+  width: 100%;
+  aspect-ratio: 9 / 19.5;
+  background: var(--pz-bezel);
+  border: 1px solid var(--pz-bezel-edge);
+  border-radius: 26px;
+  padding: 5px;
+  box-shadow:
+    0 2px 2px rgba(0, 0, 0, 0.4) inset,
+    0 24px 48px -22px rgba(0, 0, 0, 0.72),
+    0 0 0 1px rgba(0, 0, 0, 0.35);
+}
+.qf-hero-vphone__island {
+  position: absolute;
+  top: 8px;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 42px;
+  height: 12px;
+  background: #05070b;
+  border-radius: 8px;
+  z-index: 3;
+}
+.qf-hero-vphone__screen {
+  position: relative;
+  height: 100%;
+  border-radius: 21px;
+  overflow: hidden;
+  background: var(--pz-screen);
+}
+.qf-hero-vphone__vid {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
 /* ── Device frame — realistic proportions, aspect-locked. ── */
 .qf-phone__frame {
   position: relative;

@@ -1,34 +1,57 @@
 /* ─────────────────────────────────────────────────────────────────────────
-   Hero device composite — the single ready-made laptop + phone render.
-   Replaces the old desktop composite image AND the animated CSS phone with one
-   transparent-background WebP (1600×1046, 1.53:1 landscape) that already shows
-   both devices. Loaded LAST so it out-cascades the earlier hero sheets
-   (landing-hero-redesign / -phone / -polish) and the JS-injected cleanup sheet.
-   `html body.qf-wft` specificity bump beats those equal-specificity rules.
+   Hero device pair — TWO looping product videos framed as a laptop + phone,
+   replacing the old static composite WebP. The wrapper KEEPS the class
+   `.qf-hero-devices` so the frame + dotted-grid layers (landing-frame.css) keep
+   sitting correctly behind it (z-index 1 over the ::before dot field), and it
+   carries the shared soft drop-shadow + the desktop scale(1.2) origin center-
+   right. Loaded LAST so it out-cascades the earlier hero sheets. Phone bezel
+   lives in landing-hero-phone.css (repurposed retired bezel).
    ───────────────────────────────────────────────────────────────────────── */
 
-/* Desktop — large landscape focal image, full width of the media column, with
-   a soft drop-shadow that grounds the transparent PNG on the dark hero. The
-   filter never affects the layout box, so it can't create horizontal scroll. */
+/* Wrapper — reserves the same 1600×1046 (1.53:1) box the composite used so the
+   hero grid geometry is unchanged; positions the two device frames; grounds the
+   whole group with ONE soft drop-shadow (paint only → never any layout / scroll). */
 html body.qf-wft .visual-flow.qf-hero-media > .qf-hero-devices {
   display: block !important;
+  position: relative !important;
   width: 100% !important;
-  height: auto !important;
   max-width: 100% !important;
+  height: auto !important;
+  aspect-ratio: 1600 / 1046 !important;
   border: 0 !important;
-  border-radius: 0 !important;
   background: none !important;
   box-shadow: none !important;
-  -webkit-mask-image: none !important;
-  mask-image: none !important;
   filter: drop-shadow(0 32px 60px rgba(0, 0, 0, 0.5)) !important;
 }
 
-/* Desktop only — make the device mockups 20% larger + more prominent (Alex).
-   transform scales the paint, not the layout box, so it never reflows the grid
-   or creates horizontal page scroll; origin centred-right keeps the composite's
-   right edge anchored (the phone stays inside the viewport) and grows it left +
-   up/down into the hero's whitespace. Mobile (≤640) is untouched. */
+/* Laptop — reuse the `.qf-browser` window chrome; large, upper-left. */
+html body.qf-wft .qf-hero-devices > .qf-hero-laptop {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 80%;
+  z-index: 1;
+}
+/* Drop the component's own heavy drop-shadow so the wrapper's shadow leads
+   (avoids a doubled shadow on the grouped devices). */
+html body.qf-wft .qf-hero-devices > .qf-hero-laptop > .qf-browser {
+  filter: none !important;
+}
+
+/* Phone — overlaps the bottom-right corner of the laptop, in front of it. Kept
+   inside the wrapper's right edge (right:2%, width:25%) so the desktop
+   scale(1.2) origin center-right never pushes it past the viewport. */
+html body.qf-wft .qf-hero-devices > .qf-hero-vphone {
+  position: absolute;
+  right: 2%;
+  bottom: -2%;
+  width: 25%;
+  z-index: 2;
+}
+
+/* Desktop only — 20% larger, anchored center-right: grows left + up/down into
+   the hero's whitespace while the right edge stays anchored inside the viewport.
+   transform scales the paint, not the layout box → no reflow, no page scroll. */
 @media (min-width: 641px) {
   html body.qf-wft .visual-flow.qf-hero-media > .qf-hero-devices {
     transform: scale(1.2) !important;
@@ -37,17 +60,14 @@ html body.qf-wft .visual-flow.qf-hero-media > .qf-hero-devices {
 }
 
 /* Mobile (≤640px) — the hero reflows to a single column (title → media → lead).
-   The composite scales down to the full width of its container. Landscape, so
-   a full-width render reads well here; the grid is min(92%, 100vw−32px) wide,
-   which keeps it inside the viewport (no horizontal page overflow). */
+   Keep the same laptop+phone composition, scaled down to the column width
+   (mirrors how the old composite behaved); no scale transform; lighter shadow.
+   The grid column is min(92%, 100vw−32px) → stays inside the viewport. */
 @media (max-width: 640px) {
   html body.qf-wft .visual-flow.qf-hero-media {
     max-width: none !important;
   }
   html body.qf-wft .visual-flow.qf-hero-media > .qf-hero-devices {
-    display: block !important;
-    width: 100% !important;
-    height: auto !important;
     filter: drop-shadow(0 12px 24px rgba(0, 0, 0, 0.45)) !important;
   }
 }
