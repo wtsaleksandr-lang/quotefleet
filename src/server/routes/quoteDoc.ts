@@ -2,6 +2,7 @@ import type { Express, Request, Response } from 'express';
 import { and, desc, eq } from 'drizzle-orm';
 import { db } from '../../db/client.js';
 import { tenants, brandConfigs, leads, accessorials, rateCards, auditLog } from '../../db/schema.js';
+import { enforceTenantAccess } from '../access.js';
 import { loadEnv } from '../../config.js';
 import { publicDocLimiter, quoteEmailSendLimiter } from '../rateLimits.js';
 import { requireAuth, requireTenant } from '../middleware.js';
@@ -291,6 +292,10 @@ export function registerQuoteDocRoutes(app: Express) {
     ]);
     const tenant = tenantRows[0];
     if (!tenant || tenant.status !== 'active') return res.status(404).json({ error: 'Carrier not found' });
+    // Private-calculator gate — a private tenant's quote doc (rates + customer
+    // PII) is not readable without the access grant, matching the sibling
+    // /api/public/lead/:refId endpoint.
+    if (!(await enforceTenantAccess(tenant, req, res))) return;
 
     // Friendly equipment label — same human name the widget's equipment
     // dropdown shows (from the carrier's own rate card), so the hosted quote
@@ -425,6 +430,8 @@ export function registerQuoteDocRoutes(app: Express) {
     ]);
     const tenant = tenantRows[0];
     if (!tenant || tenant.status !== 'active') return res.status(404).json({ error: 'Carrier not found' });
+    // Private-calculator gate (same as /api/public/lead/:refId).
+    if (!(await enforceTenantAccess(tenant, req, res))) return;
 
     const base = loadEnv().PUBLIC_BASE_URL.replace(/\/$/, '');
     const { subject, text, html, quoteUrl } = buildQuoteDocEmail(lead, tenant, brandRows[0] || null, base);
