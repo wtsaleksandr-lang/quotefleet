@@ -19,10 +19,13 @@
    never any horizontal overflow).
    ───────────────────────────────────────────────────────────────────────── */
 
-/* Shared horizontal offset = the container edge (1200px column), clamped so it
-   never goes past a 24px inset on screens narrower than the column. */
+/* Shared horizontal offset = 632px from centre — i.e. ~32px OUTSIDE the 1200px
+   content column (whose edge is at 600px) and ~42px clear of the widest real
+   content (text/cards reach ±590px from centre). Clamped with max(0px, …) so on
+   viewports with no gutter the rails simply pull flush to the viewport edge —
+   still outside the content (which never reaches 0px) and never overflowing. */
 
-/* ── 1. Vertical frame rails (left + right of the content column) ────────── */
+/* ── 1. Vertical frame rails (left + right, OUTSIDE the content column) ───── */
 body.landing-v2.qf-wft main {
   position: relative;
 }
@@ -38,36 +41,43 @@ body.landing-v2.qf-wft main::after {
   z-index: 5;
 }
 body.landing-v2.qf-wft main::before {
-  left: max(var(--space-3), calc(50% - 600px));
+  left: max(0px, calc(50% - 632px));
 }
 body.landing-v2.qf-wft main::after {
-  right: max(var(--space-3), calc(50% - 600px));
+  right: max(0px, calc(50% - 632px));
 }
 
-/* ── 2. Horizontal section dividers (top of each section, incl. hero top) ──
+/* ── 2. Horizontal section dividers (in the GAP above each section) ────────
    Uses ::after because .hero and .qf-globe-section already claim ::before; no
    rendered section defines a section-level ::after, so this never collides.
-   Inset to the same rail offset → the horizontals meet the verticals. */
+   Inset to the same rail offset → the horizontals meet the verticals. Pulled UP
+   one --space-3 (24px) into the inter-section gap so the line lands in empty
+   padding — never across a section whose content starts flush at its top. */
 body.landing-v2.qf-wft main > section {
   position: relative;
 }
 body.landing-v2.qf-wft main > section::after {
   content: "";
   position: absolute;
-  top: 0;
-  left: max(var(--space-3), calc(50% - 600px));
-  right: max(var(--space-3), calc(50% - 600px));
+  top: calc(var(--space-3) * -1);
+  left: max(0px, calc(50% - 632px));
+  right: max(0px, calc(50% - 632px));
   height: 1px;
   background: rgba(255, 255, 255, 0.07);
   pointer-events: none;
   z-index: 4;
 }
+/* The hero is the first section — its "top" divider would sit under the floating
+   header. Suppress it; the header already caps the top of the frame. */
+body.landing-v2.qf-wft main > section.hero::after {
+  display: none;
+}
 
 /* ── 3. Dotted grid behind the hero device composite ──────────────────────
    The hero image is a transparent-background WebP, so a dot layer sitting
-   BEHIND it shows through the gaps around the laptop + phone. Confined to the
-   media column and masked toward the top-right so it fades out before the copy
-   and never reads as loud gridlines. */
+   BEHIND it shows through the open space around the laptop + phone. A broad,
+   centre-weighted mask keeps the dotted field clearly visible beside/behind the
+   devices while fading softly at the outer edges — subtle, never loud. */
 body.landing-v2.qf-wft .hero .qf-hero-media {
   position: relative;
   isolation: isolate;
@@ -75,12 +85,16 @@ body.landing-v2.qf-wft .hero .qf-hero-media {
 body.landing-v2.qf-wft .hero .qf-hero-media::before {
   content: "";
   position: absolute;
-  inset: 0;
-  background-image: radial-gradient(rgba(255, 255, 255, 0.10) 1px, transparent 1px);
-  background-size: 24px 24px;
+  /* Extend a little LEFT + up/down beyond the media box so a band of dots reads
+     in the open hero space beside/behind the devices, not only under them. */
+  inset: -8% -2% -8% -14%;
+  background-image: radial-gradient(rgba(255, 255, 255, 0.15) 1px, transparent 1px);
+  background-size: 22px 22px;
   background-position: 0 0;
-  -webkit-mask-image: radial-gradient(120% 120% at 100% 28%, rgba(255, 255, 255, 1) 42%, rgba(255, 255, 255, 0) 80%);
-  mask-image: radial-gradient(120% 120% at 100% 28%, rgba(255, 255, 255, 1) 42%, rgba(255, 255, 255, 0) 80%);
+  /* Broad, centre-weighted fade so the dotted field is clearly visible across
+     the open area around the composite, softening only at the outer edges. */
+  -webkit-mask-image: radial-gradient(125% 125% at 55% 42%, rgba(255, 255, 255, 1) 62%, rgba(255, 255, 255, 0) 92%);
+  mask-image: radial-gradient(125% 125% at 55% 42%, rgba(255, 255, 255, 1) 62%, rgba(255, 255, 255, 0) 92%);
   pointer-events: none;
   z-index: 0;
 }
@@ -90,11 +104,19 @@ body.landing-v2.qf-wft .hero .qf-hero-media > .qf-hero-devices {
 }
 
 /* ── Responsive: keep the frame + dot grid clean on mobile ────────────────
-   The rails/dividers auto-clamp to a 24px inset via max(var(--space-3), …).
-   Soften the hero dot grid so the reflowed single-column hero stays uncluttered. */
+   On the single-column mobile layout there is no gutter, so hide the vertical
+   rails entirely (the max(0px, …) clamp already guarantees no overflow, but a
+   full-height edge line adds clutter here). Horizontal dividers stay — they sit
+   in the vertical gaps between stacked sections. Soften the hero dot grid so the
+   reflowed hero stays uncluttered. */
 @media (max-width: 640px) {
+  body.landing-v2.qf-wft main::before,
+  body.landing-v2.qf-wft main::after {
+    display: none;
+  }
   body.landing-v2.qf-wft .hero .qf-hero-media::before {
-    opacity: 0.55;
-    background-size: 24px 24px;
+    inset: 0;
+    opacity: 0.5;
+    background-size: 20px 20px;
   }
 }
