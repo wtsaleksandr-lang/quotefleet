@@ -1,0 +1,100 @@
+/* ─────────────────────────────────────────────────────────────────────────
+   landing-frame.css — subtle white framing system for the dark landing.
+
+   Adds three quiet, premium layers on top of the existing landing (no copy,
+   image, or content changes):
+     1. Two thin VERTICAL rails at the content-column edges, running from just
+        under the header to the top of the footer.
+     2. Thin HORIZONTAL dividers at the top of every section (wrapping the hero
+        and separating each section), inset to MEET the vertical rails so the
+        page reads as a framed grid.
+     3. A subtle DOTTED grid behind the hero device composite (the transparent
+        WebP lets the dots show through the gaps; devices stay fully on top).
+
+   All lines are low-opacity white via rgba(255,255,255,X) — never a hardcoded
+   #fff/white (keeps the color guard green). Positions use calc()/var() (skipped
+   by the spacing guard) or 0 (on-ramp). Loaded LAST so it out-cascades earlier
+   landing sheets. Frame width is locked to the site container (max-width 1200,
+   so the rails sit at 50% ± 600px, clamped to a 24px inset on narrow screens →
+   never any horizontal overflow).
+   ───────────────────────────────────────────────────────────────────────── */
+
+/* Shared horizontal offset = the container edge (1200px column), clamped so it
+   never goes past a 24px inset on screens narrower than the column. */
+
+/* ── 1. Vertical frame rails (left + right of the content column) ────────── */
+body.landing-v2.qf-wft main {
+  position: relative;
+}
+body.landing-v2.qf-wft main::before,
+body.landing-v2.qf-wft main::after {
+  content: "";
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  width: 1px;
+  background: rgba(255, 255, 255, 0.08);
+  pointer-events: none;
+  z-index: 5;
+}
+body.landing-v2.qf-wft main::before {
+  left: max(var(--space-3), calc(50% - 600px));
+}
+body.landing-v2.qf-wft main::after {
+  right: max(var(--space-3), calc(50% - 600px));
+}
+
+/* ── 2. Horizontal section dividers (top of each section, incl. hero top) ──
+   Uses ::after because .hero and .qf-globe-section already claim ::before; no
+   rendered section defines a section-level ::after, so this never collides.
+   Inset to the same rail offset → the horizontals meet the verticals. */
+body.landing-v2.qf-wft main > section {
+  position: relative;
+}
+body.landing-v2.qf-wft main > section::after {
+  content: "";
+  position: absolute;
+  top: 0;
+  left: max(var(--space-3), calc(50% - 600px));
+  right: max(var(--space-3), calc(50% - 600px));
+  height: 1px;
+  background: rgba(255, 255, 255, 0.07);
+  pointer-events: none;
+  z-index: 4;
+}
+
+/* ── 3. Dotted grid behind the hero device composite ──────────────────────
+   The hero image is a transparent-background WebP, so a dot layer sitting
+   BEHIND it shows through the gaps around the laptop + phone. Confined to the
+   media column and masked toward the top-right so it fades out before the copy
+   and never reads as loud gridlines. */
+body.landing-v2.qf-wft .hero .qf-hero-media {
+  position: relative;
+  isolation: isolate;
+}
+body.landing-v2.qf-wft .hero .qf-hero-media::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background-image: radial-gradient(rgba(255, 255, 255, 0.10) 1px, transparent 1px);
+  background-size: 24px 24px;
+  background-position: 0 0;
+  -webkit-mask-image: radial-gradient(120% 120% at 100% 28%, rgba(255, 255, 255, 1) 42%, rgba(255, 255, 255, 0) 80%);
+  mask-image: radial-gradient(120% 120% at 100% 28%, rgba(255, 255, 255, 1) 42%, rgba(255, 255, 255, 0) 80%);
+  pointer-events: none;
+  z-index: 0;
+}
+body.landing-v2.qf-wft .hero .qf-hero-media > .qf-hero-devices {
+  position: relative;
+  z-index: 1;
+}
+
+/* ── Responsive: keep the frame + dot grid clean on mobile ────────────────
+   The rails/dividers auto-clamp to a 24px inset via max(var(--space-3), …).
+   Soften the hero dot grid so the reflowed single-column hero stays uncluttered. */
+@media (max-width: 640px) {
+  body.landing-v2.qf-wft .hero .qf-hero-media::before {
+    opacity: 0.55;
+    background-size: 24px 24px;
+  }
+}
