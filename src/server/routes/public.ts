@@ -34,7 +34,7 @@ import { estimateTransit } from '../../calc/transit.js';
 import { distanceBetween } from '../../calc/distance.js';
 import { generateLeadReply } from '../../ai/replyAgent.js';
 import { leadChatTurn } from '../../ai/chatAgent.js';
-import { sendEmail } from '../../email/send.js';
+import { sendEmail, brandedFrom } from '../../email/send.js';
 import {
   leadAutoReplyEmail,
   leadNotificationEmail,
@@ -716,11 +716,22 @@ export function registerPublicRoutes(app: Express) {
       if (ai[0]?.autoReplyEnabled && canUseProFeature(tenant) && row && body.customerEmail) {
         const aiBody = await generateLeadReply(tenant.id, row.id);
         const quoteUrl = `${loadEnv().PUBLIC_BASE_URL.replace(/\/$/, '')}/quote/${encodeURIComponent(refId)}`;
+        // Customer-facing: wear the CARRIER's brand (name + sender), not
+        // QuoteFleet's — this email goes to the carrier's own customer.
+        const arDisplayName = brand?.displayName || tenant.name;
         const arResult = await sendEmail({
           to: body.customerEmail,
+          from: brandedFrom(arDisplayName),
           subject: `Quote ${refId} — ${tenant.name}`,
           text: aiBody,
-          html: leadAutoReplyEmail({ aiBody, refId, quoteUrl, mapUrl }),
+          html: leadAutoReplyEmail({
+            aiBody,
+            refId,
+            quoteUrl,
+            mapUrl,
+            brandName: arDisplayName,
+            brandLogoUrl: brand?.logoUrl ?? null,
+          }),
         });
         if (!arResult.ok) {
           console.error(`[email] lead auto-reply send FAILED (lead ${refId}): ${arResult.error ?? 'unknown error'}`);

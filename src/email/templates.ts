@@ -20,10 +20,11 @@ const BRAND = {
   name: 'QuoteFleet',
   operator: 'MR Holdings & Trade LLC',
   // PHYSICAL POSTAL ADDRESS — legally required in the footer of every
-  // marketing/lifecycle email under CAN-SPAM (US) and CASL (Canada).
-  // TODO(compliance): REPLACE THIS PLACEHOLDER with the real registered
-  // mailing address BEFORE any lifecycle/marketing email is sent at scale.
-  postalAddress: 'MR Holdings & Trade LLC · [POSTAL ADDRESS — set before sending marketing email]',
+  // marketing/lifecycle email under CAN-SPAM (US) and CASL (Canada). Rendered
+  // ONLY on marketing/lifecycle emails (isMarketing) — never on transactional,
+  // per "don't show it where it isn't mandatory". This is the Wyoming
+  // registered office, matching the /privacy, /dpa and /refund legal pages.
+  postalAddress: 'MR Holdings & Trade LLC · 30 N Gould St, Ste R, Sheridan, WY 82801',
   primary: '#0D3CFC',          // brand blue (retired teal #0EA5B7)
   primaryDark: '#0A2FCB',
   ink: '#0B0F14',
@@ -54,10 +55,79 @@ function shell(opts: {
    *  Omitted for transactional emails (magic-link, lead/callback/booking
    *  notifications) which are CAN-SPAM/CASL-exempt and must always send. */
   unsubscribeUrl?: string;
+  /** CARRIER-BRANDED customer-facing emails ONLY (lead auto-reply, quote-doc
+   *  share). When present, the header shows the CARRIER's name/logo instead of
+   *  QuoteFleet's, and the footer drops the platform's own support/security/DPA
+   *  links, replacing them with a single subtle "Powered by QuoteFleet" line.
+   *  Absent → renders EXACTLY as before (QuoteFleet-branded). */
+  brand?: { name: string; logoUrl?: string | null };
+  /** Reserved: when carrier-branded (`brand` present) the footer already
+   *  renders the subtle "Powered by QuoteFleet" line; this flag lets a caller
+   *  request it explicitly. Presence of `brand` implies it. */
+  poweredBy?: boolean;
 }): string {
   // Marketing/lifecycle emails pass an unsubscribeUrl; transactional don't.
   // That presence is our single signal for the fuller (legal) footer.
   const isMarketing = opts.unsubscribeUrl != null && opts.unsubscribeUrl !== '';
+  // Carrier-branded customer-facing mode — the header wears the carrier's
+  // identity and the footer sheds the platform's own links (see comments below).
+  const brand = opts.brand;
+  const brandName = brand?.name?.trim() || '';
+  const brandLogo = brand?.logoUrl && String(brand.logoUrl).trim() !== '' ? String(brand.logoUrl).trim() : '';
+  // Header — carrier brand (no anchor to quotefleet.net; the customer's
+  // relationship is with the carrier) vs. the standard QuoteFleet header.
+  const header = brand
+    ? `<table role="presentation" cellspacing="0" cellpadding="0" border="0">
+              <tr>
+                <td valign="middle">
+                  ${brandLogo ? `<img src="${escape(brandLogo)}" height="${BRAND.logoH}" alt="${escape(brandName)}" style="display:inline-block;vertical-align:middle;border:0;outline:none;text-decoration:none;margin-right:10px;max-height:${BRAND.logoH}px;">` : ''}<span style="font-size:19px;font-weight:700;letter-spacing:-0.01em;color:${BRAND.ink};vertical-align:middle;">${escape(brandName)}</span>
+                </td>
+              </tr>
+            </table>`
+    : `<table role="presentation" cellspacing="0" cellpadding="0" border="0">
+              <tr>
+                <td valign="middle">
+                  <!-- Logo + wordmark wrapped together in one anchor so tapping
+                       the brand opens the site. Inline-block + vertical-align
+                       keeps the img/span on one line in every major client. -->
+                  <a href="https://quotefleet.net" style="text-decoration:none;display:inline-block;">
+                    <img src="${BRAND.logoIcon}" width="${BRAND.logoW}" height="${BRAND.logoH}" alt="${escape(BRAND.name)}" style="display:inline-block;vertical-align:middle;border:0;outline:none;text-decoration:none;margin-right:10px;">
+                    <span style="font-size:19px;font-weight:700;letter-spacing:-0.01em;color:${BRAND.ink};vertical-align:middle;">${escape(BRAND.name)}</span>
+                  </a>
+                </td>
+              </tr>
+            </table>`;
+  // Footer body — carrier mode suppresses the platform's support/security/DPA
+  // links (those are QuoteFleet's, not the carrier's) and shows one tiny, muted
+  // "Powered by QuoteFleet" line. Non-brand mode is byte-identical to before.
+  const footerBody = brand
+    ? `
+            ${opts.footerNote ? `<div style="margin:0 0 14px 0;">${opts.footerNote}</div>` : ''}
+            <div style="font-size:11px;color:${BRAND.mutedSoft};">
+              Powered by <a href="https://quotefleet.net" style="color:${BRAND.mutedSoft};text-decoration:none;">QuoteFleet</a>
+            </div>`
+    : `
+            ${opts.footerNote ? `<div style="margin:0 0 14px 0;">${opts.footerNote}</div>` : ''}
+            <div>
+              <a href="${BRAND.supportUrl}" style="color:${BRAND.primary};text-decoration:none;">Questions? Chat with us&nbsp;→</a>
+            </div>
+            <div style="margin-top:10px;">
+              <a href="mailto:${BRAND.support}" style="color:${BRAND.muted};text-decoration:underline;">${escape(BRAND.support)}</a>
+              &nbsp;·&nbsp; The ${escape(BRAND.name)} Team
+            </div>${isMarketing ? `
+            <div style="margin-top:10px;">
+              ${escape(BRAND.postalAddress)}
+            </div>` : ''}
+            <div style="margin-top:10px;">
+              <a href="https://quotefleet.net/security" style="color:${BRAND.muted};text-decoration:underline;">Security</a>
+              &nbsp;·&nbsp;
+              <a href="https://quotefleet.net/dpa" style="color:${BRAND.muted};text-decoration:underline;">DPA</a>
+            </div>${isMarketing ? `
+            <div style="margin-top:10px;">
+              You're receiving QuoteFleet product updates because you started a trial.
+              <a href="${escape(opts.unsubscribeUrl!)}" style="color:${BRAND.muted};text-decoration:underline;">Unsubscribe from product updates</a>.
+              You'll still get essential account emails like sign-in links.
+            </div>` : ''}`;
   return `<!doctype html>
 <html lang="en">
 <head>
@@ -79,19 +149,7 @@ function shell(opts: {
         <!-- Header / brand -->
         <tr>
           <td style="padding:24px 32px 18px 32px;border-bottom:1px solid ${BRAND.border};">
-            <table role="presentation" cellspacing="0" cellpadding="0" border="0">
-              <tr>
-                <td valign="middle">
-                  <!-- Logo + wordmark wrapped together in one anchor so tapping
-                       the brand opens the site. Inline-block + vertical-align
-                       keeps the img/span on one line in every major client. -->
-                  <a href="https://quotefleet.net" style="text-decoration:none;display:inline-block;">
-                    <img src="${BRAND.logoIcon}" width="${BRAND.logoW}" height="${BRAND.logoH}" alt="${escape(BRAND.name)}" style="display:inline-block;vertical-align:middle;border:0;outline:none;text-decoration:none;margin-right:10px;">
-                    <span style="font-size:19px;font-weight:700;letter-spacing:-0.01em;color:${BRAND.ink};vertical-align:middle;">${escape(BRAND.name)}</span>
-                  </a>
-                </td>
-              </tr>
-            </table>
+            ${header}
           </td>
         </tr>
         <!-- Body -->
@@ -105,28 +163,7 @@ function shell(opts: {
              address line and the unsubscribe line (CAN-SPAM/CASL). Transactional
              omits both; those aren't legally required and only add clutter. -->
         <tr>
-          <td style="padding:18px 32px 22px 32px;border-top:1px solid ${BRAND.border};font-size:12px;color:${BRAND.muted};line-height:1.55;text-align:left;">
-            ${opts.footerNote ? `<div style="margin:0 0 14px 0;">${opts.footerNote}</div>` : ''}
-            <div>
-              <a href="${BRAND.supportUrl}" style="color:${BRAND.primary};text-decoration:none;">Questions? Chat with us&nbsp;→</a>
-            </div>
-            <div style="margin-top:10px;">
-              <a href="mailto:${BRAND.support}" style="color:${BRAND.muted};text-decoration:underline;">${escape(BRAND.support)}</a>
-              &nbsp;·&nbsp; The ${escape(BRAND.name)} Team
-            </div>${isMarketing ? `
-            <div style="margin-top:10px;">
-              ${escape(BRAND.postalAddress)}
-            </div>` : ''}
-            <div style="margin-top:10px;">
-              <a href="https://quotefleet.net/security" style="color:${BRAND.muted};text-decoration:underline;">Security</a>
-              &nbsp;·&nbsp;
-              <a href="https://quotefleet.net/dpa" style="color:${BRAND.muted};text-decoration:underline;">DPA</a>
-            </div>${isMarketing ? `
-            <div style="margin-top:10px;">
-              You're receiving QuoteFleet product updates because you started a trial.
-              <a href="${escape(opts.unsubscribeUrl!)}" style="color:${BRAND.muted};text-decoration:underline;">Unsubscribe from product updates</a>.
-              You'll still get essential account emails like sign-in links.
-            </div>` : ''}
+          <td style="padding:18px 32px 22px 32px;border-top:1px solid ${BRAND.border};font-size:12px;color:${BRAND.muted};line-height:1.55;text-align:left;">${footerBody}
           </td>
         </tr>
       </table>${isMarketing ? '' : `
@@ -135,7 +172,7 @@ function shell(opts: {
       <table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0" style="max-width:560px;margin-top:14px;">
         <tr>
           <td align="center" style="font-size:11px;color:${BRAND.mutedSoft};line-height:1.5;">
-            You're receiving this because you (or someone using your address) requested it from ${escape(BRAND.name)}.
+            You're receiving this because you (or someone using your address) requested it from ${escape(brand ? brandName : BRAND.name)}.
             If that wasn't you, ignore this email — no action will be taken.
           </td>
         </tr>
@@ -299,6 +336,11 @@ export function leadAutoReplyEmail(opts: {
   quoteUrl?: string;
   /** Absolute route-map proxy URL; rendered under the heading when present. */
   mapUrl?: string;
+  /** Carrier display name — this email goes to the carrier's OWN customer, so
+   *  it wears the carrier's brand, not QuoteFleet's. */
+  brandName: string;
+  /** Carrier logo (absolute HTTPS). When empty/null, the header shows the name only. */
+  brandLogoUrl?: string | null;
 }): string {
   const inner =
     eyebrow(`Quote ${opts.refId}`) +
@@ -309,6 +351,7 @@ export function leadAutoReplyEmail(opts: {
   return shell({
     preheader: `Your quote ${opts.refId} — details inside`,
     inner,
+    brand: { name: opts.brandName, logoUrl: opts.brandLogoUrl },
   });
 }
 

@@ -35,7 +35,11 @@ const h = vi.hoisted(() => {
   return { state, sendEmailMock };
 });
 
-vi.mock('../../email/send.js', () => ({ sendEmail: h.sendEmailMock }));
+vi.mock('../../email/send.js', () => ({
+  sendEmail: h.sendEmailMock,
+  // Mirror the real helper's shape: "<DisplayName> <addr>".
+  brandedFrom: (name: string) => `${(name || 'QuoteFleet').replace(/["<>]/g, '').trim()} <hello@quotefleet.net>`,
+}));
 
 vi.mock('../../db/client.js', async () => {
   const { getTableName } = await import('drizzle-orm');
@@ -137,12 +141,15 @@ describe('sendQuoteDocEmail — recipient is always the stored customer email', 
     expect(arg.to).toBe('real-customer@shipper.io');
   });
 
-  it('(e) sends transactional (no List-Unsubscribe) from the platform sender (no from override)', async () => {
+  it('(e) sends transactional (no List-Unsubscribe) under the CARRIER-branded sender', async () => {
     const { sendQuoteDocEmail } = await import('./quoteDoc.js');
     await sendQuoteDocEmail({ tenantId: 1, refId: 'QF-ABC123' });
     const arg = h.sendEmailMock.mock.calls[0][0] as { from?: string; listUnsubscribeUrl?: string; replyTo?: string };
     expect(arg.listUnsubscribeUrl).toBeUndefined();
-    expect(arg.from).toBeUndefined(); // platform default sender
+    // Customer-facing: the From now wears the carrier's brand name (no brand
+    // config in this fixture → falls back to tenant.name 'Acme Freight').
+    expect(arg.from).toBeDefined();
+    expect(arg.from).toContain('Acme Freight');
     expect(arg.replyTo).toBe('ops@acme.com'); // carrier's own opt-in inbox
   });
 });
@@ -237,7 +244,10 @@ describe('buildQuoteDocEmail — carrier-branded (NOT QuoteFleet-branded)', () =
     const out = buildQuoteDocEmail(baseLead() as never, baseTenant() as never, null, 'https://quotefleet.net');
     expect(out.subject).toBe('Quote QF-ABC123 from Acme Freight');
     expect(out.html).toContain('Acme Freight');
-    expect(out.html).not.toContain('QuoteFleet');
+    // Carrier-branded, but with ONE subtle "Powered by QuoteFleet" attribution
+    // in the footer — the only platform mention in the whole email.
+    expect(out.html).toContain('Powered by');
+    expect(out.html.match(/QuoteFleet/g)?.length ?? 0).toBe(1);
     expect(out.quoteUrl).toBe('https://quotefleet.net/quote/QF-ABC123');
   });
 });

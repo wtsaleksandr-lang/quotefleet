@@ -7,7 +7,7 @@ import { resolveFeatures } from '../features.js';
 import { loadEnv } from '../../config.js';
 import { publicDocLimiter, quoteEmailSendLimiter } from '../rateLimits.js';
 import { requireAuth, requireTenant } from '../middleware.js';
-import { sendEmail } from '../../email/send.js';
+import { sendEmail, brandedFrom } from '../../email/send.js';
 import { loadCarrierProfile } from './carrierProfile.js';
 import { customerFacingLines } from '../../calc/engine.js';
 import { resolveQuoteDisclaimer } from '../quoteDisclaimer.js';
@@ -66,6 +66,7 @@ export function buildQuoteDocEmail(
   base: string
 ): QuoteDocEmail {
   const carrierName = brand?.displayName || tenant.name;
+  const logoUrl = brand?.logoUrl && String(brand.logoUrl).trim() !== '' ? String(brand.logoUrl).trim() : '';
   const quoteUrl = `${base.replace(/\/$/, '')}/quote/${encodeURIComponent(lead.refId)}`;
   const total = money(lead.quotedTotal, lead.quotedCurrency);
   const lane = leadLaneText(lead);
@@ -111,6 +112,8 @@ export function buildQuoteDocEmail(
     '<table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0" style="background:#f3f5f8;"><tr><td align="center" style="padding:24px 16px;">',
     '<table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0" style="max-width:620px;background:#fff;border:1px solid #d9e1ec;border-radius:10px;overflow:hidden;">',
     '<tr><td style="padding:24px 24px 8px 24px;">',
+    // Carrier logo (its own brand — this quote goes to the carrier's customer).
+    logoUrl ? '<img src="' + esc(logoUrl) + '" alt="' + esc(carrierName) + '" style="display:block;max-height:36px;margin:0 0 12px;border:0;outline:none;text-decoration:none;">' : '',
     '<div style="font-size:12px;text-transform:uppercase;color:#64748b;font-weight:bold;letter-spacing:0.05em;">Freight Quote</div>',
     '<h1 style="margin:4px 0 18px;font-size:22px;color:#111827;">' + esc(carrierName) + '</h1>',
     '<p style="margin:0 0 12px;font-size:15px;line-height:1.6;">' + esc(greeting) + '</p>',
@@ -128,6 +131,9 @@ export function buildQuoteDocEmail(
     '</td></tr></table>',
     '<p style="margin:0;font-size:12px;color:#475569;line-height:1.5;">Quote is based on the details provided and may change if shipment details or required add-ons change.</p>',
     '</td></tr></table>',
+    // Subtle platform attribution — the carrier's customer sees the carrier's
+    // brand throughout; this one muted line is the only QuoteFleet mention.
+    '<div style="margin:14px 0 0;font-size:11px;color:#64748b;text-align:center;">Powered by <a href="https://quotefleet.net" style="color:#64748b;text-decoration:none;">QuoteFleet</a></div>',
     '</td></tr></table>',
     '</body></html>',
   ].join('');
@@ -218,16 +224,20 @@ export async function sendQuoteDocEmail(params: { tenantId: number; refId: strin
   }
 
   const base = loadEnv().PUBLIC_BASE_URL.replace(/\/$/, '');
-  const email = buildQuoteDocEmail(lead, tenant, brandRows[0] ?? null, base);
+  const brandCfg = brandRows[0] ?? null;
+  const email = buildQuoteDocEmail(lead, tenant, brandCfg, base);
+  // Customer-facing: send under the carrier's brand name, not QuoteFleet's.
+  const displayName = brandCfg?.displayName || tenant.name;
 
   const result = await sendEmail({
     to,
+    from: brandedFrom(displayName),
     subject: email.subject,
     text: email.text,
     html: email.html,
     // Replies go back to the carrier's own opt-in public inbox when set.
     replyTo: tenant.publicContactEmail ?? undefined,
-    // Transactional (owner-initiated): no List-Unsubscribe header, platform sender.
+    // Transactional (owner-initiated): no List-Unsubscribe header.
   });
 
   if (!result.ok) {
@@ -559,12 +569,16 @@ export async function shareQuoteDoc(params: {
   }
 
   const base = loadEnv().PUBLIC_BASE_URL.replace(/\/$/, '');
-  const email = buildQuoteDocEmail(lead, tenant, brandRows[0] ?? null, base);
+  const brandCfg = brandRows[0] ?? null;
+  const email = buildQuoteDocEmail(lead, tenant, brandCfg, base);
+  // Customer-facing: send under the carrier's brand name, not QuoteFleet's.
+  const displayName = brandCfg?.displayName || tenant.name;
 
   let sent = 0;
   for (const to of recipients) {
     const result = await sendEmail({
       to,
+      from: brandedFrom(displayName),
       subject: email.subject,
       text: email.text,
       html: email.html,

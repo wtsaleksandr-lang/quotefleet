@@ -72,6 +72,28 @@ export function encodeEmailSubject(subject: string): string {
   return words.join(' ');
 }
 
+/**
+ * Build a branded `From` header value — `"<DisplayName> <addr>"` — reusing the
+ * platform's own verified sending address so DKIM/SPF stay intact, while the
+ * human-visible name becomes the carrier's. Used for customer-facing emails so
+ * the carrier's END CUSTOMER sees e.g. `Harbor Link Logistics <hello@quotefleet.net>`.
+ *
+ * `addr` is the bare email parsed out of `RESEND_FROM_EMAIL` (which may be a
+ * display-name form `"QuoteFleet <hello@quotefleet.net>"` or a bare address),
+ * falling back to `SMTP_FROM`, then a hard default. `displayName` is stripped of
+ * characters that would break the header (`"`, `<`, `>`) and defaults to
+ * `QuoteFleet` when empty.
+ */
+export function brandedFrom(displayName: string): string {
+  const env = loadEnv();
+  const raw = env.RESEND_FROM_EMAIL || env.SMTP_FROM || 'hello@quotefleet.net';
+  // Pull the bare address out of a possible `"Name <addr>"` form.
+  const m = /<([^>]+)>/.exec(raw);
+  const addr = (m ? m[1] : raw).trim();
+  const name = String(displayName ?? '').replace(/["<>]/g, '').trim() || 'QuoteFleet';
+  return `${name} <${addr}>`;
+}
+
 export interface EmailIn {
   to: string;
   subject: string;

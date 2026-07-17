@@ -318,7 +318,9 @@ describe('map embedded on every surface (source-level)', () => {
   it('public lead route passes the absolute proxy mapUrl to both emails', async () => {
     const p = await route('public.ts');
     expect(p).toContain('/api/public/quote-map/');
-    expect(p).toContain('leadAutoReplyEmail({ aiBody, refId, quoteUrl, mapUrl })');
+    // Auto-reply is now carrier-branded: still passes mapUrl, plus brandName /
+    // brandLogoUrl so the customer sees the carrier's brand not QuoteFleet's.
+    expect(p).toMatch(/leadAutoReplyEmail\(\{[\s\S]*mapUrl,[\s\S]*brandName:/);
     expect(p).toMatch(/leadNotificationEmail\(\{[\s\S]*mapUrl,/);
   });
 

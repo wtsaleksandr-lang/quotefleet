@@ -34,7 +34,10 @@ const h = vi.hoisted(() => {
   return { state, sendEmailMock };
 });
 
-vi.mock('../../email/send.js', () => ({ sendEmail: h.sendEmailMock }));
+vi.mock('../../email/send.js', () => ({
+  sendEmail: h.sendEmailMock,
+  brandedFrom: (name: string) => `${(name || 'QuoteFleet').replace(/["<>]/g, '').trim()} <hello@quotefleet.net>`,
+}));
 
 vi.mock('../../db/client.js', async () => {
   const { getTableName } = await import('drizzle-orm');

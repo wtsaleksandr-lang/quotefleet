@@ -208,3 +208,28 @@ describe('List-Unsubscribe header (marketing vs transactional)', () => {
     expect(smtpArgs.headers?.['List-Unsubscribe-Post']).toBe('List-Unsubscribe=One-Click');
   });
 });
+
+/**
+ * brandedFrom — carrier-branded `From` for customer-facing emails.
+ *
+ * Placed LAST on purpose: loadEnv() caches on first call, and the SMTP-path
+ * tests above rely on establishing that cache with SMTP creds set. Calling
+ * brandedFrom (→ loadEnv) earlier would poison that cache. By here the cache is
+ * warm; neither RESEND_FROM_EMAIL nor SMTP_FROM is ever set in this file, so the
+ * bare address falls back to the hard default hello@quotefleet.net.
+ */
+describe('brandedFrom', () => {
+  it('wraps a carrier display name around the platform bare address', async () => {
+    const { brandedFrom } = await import('./send.js');
+    const out = brandedFrom('Harbor Link Logistics');
+    expect(out).toContain('Harbor Link Logistics <');
+    expect(out).toContain('hello@quotefleet.net');
+    expect(out).toBe('Harbor Link Logistics <hello@quotefleet.net>');
+  });
+
+  it('strips header-breaking chars and defaults an empty name to QuoteFleet', async () => {
+    const { brandedFrom } = await import('./send.js');
+    expect(brandedFrom(' Evil <x> "y"')).toBe('Evil x y <hello@quotefleet.net>');
+    expect(brandedFrom('')).toBe('QuoteFleet <hello@quotefleet.net>');
+  });
+});
