@@ -297,6 +297,15 @@
   function wireActions(data) {
     $('qdoc-print').onclick = function () { window.print(); };
     $('qdoc-pdf').onclick = function () { window.print(); };
+    // Deep-link auto-print: the widget's "Download PDF" action opens this page
+    // with ?print=1 to trigger the browser's Save-as-PDF dialog on the branded
+    // quote doc (no server-side PDF renderer is a dependency). Fires once the
+    // doc has rendered so the print captures the full quote.
+    try {
+      if (new URLSearchParams(location.search).get('print') === '1') {
+        setTimeout(function () { window.print(); }, 400);
+      }
+    } catch (e) { /* ignore */ }
     $('qdoc-email').onclick = function () {
       var subject = 'Quote ' + data.quote.refId + ' from ' + ((data.brand && data.brand.displayName) || data.tenant.name);
       var body = 'View quote ' + data.quote.refId + ': ' + (data.quote.quoteUrl || location.href) + '\n\nEstimated total: ' + money(data.quote.total, data.quote.currency);

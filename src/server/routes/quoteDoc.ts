@@ -2,7 +2,8 @@ import type { Express, Request, Response } from 'express';
 import { and, desc, eq } from 'drizzle-orm';
 import { db } from '../../db/client.js';
 import { tenants, brandConfigs, leads, accessorials, rateCards, auditLog } from '../../db/schema.js';
-import { enforceTenantAccess } from '../access.js';
+import { enforceTenantAccess, tenantAccessAllowed } from '../access.js';
+import { resolveFeatures } from '../features.js';
 import { loadEnv } from '../../config.js';
 import { publicDocLimiter, quoteEmailSendLimiter } from '../rateLimits.js';
 import { requireAuth, requireTenant } from '../middleware.js';
@@ -141,6 +142,21 @@ export function buildQuoteDocEmail(
 const QUOTE_DOC_EMAIL_COOLDOWN_MS = 60_000;
 /** auditLog.action recorded on every successful quote-doc email send. */
 const QUOTE_DOC_EMAIL_ACTION = 'quote.doc_email_sent';
+/** auditLog.action recorded on a customer-initiated quote-doc share. */
+const QUOTE_DOC_SHARE_ACTION = 'quote.doc_shared';
+/** Hard cap on recipients per share request (also enforced client-side). */
+const MAX_SHARE_RECIPIENTS = 5;
+
+/** Conservative single-address email validation. Trims, requires a local part,
+ *  an @, a dotted domain, and no whitespace. Mirrors the widget's client-side
+ *  check but is the authoritative gate — a share is refused if ANY address
+ *  fails, so an invalid entry can never leak a real customer's quote nowhere. */
+export function isValidShareEmail(raw: unknown): raw is string {
+  if (typeof raw !== 'string') return false;
+  const s = raw.trim();
+  if (!s || s.length > 254 || /\s/.test(s)) return false;
+  return /^[^@]+@[^@.]+(\.[^@.]+)+$/.test(s);
+}
 
 export type QuoteDocSendResult = { status: number; json: Record<string, unknown> };
 
@@ -460,4 +476,115 @@ export function registerQuoteDocRoutes(app: Express) {
       return res.status(result.status).json(result.json);
     }
   );
+
+  // PUBLIC customer share — email the carrier-branded quote document to one or
+  // more recipients the customer names (share-with-others / email-me-a-copy).
+  //
+  // Keyed by the unguessable 21-char refId (same public surface as GET
+  // /api/public/quote-doc/:refId), rate-limited (publicDocLimiter). All the
+  // guards live in shareQuoteDoc; the route just wires the private-calculator
+  // access predicate (the same tenantAccessAllowed the sibling endpoints use).
+  app.post('/api/public/quote-doc/:refId/share', publicDocLimiter, async (req: Request, res: Response) => {
+    const result = await shareQuoteDoc({
+      refId: String(req.params.refId ?? ''),
+      recipients: (req.body as { recipients?: unknown })?.recipients,
+      checkAccess: (tenant) => tenantAccessAllowed(tenant, req),
+    });
+    return res.status(result.status).json(result.json);
+  });
+}
+
+/**
+ * Share the carrier-branded quote document with one or more customer-named
+ * recipients. Pure business logic (no req/res) so it's unit-testable; the
+ * route wires the access predicate. Guards, in order:
+ *   • recipients must be a 1..MAX_SHARE_RECIPIENTS array of valid emails
+ *     (ANY invalid → 400, so a typo is surfaced not silently dropped),
+ *   • the lead (by refId) + an ACTIVE tenant must exist,
+ *   • the private-calculator access gate must pass (checkAccess),
+ *   • the tenant's `quoteShare` feature must be ON (else 403).
+ * Reuses buildQuoteDocEmail so the shared copy is byte-identical to the
+ * carrier's own quote email. Records ONE audit entry summarising the send.
+ */
+export async function shareQuoteDoc(params: {
+  refId: string;
+  recipients: unknown;
+  checkAccess?: (tenant: typeof tenants.$inferSelect) => Promise<boolean>;
+}): Promise<QuoteDocSendResult> {
+  const refId = String(params.refId ?? '').trim();
+  if (!refId) return { status: 400, json: { error: 'Missing refId' } };
+
+  const rawRecipients = params.recipients;
+  if (!Array.isArray(rawRecipients) || rawRecipients.length === 0) {
+    return { status: 400, json: { error: 'no_recipients', message: 'Add at least one email address.' } };
+  }
+  if (rawRecipients.length > MAX_SHARE_RECIPIENTS) {
+    return { status: 400, json: { error: 'too_many', message: `You can share with at most ${MAX_SHARE_RECIPIENTS} people at a time.` } };
+  }
+  // Normalize + dedupe; refuse the whole request if ANY address is invalid.
+  const seen = new Set<string>();
+  const recipients: string[] = [];
+  for (const r of rawRecipients) {
+    if (!isValidShareEmail(r)) {
+      return { status: 400, json: { error: 'invalid_email', message: 'One or more email addresses look invalid.' } };
+    }
+    const norm = r.trim().toLowerCase();
+    if (!seen.has(norm)) { seen.add(norm); recipients.push(r.trim()); }
+  }
+
+  const leadRows = await db().select().from(leads).where(eq(leads.refId, refId)).limit(1);
+  const lead = leadRows[0];
+  if (!lead) return { status: 404, json: { error: 'Quote not found' } };
+
+  const [tenantRows, brandRows] = await Promise.all([
+    db().select().from(tenants).where(eq(tenants.id, lead.tenantId)).limit(1),
+    db().select().from(brandConfigs).where(eq(brandConfigs.tenantId, lead.tenantId)).limit(1),
+  ]);
+  const tenant = tenantRows[0];
+  if (!tenant || tenant.status !== 'active') return { status: 404, json: { error: 'Carrier not found' } };
+
+  // Private-calculator gate — same predicate the sibling public quote-doc
+  // endpoints enforce (enforceTenantAccess wraps this exact check).
+  const checkAccess = params.checkAccess ?? (async () => true);
+  if (!(await checkAccess(tenant))) {
+    return {
+      status: 403,
+      json: { error: 'access_denied', message: 'This calculator is private. Open the access link the company shared with you.' },
+    };
+  }
+
+  // Feature gate — the carrier can turn customer sharing OFF.
+  if (!resolveFeatures(brandRows[0] ?? null).quoteShare) {
+    return { status: 403, json: { error: 'sharing_disabled', message: 'Sharing is turned off for this quote.' } };
+  }
+
+  const base = loadEnv().PUBLIC_BASE_URL.replace(/\/$/, '');
+  const email = buildQuoteDocEmail(lead, tenant, brandRows[0] ?? null, base);
+
+  let sent = 0;
+  for (const to of recipients) {
+    const result = await sendEmail({
+      to,
+      subject: email.subject,
+      text: email.text,
+      html: email.html,
+      // Replies go to the carrier's own opt-in public inbox when set.
+      replyTo: tenant.publicContactEmail ?? undefined,
+    });
+    if (result.ok) sent += 1;
+  }
+
+  if (sent === 0) {
+    return { status: 502, json: { error: 'send_failed', message: 'The email provider rejected the message. Try again shortly.' } };
+  }
+
+  await db().insert(auditLog).values({
+    tenantId: tenant.id,
+    userId: null,
+    actorKind: 'system',
+    action: QUOTE_DOC_SHARE_ACTION,
+    detailsJson: { refId: lead.refId, leadId: lead.id, recipients, sent },
+  });
+
+  return { status: 200, json: { ok: true, sent } };
 }

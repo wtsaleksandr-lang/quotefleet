@@ -50,6 +50,7 @@ import { resolveWidgetTheme, WIDGET_PRESETS } from '../widgetThemes.js';
 import { resolveQuoteDisclaimer } from '../quoteDisclaimer.js';
 import { loadCarrierProfile } from './carrierProfile.js';
 import { enforceTenantAccess } from '../access.js';
+import { resolveFeatures } from '../features.js';
 
 /** Returns true if the request's Origin/Referer host matches the
  *  tenant's brand_configs.allowed_domains (CSV). Empty list = wide open
@@ -334,6 +335,10 @@ export function registerPublicRoutes(app: Express) {
       // Terms shown at the bottom of the widget result card. Resolves to the
       // carrier's own text when set, else the platform default.
       disclaimer: resolveQuoteDisclaimer(tenant.quoteDisclaimer),
+      // Fully-resolved per-tenant feature toggles (defaults applied). The
+      // widget reads features.quoteShare to decide whether to render the
+      // share / email / print / PDF action bar. See src/server/features.ts.
+      features: resolveFeatures(brand),
       brand: brand ?? null,
       // Fully-resolved widget theme (preset + optional accent override +
       // font). widget.js#applyTheme writes tokens.* onto the document root.

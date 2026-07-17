@@ -150,6 +150,7 @@
     pickupResolved: null,
     deliveryResolved: null,
     refId: '',
+    customerEmail: '',
   };
 
   // Apply the FULL resolved theme (preset + optional accent override + font)
@@ -1014,6 +1015,9 @@
         btn.disabled = false; btn.textContent = oldText;
         if (resp.error) { showError('qf-submit-error', resp.error); return; }
         state.refId = resp.refId || '';
+        // Remember the email the customer entered so "Email me this quote" can
+        // send a copy to them without re-asking (empty when they gave none).
+        state.customerEmail = email || '';
         $('qf-thanks-msg').textContent = 'Thanks — your quote request was sent.';
         $('qf-thanks-detail').textContent = resp.refId ? 'Reference: ' + resp.refId + '. Open your full quote below, or ask a question / request a callback.' : 'You can now ask a question or request a callback.';
         // Link the customer straight to the polished hosted quote (opens in a
@@ -1042,8 +1046,141 @@
           }
         }
         showStep('thanks');
+        renderShareBar();
       })
       .catch(function (err) { btn.disabled = false; btn.textContent = oldText; showError('qf-submit-error', 'Network error — please try again.'); console.error(err); });
+  }
+
+  // ── Customer share / email / print / PDF action bar ───────────────────
+  // Rendered under the post-submit quote result (thanks step) once a lead
+  // (refId) exists — email/share/PDF all need the persisted quote doc. Gated
+  // on the per-tenant `features.quoteShare` toggle (default ON); when the
+  // carrier turns it off, nothing renders. Print reuses window.qfPrintQuote.
+  var SHARE_EMAIL_RE = /^[^@\s]+@[^@\s.]+(\.[^@\s.]+)+$/;
+  var MAX_SHARE_RECIPIENTS = 5;
+
+  function parseEmailList(raw) {
+    return String(raw || '')
+      .split(/[\s,;]+/)
+      .map(function (s) { return s.trim(); })
+      .filter(Boolean);
+  }
+
+  function shareFeatureOn() {
+    var f = (state.config && state.config.features) || {};
+    // Default ON — only an explicit false disables it (mirrors resolveFeatures).
+    return f.quoteShare !== false;
+  }
+
+  function postShare(recipients) {
+    return fetch(withGrant('/api/public/quote-doc/' + encodeURIComponent(state.refId) + '/share'), {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ recipients: recipients }),
+    }).then(function (r) { return r.json().then(function (j) { return { ok: r.ok, body: j }; }); });
+  }
+
+  function renderShareBar() {
+    if (!shareFeatureOn() || !state.refId) return;
+    var thanks = $('qf-step-thanks');
+    if (!thanks || thanks.querySelector('.qf-share-bar')) return;
+
+    var status = el('div', { class: 'qf-share-status', role: 'status', 'aria-live': 'polite' });
+    function setStatus(msg, kind) {
+      status.textContent = msg || '';
+      status.setAttribute('data-kind', kind || '');
+      status.style.display = msg ? 'block' : 'none';
+    }
+
+    // Multi-email input panel (revealed by "Share with others" / email-me when
+    // no address is on file). Comma / space / newline separated, max 5.
+    var input = el('textarea', {
+      class: 'qf-input qf-share-input',
+      rows: '2',
+      placeholder: 'name@company.com, colleague@company.com',
+      'aria-label': 'Email addresses to send this quote to',
+    });
+    var sendBtn = el('button', { type: 'button', class: 'qf-cta qf-share-send', text: 'Send quote' });
+    var hint = el('div', { class: 'qf-share-hint', text: 'Separate up to ' + MAX_SHARE_RECIPIENTS + ' emails with a comma. We’ll send each person the full quote.' });
+    var panel = el('div', { class: 'qf-share-panel', hidden: 'hidden' }, [input, sendBtn, hint]);
+
+    function doSend(recipients, busyBtn, busyLabel) {
+      if (!recipients.length) { setStatus('Please enter at least one email address.', 'err'); return; }
+      if (recipients.length > MAX_SHARE_RECIPIENTS) { setStatus('You can share with at most ' + MAX_SHARE_RECIPIENTS + ' people at a time.', 'err'); return; }
+      var bad = recipients.filter(function (e) { return !SHARE_EMAIL_RE.test(e); });
+      if (bad.length) { setStatus('That email looks invalid: ' + bad[0], 'err'); return; }
+      var old = busyBtn ? busyBtn.textContent : '';
+      if (busyBtn) { busyBtn.disabled = true; busyBtn.textContent = busyLabel || 'Sending…'; }
+      setStatus('', '');
+      postShare(recipients).then(function (r) {
+        if (busyBtn) { busyBtn.disabled = false; busyBtn.textContent = old; }
+        if (r.ok && r.body && r.body.sent) {
+          setStatus('Sent to ' + r.body.sent + (r.body.sent === 1 ? ' recipient.' : ' recipients.'), 'ok');
+          input.value = '';
+          panel.hidden = true;
+        } else {
+          setStatus((r.body && r.body.message) || 'Could not send — please try again.', 'err');
+        }
+        autoResize();
+      }).catch(function () {
+        if (busyBtn) { busyBtn.disabled = false; busyBtn.textContent = old; }
+        setStatus('Network error — please try again.', 'err');
+      });
+    }
+
+    // "Email me this quote" — send to the address the customer already entered;
+    // if none is on file, reveal the panel so they can supply one.
+    var emailMeBtn = el('button', { type: 'button', class: 'qf-cta qf-secondary qf-share-emailme', text: 'Email me this quote' });
+    emailMeBtn.addEventListener('click', function () {
+      if (state.customerEmail && SHARE_EMAIL_RE.test(state.customerEmail)) {
+        doSend([state.customerEmail], emailMeBtn, 'Sending…');
+      } else {
+        panel.hidden = false;
+        input.placeholder = 'you@company.com';
+        setStatus('Enter your email and we’ll send you a copy.', '');
+        input.focus();
+        autoResize();
+      }
+    });
+
+    // "Share with others" — reveal the multi-email input.
+    var shareBtn = el('button', { type: 'button', class: 'qf-cta qf-secondary qf-share-others', text: 'Share with others' });
+    shareBtn.addEventListener('click', function () {
+      panel.hidden = !panel.hidden;
+      if (!panel.hidden) { input.placeholder = 'name@company.com, colleague@company.com'; setStatus('', ''); input.focus(); }
+      autoResize();
+    });
+
+    sendBtn.addEventListener('click', function () { doSend(parseEmailList(input.value), sendBtn, 'Sending…'); });
+
+    // "Print" — reuse the widget's existing print path.
+    var printBtn = el('button', { type: 'button', class: 'qf-cta qf-secondary qf-share-print', text: 'Print' });
+    printBtn.addEventListener('click', function () { if (typeof window.qfPrintQuote === 'function') window.qfPrintQuote(); else window.print(); });
+
+    // "Download PDF" — no server-side PDF renderer is a dependency, so open the
+    // hosted branded quote page and auto-trigger the browser's print / Save-as-
+    // PDF dialog (honest: it's print-to-PDF of the branded quote doc).
+    var pdfBtn = el('a', {
+      class: 'qf-cta qf-secondary qf-share-pdf',
+      href: (location.origin + '/quote/' + encodeURIComponent(state.refId) + '?print=1'),
+      target: '_blank',
+      rel: 'noopener',
+      text: 'Download PDF',
+    });
+
+    var actions = el('div', { class: 'qf-share-actions' }, [emailMeBtn, shareBtn, printBtn, pdfBtn]);
+    var bar = el('div', { class: 'qf-share-bar' }, [
+      el('div', { class: 'qf-share-title', text: 'Send or save this quote' }),
+      actions,
+      panel,
+      status,
+    ]);
+    setStatus('', '');
+
+    var viewBtn = $('qf-view-quote');
+    if (viewBtn && viewBtn.parentNode) viewBtn.insertAdjacentElement('afterend', bar);
+    else thanks.insertBefore(bar, thanks.firstChild);
+    autoResize();
   }
 
   // ── Live route-map card ───────────────────────────────────────────────

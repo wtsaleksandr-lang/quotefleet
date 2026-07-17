@@ -62,6 +62,7 @@ import {
   FONT_COLOR_SWATCHES,
 } from '../widgetThemes.js';
 import { loadEnv } from '../../config.js';
+import { resolveFeatures, sanitizeFeaturesPatch } from '../features.js';
 import { makePreviewGrant, PREVIEW_GRANT_PARAM, PREVIEW_GRANT_TTL_MS } from '../access.js';
 import { syncTenantToMarketplace } from '../../marketplace/sync.js';
 import { DEFAULT_AI_SYSTEM_PROMPT, AUTO_FSC_DEFAULTS } from '../../calc/defaults.js';
@@ -633,6 +634,11 @@ export function registerTenantRoutes(app: Express) {
       .string()
       .regex(/^(auto|#[0-9a-fA-F]{6})$/, "fontColor must be 'auto' or a #RRGGBB hex")
       .optional(),
+    // Per-tenant optional feature toggles (partial). Only the known boolean
+    // keys are persisted (sanitizeFeaturesPatch), and the patch is MERGED with
+    // the existing column so toggling one feature never drops another. See
+    // src/server/features.ts.
+    featuresJson: z.record(z.string(), z.boolean()).optional(),
   });
 
   app.put('/api/tenant/brand', requireAuth, requireTenant, async (req, res) => {
@@ -667,9 +673,24 @@ export function registerTenantRoutes(app: Express) {
         field: 'showPoweredBy',
       });
     }
+    // Feature toggles live in a single JSON bag. MERGE a partial patch with the
+    // existing column (sanitized to known boolean keys) so toggling one feature
+    // never clobbers another. Strip the raw field out of the column spread — we
+    // write the merged object explicitly below.
+    const { featuresJson: rawFeatures, ...columnPatch } = patch;
+    const set: Record<string, unknown> = { ...columnPatch, updatedAt: new Date() };
+    const featurePatch = sanitizeFeaturesPatch(rawFeatures);
+    if (featurePatch) {
+      const existing = await db()
+        .select({ featuresJson: brandConfigs.featuresJson })
+        .from(brandConfigs)
+        .where(eq(brandConfigs.tenantId, req.tenant!.id))
+        .limit(1);
+      set.featuresJson = { ...(existing[0]?.featuresJson ?? {}), ...featurePatch };
+    }
     await db()
       .update(brandConfigs)
-      .set({ ...patch, updatedAt: new Date() })
+      .set(set)
       .where(eq(brandConfigs.tenantId, req.tenant!.id));
     res.json({ ok: true });
   });

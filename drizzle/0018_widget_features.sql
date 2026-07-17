@@ -1,0 +1,17 @@
+-- Per-tenant optional widget feature toggles.
+--
+-- A single, extensible JSON bag on brand_configs so new opt-in widget features
+-- (share/email/print/PDF now; booking later) never need a fresh column. The
+-- typed resolver src/server/features.ts (resolveFeatures) supplies defaults
+-- when the column is null:
+--   { quoteShare: true, quoteBooking: false }
+-- so every existing tenant keeps the share action bar ON with no backfill.
+--
+-- Known keys today:
+--   quote_share    (default ON)  — the customer share/email/print/PDF action bar
+--   quote_booking  (default OFF) — reserved for a later booking wave
+--
+-- Nullable, no default, no backfill — existing rows read null and resolve to
+-- the defaults above. Idempotent (ADD COLUMN IF NOT EXISTS) so it's safe to
+-- re-run on every deploy.
+ALTER TABLE "brand_configs" ADD COLUMN IF NOT EXISTS "features_json" jsonb;

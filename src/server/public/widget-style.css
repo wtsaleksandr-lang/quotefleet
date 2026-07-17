@@ -358,3 +358,23 @@ body[data-qf-cta-hover="fill"] .qf-cta:not(.qf-secondary):hover { background: va
 
 /* Single shared hint under the pickup/delivery fields (Alex: one, smaller). */
 .qf-addr-hint { margin-top: var(--space-1); font-size: 11px; line-height: 1.4; color: var(--w-muted); }
+
+/* ── Customer share / email / print / PDF action bar ───────────────────────
+   Rendered under the post-submit quote result (thanks step) when the tenant's
+   quoteShare feature is on. Theme-aware (all colours resolve from the runtime
+   --w-* tokens or color-mix against --w-fg, so it reads on light AND dark
+   presets); spacing on the 8px ramp; buttons wrap to one column at 390px. */
+.qf-share-bar { margin-top: var(--space-2); padding-top: var(--space-2); border-top: 1px solid var(--w-border); }
+.qf-share-title { font-size: 12px; font-weight: 700; letter-spacing: 0.04em; text-transform: uppercase; color: var(--w-muted); margin-bottom: var(--space-1); }
+.qf-share-actions { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: var(--space-1); }
+.qf-share-actions .qf-cta { margin-top: 0; min-height: 44px; font-size: 14px; text-decoration: none; }
+.qf-share-panel { margin-top: var(--space-1-5); padding: var(--space-1-5); border: 1px solid var(--w-border); border-radius: var(--w-radius); background: color-mix(in srgb, var(--w-fg) 4%, transparent); }
+.qf-share-input { width: 100%; min-height: 44px; resize: vertical; }
+.qf-share-panel .qf-share-send { margin-top: var(--space-1); }
+.qf-share-hint { margin-top: var(--space-1); font-size: 11px; line-height: 1.4; color: var(--w-muted); }
+.qf-share-status { display: none; margin-top: var(--space-1); font-size: 12.5px; line-height: 1.4; font-weight: 650; color: var(--w-fg); }
+.qf-share-status[data-kind="ok"] { color: color-mix(in srgb, var(--w-fg) 40%, #2f9e44); }
+.qf-share-status[data-kind="err"] { color: color-mix(in srgb, var(--w-fg) 40%, #e5484d); }
+@media (max-width: 390px) {
+  .qf-share-actions { grid-template-columns: 1fr; }
+}

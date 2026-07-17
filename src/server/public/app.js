@@ -2038,6 +2038,38 @@
     wrap.appendChild(txt);
     return wrap;
   }
+
+  // A toggle row bound to a key inside the brand's featuresJson bag (the
+  // per-tenant optional-feature toggles). Reads the resolved default when the
+  // key is absent and saves a partial featuresJson patch (the server merges it
+  // with the existing bag, so sibling features are never dropped).
+  function brandFeatureToggle(b, label, featureKey, defaultVal, hint) {
+    var wrap = el('label', {
+      style: {
+        display: 'flex', gap: '12px', alignItems: 'flex-start',
+        padding: '12px 0', borderTop: '1px solid var(--border)', cursor: 'pointer',
+      },
+    });
+    var cb = el('input', { type: 'checkbox', style: { marginTop: '3px', flex: '0 0 auto' } });
+    var feats = (b && b.featuresJson) || {};
+    cb.checked = (feats[featureKey] !== undefined && feats[featureKey] !== null) ? !!feats[featureKey] : defaultVal;
+    cb.addEventListener('change', function () {
+      var next = cb.checked;
+      var patch = {}; patch[featureKey] = next;
+      saveBrandPatch({ featuresJson: patch }).then(function () {
+        if (!b.featuresJson) b.featuresJson = {};
+        b.featuresJson[featureKey] = next;
+        toastOk('Saved');
+      }).catch(function (e) { cb.checked = !next; toastErr(e); });
+    });
+    var txt = el('div', { style: { flex: '1 1 auto' } }, [
+      el('div', { text: label, style: { fontWeight: '600' } }),
+      hint ? el('div', { class: 'field-hint', text: hint, style: { marginTop: '2px' } }) : null,
+    ]);
+    wrap.appendChild(cb);
+    wrap.appendChild(txt);
+    return wrap;
+  }
   // Preview card — show the live widget so brand changes are visible
   // without opening a new tab. Points at the signed owner-preview URL
   // (same as Customize) so the real calculator renders here even for a
@@ -2157,7 +2189,19 @@
       lc.appendChild(copyWrap);
       c.appendChild(lc);
 
-      // Card 2 — Access (public vs private invite-only calculator).
+      // Card 2 — Quote actions (customer share / email / print / PDF bar).
+      var qa = el('div', { class: 'card', style: { marginTop: '14px' } });
+      qa.appendChild(el('div', { class: 'card-title', text: 'Quote actions' }));
+      qa.appendChild(el('div', { class: 'card-subtitle', text: 'Let customers send and save their quote straight from your widget.' }));
+      qa.appendChild(brandFeatureToggle(b,
+        'Let customers share / email / print / download the quote',
+        'quoteShare',
+        true,
+        'Adds an action bar under the quote with “Email me this quote”, “Share with others”, Print, and Download PDF. Turn off to hide it.'
+      ));
+      c.appendChild(qa);
+
+      // Card 3 — Access (public vs private invite-only calculator).
       var accCard = el('div', { class: 'card', style: { marginTop: '14px' } });
       c.appendChild(accCard);
       renderAccessCard(accCard, access);

@@ -489,6 +489,13 @@ export const brandConfigs = pgTable('brand_configs', {
    *  surface) or a #RRGGBB hex that is only applied where it passes WCAG.
    *  Default 'auto' leaves existing tenants unchanged. */
   fontColor: text('font_color').notNull().default('auto'),
+  /** Per-tenant optional feature toggles. A single, extensible JSON bag so new
+   *  opt-in widget features never need a new column. Nullable — null resolves
+   *  to the defaults in src/server/features.ts (resolveFeatures). Known keys:
+   *    { quoteShare?: boolean, quoteBooking?: boolean }
+   *  quoteShare (default ON) gates the customer share/email/print/PDF action
+   *  bar; quoteBooking (default OFF) is reserved for a later booking wave. */
+  featuresJson: jsonb('features_json').$type<Record<string, boolean>>(),
   updatedAt: timestamp('updated_at', { mode: 'date' }).notNull().defaultNow(),
 });
 
