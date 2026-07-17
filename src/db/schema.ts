@@ -74,6 +74,13 @@ export const tenants = pgTable(
     countryFocus: text('country_focus').notNull().default('US'),
     /** Random unguessable token used in <script src="...embed.js?t=..."> */
     embedToken: text('embed_token').notNull().unique(),
+    /** Secret token for the tenant's dedicated inbound rate-email address
+     *  (`rates-<token>@<INBOUND_EMAIL_DOMAIN>`). DISTINCT from embedToken —
+     *  embedToken is public (it ships in the widget <script> src), so it must
+     *  never be reused as the inbound address secret. Nullable + minted lazily
+     *  the first time a tenant turns the email-import feature ON; null until
+     *  then. Kept unguessable so randoms can't spam a tenant's importer. */
+    ingestEmailToken: text('ingest_email_token').unique(),
     /** Billed/selected tier: 'free' | 'vital' | 'pro'. Feature access is
      *  computed from this via src/server/plans.ts (a trialing tenant gets
      *  Pro regardless). Legacy 'starter'/'enterprise' rows normalize to

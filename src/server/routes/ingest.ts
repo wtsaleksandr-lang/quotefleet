@@ -190,69 +190,14 @@ export function registerIngestRoutes(app: Express) {
     }
 
     const tenantId = req.tenant!.id;
-    const inserted = { rateCards: 0, accessorials: 0, laneZones: 0 };
 
-    // Wrap every insert + the status flip in one transaction so a failure
-    // halfway leaves the job in 'ready_for_review' (retryable) instead
-    // of half-applied + marked done (which was the previous bug).
+    let inserted: ApplyResult;
     try {
-      await db().transaction(async (tx) => {
-        for (const c of parse.data.rateCards ?? []) {
-          await tx.insert(rateCards).values({
-            tenantId,
-            service: String(c.service ?? 'ftl'),
-            equipment: String(c.equipment ?? 'dryvan'),
-            label: c.label != null ? String(c.label) : null,
-            ratePerMile: Number(c.ratePerMile ?? 0),
-            minimumCharge: Number(c.minimumCharge ?? 0),
-            flatFee: Number(c.flatFee ?? 0),
-            fuelSurchargePct: Number(c.fuelSurchargePct ?? 0),
-            marginPct: Number(c.marginPct ?? 0),
-            enabled: true,
-            notes: 'Imported from rate-sheet ingest job #' + id,
-            lastAiEditAt: new Date(),
-            lastAiEditReason: 'rate-sheet ingest',
-          });
-          inserted.rateCards++;
-        }
-        for (const a of parse.data.accessorials ?? []) {
-          await tx.insert(accessorials).values({
-            tenantId,
-            code: String(a.code ?? 'misc'),
-            label: String(a.label ?? a.code ?? 'Accessorial'),
-            kind: String(a.kind ?? 'flat'),
-            amount: Number(a.amount ?? 0),
-            trigger: 'optional',
-            appliesToServices: Array.isArray(a.appliesToServices) ? (a.appliesToServices as string[]) : undefined,
-            enabled: true,
-          });
-          inserted.accessorials++;
-        }
-        for (const z of parse.data.laneZones ?? []) {
-          await tx.insert(laneZones).values({
-            tenantId,
-            label: String(z.label ?? 'Imported zone'),
-            anchorPortCode: z.anchorPortCode != null ? String(z.anchorPortCode) : null,
-            anchorCity: z.anchorCity != null ? String(z.anchorCity) : null,
-            anchorState: z.anchorState != null ? String(z.anchorState) : null,
-            radiusMiles: Number(z.radiusMiles ?? 0),
-            flatPrice: Number(z.flatPrice ?? 0),
-            equipmentScope: Array.isArray(z.equipmentScope) ? (z.equipmentScope as string[]) : undefined,
-            enabled: true,
-          });
-          inserted.laneZones++;
-        }
-        await tx
-          .update(ingestJobs)
-          .set({ status: 'applied', appliedAt: new Date(), updatedAt: new Date() })
-          .where(eq(ingestJobs.id, id));
-      });
+      inserted = await applyDraftToTenant(tenantId, id, parse.data);
     } catch (err) {
       console.error('[ingest.apply] transaction failed:', err);
       return res.status(500).json({ error: 'Apply failed — nothing was changed. Try again.' });
     }
-
-    void syncTenantToMarketplace(tenantId);
 
     return res.json({ ok: true, inserted });
   });
@@ -369,6 +314,92 @@ export function registerIngestRoutes(app: Express) {
       .where(and(eq(ingestJobs.id, id), eq(ingestJobs.tenantId, req.tenant!.id)));
     return res.json({ ok: true });
   });
+}
+
+/** Count of rows written by an apply. */
+export interface ApplyResult {
+  rateCards: number;
+  accessorials: number;
+  laneZones: number;
+}
+
+/** A parsed/edited draft in the loose shape the AI parser + apply path use. */
+export interface IngestDraft {
+  rateCards?: Array<Record<string, unknown>>;
+  accessorials?: Array<Record<string, unknown>>;
+  laneZones?: Array<Record<string, unknown>>;
+}
+
+/**
+ * Persist a parsed ingest draft to a tenant's live rate book and mark the job
+ * 'applied'. Shared by the operator-triggered apply endpoint AND the inbound
+ * email auto-import path so the coercion/defaults + the "all-or-nothing"
+ * transaction are identical.
+ *
+ * Every insert + the status flip run in ONE transaction: a failure halfway
+ * leaves the job un-applied (retryable) rather than half-applied + marked done.
+ * Marketplace sync is fired best-effort AFTER commit.
+ */
+export async function applyDraftToTenant(
+  tenantId: number,
+  jobId: number,
+  draft: IngestDraft,
+): Promise<ApplyResult> {
+  const inserted: ApplyResult = { rateCards: 0, accessorials: 0, laneZones: 0 };
+  await db().transaction(async (tx) => {
+    for (const c of draft.rateCards ?? []) {
+      await tx.insert(rateCards).values({
+        tenantId,
+        service: String(c.service ?? 'ftl'),
+        equipment: String(c.equipment ?? 'dryvan'),
+        label: c.label != null ? String(c.label) : null,
+        ratePerMile: Number(c.ratePerMile ?? 0),
+        minimumCharge: Number(c.minimumCharge ?? 0),
+        flatFee: Number(c.flatFee ?? 0),
+        fuelSurchargePct: Number(c.fuelSurchargePct ?? 0),
+        marginPct: Number(c.marginPct ?? 0),
+        enabled: true,
+        notes: 'Imported from rate-sheet ingest job #' + jobId,
+        lastAiEditAt: new Date(),
+        lastAiEditReason: 'rate-sheet ingest',
+      });
+      inserted.rateCards++;
+    }
+    for (const a of draft.accessorials ?? []) {
+      await tx.insert(accessorials).values({
+        tenantId,
+        code: String(a.code ?? 'misc'),
+        label: String(a.label ?? a.code ?? 'Accessorial'),
+        kind: String(a.kind ?? 'flat'),
+        amount: Number(a.amount ?? 0),
+        trigger: 'optional',
+        appliesToServices: Array.isArray(a.appliesToServices) ? (a.appliesToServices as string[]) : undefined,
+        enabled: true,
+      });
+      inserted.accessorials++;
+    }
+    for (const z of draft.laneZones ?? []) {
+      await tx.insert(laneZones).values({
+        tenantId,
+        label: String(z.label ?? 'Imported zone'),
+        anchorPortCode: z.anchorPortCode != null ? String(z.anchorPortCode) : null,
+        anchorCity: z.anchorCity != null ? String(z.anchorCity) : null,
+        anchorState: z.anchorState != null ? String(z.anchorState) : null,
+        radiusMiles: Number(z.radiusMiles ?? 0),
+        flatPrice: Number(z.flatPrice ?? 0),
+        equipmentScope: Array.isArray(z.equipmentScope) ? (z.equipmentScope as string[]) : undefined,
+        enabled: true,
+      });
+      inserted.laneZones++;
+    }
+    await tx
+      .update(ingestJobs)
+      .set({ status: 'applied', appliedAt: new Date(), updatedAt: new Date() })
+      .where(eq(ingestJobs.id, jobId));
+  });
+
+  void syncTenantToMarketplace(tenantId);
+  return inserted;
 }
 
 /**

@@ -27,12 +27,19 @@ export interface WidgetFeatures {
   /** Reserved: let customers request a booking straight from the quote.
    *  Default false — a later wave owns this. */
   quoteBooking: boolean;
+  /** Forward-email auto-import: give this tenant a dedicated inbound address
+   *  (`rates-<token>@…`) they can forward/BCC rate emails to, which the system
+   *  reads and applies to their calculator automatically. Default false
+   *  (opt-IN) — OFF means no inbound address is minted and the inbound webhook
+   *  refuses mail for this tenant. */
+  emailImport: boolean;
 }
 
 /** Default value for every known feature. */
 export const FEATURE_DEFAULTS: WidgetFeatures = {
   quoteShare: true,
   quoteBooking: false,
+  emailImport: false,
 };
 
 /** The keys the dashboard toggle + PUT allow-list may write. Anything else in

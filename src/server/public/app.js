@@ -2528,11 +2528,114 @@
   // ── helpers ────────────────────────────────────────────────────
   function showErr(c) { return function (err) { c.innerHTML = '<div class="notice error">' + (err.message || 'Failed') + '</div>'; }; }
 
+  // ── Auto-import rates from email (forward/BCC → auto-read) ─────
+  // A per-tenant toggle (featuresJson.emailImport). When ON, we expose the
+  // tenant's dedicated inbound address + a short benefit description. OFF hides
+  // the address entirely. Address + minting are handled server-side by
+  // GET /api/tenant/email-import.
+  function buildEmailImportCard() {
+    var card = el('div', { class: 'card', style: { padding: '14px 18px', marginBottom: '20px' } });
+    card.appendChild(el('div', { class: 'card-title', text: 'Auto-import rates from email' }));
+    card.appendChild(el('div', {
+      class: 'card-subtitle',
+      text: 'Forward or BCC your rate emails to a private address and we’ll read them and update your calculator automatically — no logging in.',
+    }));
+
+    var toggleRow = el('label', {
+      style: {
+        display: 'flex', gap: '12px', alignItems: 'flex-start',
+        padding: '12px 0', borderTop: '1px solid var(--border)', cursor: 'pointer',
+      },
+    });
+    var cb = el('input', { type: 'checkbox', style: { marginTop: '3px', flex: '0 0 auto' } });
+    var toggleTxt = el('div', { style: { flex: '1 1 auto' } }, [
+      el('div', { text: 'Turn on email import', style: { fontWeight: '600' } }),
+      el('div', {
+        class: 'field-hint',
+        text: 'New or ambiguous rates are held for a quick review; clean ones apply on their own.',
+        style: { marginTop: '2px' },
+      }),
+    ]);
+    toggleRow.appendChild(cb);
+    toggleRow.appendChild(toggleTxt);
+    card.appendChild(toggleRow);
+
+    var panel = el('div', {
+      style: {
+        display: 'none', margin: '4px 0 0 30px', paddingTop: '10px',
+        borderTop: '1px dashed var(--border)',
+      },
+    });
+    card.appendChild(panel);
+
+    function renderPanel(data) {
+      panel.innerHTML = '';
+      if (!data || !data.enabled) { panel.style.display = 'none'; return; }
+      panel.style.display = 'block';
+      panel.appendChild(el('div', {
+        text: 'Your rate-import address',
+        style: { fontWeight: '600', fontSize: '13px', marginBottom: '6px', color: 'var(--ink)' },
+      }));
+      var row = el('div', { style: { display: 'flex', gap: '8px', alignItems: 'center', flexWrap: 'wrap' } });
+      var input = el('input', {
+        class: 'input', type: 'text', readonly: 'readonly',
+        style: { flex: '1 1 260px', fontFamily: 'var(--font-mono)', fontSize: '12px' },
+      });
+      input.value = data.address || '';
+      input.addEventListener('focus', function () { input.select(); });
+      var copyBtn = el('button', { class: 'btn btn-secondary', text: 'Copy' });
+      copyBtn.addEventListener('click', function () {
+        navigator.clipboard.writeText(data.address || '').then(function () {
+          copyBtn.textContent = 'Copied ✓'; toastOk('Copied');
+          setTimeout(function () { copyBtn.textContent = 'Copy'; }, 1500);
+        });
+      });
+      row.appendChild(input);
+      row.appendChild(copyBtn);
+      panel.appendChild(row);
+      panel.appendChild(el('div', {
+        class: 'field-hint',
+        style: { marginTop: '8px', lineHeight: '1.5' },
+        text: 'Forward or BCC rate emails to this address. We read them and update your calculator automatically — clean rates apply on their own, new or ambiguous ones are held for a quick review.',
+      }));
+      if (!data.domainConfigured || !data.webhookConfigured) {
+        panel.appendChild(el('div', {
+          class: 'notice warn',
+          style: { marginTop: '10px' },
+          text: 'Setup in progress — this address isn’t receiving mail yet. We’ll let you know when it’s live.',
+        }));
+      }
+    }
+
+    function load() {
+      api('/api/tenant/email-import').then(function (data) {
+        cb.checked = !!(data && data.enabled);
+        renderPanel(data);
+      }).catch(function () { /* leave toggle off; card still usable */ });
+    }
+
+    cb.addEventListener('change', function () {
+      var next = cb.checked;
+      saveBrandPatch({ featuresJson: { emailImport: next } }).then(function () {
+        toastOk('Saved');
+        return api('/api/tenant/email-import'); // mint/get (or clear) the address
+      }).then(function (data) { renderPanel(data); }).catch(function (e) {
+        cb.checked = !next; toastErr(e);
+      });
+    });
+
+    load();
+    return card;
+  }
+
   // ── AI Import (rate-sheet ingest) ─────────────────────────────
   function renderIngest(c) {
     c.innerHTML = '';
     c.appendChild(el('h1', { text: 'AI import' }));
     c.appendChild(el('p', { class: 'page-sub', text: 'Upload a rate sheet — PDF, image, Excel, email — and the AI extracts rate cards, accessorials, and lane zones for review.' }));
+
+    // Forward-email auto-import (per-tenant toggle + dedicated address).
+    c.appendChild(buildEmailImportCard());
 
     // ── Upload card ────────────────────────────────────────
     var dropCard = el('div', { class: 'card', style: { padding: '14px 18px' } });

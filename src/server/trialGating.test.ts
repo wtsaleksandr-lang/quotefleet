@@ -27,6 +27,7 @@ const baseT: Tenant = {
   contactPhone: null,
   countryFocus: 'US',
   embedToken: 'tok',
+  ingestEmailToken: null,
   plan: 'free',
   status: 'active',
   accessMode: 'public',

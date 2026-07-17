@@ -48,6 +48,16 @@ export interface Env {
   SMTP_USER?: string;
   SMTP_PASS?: string;
   SMTP_FROM?: string;
+  /** Domain the per-tenant inbound rate-email addresses live under, e.g.
+   *  "rates.quotefleet.net". Each tenant gets `rates-<token>@<this>`. When
+   *  unset the dashboard shows a placeholder + the feature stays non-live
+   *  (the address is shown greyed with a "not configured yet" note). */
+  INBOUND_EMAIL_DOMAIN?: string;
+  /** Shared secret the mail provider (SendGrid Inbound Parse / Mailgun Route /
+   *  etc.) must send as `X-Inbound-Secret` when it POSTs a forwarded rate
+   *  email to /api/inbound/rate-email. Unset → the inbound endpoint refuses
+   *  every request (503), so email-import never accepts mail until configured. */
+  INBOUND_WEBHOOK_SECRET?: string;
 }
 
 let cached: Env | null = null;
@@ -139,6 +149,8 @@ export function loadEnv(): Env {
     SMTP_USER: opt('SMTP_USER'),
     SMTP_PASS: opt('SMTP_PASS'),
     SMTP_FROM: opt('SMTP_FROM'),
+    INBOUND_EMAIL_DOMAIN: opt('INBOUND_EMAIL_DOMAIN'),
+    INBOUND_WEBHOOK_SECRET: opt('INBOUND_WEBHOOK_SECRET'),
   };
   return cached;
 }

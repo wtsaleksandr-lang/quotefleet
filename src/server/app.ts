@@ -23,6 +23,7 @@ import { registerAdminRoutes } from './routes/admin.js';
 import { registerAiRoutes } from './routes/ai.js';
 import { registerAutocompleteRoutes } from './routes/autocomplete.js';
 import { registerIngestRoutes } from './routes/ingest.js';
+import { registerInboundRoutes } from './routes/inbound.js';
 import { registerMarketplaceRoutes } from './routes/marketplace.js';
 import { registerToolsRoutes } from './routes/tools.js';
 import { registerBillingRoutes, registerStripeWebhook } from './routes/billing.js';
@@ -110,6 +111,7 @@ export function createApp(): express.Express {
   registerAiRoutes(app);
   registerAutocompleteRoutes(app);
   registerIngestRoutes(app);
+  registerInboundRoutes(app);
   registerMarketplaceRoutes(app);
   registerToolsRoutes(app);
   registerBillingRoutes(app);

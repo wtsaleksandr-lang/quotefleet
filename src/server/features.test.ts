@@ -12,8 +12,8 @@ import {
 } from './features.js';
 
 describe('resolveFeatures — defaults', () => {
-  it('null brand → defaults (share ON, booking OFF)', () => {
-    expect(resolveFeatures(null)).toEqual({ quoteShare: true, quoteBooking: false });
+  it('null brand → defaults (share ON, booking OFF, emailImport OFF)', () => {
+    expect(resolveFeatures(null)).toEqual({ quoteShare: true, quoteBooking: false, emailImport: false });
   });
 
   it('null featuresJson column → defaults', () => {
@@ -53,7 +53,7 @@ describe('resolveFeatures — malformed input never disables a feature by accide
 
   it('unknown keys are dropped from the resolved result', () => {
     const f = resolveFeatures({ featuresJson: { somethingElse: true } as Record<string, boolean> });
-    expect(Object.keys(f).sort()).toEqual(['quoteBooking', 'quoteShare']);
+    expect(Object.keys(f).sort()).toEqual(['emailImport', 'quoteBooking', 'quoteShare']);
   });
 });
 

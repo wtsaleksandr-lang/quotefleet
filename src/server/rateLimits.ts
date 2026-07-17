@@ -109,6 +109,25 @@ export const quoteEmailSendLimiter: RateLimitRequestHandler = rateLimit({
   message: { error: 'Too many send attempts for this quote. Try again in a few minutes.' },
 });
 
+/** POST /api/inbound/rate-email — the mail provider posts one forwarded rate
+ *  email per real forward, so a modest cap stops a misconfigured provider loop
+ *  or a spammer who guessed the shared secret from hammering the AI parser.
+ *  Keyed by the recipient token when present (so one busy tenant can't starve
+ *  another) and falls back to the caller IP. */
+export const inboundEmailLimiter: RateLimitRequestHandler = rateLimit({
+  windowMs: minutes(15),
+  limit: 30,
+  standardHeaders: 'draft-7',
+  legacyHeaders: false,
+  keyGenerator: (req) => {
+    const body = (req.body ?? {}) as { to?: unknown };
+    const to = typeof body.to === 'string' ? body.to : Array.isArray(body.to) ? body.to.join(',') : '';
+    const m = to.match(/rates-([0-9a-z]+)@/i);
+    return m ? `inbound:${m[1].toLowerCase()}` : `inbound-ip:${req.ip}`;
+  },
+  message: { error: 'Too many inbound emails. Try again shortly.' },
+});
+
 /** /api/auth/magic-link/send — anti-email-bomb. */
 export const magicLinkLimiter: RateLimitRequestHandler = rateLimit({
   windowMs: minutes(60),
