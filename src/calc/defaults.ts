@@ -258,6 +258,7 @@ export const DEFAULT_ACCESSORIALS: Omit<NewAccessorial, 'tenantId'>[] = [
     kind: 'per_day',
     amount: 350,
     trigger: 'optional',
+    conditionJson: { daysFlag: 'layoverDays' },
     enabled: true,
     sortOrder: 20,
   },

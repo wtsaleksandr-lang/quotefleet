@@ -187,6 +187,13 @@ function matchLaneZone(
 }
 
 /** Decide which accessorials auto-trigger for this request. */
+// An accessorial applies to a quote's service if it has no service scope, or
+// its scope includes the service. Enforced for BOTH auto and optional lines.
+function inScope(a: Accessorial, req: CalcRequest): boolean {
+  const scope = a.appliesToServices ?? [];
+  return scope.length === 0 || scope.includes(req.service);
+}
+
 function autoTriggered(
   list: Accessorial[],
   req: CalcRequest
@@ -194,9 +201,7 @@ function autoTriggered(
   const out: Accessorial[] = [];
   for (const a of list) {
     if (!a.enabled) continue;
-    // service scope
-    const scope = a.appliesToServices ?? [];
-    if (scope.length > 0 && !scope.includes(req.service)) continue;
+    if (!inScope(a, req)) continue;
     if (a.trigger === 'auto') {
       out.push(a);
       continue;
@@ -249,15 +254,23 @@ function applyAccessorial(
     case 'pct_of_base':
       return base * (a.amount / 100);
     case 'per_day': {
-      // Used for storage / layover. Reads ai-extracted day count if present.
-      const days =
-        Number(req.flags?.storageDays ?? 0) +
-        Number(req.flags?.layoverDays ?? 0);
+      // Each per_day accessorial bills its OWN day count: layover reads
+      // layoverDays; storage / yard / chassis / reefer-type charges read
+      // storageDays. Summing both flags cross-charged every per_day line by the
+      // other's days (e.g. storage billing layover nights). Source is chosen by
+      // conditionJson.daysFlag, defaulting to storageDays.
+      const flag: 'storageDays' | 'layoverDays' =
+        a.conditionJson?.daysFlag === 'layoverDays' ? 'layoverDays' : 'storageDays';
+      const days = Number(req.flags?.[flag] ?? 0);
       return a.amount * Math.max(0, days);
     }
     case 'per_hour': {
+      // Bill hours OVER the accessorial's free window, not the raw hours.
+      // conditionJson.freeHours (e.g. detention = 2, detention_terminal = 1)
+      // was carried in the seed but never applied.
       const hours = Number(req.flags?.detentionHours ?? 0);
-      return a.amount * Math.max(0, hours);
+      const freeHours = Number(a.conditionJson?.freeHours ?? 0);
+      return a.amount * Math.max(0, hours - freeHours);
     }
     default:
       return a.amount;
@@ -435,6 +448,7 @@ export function calculate(
       a.enabled &&
       a.trigger === 'optional' &&
       selectedCodes.has(a.code) &&
+      inScope(a, req) &&
       !auto.find((x) => x.code === a.code)
   );
   for (const a of optional) {

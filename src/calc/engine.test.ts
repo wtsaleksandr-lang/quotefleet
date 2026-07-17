@@ -197,6 +197,47 @@ describe('calculate', () => {
     expect(r.lines.find((l) => l.code === 'detention')?.amount).toBe(225);
   });
 
+  it('Per-day accessorials read their own day flag (no cross-charge)', () => {
+    const storage = accessorial({ code: 'storage', label: 'Storage', kind: 'per_day', amount: 45 });
+    const layover = accessorial({ code: 'layover', label: 'Layover', kind: 'per_day', amount: 350, conditionJson: { daysFlag: 'layoverDays' } });
+    const r = calculate(
+      [rateCard({})], [storage, layover], [],
+      req({ miles: 100, selectedAccessorialCodes: ['storage', 'layover'], flags: { storageDays: 2, layoverDays: 1 } })
+    );
+    // storage bills its 2 storage days (not 3 = storage+layover); layover bills its 1 layover day
+    expect(r.lines.find((l) => l.code === 'storage')?.amount).toBe(90);
+    expect(r.lines.find((l) => l.code === 'layover')?.amount).toBe(350);
+  });
+
+  it('Per-day accessorial does not bill against the other flag (no phantom days)', () => {
+    const storage = accessorial({ code: 'storage', label: 'Storage', kind: 'per_day', amount: 45 });
+    const r = calculate(
+      [rateCard({})], [storage], [],
+      req({ miles: 100, selectedAccessorialCodes: ['storage'], flags: { storageDays: 0, layoverDays: 5 } })
+    );
+    // zero storage days -> no storage charge, even with layover days present
+    expect(r.lines.find((l) => l.code === 'storage')).toBeUndefined();
+  });
+
+  it('Optional accessorial out of service scope is not applied', () => {
+    const drayOnly = accessorial({ code: 'flip_fee', label: 'Flip', kind: 'flat', amount: 200, appliesToServices: ['drayage'] });
+    const r = calculate(
+      [rateCard({})], [drayOnly], [],
+      req({ service: 'ftl', miles: 100, selectedAccessorialCodes: ['flip_fee'] })
+    );
+    expect(r.lines.find((l) => l.code === 'flip_fee')).toBeUndefined();
+  });
+
+  it('Per-hour accessorial bills only hours over the free window', () => {
+    const det = accessorial({ code: 'detention', label: 'Detention', kind: 'per_hour', amount: 99, conditionJson: { freeHours: 2 } });
+    const r = calculate(
+      [rateCard({})], [det], [],
+      req({ miles: 100, selectedAccessorialCodes: ['detention'], flags: { detentionHours: 3 } })
+    );
+    // (3 - 2 free) * 99
+    expect(r.lines.find((l) => l.code === 'detention')?.amount).toBe(99);
+  });
+
   it('Snapshot — full breakdown for representative quote', () => {
     const r = calculate(
       [rateCard({ marginPct: 10 })],
