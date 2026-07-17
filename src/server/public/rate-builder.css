@@ -137,7 +137,7 @@
 .qf-rate-table-wrap {
   position: relative;
   padding-top: 16px; /* room for the pill so overflow-x clipping never eats it */
-  overflow-x: auto;  /* wide grid scrolls in-place instead of spilling past the page edge */
+  overflow-x: auto; max-width: 100%; min-width: 0; /* TABLE scrolls, never the page — wrap pinned to its column at every width (min-width:0 stops a grid/flex ancestor growing it to the table's intrinsic ~1413px) */
 }
 .qf-rate-table-wrap::before {
   content: 'Rate builder';

@@ -150,26 +150,49 @@
     });
   }
 
+  var ROUTES = {
+    overview: function (c) { return renderOverview(c); },
+    leads: function (c) { return renderLeads(c); },
+    rates: function (c) { return renderRates(c); },
+    accessorials: function (c) { return renderAccessorials(c); },
+    zones: function (c) { return renderZones(c); },
+    ai: function (c) { return renderAi(c); },
+    ingest: function (c) { return renderIngest(c); },
+    brand: function (c) { return renderBrand(c); },
+    'widget-settings': function (c) { return renderWidgetSettings(c); },
+    embed: function (c) { return renderEmbed(c); },
+    audit: function (c) { return renderAudit(c); },
+    account: function (c) { return renderAccount(c); },
+    callbacks: function (c) { return renderCallbacks(c); },
+  };
+
+  // Not-found fallback so an unknown route never hangs on the "Loading…"
+  // spinner. Shows a clean panel with a one-click way back to Overview.
+  function renderNotFound(c) {
+    c.innerHTML = '';
+    var card = el('div', { class: 'card', style: { marginTop: '12px', padding: '32px 24px', textAlign: 'center' } });
+    card.appendChild(el('div', { style: { fontSize: '17px', fontWeight: '800' }, text: 'Page not found' }));
+    card.appendChild(el('div', { class: 'muted-small', style: { margin: '8px auto 18px', maxWidth: '420px', lineHeight: '1.5' }, text: 'That page doesn’t exist or has moved.' }));
+    var btn = el('button', { class: 'btn btn-primary', text: 'Back to Overview' });
+    btn.addEventListener('click', function () { go('overview'); });
+    card.appendChild(btn);
+    c.appendChild(card);
+  }
+
   function go(route) {
     state.route = route;
-    setActiveNav(route);
+    // Match on the base segment so nested routes (e.g. "leads/QF-123") still
+    // dispatch to their handler; the full route is pushed to the URL so the
+    // handler can read the sub-path (renderLeads → renderLeadDetail).
+    var base = String(route).split('/')[0];
+    setActiveNav(base);
     history.pushState({}, '', '/app/' + route);
-    if (route === 'overview' || route === 'leads' || route === 'callbacks') refreshNavBadges();
+    if (base === 'overview' || base === 'leads' || base === 'callbacks') refreshNavBadges();
     var c = $('#page-content');
     c.innerHTML = '<div class="muted">Loading…</div>';
-    if (route === 'overview') return renderOverview(c);
-    if (route === 'leads') return renderLeads(c);
-    if (route === 'rates') return renderRates(c);
-    if (route === 'accessorials') return renderAccessorials(c);
-    if (route === 'zones') return renderZones(c);
-    if (route === 'ai') return renderAi(c);
-    if (route === 'ingest') return renderIngest(c);
-    if (route === 'brand') return renderBrand(c);
-    if (route === 'widget-settings') return renderWidgetSettings(c);
-    if (route === 'embed') return renderEmbed(c);
-    if (route === 'audit') return renderAudit(c);
-    if (route === 'account') return renderAccount(c);
-    if (route === 'callbacks') return renderCallbacks(c);
+    var handler = ROUTES[base];
+    if (handler) return handler(c);
+    return renderNotFound(c);
   }
 
   // ── Theme toggle ──────────────────────────────────────────────
@@ -529,20 +552,23 @@
         }));
         return;
       }
-      var tbl = el('table', { class: 'table' });
+      // qf-leads-table drives the ≤480px stacked-card reflow (lead-queue-search.css):
+      // each <td> carries a data-label so the decision-critical Total + Status
+      // stay visible on mobile without a sideways scroll to reach them.
+      var tbl = el('table', { class: 'table qf-leads-table' });
       tbl.innerHTML = '<thead><tr><th>Ref</th><th>Customer</th><th>Service</th><th>Lane</th><th style="text-align:right;">Total</th><th>Status</th><th>When</th></tr></thead><tbody></tbody>';
       var tb = $('tbody', tbl);
       d.leads.forEach(function (l) {
         tb.appendChild(el('tr', {
           on: { click: function () { go('leads/' + l.refId); } },
           style: { cursor: 'pointer' },
-          html: '<td><strong>' + l.refId + '</strong></td>' +
-                '<td>' + (l.customerName || '—') + '<br><span class="muted-small">' + (l.customerEmail || '') + '</span></td>' +
-                '<td>' + (l.service || '') + ' / ' + (l.equipment || '') + '</td>' +
-                '<td>' + (l.pickupCity || '?') + ' → ' + (l.deliveryCity || '?') + '</td>' +
-                '<td style="text-align:right;">$' + fmtMoney(l.quotedTotal) + '</td>' +
-                '<td><span class="badge ' + statusClass(l.status) + '">' + statusLabel(l.status) + '</span></td>' +
-                '<td><span class="muted-small">' + fmtDate(l.createdAt) + '</span></td>',
+          html: '<td data-label="Ref"><strong>' + l.refId + '</strong></td>' +
+                '<td data-label="Customer">' + (l.customerName || '—') + '<br><span class="muted-small">' + (l.customerEmail || '') + '</span></td>' +
+                '<td data-label="Service">' + (l.service || '') + ' / ' + (l.equipment || '') + '</td>' +
+                '<td data-label="Lane">' + (l.pickupCity || '?') + ' → ' + (l.deliveryCity || '?') + '</td>' +
+                '<td data-label="Total" style="text-align:right;">$' + fmtMoney(l.quotedTotal) + '</td>' +
+                '<td data-label="Status"><span class="badge ' + statusClass(l.status) + '">' + statusLabel(l.status) + '</span></td>' +
+                '<td data-label="When"><span class="muted-small">' + fmtDate(l.createdAt) + '</span></td>',
         }));
       });
       c.appendChild(tbl);
@@ -950,7 +976,15 @@
       // (qf-rate-search-hidden) and the status-chip filter (row.hidden); both
       // compose as AND. No inline style.display here so they never fight.
       if (d.rateCards.length) {
-        c.appendChild(tbl);
+        // Wrap the wide rate grid in a scroll container so the TABLE scrolls
+        // sideways, never the page (rate-builder.css .qf-rate-table-wrap keeps
+        // overflow-x:auto + max-width:100% + min-width:0 at ALL widths). Wrapping
+        // here — rather than relying on rate-builder.js's async enhancer — means
+        // the container is present the instant the table renders, so a slow
+        // enhancer can't leave the desktop table spilling past the page edge.
+        var tblWrap = el('div', { class: 'qf-rate-table-wrap' });
+        tblWrap.appendChild(tbl);
+        c.appendChild(tblWrap);
       } else {
         // 0 rate cards used to render a bare header row (looked broken). Show a
         // friendly empty-state that ties into the modes explanation up top.

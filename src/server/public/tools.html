@@ -32,7 +32,7 @@
     .tool-card { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius-lg); padding: 22px; }
     .tool-row { display: flex; gap: 10px; flex-wrap: wrap; margin-top: 6px; }
     .chip { padding: 6px 12px; border-radius: var(--radius-btn); border: 1px solid var(--border-strong); cursor: pointer; font-size: 12px; font-family: var(--font-mono); letter-spacing: 0.06em; text-transform: uppercase; color: var(--ink-soft); background: var(--surface-2); }
-    .chip.active { border-color: var(--accent); color: var(--accent-ink); background: var(--accent); }
+    .chip.active { border-color: var(--accent); color: var(--accent); background: var(--accent-soft); }
     .res-total { font-size: 56px; font-weight: 800; letter-spacing: -0.04em; color: var(--ink); }
     .res-line { display: flex; justify-content: space-between; padding: 8px 0; border-bottom: 1px solid var(--border); font-size: 14px; }
     .res-line:last-child { border-bottom: 0; }
@@ -202,23 +202,42 @@
     document.getElementById('year').textContent = new Date().getFullYear();
     var state = { service: null, equipment: null, flags: {}, pickupResolved: null, deliveryResolved: null };
 
-    fetch('/api/tools/config').then(function (r) { return r.json(); }).then(function (cfg) {
+    function toolsConfigNote(msg) {
       var sw = document.getElementById('qf-services');
-      var labels = { drayage: 'Drayage', ftl: 'Truckload', ltl: 'LTL', expedited: 'Expedited', hotshot: 'Hotshot' };
-      cfg.services.forEach(function (s, i) {
-        var c = document.createElement('span');
-        c.className = 'chip' + (i === 0 ? ' active' : '');
-        c.textContent = labels[s] || s;
-        c.dataset.service = s;
-        c.addEventListener('click', function () {
-          [].forEach.call(sw.querySelectorAll('.chip'), function (x) { x.classList.remove('active'); });
-          c.classList.add('active');
-          selectService(s, cfg.equipmentByService[s] || []);
+      if (sw && !sw.children.length) {
+        var note = document.createElement('span');
+        note.className = 'muted-small';
+        note.textContent = msg;
+        sw.appendChild(note);
+      }
+    }
+    fetch('/api/tools/config')
+      // A failed / slow / empty config response must never blank the public SEO
+      // calculator. Treat a non-OK status or an unparseable body as an empty
+      // config, then defend every field access below.
+      .then(function (r) { return r.ok ? r.json().catch(function () { return {}; }) : {}; })
+      .then(function (cfg) {
+        cfg = cfg || {};
+        var services = cfg.services || [];
+        var equipmentByService = cfg.equipmentByService || {};
+        var sw = document.getElementById('qf-services');
+        var labels = { drayage: 'Drayage', ftl: 'Truckload', ltl: 'LTL', expedited: 'Expedited', hotshot: 'Hotshot' };
+        if (!services.length) { toolsConfigNote('Service options are unavailable right now — refresh in a moment.'); return; }
+        services.forEach(function (s, i) {
+          var c = document.createElement('span');
+          c.className = 'chip' + (i === 0 ? ' active' : '');
+          c.textContent = labels[s] || s;
+          c.dataset.service = s;
+          c.addEventListener('click', function () {
+            [].forEach.call(sw.querySelectorAll('.chip'), function (x) { x.classList.remove('active'); });
+            c.classList.add('active');
+            selectService(s, equipmentByService[s] || []);
+          });
+          sw.appendChild(c);
         });
-        sw.appendChild(c);
-      });
-      if (cfg.services[0]) selectService(cfg.services[0], cfg.equipmentByService[cfg.services[0]] || []);
-    });
+        if (services[0]) selectService(services[0], equipmentByService[services[0]] || []);
+      })
+      .catch(function () { toolsConfigNote('Service options are unavailable right now — refresh in a moment.'); });
 
     function selectService(s, equip) {
       state.service = s;

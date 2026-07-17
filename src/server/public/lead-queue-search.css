@@ -103,3 +103,52 @@ html[data-theme="light"] tr.qf-lead-hot-row {
     justify-self: start;
   }
 }
+
+/* ── Leads list: mobile stacked-card reflow (≤480px) ──────────────────────
+   The shared .table rule (dashboard-polish.css ≤900px) turns the leads grid
+   into a sideways-scrolling block, which pushes the decision-critical Total
+   and Status columns off-screen at 390px. Below 480px each lead reflows into a
+   stacked card so ref + customer + lane + Total + Status all read WITHOUT any
+   horizontal scroll. Each <td> labels itself via its data-label attribute. */
+@media (max-width: 480px) {
+  .qf-leads-table {
+    display: block;
+    overflow-x: visible;
+    border: 0;
+    background: transparent;
+  }
+  .qf-leads-table thead { display: none; }
+  .qf-leads-table tbody { display: block; }
+  .qf-leads-table tbody tr {
+    display: block;
+    border: 1px solid var(--border);
+    border-radius: 14px;
+    background: var(--surface);
+    padding: 4px 16px 8px;
+    margin-bottom: 12px;
+  }
+  .qf-leads-table tbody tr:hover { background: var(--surface); }
+  .qf-leads-table tbody td {
+    display: flex;
+    align-items: baseline;
+    justify-content: space-between;
+    gap: 12px;
+    padding: 8px 0;
+    text-align: left !important;
+    border-bottom: 1px solid var(--border);
+  }
+  .qf-leads-table tbody tr td:last-child { border-bottom: 0; }
+  .qf-leads-table tbody td::before {
+    content: attr(data-label);
+    flex: 0 0 auto;
+    color: var(--muted);
+    font: 700 11px var(--font-mono);
+    letter-spacing: .05em;
+    text-transform: uppercase;
+  }
+  /* Customer cell: name over email in a right-aligned column, so the pair
+     stays together instead of the label/name/email spreading three ways. */
+  .qf-leads-table tbody td[data-label="Customer"] { text-align: right; }
+  .qf-leads-table tbody td[data-label="Customer"] br { display: block; }
+  .qf-leads-table tbody td .muted-small { display: inline-block; }
+}
