@@ -2606,6 +2606,18 @@
 
     refreshList();
 
+    // Reassuring processing state shown while the parse job runs. Theme-aware
+    // spinner (token colors, no literal #fff/#000) + the filename being read.
+    function processingHtml(name) {
+      return '<div class="qf-ingest-processing" role="status" aria-live="polite">'
+        + '<div class="qf-ingest-spinner" aria-hidden="true"></div>'
+        + '<div class="qf-ingest-processing-copy">'
+        + '<div class="qf-ingest-processing-title">Reading your rate sheet… '
+        + '<span class="qf-ingest-file">' + escapeHtml(name) + '</span></div>'
+        + '<div class="qf-ingest-processing-sub">Extracting rate cards, accessorials, and zones</div>'
+        + '</div></div>';
+    }
+
     function handleFile(file) {
       if (file.size > 5 * 1024 * 1024) {
         statusBox.innerHTML = '<div class="notice error">File is bigger than 5 MB — split it into smaller chunks.</div>';
@@ -2622,7 +2634,7 @@
           method: 'POST',
           body: { filename: file.name, mimeType: file.type || 'application/octet-stream', dataBase64: b64 },
         }).then(function (r) {
-          statusBox.innerHTML = '<div class="muted-small">Parsing <span class="dots"></span></div>';
+          statusBox.innerHTML = processingHtml(file.name);
           pollJob(r.jobId, 0);
         }).catch(function (err) {
           statusBox.innerHTML = '<div class="notice error">' + escapeHtml(err.message || 'Upload failed') + '</div>';
@@ -2730,12 +2742,65 @@
         return;
       }
 
+      // ── System auto-verification (reliability without manual labor) ──
+      // We quote a spread of sample lanes against the draft automatically and
+      // report a calm summary. The owner never has to hand-test anything.
+      var autocheck = el('div', { class: 'qf-autocheck qf-autocheck-loading', style: { marginTop: '14px' } });
+      autocheck.innerHTML = '<span class="qf-autocheck-spin" aria-hidden="true"></span>'
+        + '<span>Auto-checking a spread of sample lanes with your rates…</span>';
+      card.appendChild(autocheck);
+      api('/api/tenant/ingest/' + job.id + '/autocheck').then(function (r) {
+        autocheck.className = 'qf-autocheck';
+        if (r.flaggedCount > 0) {
+          var items = (r.flagged || []).map(function (f) {
+            return '<li>' + escapeHtml(f.label) + ' — ' + escapeHtml(f.reason) + '</li>';
+          }).join('');
+          autocheck.classList.add('qf-autocheck-flag');
+          autocheck.innerHTML = '<div class="qf-autocheck-line"><strong>We auto-quoted ' + r.total + ' sample lanes</strong> — '
+            + r.clean + ' clean, ' + r.flaggedCount + ' to look at:</div>'
+            + '<ul class="qf-autocheck-list">' + items + '</ul>';
+        } else {
+          autocheck.classList.add('qf-autocheck-ok');
+          autocheck.innerHTML = '<span class="qf-autocheck-tick" aria-hidden="true">✓</span>'
+            + '<span>We auto-quoted ' + r.total + ' sample lanes with your rates — all computed cleanly. '
+            + 'You can apply now, or try a lane yourself first.</span>';
+        }
+      }).catch(function () {
+        // Auto-check is a bonus; never block the review if it fails.
+        autocheck.remove();
+      });
+
       // Editable selection per item type.
       var rcSelections = renderItemList(card, 'Rate cards', parsed.rateCards || [], rateCardSummary);
       var accSelections = renderItemList(card, 'Accessorials', parsed.accessorials || [], accSummary);
       var lzSelections = renderItemList(card, 'Lane zones', parsed.laneZones || [], laneZoneSummary);
 
-      var actionRow = el('div', { style: { marginTop: '20px', display: 'flex', gap: '10px' } });
+      function currentSelection() {
+        return {
+          rateCards: rcSelections.selected(),
+          accessorials: accSelections.selected(),
+          laneZones: lzSelections.selected(),
+        };
+      }
+      function doApply(body, onDone) {
+        var total = body.rateCards.length + body.accessorials.length + body.laneZones.length;
+        if (total === 0) { toastErr({ message: 'Tick at least one item to apply.' }); return; }
+        api('/api/tenant/ingest/' + job.id + '/apply', {
+          method: 'POST', body: body,
+        }).then(function (r) {
+          reviewBox.innerHTML = '<div class="notice"><strong>Applied.</strong> ' +
+            r.inserted.rateCards + ' rate cards · ' +
+            r.inserted.accessorials + ' accessorials · ' +
+            r.inserted.laneZones + ' lane zones</div>';
+          refreshList();
+          if (onDone) onDone(true);
+        }).catch(function (err) {
+          toastErr({ message: err.message || 'Apply failed.' });
+          if (onDone) onDone(false);
+        });
+      }
+
+      var actionRow = el('div', { style: { marginTop: '20px', display: 'flex', gap: '10px', alignItems: 'center', flexWrap: 'wrap' } });
       var applyBtn = el('button', {
         class: 'btn btn-primary',
         text: 'Apply selected',
@@ -2774,10 +2839,145 @@
           });
         } }
       });
+      // Manual test is OPTIONAL — a quiet confidence bonus, never a gate.
+      // Apply is available directly; this just lets a curious owner try a lane.
+      var testLink = el('button', {
+        class: 'btn btn-ghost btn-sm qf-try-lane',
+        text: 'Try a lane yourself',
+        on: { click: function () { openTestModal(job, parsed, currentSelection, doApply); } },
+      });
+      var testHint = el('span', { class: 'muted-small', text: 'optional' });
       actionRow.appendChild(applyBtn);
       actionRow.appendChild(rejectBtn);
+      actionRow.appendChild(testLink);
+      actionRow.appendChild(testHint);
       card.appendChild(actionRow);
       reviewBox.appendChild(card);
+    }
+
+    // ── "Test your rates" modal ─────────────────────────────────────
+    // Confirm-by-simulation: run a sample lane against the not-yet-applied
+    // draft, exactly as a customer would, so the owner sees the quote BEFORE
+    // committing. Uses the preview-quote endpoint (no persist).
+    function openTestModal(job, parsed, getSelection, applyFn) {
+      var cards = (parsed.rateCards || []).filter(function (c) { return c && c.service; });
+      // Unique services from the draft's rate cards.
+      var services = [];
+      cards.forEach(function (c) { if (services.indexOf(c.service) < 0) services.push(c.service); });
+      if (!services.length) { toastErr({ message: 'No rate cards in this draft to test.' }); return; }
+
+      var backdrop = el('div', { class: 'qf-modal-backdrop is-open' });
+      var cardEl = el('div', { class: 'qf-modal-card qf-test-card', role: 'dialog', 'aria-modal': 'true' });
+      cardEl.appendChild(el('h3', { text: 'Try a lane yourself' }));
+      cardEl.appendChild(el('p', { text: 'Optional — your rates are ready to apply. We already auto-checked a spread of sample lanes. Run any lane here to see exactly what a customer would be quoted.' }));
+
+      function equipmentFor(svc) {
+        var eqs = [];
+        cards.forEach(function (c) { if (c.service === svc && c.equipment && eqs.indexOf(c.equipment) < 0) eqs.push(c.equipment); });
+        return eqs;
+      }
+      function opts(list) {
+        return list.map(function (v) { return '<option value="' + escapeHtml(v) + '">' + escapeHtml(v) + '</option>'; }).join('');
+      }
+
+      var grid = el('div', { class: 'qf-test-grid' });
+      grid.innerHTML =
+        '<div class="qf-test-field"><label>Service</label>'
+          + '<select class="input" data-f="service">' + opts(services) + '</select></div>'
+        + '<div class="qf-test-field"><label>Equipment</label>'
+          + '<select class="input" data-f="equipment">' + opts(equipmentFor(services[0])) + '</select></div>'
+        + '<div class="qf-test-field"><label>Pickup (city, ST or ZIP)</label>'
+          + '<input class="input" data-f="pickup" placeholder="Long Beach, CA" /></div>'
+        + '<div class="qf-test-field"><label>Delivery (city, ST or ZIP)</label>'
+          + '<input class="input" data-f="delivery" placeholder="Phoenix, AZ" /></div>'
+        + '<div class="qf-test-field"><label>Weight (lb, optional)</label>'
+          + '<input class="input" data-f="weight" type="number" min="0" placeholder="e.g. 18000" /></div>'
+        + '<div class="qf-test-field"><label>&nbsp;</label>'
+          + '<button type="button" class="btn btn-primary" data-f="run">Get sample quote</button></div>';
+      cardEl.appendChild(grid);
+
+      var svcSel = grid.querySelector('[data-f="service"]');
+      var eqSel = grid.querySelector('[data-f="equipment"]');
+      svcSel.addEventListener('change', function () { eqSel.innerHTML = opts(equipmentFor(svcSel.value)); });
+
+      var resultBox = el('div', { class: 'qf-test-result', style: { display: 'none' } });
+      cardEl.appendChild(resultBox);
+
+      function parseLoc(s) {
+        var t = String(s || '').trim();
+        if (!t) return null;
+        if (/^\d{5}$/.test(t)) return { zip: t, country: 'US' };
+        if (/^[A-Za-z]\d[A-Za-z]/.test(t)) return { zip: t.replace(/\s+/g, ''), country: 'CA' };
+        var parts = t.split(',').map(function (p) { return p.trim(); }).filter(Boolean);
+        if (parts.length >= 2) return { city: parts[0], state: parts[1].slice(0, 2).toUpperCase(), country: 'US' };
+        return { city: t, country: 'US' };
+      }
+
+      var runBtn = grid.querySelector('[data-f="run"]');
+      runBtn.addEventListener('click', function () {
+        var pickup = parseLoc(grid.querySelector('[data-f="pickup"]').value);
+        var delivery = parseLoc(grid.querySelector('[data-f="delivery"]').value);
+        if (!pickup || !delivery) { toastErr({ message: 'Enter both a pickup and a delivery location.' }); return; }
+        var wRaw = grid.querySelector('[data-f="weight"]').value;
+        var body = { service: svcSel.value, equipment: eqSel.value, pickup: pickup, delivery: delivery };
+        if (wRaw && !isNaN(Number(wRaw))) body.weightLbs = Number(wRaw);
+        runBtn.disabled = true; runBtn.textContent = 'Quoting…';
+        resultBox.style.display = 'block';
+        resultBox.innerHTML = '<div class="qf-ingest-processing" style="margin:0;"><div class="qf-ingest-spinner"></div>'
+          + '<div class="qf-ingest-processing-copy"><div class="qf-ingest-processing-title">Calculating…</div></div></div>';
+        api('/api/tenant/ingest/' + job.id + '/preview-quote', { method: 'POST', body: body })
+          .then(function (r) { renderQuote(r); })
+          .catch(function (err) {
+            resultBox.innerHTML = '<div class="notice error">' + escapeHtml(err.message || 'Could not compute a quote.') + '</div>';
+          })
+          .then(function () { runBtn.disabled = false; runBtn.textContent = 'Get sample quote'; });
+      });
+
+      function renderQuote(r) {
+        if (r.unsupported) {
+          resultBox.innerHTML = '<div class="notice warn">' + escapeHtml(r.unsupported.reason || 'No matching rate for this lane.') + '</div>';
+          return;
+        }
+        var res = r.result || {};
+        var lines = res.lines || [];
+        var html = '';
+        if (typeof r.miles === 'number') html += '<div class="muted-small" style="margin-bottom:8px;">Lane distance ≈ ' + Math.round(r.miles) + ' mi</div>';
+        lines.forEach(function (l) {
+          html += '<div class="qf-test-line"><span>' + escapeHtml(l.name || l.kind || '') + '</span>'
+            + '<span class="qf-test-amt">$' + fmtMoney(Number(l.amount) || 0) + '</span></div>';
+        });
+        html += '<div class="qf-test-total"><span>Customer total</span>'
+          + '<span class="qf-test-amt">$' + fmtMoney(Number(res.total) || 0) + '</span></div>';
+        resultBox.innerHTML = html;
+      }
+
+      function close() {
+        backdrop.remove();
+        if (window.__qfTestKeydown) { document.removeEventListener('keydown', window.__qfTestKeydown); window.__qfTestKeydown = null; }
+      }
+
+      var actions = el('div', { class: 'qf-modal-actions' });
+      var keepBtn = el('button', { class: 'btn', text: 'Close', on: { click: close } });
+      var confirmBtn = el('button', {
+        class: 'btn btn-primary',
+        text: 'Apply these rates',
+        on: { click: function () {
+          confirmBtn.disabled = true; confirmBtn.textContent = 'Applying…';
+          applyFn(getSelection(), function (ok) {
+            if (ok) { close(); window.scrollTo(0, 0); }
+            else { confirmBtn.disabled = false; confirmBtn.textContent = 'Apply these rates'; }
+          });
+        } },
+      });
+      actions.appendChild(keepBtn);
+      actions.appendChild(confirmBtn);
+      cardEl.appendChild(actions);
+
+      backdrop.appendChild(cardEl);
+      backdrop.addEventListener('click', function (ev) { if (ev.target === backdrop) close(); });
+      window.__qfTestKeydown = function (ev) { if (ev.key === 'Escape') close(); };
+      document.addEventListener('keydown', window.__qfTestKeydown);
+      document.body.appendChild(backdrop);
     }
 
     function renderItemList(parent, title, items, summarize) {
