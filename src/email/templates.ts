@@ -102,7 +102,14 @@ function shell(opts: {
   // "Powered by QuoteFleet" line. Non-brand mode is byte-identical to before.
   const footerBody = brand
     ? `
-            ${opts.footerNote ? `<div style="margin:0 0 14px 0;">${opts.footerNote}</div>` : ''}
+            ${opts.footerNote ? `<div style="margin:0 0 14px 0;">${opts.footerNote}</div>` : ''}${isMarketing ? `
+            <div style="margin:0 0 12px 0;color:${BRAND.muted};">
+              You're receiving this because you requested a quote from ${escape(brandName)}.
+              <a href="${escape(opts.unsubscribeUrl!)}" style="color:${BRAND.muted};text-decoration:underline;">Unsubscribe from these reminders</a>.
+            </div>
+            <div style="margin:0 0 12px 0;font-size:11px;color:${BRAND.mutedSoft};">
+              ${escape(BRAND.postalAddress)}
+            </div>` : ''}
             <div style="font-size:11px;color:${BRAND.mutedSoft};">
               Powered by <a href="https://quotefleet.net" style="color:${BRAND.mutedSoft};text-decoration:none;">QuoteFleet</a>
             </div>`
@@ -663,4 +670,128 @@ export function lifecycleExpiredEmail(opts: {
     inner,
     unsubscribeUrl: opts.unsubscribeUrl,
   });
+}
+
+/* ──────────────────────────────────────────────────────────────────────
+ * Automated follow-up sequence (Wave 1) — carrier-branded, customer-facing.
+ *
+ * Three touches sent to a customer who got a quote but didn't book, with the
+ * discount saved for the LAST touch (don't train customers to wait for a
+ * deal). These are COMMERCIAL emails: each renders through the carrier-branded
+ * shell WITH an unsubscribeUrl, so the footer carries the CAN-SPAM / CASL
+ * unsubscribe line + physical postal address + the subtle "Powered by
+ * QuoteFleet" attribution. The sequence auto-stops on book / reply /
+ * unsubscribe — that machinery is a later wave; this file only renders.
+ * ────────────────────────────────────────────────────────────────────── */
+
+/** Shared args for every follow-up touch. */
+interface FollowUpArgs {
+  refId: string;
+  customerName: string;
+  brandName: string;
+  brandLogoUrl?: string | null;
+  quoteUrl: string;
+  laneFrom: string;
+  laneTo: string;
+  /** Pre-formatted, currency-styled total, e.g. "$2,450.00". */
+  total: string;
+  unsubscribeUrl: string;
+}
+
+/** A centered, letter-spaced mono chip for a short code (promo / voucher).
+ *  Same visual language as magicLinkEmail's URL box (mono, soft bg, hairline
+ *  border) but sized + centered for a short token. */
+function codeChip(code: string): string {
+  return `<table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0" style="margin:0 0 20px 0;">
+      <tr>
+        <td align="center" style="padding:14px 16px;background:${BRAND.bg};border:1px dashed ${BRAND.primary};border-radius:8px;font-family:'JetBrains Mono','SF Mono',Menlo,Consolas,monospace;font-size:22px;font-weight:700;letter-spacing:0.14em;color:${BRAND.ink};">${escape(code)}</td>
+      </tr>
+    </table>`;
+}
+
+/** Appends a `promo=<code>` query param to the quote URL (preserving any
+ *  existing query string) so the discount is pre-applied on arrival. */
+function withPromo(quoteUrl: string, promoCode: string): string {
+  const sep = quoteUrl.indexOf('?') > -1 ? '&' : '?';
+  return `${quoteUrl}${sep}promo=${encodeURIComponent(promoCode)}`;
+}
+
+/* ── FU1 — the gentle nudge ─────────────────────────────────────────────── */
+export function followupNudgeEmail(opts: FollowUpArgs): { subject: string; html: string } {
+  const subject = `Still planning that shipment, ${opts.customerName}?`;
+  const inner =
+    eyebrow(`Quote ${opts.refId}`) +
+    heading('Your quote is ready when you are') +
+    paragraph(`Hi ${escape(opts.customerName)}, just circling back — your ${escape(opts.brandName)} quote is saved and the price below is locked in. Whenever you're ready to move, you're one click from booking.`) +
+    detailBox([
+      ['Lane', `${opts.laneFrom} → ${opts.laneTo}`],
+      ['Your locked total', opts.total],
+    ]) +
+    ctaButton('View your quote', opts.quoteUrl) +
+    paragraph(`<span style="color:${BRAND.muted};">Questions about the lane, timing, or accessorials? Just reply to this email — a real person will help.</span>`);
+  return {
+    subject,
+    html: shell({
+      preheader: `Your ${opts.brandName} quote ${opts.refId} is saved — ${opts.total}`,
+      inner,
+      brand: { name: opts.brandName, logoUrl: opts.brandLogoUrl },
+      unsubscribeUrl: opts.unsubscribeUrl,
+    }),
+  };
+}
+
+/* ── FU2 — the reminder (more urgency, no discount) ─────────────────────── */
+export function followupReminderEmail(opts: FollowUpArgs): { subject: string; html: string } {
+  const subject = `Your ${opts.brandName} quote ${opts.refId} is still held.`;
+  const inner =
+    eyebrow(`Quote ${opts.refId}`) +
+    heading('This rate is still honored — for now') +
+    paragraph(`Freight rates move with the market, but we're still holding the price we quoted you. Lock it in before capacity or fuel shifts it.`) +
+    detailBox([
+      ['Lane', `${opts.laneFrom} → ${opts.laneTo}`],
+      ['Held total', opts.total],
+    ]) +
+    ctaButton('Book this shipment', opts.quoteUrl) +
+    paragraph(`<span style="color:${BRAND.muted};">Need to adjust the pickup date, equipment, or stops? Reply and we'll re-quote in minutes.</span>`);
+  return {
+    subject,
+    html: shell({
+      preheader: `We're still holding your ${opts.total} rate on ${opts.laneFrom} → ${opts.laneTo}`,
+      inner,
+      brand: { name: opts.brandName, logoUrl: opts.brandLogoUrl },
+      unsubscribeUrl: opts.unsubscribeUrl,
+    }),
+  };
+}
+
+/* ── FU3 — the discount (ONLY ever rendered with a real promo code) ─────── */
+export function followupDiscountEmail(
+  opts: FollowUpArgs & { promoCode: string; percentOff: number },
+): { subject: string; html: string } {
+  // Hard invariant: the discount touch NEVER renders without a real code +
+  // a positive percent. The sender must supply an active promo code; a missing
+  // code means there is no discount to offer, so refuse rather than send an
+  // empty "here's your discount" email.
+  const code = String(opts.promoCode ?? '').trim();
+  const pct = Number(opts.percentOff);
+  if (!code || !Number.isFinite(pct) || pct <= 0) {
+    throw new Error('followupDiscountEmail requires a non-empty promoCode and a positive percentOff');
+  }
+  const subject = `A discount on your ${opts.brandName} quote — code ${code}.`;
+  const inner =
+    eyebrow(`${pct}% off`) +
+    heading(`Here's ${pct}% off to get you rolling`) +
+    paragraph(`We'd love to move your load on ${escape(opts.laneFrom)} → ${escape(opts.laneTo)}. Use the code below at checkout for ${pct}% off your ${escape(opts.total)}.`) +
+    codeChip(code) +
+    ctaButton(`Claim ${pct}% off`, withPromo(opts.quoteUrl, code)) +
+    paragraph(`<span style="color:${BRAND.muted};">Apply <strong style="color:${BRAND.inkSoft};">${escape(code)}</strong> at checkout, or just tap the button above and it's added for you.</span>`);
+  return {
+    subject,
+    html: shell({
+      preheader: `${pct}% off your ${opts.brandName} quote with code ${code}`,
+      inner,
+      brand: { name: opts.brandName, logoUrl: opts.brandLogoUrl },
+      unsubscribeUrl: opts.unsubscribeUrl,
+    }),
+  };
 }

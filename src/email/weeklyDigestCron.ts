@@ -159,8 +159,7 @@ async function sendOne(t: Tenant, stats: WeeklyDigestStats, now: Date): Promise<
     `• Auto-replies sent: ${stats.autoRepliesSent}\n` +
     `• Chat conversations: ${stats.chatConversations}\n` +
     `• Quote page views: ${stats.engagement.views}\n` +
-    `• PDF quotes saved: ${stats.engagement.pdfSaves}\n` +
-    `• Emails opened / links clicked: coming soon\n\n` +
+    `• PDF quotes saved: ${stats.engagement.pdfSaves}\n\n` +
     `See the full breakdown: ${dashboardUrl}\n\n` +
     `---\nYou're receiving QuoteFleet performance recaps because you have an active account. ` +
     `Unsubscribe: ${unsub}\n` +

@@ -63,7 +63,7 @@ import {
 } from '../widgetThemes.js';
 import { MAP_STYLE_KEYS, MAP_STYLE_LIST } from '../routeMap.js';
 import { loadEnv } from '../../config.js';
-import { resolveFeatures, sanitizeFeaturesPatch, sanitizeBookingPatch } from '../features.js';
+import { resolveFeatures, sanitizeFeaturesPatch, sanitizeBookingPatch, sanitizeFollowUpPatch } from '../features.js';
 import { makePreviewGrant, PREVIEW_GRANT_PARAM, PREVIEW_GRANT_TTL_MS } from '../access.js';
 import { syncTenantToMarketplace } from '../../marketplace/sync.js';
 import { DEFAULT_AI_SYSTEM_PROMPT, AUTO_FSC_DEFAULTS } from '../../calc/defaults.js';
@@ -726,7 +726,15 @@ export function registerTenantRoutes(app: Express) {
         ? (rawFeatures as Record<string, unknown>).booking
         : undefined,
     );
-    if (featurePatch || bookingPatch) {
+    // The automated follow-up + promo config is a nested object under the
+    // `followUp` key (Wave 1) — sanitized + merged separately, same pattern as
+    // `booking`, so it never collides with the boolean flags or the deposit.
+    const followUpPatch = sanitizeFollowUpPatch(
+      rawFeatures && typeof rawFeatures === 'object'
+        ? (rawFeatures as Record<string, unknown>).followUp
+        : undefined,
+    );
+    if (featurePatch || bookingPatch || followUpPatch) {
       const existing = await db()
         .select({ featuresJson: brandConfigs.featuresJson })
         .from(brandConfigs)
@@ -735,6 +743,7 @@ export function registerTenantRoutes(app: Express) {
       const merged: Record<string, unknown> = { ...(existing[0]?.featuresJson ?? {}) };
       if (featurePatch) Object.assign(merged, featurePatch);
       if (bookingPatch) merged.booking = bookingPatch;
+      if (followUpPatch) merged.followUp = followUpPatch;
       set.featuresJson = merged;
     }
     await db()

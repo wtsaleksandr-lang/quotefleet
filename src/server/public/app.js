@@ -2433,6 +2433,274 @@
     wrap.appendChild(sub);
     return wrap;
   }
+
+  // Automated follow-up + promo (Wave 1). Master on/off toggle for
+  // followUp.enabled, with ALL cadence/customization settings folded away
+  // (collapsed by default) to keep the surface clean. The nested `followUp`
+  // object saves through the merge-PUT, so it never drops sibling feature keys.
+  // Marketing model: 3 touches (nudge → reminder → discount), the discount
+  // saved for the LAST touch, auto-stops on book/reply/unsubscribe. The
+  // scheduler/sender + promo-code CRUD land in a LATER wave — this configures
+  // the shape and shells the promo UI only.
+  var FU_PRESETS = {
+    gentle: { day1: 3, day2: 7, day3: 12, discountPct: 5 },
+    standard: { day1: 2, day2: 5, day3: 9, discountPct: 8 },
+    assertive: { day1: 1, day2: 3, day3: 6, discountPct: 10 },
+  };
+  function brandFollowUpConfig(b) {
+    if (!b.featuresJson) b.featuresJson = {};
+    var feats = b.featuresJson;
+    var stored = (feats.followUp && typeof feats.followUp === 'object') ? feats.followUp : {};
+    var presets = ['gentle', 'standard', 'assertive', 'custom'];
+    var std = FU_PRESETS.standard;
+    // Working state — the effective config the UI edits + saves.
+    var fu = {
+      enabled: stored.enabled === true,
+      preset: presets.indexOf(stored.preset) > -1 ? stored.preset : 'standard',
+    };
+    // Custom cadence store (seeded from stored custom values, else standard).
+    var custom = {
+      day1: intOr(stored.day1, std.day1),
+      day2: intOr(stored.day2, std.day2),
+      day3: intOr(stored.day3, std.day3),
+      discountPct: intOr(stored.discountPct, std.discountPct),
+    };
+    function intOr(v, d) { var n = parseInt(v, 10); return isFinite(n) && n >= 0 ? n : d; }
+
+    function buildPayload() {
+      if (fu.preset === 'custom') {
+        return { enabled: fu.enabled, preset: 'custom', day1: custom.day1, day2: custom.day2, day3: custom.day3, discountPct: custom.discountPct };
+      }
+      var p = FU_PRESETS[fu.preset] || std;
+      return { enabled: fu.enabled, preset: fu.preset, day1: p.day1, day2: p.day2, day3: p.day3, discountPct: p.discountPct };
+    }
+    function save() {
+      var payload = buildPayload();
+      saveBrandPatch({ featuresJson: { followUp: payload } }).then(function () {
+        feats.followUp = payload; toastOk('Saved');
+      }).catch(toastErr);
+    }
+    function effectiveCadence() {
+      return fu.preset === 'custom' ? custom : (FU_PRESETS[fu.preset] || std);
+    }
+
+    var wrap = el('div');
+
+    // ── Master on/off toggle ───────────────────────────────────────────
+    var toggleRow = el('label', {
+      style: {
+        display: 'flex', gap: '12px', alignItems: 'flex-start',
+        padding: '12px 0', borderTop: '1px solid var(--border)', cursor: 'pointer',
+      },
+    });
+    var cb = el('input', { type: 'checkbox', style: { marginTop: '3px', flex: '0 0 auto' } });
+    cb.checked = fu.enabled;
+    var toggleTxt = el('div', { style: { flex: '1 1 auto' } }, [
+      el('div', { text: 'Auto-follow-up leads who don’t book', style: { fontWeight: '600' } }),
+      el('div', {
+        class: 'field-hint',
+        text: 'Sends up to 3 touches to a customer who got a quote but didn’t book: a gentle nudge, then a reminder, then a discount. Auto-stops the moment they book, reply, or unsubscribe.',
+        style: { marginTop: '2px' },
+      }),
+    ]);
+    toggleRow.appendChild(cb);
+    toggleRow.appendChild(toggleTxt);
+    wrap.appendChild(toggleRow);
+
+    // ── Fold: everything else lives under the folding button ────────────
+    var fold = el('details', { style: { marginTop: '8px' } });
+    var sum = el('summary', {
+      style: {
+        cursor: 'pointer', fontWeight: '700', fontSize: '13px', color: 'var(--ink)',
+        padding: '12px', borderRadius: '10px', background: 'var(--surface)',
+        border: '1px solid var(--border)', userSelect: 'none', listStyle: 'none',
+      },
+    });
+    sum.appendChild(el('span', { text: 'Cadence & discount settings' }));
+    sum.appendChild(el('span', {
+      style: { color: 'var(--muted)', fontWeight: '500', fontSize: '12px', marginLeft: '8px' },
+      text: '— pick a pace, set your discount, add a promo code',
+    }));
+    fold.appendChild(sum);
+
+    var foldBody = el('div', { style: { paddingTop: '16px' } });
+
+    // ── Preset tiles (radio-style; selected = OUTLINE, never a bright fill) ─
+    foldBody.appendChild(el('div', { class: 'field-label', text: 'Cadence', style: { marginBottom: '8px' } }));
+    var tileRow = el('div', { style: { display: 'flex', flexWrap: 'wrap', gap: '8px', marginBottom: '16px' } });
+    var tiles = {};
+    function tileSub(key) {
+      if (key === 'custom') return 'Set your own timing + discount';
+      var p = FU_PRESETS[key];
+      return 'Days ' + p.day1 + ' · ' + p.day2 + ' · ' + p.day3 + '  ·  ' + p.discountPct + '% off';
+    }
+    function makeTile(key, title) {
+      var tile = el('div', {
+        style: {
+          flex: '1 1 140px', minWidth: '140px', boxSizing: 'border-box', cursor: 'pointer',
+          padding: '12px', borderRadius: '10px', border: '2px solid var(--border)',
+          background: 'var(--surface)',
+        },
+      });
+      tile.appendChild(el('div', { text: title, style: { fontWeight: '700', fontSize: '13px', color: 'var(--ink)' } }));
+      tile.appendChild(el('div', { text: tileSub(key), style: { marginTop: '4px', fontSize: '12px', color: 'var(--muted)', lineHeight: '1.5' } }));
+      tile.addEventListener('click', function () { selectPreset(key, true); });
+      tiles[key] = tile;
+      return tile;
+    }
+    tileRow.appendChild(makeTile('gentle', 'Gentle'));
+    tileRow.appendChild(makeTile('standard', 'Standard'));
+    tileRow.appendChild(makeTile('assertive', 'Assertive'));
+    tileRow.appendChild(makeTile('custom', 'Custom'));
+    foldBody.appendChild(tileRow);
+
+    // ── Custom inputs (only visible when preset = custom) ───────────────
+    // Field with the title in-field (label) + help cue TOP-RIGHT + 2px gaps.
+    function numField(labelText, hintText, value, min, max, onCommit) {
+      var f = el('div', { class: 'field', style: { marginBottom: '2px', flex: '1 1 90px', minWidth: '90px' } });
+      var head = el('div', { style: { display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', gap: '8px' } });
+      head.appendChild(el('label', { class: 'field-label', text: labelText }));
+      if (hintText) head.appendChild(el('span', { class: 'field-hint', text: hintText, style: { marginTop: '0' } }));
+      f.appendChild(head);
+      var inp = el('input', { class: 'input', type: 'number', min: String(min), max: String(max), step: '1' });
+      inp.value = String(value);
+      inp.addEventListener('blur', function () { onCommit(inp); });
+      f.appendChild(inp);
+      return { field: f, input: inp };
+    }
+    var customWrap = el('div', {
+      style: {
+        display: fu.preset === 'custom' ? 'block' : 'none',
+        margin: '4px 0 16px 0', padding: '12px', borderRadius: '10px',
+        border: '1px dashed var(--border)', background: 'var(--surface)',
+      },
+    });
+    var daysRow = el('div', { style: { display: 'flex', flexWrap: 'wrap', gap: '8px', marginBottom: '12px' } });
+    var d1, d2, d3, disc;
+    function clampInt(v, lo, hi, d) { var n = parseInt(v, 10); if (!isFinite(n)) return d; return Math.min(hi, Math.max(lo, n)); }
+    function commitCustom() {
+      // Enforce 1 ≤ day1 < day2 < day3 ≤ 30 and discount 0–90; reflect back.
+      custom.day1 = clampInt(d1.input.value, 1, 28, custom.day1);
+      custom.day2 = clampInt(d2.input.value, custom.day1 + 1, 29, custom.day2);
+      custom.day3 = clampInt(d3.input.value, custom.day2 + 1, 30, custom.day3);
+      custom.discountPct = clampInt(disc.input.value, 0, 90, custom.discountPct);
+      d1.input.value = String(custom.day1);
+      d2.input.value = String(custom.day2);
+      d3.input.value = String(custom.day3);
+      disc.input.value = String(custom.discountPct);
+      syncPromoPrefill();
+      save();
+    }
+    d1 = numField('1st touch (day)', '1–30', custom.day1, 1, 30, commitCustom);
+    d2 = numField('2nd touch (day)', 'after 1st', custom.day2, 1, 30, commitCustom);
+    d3 = numField('3rd touch (day)', 'the discount', custom.day3, 1, 30, commitCustom);
+    daysRow.appendChild(d1.field);
+    daysRow.appendChild(d2.field);
+    daysRow.appendChild(d3.field);
+    customWrap.appendChild(daysRow);
+    disc = numField('Discount on the 3rd touch (%)', '0–90', custom.discountPct, 0, 90, commitCustom);
+    customWrap.appendChild(disc.field);
+    foldBody.appendChild(customWrap);
+
+    function selectPreset(key, doSave) {
+      fu.preset = key;
+      presets.forEach(function (p) {
+        var t = tiles[p];
+        if (!t) return;
+        var on = p === key;
+        t.style.borderColor = on ? 'var(--accent)' : 'var(--border)';
+        t.style.background = on ? 'var(--accent-soft)' : 'var(--surface)';
+      });
+      customWrap.style.display = key === 'custom' ? 'block' : 'none';
+      syncPromoPrefill();
+      if (doSave) save();
+    }
+
+    // ── Promo-code sub-section (UI shell — CRUD routes land in a later wave) ─
+    var promoSec = el('div', { style: { marginTop: '16px', paddingTop: '16px', borderTop: '1px solid var(--border)' } });
+    promoSec.appendChild(el('div', { class: 'field-label', text: 'Discount promo code', style: { marginBottom: '4px' } }));
+    promoSec.appendChild(el('div', {
+      class: 'field-hint',
+      text: 'The 3rd email (the discount) only sends when you have an active promo code. Add one below.',
+      style: { marginBottom: '12px' },
+    }));
+
+    var promoForm = el('div', { style: { display: 'flex', flexWrap: 'wrap', gap: '8px', alignItems: 'flex-end', marginBottom: '12px' } });
+    var codeF = el('div', { class: 'field', style: { marginBottom: '0', flex: '2 1 160px', minWidth: '160px' } });
+    codeF.appendChild(el('label', { class: 'field-label', text: 'Code' }));
+    var codeInput = el('input', { class: 'input', type: 'text', placeholder: 'e.g. SAVE8' });
+    codeF.appendChild(codeInput);
+    promoForm.appendChild(codeF);
+
+    var pctF = el('div', { class: 'field', style: { marginBottom: '0', flex: '1 1 90px', minWidth: '90px' } });
+    pctF.appendChild(el('label', { class: 'field-label', text: '% off' }));
+    var pctInput = el('input', { class: 'input', type: 'number', min: '0', max: '90', step: '1' });
+    pctF.appendChild(pctInput);
+    promoForm.appendChild(pctF);
+
+    var addBtn = el('button', { class: 'btn btn-primary', text: 'Add promo code', style: { flex: '0 0 auto' } });
+    promoForm.appendChild(addBtn);
+    promoSec.appendChild(promoForm);
+
+    var promoList = el('div', {});
+    function renderPromoEmpty() {
+      promoList.innerHTML = '';
+      promoList.appendChild(el('div', { class: 'field-hint', text: 'No promo codes yet.' }));
+    }
+    renderPromoEmpty();
+    var promoChips = [];
+    function renderPromoList() {
+      if (!promoChips.length) { renderPromoEmpty(); return; }
+      promoList.innerHTML = '';
+      promoChips.forEach(function (pc) {
+        var chip = el('div', {
+          style: {
+            display: 'inline-flex', alignItems: 'center', gap: '8px', marginRight: '8px', marginBottom: '8px',
+            padding: '8px 12px', borderRadius: '8px', border: '1px solid var(--border)', background: 'var(--surface)',
+            fontSize: '13px', color: 'var(--ink)', fontWeight: '600',
+          },
+        });
+        chip.appendChild(el('span', { text: pc.code, style: { fontFamily: 'ui-monospace, Menlo, monospace' } }));
+        chip.appendChild(el('span', { text: pc.percentOff + '% off', style: { color: 'var(--muted)', fontWeight: '500' } }));
+        promoList.appendChild(chip);
+      });
+    }
+    function syncPromoPrefill() {
+      // Prefill the %off with the selected cadence's suggested discount.
+      if (document.activeElement !== pctInput) pctInput.value = String(effectiveCadence().discountPct);
+    }
+    syncPromoPrefill();
+
+    addBtn.addEventListener('click', function () {
+      var code = (codeInput.value || '').trim().toUpperCase();
+      var pct = clampInt(pctInput.value, 0, 90, effectiveCadence().discountPct);
+      if (!code) { toast('Enter a promo code first', 'warn'); return; }
+      // Optimistically show it in the shell so the UI is demonstrable now; the
+      // real CRUD persistence lands in a later wave. Fire the POST at the
+      // (not-yet-existing) route; swallow its absence quietly for this wave.
+      promoChips.push({ code: code, percentOff: pct });
+      renderPromoList();
+      codeInput.value = '';
+      toastOk('Promo added');
+      api('/api/tenant/promo-codes', { method: 'POST', body: { code: code, percentOff: pct } })
+        .catch(function () { /* route lands in a later wave — expected 404 for now */ });
+    });
+    promoSec.appendChild(promoList);
+    foldBody.appendChild(promoSec);
+
+    fold.appendChild(foldBody);
+    wrap.appendChild(fold);
+
+    // Initial selected-tile paint.
+    selectPreset(fu.preset, false);
+
+    cb.addEventListener('change', function () {
+      fu.enabled = cb.checked;
+      save();
+    });
+
+    return wrap;
+  }
   // Preview card — show the live widget so brand changes are visible
   // without opening a new tab. Points at the signed owner-preview URL
   // (same as Customize) so the real calculator renders here even for a
@@ -2566,7 +2834,14 @@
       qa.appendChild(brandBookingConfig(b));
       c.appendChild(qa);
 
-      // Card 3 — Access (public vs private invite-only calculator).
+      // Card 3 — Automated follow-up + promo (default OFF, opt-in).
+      var fuCard = el('div', { class: 'card', style: { marginTop: '14px' } });
+      fuCard.appendChild(el('div', { class: 'card-title', text: 'Automated follow-up' }));
+      fuCard.appendChild(el('div', { class: 'card-subtitle', text: 'Win back customers who got a quote but didn’t book — with a short, polite email sequence that stops the moment they respond.' }));
+      fuCard.appendChild(brandFollowUpConfig(b));
+      c.appendChild(fuCard);
+
+      // Card 4 — Access (public vs private invite-only calculator).
       var accCard = el('div', { class: 'card', style: { marginTop: '14px' } });
       c.appendChild(accCard);
       renderAccessCard(accCard, access);

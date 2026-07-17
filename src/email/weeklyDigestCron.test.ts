@@ -109,8 +109,9 @@ describe('weekly digest cron audience + compliance', () => {
     expect(arg.html).toContain('Unsubscribe from product updates');
     expect(arg.html).toContain(arg.listUnsubscribeUrl!);
     expect(arg.text).toContain('Unsubscribe:');
-    // Opens/clicks placeholder, never fabricated numbers.
-    expect(arg.html).toContain('coming soon');
+    // Opens/clicks placeholder was removed (feature not shipped) — must not reappear.
+    expect(arg.html).not.toContain('coming soon');
+    expect(arg.text).not.toContain('coming soon');
     // lastWeeklyDigestAt stamped for the double-send guard.
     expect(updateMock).toHaveBeenCalledTimes(1);
     expect((updateMock.mock.calls[0][0] as { lastWeeklyDigestAt?: Date }).lastWeeklyDigestAt).toEqual(NOW);
