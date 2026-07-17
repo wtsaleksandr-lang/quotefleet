@@ -231,7 +231,7 @@
   // card renders in the carrier's chosen look. null/unknown → 'branded'.
   var brandMapStyle = 'branded';
   function normMapStyle(s) {
-    return (s === 'grayscale' || s === 'standard' || s === 'dark_routes') ? s : 'branded';
+    return (s === 'grayscale' || s === 'standard' || s === 'soft' || s === 'dark_routes' || s === 'satellite') ? s : 'branded';
   }
 
   function init() {

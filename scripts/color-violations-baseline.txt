@@ -8,7 +8,7 @@ src/server/public/brand-editor.css:121:29	color: #fff
 src/server/public/brand-editor.css:134:3	color: #fff
 src/server/public/brand-studio-preview.css:31:3	background: #fff
 src/server/public/brand-studio-preview.css:85:3	color: #fff
-src/server/public/customize-panel.css:209:21	background: #fff
+src/server/public/customize-panel.css:213:21	background: #fff
 src/server/public/dashboard-preview.css:106:28	color: #fff
 src/server/public/dashboard-preview.css:135:3	color: #fff
 src/server/public/dashboard-setup.css:274:3	color: #fff

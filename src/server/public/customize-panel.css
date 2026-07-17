@@ -158,8 +158,12 @@
 .qf-ms-standard   { background: linear-gradient(135deg, #e8efe4, #cfe0f0); }
 .qf-ms-standard::after   { background: #0D3CFC; }
 .qf-ms-dark-routes,
-.qf-ms-dark_routes { background: linear-gradient(135deg, #0a0e1a, #05080f); }
-.qf-ms-dark_routes::after { background: #5B8CFF; height: 4px; }
+.qf-ms-dark_routes { background: linear-gradient(135deg, #2c2c2c, #0e0e0e); }
+.qf-ms-dark_routes::after { background: #f4f6f8; height: 4px; }
+.qf-ms-soft       { background: linear-gradient(135deg, #f4f1ea, #cfe0cf); }
+.qf-ms-soft::after       { background: #0D3CFC; }
+.qf-ms-satellite  { background: linear-gradient(135deg, #4f6b3f 0%, #8f7d5a 55%, #35597c 100%); }
+.qf-ms-satellite::after  { background: #f4f6f8; height: 4px; }
 
 /* ── Text-colour swatches (background-aware) ──────────────────────────── */
 .qf-cz-textcolor-row { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }

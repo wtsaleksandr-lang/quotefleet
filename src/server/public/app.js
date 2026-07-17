@@ -2046,9 +2046,11 @@
       // chosen style. The route line stays clearly visible on every option.
       var mapStyles = d.mapStyles || [
         { key: 'branded', label: 'Branded' },
-        { key: 'grayscale', label: 'Minimal gray' },
+        { key: 'grayscale', label: 'Clean' },
         { key: 'standard', label: 'Standard' },
-        { key: 'dark_routes', label: 'Dark routes' },
+        { key: 'soft', label: 'Soft' },
+        { key: 'dark_routes', label: 'Dark' },
+        { key: 'satellite', label: 'Satellite' },
       ];
       var mapSec = el('div', { class: 'card qf-cz-section' });
       mapSec.appendChild(el('div', { class: 'qf-cz-section-title', text: 'Map style' }));

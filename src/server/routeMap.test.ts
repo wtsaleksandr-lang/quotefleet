@@ -199,11 +199,14 @@ describe('buildStaticMapUrl — map styles', () => {
     expect(s).toContain('feature:poi|visibility:off');
   });
 
-  it('grayscale is a desaturated gray set with muted labels', () => {
+  it('grayscale ("Clean") is a crisp legible light set: white roads w/ edges, readable labels, blue-grey water', () => {
     const s = styleParams('grayscale');
     expect(s).toContain('feature:road|element:geometry|color:0xffffff');
-    expect(s).toContain('element:labels.text.fill|color:0x9aa0a6');
-    expect(s).toContain('feature:water|element:geometry|color:0xdfe3e8');
+    // Defined road edges (not washed out) + readable dark labels.
+    expect(s).toContain('feature:road|element:geometry.stroke|color:0xc3ccda');
+    expect(s).toContain('element:labels.text.fill|color:0x3c4043');
+    // Soft blue-grey water, not the near-white wash it used to be.
+    expect(s).toContain('feature:water|element:geometry|color:0xa9bcd6');
     // Not the branded navy nor the standard (empty) look.
     expect(s).not.toContain('feature:road.highway|element:geometry|color:0x9fbcf3');
   });
@@ -212,15 +215,51 @@ describe('buildStaticMapUrl — map styles', () => {
     expect(styleParams('standard')).toEqual([]);
   });
 
-  it('dark_routes uses a dark, dimmed base (not branded-dark cobalt highways)', () => {
-    const s = styleParams('dark_routes');
-    expect(s).toContain('element:geometry|color:0x0a0e1a');
-    expect(s).toContain('feature:road.highway|element:geometry|color:0x263053');
-    expect(s).not.toContain('feature:road.highway|element:geometry|color:0x3f5cc0');
+  it('soft ("Soft") is a warm Apple-style pastel: cream land, sage parks, soft blue water, roadmap', () => {
+    const s = styleParams('soft');
+    expect(s).toContain('feature:landscape|element:geometry|color:0xf4f1ea'); // warm cream land
+    expect(s).toContain('feature:poi.park|element:geometry|color:0xc9dbb8'); // sage parks
+    expect(s).toContain('feature:water|element:geometry|color:0xa8cfe6'); // soft blue water
+    // Softer than standard (which has NO overrides) and warmer than grayscale (neutral grey land).
+    expect(styleParams('standard')).toEqual([]);
+    expect(s).not.toContain('feature:landscape|element:geometry|color:0xe1e5ec'); // not the grey Clean land
+    // Cobalt route on roadmap, not white/hybrid.
+    const url = new URL(buildStaticMapUrl(KEY, LA, CHI, POLY, 'light', 'soft'));
+    expect(url.searchParams.get('maptype')).toBe('roadmap');
+    expect(url.searchParams.get('path')).toBe(`color:0x0D3CFCff|weight:4|enc:${POLY}`);
   });
 
-  it('every style yields a distinct style= signature', () => {
-    const sigs = MAP_STYLE_KEYS.map((k) => JSON.stringify(styleParams(k)));
+  it('satellite applies NO style overrides (real imagery via maptype=hybrid)', () => {
+    expect(styleParams('satellite')).toEqual([]);
+    const url = new URL(buildStaticMapUrl(KEY, LA, CHI, POLY, 'light', 'satellite'));
+    expect(url.searchParams.get('maptype')).toBe('hybrid');
+  });
+
+  it('every non-satellite style stays on maptype=roadmap', () => {
+    for (const k of MAP_STYLE_KEYS) {
+      const mt = new URL(buildStaticMapUrl(KEY, LA, CHI, POLY, 'light', k)).searchParams.get('maptype');
+      expect(mt).toBe(k === 'satellite' ? 'hybrid' : 'roadmap');
+    }
+  });
+
+  it('dark_routes ("Dark") is a NEUTRAL grey base (not branded-dark navy)', () => {
+    const s = styleParams('dark_routes');
+    // Neutral graphite geometry (R=G=B), not navy.
+    expect(s).toContain('element:geometry|color:0x1b1b1b');
+    expect(s).toContain('feature:road.highway|element:geometry|color:0x484848');
+    // Neither the branded-dark navy highway nor the old blue dark_routes base.
+    expect(s).not.toContain('feature:road.highway|element:geometry|color:0x3f5cc0');
+    expect(s).not.toContain('element:geometry|color:0x0a0e1a');
+  });
+
+  it('every style yields a distinct maptype+style signature', () => {
+    // standard and satellite both drop `style=` overrides, so distinctness is
+    // carried by maptype (roadmap vs hybrid) — sign on the full pair.
+    const sig = (k: (typeof MAP_STYLE_KEYS)[number]) => {
+      const url = new URL(buildStaticMapUrl(KEY, LA, CHI, POLY, 'light', k));
+      return JSON.stringify([url.searchParams.get('maptype'), url.searchParams.getAll('style')]);
+    };
+    const sigs = MAP_STYLE_KEYS.map(sig);
     expect(new Set(sigs).size).toBe(MAP_STYLE_KEYS.length);
   });
 
@@ -233,12 +272,17 @@ describe('buildStaticMapUrl — map styles', () => {
     }
   });
 
-  it('dark_routes spotlights the route with a brighter, heavier line', () => {
+  it('dark_routes spotlights the route with a bright WHITE, heavier line (Uber look)', () => {
     const path = new URL(buildStaticMapUrl(KEY, LA, CHI, POLY, 'light', 'dark_routes')).searchParams.get('path');
-    expect(path).toBe(`color:0x5B8CFFff|weight:6|enc:${POLY}`);
+    expect(path).toBe(`color:0xffffffff|weight:6|enc:${POLY}`);
     // The other styles keep the brand cobalt at weight 4.
     const branded = new URL(buildStaticMapUrl(KEY, LA, CHI, POLY, 'light', 'branded')).searchParams.get('path');
     expect(branded).toBe(`color:0x0D3CFCff|weight:4|enc:${POLY}`);
+  });
+
+  it('satellite draws a bright WHITE route (weight 5) for contrast over imagery', () => {
+    const path = new URL(buildStaticMapUrl(KEY, LA, CHI, POLY, 'light', 'satellite')).searchParams.get('path');
+    expect(path).toBe(`color:0xffffffff|weight:5|enc:${POLY}`);
   });
 });
 
@@ -249,6 +293,14 @@ describe('buildBaseMapUrl — map styles', () => {
     expect(url.searchParams.getAll('style')).toContain('feature:road|element:geometry|color:0xffffff');
     // standard base map has no style overrides.
     expect(new URL(buildBaseMapUrl(KEY, 'light', 'standard')).searchParams.getAll('style')).toEqual([]);
+  });
+
+  it('satellite base map uses maptype=hybrid with no style overrides', () => {
+    const url = new URL(buildBaseMapUrl(KEY, 'light', 'satellite'));
+    expect(url.searchParams.get('maptype')).toBe('hybrid');
+    expect(url.searchParams.getAll('style')).toEqual([]);
+    // Non-satellite base maps stay on roadmap.
+    expect(new URL(buildBaseMapUrl(KEY, 'light', 'branded')).searchParams.get('maptype')).toBe('roadmap');
   });
 });
 
@@ -275,7 +327,7 @@ describe('getRouteMap — map style is part of the cache key', () => {
       routes: [{ overview_polyline: { points: POLY }, legs: [{ distance: { value: 100_000 } }] }],
     });
     const gray = await getRouteMap(LA, CHI, KEY, 'light', f, 'grayscale');
-    expect(new URL(gray!.url).searchParams.getAll('style')).toContain('element:labels.text.fill|color:0x9aa0a6');
+    expect(new URL(gray!.url).searchParams.getAll('style')).toContain('element:labels.text.fill|color:0x3c4043');
   });
 
   it('defaults to branded when no style is passed (existing callers unchanged)', async () => {
