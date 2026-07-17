@@ -24,6 +24,18 @@ html body.qf-wft .visual-flow.qf-hero-media > .qf-hero-devices {
   filter: drop-shadow(0 32px 60px rgba(0, 0, 0, 0.5)) !important;
 }
 
+/* Desktop only — make the device mockups 20% larger + more prominent (Alex).
+   transform scales the paint, not the layout box, so it never reflows the grid
+   or creates horizontal page scroll; origin centred-right keeps the composite's
+   right edge anchored (the phone stays inside the viewport) and grows it left +
+   up/down into the hero's whitespace. Mobile (≤640) is untouched. */
+@media (min-width: 641px) {
+  html body.qf-wft .visual-flow.qf-hero-media > .qf-hero-devices {
+    transform: scale(1.2) !important;
+    transform-origin: center right !important;
+  }
+}
+
 /* Mobile (≤640px) — the hero reflows to a single column (title → media → lead).
    The composite scales down to the full width of its container. Landscape, so
    a full-width render reads well here; the grid is min(92%, 100vw−32px) wide,
