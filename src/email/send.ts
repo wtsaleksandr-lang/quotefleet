@@ -171,7 +171,7 @@ export async function sendEmail(msg: EmailIn): Promise<EmailOut> {
     providerAttempted = true;
     try {
       await t.sendMail({
-        from: msg.from ?? env.SMTP_FROM ?? 'noreply@quotefleet.com',
+        from: msg.from ?? env.SMTP_FROM ?? 'noreply@quotefleet.net',
         to: msg.to,
         subject: msg.subject,
         text: msg.text,
