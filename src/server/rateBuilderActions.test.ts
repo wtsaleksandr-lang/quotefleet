@@ -9,10 +9,12 @@ async function file(name: string) {
 }
 
 describe('rate builder save states and duplicate action', () => {
-  it('loads rate builder assets from the dashboard shell', async () => {
+  it('keeps the rate builder stylesheet mounted but not the retired JS layer', async () => {
     const html = await file('app.html');
     expect(html).toContain('/rate-builder.css');
-    expect(html).toContain('/rate-builder.js');
+    // The decorative rate-builder.js layer was retired (portal simplification);
+    // the stylesheet stays linked.
+    expect(html).not.toContain('/rate-builder.js');
   });
 
   it('adds rate-card save-state and duplicate affordances', async () => {

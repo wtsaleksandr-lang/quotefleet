@@ -9,10 +9,11 @@ async function file(name: string) {
 }
 
 describe('drayage zone polish', () => {
-  it('loads the zone scanner assets from the dashboard polish layer', async () => {
+  it('keeps the retired zone scanner panel out of the dashboard polish layer', async () => {
+    // drayage-zone-polish was retired (portal simplification); the loader must not re-inject it.
     const polish = await file('premium-saas-polish.js');
-    expect(polish).toContain('/drayage-zone-polish.css');
-    expect(polish).toContain('/drayage-zone-polish.js');
+    expect(polish).not.toContain('/drayage-zone-polish.css');
+    expect(polish).not.toContain('/drayage-zone-polish.js');
   });
 
   it('labels common drayage zone readiness gaps', async () => {

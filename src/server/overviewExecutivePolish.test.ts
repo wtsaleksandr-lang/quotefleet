@@ -9,10 +9,12 @@ async function file(name: string) {
 }
 
 describe('overview executive polish', () => {
-  it('loads overview executive assets from the dashboard shell', async () => {
+  it('keeps the overview executive stylesheet mounted but not the retired JS layer', async () => {
     const html = await file('app.html');
     expect(html).toContain('/overview-executive-polish.css');
-    expect(html).toContain('/overview-executive-polish.js');
+    // The decorative overview-executive-polish.js layer was retired from the shell
+    // (portal simplification); the stylesheet stays linked.
+    expect(html).not.toContain('/overview-executive-polish.js');
   });
 
   it('adds a premium overview hero and enhanced stat cards', async () => {

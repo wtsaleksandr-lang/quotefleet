@@ -9,10 +9,11 @@ async function file(name: string) {
 }
 
 describe('brand and embed share readiness polish', () => {
-  it('loads share readiness assets from the dashboard polish helper', async () => {
+  it('keeps the retired share readiness panel out of the dashboard polish helper', async () => {
+    // share-readiness was retired (portal simplification); the loader must not re-inject it.
     const loader = await file('premium-saas-polish.js');
-    expect(loader).toContain('/share-readiness.css');
-    expect(loader).toContain('/share-readiness.js');
+    expect(loader).not.toContain('/share-readiness.css');
+    expect(loader).not.toContain('/share-readiness.js');
   });
 
   it('adds a non-destructive checklist for brand and embed pages', async () => {

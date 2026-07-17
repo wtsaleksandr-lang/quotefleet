@@ -9,10 +9,11 @@ async function file(name: string) {
 }
 
 describe('AI import polish', () => {
-  it('loads the AI import readiness assets from the dashboard polish layer', async () => {
+  it('keeps the retired AI import panel out of the dashboard polish layer', async () => {
+    // ai-import-polish was retired (portal simplification); the loader must not re-inject it.
     const polish = await file('premium-saas-polish.js');
-    expect(polish).toContain('/ai-import-polish.css');
-    expect(polish).toContain('/ai-import-polish.js');
+    expect(polish).not.toContain('/ai-import-polish.css');
+    expect(polish).not.toContain('/ai-import-polish.js');
   });
 
   it('adds import readiness, filters, and safe apply guidance', async () => {

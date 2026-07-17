@@ -46,19 +46,28 @@ describe('dashboard asset map', () => {
       '/premium-saas-polish.css',
       '/app-quote-actions.css',
     ]);
+    // Retired (portal simplification): the dashboard-setup, dashboard-preview,
+    // rate-builder, setup-builder, brand-editor, and ai-setup JS layers were
+    // removed from the shell (their stylesheets remain linked above). The
+    // remaining scripts must still load in this intentional order.
     expectOrdered(html, [
       '/app.js',
       '/premium-saas-polish.js',
+      '/app-quote-actions.js',
+      '/app-quote-activity.js',
+      '/app-accessorial-tools.js',
+      '/app-carrier-profile.js',
+    ]);
+    // The retired builder JS layers must not be re-added to the shell.
+    for (const retired of [
       '/dashboard-setup.js',
       '/dashboard-preview.js',
       '/rate-builder.js',
       '/setup-builder.js',
       '/brand-editor.js',
       '/ai-setup.js',
-      '/app-quote-actions.js',
-      '/app-quote-activity.js',
-      '/app-accessorial-tools.js',
-      '/app-carrier-profile.js',
-    ]);
+    ]) {
+      expect(html, `${retired} should stay retired`).not.toContain(retired);
+    }
   });
 });

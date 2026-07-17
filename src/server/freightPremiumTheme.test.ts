@@ -16,7 +16,9 @@ describe('premium freight visual theme', () => {
     expect(html).toContain('/freight-premium-theme.css');
     expect(html).toContain('/freight-brand-refresh.js');
     expect(loader).toContain('/freight-premium-theme.css');
-    expect(loader).toContain('/freight-brand-refresh.js');
+    // freight-brand-refresh was retired from the dashboard polish loader (portal
+    // simplification); the public widget still loads it (widget.html, asserted above).
+    expect(loader).not.toContain('/freight-brand-refresh.js');
   });
 
   it('uses a clear premium QF fallback mark and lighter palette', async () => {

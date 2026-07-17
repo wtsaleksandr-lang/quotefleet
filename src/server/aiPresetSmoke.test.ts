@@ -9,10 +9,12 @@ async function file(name: string) {
 }
 
 describe('AI setup presets', () => {
-  it('keeps AI setup assets mounted', async () => {
+  it('keeps the AI setup stylesheet mounted but not the retired JS layer', async () => {
     const html = await file('app.html');
     expect(html).toContain('/ai-setup.css');
-    expect(html).toContain('/ai-setup.js');
+    // The decorative ai-setup.js coach layer was retired (portal simplification);
+    // the stylesheet stays linked.
+    expect(html).not.toContain('/ai-setup.js');
   });
 
   it('adds guardrail preset controls', async () => {

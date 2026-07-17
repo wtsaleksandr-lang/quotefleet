@@ -9,10 +9,11 @@ async function file(name: string) {
 }
 
 describe('brand studio preview polish', () => {
-  it('loads brand preview assets from the shared polish loader', async () => {
+  it('keeps the retired brand studio preview panel out of the shared polish loader', async () => {
+    // brand-studio-preview was retired (portal simplification); the loader must not re-inject it.
     const loader = await file('premium-saas-polish.js');
-    expect(loader).toContain('/brand-studio-preview.css');
-    expect(loader).toContain('/brand-studio-preview.js');
+    expect(loader).not.toContain('/brand-studio-preview.css');
+    expect(loader).not.toContain('/brand-studio-preview.js');
   });
 
   it('adds a live-feel widget preview to the brand page', async () => {

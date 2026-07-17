@@ -25,8 +25,8 @@ describe('calculator global color enforcement without gradients', () => {
     // Wave-1 theming: colours are now driven by --w-* custom properties whose
     // FALLBACKS are the original Midnight values, so an absent theme payload
     // still renders the current approved widget. Assert the token+fallback form.
-    expect(css).toContain('background: var(--w-page-bg, #161616) !important');
-    expect(css).toContain('background: var(--w-surface, #181D1F) !important');
+    expect(css).toContain('background: var(--w-page-bg, #13181A) !important');
+    expect(css).toContain('background: var(--w-surface, #1E2528) !important');
     expect(css).toContain('background: var(--w-input-bg, #E6E3E0) !important');
     expect(css).toContain('background: var(--w-input-bg-hover, #D4CFC9) !important');
     // Accent-filled TEXT surfaces use the WCAG-hardened solid accent (falls

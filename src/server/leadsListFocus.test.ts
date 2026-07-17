@@ -9,13 +9,14 @@ async function file(name: string) {
 }
 
 describe('leads list focus polish', () => {
-  it('loads the leads focus assets from the dashboard polish layer', async () => {
+  it('keeps the retired leads focus panel unloaded (retired source intact)', async () => {
     const loader = await file('premium-saas-polish.js');
     const helper = await file('leads-list-focus.js');
     const css = await file('leads-list-focus.css');
 
-    expect(loader).toContain('/leads-list-focus.css');
-    expect(loader).toContain('/leads-list-focus.js');
+    // Retired (portal simplification): the polish loader must not re-inject it.
+    expect(loader).not.toContain('/leads-list-focus.css');
+    expect(loader).not.toContain('/leads-list-focus.js');
     expect(helper).toContain('Work the hottest leads first');
     expect(helper).toContain('Needs attention');
     expect(helper).toContain('High value');

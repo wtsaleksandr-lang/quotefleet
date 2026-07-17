@@ -9,12 +9,13 @@ async function file(name: string) {
 }
 
 describe('calculator launch panel', () => {
-  it('loads the launch panel for the embed route', async () => {
+  it('keeps the retired launch panel unloaded (retired source intact)', async () => {
     const loader = await file('premium-saas-polish.js');
     const js = await file('launch-panel.js');
     const css = await file('launch-panel.css');
-    expect(loader).toContain('/launch-panel.css');
-    expect(loader).toContain('/launch-panel.js');
+    // Retired (portal simplification): the polish loader must not re-inject it.
+    expect(loader).not.toContain('/launch-panel.css');
+    expect(loader).not.toContain('/launch-panel.js');
     expect(js).toContain('Launch workspace');
     expect(js).toContain('Put your calculator where customers already ask for rates.');
     expect(js).toContain('Copy link');

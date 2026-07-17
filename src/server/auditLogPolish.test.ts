@@ -9,10 +9,11 @@ async function file(name: string) {
 }
 
 describe('audit log polish', () => {
-  it('loads audit log polish assets from the dashboard polish helper', async () => {
+  it('keeps the retired audit log polish panel out of the dashboard polish helper', async () => {
+    // audit-log-polish was retired (portal simplification); the loader must not re-inject it.
     const loader = await file('premium-saas-polish.js');
-    expect(loader).toContain('/audit-log-polish.css');
-    expect(loader).toContain('/audit-log-polish.js');
+    expect(loader).not.toContain('/audit-log-polish.css');
+    expect(loader).not.toContain('/audit-log-polish.js');
   });
 
   it('adds a non-destructive scanner and filters to the audit page', async () => {

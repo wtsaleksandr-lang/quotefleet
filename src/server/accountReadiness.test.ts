@@ -9,10 +9,12 @@ async function file(name: string) {
 }
 
 describe('account readiness polish', () => {
-  it('loads account readiness assets from the dashboard polish helper', async () => {
+  it('keeps the retired account readiness panel out of the dashboard polish helper', async () => {
+    // The decorative account-readiness panel was retired (portal simplification);
+    // the polish loader must not re-inject it.
     const loader = await file('premium-saas-polish.js');
-    expect(loader).toContain('/account-readiness.css');
-    expect(loader).toContain('/account-readiness.js');
+    expect(loader).not.toContain('/account-readiness.css');
+    expect(loader).not.toContain('/account-readiness.js');
   });
 
   it('adds a non-destructive readiness checklist to the account page', async () => {

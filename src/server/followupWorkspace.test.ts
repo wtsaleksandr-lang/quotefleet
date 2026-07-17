@@ -9,12 +9,13 @@ async function file(name: string) {
 }
 
 describe('follow-up workspace polish', () => {
-  it('loads follow-up workspace assets through the dashboard polish helper', async () => {
+  it('keeps the retired follow-up workspace panel unloaded (retired source intact)', async () => {
     const js = await file('premium-saas-polish.js');
     const followupJs = await file('followup-workspace.js');
     const followupCss = await file('followup-workspace.css');
-    expect(js).toContain('/followup-workspace.css');
-    expect(js).toContain('/followup-workspace.js');
+    // Retired (portal simplification): the polish loader must not re-inject it.
+    expect(js).not.toContain('/followup-workspace.css');
+    expect(js).not.toContain('/followup-workspace.js');
     expect(followupJs).toContain('Follow-up workspace');
     expect(followupJs).toContain('Lead follow-up');
     expect(followupJs).toContain('Callback workspace');

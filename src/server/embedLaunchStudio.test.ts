@@ -9,10 +9,12 @@ async function file(name: string) {
 }
 
 describe('embed launch workspace polish', () => {
-  it('loads embed launch assets from the dashboard shell', async () => {
+  it('keeps the embed launch stylesheet mounted but not the retired JS layer', async () => {
     const html = await file('app.html');
     expect(html).toContain('/embed-launch-studio.css');
-    expect(html).toContain('/embed-launch-studio.js');
+    // The launch-workspace studio JS was retired/neutralised (portal simplification)
+    // and removed from the shell; the stylesheet stays linked.
+    expect(html).not.toContain('/embed-launch-studio.js');
   });
 
   it('adds a launch workspace around live preview and JS embed cards', async () => {

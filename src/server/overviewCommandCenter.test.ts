@@ -9,10 +9,11 @@ async function file(name: string) {
 }
 
 describe('overview command center polish', () => {
-  it('loads overview command center assets from the dashboard polish helper', async () => {
+  it('keeps the retired overview command center panel out of the dashboard polish helper', async () => {
+    // overview-command-center was retired (portal simplification); the loader must not re-inject it.
     const loader = await file('premium-saas-polish.js');
-    expect(loader).toContain('/overview-command-center.css');
-    expect(loader).toContain('/overview-command-center.js');
+    expect(loader).not.toContain('/overview-command-center.css');
+    expect(loader).not.toContain('/overview-command-center.js');
   });
 
   it('groups recent leads and edits into an actionable overview queue', async () => {

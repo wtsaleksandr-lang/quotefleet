@@ -9,10 +9,12 @@ async function file(name: string) {
 }
 
 describe('setup onboarding and empty states', () => {
-  it('loads setup onboarding assets from the dashboard shell', async () => {
+  it('keeps the setup stylesheet mounted but not the retired dashboard-setup JS layer', async () => {
     const html = await file('app.html');
     expect(html).toContain('/dashboard-setup.css');
-    expect(html).toContain('/dashboard-setup.js');
+    // The decorative dashboard-setup.js coach layer was retired (portal simplification);
+    // the stylesheet stays linked.
+    expect(html).not.toContain('/dashboard-setup.js');
   });
 
   it('adds route-specific setup coaching and stronger empty-state guidance', async () => {

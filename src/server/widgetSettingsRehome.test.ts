@@ -12,15 +12,19 @@ async function read(rel: string) {
 // exist). This suite guards that they were re-homed onto the Embed page and
 // that the Customize page did NOT re-absorb them.
 describe('widget settings re-homed onto the Embed page', () => {
-  it('exposes lead-capture, copy, powered-by and embedding controls in renderEmbed', async () => {
+  it('exposes lead-capture, copy and powered-by controls on the Widget settings page (embedding stays on Embed)', async () => {
     const js = await read('src/server/public/app.js');
+    // Lead capture / copy / powered-by were re-homed onto a dedicated Widget
+    // settings page (renderWidgetSettings); embedding (allowedDomains) stays on
+    // the Embed page (renderEmbed). Slice each surface between its own function
+    // boundaries (file order: renderBrand → renderWidgetSettings → renderEmbed).
+    const widgetFn = js.slice(js.indexOf('function renderWidgetSettings'), js.indexOf('function renderEmbed'));
     const embedFn = js.slice(js.indexOf('function renderEmbed'), js.indexOf('function renderAudit'));
 
-    // Section headers
-    expect(embedFn).toContain('Widget settings — lead capture & copy');
-    expect(embedFn).toContain('Widget settings — embedding');
+    // Section header on the Widget settings page.
+    expect(widgetFn).toContain('Lead capture & copy');
 
-    // Each re-exposed brand_configs field is wired in the embed surface.
+    // Each re-exposed brand_configs behaviour/copy field is wired on the widget page.
     for (const key of [
       'requireEmail',
       'requirePhone',
@@ -28,15 +32,18 @@ describe('widget settings re-homed onto the Embed page', () => {
       'showPoweredBy',
       'ctaText',
       'footerNote',
-      'allowedDomains',
     ]) {
-      expect(embedFn).toContain(`'${key}'`);
+      expect(widgetFn).toContain(`'${key}'`);
     }
 
-    // Saves go through the existing brand PUT.
-    expect(embedFn).toContain("api('/api/tenant/brand', { method: 'PUT'");
-    // Embed page must also fetch the brand config to seed the controls.
-    expect(embedFn).toContain("api('/api/tenant/brand')");
+    // Widget settings page fetches the brand config to seed the controls.
+    expect(widgetFn).toContain("api('/api/tenant/brand')");
+    // Saves go through the existing brand PUT (shared saveBrandPatch helper).
+    expect(js).toContain("api('/api/tenant/brand', { method: 'PUT'");
+
+    // Embedding controls live on the Embed page.
+    expect(embedFn).toContain('Widget settings — embedding');
+    expect(embedFn).toContain("'allowedDomains'");
   });
 
   it('does NOT duplicate appearance controls (theme/accent/font/logo/company) on the Embed page', async () => {
@@ -49,7 +56,10 @@ describe('widget settings re-homed onto the Embed page', () => {
 
   it('keeps the Customize page appearance-only (no behaviour/copy controls)', async () => {
     const js = await read('src/server/public/app.js');
-    const brandFn = js.slice(js.indexOf('function renderBrand'), js.indexOf('function renderEmbed'));
+    // Slice renderBrand up to the NEXT function (renderWidgetSettings) — the
+    // behaviour/copy controls now live in renderWidgetSettings, so slicing to
+    // renderEmbed would sweep them in and give a false positive.
+    const brandFn = js.slice(js.indexOf('function renderBrand'), js.indexOf('function renderWidgetSettings'));
     for (const key of ['requireEmail', 'requirePhone', 'showQuoteBeforeContact', 'ctaText', 'footerNote', 'allowedDomains', 'showPoweredBy']) {
       expect(brandFn).not.toContain(key);
     }

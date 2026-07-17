@@ -11,14 +11,14 @@ async function file(name: string) {
 describe('public static page smoke checks', () => {
   it('landing page has simple visual-first positioning and no placeholder links', async () => {
     const html = await file('landing.html');
-    expect(html).toContain('Win more loads with instant freight quotes.');
+    expect(html).toContain('The best online quoting tool built for trucking — ready to launch today.');
     expect(html).toContain('Stop losing loads to slow, manual quoting.');
     expect(html).toContain('For trucking service providers');
     expect(html).toContain('acmetrucking.yourquote.net');
-    expect(html).toContain('Add to email signature');
+    expect(html).toContain('email signature');
     expect(html).toContain('Instant lead capture');
     expect(html).toContain('Send branded PDF');
-    expect(html).toContain('Schedule follow-ups');
+    expect(html).toContain('Automated follow-ups');
     expect(html).toContain('Follow-up reminders');
     expect(html).toContain('Do not let a warm quote go cold.');
     expect(html).toContain('No contracts');
@@ -75,7 +75,8 @@ describe('public static page smoke checks', () => {
     const css = await file('dashboard-setup.css');
     const todo = await readFile(resolve(process.cwd(), 'docs/product-todo.md'), 'utf8');
     expect(html).toContain('/dashboard-setup.css');
-    expect(html).toContain('/dashboard-setup.js');
+    // dashboard-setup.js JS layer retired (portal simplification); stylesheet stays.
+    expect(html).not.toContain('/dashboard-setup.js');
     expect(js).toContain('Calculator setup');
     expect(js).toContain('Get your rate page ready');
     expect(js).toContain('qf-setup-panel');
@@ -90,7 +91,8 @@ describe('public static page smoke checks', () => {
     const js = await file('dashboard-preview.js');
     const css = await file('dashboard-preview.css');
     expect(html).toContain('/dashboard-preview.css');
-    expect(html).toContain('/dashboard-preview.js');
+    // dashboard-preview.js JS layer retired (portal simplification); stylesheet stays.
+    expect(html).not.toContain('/dashboard-preview.js');
     expect(js).toContain('Customer preview');
     expect(js).toContain('See what customers open from your link.');
     expect(js).toContain('qf-preview-card');
@@ -104,7 +106,8 @@ describe('public static page smoke checks', () => {
     const js = await file('rate-builder.js');
     const css = await file('rate-builder.css');
     expect(html).toContain('/rate-builder.css');
-    expect(html).toContain('/rate-builder.js');
+    // rate-builder.js JS layer retired (portal simplification); stylesheet stays.
+    expect(html).not.toContain('/rate-builder.js');
     expect(js).toContain('Rate builder');
     expect(js).toContain('Start with one simple rate card.');
     expect(js).toContain('qf-builder-hero');
@@ -122,7 +125,8 @@ describe('public static page smoke checks', () => {
     const js = await file('setup-builder.js');
     const css = await file('setup-builder.css');
     expect(html).toContain('/setup-builder.css');
-    expect(html).toContain('/setup-builder.js');
+    // setup-builder.js JS layer retired (portal simplification); stylesheet stays.
+    expect(html).not.toContain('/setup-builder.js');
     expect(js).toContain('Charge builder');
     expect(js).toContain('Zone builder');
     expect(js).toContain('Add the charges customers usually ask about.');
@@ -136,7 +140,8 @@ describe('public static page smoke checks', () => {
     const js = await file('brand-editor.js');
     const css = await file('brand-editor.css');
     expect(html).toContain('/brand-editor.css');
-    expect(html).toContain('/brand-editor.js');
+    // brand-editor.js JS layer retired (portal simplification); stylesheet stays.
+    expect(html).not.toContain('/brand-editor.js');
     expect(js).toContain('Brand page editor');
     expect(js).toContain('Make the calculator look like your company.');
     expect(js).toContain('qf-brand-editor');
@@ -150,7 +155,8 @@ describe('public static page smoke checks', () => {
     const js = await file('ai-setup.js');
     const css = await file('ai-setup.css');
     expect(html).toContain('/ai-setup.css');
-    expect(html).toContain('/ai-setup.js');
+    // ai-setup.js JS layer retired (portal simplification); stylesheet stays.
+    expect(html).not.toContain('/ai-setup.js');
     expect(js).toContain('AI setup');
     expect(js).toContain('Give the assistant clear rules before customers use it.');
     expect(js).toContain('Do not promise');
