@@ -3,65 +3,118 @@
    these rules win. Colours stay owned by the theme/contrast engine — this file
    only touches layout, sizing, positioning, and motion. */
 
-/* ── 1 + 2. Help cues: smaller, subtler glyph (Alex: -20%). Hit box stays
-   >=24px (WCAG) — only the visible glyph + ring shrink. ── */
+/* ── Help cue (SHARED class — change once, every instance updates). Two rules:
+   (a) 20% smaller than the base 9px glyph / 16px ring; (b) anchored to the
+   TOP-RIGHT corner of whatever element hosts it (title rows, flag chips, add-on
+   chips). This intentionally reverses the earlier top-left placement. The
+   visible glyph + ring shrink 20%; the tap box stays 24px (WCAG 2.2). ── */
 .qf-help {
-  font-size: 6.5px;
-}
-.qf-help::before {
-  width: 9.5px;
-  height: 9.5px;
-}
-
-/* Section-label cues (Equipment, Cargo, Size & handling, Pickup port, Booking…)
-   pushed to the top-right of their title row instead of hugging the label. */
-.qf-title-inline .qf-help {
-  margin-left: auto;
-}
-
-/* ── 2 + 3. Add-on buttons: cue anchored to the top-right corner. The visible
-   glyph is small; the 24px hit box overhangs the corner slightly, which is fine
-   for a target. Reserve right padding so centred text never slides under it. */
-#qf-options .qf-flags label,
-#qf-options .qf-accessorials .qf-acc-chip {
-  position: relative;
-  padding-right: var(--space-3);
-}
-#qf-options .qf-flags label > .qf-help,
-#qf-options .qf-accessorials .qf-acc-chip > .qf-help {
   position: absolute;
   top: 0;
   right: 0;
   margin: 0;
-  width: var(--tap-min);
-  height: var(--tap-min);
-  min-width: var(--tap-min);
+  z-index: 2;
+  font-size: 7.2px;            /* base 9px − 20% */
+}
+.qf-help::before {
+  width: 12.8px;              /* base 16px − 20% */
+  height: 12.8px;
 }
 
-/* ── 5. Remove the visible checkbox from add-on flag buttons. The <input> stays
-   in the DOM (label click still toggles it, logic + hazmat panel unaffected),
-   it is just no longer painted. Selected state = outlined/tinted button. */
-#qf-options .qf-flags label > input[type="checkbox"] {
+/* Every element that directly hosts a "?" cue becomes its positioning context
+   and reserves right padding so its own text never runs under the badge. */
+.qf-title-inline,
+.qf-addr-title,
+#qf-options-modal .qf-flags label,
+#qf-options-modal .qf-accessorials .qf-acc-chip {
+  position: relative;
+}
+.qf-title-inline,
+.qf-addr-title {
+  padding-right: var(--space-3);
+}
+
+/* ── Uniform add-on grid: the three flag toggles (Residential / Hazmat /
+   Temp-control) and every accessorial pill collapse into ONE even grid of
+   identical chips — same width AND height regardless of label length. The two
+   source containers become display:contents so their children are direct cells
+   of a single grid laid out on .qf-options-inner. ── */
+#qf-options-modal .qf-options-inner {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: var(--tap-gap);
+  align-items: stretch;
+}
+#qf-options-modal .qf-flags,
+#qf-options-modal .qf-accessorials {
+  display: contents;
+}
+/* Conditional detail (hazmat class) and the empty-state note span the full row. */
+#qf-options-modal .qf-conditional-panel,
+#qf-options-modal .qf-accessorials .qf-tagline {
+  grid-column: 1 / -1;
+}
+
+/* ONE chip component shared by flag labels and accessorial pills — fixed cell,
+   consistent internal layout (indicator + label + top-right "?"). */
+#qf-options-modal .qf-flags label,
+#qf-options-modal .qf-accessorials .qf-acc-chip {
+  display: flex;
+  align-items: center;
+  justify-content: flex-start;
+  gap: var(--space-1);
+  width: 100%;
+  min-height: 48px;
+  margin: 0;
+  padding: var(--space-1-5);
+  padding-right: var(--space-3);
+  box-sizing: border-box;
+  border: 1px solid var(--w-border);
+  border-radius: 12px;
+  background: color-mix(in srgb, var(--w-fg) 3%, transparent);
+  color: var(--w-fg);
+  font-size: 12.5px;
+  font-weight: 650;
+  line-height: 1.25;
+  text-align: left;
+  white-space: normal;
+  cursor: pointer;
+  transition: border-color 0.15s, background 0.15s, color 0.15s;
+}
+/* Label fills the cell, wraps to at most 2 lines then ellipsis — a long label
+   never stretches the chip. */
+#qf-options-modal .qf-flags label > span:not(.qf-help),
+#qf-options-modal .qf-accessorials .qf-acc-label {
+  flex: 1 1 auto;
+  min-width: 0;
+  overflow: hidden;
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+  line-clamp: 2;
+  white-space: normal;
+  text-overflow: ellipsis;
+  overflow-wrap: anywhere;
+}
+/* The flag checkbox stays in the DOM (label click still toggles it) but is not
+   painted — selected state is shown by the chip outline, matching the pills. */
+#qf-options-modal .qf-flags label > input[type="checkbox"] {
   display: none;
 }
-#qf-options .qf-flags label:has(> input[type="checkbox"]:checked) {
-  border-color: var(--w-primary) !important;
-  background: color-mix(in srgb, var(--w-primary) 10%, transparent) !important;
-  color: var(--w-primary) !important;
+/* Selected = outline emphasis + soft tint, NOT a bright fill (house rule). */
+#qf-options-modal .qf-flags label:has(> input[type="checkbox"]:checked),
+#qf-options-modal .qf-accessorials .qf-acc-chip.active {
+  border-color: var(--w-primary);
+  background: color-mix(in srgb, var(--w-primary) 10%, transparent);
+  color: var(--w-primary);
   font-weight: 800;
 }
 
-/* ── Add-ons modal: keep the 3-up flag labels on ONE line at desktop. Inside
-   the popup dialog each flag carries a visible checkbox AND a help "?" chip, so
-   in a 520px card the ~156px columns clipped "Residential" to "Reside…" and
-   wrapped "Temp-control" to two lines. Trim the label side padding to the 8px
-   ramp and keep the text single-line; the dialog itself widens to 600px at
-   ≥560px (below). Mobile stacks these 1-per-row (≤640px) and is untouched. */
-#qf-options-modal .qf-flags label {
-  padding: 12px 8px;
-}
-#qf-options-modal .qf-flags label span:not(.qf-help) {
-  white-space: nowrap;
+/* Reflow: 2 columns on narrow cards / phones (grid keeps cells uniform). */
+@media (max-width: 560px) {
+  #qf-options-modal .qf-options-inner {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
 }
 
 /* ── 6. "Shipment options & add-ons" opens a popup modal (was an inline fold).
