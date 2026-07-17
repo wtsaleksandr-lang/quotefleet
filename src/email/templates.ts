@@ -379,9 +379,12 @@ export function bookingAcceptedEmail(opts: {
   customerName: string;
   contactLine: string;
   total: string;
+  /** Deposit to book (e.g. "$150.00"), or null when no deposit is configured. */
+  deposit?: string | null;
   laneFrom: string;
   laneTo: string;
   preferredDate?: string | null;
+  readyByTime?: string | null;
   note?: string | null;
   dashboardUrl: string;
 }): string {
@@ -392,8 +395,10 @@ export function bookingAcceptedEmail(opts: {
     detailBox([
       ['Contact', opts.contactLine],
       ['Total', opts.total],
+      ['Deposit to book', opts.deposit ?? null],
       ['Lane', `${opts.laneFrom} → ${opts.laneTo}`],
       ['Requested date', opts.preferredDate ?? null],
+      ['Ready by', opts.readyByTime ?? null],
       ['Note', opts.note ?? null],
     ]) +
     ctaButton('View in dashboard', opts.dashboardUrl);

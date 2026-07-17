@@ -341,6 +341,8 @@
       // Remove the injected share/print links + reveal panel so the thanks step
       // is clean if it's ever revisited before the next lead is submitted.
       $$('.qf-share-emailme, .qf-share-print, .qf-tl-sep-injected, .qf-share-panel, .qf-share-status').forEach(function (n) { n.remove(); });
+      // Drop any injected "Book this load" button + panel + confirmation too.
+      $$('.qf-book-btn, .qf-book-panel, .qf-book-done').forEach(function (n) { n.remove(); });
       var viewQuoteBtn = $('qf-view-quote'); if (viewQuoteBtn) viewQuoteBtn.style.display = 'none';
       ['qf-cb-phone', 'qf-cb-time', 'qf-cb-topic'].forEach(function (id) { var el = $(id); if (el) { el.value = ''; el.disabled = false; } });
       showCallbackError(null);
@@ -1052,6 +1054,7 @@
         }
         showStep('thanks');
         renderShareBar();
+        renderBookingAffordance();
       })
       .catch(function (err) { btn.disabled = false; btn.textContent = oldText; showError('qf-submit-error', 'Network error — please try again.'); console.error(err); });
   }
@@ -1178,6 +1181,130 @@
     row.insertAdjacentElement('afterend', status);
     row.insertAdjacentElement('afterend', panel);
     setStatus('', '');
+    autoResize();
+  }
+
+  // ── "Book this load" affordance (Wave 2a) ─────────────────────────────────
+  // Rendered on the thanks step (a lead/refId already exists) ONLY when the
+  // tenant's features.quoteBooking is on (default OFF). ONE secondary button
+  // reveals a compact inline booking panel (pickup date, ready-by, contact,
+  // notes) prefilled from the lead; if a deposit is configured we show one
+  // "$X deposit to book" line. Submit reuses the existing booking_requested
+  // flow (POST /api/public/accept/:refId). Payment CHARGE is Wave 2b — this
+  // records the booking + deposit intent only.
+  function bookingFeatureOn() {
+    var f = (state.config && state.config.features) || {};
+    return f.quoteBooking === true; // default OFF — only an explicit true enables
+  }
+  function bookingConfig() {
+    return (state.config && state.config.booking) || { depositType: 'none', depositValue: 0 };
+  }
+  function currentQuoteTotal() {
+    return (state.quote && state.quote.result && typeof state.quote.result.total === 'number')
+      ? state.quote.result.total : 0;
+  }
+  // DISPLAY-ONLY mirror of the server's computeDeposit — the server recomputes
+  // authoritatively from the saved quotedTotal on submit, so this is just a
+  // preview and can never set the charged amount.
+  function computeDepositClient(total, cfg) {
+    if (!cfg || cfg.depositType === 'none') return 0;
+    var value = (typeof cfg.depositValue === 'number' && isFinite(cfg.depositValue) && cfg.depositValue > 0) ? cfg.depositValue : 0;
+    if (value === 0) return 0;
+    if (cfg.depositType === 'fixed') return Math.round(value * 100) / 100;
+    var t = (typeof total === 'number' && isFinite(total) && total > 0) ? total : 0;
+    if (t === 0) return 0;
+    return Math.round(t * Math.min(value, 100)) / 100; // (t * pct/100) to cents
+  }
+
+  function renderBookingAffordance() {
+    if (!state.refId) return;
+    var host = $('qf-step-thanks');
+    if (!host) return;
+    // Idempotent — drop any previously-injected booking UI (re-quote in session).
+    $$('.qf-book-btn, .qf-book-panel, .qf-book-done').forEach(function (n) { n.remove(); });
+    if (!bookingFeatureOn()) return;
+
+    var actionsRow = $('qf-thanks-actions');
+    var cfg = bookingConfig();
+    var deposit = computeDepositClient(currentQuoteTotal(), cfg);
+
+    function field(labelText, inputEl) {
+      return el('div', { class: 'qf-field qf-full' }, [el('label', { text: labelText }), inputEl]);
+    }
+    var dateIn = el('input', { class: 'qf-input', type: 'date', 'aria-label': 'Pickup date' });
+    var timeIn = el('input', { class: 'qf-input', type: 'text', placeholder: 'e.g. By 4pm', 'aria-label': 'Ready-by time' });
+    var nameIn = el('input', { class: 'qf-input', type: 'text', placeholder: 'Your name', 'aria-label': 'Contact name' });
+    var phoneIn = el('input', { class: 'qf-input', type: 'text', placeholder: 'Phone', 'aria-label': 'Contact phone' });
+    var emailIn = el('input', { class: 'qf-input', type: 'email', placeholder: 'you@company.com', 'aria-label': 'Contact email' });
+    var notesIn = el('textarea', { class: 'qf-input', rows: '2', placeholder: 'Anything the carrier should know (optional)', 'aria-label': 'Booking notes' });
+    // Prefill from the lead's contact step so the customer re-types nothing.
+    nameIn.value = ($('qf-c-name') && $('qf-c-name').value) || '';
+    phoneIn.value = ($('qf-c-phone') && $('qf-c-phone').value) || '';
+    emailIn.value = ($('qf-c-email') && $('qf-c-email').value) || state.customerEmail || '';
+
+    var grid = el('div', { class: 'qf-grid' }, [
+      field('Pickup date', dateIn),
+      field('Ready by', timeIn),
+      field('Name', nameIn),
+      field('Phone', phoneIn),
+      field('Email', emailIn),
+      field('Notes', notesIn),
+    ]);
+    var depositLine = deposit > 0
+      ? el('div', { class: 'qf-book-deposit', text: '$' + fmtMoney(deposit) + ' deposit to book' })
+      : null;
+    var sendBtn = el('button', { type: 'button', class: 'qf-cta qf-book-send', text: 'Request booking' });
+    var status = el('div', { class: 'qf-book-status', role: 'status', 'aria-live': 'polite' });
+    function setStatus(msg, kind) { status.textContent = msg || ''; status.setAttribute('data-kind', kind || ''); status.style.display = msg ? 'block' : 'none'; }
+    var panelKids = [grid];
+    if (depositLine) panelKids.push(depositLine);
+    panelKids.push(sendBtn, status);
+    var panel = el('div', { class: 'qf-book-panel', hidden: 'hidden' }, panelKids);
+
+    var bookBtn = el('button', { type: 'button', class: 'qf-cta qf-secondary qf-book-btn', text: 'Book this load' });
+    bookBtn.addEventListener('click', function () {
+      panel.hidden = !panel.hidden;
+      if (!panel.hidden) { setStatus('', ''); dateIn.focus(); }
+      autoResize();
+    });
+
+    sendBtn.addEventListener('click', function () {
+      var payload = {
+        customerName: nameIn.value.trim() || undefined,
+        customerEmail: emailIn.value.trim() || undefined,
+        customerPhone: phoneIn.value.trim() || undefined,
+        preferredDate: dateIn.value || undefined,
+        readyByTime: timeIn.value.trim() || undefined,
+        note: notesIn.value.trim() || undefined,
+      };
+      var old = sendBtn.textContent; sendBtn.disabled = true; sendBtn.textContent = 'Sending…';
+      fetch(withGrant('/api/public/accept/' + encodeURIComponent(state.refId)), {
+        method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload),
+      }).then(function (r) { return r.json().then(function (j) { return { ok: r.ok, body: j }; }); })
+        .then(function (r) {
+          sendBtn.disabled = false; sendBtn.textContent = old;
+          if (r.ok && r.body && r.body.ok) {
+            var carrier = (state.config && state.config.tenant && state.config.tenant.name) || 'the carrier';
+            panel.hidden = true;
+            bookBtn.style.display = 'none';
+            var done = el('div', { class: 'qf-book-done qf-success', text: 'Booking requested — ' + carrier + ' will confirm.' });
+            if (bookBtn.parentNode) bookBtn.parentNode.insertBefore(done, bookBtn);
+          } else {
+            setStatus((r.body && r.body.error) || 'Could not send — please try again.', 'err');
+          }
+          autoResize();
+        })
+        .catch(function () { sendBtn.disabled = false; sendBtn.textContent = old; setStatus('Network error — please try again.', 'err'); });
+    });
+
+    // Place the button just above the quiet action row; the panel right after it.
+    if (actionsRow && actionsRow.parentNode) {
+      actionsRow.parentNode.insertBefore(bookBtn, actionsRow);
+      actionsRow.parentNode.insertBefore(panel, actionsRow);
+    } else {
+      host.appendChild(bookBtn);
+      host.appendChild(panel);
+    }
     autoResize();
   }
 

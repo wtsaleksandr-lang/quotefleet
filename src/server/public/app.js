@@ -2070,6 +2070,107 @@
     wrap.appendChild(txt);
     return wrap;
   }
+
+  // "Book this load" toggle + deposit config (Wave 2a). The quoteBooking flag
+  // lives alongside the other booleans in featuresJson; the deposit config is a
+  // nested `booking` object ({ depositType, depositValue }). Both save through
+  // the merge-PUT (partial featuresJson patch), so toggling booking or editing
+  // the deposit never drops sibling feature keys. The deposit sub-panel is only
+  // shown when booking is on. Payment CHARGE is a later wave — this configures
+  // the deposit amount shown to customers + recorded on a booking request.
+  function brandBookingConfig(b) {
+    if (!b.featuresJson) b.featuresJson = {};
+    var feats = b.featuresJson;
+    var booking = (feats.booking && typeof feats.booking === 'object')
+      ? feats.booking : { depositType: 'none', depositValue: 0 };
+
+    var wrap = el('div');
+
+    // The on/off toggle (custom so it can reveal/hide the deposit sub-panel).
+    var toggleRow = el('label', {
+      style: {
+        display: 'flex', gap: '12px', alignItems: 'flex-start',
+        padding: '12px 0', borderTop: '1px solid var(--border)', cursor: 'pointer',
+      },
+    });
+    var cb = el('input', { type: 'checkbox', style: { marginTop: '3px', flex: '0 0 auto' } });
+    cb.checked = feats.quoteBooking === true;
+    var toggleTxt = el('div', { style: { flex: '1 1 auto' } }, [
+      el('div', { text: 'Let customers book this load', style: { fontWeight: '600' } }),
+      el('div', {
+        class: 'field-hint',
+        text: 'Adds a “Book this load” button under the quote. The customer picks a pickup date, ready-by time, and confirms contact details. Turn on a deposit below to show what it takes to book.',
+        style: { marginTop: '2px' },
+      }),
+    ]);
+    toggleRow.appendChild(cb);
+    toggleRow.appendChild(toggleTxt);
+    wrap.appendChild(toggleRow);
+
+    // Deposit sub-panel — indented, only visible when booking is on.
+    var sub = el('div', {
+      style: {
+        display: cb.checked ? 'block' : 'none',
+        margin: '4px 0 0 30px', paddingTop: '10px', borderTop: '1px dashed var(--border)',
+      },
+    });
+
+    var typeField = el('div', { class: 'field', style: { marginBottom: '10px' } });
+    typeField.appendChild(el('label', { class: 'field-label', text: 'Deposit to book' }));
+    var typeSel = el('select', { class: 'input' }, [
+      el('option', { value: 'none', text: 'No deposit' }),
+      el('option', { value: 'percent', text: 'Percent of quote' }),
+      el('option', { value: 'fixed', text: 'Fixed amount' }),
+    ]);
+    typeSel.value = ['none', 'percent', 'fixed'].indexOf(booking.depositType) > -1 ? booking.depositType : 'none';
+    typeField.appendChild(typeSel);
+    sub.appendChild(typeField);
+
+    var amtField = el('div', { class: 'field', style: { marginBottom: '4px' } });
+    var amtLabel = el('label', { class: 'field-label', text: 'Amount' });
+    amtField.appendChild(amtLabel);
+    var amtInput = el('input', { class: 'input', type: 'number', min: '0', step: '0.01' });
+    amtInput.value = (typeof booking.depositValue === 'number' && booking.depositValue > 0) ? String(booking.depositValue) : '';
+    amtField.appendChild(amtInput);
+    var amtHint = el('span', { class: 'field-hint', text: '' });
+    amtField.appendChild(amtHint);
+    sub.appendChild(amtField);
+
+    function syncAmtUi() {
+      var t = typeSel.value;
+      amtField.style.display = t === 'none' ? 'none' : 'block';
+      if (t === 'percent') { amtLabel.textContent = 'Percent of quote (%)'; amtInput.setAttribute('max', '100'); amtHint.textContent = 'e.g. 10 = 10% of the quoted total.'; }
+      else if (t === 'fixed') { amtLabel.textContent = 'Fixed amount ($)'; amtInput.removeAttribute('max'); amtHint.textContent = 'A flat dollar deposit, regardless of quote size.'; }
+    }
+    syncAmtUi();
+
+    function saveBooking() {
+      var t = typeSel.value;
+      var v = parseFloat(amtInput.value);
+      if (!isFinite(v) || v < 0) v = 0;
+      if (t === 'percent' && v > 100) v = 100;
+      if (t === 'none') v = 0;
+      var payload = { depositType: t, depositValue: v };
+      saveBrandPatch({ featuresJson: { booking: payload } }).then(function () {
+        feats.booking = payload;
+        toastOk('Saved');
+      }).catch(toastErr);
+    }
+    typeSel.addEventListener('change', function () { syncAmtUi(); saveBooking(); });
+    amtInput.addEventListener('blur', saveBooking);
+
+    cb.addEventListener('change', function () {
+      var next = cb.checked;
+      saveBrandPatch({ featuresJson: { quoteBooking: next } }).then(function () {
+        feats.quoteBooking = next;
+        sub.style.display = next ? 'block' : 'none';
+        toastOk('Saved');
+      }).catch(function (e) { cb.checked = !next; toastErr(e); });
+    });
+
+    wrap.appendChild(sub);
+    return wrap;
+  }
   // Preview card — show the live widget so brand changes are visible
   // without opening a new tab. Points at the signed owner-preview URL
   // (same as Customize) so the real calculator renders here even for a
@@ -2199,6 +2300,8 @@
         true,
         'Adds an action bar under the quote with “Email me this quote”, “Share with others”, Print, and Download PDF. Turn off to hide it.'
       ));
+      // "Book this load" + per-tenant deposit config (default OFF).
+      qa.appendChild(brandBookingConfig(b));
       c.appendChild(qa);
 
       // Card 3 — Access (public vs private invite-only calculator).

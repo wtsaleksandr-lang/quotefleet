@@ -378,3 +378,18 @@ body[data-qf-cta-hover="fill"] .qf-cta:not(.qf-secondary):hover { background: va
 @media (max-width: 390px) {
   .qf-share-actions { grid-template-columns: 1fr; }
 }
+
+/* ── "Book this load" affordance (Wave 2a) ─────────────────────────────────
+   Gated on the tenant's quoteBooking feature (default OFF). ONE normal-sized
+   secondary button on the thanks step; clicking reveals a compact inline
+   booking panel (reuses .qf-grid/.qf-field/.qf-input). Minimal — no card pile.
+   Theme-aware via the runtime --w-* tokens; the deposit line reads on light AND
+   dark (color-mix against --w-fg, never cobalt-on-dark). */
+.qf-book-btn { display: block; width: max-content; min-width: 240px; max-width: 100%; margin: var(--space-1-5) auto 0; min-height: 44px; padding-left: var(--space-3); padding-right: var(--space-3); }
+.qf-book-panel { margin-top: var(--space-1-5); padding: var(--space-1-5); border: 1px solid var(--w-border); border-radius: var(--w-radius); background: color-mix(in srgb, var(--w-fg) 4%, transparent); }
+.qf-book-panel .qf-grid { margin-top: 0; }
+.qf-book-deposit { margin-top: var(--space-1-5); font-size: 14px; font-weight: 750; color: var(--w-fg); }
+.qf-book-panel .qf-book-send { margin-top: var(--space-1-5); }
+.qf-book-status { display: none; margin-top: var(--space-1); font-size: 12.5px; line-height: 1.4; font-weight: 650; color: var(--w-fg); }
+.qf-book-status[data-kind="err"] { color: color-mix(in srgb, var(--w-fg) 40%, #e5484d); }
+.qf-book-done { margin-top: var(--space-1-5); }

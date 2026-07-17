@@ -62,7 +62,7 @@ import {
   FONT_COLOR_SWATCHES,
 } from '../widgetThemes.js';
 import { loadEnv } from '../../config.js';
-import { resolveFeatures, sanitizeFeaturesPatch } from '../features.js';
+import { resolveFeatures, sanitizeFeaturesPatch, sanitizeBookingPatch } from '../features.js';
 import { makePreviewGrant, PREVIEW_GRANT_PARAM, PREVIEW_GRANT_TTL_MS } from '../access.js';
 import { syncTenantToMarketplace } from '../../marketplace/sync.js';
 import { DEFAULT_AI_SYSTEM_PROMPT, AUTO_FSC_DEFAULTS } from '../../calc/defaults.js';
@@ -634,11 +634,14 @@ export function registerTenantRoutes(app: Express) {
       .string()
       .regex(/^(auto|#[0-9a-fA-F]{6})$/, "fontColor must be 'auto' or a #RRGGBB hex")
       .optional(),
-    // Per-tenant optional feature toggles (partial). Only the known boolean
-    // keys are persisted (sanitizeFeaturesPatch), and the patch is MERGED with
-    // the existing column so toggling one feature never drops another. See
+    // Per-tenant optional feature toggles (partial) + the nested `booking`
+    // deposit config object. Only known boolean keys (sanitizeFeaturesPatch)
+    // and a validated booking object (sanitizeBookingPatch) are persisted, and
+    // both are MERGED with the existing column so toggling one setting never
+    // drops another. Value type is unknown here because `booking` is an object,
+    // not a boolean — the sanitizers enforce the real shape. See
     // src/server/features.ts.
-    featuresJson: z.record(z.string(), z.boolean()).optional(),
+    featuresJson: z.record(z.string(), z.unknown()).optional(),
   });
 
   app.put('/api/tenant/brand', requireAuth, requireTenant, async (req, res) => {
@@ -680,13 +683,23 @@ export function registerTenantRoutes(app: Express) {
     const { featuresJson: rawFeatures, ...columnPatch } = patch;
     const set: Record<string, unknown> = { ...columnPatch, updatedAt: new Date() };
     const featurePatch = sanitizeFeaturesPatch(rawFeatures);
-    if (featurePatch) {
+    // The booking deposit config is a nested object under the `booking` key —
+    // sanitized + merged separately so it never collides with the boolean flags.
+    const bookingPatch = sanitizeBookingPatch(
+      rawFeatures && typeof rawFeatures === 'object'
+        ? (rawFeatures as Record<string, unknown>).booking
+        : undefined,
+    );
+    if (featurePatch || bookingPatch) {
       const existing = await db()
         .select({ featuresJson: brandConfigs.featuresJson })
         .from(brandConfigs)
         .where(eq(brandConfigs.tenantId, req.tenant!.id))
         .limit(1);
-      set.featuresJson = { ...(existing[0]?.featuresJson ?? {}), ...featurePatch };
+      const merged: Record<string, unknown> = { ...(existing[0]?.featuresJson ?? {}) };
+      if (featurePatch) Object.assign(merged, featurePatch);
+      if (bookingPatch) merged.booking = bookingPatch;
+      set.featuresJson = merged;
     }
     await db()
       .update(brandConfigs)

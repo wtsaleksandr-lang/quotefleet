@@ -50,7 +50,7 @@ import { resolveWidgetTheme, WIDGET_PRESETS } from '../widgetThemes.js';
 import { resolveQuoteDisclaimer } from '../quoteDisclaimer.js';
 import { loadCarrierProfile } from './carrierProfile.js';
 import { enforceTenantAccess } from '../access.js';
-import { resolveFeatures } from '../features.js';
+import { resolveFeatures, resolveBookingConfig, computeDeposit } from '../features.js';
 
 /** Returns true if the request's Origin/Referer host matches the
  *  tenant's brand_configs.allowed_domains (CSV). Empty list = wide open
@@ -339,6 +339,11 @@ export function registerPublicRoutes(app: Express) {
       // widget reads features.quoteShare to decide whether to render the
       // share / email / print / PDF action bar. See src/server/features.ts.
       features: resolveFeatures(brand),
+      // Per-tenant booking deposit config (display bits only — no charge in
+      // this wave). The widget reads this ONLY when features.quoteBooking is on
+      // to show the "$X deposit to book" line; the server is authoritative for
+      // the real amount on submit (accept route). Default { none, 0 }.
+      booking: resolveBookingConfig(brand),
       brand: brand ?? null,
       // Fully-resolved widget theme (preset + optional accent override +
       // font). widget.js#applyTheme writes tokens.* onto the document root.
@@ -924,7 +929,11 @@ export function registerPublicRoutes(app: Express) {
   const AcceptSchema = z.object({
     customerName: z.string().max(120).optional(),
     customerEmail: z.string().email().optional().or(z.literal('')),
+    customerPhone: z.string().max(40).optional(),
+    // preferredDate doubles as the "Book this load" pickup date.
     preferredDate: z.string().max(120).optional(),
+    // "Book this load" ready-by time (e.g. "By 4pm"). Free text, carrier-facing.
+    readyByTime: z.string().max(120).optional(),
     note: z.string().max(1000).optional(),
   });
 
@@ -951,9 +960,27 @@ export function registerPublicRoutes(app: Express) {
 
       // Never downgrade a lead the carrier already marked won.
       const nextStatus = lead.status === 'won' ? 'won' : 'booking_requested';
+
+      // Resolve the tenant's booking deposit config and compute the deposit for
+      // THIS quote total. Server-authoritative — the widget only displays a
+      // preview; the persisted/notified amount is computed here from the saved
+      // quotedTotal so a tampered client can't set its own deposit. Display +
+      // intent only in this wave (no charge). Wave 2b (Stripe) creates the
+      // PaymentIntent HERE from the same `deposit` value, keying idempotency on
+      // refId, before/after the status update.
+      const acceptBrand = (
+        await db().select().from(brandConfigs).where(eq(brandConfigs.tenantId, lead.tenantId)).limit(1)
+      )[0];
+      const bookingCfg = resolveBookingConfig(acceptBrand ?? null);
+      const deposit = computeDeposit(Number(lead.quotedTotal ?? 0), bookingCfg);
+      const depositLabel = deposit > 0 ? `$${deposit.toFixed(2)}` : null;
+
       // Append the customer's booking note without clobbering dispatcher notes.
       const bookingNote = [
         body.preferredDate ? `Requested pickup/date: ${body.preferredDate}` : '',
+        body.readyByTime ? `Ready by: ${body.readyByTime}` : '',
+        body.customerPhone ? `Phone: ${body.customerPhone}` : '',
+        depositLabel ? `Deposit to book: ${depositLabel} (${bookingCfg.depositType})` : '',
         body.note ? `Customer note: ${body.note}` : '',
       ].filter(Boolean).join('\n');
       const mergedNotes = [lead.notes, bookingNote ? `[Booking request] ${bookingNote}` : '']
@@ -978,8 +1005,10 @@ export function registerPublicRoutes(app: Express) {
             `${lead.customerName || 'A customer'} accepted quote ${refId} and requested booking.`,
             `Contact: ${contactLine}`,
             `Total: $${Number(lead.quotedTotal ?? 0).toFixed(2)}`,
+            depositLabel ? `Deposit to book: ${depositLabel} (${bookingCfg.depositType})` : '',
             `Lane: ${lead.pickupCity ?? '?'} → ${lead.deliveryCity ?? '?'}`,
             body.preferredDate ? `Requested pickup/date: ${body.preferredDate}` : '',
+            body.readyByTime ? `Ready by: ${body.readyByTime}` : '',
             body.note ? `Note: ${body.note}` : '',
             `\nOpen in dashboard: ${loadEnv().PUBLIC_BASE_URL}/app/leads/${refId}`,
           ].filter(Boolean);
@@ -992,9 +1021,11 @@ export function registerPublicRoutes(app: Express) {
               customerName: lead.customerName || 'A customer',
               contactLine,
               total: `$${Number(lead.quotedTotal ?? 0).toFixed(2)}`,
+              deposit: depositLabel,
               laneFrom: lead.pickupCity ?? '?',
               laneTo: lead.deliveryCity ?? '?',
               preferredDate: body.preferredDate || null,
+              readyByTime: body.readyByTime || null,
               note: body.note || null,
               dashboardUrl: `${loadEnv().PUBLIC_BASE_URL.replace(/\/$/, '')}/app/leads/${refId}`,
             }),
@@ -1007,7 +1038,9 @@ export function registerPublicRoutes(app: Express) {
         console.warn('[public/accept] notify failed (non-fatal):', err);
       }
 
-      return res.json({ ok: true, status: nextStatus });
+      // `deposit` is echoed for the widget's confirmation + as the amount Wave
+      // 2b (Stripe) will charge. 0 when no deposit is configured.
+      return res.json({ ok: true, status: nextStatus, deposit });
     }
   );
 
