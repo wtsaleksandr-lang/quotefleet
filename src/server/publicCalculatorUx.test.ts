@@ -16,7 +16,7 @@ describe('public calculator UX polish', () => {
     expect(html).toContain('Fast estimate');
     expect(html).toContain('Written quote option');
     expect(html).toContain('Calculate estimate');
-    expect(html).toContain('Get written quote');
+    expect(html).toContain('Get this quote in writing');
     expect(html).toContain('Send written quote request');
     expect(css).toContain('Phase AE: customer-facing calculator UX polish');
     expect(css).toContain('.qf-result-actions');

@@ -217,7 +217,7 @@
       }
     }
     var contBtn = $('qf-continue-btn');
-    if (contBtn) contBtn.textContent = rules.showQuoteBeforeContact ? 'Claim this quote →' : 'Continue — get this quote in writing';
+    if (contBtn) contBtn.textContent = rules.showQuoteBeforeContact ? 'Claim this quote →' : 'Get this quote in writing';
   }
 
   // Demo-only light/dark preset override, forwarded to the config endpoint so
@@ -282,7 +282,9 @@
     var chatOpenBtn = $('qf-chat-open-btn');
     if (chatOpenBtn) {
       chatOpenBtn.addEventListener('click', function () {
-        $('qf-chat-toggle').style.display = 'none';
+        // Reveal the chat panel below the link row (links stay in place — hiding
+        // an individual text link would leave a dangling middot separator).
+        var cf = $('qf-callback-form'); if (cf) cf.style.display = 'none';
         $('qf-chat').style.display = 'block';
         var input = $('qf-chat-input');
         if (input) input.focus();
@@ -304,7 +306,7 @@
     var cbSend = $('qf-cb-send-btn');
     if (cbOpen && cbForm) {
       cbOpen.addEventListener('click', function () {
-        cbOpen.style.display = 'none';
+        var ch = $('qf-chat'); if (ch) ch.style.display = 'none';
         cbForm.style.display = 'block';
         var phoneIn = $('qf-cb-phone');
         var leadPhone = $('qf-c-phone') && $('qf-c-phone').value;
@@ -336,6 +338,9 @@
       var cbSendBtn = $('qf-cb-send-btn'); if (cbSendBtn) cbSendBtn.style.display = '';
       var cbCancelBtn = $('qf-cb-cancel-btn'); if (cbCancelBtn) cbCancelBtn.style.display = '';
       var cbSuccess = $('qf-cb-success'); if (cbSuccess) cbSuccess.style.display = 'none';
+      // Remove the injected share/print links + reveal panel so the thanks step
+      // is clean if it's ever revisited before the next lead is submitted.
+      $$('.qf-share-emailme, .qf-share-print, .qf-tl-sep-injected, .qf-share-panel, .qf-share-status').forEach(function (n) { n.remove(); });
       var viewQuoteBtn = $('qf-view-quote'); if (viewQuoteBtn) viewQuoteBtn.style.display = 'none';
       ['qf-cb-phone', 'qf-cb-time', 'qf-cb-topic'].forEach(function (id) { var el = $(id); if (el) { el.value = ''; el.disabled = false; } });
       showCallbackError(null);
@@ -1019,7 +1024,7 @@
         // send a copy to them without re-asking (empty when they gave none).
         state.customerEmail = email || '';
         $('qf-thanks-msg').textContent = 'Thanks — your quote request was sent.';
-        $('qf-thanks-detail').textContent = resp.refId ? 'Reference: ' + resp.refId + '. Open your full quote below, or ask a question / request a callback.' : 'You can now ask a question or request a callback.';
+        $('qf-thanks-detail').textContent = resp.refId ? 'Reference ' + resp.refId + ' — view your full quote below.' : 'Your request was sent.';
         // Link the customer straight to the polished hosted quote (opens in a
         // new tab since the widget is often embedded in an iframe).
         var viewBtn = $('qf-view-quote');
@@ -1081,9 +1086,14 @@
   }
 
   function renderShareBar() {
-    if (!shareFeatureOn() || !state.refId) return;
-    var thanks = $('qf-step-thanks');
-    if (!thanks || thanks.querySelector('.qf-share-bar')) return;
+    if (!state.refId) return;
+    var row = $('qf-thanks-actions');
+    if (!row) return;
+
+    // Idempotent: drop any previously-injected links/panel (re-quote in same
+    // session) so the row never accumulates duplicates.
+    $$('.qf-share-emailme, .qf-share-print, .qf-tl-sep-injected, .qf-share-panel, .qf-share-status')
+      .forEach(function (n) { n.remove(); });
 
     var status = el('div', { class: 'qf-share-status', role: 'status', 'aria-live': 'polite' });
     function setStatus(msg, kind) {
@@ -1128,58 +1138,46 @@
       });
     }
 
-    // "Email me this quote" — send to the address the customer already entered;
-    // if none is on file, reveal the panel so they can supply one.
-    var emailMeBtn = el('button', { type: 'button', class: 'qf-cta qf-secondary qf-share-emailme', text: 'Email me this quote' });
-    emailMeBtn.addEventListener('click', function () {
-      if (state.customerEmail && SHARE_EMAIL_RE.test(state.customerEmail)) {
-        doSend([state.customerEmail], emailMeBtn, 'Sending…');
-      } else {
-        panel.hidden = false;
-        input.placeholder = 'you@company.com';
-        setStatus('Enter your email and we’ll send you a copy.', '');
-        input.focus();
-        autoResize();
-      }
-    });
-
-    // "Share with others" — reveal the multi-email input.
-    var shareBtn = el('button', { type: 'button', class: 'qf-cta qf-secondary qf-share-others', text: 'Share with others' });
-    shareBtn.addEventListener('click', function () {
-      panel.hidden = !panel.hidden;
-      if (!panel.hidden) { input.placeholder = 'name@company.com, colleague@company.com'; setStatus('', ''); input.focus(); }
-      autoResize();
-    });
-
     sendBtn.addEventListener('click', function () { doSend(parseEmailList(input.value), sendBtn, 'Sending…'); });
 
-    // "Print" — reuse the widget's existing print path.
-    var printBtn = el('button', { type: 'button', class: 'qf-cta qf-secondary qf-share-print', text: 'Print' });
-    printBtn.addEventListener('click', function () { if (typeof window.qfPrintQuote === 'function') window.qfPrintQuote(); else window.print(); });
+    var injected = [];
 
-    // "Download PDF" — no server-side PDF renderer is a dependency, so open the
-    // hosted branded quote page and auto-trigger the browser's print / Save-as-
-    // PDF dialog (honest: it's print-to-PDF of the branded quote doc).
-    var pdfBtn = el('a', {
-      class: 'qf-cta qf-secondary qf-share-pdf',
-      href: (location.origin + '/quote/' + encodeURIComponent(state.refId) + '?print=1'),
-      target: '_blank',
-      rel: 'noopener',
-      text: 'Download PDF',
+    // "Email / share" — one quiet text link that reveals the multi-email panel
+    // (merges the old "Email me this quote" + "Share with others"). Pre-fills the
+    // customer's own address when known. Gated on features.quoteShare.
+    if (shareFeatureOn()) {
+      var shareLink = el('button', { type: 'button', class: 'qf-textlink qf-share-emailme', text: 'Email / share' });
+      shareLink.addEventListener('click', function () {
+        panel.hidden = !panel.hidden;
+        if (!panel.hidden) {
+          if (!input.value && state.customerEmail && SHARE_EMAIL_RE.test(state.customerEmail)) input.value = state.customerEmail;
+          setStatus('', '');
+          input.focus();
+        }
+        autoResize();
+      });
+      injected.push(shareLink);
+    }
+
+    // "Print / PDF" — reuse the widget's print path (the browser dialog also
+    // saves a PDF copy). Always available, not gated on share.
+    var printLink = el('button', { type: 'button', class: 'qf-textlink qf-share-print', text: 'Print / PDF' });
+    printLink.addEventListener('click', function () { if (typeof window.qfPrintQuote === 'function') window.qfPrintQuote(); else window.print(); });
+    injected.push(printLink);
+
+    // Prepend the injected links (each trailed by a middot) to the FRONT of the
+    // compact action row, before the static Ask / Callback / Start-another links.
+    var frag = document.createDocumentFragment();
+    injected.forEach(function (node) {
+      frag.appendChild(node);
+      frag.appendChild(el('span', { class: 'qf-tl-sep qf-tl-sep-injected', 'aria-hidden': 'true', text: '·' }));
     });
+    row.insertBefore(frag, row.firstChild);
 
-    var actions = el('div', { class: 'qf-share-actions' }, [emailMeBtn, shareBtn, printBtn, pdfBtn]);
-    var bar = el('div', { class: 'qf-share-bar' }, [
-      el('div', { class: 'qf-share-title', text: 'Send or save this quote' }),
-      actions,
-      panel,
-      status,
-    ]);
+    // The reveal panel + status live just below the row (panel above status).
+    row.insertAdjacentElement('afterend', status);
+    row.insertAdjacentElement('afterend', panel);
     setStatus('', '');
-
-    var viewBtn = $('qf-view-quote');
-    if (viewBtn && viewBtn.parentNode) viewBtn.insertAdjacentElement('afterend', bar);
-    else thanks.insertBefore(bar, thanks.firstChild);
     autoResize();
   }
 

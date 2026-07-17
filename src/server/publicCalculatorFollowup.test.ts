@@ -8,24 +8,20 @@ async function file(name: string) {
   return readFile(resolve(publicDir, name), 'utf8');
 }
 
-describe('public calculator follow-up polish', () => {
-  it('loads isolated follow-up assets on the widget page', async () => {
+describe('public calculator follow-up card retired', () => {
+  it('no longer loads the follow-up injector on the widget page', async () => {
     const html = await file('widget.html');
-    expect(html).toContain('public-calculator-followup.css');
-    expect(html).toContain('public-calculator-followup.js');
+    // The "Need help? — Choose the fastest follow-up path" card duplicated the
+    // real Ask-a-question / Request-callback actions, so it was removed for the
+    // minimal result. Neither the script nor its stylesheet is loaded anymore.
+    expect(html).not.toContain('public-calculator-followup.js');
+    expect(html).not.toContain('public-calculator-followup.css');
   });
 
-  it('adds customer guidance for chat and callback choices', async () => {
+  it('leaves the injector as an inert no-op stub with no card markup', async () => {
     const js = await file('public-calculator-followup.js');
-    const css = await file('public-calculator-followup.css');
-
-    expect(js).toContain('Choose the fastest follow-up path');
-    expect(js).toContain('Ask AI');
-    expect(js).toContain('Request callback');
-    expect(js).toContain('qf-followup-choice-panel');
-
-    expect(css).toContain('Phase AR: public calculator follow-up choices');
-    expect(css).toContain('.qf-followup-choice-panel');
-    expect(css).toContain('.qf-followup-choice-grid');
+    expect(js).toContain('RETIRED');
+    expect(js).not.toContain('Choose the fastest follow-up path');
+    expect(js).not.toContain('qf-followup-choice-panel');
   });
 });

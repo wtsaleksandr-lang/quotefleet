@@ -19,7 +19,6 @@ describe('quote output helper', () => {
     const css = await file('public-calculator-ux.css');
 
     expect(js).toContain('qf-print-summary');
-    expect(js).toContain('qf-print-quote-btn');
     expect(js).toContain('qfPrintQuote');
 
     expect(css).toContain('Phase BH');

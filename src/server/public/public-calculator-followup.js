@@ -1,35 +1,7 @@
-(() => {
-  const PANEL_CLASS = 'qf-followup-choice-panel';
-
-  function mount() {
-    const thanks = document.getElementById('qf-step-thanks');
-    const actions = document.querySelector('.qf-thanks-actions');
-    if (!thanks || !actions || thanks.querySelector(`.${PANEL_CLASS}`)) return;
-
-    const panel = document.createElement('section');
-    panel.className = PANEL_CLASS;
-    panel.innerHTML = `
-      <div class="qf-followup-choice-head">
-        <span>Need help?</span>
-        <strong>Choose the fastest follow-up path</strong>
-      </div>
-      <div class="qf-followup-choice-grid">
-        <div>
-          <b>Ask AI</b>
-          <small>Best for transit time, accessorials, paperwork, or quote questions.</small>
-        </div>
-        <div>
-          <b>Request callback</b>
-          <small>Best when timing, pickup readiness, or special handling needs a dispatcher.</small>
-        </div>
-      </div>
-    `;
-
-    actions.insertAdjacentElement('beforebegin', panel);
-  }
-
-  const observer = new MutationObserver(mount);
-  observer.observe(document.body, { childList: true, subtree: true });
-  document.addEventListener('click', () => setTimeout(mount, 0), true);
-  mount();
-})();
+// RETIRED. This script previously injected a "Need help? — Choose the fastest
+// follow-up path" card (Ask AI / Request callback blurbs) onto the thanks step.
+// That card duplicated the real Ask-a-question / Request-callback actions, so it
+// was removed for the minimal result. The <script> tag was dropped from
+// widget.html; this file is kept as a no-op stub to avoid a dangling 404 if any
+// cached page still references it.
+(() => {});

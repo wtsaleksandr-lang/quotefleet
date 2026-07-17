@@ -15,17 +15,18 @@ describe('public calculator result polish', () => {
     expect(html).toContain('widget.js');
   });
 
-  it('adds quote result guidance without changing pricing logic', async () => {
+  it('keeps the print helper but drops the redundant "Estimate ready" guide card', async () => {
     const js = await file('public-calculator-result.js');
-    const css = await file('public-calculator-ux.css');
 
-    expect(js).toContain('Estimate ready');
-    expect(js).toContain('Next step:');
-    expect(js).toContain('Written follow-up');
-    expect(js).toContain('qf-result-guide');
+    // Print / PDF path preserved — the minimal result's compact "Print / PDF"
+    // link calls window.qfPrintQuote, which builds the print summary.
+    expect(js).toContain('qfPrintQuote');
+    expect(js).toContain('qf-print-summary');
 
-    expect(css).toContain('.qf-result-guide');
-    expect(css).toContain('.qf-result-pill');
-    expect(css).toContain('.qf-result-mini-grid');
+    // The cluttered "Estimate ready" card (mini-grid + its own Print button) is
+    // retired for the minimal result — it is no longer injected.
+    expect(js).not.toContain('qf-result-guide');
+    expect(js).not.toContain('Estimate ready');
+    expect(js).not.toContain('qf-result-mini-grid');
   });
 });

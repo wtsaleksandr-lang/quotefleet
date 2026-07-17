@@ -523,3 +523,102 @@ html { scrollbar-width: thin; scrollbar-color: rgba(135, 138, 150, 0.38) transpa
 .qf-booking-summary[aria-expanded="true"] .qf-options-caret { transform: rotate(-135deg); }
 .qf-booking-fold .qf-booking-card[hidden] { display: none; }
 .qf-booking-fold .qf-booking-card { margin-top: var(--space-1); }
+
+/* ── Minimal post-quote result ─────────────────────────────────────────────
+   The estimate keeps ONE primary button ("Get this quote in writing"); every
+   secondary affordance (Edit details, Email / share, Print / PDF, Ask a
+   question, Request callback, Start another quote) is a quiet text link — plain
+   clickable words with an underline-on-hover, not a boxed button. On the
+   midnight theme the links read periwinkle/near-white via --w-accent-on-surface
+   (never cobalt directly on the dark surface); on light they take the brand
+   accent. Consolidated from the old cluttered stacks: the "Estimate ready" card,
+   the "Need help / fastest follow-up path" card, the titled share bar, and the
+   duplicate ask/callback buttons are all gone. */
+
+/* Result actions: a normal-sized (not full-bleed) primary + a centered
+   "Edit details" text link beneath it. */
+.qf-result-actions {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--space-1);
+  grid-template-columns: none;
+  margin-top: var(--space-2);
+}
+.qf-result-actions .qf-cta {
+  width: auto;
+  min-width: 240px;
+  max-width: 100%;
+  margin-top: 0;
+  padding-left: var(--space-3);
+  padding-right: var(--space-3);
+}
+
+/* Shared quiet text link (a <button>/<a> styled as a word). */
+.qf-textlink {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-0-5);
+  min-height: var(--tap-min);
+  padding: var(--space-0-5) 2px;
+  background: none;
+  border: 0;
+  font: inherit;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--w-accent-on-surface, var(--w-primary));
+  text-decoration: none;
+  cursor: pointer;
+  transition: color 0.12s ease, opacity 0.12s ease;
+}
+.qf-textlink:hover {
+  text-decoration: underline;
+  text-underline-offset: 3px;
+  opacity: 0.85;
+}
+.qf-textlink:focus-visible {
+  outline: 2px solid var(--w-accent-on-surface, var(--w-primary));
+  outline-offset: 2px;
+  border-radius: 4px;
+}
+/* "Edit details" sits inside the light "receipt" result card, so it must read
+   as dark-on-light — the brand cobalt (--w-primary) is high-contrast there and
+   allowed (the no-cobalt-on-dark rule only governs dark surfaces). */
+.qf-result-actions .qf-edit-link { color: var(--w-primary); }
+.qf-result-actions .qf-edit-link:hover { color: var(--w-primary-hover); }
+
+/* Thanks step: one tight, wrapping row of text links separated by middots. */
+.qf-thanks-actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-0-5);
+  grid-template-columns: none;
+  margin-top: var(--space-2);
+}
+.qf-tl-sep {
+  color: var(--w-muted);
+  opacity: 0.55;
+  font-size: 13px;
+  user-select: none;
+}
+
+/* View-your-full-quote — the prominent (but still un-boxed) post-submit link. */
+.qf-view-quote.qf-quote-link {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-0-5);
+  margin: var(--space-1-5) 0;
+  min-height: var(--tap-min);
+  font-size: 14px;
+  font-weight: 750;
+  color: var(--w-accent-on-surface, var(--w-primary));
+  text-align: left;
+}
+.qf-view-quote.qf-quote-link:hover {
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+
+/* The share reveal panel spans full width just below the link row. */
+#qf-step-thanks .qf-share-panel { margin-top: var(--space-1-5); }
