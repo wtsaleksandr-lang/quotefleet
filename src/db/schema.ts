@@ -496,6 +496,11 @@ export const brandConfigs = pgTable('brand_configs', {
    *  surface) or a #RRGGBB hex that is only applied where it passes WCAG.
    *  Default 'auto' leaves existing tenants unchanged. */
   fontColor: text('font_color').notNull().default('auto'),
+  /** Per-tenant MAP STYLE for the calculator's base + route maps: one of
+   *  'branded' | 'grayscale' | 'standard' | 'dark_routes'. Nullable — null
+   *  resolves to 'branded' (resolveMapStyle in src/server/routeMap.ts), which
+   *  reproduces the current theme-aware look, so existing tenants are unchanged. */
+  mapStyle: text('map_style'),
   /** Per-tenant optional feature toggles. A single, extensible JSON bag so new
    *  opt-in widget features never need a new column. Nullable — null resolves
    *  to the defaults in src/server/features.ts (resolveFeatures). Known keys:

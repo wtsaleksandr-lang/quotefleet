@@ -61,6 +61,7 @@ import {
   CTA_HOVER_STYLES,
   FONT_COLOR_SWATCHES,
 } from '../widgetThemes.js';
+import { MAP_STYLE_KEYS, MAP_STYLE_LIST } from '../routeMap.js';
 import { loadEnv } from '../../config.js';
 import { resolveFeatures, sanitizeFeaturesPatch, sanitizeBookingPatch } from '../features.js';
 import { makePreviewGrant, PREVIEW_GRANT_PARAM, PREVIEW_GRANT_TTL_MS } from '../access.js';
@@ -600,7 +601,9 @@ export function registerTenantRoutes(app: Express) {
     // controls. The panel filters fontColors to the WCAG-safe subset for the
     // currently-selected background client-side (mirrors safeFontColors).
     const ctaHovers = CTA_HOVER_STYLES.map((id) => ({ id }));
-    res.json({ brand: row[0] ?? null, presets, fonts, ctaHovers, fontColors: FONT_COLOR_SWATCHES });
+    // Map-style options (key + label + hint) for the Customize "Map style" picker.
+    const mapStyles = MAP_STYLE_LIST.map((m) => ({ key: m.key, label: m.label, hint: m.hint }));
+    res.json({ brand: row[0] ?? null, presets, fonts, ctaHovers, fontColors: FONT_COLOR_SWATCHES, mapStyles });
   });
 
   const BrandPatch = z.object({
@@ -634,6 +637,9 @@ export function registerTenantRoutes(app: Express) {
       .string()
       .regex(/^(auto|#[0-9a-fA-F]{6})$/, "fontColor must be 'auto' or a #RRGGBB hex")
       .optional(),
+    // Per-tenant map style for the calculator's base + route maps. One of the
+    // canonical keys; null clears back to the 'branded' default. See routeMap.ts.
+    mapStyle: z.enum([...MAP_STYLE_KEYS] as [string, ...string[]]).nullable().optional(),
     // Per-tenant optional feature toggles (partial) + the nested `booking`
     // deposit config object. Only known boolean keys (sanitizeFeaturesPatch)
     // and a validated booking object (sanitizeBookingPatch) are persisted, and

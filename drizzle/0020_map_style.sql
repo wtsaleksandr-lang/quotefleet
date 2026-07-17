@@ -1,0 +1,13 @@
+-- Per-tenant MAP STYLE for the calculator's base + route maps.
+--
+-- A carrier chooses how their map LOOKS (Customize → Map style):
+--   branded     — on-brand navy + highlighted cobalt roads (the current look; DEFAULT)
+--   grayscale   — clean, desaturated minimal gray with quiet labels
+--   standard    — real Google Maps colors
+--   dark_routes — dark base with the route line spotlighted
+--
+-- The typed resolver src/server/routeMap.ts (resolveMapStyle) maps null/unknown
+-- back to 'branded', so every existing tenant renders exactly as before with no
+-- backfill. Nullable, no default. Idempotent (ADD COLUMN IF NOT EXISTS) so it's
+-- safe to re-run on every deploy.
+ALTER TABLE "brand_configs" ADD COLUMN IF NOT EXISTS "map_style" text;

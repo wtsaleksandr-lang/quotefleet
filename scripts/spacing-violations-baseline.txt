@@ -156,15 +156,15 @@ src/server/public/callback-queue-search.css:6	spacing	margin: 0 0 14px
 src/server/public/callback-queue-search.css:68	spacing	padding: 12px 14px
 src/server/public/callback-queue-search.css:7	spacing	padding: 14px
 src/server/public/customize-panel.css:115	spacing	padding: 8px 13px
-src/server/public/customize-panel.css:131	spacing	gap: 7px
-src/server/public/customize-panel.css:131	spacing	padding: 6px 12px 6px 8px
-src/server/public/customize-panel.css:150	spacing	gap: 6px
-src/server/public/customize-panel.css:150	spacing	padding: 22px 16px
-src/server/public/customize-panel.css:158	spacing	margin-top: 6px
-src/server/public/customize-panel.css:162	spacing	padding: 6px
-src/server/public/customize-panel.css:166	spacing	padding: 14px
-src/server/public/customize-panel.css:167	spacing	margin-bottom: 10px
-src/server/public/customize-panel.css:176	spacing	margin-top: 10px
+src/server/public/customize-panel.css:167	spacing	gap: 7px
+src/server/public/customize-panel.css:167	spacing	padding: 6px 12px 6px 8px
+src/server/public/customize-panel.css:186	spacing	gap: 6px
+src/server/public/customize-panel.css:186	spacing	padding: 22px 16px
+src/server/public/customize-panel.css:194	spacing	margin-top: 6px
+src/server/public/customize-panel.css:198	spacing	padding: 6px
+src/server/public/customize-panel.css:202	spacing	padding: 14px
+src/server/public/customize-panel.css:203	spacing	margin-bottom: 10px
+src/server/public/customize-panel.css:212	spacing	margin-top: 10px
 src/server/public/customize-panel.css:32	spacing	margin: 0 0 18px
 src/server/public/customize-panel.css:36	spacing	gap: 18px
 src/server/public/customize-panel.css:40	spacing	gap: 14px

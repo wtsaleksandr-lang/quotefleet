@@ -1,9 +1,12 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest';
 import {
   buildStaticMapUrl,
+  buildBaseMapUrl,
   fetchDirections,
   getRouteMap,
   laneCacheKey,
+  resolveMapStyle,
+  MAP_STYLE_KEYS,
   __clearRouteCache,
 } from './routeMap.js';
 
@@ -169,5 +172,118 @@ describe('laneCacheKey', () => {
     expect(laneCacheKey({ lat: 33.770011, lng: -118.19372 }, CHI)).toBe(
       laneCacheKey({ lat: 33.770009, lng: -118.19372 }, CHI)
     );
+  });
+});
+
+// ── Per-tenant map style ────────────────────────────────────────────────────
+describe('resolveMapStyle', () => {
+  it('accepts each known style key', () => {
+    for (const k of MAP_STYLE_KEYS) expect(resolveMapStyle(k)).toBe(k);
+  });
+  it('defaults null / undefined / unknown to branded', () => {
+    expect(resolveMapStyle(null)).toBe('branded');
+    expect(resolveMapStyle(undefined)).toBe('branded');
+    expect(resolveMapStyle('')).toBe('branded');
+    expect(resolveMapStyle('neon-city')).toBe('branded');
+    expect(resolveMapStyle(42)).toBe('branded');
+  });
+});
+
+describe('buildStaticMapUrl — map styles', () => {
+  const styleParams = (mapStyle: (typeof MAP_STYLE_KEYS)[number]) =>
+    new URL(buildStaticMapUrl(KEY, LA, CHI, POLY, 'light', mapStyle)).searchParams.getAll('style');
+
+  it('branded reproduces the existing themed look (light branded roads)', () => {
+    const s = styleParams('branded');
+    expect(s).toContain('feature:road.highway|element:geometry|color:0x9fbcf3');
+    expect(s).toContain('feature:poi|visibility:off');
+  });
+
+  it('grayscale is a desaturated gray set with muted labels', () => {
+    const s = styleParams('grayscale');
+    expect(s).toContain('feature:road|element:geometry|color:0xffffff');
+    expect(s).toContain('element:labels.text.fill|color:0x9aa0a6');
+    expect(s).toContain('feature:water|element:geometry|color:0xdfe3e8');
+    // Not the branded navy nor the standard (empty) look.
+    expect(s).not.toContain('feature:road.highway|element:geometry|color:0x9fbcf3');
+  });
+
+  it('standard applies NO style overrides (real Google colors)', () => {
+    expect(styleParams('standard')).toEqual([]);
+  });
+
+  it('dark_routes uses a dark, dimmed base (not branded-dark cobalt highways)', () => {
+    const s = styleParams('dark_routes');
+    expect(s).toContain('element:geometry|color:0x0a0e1a');
+    expect(s).toContain('feature:road.highway|element:geometry|color:0x263053');
+    expect(s).not.toContain('feature:road.highway|element:geometry|color:0x3f5cc0');
+  });
+
+  it('every style yields a distinct style= signature', () => {
+    const sigs = MAP_STYLE_KEYS.map((k) => JSON.stringify(styleParams(k)));
+    expect(new Set(sigs).size).toBe(MAP_STYLE_KEYS.length);
+  });
+
+  it('the route polyline is present + visible on every style', () => {
+    for (const k of MAP_STYLE_KEYS) {
+      const path = new URL(buildStaticMapUrl(KEY, LA, CHI, POLY, 'light', k)).searchParams.get('path');
+      expect(path).toMatch(/enc:/);
+      // A saturated line color + a positive weight on every style.
+      expect(path).toMatch(/^color:0x[0-9A-Fa-f]{6,8}\|weight:[1-9]/);
+    }
+  });
+
+  it('dark_routes spotlights the route with a brighter, heavier line', () => {
+    const path = new URL(buildStaticMapUrl(KEY, LA, CHI, POLY, 'light', 'dark_routes')).searchParams.get('path');
+    expect(path).toBe(`color:0x5B8CFFff|weight:6|enc:${POLY}`);
+    // The other styles keep the brand cobalt at weight 4.
+    const branded = new URL(buildStaticMapUrl(KEY, LA, CHI, POLY, 'light', 'branded')).searchParams.get('path');
+    expect(branded).toBe(`color:0x0D3CFCff|weight:4|enc:${POLY}`);
+  });
+});
+
+describe('buildBaseMapUrl — map styles', () => {
+  it('carries the style specs and stays centered on North America', () => {
+    const url = new URL(buildBaseMapUrl(KEY, 'light', 'grayscale'));
+    expect(url.searchParams.get('center')).toBe('44,-97');
+    expect(url.searchParams.getAll('style')).toContain('feature:road|element:geometry|color:0xffffff');
+    // standard base map has no style overrides.
+    expect(new URL(buildBaseMapUrl(KEY, 'light', 'standard')).searchParams.getAll('style')).toEqual([]);
+  });
+});
+
+describe('getRouteMap — map style is part of the cache key', () => {
+  beforeEach(() => __clearRouteCache());
+
+  it('different styles each re-fetch once; a repeat of the same style is cached', async () => {
+    const f = mockFetch({
+      status: 'OK',
+      routes: [{ overview_polyline: { points: POLY }, legs: [{ distance: { value: 100_000 } }] }],
+    });
+    await getRouteMap(LA, CHI, KEY, 'light', f, 'branded');
+    await getRouteMap(LA, CHI, KEY, 'light', f, 'grayscale');
+    // Distinct style → distinct cache entry → a second upstream call.
+    expect((f as unknown as ReturnType<typeof vi.fn>)).toHaveBeenCalledTimes(2);
+    // Same lane+theme+style is served from cache (still 2 total).
+    await getRouteMap(LA, CHI, KEY, 'light', f, 'grayscale');
+    expect((f as unknown as ReturnType<typeof vi.fn>)).toHaveBeenCalledTimes(2);
+  });
+
+  it('renders the requested style into the returned URL', async () => {
+    const f = mockFetch({
+      status: 'OK',
+      routes: [{ overview_polyline: { points: POLY }, legs: [{ distance: { value: 100_000 } }] }],
+    });
+    const gray = await getRouteMap(LA, CHI, KEY, 'light', f, 'grayscale');
+    expect(new URL(gray!.url).searchParams.getAll('style')).toContain('element:labels.text.fill|color:0x9aa0a6');
+  });
+
+  it('defaults to branded when no style is passed (existing callers unchanged)', async () => {
+    const f = mockFetch({
+      status: 'OK',
+      routes: [{ overview_polyline: { points: POLY }, legs: [{ distance: { value: 100_000 } }] }],
+    });
+    const res = await getRouteMap(LA, CHI, KEY, 'light', f);
+    expect(new URL(res!.url).searchParams.get('path')).toBe(`color:0x0D3CFCff|weight:4|enc:${POLY}`);
   });
 });

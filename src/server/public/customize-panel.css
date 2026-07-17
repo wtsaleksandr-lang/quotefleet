@@ -125,6 +125,42 @@
   box-shadow: 0 0 0 1px var(--accent-fill);
 }
 
+/* ── Map-style chips (per-tenant map look) ────────────────────────────── */
+.qf-cz-mapstyle-row { display: flex; flex-wrap: wrap; gap: 8px; }
+.qf-cz-mapstyle {
+  display: inline-flex; align-items: center; gap: 8px; padding: 8px 12px 8px 8px;
+  border-radius: 999px; border: 1px solid var(--border-strong);
+  background: var(--surface-2); color: var(--ink-soft);
+  font-size: 12px; font-weight: 600; cursor: pointer;
+  transition: transform .1s ease, box-shadow .12s ease, border-color .12s ease, color .12s ease;
+}
+.qf-cz-mapstyle:hover { transform: translateY(-1px); }
+.qf-cz-mapstyle:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+.qf-cz-mapstyle.is-selected {
+  border-color: var(--accent-fill); color: var(--ink);
+  box-shadow: 0 0 0 1px var(--accent-fill);
+}
+/* Tiny map-preview swatch: a representative base + a diagonal route line so
+   each option reads at a glance. Self-contained (no Static Maps call). */
+.qf-cz-mapstyle-swatch {
+  position: relative; width: 28px; height: 20px; border-radius: 5px;
+  border: 1px solid var(--border-strong); overflow: hidden; flex: 0 0 auto;
+}
+.qf-cz-mapstyle-swatch::after {
+  content: ''; position: absolute; left: -4px; right: -4px; top: 50%;
+  height: 3px; transform: rotate(-24deg); transform-origin: center;
+  border-radius: 2px;
+}
+.qf-ms-branded    { background: linear-gradient(135deg, #16204a, #0f1629); }
+.qf-ms-branded::after    { background: #3f5cc0; }
+.qf-ms-grayscale  { background: linear-gradient(135deg, #f2f3f5, #d9dde2); }
+.qf-ms-grayscale::after  { background: #0D3CFC; }
+.qf-ms-standard   { background: linear-gradient(135deg, #e8efe4, #cfe0f0); }
+.qf-ms-standard::after   { background: #0D3CFC; }
+.qf-ms-dark-routes,
+.qf-ms-dark_routes { background: linear-gradient(135deg, #0a0e1a, #05080f); }
+.qf-ms-dark_routes::after { background: #5B8CFF; height: 4px; }
+
 /* ── Text-colour swatches (background-aware) ──────────────────────────── */
 .qf-cz-textcolor-row { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
 .qf-cz-textcolor {

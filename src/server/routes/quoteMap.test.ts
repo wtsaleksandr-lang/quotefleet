@@ -25,6 +25,7 @@ const h = vi.hoisted(() => {
   const state = {
     leadRows: [] as Record<string, unknown>[],
     tenantRows: [] as Record<string, unknown>[],
+    brandRows: [] as Record<string, unknown>[],
     cacheRows: [] as Record<string, unknown>[],
     inserts: [] as Array<{ table: string; values: Record<string, unknown> }>,
   };
@@ -47,6 +48,7 @@ vi.mock('../../db/client.js', async () => {
     const n = getTableName(table as never);
     if (n === 'leads') return h.state.leadRows;
     if (n === 'tenants') return h.state.tenantRows;
+    if (n === 'brand_configs') return h.state.brandRows;
     if (n === 'route_map_cache') return h.state.cacheRows;
     return [];
   }
@@ -122,6 +124,7 @@ const baseTenant = () => ({ id: 1, name: 'Acme Freight', status: 'active' });
 beforeEach(() => {
   h.state.leadRows = [baseLead()];
   h.state.tenantRows = [baseTenant()];
+  h.state.brandRows = [];
   h.state.cacheRows = [];
   h.state.inserts = [];
   h.getRouteMapMock.mockClear();
@@ -155,12 +158,15 @@ describe('quote-map proxy — happy path', () => {
     const bodyStr = (res.body as Buffer).toString('binary');
     expect(bodyStr).not.toContain(SECRET_KEY);
     expect(JSON.stringify(res.headers)).not.toContain(SECRET_KEY);
-    // The key WAS used server-side (getRouteMap received it).
+    // The key WAS used server-side (getRouteMap received it), with the tenant's
+    // resolved map style (null brand → 'branded').
     expect(h.getRouteMapMock).toHaveBeenCalledWith(
       { lat: 33.77, lng: -118.19 },
       { lat: 41.87, lng: -87.62 },
       SECRET_KEY,
-      'light'
+      'light',
+      undefined,
+      'branded'
     );
   });
 
@@ -170,7 +176,7 @@ describe('quote-map proxy — happy path', () => {
     const ins = h.state.inserts.find((i) => i.table === 'route_map_cache');
     expect(ins).toBeTruthy();
     expect(ins!.values.pngBase64).toBe(PNG_BYTES.toString('base64'));
-    expect(String(ins!.values.cacheKey)).toMatch(/\|light$/);
+    expect(String(ins!.values.cacheKey)).toMatch(/\|light\|branded$/);
   });
 });
 
@@ -193,16 +199,37 @@ describe('quote-map proxy — theme routing', () => {
     const handler = await getHandler();
     await handler(req('QF-ABC123.png', { theme: 'dark' }), new MockRes());
     const ins = h.state.inserts.find((i) => i.table === 'route_map_cache');
-    expect(String(ins!.values.cacheKey)).toMatch(/\|dark$/);
+    expect(String(ins!.values.cacheKey)).toMatch(/\|dark\|branded$/);
     // getRouteMap is asked for the dark render.
-    expect(h.getRouteMapMock).toHaveBeenCalledWith(expect.anything(), expect.anything(), SECRET_KEY, 'dark');
+    expect(h.getRouteMapMock).toHaveBeenCalledWith(expect.anything(), expect.anything(), SECRET_KEY, 'dark', undefined, 'branded');
   });
 
   it('an unknown theme value falls back to light', async () => {
     const handler = await getHandler();
     await handler(req('QF-ABC123.png', { theme: 'neon' }), new MockRes());
     const ins = h.state.inserts.find((i) => i.table === 'route_map_cache');
-    expect(String(ins!.values.cacheKey)).toMatch(/\|light$/);
+    expect(String(ins!.values.cacheKey)).toMatch(/\|light\|branded$/);
+  });
+});
+
+describe('quote-map proxy — per-tenant map style', () => {
+  it('renders the tenant map style + routes the cache key through it', async () => {
+    h.state.brandRows = [{ tenantId: 1, mapStyle: 'dark_routes' }];
+    const handler = await getHandler();
+    await handler(req('QF-ABC123.png'), new MockRes());
+    const ins = h.state.inserts.find((i) => i.table === 'route_map_cache');
+    expect(String(ins!.values.cacheKey)).toMatch(/\|light\|dark_routes$/);
+    expect(h.getRouteMapMock).toHaveBeenCalledWith(
+      expect.anything(), expect.anything(), SECRET_KEY, 'light', undefined, 'dark_routes',
+    );
+  });
+
+  it('an unknown/blank tenant style falls back to branded', async () => {
+    h.state.brandRows = [{ tenantId: 1, mapStyle: 'neon-city' }];
+    const handler = await getHandler();
+    await handler(req('QF-ABC123.png'), new MockRes());
+    const ins = h.state.inserts.find((i) => i.table === 'route_map_cache');
+    expect(String(ins!.values.cacheKey)).toMatch(/\|light\|branded$/);
   });
 });
 

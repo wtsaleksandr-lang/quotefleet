@@ -226,6 +226,14 @@
   var themePreset = '';
   try { themePreset = new URLSearchParams(location.search).get('preset') || ''; } catch (e) {}
 
+  // Per-tenant MAP STYLE (Customize → Map style). Resolved from the widget
+  // config's brand and passed to the base-map + route-preview calls so the map
+  // card renders in the carrier's chosen look. null/unknown → 'branded'.
+  var brandMapStyle = 'branded';
+  function normMapStyle(s) {
+    return (s === 'grayscale' || s === 'standard' || s === 'dark_routes') ? s : 'branded';
+  }
+
   function init() {
     var cfgUrl = '/api/public/widget/' + slug;
     if (themePreset) cfgUrl += (cfgUrl.indexOf('?') > -1 ? '&' : '?') + 'preset=' + encodeURIComponent(themePreset);
@@ -234,6 +242,7 @@
       .then(function (cfg) {
         if (cfg.error) { $('qf-root').innerHTML = '<div class="qf-error">' + cfg.error + '</div>'; return; }
         state.config = cfg;
+        brandMapStyle = normMapStyle(cfg.brand && cfg.brand.mapStyle);
         // Expose the resolved brand + contact so the /w/demo "brand it
         // yourself" preview can default to the carrier's REAL identity
         // instead of blank "Your company name" placeholders.
@@ -1356,7 +1365,7 @@
     var seq = ++mapReqSeq;
     fetch(withGrant('/api/public/route-preview/' + slug), {
       method: 'POST', headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ pickup: pickup, delivery: delivery, service: state.service, theme: isDarkMapTheme() ? 'dark' : 'light' })
+      body: JSON.stringify({ pickup: pickup, delivery: delivery, service: state.service, theme: isDarkMapTheme() ? 'dark' : 'light', style: brandMapStyle })
     }).then(function (r) { return r.json(); }).then(function (resp) {
       if (seq !== mapReqSeq) return;
       if (!resp || !resp.ok) { showBaseMap(); autoResize(); return; }
@@ -1391,7 +1400,7 @@
   // a hint; renderRouteMap() removes it and swaps in the real routed lane.
   function showBaseMap() {
     var card = $('qf-map-card'); if (!card) return;
-    var url = withGrant('/api/public/base-map.png?theme=' + mapThemeParam());
+    var url = withGrant('/api/public/base-map.png?theme=' + mapThemeParam() + '&style=' + brandMapStyle);
     var img = $('qf-map-img'), mimg = $('qf-map-modal-img');
     if (img) { img.src = url; img.alt = 'Map of North America'; }
     if (mimg) { mimg.src = url; mimg.alt = 'Map of North America'; }

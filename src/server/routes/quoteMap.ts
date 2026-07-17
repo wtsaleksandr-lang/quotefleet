@@ -20,10 +20,10 @@
 import type { Express, Request, Response } from 'express';
 import { eq } from 'drizzle-orm';
 import { db } from '../../db/client.js';
-import { tenants, leads, routeMapCache } from '../../db/schema.js';
+import { tenants, leads, routeMapCache, brandConfigs } from '../../db/schema.js';
 import { loadEnv } from '../../config.js';
 import { quoteMapLimiter } from '../rateLimits.js';
-import { getRouteMap, laneCacheKey, normalizeTheme, type LatLng } from '../routeMap.js';
+import { getRouteMap, laneCacheKey, normalizeTheme, resolveMapStyle, type LatLng } from '../routeMap.js';
 
 // Browsers/proxies may cache the rendered snapshot for a week — the lane
 // geometry for a given quote never changes.
@@ -92,8 +92,17 @@ export function registerQuoteMapRoutes(app: Express): void {
     const destination = coord(lead.deliveryLat, lead.deliveryLng);
     if (!origin || !destination) return res.status(404).json({ error: 'No route coordinates for this quote' });
 
-    // Persistent cache: lane + theme. A hit never touches Google.
-    const cacheKey = `${laneCacheKey(origin, destination)}|${theme}`;
+    // Per-tenant map style (Customize → Map style); null resolves to 'branded'.
+    const brandRows = await db()
+      .select({ mapStyle: brandConfigs.mapStyle })
+      .from(brandConfigs)
+      .where(eq(brandConfigs.tenantId, lead.tenantId))
+      .limit(1);
+    const mapStyle = resolveMapStyle(brandRows[0]?.mapStyle);
+
+    // Persistent cache: lane + theme + style. A hit never touches Google, and
+    // the style in the key keeps distinct looks from cross-contaminating.
+    const cacheKey = `${laneCacheKey(origin, destination)}|${theme}|${mapStyle}`;
     const cached = await loadCachedPng(cacheKey);
     if (cached) return sendPng(res, cached);
 
@@ -102,7 +111,7 @@ export function registerQuoteMapRoutes(app: Express): void {
 
     // Resolve the Static Maps URL server-side (WITH the key — stays in-process),
     // then fetch the PNG bytes here so the key never reaches the client.
-    const route = await getRouteMap(origin, destination, env.GOOGLE_MAPS_API_KEY, theme);
+    const route = await getRouteMap(origin, destination, env.GOOGLE_MAPS_API_KEY, theme, undefined, mapStyle);
     if (!route) return res.status(404).json({ error: 'Map unavailable' });
 
     let png: Buffer;

@@ -1814,6 +1814,40 @@
       hoverSec.appendChild(hoverRow);
       controls.appendChild(hoverSec);
 
+      // ── Map style ───────────────────────────────────────────────
+      // How the calculator's base + route maps look. Saving reloads the live
+      // preview (same flow as Theme/Button hover), so the map re-renders in the
+      // chosen style. The route line stays clearly visible on every option.
+      var mapStyles = d.mapStyles || [
+        { key: 'branded', label: 'Branded' },
+        { key: 'grayscale', label: 'Minimal gray' },
+        { key: 'standard', label: 'Standard' },
+        { key: 'dark_routes', label: 'Dark routes' },
+      ];
+      var mapSec = el('div', { class: 'card qf-cz-section' });
+      mapSec.appendChild(el('div', { class: 'qf-cz-section-title', text: 'Map style' }));
+      mapSec.appendChild(el('div', { class: 'qf-cz-hint', text: 'How the map on your calculator looks. The route line stays clear on every style.' }));
+      var mapRow = el('div', { class: 'qf-cz-mapstyle-row' });
+      var currentMapStyle = b.mapStyle || 'branded';
+      mapStyles.forEach(function (m) {
+        var on = m.key === currentMapStyle;
+        var chip = el('button', { type: 'button', class: 'qf-cz-mapstyle' + (on ? ' is-selected' : ''), 'data-mapstyle': m.key, 'aria-pressed': on ? 'true' : 'false', title: m.hint || m.label });
+        chip.appendChild(el('span', { class: 'qf-cz-mapstyle-swatch qf-ms-' + m.key }));
+        chip.appendChild(el('span', { class: 'qf-cz-mapstyle-name', text: m.label + (m.key === 'branded' ? ' (default)' : '') }));
+        chip.addEventListener('click', function () {
+          currentMapStyle = m.key;
+          $$('.qf-cz-mapstyle', mapRow).forEach(function (n) {
+            var s = n.getAttribute('data-mapstyle') === m.key;
+            n.classList.toggle('is-selected', s);
+            n.setAttribute('aria-pressed', s ? 'true' : 'false');
+          });
+          queueSave({ mapStyle: m.key }, true);
+        });
+        mapRow.appendChild(chip);
+      });
+      mapSec.appendChild(mapRow);
+      controls.appendChild(mapSec);
+
       // ── Text color (background-aware, WCAG-limited) ──────────────
       // Only colours that clear WCAG AA against the CURRENT theme background
       // are offered; the set updates whenever the theme/accent changes.

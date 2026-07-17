@@ -45,7 +45,7 @@ import { loadEnv } from '../../config.js';
 import { getTrialState } from '../trialGating.js';
 import { canUseProFeature } from '../plans.js';
 import { publicCalcLimiter, publicChatLimiter, publicLeadLimiter, quoteMapLimiter } from '../rateLimits.js';
-import { buildBaseMapUrl, getRouteMap, laneCacheKey, normalizeTheme, peekRouteMap } from '../routeMap.js';
+import { buildBaseMapUrl, getRouteMap, laneCacheKey, normalizeTheme, peekRouteMap, resolveMapStyle } from '../routeMap.js';
 import { resolveWidgetTheme, WIDGET_PRESETS } from '../widgetThemes.js';
 import { resolveQuoteDisclaimer } from '../quoteDisclaimer.js';
 import { loadCarrierProfile } from './carrierProfile.js';
@@ -468,8 +468,14 @@ export function registerPublicRoutes(app: Express) {
       const dist = await distanceBetween(pickupForDistance, body.delivery as Parameters<typeof distanceBetween>[1]);
       if ('error' in dist) return res.json({ ok: false });
       const theme = normalizeTheme(body.theme);
-      // Branded route map (highlighted roads) for the widget's map card.
-      const rm = await getRouteMap(dist.origin, dist.destination, loadEnv().GOOGLE_MAPS_API_KEY, theme);
+      // Per-tenant map style (Customize → Map style), server-authoritative from
+      // the tenant's saved brand config; null resolves to 'branded'.
+      const previewBrand = (
+        await db().select().from(brandConfigs).where(eq(brandConfigs.tenantId, tenant.id)).limit(1)
+      )[0];
+      const mapStyle = resolveMapStyle(previewBrand?.mapStyle);
+      // Route map for the widget's map card, rendered in the tenant's map style.
+      const rm = await getRouteMap(dist.origin, dist.destination, loadEnv().GOOGLE_MAPS_API_KEY, theme, undefined, mapStyle);
       const lane = laneCacheKey(dist.origin, dist.destination);
       return res.json({
         ok: true,
@@ -477,7 +483,9 @@ export function registerPublicRoutes(app: Express) {
         transit: estimateTransit(dist.miles, body.service),
         origin: dist.origin,
         destination: dist.destination,
-        mapUrl: rm ? `/api/public/route-map.png?lane=${encodeURIComponent(lane)}&theme=${theme}` : null,
+        // The style is carried on the PNG URL so route-map.png peeks the exact
+        // cache entry (lane|theme|style) this preview just generated.
+        mapUrl: rm ? `/api/public/route-map.png?lane=${encodeURIComponent(lane)}&theme=${theme}&style=${mapStyle}` : null,
       });
     } catch {
       return res.json({ ok: false });
@@ -491,7 +499,12 @@ export function registerPublicRoutes(app: Express) {
   const baseMapCache = new Map<string, Buffer>();
   app.get('/api/public/base-map.png', quoteMapLimiter, async (req: Request, res: Response) => {
     const theme = normalizeTheme(req.query.theme);
-    const cached = baseMapCache.get(theme);
+    // Per-tenant map style is passed by the widget (base-map.png is tenant-less);
+    // resolveMapStyle guards any bad value back to 'branded'. The cache key
+    // includes the style so styles never cross-contaminate the base-map cache.
+    const mapStyle = resolveMapStyle(req.query.style);
+    const cacheKey = `${theme}|${mapStyle}`;
+    const cached = baseMapCache.get(cacheKey);
     if (cached) {
       res.setHeader('content-type', 'image/png');
       res.setHeader('cache-control', 'public, max-age=86400');
@@ -500,10 +513,10 @@ export function registerPublicRoutes(app: Express) {
     const key = loadEnv().GOOGLE_MAPS_API_KEY;
     if (!key) return res.status(404).end();
     try {
-      const img = await fetch(buildBaseMapUrl(key, theme));
+      const img = await fetch(buildBaseMapUrl(key, theme, mapStyle));
       if (!img.ok) return res.status(502).end();
       const buf = Buffer.from(await img.arrayBuffer());
-      baseMapCache.set(theme, buf);
+      baseMapCache.set(cacheKey, buf);
       res.setHeader('content-type', 'image/png');
       res.setHeader('cache-control', 'public, max-age=86400');
       return res.end(buf);
@@ -518,8 +531,9 @@ export function registerPublicRoutes(app: Express) {
   app.get('/api/public/route-map.png', quoteMapLimiter, async (req: Request, res: Response) => {
     const lane = typeof req.query.lane === 'string' ? req.query.lane : '';
     const theme = normalizeTheme(req.query.theme);
+    const mapStyle = resolveMapStyle(req.query.style);
     if (!lane) return res.status(400).end();
-    const rm = peekRouteMap(`${lane}|${theme}`);
+    const rm = peekRouteMap(`${lane}|${theme}|${mapStyle}`);
     if (!rm) return res.status(404).end();
     try {
       const img = await fetch(rm.url);
