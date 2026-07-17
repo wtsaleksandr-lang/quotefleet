@@ -1391,7 +1391,10 @@
     // Re-report height once the map image actually loads: it has height:auto, so
     // the card grows only after the bitmap arrives — without this the host iframe
     // stays sized to the pre-image height and shows an inner scrollbar.
-    if (img) { img.onload = autoResize; img.src = resp.mapUrl; }
+    // If the bitmap is already in cache, setting src can leave img.complete true
+    // with onload never firing — report immediately so the card's grown height
+    // is picked up (ResizeObserver also covers this; belt-and-suspenders).
+    if (img) { img.onload = scheduleAutoResize; img.src = resp.mapUrl; if (img.complete && img.naturalWidth) scheduleAutoResize(); }
     if (mimg) mimg.src = resp.mapUrl;
     card.hidden = false;
     autoResize();
@@ -1407,7 +1410,7 @@
     var img = $('qf-map-img'), mimg = $('qf-map-modal-img');
     // height:auto image → re-report height on load so the host iframe expands to
     // fit the base map instead of leaving an inner scrollbar (see renderRouteMap).
-    if (img) { img.onload = autoResize; img.src = url; img.alt = 'Map of North America'; }
+    if (img) { img.onload = scheduleAutoResize; img.src = url; img.alt = 'Map of North America'; if (img.complete && img.naturalWidth) scheduleAutoResize(); }
     if (mimg) { mimg.src = url; mimg.alt = 'Map of North America'; }
     ['qf-map-distance', 'qf-map-transit', 'qf-map-pickup', 'qf-map-delivery',
      'qf-map-m-distance', 'qf-map-m-transit', 'qf-map-m-pickup', 'qf-map-m-delivery'
@@ -1591,27 +1594,77 @@
     requestAnimationFrame(function () { if (tipEl) tipEl.classList.add('show'); });
   }
 
-  function autoResize() {
+  // rAF-debounced height post: rapid consecutive layout changes (image decode,
+  // font swap, add-ons opening) collapse into a single postMessage per frame.
+  var _resizeRaf = 0;
+  function scheduleAutoResize() {
+    if (_resizeRaf) return;
+    _resizeRaf = requestAnimationFrame(function () { _resizeRaf = 0; autoResize(); });
+  }
+
+  // Continuous height sync (the robust cure). A ResizeObserver on #qf-root posts
+  // the widget's TRUE height on EVERY size change — layout-only growth included:
+  // map-image decode, cached images (img.complete already true so onload never
+  // fires), web-font (FOUT) swaps, add-ons, results, chat. The old model relied
+  // on discrete autoResize() calls + a MutationObserver(childList) that are BLIND
+  // to layout-only growth, so the host iframe stayed clamped and showed an inner
+  // scrollbar ("renders too small / cut-off"). Discrete calls stay as instant
+  // belt-and-suspenders; the observer guarantees eventual correctness.
+  function setupHeightSync() {
     try {
-      if (!(window.parent && window.parent !== window)) return;
-      // Report the ACTUAL content height (the #qf-root container's bottom in
-      // document space), not documentElement.scrollHeight. The latter can latch
-      // tall — once the host iframe is sized up (e.g. options modal / chat), a
-      // body that fills the iframe keeps reporting the inflated viewport height
-      // and never shrinks back, leaving a big blank strip under the widget. The
-      // fixed options modal lives OUTSIDE #qf-root, so it's correctly excluded.
-      var root = document.getElementById('qf-root');
-      var height;
-      if (root && root.getBoundingClientRect) {
-        var rect = root.getBoundingClientRect();
-        var padB = parseFloat((window.getComputedStyle && getComputedStyle(document.body).paddingBottom) || '0') || 0;
-        height = Math.ceil(rect.top + (window.pageYOffset || 0) + rect.height + padB);
-      } else {
-        height = document.documentElement.scrollHeight;
+      // Observe document.body (superset of #qf-root) so ANY in-flow size change
+      // is caught — including the body-level #qf-powered footer, not just #qf-root.
+      var target = document.body || document.getElementById('qf-root');
+      if (target && typeof ResizeObserver !== 'undefined') {
+        new ResizeObserver(scheduleAutoResize).observe(target);
       }
-      window.parent.postMessage({ type: 'QF_WIDGET_HEIGHT', height: height }, '*');
+      // Late web-font swap is a layout-only reflow (no DOM mutation) — re-report
+      // once fonts settle so text-driven height changes are captured too.
+      if (document.fonts && document.fonts.ready && document.fonts.ready.then) {
+        document.fonts.ready.then(scheduleAutoResize).catch(function () { });
+      }
+      // Initial post after first paint so the host sizes to real content up front.
+      requestAnimationFrame(scheduleAutoResize);
     } catch (_) { }
   }
 
+  // True content height = the lowest bottom edge among the body's IN-FLOW
+  // children, plus the body's bottom padding. This is the robust signal:
+  //  - It includes the "Powered by" footer (#qf-powered), which renders as a
+  //    body-level sibling BELOW #qf-root — so a bare #qf-root-bottom measure
+  //    clips it behind an inner scrollbar.
+  //  - It EXCLUDES off-flow overlays (the options/map modal is position:fixed;
+  //    tooltips are absolute) so they never inflate the height / leave a strip.
+  //  - Unlike documentElement.scrollHeight it is NOT floored by the iframe's own
+  //    viewport height, so it SHRINKS back when content shrinks instead of
+  //    latching tall (the recurring "big blank strip" / stuck-height bug).
+  function contentHeight() {
+    var body = document.body;
+    if (!body) return document.documentElement.scrollHeight;
+    var maxBottom = 0;
+    var kids = body.children;
+    for (var i = 0; i < kids.length; i++) {
+      var elk = kids[i];
+      var tag = elk.tagName;
+      if (tag === 'SCRIPT' || tag === 'STYLE' || tag === 'LINK' || tag === 'TEMPLATE') continue;
+      var cs = window.getComputedStyle ? getComputedStyle(elk) : null;
+      if (cs && (cs.position === 'fixed' || cs.position === 'absolute' || cs.display === 'none')) continue;
+      var r = elk.getBoundingClientRect();
+      if (!r.height) continue;
+      var bottom = r.top + (window.pageYOffset || 0) + r.height;
+      if (bottom > maxBottom) maxBottom = bottom;
+    }
+    var padB = parseFloat((window.getComputedStyle && getComputedStyle(body).paddingBottom) || '0') || 0;
+    return Math.ceil(maxBottom + padB);
+  }
+
+  function autoResize() {
+    try {
+      if (!(window.parent && window.parent !== window)) return;
+      window.parent.postMessage({ type: 'QF_WIDGET_HEIGHT', height: contentHeight() }, '*');
+    } catch (_) { }
+  }
+
+  setupHeightSync();
   init();
 })();

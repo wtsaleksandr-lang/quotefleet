@@ -293,17 +293,50 @@
       // Same-origin: size immediately on load so there's no fallback-height
       // flash. Measure the widget's #qf-root content height (not the document
       // scrollHeight, which can be inflated) to match what autoResize reports.
+      // Mirror widget.js contentHeight(): lowest bottom among the widget body's
+      // IN-FLOW children (captures the body-level #qf-powered footer, excludes the
+      // fixed/hidden modal) + body padding-bottom. NOT documentElement.scrollHeight
+      // — that is floored by the iframe viewport and would latch tall (never
+      // shrink). Same-origin, so we can read the iframe's document directly.
+      function measureRoot(doc) {
+        if (!doc || !doc.body) return doc ? doc.documentElement.scrollHeight : 0;
+        var win = doc.defaultView;
+        var maxBottom = 0;
+        var kids = doc.body.children;
+        for (var i = 0; i < kids.length; i++) {
+          var elk = kids[i], tag = elk.tagName;
+          if (tag === 'SCRIPT' || tag === 'STYLE' || tag === 'LINK' || tag === 'TEMPLATE') continue;
+          var cs = win.getComputedStyle(elk);
+          if (cs.position === 'fixed' || cs.position === 'absolute' || cs.display === 'none') continue;
+          var r = elk.getBoundingClientRect();
+          if (!r.height) continue;
+          var bottom = r.top + (win.pageYOffset || 0) + r.height;
+          if (bottom > maxBottom) maxBottom = bottom;
+        }
+        var padB = 0;
+        try { padB = parseFloat(win.getComputedStyle(doc.body).paddingBottom) || 0; } catch (e) { /* ignore */ }
+        return Math.ceil(maxBottom + padB);
+      }
+      var shellRO = null;
       frame.addEventListener('load', function () {
         try {
           var doc = frame.contentDocument;
           // Let the calculator fill the device frame edge-to-edge (removes the
           // ~34px dead side-gap from its default centered 620px cap). Demo-only.
           if (doc && doc.body) doc.body.classList.add('qfd-embed-fill');
-          var root = doc && doc.getElementById('qf-root');
-          var h = root
-            ? root.getBoundingClientRect().top + root.getBoundingClientRect().height
-            : doc.documentElement.scrollHeight;
-          setH(h);
+          setH(measureRoot(doc));
+          // Same-origin fallback: observe the widget's body so the iframe re-sizes
+          // even if a QF_WIDGET_HEIGHT message is ever missed (belt-and-suspenders
+          // to the widget's own ResizeObserver). Observing body (superset of
+          // #qf-root) covers layout-only growth — map-image decode, font swaps —
+          // and the body-level footer, which the measure-once-on-load approach and
+          // a #qf-root-only observer could not see.
+          if (shellRO) { shellRO.disconnect(); shellRO = null; }
+          var roTarget = (doc && doc.body) || (doc && doc.getElementById('qf-root'));
+          if (roTarget && typeof ResizeObserver !== 'undefined') {
+            shellRO = new ResizeObserver(function () { setH(measureRoot(doc)); });
+            shellRO.observe(roTarget);
+          }
         } catch (e) { /* ignore */ }
       });
       // And keep in sync as the widget grows/shrinks (add-ons, results, chat).
