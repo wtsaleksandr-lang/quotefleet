@@ -2549,9 +2549,9 @@
       },
       text: '',
     });
-    drop.innerHTML = '<div style="font-size:18px; color:var(--ink); margin-bottom:6px;">Drop a rate sheet here</div>'
+    drop.innerHTML = '<div style="font-size:18px; color:var(--ink); margin-bottom:6px;">Drop a rate sheet, or paste a screenshot</div>'
       + '<div style="font-size:13px; color:var(--muted);">PDF · PNG · JPEG · Excel (.xlsx) · Email (.eml) · CSV · Up to 5 MB</div>'
-      + '<div style="margin-top:12px; font-family:var(--font-mono); font-size:11px; color:var(--muted-soft); letter-spacing:0.06em;">OR CLICK TO BROWSE</div>';
+      + '<div style="margin-top:12px; font-family:var(--font-mono); font-size:11px; color:var(--muted-soft); letter-spacing:0.06em;">CLICK TO BROWSE · CTRL/⌘+V TO PASTE</div>';
     var fileInput = el('input', { type: 'file', style: { display: 'none' }, accept: '.pdf,.png,.jpg,.jpeg,.webp,.gif,.xlsx,.xls,.eml,.csv,.txt' });
 
     drop.appendChild(fileInput);
@@ -2566,6 +2566,27 @@
     fileInput.addEventListener('change', function () {
       if (fileInput.files && fileInput.files[0]) handleFile(fileInput.files[0]);
     });
+    // Paste a screenshot straight from the clipboard (Ctrl/⌘+V) — the fastest
+    // path for a busy owner who just snipped their rate sheet. Scoped to the
+    // AI-import page: the handler no-ops once the page is unmounted, and any
+    // prior handler is removed so repeat visits don't stack listeners.
+    if (window.__qfIngestPaste) document.removeEventListener('paste', window.__qfIngestPaste);
+    window.__qfIngestPaste = function (ev) {
+      if (!document.getElementById('ingest-review')) return; // page no longer mounted
+      var items = (ev.clipboardData && ev.clipboardData.items) || [];
+      for (var i = 0; i < items.length; i++) {
+        if (items[i].type && items[i].type.indexOf('image/') === 0) {
+          var blob = items[i].getAsFile();
+          if (!blob) continue;
+          ev.preventDefault();
+          var named = blob;
+          try { named = new File([blob], 'pasted-rate-sheet.png', { type: blob.type || 'image/png' }); } catch (e) { /* Safari: use the blob as-is */ }
+          handleFile(named);
+          return;
+        }
+      }
+    };
+    document.addEventListener('paste', window.__qfIngestPaste);
 
     var statusBox = el('div', { style: { marginTop: '14px', minHeight: '24px' } });
     dropCard.appendChild(drop);

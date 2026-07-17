@@ -5,14 +5,13 @@
  * asks Claude to extract a structured rate book. Returns a draft the
  * carrier reviews and confirms before any DB write.
  *
- * Supported MIME types (V1):
+ * Supported MIME types:
  *   - application/pdf            → native Claude PDF support
  *   - image/png, image/jpeg, image/webp, image/gif → native Claude vision
+ *     (also how a pasted/dropped SCREENSHOT of a rate sheet is read)
  *   - text/plain, text/csv, text/html → wrapped as text content
- *
- * Excel and .eml are accepted but a friendly error tells the user to
- * convert to PDF or paste contents — Excel parsing needs `xlsx` and
- * .eml needs `mailparser`, both currently uninstalled.
+ *   - Excel (.xlsx) → parsed via `xlsx` and rendered to CSV per sheet
+ *   - Email (.eml)  → parsed via `mailparser` (body + attachments)
  *
  * The model returns structured JSON matching the calculator's existing
  * shapes so applying changes is a straight DB upsert.
