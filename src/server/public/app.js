@@ -465,21 +465,15 @@
         c.appendChild(chk);
       }
 
-      var stats = el('div', { class: 'features', style: { margin: '0 0 24px 0' } });
-      [
-        ['Leads (all time)', d.stats.totalLeads],
-        ['New / unactioned', d.stats.newLeads],
-        ['Won', d.stats.wonLeads],
-        ['Avg. quote', '$' + fmtMoney(d.stats.avgQuote)],
-      ].forEach(function (s) {
-        var card = el('div', { class: 'feature' });
-        card.appendChild(el('div', { class: 'muted-small', text: s[0] }));
-        card.appendChild(el('div', { style: { fontSize: '28px', fontWeight: '800', letterSpacing: '-0.02em' }, text: String(s[1]) }));
-        stats.appendChild(card);
-      });
-      c.appendChild(stats);
+      // KPI Overview — period-scoped big-number tiles, deltas, charts, and a
+      // latest-lane map. Rebuilt from the old 4 all-time stat cards. The block
+      // owns its own period toggle and refetches /overview/kpis on change; the
+      // recent-leads table + audit + setup checklist below are untouched.
+      var kpiSection = el('div', { class: 'qf-kpi-section' });
+      c.appendChild(kpiSection);
+      renderKpiBlock(kpiSection, d);
 
-      c.appendChild(el('h2', { text: 'Recent leads' }));
+      c.appendChild(el('h2', { text: 'Recent leads', style: { marginTop: '32px' } }));
       if (!d.recentLeads.length) {
         c.appendChild(el('p', { class: 'muted', text: 'No leads yet. Share your widget link to get your first.' }));
       } else {
@@ -518,6 +512,180 @@
         c.appendChild(ul);
       }
     }).catch(showErr(c));
+  }
+
+  // ── KPI Overview block ────────────────────────────────────────
+  // Big-number tiles + deltas + inline-SVG trend + CSS lane/equipment bars +
+  // a latest-lane map card. No chart deps — pure SVG + flex bars, theme-aware
+  // via CSS tokens (overview-kpis.css). `overview` is the /api/tenant/overview
+  // payload, reused for the map card's most-recent lead (no extra fetch).
+  var KPI_PERIODS = ['7d', '30d', '90d'];
+  function currentKpiPeriod() {
+    try { var p = localStorage.getItem('qf-kpi-period'); if (KPI_PERIODS.indexOf(p) >= 0) return p; } catch (e) {}
+    return '30d';
+  }
+  function fmtInt(n) {
+    if (typeof n !== 'number' || isNaN(n)) return '0';
+    return Math.round(n).toLocaleString('en-US');
+  }
+  function renderKpiBlock(wrap, overview) {
+    var period = currentKpiPeriod();
+    wrap.innerHTML = '';
+    var head = el('div', { class: 'qf-kpi-head' });
+    head.appendChild(el('h2', { text: 'Performance', style: { margin: '0' } }));
+    var toggle = el('div', { class: 'qf-kpi-toggle', role: 'group', 'aria-label': 'Metric period' });
+    KPI_PERIODS.forEach(function (p) {
+      var b = el('button', {
+        type: 'button',
+        class: 'qf-kpi-period-btn' + (p === period ? ' is-active' : ''),
+        text: p.toUpperCase(),
+        'aria-pressed': p === period ? 'true' : 'false',
+      });
+      b.addEventListener('click', function () {
+        if (p === currentKpiPeriod()) return;
+        try { localStorage.setItem('qf-kpi-period', p); } catch (e) {}
+        renderKpiBlock(wrap, overview);
+      });
+      toggle.appendChild(b);
+    });
+    head.appendChild(toggle);
+    wrap.appendChild(head);
+
+    var body = el('div', { class: 'qf-kpi-body' });
+    body.appendChild(el('p', { class: 'muted-small', style: { margin: '0' }, text: 'Loading metrics…' }));
+    wrap.appendChild(body);
+
+    api('/api/tenant/overview/kpis?period=' + encodeURIComponent(period)).then(function (k) {
+      renderKpiBody(body, k, overview);
+    }).catch(function () {
+      body.innerHTML = '';
+      body.appendChild(el('p', { class: 'muted-small', style: { margin: '0' }, text: 'Could not load performance metrics.' }));
+    });
+  }
+
+  function deltaPill(delta) {
+    var d = delta ? delta.deltaPct : null;
+    var cls = 'qf-kpi-delta', arrow, txt;
+    if (d == null || typeof d !== 'number' || isNaN(d)) { cls += ' is-flat'; arrow = '—'; txt = ''; }
+    else if (d > 0) { cls += ' is-up'; arrow = '▲'; txt = d + '%'; }
+    else if (d < 0) { cls += ' is-down'; arrow = '▼'; txt = Math.abs(d) + '%'; }
+    else { cls += ' is-flat'; arrow = '—'; txt = '0%'; }
+    return el('span', { class: cls, text: txt ? arrow + ' ' + txt : arrow });
+  }
+
+  function kpiTile(label, valueText, delta, subText) {
+    var tile = el('div', { class: 'qf-kpi-tile' });
+    tile.appendChild(el('div', { class: 'qf-kpi-label', text: label }));
+    tile.appendChild(el('div', { class: 'qf-kpi-value', text: valueText }));
+    var meta = el('div', { class: 'qf-kpi-meta' });
+    meta.appendChild(deltaPill(delta));
+    if (subText) meta.appendChild(el('span', { class: 'qf-kpi-sub', text: subText }));
+    tile.appendChild(meta);
+    return tile;
+  }
+
+  // Responsive inline-SVG trend (area + line). viewBox scales; the line uses
+  // vector-effect:non-scaling-stroke (CSS) so it stays crisp when stretched.
+  function trendChart(series) {
+    var wrap = el('div', { class: 'qf-kpi-trend' });
+    var vals = (series || []).map(function (p) { return p.quotes || 0; });
+    var n = vals.length;
+    var total = vals.reduce(function (s, v) { return s + v; }, 0);
+    if (!n || total === 0) {
+      wrap.appendChild(el('p', { class: 'muted-small', style: { margin: '0' }, text: 'No quotes in this period.' }));
+      return wrap;
+    }
+    var W = 300, H = 96, pad = 6;
+    var max = Math.max.apply(null, vals.concat([1]));
+    var x = function (i) { return n === 1 ? W / 2 : pad + (i / (n - 1)) * (W - 2 * pad); };
+    var y = function (v) { return H - pad - (v / max) * (H - 2 * pad); };
+    var line = '';
+    for (var i = 0; i < n; i++) { line += (i === 0 ? 'M' : 'L') + x(i).toFixed(1) + ',' + y(vals[i]).toFixed(1) + ' '; }
+    var area = 'M' + x(0).toFixed(1) + ',' + (H - pad) + ' ' + line + 'L' + x(n - 1).toFixed(1) + ',' + (H - pad) + ' Z';
+    wrap.innerHTML =
+      '<svg class="qf-kpi-trend-svg" viewBox="0 0 ' + W + ' ' + H + '" preserveAspectRatio="none" role="img" aria-label="Quotes over time">' +
+      '<path class="qf-kpi-trend-area" d="' + area + '"/>' +
+      '<path class="qf-kpi-trend-line" d="' + line.trim() + '"/>' +
+      '</svg>';
+    return wrap;
+  }
+
+  // Horizontal CSS-flex bars — width as % of the max, labels truncate.
+  function barList(items, labelKey, countKey, opts) {
+    opts = opts || {};
+    var wrap = el('div', { class: 'qf-kpi-bars' });
+    if (!items || !items.length) {
+      wrap.appendChild(el('p', { class: 'muted-small', style: { margin: '0' }, text: opts.empty || 'No data yet.' }));
+      return wrap;
+    }
+    var rows = items.slice(0, 5);
+    var max = Math.max.apply(null, rows.map(function (r) { return r[countKey] || 0; }).concat([1]));
+    rows.forEach(function (r) {
+      var row = el('div', { class: 'qf-kpi-bar-row' });
+      row.appendChild(el('div', { class: 'qf-kpi-bar-label', text: String(r[labelKey]), title: String(r[labelKey]) }));
+      var track = el('div', { class: 'qf-kpi-bar-track' });
+      var fill = el('div', { class: 'qf-kpi-bar-fill' });
+      fill.style.width = Math.max(4, Math.round((r[countKey] || 0) / max * 100)) + '%';
+      track.appendChild(fill);
+      row.appendChild(track);
+      row.appendChild(el('div', { class: 'qf-kpi-bar-count', text: String(r[countKey]) }));
+      wrap.appendChild(row);
+    });
+    return wrap;
+  }
+
+  // Latest lane with coordinates → the cached server-side static map (theme
+  // synced to the dashboard). Returns null when no lead has coords (card hidden).
+  function latestLaneCard(overview) {
+    var leadsArr = (overview && overview.recentLeads) || [];
+    var lead = null;
+    for (var i = 0; i < leadsArr.length; i++) {
+      var l = leadsArr[i];
+      if (l && l.refId && l.pickupLat != null && l.pickupLng != null && l.deliveryLat != null && l.deliveryLng != null) { lead = l; break; }
+    }
+    if (!lead) return null;
+    var theme = document.documentElement.getAttribute('data-theme') === 'light' ? 'light' : 'dark';
+    var card = el('div', { class: 'card qf-kpi-card qf-kpi-map-card' });
+    card.appendChild(el('div', { class: 'qf-kpi-card-title', text: 'Latest lane' }));
+    var route = 'leads/' + encodeURIComponent(lead.refId);
+    var a = el('a', { href: '/app/' + route, 'data-route': route, class: 'qf-kpi-map-link' });
+    a.appendChild(el('img', {
+      class: 'qf-kpi-map-img',
+      src: '/api/public/quote-map/' + encodeURIComponent(lead.refId) + '.png?theme=' + theme,
+      alt: 'Route map for ' + lead.refId,
+      loading: 'lazy',
+    }));
+    a.appendChild(el('div', { class: 'qf-kpi-map-caption', text: (lead.pickupCity || '—') + ' → ' + (lead.deliveryCity || '—') }));
+    card.appendChild(a);
+    return card;
+  }
+
+  function kpiCard(title, contentNode) {
+    var card = el('div', { class: 'card qf-kpi-card' });
+    card.appendChild(el('div', { class: 'qf-kpi-card-title', text: title }));
+    card.appendChild(contentNode);
+    return card;
+  }
+
+  function renderKpiBody(body, k, overview) {
+    body.innerHTML = '';
+    var t = k.tiles;
+    var tiles = el('div', { class: 'qf-kpi-tiles' });
+    tiles.appendChild(kpiTile('Quotes', fmtInt(t.quotes.current), t.quotes, null));
+    tiles.appendChild(kpiTile('Won', fmtInt(t.won.current), t.won, t.conversionPct + '% conversion'));
+    tiles.appendChild(kpiTile('Quoted value', '$' + fmtInt(t.quotedValue.current), t.quotedValue, null));
+    tiles.appendChild(kpiTile('Avg. quote', '$' + fmtInt(t.avgQuote.current), t.avgQuote, null));
+    body.appendChild(tiles);
+
+    var charts = el('div', { class: 'qf-kpi-charts' });
+    charts.appendChild(kpiCard('Quotes over time', trendChart(k.series)));
+    charts.appendChild(kpiCard('Top lanes', barList(k.topLanes, 'lane', 'count', { empty: 'No lanes yet.' })));
+    if (k.equipmentMix && k.equipmentMix.length) {
+      charts.appendChild(kpiCard('Equipment mix', barList(k.equipmentMix, 'equipment', 'count', { empty: 'No equipment yet.' })));
+    }
+    var mapCard = latestLaneCard(overview);
+    if (mapCard) charts.appendChild(mapCard);
+    body.appendChild(charts);
   }
 
   function statusClass(s) {

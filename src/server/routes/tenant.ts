@@ -28,7 +28,7 @@
  *   PATCH  /api/tenant/callbacks/:id      — update status / notes
  */
 import type { Express, Request, Response } from 'express';
-import { eq, desc, and } from 'drizzle-orm';
+import { eq, desc, and, gte } from 'drizzle-orm';
 import { z } from 'zod';
 import { nanoid } from 'nanoid';
 import { db } from '../../db/client.js';
@@ -76,7 +76,10 @@ import {
 } from '../../calc/seedTemplates.js';
 import { getDieselPrice, asOfLabel } from '../../eia/dieselPrice.js';
 import { autoFscPerMile } from '../../calc/fuelSurcharge.js';
+import { summarizeKpis, isKpiPeriod, PERIOD_DAYS, type KpiPeriod } from '../overviewStats.js';
 import { createHmac } from 'node:crypto';
+
+const DAY_MS = 24 * 60 * 60 * 1000;
 
 /** Seed defaults stamped at signup (see routes/auth.ts + calc/defaults.ts).
  *  Used to tell a genuinely-customized brand/AI config apart from the
@@ -130,6 +133,33 @@ export function registerTenantRoutes(app: Express) {
           : 0,
     };
     return res.json({ tenant: req.tenant, stats, recentLeads: recent, audit });
+  });
+
+  // ── KPI overview (period-scoped big-number metrics) ────────────
+  // Powers the dashboard's "Performance" board: quotes / conversions / quoted
+  // value / avg-quote tiles with period-over-period deltas, a quotes-over-time
+  // series, top lanes, and equipment mix. One indexed read over the tenant's
+  // leads across BOTH the current and the prior equal-length window (via
+  // leads_tenant_created_idx); all bucketing happens in the pure summarizeKpis()
+  // so the conversion definition stays shared with the weekly digest.
+  app.get('/api/tenant/overview/kpis', requireAuth, requireTenant, async (req: Request, res: Response) => {
+    const tid = req.tenant!.id;
+    const period: KpiPeriod = isKpiPeriod(req.query.period) ? req.query.period : '30d';
+    const now = new Date();
+    const since = new Date(now.getTime() - 2 * PERIOD_DAYS[period] * DAY_MS);
+    const rows = await db()
+      .select({
+        createdAt: leads.createdAt,
+        status: leads.status,
+        quotedTotal: leads.quotedTotal,
+        equipment: leads.equipment,
+        pickupCity: leads.pickupCity,
+        deliveryCity: leads.deliveryCity,
+      })
+      .from(leads)
+      .where(and(eq(leads.tenantId, tid), gte(leads.createdAt, since)))
+      .orderBy(desc(leads.createdAt));
+    return res.json(summarizeKpis({ now, period, leadRows: rows }));
   });
 
   // ── guided-setup status ───────────────────────────────────────

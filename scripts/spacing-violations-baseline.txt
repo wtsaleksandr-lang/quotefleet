@@ -180,7 +180,7 @@ src/server/public/customize-panel.css:81	spacing	right: 9px
 src/server/public/customize-panel.css:98	spacing	gap: 7px
 src/server/public/dashboard-freight-shell.css:107	spacing	padding: 18px 22px 6px
 src/server/public/dashboard-freight-shell.css:120	spacing	padding: 34px 42px 42px
-src/server/public/dashboard-freight-shell.css:171	spacing	padding: 72px 18px 28px
+src/server/public/dashboard-freight-shell.css:178	spacing	padding: 72px 18px 28px
 src/server/public/dashboard-freight-shell.css:34	spacing	margin: 14px 0 14px 14px
 src/server/public/dashboard-freight-shell.css:45	spacing	padding: 16px 14px 18px
 src/server/public/dashboard-freight-shell.css:52	spacing	gap: 10px
@@ -531,23 +531,6 @@ src/server/public/leads-list-focus.css:54	spacing	padding: 11px
 src/server/public/leads-list-focus.css:7	spacing	padding: 14px
 src/server/public/leads-list-focus.css:78	spacing	margin: 0 0 10px
 src/server/public/leads-list-focus.css:85	spacing	padding: 7px 10px
-src/server/public/overview-command-center.css:10	spacing	margin: 0 0 26px
-src/server/public/overview-command-center.css:11	spacing	padding: 20px
-src/server/public/overview-command-center.css:19	spacing	margin: 0 0 6px
-src/server/public/overview-command-center.css:2	spacing	gap: 14px
-src/server/public/overview-command-center.css:42	spacing	gap: 10px
-src/server/public/overview-command-center.css:53	spacing	padding: 14px
-src/server/public/overview-command-center.css:67	line-height	line-height: 1
-src/server/public/overview-command-center.css:8	spacing	gap: 18px
-src/server/public/overview-command-center.css:82	spacing	gap: 18px
-src/server/public/overview-executive-polish.css:13	spacing	gap: 18px
-src/server/public/overview-executive-polish.css:15	spacing	margin: 0 0 18px
-src/server/public/overview-executive-polish.css:151	spacing	padding: 20px 24px
-src/server/public/overview-executive-polish.css:154	spacing	inset: auto -26px -40px auto
-src/server/public/overview-executive-polish.css:32	spacing	margin-bottom: 7px
-src/server/public/overview-executive-polish.css:54	spacing	gap: 10px
-src/server/public/overview-executive-polish.css:65	spacing	padding: 18px
-src/server/public/overview-executive-polish.css:76	spacing	inset: auto -30px -46px auto
 src/server/public/premium-saas-polish.css:10	spacing	padding: 18px
 src/server/public/premium-saas-polish.css:117	spacing	margin-top: 14px
 src/server/public/premium-saas-polish.css:138	spacing	bottom: 14px

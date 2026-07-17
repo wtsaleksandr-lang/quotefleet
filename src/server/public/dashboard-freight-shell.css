@@ -163,6 +163,13 @@ html[data-theme="light"] .btn-ghost {
 }
 
 @media (max-width: 900px) {
+  /* The light shell grid (268px 1fr) is declared outside a media query above,
+     so it out-specifies the base mobile collapse in style.css and the content
+     column never goes full-width on phones — clipping wide KPI values. Collapse
+     it here (sidebar becomes the off-canvas overlay, matching dark). */
+  html[data-theme="light"] .app-shell {
+    grid-template-columns: 1fr;
+  }
   html[data-theme="light"] .sidebar {
     margin: 0;
     height: 100vh;

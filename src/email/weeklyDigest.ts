@@ -25,13 +25,12 @@
 import { and, eq, gte } from 'drizzle-orm';
 import { db } from '../db/client.js';
 import { auditLog, callbackRequests, conversations, leads } from '../db/schema.js';
+// Single source of truth for what counts as a conversion — shared with the
+// dashboard KPI overview so the digest and the dashboard never disagree.
+import { CONVERTED_STATUSES } from '../server/overviewStats.js';
 
 const DAY_MS = 24 * 60 * 60 * 1000;
 export const WEEK_MS = 7 * DAY_MS;
-
-/** Lead statuses that count as a "conversion" for the digest headline —
- *  a customer either accepted the quote (won) or asked to book it. */
-const CONVERTED_STATUSES = new Set(['won', 'booking_requested']);
 
 /** On-page engagement rollup pulled from the quote.activity audit events.
  *  Mirrors the event vocabulary in routes/quoteActivity.ts. */
