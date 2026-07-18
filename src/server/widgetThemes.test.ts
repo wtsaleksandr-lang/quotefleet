@@ -72,12 +72,12 @@ describe('resolveWidgetTheme', () => {
   });
 
   it('applies a custom accent override on top of the preset', () => {
-    const t = resolveWidgetTheme({ themePreset: 'graphite', accentOverride: '#8A2BE2' });
+    const t = resolveWidgetTheme({ themePreset: 'tesla', accentOverride: '#8A2BE2' });
     expect(t.accentOverride).toBe('#8A2BE2');
     expect(t.tokens['--w-accent']).toBe('#8A2BE2');
     expect(t.tokens['--w-primary']).toBe('#8A2BE2');
-    // Non-accent tokens stay from the base preset (Graphite graphite page).
-    expect(t.tokens['--w-page-bg']).toBe('#141517');
+    // Non-accent tokens stay from the base preset (Voltage/Tesla near-black page).
+    expect(t.tokens['--w-page-bg']).toBe('#0A0A0B');
     // Hover is a darkened accent (not equal to the accent).
     expect(t.tokens['--w-accent-hover']).not.toBe('#8A2BE2');
   });
@@ -115,10 +115,10 @@ describe('resolveWidgetTheme', () => {
     }
   });
 
-  it('exposes exactly fifteen presets and six fonts', () => {
+  it('exposes exactly eleven presets and six fonts', () => {
     expect(WIDGET_PRESET_LIST.map((p) => p.id)).toEqual([
-      'midnight', 'mono', 'graphite', 'ironhorse', 'nocturne', 'sapphire',
-      'harbor', 'cupertino', 'material', 'booking', 'indigo', 'tesla', 'stripe', 'stone', 'cream',
+      'midnight', 'mono', 'ironhorse', 'harbor', 'cupertino', 'material',
+      'booking', 'tesla', 'stripe', 'stone', 'cream',
     ]);
     expect(Object.keys(WIDGET_FONTS).sort()).toEqual(['inter', 'oswald', 'roboto', 'satoshi', 'sora', 'system']);
     expect(WIDGET_PRESETS.midnight.mode).toBe('dark');
@@ -132,9 +132,9 @@ describe('resolveWidgetTheme', () => {
     expect(WIDGET_PRESETS.stripe.mode).toBe('light');
     // Stone (blueprint) is a cool-slate LIGHT theme.
     expect(WIDGET_PRESETS.stone.mode).toBe('light');
-    // A balanced light + dark lineup (6 dark, 9 light).
-    expect(WIDGET_PRESET_LIST.filter((p) => p.mode === 'dark')).toHaveLength(6);
-    expect(WIDGET_PRESET_LIST.filter((p) => p.mode === 'light')).toHaveLength(9);
+    // A balanced light + dark lineup (3 dark, 8 light).
+    expect(WIDGET_PRESET_LIST.filter((p) => p.mode === 'dark')).toHaveLength(3);
+    expect(WIDGET_PRESET_LIST.filter((p) => p.mode === 'light')).toHaveLength(8);
   });
 
   it('ironhorse (Harley) ships the condensed Oswald voice + orange-on-white moto structure', () => {
@@ -347,13 +347,13 @@ describe('resolveWidgetTheme', () => {
     // Cream (the other locked theme) also keeps defaults.
     expect(resolveWidgetTheme({ themePreset: 'cream' }).tokens['--w-radius-card']).toBe('8px');
 
-    // Graphite = small-radius + uppercase tracked labels; Cupertino =
+    // Stone = small-radius + uppercase tracked labels; Cupertino =
     // large-soft + sentence-case; mono = moderate white-Uber shell.
-    const graphite = resolveWidgetTheme({ themePreset: 'graphite' }).tokens;
+    const stone = resolveWidgetTheme({ themePreset: 'stone' }).tokens;
     const cup = resolveWidgetTheme({ themePreset: 'cupertino' }).tokens;
     const mono = resolveWidgetTheme({ themePreset: 'mono' }).tokens;
-    expect(graphite['--w-radius-card']).toBe('4px');
-    expect(graphite['--w-label-transform']).toBe('uppercase');
+    expect(stone['--w-radius-card']).toBe('5px');
+    expect(stone['--w-label-transform']).toBe('uppercase');
     expect(cup['--w-radius-card']).toBe('20px');
     expect(cup['--w-label-transform']).toBe('none');
     expect(mono['--w-radius-card']).toBe('16px');

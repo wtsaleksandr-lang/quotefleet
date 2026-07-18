@@ -34,6 +34,21 @@
   padding-right: var(--space-3);
 }
 
+/* ── Equipment / Weight help cues → TOP-LEFT (hard UI rule: "help cue top-left
+   only"). Only the two "?" cues inside #qf-equip-weight-row move; every other
+   cue (pickup port, terminal, freight details, booking, flag chips) keeps the
+   shared top-right placement. The host reserves LEFT padding instead of right
+   so the label text never runs under the badge. `left`/`right` are 0/auto (on
+   the spacing ramp / non-numeric); padding uses ramp tokens — guard-safe. ── */
+#qf-equip-weight-row .qf-title-inline {
+  padding-left: var(--space-3);
+  padding-right: var(--space-1);
+}
+#qf-equip-weight-row .qf-help {
+  right: auto;
+  left: 0;
+}
+
 /* ── Uniform add-on grid: the three flag toggles (Residential / Hazmat /
    Temp-control) and every accessorial pill collapse into ONE even grid of
    identical chips — same width AND height regardless of label length. The two

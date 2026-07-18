@@ -891,3 +891,30 @@ body[data-qf-preset="stone"] {
   --qfi-soft: rgba(43,49,56,.12);
   --qfi-line: rgba(30,42,54,.20);
 }
+/* Stone active service tab — filled cool-graphite, matching Stone's active
+   chip / CTA / total drench. The base `.qf-tabs button.active` renders a light
+   raised pill (--w-accent-surface), which on the cool-slate drench reads as a
+   washed-out light chip with no clear active state. Fill it with the graphite
+   solid accent + its paired readable text, mirroring the booking active-tab
+   rule. Scoped to body[data-qf-preset="stone"] so no other preset shifts. No
+   #fff/#000/white/black literals — the white fallback lives inside var(). */
+body[data-qf-preset="stone"] .qf-tabs button.active {
+  background: var(--w-accent-solid, #21272D) !important;
+  background-image: none !important;
+  color: var(--w-accent-text, #FFFFFF) !important;
+  box-shadow: none !important;
+}
+
+/* --- Genset / oversize toggle labels: legible on every theme ----------------
+   The bold `.qf-oog-toggle` label ("Genset required for reefer container",
+   "This shipment is oversized / out of gauge") is painted a hardcoded dark
+   slate (#334155) in public-calculator-mobile-cleanup.css — fine on light
+   panels but DIM / low-contrast on the dark-panel themes (midnight, tesla,
+   booking). Route it to --w-text (light-on-dark, dark-on-light) so it reads on
+   every preset, matching the sub-panel's own `strong` headings. Shared across
+   all presets — light themes stay dark ink (no regression). No #fff/#000/white/
+   black literals — the fallback lives inside var(). */
+body.qf-app-calculator .qf-oog-toggle,
+body.qf-app-calculator .qf-oog-toggle span {
+  color: var(--w-text, #FFFFFF) !important;
+}
