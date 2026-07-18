@@ -46,10 +46,10 @@ export function normalizeTheme(raw: unknown): MapTheme {
 //   satellite   — real aerial imagery (maptype=hybrid) + labels + white route
 // NOTE: the string KEYS stay stable so tenants' saved selections persist; only
 // the LOOK + label/hint of `grayscale`/`dark_routes` changed, `soft`+`satellite` are new.
-export type MapStyle = 'branded' | 'grayscale' | 'standard' | 'soft' | 'dark_routes' | 'mono' | 'satellite' | 'ironhorse' | 'harbor' | 'cupertino' | 'material' | 'booking' | 'tesla' | 'stripe';
+export type MapStyle = 'branded' | 'grayscale' | 'standard' | 'soft' | 'dark_routes' | 'mono' | 'satellite' | 'ironhorse' | 'harbor' | 'cupertino' | 'material' | 'booking' | 'tesla' | 'stripe' | 'stone';
 
 /** Canonical style keys (source of truth for the Zod enum + the picker). */
-export const MAP_STYLE_KEYS = ['branded', 'grayscale', 'standard', 'soft', 'dark_routes', 'mono', 'satellite', 'ironhorse', 'harbor', 'cupertino', 'material', 'booking', 'tesla', 'stripe'] as const;
+export const MAP_STYLE_KEYS = ['branded', 'grayscale', 'standard', 'soft', 'dark_routes', 'mono', 'satellite', 'ironhorse', 'harbor', 'cupertino', 'material', 'booking', 'tesla', 'stripe', 'stone'] as const;
 
 /** Human labels + one-line hints for the Customize picker. */
 export const MAP_STYLE_LIST: Array<{ key: MapStyle; label: string; hint: string }> = [
@@ -67,6 +67,7 @@ export const MAP_STYLE_LIST: Array<{ key: MapStyle; label: string; hint: string 
   { key: 'booking', label: 'Voyage', hint: 'Clean light blue map, cool water, deep-blue route and pins.' },
   { key: 'tesla', label: 'Voltage', hint: 'Near-black night-nav map with a bright Tesla-red route and pins.' },
   { key: 'stripe', label: 'Blurple', hint: 'Soft light Stripe map, indigo route and pins.' },
+  { key: 'stone', label: 'Stone', hint: 'Cool slate-grey map, graphite route and pins.' },
 ];
 
 /** Normalize any caller/tenant input to a valid style. null/unknown → branded,
@@ -84,7 +85,8 @@ export function resolveMapStyle(raw: unknown): MapStyle {
     raw === 'material' ||
     raw === 'booking' ||
     raw === 'tesla' ||
-    raw === 'stripe'
+    raw === 'stripe' ||
+    raw === 'stone'
     ? raw
     : 'branded';
 }
@@ -455,6 +457,35 @@ const STRIPE_STYLES: string[] = [
   'feature:road.highway|element:geometry.stroke|color:0xd5dbe3',
 ];
 
+// `stone` (label: "Stone") — a cool-slate industrial/blueprint map matching the
+// Stone widget: cool blue-grey slate land (reads as an extension of the shell),
+// cool off-white roads LIGHTER than the land, cool desaturated blue-grey water,
+// muted cool blue-green-grey parks, POI/transit off, muted cool labels. The one
+// element with weight is the cool-graphite route line + graphite A·B pins (see
+// routeLine / markerColors). Verbatim from `_rec/render-stone.mjs` STONE_MAP_STYLES.
+const STONE_STYLES: string[] = [
+  'element:geometry|color:0xbfc5cb',
+  'element:labels.text.fill|color:0x5a636b',
+  'element:labels.text.stroke|color:0xeef1f4',
+  'feature:administrative|element:geometry|color:0xa9b2ba',
+  'feature:administrative.country|element:geometry.stroke|color:0x97a2ab',
+  'feature:administrative.province|element:geometry.stroke|color:0xa9b2ba',
+  'feature:landscape|element:geometry|color:0xbfc5cb',
+  'feature:poi|element:labels.icon|visibility:off',
+  'feature:poi|element:labels.text|visibility:off',
+  'feature:poi.park|element:geometry|color:0xb4c2bd',
+  'feature:transit|visibility:off',
+  'feature:water|element:geometry|color:0xaebfce',
+  'feature:water|element:labels.text.fill|color:0x6d7f8f',
+  'feature:road|element:geometry|color:0xdfe4e8',
+  'feature:road|element:geometry.stroke|color:0xb6bec6',
+  'feature:road|element:labels.text.fill|color:0x5a636b',
+  'feature:road.arterial|element:geometry|color:0xe3e8ec',
+  'feature:road.arterial|element:geometry.stroke|color:0xb0b9c1',
+  'feature:road.highway|element:geometry|color:0xe8edf0',
+  'feature:road.highway|element:geometry.stroke|color:0xaab4bd',
+];
+
 /** Resolve the Static Maps `style=` spec list for a (theme, mapStyle) pair.
  *  `branded` follows the light/dark theme (unchanged); the others are fixed.
  *  `standard` and `satellite` return [] → no style overrides (satellite uses
@@ -487,6 +518,8 @@ function styleSpecs(theme: MapTheme, mapStyle: MapStyle): string[] {
       return TESLA_STYLES;
     case 'stripe':
       return STRIPE_STYLES;
+    case 'stone':
+      return STONE_STYLES;
     case 'branded':
     default:
       return themeStyles(theme);
@@ -522,6 +555,8 @@ function routeLine(mapStyle: MapStyle): { color: string; weight: string } {
   if (mapStyle === 'tesla') return { color: '0xE82127ff', weight: '6' };
   // stripe (Blurple): the indigo route line over the soft light map.
   if (mapStyle === 'stripe') return { color: '0x635BFFff', weight: '5' };
+  // stone (Stone): the cool-graphite route line over the cool-slate map.
+  if (mapStyle === 'stone') return { color: '0x21272Dff', weight: '6' };
   return { color: ROUTE_COLOR, weight: '4' };
 }
 
@@ -541,6 +576,8 @@ function markerColors(mapStyle: MapStyle): { origin: string; dest: string } {
   if (mapStyle === 'tesla') return { origin: '0xE82127', dest: '0xE82127' };
   // stripe (Blurple): both pins the indigo blurple for one cohesive object.
   if (mapStyle === 'stripe') return { origin: '0x635BFF', dest: '0x635BFF' };
+  // stone (Stone): both pins the cool graphite for one cohesive object.
+  if (mapStyle === 'stone') return { origin: '0x21272D', dest: '0x21272D' };
   return { origin: ORIGIN_COLOR, dest: DEST_COLOR };
 }
 

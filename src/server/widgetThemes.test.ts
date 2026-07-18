@@ -115,10 +115,10 @@ describe('resolveWidgetTheme', () => {
     }
   });
 
-  it('exposes exactly fourteen presets and six fonts', () => {
+  it('exposes exactly fifteen presets and six fonts', () => {
     expect(WIDGET_PRESET_LIST.map((p) => p.id)).toEqual([
       'midnight', 'mono', 'graphite', 'ironhorse', 'nocturne', 'sapphire',
-      'harbor', 'cupertino', 'material', 'booking', 'indigo', 'tesla', 'stripe', 'cream',
+      'harbor', 'cupertino', 'material', 'booking', 'indigo', 'tesla', 'stripe', 'stone', 'cream',
     ]);
     expect(Object.keys(WIDGET_FONTS).sort()).toEqual(['inter', 'oswald', 'roboto', 'satoshi', 'sora', 'system']);
     expect(WIDGET_PRESETS.midnight.mode).toBe('dark');
@@ -130,9 +130,11 @@ describe('resolveWidgetTheme', () => {
     // Voltage (Tesla) is a near-black DARK theme; Blurple (Stripe) is LIGHT.
     expect(WIDGET_PRESETS.tesla.mode).toBe('dark');
     expect(WIDGET_PRESETS.stripe.mode).toBe('light');
-    // A balanced light + dark lineup (6 dark, 8 light).
+    // Stone (blueprint) is a cool-slate LIGHT theme.
+    expect(WIDGET_PRESETS.stone.mode).toBe('light');
+    // A balanced light + dark lineup (6 dark, 9 light).
     expect(WIDGET_PRESET_LIST.filter((p) => p.mode === 'dark')).toHaveLength(6);
-    expect(WIDGET_PRESET_LIST.filter((p) => p.mode === 'light')).toHaveLength(8);
+    expect(WIDGET_PRESET_LIST.filter((p) => p.mode === 'light')).toHaveLength(9);
   });
 
   it('ironhorse (Harley) ships the condensed Oswald voice + orange-on-white moto structure', () => {
@@ -291,6 +293,40 @@ describe('resolveWidgetTheme', () => {
     expect(t.fontStack).toContain('Inter');
   });
 
+  it('stone (blueprint) is a cool-slate light theme with the filled-graphite active pattern', () => {
+    const t = resolveWidgetTheme({ themePreset: 'stone' });
+    expect(t.mode).toBe('light');
+    // Cool slate-grey drench — genuinely grey surfaces, tonal shades of one family.
+    expect(t.tokens['--w-page-bg']).toBe('#A9B0B8');
+    expect(t.tokens['--w-surface']).toBe('#BFC5CB');
+    expect(t.tokens['--w-input-bg']).toBe('#CFD4D9');
+    expect(t.tokens['--w-text']).toBe('#191F25');
+    // Cool graphite accent; FILLED CTA/total surfaces use the deeper #21272D.
+    expect(t.tokens['--w-accent']).toBe('#2B3138');
+    expect(t.tokens['--w-accent-solid']).toBe('#21272D');
+    // White CTA/total text clears WCAG AA on the deeper graphite fill.
+    expect(contrastRatio(t.tokens['--w-accent-text'], t.tokens['--w-accent-solid'])).toBeGreaterThanOrEqual(WCAG.NORMAL);
+    expect(contrastRatio(t.tokens['--w-total-text'], t.tokens['--w-accent-solid'])).toBeGreaterThanOrEqual(WCAG.NORMAL);
+    // Body text reads on the cool-slate surface.
+    expect(contrastRatio(t.tokens['--w-text'], t.tokens['--w-surface'])).toBeGreaterThanOrEqual(WCAG.NORMAL);
+    // Sharp small radius + tight technical UPPERCASE micro-labels.
+    expect(t.tokens['--w-radius-card']).toBe('5px');
+    expect(t.tokens['--w-radius-pill']).toBe('4px');
+    expect(t.tokens['--w-label-transform']).toBe('uppercase');
+    expect(t.tokens['--w-label-spacing']).toBe('0.06em');
+    expect(t.tokens['--w-label-weight']).toBe('600');
+    // Active chip = filled cool graphite (white text); inactive = cool-slate tint.
+    expect(t.tokens['--w-active-border-color']).toBe('transparent');
+    expect(t.tokens['--w-chip-active-bg']).toBe('#21272D');
+    expect(t.tokens['--w-chip-active-text']).toBe('#FFFFFF');
+    expect(t.tokens['--w-chip-inactive-bg']).toBe('#B4BBC2');
+    // Active-chip white text clears WCAG AA on the graphite chip fill.
+    expect(contrastRatio(t.tokens['--w-chip-active-text'], t.tokens['--w-chip-active-bg'])).toBeGreaterThanOrEqual(WCAG.NORMAL);
+    // Ships the neutral Inter (Swiss grotesque) voice.
+    expect(t.font).toBe('inter');
+    expect(t.fontStack).toContain('Inter');
+  });
+
   it('ONLY cupertino is frosted — every other preset emits its opaque surface + 0px blur', () => {
     for (const preset of WIDGET_PRESET_LIST) {
       const t = resolveWidgetTheme({ themePreset: preset.id });
@@ -360,7 +396,7 @@ describe('resolveWidgetTheme', () => {
     // the remaining presets must emit the neutral defaults so their tabs /
     // chips / flags render byte-for-byte as before (no border, input-surface
     // fill, solid-accent active chip).
-    const CUSTOM_STATEFUL = new Set(['mono', 'ironhorse', 'harbor', 'booking', 'tesla', 'stripe']);
+    const CUSTOM_STATEFUL = new Set(['mono', 'ironhorse', 'harbor', 'booking', 'tesla', 'stripe', 'stone']);
     for (const preset of WIDGET_PRESET_LIST) {
       if (CUSTOM_STATEFUL.has(preset.id)) continue;
       const t = resolveWidgetTheme({ themePreset: preset.id });

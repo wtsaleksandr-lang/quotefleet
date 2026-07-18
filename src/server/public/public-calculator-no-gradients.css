@@ -837,3 +837,57 @@ body[data-qf-preset="booking"] .qf-customer-note {
   border-color: rgba(255, 255, 255, 0.14) !important;
   color: var(--w-surface-2-text, #E6E3E0) !important;
 }
+
+/* --- 5. Stone — remap the hardcoded-cobalt result-card accents to cool slate --
+   A handful of estimate-note / contact-head / help-cue / result-card elements
+   are painted with HARDCODED blue in public-calculator-ux.css (.qf-customer-note
+   /.qf-contact-head/.qf-result-guide/.qf-help/.qf-result::before) + widget-style
+   .css (.qf-eta), and the separate --qfi-* namespace in quote-interactive.css —
+   none are --w-* token-driven, so the cool-slate Stone drench needs a scoped
+   override (mono/material ship the same shape). Remaps them to Stone's cool
+   slate/graphite family. No #fff/#000/white/black literals (guard-safe) — the
+   hexes are cool blue-grey slate + graphite. Scoped to body[data-qf-preset=
+   "stone"] so no other preset shifts. Verbatim from `_rec/render-stone.mjs`. */
+body[data-qf-preset="stone"] .qf-customer-note,
+body[data-qf-preset="stone"] .qf-result .qf-customer-note,
+body[data-qf-preset="stone"] .qf-contact-head,
+body[data-qf-preset="stone"] .qf-result-guide {
+  background: #B4BBC2 !important;
+  background-image: none !important;
+  border: 1px solid rgba(30,42,54,.20) !important;
+  color: #2F373F !important;
+}
+body[data-qf-preset="stone"] .qf-help {
+  background: #B4BBC2 !important;
+  background-image: none !important;
+  border: 1px solid transparent !important;
+  color: #414A53 !important;
+}
+body[data-qf-preset="stone"] .qf-mini-stepper span:first-child {
+  background: rgba(43,49,56,.12) !important;
+  color: #2B3138 !important;
+}
+/* The result-card "Est. transit" pill (.qf-eta) is hardcoded blue in
+   widget-style.css — remap to a cool-slate tint + graphite ink. */
+body[data-qf-preset="stone"] .qf-result .qf-eta {
+  color: #2B3138 !important;
+  background: rgba(43,49,56,.12) !important;
+  border: 1px solid rgba(43,49,56,.26) !important;
+}
+/* The "Quote estimate" corner badge (.qf-result::before) + section title are
+   hardcoded blue in public-calculator-ux.css — remap to cool-slate/graphite. */
+body[data-qf-preset="stone"] .qf-result::before {
+  border-color: rgba(43,49,56,.26) !important;
+  background: #D3D8DD !important;
+  color: #2B3138 !important;
+}
+body[data-qf-preset="stone"] .qf-result .qf-section-title {
+  color: #2F373F !important;
+}
+/* The interactive transit note / map-modal use the separate --qfi-* namespace
+   (blue defaults in quote-interactive.css) — remap to the cool graphite accent. */
+body[data-qf-preset="stone"] {
+  --qfi-primary: #2B3138;
+  --qfi-soft: rgba(43,49,56,.12);
+  --qfi-line: rgba(30,42,54,.20);
+}

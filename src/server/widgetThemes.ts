@@ -980,6 +980,66 @@ const PRESETS_RAW: WidgetPreset[] = [
     },
   },
   {
+    id: 'stone',
+    label: 'Stone',
+    description: 'Inspired by architectural blueprint / industrial concrete — a COOL slate-grey MONOCHROME drench: page, card, inputs and panels are all tonal shades of one cool blue-grey slate, sharp small corners, tight technical uppercase labels, and a single restrained cool-graphite accent on the CTA / total / active tab / route.',
+    mode: 'light',
+    // Cool / sharp / technical blueprint voice: sharp small radius, cool hairline
+    // borders, a crisp cool-tinted shadow, tight technical UPPERCASE micro-labels.
+    // The one distinctive active state = FILLED cool graphite (crisp white text);
+    // INACTIVE = borderless cool-slate tint (Booking/Tesla-style intentional fill,
+    // drenched in the theme's own cool family).
+    structure: {
+      radiusCard: '5px',
+      radiusInput: '4px',
+      radiusBtn: '4px',
+      radiusPill: '4px',
+      borderWidth: '1px',
+      cardShadow: '0 1px 2px rgba(30,42,54,.10), 0 14px 32px -20px rgba(24,34,44,.34)',
+      labelTransform: 'uppercase',
+      labelSpacing: '0.06em',
+      labelWeight: '600',
+      activeBorderColor: 'transparent',
+      activeBorderWidth: '0',
+      chipInactiveBg: '#B4BBC2',
+      chipInactiveBorder: 'transparent',
+      chipActiveBg: '#21272D',
+      chipActiveText: '#FFFFFF',
+    },
+    // Inter — the neutral Swiss grotesque: cool, precise, architectural. Reads as
+    // blueprint/technical (vs Satoshi's warmth), matching the cool-slate drench.
+    defaultFont: 'inter',
+    palette: {
+      mode: 'light',
+      // COOL SLATE drench — every layer a tonal shade of ONE cool blue-grey slate.
+      pageBg: '#A9B0B8',
+      surface: '#BFC5CB',
+      surface2: '#B4BBC2',
+      surface2Text: '#1B2127',
+      inputBg: '#CFD4D9',
+      inputBgHover: '#C4CAD0',
+      inputText: '#1A2026',
+      inputBorder: 'rgba(38,52,66,.24)',
+      text: '#191F25',
+      muted: '#414A53',
+      muted2: '#454E58',
+      contactText: '#2F373F',
+      border: 'rgba(30,42,54,.20)',
+      // Cool graphite / gunmetal steel — the single restrained accent.
+      accent: '#2B3138',
+      // Deeper cool graphite so WHITE CTA/total/active-chip text clears WCAG AA.
+      accentSolid: '#21272D',
+      accentHover: '#161B20',
+      accentText: '#FFFFFF',
+      accentSurface: '#D3D8DD',
+      accentOnSurface: '#2B3138',
+      errorBg: '#E6DBDA',
+      errorText: '#6C231B',
+      successBg: '#DAE2DE',
+      successText: '#25402F',
+    },
+  },
+  {
     id: 'cream',
     label: 'Cream',
     description: 'Soft light theme — effortel sage-tinted surfaces, ink text, cobalt accent.',
