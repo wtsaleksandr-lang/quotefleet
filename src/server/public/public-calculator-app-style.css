@@ -113,8 +113,8 @@ body.qf-app-calculator .qf-section-title {
 
 body.qf-app-calculator .qf-field label {
   color: #334155;
-  font-size: 12px;
-  font-weight: 760;
+  font-size: 12px; letter-spacing: var(--w-label-spacing, 0.01em); text-transform: var(--w-label-transform, none);
+  font-weight: var(--w-label-weight, 760);
 }
 
 body.qf-app-calculator .qf-input,

@@ -67,6 +67,57 @@ export interface WidgetThemeTokens {
   '--w-primary': string;
   '--w-primary-hover': string;
   '--w-font': string;
+  // ── STRUCTURAL tokens (Wave 4) ────────────────────────────────────
+  // These carry the *design language* — corner radius, border weight,
+  // elevation and label typography — so each preset can be a genuinely
+  // different shell (sharp Uber ↔ soft Apple), not just a recolour. The
+  // widget CSS reads each with the current Midnight value as its fallback,
+  // so Midnight (and Cream) stay pixel-for-pixel identical.
+  /** Card / shell corner radius (e.g. sharp 2px ↔ soft 18px). */
+  '--w-radius-card': string;
+  /** Input & select corner radius. */
+  '--w-radius-input': string;
+  /** CTA / button & total-box corner radius. */
+  '--w-radius-btn': string;
+  /** Chip / pill corner radius (999px = fully round, small = tab-like). */
+  '--w-radius-pill': string;
+  /** Card / panel border width (hairline 1px, or 0 for borderless). */
+  '--w-border-width': string;
+  /** Card elevation — flat `none`, soft-diffuse, or Material-elevated. */
+  '--w-card-shadow': string;
+  /** Field-label text-transform (`none` sentence-case ↔ `uppercase`). */
+  '--w-label-transform': string;
+  /** Field-label letter-spacing (tight sentence ↔ wide tracked caps). */
+  '--w-label-spacing': string;
+  /** Field-label font-weight. */
+  '--w-label-weight': string;
+  // ── STATEFUL-CONTROL tokens (Wave 5 — the "Uber" active/inactive pattern) ──
+  // Drive how the calculator's stateful toggles (service tabs, unit toggles,
+  // accessory chips, option flags) read in their ON vs OFF state. Defaults
+  // reproduce the current look byte-for-byte, so every preset except mono is
+  // unchanged; mono uses them to render Uber's signature "selected = thin black
+  // border on white; unselected = soft grey tint, borderless" behaviour.
+  /** Visible border colour for the ACTIVE tab / chip (default `transparent`). */
+  '--w-active-border-color': string;
+  /** Visible border width for the ACTIVE tab / chip (default `0`). */
+  '--w-active-border-width': string;
+  /** Fill for an INACTIVE tab / chip / flag (default = the input surface). */
+  '--w-chip-inactive-bg': string;
+  /** Border colour for an INACTIVE chip / flag (default = the input border). */
+  '--w-chip-inactive-border': string;
+  /** Fill for an ACTIVE accessory chip (default = the solid accent). */
+  '--w-chip-active-bg': string;
+  /** Text colour for an ACTIVE accessory chip (default = on-accent text). */
+  '--w-chip-active-text': string;
+  // ── FROSTED-GLASS tokens (Wave 6 — the Cupertino/Apple frosted shell) ──────
+  // A translucent surface + backdrop-blur radius that only the cupertino-scoped
+  // CSS reads. Always emitted so the token type stays total: a `frosted` preset
+  // gets a semi-opaque surface + real blur; every other preset gets its OPAQUE
+  // surface value + `0px` blur, so its shell renders byte-for-byte identical.
+  /** Frosted shell fill — translucent for frosted presets, else the opaque surface. */
+  '--w-surface-frost': string;
+  /** Backdrop-blur radius for the frosted shell (`0px` = no blur / no frost). */
+  '--w-frost-blur': string;
 }
 
 type ThemeMode = 'dark' | 'light';
@@ -89,6 +140,12 @@ interface PresetPalette {
   contactText: string;
   border: string;
   accent: string;
+  /** Optional fill colour for accent-filled TEXT surfaces (CTA, total box,
+   *  active chip) when it must differ from the identity `accent`. Lets a bright
+   *  identity accent (e.g. Harley `#FC6600`, iOS `#007AFF`) stay bright for
+   *  route/pins/on-surface labels while the FILLED buttons use a slightly
+   *  deeper shade that carries WHITE text at WCAG AA. Omitted → fill = accent. */
+  accentSolid?: string;
   accentHover: string;
   accentText: string;
   accentSurface: string;
@@ -99,12 +156,67 @@ interface PresetPalette {
   successText: string;
 }
 
+// Per-preset STRUCTURAL signature — the non-colour half of the design
+// language. Emitted as `--w-*` structural tokens by buildTokens(). Any preset
+// may omit fields; DEFAULT_STRUCTURE (= today's Midnight values) fills the gaps
+// so the default shell never moves.
+interface PresetStructure {
+  /** Card / shell radius. */ radiusCard: string;
+  /** Input / select radius. */ radiusInput: string;
+  /** Button / total-box radius. */ radiusBtn: string;
+  /** Chip / pill radius. */ radiusPill: string;
+  /** Card / panel border width. */ borderWidth: string;
+  /** Card elevation / box-shadow. */ cardShadow: string;
+  /** Field-label text-transform. */ labelTransform: string;
+  /** Field-label letter-spacing. */ labelSpacing: string;
+  /** Field-label font-weight. */ labelWeight: string;
+  // ── Optional stateful-control overrides (Wave 5) ──────────────────────────
+  // Omitted by every preset except mono; buildTokens fills the gaps with the
+  // current-look defaults so all other presets stay pixel-for-pixel identical.
+  /** ACTIVE tab/chip border colour. */ activeBorderColor?: string;
+  /** ACTIVE tab/chip border width. */ activeBorderWidth?: string;
+  /** INACTIVE tab/chip fill. */ chipInactiveBg?: string;
+  /** INACTIVE chip/flag border colour. */ chipInactiveBorder?: string;
+  /** ACTIVE chip fill. */ chipActiveBg?: string;
+  /** ACTIVE chip text colour. */ chipActiveText?: string;
+  // ── Optional frosted-glass shell (Wave 6) ─────────────────────────────────
+  // Set only by cupertino (Apple). When true, buildTokens emits a translucent
+  // `--w-surface-frost` + a real `--w-frost-blur` radius; every other preset
+  // leaves it undefined → opaque surface + `0px` blur, so no other shell moves.
+  /** Frosted-glass shell (translucent surface + backdrop blur). */ frosted?: boolean;
+}
+
+// The current approved widget's exact structural values. These MUST equal the
+// CSS fallbacks in public-calculator-no-gradients.css / widget-style.css, so a
+// preset that spreads DEFAULT_STRUCTURE renders the widget unchanged.
+const DEFAULT_STRUCTURE: PresetStructure = {
+  // Match the LIVE calculator exactly: shell 8px (no-gradients / maersk card),
+  // inputs 6px (maersk control), buttons/chips 4px (maersk button), pills 999px,
+  // 1px hairline, the approved deep shadow, and app-style's field labels
+  // (weight 760, 0.01em, sentence-case).
+  radiusCard: '8px',
+  radiusInput: '6px',
+  radiusBtn: '4px',
+  radiusPill: '999px',
+  borderWidth: '1px',
+  cardShadow: '0 24px 60px -32px rgba(0,0,0,.75)',
+  labelTransform: 'none',
+  labelSpacing: '0.01em',
+  labelWeight: '760',
+};
+
 export interface WidgetPreset {
   id: string;
   label: string;
   description: string;
   mode: ThemeMode;
   palette: PresetPalette;
+  /** The design-language / structural signature. */
+  structure: PresetStructure;
+  /** Preset's default self-hosted font — used when the tenant hasn't picked
+   *  one. Omitted → the global DEFAULT_FONT_ID. Lets a preset ship the type
+   *  voice its design language needs (e.g. mono's clean geometric grotesque). */
+  defaultFont?: string;
 }
 
 // ── colour maths — delegated to the WCAG contrast engine ────────────
@@ -156,10 +268,28 @@ export const WIDGET_FONTS: Record<string, WidgetFont> = {
     stack: `'Sora', 'Inter', ${SYSTEM_FALLBACK}`,
     selfHosted: true,
   },
+  roboto: {
+    id: 'roboto',
+    label: 'Roboto',
+    // The Google / Android system font — the Material design-language voice.
+    stack: `'Roboto', 'Inter', ${SYSTEM_FALLBACK}`,
+    selfHosted: true,
+  },
+  oswald: {
+    id: 'oswald',
+    label: 'Oswald',
+    // Condensed bold — the Ironhorse / Harley moto voice. Condensed fallbacks
+    // first so a slow font-load still reads narrow, then the self-hosted sans.
+    stack: `'Oswald', 'Saira Condensed', 'Archivo Narrow', 'Satoshi', 'Inter', ${SYSTEM_FALLBACK}`,
+    selfHosted: true,
+  },
   system: {
     id: 'system',
     label: 'System',
-    stack: `'Inter', ${SYSTEM_FALLBACK}`,
+    // The Apple/SF voice — SF Pro renders natively on Apple devices; Inter is
+    // the cross-platform fallback (no binaries shipped, selfHosted stays false).
+    // cupertino's defaultFont: 'system' gives it this SF stack.
+    stack: `-apple-system, BlinkMacSystemFont, 'SF Pro Text', 'SF Pro Display', 'Inter', system-ui, sans-serif`,
     selfHosted: false,
   },
 };
@@ -167,13 +297,28 @@ export const WIDGET_FONTS: Record<string, WidgetFont> = {
 export const DEFAULT_FONT_ID = 'satoshi';
 export const DEFAULT_PRESET_ID = 'midnight';
 
-// ── The curated preset set (6) ──────────────────────────────────────
+// ── The curated preset set (14 — a premium light + dark lineup) ─────
+// Wave 4: each preset is now a DISTINCT DESIGN LANGUAGE, not a recolour. The
+// `structure` block drives corner radius, border weight, elevation and label
+// typography; the palette drives a premium, brand-evocative colour world.
+// Together they make the calculators look like they came from different design
+// teams (sharp mono Uber ↔ airy soft Apple ↔ elevated Google ↔ glassy Linear).
+//
+// Every accent was chosen so its guaranteed-readable label text is clean, not
+// borderline; the WCAG engine still hardens anything that drifts. Brand
+// inspiration lives in `description` only; the user-facing `label` is a neutral
+// premium name (no trademarks). Midnight (default) + Cream keep their exact
+// palettes AND spread DEFAULT_STRUCTURE, so they render pixel-for-pixel as
+// before.
 const PRESETS_RAW: WidgetPreset[] = [
   {
     id: 'midnight',
     label: 'Midnight',
     description: 'The QuoteFleet default — charcoal shell, cream inputs, cobalt accent.',
     mode: 'dark',
+    // UNCHANGED — the approved default. Standard 8px shell, hairline border,
+    // restrained deep shadow, sentence-case labels.
+    structure: { ...DEFAULT_STRUCTURE },
     palette: {
       mode: 'dark',
       // Effortel-family premium charcoal (cool green-grey undertone) with clear
@@ -203,127 +348,635 @@ const PRESETS_RAW: WidgetPreset[] = [
     },
   },
   {
-    id: 'slate',
-    label: 'Slate',
-    description: 'Cool blue-grey shell with a periwinkle accent.',
+    id: 'mono',
+    label: 'Clarity',
+    description: 'Inspired by Uber — premium WHITE surfaces, high-contrast black text and a solid black CTA. Selected controls take a thin black border on white; unselected controls are borderless with a soft grey tint. Moderate radius, clean geometric grotesque type.',
+    mode: 'light',
+    // The Uber design language: white shell, black ink, moderate radius, a
+    // barely-there elevation and clean sentence-case labels. The active/inactive
+    // control pattern lives in the stateful-control tokens below.
+    structure: {
+      radiusCard: '16px',
+      radiusInput: '10px',
+      radiusBtn: '12px',
+      radiusPill: '10px',
+      borderWidth: '1px',
+      cardShadow: '0 1px 2px rgba(0,0,0,.05), 0 14px 34px -20px rgba(0,0,0,.16)',
+      labelTransform: 'none',
+      labelSpacing: 'normal',
+      labelWeight: '600',
+      // Uber pattern: ON = white fill + a BOLD black border; OFF = grey tint,
+      // borderless. These override the current-look defaults for mono only.
+      // 2.5px matches the heavy selected outline in the Uber reference.
+      activeBorderColor: '#111111',
+      activeBorderWidth: '2.5px',
+      chipInactiveBg: '#F6F6F6',
+      chipInactiveBorder: 'transparent',
+      chipActiveBg: '#FFFFFF',
+      chipActiveText: '#111111',
+    },
+    // Satoshi — the closest self-hosted match to Uber Move (a clean geometric
+    // grotesque with a tall x-height). Reads the most Uber-like of the three.
+    defaultFont: 'satoshi',
+    palette: {
+      mode: 'light',
+      // Premium white — the whole shell is white, not grey; surface-2 is the
+      // soft #F6F6F6 tint used for inactive controls and quiet sub-panels.
+      pageBg: '#FFFFFF',
+      surface: '#FFFFFF',
+      surface2: '#F6F6F6',
+      surface2Text: '#111111',
+      inputBg: '#FFFFFF',
+      inputBgHover: '#F6F6F6',
+      inputText: '#111111',
+      inputBorder: '#E4E4E4',
+      text: '#111111',
+      muted: '#6B6B6B',
+      muted2: '#8A8A8A',
+      contactText: '#4A4A4A',
+      border: '#EAEAEA',
+      // Solid BLACK accent: CTA / total box render black with white label text
+      // (engine-picked) — Uber's signature high-contrast button. On-surface
+      // accent is also black so pill/label accents read as clean ink on white.
+      accent: '#111111',
+      accentHover: '#000000',
+      accentText: '#FFFFFF',
+      accentSurface: '#FFFFFF',
+      accentOnSurface: '#111111',
+      errorBg: '#FBE9E7',
+      errorText: '#7A1712',
+      successBg: '#E8F3EC',
+      successText: '#14532D',
+    },
+  },
+  {
+    id: 'graphite',
+    label: 'Graphite',
+    description: 'Inspired by Tesla — automotive-premium graphite, ultra-minimal: small corners, flat shell, thin uppercase tracked labels, a restrained cool-steel accent used sparingly.',
     mode: 'dark',
+    // Automotive minimal: small 4px corners, near-flat elevation, light-weight
+    // uppercase micro-labels. The accent is a muted steel — deliberately quiet.
+    structure: {
+      radiusCard: '4px',
+      radiusInput: '4px',
+      radiusBtn: '4px',
+      radiusPill: '4px',
+      borderWidth: '1px',
+      cardShadow: '0 2px 6px -2px rgba(0,0,0,.55)',
+      labelTransform: 'uppercase',
+      labelSpacing: '0.16em',
+      labelWeight: '500',
+    },
     palette: {
       mode: 'dark',
-      pageBg: '#14181F',
-      surface: '#1B212B',
-      surface2: '#212936',
-      surface2Text: '#E4E8F0',
-      inputBg: '#E7EAF0',
-      inputBgHover: '#D6DBE6',
-      inputText: '#1B2130',
-      inputBorder: 'rgba(110,139,255,.28)',
+      // Cool neutral graphite with even, premium depth between layers.
+      pageBg: '#141517',
+      surface: '#1C1E21',
+      surface2: '#25282C',
+      surface2Text: '#E4E6E9',
+      inputBg: '#ECEEF0',
+      inputBgHover: '#DCDFE3',
+      inputText: '#17181A',
+      inputBorder: 'rgba(120,140,160,.28)',
       text: '#FFFFFF',
-      muted: '#AEB8CA',
-      muted2: '#9AA6BC',
-      contactText: '#C2CBDC',
-      border: 'rgba(255,255,255,.12)',
-      accent: '#4F6BF0',
-      accentHover: '#3F58DC',
+      muted: '#A9AFB7',
+      muted2: '#8C929B',
+      contactText: '#C2C7CE',
+      border: 'rgba(255,255,255,.08)',
+      // Restrained cool steel — premium, never a loud fill.
+      accent: '#47566A',
+      accentHover: '#3A4757',
       accentText: '#FFFFFF',
-      accentSurface: '#EEF1FB',
-      accentOnSurface: '#8DA2FF',
-      errorBg: '#F1E7E7',
+      accentSurface: '#FFFFFF',
+      accentOnSurface: '#9DB0C6',
+      errorBg: '#EFE7E4',
       errorText: '#1E1E1E',
-      successBg: '#E4EDF1',
+      successBg: '#E4EDE9',
       successText: '#1E1E1E',
     },
   },
   {
-    id: 'carbon',
-    label: 'Carbon',
-    description: 'Neutral near-black with a crisp white/blue accent.',
+    id: 'ironhorse',
+    label: 'Ironhorse',
+    description:
+      'Inspired by Harley-Davidson — bold orange-on-black moto identity: heavy uppercase condensed labels, black active borders on white, sharp small radius.',
+    mode: 'light',
+    // Moto identity: white shell, near-black ink, sharp small corners, heavy
+    // tracked uppercase labels, a BLACK active border on the orange-accented
+    // controls. Ships Oswald (condensed) as its type voice.
+    structure: {
+      radiusCard: '10px',
+      radiusInput: '8px',
+      radiusBtn: '6px',
+      radiusPill: '999px',
+      borderWidth: '1.5px',
+      cardShadow: '0 1px 2px rgba(17,17,17,.05), 0 16px 40px -24px rgba(17,17,17,.22)',
+      labelTransform: 'uppercase',
+      labelSpacing: '0.08em',
+      labelWeight: '800',
+      activeBorderColor: '#111111',
+      activeBorderWidth: '2px',
+      chipInactiveBg: '#F4F4F5',
+      chipInactiveBorder: 'transparent',
+      chipActiveBg: '#FC6600',
+      chipActiveText: '#111111',
+    },
+    defaultFont: 'oswald',
+    palette: {
+      mode: 'light',
+      pageBg: '#F3F3F4',
+      surface: '#FFFFFF',
+      surface2: '#F4F4F5',
+      surface2Text: '#111111',
+      inputBg: '#FFFFFF',
+      inputBgHover: '#F5F5F5',
+      inputText: '#111111',
+      inputBorder: 'rgba(17,17,17,.18)',
+      text: '#0F0F0F',
+      muted: '#5A5A5A',
+      muted2: '#767676',
+      contactText: '#3A3A3A',
+      border: 'rgba(17,17,17,.16)',
+      accent: '#FC6600',
+      accentHover: '#E25B00',
+      accentText: '#111111',
+      accentSurface: '#FFEAD9',
+      accentOnSurface: '#C2410C',
+      errorBg: '#FBE4E0',
+      errorText: '#7A1712',
+      successBg: '#E7F3EA',
+      successText: '#14532D',
+    },
+  },
+  {
+    id: 'nocturne',
+    label: 'Nocturne',
+    description: 'Inspired by Linear / Vercel — a cool purple-tinted charcoal with glassy hairline borders, soft diffuse elevation and a refined violet accent.',
     mode: 'dark',
+    // Refined dark-tool aesthetic: medium 12px corners, soft diffuse shadow,
+    // small tracked uppercase labels — glassy and modern.
+    structure: {
+      radiusCard: '12px',
+      radiusInput: '10px',
+      radiusBtn: '8px',
+      radiusPill: '999px',
+      borderWidth: '1px',
+      cardShadow: '0 20px 50px -24px rgba(0,0,0,.65)',
+      labelTransform: 'uppercase',
+      labelSpacing: '0.08em',
+      labelWeight: '600',
+    },
     palette: {
       mode: 'dark',
-      pageBg: '#0E0E0E',
-      surface: '#161616',
-      surface2: '#1E1E1E',
-      surface2Text: '#EAEAEA',
-      inputBg: '#F2F2F0',
-      inputBgHover: '#E2E2DF',
-      inputText: '#141414',
-      inputBorder: 'rgba(37,99,235,.24)',
+      // Cool violet-tinted charcoal.
+      pageBg: '#14131C',
+      surface: '#1C1B26',
+      surface2: '#252433',
+      surface2Text: '#E7E5F0',
+      inputBg: '#ECEBF3',
+      inputBgHover: '#DBDAE8',
+      inputText: '#1A1826',
+      inputBorder: 'rgba(120,110,220,.30)',
       text: '#FFFFFF',
-      muted: '#B4B4B4',
-      muted2: '#9C9C9C',
-      contactText: '#C6C6C6',
-      border: 'rgba(255,255,255,.12)',
-      accent: '#2563EB',
-      accentHover: '#1D4FD0',
+      muted: '#B0AAC6',
+      muted2: '#948EB0',
+      contactText: '#C6C1DA',
+      border: 'rgba(255,255,255,.10)',
+      accent: '#5B54C9',
+      accentHover: '#4B45AE',
       accentText: '#FFFFFF',
       accentSurface: '#FFFFFF',
-      accentOnSurface: '#7AA2FF',
-      errorBg: '#F0E7E7',
-      errorText: '#141414',
-      successBg: '#E7EDE9',
-      successText: '#141414',
+      accentOnSurface: '#9E97F0',
+      errorBg: '#EDE7E3',
+      errorText: '#1E1E1E',
+      successBg: '#E1EAEF',
+      successText: '#1E1E1E',
     },
   },
   {
-    id: 'ocean',
-    label: 'Ocean',
-    description: 'Deep navy shell with a bright azure accent.',
+    id: 'sapphire',
+    label: 'Sapphire',
+    description: 'Inspired by enterprise fintech (IBM / Bloomberg) — a deep navy-blue shell, soft rounded cards and a confident azure accent.',
     mode: 'dark',
+    // A genuinely different surface HUE — the whole shell is deep navy, not
+    // grey. Medium-large rounded cards, soft elevation, calm sentence labels.
+    structure: {
+      radiusCard: '10px',
+      radiusInput: '8px',
+      radiusBtn: '8px',
+      radiusPill: '999px',
+      borderWidth: '1px',
+      cardShadow: '0 18px 44px -22px rgba(0,0,0,.72)',
+      labelTransform: 'none',
+      labelSpacing: '0.02em',
+      labelWeight: '600',
+    },
     palette: {
       mode: 'dark',
-      pageBg: '#0B1220',
+      pageBg: '#0B1120',
       surface: '#111A2E',
-      surface2: '#16223C',
-      surface2Text: '#E4EAF4',
-      inputBg: '#E9EEF6',
-      inputBgHover: '#D7DFED',
-      inputText: '#0F1B30',
-      inputBorder: 'rgba(37,99,235,.28)',
+      surface2: '#18233B',
+      surface2Text: '#DCE6F5',
+      inputBg: '#EAF0F9',
+      inputBgHover: '#D8E2F1',
+      inputText: '#0F1830',
+      inputBorder: 'rgba(45,108,223,.30)',
       text: '#FFFFFF',
-      muted: '#A7B4CC',
-      muted2: '#93A2BF',
-      contactText: '#BCC8DE',
-      border: 'rgba(255,255,255,.14)',
-      accent: '#2563EB',
-      accentHover: '#1E52D0',
+      muted: '#9DB0CE',
+      muted2: '#8598B8',
+      contactText: '#BACAE4',
+      border: 'rgba(255,255,255,.10)',
+      accent: '#2D6CDF',
+      accentHover: '#245ABF',
       accentText: '#FFFFFF',
-      accentSurface: '#EAF0FC',
-      accentOnSurface: '#6E9BFF',
-      errorBg: '#EFE6E4',
-      errorText: '#0F1B30',
-      successBg: '#E3ECF2',
-      successText: '#0F1B30',
+      accentSurface: '#FFFFFF',
+      accentOnSurface: '#7CA6F5',
+      errorBg: '#EDE3E1',
+      errorText: '#1E1E1E',
+      successBg: '#DFE9F2',
+      successText: '#1E1E1E',
     },
   },
   {
-    id: 'emerald',
-    label: 'Emerald',
-    description: 'Dark shell with a rich emerald-green accent.',
+    id: 'harbor',
+    label: 'Harbor',
+    description:
+      'Inspired by premium ride-share apps — deep petrol-teal accent, soft large radius, sentence-case labels, white pill tabs that fill teal when active.',
+    mode: 'light',
+    // Ride-app polish: white shell, deep petrol-teal accent, soft large radius,
+    // relaxed sentence-case labels. Stateful pattern: ACTIVE tab = filled teal
+    // pill (white text, no border); INACTIVE tab = white pill + light hairline.
+    structure: {
+      radiusCard: '18px',
+      radiusInput: '12px',
+      radiusBtn: '12px',
+      radiusPill: '999px',
+      borderWidth: '1px',
+      cardShadow: '0 1px 2px rgba(9,42,53,.05), 0 18px 44px -20px rgba(9,42,53,.22)',
+      labelTransform: 'none',
+      labelSpacing: 'normal',
+      labelWeight: '600',
+      activeBorderColor: 'transparent',
+      activeBorderWidth: '0',
+      chipInactiveBg: '#FFFFFF',
+      chipInactiveBorder: 'rgba(15,42,51,.16)',
+      chipActiveBg: '#0C566B',
+      chipActiveText: '#FFFFFF',
+    },
+    defaultFont: 'inter',
+    palette: {
+      mode: 'light',
+      pageBg: '#EAEEF3',
+      surface: '#FFFFFF',
+      surface2: '#F1F5F8',
+      surface2Text: '#0F2A33',
+      inputBg: '#FFFFFF',
+      inputBgHover: '#F1F5F8',
+      inputText: '#0F2A33',
+      inputBorder: 'rgba(12,86,107,.24)',
+      text: '#0F2A33',
+      muted: '#5A6B73',
+      muted2: '#79878E',
+      contactText: '#3E4E55',
+      border: 'rgba(15,42,51,.12)',
+      accent: '#0C566B',
+      accentHover: '#083F50',
+      accentText: '#FFFFFF',
+      accentSurface: '#E5F0F3',
+      accentOnSurface: '#0C566B',
+      errorBg: '#FCEAE7',
+      errorText: '#7A1A12',
+      successBg: '#E3F1E9',
+      successText: '#14532D',
+    },
+  },
+  {
+    id: 'cupertino',
+    label: 'Cupertino',
+    description: 'Inspired by Apple / iOS — airy FROSTED-glass shell over a soft grey page, generous whitespace, LARGE soft radius, hairline borders, translucent panels with a backdrop blur, sentence-case labels, system-blue accent, SF type voice.',
+    mode: 'light',
+    // The softest, airiest shell — now a genuine Apple FROSTED-GLASS card:
+    // large 20px corners, a gentle two-layer diffuse shadow, relaxed
+    // sentence-case labels at Apple's 590 weight, and the frosted flag that
+    // turns the shell + inner panels + map badges translucent (cupertino-scoped
+    // CSS reads --w-surface-frost / --w-frost-blur). Minimal and premium.
+    structure: {
+      radiusCard: '20px',
+      radiusInput: '12px',
+      radiusBtn: '12px',
+      radiusPill: '999px',
+      borderWidth: '1px',
+      cardShadow: '0 8px 30px -8px rgba(60,60,67,.16), 0 2px 8px -3px rgba(60,60,67,.12)',
+      labelTransform: 'none',
+      labelSpacing: 'normal',
+      labelWeight: '590',
+      frosted: true,
+    },
+    // SF voice — the `system` font stack now points at SF Pro (native on Apple
+    // devices) with Inter as the cross-platform fallback.
+    defaultFont: 'system',
+    palette: {
+      mode: 'light',
+      // Soft cool-grey page so the translucent white card reads as frosted glass
+      // lifted off it; pristine white surface, iOS grouped-list secondary.
+      pageBg: '#EDEDF2',
+      surface: '#FFFFFF',
+      surface2: '#F2F2F7',
+      surface2Text: '#1C1C1E',
+      inputBg: '#FFFFFF',
+      inputBgHover: '#F2F2F7',
+      inputText: '#1C1C1E',
+      inputBorder: 'rgba(60,60,67,0.18)',
+      text: '#1C1C1E',
+      muted: '#6E6E73',
+      muted2: '#8E8E93',
+      contactText: '#48484A',
+      border: 'rgba(60,60,67,0.12)',
+      // System-blue #007AFF as the DISPLAY accent (on-surface labels/icons).
+      // The FILLED CTA + total box use the slightly deeper #0069E0 so Apple's
+      // iconic WHITE-on-blue text clears WCAG AA (white-on-#0069E0 ≈ 4.9:1;
+      // #007AFF alone would keep dark text at 4.59:1).
+      accent: '#007AFF',
+      accentSolid: '#0069E0',
+      accentHover: '#0056BD',
+      accentText: '#FFFFFF',
+      accentSurface: '#E9F1FF',
+      accentOnSurface: '#0069E0',
+      errorBg: '#FCE7E5',
+      errorText: '#7A1512',
+      successBg: '#E4F7EA',
+      successText: '#248A3D',
+    },
+  },
+  {
+    id: 'material',
+    label: 'Material',
+    description: 'Inspired by Google / Android — tonal light surfaces, ELEVATED cards with a visible Material shadow, larger radius, Roboto Medium labels, Material-3 segmented service tabs, Google-blue accent.',
+    mode: 'light',
+    // The one card that clearly floats — a two-layer Material elevation. M3
+    // refinement: 16px corners, Roboto Medium (500) sentence-case labels at
+    // 0.01em tracking. The segmented tabs / blue focus / tonal surfaces / green
+    // ETA live in the material-scoped block of public-calculator-no-gradients.css.
+    structure: {
+      radiusCard: '16px',
+      radiusInput: '8px',
+      radiusBtn: '8px',
+      radiusPill: '999px',
+      borderWidth: '1px',
+      cardShadow: '0 1px 3px rgba(60,64,67,.30), 0 8px 24px -6px rgba(60,64,67,.24)',
+      labelTransform: 'none',
+      labelSpacing: '0.01em',
+      labelWeight: '500',
+    },
+    // Roboto — the Google/Android system font, the Material type voice.
+    defaultFont: 'roboto',
+    palette: {
+      mode: 'light',
+      pageBg: '#F1F3F4',
+      surface: '#FFFFFF',
+      surface2: '#F1F3F4',
+      surface2Text: '#202124',
+      inputBg: '#FFFFFF',
+      inputBgHover: '#F1F3F4',
+      inputText: '#202124',
+      inputBorder: 'rgba(26,115,232,.24)',
+      text: '#202124',
+      muted: '#5F6368',
+      muted2: '#80868B',
+      contactText: '#3C4043',
+      border: 'rgba(60,64,67,.16)',
+      accent: '#1A73E8',
+      accentHover: '#1667D6',
+      accentText: '#FFFFFF',
+      accentSurface: '#E8F0FE',
+      accentOnSurface: '#1A73E8',
+      errorBg: '#FCE8E6',
+      errorText: '#7A1A12',
+      successBg: '#E6F4EA',
+      successText: '#137333',
+    },
+  },
+  {
+    id: 'booking',
+    label: 'Voyage',
+    description:
+      'Inspired by Booking.com — an all-blue tonal DARK shell: deep-blue card over a darker blue page, borderless resting controls that take a 2px WHITE border when active, white text, a bright action-blue accent.',
     mode: 'dark',
+    // The Booking signature: a borderless resting shell (borderWidth 0) whose
+    // ACTIVE tab / chip is carried by a 2px white border on a tonal-blue fill —
+    // not a colour swap. Medium 16px card, soft deep drop shadow, semibold
+    // sentence-case labels. The active-tab label + white focus ring + contact
+    // link colour live in the booking-scoped block of no-gradients.css.
+    structure: {
+      radiusCard: '16px',
+      radiusInput: '12px',
+      radiusBtn: '12px',
+      radiusPill: '10px',
+      borderWidth: '0',
+      cardShadow: '0 24px 60px -30px rgba(0,10,40,.55)',
+      labelTransform: 'none',
+      labelSpacing: '0.01em',
+      labelWeight: '600',
+      activeBorderColor: '#FFFFFF',
+      activeBorderWidth: '2px',
+      chipInactiveBg: '#0D459A',
+      chipInactiveBorder: 'transparent',
+      chipActiveBg: '#12509F',
+      chipActiveText: '#FFFFFF',
+    },
+    defaultFont: 'inter',
     palette: {
       mode: 'dark',
-      pageBg: '#0E1512',
-      surface: '#14201B',
-      surface2: '#1A2A22',
-      surface2Text: '#E4EDE7',
-      inputBg: '#E8EDE9',
-      inputBgHover: '#D6DED9',
-      inputText: '#14231C',
-      inputBorder: 'rgba(5,150,105,.30)',
+      pageBg: '#002E77',
+      surface: '#003B95',
+      surface2: '#0D459A',
+      surface2Text: '#FFFFFF',
+      inputBg: '#00337F',
+      inputBgHover: '#0A3F8C',
+      inputText: '#FFFFFF',
+      inputBorder: 'rgba(255,255,255,.16)',
       text: '#FFFFFF',
-      muted: '#A9BCB2',
-      muted2: '#95A99F',
-      contactText: '#BECDC4',
+      muted: 'rgba(255,255,255,.72)',
+      muted2: 'rgba(255,255,255,.58)',
+      contactText: 'rgba(255,255,255,.80)',
       border: 'rgba(255,255,255,.12)',
-      accent: '#059669',
-      accentHover: '#047857',
+      accent: '#006CE4',
+      accentHover: '#0059C2',
       accentText: '#FFFFFF',
-      accentSurface: '#E6F5EF',
-      accentOnSurface: '#34D399',
-      errorBg: '#EDE7E2',
-      errorText: '#14231C',
-      successBg: '#E1EFE7',
-      successText: '#14231C',
+      accentSurface: '#0D459A',
+      accentOnSurface: '#9DBEF5',
+      errorBg: '#FCE7E4',
+      errorText: '#7A1512',
+      successBg: '#E4F7EA',
+      successText: '#177A3D',
+    },
+  },
+  {
+    id: 'indigo',
+    label: 'Indigo',
+    description: 'Inspired by Stripe — refined fintech light surfaces, elegantly rounded cards, a soft floating shadow and the signature indigo accent.',
+    mode: 'light',
+    // Refined and rounded: generous 14px cards, soft coloured-shadow float,
+    // quiet sentence-case labels. Fintech polish.
+    structure: {
+      radiusCard: '14px',
+      radiusInput: '10px',
+      radiusBtn: '10px',
+      radiusPill: '999px',
+      borderWidth: '1px',
+      cardShadow: '0 10px 40px -16px rgba(26,31,54,.26)',
+      labelTransform: 'none',
+      labelSpacing: '0.01em',
+      labelWeight: '550',
+    },
+    palette: {
+      mode: 'light',
+      pageBg: '#F6F5FB',
+      surface: '#FFFFFF',
+      surface2: '#F1F0F9',
+      surface2Text: '#1A1F36',
+      inputBg: '#FFFFFF',
+      inputBgHover: '#F3F2FB',
+      inputText: '#1A1F36',
+      inputBorder: 'rgba(99,91,255,.24)',
+      text: '#1A1F36',
+      muted: '#5B6178',
+      muted2: '#6E7488',
+      contactText: '#454B5F',
+      border: 'rgba(26,31,54,.12)',
+      accent: '#635BFF',
+      accentHover: '#514BE0',
+      accentText: '#FFFFFF',
+      accentSurface: '#ECEBFF',
+      accentOnSurface: '#514BE0',
+      errorBg: '#FCE9E6',
+      errorText: '#7A1A12',
+      successBg: '#E4F5EC',
+      successText: '#12633A',
+    },
+  },
+  {
+    id: 'tesla',
+    label: 'Voltage',
+    description:
+      'Inspired by Tesla — an in-car-console DARK theme: near-black page, faintly-lifted graphite cards, DARK inputs with white text, thin tracked UPPERCASE micro-labels, and the Tesla-red accent used sparingly on the CTA / total / active chip.',
+    mode: 'dark',
+    // The Tesla instrument-cluster voice: near-flat elevation (hairline dividers
+    // do the structural work), small-medium corners, thin tracked UPPERCASE
+    // micro-labels. Active control = FILLED Tesla red (white text); inactive =
+    // dark graphite tint + a faint hairline. Ships the geometric Sora voice.
+    structure: {
+      radiusCard: '10px',
+      radiusInput: '8px',
+      radiusBtn: '8px',
+      radiusPill: '999px',
+      borderWidth: '1px',
+      cardShadow: '0 1px 2px rgba(0,0,0,.5)',
+      labelTransform: 'uppercase',
+      labelSpacing: '0.14em',
+      labelWeight: '500',
+      activeBorderColor: 'transparent',
+      activeBorderWidth: '0',
+      chipInactiveBg: '#1E1F21',
+      chipInactiveBorder: 'rgba(255,255,255,.10)',
+      chipActiveBg: '#C8151B',
+      chipActiveText: '#FFFFFF',
+    },
+    defaultFont: 'sora',
+    palette: {
+      mode: 'dark',
+      // The Tesla console void: near-black page, faintly-lifted graphite cards.
+      pageBg: '#0A0A0B',
+      surface: '#141516',
+      surface2: '#1E1F21',
+      surface2Text: '#F5F5F7',
+      // DARK input fields with white text — the in-car console look (distinct
+      // from graphite's LIGHT cream inputs).
+      inputBg: '#1E1F21',
+      inputBgHover: '#26282B',
+      inputText: '#FFFFFF',
+      inputBorder: 'rgba(255,255,255,.14)',
+      text: '#FFFFFF',
+      muted: '#A8AAAD',
+      muted2: '#85878B',
+      contactText: '#C7C9CC',
+      border: 'rgba(255,255,255,.09)',
+      // Tesla RED identity — pure #E82127 for route line, pins, on-surface accents.
+      accent: '#E82127',
+      // Deeper red so WHITE CTA/total/active-chip text clears WCAG AA (5.87:1).
+      accentSolid: '#C8151B',
+      accentHover: '#B81419',
+      accentText: '#FFFFFF',
+      accentSurface: '#FFFFFF',
+      // Brightened red that reads on the dark surface (5.99:1) for on-surface labels.
+      accentOnSurface: '#FF5A5F',
+      errorBg: '#F2E4E4',
+      errorText: '#5A1416',
+      successBg: '#E3EEE8',
+      successText: '#14432A',
+    },
+  },
+  {
+    id: 'stripe',
+    label: 'Blurple',
+    description:
+      'Inspired by Stripe — a refined fintech LIGHT theme: a surface-gray page under a pure-white card, a soft layered slate-blue float shadow, a top aurora accent strip, and the signature indigo (blurple) accent with a gradient CTA.',
+    mode: 'light',
+    // Stripe polish: generously rounded card, the layered SOFT float with the
+    // slate-blue (50,50,93) coloured shadow (three layers = the floating-card
+    // tell), quiet sentence-case labels at Stripe's 560 weight. Segmented tabs:
+    // ACTIVE = filled indigo pill (white text, no border); INACTIVE = surface-
+    // gray tint + hairline. Ships Inter (closest free match to Söhne).
+    structure: {
+      radiusCard: '16px',
+      radiusInput: '8px',
+      radiusBtn: '10px',
+      radiusPill: '999px',
+      borderWidth: '1px',
+      cardShadow:
+        '0 7px 14px 0 rgba(50,50,93,.10), 0 3px 6px 0 rgba(0,0,0,.06), 0 18px 40px -12px rgba(50,50,93,.14)',
+      labelTransform: 'none',
+      labelSpacing: '0.01em',
+      labelWeight: '560',
+      activeBorderColor: 'transparent',
+      activeBorderWidth: '0',
+      chipInactiveBg: '#F6F9FC',
+      chipInactiveBorder: 'rgba(10,37,64,.10)',
+      chipActiveBg: '#5A52E0',
+      chipActiveText: '#FFFFFF',
+    },
+    defaultFont: 'inter',
+    palette: {
+      mode: 'light',
+      // Stripe's signature surface-gray page so the pure-white card floats on it.
+      pageBg: '#F6F9FC',
+      surface: '#FFFFFF',
+      surface2: '#F6F9FC',
+      surface2Text: '#0A2540',
+      inputBg: '#FFFFFF',
+      inputBgHover: '#F6F9FC',
+      inputText: '#0A2540',
+      // Stripe's neutral field border (#E3E8EE) — indigo only appears on focus.
+      inputBorder: '#E3E8EE',
+      // Stripe primary text = dark slate, never pure black.
+      text: '#0A2540',
+      muted: '#425466',
+      muted2: '#697386',
+      contactText: '#425466',
+      border: 'rgba(10,37,64,.10)',
+      // The blurple identity.
+      accent: '#635BFF',
+      // Deeper indigo for FILLED text surfaces so WHITE clears AA comfortably
+      // (white-on-#635BFF ≈ 4.70:1 borderline; white-on-#5A52E0 ≈ 5.6:1).
+      accentSolid: '#5A52E0',
+      accentHover: '#5147E6',
+      accentText: '#FFFFFF',
+      accentSurface: '#EFEEFF',
+      accentOnSurface: '#514BE0',
+      errorBg: '#FCE9EC',
+      errorText: '#7A1A2E',
+      successBg: '#E3F5EC',
+      successText: '#0E6245',
     },
   },
   {
@@ -331,6 +984,8 @@ const PRESETS_RAW: WidgetPreset[] = [
     label: 'Cream',
     description: 'Soft light theme — effortel sage-tinted surfaces, ink text, cobalt accent.',
     mode: 'light',
+    // UNCHANGED — the approved soft light shell. Spreads DEFAULT_STRUCTURE.
+    structure: { ...DEFAULT_STRUCTURE },
     palette: {
       mode: 'light',
       // Effortel-family light: a soft sage-tinted shell + cool near-white
@@ -391,6 +1046,7 @@ function normalizeCtaHover(v: string | null | undefined): CtaHover {
 // below threshold.
 function buildTokens(
   p: PresetPalette,
+  s: PresetStructure,
   fontStack: string,
   fontColor: string | null,
 ): WidgetThemeTokens {
@@ -398,9 +1054,11 @@ function buildTokens(
     p.mode === 'light' ? 'rgba(20,16,10,.14)' : p.accentSurface;
 
   // Accent-filled TEXT surfaces (CTA, total box, active chip): a guaranteed
-  // readable {fill, text} pair. `solid` is the accent, hardened only if no
-  // pure foreground could clear 4.5:1 on the raw accent (rare borderline hues).
-  const onAccent = accessibleOnAccent(p.accent, WCAG.NORMAL);
+  // readable {fill, text} pair. `solid` is `accentSolid` when the preset sets
+  // one (a deeper shade so WHITE text passes, keeping the identity `accent`
+  // bright), else the raw accent — hardened only if no pure foreground could
+  // clear 4.5:1 on it (rare borderline hues).
+  const onAccent = accessibleOnAccent(p.accentSolid ?? p.accent, WCAG.NORMAL);
   const autoAccentText = onAccent.text;
   const autoTotalText = onAccent.text;
   // Pill / on-surface accent labels render over the shell surface.
@@ -446,6 +1104,29 @@ function buildTokens(
     '--w-primary': p.accent,
     '--w-primary-hover': p.accentHover,
     '--w-font': fontStack,
+    // Structural tokens — the design-language half of the theme.
+    '--w-radius-card': s.radiusCard,
+    '--w-radius-input': s.radiusInput,
+    '--w-radius-btn': s.radiusBtn,
+    '--w-radius-pill': s.radiusPill,
+    '--w-border-width': s.borderWidth,
+    '--w-card-shadow': s.cardShadow,
+    '--w-label-transform': s.labelTransform,
+    '--w-label-spacing': s.labelSpacing,
+    '--w-label-weight': s.labelWeight,
+    // Stateful-control tokens — defaults reproduce the current look exactly so
+    // every preset except mono renders unchanged; mono overrides via `structure`.
+    '--w-active-border-color': s.activeBorderColor ?? 'transparent',
+    '--w-active-border-width': s.activeBorderWidth ?? '0',
+    '--w-chip-inactive-bg': s.chipInactiveBg ?? p.inputBg,
+    '--w-chip-inactive-border': s.chipInactiveBorder ?? p.inputBorder,
+    '--w-chip-active-bg': s.chipActiveBg ?? onAccent.bg,
+    '--w-chip-active-text': s.chipActiveText ?? accentText,
+    // Frosted-glass tokens — always emitted so the type stays total. A frosted
+    // preset (cupertino) gets a translucent surface + real blur; every other
+    // preset gets its OPAQUE surface value + `0px` blur → shell unchanged.
+    '--w-surface-frost': s.frosted ? 'rgba(255,255,255,0.72)' : p.surface,
+    '--w-frost-blur': s.frosted ? '30px' : '0px',
   };
 }
 
@@ -469,6 +1150,10 @@ function applyAccentOverride(p: PresetPalette, hex: string): PresetPalette {
   return {
     ...p,
     accent,
+    // A custom accent replaces BOTH the identity accent and the filled-button
+    // colour — drop any preset-specific accentSolid so the tenant's hex drives
+    // the CTA/total fill (engine-hardened) rather than the preset's paired shade.
+    accentSolid: undefined,
     accentHover,
     accentText,
     accentOnSurface: onSurface,
@@ -519,7 +1204,10 @@ function normalizeHex(v: string | null | undefined): string | null {
 export function resolveWidgetTheme(brand: BrandThemeInput | null | undefined): ResolvedWidgetTheme {
   const presetId = brand?.themePreset && WIDGET_PRESETS[brand.themePreset] ? brand.themePreset : DEFAULT_PRESET_ID;
   const preset = WIDGET_PRESETS[presetId];
-  const fontId = brand?.fontFamily && WIDGET_FONTS[brand.fontFamily] ? brand.fontFamily : DEFAULT_FONT_ID;
+  // Tenant's explicit font wins; otherwise the preset's own default font (its
+  // design-language voice); otherwise the global default.
+  const presetFont = preset.defaultFont && WIDGET_FONTS[preset.defaultFont] ? preset.defaultFont : DEFAULT_FONT_ID;
+  const fontId = brand?.fontFamily && WIDGET_FONTS[brand.fontFamily] ? brand.fontFamily : presetFont;
   const font = WIDGET_FONTS[fontId];
 
   const accentOverride = normalizeHex(brand?.accentOverride);
@@ -539,7 +1227,7 @@ export function resolveWidgetTheme(brand: BrandThemeInput | null | undefined): R
     accentOverride,
     fontColor: fontColor ?? 'auto',
     ctaHover,
-    tokens: buildTokens(palette, font.stack, fontColor),
+    tokens: buildTokens(palette, preset.structure, font.stack, fontColor),
   };
 }
 

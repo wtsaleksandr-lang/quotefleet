@@ -14,6 +14,20 @@
   --qf-maersk-radius-button: 4px;
 }
 
+/* Wave 4 — widget theme structural tokens re-map the CALCULATOR's radius scale.
+   Scoped to body.qf-app-calculator so it only takes effect inside the widget
+   iframe (where widget.js has set --w-radius-*); every other surface on the
+   site keeps the global :root fallbacks above, unchanged. The fallbacks equal
+   the current values, so the default (Midnight) shell stays pixel-for-pixel
+   identical. Presets like Onyx (2px, sharp) / Cupertino (14–18px, soft) now
+   restyle the whole card, inputs, buttons and chips — not just the colour. */
+body.qf-app-calculator {
+  --qf-maersk-radius-card: var(--w-radius-card, 8px);
+  --qf-maersk-radius-control: var(--w-radius-input, 6px);
+  --qf-maersk-radius-button: var(--w-radius-btn, 4px);
+  --radius-pill: var(--w-radius-pill, 999px);
+}
+
 .card,
 .price-card,
 .support-card,

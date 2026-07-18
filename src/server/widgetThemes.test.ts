@@ -25,6 +25,16 @@ const REQUIRED_TOKENS = [
   '--w-accent-pill-border', '--w-total-text', '--w-pill-text',
   '--w-error-bg', '--w-error-text', '--w-success-bg',
   '--w-success-text', '--w-primary', '--w-primary-hover', '--w-font',
+  // Structural (design-language) tokens — Wave 4.
+  '--w-radius-card', '--w-radius-input', '--w-radius-btn', '--w-radius-pill',
+  '--w-border-width', '--w-card-shadow',
+  '--w-label-transform', '--w-label-spacing', '--w-label-weight',
+  // Stateful-control tokens — Wave 5 (the mono/Uber active-inactive pattern).
+  '--w-active-border-color', '--w-active-border-width',
+  '--w-chip-inactive-bg', '--w-chip-inactive-border',
+  '--w-chip-active-bg', '--w-chip-active-text',
+  // Frosted-glass tokens — Wave 6 (the cupertino/Apple frosted shell).
+  '--w-surface-frost', '--w-frost-blur',
 ] as const;
 
 describe('resolveWidgetTheme', () => {
@@ -62,12 +72,12 @@ describe('resolveWidgetTheme', () => {
   });
 
   it('applies a custom accent override on top of the preset', () => {
-    const t = resolveWidgetTheme({ themePreset: 'ocean', accentOverride: '#8A2BE2' });
+    const t = resolveWidgetTheme({ themePreset: 'graphite', accentOverride: '#8A2BE2' });
     expect(t.accentOverride).toBe('#8A2BE2');
     expect(t.tokens['--w-accent']).toBe('#8A2BE2');
     expect(t.tokens['--w-primary']).toBe('#8A2BE2');
-    // Non-accent tokens stay from the base preset (Ocean navy page).
-    expect(t.tokens['--w-page-bg']).toBe('#0B1220');
+    // Non-accent tokens stay from the base preset (Graphite graphite page).
+    expect(t.tokens['--w-page-bg']).toBe('#141517');
     // Hover is a darkened accent (not equal to the accent).
     expect(t.tokens['--w-accent-hover']).not.toBe('#8A2BE2');
   });
@@ -95,6 +105,9 @@ describe('resolveWidgetTheme', () => {
       for (const key of REQUIRED_TOKENS) {
         expect(t.tokens[key], `${preset.id} missing ${key}`).toBeTruthy();
       }
+      // The emitted token set is EXACTLY the contract — no extra, no missing.
+      // Locks the count so a new token must be added to REQUIRED_TOKENS too.
+      expect(Object.keys(t.tokens).sort(), `${preset.id} token set`).toEqual([...REQUIRED_TOKENS].sort());
       // NO teal anywhere — the old default accent (#06b6d4) must be gone.
       const values = Object.values(t.tokens).join(' ').toLowerCase();
       expect(values, `${preset.id} contains teal`).not.toContain('#06b6d4');
@@ -102,12 +115,263 @@ describe('resolveWidgetTheme', () => {
     }
   });
 
-  it('exposes exactly six presets and four fonts', () => {
+  it('exposes exactly fourteen presets and six fonts', () => {
     expect(WIDGET_PRESET_LIST.map((p) => p.id)).toEqual([
-      'midnight', 'slate', 'carbon', 'ocean', 'emerald', 'cream',
+      'midnight', 'mono', 'graphite', 'ironhorse', 'nocturne', 'sapphire',
+      'harbor', 'cupertino', 'material', 'booking', 'indigo', 'tesla', 'stripe', 'cream',
     ]);
-    expect(Object.keys(WIDGET_FONTS).sort()).toEqual(['inter', 'satoshi', 'sora', 'system']);
+    expect(Object.keys(WIDGET_FONTS).sort()).toEqual(['inter', 'oswald', 'roboto', 'satoshi', 'sora', 'system']);
     expect(WIDGET_PRESETS.midnight.mode).toBe('dark');
+    // Ironhorse (Harley) + Harbor (ride-app) are both LIGHT themes.
+    expect(WIDGET_PRESETS.ironhorse.mode).toBe('light');
+    expect(WIDGET_PRESETS.harbor.mode).toBe('light');
+    // Voyage (Booking) is an all-blue DARK theme.
+    expect(WIDGET_PRESETS.booking.mode).toBe('dark');
+    // Voltage (Tesla) is a near-black DARK theme; Blurple (Stripe) is LIGHT.
+    expect(WIDGET_PRESETS.tesla.mode).toBe('dark');
+    expect(WIDGET_PRESETS.stripe.mode).toBe('light');
+    // A balanced light + dark lineup (6 dark, 8 light).
+    expect(WIDGET_PRESET_LIST.filter((p) => p.mode === 'dark')).toHaveLength(6);
+    expect(WIDGET_PRESET_LIST.filter((p) => p.mode === 'light')).toHaveLength(8);
+  });
+
+  it('ironhorse (Harley) ships the condensed Oswald voice + orange-on-white moto structure', () => {
+    const t = resolveWidgetTheme({ themePreset: 'ironhorse' });
+    expect(t.mode).toBe('light');
+    expect(t.tokens['--w-surface']).toBe('#FFFFFF');
+    expect(t.tokens['--w-accent']).toBe('#FC6600');
+    // Sharp small radius + heavy tracked uppercase labels.
+    expect(t.tokens['--w-radius-card']).toBe('10px');
+    expect(t.tokens['--w-label-transform']).toBe('uppercase');
+    expect(t.tokens['--w-label-weight']).toBe('800');
+    // Black active border on white — the moto control pattern.
+    expect(t.tokens['--w-active-border-color']).toBe('#111111');
+    expect(t.tokens['--w-active-border-width']).toBe('2px');
+    // Its own default font is the self-hosted condensed Oswald.
+    expect(t.font).toBe('oswald');
+    expect(t.fontStack).toContain('Oswald');
+  });
+
+  it('harbor (ride-app) is a soft teal light theme with filled-teal active tabs', () => {
+    const t = resolveWidgetTheme({ themePreset: 'harbor' });
+    expect(t.mode).toBe('light');
+    expect(t.tokens['--w-surface']).toBe('#FFFFFF');
+    expect(t.tokens['--w-accent']).toBe('#0C566B');
+    // Soft large radius, sentence-case labels.
+    expect(t.tokens['--w-radius-card']).toBe('18px');
+    expect(t.tokens['--w-label-transform']).toBe('none');
+    // Active tab = filled teal pill (white text, no border); inactive = white + hairline.
+    expect(t.tokens['--w-active-border-color']).toBe('transparent');
+    expect(t.tokens['--w-chip-active-bg']).toBe('#0C566B');
+    expect(t.tokens['--w-chip-active-text']).toBe('#FFFFFF');
+    expect(t.tokens['--w-chip-inactive-bg']).toBe('#FFFFFF');
+    expect(t.font).toBe('inter');
+  });
+
+  it('cupertino (Apple) is a FROSTED white theme with the SF voice + system-blue accent', () => {
+    const t = resolveWidgetTheme({ themePreset: 'cupertino' });
+    expect(t.mode).toBe('light');
+    expect(t.tokens['--w-surface']).toBe('#FFFFFF');
+    expect(t.tokens['--w-page-bg']).toBe('#EDEDF2');
+    // System-blue #007AFF is the DISPLAY accent; on-surface labels come from #0069E0.
+    expect(t.tokens['--w-accent']).toBe('#007AFF');
+    expect(t.tokens['--w-accent-on-surface']).toBe('#0069E0');
+    // White-on-#007AFF is only ~4:1, so the engine picks a guaranteed-readable
+    // label for the SOLID CTA/total fill. Whatever it chooses, the pair clears
+    // WCAG AA, and the fill stays imperceptibly close to the display accent.
+    expect(contrastRatio(t.tokens['--w-accent-text'], t.tokens['--w-accent-solid'])).toBeGreaterThanOrEqual(WCAG.NORMAL);
+    expect(contrastRatio(t.tokens['--w-total-text'], t.tokens['--w-accent-solid'])).toBeGreaterThanOrEqual(WCAG.NORMAL);
+    expect(contrastRatio(t.tokens['--w-accent-solid'], t.tokens['--w-accent'])).toBeLessThan(1.3);
+    // On-surface accent label reads on the white shell.
+    expect(contrastRatio(t.tokens['--w-pill-text'], t.tokens['--w-surface'])).toBeGreaterThanOrEqual(WCAG.UI);
+    // Large soft radius, sentence-case labels at Apple's 590 weight.
+    expect(t.tokens['--w-radius-card']).toBe('20px');
+    expect(t.tokens['--w-label-transform']).toBe('none');
+    expect(t.tokens['--w-label-weight']).toBe('590');
+    // The frosted-glass tokens: translucent surface + a real blur radius.
+    expect(t.tokens['--w-surface-frost']).toBe('rgba(255,255,255,0.72)');
+    expect(t.tokens['--w-frost-blur']).toBe('30px');
+    // Ships the SF/system font voice.
+    expect(t.font).toBe('system');
+    expect(t.fontStack).toContain('SF Pro');
+    expect(t.fontStack).toContain('-apple-system');
+  });
+
+  it('material (Google) ships the Roboto voice + M3-refined structure', () => {
+    const t = resolveWidgetTheme({ themePreset: 'material' });
+    expect(t.mode).toBe('light');
+    expect(t.tokens['--w-surface']).toBe('#FFFFFF');
+    expect(t.tokens['--w-accent']).toBe('#1A73E8');
+    // M3 refinement: 16px card, Roboto Medium (500) sentence-case labels at 0.01em.
+    expect(t.tokens['--w-radius-card']).toBe('16px');
+    expect(t.tokens['--w-label-transform']).toBe('none');
+    expect(t.tokens['--w-label-weight']).toBe('500');
+    expect(t.tokens['--w-label-spacing']).toBe('0.01em');
+    // Its own default font is the self-hosted Roboto.
+    expect(t.font).toBe('roboto');
+    expect(t.fontStack).toContain('Roboto');
+    expect(WIDGET_FONTS.roboto.selfHosted).toBe(true);
+  });
+
+  it('booking (Voyage) is an all-blue dark theme with the white-border active pattern', () => {
+    const t = resolveWidgetTheme({ themePreset: 'booking' });
+    expect(t.mode).toBe('dark');
+    // All-blue tonal shell: deep-blue card, darker blue page, action-blue accent.
+    expect(t.tokens['--w-surface']).toBe('#003B95');
+    expect(t.tokens['--w-page-bg']).toBe('#002E77');
+    expect(t.tokens['--w-accent']).toBe('#006CE4');
+    expect(t.tokens['--w-text']).toBe('#FFFFFF');
+    // White body text reads on the deep-blue surface.
+    expect(contrastRatio(t.tokens['--w-text'], t.tokens['--w-surface'])).toBeGreaterThanOrEqual(WCAG.NORMAL);
+    // Borderless resting shell; the active tab/chip is carried by a 2px WHITE border.
+    expect(t.tokens['--w-border-width']).toBe('0');
+    expect(t.tokens['--w-active-border-color']).toBe('#FFFFFF');
+    expect(t.tokens['--w-active-border-width']).toBe('2px');
+    expect(t.tokens['--w-chip-inactive-bg']).toBe('#0D459A');
+    expect(t.tokens['--w-chip-active-bg']).toBe('#12509F');
+    expect(t.tokens['--w-chip-active-text']).toBe('#FFFFFF');
+    // White text passes on the action-blue solid fill (AA).
+    expect(contrastRatio(t.tokens['--w-accent-text'], t.tokens['--w-accent-solid'])).toBeGreaterThanOrEqual(WCAG.NORMAL);
+    expect(t.font).toBe('inter');
+  });
+
+  it('tesla (Voltage) is a near-black dark theme with dark inputs + Tesla-red accent', () => {
+    const t = resolveWidgetTheme({ themePreset: 'tesla' });
+    expect(t.mode).toBe('dark');
+    // Near-black console shell + graphite cards.
+    expect(t.tokens['--w-page-bg']).toBe('#0A0A0B');
+    expect(t.tokens['--w-surface']).toBe('#141516');
+    // DARK inputs with white text — the in-car console look.
+    expect(t.tokens['--w-input-bg']).toBe('#1E1F21');
+    expect(t.tokens['--w-input-text']).toBe('#FFFFFF');
+    // Tesla-red identity accent; the FILLED CTA/total use the deeper #C8151B.
+    expect(t.tokens['--w-accent']).toBe('#E82127');
+    expect(t.tokens['--w-accent-solid']).toBe('#C8151B');
+    // White CTA/total text clears WCAG AA on the deeper red fill.
+    expect(contrastRatio(t.tokens['--w-accent-text'], t.tokens['--w-accent-solid'])).toBeGreaterThanOrEqual(WCAG.NORMAL);
+    expect(contrastRatio(t.tokens['--w-total-text'], t.tokens['--w-accent-solid'])).toBeGreaterThanOrEqual(WCAG.NORMAL);
+    // Thin tracked UPPERCASE micro-labels; medium card radius; near-flat shadow.
+    expect(t.tokens['--w-radius-card']).toBe('10px');
+    expect(t.tokens['--w-label-transform']).toBe('uppercase');
+    expect(t.tokens['--w-label-spacing']).toBe('0.14em');
+    expect(t.tokens['--w-label-weight']).toBe('500');
+    // Active chip = filled deep-red (white text); inactive = dark graphite tint.
+    expect(t.tokens['--w-chip-active-bg']).toBe('#C8151B');
+    expect(t.tokens['--w-chip-active-text']).toBe('#FFFFFF');
+    expect(t.tokens['--w-chip-inactive-bg']).toBe('#1E1F21');
+    // Ships the geometric Sora voice.
+    expect(t.font).toBe('sora');
+    expect(t.fontStack).toContain('Sora');
+  });
+
+  it('stripe (Blurple) is a fintech light theme with the indigo accent + soft float', () => {
+    const t = resolveWidgetTheme({ themePreset: 'stripe' });
+    expect(t.mode).toBe('light');
+    // Surface-gray page under a pure-white card.
+    expect(t.tokens['--w-page-bg']).toBe('#F6F9FC');
+    expect(t.tokens['--w-surface']).toBe('#FFFFFF');
+    // Dark-slate text, never pure black.
+    expect(t.tokens['--w-text']).toBe('#0A2540');
+    // Blurple identity accent; FILLED surfaces use the deeper #5A52E0.
+    expect(t.tokens['--w-accent']).toBe('#635BFF');
+    expect(t.tokens['--w-accent-solid']).toBe('#5A52E0');
+    // White label clears WCAG AA on the deeper indigo fill.
+    expect(contrastRatio(t.tokens['--w-accent-text'], t.tokens['--w-accent-solid'])).toBeGreaterThanOrEqual(WCAG.NORMAL);
+    // Generously rounded card, sentence-case labels at Stripe's 560 weight.
+    expect(t.tokens['--w-radius-card']).toBe('16px');
+    expect(t.tokens['--w-label-transform']).toBe('none');
+    expect(t.tokens['--w-label-weight']).toBe('560');
+    // The layered slate-blue coloured float shadow (three layers — the Stripe tell).
+    expect(t.tokens['--w-card-shadow']).toContain('rgba(50,50,93,.10)');
+    // Segmented tabs: active = filled indigo pill (white text); inactive = gray tint.
+    expect(t.tokens['--w-chip-active-bg']).toBe('#5A52E0');
+    expect(t.tokens['--w-chip-active-text']).toBe('#FFFFFF');
+    expect(t.tokens['--w-chip-inactive-bg']).toBe('#F6F9FC');
+    expect(t.font).toBe('inter');
+    expect(t.fontStack).toContain('Inter');
+  });
+
+  it('ONLY cupertino is frosted — every other preset emits its opaque surface + 0px blur', () => {
+    for (const preset of WIDGET_PRESET_LIST) {
+      const t = resolveWidgetTheme({ themePreset: preset.id });
+      if (preset.id === 'cupertino') continue;
+      // Non-frosted presets: frost mirror equals the opaque surface, blur is off,
+      // so their shell renders byte-for-byte identical (the frosted CSS is a no-op).
+      expect(t.tokens['--w-surface-frost'], `${preset.id} frost`).toBe(t.tokens['--w-surface']);
+      expect(t.tokens['--w-frost-blur'], `${preset.id} blur`).toBe('0px');
+    }
+  });
+
+  it('each preset is a DISTINCT design language, not just a recolour', () => {
+    // Midnight (default) must keep the approved structural values exactly.
+    const mid = resolveWidgetTheme({ themePreset: 'midnight' }).tokens;
+    expect(mid['--w-radius-card']).toBe('8px');
+    expect(mid['--w-card-shadow']).toBe('0 24px 60px -32px rgba(0,0,0,.75)');
+    expect(mid['--w-label-transform']).toBe('none');
+    // Cream (the other locked theme) also keeps defaults.
+    expect(resolveWidgetTheme({ themePreset: 'cream' }).tokens['--w-radius-card']).toBe('8px');
+
+    // Graphite = small-radius + uppercase tracked labels; Cupertino =
+    // large-soft + sentence-case; mono = moderate white-Uber shell.
+    const graphite = resolveWidgetTheme({ themePreset: 'graphite' }).tokens;
+    const cup = resolveWidgetTheme({ themePreset: 'cupertino' }).tokens;
+    const mono = resolveWidgetTheme({ themePreset: 'mono' }).tokens;
+    expect(graphite['--w-radius-card']).toBe('4px');
+    expect(graphite['--w-label-transform']).toBe('uppercase');
+    expect(cup['--w-radius-card']).toBe('20px');
+    expect(cup['--w-label-transform']).toBe('none');
+    expect(mono['--w-radius-card']).toBe('16px');
+    expect(mono['--w-label-transform']).toBe('none');
+
+    // The radius, shadow and label-transform genuinely VARY across the set —
+    // the whole point of Wave 4 (guards against a future silent flattening).
+    const radii = new Set(WIDGET_PRESET_LIST.map((p) => resolveWidgetTheme({ themePreset: p.id }).tokens['--w-radius-card']));
+    const shadows = new Set(WIDGET_PRESET_LIST.map((p) => resolveWidgetTheme({ themePreset: p.id }).tokens['--w-card-shadow']));
+    const transforms = new Set(WIDGET_PRESET_LIST.map((p) => resolveWidgetTheme({ themePreset: p.id }).tokens['--w-label-transform']));
+    expect(radii.size).toBeGreaterThanOrEqual(5);
+    expect(shadows.size).toBeGreaterThanOrEqual(6);
+    expect(transforms.size).toBe(2); // 'none' and 'uppercase'
+  });
+
+  it('mono ("Clarity"/Uber) is a premium WHITE theme with the black active-border pattern', () => {
+    const t = resolveWidgetTheme({ themePreset: 'mono' });
+    expect(t.mode).toBe('light');
+    // Premium white surfaces, high-contrast black text, solid black CTA/accent.
+    expect(t.tokens['--w-surface']).toBe('#FFFFFF');
+    expect(t.tokens['--w-page-bg']).toBe('#FFFFFF');
+    expect(t.tokens['--w-text']).toBe('#111111');
+    expect(t.tokens['--w-accent']).toBe('#111111');
+    expect(t.tokens['--w-accent-text']).toBe('#FFFFFF'); // white label on the black CTA
+    // Uber active/inactive control pattern: black active border, tinted borderless inactive.
+    expect(t.tokens['--w-active-border-color']).toBe('#111111');
+    expect(t.tokens['--w-active-border-width']).toBe('2.5px');
+    expect(t.tokens['--w-chip-inactive-bg']).toBe('#F6F6F6');
+    expect(t.tokens['--w-chip-inactive-border']).toBe('transparent');
+    expect(t.tokens['--w-chip-active-bg']).toBe('#FFFFFF');
+    expect(t.tokens['--w-chip-active-text']).toBe('#111111');
+    // Ships its own default font (closest self-hosted match to Uber Move).
+    expect(t.font).toBe('satoshi');
+    expect(t.fontStack).toContain('Satoshi');
+  });
+
+  it('every OTHER preset keeps the current-look stateful-control defaults (unchanged)', () => {
+    // Presets that ship a custom stateful-control pattern (mono/Uber,
+    // ironhorse/Harley black-border, harbor/ride-app filled pill) are exempt;
+    // the remaining presets must emit the neutral defaults so their tabs /
+    // chips / flags render byte-for-byte as before (no border, input-surface
+    // fill, solid-accent active chip).
+    const CUSTOM_STATEFUL = new Set(['mono', 'ironhorse', 'harbor', 'booking', 'tesla', 'stripe']);
+    for (const preset of WIDGET_PRESET_LIST) {
+      if (CUSTOM_STATEFUL.has(preset.id)) continue;
+      const t = resolveWidgetTheme({ themePreset: preset.id });
+      expect(t.tokens['--w-active-border-color'], `${preset.id}`).toBe('transparent');
+      expect(t.tokens['--w-active-border-width'], `${preset.id}`).toBe('0');
+      // Inactive fill/border mirror the input surface; active chip = solid accent.
+      expect(t.tokens['--w-chip-inactive-bg'], `${preset.id}`).toBe(t.tokens['--w-input-bg']);
+      expect(t.tokens['--w-chip-inactive-border'], `${preset.id}`).toBe(t.tokens['--w-input-border']);
+      expect(t.tokens['--w-chip-active-bg'], `${preset.id}`).toBe(t.tokens['--w-accent-solid']);
+      expect(t.tokens['--w-chip-active-text'], `${preset.id}`).toBe(t.tokens['--w-accent-text']);
+    }
   });
 });
 
@@ -125,7 +389,7 @@ describe('resolveWidgetTheme — WCAG contrast guarantees', () => {
     '#ff0044', '#3b22f4', '#c8e8ff', '#FDE68A', '#E6E3E0',
   ];
 
-  it('every preset ships body text that reads on its surface (validates the 6)', () => {
+  it('every preset ships body text that reads on its surface (validates the lineup)', () => {
     for (const preset of WIDGET_PRESET_LIST) {
       const t = resolveWidgetTheme({ themePreset: preset.id });
       const r = contrastRatio(t.tokens['--w-text'], t.tokens['--w-surface']);

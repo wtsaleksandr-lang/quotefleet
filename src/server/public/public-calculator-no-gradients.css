@@ -30,9 +30,9 @@ body.qf-app-calculator {
 body.qf-app-calculator .qf-widget {
   background: var(--w-surface, #1E2528) !important;
   background-image: none !important;
-  border: 1px solid var(--w-border, rgba(255,255,255,.12)) !important;
-  border-radius: 8px !important;
-  box-shadow: 0 24px 60px -32px rgba(0,0,0,.75) !important;
+  border: var(--w-border-width, 1px) solid var(--w-border, rgba(255,255,255,.12)) !important;
+  border-radius: var(--w-radius-card, 8px) !important;
+  box-shadow: var(--w-card-shadow, 0 24px 60px -32px rgba(0,0,0,.75)) !important;
   color: var(--w-text, #FFFFFF) !important;
 }
 
@@ -223,14 +223,16 @@ body.qf-app-calculator .qf-success {
 }
 
 /* --- Header polish --------------------------------------------------------
-   "INSTANT FREIGHT ESTIMATE" pill — Alex: our branded blue. Solid cobalt pill
-   so it reads clearly on both the dark and light shells. */
+   "INSTANT FREIGHT ESTIMATE" pill — now THEME-AWARE: it takes the theme accent
+   fill + the engine-picked on-accent label. Blue-accent themes (Midnight
+   default etc.) keep their cobalt pill (accent = #0D3CFC → no change); the
+   monochrome "mono" theme gets a solid BLACK pill (accent = #111111) so
+   nothing reads blue. The #0D3CFC / #fff fallbacks keep the pill if a theme
+   payload never arrives. */
 body.qf-app-calculator .qf-header .brand-name::after {
-  background: #0D3CFC !important;
-  border: 1px solid #0D3CFC !important;
-  /* White label reads on the cobalt pill in both the dark and light shells
-     (was the WCAG on-surface accent; Alex wants the full branded blue). */
-  color: rgb(255,255,255) !important;
+  background: var(--w-accent, #0D3CFC) !important;
+  border: 1px solid var(--w-accent, #0D3CFC) !important;
+  color: var(--w-accent-text, #ffffff) !important;
 }
 
 /* Logo slot: hairline border to match the shell. */
@@ -279,4 +281,559 @@ body.qf-app-calculator .qf-oog-panel .qf-field-hint,
 body.qf-app-calculator .qf-conditional-panel .qf-field-hint,
 body.qf-app-calculator .qf-oog-panel #qf-oog-help {
   color: var(--w-muted-2, #9FB2BB) !important;
+}
+
+/* --- Stateful-control ON/OFF pattern (Wave 5 — the "Uber" look) ------------
+   Service tabs, accessory chips and option flags read differently in their ON
+   vs OFF state. Every value below is a --w-* token whose FALLBACK equals the
+   current computed look, and buildTokens() emits those same current values for
+   every preset EXCEPT mono — so the 8 other themes render byte-for-byte
+   unchanged. The mono ("Clarity"/Uber) preset overrides the tokens to get:
+     · selected tab / chip → WHITE fill + a thin BLACK border
+     · unselected tab / chip / flag → soft grey TINT, borderless
+   These are the LAST rules in the last-loaded layer, so they win by source
+   order over the combined selectors above at equal specificity. */
+
+/* INACTIVE tabs / chips / flags — tint fill, token-driven border colour.
+   (The .active rules below have a higher-specificity `.active` class, so they
+   always win for the selected element regardless of order.) */
+body.qf-app-calculator .qf-tabs button,
+body.qf-app-calculator .qf-acc-chip,
+body.qf-app-calculator .qf-options-panel .qf-acc-chip,
+body.qf-app-calculator .qf-flags label,
+body.qf-app-calculator .qf-options-panel .qf-flags label {
+  background: var(--w-chip-inactive-bg, var(--w-input-bg, #E6E3E0)) !important;
+  border-color: var(--w-chip-inactive-border, var(--w-input-border, rgba(13,60,252,.22))) !important;
+}
+
+/* ACTIVE service tab — white surface, accent (black in mono) label, plus a
+   token-driven border: 0/transparent for every current theme (no visible
+   change), a thin black hairline for mono. */
+body.qf-app-calculator .qf-tabs button.active {
+  background: var(--w-accent-surface, #FFFFFF) !important;
+  background-image: none !important;
+  border: var(--w-active-border-width, 0) solid var(--w-active-border-color, transparent) !important;
+  color: var(--w-accent, #0D3CFC) !important;
+}
+
+/* ACTIVE accessory chip — defaults reproduce the current solid-accent fill;
+   mono overrides to a white fill + thin black border + black label. */
+body.qf-app-calculator .qf-acc-chip.active,
+body.qf-app-calculator .qf-options-panel .qf-acc-chip.active {
+  background: var(--w-chip-active-bg, var(--w-accent-solid, var(--w-accent, #0D3CFC))) !important;
+  background-image: none !important;
+  border: var(--w-active-border-width, 1px) solid var(--w-active-border-color, var(--w-accent-solid, var(--w-accent, #0D3CFC))) !important;
+  color: var(--w-chip-active-text, var(--w-accent-text, #FFFFFF)) !important;
+}
+
+/* lbs / kg unit toggle — the ACTIVE ("is-on") segment already renders white
+   (--w-bg) with accent-coloured text (--w-primary), so mono gets a white pill
+   with black text automatically. We only add the token-driven border: 0/
+   transparent for every current theme (no change), a thin black hairline for
+   mono. Fill + text are intentionally left as-is so no other preset shifts. */
+body.qf-app-calculator .qf-wt-unit button.is-on {
+  border: var(--w-active-border-width, 0) solid var(--w-active-border-color, transparent) !important;
+}
+
+/* --- Mono ("Clarity"/Uber) monochrome sweep -------------------------------
+   Scoped to body[data-qf-preset="mono"] (set by widget.js#applyTheme), so ONLY
+   the mono theme is affected — every other preset keeps its exact look. These
+   neutralise the last bits of brand-blue that aren't accent-driven so the
+   Clarity theme reads fully black-and-white:
+     · the "estimate helps you move faster" note box (blue gradient + blue
+       border in public-calculator-ux.css) → soft grey, borderless-quiet
+     · the "?" help cue → neutral grey pill (was accent-coloured). */
+body[data-qf-preset="mono"] .qf-customer-note,
+body[data-qf-preset="mono"] .qf-result .qf-customer-note,
+body[data-qf-preset="mono"] .qf-contact-head,
+body[data-qf-preset="mono"] .qf-result-guide {
+  background: #F6F6F6 !important;
+  background-image: none !important;
+  border: 1px solid #EAEAEA !important;
+  color: #4A4A4A !important;
+}
+body[data-qf-preset="mono"] .qf-help {
+  background: #F1F1F1 !important;
+  background-image: none !important;
+  border: 1px solid transparent !important;
+  color: #6B6B6B !important;
+}
+/* Badge shape: the "INSTANT FREIGHT ESTIMATE" badge is only ~24px tall, so a
+   12px radius still reads as a full pill. A fixed 6px gives it distinctly soft
+   corners that read as a ROUNDED RECTANGLE, not a pill. Mono-scoped — other
+   themes keep their 999px pill (unscoped default in public-calculator-ux.css). */
+body[data-qf-preset="mono"] .qf-header .brand-name::after {
+  border-radius: 6px !important;
+}
+
+/* Business logo (mono only): round + black-and-white. The tenant logo — a
+   custom <img> or the auto-generated square initials tile — renders as a
+   square colour tile in every other theme. On Clarity/mono it becomes a round,
+   monochrome mark to match the black-ink Uber aesthetic. Fixed square box +
+   object-fit:cover so even a rectangular custom logo clips to a true circle
+   (not an ellipse). Scoped to mono so no other preset's logo changes. */
+body[data-qf-preset="mono"] .qf-header img {
+  width: 32px !important;
+  height: 32px !important;
+  border-radius: 50% !important;
+  object-fit: cover !important;
+  /* grayscale only — the earlier contrast() boost exaggerated the clip rim.
+     No border so the browser's anti-aliased circle edge stays crisp. */
+  filter: grayscale(1) !important;
+  border: 0 !important;
+  background: transparent !important;
+}
+/* Same round + monochrome treatment for the demo-preview logo slot (a button
+   that paints the tenant logo via a CSS background, replacing the hidden <img>
+   only inside the /w/demo experience) — so the live demo preview matches the
+   production widget's mono logo. Mono-scoped; no effect on other presets.
+   The CSS background clips to border-radius automatically, so NO overflow:hidden
+   (which would swallow the "✎" edit badge that sits at the slot's outer corner).
+   Replace the default DASHED border with a clean solid hairline so the round
+   edge reads smooth, not ridged. */
+body[data-qf-preset="mono"] .qf-header .qf-demo-logo-slot {
+  border-radius: 50% !important;
+  border: 1px solid rgba(17, 17, 17, 0.10) !important;
+  filter: grayscale(1) !important;
+  overflow: visible !important;
+}
+
+/* Mono only: drop the "?" help cue from the Equipment + Weight fields (both live
+   inside #qf-equip-weight-row). Other cues (pickup port, terminal, delivery,
+   LTL freight details) and every other preset are untouched. */
+body[data-qf-preset="mono"] #qf-equip-weight-row .qf-help {
+  display: none !important;
+}
+
+/* Frosted-glass map overlay badges (Apple glass, Uber shape) ----------------
+   Every other theme keeps the dark-gradient address bar (top) + distance/
+   transit bar (bottom) from widget-style.css. For mono ONLY, turn those bars
+   into DISCRETE, individually-bordered frosted white badges (semi-opaque white
+   + backdrop blur/saturate + hairline + soft shadow + ~8px rounded-rect), dark
+   text — matching Uber's clean white map labels. Each element carries its OWN
+   frosted border so nothing reads as one long connected bar. Scoped to
+   body[data-qf-preset="mono"] so no other preset shifts. rgba() + blur only —
+   no #fff literal, safe for the colour guard.
+
+   The confirmed frosted style, applied per-element. */
+body[data-qf-preset="mono"] .qf-ma-pt,
+body[data-qf-preset="mono"] .qf-map-overlay,
+body[data-qf-preset="mono"] .qf-map-expand {
+  background: rgba(255, 255, 255, 0.68) !important;
+  background-image: none !important;
+  -webkit-backdrop-filter: blur(14px) saturate(1.3);
+  backdrop-filter: blur(14px) saturate(1.3);
+  border: 1px solid rgba(255, 255, 255, 0.55) !important;
+  box-shadow: 0 2px 10px -2px rgba(15, 23, 42, 0.22);
+  /* Rounded-RECTANGLE corners matching the theme's CTA / "INSTANT FREIGHT
+     ESTIMATE" badge character (~8px) — deliberately NOT a fully-round pill. */
+  border-radius: 8px !important;
+}
+/* Address wrapper: transparent positioning shell only — the frost now lives on
+   each .qf-ma-pt so pickup + delivery read as TWO separate badges, not one bar.
+   Nudged UP a touch (top inset space-0-5 vs the old space-1). */
+body[data-qf-preset="mono"] .qf-map-addr {
+  left: var(--space-1) !important;
+  right: var(--space-1) !important;
+  top: var(--space-0-5) !important;
+  padding: 0 !important;
+  background: none !important;
+  background-image: none !important;
+  gap: var(--space-1) !important;
+  align-items: flex-start !important;
+}
+/* Each point (green-dot pickup / red-dot delivery) is its own frosted badge,
+   sized to its content and capped so a long address can't swallow the other. */
+body[data-qf-preset="mono"] .qf-ma-pt {
+  flex: 0 1 auto !important;
+  max-width: 48% !important;
+  padding: var(--space-0-5) var(--space-1) !important;
+}
+/* Distance + transit combined into ONE discrete frosted badge (not a full-width
+   bar): same padding/size character as the top badges and the SAME inset from
+   the map edge (space-0-5, mirroring the top badges), anchored bottom-left. */
+body[data-qf-preset="mono"] .qf-map-overlay {
+  left: var(--space-1) !important;
+  right: auto !important;
+  top: auto !important;
+  bottom: var(--space-0-5) !important;
+  padding: var(--space-0-5) var(--space-1) !important;
+  gap: var(--space-1) !important;
+}
+/* Expand icon: same frosted rounded-rect as the other badges (dark glyph on the
+   frost), matched to the distance badge's bottom inset so the row lines up. */
+body[data-qf-preset="mono"] .qf-map-expand {
+  right: var(--space-1) !important;
+  bottom: var(--space-0-5) !important;
+  color: rgba(17, 17, 17, 0.82) !important;
+}
+/* Dark text on the frosted white so it reads like Uber's map labels. */
+body[data-qf-preset="mono"] .qf-ma-txt,
+body[data-qf-preset="mono"] .qf-map-ov-val {
+  color: rgba(17, 17, 17, 0.92) !important;
+}
+body[data-qf-preset="mono"] .qf-map-ov-lbl {
+  color: rgba(17, 17, 17, 0.55) !important;
+}
+body[data-qf-preset="mono"] .qf-map-ov-div {
+  background: rgba(17, 17, 17, 0.16) !important;
+}
+
+/* Mono flow consistency — later steps (result / contact / thanks) -----------
+   A few result-screen accents are hardcoded brand-cobalt + fully-round pills in
+   widget-style.css / public-calculator-ux.css and are NOT reached by the
+   token-driven layer above (pseudo-elements, inline badges, the transit
+   timeline). On the mono/Clarity theme those read as stray BLUE pills, breaking
+   the black-ink, rounded-rectangle Uber pattern. Re-point them at the theme
+   tokens (black accent, grey tint, rounded-rect radius) — scoped to
+   body[data-qf-preset="mono"] so every other preset keeps its cobalt look. */
+/* ETA badge + LTL freight-class badge: quiet grey-tint chip, black text,
+   rounded-rect (mono's --w-radius-pill = 10px), no blue border. */
+body[data-qf-preset="mono"] .qf-result .qf-eta,
+body[data-qf-preset="mono"] .qf-ltl-class {
+  color: var(--w-text, #111111) !important;
+  background: var(--w-surface-2, #F6F6F6) !important;
+  border-color: transparent !important;
+  border-radius: var(--w-radius-pill, 10px) !important;
+}
+/* "Quote estimate" corner tag (a ::before pseudo the token layer can't reach):
+   quiet muted-grey tag on the soft tint, rounded-rect, hairline border. */
+body[data-qf-preset="mono"] .qf-result::before {
+  color: var(--w-muted, #6B6B6B) !important;
+  background: var(--w-surface-2, #F6F6F6) !important;
+  border-color: var(--w-border, #EAEAEA) !important;
+  border-radius: var(--w-radius-pill, 10px) !important;
+}
+/* Transit timeline: solid black progress fill + black truck glyph (was a
+   green→cobalt gradient + cobalt truck). Solid colour survives the global
+   background-image:none reset. */
+body[data-qf-preset="mono"] .qf-tl-fill {
+  background: var(--w-accent-solid, #111111) !important;
+  background-image: none !important;
+}
+body[data-qf-preset="mono"] .qf-tl-truck {
+  color: var(--w-accent-solid, #111111) !important;
+}
+
+/* --- Harbor: section titles are SENTENCE-CASE ------------------------------
+   .qf-section-title / .qf-addr-title are force-UPPERCASED globally
+   (widget-style.css) and the theme's --w-label-* tokens only reach
+   .qf-field label — so a preset whose label voice is sentence-case needs the
+   titles realigned here. Harbor reads as a soft ride-app: sentence-case,
+   normal tracking, medium weight. Scoped to body[data-qf-preset="harbor"] so
+   Clarity/mono and every other preset keep their uppercase titles. */
+body[data-qf-preset="harbor"] .qf-section-title,
+body[data-qf-preset="harbor"] .qf-addr-title {
+  text-transform: none !important;
+  letter-spacing: normal !important;
+  font-weight: 600 !important;
+}
+
+/* --- Ironhorse: heavy, tracked UPPERCASE section titles --------------------
+   Ironhorse keeps the global uppercase but pushes the titles to the theme's
+   moto label voice — heavy weight + wider tracking — to match its uppercase
+   .qf-field label tokens. Scoped so no other preset's titles shift. */
+body[data-qf-preset="ironhorse"] .qf-section-title,
+body[data-qf-preset="ironhorse"] .qf-addr-title {
+  letter-spacing: 0.08em !important;
+  font-weight: 800 !important;
+}
+
+/* --- Cupertino ("Cupertino"/Apple) FROSTED-GLASS shell --------------------
+   The only preset whose card + panels are TRANSLUCENT: an Apple frosted-glass
+   look. The engine emits --w-surface-frost (rgba white ~.72) + --w-frost-blur
+   (30px) ONLY for this preset; every other preset gets its opaque surface + 0px
+   blur, so this block reads them and no other shell moves. Scoped to
+   body[data-qf-preset="cupertino"]. rgba() only — no #fff/#000 literal, safe for
+   the hardcoded-colour guard. */
+/* Frosted card shell: translucent surface + real backdrop blur over the soft
+   grey page, with a bright glassy hairline edge. */
+body[data-qf-preset="cupertino"] .qf-widget {
+  background: var(--w-surface-frost, rgba(255, 255, 255, 0.72)) !important;
+  background-image: none !important;
+  -webkit-backdrop-filter: blur(var(--w-frost-blur, 30px)) saturate(180%);
+  backdrop-filter: blur(var(--w-frost-blur, 30px)) saturate(180%);
+  border-color: rgba(255, 255, 255, 0.6) !important;
+}
+/* Quiet inner panels — the options/add-ons panel, the result card and the
+   out-of-guardrails panel read as LIGHTER frosted glass sitting on the card. */
+body[data-qf-preset="cupertino"] .qf-options-panel,
+body[data-qf-preset="cupertino"] .qf-result,
+body[data-qf-preset="cupertino"] .qf-oog-panel {
+  background: rgba(255, 255, 255, 0.55) !important;
+  background-image: none !important;
+  -webkit-backdrop-filter: blur(18px) saturate(180%);
+  backdrop-filter: blur(18px) saturate(180%);
+}
+/* Map overlay badges (pickup/delivery address pills, distance/transit bar,
+   expand button) — frosted white glass with soft rounded-rect corners, mirroring
+   the mono frosted-badge pattern but at Apple's lighter opacity. */
+body[data-qf-preset="cupertino"] .qf-ma-pt,
+body[data-qf-preset="cupertino"] .qf-map-overlay,
+body[data-qf-preset="cupertino"] .qf-map-expand {
+  background: rgba(255, 255, 255, 0.7) !important;
+  background-image: none !important;
+  -webkit-backdrop-filter: blur(14px) saturate(180%);
+  backdrop-filter: blur(14px) saturate(180%);
+  border-radius: 12px !important;
+}
+/* Sentence-case section titles: .qf-section-title / .qf-addr-title are force-
+   UPPERCASED globally (widget-style.css); Apple reads sentence-case with the
+   theme's 590 label weight. Scoped so no other preset's titles shift. */
+body[data-qf-preset="cupertino"] .qf-section-title,
+body[data-qf-preset="cupertino"] .qf-addr-title {
+  text-transform: none !important;
+  letter-spacing: normal !important;
+  font-weight: 590 !important;
+}
+
+/* --- Material ("Material"/Google) — Material-3 refinement ------------------
+   The Google/Android tells that --w-* tokens can't carry: Material-3 SEGMENTED
+   service tabs (tonal-grey pill container; the selected segment a tonal-blue
+   #E8F0FE fill with the AA-safe #1967D2 label — NOT #1A73E8, which fails on the
+   tint), sentence-case section titles, a Google-blue focus ring, tonal-grey
+   quiet surfaces, a filled pill CTA and Google-green ETA/transit. Scoped to
+   body[data-qf-preset="material"] so no other preset shifts. The base
+   active-tab / title rules use !important, so the overrides here do too.
+   No #fff/#000/white/black literals (guard-safe). Verbatim from
+   `_rec/render-material-v2.mjs`. */
+body[data-qf-preset="material"] .qf-tabs {
+  background: #F1F3F4;
+  border: 1px solid #E3E6EA;
+  border-radius: 999px;
+  padding: 4px;
+  gap: 4px;
+  box-shadow: none;
+}
+body[data-qf-preset="material"] .qf-tabs button {
+  border-radius: 999px;
+  font-weight: 500;
+  letter-spacing: .01em;
+  color: #5F6368;
+  background: transparent;
+  box-shadow: none;
+  transition: background .15s, color .15s;
+}
+body[data-qf-preset="material"] .qf-tabs button:hover:not(.active) {
+  background: rgba(26, 115, 232, .06);
+  color: #3C4043;
+}
+body[data-qf-preset="material"] .qf-tabs button.active {
+  background: #E8F0FE !important;
+  background-image: none !important;
+  color: #1967D2 !important;
+  font-weight: 500;
+  border: 0 !important;
+  box-shadow: none !important;
+}
+/* Sentence-case titles — undo the global force-uppercase for this preset. */
+body[data-qf-preset="material"] .qf-section-title,
+body[data-qf-preset="material"] .qf-addr-title {
+  text-transform: none !important;
+  letter-spacing: .01em !important;
+  font-weight: 500 !important;
+  color: #5F6368 !important;
+}
+/* Google-blue Material focus — a 2px blue ring on the active field. */
+body[data-qf-preset="material"] .qf-input:focus,
+body[data-qf-preset="material"] .qf-select:focus {
+  outline: 0;
+  border-color: #1A73E8 !important;
+  box-shadow: 0 0 0 2px rgba(26, 115, 232, .35) !important;
+}
+/* Tonal-grey surface containers for the quiet panels. */
+body[data-qf-preset="material"] .qf-customer-note,
+body[data-qf-preset="material"] .qf-options-summary {
+  background: #F1F3F4;
+  border: 1px solid #E3E6EA;
+  border-radius: 12px;
+  color: #3C4043;
+}
+body[data-qf-preset="material"] .qf-options-summary:hover {
+  background: #E8EAED;
+}
+/* M3 filled pill CTA — blue, subtle two-part Material elevation. */
+body[data-qf-preset="material"] .qf-cta:not(.qf-secondary) {
+  border-radius: 999px;
+  font-weight: 500;
+  letter-spacing: .01em;
+  box-shadow: 0 1px 2px rgba(60, 64, 67, .30), 0 1px 3px 1px rgba(60, 64, 67, .15);
+}
+/* Google-green emphasis for the positive / ETA / transit strings. */
+body[data-qf-preset="material"] .qf-eta,
+body[data-qf-preset="material"] .qf-tl-mid {
+  color: #137333 !important;
+  font-weight: 500;
+}
+
+/* --- Voyage ("Voyage"/Booking) — all-blue tonal shell ---------------------
+   The Booking signature that --w-* tokens can't carry: the ACTIVE service tab
+   is a tonal-blue fill with WHITE text carried by a 2px WHITE border (the base
+   active-tab rule forces label = var(--w-accent), so white is forced here); the
+   input/select focus ring is a white border + soft white glow; the contact link
+   reads in the light booking-blue #9DBEF5; and the lbs/kg ACTIVE segment stays
+   on-palette (tonal-blue fill + white text + white border) instead of the
+   default white pill. Scoped to body[data-qf-preset="booking"] so no other
+   preset shifts. Every white literal is rgba(255,255,255,x) so the hardcoded-
+   colour guard stays at 0 new. Verbatim from `_rec/render-booking.mjs`. */
+body[data-qf-preset="booking"] .qf-tabs button.active {
+  background: var(--w-accent-surface, #0D459A) !important;
+  background-image: none !important;
+  color: rgba(255, 255, 255, 1) !important;
+  border: 2px solid rgba(255, 255, 255, 1) !important;
+}
+body[data-qf-preset="booking"] .qf-input:focus,
+body[data-qf-preset="booking"] .qf-select:focus {
+  border-color: rgba(255, 255, 255, 1) !important;
+  box-shadow: 0 0 0 3px rgba(255, 255, 255, .20) !important;
+}
+body[data-qf-preset="booking"] a.qf-contact-value {
+  color: #9DBEF5 !important;
+}
+/* lbs / kg ACTIVE segment — on-palette tonal-blue fill + white text + border. */
+body[data-qf-preset="booking"] .qf-wt-unit button.is-on {
+  background: #12509F !important;
+  color: rgba(255, 255, 255, 1) !important;
+  border: 2px solid rgba(255, 255, 255, 1) !important;
+}
+
+/* --- Blurple ("Blurple"/Stripe) — aurora strip + gradient CTA -------------
+   The two Stripe tells that a single --w-* token can't carry: (1) the
+   multi-colour AURORA accent strip along the top edge of the card, and (2) the
+   real Stripe indigo GRADIENT on the primary CTAs. Decorative only — no text
+   sits over the aurora, so the mesh is WCAG-safe; both CTA gradient stops clear
+   white label text at AA (>=4.5:1). Scoped to body[data-qf-preset="stripe"] so
+   no other preset shifts. No #fff/#000/white/black literals (guard-safe) — the
+   hex stops are brand indigo/violet/pink/amber/cyan. Verbatim from
+   `_rec/_render-stripe.mjs` STRIPE_SCOPED_CSS. */
+body[data-qf-preset="stripe"] .qf-widget { position: relative; }
+/* content + background carry !important so they beat the base
+   `body.qf-app-calculator .qf-widget::before { content:none; background:none }`
+   reset (equal specificity → later !important wins). */
+body[data-qf-preset="stripe"] .qf-widget::before {
+  content: "" !important; position: absolute; top: 0; left: 0; right: 0; height: 4px;
+  border-radius: 16px 16px 0 0;
+  background: linear-gradient(90deg, #635BFF 0%, #8A5CF6 22%, #C965D6 44%, #FF7AA2 64%, #FFB35C 82%, #4BC0E0 100%) !important;
+  background-image: linear-gradient(90deg, #635BFF 0%, #8A5CF6 22%, #C965D6 44%, #FF7AA2 64%, #FFB35C 82%, #4BC0E0 100%) !important;
+  box-shadow: none !important;
+  z-index: 3; pointer-events: none;
+}
+body[data-qf-preset="stripe"] #qf-calc-btn,
+body[data-qf-preset="stripe"] #qf-submit-btn,
+body[data-qf-preset="stripe"] #qf-continue-btn {
+  background-image: linear-gradient(135deg, #635BFF 0%, #5348E6 100%) !important;
+  border-color: transparent !important;
+}
+
+/* --- Dark-preset RESULT-CARD legibility fix -------------------------------
+   The result card's line-item BREAKDOWN panel (.qf-result .lines) and the
+   "QUOTE ESTIMATE" corner tag (.qf-result::before) are painted a translucent
+   WHITE in public-calculator-ux.css. On the DARK-INPUT presets whose result
+   card itself renders dark (--w-input-bg is a dark surface: Voltage/Tesla and
+   Voyage/Booking), that white panel collides with the light --w-muted / white
+   line-item labels — near-illegible. The LIGHT-INPUT dark presets (Midnight,
+   Graphite, Nocturne, Sapphire) render a light receipt card where the white
+   panel reads fine, so this is SCOPED to the two dark-card presets ONLY —
+   Midnight and every other preset are byte-for-byte untouched. The panel/tag
+   move to the theme's own faintly-lifted --w-surface-2 with the standard
+   light --w-text / --w-muted labels, which clear WCAG on it. Token-driven, so
+   an accent override never breaks it. No raw #fff/#000 literals (guard-safe). */
+body[data-qf-preset="tesla"] .qf-result .lines,
+body[data-qf-preset="booking"] .qf-result .lines {
+  background: var(--w-surface-2, #1E1F21) !important;
+  background-image: none !important;
+  border-color: var(--w-border, rgba(255,255,255,.12)) !important;
+}
+body[data-qf-preset="tesla"] .qf-result .line .name,
+body[data-qf-preset="booking"] .qf-result .line .name,
+body[data-qf-preset="tesla"] .qf-result .meta,
+body[data-qf-preset="booking"] .qf-result .meta {
+  color: var(--w-muted, #A8AAAD) !important;
+}
+body[data-qf-preset="tesla"] .qf-result .line .amt,
+body[data-qf-preset="booking"] .qf-result .line .amt,
+body[data-qf-preset="tesla"] .qf-result .line.total-row .name,
+body[data-qf-preset="booking"] .qf-result .line.total-row .name,
+body[data-qf-preset="tesla"] .qf-result .line.total-row .amt,
+body[data-qf-preset="booking"] .qf-result .line.total-row .amt {
+  color: var(--w-text, #FFFFFF) !important;
+}
+body[data-qf-preset="tesla"] .qf-result::before,
+body[data-qf-preset="booking"] .qf-result::before {
+  background: var(--w-surface-2, #1E1F21) !important;
+  color: var(--w-muted, #A8AAAD) !important;
+  border-color: var(--w-border, rgba(255,255,255,.12)) !important;
+}
+
+/* ==========================================================================
+   PRESET-SCOPED CONTRAST FIXES (visual-gate findings) — appended at EOF.
+   Each block is scoped to a single body[data-qf-preset="..."] so NO other
+   preset (esp. midnight / cream / defaults) is touched. rgba()/non-white hex
+   only — no #fff/#000/white/black literals (hardcoded-colour guard clean).
+   ========================================================================== */
+
+/* --- 1. Cupertino: legible text on the FROSTED map overlays ----------------
+   Cupertino replaces the bottom distance/transit badge's dark gradient with a
+   light rgba-white frost (background-image:none above, lines ~571-579), but the
+   overlay text (widget-style.css) stays WHITE — so "118 mi / 1 day / DISTANCE /
+   EST. TRANSIT" and the expand glyph wash out on the light frost. (The TOP
+   address pills keep the .qf-map-addr dark gradient underneath, so they still
+   read and are intentionally left alone.) Re-point the bottom-badge text +
+   divider + expand glyph to a dark Apple slate so the frosted badge reads
+   clearly, matching cupertino's other frosted map badges. Scoped to
+   body[data-qf-preset="cupertino"]. */
+body[data-qf-preset="cupertino"] .qf-map-ov-val {
+  color: rgba(28, 28, 30, 0.92) !important;
+}
+body[data-qf-preset="cupertino"] .qf-map-ov-lbl {
+  color: rgba(28, 28, 30, 0.6) !important;
+}
+body[data-qf-preset="cupertino"] .qf-map-ov-div {
+  background: rgba(28, 28, 30, 0.16) !important;
+}
+body[data-qf-preset="cupertino"] .qf-map-expand {
+  color: rgba(28, 28, 30, 0.82) !important;
+}
+
+/* --- 2. Tesla + Booking: collapsed "Shipment options & add-ons" bar label --
+   The .qf-options-summary trigger inherits a DARK label colour (widget-ux-fixes
+   .css / --w-fg) that reads fine on the light options surface of most presets,
+   but Tesla and Booking render a DARK/tonal options surface (--w-input-bg =
+   #1E1F21 / #00337F), so the dark label sits dark-on-dark. Re-point the label to
+   the preset's LIGHT foreground (--w-surface-2-text = #F5F5F7 tesla / #FFFFFF
+   booking). The caret (border:--w-primary) + "N selected" count pill
+   (color:--w-primary) keep their accent and stay legible. Scoped so no other
+   preset shifts. */
+body[data-qf-preset="tesla"] .qf-options-summary,
+body[data-qf-preset="booking"] .qf-options-summary {
+  color: var(--w-surface-2-text, #E6E3E0) !important;
+}
+
+/* --- 3. Booking: secondary controls were blue-on-blue ---------------------
+   The "Back" secondary CTA (contact / callback steps) paints its label
+   var(--w-accent) (#006CE4) on the booking accent-surface (#0D459A) and the
+   "Edit details" result link paints var(--w-primary) (blue) on the dark booking
+   result card — both read blue-on-blue. Re-point them to booking's light
+   on-surface accent (#9DBEF5, matching a.qf-contact-value above) so they read
+   clearly on the blue shell. Scoped to body[data-qf-preset="booking"]. */
+body[data-qf-preset="booking"] .qf-cta.qf-secondary {
+  color: #9DBEF5 !important;
+}
+body[data-qf-preset="booking"] .qf-result-actions .qf-edit-link,
+body[data-qf-preset="booking"] .qf-result-actions .qf-edit-link:hover {
+  color: #9DBEF5 !important;
+}
+
+/* --- 4. Tesla + Booking: tone down the loud estimate-note panel ------------
+   The "This estimate helps you move faster…" note (.qf-customer-note) paints a
+   bright near-white gradient (public-calculator-ux.css) — legible but LOUD on
+   the dark/blue shell. Re-skin it to a quiet on-palette translucent film over
+   the shell with the preset's LIGHT text (light-on-dark → AA-safe). Scoped to
+   tesla + booking; every other preset keeps its light note. */
+body[data-qf-preset="tesla"] .qf-customer-note,
+body[data-qf-preset="booking"] .qf-customer-note {
+  background: rgba(255, 255, 255, 0.06) !important;
+  background-image: none !important;
+  border-color: rgba(255, 255, 255, 0.14) !important;
+  color: var(--w-surface-2-text, #E6E3E0) !important;
 }

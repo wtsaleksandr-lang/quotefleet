@@ -24,6 +24,17 @@
 @font-face { font-family:'Sora'; font-style:normal; font-weight:600; font-display:swap; src:url('/vendor/fonts/sora-600.woff2') format('woff2'); }
 @font-face { font-family:'Sora'; font-style:normal; font-weight:700; font-display:swap; src:url('/vendor/fonts/sora-700.woff2') format('woff2'); }
 
+/* ── Oswald (condensed bold — the Ironhorse / moto type voice) ──── */
+@font-face { font-family:'Oswald'; font-style:normal; font-weight:400; font-display:swap; src:url('/vendor/fonts/oswald-400.woff2') format('woff2'); }
+@font-face { font-family:'Oswald'; font-style:normal; font-weight:500; font-display:swap; src:url('/vendor/fonts/oswald-500.woff2') format('woff2'); }
+@font-face { font-family:'Oswald'; font-style:normal; font-weight:600; font-display:swap; src:url('/vendor/fonts/oswald-600.woff2') format('woff2'); }
+@font-face { font-family:'Oswald'; font-style:normal; font-weight:700; font-display:swap; src:url('/vendor/fonts/oswald-700.woff2') format('woff2'); }
+
+/* ── Roboto (Google / Android — the Material type voice) ────────────── */
+@font-face { font-family:'Roboto'; font-style:normal; font-weight:400; font-display:swap; src:url('/vendor/fonts/roboto-400.woff2') format('woff2'); }
+@font-face { font-family:'Roboto'; font-style:normal; font-weight:500; font-display:swap; src:url('/vendor/fonts/roboto-500.woff2') format('woff2'); }
+@font-face { font-family:'Roboto'; font-style:normal; font-weight:700; font-display:swap; src:url('/vendor/fonts/roboto-700.woff2') format('woff2'); }
+
 /* Apply the resolved theme font. --w-font is set at runtime by
    widget.js#applyTheme; the fallback keeps the widget on Satoshi if the
    theme payload never arrives. Inputs/buttons don't inherit font-family,

@@ -107,13 +107,13 @@ a.qf-contact-value:hover { text-decoration: underline; }
 .qf-grid { display: grid; grid-template-columns: 1fr 1fr; gap: var(--space-1-5); }
 .qf-grid .qf-full { grid-column: 1 / -1; }
 .qf-field { display: flex; flex-direction: column; gap: var(--label-gap); }
-.qf-field label { font-size: 12px; font-weight: 650; color: var(--w-muted); letter-spacing: 0.01em; }
+.qf-field label { font-size: 12px; font-weight: var(--w-label-weight, 650); color: var(--w-muted); letter-spacing: var(--w-label-spacing, 0.01em); text-transform: var(--w-label-transform, none); }
 .qf-input, .qf-select {
   width: 100%;
   padding: var(--space-1-5);
   font-size: 14px;
   border: 1px solid var(--w-border);
-  border-radius: 9px;
+  border-radius: var(--w-radius-input, 9px);
   background: white;
   color: var(--w-fg);
   transition: border-color 0.15s, box-shadow 0.15s;

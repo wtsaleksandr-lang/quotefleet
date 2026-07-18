@@ -175,6 +175,11 @@
     // long-standing border-on-hover look. See widgetThemes.ts CTA_HOVER_STYLES.
     var hover = theme.ctaHover || 'border';
     document.body.setAttribute('data-qf-cta-hover', hover);
+    // Preset id → body attribute so the widget CSS can apply the handful of
+    // preset-specific tweaks that aren't expressible as a single --w-* token
+    // (e.g. neutralising stray brand-blue on the monochrome "mono" theme).
+    // Absent/empty for a null theme; harmless for every other preset.
+    if (theme.preset) document.body.setAttribute('data-qf-preset', theme.preset);
   }
 
   function applyBrand(brand) {

@@ -46,10 +46,10 @@ export function normalizeTheme(raw: unknown): MapTheme {
 //   satellite   — real aerial imagery (maptype=hybrid) + labels + white route
 // NOTE: the string KEYS stay stable so tenants' saved selections persist; only
 // the LOOK + label/hint of `grayscale`/`dark_routes` changed, `soft`+`satellite` are new.
-export type MapStyle = 'branded' | 'grayscale' | 'standard' | 'soft' | 'dark_routes' | 'satellite';
+export type MapStyle = 'branded' | 'grayscale' | 'standard' | 'soft' | 'dark_routes' | 'mono' | 'satellite' | 'ironhorse' | 'harbor' | 'cupertino' | 'material' | 'booking' | 'tesla' | 'stripe';
 
 /** Canonical style keys (source of truth for the Zod enum + the picker). */
-export const MAP_STYLE_KEYS = ['branded', 'grayscale', 'standard', 'soft', 'dark_routes', 'satellite'] as const;
+export const MAP_STYLE_KEYS = ['branded', 'grayscale', 'standard', 'soft', 'dark_routes', 'mono', 'satellite', 'ironhorse', 'harbor', 'cupertino', 'material', 'booking', 'tesla', 'stripe'] as const;
 
 /** Human labels + one-line hints for the Customize picker. */
 export const MAP_STYLE_LIST: Array<{ key: MapStyle; label: string; hint: string }> = [
@@ -58,7 +58,15 @@ export const MAP_STYLE_LIST: Array<{ key: MapStyle; label: string; hint: string 
   { key: 'standard', label: 'Standard', hint: 'Real Google Maps colors.' },
   { key: 'soft', label: 'Soft', hint: 'Soft, Apple-inspired pastel map.' },
   { key: 'dark_routes', label: 'Dark', hint: 'Dark grey base with a bright white route (Uber-style).' },
+  { key: 'mono', label: 'Mono', hint: 'Minimal light grey base with a black route (Uber-style).' },
   { key: 'satellite', label: 'Satellite', hint: 'Real aerial imagery with labels.' },
+  { key: 'ironhorse', label: 'Ironhorse', hint: 'Clean light base with a bold orange route (moto-style).' },
+  { key: 'harbor', label: 'Harbor', hint: 'Light port map, soft blue water, deep teal route.' },
+  { key: 'cupertino', label: 'Cupertino', hint: 'Apple-Maps-style cream land, sage parks, soft blue water, system-blue route.' },
+  { key: 'material', label: 'Material', hint: 'Google-Maps-style grey land, yellow highways, blue water, blue route.' },
+  { key: 'booking', label: 'Voyage', hint: 'Clean light blue map, cool water, deep-blue route and pins.' },
+  { key: 'tesla', label: 'Voltage', hint: 'Near-black night-nav map with a bright Tesla-red route and pins.' },
+  { key: 'stripe', label: 'Blurple', hint: 'Soft light Stripe map, indigo route and pins.' },
 ];
 
 /** Normalize any caller/tenant input to a valid style. null/unknown → branded,
@@ -68,7 +76,15 @@ export function resolveMapStyle(raw: unknown): MapStyle {
     raw === 'standard' ||
     raw === 'soft' ||
     raw === 'dark_routes' ||
-    raw === 'satellite'
+    raw === 'mono' ||
+    raw === 'satellite' ||
+    raw === 'ironhorse' ||
+    raw === 'harbor' ||
+    raw === 'cupertino' ||
+    raw === 'material' ||
+    raw === 'booking' ||
+    raw === 'tesla' ||
+    raw === 'stripe'
     ? raw
     : 'branded';
 }
@@ -204,6 +220,241 @@ const DARK_ROUTES_STYLES: string[] = [
   'feature:road.highway|element:geometry.stroke|color:0x2a2a2a',
 ];
 
+// `mono` (label: "Mono") — Uber's REAL light map, matched precisely to the app:
+//   · base LAND = very light cool grey / faint lavender (NOT green)
+//   · the whole ROAD network = light PERIWINKLE-BLUE (Uber's signature look),
+//     highways a touch stronger with a slightly darker blue stroke
+//   · GREEN only for PARKS (green geometry + green park labels + tree icons);
+//     every other POI + transit hidden
+//   · WATER = soft blue; neighborhood + locality labels = periwinkle-blue
+// Deliberately muted/subtle. The focal point is the BLACK route line (see
+// routeLine) — a black route over the light periwinkle map, exactly like Uber.
+const MONO_STYLES: string[] = [
+  'element:geometry|color:0xf1f1f5',
+  'element:labels.text.fill|color:0x8a8a8a',
+  'element:labels.text.stroke|color:0xffffff',
+  'feature:administrative|element:geometry|color:0xd8d8de',
+  'feature:administrative.country|element:geometry.stroke|color:0xc4c4cc',
+  'feature:administrative.province|element:geometry.stroke|color:0xd0d0d8',
+  // Neighborhood + locality labels in Uber's periwinkle-blue.
+  'feature:administrative.neighborhood|element:labels.text.fill|color:0x8a9bc4',
+  'feature:administrative.locality|element:labels.text.fill|color:0x8a9bc4',
+  'feature:landscape|element:geometry|color:0xf1f1f5',
+  // Hide every POI except parks; keep parks green with green labels + icons.
+  'feature:poi|element:labels.icon|visibility:off',
+  'feature:poi|element:labels.text|visibility:off',
+  'feature:poi.park|element:geometry|color:0xaedeba',
+  'feature:poi.park|element:labels.text|visibility:on',
+  'feature:poi.park|element:labels.text.fill|color:0x4e7c4e',
+  'feature:poi.park|element:labels.icon|visibility:on',
+  'feature:transit|visibility:off',
+  // Soft blue water/lakes.
+  'feature:water|element:geometry|color:0xc6d6ec',
+  'feature:water|element:labels.text.fill|color:0x8ba3b8',
+  // The whole road network reads periwinkle-blue — Uber's signature.
+  'feature:road|element:geometry|color:0xced9f2',
+  'feature:road|element:labels.text.fill|color:0x8f8f8f',
+  'feature:road.arterial|element:geometry|color:0xc4d2f0',
+  'feature:road.arterial|element:geometry.stroke|color:0xb2c2ea',
+  'feature:road.highway|element:geometry|color:0xb4c4ec',
+  'feature:road.highway|element:geometry.stroke|color:0x9fb2e0',
+];
+
+// `ironhorse` (label: "Ironhorse") — Harley-inspired. A clean high-key LIGHT
+// base: warm-neutral light land, WHITE roads with crisp grey edges, soft blue
+// water, POI/transit hidden — so the one saturated element is the bold ORANGE
+// route + orange A·B pins (see routeLine / markerColors). Verbatim from the
+// approved `_rec/_harley-map.mjs` harness.
+const IRONHORSE_STYLES: string[] = [
+  'element:geometry|color:0xf2f1ef',
+  'element:labels.text.fill|color:0x5b5b5b',
+  'element:labels.text.stroke|color:0xffffff',
+  'feature:administrative|element:geometry|color:0xcfcdc9',
+  'feature:administrative.country|element:geometry.stroke|color:0xb4b1ac',
+  'feature:administrative.province|element:geometry.stroke|color:0xcbc9c5',
+  'feature:landscape|element:geometry|color:0xf2f1ef',
+  'feature:poi|visibility:off',
+  'feature:transit|visibility:off',
+  'feature:water|element:geometry|color:0xbcd3e0',
+  'feature:water|element:labels.text.fill|color:0x6f8fa0',
+  'feature:road|element:geometry|color:0xffffff',
+  'feature:road|element:geometry.stroke|color:0xdedbd6',
+  'feature:road|element:labels.text.fill|color:0x6b6b6b',
+  'feature:road.arterial|element:geometry|color:0xffffff',
+  'feature:road.arterial|element:geometry.stroke|color:0xd8d5cf',
+  'feature:road.highway|element:geometry|color:0xffffff',
+  'feature:road.highway|element:geometry.stroke|color:0xc9c5be',
+];
+
+// `harbor` (label: "Harbor") — ride-app / port-inspired. Light cool-grey base,
+// clean near-white roads, and the signature SOFT BLUE harbor water, with a deep
+// TEAL route + teal A·B pins (see routeLine / markerColors). Verbatim from the
+// approved `_rec/render-harbor.mjs` HARBOR_STYLES array.
+const HARBOR_STYLES: string[] = [
+  'element:geometry|color:0xeef1f5',
+  'element:labels.text.fill|color:0x5a6b73',
+  'element:labels.text.stroke|color:0xffffff',
+  'feature:administrative|element:geometry|color:0xcdd6de',
+  'feature:administrative.country|element:geometry.stroke|color:0xacb8c2',
+  'feature:administrative.province|element:geometry.stroke|color:0xcdd6de',
+  'feature:landscape|element:geometry|color:0xe8ecf1',
+  'feature:poi|element:labels.icon|visibility:off',
+  'feature:poi|element:labels.text|visibility:off',
+  'feature:poi.park|element:geometry|color:0xcfe4d6',
+  'feature:transit|visibility:off',
+  'feature:water|element:geometry|color:0xbcd4ea',
+  'feature:water|element:labels.text.fill|color:0x6f93b3',
+  'feature:road|element:geometry|color:0xffffff',
+  'feature:road|element:geometry.stroke|color:0xd7dee7',
+  'feature:road|element:labels.text.fill|color:0x6a7580',
+  'feature:road.arterial|element:geometry|color:0xffffff',
+  'feature:road.arterial|element:geometry.stroke|color:0xcfd8e2',
+  'feature:road.highway|element:geometry|color:0xffffff',
+  'feature:road.highway|element:geometry.stroke|color:0xbcc7d3',
+];
+
+// `cupertino` (label: "Cupertino") — Apple-Maps-inspired. CREAM land, soft SAGE
+// natural terrain + green parks, soft blue water, clean WHITE roads with a
+// warm-grey edge, quiet simplified labels; POI / transit / administrative
+// borders hidden so it reads calm and minimal. The one saturated element is the
+// SYSTEM-BLUE route line + green/red Apple endpoint pins (see routeLine /
+// markerColors). Matches the frosted cupertino widget preset.
+const CUPERTINO_STYLES: string[] = [
+  'element:geometry|color:0xf3efe6',
+  'element:labels.text.fill|color:0x9a9a9f',
+  'element:labels.text.stroke|color:0xffffff',
+  'feature:administrative|element:geometry|visibility:off',
+  'feature:landscape|element:geometry|color:0xf3efe6',
+  'feature:landscape.natural|element:geometry|color:0xc9e7a8',
+  'feature:poi|element:labels.icon|visibility:off',
+  'feature:poi|element:labels.text|visibility:off',
+  'feature:poi.park|element:geometry|color:0xc4e6a3',
+  'feature:poi.park|element:labels.text.fill|color:0x6f9e5a',
+  'feature:transit|visibility:off',
+  'feature:water|element:geometry|color:0xa9d9f2',
+  'feature:water|element:labels.text.fill|color:0x7fa8c4',
+  'feature:road|element:geometry|color:0xffffff',
+  'feature:road|element:geometry.stroke|color:0xe8e6e1',
+  'feature:road|element:labels.text.fill|color:0x9a9a9f',
+  'feature:road.arterial|element:geometry|color:0xffffff',
+  'feature:road.arterial|element:geometry.stroke|color:0xe6e2da',
+  'feature:road.highway|element:geometry|color:0xffffff',
+  'feature:road.highway|element:geometry.stroke|color:0xe0ddd6',
+];
+
+// `material` (label: "Material") — genuine Google-Maps roadmap look. Grey land,
+// WHITE roads with a light grey stroke, the signature YELLOW highways (yellow
+// fill + amber stroke), blue water, green parks, quiet grey labels, POI/transit
+// off. The saturated elements are the BLUE route line + red/blue Google pins
+// (see routeLine / markerColors). Verbatim from `_rec/render-material-v2.mjs`.
+const MATERIAL_STYLES: string[] = [
+  'element:geometry|color:0xe8eaed',
+  'element:labels.text.fill|color:0x5f6368',
+  'element:labels.text.stroke|color:0xffffff',
+  'feature:administrative|element:geometry.stroke|color:0xc4c7cc',
+  'feature:administrative.land_parcel|visibility:off',
+  'feature:administrative.neighborhood|visibility:off',
+  'feature:landscape.natural|element:geometry|color:0xe8eaed',
+  'feature:landscape.man_made|element:geometry|color:0xe3e5e8',
+  'feature:poi|element:labels|visibility:off',
+  'feature:poi|element:geometry|color:0xdfe3e0',
+  'feature:poi.park|element:geometry|color:0xc8e6c9',
+  'feature:poi.park|element:labels.text.fill|color:0x5a8a5e',
+  'feature:transit|visibility:off',
+  'feature:water|element:geometry|color:0xaadaff',
+  'feature:water|element:labels.text.fill|color:0x6f9fd8',
+  'feature:road|element:geometry.fill|color:0xffffff',
+  'feature:road|element:geometry.stroke|color:0xe0e2e6',
+  'feature:road|element:labels.text.fill|color:0x6b7075',
+  'feature:road.arterial|element:geometry.fill|color:0xffffff',
+  'feature:road.arterial|element:geometry.stroke|color:0xd6d9dd',
+  'feature:road.highway|element:geometry.fill|color:0xf9d949',
+  'feature:road.highway|element:geometry.stroke|color:0xf0b71e',
+  'feature:road.highway|element:labels.text.fill|color:0x8a6d1a',
+  'feature:road.highway|element:labels.text.stroke|color:0xffffff',
+  'feature:road.highway.controlled_access|element:geometry.fill|color:0xf9d949',
+  'feature:road.highway.controlled_access|element:geometry.stroke|color:0xf0b71e',
+];
+
+// `booking` (label: "Voyage") — a light, clean, all-blue-leaning map matching
+// the Booking widget: light blue-grey land, WHITE roads with a cool grey edge,
+// cool booking-blue water, soft green parks, POI/transit off. The saturated
+// elements are the deep booking-blue route line + deep-blue A·B pins (see
+// routeLine / markerColors). Verbatim from `_rec/render-booking.mjs`.
+const BOOKING_STYLES: string[] = [
+  'element:geometry|color:0xeef2f8',
+  'element:labels.text.fill|color:0x5f6b80',
+  'element:labels.text.stroke|color:0xffffff',
+  'feature:administrative|element:geometry|color:0xccd6e6',
+  'feature:administrative.province|element:geometry.stroke|color:0xccd6e6',
+  'feature:landscape|element:geometry|color:0xe9edf5',
+  'feature:poi|visibility:off',
+  'feature:poi.park|element:geometry|color:0xd4e3d6',
+  'feature:transit|visibility:off',
+  'feature:water|element:geometry|color:0xbcd0ec',
+  'feature:water|element:labels.text.fill|color:0x6f8bb3',
+  'feature:road|element:geometry|color:0xffffff',
+  'feature:road|element:geometry.stroke|color:0xd6deea',
+  'feature:road.highway|element:geometry|color:0xffffff',
+  'feature:road.highway|element:geometry.stroke|color:0xbcc6d8',
+  'feature:road.arterial|element:geometry|color:0xffffff',
+  'feature:road.arterial|element:geometry.stroke|color:0xcfd8e6',
+];
+
+// `tesla` (label: "Voltage") — a Tesla night-nav DARK map matching the Voltage
+// widget: near-black land + faint-blue very dark water, dark-grey roads that
+// read as lit paths, muted grey labels, POI/transit/admin off. The one pop of
+// colour is the bright Tesla-RED route line + red A·B pins (see routeLine /
+// markerColors). Verbatim from `_rec/render-tesla.mjs` TESLA_MAP_STYLES.
+const TESLA_STYLES: string[] = [
+  'element:geometry|color:0x17181a',
+  'element:labels.text.fill|color:0x8a8c90',
+  'element:labels.text.stroke|color:0x0a0a0b',
+  'feature:administrative|element:geometry|visibility:off',
+  'feature:administrative.land_parcel|visibility:off',
+  'feature:administrative.neighborhood|visibility:off',
+  'feature:landscape|element:geometry|color:0x17181a',
+  'feature:poi|visibility:off',
+  'feature:poi.park|element:geometry|color:0x14201a',
+  'feature:transit|visibility:off',
+  'feature:water|element:geometry|color:0x0f1114',
+  'feature:water|element:labels.text.fill|color:0x4a5560',
+  'feature:road|element:geometry|color:0x2a2c30',
+  'feature:road|element:geometry.stroke|color:0x33363b',
+  'feature:road|element:labels.text.fill|color:0x9a9ca0',
+  'feature:road.arterial|element:geometry|color:0x2f3237',
+  'feature:road.highway|element:geometry|color:0x3a3d42',
+  'feature:road.highway|element:geometry.stroke|color:0x44474d',
+];
+
+// `stripe` (label: "Blurple") — a soft light Stripe map matching the Blurple
+// widget: surface-gray land, WHITE roads with a cool grey edge, soft Stripe-blue
+// water, quiet green parks, POI/transit off, muted slate labels. The saturated
+// elements are the indigo route line + indigo A·B pins (see routeLine /
+// markerColors). Verbatim from `_rec/_render-stripe.mjs` STRIPE_MAP_STYLES.
+const STRIPE_STYLES: string[] = [
+  'element:geometry|color:0xf6f9fc',
+  'element:labels.text.fill|color:0x697386',
+  'element:labels.text.stroke|color:0xffffff',
+  'feature:administrative|element:geometry|color:0xe3e8ee',
+  'feature:administrative.country|element:geometry.stroke|color:0xd5dbe3',
+  'feature:administrative.province|element:geometry.stroke|color:0xe3e8ee',
+  'feature:landscape|element:geometry|color:0xf6f9fc',
+  'feature:poi|element:labels.icon|visibility:off',
+  'feature:poi|element:labels.text|visibility:off',
+  'feature:poi.park|element:geometry|color:0xe6f4ec',
+  'feature:transit|visibility:off',
+  'feature:water|element:geometry|color:0xd9e4f5',
+  'feature:water|element:labels.text.fill|color:0x8098bd',
+  'feature:road|element:geometry|color:0xffffff',
+  'feature:road|element:geometry.stroke|color:0xe3e8ee',
+  'feature:road|element:labels.text.fill|color:0x8792a2',
+  'feature:road.arterial|element:geometry|color:0xffffff',
+  'feature:road.arterial|element:geometry.stroke|color:0xe3e8ee',
+  'feature:road.highway|element:geometry|color:0xffffff',
+  'feature:road.highway|element:geometry.stroke|color:0xd5dbe3',
+];
+
 /** Resolve the Static Maps `style=` spec list for a (theme, mapStyle) pair.
  *  `branded` follows the light/dark theme (unchanged); the others are fixed.
  *  `standard` and `satellite` return [] → no style overrides (satellite uses
@@ -220,6 +471,22 @@ function styleSpecs(theme: MapTheme, mapStyle: MapStyle): string[] {
       return [];
     case 'dark_routes':
       return DARK_ROUTES_STYLES;
+    case 'mono':
+      return MONO_STYLES;
+    case 'ironhorse':
+      return IRONHORSE_STYLES;
+    case 'harbor':
+      return HARBOR_STYLES;
+    case 'cupertino':
+      return CUPERTINO_STYLES;
+    case 'material':
+      return MATERIAL_STYLES;
+    case 'booking':
+      return BOOKING_STYLES;
+    case 'tesla':
+      return TESLA_STYLES;
+    case 'stripe':
+      return STRIPE_STYLES;
     case 'branded':
     default:
       return themeStyles(theme);
@@ -239,7 +506,42 @@ function mapTypeFor(mapStyle: MapStyle): 'roadmap' | 'hybrid' {
 function routeLine(mapStyle: MapStyle): { color: string; weight: string } {
   if (mapStyle === 'dark_routes') return { color: '0xffffffff', weight: '6' };
   if (mapStyle === 'satellite') return { color: '0xffffffff', weight: '5' };
+  // mono (Uber light): a solid near-black route line on the near-white base.
+  if (mapStyle === 'mono') return { color: '0x111111ff', weight: '6' };
+  // ironhorse (Harley): a bold ORANGE route line, the one saturated element.
+  if (mapStyle === 'ironhorse') return { color: '0xfc6600ff', weight: '6' };
+  // harbor (ride-app): a deep TEAL route line matching the theme accent.
+  if (mapStyle === 'harbor') return { color: '0x0C566Bff', weight: '5' };
+  // cupertino (Apple): the SYSTEM-BLUE route line over the cream/pastel map.
+  if (mapStyle === 'cupertino') return { color: '0x0A84FFff', weight: '5' };
+  // material (Google): the Google-blue route line, weight 6.
+  if (mapStyle === 'material') return { color: '0x4285F4ff', weight: '6' };
+  // booking (Voyage): the deep booking-blue action route line.
+  if (mapStyle === 'booking') return { color: '0x006CE4ff', weight: '5' };
+  // tesla (Voltage): the bright Tesla-red route line over the near-black map.
+  if (mapStyle === 'tesla') return { color: '0xE82127ff', weight: '6' };
+  // stripe (Blurple): the indigo route line over the soft light map.
+  if (mapStyle === 'stripe') return { color: '0x635BFFff', weight: '5' };
   return { color: ROUTE_COLOR, weight: '4' };
+}
+
+// Endpoint A·B pin colours. Most styles keep the home-palette green/red pair;
+// ironhorse + harbor tint BOTH pins to the theme accent (orange / teal) so the
+// map reads as one cohesive branded object, matching the approved harnesses.
+function markerColors(mapStyle: MapStyle): { origin: string; dest: string } {
+  if (mapStyle === 'ironhorse') return { origin: '0xfc6600', dest: '0xfc6600' };
+  if (mapStyle === 'harbor') return { origin: '0x0C566B', dest: '0x0C566B' };
+  // cupertino: Apple's system green pickup + system red delivery pins.
+  if (mapStyle === 'cupertino') return { origin: '0x34C759', dest: '0xFF3B30' };
+  // material (Google): red pickup + blue delivery, Google's marker pair.
+  if (mapStyle === 'material') return { origin: '0xEA4335', dest: '0x1A73E8' };
+  // booking (Voyage): both pins the deep booking blue for one cohesive object.
+  if (mapStyle === 'booking') return { origin: '0x003B95', dest: '0x003B95' };
+  // tesla (Voltage): both pins the Tesla red for one cohesive branded object.
+  if (mapStyle === 'tesla') return { origin: '0xE82127', dest: '0xE82127' };
+  // stripe (Blurple): both pins the indigo blurple for one cohesive object.
+  if (mapStyle === 'stripe') return { origin: '0x635BFF', dest: '0x635BFF' };
+  return { origin: ORIGIN_COLOR, dest: DEST_COLOR };
 }
 
 // Retina-sized to balance the left-column panel (img renders ~210px tall,
@@ -285,9 +587,11 @@ export function buildStaticMapUrl(
   // (aerial `hybrid`). The A/B markers + route line are overlays drawn on top
   // of any style/imagery, so they always pop.
   for (const s of styleSpecs(theme, mapStyle)) params.append('style', s);
-  // Green origin (A), red destination (B).
-  params.append('markers', `color:${ORIGIN_COLOR}|label:A|${origin.lat},${origin.lng}`);
-  params.append('markers', `color:${DEST_COLOR}|label:B|${destination.lat},${destination.lng}`);
+  // Endpoint pins: green origin (A) / red destination (B) by default; the
+  // ironhorse + harbor styles tint both to their theme accent.
+  const pins = markerColors(mapStyle);
+  params.append('markers', `color:${pins.origin}|label:A|${origin.lat},${origin.lng}`);
+  params.append('markers', `color:${pins.dest}|label:B|${destination.lat},${destination.lng}`);
   const line = routeLine(mapStyle);
   if (encodedPolyline) {
     // Real road route — Google returns the polyline already URL-safe/encoded.

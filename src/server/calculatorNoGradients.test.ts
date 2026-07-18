@@ -35,7 +35,15 @@ describe('calculator global color enforcement without gradients', () => {
     expect(css).toContain('background-image: none !important');
     expect(css).toContain('body.qf-app-calculator .qf-result');
     expect(css).toContain('body.qf-app-calculator .qf-cta:disabled::after');
-    expect(css).not.toContain('linear-gradient');
+    // The base/global calculator rules must stay gradient-free — that is the
+    // whole point of this override layer. The ONE sanctioned exception is the
+    // Blurple (Stripe) preset's decorative aurora accent strip + gradient CTA,
+    // strictly scoped to body[data-qf-preset="stripe"]. Strip that scoped tail
+    // and assert the remaining (base) CSS is still entirely gradient-free.
+    const base = css.replace(/body\[data-qf-preset="stripe"\][\s\S]*$/, '');
+    expect(base).not.toContain('linear-gradient');
+    expect(base).not.toContain('radial-gradient');
+    // Any gradient that DOES survive belongs only to the scoped Stripe block.
     expect(css).not.toContain('radial-gradient');
   });
 });
