@@ -918,3 +918,240 @@ body.qf-app-calculator .qf-oog-toggle,
 body.qf-app-calculator .qf-oog-toggle span {
   color: var(--w-text, #FFFFFF) !important;
 }
+
+/* ============================================================================
+   CITRON preset — token-driven lime (variant C). Verbatim from
+   `_rec/render-citron-final.mjs` CITRON_CSS. Only paints the elements the token
+   layer can't reach on its own (active tab, lbs/kg, timeline/eta) — every accent
+   fill reads a --w-* token so a tenant accent override recolours them. The dark
+   eyebrow badge, sentence-case titles and neutralised blue leaks keep the
+   identity accent. No #fff/#000/white/black literals (fallbacks live in var()).
+   ========================================================================== */
+/* Active service tab -> token accent fill (default rule only tints it). */
+body[data-qf-preset="citron"] .qf-tabs button.active {
+  background: var(--w-accent-solid, #C3F832) !important;
+  background-image: none !important;
+  border-color: var(--w-accent-solid, #C3F832) !important;
+  color: var(--w-accent-text, #292928) !important;
+}
+/* lbs/kg active segment -> token accent fill. */
+body[data-qf-preset="citron"] .qf-wt-unit button.is-on {
+  background: var(--w-accent-solid, #C3F832) !important;
+  color: var(--w-accent-text, #292928) !important;
+}
+/* Transit timeline fill + "Est. transit" status pill -> token accent. */
+body[data-qf-preset="citron"] .qf-tl-fill {
+  background: var(--w-accent-solid, #C3F832) !important;
+  background-image: none !important;
+}
+body[data-qf-preset="citron"] .qf-tl-truck { color: var(--w-accent, #292928) !important; }
+body[data-qf-preset="citron"] .qf-result .qf-eta,
+body[data-qf-preset="citron"] .qf-ltl-class {
+  background: var(--w-accent-solid, #C3F832) !important;
+  color: var(--w-accent-text, #292928) !important;
+  border: 1px solid var(--w-accent-solid, #C3F832) !important;
+}
+/* Keep the "INSTANT FREIGHT ESTIMATE" eyebrow badge on the DARK identity accent.
+   The shared accent-solid rule would tint it LIME (weak pill edge on white); it's
+   an on-surface label, so pin it to --w-accent (dark) with a light label. Still
+   token-driven -> follows a tenant override (dark badge -> tenant-color badge). */
+body[data-qf-preset="citron"] .qf-demo-logo-slot em {
+  background: var(--w-accent, #292928) !important;
+  background-image: none !important;
+  border-color: var(--w-accent, #292928) !important;
+  color: #F8F8F8 !important;
+}
+/* "Quote estimate" corner badge -> quiet neutral (not accent). */
+body[data-qf-preset="citron"] .qf-result::before {
+  color: var(--w-muted, #5C5C5A) !important;
+  background: var(--w-surface-2, #F1F1F0) !important;
+  border-color: var(--w-border, rgba(41,41,40,.12)) !important;
+}
+/* Sentence-case section titles (global rule force-uppercases them). */
+body[data-qf-preset="citron"] .qf-section-title,
+body[data-qf-preset="citron"] .qf-addr-title {
+  text-transform: none !important; letter-spacing: normal !important; font-weight: 600 !important;
+}
+/* Neutralize hardcoded-blue estimate-note / contact-header / help / stepper. */
+body[data-qf-preset="citron"] .qf-customer-note,
+body[data-qf-preset="citron"] .qf-result .qf-customer-note,
+body[data-qf-preset="citron"] .qf-contact-head,
+body[data-qf-preset="citron"] .qf-result-guide {
+  background: #F1F1F0 !important; background-image: none !important;
+  border: 1px solid rgba(41,41,40,.12) !important; color: #3C3C3A !important;
+}
+body[data-qf-preset="citron"] .qf-help {
+  background: #F1F1F0 !important; background-image: none !important;
+  border: 1px solid transparent !important; color: #5C5C5A !important;
+}
+body[data-qf-preset="citron"] .qf-mini-stepper span:first-child {
+  background: rgba(41,41,40,.10) !important; color: #292928 !important;
+}
+/* Interactive transit note / map-modal (--qfi-* namespace) -> follow identity accent. */
+body[data-qf-preset="citron"] {
+  --qfi-primary: var(--w-accent, #292928);
+  --qfi-soft: rgba(41,41,40,.08);
+  --qfi-line: rgba(41,41,40,.16);
+}
+
+/* ============================================================================
+   VAULT preset — cream fintech + diagonal grey HATCH (v3). Verbatim from
+   `_rec/_render-vault.mjs` VAULT_SCOPED_CSS. Grey #777781 hatch lines on the
+   hero band + receipt panel + options bar; ink-hatch over the vermillion total;
+   text made transparent-backed so it overlaps the stripes; SOLID vermillion
+   active tab; prominent light-blue #9DCAFF info panel / eta / edit-details; a
+   19px grey decorative stat. No #fff/#000/white/black literals as direct values
+   (the only #FFFFFF/#CC3410 live inside var() fallbacks; #9DCAFF/#12233A etc.
+   are fine per the guard).
+   ========================================================================== */
+/* ── VAULT diagonal HATCH texture (replicates VaultBank chart fill) ──────────
+   Reusable primitive (GREY #777781 lines, plainly visible):
+     repeating-linear-gradient(45deg, rgba(119,119,129,.20) 0 1.5px, transparent 1.5px 7px)
+
+   PLACEMENT 1 (PRIMARY — result RECEIPT panel = their chart-fill analogue):
+   a BOLD grey diagonal hatch fills the line-item breakdown. Line-item text sits
+   in a z-index:1 layer; ink #1A1714 over the hatched cream still clears >11:1. */
+body[data-qf-preset="vault"] .qf-result .lines { position: relative; overflow: hidden; }
+body[data-qf-preset="vault"] .qf-result .lines::before {
+  content: "" !important; position: absolute; inset: 0; z-index: 0; pointer-events: none;
+  background: repeating-linear-gradient(45deg, rgba(119,119,129,.20) 0 1.5px, transparent 1.5px 7px) !important;
+  background-image: repeating-linear-gradient(45deg, rgba(119,119,129,.20) 0 1.5px, transparent 1.5px 7px) !important;
+}
+/* Rows/cells are TRANSPARENT so the hatch runs CONTINUOUSLY behind every label +
+   amount (no solid patch); text sits on top via z-index and stays legible. */
+body[data-qf-preset="vault"] .qf-result .lines .line,
+body[data-qf-preset="vault"] .qf-result .lines .line .name,
+body[data-qf-preset="vault"] .qf-result .lines .line .amt,
+body[data-qf-preset="vault"] .qf-result .lines .line.total-row { background: transparent !important; background-image: none !important; }
+body[data-qf-preset="vault"] .qf-result .lines .line { position: relative; z-index: 1; }
+
+/* PLACEMENT 2 (HERO BAND — visible grey hatch strip under the header): a full-
+   width band of the grey hatch across the top of the card. Decorative only, no
+   text over it, so it reads as a bold brand texture. */
+body[data-qf-preset="vault"] .qf-widget { position: relative; }
+body[data-qf-preset="vault"] .qf-widget::before {
+  content: "" !important; position: absolute; top: 0; left: 0; right: 0; height: 16px;
+  border-radius: 18px 18px 0 0; z-index: 3; pointer-events: none;
+  background: repeating-linear-gradient(45deg, rgba(119,119,129,.26) 0 1.6px, transparent 1.6px 7px) !important;
+  background-image: repeating-linear-gradient(45deg, rgba(119,119,129,.26) 0 1.6px, transparent 1.6px 7px) !important;
+}
+
+/* PLACEMENT 3 (money moment — Estimated-total box): a LIGHTER hatch over the
+   vermillion fill. Uses dark-ink lines (rgba 20,10,4) which DARKEN the local bg,
+   so the white total's contrast only IMPROVES — never drops below AA. */
+body[data-qf-preset="vault"] .qf-total-box { position: relative !important; overflow: hidden; }
+body[data-qf-preset="vault"] .qf-total-box::before {
+  content: "" !important; position: absolute; inset: 0; z-index: 0; pointer-events: none;
+  background: repeating-linear-gradient(45deg, rgba(20,10,4,.18) 0 1.5px, transparent 1.5px 7px) !important;
+  background-image: repeating-linear-gradient(45deg, rgba(20,10,4,.18) 0 1.5px, transparent 1.5px 7px) !important;
+}
+/* Label + number are TRANSPARENT + on top, so the ink hatch runs CONTINUOUSLY
+   behind "Estimated total" and "$1,840.00" — text overlaps the stripes. */
+body[data-qf-preset="vault"] .qf-total-box .qf-section-title,
+body[data-qf-preset="vault"] .qf-total-box .total,
+body[data-qf-preset="vault"] .qf-total-box .total .currency {
+  position: relative; z-index: 1; background: transparent !important; background-image: none !important;
+}
+
+/* ── TRUCKING-MODE service tabs — ACTIVE tab = SOLID accentSolid orange (#CC3410),
+   the SAME fill as the "Get my rate" CTA, WHITE text. Mirrors the booking/tesla/
+   stone .qf-tabs button.active precedent. */
+body[data-qf-preset="vault"] .qf-tabs button.active {
+  background: var(--w-accent-solid, #CC3410) !important;
+  background-image: none !important;
+  color: var(--w-accent-text, #FFFFFF) !important;
+  border-color: var(--w-accent-solid, #CC3410) !important;
+  box-shadow: none !important;
+}
+
+/* PLACEMENT 4 (extra presence — collapsed "Shipment options" bar): a subtler
+   grey hatch so the texture recurs on the form. Trigger label sits above it. */
+body[data-qf-preset="vault"] .qf-options-summary { position: relative; overflow: hidden; }
+body[data-qf-preset="vault"] .qf-options-summary::before {
+  content: "" !important; position: absolute; inset: 0; z-index: 0; pointer-events: none;
+  background: repeating-linear-gradient(45deg, rgba(119,119,129,.14) 0 1.4px, transparent 1.4px 8px) !important;
+}
+body[data-qf-preset="vault"] .qf-options-summary > * { position: relative; z-index: 1; }
+
+/* ── SECONDARY LIGHT-BLUE (#9DCAFF) — used PROMINENTLY, like the ref ──────────
+   (a) the estimate / info panel is a SOLID light-blue surface (dark ink 9.29:1);
+   (b) the "Est. transit" stat pill is light-blue; (c) the "Edit details"
+   secondary action (the ref's "More" analogue) is a light-blue pill. */
+body[data-qf-preset="vault"] .qf-customer-note,
+body[data-qf-preset="vault"] .qf-result .qf-customer-note {
+  background: #9DCAFF !important; background-image: none !important;
+  border: 1px solid #6FA6EE !important; color: #12233A !important;
+}
+body[data-qf-preset="vault"] .qf-result .qf-eta {
+  background: #9DCAFF !important; background-image: none !important;
+  border: 1px solid #6FA6EE !important; color: #12233A !important;
+}
+body[data-qf-preset="vault"] #qf-edit-btn {
+  background: #9DCAFF !important; color: #12233A !important;
+  border: 1px solid #6FA6EE !important; border-radius: 999px !important; font-weight: 600 !important;
+}
+/* collapsed options count pill also light-blue */
+body[data-qf-preset="vault"] .qf-options-count,
+body[data-qf-preset="vault"] .qf-options-summary .qf-count {
+  background: #9DCAFF !important; color: #12233A !important; border-color: transparent !important;
+}
+
+/* ── GREY #777781 as SECONDARY DECORATIVE text (LARGE text only, AA-large) ────
+   The result summary meta line ("Approx. 118 mi · FTL · 53' Reefer") is promoted
+   to a confident 19px/700 stat and painted brand grey. At >=18.66px bold it is
+   WCAG LARGE text (threshold 3.0), and #777781 on cream = 4.18:1 → clears it.
+   Small body copy keeps the darker --w-muted (#5B5B62). */
+body[data-qf-preset="vault"] .qf-result .meta {
+  color: #777781 !important; font-size: 19px !important; font-weight: 700 !important;
+  letter-spacing: -.01em !important;
+}
+
+/* ============================================================================
+   MAP BLEND — feathered map edges (OPTIONAL, global, theme-agnostic toggle)
+   ----------------------------------------------------------------------------
+   Dissolves the route-map's hard rectangular border and feathers all four
+   edges into the calculator surface, so the map "melts" into the card.
+   Verbatim from `_rec/map-blend.css`.
+
+   Toggle: body[data-qf-map-blend="on"]  (mirrors body[data-qf-cta-hover=…]).
+   OFF / absent  → map renders exactly as today (this block adds nothing).
+
+   Colour is read 100% from theme tokens — var(--w-surface) is the SAME value
+   the widget shell (.qf-widget) paints, with --w-page-bg as fallback — so the
+   feather melts into EVERY preset, light or dark, with zero per-preset code.
+   Guard-safe: no #fff/#000/white/black literals — tokens + `transparent` only.
+
+   The overlay badges (address pills / distance-transit / expand) keep their
+   own dark backing gradients and are lifted ABOVE the feather (z-index), so
+   they stay fully crisp and legible with the blend ON.
+   ========================================================================== */
+
+/* Dissolve the hard rectangular border; card surface = the melt colour. */
+body[data-qf-map-blend="on"] .qf-map-card {
+  border-color: transparent;
+  background: var(--w-surface, var(--w-page-bg));
+}
+
+/* Feather overlay: four stacked edge gradients fading the map into the
+   surface colour. pointer-events:none, sits ABOVE the map image (auto/0)
+   but BELOW every badge (z-index:2). ~36–40px feather = smooth, not muddy. */
+body[data-qf-map-blend="on"] .qf-map-canvas::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  z-index: 1;
+  pointer-events: none;
+  border-radius: inherit;
+  background:
+    linear-gradient(to bottom, var(--w-surface, var(--w-page-bg)), transparent 38px), /* top edge    */
+    linear-gradient(to top,    var(--w-surface, var(--w-page-bg)), transparent 38px), /* bottom edge */
+    linear-gradient(to right,  var(--w-surface, var(--w-page-bg)), transparent 40px), /* left edge   */
+    linear-gradient(to left,   var(--w-surface, var(--w-page-bg)), transparent 40px); /* right edge  */
+}
+
+/* Keep the overlay badges CRISP — lift them above the feather layer. */
+body[data-qf-map-blend="on"] .qf-map-addr,
+body[data-qf-map-blend="on"] .qf-map-overlay,
+body[data-qf-map-blend="on"] .qf-map-expand {
+  z-index: 2;
+}

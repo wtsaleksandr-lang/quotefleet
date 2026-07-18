@@ -8,6 +8,8 @@ import {
   DEFAULT_FONT_ID,
   CTA_HOVER_STYLES,
   DEFAULT_CTA_HOVER,
+  MAP_BLEND_VALUES,
+  DEFAULT_MAP_BLEND,
   safeFontColors,
   FONT_COLOR_SWATCHES,
 } from './widgetThemes.js';
@@ -115,12 +117,14 @@ describe('resolveWidgetTheme', () => {
     }
   });
 
-  it('exposes exactly eleven presets and six fonts', () => {
+  it('exposes exactly thirteen presets and eight fonts', () => {
     expect(WIDGET_PRESET_LIST.map((p) => p.id)).toEqual([
       'midnight', 'mono', 'ironhorse', 'harbor', 'cupertino', 'material',
-      'booking', 'tesla', 'stripe', 'stone', 'cream',
+      'booking', 'tesla', 'stripe', 'stone', 'citron', 'vault', 'cream',
     ]);
-    expect(Object.keys(WIDGET_FONTS).sort()).toEqual(['inter', 'oswald', 'roboto', 'satoshi', 'sora', 'system']);
+    expect(Object.keys(WIDGET_FONTS).sort()).toEqual(
+      ['clashdisplay', 'dmsans', 'inter', 'oswald', 'roboto', 'satoshi', 'sora', 'system'],
+    );
     expect(WIDGET_PRESETS.midnight.mode).toBe('dark');
     // Ironhorse (Harley) + Harbor (ride-app) are both LIGHT themes.
     expect(WIDGET_PRESETS.ironhorse.mode).toBe('light');
@@ -132,9 +136,12 @@ describe('resolveWidgetTheme', () => {
     expect(WIDGET_PRESETS.stripe.mode).toBe('light');
     // Stone (blueprint) is a cool-slate LIGHT theme.
     expect(WIDGET_PRESETS.stone.mode).toBe('light');
-    // A balanced light + dark lineup (3 dark, 8 light).
+    // Citron (lime) + Vault (cream fintech) are both LIGHT themes.
+    expect(WIDGET_PRESETS.citron.mode).toBe('light');
+    expect(WIDGET_PRESETS.vault.mode).toBe('light');
+    // A balanced light + dark lineup (3 dark, 10 light).
     expect(WIDGET_PRESET_LIST.filter((p) => p.mode === 'dark')).toHaveLength(3);
-    expect(WIDGET_PRESET_LIST.filter((p) => p.mode === 'light')).toHaveLength(8);
+    expect(WIDGET_PRESET_LIST.filter((p) => p.mode === 'light')).toHaveLength(10);
   });
 
   it('ironhorse (Harley) ships the condensed Oswald voice + orange-on-white moto structure', () => {
@@ -327,6 +334,68 @@ describe('resolveWidgetTheme', () => {
     expect(t.fontStack).toContain('Inter');
   });
 
+  it('citron (lime) is a token-driven light theme — near-black identity, LIME accent-solid, chip tokens inherit', () => {
+    const t = resolveWidgetTheme({ themePreset: 'citron' });
+    expect(t.mode).toBe('light');
+    // White cards on an off-white page, near-black ink.
+    expect(t.tokens['--w-surface']).toBe('#FFFFFF');
+    expect(t.tokens['--w-page-bg']).toBe('#F8F8F8');
+    expect(t.tokens['--w-text']).toBe('#292928');
+    // Near-black IDENTITY accent (on-white labels), LIME as the accent-solid fill.
+    expect(t.tokens['--w-accent']).toBe('#292928');
+    expect(t.tokens['--w-accent-solid']).toBe('#C3F832');
+    // Lime carries dark text (engine-picked); the pair clears WCAG AA.
+    expect(contrastRatio(t.tokens['--w-accent-text'], t.tokens['--w-accent-solid'])).toBeGreaterThanOrEqual(WCAG.NORMAL);
+    expect(contrastRatio(t.tokens['--w-total-text'], t.tokens['--w-accent-solid'])).toBeGreaterThanOrEqual(WCAG.NORMAL);
+    // chipActive* are INTENTIONALLY omitted → they inherit accent-solid / accent-text
+    // (lime now, tenant override later), never a hardcoded literal.
+    expect(t.tokens['--w-chip-active-bg']).toBe(t.tokens['--w-accent-solid']);
+    expect(t.tokens['--w-chip-active-text']).toBe(t.tokens['--w-accent-text']);
+    // Editorial soft shell + DM Sans voice.
+    expect(t.tokens['--w-radius-card']).toBe('16px');
+    expect(t.tokens['--w-label-transform']).toBe('none');
+    expect(t.font).toBe('dmsans');
+    expect(t.fontStack).toContain('DM Sans');
+    expect(WIDGET_FONTS.dmsans.selfHosted).toBe(true);
+  });
+
+  it('citron lime is NOT locked — a tenant accent override recolours the CTA/total fill', () => {
+    const t = resolveWidgetTheme({ themePreset: 'citron', accentOverride: '#0057FF' });
+    // Override clears accentSolid → the engine drives the fill from the tenant hex.
+    expect(t.tokens['--w-accent']).toBe('#0057FF');
+    expect(t.tokens['--w-accent-solid']).not.toBe('#C3F832');
+    // Whatever the engine picks, CTA/total text still clears WCAG AA on the fill.
+    expect(contrastRatio(t.tokens['--w-accent-text'], t.tokens['--w-accent-solid'])).toBeGreaterThanOrEqual(WCAG.NORMAL);
+    expect(contrastRatio(t.tokens['--w-total-text'], t.tokens['--w-accent-solid'])).toBeGreaterThanOrEqual(WCAG.NORMAL);
+  });
+
+  it('vault (cream fintech) is a light theme with a deep-vermillion CTA fill + Clash Display voice', () => {
+    const t = resolveWidgetTheme({ themePreset: 'vault' });
+    expect(t.mode).toBe('light');
+    // Warm bone page under a lighter cream card (NOT white).
+    expect(t.tokens['--w-page-bg']).toBe('#EAE4D9');
+    expect(t.tokens['--w-surface']).toBe('#FBF8F2');
+    expect(t.tokens['--w-text']).toBe('#1A1714');
+    // Vermillion identity accent; the FILLED CTA/total use the deeper #CC3410.
+    expect(t.tokens['--w-accent']).toBe('#F04E23');
+    expect(t.tokens['--w-accent-solid']).toBe('#CC3410');
+    // White CTA/total text clears WCAG AA on the deeper vermillion fill.
+    expect(contrastRatio(t.tokens['--w-accent-text'], t.tokens['--w-accent-solid'])).toBeGreaterThanOrEqual(WCAG.NORMAL);
+    expect(contrastRatio(t.tokens['--w-total-text'], t.tokens['--w-accent-solid'])).toBeGreaterThanOrEqual(WCAG.NORMAL);
+    // Body text reads on the warm cream surface.
+    expect(contrastRatio(t.tokens['--w-text'], t.tokens['--w-surface'])).toBeGreaterThanOrEqual(WCAG.NORMAL);
+    // Active tab/chip = filled deep-vermillion (white text); inactive = warm cream pill.
+    expect(t.tokens['--w-chip-active-bg']).toBe('#CC3410');
+    expect(t.tokens['--w-chip-active-text']).toBe('#FFFFFF');
+    expect(t.tokens['--w-chip-inactive-bg']).toBe('#FBF8F2');
+    // Soft 18px card, sentence-case 600 labels, Clash Display voice.
+    expect(t.tokens['--w-radius-card']).toBe('18px');
+    expect(t.tokens['--w-label-transform']).toBe('none');
+    expect(t.font).toBe('clashdisplay');
+    expect(t.fontStack).toContain('Clash Display');
+    expect(WIDGET_FONTS.clashdisplay.selfHosted).toBe(true);
+  });
+
   it('ONLY cupertino is frosted — every other preset emits its opaque surface + 0px blur', () => {
     for (const preset of WIDGET_PRESET_LIST) {
       const t = resolveWidgetTheme({ themePreset: preset.id });
@@ -396,7 +465,7 @@ describe('resolveWidgetTheme', () => {
     // the remaining presets must emit the neutral defaults so their tabs /
     // chips / flags render byte-for-byte as before (no border, input-surface
     // fill, solid-accent active chip).
-    const CUSTOM_STATEFUL = new Set(['mono', 'ironhorse', 'harbor', 'booking', 'tesla', 'stripe', 'stone']);
+    const CUSTOM_STATEFUL = new Set(['mono', 'ironhorse', 'harbor', 'booking', 'tesla', 'stripe', 'stone', 'citron', 'vault']);
     for (const preset of WIDGET_PRESET_LIST) {
       if (CUSTOM_STATEFUL.has(preset.id)) continue;
       const t = resolveWidgetTheme({ themePreset: preset.id });
@@ -548,6 +617,24 @@ describe('resolveWidgetTheme — CTA hover', () => {
   it('passes through each supported style', () => {
     for (const style of CTA_HOVER_STYLES) {
       expect(resolveWidgetTheme({ ctaHover: style }).ctaHover).toBe(style);
+    }
+  });
+});
+
+// ── Map-blend toggle ─────────────────────────────────────────────────
+describe('resolveWidgetTheme — map blend', () => {
+  it('defaults to off (existing tenants unchanged) and normalizes unknown values', () => {
+    expect(resolveWidgetTheme(null).mapBlend).toBe(DEFAULT_MAP_BLEND);
+    expect(resolveWidgetTheme(null).mapBlend).toBe('off');
+    expect(resolveWidgetTheme({}).mapBlend).toBe('off');
+    expect(resolveWidgetTheme({ mapBlend: 'sometimes' }).mapBlend).toBe('off');
+    expect(resolveWidgetTheme({ mapBlend: null }).mapBlend).toBe('off');
+  });
+
+  it("passes 'on' through and supports every declared value", () => {
+    expect(resolveWidgetTheme({ mapBlend: 'on' }).mapBlend).toBe('on');
+    for (const v of MAP_BLEND_VALUES) {
+      expect(resolveWidgetTheme({ mapBlend: v }).mapBlend).toBe(v);
     }
   });
 });

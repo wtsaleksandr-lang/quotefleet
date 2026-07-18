@@ -46,10 +46,10 @@ export function normalizeTheme(raw: unknown): MapTheme {
 //   satellite   — real aerial imagery (maptype=hybrid) + labels + white route
 // NOTE: the string KEYS stay stable so tenants' saved selections persist; only
 // the LOOK + label/hint of `grayscale`/`dark_routes` changed, `soft`+`satellite` are new.
-export type MapStyle = 'branded' | 'grayscale' | 'standard' | 'soft' | 'dark_routes' | 'mono' | 'satellite' | 'ironhorse' | 'harbor' | 'cupertino' | 'material' | 'booking' | 'tesla' | 'stripe' | 'stone';
+export type MapStyle = 'branded' | 'grayscale' | 'standard' | 'soft' | 'dark_routes' | 'mono' | 'satellite' | 'ironhorse' | 'harbor' | 'cupertino' | 'material' | 'booking' | 'tesla' | 'stripe' | 'stone' | 'citron' | 'vault';
 
 /** Canonical style keys (source of truth for the Zod enum + the picker). */
-export const MAP_STYLE_KEYS = ['branded', 'grayscale', 'standard', 'soft', 'dark_routes', 'mono', 'satellite', 'ironhorse', 'harbor', 'cupertino', 'material', 'booking', 'tesla', 'stripe', 'stone'] as const;
+export const MAP_STYLE_KEYS = ['branded', 'grayscale', 'standard', 'soft', 'dark_routes', 'mono', 'satellite', 'ironhorse', 'harbor', 'cupertino', 'material', 'booking', 'tesla', 'stripe', 'stone', 'citron', 'vault'] as const;
 
 /** Human labels + one-line hints for the Customize picker. */
 export const MAP_STYLE_LIST: Array<{ key: MapStyle; label: string; hint: string }> = [
@@ -68,6 +68,8 @@ export const MAP_STYLE_LIST: Array<{ key: MapStyle; label: string; hint: string 
   { key: 'tesla', label: 'Voltage', hint: 'Near-black night-nav map with a bright Tesla-red route and pins.' },
   { key: 'stripe', label: 'Blurple', hint: 'Soft light Stripe map, indigo route and pins.' },
   { key: 'stone', label: 'Stone', hint: 'Cool slate-grey map, graphite route and pins.' },
+  { key: 'citron', label: 'Citron', hint: 'Minimal light B&W map, near-black route, lime pins.' },
+  { key: 'vault', label: 'Vault', hint: 'Warm cream map, vermillion route and pins.' },
 ];
 
 /** Normalize any caller/tenant input to a valid style. null/unknown → branded,
@@ -86,7 +88,9 @@ export function resolveMapStyle(raw: unknown): MapStyle {
     raw === 'booking' ||
     raw === 'tesla' ||
     raw === 'stripe' ||
-    raw === 'stone'
+    raw === 'stone' ||
+    raw === 'citron' ||
+    raw === 'vault'
     ? raw
     : 'branded';
 }
@@ -486,6 +490,51 @@ const STONE_STYLES: string[] = [
   'feature:road.highway|element:geometry.stroke|color:0xaab4bd',
 ];
 
+// `citron` (label: "Citron") — a minimal light B&W map matching the Citron
+// widget: near-white neutral land, neutral-grey water, white roads on a faint
+// grey stroke, POI/transit off, quiet grey labels. The one accents are the
+// near-black route line + lime A·B pins (see routeLine / markerColors).
+// Verbatim from `_rec/render-citron-final.mjs` citron map styles.
+const CITRON_STYLES: string[] = [
+  'element:geometry|color:0xf4f4f3',
+  'element:labels.text.fill|color:0x8a8a88',
+  'element:labels.text.stroke|color:0xffffff',
+  'feature:landscape|element:geometry|color:0xf1f1f0',
+  'feature:poi|element:labels.icon|visibility:off',
+  'feature:poi|element:labels.text|visibility:off',
+  'feature:transit|visibility:off',
+  'feature:water|element:geometry|color:0xe4e6e6',
+  'feature:road|element:geometry|color:0xffffff',
+  'feature:road|element:geometry.stroke|color:0xe0e0df',
+  'feature:road|element:labels.text.fill|color:0x9a9a98',
+  'feature:road.highway|element:geometry|color:0xf0f0ee',
+  'feature:road.highway|element:geometry.stroke|color:0xd2d2d0',
+];
+
+// `vault` (label: "Vault") — a warm cream map matching the Vault widget: warm
+// cream/bone land (reads as an extension of the shell), warm cream roads, cool
+// desaturated water, POI/transit off, warm-grey labels. The one element with
+// weight is the vermillion route line + vermillion A·B pins (see routeLine /
+// markerColors). Verbatim from `_rec/_render-vault.mjs` VAULT_STYLES.
+const VAULT_STYLES: string[] = [
+  'element:geometry|color:0xEDE7DB',
+  'element:labels.text.fill|color:0x6C6C73',
+  'element:labels.text.stroke|color:0xFBF8F2',
+  'feature:administrative|element:geometry|color:0xD8CFC0',
+  'feature:administrative.province|element:geometry.stroke|color:0xCDC3B2',
+  'feature:landscape|element:geometry|color:0xF1EBDF',
+  'feature:poi|visibility:off',
+  'feature:poi.park|element:geometry|color:0xDCE3CE',
+  'feature:transit|visibility:off',
+  'feature:water|element:geometry|color:0xC7D2D6',
+  'feature:water|element:labels.text.fill|color:0x8A96A0',
+  'feature:road|element:geometry|color:0xFBF8F2',
+  'feature:road|element:geometry.stroke|color:0xE0D6C6',
+  'feature:road|element:labels.text.fill|color:0x8A8378',
+  'feature:road.highway|element:geometry|color:0xFFFDF9',
+  'feature:road.highway|element:geometry.stroke|color:0xD8C7B4',
+];
+
 /** Resolve the Static Maps `style=` spec list for a (theme, mapStyle) pair.
  *  `branded` follows the light/dark theme (unchanged); the others are fixed.
  *  `standard` and `satellite` return [] → no style overrides (satellite uses
@@ -520,6 +569,10 @@ function styleSpecs(theme: MapTheme, mapStyle: MapStyle): string[] {
       return STRIPE_STYLES;
     case 'stone':
       return STONE_STYLES;
+    case 'citron':
+      return CITRON_STYLES;
+    case 'vault':
+      return VAULT_STYLES;
     case 'branded':
     default:
       return themeStyles(theme);
@@ -557,6 +610,10 @@ function routeLine(mapStyle: MapStyle): { color: string; weight: string } {
   if (mapStyle === 'stripe') return { color: '0x635BFFff', weight: '5' };
   // stone (Stone): the cool-graphite route line over the cool-slate map.
   if (mapStyle === 'stone') return { color: '0x21272Dff', weight: '6' };
+  // citron (Citron): the near-black identity route line over the B&W map.
+  if (mapStyle === 'citron') return { color: '0x292928ff', weight: '5' };
+  // vault (Vault): the vermillion identity route line over the cream map.
+  if (mapStyle === 'vault') return { color: '0xF04E23ff', weight: '5' };
   return { color: ROUTE_COLOR, weight: '4' };
 }
 
@@ -578,6 +635,10 @@ function markerColors(mapStyle: MapStyle): { origin: string; dest: string } {
   if (mapStyle === 'stripe') return { origin: '0x635BFF', dest: '0x635BFF' };
   // stone (Stone): both pins the cool graphite for one cohesive object.
   if (mapStyle === 'stone') return { origin: '0x21272D', dest: '0x21272D' };
+  // citron (Citron): both pins the signature lime for one cohesive object.
+  if (mapStyle === 'citron') return { origin: '0xC3F832', dest: '0xC3F832' };
+  // vault (Vault): both pins the vermillion for one cohesive branded object.
+  if (mapStyle === 'vault') return { origin: '0xF04E23', dest: '0xF04E23' };
   return { origin: ORIGIN_COLOR, dest: DEST_COLOR };
 }
 

@@ -275,6 +275,22 @@ export const WIDGET_FONTS: Record<string, WidgetFont> = {
     stack: `'Roboto', 'Inter', ${SYSTEM_FALLBACK}`,
     selfHosted: true,
   },
+  dmsans: {
+    id: 'dmsans',
+    label: 'DM Sans',
+    // The token-driven lime "Citron" voice — a friendly low-contrast geometric
+    // grotesque. Inter falls back for legibility on a slow font-load.
+    stack: `'DM Sans', 'Inter', ${SYSTEM_FALLBACK}`,
+    selfHosted: true,
+  },
+  clashdisplay: {
+    id: 'clashdisplay',
+    label: 'Clash Display',
+    // The bold cream fintech "Vault" display voice. Satoshi/Inter fall back for
+    // legibility at body size.
+    stack: `'Clash Display', 'Satoshi', 'Inter', ${SYSTEM_FALLBACK}`,
+    selfHosted: true,
+  },
   oswald: {
     id: 'oswald',
     label: 'Oswald',
@@ -861,6 +877,122 @@ const PRESETS_RAW: WidgetPreset[] = [
     },
   },
   {
+    id: 'citron',
+    label: 'Citron',
+    description:
+      'A crisp editorial LIGHT theme — white cards on an off-white page, near-black identity ink, and a signature LIME fill (token-driven) on the CTA, estimate-total and active controls. The lime lives in the accent-solid token, so a tenant accent override recolours every filled surface; the identity accent stays near-black for on-white labels. DM Sans type voice.',
+    mode: 'light',
+    // Editorial lime voice: soft 16px card, hairline border, quiet layered
+    // shadow, sentence-case 600 labels. The lime is wired through accentSolid so
+    // the CTA/total/active states are recolourable; chipActive* are intentionally
+    // OMITTED so active chips inherit the lime now and a tenant override later.
+    structure: {
+      radiusCard: '16px',
+      radiusInput: '12px',
+      radiusBtn: '12px',
+      radiusPill: '999px',
+      borderWidth: '1px',
+      cardShadow: '0 1px 2px rgba(41,41,40,.05), 0 16px 40px -24px rgba(41,41,40,.16)',
+      labelTransform: 'none',
+      labelSpacing: 'normal',
+      labelWeight: '600',
+      activeBorderColor: 'transparent',
+      activeBorderWidth: '0',
+      chipInactiveBg: '#FFFFFF',
+      chipInactiveBorder: 'rgba(41,41,40,.16)',
+      // chipActiveBg / chipActiveText intentionally omitted → inherit accent-solid
+      // (lime now, tenant override later). Never hardcode the lime here.
+    },
+    defaultFont: 'dmsans',
+    palette: {
+      mode: 'light',
+      pageBg: '#F8F8F8',
+      surface: '#FFFFFF',
+      surface2: '#F1F1F0',
+      surface2Text: '#292928',
+      inputBg: '#FFFFFF',
+      inputBgHover: '#F5F5F4',
+      inputText: '#292928',
+      inputBorder: 'rgba(41,41,40,.18)',
+      text: '#292928',
+      muted: '#5C5C5A',
+      muted2: '#6A6A68',
+      contactText: '#3C3C3A',
+      border: 'rgba(41,41,40,.12)',
+      // Identity accent = near-black (on-white labels / eyebrow badge / links).
+      accent: '#292928',
+      // FILLED accent surfaces (CTA, total, active tab/chip/segment) = LIME.
+      // accessibleOnAccent(#C3F832) → dark text automatically; cleared on a tenant
+      // override so the CTA is editor-recolourable.
+      accentSolid: '#C3F832',
+      accentHover: '#B4E824',
+      accentText: '#292928',
+      accentSurface: '#EDEDEC',
+      accentOnSurface: '#292928',
+      errorBg: '#FBE9E7',
+      errorText: '#7A1712',
+      successBg: '#EAF6C9',
+      successText: '#3B4A0A',
+    },
+  },
+  {
+    id: 'vault',
+    label: 'Vault',
+    description:
+      'A bold cream fintech LIGHT theme — warm bone page under a lighter cream card, a diagonal grey HATCH texture (hero band + receipt panel + money box), vermillion identity accent with a deeper vermillion CTA fill, and prominent light-blue info surfaces. Clash Display display voice.',
+    mode: 'light',
+    // Cream fintech voice: soft 18px card, warm layered shadow, sentence-case 600
+    // labels. ACTIVE tab/chip = FILLED deep-vermillion pill (white text, no
+    // border); INACTIVE = warm cream pill + grey hairline. The hatch texture +
+    // light-blue surfaces live in the vault-scoped block of no-gradients.css.
+    structure: {
+      radiusCard: '18px',
+      radiusInput: '12px',
+      radiusBtn: '14px',
+      radiusPill: '999px',
+      borderWidth: '1px',
+      cardShadow: '0 1px 2px rgba(40,28,18,.05), 0 20px 48px -24px rgba(40,28,18,.26)',
+      labelTransform: 'none',
+      labelSpacing: 'normal',
+      labelWeight: '600',
+      activeBorderColor: 'transparent',
+      activeBorderWidth: '0',
+      chipInactiveBg: '#FBF8F2',
+      chipInactiveBorder: 'rgba(119,119,129,.42)',
+      chipActiveBg: '#CC3410',
+      chipActiveText: '#FFFFFF',
+    },
+    defaultFont: 'clashdisplay',
+    palette: {
+      mode: 'light',
+      pageBg: '#EAE4D9',
+      surface: '#FBF8F2',
+      surface2: '#F1EBDF',
+      surface2Text: '#1A1714',
+      inputBg: '#FFFDF9',
+      inputBgHover: '#F6F1E8',
+      inputText: '#1A1714',
+      inputBorder: 'rgba(119,119,129,.44)',
+      text: '#1A1714',
+      muted: '#5B5B62',
+      muted2: '#6C6C73',
+      contactText: '#3A3A40',
+      border: 'rgba(119,119,129,.42)',
+      // Vermillion IDENTITY (route, pins, on-surface highlight).
+      accent: '#F04E23',
+      // Deeper vermillion so WHITE CTA/total text clears AA (~5.16:1).
+      accentSolid: '#CC3410',
+      accentHover: '#B02D0D',
+      accentText: '#FFFFFF',
+      accentSurface: '#FBE3DB',
+      accentOnSurface: '#B8340F',
+      errorBg: '#FBE4DE',
+      errorText: '#7A1E12',
+      successBg: '#E6EFE1',
+      successText: '#2C4A1E',
+    },
+  },
+  {
     id: 'cream',
     label: 'Cream',
     description: 'Soft light theme — effortel sage-tinted surfaces, ink text, cobalt accent.',
@@ -917,6 +1049,21 @@ function normalizeCtaHover(v: string | null | undefined): CtaHover {
   return (CTA_HOVER_STYLES as readonly string[]).includes(v ?? '')
     ? (v as CtaHover)
     : DEFAULT_CTA_HOVER;
+}
+
+// ── Map-blend toggle ────────────────────────────────────────────────
+// Optional per-tenant flag that feathers the route-map's edges into the
+// calculator surface (a theme-agnostic, token-driven effect). Off by default →
+// existing tenants render the map exactly as before. Mirrors the ctaHover axis:
+// resolved here, emitted on the theme payload, applied as a body attribute.
+export const MAP_BLEND_VALUES = ['on', 'off'] as const;
+export type MapBlend = (typeof MAP_BLEND_VALUES)[number];
+export const DEFAULT_MAP_BLEND: MapBlend = 'off';
+
+function normalizeMapBlend(v: string | null | undefined): MapBlend {
+  return (MAP_BLEND_VALUES as readonly string[]).includes(v ?? '')
+    ? (v as MapBlend)
+    : DEFAULT_MAP_BLEND;
 }
 
 // ── Token assembly ──────────────────────────────────────────────────
@@ -1053,6 +1200,8 @@ export interface ResolvedWidgetTheme {
   fontColor: string;
   /** Per-tenant CTA hover effect. */
   ctaHover: CtaHover;
+  /** Per-tenant feathered-map-edges toggle ('on' | 'off', default 'off'). */
+  mapBlend: MapBlend;
   tokens: WidgetThemeTokens;
 }
 
@@ -1065,6 +1214,8 @@ export interface BrandThemeInput {
   fontColor?: string | null;
   /** Per-tenant CTA hover effect (border | lift | glow | fill | none). */
   ctaHover?: string | null;
+  /** Per-tenant feathered-map-edges toggle ('on' | 'off'). Default 'off'. */
+  mapBlend?: string | null;
   /** Legacy column — used only as an accent override when set to a real
    *  non-default value and no explicit accentOverride is present. */
   primaryColor?: string | null;
@@ -1099,6 +1250,7 @@ export function resolveWidgetTheme(brand: BrandThemeInput | null | undefined): R
   const fontColor =
     brand?.fontColor && brand.fontColor !== 'auto' ? normalizeHex(brand.fontColor) : null;
   const ctaHover = normalizeCtaHover(brand?.ctaHover);
+  const mapBlend = normalizeMapBlend(brand?.mapBlend);
 
   return {
     preset: presetId,
@@ -1108,6 +1260,7 @@ export function resolveWidgetTheme(brand: BrandThemeInput | null | undefined): R
     accentOverride,
     fontColor: fontColor ?? 'auto',
     ctaHover,
+    mapBlend,
     tokens: buildTokens(palette, preset.structure, font.stack, fontColor),
   };
 }

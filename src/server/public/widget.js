@@ -175,6 +175,10 @@
     // long-standing border-on-hover look. See widgetThemes.ts CTA_HOVER_STYLES.
     var hover = theme.ctaHover || 'border';
     document.body.setAttribute('data-qf-cta-hover', hover);
+    // Per-tenant feathered-map-edges toggle. The shared calculator CSS keys off
+    // this attribute; default 'off' leaves the map exactly as today. See
+    // widgetThemes.ts MAP_BLEND_VALUES + the body[data-qf-map-blend="on"] block.
+    document.body.setAttribute('data-qf-map-blend', theme.mapBlend || 'off');
     // Preset id → body attribute so the widget CSS can apply the handful of
     // preset-specific tweaks that aren't expressible as a single --w-* token
     // (e.g. neutralising stray brand-blue on the monochrome "mono" theme).

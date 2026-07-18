@@ -35,6 +35,17 @@
 @font-face { font-family:'Roboto'; font-style:normal; font-weight:500; font-display:swap; src:url('/vendor/fonts/roboto-500.woff2') format('woff2'); }
 @font-face { font-family:'Roboto'; font-style:normal; font-weight:700; font-display:swap; src:url('/vendor/fonts/roboto-700.woff2') format('woff2'); }
 
+/* ── DM Sans (the token-driven lime "Citron" voice) ─────────────────── */
+@font-face { font-family:'DM Sans'; font-style:normal; font-weight:400; font-display:swap; src:url('/vendor/fonts/dmsans-400.woff2') format('woff2'); }
+@font-face { font-family:'DM Sans'; font-style:normal; font-weight:500; font-display:swap; src:url('/vendor/fonts/dmsans-500.woff2') format('woff2'); }
+@font-face { font-family:'DM Sans'; font-style:normal; font-weight:700; font-display:swap; src:url('/vendor/fonts/dmsans-700.woff2') format('woff2'); }
+
+/* ── Clash Display (the bold cream fintech "Vault" display voice) ────── */
+@font-face { font-family:'Clash Display'; font-style:normal; font-weight:400; font-display:swap; src:url('/vendor/fonts/clash-display-400.woff2') format('woff2'); }
+@font-face { font-family:'Clash Display'; font-style:normal; font-weight:500; font-display:swap; src:url('/vendor/fonts/clash-display-500.woff2') format('woff2'); }
+@font-face { font-family:'Clash Display'; font-style:normal; font-weight:600; font-display:swap; src:url('/vendor/fonts/clash-display-600.woff2') format('woff2'); }
+@font-face { font-family:'Clash Display'; font-style:normal; font-weight:700; font-display:swap; src:url('/vendor/fonts/clash-display-700.woff2') format('woff2'); }
+
 /* Apply the resolved theme font. --w-font is set at runtime by
    widget.js#applyTheme; the fallback keeps the widget on Satoshi if the
    theme payload never arrives. Inputs/buttons don't inherit font-family,
