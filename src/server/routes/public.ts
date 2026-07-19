@@ -1160,14 +1160,19 @@ function groupBy<T extends Record<string, unknown>>(
   byKey: keyof T,
   valKey: keyof T,
   labelKey: keyof T
-): Record<string, Array<{ value: string; label: string }>> {
-  const out: Record<string, Array<{ value: string; label: string }>> = {};
+): Record<string, Array<{ value: string; label: string; maxWeightLbs?: number }>> {
+  const out: Record<string, Array<{ value: string; label: string; maxWeightLbs?: number }>> = {};
   for (const row of arr) {
     const k = String(row[byKey] ?? '');
     if (!out[k]) out[k] = [];
+    // Carry the card's per-equipment weight ceiling so the widget can warn on
+    // a physically-impossible load (e.g. a sprinter quoted 44,000 lb) using the
+    // tenant's OWN configured capacity, not a stale client-side guess.
+    const mw = Number((row as Record<string, unknown>).maxWeightLbs);
     out[k].push({
       value: String(row[valKey] ?? ''),
       label: String(row[labelKey] ?? row[valKey] ?? ''),
+      ...(Number.isFinite(mw) && mw > 0 ? { maxWeightLbs: mw } : {}),
     });
   }
   return out;

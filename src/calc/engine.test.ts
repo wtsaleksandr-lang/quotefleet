@@ -429,4 +429,41 @@ describe('customerFacingLines — margin is never shown to the customer', () => 
     const stored = [{ name: 'Linehaul', amount: 1000, kind: 'linehaul' }];
     expect(customerFacingLines(stored)).toEqual(stored);
   });
+
+  it('strips non-reconciling descriptors that would not add up once margin is folded in', () => {
+    const stored = [
+      { name: 'Linehaul (500 mi × $2.50/mi)', amount: 1250, kind: 'linehaul' },
+      { name: 'Fuel surcharge (22.0% of linehaul)', amount: 275, kind: 'fuel' },
+      { name: 'Margin (12.0%)', amount: 183, kind: 'margin' },
+    ];
+    const customer = customerFacingLines(stored);
+    const linehaul = customer.find((l) => l.kind === 'linehaul');
+    const fuel = customer.find((l) => l.kind === 'fuel');
+    // The misleading "N mi × $X/mi" / "N% of linehaul" parentheticals are gone.
+    expect(linehaul?.name).toBe('Linehaul');
+    expect(fuel?.name).toBe('Fuel surcharge');
+    expect(customer.some((l) => /of linehaul|mi ×/.test(String(l.name)))).toBe(false);
+  });
+
+  it('strips the "was below minimum" descriptor on minimum-charge lines', () => {
+    const stored = [
+      { name: 'Minimum charge (96 mi × $2.55/mi was below minimum)', amount: 350, kind: 'minimum' },
+      { name: 'Margin (12.0%)', amount: 42, kind: 'margin' },
+    ];
+    const min = customerFacingLines(stored).find((l) => l.kind === 'minimum');
+    expect(min?.name).toBe('Minimum charge');
+  });
+
+  it('keeps descriptors that make no margin-relative arithmetic claim', () => {
+    const stored = [
+      { name: 'Line haul (LTL — class 100, 4,000 lb)', amount: 500, kind: 'linehaul' },
+      { name: 'Fuel surcharge (national avg diesel $4.10/gal — $0.53/mi)', amount: 53, kind: 'fuel' },
+      { name: 'Margin (12.0%)', amount: 60, kind: 'margin' },
+    ];
+    const customer = customerFacingLines(stored);
+    // LTL class/weight note and the per-mile diesel basis are honest (computed
+    // off class/miles, not the margin-inflated linehaul) — leave them intact.
+    expect(customer.find((l) => l.kind === 'fuel')?.name).toContain('$0.53/mi');
+    expect(customer.find((l) => l.kind === 'linehaul')?.name).toContain('class 100');
+  });
 });

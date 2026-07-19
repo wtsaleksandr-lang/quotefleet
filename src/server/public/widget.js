@@ -149,6 +149,11 @@
     deliveryResolved: null,
     refId: '',
     customerEmail: '',
+    // Soft-confirm acknowledgements: key -> signature of the exact situation the
+    // customer already dismissed once. Lets a warning (over-capacity weight,
+    // same pickup/delivery) be a gentle "are you sure?" they can proceed past on
+    // a second click, instead of a hard block or a silent bad quote.
+    acks: {},
   };
 
   // Apply the FULL resolved theme (preset + optional accent override + font)
@@ -528,6 +533,64 @@
   // Sanity ceiling for a single LTL piece dimension (inches). A 53' trailer is
   // ~636"; anything beyond is a typo / not real LTL freight.
   var MAX_LTL_DIM_IN = 636;
+
+  // Per-equipment max PAYLOAD (cargo) weight, lb — road-legal US figures, used
+  // to warn on a physically-impossible load (a sprinter quoted 44,000 lb) that
+  // would otherwise price silently. Keyed by "service|equipment" because the
+  // equipment code "flatbed" means ~48,000 lb under FTL but ~16,000 lb under
+  // hotshot (Class-3/5 dually + gooseneck). PREFERRED source is the tenant's
+  // own rate-card maxWeightLbs sent in the widget config; this map is the
+  // fallback when an older config omits it. Sources (typical, road-legal):
+  //   dry van 53' ~45,000 · reefer 53' ~44,000 · flatbed/step-deck ~48,000 ·
+  //   conestoga ~47,000 · sprinter/cargo van ~3,000–4,000 · box truck 24–26'
+  //   ~10,000–12,000 · hotshot (Class-3/5 + gooseneck) ~16,500 · sea container
+  //   20'/40'/40HC/45' ~44,000 road-legal · LTL is class-rated (~20,000 cap).
+  var EQUIP_MAX_WEIGHT = {
+    'ftl|dryvan': 45000,
+    'ftl|reefer': 44000,
+    'ftl|flatbed': 48000,
+    'ftl|step_deck': 48000,
+    'ftl|conestoga': 47000,
+    'expedited|sprinter': 4000,
+    'expedited|box_truck': 12000,
+    'hotshot|flatbed': 16000,
+    'drayage|container_20': 44000,
+    'drayage|container_40': 44000,
+    'drayage|container_40hc': 44000,
+    'drayage|container_45': 44000,
+    'ltl|pallet': 20000,
+  };
+  // Suggested larger equipment when a load exceeds capacity, by "service|equipment".
+  var EQUIP_UPSIZE = {
+    'expedited|sprinter': 'a box truck, or FTL / LTL freight',
+    'expedited|box_truck': 'a hotshot, flatbed, or full truckload (FTL)',
+    'hotshot|flatbed': 'a full-truckload flatbed or step-deck',
+    'ltl|pallet': 'a full-truckload (FTL) service',
+  };
+  // Resolve the capacity for the current selection: tenant card value first,
+  // then the static fallback map. Returns a positive number or null (unknown).
+  function equipMaxWeight() {
+    var svc = state.service, eq = state.equipment;
+    if (!svc || !eq) return null;
+    var list = (state.config && state.config.equipmentByService && state.config.equipmentByService[svc]) || [];
+    for (var i = 0; i < list.length; i++) {
+      if (list[i] && list[i].value === eq && Number(list[i].maxWeightLbs) > 0) return Number(list[i].maxWeightLbs);
+    }
+    var k = svc + '|' + eq;
+    return EQUIP_MAX_WEIGHT[k] > 0 ? EQUIP_MAX_WEIGHT[k] : null;
+  }
+
+  // Soft-confirm gate: when `active`, show `message` and block THIS submit, but
+  // remember the exact situation (`sig`) so an identical resubmit proceeds —
+  // the customer can dismiss the warning by clicking Calculate again. When the
+  // situation clears, the ack resets so it warns afresh next time.
+  function softConfirm(key, active, sig, message) {
+    if (!active) { delete state.acks[key]; return false; }
+    if (state.acks[key] === sig) return false;
+    state.acks[key] = sig;
+    showError('qf-error', message);
+    return true;
+  }
   function newLtlItem() { return { commodity: '', freightType: 'General', qty: '1', length: '', width: '', height: '', dimUnit: 'in', weight: '', wtUnit: 'lb' }; }
   function ensureLtlItem() { if (!state.ltlItems.length) state.ltlItems.push(newLtlItem()); }
   // Per-item + aggregate LTL math, all normalized to inches + pounds. cubicFt is
@@ -966,6 +1029,13 @@
     if (!req.equipment) { showError('qf-error', 'Please pick an equipment type.'); return; }
     var hasPickup = !!(req.pickup.zip || req.pickup.city || req.pickup.portCode);
     if (!hasPickup) { showError('qf-error', 'Please pick a pickup port (drayage) or enter a pickup ZIP/postal code.'); return; }
+    // Symmetric pickup/delivery rule: both sides require a postal code (delivery
+    // already did). Previously pickup accepted city-only while delivery didn't —
+    // an inconsistency that let one leg be coarse. Drayage pickup is a PORT (not
+    // a ZIP), so it is exempt from this check.
+    var isDrayagePortPickup = state.service === 'drayage' && !!state.pickupPortCode;
+    var pickupZipEl = $('qf-pickup-zip');
+    if (!isDrayagePortPickup && !hasPostalCode(pickupZipEl ? pickupZipEl.value : '', req.pickup)) { showError('qf-error', 'Please enter a pickup ZIP/postal code for a more accurate rate. City-only pickup can change the price in large metro areas.'); return; }
     if (!req.delivery.zip && !req.delivery.city) { showError('qf-error', 'Please enter a delivery ZIP/postal code.'); return; }
     if (!hasPostalCode($('qf-delivery-zip').value, req.delivery)) { showError('qf-error', 'Please enter a delivery ZIP/postal code for a more accurate rate. City-only delivery can change the price in large metro areas.'); return; }
     if (req.service === 'ltl') {
@@ -983,6 +1053,19 @@
       var hasDims = ($('qf-oog-height').value || $('qf-oog-width').value || $('qf-oog-length').value || $('qf-oog-notes').value || '').trim();
       if (!hasDims) { showError('qf-error', 'Please add oversize dimensions or notes for open top / flat rack review.'); return; }
     }
+    // FIX 2 — physically-impossible load: soft-warn when the weight exceeds the
+    // equipment's typical payload capacity (sprinter @ 44,000 lb, hotshot @
+    // 48,000 lb). Not a hard block — a second click quotes anyway.
+    var cap = state.service === 'ltl' ? null : equipMaxWeight();
+    if (cap != null) {
+      var eqKey = state.service + '|' + state.equipment;
+      if (softConfirm('weightcap', req.weightLbs > cap, eqKey + '|' + req.weightLbs,
+        'That weight is above the typical capacity for ' + friendlyEquipmentLabel() + ' (~' + cap.toLocaleString() + ' lb). Consider ' + (EQUIP_UPSIZE[eqKey] || 'a larger equipment type') + ', or contact us for oversize / over-legal freight. Click Calculate again to quote anyway.')) return;
+    } else { delete state.acks.weightcap; }
+    // FIX 4a — same pickup == delivery ZIP: gentle confirm before pricing at min.
+    var pz = (req.pickup.zip || '').toUpperCase(), dz = (req.delivery.zip || '').toUpperCase();
+    if (softConfirm('sameloc', !!(pz && dz && pz === dz), pz + '|' + dz,
+      'Pickup and delivery look like the same location (' + pz + '). Is that right? Click Calculate again to continue.')) return;
     var btn = $('qf-calc-btn'); var oldText = btn.textContent; btn.disabled = true; btn.innerHTML = '<span class="qf-spinner"></span> &nbsp; Calculating…';
     fetch(withGrant('/api/public/quote/' + slug), { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(req) })
       .then(function (r) { return r.json(); })

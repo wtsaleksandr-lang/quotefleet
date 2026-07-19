@@ -255,3 +255,26 @@ describe('seedTemplates — first-run pristine guard (never clobber a customized
     expect(isSeedPristine(rows)).toBe(false);
   });
 });
+
+describe('default rate-card ceilings', () => {
+  const card = (service: string, equipment: string) =>
+    DEFAULT_RATE_CARDS.find((c) => c.service === service && c.equipment === equipment);
+
+  it('FIX 3 — expedited & hotshot maxMiles clear a cross-country lane (LA→NY ~2,900 mi)', () => {
+    // Prior 2,500-mi default blocked legitimate coast-to-coast expedited/hotshot.
+    expect(card('expedited', 'sprinter')!.maxMiles).toBeGreaterThanOrEqual(3000);
+    expect(card('expedited', 'box_truck')!.maxMiles).toBeGreaterThanOrEqual(3000);
+    expect(card('hotshot', 'flatbed')!.maxMiles).toBeGreaterThanOrEqual(3000);
+  });
+
+  it('FIX 2 — every default card carries a sane per-equipment weight ceiling', () => {
+    for (const c of DEFAULT_RATE_CARDS) {
+      expect(c.maxWeightLbs, `${c.service}/${c.equipment}`).toBeGreaterThan(0);
+      // Nothing road-legal exceeds ~48,000 lb payload.
+      expect(c.maxWeightLbs!, `${c.service}/${c.equipment}`).toBeLessThanOrEqual(48000);
+    }
+    // A sprinter must never be rated for a full-truckload weight.
+    expect(card('expedited', 'sprinter')!.maxWeightLbs).toBeLessThanOrEqual(4000);
+    expect(card('hotshot', 'flatbed')!.maxWeightLbs).toBeLessThanOrEqual(16500);
+  });
+});

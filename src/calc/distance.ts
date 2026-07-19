@@ -23,6 +23,7 @@ import { db } from '../db/client.js';
 import { geocodeCache, distanceCache } from '../db/schema.js';
 import { distanceMiles } from './engine.js';
 import { ZIP_CENTROIDS } from './zipCentroids.js';
+import { ZIP5_CENTROIDS } from './zip5Centroids.js';
 import { CANADA_FSA_CENTROIDS } from './canadaFsa.js';
 import { PORTS_DATA } from '../data/ports.js';
 
@@ -112,7 +113,25 @@ export async function geocode(input: {
       // Reject obvious placeholder ZIPs first — their prefix can map to a real
       // centroid (999 → Ketchikan AK) and would otherwise price a bogus lane.
       if (BOGUS_US_ZIPS.has(zip)) return null;
-      const c = ZIP_CENTROIDS[zip3];
+      // Prefer the full 5-digit ZCTA centroid so same-metro cross-ZIP lanes
+      // (90001↔90210, 60607↔60601) resolve to distinct points instead of
+      // collapsing to one ZIP3 prefix centroid (which yields a bogus 0 mi).
+      // City/state labels stay from the coarse ZIP3 table (the 5-digit
+      // gazetteer carries no place name); the ZIP3 centroid is the fallback.
+      const c3 = ZIP_CENTROIDS[zip3];
+      const c5 = /^\d{5}$/.test(zip) ? ZIP5_CENTROIDS[zip] : undefined;
+      if (c5) {
+        return {
+          lat: c5[0],
+          lng: c5[1],
+          source: 'zip',
+          zip,
+          country,
+          city: c3 ? c3[2] : undefined,
+          state: c3 ? c3[3] : undefined,
+        };
+      }
+      const c = c3;
       if (c) {
         return {
           lat: c[0],

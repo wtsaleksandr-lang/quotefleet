@@ -120,7 +120,11 @@ export const DEFAULT_RATE_CARDS: Omit<NewRateCard, 'tenantId'>[] = [
     fuelSurchargePct: 18,
     marginPct: 15,
     maxWeightLbs: 4000,
-    maxMiles: 2500,
+    // Expedited sprinter/box runs cross-country when transit time is the
+    // priority (coast-to-coast is a standard use case), so the auto-quote
+    // ceiling must clear LA→NY (~2,900 computed mi). 2,500 blocked legitimate
+    // long-haul. New-tenant default only; existing tenants keep their value.
+    maxMiles: 3500,
     enabled: true,
     sortOrder: 5,
   },
@@ -134,7 +138,8 @@ export const DEFAULT_RATE_CARDS: Omit<NewRateCard, 'tenantId'>[] = [
     fuelSurchargePct: 20,
     marginPct: 15,
     maxWeightLbs: 12000,
-    maxMiles: 2500,
+    // See sprinter note — expedited box trucks also run cross-country.
+    maxMiles: 3500,
     enabled: true,
     sortOrder: 6,
   },
@@ -148,7 +153,10 @@ export const DEFAULT_RATE_CARDS: Omit<NewRateCard, 'tenantId'>[] = [
     fuelSurchargePct: 22,
     marginPct: 15,
     maxWeightLbs: 16000,
-    maxMiles: 2500,
+    // Hotshot is mostly regional (50–500 mi) but scales to cross-country with
+    // team drivers for urgent loads, so it must not hard-block coast-to-coast.
+    // 3,500 clears LA→NY; new-tenant default only, tenant-editable.
+    maxMiles: 3500,
     enabled: true,
     sortOrder: 7,
   },

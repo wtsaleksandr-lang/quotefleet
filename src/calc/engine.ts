@@ -559,6 +559,33 @@ export function calculate(
 type BreakdownLine = { name?: string; amount?: number; kind?: string; note?: string; code?: string };
 
 /**
+ * Customer-facing surfaces fold the carrier's margin INTO the displayed
+ * linehaul/minimum amount (see customerFacingLines). That makes any
+ * parenthetical descriptor that states an arithmetic relationship against the
+ * PRE-margin base no longer reconcile with the number shown — e.g.
+ * "Fuel surcharge (22.0% of linehaul) $77.00" where 22% of the displayed
+ * (margin-inflated) $401.24 linehaul ≠ $77, or "Minimum charge (96 mi ×
+ * $2.55/mi was below minimum)" where the shown amount now includes margin.
+ *
+ * Strip ONLY those non-reconciling descriptors so the customer line reads
+ * honestly ("Fuel surcharge", "Linehaul", "Minimum charge"). Descriptors that
+ * make no margin-relative arithmetic claim are left intact: the auto-mode fuel
+ * basis ("$0.53/mi" diesel-derived, computed off miles not linehaul), the LTL
+ * class/weight note, the zone-tariff label, per-load fee. Internal/admin views
+ * never call customerFacingLines, so their descriptors (which DO reconcile
+ * against the pre-margin base) are unchanged.
+ */
+function stripNonReconcilingDescriptor<T extends BreakdownLine>(line: T): T {
+  if (!line || typeof line.name !== 'string') return line;
+  if (line.kind === 'fuel' || line.kind === 'minimum' || line.kind === 'linehaul') {
+    line.name = line.name
+      .replace(/\s*\([^()]*(?:% of linehaul|mi ×|was below minimum)[^()]*\)\s*$/i, '')
+      .trim();
+  }
+  return line;
+}
+
+/**
  * Customer-facing view of a price breakdown.
  *
  * The carrier's profit margin must NEVER be shown to their customer — it
@@ -580,7 +607,9 @@ export function customerFacingLines<T extends BreakdownLine>(lines: T[] | null |
   const marginTotal = round2(
     src.filter((l) => l && l.kind === 'margin').reduce((sum, l) => sum + (Number(l.amount) || 0), 0)
   );
-  const visible = src.filter((l) => l && l.kind !== 'margin').map((l) => ({ ...l }));
+  const visible = src
+    .filter((l) => l && l.kind !== 'margin')
+    .map((l) => stripNonReconcilingDescriptor({ ...l }));
   if (marginTotal === 0) return visible;
   const target =
     visible.find((l) => l.kind === 'linehaul') ?? visible.find((l) => l.kind === 'minimum');
