@@ -34,19 +34,14 @@
   padding-right: var(--space-3);
 }
 
-/* ── Equipment / Weight help cues → TOP-LEFT (hard UI rule: "help cue top-left
-   only"). Only the two "?" cues inside #qf-equip-weight-row move; every other
-   cue (pickup port, terminal, freight details, booking, flag chips) keeps the
-   shared top-right placement. The host reserves LEFT padding instead of right
-   so the label text never runs under the badge. `left`/`right` are 0/auto (on
-   the spacing ramp / non-numeric); padding uses ramp tokens — guard-safe. ── */
-#qf-equip-weight-row .qf-title-inline {
-  padding-left: var(--space-3);
-  padding-right: var(--space-1);
-}
-#qf-equip-weight-row .qf-help {
-  right: auto;
-  left: 0;
+/* ── Help cues REMOVED from the calculator. The field labels plus the inline
+   helper text under each field are self-explanatory, so the "?" badges just read
+   as clutter. Hidden globally — every cue (equipment, weight, pickup port,
+   terminal, freight details, booking, and the accessorial/flag chips). The tip
+   JS stays in place but has nothing to attach to; no label indent is needed. ── */
+.qf-widget .qf-help,
+#qf-options-modal .qf-help {
+  display: none !important;
 }
 
 /* ── Uniform add-on grid: the three flag toggles (Residential / Hazmat /
