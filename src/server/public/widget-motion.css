@@ -1,0 +1,259 @@
+/* ═══════════════════════════════════════════════════════════════════════════
+   QuoteFleet widget — PREMIUM MOTION LAYER
+   Apple / Stripe / Linear-grade: restrained, fast, consistent. One shared set
+   of duration + easing tokens drives every transition/animation so the whole
+   widget feels like a single system across all 13 data-qf-preset themes.
+
+   Loaded last of the STATIC stylesheets in widget.html (after widget-ux-fixes),
+   before the JS-injected theme sheets. It only sets motion properties
+   (transition / animation / transform) plus a couple of token-driven surfaces
+   for the sliding tab indicator + weight-unit thumb — no colour literals, all
+   spacing on the 8px ramp (or via var()/calc so the guards treat it as
+   compliant).
+
+   ACCESSIBILITY: every motion below is disabled/normalised under
+   prefers-reduced-motion at the very bottom of this file. That block is
+   mandatory and authoritative.
+   ═══════════════════════════════════════════════════════════════════════════ */
+
+:root {
+  /* Durations — fast/base/slow. Tuned for "quick but not instant". */
+  --qf-dur-fast: 140ms;
+  --qf-dur: 200ms;
+  --qf-dur-slow: 320ms;
+  /* Easings — a single premium ease (slight overshoot-free settle) + an
+     ease-out for entrances so things decelerate into place. */
+  --qf-ease: cubic-bezier(.2, .7, .2, 1);
+  --qf-ease-out: cubic-bezier(.16, 1, .3, 1);
+}
+
+/* ── Shared entrance keyframes ──────────────────────────────────────────── */
+@keyframes qf-panel-in {
+  from { opacity: 0; transform: translateY(6px); }
+  to   { opacity: 1; transform: none; }
+}
+@keyframes qf-reveal-in {
+  from { opacity: 0; transform: translateY(10px); }
+  to   { opacity: 1; transform: none; }
+}
+@keyframes qf-scrim-in {
+  from { opacity: 0; }
+  to   { opacity: 1; }
+}
+
+/* ════════════════════════════════════════════════════════════════════════
+   1. SLIDING SERVICE-TAB INDICATOR (#qf-services)
+   A single positioned element (.qf-tabs-ind, created + sized in widget.js)
+   sits UNDER the buttons and carries the active-pill look. It reuses the SAME
+   runtime tokens the per-theme active tab uses (--w-accent-surface, the active
+   border tokens) so it matches Clarity's hairline, Booking's border, Tesla /
+   Harbor / Vault fills etc. automatically. The real button's own active fill
+   is made transparent (id-scoped, so it beats the token sheet's !important)
+   and the indicator becomes the moving pill.
+   ════════════════════════════════════════════════════════════════════════ */
+#qf-services { position: relative; }
+#qf-services button { position: relative; z-index: 1; }
+
+.qf-tabs-ind {
+  position: absolute;
+  left: 0;
+  top: 0;
+  z-index: 0;
+  border-radius: 10px;
+  background: var(--w-accent-surface, var(--w-bg, var(--w-input-bg)));
+  border: var(--w-active-border-width, 0) solid var(--w-active-border-color, transparent);
+  box-shadow: 0 1px 2px rgba(15, 23, 42, 0.10), 0 6px 16px -12px rgba(15, 23, 42, 0.30);
+  pointer-events: none;
+  opacity: 0;
+  will-change: transform, width, height;
+  transition:
+    transform var(--qf-dur) var(--qf-ease),
+    width var(--qf-dur) var(--qf-ease),
+    height var(--qf-dur) var(--qf-ease),
+    opacity var(--qf-dur-fast) var(--qf-ease);
+}
+/* Suppress the slide on first paint / resize reposition (JS toggles this). */
+.qf-tabs-ind.qf-no-anim { transition: none; }
+
+/* Neutralise the button's own active fill so ONLY the sliding indicator shows.
+   id-scoped (#qf-services) → higher specificity than the token sheet's
+   `body.qf-app-calculator .qf-tabs button.active` !important rule, so this wins
+   on every preset. The label colour (var(--w-accent)) is left untouched. */
+body.qf-app-calculator #qf-services button.active,
+#qf-services button.active {
+  background: transparent !important;
+  background-image: none !important;
+  border-color: transparent !important;
+  box-shadow: none !important;
+}
+/* The tab label itself crossfades its colour as selection moves. */
+#qf-services button {
+  transition:
+    color var(--qf-dur) var(--qf-ease),
+    transform var(--qf-dur-fast) var(--qf-ease);
+}
+
+/* ════════════════════════════════════════════════════════════════════════
+   2. lbs / kg UNIT TOGGLE — sliding thumb (#qf-wt-unit)
+   A pseudo-element thumb slides between the two segments. Position is driven
+   by a data-wt attribute set in widget.js (more universally supported than
+   :has). On the two presets that paint their own accent-coloured is-on segment
+   (booking, citron) the opaque segment simply covers the thumb and the colour
+   crossfades instead — a graceful, still-premium fallback.
+   ════════════════════════════════════════════════════════════════════════ */
+.qf-wt-unit { position: relative; }
+.qf-wt-unit::before {
+  content: '';
+  position: absolute;
+  z-index: 0;
+  top: var(--space-0-5);
+  bottom: var(--space-0-5);
+  left: var(--space-0-5);
+  width: calc(50% - var(--space-0-5));
+  border-radius: 6px;
+  background: var(--w-bg, var(--w-input-bg));
+  box-shadow: 0 1px 2px rgba(15, 23, 42, 0.14);
+  pointer-events: none;
+  transition: transform var(--qf-dur) var(--qf-ease);
+}
+.qf-wt-unit[data-wt="kg"]::before { transform: translateX(100%); }
+.qf-wt-unit button { position: relative; z-index: 1; }
+/* Let the thumb show through the active segment on the default themes; the
+   two accent-segment presets re-opaque this via their own higher-specificity
+   rule, so no regression there. */
+.qf-wt-unit button.is-on { background: transparent; box-shadow: none; }
+.qf-wt-unit button {
+  transition:
+    color var(--qf-dur-fast) var(--qf-ease),
+    background-color var(--qf-dur-fast) var(--qf-ease);
+}
+
+/* ════════════════════════════════════════════════════════════════════════
+   3. SMOOTH FOLD / UNFOLD (Booking details + generic .qf-fold)
+   widget.js animates max-height + opacity between measured heights (no content
+   jump/clip) and restores auto height on transitionend. The chevron rotates
+   via the existing aria-expanded rule; we just standardise its easing.
+   ════════════════════════════════════════════════════════════════════════ */
+.qf-fold {
+  overflow: hidden;
+  transition:
+    max-height var(--qf-dur) var(--qf-ease),
+    opacity var(--qf-dur) var(--qf-ease);
+}
+.qf-booking-summary .qf-options-caret,
+.qf-options-summary .qf-options-caret {
+  transition: transform var(--qf-dur) var(--qf-ease);
+}
+
+/* ════════════════════════════════════════════════════════════════════════
+   4. DISPLAY-TOGGLED CONDITIONAL PANELS — gentle enter
+   These panels flip display:none → shown in widget.js. Chromium replays a CSS
+   animation each time an element re-enters rendering, so a keyed entrance runs
+   automatically on every open with zero JS coupling.
+   ════════════════════════════════════════════════════════════════════════ */
+#qf-oog-fields,
+#qf-genset-panel,
+#qf-hazmat-panel,
+#qf-ltl-panel,
+#qf-chat,
+#qf-callback-form,
+.qf-share-panel:not([hidden]),
+.qf-book-panel:not([hidden]) {
+  animation: qf-panel-in var(--qf-dur) var(--qf-ease-out);
+}
+
+/* ════════════════════════════════════════════════════════════════════════
+   5. RESULT CARD REVEAL + count-up
+   The number count-up already lives in widget.js (animateNumber, reduced-motion
+   aware). Here we fade+slide the whole card in when a quote appears; widget.js
+   re-triggers the .qf-reveal class so it replays on every calculate.
+   ════════════════════════════════════════════════════════════════════════ */
+.qf-result.qf-reveal {
+  animation: qf-reveal-in var(--qf-dur-slow) var(--qf-ease-out);
+}
+
+/* ════════════════════════════════════════════════════════════════════════
+   6. OPTIONS MODAL — scrim fade (card rise already exists in widget-ux-fixes)
+   ════════════════════════════════════════════════════════════════════════ */
+.qf-modal:not([hidden]) .qf-modal-scrim {
+  animation: qf-scrim-in var(--qf-dur) var(--qf-ease-out);
+}
+
+/* ════════════════════════════════════════════════════════════════════════
+   7. BUTTONS / CHIPS — hover lift + press feedback, focus rings
+   Restrained: a 1px lift on hover (CTA lift is owned per-tenant elsewhere) and
+   a tiny scale-down on press so every tappable control feels physical. All
+   selection-state colour changes crossfade via the tokens above.
+   ════════════════════════════════════════════════════════════════════════ */
+.qf-cta,
+.qf-acc-chip,
+.qf-ltl-add,
+.qf-textlink,
+.qf-modal-x {
+  transition:
+    background-color var(--qf-dur-fast) var(--qf-ease),
+    border-color var(--qf-dur-fast) var(--qf-ease),
+    color var(--qf-dur-fast) var(--qf-ease),
+    box-shadow var(--qf-dur-fast) var(--qf-ease),
+    transform var(--qf-dur-fast) var(--qf-ease);
+}
+.qf-cta:active:not(:disabled) { transform: translateY(0) scale(.985); }
+#qf-services button:active,
+.qf-acc-chip:active,
+.qf-wt-unit button:active { transform: scale(.97); }
+.qf-acc-chip:hover { transform: translateY(-1px); }
+
+/* Inputs / selects — smooth focus ring (upgrades the base .15s to tokens). */
+.qf-input,
+.qf-select,
+.qf-cs-btn {
+  transition:
+    border-color var(--qf-dur-fast) var(--qf-ease),
+    box-shadow var(--qf-dur-fast) var(--qf-ease),
+    background-color var(--qf-dur-fast) var(--qf-ease);
+}
+
+/* ════════════════════════════════════════════════════════════════════════
+   REDUCED MOTION — mandatory. Disable/normalise EVERYTHING above: no
+   transitions, no keyframe entrances, no transforms. Elements land instantly
+   in their final state. Premium AND accessible.
+   ════════════════════════════════════════════════════════════════════════ */
+@media (prefers-reduced-motion: reduce) {
+  .qf-tabs-ind,
+  #qf-services button,
+  .qf-wt-unit::before,
+  .qf-wt-unit button,
+  .qf-fold,
+  .qf-booking-summary .qf-options-caret,
+  .qf-options-summary .qf-options-caret,
+  .qf-cta,
+  .qf-acc-chip,
+  .qf-ltl-add,
+  .qf-textlink,
+  .qf-modal-x,
+  .qf-input,
+  .qf-select,
+  .qf-cs-btn {
+    transition: none !important;
+  }
+  #qf-oog-fields,
+  #qf-genset-panel,
+  #qf-hazmat-panel,
+  #qf-ltl-panel,
+  #qf-chat,
+  #qf-callback-form,
+  .qf-share-panel,
+  .qf-book-panel,
+  .qf-result.qf-reveal,
+  .qf-modal:not([hidden]) .qf-modal-scrim,
+  .qf-modal-card {
+    animation: none !important;
+  }
+  .qf-cta:active:not(:disabled),
+  #qf-services button:active,
+  .qf-acc-chip:active,
+  .qf-acc-chip:hover,
+  .qf-wt-unit button:active {
+    transform: none !important;
+  }
+}

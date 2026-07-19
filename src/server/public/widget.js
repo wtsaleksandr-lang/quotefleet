@@ -23,6 +23,102 @@
     return n.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
   }
 
+  // ── Motion helpers (premium-motion layer; widget-motion.css) ──────────────
+  function prefersReduce() {
+    return !!(window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches);
+  }
+  // Keep the embedding iframe's height in sync WHILE a height animation runs, so
+  // the parent frame follows the fold/reveal smoothly instead of snapping to the
+  // final height. Bounded to `dur` ms.
+  function pumpResize(dur) {
+    if (prefersReduce() || !window.requestAnimationFrame) { autoResize(); return; }
+    var start = null;
+    requestAnimationFrame(function loop(ts) {
+      if (start === null) start = ts;
+      autoResize();
+      if (ts - start < dur) requestAnimationFrame(loop);
+    });
+  }
+
+  // Smooth height fold. Animates max-height + opacity between measured heights
+  // with no content jump/clip, then restores auto height so later reflow is
+  // free. Reduced-motion → instant hidden toggle. `panel` is the collapsible
+  // element that carries the `hidden` attribute.
+  function animateFold(panel, open) {
+    if (!panel) return;
+    if (panel._foldEnd) { panel.removeEventListener('transitionend', panel._foldEnd); panel._foldEnd = null; }
+    if (prefersReduce()) {
+      panel.hidden = !open;
+      panel.style.maxHeight = ''; panel.style.opacity = ''; panel.style.overflow = '';
+      autoResize();
+      return;
+    }
+    panel.classList.add('qf-fold');
+    if (open) {
+      panel.hidden = false;
+      panel.style.overflow = 'hidden';
+      var target = panel.scrollHeight;
+      panel.style.maxHeight = '0px';
+      panel.style.opacity = '0';
+      void panel.offsetWidth; // commit the collapsed start state
+      panel.style.maxHeight = target + 'px';
+      panel.style.opacity = '1';
+      panel._foldEnd = function (e) {
+        if (e.target !== panel || e.propertyName !== 'max-height') return;
+        panel.style.maxHeight = ''; panel.style.overflow = ''; // let content grow freely
+        panel.removeEventListener('transitionend', panel._foldEnd); panel._foldEnd = null;
+        autoResize();
+      };
+      panel.addEventListener('transitionend', panel._foldEnd);
+    } else {
+      panel.style.overflow = 'hidden';
+      panel.style.maxHeight = panel.scrollHeight + 'px';
+      panel.style.opacity = '1';
+      void panel.offsetWidth;
+      panel.style.maxHeight = '0px';
+      panel.style.opacity = '0';
+      panel._foldEnd = function (e) {
+        if (e.target !== panel || e.propertyName !== 'max-height') return;
+        panel.hidden = true;
+        panel.style.maxHeight = ''; panel.style.opacity = ''; panel.style.overflow = '';
+        panel.removeEventListener('transitionend', panel._foldEnd); panel._foldEnd = null;
+        autoResize();
+      };
+      panel.addEventListener('transitionend', panel._foldEnd);
+    }
+    pumpResize(340);
+  }
+
+  // Sliding service-tab indicator. A single positioned element under the tabs
+  // that carries the active-pill look (reusing the theme's own active tokens via
+  // CSS) and slides/resizes to the active button. `animate=false` snaps it
+  // (first paint / resize) so only genuine tab switches slide.
+  function positionTabIndicator(animate) {
+    var wrap = $('qf-services');
+    if (!wrap) return;
+    var active = wrap.querySelector('button.active');
+    var ind = wrap.querySelector('.qf-tabs-ind');
+    if (!active) { if (ind) ind.style.opacity = '0'; return; }
+    if (!ind) {
+      ind = document.createElement('span');
+      ind.className = 'qf-tabs-ind qf-no-anim';
+      ind.setAttribute('aria-hidden', 'true');
+      wrap.insertBefore(ind, wrap.firstChild);
+    }
+    if (!animate) ind.classList.add('qf-no-anim');
+    var r = getComputedStyle(active).borderRadius;
+    if (r && r !== '0px') ind.style.borderRadius = r;
+    ind.style.width = active.offsetWidth + 'px';
+    ind.style.height = active.offsetHeight + 'px';
+    ind.style.transform = 'translate(' + active.offsetLeft + 'px,' + active.offsetTop + 'px)';
+    ind.style.opacity = '1';
+    if (!animate) {
+      // Flush the snapped position, then re-enable transitions for next switch.
+      void ind.offsetWidth;
+      requestAnimationFrame(function () { ind.classList.remove('qf-no-anim'); });
+    }
+  }
+
   function titleizeWord(s) {
     return String(s || '').replace(/[_-]+/g, ' ').replace(/\b\w/g, function (c) { return c.toUpperCase(); }).trim();
   }
@@ -302,14 +398,18 @@
     if (bookingSummary && bookingBody) {
       bookingSummary.addEventListener('click', function () {
         var willOpen = bookingBody.hidden;
-        bookingBody.hidden = !willOpen;
         bookingSummary.setAttribute('aria-expanded', willOpen ? 'true' : 'false');
-        autoResize();
+        animateFold(bookingBody, willOpen);
       });
     }
     initTypeaheads();
     initRouteMapCard();
     initWeightUnit();
+    // Keep the sliding tab indicator aligned when the tab widths change
+    // (viewport resize, late web-font swap).
+    window.addEventListener('resize', function () { positionTabIndicator(false); });
+    if (document.fonts && document.fonts.ready) { document.fonts.ready.then(function () { positionTabIndicator(false); }); }
+    setTimeout(function () { positionTabIndicator(false); }, 600);
     $('qf-back-btn').addEventListener('click', function () { showStep('quote'); });
     $('qf-submit-btn').addEventListener('click', onSubmit);
 
@@ -503,10 +603,14 @@
   }
   function initWeightUnit() {
     var wrap = $('qf-wt-unit'); if (!wrap) return;
+    // Drive the sliding thumb (widget-motion.css) off a data attribute — more
+    // universally supported than :has() and reflects the initial 'lbs' state.
+    wrap.setAttribute('data-wt', state.weightUnit === 'kg' ? 'kg' : 'lbs');
     var btns = Array.prototype.slice.call(wrap.querySelectorAll('button'));
     btns.forEach(function (btn) {
       btn.addEventListener('click', function () {
         state.weightUnit = btn.getAttribute('data-unit') === 'kg' ? 'kg' : 'lbs';
+        wrap.setAttribute('data-wt', state.weightUnit);
         btns.forEach(function (b) {
           var on = b === btn;
           b.classList.toggle('is-on', on);
@@ -717,8 +821,12 @@
   }
 
   function selectService(service) {
+    var firstSelect = state.service == null;
     state.service = service;
     $$('#qf-services button').forEach(function (b) { b.classList.toggle('active', b.dataset.service === service); });
+    // Slide the active-tab indicator to the new tab (snap on the very first
+    // selection so it doesn't animate in from the left on load).
+    positionTabIndicator(!firstSelect);
     var equip = state.config.equipmentByService[service] || [];
     if (service === 'drayage') equip = withDrayageEquipmentDefaults(equip);
     var sel = $('qf-equipment');
@@ -1142,7 +1250,15 @@
     var totalRow = el('div', { class: 'line total-row' }, [el('span', { class: 'name', text: 'Total' }), el('span', { class: 'amt', text: '$' + fmtMoney(r.total) })]);
     lines.appendChild(totalRow);
     renderDisclaimer();
-    $('qf-result').style.display = 'block';
+    var resultBox = $('qf-result');
+    resultBox.style.display = 'block';
+    // Fade + slide the card in on every calculate (re-trigger the CSS animation).
+    if (!prefersReduce()) {
+      resultBox.classList.remove('qf-reveal');
+      void resultBox.offsetWidth;
+      resultBox.classList.add('qf-reveal');
+      pumpResize(360);
+    }
     // Reveal the transit timeline — the truck glides from pickup to delivery.
     var tl = $('qf-timeline');
     if (tl) {

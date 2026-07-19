@@ -59,9 +59,15 @@ body.qf-app-calculator .qf-section-title {
   color: var(--w-text, #FFFFFF) !important;
 }
 
-body.qf-app-calculator .qf-field label,
-body.qf-app-calculator .qf-field-hint {
+body.qf-app-calculator .qf-field label {
   color: var(--w-muted, #B1C5CE) !important;
+}
+/* Field hints render over tinted surface-2 panels (genset/oog/booking sub-
+   cards) where --w-muted / --w-muted-2 dipped below AA on 8 presets. Route to
+   --w-hint-text, the engine foreground guaranteed ≥4.5:1 on --w-surface-2 (and
+   therefore also on the lighter-contrast main surface). */
+body.qf-app-calculator .qf-field-hint {
+  color: var(--w-hint-text, var(--w-muted, #B1C5CE)) !important;
 }
 
 body.qf-app-calculator .qf-tabs,
@@ -280,7 +286,9 @@ body.qf-app-calculator .qf-booking-card .qf-field-hint,
 body.qf-app-calculator .qf-oog-panel .qf-field-hint,
 body.qf-app-calculator .qf-conditional-panel .qf-field-hint,
 body.qf-app-calculator .qf-oog-panel #qf-oog-help {
-  color: var(--w-muted-2, #9FB2BB) !important;
+  /* Was --w-muted-2 (an even lighter tone) → failed AA on the surface-2 sub-
+     panels. --w-hint-text is engine-guaranteed ≥4.5:1 on --w-surface-2. */
+  color: var(--w-hint-text, var(--w-muted-2, #9FB2BB)) !important;
 }
 
 /* --- Stateful-control ON/OFF pattern (Wave 5 — the "Uber" look) ------------
@@ -313,7 +321,13 @@ body.qf-app-calculator .qf-tabs button.active {
   background: var(--w-accent-surface, #FFFFFF) !important;
   background-image: none !important;
   border: var(--w-active-border-width, 0) solid var(--w-active-border-color, transparent) !important;
-  color: var(--w-accent, #0D3CFC) !important;
+  /* Label sits on the sliding indicator, which paints --w-accent-surface. The
+     raw accent fell below AA on that pale pill for ironhorse/cupertino/tesla/
+     stripe; --w-tab-active-text is the engine-hardened accent guaranteed to
+     read there. Midnight/Cream/mono/harbor already passed → token = their
+     accent unchanged. Solid-fill presets (booking/stone/vault/citron/material)
+     override this below. */
+  color: var(--w-tab-active-text, var(--w-accent, #0D3CFC)) !important;
 }
 
 /* ACTIVE accessory chip — defaults reproduce the current solid-accent fill;
@@ -904,6 +918,16 @@ body[data-qf-preset="stone"] .qf-tabs button.active {
   color: var(--w-accent-text, #FFFFFF) !important;
   box-shadow: none !important;
 }
+/* MOTION FIX: the sliding tab indicator (widget-motion.css .qf-tabs-ind) paints
+   --w-accent-surface by default — LIGHT for Stone (#D3D8DD) — so Stone's white
+   active-tab label washed out (1.43:1) once the button's own dark fill went
+   transparent behind the indicator. Point the indicator at Stone's real active
+   fill (--w-accent-solid graphite) so the white label reads. Higher specificity
+   than the motion default → wins; motion (slide) unaffected. */
+body[data-qf-preset="stone"] .qf-tabs-ind {
+  background: var(--w-accent-solid, #21272D) !important;
+  border-color: transparent !important;
+}
 
 /* --- Genset / oversize toggle labels: legible on every theme ----------------
    The bold `.qf-oog-toggle` label ("Genset required for reefer container",
@@ -1062,6 +1086,14 @@ body[data-qf-preset="vault"] .qf-tabs button.active {
   color: var(--w-accent-text, #FFFFFF) !important;
   border-color: var(--w-accent-solid, #CC3410) !important;
   box-shadow: none !important;
+}
+/* MOTION FIX (mirrors Stone): the sliding indicator defaults to --w-accent-
+   surface (LIGHT cream #FBE3DB for Vault), washing out the white active-tab
+   label (1.23:1). Paint the indicator with Vault's real active fill (deep
+   vermillion --w-accent-solid) so the white label reads. */
+body[data-qf-preset="vault"] .qf-tabs-ind {
+  background: var(--w-accent-solid, #CC3410) !important;
+  border-color: transparent !important;
 }
 
 /* PLACEMENT 4 (extra presence — collapsed "Shipment options" bar): a subtler

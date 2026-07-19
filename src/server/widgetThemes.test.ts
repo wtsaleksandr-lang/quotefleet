@@ -37,7 +37,14 @@ const REQUIRED_TOKENS = [
   '--w-chip-active-bg', '--w-chip-active-text',
   // Frosted-glass tokens — Wave 6 (the cupertino/Apple frosted shell).
   '--w-surface-frost', '--w-frost-blur',
+  // Context foregrounds — contrast-audit fixes (footer / hints / result card /
+  // active tab), each engine-guaranteed ≥ AA on its own rendered surface.
+  '--w-footer-text', '--w-hint-text',
+  '--w-oncard-text', '--w-oncard-muted', '--w-oncard-accent',
+  '--w-tab-active-text',
 ] as const;
+
+const HEX6 = /^#[0-9a-fA-F]{6}$/;
 
 describe('resolveWidgetTheme', () => {
   it('defaults a null brand to Midnight + Satoshi (the current widget look)', () => {
@@ -532,6 +539,46 @@ describe('resolveWidgetTheme — WCAG contrast guarantees', () => {
           .toBeGreaterThanOrEqual(WCAG.UI);
       }
     }
+  });
+
+  it('context foregrounds clear WCAG AA on their OWN surface for every preset', () => {
+    // These tokens fix the axe-core contrast audit: each renders over a surface
+    // the shell-level muted/text tokens can't safely carry.
+    for (const preset of WIDGET_PRESET_LIST) {
+      const t = resolveWidgetTheme({ themePreset: preset.id }).tokens;
+      // Footer ("Powered by") sits on the page background. booking/tesla express
+      // muted as translucent rgba() (unmeasurable + already AA on their dark
+      // page), so only assert the solid-hex footer values (the presets we fixed).
+      if (HEX6.test(t['--w-footer-text'])) {
+        const r = contrastRatio(t['--w-footer-text'], t['--w-page-bg']);
+        expect(r, `${preset.id}: footer ${t['--w-footer-text']} on page ${t['--w-page-bg']} = ${r.toFixed(2)}`)
+          .toBeGreaterThanOrEqual(WCAG.NORMAL);
+      }
+      // Field hints on the tinted surface-2 panels.
+      const rHint = contrastRatio(t['--w-hint-text'], t['--w-surface-2']);
+      expect(rHint, `${preset.id}: hint ${t['--w-hint-text']} on surface-2 ${t['--w-surface-2']} = ${rHint.toFixed(2)}`)
+        .toBeGreaterThanOrEqual(WCAG.NORMAL);
+      // Result-card foregrounds on --w-input-bg (light even on dark Midnight).
+      for (const key of ['--w-oncard-text', '--w-oncard-muted', '--w-oncard-accent'] as const) {
+        const r = contrastRatio(t[key], t['--w-input-bg']);
+        expect(r, `${preset.id}: ${key} ${t[key]} on card ${t['--w-input-bg']} = ${r.toFixed(2)}`)
+          .toBeGreaterThanOrEqual(WCAG.NORMAL);
+      }
+      // Active service-tab label on the sliding indicator's default fill.
+      const rTab = contrastRatio(t['--w-tab-active-text'], t['--w-accent-surface']);
+      expect(rTab, `${preset.id}: tab-text ${t['--w-tab-active-text']} on indicator ${t['--w-accent-surface']} = ${rTab.toFixed(2)}`)
+        .toBeGreaterThanOrEqual(WCAG.NORMAL);
+    }
+  });
+
+  it('Midnight result-card text stays legible on its CREAM card (was 1.4:1)', () => {
+    // Midnight is a DARK theme whose result card paints the light cream input
+    // surface; its light shell muted (#B1C5CE) was illegible there. The oncard
+    // tokens must read on the cream card, NOT match the shell muted.
+    const t = resolveWidgetTheme({ themePreset: 'midnight' }).tokens;
+    expect(t['--w-input-bg']).toBe('#E6E3E0');
+    expect(contrastRatio(t['--w-oncard-muted'], '#E6E3E0')).toBeGreaterThanOrEqual(WCAG.NORMAL);
+    expect(t['--w-oncard-muted']).not.toBe(t['--w-muted']);
   });
 
   it('the reported bug is gone: default Midnight total box is white on cobalt', () => {

@@ -595,7 +595,7 @@ src/server/public/public-calculator-mobile-cleanup.css:51	spacing	padding: 13px 
 src/server/public/public-calculator-mobile-cleanup.css:84	spacing	padding: 13px
 src/server/public/public-calculator-mobile-cleanup.css:9	spacing	padding-inline: 6px
 src/server/public/public-calculator-mobile-cleanup.css:90	spacing	margin-bottom: 9px
-src/server/public/public-calculator-no-gradients.css:166	spacing	padding: 14px 16px
+src/server/public/public-calculator-no-gradients.css:172	spacing	padding: 14px 16px
 src/server/public/public-calculator-ux.css:101	spacing	gap: 7px
 src/server/public/public-calculator-ux.css:102	spacing	margin-top: 10px
 src/server/public/public-calculator-ux.css:109	spacing	padding: 8px 7px
@@ -634,12 +634,12 @@ src/server/public/public-calculator-ux.css:492	spacing	padding: 7px 0
 src/server/public/public-calculator-ux.css:496	spacing	padding-top: 10px
 src/server/public/public-calculator-ux.css:51	spacing	margin-top: 14px
 src/server/public/public-calculator-ux.css:511	spacing	padding: 11px 13px
-src/server/public/public-calculator-ux.css:560	spacing	padding: 9px
-src/server/public/public-calculator-ux.css:561	spacing	padding: 18px
-src/server/public/public-calculator-ux.css:562	spacing	gap: 7px
-src/server/public/public-calculator-ux.css:564	spacing	gap: 6px
-src/server/public/public-calculator-ux.css:570	spacing	margin-bottom: 10px
-src/server/public/public-calculator-ux.css:572	spacing	margin-top: 6px
+src/server/public/public-calculator-ux.css:561	spacing	padding: 9px
+src/server/public/public-calculator-ux.css:562	spacing	padding: 18px
+src/server/public/public-calculator-ux.css:563	spacing	gap: 7px
+src/server/public/public-calculator-ux.css:565	spacing	gap: 6px
+src/server/public/public-calculator-ux.css:571	spacing	margin-bottom: 10px
+src/server/public/public-calculator-ux.css:573	spacing	margin-top: 6px
 src/server/public/public-calculator-ux.css:64	spacing	margin-top: 13px
 src/server/public/public-calculator-ux.css:74	spacing	gap: 10px
 src/server/public/public-calculator-ux.css:85	spacing	padding: 5px 8px
@@ -823,5 +823,5 @@ src/server/public/style.css:997	spacing	padding: 18px
 src/server/public/tools-marketplace-wefixtrades.css:3	spacing	padding: 58px 28px 34px
 src/server/public/vertical-pages-wefixtrades.css:33	spacing	padding: 42px 28px
 src/server/public/vertical-pages-wefixtrades.css:5	spacing	padding: 76px 28px 58px
-src/server/public/widget-style.css:200	spacing	left: -9999px
-src/server/public/widget-style.css:217	spacing	top: -5px
+src/server/public/widget-style.css:205	spacing	left: -9999px
+src/server/public/widget-style.css:222	spacing	top: -5px

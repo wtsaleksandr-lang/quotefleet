@@ -143,17 +143,22 @@ a.qf-contact-value:hover { text-decoration: underline; }
 
 .qf-result { background: linear-gradient(135deg, #f0f9ff 0%, #ecfeff 100%); border-radius: var(--w-radius); padding: var(--space-2); margin-top: var(--space-2); border: 1px solid #c8e8ff; }
 .qf-result .total { font-size: 36px; font-weight: 800; color: var(--w-fg); letter-spacing: -0.03em; line-height: 1; margin-bottom: var(--space-0-5); }
-.qf-result .total .currency { font-size: 18px; color: var(--w-muted); margin-right: var(--space-0-5); font-weight: 600; }
-.qf-result .meta { font-size: 13px; color: var(--w-muted); margin-bottom: var(--space-1); }
-.qf-result .qf-eta { display: inline-flex; align-items: center; font-size: 12.5px; font-weight: 700; color: #0D3CFC; background: rgba(13,60,252,0.08); border: 1px solid rgba(13,60,252,0.18); border-radius: 999px; padding: var(--space-0-5) var(--space-1-5); margin: 0 0 var(--space-1-5); }
+.qf-result .total .currency { font-size: 18px; color: var(--w-oncard-muted, var(--w-muted)); margin-right: var(--space-0-5); font-weight: 600; }
+.qf-result .meta { font-size: 13px; color: var(--w-oncard-muted, var(--w-muted)); margin-bottom: var(--space-1); }
+/* ETA pill: text = --w-oncard-accent (engine-guaranteed ≥AA on the result
+   card). The fill is a NEUTRAL card-toned wash, NOT an accent tint — an
+   accent-hued fill pulls the background toward the text's own hue and shaves
+   contrast below AA (ironhorse/cupertino/booking/tesla/stripe were 3.9–4.3).
+   The pill shape reads from the hairline border + radius instead. */
+.qf-result .qf-eta { display: inline-flex; align-items: center; font-size: 12.5px; font-weight: 700; color: var(--w-oncard-accent, #0D3CFC); background: transparent; border: 1px solid var(--w-accent-pill-border, rgba(13,60,252,0.18)); border-radius: 999px; padding: var(--space-0-5) var(--space-1-5); margin: 0 0 var(--space-1-5); }
 .qf-route-map { display: block; width: 100%; aspect-ratio: 640 / 360; object-fit: cover; border: 1px solid var(--w-border); border-radius: var(--w-radius); margin-top: var(--space-1-5); }
 .qf-route-map[hidden] { display: none; }
 .qf-view-quote { display: block; text-align: center; text-decoration: none; margin-bottom: var(--space-1-5); }
 .qf-result .lines { font-size: 13px; display: flex; flex-direction: column; gap: var(--space-0-5); }
 .qf-result .line { display: flex; justify-content: space-between; gap: var(--space-1); padding: var(--space-0-5) 0; border-bottom: 1px dashed rgba(15,23,42,0.07); }
 .qf-result .line:last-child { border-bottom: 0; font-weight: 700; padding-top: var(--space-1); }
-.qf-result .line .name { color: var(--w-muted); }
-.qf-result .line.total-row .name, .qf-result .line.total-row .amt { color: var(--w-fg); }
+.qf-result .line .name { color: var(--w-oncard-muted, var(--w-muted)); }
+.qf-result .line.total-row .name, .qf-result .line.total-row .amt { color: var(--w-oncard-text, var(--w-fg)); }
 
 /* Accent-filled "Estimated total" box. The foreground (--w-total-text) is
    computed server-side by the WCAG contrast engine to read on ANY accent —
@@ -180,8 +185,8 @@ body[data-qf-cta-hover="fill"] .qf-cta:not(.qf-secondary):hover { background: va
 
 .qf-error { background: #fee2e2; color: var(--w-error); border-radius: 8px; padding: var(--space-1-5) var(--space-2); font-size: 13px; margin-top: var(--space-1-5); }
 .qf-success { background: #dcfce7; color: var(--w-success); border-radius: 8px; padding: var(--space-1-5) var(--space-2); font-size: 13px; margin-top: var(--space-1-5); }
-.qf-footer { margin-top: var(--space-2); font-size: 11.5px; color: var(--w-muted); text-align: center; }
-.qf-footer a { color: var(--w-muted); }
+.qf-footer { margin-top: var(--space-2); font-size: 11.5px; color: var(--w-footer-text, var(--w-muted)); text-align: center; }
+.qf-footer a { color: var(--w-footer-text, var(--w-muted)); }
 .qf-spinner { display: inline-block; width: 14px; height: 14px; border: 2px solid rgba(255,255,255,0.4); border-top-color: white; border-radius: 50%; animation: qf-spin 0.8s linear infinite; }
 @keyframes qf-spin { to { transform: rotate(360deg); } }
 
@@ -272,14 +277,14 @@ body[data-qf-cta-hover="fill"] .qf-cta:not(.qf-secondary):hover { background: va
   font-weight: 800;
   text-transform: uppercase;
   letter-spacing: 0.08em;
-  color: var(--w-muted);
+  color: var(--w-oncard-muted, var(--w-muted));
   margin-bottom: var(--space-0-5);
 }
 .qf-disclaimer-text {
   margin: 0;
   font-size: 11px;
   line-height: 1.5;
-  color: var(--w-muted);
+  color: var(--w-oncard-muted, var(--w-muted));
 }
 
 /* Pickup + Delivery side-by-side (Alex: keep on one line, both viewports).
@@ -344,11 +349,11 @@ body[data-qf-cta-hover="fill"] .qf-cta:not(.qf-secondary):hover { background: va
 .qf-tl-b { background: #f97373; }
 .qf-tl-bar { position: relative; flex: 1; height: 3px; border-radius: 999px; background: rgba(15,23,42,.12); }
 .qf-tl-fill { position: absolute; left: 0; top: 0; height: 100%; width: 0; border-radius: 999px; background: linear-gradient(90deg, #36c98b, #0D3CFC); transition: width 1.25s ease; }
-.qf-tl-truck { position: absolute; top: 50%; left: 0; transform: translate(-50%, -50%); color: #0D3CFC; transition: left 1.25s ease; }
+.qf-tl-truck { position: absolute; top: 50%; left: 0; transform: translate(-50%, -50%); color: var(--w-oncard-accent, #0D3CFC); transition: left 1.25s ease; }
 .qf-timeline.show .qf-tl-fill { width: 100%; }
 .qf-timeline.show .qf-tl-truck { left: 100%; }
-.qf-tl-labels { display: flex; justify-content: space-between; align-items: center; gap: var(--space-1); margin-top: var(--space-1); font-size: 11px; color: #5a6478; }
-.qf-tl-mid { font-weight: 700; color: #0c1424; }
+.qf-tl-labels { display: flex; justify-content: space-between; align-items: center; gap: var(--space-1); margin-top: var(--space-1); font-size: 11px; color: var(--w-oncard-muted, #5a6478); }
+.qf-tl-mid { font-weight: 700; color: var(--w-oncard-text, #0c1424); }
 @media (prefers-reduced-motion: reduce) {
   .qf-timeline { opacity: 1; transform: none; }
   .qf-tl-fill, .qf-tl-truck, .qf-timeline { transition: none; }

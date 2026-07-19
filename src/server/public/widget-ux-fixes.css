@@ -680,11 +680,12 @@ html { scrollbar-width: thin; scrollbar-color: rgba(135, 138, 150, 0.38) transpa
   outline-offset: 2px;
   border-radius: 4px;
 }
-/* "Edit details" sits inside the light "receipt" result card, so it must read
-   as dark-on-light — the brand cobalt (--w-primary) is high-contrast there and
-   allowed (the no-cobalt-on-dark rule only governs dark surfaces). */
-.qf-result-actions .qf-edit-link { color: var(--w-primary); }
-.qf-result-actions .qf-edit-link:hover { color: var(--w-primary-hover); }
+/* "Edit details" sits on the result card (--w-input-bg), whose lightness varies
+   by preset — cream on Midnight, dark graphite on Voltage/Voyage — so the raw
+   accent (--w-primary) fell below AA on 5 presets. Use --w-oncard-accent: the
+   contrast-engine accent guaranteed ≥4.5:1 on the result-card surface. */
+.qf-result-actions .qf-edit-link { color: var(--w-oncard-accent, var(--w-primary)); }
+.qf-result-actions .qf-edit-link:hover { color: var(--w-oncard-accent, var(--w-primary-hover)); }
 
 /* Thanks step: one tight, wrapping row of text links separated by middots. */
 .qf-thanks-actions {

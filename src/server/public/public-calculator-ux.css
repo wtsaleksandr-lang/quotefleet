@@ -515,9 +515,10 @@ body {
 .qf-success {
   border-radius: 13px;
 }
-.qf-footer {
-  opacity: 0.82;
-}
+/* Footer opacity removed: it dropped "Powered by QuoteFleet" (already the muted
+   token on --w-page-bg) below WCAG AA on 9 themes. The colour is now the
+   contrast-engine --w-footer-text token (widget-style.css), guaranteed ≥4.5:1
+   on every preset's page background, so no dimming is needed. */
 
 @media print {
   body {

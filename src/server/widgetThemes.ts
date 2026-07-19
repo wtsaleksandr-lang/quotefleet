@@ -118,6 +118,24 @@ export interface WidgetThemeTokens {
   '--w-surface-frost': string;
   /** Backdrop-blur radius for the frosted shell (`0px` = no blur / no frost). */
   '--w-frost-blur': string;
+  // ── WCAG-computed CONTEXT foregrounds (contrast-audit fixes) ───────────────
+  // Each is guaranteed by the contrast engine to clear WCAG AA on the SPECIFIC
+  // surface it renders over — surfaces whose foreground the shell-level muted/
+  // text tokens can't safely carry (the page bg behind the footer, the tinted
+  // surface-2 panels, and the RESULT CARD, which paints --w-input-bg and can be
+  // light even on a dark theme like Midnight).
+  /** "Powered by" footer text/link — reads on --w-page-bg for every preset. */
+  '--w-footer-text': string;
+  /** Field-hint helper text — reads on the tinted --w-surface-2 panels. */
+  '--w-hint-text': string;
+  /** Primary text on the result card (--w-input-bg surface). */
+  '--w-oncard-text': string;
+  /** Muted/secondary text on the result card (line items, meta, disclaimer). */
+  '--w-oncard-muted': string;
+  /** Accent-tinted text on the result card (ETA pill, timeline, edit link). */
+  '--w-oncard-accent': string;
+  /** Active service-tab label — reads on the sliding indicator's fill. */
+  '--w-tab-active-text': string;
 }
 
 type ThemeMode = 'dark' | 'light';
@@ -229,6 +247,7 @@ import {
   darken,
   lighten,
   rgba,
+  hexToRgb,
   pickForeground,
   ensureReadable,
   accessibleOnAccent,
@@ -1092,6 +1111,42 @@ function buildTokens(
   // Pill / on-surface accent labels render over the shell surface.
   const autoPillText = ensureReadable(p.accentOnSurface, p.surface, { level: WCAG.NORMAL });
 
+  // ── Context-specific WCAG-safe foregrounds (contrast-audit fixes) ──────────
+  // Some surfaces the shell-level muted/text tokens can't carry:
+  //   · the footer sits on --w-page-bg (outside the card);
+  //   · field hints sit on the tinted --w-surface-2 panels;
+  //   · the RESULT CARD paints --w-input-bg, which is LIGHT even on a dark theme
+  //     (Midnight: dark shell, cream card) — so the light dark-theme muted token
+  //     is near-invisible there.
+  // Each foreground below is derived from an ALWAYS-hex source (surface2Text /
+  // inputText / a hex accent), never the muted tokens — booking/tesla express
+  // muted as translucent rgba(), which the engine can't nudge for contrast.
+  const bgRgb = (hex: string) => hexToRgb(hex) ?? { r: 255, g: 255, b: 255 };
+  // Footer text: only hardened when muted is a solid hex (the presets whose
+  // footer fails); rgba-muted dark presets already clear AA on their dark page.
+  const footerText = HEX6_RE.test(p.muted)
+    ? ensureReadable(p.muted, p.pageBg, { level: WCAG.NORMAL })
+    : p.muted;
+  // Field-hint helper: a muted-but-AA foreground on surface-2, from surface-2's
+  // own readable text colour mixed 42% toward the panel, then guaranteed.
+  const hintText = ensureReadable(
+    mix(p.surface2Text, 0.42, bgRgb(p.surface2)),
+    p.surface2,
+    { level: WCAG.NORMAL },
+  );
+  // Result-card foregrounds (surface = --w-input-bg).
+  const oncardText = ensureReadable(p.inputText, p.inputBg, { level: WCAG.NORMAL });
+  const oncardMuted = ensureReadable(
+    mix(p.inputText, 0.4, bgRgb(p.inputBg)),
+    p.inputBg,
+    { level: WCAG.NORMAL },
+  );
+  const oncardAccent = ensureReadable(p.accent, p.inputBg, { level: WCAG.NORMAL });
+  // Active service-tab label: reads on the sliding indicator (which paints
+  // --w-accent-surface for the light-pill presets). stone/vault paint the
+  // indicator with --w-accent-solid instead (scoped CSS) + keep white text.
+  const tabActiveText = ensureReadable(p.accent, p.accentSurface, { level: WCAG.NORMAL });
+
   const fc = fontColor && HEX6_RE.test(fontColor) ? fontColor : null;
   const text = fc && passes(fc, p.surface, WCAG.NORMAL) ? fc : p.text;
   // A tenant font colour is only honoured on the accent fill if IT passes on
@@ -1155,6 +1210,13 @@ function buildTokens(
     // preset gets its OPAQUE surface value + `0px` blur → shell unchanged.
     '--w-surface-frost': s.frosted ? 'rgba(255,255,255,0.72)' : p.surface,
     '--w-frost-blur': s.frosted ? '30px' : '0px',
+    // Context foregrounds — each guaranteed ≥ AA on its own surface.
+    '--w-footer-text': footerText,
+    '--w-hint-text': hintText,
+    '--w-oncard-text': oncardText,
+    '--w-oncard-muted': oncardMuted,
+    '--w-oncard-accent': oncardAccent,
+    '--w-tab-active-text': tabActiveText,
   };
 }
 
