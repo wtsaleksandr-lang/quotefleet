@@ -806,9 +806,12 @@
     var wrap = $('qf-services'); wrap.innerHTML = '';
     if (!services.length) { $('qf-error').style.display = 'block'; $('qf-error').textContent = 'No services configured. Contact us directly.'; return; }
     var labels = { drayage: 'Drayage', ftl: 'FTL', ltl: 'LTL', expedited: 'Expedite', hotshot: 'Hotshot' };
+    wrap.setAttribute('role', 'tablist');
     services.forEach(function (s, i) {
       var btn = el('button', { class: i === 0 ? 'active' : '', text: labels[s] || s, on: { click: function () { selectService(s); } } });
       btn.dataset.service = s;
+      btn.setAttribute('role', 'tab');
+      btn.setAttribute('aria-selected', i === 0 ? 'true' : 'false');
       wrap.appendChild(btn);
     });
     // A single service has nothing to choose — hide the whole selector bar (a lone
@@ -823,7 +826,7 @@
   function selectService(service) {
     var firstSelect = state.service == null;
     state.service = service;
-    $$('#qf-services button').forEach(function (b) { b.classList.toggle('active', b.dataset.service === service); });
+    $$('#qf-services button').forEach(function (b) { var on = b.dataset.service === service; b.classList.toggle('active', on); b.setAttribute('aria-selected', on ? 'true' : 'false'); });
     // Slide the active-tab indicator to the new tab (snap on the very first
     // selection so it doesn't animate in from the left on load).
     positionTabIndicator(!firstSelect);
@@ -1038,11 +1041,21 @@
       else { countEl.hidden = true; }
     }
 
+    // Visible, focusable descendants of the dialog card — used to move focus
+    // in on open and to trap Tab/Shift+Tab within the dialog.
+    function focusables() {
+      if (!card) return [];
+      return Array.prototype.slice.call(card.querySelectorAll('a[href],button:not([disabled]),input:not([disabled]),select:not([disabled]),textarea:not([disabled]),[tabindex]:not([tabindex="-1"])'))
+        .filter(function (n) { return n.offsetWidth || n.offsetHeight || n.getClientRects().length; });
+    }
     function openModal() {
       modal.hidden = false;
       document.body.classList.add('qf-modal-open');
       summary.setAttribute('aria-expanded', 'true');
       if (card) card.scrollTop = 0;
+      // Move focus INTO the dialog (close button, else first focusable field).
+      var target = $('qf-options-close') || focusables()[0];
+      if (target) target.focus();
     }
     function closeModal() {
       modal.hidden = true;
@@ -1055,6 +1068,20 @@
     summary.addEventListener('click', openModal);
     modal.querySelectorAll('[data-qf-close]').forEach(function (el) { el.addEventListener('click', closeModal); });
     document.addEventListener('keydown', function (e) { if (e.key === 'Escape' && !modal.hidden) closeModal(); });
+    // Focus trap — Tab / Shift+Tab cycle within the dialog card, never reaching
+    // the page behind it.
+    modal.addEventListener('keydown', function (e) {
+      if (e.key !== 'Tab' || modal.hidden) return;
+      var f = focusables();
+      if (!f.length) { e.preventDefault(); return; }
+      var first = f[0], last = f[f.length - 1], active = document.activeElement;
+      var inside = card && card.contains(active);
+      if (e.shiftKey) {
+        if (active === first || !inside) { e.preventDefault(); last.focus(); }
+      } else {
+        if (active === last || !inside) { e.preventDefault(); first.focus(); }
+      }
+    });
     // Flags fire 'change'; accessorial chips are buttons — recount after their click handler runs.
     modal.addEventListener('change', updateCount);
     modal.addEventListener('click', function () { setTimeout(updateCount, 0); });

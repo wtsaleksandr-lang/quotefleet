@@ -271,10 +271,17 @@ export function registerPublicRoutes(app: Express) {
   ifr.setAttribute('allow','clipboard-write');
   div.appendChild(ifr);
   mount.parentNode.insertBefore(div, mount);
-  // Auto-resize via postMessage from the iframe.
+  // Auto-resize via postMessage from the iframe. Only messages coming from
+  // THIS widget's iframe may resize THIS iframe (frame-source safety check).
   window.addEventListener('message', function(e){
-    if(!e || !e.data || e.data.qf!=='resize' || e.data.slug!==${JSON.stringify(tenant.slug)}) return;
-    if (typeof e.data.h==='number') ifr.style.height=e.data.h+'px';
+    if(!e || !e.data) return;
+    if(e.source !== ifr.contentWindow) return;
+    var h;
+    // Shape the widget actually posts: { type:'QF_WIDGET_HEIGHT', height:N }.
+    if(e.data.type==='QF_WIDGET_HEIGHT' && typeof e.data.height==='number') h=e.data.height;
+    // Legacy back-compat shape: { qf:'resize', slug, h }.
+    else if(e.data.qf==='resize' && e.data.slug===${JSON.stringify(tenant.slug)} && typeof e.data.h==='number') h=e.data.h;
+    if(typeof h==='number' && h>0) ifr.style.height=h+'px';
   });
 })();
 `);
