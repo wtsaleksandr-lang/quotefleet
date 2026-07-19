@@ -39,6 +39,13 @@ export interface GeoPoint {
 
 const STRAIGHT_TO_ROAD_FACTOR = 1.18;
 
+/**
+ * Placeholder / non-geographic US ZIPs that must never resolve, even though
+ * their 3-digit prefix happens to map to a real centroid (e.g. 999 = Ketchikan
+ * AK). These are the classic "fake ZIP" values a bot or fat-fingered user types.
+ */
+const BOGUS_US_ZIPS = new Set(['00000', '99999']);
+
 function normCountry(c?: string): string {
   if (!c) return 'US';
   const s = c.trim().toUpperCase();
@@ -102,6 +109,9 @@ export async function geocode(input: {
     const zip = input.zip.replace(/\s+/g, '').toUpperCase();
     if (country === 'US') {
       const zip3 = zip.slice(0, 3);
+      // Reject obvious placeholder ZIPs first — their prefix can map to a real
+      // centroid (999 → Ketchikan AK) and would otherwise price a bogus lane.
+      if (BOGUS_US_ZIPS.has(zip)) return null;
       const c = ZIP_CENTROIDS[zip3];
       if (c) {
         return {
@@ -114,6 +124,11 @@ export async function geocode(input: {
           state: c[3],
         };
       }
+      // ZIP_CENTROIDS covers every assigned US ZIP3. A purely-numeric 5-digit
+      // ZIP whose prefix ISN'T here is unassigned / invalid — return unresolved
+      // rather than fabricate a location via Nominatim (which can confidently
+      // match an unrelated place for junk input and price a wrong lane).
+      if (/^\d{5}$/.test(zip)) return null;
     } else if (country === 'CA') {
       const fsa = zip.slice(0, 3);
       const c = CANADA_FSA_CENTROIDS[fsa];
@@ -276,7 +291,11 @@ export async function distanceBetween(
           source: 'manual',
         } satisfies GeoPoint)
       : await geocode(origin);
-  if (!o) return { error: 'Could not resolve pickup location to coordinates.' };
+  if (!o)
+    return {
+      error:
+        "We couldn't price this lane — the pickup ZIP/postal code wasn't recognized. Please double-check it, or contact us for a custom quote.",
+    };
   const d =
     destination.lat != null && destination.lng != null
       ? ({
@@ -286,7 +305,10 @@ export async function distanceBetween(
         } satisfies GeoPoint)
       : await geocode(destination);
   if (!d)
-    return { error: 'Could not resolve delivery location to coordinates.' };
+    return {
+      error:
+        "We couldn't price this lane — the delivery ZIP/postal code wasn't recognized. Please double-check it, or contact us for a custom quote.",
+    };
 
   // distance cache key
   const oKey = `${o.lat.toFixed(2)},${o.lng.toFixed(2)}`;

@@ -60,6 +60,7 @@ import {
   WIDGET_PRESET_LIST,
   CTA_HOVER_STYLES,
   FONT_COLOR_SWATCHES,
+  MAP_BLEND_VALUES,
 } from '../widgetThemes.js';
 import { MAP_STYLE_KEYS, MAP_STYLE_LIST } from '../routeMap.js';
 import { loadEnv } from '../../config.js';
@@ -185,13 +186,28 @@ export function registerTenantRoutes(app: Express) {
 
     const brand = brandRow[0];
     const tenantName = (req.tenant!.name ?? '').trim();
+    // Any genuine customization credits the "Brand" step. This now also counts
+    // the Customize panel's THEMING columns (theme preset, accent override, font,
+    // map style, CTA hover, text color, map blend) — previously the meter only
+    // looked at logo/name/colors/tagline, so a tenant who fully themed their
+    // widget but left those four never got credit and the step stayed incomplete.
+    const themeCustomized =
+      !!brand &&
+      ((brand.themePreset ?? 'midnight') !== 'midnight' ||
+        (!!brand.accentOverride && brand.accentOverride.trim() !== '') ||
+        (brand.fontFamily ?? 'satoshi') !== 'satoshi' ||
+        (!!brand.mapStyle && brand.mapStyle.trim() !== '') ||
+        (brand.ctaHover ?? 'border') !== 'border' ||
+        (brand.fontColor ?? 'auto') !== 'auto' ||
+        (brand.mapBlend ?? 'off') !== 'off');
     const brandConfigured =
       !!brand &&
       ((!!brand.logoUrl && brand.logoUrl.trim() !== '') ||
         (!!brand.displayName && brand.displayName.trim() !== '' && brand.displayName.trim() !== tenantName) ||
         brand.primaryColor !== SEED_BRAND_PRIMARY ||
         brand.accentColor !== SEED_BRAND_ACCENT ||
-        (!!brand.tagline && brand.tagline.trim() !== '' && brand.tagline.trim() !== SEED_BRAND_TAGLINE));
+        (!!brand.tagline && brand.tagline.trim() !== '' && brand.tagline.trim() !== SEED_BRAND_TAGLINE) ||
+        themeCustomized);
 
     const ai = aiRow[0];
     const aiConfigured =
@@ -670,6 +686,10 @@ export function registerTenantRoutes(app: Express) {
     // Per-tenant map style for the calculator's base + route maps. One of the
     // canonical keys; null clears back to the 'branded' default. See routeMap.ts.
     mapStyle: z.enum([...MAP_STYLE_KEYS] as [string, ...string[]]).nullable().optional(),
+    // Per-tenant MAP-BLEND toggle ('on' | 'off'). Feathers the route-map edges
+    // into the calculator surface. Persisted verbatim; resolveWidgetTheme reads
+    // it and the widget applies body[data-qf-map-blend]. See widgetThemes.ts.
+    mapBlend: z.enum([...MAP_BLEND_VALUES] as [string, ...string[]]).optional(),
     // Per-tenant optional feature toggles (partial) + the nested `booking`
     // deposit config object. Only known boolean keys (sanitizeFeaturesPatch)
     // and a validated booking object (sanitizeBookingPatch) are persisted, and

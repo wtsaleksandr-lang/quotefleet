@@ -80,16 +80,14 @@
   }
 
   function withDrayageEquipmentDefaults(list) {
-    var next = (list || []).slice();
-    function addIfMissing(value, label, needles) {
-      var exists = next.some(function (item) { return equipmentValueMatches(item.value || item.label, needles); });
-      if (!exists) next.push({ value: value, label: label });
-    }
-    addIfMissing('container_20_reefer', "20' Reefer container", ['20', 'reefer']);
-    addIfMissing('container_40_reefer', "40' Reefer container", ['40', 'reefer']);
-    addIfMissing('container_40_open_top', "40' Open top container", ['open top', 'opentop']);
-    addIfMissing('container_40_flat_rack', "40' Flat rack", ['flat rack', 'flatrack']);
-    return next;
+    // Only advertise equipment the tenant actually has a rate card for (the
+    // server's equipmentByService list). Previously this padded the dropdown
+    // with reefer / open-top / flat-rack containers even when un-priceable,
+    // which dead-ended the customer with "No rate card configured…" after the
+    // full OOG flow. If a tenant DOES card those, they arrive from the server
+    // and show normally (and their OOG panel still triggers via
+    // isOpenTopOrFlatRack). See FIX 5.
+    return (list || []).slice();
   }
 
   function isOpenTopOrFlatRack(value) {
@@ -524,6 +522,12 @@
     return 500;
   }
   var LB_PER_KG = 2.2046226, IN_PER_CM = 1 / 2.54;
+  // Over-legal ceiling for an automated instant quote — mirrors the server's
+  // MAX_QUOTABLE_WEIGHT_LBS (src/calc/engine.ts). Above this we route to a human.
+  var MAX_QUOTABLE_WEIGHT_LBS = 80000;
+  // Sanity ceiling for a single LTL piece dimension (inches). A 53' trailer is
+  // ~636"; anything beyond is a typo / not real LTL freight.
+  var MAX_LTL_DIM_IN = 636;
   function newLtlItem() { return { commodity: '', freightType: 'General', qty: '1', length: '', width: '', height: '', dimUnit: 'in', weight: '', wtUnit: 'lb' }; }
   function ensureLtlItem() { if (!state.ltlItems.length) state.ltlItems.push(newLtlItem()); }
   // Per-item + aggregate LTL math, all normalized to inches + pounds. cubicFt is
@@ -925,6 +929,10 @@
       req.flags.palletized = true;
       req.flags.loadedFromDock = true;
       req.meta.ltlClass = t.cls || undefined;
+      // Send the SAME aggregate class the item-row summary shows as an explicit
+      // override so the server prices + stores it, instead of re-deriving a
+      // wrong (lower) class from total-weight ÷ single-largest-item volume.
+      if (t.cls) req.freightClass = t.cls;
       req.meta.ltlItems = state.ltlItems.map(function (it) {
         var toIn = it.dimUnit === 'cm' ? IN_PER_CM : 1;
         return {
@@ -965,8 +973,10 @@
       if (lt.validItems < 1) { showError('qf-error', 'Add at least one item with its weight and length / width / height so we can determine the freight class.'); return; }
     }
     if (!(req.weightLbs > 0)) { showError('qf-error', req.service === 'ltl' ? 'Enter the shipment weight — LTL is priced by weight and size.' : 'Enter the load weight (lbs).'); return; }
+    if (req.weightLbs > MAX_QUOTABLE_WEIGHT_LBS) { showError('qf-error', 'That weight is over the legal limit for a standard instant quote. For over-legal / oversize loads, please contact us for a custom quote.'); return; }
     if (req.service === 'ltl') {
       if (!(req.lengthIn > 0 && req.widthIn > 0 && req.heightIn > 0)) { showError('qf-error', 'Enter length, width, and height for each item so we can determine the freight class.'); return; }
+      if (req.lengthIn > MAX_LTL_DIM_IN || req.widthIn > MAX_LTL_DIM_IN || req.heightIn > MAX_LTL_DIM_IN) { showError('qf-error', 'Those dimensions look too large for LTL freight. Please double-check length / width / height, or contact us for oversize / full-truckload freight.'); return; }
     }
     var oogCheck = $('qf-oog-check');
     if (isOpenTopOrFlatRack(req.equipment) && oogCheck && oogCheck.checked) {

@@ -1,0 +1,13 @@
+-- leads.meta_json — flexible client-collected extras persisted verbatim for the
+-- dispatcher (the LTL per-commodity breakdown `ltlItems`, the aggregate LTL
+-- class, and the drayage OOG oversize dimensions `oversize`).
+--
+-- This column was added to src/db/schema.ts in a prior fix wave but its
+-- migration file was never generated, so a fresh prod deploy would 500 on any
+-- INSERT/SELECT that touches it. Backfilling the migration here makes the boot
+-- migrator (src/db/migrate.ts) self-heal the column on deploy.
+--
+-- Nullable, no default, no backfill — existing rows read null. Idempotent
+-- (ADD COLUMN IF NOT EXISTS) so it's safe to re-run on every deploy and safe
+-- even where the column was already added by hand.
+ALTER TABLE "leads" ADD COLUMN IF NOT EXISTS "meta_json" jsonb;

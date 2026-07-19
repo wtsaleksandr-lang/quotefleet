@@ -6,6 +6,14 @@
    guards. Spacing uses the 8px ramp via var(--space-*).
    ───────────────────────────────────────────────────────────────────────── */
 
+/* While the wizard is open, lock the page behind it so the dashboard shell
+   underneath (which stays in the document flow) can't be scrolled into view as a
+   sliver below the fixed overlay. The overlay scrolls its own content. */
+html.qf-ob-open,
+html.qf-ob-open body {
+  overflow: hidden;
+}
+
 .qf-ob-overlay {
   position: fixed;
   inset: 0;

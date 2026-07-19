@@ -1298,11 +1298,23 @@
       if (opts && opts.step) inp.step = opts.step;
       inp.style.width = (opts && opts.w) || '90px';
       if (opts && opts.right) inp.style.textAlign = 'right';
-      inp.addEventListener('blur', function () {
-        var v = inp.value;
-        if (opts && opts.type === 'number') v = v === '' ? null : Number(v);
-        api('/api/tenant/rate-cards/' + r.id, { method: 'PUT', body: (function () { var p = {}; p[field] = v; return p; })() }).catch(toastErr);
-      });
+      // Disabled cell (e.g. LTL's $/mi — LTL is class/cwt-priced, so a per-mile
+      // rate is meaningless and must not be editable). Show a muted placeholder
+      // and skip the save handler entirely so nothing can be written for it.
+      if (opts && opts.disabled) {
+        inp.disabled = true;
+        inp.value = '';
+        inp.placeholder = opts.disabledPlaceholder || 'n/a';
+        if (opts.disabledTitle) inp.title = opts.disabledTitle;
+        inp.style.opacity = '0.5';
+        inp.style.cursor = 'not-allowed';
+      } else {
+        inp.addEventListener('blur', function () {
+          var v = inp.value;
+          if (opts && opts.type === 'number') v = v === '' ? null : Number(v);
+          api('/api/tenant/rate-cards/' + r.id, { method: 'PUT', body: (function () { var p = {}; p[field] = v; return p; })() }).catch(toastErr);
+        });
+      }
       var td = el('td'); td.appendChild(inp);
       if (opts && opts.label) td.dataset.label = opts.label;
       return td;
@@ -1327,7 +1339,7 @@
       'container_20', 'container_40', 'container_40hc', 'container_45',
       'sprinter', 'box_truck', 'tractor_only', 'pallet'], 'Equipment'));
     tr.appendChild(inputCell('label', r.label, { w: '160px', label: 'Label' }));
-    tr.appendChild(inputCell('ratePerMile', r.ratePerMile, { type: 'number', step: '0.01', right: true, w: '80px', label: '$/mi' }));
+    tr.appendChild(inputCell('ratePerMile', r.ratePerMile, { type: 'number', step: '0.01', right: true, w: '80px', label: '$/mi', disabled: r.service === 'ltl', disabledPlaceholder: 'class', disabledTitle: 'LTL is priced by freight class and weight (set it in “LTL pricing” below), not $/mile.' }));
     tr.appendChild(inputCell('minimumCharge', r.minimumCharge, { type: 'number', step: '1', right: true, w: '80px', label: 'Min' }));
     tr.appendChild(inputCell('flatFee', r.flatFee, { type: 'number', step: '1', right: true, w: '80px', label: 'Flat' }));
     tr.appendChild(inputCell('fuelSurchargePct', r.fuelSurchargePct, { type: 'number', step: '0.5', right: true, w: '70px', label: 'Fuel %' }));
@@ -2075,6 +2087,34 @@
       });
       mapSec.appendChild(mapRow);
       controls.appendChild(mapSec);
+
+      // ── Map blend (feather map edges into the card) ──────────────
+      // A theme-agnostic ON/OFF toggle. When on, the route map's edges feather
+      // softly into the calculator surface (body[data-qf-map-blend="on"]).
+      // Saving reloads the live preview (same queueSave flow as Map style), so
+      // the feather appears immediately. Off by default — crisp rectangular map.
+      var blendSec = el('div', { class: 'card qf-cz-section' });
+      blendSec.appendChild(el('div', { class: 'qf-cz-section-title', text: 'Map blend' }));
+      blendSec.appendChild(el('div', { class: 'qf-cz-hint', text: 'Blend the map into the card — its edges feather softly into your calculator surface.' }));
+      var blendRow = el('div', { class: 'qf-cz-hover-row' });
+      var currentMapBlend = (b.mapBlend === 'on') ? 'on' : 'off';
+      [{ id: 'off', label: 'Off' }, { id: 'on', label: 'On' }].forEach(function (o) {
+        var on = o.id === currentMapBlend;
+        var chip = el('button', { type: 'button', class: 'qf-cz-hover-chip' + (on ? ' is-selected' : ''), 'data-mapblend': o.id, 'aria-pressed': on ? 'true' : 'false', title: 'Blend map into the card' });
+        chip.appendChild(el('span', { class: 'qf-cz-hover-name', text: o.label + (o.id === 'off' ? ' (default)' : '') }));
+        chip.addEventListener('click', function () {
+          currentMapBlend = o.id;
+          $$('.qf-cz-hover-chip', blendRow).forEach(function (n) {
+            var s = n.getAttribute('data-mapblend') === o.id;
+            n.classList.toggle('is-selected', s);
+            n.setAttribute('aria-pressed', s ? 'true' : 'false');
+          });
+          queueSave({ mapBlend: o.id }, true);
+        });
+        blendRow.appendChild(chip);
+      });
+      blendSec.appendChild(blendRow);
+      controls.appendChild(blendSec);
 
       // ── Text color (background-aware, WCAG-limited) ──────────────
       // Only colours that clear WCAG AA against the CURRENT theme background

@@ -123,6 +123,14 @@
     shell.appendChild(foot);
 
     document.body.appendChild(overlay);
+    // Lock the page behind the modal. The overlay is position:fixed and covers
+    // the viewport, but the underlying dashboard shell stays in the document
+    // flow — without this, a user could scroll the ~tens of px of page underflow
+    // and reveal a sliver of the dashboard sidebar peeking below the overlay
+    // (also what showed as a stray dark rectangle at the bottom of full-page
+    // screenshots). The overlay itself scrolls internally (overflow-y:auto), so
+    // locking the body never traps the wizard's own content.
+    document.documentElement.classList.add('qf-ob-open');
 
     function setProgress() {
       var spans = progress.querySelectorAll('span');
@@ -431,6 +439,8 @@
     function close() {
       var o = document.getElementById('qf-ob-overlay');
       if (o && o.parentNode) o.parentNode.removeChild(o);
+      // Release the scroll-lock added on mount.
+      document.documentElement.classList.remove('qf-ob-open');
     }
 
     render();

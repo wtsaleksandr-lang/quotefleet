@@ -28,7 +28,7 @@ import {
   callbackRequests,
 } from '../../db/schema.js';
 import express from 'express';
-import { calculate, customerFacingLines, type CalcRequest, type FscOptions } from '../../calc/engine.js';
+import { calculate, customerFacingLines, MAX_QUOTABLE_WEIGHT_LBS, type CalcRequest, type FscOptions } from '../../calc/engine.js';
 import { resolveFscForTenant, asOfLabel } from '../../eia/dieselPrice.js';
 import { estimateTransit } from '../../calc/transit.js';
 import { distanceBetween } from '../../calc/distance.js';
@@ -106,6 +106,29 @@ const QuoteSchema = z.object({
   lengthIn: z.number().optional(),
   widthIn: z.number().optional(),
   heightIn: z.number().optional(),
+  /**
+   * LTL aggregate freight class computed client-side from ALL item rows
+   * (weight ÷ summed volume). The engine honors this as an override
+   * (classSource:'override') so the displayed, priced, and stored class match.
+   * Without it the server would re-derive a WRONG class from total-weight ÷
+   * single-largest-item volume, understating multi-pallet LTL ~2×.
+   */
+  freightClass: z.number().positive().optional(),
+  /**
+   * Flexible per-request extras collected by the widget. Kept permissive so
+   * new client fields don't require a schema bump; persisted verbatim on the
+   * lead for the dispatcher. Includes the LTL per-commodity breakdown and the
+   * drayage OOG oversize dimensions.
+   */
+  meta: z
+    .object({
+      ltlClass: z.number().optional(),
+      ltlItems: z.array(z.record(z.string(), z.unknown())).optional(),
+      oversize: z.record(z.string(), z.unknown()).optional(),
+      deliveryZipConfirmed: z.boolean().optional(),
+    })
+    .passthrough()
+    .optional(),
   pickupDate: z.string().optional(),
   deliveryDate: z.string().optional(),
   commodity: z.string().optional(),
@@ -142,6 +165,10 @@ const LeadSchema = QuoteSchema.extend({
   customerPhone: z.string().optional(),
   customerCompany: z.string().optional(),
 });
+
+/** Shown when a request weight exceeds the automated-quote ceiling. */
+const OVER_LEGAL_WEIGHT_MESSAGE =
+  'That weight is over the legal limit for a standard instant quote. For over-legal / oversize loads, please contact us for a custom quote.';
 
 async function getTenantBySlug(slug: string) {
   const rows = await db().select().from(tenants).where(eq(tenants.slug, slug)).limit(1);
@@ -389,6 +416,9 @@ export function registerPublicRoutes(app: Express) {
       return res.status(400).json({ error: 'Invalid input', details: parse.error.flatten() });
     }
     const body = parse.data;
+    if (typeof body.weightLbs === 'number' && body.weightLbs > MAX_QUOTABLE_WEIGHT_LBS) {
+      return res.status(400).json({ error: OVER_LEGAL_WEIGHT_MESSAGE });
+    }
     const { cards, accs, zones, terms } = await loadConfig(tenant.id);
 
     // Distance — for drayage with a known port, fall back to the port's
@@ -408,6 +438,7 @@ export function registerPublicRoutes(app: Express) {
       lengthIn: body.lengthIn,
       widthIn: body.widthIn,
       heightIn: body.heightIn,
+      freightClass: body.freightClass,
       pickupCity: body.pickup.city,
       pickupState: body.pickup.state,
       pickupZip: body.pickup.zip,
@@ -579,6 +610,9 @@ export function registerPublicRoutes(app: Express) {
       return res.status(400).json({ error: 'Invalid input', details: parse.error.flatten() });
     }
     const body = parse.data;
+    if (typeof body.weightLbs === 'number' && body.weightLbs > MAX_QUOTABLE_WEIGHT_LBS) {
+      return res.status(400).json({ error: OVER_LEGAL_WEIGHT_MESSAGE });
+    }
 
     // Carrier-controlled contact requirements (brand_configs flags).
     // Default behavior preserves the original "email required" rule.
@@ -608,6 +642,7 @@ export function registerPublicRoutes(app: Express) {
       lengthIn: body.lengthIn,
       widthIn: body.widthIn,
       heightIn: body.heightIn,
+      freightClass: body.freightClass,
       pickupCity: body.pickup.city,
       pickupState: body.pickup.state,
       pickupZip: body.pickup.zip,
@@ -684,6 +719,10 @@ export function registerPublicRoutes(app: Express) {
         commodity: body.commodity,
         notes: body.notes,
         accessorialCodes: body.selectedAccessorialCodes ?? [],
+        // Persist the client-collected extras (LTL per-commodity breakdown +
+        // aggregate class, drayage OOG oversize dims) so the dispatcher sees
+        // exactly what the customer entered — previously stripped by the schema.
+        metaJson: body.meta ?? null,
         distanceMiles: dist.miles,
         breakdownJson: calc.lines.map((l) => ({
           name: l.name,

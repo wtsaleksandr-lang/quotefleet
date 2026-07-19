@@ -1,0 +1,14 @@
+-- Per-tenant MAP-BLEND toggle on brand_configs.
+--
+-- 'on' feathers the route-map's edges into the calculator surface (a
+-- theme-agnostic, token-driven effect); 'off' (DEFAULT) keeps the map's crisp
+-- rectangular edge — the current look. Read by resolveWidgetTheme
+-- (src/server/widgetThemes.ts, MAP_BLEND_VALUES) and applied to the widget as
+-- body[data-qf-map-blend]. The dashboard Customize panel writes it via
+-- PUT /api/tenant/brand.
+--
+-- NOT NULL DEFAULT 'off' — Postgres fills every existing row with 'off' as it
+-- adds the column, so existing tenants are unchanged with no separate backfill
+-- and the map renders exactly as before. Idempotent (ADD COLUMN IF NOT EXISTS)
+-- so it's safe to re-run on every deploy.
+ALTER TABLE "brand_configs" ADD COLUMN IF NOT EXISTS "map_blend" text NOT NULL DEFAULT 'off';

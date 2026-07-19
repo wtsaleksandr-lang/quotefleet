@@ -88,3 +88,53 @@ describe('customize panel — dashboard UI', () => {
     expect(studio).toMatch(/function mount\(\) \{\s*\n[\s\S]*?\n\s*return;/);
   });
 });
+
+describe('customize panel — map-blend toggle (persist + UI + setup meter)', () => {
+  it('accepts mapBlend in the brand PUT schema, validated against MAP_BLEND_VALUES', async () => {
+    const src = await read('src/server/routes/tenant.ts');
+    // The enum is imported from the theme engine (single source of truth) and
+    // wired into BrandPatch so PUT /api/tenant/brand accepts + persists it.
+    expect(src).toContain('MAP_BLEND_VALUES');
+    expect(src).toContain('mapBlend: z.enum([...MAP_BLEND_VALUES]');
+  });
+
+  it('persists mapBlend as a real brand_configs column with a safe default', async () => {
+    const schema = await read('src/db/schema.ts');
+    // notNull default 'off' — existing tenants render the map exactly as before.
+    expect(schema).toContain("mapBlend: text('map_blend').notNull().default('off')");
+    // A migration file backfills it so a fresh prod deploy doesn't 500.
+    const mig = await read('drizzle/0022_brand_map_blend.sql');
+    expect(mig).toContain('ADD COLUMN IF NOT EXISTS "map_blend" text NOT NULL DEFAULT \'off\'');
+    // The (previously missing) leads.meta_json migration is present too.
+    const metaMig = await read('drizzle/0021_leads_meta_json.sql');
+    expect(metaMig).toContain('ADD COLUMN IF NOT EXISTS "meta_json" jsonb');
+    // Both are registered in the boot-migrator journal.
+    const journal = await read('drizzle/meta/_journal.json');
+    expect(journal).toContain('0021_leads_meta_json');
+    expect(journal).toContain('0022_brand_map_blend');
+  });
+
+  it('renders a Map-blend On/Off toggle that saves through the brand PUT', async () => {
+    const js = await pub('app.js');
+    expect(js).toContain('Map blend');
+    expect(js).toContain('data-mapblend');
+    expect(js).toContain("queueSave({ mapBlend: o.id }");
+    // reflects the loaded value
+    expect(js).toContain("(b.mapBlend === 'on') ? 'on' : 'off'");
+  });
+
+  it('the setup-status Brand step counts the Customize panel theming columns', async () => {
+    const src = await read('src/server/routes/tenant.ts');
+    // brandConfigured now also credits any non-default theming (preset/accent/
+    // font/map style/CTA hover/text color/map blend), not just logo/name/colors.
+    expect(src).toContain('themeCustomized');
+    expect(src).toContain("(brand.themePreset ?? 'midnight') !== 'midnight'");
+    expect(src).toContain("(brand.mapBlend ?? 'off') !== 'off'");
+    expect(src).toContain("(brand.ctaHover ?? 'border') !== 'border'");
+    expect(src).toContain("(brand.fontColor ?? 'auto') !== 'auto'");
+    expect(src).toContain('brand.mapStyle');
+    expect(src).toContain('brand.accentOverride');
+    // …and it's OR-ed into the final brand-configured decision.
+    expect(src).toContain('themeCustomized);');
+  });
+});

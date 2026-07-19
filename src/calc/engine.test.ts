@@ -294,6 +294,26 @@ describe('calculate', () => {
     expect(bulky.total).toBeGreaterThan(dense.total);
   });
 
+  it('LTL — aggregate freightClass override is priced AND surfaced (displayed = priced = stored)', () => {
+    // Multi-pallet reality: the widget aggregates all item rows into one class
+    // (weight ÷ SUMMED volume) and sends it as `freightClass`. The server must
+    // price + report THAT class, not re-derive a lower one from total-weight ÷
+    // the single-largest-item volume. Here 500 lb over two 48×40×48 pallets is
+    // class 200; the single-item derivation would wrongly land on ~100.
+    const ltlCard = rateCard({ service: 'ltl', equipment: 'pallet', ratePerMile: 0, minimumCharge: 125, flatFee: 50, fuelSurchargePct: 0, marginPct: 0 });
+    const dims = { lengthIn: 48, widthIn: 40, heightIn: 48 };
+    const derived = calculate([ltlCard], [], [], req({ service: 'ltl', equipment: 'pallet', miles: 600, weightLbs: 500, ...dims }));
+    const overridden = calculate([ltlCard], [], [], req({ service: 'ltl', equipment: 'pallet', miles: 600, weightLbs: 500, freightClass: 200, ...dims }));
+    // The override wins end-to-end.
+    expect(overridden.ltl?.classSource).toBe('override');
+    expect(overridden.ltl?.freightClass).toBe(200);
+    // The linehaul label the customer sees reflects the SAME class.
+    expect(overridden.lines.find((l) => l.kind === 'linehaul')?.name).toMatch(/class 200/i);
+    // And it prices higher than the (wrong, cheaper) single-item derivation.
+    expect(derived.ltl?.freightClass).toBeLessThan(200);
+    expect(overridden.total).toBeGreaterThan(derived.total);
+  });
+
   it('LTL — no dock auto-adds liftgate; loose auto-adds handling', () => {
     const ltlCard = rateCard({ service: 'ltl', equipment: 'pallet', ratePerMile: 0, minimumCharge: 125, flatFee: 50, fuelSurchargePct: 0, marginPct: 0 });
     const noDock = accessorial({ code: 'ltl_no_dock', label: 'Liftgate / No-dock', kind: 'flat', amount: 95, trigger: 'auto_if_no_dock', appliesToServices: ['ltl'] });

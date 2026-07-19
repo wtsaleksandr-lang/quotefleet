@@ -501,6 +501,13 @@ export const brandConfigs = pgTable('brand_configs', {
    *  resolves to 'branded' (resolveMapStyle in src/server/routeMap.ts), which
    *  reproduces the current theme-aware look, so existing tenants are unchanged. */
   mapStyle: text('map_style'),
+  /** Per-tenant MAP-BLEND toggle: 'on' feathers the route-map's edges into the
+   *  calculator surface (a theme-agnostic, token-driven effect); 'off' (default)
+   *  keeps the map's crisp rectangular edge — the current look. Read by
+   *  resolveWidgetTheme (src/server/widgetThemes.ts, MAP_BLEND_VALUES) and applied
+   *  as body[data-qf-map-blend]. notNull default 'off' so existing rows are
+   *  unchanged with no backfill. */
+  mapBlend: text('map_blend').notNull().default('off'),
   /** Per-tenant optional feature toggles. A single, extensible JSON bag so new
    *  opt-in widget features never need a new column. Nullable — null resolves
    *  to the defaults in src/server/features.ts (resolveFeatures). Known keys:
@@ -587,6 +594,11 @@ export const leads = pgTable(
 
     /** Selected accessorials (codes, e.g. ["liftgate","residential"]). */
     accessorialCodes: jsonb('accessorial_codes').$type<string[]>(),
+
+    /** Flexible client-collected extras persisted verbatim for the dispatcher:
+     *  the LTL per-commodity breakdown (`ltlItems`), the aggregate LTL class,
+     *  and the drayage OOG oversize dimensions (`oversize`). */
+    metaJson: jsonb('meta_json').$type<Record<string, unknown>>(),
 
     /** Computed at quote time. */
     distanceMiles: doublePrecision('distance_miles'),

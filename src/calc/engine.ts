@@ -33,6 +33,14 @@ import {
   type FreightClassEstimate,
 } from './freightClass.js';
 
+/**
+ * Absolute upper bound (pounds) for an automated instant quote. Anything above
+ * this is over-legal / oversize and must route to a human ("please contact us")
+ * rather than silently pricing an impossible load. Shared by the client widget
+ * (mirrored as a literal) and the server quote routes.
+ */
+export const MAX_QUOTABLE_WEIGHT_LBS = 80000;
+
 export interface CalcRequest {
   service: string; // 'drayage' | 'ftl' | 'ltl' | ...
   equipment: string; // 'dryvan' | 'container_40hc' | ...
@@ -377,7 +385,11 @@ export function calculate(
         ? req.freightClass
         : est?.freightClass ?? 100;
     if (est) {
-      ltlRating = { ...est, classSource: req.freightClass ? 'override' : 'derived' };
+      // When the widget sends an aggregate override (multi-item LTL), the
+      // effective class used for pricing MUST also be the one reported back in
+      // `ltl.freightClass` — otherwise the result-card chip + the stored lead
+      // show the density-derived class while the price reflects the override.
+      ltlRating = { ...est, freightClass, classSource: req.freightClass ? 'override' : 'derived' };
     } else if (typeof req.freightClass === 'number' && req.freightClass > 0) {
       ltlRating = {
         freightClass,
