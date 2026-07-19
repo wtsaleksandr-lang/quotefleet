@@ -213,13 +213,31 @@ async function seedDemoTenant() {
   if (existing[0]) {
     tenantId = existing[0].id;
     console.log(`[seed] Demo tenant exists (id=${tenantId}) — repairing.`);
-    if (existing[0].plan === 'free' && !existing[0].trialEndsAt) {
+    // The demo must be Pro to showcase every feature (incl. AI chat). Force it
+    // regardless of the current plan — older demos were seeded 'free'/'starter',
+    // and only 'free' was being bumped before, so a 'starter' demo stayed gated.
+    if (existing[0].plan !== 'pro') {
       await db()
         .update(tenants)
         .set({ plan: 'pro' })
         .where(eq(tenants.id, tenantId));
-      console.log('[seed]   plan: free → pro (demo shows every feature, incl. AI)');
+      console.log(`[seed]   plan: ${existing[0].plan} → pro (demo shows every feature, incl. AI)`);
     }
+    // Ensure the demo's AI follow-up chat is enabled. The insert branch below sets
+    // this, but an EXISTING demo row (created before chat, or seeded chatEnabled:false)
+    // never got repaired — the previous existing-branch touched only `plan`. Upsert it.
+    await db()
+      .insert(aiConfigs)
+      .values({
+        tenantId,
+        systemPrompt: DEFAULT_AI_SYSTEM_PROMPT,
+        tone: 'professional',
+        autoReplyEnabled: true,
+        chatEnabled: true,
+        modelPreference: 'auto',
+      })
+      .onConflictDoUpdate({ target: aiConfigs.tenantId, set: { chatEnabled: true } });
+    console.log('[seed]   aiConfig.chatEnabled = true');
   } else {
     const embedToken = nanoid(24);
     const [t] = await db()
