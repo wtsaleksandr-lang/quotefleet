@@ -355,6 +355,35 @@ body.qf-modal-open { overflow: hidden; }
   opacity: 1;
 }
 
+/* ── Single equipment option: static read-only label instead of a lone 1-item
+   dropdown (widget.js adds .qf-equip-single + a .qf-equip-static node, and keeps
+   the native <select> populated but hidden so calculate + meta still work). Hide
+   both the custom-select wrapper and the raw select; style the label to match a
+   filled, non-interactive input. ── */
+.qf-field.qf-equip-single .qf-cs,
+.qf-field.qf-equip-single > #qf-equipment { display: none !important; }
+.qf-equip-static {
+  display: flex;
+  align-items: center;
+  min-height: 44px;
+  padding: var(--space-1) var(--space-1-5);
+  box-sizing: border-box;
+  border: 1px solid var(--w-border);
+  border-radius: 10px;
+  background: color-mix(in srgb, var(--w-fg) 4%, transparent);
+  color: var(--w-text, var(--w-fg));
+  font-size: 12px;
+  font-weight: 600;
+  cursor: default;
+}
+
+/* ── P6: the Booking-details summary is not a positioning context, so the shared
+   absolute top-right help cue had no positioned host and floated to the page's
+   top-right corner (the stray "?" seen on the drayage layout). Restore inline
+   relative flow for just this cue so it sits after the label text and its ring
+   (::before) anchors back to the glyph. ── */
+.qf-booking-summary .qf-help { position: relative; top: auto; right: auto; }
+
 /* ── lbs / kg weight-unit toggle (Alex). Compact segmented control in the
    Weight title row; JS converts kg → lbs before the quote + LTL class. ── */
 .qf-wt-unit {
@@ -500,6 +529,13 @@ body.qf-modal-open { overflow: hidden; }
    after this file and set .qf-tabs / .qf-section-title margins with !important. */
 #qf-root.qf-ltl-mode #qf-services { margin-bottom: var(--space-1-5) !important; }
 #qf-root.qf-ltl-mode .qf-addr-title { margin-top: 0 !important; }
+
+/* A single configured service has nothing to choose — renderServices hides the
+   #qf-services bar inline, but body.qf-app-calculator forces .qf-tabs to
+   display:grid !important, so mirror the qf-ltl-mode precedent with an id-level
+   !important rule that actually wins. The bar's own margin goes with it (the row
+   is display:none), so no leading gap remains under the tabs. */
+#qf-root.qf-single-service #qf-services { display: none !important; }
 
 /* (2) Smaller in-field titles (placeholders) + values across the widget. */
 .qf-widget .qf-input,

@@ -558,7 +558,9 @@
     var t = ltlTotals();
     var kg = Math.round(t.weightLbs / LB_PER_KG);
     var wEl = $('qf-ltl-sum-weight'); if (wEl) wEl.textContent = t.weightLbs > 0 ? (t.weightLbs.toLocaleString() + ' lb / ' + kg.toLocaleString() + ' kg') : '—';
-    var pEl = $('qf-ltl-sum-pieces'); if (pEl) pEl.textContent = t.pieces > 0 ? String(t.pieces) : '0';
+    // Gate Pieces like the other summary cells: until a real item with weight
+    // exists it shows "—", not the default item's bogus "1" on an empty form.
+    var pEl = $('qf-ltl-sum-pieces'); if (pEl) pEl.textContent = (t.weightLbs > 0 && t.pieces > 0) ? String(t.pieces) : '—';
     var cEl = $('qf-ltl-sum-class'); if (cEl) cEl.textContent = t.cls ? ('Class ' + t.cls) : '—';
     autoResize();
   }
@@ -638,6 +640,12 @@
       btn.dataset.service = s;
       wrap.appendChild(btn);
     });
+    // A single service has nothing to choose — hide the whole selector bar (a lone
+    // pill looks pointless) but still select it so the rest of the flow works. The
+    // qf-single-service root class lets CSS collapse any gap the hidden bar leaves.
+    var single = services.length <= 1;
+    wrap.style.display = single ? 'none' : '';
+    var root = $('qf-root'); if (root) root.classList.toggle('qf-single-service', single);
     selectService(services[0]);
   }
 
@@ -651,6 +659,24 @@
     equip.forEach(function (e) { var opt = document.createElement('option'); opt.value = e.value; opt.textContent = normalizeEquipmentLabel(e.label || e.value, service); sel.appendChild(opt); });
     state.equipment = equip[0] ? equip[0].value : null;
     sel.onchange = function () { state.equipment = sel.value; syncOogPanel(); };
+    // A single equipment option has nothing to choose — show a static read-only
+    // label instead of a lone 1-item dropdown. The native <select> stays
+    // populated (hidden via CSS) so calculate + the estimate meta still read the
+    // value. Drayage pads to 4 options, so it always keeps the real dropdown.
+    var eqField = sel.closest && sel.closest('.qf-field');
+    if (eqField) {
+      var single = equip.length <= 1;
+      var staticEl = eqField.querySelector('.qf-equip-static');
+      if (single) {
+        if (!staticEl) { staticEl = el('div', { class: 'qf-equip-static' }); eqField.appendChild(staticEl); }
+        staticEl.textContent = equip[0] ? normalizeEquipmentLabel(equip[0].label || equip[0].value, service) : '—';
+        staticEl.style.display = '';
+        eqField.classList.add('qf-equip-single');
+      } else {
+        if (staticEl) staticEl.style.display = 'none';
+        eqField.classList.remove('qf-equip-single');
+      }
+    }
     renderAccessorials(state.config.accessorials);
     var isDrayage = service === 'drayage';
     var drayPickup = $('qf-drayage-pickup');
@@ -984,9 +1010,26 @@
 
   function renderResult(resp) {
     var r = resp.result;
+    // Guard the degenerate $0 / empty result. A total that isn't a positive
+    // number has no actionable price, so show the same contact fallback the
+    // `unsupported` path uses instead of a $0 hero + "Get this quote" CTA.
+    if (!(r && r.total > 0)) {
+      var c = (state.config && state.config.contact) || {};
+      var reach = c.phone ? ('call ' + c.phone) : (c.email ? ('email ' + c.email) : 'contact us');
+      showError('qf-error', 'We couldn’t price this lane automatically — please ' + reach + ' and the team will quote it directly.');
+      $('qf-result').style.display = 'none';
+      autoResize();
+      return;
+    }
     animateNumber($('qf-total'), r.total, fmtMoney, 750);
     var serviceLabel = SERVICE_LABELS[state.service] || (state.service ? titleizeWord(state.service) : 'Truck');
-    var metaText = 'Approx. ' + Math.round(resp.miles) + ' mi · ' + serviceLabel + ' · ' + friendlyEquipmentLabel();
+    // Omit the "Approx. 0 mi" fragment when miles is falsy — a zero-mile lead-in
+    // reads as broken; the service + equipment meta still render.
+    var metaParts = [];
+    if (resp.miles) metaParts.push('Approx. ' + Math.round(resp.miles) + ' mi');
+    metaParts.push(serviceLabel);
+    metaParts.push(friendlyEquipmentLabel());
+    var metaText = metaParts.join(' · ');
     if (r.ltl && r.ltl.freightClass) metaText += ' · Class ' + r.ltl.freightClass;
     $('qf-meta').textContent = metaText;
     var eta = $('qf-eta');
@@ -997,7 +1040,12 @@
       } else { eta.textContent = ''; eta.style.display = 'none'; }
     }
     var lines = $('qf-lines'); lines.innerHTML = '';
-    r.lines.forEach(function (l) { var row = el('div', { class: 'line' }, [el('span', { class: 'name', text: l.name }), el('span', { class: 'amt', text: '$' + fmtMoney(l.amount) })]); lines.appendChild(row); });
+    // Suppress a single line item that merely restates the total (a lone
+    // "Line haul $X" directly above "Total $X") — show only the Total row.
+    var onlyLine = (r.lines || []).length === 1 && Math.abs((r.lines[0].amount || 0) - r.total) < 0.005;
+    if (!onlyLine) {
+      r.lines.forEach(function (l) { var row = el('div', { class: 'line' }, [el('span', { class: 'name', text: l.name }), el('span', { class: 'amt', text: '$' + fmtMoney(l.amount) })]); lines.appendChild(row); });
+    }
     var totalRow = el('div', { class: 'line total-row' }, [el('span', { class: 'name', text: 'Total' }), el('span', { class: 'amt', text: '$' + fmtMoney(r.total) })]);
     lines.appendChild(totalRow);
     renderDisclaimer();
