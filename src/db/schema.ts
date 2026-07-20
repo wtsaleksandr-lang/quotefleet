@@ -163,6 +163,17 @@ export const tenants = pgTable(
         radiusMiles?: number;
         baseCity?: string | null;
       };
+      /** Quoting rules answered in the wizard, recorded for provenance/AI
+       *  context. The AUTHORITATIVE values live in the tenant columns
+       *  (`fscMode`, `accessMode`) — this is a record of what was chosen
+       *  during onboarding, not a second source of truth. */
+      fscMode?: 'manual' | 'auto';
+      /** The fixed percentage chosen with fscMode 'manual'. There is no
+       *  tenant-level FSC column — manual mode reads each rate card's
+       *  `fuelSurchargePct`, which onboarding writes across the board — so
+       *  this is the only record of the single number they typed. */
+      fscPercent?: number;
+      accessMode?: 'public' | 'private';
     }>(),
     /** Optional per-tenant Anthropic API key (encrypted). When set,
      *  overrides the platform default for that tenant's AI calls. */

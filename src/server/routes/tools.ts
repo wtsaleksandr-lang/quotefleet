@@ -174,6 +174,11 @@ export function registerToolsRoutes(app: Express) {
       selectedAccessorialCodes: body.selectedAccessorialCodes,
       flags: body.flags,
     };
+    // Platform-level public tool — there is no tenant here, so there is no
+    // carrier currency to inherit. The PLATFORM_* rate cards are authored in
+    // USD, so USD (the engine default) is the correct label. Do NOT derive a
+    // currency from the shipment's country: that would relabel USD-priced
+    // benchmark rates as CAD without converting them.
     const result = calculate(PLATFORM_RATE_CARDS, PLATFORM_ACCESSORIALS, PLATFORM_LANE_ZONES, calcReq);
 
     // Pull a benchmark — "the market median for this lane is $X" — from

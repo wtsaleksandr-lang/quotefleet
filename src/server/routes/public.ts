@@ -28,7 +28,7 @@ import {
   callbackRequests,
 } from '../../db/schema.js';
 import express from 'express';
-import { calculate, customerFacingLines, MAX_QUOTABLE_WEIGHT_LBS, type CalcRequest, type FscOptions } from '../../calc/engine.js';
+import { calculate, currencyForCountry, customerFacingLines, MAX_QUOTABLE_WEIGHT_LBS, type CalcRequest, type FscOptions } from '../../calc/engine.js';
 import { resolveFscForTenant, asOfLabel } from '../../eia/dieselPrice.js';
 import { estimateTransit } from '../../calc/transit.js';
 import { distanceBetween } from '../../calc/distance.js';
@@ -40,6 +40,8 @@ import {
   leadNotificationEmail,
   callbackRequestedEmail,
   bookingAcceptedEmail,
+  formatEmailMoney,
+  type QuoteCurrency,
 } from '../../email/templates.js';
 import { loadEnv } from '../../config.js';
 import { getTrialState } from '../trialGating.js';
@@ -464,6 +466,9 @@ export function registerPublicRoutes(app: Express) {
       deliveryTerminalCode: body.delivery.terminalCode,
       selectedAccessorialCodes: body.selectedAccessorialCodes,
       flags: body.flags,
+      // Label only — the carrier priced their rate cards in their own
+      // currency, so we tag the quote with it and never convert any amount.
+      currency: currencyForCountry(tenant.countryFocus),
     };
     const fsc = await fscOptionsForTenant(tenant);
     const result = calculate(cards, accs, zones, calcReq, terms, fsc);
@@ -668,6 +673,8 @@ export function registerPublicRoutes(app: Express) {
       deliveryTerminalCode: body.delivery.terminalCode,
       selectedAccessorialCodes: body.selectedAccessorialCodes,
       flags: body.flags,
+      // Label only — see the quote endpoint above. No FX conversion happens.
+      currency: currencyForCountry(tenant.countryFocus),
     };
     const fsc = await fscOptionsForTenant(tenant);
     const calc = calculate(cards, accs, zones, calcReq, terms, fsc);
@@ -738,7 +745,9 @@ export function registerPublicRoutes(app: Express) {
           note: l.note,
         })),
         quotedTotal: calc.total,
-        quotedCurrency: 'USD',
+        // Persist the currency the quote was actually priced in (from the
+        // carrier's countryFocus) rather than leaning on the column default.
+        quotedCurrency: calc.currency,
         sourceUrl,
         sourceIp,
         userAgent: req.headers['user-agent'] ?? null,
@@ -801,18 +810,22 @@ export function registerPublicRoutes(app: Express) {
         : body.customerPhone
           ? `(${body.customerPhone})`
           : '(no contact info provided)';
+      // Currency LABEL for this quote — the calc already priced it in the
+      // carrier's own currency; formatting never converts or alters the amount.
+      const notifyTotal = formatEmailMoney(calc.total, calc.currency);
       const notifyResult = await sendEmail({
         to: tenant.contactEmail,
-        subject: `New lead ${refId} ($${calc.total.toFixed(2)}) — ${body.customerName}`,
+        subject: `New lead ${refId} (${notifyTotal}) — ${body.customerName}`,
         text:
           `New quote request from ${body.customerName} ${contactLine}.\n` +
           `Lane: ${body.pickup.city ?? '?'} → ${body.delivery.city ?? '?'} (${dist.miles} mi)\n` +
           `Equipment: ${body.equipment}\n` +
-          `Total: $${calc.total.toFixed(2)}\n\n` +
+          `Total: ${notifyTotal}\n\n` +
           `View in dashboard: ${loadEnv().PUBLIC_BASE_URL}/app/leads/${refId}`,
         html: leadNotificationEmail({
           refId,
-          total: `$${calc.total.toFixed(2)}`,
+          total: notifyTotal,
+          currency: calc.currency,
           customerName: body.customerName,
           contactLine,
           customerEmail: body.customerEmail || null,
@@ -1054,7 +1067,14 @@ export function registerPublicRoutes(app: Express) {
       )[0];
       const bookingCfg = resolveBookingConfig(acceptBrand ?? null);
       const deposit = computeDeposit(Number(lead.quotedTotal ?? 0), bookingCfg);
-      const depositLabel = deposit > 0 ? `$${deposit.toFixed(2)}` : null;
+      // Currency LABEL for this booking. There is no fresh calc on this path —
+      // the quote was priced (and its currency frozen) when the lead was
+      // created — so the stored `lead.quotedCurrency` is the only correct
+      // source. The column is `text` with a 'USD' default, so narrow it here;
+      // anything unrecognised falls back to USD rather than inventing a symbol.
+      const bookingCurrency: QuoteCurrency = lead.quotedCurrency === 'CAD' ? 'CAD' : 'USD';
+      const depositLabel = deposit > 0 ? formatEmailMoney(deposit, bookingCurrency) : null;
+      const bookingTotalLabel = formatEmailMoney(Number(lead.quotedTotal ?? 0), bookingCurrency);
 
       // Append the customer's booking note without clobbering dispatcher notes.
       const bookingNote = [
@@ -1085,7 +1105,7 @@ export function registerPublicRoutes(app: Express) {
           const lines = [
             `${lead.customerName || 'A customer'} accepted quote ${refId} and requested booking.`,
             `Contact: ${contactLine}`,
-            `Total: $${Number(lead.quotedTotal ?? 0).toFixed(2)}`,
+            `Total: ${bookingTotalLabel}`,
             depositLabel ? `Deposit to book: ${depositLabel} (${bookingCfg.depositType})` : '',
             `Lane: ${lead.pickupCity ?? '?'} → ${lead.deliveryCity ?? '?'}`,
             body.preferredDate ? `Requested pickup/date: ${body.preferredDate}` : '',
@@ -1101,7 +1121,8 @@ export function registerPublicRoutes(app: Express) {
               refId,
               customerName: lead.customerName || 'A customer',
               contactLine,
-              total: `$${Number(lead.quotedTotal ?? 0).toFixed(2)}`,
+              total: bookingTotalLabel,
+              currency: bookingCurrency,
               deposit: depositLabel,
               laneFrom: lead.pickupCity ?? '?',
               laneTo: lead.deliveryCity ?? '?',
@@ -1152,6 +1173,13 @@ export function registerPublicRoutes(app: Express) {
           .join(', '),
         miles: lead.distanceMiles,
         total: lead.quotedTotal,
+        // The hosted quote page (public/quote.js) formats EVERY figure with
+        // money(n, data.quote.currency). Without this field it fell back to USD
+        // and rendered a CAD quote as a mix of server-side "CA$" (quoteDoc.ts,
+        // which reads lead.quotedCurrency) and client-side bare "$" — visibly
+        // broken on a customer-facing page. Send the stored currency so the
+        // whole page agrees.
+        currency: lead.quotedCurrency,
         breakdown: lead.breakdownJson,
         aiSummary: lead.aiSummary,
         createdAt: lead.createdAt,

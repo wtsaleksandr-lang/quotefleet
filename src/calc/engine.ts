@@ -8,7 +8,9 @@
  *     would happen if I changed X" without writing to the DB)
  *
  * Inputs: tenant rate config (rate cards + accessorials) + a request.
- * Output: line-itemised breakdown + total. Always USD for now.
+ * Output: line-itemised breakdown + total, labelled in the carrier's own
+ * currency (req.currency, derived from their countryFocus). The engine never
+ * converts — the carrier priced their rate cards in that currency already.
  *
  * Logic order (top-to-bottom, each step adds to running total):
  *   1. Linehaul   = max(miles × ratePerMile + flatFee, minimumCharge)
@@ -41,10 +43,28 @@ import {
  */
 export const MAX_QUOTABLE_WEIGHT_LBS = 80000;
 
+/**
+ * Currency the carrier prices in.
+ *
+ * IMPORTANT: this LABELS the quote, it never converts it. A Canadian carrier
+ * types Canadian dollars into their rate cards; we must render "CA$2,450.00",
+ * not silently call it USD (which is what happened before — the engine
+ * hard-coded 'USD' on every return path) and never apply an FX rate to a
+ * number the carrier already priced.
+ */
+export type Currency = 'USD' | 'CAD';
+
+/** Country focus → the currency that carrier quotes in. */
+export function currencyForCountry(country?: string | null): Currency {
+  return String(country ?? '').trim().toUpperCase() === 'CA' ? 'CAD' : 'USD';
+}
+
 export interface CalcRequest {
   service: string; // 'drayage' | 'ftl' | 'ltl' | ...
   equipment: string; // 'dryvan' | 'container_40hc' | ...
   miles: number;
+  /** Carrier's pricing currency (label only — see Currency). Defaults USD. */
+  currency?: Currency;
   weightLbs?: number;
   pieces?: number;
   /** LTL: shipment dimensions (inches) — required to derive freight class. */
@@ -108,7 +128,7 @@ export interface CalcResult {
   fuelSurcharge: number;
   margin: number;
   total: number;
-  currency: 'USD';
+  currency: Currency;
   /** Set when no rate card / lane zone matches the request. */
   unsupported?: { reason: string };
   /** LTL only: the size/weight rating basis behind the price (credibility). */
@@ -324,7 +344,7 @@ export function calculate(
       fuelSurcharge: 0,
       margin: 0,
       total: 0,
-      currency: 'USD',
+      currency: req.currency ?? 'USD',
       unsupported: {
         reason:
           `No rate card configured for service "${req.service}" with equipment "${req.equipment}". ` +
@@ -349,7 +369,7 @@ export function calculate(
       fuelSurcharge: 0,
       margin: 0,
       total: 0,
-      currency: 'USD',
+      currency: req.currency ?? 'USD',
       unsupported: {
         reason:
           `This lane is about ${Math.round(req.miles)} miles, beyond the ${Math.round(card.maxMiles)}-mile range for ${req.service.toUpperCase()} ${req.equipment}. ` +
@@ -386,7 +406,7 @@ export function calculate(
       fuelSurcharge: 0,
       margin: 0,
       total: 0,
-      currency: 'USD',
+      currency: req.currency ?? 'USD',
       unsupported: {
         reason:
           `This load is about ${Math.round(req.weightLbs).toLocaleString('en-US')} lb, beyond the ${Math.round(card.maxWeightLbs).toLocaleString('en-US')}-lb capacity for ${req.service.toUpperCase()} ${req.equipment}. ` +
@@ -587,7 +607,7 @@ export function calculate(
     fuelSurcharge: fuel,
     margin,
     total,
-    currency: 'USD',
+    currency: req.currency ?? 'USD',
     ...(ltlRating ? { ltl: ltlRating } : {}),
   };
 }

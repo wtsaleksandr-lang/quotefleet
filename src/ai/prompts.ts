@@ -2,9 +2,14 @@
  * Prompt templates used across the three AI agents.
  */
 import type { Tenant, AiConfig } from '../db/schema.js';
+import { carrierContextSection } from './carrierContext.js';
+import { currencyInstructionSection, type QuoteCurrency } from './quoteCurrency.js';
 
 export function rateAdjusterSystemPrompt(tenant: Tenant, ai: AiConfig | null): string {
   const tenantPrompt = ai?.systemPrompt ?? '';
+  // '' for any tenant who skipped or predates the onboarding wizard, so their
+  // prompt is unchanged.
+  const carrier = carrierContextSection(tenant);
   return `You are the dedicated AI rate-card assistant for ${tenant.name} (slug: ${tenant.slug}).
 
 Your job: when the carrier types instructions in plain English, translate them into precise updates to their rate cards, accessorials, and lane zones. You have tools available — use them.
@@ -20,13 +25,22 @@ Rules:
 - Never invent fuel surcharge values without confirming the EIA diesel index source.
 
 Carrier's own AI persona / context (use this to set tone):
-${tenantPrompt}
+${tenantPrompt}${carrier}
 
 You are running inside a webapp; the user can see your tool calls in a side panel.`;
 }
 
-export function leadReplySystemPrompt(tenant: Tenant, ai: AiConfig | null): string {
+export function leadReplySystemPrompt(
+  tenant: Tenant,
+  ai: AiConfig | null,
+  /** Currency this specific quote was priced in. Labelling only — the model is
+   *  told which symbol to write, never to change an amount. Defaults to USD so
+   *  existing callers keep the prompt they had. */
+  currency: QuoteCurrency = 'USD'
+): string {
   const tenantPrompt = ai?.systemPrompt ?? '';
+  const carrier = carrierContextSection(tenant);
+  const money = currencyInstructionSection(currency);
   return `You write the FIRST EMAIL REPLY to an inbound quote request received by ${tenant.name}.
 
 The customer just used the instant-quote calculator on ${tenant.name}'s website. We have:
@@ -45,13 +59,22 @@ Your reply should:
 - 6-12 lines max. Get to the price fast.
 
 Carrier's own AI persona / context:
-${tenantPrompt}
+${tenantPrompt}${carrier}${money}
 
 Sign as: "${tenant.name}"`;
 }
 
-export function leadChatSystemPrompt(tenant: Tenant, ai: AiConfig | null): string {
+export function leadChatSystemPrompt(
+  tenant: Tenant,
+  ai: AiConfig | null,
+  /** Currency this specific quote was priced in. Labelling only — the model is
+   *  told which symbol to write, never to change an amount. Defaults to USD so
+   *  existing callers keep the prompt they had. */
+  currency: QuoteCurrency = 'USD'
+): string {
   const tenantPrompt = ai?.systemPrompt ?? '';
+  const carrier = carrierContextSection(tenant);
+  const money = currencyInstructionSection(currency, 'chat');
   return `You are the customer-service chat AI for ${tenant.name}. A customer who just received a quote is asking follow-up questions.
 
 You can:
@@ -68,5 +91,5 @@ You CANNOT:
 Tone: ${ai?.tone ?? 'professional'}, concise, never pushy. 2-4 sentence replies typically.
 
 Carrier persona / context:
-${tenantPrompt}`;
+${tenantPrompt}${carrier}${money}`;
 }

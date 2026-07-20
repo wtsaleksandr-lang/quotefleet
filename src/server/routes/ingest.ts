@@ -40,6 +40,7 @@ import { parseRateSheet, IngestUnsupportedError } from '../../ai/ingestFile.js';
 import { syncTenantToMarketplace } from '../../marketplace/sync.js';
 import {
   calculate,
+  currencyForCountry,
   customerFacingLines,
   type CalcRequest,
 } from '../../calc/engine.js';
@@ -286,6 +287,9 @@ export function registerIngestRoutes(app: Express) {
       deliveryPortCode: body.delivery.portCode,
       selectedAccessorialCodes: body.selectedAccessorialCodes,
       flags: body.flags,
+      // Label only — the draft's rates are already in the carrier's own
+      // currency, so tag the preview with it. Nothing is converted.
+      currency: currencyForCountry(req.tenant!.countryFocus),
     };
 
     // Manual-mode fuel (each draft card's own fuelSurchargePct) — the honest
@@ -571,6 +575,10 @@ export function runDraftAutoCheck(draft: {
   const { cards, accs, zones } = draftToEngineConfig(draft);
   const samples = buildAutoCheckSamples(cards, zones);
   const results: AutoCheckSampleResult[] = samples.map((s) => {
+    // No tenant in scope here — this is a pure sanity check over a parsed
+    // draft (does each service price above $0?), and the currency label is
+    // never surfaced from these results. Engine defaults to USD; that is a
+    // label on a throwaway probe, not a converted amount.
     const r = calculate(cards, accs, zones, s.request);
     if (r.unsupported) {
       return { label: s.label, service: s.request.service, ok: false, reason: r.unsupported.reason };

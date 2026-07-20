@@ -178,6 +178,54 @@ html.qf-ob-open body {
   border-color: var(--accent);
 }
 
+/* ── grouped sub-questions (quoting rules, trust details) ─────────────────────
+   A step that asks TWO things gets a small label + a left-aligned help line
+   above each group. Help/hint copy is always top-LEFT, never right-aligned. */
+.qf-ob-group-label {
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--ink);
+  text-align: left;
+  margin-bottom: var(--space-0-5);
+}
+/* The first group sits directly under the step sub-heading, which already
+   carries its own bottom margin — only later groups need the separation. */
+.qf-ob-cards + .qf-ob-group-label,
+.qf-ob-field + .qf-ob-group-label,
+.qf-ob-rates + .qf-ob-group-label {
+  margin-top: var(--space-3);
+}
+.qf-ob-hint {
+  font-size: 13px;
+  line-height: 1.5;
+  color: var(--muted);
+  text-align: left;
+  margin: 0 0 var(--space-1-5) 0;
+}
+.qf-ob-hint-error { color: var(--error); }
+
+/* Manual fuel-surcharge percentage. Narrow on desktop (it holds at most three
+   characters) but never so narrow it stops being a comfortable tap target. */
+.qf-ob-pct {
+  margin-top: var(--space-1-5);
+  max-width: 220px;
+}
+
+/* Trust details: MC + DOT pair up from 480px so neither is ever left alone on
+   a line; the email spans the full row beneath them. */
+.qf-ob-trust {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: var(--space-1-5);
+  margin-bottom: var(--space-2);
+}
+@media (min-width: 480px) {
+  .qf-ob-trust { grid-template-columns: 1fr 1fr; }
+  .qf-ob-trust-wide { grid-column: 1 / -1; }
+}
+/* The grid gap owns the rhythm here — the field's own margin would double it. */
+.qf-ob-trust .qf-ob-field { margin-bottom: 0; }
+
 /* ── lane + brand inputs ─────────────────────────────────────────────────── */
 .qf-ob-field {
   margin-bottom: var(--space-2);

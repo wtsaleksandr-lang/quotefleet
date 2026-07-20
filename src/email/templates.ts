@@ -397,10 +397,57 @@ export function leadAutoReplyEmail(opts: {
   });
 }
 
+/* ── Quote currency labelling ──────────────────────────────────────────────
+ * A quote is priced in exactly ONE currency and is never converted, so this is
+ * pure LABELLING: the amount is never touched, only the symbol in front of it.
+ *
+ * The locale is pinned to 'en-US' for EVERY currency — matching the existing
+ * precedent in src/server/routes/quoteDoc.ts. This matters: an 'en-CA' locale
+ * formats CAD as a bare "$", indistinguishable from USD to the customer
+ * reading the email. 'en-US' gives "$" for USD and "CA$" for CAD.
+ * ────────────────────────────────────────────────────────────────────────── */
+
+export type QuoteCurrency = 'USD' | 'CAD';
+
+const MONEY_LOCALE = 'en-US';
+
+function moneyFormatter(currency: QuoteCurrency | undefined): Intl.NumberFormat {
+  return new Intl.NumberFormat(MONEY_LOCALE, { style: 'currency', currency: currency || 'USD' });
+}
+
+/** Format a raw amount for an email: "$2,450.00" (USD) / "CA$2,450.00" (CAD).
+ *  Callers that build a pre-formatted total should use this rather than
+ *  hand-rolling `` `$${n.toFixed(2)}` ``, which hardcodes the US symbol. */
+export function formatEmailMoney(amount: number, currency: QuoteCurrency = 'USD'): string {
+  return moneyFormatter(currency).format(Number.isFinite(amount) ? amount : 0);
+}
+
+/** The bare symbol for a currency ("$" / "CA$"), derived from the same
+ *  formatter so it can never drift from `formatEmailMoney`. */
+function currencySymbol(currency: QuoteCurrency | undefined): string {
+  const part = moneyFormatter(currency).formatToParts(0).find((p) => p.type === 'currency');
+  return part ? part.value : '$';
+}
+
+/** Re-label an ALREADY-formatted money string for `currency`.
+ *  Templates receive totals pre-formatted by their caller (today always "$…"),
+ *  so when the quote is CAD we upgrade the bare "$" to "CA$". Digits are never
+ *  altered. Strings that carry no "$", or that are already explicitly labelled
+ *  ("CA$…", "US$…"), are returned untouched. */
+function labelMoney(total: string, currency?: QuoteCurrency): string {
+  const c = currency ?? 'USD';
+  if (c === 'USD') return total;
+  if (!total.includes('$')) return total;
+  if (/[A-Za-z]{2,3}\s*\$/.test(total)) return total;
+  return total.replace('$', currencySymbol(c));
+}
+
 /* ── Lead notification (carrier-facing) ────────────────────────────────── */
 export function leadNotificationEmail(opts: {
   refId: string;
   total: string;
+  /** Currency the quote was priced in. Labelling only — defaults to USD. */
+  currency?: QuoteCurrency;
   customerName: string;
   contactLine: string;
   /** Customer contact channels — when present, render "Email"/"Call" CTAs
@@ -415,13 +462,14 @@ export function leadNotificationEmail(opts: {
   /** Absolute route-map proxy URL; rendered under the lane details when present. */
   mapUrl?: string;
 }): string {
+  const total = labelMoney(opts.total, opts.currency);
   const inner =
     eyebrow('New lead') +
-    heading(`New quote request — ${opts.total}`) +
+    heading(`New quote request — ${total}`) +
     paragraph(`<strong style="color:${BRAND.ink};">${escape(opts.customerName)}</strong> ${escape(opts.contactLine)} just requested a quote.`) +
     detailBox([
       ['Quote', opts.refId],
-      ['Total', opts.total],
+      ['Total', total],
       ['Lane', `${opts.laneFrom} → ${opts.laneTo}${opts.miles ? ` (${opts.miles} mi)` : ''}`],
       ['Equipment', opts.equipment ?? null],
     ]) +
@@ -434,7 +482,7 @@ export function leadNotificationEmail(opts: {
       ],
     );
   return shell({
-    preheader: `${opts.customerName} — ${opts.laneFrom} → ${opts.laneTo} — ${opts.total}`,
+    preheader: `${opts.customerName} — ${opts.laneFrom} → ${opts.laneTo} — ${total}`,
     inner,
   });
 }
@@ -480,6 +528,8 @@ export function bookingAcceptedEmail(opts: {
   customerName: string;
   contactLine: string;
   total: string;
+  /** Currency the quote was priced in. Labelling only — defaults to USD. */
+  currency?: QuoteCurrency;
   /** Deposit to book (e.g. "$150.00"), or null when no deposit is configured. */
   deposit?: string | null;
   laneFrom: string;
@@ -489,14 +539,15 @@ export function bookingAcceptedEmail(opts: {
   note?: string | null;
   dashboardUrl: string;
 }): string {
+  const total = labelMoney(opts.total, opts.currency);
   const inner =
     eyebrow('Booking requested') +
     heading(`${opts.customerName} accepted the quote`) +
     paragraph(`Quote <strong style="color:${BRAND.ink};">${escape(opts.refId)}</strong> was accepted and a booking was requested.`) +
     detailBox([
       ['Contact', opts.contactLine],
-      ['Total', opts.total],
-      ['Deposit to book', opts.deposit ?? null],
+      ['Total', total],
+      ['Deposit to book', opts.deposit ? labelMoney(opts.deposit, opts.currency) : null],
       ['Lane', `${opts.laneFrom} → ${opts.laneTo}`],
       ['Requested date', opts.preferredDate ?? null],
       ['Ready by', opts.readyByTime ?? null],
@@ -504,7 +555,7 @@ export function bookingAcceptedEmail(opts: {
     ]) +
     ctaButton('View in dashboard', opts.dashboardUrl);
   return shell({
-    preheader: `${opts.customerName} accepted quote ${opts.refId} — ${opts.total}`,
+    preheader: `${opts.customerName} accepted quote ${opts.refId} — ${total}`,
     inner,
   });
 }
@@ -693,8 +744,13 @@ interface FollowUpArgs {
   quoteUrl: string;
   laneFrom: string;
   laneTo: string;
-  /** Pre-formatted, currency-styled total, e.g. "$2,450.00". */
+  /** Pre-formatted, currency-styled total, e.g. "$2,450.00" / "CA$2,450.00".
+   *  Build it with `formatEmailMoney(amount, currency)`. */
   total: string;
+  /** Currency the quote was priced in. Labelling only — defaults to USD.
+   *  When set to 'CAD', a total that arrives with a bare "$" is re-labelled
+   *  "CA$" so a Canadian customer is never shown an ambiguous symbol. */
+  currency?: QuoteCurrency;
   unsubscribeUrl: string;
 }
 
@@ -719,20 +775,21 @@ function withPromo(quoteUrl: string, promoCode: string): string {
 /* ── FU1 — the gentle nudge ─────────────────────────────────────────────── */
 export function followupNudgeEmail(opts: FollowUpArgs): { subject: string; html: string } {
   const subject = `Still planning that shipment, ${opts.customerName}?`;
+  const total = labelMoney(opts.total, opts.currency);
   const inner =
     eyebrow(`Quote ${opts.refId}`) +
     heading('Your quote is ready when you are') +
     paragraph(`Hi ${escape(opts.customerName)}, just circling back — your ${escape(opts.brandName)} quote is saved and the price below is locked in. Whenever you're ready to move, you're one click from booking.`) +
     detailBox([
       ['Lane', `${opts.laneFrom} → ${opts.laneTo}`],
-      ['Your locked total', opts.total],
+      ['Your locked total', total],
     ]) +
     ctaButton('View your quote', opts.quoteUrl) +
     paragraph(`<span style="color:${BRAND.muted};">Questions about the lane, timing, or accessorials? Just reply to this email — a real person will help.</span>`);
   return {
     subject,
     html: shell({
-      preheader: `Your ${opts.brandName} quote ${opts.refId} is saved — ${opts.total}`,
+      preheader: `Your ${opts.brandName} quote ${opts.refId} is saved — ${total}`,
       inner,
       brand: { name: opts.brandName, logoUrl: opts.brandLogoUrl },
       unsubscribeUrl: opts.unsubscribeUrl,
@@ -743,20 +800,21 @@ export function followupNudgeEmail(opts: FollowUpArgs): { subject: string; html:
 /* ── FU2 — the reminder (more urgency, no discount) ─────────────────────── */
 export function followupReminderEmail(opts: FollowUpArgs): { subject: string; html: string } {
   const subject = `Your ${opts.brandName} quote ${opts.refId} is still held.`;
+  const total = labelMoney(opts.total, opts.currency);
   const inner =
     eyebrow(`Quote ${opts.refId}`) +
     heading('This rate is still honored — for now') +
     paragraph(`Freight rates move with the market, but we're still holding the price we quoted you. Lock it in before capacity or fuel shifts it.`) +
     detailBox([
       ['Lane', `${opts.laneFrom} → ${opts.laneTo}`],
-      ['Held total', opts.total],
+      ['Held total', total],
     ]) +
     ctaButton('Book this shipment', opts.quoteUrl) +
     paragraph(`<span style="color:${BRAND.muted};">Need to adjust the pickup date, equipment, or stops? Reply and we'll re-quote in minutes.</span>`);
   return {
     subject,
     html: shell({
-      preheader: `We're still holding your ${opts.total} rate on ${opts.laneFrom} → ${opts.laneTo}`,
+      preheader: `We're still holding your ${total} rate on ${opts.laneFrom} → ${opts.laneTo}`,
       inner,
       brand: { name: opts.brandName, logoUrl: opts.brandLogoUrl },
       unsubscribeUrl: opts.unsubscribeUrl,
@@ -778,10 +836,11 @@ export function followupDiscountEmail(
     throw new Error('followupDiscountEmail requires a non-empty promoCode and a positive percentOff');
   }
   const subject = `A discount on your ${opts.brandName} quote — code ${code}.`;
+  const total = labelMoney(opts.total, opts.currency);
   const inner =
     eyebrow(`${pct}% off`) +
     heading(`Here's ${pct}% off to get you rolling`) +
-    paragraph(`We'd love to move your load on ${escape(opts.laneFrom)} → ${escape(opts.laneTo)}. Use the code below at checkout for ${pct}% off your ${escape(opts.total)}.`) +
+    paragraph(`We'd love to move your load on ${escape(opts.laneFrom)} → ${escape(opts.laneTo)}. Use the code below at checkout for ${pct}% off your ${escape(total)}.`) +
     codeChip(code) +
     ctaButton(`Claim ${pct}% off`, withPromo(opts.quoteUrl, code)) +
     paragraph(`<span style="color:${BRAND.muted};">Apply <strong style="color:${BRAND.inkSoft};">${escape(code)}</strong> at checkout, or just tap the button above and it's added for you.</span>`);

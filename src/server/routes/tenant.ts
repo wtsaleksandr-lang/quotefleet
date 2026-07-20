@@ -1191,6 +1191,31 @@ export function registerTenantRoutes(app: Express) {
       })
       .nullable()
       .optional(),
+    /** Quoting rules (wizard step 3). Every field below is OPTIONAL so the Skip
+     *  path and older clients keep working — an omitted field NEVER overwrites
+     *  the tenant's current value. */
+    /** 'auto' derives the fuel surcharge from the EIA diesel index; 'manual'
+     *  keeps the fixed per-rate-card percentage. → tenants.fscMode */
+    fscMode: z.enum(['manual', 'auto']).optional(),
+    /** Only meaningful with fscMode 'manual'. There is no tenant-level FSC
+     *  percentage column — manual mode reads each rate card's
+     *  fuel_surcharge_pct — so this is written across the tenant's rate cards.
+     *  Ignored when fscMode is not 'manual'. */
+    fscPercent: z.number().min(0).max(100).optional(),
+    /** 'public' = prices shown instantly; 'private' = invite/lead-gated (the
+     *  only two values src/server/access.ts recognises). → tenants.accessMode */
+    accessMode: z.enum(['public', 'private']).optional(),
+    /** OPTIONAL trust details (wizard step 5), all shown on customer-facing
+     *  surfaces. Empty string is accepted and normalised to null so clearing a
+     *  field is possible; omitting the key leaves the column untouched. */
+    mcNumber: z.string().max(40).nullable().optional(),
+    dotNumber: z.string().max(40).nullable().optional(),
+    /** PUBLIC contact address — never seeded from the operator's login email
+     *  (tenants.contactEmail), which must stay private. */
+    publicContactEmail: z
+      .union([z.string().email().max(160), z.literal('')])
+      .nullable()
+      .optional(),
   });
 
   app.post('/api/tenant/onboarding/apply', requireAuth, requireTenant, async (req, res) => {
@@ -1255,6 +1280,28 @@ export function registerTenantRoutes(app: Express) {
     // rates, or already completed onboarding once, keeps every row.
     const doReseed = !alreadyCompleted && pristine;
 
+    // Quoting rules + trust details. Each is applied ONLY when the client
+    // actually sent it, so an older wizard, a partial payload, or the Skip path
+    // never clobbers a value the carrier set elsewhere in Settings.
+    const norm = (v: string | null | undefined): string | null =>
+      ((v ?? '').trim() || null);
+    const settingsPatch: Partial<typeof tenants.$inferInsert> = {};
+    if (body.fscMode !== undefined) settingsPatch.fscMode = body.fscMode;
+    if (body.accessMode !== undefined) settingsPatch.accessMode = body.accessMode;
+    if (body.mcNumber !== undefined) settingsPatch.mcNumber = norm(body.mcNumber);
+    if (body.dotNumber !== undefined) settingsPatch.dotNumber = norm(body.dotNumber);
+    if (body.publicContactEmail !== undefined) {
+      settingsPatch.publicContactEmail = norm(body.publicContactEmail);
+    }
+
+    // A manual fuel surcharge has NO tenant-level column: manual mode reads each
+    // rate card's fuel_surcharge_pct (see tenants.fscMode in schema.ts). So the
+    // one percentage the carrier typed is written across their rate cards.
+    // Only when they explicitly picked manual AND supplied a number — on 'auto'
+    // the EIA index owns the surcharge and these columns are left alone.
+    const manualFscPct =
+      body.fscMode === 'manual' && body.fscPercent !== undefined ? body.fscPercent : null;
+
     await db().transaction(async (tx) => {
       if (doReseed) {
         await tx.delete(rateCards).where(eq(rateCards.tenantId, tid));
@@ -1271,6 +1318,14 @@ export function registerTenantRoutes(app: Express) {
         if (template.laneZones.length > 0) {
           await tx.insert(laneZones).values(template.laneZones.map((z) => ({ ...z, tenantId: tid })));
         }
+      }
+
+      // Runs AFTER the reseed so it lands on the rows the tenant actually keeps.
+      if (manualFscPct !== null) {
+        await tx
+          .update(rateCards)
+          .set({ fuelSurchargePct: manualFscPct, updatedAt: new Date() })
+          .where(eq(rateCards.tenantId, tid));
       }
 
       // Brand: colors are free for everyone; a custom logo is a Vital+ perk, so
@@ -1312,7 +1367,11 @@ export function registerTenantRoutes(app: Express) {
                   baseCity: body.serviceArea.baseCity ?? null,
                 }
               : undefined,
+            fscMode: body.fscMode,
+            fscPercent: manualFscPct ?? undefined,
+            accessMode: body.accessMode,
           },
+          ...settingsPatch,
           updatedAt: new Date(),
         })
         .where(eq(tenants.id, tid));
@@ -1328,6 +1387,16 @@ export function registerTenantRoutes(app: Express) {
           pricingMode,
           serviceArea: body.serviceArea?.kind ?? null,
           reseeded: doReseed,
+          fscMode: body.fscMode ?? null,
+          fscPercent: manualFscPct,
+          accessMode: body.accessMode ?? null,
+          // Whether they were set — never the values, which are tenant PII-ish
+          // contact details already stored on the row itself.
+          trustDetails: {
+            mcNumber: settingsPatch.mcNumber != null,
+            dotNumber: settingsPatch.dotNumber != null,
+            publicContactEmail: settingsPatch.publicContactEmail != null,
+          },
         },
       });
     });
@@ -1340,6 +1409,8 @@ export function registerTenantRoutes(app: Express) {
       freightVertical: primaryVertical,
       freightVerticals: selectedVerticals,
       pricingMode,
+      fscMode: body.fscMode ?? null,
+      accessMode: body.accessMode ?? null,
     });
   });
 }

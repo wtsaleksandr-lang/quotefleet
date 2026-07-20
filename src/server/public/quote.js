@@ -249,16 +249,19 @@
     }
   }
 
-  function accessorialAmount(a) {
+  // `currency` is the quote's own currency (data.quote.currency) — accessorial
+  // rate units must wear the SAME label as the totals, never a hardcoded US $.
+  function accessorialAmount(a, currency) {
     if (a.amount == null) return '';
     if (a.kind === 'pct_of_base') return Number(a.amount).toFixed(1) + '%';
-    if (a.kind === 'per_mile') return money(Number(a.amount), 'USD') + ' / mi';
-    if (a.kind === 'per_day') return money(Number(a.amount), 'USD') + ' / day';
-    if (a.kind === 'per_hour') return money(Number(a.amount), 'USD') + ' / hr';
-    return money(Number(a.amount), 'USD');
+    if (a.kind === 'per_mile') return money(Number(a.amount), currency) + ' / mi';
+    if (a.kind === 'per_day') return money(Number(a.amount), currency) + ' / day';
+    if (a.kind === 'per_hour') return money(Number(a.amount), currency) + ' / hr';
+    return money(Number(a.amount), currency);
   }
 
   function renderAccessorials(data) {
+    var currency = data.quote.currency;
     var selected = new Set(data.shipment.accessorialCodes || []);
     var wrap = $('qdoc-accessorials');
     wrap.innerHTML = '';
@@ -279,7 +282,7 @@
       var name = document.createElement('strong');
       name.textContent = a.label || titleize(a.code);
       var amt = document.createElement('span');
-      amt.textContent = accessorialAmount(a);
+      amt.textContent = accessorialAmount(a, currency);
       var desc = document.createElement('small');
       desc.textContent = selected.has(a.code) ? 'Included/selected on this quote' : (a.description || 'May apply if required');
       card.appendChild(name); card.appendChild(amt); card.appendChild(desc);

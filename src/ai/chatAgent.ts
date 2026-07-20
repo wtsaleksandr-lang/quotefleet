@@ -17,6 +17,13 @@ import {
 } from '../db/schema.js';
 import { complete } from './client.js';
 import { leadChatSystemPrompt } from './prompts.js';
+import { formatEmailMoney } from '../email/templates.js';
+import {
+  labelSummaryCurrency,
+  quoteCurrencySymbol,
+  resolveQuoteCurrency,
+  type QuoteCurrency,
+} from './quoteCurrency.js';
 
 export async function leadChatTurn(
   tenantId: number,
@@ -62,17 +69,28 @@ export async function leadChatTurn(
     content: h.content,
   }));
 
+  // The quote was priced in the carrier's own currency at lead-creation time,
+  // so `lead.quotedCurrency` is the only correct label for every amount in the
+  // chat. Feed it to BOTH ends: the prompt (so the model writes "CA$"), and the
+  // quote context below (so it never sees a bare "$" to copy).
+  const currency: QuoteCurrency = resolveQuoteCurrency(lead.quotedCurrency);
+
   // Quote context as system suffix.
+  // Currency LABEL only — formatEmailMoney never converts or alters the amount
+  // (same en-US locale and 2dp as the `toFixed(2)` it replaces).
   const ctx = `Quote context:
 Ref: ${lead.refId}
 Service: ${lead.service} (${lead.equipment})
 Pickup: ${[lead.pickupCity, lead.pickupState].filter(Boolean).join(', ')}
 Delivery: ${[lead.deliveryCity, lead.deliveryState].filter(Boolean).join(', ')}
 Distance: ${lead.distanceMiles ? Math.round(lead.distanceMiles) + ' mi' : 'unknown'}
-Total quoted: $${lead.quotedTotal?.toFixed(2) ?? '?'}`;
+Currency: ${currency} (label every amount with "${quoteCurrencySymbol(currency)}")
+Total quoted: ${
+    typeof lead.quotedTotal === 'number' ? formatEmailMoney(lead.quotedTotal, currency) : '?'
+  }`;
 
   const sys =
-    leadChatSystemPrompt(tenant as Tenant, ai) +
+    leadChatSystemPrompt(tenant as Tenant, ai, currency) +
     '\n\n' +
     ctx;
 
@@ -83,7 +101,15 @@ Total quoted: $${lead.quotedTotal?.toFixed(2) ?? '?'}`;
     maxTokens: 600,
   });
 
-  const reply = out.text.trim() || 'Let me check with dispatch and get back to you shortly.';
+  // Belt-and-braces: if the model wrote a bare "$" anyway, re-label it. Symbol
+  // only — no amount is ever recomputed here. This response is NOT streamed
+  // (`complete` resolves the full text), so post-formatting cannot corrupt a
+  // partial chunk. It also runs BEFORE the row is persisted: history is replayed
+  // into later turns, so an unlabelled reply stored now would be a bare "$" in
+  // the model's own context on the next turn — exactly the copy-the-input bug.
+  const reply =
+    labelSummaryCurrency(out.text.trim(), currency) ||
+    'Let me check with dispatch and get back to you shortly.';
 
   await db().insert(conversations).values({
     tenantId,

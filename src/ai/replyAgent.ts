@@ -10,6 +10,13 @@ import { tenants, aiConfigs, leads, type Tenant, type Lead } from '../db/schema.
 import { complete } from './client.js';
 import { leadReplySystemPrompt } from './prompts.js';
 import { customerFacingLines } from '../calc/engine.js';
+import { formatEmailMoney } from '../email/templates.js';
+import {
+  labelSummaryCurrency,
+  quoteCurrencySymbol,
+  resolveQuoteCurrency,
+  type QuoteCurrency,
+} from './quoteCurrency.js';
 
 export async function generateLeadReply(
   tenantId: number,
@@ -29,8 +36,13 @@ export async function generateLeadReply(
   const lead = leadRow[0];
   if (!lead) throw new Error('Lead not found');
 
-  const sys = leadReplySystemPrompt(tenant as Tenant, ai);
-  const summary = leadSummary(lead);
+  // The quote was priced in the carrier's own currency at lead-creation time,
+  // so `lead.quotedCurrency` is the only correct label for every amount in the
+  // reply. Feed it to BOTH ends: the prompt (so the model writes "CA$"), and
+  // the summary we hand the model (so it never sees a bare "$" to copy).
+  const currency: QuoteCurrency = resolveQuoteCurrency(lead.quotedCurrency);
+  const sys = leadReplySystemPrompt(tenant as Tenant, ai, currency);
+  const summary = leadSummary(lead, currency);
   const out = await complete({
     tenantId,
     system: sys,
@@ -45,10 +57,12 @@ export async function generateLeadReply(
     ],
     maxTokens: 800,
   });
-  return out.text.trim();
+  // Belt-and-braces: if the model wrote a bare "$" anyway, re-label it. Symbol
+  // only — no amount is ever recomputed here.
+  return labelSummaryCurrency(out.text.trim(), currency) ?? '';
 }
 
-function leadSummary(l: Lead): string {
+function leadSummary(l: Lead, currency: QuoteCurrency = 'USD'): string {
   const lines: string[] = [];
   lines.push(`Ref: ${l.refId}`);
   lines.push(`Customer: ${l.customerName ?? '(unnamed)'} <${l.customerEmail ?? '?'}>`);
@@ -69,14 +83,20 @@ function leadSummary(l: Lead): string {
   if (l.accessorialCodes && l.accessorialCodes.length) {
     lines.push(`Accessorials selected: ${l.accessorialCodes.join(', ')}`);
   }
-  lines.push(`Quoted total: $${l.quotedTotal?.toFixed(2) ?? '?'}`);
+  lines.push(`Currency: ${currency} (label every amount with "${quoteCurrencySymbol(currency)}")`);
+  // Currency LABEL only — formatEmailMoney never converts or alters the amount.
+  lines.push(
+    `Quoted total: ${
+      typeof l.quotedTotal === 'number' ? formatEmailMoney(l.quotedTotal, currency) : '?'
+    }`
+  );
   // Customer-facing email: fold the carrier's margin into linehaul so the
   // reply never exposes their markup (total is unchanged).
   const customerBreakdown = customerFacingLines(l.breakdownJson as Parameters<typeof customerFacingLines>[0]);
   if (customerBreakdown.length) {
     lines.push('Breakdown:');
     for (const item of customerBreakdown) {
-      lines.push(`  - ${item.name}: $${(Number(item.amount) || 0).toFixed(2)}`);
+      lines.push(`  - ${item.name}: ${formatEmailMoney(Number(item.amount) || 0, currency)}`);
     }
   }
   if (l.notes) lines.push(`Notes: ${l.notes}`);

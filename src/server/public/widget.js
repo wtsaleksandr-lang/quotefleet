@@ -23,6 +23,47 @@
     return n.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
   }
 
+  // ── Currency labelling ────────────────────────────────────────────────────
+  // A quote is priced in exactly ONE currency and is never converted, so this
+  // is pure LABELLING: the number is never touched, only the symbol in front of
+  // it changes.
+  //
+  // The locale is pinned to 'en-US' for EVERY currency — matching the existing
+  // precedent in src/server/routes/quoteDoc.ts. This matters: an 'en-CA' locale
+  // formats CAD as a bare "$", which reads as USD to the customer. 'en-US'
+  // gives "$" for USD (unchanged) and "CA$" for CAD (unmistakably Canadian).
+  var MONEY_LOCALE = 'en-US';
+
+  function moneyFormatter(code) {
+    return new Intl.NumberFormat(MONEY_LOCALE, { style: 'currency', currency: code || 'USD' });
+  }
+
+  // Currency of the quote currently on screen. Defaults to USD before the first
+  // calculate, and if an older server build omits the field.
+  function activeCurrency() {
+    return (state.quote && state.quote.result && state.quote.result.currency) || 'USD';
+  }
+
+  // The single money formatter for this widget.
+  // "$2,450.00" for USD, "CA$2,450.00" for CAD.
+  function fmtAmount(n, code) {
+    var v = (typeof n === 'number' && isFinite(n)) ? n : 0;
+    try { return moneyFormatter(code || activeCurrency()).format(v); }
+    catch (e) { return '$' + fmtMoney(v); }
+  }
+
+  // Just the symbol ("$" / "CA$"), for the hero total — which renders the
+  // symbol in its own span so the digits can count up independently.
+  function currencySymbol(code) {
+    try {
+      var parts = moneyFormatter(code || 'USD').formatToParts(0);
+      for (var i = 0; i < parts.length; i++) {
+        if (parts[i].type === 'currency') return parts[i].value;
+      }
+    } catch (e) { /* fall through */ }
+    return '$';
+  }
+
   // ── Motion helpers (premium-motion layer; widget-motion.css) ──────────────
   function prefersReduce() {
     return !!(window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches);
@@ -1255,6 +1296,11 @@
       autoResize();
       return;
     }
+    // The hero total splits the symbol into its own span so the digits can
+    // count up independently — label the symbol from the quote's currency.
+    var cur = r.currency || 'USD';
+    var curEl = $('qf-total-currency');
+    if (curEl) curEl.textContent = currencySymbol(cur);
     animateNumber($('qf-total'), r.total, fmtMoney, 750);
     var serviceLabel = SERVICE_LABELS[state.service] || (state.service ? titleizeWord(state.service) : 'Truck');
     // Omit the "Approx. 0 mi" fragment when miles is falsy — a zero-mile lead-in
@@ -1278,9 +1324,9 @@
     // "Line haul $X" directly above "Total $X") — show only the Total row.
     var onlyLine = (r.lines || []).length === 1 && Math.abs((r.lines[0].amount || 0) - r.total) < 0.005;
     if (!onlyLine) {
-      r.lines.forEach(function (l) { var row = el('div', { class: 'line' }, [el('span', { class: 'name', text: l.name }), el('span', { class: 'amt', text: '$' + fmtMoney(l.amount) })]); lines.appendChild(row); });
+      r.lines.forEach(function (l) { var row = el('div', { class: 'line' }, [el('span', { class: 'name', text: l.name }), el('span', { class: 'amt', text: fmtAmount(l.amount, cur) })]); lines.appendChild(row); });
     }
-    var totalRow = el('div', { class: 'line total-row' }, [el('span', { class: 'name', text: 'Total' }), el('span', { class: 'amt', text: '$' + fmtMoney(r.total) })]);
+    var totalRow = el('div', { class: 'line total-row' }, [el('span', { class: 'name', text: 'Total' }), el('span', { class: 'amt', text: fmtAmount(r.total, cur) })]);
     lines.appendChild(totalRow);
     renderDisclaimer();
     var resultBox = $('qf-result');
@@ -1575,7 +1621,7 @@
       field('Notes', notesIn),
     ]);
     var depositLine = deposit > 0
-      ? el('div', { class: 'qf-book-deposit', text: '$' + fmtMoney(deposit) + ' deposit to book' })
+      ? el('div', { class: 'qf-book-deposit', text: fmtAmount(deposit) + ' deposit to book' })
       : null;
     var sendBtn = el('button', { type: 'button', class: 'qf-cta qf-book-send', text: 'Request booking' });
     var status = el('div', { class: 'qf-book-status', role: 'status', 'aria-live': 'polite' });
