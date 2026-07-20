@@ -30,6 +30,36 @@ body.qf-wft .qf-chip-ico {
   color: #6E8BFF; /* periwinkle check — readable accent, not the forced cobalt */
 }
 
+/* ── Illustrative trust-badge icons (hero pills) ─────────────────────────────
+   Each hero pill leads with a circular badge holding an illustrative line-icon.
+   MANDATORY on the LEFT of the text and never wrapped/stacked below it: the
+   badge is flex:0 0 auto and the chip is nowrap, so icon+label stay one line.
+   Black/white contrast rule: on the dark hero the icon strokes are near-white
+   inside a hairline-bordered translucent disc — high contrast, clearly visible. */
+body.qf-wft .qf-hero-pills .qf-chip { padding: 4px 12px 4px 4px; gap: 8px; }
+body.qf-wft .qf-chip-badge {
+  flex: 0 0 auto;
+  width: 30px;
+  height: 30px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 999px;
+  border: 1px solid rgba(245, 252, 255, 0.28);
+  /* Darker, neutral disc so the near-white icon reads as crisp WHITE rather than
+     picking up the hero's blue backdrop through a near-transparent badge. */
+  background: rgba(9, 12, 18, 0.55);
+  color: rgba(255, 255, 255, 0.98); /* icon stroke = white for the contrast rule */
+}
+body.qf-wft .qf-chip-badge .qf-trust-ico {
+  width: 18px;
+  height: 18px;
+  display: block;
+  /* Force WHITE — several cleanup sheets colour hero SVGs #9aaeff !important;
+     the trust badges must stay black/white per the contrast requirement. */
+  color: rgba(255, 255, 255, 0.98) !important;
+}
+
 /* ── No-orphan pill/badge/chip row utility (GLOBAL, reusable) ────────────────
    Alex's global rule: a group of similar small elements (pills / badges / chips
    / buttons) must NEVER wrap so a single item sits alone on a line. Keep >=2 per
