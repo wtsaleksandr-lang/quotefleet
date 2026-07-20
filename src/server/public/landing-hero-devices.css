@@ -24,12 +24,29 @@ html body.qf-wft .visual-flow.qf-hero-media > .qf-hero-devices {
   filter: drop-shadow(0 32px 60px rgba(0, 0, 0, 0.5)) !important;
 }
 
+/* ── Bigger devices: give the media the LARGER hero column so the looped video
+   content reads clearly. cleanup.css (JS-injected last) sets the effective
+   desktop grid to `minmax(0,.9fr) minmax(380px,.72fr)` — media was the NARROW
+   column (~490px → tiny mockups). `html body` specificity + the ≥981px gate
+   out-cascade it and flip media to the dominant column. Scoped to two-column
+   desktop only; ≤980 stays single-column (cleanup's 1fr). ── */
+@media (min-width: 981px) {
+  html body.qf-wft .hero-grid {
+    grid-template-columns: minmax(0, .8fr) minmax(0, 1.19fr) !important;
+    gap: clamp(48px, 3vw, 60px) !important;
+    align-items: center !important;
+  }
+  /* Cap the copy content so its longest lines (lead + pills) end well left of
+     the enlarged device cluster — the two never touch, so no collision. */
+  html body.qf-wft .hero-copy { max-width: 450px !important; }
+}
+
 /* Laptop — reuse the `.qf-browser` window chrome; large, upper-left. */
 html body.qf-wft .qf-hero-devices > .qf-hero-laptop {
   position: absolute;
   top: 0;
   left: 0;
-  width: 80%;
+  width: 88%;
   z-index: 1;
 }
 /* Drop the component's own heavy drop-shadow so the wrapper's shadow leads
@@ -43,29 +60,44 @@ html body.qf-wft .qf-hero-devices > .qf-hero-laptop > .qf-browser {
    scale(1.2) origin center-right never pushes it past the viewport. */
 html body.qf-wft .qf-hero-devices > .qf-hero-vphone {
   position: absolute;
-  right: 2%;
-  bottom: -2%;
-  width: 25%;
+  right: 0%;
+  bottom: -3%;
+  width: 31%;
   z-index: 2;
 }
 
-/* Desktop only — 20% larger, anchored center-right: grows left + up/down into
-   the hero's whitespace while the right edge stays anchored inside the viewport.
-   transform scales the paint, not the layout box → no reflow, no page scroll. */
-@media (min-width: 641px) {
-  html body.qf-wft .visual-flow.qf-hero-media > .qf-hero-devices {
-    transform: scale(1.2) !important;
-    transform-origin: center right !important;
+/* No desktop scale transform. The device pair is now enlarged directly via the
+   wider media column + larger laptop/phone percentages, so the old center-right
+   scale(1.2) is gone — it was what pushed the laptop left into the H1 (collision)
+   and off-screen at tablet (clip). Size now comes from layout, not paint scale,
+   which keeps the mockups crisp and the copy clear. */
+
+/* Tablet (641–980px) — single-column stack (cleanup's 1fr). No scale (avoids the
+   off-screen clip); the device cluster fills a wide, centered media box so the
+   mockups stay large. Centered so laptop + phone both sit inside the viewport. */
+@media (min-width: 641px) and (max-width: 980px) {
+  html body.qf-wft .visual-flow.qf-hero-media {
+    max-width: 760px !important;
+    margin-left: auto !important;
+    margin-right: auto !important;
   }
 }
 
 /* Mobile (≤640px) — the hero reflows to a single column (title → media → lead).
-   Keep the same laptop+phone composition, scaled down to the column width
-   (mirrors how the old composite behaved); no scale transform; lighter shadow.
-   The grid column is min(92%, 100vw−32px) → stays inside the viewport. */
+   Keep the laptop+phone composition but let it fill the column and enlarge the
+   two devices so their looped content is legible; no scale transform; lighter
+   shadow. The grid column is min(94%, 100vw−24px) → stays inside the viewport. */
 @media (max-width: 640px) {
   html body.qf-wft .visual-flow.qf-hero-media {
     max-width: none !important;
+  }
+  html body.qf-wft .qf-hero-devices > .qf-hero-laptop {
+    width: 93% !important;
+  }
+  html body.qf-wft .qf-hero-devices > .qf-hero-vphone {
+    width: 34% !important;
+    right: 0% !important;
+    bottom: -4% !important;
   }
   html body.qf-wft .visual-flow.qf-hero-media > .qf-hero-devices {
     filter: drop-shadow(0 12px 24px rgba(0, 0, 0, 0.45)) !important;

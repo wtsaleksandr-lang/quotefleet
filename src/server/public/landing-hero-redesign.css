@@ -55,7 +55,7 @@ html body.qf-wft .hero h1 {
    rounded into a clean app frame on a transparent background. Enlarge it and
    ground it with a soft drop-shadow that hugs the frame's alpha (no box). ── */
 body.qf-wft .visual-flow.qf-hero-media {
-  max-width: 820px !important;
+  max-width: 960px !important;
   width: 100% !important;
   justify-self: stretch !important;
 }
@@ -142,7 +142,7 @@ body.qf-wft .hero-cta .demo-link .arr {
     flex-direction: column !important;
     align-items: stretch !important;
     gap: 24px !important;
-    width: min(92%, calc(100vw - 32px)) !important;
+    width: min(94%, calc(100vw - 24px)) !important;
   }
 
   body.qf-wft .hero-copy {
