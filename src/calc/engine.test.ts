@@ -357,6 +357,30 @@ describe('calculate', () => {
     expect(r.unsupported).toBeUndefined();
     expect(r.subtotalLinehaul).toBe(425);
   });
+
+  it('Weight guard — a load beyond card.maxWeightLbs is unsupported (a 30k-lb Sprinter must NOT price)', () => {
+    // A Sprinter van capped at 4,000 lb quoted 30,000 lb is physically
+    // impossible — the server must reject it, not silently price a bogus load.
+    const c = rateCard({ service: 'expedited', equipment: 'sprinter', maxWeightLbs: 4000, maxMiles: 3000 });
+    const r = calculate([c], [], [], req({ service: 'expedited', equipment: 'sprinter', miles: 200, weightLbs: 30000 }));
+    expect(r.unsupported).toBeDefined();
+    expect(r.unsupported?.reason).toMatch(/capacity|larger equipment|custom quote/i);
+    expect(r.total).toBe(0);
+  });
+
+  it('Weight guard — a load at/under card.maxWeightLbs still prices normally', () => {
+    const c = rateCard({ service: 'expedited', equipment: 'sprinter', maxWeightLbs: 4000, maxMiles: 3000 });
+    const r = calculate([c], [], [], req({ service: 'expedited', equipment: 'sprinter', miles: 200, weightLbs: 3500 }));
+    expect(r.unsupported).toBeUndefined();
+    expect(r.total).toBeGreaterThan(0);
+  });
+
+  it('Weight guard — a card with no maxWeightLbs (null) never blocks on weight', () => {
+    const c = rateCard({ service: 'ftl', equipment: 'dryvan', maxWeightLbs: null });
+    const r = calculate([c], [], [], req({ service: 'ftl', equipment: 'dryvan', miles: 200, weightLbs: 44000 }));
+    expect(r.unsupported).toBeUndefined();
+    expect(r.total).toBeGreaterThan(0);
+  });
 });
 
 describe('seed-template verticals — each computes a real quote with its default set', () => {

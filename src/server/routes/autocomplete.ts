@@ -161,10 +161,21 @@ interface AutocompleteSuggestion {
 }
 
 async function googleAutocomplete(q: string, apiKey: string): Promise<{ suggestions: AutocompleteSuggestion[]; provider: string }> {
+  // Postal-code queries (US ZIP "60607", ZIP+4, or a Canadian FSA start like
+  // "m5v") must NOT return street-address predictions. Under `types=geocode`
+  // Google treats a bare ZIP as a possible house number and pollutes the
+  // dropdown with rows like "60607 Juniper Ln, La Quinta CA" — whose visible
+  // label is a DIFFERENT city than the ZIP the customer meant, so the priced
+  // lane silently diverges from what they picked (server geocode lets the ZIP
+  // win). For these queries request `(regions)` — postal_code + locality +
+  // admin areas, no street addresses — so only true place/postal hits show.
+  // Genuine free-text address typing (has spaces/letters after any digits)
+  // keeps `geocode`. `q` arrives lowercased + trimmed.
+  const looksPostal = /^\d{3,5}(-\d{0,4})?$/.test(q) || /^[a-z]\d[a-z]/.test(q);
   const url = new URL('https://maps.googleapis.com/maps/api/place/autocomplete/json');
   url.searchParams.set('input', q);
   url.searchParams.set('components', 'country:us|country:ca'); // strict US/CA filter
-  url.searchParams.set('types', 'geocode'); // addresses + cities + postcodes (no businesses)
+  url.searchParams.set('types', looksPostal ? '(regions)' : 'geocode'); // regions for ZIP/FSA; geocode (+addresses) for free text
   url.searchParams.set('language', 'en');
   url.searchParams.set('key', apiKey);
   const r = await fetch(url);
@@ -215,9 +226,12 @@ async function mapboxAutocomplete(q: string, token: string): Promise<{ suggestio
   const url = new URL(
     `https://api.mapbox.com/geocoding/v5/mapbox.places/${encodeURIComponent(q)}.json`
   );
+  // Same postal-query rule as the Google path: a bare ZIP / FSA must not pull
+  // street `address` rows (whose label city can differ from the ZIP's).
+  const looksPostal = /^\d{3,5}(-\d{0,4})?$/.test(q) || /^[a-z]\d[a-z]/.test(q);
   url.searchParams.set('access_token', token);
   url.searchParams.set('country', 'us,ca');
-  url.searchParams.set('types', 'postcode,place,locality,address,district');
+  url.searchParams.set('types', looksPostal ? 'postcode,place,locality,district' : 'postcode,place,locality,address,district');
   url.searchParams.set('autocomplete', 'true');
   url.searchParams.set('limit', '6');
   const r = await fetch(url);

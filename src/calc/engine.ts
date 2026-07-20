@@ -358,6 +358,43 @@ export function calculate(
     };
   }
 
+  // ── Weight-capacity guard ─────────────────────────────────────────
+  // Each rate card also carries a maxWeightLbs ceiling (e.g. a Sprinter van
+  // = 4,000 lb, a hotshot flatbed = 16,500 lb). Like maxMiles above it was
+  // previously only surfaced to the widget as a soft, bypassable client
+  // warning — the server never enforced it, so an API caller (or a user who
+  // clicks past the warning) could price a physically-impossible 30,000-lb
+  // Sprinter load. Enforce the tenant's OWN configured capacity here so the
+  // displayed cap, the enforced cap, and the priced load can never diverge.
+  // The global MAX_QUOTABLE_WEIGHT_LBS legal cap is checked separately at the
+  // route; this is the finer, per-equipment ceiling. Zone flat tariffs are
+  // exempt (mirrors the maxMiles guard) — they price a container move, not a
+  // per-equipment truckload.
+  if (
+    !zone &&
+    card &&
+    typeof card.maxWeightLbs === 'number' &&
+    card.maxWeightLbs > 0 &&
+    typeof req.weightLbs === 'number' &&
+    req.weightLbs > card.maxWeightLbs
+  ) {
+    return {
+      request: req,
+      lines: [],
+      subtotalLinehaul: 0,
+      subtotalAccessorials: 0,
+      fuelSurcharge: 0,
+      margin: 0,
+      total: 0,
+      currency: 'USD',
+      unsupported: {
+        reason:
+          `This load is about ${Math.round(req.weightLbs).toLocaleString('en-US')} lb, beyond the ${Math.round(card.maxWeightLbs).toLocaleString('en-US')}-lb capacity for ${req.service.toUpperCase()} ${req.equipment}. ` +
+          `Please choose a larger equipment type, or contact us for a custom quote.`,
+      },
+    };
+  }
+
   // ── Linehaul ──────────────────────────────────────────────────────
   let linehaul = 0;
   let ltlRating: (FreightClassEstimate & { classSource: 'derived' | 'override' }) | undefined;
