@@ -535,19 +535,23 @@
       if (!d.recentLeads.length) {
         c.appendChild(el('p', { class: 'muted', text: 'No leads yet. Share your widget link to get your first.' }));
       } else {
-        var tbl = el('table', { class: 'table' });
+        // qf-leads-table drives the ≤480px stacked-card reflow (lead-queue-search.css)
+        // so on a phone the Total + Status columns stay visible instead of being
+        // pushed off-screen behind the shared .table sideways scroll. Each <td>
+        // carries a data-label the reflow renders as its row heading.
+        var tbl = el('table', { class: 'table qf-leads-table' });
         tbl.innerHTML =
           '<thead><tr><th>Ref</th><th>Customer</th><th>Service</th><th>Lane</th><th style="text-align:right;">Total</th><th>When</th><th>Status</th></tr></thead><tbody></tbody>';
         var tb = $('tbody', tbl);
         d.recentLeads.forEach(function (l) {
           tb.innerHTML += '<tr>' +
-            '<td><a href="/app/leads/' + encodeURIComponent(l.refId) + '" data-route="leads/' + encodeURIComponent(l.refId) + '">' + l.refId + '</a></td>' +
-            '<td>' + (l.customerName || '—') + '<br><span class="muted-small">' + (l.customerEmail || '') + '</span></td>' +
-            '<td>' + (l.service || '') + ' / ' + (l.equipment || '') + '</td>' +
-            '<td>' + (l.pickupCity || '?') + ' → ' + (l.deliveryCity || '?') + '<br><span class="muted-small">' + (l.distanceMiles ? Math.round(l.distanceMiles) + ' mi' : '') + '</span></td>' +
-            '<td style="text-align:right;font-variant-numeric:tabular-nums;">$' + fmtMoney(l.quotedTotal) + '</td>' +
-            '<td><span class="muted-small">' + fmtDate(l.createdAt) + '</span></td>' +
-            '<td><span class="badge ' + statusClass(l.status) + '">' + statusLabel(l.status) + '</span></td>' +
+            '<td data-label="Ref"><a href="/app/leads/' + encodeURIComponent(l.refId) + '" data-route="leads/' + encodeURIComponent(l.refId) + '">' + l.refId + '</a></td>' +
+            '<td data-label="Customer">' + (l.customerName || '—') + '<br><span class="muted-small">' + (l.customerEmail || '') + '</span></td>' +
+            '<td data-label="Service">' + (l.service || '') + ' / ' + (l.equipment || '') + '</td>' +
+            '<td data-label="Lane">' + (l.pickupCity || '?') + ' → ' + (l.deliveryCity || '?') + '<br><span class="muted-small">' + (l.distanceMiles ? Math.round(l.distanceMiles) + ' mi' : '') + '</span></td>' +
+            '<td data-label="Total" style="text-align:right;font-variant-numeric:tabular-nums;">$' + fmtMoney(l.quotedTotal) + '</td>' +
+            '<td data-label="When"><span class="muted-small">' + fmtDate(l.createdAt) + '</span></td>' +
+            '<td data-label="Status"><span class="badge ' + statusClass(l.status) + '">' + statusLabel(l.status) + '</span></td>' +
             '</tr>';
         });
         c.appendChild(tbl);
@@ -1551,7 +1555,11 @@
       c.appendChild(el('h1', { text: 'Drayage zones' }));
       c.appendChild(el('p', { class: 'page-sub', text: 'Flat prices for pulling containers within a radius of a port. Only needed if you quote drayage / port-rail work — you can skip this otherwise.' }));
       if (d.laneZones.length) {
-        var tbl = el('table', { class: 'table' });
+        // qf-leads-table gives the ≤480px stacked-card reflow; the zone rows
+        // already carry data-label on each cell, so on a phone the price, the
+        // enabled toggle and delete stop hiding behind the shared .table
+        // sideways scroll (they were off-screen at 375px).
+        var tbl = el('table', { class: 'table qf-leads-table qf-zones-table' });
         tbl.innerHTML = '<thead><tr><th>Label</th><th>Port</th><th>Radius (mi)</th><th>Flat $</th><th>Enabled</th><th></th></tr></thead><tbody></tbody>';
         var tb = $('tbody', tbl);
         d.laneZones.forEach(function (z) { tb.appendChild(zoneRow(z)); });
@@ -3823,7 +3831,7 @@
       bar.innerHTML =
         'Trial — ' + trial.daysLeft + ' day' + (trial.daysLeft === 1 ? '' : 's') + ' left · ' +
         'all features unlocked &nbsp;·&nbsp; ' +
-        '<a href="/pricing" data-manage-billing style="color: var(--accent); text-decoration: underline; display: inline-block; padding: 11px 8px; margin: -11px 0; line-height: 1;">Manage plan →</a>';
+        '<a href="/pricing" data-manage-billing style="color: var(--accent); text-decoration: underline; display: inline-flex; align-items: center; min-height: 44px; padding: 4px 8px; margin: -4px 0; line-height: 1;">Manage plan →</a>';
       var mb = bar.querySelector('[data-manage-billing]');
       if (mb) mb.addEventListener('click', function (e) { e.preventDefault(); openBillingPortal(); });
       document.body.classList.remove('qf-trial-locked');

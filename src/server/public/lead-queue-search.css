@@ -151,4 +151,19 @@ html[data-theme="light"] tr.qf-lead-hot-row {
   .qf-leads-table tbody td[data-label="Customer"] { text-align: right; }
   .qf-leads-table tbody td[data-label="Customer"] br { display: block; }
   .qf-leads-table tbody td .muted-small { display: inline-block; }
+
+  /* Zones reuse this reflow but their cells hold INPUTS with fixed inline
+     widths (e.g. 300px) that would overflow a 375px card. Let each input take
+     the remaining width beside its label. !important overrides the per-input
+     inline width set in zoneRow(). */
+  .qf-zones-table tbody td .input {
+    width: auto !important;
+    min-width: 0;
+    flex: 1 1 auto;
+    text-align: right;
+  }
+  .qf-zones-table tbody td { gap: 16px; }
+  /* Delete-button cell (last, no data-label): let the button span the row. */
+  .qf-zones-table tbody td:last-child { justify-content: stretch; }
+  .qf-zones-table tbody td:last-child .btn { width: 100%; }
 }
