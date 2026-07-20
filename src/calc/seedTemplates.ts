@@ -278,6 +278,73 @@ export function getSeedTemplate(vertical: FreightVertical): SeedTemplate {
   };
 }
 
+/**
+ * Build ONE seed set from several verticals.
+ *
+ * Carriers routinely run more than one mode — dry van + reefer + flatbed is an
+ * ordinary combination, not an edge case. Seeding only the "main" vertical left
+ * such a tenant with a calculator that couldn't quote most of their business,
+ * so their customers silently bounced off the modes we never seeded.
+ *
+ * Union semantics, first-selected wins on a collision:
+ *  - rate cards   deduped by service::equipment
+ *  - accessorials deduped by code
+ *  - lane zones   deduped by label (they're generated, so identical across
+ *                 verticals that include them; take one copy)
+ *
+ * `pricingMode` follows the FIRST selected vertical — that's the tenant's
+ * primary book of business and the wizard lets them override it anyway.
+ */
+export function mergeSeedTemplates(verticals: FreightVertical[]): SeedTemplate {
+  const picked = verticals.filter((v, i) => verticals.indexOf(v) === i);
+  if (picked.length === 0) throw new Error('mergeSeedTemplates requires at least one vertical');
+  if (picked.length === 1) return getSeedTemplate(picked[0]!);
+
+  const parts = picked.map((v) => getSeedTemplate(v));
+  const primary = parts[0]!;
+
+  const rcSeen = new Set<string>();
+  const rateCards: SeedTemplate['rateCards'] = [];
+  const accSeen = new Set<string>();
+  const accessorials: SeedTemplate['accessorials'] = [];
+  const zoneSeen = new Set<string>();
+  const laneZones: SeedTemplate['laneZones'] = [];
+
+  for (const p of parts) {
+    for (const c of p.rateCards) {
+      const k = `${c.service}::${c.equipment}`;
+      if (rcSeen.has(k)) continue;
+      rcSeen.add(k);
+      rateCards.push({ ...c });
+    }
+    for (const a of p.accessorials) {
+      if (accSeen.has(a.code)) continue;
+      accSeen.add(a.code);
+      accessorials.push({ ...a });
+    }
+    for (const z of p.laneZones) {
+      const k = String(z.label ?? '');
+      if (zoneSeen.has(k)) continue;
+      zoneSeen.add(k);
+      laneZones.push({ ...z });
+    }
+  }
+
+  // Keep sortOrder stable and contiguous across the merged set so the
+  // dashboard and the wizard's "top 3 rates" show a sensible order.
+  rateCards.forEach((c, i) => { c.sortOrder = i; });
+
+  return {
+    vertical: primary.vertical,
+    label: picked.length === 2 ? `${parts[0]!.label} + ${parts[1]!.label}` : `${primary.label} +${picked.length - 1} more`,
+    blurb: primary.blurb,
+    pricingMode: primary.pricingMode,
+    rateCards,
+    accessorials,
+    laneZones,
+  };
+}
+
 // ── first-run "seed pristine" guard ────────────────────────────────────────
 // The apply-endpoint is only allowed to DELETE + reseed a tenant's rate rows
 // when those rows are still exactly the out-of-the-box signup seed. If the

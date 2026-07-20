@@ -72,6 +72,7 @@ import {
   FREIGHT_VERTICALS,
   PRICING_MODES,
   getSeedTemplate,
+  mergeSeedTemplates,
   isSeedPristine,
   type FreightVertical,
 } from '../../calc/seedTemplates.js';
@@ -1156,11 +1157,29 @@ export function registerTenantRoutes(app: Express) {
   const OnboardingApply = z.object({
     skip: z.boolean().optional(),
     freightVertical: z.enum([...FREIGHT_VERTICALS] as [FreightVertical, ...FreightVertical[]]).optional(),
+    /** Multi-mode selection. A carrier running dry van + reefer + flatbed is
+     *  ordinary; seeding one vertical left them unable to quote the rest.
+     *  `freightVertical` stays accepted so older clients keep working. */
+    freightVerticals: z
+      .array(z.enum([...FREIGHT_VERTICALS] as [FreightVertical, ...FreightVertical[]]))
+      .min(1)
+      .max(FREIGHT_VERTICALS.length)
+      .optional(),
     pricingMode: z.enum([...PRICING_MODES] as [string, ...string[]]).optional(),
+    /** Superseded by serviceArea; still accepted from older clients. */
     mainLane: z
       .object({
         from: z.string().max(160).nullable().optional(),
         to: z.string().max(160).nullable().optional(),
+      })
+      .nullable()
+      .optional(),
+    serviceArea: z
+      .object({
+        kind: z.enum(['nationwide_us', 'nationwide_ca', 'cross_border', 'regions', 'radius']),
+        regions: z.array(z.string().min(2).max(3)).max(75).optional(),
+        radiusMiles: z.number().int().positive().max(3000).optional(),
+        baseCity: z.string().max(160).nullable().optional(),
       })
       .nullable()
       .optional(),
@@ -1194,10 +1213,20 @@ export function registerTenantRoutes(app: Express) {
       return res.json({ ok: true, skipped: true, reseeded: false });
     }
 
-    if (!body.freightVertical) {
-      return res.status(400).json({ error: 'freightVertical is required to finish onboarding' });
+    // Accept either shape: the multi-select `freightVerticals` (current wizard)
+    // or a single `freightVertical` (older clients). Seed from the UNION so a
+    // multi-mode carrier gets a calculator that can quote all of their business.
+    const selectedVerticals: FreightVertical[] =
+      body.freightVerticals && body.freightVerticals.length > 0
+        ? body.freightVerticals
+        : body.freightVertical
+          ? [body.freightVertical]
+          : [];
+    if (selectedVerticals.length === 0) {
+      return res.status(400).json({ error: 'At least one freight vertical is required to finish onboarding' });
     }
-    const template = getSeedTemplate(body.freightVertical);
+    const primaryVertical = selectedVerticals[0]!;
+    const template = mergeSeedTemplates(selectedVerticals);
     const pricingMode = body.pricingMode ?? template.pricingMode;
 
     // Read the current seed rows + the tenant's existing onboarding record to
@@ -1269,10 +1298,19 @@ export function registerTenantRoutes(app: Express) {
           onboardingJson: {
             completedAt: new Date().toISOString(),
             skipped: false,
-            freightVertical: body.freightVertical,
+            freightVertical: primaryVertical,
+            freightVerticals: selectedVerticals,
             pricingMode,
             mainLane: body.mainLane
               ? { from: body.mainLane.from ?? null, to: body.mainLane.to ?? null }
+              : undefined,
+            serviceArea: body.serviceArea
+              ? {
+                  kind: body.serviceArea.kind,
+                  regions: body.serviceArea.regions,
+                  radiusMiles: body.serviceArea.radiusMiles,
+                  baseCity: body.serviceArea.baseCity ?? null,
+                }
               : undefined,
           },
           updatedAt: new Date(),
@@ -1284,11 +1322,24 @@ export function registerTenantRoutes(app: Express) {
         userId: req.user!.id,
         action: 'onboarding.apply',
         actorKind: 'user',
-        detailsJson: { freightVertical: body.freightVertical, pricingMode, reseeded: doReseed },
+        detailsJson: {
+          freightVertical: primaryVertical,
+          freightVerticals: selectedVerticals,
+          pricingMode,
+          serviceArea: body.serviceArea?.kind ?? null,
+          reseeded: doReseed,
+        },
       });
     });
 
     bumpMarketplace(tid);
-    res.json({ ok: true, skipped: false, reseeded: doReseed, freightVertical: body.freightVertical, pricingMode });
+    res.json({
+      ok: true,
+      skipped: false,
+      reseeded: doReseed,
+      freightVertical: primaryVertical,
+      freightVerticals: selectedVerticals,
+      pricingMode,
+    });
   });
 }

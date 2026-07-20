@@ -17,10 +17,16 @@ describe('onboarding wizard — client overlay', () => {
     expect(js).toContain('/api/tenant/onboarding/apply');
     expect(js).toContain('Skip for now');
     // the four steps
-    expect(js).toContain('What do you haul most?');
+    expect(js).toContain('What do you haul?');
     expect(js).toContain('How do you price it?');
-    expect(js).toContain('Your main lane?');
-    expect(js).toContain('Make it yours');
+    expect(js).toContain('Where do you operate?');
+    expect(js).toContain('Confirm your top 3 rates');
+    // The brand-color step was removed — branding isn't needed to produce a
+    // working calculator and the dashboard already nudges for it.
+    expect(js).not.toContain('Make it yours');
+    expect(js).not.toContain('qf-ob-swatch');
+    // The single-lane question was replaced by a real service area.
+    expect(js).not.toContain('Your main lane?');
     // all six verticals present in the picker
     for (const v of ['drayage', 'dryvan_ftl', 'reefer', 'ltl', 'hotshot', 'flatbed']) {
       expect(js).toContain(v);
@@ -29,16 +35,16 @@ describe('onboarding wizard — client overlay', () => {
     expect(css).toContain('.qf-ob-card');
   });
 
-  it('adds the confirm-top-3-rates finish step (step 5 of 5)', async () => {
+  it('adds the confirm-top-3-rates finish step (step 4 of 4)', async () => {
     const js = await pub('onboarding-wizard.js');
     const css = await pub('onboarding-wizard.css');
 
-    // The wizard now runs five steps.
-    expect(js).toContain('var STEPS = 5');
-    expect(js).toContain('Step 5 of 5');
+    // The wizard runs four steps since the brand-color step was dropped.
+    expect(js).toContain('var STEPS = 4');
+    expect(js).toContain('Step 4 of 4');
     expect(js).toContain('Confirm your top 3 rates');
-    // No stale "of 4" kicker strings survive the extension.
-    expect(js).not.toContain('of 4');
+    // No stale "of 5" kicker strings survive the removal.
+    expect(js).not.toContain('of 5');
 
     // Rates are fetched AFTER apply (so the reseed has run) and capped at 3 by
     // sortOrder.

@@ -7,6 +7,7 @@ import {
 import {
   FREIGHT_VERTICALS,
   getSeedTemplate,
+  mergeSeedTemplates,
   isSeedPristine,
   listVerticalOptions,
   DEFAULT_SEED_COUNTS,
@@ -276,5 +277,56 @@ describe('default rate-card ceilings', () => {
     // A sprinter must never be rated for a full-truckload weight.
     expect(card('expedited', 'sprinter')!.maxWeightLbs).toBeLessThanOrEqual(4000);
     expect(card('hotshot', 'flatbed')!.maxWeightLbs).toBeLessThanOrEqual(16500);
+  });
+});
+
+describe('mergeSeedTemplates — multi-mode carriers', () => {
+  it('a single vertical merges to exactly its own template', () => {
+    const one = mergeSeedTemplates(['reefer']);
+    const direct = getSeedTemplate('reefer');
+    expect(one.rateCards.map((c) => `${c.service}::${c.equipment}`).sort())
+      .toEqual(direct.rateCards.map((c) => `${c.service}::${c.equipment}`).sort());
+  });
+
+  it('seeds the UNION of every selected mode (the whole point of multi-select)', () => {
+    // A carrier running dry van + reefer + flatbed must end up able to quote
+    // ALL THREE — seeding only the "main" one left the rest unquotable.
+    const merged = mergeSeedTemplates(['dryvan_ftl', 'reefer', 'flatbed']);
+    const keys = new Set(merged.rateCards.map((c) => `${c.service}::${c.equipment}`));
+    for (const v of ['dryvan_ftl', 'reefer', 'flatbed'] as const) {
+      for (const c of getSeedTemplate(v).rateCards) {
+        expect(keys.has(`${c.service}::${c.equipment}`), `${v} card ${c.equipment} must survive the merge`).toBe(true);
+      }
+    }
+    // And it must be strictly richer than any single one of them.
+    expect(merged.rateCards.length).toBeGreaterThan(getSeedTemplate('dryvan_ftl').rateCards.length);
+  });
+
+  it('never duplicates a shared rate card, accessorial, or lane zone', () => {
+    const merged = mergeSeedTemplates(['drayage', 'dryvan_ftl', 'reefer', 'ltl', 'hotshot', 'flatbed']);
+    const rcKeys = merged.rateCards.map((c) => `${c.service}::${c.equipment}`);
+    expect(new Set(rcKeys).size).toBe(rcKeys.length);
+    const accCodes = merged.accessorials.map((a) => a.code);
+    expect(new Set(accCodes).size).toBe(accCodes.length);
+    const zoneLabels = merged.laneZones.map((z) => String(z.label));
+    expect(new Set(zoneLabels).size).toBe(zoneLabels.length);
+  });
+
+  it('takes pricingMode from the first selected vertical and re-numbers sortOrder', () => {
+    const merged = mergeSeedTemplates(['drayage', 'dryvan_ftl']);
+    expect(merged.pricingMode).toBe(getSeedTemplate('drayage').pricingMode);
+    expect(merged.rateCards.map((c) => c.sortOrder)).toEqual(merged.rateCards.map((_, i) => i));
+  });
+
+  it('is order-insensitive for coverage and de-dupes a repeated pick', () => {
+    const a = mergeSeedTemplates(['reefer', 'flatbed']);
+    const b = mergeSeedTemplates(['flatbed', 'reefer']);
+    expect(new Set(a.rateCards.map((c) => c.equipment))).toEqual(new Set(b.rateCards.map((c) => c.equipment)));
+    const dup = mergeSeedTemplates(['reefer', 'reefer']);
+    expect(dup.rateCards.length).toBe(getSeedTemplate('reefer').rateCards.length);
+  });
+
+  it('throws on an empty selection rather than seeding nothing', () => {
+    expect(() => mergeSeedTemplates([])).toThrow();
   });
 });

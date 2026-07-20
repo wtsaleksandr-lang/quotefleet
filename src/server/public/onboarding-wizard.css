@@ -225,23 +225,54 @@ html.qf-ob-open body {
   .qf-ob-lane-arrow { display: block; }
 }
 
-.qf-ob-swatches {
+/* ── service-area: state / province picker ───────────────────────────────────
+   A dense grid of 2-letter codes. auto-fill with a fixed minimum keeps the rows
+   evenly packed at every width, so a row never ends up holding a single lone
+   chip (the global no-orphan rule for badge/pill/chip groups). */
+.qf-ob-regions {
   display: flex;
-  flex-wrap: wrap;
+  flex-direction: column;
   gap: var(--space-1);
 }
-.qf-ob-swatch {
-  width: 40px;
-  height: 40px;
-  border-radius: var(--radius-pill);
-  border: 1px solid var(--border);
-  cursor: pointer;
-  padding: 0;
-  transition: transform 0.12s ease, box-shadow 0.12s ease;
+.qf-ob-region-group {
+  font-size: 12px;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--muted);
+  margin-top: var(--space-1);
 }
-.qf-ob-swatch:hover { transform: scale(1.08); }
-.qf-ob-swatch.is-selected {
-  box-shadow: 0 0 0 2px var(--bg), 0 0 0 4px var(--accent);
+/* Column counts are FIXED, not auto-fill, and deliberately chosen so neither
+   list ever strands a lone chip on the last line (the global no-orphan rule):
+     10 cols → 50 states = 5 exact rows; 13 provinces = 10 + 3
+      5 cols → 50 states = 10 exact rows; 13 provinces = 5 + 5 + 3
+   auto-fill previously resolved to 6 across at 375px, which left the 13th
+   province alone on its own row (6 + 6 + 1). */
+.qf-ob-region-row {
+  display: grid;
+  grid-template-columns: repeat(10, minmax(0, 1fr));
+  gap: var(--space-1);
+}
+@media (max-width: 640px) {
+  .qf-ob-region-row { grid-template-columns: repeat(5, minmax(0, 1fr)); }
+}
+.qf-ob-region {
+  padding: var(--space-1);
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--border);
+  background: transparent;
+  color: var(--text);
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: border-color 0.12s ease, background 0.12s ease;
+}
+.qf-ob-region:hover { border-color: var(--accent); }
+/* Selected = outline + tint, never a bright solid fill. */
+.qf-ob-region.is-selected {
+  border-color: var(--accent);
+  box-shadow: inset 0 0 0 1px var(--accent);
+  background: color-mix(in srgb, var(--accent) 12%, transparent);
 }
 
 /* ── footer nav ──────────────────────────────────────────────────────────── */

@@ -140,9 +140,29 @@ export const tenants = pgTable(
     onboardingJson: jsonb('onboarding_json').$type<{
       completedAt: string | null;
       skipped: boolean;
+      /** Primary vertical. Kept for back-compat with rows written before
+       *  multi-mode onboarding; new writes also set `freightVerticals`. */
       freightVertical?: string;
+      /** Every mode the carrier runs — dry van + reefer + flatbed is an
+       *  ordinary combination, not an edge case. Seeding only one left the
+       *  calculator unable to quote most of their business. */
+      freightVerticals?: string[];
       pricingMode?: string;
+      /** Superseded by `serviceArea`. Retained so existing rows still read. */
       mainLane?: { from: string | null; to: string | null };
+      /** Where the carrier actually operates. Carriers describe coverage as
+       *  regions / states / provinces / nationwide — not one lane. Stored and
+       *  used for AI context, quote examples and the carrier profile; NOT
+       *  enforced against incoming quotes (enforcing would reject real
+       *  business whenever a carrier under-declares their coverage). */
+      serviceArea?: {
+        kind: 'nationwide_us' | 'nationwide_ca' | 'cross_border' | 'regions' | 'radius';
+        /** State/province codes, e.g. ['CA','AZ','NV','ON'] — kind 'regions'. */
+        regions?: string[];
+        /** kind 'radius' — e.g. 300 mi around 'Long Beach, CA'. */
+        radiusMiles?: number;
+        baseCity?: string | null;
+      };
     }>(),
     /** Optional per-tenant Anthropic API key (encrypted). When set,
      *  overrides the platform default for that tenant's AI calls. */

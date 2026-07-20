@@ -2,17 +2,29 @@
    Post-signup guided onboarding wizard (client).
 
    A full-bleed overlay shown once, right after signup, gated by the SERVER
-   flag `tenant.needsOnboarding` (set in app.js boot). Five short steps:
-     1. What do you haul?   → freight vertical  (seeds the calculator)
+   flag `tenant.needsOnboarding` (set in app.js boot). Four short steps:
+     1. What do you haul?   → freight verticals (MULTI-select; seeds all of them)
      2. How do you price?   → pricing mode
-     3. Main lane           → from / to
-     4. Brand (optional)    → primary color / accent
-     5. Confirm top 3 rates → tweak headline prices + copy the share link
+     3. Where do you operate? → service area (nationwide US / nationwide CA /
+                                cross-border / states+provinces / radius)
+     4. Confirm top rates   → tweak headline prices + copy the share link
 
-   Leaving step 4 (brand) POSTs /api/tenant/onboarding/apply (reseeds the tenant
-   with the picked vertical's subset when the seed is still pristine); on success
-   it GETs /api/tenant/rate-cards (after the reseed ran) and shows the top-3
-   confirm step. Step 5 "Finish" PUTs any edited rate rows, then closes and hands
+   Why multi-select: carriers routinely run several modes (dry van + reefer +
+   flatbed is ordinary). Seeding a single "main" vertical left the calculator
+   unable to quote most of their business.
+
+   Why a service area, not a lane: carriers describe coverage as regions, states
+   or provinces, or nationwide. Asking for one origin→destination lane implied we
+   thought they ran a single truck on a single route. The area is stored for AI
+   context / examples / carrier profile — it never blocks an incoming quote.
+
+   There is no brand-color step: it isn't needed to produce a working calculator,
+   and the dashboard already nudges for branding via setup-status.
+
+   Leaving step 3 (service area) POSTs /api/tenant/onboarding/apply (reseeds the
+   tenant with the UNION of the picked verticals when the seed is still pristine);
+   on success it GETs /api/tenant/rate-cards (after the reseed ran) and shows the
+   confirm step. Step 4 "Finish" PUTs any edited rate rows, then closes and hands
    control back to the dashboard. "Skip for now" posts { skip:true } and falls
    straight through to the dashboard.
 
@@ -39,9 +51,19 @@
     { id: 'zone', label: 'Zone tariff', blurb: 'Flat price by port / radius zone.' }
   ];
 
-  // Preset brand colors (hex lives in JS, not CSS — no theme token needed for a
-  // color the user is literally picking). WCAG-safe brand hues.
-  var SWATCHES = ['#0D3CFC', '#2563EB', '#0F766E', '#B91C1C', '#B45309', '#7C3AED', '#0891B2', '#334155'];
+  // Where the carrier operates. Carriers describe coverage as regions, states /
+  // provinces, or nationwide — asking for ONE origin→destination lane implied we
+  // thought they ran a single truck on a single route.
+  var AREAS = [
+    { id: 'nationwide_us', label: 'Nationwide — USA', blurb: 'You run loads anywhere in the lower 48.' },
+    { id: 'nationwide_ca', label: 'Nationwide — Canada', blurb: 'You run loads across the Canadian provinces.' },
+    { id: 'cross_border', label: 'Cross-border US ⇄ Canada', blurb: 'You run both countries, including border crossings.' },
+    { id: 'regions', label: 'Specific states / provinces', blurb: 'Pick the ones you cover — add or change them any time.' },
+    { id: 'radius', label: 'Within a radius of my base', blurb: 'Regional work measured out from your home terminal.' }
+  ];
+
+  var US_STATES = ['AL','AK','AZ','AR','CA','CO','CT','DE','FL','GA','HI','ID','IL','IN','IA','KS','KY','LA','ME','MD','MA','MI','MN','MS','MO','MT','NE','NV','NH','NJ','NM','NY','NC','ND','OH','OK','OR','PA','RI','SC','SD','TN','TX','UT','VT','VA','WA','WV','WI','WY'];
+  var CA_PROVINCES = ['AB','BC','MB','NB','NL','NS','NT','NU','ON','PE','QC','SK','YT'];
 
   function el(tag, cls, html) {
     var n = document.createElement(tag);
@@ -57,16 +79,23 @@
 
     var state = {
       step: 0,
-      vertical: null,
+      // Multi-select: most carriers run more than one mode (dry van + reefer +
+      // flatbed is ordinary). Seeding a single vertical left them with a
+      // calculator that couldn't quote the rest of their business.
+      verticals: [],
       pricing: null,
-      laneFrom: '',
-      laneTo: '',
-      brandColor: null,
+      areaKind: null,
+      regions: [],
+      radiusMiles: 300,
+      baseCity: '',
       rates: null,
       ratesLoaded: false,
       submitting: false
     };
-    var STEPS = 5;
+    // 4 steps: modes → pricing → service area → confirm rates. The brand-color
+    // step was removed — it isn't needed to produce a working calculator, and
+    // the dashboard already nudges for branding via setup-status.
+    var STEPS = 4;
 
     // Which of ratePerMile / flatFee / minimumCharge is the "headline" price for
     // a seeded row — the first non-zero wins so we never surface an editable 0
@@ -159,20 +188,29 @@
       body.innerHTML = '';
 
       if (state.step === 0) {
-        body.appendChild(el('div', 'qf-ob-kicker', 'Step 1 of 5'));
-        body.appendChild(el('h1', 'qf-ob-title', 'What do you haul most?'));
-        body.appendChild(el('p', 'qf-ob-sub', 'Pick your main freight so we tailor the calculator to it — you can add the others later.'));
+        body.appendChild(el('div', 'qf-ob-kicker', 'Step 1 of 4'));
+        body.appendChild(el('h1', 'qf-ob-title', 'What do you haul?'));
+        body.appendChild(el('p', 'qf-ob-sub', 'Select every mode you run — we seed rates for all of them, so your customers can quote anything you actually haul.'));
         var grid = el('div', 'qf-ob-cards is-two');
         VERTICALS.forEach(function (v) {
-          grid.appendChild(optionCard(v, state.vertical === v.id, function () {
-            state.vertical = v.id;
-            if (!state.pricing) state.pricing = v.pricing; // sensible default
+          var on = state.verticals.indexOf(v.id) !== -1;
+          grid.appendChild(optionCard(v, on, function () {
+            var i = state.verticals.indexOf(v.id);
+            if (i === -1) state.verticals.push(v.id);
+            else state.verticals.splice(i, 1);
+            // Default the pricing model from the FIRST mode picked; the tenant
+            // can still override it on the next step.
+            if (state.verticals.length === 1) state.pricing = v.pricing;
+            if (state.verticals.length === 0) state.pricing = null;
             render();
           }));
         });
         body.appendChild(grid);
+        if (state.verticals.length > 1) {
+          body.appendChild(el('p', 'qf-ob-sub', state.verticals.length + ' modes selected — rates will be seeded for each.'));
+        }
       } else if (state.step === 1) {
-        body.appendChild(el('div', 'qf-ob-kicker', 'Step 2 of 5'));
+        body.appendChild(el('div', 'qf-ob-kicker', 'Step 2 of 4'));
         body.appendChild(el('h1', 'qf-ob-title', 'How do you price it?'));
         body.appendChild(el('p', 'qf-ob-sub', 'This sets your default. You can fine-tune every rate afterward.'));
         var pgrid = el('div', 'qf-ob-cards is-two');
@@ -184,49 +222,75 @@
         });
         body.appendChild(pgrid);
       } else if (state.step === 2) {
-        body.appendChild(el('div', 'qf-ob-kicker', 'Step 3 of 5'));
-        body.appendChild(el('h1', 'qf-ob-title', 'Your main lane?'));
-        body.appendChild(el('p', 'qf-ob-sub', 'Optional — the lane you run most. It helps us pre-tune examples. Skip either field if unsure.'));
-        var lane = el('div', 'qf-ob-lane');
-        var fromWrap = el('div', 'qf-ob-field');
-        fromWrap.appendChild(el('label', null, 'From'));
-        var fromIn = el('input', 'qf-ob-input');
-        fromIn.type = 'text';
-        fromIn.placeholder = 'e.g. Los Angeles, CA';
-        fromIn.value = state.laneFrom;
-        fromIn.addEventListener('input', function () { state.laneFrom = fromIn.value; });
-        fromWrap.appendChild(fromIn);
-        lane.appendChild(fromWrap);
-        lane.appendChild(el('div', 'qf-ob-lane-arrow', '→'));
-        var toWrap = el('div', 'qf-ob-field');
-        toWrap.appendChild(el('label', null, 'To'));
-        var toIn = el('input', 'qf-ob-input');
-        toIn.type = 'text';
-        toIn.placeholder = 'e.g. Phoenix, AZ';
-        toIn.value = state.laneTo;
-        toIn.addEventListener('input', function () { state.laneTo = toIn.value; });
-        toWrap.appendChild(toIn);
-        lane.appendChild(toWrap);
-        body.appendChild(lane);
-      } else if (state.step === 3) {
-        body.appendChild(el('div', 'qf-ob-kicker', 'Step 4 of 5'));
-        body.appendChild(el('h1', 'qf-ob-title', 'Make it yours'));
-        body.appendChild(el('p', 'qf-ob-sub', 'Optional — pick a brand color for your customer-facing calculator. You can refine the full brand later.'));
-        var field = el('div', 'qf-ob-field');
-        field.appendChild(el('label', null, 'Brand color'));
-        var sw = el('div', 'qf-ob-swatches');
-        SWATCHES.forEach(function (hex) {
-          var b = el('button', 'qf-ob-swatch' + (state.brandColor === hex ? ' is-selected' : ''));
-          b.type = 'button';
-          b.style.background = hex;
-          b.setAttribute('aria-label', 'Brand color ' + hex);
-          b.addEventListener('click', function () { state.brandColor = hex; render(); });
-          sw.appendChild(b);
+        body.appendChild(el('div', 'qf-ob-kicker', 'Step 3 of 4'));
+        body.appendChild(el('h1', 'qf-ob-title', 'Where do you operate?'));
+        body.appendChild(el('p', 'qf-ob-sub', 'Your coverage area. This tunes examples and your carrier profile — it never blocks a customer from requesting a quote.'));
+        var agrid = el('div', 'qf-ob-cards');
+        AREAS.forEach(function (a) {
+          agrid.appendChild(optionCard(a, state.areaKind === a.id, function () {
+            state.areaKind = a.id;
+            render();
+          }));
         });
-        field.appendChild(sw);
-        body.appendChild(field);
-      } else if (state.step === 4) {
-        body.appendChild(el('div', 'qf-ob-kicker', 'Step 5 of 5'));
+        body.appendChild(agrid);
+
+        if (state.areaKind === 'regions') {
+          var rf = el('div', 'qf-ob-field');
+          rf.appendChild(el('label', null, 'States / provinces you cover'));
+          var chips = el('div', 'qf-ob-regions');
+          var addGroup = function (codes, groupLabel) {
+            chips.appendChild(el('div', 'qf-ob-region-group', groupLabel));
+            var row = el('div', 'qf-ob-region-row');
+            codes.forEach(function (code) {
+              var on = state.regions.indexOf(code) !== -1;
+              var c = el('button', 'qf-ob-region' + (on ? ' is-selected' : ''), code);
+              c.type = 'button';
+              c.setAttribute('aria-pressed', on ? 'true' : 'false');
+              c.addEventListener('click', function () {
+                var i = state.regions.indexOf(code);
+                if (i === -1) state.regions.push(code);
+                else state.regions.splice(i, 1);
+                render();
+              });
+              row.appendChild(c);
+            });
+            chips.appendChild(row);
+          };
+          addGroup(US_STATES, 'United States');
+          addGroup(CA_PROVINCES, 'Canada');
+          rf.appendChild(chips);
+          body.appendChild(rf);
+        } else if (state.areaKind === 'radius') {
+          var radWrap = el('div', 'qf-ob-lane');
+          var milesWrap = el('div', 'qf-ob-field');
+          milesWrap.appendChild(el('label', null, 'Radius (miles)'));
+          var milesIn = el('input', 'qf-ob-input');
+          milesIn.type = 'number';
+          milesIn.min = '1';
+          milesIn.max = '3000';
+          milesIn.inputMode = 'numeric';
+          milesIn.value = state.radiusMiles;
+          milesIn.addEventListener('input', function () {
+            var n = parseInt(milesIn.value, 10);
+            state.radiusMiles = isNaN(n) ? 0 : n;
+            gateNext();
+          });
+          milesWrap.appendChild(milesIn);
+          radWrap.appendChild(milesWrap);
+          radWrap.appendChild(el('div', 'qf-ob-lane-arrow', 'of'));
+          var baseWrap = el('div', 'qf-ob-field');
+          baseWrap.appendChild(el('label', null, 'Base city'));
+          var baseIn = el('input', 'qf-ob-input');
+          baseIn.type = 'text';
+          baseIn.placeholder = 'e.g. Long Beach, CA';
+          baseIn.value = state.baseCity;
+          baseIn.addEventListener('input', function () { state.baseCity = baseIn.value; gateNext(); });
+          baseWrap.appendChild(baseIn);
+          radWrap.appendChild(baseWrap);
+          body.appendChild(radWrap);
+        }
+      } else if (state.step === 3) {
+        body.appendChild(el('div', 'qf-ob-kicker', 'Step 4 of 4'));
         body.appendChild(el('h1', 'qf-ob-title', 'Confirm your top 3 rates'));
         body.appendChild(el('p', 'qf-ob-sub', 'These seeded from your pick. Tweak the headline price on each, then copy your calculator link to share it.'));
 
@@ -303,18 +367,31 @@
         body.appendChild(copyField);
       }
 
-      // gate Continue on the required steps
-      if (state.step === 0) nextBtn.disabled = !state.vertical;
-      else if (state.step === 1) nextBtn.disabled = !state.pricing;
-      else nextBtn.disabled = false;
-      nextBtn.disabled = nextBtn.disabled || state.submitting;
+      gateNext();
+    }
+
+    // Gate Continue on the required steps. Split out of render() so the radius
+    // inputs can re-gate on each keystroke without a full re-render (which would
+    // steal focus from the field being typed in).
+    function gateNext() {
+      var blocked = false;
+      if (state.step === 0) blocked = state.verticals.length === 0;
+      else if (state.step === 1) blocked = !state.pricing;
+      else if (state.step === 2) {
+        if (!state.areaKind) blocked = true;
+        else if (state.areaKind === 'regions') blocked = state.regions.length === 0;
+        else if (state.areaKind === 'radius') {
+          blocked = !(state.radiusMiles > 0) || state.baseCity.trim() === '';
+        }
+      }
+      nextBtn.disabled = blocked || state.submitting;
     }
 
     function onNext() {
       if (state.submitting) return;
-      // Leaving the brand step (step 4 of 5): commit the setup, then load the
-      // reseeded rate cards and advance to the confirm-rates step.
-      if (state.step === 3) { applyAndLoadRates(); return; }
+      // Leaving the service-area step (step 3 of 4): commit the setup, then load
+      // the reseeded rate cards and advance to the confirm-rates step.
+      if (state.step === 2) { applyAndLoadRates(); return; }
       if (state.step < STEPS - 1) { state.step++; render(); return; }
       // Confirm-rates step: persist any edits, then finish.
       finishRates();
@@ -326,7 +403,24 @@
       body.appendChild(el('div', 'qf-ob-error', msg));
     }
 
-    // Step 4 → 5: POST the setup, then GET the (reseeded) rate cards. The rate
+    // Shape the service-area answer for the API — only the fields that belong to
+    // the picked kind, so we never persist a stale radius from a switched choice.
+    function buildServiceArea() {
+      if (!state.areaKind) return null;
+      if (state.areaKind === 'regions') {
+        return { kind: 'regions', regions: state.regions.slice() };
+      }
+      if (state.areaKind === 'radius') {
+        return {
+          kind: 'radius',
+          radiusMiles: state.radiusMiles,
+          baseCity: state.baseCity.trim() || null
+        };
+      }
+      return { kind: state.areaKind };
+    }
+
+    // Step 3 → 4: POST the setup, then GET the (reseeded) rate cards. The rate
     // fetch MUST run AFTER apply so the pristine-seed reseed has already run.
     function applyAndLoadRates() {
       if (state.submitting) return;
@@ -335,11 +429,13 @@
       skipBtn.disabled = true;
 
       var payload = {
-        freightVertical: state.vertical,
+        // Send BOTH: freightVerticals is the real selection, freightVertical is
+        // the primary — kept so an older server still understands the request.
+        freightVerticals: state.verticals.slice(),
+        freightVertical: state.verticals[0],
         pricingMode: state.pricing,
-        mainLane: { from: state.laneFrom.trim() || null, to: state.laneTo.trim() || null }
+        serviceArea: buildServiceArea()
       };
-      if (state.brandColor) payload.brand = { primaryColor: state.brandColor };
 
       fetch('/api/tenant/onboarding/apply', {
         method: 'POST',
@@ -364,7 +460,7 @@
           state.ratesLoaded = true;
           state.submitting = false;
           skipBtn.disabled = false;
-          state.step = 4;
+          state.step = 3; // confirm-rates is the last step (index 3 of 4)
           render();
         })
         .catch(function () {
