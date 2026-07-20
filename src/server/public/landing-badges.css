@@ -30,21 +30,62 @@ body.qf-wft .qf-chip-ico {
   color: #6E8BFF; /* periwinkle check — readable accent, not the forced cobalt */
 }
 
-/* ── Hero benefit pills (left-aligned, under the CTA/trial line) ───────────── */
-body.qf-wft .qf-hero-pills {
+/* ── No-orphan pill/badge/chip row utility (GLOBAL, reusable) ────────────────
+   Alex's global rule: a group of similar small elements (pills / badges / chips
+   / buttons) must NEVER wrap so a single item sits alone on a line. Keep >=2 per
+   line — shrink the inter-item gap (and, at narrow widths, the pill padding/font)
+   to stay inline; when they must wrap, wrap into EVEN rows via a fixed column
+   grid (4 -> 2x2), never 3+1. Odd counts stay all-on-one-line via an N-column
+   grid so the single row can't drop to a lone item. Reuse anywhere by adding
+   .qf-pill-row plus a count modifier to the group container.
+   Guard-safe: no #fff/#000 literals; spacing on the 8px ramp — the narrow-width
+   gap/padding step down to on-ramp 4/8 values to tighten before wrapping. */
+.qf-pill-row {
   display: flex;
   flex-wrap: wrap;
+  align-items: center;
   gap: 8px;
+}
+@media (max-width: 400px) {
+  .qf-pill-row { gap: 4px; } /* ramp step down (8 -> 4): tighten the gap before wrapping */
+}
+
+/* Balanced-wrap variants — force N content-sized columns so a group of similar
+   items never leaves a lone item on a line (4 -> cols2 = 2x2; a triple -> cols3
+   stays 3-across). minmax(0,max-content) keeps columns content-sized when there
+   is room and lets them shrink (chip text wrapping) at narrow widths, so the
+   N-across layout holds down to 320px without overflow or an orphan row. */
+.qf-pill-row--cols2,
+.qf-pill-row--cols3 {
+  display: grid;
+  align-items: stretch;
+}
+.qf-pill-row--cols2 { grid-template-columns: repeat(2, minmax(0, max-content)); }
+.qf-pill-row--cols3 { grid-template-columns: repeat(3, minmax(0, max-content)); }
+.qf-pill-row--start  { justify-content: start; }
+.qf-pill-row--center { justify-content: center; }
+
+/* Items in a balanced grid must be able to wrap their label so a column can
+   shrink instead of overflowing — this is what preserves >=2 per line at 320px. */
+.qf-pill-row--cols2 > *,
+.qf-pill-row--cols3 > * { min-width: 0; white-space: normal; }
+/* .qf-chip forces white-space:nowrap under body.qf-wft (higher specificity), so
+   re-allow wrapping for chips that live inside a balanced grid. */
+body.qf-wft .qf-pill-row--cols2 > .qf-chip,
+body.qf-wft .qf-pill-row--cols3 > .qf-chip { white-space: normal; }
+
+/* ── Hero benefit pills (4, left-aligned under the CTA/trial line) ───────────
+   Uses .qf-pill-row--cols2 in the HTML → always a balanced 2x2, never 3+1 or a
+   lone pill, from 1440px down to 320px. */
+body.qf-wft .qf-hero-pills {
   margin-top: 24px;
   max-width: 520px;
 }
 
-/* ── Refined-band badges (centered under the short line) ───────────────────── */
+/* ── Refined-band badges (3, centered under the short line) ──────────────────
+   Uses .qf-pill-row--cols3 in the HTML → held 3-across so they never drop to a
+   2+1 orphan; columns shrink and labels wrap at the smallest widths. */
 body.qf-wft .qf-refined-badges {
-  display: flex;
-  flex-wrap: wrap;
-  justify-content: center;
-  gap: 8px;
   margin-top: 24px;
 }
 
@@ -58,4 +99,16 @@ body.qf-wft .qf-refined-badges {
     margin-top: 16px;
   }
   body.qf-wft .qf-refined-badges { margin-top: 16px; }
+}
+
+/* At the smallest widths, trim chip padding/font a touch so the 2–3 columns stay
+   comfortable and wrap as little as possible (shrink-before-wrap; ramp step down
+   from 8/12 to 4/8). */
+@media (max-width: 380px) {
+  body.qf-wft .qf-hero-pills .qf-chip,
+  body.qf-wft .qf-refined-badges .qf-chip {
+    padding: 4px 8px;
+    font-size: 12px;
+    gap: 4px;
+  }
 }
