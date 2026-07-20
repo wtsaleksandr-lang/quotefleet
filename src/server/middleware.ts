@@ -24,8 +24,17 @@ const MUTATING_METHODS = new Set(['POST', 'PUT', 'PATCH', 'DELETE']);
 
 /** Path prefixes that bypass the trial-expired write-block. The billing
  *  upgrade flow itself must remain reachable — otherwise a locked-out
- *  tenant literally cannot pay to unlock. */
-const BILLING_ROUTE_BYPASS = ['/api/billing/'];
+ *  tenant literally cannot pay to unlock.
+ *
+ *  The onboarding-apply route is exempt for the same reason: the post-signup
+ *  wizard is gated on `needsOnboarding`, and BOTH "Continue" and "Skip for now"
+ *  POST to /api/tenant/onboarding/apply. Blocking it left an expired-trial
+ *  tenant permanently trapped — the wizard reopened on every load, every button
+ *  returned 403, and the only visible feedback was "Something went wrong saving
+ *  your setup". They could not even reach the dashboard to find the upgrade CTA.
+ *  Clearing a setup gate is not the kind of live-config mutation this block
+ *  exists to prevent. */
+const BILLING_ROUTE_BYPASS = ['/api/billing/', '/api/tenant/onboarding/apply'];
 
 /** When true, skip trial enforcement entirely. Set in test runners or
  *  when debugging against seeded fixtures. */
