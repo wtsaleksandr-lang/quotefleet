@@ -73,6 +73,18 @@ body.landing-v2.qf-wft main > section.hero::after {
   display: none;
 }
 
+/* A few sections run their content FLUSH to their bottom edge (no bottom gap):
+   the before/after compare block (.compare-simple-section) and the wins-stats
+   block (.qf-wins-section). For those, the default -1×space-3 pull would drop the
+   NEXT section's divider onto that flush content. So for the section that follows
+   each of them, place the divider just INSIDE its own (generous) top padding
+   instead — the line still reads as a boundary but lands in the empty band above
+   the heading, never on the previous section's content. */
+body.landing-v2.qf-wft main > .compare-simple-section + section::after,
+body.landing-v2.qf-wft main > .qf-wins-section + section::after {
+  top: var(--space-3);
+}
+
 /* ── 3. Dotted grid behind the hero device composite ──────────────────────
    The hero image is a transparent-background WebP, so a dot layer sitting
    BEHIND it shows through the open space around the laptop + phone. A broad,
