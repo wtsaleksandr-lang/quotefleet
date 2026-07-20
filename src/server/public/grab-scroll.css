@@ -1,0 +1,32 @@
+/* QuoteFleet — "grab to scroll" cursor affordance (shared).
+   Pairs with grab-scroll.js. Idle draggable background shows the open-hand
+   `grab` cursor; while a drag is engaged the whole document shows `grabbing`
+   and text selection is suppressed.
+
+   The grab cursor is scoped so it only reads on the draggable background —
+   interactive controls (and anything the utility excludes) keep their own
+   native cursor via a zero-specificity :where() reset, so a stray rule never
+   loses to it and buttons/links/inputs look normal. */
+
+.qf-grab-surface {
+  cursor: grab;
+}
+
+/* Controls keep their normal cursor. :where() = 0 specificity, so any explicit
+   cursor rule (e.g. buttons/links set to pointer) still wins over `grab`. */
+.qf-grab-surface :where(
+  input, textarea, select, button, a, label,
+  [contenteditable], [role="slider"], [role="tab"],
+  .qf-tabs, .qf-tabs-ind, .qf-map, .qf-map-card, .qf-map-canvas,
+  .qf-modal, .qf-modal-card, [data-no-grabscroll]
+) {
+  cursor: auto;
+}
+
+/* While dragging: grabbing cursor everywhere + no accidental text selection. */
+html.qf-grabbing,
+html.qf-grabbing * {
+  cursor: grabbing !important;
+  user-select: none !important;
+  -webkit-user-select: none !important;
+}

@@ -3932,6 +3932,19 @@
       if (t) t.hidden = false;
       wireMobileNav();
       wireThemeToggle();
+      // Grab-to-scroll (drag-to-pan) on the dashboard's main content area. The
+      // window is the scroll container (.app-shell is a min-height grid; only
+      // the sidebar scrolls internally), so panning the .app-main background
+      // scrolls the page. Mouse/pen only — native touch scroll is untouched.
+      // Rate-builder inputs, buttons, tables, nested scroll panes, and modals
+      // are excluded by the shared utility so they behave normally.
+      var appMain = document.querySelector('.app-main');
+      if (window.QFGrabScroll && appMain) {
+        window.QFGrabScroll.attach(window, {
+          surface: appMain,
+          exclude: window.QFGrabScroll.DEFAULT_EXCLUDE + ', table, thead, tbody, tr, td, th, [role="dialog"], .qf-modal, .modal',
+        });
+      }
 
       $$('.sidebar [data-route]').forEach(function (b) {
         b.addEventListener('click', function () { go(b.dataset.route); });

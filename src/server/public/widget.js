@@ -405,6 +405,12 @@
     initTypeaheads();
     initRouteMapCard();
     initWeightUnit();
+    // Grab-to-scroll (drag-to-pan) on the standalone / demo page. The bare
+    // widget auto-grows when embedded (no internal scroll), so this targets the
+    // full page window; mouse/pen only — native touch scroll is left untouched.
+    // Interactive controls, the tab indicator, the map, and the options modal
+    // are excluded by the shared utility so they behave normally.
+    if (window.QFGrabScroll) window.QFGrabScroll.attach(window);
     // Keep the sliding tab indicator aligned when the tab widths change
     // (viewport resize, late web-font swap).
     window.addEventListener('resize', function () { positionTabIndicator(false); });
