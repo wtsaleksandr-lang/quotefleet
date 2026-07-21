@@ -30,31 +30,18 @@ body.qf-wft .qf-chip-ico {
   color: #6E8BFF; /* periwinkle check — readable accent, not the forced cobalt */
 }
 
-/* ── Illustrative trust-badge icons (hero pills) ─────────────────────────────
-   Each hero pill leads with a circular badge holding an illustrative line-icon.
-   MANDATORY on the LEFT of the text and never wrapped/stacked below it: the
-   badge is flex:0 0 auto and the chip is nowrap, so icon+label stay one line.
-   Black/white contrast rule: on the dark hero the icon strokes are near-white
-   inside a hairline-bordered translucent disc — high contrast, clearly visible. */
+/* ── Trust-badge icons (hero pills) ──────────────────────────────────────────
+   Each hero pill leads with a WHITE-CIRCLE icon: the supplied icon centered on a
+   white disc, cropped to a circle, no border, all four normalised to the same
+   size and never clipped (the circle is baked into the PNG). It sits on the LEFT
+   of the label (flex:0 0 auto + chip nowrap), never wrapping or stacking. */
 body.qf-wft .qf-hero-pills .qf-chip { padding: 4px 12px 4px 4px; gap: 8px; }
-body.qf-wft .qf-chip-badge {
+body.qf-wft .qf-hero-pills .qf-hero-trust-ico {
   flex: 0 0 auto;
-  width: 30px;
-  height: 30px;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  border-radius: 999px;
-  /* CREAM disc: the trust icons are black-outline PNGs and would be invisible on
-     the dark hero, so they sit on a light circle for contrast (Alex's spec). */
-  background: rgba(247, 244, 238, 0.97);
-  border: 1px solid rgba(20, 22, 28, 0.12);
-}
-body.qf-wft .qf-chip-badge .qf-trust-ico {
-  width: 16px;
-  height: 16px;
-  object-fit: contain; /* keep each icon's aspect; sized modest, never oversized */
+  width: 26px;
+  height: 26px;
   display: block;
+  border-radius: 50%;
 }
 
 /* ── No-orphan pill/badge/chip row utility (GLOBAL, reusable) ────────────────
