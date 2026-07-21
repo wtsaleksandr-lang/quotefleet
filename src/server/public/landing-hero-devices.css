@@ -32,13 +32,17 @@ html body.qf-wft .visual-flow.qf-hero-media > .qf-hero-devices {
    desktop only; ≤980 stays single-column (cleanup's 1fr). ── */
 @media (min-width: 981px) {
   html body.qf-wft .hero-grid {
-    grid-template-columns: minmax(0, .8fr) minmax(0, 1.19fr) !important;
+    /* width:100% forces the grid to FILL its 1300px max-width — without it the
+       fr tracks shrank to content (~1180px total), starving both columns:
+       the H1 wrapped to 6 lines and the device video rendered small. */
+    width: 100% !important;
+    grid-template-columns: minmax(0, .92fr) minmax(0, 1.12fr) !important;
     gap: clamp(48px, 3vw, 60px) !important;
     align-items: center !important;
   }
-  /* Cap the copy content so its longest lines (lead + pills) end well left of
-     the enlarged device cluster — the two never touch, so no collision. */
-  html body.qf-wft .hero-copy { max-width: 450px !important; }
+  /* Cap the copy content so its longest lines end well left of the device
+     cluster (no collision) — but wide enough that the H1 no longer over-wraps. */
+  html body.qf-wft .hero-copy { max-width: 560px !important; }
 }
 
 /* Laptop — reuse the `.qf-browser` window chrome; large, upper-left. */

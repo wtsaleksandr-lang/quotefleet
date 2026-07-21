@@ -243,7 +243,7 @@ h1 { font-weight: 800; letter-spacing: -0.035em; }
 p { margin: 0; }
 
 /* ── Layout containers ─────────────────────────────────────────── */
-.container { max-width: 1200px; margin: 0 auto; padding: 0 var(--space-3); }
+.container { max-width: 1360px; margin: 0 auto; padding: 0 var(--space-3); }
 .container-narrow { max-width: 780px; margin: 0 auto; padding: 0 var(--space-3); }
 
 /* ── Tag — bracketed monospace small-caps label.

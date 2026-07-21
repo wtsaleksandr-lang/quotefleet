@@ -41,10 +41,10 @@ body.landing-v2.qf-wft main::after {
   z-index: 5;
 }
 body.landing-v2.qf-wft main::before {
-  left: max(0px, calc(50% - 632px));
+  left: max(0px, calc(50% - 712px));
 }
 body.landing-v2.qf-wft main::after {
-  right: max(0px, calc(50% - 632px));
+  right: max(0px, calc(50% - 712px));
 }
 
 /* ── 2. Horizontal section dividers (in the GAP above each section) ────────
@@ -60,8 +60,8 @@ body.landing-v2.qf-wft main > section::after {
   content: "";
   position: absolute;
   top: calc(var(--space-3) * -1);
-  left: max(0px, calc(50% - 632px));
-  right: max(0px, calc(50% - 632px));
+  left: max(0px, calc(50% - 712px));
+  right: max(0px, calc(50% - 712px));
   height: 1px;
   background: rgba(255, 255, 255, 0.07);
   pointer-events: none;

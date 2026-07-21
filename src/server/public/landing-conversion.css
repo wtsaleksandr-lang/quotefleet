@@ -76,7 +76,7 @@
   pointer-events: none;
 }
 .hero-grid {
-  max-width: 1160px;
+  max-width: 1360px;
   margin: 0 auto;
   display: grid;
   grid-template-columns: minmax(0, .9fr) minmax(440px, 1.1fr);
@@ -289,7 +289,7 @@
 
 .section { padding: 70px 24px; }
 .section-alt { background: #12161d; }
-.container { max-width: 1120px; margin: 0 auto; }
+.container { max-width: 1360px; margin: 0 auto; }
 .section-head { text-align: center; max-width: 730px; margin: 0 auto 34px; }
 .section-head h2 {
   margin: 10px 0 0;
