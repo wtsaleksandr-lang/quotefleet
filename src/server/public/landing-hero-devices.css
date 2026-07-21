@@ -107,3 +107,57 @@ html body.qf-wft .qf-hero-devices > .qf-hero-vphone {
     filter: drop-shadow(0 12px 24px rgba(0, 0, 0, 0.45)) !important;
   }
 }
+
+/* ─────────────────────────────────────────────────────────────────────────
+   HERO SWAP CHOREOGRAPHY (driven by landing-hero-swap.js)
+
+   The laptop and phone tell one story via a foreground/background depth swap:
+   laptop first (drop in a rate sheet → AI accepts + processes it), then it
+   slides back + dims while the phone scales up into the foreground and runs the
+   live customer calculator, then it swaps back and loops. The JS toggles
+   .stage-laptop / .stage-phone on .qf-hero-devices--video; these rules give each
+   device its front vs. back pose and animate between them. Without the JS the
+   base rules above still render the static side-by-side layout (no blank hero).
+   ───────────────────────────────────────────────────────────────────────── */
+html body.qf-wft .qf-hero-devices--video > .qf-hero-laptop,
+html body.qf-wft .qf-hero-devices--video > .qf-hero-vphone {
+  transition: transform .9s cubic-bezier(.45, .05, .2, 1), opacity .6s ease, filter .6s ease;
+  will-change: transform, opacity;
+}
+/* Grow toward the frame's centre, not each element's own corner. */
+html body.qf-wft .qf-hero-devices--video > .qf-hero-laptop { transform-origin: 32% 42%; }
+html body.qf-wft .qf-hero-devices--video > .qf-hero-vphone { transform-origin: 88% 58%; }
+
+/* STAGE 1 — laptop in front; phone tucked back, shrunk and dimmed. */
+html body.qf-wft .qf-hero-devices--video.stage-laptop > .qf-hero-laptop {
+  z-index: 3; transform: none; opacity: 1; filter: none;
+}
+html body.qf-wft .qf-hero-devices--video.stage-laptop > .qf-hero-vphone {
+  z-index: 1; transform: translate(15%, 7%) scale(.72); opacity: .4;
+  filter: blur(1.2px) saturate(.92);
+}
+
+/* STAGE 2 — phone in front (a tall device already ~full frame-height, so it
+   comes forward at near-full size, centred + sharp, rather than growing huge);
+   laptop shrinks to a small, dimmed, blurred card behind the top-left. */
+html body.qf-wft .qf-hero-devices--video.stage-phone > .qf-hero-vphone {
+  z-index: 3; transform: translate(-108%, -6%) scale(.98); opacity: 1; filter: none;
+}
+html body.qf-wft .qf-hero-devices--video.stage-phone > .qf-hero-laptop {
+  z-index: 1; transform: translate(-4%, -12%) scale(.6); opacity: .34;
+  filter: blur(2px) saturate(.88);
+}
+
+/* Mobile (≤640px): the hero is a single narrow column, so use a gentler swap
+   with smaller offsets/scales that never push a device outside the column. */
+@media (max-width: 640px) {
+  html body.qf-wft .qf-hero-devices--video.stage-laptop > .qf-hero-vphone {
+    transform: translate(6%, 5%) scale(.76);
+  }
+  html body.qf-wft .qf-hero-devices--video.stage-phone > .qf-hero-vphone {
+    transform: translate(-95%, -4%) scale(.92);
+  }
+  html body.qf-wft .qf-hero-devices--video.stage-phone > .qf-hero-laptop {
+    transform: translate(-2%, -8%) scale(.64); opacity: .32; filter: blur(2px) saturate(.88);
+  }
+}
