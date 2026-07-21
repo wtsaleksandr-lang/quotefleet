@@ -600,6 +600,51 @@ body[data-qf-preset="cupertino"] .qf-addr-title {
   letter-spacing: normal !important;
   font-weight: 590 !important;
 }
+/* iOS SEGMENTED CONTROL — the single most recognizable Apple tell. The service
+   tabs become a tonal-grey track carrying a WHITE sliding thumb with a soft
+   shadow under the selected segment; the label stays dark (iOS never tints the
+   selected segment's text). This is what makes Cupertino read as iOS at a glance
+   rather than "another light blue theme". rgba only (guard-safe). */
+body[data-qf-preset="cupertino"] .qf-tabs {
+  background: rgba(118, 118, 128, 0.12) !important;
+  border: 0 !important;
+  border-radius: 10px !important;
+  padding: 4px !important;
+  gap: 4px !important;
+  box-shadow: none !important;
+}
+body[data-qf-preset="cupertino"] .qf-tabs button {
+  border-radius: 7px !important;
+  background: transparent !important;
+  color: #1C1C1E !important;
+  font-weight: 590 !important;
+  box-shadow: none !important;
+  border: 0 !important;
+  transition: background .18s ease, box-shadow .18s ease;
+}
+body[data-qf-preset="cupertino"] .qf-tabs button.active {
+  background: rgba(255, 255, 255, 0.96) !important;
+  background-image: none !important;
+  color: #1C1C1E !important;
+  box-shadow: 0 3px 8px -2px rgba(60, 60, 67, 0.22), 0 0 0 0.5px rgba(60, 60, 67, 0.06) !important;
+  border: 0 !important;
+}
+/* iOS grouped-list inputs — softly filled rounded fields with a hairline, not a
+   hard outline; on focus, the system-blue ring. Pairs with the frosted shell to
+   complete the Apple look. */
+body[data-qf-preset="cupertino"] .qf-input,
+body[data-qf-preset="cupertino"] .qf-select {
+  background: rgba(118, 118, 128, 0.08) !important;
+  background-image: none !important;
+  border: 1px solid rgba(60, 60, 67, 0.10) !important;
+  border-radius: 12px !important;
+}
+body[data-qf-preset="cupertino"] .qf-input:focus,
+body[data-qf-preset="cupertino"] .qf-select:focus {
+  outline: 0;
+  border-color: #007AFF !important;
+  box-shadow: 0 0 0 3px rgba(0, 122, 255, 0.16) !important;
+}
 
 /* --- Material ("Material"/Google) — Material-3 refinement ------------------
    The Google/Android tells that --w-* tokens can't carry: Material-3 SEGMENTED
@@ -648,12 +693,27 @@ body[data-qf-preset="material"] .qf-addr-title {
   font-weight: 500 !important;
   color: #5F6368 !important;
 }
-/* Google-blue Material focus — a 2px blue ring on the active field. */
+/* MD3 FILLED TEXT FIELDS — the single most recognizable Google tell. Instead of
+   the outlined white inputs every other light preset uses, Material's fields are
+   tonal-grey FILLED with only a bottom underline (rounded top, square bottom).
+   This is what makes Material read as Android/Material Design at a glance rather
+   than "another light blue theme". */
+body[data-qf-preset="material"] .qf-input,
+body[data-qf-preset="material"] .qf-select {
+  background: #F1F3F4 !important;
+  background-image: none !important;
+  border: 0 !important;
+  border-bottom: 1px solid #5F6368 !important;
+  border-radius: 8px 8px 0 0 !important;
+}
+/* Focus: the underline thickens to a 2px Google-blue bar and the fill lifts a
+   shade — MD3's stateful text field, not a box ring. */
 body[data-qf-preset="material"] .qf-input:focus,
 body[data-qf-preset="material"] .qf-select:focus {
   outline: 0;
-  border-color: #1A73E8 !important;
-  box-shadow: 0 0 0 2px rgba(26, 115, 232, .35) !important;
+  background: #E8EAED !important;
+  border-bottom: 2px solid #1A73E8 !important;
+  box-shadow: none !important;
 }
 /* Tonal-grey surface containers for the quiet panels. */
 body[data-qf-preset="material"] .qf-customer-note,
