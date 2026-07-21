@@ -35,7 +35,22 @@ body.qf-wft .qf-chip-ico {
    white disc, cropped to a circle, no border, all four normalised to the same
    size and never clipped (the circle is baked into the PNG). It sits on the LEFT
    of the label (flex:0 0 auto + chip nowrap), never wrapping or stacking. */
-body.qf-wft .qf-hero-pills .qf-chip { padding: 4px 12px 4px 4px; gap: 8px; border: 0; }
+/* Frosted-glass pill with a soft 3D lift: translucent light fill + backdrop
+   blur (frost), an inner top highlight + bottom shade for depth, and a drop
+   shadow so each pill pops off the dark hero. No hard border (Alex removed it) —
+   the glass edge is the inset highlight, not an outline. */
+body.qf-wft .qf-hero-pills .qf-chip {
+  padding: 4px 12px 4px 4px;
+  gap: 8px;
+  border: 0;
+  background: rgba(245, 252, 255, 0.08);
+  -webkit-backdrop-filter: blur(10px) saturate(140%);
+  backdrop-filter: blur(10px) saturate(140%);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.18),
+    inset 0 -1px 0 rgba(0, 0, 0, 0.22),
+    0 6px 16px -8px rgba(0, 0, 0, 0.55);
+}
 body.qf-wft .qf-hero-pills .qf-hero-trust-ico {
   flex: 0 0 auto;
   width: 26px;
