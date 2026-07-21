@@ -16,12 +16,15 @@ describe('onboarding wizard — client overlay', () => {
     expect(js).toContain('window.QFOnboardingWizard');
     expect(js).toContain('/api/tenant/onboarding/apply');
     expect(js).toContain('Skip for now');
-    // the five steps, in order
+    // the four steps, in order: modes → area → quoting → confirm
     expect(js).toContain('What do you haul?');
-    expect(js).toContain('How do you price it?');
-    expect(js).toContain('How should we quote?');
     expect(js).toContain('Where do you operate?');
+    expect(js).toContain('How should we quote?');
     expect(js).toContain('Confirm your top 3 rates');
+    // The standalone pricing-mode step was dropped — the pricing model is
+    // DERIVED from the first mode and the engine ignores an explicit choice, so
+    // asking it as its own screen read as dummy filler.
+    expect(js).not.toContain('How do you price it?');
     // The brand-color step was removed — branding isn't needed to produce a
     // working calculator and the dashboard already nudges for it.
     expect(js).not.toContain('Make it yours');
@@ -36,16 +39,17 @@ describe('onboarding wizard — client overlay', () => {
     expect(css).toContain('.qf-ob-card');
   });
 
-  it('adds the confirm-top-3-rates finish step (step 5 of 5)', async () => {
+  it('adds the confirm-top-3-rates finish step (step 4 of 4)', async () => {
     const js = await pub('onboarding-wizard.js');
     const css = await pub('onboarding-wizard.css');
 
-    // Five steps: the quoting-rules step was added between pricing and area.
-    expect(js).toContain('var STEPS = 5');
-    for (const n of [1, 2, 3, 4, 5]) expect(js).toContain(`Step ${n} of 5`);
+    // Four steps: modes → service area → quoting rules → confirm. The standalone
+    // pricing-mode screen was removed (mode-derived + engine-ignored).
+    expect(js).toContain('var STEPS = 4');
+    for (const n of [1, 2, 3, 4]) expect(js).toContain(`Step ${n} of 4`);
     expect(js).toContain('Confirm your top 3 rates');
-    // No stale "of 4" kicker strings survive the insertion.
-    expect(js).not.toContain('of 4');
+    // No stale "of 5" kicker strings survive the removal.
+    expect(js).not.toContain('of 5');
 
     // Rates are fetched AFTER apply (so the reseed has run) and capped at 3 by
     // sortOrder.
@@ -78,7 +82,7 @@ describe('onboarding wizard — client overlay', () => {
     const js = await pub('onboarding-wizard.js');
     const css = await pub('onboarding-wizard.css');
 
-    expect(js).toContain('Step 3 of 5');
+    expect(js).toContain('Step 3 of 4');
     expect(js).toContain('How should we quote?');
     // Fuel surcharge — auto is the DEFAULT (quotes stay current on their own).
     expect(js).toContain('Track diesel automatically');

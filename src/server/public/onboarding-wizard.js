@@ -2,17 +2,17 @@
    Post-signup guided onboarding wizard (client).
 
    A full-bleed overlay shown once, right after signup, gated by the SERVER
-   flag `tenant.needsOnboarding` (set in app.js boot). Five short steps:
-     1. What do you haul?   → freight verticals (MULTI-select; seeds all of them)
-     2. How do you price?   → pricing mode
+   flag `tenant.needsOnboarding` (set in app.js boot). Four short steps — every
+   one genuinely configures the calculator; there is no survey filler:
+     1. What do you haul?    → freight verticals (MULTI-select; seeds rate cards,
+                                accessorials and zones for ALL of them)
+     2. Where do you operate? → service area (nationwide US / nationwide CA /
+                                cross-border / states+provinces / radius)
      3. How should we quote? → fuel-surcharge mode (auto EIA diesel index vs a
                                 fixed manual %) + who sees prices (public vs
                                 lead-gated). Both materially change what every
-                                customer sees, and both previously kept a
-                                default the carrier never actually chose.
-     4. Where do you operate? → service area (nationwide US / nationwide CA /
-                                cross-border / states+provinces / radius)
-     5. Confirm top rates   → tweak headline prices, add OPTIONAL trust details
+                                customer sees.
+     4. Confirm top rates    → tweak headline prices, add OPTIONAL trust details
                               (MC#, DOT#, public contact email) + copy the
                               share link
 
@@ -25,13 +25,19 @@
    thought they ran a single truck on a single route. The area is stored for AI
    context / examples / carrier profile — it never blocks an incoming quote.
 
+   Why NO standalone pricing-mode step: the pricing model is DERIVED from the
+   first mode picked (drayage → zone tariff, FTL/reefer/flatbed → per mile,
+   LTL → minimum+mileage) and the seed already assigns it per mode. Asking it as
+   its own screen was redundant + read as a dummy survey question, so it's gone;
+   the derived value is still sent to the server.
+
    There is no brand-color step: it isn't needed to produce a working calculator,
    and the dashboard already nudges for branding via setup-status.
 
-   Leaving step 4 (service area) POSTs /api/tenant/onboarding/apply (reseeds the
+   Leaving step 3 (quoting rules) POSTs /api/tenant/onboarding/apply (reseeds the
    tenant with the UNION of the picked verticals when the seed is still pristine);
    on success it GETs /api/tenant/rate-cards (after the reseed ran) and shows the
-   confirm step. Step 5 "Finish" re-POSTs apply (now carrying the OPTIONAL trust
+   confirm step. Step 4 "Finish" re-POSTs apply (now carrying the OPTIONAL trust
    details, which are only collected on that last step — the reseed can't run
    twice because onboarding is already marked completed), PUTs any edited rate
    rows, then closes and hands control back to the dashboard. "Skip for now"
@@ -133,11 +139,10 @@
       ratesLoaded: false,
       submitting: false
     };
-    // 5 steps: modes → pricing → quoting rules → service area → confirm rates.
-    // The brand-color step was removed — it isn't needed to produce a working
-    // calculator, and the dashboard already nudges for branding via
-    // setup-status.
-    var STEPS = 5;
+    // 4 steps: modes → service area → quoting rules → confirm rates. The pricing
+    // step was dropped (mode-derived + engine-ignored) and the brand-color step
+    // was removed — neither is needed to produce a working calculator.
+    var STEPS = 4;
 
     // Which of ratePerMile / flatFee / minimumCharge is the "headline" price for
     // a seeded row — the first non-zero wins so we never surface an editable 0
@@ -235,7 +240,7 @@
       body.innerHTML = '';
 
       if (state.step === 0) {
-        body.appendChild(el('div', 'qf-ob-kicker', 'Step 1 of 5'));
+        body.appendChild(el('div', 'qf-ob-kicker', 'Step 1 of 4'));
         body.appendChild(el('h1', 'qf-ob-title', 'What do you haul?'));
         body.appendChild(el('p', 'qf-ob-sub', 'Select every mode you run — we seed rates for all of them, so your customers can quote anything you actually haul.'));
         var grid = el('div', 'qf-ob-cards is-two');
@@ -245,8 +250,10 @@
             var i = state.verticals.indexOf(v.id);
             if (i === -1) state.verticals.push(v.id);
             else state.verticals.splice(i, 1);
-            // Default the pricing model from the FIRST mode picked; the tenant
-            // can still override it on the next step.
+            // Pricing model is DERIVED from the first mode picked (drayage → zone
+            // tariff, FTL/reefer/flatbed → per mile, LTL → minimum+mileage) — the
+            // seed already assigns the right model per mode, so we don't ask it as
+            // its own screen (it read as a redundant survey question).
             if (state.verticals.length === 1) state.pricing = v.pricing;
             if (state.verticals.length === 0) state.pricing = null;
             render();
@@ -256,20 +263,8 @@
         if (state.verticals.length > 1) {
           body.appendChild(el('p', 'qf-ob-sub', state.verticals.length + ' modes selected — rates will be seeded for each.'));
         }
-      } else if (state.step === 1) {
-        body.appendChild(el('div', 'qf-ob-kicker', 'Step 2 of 5'));
-        body.appendChild(el('h1', 'qf-ob-title', 'How do you price it?'));
-        body.appendChild(el('p', 'qf-ob-sub', 'This sets your default. You can fine-tune every rate afterward.'));
-        var pgrid = el('div', 'qf-ob-cards is-two');
-        PRICING.forEach(function (p) {
-          pgrid.appendChild(optionCard(p, state.pricing === p.id, function () {
-            state.pricing = p.id;
-            render();
-          }));
-        });
-        body.appendChild(pgrid);
       } else if (state.step === 2) {
-        body.appendChild(el('div', 'qf-ob-kicker', 'Step 3 of 5'));
+        body.appendChild(el('div', 'qf-ob-kicker', 'Step 3 of 4'));
         body.appendChild(el('h1', 'qf-ob-title', 'How should we quote?'));
         body.appendChild(el('p', 'qf-ob-sub', 'Two rules that change what every customer sees. Both are editable later in Settings.'));
 
@@ -317,8 +312,8 @@
           }));
         });
         body.appendChild(acgrid);
-      } else if (state.step === 3) {
-        body.appendChild(el('div', 'qf-ob-kicker', 'Step 4 of 5'));
+      } else if (state.step === 1) {
+        body.appendChild(el('div', 'qf-ob-kicker', 'Step 2 of 4'));
         body.appendChild(el('h1', 'qf-ob-title', 'Where do you operate?'));
         body.appendChild(el('p', 'qf-ob-sub', 'Your coverage area. This tunes examples and your carrier profile — it never blocks a customer from requesting a quote.'));
         var agrid = el('div', 'qf-ob-cards');
@@ -359,7 +354,7 @@
         } else if (state.areaKind === 'radius') {
           var radWrap = el('div', 'qf-ob-lane');
           var milesWrap = el('div', 'qf-ob-field');
-          milesWrap.appendChild(el('label', null, 'Radius (miles)'));
+          milesWrap.appendChild(el('label', null, 'Radius'));
           var milesIn = el('input', 'qf-ob-input');
           milesIn.type = 'number';
           milesIn.min = '1';
@@ -373,7 +368,7 @@
           });
           milesWrap.appendChild(milesIn);
           radWrap.appendChild(milesWrap);
-          radWrap.appendChild(el('div', 'qf-ob-lane-arrow', 'of'));
+          radWrap.appendChild(el('div', 'qf-ob-lane-arrow', 'miles of'));
           var baseWrap = el('div', 'qf-ob-field');
           baseWrap.appendChild(el('label', null, 'Base city'));
           var baseIn = el('input', 'qf-ob-input');
@@ -385,8 +380,8 @@
           radWrap.appendChild(baseWrap);
           body.appendChild(radWrap);
         }
-      } else if (state.step === 4) {
-        body.appendChild(el('div', 'qf-ob-kicker', 'Step 5 of 5'));
+      } else if (state.step === 3) {
+        body.appendChild(el('div', 'qf-ob-kicker', 'Step 4 of 4'));
         body.appendChild(el('h1', 'qf-ob-title', 'Confirm your top 3 rates'));
         body.appendChild(el('p', 'qf-ob-sub', 'These seeded from your pick. Tweak the headline price on each, then copy your calculator link to share it.'));
 
@@ -509,20 +504,21 @@
     function gateNext() {
       var blocked = false;
       if (state.step === 0) blocked = state.verticals.length === 0;
-      else if (state.step === 1) blocked = !state.pricing;
-      else if (state.step === 2) {
+      else if (state.step === 1) {
+        // Territory: a kind must be picked; regions needs >=1 chip; radius needs
+        // a positive mileage and a base city.
+        if (!state.areaKind) blocked = true;
+        else if (state.areaKind === 'regions') blocked = state.regions.length === 0;
+        else if (state.areaKind === 'radius') {
+          blocked = !(state.radiusMiles > 0) || state.baseCity.trim() === '';
+        }
+      } else if (state.step === 2) {
         // Both answers are always pre-selected, so the only way to block here is
         // a manual fuel surcharge that isn't a usable 0-100 percentage.
         if (state.fscMode === 'manual') {
           blocked = !(typeof state.fscPercent === 'number' && state.fscPercent >= 0 && state.fscPercent <= 100);
         }
       } else if (state.step === 3) {
-        if (!state.areaKind) blocked = true;
-        else if (state.areaKind === 'regions') blocked = state.regions.length === 0;
-        else if (state.areaKind === 'radius') {
-          blocked = !(state.radiusMiles > 0) || state.baseCity.trim() === '';
-        }
-      } else if (state.step === 4) {
         // Trust details are optional — but a NON-EMPTY email must be valid, or
         // the server would 400 the whole finish.
         var mail = state.publicContactEmail.trim();
@@ -535,9 +531,10 @@
 
     function onNext() {
       if (state.submitting) return;
-      // Leaving the service-area step (step 4 of 5): commit the setup, then load
-      // the reseeded rate cards and advance to the confirm-rates step.
-      if (state.step === 3) { applyAndLoadRates(); return; }
+      // Leaving the quoting-rules step (step 3 of 4, index 2): commit the setup,
+      // then load the reseeded rate cards and advance to the confirm-rates step.
+      // The reseed depends only on modes + territory, both already answered.
+      if (state.step === 2) { applyAndLoadRates(); return; }
       if (state.step < STEPS - 1) { state.step++; render(); return; }
       // Confirm-rates step: persist any edits, then finish.
       finishRates();
@@ -601,7 +598,7 @@
       return payload;
     }
 
-    // Step 4 → 5: POST the setup, then GET the (reseeded) rate cards. The rate
+    // Step 3 → 4: POST the setup, then GET the (reseeded) rate cards. The rate
     // fetch MUST run AFTER apply so the pristine-seed reseed has already run.
     function applyAndLoadRates() {
       if (state.submitting) return;
@@ -634,7 +631,7 @@
           state.ratesLoaded = true;
           state.submitting = false;
           skipBtn.disabled = false;
-          state.step = 4; // confirm-rates is the last step (index 4 of 5)
+          state.step = 3; // confirm-rates is the last step (index 3 of 4)
           render();
         })
         .catch(function () {
@@ -645,7 +642,7 @@
         });
     }
 
-    // Step 5 "Finish": re-POST apply with the OPTIONAL trust details (collected
+    // Step 4 "Finish": re-POST apply with the OPTIONAL trust details (collected
     // only on this step), then PUT only the rows whose headline price was edited
     // (never delete a row — that would flip setup-status.rates back to false),
     // then close and hand control to the dashboard.
