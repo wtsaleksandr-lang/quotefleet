@@ -35,7 +35,7 @@ body.qf-wft .qf-chip-ico {
    white disc, cropped to a circle, no border, all four normalised to the same
    size and never clipped (the circle is baked into the PNG). It sits on the LEFT
    of the label (flex:0 0 auto + chip nowrap), never wrapping or stacking. */
-body.qf-wft .qf-hero-pills .qf-chip { padding: 4px 12px 4px 4px; gap: 8px; }
+body.qf-wft .qf-hero-pills .qf-chip { padding: 4px 12px 4px 4px; gap: 8px; border: 0; }
 body.qf-wft .qf-hero-pills .qf-hero-trust-ico {
   flex: 0 0 auto;
   width: 26px;
