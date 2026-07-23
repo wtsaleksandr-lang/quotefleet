@@ -11,16 +11,16 @@ async function file(name: string) {
 describe('public static page smoke checks', () => {
   it('landing page has simple visual-first positioning and no placeholder links', async () => {
     const html = await file('landing.html');
-    expect(html).toContain('The best online quoting tool built for trucking — ready to launch today.');
+    expect(html).toContain('Quote every load in seconds');
     expect(html).toContain('Stop losing loads to slow, manual quoting.');
-    expect(html).toContain('For trucking service providers');
+    expect(html).toContain('For carriers, brokers');
     expect(html).toContain('acmetrucking.yourquote.net');
     expect(html).toContain('email signature');
     expect(html).toContain('Instant lead capture');
-    expect(html).toContain('Send branded PDF');
-    expect(html).toContain('Automated follow-ups');
-    expect(html).toContain('Follow-up reminders');
-    expect(html).toContain('Do not let a warm quote go cold.');
+    expect(html).toContain('Branded PDF quotes');
+    expect(html).toContain('Automatic follow-ups');
+    expect(html).toContain('24/7 AI service agent');
+    expect(html).toContain('Everything included');
     expect(html).toContain('No contracts');
     expect(html).toContain('/w/demo');
     expect(html).toContain('/signup');
