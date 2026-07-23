@@ -1441,13 +1441,25 @@
     box.style.display = 'block';
   }
 
+  // Show a validation message AND bring the offending field into view + focus it,
+  // so the reason a submit failed is never stranded below the fold on mobile.
+  function failField(fieldId, msg) {
+    showError('qf-submit-error', msg);
+    var f = $(fieldId);
+    if (!f) return;
+    f.classList.add('qf-field-invalid');
+    f.setAttribute('aria-invalid', 'true');
+    try { f.scrollIntoView({ block: 'center', behavior: 'smooth' }); } catch (_) {}
+    try { f.focus({ preventScroll: true }); } catch (_) { f.focus(); }
+    f.addEventListener('input', function clr() { f.classList.remove('qf-field-invalid'); f.removeAttribute('aria-invalid'); f.removeEventListener('input', clr); });
+  }
   function onSubmit(e) {
     e && e.preventDefault(); showError('qf-submit-error', null); var rules = getContactRules();
     var name = $('qf-c-name').value.trim(); var email = $('qf-c-email').value.trim(); var phone = $('qf-c-phone').value.trim();
-    if (!name) { showError('qf-submit-error', 'Please enter your name.'); return; }
-    if (rules.requireEmail) { if (!email || !/^\S+@\S+\.\S+$/.test(email)) { showError('qf-submit-error', 'Please enter a valid email.'); return; } }
-    else if (email && !/^\S+@\S+\.\S+$/.test(email)) { showError('qf-submit-error', 'That email looks invalid — clear it or fix the format.'); return; }
-    if (rules.requirePhone && !phone) { showError('qf-submit-error', 'Please enter a phone number.'); return; }
+    if (!name) { failField('qf-c-name', 'Please enter your name.'); return; }
+    if (rules.requireEmail) { if (!email || !/^\S+@\S+\.\S+$/.test(email)) { failField('qf-c-email', 'Please enter a valid email.'); return; } }
+    else if (email && !/^\S+@\S+\.\S+$/.test(email)) { failField('qf-c-email', 'That email looks invalid — clear it or fix the format.'); return; }
+    if (rules.requirePhone && !phone) { failField('qf-c-phone', 'Please enter a phone number.'); return; }
     var req = gatherQuoteRequest();
     // Flatten the customer fields onto the quote request. The server's
     // LeadSchema extends QuoteSchema (service/equipment/pickup/delivery at

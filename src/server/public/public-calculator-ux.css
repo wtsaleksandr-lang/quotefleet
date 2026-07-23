@@ -1,4 +1,13 @@
 /* Phase AE: customer-facing calculator UX polish. */
+/* Lead-form invalid field — a clear red outline on the field that failed
+   validation (the message alone used to sit below the fold on mobile). */
+.qf-field-invalid,
+input.qf-field-invalid,
+textarea.qf-field-invalid {
+  border-color: #dc2626 !important;
+  box-shadow: 0 0 0 3px rgba(220, 38, 38, 0.14) !important;
+}
+
 .qf-trust-strip {
   display: grid;
   grid-template-columns: repeat(3, 1fr);
