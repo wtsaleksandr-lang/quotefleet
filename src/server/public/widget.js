@@ -491,6 +491,8 @@
     setTimeout(function () { positionTabIndicator(false); }, 600);
     $('qf-back-btn').addEventListener('click', function () { showStep('quote'); });
     $('qf-submit-btn').addEventListener('click', onSubmit);
+    var leadFilesEl = $('qf-c-files');
+    if (leadFilesEl) leadFilesEl.addEventListener('change', renderLeadFileList);
 
     var oogCheck = $('qf-oog-check');
     if (oogCheck) oogCheck.addEventListener('change', function () { var fields = $('qf-oog-fields'); if (fields) fields.style.display = oogCheck.checked ? '' : 'none'; autoResize(); });
@@ -590,8 +592,9 @@
       showCallbackError(null);
       $('qf-result').style.display = 'none';
       resetCalcCta();
-      ['qf-pickup-zip', 'qf-delivery-zip', 'qf-weight', 'qf-booking', 'qf-c-name', 'qf-c-email', 'qf-c-phone', 'qf-c-company', 'qf-c-notes', 'qf-oog-length', 'qf-oog-width', 'qf-oog-height', 'qf-oog-weight', 'qf-oog-notes']
+      ['qf-pickup-zip', 'qf-delivery-zip', 'qf-weight', 'qf-booking', 'qf-c-name', 'qf-c-email', 'qf-c-phone', 'qf-c-company', 'qf-c-notes', 'qf-oog-length', 'qf-oog-width', 'qf-oog-height', 'qf-oog-weight', 'qf-oog-notes', 'qf-c-files']
         .forEach(function (id) { var el = $(id); if (el) el.value = ''; });
+      renderLeadFileList();
       state.ltlItems = [];
       if (state.service === 'ltl') { renderLtlItems(); updateLtlSummary(); }
       var oog = $('qf-oog-check'); if (oog) oog.checked = false;
@@ -1605,6 +1608,27 @@
     try { f.focus({ preventScroll: true }); } catch (_) { f.focus(); }
     f.addEventListener('input', function clr() { f.classList.remove('qf-field-invalid'); f.removeAttribute('aria-invalid'); f.removeEventListener('input', clr); });
   }
+
+  // Optional lead attachments (work order / delivery order). Limits mirror the
+  // server; the file is base64'd into the lead POST and relayed to the carrier's
+  // email — nothing is stored, so keep it small.
+  var LEAD_FILE_MAX_BYTES = 3 * 1024 * 1024, LEAD_FILE_MAX_COUNT = 2;
+  function readFileAsBase64(file) {
+    return new Promise(function (resolve, reject) {
+      var fr = new FileReader();
+      fr.onload = function () {
+        var res = String(fr.result || ''); var comma = res.indexOf(',');
+        resolve({ filename: file.name, mimeType: file.type, dataBase64: comma >= 0 ? res.slice(comma + 1) : res });
+      };
+      fr.onerror = function () { reject(new Error('read failed')); };
+      fr.readAsDataURL(file);
+    });
+  }
+  function renderLeadFileList() {
+    var list = $('qf-c-files-list'); var input = $('qf-c-files'); if (!list || !input) return;
+    var files = input.files ? Array.prototype.slice.call(input.files) : [];
+    list.textContent = files.length ? files.map(function (f) { return f.name; }).join(', ') : '';
+  }
   function onSubmit(e) {
     e && e.preventDefault(); showError('qf-submit-error', null); var rules = getContactRules();
     var name = $('qf-c-name').value.trim(); var email = $('qf-c-email').value.trim(); var phone = $('qf-c-phone').value.trim();
@@ -1618,15 +1642,26 @@
     // the top level) — sending them nested under `quoteRequest` made every
     // lead submission fail validation with HTTP 400. `sourceUrl` is derived
     // server-side from the Referer header, so it isn't sent here.
-    var payload = Object.assign({}, req, {
-      customerName: name,
-      customerEmail: email || undefined,
-      customerPhone: phone || undefined,
-      customerCompany: $('qf-c-company').value.trim() || undefined,
-      notes: $('qf-c-notes').value.trim() || req.notes || undefined,
-    });
+    var leadFileInput = $('qf-c-files');
+    var leadFiles = leadFileInput && leadFileInput.files ? Array.prototype.slice.call(leadFileInput.files) : [];
+    if (leadFiles.length > LEAD_FILE_MAX_COUNT) { failField('qf-c-files', 'Please attach at most ' + LEAD_FILE_MAX_COUNT + ' files.'); return; }
+    for (var _fi = 0; _fi < leadFiles.length; _fi++) {
+      if (leadFiles[_fi].size > LEAD_FILE_MAX_BYTES) { failField('qf-c-files', 'Each file must be under 3 MB.'); return; }
+      if (!/\.(pdf|jpe?g|png)$/i.test(leadFiles[_fi].name)) { failField('qf-c-files', 'Only PDF, JPG, or PNG files can be attached.'); return; }
+    }
     var btn = $('qf-submit-btn'); var oldText = btn.textContent; btn.disabled = true; btn.innerHTML = '<span class="qf-spinner"></span> &nbsp; Sending…';
-    fetch(withGrant('/api/public/lead/' + slug), { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) })
+    Promise.all(leadFiles.map(readFileAsBase64))
+      .then(function (attachments) {
+        var payload = Object.assign({}, req, {
+          customerName: name,
+          customerEmail: email || undefined,
+          customerPhone: phone || undefined,
+          customerCompany: $('qf-c-company').value.trim() || undefined,
+          notes: $('qf-c-notes').value.trim() || req.notes || undefined,
+        });
+        if (attachments.length) payload.attachments = attachments;
+        return fetch(withGrant('/api/public/lead/' + slug), { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) });
+      })
       .then(function (r) { return r.json(); })
       .then(function (resp) {
         btn.disabled = false; btn.textContent = oldText;

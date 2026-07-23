@@ -94,6 +94,13 @@ export function brandedFrom(displayName: string): string {
   return `${name} <${addr}>`;
 }
 
+export interface EmailAttachment {
+  filename: string;
+  /** Base64-encoded file content (no `data:` prefix). */
+  contentBase64: string;
+  contentType?: string;
+}
+
 export interface EmailIn {
   to: string;
   subject: string;
@@ -101,6 +108,10 @@ export interface EmailIn {
   html?: string;
   replyTo?: string;
   from?: string;
+  /** Optional file attachments (e.g. a customer's work order / delivery order
+   *  relayed to the carrier). Relayed straight to the recipient's inbox — we
+   *  store nothing. Keep the total small; providers cap attachment size. */
+  attachments?: EmailAttachment[];
   /** MARKETING/LIFECYCLE ONLY: when set, sendEmail attaches RFC 2369 /
    *  RFC 8058 unsubscribe headers (`List-Unsubscribe` +
    *  `List-Unsubscribe-Post`) on both the Resend and SMTP paths. Transactional
@@ -167,6 +178,10 @@ export async function sendEmail(msg: EmailIn): Promise<EmailOut> {
           reply_to: msg.replyTo,
           // Marketing/lifecycle only — omitted (undefined) for transactional.
           ...(listHeaders ? { headers: listHeaders } : {}),
+          // Resend takes base64 in `content`.
+          ...(msg.attachments?.length
+            ? { attachments: msg.attachments.map((a) => ({ filename: a.filename, content: a.contentBase64 })) }
+            : {}),
         }),
       });
       if (!r.ok) {
@@ -201,6 +216,16 @@ export async function sendEmail(msg: EmailIn): Promise<EmailOut> {
         replyTo: msg.replyTo,
         // Marketing/lifecycle only — omitted for transactional sends.
         ...(listHeaders ? { headers: listHeaders } : {}),
+        // Nodemailer takes a Buffer.
+        ...(msg.attachments?.length
+          ? {
+              attachments: msg.attachments.map((a) => ({
+                filename: a.filename,
+                content: Buffer.from(a.contentBase64, 'base64'),
+                contentType: a.contentType,
+              })),
+            }
+          : {}),
       });
       return { ok: true, provider: 'smtp' };
     } catch (err) {
