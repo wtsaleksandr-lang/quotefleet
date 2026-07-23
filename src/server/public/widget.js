@@ -518,6 +518,30 @@
       });
     }
 
+    // Result-step quote chat (pre-lead).
+    var rchatOpen = $('qf-rchat-open-btn');
+    if (rchatOpen) {
+      rchatOpen.addEventListener('click', function () {
+        var panel = $('qf-rchat'); if (!panel) return;
+        var show = panel.style.display === 'none' || !panel.style.display;
+        panel.style.display = show ? 'block' : 'none';
+        rchatOpen.setAttribute('aria-expanded', show ? 'true' : 'false');
+        if (show) {
+          if (!$('qf-rchat-msgs').children.length) appendChatBubble('assistant', 'Hi! Ask me anything about this estimate — transit time, accessorials, pickup readiness, or how to lock it in.', 'qf-rchat-msgs');
+          var ri = $('qf-rchat-input'); if (ri) ri.focus();
+        }
+        autoResize();
+      });
+    }
+    var rchatSend = $('qf-rchat-send');
+    var rchatInput = $('qf-rchat-input');
+    if (rchatSend && rchatInput) {
+      rchatSend.addEventListener('click', sendQuoteChatMessage);
+      rchatInput.addEventListener('keydown', function (e) {
+        if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); sendQuoteChatMessage(); }
+      });
+    }
+
     var cbOpen = $('qf-callback-open-btn');
     var cbForm = $('qf-callback-form');
     var cbCancel = $('qf-cb-cancel-btn');
@@ -929,7 +953,7 @@
     // restore the primary CTA (otherwise a stale result + "Recalculate" linger).
     if (!firstSelect && state.service !== service) {
       var rb = $('qf-result'); if (rb) rb.style.display = 'none';
-      showError('qf-error', null); resetCalcCta();
+      showError('qf-error', null); resetCalcCta(); resetQuoteChat();
     }
     state.service = service;
     $$('#qf-services button').forEach(function (b) { var on = b.dataset.service === service; b.classList.toggle('active', on); b.setAttribute('aria-selected', on ? 'true' : 'false'); });
@@ -1072,9 +1096,63 @@
 
   function escapeHtml(s) { return String(s == null ? '' : s).replace(/[&<>"']/g, function (m) { return ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[m]); }); }
 
-  function appendChatBubble(role, text) {
-    var msgs = $('qf-chat-msgs'); if (!msgs) return null;
-    var b = document.createElement('div'); b.className = 'qf-chat-bubble ' + role; b.textContent = text; msgs.appendChild(b); msgs.scrollTop = msgs.scrollHeight; autoResize(); return b;
+  function appendChatBubble(role, text, msgsId) {
+    var msgs = $(msgsId || 'qf-chat-msgs'); if (!msgs) return null;
+    var b = document.createElement('div'); b.className = 'qf-chat-bubble ' + role;
+    // Render **bold** from the model safely — split on the markers and wrap odd
+    // segments in <strong> via textContent (never innerHTML with AI text → no XSS).
+    String(text).split(/\*\*/).forEach(function (seg, i) {
+      if (i % 2 === 1) { var s = document.createElement('strong'); s.textContent = seg; b.appendChild(s); }
+      else if (seg) { b.appendChild(document.createTextNode(seg)); }
+    });
+    msgs.appendChild(b); msgs.scrollTop = msgs.scrollHeight; autoResize(); return b;
+  }
+
+  // ── Pre-lead quote chat (result step) ──────────────────────────────────────
+  // Lets a shopper ask about the quote they're viewing BEFORE handing over
+  // contact details. Stateless server-side: the client holds the short history
+  // and sends it (+ the current quote context) each turn to /quote-chat.
+  var quoteChatHistory = [];
+  function quoteChatContextFromState() {
+    var q = state.quote || {}; var r = q.result || {};
+    var pk = state.pickupResolved || {}; var dl = state.deliveryResolved || {};
+    return {
+      service: state.service || null,
+      equipment: customerEquipmentLabel() || state.equipment || null,
+      pickupCity: pk.city || null, pickupState: pk.state || null,
+      deliveryCity: dl.city || null, deliveryState: dl.state || null,
+      distanceMiles: (typeof q.miles === 'number' ? q.miles : (typeof r.miles === 'number' ? r.miles : null)),
+      transit: (q.transit && q.transit.text) || null,
+      total: (typeof r.total === 'number' ? r.total : null),
+      currency: (r.currency || q.currency || null),
+    };
+  }
+  function resetQuoteChat() {
+    quoteChatHistory = [];
+    var msgs = $('qf-rchat-msgs'); if (msgs) msgs.innerHTML = '';
+    var panel = $('qf-rchat'); if (panel) panel.style.display = 'none';
+    var open = $('qf-rchat-open-btn'); if (open) open.setAttribute('aria-expanded', 'false');
+  }
+  function sendQuoteChatMessage() {
+    var input = $('qf-rchat-input'); if (!input) return;
+    var msg = (input.value || '').trim(); if (!msg) return;
+    appendChatBubble('user', msg, 'qf-rchat-msgs'); input.value = '';
+    quoteChatHistory.push({ role: 'user', content: msg });
+    var thinking = appendChatBubble('thinking', 'Thinking…', 'qf-rchat-msgs');
+    var sendBtn = $('qf-rchat-send'); if (sendBtn) sendBtn.disabled = true;
+    fetch(withGrant('/api/public/quote-chat/' + slug), {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ message: msg, quote: quoteChatContextFromState(), history: quoteChatHistory.slice(0, -1) }),
+    })
+      .then(function (r) { return r.json(); })
+      .then(function (resp) {
+        if (thinking) thinking.remove(); if (sendBtn) sendBtn.disabled = false;
+        if (resp.error) { appendChatBubble('assistant', 'Sorry — ' + resp.error, 'qf-rchat-msgs'); return; }
+        var reply = resp.reply || '(no reply)';
+        appendChatBubble('assistant', reply, 'qf-rchat-msgs');
+        quoteChatHistory.push({ role: 'assistant', content: reply });
+      })
+      .catch(function () { if (thinking) thinking.remove(); if (sendBtn) sendBtn.disabled = false; appendChatBubble('assistant', 'Connection error. Try again in a moment.', 'qf-rchat-msgs'); });
   }
 
   function sendChatMessage() {
@@ -1479,6 +1557,8 @@
     // to "Recalculate" so it no longer reads as if nothing has happened yet.
     var cbtn = $('qf-calc-btn');
     if (cbtn) { if (!cbtn.dataset.calcLabel) cbtn.dataset.calcLabel = cbtn.textContent; cbtn.textContent = 'Recalculate'; }
+    // Fresh quote → fresh chat (history references the prior numbers otherwise).
+    resetQuoteChat();
     // Fade + slide the card in on every calculate (re-trigger the CSS animation).
     if (!prefersReduce()) {
       resultBox.classList.remove('qf-reveal');

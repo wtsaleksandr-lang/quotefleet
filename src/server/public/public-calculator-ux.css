@@ -633,3 +633,30 @@ textarea.qf-field-invalid {
   margin: 0 0 8px;
 }
 .qf-opt-group-label.qf-opt-group-sep { margin-top: 16px; }
+
+/* ── Result-step quote chat (.qf-rchat) — the reused .qf-chat styling was built
+   for the widget's default surface; on the light result card the assistant
+   bubble fell back to a dark token pair (unreadable) and the input didn't flex.
+   Scope readable colours + a proper input/Send split to the result chat only. ── */
+body.qf-app-calculator .qf-rchat .qf-chat-bubble.assistant {
+  background: var(--w-accent-surface, #FFFFFF) !important;
+  color: var(--w-input-text, #1E1E1E) !important;
+}
+body.qf-app-calculator .qf-rchat .qf-chat-bubble.thinking {
+  color: var(--w-muted, #5b6472) !important;
+}
+body.qf-app-calculator .qf-rchat .qf-chat-input-row {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+}
+body.qf-app-calculator .qf-rchat .qf-chat-input-row .qf-input {
+  flex: 1 1 auto !important;
+  width: auto !important;
+  min-width: 0 !important;
+}
+body.qf-app-calculator .qf-rchat .qf-chat-send {
+  flex: 0 0 auto !important;
+  width: auto !important;
+}
+.qf-rchat-launch { margin-top: 8px; text-align: center; }
