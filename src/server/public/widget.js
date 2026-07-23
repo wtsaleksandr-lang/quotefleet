@@ -663,8 +663,7 @@
           b.classList.toggle('is-on', on);
           b.setAttribute('aria-pressed', on ? 'true' : 'false');
         });
-        var inp = $('qf-weight');
-        if (inp) inp.placeholder = state.weightUnit === 'kg' ? 'e.g. 17000' : 'e.g. 38000';
+        updateWeightPlaceholder();
         updateLtlClassReadout();
       });
     });
@@ -730,6 +729,16 @@
     var k = svc + '|' + eq;
     return EQUIP_MAX_WEIGHT[k] > 0 ? EQUIP_MAX_WEIGHT[k] : null;
   }
+
+  // Equipment-aware weight-field example: ~55% of the selected equipment's
+  // capacity (so a Sprinter shows "e.g. 2500", not "e.g. 38000" = 9.5× its max).
+  function weightPlaceholder() {
+    var cap = state.service === 'ltl' ? null : equipMaxWeight();
+    var lbs = cap ? Math.max(500, Math.round((cap * 0.55) / 500) * 500) : 20000;
+    if (state.weightUnit === 'kg') return 'e.g. ' + Math.max(200, Math.round(lbs / LB_PER_KG / 100) * 100);
+    return 'e.g. ' + lbs;
+  }
+  function updateWeightPlaceholder() { var inp = $('qf-weight'); if (inp) inp.placeholder = weightPlaceholder(); }
 
   // Soft-confirm gate: when `active`, show `message` and block THIS submit, but
   // remember the exact situation (`sig`) so an identical resubmit proceeds —
@@ -887,7 +896,8 @@
     sel.innerHTML = '';
     equip.forEach(function (e) { var opt = document.createElement('option'); opt.value = e.value; opt.textContent = normalizeEquipmentLabel(e.label || e.value, service); sel.appendChild(opt); });
     state.equipment = equip[0] ? equip[0].value : null;
-    sel.onchange = function () { state.equipment = sel.value; syncOogPanel(); };
+    updateWeightPlaceholder();
+    sel.onchange = function () { state.equipment = sel.value; syncOogPanel(); updateWeightPlaceholder(); };
     // Single-equipment modes (e.g. Hotshot) have nothing to choose, AND the
     // equipment name is carrier fleet-spec jargon a shipper doesn't care about
     // ("Class-3 dually + flatbed"). Hide the whole Equipment field so Weight
