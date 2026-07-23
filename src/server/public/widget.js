@@ -897,7 +897,18 @@
     equip.forEach(function (e) { var opt = document.createElement('option'); opt.value = e.value; opt.textContent = normalizeEquipmentLabel(e.label || e.value, service); sel.appendChild(opt); });
     state.equipment = equip[0] ? equip[0].value : null;
     updateWeightPlaceholder();
-    sel.onchange = function () { state.equipment = sel.value; syncOogPanel(); updateWeightPlaceholder(); };
+    sel.onchange = function () {
+      state.equipment = sel.value; syncOogPanel(); updateWeightPlaceholder();
+      // Equipment can change which add-ons are valid (open-deck items). Re-render
+      // the chips, drop any now-invalid selections, and refresh the count badge.
+      if (state.config && state.config.accessorials) {
+        var ok = {};
+        state.config.accessorials.forEach(function (a) { if (accessorialAllowedForEquipment(a)) ok[a.code] = 1; });
+        state.selectedAccessorials = state.selectedAccessorials.filter(function (c) { return ok[c]; });
+        renderAccessorials(state.config.accessorials);
+        if (refreshOptionsCount) refreshOptionsCount();
+      }
+    };
     // Single-equipment modes (e.g. Hotshot) have nothing to choose, AND the
     // equipment name is carrier fleet-spec jargon a shipper doesn't care about
     // ("Class-3 dually + flatbed"). Hide the whole Equipment field so Weight
@@ -1084,9 +1095,27 @@
     return (a && a.description) || ACCESSORIAL_HELP[a && a.code] || ('Optional add-on: ' + ((a && a.label) || 'extra service') + '.');
   }
 
+  // Open-deck equipment — the only place tarping / oversize-permit add-ons make
+  // sense. (Straps/chains are intentionally NOT gated — dry vans use them too.)
+  var OPEN_DECK_EQUIP = { flatbed: 1, step_deck: 1, conestoga: 1 };
+  // Open-deck-only add-ons, matched by code OR label so it works whether the
+  // tenant runs our seed codes or a persisted custom config.
+  function isOpenDeckAccessorial(a) {
+    var s = ((a.code || '') + ' ' + (a.label || '')).toLowerCase();
+    return /tarp|oversize|over-size|open.?deck/.test(s);
+  }
+  // Gate an add-on by the SELECTED equipment (not just the service), so we never
+  // offer a physically-impossible combo (e.g. Tarping/Oversize on a Dry Van).
+  function accessorialAllowedForEquipment(a) {
+    if (!isOpenDeckAccessorial(a)) return true;
+    return !!OPEN_DECK_EQUIP[state.equipment || ''] || state.service === 'hotshot';
+  }
   function renderAccessorials(list) {
     var wrap = $('qf-accessorials'); wrap.innerHTML = '';
-    var visible = (list || []).filter(function (a) { if (!a.appliesToServices || a.appliesToServices.length === 0) return true; return a.appliesToServices.indexOf(state.service) >= 0; });
+    var visible = (list || []).filter(function (a) {
+      var svcOk = !a.appliesToServices || a.appliesToServices.length === 0 || a.appliesToServices.indexOf(state.service) >= 0;
+      return svcOk && accessorialAllowedForEquipment(a);
+    });
     if (!visible.length) { wrap.appendChild(el('span', { class: 'qf-tagline', text: 'No optional add-ons for this service.' })); return; }
     visible.forEach(function (a) {
       var chip = el('button', { class: 'qf-acc-chip' + (state.selectedAccessorials.indexOf(a.code) >= 0 ? ' active' : ''), on: { click: function (ev) { ev.preventDefault(); if (ev.target && ev.target.closest && ev.target.closest('.qf-help')) return; var i = state.selectedAccessorials.indexOf(a.code); if (i >= 0) state.selectedAccessorials.splice(i, 1); else state.selectedAccessorials.push(a.code); chip.classList.toggle('active'); } } }, [
