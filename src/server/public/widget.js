@@ -232,6 +232,24 @@
     return v.indexOf('open top') >= 0 || v.indexOf('opentop') >= 0 || v.indexOf('flat rack') >= 0 || v.indexOf('flatrack') >= 0;
   }
 
+  function isReeferContainer(value) {
+    var v = String(value || '').toLowerCase();
+    return v.indexOf('reefer') >= 0 || v.indexOf('refrigerated') >= 0;
+  }
+
+  // Reveal the genset + reefer-temperature panel only for a refrigerated drayage
+  // container (the panel exists in the markup but was never surfaced before).
+  function syncReeferPanel() {
+    var panel = $('qf-genset-panel'); if (!panel) return;
+    var show = state.service === 'drayage' && isReeferContainer(state.equipment);
+    panel.style.display = show ? '' : 'none';
+    if (!show) {
+      var g = $('qf-genset'); if (g) g.checked = false;
+      var t = $('qf-reefer-temp'); if (t) t.value = '';
+    }
+    autoResize();
+  }
+
   function syncOogPanel() {
     var panel = $('qf-oog-panel');
     var check = $('qf-oog-check');
@@ -557,6 +575,8 @@
       var dims = $('qf-dims-check'); if (dims) dims.checked = false;
       var dimsFields = $('qf-dims-fields'); if (dimsFields) dimsFields.style.display = 'none';
       ['qf-dims-pieces', 'qf-dims-length', 'qf-dims-width', 'qf-dims-height'].forEach(function (id) { var el = $(id); if (el) el.value = ''; });
+      var genset = $('qf-genset'); if (genset) genset.checked = false;
+      var reeferTemp = $('qf-reefer-temp'); if (reeferTemp) reeferTemp.value = '';
       var oc = $('qf-ocean-carrier'); if (oc) oc.value = '';
       var pp = $('qf-pickup-port-input'); if (pp) pp.value = '';
       var pt = $('qf-pickup-terminal'); if (pt) pt.value = '';
@@ -924,7 +944,7 @@
     state.equipment = equip[0] ? equip[0].value : null;
     updateWeightPlaceholder();
     sel.onchange = function () {
-      state.equipment = sel.value; syncOogPanel(); updateWeightPlaceholder();
+      state.equipment = sel.value; syncOogPanel(); syncReeferPanel(); updateWeightPlaceholder();
       // Equipment can change which add-ons are valid (open-deck items). Re-render
       // the chips, drop any now-invalid selections, and refresh the count badge.
       if (state.config && state.config.accessorials) {
@@ -966,6 +986,7 @@
     renderAccessorials(state.config.accessorials);
     if (refreshOptionsCount) refreshOptionsCount();
     syncDimsPanel();
+    syncReeferPanel();
     var isDrayage = service === 'drayage';
     var drayPickup = $('qf-drayage-pickup');
     var defaultPickup = $('qf-default-pickup');
@@ -1284,6 +1305,13 @@
         height: ($('qf-oog-height') && $('qf-oog-height').value || '').trim() || undefined,
         weight: ($('qf-oog-weight') && $('qf-oog-weight').value || '').trim() || undefined,
         notes: ($('qf-oog-notes') && $('qf-oog-notes').value || '').trim() || undefined,
+      };
+    }
+    if (state.service === 'drayage' && isReeferContainer(state.equipment)) {
+      var gensetEl = $('qf-genset'); var reeferTempEl = $('qf-reefer-temp');
+      req.meta.reefer = {
+        genset: !!(gensetEl && gensetEl.checked),
+        tempF: (reeferTempEl && reeferTempEl.value || '').trim() || undefined,
       };
     }
     var dimsCheck = $('qf-dims-check');
