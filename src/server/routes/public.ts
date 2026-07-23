@@ -34,7 +34,7 @@ import { estimateTransit } from '../../calc/transit.js';
 import { distanceBetween } from '../../calc/distance.js';
 import { generateLeadReply } from '../../ai/replyAgent.js';
 import { leadChatTurn, quoteChatTurn, type QuoteChatContext } from '../../ai/chatAgent.js';
-import { sendEmail, brandedFrom } from '../../email/send.js';
+import { sendEmail, brandedFrom, type EmailAttachment } from '../../email/send.js';
 import {
   leadAutoReplyEmail,
   leadNotificationEmail,
@@ -175,6 +175,53 @@ const OVER_LEGAL_WEIGHT_MESSAGE =
 async function getTenantBySlug(slug: string) {
   const rows = await db().select().from(tenants).where(eq(tenants.slug, slug)).limit(1);
   return rows[0] ?? null;
+}
+
+// ── Lead attachments (customer's work order / delivery order) ────────────────
+// Simplest, free, zero-storage design: the file is RELAYED as an attachment on
+// the carrier's lead-notification email — we never persist it. Kept small so the
+// whole lead POST stays under the 7MB body limit and inside provider caps.
+const ATTACH_MAX_BYTES = 3 * 1024 * 1024; // 3 MB per file
+const ATTACH_MAX_COUNT = 2;
+const ATTACH_MAX_TOTAL = 4 * 1024 * 1024; // ~5.3MB base64 — fits the 7MB body cap
+
+/** Sniff magic bytes so a renamed executable can't pose as a PDF/image. */
+function sniffAllowedType(buf: Buffer): 'application/pdf' | 'image/jpeg' | 'image/png' | null {
+  if (buf.length >= 4 && buf[0] === 0x25 && buf[1] === 0x50 && buf[2] === 0x44 && buf[3] === 0x46) return 'application/pdf'; // %PDF
+  if (buf.length >= 3 && buf[0] === 0xff && buf[1] === 0xd8 && buf[2] === 0xff) return 'image/jpeg'; // JPEG SOI
+  if (buf.length >= 8 && buf[0] === 0x89 && buf[1] === 0x50 && buf[2] === 0x4e && buf[3] === 0x47) return 'image/png'; // PNG
+  return null;
+}
+
+/** Validate + normalize customer-supplied attachments into email attachments.
+ *  Returns [] when none; an error string when a file is invalid. */
+function validateLeadAttachments(
+  raw: unknown
+): { ok: true; attachments: EmailAttachment[] } | { ok: false; error: string } {
+  if (!Array.isArray(raw) || raw.length === 0) return { ok: true, attachments: [] };
+  if (raw.length > ATTACH_MAX_COUNT) return { ok: false, error: `Please attach at most ${ATTACH_MAX_COUNT} files.` };
+  const out: EmailAttachment[] = [];
+  let total = 0;
+  for (const item of raw) {
+    const rec = (item ?? {}) as Record<string, unknown>;
+    const dataBase64 = typeof rec.dataBase64 === 'string' ? rec.dataBase64 : '';
+    if (!dataBase64) continue;
+    let buf: Buffer;
+    try { buf = Buffer.from(dataBase64, 'base64'); } catch { return { ok: false, error: 'A file could not be read.' }; }
+    if (buf.length === 0) continue;
+    if (buf.length > ATTACH_MAX_BYTES) return { ok: false, error: `Each file must be under ${ATTACH_MAX_BYTES / 1024 / 1024} MB.` };
+    total += buf.length;
+    if (total > ATTACH_MAX_TOTAL) return { ok: false, error: 'Attachments are too large — please keep the total small.' };
+    const type = sniffAllowedType(buf);
+    if (!type) return { ok: false, error: 'Only PDF, JPG, or PNG files can be attached.' };
+    // Strip CR/LF/quotes from the client name (header-injection safety) and
+    // guarantee an extension that matches the sniffed type.
+    const rawName = (typeof rec.filename === 'string' ? rec.filename : 'attachment').replace(/[\r\n"]/g, '').slice(0, 120);
+    const ext = type === 'application/pdf' ? '.pdf' : type === 'image/png' ? '.png' : '.jpg';
+    const filename = /\.(pdf|jpe?g|png)$/i.test(rawName) ? rawName : rawName + ext;
+    out.push({ filename, contentBase64: dataBase64, contentType: type });
+  }
+  return { ok: true, attachments: out };
 }
 
 /**
@@ -625,6 +672,12 @@ export function registerPublicRoutes(app: Express) {
     if (typeof body.weightLbs === 'number' && body.weightLbs > MAX_QUOTABLE_WEIGHT_LBS) {
       return res.status(400).json({ error: OVER_LEGAL_WEIGHT_MESSAGE });
     }
+    // Optional customer attachments (work order / delivery order). Validated from
+    // the raw body (LeadSchema strips them) and relayed on the carrier's lead
+    // email below — never stored. Reject bad files before doing any real work.
+    const attCheck = validateLeadAttachments((req.body as Record<string, unknown>)?.attachments);
+    if (!attCheck.ok) return res.status(400).json({ error: attCheck.error });
+    const leadAttachments = attCheck.attachments;
 
     // Carrier-controlled contact requirements (brand_configs flags).
     // Default behavior preserves the original "email required" rule.
@@ -837,6 +890,9 @@ export function registerPublicRoutes(app: Express) {
           dashboardUrl: `${loadEnv().PUBLIC_BASE_URL.replace(/\/$/, '')}/app/leads/${refId}`,
           mapUrl,
         }),
+        // Relay the customer's work order / delivery order straight to the
+        // carrier's inbox — zero storage on our side.
+        ...(leadAttachments.length ? { attachments: leadAttachments } : {}),
       });
       if (!notifyResult.ok) {
         console.error(`[email] lead notification send FAILED (lead ${refId}): ${notifyResult.error ?? 'unknown error'}`);
