@@ -52,13 +52,13 @@ describe('landing WeFixTrades cleanup skin', () => {
     expect(hideBlock).toContain('.scheduler-section');
     expect(hideBlock).toContain('display: none !important');
 
-    // The real paid differentiators (24/7 AI chat, branded PDF, automated
-    // follow-ups) ARE now surfaced — as one clean, on-brand consolidated band,
-    // not the legacy blocks. It must be present and NOT in the hide-list.
+    // The real paid differentiators (24/7 AI service agent, branded PDF,
+    // automatic follow-ups) ARE now surfaced — as one clean, on-brand
+    // consolidated band, not the legacy blocks. Present and NOT in the hide-list.
     expect(html).toContain('class="section qf-included-section"');
-    expect(html).toContain('24/7 AI chat');
+    expect(html).toContain('24/7 AI service agent');
     expect(html).toContain('Branded PDF quotes');
-    expect(html).toContain('Automated follow-ups');
+    expect(html).toContain('Automatic follow-ups');
     expect(css).toContain('body.qf-wft .qf-included-card');
     expect(hideBlock).not.toContain('.qf-included-section');
     expect(css).toContain('.floating-note');
