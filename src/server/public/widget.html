@@ -53,6 +53,18 @@
           <div class="qf-field-hint">Oversize details help the team review permits, routing, and equipment. They do not replace final carrier confirmation.</div>
         </div>
       </div>
+      <div class="qf-conditional-panel" id="qf-dims-panel" style="display:none;">
+        <label class="qf-oog-toggle"><input type="checkbox" id="qf-dims-check"> <span>Add cargo dimensions &amp; piece count <span class="qf-title-muted">optional</span></span></label>
+        <div class="qf-dims-fields" id="qf-dims-fields" style="display:none;">
+          <div class="qf-grid">
+            <div class="qf-field"><label>Pieces</label><input class="qf-input" id="qf-dims-pieces" type="number" min="1" placeholder="e.g. 4"></div>
+            <div class="qf-field"><label>Length</label><input class="qf-input" id="qf-dims-length" placeholder="e.g. 48 in"></div>
+            <div class="qf-field"><label>Width</label><input class="qf-input" id="qf-dims-width" placeholder="e.g. 40 in"></div>
+            <div class="qf-field"><label>Height</label><input class="qf-input" id="qf-dims-height" placeholder="e.g. 45 in"></div>
+          </div>
+          <div class="qf-field-hint">Helps match the right vehicle (Sprinter, cargo van, or straight truck) and confirm your freight fits. Optional — leave blank if unsure.</div>
+        </div>
+      </div>
       <div class="qf-conditional-panel" id="qf-genset-panel" style="display:none;">
         <label class="qf-oog-toggle"><input type="checkbox" id="qf-genset"> <span>Genset required for reefer container</span></label>
         <div class="qf-field-hint">Select this if the refrigerated container needs powered temperature control during pickup, waiting time, or delivery.</div>

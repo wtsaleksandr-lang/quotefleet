@@ -246,6 +246,20 @@
     autoResize();
   }
 
+  // Optional cargo dimensions + piece count for Expedite / Hotshot — those
+  // shippers often move a few discrete pieces where "does it fit a Sprinter vs
+  // a straight truck" matters. Hidden for the other modes.
+  function syncDimsPanel() {
+    var panel = $('qf-dims-panel'); if (!panel) return;
+    var show = state.service === 'expedited' || state.service === 'hotshot';
+    panel.style.display = show ? '' : 'none';
+    if (!show) {
+      var c = $('qf-dims-check'); if (c) c.checked = false;
+      var f = $('qf-dims-fields'); if (f) f.style.display = 'none';
+    }
+    autoResize();
+  }
+
   var slug = (window.QF_TENANT_SLUG || '').toString();
   if (!slug) {
     var pathMatch = location.pathname.match(/^\/w\/([^/?#]+)/);
@@ -462,6 +476,8 @@
 
     var oogCheck = $('qf-oog-check');
     if (oogCheck) oogCheck.addEventListener('change', function () { var fields = $('qf-oog-fields'); if (fields) fields.style.display = oogCheck.checked ? '' : 'none'; autoResize(); });
+    var dimsCheck = $('qf-dims-check');
+    if (dimsCheck) dimsCheck.addEventListener('change', function () { var fields = $('qf-dims-fields'); if (fields) fields.style.display = dimsCheck.checked ? '' : 'none'; autoResize(); });
 
     var chatOpenBtn = $('qf-chat-open-btn');
     if (chatOpenBtn) {
@@ -538,6 +554,9 @@
       if (state.service === 'ltl') { renderLtlItems(); updateLtlSummary(); }
       var oog = $('qf-oog-check'); if (oog) oog.checked = false;
       var oogFields = $('qf-oog-fields'); if (oogFields) oogFields.style.display = 'none';
+      var dims = $('qf-dims-check'); if (dims) dims.checked = false;
+      var dimsFields = $('qf-dims-fields'); if (dimsFields) dimsFields.style.display = 'none';
+      ['qf-dims-pieces', 'qf-dims-length', 'qf-dims-width', 'qf-dims-height'].forEach(function (id) { var el = $(id); if (el) el.value = ''; });
       var oc = $('qf-ocean-carrier'); if (oc) oc.value = '';
       var pp = $('qf-pickup-port-input'); if (pp) pp.value = '';
       var pt = $('qf-pickup-terminal'); if (pt) pt.value = '';
@@ -946,6 +965,7 @@
     }
     renderAccessorials(state.config.accessorials);
     if (refreshOptionsCount) refreshOptionsCount();
+    syncDimsPanel();
     var isDrayage = service === 'drayage';
     var drayPickup = $('qf-drayage-pickup');
     var defaultPickup = $('qf-default-pickup');
@@ -1264,6 +1284,15 @@
         height: ($('qf-oog-height') && $('qf-oog-height').value || '').trim() || undefined,
         weight: ($('qf-oog-weight') && $('qf-oog-weight').value || '').trim() || undefined,
         notes: ($('qf-oog-notes') && $('qf-oog-notes').value || '').trim() || undefined,
+      };
+    }
+    var dimsCheck = $('qf-dims-check');
+    if (dimsCheck && dimsCheck.checked) {
+      req.meta.cargo = {
+        pieces: ($('qf-dims-pieces') && $('qf-dims-pieces').value || '').trim() || undefined,
+        length: ($('qf-dims-length') && $('qf-dims-length').value || '').trim() || undefined,
+        width: ($('qf-dims-width') && $('qf-dims-width').value || '').trim() || undefined,
+        height: ($('qf-dims-height') && $('qf-dims-height').value || '').trim() || undefined,
       };
     }
     if (pickupDateEl && pickupDateEl.value) req.pickupDate = pickupDateEl.value;
