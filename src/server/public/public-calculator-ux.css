@@ -138,17 +138,14 @@
   pointer-events: none;
 }
 .qf-terminal-search-input {
-  padding-right: 36px;
+  /* A long selected terminal name now ellipsizes inside the field (shown when
+     the input is not focused) instead of clipping mid-character; the full name
+     is available on hover (title) and in the dropdown. */
+  text-overflow: ellipsis;
 }
-.qf-terminal-search-field::after {
-  content: '⌕';
-  position: absolute;
-  right: 12px;
-  top: 38px;
-  color: var(--w-muted);
-  font-size: 14px;
-  pointer-events: none;
-}
+/* The stray magnifier ::after glyph floated above the field's top-right corner
+   (its fixed top offset assumed a specific label height) — removed. The field
+   already reads as searchable from its placeholder + "Start typing…" help. */
 .qf-terminal-suggestions {
   max-height: 260px;
   overflow: auto;
@@ -159,9 +156,23 @@
   gap: 10px;
   align-items: center;
 }
+/* Name ellipsizes so a long terminal never pushes the carrier/code pill off. */
+.qf-terminal-suggestion-label {
+  flex: 1 1 auto;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
 .qf-terminal-suggestion .meta {
   flex: 0 0 auto;
+  max-width: 46%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
   border-radius: 999px;
+  /* moved below: on small phones the code pill is dropped so the terminal NAME
+     gets the full row width instead of collapsing to ~6 chars. */
   background: rgba(37, 99, 235, 0.08);
   color: var(--w-primary);
   padding: 3px 7px;
@@ -174,6 +185,20 @@
   font-size: 11.5px;
   line-height: 1.35;
 }
+/* Small phones: drop the code pill so the terminal NAME uses the full width
+   (it was collapsing to ~6 chars — "West B…" — making the LA terminals
+   indistinguishable). The full carrier/code is still in the field title + selection. */
+@media (max-width: 430px) {
+  .qf-terminal-suggestion .meta { display: none; }
+  .qf-terminal-suggestion-label { max-width: none; }
+}
+
+/* Single-equipment modes (Hotshot): hide the Equipment field entirely so the
+   shipper never sees carrier fleet jargon ("Class-3 dually + flatbed"); Weight
+   fills the row. The hidden <select> keeps its value so the quote is unaffected. */
+.qf-hide-equipment #qf-equip-weight-row > .qf-addr-col:first-child { display: none !important; }
+.qf-hide-equipment #qf-equip-weight-row { grid-template-columns: 1fr !important; }
+.qf-hide-equipment #qf-equip-weight-row > .qf-addr-col { flex: 1 1 100% !important; }
 
 /* Phase BH: stronger quote print and PDF-save workflow. */
 .qf-pdf-actions {
@@ -408,10 +433,18 @@ body {
   color: #1d4ed8;
   transform: translateY(-1px);
 }
+/* Selected = OUTLINE + subtle tint + check, never a solid bright-blue fill
+   (standing UI rule). !important beats the brighter fill some theme sheets set. */
 .qf-acc-chip.active {
-  background: linear-gradient(135deg, rgba(37, 99, 235, 0.11), rgba(6, 182, 212, 0.09));
-  border-color: rgba(37, 99, 235, 0.42);
-  color: #1d4ed8;
+  background: rgba(37, 99, 235, 0.10) !important;
+  border-color: rgba(37, 99, 235, 0.60) !important;
+  color: #1d4ed8 !important;
+  box-shadow: inset 0 0 0 1px rgba(37, 99, 235, 0.35) !important;
+}
+.qf-acc-chip.active .qf-acc-label::before {
+  content: '\2713\00a0'; /* ✓ prefix marks the selection without a fill */
+  color: #2563eb;
+  font-weight: 900;
 }
 .qf-customer-note,
 .qf-contact-head,
@@ -574,3 +607,56 @@ body {
   .qf-result-mini-grid { grid-template-columns: 1fr; }
   .qf-terminal-suggestion { align-items: flex-start; }
 }
+/* ── Appended at EOF so pre-existing line numbers don't shift (the spacing/color
+   guards use line-based baselines — see feedback_guard_exit_code_via_pipe). ── */
+/* Lead-form invalid field — a clear red outline on the field that failed
+   validation (the message alone used to sit below the fold on mobile). */
+.qf-field-invalid,
+input.qf-field-invalid,
+textarea.qf-field-invalid {
+  border-color: #dc2626 !important;
+  box-shadow: 0 0 0 3px rgba(220, 38, 38, 0.14) !important;
+}
+/* Options-modal group headers — separate the shipment CONDITIONS (toggles) from
+   the optional ADD-ONS (chips) so the panel scans as two clear groups. */
+.qf-opt-group-label {
+  /* The options body is a 2-col grid/flex of chips — force the header onto its
+     own full-width row instead of becoming a chip-sized cell. */
+  grid-column: 1 / -1;
+  flex-basis: 100%;
+  width: 100%;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--w-muted, #8a94a6);
+  margin: 0 0 8px;
+}
+.qf-opt-group-label.qf-opt-group-sep { margin-top: 16px; }
+
+/* ── Result-step quote chat (.qf-rchat) — the reused .qf-chat styling was built
+   for the widget's default surface; on the light result card the assistant
+   bubble fell back to a dark token pair (unreadable) and the input didn't flex.
+   Scope readable colours + a proper input/Send split to the result chat only. ── */
+body.qf-app-calculator .qf-rchat .qf-chat-bubble.assistant {
+  background: var(--w-accent-surface, #FFFFFF) !important;
+  color: var(--w-input-text, #1E1E1E) !important;
+}
+body.qf-app-calculator .qf-rchat .qf-chat-bubble.thinking {
+  color: var(--w-muted, #5b6472) !important;
+}
+body.qf-app-calculator .qf-rchat .qf-chat-input-row {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+}
+body.qf-app-calculator .qf-rchat .qf-chat-input-row .qf-input {
+  flex: 1 1 auto !important;
+  width: auto !important;
+  min-width: 0 !important;
+}
+body.qf-app-calculator .qf-rchat .qf-chat-send {
+  flex: 0 0 auto !important;
+  width: auto !important;
+}
+.qf-rchat-launch { margin-top: 8px; text-align: center; }

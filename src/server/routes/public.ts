@@ -33,7 +33,7 @@ import { resolveFscForTenant, asOfLabel } from '../../eia/dieselPrice.js';
 import { estimateTransit } from '../../calc/transit.js';
 import { distanceBetween } from '../../calc/distance.js';
 import { generateLeadReply } from '../../ai/replyAgent.js';
-import { leadChatTurn } from '../../ai/chatAgent.js';
+import { leadChatTurn, quoteChatTurn, type QuoteChatContext } from '../../ai/chatAgent.js';
 import { sendEmail, brandedFrom } from '../../email/send.js';
 import {
   leadAutoReplyEmail,
@@ -902,6 +902,47 @@ export function registerPublicRoutes(app: Express) {
       return res.status(503).json({ error: 'Chat is temporarily unavailable. Please try again in a minute.' });
     }
   });
+
+  // ── pre-lead quote chat — shopper asks about the quote they're viewing,
+  //    BEFORE submitting contact details. Stateless (no lead / no conversation
+  //    row is created) so an anonymous question never pollutes the CRM. The
+  //    client sends the current quote context + short history each turn. ──
+  app.post(
+    '/api/public/quote-chat/:slug',
+    publicChatLimiter,
+    express.json({ limit: '8kb' }),
+    async (req: Request, res: Response) => {
+      const tenant = await getTenantBySlug(String(req.params.slug));
+      if (!tenant || tenant.status !== 'active') return res.status(404).json({ error: 'Tenant not found' });
+      // Private-calculator gate — same as the quote route.
+      if (!(await enforceTenantAccess(tenant, req, res))) return;
+      const brand = (await db().select().from(brandConfigs).where(eq(brandConfigs.tenantId, tenant.id)).limit(1))[0];
+      if (!originAllowed(brand?.allowedDomains, req)) {
+        return res.status(403).json({ error: 'This widget is not authorized for the calling domain.' });
+      }
+      const message = String(req.body?.message ?? '').trim();
+      if (!message) return res.status(400).json({ error: 'Message is required' });
+      if (message.length > 2000) return res.status(400).json({ error: 'Message too long (2000 chars max).' });
+      // AI 24/7 chat is Pro-only (all tenants get it during trial).
+      const aiCfg = (
+        await db().select().from(aiConfigs).where(eq(aiConfigs.tenantId, tenant.id)).limit(1)
+      )[0];
+      if (!aiCfg?.chatEnabled || !canUseProFeature(tenant)) {
+        return res
+          .status(403)
+          .json({ error: 'Chat is not available here. Submit your details and the team will follow up.' });
+      }
+      const quote: QuoteChatContext = (req.body?.quote ?? {}) as QuoteChatContext;
+      const history = Array.isArray(req.body?.history) ? req.body.history : [];
+      try {
+        const reply = await quoteChatTurn(tenant.id, quote, history, message);
+        return res.json({ ok: true, reply });
+      } catch (err) {
+        console.error('[public.quote-chat] AI failed:', err);
+        return res.status(503).json({ error: 'Chat is temporarily unavailable. Please try again in a minute.' });
+      }
+    }
+  );
 
   // ── callback request — visitor asks a human to call them back ──
   // Two creation paths share this endpoint:

@@ -127,8 +127,6 @@ body.qf-app-calculator .qf-help {
 }
 
 body.qf-app-calculator .qf-cta,
-body.qf-app-calculator .qf-acc-chip.active,
-body.qf-app-calculator .qf-options-panel .qf-acc-chip.active,
 body.qf-app-calculator .qf-demo-logo-slot em,
 body.qf-app-calculator .qf-chat-bubble.user,
 body.qf-app-calculator .qf-chat-send {
@@ -334,10 +332,12 @@ body.qf-app-calculator .qf-tabs button.active {
    mono overrides to a white fill + thin black border + black label. */
 body.qf-app-calculator .qf-acc-chip.active,
 body.qf-app-calculator .qf-options-panel .qf-acc-chip.active {
-  background: var(--w-chip-active-bg, var(--w-accent-solid, var(--w-accent, #0D3CFC))) !important;
+  /* Selected = outline + subtle tint (+ a ✓ from public-calculator-ux.css),
+     NOT a solid bright-blue fill (standing UI rule: selected = outline). */
+  background: rgba(37, 99, 235, 0.10) !important;
   background-image: none !important;
-  border: var(--w-active-border-width, 1px) solid var(--w-active-border-color, var(--w-accent-solid, var(--w-accent, #0D3CFC))) !important;
-  color: var(--w-chip-active-text, var(--w-accent-text, #FFFFFF)) !important;
+  border: 1px solid var(--w-accent-solid, var(--w-accent, #0D3CFC)) !important;
+  color: var(--w-accent-solid, var(--w-accent, #0D3CFC)) !important;
 }
 
 /* lbs / kg unit toggle — the ACTIVE ("is-on") segment already renders white

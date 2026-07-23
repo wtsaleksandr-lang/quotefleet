@@ -128,23 +128,33 @@ html body.qf-wft .qf-hero-devices--video > .qf-hero-vphone {
 html body.qf-wft .qf-hero-devices--video > .qf-hero-laptop { transform-origin: 32% 42%; }
 html body.qf-wft .qf-hero-devices--video > .qf-hero-vphone { transform-origin: 88% 58%; }
 
-/* STAGE 1 — laptop in front; phone tucked back, shrunk and dimmed. */
+/* STAGE 1 — laptop in front, alone. The phone is fully hidden (opacity 0), not
+   shown as a blurred card behind the desktop: keeping only the sharp desktop in
+   the initial state reads cleaner. The phone fades + scales in only when it
+   becomes the focus (stage-phone). */
 html body.qf-wft .qf-hero-devices--video.stage-laptop > .qf-hero-laptop {
-  z-index: 3; transform: none; opacity: 1; filter: none;
+  /* Laptop is the sole focus now (the phone is hidden in this stage), so centre
+     it in the media box instead of leaving it in the top-left where it used to
+     sit beside the phone. translate is in % of the laptop's own size; the
+     laptop is 88% wide at left:0, so +6.8% of its width recentres it. */
+  z-index: 3; transform: translate(6.8%, 12%); opacity: 1; filter: none;
 }
 html body.qf-wft .qf-hero-devices--video.stage-laptop > .qf-hero-vphone {
-  z-index: 1; transform: translate(15%, 7%) scale(.72); opacity: .4;
-  filter: blur(1.2px) saturate(.92);
+  z-index: 1; transform: translate(15%, 7%) scale(.72); opacity: 0;
+  filter: none; pointer-events: none;
 }
 
-/* STAGE 2 — phone in front (a tall device already ~full frame-height, so it
-   comes forward at near-full size, centred + sharp, rather than growing huge);
-   laptop shrinks to a small, dimmed, blurred card behind the top-left. */
+/* STAGE 2 — phone in front, enlarged ~20% (scale .98 → 1.18) so the on-screen
+   calculator content is clearly legible; laptop shrinks to a small, dimmed,
+   blurred card behind the top-left (the one background-blur we keep). */
 html body.qf-wft .qf-hero-devices--video.stage-phone > .qf-hero-vphone {
-  z-index: 3; transform: translate(-108%, -6%) scale(.98); opacity: 1; filter: none;
+  z-index: 3; transform: translate(-92%, -7%) scale(1.18); opacity: 1; filter: none;
 }
 html body.qf-wft .qf-hero-devices--video.stage-phone > .qf-hero-laptop {
-  z-index: 1; transform: translate(-4%, -12%) scale(.6); opacity: .34;
+  /* Tuck the dimmed background laptop to the RIGHT (behind the phone) instead of
+     letting it drift left toward the copy — it should sit behind the focused
+     phone, never encroaching on the headline. */
+  z-index: 1; transform: translate(24%, -8%) scale(.58); opacity: .32;
   filter: blur(2px) saturate(.88);
 }
 
@@ -155,7 +165,7 @@ html body.qf-wft .qf-hero-devices--video.stage-phone > .qf-hero-laptop {
     transform: translate(6%, 5%) scale(.76);
   }
   html body.qf-wft .qf-hero-devices--video.stage-phone > .qf-hero-vphone {
-    transform: translate(-95%, -4%) scale(.92);
+    transform: translate(-82%, 3%) scale(1.10);
   }
   html body.qf-wft .qf-hero-devices--video.stage-phone > .qf-hero-laptop {
     transform: translate(-2%, -8%) scale(.64); opacity: .32; filter: blur(2px) saturate(.88);

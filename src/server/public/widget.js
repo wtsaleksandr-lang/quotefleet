@@ -232,6 +232,24 @@
     return v.indexOf('open top') >= 0 || v.indexOf('opentop') >= 0 || v.indexOf('flat rack') >= 0 || v.indexOf('flatrack') >= 0;
   }
 
+  function isReeferContainer(value) {
+    var v = String(value || '').toLowerCase();
+    return v.indexOf('reefer') >= 0 || v.indexOf('refrigerated') >= 0;
+  }
+
+  // Reveal the genset + reefer-temperature panel only for a refrigerated drayage
+  // container (the panel exists in the markup but was never surfaced before).
+  function syncReeferPanel() {
+    var panel = $('qf-genset-panel'); if (!panel) return;
+    var show = state.service === 'drayage' && isReeferContainer(state.equipment);
+    panel.style.display = show ? '' : 'none';
+    if (!show) {
+      var g = $('qf-genset'); if (g) g.checked = false;
+      var t = $('qf-reefer-temp'); if (t) t.value = '';
+    }
+    autoResize();
+  }
+
   function syncOogPanel() {
     var panel = $('qf-oog-panel');
     var check = $('qf-oog-check');
@@ -242,6 +260,20 @@
     if (!show) {
       if (check) check.checked = false;
       if (fields) fields.style.display = 'none';
+    }
+    autoResize();
+  }
+
+  // Optional cargo dimensions + piece count for Expedite / Hotshot — those
+  // shippers often move a few discrete pieces where "does it fit a Sprinter vs
+  // a straight truck" matters. Hidden for the other modes.
+  function syncDimsPanel() {
+    var panel = $('qf-dims-panel'); if (!panel) return;
+    var show = state.service === 'expedited' || state.service === 'hotshot';
+    panel.style.display = show ? '' : 'none';
+    if (!show) {
+      var c = $('qf-dims-check'); if (c) c.checked = false;
+      var f = $('qf-dims-fields'); if (f) f.style.display = 'none';
     }
     autoResize();
   }
@@ -462,6 +494,8 @@
 
     var oogCheck = $('qf-oog-check');
     if (oogCheck) oogCheck.addEventListener('change', function () { var fields = $('qf-oog-fields'); if (fields) fields.style.display = oogCheck.checked ? '' : 'none'; autoResize(); });
+    var dimsCheck = $('qf-dims-check');
+    if (dimsCheck) dimsCheck.addEventListener('change', function () { var fields = $('qf-dims-fields'); if (fields) fields.style.display = dimsCheck.checked ? '' : 'none'; autoResize(); });
 
     var chatOpenBtn = $('qf-chat-open-btn');
     if (chatOpenBtn) {
@@ -481,6 +515,30 @@
       chatSendBtn.addEventListener('click', sendChatMessage);
       chatInput.addEventListener('keydown', function (e) {
         if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); sendChatMessage(); }
+      });
+    }
+
+    // Result-step quote chat (pre-lead).
+    var rchatOpen = $('qf-rchat-open-btn');
+    if (rchatOpen) {
+      rchatOpen.addEventListener('click', function () {
+        var panel = $('qf-rchat'); if (!panel) return;
+        var show = panel.style.display === 'none' || !panel.style.display;
+        panel.style.display = show ? 'block' : 'none';
+        rchatOpen.setAttribute('aria-expanded', show ? 'true' : 'false');
+        if (show) {
+          if (!$('qf-rchat-msgs').children.length) appendChatBubble('assistant', 'Hi! Ask me anything about this estimate — transit time, accessorials, pickup readiness, or how to lock it in.', 'qf-rchat-msgs');
+          var ri = $('qf-rchat-input'); if (ri) ri.focus();
+        }
+        autoResize();
+      });
+    }
+    var rchatSend = $('qf-rchat-send');
+    var rchatInput = $('qf-rchat-input');
+    if (rchatSend && rchatInput) {
+      rchatSend.addEventListener('click', sendQuoteChatMessage);
+      rchatInput.addEventListener('keydown', function (e) {
+        if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); sendQuoteChatMessage(); }
       });
     }
 
@@ -531,12 +589,18 @@
       ['qf-cb-phone', 'qf-cb-time', 'qf-cb-topic'].forEach(function (id) { var el = $(id); if (el) { el.value = ''; el.disabled = false; } });
       showCallbackError(null);
       $('qf-result').style.display = 'none';
+      resetCalcCta();
       ['qf-pickup-zip', 'qf-delivery-zip', 'qf-weight', 'qf-booking', 'qf-c-name', 'qf-c-email', 'qf-c-phone', 'qf-c-company', 'qf-c-notes', 'qf-oog-length', 'qf-oog-width', 'qf-oog-height', 'qf-oog-weight', 'qf-oog-notes']
         .forEach(function (id) { var el = $(id); if (el) el.value = ''; });
       state.ltlItems = [];
       if (state.service === 'ltl') { renderLtlItems(); updateLtlSummary(); }
       var oog = $('qf-oog-check'); if (oog) oog.checked = false;
       var oogFields = $('qf-oog-fields'); if (oogFields) oogFields.style.display = 'none';
+      var dims = $('qf-dims-check'); if (dims) dims.checked = false;
+      var dimsFields = $('qf-dims-fields'); if (dimsFields) dimsFields.style.display = 'none';
+      ['qf-dims-pieces', 'qf-dims-length', 'qf-dims-width', 'qf-dims-height'].forEach(function (id) { var el = $(id); if (el) el.value = ''; });
+      var genset = $('qf-genset'); if (genset) genset.checked = false;
+      var reeferTemp = $('qf-reefer-temp'); if (reeferTemp) reeferTemp.value = '';
       var oc = $('qf-ocean-carrier'); if (oc) oc.value = '';
       var pp = $('qf-pickup-port-input'); if (pp) pp.value = '';
       var pt = $('qf-pickup-terminal'); if (pt) pt.value = '';
@@ -663,8 +727,7 @@
           b.classList.toggle('is-on', on);
           b.setAttribute('aria-pressed', on ? 'true' : 'false');
         });
-        var inp = $('qf-weight');
-        if (inp) inp.placeholder = state.weightUnit === 'kg' ? 'e.g. 17000' : 'e.g. 38000';
+        updateWeightPlaceholder();
         updateLtlClassReadout();
       });
     });
@@ -730,6 +793,16 @@
     var k = svc + '|' + eq;
     return EQUIP_MAX_WEIGHT[k] > 0 ? EQUIP_MAX_WEIGHT[k] : null;
   }
+
+  // Equipment-aware weight-field example: ~55% of the selected equipment's
+  // capacity (so a Sprinter shows "e.g. 2500", not "e.g. 38000" = 9.5× its max).
+  function weightPlaceholder() {
+    var cap = state.service === 'ltl' ? null : equipMaxWeight();
+    var lbs = cap ? Math.max(500, Math.round((cap * 0.55) / 500) * 500) : 20000;
+    if (state.weightUnit === 'kg') return 'e.g. ' + Math.max(200, Math.round(lbs / LB_PER_KG / 100) * 100);
+    return 'e.g. ' + lbs;
+  }
+  function updateWeightPlaceholder() { var inp = $('qf-weight'); if (inp) inp.placeholder = weightPlaceholder(); }
 
   // Soft-confirm gate: when `active`, show `message` and block THIS submit, but
   // remember the exact situation (`sig`) so an identical resubmit proceeds —
@@ -870,8 +943,18 @@
     selectService(services[0]);
   }
 
+  // Set by initOptionsPanel() so selectService() can refresh the "N selected"
+  // badge after it prunes add-ons on a mode switch.
+  var refreshOptionsCount = null;
+
   function selectService(service) {
     var firstSelect = state.service == null;
+    // Switching mode invalidates any quote already on screen — clear it and
+    // restore the primary CTA (otherwise a stale result + "Recalculate" linger).
+    if (!firstSelect && state.service !== service) {
+      var rb = $('qf-result'); if (rb) rb.style.display = 'none';
+      showError('qf-error', null); resetCalcCta(); resetQuoteChat();
+    }
     state.service = service;
     $$('#qf-services button').forEach(function (b) { var on = b.dataset.service === service; b.classList.toggle('active', on); b.setAttribute('aria-selected', on ? 'true' : 'false'); });
     // Slide the active-tab indicator to the new tab (snap on the very first
@@ -883,26 +966,51 @@
     sel.innerHTML = '';
     equip.forEach(function (e) { var opt = document.createElement('option'); opt.value = e.value; opt.textContent = normalizeEquipmentLabel(e.label || e.value, service); sel.appendChild(opt); });
     state.equipment = equip[0] ? equip[0].value : null;
-    sel.onchange = function () { state.equipment = sel.value; syncOogPanel(); };
-    // A single equipment option has nothing to choose — show a static read-only
-    // label instead of a lone 1-item dropdown. The native <select> stays
-    // populated (hidden via CSS) so calculate + the estimate meta still read the
-    // value. Drayage pads to 4 options, so it always keeps the real dropdown.
+    updateWeightPlaceholder();
+    sel.onchange = function () {
+      state.equipment = sel.value; syncOogPanel(); syncReeferPanel(); updateWeightPlaceholder();
+      // Equipment can change which add-ons are valid (open-deck items). Re-render
+      // the chips, drop any now-invalid selections, and refresh the count badge.
+      if (state.config && state.config.accessorials) {
+        var ok = {};
+        state.config.accessorials.forEach(function (a) { if (accessorialAllowedForEquipment(a)) ok[a.code] = 1; });
+        state.selectedAccessorials = state.selectedAccessorials.filter(function (c) { return ok[c]; });
+        renderAccessorials(state.config.accessorials);
+        if (refreshOptionsCount) refreshOptionsCount();
+      }
+    };
+    // Single-equipment modes (e.g. Hotshot) have nothing to choose, AND the
+    // equipment name is carrier fleet-spec jargon a shipper doesn't care about
+    // ("Class-3 dually + flatbed"). Hide the whole Equipment field so Weight
+    // takes the row; the hidden <select> keeps its value so the quote still
+    // uses the right rate card. Drayage pads to 4 options → keeps its dropdown.
+    var single = equip.length <= 1;
+    var eqRoot = $('qf-root');
+    if (eqRoot) eqRoot.classList.toggle('qf-hide-equipment', single && service !== 'ltl');
+    // Retire the old static jargon label if a previous build left one behind.
     var eqField = sel.closest && sel.closest('.qf-field');
     if (eqField) {
-      var single = equip.length <= 1;
       var staticEl = eqField.querySelector('.qf-equip-static');
-      if (single) {
-        if (!staticEl) { staticEl = el('div', { class: 'qf-equip-static' }); eqField.appendChild(staticEl); }
-        staticEl.textContent = equip[0] ? normalizeEquipmentLabel(equip[0].label || equip[0].value, service) : '—';
-        staticEl.style.display = '';
-        eqField.classList.add('qf-equip-single');
-      } else {
-        if (staticEl) staticEl.style.display = 'none';
-        eqField.classList.remove('qf-equip-single');
-      }
+      if (staticEl) staticEl.style.display = 'none';
+      eqField.classList.remove('qf-equip-single');
+    }
+    // Prune add-ons that don't apply to the newly selected service, so the
+    // "N selected" badge and the rendered chips always agree. Previously the
+    // badge kept stale codes from the previous mode (e.g. "4 selected") while
+    // only the one add-on valid in the new mode showed as active — a mismatch.
+    // Universal add-ons (no appliesToServices) are kept across modes.
+    if (state.config && state.config.accessorials) {
+      state.selectedAccessorials = (state.selectedAccessorials || []).filter(function (code) {
+        var a = state.config.accessorials.filter(function (x) { return x.code === code; })[0];
+        if (!a) return false;
+        if (!a.appliesToServices || a.appliesToServices.length === 0) return true;
+        return a.appliesToServices.indexOf(service) >= 0;
+      });
     }
     renderAccessorials(state.config.accessorials);
+    if (refreshOptionsCount) refreshOptionsCount();
+    syncDimsPanel();
+    syncReeferPanel();
     var isDrayage = service === 'drayage';
     var drayPickup = $('qf-drayage-pickup');
     var defaultPickup = $('qf-default-pickup');
@@ -988,9 +1096,63 @@
 
   function escapeHtml(s) { return String(s == null ? '' : s).replace(/[&<>"']/g, function (m) { return ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[m]); }); }
 
-  function appendChatBubble(role, text) {
-    var msgs = $('qf-chat-msgs'); if (!msgs) return null;
-    var b = document.createElement('div'); b.className = 'qf-chat-bubble ' + role; b.textContent = text; msgs.appendChild(b); msgs.scrollTop = msgs.scrollHeight; autoResize(); return b;
+  function appendChatBubble(role, text, msgsId) {
+    var msgs = $(msgsId || 'qf-chat-msgs'); if (!msgs) return null;
+    var b = document.createElement('div'); b.className = 'qf-chat-bubble ' + role;
+    // Render **bold** from the model safely — split on the markers and wrap odd
+    // segments in <strong> via textContent (never innerHTML with AI text → no XSS).
+    String(text).split(/\*\*/).forEach(function (seg, i) {
+      if (i % 2 === 1) { var s = document.createElement('strong'); s.textContent = seg; b.appendChild(s); }
+      else if (seg) { b.appendChild(document.createTextNode(seg)); }
+    });
+    msgs.appendChild(b); msgs.scrollTop = msgs.scrollHeight; autoResize(); return b;
+  }
+
+  // ── Pre-lead quote chat (result step) ──────────────────────────────────────
+  // Lets a shopper ask about the quote they're viewing BEFORE handing over
+  // contact details. Stateless server-side: the client holds the short history
+  // and sends it (+ the current quote context) each turn to /quote-chat.
+  var quoteChatHistory = [];
+  function quoteChatContextFromState() {
+    var q = state.quote || {}; var r = q.result || {};
+    var pk = state.pickupResolved || {}; var dl = state.deliveryResolved || {};
+    return {
+      service: state.service || null,
+      equipment: customerEquipmentLabel() || state.equipment || null,
+      pickupCity: pk.city || null, pickupState: pk.state || null,
+      deliveryCity: dl.city || null, deliveryState: dl.state || null,
+      distanceMiles: (typeof q.miles === 'number' ? q.miles : (typeof r.miles === 'number' ? r.miles : null)),
+      transit: (q.transit && q.transit.text) || null,
+      total: (typeof r.total === 'number' ? r.total : null),
+      currency: (r.currency || q.currency || null),
+    };
+  }
+  function resetQuoteChat() {
+    quoteChatHistory = [];
+    var msgs = $('qf-rchat-msgs'); if (msgs) msgs.innerHTML = '';
+    var panel = $('qf-rchat'); if (panel) panel.style.display = 'none';
+    var open = $('qf-rchat-open-btn'); if (open) open.setAttribute('aria-expanded', 'false');
+  }
+  function sendQuoteChatMessage() {
+    var input = $('qf-rchat-input'); if (!input) return;
+    var msg = (input.value || '').trim(); if (!msg) return;
+    appendChatBubble('user', msg, 'qf-rchat-msgs'); input.value = '';
+    quoteChatHistory.push({ role: 'user', content: msg });
+    var thinking = appendChatBubble('thinking', 'Thinking…', 'qf-rchat-msgs');
+    var sendBtn = $('qf-rchat-send'); if (sendBtn) sendBtn.disabled = true;
+    fetch(withGrant('/api/public/quote-chat/' + slug), {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ message: msg, quote: quoteChatContextFromState(), history: quoteChatHistory.slice(0, -1) }),
+    })
+      .then(function (r) { return r.json(); })
+      .then(function (resp) {
+        if (thinking) thinking.remove(); if (sendBtn) sendBtn.disabled = false;
+        if (resp.error) { appendChatBubble('assistant', 'Sorry — ' + resp.error, 'qf-rchat-msgs'); return; }
+        var reply = resp.reply || '(no reply)';
+        appendChatBubble('assistant', reply, 'qf-rchat-msgs');
+        quoteChatHistory.push({ role: 'assistant', content: reply });
+      })
+      .catch(function () { if (thinking) thinking.remove(); if (sendBtn) sendBtn.disabled = false; appendChatBubble('assistant', 'Connection error. Try again in a moment.', 'qf-rchat-msgs'); });
   }
 
   function sendChatMessage() {
@@ -1059,9 +1221,27 @@
     return (a && a.description) || ACCESSORIAL_HELP[a && a.code] || ('Optional add-on: ' + ((a && a.label) || 'extra service') + '.');
   }
 
+  // Open-deck equipment — the only place tarping / oversize-permit add-ons make
+  // sense. (Straps/chains are intentionally NOT gated — dry vans use them too.)
+  var OPEN_DECK_EQUIP = { flatbed: 1, step_deck: 1, conestoga: 1 };
+  // Open-deck-only add-ons, matched by code OR label so it works whether the
+  // tenant runs our seed codes or a persisted custom config.
+  function isOpenDeckAccessorial(a) {
+    var s = ((a.code || '') + ' ' + (a.label || '')).toLowerCase();
+    return /tarp|oversize|over-size|open.?deck/.test(s);
+  }
+  // Gate an add-on by the SELECTED equipment (not just the service), so we never
+  // offer a physically-impossible combo (e.g. Tarping/Oversize on a Dry Van).
+  function accessorialAllowedForEquipment(a) {
+    if (!isOpenDeckAccessorial(a)) return true;
+    return !!OPEN_DECK_EQUIP[state.equipment || ''] || state.service === 'hotshot';
+  }
   function renderAccessorials(list) {
     var wrap = $('qf-accessorials'); wrap.innerHTML = '';
-    var visible = (list || []).filter(function (a) { if (!a.appliesToServices || a.appliesToServices.length === 0) return true; return a.appliesToServices.indexOf(state.service) >= 0; });
+    var visible = (list || []).filter(function (a) {
+      var svcOk = !a.appliesToServices || a.appliesToServices.length === 0 || a.appliesToServices.indexOf(state.service) >= 0;
+      return svcOk && accessorialAllowedForEquipment(a);
+    });
     if (!visible.length) { wrap.appendChild(el('span', { class: 'qf-tagline', text: 'No optional add-ons for this service.' })); return; }
     visible.forEach(function (a) {
       var chip = el('button', { class: 'qf-acc-chip' + (state.selectedAccessorials.indexOf(a.code) >= 0 ? ' active' : ''), on: { click: function (ev) { ev.preventDefault(); if (ev.target && ev.target.closest && ev.target.closest('.qf-help')) return; var i = state.selectedAccessorials.indexOf(a.code); if (i >= 0) state.selectedAccessorials.splice(i, 1); else state.selectedAccessorials.push(a.code); chip.classList.toggle('active'); } } }, [
@@ -1087,6 +1267,9 @@
       if (n > 0) { countEl.textContent = n + ' selected'; countEl.hidden = false; }
       else { countEl.hidden = true; }
     }
+    // Expose so selectService() can refresh the badge after a mode switch prunes
+    // the selection (the modal's own change/click handlers don't fire then).
+    refreshOptionsCount = updateCount;
 
     // Visible, focusable descendants of the dialog card — used to move focus
     // in on open and to trap Tab/Shift+Tab within the dialog.
@@ -1202,6 +1385,22 @@
         notes: ($('qf-oog-notes') && $('qf-oog-notes').value || '').trim() || undefined,
       };
     }
+    if (state.service === 'drayage' && isReeferContainer(state.equipment)) {
+      var gensetEl = $('qf-genset'); var reeferTempEl = $('qf-reefer-temp');
+      req.meta.reefer = {
+        genset: !!(gensetEl && gensetEl.checked),
+        tempF: (reeferTempEl && reeferTempEl.value || '').trim() || undefined,
+      };
+    }
+    var dimsCheck = $('qf-dims-check');
+    if (dimsCheck && dimsCheck.checked) {
+      req.meta.cargo = {
+        pieces: ($('qf-dims-pieces') && $('qf-dims-pieces').value || '').trim() || undefined,
+        length: ($('qf-dims-length') && $('qf-dims-length').value || '').trim() || undefined,
+        width: ($('qf-dims-width') && $('qf-dims-width').value || '').trim() || undefined,
+        height: ($('qf-dims-height') && $('qf-dims-height').value || '').trim() || undefined,
+      };
+    }
     if (pickupDateEl && pickupDateEl.value) req.pickupDate = pickupDateEl.value;
     return req;
   }
@@ -1210,16 +1409,24 @@
     e && e.preventDefault(); showError('qf-error', null); var req = gatherQuoteRequest();
     if (!req.equipment) { showError('qf-error', 'Please pick an equipment type.'); return; }
     var hasPickup = !!(req.pickup.zip || req.pickup.city || req.pickup.portCode);
-    if (!hasPickup) { showError('qf-error', 'Please pick a pickup port (drayage) or enter a pickup ZIP/postal code.'); return; }
+    if (!hasPickup) { showError('qf-error', state.service === 'drayage' ? 'Please pick a pickup port, or enter a pickup ZIP/postal code.' : 'Please enter a pickup city, ZIP, or address.'); return; }
     // Symmetric pickup/delivery rule: both sides require a postal code (delivery
     // already did). Previously pickup accepted city-only while delivery didn't —
     // an inconsistency that let one leg be coarse. Drayage pickup is a PORT (not
     // a ZIP), so it is exempt from this check.
     var isDrayagePortPickup = state.service === 'drayage' && !!state.pickupPortCode;
     var pickupZipEl = $('qf-pickup-zip');
-    if (!isDrayagePortPickup && !hasPostalCode(pickupZipEl ? pickupZipEl.value : '', req.pickup)) { showError('qf-error', 'Please enter a pickup ZIP/postal code for a more accurate rate. City-only pickup can change the price in large metro areas.'); return; }
-    if (!req.delivery.zip && !req.delivery.city) { showError('qf-error', 'Please enter a delivery ZIP/postal code.'); return; }
-    if (!hasPostalCode($('qf-delivery-zip').value, req.delivery)) { showError('qf-error', 'Please enter a delivery ZIP/postal code for a more accurate rate. City-only delivery can change the price in large metro areas.'); return; }
+    // City-only pickup/delivery is a SOFT confirm, not a dead-end: the helper
+    // text invites a city, so a city-only entry now WARNS once (ZIP = exact
+    // rate) and quotes on the next click — instead of the primary CTA silently
+    // no-op'ing, which read as broken and killed conversions.
+    if (!req.delivery.zip && !req.delivery.city) { showError('qf-error', 'Please enter a delivery city, ZIP, or address.'); return; }
+    // ONE soft-confirm covering either/both city-only legs → warn once, quote on
+    // the next click (instead of the CTA silently no-op'ing, or stacking two
+    // separate warnings that took three clicks to clear).
+    var cityOnly = (!isDrayagePortPickup && !hasPostalCode(pickupZipEl ? pickupZipEl.value : '', req.pickup)) || !hasPostalCode($('qf-delivery-zip').value, req.delivery);
+    if (softConfirm('cityonly', cityOnly, 'c:' + (req.pickup.zip || req.pickup.city || '') + '>' + (req.delivery.zip || req.delivery.city || ''),
+      'Tip: adding a ZIP gives an exact rate — city-only lanes can vary in large metros. Press Get instant quote again to estimate with what you entered.')) return;
     if (req.service === 'ltl') {
       var lt = ltlTotals();
       if (lt.validItems < 1) { showError('qf-error', 'Add at least one item with its weight and length / width / height so we can determine the freight class.'); return; }
@@ -1268,6 +1475,16 @@
     return normalizeEquipmentLabel(state.equipment || '', state.service);
   }
 
+  // Customer-facing equipment label for the quote meta line. Strips internal
+  // carrier jargon and never repeats the service word that already leads the
+  // line (fixes "Hotshot · Hotshot (Class-3 dually + flatbed)" and the LTL
+  // phantom "LTL Pallet (…)" the shipper never chose).
+  function customerEquipmentLabel() {
+    if (state.service === 'ltl') return ''; // LTL is described by freight class, not a truck
+    if (state.service === 'hotshot') return 'Flatbed'; // drop the "Class-3 dually" fleet spec
+    return friendlyEquipmentLabel();
+  }
+
   // Count a number up to its final value (ease-out cubic) for the price reveal.
   function animateNumber(node, to, fmt, dur) {
     if (!node) return;
@@ -1283,6 +1500,9 @@
     requestAnimationFrame(step);
   }
 
+  // Revert the primary CTA to its original label (used when the result is
+  // cleared or the mode changes, so it no longer reads "Recalculate").
+  function resetCalcCta() { var b = $('qf-calc-btn'); if (b && b.dataset.calcLabel) b.textContent = b.dataset.calcLabel; }
   function renderResult(resp) {
     var r = resp.result;
     // Guard the degenerate $0 / empty result. A total that isn't a positive
@@ -1293,6 +1513,7 @@
       var reach = c.phone ? ('call ' + c.phone) : (c.email ? ('email ' + c.email) : 'contact us');
       showError('qf-error', 'We couldn’t price this lane automatically — please ' + reach + ' and the team will quote it directly.');
       $('qf-result').style.display = 'none';
+      resetCalcCta();
       autoResize();
       return;
     }
@@ -1308,7 +1529,8 @@
     var metaParts = [];
     if (resp.miles) metaParts.push('Approx. ' + Math.round(resp.miles) + ' mi');
     metaParts.push(serviceLabel);
-    metaParts.push(friendlyEquipmentLabel());
+    var eqLabel = customerEquipmentLabel();
+    if (eqLabel) metaParts.push(eqLabel);
     var metaText = metaParts.join(' · ');
     if (r.ltl && r.ltl.freightClass) metaText += ' · Class ' + r.ltl.freightClass;
     $('qf-meta').textContent = metaText;
@@ -1331,6 +1553,12 @@
     renderDisclaimer();
     var resultBox = $('qf-result');
     resultBox.style.display = 'block';
+    // A quote is now on screen — demote the primary CTA from "Get instant quote"
+    // to "Recalculate" so it no longer reads as if nothing has happened yet.
+    var cbtn = $('qf-calc-btn');
+    if (cbtn) { if (!cbtn.dataset.calcLabel) cbtn.dataset.calcLabel = cbtn.textContent; cbtn.textContent = 'Recalculate'; }
+    // Fresh quote → fresh chat (history references the prior numbers otherwise).
+    resetQuoteChat();
     // Fade + slide the card in on every calculate (re-trigger the CSS animation).
     if (!prefersReduce()) {
       resultBox.classList.remove('qf-reveal');
@@ -1365,13 +1593,25 @@
     box.style.display = 'block';
   }
 
+  // Show a validation message AND bring the offending field into view + focus it,
+  // so the reason a submit failed is never stranded below the fold on mobile.
+  function failField(fieldId, msg) {
+    showError('qf-submit-error', msg);
+    var f = $(fieldId);
+    if (!f) return;
+    f.classList.add('qf-field-invalid');
+    f.setAttribute('aria-invalid', 'true');
+    try { f.scrollIntoView({ block: 'center', behavior: 'smooth' }); } catch (_) {}
+    try { f.focus({ preventScroll: true }); } catch (_) { f.focus(); }
+    f.addEventListener('input', function clr() { f.classList.remove('qf-field-invalid'); f.removeAttribute('aria-invalid'); f.removeEventListener('input', clr); });
+  }
   function onSubmit(e) {
     e && e.preventDefault(); showError('qf-submit-error', null); var rules = getContactRules();
     var name = $('qf-c-name').value.trim(); var email = $('qf-c-email').value.trim(); var phone = $('qf-c-phone').value.trim();
-    if (!name) { showError('qf-submit-error', 'Please enter your name.'); return; }
-    if (rules.requireEmail) { if (!email || !/^\S+@\S+\.\S+$/.test(email)) { showError('qf-submit-error', 'Please enter a valid email.'); return; } }
-    else if (email && !/^\S+@\S+\.\S+$/.test(email)) { showError('qf-submit-error', 'That email looks invalid — clear it or fix the format.'); return; }
-    if (rules.requirePhone && !phone) { showError('qf-submit-error', 'Please enter a phone number.'); return; }
+    if (!name) { failField('qf-c-name', 'Please enter your name.'); return; }
+    if (rules.requireEmail) { if (!email || !/^\S+@\S+\.\S+$/.test(email)) { failField('qf-c-email', 'Please enter a valid email.'); return; } }
+    else if (email && !/^\S+@\S+\.\S+$/.test(email)) { failField('qf-c-email', 'That email looks invalid — clear it or fix the format.'); return; }
+    if (rules.requirePhone && !phone) { failField('qf-c-phone', 'Please enter a phone number.'); return; }
     var req = gatherQuoteRequest();
     // Flatten the customer fields onto the quote request. The server's
     // LeadSchema extends QuoteSchema (service/equipment/pickup/delivery at
