@@ -870,6 +870,10 @@
     selectService(services[0]);
   }
 
+  // Set by initOptionsPanel() so selectService() can refresh the "N selected"
+  // badge after it prunes add-ons on a mode switch.
+  var refreshOptionsCount = null;
+
   function selectService(service) {
     var firstSelect = state.service == null;
     state.service = service;
@@ -884,25 +888,36 @@
     equip.forEach(function (e) { var opt = document.createElement('option'); opt.value = e.value; opt.textContent = normalizeEquipmentLabel(e.label || e.value, service); sel.appendChild(opt); });
     state.equipment = equip[0] ? equip[0].value : null;
     sel.onchange = function () { state.equipment = sel.value; syncOogPanel(); };
-    // A single equipment option has nothing to choose — show a static read-only
-    // label instead of a lone 1-item dropdown. The native <select> stays
-    // populated (hidden via CSS) so calculate + the estimate meta still read the
-    // value. Drayage pads to 4 options, so it always keeps the real dropdown.
+    // Single-equipment modes (e.g. Hotshot) have nothing to choose, AND the
+    // equipment name is carrier fleet-spec jargon a shipper doesn't care about
+    // ("Class-3 dually + flatbed"). Hide the whole Equipment field so Weight
+    // takes the row; the hidden <select> keeps its value so the quote still
+    // uses the right rate card. Drayage pads to 4 options → keeps its dropdown.
+    var single = equip.length <= 1;
+    var eqRoot = $('qf-root');
+    if (eqRoot) eqRoot.classList.toggle('qf-hide-equipment', single && service !== 'ltl');
+    // Retire the old static jargon label if a previous build left one behind.
     var eqField = sel.closest && sel.closest('.qf-field');
     if (eqField) {
-      var single = equip.length <= 1;
       var staticEl = eqField.querySelector('.qf-equip-static');
-      if (single) {
-        if (!staticEl) { staticEl = el('div', { class: 'qf-equip-static' }); eqField.appendChild(staticEl); }
-        staticEl.textContent = equip[0] ? normalizeEquipmentLabel(equip[0].label || equip[0].value, service) : '—';
-        staticEl.style.display = '';
-        eqField.classList.add('qf-equip-single');
-      } else {
-        if (staticEl) staticEl.style.display = 'none';
-        eqField.classList.remove('qf-equip-single');
-      }
+      if (staticEl) staticEl.style.display = 'none';
+      eqField.classList.remove('qf-equip-single');
+    }
+    // Prune add-ons that don't apply to the newly selected service, so the
+    // "N selected" badge and the rendered chips always agree. Previously the
+    // badge kept stale codes from the previous mode (e.g. "4 selected") while
+    // only the one add-on valid in the new mode showed as active — a mismatch.
+    // Universal add-ons (no appliesToServices) are kept across modes.
+    if (state.config && state.config.accessorials) {
+      state.selectedAccessorials = (state.selectedAccessorials || []).filter(function (code) {
+        var a = state.config.accessorials.filter(function (x) { return x.code === code; })[0];
+        if (!a) return false;
+        if (!a.appliesToServices || a.appliesToServices.length === 0) return true;
+        return a.appliesToServices.indexOf(service) >= 0;
+      });
     }
     renderAccessorials(state.config.accessorials);
+    if (refreshOptionsCount) refreshOptionsCount();
     var isDrayage = service === 'drayage';
     var drayPickup = $('qf-drayage-pickup');
     var defaultPickup = $('qf-default-pickup');
@@ -1087,6 +1102,9 @@
       if (n > 0) { countEl.textContent = n + ' selected'; countEl.hidden = false; }
       else { countEl.hidden = true; }
     }
+    // Expose so selectService() can refresh the badge after a mode switch prunes
+    // the selection (the modal's own change/click handlers don't fire then).
+    refreshOptionsCount = updateCount;
 
     // Visible, focusable descendants of the dialog card — used to move focus
     // in on open and to trap Tab/Shift+Tab within the dialog.
@@ -1210,16 +1228,24 @@
     e && e.preventDefault(); showError('qf-error', null); var req = gatherQuoteRequest();
     if (!req.equipment) { showError('qf-error', 'Please pick an equipment type.'); return; }
     var hasPickup = !!(req.pickup.zip || req.pickup.city || req.pickup.portCode);
-    if (!hasPickup) { showError('qf-error', 'Please pick a pickup port (drayage) or enter a pickup ZIP/postal code.'); return; }
+    if (!hasPickup) { showError('qf-error', state.service === 'drayage' ? 'Please pick a pickup port, or enter a pickup ZIP/postal code.' : 'Please enter a pickup city, ZIP, or address.'); return; }
     // Symmetric pickup/delivery rule: both sides require a postal code (delivery
     // already did). Previously pickup accepted city-only while delivery didn't —
     // an inconsistency that let one leg be coarse. Drayage pickup is a PORT (not
     // a ZIP), so it is exempt from this check.
     var isDrayagePortPickup = state.service === 'drayage' && !!state.pickupPortCode;
     var pickupZipEl = $('qf-pickup-zip');
-    if (!isDrayagePortPickup && !hasPostalCode(pickupZipEl ? pickupZipEl.value : '', req.pickup)) { showError('qf-error', 'Please enter a pickup ZIP/postal code for a more accurate rate. City-only pickup can change the price in large metro areas.'); return; }
-    if (!req.delivery.zip && !req.delivery.city) { showError('qf-error', 'Please enter a delivery ZIP/postal code.'); return; }
-    if (!hasPostalCode($('qf-delivery-zip').value, req.delivery)) { showError('qf-error', 'Please enter a delivery ZIP/postal code for a more accurate rate. City-only delivery can change the price in large metro areas.'); return; }
+    // City-only pickup/delivery is a SOFT confirm, not a dead-end: the helper
+    // text invites a city, so a city-only entry now WARNS once (ZIP = exact
+    // rate) and quotes on the next click — instead of the primary CTA silently
+    // no-op'ing, which read as broken and killed conversions.
+    if (!req.delivery.zip && !req.delivery.city) { showError('qf-error', 'Please enter a delivery city, ZIP, or address.'); return; }
+    // ONE soft-confirm covering either/both city-only legs → warn once, quote on
+    // the next click (instead of the CTA silently no-op'ing, or stacking two
+    // separate warnings that took three clicks to clear).
+    var cityOnly = (!isDrayagePortPickup && !hasPostalCode(pickupZipEl ? pickupZipEl.value : '', req.pickup)) || !hasPostalCode($('qf-delivery-zip').value, req.delivery);
+    if (softConfirm('cityonly', cityOnly, 'c:' + (req.pickup.zip || req.pickup.city || '') + '>' + (req.delivery.zip || req.delivery.city || ''),
+      'Tip: adding a ZIP gives an exact rate — city-only lanes can vary in large metros. Press Get instant quote again to estimate with what you entered.')) return;
     if (req.service === 'ltl') {
       var lt = ltlTotals();
       if (lt.validItems < 1) { showError('qf-error', 'Add at least one item with its weight and length / width / height so we can determine the freight class.'); return; }
@@ -1268,6 +1294,16 @@
     return normalizeEquipmentLabel(state.equipment || '', state.service);
   }
 
+  // Customer-facing equipment label for the quote meta line. Strips internal
+  // carrier jargon and never repeats the service word that already leads the
+  // line (fixes "Hotshot · Hotshot (Class-3 dually + flatbed)" and the LTL
+  // phantom "LTL Pallet (…)" the shipper never chose).
+  function customerEquipmentLabel() {
+    if (state.service === 'ltl') return ''; // LTL is described by freight class, not a truck
+    if (state.service === 'hotshot') return 'Flatbed'; // drop the "Class-3 dually" fleet spec
+    return friendlyEquipmentLabel();
+  }
+
   // Count a number up to its final value (ease-out cubic) for the price reveal.
   function animateNumber(node, to, fmt, dur) {
     if (!node) return;
@@ -1308,7 +1344,8 @@
     var metaParts = [];
     if (resp.miles) metaParts.push('Approx. ' + Math.round(resp.miles) + ' mi');
     metaParts.push(serviceLabel);
-    metaParts.push(friendlyEquipmentLabel());
+    var eqLabel = customerEquipmentLabel();
+    if (eqLabel) metaParts.push(eqLabel);
     var metaText = metaParts.join(' · ');
     if (r.ltl && r.ltl.freightClass) metaText += ' · Class ' + r.ltl.freightClass;
     $('qf-meta').textContent = metaText;

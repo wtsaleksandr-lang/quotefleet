@@ -52,9 +52,16 @@
       return Array.from(select.options || []);
     }
 
+    function shortLabel(opt) {
+      // Drop the trailing "  (carrier)" suffix so a SELECTED terminal fits the
+      // narrow input; the carrier still shows in the suggestion dropdown, and the
+      // full name is on the input's title (hover) + ellipsized by CSS.
+      return labelForOption(opt).split('  (')[0].trim();
+    }
     function syncInput() {
       var selected = options().find(function (opt) { return opt.value === select.value; });
-      input.value = select.value ? labelForOption(selected) : '';
+      input.value = select.value ? shortLabel(selected) : '';
+      input.title = select.value ? labelForOption(selected) : '';
       input.placeholder = options().length > 1 ? "I don't know yet" : 'Select pickup port first';
     }
 
@@ -74,7 +81,12 @@
     function addItem(text, opt, metaText) {
       var item = document.createElement('div');
       item.className = 'qf-suggestion qf-terminal-suggestion';
-      item.textContent = text;
+      // Wrap the name in its own span so it can ellipsize instead of pushing the
+      // carrier/code meta pill off the row when the terminal name is long.
+      var label = document.createElement('span');
+      label.className = 'qf-terminal-suggestion-label';
+      label.textContent = text;
+      item.appendChild(label);
       if (metaText) {
         var meta = document.createElement('span');
         meta.className = 'meta';
