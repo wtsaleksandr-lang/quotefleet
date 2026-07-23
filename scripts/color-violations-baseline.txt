@@ -52,11 +52,11 @@ src/server/public/public-calculator-brand-preview.css:63:3	background-color: #ff
 src/server/public/public-calculator-brand-preview.css:97:3	color: #ffffff
 src/server/public/public-calculator-brand-preview.css:112:3	background: #ffffff
 src/server/public/public-calculator-followup.css:32:3	background: #fff
-src/server/public/public-calculator-ux.css:355:3	background: #ffffff
-src/server/public/public-calculator-ux.css:378:3	background: #ffffff
-src/server/public/public-calculator-ux.css:383:3	background: #ffffff
-src/server/public/public-calculator-ux.css:441:3	background: #ffffff
-src/server/public/public-calculator-ux.css:525:5	background: #ffffff
+src/server/public/public-calculator-ux.css:380:3	background: #ffffff
+src/server/public/public-calculator-ux.css:403:3	background: #ffffff
+src/server/public/public-calculator-ux.css:408:3	background: #ffffff
+src/server/public/public-calculator-ux.css:474:3	background: #ffffff
+src/server/public/public-calculator-ux.css:558:5	background: #ffffff
 src/server/public/public-pages-wefixtrades.css:59:3	color: #FFFFFF
 src/server/public/public-pages-wefixtrades.css:64:37	border-color: #FFFFFF
 src/server/public/public-pages-wefixtrades.css:65:36	color: #FFFFFF
