@@ -531,6 +531,7 @@
       ['qf-cb-phone', 'qf-cb-time', 'qf-cb-topic'].forEach(function (id) { var el = $(id); if (el) { el.value = ''; el.disabled = false; } });
       showCallbackError(null);
       $('qf-result').style.display = 'none';
+      resetCalcCta();
       ['qf-pickup-zip', 'qf-delivery-zip', 'qf-weight', 'qf-booking', 'qf-c-name', 'qf-c-email', 'qf-c-phone', 'qf-c-company', 'qf-c-notes', 'qf-oog-length', 'qf-oog-width', 'qf-oog-height', 'qf-oog-weight', 'qf-oog-notes']
         .forEach(function (id) { var el = $(id); if (el) el.value = ''; });
       state.ltlItems = [];
@@ -885,6 +886,12 @@
 
   function selectService(service) {
     var firstSelect = state.service == null;
+    // Switching mode invalidates any quote already on screen — clear it and
+    // restore the primary CTA (otherwise a stale result + "Recalculate" linger).
+    if (!firstSelect && state.service !== service) {
+      var rb = $('qf-result'); if (rb) rb.style.display = 'none';
+      showError('qf-error', null); resetCalcCta();
+    }
     state.service = service;
     $$('#qf-services button').forEach(function (b) { var on = b.dataset.service === service; b.classList.toggle('active', on); b.setAttribute('aria-selected', on ? 'true' : 'false'); });
     // Slide the active-tab indicator to the new tab (snap on the very first
@@ -1358,6 +1365,9 @@
     requestAnimationFrame(step);
   }
 
+  // Revert the primary CTA to its original label (used when the result is
+  // cleared or the mode changes, so it no longer reads "Recalculate").
+  function resetCalcCta() { var b = $('qf-calc-btn'); if (b && b.dataset.calcLabel) b.textContent = b.dataset.calcLabel; }
   function renderResult(resp) {
     var r = resp.result;
     // Guard the degenerate $0 / empty result. A total that isn't a positive
@@ -1368,6 +1378,7 @@
       var reach = c.phone ? ('call ' + c.phone) : (c.email ? ('email ' + c.email) : 'contact us');
       showError('qf-error', 'We couldn’t price this lane automatically — please ' + reach + ' and the team will quote it directly.');
       $('qf-result').style.display = 'none';
+      resetCalcCta();
       autoResize();
       return;
     }
@@ -1407,6 +1418,10 @@
     renderDisclaimer();
     var resultBox = $('qf-result');
     resultBox.style.display = 'block';
+    // A quote is now on screen — demote the primary CTA from "Get instant quote"
+    // to "Recalculate" so it no longer reads as if nothing has happened yet.
+    var cbtn = $('qf-calc-btn');
+    if (cbtn) { if (!cbtn.dataset.calcLabel) cbtn.dataset.calcLabel = cbtn.textContent; cbtn.textContent = 'Recalculate'; }
     // Fade + slide the card in on every calculate (re-trigger the CSS animation).
     if (!prefersReduce()) {
       resultBox.classList.remove('qf-reveal');
