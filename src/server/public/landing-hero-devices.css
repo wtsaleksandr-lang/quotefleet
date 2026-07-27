@@ -95,16 +95,32 @@ html body.qf-wft .qf-hero-devices > .qf-hero-vphone {
   html body.qf-wft .visual-flow.qf-hero-media {
     max-width: none !important;
   }
-  html body.qf-wft .qf-hero-devices > .qf-hero-laptop {
-    width: 93% !important;
+  /* OVERLAP FIX (mobile only): the laptop's real height = the .qf-browser chrome
+     bar + the 1600/1046 video, which is TALLER than the wrapper's reserved
+     `aspect-ratio: 1600/1046` box. As an absolutely-positioned child the laptop
+     overflowed the wrapper's bottom by ~60px. On desktop that overflow falls into
+     empty space in the right grid column (harmless); on mobile's single column it
+     landed on top of the lead paragraph below. Take the laptop IN-FLOW on mobile
+     and let the wrapper size to its true height, so the lead always clears it. */
+  html body.qf-wft .visual-flow.qf-hero-media > .qf-hero-devices {
+    aspect-ratio: auto !important;
+    height: auto !important;
+    filter: drop-shadow(0 12px 24px rgba(0, 0, 0, 0.45)) !important;
   }
+  html body.qf-wft .qf-hero-devices > .qf-hero-laptop {
+    position: relative !important;
+    top: auto !important;
+    left: auto !important;
+    width: 100% !important;
+    margin: 0 auto !important;
+  }
+  /* Keep the phone as an overlay, but lift it inside the now-shorter wrapper
+     (was bottom:-4%, which hung below the wrapper) so its enlarged stage-phone
+     pose can't dip onto the lead either. */
   html body.qf-wft .qf-hero-devices > .qf-hero-vphone {
     width: 34% !important;
     right: 0% !important;
-    bottom: -4% !important;
-  }
-  html body.qf-wft .visual-flow.qf-hero-media > .qf-hero-devices {
-    filter: drop-shadow(0 12px 24px rgba(0, 0, 0, 0.45)) !important;
+    bottom: 8% !important;
   }
 }
 
@@ -161,6 +177,13 @@ html body.qf-wft .qf-hero-devices--video.stage-phone > .qf-hero-laptop {
 /* Mobile (≤640px): the hero is a single narrow column, so use a gentler swap
    with smaller offsets/scales that never push a device outside the column. */
 @media (max-width: 640px) {
+  /* The desktop lone-laptop pose recenters the laptop with translate(6.8%, 12%)
+     to fill a TALL desktop media box. On mobile the laptop is now in-flow and
+     that 12% downward shift only pushed it toward the lead — drop it so the
+     laptop rests cleanly at the top of the (auto-height) wrapper. */
+  html body.qf-wft .qf-hero-devices--video.stage-laptop > .qf-hero-laptop {
+    transform: none;
+  }
   html body.qf-wft .qf-hero-devices--video.stage-laptop > .qf-hero-vphone {
     transform: translate(6%, 5%) scale(.76);
   }
