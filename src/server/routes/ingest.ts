@@ -288,8 +288,9 @@ export function registerIngestRoutes(app: Express) {
       selectedAccessorialCodes: body.selectedAccessorialCodes,
       flags: body.flags,
       // Label only — the draft's rates are already in the carrier's own
-      // currency, so tag the preview with it. Nothing is converted.
-      currency: currencyForCountry(req.tenant!.countryFocus),
+      // currency, so tag the preview with it. Nothing is converted. BOTH-focus
+      // tenants label per resolved lane country (delivery first, then pickup).
+      currency: currencyForCountry(req.tenant!.countryFocus, body.delivery.country ?? body.pickup.country),
     };
 
     // Manual-mode fuel (each draft card's own fuelSurchargePct) — the honest

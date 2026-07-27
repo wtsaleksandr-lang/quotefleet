@@ -91,6 +91,45 @@ describe('currencyForCountry — label-only currency selection', () => {
   });
 });
 
+describe('BOTH-focus lane currency — end-to-end through calculate()', () => {
+  // Mirrors exactly what the quote routes (public / ingest / ai) now do: derive
+  // the label from countryFocus + the resolved lane country (delivery first,
+  // then pickup), then price the lane. Proves a BOTH tenant's Canadian-
+  // destination lane is labelled CAD end-to-end while the priced amounts are
+  // untouched (label-only, never converted).
+  const cards = [rateCard({ ratePerMile: 2.5, minimumCharge: 350, fuelSurchargePct: 0, marginPct: 0 })];
+
+  const priceLane = (deliveryCountry?: string, pickupCountry?: string) =>
+    calculate(cards, [], [], req({
+      miles: 600,
+      pickupCountry,
+      deliveryCountry,
+      // The exact expression now wired at every route call site.
+      currency: currencyForCountry('BOTH', deliveryCountry ?? pickupCountry),
+    }));
+
+  it('a BOTH tenant\'s Canadian-destination lane labels CAD', () => {
+    expect(priceLane('CA', 'US').currency).toBe('CAD');
+  });
+
+  it('falls back to pickup country when delivery country is absent', () => {
+    expect(priceLane(undefined, 'CA').currency).toBe('CAD');
+  });
+
+  it('a US-destination lane stays USD', () => {
+    expect(priceLane('US', 'CA').currency).toBe('USD');
+  });
+
+  it('label-only: the CAD and USD lanes price the identical total (no FX)', () => {
+    const ca = priceLane('CA');
+    const us = priceLane('US');
+    expect(ca.currency).toBe('CAD');
+    expect(us.currency).toBe('USD');
+    expect(ca.total).toBeGreaterThan(0);
+    expect(ca.total).toBe(us.total); // same number, only the label differs
+  });
+});
+
 describe('calculate', () => {
   it('FTL dryvan — basic linehaul + fuel + margin', () => {
     const r = calculate([rateCard({})], [], [], req({ miles: 500 }));

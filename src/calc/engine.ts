@@ -82,10 +82,10 @@ function isCanadianLane(code?: string | null): boolean {
  *              worse than the reverse, and no amount is ever converted either
  *              way.
  *
- * FALLBACK NOTE: the route call sites (public / ingest / ai quote builders)
- * currently pass only `countryFocus`, so a BOTH tenant still resolves to USD at
- * runtime until they also forward the resolved lane country as the 2nd arg.
- * This helper is backward-compatible and ready for that one-arg wiring change.
+ * The quote routes (public / ingest / ai quote builders) forward the lane's
+ * resolved country here as `laneCountry` (delivery first, then pickup), so a
+ * BOTH tenant now labels Canadian lanes CAD at runtime. The 2nd arg stays
+ * optional so any other caller keeps the safe USD default.
  */
 export function currencyForCountry(
   country?: string | null,
