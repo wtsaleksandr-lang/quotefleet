@@ -87,6 +87,36 @@ html body.qf-wft .qf-hero-devices > .qf-hero-vphone {
   }
 }
 
+/* ── OVERLAP FIX — applies across the ENTIRE single-column range (≤980px). ──
+   The hero grid collapses from two columns to one at ≤980px (cleanup.css
+   `@media (max-width:980) .hero-grid { grid-template-columns: 1fr }`), NOT ≤640.
+   `.qf-hero-devices` reserves `aspect-ratio: 1600/1046`, but the laptop's real
+   height is the `.qf-browser` chrome bar PLUS the 1600/1046 video, so the
+   absolutely-positioned `.qf-hero-laptop` overflowed the wrapper's bottom by
+   ~55px. On the two-column desktop (≥981) that overflow lands in empty space in
+   the right grid column (harmless); once the hero is stacked it ate the gap down
+   to the next section (14–33px), and in the ≤640 reorder — where the media sits
+   between the H1 and the lead — it landed directly on the lead text. Take the
+   laptop IN-FLOW so the wrapper sizes to its true height and everything below it
+   always clears; lift the phone overlay inside the now-shorter wrapper. The
+   companion `stage-laptop` transform reset lives in the swap block below. */
+@media (max-width: 980px) {
+  html body.qf-wft .visual-flow.qf-hero-media > .qf-hero-devices {
+    aspect-ratio: auto !important;
+    height: auto !important;
+  }
+  html body.qf-wft .qf-hero-devices > .qf-hero-laptop {
+    position: relative !important;
+    top: auto !important;
+    left: auto !important;
+    width: 100% !important;
+    margin: 0 auto !important;
+  }
+  html body.qf-wft .qf-hero-devices > .qf-hero-vphone {
+    bottom: 8% !important;
+  }
+}
+
 /* Mobile (≤640px) — the hero reflows to a single column (title → media → lead).
    Keep the laptop+phone composition but let it fill the column and enlarge the
    two devices so their looped content is legible; no scale transform; lighter
@@ -95,16 +125,13 @@ html body.qf-wft .qf-hero-devices > .qf-hero-vphone {
   html body.qf-wft .visual-flow.qf-hero-media {
     max-width: none !important;
   }
-  html body.qf-wft .qf-hero-devices > .qf-hero-laptop {
-    width: 93% !important;
+  html body.qf-wft .visual-flow.qf-hero-media > .qf-hero-devices {
+    filter: drop-shadow(0 12px 24px rgba(0, 0, 0, 0.45)) !important;
   }
+  /* Slightly larger phone overlay on the narrowest screens. */
   html body.qf-wft .qf-hero-devices > .qf-hero-vphone {
     width: 34% !important;
     right: 0% !important;
-    bottom: -4% !important;
-  }
-  html body.qf-wft .visual-flow.qf-hero-media > .qf-hero-devices {
-    filter: drop-shadow(0 12px 24px rgba(0, 0, 0, 0.45)) !important;
   }
 }
 
@@ -156,6 +183,19 @@ html body.qf-wft .qf-hero-devices--video.stage-phone > .qf-hero-laptop {
      phone, never encroaching on the headline. */
   z-index: 1; transform: translate(24%, -8%) scale(.58); opacity: .32;
   filter: blur(2px) saturate(.88);
+}
+
+/* Across the whole single-column range (≤980px) the laptop is now IN-FLOW (see
+   the overlap-fix block above). The desktop lone-laptop pose recenters it with
+   `translate(6.8%, 12%)` to fill a TALL desktop media box; once stacked, that 12%
+   downward shift only pushes the laptop toward whatever is below it (the lead at
+   ≤640, the next section in the 641–980 band). Reset it so the laptop rests
+   cleanly at the top of its auto-height wrapper. Placed after the base pose so it
+   out-cascades it at equal specificity when the media query matches. */
+@media (max-width: 980px) {
+  html body.qf-wft .qf-hero-devices--video.stage-laptop > .qf-hero-laptop {
+    transform: none;
+  }
 }
 
 /* Mobile (≤640px): the hero is a single narrow column, so use a gentler swap
