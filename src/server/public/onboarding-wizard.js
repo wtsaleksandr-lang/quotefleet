@@ -243,6 +243,21 @@
         body.appendChild(el('div', 'qf-ob-kicker', 'Step 1 of 4'));
         body.appendChild(el('h1', 'qf-ob-title', 'What do you haul?'));
         body.appendChild(el('p', 'qf-ob-sub', 'Select every mode you run — we seed rates for all of them, so your customers can quote anything you actually haul.'));
+
+        // Fast path — upload a real rate sheet instead of starting from templates.
+        var fast = el('div', 'qf-ob-fastpath');
+        fast.style.cssText = 'display:flex;align-items:center;gap:14px;flex-wrap:wrap;margin:0 0 20px;padding:14px 16px;border-radius:14px;border:1px solid rgba(120,150,255,.42);background:rgba(79,124,255,.12);';
+        var fastTxt = el('div');
+        fastTxt.style.cssText = 'flex:1 1 240px;min-width:0;';
+        fastTxt.innerHTML = '<div style="font-weight:800;font-size:14px;">Already have a rate sheet?</div><div style="margin-top:3px;font-size:12.5px;line-height:1.45;opacity:.82;">Upload a PDF, Excel or screenshot — our AI reads it and builds your real rates. Skip the template estimates.</div>';
+        fast.appendChild(fastTxt);
+        var fastBtn = el('button', 'qf-ob-fastpath-btn', 'Upload a rate sheet →');
+        fastBtn.type = 'button';
+        fastBtn.style.cssText = 'flex:0 0 auto;cursor:pointer;font-weight:700;font-size:13px;padding:10px 16px;border-radius:10px;border:0;background:#4f7cff;color:#fff;white-space:nowrap;';
+        fastBtn.addEventListener('click', finishToIngest);
+        fast.appendChild(fastBtn);
+        body.appendChild(fast);
+
         var grid = el('div', 'qf-ob-cards is-two');
         VERTICALS.forEach(function (v) {
           var on = state.verticals.indexOf(v.id) !== -1;
@@ -714,6 +729,28 @@
           nextBtn.disabled = false;
           skipBtn.disabled = false;
           showError('Something went wrong saving your setup. Please try again, or Skip for now.');
+        });
+    }
+
+    // Fast path: skip the template survey and go straight to AI import to load
+    // the carrier's REAL rate sheet. We still mark onboarding done (skip apply)
+    // so the wizard doesn't re-open, then hand off to the /app/ingest route.
+    function finishToIngest() {
+      if (state.submitting) return;
+      state.submitting = true;
+      fetch('/api/tenant/onboarding/apply', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
+        body: JSON.stringify({ skip: true })
+      })
+        .then(function () {
+          close();
+          if (window.QFApp && typeof window.QFApp.go === 'function') window.QFApp.go('ingest');
+          else window.location.href = '/app/ingest';
+        })
+        .catch(function () {
+          state.submitting = false;
+          showError('Could not open the importer. Please try again, or pick your modes below.');
         });
     }
 
