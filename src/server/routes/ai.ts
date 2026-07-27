@@ -111,8 +111,9 @@ export function registerAiRoutes(app: Express) {
       deliveryPortCode: parse.data.delivery.portCode,
       selectedAccessorialCodes: parse.data.selectedAccessorialCodes,
       // Label only — mirrors what the public widget would quote for this
-      // carrier. No amount is converted.
-      currency: currencyForCountry(req.tenant!.countryFocus),
+      // carrier. No amount is converted. BOTH-focus tenants label per resolved
+      // lane country (delivery first, then pickup).
+      currency: currencyForCountry(req.tenant!.countryFocus, parse.data.delivery.country ?? parse.data.pickup.country),
     };
     const fscCtx = await resolveFscForTenant(req.tenant!);
     const result = calculate(cards, accs, zones, calcReq, [], {

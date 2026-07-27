@@ -2015,6 +2015,16 @@
       renderRouteMap(resp);
     }).catch(function () { if (seq === mapReqSeq) { showBaseMap(); autoResize(); } });
   }
+  // Graceful-hide: if a map bitmap 404s (Maps key missing / over-quota) the
+  // <img> would otherwise render a broken-image icon inside the card (the old
+  // "blank grey grid" symptom). Collapse the whole card container instead so
+  // the widget just drops the map cleanly, then re-report height.
+  function hideMapCard() {
+    var card = $('qf-map-card');
+    if (card) { card.hidden = true; card.style.display = 'none'; }
+    var modal = $('qf-map-modal'); if (modal) modal.hidden = true;
+    scheduleAutoResize();
+  }
   function renderRouteMap(resp) {
     var card = $('qf-map-card'); if (!card) return;
     // No routed map (rare, maps key live) → fall back to the North America base
@@ -2037,9 +2047,11 @@
     // If the bitmap is already in cache, setting src can leave img.complete true
     // with onload never firing — report immediately so the card's grown height
     // is picked up (ResizeObserver also covers this; belt-and-suspenders).
-    if (img) { img.onload = scheduleAutoResize; img.src = resp.mapUrl; if (img.complete && img.naturalWidth) scheduleAutoResize(); }
+    if (img) { img.onload = scheduleAutoResize; img.onerror = hideMapCard; img.src = resp.mapUrl; if (img.complete && img.naturalWidth) scheduleAutoResize(); }
     if (mimg) mimg.src = resp.mapUrl;
-    card.hidden = false;
+    // Clear any display:none left by a prior hideMapCard() so a recovered map
+    // (key restored / retry succeeds) re-appears rather than staying collapsed.
+    card.hidden = false; card.style.display = '';
     autoResize();
   }
   function mapThemeParam() { return resolvedMapTheme(); }
@@ -2053,13 +2065,14 @@
     var img = $('qf-map-img'), mimg = $('qf-map-modal-img');
     // height:auto image → re-report height on load so the host iframe expands to
     // fit the base map instead of leaving an inner scrollbar (see renderRouteMap).
-    if (img) { img.onload = scheduleAutoResize; img.src = url; img.alt = 'Map of North America'; if (img.complete && img.naturalWidth) scheduleAutoResize(); }
+    if (img) { img.onload = scheduleAutoResize; img.onerror = hideMapCard; img.src = url; img.alt = 'Map of North America'; if (img.complete && img.naturalWidth) scheduleAutoResize(); }
     if (mimg) { mimg.src = url; mimg.alt = 'Map of North America'; }
     ['qf-map-distance', 'qf-map-transit', 'qf-map-pickup', 'qf-map-delivery',
      'qf-map-m-distance', 'qf-map-m-transit', 'qf-map-m-pickup', 'qf-map-m-delivery'
     ].forEach(function (id) { var el = $(id); if (el) el.textContent = '—'; });
     card.classList.add('qf-map-base');
-    card.hidden = false;
+    // Clear any display:none left by a prior hideMapCard() (see renderRouteMap).
+    card.hidden = false; card.style.display = '';
   }
   function initRouteMapCard() {
     var open = $('qf-map-open'), modal = $('qf-map-modal');

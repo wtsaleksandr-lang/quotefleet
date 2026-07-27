@@ -54,9 +54,47 @@ export const MAX_QUOTABLE_WEIGHT_LBS = 80000;
  */
 export type Currency = 'USD' | 'CAD';
 
-/** Country focus → the currency that carrier quotes in. */
-export function currencyForCountry(country?: string | null): Currency {
-  return String(country ?? '').trim().toUpperCase() === 'CA' ? 'CAD' : 'USD';
+/** Canadian province / territory codes. Some geocoders resolve a lane to a
+ *  province rather than a country, so we accept either when labelling a
+ *  BOTH-focus quote's currency. Used for the LABEL only — never to convert. */
+const CA_PROVINCE_CODES = new Set([
+  'AB', 'BC', 'MB', 'NB', 'NL', 'NS', 'NT', 'NU', 'ON', 'PE', 'QC', 'SK', 'YT',
+]);
+
+/** True when a resolved lane country (or province) code denotes Canada.
+ *  Expects a COUNTRY code by contract — 'CA' means Canada here, not the US
+ *  state California (callers pass the lane's resolved *country*). */
+function isCanadianLane(code?: string | null): boolean {
+  const c = String(code ?? '').trim().toUpperCase();
+  if (!c) return false;
+  return c === 'CA' || c === 'CAN' || c === 'CANADA' || CA_PROVINCE_CODES.has(c);
+}
+
+/**
+ * Country focus → the currency a carrier LABELS quotes in (never converts).
+ *
+ *   - 'CA'   → always CAD (the carrier priced their rate cards in CAD).
+ *   - 'US'   → always USD, even on a cross-border lane still priced in USD.
+ *   - 'BOTH' → per-lane: a Canadian origin/destination labels CAD, everything
+ *              else USD. Pass the lane's resolved country (`laneCountry`, an
+ *              ISO-2 code like 'CA'/'US') to activate this. Without it a BOTH
+ *              tenant safely defaults to USD — mislabelling a US lane as CAD is
+ *              worse than the reverse, and no amount is ever converted either
+ *              way.
+ *
+ * The quote routes (public / ingest / ai quote builders) forward the lane's
+ * resolved country here as `laneCountry` (delivery first, then pickup), so a
+ * BOTH tenant now labels Canadian lanes CAD at runtime. The 2nd arg stays
+ * optional so any other caller keeps the safe USD default.
+ */
+export function currencyForCountry(
+  country?: string | null,
+  laneCountry?: string | null,
+): Currency {
+  const focus = String(country ?? '').trim().toUpperCase();
+  if (focus === 'CA') return 'CAD';
+  if (focus === 'BOTH') return isCanadianLane(laneCountry) ? 'CAD' : 'USD';
+  return 'USD';
 }
 
 export interface CalcRequest {

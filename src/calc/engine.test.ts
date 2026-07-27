@@ -13,7 +13,7 @@
  *   - unsupported equipment → friendly error
  */
 import { describe, it, expect } from 'vitest';
-import { calculate, customerFacingLines, type CalcRequest } from './engine.js';
+import { calculate, currencyForCountry, customerFacingLines, type CalcRequest } from './engine.js';
 import type { RateCard, Accessorial, LaneZone, Terminal } from '../db/schema.js';
 import { getSeedTemplate, type FreightVertical } from './seedTemplates.js';
 
@@ -61,6 +61,73 @@ function terminal(o: Partial<Terminal>): Terminal {
 
 const req = (o: Partial<CalcRequest> = {}): CalcRequest => ({
   service: 'ftl', equipment: 'dryvan', miles: 500, ...o,
+});
+
+describe('currencyForCountry — label-only currency selection', () => {
+  it('CA focus always labels CAD; US / null / garbage label USD', () => {
+    expect(currencyForCountry('CA')).toBe('CAD');
+    expect(currencyForCountry('ca')).toBe('CAD');
+    expect(currencyForCountry('US')).toBe('USD');
+    expect(currencyForCountry(null)).toBe('USD');
+    expect(currencyForCountry(undefined)).toBe('USD');
+    expect(currencyForCountry('EUR')).toBe('USD');
+  });
+
+  it('US focus stays USD even on a Canadian lane (carrier prices in USD)', () => {
+    expect(currencyForCountry('US', 'CA')).toBe('USD');
+  });
+
+  it('BOTH focus labels CAD on a Canadian lane, USD on a US lane', () => {
+    expect(currencyForCountry('BOTH', 'CA')).toBe('CAD');
+    expect(currencyForCountry('BOTH', 'CAN')).toBe('CAD');
+    expect(currencyForCountry('BOTH', 'ON')).toBe('CAD'); // province code
+    expect(currencyForCountry('BOTH', 'US')).toBe('USD');
+  });
+
+  it('BOTH focus without a resolved lane safely defaults to USD', () => {
+    expect(currencyForCountry('BOTH')).toBe('USD');
+    expect(currencyForCountry('BOTH', null)).toBe('USD');
+    expect(currencyForCountry('BOTH', '')).toBe('USD');
+  });
+});
+
+describe('BOTH-focus lane currency — end-to-end through calculate()', () => {
+  // Mirrors exactly what the quote routes (public / ingest / ai) now do: derive
+  // the label from countryFocus + the resolved lane country (delivery first,
+  // then pickup), then price the lane. Proves a BOTH tenant's Canadian-
+  // destination lane is labelled CAD end-to-end while the priced amounts are
+  // untouched (label-only, never converted).
+  const cards = [rateCard({ ratePerMile: 2.5, minimumCharge: 350, fuelSurchargePct: 0, marginPct: 0 })];
+
+  const priceLane = (deliveryCountry?: string, pickupCountry?: string) =>
+    calculate(cards, [], [], req({
+      miles: 600,
+      pickupCountry,
+      deliveryCountry,
+      // The exact expression now wired at every route call site.
+      currency: currencyForCountry('BOTH', deliveryCountry ?? pickupCountry),
+    }));
+
+  it('a BOTH tenant\'s Canadian-destination lane labels CAD', () => {
+    expect(priceLane('CA', 'US').currency).toBe('CAD');
+  });
+
+  it('falls back to pickup country when delivery country is absent', () => {
+    expect(priceLane(undefined, 'CA').currency).toBe('CAD');
+  });
+
+  it('a US-destination lane stays USD', () => {
+    expect(priceLane('US', 'CA').currency).toBe('USD');
+  });
+
+  it('label-only: the CAD and USD lanes price the identical total (no FX)', () => {
+    const ca = priceLane('CA');
+    const us = priceLane('US');
+    expect(ca.currency).toBe('CAD');
+    expect(us.currency).toBe('USD');
+    expect(ca.total).toBeGreaterThan(0);
+    expect(ca.total).toBe(us.total); // same number, only the label differs
+  });
 });
 
 describe('calculate', () => {

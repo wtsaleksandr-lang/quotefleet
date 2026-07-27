@@ -515,7 +515,9 @@ export function registerPublicRoutes(app: Express) {
       flags: body.flags,
       // Label only — the carrier priced their rate cards in their own
       // currency, so we tag the quote with it and never convert any amount.
-      currency: currencyForCountry(tenant.countryFocus),
+      // For a BOTH-focus tenant the lane's resolved country (delivery first,
+      // then pickup) decides CAD vs USD; CA/US focus ignore it.
+      currency: currencyForCountry(tenant.countryFocus, body.delivery.country ?? body.pickup.country),
     };
     const fsc = await fscOptionsForTenant(tenant);
     const result = calculate(cards, accs, zones, calcReq, terms, fsc);
@@ -727,7 +729,8 @@ export function registerPublicRoutes(app: Express) {
       selectedAccessorialCodes: body.selectedAccessorialCodes,
       flags: body.flags,
       // Label only — see the quote endpoint above. No FX conversion happens.
-      currency: currencyForCountry(tenant.countryFocus),
+      // BOTH-focus tenants label per resolved lane country (delivery→pickup).
+      currency: currencyForCountry(tenant.countryFocus, body.delivery.country ?? body.pickup.country),
     };
     const fsc = await fscOptionsForTenant(tenant);
     const calc = calculate(cards, accs, zones, calcReq, terms, fsc);
