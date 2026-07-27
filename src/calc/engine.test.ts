@@ -13,7 +13,7 @@
  *   - unsupported equipment → friendly error
  */
 import { describe, it, expect } from 'vitest';
-import { calculate, customerFacingLines, type CalcRequest } from './engine.js';
+import { calculate, currencyForCountry, customerFacingLines, type CalcRequest } from './engine.js';
 import type { RateCard, Accessorial, LaneZone, Terminal } from '../db/schema.js';
 import { getSeedTemplate, type FreightVertical } from './seedTemplates.js';
 
@@ -61,6 +61,34 @@ function terminal(o: Partial<Terminal>): Terminal {
 
 const req = (o: Partial<CalcRequest> = {}): CalcRequest => ({
   service: 'ftl', equipment: 'dryvan', miles: 500, ...o,
+});
+
+describe('currencyForCountry — label-only currency selection', () => {
+  it('CA focus always labels CAD; US / null / garbage label USD', () => {
+    expect(currencyForCountry('CA')).toBe('CAD');
+    expect(currencyForCountry('ca')).toBe('CAD');
+    expect(currencyForCountry('US')).toBe('USD');
+    expect(currencyForCountry(null)).toBe('USD');
+    expect(currencyForCountry(undefined)).toBe('USD');
+    expect(currencyForCountry('EUR')).toBe('USD');
+  });
+
+  it('US focus stays USD even on a Canadian lane (carrier prices in USD)', () => {
+    expect(currencyForCountry('US', 'CA')).toBe('USD');
+  });
+
+  it('BOTH focus labels CAD on a Canadian lane, USD on a US lane', () => {
+    expect(currencyForCountry('BOTH', 'CA')).toBe('CAD');
+    expect(currencyForCountry('BOTH', 'CAN')).toBe('CAD');
+    expect(currencyForCountry('BOTH', 'ON')).toBe('CAD'); // province code
+    expect(currencyForCountry('BOTH', 'US')).toBe('USD');
+  });
+
+  it('BOTH focus without a resolved lane safely defaults to USD', () => {
+    expect(currencyForCountry('BOTH')).toBe('USD');
+    expect(currencyForCountry('BOTH', null)).toBe('USD');
+    expect(currencyForCountry('BOTH', '')).toBe('USD');
+  });
 });
 
 describe('calculate', () => {
