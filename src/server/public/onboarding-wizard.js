@@ -170,29 +170,49 @@
     var shell = el('div', 'qf-ob-shell');
     overlay.appendChild(shell);
 
-    // Header
+    // Inline arrow icons (currentColor, no external requests).
+    var ARROW_LEFT = '<svg class="qf-ob-btn-ico" viewBox="0 0 16 16" aria-hidden="true" focusable="false"><path d="M10 3 L5 8 L10 13" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"/></svg>';
+    var ARROW_RIGHT = '<svg class="qf-ob-btn-ico" viewBox="0 0 16 16" aria-hidden="true" focusable="false"><path d="M6 3 L11 8 L6 13" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"/></svg>';
+
+    // Header: brand mark (top-left) + a right group holding the thin progress
+    // bar and the Skip control (Stripe-style placement).
     var head = el('div', 'qf-ob-head');
-    head.appendChild(el('div', 'qf-ob-brand', 'QuoteFleet setup'));
+    var brand = el('div', 'qf-ob-brand');
+    var brandMark = el('div', 'qf-ob-brand-mark');
+    brandMark.setAttribute('role', 'img');
+    brandMark.setAttribute('aria-label', 'QuoteFleet');
+    brand.appendChild(brandMark);
+    head.appendChild(brand);
+
+    var headRight = el('div', 'qf-ob-head-right');
+    // Thin top-right progress bar: a track with an accent fill grown by
+    // setProgress() as the carrier advances the 4 steps.
+    var progress = el('div', 'qf-ob-progress');
+    progress.setAttribute('role', 'progressbar');
+    progress.setAttribute('aria-label', 'Setup progress');
+    var progressFill = el('div', 'qf-ob-progress-fill');
+    progress.appendChild(progressFill);
+    headRight.appendChild(progress);
+
     var skipBtn = el('button', 'qf-ob-skip', 'Skip for now');
     skipBtn.type = 'button';
     skipBtn.addEventListener('click', function () { finish(true); });
-    head.appendChild(skipBtn);
+    headRight.appendChild(skipBtn);
+    head.appendChild(headRight);
     shell.appendChild(head);
-
-    // Progress
-    var progress = el('div', 'qf-ob-progress');
-    for (var i = 0; i < STEPS; i++) progress.appendChild(el('span'));
-    shell.appendChild(progress);
 
     // Body + footer
     var body = el('div', 'qf-ob-body');
     shell.appendChild(body);
     var foot = el('div', 'qf-ob-foot');
-    var backBtn = el('button', 'qf-ob-btn qf-ob-btn-back', 'Back');
+    var backBtn = el('button', 'qf-ob-btn qf-ob-btn-back');
     backBtn.type = 'button';
+    backBtn.innerHTML = ARROW_LEFT + '<span class="qf-ob-btn-label">Back</span>';
     backBtn.addEventListener('click', function () { if (state.step > 0) { state.step--; render(); } });
-    var nextBtn = el('button', 'qf-ob-btn qf-ob-btn-next', 'Continue');
+    var nextBtn = el('button', 'qf-ob-btn qf-ob-btn-next');
     nextBtn.type = 'button';
+    nextBtn.innerHTML = '<span class="qf-ob-btn-label">Continue</span>' + ARROW_RIGHT;
+    var nextLabel = nextBtn.querySelector('.qf-ob-btn-label');
     nextBtn.addEventListener('click', onNext);
     foot.appendChild(backBtn);
     foot.appendChild(nextBtn);
@@ -209,11 +229,13 @@
     document.documentElement.classList.add('qf-ob-open');
 
     function setProgress() {
-      var spans = progress.querySelectorAll('span');
-      for (var s = 0; s < spans.length; s++) {
-        if (s <= state.step) spans[s].classList.add('is-active');
-        else spans[s].classList.remove('is-active');
-      }
+      // Fill the top-right bar left-to-right: one completed step-width per step
+      // reached (step 0 → 25%, the final step → 100%).
+      var pct = Math.round(((state.step + 1) / STEPS) * 100);
+      progressFill.style.width = pct + '%';
+      progress.setAttribute('aria-valuenow', String(state.step + 1));
+      progress.setAttribute('aria-valuemin', '1');
+      progress.setAttribute('aria-valuemax', String(STEPS));
     }
 
     function optionCard(item, selected, onClick) {
@@ -236,7 +258,7 @@
       emailHint = null;
       setProgress();
       backBtn.style.visibility = state.step === 0 ? 'hidden' : 'visible';
-      nextBtn.textContent = state.step === STEPS - 1 ? 'Finish' : 'Continue';
+      nextLabel.textContent = state.step === STEPS - 1 ? 'Finish' : 'Continue';
       body.innerHTML = '';
 
       if (state.step === 0) {
