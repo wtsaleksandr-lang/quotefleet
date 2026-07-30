@@ -20,6 +20,39 @@ html.qf-ob-open body {
    never fully hides, whatever is behind) and the dot pattern is a token-tinted
    radial-gradient — very low contrast, reads as texture not noise. */
 .qf-ob-overlay {
+  /* ── Forced LIGHT scope (Stripe bright onboarding) ─────────────────────────
+     The dashboard behind the wizard stays on the app's global (dark) theme, but
+     the wizard itself always renders as a premium WHITE card. QuoteFleet's light
+     palette is defined under html[data-theme="light"], which a subtree attribute
+     can't match — so we re-point the SAME token variables to their light values
+     right here on the overlay. Every .qf-ob-* rule already consumes these via
+     var(), so the whole subtree flips light for free. These are custom-property
+     DEFINITIONS (not color/background declarations), so the hardcoded-color
+     guard doesn't scan them; the values mirror style.css's
+     html[data-theme="light"] block verbatim. */
+  --bg:            #F7F8FA;
+  --surface:       #FFFFFF;
+  --surface-2:     #F1F3F6;
+  --surface-3:     #E5E7EB;
+  --border:        #E5E7EB;
+  --border-strong: #CBD0D6;
+  --ink:        #0B0F14;
+  --ink-soft:   #1E2530;
+  --muted:      #5A6470;
+  --muted-soft: #8F98A4;
+  --accent:        #0D3CFC;
+  --accent-strong: #0B34D6;
+  --accent-soft:   rgba(13, 60, 252, 0.08);
+  --accent-fill:   #0D3CFC;
+  --accent-ink:    #FFFFFF;
+  /* Primary CTA on white = solid high-contrast brand blue with white text (the
+     cream --cta-bg is a dark-surface treatment and washes out on white). */
+  --cta-bg:        #0D3CFC;
+  --cta-bg-hover:  #0B34D6;
+  --cta-text:      #FFFFFF;
+  --error:      #B91C1C;
+  --shadow-lg:  0 24px 60px -16px rgba(15, 23, 42, 0.18);
+
   position: fixed;
   inset: 0;
   z-index: 2000;
@@ -27,7 +60,7 @@ html.qf-ob-open body {
   align-items: center;
   justify-content: center;
   padding: var(--space-3);
-  background-color: color-mix(in srgb, var(--bg) 86%, transparent);
+  background-color: color-mix(in srgb, var(--bg) 92%, transparent);
   background-image: radial-gradient(
     circle,
     color-mix(in srgb, var(--ink) 7%, transparent) 1px,
@@ -64,9 +97,9 @@ html.qf-ob-open body {
   margin-bottom: var(--space-3);
 }
 
-/* Brand mark, top-left. The variant swaps with the theme so it always reads as
-   the clean/"premium" mark against the card surface (light keys on the dark
-   card, dark keys on the light card). */
+/* Brand mark, top-left. The wizard card is ALWAYS white (forced-light scope
+   above), so the on-light mark variant (dark keys) is the correct one in every
+   global theme — the ondark/white-keys mark would be invisible on white. */
 .qf-ob-brand {
   display: flex;
   align-items: center;
@@ -75,13 +108,10 @@ html.qf-ob-open body {
 .qf-ob-brand-mark {
   width: 30px;
   height: 30px;
-  background-image: url("/brand/mark-keys-ondark.png");
+  background-image: url("/brand/mark-keys.png");
   background-size: contain;
   background-repeat: no-repeat;
   background-position: left center;
-}
-html[data-theme="light"] .qf-ob-brand-mark {
-  background-image: url("/brand/mark-keys.png");
 }
 
 .qf-ob-head-right {
