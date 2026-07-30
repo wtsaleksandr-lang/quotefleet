@@ -6,37 +6,89 @@
    guards. Spacing uses the 8px ramp via var(--space-*).
    ───────────────────────────────────────────────────────────────────────── */
 
-/* While the wizard is open, lock the page behind it so the dashboard shell
-   underneath (which stays in the document flow) can't be scrolled into view as a
-   sliver below the fixed overlay. The overlay scrolls its own content. */
+/* While the wizard is open, lock the page behind it so the dimmed backdrop
+   (and the dashboard shell under it, which stays in the document flow) can't be
+   scrolled. The floating card scrolls its own body. */
 html.qf-ob-open,
 html.qf-ob-open body {
   overflow: hidden;
 }
 
+/* ── backdrop: dimmed scrim + faint dotted-grid texture ──────────────────────
+   Stripe-style: a floating card centered on a calm, lightly-textured backdrop.
+   The scrim is the theme's own page colour at reduced opacity (so it dims,
+   never fully hides, whatever is behind) and the dot pattern is a token-tinted
+   radial-gradient — very low contrast, reads as texture not noise. */
 .qf-ob-overlay {
+  /* ── Forced LIGHT scope (Stripe bright onboarding) ─────────────────────────
+     The dashboard behind the wizard stays on the app's global (dark) theme, but
+     the wizard itself always renders as a premium WHITE card. QuoteFleet's light
+     palette is defined under html[data-theme="light"], which a subtree attribute
+     can't match — so we re-point the SAME token variables to their light values
+     right here on the overlay. Every .qf-ob-* rule already consumes these via
+     var(), so the whole subtree flips light for free. These are custom-property
+     DEFINITIONS (not color/background declarations), so the hardcoded-color
+     guard doesn't scan them; the values mirror style.css's
+     html[data-theme="light"] block verbatim. */
+  --bg:            #F7F8FA;
+  --surface:       #FFFFFF;
+  --surface-2:     #F1F3F6;
+  --surface-3:     #E5E7EB;
+  --border:        #E5E7EB;
+  --border-strong: #CBD0D6;
+  --ink:        #0B0F14;
+  --ink-soft:   #1E2530;
+  --muted:      #5A6470;
+  --muted-soft: #8F98A4;
+  --accent:        #0D3CFC;
+  --accent-strong: #0B34D6;
+  --accent-soft:   rgba(13, 60, 252, 0.08);
+  --accent-fill:   #0D3CFC;
+  --accent-ink:    #FFFFFF;
+  /* Primary CTA on white = solid high-contrast brand blue with white text (the
+     cream --cta-bg is a dark-surface treatment and washes out on white). */
+  --cta-bg:        #0D3CFC;
+  --cta-bg-hover:  #0B34D6;
+  --cta-text:      #FFFFFF;
+  --error:      #B91C1C;
+  --shadow-lg:  0 24px 60px -16px rgba(15, 23, 42, 0.18);
+
   position: fixed;
   inset: 0;
   z-index: 2000;
   display: flex;
-  align-items: stretch;
+  align-items: center;
   justify-content: center;
-  background: var(--bg);
+  padding: var(--space-3);
+  background-color: color-mix(in srgb, var(--bg) 92%, transparent);
+  background-image: radial-gradient(
+    circle,
+    color-mix(in srgb, var(--ink) 7%, transparent) 1px,
+    transparent 1px
+  );
+  background-size: 24px 24px;
   overflow-y: auto;
   -webkit-overflow-scrolling: touch;
 }
 
+/* The floating card itself — rounded, soft-shadowed, capped to the viewport so
+   its header + footer stay fixed while a long step scrolls inside the body. */
 .qf-ob-shell {
+  position: relative;
   width: 100%;
-  max-width: 640px;
-  margin: 0 auto;
+  max-width: 560px;
+  margin: auto;
   display: flex;
   flex-direction: column;
-  min-height: 100%;
-  padding: var(--space-3) var(--space-2);
+  max-height: calc(100dvh - var(--space-6));
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-lg);
+  padding: var(--space-4);
 }
 
-/* ── header: progress + skip ─────────────────────────────────────────────── */
+/* ── header: brand mark (left) + progress bar & skip (right) ─────────────── */
 .qf-ob-head {
   display: flex;
   align-items: center;
@@ -45,51 +97,72 @@ html.qf-ob-open body {
   margin-bottom: var(--space-3);
 }
 
+/* Brand mark, top-left. The wizard card is ALWAYS white (forced-light scope
+   above), so the on-light mark variant (dark keys) is the correct one in every
+   global theme — the ondark/white-keys mark would be invisible on white. */
 .qf-ob-brand {
   display: flex;
   align-items: center;
   gap: var(--space-1);
-  font-weight: 700;
-  color: var(--ink);
-  font-size: 15px;
+}
+.qf-ob-brand-mark {
+  width: 30px;
+  height: 30px;
+  background-image: url("/brand/mark-keys.png");
+  background-size: contain;
+  background-repeat: no-repeat;
+  background-position: left center;
+}
+
+.qf-ob-head-right {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
 }
 
 .qf-ob-skip {
   appearance: none;
-  border: 1px solid var(--border);
+  border: 0;
   background: transparent;
   color: var(--muted);
   border-radius: var(--radius-pill);
-  padding: var(--space-1) var(--space-2);
-  min-height: 36px;
+  padding: var(--space-1) var(--space-1-5);
+  min-height: 32px;
   font-size: 13px;
+  font-weight: 600;
   cursor: pointer;
-  transition: color 0.15s ease, border-color 0.15s ease;
+  transition: color 0.15s ease, background 0.15s ease;
 }
 .qf-ob-skip:hover {
   color: var(--ink);
-  border-color: var(--border-strong);
+  background: var(--surface-2);
 }
 
+/* Thin top-right progress bar — a short rounded track whose accent fill grows
+   left-to-right as the carrier advances the 4 steps (width set by setProgress). */
 .qf-ob-progress {
-  display: flex;
-  gap: var(--space-1);
-  margin-bottom: var(--space-3);
-}
-.qf-ob-progress span {
-  flex: 1 1 0;
+  width: 88px;
   height: 4px;
   border-radius: var(--radius-pill);
-  background: var(--surface-2);
-  transition: background 0.2s ease;
+  background: var(--surface-3);
+  overflow: hidden;
 }
-.qf-ob-progress span.is-active {
+.qf-ob-progress-fill {
+  height: 100%;
+  width: 25%;
   background: var(--accent);
+  border-radius: var(--radius-pill);
+  transition: width 0.25s ease;
 }
 
-/* ── step body ───────────────────────────────────────────────────────────── */
+/* ── step body ────────────────────────────────────────────────────────────
+   Scrolls inside the card so the header + footer stay put on long steps (the
+   50-state region picker, the confirm-rates + trust step). The negative-free
+   padding-inline keeps focus rings off the scroll edge. */
 .qf-ob-body {
   flex: 1 1 auto;
+  overflow-y: auto;
+  -webkit-overflow-scrolling: touch;
 }
 .qf-ob-kicker {
   text-transform: uppercase;
@@ -332,11 +405,11 @@ html.qf-ob-open body {
   margin-top: var(--space-3);
   padding-top: var(--space-2);
   border-top: 1px solid var(--border);
-  position: sticky;
-  bottom: 0;
-  background: var(--bg);
 }
 .qf-ob-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-1);
   appearance: none;
   cursor: pointer;
   border-radius: var(--radius-btn);
@@ -346,12 +419,15 @@ html.qf-ob-open body {
   font-weight: 600;
   transition: background 0.15s ease, border-color 0.15s ease, opacity 0.15s ease;
 }
+/* Back, bottom-left: ghost/outlined with a leading left-arrow. */
 .qf-ob-btn-back {
   border: 1px solid var(--border);
   background: transparent;
   color: var(--ink);
 }
 .qf-ob-btn-back:hover { border-color: var(--border-strong); }
+/* Continue / Finish, bottom-right: solid premium-cream CTA with a trailing
+   right-arrow. */
 .qf-ob-btn-next {
   border: 1px solid var(--cta-bg);
   background: var(--cta-bg);
@@ -359,6 +435,13 @@ html.qf-ob-open body {
 }
 .qf-ob-btn-next:hover { background: var(--cta-bg-hover); border-color: var(--cta-bg-hover); }
 .qf-ob-btn:disabled { opacity: 0.5; cursor: not-allowed; }
+/* Inline arrow icons — inherit the button's currentColor. */
+.qf-ob-btn-ico {
+  width: 16px;
+  height: 16px;
+  flex: 0 0 auto;
+  display: inline-block;
+}
 
 .qf-ob-error {
   color: var(--error);
@@ -450,7 +533,23 @@ html.qf-ob-open body {
   color: var(--accent-ink);
 }
 
+/* On phones the floating card goes full-bleed / full-height (edge-to-edge, no
+   rounded corners or shadow) so nothing is cramped and the footer stays
+   reachable at the bottom of the viewport. */
+@media (max-width: 480px) {
+  .qf-ob-overlay { padding: 0; }
+  .qf-ob-shell {
+    max-width: none;
+    min-height: 100dvh;
+    max-height: 100dvh;
+    border: 0;
+    border-radius: 0;
+    box-shadow: none;
+    padding: var(--space-3);
+  }
+}
+
 @media (max-width: 380px) {
   .qf-ob-title { font-size: 20px; }
-  .qf-ob-shell { padding: var(--space-2) var(--space-1-5); }
+  .qf-ob-shell { padding: var(--space-3) var(--space-2); }
 }
