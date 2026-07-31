@@ -398,3 +398,58 @@ body[data-qf-cta-hover="fill"] .qf-cta:not(.qf-secondary):hover { background: va
 .qf-book-status { display: none; margin-top: var(--space-1); font-size: 12.5px; line-height: 1.4; font-weight: 650; color: var(--w-fg); }
 .qf-book-status[data-kind="err"] { color: color-mix(in srgb, var(--w-fg) 40%, #e5484d); }
 .qf-book-done { margin-top: var(--space-1-5); }
+
+/* ── B&W-aware map overlay (mono map styles) ───────────────────────────────
+   The on-map overlay (distance/transit bottom bar + pickup/delivery top bar)
+   defaults to the branded look: a navy gradient with white text. On the two
+   true-monochrome base maps it must MATCH the map instead of fighting it.
+   Scoped STRICTLY to body[data-qf-map-style="blackwhite"] /
+   ["blackwhite_inverted"] (set in widget.js applyTheme) so no other map style
+   changes. Content/layout/spacing untouched — colour + hairline/shadow only.
+   Numeric rgba only (guard-safe: no #fff/#000/white/black), neutral greys so
+   NO brand colour leaks in; brand A/B dots collapse to mono (A solid, B ring).
+
+   blackwhite (white land, black route) → dark ink on a near-white translucent
+   chip, hairline grey border + soft shadow. */
+body[data-qf-map-style="blackwhite"] .qf-map-overlay {
+  background: linear-gradient(rgba(249,249,249,0), rgba(249,249,249,0.92));
+  border-top: 1px solid rgba(17,17,17,0.10);
+  box-shadow: 0 -1px 6px rgba(17,17,17,0.06);
+}
+body[data-qf-map-style="blackwhite"] .qf-map-ov-val { color: rgba(17,17,17,0.94); }
+body[data-qf-map-style="blackwhite"] .qf-map-ov-lbl { color: rgba(17,17,17,0.58); }
+body[data-qf-map-style="blackwhite"] .qf-map-ov-div { background: rgba(17,17,17,0.20); }
+body[data-qf-map-style="blackwhite"] .qf-map-addr {
+  background: linear-gradient(rgba(249,249,249,0.94), rgba(249,249,249,0));
+  border-bottom: 1px solid rgba(17,17,17,0.08);
+}
+body[data-qf-map-style="blackwhite"] .qf-ma-txt { color: rgba(17,17,17,0.88); }
+body[data-qf-map-style="blackwhite"] .qf-ma-a { background: rgba(17,17,17,0.90); }
+body[data-qf-map-style="blackwhite"] .qf-ma-b { background: transparent; box-shadow: inset 0 0 0 2px rgba(17,17,17,0.90); }
+body[data-qf-map-style="blackwhite"] .qf-map-expand {
+  color: rgba(17,17,17,0.85);
+  background: rgba(249,249,249,0.80);
+  box-shadow: 0 1px 4px rgba(17,17,17,0.15);
+}
+
+/* blackwhite_inverted (black land, white route) → light ink on a near-black
+   translucent chip matching the map's neutral ground, faint light hairline. */
+body[data-qf-map-style="blackwhite_inverted"] .qf-map-overlay {
+  background: linear-gradient(rgba(20,20,20,0), rgba(20,20,20,0.88));
+  border-top: 1px solid rgba(245,245,245,0.12);
+}
+body[data-qf-map-style="blackwhite_inverted"] .qf-map-ov-val { color: rgba(245,245,245,0.96); }
+body[data-qf-map-style="blackwhite_inverted"] .qf-map-ov-lbl { color: rgba(245,245,245,0.64); }
+body[data-qf-map-style="blackwhite_inverted"] .qf-map-ov-div { background: rgba(245,245,245,0.26); }
+body[data-qf-map-style="blackwhite_inverted"] .qf-map-addr {
+  background: linear-gradient(rgba(20,20,20,0.90), rgba(20,20,20,0));
+  border-bottom: 1px solid rgba(245,245,245,0.10);
+}
+body[data-qf-map-style="blackwhite_inverted"] .qf-ma-txt { color: rgba(245,245,245,0.90); }
+body[data-qf-map-style="blackwhite_inverted"] .qf-ma-a { background: rgba(245,245,245,0.92); }
+body[data-qf-map-style="blackwhite_inverted"] .qf-ma-b { background: transparent; box-shadow: inset 0 0 0 2px rgba(245,245,245,0.92); }
+body[data-qf-map-style="blackwhite_inverted"] .qf-map-expand {
+  color: rgba(245,245,245,0.90);
+  background: rgba(20,20,20,0.65);
+  box-shadow: 0 1px 4px rgba(17,17,17,0.4);
+}

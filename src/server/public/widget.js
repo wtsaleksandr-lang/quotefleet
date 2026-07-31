@@ -351,6 +351,15 @@
     // this attribute; default 'off' leaves the map exactly as today. See
     // widgetThemes.ts MAP_BLEND_VALUES + the body[data-qf-map-blend="on"] block.
     document.body.setAttribute('data-qf-map-blend', theme.mapBlend || 'off');
+    // Expose the resolved MAP STYLE on the body so the shared calculator CSS can
+    // re-skin the on-map overlay (distance/transit + addresses) to MATCH the
+    // active base map. brandMapStyle is a module-level var resolved just before
+    // this call (init's config .then). The monochrome blackwhite /
+    // blackwhite_inverted styles key off this to drop the brand overlay look in
+    // favour of dark-ink-on-light / light-ink-on-dark; every other value keeps
+    // the default branded overlay untouched. Re-runs on the demo ?mapStyle=
+    // override because applyTheme runs after brandMapStyle is (re)resolved.
+    document.body.setAttribute('data-qf-map-style', brandMapStyle || 'branded');
     // Preset id → body attribute so the widget CSS can apply the handful of
     // preset-specific tweaks that aren't expressible as a single --w-* token
     // (e.g. neutralising stray brand-blue on the monochrome "mono" theme).
@@ -412,7 +421,7 @@
   // card renders in the carrier's chosen look. null/unknown → 'branded'.
   var brandMapStyle = 'branded';
   function normMapStyle(s) {
-    return (s === 'grayscale' || s === 'standard' || s === 'soft' || s === 'dark_routes' || s === 'satellite') ? s : 'branded';
+    return (s === 'grayscale' || s === 'standard' || s === 'soft' || s === 'dark_routes' || s === 'satellite' || s === 'blackwhite' || s === 'blackwhite_inverted') ? s : 'branded';
   }
 
   // DEMO-ONLY map overrides (?mapStyle= / ?mapTheme=). The /w/demo showcase pins
