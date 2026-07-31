@@ -252,6 +252,15 @@
       .qf-mc-fab {
         bottom: calc(84px + env(safe-area-inset-bottom, 0px));
       }
+      /* The 84px lift clears the pricing page's bottom-anchored "Start 14-day
+         trial" CTA (#103). On the landing page the primary "Start free" CTA
+         sits mid-hero instead, so that same lift drops the launcher right on
+         top of it. Return the launcher to the conventional bottom-right corner
+         on landing only — it clears the mid-page CTA and leaves pricing and
+         desktop untouched. Scoped to body.landing-v2 (landing page only). */
+      body.landing-v2 .qf-mc-fab {
+        bottom: calc(20px + env(safe-area-inset-bottom, 0px));
+      }
       .qf-mc-panel {
         top: 72px; right: 8px; bottom: calc(8px + env(safe-area-inset-bottom, 0px)); left: 8px;
         width: auto; height: auto; max-width: none; max-height: none;

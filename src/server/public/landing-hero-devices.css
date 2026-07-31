@@ -45,12 +45,17 @@ html body.qf-wft .visual-flow.qf-hero-media > .qf-hero-devices {
   html body.qf-wft .hero-copy { max-width: 560px !important; }
 }
 
-/* Laptop — reuse the `.qf-browser` window chrome; large, upper-left. */
+/* Laptop — reuse the `.qf-browser` window chrome; large, upper-left.
+   Desktop mockup enlarged +15% (88% → 101.2% of the media column). Only takes
+   effect ≥981px; the ≤980 block below pins it to 100% (in-flow, full column) so
+   the bump never overflows the stacked/mobile layout. The stage-laptop recenter
+   translate is retuned below (6.8% → -0.6%) so the now-near-full-width laptop
+   stays centered in the column instead of overflowing the right edge. */
 html body.qf-wft .qf-hero-devices > .qf-hero-laptop {
   position: absolute;
   top: 0;
   left: 0;
-  width: 88%;
+  width: 101.2%;
   z-index: 1;
 }
 /* Drop the component's own heavy drop-shadow so the wrapper's shadow leads
@@ -66,7 +71,7 @@ html body.qf-wft .qf-hero-devices > .qf-hero-vphone {
   position: absolute;
   right: 0%;
   bottom: -3%;
-  width: 31%;
+  width: 34.1%; /* mobile mockup enlarged +10% (was 31%); overlay anchored right:0, stays in-column */
   z-index: 2;
 }
 
@@ -128,9 +133,9 @@ html body.qf-wft .qf-hero-devices > .qf-hero-vphone {
   html body.qf-wft .visual-flow.qf-hero-media > .qf-hero-devices {
     filter: drop-shadow(0 12px 24px rgba(0, 0, 0, 0.45)) !important;
   }
-  /* Slightly larger phone overlay on the narrowest screens. */
+  /* Slightly larger phone overlay on the narrowest screens (enlarged +10%: 34% → 37.4%). */
   html body.qf-wft .qf-hero-devices > .qf-hero-vphone {
-    width: 34% !important;
+    width: 37.4% !important;
     right: 0% !important;
   }
 }
@@ -162,9 +167,11 @@ html body.qf-wft .qf-hero-devices--video > .qf-hero-vphone { transform-origin: 8
 html body.qf-wft .qf-hero-devices--video.stage-laptop > .qf-hero-laptop {
   /* Laptop is the sole focus now (the phone is hidden in this stage), so centre
      it in the media box instead of leaving it in the top-left where it used to
-     sit beside the phone. translate is in % of the laptop's own size; the
-     laptop is 88% wide at left:0, so +6.8% of its width recentres it. */
-  z-index: 3; transform: translate(6.8%, 12%); opacity: 1; filter: none;
+     sit beside the phone. translate is in % of the laptop's own size; the laptop
+     is now 101.2% wide at left:0 (enlarged +15%), so -0.6% of its width recentres
+     it to sit flush in the column (was +6.8% back when it was 88% wide). Applies
+     ≥981px only; the ≤980 block below resets this to `transform: none`. */
+  z-index: 3; transform: translate(-0.6%, 12%); opacity: 1; filter: none;
 }
 html body.qf-wft .qf-hero-devices--video.stage-laptop > .qf-hero-vphone {
   z-index: 1; transform: translate(15%, 7%) scale(.72); opacity: 0;
