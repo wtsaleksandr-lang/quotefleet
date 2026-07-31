@@ -46,10 +46,10 @@ export function normalizeTheme(raw: unknown): MapTheme {
 //   satellite   — real aerial imagery (maptype=hybrid) + labels + white route
 // NOTE: the string KEYS stay stable so tenants' saved selections persist; only
 // the LOOK + label/hint of `grayscale`/`dark_routes` changed, `soft`+`satellite` are new.
-export type MapStyle = 'branded' | 'grayscale' | 'standard' | 'soft' | 'dark_routes' | 'mono' | 'satellite' | 'ironhorse' | 'harbor' | 'cupertino' | 'material' | 'booking' | 'tesla' | 'stripe' | 'stone' | 'citron' | 'vault' | 'blackwhite';
+export type MapStyle = 'branded' | 'grayscale' | 'standard' | 'soft' | 'dark_routes' | 'mono' | 'satellite' | 'ironhorse' | 'harbor' | 'cupertino' | 'material' | 'booking' | 'tesla' | 'stripe' | 'stone' | 'citron' | 'vault' | 'blackwhite' | 'blackwhite_inverted';
 
 /** Canonical style keys (source of truth for the Zod enum + the picker). */
-export const MAP_STYLE_KEYS = ['branded', 'grayscale', 'standard', 'soft', 'dark_routes', 'mono', 'satellite', 'ironhorse', 'harbor', 'cupertino', 'material', 'booking', 'tesla', 'stripe', 'stone', 'citron', 'vault', 'blackwhite'] as const;
+export const MAP_STYLE_KEYS = ['branded', 'grayscale', 'standard', 'soft', 'dark_routes', 'mono', 'satellite', 'ironhorse', 'harbor', 'cupertino', 'material', 'booking', 'tesla', 'stripe', 'stone', 'citron', 'vault', 'blackwhite', 'blackwhite_inverted'] as const;
 
 /** Human labels + one-line hints for the Customize picker. */
 export const MAP_STYLE_LIST: Array<{ key: MapStyle; label: string; hint: string }> = [
@@ -71,6 +71,7 @@ export const MAP_STYLE_LIST: Array<{ key: MapStyle; label: string; hint: string 
   { key: 'citron', label: 'Citron', hint: 'Minimal light B&W map, near-black route, lime pins.' },
   { key: 'vault', label: 'Vault', hint: 'Warm cream map, vermillion route and pins.' },
   { key: 'blackwhite', label: 'Black & White', hint: 'True monochrome map — white land, black route and pins, no colour.' },
+  { key: 'blackwhite_inverted', label: 'Black & White (Inverted)', hint: 'Inverted monochrome — black land, white roads, white route and pins.' },
 ];
 
 /** Normalize any caller/tenant input to a valid style. null/unknown → branded,
@@ -92,7 +93,8 @@ export function resolveMapStyle(raw: unknown): MapStyle {
     raw === 'stone' ||
     raw === 'citron' ||
     raw === 'vault' ||
-    raw === 'blackwhite'
+    raw === 'blackwhite' ||
+    raw === 'blackwhite_inverted'
     ? raw
     : 'branded';
 }
@@ -565,6 +567,34 @@ const BLACKWHITE_STYLES: string[] = [
   'feature:road.highway|element:geometry.stroke|color:0x7d7d7d',
 ];
 
+// `blackwhite_inverted` (label: "Black & White (Inverted)") — the negative of
+// `blackwhite`: near-black land + dark greyscale water, roads rendered as LIGHT
+// lines (highway brightest) with dark edges for hierarchy, light labels, POI/
+// transit off. No colour. The bright WHITE route line + near-white A·B pins are
+// the only ink on the dark ground (night-nav / inverted-print look).
+const BLACKWHITE_INVERTED_STYLES: string[] = [
+  'element:geometry|color:0x121212',
+  'element:labels.text.fill|color:0xe6e6e6',
+  'element:labels.text.stroke|color:0x121212',
+  'feature:administrative|element:geometry.stroke|color:0x3a3a3a',
+  'feature:administrative.country|element:geometry.stroke|color:0x707070',
+  'feature:administrative.province|element:geometry.stroke|color:0x484848',
+  'feature:landscape|element:geometry|color:0x121212',
+  'feature:landscape.natural|element:geometry|color:0x181818',
+  'feature:poi|visibility:off',
+  'feature:poi.park|element:geometry|color:0x1c1c1c',
+  'feature:transit|visibility:off',
+  'feature:water|element:geometry|color:0x242424',
+  'feature:water|element:labels.text.fill|color:0x8f8f8f',
+  'feature:road|element:geometry|color:0xd6d6d6',
+  'feature:road|element:geometry.stroke|color:0x363636',
+  'feature:road|element:labels.text.fill|color:0xbdbdbd',
+  'feature:road|element:labels.text.stroke|color:0x121212',
+  'feature:road.arterial|element:geometry|color:0xe4e4e4',
+  'feature:road.highway|element:geometry|color:0xf4f4f4',
+  'feature:road.highway|element:geometry.stroke|color:0x8a8a8a',
+];
+
 /** Resolve the Static Maps `style=` spec list for a (theme, mapStyle) pair.
  *  `branded` follows the light/dark theme (unchanged); the others are fixed.
  *  `standard` and `satellite` return [] → no style overrides (satellite uses
@@ -605,6 +635,8 @@ function styleSpecs(theme: MapTheme, mapStyle: MapStyle): string[] {
       return VAULT_STYLES;
     case 'blackwhite':
       return BLACKWHITE_STYLES;
+    case 'blackwhite_inverted':
+      return BLACKWHITE_INVERTED_STYLES;
     case 'branded':
     default:
       return themeStyles(theme);
@@ -648,6 +680,8 @@ function routeLine(mapStyle: MapStyle): { color: string; weight: string } {
   if (mapStyle === 'vault') return { color: '0xF04E23ff', weight: '5' };
   // blackwhite (Black & White): a solid black route line — the only "ink".
   if (mapStyle === 'blackwhite') return { color: '0x111111ff', weight: '6' };
+  // blackwhite_inverted: a bright WHITE route line over the near-black ground.
+  if (mapStyle === 'blackwhite_inverted') return { color: '0xffffffff', weight: '6' };
   return { color: ROUTE_COLOR, weight: '4' };
 }
 
@@ -675,6 +709,8 @@ function markerColors(mapStyle: MapStyle): { origin: string; dest: string } {
   if (mapStyle === 'vault') return { origin: '0xF04E23', dest: '0xF04E23' };
   // blackwhite (Black & White): both pins near-black (white A·B labels) — no colour.
   if (mapStyle === 'blackwhite') return { origin: '0x1a1a1a', dest: '0x1a1a1a' };
+  // blackwhite_inverted: both pins near-white (dark A·B labels) over the dark map.
+  if (mapStyle === 'blackwhite_inverted') return { origin: '0xf2f2f2', dest: '0xf2f2f2' };
   return { origin: ORIGIN_COLOR, dest: DEST_COLOR };
 }
 
