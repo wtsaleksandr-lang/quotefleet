@@ -21,3 +21,6 @@ logs/
 /blob-report/
 /playwright/.cache/
 _rec/
+
+# Scratchpad — throwaway agent artifacts, never commit
+scratchpad/
