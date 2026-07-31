@@ -1,0 +1,12 @@
+import { chromium } from '@playwright/test';
+const b = await chromium.launch(); const p = await (await b.newContext()).newPage();
+const errs=[]; p.on('console',m=>{if(m.type()==='error')errs.push(m.text())}); p.on('pageerror',e=>errs.push('PAGEERR '+e.message));
+const resp = await p.goto('http://localhost:8854/w/demo',{waitUntil:'networkidle'});
+console.log('status', resp.status());
+await p.waitForTimeout(2000);
+console.log('has #qf-services', await p.locator('#qf-services').count());
+console.log('service btns', await p.locator('#qf-services button').count());
+console.log('body snippet', (await p.locator('body').innerText().catch(()=>'')).slice(0,300).replace(/\n+/g,' | '));
+console.log('errors', JSON.stringify(errs.slice(0,8)));
+await p.screenshot({path:'scratchpad/dbg-load.png'});
+await b.close();
