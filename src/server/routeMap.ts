@@ -46,10 +46,10 @@ export function normalizeTheme(raw: unknown): MapTheme {
 //   satellite   — real aerial imagery (maptype=hybrid) + labels + white route
 // NOTE: the string KEYS stay stable so tenants' saved selections persist; only
 // the LOOK + label/hint of `grayscale`/`dark_routes` changed, `soft`+`satellite` are new.
-export type MapStyle = 'branded' | 'grayscale' | 'standard' | 'soft' | 'dark_routes' | 'mono' | 'satellite' | 'ironhorse' | 'harbor' | 'cupertino' | 'material' | 'booking' | 'tesla' | 'stripe' | 'stone' | 'citron' | 'vault';
+export type MapStyle = 'branded' | 'grayscale' | 'standard' | 'soft' | 'dark_routes' | 'mono' | 'satellite' | 'ironhorse' | 'harbor' | 'cupertino' | 'material' | 'booking' | 'tesla' | 'stripe' | 'stone' | 'citron' | 'vault' | 'blackwhite';
 
 /** Canonical style keys (source of truth for the Zod enum + the picker). */
-export const MAP_STYLE_KEYS = ['branded', 'grayscale', 'standard', 'soft', 'dark_routes', 'mono', 'satellite', 'ironhorse', 'harbor', 'cupertino', 'material', 'booking', 'tesla', 'stripe', 'stone', 'citron', 'vault'] as const;
+export const MAP_STYLE_KEYS = ['branded', 'grayscale', 'standard', 'soft', 'dark_routes', 'mono', 'satellite', 'ironhorse', 'harbor', 'cupertino', 'material', 'booking', 'tesla', 'stripe', 'stone', 'citron', 'vault', 'blackwhite'] as const;
 
 /** Human labels + one-line hints for the Customize picker. */
 export const MAP_STYLE_LIST: Array<{ key: MapStyle; label: string; hint: string }> = [
@@ -70,6 +70,7 @@ export const MAP_STYLE_LIST: Array<{ key: MapStyle; label: string; hint: string 
   { key: 'stone', label: 'Stone', hint: 'Cool slate-grey map, graphite route and pins.' },
   { key: 'citron', label: 'Citron', hint: 'Minimal light B&W map, near-black route, lime pins.' },
   { key: 'vault', label: 'Vault', hint: 'Warm cream map, vermillion route and pins.' },
+  { key: 'blackwhite', label: 'Black & White', hint: 'True monochrome map — white land, black route and pins, no colour.' },
 ];
 
 /** Normalize any caller/tenant input to a valid style. null/unknown → branded,
@@ -90,7 +91,8 @@ export function resolveMapStyle(raw: unknown): MapStyle {
     raw === 'stripe' ||
     raw === 'stone' ||
     raw === 'citron' ||
-    raw === 'vault'
+    raw === 'vault' ||
+    raw === 'blackwhite'
     ? raw
     : 'branded';
 }
@@ -535,6 +537,34 @@ const VAULT_STYLES: string[] = [
   'feature:road.highway|element:geometry.stroke|color:0xD8C7B4',
 ];
 
+// `blackwhite` (label: "Black & White") — a TRUE monochrome map: pure-white
+// land, greyscale water, white roads with progressively darker grey strokes
+// (arterial → highway) for legible hierarchy, near-black labels, POI/transit
+// off. No colour anywhere — the black route line + black A·B pins (see
+// routeLine / markerColors) are the only "ink". Editorial / newspaper look.
+const BLACKWHITE_STYLES: string[] = [
+  'element:geometry|color:0xffffff',
+  'element:labels.text.fill|color:0x1a1a1a',
+  'element:labels.text.stroke|color:0xffffff',
+  'feature:administrative|element:geometry.stroke|color:0xc8c8c8',
+  'feature:administrative.country|element:geometry.stroke|color:0x8f8f8f',
+  'feature:administrative.province|element:geometry.stroke|color:0xbcbcbc',
+  'feature:landscape|element:geometry|color:0xffffff',
+  'feature:landscape.natural|element:geometry|color:0xf6f6f6',
+  'feature:poi|visibility:off',
+  'feature:poi.park|element:geometry|color:0xefefef',
+  'feature:transit|visibility:off',
+  'feature:water|element:geometry|color:0xdcdcdc',
+  'feature:water|element:labels.text.fill|color:0x6f6f6f',
+  'feature:road|element:geometry|color:0xffffff',
+  'feature:road|element:geometry.stroke|color:0xcccccc',
+  'feature:road|element:labels.text.fill|color:0x555555',
+  'feature:road|element:labels.text.stroke|color:0xffffff',
+  'feature:road.arterial|element:geometry.stroke|color:0xb8b8b8',
+  'feature:road.highway|element:geometry|color:0xf0f0f0',
+  'feature:road.highway|element:geometry.stroke|color:0x7d7d7d',
+];
+
 /** Resolve the Static Maps `style=` spec list for a (theme, mapStyle) pair.
  *  `branded` follows the light/dark theme (unchanged); the others are fixed.
  *  `standard` and `satellite` return [] → no style overrides (satellite uses
@@ -573,6 +603,8 @@ function styleSpecs(theme: MapTheme, mapStyle: MapStyle): string[] {
       return CITRON_STYLES;
     case 'vault':
       return VAULT_STYLES;
+    case 'blackwhite':
+      return BLACKWHITE_STYLES;
     case 'branded':
     default:
       return themeStyles(theme);
@@ -614,6 +646,8 @@ function routeLine(mapStyle: MapStyle): { color: string; weight: string } {
   if (mapStyle === 'citron') return { color: '0x292928ff', weight: '5' };
   // vault (Vault): the vermillion identity route line over the cream map.
   if (mapStyle === 'vault') return { color: '0xF04E23ff', weight: '5' };
+  // blackwhite (Black & White): a solid black route line — the only "ink".
+  if (mapStyle === 'blackwhite') return { color: '0x111111ff', weight: '6' };
   return { color: ROUTE_COLOR, weight: '4' };
 }
 
@@ -639,6 +673,8 @@ function markerColors(mapStyle: MapStyle): { origin: string; dest: string } {
   if (mapStyle === 'citron') return { origin: '0xC3F832', dest: '0xC3F832' };
   // vault (Vault): both pins the vermillion for one cohesive branded object.
   if (mapStyle === 'vault') return { origin: '0xF04E23', dest: '0xF04E23' };
+  // blackwhite (Black & White): both pins near-black (white A·B labels) — no colour.
+  if (mapStyle === 'blackwhite') return { origin: '0x1a1a1a', dest: '0x1a1a1a' };
   return { origin: ORIGIN_COLOR, dest: DEST_COLOR };
 }
 

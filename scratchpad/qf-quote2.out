@@ -1,0 +1,56 @@
+[
+  {
+    "tag": "ftl-desk",
+    "pickup": "Los Angeles, CA, USA",
+    "delivery": "Phoenix, AZ, USA",
+    "btn": "Get instant quote",
+    "resultVisible": false,
+    "resultText": "(hidden)",
+    "errorVisible": "Please enter a pickup ZIP/postal code for a more accurate rate. City-only pickup can change the price in large metro areas."
+  },
+  {
+    "tag": "expedited-desk",
+    "pickup": "Los Angeles, CA, USA",
+    "delivery": "Phoenix, AZ, USA",
+    "btn": "Get instant quote",
+    "resultVisible": false,
+    "resultText": "(hidden)",
+    "errorVisible": "Please enter a pickup ZIP/postal code for a more accurate rate. City-only pickup can change the price in large metro areas."
+  },
+  {
+    "tag": "hotshot-desk",
+    "pickup": "Los Angeles, CA, USA",
+    "delivery": "Phoenix, AZ, USA",
+    "btn": "Get instant quote",
+    "resultVisible": false,
+    "resultText": "(hidden)",
+    "errorVisible": "Please enter a pickup ZIP/postal code for a more accurate rate. City-only pickup can change the price in large metro areas."
+  },
+  {
+    "tag": "ftl-mob",
+    "pickup": "Los Angeles, CA, USA",
+    "delivery": "Phoenix, AZ, USA",
+    "btn": "Get instant quote",
+    "resultVisible": false,
+    "resultText": "(hidden)",
+    "errorVisible": "Please enter a pickup ZIP/postal code for a more accurate rate. City-only pickup can change the price in large metro areas."
+  },
+  {
+    "tag": "expedited-mob",
+    "pickup": "Los Angeles, CA, USA",
+    "delivery": "Phoenix, AZ, USA",
+    "btn": "Get instant quote",
+    "resultVisible": false,
+    "resultText": "(hidden)",
+    "errorVisible": "Please enter a pickup ZIP/postal code for a more accurate rate. City-only pickup can change the price in large metro areas."
+  },
+  {
+    "tag": "hotshot-mob",
+    "pickup": "Los Angeles, CA, USA",
+    "delivery": "Phoenix, AZ, USA",
+    "btn": "Get instant quote",
+    "resultVisible": false,
+    "resultText": "(hidden)",
+    "errorVisible": "Please enter a pickup ZIP/postal code for a more accurate rate. City-only pickup can change the price in large metro areas."
+  }
+]

@@ -1,0 +1,233 @@
+[
+  {
+    "step": "signup",
+    "submitDisabledAfterFill": false
+  },
+  {
+    "step": "signup",
+    "landedUrl": "http://localhost:8854/app"
+  },
+  {
+    "step": "auth-me",
+    "status": 200,
+    "tenant": "qa-1784435799988",
+    "needsOnboarding": true,
+    "plan": "free"
+  },
+  {
+    "step": "setup-status",
+    "status": 200,
+    "json": {
+      "rates": true,
+      "accessorials": true,
+      "zones": true,
+      "brand": false,
+      "ai": false
+    }
+  },
+  {
+    "step": "overview",
+    "status": 200
+  },
+  {
+    "step": "rate-cards-seeded",
+    "status": 200,
+    "total": 13,
+    "services": [
+      "expedited",
+      "hotshot",
+      "ftl",
+      "drayage",
+      "ltl"
+    ],
+    "countsByService": {
+      "expedited": 2,
+      "hotshot": 1,
+      "ftl": 5,
+      "drayage": 4,
+      "ltl": 1
+    }
+  },
+  {
+    "step": "rate-card-edit",
+    "mode": "ftl",
+    "cardId": 1036,
+    "putStatus": 200,
+    "oldRate": 2.55,
+    "newRate": 2.92,
+    "persistedRate": 2.92,
+    "persisted": true
+  },
+  {
+    "step": "rate-card-edit",
+    "mode": "ltl",
+    "cardId": 1048,
+    "putStatus": 200,
+    "oldRate": 0,
+    "newRate": 0.37,
+    "persistedRate": 0.37,
+    "persisted": true
+  },
+  {
+    "step": "rate-card-edit",
+    "mode": "drayage",
+    "cardId": 1044,
+    "putStatus": 200,
+    "oldRate": 4.5,
+    "newRate": 4.87,
+    "persistedRate": 4.87,
+    "persisted": true
+  },
+  {
+    "step": "rate-card-edit",
+    "mode": "expedited",
+    "cardId": 1041,
+    "putStatus": 200,
+    "oldRate": 1.85,
+    "newRate": 2.22,
+    "persistedRate": 2.22,
+    "persisted": true
+  },
+  {
+    "step": "rate-card-edit",
+    "mode": "hotshot",
+    "cardId": 1043,
+    "putStatus": 200,
+    "oldRate": 2.6,
+    "newRate": 2.97,
+    "persistedRate": 2.97,
+    "persisted": true
+  },
+  {
+    "step": "lane-zones",
+    "status": 200,
+    "count": 39
+  },
+  {
+    "step": "lane-zone-edit",
+    "zoneId": 3048,
+    "putStatus": 200,
+    "persisted": true
+  },
+  {
+    "step": "brand-get",
+    "status": 200,
+    "presetCount": 13,
+    "fontCount": 8,
+    "mapStyleCount": 17,
+    "currentPreset": "midnight"
+  },
+  {
+    "step": "brand-theme",
+    "preset": "citron",
+    "putStatus": 200,
+    "persisted": true
+  },
+  {
+    "step": "brand-theme",
+    "preset": "vault",
+    "putStatus": 200,
+    "persisted": true
+  },
+  {
+    "step": "brand-theme",
+    "preset": "midnight",
+    "putStatus": 200,
+    "persisted": true
+  },
+  {
+    "step": "brand-accent-font",
+    "putStatus": 200,
+    "accentPersisted": true,
+    "fontPersisted": true
+  },
+  {
+    "step": "brand-map-blend",
+    "putStatus": 200,
+    "echoedMapBlend": "on"
+  },
+  {
+    "step": "brand-contact-gate",
+    "putStatus": 200,
+    "requireEmail": false,
+    "requirePhone": true,
+    "showQuoteBeforeContact": true
+  },
+  {
+    "step": "brand-map-style",
+    "pick": "grayscale",
+    "putStatus": 200,
+    "persisted": true
+  },
+  {
+    "step": "accessorials-get",
+    "status": 200,
+    "count": 39
+  },
+  {
+    "step": "accessorial-edit",
+    "id": 3520,
+    "putStatus": 200,
+    "persisted": true
+  },
+  {
+    "step": "brand-booking",
+    "putStatus": 200
+  },
+  {
+    "step": "embed-get",
+    "status": 200,
+    "snippetHasToken": true,
+    "directLink": "https://qa-1784435799988.drayagerate.online/"
+  },
+  {
+    "step": "regenerate-embed",
+    "status": 200,
+    "newTokenLen": 24
+  },
+  {
+    "step": "preview-url",
+    "status": 200,
+    "hasUrl": true
+  },
+  {
+    "step": "public-widget-config",
+    "status": 200,
+    "services": [
+      "ftl",
+      "expedited",
+      "hotshot",
+      "drayage",
+      "ltl"
+    ],
+    "themePreset": "midnight",
+    "mapBlend": "on",
+    "accentOverride": "#12AB56"
+  },
+  {
+    "step": "widget-live-desktop",
+    "url": "http://localhost:8854/w/qa-1784435799988",
+    "consoleErrors": [],
+    "modeKeywordsSeen": [
+      "ftl",
+      "ltl",
+      "drayage",
+      "hotshot"
+    ]
+  },
+  {
+    "step": "widget-live-mobile",
+    "ok": true
+  },
+  {
+    "step": "dashboard-mobile",
+    "ok": true
+  },
+  {
+    "step": "SUMMARY",
+    "consoleErrors": [],
+    "netFails": [],
+    "slug": "qa-1784435799988",
+    "email": "qa+1784435799988@example.com"
+  }
+]
