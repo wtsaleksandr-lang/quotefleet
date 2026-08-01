@@ -24,7 +24,6 @@
   <link rel="stylesheet" href="/landing-s-polish.css">
   <link rel="stylesheet" href="/landing-wefixtrades.css">
   <link rel="stylesheet" href="/landing-home-fixes.css">
-  <link rel="stylesheet" href="/quotefleet-rates-globe.css">
   <link rel="stylesheet" href="/landing-final-cta.css">
   <link rel="stylesheet" href="/landing-hero-redesign.css">
   <link rel="stylesheet" href="/landing-hero-phone.css">
@@ -138,22 +137,7 @@
 
     <section class="section qf-multimode-section" data-reveal><div class="container"><div class="section-head light-head"><span class="section-kicker">One tool, every mode</span><h2>Dry van, reefer, drayage, LTL &mdash; one calculator.</h2><p>Per-mile truckload, LTL by class, port-aware drayage with chassis and prepull &mdash; all priced to your rates, not an industry average. Switch modes without switching tools.</p></div></div></section>
 
-    <section class="qf-globe-section" id="rates-database" data-reveal>
-      <div class="qf-globe-head">
-        <span class="qf-globe-eyebrow">Free, growing rate data</span>
-        <h2>Rate intelligence brokers pay for &mdash; <span class="qf-globe-accent">free for every carrier</span>.</h2>
-        <p>Every quote feeds an anonymous, aggregated read on the going rate by lane and equipment &mdash; never company names, never anyone&rsquo;s individual pricing. The more carriers quote through QuoteFleet, the sharper it gets. Opt-in, and free forever.</p>
-      </div>
-      <div class="qf-globe-viewport">
-        <div class="qf-globe-center"><div id="qf-globe-canvas"></div></div>
-      </div>
-      <p class="qf-globe-hint"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><path d="M2 12h20M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"/></svg>Drag to explore live rate activity</p>
-      <div class="qf-globe-stats">
-        <div class="qf-globe-stat"><b>Fully anonymous</b><span>no names, no individual rates</span></div>
-        <div class="qf-globe-stat"><b>Grows with every quote</b><span>sharper as more carriers join</span></div>
-        <div class="qf-globe-stat"><b>Free forever</b><span>for every carrier</span></div>
-      </div>
-    </section>
+    <!-- Rate-intelligence globe section hidden on request (2026-08-01). Was: <section class="qf-globe-section" id="rates-database"> with #qf-globe-canvas. Restore from git history if needed. -->
 
     <section class="section use-section section-alt" data-reveal><div class="container"><div class="section-head light-head"><span class="section-kicker">Use it your way</span><h2>Start with a link. Add it to your site later if you want.</h2></div><div class="use-grid"><div class="use-card"><span class="use-badge">01</span><strong>Standalone page</strong><p>Use your own branded link from day one.</p><div class="url-chip">acmetrucking.yourquote.net</div></div><div class="use-card"><span class="use-badge">02</span><strong>On your website</strong><p>Add the calculator later if you want it on your existing site.</p><div class="site-mini"><span>Home</span><span>Services</span><b>Rate calculator</b></div></div><div class="use-card"><span class="use-badge">03</span><strong>Share directly</strong><p>Send it to repeat customers, quote requests, and potential clients.</p><div class="email-mini"><b>Best, Acme Trucking</b><span>Check rates → yourquote.net</span></div></div></div></div></section>
 
@@ -207,9 +191,6 @@
 
   <script src="/landing-hero-swap.js" defer></script>
   <script src="/landing-motion.js" defer></script>
-  <script src="/vendor/globe.gl.min.js" defer></script>
-  <script src="/vendor/topojson-client.min.js" defer></script>
-  <script src="/quotefleet-rates-globe.js" defer></script>
   <script>document.getElementById('year').textContent = new Date().getFullYear();</script>
   <script>
   (function () {
