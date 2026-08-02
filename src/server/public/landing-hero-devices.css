@@ -232,14 +232,14 @@ html body.qf-wft .qf-hero-devices--video.stage-phone > .qf-hero-laptop {
        laptop's shadow) and 1–5px of horizontal scroll from the hidden phone poking past
        the viewport. Pull the media column back a touch (.83fr/1.25fr), trim the cap to
        min(1700px,95.5vw), and — the key lever — raise the column `gap` to
-       clamp(72px,5vw,112px). That pushes the laptop right so its box gap to the copy is
+       clamp(80px,5vw,120px) (on the 8px ramp). That pushes the laptop right so its gap to the copy is
        ≥67px at every desktop width (shadow fully clears the text) with NO h-scroll, while
        the laptop stays large (~55% vw mid-range, its natural max ~972px at 1920). The
        bigger gap also pulls the media column narrower, so the hidden phone no longer
        overflows the right edge — killing the h-scroll too. */
     max-width: min(1700px, 95.5vw) !important;
     grid-template-columns: minmax(0, 0.83fr) minmax(0, 1.25fr) !important;
-    gap: clamp(72px, 5vw, 112px) !important;
+    gap: clamp(80px, 5vw, 120px) !important;
   }
   html body.qf-wft .hero-copy { max-width: 535px !important; }
   html body.qf-wft .hero.visual-hero { padding-bottom: clamp(48px, 6vw, 120px) !important; }
