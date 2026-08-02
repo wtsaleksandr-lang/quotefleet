@@ -398,6 +398,47 @@ body[data-qf-cta-hover="fill"] .qf-cta:not(.qf-secondary):hover { background: va
 .qf-book-status { display: none; margin-top: var(--space-1); font-size: 12.5px; line-height: 1.4; font-weight: 650; color: var(--w-fg); }
 .qf-book-status[data-kind="err"] { color: color-mix(in srgb, var(--w-fg) 40%, #e5484d); }
 .qf-book-done { margin-top: var(--space-1-5); }
+/* Punched-up "booked" payoff: animated checkmark badge + headline + the
+   server-confirmed deposit amount. Tenant-branded via the runtime --w-* tokens
+   so it reads on light AND dark; legible at 390px (badge + copy wrap cleanly). */
+.qf-book-success {
+  display: flex;
+  align-items: center;
+  gap: var(--space-1-5);
+  padding: var(--space-2);
+  border-radius: var(--w-radius);
+  border: 1px solid color-mix(in srgb, var(--w-success) 35%, var(--w-border));
+  background: color-mix(in srgb, var(--w-success) 12%, var(--w-bg));
+  animation: qf-book-pop 0.42s cubic-bezier(0.22, 0.61, 0.36, 1) both;
+}
+@keyframes qf-book-pop {
+  from { opacity: 0; transform: translateY(8px); }
+  to { opacity: 1; transform: none; }
+}
+.qf-book-check { flex: none; display: inline-flex; color: var(--w-success); }
+.qf-book-check-circle {
+  stroke: currentColor;
+  stroke-dasharray: 151;
+  stroke-dashoffset: 151;
+  animation: qf-book-check-circle 0.5s ease-out forwards;
+}
+.qf-book-check-path {
+  stroke: currentColor;
+  stroke-dasharray: 40;
+  stroke-dashoffset: 40;
+  animation: qf-book-check-tick 0.35s 0.35s ease-out forwards;
+}
+@keyframes qf-book-check-circle { to { stroke-dashoffset: 0; } }
+@keyframes qf-book-check-tick { to { stroke-dashoffset: 0; } }
+.qf-book-success-copy { min-width: 0; }
+.qf-book-success-title { font-size: 15px; font-weight: 800; color: var(--w-fg); line-height: 1.3; }
+.qf-book-success-sub { margin-top: var(--space-0-5); font-size: 13px; line-height: 1.45; color: var(--w-muted, var(--w-fg)); }
+.qf-book-success-sub strong { color: var(--w-fg); font-weight: 750; }
+@media (prefers-reduced-motion: reduce) {
+  .qf-book-success { animation: none; }
+  .qf-book-check-circle,
+  .qf-book-check-path { animation: none; stroke-dashoffset: 0; }
+}
 
 /* ── B&W-aware map overlay (mono map styles) ───────────────────────────────
    The on-map overlay (distance/transit bottom bar + pickup/delivery top bar)

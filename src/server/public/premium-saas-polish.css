@@ -291,6 +291,46 @@
 .qf-ingest-skeleton-row:nth-child(2) .qf-skel-line { animation-delay: .15s; }
 .qf-ingest-skeleton-row:nth-child(3) .qf-skel-line { animation-delay: .3s; }
 
+/* ── AI import: staged progress bar (rate-engine build indicator) ────── */
+/* A thin token-colored track whose fill advances per processing stage
+   (driven from app.js startStages) with a glossy sheen sweeping across it so
+   the wait reads as a live multi-stage engine. Caps at 94% until the parse
+   truly completes. */
+.qf-ingest-progress {
+  position: relative;
+  height: 6px;
+  margin-top: 12px;
+  border-radius: 999px;
+  overflow: hidden;
+  background: color-mix(in srgb, var(--ink) 8%, transparent);
+}
+.qf-ingest-progress-fill {
+  position: relative;
+  display: block;
+  width: 12%;
+  height: 100%;
+  border-radius: 999px;
+  background: linear-gradient(90deg,
+    color-mix(in srgb, var(--accent) 65%, transparent),
+    var(--accent));
+  transition: width .85s cubic-bezier(.22, .61, .36, 1);
+}
+.qf-ingest-progress-fill::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  border-radius: 999px;
+  background: linear-gradient(90deg, transparent,
+    color-mix(in srgb, var(--surface) 60%, transparent), transparent);
+  background-size: 45% 100%;
+  background-repeat: no-repeat;
+  animation: qf-ingest-sheen 1.4s ease-in-out infinite;
+}
+@keyframes qf-ingest-sheen {
+  0% { background-position: -45% 0; }
+  100% { background-position: 145% 0; }
+}
+
 /* ── AI import: animated review reveal ──────────────────────────────── */
 .qf-reveal-in {
   animation: qf-review-reveal .42s cubic-bezier(.22, .61, .36, 1) both;
@@ -341,6 +381,8 @@
   .qf-reveal-in,
   .qf-reveal-row { opacity: 1 !important; transform: none !important; }
   .qf-ingest-processing-sub { transition: none !important; }
+  .qf-ingest-progress-fill { transition: none !important; }
+  .qf-ingest-progress-fill::after { animation: none !important; }
   .qf-check-draw.is-animating .qf-check-circle { stroke-dashoffset: 0 !important; }
   .qf-check-draw.is-animating .qf-check-path { stroke-dashoffset: 0 !important; }
 }

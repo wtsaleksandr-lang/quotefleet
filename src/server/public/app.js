@@ -3306,6 +3306,7 @@
         + '<span class="qf-ingest-file">' + escapeHtml(name) + '</span></div>'
         + '<div class="qf-ingest-processing-sub" data-ingest-stage>Reading your rate sheet…</div>'
         + '</div></div>'
+        + '<div class="qf-ingest-progress" aria-hidden="true"><span class="qf-ingest-progress-fill" data-ingest-fill></span></div>'
         + '<div class="qf-ingest-skeleton" aria-hidden="true">'
         + '<div class="qf-ingest-skeleton-row"><span class="qf-skel-line qf-skel-title"></span><span class="qf-skel-line qf-skel-meta"></span></div>'
         + '<div class="qf-ingest-skeleton-row"><span class="qf-skel-line qf-skel-title"></span><span class="qf-skel-line qf-skel-meta"></span></div>'
@@ -3313,34 +3314,50 @@
         + '</div>';
     }
 
-    // Cycle the processing subtitle through timed stages so the wait feels
-    // like real progress, not a frozen spinner. Frontend-driven (independent
-    // of backend poll cadence); lands on a calm final line if parsing runs
-    // long. aria-live on the container announces each stage.
+    // Cycle the processing subtitle through timed stages + advance a progress
+    // bar so the wait reads like a real multi-stage backend engine, not a
+    // frozen spinner. Frontend-driven (independent of backend poll cadence);
+    // holds on the final "Building your rate engine…" line with the bar near
+    // full (never 100% — the parse isn't done until ready_for_review) and its
+    // sheen still sweeping. aria-live on the container announces each stage.
     var stageTimer = null;
     var STAGES = [
       'Reading your rate sheet…',
-      'Pulling out rate cards…',
-      'Checking fuel surcharges & accessorials…',
-      'Auto-quoting sample lanes to verify…',
+      'Extracting lane rates & accessorials…',
+      'Normalizing equipment & service classes…',
+      'Mapping port & terminal zones…',
+      'Calibrating fuel-surcharge tables…',
+      'Auto-quoting 12 sample lanes…',
+      'Validating margins & minimums…',
+      'Building your rate engine…',
     ];
-    var STAGE_FINAL = 'Still working — large sheets take a moment…';
+    // Cross-fade the stage line: fade out, swap text, fade back in.
+    function swapStage(sub, text) {
+      sub.classList.add('is-swapping');
+      setTimeout(function () {
+        var s2 = statusBox.querySelector('[data-ingest-stage]');
+        if (s2) { s2.textContent = text; s2.classList.remove('is-swapping'); }
+      }, prefersReducedMotion() ? 0 : 200);
+    }
+    function setStageFill(pct) {
+      var f = statusBox.querySelector('[data-ingest-fill]');
+      if (f) f.style.width = pct + '%';
+    }
     function startStages() {
       stopStages();
       var i = 0;
+      setStageFill(Math.round((1 / STAGES.length) * 100)); // seed the first segment
       stageTimer = setInterval(function () {
         var sub = statusBox.querySelector('[data-ingest-stage]');
         if (!sub) { stopStages(); return; }
         i += 1;
-        var next = i < STAGES.length ? STAGES[i] : STAGE_FINAL;
-        // Cross-fade the line: fade out, swap text, fade back in.
-        sub.classList.add('is-swapping');
-        setTimeout(function () {
-          var s2 = statusBox.querySelector('[data-ingest-stage]');
-          if (s2) { s2.textContent = next; s2.classList.remove('is-swapping'); }
-        }, prefersReducedMotion() ? 0 : 200);
-        if (i >= STAGES.length) stopStages(); // hold on the final calm line
-      }, 2600);
+        var idx = i < STAGES.length ? i : STAGES.length - 1;
+        swapStage(sub, STAGES[idx]);
+        // Fill tracks stage progress but caps at 94% — the engine isn't "done"
+        // until the poll returns ready_for_review.
+        setStageFill(Math.min(94, Math.round(((idx + 1) / STAGES.length) * 100)));
+        if (i >= STAGES.length - 1) stopStages(); // reached the final stage — hold
+      }, 1050);
     }
     function stopStages() {
       if (stageTimer) { clearInterval(stageTimer); stageTimer = null; }

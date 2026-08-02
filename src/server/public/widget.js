@@ -1941,7 +1941,24 @@
             var carrier = (state.config && state.config.tenant && state.config.tenant.name) || 'the carrier';
             panel.hidden = true;
             bookBtn.style.display = 'none';
-            var done = el('div', { class: 'qf-book-done qf-success', text: 'Booking requested — ' + carrier + ' will confirm.' });
+            // Prefer the server-authoritative deposit echoed by the accept route;
+            // fall back to the client preview if absent.
+            var srvDep = (r.body && typeof r.body.deposit === 'number' && isFinite(r.body.deposit)) ? r.body.deposit : deposit;
+            var depHtml = srvDep > 0
+              ? '<strong>' + escapeHtml(fmtAmount(srvDep)) + ' deposit</strong> — ' + escapeHtml(carrier) + ' will confirm &amp; send a payment link.'
+              : escapeHtml(carrier) + ' will confirm your booking shortly.';
+            var done = el('div', { class: 'qf-book-done qf-book-success', role: 'status', 'aria-live': 'polite' });
+            done.innerHTML =
+              '<span class="qf-book-check" aria-hidden="true">'
+                + '<svg viewBox="0 0 52 52" width="40" height="40" role="img">'
+                + '<circle class="qf-book-check-circle" cx="26" cy="26" r="24" fill="none" stroke-width="3"></circle>'
+                + '<path class="qf-book-check-path" fill="none" stroke-width="4" stroke-linecap="round" stroke-linejoin="round" d="M15 27 l7 7 l15 -16"></path>'
+                + '</svg>'
+              + '</span>'
+              + '<div class="qf-book-success-copy">'
+                + '<div class="qf-book-success-title">Booking requested ✓</div>'
+                + '<div class="qf-book-success-sub">' + depHtml + '</div>'
+              + '</div>';
             if (bookBtn.parentNode) bookBtn.parentNode.insertBefore(done, bookBtn);
           } else {
             setStatus((r.body && r.body.error) || 'Could not send — please try again.', 'err');
