@@ -71,13 +71,16 @@ describe('resolveWidgetTheme', () => {
     expect(t.font).toBe('satoshi');
   });
 
-  it('resolves the Cream light theme with dark text', () => {
+  it('resolves the Cream (now matte-slate DARK) theme with near-white text', () => {
     const t = resolveWidgetTheme({ themePreset: 'cream' });
-    expect(t.mode).toBe('light');
-    expect(t.tokens['--w-text']).toBe('#232A2C');
+    expect(t.mode).toBe('dark');
+    expect(t.tokens['--w-text']).toBe('#F5F7FA');
+    expect(t.tokens['--w-page-bg']).toBe('#16181D');
     expect(t.tokens['--w-accent']).toBe('#0D3CFC');
-    // Light theme gives the "accent chip" a visible hairline border.
-    expect(t.tokens['--w-accent-surface-border']).not.toBe(t.tokens['--w-accent-surface']);
+    // Near-white body text clears WCAG AA on the dark card surface.
+    expect(contrastRatio(t.tokens['--w-text'], t.tokens['--w-surface'])).toBeGreaterThanOrEqual(WCAG.NORMAL);
+    // Dark theme: the accent-surface border mirrors the accent surface itself.
+    expect(t.tokens['--w-accent-surface-border']).toBe(t.tokens['--w-accent-surface']);
   });
 
   it('applies a custom accent override on top of the preset', () => {
@@ -124,9 +127,9 @@ describe('resolveWidgetTheme', () => {
     }
   });
 
-  it('exposes exactly thirteen presets and eight fonts', () => {
+  it('exposes exactly twelve presets and eight fonts', () => {
     expect(WIDGET_PRESET_LIST.map((p) => p.id)).toEqual([
-      'midnight', 'mono', 'ironhorse', 'harbor', 'cupertino', 'material',
+      'midnight', 'mono', 'ironhorse', 'harbor', 'cupertino',
       'booking', 'tesla', 'stripe', 'stone', 'citron', 'vault', 'cream',
     ]);
     expect(Object.keys(WIDGET_FONTS).sort()).toEqual(
@@ -146,9 +149,11 @@ describe('resolveWidgetTheme', () => {
     // Citron (lime) + Vault (cream fintech) are both LIGHT themes.
     expect(WIDGET_PRESETS.citron.mode).toBe('light');
     expect(WIDGET_PRESETS.vault.mode).toBe('light');
-    // A balanced light + dark lineup (3 dark, 10 light).
-    expect(WIDGET_PRESET_LIST.filter((p) => p.mode === 'dark')).toHaveLength(3);
-    expect(WIDGET_PRESET_LIST.filter((p) => p.mode === 'light')).toHaveLength(10);
+    // Cream is now a premium matte-slate DARK theme (was light).
+    expect(WIDGET_PRESETS.cream.mode).toBe('dark');
+    // A balanced light + dark lineup (4 dark, 8 light).
+    expect(WIDGET_PRESET_LIST.filter((p) => p.mode === 'dark')).toHaveLength(4);
+    expect(WIDGET_PRESET_LIST.filter((p) => p.mode === 'light')).toHaveLength(8);
   });
 
   it('ironhorse (Harley) ships the condensed Oswald voice + orange-on-white moto structure', () => {
@@ -211,22 +216,6 @@ describe('resolveWidgetTheme', () => {
     expect(t.font).toBe('system');
     expect(t.fontStack).toContain('SF Pro');
     expect(t.fontStack).toContain('-apple-system');
-  });
-
-  it('material (Google) ships the Roboto voice + M3-refined structure', () => {
-    const t = resolveWidgetTheme({ themePreset: 'material' });
-    expect(t.mode).toBe('light');
-    expect(t.tokens['--w-surface']).toBe('#FFFFFF');
-    expect(t.tokens['--w-accent']).toBe('#1A73E8');
-    // M3 refinement: 16px card, Roboto Medium (500) sentence-case labels at 0.01em.
-    expect(t.tokens['--w-radius-card']).toBe('16px');
-    expect(t.tokens['--w-label-transform']).toBe('none');
-    expect(t.tokens['--w-label-weight']).toBe('500');
-    expect(t.tokens['--w-label-spacing']).toBe('0.01em');
-    // Its own default font is the self-hosted Roboto.
-    expect(t.font).toBe('roboto');
-    expect(t.fontStack).toContain('Roboto');
-    expect(WIDGET_FONTS.roboto.selfHosted).toBe(true);
   });
 
   it('booking (Voyage) is an all-blue dark theme with the white-border active pattern', () => {
@@ -605,17 +594,17 @@ describe('resolveWidgetTheme — font-colour override', () => {
   });
 
   it('applies a chosen colour ONLY where it passes WCAG on that surface', () => {
-    // Charcoal on the Cream light surface passes → applied to body text.
-    const t = resolveWidgetTheme({ themePreset: 'cream', fontColor: '#141414' });
-    expect(t.fontColor).toBe('#141414');
-    expect(t.tokens['--w-text']).toBe('#141414');
+    // White on the Cream (now dark) surface passes → applied to body text.
+    const t = resolveWidgetTheme({ themePreset: 'cream', fontColor: '#FFFFFF' });
+    expect(t.fontColor).toBe('#FFFFFF');
+    expect(t.tokens['--w-text']).toBe('#FFFFFF');
     expect(contrastRatio(t.tokens['--w-text'], t.tokens['--w-surface'])).toBeGreaterThanOrEqual(WCAG.NORMAL);
   });
 
   it('falls back to the safe auto colour on any surface the choice would fail', () => {
-    // White text on the Cream (light) surface FAILS → body text must NOT be white.
-    const t = resolveWidgetTheme({ themePreset: 'cream', fontColor: '#FFFFFF' });
-    expect(t.tokens['--w-text']).not.toBe('#FFFFFF');
+    // Charcoal on the Cream (now dark) surface FAILS → body text must NOT be charcoal.
+    const t = resolveWidgetTheme({ themePreset: 'cream', fontColor: '#141414' });
+    expect(t.tokens['--w-text']).not.toBe('#141414');
     expect(contrastRatio(t.tokens['--w-text'], t.tokens['--w-surface'])).toBeGreaterThanOrEqual(WCAG.NORMAL);
   });
 

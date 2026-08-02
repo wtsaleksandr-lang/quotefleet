@@ -332,7 +332,7 @@ export const WIDGET_FONTS: Record<string, WidgetFont> = {
 export const DEFAULT_FONT_ID = 'satoshi';
 export const DEFAULT_PRESET_ID = 'midnight';
 
-// ── The curated preset set (11 — a premium light + dark lineup) ─────
+// ── The curated preset set (12 — a premium light + dark lineup) ─────
 // Wave 4: each preset is now a DISTINCT DESIGN LANGUAGE, not a recolour. The
 // `structure` block drives corner radius, border weight, elevation and label
 // typography; the palette drives a premium, brand-evocative colour world.
@@ -342,9 +342,10 @@ export const DEFAULT_PRESET_ID = 'midnight';
 // Every accent was chosen so its guaranteed-readable label text is clean, not
 // borderline; the WCAG engine still hardens anything that drifts. Brand
 // inspiration lives in `description` only; the user-facing `label` is a neutral
-// premium name (no trademarks). Midnight (default) + Cream keep their exact
-// palettes AND spread DEFAULT_STRUCTURE, so they render pixel-for-pixel as
-// before.
+// premium name (no trademarks). Midnight (default) keeps its exact palette AND
+// spreads DEFAULT_STRUCTURE, so it renders pixel-for-pixel as before; Cream
+// spreads DEFAULT_STRUCTURE too (same shell geometry) but its palette is now a
+// premium matte-slate DARK world.
 const PRESETS_RAW: WidgetPreset[] = [
   {
     id: 'midnight',
@@ -606,54 +607,6 @@ const PRESETS_RAW: WidgetPreset[] = [
       errorText: '#7A1512',
       successBg: '#E4F7EA',
       successText: '#248A3D',
-    },
-  },
-  {
-    id: 'material',
-    label: 'Material',
-    description: 'Inspired by Google / Android — tonal light surfaces, ELEVATED cards with a visible Material shadow, larger radius, Roboto Medium labels, Material-3 segmented service tabs, Google-blue accent.',
-    mode: 'light',
-    // The one card that clearly floats — a two-layer Material elevation. M3
-    // refinement: 16px corners, Roboto Medium (500) sentence-case labels at
-    // 0.01em tracking. The segmented tabs / blue focus / tonal surfaces / green
-    // ETA live in the material-scoped block of public-calculator-no-gradients.css.
-    structure: {
-      radiusCard: '16px',
-      radiusInput: '8px',
-      radiusBtn: '8px',
-      radiusPill: '999px',
-      borderWidth: '1px',
-      cardShadow: '0 1px 3px rgba(60,64,67,.30), 0 8px 24px -6px rgba(60,64,67,.24)',
-      labelTransform: 'none',
-      labelSpacing: '0.01em',
-      labelWeight: '500',
-    },
-    // Roboto — the Google/Android system font, the Material type voice.
-    defaultFont: 'roboto',
-    palette: {
-      mode: 'light',
-      pageBg: '#F1F3F4',
-      surface: '#FFFFFF',
-      surface2: '#F1F3F4',
-      surface2Text: '#202124',
-      inputBg: '#FFFFFF',
-      inputBgHover: '#F1F3F4',
-      inputText: '#202124',
-      inputBorder: 'rgba(26,115,232,.24)',
-      text: '#202124',
-      muted: '#5F6368',
-      muted2: '#80868B',
-      contactText: '#3C4043',
-      border: 'rgba(60,64,67,.16)',
-      accent: '#1A73E8',
-      accentHover: '#1667D6',
-      accentText: '#FFFFFF',
-      accentSurface: '#E8F0FE',
-      accentOnSurface: '#1A73E8',
-      errorBg: '#FCE8E6',
-      errorText: '#7A1A12',
-      successBg: '#E6F4EA',
-      successText: '#137333',
     },
   },
   {
@@ -1014,34 +967,41 @@ const PRESETS_RAW: WidgetPreset[] = [
   {
     id: 'cream',
     label: 'Cream',
-    description: 'Soft light theme — effortel sage-tinted surfaces, ink text, cobalt accent.',
-    mode: 'light',
-    // UNCHANGED — the approved soft light shell. Spreads DEFAULT_STRUCTURE.
+    // NOTE: the palette is now a premium matte-slate DARK shell (the name
+    // "Cream" is retained for backward-compat / tenant ids — flag for a future
+    // rename if desired). Keeps the cobalt accent + Satoshi voice and spreads
+    // DEFAULT_STRUCTURE, so it stays structurally pixel-for-pixel with Midnight.
+    description: 'Premium matte-slate dark theme — deep graphite surfaces, near-white text, cobalt accent.',
+    mode: 'dark',
     structure: { ...DEFAULT_STRUCTURE },
     palette: {
-      mode: 'light',
-      // Effortel-family light: a soft sage-tinted shell + cool near-white
-      // surfaces with cool ink/muted text — cleaner and more premium than the
-      // old warm beige.
-      pageBg: '#E7EDEA',
-      surface: '#F6FAF8',
-      surface2: '#ECF1EE',
-      surface2Text: '#232A2C',
+      mode: 'dark',
+      // Refined deep-slate matte (neutral graphite, not pure black). Light,
+      // high-legibility WHITE inputs sit on the dark shell (the Midnight
+      // pattern), so the result card reads as crisp dark-on-white; every
+      // shell foreground below is tuned for WCAG AA on the dark surfaces.
+      pageBg: '#16181D',
+      surface: '#1E2128',
+      surface2: '#262A32',
+      surface2Text: '#E8EAED',
       inputBg: '#FFFFFF',
-      inputBgHover: '#EFF3F1',
-      inputText: '#232A2C',
-      inputBorder: 'rgba(13,60,252,.24)',
-      text: '#232A2C',
-      muted: '#5F6F77',
-      muted2: '#6E7C83',
-      contactText: '#4E5A61',
-      border: 'rgba(34,40,42,.12)',
+      inputBgHover: '#EEF1F4',
+      inputText: '#20242B',
+      inputBorder: 'rgba(13,60,252,.30)',
+      text: '#F5F7FA',
+      muted: '#AAB4BD',
+      muted2: '#96A1AB',
+      contactText: '#C6CDD4',
+      border: 'rgba(255,255,255,.12)',
       accent: '#0D3CFC',
       accentHover: '#0B32D4',
       accentText: '#FFFFFF',
-      accentSurface: '#E7ECFF',
-      accentOnSurface: '#0D3CFC',
-      errorBg: '#F6E4DD',
+      // Dark-mode accent-surface (mirrors Midnight): white tint behind the
+      // active-tab indicator; on-surface cobalt is brightened so it reads on
+      // the dark shell.
+      accentSurface: '#FFFFFF',
+      accentOnSurface: '#6E8BFF',
+      errorBg: '#F3E3DE',
       errorText: '#5A1E14',
       successBg: '#E3EFE7',
       successText: '#1E3A26',
