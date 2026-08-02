@@ -219,22 +219,16 @@ html body.qf-wft .qf-hero-devices--video.stage-phone > .qf-hero-laptop {
   }
 }
 
-/* ── Hero DESKTOP (laptop) mockup: enlarge frame + clarify its content. ≥981px only — mobile untouched. ──
-   Root cause: the laptop is a looping video of a full 1280px desktop app screen downscaled to ~0.57×,
-   so its native ~14px text renders at ~8px (below the readability floor), and at ≥1600px the capped grid
-   wastes ~280px of margin each side. This widens the device column + reclaims that dead space, adds
-   vertical room so the taller frame clears the section below, and crop-zooms the laptop video so each
-   element crosses the legibility floor. */
+/* ── Hero DESKTOP (laptop) mockup: enlarge the frame. ≥981px only — mobile untouched. ──
+   The laptop video is now a purpose-produced dark loop with its OWN dynamic zoom (punch-in on the
+   file drop + the parsed-rate result, pull-back during processing), so no CSS crop-zoom is needed.
+   This widens the device column + reclaims the dead margin at wide viewports so the mockup reads big
+   and prominent, and adds vertical room so the taller frame clears the section below. */
 @media (min-width: 981px) {
   html body.qf-wft .hero-grid {
-    max-width: min(1560px, 94vw) !important;
-    grid-template-columns: minmax(0, 0.82fr) minmax(0, 1.28fr) !important;
+    max-width: min(1720px, 96vw) !important;
+    grid-template-columns: minmax(0, 0.8fr) minmax(0, 1.3fr) !important;
   }
   html body.qf-wft .hero-copy { max-width: 520px !important; }
   html body.qf-wft .hero.visual-hero { padding-bottom: clamp(48px, 6vw, 120px) !important; }
-  html body.qf-wft .qf-hero-laptop .qf-browser { overflow: hidden !important; }
-  html body.qf-wft .qf-hero-laptop .qf-browser-vid {
-    width: 122% !important;
-    transform: translateX(-9%) !important;
-  }
 }
