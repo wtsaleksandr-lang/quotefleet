@@ -332,7 +332,7 @@ export const WIDGET_FONTS: Record<string, WidgetFont> = {
 export const DEFAULT_FONT_ID = 'satoshi';
 export const DEFAULT_PRESET_ID = 'midnight';
 
-// ── The curated preset set (5 — a premium light + dark lineup) ─────
+// ── The curated preset set (12 — a premium light + dark lineup) ─────
 // Wave 4: each preset is now a DISTINCT DESIGN LANGUAGE, not a recolour. The
 // `structure` block drives corner radius, border weight, elevation and label
 // typography; the palette drives a premium, brand-evocative colour world.
@@ -443,6 +443,409 @@ const PRESETS_RAW: WidgetPreset[] = [
       errorText: '#7A1712',
       successBg: '#E8F3EC',
       successText: '#14532D',
+    },
+  },
+  {
+    id: 'ironhorse',
+    label: 'Ironhorse',
+    description:
+      'Inspired by Harley-Davidson — bold orange-on-black moto identity: heavy uppercase condensed labels, black active borders on white, sharp small radius.',
+    mode: 'light',
+    // Moto identity: white shell, near-black ink, sharp small corners, heavy
+    // tracked uppercase labels, a BLACK active border on the orange-accented
+    // controls. Ships Oswald (condensed) as its type voice.
+    structure: {
+      radiusCard: '10px',
+      radiusInput: '8px',
+      radiusBtn: '6px',
+      radiusPill: '999px',
+      borderWidth: '1.5px',
+      cardShadow: '0 1px 2px rgba(17,17,17,.05), 0 16px 40px -24px rgba(17,17,17,.22)',
+      labelTransform: 'uppercase',
+      labelSpacing: '0.08em',
+      labelWeight: '800',
+      activeBorderColor: '#111111',
+      activeBorderWidth: '2px',
+      chipInactiveBg: '#F4F4F5',
+      chipInactiveBorder: 'transparent',
+      chipActiveBg: '#FC6600',
+      chipActiveText: '#111111',
+    },
+    defaultFont: 'oswald',
+    palette: {
+      mode: 'light',
+      pageBg: '#F3F3F4',
+      surface: '#FFFFFF',
+      surface2: '#F4F4F5',
+      surface2Text: '#111111',
+      inputBg: '#FFFFFF',
+      inputBgHover: '#F5F5F5',
+      inputText: '#111111',
+      inputBorder: 'rgba(17,17,17,.18)',
+      text: '#0F0F0F',
+      muted: '#5A5A5A',
+      muted2: '#767676',
+      contactText: '#3A3A3A',
+      border: 'rgba(17,17,17,.16)',
+      accent: '#FC6600',
+      accentHover: '#E25B00',
+      accentText: '#111111',
+      accentSurface: '#FFEAD9',
+      accentOnSurface: '#C2410C',
+      errorBg: '#FBE4E0',
+      errorText: '#7A1712',
+      successBg: '#E7F3EA',
+      successText: '#14532D',
+    },
+  },
+  {
+    id: 'harbor',
+    label: 'Harbor',
+    description:
+      'Inspired by premium ride-share apps — deep petrol-teal accent, soft large radius, sentence-case labels, white pill tabs that fill teal when active.',
+    mode: 'light',
+    // Ride-app polish: white shell, deep petrol-teal accent, soft large radius,
+    // relaxed sentence-case labels. Stateful pattern: ACTIVE tab = filled teal
+    // pill (white text, no border); INACTIVE tab = white pill + light hairline.
+    structure: {
+      radiusCard: '18px',
+      radiusInput: '12px',
+      radiusBtn: '12px',
+      radiusPill: '999px',
+      borderWidth: '1px',
+      cardShadow: '0 1px 2px rgba(9,42,53,.05), 0 18px 44px -20px rgba(9,42,53,.22)',
+      labelTransform: 'none',
+      labelSpacing: 'normal',
+      labelWeight: '600',
+      activeBorderColor: 'transparent',
+      activeBorderWidth: '0',
+      chipInactiveBg: '#FFFFFF',
+      chipInactiveBorder: 'rgba(15,42,51,.16)',
+      chipActiveBg: '#0C566B',
+      chipActiveText: '#FFFFFF',
+    },
+    defaultFont: 'inter',
+    palette: {
+      mode: 'light',
+      pageBg: '#EAEEF3',
+      surface: '#FFFFFF',
+      surface2: '#F1F5F8',
+      surface2Text: '#0F2A33',
+      inputBg: '#FFFFFF',
+      inputBgHover: '#F1F5F8',
+      inputText: '#0F2A33',
+      inputBorder: 'rgba(12,86,107,.24)',
+      text: '#0F2A33',
+      muted: '#5A6B73',
+      muted2: '#79878E',
+      contactText: '#3E4E55',
+      border: 'rgba(15,42,51,.12)',
+      accent: '#0C566B',
+      accentHover: '#083F50',
+      accentText: '#FFFFFF',
+      accentSurface: '#E5F0F3',
+      accentOnSurface: '#0C566B',
+      errorBg: '#FCEAE7',
+      errorText: '#7A1A12',
+      successBg: '#E3F1E9',
+      successText: '#14532D',
+    },
+  },
+  {
+    id: 'cupertino',
+    label: 'Cupertino',
+    description: 'Inspired by Apple / iOS — airy FROSTED-glass shell over a soft grey page, generous whitespace, LARGE soft radius, hairline borders, translucent panels with a backdrop blur, sentence-case labels, system-blue accent, SF type voice.',
+    mode: 'light',
+    // The softest, airiest shell — now a genuine Apple FROSTED-GLASS card:
+    // large 20px corners, a gentle two-layer diffuse shadow, relaxed
+    // sentence-case labels at Apple's 590 weight, and the frosted flag that
+    // turns the shell + inner panels + map badges translucent (cupertino-scoped
+    // CSS reads --w-surface-frost / --w-frost-blur). Minimal and premium.
+    structure: {
+      radiusCard: '20px',
+      radiusInput: '12px',
+      radiusBtn: '12px',
+      radiusPill: '999px',
+      borderWidth: '1px',
+      cardShadow: '0 8px 30px -8px rgba(60,60,67,.16), 0 2px 8px -3px rgba(60,60,67,.12)',
+      labelTransform: 'none',
+      labelSpacing: 'normal',
+      labelWeight: '590',
+      frosted: true,
+    },
+    // SF voice — the `system` font stack now points at SF Pro (native on Apple
+    // devices) with Inter as the cross-platform fallback.
+    defaultFont: 'system',
+    palette: {
+      mode: 'light',
+      // Soft cool-grey page so the translucent white card reads as frosted glass
+      // lifted off it; pristine white surface, iOS grouped-list secondary.
+      pageBg: '#EDEDF2',
+      surface: '#FFFFFF',
+      surface2: '#F2F2F7',
+      surface2Text: '#1C1C1E',
+      inputBg: '#FFFFFF',
+      inputBgHover: '#F2F2F7',
+      inputText: '#1C1C1E',
+      inputBorder: 'rgba(60,60,67,0.18)',
+      text: '#1C1C1E',
+      muted: '#6E6E73',
+      muted2: '#8E8E93',
+      contactText: '#48484A',
+      border: 'rgba(60,60,67,0.12)',
+      // System-blue #007AFF as the DISPLAY accent (on-surface labels/icons).
+      // The FILLED CTA + total box use the slightly deeper #0069E0 so Apple's
+      // iconic WHITE-on-blue text clears WCAG AA (white-on-#0069E0 ≈ 4.9:1;
+      // #007AFF alone would keep dark text at 4.59:1).
+      accent: '#007AFF',
+      accentSolid: '#0069E0',
+      accentHover: '#0056BD',
+      accentText: '#FFFFFF',
+      accentSurface: '#E9F1FF',
+      accentOnSurface: '#0069E0',
+      errorBg: '#FCE7E5',
+      errorText: '#7A1512',
+      successBg: '#E4F7EA',
+      successText: '#248A3D',
+    },
+  },
+  {
+    id: 'booking',
+    label: 'Voyage',
+    description:
+      'Inspired by Booking.com — an all-blue tonal DARK shell: deep-blue card over a darker blue page, borderless resting controls that take a 2px WHITE border when active, white text, a bright action-blue accent.',
+    mode: 'dark',
+    // The Booking signature: a borderless resting shell (borderWidth 0) whose
+    // ACTIVE tab / chip is carried by a 2px white border on a tonal-blue fill —
+    // not a colour swap. Medium 16px card, soft deep drop shadow, semibold
+    // sentence-case labels. The active-tab label + white focus ring + contact
+    // link colour live in the booking-scoped block of no-gradients.css.
+    structure: {
+      radiusCard: '16px',
+      radiusInput: '12px',
+      radiusBtn: '12px',
+      radiusPill: '10px',
+      borderWidth: '0',
+      cardShadow: '0 24px 60px -30px rgba(0,10,40,.55)',
+      labelTransform: 'none',
+      labelSpacing: '0.01em',
+      labelWeight: '600',
+      activeBorderColor: '#FFFFFF',
+      activeBorderWidth: '2px',
+      chipInactiveBg: '#0D459A',
+      chipInactiveBorder: 'transparent',
+      chipActiveBg: '#12509F',
+      chipActiveText: '#FFFFFF',
+    },
+    defaultFont: 'inter',
+    palette: {
+      mode: 'dark',
+      pageBg: '#002E77',
+      surface: '#003B95',
+      surface2: '#0D459A',
+      surface2Text: '#FFFFFF',
+      inputBg: '#00337F',
+      inputBgHover: '#0A3F8C',
+      inputText: '#FFFFFF',
+      inputBorder: 'rgba(255,255,255,.16)',
+      text: '#FFFFFF',
+      muted: 'rgba(255,255,255,.72)',
+      muted2: 'rgba(255,255,255,.58)',
+      contactText: 'rgba(255,255,255,.80)',
+      border: 'rgba(255,255,255,.12)',
+      accent: '#006CE4',
+      accentHover: '#0059C2',
+      accentText: '#FFFFFF',
+      accentSurface: '#0D459A',
+      accentOnSurface: '#9DBEF5',
+      errorBg: '#FCE7E4',
+      errorText: '#7A1512',
+      successBg: '#E4F7EA',
+      successText: '#177A3D',
+    },
+  },
+  {
+    id: 'tesla',
+    label: 'Voltage',
+    description:
+      'Inspired by Tesla — an in-car-console DARK theme: near-black page, faintly-lifted graphite cards, DARK inputs with white text, thin tracked UPPERCASE micro-labels, and the Tesla-red accent used sparingly on the CTA / total / active chip.',
+    mode: 'dark',
+    // The Tesla instrument-cluster voice: near-flat elevation (hairline dividers
+    // do the structural work), small-medium corners, thin tracked UPPERCASE
+    // micro-labels. Active control = FILLED Tesla red (white text); inactive =
+    // dark graphite tint + a faint hairline. Ships the geometric Sora voice.
+    structure: {
+      radiusCard: '10px',
+      radiusInput: '8px',
+      radiusBtn: '8px',
+      radiusPill: '999px',
+      borderWidth: '1px',
+      cardShadow: '0 1px 2px rgba(0,0,0,.5)',
+      labelTransform: 'uppercase',
+      labelSpacing: '0.14em',
+      labelWeight: '500',
+      activeBorderColor: 'transparent',
+      activeBorderWidth: '0',
+      chipInactiveBg: '#1E1F21',
+      chipInactiveBorder: 'rgba(255,255,255,.10)',
+      chipActiveBg: '#C8151B',
+      chipActiveText: '#FFFFFF',
+    },
+    defaultFont: 'sora',
+    palette: {
+      mode: 'dark',
+      // The Tesla console void: near-black page, faintly-lifted graphite cards.
+      pageBg: '#0A0A0B',
+      surface: '#141516',
+      surface2: '#1E1F21',
+      surface2Text: '#F5F5F7',
+      // DARK input fields with white text — the in-car console look (distinct
+      // from graphite's LIGHT cream inputs).
+      inputBg: '#1E1F21',
+      inputBgHover: '#26282B',
+      inputText: '#FFFFFF',
+      inputBorder: 'rgba(255,255,255,.14)',
+      text: '#FFFFFF',
+      muted: '#A8AAAD',
+      muted2: '#85878B',
+      contactText: '#C7C9CC',
+      border: 'rgba(255,255,255,.09)',
+      // Tesla RED identity — pure #E82127 for route line, pins, on-surface accents.
+      accent: '#E82127',
+      // Deeper red so WHITE CTA/total/active-chip text clears WCAG AA (5.87:1).
+      accentSolid: '#C8151B',
+      accentHover: '#B81419',
+      accentText: '#FFFFFF',
+      accentSurface: '#FFFFFF',
+      // Brightened red that reads on the dark surface (5.99:1) for on-surface labels.
+      accentOnSurface: '#FF5A5F',
+      errorBg: '#F2E4E4',
+      errorText: '#5A1416',
+      successBg: '#E3EEE8',
+      successText: '#14432A',
+    },
+  },
+  {
+    id: 'stripe',
+    label: 'Blurple',
+    description:
+      'Inspired by Stripe — a refined fintech LIGHT theme: a surface-gray page under a pure-white card, a soft layered slate-blue float shadow, a top aurora accent strip, and the signature indigo (blurple) accent with a gradient CTA.',
+    mode: 'light',
+    // Stripe polish: generously rounded card, the layered SOFT float with the
+    // slate-blue (50,50,93) coloured shadow (three layers = the floating-card
+    // tell), quiet sentence-case labels at Stripe's 560 weight. Segmented tabs:
+    // ACTIVE = filled indigo pill (white text, no border); INACTIVE = surface-
+    // gray tint + hairline. Ships Inter (closest free match to Söhne).
+    structure: {
+      radiusCard: '16px',
+      radiusInput: '8px',
+      radiusBtn: '10px',
+      radiusPill: '999px',
+      borderWidth: '1px',
+      cardShadow:
+        '0 7px 14px 0 rgba(50,50,93,.10), 0 3px 6px 0 rgba(0,0,0,.06), 0 18px 40px -12px rgba(50,50,93,.14)',
+      labelTransform: 'none',
+      labelSpacing: '0.01em',
+      labelWeight: '560',
+      activeBorderColor: 'transparent',
+      activeBorderWidth: '0',
+      chipInactiveBg: '#F6F9FC',
+      chipInactiveBorder: 'rgba(10,37,64,.10)',
+      chipActiveBg: '#5A52E0',
+      chipActiveText: '#FFFFFF',
+    },
+    defaultFont: 'inter',
+    palette: {
+      mode: 'light',
+      // Stripe's signature surface-gray page so the pure-white card floats on it.
+      pageBg: '#F6F9FC',
+      surface: '#FFFFFF',
+      surface2: '#F6F9FC',
+      surface2Text: '#0A2540',
+      inputBg: '#FFFFFF',
+      inputBgHover: '#F6F9FC',
+      inputText: '#0A2540',
+      // Stripe's neutral field border (#E3E8EE) — indigo only appears on focus.
+      inputBorder: '#E3E8EE',
+      // Stripe primary text = dark slate, never pure black.
+      text: '#0A2540',
+      muted: '#425466',
+      muted2: '#697386',
+      contactText: '#425466',
+      border: 'rgba(10,37,64,.10)',
+      // The blurple identity.
+      accent: '#635BFF',
+      // Deeper indigo for FILLED text surfaces so WHITE clears AA comfortably
+      // (white-on-#635BFF ≈ 4.70:1 borderline; white-on-#5A52E0 ≈ 5.6:1).
+      accentSolid: '#5A52E0',
+      accentHover: '#5147E6',
+      accentText: '#FFFFFF',
+      accentSurface: '#EFEEFF',
+      accentOnSurface: '#514BE0',
+      errorBg: '#FCE9EC',
+      errorText: '#7A1A2E',
+      successBg: '#E3F5EC',
+      successText: '#0E6245',
+    },
+  },
+  {
+    id: 'stone',
+    label: 'Stone',
+    description: 'Inspired by architectural blueprint / industrial concrete — a COOL slate-grey MONOCHROME drench: page, card, inputs and panels are all tonal shades of one cool blue-grey slate, sharp small corners, tight technical uppercase labels, and a single restrained cool-graphite accent on the CTA / total / active tab / route.',
+    mode: 'light',
+    // Cool / sharp / technical blueprint voice: sharp small radius, cool hairline
+    // borders, a crisp cool-tinted shadow, tight technical UPPERCASE micro-labels.
+    // The one distinctive active state = FILLED cool graphite (crisp white text);
+    // INACTIVE = borderless cool-slate tint (Booking/Tesla-style intentional fill,
+    // drenched in the theme's own cool family).
+    structure: {
+      radiusCard: '5px',
+      radiusInput: '4px',
+      radiusBtn: '4px',
+      radiusPill: '4px',
+      borderWidth: '1px',
+      cardShadow: '0 1px 2px rgba(30,42,54,.10), 0 14px 32px -20px rgba(24,34,44,.34)',
+      labelTransform: 'uppercase',
+      labelSpacing: '0.06em',
+      labelWeight: '600',
+      activeBorderColor: 'transparent',
+      activeBorderWidth: '0',
+      chipInactiveBg: '#B4BBC2',
+      chipInactiveBorder: 'transparent',
+      chipActiveBg: '#21272D',
+      chipActiveText: '#FFFFFF',
+    },
+    // Inter — the neutral Swiss grotesque: cool, precise, architectural. Reads as
+    // blueprint/technical (vs Satoshi's warmth), matching the cool-slate drench.
+    defaultFont: 'inter',
+    palette: {
+      mode: 'light',
+      // COOL SLATE drench — every layer a tonal shade of ONE cool blue-grey slate.
+      pageBg: '#A9B0B8',
+      surface: '#BFC5CB',
+      surface2: '#B4BBC2',
+      surface2Text: '#1B2127',
+      inputBg: '#CFD4D9',
+      inputBgHover: '#C4CAD0',
+      inputText: '#1A2026',
+      inputBorder: 'rgba(38,52,66,.24)',
+      text: '#191F25',
+      muted: '#414A53',
+      muted2: '#454E58',
+      contactText: '#2F373F',
+      border: 'rgba(30,42,54,.20)',
+      // Cool graphite / gunmetal steel — the single restrained accent.
+      accent: '#2B3138',
+      // Deeper cool graphite so WHITE CTA/total/active-chip text clears WCAG AA.
+      accentSolid: '#21272D',
+      accentHover: '#161B20',
+      accentText: '#FFFFFF',
+      accentSurface: '#D3D8DD',
+      accentOnSurface: '#2B3138',
+      errorBg: '#E6DBDA',
+      errorText: '#6C231B',
+      successBg: '#DAE2DE',
+      successText: '#25402F',
     },
   },
   {
