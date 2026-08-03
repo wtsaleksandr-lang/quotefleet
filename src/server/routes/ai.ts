@@ -19,13 +19,18 @@ import {
   laneZones,
 } from '../../db/schema.js';
 import { requireAuth, requireTenant } from '../middleware.js';
+import { aiTenantBurstLimiter, aiTenantDailyLimiter } from '../rateLimits.js';
 import { rateAgentTurn, applyRateMutation } from '../../ai/rateAgent.js';
 import { calculate, currencyForCountry, type CalcRequest } from '../../calc/engine.js';
 import { resolveFscForTenant, asOfLabel } from '../../eia/dieselPrice.js';
 import { distanceBetween } from '../../calc/distance.js';
 
 export function registerAiRoutes(app: Express) {
-  app.post('/api/ai/rate-chat', requireAuth, requireTenant, async (req, res) => {
+  // Per-tenant AI cost cap (audit H3): rate-chat calls Anthropic on the shared
+  // platform key when the tenant has no BYO key. Burst + daily limiters keyed by
+  // tenant id, chained AFTER requireTenant so req.tenant is resolved; BYO-key
+  // tenants are skipped. See rateLimits.ts.
+  app.post('/api/ai/rate-chat', requireAuth, requireTenant, aiTenantBurstLimiter, aiTenantDailyLimiter, async (req, res) => {
     const { message } = req.body ?? {};
     if (typeof message !== 'string' || !message.trim()) {
       return res.status(400).json({ error: 'Message is required' });
