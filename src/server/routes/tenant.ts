@@ -28,7 +28,7 @@
  *   PATCH  /api/tenant/callbacks/:id      — update status / notes
  */
 import type { Express, Request, Response } from 'express';
-import { eq, desc, and, gte } from 'drizzle-orm';
+import { eq, desc, and, gte, or, ilike, count } from 'drizzle-orm';
 import { z } from 'zod';
 import { nanoid } from 'nanoid';
 import { db } from '../../db/client.js';
@@ -116,6 +116,46 @@ const zFactor = z.number().finite().min(0).max(MAX_FACTOR);
  *  bare "Invalid input". */
 function invalidInput(res: Response, err: z.ZodError) {
   return res.status(400).json({ error: 'Invalid input', details: err.flatten().fieldErrors });
+}
+
+/** The lead statuses the leads-list UI can filter by (mirrors the PATCH enum
+ *  + app.js LEAD_STATUSES). Anything outside this set is treated as "no
+ *  filter" rather than an error, so a stale/garbage `?status=` can't 400 the
+ *  whole queue. */
+export const LEAD_LIST_STATUSES = [
+  'draft', 'new', 'replied', 'booking_requested', 'won', 'lost', 'spam',
+] as const;
+
+const LEADS_PAGE_SIZE_DEFAULT = 25;
+const LEADS_PAGE_SIZE_MAX = 100;
+const LEADS_SEARCH_MAX = 120;
+
+function toInt(v: unknown, fallback: number): number {
+  const n = parseInt(String(v ?? ''), 10);
+  return Number.isFinite(n) ? n : fallback;
+}
+
+/** Pure parse/clamp of the leads-list query string. Extracted so the
+ *  pagination + filter contract is unit-testable without a live DB:
+ *  - pageSize defaults to 25, floors at 1, caps at 100 (bounds the page query)
+ *  - page floors at 1; offset = (page-1)*pageSize
+ *  - status is whitelisted against LEAD_LIST_STATUSES (else undefined)
+ *  - search is trimmed + length-capped
+ *  Tenant scoping is applied in the handler, never here. */
+export function parseLeadsQuery(query: Record<string, unknown>): {
+  page: number; pageSize: number; offset: number; status?: string; search: string;
+} {
+  const rawStatus = typeof query.status === 'string' ? query.status : '';
+  const status = (LEAD_LIST_STATUSES as readonly string[]).includes(rawStatus)
+    ? rawStatus
+    : undefined;
+  const search = typeof query.search === 'string'
+    ? query.search.trim().slice(0, LEADS_SEARCH_MAX)
+    : '';
+  const pageSize = Math.min(Math.max(toInt(query.pageSize, LEADS_PAGE_SIZE_DEFAULT), 1), LEADS_PAGE_SIZE_MAX);
+  const page = Math.max(toInt(query.page, 1), 1);
+  const offset = (page - 1) * pageSize;
+  return { page, pageSize, offset, status, search };
 }
 
 /** Seed defaults stamped at signup (see routes/auth.ts + calc/defaults.ts).
@@ -567,19 +607,47 @@ export function registerTenantRoutes(app: Express) {
 
   // ── leads ─────────────────────────────────────────────────────
   app.get('/api/tenant/leads', requireAuth, requireTenant, async (req, res) => {
-    const status = (req.query.status as string | undefined) ?? undefined;
-    // Push the status filter into the SQL query — earlier we filtered in
-    // JS *after* a 200-row LIMIT, so a tenant with >200 leads could ask
-    // for `?status=won` and get 0 hits even with wins beyond the window.
-    const baseWhere = eq(leads.tenantId, req.tenant!.id);
-    const where = status ? and(baseWhere, eq(leads.status, status)) : baseWhere;
+    // Server-side pagination + search + status filter. Earlier this hard-capped
+    // at LIMIT 200 with no offset, so a tenant with >200 leads could never see
+    // (or search/filter) older rows — the client scanned only the loaded 200.
+    // Now every filter runs in SQL, tenant-scoped, over the whole table.
+    const { page, pageSize, offset, status, search } = parseLeadsQuery(req.query);
+
+    const filters = [eq(leads.tenantId, req.tenant!.id)];
+    if (status) filters.push(eq(leads.status, status));
+    if (search) {
+      // Escape LIKE wildcards so a literal % / _ in the term isn't a wildcard
+      // (Postgres treats backslash as the default LIKE escape char).
+      const like = `%${search.replace(/[\\%_]/g, (c) => `\\${c}`)}%`;
+      const match = or(
+        ilike(leads.refId, like),
+        ilike(leads.customerName, like),
+        ilike(leads.customerEmail, like),
+        ilike(leads.customerCompany, like),
+        ilike(leads.pickupCity, like),
+        ilike(leads.deliveryCity, like),
+      );
+      if (match) filters.push(match);
+    }
+    const where = and(...filters);
+
+    // total = full filtered count (drives accurate "N leads" + page count).
+    const [{ total }] = await db()
+      .select({ total: count() })
+      .from(leads)
+      .where(where);
+
+    // Stable order: newest first, id as tiebreak so paging never repeats/skips
+    // rows sharing a createdAt second.
     const rows = await db()
       .select()
       .from(leads)
       .where(where)
-      .orderBy(desc(leads.createdAt))
-      .limit(200);
-    res.json({ leads: rows });
+      .orderBy(desc(leads.createdAt), desc(leads.id))
+      .limit(pageSize)
+      .offset(offset);
+
+    res.json({ leads: rows, total: Number(total ?? 0), page, pageSize });
   });
 
   // CSV export of all leads — used by the dashboard's Export button. We

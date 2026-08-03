@@ -125,7 +125,12 @@
   <script src="/app-route.js"></script>
   <script src="/app.js"></script>
   <script src="/premium-saas-polish.js"></script>
-  <script src="/lead-queue-search.js"></script>
+  <!-- lead-queue-search.js retired: leads search/status/pagination is now
+       server-backed in app.js renderLeads (feat/leads-server-pagination). The
+       old script client-filtered only the loaded rows, giving counts that
+       disagreed with the server past the 200-row cap. Its CSS
+       (lead-queue-search.css) is kept — renderLeads reuses .qf-lead-searchbar +
+       the ≤480px .qf-leads-table card reflow. -->
   <script src="/lead-detail-command.js"></script>
   <script src="/callback-queue-search.js"></script>
   <script src="/rate-card-search.js"></script>
