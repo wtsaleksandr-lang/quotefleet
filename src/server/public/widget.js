@@ -420,8 +420,14 @@
   // config's brand and passed to the base-map + route-preview calls so the map
   // card renders in the carrier's chosen look. null/unknown → 'branded'.
   var brandMapStyle = 'branded';
+  // Canonical map-style keys — kept in sync with MAP_STYLE_KEYS in routeMap.ts.
+  // The map style is a SEPARATE axis from the calculator preset: any tenant may
+  // pair ANY map with ANY calculator, so this passes through every valid style
+  // (not just a subset) — otherwise a chosen style like 'tesla'/'vault'/'mono'
+  // would be silently downgraded to 'branded' on the base-map + overlay paths.
+  var MAP_STYLE_KEYS = ['branded', 'grayscale', 'standard', 'soft', 'dark_routes', 'mono', 'satellite', 'ironhorse', 'harbor', 'cupertino', 'material', 'booking', 'tesla', 'stripe', 'stone', 'citron', 'vault', 'blackwhite', 'blackwhite_inverted'];
   function normMapStyle(s) {
-    return (s === 'grayscale' || s === 'standard' || s === 'soft' || s === 'dark_routes' || s === 'satellite' || s === 'blackwhite' || s === 'blackwhite_inverted') ? s : 'branded';
+    return MAP_STYLE_KEYS.indexOf(s) > -1 ? s : 'branded';
   }
 
   // DEMO-ONLY map overrides (?mapStyle= / ?mapTheme=). The /w/demo showcase pins
