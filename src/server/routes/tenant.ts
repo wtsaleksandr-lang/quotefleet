@@ -83,6 +83,40 @@ import { createHmac } from 'node:crypto';
 
 const DAY_MS = 24 * 60 * 60 * 1000;
 
+// ── pricing input guards (audit RATE-C1 / H4) ──────────────────────────────
+// Money / rate / percent / radius fields flow straight into customer quote
+// totals via src/calc/engine.ts (miles × ratePerMile + flatFee, fuel %, margin
+// %, zone flatPrice, accessorial amount). A bare `z.number()` accepts negative,
+// non-finite (Infinity), and NaN values (typeof NaN === 'number', so zod's
+// number type passes it) — any of which corrupts the total. These bounded,
+// finite-checked validators reject bad input with a 400 instead of persisting
+// it. `.finite()` rejects both NaN and ±Infinity.
+const MAX_MONEY = 1_000_000; // flat fee, minimum charge, zone flat price, accessorial flat amount
+const MAX_PER_MILE = 100_000; // $/mile linehaul rate, per-cwt rate
+const MAX_MILES = 100_000; // radius / max miles bound
+const MAX_WEIGHT = 100_000_000; // lbs upper bound (sane freight ceiling)
+const MAX_FACTOR = 100_000; // dimensionless LTL rate factors
+
+/** Non-negative finite dollar amount (flat fee, minimum charge, flat price). */
+const zMoney = z.number().finite().min(0).max(MAX_MONEY);
+/** Non-negative finite per-mile / per-cwt rate. */
+const zRate = z.number().finite().min(0).max(MAX_PER_MILE);
+/** Percentage 0–100, finite (fuel surcharge %, margin %, pct-of-base). */
+const zPercent = z.number().finite().min(0).max(100);
+/** Non-negative finite mileage / radius. */
+const zMiles = z.number().finite().min(0).max(MAX_MILES);
+/** Non-negative finite weight in lbs. */
+const zWeight = z.number().finite().min(0).max(MAX_WEIGHT);
+/** Non-negative finite dimensionless factor (LTL weight-break / distance). */
+const zFactor = z.number().finite().min(0).max(MAX_FACTOR);
+
+/** Shared 400 for a failed pricing-schema parse — surfaces the field-level
+ *  zod messages so a client knows WHICH value was out of range, rather than a
+ *  bare "Invalid input". */
+function invalidInput(res: Response, err: z.ZodError) {
+  return res.status(400).json({ error: 'Invalid input', details: err.flatten().fieldErrors });
+}
+
 /** Seed defaults stamped at signup (see routes/auth.ts + calc/defaults.ts).
  *  Used to tell a genuinely-customized brand/AI config apart from the
  *  out-of-the-box seed so the guided-setup meter only credits real work. */
@@ -234,33 +268,33 @@ export function registerTenantRoutes(app: Express) {
   });
 
   const LtlConfigSchema = z.object({
-    baseRatePerCwt: z.number(),
-    classRates: z.record(z.string(), z.number()),
-    weightBreaks: z.array(z.object({ minLbs: z.number(), rateFactor: z.number() })),
-    distanceFactorPer1000Mi: z.number(),
+    baseRatePerCwt: zRate,
+    classRates: z.record(z.string(), zRate),
+    weightBreaks: z.array(z.object({ minLbs: zWeight, rateFactor: zFactor })),
+    distanceFactorPer1000Mi: zFactor,
   });
 
   const RateCardPatch = z.object({
     service: z.string().optional(),
     equipment: z.string().optional(),
     label: z.string().optional(),
-    ratePerMile: z.number().optional(),
-    minimumCharge: z.number().optional(),
-    flatFee: z.number().optional(),
-    fuelSurchargePct: z.number().optional(),
-    marginPct: z.number().optional(),
-    maxWeightLbs: z.number().nullable().optional(),
-    maxMiles: z.number().nullable().optional(),
+    ratePerMile: zRate.optional(),
+    minimumCharge: zMoney.optional(),
+    flatFee: zMoney.optional(),
+    fuelSurchargePct: zPercent.optional(),
+    marginPct: zPercent.optional(),
+    maxWeightLbs: zWeight.nullable().optional(),
+    maxMiles: zMiles.nullable().optional(),
     ltlConfig: LtlConfigSchema.nullable().optional(),
     enabled: z.boolean().optional(),
-    sortOrder: z.number().optional(),
+    sortOrder: z.number().int().finite().min(0).optional(),
     notes: z.string().nullable().optional(),
   });
 
   app.put('/api/tenant/rate-cards/:id', requireAuth, requireTenant, async (req, res) => {
     const id = Number(req.params.id);
     const parse = RateCardPatch.safeParse(req.body);
-    if (!parse.success) return res.status(400).json({ error: 'Invalid input' });
+    if (!parse.success) return invalidInput(res, parse.error);
     const existing = await db()
       .select()
       .from(rateCards)
@@ -288,7 +322,7 @@ export function registerTenantRoutes(app: Express) {
       equipment: true,
     });
     const parse = RateCardCreate.safeParse(req.body);
-    if (!parse.success) return res.status(400).json({ error: 'Invalid input' });
+    if (!parse.success) return invalidInput(res, parse.error);
     const [row] = await db()
       .insert(rateCards)
       .values({
@@ -331,23 +365,38 @@ export function registerTenantRoutes(app: Express) {
     res.json({ accessorials: rows });
   });
 
-  const AccessorialPatch = z.object({
+  const AccessorialBase = z.object({
     code: z.string().optional(),
     label: z.string().optional(),
     description: z.string().nullable().optional(),
     kind: z.string().optional(),
-    amount: z.number().optional(),
+    // `amount` is a flat dollar figure for most kinds, but a PERCENTAGE when
+    // kind === 'pct_of_base'. Bound non-negative + finite here (blocks
+    // negative / NaN / Infinity / absurd), then clamp the percent case to
+    // ≤ 100 in the refine below (audit RATE-C1 / H4).
+    amount: zMoney.optional(),
     trigger: z.string().optional(),
     conditionJson: z.record(z.string(), z.unknown()).nullable().optional(),
     appliesToServices: z.array(z.string()).nullable().optional(),
     enabled: z.boolean().optional(),
-    sortOrder: z.number().optional(),
+    sortOrder: z.number().int().finite().min(0).optional(),
   });
+  // A percentage-kind accessorial's `amount` is a percent → clamp to ≤ 100.
+  const pctOfBaseRefine = (val: { kind?: string; amount?: number }, ctx: z.RefinementCtx) => {
+    if (val.kind === 'pct_of_base' && val.amount != null && val.amount > 100) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ['amount'],
+        message: 'Percentage-of-base accessorial amount must be between 0 and 100',
+      });
+    }
+  };
+  const AccessorialPatch = AccessorialBase.superRefine(pctOfBaseRefine);
 
   app.put('/api/tenant/accessorials/:id', requireAuth, requireTenant, async (req, res) => {
     const id = Number(req.params.id);
     const parse = AccessorialPatch.safeParse(req.body);
-    if (!parse.success) return res.status(400).json({ error: 'Invalid input' });
+    if (!parse.success) return invalidInput(res, parse.error);
     await db()
       .update(accessorials)
       .set({ ...parse.data, updatedAt: new Date() })
@@ -357,9 +406,11 @@ export function registerTenantRoutes(app: Express) {
   });
 
   app.post('/api/tenant/accessorials', requireAuth, requireTenant, async (req, res) => {
-    const AccessorialCreate = AccessorialPatch.required({ code: true, label: true });
+    const AccessorialCreate = AccessorialBase.required({ code: true, label: true }).superRefine(
+      pctOfBaseRefine,
+    );
     const parse = AccessorialCreate.safeParse(req.body);
-    if (!parse.success) return res.status(400).json({ error: 'Invalid input' });
+    if (!parse.success) return invalidInput(res, parse.error);
     const [row] = await db()
       .insert(accessorials)
       .values({
@@ -404,17 +455,17 @@ export function registerTenantRoutes(app: Express) {
     anchorPortCode: z.string().nullable().optional(),
     anchorCity: z.string().nullable().optional(),
     anchorState: z.string().nullable().optional(),
-    radiusMiles: z.number().optional(),
-    flatPrice: z.number().optional(),
+    radiusMiles: zMiles.optional(),
+    flatPrice: zMoney.optional(),
     equipmentScope: z.array(z.string()).nullable().optional(),
     enabled: z.boolean().optional(),
-    sortOrder: z.number().optional(),
+    sortOrder: z.number().int().finite().min(0).optional(),
   });
 
   app.put('/api/tenant/lane-zones/:id', requireAuth, requireTenant, async (req, res) => {
     const id = Number(req.params.id);
     const parse = LaneZonePatch.safeParse(req.body);
-    if (!parse.success) return res.status(400).json({ error: 'Invalid input' });
+    if (!parse.success) return invalidInput(res, parse.error);
     await db()
       .update(laneZones)
       .set({ ...parse.data, updatedAt: new Date() })
@@ -430,7 +481,7 @@ export function registerTenantRoutes(app: Express) {
       flatPrice: true,
     });
     const parse = LaneZoneCreate.safeParse(req.body);
-    if (!parse.success) return res.status(400).json({ error: 'Invalid input' });
+    if (!parse.success) return invalidInput(res, parse.error);
     const [row] = await db()
       .insert(laneZones)
       .values({
