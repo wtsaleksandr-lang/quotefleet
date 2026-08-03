@@ -16,6 +16,10 @@
     return e;
   }
   function fmtDate(d) { return d ? new Date(d).toLocaleString() : '—'; }
+  function fmtMoney(n) {
+    var v = Number(n) || 0;
+    return '$' + v.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+  }
   function api(path, opts) {
     opts = opts || {};
     opts.headers = Object.assign({ 'Content-Type': 'application/json' }, opts.headers || {});
@@ -76,6 +80,33 @@
       c.appendChild(el('h1', { text: 'Platform overview' }));
       c.appendChild(el('p', { class: 'page-sub', text: 'A view across all tenants on this deployment.' }));
       var grid = el('div', { class: 'features', style: { margin: '0 0 24px 0' } });
+
+      // ── MRR tile — real recognized revenue, with per-plan breakdown and a
+      //    muted trial-pipeline line (NOT counted in MRR). Money figures use
+      //    tabular-nums so they align; the whole tile reuses the stat-tile
+      //    `.feature` styling the counts below use. ──────────────────────────
+      var byPlan = s.byPlan || { vital: { count: 0 }, pro: { count: 0 } };
+      var vitalN = (byPlan.vital && byPlan.vital.count) || 0;
+      var proN = (byPlan.pro && byPlan.pro.count) || 0;
+      var trialN = s.trialingCount || 0;
+      var mrrCard = el('div', { class: 'feature' });
+      mrrCard.appendChild(el('div', { class: 'muted-small', text: 'Monthly recurring revenue' }));
+      mrrCard.appendChild(el('div', {
+        style: { fontSize: '32px', fontWeight: '800', letterSpacing: '-0.02em', fontVariantNumeric: 'tabular-nums' },
+        text: fmtMoney(s.mrr) + '/mo',
+      }));
+      mrrCard.appendChild(el('div', {
+        class: 'muted-small',
+        style: { marginTop: '4px' },
+        text: vitalN + ' Vital · ' + proN + ' Pro',
+      }));
+      mrrCard.appendChild(el('div', {
+        class: 'muted-small',
+        style: { marginTop: '4px' },
+        text: trialN + ' in trial (potential ' + fmtMoney(s.potentialTrialMrr) + ')',
+      }));
+      grid.appendChild(mrrCard);
+
       [
         ['Tenants', s.tenants],
         ['Users', s.users],
