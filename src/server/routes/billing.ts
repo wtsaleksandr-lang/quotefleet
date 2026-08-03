@@ -23,11 +23,12 @@ import express from 'express';
 import { eq } from 'drizzle-orm';
 import Stripe from 'stripe';
 import { db } from '../../db/client.js';
-import { tenants, type Tenant } from '../../db/schema.js';
+import { tenants, auditLog, type Tenant } from '../../db/schema.js';
 import { requireAuth, requireTenant } from '../middleware.js';
 import { loadEnv } from '../../config.js';
 import {
   type PaidPlanId,
+  type PlanId,
   planForPriceId,
   priceIdForPlan,
   parsePaidPlan,
@@ -220,9 +221,85 @@ function planFromSubscription(sub: Stripe.Subscription): PaidPlanId {
   return parsePaidPlan(meta);
 }
 
+/**
+ * Stripe subscription statuses where the tenant is fully live and paying
+ * (or in the all-inclusive trial). Access + billed tier apply.
+ */
+const LIVE_STATUSES: ReadonlySet<Stripe.Subscription.Status> = new Set(['active', 'trialing']);
+
+/**
+ * GRACE statuses — Stripe is still retrying / completing the payment, NOT a
+ * terminal cancellation. `past_due` = an auto-renewal charge failed and
+ * Stripe's smart-retry dunning is running (days, per the retry schedule);
+ * `incomplete` = the very first payment hasn't confirmed yet. In BOTH we
+ * KEEP the paid plan AND keep `stripeSubscriptionId` — nuking access on the
+ * first failed renewal is wrong, and dropping the sub id destroys the
+ * reference needed to recover the customer. Access continues until Stripe
+ * reaches a terminal state (→ `canceled`/`unpaid`/`incomplete_expired`).
+ */
+const GRACE_STATUSES: ReadonlySet<Stripe.Subscription.Status> = new Set(['past_due', 'incomplete']);
+
+export type BillingHealth = 'active' | 'grace' | 'inactive';
+
+export interface SubscriptionPlanState {
+  /** Plan to store on the tenant row. */
+  plan: PlanId;
+  /** Whether to KEEP the stripeSubscriptionId. True while live OR in grace
+   *  (so a past_due sub can be recovered); false ONLY in terminal states. */
+  keepSubscriptionId: boolean;
+  /** Coarse billing health, for surfacing an "update your card" nudge. */
+  health: BillingHealth;
+}
+
+/**
+ * Map a Stripe subscription's status → what the tenant row should become.
+ * Pure + exported so the mapping is unit-testable in isolation.
+ *
+ *   status                          plan        subId    health
+ *   ─────────────────────────────   ─────────   ──────   ────────
+ *   active, trialing                paid tier   keep     active
+ *   past_due, incomplete (GRACE)    paid tier   keep     grace
+ *   canceled, unpaid,               free        drop     inactive
+ *     incomplete_expired, paused,
+ *     (any other terminal)
+ */
+export function deriveSubscriptionState(sub: Stripe.Subscription): SubscriptionPlanState {
+  if (LIVE_STATUSES.has(sub.status)) {
+    return { plan: planFromSubscription(sub), keepSubscriptionId: true, health: 'active' };
+  }
+  if (GRACE_STATUSES.has(sub.status)) {
+    // Payment failed / not yet confirmed — Stripe is retrying. Keep the paid
+    // plan and the sub id; access continues through the dunning window.
+    return { plan: planFromSubscription(sub), keepSubscriptionId: true, health: 'grace' };
+  }
+  // Terminal: canceled, unpaid, incomplete_expired, paused → downgrade.
+  return { plan: 'free', keepSubscriptionId: false, health: 'inactive' };
+}
+
+/** Best-effort audit write for billing lifecycle events. Never throws — a
+ *  failed audit is logged, not propagated, so it can't 500 the webhook. */
+async function recordBillingAudit(
+  tenantId: number,
+  action: string,
+  details: Record<string, unknown>
+): Promise<void> {
+  try {
+    await db().insert(auditLog).values({
+      tenantId,
+      userId: null,
+      action,
+      actorKind: 'system',
+      detailsJson: details,
+    });
+  } catch (err) {
+    console.error('[billing.webhook] audit write failed:', err);
+  }
+}
+
 /** Apply a subscription's state to the tenant row (plan, ids, dates).
- *  trialing/active → the tier from its Price; anything else → 'free'. */
-async function applySubscription(sub: Stripe.Subscription): Promise<void> {
+ *  live/grace → keep the paid tier + sub id; terminal → 'free' + drop id.
+ *  See deriveSubscriptionState for the full status→plan table. */
+export async function applySubscription(sub: Stripe.Subscription): Promise<void> {
   const customerId = String(sub.customer);
   const t = (
     await db().select().from(tenants).where(eq(tenants.stripeCustomerId, customerId)).limit(1)
@@ -231,8 +308,7 @@ async function applySubscription(sub: Stripe.Subscription): Promise<void> {
     console.warn('[billing.webhook] no tenant for customer', customerId);
     return;
   }
-  const live = sub.status === 'active' || sub.status === 'trialing';
-  const plan = live ? planFromSubscription(sub) : 'free';
+  const { plan, keepSubscriptionId, health } = deriveSubscriptionState(sub);
   const cpeUnix = (sub as unknown as { current_period_end?: number }).current_period_end;
   const periodEnd = typeof cpeUnix === 'number' ? new Date(cpeUnix * 1000) : null;
   // Keep the tenant's trialEndsAt aligned with Stripe's trial so the
@@ -247,17 +323,73 @@ async function applySubscription(sub: Stripe.Subscription): Promise<void> {
     .update(tenants)
     .set({
       plan,
-      stripeSubscriptionId: live ? sub.id : null,
+      // Keep the sub id in live AND grace states — only terminal states
+      // (keepSubscriptionId === false) clear it. Losing it during a
+      // recoverable past_due would strand the customer with no reference.
+      stripeSubscriptionId: keepSubscriptionId ? sub.id : null,
       subscriptionEndsAt: periodEnd,
       ...(trialEnd ? { trialEndsAt: trialEnd } : {}),
       updatedAt: new Date(),
     })
     .where(eq(tenants.id, t.id));
-  console.log(`[billing.webhook] tenant ${t.slug} → ${plan} (sub ${sub.status})`);
+  console.log(`[billing.webhook] tenant ${t.slug} → ${plan} (sub ${sub.status}, health ${health})`);
+  // Record entry into / exit from the dunning grace window so the app can
+  // later surface an "update your card" nudge without losing access.
+  if (health === 'grace') {
+    await recordBillingAudit(t.id, 'billing.subscription_past_due', {
+      subscriptionId: sub.id,
+      status: sub.status,
+      plan,
+      currentPeriodEnd: periodEnd ? periodEnd.toISOString() : null,
+    });
+  }
 }
 
-async function handleEvent(event: Stripe.Event): Promise<void> {
+export async function handleEvent(event: Stripe.Event): Promise<void> {
   switch (event.type) {
+    case 'invoice.payment_failed': {
+      // A renewal (or first) charge failed. Stripe will keep retrying per the
+      // smart-retry schedule and, separately, move the subscription to
+      // `past_due` (handled by applySubscription, which KEEPS access). Here we
+      // only RECORD the failure so the app can surface "update your card" — we
+      // do NOT touch the plan; access is retained during the grace window.
+      const invoice = event.data.object as Stripe.Invoice;
+      const customerId = invoice.customer != null ? String(invoice.customer) : null;
+      if (!customerId) return;
+      const t = (
+        await db().select().from(tenants).where(eq(tenants.stripeCustomerId, customerId)).limit(1)
+      )[0];
+      if (!t) {
+        console.warn('[billing.webhook] payment_failed: no tenant for customer', customerId);
+        return;
+      }
+      const inv = invoice as unknown as {
+        id?: string;
+        subscription?: string | { id?: string } | null;
+        attempt_count?: number;
+        next_payment_attempt?: number | null;
+        amount_due?: number;
+        currency?: string;
+      };
+      const subscriptionId =
+        typeof inv.subscription === 'string' ? inv.subscription : inv.subscription?.id ?? null;
+      const nextAttempt =
+        typeof inv.next_payment_attempt === 'number'
+          ? new Date(inv.next_payment_attempt * 1000).toISOString()
+          : null;
+      await recordBillingAudit(t.id, 'billing.payment_failed', {
+        invoiceId: inv.id ?? null,
+        subscriptionId,
+        attemptCount: inv.attempt_count ?? null,
+        nextPaymentAttempt: nextAttempt,
+        amountDue: inv.amount_due ?? null,
+        currency: inv.currency ?? null,
+      });
+      console.warn(
+        `[billing.webhook] payment_failed for tenant ${t.slug} — access retained during grace (next retry ${nextAttempt ?? 'n/a'})`
+      );
+      return;
+    }
     case 'checkout.session.completed': {
       const session = event.data.object as Stripe.Checkout.Session;
       const subscriptionId = session.subscription != null ? String(session.subscription) : null;
