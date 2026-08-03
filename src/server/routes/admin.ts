@@ -15,6 +15,106 @@ import { db } from '../../db/client.js';
 import { tenants, leads, users, auditLog } from '../../db/schema.js';
 import { requireAuth, requireSuperAdmin } from '../middleware.js';
 import { runAggregatesNow } from '../../marketplace/cron.js';
+import { PLAN_IDS } from '../plans.js';
+
+/** Valid tenant lifecycle statuses. 'active' is the only one that serves a
+ *  public quote page — 'suspended'/'churned' 404 the widget (see public.ts's
+ *  `status !== 'active'` gate + the admin.js status field). A bad status here
+ *  is a full public-facing outage for that tenant, so the PATCH enum-validates. */
+export const TENANT_STATUS_VALUES = ['active', 'suspended', 'churned'] as const;
+
+/**
+ * Schema for the admin tenant PATCH. `plan` and `status` are enum-validated
+ * against the ACTUAL accepted values so a typo can't silently collapse a
+ * paying tenant to free (via normalizePlan) or 404 its public pages. All
+ * fields stay optional (partial PATCH); an unknown enum value is a clean 400.
+ */
+const AdminTenantPatch = z.object({
+  plan: z.enum(PLAN_IDS).optional(),
+  status: z.enum(TENANT_STATUS_VALUES).optional(),
+  name: z.string().optional(),
+  contactEmail: z.string().email().optional(),
+});
+export type AdminTenantPatch = z.infer<typeof AdminTenantPatch>;
+
+/** Best-effort audit write for super-admin mutations. Mirrors the app-wide
+ *  `insert(auditLog)` shape (tenant.ts / inbound.ts) but stamps
+ *  `actorKind: 'super_admin'` and the acting operator's user id. Scoped to the
+ *  TARGET tenant so the entry surfaces in that tenant's audit log. Never blocks
+ *  the response — a failed audit is logged, not thrown. */
+async function recordAdminAudit(
+  tenantId: number | null,
+  userId: number | null | undefined,
+  action: string,
+  details: Record<string, unknown>
+): Promise<void> {
+  try {
+    await db().insert(auditLog).values({
+      tenantId,
+      userId: userId ?? null,
+      action,
+      actorKind: 'super_admin',
+      detailsJson: details,
+    });
+  } catch (err) {
+    console.error('[admin] audit write failed:', err);
+  }
+}
+
+/**
+ * Core of `PATCH /api/admin/tenants/:slug`, extracted so it is unit-testable
+ * (same pattern as quoteDoc.ts). Returns `{ status, json }`.
+ *
+ *  - H1: enum-validates plan/status; unknown value → 400 with field detail.
+ *  - H3: a slug that matches 0 rows → 404 (no more silent `{ok:true}`).
+ *  - H2: on success, writes a before→after audit row scoped to the tenant.
+ */
+export async function patchTenantAdmin(opts: {
+  slug: string;
+  body: unknown;
+  actorUserId?: number | null;
+}): Promise<{ status: number; json: Record<string, unknown> }> {
+  const parse = AdminTenantPatch.safeParse(opts.body);
+  if (!parse.success) {
+    return { status: 400, json: { error: 'Invalid input', details: parse.error.flatten() } };
+  }
+
+  // Load the current row first — gives both the existence check (H3) and the
+  // before-values for the audit (H2).
+  const existing = await db()
+    .select()
+    .from(tenants)
+    .where(eq(tenants.slug, opts.slug))
+    .limit(1);
+  const before = existing[0] as Record<string, unknown> | undefined;
+  if (!before) {
+    return { status: 404, json: { error: `No tenant with slug '${opts.slug}'.` } };
+  }
+
+  const updated = await db()
+    .update(tenants)
+    .set({ ...parse.data, updatedAt: new Date() })
+    .where(eq(tenants.slug, opts.slug))
+    .returning();
+  // Authoritative affected-row count — 0 means the row vanished between the
+  // read and the write (race / concurrent delete). Still a 404, never {ok}.
+  if (updated.length === 0) {
+    return { status: 404, json: { error: `No tenant with slug '${opts.slug}'.` } };
+  }
+  const after = updated[0] as Record<string, unknown>;
+
+  // Audit only the fields the caller actually sent, before→after.
+  const changed: Record<string, { before: unknown; after: unknown }> = {};
+  for (const key of Object.keys(parse.data)) {
+    changed[key] = { before: before[key], after: after[key] };
+  }
+  await recordAdminAudit(before.id as number, opts.actorUserId, 'admin.tenant.update', {
+    slug: opts.slug,
+    changed,
+  });
+
+  return { status: 200, json: { ok: true, tenant: after } };
+}
 
 export function registerAdminRoutes(app: Express) {
   app.get('/api/admin/tenants', requireAuth, requireSuperAdmin, async (_req, res) => {
@@ -72,19 +172,12 @@ export function registerAdminRoutes(app: Express) {
   });
 
   app.patch('/api/admin/tenants/:slug', requireAuth, requireSuperAdmin, async (req, res) => {
-    const Patch = z.object({
-      plan: z.string().optional(),
-      status: z.string().optional(),
-      name: z.string().optional(),
-      contactEmail: z.string().email().optional(),
+    const result = await patchTenantAdmin({
+      slug: String(req.params.slug),
+      body: req.body,
+      actorUserId: req.user?.id ?? null,
     });
-    const parse = Patch.safeParse(req.body);
-    if (!parse.success) return res.status(400).json({ error: 'Invalid input' });
-    await db()
-      .update(tenants)
-      .set({ ...parse.data, updatedAt: new Date() })
-      .where(eq(tenants.slug, String(req.params.slug)));
-    res.json({ ok: true });
+    res.status(result.status).json(result.json);
   });
 
   app.get('/api/admin/stats', requireAuth, requireSuperAdmin, async (_req, res) => {
@@ -101,8 +194,13 @@ export function registerAdminRoutes(app: Express) {
   });
 
   // Manually trigger marketplace-aggregate recomputation (also runs hourly).
-  app.post('/api/admin/marketplace/recompute-aggregates', requireAuth, requireSuperAdmin, async (_req, res) => {
+  app.post('/api/admin/marketplace/recompute-aggregates', requireAuth, requireSuperAdmin, async (req, res) => {
     const result = await runAggregatesNow();
+    // Global (not tenant-scoped) admin action → audit with a null tenantId.
+    await recordAdminAudit(null, req.user?.id ?? null, 'admin.marketplace.recompute', {
+      ok: result.ok,
+      ...(result.ok ? {} : { error: (result as { error?: unknown }).error }),
+    });
     if (!result.ok) return res.status(500).json(result);
     return res.json(result);
   });

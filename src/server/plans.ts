@@ -28,6 +28,10 @@ import { loadEnv } from '../config.js';
 export type PlanId = 'free' | 'vital' | 'pro';
 export type PaidPlanId = 'vital' | 'pro';
 
+/** Canonical, ordered list of the plan ids a tenant row may hold. Single
+ *  source of truth for input validation (e.g. the admin tenant PATCH). */
+export const PLAN_IDS = ['free', 'vital', 'pro'] as const satisfies readonly PlanId[];
+
 /** Monthly price in USD, for copy + display. Source of truth for the app;
  *  the real charge is whatever the Stripe Price says. */
 export const PLAN_PRICES_USD: Record<PaidPlanId, number> = {
