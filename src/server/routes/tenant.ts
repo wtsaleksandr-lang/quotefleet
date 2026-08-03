@@ -46,6 +46,7 @@ import {
   accessLinks,
 } from '../../db/schema.js';
 import { requireAuth, requireTenant, requireOwner, requirePlan } from '../middleware.js';
+import { findConflictingEnabledCard } from '../../calc/engine.js';
 
 /** Plan tiers for feature gating, expressed as EFFECTIVE plans (see
  *  src/server/plans.ts). Trial tenants resolve to 'pro' and pass every
@@ -301,6 +302,32 @@ export function registerTenantRoutes(app: Express) {
       .where(and(eq(rateCards.id, id), eq(rateCards.tenantId, req.tenant!.id)))
       .limit(1);
     if (!existing[0]) return res.status(404).json({ error: 'Rate card not found' });
+    // Duplicate guard: the state this card WOULD have after the patch must not
+    // collide with a different enabled card for the same (service, equipment).
+    const next = {
+      id,
+      service: parse.data.service ?? existing[0].service,
+      equipment: parse.data.equipment ?? existing[0].equipment,
+      enabled: parse.data.enabled ?? existing[0].enabled,
+    };
+    if (next.enabled) {
+      const peers = await db()
+        .select()
+        .from(rateCards)
+        .where(
+          and(
+            eq(rateCards.tenantId, req.tenant!.id),
+            eq(rateCards.service, next.service),
+            eq(rateCards.equipment, next.equipment),
+            eq(rateCards.enabled, true),
+          ),
+        );
+      if (findConflictingEnabledCard(peers, next)) {
+        return res.status(409).json({
+          error: `You already have an enabled rate card for ${next.service}/${next.equipment} — disable or edit the existing one first.`,
+        });
+      }
+    }
     await db()
       .update(rateCards)
       .set({ ...parse.data, updatedAt: new Date() })
@@ -323,6 +350,34 @@ export function registerTenantRoutes(app: Express) {
     });
     const parse = RateCardCreate.safeParse(req.body);
     if (!parse.success) return invalidInput(res, parse.error);
+    // Duplicate guard: reject creating an enabled card when a different enabled
+    // card already exists for the same (service, equipment). Disabled cards may
+    // duplicate freely.
+    const willEnable = parse.data.enabled ?? true;
+    if (willEnable) {
+      const peers = await db()
+        .select()
+        .from(rateCards)
+        .where(
+          and(
+            eq(rateCards.tenantId, req.tenant!.id),
+            eq(rateCards.service, parse.data.service!),
+            eq(rateCards.equipment, parse.data.equipment!),
+            eq(rateCards.enabled, true),
+          ),
+        );
+      if (
+        findConflictingEnabledCard(peers, {
+          service: parse.data.service!,
+          equipment: parse.data.equipment!,
+          enabled: true,
+        })
+      ) {
+        return res.status(409).json({
+          error: `You already have an enabled rate card for ${parse.data.service}/${parse.data.equipment} — disable or edit the existing one first.`,
+        });
+      }
+    }
     const [row] = await db()
       .insert(rateCards)
       .values({

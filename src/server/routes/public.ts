@@ -11,7 +11,7 @@
  *   GET  /api/public/lead/:refId         — read lead (for chat page)
  */
 import type { Express, Request, Response } from 'express';
-import { eq, and } from 'drizzle-orm';
+import { eq, and, desc } from 'drizzle-orm';
 import { nanoid } from 'nanoid';
 import { z } from 'zod';
 import { db } from '../../db/client.js';
@@ -254,7 +254,16 @@ async function resolvePickupForDistance(loc: {
 
 async function loadConfig(tenantId: number) {
   const [cards, accs, zones, terms, brand] = await Promise.all([
-    db().select().from(rateCards).where(eq(rateCards.tenantId, tenantId)),
+    // Deterministic order so a tenant with duplicate enabled cards for the
+    // same (service, equipment) always resolves to the SAME card (never a
+    // random price). Winner: most-recently-updated enabled card wins; `id` is
+    // the deterministic tiebreak. Mirrors compareRateCardPriority in the
+    // engine, which the widget/calc path relies on.
+    db()
+      .select()
+      .from(rateCards)
+      .where(eq(rateCards.tenantId, tenantId))
+      .orderBy(desc(rateCards.updatedAt), desc(rateCards.id)),
     db().select().from(accessorials).where(eq(accessorials.tenantId, tenantId)),
     db().select().from(laneZones).where(eq(laneZones.tenantId, tenantId)),
     db().select().from(terminals).where(eq(terminals.tenantId, tenantId)),
