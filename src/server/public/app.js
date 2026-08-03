@@ -861,15 +861,38 @@
   function renderLeads(c) {
     var inner = location.pathname.split('/app/leads/')[1];
     if (inner) return renderLeadDetail(c, inner);
-    api('/api/tenant/leads').then(function (d) {
+
+    // Server-backed leads queue: search (debounced) + status filter +
+    // Prev/Next pagination all drive the query, so counts + results reflect
+    // the WHOLE table, not just a loaded page. Reset to page 1 whenever the
+    // search or status filter changes.
+    var state = { page: 1, pageSize: 25, search: '', status: '' };
+    var shell = null;       // built once, from the first response
+    var searchTimer = null;
+
+    function qs() {
+      var p = '?page=' + state.page + '&pageSize=' + state.pageSize;
+      if (state.search) p += '&search=' + encodeURIComponent(state.search);
+      if (state.status) p += '&status=' + encodeURIComponent(state.status);
+      return p;
+    }
+    function load() { api('/api/tenant/leads' + qs()).then(render).catch(showErr(c)); }
+
+    function render(d) {
+      if (!shell) buildShell(d);
+      if (shell.empty) return;
+      renderList(d);
+    }
+
+    function buildShell(d) {
       c.innerHTML = '';
       // Header row: title on the left, Export CSV on the right. The button
       // downloads the tenant's full lead list from
       //   GET /api/tenant/leads/export.csv
       // which is session-cookie authed + tenant-scoped, so a plain download
       // link carries the same session (no token to attach). The endpoint takes
-      // no filters, so this always exports every lead. Only shown when there is
-      // something to export.
+      // no filters, so this always exports EVERY lead regardless of the current
+      // search/status view. Only shown when the tenant has leads at all.
       var head = el('div', { class: 'qf-leads-header' });
       head.appendChild(el('h1', { text: 'Leads' }));
       if (d.leads.length) {
@@ -881,14 +904,93 @@
         }));
       }
       c.appendChild(head);
-      c.appendChild(el('p', { class: 'page-sub', text: d.leads.length + ' total' }));
-      if (!d.leads.length) {
+
+      // Zero leads AND no active filter → the classic empty state, no controls.
+      if (!d.total && !state.search && !state.status) {
+        c.appendChild(el('p', { class: 'page-sub', text: '0 leads' }));
         c.appendChild(el('div', {
           class: 'notice',
           html: 'No leads yet. Copy your <a href="/app/embed">embed code</a> and add it to your website to start collecting quotes.',
         }));
+        shell = { empty: true };
         return;
       }
+
+      var sub = el('p', { class: 'page-sub' });
+      c.appendChild(sub);
+
+      // Server-backed search + status controls. Reuses the .qf-lead-searchbar
+      // shell styling; the counts here are the SERVER's, so they stay accurate
+      // past the old 200-row cap.
+      var bar = el('section', { class: 'qf-lead-searchbar qf-leads-controls' });
+      bar.appendChild(el('div', {}, [
+        el('strong', { text: 'Lead queue control' }),
+        el('span', { text: 'Search by ref, customer, company, email, or lane; filter by status.' }),
+      ]));
+      var searchField = el('label');
+      searchField.appendChild(el('span', { text: 'Search leads' }));
+      var searchInput = el('input', { type: 'search', placeholder: 'Search ref, company, lane…' });
+      searchInput.value = state.search;
+      searchField.appendChild(searchInput);
+      bar.appendChild(searchField);
+
+      var statusField = el('label');
+      statusField.appendChild(el('span', { text: 'Status' }));
+      var statusSel = el('select', { class: 'qf-lead-status-filter' });
+      statusSel.appendChild(el('option', { value: '', text: 'All statuses' }));
+      LEAD_STATUSES.forEach(function (s) {
+        var o = el('option', { value: s, text: statusLabel(s) });
+        if (s === state.status) o.selected = true;
+        statusSel.appendChild(o);
+      });
+      statusField.appendChild(statusSel);
+      bar.appendChild(statusField);
+
+      var count = el('b', { class: 'qf-lead-search-count' });
+      bar.appendChild(count);
+      c.appendChild(bar);
+
+      searchInput.addEventListener('input', function () {
+        clearTimeout(searchTimer);
+        searchTimer = setTimeout(function () {
+          var v = searchInput.value.trim();
+          if (v === state.search) return;
+          state.search = v; state.page = 1; load();
+        }, 300);
+      });
+      statusSel.addEventListener('change', function () {
+        state.status = statusSel.value; state.page = 1; load();
+      });
+
+      var listWrap = el('div', { class: 'qf-leads-list' });
+      c.appendChild(listWrap);
+      var pager = el('div', { class: 'qf-leads-pager' });
+      c.appendChild(pager);
+
+      shell = { sub: sub, count: count, listWrap: listWrap, pager: pager };
+    }
+
+    function renderList(d) {
+      var totalPages = Math.max(1, Math.ceil(d.total / d.pageSize));
+      shell.sub.textContent = d.total + (d.total === 1 ? ' lead' : ' leads');
+      shell.listWrap.innerHTML = '';
+
+      if (!d.leads.length) {
+        shell.count.textContent = '0 shown';
+        shell.listWrap.appendChild(el('div', {
+          class: 'qf-lead-search-empty',
+          text: (state.search || state.status)
+            ? 'No leads match your search or status filter.'
+            : 'No leads on this page.',
+        }));
+        renderPager(d, totalPages);
+        return;
+      }
+
+      var from = d.pageSize * (d.page - 1) + 1;
+      var to = from + d.leads.length - 1;
+      shell.count.textContent = 'Showing ' + from + '–' + to + ' of ' + d.total;
+
       // qf-leads-table drives the ≤480px stacked-card reflow (lead-queue-search.css):
       // each <td> carries a data-label so the decision-critical Total + Status
       // stay visible on mobile without a sideways scroll to reach them.
@@ -908,8 +1010,26 @@
                 '<td data-label="When"><span class="muted-small">' + fmtDate(l.createdAt) + '</span></td>',
         }));
       });
-      c.appendChild(tbl);
-    }).catch(showErr(c));
+      shell.listWrap.appendChild(tbl);
+      renderPager(d, totalPages);
+    }
+
+    function renderPager(d, totalPages) {
+      shell.pager.innerHTML = '';
+      if (totalPages <= 1) return;
+      var prev = el('button', { type: 'button', class: 'btn btn-secondary', text: 'Prev' });
+      if (d.page <= 1) prev.setAttribute('disabled', '');
+      prev.addEventListener('click', function () { if (state.page > 1) { state.page -= 1; load(); } });
+      var info = el('span', { class: 'qf-leads-pager-info', text: 'Page ' + d.page + ' of ' + totalPages });
+      var next = el('button', { type: 'button', class: 'btn btn-secondary', text: 'Next' });
+      if (d.page >= totalPages) next.setAttribute('disabled', '');
+      next.addEventListener('click', function () { if (state.page < totalPages) { state.page += 1; load(); } });
+      shell.pager.appendChild(prev);
+      shell.pager.appendChild(info);
+      shell.pager.appendChild(next);
+    }
+
+    load();
   }
 
   function renderLeadDetail(c, refId) {

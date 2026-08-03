@@ -207,3 +207,65 @@ html[data-theme="light"] tr.qf-lead-hot-row {
   }
   .qf-callbacks-table tbody tr.callback-notes-editor td::before { display: none; }
 }
+
+/* ── Leads: server-backed search + status filter + pagination ────────────────
+   renderLeads (app.js) now owns the leads queue controls and drives them
+   against GET /api/tenant/leads (page/pageSize/search/status). These rules
+   extend the .qf-lead-searchbar shell above with a status <select> that
+   matches the search input, a 3-across control layout (search · status ·
+   count) that collapses to a single column on a phone, and a centered
+   Prev/Next pager. Tokens + 8px ramp only. */
+.qf-lead-searchbar.qf-leads-controls {
+  grid-template-columns: minmax(0, 1.4fr) minmax(0, 1fr) auto;
+  grid-template-areas:
+    "head   head   head"
+    "search status count";
+  row-gap: 12px;
+}
+.qf-lead-searchbar.qf-leads-controls > div { grid-area: head; }
+.qf-lead-searchbar.qf-leads-controls > label:nth-of-type(1) { grid-area: search; }
+.qf-lead-searchbar.qf-leads-controls > label:nth-of-type(2) { grid-area: status; }
+.qf-lead-searchbar.qf-leads-controls > .qf-lead-search-count { grid-area: count; }
+
+.qf-lead-searchbar select {
+  width: 100%;
+  border: 1px solid var(--border-strong);
+  border-radius: 999px;
+  background: var(--surface-2);
+  color: var(--ink);
+  padding: 8px 12px;
+  font-size: 13.5px;
+  outline: none;
+}
+.qf-lead-searchbar select:focus {
+  border-color: var(--accent);
+  box-shadow: 0 0 0 4px var(--accent-soft);
+}
+
+.qf-leads-pager {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+  margin: 16px 0 0;
+}
+.qf-leads-pager .btn[disabled] {
+  opacity: 0.5;
+  cursor: default;
+}
+.qf-leads-pager-info {
+  color: var(--muted);
+  font-size: 13px;
+  white-space: nowrap;
+}
+
+@media (max-width: 900px) {
+  .qf-lead-searchbar.qf-leads-controls {
+    grid-template-columns: 1fr;
+    grid-template-areas:
+      "head"
+      "search"
+      "status"
+      "count";
+  }
+}
