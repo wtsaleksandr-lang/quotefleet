@@ -16,9 +16,18 @@
  * IP source: we trust X-Forwarded-For via `app.set('trust proxy', 1)`
  * in app.ts, so `req.ip` is the real client IP behind Cloudflare.
  */
+import type { Request } from 'express';
 import rateLimit, { type RateLimitRequestHandler } from 'express-rate-limit';
 
 const minutes = (n: number) => n * 60 * 1000;
+
+/** Read a positive integer from the environment, else fall back. Lets ops
+ *  tune the AI caps without a code change (e.g. AI_TENANT_DAILY_LIMIT=400). */
+const envInt = (name: string, fallback: number): number => {
+  const raw = process.env[name];
+  const n = raw != null ? Number(raw) : NaN;
+  return Number.isFinite(n) && n > 0 ? Math.floor(n) : fallback;
+};
 
 /** /api/public/quote/:slug — costly per-call (calls Anthropic and DB).
  *  30 / IP / minute is generous for a real customer typing quotes,
@@ -126,6 +135,69 @@ export const inboundEmailLimiter: RateLimitRequestHandler = rateLimit({
     return m ? `inbound:${m[1].toLowerCase()}` : `inbound-ip:${req.ip}`;
   },
   message: { error: 'Too many inbound emails. Try again shortly.' },
+});
+
+/** Per-tenant AI limiters — platform-cost protection (audit H3).
+ *
+ *  The AI rate-chat (`POST /api/ai/rate-chat`) and rate-sheet ingest
+ *  (`POST /api/tenant/ingest`) endpoints call Anthropic on each request —
+ *  ingest runs a Sonnet VISION pass over an uploaded document — and BOTH fall
+ *  back to the shared platform ANTHROPIC_API_KEY when the tenant hasn't set
+ *  their own (see ai/client.ts + ai/ingestFile.ts). With no cap, a single
+ *  tenant looping uploads/chat runs the platform AI bill up unbounded.
+ *
+ *  So we gate both routes with TWO limiters keyed by TENANT id (not IP — a
+ *  tenant behind one office IP must still get their full quota, and a tenant
+ *  can't dodge the cap by rotating IPs): a short-window BURST cap that stops a
+ *  tight loop, and a rolling DAILY cap that bounds total daily platform spend.
+ *
+ *  BYO-key exemption: a tenant that configured its OWN Anthropic key spends its
+ *  own budget, not the platform's — so both limiters `skip` those tenants
+ *  entirely (effectively unlimited). This is the incentive to bring a key.
+ *
+ *  Caps are env-overridable so ops can tune them without a deploy. Defaults are
+ *  sized for a real freight-SaaS admin: a human adjusting rates or importing a
+ *  sheet does a handful of AI actions in a sitting, nowhere near 10/min or
+ *  200/day; a runaway loop hits them fast. */
+const AI_BURST_LIMIT = envInt('AI_TENANT_BURST_LIMIT', 10); // per minute / tenant
+const AI_DAILY_LIMIT = envInt('AI_TENANT_DAILY_LIMIT', 200); // per 24h / tenant
+
+/** Shown on a 429 from either AI limiter — graceful, never a 500, and it points
+ *  the tenant at the BYO-key path for a higher ceiling. */
+const AI_LIMIT_MESSAGE = {
+  error:
+    "You've hit the AI usage limit for now — try again in a bit, or add your own API key in Settings for higher limits.",
+};
+
+/** A tenant with its own configured Anthropic key isn't spending platform
+ *  budget, so the platform-cost caps don't apply to it. */
+function tenantHasByoKey(req: Request): boolean {
+  return !!req.tenant?.anthropicKeyEncrypted;
+}
+
+/** Key AI limits by tenant id (falls back to IP for the — unreachable behind
+ *  requireTenant — case where no tenant is resolved). */
+const aiTenantKey = (prefix: string) => (req: Request): string =>
+  req.tenant?.id != null ? `${prefix}:${req.tenant.id}` : `${prefix}-ip:${req.ip}`;
+
+export const aiTenantBurstLimiter: RateLimitRequestHandler = rateLimit({
+  windowMs: minutes(1),
+  limit: AI_BURST_LIMIT,
+  standardHeaders: 'draft-7',
+  legacyHeaders: false,
+  keyGenerator: aiTenantKey('ai-burst'),
+  skip: tenantHasByoKey,
+  message: AI_LIMIT_MESSAGE,
+});
+
+export const aiTenantDailyLimiter: RateLimitRequestHandler = rateLimit({
+  windowMs: minutes(60 * 24),
+  limit: AI_DAILY_LIMIT,
+  standardHeaders: 'draft-7',
+  legacyHeaders: false,
+  keyGenerator: aiTenantKey('ai-daily'),
+  skip: tenantHasByoKey,
+  message: AI_LIMIT_MESSAGE,
 });
 
 /** /api/auth/magic-link/send — anti-email-bomb. */

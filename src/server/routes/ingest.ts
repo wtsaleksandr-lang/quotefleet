@@ -37,6 +37,7 @@ import {
   tenants,
 } from '../../db/schema.js';
 import { requireAuth, requireTenant } from '../middleware.js';
+import { aiTenantBurstLimiter, aiTenantDailyLimiter } from '../rateLimits.js';
 import { addTrustedSender } from '../emailImport.js';
 import { parseRateSheet, IngestUnsupportedError } from '../../ai/ingestFile.js';
 import { syncTenantToMarketplace } from '../../marketplace/sync.js';
@@ -95,7 +96,12 @@ const PreviewSchema = z.object({
 
 export function registerIngestRoutes(app: Express) {
   // ── Start a job ──────────────────────────────────────────────────
-  app.post('/api/tenant/ingest', requireAuth, requireTenant, async (req: Request, res: Response) => {
+  // Per-tenant AI cost cap (audit H3): the parse runs a Sonnet VISION pass on
+  // the uploaded document, on the shared platform key when the tenant has no
+  // BYO key. Burst + daily limiters keyed by tenant id gate the UPLOAD (the only
+  // AI-spend entry point here — poll/list/apply/preview/reject don't call the
+  // model). Chained AFTER requireTenant; BYO-key tenants are skipped.
+  app.post('/api/tenant/ingest', requireAuth, requireTenant, aiTenantBurstLimiter, aiTenantDailyLimiter, async (req: Request, res: Response) => {
     const parse = StartSchema.safeParse(req.body);
     if (!parse.success) {
       return res.status(400).json({ error: 'Invalid input', details: parse.error.flatten() });
