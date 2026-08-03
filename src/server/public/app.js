@@ -25,6 +25,15 @@
     if (!d) return '—';
     return new Date(d).toLocaleString();
   }
+  // Escapes HTML-significant chars so customer/tenant/imported values can be
+  // safely interpolated into innerHTML string builders. Module-scoped so every
+  // render function can reach it (prevents stored XSS from lead/callback/audit
+  // fields sourced from the anonymous public widget + inbound rate-email import).
+  function escapeHtml(s) {
+    return String(s == null ? '' : s).replace(/[&<>"']/g, function (m) {
+      return m === '&' ? '&amp;' : m === '<' ? '&lt;' : m === '>' ? '&gt;' : m === '"' ? '&quot;' : '&#39;';
+    });
+  }
   function api(path, opts) {
     opts = opts || {};
     opts.headers = Object.assign({ 'Content-Type': 'application/json' }, opts.headers || {});
@@ -545,10 +554,10 @@
         var tb = $('tbody', tbl);
         d.recentLeads.forEach(function (l) {
           tb.innerHTML += '<tr>' +
-            '<td data-label="Ref"><a href="/app/leads/' + encodeURIComponent(l.refId) + '" data-route="leads/' + encodeURIComponent(l.refId) + '">' + l.refId + '</a></td>' +
-            '<td data-label="Customer">' + (l.customerName || '—') + '<br><span class="muted-small">' + (l.customerEmail || '') + '</span></td>' +
-            '<td data-label="Service">' + (l.service || '') + ' / ' + (l.equipment || '') + '</td>' +
-            '<td data-label="Lane">' + (l.pickupCity || '?') + ' → ' + (l.deliveryCity || '?') + '<br><span class="muted-small">' + (l.distanceMiles ? Math.round(l.distanceMiles) + ' mi' : '') + '</span></td>' +
+            '<td data-label="Ref"><a href="/app/leads/' + encodeURIComponent(l.refId) + '" data-route="leads/' + encodeURIComponent(l.refId) + '">' + escapeHtml(l.refId) + '</a></td>' +
+            '<td data-label="Customer">' + escapeHtml(l.customerName || '—') + '<br><span class="muted-small">' + escapeHtml(l.customerEmail || '') + '</span></td>' +
+            '<td data-label="Service">' + escapeHtml(l.service || '') + ' / ' + escapeHtml(l.equipment || '') + '</td>' +
+            '<td data-label="Lane">' + escapeHtml(l.pickupCity || '?') + ' → ' + escapeHtml(l.deliveryCity || '?') + '<br><span class="muted-small">' + (l.distanceMiles ? Math.round(l.distanceMiles) + ' mi' : '') + '</span></td>' +
             '<td data-label="Total" style="text-align:right;font-variant-numeric:tabular-nums;">$' + fmtMoney(l.quotedTotal) + '</td>' +
             '<td data-label="When"><span class="muted-small">' + fmtDate(l.createdAt) + '</span></td>' +
             '<td data-label="Status"><span class="badge ' + statusClass(l.status) + '">' + statusLabel(l.status) + '</span></td>' +
@@ -565,9 +574,9 @@
         d.audit.forEach(function (a) {
           ul.appendChild(el('div', {
             class: 'card-row',
-            html: '<div><strong>' + a.action + '</strong> <span class="badge ' +
-              (a.actorKind === 'ai_agent' ? 'badge-info' : 'badge-muted') + '">' + a.actorKind +
-              '</span><br><span class="muted-small">' + (a.detailsJson && a.detailsJson.reason ? a.detailsJson.reason : '') + '</span></div>' +
+            html: '<div><strong>' + escapeHtml(a.action) + '</strong> <span class="badge ' +
+              (a.actorKind === 'ai_agent' ? 'badge-info' : 'badge-muted') + '">' + escapeHtml(a.actorKind) +
+              '</span><br><span class="muted-small">' + escapeHtml(a.detailsJson && a.detailsJson.reason ? a.detailsJson.reason : '') + '</span></div>' +
               '<span class="muted-small">' + fmtDate(a.createdAt) + '</span>',
           }));
         });
@@ -792,10 +801,10 @@
         tb.appendChild(el('tr', {
           on: { click: function () { go('leads/' + l.refId); } },
           style: { cursor: 'pointer' },
-          html: '<td data-label="Ref"><strong>' + l.refId + '</strong></td>' +
-                '<td data-label="Customer">' + (l.customerName || '—') + '<br><span class="muted-small">' + (l.customerEmail || '') + '</span></td>' +
-                '<td data-label="Service">' + (l.service || '') + ' / ' + (l.equipment || '') + '</td>' +
-                '<td data-label="Lane">' + (l.pickupCity || '?') + ' → ' + (l.deliveryCity || '?') + '</td>' +
+          html: '<td data-label="Ref"><strong>' + escapeHtml(l.refId) + '</strong></td>' +
+                '<td data-label="Customer">' + escapeHtml(l.customerName || '—') + '<br><span class="muted-small">' + escapeHtml(l.customerEmail || '') + '</span></td>' +
+                '<td data-label="Service">' + escapeHtml(l.service || '') + ' / ' + escapeHtml(l.equipment || '') + '</td>' +
+                '<td data-label="Lane">' + escapeHtml(l.pickupCity || '?') + ' → ' + escapeHtml(l.deliveryCity || '?') + '</td>' +
                 '<td data-label="Total" style="text-align:right;">$' + fmtMoney(l.quotedTotal) + '</td>' +
                 '<td data-label="Status"><span class="badge ' + statusClass(l.status) + '">' + statusLabel(l.status) + '</span></td>' +
                 '<td data-label="When"><span class="muted-small">' + fmtDate(l.createdAt) + '</span></td>',
@@ -815,17 +824,17 @@
 
       var leftCard = el('div', { class: 'card' });
       leftCard.appendChild(el('div', { class: 'card-title', text: 'Customer' }));
-      leftCard.innerHTML += '<div><strong>' + (l.customerName || '—') + '</strong></div>' +
-        '<div class="muted">' + (l.customerEmail || '') + '</div>' +
-        (l.customerPhone ? '<div class="muted">' + l.customerPhone + '</div>' : '') +
-        (l.customerCompany ? '<div class="muted">' + l.customerCompany + '</div>' : '');
+      leftCard.innerHTML += '<div><strong>' + escapeHtml(l.customerName || '—') + '</strong></div>' +
+        '<div class="muted">' + escapeHtml(l.customerEmail || '') + '</div>' +
+        (l.customerPhone ? '<div class="muted">' + escapeHtml(l.customerPhone) + '</div>' : '') +
+        (l.customerCompany ? '<div class="muted">' + escapeHtml(l.customerCompany) + '</div>' : '');
 
       var rightCard = el('div', { class: 'card' });
       rightCard.appendChild(el('div', { class: 'card-title', text: 'Shipment' }));
-      rightCard.innerHTML += '<div><strong>' + (l.service || '') + '</strong> / ' + (l.equipment || '') + '</div>' +
-        '<div class="muted">' + (l.pickupCity || '?') + ', ' + (l.pickupState || '') + ' → ' + (l.deliveryCity || '?') + ', ' + (l.deliveryState || '') + '</div>' +
-        '<div class="muted">' + (l.distanceMiles ? Math.round(l.distanceMiles) + ' mi' : '') + (l.weightLbs ? ' · ' + l.weightLbs + ' lbs' : '') + '</div>' +
-        '<div class="muted">' + (l.pickupDate ? 'Pickup: ' + l.pickupDate : '') + '</div>';
+      rightCard.innerHTML += '<div><strong>' + escapeHtml(l.service || '') + '</strong> / ' + escapeHtml(l.equipment || '') + '</div>' +
+        '<div class="muted">' + escapeHtml(l.pickupCity || '?') + ', ' + escapeHtml(l.pickupState || '') + ' → ' + escapeHtml(l.deliveryCity || '?') + ', ' + escapeHtml(l.deliveryState || '') + '</div>' +
+        '<div class="muted">' + (l.distanceMiles ? Math.round(l.distanceMiles) + ' mi' : '') + (l.weightLbs ? ' · ' + escapeHtml(l.weightLbs) + ' lbs' : '') + '</div>' +
+        '<div class="muted">' + (l.pickupDate ? 'Pickup: ' + escapeHtml(l.pickupDate) : '') + '</div>';
 
       grid.appendChild(leftCard);
       grid.appendChild(rightCard);
@@ -838,7 +847,7 @@
       tbl.innerHTML = '<thead><tr><th>Line</th><th style="text-align:right;">Amount</th></tr></thead><tbody></tbody>';
       var tb = $('tbody', tbl);
       (l.breakdownJson || []).forEach(function (b) {
-        tb.innerHTML += '<tr><td>' + b.name + '</td><td style="text-align:right;">$' + fmtMoney(b.amount) + '</td></tr>';
+        tb.innerHTML += '<tr><td>' + escapeHtml(b.name) + '</td><td style="text-align:right;">$' + fmtMoney(b.amount) + '</td></tr>';
       });
       quoteCard.appendChild(tbl);
       c.appendChild(quoteCard);
@@ -924,12 +933,12 @@
         var topicLine = (cb.topic || '').slice(0, 80);
         if (cb.preferredTime) topicLine = topicLine ? topicLine + ' · ' + cb.preferredTime : cb.preferredTime;
         row.innerHTML =
-          '<td><strong>' + (cb.customerName || '—') + '</strong>' +
-            (cb.customerCompany ? '<br><span class="muted-small">' + cb.customerCompany + '</span>' : '') + '</td>' +
-          '<td><a href="tel:' + encodeURIComponent(cb.customerPhone) + '">' + cb.customerPhone + '</a>' +
-            (cb.customerEmail ? '<br><span class="muted-small">' + cb.customerEmail + '</span>' : '') + '</td>' +
-          '<td>' + (cb.leadRefId ? '<a href="/app/leads/' + encodeURIComponent(cb.leadRefId) + '" data-route="leads/' + encodeURIComponent(cb.leadRefId) + '">' + cb.leadRefId + '</a>' : '<span class="muted-small">—</span>') + '</td>' +
-          '<td><span class="muted-small">' + (topicLine || '—') + '</span>' +
+          '<td><strong>' + escapeHtml(cb.customerName || '—') + '</strong>' +
+            (cb.customerCompany ? '<br><span class="muted-small">' + escapeHtml(cb.customerCompany) + '</span>' : '') + '</td>' +
+          '<td><a href="tel:' + encodeURIComponent(cb.customerPhone) + '">' + escapeHtml(cb.customerPhone) + '</a>' +
+            (cb.customerEmail ? '<br><span class="muted-small">' + escapeHtml(cb.customerEmail) + '</span>' : '') + '</td>' +
+          '<td>' + (cb.leadRefId ? '<a href="/app/leads/' + encodeURIComponent(cb.leadRefId) + '" data-route="leads/' + encodeURIComponent(cb.leadRefId) + '">' + escapeHtml(cb.leadRefId) + '</a>' : '<span class="muted-small">—</span>') + '</td>' +
+          '<td><span class="muted-small">' + escapeHtml(topicLine || '—') + '</span>' +
             (cb.triggerSource === 'chat_escalation' ? '<br><span class="badge">from chat</span>' : '') + '</td>' +
           '<td></td>' +
           '<td><span class="muted-small">' + fmtDate(cb.createdAt) + '</span></td>' +
@@ -3102,16 +3111,16 @@
       d.audit.forEach(function (a) {
         var reason = (a.detailsJson && a.detailsJson.reason) ? a.detailsJson.reason : (a.detailsJson ? JSON.stringify(a.detailsJson).slice(0, 140) : '');
         tb.innerHTML += '<tr><td><span class="muted-small">' + fmtDate(a.createdAt) + '</span></td>' +
-          '<td><strong>' + a.action + '</strong></td>' +
-          '<td><span class="badge ' + (a.actorKind === 'ai_agent' ? 'badge-info' : 'badge-muted') + '">' + a.actorKind + '</span></td>' +
-          '<td><span class="muted-small">' + reason + '</span></td></tr>';
+          '<td><strong>' + escapeHtml(a.action) + '</strong></td>' +
+          '<td><span class="badge ' + (a.actorKind === 'ai_agent' ? 'badge-info' : 'badge-muted') + '">' + escapeHtml(a.actorKind) + '</span></td>' +
+          '<td><span class="muted-small">' + escapeHtml(reason) + '</span></td></tr>';
       });
       c.appendChild(tbl);
     }).catch(showErr(c));
   }
 
   // ── helpers ────────────────────────────────────────────────────
-  function showErr(c) { return function (err) { c.innerHTML = '<div class="notice error">' + (err.message || 'Failed') + '</div>'; }; }
+  function showErr(c) { return function (err) { c.innerHTML = '<div class="notice error">' + escapeHtml(err.message || 'Failed') + '</div>'; }; }
 
   // ── Auto-import rates from email (forward/BCC → auto-read) ─────
   // A per-tenant toggle (featuresJson.emailImport). When ON, we expose the
@@ -3819,11 +3828,6 @@
     function laneZoneSummary(z) {
       return '<strong>' + escapeHtml(z.label || (z.anchorPortCode || z.anchorCity || 'zone')) + '</strong>'
         + '<div class="muted-small">' + escapeHtml('within ' + (z.radiusMiles ?? '?') + ' mi · $' + (z.flatPrice ?? '?')) + '</div>';
-    }
-    function escapeHtml(s) {
-      return String(s == null ? '' : s).replace(/[&<>"']/g, function (m) {
-        return m === '&' ? '&amp;' : m === '<' ? '&lt;' : m === '>' ? '&gt;' : m === '"' ? '&quot;' : '&#39;';
-      });
     }
   }
 
