@@ -469,7 +469,8 @@
         var configured = !!(billing && billing.configured);
         var trial = r.trial || {};
         var status = trial.status || 'unknown';
-        var planLabel = (r.tenant && r.tenant.plan) || 'free';
+        var planSlug = (r.tenant && r.tenant.plan) || 'free';
+        var planLabel = planSlug.charAt(0).toUpperCase() + planSlug.slice(1);
         billBody.innerHTML = '';
 
         function addNote(txt) {
