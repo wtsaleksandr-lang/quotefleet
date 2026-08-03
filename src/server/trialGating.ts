@@ -18,6 +18,22 @@
 import { type Tenant } from '../db/schema.js';
 import { effectivePlan, isTrialing } from './plans.js';
 
+/**
+ * Key stored in the tenant's `lifecycle_emails_json` when a paid subscription
+ * enters Stripe's dunning grace window (`past_due`/`incomplete`) — set from the
+ * billing webhook (see billing.ts). Presence = "the last payment failed, update
+ * your card". Value is the ISO timestamp we first saw the failure. Cleared when
+ * the subscription returns to `active`. Reusing the open-typed lifecycle jsonb
+ * avoids a schema migration for this single per-tenant flag.
+ */
+export const BILLING_PAST_DUE_KEY = 'billingPastDueSince';
+
+/** True when the tenant is in the payment-grace window (card failed, still
+ *  inside Stripe's retry schedule) per the persisted lifecycle marker. */
+export function isTenantBillingPastDue(tenant: Tenant): boolean {
+  return !!tenant.lifecycleEmailsJson?.[BILLING_PAST_DUE_KEY];
+}
+
 export interface TrialState {
   /** 'trial' | 'trial_expired' | 'paid' | 'unknown' */
   status: 'trial' | 'trial_expired' | 'paid' | 'unknown';
@@ -29,6 +45,11 @@ export interface TrialState {
   daysLeft: number;
   /** ISO date when trial ends (or null). */
   trialEndsAt: string | null;
+  /** True when the tenant's last renewal charge failed and Stripe is retrying
+   *  (grace window). Drives the "update your card" banner, which takes
+   *  precedence over the trial countdown. Independent of `status`: a paying
+   *  tenant is `status:'paid'` but still past_due here. */
+  paymentPastDue: boolean;
   /** Reason string when not accepting (for surfacing in the API response). */
   reason?: string;
 }
@@ -42,6 +63,7 @@ export async function getTrialState(tenant: Tenant): Promise<TrialState> {
   const isActive = tenant.status === 'active';
   const trialEnd = tenant.trialEndsAt ?? null;
   const eff = effectivePlan(tenant);
+  const paymentPastDue = isTenantBillingPastDue(tenant);
 
   // Inside the 14-day all-inclusive trial.
   if (isTrialing(tenant)) {
@@ -51,6 +73,7 @@ export async function getTrialState(tenant: Tenant): Promise<TrialState> {
       plan: eff, // 'pro' during trial
       daysLeft: trialEnd ? daysBetween(now, trialEnd) : 0,
       trialEndsAt: trialEnd ? trialEnd.toISOString() : null,
+      paymentPastDue,
       reason: isActive ? undefined : 'Tenant is suspended.',
     };
   }
@@ -63,6 +86,7 @@ export async function getTrialState(tenant: Tenant): Promise<TrialState> {
       plan: eff,
       daysLeft: 0,
       trialEndsAt: trialEnd ? trialEnd.toISOString() : null,
+      paymentPastDue,
     };
   }
 
@@ -73,6 +97,7 @@ export async function getTrialState(tenant: Tenant): Promise<TrialState> {
     plan: 'free',
     daysLeft: 0,
     trialEndsAt: trialEnd ? trialEnd.toISOString() : null,
+    paymentPastDue,
     reason: 'Your trial has ended. Choose a plan to keep capturing leads.',
   };
 }

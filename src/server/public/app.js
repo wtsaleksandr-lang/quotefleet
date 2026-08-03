@@ -4027,6 +4027,7 @@
   // tenants get no banner. The visibility + CTA logic lives in the shared,
   // unit-tested QFTrialBanner module (trial-banner.js) so this is just DOM.
   var trialBannerDismissed = false; // in-memory only → banner returns on reload
+  var paymentBannerDismissed = false; // in-memory only → payment warning returns on reload
 
   // Cache /api/billing/status once; the banner + Account card both read it.
   function ensureBillingStatus() {
@@ -4074,13 +4075,16 @@
             ? trial.daysLeft
             : window.QFTrialBanner.daysLeftFrom(trial.trialEndsAt),
           billingConfigured: billingConfigured,
+          paymentPastDue: !!trial.paymentPastDue,
         })
       : { show: false };
 
     // Paid / unknown → no banner, and never leave inputs locked.
     if (!view.show) { removeTrialBanner(); document.body.classList.remove('qf-trial-locked'); return; }
-    // Trial is dismissible for the current page load; expired is not.
+    // Trial + payment_issue are dismissible for the current page load (they
+    // return on reload while unresolved); expired is not.
     if (view.variant === 'trial' && trialBannerDismissed) { removeTrialBanner(); return; }
+    if (view.variant === 'payment_issue' && paymentBannerDismissed) { removeTrialBanner(); return; }
 
     var bar = document.getElementById('qf-trial-bar');
     if (!bar) {
@@ -4095,12 +4099,11 @@
     var msg = el('div', { class: 'qf-trial-banner-msg' });
     msg.appendChild(el('span', { class: 'qf-trial-banner-dot', 'aria-hidden': 'true' }));
     msg.appendChild(el('span', { class: 'qf-trial-banner-headline', text: view.headline }));
-    msg.appendChild(el('span', {
-      class: 'qf-trial-banner-sub',
-      text: view.variant === 'trial'
-        ? 'Every feature unlocked'
-        : 'Your calculator is read-only until you subscribe',
-    }));
+    var subText;
+    if (view.variant === 'trial') subText = 'Every feature unlocked';
+    else if (view.variant === 'payment_issue') subText = 'Your service stays active while you update it';
+    else subText = 'Your calculator is read-only until you subscribe';
+    msg.appendChild(el('span', { class: 'qf-trial-banner-sub', text: subText }));
     bar.appendChild(msg);
 
     if (view.ctaShown && view.ctaLabel) {
@@ -4108,6 +4111,9 @@
       cta.appendChild(document.createTextNode(view.ctaLabel.replace(/\s*→\s*$/, '')));
       cta.appendChild(el('span', { class: 'arr', 'aria-hidden': 'true', text: '→' }));
       cta.addEventListener('click', function () {
+        // payment_issue → open the Stripe Customer Portal to fix the card;
+        // trial/expired → start the subscribe Checkout flow.
+        if (view.variant === 'payment_issue') { openBillingPortal(); return; }
         cta.disabled = true;
         startSubscribeCheckout('vital').then(
           function () { cta.disabled = false; },
@@ -4117,17 +4123,27 @@
       bar.appendChild(cta);
     }
 
-    // Dismiss — trial only, in-memory flag so an active countdown returns on
-    // the next reload (we never hard-hide a live trial).
-    if (view.variant === 'trial') {
-      var close = el('button', { class: 'qf-trial-banner-close', type: 'button', 'aria-label': 'Dismiss trial banner' });
+    // Dismiss — trial + payment_issue only. In-memory flag so the banner
+    // returns on the next reload while unresolved (we never hard-hide a live
+    // trial or an unfixed payment). Expired stays pinned (read-only state).
+    if (view.variant === 'trial' || view.variant === 'payment_issue') {
+      var isPayment = view.variant === 'payment_issue';
+      var close = el('button', {
+        class: 'qf-trial-banner-close',
+        type: 'button',
+        'aria-label': isPayment ? 'Dismiss payment banner' : 'Dismiss trial banner',
+      });
       close.innerHTML = '<svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>';
-      close.addEventListener('click', function () { trialBannerDismissed = true; removeTrialBanner(); });
+      close.addEventListener('click', function () {
+        if (isPayment) paymentBannerDismissed = true; else trialBannerDismissed = true;
+        removeTrialBanner();
+      });
       bar.appendChild(close);
     }
 
     // Read-only lock for the expired state (mirrors the server write-block so
     // users don't type into fields whose backend write would 403 anyway).
+    // payment_issue keeps FULL access (paying tenant in grace) — never lock.
     if (view.variant === 'expired') document.body.classList.add('qf-trial-locked');
     else document.body.classList.remove('qf-trial-locked');
   }

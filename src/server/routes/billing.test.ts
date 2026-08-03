@@ -166,6 +166,48 @@ describe('applySubscription — writes the tenant row', () => {
     expect(state.updates[0].stripeSubscriptionId).toBe('sub_123');
   });
 
+  it('past_due SETS the persisted past-due marker on the tenant', async () => {
+    await applySubscription(makeSub('past_due'));
+    const life = state.updates[0].lifecycleEmailsJson as Record<string, unknown>;
+    expect(life).toBeTruthy();
+    expect(typeof life.billingPastDueSince).toBe('string');
+  });
+
+  it('active CLEARS a previously-set past-due marker', async () => {
+    state.tenantRow = {
+      id: 7,
+      slug: 'acme',
+      stripeCustomerId: 'cus_123',
+      plan: 'pro',
+      stripeSubscriptionId: 'sub_123',
+      lifecycleEmailsJson: { billingPastDueSince: '2026-01-01T00:00:00.000Z', welcome: '2026-01-01' },
+    };
+    await applySubscription(makeSub('active'));
+    const life = state.updates[0].lifecycleEmailsJson as Record<string, unknown>;
+    expect(life.billingPastDueSince).toBeUndefined(); // cleared
+    expect(life.welcome).toBe('2026-01-01'); // unrelated lifecycle keys preserved
+  });
+
+  it('active with NO marker does not touch lifecycleEmailsJson (no needless write)', async () => {
+    await applySubscription(makeSub('active'));
+    expect('lifecycleEmailsJson' in state.updates[0]).toBe(false);
+  });
+
+  it('terminal canceled CLEARS the marker while downgrading to free', async () => {
+    state.tenantRow = {
+      id: 7,
+      slug: 'acme',
+      stripeCustomerId: 'cus_123',
+      plan: 'pro',
+      stripeSubscriptionId: 'sub_123',
+      lifecycleEmailsJson: { billingPastDueSince: '2026-01-01T00:00:00.000Z' },
+    };
+    await applySubscription(makeSub('canceled'));
+    expect(state.updates[0].plan).toBe('free');
+    const life = state.updates[0].lifecycleEmailsJson as Record<string, unknown>;
+    expect(life.billingPastDueSince).toBeUndefined();
+  });
+
   it('REGRESSION GUARD: past_due must NOT downgrade to free/null (the bug)', async () => {
     await applySubscription(makeSub('past_due'));
     expect(state.updates[0].plan).not.toBe('free');
@@ -225,13 +267,38 @@ describe('handleEvent — webhook routing', () => {
     } as unknown as Stripe.Event;
 
     await expect(handleEvent(invoiceEvent)).resolves.toBeUndefined();
-    // No plan change — access retained during grace.
-    expect(state.updates).toHaveLength(0);
+    // No PLAN change — access retained during grace. (The only write is the
+    // "update your card" marker below, never a plan/subId downgrade.)
+    expect(state.updates.every((u) => !('plan' in u))).toBe(true);
+    expect(state.updates.every((u) => !('stripeSubscriptionId' in u))).toBe(true);
     // Failure recorded for later "update your card" surfacing.
     const audit = state.inserts.find((i) => i.action === 'billing.payment_failed');
     expect(audit).toBeTruthy();
     expect(audit?.actorKind).toBe('system');
     expect((audit?.detailsJson as Record<string, unknown>).subscriptionId).toBe('sub_123');
+    // The persisted past-due marker is set so /api/auth/me can raise the banner.
+    const marked = state.updates.find(
+      (u) => (u.lifecycleEmailsJson as Record<string, unknown> | undefined)?.billingPastDueSince
+    );
+    expect(marked).toBeTruthy();
+  });
+
+  it('invoice.payment_failed does NOT re-write the marker when already set', async () => {
+    state.tenantRow = {
+      id: 7,
+      slug: 'acme',
+      stripeCustomerId: 'cus_123',
+      plan: 'pro',
+      stripeSubscriptionId: 'sub_123',
+      lifecycleEmailsJson: { billingPastDueSince: '2026-01-01T00:00:00.000Z' },
+    };
+    const invoiceEvent = {
+      type: 'invoice.payment_failed',
+      data: { object: { id: 'in_3', customer: 'cus_123', subscription: 'sub_123' } },
+    } as unknown as Stripe.Event;
+    await handleEvent(invoiceEvent);
+    // Marker already present → no tenant update at all (only the audit insert).
+    expect(state.updates).toHaveLength(0);
   });
 
   it('invoice.payment_failed for an unknown customer no-ops without throwing', async () => {
