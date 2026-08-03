@@ -42,7 +42,6 @@ import { loadEnv, defaultHostDomain } from '../../config.js';
 import { DEFAULT_QUOTE_DISCLAIMER } from '../quoteDisclaimer.js';
 import { getTrialState, type TrialState } from '../trialGating.js';
 import { magicLinkLimiter, signupLimiter, loginLimiter } from '../rateLimits.js';
-import { createTrialCheckoutSession, billingConfigured } from './billing.js';
 import { parsePaidPlan } from '../plans.js';
 
 const RESERVED_SLUGS = new Set([
@@ -336,32 +335,17 @@ export function registerAuthRoutes(app: Express) {
     const token = await createSession(result.userId);
     setCookie(res, token);
 
-    // Card-required trial: if billing is configured, open a Stripe Checkout
-    // session (subscription mode, 14-day trial, $0 card validation) for the
-    // selected tier and hand the client its URL to redirect to. If billing
-    // is NOT configured (dev / not yet wired — the current prod state), we
-    // degrade gracefully — the account is created on a trial and the client
-    // just lands on /app. NOTE: while billing is unconfigured, signup is
-    // card-free, so the signup/pricing copy says "no credit card required"
-    // (src/server/public/signup.html, pricing.html). When billing is turned
-    // on, restore the card field + card copy together so they stay accurate.
+    // Card-AFTER-trial: signup is ALWAYS card-free — we do NOT create a Stripe
+    // Checkout session at signup, even when billing is configured. The card is
+    // collected LATER, at subscribe / trial-end, not up front. Product decision
+    // 2026-08-03 (see plans.ts + memory project_quotefleet_pricing_model): don't
+    // gate signup behind a card. Every signup lands on a card-free 14-day
+    // all-inclusive trial and the client goes straight to /app (checkoutUrl is
+    // always null). The day-14 paywall + the in-app "subscribe" escape (which
+    // DOES collect the card via createTrialCheckoutSession) + the trial-reminder
+    // emails live elsewhere (trial-gating middleware + billing routes), NOT here.
     const selectedPlan = parsePaidPlan(parse.data.plan);
-    let checkoutUrl: string | null = null;
-    if (billingConfigured()) {
-      try {
-        const t = (
-          await db().select().from(tenants).where(eq(tenants.id, result.tenantId)).limit(1)
-        )[0];
-        if (t) {
-          const session = await createTrialCheckoutSession({ tenant: t, plan: selectedPlan });
-          checkoutUrl = session.url;
-        }
-      } catch (err) {
-        // Don't fail signup if Checkout creation hiccups — the tenant can
-        // add a card from the dashboard. Log and continue to /app.
-        console.error('[auth.signup] checkout session creation failed:', err);
-      }
-    }
+    const checkoutUrl: string | null = null;
 
     const proto = env.PUBLIC_BASE_URL.startsWith('http://') ? 'http:' : 'https:';
     return res.json({
@@ -376,8 +360,10 @@ export function registerAuthRoutes(app: Express) {
         trialEndsAt,
       },
       plan: selectedPlan,
-      // When present the client should redirect here to add a card before
-      // the trial starts; otherwise go straight to /app.
+      // Always null now — signup is card-free (card-after-trial). Kept in the
+      // response shape for client compatibility: the client lands on /app when
+      // checkoutUrl is absent/null (the norm). The card is collected later at
+      // subscribe / trial-end, not at signup.
       checkoutUrl,
       role: 'tenant_owner',
     });

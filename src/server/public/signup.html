@@ -204,9 +204,10 @@
         var res = await fetch('/api/auth/signup', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ companyName: String(fd.get('companyName') || '').trim(), slug: slugInput.value.trim(), hostDomain: fd.get('hostDomain'), email: normalizeEmail(fd.get('email')), password: fd.get('password'), plan: selectedPlan(), countryFocus: fd.get('countryFocus') || 'US', contactPhone: fd.get('contactPhone') || undefined, dpaAccepted: true, dpaVersion: '1.0' }) });
         var j = await res.json();
         if (!res.ok) { err.textContent = bestError(j); err.classList.remove('hidden'); submit.disabled = false; submit.innerHTML = oldText; syncSubmit(); return; }
-        // If billing is configured the server returns a Stripe Checkout URL to
-        // add a card ($0 validation); redirect there. On prod billing is NOT
-        // configured, so checkoutUrl is absent and signup is card-free → /app.
+        // Card-after-trial: signup is always card-free, so the server returns
+        // checkoutUrl:null and we land straight on /app — this is the norm. The
+        // guarded redirect below is a defensive no-op kept only in case a future
+        // flow reintroduces an up-front checkout; today checkoutUrl is never set.
         if (j.checkoutUrl) { submit.innerHTML = 'Redirecting to secure checkout…'; location.href = j.checkoutUrl; return; }
         location.href = '/app';
       } catch (ex) { err.textContent = 'Network error — try again.'; err.classList.remove('hidden'); submit.disabled = false; submit.innerHTML = oldText; syncSubmit(); }
