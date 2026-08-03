@@ -1132,3 +1132,20 @@ html[data-theme="light"] .hero h1 .accent {
 .qf-rp-status-invalid  { background: var(--error-bg); color: var(--error); }
 .qf-rate-proposal[data-status="applied"]   { border-color: var(--success); }
 .qf-rate-proposal[data-status="discarded"] { opacity: 0.72; }
+
+/* ── Admin overview stat tiles ─────────────────────────────────────
+   The admin dashboard's overview counts (Tenants / Users / Total leads /
+   MRR) live in `.features` cells with the class `.feature`. Give those
+   tiles real card chrome — surface + hairline + radius + padding — so they
+   read as an intentional, consistent set instead of flat text. The parent
+   grid already stretches cells (default align-items), so the taller MRR
+   tile sets the row height and the counts match it. Non-interactive by
+   design (no hover lift), and a plain block container so each tile's own
+   internal spacing (e.g. the MRR breakdown lines) is left intact. Tokens
+   only. */
+.feature {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  padding: var(--space-3);
+}
