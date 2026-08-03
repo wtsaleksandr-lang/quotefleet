@@ -258,20 +258,39 @@
     c.appendChild(card);
   }
 
-  function go(route) {
+  // Parse a pathname/route through the shared, unit-tested helper (app-route.js)
+  // so boot / popstate / clicks all derive the FULL nested route identically.
+  var RouteUtil = (typeof window !== 'undefined' && window.QFAppRoute) || {
+    fullRoute: function (p) { return (String(p || '').split('/app/')[1] || 'overview').replace(/\/+$/, '') || 'overview'; },
+    baseSegment: function (r) { return String(r || '').split('/')[0] || 'overview'; },
+  };
+
+  // Render a route WITHOUT touching history. Dispatches on the base segment
+  // (which handler + which nav item), but the handlers read the FULL path from
+  // the URL (renderLeads → renderLeadDetail), so the caller must ensure the URL
+  // already reflects `route`. Used by popstate/boot directly (the URL is already
+  // correct) and by go() after it pushes state. Splitting render from pushState
+  // is the fix for audit shell-H1: Back → popstate → render no longer appends a
+  // duplicate history entry, so Back/Forward work.
+  function render(route) {
+    route = route || 'overview';
     state.route = route;
-    // Match on the base segment so nested routes (e.g. "leads/QF-123") still
-    // dispatch to their handler; the full route is pushed to the URL so the
-    // handler can read the sub-path (renderLeads → renderLeadDetail).
-    var base = String(route).split('/')[0];
+    var base = RouteUtil.baseSegment(route);
     setActiveNav(base);
-    history.pushState({}, '', '/app/' + route);
     if (base === 'overview' || base === 'leads' || base === 'callbacks') refreshNavBadges();
     var c = $('#page-content');
     c.innerHTML = '<div class="muted">Loading…</div>';
     var handler = ROUTES[base];
     if (handler) return handler(c);
     return renderNotFound(c);
+  }
+
+  // User-initiated navigation (sidebar / link / row click): push the new URL
+  // (so Back can return here) THEN render it. `route` is the full route, incl.
+  // any sub-path like "leads/QF-123", so the pushed URL carries the deep link.
+  function go(route) {
+    history.pushState({}, '', '/app/' + route);
+    return render(route);
   }
 
   // ── Theme toggle ──────────────────────────────────────────────
@@ -4214,15 +4233,19 @@
       refreshNavBadges();
       syncZonesNav();
 
-      // Route from URL
-      var initial = (location.pathname.split('/app/')[1] || 'overview').split('/')[0];
+      // Route from URL — the FULL nested route (e.g. "leads/QF-123"), so a
+      // refresh / deep link / bookmark lands on the right view (audit shell-H2 /
+      // leads-H1). We render (not go): the loaded URL is already correct, so
+      // pushing state here would only append a redundant history entry AND, when
+      // it rewrote to the base segment, drop the sub-path.
+      var initial = RouteUtil.fullRoute(location.pathname);
       // Post-signup guided onboarding: gated by the SERVER flag (survives the
       // billing/Stripe hop). Show the wizard overlay instead of routing; it
       // hands control back via onDone once finished or skipped.
       if (r.tenant && r.tenant.needsOnboarding && window.QFOnboardingWizard) {
-        window.QFOnboardingWizard.open({ me: r, onDone: function () { go(initial); } });
+        window.QFOnboardingWizard.open({ me: r, onDone: function () { render(initial); } });
       } else {
-        go(initial);
+        render(initial);
       }
     }).catch(function (e) {
       // Only bounce to /login on a genuine auth failure (401). Any other
@@ -4237,9 +4260,12 @@
     var a = e.target.closest('a[data-route]');
     if (a) { e.preventDefault(); go(a.dataset.route); }
   });
+  // Back / Forward: the browser has ALREADY updated location to the target, so
+  // we render it directly — NEVER go()/pushState (audit shell-H1: pushing here
+  // clobbers forward history and gets navigation stuck). Derive the FULL nested
+  // route so Back to "/app/leads/QF-123" restores the detail view, not the list.
   window.addEventListener('popstate', function () {
-    var r = (location.pathname.split('/app/')[1] || 'overview').split('/')[0];
-    go(r);
+    render(RouteUtil.fullRoute(location.pathname));
   });
 
   boot();
