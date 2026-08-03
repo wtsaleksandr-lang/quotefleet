@@ -16,7 +16,7 @@ describe('public static page smoke checks', () => {
     expect(html).toContain('For carriers, brokers');
     expect(html).toContain('acmetrucking.yourquote.net');
     expect(html).toContain('email signature');
-    expect(html).toContain('Instant lead capture');
+    expect(html).toContain('qualified leads hit your inbox');
     expect(html).toContain('Branded PDF quotes');
     expect(html).toContain('Automatic follow-ups');
     expect(html).toContain('24/7 AI service agent');
@@ -165,23 +165,16 @@ describe('public static page smoke checks', () => {
     expect(css).toContain('.qf-ai-card');
   });
 
-  it('landing page mounts the free rates database globe with self-hosted libs', async () => {
+  it('landing page no longer mounts the rates-database globe (removed on request 2026-08-01)', async () => {
     const html = await file('landing.html');
-    // Section + copy
-    expect(html).toContain('id="rates-database"');
-    expect(html).toContain('qf-globe-section');
-    expect(html).toContain('id="qf-globe-canvas"');
-    expect(html).toContain('Free, growing rate data');
-    expect(html).toContain('Drag to explore live rate activity');
-    // Qualitative, honest stats (no fabricated counts); forward-looking / growing framing
-    expect(html).toContain('Fully anonymous');
-    expect(html).toContain('Grows with every quote');
-    expect(html).toContain('Free forever');
-    // Self-hosted vendor scripts + module + stylesheet wired (no runtime CDN)
-    expect(html).toContain('/vendor/globe.gl.min.js');
-    expect(html).toContain('/vendor/topojson-client.min.js');
-    expect(html).toContain('/quotefleet-rates-globe.js');
-    expect(html).toContain('/quotefleet-rates-globe.css');
+    // The interactive rate-intelligence globe section was intentionally removed
+    // from the homepage. Assert only on the actual mount artifacts — the canvas
+    // element and the self-hosted script/vendor paths — since a documentation
+    // comment still references the old class/id names.
+    expect(html).not.toContain('id="qf-globe-canvas"');
+    expect(html).not.toContain('/quotefleet-rates-globe.js');
+    expect(html).not.toContain('/vendor/globe.gl.min.js');
+    expect(html).not.toContain('/vendor/topojson-client.min.js');
   });
 
   it('rates globe module is self-hosted, lazy, reduced-motion aware and teal-free', async () => {
