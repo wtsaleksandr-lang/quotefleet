@@ -167,3 +167,43 @@ html[data-theme="light"] tr.qf-lead-hot-row {
   .qf-zones-table tbody td:last-child { justify-content: stretch; }
   .qf-zones-table tbody td:last-child .btn { width: 100%; }
 }
+
+/* ── Leads header (title + Export CSV) ──────────────────────────────────────
+   The Export CSV button sits opposite the page title. On a narrow phone it
+   wraps under the title instead of pushing the H1 off-screen. */
+.qf-leads-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  flex-wrap: wrap;
+}
+.qf-leads-export { flex: 0 0 auto; }
+
+/* ── Callbacks + Audit tables: reuse the leads ≤480px card reflow ────────────
+   Both tables carry `qf-leads-table`, so the block above already stacks their
+   rows into labelled cards on a phone. These rules only tune the two cells the
+   leads table doesn't have — the callbacks status <select> and the inline
+   notes-editor row. Desktop is untouched (all scoped to ≤480px). */
+@media (max-width: 480px) {
+  /* Status <select> fills the space beside its STATUS label rather than letting
+     its default 100% width overflow the card. */
+  .qf-callbacks-table tbody td .select {
+    width: auto;
+    min-width: 0;
+    flex: 1 1 auto;
+    text-align: left;
+  }
+  /* Notes editor is a full-width expander, not a labelled key/value cell: drop
+     the card chrome + the empty ::before so the textarea spans the card. */
+  .qf-callbacks-table tbody tr.callback-notes-editor {
+    border: 0;
+    background: transparent;
+    padding: 0;
+  }
+  .qf-callbacks-table tbody tr.callback-notes-editor td {
+    display: block;
+    border-bottom: 0;
+  }
+  .qf-callbacks-table tbody tr.callback-notes-editor td::before { display: none; }
+}

@@ -863,7 +863,24 @@
     if (inner) return renderLeadDetail(c, inner);
     api('/api/tenant/leads').then(function (d) {
       c.innerHTML = '';
-      c.appendChild(el('h1', { text: 'Leads' }));
+      // Header row: title on the left, Export CSV on the right. The button
+      // downloads the tenant's full lead list from
+      //   GET /api/tenant/leads/export.csv
+      // which is session-cookie authed + tenant-scoped, so a plain download
+      // link carries the same session (no token to attach). The endpoint takes
+      // no filters, so this always exports every lead. Only shown when there is
+      // something to export.
+      var head = el('div', { class: 'qf-leads-header' });
+      head.appendChild(el('h1', { text: 'Leads' }));
+      if (d.leads.length) {
+        head.appendChild(el('a', {
+          class: 'btn btn-secondary qf-leads-export',
+          href: '/api/tenant/leads/export.csv',
+          download: '',
+          text: 'Export CSV',
+        }));
+      }
+      c.appendChild(head);
       c.appendChild(el('p', { class: 'page-sub', text: d.leads.length + ' total' }));
       if (!d.leads.length) {
         c.appendChild(el('div', {
@@ -1004,7 +1021,12 @@
         }));
         return;
       }
-      var tbl = el('table', { class: 'table' });
+      // qf-leads-table gives the ≤480px stacked-card reflow (lead-queue-search.css);
+      // each <td> carries a data-label so on a phone the phone number, status
+      // control and notes button stack into a labelled card instead of running
+      // off-screen. qf-callbacks-table tunes the two interactive cells (status
+      // <select> + notes editor row) that the leads table doesn't have.
+      var tbl = el('table', { class: 'table qf-leads-table qf-callbacks-table' });
       tbl.innerHTML = '<thead><tr>' +
         '<th>Customer</th><th>Phone</th><th>Quote</th><th>Topic / preferred time</th>' +
         '<th>Status</th><th>When</th><th></th></tr></thead><tbody></tbody>';
@@ -1014,16 +1036,16 @@
         var topicLine = (cb.topic || '').slice(0, 80);
         if (cb.preferredTime) topicLine = topicLine ? topicLine + ' · ' + cb.preferredTime : cb.preferredTime;
         row.innerHTML =
-          '<td><strong>' + escapeHtml(cb.customerName || '—') + '</strong>' +
+          '<td data-label="Customer"><strong>' + escapeHtml(cb.customerName || '—') + '</strong>' +
             (cb.customerCompany ? '<br><span class="muted-small">' + escapeHtml(cb.customerCompany) + '</span>' : '') + '</td>' +
-          '<td><a href="tel:' + encodeURIComponent(cb.customerPhone) + '">' + escapeHtml(cb.customerPhone) + '</a>' +
+          '<td data-label="Phone"><a href="tel:' + encodeURIComponent(cb.customerPhone) + '">' + escapeHtml(cb.customerPhone) + '</a>' +
             (cb.customerEmail ? '<br><span class="muted-small">' + escapeHtml(cb.customerEmail) + '</span>' : '') + '</td>' +
-          '<td>' + (cb.leadRefId ? '<a href="/app/leads/' + encodeURIComponent(cb.leadRefId) + '" data-route="leads/' + encodeURIComponent(cb.leadRefId) + '">' + escapeHtml(cb.leadRefId) + '</a>' : '<span class="muted-small">—</span>') + '</td>' +
-          '<td><span class="muted-small">' + escapeHtml(topicLine || '—') + '</span>' +
+          '<td data-label="Quote">' + (cb.leadRefId ? '<a href="/app/leads/' + encodeURIComponent(cb.leadRefId) + '" data-route="leads/' + encodeURIComponent(cb.leadRefId) + '">' + escapeHtml(cb.leadRefId) + '</a>' : '<span class="muted-small">—</span>') + '</td>' +
+          '<td data-label="Topic"><span class="muted-small">' + escapeHtml(topicLine || '—') + '</span>' +
             (cb.triggerSource === 'chat_escalation' ? '<br><span class="badge">from chat</span>' : '') + '</td>' +
-          '<td></td>' +
-          '<td><span class="muted-small">' + fmtDate(cb.createdAt) + '</span></td>' +
-          '<td></td>';
+          '<td data-label="Status"></td>' +
+          '<td data-label="When"><span class="muted-small">' + fmtDate(cb.createdAt) + '</span></td>' +
+          '<td data-label="Notes"></td>';
         // Status select.
         var statusCell = row.children[4];
         var sel = el('select', { class: 'select' });
@@ -3268,15 +3290,18 @@
         c.appendChild(el('p', { class: 'muted', text: 'No edits yet.' }));
         return;
       }
-      var tbl = el('table', { class: 'table' });
+      // qf-leads-table drives the ≤480px stacked-card reflow (lead-queue-search.css):
+      // each <td> carries a data-label so the log reads as labelled cards on a
+      // phone instead of a 4-column table that scrolls sideways.
+      var tbl = el('table', { class: 'table qf-leads-table' });
       tbl.innerHTML = '<thead><tr><th>When</th><th>Action</th><th>By</th><th>Reason / details</th></tr></thead><tbody></tbody>';
       var tb = $('tbody', tbl);
       d.audit.forEach(function (a) {
         var reason = (a.detailsJson && a.detailsJson.reason) ? a.detailsJson.reason : (a.detailsJson ? JSON.stringify(a.detailsJson).slice(0, 140) : '');
-        tb.innerHTML += '<tr><td><span class="muted-small">' + fmtDate(a.createdAt) + '</span></td>' +
-          '<td><strong>' + escapeHtml(a.action) + '</strong></td>' +
-          '<td><span class="badge ' + (a.actorKind === 'ai_agent' ? 'badge-info' : 'badge-muted') + '">' + escapeHtml(a.actorKind) + '</span></td>' +
-          '<td><span class="muted-small">' + escapeHtml(reason) + '</span></td></tr>';
+        tb.innerHTML += '<tr><td data-label="When"><span class="muted-small">' + fmtDate(a.createdAt) + '</span></td>' +
+          '<td data-label="Action"><strong>' + escapeHtml(a.action) + '</strong></td>' +
+          '<td data-label="By"><span class="badge ' + (a.actorKind === 'ai_agent' ? 'badge-info' : 'badge-muted') + '">' + escapeHtml(a.actorKind) + '</span></td>' +
+          '<td data-label="Reason"><span class="muted-small">' + escapeHtml(reason) + '</span></td></tr>';
       });
       c.appendChild(tbl);
     }).catch(showErr(c));
