@@ -129,7 +129,8 @@ export const tenants = pgTable(
     /** When the current subscription period ends (mirrored from Stripe). */
     subscriptionEndsAt: timestamp('subscription_ends_at', { mode: 'date' }),
     /** Tracks one-shot lifecycle emails so the cron doesn't re-send.
-     *  Keys: 'welcome', 'day_7', 'day_12', 'day_14_expired', etc.
+     *  Keys: 'welcome', 'day_7', 'trialReminderDay11SentAt',
+     *  'trialReminderDay14SentAt', 'day_14_expired', etc.
      *  Values: ISO timestamp of when sent. */
     lifecycleEmailsJson: jsonb('lifecycle_emails_json').$type<Record<string, string>>(),
     /** When the last WEEKLY performance digest was sent to this tenant. The

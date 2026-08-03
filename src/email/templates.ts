@@ -612,23 +612,52 @@ export function lifecycleDay7Email(opts: {
   });
 }
 
-export function lifecycleDay12Email(opts: {
+/* ── Trial-end card reminders (tenant-facing) ──────────────────────────────
+ * Two honest, non-pushy nudges that complete the card-after-trial model:
+ * signup is card-free, so as the 14-day trial winds down we remind the owner
+ * to add a card BEFORE it ends — helpful, not a dark pattern. Both link to the
+ * dashboard billing flow (/app → plan settings) where the card is added, and
+ * both render through the marketing shell WITH an unsubscribeUrl so the footer
+ * carries the CAN-SPAM/CASL unsubscribe line + postal address.
+ * ────────────────────────────────────────────────────────────────────────── */
+
+/** Day 11 — ~3 days before the 14-day trial ends. */
+export function trialReminderDay11Email(opts: {
   appUrl: string;
   pricingUrl: string;
   unsubscribeUrl?: string;
 }): string {
   const inner =
-    eyebrow('2 days left') +
-    heading('Your trial ends in 2 days') +
-    paragraph('If you\'ve added a card, your plan starts automatically with no interruption. If not, your hosted page stays live but new leads pause until you choose a plan.') +
+    eyebrow('3 days left') +
+    heading('3 days left on your QuoteFleet trial') +
+    paragraph('Your all-inclusive trial ends in about 3 days. Add a card now and your calculator, hosted page, and lead inbox keep running with zero interruption — nothing changes for you or your customers.') +
     paragraph(
       `<strong style="color:${BRAND.ink};">Vital — $14.80/mo:</strong> hosted page, widget, unlimited quotes, lead inbox, branded quotes.<br>` +
         `<strong style="color:${BRAND.ink};">Pro — $34.80/mo:</strong> everything in Vital plus AI auto-reply &amp; 24/7 chat, branded PDF quotes, automation, custom domain, and analytics.`
     ) +
-    ctaButton('Choose your plan', opts.appUrl) +
-    paragraph(`<a href="${escape(opts.pricingUrl)}" style="color:${BRAND.primary};text-decoration:underline;">Compare plans</a> · Reply if you have questions — happy to extend the trial if you need a few extra days.`);
+    ctaButton('Add a card', opts.appUrl) +
+    paragraph(`No rush — you won't be charged until the trial ends, and you can cancel anytime. <a href="${escape(opts.pricingUrl)}" style="color:${BRAND.primary};text-decoration:underline;">Compare plans</a> or just reply with any questions.`);
   return shell({
-    preheader: 'Your QuoteFleet trial ends in 2 days — pick a plan to stay live',
+    preheader: '3 days left on your QuoteFleet trial — add a card to keep your calculator live',
+    inner,
+    unsubscribeUrl: opts.unsubscribeUrl,
+  });
+}
+
+/** Day 14 — the last day of the trial (before it actually expires). */
+export function trialReminderDay14Email(opts: {
+  appUrl: string;
+  unsubscribeUrl?: string;
+}): string {
+  const inner =
+    eyebrow('Last day') +
+    heading('Your QuoteFleet trial ends today') +
+    paragraph('Today is the last day of your trial. Add a card to keep your calculator running — your hosted page and widget stay live and no leads are missed. If you add it before the day is out, the switch is seamless.') +
+    paragraph('If you don\'t, your hosted page stays up but new leads pause until you choose a plan — you can pick one back up anytime.') +
+    ctaButton('Add a card to keep it running', opts.appUrl) +
+    paragraph(`Vital $14.80/mo or Pro $34.80/mo — cancel anytime. Questions, or need a few more days? Just reply — a real person will help.`);
+  return shell({
+    preheader: 'Your QuoteFleet trial ends today — add a card to keep it running',
     inner,
     unsubscribeUrl: opts.unsubscribeUrl,
   });
