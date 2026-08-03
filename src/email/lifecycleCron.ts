@@ -5,16 +5,20 @@
  * Schedule: every 10 minutes from app boot. Each tick scans tenants on
  * the trial and decides which (if any) lifecycle email is due.
  *
- *   welcome                   — sent within 10 min of signup
- *   day_7                     — sent 7 days after signup if not yet upgraded
- *   trialReminderDay11SentAt  — day 11 (~3 days before expiry): add a card
- *   day_12                    — sent 12 days after signup (2 days before expiry)
- *   trialReminderDay14SentAt  — day 14 (last day, before expiry): ends today
- *   day_14_expired            — sent right after trial_ends_at passes
+ * One coherent card-after-trial sequence — no two touches within ~2 days:
+ *
+ *   welcome                   — day 0   (within 10 min of signup)
+ *   day_7                     — day 7   (mid-trial check-in)
+ *   trialReminderDay11SentAt  — day 11  (~3 days left: add a card)
+ *   trialReminderDay14SentAt  — day 14  (last day, before expiry: ends today)
+ *   day_14_expired            — day 15+ (post-expiry win-back)
  *
  * The two trialReminder* card-nudges complete the card-after-trial model
  * (signup is card-free → nudge the owner to add a card before the trial ends).
  * They go ONLY to still-trialing free tenants and never to a paying customer.
+ * The old day_12 "ends in 2 days" email was RETIRED — it duplicated the day-11
+ * nudge one day apart; day-11 is kept (cleaner threshold + card copy). The
+ * expiry email is held to day 15+ so "ends today" and "ended" never collide.
  *
  * Each tenant row has lifecycleEmailsJson = { welcome: '<iso>', ... }
  * to track what's been sent. We never re-send the same email twice.
@@ -31,7 +35,6 @@ import { sendEmail } from './send.js';
 import {
   lifecycleWelcomeEmail,
   lifecycleDay7Email,
-  lifecycleDay12Email,
   lifecycleExpiredEmail,
   trialReminderDay11Email,
   trialReminderDay14Email,
@@ -117,20 +120,21 @@ export function decideNextEmail(t: Tenant, now: number = Date.now()): LifecycleE
   // Welcome email — within first 10 minutes of signup.
   if (!sent.welcome) return makeWelcome(t);
 
-  // Day 7 nudge.
+  // Day 7 — mid-trial check-in.
   if (ageDays >= 7 && !sent.day_7) return makeDay7(t);
 
-  // Day 11 — ~3 days before trial ends: "add a card to keep your calculator live".
+  // Day 11 — the single "few days left" card nudge (~3 days before the trial
+  // ends). This replaces the retired day_12 email: two "add a card" nudges one
+  // day apart was redundant, so we keep one, at the cleaner threshold, with the
+  // card-after-trial copy.
   if (stillTrialing && ageDays >= 11 && !sent.trialReminderDay11SentAt) return makeDay11(t);
-
-  // Day 12 — 2 days before trial expires.
-  if (ageDays >= 12 && !sent.day_12) return makeDay12(t);
 
   // Day 14 — the last day (before expiry): "your trial ends today".
   if (stillTrialing && ageDays >= 13 && !sent.trialReminderDay14SentAt) return makeDay14(t);
 
-  // Trial-expired email — sent the first tick after the deadline passes.
-  if (now >= trialEnd && !sent.day_14_expired) return makeExpired(t);
+  // Trial-expired win-back — deliberately held to day 15+ (≥1 day AFTER expiry)
+  // so it never lands within a day of the day-14 "ends today" touch.
+  if (ageDays >= 15 && !sent.day_14_expired) return makeExpired(t);
 
   return null;
 }
@@ -180,25 +184,6 @@ function makeDay7(t: Tenant): LifecycleEmail {
       `Trial ends in 7 days, then your plan starts — Vital $14.80/mo or Pro $34.80/mo (${base}/pricing). Manage or switch plans anytime from your dashboard.\n\n` +
       `— QuoteFleet\n`,
     html: lifecycleDay7Email({ loginUrl: `${base}/login`, pricingUrl: `${base}/pricing`, unsubscribeUrl: unsub }),
-  };
-}
-
-function makeDay12(t: Tenant): LifecycleEmail {
-  const base = publicBaseUrl();
-  const unsub = unsubscribeUrl(base, t.id);
-  return {
-    key: 'day_12',
-    listUnsubscribeUrl: unsub,
-    subject: `Your QuoteFleet trial ends in 2 days`,
-    body:
-      `Hi,\n\n` +
-      `Your trial wraps up in 2 days. If you've added a card, your plan starts automatically with no interruption. If not, your hosted page stays live but new leads pause until you choose a plan.\n\n` +
-      `Vital is $14.80/mo (hosted page, widget, unlimited quotes, lead inbox, branded quotes). Pro is $34.80/mo — everything in Vital plus AI auto-reply & 24/7 chat, branded PDF quotes, automation, custom domain, and analytics.\n\n` +
-      `Choose or manage your plan: ${base}/app  →  Plan settings.\n\n` +
-      `Compare plans: ${base}/pricing\n\n` +
-      `Reply if you have questions — happy to extend the trial if you need a few extra days.\n\n` +
-      `— QuoteFleet\n`,
-    html: lifecycleDay12Email({ appUrl: `${base}/app`, pricingUrl: `${base}/pricing`, unsubscribeUrl: unsub }),
   };
 }
 

@@ -612,28 +612,6 @@ export function lifecycleDay7Email(opts: {
   });
 }
 
-export function lifecycleDay12Email(opts: {
-  appUrl: string;
-  pricingUrl: string;
-  unsubscribeUrl?: string;
-}): string {
-  const inner =
-    eyebrow('2 days left') +
-    heading('Your trial ends in 2 days') +
-    paragraph('If you\'ve added a card, your plan starts automatically with no interruption. If not, your hosted page stays live but new leads pause until you choose a plan.') +
-    paragraph(
-      `<strong style="color:${BRAND.ink};">Vital — $14.80/mo:</strong> hosted page, widget, unlimited quotes, lead inbox, branded quotes.<br>` +
-        `<strong style="color:${BRAND.ink};">Pro — $34.80/mo:</strong> everything in Vital plus AI auto-reply &amp; 24/7 chat, branded PDF quotes, automation, custom domain, and analytics.`
-    ) +
-    ctaButton('Choose your plan', opts.appUrl) +
-    paragraph(`<a href="${escape(opts.pricingUrl)}" style="color:${BRAND.primary};text-decoration:underline;">Compare plans</a> · Reply if you have questions — happy to extend the trial if you need a few extra days.`);
-  return shell({
-    preheader: 'Your QuoteFleet trial ends in 2 days — pick a plan to stay live',
-    inner,
-    unsubscribeUrl: opts.unsubscribeUrl,
-  });
-}
-
 /* ── Trial-end card reminders (tenant-facing) ──────────────────────────────
  * Two honest, non-pushy nudges that complete the card-after-trial model:
  * signup is card-free, so as the 14-day trial winds down we remind the owner
