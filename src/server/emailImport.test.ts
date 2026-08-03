@@ -17,6 +17,9 @@ import {
   inboundDomain,
   pickBestContent,
   decideEmailImport,
+  normalizeSenderAddress,
+  isSenderTrusted,
+  addTrustedSender,
   PLACEHOLDER_INBOUND_DOMAIN,
 } from './emailImport.js';
 
@@ -125,6 +128,49 @@ describe('pickBestContent — best attachment else body', () => {
       ],
     });
     expect(pick?.filename).toBe('big.png');
+  });
+});
+
+describe('trusted-sender allowlist — the auto-apply gate (audit H2)', () => {
+  it('normalizes a from header: unwraps display name, lowercases, trims', () => {
+    expect(normalizeSenderAddress('Dispatch Team <DISPATCH@Carrier.com>')).toBe('dispatch@carrier.com');
+    expect(normalizeSenderAddress('  Ops@Carrier.COM  ')).toBe('ops@carrier.com');
+  });
+
+  it('returns null for values that are not a plausible address (never trusted)', () => {
+    expect(normalizeSenderAddress(undefined)).toBeNull();
+    expect(normalizeSenderAddress('')).toBeNull();
+    expect(normalizeSenderAddress('not-an-email')).toBeNull();
+    expect(normalizeSenderAddress('a@b')).toBeNull(); // no dotted domain
+    expect(normalizeSenderAddress('a b@c.com')).toBeNull(); // whitespace
+  });
+
+  it('isSenderTrusted matches on normalized addresses, case/wrapper-insensitive', () => {
+    const allow = ['dispatch@carrier.com'];
+    expect(isSenderTrusted('DISPATCH@Carrier.com', allow)).toBe(true);
+    expect(isSenderTrusted('Dispatch <dispatch@carrier.com>', allow)).toBe(true);
+    expect(isSenderTrusted('someone@else.com', allow)).toBe(false);
+  });
+
+  it('an empty / null allowlist trusts NOBODY (the safe default for every tenant)', () => {
+    expect(isSenderTrusted('dispatch@carrier.com', [])).toBe(false);
+    expect(isSenderTrusted('dispatch@carrier.com', null)).toBe(false);
+    expect(isSenderTrusted('dispatch@carrier.com', undefined)).toBe(false);
+    // An unnormalizable sender is never trusted even against a broad list.
+    expect(isSenderTrusted('garbage', ['garbage'])).toBe(false);
+  });
+
+  it('addTrustedSender appends a normalized address, de-duplicates, and never mutates input', () => {
+    const base: string[] = [];
+    const next = addTrustedSender(base, 'Dispatch <DISPATCH@Carrier.com>');
+    expect(next).toEqual(['dispatch@carrier.com']);
+    expect(base).toEqual([]); // input untouched
+    // De-dup: adding the same sender (any casing/wrapper) is a no-op-length.
+    expect(addTrustedSender(next, 'dispatch@carrier.com')).toEqual(['dispatch@carrier.com']);
+    // Unnormalizable senders are dropped, list returned unchanged.
+    expect(addTrustedSender(next, 'garbage')).toEqual(['dispatch@carrier.com']);
+    // From null base, still works.
+    expect(addTrustedSender(null, 'a@b.com')).toEqual(['a@b.com']);
   });
 });
 

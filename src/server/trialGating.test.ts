@@ -28,6 +28,7 @@ const baseT: Tenant = {
   countryFocus: 'US',
   embedToken: 'tok',
   ingestEmailToken: null,
+  ingestTrustedSendersJson: [],
   plan: 'free',
   status: 'active',
   accessMode: 'public',

@@ -34,8 +34,10 @@ import {
   rateCards,
   accessorials,
   laneZones,
+  tenants,
 } from '../../db/schema.js';
 import { requireAuth, requireTenant } from '../middleware.js';
+import { addTrustedSender } from '../emailImport.js';
 import { parseRateSheet, IngestUnsupportedError } from '../../ai/ingestFile.js';
 import { syncTenantToMarketplace } from '../../marketplace/sync.js';
 import {
@@ -198,6 +200,27 @@ export function registerIngestRoutes(app: Express) {
     } catch (err) {
       console.error('[ingest.apply] transaction failed:', err);
       return res.status(500).json({ error: 'Apply failed — nothing was changed. Try again.' });
+    }
+
+    // Trust-on-approve (audit H2): approving an email-originated import trusts
+    // its sender, so future imports from that now-known sender can auto-apply
+    // (still subject to the opt-in flag + confidence/auto-check gates). Only
+    // email-origin jobs carry a sourceEmail; manual uploads don't and are no-ops.
+    if (job.sourceEmail) {
+      const current = req.tenant!.ingestTrustedSendersJson;
+      const next = addTrustedSender(current, job.sourceEmail);
+      if (next.length !== (Array.isArray(current) ? current.length : 0)) {
+        try {
+          await db()
+            .update(tenants)
+            .set({ ingestTrustedSendersJson: next, updatedAt: new Date() })
+            .where(eq(tenants.id, tenantId));
+        } catch (err) {
+          // Non-fatal: the rates DID apply; only the trust update failed. Log
+          // and continue rather than fail the approve the operator just made.
+          console.error('[ingest.apply] trust-on-approve update failed:', err);
+        }
+      }
     }
 
     return res.json({ ok: true, inserted });

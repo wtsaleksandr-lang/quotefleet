@@ -81,6 +81,19 @@ export const tenants = pgTable(
      *  the first time a tenant turns the email-import feature ON; null until
      *  then. Kept unguessable so randoms can't spam a tenant's importer. */
     ingestEmailToken: text('ingest_email_token').unique(),
+    /** Trusted sender allowlist for the inbound rate-email importer. An
+     *  email-imported rate sheet may only AUTO-APPLY to live pricing when its
+     *  normalized `from` address is on this list (in addition to the opt-in
+     *  feature flag + high-confidence/auto-check gates). An import from an
+     *  unrecognized sender is HELD for human review instead — approving it adds
+     *  the sender here, so subsequent imports from that now-known sender can
+     *  auto-apply ("hold the first, trust after approval"). Normalized lowercase
+     *  addresses. NOT NULL DEFAULT '[]' — existing tenants start empty, so their
+     *  next inbound import is safely held rather than silently applied. */
+    ingestTrustedSendersJson: jsonb('ingest_trusted_senders_json')
+      .$type<string[]>()
+      .notNull()
+      .default([]),
     /** Billed/selected tier: 'free' | 'vital' | 'pro'. Feature access is
      *  computed from this via src/server/plans.ts (a trialing tenant gets
      *  Pro regardless). Legacy 'starter'/'enterprise' rows normalize to
@@ -1161,6 +1174,11 @@ export const ingestJobs = pgTable('ingest_jobs', {
   status: text('status').notNull().default('pending'),
   /** What the model extracted. JSON mirroring NewRateCard / NewAccessorial / NewLaneZone shapes. */
   parsedJson: jsonb('parsed_json').$type<Record<string, unknown>>(),
+  /** For email-originated jobs: the normalized `from` address the rate sheet
+   *  arrived from. Null for manual dashboard uploads. Recorded so that when an
+   *  operator APPROVES a held email import, its sender can be added to the
+   *  tenant's `ingestTrustedSendersJson` allowlist (trust-on-approve). */
+  sourceEmail: text('source_email'),
   /** Human notes from the operator during review. */
   reviewNotes: text('review_notes'),
   /** Error message when status='failed'. */

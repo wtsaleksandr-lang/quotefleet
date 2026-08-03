@@ -162,6 +162,13 @@
       "when": 1785456000000,
       "tag": "0022_brand_map_blend",
       "breakpoints": true
+    },
+    {
+      "idx": 23,
+      "version": "7",
+      "when": 1785542400000,
+      "tag": "0023_ingest_sender_allowlist",
+      "breakpoints": true
     }
   ]
 }

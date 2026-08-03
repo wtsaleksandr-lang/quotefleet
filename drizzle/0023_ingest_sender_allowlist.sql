@@ -1,0 +1,24 @@
+-- Inbound rate-email importer: trusted-sender allowlist + per-job source sender.
+--
+-- SECURITY (audit H2): the inbound webhook auto-applied a parsed rate sheet to a
+-- tenant's LIVE pricing whenever confidence was high + the auto-check was clean,
+-- with the `from` address only LOGGED, never validated. Anyone who learned the
+-- per-tenant token (or spoofed/forwarded a sender) could push pricing straight
+-- live and poison customer quotes. These columns add an ADDITIONAL gate: an
+-- email import may auto-apply ONLY when its normalized `from` is on the tenant's
+-- allowlist; otherwise it is HELD for human review. Approving a held import adds
+-- its sender to the allowlist, so the FIRST import from a new sender is held and
+-- subsequent ones can auto-apply.
+--
+-- tenants.ingest_trusted_senders_json — the allowlist. NOT NULL DEFAULT '[]', so
+-- Postgres fills every existing row with an empty array as it adds the column:
+-- existing tenants start with NO trusted senders, meaning their next inbound
+-- import is safely HELD rather than silently auto-applied. Additive, no backfill.
+--
+-- ingest_jobs.source_email — the normalized sender of an email-origin job, so the
+-- approve path knows which address to trust. Nullable (manual uploads have none).
+--
+-- Idempotent (ADD COLUMN IF NOT EXISTS) so it's safe to re-run on every deploy —
+-- the boot migrator (src/db/migrate.ts) applies this on republish.
+ALTER TABLE "tenants" ADD COLUMN IF NOT EXISTS "ingest_trusted_senders_json" jsonb NOT NULL DEFAULT '[]'::jsonb;
+ALTER TABLE "ingest_jobs" ADD COLUMN IF NOT EXISTS "source_email" text;

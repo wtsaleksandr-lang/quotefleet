@@ -95,6 +95,62 @@ export function resolveTokenFromRecipients(to: unknown): string | null {
 }
 
 /* ─────────────────────────────────────────────────────────────────────────
+ * Trusted-sender allowlist — the auto-apply gate (audit H2).
+ *
+ * An inbound rate sheet may only AUTO-APPLY to live pricing when its `from`
+ * address is on the tenant's allowlist. An import from an unrecognized sender is
+ * held for human review; approving it adds the sender here. These helpers are
+ * pure so they unit-test without a DB.
+ * ───────────────────────────────────────────────────────────────────────── */
+
+/**
+ * Normalize a `from` header to a bare, comparable email address:
+ * unwrap an optional `Display Name <addr>`, lowercase, trim. Returns null when
+ * the value doesn't contain a plausible `local@domain.tld` address — a value we
+ * can't normalize is never trusted.
+ */
+export function normalizeSenderAddress(from: string | null | undefined): string | null {
+  if (!from || typeof from !== 'string') return null;
+  const angle = from.match(/<([^>]+)>/);
+  const raw = (angle ? angle[1] : from).trim().toLowerCase();
+  // Minimal shape check: exactly one @, non-empty local part, a dotted domain,
+  // and no whitespace — enough to reject junk without over-validating.
+  if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(raw)) return null;
+  return raw;
+}
+
+/**
+ * Is `from` on the tenant's trusted-sender allowlist? Compares NORMALIZED
+ * addresses on both sides, so casing / display-name wrappers never matter. A
+ * null/empty allowlist (the default for every existing tenant) trusts nobody.
+ */
+export function isSenderTrusted(
+  from: string | null | undefined,
+  allowlist: string[] | null | undefined,
+): boolean {
+  const norm = normalizeSenderAddress(from);
+  if (!norm || !Array.isArray(allowlist)) return false;
+  return allowlist.some((a) => normalizeSenderAddress(a) === norm);
+}
+
+/**
+ * Return a NEW allowlist with `from` added (normalized, de-duplicated). The
+ * input is left untouched. When `from` can't be normalized, the list is
+ * returned unchanged (we never trust an address we can't compare later).
+ */
+export function addTrustedSender(
+  allowlist: string[] | null | undefined,
+  from: string | null | undefined,
+): string[] {
+  const base = Array.isArray(allowlist) ? allowlist.slice() : [];
+  const norm = normalizeSenderAddress(from);
+  if (!norm) return base;
+  if (base.some((a) => normalizeSenderAddress(a) === norm)) return base;
+  base.push(norm);
+  return base;
+}
+
+/* ─────────────────────────────────────────────────────────────────────────
  * Pick the best single content out of an inbound payload to parse.
  * ───────────────────────────────────────────────────────────────────────── */
 
