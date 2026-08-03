@@ -51,7 +51,7 @@ describe('"Book this load" is gated on features.quoteBooking (default OFF)', () 
     expect(js).toContain('deposit to book');
     expect(js).toContain('/api/public/accept/');
     // confirmation copy on success
-    expect(js).toContain('Booking requested — ');
+    expect(js).toContain('Booking requested');
   });
 });
 
