@@ -40,7 +40,19 @@
     if (opts.body && typeof opts.body !== 'string') opts.body = JSON.stringify(opts.body);
     return fetch(path, opts).then(function (r) {
       return r.json().then(function (j) {
-        if (!r.ok) { var err = new Error(j.error || ('HTTP ' + r.status)); err.status = r.status; throw err; }
+        if (!r.ok) {
+          // Day-14 write-block escape: the trial-gating middleware answers any
+          // mutating call from an expired free tenant with
+          //   403 { error:'trial_expired', message, trialEndsAt }
+          // Surface the subscribe path (flip the shell banner to its expired
+          // CTA) instead of bubbling a raw "trial_expired" string to a toast.
+          if (r.status === 403 && j && j.error === 'trial_expired') {
+            try { handleTrialExpired(j); } catch (e) { /* non-fatal — never mask the throw */ }
+            var te = new Error(j.message || 'Your trial has ended. Subscribe to keep making changes.');
+            te.status = r.status; te.code = 'trial_expired'; throw te;
+          }
+          var err = new Error(j.error || ('HTTP ' + r.status)); err.status = r.status; throw err;
+        }
         return j;
       });
     });
@@ -437,21 +449,70 @@
         coCard.appendChild(saveCo);
       }).catch(function () { coLoading.textContent = 'Could not load company details.'; });
 
-      // ── Plan & billing card ─────────────────────────────────────
-      // In-app subscription management: opens the Stripe Customer Portal
-      // (change card / cancel) via GET /api/billing/portal. A subscriber
-      // no longer has to leave for the public pricing page to cancel.
+      // ── Plan & billing card (audit H1/H2) ───────────────────────
+      // Renders the REAL billing state instead of a blind "Current plan: free"
+      // with an always-on Manage-billing button:
+      //   - trialing  → "14-day trial · N days left" + Subscribe CTA (if configured)
+      //   - active    → plan name + Manage billing (Stripe portal)
+      //   - expired   → "trial ended" + Add-a-card CTA (if configured)
+      //   - unconfigured → calm "Billing isn't enabled yet" — no dead button
+      // Uses r.trial/r.tenant already on the wire (H2) and gates Manage/Subscribe
+      // on /api/billing/status (H1) so we never open a portal/checkout that 503s.
       var billCard = el('div', { class: 'card', style: { marginTop: '14px' } });
       billCard.appendChild(el('div', { class: 'card-title', text: 'Plan & billing' }));
-      var planLabel = (r.tenant && r.tenant.plan) || 'free';
-      billCard.appendChild(el('p', {
-        class: 'muted', style: { marginTop: 0 },
-        text: 'Current plan: ' + planLabel + '. Update your card, change plan, or cancel anytime — no phone call needed.',
-      }));
-      var billBtn = el('button', { class: 'btn btn-primary', text: 'Manage billing' });
-      billBtn.addEventListener('click', function () { openBillingPortal(); });
-      billCard.appendChild(billBtn);
+      var billBody = el('div');
+      billBody.appendChild(el('p', { class: 'muted-small', style: { marginTop: 0 }, text: 'Loading…' }));
+      billCard.appendChild(billBody);
       c.appendChild(billCard);
+
+      ensureBillingStatus().then(function (billing) {
+        var configured = !!(billing && billing.configured);
+        var trial = r.trial || {};
+        var status = trial.status || 'unknown';
+        var planLabel = (r.tenant && r.tenant.plan) || 'free';
+        billBody.innerHTML = '';
+
+        function addNote(txt) {
+          billBody.appendChild(el('p', { class: 'muted', style: { marginTop: 0, marginBottom: '16px' }, text: txt }));
+        }
+        function addSubscribeBtn(label) {
+          var b = el('button', { class: 'btn btn-primary', type: 'button' });
+          b.appendChild(document.createTextNode(label));
+          b.appendChild(el('span', { class: 'arr', 'aria-hidden': 'true', text: '→' }));
+          b.addEventListener('click', function () {
+            b.disabled = true;
+            startSubscribeCheckout('vital').then(function () { b.disabled = false; }, function () { b.disabled = false; });
+          });
+          billBody.appendChild(b);
+        }
+        function addUnconfiguredNote() {
+          // Calm, honest — no Manage/Subscribe button that would 503.
+          billBody.appendChild(el('p', {
+            class: 'muted-small', style: { marginTop: 0, marginBottom: 0 },
+            text: "Billing isn't enabled yet — you'll be able to add a card here once online payments are turned on. Your trial keeps every feature unlocked in the meantime.",
+          }));
+        }
+
+        if (status === 'trial') {
+          var dLeft = typeof trial.daysLeft === 'number' ? trial.daysLeft : 0;
+          var daysTxt = dLeft <= 0 ? 'last day' : (dLeft === 1 ? '1 day left' : dLeft + ' days left');
+          addNote('14-day trial · ' + daysTxt + ' — every feature unlocked. Subscribe to keep your calculator live when the trial ends.');
+          if (configured) addSubscribeBtn('Keep your calculator live '); else addUnconfiguredNote();
+        } else if (status === 'trial_expired') {
+          addNote('Your free trial has ended — your calculator is read-only. Subscribe to keep making changes and capturing leads.');
+          if (configured) addSubscribeBtn('Add a card to continue '); else addUnconfiguredNote();
+        } else if (status === 'paid') {
+          addNote('Current plan: ' + planLabel + '. Update your card, change plan, or cancel anytime — no phone call needed.');
+          // Only a real subscription can be "managed" — the portal 404s otherwise.
+          var mBtn = el('button', { class: 'btn btn-primary', type: 'button', text: 'Manage billing' });
+          mBtn.addEventListener('click', function () { openBillingPortal(); });
+          billBody.appendChild(mBtn);
+        } else {
+          // Unknown trial state (e.g. no tenant): show the plan, no dead button.
+          addNote('Current plan: ' + planLabel + '.');
+          if (!configured) addUnconfiguredNote();
+        }
+      });
 
       // Password card
       var pwd = el('div', { class: 'card', style: { marginTop: '14px' } });
@@ -3832,44 +3893,129 @@
   }
 
   // ── Trial banner ──────────────────────────────────────────────
-  function renderTrialBanner(trial, tenant) {
-    if (!trial) return;
+  // Slim countdown banner at the top of the authed shell. Honest about
+  // billing (audit H1): the subscribe CTA only appears when Stripe is
+  // actually configured — an unconfigured deployment shows the countdown
+  // with NO dead button (a button that 503s is worse than none). Paid
+  // tenants get no banner. The visibility + CTA logic lives in the shared,
+  // unit-tested QFTrialBanner module (trial-banner.js) so this is just DOM.
+  var trialBannerDismissed = false; // in-memory only → banner returns on reload
+
+  // Cache /api/billing/status once; the banner + Account card both read it.
+  function ensureBillingStatus() {
+    if (state.billing) return Promise.resolve(state.billing);
+    return api('/api/billing/status')
+      .then(function (b) { state.billing = b || { configured: false }; return state.billing; })
+      .catch(function () { state.billing = { configured: false }; return state.billing; });
+  }
+
+  // Start the EXISTING subscribe / Checkout flow: POST /api/billing/checkout-session
+  // returns a Stripe Checkout URL (14-day trial + card collection) we redirect
+  // to. Same endpoint the pricing/upgrade path uses — not a new one. Defaults
+  // to the entry tier (vital); the Checkout page still lets them adjust.
+  function startSubscribeCheckout(plan) {
+    return api('/api/billing/checkout-session', { method: 'POST', body: { plan: plan || 'vital' } })
+      .then(function (r) {
+        if (r && r.url) { window.location.href = r.url; return; }
+        toast('Checkout is unavailable right now.', 'warn');
+      })
+      .catch(function (e) {
+        if (e && e.status === 503) { toast(e.message || "Billing isn't enabled yet.", 'warn'); return; }
+        toastErr(e);
+      });
+  }
+  window.qfStartSubscribe = startSubscribeCheckout;
+
+  function removeTrialBanner() {
+    var bar = document.getElementById('qf-trial-bar');
+    if (bar) bar.remove();
+  }
+
+  function renderTrialBanner(trial) {
+    state.trial = trial || state.trial || null;
+    if (!state.trial) { removeTrialBanner(); document.body.classList.remove('qf-trial-locked'); return; }
+    ensureBillingStatus().then(function (billing) {
+      paintTrialBanner(state.trial, !!(billing && billing.configured));
+    });
+  }
+
+  function paintTrialBanner(trial, billingConfigured) {
+    var view = window.QFTrialBanner
+      ? window.QFTrialBanner.computeTrialBannerView({
+          trialStatus: trial.status,
+          daysLeft: typeof trial.daysLeft === 'number'
+            ? trial.daysLeft
+            : window.QFTrialBanner.daysLeftFrom(trial.trialEndsAt),
+          billingConfigured: billingConfigured,
+        })
+      : { show: false };
+
+    // Paid / unknown → no banner, and never leave inputs locked.
+    if (!view.show) { removeTrialBanner(); document.body.classList.remove('qf-trial-locked'); return; }
+    // Trial is dismissible for the current page load; expired is not.
+    if (view.variant === 'trial' && trialBannerDismissed) { removeTrialBanner(); return; }
+
     var bar = document.getElementById('qf-trial-bar');
     if (!bar) {
       bar = document.createElement('div');
       bar.id = 'qf-trial-bar';
       document.body.insertBefore(bar, document.body.firstChild);
     }
-    bar.style.cssText =
-      'padding:9px 18px; font-family: var(--font-mono); font-size:11.5px;' +
-      'letter-spacing:0.08em; text-transform:uppercase; text-align:center;' +
-      'border-bottom:1px solid var(--border); position:sticky; top:0; z-index:100;';
-    if (trial.status === 'trial') {
-      var color = trial.daysLeft <= 3 ? 'var(--warn)' : 'var(--accent)';
-      bar.style.background = 'var(--surface)';
-      bar.style.color = color;
-      // All-inclusive trial: every Pro feature unlocked, no lead cap.
-      bar.innerHTML =
-        'Trial — ' + trial.daysLeft + ' day' + (trial.daysLeft === 1 ? '' : 's') + ' left · ' +
-        'all features unlocked &nbsp;·&nbsp; ' +
-        '<a href="/pricing" data-manage-billing style="color: var(--accent); text-decoration: underline; display: inline-flex; align-items: center; min-height: 44px; padding: 4px 8px; margin: -4px 0; line-height: 1;">Manage plan →</a>';
-      var mb = bar.querySelector('[data-manage-billing]');
-      if (mb) mb.addEventListener('click', function (e) { e.preventDefault(); openBillingPortal(); });
-      document.body.classList.remove('qf-trial-locked');
-    } else if (trial.status === 'trial_expired') {
-      bar.style.background = 'var(--error-bg)';
-      bar.style.color = 'var(--error)';
-      bar.innerHTML =
-        'Trial ended — your widget is read-only. ' +
-        '<a href="/pricing" style="color: var(--error); text-decoration: underline;">Choose a plan to keep capturing leads →</a>';
-      // Add the trial-locked body class so CSS disables every editable
-      // control inside .app-main. Keeps users from typing into a field
-      // whose backend write would fail anyway.
-      document.body.classList.add('qf-trial-locked');
-    } else if (trial.status === 'paid') {
-      bar.remove();
-      document.body.classList.remove('qf-trial-locked');
+    bar.className = 'qf-trial-banner qf-trial-banner--' + view.variant + (view.urgent ? ' is-urgent' : '');
+    bar.setAttribute('role', view.variant === 'expired' ? 'alert' : 'status');
+    bar.innerHTML = '';
+
+    var msg = el('div', { class: 'qf-trial-banner-msg' });
+    msg.appendChild(el('span', { class: 'qf-trial-banner-dot', 'aria-hidden': 'true' }));
+    msg.appendChild(el('span', { class: 'qf-trial-banner-headline', text: view.headline }));
+    msg.appendChild(el('span', {
+      class: 'qf-trial-banner-sub',
+      text: view.variant === 'trial'
+        ? 'Every feature unlocked'
+        : 'Your calculator is read-only until you subscribe',
+    }));
+    bar.appendChild(msg);
+
+    if (view.ctaShown && view.ctaLabel) {
+      var cta = el('button', { class: 'btn btn-primary qf-trial-banner-cta', type: 'button' });
+      cta.appendChild(document.createTextNode(view.ctaLabel.replace(/\s*→\s*$/, '')));
+      cta.appendChild(el('span', { class: 'arr', 'aria-hidden': 'true', text: '→' }));
+      cta.addEventListener('click', function () {
+        cta.disabled = true;
+        startSubscribeCheckout('vital').then(
+          function () { cta.disabled = false; },
+          function () { cta.disabled = false; }
+        );
+      });
+      bar.appendChild(cta);
     }
+
+    // Dismiss — trial only, in-memory flag so an active countdown returns on
+    // the next reload (we never hard-hide a live trial).
+    if (view.variant === 'trial') {
+      var close = el('button', { class: 'qf-trial-banner-close', type: 'button', 'aria-label': 'Dismiss trial banner' });
+      close.innerHTML = '<svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>';
+      close.addEventListener('click', function () { trialBannerDismissed = true; removeTrialBanner(); });
+      bar.appendChild(close);
+    }
+
+    // Read-only lock for the expired state (mirrors the server write-block so
+    // users don't type into fields whose backend write would 403 anyway).
+    if (view.variant === 'expired') document.body.classList.add('qf-trial-locked');
+    else document.body.classList.remove('qf-trial-locked');
+  }
+
+  // Day-14 write-block escape: called from api() when a mutating request 403s
+  // with trial_expired. Flip the banner into its expired state (surfacing the
+  // subscribe CTA prominently) and nudge the user — no generic error page.
+  function handleTrialExpired(j) {
+    state.trial = {
+      status: 'trial_expired',
+      daysLeft: 0,
+      trialEndsAt: (j && j.trialEndsAt) || (state.trial && state.trial.trialEndsAt) || null,
+    };
+    renderTrialBanner(state.trial);
+    toast('Your free trial has ended — subscribe to keep making changes.', 'warn');
   }
 
   // Sidebar toggle — works at every width.
@@ -3955,7 +4101,7 @@
           : (r.tenant && '/w/' + r.tenant.slug) || '';
       $('#loading').style.display = 'none';
       $('#app-shell').hidden = false;
-      renderTrialBanner(r.trial, r.tenant);
+      renderTrialBanner(r.trial);
       // Reveal the hamburger and wire its toggle now that the shell is visible.
       var t = document.getElementById('qf-mobile-nav-toggle');
       if (t) t.hidden = false;

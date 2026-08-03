@@ -179,3 +179,87 @@ html[data-theme="light"] .btn-ghost {
     padding: 72px 18px 28px;
   }
 }
+
+/* ── Trial countdown banner ───────────────────────────────────────────────
+   Rendered by renderTrialBanner() in app.js; view logic in trial-banner.js.
+   A status dot + headline + subtext on the left, the subscribe CTA on the
+   right — intentional, not a warning strip. Theme-aware via tokens; wraps to
+   a centered stack at 375px so the CTA never overflows. Appended at EOF so the
+   line-based spacing/color guard baselines don't renumber (per project rule). */
+.qf-trial-banner {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-wrap: wrap;
+  gap: 8px 16px;
+  padding: 12px 16px;
+  background: var(--surface);
+  color: var(--ink);
+  border-bottom: 1px solid var(--border);
+  position: sticky;
+  top: 0;
+  z-index: 100;
+  line-height: 1.5;
+}
+.qf-trial-banner--expired {
+  background: var(--error-bg);
+  border-bottom-color: var(--error);
+}
+.qf-trial-banner-msg {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 8px;
+  min-width: 0;
+}
+.qf-trial-banner-dot {
+  flex: 0 0 auto;
+  width: 8px;
+  height: 8px;
+  border-radius: var(--radius-pill);
+  background: var(--accent);
+}
+.qf-trial-banner.is-urgent .qf-trial-banner-dot { background: var(--warn); }
+.qf-trial-banner--expired .qf-trial-banner-dot { background: var(--error); }
+.qf-trial-banner-headline {
+  font-weight: 700;
+  font-size: 14px;
+  color: var(--ink);
+}
+.qf-trial-banner-sub {
+  font-size: 13px;
+  color: var(--muted);
+}
+.qf-trial-banner-cta.btn.btn-primary {
+  flex: 0 0 auto;
+  padding: 8px 16px;
+  font-size: 13px;
+}
+.qf-trial-banner-close {
+  flex: 0 0 auto;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  padding: 0;
+  border: 0;
+  border-radius: var(--radius-btn);
+  background: transparent;
+  color: var(--muted);
+  cursor: pointer;
+}
+.qf-trial-banner-close:hover {
+  color: var(--ink);
+  background: var(--surface-2);
+}
+
+@media (max-width: 900px) {
+  .qf-trial-banner {
+    gap: 8px;
+    text-align: center;
+  }
+  .qf-trial-banner-msg {
+    justify-content: center;
+  }
+}
