@@ -201,13 +201,69 @@ export function distanceMiles(
   return haversineMiles(a, b);
 }
 
+/**
+ * Deterministic priority order for rate cards. When a tenant has more than
+ * one enabled card for the same (service, equipment) — including legacy
+ * duplicates created before the write-time guard existed — the winner MUST
+ * be stable across every request, or a customer gets a random price.
+ *
+ * Rule: the most-recently-updated enabled card wins; `id` is the
+ * deterministic final tiebreak (higher id, i.e. the newer row, wins). This
+ * mirrors the `updatedAt DESC, id DESC` order used by the rate-card query in
+ * `loadConfig` (src/server/routes/public.ts) so the SAME card always wins
+ * regardless of arbitrary DB row order.
+ */
+export function compareRateCardPriority(a: RateCard, b: RateCard): number {
+  const at = a.updatedAt instanceof Date ? a.updatedAt.getTime() : 0;
+  const bt = b.updatedAt instanceof Date ? b.updatedAt.getTime() : 0;
+  if (at !== bt) return bt - at; // updatedAt DESC
+  return b.id - a.id; // id DESC
+}
+
 function findRateCard(
   cards: RateCard[],
   service: string,
   equipment: string
 ): RateCard | undefined {
-  return cards.find(
+  // Match predicate is unchanged (enabled + service + equipment). The only
+  // change is that when multiple cards match we return the deterministic
+  // winner (compareRateCardPriority) instead of whichever row happened to be
+  // first in an arbitrarily-ordered array — so pricing can never be random.
+  const matches = cards.filter(
     (c) => c.enabled && c.service === service && c.equipment === equipment
+  );
+  if (matches.length === 0) return undefined;
+  return matches.slice().sort(compareRateCardPriority)[0];
+}
+
+/** Minimal shape needed to detect a duplicate-enabled rate-card conflict. */
+export interface RateCardIdentity {
+  id: number;
+  service: string;
+  equipment: string;
+  enabled: boolean;
+}
+
+/**
+ * Write-time duplicate guard. Given the tenant's existing rate cards and a
+ * candidate being created or edited, return the conflicting card if enabling
+ * the candidate would leave TWO different enabled cards for the same
+ * (service, equipment) — otherwise undefined.
+ *
+ * Allowed (returns undefined): editing the SAME card (matched by id), a
+ * disabled candidate, or a new (service, equipment) with no enabled peer.
+ */
+export function findConflictingEnabledCard<T extends RateCardIdentity>(
+  existing: T[],
+  candidate: { id?: number | null; service: string; equipment: string; enabled: boolean }
+): T | undefined {
+  if (!candidate.enabled) return undefined; // disabled cards may duplicate freely
+  return existing.find(
+    (c) =>
+      c.enabled &&
+      c.service === candidate.service &&
+      c.equipment === candidate.equipment &&
+      c.id !== candidate.id
   );
 }
 
