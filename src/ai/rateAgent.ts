@@ -3,8 +3,19 @@
  * English ("raise drayage from LAX by 10% and add a $50 chassis fee").
  * The agent has tools to update rate cards, accessorials, and zones.
  *
- * One LLM round-trip per user turn. Multi-step changes are surfaced as
- * a plan that the user must confirm before tools are actually called.
+ * CONFIRM-BEFORE-APPLY (audit H1). The AI never writes live pricing on its
+ * own. When the model calls a MUTATION tool the agent does NOT touch the DB —
+ * it validates the input against the RATE-C1 bounds, reads the current row for
+ * a before→after diff, and returns a STRUCTURED PROPOSAL (nothing persisted).
+ * The proposal is saved as a `conversations` row with status `pending`; the UI
+ * renders it as a diff card with Apply / Discard. Only when the owner clicks
+ * Apply does POST /api/ai/rate-proposals/:id/apply call `applyRateMutation`,
+ * which RE-VALIDATES the stored input server-side (never trusts client numbers)
+ * and then writes + audit-logs. This prevents a single semantic mis-map (e.g.
+ * the model reading "$600 minimum" as ratePerMile=600) from silently wrecking a
+ * tenant's live rates — the human sees exactly what changes first.
+ *
+ * READ tools (list_*) still run inline — they have no side effects.
  */
 import { eq, and } from 'drizzle-orm';
 import { z } from 'zod';
@@ -226,77 +237,226 @@ interface ToolCallResult {
   ok: boolean;
   message: string;
   data?: unknown;
+  /** Present when a mutation tool produced a proposal (nothing written yet). */
+  proposal?: RateProposal;
 }
 
-async function execTool(
+// ─── Proposals (confirm-before-apply) ─────────────────────────────────
+// The four mutation tools never write when the model calls them; they return
+// a RateProposal instead. Persisted as a pending `conversations` row and
+// applied only via the Apply endpoint, which re-validates the stored input.
+export const MUTATION_TOOLS = new Set([
+  'update_rate_card',
+  'create_accessorial',
+  'update_accessorial',
+  'update_lane_zone',
+]);
+
+/** Mutable field lists — the only keys copied from tool input into a DB patch.
+ *  Shared by the diff builder and the writer so they can never drift. */
+const MUTABLE_FIELDS: Record<string, string[]> = {
+  update_rate_card: [
+    'ratePerMile', 'minimumCharge', 'flatFee', 'fuelSurchargePct',
+    'marginPct', 'maxWeightLbs', 'maxMiles', 'enabled', 'label', 'notes',
+  ],
+  create_accessorial: [
+    'code', 'label', 'description', 'kind', 'amount', 'trigger', 'appliesToServices',
+  ],
+  update_accessorial: ['amount', 'kind', 'trigger', 'enabled', 'label', 'description'],
+  update_lane_zone: ['flatPrice', 'radiusMiles', 'enabled'],
+};
+
+export interface ProposalChange {
+  field: string;         // machine field name
+  label: string;         // human label, e.g. "Per-mile rate"
+  from: string | null;   // formatted current value (null for a create)
+  to: string;            // formatted proposed value
+}
+
+export interface RateProposal {
+  /** conversations row id; 0 until persisted, then the real row id. */
+  id: number;
+  tool: string;
+  entity: 'rate_card' | 'accessorial' | 'lane_zone';
+  op: 'update' | 'create';
+  /** Validated tool input — the source of truth, re-validated at apply time. */
+  input: Record<string, unknown>;
+  title: string;         // "Dry Van FTL"
+  reason: string;        // audit reason from the model
+  summary: string;       // one-line human sentence
+  changes: ProposalChange[];
+}
+
+const FIELD_LABELS: Record<string, string> = {
+  ratePerMile: 'Per-mile rate', minimumCharge: 'Minimum charge', flatFee: 'Flat fee',
+  fuelSurchargePct: 'Fuel surcharge', marginPct: 'Margin', maxWeightLbs: 'Max weight',
+  maxMiles: 'Max miles', enabled: 'Status', label: 'Label', notes: 'Notes',
+  amount: 'Amount', kind: 'Kind', trigger: 'Trigger', description: 'Description',
+  code: 'Code', appliesToServices: 'Applies to', flatPrice: 'Flat price',
+  radiusMiles: 'Radius',
+};
+const MONEY_FIELDS = new Set(['ratePerMile', 'minimumCharge', 'flatFee', 'amount', 'flatPrice']);
+const PCT_FIELDS = new Set(['fuelSurchargePct', 'marginPct']);
+const MILES_FIELDS = new Set(['maxMiles', 'radiusMiles']);
+const WEIGHT_FIELDS = new Set(['maxWeightLbs']);
+
+function fmtFieldValue(field: string, v: unknown): string {
+  if (v === null || v === undefined || v === '') return '—';
+  if (typeof v === 'boolean') return v ? 'Enabled' : 'Disabled';
+  if (typeof v === 'number') {
+    if (MONEY_FIELDS.has(field)) return `$${v.toFixed(2)}`;
+    if (PCT_FIELDS.has(field)) return `${v}%`;
+    if (MILES_FIELDS.has(field)) return `${v} mi`;
+    if (WEIGHT_FIELDS.has(field)) return `${v.toLocaleString('en-US')} lbs`;
+    return String(v);
+  }
+  if (Array.isArray(v)) return v.length ? v.join(', ') : '—';
+  return String(v);
+}
+
+/**
+ * PURE diff builder. Given a mutation tool, its validated input, and the
+ * current DB row (`before`, null for a create), return the human-readable
+ * proposal shell (no id yet). No I/O — unit-testable in isolation.
+ */
+export function buildRateChangeDiff(
+  tool: string,
+  input: Record<string, unknown>,
+  before: Record<string, unknown> | null
+): Omit<RateProposal, 'id'> {
+  const reason = String(input.reason ?? '');
+  const fields = MUTABLE_FIELDS[tool] ?? [];
+  const changes: ProposalChange[] = [];
+  for (const f of fields) {
+    if (input[f] === undefined) continue;
+    const to = fmtFieldValue(f, input[f]);
+    const from = before ? fmtFieldValue(f, (before as Record<string, unknown>)[f]) : null;
+    // On an update, skip no-op fields the model re-sent unchanged.
+    if (before && from === to) continue;
+    changes.push({ field: f, label: FIELD_LABELS[f] ?? f, from, to });
+  }
+
+  let entity: RateProposal['entity'];
+  let op: RateProposal['op'];
+  let title: string;
+  switch (tool) {
+    case 'update_rate_card':
+      entity = 'rate_card'; op = 'update';
+      title = String(before?.label || `${before?.service ?? ''} ${before?.equipment ?? ''}`.trim() || `Rate card #${before?.id ?? input.id}`);
+      break;
+    case 'create_accessorial':
+      entity = 'accessorial'; op = 'create';
+      title = String(input.label || input.code || 'New accessorial');
+      break;
+    case 'update_accessorial':
+      entity = 'accessorial'; op = 'update';
+      title = String(before?.label || `Accessorial #${before?.id ?? input.id}`);
+      break;
+    case 'update_lane_zone':
+      entity = 'lane_zone'; op = 'update';
+      title = String(before?.label || `Lane zone #${before?.id ?? input.id}`);
+      break;
+    default:
+      entity = 'rate_card'; op = 'update'; title = 'Change';
+  }
+
+  let summary: string;
+  if (op === 'create') {
+    summary = `Create accessorial "${title}" — ${fmtFieldValue('kind', input.kind)} ${fmtFieldValue('amount', input.amount)}`;
+  } else if (changes.length === 1) {
+    summary = `${title} — ${changes[0].label}: ${changes[0].from} → ${changes[0].to}`;
+  } else if (changes.length === 0) {
+    summary = `${title} — no effective change`;
+  } else {
+    summary = `${title} — ${changes.length} changes`;
+  }
+
+  return { tool, entity, op, input, title, reason, summary, changes };
+}
+
+/**
+ * Fetch the current row for an UPDATE tool (ownership-scoped). Returns the row
+ * or an error message. Creates have no `before`. Extracted so both propose and
+ * apply share the exact same ownership check.
+ */
+async function fetchBeforeRow(
   tenantId: number,
-  userId: number | null,
-  name: string,
+  tool: string,
+  input: Record<string, unknown>
+): Promise<{ ok: true; before: Record<string, unknown> | null } | { ok: false; message: string }> {
+  if (tool === 'create_accessorial') return { ok: true, before: null };
+  const id = Number(input.id);
+  if (tool === 'update_rate_card') {
+    const r = await db().select().from(rateCards)
+      .where(and(eq(rateCards.id, id), eq(rateCards.tenantId, tenantId))).limit(1);
+    if (!r[0]) return { ok: false, message: `Rate card ${id} not found for this tenant.` };
+    return { ok: true, before: r[0] as Record<string, unknown> };
+  }
+  if (tool === 'update_accessorial') {
+    const r = await db().select().from(accessorials)
+      .where(and(eq(accessorials.id, id), eq(accessorials.tenantId, tenantId))).limit(1);
+    if (!r[0]) return { ok: false, message: `Accessorial ${id} not found.` };
+    return { ok: true, before: r[0] as Record<string, unknown> };
+  }
+  if (tool === 'update_lane_zone') {
+    const r = await db().select().from(laneZones)
+      .where(and(eq(laneZones.id, id), eq(laneZones.tenantId, tenantId))).limit(1);
+    if (!r[0]) return { ok: false, message: `Lane zone ${id} not found.` };
+    return { ok: true, before: r[0] as Record<string, unknown> };
+  }
+  return { ok: false, message: `Unknown tool: ${tool}` };
+}
+
+/**
+ * Turn a model mutation-tool call into a PROPOSAL. Validates (RATE-C1 bounds),
+ * confirms ownership, computes the diff. Writes NOTHING. Returns the proposal
+ * (id 0) in `data`/`proposal`; the caller persists it and assigns the id.
+ */
+export async function proposeMutation(
+  tenantId: number,
+  tool: string,
   rawInput: Record<string, unknown>
 ): Promise<ToolCallResult> {
-  // Validate first — bounds-check every numeric field, enum-check kind/
-  // trigger, length-cap strings. A bad input is returned to the model so
-  // it can correct on the next turn instead of silently writing garbage.
-  const v = validateToolInput(name, rawInput);
+  const v = validateToolInput(tool, rawInput);
   if (!v.ok) return { ok: false, message: v.message };
   const input = v.data;
-  switch (name) {
-    case 'list_rate_cards': {
-      const rows = await db()
-        .select()
-        .from(rateCards)
-        .where(eq(rateCards.tenantId, tenantId));
-      return {
-        ok: true,
-        message: `Loaded ${rows.length} rate cards`,
-        data: rows,
-      };
-    }
-    case 'list_accessorials': {
-      const rows = await db()
-        .select()
-        .from(accessorials)
-        .where(eq(accessorials.tenantId, tenantId));
-      return {
-        ok: true,
-        message: `Loaded ${rows.length} accessorials`,
-        data: rows,
-      };
-    }
-    case 'list_lane_zones': {
-      const rows = await db()
-        .select()
-        .from(laneZones)
-        .where(eq(laneZones.tenantId, tenantId));
-      return {
-        ok: true,
-        message: `Loaded ${rows.length} lane zones`,
-        data: rows,
-      };
-    }
+  const b = await fetchBeforeRow(tenantId, tool, input);
+  if (!b.ok) return { ok: false, message: b.message };
+  const shell = buildRateChangeDiff(tool, input, b.before);
+  const proposal: RateProposal = { id: 0, ...shell };
+  return {
+    ok: true,
+    message: `Proposed (pending your confirmation — NOTHING has been applied): ${proposal.summary}`,
+    proposal,
+    data: { proposal: { summary: proposal.summary, changes: proposal.changes } },
+  };
+}
+
+/**
+ * WRITE path. Called ONLY from the Apply endpoint after the owner confirms.
+ * Re-validates the stored input against the same RATE-C1 bounds (never trusts
+ * a client-supplied number), then writes + audit-logs. Returns the result.
+ */
+export async function applyRateMutation(
+  tenantId: number,
+  userId: number | null,
+  tool: string,
+  rawInput: Record<string, unknown>
+): Promise<ToolCallResult> {
+  // Server-side re-validation — the client only sends a proposal id, but we
+  // still bounds-check the stored input in case it was ever tampered with.
+  const v = validateToolInput(tool, rawInput);
+  if (!v.ok) return { ok: false, message: v.message };
+  const input = v.data;
+  switch (tool) {
     case 'update_rate_card': {
       const id = Number(input.id);
       const reason = String(input.reason ?? '');
-      // Verify ownership.
-      const existing = await db()
-        .select()
-        .from(rateCards)
-        .where(and(eq(rateCards.id, id), eq(rateCards.tenantId, tenantId)))
-        .limit(1);
+      const existing = await db().select().from(rateCards)
+        .where(and(eq(rateCards.id, id), eq(rateCards.tenantId, tenantId))).limit(1);
       if (!existing[0]) return { ok: false, message: `Rate card ${id} not found for this tenant.` };
       const patch: Record<string, unknown> = {};
-      for (const k of [
-        'ratePerMile',
-        'minimumCharge',
-        'flatFee',
-        'fuelSurchargePct',
-        'marginPct',
-        'maxWeightLbs',
-        'maxMiles',
-        'enabled',
-        'label',
-        'notes',
-      ]) {
+      for (const k of MUTABLE_FIELDS.update_rate_card) {
         if (input[k] !== undefined) patch[k] = input[k];
       }
       patch.lastAiEditAt = new Date();
@@ -304,8 +464,7 @@ async function execTool(
       patch.updatedAt = new Date();
       await db().update(rateCards).set(patch).where(eq(rateCards.id, id));
       await db().insert(auditLog).values({
-        tenantId,
-        userId,
+        tenantId, userId,
         action: 'rate_card.update',
         actorKind: 'ai_agent',
         detailsJson: { id, before: existing[0], patch, reason },
@@ -313,52 +472,40 @@ async function execTool(
       return { ok: true, message: `Rate card #${id} updated.`, data: patch };
     }
     case 'create_accessorial': {
-      const [row] = await db()
-        .insert(accessorials)
-        .values({
-          tenantId,
-          code: String(input.code),
-          label: String(input.label),
-          description: input.description ? String(input.description) : null,
-          kind: String(input.kind),
-          amount: Number(input.amount),
-          trigger: String(input.trigger),
-          appliesToServices: input.appliesToServices as string[] | undefined,
-          enabled: true,
-          sortOrder: 1000,
-        })
-        .returning();
-      await db().insert(auditLog).values({
+      const [row] = await db().insert(accessorials).values({
         tenantId,
-        userId,
+        code: String(input.code),
+        label: String(input.label),
+        description: input.description ? String(input.description) : null,
+        kind: String(input.kind),
+        amount: Number(input.amount),
+        trigger: String(input.trigger),
+        appliesToServices: input.appliesToServices as string[] | undefined,
+        enabled: true,
+        sortOrder: 1000,
+      }).returning();
+      await db().insert(auditLog).values({
+        tenantId, userId,
         action: 'accessorial.create',
         actorKind: 'ai_agent',
         detailsJson: { id: row?.id, input, reason: input.reason },
       });
-      return {
-        ok: true,
-        message: `Accessorial "${input.label}" created.`,
-        data: row,
-      };
+      return { ok: true, message: `Accessorial "${input.label}" created.`, data: row };
     }
     case 'update_accessorial': {
       const id = Number(input.id);
       const reason = String(input.reason ?? '');
-      const existing = await db()
-        .select()
-        .from(accessorials)
-        .where(and(eq(accessorials.id, id), eq(accessorials.tenantId, tenantId)))
-        .limit(1);
+      const existing = await db().select().from(accessorials)
+        .where(and(eq(accessorials.id, id), eq(accessorials.tenantId, tenantId))).limit(1);
       if (!existing[0]) return { ok: false, message: `Accessorial ${id} not found.` };
       const patch: Record<string, unknown> = {};
-      for (const k of ['amount', 'kind', 'trigger', 'enabled', 'label', 'description']) {
+      for (const k of MUTABLE_FIELDS.update_accessorial) {
         if (input[k] !== undefined) patch[k] = input[k];
       }
       patch.updatedAt = new Date();
       await db().update(accessorials).set(patch).where(eq(accessorials.id, id));
       await db().insert(auditLog).values({
-        tenantId,
-        userId,
+        tenantId, userId,
         action: 'accessorial.update',
         actorKind: 'ai_agent',
         detailsJson: { id, before: existing[0], patch, reason },
@@ -368,26 +515,56 @@ async function execTool(
     case 'update_lane_zone': {
       const id = Number(input.id);
       const reason = String(input.reason ?? '');
-      const existing = await db()
-        .select()
-        .from(laneZones)
-        .where(and(eq(laneZones.id, id), eq(laneZones.tenantId, tenantId)))
-        .limit(1);
+      const existing = await db().select().from(laneZones)
+        .where(and(eq(laneZones.id, id), eq(laneZones.tenantId, tenantId))).limit(1);
       if (!existing[0]) return { ok: false, message: `Lane zone ${id} not found.` };
       const patch: Record<string, unknown> = {};
-      for (const k of ['flatPrice', 'radiusMiles', 'enabled']) {
+      for (const k of MUTABLE_FIELDS.update_lane_zone) {
         if (input[k] !== undefined) patch[k] = input[k];
       }
       patch.updatedAt = new Date();
       await db().update(laneZones).set(patch).where(eq(laneZones.id, id));
       await db().insert(auditLog).values({
-        tenantId,
-        userId,
+        tenantId, userId,
         action: 'lane_zone.update',
         actorKind: 'ai_agent',
         detailsJson: { id, before: existing[0], patch, reason },
       });
       return { ok: true, message: `Lane zone #${id} updated.`, data: patch };
+    }
+    default:
+      return { ok: false, message: `Unknown tool: ${tool}` };
+  }
+}
+
+/**
+ * Dispatch a model tool call. READ tools run inline; MUTATION tools return a
+ * proposal (write nothing). This is the ONLY place the agent loop reaches the
+ * DB per model turn.
+ */
+async function execTool(
+  tenantId: number,
+  _userId: number | null,
+  name: string,
+  rawInput: Record<string, unknown>
+): Promise<ToolCallResult> {
+  if (MUTATION_TOOLS.has(name)) {
+    return proposeMutation(tenantId, name, rawInput);
+  }
+  const v = validateToolInput(name, rawInput);
+  if (!v.ok) return { ok: false, message: v.message };
+  switch (name) {
+    case 'list_rate_cards': {
+      const rows = await db().select().from(rateCards).where(eq(rateCards.tenantId, tenantId));
+      return { ok: true, message: `Loaded ${rows.length} rate cards`, data: rows };
+    }
+    case 'list_accessorials': {
+      const rows = await db().select().from(accessorials).where(eq(accessorials.tenantId, tenantId));
+      return { ok: true, message: `Loaded ${rows.length} accessorials`, data: rows };
+    }
+    case 'list_lane_zones': {
+      const rows = await db().select().from(laneZones).where(eq(laneZones.tenantId, tenantId));
+      return { ok: true, message: `Loaded ${rows.length} lane zones`, data: rows };
     }
     default:
       return { ok: false, message: `Unknown tool: ${name}` };
@@ -397,6 +574,9 @@ async function execTool(
 export interface RateAgentTurn {
   reply: string;
   toolResults: Array<{ tool: string; result: ToolCallResult }>;
+  /** Pending proposals produced this turn — each persisted, id-assigned, and
+   *  awaiting Apply/Discard in the chat UI. Empty when the turn only read. */
+  proposals: RateProposal[];
 }
 
 export async function rateAgentTurn(
@@ -487,5 +667,34 @@ export async function rateAgentTurn(
     metadataJson: { toolResults: toolResults.map((t) => ({ tool: t.tool, ok: t.result.ok })) },
   });
 
-  return { reply: finalText, toolResults };
+  // Persist every proposal as its own `pending` conversation row. The row id
+  // IS the proposal id the Apply/Discard endpoints key on; storing the full
+  // (validated) input means the server never has to trust a client number.
+  const proposals: RateProposal[] = [];
+  for (const tr of toolResults) {
+    const p = tr.result.proposal;
+    if (!tr.result.ok || !p) continue;
+    const [row] = await db().insert(conversations).values({
+      tenantId,
+      channel: 'admin_rate_chat',
+      userId,
+      role: 'tool',
+      content: p.summary,
+      metadataJson: {
+        kind: 'rate_proposal',
+        status: 'pending',
+        tool: p.tool,
+        entity: p.entity,
+        op: p.op,
+        title: p.title,
+        reason: p.reason,
+        summary: p.summary,
+        changes: p.changes,
+        input: p.input,
+      },
+    }).returning({ id: conversations.id });
+    proposals.push({ ...p, id: row?.id ?? 0 });
+  }
+
+  return { reply: finalText, toolResults, proposals };
 }

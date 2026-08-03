@@ -19,7 +19,7 @@ import {
   laneZones,
 } from '../../db/schema.js';
 import { requireAuth, requireTenant } from '../middleware.js';
-import { rateAgentTurn } from '../../ai/rateAgent.js';
+import { rateAgentTurn, applyRateMutation } from '../../ai/rateAgent.js';
 import { calculate, currencyForCountry, type CalcRequest } from '../../calc/engine.js';
 import { resolveFscForTenant, asOfLabel } from '../../eia/dieselPrice.js';
 import { distanceBetween } from '../../calc/distance.js';
@@ -55,6 +55,75 @@ export function registerAiRoutes(app: Express) {
       .orderBy(asc(conversations.createdAt))
       .limit(200);
     res.json({ messages: rows });
+  });
+
+  // ── Confirm-before-apply: proposals (audit H1) ─────────────────
+  // The AI never writes live pricing. A mutation produces a `pending`
+  // proposal (a conversations row whose id is the proposal id). These two
+  // endpoints are the ONLY path that mutates rates from the AI surface:
+  //   apply   — re-validates the STORED input against RATE-C1 bounds
+  //             server-side (client sends only the id — never a number),
+  //             then writes + audit-logs, and flips the row to `applied`.
+  //   discard — flips the row to `discarded`; nothing is written.
+  type LoadedProposal =
+    | { ok: false; code: number; msg: string; status?: unknown }
+    | { ok: true; meta: Record<string, unknown> };
+  async function loadPendingProposal(tenantId: number, id: number): Promise<LoadedProposal> {
+    if (!Number.isInteger(id) || id <= 0) return { ok: false, code: 400, msg: 'Invalid proposal id' };
+    const rows = await db()
+      .select()
+      .from(conversations)
+      .where(and(eq(conversations.id, id), eq(conversations.tenantId, tenantId)))
+      .limit(1);
+    const row = rows[0];
+    const meta = (row?.metadataJson ?? {}) as Record<string, unknown>;
+    if (!row || meta.kind !== 'rate_proposal') return { ok: false, code: 404, msg: 'Proposal not found' };
+    if (meta.status !== 'pending') {
+      return { ok: false, code: 409, msg: `This change was already ${String(meta.status)}.`, status: meta.status };
+    }
+    return { ok: true, meta };
+  }
+
+  app.post('/api/ai/rate-proposals/:id/apply', requireAuth, requireTenant, async (req, res) => {
+    const id = Number(req.params.id);
+    const loaded = await loadPendingProposal(req.tenant!.id, id);
+    if (!loaded.ok) return res.status(loaded.code).json({ error: loaded.msg, status: loaded.status });
+    const { meta } = loaded;
+    try {
+      // NEVER trust a client number: apply from the stored input, and
+      // applyRateMutation re-runs the full RATE-C1 validation before writing.
+      const result = await applyRateMutation(
+        req.tenant!.id,
+        req.user!.id,
+        String(meta.tool),
+        (meta.input ?? {}) as Record<string, unknown>
+      );
+      if (!result.ok) {
+        // Re-validation rejected the stored value (e.g. tampered / out of
+        // bounds). Nothing was written; leave it pending and report why.
+        return res.status(400).json({ error: result.message });
+      }
+      await db()
+        .update(conversations)
+        .set({ metadataJson: { ...meta, status: 'applied', appliedAt: new Date().toISOString(), appliedByUserId: req.user!.id } })
+        .where(eq(conversations.id, id));
+      return res.json({ ok: true, status: 'applied', message: result.message });
+    } catch (err) {
+      console.error('[ai/rate-proposals/apply] error:', err);
+      return res.status(500).json({ error: 'Apply failed. Try again or contact support.' });
+    }
+  });
+
+  app.post('/api/ai/rate-proposals/:id/discard', requireAuth, requireTenant, async (req, res) => {
+    const id = Number(req.params.id);
+    const loaded = await loadPendingProposal(req.tenant!.id, id);
+    if (!loaded.ok) return res.status(loaded.code).json({ error: loaded.msg, status: loaded.status });
+    const { meta } = loaded;
+    await db()
+      .update(conversations)
+      .set({ metadataJson: { ...meta, status: 'discarded', discardedAt: new Date().toISOString() } })
+      .where(eq(conversations.id, id));
+    return res.json({ ok: true, status: 'discarded' });
   });
 
   // ── preview quote (admin sandbox to test rates) ───────────────

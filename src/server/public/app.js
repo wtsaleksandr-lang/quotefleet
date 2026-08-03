@@ -1774,6 +1774,72 @@
     return tr;
   }
 
+  // ── AI rate-change proposal card (confirm-before-apply, audit H1) ──
+  // A mutation the AI drafted. Nothing is live until the owner clicks Apply,
+  // which re-validates server-side. `status` is 'pending' | 'applied' |
+  // 'discarded' | 'invalid'. Pending renders Discard + Apply; a settled
+  // proposal renders a read-only status pill instead.
+  function renderRateProposal(p, status) {
+    status = status || 'pending';
+    var card = el('div', { class: 'qf-rate-proposal', 'data-proposal-id': String(p.id) });
+
+    var head = el('div', { class: 'qf-rp-head' });
+    head.appendChild(el('span', { class: 'qf-rp-badge', text: p.op === 'create' ? 'New' : 'Proposed change' }));
+    head.appendChild(el('span', { class: 'qf-rp-title', text: p.title || 'Rate change' }));
+    card.appendChild(head);
+
+    var list = el('div', { class: 'qf-rp-changes' });
+    (p.changes || []).forEach(function (ch) {
+      var row = el('div', { class: 'qf-rp-change' });
+      row.appendChild(el('span', { class: 'qf-rp-field', text: ch.label }));
+      var vals = el('span', { class: 'qf-rp-values' });
+      if (ch.from !== null && ch.from !== undefined) {
+        vals.appendChild(el('span', { class: 'qf-rp-from', text: ch.from }));
+        vals.appendChild(el('span', { class: 'qf-rp-arrow', text: '→', 'aria-label': 'changes to' }));
+      }
+      vals.appendChild(el('span', { class: 'qf-rp-to', text: ch.to }));
+      row.appendChild(vals);
+      list.appendChild(row);
+    });
+    if (!(p.changes || []).length) {
+      list.appendChild(el('div', { class: 'qf-rp-change' }, [el('span', { class: 'qf-rp-field', text: p.summary || 'No effective change' })]));
+    }
+    card.appendChild(list);
+
+    if (p.reason) card.appendChild(el('div', { class: 'qf-rp-reason', text: p.reason }));
+
+    var foot = el('div', { class: 'qf-rp-foot' });
+    if (status === 'pending') {
+      var discardBtn = el('button', { class: 'btn btn-secondary btn-sm qf-rp-discard', text: 'Discard' });
+      var applyBtn = el('button', { class: 'btn btn-primary btn-sm qf-rp-apply', text: 'Apply change' });
+      function settle(state, label) {
+        card.dataset.status = state;
+        foot.innerHTML = '';
+        foot.appendChild(el('span', { class: 'qf-rp-status qf-rp-status-' + state, text: label }));
+      }
+      applyBtn.addEventListener('click', function () {
+        applyBtn.disabled = true; discardBtn.disabled = true;
+        api('/api/ai/rate-proposals/' + p.id + '/apply', { method: 'POST' })
+          .then(function () { settle('applied', 'Applied — now live'); toastOk('Change applied'); })
+          .catch(function (err) { applyBtn.disabled = false; discardBtn.disabled = false; toastErr(err); });
+      });
+      discardBtn.addEventListener('click', function () {
+        applyBtn.disabled = true; discardBtn.disabled = true;
+        api('/api/ai/rate-proposals/' + p.id + '/discard', { method: 'POST' })
+          .then(function () { settle('discarded', 'Discarded'); })
+          .catch(function (err) { applyBtn.disabled = false; discardBtn.disabled = false; toastErr(err); });
+      });
+      foot.appendChild(discardBtn);
+      foot.appendChild(applyBtn);
+    } else {
+      var labels = { applied: 'Applied — now live', discarded: 'Discarded', invalid: 'Rejected — out of range' };
+      card.dataset.status = status;
+      foot.appendChild(el('span', { class: 'qf-rp-status qf-rp-status-' + status, text: labels[status] || status }));
+    }
+    card.appendChild(foot);
+    return card;
+  }
+
   // ── AI agent panel ────────────────────────────────────────────
   function renderAi(c) {
     Promise.all([
@@ -1792,6 +1858,15 @@
       var chat = el('div', { class: 'chat-panel' });
       var msgList = el('div', { class: 'chat-messages', id: 'rate-chat-msgs' });
       hist.forEach(function (m) {
+        var meta = m.metadataJson || null;
+        if (meta && meta.kind === 'rate_proposal') {
+          msgList.appendChild(renderRateProposal({
+            id: m.id, title: meta.title, changes: meta.changes, reason: meta.reason,
+            op: meta.op, summary: meta.summary,
+          }, meta.status || 'pending'));
+          return;
+        }
+        if (m.role === 'tool') return; // non-proposal tool rows aren't shown
         msgList.appendChild(el('div', { class: 'chat-bubble ' + (m.role === 'assistant' ? 'assistant' : 'user'), text: m.content }));
       });
       if (!hist.length) {
@@ -1816,8 +1891,15 @@
           .then(function (r) {
             sendBtn.disabled = false;
             pending.textContent = r.reply || '(no reply)';
+            // Mutation tools no longer apply — they return proposals. Render
+            // each as a confirm card with Apply / Discard.
+            if (r.proposals && r.proposals.length) {
+              r.proposals.forEach(function (p) { msgList.appendChild(renderRateProposal(p, 'pending')); });
+            }
+            // Only READ tools surface as tool bubbles now (proposals are cards).
             if (r.toolResults && r.toolResults.length) {
               r.toolResults.forEach(function (t) {
+                if (t.result && t.result.proposal) return; // rendered as a card above
                 var tag = el('div', { class: 'chat-bubble tool' }, [
                   el('span', { class: 'qf-tool-ico', html: WRENCH_SVG, 'aria-hidden': 'true' }),
                   ' ' + t.tool + ': ' + t.result.message
@@ -1834,7 +1916,7 @@
       var rightCol = el('div');
       var cfgCard = el('div', { class: 'card' });
       cfgCard.appendChild(el('div', { class: 'card-title', text: 'AI behaviour' }));
-      cfgCard.appendChild(el('div', { class: 'card-subtitle', text: 'Edits apply immediately.' }));
+      cfgCard.appendChild(el('div', { class: 'card-subtitle', text: 'Rate changes are proposed for your review — nothing goes live until you click Apply.' }));
 
       function renderField(label, child) {
         return el('div', { class: 'field', style: { marginBottom: '12px' } }, [el('label', { class: 'field-label', text: label }), child]);
