@@ -41,6 +41,8 @@ import {
   decideEmailImport,
   buildInboundAddress,
   generateIngestEmailToken,
+  normalizeSenderAddress,
+  isSenderTrusted,
   type InboundAttachment,
 } from '../emailImport.js';
 
@@ -200,6 +202,9 @@ export function registerInboundRoutes(app: Express) {
         sizeBytes,
         storageRef: pick.dataBase64,
         status: 'parsing',
+        // Recorded so trust-on-approve can add this sender to the tenant's
+        // allowlist when an operator approves a held import.
+        sourceEmail: normalizeSenderAddress(payload.from),
       })
       .returning({ id: ingestJobs.id });
     if (!job) return res.status(500).json({ error: 'Failed to create ingest job.' });
@@ -245,7 +250,16 @@ export function registerInboundRoutes(app: Express) {
     const autoCheck = runDraftAutoCheck(draft);
     const decision = decideEmailImport(draft, autoCheck);
 
-    if (decision.autoApply) {
+    // 8a. Sender allowlist gate (audit H2). An unguessable token + opt-in flag
+    // are NOT enough to send pricing live: a leaked/guessed token or a spoofed /
+    // forwarded sender could poison quotes. Auto-apply may proceed ONLY when the
+    // normalized `from` is on the tenant's trusted-sender allowlist. An import
+    // from an unrecognized sender is HELD for review — approving it trusts the
+    // sender, so subsequent imports from it can auto-apply. This is an ADDITIONAL
+    // gate; it never weakens the token / opt-in / confidence checks above.
+    const senderTrusted = isSenderTrusted(payload.from, tenantRow.ingestTrustedSendersJson);
+
+    if (decision.autoApply && senderTrusted) {
       let counts;
       try {
         counts = await applyDraftToTenant(tenantRow.id, job.id, draft);
@@ -285,21 +299,34 @@ export function registerInboundRoutes(app: Express) {
       return res.status(200).json({ ok: true, status: 'auto_applied', counts });
     }
 
-    // 9. Held for review — never blindly apply ambiguous/low-confidence rates.
+    // 9. Held for review — never blindly apply ambiguous/low-confidence rates,
+    // and never auto-apply from a sender the tenant hasn't approved before.
+    // An unknown sender is the reason even when the draft itself was auto-apply-
+    // eligible: the sender gate is what held it.
+    const heldReason = decision.autoApply && !senderTrusted ? 'unknown_sender' : decision.reason;
     await recordAudit(tenantRow.id, 'ingest.email_held', {
-      jobId: job.id, from: payload.from, reason: decision.reason,
+      jobId: job.id, from: payload.from, reason: heldReason,
       confidence: draft.confidence, flagged: autoCheck.flaggedCount,
     });
+    // For a new/unknown sender, tell the owner that approving trusts them — the
+    // held import already surfaces in the review UI; this is copy only.
+    const reviewBody = heldReason === 'unknown_sender'
+      ? `We received new rates by email from ${normalizeSenderAddress(payload.from) ?? 'an unrecognized sender'} and read them, ` +
+        `but we hold the first import from a new sender until you approve it. Approve it to apply these rates and trust ` +
+        `future imports from this sender: ${link}`
+      : `We received new rates by email and read them, but a quick human review is needed before they go live. ` +
+        `Review and apply them here: ${link}`;
+    const reviewHtmlBody = heldReason === 'unknown_sender'
+      ? `We received new rates by email from ${normalizeSenderAddress(payload.from) ?? 'an unrecognized sender'} and read them. ` +
+        `We hold the first import from a new sender until you approve it — approve to apply these rates and trust future imports from this sender.`
+      : `We received new rates by email and read them, but a quick human review is needed before they go live.`;
     await notifyOwner(
       ownerEmail,
       'New rates received by email need a quick review',
-      `We received new rates by email and read them, but a quick human review is needed before they go live. ` +
-        `Review and apply them here: ${link}`,
-      ownerHtml('New rates received by email need a quick review',
-        `We received new rates by email and read them, but a quick human review is needed before they go live.`,
-        link, 'Review rates'),
+      reviewBody,
+      ownerHtml('New rates received by email need a quick review', reviewHtmlBody, link, 'Review rates'),
     );
-    return res.status(200).json({ ok: true, status: 'held_for_review', reason: decision.reason });
+    return res.status(200).json({ ok: true, status: 'held_for_review', reason: heldReason });
   });
 }
 

@@ -121,7 +121,15 @@ const goodPayload = {
   text: 'FTL dry van $2.50/mi',
   attachments: [{ filename: 'rates.pdf', contentType: 'application/pdf', contentBase64: Buffer.from('%PDF').toString('base64') }],
 };
-const tenantRow = { id: 7, contactEmail: 'owner@carrier.com', ingestEmailToken: 'tok123' };
+// Base tenant TRUSTS the goodPayload sender, so the existing auto-apply tests
+// exercise the happy path. The sender-allowlist gate is covered explicitly in
+// the "sender allowlist gate" describe below.
+const tenantRow = {
+  id: 7,
+  contactEmail: 'owner@carrier.com',
+  ingestEmailToken: 'tok123',
+  ingestTrustedSendersJson: ['dispatch@carrier.com'],
+};
 const brandOn = { featuresJson: { emailImport: true } };
 
 beforeEach(() => {
@@ -237,5 +245,61 @@ describe('smart safety model', () => {
     expect(res.statusCode).toBe(200);
     expect((res.body as { status: string }).status).toBe('no_parseable_content');
     expect(h.state.inserts).toEqual([]);
+  });
+});
+
+describe('sender allowlist gate (audit H2)', () => {
+  it('HOLDS a high-confidence + all-clean draft from an UNTRUSTED sender — never applies, live rates unchanged', async () => {
+    // Feature ON + high confidence + clean auto-check, but the sender is NOT on
+    // the tenant's allowlist → must be HELD, not auto-applied.
+    h.state.selectQueue = [[{ ...tenantRow, ingestTrustedSendersJson: [] }], [brandOn]];
+    const { applyDraftToTenant } = await import('./ingest.js');
+    (applyDraftToTenant as ReturnType<typeof vi.fn>).mockClear();
+    const res = new MockRes();
+    await (await getPostHandler())(req(goodPayload), res);
+    expect(res.statusCode).toBe(200);
+    const body = res.body as { status: string; reason: string };
+    expect(body.status).toBe('held_for_review');
+    expect(body.reason).toBe('unknown_sender');
+    // The live rate book was never touched.
+    expect(applyDraftToTenant).not.toHaveBeenCalled();
+    // Held for review, audited with the unknown-sender reason.
+    const held = h.state.inserts.find((i) => i.action === 'ingest.email_held') as
+      | { detailsJson?: { reason?: string } }
+      | undefined;
+    expect(held).toBeTruthy();
+    expect(held!.detailsJson?.reason).toBe('unknown_sender');
+    // Owner told approving trusts the sender.
+    expect(h.state.emails[0].subject).toMatch(/need a quick review/i);
+  });
+
+  it('AUTO-APPLIES the same draft once the sender IS on the allowlist', async () => {
+    h.state.selectQueue = [[{ ...tenantRow, ingestTrustedSendersJson: ['dispatch@carrier.com'] }], [brandOn]];
+    const { applyDraftToTenant } = await import('./ingest.js');
+    (applyDraftToTenant as ReturnType<typeof vi.fn>).mockClear();
+    const res = new MockRes();
+    await (await getPostHandler())(req(goodPayload), res);
+    expect(res.statusCode).toBe(200);
+    expect((res.body as { status: string }).status).toBe('auto_applied');
+    expect(applyDraftToTenant).toHaveBeenCalledTimes(1);
+  });
+
+  it('trust match is case-insensitive and tolerates a display-name wrapper', async () => {
+    h.state.selectQueue = [[{ ...tenantRow, ingestTrustedSendersJson: ['dispatch@carrier.com'] }], [brandOn]];
+    const { applyDraftToTenant } = await import('./ingest.js');
+    (applyDraftToTenant as ReturnType<typeof vi.fn>).mockClear();
+    const res = new MockRes();
+    await (await getPostHandler())(req({ ...goodPayload, from: 'Dispatch Team <DISPATCH@Carrier.com>' }), res);
+    expect((res.body as { status: string }).status).toBe('auto_applied');
+    expect(applyDraftToTenant).toHaveBeenCalledTimes(1);
+  });
+
+  it('records the normalized sender on the job so approve can trust it', async () => {
+    h.state.selectQueue = [[{ ...tenantRow, ingestTrustedSendersJson: [] }], [brandOn]];
+    const res = new MockRes();
+    await (await getPostHandler())(req({ ...goodPayload, from: 'Dispatch <DISPATCH@Carrier.com>' }), res);
+    const jobInsert = h.state.inserts.find((i) => i.sourceEmail !== undefined);
+    expect(jobInsert).toBeTruthy();
+    expect(jobInsert!.sourceEmail).toBe('dispatch@carrier.com');
   });
 });
