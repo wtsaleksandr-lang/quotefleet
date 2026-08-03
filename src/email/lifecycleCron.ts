@@ -5,10 +5,16 @@
  * Schedule: every 10 minutes from app boot. Each tick scans tenants on
  * the trial and decides which (if any) lifecycle email is due.
  *
- *   welcome         — sent within 10 min of signup
- *   day_7           — sent 7 days after signup if not yet upgraded
- *   day_12          — sent 12 days after signup (2 days before expiry)
- *   day_14_expired  — sent right after trial_ends_at passes
+ *   welcome                   — sent within 10 min of signup
+ *   day_7                     — sent 7 days after signup if not yet upgraded
+ *   trialReminderDay11SentAt  — day 11 (~3 days before expiry): add a card
+ *   day_12                    — sent 12 days after signup (2 days before expiry)
+ *   trialReminderDay14SentAt  — day 14 (last day, before expiry): ends today
+ *   day_14_expired            — sent right after trial_ends_at passes
+ *
+ * The two trialReminder* card-nudges complete the card-after-trial model
+ * (signup is card-free → nudge the owner to add a card before the trial ends).
+ * They go ONLY to still-trialing free tenants and never to a paying customer.
  *
  * Each tenant row has lifecycleEmailsJson = { welcome: '<iso>', ... }
  * to track what's been sent. We never re-send the same email twice.
@@ -27,6 +33,8 @@ import {
   lifecycleDay7Email,
   lifecycleDay12Email,
   lifecycleExpiredEmail,
+  trialReminderDay11Email,
+  trialReminderDay14Email,
 } from './templates.js';
 import { unsubscribeUrl } from './unsubscribe.js';
 import { loadEnv } from '../config.js';
@@ -92,13 +100,19 @@ interface LifecycleEmail {
   listUnsubscribeUrl: string;
 }
 
-function decideNextEmail(t: Tenant): LifecycleEmail | null {
+/** Decide the single lifecycle email (if any) due for tenant `t` at `now`.
+ *  Priority-ordered — at most one email per tick; the 10-min cadence lets the
+ *  sequence catch up smoothly. `now` is injectable for deterministic tests.
+ *  Exported for tests; the cron drives it on a timer via runOnce. */
+export function decideNextEmail(t: Tenant, now: number = Date.now()): LifecycleEmail | null {
   if (!t.trialEndsAt) return null;
   const sent = t.lifecycleEmailsJson ?? {};
-  const now = Date.now();
   const trialEnd = t.trialEndsAt.getTime();
   const trialStart = trialEnd - 14 * 24 * 60 * 60 * 1000;
   const ageDays = (now - trialStart) / (24 * 60 * 60 * 1000);
+  // Card reminders never go to a paying tenant. The cron query already filters
+  // plan='free', but guard here too so decideNextEmail is correct on its own.
+  const stillTrialing = t.plan === 'free' && now < trialEnd;
 
   // Welcome email — within first 10 minutes of signup.
   if (!sent.welcome) return makeWelcome(t);
@@ -106,8 +120,14 @@ function decideNextEmail(t: Tenant): LifecycleEmail | null {
   // Day 7 nudge.
   if (ageDays >= 7 && !sent.day_7) return makeDay7(t);
 
+  // Day 11 — ~3 days before trial ends: "add a card to keep your calculator live".
+  if (stillTrialing && ageDays >= 11 && !sent.trialReminderDay11SentAt) return makeDay11(t);
+
   // Day 12 — 2 days before trial expires.
   if (ageDays >= 12 && !sent.day_12) return makeDay12(t);
+
+  // Day 14 — the last day (before expiry): "your trial ends today".
+  if (stillTrialing && ageDays >= 13 && !sent.trialReminderDay14SentAt) return makeDay14(t);
 
   // Trial-expired email — sent the first tick after the deadline passes.
   if (now >= trialEnd && !sent.day_14_expired) return makeExpired(t);
@@ -179,6 +199,44 @@ function makeDay12(t: Tenant): LifecycleEmail {
       `Reply if you have questions — happy to extend the trial if you need a few extra days.\n\n` +
       `— QuoteFleet\n`,
     html: lifecycleDay12Email({ appUrl: `${base}/app`, pricingUrl: `${base}/pricing`, unsubscribeUrl: unsub }),
+  };
+}
+
+function makeDay11(t: Tenant): LifecycleEmail {
+  const base = publicBaseUrl();
+  const unsub = unsubscribeUrl(base, t.id);
+  return {
+    key: 'trialReminderDay11SentAt',
+    listUnsubscribeUrl: unsub,
+    subject: `3 days left on your QuoteFleet trial`,
+    body:
+      `Hi,\n\n` +
+      `Your all-inclusive QuoteFleet trial ends in about 3 days.\n\n` +
+      `Add a card now and your calculator, hosted page, and lead inbox keep running with zero interruption — nothing changes for you or your customers. You won't be charged until the trial ends, and you can cancel anytime.\n\n` +
+      `Add a card: ${base}/app  →  Plan settings.\n\n` +
+      `Vital is $14.80/mo or Pro is $34.80/mo — compare plans: ${base}/pricing\n\n` +
+      `Reply if you have any questions.\n\n` +
+      `— QuoteFleet\n`,
+    html: trialReminderDay11Email({ appUrl: `${base}/app`, pricingUrl: `${base}/pricing`, unsubscribeUrl: unsub }),
+  };
+}
+
+function makeDay14(t: Tenant): LifecycleEmail {
+  const base = publicBaseUrl();
+  const unsub = unsubscribeUrl(base, t.id);
+  return {
+    key: 'trialReminderDay14SentAt',
+    listUnsubscribeUrl: unsub,
+    subject: `Your QuoteFleet trial ends today`,
+    body:
+      `Hi,\n\n` +
+      `Today is the last day of your QuoteFleet trial.\n\n` +
+      `Add a card to keep your calculator running — your hosted page and widget stay live and no leads are missed. Add it before the day is out and the switch is seamless.\n\n` +
+      `If you don't, your hosted page stays up but new leads pause until you choose a plan — you can pick one back up anytime.\n\n` +
+      `Add a card: ${base}/app  →  Plan settings.\n\n` +
+      `Vital $14.80/mo or Pro $34.80/mo — cancel anytime. Questions, or need a few more days? Just reply.\n\n` +
+      `— QuoteFleet\n`,
+    html: trialReminderDay14Email({ appUrl: `${base}/app`, unsubscribeUrl: unsub }),
   };
 }
 
