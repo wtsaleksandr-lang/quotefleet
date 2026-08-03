@@ -52,9 +52,25 @@ describe('dashboard trust gaps — in-app billing management', () => {
     expect(app).toContain('e.status === 404');
   });
 
-  it('the trial banner Manage plan action opens the portal, not just /pricing', async () => {
+  it('the trial banner CTA starts the in-app subscribe flow (checkout-session), gated on billing config', async () => {
     const app = await pub('app.js');
-    expect(app).toContain('data-manage-billing');
+    // Reuses the existing subscribe endpoint (returns a Stripe Checkout URL) —
+    // not a dead /pricing link, and not the portal (which 404s for a card-free
+    // trial that has no Stripe customer yet).
+    expect(app).toContain('/api/billing/checkout-session');
+    expect(app).toContain('startSubscribeCheckout');
+    // Honest CTA gating (audit H1): the button only renders when Stripe is
+    // configured, via the shared, unit-tested QFTrialBanner view logic.
+    expect(app).toContain('ensureBillingStatus');
+    expect(app).toContain('computeTrialBannerView');
+  });
+
+  it('the day-14 write-block 403 is caught and surfaces the subscribe escape', async () => {
+    const app = await pub('app.js');
+    // A mutating call that 403s with trial_expired flips the banner to its
+    // expired subscribe CTA instead of showing a raw "trial_expired" error.
+    expect(app).toContain("j.error === 'trial_expired'");
+    expect(app).toContain('handleTrialExpired');
   });
 });
 
