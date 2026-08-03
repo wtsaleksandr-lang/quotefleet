@@ -1563,6 +1563,8 @@
     var totalRow = el('div', { class: 'line total-row' }, [el('span', { class: 'name', text: 'Total' }), el('span', { class: 'amt', text: fmtAmount(r.total, cur) })]);
     lines.appendChild(totalRow);
     renderDisclaimer();
+    // Total is now known → fill the map's "$/mi" metric (miles came in earlier).
+    updatePerMile();
     var resultBox = $('qf-result');
     resultBox.style.display = 'block';
     // A quote is now on screen — demote the primary CTA from "Get instant quote"
@@ -2051,6 +2053,19 @@
     var modal = $('qf-map-modal'); if (modal) modal.hidden = true;
     scheduleAutoResize();
   }
+  // "$/mi" overlay metric = quote total ÷ route miles. Both inputs arrive at
+  // different times (miles on the route map, total after Calculate), so this
+  // single helper is called from BOTH renderRouteMap and renderResult and just
+  // reads whatever's currently in state — showing "—" until both exist.
+  function updatePerMile() {
+    var total = currentQuoteTotal();
+    var miles = (state.mapMiles != null) ? state.mapMiles
+      : (state.quote && state.quote.miles != null) ? Number(state.quote.miles) : null;
+    var txt = (total > 0 && miles && miles > 0)
+      ? (currencySymbol(activeCurrency()) + (total / miles).toFixed(2))
+      : '—';
+    ['qf-map-permile', 'qf-map-m-permile'].forEach(function (id) { var e = $(id); if (e) e.textContent = txt; });
+  }
   function renderRouteMap(resp) {
     var card = $('qf-map-card'); if (!card) return;
     // No routed map (rare, maps key live) → fall back to the North America base
@@ -2063,6 +2078,8 @@
     var tEl = $('qf-map-transit'); if (tEl) tEl.textContent = (resp.transit && resp.transit.text) ? resp.transit.text : '—';
     var pu = $('qf-map-pickup'); if (pu) pu.textContent = addrLabel(state.pickupResolved, 'qf-pickup-zip');
     var de = $('qf-map-delivery'); if (de) de.textContent = addrLabel(state.deliveryResolved, 'qf-delivery-zip');
+    state.mapMiles = (resp.miles != null) ? Number(resp.miles) : null;
+    updatePerMile();
     // Mirror the same distance/transit + addresses onto the expanded modal map.
     var mm = { 'qf-map-m-distance': dEl, 'qf-map-m-transit': tEl, 'qf-map-m-pickup': pu, 'qf-map-m-delivery': de };
     Object.keys(mm).forEach(function (id) { var t = $(id); if (t && mm[id]) t.textContent = mm[id].textContent; });
@@ -2093,9 +2110,10 @@
     // fit the base map instead of leaving an inner scrollbar (see renderRouteMap).
     if (img) { img.onload = scheduleAutoResize; img.onerror = hideMapCard; img.src = url; img.alt = 'Map of North America'; if (img.complete && img.naturalWidth) scheduleAutoResize(); }
     if (mimg) { mimg.src = url; mimg.alt = 'Map of North America'; }
-    ['qf-map-distance', 'qf-map-transit', 'qf-map-pickup', 'qf-map-delivery',
-     'qf-map-m-distance', 'qf-map-m-transit', 'qf-map-m-pickup', 'qf-map-m-delivery'
+    ['qf-map-distance', 'qf-map-transit', 'qf-map-permile', 'qf-map-pickup', 'qf-map-delivery',
+     'qf-map-m-distance', 'qf-map-m-transit', 'qf-map-m-permile', 'qf-map-m-pickup', 'qf-map-m-delivery'
     ].forEach(function (id) { var el = $(id); if (el) el.textContent = '—'; });
+    state.mapMiles = null;
     card.classList.add('qf-map-base');
     // Clear any display:none left by a prior hideMapCard() (see renderRouteMap).
     card.hidden = false; card.style.display = '';

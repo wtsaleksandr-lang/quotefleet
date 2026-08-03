@@ -687,6 +687,23 @@ html { scrollbar-width: thin; scrollbar-color: rgba(135, 138, 150, 0.38) transpa
 .qf-result-actions .qf-edit-link { color: var(--w-oncard-accent, var(--w-primary)); }
 .qf-result-actions .qf-edit-link:hover { color: var(--w-oncard-accent, var(--w-primary-hover)); }
 
+/* Result sub-links: "Edit details" and "Ask about this quote" sit INLINE on one
+   centered row (dot-separated) beneath the CTA — not stacked. */
+.qf-result-sublinks {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: center;
+  gap: var(--space-1);
+}
+.qf-result-sublinks .qf-textlink { min-height: 0; padding: 2px var(--space-0-5); }
+.qf-sublink-sep {
+  color: var(--w-oncard-accent, var(--w-primary));
+  opacity: 0.5;
+  font-size: 13px;
+  user-select: none;
+}
+
 /* Thanks step: one tight, wrapping row of text links separated by middots. */
 .qf-thanks-actions {
   display: flex;

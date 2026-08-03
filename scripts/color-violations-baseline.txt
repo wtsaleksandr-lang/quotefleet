@@ -3,7 +3,7 @@
 # (var(--*)) or wrap in a [data-theme=...] scope, then delete the line.
 # Format: <file>:<line>:<col>\t<snippet>
 src/server/public/addons-panel.css:35:3	color: #fff
-src/server/public/app-quote-actions.css:1:636	color:#fff
+src/server/public/app-quote-actions.css:1:590	color:#fff
 src/server/public/brand-editor.css:121:29	color: #fff
 src/server/public/brand-editor.css:134:3	color: #fff
 src/server/public/brand-studio-preview.css:31:3	background: #fff
