@@ -45,8 +45,12 @@
    *   opts.trialStatus      — 'trial' | 'trial_expired' | 'paid' | 'unknown' | null
    *   opts.daysLeft         — whole days left (from the server trial state)
    *   opts.billingConfigured — Stripe configured? (gates the CTA)
+   *   opts.paymentPastDue   — paid tenant whose last charge failed (grace window)
    *
    * Returns { show, variant, urgent, headline, ctaShown, ctaLabel }.
+   *   - payment_issue → "We couldn't process your payment…"; CTA "Update card →"
+   *       only if configured. TAKES PRECEDENCE over every trial state: a paying
+   *       but past_due tenant must see the card warning, not a trial countdown.
    *   - paid / unknown / null → { show:false } (no banner at all)
    *   - trial   → countdown; CTA "Keep your calculator live →" only if configured
    *   - expired → "Your free trial has ended"; CTA "Add a card to continue →" only if configured
@@ -56,6 +60,19 @@
     var status = opts.trialStatus;
     var daysLeft = typeof opts.daysLeft === 'number' ? opts.daysLeft : 0;
     var configured = !!opts.billingConfigured;
+
+    // Precedence: a failed payment outranks any trial state. Shown for a paying
+    // tenant in the dunning grace window until the card is fixed (marker clears).
+    if (opts.paymentPastDue) {
+      return {
+        show: true,
+        variant: 'payment_issue',
+        urgent: true,
+        headline: "We couldn't process your payment — update your card to keep your service.",
+        ctaShown: configured,
+        ctaLabel: configured ? 'Update card →' : null,
+      };
+    }
 
     if (status === 'trial') {
       return {

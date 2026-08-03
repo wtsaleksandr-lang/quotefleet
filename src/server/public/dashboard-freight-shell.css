@@ -263,3 +263,15 @@ html[data-theme="light"] .btn-ghost {
     justify-content: center;
   }
 }
+
+/* Payment-issue banner (past_due / grace): a paying tenant whose last charge
+   failed. Restrained amber --warn tint — a nudge, not the garish read-only
+   --error strip — because the service is STILL active while they update the
+   card. Theme-aware via tokens; inherits the shared banner layout + the 375px
+   stacking rule above. Appended at EOF so the line-based guard baselines don't
+   renumber. */
+.qf-trial-banner--payment_issue {
+  background: var(--warn-bg);
+  border-bottom-color: var(--warn);
+}
+.qf-trial-banner--payment_issue .qf-trial-banner-dot { background: var(--warn); }

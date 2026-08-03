@@ -63,6 +63,51 @@ describe('computeTrialBannerView', () => {
   });
 });
 
+describe('computeTrialBannerView — payment_issue (past_due / grace)', () => {
+  it('past_due paid tenant + configured → "update your card" banner with portal CTA', () => {
+    const v = computeTrialBannerView({ trialStatus: 'paid', paymentPastDue: true, billingConfigured: true });
+    expect(v.show).toBe(true);
+    expect(v.variant).toBe('payment_issue');
+    expect(v.urgent).toBe(true);
+    expect(v.headline).toBe("We couldn't process your payment — update your card to keep your service.");
+    expect(v.ctaShown).toBe(true);
+    expect(v.ctaLabel).toBe('Update card →');
+  });
+
+  it('past_due + billing NOT configured → banner shown but NO CTA (no dead button)', () => {
+    const v = computeTrialBannerView({ trialStatus: 'paid', paymentPastDue: true, billingConfigured: false });
+    expect(v.show).toBe(true);
+    expect(v.variant).toBe('payment_issue');
+    expect(v.ctaShown).toBe(false);
+    expect(v.ctaLabel).toBeNull();
+  });
+
+  it('TAKES PRECEDENCE over an active trial countdown', () => {
+    const v = computeTrialBannerView({ trialStatus: 'trial', daysLeft: 10, paymentPastDue: true, billingConfigured: true });
+    expect(v.variant).toBe('payment_issue'); // NOT 'trial'
+    expect(v.headline).not.toBe('Trial · 10 days left');
+  });
+
+  it('TAKES PRECEDENCE over the expired state', () => {
+    const v = computeTrialBannerView({ trialStatus: 'trial_expired', daysLeft: 0, paymentPastDue: true, billingConfigured: true });
+    expect(v.variant).toBe('payment_issue'); // NOT 'expired'
+  });
+
+  it('healthy paid tenant (not past_due) → no payment banner', () => {
+    const v = computeTrialBannerView({ trialStatus: 'paid', paymentPastDue: false, billingConfigured: true });
+    expect(v.show).toBe(false);
+    expect(v.variant).not.toBe('payment_issue');
+  });
+
+  it('resolves: once the marker clears (paymentPastDue false) the trial countdown shows again', () => {
+    const stillDue = computeTrialBannerView({ trialStatus: 'trial', daysLeft: 5, paymentPastDue: true, billingConfigured: true });
+    expect(stillDue.variant).toBe('payment_issue');
+    const cleared = computeTrialBannerView({ trialStatus: 'trial', daysLeft: 5, paymentPastDue: false, billingConfigured: true });
+    expect(cleared.variant).toBe('trial');
+    expect(cleared.headline).toBe('Trial · 5 days left');
+  });
+});
+
 describe('trialHeadline (day-count copy edges)', () => {
   it('pluralizes days, singularizes 1 day, and calls the final day "last day"', () => {
     expect(trialHeadline(10)).toBe('Trial · 10 days left');

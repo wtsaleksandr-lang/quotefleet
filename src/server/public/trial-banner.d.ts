@@ -9,11 +9,12 @@ export interface TrialBannerViewOpts {
   trialStatus?: TrialBannerStatus;
   daysLeft?: number;
   billingConfigured?: boolean;
+  paymentPastDue?: boolean;
 }
 
 export interface TrialBannerView {
   show: boolean;
-  variant: 'trial' | 'expired' | null;
+  variant: 'trial' | 'expired' | 'payment_issue' | null;
   urgent: boolean;
   headline: string | null;
   ctaShown: boolean;

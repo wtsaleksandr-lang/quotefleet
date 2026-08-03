@@ -26,6 +26,7 @@ import { db } from '../../db/client.js';
 import { tenants, auditLog, type Tenant } from '../../db/schema.js';
 import { requireAuth, requireTenant } from '../middleware.js';
 import { loadEnv } from '../../config.js';
+import { BILLING_PAST_DUE_KEY } from '../trialGating.js';
 import {
   type PaidPlanId,
   type PlanId,
@@ -311,6 +312,20 @@ export async function applySubscription(sub: Stripe.Subscription): Promise<void>
   const { plan, keepSubscriptionId, health } = deriveSubscriptionState(sub);
   const cpeUnix = (sub as unknown as { current_period_end?: number }).current_period_end;
   const periodEnd = typeof cpeUnix === 'number' ? new Date(cpeUnix * 1000) : null;
+  // Persist / clear the "payment failed — update your card" marker in the
+  // open-typed lifecycle jsonb (no migration). Set on entry to grace, cleared
+  // on return to active (and on any terminal downgrade). Only touch the jsonb
+  // when it actually changes, to avoid clobbering concurrent lifecycle writes.
+  const lifecycle = { ...(t.lifecycleEmailsJson ?? {}) };
+  const hadMarker = !!lifecycle[BILLING_PAST_DUE_KEY];
+  let lifecycleChanged = false;
+  if (health === 'grace' && !hadMarker) {
+    lifecycle[BILLING_PAST_DUE_KEY] = new Date().toISOString();
+    lifecycleChanged = true;
+  } else if (health !== 'grace' && hadMarker) {
+    delete lifecycle[BILLING_PAST_DUE_KEY];
+    lifecycleChanged = true;
+  }
   // Keep the tenant's trialEndsAt aligned with Stripe's trial so the
   // all-inclusive trial (effectivePlan → pro) begins/ends exactly when
   // Stripe says. Once converted (trial_end null) we leave the stored date
@@ -329,6 +344,7 @@ export async function applySubscription(sub: Stripe.Subscription): Promise<void>
       stripeSubscriptionId: keepSubscriptionId ? sub.id : null,
       subscriptionEndsAt: periodEnd,
       ...(trialEnd ? { trialEndsAt: trialEnd } : {}),
+      ...(lifecycleChanged ? { lifecycleEmailsJson: lifecycle } : {}),
       updatedAt: new Date(),
     })
     .where(eq(tenants.id, t.id));
@@ -385,6 +401,22 @@ export async function handleEvent(event: Stripe.Event): Promise<void> {
         amountDue: inv.amount_due ?? null,
         currency: inv.currency ?? null,
       });
+      // Set the "update your card" marker so the app can nudge the tenant. The
+      // paired customer.subscription.updated → past_due also sets it via
+      // applySubscription; doing it here too covers the case where this event
+      // lands first / alone. Idempotent — only writes if not already marked.
+      if (!t.lifecycleEmailsJson?.[BILLING_PAST_DUE_KEY]) {
+        await db()
+          .update(tenants)
+          .set({
+            lifecycleEmailsJson: {
+              ...(t.lifecycleEmailsJson ?? {}),
+              [BILLING_PAST_DUE_KEY]: new Date().toISOString(),
+            },
+            updatedAt: new Date(),
+          })
+          .where(eq(tenants.id, t.id));
+      }
       console.warn(
         `[billing.webhook] payment_failed for tenant ${t.slug} — access retained during grace (next retry ${nextAttempt ?? 'n/a'})`
       );
