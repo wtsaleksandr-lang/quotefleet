@@ -1079,3 +1079,56 @@ html[data-theme="light"] .hero h1 .accent {
 .site-footer a:hover { color: var(--ink); }
 /* Company / product line + any explicitly muted note stays subtler. */
 .site-footer strong { color: rgba(255, 255, 255, 0.78); font-weight: 600; }
+
+/* ── AI rate-change proposal card (confirm-before-apply, audit H1) ───────
+   Rendered inside the rate-chat message list. A structured before→after diff
+   the owner must Apply before it touches live pricing. Theme-aware tokens
+   only; 8px spacing ramp; readable at 375px. */
+.qf-rate-proposal {
+  align-self: stretch;
+  display: flex; flex-direction: column; gap: var(--space-1-5);
+  background: var(--surface-2); border: 1px solid var(--border-strong);
+  border-radius: var(--radius); padding: var(--space-2);
+}
+.qf-rp-head { display: flex; flex-wrap: wrap; align-items: center; gap: var(--space-1); }
+.qf-rp-badge {
+  display: inline-flex; align-items: center;
+  padding: var(--space-0-5) var(--space-1);
+  border-radius: var(--radius-pill);
+  background: var(--accent-soft); color: var(--accent);
+  font-size: 11px; font-weight: 700; letter-spacing: 0.02em;
+  text-transform: uppercase;
+}
+.qf-rp-title { color: var(--ink); font-weight: 700; font-size: 14px; line-height: 1.4; }
+.qf-rp-changes {
+  display: flex; flex-direction: column; gap: var(--space-1);
+  background: var(--surface); border: 1px solid var(--border);
+  border-radius: var(--radius-btn); padding: var(--space-1-5);
+}
+.qf-rp-change {
+  display: flex; flex-wrap: wrap; align-items: baseline;
+  justify-content: space-between; gap: var(--space-1);
+}
+.qf-rp-field { color: var(--muted); font-size: 12.5px; line-height: 1.5; font-weight: 600; }
+.qf-rp-values {
+  display: inline-flex; align-items: baseline; flex-wrap: wrap;
+  gap: var(--space-1); font-size: 13px; line-height: 1.5;
+}
+.qf-rp-from { color: var(--muted); text-decoration: line-through; }
+.qf-rp-arrow { color: var(--muted-soft); font-weight: 700; }
+.qf-rp-to { color: var(--ink); font-weight: 700; }
+.qf-rp-reason { color: var(--muted); font-size: 12px; line-height: 1.5; font-style: italic; }
+.qf-rp-foot {
+  display: flex; flex-wrap: wrap; align-items: center;
+  justify-content: flex-end; gap: var(--space-1);
+}
+.qf-rp-status {
+  display: inline-flex; align-items: center;
+  padding: var(--space-0-5) var(--space-1);
+  border-radius: var(--radius-pill); font-size: 12px; font-weight: 600;
+}
+.qf-rp-status-applied  { background: var(--success-bg); color: var(--success); }
+.qf-rp-status-discarded { background: var(--surface-3); color: var(--muted); }
+.qf-rp-status-invalid  { background: var(--error-bg); color: var(--error); }
+.qf-rate-proposal[data-status="applied"]   { border-color: var(--success); }
+.qf-rate-proposal[data-status="discarded"] { opacity: 0.72; }
