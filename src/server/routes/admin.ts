@@ -15,7 +15,13 @@ import { db } from '../../db/client.js';
 import { tenants, leads, users, auditLog } from '../../db/schema.js';
 import { requireAuth, requireSuperAdmin } from '../middleware.js';
 import { runAggregatesNow } from '../../marketplace/cron.js';
-import { PLAN_IDS } from '../plans.js';
+import {
+  PLAN_IDS,
+  PLAN_PRICES_USD,
+  normalizePlan,
+  isTrialing,
+  type PaidPlanId,
+} from '../plans.js';
 
 /** Valid tenant lifecycle statuses. 'active' is the only one that serves a
  *  public quote page — 'suspended'/'churned' 404 the widget (see public.ts's
@@ -116,6 +122,84 @@ export async function patchTenantAdmin(opts: {
   return { status: 200, json: { ok: true, tenant: after } };
 }
 
+/** The minimal tenant shape MRR needs: the billed/selected `plan`, the
+ *  lifecycle `status`, and the `trialEndsAt` timestamp that decides whether
+ *  the tenant is still inside its (unbilled) 14-day trial. */
+export interface MrrTenant {
+  plan: string | null;
+  status: string | null;
+  trialEndsAt: Date | null;
+}
+
+/** Per-plan and aggregate monthly-recurring-revenue breakdown. `mrr` is REAL
+ *  recognized revenue; the trial figures are a separate, not-yet-billed
+ *  pipeline number. All money values are USD rounded to cents. */
+export interface MrrBreakdown {
+  /** Total real MRR = Σ (active, past-trial, paid tenants) × plan price. */
+  mrr: number;
+  /** Count + revenue per paid tier, over the same active-paying population. */
+  byPlan: {
+    vital: { count: number; mrr: number };
+    pro: { count: number; mrr: number };
+  };
+  /** Active tenants still inside their 14-day trial — NOT in `mrr`. */
+  trialingCount: number;
+  /** Pipeline MRR if every current trial converts to the tier it selected
+   *  (a free/unset selection defaults to Vital). NOT counted in `mrr`. */
+  potentialTrialMrr: number;
+}
+
+const roundCents = (n: number): number => Math.round(n * 100) / 100;
+
+/**
+ * Pure, unit-testable MRR computation over the tenant list.
+ *
+ * A tenant contributes to REAL `mrr` only when it is genuinely paying:
+ *   - `status === 'active'`   (suspended / churned never bill), AND
+ *   - NOT trialing            (a trial is $0 until Stripe auto-bills at day 14), AND
+ *   - a paid `plan`           (normalizePlan → 'vital' | 'pro'; 'free' = never
+ *                              subscribed / cancelled → excluded).
+ *
+ * Active trialing tenants are tallied separately as `trialingCount` +
+ * `potentialTrialMrr` (their selected tier, defaulting Vital) so the trial
+ * pipeline is visible but never inflates recognized revenue. This mirrors the
+ * app's own access gate (see src/server/plans.ts: `effectivePlan` /
+ * `hasCoreAccess`) — it just splits the trial slice out for accounting.
+ */
+export function computeMrr(rows: MrrTenant[]): MrrBreakdown {
+  const byPlan = {
+    vital: { count: 0, mrr: 0 },
+    pro: { count: 0, mrr: 0 },
+  };
+  let trialingCount = 0;
+  let potentialTrialMrr = 0;
+
+  for (const t of rows) {
+    if (t.status !== 'active') continue; // suspended / churned never bill
+    if (isTrialing(t)) {
+      // Still inside the free trial — pipeline, not revenue.
+      trialingCount += 1;
+      const selected = normalizePlan(t.plan);
+      const converts: PaidPlanId = selected === 'free' ? 'vital' : selected;
+      potentialTrialMrr += PLAN_PRICES_USD[converts];
+      continue;
+    }
+    const plan = normalizePlan(t.plan);
+    if (plan === 'free') continue; // never subscribed / cancelled
+    byPlan[plan].count += 1;
+    byPlan[plan].mrr += PLAN_PRICES_USD[plan];
+  }
+
+  byPlan.vital.mrr = roundCents(byPlan.vital.mrr);
+  byPlan.pro.mrr = roundCents(byPlan.pro.mrr);
+  return {
+    mrr: roundCents(byPlan.vital.mrr + byPlan.pro.mrr),
+    byPlan,
+    trialingCount,
+    potentialTrialMrr: roundCents(potentialTrialMrr),
+  };
+}
+
 export function registerAdminRoutes(app: Express) {
   app.get('/api/admin/tenants', requireAuth, requireSuperAdmin, async (_req, res) => {
     const rows = await db().select().from(tenants).orderBy(desc(tenants.createdAt));
@@ -181,15 +265,29 @@ export function registerAdminRoutes(app: Express) {
   });
 
   app.get('/api/admin/stats', requireAuth, requireSuperAdmin, async (_req, res) => {
-    const [tenantCount, userCount, leadCount] = await Promise.all([
+    const [tenantCount, userCount, leadCount, mrrRows] = await Promise.all([
       db().select({ n: sql<number>`count(*)::int` }).from(tenants),
       db().select({ n: sql<number>`count(*)::int` }).from(users),
       db().select({ n: sql<number>`count(*)::int` }).from(leads),
+      // One flat scan of the columns MRR needs — no N+1; billing math runs
+      // in-code via computeMrr (unit-tested), not in SQL.
+      db()
+        .select({
+          plan: tenants.plan,
+          status: tenants.status,
+          trialEndsAt: tenants.trialEndsAt,
+        })
+        .from(tenants),
     ]);
+    const revenue = computeMrr(mrrRows);
     res.json({
       tenants: tenantCount[0]?.n ?? 0,
       users: userCount[0]?.n ?? 0,
       leads: leadCount[0]?.n ?? 0,
+      mrr: revenue.mrr,
+      byPlan: revenue.byPlan,
+      trialingCount: revenue.trialingCount,
+      potentialTrialMrr: revenue.potentialTrialMrr,
     });
   });
 
