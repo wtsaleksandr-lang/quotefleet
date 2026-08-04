@@ -67,7 +67,65 @@
     c.innerHTML = '<div class="muted">Loading…</div>';
     if (r === 'overview') return renderOverview(c);
     if (r === 'tenants') return renderTenants(c);
+    if (r === 'outreach') return renderOutreach(c);
     if (r.indexOf('tenants/') === 0) return renderTenantDetail(c, r.split('/')[1]);
+  }
+
+  // Minimal super-admin trigger for the Phase-1 company-enrichment service.
+  // Type a freight company's domain → POST /api/admin/outreach/enrich → show
+  // the returned CompanyProfile JSON. The rich provisioning UI comes later.
+  function renderOutreach(c) {
+    c.innerHTML = '';
+    c.appendChild(el('h1', { text: 'Company enrichment' }));
+    c.appendChild(el('p', {
+      class: 'page-sub',
+      text: 'Turn a freight company domain into a structured profile (deterministic parse + AI + optional FMCSA). Profile generation only — no email is sent.',
+    }));
+
+    var card = el('div', { class: 'card' });
+    var f = el('div', { class: 'field' });
+    f.appendChild(el('label', { class: 'field-label', text: 'Company domain' }));
+    var input = el('input', {
+      class: 'input',
+      type: 'text',
+      placeholder: 'acme-freight.com',
+      autocomplete: 'off',
+      spellcheck: 'false',
+    });
+    f.appendChild(input);
+    card.appendChild(f);
+    var goBtn = el('button', { class: 'btn btn-primary', type: 'button', text: 'Enrich' });
+    card.appendChild(goBtn);
+    c.appendChild(card);
+
+    var out = el('div', { style: { marginTop: '16px' } });
+    c.appendChild(out);
+
+    function run() {
+      var domain = (input.value || '').trim();
+      if (!domain) { input.focus(); return; }
+      goBtn.disabled = true;
+      out.innerHTML = '';
+      out.appendChild(el('div', { class: 'muted', text: 'Enriching ' + domain + '…' }));
+      api('/api/admin/outreach/enrich', { method: 'POST', body: { domain: domain } })
+        .then(function (d) {
+          out.innerHTML = '';
+          var pre = el('pre', {
+            class: 'input',
+            style: { whiteSpace: 'pre-wrap', overflowX: 'auto', fontVariantNumeric: 'tabular-nums' },
+            text: JSON.stringify(d.profile, null, 2),
+          });
+          out.appendChild(pre);
+        })
+        .catch(function (err) {
+          out.innerHTML = '';
+          out.appendChild(el('div', { class: 'notice error', text: err.message }));
+        })
+        .finally(function () { goBtn.disabled = false; });
+    }
+    goBtn.addEventListener('click', run);
+    input.addEventListener('keydown', function (ev) { if (ev.key === 'Enter') { ev.preventDefault(); run(); } });
+    input.focus();
   }
 
   function renderOverview(c) {

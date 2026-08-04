@@ -68,6 +68,11 @@ export interface Env {
    *  email to /api/inbound/rate-email. Unset → the inbound endpoint refuses
    *  every request (503), so email-import never accepts mail until configured. */
   INBOUND_WEBHOOK_SECRET?: string;
+  /** FMCSA QCMobile API "WebKey" for the outreach company-enrichment tool
+   *  (super-admin only). When unset, enrichment soft-skips the FMCSA
+   *  MC/DOT + firmographics lookup — the rest of the profile is unaffected.
+   *  Free key: register at https://mobile.fmcsa.dot.gov/QCDevsite/docs/getStarted. */
+  FMCSA_WEBKEY?: string;
 }
 
 let cached: Env | null = null;
@@ -163,6 +168,7 @@ export function loadEnv(): Env {
     SMTP_FROM: opt('SMTP_FROM'),
     INBOUND_EMAIL_DOMAIN: opt('INBOUND_EMAIL_DOMAIN'),
     INBOUND_WEBHOOK_SECRET: opt('INBOUND_WEBHOOK_SECRET'),
+    FMCSA_WEBKEY: opt('FMCSA_WEBKEY'),
   };
   return cached;
 }

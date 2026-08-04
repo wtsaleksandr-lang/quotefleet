@@ -34,6 +34,7 @@ import { registerQuoteDocRoutes } from './routes/quoteDoc.js';
 import { registerQuoteMapRoutes } from './routes/quoteMap.js';
 import { registerQuoteActivityRoutes } from './routes/quoteActivity.js';
 import { registerCarrierProfileRoutes } from './routes/carrierProfile.js';
+import { registerOutreachRoutes } from './routes/outreach.js';
 import { registerUnsubscribeRoutes } from './routes/unsubscribe.js';
 import { hostInfoMiddleware } from './hostInfo.js';
 
@@ -125,6 +126,7 @@ export function createApp(): express.Express {
   registerQuoteMapRoutes(app);
   registerQuoteActivityRoutes(app);
   registerCarrierProfileRoutes(app);
+  registerOutreachRoutes(app);
   registerUnsubscribeRoutes(app);
 
   app.get(['/healthz', '/api/health'], async (_req, res) => {
