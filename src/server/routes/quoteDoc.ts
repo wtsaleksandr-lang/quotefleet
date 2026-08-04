@@ -151,7 +151,7 @@ const QUOTE_DOC_EMAIL_ACTION = 'quote.doc_email_sent';
 /** auditLog.action recorded on a customer-initiated quote-doc share. */
 const QUOTE_DOC_SHARE_ACTION = 'quote.doc_shared';
 /** Hard cap on recipients per share request (also enforced client-side). */
-const MAX_SHARE_RECIPIENTS = 5;
+const MAX_SHARE_RECIPIENTS = 10;
 
 /** Conservative single-address email validation. Trims, requires a local part,
  *  an @, a dotted domain, and no whitespace. Mirrors the widget's client-side

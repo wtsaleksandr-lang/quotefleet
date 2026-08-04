@@ -599,7 +599,7 @@
       var cbSuccess = $('qf-cb-success'); if (cbSuccess) cbSuccess.style.display = 'none';
       // Remove the injected share/print links + reveal panel so the thanks step
       // is clean if it's ever revisited before the next lead is submitted.
-      $$('.qf-share-emailme, .qf-share-print, .qf-tl-sep-injected, .qf-share-panel, .qf-share-status').forEach(function (n) { n.remove(); });
+      $$('.qf-share-emailme, .qf-share-copylink, .qf-share-print, .qf-tl-sep-injected, .qf-share-panel, .qf-share-status').forEach(function (n) { n.remove(); });
       // Drop any injected "Book this load" button + panel + confirmation too.
       $$('.qf-book-btn, .qf-book-panel, .qf-book-done').forEach(function (n) { n.remove(); });
       var viewQuoteBtn = $('qf-view-quote'); if (viewQuoteBtn) viewQuoteBtn.style.display = 'none';
@@ -1684,6 +1684,11 @@
         btn.disabled = false; btn.textContent = oldText;
         if (resp.error) { showError('qf-submit-error', resp.error); return; }
         state.refId = resp.refId || '';
+        // Authoritative hosted quote URL (server-provided when available) — used
+        // by the "View quote" button AND the share-bar "Copy link" affordance.
+        // In an embedded iframe location.origin is the host site, so prefer the
+        // server's quoteUrl and only fall back to a same-origin path.
+        state.quoteUrl = resp.refId ? (resp.quoteUrl || (location.origin + '/quote/' + encodeURIComponent(resp.refId))) : '';
         // Remember the email the customer entered so "Email me this quote" can
         // send a copy to them without re-asking (empty when they gave none).
         state.customerEmail = email || '';
@@ -1694,7 +1699,7 @@
         var viewBtn = $('qf-view-quote');
         if (viewBtn) {
           if (resp.refId) {
-            viewBtn.href = resp.quoteUrl || (location.origin + '/quote/' + encodeURIComponent(resp.refId));
+            viewBtn.href = state.quoteUrl;
             viewBtn.style.display = '';
           } else {
             viewBtn.style.display = 'none';
@@ -1727,7 +1732,7 @@
   // on the per-tenant `features.quoteShare` toggle (default ON); when the
   // carrier turns it off, nothing renders. Print reuses window.qfPrintQuote.
   var SHARE_EMAIL_RE = /^[^@\s]+@[^@\s.]+(\.[^@\s.]+)+$/;
-  var MAX_SHARE_RECIPIENTS = 5;
+  var MAX_SHARE_RECIPIENTS = 10;
 
   function parseEmailList(raw) {
     return String(raw || '')
@@ -1757,7 +1762,7 @@
 
     // Idempotent: drop any previously-injected links/panel (re-quote in same
     // session) so the row never accumulates duplicates.
-    $$('.qf-share-emailme, .qf-share-print, .qf-tl-sep-injected, .qf-share-panel, .qf-share-status')
+    $$('.qf-share-emailme, .qf-share-copylink, .qf-share-print, .qf-tl-sep-injected, .qf-share-panel, .qf-share-status')
       .forEach(function (n) { n.remove(); });
 
     var status = el('div', { class: 'qf-share-status', role: 'status', 'aria-live': 'polite' });
@@ -1823,6 +1828,22 @@
       });
       injected.push(shareLink);
     }
+
+    // "Copy link" — copies the hosted quote URL (parity with the hosted quote
+    // page's Copy Link). Uses the async clipboard API with a window.prompt
+    // fallback for browsers/contexts where it's unavailable. Always available.
+    var copyLink = el('button', { type: 'button', class: 'qf-textlink qf-share-copylink', text: 'Copy link' });
+    copyLink.addEventListener('click', function () {
+      var url = state.quoteUrl || (state.refId ? (location.origin + '/quote/' + encodeURIComponent(state.refId)) : location.href);
+      function fallback() { window.prompt('Copy quote link:', url); }
+      if (navigator.clipboard && navigator.clipboard.writeText) {
+        navigator.clipboard.writeText(url).then(function () {
+          copyLink.textContent = 'Link copied';
+          setTimeout(function () { copyLink.textContent = 'Copy link'; }, 1500);
+        }, fallback);
+      } else { fallback(); }
+    });
+    injected.push(copyLink);
 
     // "Print / PDF" — reuse the widget's print path (the browser dialog also
     // saves a PDF copy). Always available, not gated on share.

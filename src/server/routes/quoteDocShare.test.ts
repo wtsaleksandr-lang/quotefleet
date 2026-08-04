@@ -7,7 +7,7 @@
  *
  *   (a) valid emails are sent the branded quote (returns { sent: n }),
  *   (b) an invalid address rejects the WHOLE request (400) — never a silent drop,
- *   (c) more than 5 recipients is capped (400),
+ *   (c) more than 10 recipients is capped (400),
  *   (d) a disabled tenant (quoteShare:false) → 403,
  *   (e) the private-calculator access gate is honoured (denied → 403),
  *   (f) duplicate addresses are de-duped (sent once),
@@ -156,21 +156,21 @@ describe('shareQuoteDoc — validation', () => {
     expect(h.sendEmailMock).not.toHaveBeenCalled();
   });
 
-  it('(c) caps at 5 recipients (400)', async () => {
+  it('(c) caps at 10 recipients (400)', async () => {
     const { shareQuoteDoc } = await import('./quoteDoc.js');
-    const six = ['1@x.com', '2@x.com', '3@x.com', '4@x.com', '5@x.com', '6@x.com'];
-    const r = await shareQuoteDoc({ refId: 'QF-ABC123', recipients: six });
+    const eleven = Array.from({ length: 11 }, (_, i) => `r${i + 1}@x.com`);
+    const r = await shareQuoteDoc({ refId: 'QF-ABC123', recipients: eleven });
     expect(r.status).toBe(400);
     expect(r.json.error).toBe('too_many');
     expect(h.sendEmailMock).not.toHaveBeenCalled();
   });
 
-  it('exactly 5 recipients is allowed', async () => {
+  it('exactly 10 recipients is allowed', async () => {
     const { shareQuoteDoc } = await import('./quoteDoc.js');
-    const five = ['1@x.com', '2@x.com', '3@x.com', '4@x.com', '5@x.com'];
-    const r = await shareQuoteDoc({ refId: 'QF-ABC123', recipients: five });
+    const ten = Array.from({ length: 10 }, (_, i) => `r${i + 1}@x.com`);
+    const r = await shareQuoteDoc({ refId: 'QF-ABC123', recipients: ten });
     expect(r.status).toBe(200);
-    expect(r.json.sent).toBe(5);
+    expect(r.json.sent).toBe(10);
   });
 
   it('empty / non-array recipients → 400 no_recipients', async () => {

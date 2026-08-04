@@ -2,3 +2,12 @@
 /* Quote terms / disclaimer — small print at the bottom of the doc (screen + print) */
 .qdoc-terms-panel{break-inside:avoid;margin-top:12px}
 .qdoc-terms-text{margin:0;color:var(--qdoc-muted);font-size:10px;line-height:1.5;white-space:pre-wrap;overflow-wrap:anywhere}
+
+/* Multi-recipient email share panel (hosted quote page) — parity with the
+   widget share bar. Reuses the .qdoc-accept panel/button/msg styling; adds only
+   the textarea, the helper hint, and a success (.ok) message colour. Theme via
+   the existing --qdoc-* tokens; full-width and reachable at 375px. */
+.qdoc-email-panel textarea{width:100%;border:1px solid var(--qdoc-line);border-radius:8px;padding:8px;font:inherit;resize:vertical}
+.qdoc-accept-hint{margin:0;color:var(--qdoc-muted);font-size:10px;line-height:1.5}
+.qdoc-accept-msg.ok{color:#047857}
+.qdoc-email-panel[hidden]{display:none!important}
