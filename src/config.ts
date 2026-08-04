@@ -45,6 +45,11 @@ export interface Env {
   STRIPE_CONNECT_WEBHOOK_SECRET?: string;
   STRIPE_PRICE_VITAL_MONTHLY?: string;
   STRIPE_PRICE_PRO_MONTHLY?: string;
+  /** Platform fee percent QuoteFleet takes from each booking deposit (a
+   *  destination charge's application_fee). Optional string override of the
+   *  2.9% default (see PLATFORM_FEE_PCT in routes/depositCharge.ts). Parsed +
+   *  range-clamped there; unset → the default applies. */
+  PLATFORM_FEE_PCT?: string;
   RESEND_API_KEY?: string;
   RESEND_FROM_EMAIL?: string;
   EIA_API_KEY?: string;
@@ -147,6 +152,7 @@ export function loadEnv(): Env {
     STRIPE_CONNECT_WEBHOOK_SECRET: opt('STRIPE_CONNECT_WEBHOOK_SECRET'),
     STRIPE_PRICE_VITAL_MONTHLY: opt('STRIPE_PRICE_VITAL_MONTHLY'),
     STRIPE_PRICE_PRO_MONTHLY: opt('STRIPE_PRICE_PRO_MONTHLY'),
+    PLATFORM_FEE_PCT: opt('PLATFORM_FEE_PCT'),
     RESEND_API_KEY: opt('RESEND_API_KEY'),
     RESEND_FROM_EMAIL: opt('RESEND_FROM_EMAIL'),
     EIA_API_KEY: opt('EIA_API_KEY'),

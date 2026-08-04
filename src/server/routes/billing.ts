@@ -36,6 +36,7 @@ import {
   PLAN_PRICES_USD,
   TRIAL_DAYS,
 } from '../plans.js';
+import { isDepositSession, handleDepositCheckoutCompleted } from './depositCharge.js';
 
 let stripeClient: Stripe | null = null;
 function stripe(): Stripe {
@@ -424,6 +425,14 @@ export async function handleEvent(event: Stripe.Event): Promise<void> {
     }
     case 'checkout.session.completed': {
       const session = event.data.object as Stripe.Checkout.Session;
+      // Booking-deposit destination charges (Wave 2b) also complete as
+      // checkout.session.completed on the PLATFORM account — reconcile those
+      // via the deposit handler, not the subscription flow. Non-deposit,
+      // non-subscription sessions fall through and no-op below.
+      if (isDepositSession(session)) {
+        await handleDepositCheckoutCompleted(session);
+        return;
+      }
       const subscriptionId = session.subscription != null ? String(session.subscription) : null;
       if (!subscriptionId) return;
       // Retrieve the subscription so we can map its Price → tier. This also

@@ -494,3 +494,30 @@ body[data-qf-map-style="blackwhite_inverted"] .qf-map-expand {
   background: rgba(20,20,20,0.65);
   box-shadow: 0 1px 4px rgba(17,17,17,0.4);
 }
+
+/* ── Deposit-charge return banner (Wave 2b) ─────────────────────────────────
+   Shown at the top of the widget when the shipper returns from Stripe Checkout
+   (?booking=paid|cancelled). Reassuring, tenant-branded via the runtime --w-*
+   tokens so it reads on light AND dark, and legible at 375px (badge + copy wrap
+   cleanly). Reuses the .qf-book-check animated checkmark for the paid state. */
+.qf-book-return {
+  display: flex;
+  align-items: center;
+  gap: var(--space-1-5);
+  margin-bottom: var(--space-2);
+  padding: var(--space-2);
+  border-radius: var(--w-radius);
+  border: 1px solid var(--w-border);
+  background: color-mix(in srgb, var(--w-fg) 4%, transparent);
+  animation: qf-book-pop 0.42s cubic-bezier(0.22, 0.61, 0.36, 1) both;
+}
+.qf-book-return[data-kind="paid"] {
+  border-color: color-mix(in srgb, var(--w-success) 35%, var(--w-border));
+  background: color-mix(in srgb, var(--w-success) 12%, var(--w-bg));
+}
+.qf-book-return-copy { min-width: 0; }
+.qf-book-return-title { font-size: 15px; font-weight: 800; color: var(--w-fg); line-height: 1.3; }
+.qf-book-return-sub { margin-top: var(--space-0-5); font-size: 13px; line-height: 1.45; color: var(--w-muted, var(--w-fg)); }
+@media (prefers-reduced-motion: reduce) {
+  .qf-book-return { animation: none; }
+}
