@@ -34,6 +34,15 @@
       </nav>
       <div class="qdoc-print-hint no-print">For a clean PDF, use Save PDF or Print and choose “Save as PDF”. Quote links remain live for follow-up and activity tracking.</div>
 
+      <section id="qdoc-email-panel" class="qdoc-accept qdoc-email-panel no-print" hidden>
+        <label>Email this quote
+          <textarea id="qdoc-email-input" rows="2" placeholder="name@company.com, colleague@company.com" aria-label="Email addresses to send this quote to"></textarea>
+        </label>
+        <p id="qdoc-email-hint" class="qdoc-accept-hint"></p>
+        <div class="qdoc-accept-actions"><button id="qdoc-email-send" type="button">Send quote</button><button id="qdoc-email-cancel" type="button" class="ghost">Cancel</button></div>
+        <p id="qdoc-email-msg" class="qdoc-accept-msg"></p>
+      </section>
+
       <section id="qdoc-callback" class="qdoc-callback no-print" hidden>
         <div><strong>Request a callback</strong><p>Send your phone number and the carrier will follow up.</p></div>
         <label>Phone<input id="qdoc-callback-phone" type="tel" placeholder="(555) 555-1234" /></label>

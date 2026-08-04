@@ -21,6 +21,17 @@
   function bool(value) { return value ? 'Yes' : 'No'; }
   function byKind(lines, kind) { return (lines || []).filter(function (l) { return l.kind === kind; }); }
 
+  // Multi-recipient email share (parity with the widget share bar). Kept in
+  // sync with the server cap (MAX_SHARE_RECIPIENTS in routes/quoteDoc.ts).
+  var MAX_SHARE_RECIPIENTS = 10;
+  var SHARE_EMAIL_RE = /^[^@\s]+@[^@\s.]+(\.[^@\s.]+)+$/;
+  function parseEmailList(raw) {
+    return String(raw || '')
+      .split(/[\s,;]+/)
+      .map(function (s) { return s.trim(); })
+      .filter(Boolean);
+  }
+
   function refFromUrl() {
     var m = location.pathname.match(/\/quote\/([^/?#]+)/);
     if (m) return decodeURIComponent(m[1]);
@@ -309,11 +320,30 @@
         setTimeout(function () { window.print(); }, 400);
       }
     } catch (e) { /* ignore */ }
+    // "Email" — reveal the multi-recipient share panel (parity with the widget
+    // share bar). Sends the carrier-branded quote to several addresses via the
+    // shared POST /api/public/quote-doc/:refId/share endpoint. Prefills the
+    // customer's own address when known.
+    var emailPanel = $('qdoc-email-panel');
+    var emailInput = $('qdoc-email-input');
+    var emailHint = $('qdoc-email-hint');
+    if (emailHint) emailHint.textContent = 'Add up to ' + MAX_SHARE_RECIPIENTS + ' addresses, separated by commas. Each person gets the full quote.';
     $('qdoc-email').onclick = function () {
-      var subject = 'Quote ' + data.quote.refId + ' from ' + ((data.brand && data.brand.displayName) || data.tenant.name);
-      var body = 'View quote ' + data.quote.refId + ': ' + (data.quote.quoteUrl || location.href) + '\n\nEstimated total: ' + money(data.quote.total, data.quote.currency);
-      location.href = 'mailto:?subject=' + encodeURIComponent(subject) + '&body=' + encodeURIComponent(body);
+      if (!emailPanel) return;
+      emailPanel.hidden = !emailPanel.hidden;
+      if (!emailPanel.hidden) {
+        setShareMsg('', '');
+        if (emailInput) {
+          var known = data.customer && data.customer.email;
+          if (!emailInput.value && known && SHARE_EMAIL_RE.test(known)) emailInput.value = known;
+          emailInput.focus();
+        }
+      }
     };
+    var emailCancel = $('qdoc-email-cancel');
+    if (emailCancel) emailCancel.onclick = function () { if (emailPanel) emailPanel.hidden = true; setShareMsg('', ''); };
+    var emailSend = $('qdoc-email-send');
+    if (emailSend) emailSend.onclick = function () { sendShareEmail(data); };
     $('qdoc-copy').onclick = function () {
       var url = data.quote.quoteUrl || location.href;
       if (navigator.clipboard && navigator.clipboard.writeText) {
@@ -383,6 +413,48 @@
       .catch(function (err) {
         if (btn) btn.disabled = false;
         if (msg) { msg.textContent = err.message || 'Could not submit your booking request.'; msg.className = 'qdoc-accept-msg error'; }
+      });
+  }
+
+  function setShareMsg(msg, kind) {
+    var el = $('qdoc-email-msg');
+    if (!el) return;
+    el.textContent = msg || '';
+    el.className = 'qdoc-accept-msg' + (kind ? ' ' + kind : '');
+  }
+
+  function sendShareEmail(data) {
+    var input = $('qdoc-email-input');
+    var btn = $('qdoc-email-send');
+    var recipients = parseEmailList(input ? input.value : '');
+    if (!recipients.length) { setShareMsg('Please enter at least one email address.', 'error'); return; }
+    if (recipients.length > MAX_SHARE_RECIPIENTS) {
+      setShareMsg('You can share with at most ' + MAX_SHARE_RECIPIENTS + ' people at a time.', 'error');
+      return;
+    }
+    var bad = recipients.filter(function (e) { return !SHARE_EMAIL_RE.test(e); });
+    if (bad.length) { setShareMsg('That email looks invalid: ' + bad[0], 'error'); return; }
+    var old = btn ? btn.textContent : '';
+    if (btn) { btn.disabled = true; btn.textContent = 'Sending…'; }
+    setShareMsg('', '');
+    fetch('/api/public/quote-doc/' + encodeURIComponent(data.quote.refId) + '/share', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ recipients: recipients }),
+    })
+      .then(function (r) { return r.json().then(function (j) { return { ok: r.ok, body: j }; }); })
+      .then(function (res) {
+        if (btn) { btn.disabled = false; btn.textContent = old; }
+        if (res.ok && res.body && res.body.sent) {
+          setShareMsg('Sent to ' + res.body.sent + (res.body.sent === 1 ? ' recipient.' : ' recipients.'), 'ok');
+          if (input) input.value = '';
+        } else {
+          setShareMsg((res.body && res.body.message) || 'Could not send — please try again.', 'error');
+        }
+      })
+      .catch(function () {
+        if (btn) { btn.disabled = false; btn.textContent = old; }
+        setShareMsg('Network error — please try again.', 'error');
       });
   }
 
