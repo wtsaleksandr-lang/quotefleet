@@ -3,6 +3,7 @@ import {
   applyDopplerSecrets,
   detectDopplerConfig,
   parseOverrideKeys,
+  selectDopplerToken,
   type DopplerSecrets,
 } from './bootstrapDoppler.js';
 
@@ -58,7 +59,8 @@ describe('applyDopplerSecrets', () => {
     applyDopplerSecrets(
       env,
       secretsOf({
-        DOPPLER_TOKEN: 'dp.st.prd.abc',
+        DOPPLER_TOKEN: 'dp.st.dev.abc',
+        DOPPLER_SERVICE_TOKEN: 'dp.st.prd.xyz',
         DOPPLER_PROJECT: 'quotefleet',
         DOPPLER_CONFIG: 'prd',
         DOPPLER_ENVIRONMENT: 'prd',
@@ -68,6 +70,7 @@ describe('applyDopplerSecrets', () => {
       }),
     );
     expect(env.DOPPLER_TOKEN).toBeUndefined();
+    expect(env.DOPPLER_SERVICE_TOKEN).toBeUndefined();
     expect(env.DOPPLER_PROJECT).toBeUndefined();
     expect(env.DOPPLER_CONFIG).toBeUndefined();
     expect(env.DOPPLER_ENVIRONMENT).toBeUndefined();
@@ -110,6 +113,97 @@ describe('detectDopplerConfig', () => {
 
   it('falls back to dev otherwise', () => {
     expect(detectDopplerConfig('dp.pt.notservice', undefined, undefined)).toBe('dev');
+  });
+});
+
+describe('selectDopplerToken', () => {
+  const PRD = 'dp.st.prd.prodtoken';
+  const DEV = 'dp.st.dev.devtoken';
+
+  it('prod: both tokens present → picks the prd token', () => {
+    const token = selectDopplerToken({
+      NODE_ENV: 'production',
+      DOPPLER_SERVICE_TOKEN: PRD,
+      DOPPLER_TOKEN: DEV,
+    });
+    expect(token).toBe(PRD);
+    expect(detectDopplerConfig(token!)).toBe('prd');
+  });
+
+  it('dev: both tokens present (NODE_ENV unset) → picks the dev token', () => {
+    const token = selectDopplerToken({
+      DOPPLER_SERVICE_TOKEN: PRD,
+      DOPPLER_TOKEN: DEV,
+    });
+    expect(token).toBe(DEV);
+    expect(detectDopplerConfig(token!)).toBe('dev');
+  });
+
+  it('dev: NODE_ENV=development explicit → picks the dev token', () => {
+    const token = selectDopplerToken({
+      NODE_ENV: 'development',
+      DOPPLER_SERVICE_TOKEN: PRD,
+      DOPPLER_TOKEN: DEV,
+    });
+    expect(token).toBe(DEV);
+  });
+
+  it('legacy: only DOPPLER_TOKEN present → uses it (fallback), even in prod', () => {
+    // A single dev token in prod: no prd match, so fall back to what we have.
+    const token = selectDopplerToken({
+      NODE_ENV: 'production',
+      DOPPLER_TOKEN: DEV,
+    });
+    expect(token).toBe(DEV);
+    expect(detectDopplerConfig(token!)).toBe('dev');
+  });
+
+  it('only DOPPLER_SERVICE_TOKEN present → uses it', () => {
+    const token = selectDopplerToken({
+      NODE_ENV: 'production',
+      DOPPLER_SERVICE_TOKEN: PRD,
+    });
+    expect(token).toBe(PRD);
+  });
+
+  it('no target-config match → falls back to the first available token', () => {
+    // Neither token is a prd token but we are in prod → fallback order:
+    // DOPPLER_SERVICE_TOKEN first, else DOPPLER_TOKEN.
+    const token = selectDopplerToken({
+      NODE_ENV: 'production',
+      DOPPLER_SERVICE_TOKEN: 'dp.st.stg.stgtoken',
+      DOPPLER_TOKEN: DEV,
+    });
+    expect(token).toBe('dp.st.stg.stgtoken');
+  });
+
+  it('neither token present → undefined (soft-skip)', () => {
+    expect(selectDopplerToken({})).toBeUndefined();
+    expect(selectDopplerToken({ NODE_ENV: 'production' })).toBeUndefined();
+  });
+
+  it('ignores empty / whitespace-only token values', () => {
+    expect(
+      selectDopplerToken({ DOPPLER_SERVICE_TOKEN: '', DOPPLER_TOKEN: '   ' }),
+    ).toBeUndefined();
+    // Empty prd slot must not shadow a real dev token.
+    const token = selectDopplerToken({
+      DOPPLER_SERVICE_TOKEN: '',
+      DOPPLER_TOKEN: DEV,
+    });
+    expect(token).toBe(DEV);
+  });
+});
+
+describe('DOPPLER_SERVICE_TOKEN is bookkeeping (never injected as an app secret)', () => {
+  it('is skipped by applyDopplerSecrets', () => {
+    const env: Record<string, string | undefined> = {};
+    applyDopplerSecrets(
+      env,
+      secretsOf({ DOPPLER_SERVICE_TOKEN: 'dp.st.prd.xyz', REAL: 'yes' }),
+    );
+    expect(env.DOPPLER_SERVICE_TOKEN).toBeUndefined();
+    expect(env.REAL).toBe('yes');
   });
 });
 
