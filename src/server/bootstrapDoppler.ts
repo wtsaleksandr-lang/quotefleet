@@ -9,17 +9,31 @@
  * works because Replit-injected env vars take precedence by default (we only
  * fill in MISSING keys; never overwrite).
  *
+ * Two-token / env-matched selection: Replit Secrets are SHARED between the dev
+ * workflow and the production deployment, so BOTH Doppler service tokens are
+ * visible in both environments:
+ *   - `DOPPLER_TOKEN`         = a dev service token  (`dp.st.dev.…`)
+ *   - `DOPPLER_SERVICE_TOKEN` = a prd service token  (`dp.st.prd.…`)
+ * We must NOT let prod boot on the dev token (that would pull test-mode Stripe
+ * / dev email into prod). {@link selectDopplerToken} picks the token whose
+ * embedded `dp.st.<config>.` matches the target config for this environment —
+ * `prd` when `NODE_ENV === 'production'` (consistent with config.ts), else
+ * `dev` — falling back to whatever single token is present. The chosen token
+ * then drives {@link detectDopplerConfig}, so the pulled config always matches
+ * the token (a prd token can only read /quotefleet/prd or the API 403s).
+ *
  * Override list (opt-in escape hatch): `DOPPLER_OVERRIDE_KEYS` —
  * comma-separated list of env-var names whose Doppler value should WIN over
  * any pre-existing process.env value. Default is empty (no overrides →
  * existing behaviour). The list can be set in Replit Secrets (highest
  * priority, useful for emergency disable) or in the Doppler config itself.
  *
- * Failure mode: soft. If DOPPLER_TOKEN is unset, Doppler is unreachable, the
+ * Failure mode: soft. If no Doppler token is present, Doppler is unreachable, the
  * response is malformed, or the request times out, we log a warning and
  * continue with whatever env the runtime already has. The server still boots;
- * only Doppler-only secrets are missing. With NO DOPPLER_TOKEN this module is
- * a complete no-op — boot behaves exactly as it did on Replit Secrets alone.
+ * only Doppler-only secrets are missing. With NO Doppler token at all this
+ * module is a complete no-op — boot behaves exactly as it did on Replit
+ * Secrets alone.
  *
  * Sync execution via execSync curl is deliberate — we need the secrets in
  * process.env BEFORE any other ESM import runs, and Node's native fetch is
@@ -35,6 +49,7 @@ import { execSync } from 'node:child_process';
 // secret and must be injected.
 export const DOPPLER_BOOKKEEPING = new Set([
   'DOPPLER_TOKEN',
+  'DOPPLER_SERVICE_TOKEN',
   'DOPPLER_PROJECT',
   'DOPPLER_CONFIG',
   'DOPPLER_ENVIRONMENT',
@@ -77,6 +92,41 @@ export function detectDopplerConfig(
   if (tokenMatch?.[1]) return tokenMatch[1];
   if (nodeEnv === 'production') return 'prd';
   return 'dev';
+}
+
+/**
+ * Pick the env-matched Doppler service token from the (shared) Replit Secrets.
+ *
+ * Replit Secrets are shared between the dev workflow and the production
+ * deployment, so BOTH tokens are visible in both environments:
+ *   - `DOPPLER_SERVICE_TOKEN` = prd token (`dp.st.prd.…`)
+ *   - `DOPPLER_TOKEN`         = dev token (`dp.st.dev.…`)
+ *
+ * We compute the target config for THIS environment (`prd` in production, else
+ * `dev` — consistent with config.ts's NODE_ENV check) and return the token
+ * whose embedded `dp.st.<config>.` matches. If none of the available tokens
+ * match the target config, we return the first available token (single-token
+ * legacy fallback). If no token is present at all, returns undefined so the
+ * caller can soft-skip.
+ */
+export function selectDopplerToken(
+  env: Record<string, string | undefined>,
+): string | undefined {
+  const targetConfig = env.NODE_ENV === 'production' ? 'prd' : 'dev';
+
+  // Preference order only matters as a fallback tie-breaker; the config match
+  // below is what actually decides. Filter out empty/undefined up front.
+  const candidates = [env.DOPPLER_SERVICE_TOKEN, env.DOPPLER_TOKEN].filter(
+    (t): t is string => typeof t === 'string' && t.trim() !== '',
+  );
+  if (candidates.length === 0) return undefined;
+
+  const matched = candidates.find((token) => {
+    const m = /^dp\.st\.([a-z0-9_-]+)\./.exec(token);
+    return m?.[1] === targetConfig;
+  });
+
+  return matched ?? candidates[0];
 }
 
 /**
@@ -140,9 +190,9 @@ export function parseOverrideKeys(raw: string | undefined): Set<string> {
 }
 
 (() => {
-  const token = process.env.DOPPLER_TOKEN;
+  const token = selectDopplerToken(process.env);
   if (!token) {
-    console.log('[doppler-bootstrap] DOPPLER_TOKEN not set — skipping');
+    console.log('[doppler-bootstrap] no Doppler token — skipping');
     return;
   }
 
