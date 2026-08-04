@@ -1213,8 +1213,8 @@ html[data-theme="light"] .hero h1 .accent {
   color: var(--success);
 }
 .qf-getpaid-status.is-pending {
-  background: var(--warning-bg, var(--surface-3));
-  color: var(--warning, var(--muted));
+  background: var(--warn-bg, var(--surface-3));
+  color: var(--warn, var(--muted));
 }
 .qf-getpaid-status.is-off {
   background: var(--surface-3);
