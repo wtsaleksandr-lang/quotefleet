@@ -64,18 +64,29 @@ export function computePlatformFeeCents(depositCents: number, pct: number = plat
 }
 
 /**
- * Whether the deposit CHARGE path should run for this tenant + deposit. All of:
- * Stripe configured, the tenant has a connected account, its charges are
- * enabled (cached flag), and a positive deposit is configured. False → the
- * caller keeps the intent-only fallback. Tenant-scoped: only this tenant's own
- * connected account is ever used as the destination.
+ * Whether the tenant is READY to take a deposit charge (independent of the
+ * per-quote amount): Stripe configured, a connected account exists, and its
+ * charges are enabled (cached flag). Exposed in the widget config as
+ * `booking.chargeReady` so the widget can label its CTA as a payment ahead of
+ * submit. Tenant-scoped: only this tenant's own connected account is ever used.
  */
-export function tenantCanCharge(tenant: Tenant | null | undefined, deposit: number): boolean {
+export function tenantChargeReady(tenant: Tenant | null | undefined): boolean {
   return (
     !!loadEnv().STRIPE_SECRET_KEY &&
     !!tenant &&
     !!tenant.stripeConnectAccountId &&
-    tenant.connectChargesEnabled === true &&
+    tenant.connectChargesEnabled === true
+  );
+}
+
+/**
+ * Whether the deposit CHARGE path should run for this tenant + deposit:
+ * `tenantChargeReady` AND a positive deposit is configured. False → the caller
+ * keeps the intent-only fallback.
+ */
+export function tenantCanCharge(tenant: Tenant | null | undefined, deposit: number): boolean {
+  return (
+    tenantChargeReady(tenant) &&
     typeof deposit === 'number' &&
     Number.isFinite(deposit) &&
     deposit > 0

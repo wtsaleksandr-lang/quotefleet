@@ -55,6 +55,7 @@ import { enforceTenantAccess } from '../access.js';
 import { resolveFeatures, resolveBookingConfig, computeDeposit } from '../features.js';
 import {
   tenantCanCharge,
+  tenantChargeReady,
   createDepositCheckoutSession,
   depositStripe,
   type DepositState,
@@ -437,11 +438,14 @@ export function registerPublicRoutes(app: Express) {
       // widget reads features.quoteShare to decide whether to render the
       // share / email / print / PDF action bar. See src/server/features.ts.
       features: resolveFeatures(brand),
-      // Per-tenant booking deposit config (display bits only — no charge in
-      // this wave). The widget reads this ONLY when features.quoteBooking is on
-      // to show the "$X deposit to book" line; the server is authoritative for
-      // the real amount on submit (accept route). Default { none, 0 }.
-      booking: resolveBookingConfig(brand),
+      // Per-tenant booking deposit config. The widget reads this ONLY when
+      // features.quoteBooking is on: it shows the "$X deposit to book" line and,
+      // when `chargeReady` is true (the carrier is Connect-ready → the accept
+      // route will collect the deposit via Stripe), labels the CTA as a PAYMENT
+      // ("Pay $X deposit to book"); otherwise the CTA is "Request booking"
+      // (intent-only). The server stays authoritative for the real amount + the
+      // charge decision on submit (accept route). Default { none, 0 }.
+      booking: { ...resolveBookingConfig(brand), chargeReady: tenantChargeReady(tenant) },
       brand: brand ?? null,
       // Fully-resolved widget theme (preset + optional accent override +
       // font). widget.js#applyTheme writes tokens.* onto the document root.

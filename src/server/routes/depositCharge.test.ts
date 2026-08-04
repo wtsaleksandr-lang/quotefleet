@@ -34,6 +34,7 @@ import {
   PLATFORM_FEE_PCT,
   platformFeePct,
   computePlatformFeeCents,
+  tenantChargeReady,
   tenantCanCharge,
   createDepositCheckoutSession,
   isDepositSession,
@@ -150,6 +151,20 @@ describe('computePlatformFeeCents — 2.9% of the deposit', () => {
     // out-of-range override falls back to the default
     mockEnv.PLATFORM_FEE_PCT = '250';
     expect(platformFeePct()).toBe(2.9);
+  });
+});
+
+describe('tenantChargeReady — carrier readiness (drives the widget CTA copy)', () => {
+  it('true when Stripe on + connected account + charges enabled (deposit-independent)', () => {
+    expect(tenantChargeReady(carrier)).toBe(true);
+  });
+  it('false when Stripe off / no account / charges disabled', () => {
+    mockEnv.STRIPE_SECRET_KEY = undefined;
+    expect(tenantChargeReady(carrier)).toBe(false);
+    mockEnv.STRIPE_SECRET_KEY = 'sk_test_123';
+    expect(tenantChargeReady({ ...carrier, stripeConnectAccountId: null } as Tenant)).toBe(false);
+    expect(tenantChargeReady({ ...carrier, connectChargesEnabled: false } as Tenant)).toBe(false);
+    expect(tenantChargeReady(null)).toBe(false);
   });
 });
 

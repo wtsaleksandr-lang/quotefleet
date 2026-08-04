@@ -29,10 +29,10 @@ const routesDir = resolve(process.cwd(), 'src/server/routes');
 const pub = (n: string) => readFile(resolve(publicDir, n), 'utf8');
 const route = (n: string) => readFile(resolve(routesDir, n), 'utf8');
 
-describe('widget config exposes the booking deposit config', () => {
-  it('the public widget config returns resolveBookingConfig(brand)', async () => {
+describe('widget config exposes the booking deposit config + charge readiness', () => {
+  it('the public widget config returns the resolved booking config + chargeReady', async () => {
     const p = await route('public.ts');
-    expect(p).toContain('booking: resolveBookingConfig(brand)');
+    expect(p).toContain('...resolveBookingConfig(brand), chargeReady: tenantChargeReady(tenant)');
     expect(p).toContain("import { resolveFeatures, resolveBookingConfig, computeDeposit } from '../features.js'");
   });
 });
@@ -182,5 +182,30 @@ describe('Wave 2b — the widget redirects to pay + renders the return states', 
     expect(js).toContain('Payment not completed');
     const css = await pub('widget-style.css');
     expect(css).toContain('.qf-book-return');
+  });
+
+  it('labels the CTA as a PAYMENT only when a charge will actually happen', async () => {
+    const js = await pub('widget.js');
+    // reads the server-provided charge-readiness flag
+    expect(js).toContain('function bookingChargeReady()');
+    expect(js).toContain('state.config.booking.chargeReady === true');
+    // charge path → "Pay $X deposit to book"; fallback → "Request booking"
+    expect(js).toContain('var willCharge = bookingChargeReady() && deposit > 0;');
+    expect(js).toContain("'Pay ' + fmtAmount(deposit) + ' deposit to book'");
+    expect(js).toContain("'Request booking'");
+  });
+});
+
+describe('Wave 2b — the qf-book CSS uses runtime theme tokens (dark-safe)', () => {
+  it('routes book text/island through --w-text / --w-success-bg|text, not the un-remapped --w-fg/--w-bg/--w-success', async () => {
+    const css = await pub('widget-style.css');
+    // deposit line + book text read on the shell via the runtime --w-text
+    expect(css).toContain('.qf-book-deposit { margin-top: var(--space-1-5); font-size: 14px; font-weight: 750; color: var(--w-text, var(--w-fg)); }');
+    // the paid island uses the runtime success PAIR (light panel, dark text),
+    // never color-mix(--w-success, --w-bg) which is a bright mint island on dark
+    expect(css).toContain('background: var(--w-success-bg, #dcfce7);');
+    expect(css).toContain('color: var(--w-success-text, var(--w-fg))');
+    // no qf-book rule paints text with the un-remapped legacy --w-fg alone
+    expect(css).not.toMatch(/\.qf-book-[\w-]+\s*\{[^}]*color:\s*var\(--w-fg\)\s*;/);
   });
 });

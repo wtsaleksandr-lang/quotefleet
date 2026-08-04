@@ -1885,6 +1885,12 @@
   function bookingConfig() {
     return (state.config && state.config.booking) || { depositType: 'none', depositValue: 0 };
   }
+  // Server-provided: is the carrier Connect-ready so a submitted booking will
+  // actually charge the deposit (vs. the intent-only "request" fallback)? Drives
+  // the CTA copy so a shipper is never surprised by a payment redirect.
+  function bookingChargeReady() {
+    return !!(state.config && state.config.booking && state.config.booking.chargeReady === true);
+  }
   function currentQuoteTotal() {
     return (state.quote && state.quote.result && typeof state.quote.result.total === 'number')
       ? state.quote.result.total : 0;
@@ -1988,7 +1994,13 @@
     var depositLine = deposit > 0
       ? el('div', { class: 'qf-book-deposit', text: fmtAmount(deposit) + ' deposit to book' })
       : null;
-    var sendBtn = el('button', { type: 'button', class: 'qf-cta qf-book-send', text: 'Request booking' });
+    // When the carrier is Connect-ready AND a deposit is due, submitting
+    // redirects the shipper to Stripe Checkout to PAY — so the CTA must say so
+    // up front ("Pay $X deposit to book"), never surprise them with a payment.
+    // Otherwise it's the intent-only path → "Request booking".
+    var willCharge = bookingChargeReady() && deposit > 0;
+    var sendLabel = willCharge ? ('Pay ' + fmtAmount(deposit) + ' deposit to book') : 'Request booking';
+    var sendBtn = el('button', { type: 'button', class: 'qf-cta qf-book-send', text: sendLabel });
     var status = el('div', { class: 'qf-book-status', role: 'status', 'aria-live': 'polite' });
     function setStatus(msg, kind) { status.textContent = msg || ''; status.setAttribute('data-kind', kind || ''); status.style.display = msg ? 'block' : 'none'; }
     var panelKids = [grid];
