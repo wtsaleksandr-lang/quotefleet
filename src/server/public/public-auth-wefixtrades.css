@@ -294,6 +294,14 @@ body.qf-auth-wft .qf-oauth-btn {
   text-decoration: none;
   transition: background .15s ease, box-shadow .15s ease;
 }
+/* The button is an <a>, and the global `body.qf-auth-wft a` rule earlier in
+   this file forces anchors to white with !important — which would otherwise
+   paint the label white-on-white. Re-assert the dark button ink here (higher
+   specificity + !important) so it wins (>=4.5:1 on the light button surface). */
+body.qf-auth-wft .qf-oauth-btn,
+body.qf-auth-wft .qf-oauth-label {
+  color: var(--qf-oauth-ink) !important;
+}
 body.qf-auth-wft .qf-oauth-btn:hover {
   background: var(--qf-oauth-bg-hover);
   box-shadow: 0 1px 2px rgba(20, 24, 28, .12);
