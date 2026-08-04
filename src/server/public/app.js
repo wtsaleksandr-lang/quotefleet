@@ -539,6 +539,15 @@
         }
       });
 
+      // ── Get paid card (Stripe Connect onboarding — payments PR 1) ──
+      // A "connect a way to get paid" section: a row of payout-provider
+      // options under one heading, holding the Stripe option today and
+      // LAID OUT so a PayPal option sits right beside it later. Only shown
+      // when Connect is configured (GET /api/tenant/connect/config), so we
+      // never advertise a button that would 503. NO charge here — onboarding
+      // + live status only.
+      renderGetPaidSection(c);
+
       // Password card
       var pwd = el('div', { class: 'card', style: { marginTop: '14px' } });
       pwd.appendChild(el('div', { class: 'card-title', text: 'Change password' }));
@@ -4190,6 +4199,103 @@
   var paymentBannerDismissed = false; // in-memory only → payment warning returns on reload
 
   // Cache /api/billing/status once; the banner + Account card both read it.
+  // ── Get paid (Stripe Connect Express onboarding) ──────────────
+  // Builds the "Connect a way to get paid" card on the Account page. Gated on
+  // GET /api/tenant/connect/config so the whole section is hidden unless
+  // payments are enabled (never advertises a 503 button). The Stripe option
+  // lives in a `.qf-getpaid-options` row deliberately built to hold a second
+  // provider (PayPal) beside it later. Reflects live onboarding status:
+  //   not connected → "Connect with Stripe"
+  //   details incomplete / charges off → "Finish setup" + pending pill
+  //   charges enabled → "✓ Ready to accept deposits" + Update-details link
+  // NO charge / money movement here — onboarding + status only (later PR moves
+  // money). A credit-card glyph (stroke=currentColor) keeps it theme-aware.
+  var CARD_SVG = '<svg class="qf-ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect width="20" height="14" x="2" y="5" rx="2"/><path d="M2 10h20"/></svg>';
+
+  function paintStripeOption(optEl, status) {
+    optEl.innerHTML = '';
+    var brand = el('div', { class: 'qf-getpaid-brand' });
+    brand.appendChild(el('span', { class: 'qf-getpaid-logo', html: CARD_SVG }));
+    var brandText = el('div', {});
+    brandText.appendChild(el('div', { class: 'qf-getpaid-name', text: 'Stripe' }));
+    brandText.appendChild(el('div', { class: 'qf-getpaid-desc', text: 'Bank payouts, cards & instant transfers' }));
+    brand.appendChild(brandText);
+    optEl.appendChild(brand);
+
+    var ready = !!(status && status.chargesEnabled);
+    var started = !!(status && status.connected);
+
+    var pill = el('span', { class: 'qf-getpaid-status ' + (ready ? 'is-ready' : (started ? 'is-pending' : 'is-off')) });
+    pill.textContent = ready ? '✓ Ready to accept deposits' : (started ? 'Setup incomplete' : 'Not connected');
+    optEl.appendChild(pill);
+
+    var actions = el('div', { class: 'qf-getpaid-actions' });
+    var btn = el('button', { class: 'btn ' + (ready ? 'btn-secondary' : 'btn-primary'), type: 'button' });
+    btn.appendChild(document.createTextNode(ready ? 'Update payout details' : (started ? 'Finish setup' : 'Connect with Stripe')));
+    if (!ready) btn.appendChild(el('span', { class: 'arr', 'aria-hidden': 'true', text: '→' }));
+    btn.addEventListener('click', function () {
+      btn.disabled = true;
+      startConnectOnboarding().then(function () { btn.disabled = false; }, function () { btn.disabled = false; });
+    });
+    actions.appendChild(btn);
+    optEl.appendChild(actions);
+  }
+
+  function renderGetPaidSection(c) {
+    // Fetch config first — hide the whole section when payments aren't enabled.
+    api('/api/tenant/connect/config').then(function (cfg) {
+      if (!cfg || !cfg.configured) return; // don't advertise
+
+      var card = el('div', { class: 'card', style: { marginTop: '14px' } });
+      card.appendChild(el('div', { class: 'card-title', text: 'Get paid' }));
+      card.appendChild(el('p', { class: 'muted-small', style: { marginTop: 0, marginBottom: '16px' }, text: 'Connect a way to get paid so you can collect deposits from customers when they book. Your details go straight to the payment provider — QuoteFleet never stores your bank info.' }));
+
+      var options = el('div', { class: 'qf-getpaid-options' });
+
+      // Stripe option — the live one.
+      var stripeOpt = el('div', { class: 'qf-getpaid-option' });
+      stripeOpt.appendChild(el('div', { class: 'qf-getpaid-brand' }, [el('span', { class: 'qf-getpaid-logo', html: CARD_SVG }), el('div', {}, [el('div', { class: 'qf-getpaid-name', text: 'Stripe' })])]));
+      stripeOpt.appendChild(el('p', { class: 'muted-small', style: { margin: 0 }, text: 'Checking status…' }));
+      options.appendChild(stripeOpt);
+
+      // Second-provider slot — laid out so a real PayPal "Connect" option drops
+      // in right beside Stripe in a later PR. Muted, clearly a placeholder.
+      var soon = el('div', { class: 'qf-getpaid-option is-soon' });
+      soon.appendChild(el('div', { class: 'qf-getpaid-brand' }, [el('span', { class: 'qf-getpaid-logo', html: CARD_SVG }), el('div', {}, [el('div', { class: 'qf-getpaid-name', text: 'PayPal' })])]));
+      soon.appendChild(el('span', { class: 'qf-getpaid-status is-off', text: 'Coming soon' }));
+      options.appendChild(soon);
+
+      card.appendChild(options);
+      c.appendChild(card);
+
+      // A trip back from Stripe-hosted onboarding lands on ?connect=return.
+      try {
+        if (/[?&]connect=return\b/.test(location.search)) toast('Thanks — checking your payout setup…', 'success');
+      } catch (e) {}
+
+      // Fill live status into the Stripe option.
+      api('/api/tenant/connect/status').then(function (status) {
+        paintStripeOption(stripeOpt, status);
+      }).catch(function () {
+        paintStripeOption(stripeOpt, { connected: false });
+      });
+    }).catch(function () { /* config unreachable → keep section hidden */ });
+  }
+
+  // POST /api/tenant/connect/onboard → Stripe-hosted Express onboarding URL we
+  // redirect to. 503 when payments aren't enabled (soft toast, no dead-end).
+  function startConnectOnboarding() {
+    return api('/api/tenant/connect/onboard', { method: 'POST' })
+      .then(function (r) {
+        if (r && r.url) { window.location.href = r.url; return; }
+        toast('Payout setup is unavailable right now.', 'warn');
+      })
+      .catch(function (e) {
+        if (e && e.status === 503) { toast(e.message || 'Payments are not enabled yet.', 'warn'); return; }
+        toastErr(e);
+      });
+  }
+
   function ensureBillingStatus() {
     if (state.billing) return Promise.resolve(state.billing);
     return api('/api/billing/status')

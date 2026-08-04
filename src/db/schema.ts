@@ -128,6 +128,22 @@ export const tenants = pgTable(
     stripeSubscriptionId: text('stripe_subscription_id'),
     /** When the current subscription period ends (mirrored from Stripe). */
     subscriptionEndsAt: timestamp('subscription_ends_at', { mode: 'date' }),
+    /** Stripe Connect (Express) connected-account id for this carrier — set
+     *  the first time the owner starts payout onboarding via
+     *  POST /api/tenant/connect/onboard. Null until then; every existing
+     *  tenant reads null (additive, no backfill). This is the account that
+     *  will later collect deposits from shippers with QuoteFleet as the
+     *  platform taking a fee. Money movement is a LATER PR — this column
+     *  only records the onboarding link. */
+    stripeConnectAccountId: text('stripe_connect_account_id').unique(),
+    /** Cached Connect readiness flags, refreshed from Stripe on every
+     *  /connect/status read and by the account.updated webhook. The live
+     *  Stripe account is authoritative; these are a convenience cache so the
+     *  UI can render "ready to accept deposits" without a round-trip. Null
+     *  until the account exists / first status read. */
+    connectDetailsSubmitted: boolean('connect_details_submitted'),
+    connectChargesEnabled: boolean('connect_charges_enabled'),
+    connectPayoutsEnabled: boolean('connect_payouts_enabled'),
     /** Tracks one-shot lifecycle emails so the cron doesn't re-send.
      *  Keys: 'welcome', 'day_7', 'trialReminderDay11SentAt',
      *  'trialReminderDay14SentAt', 'day_14_expired', etc.

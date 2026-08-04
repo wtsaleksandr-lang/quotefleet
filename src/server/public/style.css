@@ -1149,3 +1149,84 @@ html[data-theme="light"] .hero h1 .accent {
   border-radius: var(--radius-lg);
   padding: var(--space-3);
 }
+
+/* ── Get paid (Stripe Connect Express onboarding) ──────────────────
+   The Account-page "Connect a way to get paid" card. `.qf-getpaid-options`
+   is a responsive grid that holds ONE provider today (Stripe) and drops a
+   second (PayPal) right beside it later with no layout change — auto-fit
+   columns wrap to a single column on narrow / 375px screens. Each option is
+   a self-contained tile (surface + hairline + radius) with a brand row, a
+   status pill, and an action button. Tokens + 8px ramp only; theme-aware
+   via var(--*), so light + dark both read correctly. */
+.qf-getpaid-options {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+  gap: var(--space-2);
+}
+.qf-getpaid-option {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1-5);
+  align-items: flex-start;
+  background: var(--surface-2);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  padding: var(--space-2);
+}
+.qf-getpaid-option.is-soon {
+  background: transparent;
+  border-style: dashed;
+  opacity: 0.7;
+}
+.qf-getpaid-brand {
+  display: flex;
+  align-items: center;
+  gap: var(--space-1);
+}
+.qf-getpaid-logo {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--accent);
+}
+.qf-getpaid-name {
+  font-size: 15px;
+  font-weight: 700;
+  color: var(--ink);
+  letter-spacing: -0.01em;
+}
+.qf-getpaid-desc {
+  font-size: 12px;
+  color: var(--muted);
+  line-height: 1.4;
+}
+.qf-getpaid-status {
+  display: inline-flex;
+  align-items: center;
+  padding: var(--space-0-5) var(--space-1);
+  border-radius: var(--radius-pill);
+  font-size: 12px;
+  font-weight: 600;
+}
+.qf-getpaid-status.is-ready {
+  background: var(--success-bg);
+  color: var(--success);
+}
+.qf-getpaid-status.is-pending {
+  background: var(--warn-bg, var(--surface-3));
+  color: var(--warn, var(--muted));
+}
+.qf-getpaid-status.is-off {
+  background: var(--surface-3);
+  color: var(--muted);
+}
+.qf-getpaid-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-1);
+  margin-top: var(--space-0-5);
+}
+@media (max-width: 480px) {
+  .qf-getpaid-options { grid-template-columns: 1fr; }
+  .qf-getpaid-actions .btn { width: 100%; justify-content: center; }
+}
