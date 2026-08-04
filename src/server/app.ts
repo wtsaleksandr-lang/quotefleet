@@ -17,6 +17,7 @@ import {
   renderGatePage,
 } from './access.js';
 import { registerAuthRoutes } from './routes/auth.js';
+import { registerOAuthRoutes } from './routes/oauth.js';
 import { registerPublicRoutes } from './routes/public.js';
 import { registerTenantRoutes } from './routes/tenant.js';
 import { registerAdminRoutes } from './routes/admin.js';
@@ -105,6 +106,7 @@ export function createApp(): express.Express {
   });
 
   registerAuthRoutes(app);
+  registerOAuthRoutes(app);
   registerPublicRoutes(app);
   registerTenantRoutes(app);
   registerAdminRoutes(app);
