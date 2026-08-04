@@ -309,3 +309,23 @@ html[data-theme="light"] tr.qf-lead-hot-row {
     width: 100%;
   }
 }
+
+/* ── badge-progress: WCAG-AA amber "In progress" status ──────────────────────
+   The callback "in_progress" status can't reuse .badge-warn — dashboard-polish
+   .css overrides that global class to a low-contrast blue (--accent-2) that
+   fails AA (~2.1:1 light) and is indistinguishable from the blue .badge-info
+   "Open" badge. This dedicated class uses conventional amber with OPAQUE
+   backgrounds (so the ratio doesn't depend on a translucent blend over the
+   card surface), verified against the badge TEXT:
+     dark  (default): #FCD34D on #451A03 = 10.39:1  (AA pass, needs >=4.5)
+     light (opt-in) : #92400E on #FEF3C7 =  6.37:1  (AA pass)
+   Amber is a distinct hue from the blue "Open" badge. Not white/black, so the
+   hardcoded-color guard is satisfied. Theme-aware via the data-theme override. */
+.badge-progress {
+  background: #451A03;
+  color: #FCD34D;
+}
+html[data-theme="light"] .badge-progress {
+  background: #FEF3C7;
+  color: #92400E;
+}

@@ -50,11 +50,23 @@ describe('leads + callbacks UX polish', () => {
   it('assigns each callback status a real, tinted badge class', async () => {
     const js = await file('app.js');
     const cls = extractFn(js, 'callbackStatusClass');
-    const valid = new Set(['badge-info', 'badge-warn', 'badge-success', 'badge-muted', 'badge-error']);
+    const valid = new Set(['badge-info', 'badge-progress', 'badge-success', 'badge-muted', 'badge-error']);
     for (const s of ['open', 'in_progress', 'completed', 'no_answer', 'cancelled']) {
       expect(valid.has(cls(s))).toBe(true);
     }
     expect(cls('unknown')).toBe('badge-muted');
+  });
+
+  it('uses the AA-safe amber badge-progress for in_progress, never badge-warn', async () => {
+    const js = await file('app.js');
+    const css = await file('lead-queue-search.css');
+    const cls = extractFn(js, 'callbackStatusClass');
+    // badge-warn is overridden to a low-contrast blue elsewhere — must not be used.
+    expect(cls('in_progress')).toBe('badge-progress');
+    expect(cls('in_progress')).not.toBe('badge-warn');
+    // The dedicated class is defined with a light-theme override (theme-aware).
+    expect(css).toContain('.badge-progress {');
+    expect(css).toContain('html[data-theme="light"] .badge-progress {');
   });
 
   it('covers exactly the CALLBACK_STATUSES the queue offers', async () => {

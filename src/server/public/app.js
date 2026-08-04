@@ -876,7 +876,10 @@
   function callbackStatusClass(s) {
     return ({
       open: 'badge-info',
-      in_progress: 'badge-warn',
+      // Dedicated amber class — NOT badge-warn, which dashboard-polish.css
+      // overrides to a low-contrast blue (fails WCAG AA + clashes with the
+      // blue "Open" badge). badge-progress is defined in lead-queue-search.css.
+      in_progress: 'badge-progress',
       completed: 'badge-success',
       no_answer: 'badge-muted',
       cancelled: 'badge-error',
