@@ -67,6 +67,11 @@
     if (t) return t;
     t = document.createElement('div');
     t.id = 'qf-toasts';
+    // Announce toast content to assistive tech: polite live region so a
+    // "Saved" confirmation is read without stealing focus.
+    t.setAttribute('role', 'status');
+    t.setAttribute('aria-live', 'polite');
+    t.setAttribute('aria-atomic', 'true');
     t.style.cssText = 'position:fixed;right:18px;bottom:18px;z-index:10000;display:flex;flex-direction:column;gap:8px;pointer-events:none;';
     document.body.appendChild(t);
     return t;
@@ -857,6 +862,27 @@
     })[s] || s;
   }
 
+  // Callback statuses render as the same tinted badges as lead statuses (never
+  // raw snake_case). Labels drive both the queue badge + the <select> options.
+  function callbackStatusLabel(s) {
+    return ({
+      open: 'Open',
+      in_progress: 'In progress',
+      completed: 'Completed',
+      no_answer: 'No answer',
+      cancelled: 'Cancelled',
+    })[s] || s;
+  }
+  function callbackStatusClass(s) {
+    return ({
+      open: 'badge-info',
+      in_progress: 'badge-warn',
+      completed: 'badge-success',
+      no_answer: 'badge-muted',
+      cancelled: 'badge-error',
+    })[s] || 'badge-muted';
+  }
+
   // ── Leads ─────────────────────────────────────────────────────
   function renderLeads(c) {
     var inner = location.pathname.split('/app/leads/')[1];
@@ -929,14 +955,14 @@
       ]));
       var searchField = el('label');
       searchField.appendChild(el('span', { text: 'Search leads' }));
-      var searchInput = el('input', { type: 'search', placeholder: 'Search ref, company, lane…' });
+      var searchInput = el('input', { type: 'search', placeholder: 'Search ref, company, lane…', 'aria-label': 'Search leads by ref, customer, company, email, or lane' });
       searchInput.value = state.search;
       searchField.appendChild(searchInput);
       bar.appendChild(searchField);
 
       var statusField = el('label');
       statusField.appendChild(el('span', { text: 'Status' }));
-      var statusSel = el('select', { class: 'qf-lead-status-filter' });
+      var statusSel = el('select', { class: 'qf-lead-status-filter', 'aria-label': 'Filter leads by status' });
       statusSel.appendChild(el('option', { value: '', text: 'All statuses' }));
       LEAD_STATUSES.forEach(function (s) {
         var o = el('option', { value: s, text: statusLabel(s) });
@@ -1002,7 +1028,7 @@
           on: { click: function () { go('leads/' + l.refId); } },
           style: { cursor: 'pointer' },
           html: '<td data-label="Ref"><strong>' + escapeHtml(l.refId) + '</strong></td>' +
-                '<td data-label="Customer">' + escapeHtml(l.customerName || '—') + '<br><span class="muted-small">' + escapeHtml(l.customerEmail || '') + '</span></td>' +
+                '<td data-label="Customer"><span class="qf-stack-cell">' + escapeHtml(l.customerName || '—') + '<br><span class="muted-small">' + escapeHtml(l.customerEmail || '') + '</span></span></td>' +
                 '<td data-label="Service">' + escapeHtml(l.service || '') + ' / ' + escapeHtml(l.equipment || '') + '</td>' +
                 '<td data-label="Lane">' + escapeHtml(l.pickupCity || '?') + ' → ' + escapeHtml(l.deliveryCity || '?') + '</td>' +
                 '<td data-label="Total" style="text-align:right;">$' + fmtMoney(l.quotedTotal) + '</td>' +
@@ -1017,11 +1043,11 @@
     function renderPager(d, totalPages) {
       shell.pager.innerHTML = '';
       if (totalPages <= 1) return;
-      var prev = el('button', { type: 'button', class: 'btn btn-secondary', text: 'Prev' });
+      var prev = el('button', { type: 'button', class: 'btn btn-secondary', text: 'Prev', 'aria-label': 'Previous page of leads' });
       if (d.page <= 1) prev.setAttribute('disabled', '');
       prev.addEventListener('click', function () { if (state.page > 1) { state.page -= 1; load(); } });
       var info = el('span', { class: 'qf-leads-pager-info', text: 'Page ' + d.page + ' of ' + totalPages });
-      var next = el('button', { type: 'button', class: 'btn btn-secondary', text: 'Next' });
+      var next = el('button', { type: 'button', class: 'btn btn-secondary', text: 'Next', 'aria-label': 'Next page of leads' });
       if (d.page >= totalPages) next.setAttribute('disabled', '');
       next.addEventListener('click', function () { if (state.page < totalPages) { state.page += 1; load(); } });
       shell.pager.appendChild(prev);
@@ -1081,7 +1107,7 @@
           LEAD_STATUSES.forEach(function (s) {
             var o = document.createElement('option'); o.value = s; o.textContent = statusLabel(s); if (l.status === s) o.selected = true; sel.appendChild(o);
           });
-          sel.addEventListener('change', function () { api('/api/tenant/leads/' + encodeURIComponent(l.refId), { method: 'PATCH', body: { status: sel.value } }).catch(toastErr); });
+          sel.addEventListener('change', function () { saved(api('/api/tenant/leads/' + encodeURIComponent(l.refId), { method: 'PATCH', body: { status: sel.value } })); });
           f.appendChild(sel);
           return f;
         })(),
@@ -1091,7 +1117,12 @@
         (function () {
           var ta = el('textarea', { class: 'textarea', placeholder: 'Notes for your team…' });
           ta.value = l.notes || '';
-          ta.addEventListener('blur', function () { api('/api/tenant/leads/' + encodeURIComponent(l.refId), { method: 'PATCH', body: { notes: ta.value } }).catch(toastErr); });
+          // Only save (and toast) when the notes actually changed, so a blur
+          // that touched nothing doesn't fire a phantom "Saved".
+          ta.addEventListener('blur', function () {
+            if (ta.value === (l.notes || '')) return;
+            saved(api('/api/tenant/leads/' + encodeURIComponent(l.refId), { method: 'PATCH', body: { notes: ta.value } }).then(function (r) { l.notes = ta.value; return r; }));
+          });
           return ta;
         })(),
       ]));
@@ -1156,28 +1187,34 @@
         var topicLine = (cb.topic || '').slice(0, 80);
         if (cb.preferredTime) topicLine = topicLine ? topicLine + ' · ' + cb.preferredTime : cb.preferredTime;
         row.innerHTML =
-          '<td data-label="Customer"><strong>' + escapeHtml(cb.customerName || '—') + '</strong>' +
-            (cb.customerCompany ? '<br><span class="muted-small">' + escapeHtml(cb.customerCompany) + '</span>' : '') + '</td>' +
-          '<td data-label="Phone"><a href="tel:' + encodeURIComponent(cb.customerPhone) + '">' + escapeHtml(cb.customerPhone) + '</a>' +
-            (cb.customerEmail ? '<br><span class="muted-small">' + escapeHtml(cb.customerEmail) + '</span>' : '') + '</td>' +
+          '<td data-label="Customer"><span class="qf-stack-cell"><strong>' + escapeHtml(cb.customerName || '—') + '</strong>' +
+            (cb.customerCompany ? '<br><span class="muted-small">' + escapeHtml(cb.customerCompany) + '</span>' : '') + '</span></td>' +
+          '<td data-label="Phone"><span class="qf-stack-cell"><a href="tel:' + encodeURIComponent(cb.customerPhone) + '">' + escapeHtml(cb.customerPhone) + '</a>' +
+            (cb.customerEmail ? '<br><span class="muted-small">' + escapeHtml(cb.customerEmail) + '</span>' : '') + '</span></td>' +
           '<td data-label="Quote">' + (cb.leadRefId ? '<a href="/app/leads/' + encodeURIComponent(cb.leadRefId) + '" data-route="leads/' + encodeURIComponent(cb.leadRefId) + '">' + escapeHtml(cb.leadRefId) + '</a>' : '<span class="muted-small">—</span>') + '</td>' +
           '<td data-label="Topic"><span class="muted-small">' + escapeHtml(topicLine || '—') + '</span>' +
             (cb.triggerSource === 'chat_escalation' ? '<br><span class="badge">from chat</span>' : '') + '</td>' +
           '<td data-label="Status"></td>' +
           '<td data-label="When"><span class="muted-small">' + fmtDate(cb.createdAt) + '</span></td>' +
           '<td data-label="Notes"></td>';
-        // Status select.
+        // Status: a tinted badge (matching the leads table) with the <select>
+        // beneath it to change it. Both render the human label — never the raw
+        // snake_case value.
         var statusCell = row.children[4];
-        var sel = el('select', { class: 'select' });
+        var statusWrap = el('div', { class: 'qf-cb-status' });
+        var statusBadge = el('span', { class: 'badge ' + callbackStatusClass(cb.status), text: callbackStatusLabel(cb.status) });
+        var sel = el('select', { class: 'select', 'aria-label': 'Callback status' });
         CALLBACK_STATUSES.forEach(function (s) {
-          var o = document.createElement('option'); o.value = s; o.textContent = s; if (cb.status === s) o.selected = true; sel.appendChild(o);
+          var o = document.createElement('option'); o.value = s; o.textContent = callbackStatusLabel(s); if (cb.status === s) o.selected = true; sel.appendChild(o);
         });
         sel.addEventListener('change', function () {
-          api('/api/tenant/callbacks/' + cb.id, { method: 'PATCH', body: { status: sel.value } })
+          saved(api('/api/tenant/callbacks/' + cb.id, { method: 'PATCH', body: { status: sel.value } }))
             .then(function () { setTimeout(function () { renderCallbacks(c); }, 80); })
-            .catch(toastErr);
+            .catch(function () { /* toastErr already fired via saved() */ });
         });
-        statusCell.appendChild(sel);
+        statusWrap.appendChild(statusBadge);
+        statusWrap.appendChild(sel);
+        statusCell.appendChild(statusWrap);
         // Notes editor — inline expandable textarea. Replaces the old
         // window.prompt() flow (which violated the title-in-field +
         // top-left help-cue UI rule and offered no dark-mode contrast).

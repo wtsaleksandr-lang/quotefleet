@@ -269,3 +269,43 @@ html[data-theme="light"] tr.qf-lead-hot-row {
       "count";
   }
 }
+
+/* ── Stacked value cells (name over email/company/phone) ─────────────────────
+   The ≤480px card reflow makes each <td> a flex row (data-label ::before on the
+   left, value on the right). A raw `name<br><span>email</span>` value would turn
+   the <br> and the <span> into SEPARATE flex items, dropping the name and email
+   onto the same line. Wrapping the pair in .qf-stack-cell makes it ONE flex item
+   whose internal <br> stacks name ABOVE email as intended. Desktop is a plain
+   inline span (block content flows exactly as before). Tokens + 8px ramp only. */
+.qf-stack-cell { display: inline; }
+@media (max-width: 480px) {
+  .qf-leads-table tbody td .qf-stack-cell {
+    display: inline-flex;
+    flex-direction: column;
+    align-items: flex-end;
+    gap: var(--space-0-5);
+  }
+  .qf-leads-table tbody td .qf-stack-cell br { display: none; }
+  .qf-leads-table tbody td .qf-stack-cell .muted-small { display: block; }
+}
+
+/* ── Callback status cell: tinted badge above the change <select> ────────────
+   Mirrors how the leads table badges a status, then keeps the <select> for
+   changing it. On a phone the pair is the single value flex-item of the STATUS
+   card row, right-aligned with the select spanning the card. */
+.qf-cb-status {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: var(--space-0-5);
+}
+@media (max-width: 480px) {
+  .qf-callbacks-table tbody td .qf-cb-status {
+    flex: 1 1 auto;
+    align-items: flex-end;
+  }
+  .qf-callbacks-table tbody td .qf-cb-status .select {
+    flex: 0 0 auto;
+    width: 100%;
+  }
+}
