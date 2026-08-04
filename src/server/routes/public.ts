@@ -53,6 +53,13 @@ import { resolveQuoteDisclaimer } from '../quoteDisclaimer.js';
 import { loadCarrierProfile } from './carrierProfile.js';
 import { enforceTenantAccess } from '../access.js';
 import { resolveFeatures, resolveBookingConfig, computeDeposit } from '../features.js';
+import {
+  tenantCanCharge,
+  tenantChargeReady,
+  createDepositCheckoutSession,
+  depositStripe,
+  type DepositState,
+} from './depositCharge.js';
 
 /** Returns true if the request's Origin/Referer host matches the
  *  tenant's brand_configs.allowed_domains (CSV). Empty list = wide open
@@ -431,11 +438,14 @@ export function registerPublicRoutes(app: Express) {
       // widget reads features.quoteShare to decide whether to render the
       // share / email / print / PDF action bar. See src/server/features.ts.
       features: resolveFeatures(brand),
-      // Per-tenant booking deposit config (display bits only — no charge in
-      // this wave). The widget reads this ONLY when features.quoteBooking is on
-      // to show the "$X deposit to book" line; the server is authoritative for
-      // the real amount on submit (accept route). Default { none, 0 }.
-      booking: resolveBookingConfig(brand),
+      // Per-tenant booking deposit config. The widget reads this ONLY when
+      // features.quoteBooking is on: it shows the "$X deposit to book" line and,
+      // when `chargeReady` is true (the carrier is Connect-ready → the accept
+      // route will collect the deposit via Stripe), labels the CTA as a PAYMENT
+      // ("Pay $X deposit to book"); otherwise the CTA is "Request booking"
+      // (intent-only). The server stays authoritative for the real amount + the
+      // charge decision on submit (accept route). Default { none, 0 }.
+      booking: { ...resolveBookingConfig(brand), chargeReady: tenantChargeReady(tenant) },
       brand: brand ?? null,
       // Fully-resolved widget theme (preset + optional accent override +
       // font). widget.js#applyTheme writes tokens.* onto the document root.
@@ -1166,11 +1176,10 @@ export function registerPublicRoutes(app: Express) {
 
       // Resolve the tenant's booking deposit config and compute the deposit for
       // THIS quote total. Server-authoritative — the widget only displays a
-      // preview; the persisted/notified amount is computed here from the saved
-      // quotedTotal so a tampered client can't set its own deposit. Display +
-      // intent only in this wave (no charge). Wave 2b (Stripe) creates the
-      // PaymentIntent HERE from the same `deposit` value, keying idempotency on
-      // refId, before/after the status update.
+      // preview; the charged/persisted/notified amount is computed here from the
+      // saved quotedTotal so a tampered client can't set its own deposit. This
+      // same `deposit` value feeds the Wave 2b Stripe Checkout destination charge
+      // below (createDepositCheckoutSession) when the carrier is Connect-ready.
       const acceptBrand = (
         await db().select().from(brandConfigs).where(eq(brandConfigs.tenantId, lead.tenantId)).limit(1)
       )[0];
@@ -1198,6 +1207,62 @@ export function registerPublicRoutes(app: Express) {
         .join('\n')
         .slice(0, 4000) || null;
 
+      // ── CHARGE PATH (Wave 2b) ────────────────────────────────────────────
+      // When the carrier is Connect-ready (charges enabled) AND a deposit > 0 is
+      // configured AND Stripe is on, collect the deposit via a Stripe Checkout
+      // destination charge: shipper pays → funds route to the carrier's
+      // connected account, QuoteFleet keeps the platform fee. The amount is the
+      // SERVER-recomputed `deposit` (never a client value). We record a
+      // deposit-pending state (with the session id) and redirect the shipper to
+      // pay. If session creation fails for any reason we fall through to the
+      // intent-only path so the carrier still gets a booking request.
+      if (tenantCanCharge(acceptTenant, deposit) && acceptTenant) {
+        try {
+          const created = await createDepositCheckoutSession({
+            stripe: depositStripe(),
+            tenant: acceptTenant,
+            refId,
+            deposit,
+            currency: bookingCurrency,
+          });
+          const depositState: DepositState = {
+            status: 'pending',
+            sessionId: created.sessionId,
+            amountCents: created.amountCents,
+            currency: bookingCurrency,
+            applicationFeeAmount: created.applicationFeeAmount,
+          };
+          const mergedMeta = { ...((lead.metaJson as Record<string, unknown>) ?? {}), deposit: depositState };
+          await db()
+            .update(leads)
+            .set({
+              status: nextStatus,
+              notes: mergedNotes,
+              metaJson: mergedMeta as Record<string, unknown>,
+              updatedAt: new Date(),
+            })
+            .where(eq(leads.id, lead.id));
+          // Carrier is notified on payment (checkout.session.completed webhook),
+          // not here — the booking isn't confirmed until the deposit lands.
+          return res.json({
+            ok: true,
+            status: nextStatus,
+            deposit,
+            checkoutUrl: created.url,
+          });
+        } catch (err) {
+          console.error(
+            `[public/accept] deposit checkout failed (quote ${refId}) — falling back to intent-only:`,
+            err
+          );
+          // fall through to the intent-only path below
+        }
+      }
+
+      // ── INTENT-ONLY FALLBACK ─────────────────────────────────────────────
+      // Carrier not Connect-ready / no deposit / Stripe off / charge errored →
+      // the original behavior: record booking_requested + notify the carrier,
+      // no charge. Carriers who never connected keep working exactly as today.
       await db()
         .update(leads)
         .set({ status: nextStatus, notes: mergedNotes, updatedAt: new Date() })

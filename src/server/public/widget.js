@@ -465,6 +465,9 @@
         renderContact(cfg.contact);
         renderServices(cfg.services);
         renderAccessorials(cfg.accessorials);
+        // Show the deposit paid / cancelled banner when returning from Stripe
+        // Checkout (?booking=paid|cancelled), independent of the quote flow.
+        renderBookingReturn();
         autoResize();
       })
       .catch(function () { $('qf-root').innerHTML = '<div class="qf-error">Failed to load widget. Please refresh.</div>'; });
@@ -1882,6 +1885,12 @@
   function bookingConfig() {
     return (state.config && state.config.booking) || { depositType: 'none', depositValue: 0 };
   }
+  // Server-provided: is the carrier Connect-ready so a submitted booking will
+  // actually charge the deposit (vs. the intent-only "request" fallback)? Drives
+  // the CTA copy so a shipper is never surprised by a payment redirect.
+  function bookingChargeReady() {
+    return !!(state.config && state.config.booking && state.config.booking.chargeReady === true);
+  }
   function currentQuoteTotal() {
     return (state.quote && state.quote.result && typeof state.quote.result.total === 'number')
       ? state.quote.result.total : 0;
@@ -1897,6 +1906,55 @@
     var t = (typeof total === 'number' && isFinite(total) && total > 0) ? total : 0;
     if (t === 0) return 0;
     return Math.round(t * Math.min(value, 100)) / 100; // (t * pct/100) to cents
+  }
+
+  // Redirect the shipper to Stripe's hosted Checkout. The widget can run inside
+  // a third-party iframe where Checkout can't be framed, so navigate the TOP
+  // browsing context (the click is a user gesture); if that's blocked
+  // cross-origin, fall back to same-window, then a new tab.
+  function gotoCheckout(url) {
+    if (!url) return;
+    try {
+      if (window.top && window.top !== window.self) { window.top.location.href = url; return; }
+    } catch (e) { /* cross-origin top — fall through */ }
+    try { window.location.href = url; return; } catch (e2) { /* fall through */ }
+    try { window.open(url, '_blank'); } catch (e3) { /* give up silently */ }
+  }
+
+  // On return from Stripe Checkout the success/cancel URL lands back on the
+  // hosted quote page with ?booking=paid|cancelled. Render a standalone,
+  // reassuring banner at the top of the widget (the quote flow state is gone
+  // after the redirect, so this does NOT depend on state.refId).
+  function renderBookingReturn() {
+    var status = '';
+    try { status = new URLSearchParams(location.search).get('booking') || ''; } catch (e) { return; }
+    if (status !== 'paid' && status !== 'cancelled') return;
+    var root = $('qf-root');
+    if (!root) return;
+    if ($$('.qf-book-return').length) return; // idempotent
+
+    var banner = el('div', { class: 'qf-book-return', role: 'status', 'aria-live': 'polite', 'data-kind': status });
+    if (status === 'paid') {
+      banner.innerHTML =
+        '<span class="qf-book-check" aria-hidden="true">'
+          + '<svg viewBox="0 0 52 52" width="40" height="40" role="img">'
+          + '<circle class="qf-book-check-circle" cx="26" cy="26" r="24" fill="none" stroke-width="3"></circle>'
+          + '<path class="qf-book-check-path" fill="none" stroke-width="4" stroke-linecap="round" stroke-linejoin="round" d="M15 27 l7 7 l15 -16"></path>'
+          + '</svg>'
+        + '</span>'
+        + '<div class="qf-book-return-copy">'
+          + '<div class="qf-book-return-title">Deposit paid — booking confirmed</div>'
+          + '<div class="qf-book-return-sub">Thanks! Your deposit is in and the carrier has been notified. They’ll follow up to arrange pickup.</div>'
+        + '</div>';
+    } else {
+      banner.innerHTML =
+        '<div class="qf-book-return-copy">'
+          + '<div class="qf-book-return-title">Payment not completed</div>'
+          + '<div class="qf-book-return-sub">No worries — nothing was charged. You can start a new quote below and book again whenever you’re ready.</div>'
+        + '</div>';
+    }
+    root.insertBefore(banner, root.firstChild);
+    autoResize();
   }
 
   function renderBookingAffordance() {
@@ -1936,7 +1994,13 @@
     var depositLine = deposit > 0
       ? el('div', { class: 'qf-book-deposit', text: fmtAmount(deposit) + ' deposit to book' })
       : null;
-    var sendBtn = el('button', { type: 'button', class: 'qf-cta qf-book-send', text: 'Request booking' });
+    // When the carrier is Connect-ready AND a deposit is due, submitting
+    // redirects the shipper to Stripe Checkout to PAY — so the CTA must say so
+    // up front ("Pay $X deposit to book"), never surprise them with a payment.
+    // Otherwise it's the intent-only path → "Request booking".
+    var willCharge = bookingChargeReady() && deposit > 0;
+    var sendLabel = willCharge ? ('Pay ' + fmtAmount(deposit) + ' deposit to book') : 'Request booking';
+    var sendBtn = el('button', { type: 'button', class: 'qf-cta qf-book-send', text: sendLabel });
     var status = el('div', { class: 'qf-book-status', role: 'status', 'aria-live': 'polite' });
     function setStatus(msg, kind) { status.textContent = msg || ''; status.setAttribute('data-kind', kind || ''); status.style.display = msg ? 'block' : 'none'; }
     var panelKids = [grid];
@@ -1965,6 +2029,15 @@
         method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload),
       }).then(function (r) { return r.json().then(function (j) { return { ok: r.ok, body: j }; }); })
         .then(function (r) {
+          if (r.ok && r.body && r.body.ok && r.body.checkoutUrl) {
+            // Charge path: the carrier is Connect-ready + a deposit is due →
+            // redirect the shipper to Stripe's hosted Checkout to pay. Keep the
+            // button in a "redirecting" state (we're leaving the page).
+            sendBtn.textContent = 'Redirecting to secure payment…';
+            setStatus('Redirecting to secure payment…', '');
+            gotoCheckout(r.body.checkoutUrl);
+            return;
+          }
           sendBtn.disabled = false; sendBtn.textContent = old;
           if (r.ok && r.body && r.body.ok) {
             var carrier = (state.config && state.config.tenant && state.config.tenant.name) || 'the carrier';

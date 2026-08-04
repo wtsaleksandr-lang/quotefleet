@@ -388,34 +388,40 @@ body[data-qf-cta-hover="fill"] .qf-cta:not(.qf-secondary):hover { background: va
    Gated on the tenant's quoteBooking feature (default OFF). ONE normal-sized
    secondary button on the thanks step; clicking reveals a compact inline
    booking panel (reuses .qf-grid/.qf-field/.qf-input). Minimal — no card pile.
-   Theme-aware via the runtime --w-* tokens; the deposit line reads on light AND
-   dark (color-mix against --w-fg, never cobalt-on-dark). */
+   THEME TOKENS: the widget theme engine (widgetThemes.ts → applyTheme) remaps
+   --w-text / --w-surface / --w-success-bg / --w-success-text at runtime but
+   NOT the legacy --w-fg / --w-bg / --w-success. So text on the shell reads via
+   --w-text (white on the default Midnight dark preset), and the "paid" island
+   uses the runtime success PAIR (--w-success-bg is a light panel, dark
+   --w-success-text on it) — high contrast in light AND dark, never a bright
+   mint-on-dark island. Fallbacks keep it legible before applyTheme runs. */
 .qf-book-btn { display: block; width: max-content; min-width: 240px; max-width: 100%; margin: var(--space-1-5) auto 0; min-height: 44px; padding-left: var(--space-3); padding-right: var(--space-3); }
-.qf-book-panel { margin-top: var(--space-1-5); padding: var(--space-1-5); border: 1px solid var(--w-border); border-radius: var(--w-radius); background: color-mix(in srgb, var(--w-fg) 4%, transparent); }
+.qf-book-panel { margin-top: var(--space-1-5); padding: var(--space-1-5); border: 1px solid var(--w-border); border-radius: var(--w-radius); background: color-mix(in srgb, var(--w-text, var(--w-fg)) 4%, transparent); }
 .qf-book-panel .qf-grid { margin-top: 0; }
-.qf-book-deposit { margin-top: var(--space-1-5); font-size: 14px; font-weight: 750; color: var(--w-fg); }
+.qf-book-deposit { margin-top: var(--space-1-5); font-size: 14px; font-weight: 750; color: var(--w-text, var(--w-fg)); }
 .qf-book-panel .qf-book-send { margin-top: var(--space-1-5); }
-.qf-book-status { display: none; margin-top: var(--space-1); font-size: 12.5px; line-height: 1.4; font-weight: 650; color: var(--w-fg); }
-.qf-book-status[data-kind="err"] { color: color-mix(in srgb, var(--w-fg) 40%, #e5484d); }
+.qf-book-status { display: none; margin-top: var(--space-1); font-size: 12.5px; line-height: 1.4; font-weight: 650; color: var(--w-text, var(--w-fg)); }
+.qf-book-status[data-kind="err"] { color: color-mix(in srgb, var(--w-text, var(--w-fg)) 25%, #e5484d); }
 .qf-book-done { margin-top: var(--space-1-5); }
 /* Punched-up "booked" payoff: animated checkmark badge + headline + the
-   server-confirmed deposit amount. Tenant-branded via the runtime --w-* tokens
-   so it reads on light AND dark; legible at 390px (badge + copy wrap cleanly). */
+   server-confirmed deposit amount, on the runtime success island (light panel,
+   dark --w-success-text) so it reads on light AND the default dark preset;
+   legible at 375px (badge + copy wrap cleanly). */
 .qf-book-success {
   display: flex;
   align-items: center;
   gap: var(--space-1-5);
   padding: var(--space-2);
   border-radius: var(--w-radius);
-  border: 1px solid color-mix(in srgb, var(--w-success) 35%, var(--w-border));
-  background: color-mix(in srgb, var(--w-success) 12%, var(--w-bg));
+  border: 1px solid color-mix(in srgb, var(--w-success-text, #15803d) 22%, transparent);
+  background: var(--w-success-bg, #dcfce7);
   animation: qf-book-pop 0.42s cubic-bezier(0.22, 0.61, 0.36, 1) both;
 }
 @keyframes qf-book-pop {
   from { opacity: 0; transform: translateY(8px); }
   to { opacity: 1; transform: none; }
 }
-.qf-book-check { flex: none; display: inline-flex; color: var(--w-success); }
+.qf-book-check { flex: none; display: inline-flex; color: var(--w-success-text, var(--w-success, #15803d)); }
 .qf-book-check-circle {
   stroke: currentColor;
   stroke-dasharray: 151;
@@ -431,9 +437,9 @@ body[data-qf-cta-hover="fill"] .qf-cta:not(.qf-secondary):hover { background: va
 @keyframes qf-book-check-circle { to { stroke-dashoffset: 0; } }
 @keyframes qf-book-check-tick { to { stroke-dashoffset: 0; } }
 .qf-book-success-copy { min-width: 0; }
-.qf-book-success-title { font-size: 15px; font-weight: 800; color: var(--w-fg); line-height: 1.3; }
-.qf-book-success-sub { margin-top: var(--space-0-5); font-size: 13px; line-height: 1.45; color: var(--w-muted, var(--w-fg)); }
-.qf-book-success-sub strong { color: var(--w-fg); font-weight: 750; }
+.qf-book-success-title { font-size: 15px; font-weight: 800; color: var(--w-success-text, var(--w-fg)); line-height: 1.3; }
+.qf-book-success-sub { margin-top: var(--space-0-5); font-size: 13px; line-height: 1.45; color: color-mix(in srgb, var(--w-success-text, var(--w-fg)) 82%, var(--w-success-bg, #dcfce7)); }
+.qf-book-success-sub strong { color: var(--w-success-text, var(--w-fg)); font-weight: 750; }
 @media (prefers-reduced-motion: reduce) {
   .qf-book-success { animation: none; }
   .qf-book-check-circle,
@@ -493,4 +499,38 @@ body[data-qf-map-style="blackwhite_inverted"] .qf-map-expand {
   color: rgba(245,245,245,0.90);
   background: rgba(20,20,20,0.65);
   box-shadow: 0 1px 4px rgba(17,17,17,0.4);
+}
+
+/* ── Deposit-charge return banner (Wave 2b) ─────────────────────────────────
+   Shown at the top of the widget when the shipper returns from Stripe Checkout
+   (?booking=paid|cancelled). Same token model as .qf-book-success above: the
+   CANCELLED banner is copy on the shell (via --w-text / --w-muted), the PAID
+   banner is the runtime success island (light --w-success-bg panel + dark
+   --w-success-text) — both AA in light AND the default Midnight dark preset.
+   Legible at 375px (badge + copy wrap cleanly). */
+.qf-book-return {
+  display: flex;
+  align-items: center;
+  gap: var(--space-1-5);
+  margin-bottom: var(--space-2);
+  padding: var(--space-2);
+  border-radius: var(--w-radius);
+  border: 1px solid var(--w-border);
+  background: color-mix(in srgb, var(--w-text, var(--w-fg)) 4%, transparent);
+  animation: qf-book-pop 0.42s cubic-bezier(0.22, 0.61, 0.36, 1) both;
+}
+.qf-book-return[data-kind="paid"] {
+  border-color: color-mix(in srgb, var(--w-success-text, #15803d) 22%, transparent);
+  background: var(--w-success-bg, #dcfce7);
+}
+.qf-book-return-copy { min-width: 0; }
+/* Cancelled banner: copy sits on the shell → --w-text / --w-muted. */
+.qf-book-return-title { font-size: 15px; font-weight: 800; color: var(--w-text, var(--w-fg)); line-height: 1.3; }
+.qf-book-return-sub { margin-top: var(--space-0-5); font-size: 13px; line-height: 1.45; color: var(--w-muted, var(--w-text, var(--w-fg))); }
+/* Paid banner: copy + check sit on the light success island → --w-success-text. */
+.qf-book-return[data-kind="paid"] .qf-book-check { color: var(--w-success-text, var(--w-success, #15803d)); }
+.qf-book-return[data-kind="paid"] .qf-book-return-title { color: var(--w-success-text, var(--w-fg)); }
+.qf-book-return[data-kind="paid"] .qf-book-return-sub { color: color-mix(in srgb, var(--w-success-text, var(--w-fg)) 82%, var(--w-success-bg, #dcfce7)); }
+@media (prefers-reduced-motion: reduce) {
+  .qf-book-return { animation: none; }
 }
