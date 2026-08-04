@@ -1,6 +1,9 @@
 /**
  * Server entry point. Loads env, creates the Express app, listens.
  */
+// MUST be the FIRST import: pulls Doppler-only secrets into process.env
+// (soft no-op when DOPPLER_TOKEN is unset) BEFORE config.ts / db read env.
+import './bootstrapDoppler.js';
 import { loadEnv } from '../config.js';
 import { runMigrations } from '../db/migrate.js';
 import { createApp } from './app.js';
