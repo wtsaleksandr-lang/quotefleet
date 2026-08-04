@@ -28,6 +28,7 @@ import { registerInboundRoutes } from './routes/inbound.js';
 import { registerMarketplaceRoutes } from './routes/marketplace.js';
 import { registerToolsRoutes } from './routes/tools.js';
 import { registerBillingRoutes, registerStripeWebhook } from './routes/billing.js';
+import { registerConnectRoutes, registerConnectWebhook } from './routes/connect.js';
 import { registerMarketingChatRoute } from './routes/marketingChat.js';
 import { registerQuoteDocRoutes } from './routes/quoteDoc.js';
 import { registerQuoteMapRoutes } from './routes/quoteMap.js';
@@ -82,6 +83,7 @@ export function createApp(): express.Express {
   });
 
   registerStripeWebhook(app);
+  registerConnectWebhook(app);
 
   app.use(express.json({ limit: '7mb' }));
   app.use(express.urlencoded({ extended: true, limit: '7mb' }));
@@ -117,6 +119,7 @@ export function createApp(): express.Express {
   registerMarketplaceRoutes(app);
   registerToolsRoutes(app);
   registerBillingRoutes(app);
+  registerConnectRoutes(app);
   registerMarketingChatRoute(app);
   registerQuoteDocRoutes(app);
   registerQuoteMapRoutes(app);

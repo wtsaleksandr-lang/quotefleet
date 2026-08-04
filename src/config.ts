@@ -38,6 +38,11 @@ export interface Env {
   STRIPE_SECRET_KEY?: string;
   STRIPE_PUBLISHABLE_KEY?: string;
   STRIPE_WEBHOOK_SECRET?: string;
+  /** Signing secret for the SEPARATE Stripe Connect webhook endpoint
+   *  (/api/tenant/connect/webhook). Distinct from STRIPE_WEBHOOK_SECRET so the
+   *  Connect endpoint verifies its own events. When unset, the Connect webhook
+   *  soft-skips (503) — onboarding + live status still work without it. */
+  STRIPE_CONNECT_WEBHOOK_SECRET?: string;
   STRIPE_PRICE_VITAL_MONTHLY?: string;
   STRIPE_PRICE_PRO_MONTHLY?: string;
   RESEND_API_KEY?: string;
@@ -139,6 +144,7 @@ export function loadEnv(): Env {
     STRIPE_SECRET_KEY: opt('STRIPE_SECRET_KEY'),
     STRIPE_PUBLISHABLE_KEY: opt('STRIPE_PUBLISHABLE_KEY'),
     STRIPE_WEBHOOK_SECRET: opt('STRIPE_WEBHOOK_SECRET'),
+    STRIPE_CONNECT_WEBHOOK_SECRET: opt('STRIPE_CONNECT_WEBHOOK_SECRET'),
     STRIPE_PRICE_VITAL_MONTHLY: opt('STRIPE_PRICE_VITAL_MONTHLY'),
     STRIPE_PRICE_PRO_MONTHLY: opt('STRIPE_PRICE_PRO_MONTHLY'),
     RESEND_API_KEY: opt('RESEND_API_KEY'),
