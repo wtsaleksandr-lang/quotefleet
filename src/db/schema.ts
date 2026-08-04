@@ -226,16 +226,30 @@ export const users = pgTable(
       onDelete: 'cascade',
     }),
     email: text('email').notNull(),
-    /** bcrypt hash. */
+    /** bcrypt hash. Always set — OAuth-created users get a random unusable
+     *  hash (they sign in via the provider; they can claim a real password
+     *  later via the magic-link → change-password flow). */
     passwordHash: text('password_hash').notNull(),
     name: text('name'),
     role: text('role').notNull().default('tenant_owner'),
+    /** Stable provider subject IDs for social login (see
+     *  src/server/oauth/providers.ts). Nullable + minted the first time a
+     *  user signs in with that provider. Matching on the sub (not the email)
+     *  keeps repeat logins reliable even if the provider's display email
+     *  changes. Postgres allows many NULLs under a UNIQUE index, so
+     *  password-only users (all null) never collide. */
+    googleSub: text('google_sub'),
+    microsoftSub: text('microsoft_sub'),
+    metaSub: text('meta_sub'),
     createdAt: timestamp('created_at', { mode: 'date' }).notNull().defaultNow(),
     lastLoginAt: timestamp('last_login_at', { mode: 'date' }),
   },
   (t) => [
     uniqueIndex('users_email_idx').on(t.email),
     index('users_tenant_idx').on(t.tenantId),
+    uniqueIndex('users_google_sub_idx').on(t.googleSub),
+    uniqueIndex('users_microsoft_sub_idx').on(t.microsoftSub),
+    uniqueIndex('users_meta_sub_idx').on(t.metaSub),
   ]
 );
 

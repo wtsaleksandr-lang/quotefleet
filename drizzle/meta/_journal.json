@@ -169,6 +169,13 @@
       "when": 1785542400000,
       "tag": "0023_ingest_sender_allowlist",
       "breakpoints": true
+    },
+    {
+      "idx": 24,
+      "version": "7",
+      "when": 1785628800000,
+      "tag": "0024_oauth_social_login",
+      "breakpoints": true
     }
   ]
 }

@@ -14,24 +14,17 @@ import {
   tenants,
   users,
   sessions,
-  rateCards,
-  accessorials,
-  laneZones,
-  terminals,
-  aiConfigs,
-  brandConfigs,
   magicLinks,
 } from '../../db/schema.js';
 import { sendEmail } from '../../email/send.js';
 import { magicLinkEmail } from '../../email/templates.js';
-import {
-  DEFAULT_RATE_CARDS,
-  DEFAULT_ACCESSORIALS,
-  generateDefaultLaneZones,
-  DEFAULT_AI_SYSTEM_PROMPT,
-} from '../../calc/defaults.js';
-import { TERMINALS_DATA } from '../../data/terminals.js';
 import { hashPassword, verifyPassword } from '../../auth/password.js';
+import {
+  RESERVED_SLUGS,
+  TRIAL_DAYS,
+  slugify,
+  provisionTrialTenant,
+} from './tenantProvision.js';
 import {
   createSession,
   destroySession,
@@ -43,13 +36,6 @@ import { DEFAULT_QUOTE_DISCLAIMER } from '../quoteDisclaimer.js';
 import { getTrialState, type TrialState } from '../trialGating.js';
 import { magicLinkLimiter, signupLimiter, loginLimiter } from '../rateLimits.js';
 import { parsePaidPlan } from '../plans.js';
-
-const RESERVED_SLUGS = new Set([
-  'www', 'app', 'admin', 'api', 'mail', 'docs', 'help', 'status', 'static',
-  'cdn', 'assets', 'login', 'signup', 'logout', 'pricing', 'about', 'blog',
-  'support', 'demo', 'test', 'staging', 'dev', 'public', 'private',
-  'auth', 'oauth', 'embed', 'widget', 'chat', 'webhook', 'webhooks',
-]);
 
 /** Current DPA version published at /dpa. Bumped when the DPA's
  *  substantive terms change; existing tenants are forced to re-accept
@@ -98,8 +84,6 @@ function isSafeRelativeRedirect(path: string | null | undefined): boolean {
   return true;
 }
 
-const TRIAL_DAYS = 14;
-
 const MagicLinkSendSchema = z.object({
   email: z.string().email(),
   redirectTo: z.string().optional(),
@@ -115,16 +99,7 @@ const LoginSchema = z.object({
   password: z.string().min(1),
 });
 
-function slugify(s: string): string {
-  return s
-    .toLowerCase()
-    .trim()
-    .replace(/[^a-z0-9]+/g, '-')
-    .replace(/(^-|-$)/g, '')
-    .slice(0, 40);
-}
-
-function setCookie(res: Response, token: string) {
+export function setCookie(res: Response, token: string) {
   const env = loadEnv();
   const isHttps =
     (env.PUBLIC_BASE_URL ?? '').startsWith('https://') ||
@@ -222,104 +197,25 @@ export function registerAuthRoutes(app: Express) {
     }
     if (!hostDomain) hostDomain = defaultHostDomain();
 
-    const trialEndsAt = new Date(Date.now() + TRIAL_DAYS * 24 * 60 * 60 * 1000);
-    const embedToken = nanoid(24);
     const passwordHash = await hashPassword(password);
 
     // ATOMIC SIGNUP: tenant + ai_config + brand + rate cards + accessorials
-    // + lane zones + terminals + owner user — all-or-nothing. A failure
-    // halfway used to leave orphaned tenants with no login.
-    let result: { tenantId: number; userId: number };
+    // + lane zones + terminals + owner user — all-or-nothing. Factored into
+    // provisionTrialTenant() so social login (routes/oauth.ts) creates a
+    // first-time OAuth user's tenant through the exact same path. We do NOT
+    // auto-promote to super_admin here even when email matches
+    // SUPER_ADMIN_EMAIL — super-admin is seeded/promoted out of band.
+    let result: Awaited<ReturnType<typeof provisionTrialTenant>>;
     try {
-      result = await db().transaction(async (tx) => {
-        const [t] = await tx
-          .insert(tenants)
-          .values({
-            slug,
-            hostDomain,
-            name: companyName,
-            contactEmail: email,
-            contactPhone: contactPhone ?? null,
-            countryFocus,
-            embedToken,
-            plan: 'free',
-            status: 'active',
-            trialEndsAt,
-            // Stamp DPA consent so we can prove later when + which
-            // version of the DPA the tenant accepted.
-            dpaAcceptedAt: new Date(),
-            dpaVersion: parse.data.dpaVersion,
-          })
-          .returning({ id: tenants.id });
-        if (!t) throw new Error('tenant insert returned no row');
-
-        await tx.insert(aiConfigs).values({
-          tenantId: t.id,
-          systemPrompt: DEFAULT_AI_SYSTEM_PROMPT,
-          tone: 'professional',
-          autoReplyEnabled: true,
-          chatEnabled: true,
-        });
-        await tx.insert(brandConfigs).values({
-          tenantId: t.id,
-          displayName: companyName,
-          tagline: 'Instant freight quotes',
-          primaryColor: '#2563eb',
-          accentColor: '#6E8BFF',
-          ctaText: 'Get instant quote',
-          showPoweredBy: true,
-        });
-        if (DEFAULT_RATE_CARDS.length > 0) {
-          await tx.insert(rateCards).values(
-            DEFAULT_RATE_CARDS.map((c) => ({ ...c, tenantId: t.id }))
-          );
-        }
-        if (DEFAULT_ACCESSORIALS.length > 0) {
-          await tx.insert(accessorials).values(
-            DEFAULT_ACCESSORIALS.map((a) => ({ ...a, tenantId: t.id }))
-          );
-        }
-        const zones = generateDefaultLaneZones();
-        if (zones.length > 0) {
-          await tx.insert(laneZones).values(zones.map((z) => ({ ...z, tenantId: t.id })));
-        }
-        if (TERMINALS_DATA.length > 0) {
-          await tx.insert(terminals).values(
-            TERMINALS_DATA.map((term, idx) => ({
-              tenantId: t.id,
-              portCode: term.portCode,
-              code: term.code,
-              name: term.name,
-              carrier: term.carrier,
-              address: term.address,
-              lat: term.lat,
-              lng: term.lng,
-              notes: term.notes,
-              surcharge: 0,
-              enabled: true,
-              sortOrder: idx,
-            }))
-          );
-        }
-
-        // Owner user. We do NOT auto-promote to super_admin here even
-        // when email matches SUPER_ADMIN_EMAIL — that would let anyone
-        // who guesses the operator's email and signs up first claim root.
-        // Super-admin is created by the seed script (once, before signups
-        // are accepted) or promoted manually later via SQL.
-        const [u] = await tx
-          .insert(users)
-          .values({
-            tenantId: t.id,
-            email,
-            passwordHash,
-            role: 'tenant_owner',
-            name: companyName,
-          })
-          .returning({ id: users.id });
-        if (!u) throw new Error('user insert returned no row');
-
-        return { tenantId: t.id, userId: u.id };
+      result = await provisionTrialTenant({
+        companyName,
+        email,
+        passwordHash,
+        countryFocus,
+        contactPhone: contactPhone ?? null,
+        dpaVersion: parse.data.dpaVersion,
+        slug,
+        hostDomain,
       });
     } catch (err) {
       console.error('[auth.signup] transaction failed:', err);
@@ -331,6 +227,8 @@ export function registerAuthRoutes(app: Express) {
       }
       return res.status(500).json({ error: 'Failed to create account. Try again.' });
     }
+    const trialEndsAt = result.trialEndsAt;
+    const embedToken = result.embedToken;
 
     const token = await createSession(result.userId);
     setCookie(res, token);
