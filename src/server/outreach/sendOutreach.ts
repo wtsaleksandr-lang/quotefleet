@@ -21,13 +21,22 @@
  * run without the network, the vendor, or the DB.
  */
 import type { OutreachEmail } from '../../db/schema.js';
-import { sendEmail as realSendEmail, brandedFrom, type EmailOut } from '../../email/send.js';
+import {
+  sendEmail as realSendEmail,
+  brandedFrom,
+  type EmailOut,
+  type EmailAttachment,
+} from '../../email/send.js';
 import { SENDER_NAME } from './draftEmail.js';
+import { dbProspectDemoStore, type ProspectDemoStore } from './prospectDemoStore.js';
 import {
   dbOutreachEmailStore,
   normalizeEmailAddress,
   type OutreachEmailStore,
 } from './outreachEmailStore.js';
+
+/** Content-ID the drafter references from the HTML (`<img src="cid:quoteshot">`). */
+const QUOTE_SHOT_CID = 'quoteshot';
 
 /** Result of a Phase-3 send attempt. */
 export interface SendOutreachResult {
@@ -49,6 +58,9 @@ export interface SendOutreachDeps {
   send?: (msg: Parameters<typeof realSendEmail>[0]) => Promise<EmailOut>;
   /** Injected persistence — defaults to the DB-backed store. */
   store?: OutreachEmailStore;
+  /** Injected prospect-demo store — used to fetch the branded quote-shot PNG so
+   *  it can be embedded inline (cid:quoteshot). Defaults to the DB-backed store. */
+  demoStore?: ProspectDemoStore;
   /** Base URL for the one-click unsubscribe link. Defaults to PUBLIC_BASE_URL. */
   publicBaseUrl?: string;
 }
@@ -79,6 +91,7 @@ export async function sendOutreachEmail(
 ): Promise<SendOutreachResult> {
   const send = deps.send ?? realSendEmail;
   const store = deps.store ?? dbOutreachEmailStore;
+  const demoStore = deps.demoStore ?? dbProspectDemoStore;
   const publicBaseUrl = deps.publicBaseUrl ?? process.env.PUBLIC_BASE_URL ?? 'http://localhost:5000';
 
   // 1. Resolve the persisted draft.
@@ -102,6 +115,33 @@ export async function sendOutreachEmail(
     return { ok: false, status: 'skipped', skipped: 'suppressed', emailId };
   }
 
+  // 3b. CID-EMBEDDED SCREENSHOT. When the persisted draft references the branded
+  //     quote shot inline (`cid:quoteshot`, set by the drafter's embedImageCid
+  //     path), fetch the PNG bytes for this demo and attach them INLINE so the
+  //     image renders in Outlook (which blocks remote images). Best-effort: if
+  //     the shot is missing we still send (the CTA button carries the click).
+  let attachments: EmailAttachment[] | undefined;
+  if (draft.bodyHtml?.includes(`cid:${QUOTE_SHOT_CID}`) && draft.demoToken && demoStore.getQuoteShot) {
+    try {
+      const raw = await demoStore.getQuoteShot(draft.demoToken);
+      // Stored as raw base64; strip any `data:image/...;base64,` prefix defensively.
+      const b64 = raw ? raw.replace(/^data:[^;]+;base64,/, '') : null;
+      if (b64) {
+        attachments = [
+          {
+            filename: 'quote.png',
+            contentBase64: b64,
+            contentType: 'image/png',
+            contentId: QUOTE_SHOT_CID,
+            inline: true,
+          },
+        ];
+      }
+    } catch {
+      // Never let a shot-fetch failure block the send — degrade to alt text.
+    }
+  }
+
   // 4. Send via the shared abstraction, with a marketing List-Unsubscribe header.
   let out: EmailOut;
   try {
@@ -112,6 +152,7 @@ export async function sendOutreachEmail(
       text: draft.bodyText,
       from: brandedFrom(SENDER_NAME),
       listUnsubscribeUrl: unsubscribeUrl(publicBaseUrl, draft.unsubscribeToken),
+      ...(attachments ? { attachments } : {}),
     });
   } catch (err) {
     // Graceful: an unexpected sender throw is recorded, never propagated.

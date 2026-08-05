@@ -307,6 +307,79 @@ describe('threaded-reply headers (In-Reply-To / References / custom)', () => {
 });
 
 /**
+ * INLINE CID ATTACHMENT (Outlook-safe branded screenshot): an attachment with
+ * `contentId` + `inline` must reach the Resend payload as
+ * { content_id, disposition:'inline' } and the nodemailer args as { cid }, on
+ * their respective paths. Behavioral — inspect the actual Resend JSON body and
+ * the nodemailer args. Reuses the env cached above (Resend → SMTP precedence).
+ */
+describe('inline CID attachment (embedded screenshot)', () => {
+  const cidAttachment = {
+    filename: 'quote.png',
+    contentBase64: 'QUJD', // "ABC"
+    contentType: 'image/png',
+    contentId: 'quoteshot',
+    inline: true,
+  };
+
+  it('maps the inline attachment to Resend content_id + inline disposition', async () => {
+    const captured: Array<Record<string, unknown>> = [];
+    global.fetch = vi.fn(async (_url: unknown, init: { body: string }) => {
+      captured.push(JSON.parse(init.body));
+      return { ok: true, status: 200, json: async () => ({ id: 'e-img' }) };
+    }) as unknown as typeof fetch;
+
+    const { sendEmail } = await import('./send.js');
+    const out = await sendEmail({
+      to: 'x@y.com',
+      subject: 'branded',
+      text: 'body',
+      html: '<img src="cid:quoteshot">',
+      attachments: [cidAttachment],
+    });
+
+    expect(out.ok).toBe(true);
+    const att = (captured[0].attachments as Array<Record<string, unknown>>)[0];
+    expect(att.filename).toBe('quote.png');
+    expect(att.content).toBe('QUJD');
+    expect(att.content_id).toBe('quoteshot');
+    expect(att.content_type).toBe('image/png');
+    expect(att.disposition).toBe('inline');
+  });
+
+  it('maps the inline attachment to nodemailer { cid, Buffer } when Resend fails', async () => {
+    global.fetch = vi.fn(async () => ({
+      ok: false,
+      status: 401,
+      text: async () => 'unauthorized',
+    })) as unknown as typeof fetch;
+    mockSendMail.mockReset();
+    let smtpArgs: { attachments?: Array<Record<string, unknown>> } = {};
+    mockSendMail.mockImplementation(async (a: { attachments?: Array<Record<string, unknown>> }) => {
+      smtpArgs = a;
+      return {};
+    });
+
+    const { sendEmail } = await import('./send.js');
+    const out = await sendEmail({
+      to: 'x@y.com',
+      subject: 'branded',
+      text: 'body',
+      html: '<img src="cid:quoteshot">',
+      attachments: [cidAttachment],
+    });
+
+    expect(out.provider).toBe('smtp');
+    const att = smtpArgs.attachments![0];
+    expect(att.filename).toBe('quote.png');
+    expect(att.cid).toBe('quoteshot');
+    expect(Buffer.isBuffer(att.content)).toBe(true);
+    expect((att.content as Buffer).toString('base64')).toBe('QUJD');
+    expect(att.contentType).toBe('image/png');
+  });
+});
+
+/**
  * brandedFrom — carrier-branded `From` for customer-facing emails.
  *
  * Placed LAST on purpose: loadEnv() caches on first call, and the SMTP-path
