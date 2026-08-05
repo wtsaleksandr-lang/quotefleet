@@ -89,6 +89,20 @@ export const quoteMapLimiter: RateLimitRequestHandler = rateLimit({
   message: { error: 'Too many map requests. Slow down and try again in a minute.' },
 });
 
+/** /demo/:token prospect-preview API (widget config / quote / lead / route-preview).
+ *  Token-gated (unguessable slug) and DB-write-free, but the quote path still
+ *  geocodes + the route-preview proxies Google Static Maps, so a generous cap
+ *  stops a scrape loop while never getting in a real prospect's way. Applied
+ *  in-handler ONLY once a request is confirmed to target a demo, so it never
+ *  double-counts requests that fall through to the tenant endpoints. */
+export const publicDemoLimiter: RateLimitRequestHandler = rateLimit({
+  windowMs: minutes(1),
+  limit: 60,
+  standardHeaders: 'draft-7',
+  legacyHeaders: false,
+  message: { error: 'Too many requests. Slow down and try again in a minute.' },
+});
+
 /** /api/public/autocomplete/* — cheap per call but Google/Mapbox bills.
  *  120/min/IP is plenty for type-ahead with debounce. */
 export const publicAutocompleteLimiter: RateLimitRequestHandler = rateLimit({

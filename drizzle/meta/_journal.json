@@ -183,6 +183,13 @@
       "when": 1785715200000,
       "tag": "0025_connect_express",
       "breakpoints": true
+    },
+    {
+      "idx": 26,
+      "version": "7",
+      "when": 1785801600000,
+      "tag": "0026_prospect_demos",
+      "breakpoints": true
     }
   ]
 }
