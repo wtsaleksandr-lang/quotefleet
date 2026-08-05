@@ -119,6 +119,19 @@ export interface EmailIn {
    *  unsubscribe header. The mailto fallback is fixed; only the tokenized HTTP
    *  URL varies per tenant. */
   listUnsubscribeUrl?: string;
+  /** THREADED REPLY: RFC 5322 `In-Reply-To` — the Message-ID of the email this
+   *  send is a reply to. Set (with `references`) by the reverse-outreach replier
+   *  so the branded demo lands in the SAME thread as the broker's inbound
+   *  marketing email. Omitted for standalone sends. */
+  inReplyTo?: string;
+  /** THREADED REPLY: RFC 5322 `References` — the space-joined Message-ID chain
+   *  of the thread being replied to (usually the original's References + its
+   *  Message-ID). Omitted for standalone sends. */
+  references?: string;
+  /** Arbitrary extra headers merged into the outgoing header map on BOTH the
+   *  Resend and SMTP paths (after threading + unsubscribe headers). Escape hatch
+   *  for future per-send headers; absent by default. */
+  headers?: Record<string, string>;
 }
 
 /** Fixed mailbox for the mailto: arm of List-Unsubscribe. */
@@ -150,6 +163,21 @@ export async function sendEmail(msg: EmailIn): Promise<EmailOut> {
   // Present only for marketing/lifecycle sends; null for transactional email.
   const listHeaders = unsubscribeHeaders(msg.listUnsubscribeUrl);
 
+  // THREADED REPLY headers — only the keys that were supplied (omit undefined),
+  // so a standalone send adds nothing. Merged (with any caller-supplied
+  // `msg.headers`) alongside the List-Unsubscribe headers into the ONE header
+  // map handed to both providers, so threading works on Resend and SMTP alike.
+  const threadHeaders: Record<string, string> = {};
+  if (msg.inReplyTo) threadHeaders['In-Reply-To'] = msg.inReplyTo;
+  if (msg.references) threadHeaders['References'] = msg.references;
+  const mergedHeaders: Record<string, string> = {
+    ...(listHeaders ?? {}),
+    ...threadHeaders,
+    ...(msg.headers ?? {}),
+  };
+  // Null when nothing to send, so behavior is unchanged when no header applies.
+  const outHeaders = Object.keys(mergedHeaders).length ? mergedHeaders : null;
+
   // Tracks whether a REAL provider (Resend/SMTP) was configured and attempted,
   // and the last failure reason. If a provider was configured but every attempt
   // failed we must FAIL LOUDLY (ok:false + error) rather than silently pretend
@@ -176,8 +204,9 @@ export async function sendEmail(msg: EmailIn): Promise<EmailOut> {
           text: msg.text,
           html: msg.html,
           reply_to: msg.replyTo,
-          // Marketing/lifecycle only — omitted (undefined) for transactional.
-          ...(listHeaders ? { headers: listHeaders } : {}),
+          // List-Unsubscribe (marketing) + In-Reply-To/References (threaded
+          // reply) + any caller headers, merged; omitted when none apply.
+          ...(outHeaders ? { headers: outHeaders } : {}),
           // Resend takes base64 in `content`.
           ...(msg.attachments?.length
             ? { attachments: msg.attachments.map((a) => ({ filename: a.filename, content: a.contentBase64 })) }
@@ -214,8 +243,9 @@ export async function sendEmail(msg: EmailIn): Promise<EmailOut> {
         text: msg.text,
         html: msg.html,
         replyTo: msg.replyTo,
-        // Marketing/lifecycle only — omitted for transactional sends.
-        ...(listHeaders ? { headers: listHeaders } : {}),
+        // List-Unsubscribe (marketing) + In-Reply-To/References (threaded
+        // reply) + any caller headers, merged; omitted when none apply.
+        ...(outHeaders ? { headers: outHeaders } : {}),
         // Nodemailer takes a Buffer.
         ...(msg.attachments?.length
           ? {

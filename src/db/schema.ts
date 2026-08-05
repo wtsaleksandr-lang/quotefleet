@@ -1326,6 +1326,57 @@ export const prospectDemos = pgTable(
 );
 
 // ────────────────────────────────────────────────────────────────────
+// INBOUND PROSPECTS — REVERSE OUTREACH (Phase 0, ships inert).
+//
+// Every row is one inbound broker/carrier MARKETING email harvested from a
+// freight company's own mailbox. A later phase replies IN-THREAD with that
+// sender's OWN branded QuoteFleet demo. Like prospect_demos / outreach_emails,
+// this table is DELIBERATELY ISOLATED: it NEVER touches tenants / users /
+// leads, so a harvested prospect stays out of MRR, trials, quota, and every
+// tenant list by construction. Nothing writes here until the poller phase lands.
+// ────────────────────────────────────────────────────────────────────
+export const inboundProspects = pgTable(
+  'inbound_prospects',
+  {
+    id: serial('id').primaryKey(),
+    /** Which harvested mailbox this inbound was pulled from (e.g. a monitored
+     *  broker inbox). Lets multiple source mailboxes coexist. */
+    harvestMailbox: text('harvest_mailbox').notNull(),
+    /** Sender's email address (the broker/carrier marketer we'll reply to). */
+    fromEmail: text('from_email').notNull(),
+    /** Normalized apex/host of `fromEmail` — the demo dedupe/build key. */
+    fromDomain: text('from_domain').notNull(),
+    /** RFC 5322 Message-ID of the harvested email — the in-thread reply anchor.
+     *  Nullable (some emails omit it); UNIQUE when present for idempotent harvest. */
+    originalMessageId: text('original_message_id'),
+    /** The harvested email's References chain (In-Reply-To + References), stored
+     *  as a jsonb string array to match the schema's other jsonb usage. */
+    originalReferences: jsonb('original_references').$type<string[]>(),
+    /** Subject line of the harvested email (context for the reply draft). */
+    originalSubject: text('original_subject'),
+    /** When the harvested email was received (from its Date header). */
+    receivedAt: timestamp('received_at', { mode: 'date' }),
+    /** Parsed signature block (name/title/phone/company…) for personalization. */
+    signatureJson: jsonb('signature_json').$type<Record<string, unknown>>(),
+    /** Classifier verdict (e.g. 'broker_marketing', 'irrelevant'); null until run. */
+    classifyCategory: text('classify_category'),
+    /** Pipeline state: harvested → (classified → demoed → replied …). */
+    status: text('status').notNull().default('harvested'),
+    /** The prospect_demos token minted for this sender's branded demo, if any. */
+    demoToken: text('demo_token'),
+    /** FK-by-value to outreach_emails.id once an in-thread reply is drafted/sent. */
+    outreachEmailId: integer('outreach_email_id'),
+    createdAt: timestamp('created_at', { mode: 'date' }).notNull().defaultNow(),
+    updatedAt: timestamp('updated_at', { mode: 'date' }).notNull().defaultNow(),
+  },
+  (t) => [
+    // Nullable-unique: PG allows many NULLs, so message-less emails don't collide
+    // while a present Message-ID dedupes an idempotent re-harvest.
+    uniqueIndex('inbound_prospects_message_id_idx').on(t.originalMessageId),
+  ]
+);
+
+// ────────────────────────────────────────────────────────────────────
 // OUTREACH EMAILS — persisted AI-drafted cold emails (Phase 2 of the
 // AI Outreach Engine). Each row is a reviewed-before-send draft: the
 // personalized subject/body plus the per-recipient unsubscribe token so
@@ -1406,6 +1457,8 @@ export type OutreachProspect = typeof outreachProspects.$inferSelect;
 export type NewOutreachProspect = typeof outreachProspects.$inferInsert;
 export type ProspectDemo = typeof prospectDemos.$inferSelect;
 export type NewProspectDemo = typeof prospectDemos.$inferInsert;
+export type ProspectInbound = typeof inboundProspects.$inferSelect;
+export type NewProspectInbound = typeof inboundProspects.$inferInsert;
 export type OutreachEmail = typeof outreachEmails.$inferSelect;
 export type NewOutreachEmail = typeof outreachEmails.$inferInsert;
 export type OutreachCampaign = typeof outreachCampaigns.$inferSelect;

@@ -210,6 +210,103 @@ describe('List-Unsubscribe header (marketing vs transactional)', () => {
 });
 
 /**
+ * THREADED REPLY (reverse outreach): inReplyTo / references / headers must land
+ * in the SAME header map on both providers, so a branded-demo reply threads
+ * under the broker's original marketing email. Behavioral — inspect the actual
+ * Resend JSON body and the nodemailer args. Reuses the env cached above
+ * (RESEND_API_KEY + SMTP creds), so precedence is Resend → SMTP.
+ */
+describe('threaded-reply headers (In-Reply-To / References / custom)', () => {
+  it('puts In-Reply-To + References + custom headers in the Resend headers map', async () => {
+    const captured: Array<Record<string, unknown>> = [];
+    global.fetch = vi.fn(async (_url: unknown, init: { body: string }) => {
+      captured.push(JSON.parse(init.body));
+      return { ok: true, status: 200, json: async () => ({ id: 'e-thread' }) };
+    }) as unknown as typeof fetch;
+
+    const { sendEmail } = await import('./send.js');
+    const out = await sendEmail({
+      to: 'broker@acme.com',
+      subject: 'Re: Your capacity this week',
+      text: 'here is your branded quote',
+      inReplyTo: '<orig-123@acme.com>',
+      references: '<thread-a@acme.com> <orig-123@acme.com>',
+      headers: { 'X-QF-Reverse-Outreach': 'demo_abc' },
+    });
+
+    expect(out.ok).toBe(true);
+    const headers = captured[0].headers as Record<string, string>;
+    expect(headers['In-Reply-To']).toBe('<orig-123@acme.com>');
+    expect(headers['References']).toBe('<thread-a@acme.com> <orig-123@acme.com>');
+    expect(headers['X-QF-Reverse-Outreach']).toBe('demo_abc');
+  });
+
+  it('merges threading headers ALONGSIDE List-Unsubscribe (both present)', async () => {
+    const captured: Array<Record<string, unknown>> = [];
+    global.fetch = vi.fn(async (_url: unknown, init: { body: string }) => {
+      captured.push(JSON.parse(init.body));
+      return { ok: true, status: 200, json: async () => ({ id: 'e-both' }) };
+    }) as unknown as typeof fetch;
+
+    const { sendEmail } = await import('./send.js');
+    await sendEmail({
+      to: 'broker@acme.com',
+      subject: 'Re: capacity',
+      text: 'body',
+      inReplyTo: '<orig-9@acme.com>',
+      listUnsubscribeUrl: 'https://quotefleet.net/unsubscribe?token=9.xyz',
+    });
+
+    const headers = captured[0].headers as Record<string, string>;
+    // Threading header did not clobber the unsubscribe pair, and vice-versa.
+    expect(headers['In-Reply-To']).toBe('<orig-9@acme.com>');
+    expect(headers['List-Unsubscribe']).toContain('token=9.xyz');
+    expect(headers['List-Unsubscribe-Post']).toBe('List-Unsubscribe=One-Click');
+  });
+
+  it('carries threading headers through to the SMTP path when Resend fails', async () => {
+    global.fetch = vi.fn(async () => ({
+      ok: false,
+      status: 401,
+      text: async () => 'unauthorized',
+    })) as unknown as typeof fetch;
+    mockSendMail.mockReset();
+    let smtpArgs: { headers?: Record<string, string> } = {};
+    mockSendMail.mockImplementation(async (a: { headers?: Record<string, string> }) => {
+      smtpArgs = a;
+      return {};
+    });
+
+    const { sendEmail } = await import('./send.js');
+    const out = await sendEmail({
+      to: 'broker@acme.com',
+      subject: 'Re: capacity',
+      text: 'body',
+      inReplyTo: '<orig-7@acme.com>',
+      references: '<orig-7@acme.com>',
+    });
+
+    expect(out.provider).toBe('smtp');
+    expect(smtpArgs.headers?.['In-Reply-To']).toBe('<orig-7@acme.com>');
+    expect(smtpArgs.headers?.['References']).toBe('<orig-7@acme.com>');
+  });
+
+  it('adds NO headers map when no threading/unsubscribe/custom header is set', async () => {
+    const captured: Array<Record<string, unknown>> = [];
+    global.fetch = vi.fn(async (_url: unknown, init: { body: string }) => {
+      captured.push(JSON.parse(init.body));
+      return { ok: true, status: 200, json: async () => ({ id: 'e-none' }) };
+    }) as unknown as typeof fetch;
+
+    const { sendEmail } = await import('./send.js');
+    await sendEmail({ to: 'x@y.com', subject: 'plain', text: 'body' });
+
+    // Unchanged behavior: transactional send with no headers → no headers key.
+    expect(captured[0].headers).toBeUndefined();
+  });
+});
+
+/**
  * brandedFrom — carrier-branded `From` for customer-facing emails.
  *
  * Placed LAST on purpose: loadEnv() caches on first call, and the SMTP-path
