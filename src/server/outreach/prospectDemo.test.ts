@@ -129,11 +129,36 @@ describe('buildProspectWidgetConfig', () => {
     expect(Object.keys(cfg.theme.tokens).length).toBeGreaterThan(0);
     // mode → services + equipment
     expect(cfg.services).toContain('drayage');
-    expect(cfg.equipmentByService.drayage.some((e) => e.equipment === 'container_40hc')).toBe(true);
+    // The widget reads option.value (widget.js#renderServices) — the demo MUST
+    // emit `value` (not `equipment`), or the dropdown renders value="undefined"
+    // and no quote can ever be produced (the shipping-blocker this guards).
+    expect(cfg.equipmentByService.drayage.some((e) => e.value === 'container_40hc')).toBe(true);
     // drayage → sample ports populated so the port picker works
     expect(cfg.drayagePorts.length).toBeGreaterThan(0);
     // prospect contact surfaced from the profile
     expect(cfg.contact.phone).toBe('(555) 123-4567');
+  });
+
+  it('equipment options match the TENANT widget-config option shape {value,label,maxWeightLbs?}', () => {
+    // The widget is shared unforked, so the prospect equipmentByService entries
+    // must be byte-for-byte the same shape the tenant endpoint emits via
+    // groupBy(cards,'service','equipment','label') → { value, label, maxWeightLbs? }.
+    const cfg = buildProspectWidgetConfig(record(withAiMode('drayage')));
+    const ALLOWED = new Set(['value', 'label', 'maxWeightLbs']);
+    const allOptions = Object.values(cfg.equipmentByService).flat();
+    expect(allOptions.length).toBeGreaterThan(0);
+    for (const opt of allOptions) {
+      // exactly the tenant keys — never the internal `equipment` key
+      expect(Object.keys(opt).every((k) => ALLOWED.has(k))).toBe(true);
+      expect('equipment' in opt).toBe(false);
+      // value is the equipment id the calc engine matches on (non-empty string)
+      expect(typeof opt.value).toBe('string');
+      expect(opt.value.length).toBeGreaterThan(0);
+      expect(typeof opt.label).toBe('string');
+    }
+    // and the value must line up with a priceable sample card
+    const cardEquip = new Set((record(withAiMode('drayage')).configJson?.sampleCards ?? []).map((c) => c.equipment));
+    for (const opt of allOptions) expect(cardEquip.has(opt.value)).toBe(true);
   });
 
   it('does not populate ports for non-drayage modes', () => {

@@ -226,6 +226,11 @@ describe('GET /api/public/widget/:slug (prospect interceptor)', () => {
     expect(cfg.demo).toBe(true);
     expect((cfg.tenant as { name: string }).name).toBe('Harbor Link Logistics');
     expect(cfg.services).toContain('drayage');
+    // Equipment options carry `value` (the key widget.js consumes) — guards the
+    // value="undefined" shipping-blocker end-to-end through the served response.
+    const ebs = cfg.equipmentByService as Record<string, Array<{ value?: string }>>;
+    expect(ebs.drayage[0].value).toBe('container_40hc');
+    expect('equipment' in ebs.drayage[0]).toBe(false);
   });
 
   it('falls through to the tenant handler for a non-demo slug', async () => {

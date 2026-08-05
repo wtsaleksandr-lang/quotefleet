@@ -307,9 +307,22 @@ export function buildProspectWidgetConfig(rec: ProspectDemoRecord) {
   };
 
   const services = cfg.services.map((s) => s.service);
-  const equipmentByService: Record<string, Array<{ equipment: string; label: string }>> = {};
-  for (const s of cfg.services) {
-    equipmentByService[s.service] = s.equipments.map((e) => ({ equipment: e.equipment, label: e.label }));
+  // Build equipmentByService in the EXACT shape the tenant endpoint emits via
+  // groupBy(cards, 'service', 'equipment', 'label') → { value, label, maxWeightLbs? }.
+  // widget.js reads option.value (widget.js#renderServices), so the key MUST be
+  // `value`, not `equipment` — the widget is shared unforked. We derive it from
+  // the sample cards (the pricing source of truth) so `value` always equals the
+  // equipment id the calc engine matches on, and carry the per-equipment weight
+  // ceiling exactly like the tenant path.
+  const equipmentByService: Record<string, Array<{ value: string; label: string; maxWeightLbs?: number }>> = {};
+  for (const card of cfg.sampleCards) {
+    if (!equipmentByService[card.service]) equipmentByService[card.service] = [];
+    const mw = Number(card.maxWeightLbs);
+    equipmentByService[card.service].push({
+      value: card.equipment,
+      label: card.label || card.equipment,
+      ...(Number.isFinite(mw) && mw > 0 ? { maxWeightLbs: mw } : {}),
+    });
   }
 
   const hasDrayage = services.includes('drayage');
