@@ -545,6 +545,15 @@ export const brandConfigs = pgTable('brand_configs', {
   fontFamily: text('font_family').notNull().default('satoshi'),
   /** Optional logo URL. */
   logoUrl: text('logo_url'),
+  /** How much of the header bar the logo fills: 'half' (default — compact, the
+   *  logo at its natural size beside the brand-name, today's look) or 'full'
+   *  (a full-width contained banner; the brand-name text is hidden). The widget
+   *  applies it as #qf-header[data-logo-fill]. In BOTH modes the logo is fit
+   *  with object-fit:contain so aspect ratio is always preserved and nothing is
+   *  ever cropped/stretched — this only changes the logo's max-WIDTH budget.
+   *  See renderHeader (widget.js) + widget-ux-fixes.css. Default 'half' leaves
+   *  existing tenants unchanged. */
+  headerLogoFill: text('header_logo_fill').notNull().default('half'),
   /** Optional CTA button text override. */
   ctaText: text('cta_text').notNull().default('Get instant quote'),
   /** Footer text under the widget. */

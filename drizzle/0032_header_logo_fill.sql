@@ -1,0 +1,19 @@
+-- Header logo fill — customer-facing brand option for how much of the widget
+-- header bar the logo occupies.
+--
+--   'half' (default) — compact: the logo at its natural size sits beside the
+--                      brand-name (today's look).
+--   'full'           — a full-width contained banner; the brand-name text is
+--                      hidden so the logo reads as one mark across the bar.
+--
+-- The widget applies it as #qf-header[data-logo-fill]; in BOTH modes the logo
+-- is fit with object-fit:contain so aspect ratio is always preserved and the
+-- logo is never cropped or stretched — this option only changes the logo's
+-- max-WIDTH budget (see renderHeader in widget.js + widget-ux-fixes.css).
+--
+-- ADD COLUMN IF NOT EXISTS with a NOT-NULL default so it is idempotent and safe
+-- to re-run on every boot via runMigrations() (src/db/migrate.ts) — the Replit
+-- deploy does not run db:migrate, so this makes the republish self-healing (same
+-- pattern as 0026/0029/0030/0031). Existing rows backfill to 'half', which
+-- reproduces the current header exactly, so no tenant changes visually.
+ALTER TABLE "brand_configs" ADD COLUMN IF NOT EXISTS "header_logo_fill" text DEFAULT 'half' NOT NULL;

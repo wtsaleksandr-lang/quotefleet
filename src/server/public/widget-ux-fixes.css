@@ -739,3 +739,47 @@ html { scrollbar-width: thin; scrollbar-color: rgba(135, 138, 150, 0.38) transpa
 
 /* The share reveal panel spans full width just below the link row. */
 #qf-step-thanks .qf-share-panel { margin-top: var(--space-1-5); }
+
+/* ── Header logo: robust auto-fit + fill option (compact vs full-width) ───────
+   PRIMARY GOAL — the header bar fits ANY logo (wide banner, tall portrait,
+   square, tiny, huge) with ZERO clipping, cropping or distortion. The logo
+   <img> is fit with object-fit:contain and width/height:auto so its aspect
+   ratio is ALWAYS preserved, and it is constrained by BOTH a max-height (the
+   bar's content height) AND a max-width (the budget for the chosen mode).
+   Whichever binds first wins: a very wide logo scales down to the width, a very
+   tall logo scales down to the height — neither overflows or gets cut. The bar
+   centers its content vertically (align-items:center) and never clips
+   (overflow:visible — no cropping box).
+
+   data-logo-fill ONLY changes the max-WIDTH budget, never the no-crop rules:
+     half (default) — logo <= ~50% of the bar, sits beside the brand name
+                      (today's compact look).
+     full           — logo <= 100% of the bar as a centered contained banner;
+                      the brand-name text is hidden so it reads as one mark. */
+.qf-header { align-items: center; overflow: visible; }
+.qf-header img {
+  width: auto;
+  height: auto;
+  max-height: 32px; /* matches today's compact cap; full mode raises it below */
+  object-fit: contain;
+  display: block;
+}
+.qf-header[data-logo-fill="half"] img { max-width: 50%; }
+.qf-header[data-logo-fill="full"] {
+  justify-content: center;
+  min-height: var(--space-6);
+}
+.qf-header[data-logo-fill="full"] img {
+  max-width: 100%;
+  max-height: 56px;
+}
+/* Full-width banner reads as one mark — hide the redundant text name. The
+   attribute selector + !important beats the earlier `.qf-header .brand-name`
+   !important rule and any app-injected size override. */
+.qf-header[data-logo-fill="full"] .brand-name { display: none !important; }
+
+/* Mobile (<=400px): same no-crop guarantees on a slightly shorter banner so a
+   wide logo scales to the narrower bar and never overflows. */
+@media (max-width: 400px) {
+  .qf-header[data-logo-fill="full"] img { max-height: 48px; }
+}

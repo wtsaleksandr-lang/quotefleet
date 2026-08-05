@@ -47,6 +47,42 @@ describe('customize panel — brand endpoint (Wave 2 theming fields)', () => {
   });
 });
 
+describe('customize panel — header logo fill (compact vs full-width)', () => {
+  it('validates + persists headerLogoFill as a half|full enum in the brand PUT', async () => {
+    const src = await read('src/server/routes/tenant.ts');
+    // Enum-validated in BrandPatch, so only the two allowed values persist.
+    expect(src).toContain("headerLogoFill: z.enum(['half', 'full']).optional()");
+    // BrandPatch column fields spread straight into the update `set` — the
+    // field needs no bespoke persistence code, so this is all that's required.
+    expect(src).toContain('const set: Record<string, unknown> = { ...columnPatch');
+  });
+
+  it('adds a Compact / Full-width control on the appearance-only Customize page', async () => {
+    const js = await pub('app.js');
+    // Lives in renderBrand (appearance), not the behaviour/copy page.
+    const brandFn = js.slice(js.indexOf('function renderBrand'), js.indexOf('function renderWidgetSettings'));
+    expect(brandFn).toContain('Header logo');
+    expect(brandFn).toContain("data-logofill");
+    expect(brandFn).toContain("queueSave({ headerLogoFill: o.id }, true)");
+    // Reads the saved value to seed the current selection.
+    expect(brandFn).toContain('b.headerLogoFill');
+  });
+
+  it('renders the logo-fill attribute + robust contain-fit in the public widget', async () => {
+    const widgetJs = await pub('widget.js');
+    const css = await pub('widget-ux-fixes.css');
+    // The widget stamps the mode onto the header bar.
+    expect(widgetJs).toContain("h.setAttribute('data-logo-fill'");
+    expect(widgetJs).toContain("cfg.brand.headerLogoFill === 'full'");
+    // CSS fits ANY logo without cropping/distortion (object-fit:contain) and
+    // switches the max-width budget per mode; full hides the redundant name.
+    expect(css).toContain('object-fit: contain');
+    expect(css).toContain('.qf-header[data-logo-fill="half"] img');
+    expect(css).toContain('.qf-header[data-logo-fill="full"] img');
+    expect(css).toContain('.qf-header[data-logo-fill="full"] .brand-name');
+  });
+});
+
 describe('customize panel — dashboard UI', () => {
   it('renders a single-purpose Customize page with presets, accent, font, logo + live preview', async () => {
     const js = await pub('app.js');
