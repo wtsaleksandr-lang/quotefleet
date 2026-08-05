@@ -54,7 +54,7 @@ function makeDemoStore(): ProspectDemoStore & { rows: Map<string, ProspectDemo> 
       const row: ProspectDemo = {
         id: counter, token, domain: input.domain, companyName: input.companyName,
         profileJson: input.profileJson, brandJson: input.brandJson, configJson: input.configJson,
-        createdAt: new Date(), updatedAt: new Date(), viewedAt: null,
+        createdAt: new Date(), updatedAt: new Date(), viewedAt: null, quoteShotB64: null, quoteShotAt: null,
       };
       rows.set(token, row); byDomain.set(input.domain, token);
       return row;

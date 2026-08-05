@@ -43,7 +43,11 @@ export interface OutreachRouteDeps {
   store?: ProspectDemoStore;
   emailStore?: OutreachEmailStore;
   /** Override the drafter (tests). Defaults to the real draftOutreachEmail. */
-  draft?: (profile: CompanyProfile, demoUrl: string) => Promise<DraftedEmail>;
+  draft?: (
+    profile: CompanyProfile,
+    demoUrl: string,
+    previewImageUrl?: string,
+  ) => Promise<DraftedEmail>;
   /** Override the sender (tests). Defaults to the real sendOutreachEmail. */
   send?: (input: SendOutreachInput) => Promise<SendOutreachResult>;
 }
@@ -54,14 +58,23 @@ export function demoUrlForToken(token: string): string {
   return `${base}/demo/${token}`;
 }
 
+/** Absolute URL of the prospect's branded quote screenshot (served from the DB). */
+export function quoteShotUrlForToken(token: string): string {
+  const base = loadEnv().PUBLIC_BASE_URL.replace(/\/$/, '');
+  return `${base}/demo-shot/${token}.png`;
+}
+
 export function registerOutreachRoutes(app: Express, deps: OutreachRouteDeps = {}) {
   const enrich = deps.enrich ?? ((domain: string) => enrichCompany(domain));
   const store = deps.store ?? dbProspectDemoStore;
   const emailStore = deps.emailStore ?? dbOutreachEmailStore;
   const draft =
     deps.draft ??
-    ((profile: CompanyProfile, demoUrl: string) =>
-      draftOutreachEmail(profile, demoUrl, { publicBaseUrl: loadEnv().PUBLIC_BASE_URL }));
+    ((profile: CompanyProfile, demoUrl: string, previewImageUrl?: string) =>
+      draftOutreachEmail(profile, demoUrl, {
+        publicBaseUrl: loadEnv().PUBLIC_BASE_URL,
+        previewImageUrl,
+      }));
   const send =
     deps.send ?? ((input: SendOutreachInput) => sendOutreachEmail(input, { store: emailStore }));
 
@@ -90,7 +103,9 @@ export function registerOutreachRoutes(app: Express, deps: OutreachRouteDeps = {
       });
     }
     const demoUrl = demoUrlForToken(demo.token);
-    const email = await draft(profile, demoUrl);
+    // If a branded quote screenshot was captured for this demo, embed it.
+    const previewImageUrl = demo.quoteShotAt ? quoteShotUrlForToken(demo.token) : undefined;
+    const email = await draft(profile, demoUrl, previewImageUrl);
     const row = await emailStore.saveDraft({
       demoToken: demo.token,
       domain,

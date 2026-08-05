@@ -209,6 +209,24 @@ export function registerProspectDemoRoutes(app: Express, deps: ProspectDemoRoute
     });
   });
 
+  // ── Branded quote screenshot (embedded in the outreach email) ─────────
+  // Serves the base64 PNG captured at provision time. The token param carries a
+  // ".png" suffix (so the URL reads like an image for spam filters); strip it.
+  app.get('/demo-shot/:token', async (req: Request, res: Response, next: NextFunction) => {
+    const token = String(req.params.token).replace(/\.png$/i, '');
+    let b64: string | null = null;
+    try {
+      b64 = store.getQuoteShot ? await store.getQuoteShot(token) : null;
+    } catch (err) {
+      return next(err);
+    }
+    if (!b64) return res.status(404).end();
+    const buf = Buffer.from(b64, 'base64');
+    res.setHeader('Content-Type', 'image/png');
+    res.setHeader('Cache-Control', 'public, max-age=3600');
+    return res.end(buf);
+  });
+
   // ── Public demo page ──────────────────────────────────────────────────
   app.get('/demo/:token', async (req: Request, res: Response, next: NextFunction) => {
     const token = String(req.params.token);
