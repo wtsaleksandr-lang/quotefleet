@@ -1039,10 +1039,24 @@ export const MAP_BLEND_VALUES = ['on', 'off'] as const;
 export type MapBlend = (typeof MAP_BLEND_VALUES)[number];
 export const DEFAULT_MAP_BLEND: MapBlend = 'off';
 
-function normalizeMapBlend(v: string | null | undefined): MapBlend {
-  return (MAP_BLEND_VALUES as readonly string[]).includes(v ?? '')
-    ? (v as MapBlend)
-    : DEFAULT_MAP_BLEND;
+// ── Map-blend OPACITY (0–100) ───────────────────────────────────────
+// The on/off toggle above is superseded by a 0–100 intensity. 0 = OFF (crisp
+// map — the default); 1–100 = blend ON at that feather strength. The `mapBlend`
+// on/off master is DERIVED from opacity>0 (so the existing feather CSS still
+// triggers), and `--qf-map-blend-opacity` scales the effect. Backward-compat:
+// a legacy `mapBlend='on'` with no explicit opacity maps to 60; 'off' → 0.
+export const MAP_BLEND_OPACITY_DEFAULT = 0;
+export const MAP_BLEND_LEGACY_ON_OPACITY = 60;
+
+function normalizeMapBlendOpacity(
+  v: number | string | null | undefined,
+  legacy: string | null | undefined,
+): number {
+  const legacyOpacity = legacy === 'on' ? MAP_BLEND_LEGACY_ON_OPACITY : MAP_BLEND_OPACITY_DEFAULT;
+  if (v == null || v === '') return legacyOpacity;
+  const n = typeof v === 'number' ? v : parseInt(String(v), 10);
+  if (!Number.isFinite(n)) return legacyOpacity;
+  return Math.max(0, Math.min(100, Math.round(n)));
 }
 
 // ── Token assembly ──────────────────────────────────────────────────
@@ -1222,8 +1236,11 @@ export interface ResolvedWidgetTheme {
   fontColor: string;
   /** Per-tenant CTA hover effect. */
   ctaHover: CtaHover;
-  /** Per-tenant feathered-map-edges toggle ('on' | 'off', default 'off'). */
+  /** Per-tenant feathered-map-edges toggle ('on' | 'off', default 'off').
+   *  DERIVED: 'on' iff mapBlendOpacity > 0. */
   mapBlend: MapBlend;
+  /** Per-tenant map-blend feather intensity (0–100). 0 = off. */
+  mapBlendOpacity: number;
   tokens: WidgetThemeTokens;
 }
 
@@ -1236,8 +1253,12 @@ export interface BrandThemeInput {
   fontColor?: string | null;
   /** Per-tenant CTA hover effect (border | lift | glow | fill | none). */
   ctaHover?: string | null;
-  /** Per-tenant feathered-map-edges toggle ('on' | 'off'). Default 'off'. */
+  /** Per-tenant feathered-map-edges toggle ('on' | 'off'). Default 'off'.
+   *  Legacy — the on/off master is now derived from mapBlendOpacity. */
   mapBlend?: string | null;
+  /** Per-tenant map-blend feather intensity (0–100). 0 = off. Supersedes the
+   *  binary mapBlend flag; falls back to it ('on'→60) when absent. */
+  mapBlendOpacity?: number | string | null;
   /** Legacy column — used only as an accent override when set to a real
    *  non-default value and no explicit accentOverride is present. */
   primaryColor?: string | null;
@@ -1272,7 +1293,10 @@ export function resolveWidgetTheme(brand: BrandThemeInput | null | undefined): R
   const fontColor =
     brand?.fontColor && brand.fontColor !== 'auto' ? normalizeHex(brand.fontColor) : null;
   const ctaHover = normalizeCtaHover(brand?.ctaHover);
-  const mapBlend = normalizeMapBlend(brand?.mapBlend);
+  // Opacity is the source of truth; the on/off master is derived from it so the
+  // existing body[data-qf-map-blend="on"] feather CSS still triggers.
+  const mapBlendOpacity = normalizeMapBlendOpacity(brand?.mapBlendOpacity, brand?.mapBlend);
+  const mapBlend: MapBlend = mapBlendOpacity > 0 ? 'on' : 'off';
 
   return {
     preset: presetId,
@@ -1283,6 +1307,7 @@ export function resolveWidgetTheme(brand: BrandThemeInput | null | undefined): R
     fontColor: fontColor ?? 'auto',
     ctaHover,
     mapBlend,
+    mapBlendOpacity,
     tokens: buildTokens(palette, preset.structure, font.stack, fontColor),
   };
 }

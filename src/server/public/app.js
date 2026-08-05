@@ -2310,11 +2310,73 @@
       company.appendChild(textField('Tagline', 'tagline', b.tagline, 'One short line under your name.'));
       controls.appendChild(company);
 
+      // ── Reusable drag-scroll carousel (theme presets + map styles) ──────
+      // Wraps an existing item strip in a horizontally-scrollable track with
+      // subtle left/right chevron arrows — mirrors the QuoteQuick wizard's
+      // selector. Mouse drag scrolls the strip; touch uses native overflow
+      // scrolling. A drag (>4px) is distinguished from a tap so each item's
+      // EXISTING click/select handler + queueSave still fire on a click — this
+      // only changes LAYOUT/navigation, never the selection logic. Arrows page
+      // ~80% of the visible width and hide at each end; honours reduced-motion.
+      function makeCarousel(track) {
+        track.classList.add('qf-cz-carousel-track');
+        var wrap = el('div', { class: 'qf-cz-carousel' });
+        var CHEV_L = '<svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M15 18l-6-6 6-6"/></svg>';
+        var CHEV_R = '<svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M9 6l6 6-6 6"/></svg>';
+        var prev = el('button', { type: 'button', class: 'qf-cz-carousel-arrow qf-cz-carousel-prev', 'aria-label': 'Scroll left', html: CHEV_L });
+        var next = el('button', { type: 'button', class: 'qf-cz-carousel-arrow qf-cz-carousel-next', 'aria-label': 'Scroll right', html: CHEV_R });
+        wrap.appendChild(prev); wrap.appendChild(track); wrap.appendChild(next);
+        var reduce = !!(window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches);
+        function page() { return Math.max(120, Math.round(track.clientWidth * 0.8)); }
+        function update() {
+          var max = track.scrollWidth - track.clientWidth;
+          var x = track.scrollLeft;
+          // A few px of slack: scroll-snap + the track's padding leave the strip
+          // resting a hair off 0 at the start, so treat "near the edge" as the edge.
+          var atStart = x <= 6, atEnd = x >= max - 6;
+          prev.disabled = atStart; next.disabled = atEnd || max <= 1;
+          prev.classList.toggle('is-hidden', atStart);
+          next.classList.toggle('is-hidden', atEnd || max <= 1);
+        }
+        prev.addEventListener('click', function () { track.scrollBy({ left: -page(), behavior: reduce ? 'auto' : 'smooth' }); });
+        next.addEventListener('click', function () { track.scrollBy({ left: page(), behavior: reduce ? 'auto' : 'smooth' }); });
+        track.addEventListener('scroll', update);
+        window.addEventListener('resize', update);
+        // Mouse drag-to-scroll (touch relies on native horizontal overflow).
+        var down = false, startX = 0, startScroll = 0, moved = 0;
+        track.addEventListener('pointerdown', function (e) {
+          if (e.pointerType && e.pointerType !== 'mouse') return; // let touch/pen scroll natively
+          down = true; moved = 0; startX = e.clientX; startScroll = track.scrollLeft;
+          track.classList.add('is-grabbing');
+        });
+        track.addEventListener('pointermove', function (e) {
+          if (!down) return;
+          var dx = e.clientX - startX;
+          if (Math.abs(dx) > 3) {
+            moved = Math.max(moved, Math.abs(dx));
+            track.scrollLeft = startScroll - dx;
+            e.preventDefault();
+          }
+        });
+        function endDrag() { down = false; track.classList.remove('is-grabbing'); }
+        track.addEventListener('pointerup', endDrag);
+        track.addEventListener('pointercancel', endDrag);
+        track.addEventListener('pointerleave', endDrag);
+        // Swallow the click that follows a real drag so a drag never selects.
+        track.addEventListener('click', function (e) {
+          if (moved > 4) { e.stopPropagation(); e.preventDefault(); }
+          moved = 0;
+        }, true);
+        requestAnimationFrame(update);
+        setTimeout(update, 60);
+        return wrap;
+      }
+
       // ── Theme presets ───────────────────────────────────────────
       var themeSec = el('div', { class: 'card qf-cz-section' });
       themeSec.appendChild(el('div', { class: 'qf-cz-section-title', text: 'Theme' }));
-      themeSec.appendChild(el('div', { class: 'qf-cz-hint', text: 'A curated look — sets the background, surfaces, and default accent.' }));
-      var grid = el('div', { class: 'qf-cz-preset-grid' });
+      themeSec.appendChild(el('div', { class: 'qf-cz-hint', text: 'A curated look — sets the background, surfaces, and default accent. Drag or use the arrows to browse.' }));
+      var grid = el('div', { class: 'qf-cz-preset-strip' });
       var currentPreset = b.themePreset || 'midnight';
       presets.forEach(function (p) {
         var on = p.id === currentPreset;
@@ -2336,7 +2398,7 @@
         });
         grid.appendChild(btn);
       });
-      themeSec.appendChild(grid);
+      themeSec.appendChild(makeCarousel(grid));
       controls.appendChild(themeSec);
 
       // ── Accent color ────────────────────────────────────────────
@@ -2437,8 +2499,8 @@
       ];
       var mapSec = el('div', { class: 'card qf-cz-section' });
       mapSec.appendChild(el('div', { class: 'qf-cz-section-title', text: 'Map style' }));
-      mapSec.appendChild(el('div', { class: 'qf-cz-hint', text: 'How the map on your calculator looks. The route line stays clear on every style.' }));
-      var mapRow = el('div', { class: 'qf-cz-mapstyle-row' });
+      mapSec.appendChild(el('div', { class: 'qf-cz-hint', text: 'How the map on your calculator looks. The route line stays clear on every style. Drag or use the arrows to browse.' }));
+      var mapRow = el('div', { class: 'qf-cz-mapstyle-strip' });
       var currentMapStyle = b.mapStyle || 'branded';
       mapStyles.forEach(function (m) {
         var on = m.key === currentMapStyle;
@@ -2456,34 +2518,37 @@
         });
         mapRow.appendChild(chip);
       });
-      mapSec.appendChild(mapRow);
+      mapSec.appendChild(makeCarousel(mapRow));
       controls.appendChild(mapSec);
 
-      // ── Map blend (feather map edges into the card) ──────────────
-      // A theme-agnostic ON/OFF toggle. When on, the route map's edges feather
-      // softly into the calculator surface (body[data-qf-map-blend="on"]).
-      // Saving reloads the live preview (same queueSave flow as Map style), so
-      // the feather appears immediately. Off by default — crisp rectangular map.
+      // ── Map blend (opacity slider — feather map edges into the card) ─────
+      // Replaces the old on/off toggle with a 0–100% intensity slider. 0 = OFF
+      // (crisp rectangular map — today's default); 1–100 = blend ON, feathering
+      // the route-map's edges into the calculator surface at that strength. The
+      // on/off master is DERIVED from opacity>0 (body[data-qf-map-blend]) and the
+      // feather STRENGTH is driven by --qf-map-blend-opacity. The live preview
+      // tracks the drag; the PUT is debounced so dragging doesn't spam saves.
+      // Legacy tenants with mapBlend='on' start at 60% (see the resolve layer).
       var blendSec = el('div', { class: 'card qf-cz-section' });
       blendSec.appendChild(el('div', { class: 'qf-cz-section-title', text: 'Map blend' }));
-      blendSec.appendChild(el('div', { class: 'qf-cz-hint', text: 'Blend the map into the card — its edges feather softly into your calculator surface.' }));
-      var blendRow = el('div', { class: 'qf-cz-hover-row' });
-      var currentMapBlend = (b.mapBlend === 'on') ? 'on' : 'off';
-      [{ id: 'off', label: 'Off' }, { id: 'on', label: 'On' }].forEach(function (o) {
-        var on = o.id === currentMapBlend;
-        var chip = el('button', { type: 'button', class: 'qf-cz-hover-chip' + (on ? ' is-selected' : ''), 'data-mapblend': o.id, 'aria-pressed': on ? 'true' : 'false', title: 'Blend map into the card' });
-        chip.appendChild(el('span', { class: 'qf-cz-hover-name', text: o.label + (o.id === 'off' ? ' (default)' : '') }));
-        chip.addEventListener('click', function () {
-          currentMapBlend = o.id;
-          $$('.qf-cz-hover-chip', blendRow).forEach(function (n) {
-            var s = n.getAttribute('data-mapblend') === o.id;
-            n.classList.toggle('is-selected', s);
-            n.setAttribute('aria-pressed', s ? 'true' : 'false');
-          });
-          queueSave({ mapBlend: o.id }, true);
-        });
-        blendRow.appendChild(chip);
+      blendSec.appendChild(el('div', { class: 'qf-cz-hint', text: 'Blend the map into the card — its edges feather softly into your calculator surface. Slide to 0 for a crisp rectangular map.' }));
+      var blendInit = (typeof b.mapBlendOpacity === 'number') ? b.mapBlendOpacity : (b.mapBlend === 'on' ? 60 : 0);
+      blendInit = Math.max(0, Math.min(100, Math.round(blendInit)));
+      var blendRow = el('div', { class: 'qf-cz-blend-row' });
+      var blendInput = el('input', { class: 'qf-cz-blend-slider', type: 'range', min: '0', max: '100', step: '1', 'aria-label': 'Map blend intensity' });
+      blendInput.value = String(blendInit);
+      var blendVal = el('span', { class: 'qf-cz-blend-value', text: blendInit + '%' });
+      blendInput.addEventListener('input', function () {
+        var v = Math.max(0, Math.min(100, parseInt(blendInput.value, 10) || 0));
+        blendVal.textContent = v + '%';
+        queueSave({ mapBlendOpacity: v });
       });
+      blendInput.addEventListener('change', function () {
+        var v = Math.max(0, Math.min(100, parseInt(blendInput.value, 10) || 0));
+        queueSave({ mapBlendOpacity: v }, true);
+      });
+      blendRow.appendChild(blendInput);
+      blendRow.appendChild(blendVal);
       blendSec.appendChild(blendRow);
       controls.appendChild(blendSec);
 

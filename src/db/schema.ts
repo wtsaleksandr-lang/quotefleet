@@ -592,6 +592,13 @@ export const brandConfigs = pgTable('brand_configs', {
    *  as body[data-qf-map-blend]. notNull default 'off' so existing rows are
    *  unchanged with no backfill. */
   mapBlend: text('map_blend').notNull().default('off'),
+  /** Per-tenant MAP-BLEND OPACITY (0–100). 0 = OFF (crisp rectangular map, the
+   *  default); 1–100 = blend ON at that feather intensity. The on/off master
+   *  (map_blend / body[data-qf-map-blend]) is DERIVED from opacity>0; this value
+   *  scales the feather via the --qf-map-blend-opacity custom property. Backfilled
+   *  from the legacy map_blend flag ('on'→60, 'off'→0) in migration 0033. notNull
+   *  default 0 so existing rows are unchanged. See widgetThemes.ts. */
+  mapBlendOpacity: integer('map_blend_opacity').notNull().default(0),
   /** Per-tenant optional feature toggles. A single, extensible JSON bag so new
    *  opt-in widget features never need a new column. Nullable — null resolves
    *  to the defaults in src/server/features.ts (resolveFeatures). Known keys:

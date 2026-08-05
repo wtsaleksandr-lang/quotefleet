@@ -1265,3 +1265,18 @@ body[data-qf-map-blend="on"] .qf-map-overlay,
 body[data-qf-map-blend="on"] .qf-map-expand {
   z-index: 2;
 }
+
+/* Map-blend INTENSITY — the Customize-panel slider (0–100 → 0–1) scales the
+   feather overlay's strength via --qf-map-blend-opacity. The on/off master stays
+   body[data-qf-map-blend="on"] (set by widget.js when opacity>0); this only dials
+   the feather strength. Default 1 keeps legacy 'on' tenants at full feather.
+   Same selector/specificity as the feather block above, declared later so this
+   opacity wins. Token/var only — no colour literals, so the colour guard stays
+   green. Respects reduced-motion via the transition guard below. */
+body[data-qf-map-blend="on"] .qf-map-canvas::after {
+  opacity: var(--qf-map-blend-opacity, 1);
+  transition: opacity .12s ease;
+}
+@media (prefers-reduced-motion: reduce) {
+  body[data-qf-map-blend="on"] .qf-map-canvas::after { transition: none; }
+}

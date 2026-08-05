@@ -275,7 +275,8 @@ export function registerTenantRoutes(app: Express) {
         (!!brand.mapStyle && brand.mapStyle.trim() !== '') ||
         (brand.ctaHover ?? 'border') !== 'border' ||
         (brand.fontColor ?? 'auto') !== 'auto' ||
-        (brand.mapBlend ?? 'off') !== 'off');
+        (brand.mapBlend ?? 'off') !== 'off' ||
+        (brand.mapBlendOpacity ?? 0) > 0);
     const brandConfigured =
       !!brand &&
       ((!!brand.logoUrl && brand.logoUrl.trim() !== '') ||
@@ -869,6 +870,11 @@ export function registerTenantRoutes(app: Express) {
     // into the calculator surface. Persisted verbatim; resolveWidgetTheme reads
     // it and the widget applies body[data-qf-map-blend]. See widgetThemes.ts.
     mapBlend: z.enum([...MAP_BLEND_VALUES] as [string, ...string[]]).optional(),
+    // Per-tenant MAP-BLEND OPACITY (0–100). Supersedes the binary mapBlend flag:
+    // 0 = off (crisp map); 1–100 = blend on at that feather intensity. The
+    // Customize panel's slider writes it; resolveWidgetTheme derives the on/off
+    // master (map_blend / data-qf-map-blend) from opacity>0. See widgetThemes.ts.
+    mapBlendOpacity: z.number().int().min(0).max(100).optional(),
     // Per-tenant optional feature toggles (partial) + the nested `booking`
     // deposit config object. Only known boolean keys (sanitizeFeaturesPatch)
     // and a validated booking object (sanitizeBookingPatch) are persisted, and

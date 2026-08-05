@@ -225,3 +225,62 @@
 @media (max-width: 480px) {
   .qf-cz-preset-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
 }
+
+/* ── Drag-scroll carousel (theme presets + map styles) ────────────────────
+   A reusable horizontal strip with subtle chevron arrows, used by BOTH the
+   theme-preset and map-style selectors (see makeCarousel in app.js). The track
+   scrolls on mouse drag (grab/grabbing cursor) and native touch overflow;
+   items scroll-snap for tidy alignment. Tokens/relative units only — colour +
+   spacing guards stay green. */
+.qf-cz-carousel { display: flex; align-items: center; gap: 8px; }
+.qf-cz-carousel-track {
+  display: flex; flex-wrap: nowrap; gap: 8px;
+  flex: 1 1 auto; min-width: 0;
+  overflow-x: auto; overflow-y: hidden;
+  scroll-snap-type: x proximity;
+  -webkit-overflow-scrolling: touch;
+  touch-action: pan-x;
+  cursor: grab;
+  padding: 4px;
+  scrollbar-width: none; /* Firefox — hide the native bar, still scrollable */
+}
+.qf-cz-carousel-track::-webkit-scrollbar { width: 0; height: 0; display: none; }
+.qf-cz-carousel-track.is-grabbing { cursor: grabbing; }
+.qf-cz-carousel-track > * { flex: 0 0 auto; scroll-snap-align: start; }
+/* In the carousel the preset cards take a fixed, comfortably-tappable width. */
+.qf-cz-carousel-track .qf-cz-preset { width: 120px; }
+
+.qf-cz-carousel-arrow {
+  flex: 0 0 auto; width: 32px; height: 32px;
+  display: inline-flex; align-items: center; justify-content: center;
+  padding: 0; border-radius: 999px;
+  border: 1px solid var(--border-strong); background: var(--surface-2);
+  color: var(--ink-soft); cursor: pointer;
+  transition: opacity .14s ease, border-color .12s ease, color .12s ease, transform .1s ease;
+}
+.qf-cz-carousel-arrow:hover { color: var(--ink); transform: translateY(-1px); }
+.qf-cz-carousel-arrow:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+/* Hide at the ends. Scoped through .qf-cz-carousel so it out-specifies the
+   global `.app-main button[disabled]{opacity:.62}` in premium-saas-polish.css;
+   visibility:hidden is a belt-and-suspenders so the arrow fully disappears. */
+.qf-cz-carousel .qf-cz-carousel-arrow.is-hidden,
+.qf-cz-carousel .qf-cz-carousel-arrow:disabled { opacity: 0; visibility: hidden; pointer-events: none; }
+.qf-cz-carousel-arrow svg { display: block; }
+@media (prefers-reduced-motion: reduce) {
+  .qf-cz-carousel-arrow { transition: none; }
+}
+
+/* ── Map-blend opacity slider ─────────────────────────────────────────────
+   Replaces the old on/off toggle. 0 = crisp map; 1–100 = feather intensity.
+   The live preview tracks the drag; the save is debounced. */
+.qf-cz-blend-row { display: flex; align-items: center; gap: 12px; }
+.qf-cz-blend-slider {
+  flex: 1 1 auto; min-width: 0; max-width: 320px;
+  accent-color: var(--accent);
+  cursor: pointer;
+}
+.qf-cz-blend-slider:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+.qf-cz-blend-value {
+  flex: 0 0 auto; min-width: 44px; text-align: right;
+  font-size: 12.5px; font-weight: 600; color: var(--ink); font-variant-numeric: tabular-nums;
+}
