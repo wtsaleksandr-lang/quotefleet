@@ -80,6 +80,14 @@ export interface DraftEmailOpts {
   /** Absolute URL of a pre-rendered screenshot of the prospect's branded quote.
    *  When set, the email embeds it as a clickable image instead of the text card. */
   previewImageUrl?: string;
+  /** 'cold' (default) = a first-touch cold email. 'warm-reply' = an in-thread
+   *  reply to an inbound broker/carrier pitch (REVERSE OUTREACH). Warm mode
+   *  acknowledges they reached out first and forces a "Re: …" subject. */
+  mode?: 'cold' | 'warm-reply';
+  /** Required context when mode==='warm-reply': the inbound email we're
+   *  replying to. `subject` drives the "Re: …" reply subject; `senderName`
+   *  lets the opener greet them by name when known. */
+  inboundContext?: { subject: string; senderName?: string };
 }
 
 export interface DraftedEmail {
@@ -323,8 +331,54 @@ function assembleText(paragraphs: string[]): string {
   return `${paragraphs.join('\n\n')}\n\n${footerText()}`;
 }
 
+// ─── Reply-subject helper (warm-reply mode) ────────────────────────────────
+/**
+ * Build the in-thread reply subject: strip any existing leading "Re:" run from
+ * the inbound subject, then prefix a single "Re: ". Mirrors WFT's reply-subject
+ * helper so a thread never accumulates "Re: Re: Re:".
+ */
+export function buildReplySubject(inboundSubject: string): string {
+  const s = (inboundSubject || '').replace(/^\s*(re:\s*)+/i, '').trim();
+  return `Re: ${s || 'your note'}`;
+}
+
 // ─── AI prompt ─────────────────────────────────────────────────────────────
-function buildSystemPrompt(): string {
+function buildSystemPrompt(
+  mode: 'cold' | 'warm-reply' = 'cold',
+  inboundContext?: { subject: string; senderName?: string },
+): string {
+  if (mode === 'warm-reply') {
+    const name = inboundContext?.senderName?.trim();
+    return [
+      'You are a founder-led B2B sales writer for QuoteFleet, an embeddable instant-quote',
+      'calculator + AI dispatcher for freight carriers (drayage & trucking) in the USA/Canada.',
+      'This is a WARM REPLY: the recipient emailed US FIRST — an inbound pitch/intro about',
+      'THEIR OWN freight service — and you are replying IN-THREAD. It must feel like a peer',
+      'wrote it — freight-literate, specific, confident, concise. NOT marketing fluff.',
+      '',
+      'HARD RULES:',
+      '1. Do NOT write a subject line — the system sets the "Re: …" reply subject automatically.',
+      `2. BODY: exactly 2 short paragraphs, UNDER 10 sentences total. Paragraph 1 OPENS by`,
+      '   ACKNOWLEDGING they reached out to you first and references THEIR service/pitch —',
+      `   e.g. "Thanks for reaching out about {their service} — funny timing, because I'd`,
+      `   actually just built you a working preview…"${name ? ` (you may greet them as "${name}")` : ''}.`,
+      '   Then pivot to the branded demo. Paragraph 2 introduces the demo you built for them and',
+      '   includes the EXACT demo URL provided, phrased like "here it is — {demoUrl}". Tie it to a',
+      '   real pain: manual/slow quoting loses loads; the first carrier to respond usually wins.',
+      '   End with ONE low-friction CTA (a quick reply, or a look at the demo).',
+      '3. You may cite AT MOST 1-2 of the provided SAFE stats, framed as "the same dynamic applies',
+      '   to freight quoting". Do NOT invent freight-specific win-rate percentages or any number not',
+      '   in the provided stats.',
+      '4. Use their real company name. Do not fabricate facts not present in the input.',
+      '5. Do NOT add a signature or an unsubscribe line or a mailing address — those are appended',
+      '   automatically.',
+      '',
+      'Return ONLY minified JSON, no markdown fences, EXACTLY:',
+      '{"subject": string, "bodyText": string}',
+      'where subject is a short throwaway line (ignored — the system forces the Re: subject) and',
+      'bodyText is the plaintext body with the two paragraphs separated by a blank line.',
+    ].join('\n');
+  }
   return [
     'You are a founder-led B2B sales writer for QuoteFleet, an embeddable instant-quote',
     'calculator + AI dispatcher for freight carriers (drayage & trucking) in the USA/Canada.',
@@ -354,7 +408,11 @@ function buildSystemPrompt(): string {
   ].join('\n');
 }
 
-function buildUserPayload(profile: CompanyProfile, demoUrl: string): string {
+function buildUserPayload(
+  profile: CompanyProfile,
+  demoUrl: string,
+  inboundContext?: { subject: string; senderName?: string },
+): string {
   const facts = {
     companyName: companyDisplayName(profile),
     domain: profile.domain,
@@ -367,6 +425,14 @@ function buildUserPayload(profile: CompanyProfile, demoUrl: string): string {
     quoteFleetAngle: profile.ai?.quoteFleetAngle ?? null,
     demoUrl,
     safeStats: SAFE_STATS,
+    // Only present on a warm reply — lets the AI reference what they wrote in.
+    ...(inboundContext
+      ? {
+          theyReachedOutFirst: true,
+          theirInboundSubject: inboundContext.subject,
+          theirName: inboundContext.senderName ?? null,
+        }
+      : {}),
   };
   return `Company facts (JSON):\n${JSON.stringify(facts)}\n\nWrite the email now.`;
 }
@@ -414,6 +480,36 @@ export function buildTemplateEmail(profile: CompanyProfile, demoUrl: string): { 
   return { subject, bodyText: `${para1}\n\n${para2}` };
 }
 
+/**
+ * Warm-reply template (deterministic, no AI) — used for an in-thread reply to an
+ * inbound broker/carrier pitch when the AI key is absent or the AI reply is
+ * unusable. Opens by ACKNOWLEDGING they reached out first, then pivots to the
+ * demo. The subject is the "Re: …" reply subject (draftOutreachEmail forces the
+ * same value, so cold/warm/template stay consistent).
+ */
+export function buildWarmTemplateEmail(
+  profile: CompanyProfile,
+  demoUrl: string,
+  inboundContext: { subject: string; senderName?: string },
+): { subject: string; bodyText: string } {
+  const company = companyDisplayName(profile);
+  const modeLabel = primaryModeLabel(profile);
+  const greet = inboundContext.senderName?.trim();
+  const subject = buildReplySubject(inboundContext.subject);
+
+  const para1 =
+    `${greet ? `${greet}, thanks` : 'Thanks'} for reaching out about ${company} — funny timing, because ` +
+    `I'd actually just built you a working preview of an instant-quote tool in your own branding. ` +
+    `In freight, the first carrier to reply usually wins the load, and quoting ${modeLabel} by hand is ` +
+    `exactly where that time leaks — HBR found reply speed swings B2B qualification odds by ~400%.`;
+
+  const para2 =
+    `Here it is — ${demoUrl}. It quotes ${modeLabel} lanes in seconds and can capture the lead while a ` +
+    `competitor is still typing up a PDF. Worth a quick look? Happy to tailor it to your rates.`;
+
+  return { subject, bodyText: `${para1}\n\n${para2}` };
+}
+
 // ─── Sentence-count guard (keeps the body from becoming a wall of text) ────
 export function countSentences(text: string): number {
   const matches = text.replace(/\s+/g, ' ').trim().match(/[^.!?]+[.!?]+/g);
@@ -435,6 +531,8 @@ export async function draftOutreachEmail(
   const aiComplete = opts.aiComplete ?? complete;
   const anthropicKey = opts.anthropicKey ?? process.env.ANTHROPIC_API_KEY ?? '';
   const publicBaseUrl = opts.publicBaseUrl ?? process.env.PUBLIC_BASE_URL ?? 'http://localhost:5000';
+  const mode = opts.mode ?? 'cold';
+  const inboundContext = opts.inboundContext;
   // Still tracked per recipient — powers suppression + the invisible List-
   // Unsubscribe header (set in sendOutreach). It is NOT rendered in the body.
   const unsubscribeToken = opts.unsubscribeToken || nanoid(24);
@@ -447,8 +545,17 @@ export async function draftOutreachEmail(
     try {
       const out = await aiComplete({
         tenantId: null,
-        system: buildSystemPrompt(),
-        messages: [{ role: 'user', content: buildUserPayload(profile, demoUrl) }],
+        system: buildSystemPrompt(mode, inboundContext),
+        messages: [
+          {
+            role: 'user',
+            content: buildUserPayload(
+              profile,
+              demoUrl,
+              mode === 'warm-reply' ? inboundContext : undefined,
+            ),
+          },
+        ],
         maxTokens: 700,
       });
       const parsed = extractJson(out.text);
@@ -467,10 +574,19 @@ export async function draftOutreachEmail(
   }
 
   if (!subject || !bodyText) {
-    const tmpl = buildTemplateEmail(profile, demoUrl);
+    const tmpl =
+      mode === 'warm-reply'
+        ? buildWarmTemplateEmail(profile, demoUrl, inboundContext ?? { subject: '' })
+        : buildTemplateEmail(profile, demoUrl);
     subject = tmpl.subject;
     bodyText = tmpl.bodyText;
     aiGenerated = false;
+  }
+
+  // Warm reply always threads: force the "Re: …" subject regardless of what the
+  // AI produced, so the reply lands in the same thread as the inbound pitch.
+  if (mode === 'warm-reply') {
+    subject = buildReplySubject(inboundContext?.subject ?? '');
   }
 
   const paragraphs = toParagraphs(bodyText);
