@@ -37,6 +37,7 @@ import { registerCarrierProfileRoutes } from './routes/carrierProfile.js';
 import { registerOutreachRoutes } from './routes/outreach.js';
 import { registerProspectDemoRoutes } from './routes/prospectDemo.js';
 import { registerUnsubscribeRoutes } from './routes/unsubscribe.js';
+import { registerOutreachUnsubscribeRoutes } from './routes/outreachUnsubscribe.js';
 import { hostInfoMiddleware } from './hostInfo.js';
 
 const __filename = fileURLToPath(import.meta.url);
@@ -133,6 +134,7 @@ export function createApp(): express.Express {
   registerCarrierProfileRoutes(app);
   registerOutreachRoutes(app);
   registerUnsubscribeRoutes(app);
+  registerOutreachUnsubscribeRoutes(app);
 
   app.get(['/healthz', '/api/health'], async (_req, res) => {
     const time = new Date().toISOString();

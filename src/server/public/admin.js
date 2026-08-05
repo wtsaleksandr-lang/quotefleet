@@ -97,7 +97,9 @@
     var actions = el('div', { style: { display: 'flex', gap: '8px', flexWrap: 'wrap' } });
     var goBtn = el('button', { class: 'btn btn-secondary', type: 'button', text: 'Enrich' });
     var demoBtn = el('button', { class: 'btn btn-primary', type: 'button', text: 'Generate branded demo' });
+    var draftBtn = el('button', { class: 'btn btn-secondary', type: 'button', text: 'Draft email' });
     actions.appendChild(demoBtn);
+    actions.appendChild(draftBtn);
     actions.appendChild(goBtn);
     card.appendChild(actions);
     c.appendChild(card);
@@ -130,6 +132,49 @@
         .then(function (d) { showResult(d.demoUrl, d.profile); })
         .catch(function (err) { showError(err); })
         .finally(function () { goBtn.disabled = false; demoBtn.disabled = false; });
+    }
+
+    // Draft a personalized, CASL-compliant outreach email for review before send.
+    function draftEmail() {
+      var domain = currentDomain();
+      if (!domain) { input.focus(); return; }
+      goBtn.disabled = true; demoBtn.disabled = true; draftBtn.disabled = true;
+      out.innerHTML = '';
+      out.appendChild(el('div', { class: 'muted', text: 'Drafting an outreach email for ' + domain + '…' }));
+      api('/api/admin/outreach/draft-email', { method: 'POST', body: { domain: domain } })
+        .then(function (d) { showEmail(d); })
+        .catch(function (err) { showError(err); })
+        .finally(function () { goBtn.disabled = false; demoBtn.disabled = false; draftBtn.disabled = false; });
+    }
+
+    // Render the drafted email for human review (subject + rendered body). The
+    // body HTML is our own drafter output (compliance footer + unsubscribe link
+    // already appended); we show it so a human approves before Phase 3 sends.
+    function showEmail(d) {
+      out.innerHTML = '';
+      var emailCard = el('div', { class: 'card', style: { marginBottom: '16px' } });
+      emailCard.appendChild(el('div', { class: 'field-label', text: 'Subject' }));
+      emailCard.appendChild(el('div', { style: { fontWeight: '600', marginBottom: '16px' }, text: d.subject }));
+      emailCard.appendChild(el('div', {
+        class: 'field-label',
+        text: d.aiGenerated ? 'Body (AI-personalized)' : 'Body (template fallback)',
+      }));
+      var body = el('div', { class: 'input', style: { padding: '16px', overflowX: 'auto' } });
+      body.innerHTML = d.bodyHtml;
+      emailCard.appendChild(body);
+      if (d.demoUrl) {
+        var demoLine = el('div', { class: 'muted', style: { marginTop: '12px', wordBreak: 'break-all' } });
+        demoLine.appendChild(document.createTextNode('Linked demo: '));
+        demoLine.appendChild(el('a', { href: d.demoUrl, text: d.demoUrl, target: '_blank', rel: 'noopener' }));
+        emailCard.appendChild(demoLine);
+      }
+      out.appendChild(emailCard);
+      var pre = el('pre', {
+        class: 'input',
+        style: { whiteSpace: 'pre-wrap', overflowX: 'auto' },
+        text: d.bodyText,
+      });
+      out.appendChild(pre);
     }
 
     function showError(err) {
@@ -170,6 +215,7 @@
 
     goBtn.addEventListener('click', run);
     demoBtn.addEventListener('click', provision);
+    draftBtn.addEventListener('click', draftEmail);
     input.addEventListener('keydown', function (ev) { if (ev.key === 'Enter') { ev.preventDefault(); provision(); } });
     input.focus();
   }
