@@ -668,6 +668,12 @@
 
   function renderHeader(cfg) {
     var h = $('qf-header'); h.innerHTML = '';
+    // How much of the header bar the logo fills. 'full' → a full-width contained
+    // banner (brand-name hidden); 'half' (default) → the compact logo-beside-name
+    // look. CSS (widget-ux-fixes.css) reads #qf-header[data-logo-fill] and, in
+    // BOTH modes, fits the logo with object-fit:contain so any aspect ratio is
+    // preserved and nothing is ever cropped/stretched.
+    h.setAttribute('data-logo-fill', (cfg.brand && cfg.brand.headerLogoFill === 'full') ? 'full' : 'half');
     var name = (cfg.brand && cfg.brand.displayName) || cfg.tenant.name;
     if (cfg.brand && cfg.brand.logoUrl) {
       h.appendChild(el('img', { src: cfg.brand.logoUrl, alt: name }));

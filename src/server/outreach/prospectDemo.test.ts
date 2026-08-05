@@ -204,6 +204,8 @@ describe('buildProspectWidgetConfig', () => {
     expect(cfg.brand.logoUrl).toBe('https://acme-freight.com/logo.png');
     expect(cfg.brand.showPoweredBy).toBe(true);
     expect(cfg.brand.showQuoteBeforeContact).toBe(true);
+    // Header-logo fill defaults to the compact look for demos.
+    expect(cfg.brand.headerLogoFill).toBe('half');
     // brand colour drives the theme accent
     expect(cfg.brand.primaryColor).toBe('#ff5a1f');
     expect(cfg.theme.accentOverride).toBe('#ff5a1f');

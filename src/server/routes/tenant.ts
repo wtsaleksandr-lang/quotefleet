@@ -833,6 +833,10 @@ export function registerTenantRoutes(app: Express) {
     primaryColor: z.string().optional(),
     accentColor: z.string().optional(),
     logoUrl: z.string().max(MAX_LOGO_CHARS).nullable().optional(),
+    // How much of the header bar the logo fills — 'half' (compact, default) or
+    // 'full' (full-width contained banner). Persisted verbatim; the widget
+    // fits the logo with object-fit:contain in both modes. See renderHeader.
+    headerLogoFill: z.enum(['half', 'full']).optional(),
     ctaText: z.string().optional(),
     footerNote: z.string().nullable().optional(),
     showPoweredBy: z.boolean().optional(),

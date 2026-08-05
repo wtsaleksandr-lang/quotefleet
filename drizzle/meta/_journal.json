@@ -225,6 +225,13 @@
       "when": 1786233600000,
       "tag": "0031_broker_leads",
       "breakpoints": true
+    },
+    {
+      "idx": 32,
+      "version": "7",
+      "when": 1786320000000,
+      "tag": "0032_header_logo_fill",
+      "breakpoints": true
     }
   ]
 }

@@ -2487,6 +2487,34 @@
       blendSec.appendChild(blendRow);
       controls.appendChild(blendSec);
 
+      // ── Header logo (how much of the bar the logo fills) ─────────
+      // Two options: Compact (logo beside the company name — today's look) vs
+      // Full-width (a full-width contained banner; the name hides). Both fit the
+      // logo with object-fit:contain so ANY logo shape stays un-cropped/undistorted.
+      // Saving reloads the live preview (same queueSave flow as Map blend).
+      var logoFillSec = el('div', { class: 'card qf-cz-section' });
+      logoFillSec.appendChild(el('div', { class: 'qf-cz-section-title', text: 'Header logo' }));
+      logoFillSec.appendChild(el('div', { class: 'qf-cz-hint', text: 'How much of the header bar your logo fills. Any logo shape fits cleanly — never cropped or stretched.' }));
+      var logoFillRow = el('div', { class: 'qf-cz-hover-row' });
+      var currentLogoFill = (b.headerLogoFill === 'full') ? 'full' : 'half';
+      [{ id: 'half', label: 'Compact' }, { id: 'full', label: 'Full-width' }].forEach(function (o) {
+        var on = o.id === currentLogoFill;
+        var chip = el('button', { type: 'button', class: 'qf-cz-hover-chip' + (on ? ' is-selected' : ''), 'data-logofill': o.id, 'aria-pressed': on ? 'true' : 'false', title: o.id === 'full' ? 'A full-width logo banner (company name hides)' : 'Compact logo beside your company name' });
+        chip.appendChild(el('span', { class: 'qf-cz-hover-name', text: o.label + (o.id === 'half' ? ' (default)' : '') }));
+        chip.addEventListener('click', function () {
+          currentLogoFill = o.id;
+          $$('.qf-cz-hover-chip', logoFillRow).forEach(function (n) {
+            var s = n.getAttribute('data-logofill') === o.id;
+            n.classList.toggle('is-selected', s);
+            n.setAttribute('aria-pressed', s ? 'true' : 'false');
+          });
+          queueSave({ headerLogoFill: o.id }, true);
+        });
+        logoFillRow.appendChild(chip);
+      });
+      logoFillSec.appendChild(logoFillRow);
+      controls.appendChild(logoFillSec);
+
       // ── Text color (background-aware, WCAG-limited) ──────────────
       // Only colours that clear WCAG AA against the CURRENT theme background
       // are offered; the set updates whenever the theme/accent changes.

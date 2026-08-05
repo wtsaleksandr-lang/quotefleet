@@ -386,6 +386,8 @@ export function buildProspectWidgetConfig(rec: ProspectDemoRecord) {
     displayName,
     tagline: typeof profile.tagline === 'string' ? profile.tagline : null,
     logoUrl: brand.logoUrl,
+    // Compact header (logo beside the name) — the default look for demos.
+    headerLogoFill: 'half' as 'half' | 'full',
     showPoweredBy: true,
     requireEmail: true,
     requirePhone: false,
