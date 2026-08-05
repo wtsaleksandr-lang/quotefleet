@@ -103,6 +103,23 @@ function extractPdfText(buf: Buffer): string {
   return text;
 }
 
+// A real 16x9 RGB PNG (color type 2 — no alpha, matching the Google Static Map
+// snapshots production embeds) so PDFKit embeds it FAST (~20ms) and reliably.
+// A fake/garbage buffer throws inside PDFKit's image parser — exactly the
+// corrupt-buffer case the mapless-fallback guard must survive. (An alpha PNG
+// would hit PDFKit's slow channel-split path and must be avoided in tests.)
+const MAP_PNG = Buffer.from(
+  'iVBORw0KGgoAAAANSUhEUgAAABAAAAAJCAIAAAC0SDtlAAAAFElEQVR4nGPgtflDEmIY1TAoNAAA+pW20Tyqf28AAAAASUVORK5CYII=',
+  'base64'
+);
+/** PDFKit serialises an embedded image as an /XObject with `/Subtype /Image`
+ *  (compress:false keeps the object dict literal). NB: the plain substring
+ *  `/Image` is NOT reliable — every page's ProcSet lists `/ImageB /ImageC
+ *  /ImageI` — so we match the image-dict subtype specifically. */
+function hasEmbeddedImage(buf: Buffer): boolean {
+  return buf.toString('latin1').includes('/Subtype /Image');
+}
+
 const baseLead = () => ({
   id: 10,
   refId: 'QF-ABC123',
@@ -240,6 +257,32 @@ describe('generateQuotePdf — plan gating (Pro vs free branding)', () => {
   });
 });
 
+describe('generateQuotePdf — route-map snapshot', () => {
+  it('embeds the map image + distance caption when the resolver returns a PNG', async () => {
+    const withMap = await gen({ fetchMap: async () => ({ png: MAP_PNG, distanceMiles: 612 }) });
+    expect(withMap.status).toBe(200);
+    expect(hasEmbeddedImage(withMap.buffer!)).toBe(true);
+    // Caption carries the resolved driving distance, like the online estimate.
+    expect(extractPdfText(withMap.buffer!)).toContain('612 mi');
+    // Strictly larger than the mapless render (an image XObject was added).
+    const mapless = await gen({ fetchMap: async () => null });
+    expect(withMap.buffer!.length).toBeGreaterThan(mapless.buffer!.length);
+  }, 20000);
+
+  it('(graceful absence) falls back to a valid mapless PDF when the resolver returns null', async () => {
+    const r = await gen({ fetchMap: async () => null });
+    expect(r.status).toBe(200);
+    expect(r.buffer!.subarray(0, 5).toString('latin1')).toBe('%PDF-');
+    expect(hasEmbeddedImage(r.buffer!)).toBe(false);
+  }, 20000);
+
+  it('(graceful absence) never breaks the PDF when the resolver throws', async () => {
+    const r = await gen({ fetchMap: async () => { throw new Error('map service down'); } });
+    expect(r.status).toBe(200);
+    expect(r.buffer!.subarray(0, 5).toString('latin1')).toBe('%PDF-');
+  }, 20000);
+});
+
 describe('buildQuotePdf — pure drawer', () => {
   const input = (over: Record<string, unknown> = {}) => ({
     refId: 'QF-XYZ',
@@ -282,6 +325,26 @@ describe('buildQuotePdf — pure drawer', () => {
     const r = await buildQuotePdf(input({ brand: { primaryColor: 'not-a-color', accentColor: '', logo: null } }) as never);
     expect(r.buffer.subarray(0, 5).toString('latin1')).toBe('%PDF-');
   });
+
+  it('(e) embeds the route-map snapshot + caption when handed map bytes', async () => {
+    const { buildQuotePdf } = await import('../quotePdf.js');
+    const withMap = await buildQuotePdf(
+      input({ mapImage: MAP_PNG, mapCaption: '~612 mi · Los Angeles, CA to Phoenix, AZ' }) as never
+    );
+    expect(hasEmbeddedImage(withMap.buffer)).toBe(true);
+    expect(extractPdfText(withMap.buffer)).toContain('612 mi');
+    const mapless = await buildQuotePdf(input({ mapImage: null }) as never);
+    expect(hasEmbeddedImage(mapless.buffer)).toBe(false);
+    expect(withMap.buffer.length).toBeGreaterThan(mapless.buffer.length);
+  }, 20000);
+
+  it('(e) survives a corrupt map buffer — draws the mapless layout, never throws', async () => {
+    const { buildQuotePdf } = await import('../quotePdf.js');
+    const r = await buildQuotePdf(input({ mapImage: Buffer.from('not-a-real-png') }) as never);
+    expect(r.buffer.subarray(0, 5).toString('latin1')).toBe('%PDF-');
+    // The corrupt buffer must NOT have produced an image object.
+    expect(hasEmbeddedImage(r.buffer)).toBe(false);
+  }, 20000);
 });
 
 // ── Source-level wiring guards ───────────────────────────────────────

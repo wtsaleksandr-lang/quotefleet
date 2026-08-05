@@ -14,6 +14,8 @@ import { resolveQuoteDisclaimer } from '../quoteDisclaimer.js';
 import { estimateTransit } from '../../calc/transit.js';
 import { canUseProFeature } from '../plans.js';
 import { buildQuotePdf, type QuotePdfLine } from '../quotePdf.js';
+import { resolveMapStyle } from '../routeMap.js';
+import { resolveRouteMapPng, type RouteMapPng } from './quoteMap.js';
 
 const QUOTE_VALIDITY_DAYS = 30;
 
@@ -362,6 +364,9 @@ export async function generateQuotePdf(params: {
   refId: string;
   checkAccess?: (tenant: typeof tenants.$inferSelect) => Promise<boolean>;
   fetchLogo?: (url: string) => Promise<Buffer | null>;
+  /** Injectable route-map resolver (defaults to resolveRouteMapPng). Overridden
+   *  in tests to exercise map-present / map-absent PDF layouts deterministically. */
+  fetchMap?: typeof resolveRouteMapPng;
 }): Promise<QuotePdfDelivery> {
   const refId = String(params.refId ?? '').trim();
   if (!refId) return { status: 400, json: { error: 'Missing refId' } };
@@ -419,6 +424,49 @@ export async function generateQuotePdf(params: {
   const fetchLogo = params.fetchLogo ?? fetchLogoBytes;
   const logo = logoUrl ? await fetchLogo(logoUrl) : null;
 
+  // Route-map snapshot — the SAME origin→destination static map the hosted
+  // quote shows, resolved server-side (NO HTTP round-trip) and embedded in the
+  // PDF. Derive the lane coords + tenant map style EXACTLY as the quote-map
+  // proxy does so the PDF map is byte-identical to the widget's. Any miss (no
+  // coords, no Maps key, geocode/Directions/Static failure, timeout) yields
+  // null → the drawer cleanly falls back to its mapless layout. Never throws.
+  const origin =
+    typeof lead.pickupLat === 'number' && typeof lead.pickupLng === 'number'
+      ? { lat: lead.pickupLat, lng: lead.pickupLng }
+      : undefined;
+  const destination =
+    typeof lead.deliveryLat === 'number' && typeof lead.deliveryLng === 'number'
+      ? { lat: lead.deliveryLat, lng: lead.deliveryLng }
+      : undefined;
+  const mapStyle = resolveMapStyle(brand?.mapStyle);
+  const fetchMap = params.fetchMap ?? resolveRouteMapPng;
+  let routeMap: RouteMapPng | null = null;
+  try {
+    routeMap = await fetchMap({
+      origin,
+      destination,
+      theme: 'light',
+      mapStyle,
+      apiKey: loadEnv().GOOGLE_MAPS_API_KEY,
+    });
+  } catch {
+    routeMap = null; // Belt-and-suspenders: the PDF must render even if the resolver throws.
+  }
+  // Caption: prefer the map's resolved driving distance, else the lead's stored
+  // distance. Uses "to" (not "→") — the arrow glyph is absent from the WinAnsi
+  // standard fonts the PDF draws with.
+  const mapMiles =
+    routeMap?.distanceMiles != null
+      ? routeMap.distanceMiles
+      : typeof lead.distanceMiles === 'number'
+        ? Math.round(lead.distanceMiles)
+        : null;
+  const mapCaption = routeMap
+    ? mapMiles != null
+      ? `~${mapMiles.toLocaleString('en-US')} mi · ${pickup} to ${delivery}`
+      : `Estimated route · ${pickup} to ${delivery}`
+    : null;
+
   // Pro (or trialing) → un-badged branded PDF; everyone else → same doc + badge.
   const proBranding = canUseProFeature(tenant);
 
@@ -431,6 +479,8 @@ export async function generateQuotePdf(params: {
     distanceMiles: typeof lead.distanceMiles === 'number' ? lead.distanceMiles : null,
     transitText: estimateTransit(lead.distanceMiles, lead.service)?.text ?? null,
     lane: { pickup, delivery },
+    mapImage: routeMap?.png ?? null,
+    mapCaption,
     service: serviceLabel,
     breakdown,
     disclaimer: resolveQuoteDisclaimer(tenant.quoteDisclaimer),

@@ -37,6 +37,15 @@ export interface QuotePdfInput {
   /** Estimated transit window text (e.g. "2–3 business days"), or null. */
   transitText: string | null;
   lane: { pickup: string; delivery: string };
+  /** Pre-fetched route-map snapshot PNG bytes (origin→destination static map),
+   *  or null. Resolved by the route via getRouteMap so the PDF map is byte-for-
+   *  byte the SAME snapshot the hosted quote + branded email show. The drawer
+   *  only embeds what it's handed; a null (uncached lane / geocode miss / map
+   *  service off / port-rail lane) cleanly falls back to the mapless layout. */
+  mapImage?: Buffer | null;
+  /** Small caption drawn under the map (e.g. "~612 mi · Los Angeles, CA to
+   *  Phoenix, AZ"). Ignored when there's no mapImage. */
+  mapCaption?: string | null;
   /** Human service / equipment label (e.g. "40' Standard Container"). */
   service: string | null;
   /** Customer-facing pricing breakdown (customerFacingLines output). */
@@ -203,6 +212,38 @@ export function buildQuotePdf(input: QuotePdfInput): Promise<QuotePdfResult> {
 
   doc.y = Math.max(leftY, headerTop + metaBoxH) + 18;
 
+  // ── Route-map snapshot ─────────────────────────────────────────────────────
+  // The same origin→destination static map the hosted quote shows, placed near
+  // the top so the PDF reads like the online estimate. `cover` fills the full
+  // content width at a fixed banner height (crop, no distortion), clipped to
+  // rounded corners with a hairline border to match the online map card. The
+  // whole embed is guarded: a corrupt / unsupported buffer must NEVER break the
+  // PDF — on any failure we skip the map cleanly and keep the mapless layout.
+  if (input.mapImage && input.mapImage.length > 0) {
+    // Banner height tuned so a typical quote (map + facts + total + a handful of
+    // breakdown lines + terms) still lands on ONE page; `cover` crops to fill
+    // the full content width without distortion, matching the online map card.
+    const mapH = 160;
+    ensureSpace(mapH + 22);
+    const mapY = doc.y;
+    try {
+      doc.save();
+      doc.roundedRect(left, mapY, contentW, mapH, 8).clip();
+      doc.image(input.mapImage, left, mapY, { cover: [contentW, mapH], align: 'center', valign: 'center' });
+      doc.restore();
+      doc.roundedRect(left, mapY, contentW, mapH, 8).lineWidth(1).strokeColor(HAIRLINE).stroke();
+      doc.y = mapY + mapH + 6;
+      const caption = input.mapCaption && input.mapCaption.trim() ? input.mapCaption.trim() : 'Estimated route';
+      doc.fillColor(MUTED).font('Helvetica').fontSize(8).text(caption, left, doc.y, { width: contentW });
+      doc.y += 12;
+    } catch {
+      // Unsupported / corrupt image — restore graphics state and fall back to
+      // the mapless layout so the PDF always renders.
+      try { doc.restore(); } catch { /* no-op: nothing to restore */ }
+      doc.y = mapY;
+    }
+  }
+
   // ── Lane summary strip ─────────────────────────────────────────────────────
   const laneTop = doc.y;
   const laneH = 58;
@@ -249,6 +290,19 @@ export function buildQuotePdf(input: QuotePdfInput): Promise<QuotePdfResult> {
     doc.y = factY + 12 + maxValH + 14;
   }
 
+  // ── Estimated Total card ───────────────────────────────────────────────────
+  // Placed ABOVE the breakdown so the PDF leads with the headline number, like
+  // the online estimate: the customer sees the total first, then how it's built.
+  {
+    ensureSpace(46);
+    const totalY = doc.y;
+    const totalH = 40;
+    doc.roundedRect(left, totalY, contentW, totalH, 8).fill(primary);
+    doc.fillColor('#ffffff').font('Helvetica-Bold').fontSize(11).text('Estimated Total', left + 16, totalY + 14, { width: contentW / 2 });
+    doc.fillColor('#ffffff').font('Helvetica-Bold').fontSize(18).text(money(input.total, currency), left, totalY + 10, { width: contentW - 16, align: 'right' });
+    doc.y = totalY + totalH + 18;
+  }
+
   // ── Pricing breakdown ──────────────────────────────────────────────────────
   ensureSpace(40);
   doc.fillColor(INK).font('Helvetica-Bold').fontSize(13).text('Pricing breakdown', left, doc.y);
@@ -287,15 +341,6 @@ export function buildQuotePdf(input: QuotePdfInput): Promise<QuotePdfResult> {
     }
     doc.y += 6;
   }
-
-  // ── Grand total band ───────────────────────────────────────────────────────
-  ensureSpace(46);
-  const totalY = doc.y;
-  const totalH = 40;
-  doc.roundedRect(left, totalY, contentW, totalH, 8).fill(primary);
-  doc.fillColor('#ffffff').font('Helvetica-Bold').fontSize(11).text('Estimated Total', left + 16, totalY + 14, { width: contentW / 2 });
-  doc.fillColor('#ffffff').font('Helvetica-Bold').fontSize(18).text(money(input.total, currency), left, totalY + 10, { width: contentW - 16, align: 'right' });
-  doc.y = totalY + totalH + 18;
 
   // ── Terms / disclaimer ─────────────────────────────────────────────────────
   if (input.disclaimer) {
