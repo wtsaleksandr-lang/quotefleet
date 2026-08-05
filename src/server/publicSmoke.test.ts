@@ -228,7 +228,10 @@ describe('public static page smoke checks', () => {
     // frames the RAW widget (no recursion into the shell) and maps themes to presets
     expect(html).toContain('/w/demo?raw=1');
     expect(html).toContain("dark: 'midnight'");
-    expect(html).toContain("light: 'cream'");
+    // Light maps to a genuinely LIGHT preset (cupertino). It previously pointed
+    // at 'cream', which was repaletted to a DARK shell in widgetThemes.ts — so
+    // the demo's Light button rendered dark in both modes. See widget-demo-shell.html.
+    expect(html).toContain("light: 'cupertino'");
   });
 
   it('widget client forwards a demo preset override to the config endpoint', async () => {
