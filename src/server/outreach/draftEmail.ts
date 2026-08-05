@@ -128,31 +128,25 @@ function primaryPain(profile: CompanyProfile): string {
   return p?.trim() || 'quoting by hand means shippers wait — and the first carrier to reply usually wins the load';
 }
 
-// ─── Compliance footer builders ───────────────────────────────────────────
-function unsubscribeUrl(base: string, token: string): string {
-  return `${(base || '').replace(/\/$/, '')}/outreach/unsubscribe/${token}`;
+// ─── Footer builders ──────────────────────────────────────────────────────
+// Per product decision (2026-08): the outreach email carries NO visible mailing
+// address and NO visible unsubscribe link in the body — it's a founder-style
+// email, not a bulk newsletter. The suppression system + the invisible RFC 8058
+// List-Unsubscribe header (set in sendOutreach) still work; only the body chrome
+// is dropped. SENDER_ADDRESS is retained as a constant for records/headers.
+
+/** Plaintext sign-off (mirrors the HTML signature). No address, no unsub link. */
+function footerText(): string {
+  return `— ${SENDER_PERSON}\n${SENDER_TITLE}`;
 }
 
-function footerText(unsubUrl: string): string {
-  return [
-    '—',
-    `${SENDER_NAME}`,
-    `${SENDER_ADDRESS}`,
-    `Unsubscribe: ${unsubUrl}`,
-  ].join('\n');
-}
-
-/** Branded, compliant footer row (sender identity + address + one-click unsub). */
-function footerHtml(unsubUrl: string, company: string): string {
+/** Slim brand footer row — identity only, no address, no unsubscribe link. */
+function footerHtml(): string {
   return (
-    `<tr><td style="padding:20px 32px 24px;background:#fafbfc;border-top:1px solid ${HAIR};` +
+    `<tr><td style="padding:16px 32px 22px;background:#fafbfc;border-top:1px solid ${HAIR};` +
     `font-family:${FONT_STACK};font-size:12px;line-height:1.6;color:${FAINT};">` +
-    `<div style="font-weight:700;color:${MUT};letter-spacing:.2px;">${escapeHtml(SENDER_NAME)}</div>` +
-    `<div style="margin-top:2px;">${escapeHtml(SENDER_ADDRESS)}</div>` +
-    `<div style="margin-top:10px;">` +
-    `You're receiving this because we thought ${escapeHtml(company)} could quote faster. ` +
-    `<a href="${escapeAttr(unsubUrl)}" style="color:${MUT};text-decoration:underline;">Unsubscribe</a>.` +
-    `</div>` +
+    `<span style="font-weight:700;color:${MUT};letter-spacing:.2px;">${escapeHtml(SENDER_NAME)}</span>` +
+    ` &middot; Instant, branded freight quotes for carriers.` +
     `</td></tr>`
   );
 }
@@ -196,7 +190,6 @@ function linkifyDemo(escapedParagraph: string, demoUrl: string): string {
 /** Context the branded HTML assembler needs beyond the body paragraphs. */
 interface HtmlContext {
   demoUrl: string;
-  unsubUrl: string;
   company: string;
   modeLabel: string;
   lane: string | null;
@@ -292,17 +285,15 @@ function assembleHtml(paragraphs: string[], ctx: HtmlContext): string {
     previewCardHtml(ctx) +
     ctaHtml(ctx) +
     signatureHtml() +
-    footerHtml(ctx.unsubUrl, ctx.company) +
+    footerHtml() +
     `</table>\n` +
-    `<div style="font-family:${FONT_STACK};font-size:11px;color:#b0b8c4;padding:14px;">` +
-    `QuoteFleet &middot; instant branded freight quotes for carriers</div>\n` +
     `</td></tr>\n</table>`
   );
 }
 
-/** Assemble the plaintext version from paragraphs + the compliance footer. */
-function assembleText(paragraphs: string[], unsubUrl: string): string {
-  return `${paragraphs.join('\n\n')}\n\n${footerText(unsubUrl)}`;
+/** Assemble the plaintext version from paragraphs + the sign-off. */
+function assembleText(paragraphs: string[]): string {
+  return `${paragraphs.join('\n\n')}\n\n${footerText()}`;
 }
 
 // ─── AI prompt ─────────────────────────────────────────────────────────────
@@ -417,8 +408,9 @@ export async function draftOutreachEmail(
   const aiComplete = opts.aiComplete ?? complete;
   const anthropicKey = opts.anthropicKey ?? process.env.ANTHROPIC_API_KEY ?? '';
   const publicBaseUrl = opts.publicBaseUrl ?? process.env.PUBLIC_BASE_URL ?? 'http://localhost:5000';
+  // Still tracked per recipient — powers suppression + the invisible List-
+  // Unsubscribe header (set in sendOutreach). It is NOT rendered in the body.
   const unsubscribeToken = opts.unsubscribeToken || nanoid(24);
-  const unsubUrl = unsubscribeUrl(publicBaseUrl, unsubscribeToken);
 
   let subject: string | null = null;
   let bodyText: string | null = null;
@@ -457,13 +449,12 @@ export async function draftOutreachEmail(
   const paragraphs = toParagraphs(bodyText);
   const bodyHtml = assembleHtml(paragraphs, {
     demoUrl,
-    unsubUrl,
     company: companyDisplayName(profile),
     modeLabel: primaryModeLabel(profile),
     lane: primaryLane(profile),
     publicBaseUrl,
   });
-  const finalText = assembleText(paragraphs, unsubUrl);
+  const finalText = assembleText(paragraphs);
 
   return { subject, bodyHtml, bodyText: finalText, unsubscribeToken, aiGenerated };
 }

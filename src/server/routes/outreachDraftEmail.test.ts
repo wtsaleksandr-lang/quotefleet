@@ -178,8 +178,10 @@ describe('POST /api/admin/outreach/draft-email', () => {
     expect(r.status).toBe(200);
     expect(typeof r.json.subject).toBe('string');
     expect(String(r.json.subject)).toContain('Acme Drayage');
-    expect(String(r.json.bodyHtml)).toContain('30 Angus Road, Hamilton, ON L8K 6L1, Canada');
-    expect(String(r.json.bodyText)).toContain('30 Angus Road, Hamilton, ON L8K 6L1, Canada');
+    // Mailing address + visible unsubscribe are intentionally NOT in the body.
+    expect(String(r.json.bodyHtml)).not.toContain('30 Angus Road, Hamilton, ON L8K 6L1, Canada');
+    expect(String(r.json.bodyText)).not.toContain('30 Angus Road, Hamilton, ON L8K 6L1, Canada');
+    expect(String(r.json.bodyHtml)).not.toContain('/outreach/unsubscribe/');
     expect(String(r.json.demoUrl)).toMatch(/\/demo\/tok_/);
     expect(String(r.json.bodyText)).toContain(String(r.json.demoUrl));
     expect(typeof r.json.unsubscribeToken).toBe('string');
