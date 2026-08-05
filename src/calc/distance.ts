@@ -47,8 +47,27 @@ const STRAIGHT_TO_ROAD_FACTOR = 1.18;
  */
 const BOGUS_US_ZIPS = new Set(['00000', '99999']);
 
-function normCountry(c?: string): string {
-  if (!c) return 'US';
+/** Canadian province/territory codes — used to infer country when a caller
+ *  supplies a state/province token but omits country outright (see below). */
+const CA_PROVINCES = new Set(['AB', 'BC', 'MB', 'NB', 'NL', 'NS', 'NT', 'NU', 'ON', 'PE', 'QC', 'SK', 'YT']);
+
+/**
+ * Normalizes a country field, defaulting to 'US' when absent — EXCEPT that
+ * an absent country with a recognizable Canadian province in `state` infers
+ * 'CA' instead. This is defense-in-depth for any caller (widget free-text
+ * parsing, the AI quote tool, future callers) that resolves a city+province
+ * but doesn't attach country: without it, a city-only Canadian lane (e.g.
+ * "Mississauga, ON") silently defaulted to US, so geocode()'s Nominatim tier
+ * queried countrycodes=us and could never find an Ontario city — a hard 400.
+ * An explicitly-supplied country (including an explicit 'US') always wins;
+ * this only kicks in when country is genuinely omitted.
+ */
+export function normCountry(c?: string, state?: string): string {
+  if (!c) {
+    const st = (state ?? '').trim().toUpperCase();
+    if (CA_PROVINCES.has(st)) return 'CA';
+    return 'US';
+  }
   const s = c.trim().toUpperCase();
   if (s === 'USA' || s === 'UNITED STATES') return 'US';
   if (s === 'CANADA') return 'CA';
@@ -65,13 +84,13 @@ function normalizeQueryKey(input: {
 }): string {
   if (input.portCode) return `port:${input.portCode.toUpperCase()}`;
   if (input.zip) {
-    return `zip:${normCountry(input.country)}:${input.zip.replace(/\s+/g, '').toUpperCase()}`;
+    return `zip:${normCountry(input.country, input.state)}:${input.zip.replace(/\s+/g, '').toUpperCase()}`;
   }
   if (input.address) {
-    return `addr:${normCountry(input.country)}:${input.address.toLowerCase().trim()}`;
+    return `addr:${normCountry(input.country, input.state)}:${input.address.toLowerCase().trim()}`;
   }
   if (input.city) {
-    return `city:${normCountry(input.country)}:${(input.state ?? '').toUpperCase()}:${input.city.toLowerCase().trim()}`;
+    return `city:${normCountry(input.country, input.state)}:${(input.state ?? '').toUpperCase()}:${input.city.toLowerCase().trim()}`;
   }
   return 'unknown';
 }
@@ -85,7 +104,7 @@ export async function geocode(input: {
   address?: string;
   portCode?: string;
 }): Promise<GeoPoint | null> {
-  const country = normCountry(input.country);
+  const country = normCountry(input.country, input.state);
 
   // 0. port code shortcut
   if (input.portCode) {

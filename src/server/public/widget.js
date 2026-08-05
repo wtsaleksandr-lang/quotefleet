@@ -176,6 +176,15 @@
     };
   }
 
+  // Canadian province/territory codes — a free-typed "City, XX" with no zip
+  // and no autocomplete pick used to hardcode country:'US' here regardless of
+  // this token, so a city-only Canadian lane (e.g. "Mississauga, ON") built a
+  // US-tagged payload and the server geocoder then filtered Nominatim to
+  // countrycodes=us, which can never find an Ontario city → 400. Recognizing
+  // the province token lets the free-text path infer CA the same way the
+  // zip/postal-code branch above already does.
+  var CA_PROVINCES = ['AB', 'BC', 'MB', 'NB', 'NL', 'NS', 'NT', 'NU', 'ON', 'PE', 'QC', 'SK', 'YT'];
+
   function parseLocation(str) {
     if (!str) return {};
     var s = str.trim();
@@ -195,7 +204,8 @@
           country: /[A-Z]\d/.test(parts[parts.length - 1]) ? 'CA' : 'US',
         };
       }
-      return { city: parts[0], state: parts[1].toUpperCase().slice(0, 2), country: 'US' };
+      var stateTok = parts[1].toUpperCase().slice(0, 2);
+      return { city: parts[0], state: stateTok, country: CA_PROVINCES.indexOf(stateTok) >= 0 ? 'CA' : 'US' };
     }
     return { city: s, country: 'US' };
   }
