@@ -204,6 +204,13 @@
       "when": 1785974400000,
       "tag": "0028_outreach_send",
       "breakpoints": true
+    },
+    {
+      "idx": 29,
+      "version": "7",
+      "when": 1786060800000,
+      "tag": "0029_prospect_demo_quote_shot",
+      "breakpoints": true
     }
   ]
 }

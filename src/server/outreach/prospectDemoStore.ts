@@ -35,6 +35,11 @@ export interface ProspectDemoStore {
   upsert(input: UpsertProspectDemoInput): Promise<ProspectDemo>;
   /** Stamp viewed_at on first public load (no-op if already viewed). */
   markViewed(token: string): Promise<void>;
+  /** Store the base64 PNG of the prospect's branded quote (captured at provision
+   *  time by the orchestrator). Optional so DB-free test fakes need not implement it. */
+  setQuoteShot?(token: string, pngB64: string): Promise<void>;
+  /** Lean fetch of just the base64 quote shot for the /demo-shot serve route. */
+  getQuoteShot?(token: string): Promise<string | null>;
 }
 
 /** Mint an unguessable, URL-safe demo token. */
@@ -91,5 +96,23 @@ export const dbProspectDemoStore: ProspectDemoStore = {
       .update(prospectDemos)
       .set({ viewedAt: new Date() })
       .where(and(eq(prospectDemos.token, token), isNull(prospectDemos.viewedAt)));
+  },
+
+  async setQuoteShot(token, pngB64) {
+    if (!token) return;
+    await db()
+      .update(prospectDemos)
+      .set({ quoteShotB64: pngB64, quoteShotAt: new Date() })
+      .where(eq(prospectDemos.token, token));
+  },
+
+  async getQuoteShot(token) {
+    if (!token) return null;
+    const rows = await db()
+      .select({ b64: prospectDemos.quoteShotB64 })
+      .from(prospectDemos)
+      .where(eq(prospectDemos.token, token))
+      .limit(1);
+    return rows[0]?.b64 ?? null;
   },
 };

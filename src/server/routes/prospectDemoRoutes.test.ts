@@ -79,6 +79,8 @@ function makeStore(): FakeStore {
         createdAt: new Date(),
         updatedAt: new Date(),
         viewedAt: null,
+        quoteShotB64: null,
+        quoteShotAt: null,
       };
       rows.set(token, row);
       byDomain.set(input.domain, token);
@@ -88,6 +90,13 @@ function makeStore(): FakeStore {
       calls.markViewed.push(token);
       const r = rows.get(token);
       if (r && !r.viewedAt) rows.set(token, { ...r, viewedAt: new Date() });
+    },
+    async setQuoteShot(token, b64) {
+      const r = rows.get(token);
+      if (r) rows.set(token, { ...r, quoteShotB64: b64, quoteShotAt: new Date() });
+    },
+    async getQuoteShot(token) {
+      return rows.get(token)?.quoteShotB64 ?? null;
     },
   };
   return store;
@@ -213,6 +222,31 @@ describe('GET /demo/:token (public page)', () => {
     expect(res.status).toBe(404);
     const html = await res.text();
     expect(html).toContain('/signup');
+  });
+});
+
+describe('GET /demo-shot/:token.png (branded quote screenshot)', () => {
+  // 1x1 transparent PNG.
+  const PNG_B64 =
+    'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNk+M8AAAMBAQDJ/pLvAAAAAElFTkSuQmCC';
+
+  it('serves the stored PNG (image/png) when a shot exists', async () => {
+    const p = await provision('shotco.com', 'super_admin');
+    const token = p.json.token as string;
+    await store.setQuoteShot!(token, PNG_B64);
+
+    const res = await fetch(`${baseUrl}/demo-shot/${token}.png`); // no auth
+    expect(res.status).toBe(200);
+    expect(res.headers.get('content-type')).toBe('image/png');
+    const buf = Buffer.from(await res.arrayBuffer());
+    expect(buf.equals(Buffer.from(PNG_B64, 'base64'))).toBe(true);
+  });
+
+  it('404s when the demo has no shot yet', async () => {
+    const p = await provision('noshot.com', 'super_admin');
+    const token = p.json.token as string;
+    const res = await fetch(`${baseUrl}/demo-shot/${token}.png`);
+    expect(res.status).toBe(404);
   });
 });
 

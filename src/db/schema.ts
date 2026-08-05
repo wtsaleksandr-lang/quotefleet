@@ -1311,6 +1311,13 @@ export const prospectDemos = pgTable(
     updatedAt: timestamp('updated_at', { mode: 'date' }).notNull().defaultNow(),
     /** First time the public demo page was loaded; null until then. */
     viewedAt: timestamp('viewed_at', { mode: 'date' }),
+    /** Base64 PNG of the prospect's branded quote, captured at provision time.
+     *  Served at /demo-shot/:token.png and embedded (clickable) in the outreach
+     *  email. Null until a shot is captured. Stored in-DB so the Replit app can
+     *  serve a shot the (Playwright-capable) orchestrator produced. */
+    quoteShotB64: text('quote_shot_b64'),
+    /** When the quote shot was last captured. */
+    quoteShotAt: timestamp('quote_shot_at', { mode: 'date' }),
   },
   (t) => [
     uniqueIndex('prospect_demos_token_idx').on(t.token),

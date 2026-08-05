@@ -56,7 +56,7 @@ function makeDemoStore(): FakeDemoStore {
       const row: ProspectDemo = {
         id: counter, token, domain: input.domain, companyName: input.companyName,
         profileJson: input.profileJson, brandJson: input.brandJson, configJson: input.configJson,
-        createdAt: new Date(), updatedAt: new Date(), viewedAt: null,
+        createdAt: new Date(), updatedAt: new Date(), viewedAt: null, quoteShotB64: null, quoteShotAt: null,
       };
       rows.set(token, row); byDomain.set(input.domain, token);
       return row;
@@ -139,8 +139,10 @@ beforeAll(async () => {
     return acmeProfile(domain);
   };
   // AI-free deterministic drafter so the route test never touches the vendor.
-  const draft = (profile: CompanyProfile, demoUrl: string) =>
-    draftOutreachEmail(profile, demoUrl, { anthropicKey: '', publicBaseUrl: 'http://localhost:5000' });
+  const draft = (profile: CompanyProfile, demoUrl: string, previewImageUrl?: string) =>
+    draftOutreachEmail(profile, demoUrl, {
+      anthropicKey: '', publicBaseUrl: 'http://localhost:5000', previewImageUrl,
+    });
 
   const { registerOutreachRoutes } = await import('./outreach.js');
   const { registerOutreachUnsubscribeRoutes } = await import('./outreachUnsubscribe.js');
@@ -188,6 +190,23 @@ describe('POST /api/admin/outreach/draft-email', () => {
     // Persisted for Phase 3.
     expect(emailStore.calls.save.length).toBeGreaterThan(0);
     expect(emailStore.rows.get(String(r.json.unsubscribeToken))?.domain).toBe('acmedrayage.com');
+  });
+
+  it('embeds the clickable branded-quote screenshot when the demo has a captured shot', async () => {
+    const demo = await demoStore.upsert({
+      domain: 'withshot.com', companyName: 'Shot Co',
+      profileJson: acmeProfile('withshot.com') as unknown as Record<string, unknown>,
+      brandJson: null, configJson: null,
+    });
+    // Simulate a captured shot on the demo row.
+    demoStore.rows.set(demo.token, {
+      ...demoStore.rows.get(demo.token)!,
+      quoteShotB64: 'x', quoteShotAt: new Date(),
+    });
+    const r = await draftEmail('withshot.com', 'super_admin');
+    expect(r.status).toBe(200);
+    // The email embeds the served /demo-shot image (absolute URL), clickable to the demo.
+    expect(String(r.json.bodyHtml)).toContain(`http://localhost:5000/demo-shot/${demo.token}.png`);
   });
 
   it('reuses an existing demo profile without re-enriching', async () => {
