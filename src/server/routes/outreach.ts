@@ -23,10 +23,18 @@ import { deriveDemoConfig, deriveDemoBrand } from '../outreach/prospectDemo.js';
 import { dbProspectDemoStore, type ProspectDemoStore } from '../outreach/prospectDemoStore.js';
 import { dbOutreachEmailStore, type OutreachEmailStore } from '../outreach/outreachEmailStore.js';
 import { draftOutreachEmail, type DraftedEmail } from '../outreach/draftEmail.js';
+import { sendOutreachEmail, type SendOutreachInput, type SendOutreachResult } from '../outreach/sendOutreach.js';
+import type { OutreachEmail } from '../../db/schema.js';
 import { loadEnv } from '../../config.js';
 
 const DomainBody = z.object({
   domain: z.string().min(3).max(255),
+});
+
+const SendBody = z.object({
+  domain: z.string().min(3).max(255).optional(),
+  emailId: z.number().int().positive().optional(),
+  to: z.string().email().optional(),
 });
 
 /** Injectable deps so provision is unit-testable without network / DB. */
@@ -36,6 +44,8 @@ export interface OutreachRouteDeps {
   emailStore?: OutreachEmailStore;
   /** Override the drafter (tests). Defaults to the real draftOutreachEmail. */
   draft?: (profile: CompanyProfile, demoUrl: string) => Promise<DraftedEmail>;
+  /** Override the sender (tests). Defaults to the real sendOutreachEmail. */
+  send?: (input: SendOutreachInput) => Promise<SendOutreachResult>;
 }
 
 /** Build the public, shareable demo URL for a token. */
@@ -52,6 +62,47 @@ export function registerOutreachRoutes(app: Express, deps: OutreachRouteDeps = {
     deps.draft ??
     ((profile: CompanyProfile, demoUrl: string) =>
       draftOutreachEmail(profile, demoUrl, { publicBaseUrl: loadEnv().PUBLIC_BASE_URL }));
+  const send =
+    deps.send ?? ((input: SendOutreachInput) => sendOutreachEmail(input, { store: emailStore }));
+
+  // Ensure a persisted draft exists for a domain: reuse the existing demo's
+  // stored profile when present (no re-enrich), else enrich + provision a demo
+  // now so the email always links to a real preview. Drafts the email against
+  // the prospect's OWN branded demo URL and persists it. Returns the saved row +
+  // the drafted email + the demo URL — shared by draft-email and send.
+  async function ensureDraftRow(
+    domain: string,
+  ): Promise<{ row: OutreachEmail; email: DraftedEmail; demoUrl: string }> {
+    let demo = await store.getByDomain(domain);
+    let profile: CompanyProfile;
+    if (demo && demo.profileJson) {
+      profile = demo.profileJson as unknown as CompanyProfile;
+    } else {
+      profile = await enrich(domain);
+      const config = deriveDemoConfig(profile);
+      const brand = deriveDemoBrand(profile);
+      demo = await store.upsert({
+        domain,
+        companyName: profile.companyName,
+        profileJson: profile as unknown as Record<string, unknown>,
+        brandJson: brand,
+        configJson: config,
+      });
+    }
+    const demoUrl = demoUrlForToken(demo.token);
+    const email = await draft(profile, demoUrl);
+    const row = await emailStore.saveDraft({
+      demoToken: demo.token,
+      domain,
+      recipientEmail: profile.email ?? null,
+      unsubscribeToken: email.unsubscribeToken,
+      subject: email.subject,
+      bodyHtml: email.bodyHtml,
+      bodyText: email.bodyText,
+      aiGenerated: email.aiGenerated,
+    });
+    return { row, email, demoUrl };
+  }
 
   app.post('/api/admin/outreach/enrich', requireAuth, requireSuperAdmin, async (req, res) => {
     const parse = DomainBody.safeParse(req.body);
@@ -123,40 +174,10 @@ export function registerOutreachRoutes(app: Express, deps: OutreachRouteDeps = {
       return res.status(400).json({ error: 'That does not look like a valid domain.' });
     }
     try {
-      // Reuse an existing demo's stored profile when we have one; otherwise
-      // enrich + provision a demo now so the email always links to a real preview.
-      let demo = await store.getByDomain(domain);
-      let profile: CompanyProfile;
-      if (demo && demo.profileJson) {
-        profile = demo.profileJson as unknown as CompanyProfile;
-      } else {
-        profile = await enrich(domain);
-        const config = deriveDemoConfig(profile);
-        const brand = deriveDemoBrand(profile);
-        demo = await store.upsert({
-          domain,
-          companyName: profile.companyName,
-          profileJson: profile as unknown as Record<string, unknown>,
-          brandJson: brand,
-          configJson: config,
-        });
-      }
-
-      const demoUrl = demoUrlForToken(demo.token);
-      const email = await draft(profile, demoUrl);
-      await emailStore.saveDraft({
-        demoToken: demo.token,
-        domain,
-        recipientEmail: profile.email ?? null,
-        unsubscribeToken: email.unsubscribeToken,
-        subject: email.subject,
-        bodyHtml: email.bodyHtml,
-        bodyText: email.bodyText,
-        aiGenerated: email.aiGenerated,
-      });
-
+      const { row, email, demoUrl } = await ensureDraftRow(domain);
       return res.json({
         ok: true,
+        emailId: row.id,
         subject: email.subject,
         bodyHtml: email.bodyHtml,
         bodyText: email.bodyText,
@@ -167,6 +188,41 @@ export function registerOutreachRoutes(app: Express, deps: OutreachRouteDeps = {
     } catch (err) {
       console.error('[outreach/draft-email] error:', err);
       return res.status(500).json({ error: 'Drafting failed. Try again or check server logs.' });
+    }
+  });
+
+  // Send a reviewed outreach email (sequence step 1). Accepts either an
+  // `emailId` (send an already-persisted draft) or a `domain` (draft-if-needed
+  // via Phase 2, then send). Suppression is honored inside sendOutreachEmail —
+  // an opted-out recipient returns { skipped:'suppressed' } and nothing is sent.
+  // Never sends more than the reviewed draft; records the outcome on the row.
+  app.post('/api/admin/outreach/send', requireAuth, requireSuperAdmin, async (req, res) => {
+    const parse = SendBody.safeParse(req.body);
+    if (!parse.success) {
+      return res.status(400).json({ error: 'Provide an emailId or a domain, plus an optional "to".' });
+    }
+    const { emailId, to } = parse.data;
+    const domain = parse.data.domain ? normalizeDomain(parse.data.domain) : '';
+    if (!emailId && !domain) {
+      return res.status(400).json({ error: 'Provide an emailId or a domain.' });
+    }
+    if (domain && !/^[a-z0-9.-]+\.[a-z]{2,}$/i.test(domain)) {
+      return res.status(400).json({ error: 'That does not look like a valid domain.' });
+    }
+    try {
+      let sendInput: SendOutreachInput;
+      if (emailId) {
+        sendInput = { emailId, to };
+      } else {
+        // Ensure a fresh reviewed draft exists for the domain, then send that row.
+        const { row } = await ensureDraftRow(domain);
+        sendInput = { draft: row, to: to ?? row.recipientEmail };
+      }
+      const result = await send(sendInput);
+      return res.json(result);
+    } catch (err) {
+      console.error('[outreach/send] error:', err);
+      return res.status(500).json({ error: 'Send failed. Try again or check server logs.' });
     }
   });
 }

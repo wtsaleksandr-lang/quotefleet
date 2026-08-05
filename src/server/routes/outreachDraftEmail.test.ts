@@ -72,6 +72,7 @@ interface FakeEmailStore extends OutreachEmailStore {
 }
 function makeEmailStore(): FakeEmailStore {
   const rows = new Map<string, OutreachEmail>();
+  const byId = new Map<number, OutreachEmail>();
   const calls = { save: [] as SaveOutreachEmailInput[] };
   let counter = 0;
   return {
@@ -84,18 +85,25 @@ function makeEmailStore(): FakeEmailStore {
         recipientEmail: input.recipientEmail, unsubscribeToken: input.unsubscribeToken,
         subject: input.subject, bodyHtml: input.bodyHtml, bodyText: input.bodyText,
         aiGenerated: input.aiGenerated, suppressed: false, suppressedAt: null,
+        sentAt: null, status: null, providerId: null, sendError: null,
+        step: 1, nextFollowupAt: null, clickedAt: null,
         createdAt: new Date(), updatedAt: new Date(),
       };
       rows.set(input.unsubscribeToken, row);
+      byId.set(row.id, row);
       return row;
     },
     async getByUnsubscribeToken(token) { return rows.get(token) ?? null; },
+    async getById(id) { return byId.get(id) ?? null; },
     async suppressByToken(token) {
       const r = rows.get(token);
       if (!r) return false;
       rows.set(token, { ...r, suppressed: true, suppressedAt: new Date() });
       return true;
     },
+    async isRecipientSuppressed() { return false; },
+    async recordSend() { /* unused in draft tests */ },
+    async markClickedByToken() { return null; },
   };
 }
 

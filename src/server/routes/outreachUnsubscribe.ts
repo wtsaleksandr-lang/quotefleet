@@ -14,6 +14,7 @@
 import type { Express, Request, Response } from 'express';
 import { dbOutreachEmailStore, type OutreachEmailStore } from '../outreach/outreachEmailStore.js';
 import { SENDER_NAME } from '../outreach/draftEmail.js';
+import { loadEnv } from '../../config.js';
 
 export interface OutreachUnsubscribeDeps {
   emailStore?: OutreachEmailStore;
@@ -46,9 +47,39 @@ async function handle(req: Request, res: Response, emailStore: OutreachEmailStor
   res.status(200).type('html').send(confirmationPage());
 }
 
+/**
+ * PUBLIC click-tracking redirect — no auth.
+ *
+ *   GET /outreach/click/:token — records the FIRST CTA/demo-link click on the
+ *   matching `outreach_emails` row, then 302-redirects the recipient onward to
+ *   their branded demo. Safe against open-redirect: the destination is derived
+ *   from the row's own `demo_token` (never from a client-supplied URL). Unknown
+ *   tokens still redirect to the home base so a recipient never sees an error.
+ *
+ * NOTE (follow-up): the emailed CTA currently links straight to /demo/:token;
+ * routing it THROUGH this endpoint (so clicks are captured) is a small drafter
+ * change deferred to a later phase — the mechanism is ready here.
+ */
+async function handleClick(req: Request, res: Response, emailStore: OutreachEmailStore): Promise<void> {
+  const token = String(req.params.token || '').trim();
+  const base = loadEnv().PUBLIC_BASE_URL.replace(/\/$/, '');
+  let dest = base || '/';
+  try {
+    if (token) {
+      const row = await emailStore.markClickedByToken(token);
+      if (row?.demoToken) dest = `${base}/demo/${row.demoToken}`;
+    }
+  } catch (err) {
+    console.error('[outreach/click] failed to record click:', err);
+  }
+  res.redirect(302, dest);
+}
+
 export function registerOutreachUnsubscribeRoutes(app: Express, deps: OutreachUnsubscribeDeps = {}): void {
   const emailStore = deps.emailStore ?? dbOutreachEmailStore;
   app.get('/outreach/unsubscribe/:token', (req, res) => void handle(req, res, emailStore));
   // RFC 8058 one-click POST (mail clients may POST instead of GET).
   app.post('/outreach/unsubscribe/:token', (req, res) => void handle(req, res, emailStore));
+  // Optional click tracking → records + redirects to the prospect's demo.
+  app.get('/outreach/click/:token', (req, res) => void handleClick(req, res, emailStore));
 }
