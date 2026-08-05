@@ -232,6 +232,13 @@
       "when": 1786320000000,
       "tag": "0032_header_logo_fill",
       "breakpoints": true
+    },
+    {
+      "idx": 33,
+      "version": "7",
+      "when": 1786406400000,
+      "tag": "0033_map_blend_opacity",
+      "breakpoints": true
     }
   ]
 }

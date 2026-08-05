@@ -674,3 +674,32 @@ describe('resolveWidgetTheme — map blend', () => {
     }
   });
 });
+
+// ── Map-blend OPACITY (0–100 slider; on/off derived) ─────────────────
+describe('resolveWidgetTheme — map blend opacity', () => {
+  it('derives mapBlend on/off from mapBlendOpacity and clamps 0–100', () => {
+    expect(resolveWidgetTheme({ mapBlendOpacity: 0 }).mapBlend).toBe('off');
+    expect(resolveWidgetTheme({ mapBlendOpacity: 0 }).mapBlendOpacity).toBe(0);
+    expect(resolveWidgetTheme({ mapBlendOpacity: 60 }).mapBlend).toBe('on');
+    expect(resolveWidgetTheme({ mapBlendOpacity: 60 }).mapBlendOpacity).toBe(60);
+    // Clamp out-of-range values.
+    expect(resolveWidgetTheme({ mapBlendOpacity: 250 }).mapBlendOpacity).toBe(100);
+    expect(resolveWidgetTheme({ mapBlendOpacity: -20 }).mapBlendOpacity).toBe(0);
+    // Numeric strings coerce.
+    expect(resolveWidgetTheme({ mapBlendOpacity: '45' }).mapBlendOpacity).toBe(45);
+  });
+
+  it('backfills the legacy mapBlend flag (on → 60, off → 0) when no opacity is set', () => {
+    expect(resolveWidgetTheme({ mapBlend: 'on' }).mapBlendOpacity).toBe(60);
+    expect(resolveWidgetTheme({ mapBlend: 'off' }).mapBlendOpacity).toBe(0);
+    expect(resolveWidgetTheme(null).mapBlendOpacity).toBe(0);
+    expect(resolveWidgetTheme({}).mapBlendOpacity).toBe(0);
+  });
+
+  it('explicit opacity wins over the legacy flag', () => {
+    expect(resolveWidgetTheme({ mapBlend: 'on', mapBlendOpacity: 0 }).mapBlend).toBe('off');
+    expect(resolveWidgetTheme({ mapBlend: 'on', mapBlendOpacity: 0 }).mapBlendOpacity).toBe(0);
+    expect(resolveWidgetTheme({ mapBlend: 'off', mapBlendOpacity: 40 }).mapBlend).toBe('on');
+    expect(resolveWidgetTheme({ mapBlend: 'off', mapBlendOpacity: 40 }).mapBlendOpacity).toBe(40);
+  });
+});

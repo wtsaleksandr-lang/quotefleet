@@ -125,52 +125,87 @@ describe('customize panel — dashboard UI', () => {
   });
 });
 
-describe('customize panel — map-blend toggle (persist + UI + setup meter)', () => {
-  it('accepts mapBlend in the brand PUT schema, validated against MAP_BLEND_VALUES', async () => {
+describe('customize panel — map-blend opacity slider (persist + UI + setup meter)', () => {
+  it('accepts mapBlendOpacity (0–100) in the brand PUT schema', async () => {
     const src = await read('src/server/routes/tenant.ts');
-    // The enum is imported from the theme engine (single source of truth) and
-    // wired into BrandPatch so PUT /api/tenant/brand accepts + persists it.
+    // The 0–100 intensity supersedes the binary toggle. The legacy mapBlend enum
+    // is still accepted for backward-compat (both wired into BrandPatch).
+    expect(src).toContain('mapBlendOpacity: z.number().int().min(0).max(100)');
     expect(src).toContain('MAP_BLEND_VALUES');
     expect(src).toContain('mapBlend: z.enum([...MAP_BLEND_VALUES]');
   });
 
-  it('persists mapBlend as a real brand_configs column with a safe default', async () => {
+  it('persists map_blend_opacity as a real brand_configs column with a safe default', async () => {
     const schema = await read('src/db/schema.ts');
-    // notNull default 'off' — existing tenants render the map exactly as before.
+    // notNull default 0 = OFF — existing tenants render the map exactly as before.
+    expect(schema).toContain("mapBlendOpacity: integer('map_blend_opacity').notNull().default(0)");
+    // The legacy on/off column is retained (the on/off master is derived from it +
+    // the new opacity).
     expect(schema).toContain("mapBlend: text('map_blend').notNull().default('off')");
-    // A migration file backfills it so a fresh prod deploy doesn't 500.
-    const mig = await read('drizzle/0022_brand_map_blend.sql');
-    expect(mig).toContain('ADD COLUMN IF NOT EXISTS "map_blend" text NOT NULL DEFAULT \'off\'');
-    // The (previously missing) leads.meta_json migration is present too.
-    const metaMig = await read('drizzle/0021_leads_meta_json.sql');
-    expect(metaMig).toContain('ADD COLUMN IF NOT EXISTS "meta_json" jsonb');
+    // A NEW migration adds the column (idempotent) and backfills legacy 'on' → 60
+    // so a fresh prod deploy doesn't 500 and blended tenants keep blending.
+    const mig = await read('drizzle/0033_map_blend_opacity.sql');
+    expect(mig).toContain('ADD COLUMN IF NOT EXISTS "map_blend_opacity" integer NOT NULL DEFAULT 0');
+    expect(mig).toContain('SET "map_blend_opacity" = 60 WHERE "map_blend" = \'on\'');
+    // The original on/off migration is still present.
+    const legacyMig = await read('drizzle/0022_brand_map_blend.sql');
+    expect(legacyMig).toContain('ADD COLUMN IF NOT EXISTS "map_blend" text NOT NULL DEFAULT \'off\'');
     // Both are registered in the boot-migrator journal.
     const journal = await read('drizzle/meta/_journal.json');
-    expect(journal).toContain('0021_leads_meta_json');
     expect(journal).toContain('0022_brand_map_blend');
+    expect(journal).toContain('0033_map_blend_opacity');
   });
 
-  it('renders a Map-blend On/Off toggle that saves through the brand PUT', async () => {
+  it('renders a Map-blend opacity slider that saves through the brand PUT', async () => {
     const js = await pub('app.js');
     expect(js).toContain('Map blend');
-    expect(js).toContain('data-mapblend');
-    expect(js).toContain("queueSave({ mapBlend: o.id }");
-    // reflects the loaded value
-    expect(js).toContain("(b.mapBlend === 'on') ? 'on' : 'off'");
+    // A 0–100 range input, not an on/off chip.
+    expect(js).toContain("type: 'range', min: '0', max: '100'");
+    expect(js).toContain('queueSave({ mapBlendOpacity: v }');
+    // Backward-compat: legacy mapBlend='on' rows open at 60%.
+    expect(js).toContain("(b.mapBlend === 'on' ? 60 : 0)");
   });
 
   it('the setup-status Brand step counts the Customize panel theming columns', async () => {
     const src = await read('src/server/routes/tenant.ts');
     // brandConfigured now also credits any non-default theming (preset/accent/
-    // font/map style/CTA hover/text color/map blend), not just logo/name/colors.
+    // font/map style/CTA hover/text color/map blend + opacity), not just logo/name.
     expect(src).toContain('themeCustomized');
     expect(src).toContain("(brand.themePreset ?? 'midnight') !== 'midnight'");
     expect(src).toContain("(brand.mapBlend ?? 'off') !== 'off'");
+    expect(src).toContain('(brand.mapBlendOpacity ?? 0) > 0');
     expect(src).toContain("(brand.ctaHover ?? 'border') !== 'border'");
     expect(src).toContain("(brand.fontColor ?? 'auto') !== 'auto'");
     expect(src).toContain('brand.mapStyle');
     expect(src).toContain('brand.accentOverride');
     // …and it's OR-ed into the final brand-configured decision.
     expect(src).toContain('themeCustomized);');
+  });
+});
+
+describe('customize panel — drag-scroll carousels (theme presets + map styles)', () => {
+  it('wraps both selectors in a single reusable makeCarousel helper', async () => {
+    const js = await pub('app.js');
+    expect(js).toContain('function makeCarousel(track)');
+    // Both selectors go through it (consistent interaction).
+    expect(js).toContain('themeSec.appendChild(makeCarousel(grid))');
+    expect(js).toContain('mapSec.appendChild(makeCarousel(mapRow))');
+    // Subtle prev/next arrows + a scrollable track.
+    expect(js).toContain('qf-cz-carousel-arrow qf-cz-carousel-prev');
+    expect(js).toContain('qf-cz-carousel-arrow qf-cz-carousel-next');
+    expect(js).toContain('qf-cz-carousel-track');
+    // Drag distinguished from a tap so click-to-select still fires.
+    expect(js).toContain("track.classList.add('is-grabbing')");
+    expect(js).toContain('if (moved > 4)');
+  });
+
+  it('ships the carousel + slider styling (scrollable strip, hidden bar, arrows)', async () => {
+    const css = await pub('customize-panel.css');
+    expect(css).toContain('.qf-cz-carousel-track');
+    expect(css).toContain('overflow-x: auto');
+    expect(css).toContain('flex-wrap: nowrap');
+    expect(css).toContain('scroll-snap-type: x proximity');
+    expect(css).toContain('.qf-cz-carousel-arrow');
+    expect(css).toContain('.qf-cz-blend-slider');
   });
 });

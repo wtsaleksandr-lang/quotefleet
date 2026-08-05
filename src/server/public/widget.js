@@ -362,10 +362,17 @@
     // long-standing border-on-hover look. See widgetThemes.ts CTA_HOVER_STYLES.
     var hover = theme.ctaHover || 'border';
     document.body.setAttribute('data-qf-cta-hover', hover);
-    // Per-tenant feathered-map-edges toggle. The shared calculator CSS keys off
-    // this attribute; default 'off' leaves the map exactly as today. See
-    // widgetThemes.ts MAP_BLEND_VALUES + the body[data-qf-map-blend="on"] block.
-    document.body.setAttribute('data-qf-map-blend', theme.mapBlend || 'off');
+    // Per-tenant feathered-map-edges intensity. opacity 0 = OFF (crisp map);
+    // 1–100 = blend ON at that strength. data-qf-map-blend is the on/off master
+    // (derived from opacity>0) that turns the feather CSS on; --qf-map-blend-opacity
+    // (0–1) scales the feather strength. See widgetThemes.ts + the
+    // body[data-qf-map-blend="on"] block in public-calculator-no-gradients.css.
+    var blendOpacity = (typeof theme.mapBlendOpacity === 'number')
+      ? theme.mapBlendOpacity
+      : (theme.mapBlend === 'on' ? 60 : 0);
+    blendOpacity = Math.max(0, Math.min(100, blendOpacity));
+    document.body.setAttribute('data-qf-map-blend', blendOpacity > 0 ? 'on' : 'off');
+    document.body.style.setProperty('--qf-map-blend-opacity', String(blendOpacity / 100));
     // Expose the resolved MAP STYLE on the body so the shared calculator CSS can
     // re-skin the on-map overlay (distance/transit + addresses) to MATCH the
     // active base map. brandMapStyle is a module-level var resolved just before
