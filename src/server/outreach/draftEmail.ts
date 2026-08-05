@@ -77,6 +77,9 @@ export interface DraftEmailOpts {
   unsubscribeToken?: string;
   /** Who this is addressed to — used only for a light greeting when present. */
   recipientName?: string | null;
+  /** Absolute URL of a pre-rendered screenshot of the prospect's branded quote.
+   *  When set, the email embeds it as a clickable image instead of the text card. */
+  previewImageUrl?: string;
 }
 
 export interface DraftedEmail {
@@ -194,6 +197,9 @@ interface HtmlContext {
   modeLabel: string;
   lane: string | null;
   publicBaseUrl: string;
+  /** Absolute URL of a pre-rendered screenshot of THIS prospect's branded quote.
+   *  When present, it replaces the text preview card with a clickable image. */
+  previewImageUrl?: string;
 }
 
 /** Brand lockup header — hosted mark + text wordmark (legible even if images blocked). */
@@ -229,6 +235,27 @@ function previewCardHtml(ctx: HtmlContext): string {
     `Priced in seconds, in ${escapeHtml(ctx.company)}'s branding — while a competitor is still typing up a PDF.` +
     `</div>` +
     `</td></tr></table>` +
+    `</td></tr>`
+  );
+}
+
+/**
+ * Clickable screenshot of the prospect's OWN branded quote — the highest-intent
+ * "aha" in the email. The whole image links to their live demo; a caption cue
+ * signals it's interactive. Degrades to alt text if the client blocks images
+ * (the CTA button below still carries the click).
+ */
+function previewImageHtml(ctx: HtmlContext): string {
+  const alt = `${ctx.company}'s instant freight quote — tap to try it live`;
+  return (
+    `<tr><td style="padding:6px 32px 4px;">` +
+    `<a href="${escapeAttr(ctx.demoUrl)}" style="text-decoration:none;display:block;" target="_blank">` +
+    `<img src="${escapeAttr(ctx.previewImageUrl!)}" alt="${escapeAttr(alt)}" width="536" ` +
+    `style="display:block;width:100%;max-width:536px;height:auto;border:1px solid ${PANEL_BORDER};` +
+    `border-radius:12px;">` +
+    `<div style="margin-top:8px;font-family:${FONT_STACK};font-size:12.5px;color:${BRAND_BLUE};` +
+    `font-weight:600;">&#9654;&nbsp; This is ${escapeHtml(ctx.company)}'s live calculator — tap to try your own lane</div>` +
+    `</a>` +
     `</td></tr>`
   );
 }
@@ -282,7 +309,7 @@ function assembleHtml(paragraphs: string[], ctx: HtmlContext): string {
     headerHtml(ctx.publicBaseUrl) +
     `<tr><td style="padding:26px 32px 6px;font-family:${FONT_STACK};font-size:15.5px;` +
     `line-height:1.62;color:${INK};">\n${body}\n</td></tr>\n` +
-    previewCardHtml(ctx) +
+    (ctx.previewImageUrl ? previewImageHtml(ctx) : previewCardHtml(ctx)) +
     ctaHtml(ctx) +
     signatureHtml() +
     footerHtml() +
@@ -453,6 +480,7 @@ export async function draftOutreachEmail(
     modeLabel: primaryModeLabel(profile),
     lane: primaryLane(profile),
     publicBaseUrl,
+    previewImageUrl: opts.previewImageUrl,
   });
   const finalText = assembleText(paragraphs);
 
