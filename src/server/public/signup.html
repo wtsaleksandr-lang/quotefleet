@@ -169,6 +169,18 @@
     }).catch(function () { hostInput.innerHTML = '<option value="quotefleet.net">quotefleet.net</option>'; refreshPreview(); });
     function syncSubmit() { submit.disabled = !(dpa.checked && form.companyName.value.trim() && validEmail(normalizeEmail(emailInput.value)) && checkPassword() && slugInput.value.trim().length >= 3); }
     dpa.addEventListener('change', syncSubmit); syncSubmit();
+    // ?company= prefill from the AI Outreach demo page CTA — the prospect
+    // already gave us their company name, so don't make them retype it.
+    (function preselectCompanyFromQuery() {
+      try {
+        var raw = new URLSearchParams(location.search).get('company');
+        var name = raw ? raw.trim() : '';
+        if (name) {
+          companyInput.value = name;
+          companyInput.dispatchEvent(new Event('input', { bubbles: true }));
+        }
+      } catch (e) { /* no-op */ }
+    })();
     // Selected-plan visual highlight + ?plan= prefill from the pricing page.
     function selectedPlan() { var r = form.querySelector('input[name="plan"]:checked'); return r ? r.value : 'vital'; }
     function paintPlan() {
