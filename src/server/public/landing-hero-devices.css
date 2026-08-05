@@ -244,3 +244,24 @@ html body.qf-wft .qf-hero-devices--video.stage-phone > .qf-hero-laptop {
   html body.qf-wft .hero-copy { max-width: 535px !important; }
   html body.qf-wft .hero.visual-hero { padding-bottom: clamp(48px, 6vw, 120px) !important; }
 }
+
+/* ── TASK B — lift the DESKTOP laptop mockup so its UPPER EDGE aligns with the
+   TOP of the hero headline (h1). ≥981px only; the ≤980 stacked/mobile layout
+   keeps its own `transform: none` reset (block above) and is untouched.
+
+   Previously the media column was vertically CENTERED (align-items:center on
+   .hero-grid), so the taller copy column left the device box floating ~107px
+   below the headline top, and the lone-laptop pose then pushed it a further
+   ~59px down with translateY(12%). A fixed pixel nudge can't fix this because
+   the centering gap grows with viewport width. Instead, anchor the media box to
+   the TOP of the grid row (align-self:start → its top tracks the copy/headline
+   top, width-independent) and translate the laptop DOWN by just the eyebrow's
+   height (~52px), landing the laptop's top edge on the h1 top at every desktop
+   width. Only the media alignment + the phone-hidden laptop pose change; the
+   phone-forward stage still composes from the same anchored box. ── */
+@media (min-width: 981px) {
+  html body.qf-wft .visual-flow.qf-hero-media { align-self: start !important; }
+  html body.qf-wft .qf-hero-devices--video.stage-laptop > .qf-hero-laptop {
+    transform: translate(-0.6%, 52px) !important;
+  }
+}
