@@ -783,3 +783,25 @@ html { scrollbar-width: thin; scrollbar-color: rgba(135, 138, 150, 0.38) transpa
 @media (max-width: 400px) {
   .qf-header[data-logo-fill="full"] img { max-height: 48px; }
 }
+
+/* ── Contact card fit at phone / mobile-mockup widths (Alex) ──────────────────
+   At narrow widths the carrier contact card sits inside the widget shell which
+   sits inside a phone MOCKUP frame; the stacked side gaps (widget shell inset +
+   card inset) squeezed a full US company address so the trailing country token
+   ("US") wrapped onto its own orphan line. Reclaim horizontal room by trimming
+   the gap between the card's hosting shell (#qf-root) and the mockup frame, and
+   the card's own side padding — one ramp step each (12px -> 8px), still clear of
+   the frame edge. Paired with the renderContact no-orphan guard (nbsp before the
+   country code) so the country can never orphan at ANY address length.
+   Appended at EOF so line-based guard baselines don't renumber; !important on
+   #qf-root beats the earlier unconditional #qf-root inset rule in this file. */
+@media (max-width: 480px) {
+  #qf-root {
+    padding-left: var(--space-1) !important;
+    padding-right: var(--space-1) !important;
+  }
+  .qf-widget .qf-contact {
+    padding-left: var(--space-1);
+    padding-right: var(--space-1);
+  }
+}

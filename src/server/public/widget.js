@@ -700,6 +700,14 @@
   // the hosted quote. Only rendered when the carrier has filled them in
   // (Account → Company details / Profile phone), so an empty profile stays
   // clean.
+  // Keep a trailing country token (", US" / ", CA" / ", USA") glued to the
+  // preceding token with a non-breaking space, so it can never wrap onto its
+  // own orphan line at narrow (phone-mockup) widths — global no-orphan rule.
+  // A long address still wraps gracefully at the earlier spaces; only the
+  // final country code is pinned to the token before it.
+  function bindCountryToken(addr) {
+    return String(addr == null ? '' : addr).replace(/,\s+([A-Za-z]{2,3})\.?\s*$/, ','+String.fromCharCode(160)+'$1');
+  }
   function renderContact(contact) {
     var box = $('qf-contact');
     if (!box) return;
@@ -726,7 +734,7 @@
       chatRow.appendChild(chatLink);
       rows.push(chatRow);
     }
-    if (contact.address) rows.push(iconRow('Address', contact.address));
+    if (contact.address) rows.push(iconRow('Address', bindCountryToken(contact.address)));
     var ids = [];
     if (contact.dotNumber) ids.push('USDOT ' + contact.dotNumber);
     if (contact.mcNumber) ids.push('MC ' + contact.mcNumber);
