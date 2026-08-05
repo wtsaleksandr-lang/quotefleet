@@ -272,6 +272,60 @@ describe('quote-map proxy — 404 guards', () => {
   });
 });
 
+describe('resolveRouteMapPng — branded-PDF map resolver (reuses the proxy pipeline)', () => {
+  const LANE = { origin: { lat: 33.77, lng: -118.19 }, destination: { lat: 41.87, lng: -87.62 } };
+
+  it('calls getRouteMap with the lane + tenant style and returns the fetched PNG', async () => {
+    const { resolveRouteMapPng } = await import('./quoteMap.js');
+    const r = await resolveRouteMapPng({ ...LANE, mapStyle: 'dark_routes', apiKey: SECRET_KEY });
+    expect(r).not.toBeNull();
+    expect(r!.png.subarray(0, 4).toString('hex')).toBe('89504e47');
+    expect(r!.distanceMiles).toBe(55);
+    expect(h.getRouteMapMock).toHaveBeenCalledWith(
+      LANE.origin, LANE.destination, SECRET_KEY, 'light', h.fetchMock, 'dark_routes'
+    );
+    // Persisted for the next request under the lane|theme|style key.
+    const ins = h.state.inserts.find((i) => i.table === 'route_map_cache');
+    expect(String(ins!.values.cacheKey)).toMatch(/\|light\|dark_routes$/);
+  });
+
+  it('serves a persisted cache hit WITHOUT calling getRouteMap or fetch', async () => {
+    h.state.cacheRows = [{ cacheKey: 'x', pngBase64: PNG_BYTES.toString('base64'), kind: 'route' }];
+    const { resolveRouteMapPng } = await import('./quoteMap.js');
+    const r = await resolveRouteMapPng({ ...LANE, apiKey: SECRET_KEY });
+    expect(r!.png.subarray(0, 4).toString('hex')).toBe('89504e47');
+    expect(h.getRouteMapMock).not.toHaveBeenCalled();
+    expect(h.fetchMock).not.toHaveBeenCalled();
+  });
+
+  it('returns null (no throw) when getRouteMap yields null', async () => {
+    h.getRouteMapMock.mockResolvedValueOnce(null as never);
+    const { resolveRouteMapPng } = await import('./quoteMap.js');
+    expect(await resolveRouteMapPng({ ...LANE, apiKey: SECRET_KEY })).toBeNull();
+  });
+
+  it('returns null (no throw) when getRouteMap throws', async () => {
+    h.getRouteMapMock.mockRejectedValueOnce(new Error('directions down') as never);
+    const { resolveRouteMapPng } = await import('./quoteMap.js');
+    expect(await resolveRouteMapPng({ ...LANE, apiKey: SECRET_KEY })).toBeNull();
+  });
+
+  it('returns null when the upstream PNG fetch is not ok (never persists)', async () => {
+    h.fetchMock.mockResolvedValueOnce({ ok: false, status: 500, arrayBuffer: async () => new ArrayBuffer(0) } as never);
+    const { resolveRouteMapPng } = await import('./quoteMap.js');
+    expect(await resolveRouteMapPng({ ...LANE, apiKey: SECRET_KEY })).toBeNull();
+    expect(h.state.inserts.find((i) => i.table === 'route_map_cache')).toBeFalsy();
+  });
+
+  it('returns null when coords or the Maps key are missing (never hits Google)', async () => {
+    const { resolveRouteMapPng } = await import('./quoteMap.js');
+    expect(await resolveRouteMapPng({ destination: LANE.destination, apiKey: SECRET_KEY })).toBeNull();
+    expect(await resolveRouteMapPng({ ...LANE, apiKey: undefined })).toBeNull();
+    expect(h.getRouteMapMock).not.toHaveBeenCalled();
+    expect(h.fetchMock).not.toHaveBeenCalled();
+  });
+});
+
 // ── Source-level wiring guards ───────────────────────────────────────────
 const routesDir = resolve(process.cwd(), 'src/server/routes');
 const publicDir = resolve(process.cwd(), 'src/server/public');
