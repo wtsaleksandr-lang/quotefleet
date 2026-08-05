@@ -21,6 +21,8 @@ import { requireAuth, requireSuperAdmin } from '../middleware.js';
 import { enrichCompany, normalizeDomain, type CompanyProfile } from '../outreach/enrichCompany.js';
 import { deriveDemoConfig, deriveDemoBrand } from '../outreach/prospectDemo.js';
 import { dbProspectDemoStore, type ProspectDemoStore } from '../outreach/prospectDemoStore.js';
+import { dbOutreachEmailStore, type OutreachEmailStore } from '../outreach/outreachEmailStore.js';
+import { draftOutreachEmail, type DraftedEmail } from '../outreach/draftEmail.js';
 import { loadEnv } from '../../config.js';
 
 const DomainBody = z.object({
@@ -31,6 +33,9 @@ const DomainBody = z.object({
 export interface OutreachRouteDeps {
   enrich?: (domain: string) => Promise<CompanyProfile>;
   store?: ProspectDemoStore;
+  emailStore?: OutreachEmailStore;
+  /** Override the drafter (tests). Defaults to the real draftOutreachEmail. */
+  draft?: (profile: CompanyProfile, demoUrl: string) => Promise<DraftedEmail>;
 }
 
 /** Build the public, shareable demo URL for a token. */
@@ -42,6 +47,11 @@ export function demoUrlForToken(token: string): string {
 export function registerOutreachRoutes(app: Express, deps: OutreachRouteDeps = {}) {
   const enrich = deps.enrich ?? ((domain: string) => enrichCompany(domain));
   const store = deps.store ?? dbProspectDemoStore;
+  const emailStore = deps.emailStore ?? dbOutreachEmailStore;
+  const draft =
+    deps.draft ??
+    ((profile: CompanyProfile, demoUrl: string) =>
+      draftOutreachEmail(profile, demoUrl, { publicBaseUrl: loadEnv().PUBLIC_BASE_URL }));
 
   app.post('/api/admin/outreach/enrich', requireAuth, requireSuperAdmin, async (req, res) => {
     const parse = DomainBody.safeParse(req.body);
@@ -95,6 +105,68 @@ export function registerOutreachRoutes(app: Express, deps: OutreachRouteDeps = {
     } catch (err) {
       console.error('[outreach/provision] error:', err);
       return res.status(500).json({ error: 'Provisioning failed. Try again or check server logs.' });
+    }
+  });
+
+  // Draft a personalized, CASL/CAN-SPAM-compliant outreach email for a domain.
+  // Ensures a demo exists (reusing its stored profile, or enriching + provisioning
+  // one if absent), drafts the email against the prospect's OWN branded demo URL,
+  // persists the draft (so Phase 3 can send the exact reviewed copy), and returns
+  // the subject + HTML/text body for human review. Never sends anything.
+  app.post('/api/admin/outreach/draft-email', requireAuth, requireSuperAdmin, async (req, res) => {
+    const parse = DomainBody.safeParse(req.body);
+    if (!parse.success) {
+      return res.status(400).json({ error: 'A domain is required.' });
+    }
+    const domain = normalizeDomain(parse.data.domain);
+    if (!domain || !/^[a-z0-9.-]+\.[a-z]{2,}$/i.test(domain)) {
+      return res.status(400).json({ error: 'That does not look like a valid domain.' });
+    }
+    try {
+      // Reuse an existing demo's stored profile when we have one; otherwise
+      // enrich + provision a demo now so the email always links to a real preview.
+      let demo = await store.getByDomain(domain);
+      let profile: CompanyProfile;
+      if (demo && demo.profileJson) {
+        profile = demo.profileJson as unknown as CompanyProfile;
+      } else {
+        profile = await enrich(domain);
+        const config = deriveDemoConfig(profile);
+        const brand = deriveDemoBrand(profile);
+        demo = await store.upsert({
+          domain,
+          companyName: profile.companyName,
+          profileJson: profile as unknown as Record<string, unknown>,
+          brandJson: brand,
+          configJson: config,
+        });
+      }
+
+      const demoUrl = demoUrlForToken(demo.token);
+      const email = await draft(profile, demoUrl);
+      await emailStore.saveDraft({
+        demoToken: demo.token,
+        domain,
+        recipientEmail: profile.email ?? null,
+        unsubscribeToken: email.unsubscribeToken,
+        subject: email.subject,
+        bodyHtml: email.bodyHtml,
+        bodyText: email.bodyText,
+        aiGenerated: email.aiGenerated,
+      });
+
+      return res.json({
+        ok: true,
+        subject: email.subject,
+        bodyHtml: email.bodyHtml,
+        bodyText: email.bodyText,
+        demoUrl,
+        unsubscribeToken: email.unsubscribeToken,
+        aiGenerated: email.aiGenerated,
+      });
+    } catch (err) {
+      console.error('[outreach/draft-email] error:', err);
+      return res.status(500).json({ error: 'Drafting failed. Try again or check server logs.' });
     }
   });
 }

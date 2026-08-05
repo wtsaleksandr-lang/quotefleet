@@ -1314,6 +1314,42 @@ export const prospectDemos = pgTable(
 );
 
 // ────────────────────────────────────────────────────────────────────
+// OUTREACH EMAILS — persisted AI-drafted cold emails (Phase 2 of the
+// AI Outreach Engine). Each row is a reviewed-before-send draft: the
+// personalized subject/body plus the per-recipient unsubscribe token so
+// CASL/CAN-SPAM opt-out works and Phase 3 can send the exact draft a human
+// approved. Like prospect_demos, this NEVER touches tenants/users/leads.
+// ────────────────────────────────────────────────────────────────────
+export const outreachEmails = pgTable(
+  'outreach_emails',
+  {
+    id: serial('id').primaryKey(),
+    /** The prospect_demos token this email links to (their branded demo). */
+    demoToken: text('demo_token'),
+    /** Normalized apex/host the email was drafted for. */
+    domain: text('domain').notNull(),
+    /** Best-known recipient email (may be null until a contact is chosen). */
+    recipientEmail: text('recipient_email'),
+    /** Per-recipient unsubscribe token used in the one-click opt-out link (UNIQUE). */
+    unsubscribeToken: text('unsubscribe_token').notNull(),
+    subject: text('subject').notNull(),
+    bodyHtml: text('body_html').notNull(),
+    bodyText: text('body_text').notNull(),
+    /** True when the AI wrote the copy; false when the template fallback was used. */
+    aiGenerated: boolean('ai_generated').notNull().default(false),
+    /** Set true when the recipient clicks unsubscribe — Phase 3 must not send. */
+    suppressed: boolean('suppressed').notNull().default(false),
+    suppressedAt: timestamp('suppressed_at', { mode: 'date' }),
+    createdAt: timestamp('created_at', { mode: 'date' }).notNull().defaultNow(),
+    updatedAt: timestamp('updated_at', { mode: 'date' }).notNull().defaultNow(),
+  },
+  (t) => [
+    uniqueIndex('outreach_emails_unsub_token_idx').on(t.unsubscribeToken),
+    index('outreach_emails_domain_idx').on(t.domain),
+  ]
+);
+
+// ────────────────────────────────────────────────────────────────────
 // Type helpers for use in the rest of the codebase.
 // ────────────────────────────────────────────────────────────────────
 export type Tenant = typeof tenants.$inferSelect;
@@ -1343,6 +1379,8 @@ export type OutreachProspect = typeof outreachProspects.$inferSelect;
 export type NewOutreachProspect = typeof outreachProspects.$inferInsert;
 export type ProspectDemo = typeof prospectDemos.$inferSelect;
 export type NewProspectDemo = typeof prospectDemos.$inferInsert;
+export type OutreachEmail = typeof outreachEmails.$inferSelect;
+export type NewOutreachEmail = typeof outreachEmails.$inferInsert;
 export type OutreachCampaign = typeof outreachCampaigns.$inferSelect;
 export type OutreachEvent = typeof outreachEvents.$inferSelect;
 export type NewOutreachEvent = typeof outreachEvents.$inferInsert;
