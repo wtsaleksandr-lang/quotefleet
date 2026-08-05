@@ -96,7 +96,7 @@ describe('draftOutreachEmail — AI path', () => {
     expect(countSentences(bodyOnly)).toBeLessThanOrEqual(10);
   });
 
-  it('appends the CASL/CAN-SPAM footer (sender + address + unsubscribe) in HTML and text', async () => {
+  it('carries sender identity but NO mailing address and NO visible unsubscribe link', async () => {
     const body = `A specific opener about Acme Drayage.\n\nHere is your preview — ${DEMO_URL}. Worth a look?`;
     const draft = await draftOutreachEmail(acmeProfile(), DEMO_URL, {
       aiComplete: aiOk('A branded quote tool for Acme Drayage', body),
@@ -105,17 +105,20 @@ describe('draftOutreachEmail — AI path', () => {
     });
 
     for (const doc of [draft.bodyHtml, draft.bodyText]) {
+      // Sender identity stays (founder-style email).
       expect(doc).toContain(SENDER_NAME);
-      expect(doc).toContain(SENDER_ADDRESS);
-      expect(doc).toContain(`/outreach/unsubscribe/${draft.unsubscribeToken}`);
+      // Product decision: the physical address and the visible unsubscribe link
+      // are intentionally NOT rendered in the email body.
+      expect(doc).not.toContain(SENDER_ADDRESS);
+      expect(doc).not.toContain('/outreach/unsubscribe/');
+      expect(doc.toLowerCase()).not.toContain('unsubscribe');
     }
-    // The unsubscribe link is absolute (built from the public base URL).
-    expect(draft.bodyText).toContain(`${BASE}/outreach/unsubscribe/${draft.unsubscribeToken}`);
-    expect(draft.bodyHtml).toContain(`href="${BASE}/outreach/unsubscribe/${draft.unsubscribeToken}"`);
+    // The per-recipient token is still generated (powers suppression + the
+    // invisible List-Unsubscribe header set by the send path), just not shown.
     expect(draft.unsubscribeToken.length).toBeGreaterThanOrEqual(16);
   });
 
-  it('reuses a supplied unsubscribe token (stable per recipient)', async () => {
+  it('still tracks a supplied unsubscribe token (stable per recipient) without rendering it', async () => {
     const body = `Opener.\n\nPreview — ${DEMO_URL}.`;
     const draft = await draftOutreachEmail(acmeProfile(), DEMO_URL, {
       aiComplete: aiOk('Quotes for Acme Drayage', body),
@@ -124,7 +127,9 @@ describe('draftOutreachEmail — AI path', () => {
       unsubscribeToken: 'fixed-token-1234567890',
     });
     expect(draft.unsubscribeToken).toBe('fixed-token-1234567890');
-    expect(draft.bodyText).toContain('/outreach/unsubscribe/fixed-token-1234567890');
+    // Token is tracked but never printed in the body.
+    expect(draft.bodyText).not.toContain('fixed-token-1234567890');
+    expect(draft.bodyHtml).not.toContain('fixed-token-1234567890');
   });
 
   it('rejects an AI reply missing the demo URL → falls back to the template', async () => {
@@ -134,9 +139,9 @@ describe('draftOutreachEmail — AI path', () => {
       publicBaseUrl: BASE,
     });
     expect(draft.aiGenerated).toBe(false);
-    // Template still includes the demo URL + compliance.
+    // Template still includes the demo URL; address is intentionally omitted.
     expect(draft.bodyText).toContain(DEMO_URL);
-    expect(draft.bodyText).toContain(SENDER_ADDRESS);
+    expect(draft.bodyText).not.toContain(SENDER_ADDRESS);
   });
 
   it('never throws when the AI client errors → template fallback', async () => {
@@ -170,10 +175,11 @@ describe('draftOutreachEmail — template fallback (no AI key)', () => {
     expect(draft.bodyText).toContain(DEMO_URL);
     expect(draft.bodyHtml).toContain(DEMO_URL);
 
-    // Compliance footer in both formats.
-    expect(draft.bodyHtml).toContain(SENDER_ADDRESS);
-    expect(draft.bodyText).toContain(SENDER_ADDRESS);
-    expect(draft.bodyText).toContain(`/outreach/unsubscribe/${draft.unsubscribeToken}`);
+    // Sender identity present; address + unsubscribe intentionally omitted.
+    expect(draft.bodyHtml).toContain(SENDER_NAME);
+    expect(draft.bodyHtml).not.toContain(SENDER_ADDRESS);
+    expect(draft.bodyText).not.toContain(SENDER_ADDRESS);
+    expect(draft.bodyText).not.toContain('/outreach/unsubscribe/');
 
     // Not a wall of text.
     const bodyOnly = draft.bodyText.split('\n\n—')[0];
