@@ -1231,6 +1231,89 @@ export const platformSettings = pgTable('platform_settings', {
 });
 
 // ────────────────────────────────────────────────────────────────────
+// PROSPECT DEMOS — lightweight, shareable, on-brand preview pages for the
+// AI Outreach Engine. Given a freight company's domain, the super-admin
+// provisioner enriches it and stores a PROSPECT preview here — NOT a tenant.
+//
+// A prospect_demo is deliberately isolated from every tenant system: it
+// creates NO tenant, user, brand_config, rate_card, or lead row, so it never
+// shows up in tenant lists, MRR, trials, reminders, or quota. It only holds
+// the brand + a small sample-rate calculator config, keyed by an unguessable
+// `token` used in the public `/demo/:token` URL. The public demo page renders
+// the REAL widget themed with this brand and computes quotes from the stored
+// sample rates via the in-memory calc engine (no DB writes).
+// ────────────────────────────────────────────────────────────────────
+
+/** Brand identity captured from enrichment, persisted on a prospect_demo. */
+export interface ProspectDemoBrand {
+  primary: string | null;
+  secondary: string | null;
+  logoUrl: string | null;
+  companyName: string | null;
+}
+
+/** One in-memory sample rate card the demo calculator prices against. Mirrors
+ *  the pricing-relevant subset of `rate_cards` — never persisted as a real card. */
+export interface ProspectDemoSampleCard {
+  service: string;
+  equipment: string;
+  label: string;
+  ratePerMile: number;
+  minimumCharge: number;
+  flatFee: number;
+  fuelSurchargePct: number;
+  marginPct: number;
+  maxMiles: number | null;
+  maxWeightLbs: number | null;
+}
+
+/** The widget config a prospect_demo renders from — modes + fields + SAMPLE
+ *  rates. Shaped so the public demo endpoints can synthesize the exact
+ *  `/api/public/widget/:slug` response the (unforked) widget expects. */
+export interface ProspectDemoConfig {
+  /** Best-fit calculator mode for this company (e.g. 'drayage', 'ftl'). */
+  primaryMode: string;
+  /** Services + their equipment options rendered as the widget's mode buttons. */
+  services: Array<{
+    service: string;
+    label: string;
+    equipments: Array<{ equipment: string; label: string }>;
+  }>;
+  /** Sample rate cards the calc engine prices against. */
+  sampleCards: ProspectDemoSampleCard[];
+  /** The mode-appropriate input fields the AI suggested (drayage → port/chassis…). */
+  fields: string[];
+  /** Currency/label focus. */
+  countryFocus: 'US' | 'CA';
+}
+
+export const prospectDemos = pgTable(
+  'prospect_demos',
+  {
+    id: serial('id').primaryKey(),
+    /** Unguessable slug used in the public /demo/:token URL. */
+    token: text('token').notNull(),
+    /** Normalized apex/host this demo was built for (dedupe key). */
+    domain: text('domain').notNull(),
+    companyName: text('company_name'),
+    /** The full CompanyProfile from enrichCompany (for the admin + regeneration). */
+    profileJson: jsonb('profile_json').$type<Record<string, unknown>>(),
+    /** Brand identity applied to the widget theme + demo page header. */
+    brandJson: jsonb('brand_json').$type<ProspectDemoBrand>(),
+    /** Widget config: modes + fields + sample rates. */
+    configJson: jsonb('config_json').$type<ProspectDemoConfig>(),
+    createdAt: timestamp('created_at', { mode: 'date' }).notNull().defaultNow(),
+    updatedAt: timestamp('updated_at', { mode: 'date' }).notNull().defaultNow(),
+    /** First time the public demo page was loaded; null until then. */
+    viewedAt: timestamp('viewed_at', { mode: 'date' }),
+  },
+  (t) => [
+    uniqueIndex('prospect_demos_token_idx').on(t.token),
+    uniqueIndex('prospect_demos_domain_idx').on(t.domain),
+  ]
+);
+
+// ────────────────────────────────────────────────────────────────────
 // Type helpers for use in the rest of the codebase.
 // ────────────────────────────────────────────────────────────────────
 export type Tenant = typeof tenants.$inferSelect;
@@ -1258,6 +1341,8 @@ export type Conversation = typeof conversations.$inferSelect;
 export type Port = typeof ports.$inferSelect;
 export type OutreachProspect = typeof outreachProspects.$inferSelect;
 export type NewOutreachProspect = typeof outreachProspects.$inferInsert;
+export type ProspectDemo = typeof prospectDemos.$inferSelect;
+export type NewProspectDemo = typeof prospectDemos.$inferInsert;
 export type OutreachCampaign = typeof outreachCampaigns.$inferSelect;
 export type OutreachEvent = typeof outreachEvents.$inferSelect;
 export type NewOutreachEvent = typeof outreachEvents.$inferInsert;

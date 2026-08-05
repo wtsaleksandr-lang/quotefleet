@@ -35,6 +35,7 @@ import { registerQuoteMapRoutes } from './routes/quoteMap.js';
 import { registerQuoteActivityRoutes } from './routes/quoteActivity.js';
 import { registerCarrierProfileRoutes } from './routes/carrierProfile.js';
 import { registerOutreachRoutes } from './routes/outreach.js';
+import { registerProspectDemoRoutes } from './routes/prospectDemo.js';
 import { registerUnsubscribeRoutes } from './routes/unsubscribe.js';
 import { hostInfoMiddleware } from './hostInfo.js';
 
@@ -110,6 +111,10 @@ export function createApp(): express.Express {
 
   registerAuthRoutes(app);
   registerOAuthRoutes(app);
+  // Prospect-demo routes MUST precede the tenant public routes: they get first
+  // crack at the shared /api/public/{widget,quote,lead,route-preview}/:slug
+  // paths and call next() when the slug is not a demo token (see prospectDemo.ts).
+  registerProspectDemoRoutes(app);
   registerPublicRoutes(app);
   registerTenantRoutes(app);
   registerAdminRoutes(app);

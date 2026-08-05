@@ -1,0 +1,72 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Your instant freight quote calculator · QuoteFleet preview</title>
+  <meta name="description" content="A live preview of an on-brand instant freight quote calculator, powered by QuoteFleet.">
+  <meta name="robots" content="noindex">
+  <link rel="icon" href="/favicon.ico">
+  <link rel="stylesheet" href="/style.css">
+  <link rel="stylesheet" href="/demo.css">
+  <script>
+    // Restore the viewer's preferred theme before paint (no flash).
+    try {
+      var t = localStorage.getItem('qf-theme');
+      if (t === 'light') document.documentElement.setAttribute('data-theme', 'light');
+    } catch (e) {}
+  </script>
+</head>
+<body class="qf-demo-body">
+  <div class="demo-page" id="demo-page">
+    <header class="demo-topbar">
+      <div class="demo-brand">
+        <span class="demo-logo" id="demo-logo" aria-hidden="true"></span>
+        <span class="demo-brand-text">
+          <span class="demo-eyebrow">Live preview for</span>
+          <span class="demo-company" id="demo-company">Your company</span>
+        </span>
+      </div>
+      <div class="demo-topbar-actions">
+        <button type="button" class="demo-theme-toggle" id="demo-theme-toggle" aria-label="Toggle light or dark theme">◐</button>
+        <a class="demo-btn demo-btn-ghost" id="demo-cta-top" href="/signup">Get your own</a>
+      </div>
+    </header>
+
+    <div class="demo-banner" id="demo-banner">
+      <div class="demo-banner-text">
+        <strong id="demo-banner-title">This is a preview built for your company.</strong>
+        <span>Get your own branded quote calculator in 5 minutes — no code, no card.</span>
+      </div>
+      <a class="demo-btn demo-btn-primary" id="demo-cta-banner" href="/signup">Get your own free →</a>
+    </div>
+
+    <main class="demo-stage">
+      <div class="demo-widget-wrap">
+        <div class="demo-widget-frame">
+          <iframe class="demo-widget" id="demo-widget" title="Instant freight quote" loading="lazy" allow="clipboard-write"></iframe>
+        </div>
+        <p class="demo-widget-note">This live calculator uses sample rates for the preview. Your own version prices from your real rate cards.</p>
+      </div>
+
+      <aside class="demo-pitch">
+        <h2 class="demo-pitch-title">Why carriers add this to their site</h2>
+        <ul class="demo-points">
+          <li><span class="demo-point-ic" aria-hidden="true">⚡</span><span><strong>Instant quotes, 24/7.</strong> Shippers price a lane in seconds instead of waiting on a callback.</span></li>
+          <li><span class="demo-point-ic" aria-hidden="true">🎨</span><span><strong>Your brand, your rates.</strong> Your logo, colours, and pricing — embedded on your own site.</span></li>
+          <li><span class="demo-point-ic" aria-hidden="true">📥</span><span><strong>Every quote is a lead.</strong> Contact details land in your inbox and dashboard automatically.</span></li>
+        </ul>
+        <a class="demo-btn demo-btn-primary demo-pitch-cta" id="demo-cta-pitch" href="/signup">Build mine free →</a>
+        <p class="demo-pitch-fine">Free plan available · setup in minutes</p>
+      </aside>
+    </main>
+
+    <footer class="demo-foot">
+      <span>Powered by <a href="/" target="_blank" rel="noopener">QuoteFleet</a></span>
+      <span class="demo-foot-sep" aria-hidden="true">·</span>
+      <span class="demo-foot-note" id="demo-foot-note">An independent preview — not yet affiliated with this company.</span>
+    </footer>
+  </div>
+  <script src="/demo.js"></script>
+</body>
+</html>

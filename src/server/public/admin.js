@@ -94,37 +94,83 @@
     });
     f.appendChild(input);
     card.appendChild(f);
-    var goBtn = el('button', { class: 'btn btn-primary', type: 'button', text: 'Enrich' });
-    card.appendChild(goBtn);
+    var actions = el('div', { style: { display: 'flex', gap: '8px', flexWrap: 'wrap' } });
+    var goBtn = el('button', { class: 'btn btn-secondary', type: 'button', text: 'Enrich' });
+    var demoBtn = el('button', { class: 'btn btn-primary', type: 'button', text: 'Generate branded demo' });
+    actions.appendChild(demoBtn);
+    actions.appendChild(goBtn);
+    card.appendChild(actions);
     c.appendChild(card);
 
     var out = el('div', { style: { marginTop: '16px' } });
     c.appendChild(out);
 
+    function currentDomain() { return (input.value || '').trim(); }
+
     function run() {
-      var domain = (input.value || '').trim();
+      var domain = currentDomain();
       if (!domain) { input.focus(); return; }
-      goBtn.disabled = true;
+      goBtn.disabled = true; demoBtn.disabled = true;
       out.innerHTML = '';
       out.appendChild(el('div', { class: 'muted', text: 'Enriching ' + domain + '…' }));
       api('/api/admin/outreach/enrich', { method: 'POST', body: { domain: domain } })
-        .then(function (d) {
-          out.innerHTML = '';
-          var pre = el('pre', {
-            class: 'input',
-            style: { whiteSpace: 'pre-wrap', overflowX: 'auto', fontVariantNumeric: 'tabular-nums' },
-            text: JSON.stringify(d.profile, null, 2),
-          });
-          out.appendChild(pre);
-        })
-        .catch(function (err) {
-          out.innerHTML = '';
-          out.appendChild(el('div', { class: 'notice error', text: err.message }));
-        })
-        .finally(function () { goBtn.disabled = false; });
+        .then(function (d) { showResult(null, d.profile); })
+        .catch(function (err) { showError(err); })
+        .finally(function () { goBtn.disabled = false; demoBtn.disabled = false; });
     }
+
+    // Provision (or refresh) the shareable branded demo page, then show the link.
+    function provision() {
+      var domain = currentDomain();
+      if (!domain) { input.focus(); return; }
+      goBtn.disabled = true; demoBtn.disabled = true;
+      out.innerHTML = '';
+      out.appendChild(el('div', { class: 'muted', text: 'Building a branded demo for ' + domain + '…' }));
+      api('/api/admin/outreach/provision', { method: 'POST', body: { domain: domain } })
+        .then(function (d) { showResult(d.demoUrl, d.profile); })
+        .catch(function (err) { showError(err); })
+        .finally(function () { goBtn.disabled = false; demoBtn.disabled = false; });
+    }
+
+    function showError(err) {
+      out.innerHTML = '';
+      out.appendChild(el('div', { class: 'notice error', text: err.message }));
+    }
+
+    function showResult(demoUrl, profile) {
+      out.innerHTML = '';
+      if (demoUrl) {
+        var linkCard = el('div', { class: 'card', style: { marginBottom: '16px' } });
+        linkCard.appendChild(el('div', { class: 'field-label', text: 'Shareable demo link' }));
+        var link = el('a', { href: demoUrl, text: demoUrl, target: '_blank', rel: 'noopener', style: { wordBreak: 'break-all' } });
+        linkCard.appendChild(link);
+        var linkActions = el('div', { style: { display: 'flex', gap: '8px', flexWrap: 'wrap', marginTop: '12px' } });
+        var openBtn = el('a', { class: 'btn btn-primary', href: demoUrl, target: '_blank', rel: 'noopener', text: 'Open demo ↗' });
+        var copyBtn = el('button', { class: 'btn btn-secondary', type: 'button', text: 'Copy link' });
+        copyBtn.addEventListener('click', function () {
+          try {
+            navigator.clipboard.writeText(demoUrl).then(function () {
+              copyBtn.textContent = 'Copied ✓';
+              setTimeout(function () { copyBtn.textContent = 'Copy link'; }, 1600);
+            });
+          } catch (e) { /* clipboard unavailable */ }
+        });
+        linkActions.appendChild(openBtn);
+        linkActions.appendChild(copyBtn);
+        linkCard.appendChild(linkActions);
+        out.appendChild(linkCard);
+      }
+      var pre = el('pre', {
+        class: 'input',
+        style: { whiteSpace: 'pre-wrap', overflowX: 'auto', fontVariantNumeric: 'tabular-nums' },
+        text: JSON.stringify(profile, null, 2),
+      });
+      out.appendChild(pre);
+    }
+
     goBtn.addEventListener('click', run);
-    input.addEventListener('keydown', function (ev) { if (ev.key === 'Enter') { ev.preventDefault(); run(); } });
+    demoBtn.addEventListener('click', provision);
+    input.addEventListener('keydown', function (ev) { if (ev.key === 'Enter') { ev.preventDefault(); provision(); } });
     input.focus();
   }
 
