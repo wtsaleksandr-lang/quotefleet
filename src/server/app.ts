@@ -38,6 +38,7 @@ import { registerOutreachRoutes } from './routes/outreach.js';
 import { registerProspectDemoRoutes } from './routes/prospectDemo.js';
 import { registerUnsubscribeRoutes } from './routes/unsubscribe.js';
 import { registerOutreachUnsubscribeRoutes } from './routes/outreachUnsubscribe.js';
+import { registerInboundReviewRoutes } from './routes/inboundReview.js';
 import { hostInfoMiddleware } from './hostInfo.js';
 
 const __filename = fileURLToPath(import.meta.url);
@@ -135,6 +136,7 @@ export function createApp(): express.Express {
   registerOutreachRoutes(app);
   registerUnsubscribeRoutes(app);
   registerOutreachUnsubscribeRoutes(app);
+  registerInboundReviewRoutes(app);
 
   app.get(['/healthz', '/api/health'], async (_req, res) => {
     const time = new Date().toISOString();
