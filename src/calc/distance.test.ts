@@ -2,8 +2,63 @@ import { describe, expect, it } from 'vitest';
 import { ZIP5_CENTROIDS } from './zip5Centroids.js';
 import { ZIP_CENTROIDS } from './zipCentroids.js';
 import { distanceMiles } from './engine.js';
-import { geocode } from './distance.js';
+import { geocode, normCountry } from './distance.js';
 import { CANADA_FSA_CENTROIDS } from './canadaFsa.js';
+
+/**
+ * BUG — a Canadian city-only lane (e.g. pickup "Mississauga, ON", no postal
+ * code, no autocomplete pick) hard-400'd. Root cause: geocode()'s Nominatim
+ * tier filters by countrycodes=normCountry(input.country), which defaulted
+ * to 'US' whenever country was omitted — which is exactly what happened for
+ * free-typed city-only text (see widget.js parseLocation). Querying Nominatim
+ * with countrycodes=us for "Mississauga, ON" can never match (Ontario isn't a
+ * US state), so geocode() returned null → distanceBetween 400'd. Fix: when
+ * country is genuinely omitted, infer CA from a recognizable province token
+ * in `state` instead of hardcoding US. These are pure unit tests against the
+ * exported normCountry() — the exact function geocode() calls to build its
+ * Nominatim countrycodes param — so no network or DB is involved.
+ */
+describe('normCountry province inference (CA city-only lane fix)', () => {
+  it('infers CA when country is omitted but state is a Canadian province code', () => {
+    expect(normCountry(undefined, 'ON')).toBe('CA'); // Mississauga, ON / Toronto, ON
+    expect(normCountry(undefined, 'QC')).toBe('CA');
+    expect(normCountry(undefined, 'BC')).toBe('CA');
+    expect(normCountry(undefined, 'AB')).toBe('CA');
+  });
+
+  it('is case-insensitive on the province token', () => {
+    expect(normCountry(undefined, 'on')).toBe('CA');
+    expect(normCountry(undefined, 'Qc')).toBe('CA');
+  });
+
+  it('covers every province/territory, incl. the territories', () => {
+    for (const p of ['AB', 'BC', 'MB', 'NB', 'NL', 'NS', 'NT', 'NU', 'ON', 'PE', 'QC', 'SK', 'YT']) {
+      expect(normCountry(undefined, p), p).toBe('CA');
+    }
+  });
+
+  it('still defaults to US when both country and state are omitted (unchanged behavior)', () => {
+    expect(normCountry(undefined, undefined)).toBe('US');
+    expect(normCountry()).toBe('US');
+  });
+
+  it('US city-only lanes still resolve US — a US state token does not get reclassified', () => {
+    expect(normCountry(undefined, 'IL')).toBe('US'); // Chicago, IL
+    expect(normCountry(undefined, 'GA')).toBe('US'); // Atlanta, GA
+    expect(normCountry(undefined, 'CA')).toBe('US'); // California (2-letter US state code) — not a province
+  });
+
+  it('an explicit country always wins over the province token, even if they disagree', () => {
+    expect(normCountry('US', 'ON')).toBe('US');
+    expect(normCountry('CA', 'IL')).toBe('CA');
+  });
+
+  it('existing normalization (USA/United States/Canada spellings) is unchanged', () => {
+    expect(normCountry('USA')).toBe('US');
+    expect(normCountry('United States')).toBe('US');
+    expect(normCountry('Canada')).toBe('CA');
+  });
+});
 
 /**
  * FIX 5 — coarse ZIP3-prefix centroids collapsed same-metro cross-ZIP lanes to
