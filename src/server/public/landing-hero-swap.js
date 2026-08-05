@@ -36,6 +36,12 @@
   var timer = null;
   function clearT() { if (timer) { clearTimeout(timer); timer = null; } }
 
+  // User play/pause (set via window.qfHeroSwap, driven by
+  // landing-video-controls.js). While paused, the choreography holds its
+  // current frame and neither the watchdog nor the IntersectionObserver
+  // resumes playback.
+  var userPaused = false;
+
   function stage(name) {
     wrap.classList.remove('stage-laptop', 'stage-phone');
     wrap.classList.add(name === 'phone' ? 'stage-phone' : 'stage-laptop');
@@ -56,6 +62,7 @@
   }
 
   function playLaptop() {
+    if (userPaused) return;
     clearT();
     stage('laptop');
     try { phV.pause(); phV.currentTime = 0; } catch (e) {}
@@ -65,6 +72,7 @@
   }
 
   function playPhone() {
+    if (userPaused) return;
     clearT();
     stage('phone');
     try { lapV.pause(); } catch (e) {}
@@ -73,11 +81,45 @@
     schedule(phV, function () { clearT(); timer = setTimeout(playLaptop, DWELL); });
   }
 
+  // Freeze the whole story on the current frame.
+  function pauseAll() {
+    userPaused = true;
+    clearT();
+    try { lapV.pause(); } catch (e) {}
+    try { phV.pause(); } catch (e) {}
+  }
+  // Resume from wherever we paused (continue the current stage's clip).
+  function resumeAll() {
+    userPaused = false;
+    if (wrap.classList.contains('stage-phone')) {
+      var p = phV.play(); if (p && p.catch) p.catch(function () {});
+      schedule(phV, function () { clearT(); timer = setTimeout(playLaptop, DWELL); });
+    } else {
+      var q = lapV.play(); if (q && q.catch) q.catch(function () {});
+      schedule(lapV, function () { clearT(); timer = setTimeout(playPhone, DWELL); });
+    }
+  }
+
   if (reduce) {
     // No motion: keep both playing gently in the static layout.
     lapV.loop = true; phV.loop = true; stage('laptop');
     var pl = lapV.play(); if (pl && pl.catch) pl.catch(function () {});
     var pp = phV.play(); if (pp && pp.catch) pp.catch(function () {});
+    // Reduced-motion pause/resume just stops/starts both loops.
+    window.qfHeroSwap = {
+      isPaused: function () { return userPaused; },
+      pause: function () {
+        userPaused = true;
+        try { lapV.pause(); } catch (e) {}
+        try { phV.pause(); } catch (e) {}
+      },
+      resume: function () {
+        userPaused = false;
+        var a = lapV.play(); if (a && a.catch) a.catch(function () {});
+        var b = phV.play(); if (b && b.catch) b.catch(function () {});
+      },
+      toggle: function () { if (userPaused) this.resume(); else this.pause(); return !userPaused; }
+    };
     return;
   }
 
@@ -87,6 +129,7 @@
     io = new IntersectionObserver(function (entries) {
       var e = entries[0];
       if (!e) return;
+      if (userPaused) return;
       if (e.isIntersecting) {
         if (!wrap.classList.contains('stage-phone')) { var q = lapV.play(); if (q && q.catch) q.catch(function () {}); }
         else { var r = phV.play(); if (r && r.catch) r.catch(function () {}); }
@@ -96,6 +139,15 @@
     }, { threshold: 0.15 });
     io.observe(wrap);
   }
+
+  // Expose user play/pause so landing-video-controls.js can drive both hero
+  // videos as one choreographed unit.
+  window.qfHeroSwap = {
+    isPaused: function () { return userPaused; },
+    pause: pauseAll,
+    resume: resumeAll,
+    toggle: function () { if (userPaused) resumeAll(); else pauseAll(); return !userPaused; }
+  };
 
   function start() {
     if (lapV.readyState >= 1) playLaptop();

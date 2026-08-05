@@ -1,0 +1,69 @@
+/* ─────────────────────────────────────────────────────────────────────────
+   Landing video play/pause controls.
+
+   A subtle click / tap (and keyboard) play-pause toggle for every autoplaying
+   demo video on the marketing page — the two hero mockups (laptop + phone)
+   plus the how-it-works / flow clips. On toggle a small centered badge fades
+   in (▶ play glyph when now playing, ⏸ pause glyph when now paused) and fades
+   back out after ~700ms. Wiring lives in landing-video-controls.js.
+
+   Colors use rgba scrims only (never a raw #fff / #000 / white / black token)
+   so the hardcoded-color guard stays green; the focus ring reuses var(--accent)
+   like the rest of the site.
+   ───────────────────────────────────────────────────────────────────────── */
+
+.qf-vidctl-host {
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+}
+.qf-vidctl-host:focus { outline: none; }
+.qf-vidctl-host:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+  border-radius: 6px;
+}
+
+/* Centered, non-blocking overlay — pointer-events pass through to the host so
+   the whole video surface stays the single click target. */
+.qf-vidctl-overlay {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  pointer-events: none;
+  z-index: 4;
+}
+
+.qf-vidctl-badge {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 60px;
+  height: 60px;
+  border-radius: 50%;
+  background: rgba(12, 16, 24, 0.52);
+  border: 1px solid rgba(255, 255, 255, 0.16);
+  color: rgba(255, 255, 255, 0.96);
+  box-shadow: 0 6px 18px rgba(0, 0, 0, 0.28);
+  -webkit-backdrop-filter: blur(6px);
+  backdrop-filter: blur(6px);
+  opacity: 0;
+  transform: scale(0.86);
+  transition: opacity 0.18s ease, transform 0.28s cubic-bezier(0.2, 0.7, 0.2, 1);
+}
+.qf-vidctl-badge.is-show {
+  opacity: 1;
+  transform: scale(1);
+}
+.qf-vidctl-badge svg {
+  width: 26px;
+  height: 26px;
+  display: block;
+  fill: currentColor;
+}
+
+/* Reduced motion: still show/hide the badge, just without the fade+scale. */
+@media (prefers-reduced-motion: reduce) {
+  .qf-vidctl-badge { transition: none; }
+}
