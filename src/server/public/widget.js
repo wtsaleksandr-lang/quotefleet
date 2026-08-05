@@ -487,6 +487,30 @@
       })
       .catch(function () { $('qf-root').innerHTML = '<div class="qf-error">Failed to load widget. Please refresh.</div>'; });
 
+    // DEMO-ONLY live theme switch. The prospect demo showcase shell (demo.js)
+    // posts { qf:'theme', mode, preset } when its day/night toggle flips, so the
+    // calculator — isolated in its own iframe — follows the shell WITHOUT a
+    // reload (form state preserved). Strictly scoped: honoured only for a DEMO
+    // config (cfg.demo) AND only from our own parent window. A real tenant embed
+    // has cfg.demo falsy, so it ignores the message entirely and its saved theme
+    // is never overridden. The config endpoint validates the preset id.
+    window.addEventListener('message', function (e) {
+      if (!e || e.source !== window.parent || !e.data || e.data.qf !== 'theme') return;
+      if (!(state.config && state.config.demo)) return;
+      var preset = typeof e.data.preset === 'string' ? e.data.preset : '';
+      if (!preset) return;
+      fetch(withGrant('/api/public/widget/' + slug + '?preset=' + encodeURIComponent(preset)))
+        .then(function (r) { return r.json(); })
+        .then(function (cfg) {
+          if (!cfg || cfg.error || !cfg.theme) return;
+          state.config.theme = cfg.theme;
+          brandMapStyle = normMapStyle(demoMapStyleOverride || (cfg.brand && cfg.brand.mapStyle));
+          applyTheme(cfg.theme);
+          autoResize();
+        })
+        .catch(function () { /* ignore — keep the current theme */ });
+    });
+
     $('qf-calc-btn').addEventListener('click', onCalculate);
     $('qf-continue-btn').addEventListener('click', function () { showStep('contact'); });
     // "Edit details" on the result — scroll back up to the form so the user can

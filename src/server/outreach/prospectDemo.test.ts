@@ -222,6 +222,28 @@ describe('buildProspectWidgetConfig', () => {
     expect(cfg.contact.phone).toBe('(555) 123-4567');
   });
 
+  it('honours a demo light/dark preset override while keeping the brand accent', () => {
+    const rec = record(withAiMode('drayage'));
+    // No override → the light demo default (cupertino).
+    const dflt = buildProspectWidgetConfig(rec);
+    expect(dflt.theme.preset).toBe('cupertino');
+    expect(dflt.theme.mode).toBe('light');
+
+    // Dark override → the widget re-skins to a genuinely DARK preset, but the
+    // prospect's brand accent is still applied (same calculator, dark variant).
+    const dark = buildProspectWidgetConfig(rec, 'midnight');
+    expect(dark.theme.preset).toBe('midnight');
+    expect(dark.theme.mode).toBe('dark');
+    expect(dark.theme.accentOverride).toBe('#ff5a1f');
+
+    // Explicit light override resolves to the light preset too.
+    expect(buildProspectWidgetConfig(rec, 'cupertino').theme.mode).toBe('light');
+
+    // Unknown / junk preset ids fall back to the demo default (never throw).
+    expect(buildProspectWidgetConfig(rec, 'not-a-preset').theme.preset).toBe('cupertino');
+    expect(buildProspectWidgetConfig(rec, '').theme.preset).toBe('cupertino');
+  });
+
   it('equipment options match the TENANT widget-config option shape {value,label,maxWeightLbs?}', () => {
     // The widget is shared unforked, so the prospect equipmentByService entries
     // must be byte-for-byte the same shape the tenant endpoint emits via

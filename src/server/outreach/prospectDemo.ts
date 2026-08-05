@@ -25,7 +25,7 @@ import type {
 } from '../../db/schema.js';
 import type { CompanyProfile } from './enrichCompany.js';
 import { calculate, type CalcRequest, type CalcResult } from '../../calc/engine.js';
-import { resolveWidgetTheme } from '../widgetThemes.js';
+import { resolveWidgetTheme, WIDGET_PRESETS } from '../widgetThemes.js';
 import { resolveQuoteDisclaimer } from '../quoteDisclaimer.js';
 import { resolveFeatures, resolveBookingConfig } from '../features.js';
 
@@ -369,15 +369,23 @@ export const DEMO_THEME_PRESET = 'cupertino';
  * colours drive the theme accent; the demo shows the price BEFORE asking for
  * contact (showQuoteBeforeContact) so a prospect sees an instant quote.
  */
-export function buildProspectWidgetConfig(rec: ProspectDemoRecord) {
+export function buildProspectWidgetConfig(rec: ProspectDemoRecord, presetOverride?: string | null) {
   const brand = rec.brandJson ?? { primary: null, secondary: null, logoUrl: null, companyName: null };
   const cfg = rec.configJson ?? { primaryMode: 'ftl', services: [], sampleCards: [], fields: [], countryFocus: 'US' as const };
   const profile = (rec.profileJson ?? {}) as Record<string, unknown>;
   const displayName = brand.companyName || rec.companyName || rec.domain;
   const accent = normalizeHex(brand.primary);
 
+  // The demo defaults to a light premium preset; the showcase shell's day/night
+  // toggle may request another curated preset (a genuinely LIGHT or DARK one) so
+  // the SAME brand calculator can be previewed in either mode. Only a known
+  // preset id is honoured — anything else falls back to the demo default. This
+  // is demo-scoped by construction: it only ever runs for a prospect_demos token
+  // (the interceptor route), so a real tenant embed is never affected.
+  const presetId = presetOverride && WIDGET_PRESETS[presetOverride] ? presetOverride : DEMO_THEME_PRESET;
+
   const theme = resolveWidgetTheme({
-    themePreset: DEMO_THEME_PRESET,
+    themePreset: presetId,
     accentOverride: accent,
     primaryColor: accent,
   });
