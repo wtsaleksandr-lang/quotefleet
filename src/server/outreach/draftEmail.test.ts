@@ -204,6 +204,38 @@ describe('draftOutreachEmail — template fallback (no AI key)', () => {
   });
 });
 
+describe('draftOutreachEmail — embedded branded-quote image', () => {
+  const IMG = 'https://cdn.example.com/demo-shot/abc123XYZ.png';
+
+  it('embeds a clickable image (linked to the demo) when previewImageUrl is set', async () => {
+    const body = `Opener about Acme Drayage.\n\nPreview — ${DEMO_URL}.`;
+    const draft = await draftOutreachEmail(acmeProfile(), DEMO_URL, {
+      aiComplete: aiOk('Quotes for Acme Drayage', body),
+      anthropicKey: 'sk-test',
+      publicBaseUrl: BASE,
+      previewImageUrl: IMG,
+    });
+    // The image is present and wrapped in a link to the prospect's demo.
+    expect(draft.bodyHtml).toContain(`src="${IMG}"`);
+    expect(draft.bodyHtml).toContain(`href="${DEMO_URL}"`);
+    // Alt text carries the message if images are blocked.
+    expect(draft.bodyHtml).toMatch(/alt="[^"]*Acme Drayage[^"]*"/);
+    // The text preview card is replaced by the image (no "Instant freight estimate" card label).
+    expect(draft.bodyHtml).not.toContain('Instant freight estimate');
+  });
+
+  it('falls back to the text preview card when no previewImageUrl is given', async () => {
+    const body = `Opener about Acme Drayage.\n\nPreview — ${DEMO_URL}.`;
+    const draft = await draftOutreachEmail(acmeProfile(), DEMO_URL, {
+      aiComplete: aiOk('Quotes for Acme Drayage', body),
+      anthropicKey: 'sk-test',
+      publicBaseUrl: BASE,
+    });
+    expect(draft.bodyHtml).toContain('Instant freight estimate');
+    expect(draft.bodyHtml).not.toContain('<img src="https://cdn.example.com');
+  });
+});
+
 describe('countSentences', () => {
   it('counts sentence-terminated clauses', () => {
     expect(countSentences('One. Two! Three?')).toBe(3);
