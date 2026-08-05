@@ -169,6 +169,59 @@
         emailCard.appendChild(demoLine);
       }
       out.appendChild(emailCard);
+
+      // ── Send test — email the EXACT reviewed draft to a recipient. Honors
+      //    suppression server-side (an opted-out address returns skipped). ──
+      var sendCard = el('div', { class: 'card', style: { marginBottom: '16px' } });
+      sendCard.appendChild(el('div', { class: 'field-label', text: 'Send test' }));
+      var sendField = el('div', { class: 'field' });
+      var toInput = el('input', {
+        class: 'input',
+        type: 'email',
+        placeholder: 'you@example.com',
+        autocomplete: 'off',
+        spellcheck: 'false',
+      });
+      sendField.appendChild(toInput);
+      sendCard.appendChild(sendField);
+      var sendBtn = el('button', { class: 'btn btn-primary', type: 'button', text: 'Send test email' });
+      var sendStatus = el('div', { class: 'muted', style: { marginTop: '12px' } });
+      sendCard.appendChild(sendBtn);
+      sendCard.appendChild(sendStatus);
+      out.appendChild(sendCard);
+
+      function describeSend(r) {
+        if (r.skipped === 'suppressed') return { cls: 'notice', text: 'Skipped — recipient is unsubscribed.' };
+        if (r.skipped === 'no-recipient') return { cls: 'notice error', text: 'Skipped — no recipient address.' };
+        if (r.status === 'sent') return { cls: 'notice', text: 'Sent ✓' + (r.providerId ? ' (' + r.providerId + ')' : '') };
+        if (r.status === 'unconfigured') return { cls: 'notice', text: 'No email provider configured — logged only.' };
+        return { cls: 'notice error', text: 'Failed' + (r.error ? ' — ' + r.error : '') };
+      }
+
+      function doSend() {
+        var to = (toInput.value || '').trim();
+        if (!to) { toInput.focus(); return; }
+        sendBtn.disabled = true;
+        sendStatus.innerHTML = '';
+        sendStatus.appendChild(el('div', { class: 'muted', text: 'Sending…' }));
+        var body = d.emailId ? { emailId: d.emailId, to: to } : { domain: currentDomain(), to: to };
+        api('/api/admin/outreach/send', { method: 'POST', body: body })
+          .then(function (r) {
+            var m = describeSend(r);
+            sendStatus.innerHTML = '';
+            sendStatus.appendChild(el('div', { class: m.cls, text: m.text }));
+          })
+          .catch(function (err) {
+            sendStatus.innerHTML = '';
+            sendStatus.appendChild(el('div', { class: 'notice error', text: err.message }));
+          })
+          .finally(function () { sendBtn.disabled = false; });
+      }
+      sendBtn.addEventListener('click', doSend);
+      toInput.addEventListener('keydown', function (ev) {
+        if (ev.key === 'Enter') { ev.preventDefault(); doSend(); }
+      });
+
       var pre = el('pre', {
         class: 'input',
         style: { whiteSpace: 'pre-wrap', overflowX: 'auto' },

@@ -1340,6 +1340,21 @@ export const outreachEmails = pgTable(
     /** Set true when the recipient clicks unsubscribe — Phase 3 must not send. */
     suppressed: boolean('suppressed').notNull().default(false),
     suppressedAt: timestamp('suppressed_at', { mode: 'date' }),
+    // ── Phase 3 send + sequence + tracking ──────────────────────────────
+    /** When the email was actually handed to the provider (null until sent). */
+    sentAt: timestamp('sent_at', { mode: 'date' }),
+    /** Send outcome: null (draft) | 'sent' | 'failed' | 'skipped' | 'unconfigured'. */
+    status: text('status'),
+    /** Provider message id on a successful send (Resend id, etc.). */
+    providerId: text('provider_id'),
+    /** Human-readable failure summary on a failed send (never a secret value). */
+    sendError: text('send_error'),
+    /** Sequence step 1..3 — only step 1 is sent today; follow-ups are a scaffold. */
+    step: integer('step').notNull().default(1),
+    /** When a future scheduled follow-up may fire (null = none queued). */
+    nextFollowupAt: timestamp('next_followup_at', { mode: 'date' }),
+    /** First time the CTA/demo link was clicked through the tracking route. */
+    clickedAt: timestamp('clicked_at', { mode: 'date' }),
     createdAt: timestamp('created_at', { mode: 'date' }).notNull().defaultNow(),
     updatedAt: timestamp('updated_at', { mode: 'date' }).notNull().defaultNow(),
   },
