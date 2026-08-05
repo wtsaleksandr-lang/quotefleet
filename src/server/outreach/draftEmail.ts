@@ -35,6 +35,21 @@ import type { CompanyProfile } from './enrichCompany.js';
 export const SENDER_NAME = 'QuoteFleet';
 /** Physical mailing address — a hard CAN-SPAM / CASL requirement. */
 export const SENDER_ADDRESS = '30 Angus Road, Hamilton, ON L8K 6L1, Canada';
+/** Named founder signature — a real person lifts cold-email trust + reply rate. */
+export const SENDER_PERSON = 'Aleksandr';
+/** Signature title shown under the name. */
+export const SENDER_TITLE = 'Founder, QuoteFleet';
+
+// ─── Brand tokens (kept in sync with DESIGN-SYSTEM.md) ─────────────────────
+const BRAND_BLUE = '#0d3cfc';
+const INK = '#0f172a';
+const MUT = '#64748b';
+const FAINT = '#94a3b8';
+const HAIR = '#eef0f3';
+const PANEL = '#f6f8ff';
+const PANEL_BORDER = '#e3e9ff';
+const FONT_STACK =
+  "-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Arial,sans-serif";
 
 /**
  * Curated, SAFE stat-stack the AI may cite (framed as "the same dynamic applies
@@ -127,16 +142,18 @@ function footerText(unsubUrl: string): string {
   ].join('\n');
 }
 
-function footerHtml(unsubUrl: string): string {
+/** Branded, compliant footer row (sender identity + address + one-click unsub). */
+function footerHtml(unsubUrl: string, company: string): string {
   return (
-    `<div style="margin-top:24px;padding-top:16px;border-top:1px solid #e5e7eb;` +
-    `font-size:12px;line-height:1.5;color:#6b7280;">` +
-    `<div>${escapeHtml(SENDER_NAME)}</div>` +
-    `<div>${escapeHtml(SENDER_ADDRESS)}</div>` +
-    `<div style="margin-top:8px;">` +
-    `<a href="${escapeAttr(unsubUrl)}" style="color:#6b7280;">Unsubscribe</a>` +
-    ` from these emails.</div>` +
-    `</div>`
+    `<tr><td style="padding:20px 32px 24px;background:#fafbfc;border-top:1px solid ${HAIR};` +
+    `font-family:${FONT_STACK};font-size:12px;line-height:1.6;color:${FAINT};">` +
+    `<div style="font-weight:700;color:${MUT};letter-spacing:.2px;">${escapeHtml(SENDER_NAME)}</div>` +
+    `<div style="margin-top:2px;">${escapeHtml(SENDER_ADDRESS)}</div>` +
+    `<div style="margin-top:10px;">` +
+    `You're receiving this because we thought ${escapeHtml(company)} could quote faster. ` +
+    `<a href="${escapeAttr(unsubUrl)}" style="color:${MUT};text-decoration:underline;">Unsubscribe</a>.` +
+    `</div>` +
+    `</td></tr>`
   );
 }
 
@@ -168,23 +185,118 @@ function toParagraphs(bodyText: string): string[] {
 function linkifyDemo(escapedParagraph: string, demoUrl: string): string {
   const escUrl = escapeHtml(demoUrl);
   if (!escUrl || !escapedParagraph.includes(escUrl)) return escapedParagraph;
+  // Replace the raw URL with a clean inline link (the big CTA button carries the
+  // primary action) so the copy never shows an ugly bare URL mid-sentence.
   return escapedParagraph.replace(
     escUrl,
-    `<a href="${escapeAttr(demoUrl)}" style="color:#0d3cfc;">${escUrl}</a>`,
+    `<a href="${escapeAttr(demoUrl)}" style="color:${BRAND_BLUE};font-weight:600;text-decoration:none;">see it live</a>`,
   );
 }
 
-/** Assemble the final HTML document from paragraphs + the compliance footer. */
-function assembleHtml(paragraphs: string[], demoUrl: string, unsubUrl: string): string {
-  const body = paragraphs
-    .map((p) => `<p style="margin:0 0 16px 0;">${linkifyDemo(escapeHtml(p), demoUrl)}</p>`)
-    .join('\n');
+/** Context the branded HTML assembler needs beyond the body paragraphs. */
+interface HtmlContext {
+  demoUrl: string;
+  unsubUrl: string;
+  company: string;
+  modeLabel: string;
+  lane: string | null;
+  publicBaseUrl: string;
+}
+
+/** Brand lockup header — hosted mark + text wordmark (legible even if images blocked). */
+function headerHtml(publicBaseUrl: string): string {
+  const logo = `${(publicBaseUrl || '').replace(/\/$/, '')}/brand/logo-full.png`;
   return (
-    `<div style="font-family:-apple-system,Segoe UI,Roboto,Helvetica,Arial,sans-serif;` +
-    `font-size:15px;line-height:1.6;color:#0b0f14;max-width:560px;">\n` +
-    `${body}\n` +
-    `${footerHtml(unsubUrl)}\n` +
-    `</div>`
+    `<tr><td style="padding:22px 32px 18px;border-bottom:1px solid ${HAIR};">` +
+    `<table role="presentation" cellpadding="0" cellspacing="0"><tr>` +
+    `<td style="vertical-align:middle;padding-right:10px;">` +
+    `<img src="${escapeAttr(logo)}" alt="" width="34" height="30" ` +
+    `style="display:block;border:0;height:30px;width:auto;">` +
+    `</td>` +
+    `<td style="vertical-align:middle;font-family:${FONT_STACK};font-size:19px;` +
+    `font-weight:800;color:${INK};letter-spacing:-.2px;">QuoteFleet</td>` +
+    `</tr></table>` +
+    `</td></tr>`
+  );
+}
+
+/** A tasteful, honest product-preview card (no fabricated price). */
+function previewCardHtml(ctx: HtmlContext): string {
+  const laneText = ctx.lane ? escapeHtml(ctx.lane) : 'Your lanes';
+  const mode = escapeHtml(ctx.modeLabel);
+  return (
+    `<tr><td style="padding:4px 32px 8px;">` +
+    `<table role="presentation" width="100%" cellpadding="0" cellspacing="0" ` +
+    `style="background:${PANEL};border:1px solid ${PANEL_BORDER};border-radius:12px;">` +
+    `<tr><td style="padding:16px 18px;font-family:${FONT_STACK};">` +
+    `<div style="font-size:11px;letter-spacing:.6px;text-transform:uppercase;color:${BRAND_BLUE};font-weight:700;">` +
+    `Instant freight estimate</div>` +
+    `<div style="margin-top:9px;font-size:16px;color:${INK};font-weight:600;">${laneText} · ${mode}</div>` +
+    `<div style="margin-top:5px;font-size:13.5px;color:${MUT};line-height:1.5;">` +
+    `Priced in seconds, in ${escapeHtml(ctx.company)}'s branding — while a competitor is still typing up a PDF.` +
+    `</div>` +
+    `</td></tr></table>` +
+    `</td></tr>`
+  );
+}
+
+/** Bulletproof CTA button linking to the prospect's own branded demo. */
+function ctaHtml(ctx: HtmlContext): string {
+  const label = `See ${escapeHtml(ctx.company)}'s live demo &rarr;`;
+  return (
+    `<tr><td style="padding:20px 32px 6px;">` +
+    `<table role="presentation" cellpadding="0" cellspacing="0"><tr>` +
+    `<td style="border-radius:10px;background:${BRAND_BLUE};">` +
+    `<a href="${escapeAttr(ctx.demoUrl)}" ` +
+    `style="display:inline-block;padding:14px 28px;font-family:${FONT_STACK};font-size:15px;` +
+    `font-weight:700;color:#ffffff;text-decoration:none;border-radius:10px;">${label}</a>` +
+    `</td></tr></table>` +
+    `<div style="margin-top:10px;font-family:${FONT_STACK};font-size:13px;color:${MUT};">` +
+    `Takes 2 minutes — no signup needed to look.</div>` +
+    `</td></tr>`
+  );
+}
+
+/** Founder signature row. */
+function signatureHtml(): string {
+  return (
+    `<tr><td style="padding:18px 32px 26px;font-family:${FONT_STACK};font-size:14.5px;color:${INK};line-height:1.5;">` +
+    `<div>&mdash; ${escapeHtml(SENDER_PERSON)}</div>` +
+    `<div style="color:${MUT};font-size:13px;">${escapeHtml(SENDER_TITLE)}</div>` +
+    `</td></tr>`
+  );
+}
+
+/** Assemble the full branded HTML email (bulletproof table layout, inline styles). */
+function assembleHtml(paragraphs: string[], ctx: HtmlContext): string {
+  const body = paragraphs
+    .map(
+      (p) =>
+        `<p style="margin:0 0 15px 0;">${linkifyDemo(escapeHtml(p), ctx.demoUrl)}</p>`,
+    )
+    .join('\n');
+  const preheader =
+    `Instant, branded freight quotes for ${escapeHtml(ctx.company)} — see the live demo we built.`;
+  return (
+    // Hidden preheader (inbox preview line)
+    `<div style="display:none;max-height:0;overflow:hidden;opacity:0;mso-hide:all;">${preheader}</div>\n` +
+    `<table role="presentation" width="100%" cellpadding="0" cellspacing="0" ` +
+    `style="background:#f4f5f7;margin:0;padding:24px 12px;">\n` +
+    `<tr><td align="center">\n` +
+    `<table role="presentation" width="600" cellpadding="0" cellspacing="0" ` +
+    `style="width:600px;max-width:600px;background:#ffffff;border:1px solid #e5e7eb;` +
+    `border-radius:14px;overflow:hidden;">\n` +
+    headerHtml(ctx.publicBaseUrl) +
+    `<tr><td style="padding:26px 32px 6px;font-family:${FONT_STACK};font-size:15.5px;` +
+    `line-height:1.62;color:${INK};">\n${body}\n</td></tr>\n` +
+    previewCardHtml(ctx) +
+    ctaHtml(ctx) +
+    signatureHtml() +
+    footerHtml(ctx.unsubUrl, ctx.company) +
+    `</table>\n` +
+    `<div style="font-family:${FONT_STACK};font-size:11px;color:#b0b8c4;padding:14px;">` +
+    `QuoteFleet &middot; instant branded freight quotes for carriers</div>\n` +
+    `</td></tr>\n</table>`
   );
 }
 
@@ -343,7 +455,14 @@ export async function draftOutreachEmail(
   }
 
   const paragraphs = toParagraphs(bodyText);
-  const bodyHtml = assembleHtml(paragraphs, demoUrl, unsubUrl);
+  const bodyHtml = assembleHtml(paragraphs, {
+    demoUrl,
+    unsubUrl,
+    company: companyDisplayName(profile),
+    modeLabel: primaryModeLabel(profile),
+    lane: primaryLane(profile),
+    publicBaseUrl,
+  });
   const finalText = assembleText(paragraphs, unsubUrl);
 
   return { subject, bodyHtml, bodyText: finalText, unsubscribeToken, aiGenerated };
