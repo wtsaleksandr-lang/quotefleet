@@ -1428,6 +1428,79 @@ export const outreachEmails = pgTable(
 );
 
 // ────────────────────────────────────────────────────────────────────
+// BROKER LEADS — FMCSA property-broker prospect list (outreach pipeline).
+//
+// Each row is one active US freight BROKER ingested from FMCSA's free public
+// data: the L&I / Licensing-&-Insurance Carrier file supplies the operating
+// authority (broker_stat='A' + property_chk='Y') and the docket/MC number, and
+// the Company Census file supplies the e-mail address + power units. Populated
+// by scripts/ingestFmcsaCensus.ts and read/written ONLY through
+// src/server/outreach/leadStore.ts.
+//
+// Like prospect_demos / inbound_prospects / outreach_emails, this table is
+// DELIBERATELY ISOLATED: it NEVER references tenants / users / the tenant-scoped
+// `leads` table, so an outreach prospect stays out of MRR, trials, quota, and
+// every tenant list by construction. (Named `broker_leads`, not `leads`, because
+// `leads` above is the tenant-scoped end-customer quote-request table.)
+//
+//   mc_number        — L&I docket_number (e.g. "MC012892"); UNIQUE dedupe key.
+//   dot_number       — USDOT number (census/L&I join key, leading zeros stripped).
+//   legal_name/dba   — from L&I / census.
+//   phone, addr_*    — physical business contact from L&I/census.
+//   census_email     — email_address from the Census file (may be null).
+//   resolved_domain  — apex resolved from the email / a later web step (null now).
+//   resolved_email   — best send-to address after resolution (null now).
+//   email_source     — where resolved_email came from ('census' | 'web' | …).
+//   email_verified   — set once an address passes verification (false until then).
+//   power_units      — census power_units (fleet-size proxy).
+//   segment          — 'broker' (this ingest); reserved for future segments.
+//   demo_token       — prospect_demos token minted for this lead, if any.
+//   outreach_email_id— FK-by-value to outreach_emails.id once a draft exists.
+//   status           — pipeline state (default 'new').
+// ────────────────────────────────────────────────────────────────────
+export const brokerLeads = pgTable(
+  'broker_leads',
+  {
+    id: serial('id').primaryKey(),
+    /** L&I docket number (e.g. "MC012892") — UNIQUE dedupe key for re-runs. */
+    mcNumber: text('mc_number'),
+    /** USDOT number, leading zeros stripped so it joins census ⇄ L&I. */
+    dotNumber: text('dot_number'),
+    legalName: text('legal_name').notNull(),
+    dbaName: text('dba_name'),
+    phone: text('phone'),
+    addrStreet: text('addr_street'),
+    addrCity: text('addr_city'),
+    addrState: text('addr_state'),
+    addrZip: text('addr_zip'),
+    /** Email captured from the FMCSA Census file (`email_address`); may be null. */
+    censusEmail: text('census_email'),
+    /** Apex domain resolved from the email / a later enrichment step. */
+    resolvedDomain: text('resolved_domain'),
+    /** Best send-to address after resolution (null until an outreach phase runs). */
+    resolvedEmail: text('resolved_email'),
+    /** Provenance of resolvedEmail: 'census' | 'web' | 'manual' | … */
+    emailSource: text('email_source'),
+    emailVerified: boolean('email_verified').notNull().default(false),
+    /** Census power_units — a fleet-size proxy. */
+    powerUnits: integer('power_units'),
+    segment: text('segment').notNull().default('broker'),
+    /** prospect_demos token minted for this lead's branded demo, if any. */
+    demoToken: text('demo_token'),
+    /** FK-by-value to outreach_emails.id once a draft/send exists. */
+    outreachEmailId: integer('outreach_email_id'),
+    status: text('status').notNull().default('new'),
+    createdAt: timestamp('created_at', { mode: 'date' }).notNull().defaultNow(),
+    updatedAt: timestamp('updated_at', { mode: 'date' }).notNull().defaultNow(),
+  },
+  (t) => [
+    // Nullable-unique: PG allows many NULLs, so a lead without an MC number
+    // doesn't collide, while a present MC number dedupes an idempotent re-ingest.
+    uniqueIndex('broker_leads_mc_number_idx').on(t.mcNumber),
+  ]
+);
+
+// ────────────────────────────────────────────────────────────────────
 // Type helpers for use in the rest of the codebase.
 // ────────────────────────────────────────────────────────────────────
 export type Tenant = typeof tenants.$inferSelect;
@@ -1449,6 +1522,8 @@ export type AiConfig = typeof aiConfigs.$inferSelect;
 export type BrandConfig = typeof brandConfigs.$inferSelect;
 export type Lead = typeof leads.$inferSelect;
 export type NewLead = typeof leads.$inferInsert;
+export type BrokerLead = typeof brokerLeads.$inferSelect;
+export type NewBrokerLead = typeof brokerLeads.$inferInsert;
 export type CallbackRequest = typeof callbackRequests.$inferSelect;
 export type NewCallbackRequest = typeof callbackRequests.$inferInsert;
 export type Conversation = typeof conversations.$inferSelect;
