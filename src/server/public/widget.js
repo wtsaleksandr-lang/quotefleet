@@ -1848,10 +1848,21 @@
     });
     injected.push(copyLink);
 
-    // "Print / PDF" — reuse the widget's print path (the browser dialog also
-    // saves a PDF copy). Always available, not gated on share.
-    var printLink = el('button', { type: 'button', class: 'qf-textlink qf-share-print', text: 'Print / PDF' });
-    printLink.addEventListener('click', function () { if (typeof window.qfPrintQuote === 'function') window.qfPrintQuote(); else window.print(); });
+    // "Download PDF" — one click → the server-rendered branded PDF file (no
+    // browser print dialog). Always available, not gated on share. Uses a
+    // download anchor so the attachment saves without navigating the widget.
+    var printLink = el('button', { type: 'button', class: 'qf-textlink qf-share-print', text: 'Download PDF' });
+    printLink.addEventListener('click', function () {
+      if (!state.refId) { if (typeof window.qfPrintQuote === 'function') window.qfPrintQuote(); else window.print(); return; }
+      var pdfUrl = withGrant('/api/public/quote-doc/' + encodeURIComponent(state.refId) + '/pdf');
+      var a = document.createElement('a');
+      a.href = pdfUrl;
+      a.download = 'quote-' + state.refId + '.pdf';
+      a.rel = 'noopener';
+      document.body.appendChild(a);
+      a.click();
+      setTimeout(function () { if (a.parentNode) a.parentNode.removeChild(a); }, 0);
+    });
     injected.push(printLink);
 
     // Prepend the injected links (each trailed by a middot) to the FRONT of the

@@ -310,11 +310,13 @@
 
   function wireActions(data) {
     $('qdoc-print').onclick = function () { window.print(); };
-    $('qdoc-pdf').onclick = function () { window.print(); };
-    // Deep-link auto-print: the widget's "Download PDF" action opens this page
-    // with ?print=1 to trigger the browser's Save-as-PDF dialog on the branded
-    // quote doc (no server-side PDF renderer is a dependency). Fires once the
-    // doc has rendered so the print captures the full quote.
+    // "Download PDF" — one click → the server-rendered branded PDF file. Streams
+    // from GET /api/public/quote-doc/:refId/pdf (Content-Disposition: attachment),
+    // preserving any ?key= access grant on the current URL so a private quote's
+    // PDF stays gated. Falls back to window.print() if the ref is unknown.
+    $('qdoc-pdf').onclick = function () { downloadPdf(data); };
+    // Legacy deep-link (?print=1) still triggers the browser print dialog for
+    // any old widget builds that open the hosted quote to save a PDF.
     try {
       if (new URLSearchParams(location.search).get('print') === '1') {
         setTimeout(function () { window.print(); }, 400);
@@ -378,6 +380,22 @@
       var acceptSend = $('qdoc-accept-send');
       if (acceptSend) acceptSend.onclick = function () { sendAccept(data); };
     }
+  }
+
+  function downloadPdf(data) {
+    var ref = (data && data.quote && data.quote.refId) || refId;
+    if (!ref) { window.print(); return; }
+    // Carry a ?key= access grant (private calculators) through to the PDF route.
+    var key = '';
+    try { key = new URLSearchParams(location.search).get('key') || ''; } catch (e) {}
+    var url = '/api/public/quote-doc/' + encodeURIComponent(ref) + '/pdf' + (key ? '?key=' + encodeURIComponent(key) : '');
+    var a = document.createElement('a');
+    a.href = url;
+    a.download = 'quote-' + ref + '.pdf';
+    a.rel = 'noopener';
+    document.body.appendChild(a);
+    a.click();
+    setTimeout(function () { if (a.parentNode) a.parentNode.removeChild(a); }, 0);
   }
 
   function sendAccept(data) {
