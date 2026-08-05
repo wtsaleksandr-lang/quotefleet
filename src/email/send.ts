@@ -99,6 +99,13 @@ export interface EmailAttachment {
   /** Base64-encoded file content (no `data:` prefix). */
   contentBase64: string;
   contentType?: string;
+  /** Content-ID for an INLINE (embedded) attachment, referenced from the HTML as
+   *  `<img src="cid:<contentId>">`. Set (with `inline`) to embed a branded quote
+   *  screenshot that renders in Outlook, which blocks external images. */
+  contentId?: string;
+  /** Mark this attachment `inline` (Content-Disposition: inline) rather than a
+   *  downloadable `attachment`. Implied whenever `contentId` is set. */
+  inline?: boolean;
 }
 
 export interface EmailIn {
@@ -207,9 +214,22 @@ export async function sendEmail(msg: EmailIn): Promise<EmailOut> {
           // List-Unsubscribe (marketing) + In-Reply-To/References (threaded
           // reply) + any caller headers, merged; omitted when none apply.
           ...(outHeaders ? { headers: outHeaders } : {}),
-          // Resend takes base64 in `content`.
+          // Resend takes base64 in `content`. Inline images carry `content_id`
+          // (referenced via `cid:` in the HTML) + `disposition:'inline'` so they
+          // render embedded (Outlook-safe) rather than as a download.
           ...(msg.attachments?.length
-            ? { attachments: msg.attachments.map((a) => ({ filename: a.filename, content: a.contentBase64 })) }
+            ? {
+                attachments: msg.attachments.map((a) => {
+                  const inline = a.inline || !!a.contentId;
+                  return {
+                    filename: a.filename,
+                    content: a.contentBase64,
+                    ...(a.contentType ? { content_type: a.contentType } : {}),
+                    ...(a.contentId ? { content_id: a.contentId } : {}),
+                    ...(inline ? { disposition: 'inline' as const } : {}),
+                  };
+                }),
+              }
             : {}),
         }),
       });
@@ -246,13 +266,15 @@ export async function sendEmail(msg: EmailIn): Promise<EmailOut> {
         // List-Unsubscribe (marketing) + In-Reply-To/References (threaded
         // reply) + any caller headers, merged; omitted when none apply.
         ...(outHeaders ? { headers: outHeaders } : {}),
-        // Nodemailer takes a Buffer.
+        // Nodemailer takes a Buffer. Passing `cid` makes the attachment inline
+        // (Content-ID + inline disposition) so `<img src="cid:...">` resolves.
         ...(msg.attachments?.length
           ? {
               attachments: msg.attachments.map((a) => ({
                 filename: a.filename,
                 content: Buffer.from(a.contentBase64, 'base64'),
                 contentType: a.contentType,
+                ...(a.contentId ? { cid: a.contentId } : {}),
               })),
             }
           : {}),

@@ -13,6 +13,8 @@ import {
   draftOutreachEmail,
   buildTemplateEmail,
   countSentences,
+  assertNoLeak,
+  hasColdLeak,
   SENDER_ADDRESS,
   SENDER_NAME,
   type DraftEmailOpts,
@@ -233,6 +235,111 @@ describe('draftOutreachEmail — embedded branded-quote image', () => {
     });
     expect(draft.bodyHtml).toContain('Instant freight estimate');
     expect(draft.bodyHtml).not.toContain('<img src="https://cdn.example.com');
+  });
+});
+
+describe('draftOutreachEmail — CID-embedded screenshot (Outlook-safe)', () => {
+  const IMG = 'https://cdn.example.com/demo-shot/abc123XYZ.png';
+
+  it('embedImageCid:true → references cid:quoteshot and NOT the remote URL', async () => {
+    const body = `Opener about Acme Drayage.\n\nPreview — ${DEMO_URL}.`;
+    const draft = await draftOutreachEmail(acmeProfile(), DEMO_URL, {
+      aiComplete: aiOk('Quotes for Acme Drayage', body),
+      anthropicKey: 'sk-test',
+      publicBaseUrl: BASE,
+      previewImageUrl: IMG, // present, but CID must win
+      embedImageCid: true,
+    });
+    expect(draft.bodyHtml).toContain('src="cid:quoteshot"');
+    // The remote demo-shot URL must NOT appear as the image source.
+    expect(draft.bodyHtml).not.toContain(`src="${IMG}"`);
+    // Still wrapped in a link to the demo, with strong brand-specific alt text.
+    expect(draft.bodyHtml).toContain(`href="${DEMO_URL}"`);
+    expect(draft.bodyHtml).toMatch(/alt="[^"]*Acme Drayage[^"]*"/);
+  });
+
+  it('embedImageCid:false (default) → remote URL path unchanged', async () => {
+    const body = `Opener about Acme Drayage.\n\nPreview — ${DEMO_URL}.`;
+    const draft = await draftOutreachEmail(acmeProfile(), DEMO_URL, {
+      aiComplete: aiOk('Quotes for Acme Drayage', body),
+      anthropicKey: 'sk-test',
+      publicBaseUrl: BASE,
+      previewImageUrl: IMG,
+    });
+    expect(draft.bodyHtml).toContain(`src="${IMG}"`);
+    expect(draft.bodyHtml).not.toContain('cid:quoteshot');
+  });
+});
+
+describe('draftOutreachEmail — cold-compliant footer (CAN-SPAM)', () => {
+  it('coldCompliantFooter:true → HTML + text carry the address and a visible unsubscribe link', async () => {
+    const body = `Opener about Acme Drayage.\n\nPreview — ${DEMO_URL}.`;
+    const draft = await draftOutreachEmail(acmeProfile(), DEMO_URL, {
+      aiComplete: aiOk('Quotes for Acme Drayage', body),
+      anthropicKey: 'sk-test',
+      publicBaseUrl: BASE,
+      unsubscribeToken: 'unsub-token-abcdef1234',
+      coldCompliantFooter: true,
+    });
+    const unsubPath = '/outreach/unsubscribe/unsub-token-abcdef1234';
+    for (const doc of [draft.bodyHtml, draft.bodyText]) {
+      expect(doc).toContain(SENDER_ADDRESS);
+      expect(doc).toContain(unsubPath);
+    }
+    // The HTML link is real + labelled "Unsubscribe".
+    expect(draft.bodyHtml).toContain(`href="${BASE}${unsubPath}"`);
+    expect(draft.bodyHtml).toContain('Unsubscribe');
+  });
+
+  it('default (no coldCompliantFooter) → minimal footer, no address, no unsubscribe', async () => {
+    const body = `Opener about Acme Drayage.\n\nPreview — ${DEMO_URL}.`;
+    const draft = await draftOutreachEmail(acmeProfile(), DEMO_URL, {
+      aiComplete: aiOk('Quotes for Acme Drayage', body),
+      anthropicKey: 'sk-test',
+      publicBaseUrl: BASE,
+    });
+    for (const doc of [draft.bodyHtml, draft.bodyText]) {
+      expect(doc).toContain(SENDER_NAME);
+      expect(doc).not.toContain(SENDER_ADDRESS);
+      expect(doc).not.toContain('/outreach/unsubscribe/');
+      expect(doc.toLowerCase()).not.toContain('unsubscribe');
+    }
+  });
+});
+
+describe('assertNoLeak / cold separation guard', () => {
+  it('hasColdLeak flags banned phrases case-insensitively', () => {
+    expect(hasColdLeak('Thanks for Reaching Out about your loads')).toBe(true);
+    expect(hasColdLeak('re: your message from yesterday')).toBe(true);
+    expect(hasColdLeak('We worked together at Access Air')).toBe(true);
+    expect(hasColdLeak('cc ops08@example.com')).toBe(true);
+    expect(hasColdLeak('A clean cold opener about your drayage lanes.')).toBe(false);
+  });
+
+  it('assertNoLeak throws on leaking copy, passes clean cold copy', () => {
+    expect(() => assertNoLeak('Thanks for reaching out — here is your demo')).toThrow(/separation guard/i);
+    expect(() => assertNoLeak('We built you a demo at AccessAir speeds')).toThrow();
+    expect(() =>
+      assertNoLeak('I noticed Acme Drayage runs container drayage — I built you a preview.'),
+    ).not.toThrow();
+  });
+
+  it('cold mode with a LEAKING AI reply never returns leaking text (falls back to clean template)', async () => {
+    const leaking =
+      `Thanks for reaching out about Acme Drayage — following up on your message. ` +
+      `Here is your preview — ${DEMO_URL}.`;
+    const draft = await draftOutreachEmail(acmeProfile(), DEMO_URL, {
+      aiComplete: aiOk('Re: your message', leaking),
+      anthropicKey: 'sk-test',
+      publicBaseUrl: BASE,
+    });
+    // Leaking AI copy rejected → deterministic clean template used.
+    expect(draft.aiGenerated).toBe(false);
+    expect(hasColdLeak(draft.subject)).toBe(false);
+    expect(hasColdLeak(draft.bodyText)).toBe(false);
+    expect(hasColdLeak(draft.bodyHtml)).toBe(false);
+    // And it still carries the prospect's own demo URL.
+    expect(draft.bodyText).toContain(DEMO_URL);
   });
 });
 

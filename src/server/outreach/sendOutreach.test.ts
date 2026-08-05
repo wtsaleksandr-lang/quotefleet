@@ -183,4 +183,44 @@ describe('sendOutreachEmail', () => {
     expect(r.status).toBe('failed');
     expect(send).not.toHaveBeenCalled();
   });
+
+  // ── CID-embedded branded screenshot (Outlook-safe) ────────────────────────
+  it('attaches the quote shot INLINE (cid:quoteshot) when the draft HTML references it', async () => {
+    const row = makeRow({
+      demoToken: 'demo_cid',
+      bodyHtml: '<p>hi</p><img src="cid:quoteshot" alt="Acme calc">',
+    });
+    const store = makeStore([row]);
+    const demoStore = {
+      getQuoteShot: vi.fn(async () => 'QUJDPUJBU0U2NA=='), // stand-in base64 PNG
+    } as unknown as import('./prospectDemoStore.js').ProspectDemoStore;
+    const send = okSend({ ok: true, provider: 'resend', id: 'm1' });
+
+    const r = await sendOutreachEmail({ emailId: 1, to: 'lead@acme.com' }, { store, send, demoStore });
+
+    expect(r.status).toBe('sent');
+    expect((demoStore.getQuoteShot as ReturnType<typeof vi.fn>)).toHaveBeenCalledWith('demo_cid');
+    const msg = send.mock.calls[0][0];
+    expect(msg.attachments).toHaveLength(1);
+    expect(msg.attachments![0]).toMatchObject({
+      filename: 'quote.png',
+      contentBase64: 'QUJDPUJBU0U2NA==',
+      contentType: 'image/png',
+      contentId: 'quoteshot',
+      inline: true,
+    });
+  });
+
+  it('does NOT attach anything when the draft HTML has no cid:quoteshot reference', async () => {
+    const store = makeStore([makeRow({ bodyHtml: '<p>plain remote-image email</p>' })]);
+    const demoStore = {
+      getQuoteShot: vi.fn(async () => 'shouldNotBeFetched'),
+    } as unknown as import('./prospectDemoStore.js').ProspectDemoStore;
+    const send = okSend({ ok: true, provider: 'resend', id: 'm2' });
+
+    await sendOutreachEmail({ emailId: 1, to: 'lead@acme.com' }, { store, send, demoStore });
+
+    expect((demoStore.getQuoteShot as ReturnType<typeof vi.fn>)).not.toHaveBeenCalled();
+    expect(send.mock.calls[0][0].attachments).toBeUndefined();
+  });
 });

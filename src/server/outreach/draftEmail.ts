@@ -88,6 +88,17 @@ export interface DraftEmailOpts {
    *  replying to. `subject` drives the "Re: …" reply subject; `senderName`
    *  lets the opener greet them by name when known. */
   inboundContext?: { subject: string; senderName?: string };
+  /** COLD, at-scale sends only: embed the branded quote screenshot via a
+   *  `cid:quoteshot` reference instead of a remote `<img src=URL>`. The inline
+   *  attachment is added at SEND time (see sendOutreachEmail). CID images render
+   *  in Outlook, which blocks external images by default. Default false keeps the
+   *  remote-URL path for founder one-offs / preview. */
+  embedImageCid?: boolean;
+  /** COLD, at-scale sends only: render a small VISIBLE CAN-SPAM footer — sender
+   *  identity + physical mailing address + a working Unsubscribe link — in BOTH
+   *  the HTML and plaintext. Default false keeps the minimal founder-style chrome
+   *  (identity only) for warm/one-off sends, which are compliance-exempt. */
+  coldCompliantFooter?: boolean;
 }
 
 export interface DraftedEmail {
@@ -139,6 +150,49 @@ function primaryPain(profile: CompanyProfile): string {
   return p?.trim() || 'quoting by hand means shippers wait — and the first carrier to reply usually wins the load';
 }
 
+// ─── Cold-outreach leak guard (QuoteFleet ⊥ Access Air separation rule) ────
+/**
+ * Phrases that must NEVER appear in a COLD first-touch email. Cold outreach has
+ * had no prior contact, so any "you emailed us / thanks for reaching out /
+ * following up" wording is a factual lie AND leaks the warm-reply / Access-Air
+ * context across the hard separation boundary. Matched case-insensitively as
+ * substrings. (Warm-reply mode legitimately says "thanks for reaching out" — the
+ * guard is wired ONLY into the cold path.)
+ */
+export const COLD_LEAK_PATTERNS: readonly string[] = [
+  'thanks for reaching out',
+  'reaching out',
+  'you emailed',
+  'you reached out',
+  'your message',
+  'following up',
+  'access air',
+  'accessair',
+  'ops08',
+];
+
+/** True when `text` contains any banned cold-outreach phrase (case-insensitive). */
+export function hasColdLeak(text: string): boolean {
+  const hay = String(text ?? '').toLowerCase();
+  return COLD_LEAK_PATTERNS.some((p) => hay.includes(p));
+}
+
+/**
+ * Belt-and-suspenders separation guard for COLD copy. Throws if `text` (subject
+ * + body) contains any banned phrase, so a leaking draft is never persisted or
+ * sent — even if the AI slips past the accept-time filter.
+ */
+export function assertNoLeak(text: string): void {
+  const hay = String(text ?? '').toLowerCase();
+  for (const p of COLD_LEAK_PATTERNS) {
+    if (hay.includes(p)) {
+      throw new Error(
+        `[draftEmail] cold-outreach separation guard tripped: banned phrase "${p}" present`,
+      );
+    }
+  }
+}
+
 // ─── Footer builders ──────────────────────────────────────────────────────
 // Per product decision (2026-08): the outreach email carries NO visible mailing
 // address and NO visible unsubscribe link in the body — it's a founder-style
@@ -159,6 +213,41 @@ function footerHtml(): string {
     `<span style="font-weight:700;color:${MUT};letter-spacing:.2px;">${escapeHtml(SENDER_NAME)}</span>` +
     ` &middot; Instant, branded freight quotes for carriers.` +
     `</td></tr>`
+  );
+}
+
+/** Build the RFC 8058 / body one-click unsubscribe URL for a token. Mirrors the
+ *  send path's `unsubscribeUrl` so the visible link matches the header link. */
+function unsubscribeUrl(base: string, token: string): string {
+  return `${(base || '').replace(/\/$/, '')}/outreach/unsubscribe/${token}`;
+}
+
+/**
+ * COLD-COMPLIANT footer (CAN-SPAM / CASL): a small but VISIBLE row carrying the
+ * sender identity, the real physical mailing address, and a working Unsubscribe
+ * link. Legally required for cold B2B blasts — the batch runner passes
+ * coldCompliantFooter:true; warm/founder one-offs keep the minimal chrome.
+ */
+function coldFooterHtml(ctx: HtmlContext): string {
+  const unsub = unsubscribeUrl(ctx.publicBaseUrl, ctx.unsubscribeToken);
+  return (
+    `<tr><td style="padding:16px 32px 24px;background:#fafbfc;border-top:1px solid ${HAIR};` +
+    `font-family:${FONT_STACK};font-size:12px;line-height:1.6;color:${FAINT};">` +
+    `<span style="font-weight:700;color:${MUT};letter-spacing:.2px;">${escapeHtml(SENDER_NAME)}</span>` +
+    ` &middot; ${escapeHtml(SENDER_ADDRESS)}` +
+    ` &middot; <a href="${escapeAttr(unsub)}" style="color:${MUT};text-decoration:underline;">Unsubscribe</a>` +
+    `</td></tr>`
+  );
+}
+
+/** Plaintext cold-compliant sign-off: signature + identity + physical address +
+ *  a working unsubscribe URL (mirrors coldFooterHtml). */
+function coldFooterText(ctx: HtmlContext): string {
+  const unsub = unsubscribeUrl(ctx.publicBaseUrl, ctx.unsubscribeToken);
+  return (
+    `— ${SENDER_PERSON}\n${SENDER_TITLE}\n\n` +
+    `${SENDER_NAME} · ${SENDER_ADDRESS}\n` +
+    `Unsubscribe: ${unsub}`
   );
 }
 
@@ -208,6 +297,13 @@ interface HtmlContext {
   /** Absolute URL of a pre-rendered screenshot of THIS prospect's branded quote.
    *  When present, it replaces the text preview card with a clickable image. */
   previewImageUrl?: string;
+  /** COLD sends: reference the screenshot via `cid:quoteshot` (inline attachment
+   *  added at send time) instead of the remote URL, so Outlook renders it. */
+  embedImageCid?: boolean;
+  /** COLD sends: render the visible CAN-SPAM footer (address + unsubscribe). */
+  coldCompliantFooter?: boolean;
+  /** Per-recipient unsubscribe token — powers the visible cold footer link. */
+  unsubscribeToken: string;
 }
 
 /** Brand lockup header — hosted mark + text wordmark (legible even if images blocked). */
@@ -254,11 +350,16 @@ function previewCardHtml(ctx: HtmlContext): string {
  * (the CTA button below still carries the click).
  */
 function previewImageHtml(ctx: HtmlContext): string {
-  const alt = `${ctx.company}'s instant freight quote — tap to try it live`;
+  // Strong, brand-specific alt — this is what Outlook shows while images are
+  // still blocked (before the recipient clicks "download images").
+  const alt = `${ctx.company}'s instant-quote calculator — live rate in seconds`;
+  // CID reference renders in Outlook (external images blocked); the remote URL
+  // renders in Gmail/Apple Mail. embedImageCid wins when set.
+  const src = ctx.embedImageCid ? 'cid:quoteshot' : ctx.previewImageUrl!;
   return (
     `<tr><td style="padding:6px 32px 4px;">` +
     `<a href="${escapeAttr(ctx.demoUrl)}" style="text-decoration:none;display:block;" target="_blank">` +
-    `<img src="${escapeAttr(ctx.previewImageUrl!)}" alt="${escapeAttr(alt)}" width="536" ` +
+    `<img src="${escapeAttr(src)}" alt="${escapeAttr(alt)}" width="536" ` +
     `style="display:block;width:100%;max-width:536px;height:auto;border:1px solid ${PANEL_BORDER};` +
     `border-radius:12px;">` +
     `<div style="margin-top:8px;font-family:${FONT_STACK};font-size:12.5px;color:${BRAND_BLUE};` +
@@ -317,18 +418,20 @@ function assembleHtml(paragraphs: string[], ctx: HtmlContext): string {
     headerHtml(ctx.publicBaseUrl) +
     `<tr><td style="padding:26px 32px 6px;font-family:${FONT_STACK};font-size:15.5px;` +
     `line-height:1.62;color:${INK};">\n${body}\n</td></tr>\n` +
-    (ctx.previewImageUrl ? previewImageHtml(ctx) : previewCardHtml(ctx)) +
+    (ctx.previewImageUrl || ctx.embedImageCid ? previewImageHtml(ctx) : previewCardHtml(ctx)) +
     ctaHtml(ctx) +
     signatureHtml() +
-    footerHtml() +
+    (ctx.coldCompliantFooter ? coldFooterHtml(ctx) : footerHtml()) +
     `</table>\n` +
     `</td></tr>\n</table>`
   );
 }
 
-/** Assemble the plaintext version from paragraphs + the sign-off. */
-function assembleText(paragraphs: string[]): string {
-  return `${paragraphs.join('\n\n')}\n\n${footerText()}`;
+/** Assemble the plaintext version from paragraphs + the sign-off. Cold sends get
+ *  the visible CAN-SPAM footer (address + unsubscribe); others the minimal one. */
+function assembleText(paragraphs: string[], ctx: HtmlContext): string {
+  const footer = ctx.coldCompliantFooter ? coldFooterText(ctx) : footerText();
+  return `${paragraphs.join('\n\n')}\n\n${footer}`;
 }
 
 // ─── Reply-subject helper (warm-reply mode) ────────────────────────────────
@@ -562,8 +665,11 @@ export async function draftOutreachEmail(
       const s = typeof parsed?.subject === 'string' ? parsed.subject.trim() : '';
       const b = typeof parsed?.bodyText === 'string' ? parsed.bodyText.trim() : '';
       // Only accept the AI copy if it's usable AND actually contains the demo
-      // URL (so the prospect always gets their own preview link).
-      if (s && b && b.includes(demoUrl)) {
+      // URL (so the prospect always gets their own preview link). In COLD mode
+      // also reject copy that trips the separation guard (prior-contact / Access
+      // Air wording) so a leaking draft falls back to the clean template.
+      const leaks = mode === 'cold' && (hasColdLeak(s) || hasColdLeak(b));
+      if (s && b && b.includes(demoUrl) && !leaks) {
         subject = s;
         bodyText = b;
         aiGenerated = true;
@@ -589,16 +695,27 @@ export async function draftOutreachEmail(
     subject = buildReplySubject(inboundContext?.subject ?? '');
   }
 
-  const paragraphs = toParagraphs(bodyText);
-  const bodyHtml = assembleHtml(paragraphs, {
+  // COLD separation guard (belt-and-suspenders): even after the accept-time
+  // filter + the clean template fallback, never let a leaking cold draft leave
+  // this function. Throws so a leaking draft is never persisted or sent.
+  if (mode === 'cold') {
+    assertNoLeak(`${subject}\n${bodyText}`);
+  }
+
+  const ctx: HtmlContext = {
     demoUrl,
     company: companyDisplayName(profile),
     modeLabel: primaryModeLabel(profile),
     lane: primaryLane(profile),
     publicBaseUrl,
     previewImageUrl: opts.previewImageUrl,
-  });
-  const finalText = assembleText(paragraphs);
+    embedImageCid: opts.embedImageCid,
+    coldCompliantFooter: opts.coldCompliantFooter,
+    unsubscribeToken,
+  };
+  const paragraphs = toParagraphs(bodyText);
+  const bodyHtml = assembleHtml(paragraphs, ctx);
+  const finalText = assembleText(paragraphs, ctx);
 
   return { subject, bodyHtml, bodyText: finalText, unsubscribeToken, aiGenerated };
 }
