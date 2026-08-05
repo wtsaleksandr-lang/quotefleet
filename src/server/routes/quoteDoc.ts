@@ -12,6 +12,8 @@ import { loadCarrierProfile } from './carrierProfile.js';
 import { customerFacingLines } from '../../calc/engine.js';
 import { resolveQuoteDisclaimer } from '../quoteDisclaimer.js';
 import { estimateTransit } from '../../calc/transit.js';
+import { canUseProFeature } from '../plans.js';
+import { buildQuotePdf, type QuotePdfLine } from '../quotePdf.js';
 
 const QUOTE_VALIDITY_DAYS = 30;
 
@@ -300,6 +302,158 @@ function locationBlock(prefix: 'pickup' | 'delivery', lead: typeof leads.$inferS
   };
 }
 
+/** Max logo bytes we'll pull into a PDF (keeps a hostile/huge asset from
+ *  bloating the response or memory). 2 MB is ample for a header logo. */
+const MAX_LOGO_BYTES = 2 * 1024 * 1024;
+/** How long we wait on the tenant's logo host before giving up and rendering
+ *  the name-only header. Never blocks the PDF on a slow/broken asset. */
+const LOGO_FETCH_TIMEOUT_MS = 4000;
+
+/**
+ * Fetch a tenant logo as embeddable PDF image bytes, or null. PDFKit embeds
+ * only PNG/JPEG, so we require an image/png|jpeg content-type; anything else
+ * (SVG, WebP, HTML error page, non-2xx, timeout, oversize) yields null and the
+ * PDF header falls back to the company name. Never throws.
+ */
+export async function fetchLogoBytes(url: string): Promise<Buffer | null> {
+  const src = String(url ?? '').trim();
+  if (!/^https?:\/\//i.test(src)) return null;
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), LOGO_FETCH_TIMEOUT_MS);
+  try {
+    const resp = await fetch(src, { signal: controller.signal, redirect: 'follow' });
+    if (!resp.ok) return null;
+    const type = (resp.headers.get('content-type') || '').toLowerCase();
+    if (!/^image\/(png|jpe?g)/.test(type)) return null;
+    const buf = Buffer.from(await resp.arrayBuffer());
+    if (buf.length === 0 || buf.length > MAX_LOGO_BYTES) return null;
+    return buf;
+  } catch {
+    return null;
+  } finally {
+    clearTimeout(timer);
+  }
+}
+
+export interface QuotePdfDelivery {
+  status: number;
+  /** The PDF bytes on success; absent on any non-200. */
+  buffer?: Buffer;
+  /** Sanitized attachment filename (`quote-<refId>.pdf`) on success. */
+  filename?: string;
+  /** True when the "Powered by QuoteFleet" badge was drawn (non-Pro tenants). */
+  hasBadge?: boolean;
+  /** Error body on any non-200. */
+  json?: Record<string, unknown>;
+}
+
+/**
+ * Build the branded quote PDF for a public refId. Pure business logic (no
+ * req/res) so it's unit-testable; the route wires the private-calculator access
+ * predicate + the real logo fetch. Same access model as GET
+ * /api/public/quote-doc/:refId — tenant-scoped by the unguessable refId,
+ * respects the private-calculator gate. Reuses the exact quote data source
+ * (customerFacingLines / lane / transit / disclaimer) so the PDF matches the
+ * hosted quote + the branded email. Plan gating: Pro (and trialing) tenants get
+ * the un-badged branded PDF; every other tenant gets the SAME document with a
+ * subtle "Powered by QuoteFleet" footer badge — a free tenant is never 500'd.
+ */
+export async function generateQuotePdf(params: {
+  refId: string;
+  checkAccess?: (tenant: typeof tenants.$inferSelect) => Promise<boolean>;
+  fetchLogo?: (url: string) => Promise<Buffer | null>;
+}): Promise<QuotePdfDelivery> {
+  const refId = String(params.refId ?? '').trim();
+  if (!refId) return { status: 400, json: { error: 'Missing refId' } };
+
+  const leadRows = await db().select().from(leads).where(eq(leads.refId, refId)).limit(1);
+  const lead = leadRows[0];
+  if (!lead) return { status: 404, json: { error: 'Quote not found' } };
+
+  const [tenantRows, brandRows, rateCardRows] = await Promise.all([
+    db().select().from(tenants).where(eq(tenants.id, lead.tenantId)).limit(1),
+    db().select().from(brandConfigs).where(eq(brandConfigs.tenantId, lead.tenantId)).limit(1),
+    db().select().from(rateCards).where(eq(rateCards.tenantId, lead.tenantId)),
+  ]);
+  const tenant = tenantRows[0];
+  if (!tenant || tenant.status !== 'active') return { status: 404, json: { error: 'Carrier not found' } };
+
+  // Private-calculator gate — identical to the sibling public quote-doc GET.
+  const checkAccess = params.checkAccess ?? (async () => true);
+  if (!(await checkAccess(tenant))) {
+    return {
+      status: 403,
+      json: {
+        error: 'access_denied',
+        message: 'This calculator is private. Open the access link the company shared with you.',
+      },
+    };
+  }
+
+  const brand = brandRows[0] ?? null;
+
+  // Human service/equipment label — same one the hosted quote shows (carrier's
+  // own rate-card label when present, else the service/equipment codes).
+  const equipmentCard = rateCardRows.find((c) => c.service === lead.service && c.equipment === lead.equipment);
+  const equipmentLabel = equipmentCard?.label
+    ? equipmentCard.label.replace(/\s*\(drayage\)\s*/i, ' ').replace(/\s{2,}/g, ' ').trim()
+    : null;
+  const serviceLabel = equipmentLabel || [lead.service, lead.equipment].filter(Boolean).join(' / ') || null;
+
+  const createdAt = lead.createdAt instanceof Date ? lead.createdAt : new Date(lead.createdAt);
+  const expiresAt = addDays(createdAt, QUOTE_VALIDITY_DAYS);
+
+  const pickup =
+    [lead.pickupCity, lead.pickupState || lead.pickupZip].filter(Boolean).join(', ') || 'Pickup not specified';
+  const delivery =
+    [lead.deliveryCity, lead.deliveryState || lead.deliveryZip].filter(Boolean).join(', ') || 'Delivery not specified';
+
+  // Fold the carrier's margin into the linehaul line (never shown to customers)
+  // — the exact same customer-facing breakdown the hosted quote renders.
+  const breakdown = customerFacingLines(
+    lead.breakdownJson as Parameters<typeof customerFacingLines>[0]
+  ) as QuotePdfLine[];
+
+  // Pre-fetch the logo (PNG/JPEG only) so the pure drawer stays sync + testable.
+  const logoUrl = brand?.logoUrl && String(brand.logoUrl).trim() !== '' ? String(brand.logoUrl).trim() : '';
+  const fetchLogo = params.fetchLogo ?? fetchLogoBytes;
+  const logo = logoUrl ? await fetchLogo(logoUrl) : null;
+
+  // Pro (or trialing) → un-badged branded PDF; everyone else → same doc + badge.
+  const proBranding = canUseProFeature(tenant);
+
+  const { buffer, hasBadge } = await buildQuotePdf({
+    refId: lead.refId,
+    generatedAt: createdAt,
+    expiresAt,
+    currency: lead.quotedCurrency || 'USD',
+    total: lead.quotedTotal ?? 0,
+    distanceMiles: typeof lead.distanceMiles === 'number' ? lead.distanceMiles : null,
+    transitText: estimateTransit(lead.distanceMiles, lead.service)?.text ?? null,
+    lane: { pickup, delivery },
+    service: serviceLabel,
+    breakdown,
+    disclaimer: resolveQuoteDisclaimer(tenant.quoteDisclaimer),
+    carrier: {
+      name: brand?.displayName || tenant.name,
+      phone: tenant.contactPhone,
+      // Public doc — opt-in publicContactEmail only, never the login contactEmail.
+      email: tenant.publicContactEmail ?? null,
+      mcNumber: tenant.mcNumber,
+      dotNumber: tenant.dotNumber,
+    },
+    brand: {
+      primaryColor: brand?.primaryColor ?? '#2563eb',
+      accentColor: brand?.accentColor ?? '#6E8BFF',
+      logo,
+    },
+    proBranding,
+  });
+
+  const safeRef = lead.refId.replace(/[^A-Za-z0-9_-]/g, '') || 'quote';
+  return { status: 200, buffer, filename: `quote-${safeRef}.pdf`, hasBadge };
+}
+
 export function registerQuoteDocRoutes(app: Express) {
   app.get('/api/public/quote-doc/:refId', publicDocLimiter, async (req: Request, res: Response) => {
     const refId = String(req.params.refId ?? '').trim();
@@ -501,6 +655,27 @@ export function registerQuoteDocRoutes(app: Express) {
       checkAccess: (tenant) => tenantAccessAllowed(tenant, req),
     });
     return res.status(result.status).json(result.json);
+  });
+
+  // PUBLIC one-click branded PDF download. Same access surface as the GET
+  // quote-doc above (unguessable refId, tenant-scoped, private-calculator gate),
+  // rate-limited via publicDocLimiter. Streams a server-rendered branded PDF —
+  // NO headless browser on the request path. Pro (+ trialing) tenants get the
+  // un-badged branded document; every other tenant gets the same PDF with a
+  // subtle "Powered by QuoteFleet" footer badge (never a 500 for free).
+  app.get('/api/public/quote-doc/:refId/pdf', publicDocLimiter, async (req: Request, res: Response) => {
+    const result = await generateQuotePdf({
+      refId: String(req.params.refId ?? ''),
+      checkAccess: (tenant) => tenantAccessAllowed(tenant, req),
+    });
+    if (result.status === 200 && result.buffer) {
+      res.setHeader('Content-Type', 'application/pdf');
+      res.setHeader('Content-Disposition', `attachment; filename="${result.filename}"`);
+      res.setHeader('Content-Length', String(result.buffer.length));
+      res.setHeader('Cache-Control', 'private, no-store');
+      return res.status(200).end(result.buffer);
+    }
+    return res.status(result.status).json(result.json ?? { error: 'pdf_failed' });
   });
 }
 
