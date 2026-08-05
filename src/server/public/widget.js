@@ -323,6 +323,11 @@
     // same pickup/delivery) be a gentle "are you sure?" they can proceed past on
     // a second click, instead of a hard block or a silent bad quote.
     acks: {},
+    // True from the moment Calculate is clicked until the price request
+    // settles (success, server error, or network failure). Guards double-
+    // submit (a second click while one is already in flight is ignored) and
+    // lets onCalculate restore the button on every exit path.
+    calcPending: false,
   };
 
   // Apply the FULL resolved theme (preset + optional accent override + font)
@@ -825,16 +830,17 @@
   }
   function updateWeightPlaceholder() { var inp = $('qf-weight'); if (inp) inp.placeholder = weightPlaceholder(); }
 
-  // Soft-confirm gate: when `active`, show `message` and block THIS submit, but
-  // remember the exact situation (`sig`) so an identical resubmit proceeds —
-  // the customer can dismiss the warning by clicking Calculate again. When the
-  // situation clears, the ack resets so it warns afresh next time.
+  // Soft-confirm notice: when `active` and this exact situation (`sig`) hasn't
+  // already been surfaced for `key`, returns `message` so the caller can show
+  // it — informational only, it never blocks pricing (see onCalculate, which
+  // collects these and prices the SAME click regardless). The ack still dedupes
+  // so an unchanged lane doesn't re-nag on every Recalculate; it resets once
+  // the situation clears so it warns afresh next time it applies.
   function softConfirm(key, active, sig, message) {
-    if (!active) { delete state.acks[key]; return false; }
-    if (state.acks[key] === sig) return false;
+    if (!active) { delete state.acks[key]; return null; }
+    if (state.acks[key] === sig) return null;
     state.acks[key] = sig;
-    showError('qf-error', message);
-    return true;
+    return message;
   }
   function newLtlItem() { return { commodity: '', freightType: 'General', qty: '1', length: '', width: '', height: '', dimUnit: 'in', weight: '', wtUnit: 'lb' }; }
   function ensureLtlItem() { if (!state.ltlItems.length) state.ltlItems.push(newLtlItem()); }
@@ -1427,60 +1433,95 @@
   }
 
   function onCalculate(e) {
-    e && e.preventDefault(); showError('qf-error', null); var req = gatherQuoteRequest();
-    if (!req.equipment) { showError('qf-error', 'Please pick an equipment type.'); return; }
+    e && e.preventDefault();
+    // Double-submit guard: a click that lands while a prior calculate is still
+    // in flight (network latency, or a fast second tap) is ignored outright —
+    // it must never stack a second fetch or re-enable/disable the button out
+    // from under the first one.
+    if (state.calcPending) return;
+    showError('qf-error', null);
+    var btn = $('qf-calc-btn'); var oldText = btn ? btn.textContent : '';
+    // Flip to the pending/"Calculating…" state IMMEDIATELY, before any
+    // validation runs. Previously the spinner was only set after every guard
+    // clause had already passed, so a soft-confirm (city-only lane, over-
+    // capacity weight, same pickup/delivery) — the single most common outcome
+    // on a prospect's FIRST attempt, since most people type a city with no ZIP
+    // — showed a small tip and otherwise looked like the click did nothing.
+    // The customer then had to notice the tip, realize it meant "click again",
+    // and re-click to actually see a price. That read as broken. Fixed below:
+    // soft-confirms are now informational only (see softConfirm call sites) —
+    // they still show the tip, but no longer block pricing — so this single
+    // click always ends in either a price or a real (hard) error, never a
+    // silent no-op.
+    state.calcPending = true;
+    if (btn) { btn.disabled = true; btn.innerHTML = '<span class="qf-spinner"></span> &nbsp; Calculating…'; }
+    // Any early return (hard validation failure) must restore the button —
+    // fail() is the single exit path that does that, so every guard below
+    // routes through it instead of a bare showError()+return.
+    function fail(msg) {
+      state.calcPending = false;
+      if (btn) { btn.disabled = false; btn.textContent = oldText; }
+      showError('qf-error', msg);
+    }
+    var req = gatherQuoteRequest();
+    if (!req.equipment) { fail('Please pick an equipment type.'); return; }
     var hasPickup = !!(req.pickup.zip || req.pickup.city || req.pickup.portCode);
-    if (!hasPickup) { showError('qf-error', state.service === 'drayage' ? 'Please pick a pickup port, or enter a pickup ZIP/postal code.' : 'Please enter a pickup city, ZIP, or address.'); return; }
+    if (!hasPickup) { fail(state.service === 'drayage' ? 'Please pick a pickup port, or enter a pickup ZIP/postal code.' : 'Please enter a pickup city, ZIP, or address.'); return; }
     // Symmetric pickup/delivery rule: both sides require a postal code (delivery
     // already did). Previously pickup accepted city-only while delivery didn't —
     // an inconsistency that let one leg be coarse. Drayage pickup is a PORT (not
     // a ZIP), so it is exempt from this check.
     var isDrayagePortPickup = state.service === 'drayage' && !!state.pickupPortCode;
     var pickupZipEl = $('qf-pickup-zip');
-    // City-only pickup/delivery is a SOFT confirm, not a dead-end: the helper
-    // text invites a city, so a city-only entry now WARNS once (ZIP = exact
-    // rate) and quotes on the next click — instead of the primary CTA silently
-    // no-op'ing, which read as broken and killed conversions.
-    if (!req.delivery.zip && !req.delivery.city) { showError('qf-error', 'Please enter a delivery city, ZIP, or address.'); return; }
-    // ONE soft-confirm covering either/both city-only legs → warn once, quote on
-    // the next click (instead of the CTA silently no-op'ing, or stacking two
-    // separate warnings that took three clicks to clear).
+    if (!req.delivery.zip && !req.delivery.city) { fail('Please enter a delivery city, ZIP, or address.'); return; }
+    // Soft-confirm notices (city-only lane, over-capacity weight, same pickup/
+    // delivery) are collected here instead of shown one-at-a-time — each used
+    // to call showError() directly and `return`, so only the FIRST one to
+    // trigger was ever seen and the customer had to click again just to get
+    // PAST the warning to a price. They're informational now: all that apply
+    // are combined into one notice, shown alongside the price, in this same
+    // click. softConfirm() still dedupes per distinct signature via state.acks
+    // so an unchanged lane doesn't re-nag on every Recalculate.
+    var notices = [];
     var cityOnly = (!isDrayagePortPickup && !hasPostalCode(pickupZipEl ? pickupZipEl.value : '', req.pickup)) || !hasPostalCode($('qf-delivery-zip').value, req.delivery);
-    if (softConfirm('cityonly', cityOnly, 'c:' + (req.pickup.zip || req.pickup.city || '') + '>' + (req.delivery.zip || req.delivery.city || ''),
-      'Tip: adding a ZIP gives an exact rate — city-only lanes can vary in large metros. Press Get instant quote again to estimate with what you entered.')) return;
+    var cityOnlyMsg = softConfirm('cityonly', cityOnly, 'c:' + (req.pickup.zip || req.pickup.city || '') + '>' + (req.delivery.zip || req.delivery.city || ''),
+      'Tip: adding a ZIP gives an exact rate — city-only lanes can vary in large metros. We estimated with what you entered.');
+    if (cityOnlyMsg) notices.push(cityOnlyMsg);
     if (req.service === 'ltl') {
       var lt = ltlTotals();
-      if (lt.validItems < 1) { showError('qf-error', 'Add at least one item with its weight and length / width / height so we can determine the freight class.'); return; }
+      if (lt.validItems < 1) { fail('Add at least one item with its weight and length / width / height so we can determine the freight class.'); return; }
     }
-    if (!(req.weightLbs > 0)) { showError('qf-error', req.service === 'ltl' ? 'Enter the shipment weight — LTL is priced by weight and size.' : 'Enter the load weight (lbs).'); return; }
-    if (req.weightLbs > MAX_QUOTABLE_WEIGHT_LBS) { showError('qf-error', 'That weight is over the legal limit for a standard instant quote. For over-legal / oversize loads, please contact us for a custom quote.'); return; }
+    if (!(req.weightLbs > 0)) { fail(req.service === 'ltl' ? 'Enter the shipment weight — LTL is priced by weight and size.' : 'Enter the load weight (lbs).'); return; }
+    if (req.weightLbs > MAX_QUOTABLE_WEIGHT_LBS) { fail('That weight is over the legal limit for a standard instant quote. For over-legal / oversize loads, please contact us for a custom quote.'); return; }
     if (req.service === 'ltl') {
-      if (!(req.lengthIn > 0 && req.widthIn > 0 && req.heightIn > 0)) { showError('qf-error', 'Enter length, width, and height for each item so we can determine the freight class.'); return; }
-      if (req.lengthIn > MAX_LTL_DIM_IN || req.widthIn > MAX_LTL_DIM_IN || req.heightIn > MAX_LTL_DIM_IN) { showError('qf-error', 'Those dimensions look too large for LTL freight. Please double-check length / width / height, or contact us for oversize / full-truckload freight.'); return; }
+      if (!(req.lengthIn > 0 && req.widthIn > 0 && req.heightIn > 0)) { fail('Enter length, width, and height for each item so we can determine the freight class.'); return; }
+      if (req.lengthIn > MAX_LTL_DIM_IN || req.widthIn > MAX_LTL_DIM_IN || req.heightIn > MAX_LTL_DIM_IN) { fail('Those dimensions look too large for LTL freight. Please double-check length / width / height, or contact us for oversize / full-truckload freight.'); return; }
     }
     var oogCheck = $('qf-oog-check');
     if (isOpenTopOrFlatRack(req.equipment) && oogCheck && oogCheck.checked) {
       var hasDims = ($('qf-oog-height').value || $('qf-oog-width').value || $('qf-oog-length').value || $('qf-oog-notes').value || '').trim();
-      if (!hasDims) { showError('qf-error', 'Please add oversize dimensions or notes for open top / flat rack review.'); return; }
+      if (!hasDims) { fail('Please add oversize dimensions or notes for open top / flat rack review.'); return; }
     }
-    // FIX 2 — physically-impossible load: soft-warn when the weight exceeds the
-    // equipment's typical payload capacity (sprinter @ 44,000 lb, hotshot @
-    // 48,000 lb). Not a hard block — a second click quotes anyway.
+    // FIX 2 — physically-impossible load: informational warning when the weight
+    // exceeds the equipment's typical payload capacity (sprinter @ 44,000 lb,
+    // hotshot @ 48,000 lb). Shown, but no longer blocks — quotes the same click.
     var cap = state.service === 'ltl' ? null : equipMaxWeight();
     if (cap != null) {
       var eqKey = state.service + '|' + state.equipment;
-      if (softConfirm('weightcap', req.weightLbs > cap, eqKey + '|' + req.weightLbs,
-        'That weight is above the typical capacity for ' + friendlyEquipmentLabel() + ' (~' + cap.toLocaleString() + ' lb). Consider ' + (EQUIP_UPSIZE[eqKey] || 'a larger equipment type') + ', or contact us for oversize / over-legal freight. Click Calculate again to quote anyway.')) return;
+      var capMsg = softConfirm('weightcap', req.weightLbs > cap, eqKey + '|' + req.weightLbs,
+        'That weight is above the typical capacity for ' + friendlyEquipmentLabel() + ' (~' + cap.toLocaleString() + ' lb). Consider ' + (EQUIP_UPSIZE[eqKey] || 'a larger equipment type') + ', or contact us for oversize / over-legal freight.');
+      if (capMsg) notices.push(capMsg);
     } else { delete state.acks.weightcap; }
-    // FIX 4a — same pickup == delivery ZIP: gentle confirm before pricing at min.
+    // FIX 4a — same pickup == delivery ZIP: informational note, prices anyway.
     var pz = (req.pickup.zip || '').toUpperCase(), dz = (req.delivery.zip || '').toUpperCase();
-    if (softConfirm('sameloc', !!(pz && dz && pz === dz), pz + '|' + dz,
-      'Pickup and delivery look like the same location (' + pz + '). Is that right? Click Calculate again to continue.')) return;
-    var btn = $('qf-calc-btn'); var oldText = btn.textContent; btn.disabled = true; btn.innerHTML = '<span class="qf-spinner"></span> &nbsp; Calculating…';
+    var samelocMsg = softConfirm('sameloc', !!(pz && dz && pz === dz), pz + '|' + dz,
+      'Pickup and delivery look like the same location (' + pz + '). We priced it as entered — let us know if that\'s not right.');
+    if (samelocMsg) notices.push(samelocMsg);
+    if (notices.length) showError('qf-error', notices.join(' '));
     fetch(withGrant('/api/public/quote/' + slug), { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(req) })
       .then(function (r) { return r.json(); })
-      .then(function (resp) { btn.disabled = false; btn.textContent = oldText; if (resp.error) { showError('qf-error', resp.error); return; } if (resp.result && resp.result.unsupported) { showError('qf-error', resp.result.unsupported.reason); return; } state.quote = resp; renderResult(resp); })
-      .catch(function (err) { btn.disabled = false; btn.textContent = oldText; showError('qf-error', 'Network error — please try again.'); console.error(err); });
+      .then(function (resp) { state.calcPending = false; if (btn) { btn.disabled = false; btn.textContent = oldText; } if (resp.error) { showError('qf-error', resp.error); return; } if (resp.result && resp.result.unsupported) { showError('qf-error', resp.result.unsupported.reason); return; } state.quote = resp; renderResult(resp); })
+      .catch(function (err) { state.calcPending = false; if (btn) { btn.disabled = false; btn.textContent = oldText; } showError('qf-error', 'Network error — please try again.'); console.error(err); });
   }
 
   var SERVICE_LABELS = { drayage: 'Drayage', ftl: 'FTL', ltl: 'LTL', expedited: 'Expedite', hotshot: 'Hotshot' };
