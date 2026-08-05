@@ -45,12 +45,27 @@
     if (a) a.setAttribute('href', signup);
   });
 
+  // The light/dark preset pair the calculator switches between. The shell's
+  // day/night toggle drives the SAME brand calculator between a genuinely LIGHT
+  // and a genuinely DARK theme (accent/brand preserved). Kept in sync with the
+  // widget: the config endpoint honours `?preset=` and the widget also applies
+  // it live via postMessage. If these ids change, update DEMO_THEME_PRESET in
+  // src/server/outreach/prospectDemo.ts (the light default) to match.
+  var THEME_PRESET = { light: 'cupertino', dark: 'midnight' };
+  function shellMode() {
+    return document.documentElement.getAttribute('data-theme') === 'light' ? 'light' : 'dark';
+  }
+
   // Live widget iframe → /w/<token>. The widget fetches its config from
   // /api/public/widget/<token>, which the prospect-demo interceptor serves.
   var frame = $('demo-widget');
   if (frame && typeof D.widgetUrl === 'string' && D.widgetUrl) {
     frame.setAttribute('title', company + ' instant freight quote');
-    frame.src = D.widgetUrl;
+    // Load the calculator in the theme the shell restored pre-paint (head
+    // script), so the calculator MATCHES the shell on first paint instead of
+    // always loading the light default under a dark shell (the initial mismatch).
+    var sep = D.widgetUrl.indexOf('?') > -1 ? '&' : '?';
+    frame.src = D.widgetUrl + sep + 'preset=' + encodeURIComponent(THEME_PRESET[shellMode()]);
   }
 
   // Auto-resize to the widget's content height (same postMessage protocol as
@@ -76,6 +91,19 @@
       } else {
         document.documentElement.setAttribute('data-theme', 'light');
         try { localStorage.setItem('qf-theme', 'light'); } catch (e) {}
+      }
+      // Switch the calculator (in its isolated iframe) to match the shell — live,
+      // no reload, so any entered form values are preserved. The widget re-fetches
+      // its config with this preset and re-skins. Same-origin target; the widget
+      // only honours this for a DEMO config, so real embeds are never affected.
+      var mode = shellMode();
+      if (frame && frame.contentWindow) {
+        try {
+          frame.contentWindow.postMessage(
+            { qf: 'theme', mode: mode, preset: THEME_PRESET[mode] },
+            window.location.origin
+          );
+        } catch (e) { /* ignore */ }
       }
     });
   }

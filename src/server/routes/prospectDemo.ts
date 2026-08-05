@@ -92,7 +92,11 @@ export function registerProspectDemoRoutes(app: Express, deps: ProspectDemoRoute
       return next();
     }
     if (!demo) return next();
-    return withLimiter(req, res, () => res.json(buildProspectWidgetConfig(demo!)));
+    // Demo-scoped light/dark preset override (the showcase shell's day/night
+    // toggle). Only ever reaches a prospect_demos token, so real embeds — served
+    // by the tenant route further down the stack — are untouched.
+    const presetOverride = typeof req.query.preset === 'string' ? req.query.preset : null;
+    return withLimiter(req, res, () => res.json(buildProspectWidgetConfig(demo!, presetOverride)));
   });
 
   // ── Compute a quote from the sample rates (no DB write) ────────────────
