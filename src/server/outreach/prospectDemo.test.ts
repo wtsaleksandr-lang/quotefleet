@@ -68,6 +68,17 @@ describe('canonicalMode', () => {
     expect(canonicalMode(null)).toBe('ftl');
     expect(canonicalMode('quantum teleportation')).toBe('ftl');
   });
+
+  it('maps AIR / time-critical phrasings to expedited, not ground hotshot', () => {
+    expect(canonicalMode('air freight')).toBe('expedited');
+    expect(canonicalMode('Expedited')).toBe('expedited');
+    expect(canonicalMode('AOG parts delivery')).toBe('expedited');
+    expect(canonicalMode('next-flight-out courier')).toBe('expedited');
+    expect(canonicalMode('time-critical shipments')).toBe('expedited');
+    expect(canonicalMode('hotshot-air')).toBe('expedited');
+    // plain ground hotshot is unaffected
+    expect(canonicalMode('hotshot')).toBe('hotshot');
+  });
 });
 
 describe('deriveDemoConfig', () => {
@@ -98,6 +109,76 @@ describe('deriveDemoConfig', () => {
   it('detects a Canadian focus from address/lanes', () => {
     const cfg = deriveDemoConfig(profile({ mailingAddress: '50 King St W, Toronto, ON, Canada' }));
     expect(cfg.countryFocus).toBe('CA');
+  });
+});
+
+describe('deriveDemoConfig — AIR / expedited carriers', () => {
+  it('derives expedited + Sprinter/Box Truck for a detected AIR/expedited mode (not ground hotshot)', () => {
+    const cfg = deriveDemoConfig(profile({ tagline: 'Fast freight', serviceModes: ['expedited'] }));
+    expect(cfg.primaryMode).toBe('expedited');
+    expect(cfg.services.map((s) => s.service)).toContain('expedited');
+    const equipIds = cfg.sampleCards.filter((c) => c.service === 'expedited').map((c) => c.equipment);
+    expect(equipIds).toContain('sprinter');
+    expect(equipIds).toContain('box_truck');
+    expect(equipIds).not.toContain('hotshot_40');
+  });
+
+  it('picks up AOG / next-flight-out / courier signals from AI text even when the suggested mode is generic', () => {
+    const p = profile({
+      tagline: 'AOG same-day parts, next-flight-out courier network',
+      ai: {
+        tone: 'urgent',
+        businessSummary: 'They run AOG and next-flight-out courier freight nationwide.',
+        painPoints: [],
+        quoteFleetAngle: 'Sell speed',
+        suggestedCalculator: { mode: 'ftl', fields: [] },
+      },
+      aiAvailable: true,
+    });
+    const cfg = deriveDemoConfig(p);
+    expect(cfg.primaryMode).toBe('expedited');
+  });
+
+  it('does NOT override a clearly drayage carrier even if air-ish text is present elsewhere', () => {
+    const cfg = deriveDemoConfig(
+      profile({ tagline: 'We also do air freight sometimes', serviceModes: ['drayage'] })
+    );
+    expect(cfg.primaryMode).toBe('drayage');
+  });
+
+  it('prices expedited sample cards through the real calc engine', () => {
+    const cfg = deriveDemoConfig(profile({ tagline: 'Fast freight', serviceModes: ['expedited'] }));
+    const r = computeProspectQuote(cfg, {
+      service: 'expedited',
+      equipment: 'sprinter',
+      miles: 400,
+      weightLbs: 1200,
+    } as CalcRequest);
+    expect(r.unsupported).toBeUndefined();
+    expect(r.total).toBeGreaterThan(0);
+  });
+});
+
+describe('deriveDemoBrand — colour confidence', () => {
+  it('discards a low-confidence washed-out grey (falls back to no colour override)', () => {
+    const p = profile({ brandColors: { primary: '#32373c', secondary: null, confidence: 'low' } });
+    const brand = deriveDemoBrand(p);
+    expect(brand.primary).toBeNull();
+    expect(brand.brandColorConfidence).toBe('low');
+  });
+
+  it('keeps a low-confidence colour that is a real hue, just unverified', () => {
+    const p = profile({ brandColors: { primary: '#0477b5', secondary: null, confidence: 'low' } });
+    const brand = deriveDemoBrand(p);
+    expect(brand.primary).toBe('#0477b5');
+    expect(brand.brandColorConfidence).toBe('low');
+  });
+
+  it('never second-guesses a high-confidence colour, even if it is low-saturation', () => {
+    const p = profile({ brandColors: { primary: '#2b3138', secondary: null, confidence: 'high' } });
+    const brand = deriveDemoBrand(p);
+    expect(brand.primary).toBe('#2b3138');
+    expect(brand.brandColorConfidence).toBe('high');
   });
 });
 

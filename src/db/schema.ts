@@ -1250,6 +1250,11 @@ export interface ProspectDemoBrand {
   secondary: string | null;
   logoUrl: string | null;
   companyName: string | null;
+  /** Confidence behind `primary` — 'high' = an explicit brand signal (e.g.
+   *  theme-color meta), 'low' = a best-effort guess (or discarded entirely,
+   *  see deriveDemoBrand). Optional so a later human/vision step can review
+   *  or override low-confidence picks. Absent on older rows. */
+  brandColorConfidence?: 'high' | 'low';
 }
 
 /** One in-memory sample rate card the demo calculator prices against. Mirrors

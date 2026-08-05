@@ -51,7 +51,7 @@ export const DEMO_PORTS: DemoPort[] = [
 
 // ─── Canonical modes + sample rate sets ──────────────────────────────────
 /** The calculator modes we have a bespoke sample-rate set for. */
-export type DemoMode = 'ftl' | 'ltl' | 'drayage' | 'reefer' | 'flatbed' | 'hotshot';
+export type DemoMode = 'ftl' | 'ltl' | 'drayage' | 'reefer' | 'flatbed' | 'hotshot' | 'expedited';
 
 interface DemoServiceSpec {
   service: DemoMode;
@@ -131,7 +131,37 @@ export const SAMPLE_SERVICES: Record<DemoMode, DemoServiceSpec> = {
     ],
     fields: ['pickup', 'delivery', 'weight'],
   },
+  // AIR / time-critical carriers (AOG, next-flight-out, courier, expedited
+  // ground-to-air legs) run Sprinter/Cargo Van + Box Truck, NOT a flatbed
+  // gooseneck — 'hotshot' above is the wrong equipment class for them. This is
+  // the widget-native `expedited` service; ids/labels/rates mirror the
+  // tenant-side defaults in src/calc/defaults.ts so a demo quotes numbers a
+  // real tenant would recognize.
+  expedited: {
+    service: 'expedited',
+    label: 'Expedited / Time-Critical',
+    equipments: [
+      { equipment: 'sprinter', label: 'Sprinter / Cargo Van' },
+      { equipment: 'box_truck', label: "Box Truck (24')" },
+    ],
+    cards: [
+      { service: 'expedited', equipment: 'sprinter', label: 'Sprinter / Cargo Van', ratePerMile: 1.85, minimumCharge: 250, flatFee: 0, fuelSurchargePct: 18, marginPct: 15, maxMiles: 3500, maxWeightLbs: 4000 },
+      { service: 'expedited', equipment: 'box_truck', label: "Box Truck (24')", ratePerMile: 2.20, minimumCharge: 350, flatFee: 0, fuelSurchargePct: 20, marginPct: 15, maxMiles: 3500, maxWeightLbs: 12000 },
+    ],
+    fields: ['pickup', 'delivery', 'weight'],
+  },
 };
+
+/** AIR / time-critical / expedited-freight signals — carriers phrased this way
+ *  belong on the widget-native `expedited` service (Sprinter/Cargo Van + Box
+ *  Truck), never the ground-Hotshot (flatbed gooseneck) equipment class.
+ *  Checked BEFORE the plain-hotshot pattern so "hotshot-air"/"air hotshot"
+ *  route to `expedited`; a bare "hotshot" still falls through to ground
+ *  hotshot below. `\bair\b` alone is included (word-boundaried, so it never
+ *  matches inside "airport"/"chair") because carriers often just list "Air"
+ *  alongside other modes. */
+const AIR_EXPEDITED_RE =
+  /\bair[-\s]?(freight|cargo|charter|courier|logistics)?\b|\bexpedit(?:e|ed|ing|ion)?\b|\baog\b|\bnext[-\s]?flight[-\s]?out\b|\bcourier\b|\btime[-\s]?critical\b|\bhot[-\s]?shot[-\s]?air\b|\bair[-\s]?hot[-\s]?shot\b/i;
 
 /** Map enrichment mode strings (AI-suggested or detected) → a canonical mode we
  *  have sample rates for. Unknown / empty → 'ftl' (the safe universal default). */
@@ -141,7 +171,8 @@ export function canonicalMode(input: string | null | undefined): DemoMode {
   if (/drayage|container|\bport\b|intermodal|transload/.test(s)) return 'drayage';
   if (/reefer|refrigerat|temperature|cold\s*chain/.test(s)) return 'reefer';
   if (/flat\s*bed|flatbed|step\s*deck|stepdeck|conestoga/.test(s)) return 'flatbed';
-  if (/hot\s*shot|hotshot|expedit/.test(s)) return 'hotshot';
+  if (AIR_EXPEDITED_RE.test(s)) return 'expedited';
+  if (/hot\s*shot|hotshot/.test(s)) return 'hotshot';
   if (/\bltl\b|less[-\s]?than/.test(s)) return 'ltl';
   if (/\bftl\b|full[-\s]?truck|truckload|dry\s*van|van\b/.test(s)) return 'ftl';
   return 'ftl';
@@ -157,7 +188,25 @@ export function canonicalMode(input: string | null | undefined): DemoMode {
 export function deriveDemoConfig(profile: CompanyProfile): ProspectDemoConfig {
   const suggested = profile.ai?.suggestedCalculator?.mode;
   const detected = Array.isArray(profile.serviceModes) ? profile.serviceModes : [];
-  const primaryMode = canonicalMode(suggested || detected[0] || 'ftl');
+  let primaryMode = canonicalMode(suggested || detected[0] || 'ftl');
+
+  // Deterministic AIR / time-critical override. canonicalMode() already
+  // catches it when the AI-suggested mode or the FIRST detected mode literally
+  // says "expedited" — but AOG / next-flight-out / courier phrasing usually
+  // shows up elsewhere (tagline, AI summary/angle, other detected modes), so
+  // scan those too before falling back to primaryMode's own reading. Carriers
+  // already read as drayage/reefer/flatbed keep their existing equipment —
+  // this never overrides a clearer, more specific signal.
+  if (primaryMode !== 'drayage' && primaryMode !== 'reefer' && primaryMode !== 'flatbed') {
+    const airHay = [
+      suggested ?? '',
+      ...detected,
+      profile.tagline ?? '',
+      profile.ai?.quoteFleetAngle ?? '',
+      profile.ai?.businessSummary ?? '',
+    ].join(' ');
+    if (AIR_EXPEDITED_RE.test(airHay)) primaryMode = 'expedited';
+  }
 
   // Primary first, then other detected modes we support — deduped, capped at 3
   // so the demo stays focused.
@@ -197,13 +246,57 @@ function inferCountryFocus(profile: CompanyProfile): 'US' | 'CA' {
   return 'US';
 }
 
-/** Brand identity extracted from a profile (persisted as `brand_json`). */
+/** Rough HSL saturation (0-100) for a `#rrggbb` hex — cheap, no colour-lib
+ *  dependency. Returns null for anything that isn't a clean 6-digit hex. */
+function hexSaturationPct(hex: string): number | null {
+  const m = hex.replace(/^#/, '');
+  if (!/^[0-9a-fA-F]{6}$/.test(m)) return null;
+  const r = parseInt(m.slice(0, 2), 16) / 255;
+  const g = parseInt(m.slice(2, 4), 16) / 255;
+  const b = parseInt(m.slice(4, 6), 16) / 255;
+  const max = Math.max(r, g, b);
+  const min = Math.min(r, g, b);
+  if (max === min) return 0;
+  const l = (max + min) / 2;
+  const d = max - min;
+  const s = l > 0.5 ? d / (2 - max - min) : d / (max + min);
+  return Math.round(s * 100);
+}
+
+/** Below this saturation a colour reads as a washed-out grey/neutral rather
+ *  than an intentional brand hue (e.g. the Access Air run's #32373c ≈ 9%). */
+const LOW_SATURATION_GREY_THRESHOLD_PCT = 15;
+
+/** A colour is "unreliable" only when it's BOTH low-confidence (no explicit
+ *  theme-color/tile signal — see enrichCompany's extractBrandColors, which
+ *  already parses those) AND low-saturation: that combination means the only
+ *  thing behind it was an incidental hex pulled from page chrome (nav
+ *  border, hero-photo overlay), not a sampled CTA/nav accent. High-confidence
+ *  colours are NEVER second-guessed here, even if genuinely low-saturation —
+ *  some carriers really do brand on black/graphite. */
+function isUnreliableLowConfidenceGrey(hex: string | null, confidence: 'high' | 'low'): boolean {
+  if (!hex || confidence !== 'low') return false;
+  const sat = hexSaturationPct(hex);
+  return sat !== null && sat < LOW_SATURATION_GREY_THRESHOLD_PCT;
+}
+
+/** Brand identity extracted from a profile (persisted as `brand_json`). A
+ *  low-confidence colour that's ALSO a washed-out grey is discarded rather
+ *  than applied — `primary: null` lets the widget theme preset's own accent
+ *  stand in, a safer default than a muddy guess. `brandColorConfidence` is
+ *  always carried through so a later human/vision step can review or
+ *  override the pick. */
 export function deriveDemoBrand(profile: CompanyProfile): ProspectDemoBrand {
+  const rawPrimary = profile.brandColors?.primary ?? null;
+  const confidence: 'high' | 'low' = profile.brandColors?.confidence ?? 'low';
+  const discard = isUnreliableLowConfidenceGrey(rawPrimary, confidence);
+
   return {
-    primary: profile.brandColors?.primary ?? null,
+    primary: discard ? null : rawPrimary,
     secondary: profile.brandColors?.secondary ?? null,
     logoUrl: profile.logoUrl ?? null,
     companyName: profile.companyName ?? null,
+    brandColorConfidence: confidence,
   };
 }
 
