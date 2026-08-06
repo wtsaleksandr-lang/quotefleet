@@ -39,7 +39,15 @@ import {
 import { requireAuth, requireTenant } from '../middleware.js';
 import { aiTenantBurstLimiter, aiTenantDailyLimiter } from '../rateLimits.js';
 import { addTrustedSender } from '../emailImport.js';
-import { parseRateSheet, IngestUnsupportedError } from '../../ai/ingestFile.js';
+import {
+  parseRateSheet,
+  IngestUnsupportedError,
+  RateCardDraftSchema,
+  AccessorialDraftSchema,
+  LaneZoneDraftSchema,
+} from '../../ai/ingestFile.js';
+import { coerceLtlConfig } from '../../calc/freightClass.js';
+import type { LtlConfig } from '../../calc/freightClass.js';
 import { syncTenantToMarketplace } from '../../marketplace/sync.js';
 import {
   calculate,
@@ -58,10 +66,15 @@ const StartSchema = z.object({
   dataBase64: z.string().min(8).max(MAX_BYTES * 2), // base64 ≈ 4/3 of binary
 });
 
+// Apply boundary validation. Replaces the old loose `z.record(string, unknown)`:
+// every draft member is now validated by the shared ingest draft schemas (which
+// are lenient/passthrough, so operator-edited drafts and the current simple
+// shape still pass) — a non-array or a wholly-wrong-typed member is rejected
+// here rather than silently coerced deep in the transaction.
 const ApplySchema = z.object({
-  rateCards: z.array(z.record(z.string(), z.unknown())).optional(),
-  accessorials: z.array(z.record(z.string(), z.unknown())).optional(),
-  laneZones: z.array(z.record(z.string(), z.unknown())).optional(),
+  rateCards: z.array(RateCardDraftSchema).optional(),
+  accessorials: z.array(AccessorialDraftSchema).optional(),
+  laneZones: z.array(LaneZoneDraftSchema).optional(),
 });
 
 // "Test your rates" — a sample lane the owner runs against the not-yet-applied
@@ -202,7 +215,7 @@ export function registerIngestRoutes(app: Express) {
 
     let inserted: ApplyResult;
     try {
-      inserted = await applyDraftToTenant(tenantId, id, parse.data);
+      inserted = await applyDraftToTenant(tenantId, id, parse.data as IngestDraft);
     } catch (err) {
       console.error('[ingest.apply] transaction failed:', err);
       return res.status(500).json({ error: 'Apply failed — nothing was changed. Try again.' });
@@ -364,6 +377,105 @@ export interface IngestDraft {
   laneZones?: Array<Record<string, unknown>>;
 }
 
+/** Known accessorial triggers the engine understands. Anything else → 'optional'
+ *  (an unrecognized trigger would otherwise make the accessorial un-applyable —
+ *  it is neither an `auto_*` case nor the customer-selectable `optional`). */
+const KNOWN_TRIGGERS = new Set([
+  'optional',
+  'auto',
+  'auto_if_residential',
+  'auto_if_hazmat',
+  'auto_if_temp_controlled',
+  'auto_if_no_dock',
+  'auto_if_loose',
+  'auto_if_weight_over',
+]);
+
+function numOrNull(v: unknown): number | null {
+  if (v === null || v === undefined || v === '') return null;
+  const n = Number(v);
+  return Number.isFinite(n) ? n : null;
+}
+
+/**
+ * Normalize a loose draft rate card into the columns the engine reads. Shared
+ * by the DB apply path and the in-memory preview mapping so both persist and
+ * price identically. Folds an LTL card's absoluteMinCharge into minimumCharge
+ * (the engine enforces that floor) and coerces ltlConfig to a valid shape.
+ */
+function normalizeDraftRateCard(c: Record<string, unknown>): {
+  service: string;
+  equipment: string;
+  label: string | null;
+  ratePerMile: number;
+  minimumCharge: number;
+  flatFee: number;
+  fuelSurchargePct: number;
+  marginPct: number;
+  maxWeightLbs: number | null;
+  maxMiles: number | null;
+  ltlConfig: LtlConfig | null;
+} {
+  const ltlConfig = coerceLtlConfig(c.ltlConfig);
+  // AMC on the LTL config is the minimum-charge floor the engine enforces.
+  const minFromAmc = ltlConfig?.absoluteMinCharge ?? null;
+  const minimumCharge = numOrNull(c.minimumCharge) ?? minFromAmc ?? 0;
+  return {
+    service: String(c.service ?? 'ftl'),
+    equipment: String(c.equipment ?? 'dryvan'),
+    label: c.label != null ? String(c.label) : null,
+    ratePerMile: numOrNull(c.ratePerMile) ?? 0,
+    minimumCharge,
+    flatFee: numOrNull(c.flatFee) ?? 0,
+    fuelSurchargePct: numOrNull(c.fuelSurchargePct) ?? 0,
+    marginPct: numOrNull(c.marginPct) ?? 0,
+    maxWeightLbs: numOrNull(c.maxWeightLbs),
+    maxMiles: numOrNull(c.maxMiles),
+    ltlConfig,
+  };
+}
+
+/**
+ * Normalize a loose draft accessorial. Whitelists the trigger, and folds the
+ * free-time fields (freeHours / daysFlag) plus any explicit conditionJson /
+ * weightLbsOver into ONE conditionJson object — exactly the keys the engine's
+ * applyAccessorial + autoTriggered read (`freeHours`, `daysFlag`, `weightLbsOver`).
+ */
+function normalizeDraftAccessorial(a: Record<string, unknown>): {
+  code: string;
+  label: string;
+  kind: string;
+  amount: number;
+  trigger: string;
+  conditionJson: Record<string, unknown> | null;
+  appliesToServices: string[] | null;
+} {
+  const kind = String(a.kind ?? 'flat');
+  const rawTrigger = typeof a.trigger === 'string' ? a.trigger : 'optional';
+  const trigger = KNOWN_TRIGGERS.has(rawTrigger) ? rawTrigger : 'optional';
+
+  const cond: Record<string, unknown> = {};
+  if (a.conditionJson && typeof a.conditionJson === 'object') {
+    Object.assign(cond, a.conditionJson as Record<string, unknown>);
+  }
+  const freeHours = numOrNull(a.freeHours);
+  if (kind === 'per_hour' && freeHours !== null) cond.freeHours = freeHours;
+  if (kind === 'per_day' && (a.daysFlag === 'layoverDays' || a.daysFlag === 'storageDays')) {
+    cond.daysFlag = a.daysFlag;
+  }
+  const conditionJson = Object.keys(cond).length ? cond : null;
+
+  return {
+    code: String(a.code ?? 'misc'),
+    label: String(a.label ?? a.code ?? 'Accessorial'),
+    kind,
+    amount: numOrNull(a.amount) ?? 0,
+    trigger,
+    conditionJson,
+    appliesToServices: Array.isArray(a.appliesToServices) ? (a.appliesToServices as string[]) : null,
+  };
+}
+
 /**
  * Persist a parsed ingest draft to a tenant's live rate book and mark the job
  * 'applied'. Shared by the operator-triggered apply endpoint AND the inbound
@@ -382,16 +494,23 @@ export async function applyDraftToTenant(
   const inserted: ApplyResult = { rateCards: 0, accessorials: 0, laneZones: 0 };
   await db().transaction(async (tx) => {
     for (const c of draft.rateCards ?? []) {
+      const n = normalizeDraftRateCard(c);
       await tx.insert(rateCards).values({
         tenantId,
-        service: String(c.service ?? 'ftl'),
-        equipment: String(c.equipment ?? 'dryvan'),
-        label: c.label != null ? String(c.label) : null,
-        ratePerMile: Number(c.ratePerMile ?? 0),
-        minimumCharge: Number(c.minimumCharge ?? 0),
-        flatFee: Number(c.flatFee ?? 0),
-        fuelSurchargePct: Number(c.fuelSurchargePct ?? 0),
-        marginPct: Number(c.marginPct ?? 0),
+        service: n.service,
+        equipment: n.equipment,
+        label: n.label,
+        ratePerMile: n.ratePerMile,
+        minimumCharge: n.minimumCharge,
+        flatFee: n.flatFee,
+        fuelSurchargePct: n.fuelSurchargePct,
+        marginPct: n.marginPct,
+        // Persist the engine-enforced ceilings + the LTL class/weight config the
+        // extractor now captures. Previously these were never written, so every
+        // imported LTL card silently fell back to DEFAULT_LTL_CONFIG.
+        maxWeightLbs: n.maxWeightLbs,
+        maxMiles: n.maxMiles,
+        ltlConfig: n.ltlConfig,
         enabled: true,
         notes: 'Imported from rate-sheet ingest job #' + jobId,
         lastAiEditAt: new Date(),
@@ -400,14 +519,19 @@ export async function applyDraftToTenant(
       inserted.rateCards++;
     }
     for (const a of draft.accessorials ?? []) {
+      const n = normalizeDraftAccessorial(a);
       await tx.insert(accessorials).values({
         tenantId,
-        code: String(a.code ?? 'misc'),
-        label: String(a.label ?? a.code ?? 'Accessorial'),
-        kind: String(a.kind ?? 'flat'),
-        amount: Number(a.amount ?? 0),
-        trigger: 'optional',
-        appliesToServices: Array.isArray(a.appliesToServices) ? (a.appliesToServices as string[]) : undefined,
+        code: n.code,
+        label: n.label,
+        kind: n.kind,
+        amount: n.amount,
+        // Persist the extractor's trigger + conditionJson (freeHours / daysFlag /
+        // weightLbsOver) instead of hard-coding 'optional'. This unlocks the
+        // engine's auto-trigger + free-time accessorial pricing on import.
+        trigger: n.trigger,
+        conditionJson: n.conditionJson ?? undefined,
+        appliesToServices: n.appliesToServices ?? undefined,
         enabled: true,
       });
       inserted.accessorials++;
@@ -449,47 +573,55 @@ export function draftToEngineConfig(draft: {
   accessorials?: Array<Record<string, unknown>>;
   laneZones?: Array<Record<string, unknown>>;
 }): { cards: RateCard[]; accs: Accessorial[]; zones: LaneZone[] } {
-  const cards = (draft.rateCards ?? []).map((c, i) => ({
-    id: -(i + 1),
-    tenantId: -1,
-    service: String(c.service ?? 'ftl'),
-    equipment: String(c.equipment ?? 'dryvan'),
-    label: c.label != null ? String(c.label) : null,
-    ratePerMile: Number(c.ratePerMile ?? 0),
-    minimumCharge: Number(c.minimumCharge ?? 0),
-    flatFee: Number(c.flatFee ?? 0),
-    fuelSurchargePct: Number(c.fuelSurchargePct ?? 0),
-    marginPct: Number(c.marginPct ?? 0),
-    maxWeightLbs: null,
-    maxMiles: null,
-    ltlConfig: null,
-    enabled: true,
-    sortOrder: 0,
-    notes: null,
-    lastAiEditAt: null,
-    lastAiEditReason: null,
-    createdAt: new Date(),
-    updatedAt: new Date(),
-  })) as unknown as RateCard[];
+  const cards = (draft.rateCards ?? []).map((c, i) => {
+    const n = normalizeDraftRateCard(c);
+    return {
+      id: -(i + 1),
+      tenantId: -1,
+      service: n.service,
+      equipment: n.equipment,
+      label: n.label,
+      ratePerMile: n.ratePerMile,
+      minimumCharge: n.minimumCharge,
+      flatFee: n.flatFee,
+      fuelSurchargePct: n.fuelSurchargePct,
+      marginPct: n.marginPct,
+      // Mirror the apply path: the preview/auto-check now sees the SAME ceilings
+      // and LTL config that applying would persist, so "test your rates" is faithful.
+      maxWeightLbs: n.maxWeightLbs,
+      maxMiles: n.maxMiles,
+      ltlConfig: n.ltlConfig,
+      enabled: true,
+      sortOrder: 0,
+      notes: null,
+      lastAiEditAt: null,
+      lastAiEditReason: null,
+      createdAt: new Date(),
+      updatedAt: new Date(),
+    };
+  }) as unknown as RateCard[];
 
-  const accs = (draft.accessorials ?? []).map((a, i) => ({
-    id: -(i + 1),
-    tenantId: -1,
-    code: String(a.code ?? 'misc'),
-    label: String(a.label ?? a.code ?? 'Accessorial'),
-    description: null,
-    kind: String(a.kind ?? 'flat'),
-    amount: Number(a.amount ?? 0),
-    // Draft rows carry no trigger; apply defaults them to 'optional', so the
-    // customer picks them by code in the test modal (same as the live widget).
-    trigger: 'optional',
-    conditionJson: null,
-    appliesToServices: Array.isArray(a.appliesToServices) ? (a.appliesToServices as string[]) : null,
-    enabled: true,
-    sortOrder: 0,
-    createdAt: new Date(),
-    updatedAt: new Date(),
-  })) as unknown as Accessorial[];
+  const accs = (draft.accessorials ?? []).map((a, i) => {
+    const n = normalizeDraftAccessorial(a);
+    return {
+      id: -(i + 1),
+      tenantId: -1,
+      code: n.code,
+      label: n.label,
+      description: null,
+      kind: n.kind,
+      amount: n.amount,
+      // Mirror the apply path: the extractor's trigger + conditionJson drive the
+      // preview exactly as the persisted rows will (auto-trigger + free-time).
+      trigger: n.trigger,
+      conditionJson: n.conditionJson,
+      appliesToServices: n.appliesToServices,
+      enabled: true,
+      sortOrder: 0,
+      createdAt: new Date(),
+      updatedAt: new Date(),
+    };
+  }) as unknown as Accessorial[];
 
   const zones = (draft.laneZones ?? []).map((z, i) => ({
     id: -(i + 1),
