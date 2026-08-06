@@ -23,7 +23,7 @@ X=0.5   # crossfade-wrap length (seconds)
 # Posters point INTO a content-rich payoff (final-webm timestamps).
 ROWS=(
   "qf-hero-phone:qf-hero-phone-raw:1.05:1.05:8.0:520:1126:30:22"
-  "qf-hero-laptop:qf-hero-laptop-raw:1.60:1.00:15.0:1792:1120:33:23"
+  "qf-hero-laptop:qf-hero-laptop-raw:1.55:1.00:14.0:1792:1120:33:23"
 )
 
 seamless() {

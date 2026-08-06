@@ -86,6 +86,10 @@ const LEADS = [
   { refId:'QF-2F08', customerName:'Sam Okafor',    customerEmail:'sam@midwestparts.com',  service:'drayage', equipment:'container_40hc', pickupCity:'Savannah', deliveryCity:'Atlanta',  quotedTotal:640,  status:'new',     createdAt:_iso(96) },
   { refId:'QF-2EF7', customerName:'Lena Whitfield',customerEmail:'lena@coastsupply.com',  service:'ftl',     equipment:'dryvan',        pickupCity:'Dallas',   deliveryCity:'Phoenix',  quotedTotal:1920, status:'won',     createdAt:_iso(180) },
   { refId:'QF-2EE1', customerName:'Priya Nair',    customerEmail:'priya@harborlink.io',   service:'ltl',     equipment:'pallet',        pickupCity:'Newark',   deliveryCity:'Columbus', quotedTotal:410,  status:'replied', createdAt:_iso(240) },
+  { refId:'QF-2ED3', customerName:'Marcus Hill',   customerEmail:'marcus@ridgeline.co',   service:'ftl',     equipment:'flatbed',       pickupCity:'Houston',  deliveryCity:'Memphis',  quotedTotal:1740, status:'new',     createdAt:_iso(310) },
+  { refId:'QF-2EC9', customerName:'Tara Nguyen',   customerEmail:'tara@pacificpine.com',  service:'drayage', equipment:'container_20',  pickupCity:'Oakland',  deliveryCity:'Sacramento',quotedTotal:520, status:'replied', createdAt:_iso(365) },
+  { refId:'QF-2EBF', customerName:'Owen Brooks',   customerEmail:'owen@delta-freight.io', service:'ftl',     equipment:'reefer',        pickupCity:'Miami',    deliveryCity:'Charlotte',quotedTotal:2410, status:'won',     createdAt:_iso(420) },
+  { refId:'QF-2EB4', customerName:'Grace Alvarez', customerEmail:'grace@summitcargo.com', service:'ltl',     equipment:'pallet',        pickupCity:'Portland', deliveryCity:'Boise',    quotedTotal:380,  status:'new',     createdAt:_iso(505) },
 ];
 
 function handle(req, res) {
@@ -286,146 +290,86 @@ const camReady = await page.evaluate(() => {
 });
 if (!camReady) console.log('WARN camera not installed (no #app-shell)');
 
-const DROP_S = 1.3;   // punch-in zoom on the drop
-const REVIEW_MIN_S = 1.28, REVIEW_MAX_S = 1.4;
 
-// ── Beat 1: OPENING framed TIGHT on the dropzone card — NOT the wide empty app.
-// This fills the loop-in frame with the import UI so there is no big empty white
-// browser window (the #1 complaint). Fit adaptively to the dropzone height,
-// capped so the card + its heading still read. This is also the loop-out framing
-// (beat 9 returns here) so the crossfade-wrap has matching, content-forward ends. ──
-const dz = await page.evaluate(() => window.__rect('.qf-dropzone'));
-const dzCx = dz ? (dz.left + dz.right) / 2 : 896;
-const dzCy = dz ? (dz.top + dz.bottom) / 2 : 560;
-const OPEN_S = await page.evaluate(() => {
-  const d = window.__rect('.qf-dropzone');
-  if (!d) { window.__cam(896, 560, 1.2, 0); return 1.2; }
-  const h = d.bottom - d.top;
-  let s = (1120 * 0.74) / h;                 // dropzone card ≈ 74% of frame height
-  s = Math.max(1.18, Math.min(1.42, s));
-  window.__cam((d.left + d.right) / 2, (d.top + d.bottom) / 2, s, 0); // instant (loop-in point)
-  return +s.toFixed(3);
+// ── FIT-TO-WIDTH camera ─────────────────────────────────────────────────────
+// The dashboard content column (#page-content) is 1440px wide beside a 254px
+// sidebar. The old camera fit a VERTICAL band → it over-zoomed and CLIPPED text
+// at the left/right edges ("Leads"→"ads", "Export CSV"→"Export CS"). __fitW fits
+// the target element's WIDTH into the 1792 frame with a margin each side, so the
+// content is ALWAYS fully visible horizontally (never a clipped word). Vertically
+// it top-aligns tall content (fills the frame) or centres short content (symmetric
+// minimal bands — never a big white BOTTOM band). Sidebar sits just off-frame left.
+await page.evaluate(() => {
+  const FW = 1792, FH = 1120;
+  window.__fitW = (sel, opt) => {
+    const o = opt || {};
+    const el = typeof sel === 'string' ? document.querySelector(sel) : sel;
+    const r = el ? window.__rect(el) : null;
+    if (!r) return { err: 'missing' };
+    const marginX = o.marginX ?? 54;               // logical px margin each side (no edge clipping)
+    let s = (FW - 2 * marginX) / r.width;
+    s = Math.max(o.minS ?? 1.0, Math.min(o.maxS ?? 1.34, s));
+    const cx = (r.left + r.right) / 2;
+    const visH = FH / s;
+    const topPad = o.topPad ?? 34;
+    let cy;
+    if (o.align === 'top' || r.height > visH - topPad) cy = r.top + visH / 2 - topPad; // top-align → the content below the target fills the lower frame
+    else cy = (r.top + r.bottom) / 2;                             // shorter → centre (symmetric bands)
+    window.__cam(cx, cy, s, o.ms ?? 1150);
+    return { s: +s.toFixed(3), w: Math.round(r.width), h: Math.round(r.height), visH: Math.round(visH) };
+  };
 });
-console.log('CAM_OPEN', OPEN_S, 'BEAT1_MS', Date.now() - _t0mark); // set encode T0 ≈ BEAT1_MS/1000
-await wait(650); // short loop-in hold — a sparse beat gets the least time
+const navTo = async (route, waitSel) => {
+  await page.evaluate((r) => { const a = document.createElement('a'); a.setAttribute('data-route', r); a.href = '/app/' + r; document.body.appendChild(a); a.click(); a.remove(); }, route);
+  if (waitSel) await page.waitForSelector(waitSel, { timeout: 8000 }).catch(() => {});
+};
 
-// ── Beat 2 (FIX 2 + FIX 3): VISIBLE drag-and-drop, held at the TIGHT framing (no
-// pull to a wide empty app). Spawn the file chip off the top-right, glide it to
-// the dropzone's ON-SCREEN centre (raw getBoundingClientRect = post-camera
-// viewport coords, since the chip is position:fixed and NOT under the camera
-// transform); partway in, fire dragenter/dragover so the dropzone lights up. On
-// landing: ripple, fade the chip, then the REAL setInputFiles kicks off parsing. ──
+// ── Beat 1: OPENING — fit the ingest content column (fully visible, no clip),
+// centred. This is also the loop-out framing (beat 6) so the crossfade-wrap has
+// matching, content-forward ends. ──
+const open1 = await page.evaluate(() => window.__fitW('#page-content', { ms: 0, maxS: 1.3 }));
+console.log('CAM_OPEN', JSON.stringify(open1), 'BEAT1_MS', Date.now() - _t0mark); // encode T0 ≈ BEAT1_MS/1000
+await wait(700);
+
+// ── Beat 2: VISIBLE drag-and-drop at the same framing. Chip glides from the
+// top-right to the dropzone's ON-SCREEN centre (raw rect = post-camera viewport
+// coords), lights the dropzone, ripple, then the REAL drop. ──
 await page.evaluate(() => window.__spawnChip());
-const chipXY = await page.evaluate(() => {
-  const el = document.querySelector('.qf-dropzone');
-  const r = el.getBoundingClientRect();
-  return [Math.round(r.left + r.width / 2), Math.round(r.top + r.height / 2)];
-});
+const chipXY = await page.evaluate(() => { const r = document.querySelector('.qf-dropzone').getBoundingClientRect(); return [Math.round(r.left + r.width / 2), Math.round(r.top + r.height / 2)]; });
 await wait(180);
 await page.evaluate(([x, y]) => window.__chipTo(x, y), chipXY);
 await wait(430);
 await page.evaluate(() => { window.__fireDrag('.qf-dropzone', 'dragenter'); window.__fireDrag('.qf-dropzone', 'dragover'); });
-await wait(420); // chip settles onto the lit dropzone (~950ms glide total)
+await wait(420);
 await page.evaluate(() => window.__ripple('.qf-dropzone'));
-await wait(260);
+await wait(240);
 await page.evaluate(() => { window.__fireDrag('.qf-dropzone', 'dragleave'); window.__chipFade(); });
-await page.setInputFiles('.qf-dropzone input[type="file"]', {
-  name: 'QuoteFleet-Q3-Rates.pdf',
-  mimeType: 'application/pdf',
-  buffer: Buffer.from('%PDF-1.4 QuoteFleet — Q3 rate sheet (demo)\n'),
-});
-// Gentle punch to the accepted state — small (we are ALREADY tight), no wide bounce.
-await page.evaluate(([cx, cy, s]) => window.__cam(cx, cy, s, 700), [dzCx, dzCy, Math.min(1.5, OPEN_S + 0.08)]);
+await page.setInputFiles('.qf-dropzone input[type="file"]', { name: 'QuoteFleet-Q3-Rates.pdf', mimeType: 'application/pdf', buffer: Buffer.from('%PDF-1.4 QuoteFleet — Q3 rate sheet (demo)\n') });
 await page.waitForSelector('.qf-ingest-processing', { timeout: 5000 }).catch(() => {});
-await wait(600);
-
-// ── Beat 3: PREMIUM PROCESSING SEQUENCE — frame the rotating industry phrases +
-// gradient progress bar and HOLD so several phrases + the bar filling read. ──
-const camProc = await page.evaluate(() => {
-  const card = window.__rect('.qf-ingest-processing');
-  if (!card) return { err: 'missing' };
-  const bar = window.__rect('.qf-ingest-progress') || card;
-  const MARGIN = 84;
-  const top = card.top - 10;
-  const bottom = bar.bottom + 12;
-  const bandH = bottom - top;
-  const cx = (card.left + card.right) / 2;
-  let s = (1120 - 2 * MARGIN) / bandH;
-  s = Math.max(1.3, Math.min(1.5, s));   // higher floor → processing card fills the frame, no empty margins
-  const cy = (top + bottom) / 2;
-  window.__cam(cx, cy, s, 1150);
-  return { cx: Math.round(cx), cy: Math.round(cy), s: +s.toFixed(3), bandH: Math.round(bandH) };
-});
+// Processing grows the page → refit so it fills (dropzone + parsing card + skeleton).
+const camProc = await page.evaluate(() => window.__fitW('#page-content', { ms: 700, maxS: 1.3 }));
 console.log('CAM_PROC', JSON.stringify(camProc));
-await wait(3100);   // sparse "reading your rate sheet" beat → shorter; time goes to the content-rich payoffs
+await wait(2800); // "reading your rate sheet…" — long enough to read, no longer
 
-// Wait for the review reveal (poll returns ready_for_review).
-await page.waitForSelector('#ingest-review .qf-autocheck', { timeout: 9000 }).catch(() => {});
+// ── Beat 3: REVIEW PAYOFF — fit the review card (fully visible, fills). ──
 await page.waitForSelector('#ingest-review .card h2', { timeout: 9000 }).catch(() => {});
-// FIX 1 — NO pull-back to wide. HOLD the processing framing while the review
-// blocks render + the sample-lane count-up reflows the layout, THEN measure the
-// settled review band (in DOC coords, transform-inverted) and punch straight in.
+await page.waitForSelector('#ingest-review .qf-autocheck', { timeout: 9000 }).catch(() => {});
+await wait(900);
+const camReview = await page.evaluate(() => window.__fitW('#ingest-review', { maxS: 1.3, topPad: 28 }));
+console.log('CAM_REVIEW', JSON.stringify(camReview));
+await wait(3200); // parsed rate cards + CONFIDENCE: HIGH + 12/12 green check
+
+// ── Beat 4: LEADS — navigate, fit the leads content column (fully visible). ──
+await navTo('leads', '.qf-leads-table tbody tr');
+if (!await page.$('.qf-leads-table tbody tr')) { await navTo('leads', '.qf-leads-table tbody tr'); }
+// SNAP (ms:0) the moment the leads page renders — a cross-page nav is a CUT, so the
+// camera never holds the previous (review) scroll position over the new page (that
+// stale hold is what showed a white band below the shorter page).
+const camLeads = await page.evaluate(() => window.__fitW('#page-content', { maxS: 1.3, ms: 0 }));
+console.log('CAM_LEADS', JSON.stringify(camLeads));
 await wait(1600);
 
-// ── Beat 4: REVIEW PAYOFF → punch IN on the settled result band. ──
-const cam = await page.evaluate((cfg) => {
-  const { MIN, MAX } = cfg;
-  const box = window.__rect('#ingest-review');
-  const card = window.__rect('#ingest-review .card') || box;
-  const title = window.__rect('#ingest-review .card h2');
-  const check = window.__rect('#ingest-review .qf-autocheck');
-  if (!title || !check || !card) return { err: 'missing' };
-  const MARGIN = 46;
-  const top = title.top;
-  const bottom = check.bottom;
-  const bandH = bottom - top;
-  const cx = (card.left + card.right) / 2;
-  let s = (1120 - 2 * MARGIN) / bandH;
-  let cy;
-  if (s >= MIN) {
-    s = Math.min(MAX, s);
-    cy = (top + bottom) / 2;
-  } else {
-    s = MIN;
-    cy = top + (560 - MARGIN) / s;
-  }
-  window.__cam(cx, cy, s, 1150);
-  return { cx: Math.round(cx), cy: Math.round(cy), s: +s.toFixed(3), bandH: Math.round(bandH) };
-}, { MIN: REVIEW_MIN_S, MAX: REVIEW_MAX_S });
-console.log('CAM_REVIEW', JSON.stringify(cam));
-// Import payoff hold — summary, CONFIDENCE: HIGH, the 12/12 green check, cards.
-await wait(2500);
-
-// ── Beat 5 (FIX 1 + FIX 3): TRAVEL to Leads. No bounce to wide — PAN laterally
-// to the sidebar at a held modest zoom, ripple the Leads nav, real click. ──
-const camNav1 = await page.evaluate(() => {
-  const b = window.__rect('.sidebar [data-route="leads"]');
-  if (!b) return { err: 'missing' };
-  const cx = (b.left + b.right) / 2;
-  const cy = (b.top + b.bottom) / 2;
-  window.__cam(cx, cy, 1.16, 1150);
-  return { cx: Math.round(cx), cy: Math.round(cy) };
-});
-console.log('CAM_NAV1', JSON.stringify(camNav1));
-await wait(1250); // let the pan fully settle so the button is stable for the click
-await page.evaluate(() => window.__ripple('.sidebar [data-route="leads"]'));
-await wait(300);
-// Real click on the sidebar Leads button (its boot-wired handler calls go('leads')).
-try { await page.click('.sidebar [data-route="leads"]', { timeout: 4000 }); }
-catch (e) { console.log('LEADS_CLICK_ERR', e.message); }
-// Fallback: if the board didn't render, drive the SPA route programmatically via
-// an injected data-route anchor (caught by the document click handler → go()).
-let leadsReady = await page.waitForSelector('.qf-leads-table tbody tr', { timeout: 4000 }).then(() => true).catch(() => false);
-if (!leadsReady) {
-  console.log('LEADS_FALLBACK path=', await page.evaluate(() => location.pathname));
-  await page.evaluate(() => { const a = document.createElement('a'); a.setAttribute('data-route', 'leads'); a.href = '/app/leads'; document.body.appendChild(a); a.click(); a.remove(); });
-  leadsReady = await page.waitForSelector('.qf-leads-table tbody tr', { timeout: 5000 }).then(() => true).catch(() => false);
-}
-console.log('LEADS_READY', leadsReady);
-await wait(550);
-
-// ── Beat 6: A NEW LEAD LANDS — Marcus Webb · Long Beach → Chicago · $3,950.
-// Injected in-recording (marketing staging), with an on-brand arrival highlight. ──
+// A NEW LEAD LANDS — Marcus Webb · Long Beach → Chicago · $3,950 (marketing staging).
 const landed = await page.evaluate(() => {
   const tb = document.querySelector('.qf-leads-table tbody');
   if (!tb) return false;
@@ -449,11 +393,7 @@ const landed = await page.evaluate(() => {
     '<td data-label="When"><span class="muted-small">just now</span></td>';
   tb.insertBefore(tr, tb.firstChild);
   const n = document.querySelectorAll('.qf-leads-table tbody tr').length;
-  // Keep the page-sub ("N leads") and the "Showing 1–N of N" pager pill in sync
-  // with the injected row so the poster/money frame reads consistently.
-  document.querySelectorAll('.page-sub').forEach((elx) => {
-    if (/^\s*\d+\s+leads?\s*$/.test(elx.textContent || '')) elx.textContent = n + (n === 1 ? ' lead' : ' leads');
-  });
+  document.querySelectorAll('.page-sub').forEach((elx) => { if (/^\s*\d+\s+leads?\s*$/.test(elx.textContent || '')) elx.textContent = n + (n === 1 ? ' lead' : ' leads'); });
   document.querySelectorAll('*').forEach((elx) => {
     if (elx.children.length !== 0) return;
     const t = elx.textContent || '';
@@ -463,116 +403,50 @@ const landed = await page.evaluate(() => {
   return true;
 });
 console.log('LEAD_LANDED', landed);
+// Refit (the new row grew the table) — still fully visible, no clip.
+await page.evaluate(() => window.__fitW('#page-content', { maxS: 1.3, ms: 700 }));
+await wait(2700); // money-moment hold
 
-// ── Beat 7: punch IN on the new lead row so the money-moment reads big. ──
-const camLead = await page.evaluate(() => {
-  const row = window.__rect('#qf-mm-newlead');
-  const head = window.__rect('.qf-leads-table thead') || window.__rect('.qf-leads-table');
-  const table = window.__rect('.qf-leads-table');
-  if (!row || !table) return { err: 'missing' };
-  const MARGIN = 60;
-  const top = (head ? head.top : row.top) - 6;
-  const bottom = row.bottom + row.height * 2.2;
-  const bandH = bottom - top;
-  const cx = (table.left + table.right) / 2;
-  let s = (1120 - 2 * MARGIN) / bandH;
-  s = Math.max(1.18, Math.min(1.32, s));
-  const cy = (top + bottom) / 2;
-  window.__cam(cx, cy, s, 1150);
-  return { cx: Math.round(cx), cy: Math.round(cy), s: +s.toFixed(3) };
-});
-console.log('CAM_LEAD', JSON.stringify(camLead));
-await wait(2900); // money-moment hold
-
-// ── Beat 8 (FIX 7): AUTOMATED FOLLOW-UP scene. Travel to the sidebar, ripple +
-// click Widget settings, wait the follow-up card, open its cadence fold, then
-// ripple + click the "Standard" cadence tile (gentle→standard is a visible
-// selection change) and hold on the selectable day-timing tiles so they read. ──
-const camNav2 = await page.evaluate(() => {
-  const b = window.__rect('.sidebar [data-route="widget-settings"]');
-  if (!b) return { err: 'missing' };
-  const cx = (b.left + b.right) / 2;
-  const cy = (b.top + b.bottom) / 2;
-  window.__cam(cx, cy, 1.16, 1150);
-  return { cx: Math.round(cx), cy: Math.round(cy) };
-});
-console.log('CAM_NAV2', JSON.stringify(camNav2));
-await wait(700);
-await page.evaluate(() => window.__ripple('.sidebar [data-route="widget-settings"]'));
-await wait(280);
-await page.click('.sidebar [data-route="widget-settings"]').catch(() => {});
-// Wait for the Automated-follow-up card to render.
-await page.waitForFunction(() => {
-  return [].slice.call(document.querySelectorAll('.card')).some(c => /Automated follow-up/.test(c.textContent));
-}, { timeout: 8000 }).catch(() => {});
-await wait(400);
-
-// Open the cadence fold + frame the tile row (measured in DOC coords).
+// ── Beat 5: AUTOMATED FOLLOW-UP — navigate, open the cadence fold, fit the card,
+// then ripple + click the "Standard" tile (a visible selection change). ──
+await navTo('widget-settings');
+await page.waitForFunction(() => [].slice.call(document.querySelectorAll('.card')).some(c => /Automated follow-up/.test(c.textContent)), { timeout: 8000 }).catch(() => {});
+// Open the cadence fold + SNAP the camera to the follow-up card the moment the page
+// is ready — cross-page nav is a CUT, so no stale scroll position is ever held.
 const camFU = await page.evaluate(() => {
-  const card = [].slice.call(document.querySelectorAll('.card')).find(c => /Automated follow-up/.test(c.textContent));
+  const card = [...document.querySelectorAll('.card')].find(c => /Automated follow-up/.test(c.textContent));
   if (!card) return { err: 'no-card' };
-  const det = card.querySelector('details');
-  if (det) det.open = true;
-  // Find the cadence tile row (parent of the Gentle/Standard/... tiles).
-  const tiles = [].slice.call(card.querySelectorAll('div')).filter(d => d.children.length === 2 && d.firstElementChild && /^(Gentle|Standard|Assertive|Custom)$/.test((d.firstElementChild.textContent || '').trim()) && /Days|timing/.test(d.textContent));
-  const row = tiles.length ? tiles[0].parentElement : card;
-  const r = row.getBoundingClientRect();
-  const cs = window.__camState || { tx: 0, ty: 0, s: 1 };
-  const s0 = cs.s || 1;
-  const top = (r.top - cs.ty) / s0;
-  const bottom = (r.bottom - cs.ty) / s0;
-  const left = (r.left - cs.tx) / s0;
-  const right = (r.right - cs.tx) / s0;
-  const MARGIN = 150;
-  const bandH = Math.max(120, bottom - top);
-  let s = (1120 - 2 * MARGIN) / bandH;
-  s = Math.max(1.2, Math.min(1.42, s));
-  const cx = (left + right) / 2;
-  const cy = (top + bottom) / 2;
-  window.__cam(cx, cy, s, 1150);
-  return { s: +s.toFixed(3), tiles: tiles.length, top: Math.round(top) };
+  const det = card.querySelector('details'); if (det) det.open = true;
+  if (!card.id) card.id = 'qf-fu-card';
+  return window.__fitW('#qf-fu-card', { maxS: 1.32, topPad: 26, align: 'top', ms: 0 });
 });
 console.log('CAM_FU', JSON.stringify(camFU));
-await wait(950); // let the fold expand + camera settle before the click
-
-// Ripple + click the "Standard" tile.
+await wait(1100);
 const tileHit = await page.evaluate(() => {
-  const card = [].slice.call(document.querySelectorAll('.card')).find(c => /Automated follow-up/.test(c.textContent));
+  const card = document.getElementById('qf-fu-card') || [...document.querySelectorAll('.card')].find(c => /Automated follow-up/.test(c.textContent));
   if (!card) return false;
-  const tile = [].slice.call(card.querySelectorAll('div')).find(d => d.children.length === 2 && d.firstElementChild && (d.firstElementChild.textContent || '').trim() === 'Standard' && /Days/.test(d.textContent));
+  const tile = [...card.querySelectorAll('div')].find(d => d.children.length === 2 && d.firstElementChild && (d.firstElementChild.textContent || '').trim() === 'Standard' && /Days/.test(d.textContent));
   if (!tile) return false;
-  window.__ripple(tile);
-  window.__fuTile = tile;
-  return true;
+  window.__ripple(tile); window.__fuTile = tile; return true;
 });
 console.log('TILE_HIT', tileHit);
 await wait(300);
 await page.evaluate(() => { if (window.__fuTile) window.__fuTile.click(); });
-await wait(2600); // hold on the selected Standard tile + day-timing tiles
+await wait(2500); // hold on the selected Standard cadence + day-timing tiles
 
-// ── Beat 9: RETURN to the ingest dropzone, framed EXACTLY like the opening, so the
-// crossfade-wrap dissolves loop-out into loop-in with MATCHING, content-forward
-// ends (no wide empty-white settle). Reset the mock ingest job so the dropzone
-// renders empty again, SPA-navigate back to /app/ingest (client-side → the camera
-// install survives), then re-apply the tight opening framing (same OPEN_S). ──
+// ── Beat 6: RETURN to the ingest dropzone, framed EXACTLY like the opening, for a
+// seamless crossfade-wrap (loop-out == loop-in). Reset the mock job so the
+// dropzone renders empty again. ──
 await page.evaluate(() => fetch('/rec/reset-ingest').catch(() => {}));
-await page.click('.sidebar [data-route="ingest"]', { timeout: 4000 }).catch(() => {});
-let backReady = await page.waitForSelector('.qf-dropzone', { timeout: 4000 }).then(() => true).catch(() => false);
-if (!backReady) {
-  await page.evaluate(() => { const a = document.createElement('a'); a.setAttribute('data-route', 'ingest'); a.href = '/app/ingest'; document.body.appendChild(a); a.click(); a.remove(); });
-  backReady = await page.waitForSelector('.qf-dropzone', { timeout: 4000 }).then(() => true).catch(() => false);
-}
-console.log('BACK_READY', backReady);
-await wait(350);
-await page.evaluate((s) => {
-  const d = window.__rect('.qf-dropzone');
-  if (!d) { window.__cam(896, 560, 1.2, 1150); return; }
-  window.__cam((d.left + d.right) / 2, (d.top + d.bottom) / 2, s, 1150);
-}, OPEN_S);
-await wait(1000); // static loop-out hold (matches loop-in dropzone → seamless wrap)
+await navTo('ingest', '.qf-dropzone');
+// SNAP to the opening framing (cut) so the loop-out is instantly the empty dropzone
+// (no stale widget-settings position held over it) and holds static for the wrap.
+const back = await page.evaluate(() => window.__fitW('#page-content', { ms: 0, maxS: 1.3 }));
+console.log('BACK', JSON.stringify(back));
+await wait(1200); // static loop-out hold
+
 
 console.log('ERRS', errs.length, errs.slice(0, 8));
-console.log('DZ', JSON.stringify(dz));
 await ctx.close();
 await browser.close();
 server.close();
