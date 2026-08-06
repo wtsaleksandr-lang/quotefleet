@@ -502,6 +502,95 @@ export const laneZones = pgTable('lane_zones', {
 ]);
 
 // ────────────────────────────────────────────────────────────────────
+// RATE ZONES — zip/city → zone-id legend for matrix pricing (Tier 2).
+//
+// A carrier tariff often ships the zone legend as a SEPARATE tab (research
+// pattern 3): "zip3 900-902 = Zone A". This table stores those definitions so a
+// shipment's origin/dest can resolve to the matrix key a `rate_matrices` cell is
+// stored under. DISTINCT from `lane_zones` (a drayage radius-band flat tariff) —
+// these are pure lookup rows, not priced.
+//
+//   zone_id     — the key a rate_matrices cell references (origin_key/dest_key).
+//   match_kind  — 'zip5' | 'zip3' | 'city_state' | 'zip_range'.
+//   match_value — the literal for zip5/zip3/city_state ('90802', '900', 'los angeles,ca').
+//   match_from / match_to — inclusive bounds for 'zip_range'.
+// ────────────────────────────────────────────────────────────────────
+export const rateZones = pgTable('rate_zones', {
+  id: serial('id').primaryKey(),
+  tenantId: integer('tenant_id')
+    .notNull()
+    .references(() => tenants.id, { onDelete: 'cascade' }),
+  /** The matrix key this rule resolves to (matches rate_matrices.origin_key/dest_key). */
+  zoneId: text('zone_id').notNull(),
+  /** How a shipment location is matched: 'zip5' | 'zip3' | 'city_state' | 'zip_range'. */
+  matchKind: text('match_kind').notNull(),
+  /** Literal to match for zip5 / zip3 / city_state. Null for zip_range. */
+  matchValue: text('match_value'),
+  /** Inclusive lower bound (zip3 or zip5) for match_kind='zip_range'. */
+  matchFrom: text('match_from'),
+  /** Inclusive upper bound (zip3 or zip5) for match_kind='zip_range'. */
+  matchTo: text('match_to'),
+  /** Human label, e.g. "Zone A (LA Basin)". */
+  label: text('label'),
+  enabled: boolean('enabled').notNull().default(true),
+  sortOrder: integer('sort_order').notNull().default(0),
+  createdAt: timestamp('created_at', { mode: 'date' }).notNull().defaultNow(),
+  updatedAt: timestamp('updated_at', { mode: 'date' }).notNull().defaultNow(),
+}, (t) => [
+  index('rate_zones_tenant_idx').on(t.tenantId),
+  index('rate_zones_tenant_zone_idx').on(t.tenantId, t.zoneId),
+]);
+
+// ────────────────────────────────────────────────────────────────────
+// RATE MATRICES — native origin×dest / zone / drayage per-container pricing.
+//
+// One row per priced lane CELL (research patterns 1, 3, 5). Where Tier 1
+// flattened a matrix to lane_zones + warned, this stores the real grid so the
+// engine prices the exact cell. origin_key/dest_key are matrix keys — a zip5,
+// zip3, a rate_zones.zone_id, a "city,state", or a port/UN-LOCODE — resolved
+// from a shipment via zone/key resolution. DIRECTIONAL (A→B ≠ B→A).
+//
+//   mode        — service the cell prices ('ftl' | 'drayage' | …).
+//   equipment   — equipment/container scope; null = any.
+//   unit_basis  — 'flat' | 'per_mile' | 'per_container'.
+//   rate        — the cell value in `unit_basis`.
+//   min_charge  — per-cell minimum-charge floor (nullable).
+//   source_ref  — provenance (file+tab+cell) for audit.
+// ────────────────────────────────────────────────────────────────────
+export const rateMatrices = pgTable('rate_matrices', {
+  id: serial('id').primaryKey(),
+  tenantId: integer('tenant_id')
+    .notNull()
+    .references(() => tenants.id, { onDelete: 'cascade' }),
+  /** Service mode this cell prices, e.g. 'ftl' | 'drayage'. */
+  mode: text('mode').notNull(),
+  /** Equipment / container scope, e.g. 'dryvan' | 'container_40'. Null = any. */
+  equipment: text('equipment'),
+  /** Matrix origin key (zip5/zip3/zone_id/city,state/port code). */
+  originKey: text('origin_key').notNull(),
+  /** Matrix destination key. */
+  destKey: text('dest_key').notNull(),
+  /** Cell rate expressed in `unitBasis`. */
+  rate: doublePrecision('rate').notNull(),
+  /** 'flat' | 'per_mile' | 'per_container'. */
+  unitBasis: text('unit_basis').notNull().default('flat'),
+  /** Per-cell minimum charge floor (USD/CAD), applied as max(computed, min). */
+  minCharge: doublePrecision('min_charge'),
+  /** Currency the cell was priced in (label only; never converted). */
+  currency: text('currency'),
+  /** Effective date (YYYY-MM-DD) if the sheet stated one. */
+  effectiveDate: text('effective_date'),
+  /** Provenance: source file / tab / cell for audit. */
+  sourceRef: text('source_ref'),
+  enabled: boolean('enabled').notNull().default(true),
+  createdAt: timestamp('created_at', { mode: 'date' }).notNull().defaultNow(),
+  updatedAt: timestamp('updated_at', { mode: 'date' }).notNull().defaultNow(),
+}, (t) => [
+  index('rate_matrices_tenant_idx').on(t.tenantId),
+  index('rate_matrices_lookup_idx').on(t.tenantId, t.mode, t.originKey, t.destKey),
+]);
+
+// ────────────────────────────────────────────────────────────────────
 // AI CONFIG — one per tenant. Stores the system prompt the tenant
 // edits ("you are XYZ Trucking's AI quote assistant. We focus on
 // dryvan loads in TX. Always quote within 5 minutes...").
@@ -1532,6 +1621,10 @@ export type Accessorial = typeof accessorials.$inferSelect;
 export type NewAccessorial = typeof accessorials.$inferInsert;
 export type LaneZone = typeof laneZones.$inferSelect;
 export type NewLaneZone = typeof laneZones.$inferInsert;
+export type RateZone = typeof rateZones.$inferSelect;
+export type NewRateZone = typeof rateZones.$inferInsert;
+export type RateMatrix = typeof rateMatrices.$inferSelect;
+export type NewRateMatrix = typeof rateMatrices.$inferInsert;
 export type Terminal = typeof terminals.$inferSelect;
 export type NewTerminal = typeof terminals.$inferInsert;
 export type AiConfig = typeof aiConfigs.$inferSelect;

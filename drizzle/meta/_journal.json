@@ -239,6 +239,13 @@
       "when": 1786406400000,
       "tag": "0033_map_blend_opacity",
       "breakpoints": true
+    },
+    {
+      "idx": 34,
+      "version": "7",
+      "when": 1786492800000,
+      "tag": "0034_rate_matrices",
+      "breakpoints": true
     }
   ]
 }

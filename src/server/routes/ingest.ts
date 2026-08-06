@@ -34,6 +34,8 @@ import {
   rateCards,
   accessorials,
   laneZones,
+  rateMatrices,
+  rateZones,
   tenants,
 } from '../../db/schema.js';
 import { requireAuth, requireTenant } from '../middleware.js';
@@ -45,9 +47,11 @@ import {
   RateCardDraftSchema,
   AccessorialDraftSchema,
   LaneZoneDraftSchema,
+  RateMatrixDraftSchema,
 } from '../../ai/ingestFile.js';
 import { coerceLtlConfig } from '../../calc/freightClass.js';
 import type { LtlConfig } from '../../calc/freightClass.js';
+import type { MatrixCellInput, ZoneDefInput } from '../../calc/rateMatrix.js';
 import { syncTenantToMarketplace } from '../../marketplace/sync.js';
 import {
   calculate,
@@ -75,6 +79,7 @@ const ApplySchema = z.object({
   rateCards: z.array(RateCardDraftSchema).optional(),
   accessorials: z.array(AccessorialDraftSchema).optional(),
   laneZones: z.array(LaneZoneDraftSchema).optional(),
+  rateMatrices: z.array(RateMatrixDraftSchema).optional(),
 });
 
 // "Test your rates" — a sample lane the owner runs against the not-yet-applied
@@ -294,7 +299,7 @@ export function registerIngestRoutes(app: Express) {
       accessorials?: Array<Record<string, unknown>>;
       laneZones?: Array<Record<string, unknown>>;
     };
-    const { cards, accs, zones } = draftToEngineConfig(draft);
+    const { cards, accs, zones, matrices, matrixZones } = draftToEngineConfig(draft);
 
     const body = parse.data;
     // Same distance step as the real widget path (public.ts). Port codes are
@@ -336,8 +341,9 @@ export function registerIngestRoutes(app: Express) {
     };
 
     // Manual-mode fuel (each draft card's own fuelSurchargePct) — the honest
-    // preview of the imported numbers, no tenant auto-FSC overlay.
-    const result = calculate(cards, accs, zones, calcReq);
+    // preview of the imported numbers, no tenant auto-FSC overlay. Matrix cells
+    // + zone rules are passed so a preview lane prices through the matrix too.
+    const result = calculate(cards, accs, zones, calcReq, [], undefined, matrices, matrixZones);
 
     if (result.unsupported) {
       return res.json({ ok: true, miles: dist.miles, unsupported: result.unsupported });
@@ -368,6 +374,8 @@ export interface ApplyResult {
   rateCards: number;
   accessorials: number;
   laneZones: number;
+  rateMatrices: number;
+  rateZones: number;
 }
 
 /** A parsed/edited draft in the loose shape the AI parser + apply path use. */
@@ -375,6 +383,114 @@ export interface IngestDraft {
   rateCards?: Array<Record<string, unknown>>;
   accessorials?: Array<Record<string, unknown>>;
   laneZones?: Array<Record<string, unknown>>;
+  rateMatrices?: Array<Record<string, unknown>>;
+}
+
+/** One normalized matrix CELL ready for persistence / engine pricing. */
+interface NormMatrixCell {
+  mode: string;
+  equipment: string | null;
+  originKey: string;
+  destKey: string;
+  rate: number;
+  unitBasis: string;
+  minCharge: number | null;
+  currency: string | null;
+  effectiveDate: string | null;
+  sourceRef: string | null;
+}
+/** One normalized zone-legend rule ready for persistence / engine resolution. */
+interface NormZone {
+  zoneId: string;
+  matchKind: string;
+  matchValue: string | null;
+  matchFrom: string | null;
+  matchTo: string | null;
+  label: string | null;
+}
+
+const MATRIX_UNIT_BASES = new Set(['flat', 'per_mile', 'per_container']);
+const ZONE_MATCH_KINDS = new Set(['zip5', 'zip3', 'city_state', 'zip_range']);
+
+function strOrNull(v: unknown): string | null {
+  if (v === null || v === undefined) return null;
+  const s = String(v).trim();
+  return s ? s : null;
+}
+
+/**
+ * Flatten the loose `rateMatrices` draft blocks into normalized cells + zone
+ * rules. Each block carries defaults (mode / equipment / unitBasis / currency /
+ * effectiveDate / minCharge / sourceRef) that each cell inherits unless it
+ * overrides them. Cells missing an origin/dest key or a mode are dropped. Zone
+ * rules are de-duplicated across blocks by (zoneId, matchKind, value/range).
+ * Shared by the DB apply path and the in-memory preview so both persist and
+ * price identically.
+ */
+function normalizeDraftMatrices(
+  blocks: Array<Record<string, unknown>>,
+): { cells: NormMatrixCell[]; zones: NormZone[] } {
+  const cells: NormMatrixCell[] = [];
+  const zones: NormZone[] = [];
+  const seenZone = new Set<string>();
+
+  for (const block of blocks ?? []) {
+    if (!block || typeof block !== 'object') continue;
+    const mode = String(block.mode ?? '').trim().toLowerCase();
+    const blockEquip = strOrNull(block.equipment);
+    const rawBlockUnit = String(block.unitBasis ?? 'flat').trim();
+    const blockUnit = MATRIX_UNIT_BASES.has(rawBlockUnit) ? rawBlockUnit : 'flat';
+    const blockCurrency = strOrNull(block.currency);
+    const blockEffective = strOrNull(block.effectiveDate);
+    const blockSource = strOrNull(block.sourceRef);
+    const blockMin = numOrNull(block.minCharge);
+
+    const rawCells = Array.isArray(block.cells) ? (block.cells as Array<Record<string, unknown>>) : [];
+    for (const c of rawCells) {
+      if (!c || typeof c !== 'object') continue;
+      const originKey = strOrNull(c.originKey);
+      const destKey = strOrNull(c.destKey);
+      if (!originKey || !destKey || !mode) continue; // un-priceable without keys/mode
+      const rawUnit = String(c.unitBasis ?? blockUnit).trim();
+      const unitBasis = MATRIX_UNIT_BASES.has(rawUnit) ? rawUnit : blockUnit;
+      cells.push({
+        mode,
+        equipment: blockEquip,
+        originKey,
+        destKey,
+        rate: numOrNull(c.rate) ?? 0,
+        unitBasis,
+        minCharge: numOrNull(c.minCharge) ?? blockMin,
+        currency: blockCurrency,
+        effectiveDate: blockEffective,
+        sourceRef: blockSource,
+      });
+    }
+
+    const rawZones = Array.isArray(block.zones) ? (block.zones as Array<Record<string, unknown>>) : [];
+    for (const z of rawZones) {
+      if (!z || typeof z !== 'object') continue;
+      const zoneId = strOrNull(z.zoneId);
+      const rawKind = String(z.matchKind ?? '').trim();
+      if (!zoneId || !ZONE_MATCH_KINDS.has(rawKind)) continue;
+      const matchValue = strOrNull(z.matchValue);
+      const matchFrom = strOrNull(z.matchFrom);
+      const matchTo = strOrNull(z.matchTo);
+      const dedupeKey = `${zoneId}|${rawKind}|${matchValue ?? ''}|${matchFrom ?? ''}|${matchTo ?? ''}`;
+      if (seenZone.has(dedupeKey)) continue;
+      seenZone.add(dedupeKey);
+      zones.push({
+        zoneId,
+        matchKind: rawKind,
+        matchValue,
+        matchFrom,
+        matchTo,
+        label: strOrNull(z.label),
+      });
+    }
+  }
+
+  return { cells, zones };
 }
 
 /** Known accessorial triggers the engine understands. Anything else → 'optional'
@@ -491,7 +607,7 @@ export async function applyDraftToTenant(
   jobId: number,
   draft: IngestDraft,
 ): Promise<ApplyResult> {
-  const inserted: ApplyResult = { rateCards: 0, accessorials: 0, laneZones: 0 };
+  const inserted: ApplyResult = { rateCards: 0, accessorials: 0, laneZones: 0, rateMatrices: 0, rateZones: 0 };
   await db().transaction(async (tx) => {
     for (const c of draft.rateCards ?? []) {
       const n = normalizeDraftRateCard(c);
@@ -550,6 +666,38 @@ export async function applyDraftToTenant(
       });
       inserted.laneZones++;
     }
+    // ── Rate matrices + zone legends (Tier 2 native matrix pricing) ────
+    const { cells, zones } = normalizeDraftMatrices(draft.rateMatrices ?? []);
+    for (const z of zones) {
+      await tx.insert(rateZones).values({
+        tenantId,
+        zoneId: z.zoneId,
+        matchKind: z.matchKind,
+        matchValue: z.matchValue ?? undefined,
+        matchFrom: z.matchFrom ?? undefined,
+        matchTo: z.matchTo ?? undefined,
+        label: z.label ?? undefined,
+        enabled: true,
+      });
+      inserted.rateZones++;
+    }
+    for (const c of cells) {
+      await tx.insert(rateMatrices).values({
+        tenantId,
+        mode: c.mode,
+        equipment: c.equipment ?? undefined,
+        originKey: c.originKey,
+        destKey: c.destKey,
+        rate: c.rate,
+        unitBasis: c.unitBasis,
+        minCharge: c.minCharge ?? undefined,
+        currency: c.currency ?? undefined,
+        effectiveDate: c.effectiveDate ?? undefined,
+        sourceRef: c.sourceRef ?? undefined,
+        enabled: true,
+      });
+      inserted.rateMatrices++;
+    }
     await tx
       .update(ingestJobs)
       .set({ status: 'applied', appliedAt: new Date(), updatedAt: new Date() })
@@ -572,7 +720,14 @@ export function draftToEngineConfig(draft: {
   rateCards?: Array<Record<string, unknown>>;
   accessorials?: Array<Record<string, unknown>>;
   laneZones?: Array<Record<string, unknown>>;
-}): { cards: RateCard[]; accs: Accessorial[]; zones: LaneZone[] } {
+  rateMatrices?: Array<Record<string, unknown>>;
+}): {
+  cards: RateCard[];
+  accs: Accessorial[];
+  zones: LaneZone[];
+  matrices: MatrixCellInput[];
+  matrixZones: ZoneDefInput[];
+} {
   const cards = (draft.rateCards ?? []).map((c, i) => {
     const n = normalizeDraftRateCard(c);
     return {
@@ -639,7 +794,32 @@ export function draftToEngineConfig(draft: {
     updatedAt: new Date(),
   })) as unknown as LaneZone[];
 
-  return { cards, accs, zones };
+  // Native matrix pricing: flatten the draft blocks into engine-shaped cells +
+  // zone-resolution rules, exactly as apply persists them, so preview/autocheck
+  // price via the matrix identically to what applying would produce.
+  const { cells: normCells, zones: normZones } = normalizeDraftMatrices(draft.rateMatrices ?? []);
+  const matrices: MatrixCellInput[] = normCells.map((c, i) => ({
+    id: -(i + 1),
+    mode: c.mode,
+    equipment: c.equipment,
+    originKey: c.originKey,
+    destKey: c.destKey,
+    rate: c.rate,
+    unitBasis: c.unitBasis,
+    minCharge: c.minCharge,
+    currency: c.currency,
+    enabled: true,
+  }));
+  const matrixZones: ZoneDefInput[] = normZones.map((z) => ({
+    zoneId: z.zoneId,
+    matchKind: z.matchKind,
+    matchValue: z.matchValue,
+    matchFrom: z.matchFrom,
+    matchTo: z.matchTo,
+    enabled: true,
+  }));
+
+  return { cards, accs, zones, matrices, matrixZones };
 }
 
 /**
@@ -678,8 +858,54 @@ const REP_LANES = [
   { miles: 1015, label: 'Dallas, TX → Chicago, IL', pu: { city: 'Dallas', state: 'TX' }, de: { city: 'Chicago', state: 'IL' } },
 ];
 
-export function buildAutoCheckSamples(cards: RateCard[], zones: LaneZone[]): AutoSample[] {
+/** A representative shipment ZIP that resolves to a named matrix zone, so an
+ *  auto-check probe of a zone-keyed matrix cell actually matches. */
+function zoneRepresentativeZip(zoneId: string, zones: ZoneDefInput[]): string | undefined {
+  const z = zones.find((r) => r.enabled !== false && r.zoneId === zoneId);
+  if (!z) return undefined;
+  if (z.matchKind === 'zip5' && z.matchValue) return String(z.matchValue);
+  if (z.matchKind === 'zip3' && z.matchValue) return `${String(z.matchValue)}01`;
+  if (z.matchKind === 'zip_range' && z.matchFrom) {
+    const d = String(z.matchFrom).replace(/\D/g, '');
+    return d.length <= 3 ? `${d.padStart(3, '0').slice(0, 3)}01` : d.padStart(5, '0').slice(0, 5);
+  }
+  return undefined;
+}
+
+/** Turn a matrix key into the pickup/delivery location a probe needs: a literal
+ *  zip when numeric, else a representative zip resolved from the zone legend. */
+function matrixKeyToZip(key: string, zones: ZoneDefInput[]): string | undefined {
+  if (/^\d{3,5}$/.test(key)) return key.length === 3 ? `${key}01` : key.padStart(5, '0').slice(0, 5);
+  return zoneRepresentativeZip(key, zones);
+}
+
+export function buildAutoCheckSamples(
+  cards: RateCard[],
+  zones: LaneZone[],
+  matrices: MatrixCellInput[] = [],
+  matrixZones: ZoneDefInput[] = [],
+): AutoSample[] {
   const samples: AutoSample[] = [];
+
+  // One probe per matrix cell (up to 3) so a native matrix lane is verified to
+  // price through the engine, not just approximated.
+  for (const cell of matrices.slice(0, 3)) {
+    const puZip = matrixKeyToZip(cell.originKey, matrixZones);
+    const deZip = matrixKeyToZip(cell.destKey, matrixZones);
+    if (!puZip || !deZip) continue;
+    samples.push({
+      label: `${String(cell.mode).toUpperCase()} matrix ${cell.originKey} → ${cell.destKey}`,
+      request: {
+        service: cell.mode,
+        equipment: cell.equipment ?? cards.find((c) => c.service === cell.mode)?.equipment ?? 'dryvan',
+        miles: 500,
+        pickupZip: puZip,
+        deliveryZip: deZip,
+        pickupCountry: 'US',
+        deliveryCountry: 'US',
+      },
+    });
+  }
 
   // One flat-tariff probe per lane zone (drayage short-haul within radius).
   for (const z of zones.slice(0, 2)) {
@@ -726,22 +952,23 @@ export function buildAutoCheckSamples(cards: RateCard[], zones: LaneZone[]): Aut
     }
   }
 
-  return samples.slice(0, 8);
+  return samples.slice(0, 10);
 }
 
 export function runDraftAutoCheck(draft: {
   rateCards?: Array<Record<string, unknown>>;
   accessorials?: Array<Record<string, unknown>>;
   laneZones?: Array<Record<string, unknown>>;
+  rateMatrices?: Array<Record<string, unknown>>;
 }): AutoCheckSummary {
-  const { cards, accs, zones } = draftToEngineConfig(draft);
-  const samples = buildAutoCheckSamples(cards, zones);
+  const { cards, accs, zones, matrices, matrixZones } = draftToEngineConfig(draft);
+  const samples = buildAutoCheckSamples(cards, zones, matrices, matrixZones);
   const results: AutoCheckSampleResult[] = samples.map((s) => {
     // No tenant in scope here — this is a pure sanity check over a parsed
     // draft (does each service price above $0?), and the currency label is
     // never surfaced from these results. Engine defaults to USD; that is a
     // label on a throwaway probe, not a converted amount.
-    const r = calculate(cards, accs, zones, s.request);
+    const r = calculate(cards, accs, zones, s.request, [], undefined, matrices, matrixZones);
     if (r.unsupported) {
       return { label: s.label, service: s.request.service, ok: false, reason: r.unsupported.reason };
     }

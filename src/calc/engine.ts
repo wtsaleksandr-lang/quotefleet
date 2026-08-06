@@ -34,6 +34,12 @@ import {
   DEFAULT_LTL_CONFIG,
   type FreightClassEstimate,
 } from './freightClass.js';
+import {
+  findMatrixCell,
+  matrixLinehaul,
+  type MatrixCellInput,
+  type ZoneDefInput,
+} from './rateMatrix.js';
 
 /**
  * Absolute upper bound (pounds) for an automated instant quote. Anything above
@@ -422,14 +428,32 @@ export function calculate(
   zones: LaneZone[],
   req: CalcRequest,
   terminals: Terminal[] = [],
-  fsc?: FscOptions
+  fsc?: FscOptions,
+  // ── Tier 2: native rate-matrix pricing (ADDITIVE) ──────────────────
+  // Both default to [] so every existing caller is byte-identical: with no
+  // matrices, `matrixMatch` is always undefined and every branch below collapses
+  // to the pre-existing card / lane-zone / LTL logic. See src/calc/rateMatrix.ts.
+  matrices: MatrixCellInput[] = [],
+  matrixZones: ZoneDefInput[] = []
 ): CalcResult {
   const lines: CalcLine[] = [];
 
   const card = findRateCard(cards, req.service, req.equipment);
   const zone = matchLaneZone(zones, req);
+  // Precedence: an exact matrix cell wins over a lane_zone radius match and the
+  // per-mile / LTL rate card (documented in the PR). Resolved DIRECTIONALLY from
+  // the shipment's origin/dest → matrix keys (zip5 → zip3 → named zone →
+  // city/state). Only computed when the tenant actually has matrices.
+  const matrixMatch = matrices.length
+    ? findMatrixCell(matrices, matrixZones, {
+        origin: { zip: req.pickupZip, city: req.pickupCity, state: req.pickupState, portCode: req.pickupPortCode },
+        dest: { zip: req.deliveryZip, city: req.deliveryCity, state: req.deliveryState, portCode: req.deliveryPortCode },
+        service: req.service,
+        equipment: req.equipment,
+      })
+    : undefined;
 
-  if (!card && !zone) {
+  if (!card && !zone && !matrixMatch) {
     return {
       request: req,
       lines: [],
@@ -454,7 +478,7 @@ export function calculate(
   // $4.50/mi ≈ $12k — an absurd number that destroys quote credibility.
   // A lane-zone flat tariff (short-haul drayage inside its radius) is
   // exempt; this only guards the per-mile card path.
-  if (!zone && card && typeof card.maxMiles === 'number' && card.maxMiles > 0 && req.miles > card.maxMiles) {
+  if (!zone && !matrixMatch && card && typeof card.maxMiles === 'number' && card.maxMiles > 0 && req.miles > card.maxMiles) {
     return {
       request: req,
       lines: [],
@@ -486,6 +510,7 @@ export function calculate(
   // per-equipment truckload.
   if (
     !zone &&
+    !matrixMatch &&
     card &&
     typeof card.maxWeightLbs === 'number' &&
     card.maxWeightLbs > 0 &&
@@ -512,7 +537,30 @@ export function calculate(
   // ── Linehaul ──────────────────────────────────────────────────────
   let linehaul = 0;
   let ltlRating: (FreightClassEstimate & { classSource: 'derived' | 'override' }) | undefined;
-  if (zone) {
+  if (matrixMatch) {
+    // Matrix cell wins the linehaul (highest precedence). Price per unit_basis
+    // then apply the cell's min-charge floor. FSC + margin + accessorials then
+    // flow through the SAME existing card-driven path below — identical to how a
+    // matched lane-zone flat tariff behaves.
+    const cell = matrixMatch.cell;
+    const priced = matrixLinehaul(cell, req.miles);
+    linehaul = round2(priced.amount);
+    const basis = String(cell.unitBasis || 'flat');
+    const note =
+      basis === 'per_mile'
+        ? `${req.miles.toFixed(0)} mi × $${(Number(cell.rate) || 0).toFixed(2)}/mi from the rate matrix (${cell.originKey} → ${cell.destKey}).`
+        : basis === 'per_container'
+          ? `Per-container matrix rate for ${cell.originKey} → ${cell.destKey}.`
+          : `Flat matrix lane rate for ${cell.originKey} → ${cell.destKey}.`;
+    lines.push({
+      name: priced.floored
+        ? `Minimum charge (matrix ${cell.originKey} → ${cell.destKey})`
+        : `Matrix lane rate (${cell.originKey} → ${cell.destKey})`,
+      amount: linehaul,
+      kind: priced.floored ? 'minimum' : 'linehaul',
+      note,
+    });
+  } else if (zone) {
     linehaul = zone.flatPrice;
     lines.push({
       name: `${zone.label} (zone tariff)`,

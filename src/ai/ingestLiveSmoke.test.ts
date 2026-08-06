@@ -67,6 +67,62 @@ describe.skipIf(!RUN)('LIVE ingest smoke (ANTHROPIC_API_KEY set)', () => {
     expect(Math.abs(extracted.subtotalLinehaul - def.subtotalLinehaul)).toBeGreaterThan(1);
   }, 90_000);
 
+  it('comprehends a zip3/zone FTL origin×dest matrix → rateMatrices that PRICE to the correct cell', async () => {
+    const { parseRateSheet } = await import('./ingestFile.js');
+    const { RAW_CSV_ZONE_MATRIX } = await import('./ingestFixtures.js');
+    const { draftToEngineConfig } = await import('../server/routes/ingest.js');
+    const { calculate } = await import('../calc/engine.js');
+
+    const res = await parseRateSheet({
+      tenantId: 1,
+      filename: 'zone-matrix.csv',
+      mimeType: 'text/csv',
+      dataBase64: Buffer.from(RAW_CSV_ZONE_MATRIX, 'utf8').toString('base64'),
+    });
+    // The headline capability: a real matrix is captured NATIVELY, not flattened.
+    expect(res.parsed.rateMatrices, 'model should emit rateMatrices').toBeTruthy();
+    expect(res.parsed.rateMatrices!.length).toBeGreaterThan(0);
+
+    const { cards, accs, zones, matrices, matrixZones } = draftToEngineConfig({ rateMatrices: res.parsed.rateMatrices });
+    expect(matrices.length).toBeGreaterThan(1);
+
+    const price = (pickupZip: string, deliveryZip: string) =>
+      calculate(cards, accs, zones, { service: 'ftl', equipment: 'dryvan', miles: 400, pickupZip, deliveryZip }, [], undefined, matrices, matrixZones);
+
+    // ≥3 specific lanes must price to the EXACT printed cell (all-in → linehaul == cell).
+    expect(price('90045', '85003').subtotalLinehaul).toBe(1900); // W → E
+    expect(price('85003', '90045').subtotalLinehaul).toBe(1750); // E → W (asymmetric)
+    expect(price('60601', '90045').subtotalLinehaul).toBe(2350); // M → W
+  }, 90_000);
+
+  it('comprehends a drayage port→zone per-container matrix → prices the correct container cell', async () => {
+    const { parseRateSheet } = await import('./ingestFile.js');
+    const { RAW_CSV_DRAYAGE_MATRIX } = await import('./ingestFixtures.js');
+    const { draftToEngineConfig } = await import('../server/routes/ingest.js');
+    const { calculate } = await import('../calc/engine.js');
+
+    const res = await parseRateSheet({
+      tenantId: 1,
+      filename: 'dray-matrix.csv',
+      mimeType: 'text/csv',
+      dataBase64: Buffer.from(RAW_CSV_DRAYAGE_MATRIX, 'utf8').toString('base64'),
+    });
+    expect(res.parsed.rateMatrices!.length).toBeGreaterThan(0);
+
+    const { cards, accs, zones, matrices, matrixZones } = draftToEngineConfig({ rateMatrices: res.parsed.rateMatrices });
+    expect(matrices.length).toBeGreaterThan(2);
+
+    const price = (equipment: string, deliveryZip: string) =>
+      calculate(cards, accs, zones, {
+        service: 'drayage', equipment, miles: 25, pickupPortCode: 'USLAX', deliveryZip,
+      }, [], undefined, matrices, matrixZones);
+
+    // Per-container cells — linehaul == the printed container rate (fuel is on fscDetected, no card).
+    expect(price('container_40', '90045').subtotalLinehaul).toBe(425);
+    expect(price('container_20', '92602').subtotalLinehaul).toBe(560);
+    expect(price('container_40hc', '90680').subtotalLinehaul).toBe(545);
+  }, 90_000);
+
   it('comprehends an all-in FTL rate con → fuelSurchargePct 0', async () => {
     const { parseRateSheet } = await import('./ingestFile.js');
     const { RAW_TEXT_FTL_ALL_IN } = await import('./ingestFixtures.js');

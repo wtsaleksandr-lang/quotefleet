@@ -161,6 +161,32 @@ const SYSTEM_PROMPT = `You are an expert freight-rate-sheet parser for a truckin
     "radiusMiles": number,
     "flatPrice": number,
     "equipmentScope": ["container_20","container_40",...]
+  }],
+  "rateMatrices": [{                    // NATIVE matrix pricing — patterns 1, 3, 5 (see below). PREFER this over laneZones for a real grid.
+    "mode": "ftl" | "drayage" | "ltl" | "expedited" | "hotshot",
+    "equipment": "dryvan"|"container_40"|... | null,   // null = the block applies to any equipment
+    "unitBasis": "flat" | "per_mile" | "per_container", // how each cell's rate is expressed
+    "currency": "USD" | "CAD" | null,
+    "effectiveDate": "YYYY-MM-DD" | null,
+    "minCharge": number | null,         // block-level min-charge floor (a cell may override)
+    "sourceRef": "e.g. 'Sheet: Zone Grid'" | null,
+    "originKeys": ["900","902",...] | null,  // optional: the origin axis legend (informational)
+    "destKeys": ["850","852",...] | null,    // optional: the dest axis legend (informational)
+    "cells": [{                          // ONE object per priced cell. DIRECTIONAL: origin→dest.
+      "originKey": "900",                // zip5, zip3, a zones[].zoneId, "city,state", or a port/UN-LOCODE
+      "destKey": "850",
+      "rate": number,
+      "unitBasis": "flat"|"per_mile"|"per_container" | null, // null → inherit the block unitBasis
+      "minCharge": number | null         // per-cell floor override (null → block minCharge)
+    }],
+    "zones": [{                          // the zip/city → zone-id LEGEND (pattern 3's separate tab). Populate when the origin/dest keys are named zones.
+      "zoneId": "A",                     // referenced by cells[].originKey/destKey
+      "matchKind": "zip3" | "zip5" | "city_state" | "zip_range",
+      "matchValue": "900" | "90802" | "los angeles,ca" | null,  // for zip3/zip5/city_state
+      "matchFrom": "900" | null,         // zip_range lower bound (inclusive)
+      "matchTo": "905" | null,           // zip_range upper bound (inclusive)
+      "label": "Zone A (LA Basin)" | null
+    }] | null
   }]
 }
 
@@ -206,7 +232,15 @@ Quirks: multi-tab join · merged/multi-row headers · units stated once in a tit
 ═══ DECISION RULES ═══
 1 all-in vs linehaul+FSC before FSC math. 2 always max(computed, min/AMC). 3 % vs cpm are different — never cross. 4 FSC on net post-discount linehaul only. 5 weight-break codes are range floors, not decimals. 6 LTL discount is off a NAMED base — capture the pair. 7 18 discrete classes, never round. 8 accessorial basis + free-time load-bearing. 9 zone matrices need the zip→zone legend joined; numeric columns may be carrier-groups not sizes — verify. 10 normalize zips/aliases/currency/dates. 11 mixed modes coexist — classify per section. 12 skip ocean/customs/brokerage% with a "skipped:" warning.
 
-NEVER silently drop a concept the engine can't natively price (full O×D matrices, banded FSC-scale, per-container drayage matrices). EXTRACT it, MAP to the closest supported shape (matrix cells → laneZones or the dominant lane rate; per-container drayage → laneZones), and add a clear WARNING that it was captured-and-approximated.
+═══ RATE MATRICES (patterns 1, 3, 5) — emit rateMatrices, do NOT flatten ═══
+The engine now prices matrices NATIVELY, so a real grid goes into rateMatrices — NOT laneZones, and NOT collapsed to one dominant lane rate.
+- Pattern 1 (origin×dest MATRIX): each non-blank, non-diagonal cell → one cells[] entry {originKey:<row>, destKey:<col>, rate}. Keys are whatever the axes use (zip5, zip3, city/state, or named zones). unitBasis is usually "flat" (per-lane $) or "per_mile" if the grid is $/mi. Matrices may be ASYMMETRIC — emit A→B and B→A separately when both are printed. Skip the blank diagonal.
+- Pattern 3 (zone defs + zone×zone grid, TWO tabs): read the legend tab into zones[] (zip3/zip5/zip_range/city_state → zoneId) AND the grid tab into cells[] keyed by those zoneIds. JOIN them in ONE rateMatrices block so a shipment zip resolves zone→cell.
+- Pattern 5 (drayage port→zone per-container MATRIX): mode "drayage", one block PER container size with equipment set (container_20/40/40hc/45) and unitBasis "per_container"; rows are dest zones/zips → cells keyed originKey=port code (e.g. "USLAX"), destKey=<zone/zip>. The single stated FSC% still goes on fscDetected.
+- Normalize zips as strings; PRESERVE leading zeros ("07001" not 7001). Directional. Put the unit stated once in the title on unitBasis. Set sourceRef to the tab/section name for audit.
+- Prefer the MOST SPECIFIC key the sheet gives (zip5 > zip3 > city/state). If the axes are named zones, you MUST also populate zones[] or the cells can't resolve.
+
+Still MAP-and-WARN for concepts the engine can't natively price (banded FSC-scale → fscDetected + warning). But a full O×D matrix, a zone×zone grid, and a per-container drayage matrix now have a NATIVE home in rateMatrices — use it. Only fall back to laneZones for a genuine radius-band drayage tariff (anchor + radius + flat price), not a keyed grid.
 
 ═══ FEW-SHOT EXAMPLES (input → correct JSON fragment) ═══
 
@@ -230,6 +264,14 @@ D) Rate-card email (mixed): "Effective 3/1/26. Reefer $2.85/mi +fuel. Detention 
 E) Drayage per-container zone matrix: "Port of LA → Zone A (0-30mi): 20'=$385, 40'=$425. Zone B (30-60mi): 40'=$540. FSC 40%."
 → laneZones:[{"label":"USLAX → Zone A (0-30mi)","anchorPortCode":"USLAX","anchorCity":"Los Angeles","anchorState":"CA","radiusMiles":30,"flatPrice":425,"equipmentScope":["container_40"]},{"label":"USLAX → Zone A (0-30mi) 20'","anchorPortCode":"USLAX","anchorCity":"Los Angeles","anchorState":"CA","radiusMiles":30,"flatPrice":385,"equipmentScope":["container_20"]},{"label":"USLAX → Zone B (30-60mi)","anchorPortCode":"USLAX","anchorCity":"Los Angeles","anchorState":"CA","radiusMiles":60,"flatPrice":540,"equipmentScope":["container_40"]}]
    warnings:["Drayage per-container zone matrix mapped to lane zones; FSC 40% captured on fscDetected"].
+
+F) FTL zip3 origin×dest matrix with a zone legend (pattern 3). Legend: "Zone W = zip3 900-902; Zone E = zip3 850-852". Grid ($/lane, all-in): W→E $1,900; E→W $1,750 (asymmetric).
+→ rateMatrices:[{"mode":"ftl","equipment":"dryvan","unitBasis":"flat","currency":"USD","effectiveDate":null,"minCharge":null,"sourceRef":"Sheet: Zone Grid","originKeys":["W","E"],"destKeys":["W","E"],"cells":[{"originKey":"W","destKey":"E","rate":1900,"unitBasis":null,"minCharge":null},{"originKey":"E","destKey":"W","rate":1750,"unitBasis":null,"minCharge":null}],"zones":[{"zoneId":"W","matchKind":"zip_range","matchValue":null,"matchFrom":"900","matchTo":"902","label":"Zone W"},{"zoneId":"E","matchKind":"zip_range","matchValue":null,"matchFrom":"850","matchTo":"852","label":"Zone E"}]}]
+   fscDetected:{"present":true,"appearsIncludedInLinehaul":true,"valuePct":null,"valuePerMile":null,"fscScale":null,"notes":"grid is all-in ($/lane)"}
+
+G) Drayage port→zone per-container matrix (pattern 5). "USLAX → dest zip3 900: 20'=$385, 40'=$425. zip3 926: 20'=$520, 40'=$560. FSC 40%."
+→ rateMatrices:[{"mode":"drayage","equipment":"container_20","unitBasis":"per_container","currency":"USD","effectiveDate":null,"minCharge":null,"sourceRef":"Sheet: Dray Matrix","originKeys":["USLAX"],"destKeys":["900","926"],"cells":[{"originKey":"USLAX","destKey":"900","rate":385,"unitBasis":null,"minCharge":null},{"originKey":"USLAX","destKey":"926","rate":520,"unitBasis":null,"minCharge":null}],"zones":null},{"mode":"drayage","equipment":"container_40","unitBasis":"per_container","currency":"USD","effectiveDate":null,"minCharge":null,"sourceRef":"Sheet: Dray Matrix","originKeys":["USLAX"],"destKeys":["900","926"],"cells":[{"originKey":"USLAX","destKey":"900","rate":425,"unitBasis":null,"minCharge":null},{"originKey":"USLAX","destKey":"926","rate":560,"unitBasis":null,"minCharge":null}],"zones":null}]
+   fscDetected:{"present":true,"appearsIncludedInLinehaul":false,"valuePct":40,"valuePerMile":null,"fscScale":null,"notes":"single FSC 40% across the matrix"}
 
 ═══ TOOLS ═══
 Per-mile derivation: when a sheet shows a point-to-point total but no $/mi, call geocode_distance, divide, and fill derivedFrom. If unavailable, leave ratePerMile null + warn.
@@ -333,6 +375,46 @@ export const LaneZoneDraftSchema = z
   })
   .passthrough();
 
+const RateMatrixCellSchema = z
+  .object({
+    originKey: zStr,
+    destKey: zStr,
+    rate: zNum,
+    unitBasis: zStr,
+    minCharge: zNum,
+  })
+  .passthrough();
+
+const RateZoneDefSchema = z
+  .object({
+    zoneId: zStr,
+    matchKind: zStr,
+    matchValue: zStr,
+    matchFrom: zStr,
+    matchTo: zStr,
+    label: zStr,
+  })
+  .passthrough();
+
+export const RateMatrixDraftSchema = z
+  .object({
+    mode: zStr,
+    equipment: zStr,
+    unitBasis: zStr,
+    currency: zStr,
+    effectiveDate: zStr,
+    minCharge: zNum,
+    sourceRef: zStr,
+    originKeys: zStrArr,
+    destKeys: zStrArr,
+    // `.nullish()` (not `.optional()`) throughout: the model emits `null` for an
+    // absent optional field (matching our documented `| null` shape), and a bare
+    // `.optional()` REJECTS null — which would silently drop the whole matrix.
+    cells: z.array(RateMatrixCellSchema).nullish(),
+    zones: z.array(RateZoneDefSchema).nullish(),
+  })
+  .passthrough();
+
 const FscDetectedSchema = z
   .object({
     present: z.boolean().nullish(),
@@ -359,6 +441,7 @@ export const IngestParsedSchema = z
     rateCards: z.array(z.unknown()).nullish(),
     accessorials: z.array(z.unknown()).nullish(),
     laneZones: z.array(z.unknown()).nullish(),
+    rateMatrices: z.array(z.unknown()).nullish(),
   })
   .passthrough();
 
@@ -380,6 +463,10 @@ export type IngestParsed = {
   rateCards: Array<Record<string, unknown>>;
   accessorials: Array<Record<string, unknown>>;
   laneZones: Array<Record<string, unknown>>;
+  // Optional in the TYPE so pre-Tier-2 fixtures / callers that never set it still
+  // satisfy IngestParsed; `validateParsed` ALWAYS returns it (defaulting to []),
+  // so runtime consumers can read it without a guard.
+  rateMatrices?: Array<Record<string, unknown>>;
 };
 
 /**
@@ -413,6 +500,7 @@ export function validateParsed(raw: unknown): IngestParsed {
   const rateCards = salvage(base.rateCards, RateCardDraftSchema, 'rate card') as Array<Record<string, unknown>>;
   const accessorials = salvage(base.accessorials, AccessorialDraftSchema, 'accessorial') as Array<Record<string, unknown>>;
   const laneZones = salvage(base.laneZones, LaneZoneDraftSchema, 'lane zone') as Array<Record<string, unknown>>;
+  const rateMatrices = salvage(base.rateMatrices, RateMatrixDraftSchema, 'rate matrix') as Array<Record<string, unknown>>;
 
   return {
     summary: base.summary ?? '',
@@ -427,6 +515,7 @@ export function validateParsed(raw: unknown): IngestParsed {
     rateCards,
     accessorials,
     laneZones,
+    rateMatrices,
   };
 }
 
@@ -495,14 +584,19 @@ export async function parseRateSheet(opts: {
       { type: 'text', text: `Filename: ${opts.filename}\nExtract the rate sheet into JSON per the spec.` },
     ];
   } else if (EXCEL_MIME.has(mt)) {
-    // Convert .xlsx/.xls → CSV-formatted text. Pass each sheet to Claude
-    // labeled by sheet name. Claude reads tables natively from CSV.
+    // Convert .xlsx/.xls → CSV-formatted text, one labeled block PER TAB. A full
+    // carrier tariff is multi-tab (zone-defs / rate-grid / FSC / accessorials)
+    // and the model JOINS them (research pattern 3) — so we no longer reject a
+    // dense workbook outright. excelToText self-bounds: it caps each tab and the
+    // whole workbook (far above the old 100KB wall) and annotates any truncation,
+    // so a realistic multi-tab tariff ingests instead of erroring, while a
+    // runaway file still can't blow up model cost.
     const text = excelToText(opts.dataBase64);
-    if (text.length > 100_000) {
-      throw new Error('Spreadsheet too dense (>100KB after CSV conversion). Split into smaller sheets.');
+    if (!text.trim()) {
+      throw new Error('No readable sheets found in the spreadsheet.');
     }
     userContent = [
-      { type: 'text', text: `Filename: ${opts.filename}\nThis is a spreadsheet rendered as CSV per sheet.\n\n${text}\n\nExtract the rate sheet into JSON per the spec.` },
+      { type: 'text', text: `Filename: ${opts.filename}\nThis is a spreadsheet rendered as CSV per sheet (### Sheet: <name>). Multiple tabs may need to be JOINED (a zone-legend tab + a rate-grid tab, an FSC tab, an accessorial tab).\n\n${text}\n\nExtract the rate sheet into JSON per the spec.` },
     ];
   } else if (mt === EML_MIME) {
     // .eml: extract the body + attachments. Each attachment recursed
@@ -659,15 +753,56 @@ export function parseModelJson(cleaned: string): Record<string, unknown> {
 /* ────────────────────────────────────────────────────────────────── *
  * Excel → CSV-text rendering
  * ────────────────────────────────────────────────────────────────── */
-function excelToText(dataBase64: string): string {
+
+/** Per-tab CSV cap (chars). A single dense grid rarely needs more, and it keeps
+ *  one runaway tab from starving the others / the model budget. */
+export const EXCEL_MAX_PER_SHEET = 120_000;
+/** Whole-workbook cap (chars) — FAR above the old 100KB hard reject, so a real
+ *  multi-tab carrier tariff (zone-defs + rate-grid + FSC + accessorials) reads,
+ *  but a pathological file still can't run away with model cost. */
+export const EXCEL_MAX_TOTAL = 500_000;
+
+/**
+ * Render an .xlsx/.xls workbook to labeled per-tab CSV text.
+ *
+ * Bounded, never throwing: each tab is truncated on a row boundary at
+ * `maxPerSheet`, the whole workbook at `maxTotal`, and any truncation/omission
+ * is annotated inline so the model knows data was cut (rather than silently
+ * losing a tab). This is what lets a large multi-tab tariff ingest — the reader
+ * classifies + carries every structurally-relevant tab and the model joins them.
+ */
+export function excelToText(
+  dataBase64: string,
+  opts?: { maxPerSheet?: number; maxTotal?: number },
+): string {
+  const maxPerSheet = opts?.maxPerSheet ?? EXCEL_MAX_PER_SHEET;
+  const maxTotal = opts?.maxTotal ?? EXCEL_MAX_TOTAL;
   const buf = Buffer.from(dataBase64, 'base64');
   const wb = XLSX.read(buf, { type: 'buffer' });
   const parts: string[] = [];
+  let used = 0;
   for (const sheetName of wb.SheetNames) {
     const sheet = wb.Sheets[sheetName];
     if (!sheet) continue;
-    const csv = XLSX.utils.sheet_to_csv(sheet, { blankrows: false });
-    if (csv.trim()) parts.push(`### Sheet: ${sheetName}\n${csv}`);
+    let csv = XLSX.utils.sheet_to_csv(sheet, { blankrows: false });
+    if (!csv.trim()) continue;
+    if (csv.length > maxPerSheet) {
+      // Cut on the last row boundary that fits, so we never split mid-row.
+      const cut = csv.lastIndexOf('\n', maxPerSheet);
+      csv = csv.slice(0, cut > 0 ? cut : maxPerSheet) +
+        `\n[... tab "${sheetName}" truncated to ~${Math.round(maxPerSheet / 1000)}KB to fit the model context — request this tab alone for full detail ...]`;
+    }
+    const block = `### Sheet: ${sheetName}\n${csv}`;
+    if (used + block.length > maxTotal) {
+      const remaining = Math.max(0, maxTotal - used);
+      if (remaining > 500) parts.push(block.slice(0, remaining));
+      parts.push(
+        `[... workbook exceeds the ~${Math.round(maxTotal / 1000)}KB read budget; remaining tab(s) omitted. Split the workbook or send the rate-grid + zone-legend tabs. ...]`,
+      );
+      break;
+    }
+    parts.push(block);
+    used += block.length + 2; // +2 for the '\n\n' join
   }
   return parts.join('\n\n');
 }
