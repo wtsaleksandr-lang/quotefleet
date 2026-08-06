@@ -3698,7 +3698,7 @@
   function renderIngest(c) {
     c.innerHTML = '';
     c.appendChild(el('h1', { text: 'AI import' }));
-    c.appendChild(el('p', { class: 'page-sub', text: 'Upload a rate sheet — PDF, image, Excel, email — and the AI extracts rate cards, accessorials, and lane zones for review.' }));
+    c.appendChild(el('p', { class: 'page-sub', text: 'Upload a rate sheet — PDF, image, Excel, email — and the AI extracts rate cards, accessorials, lane zones, and rate matrices for review.' }));
 
     // Forward-email auto-import (per-tenant toggle + dedicated address).
     c.appendChild(buildEmailImportCard());
@@ -4015,24 +4015,42 @@
       var rcSelections = renderItemList(card, 'Rate cards', parsed.rateCards || [], rateCardSummary);
       var accSelections = renderItemList(card, 'Accessorials', parsed.accessorials || [], accSummary);
       var lzSelections = renderItemList(card, 'Lane zones', parsed.laneZones || [], laneZoneSummary);
+      // Native rate MATRICES (origin×dest / zone / drayage per-container grids).
+      // Previously never rendered nor sent — so an ingested matrix was silently
+      // dropped on apply and never reached a customer. Each row is one matrix
+      // BLOCK (with its nested cells + zone legend), selected the same way.
+      var mxSelections = renderItemList(card, 'Rate matrices', parsed.rateMatrices || [], rateMatrixSummary);
 
+      function selectionTotal(body) {
+        return body.rateCards.length + body.accessorials.length + body.laneZones.length + body.rateMatrices.length;
+      }
+      function appliedNotice(ins) {
+        var bits = [
+          ins.rateCards + ' rate cards',
+          ins.accessorials + ' accessorials',
+          ins.laneZones + ' lane zones',
+        ];
+        // Only mention matrices/zones when something was actually written, so
+        // legacy imports read exactly as before.
+        if (ins.rateMatrices) bits.push(ins.rateMatrices + ' matrix cells');
+        if (ins.rateZones) bits.push(ins.rateZones + ' zone rules');
+        return '<div class="notice"><strong>Applied.</strong> ' + bits.join(' · ') + '</div>';
+      }
       function currentSelection() {
         return {
           rateCards: rcSelections.selected(),
           accessorials: accSelections.selected(),
           laneZones: lzSelections.selected(),
+          rateMatrices: mxSelections.selected(),
         };
       }
       function doApply(body, onDone) {
-        var total = body.rateCards.length + body.accessorials.length + body.laneZones.length;
+        var total = selectionTotal(body);
         if (total === 0) { toastErr({ message: 'Tick at least one item to apply.' }); return; }
         api('/api/tenant/ingest/' + job.id + '/apply', {
           method: 'POST', body: body,
         }).then(function (r) {
-          reviewBox.innerHTML = '<div class="notice"><strong>Applied.</strong> ' +
-            r.inserted.rateCards + ' rate cards · ' +
-            r.inserted.accessorials + ' accessorials · ' +
-            r.inserted.laneZones + ' lane zones</div>';
+          reviewBox.innerHTML = appliedNotice(r.inserted);
           refreshList();
           if (onDone) onDone(true);
         }).catch(function (err) {
@@ -4046,12 +4064,8 @@
         class: 'btn btn-primary',
         text: 'Apply selected',
         on: { click: function () {
-          var body = {
-            rateCards: rcSelections.selected(),
-            accessorials: accSelections.selected(),
-            laneZones: lzSelections.selected(),
-          };
-          var total = body.rateCards.length + body.accessorials.length + body.laneZones.length;
+          var body = currentSelection();
+          var total = selectionTotal(body);
           if (total === 0) { toastErr({ message: 'Tick at least one item to apply.' }); return; }
           var noun = total === 1 ? 'item' : 'items';
           showConfirmModal({
@@ -4064,10 +4078,7 @@
               api('/api/tenant/ingest/' + job.id + '/apply', {
                 method: 'POST', body: body,
               }).then(function (r) {
-                reviewBox.innerHTML = '<div class="notice"><strong>Applied.</strong> ' +
-                  r.inserted.rateCards + ' rate cards · ' +
-                  r.inserted.accessorials + ' accessorials · ' +
-                  r.inserted.laneZones + ' lane zones</div>';
+                reviewBox.innerHTML = appliedNotice(r.inserted);
                 refreshList();
               }).catch(function (err) {
                 applyBtn.disabled = false; applyBtn.textContent = 'Apply selected';
@@ -4083,7 +4094,7 @@
         on: { click: function () {
           showConfirmModal({
             title: 'Discard this parsed result?',
-            body: 'The extracted rate cards, accessorials, and lane zones will be discarded. You can re-upload the sheet anytime.',
+            body: 'The extracted rate cards, accessorials, lane zones, and rate matrices will be discarded. You can re-upload the sheet anytime.',
             confirmText: 'Discard',
             cancelText: 'Keep reviewing',
             danger: true,
@@ -4142,10 +4153,13 @@
     // committing. Uses the preview-quote endpoint (no persist).
     function openTestModal(job, parsed, getSelection, applyFn) {
       var cards = (parsed.rateCards || []).filter(function (c) { return c && c.service; });
-      // Unique services from the draft's rate cards.
+      var matrixBlocks = (parsed.rateMatrices || []).filter(function (m) { return m && m.mode; });
+      // Unique services from the draft's rate cards AND its rate matrices, so a
+      // matrix-only sheet (no per-mile cards) is still testable.
       var services = [];
       cards.forEach(function (c) { if (services.indexOf(c.service) < 0) services.push(c.service); });
-      if (!services.length) { toastErr({ message: 'No rate cards in this draft to test.' }); return; }
+      matrixBlocks.forEach(function (m) { if (services.indexOf(m.mode) < 0) services.push(m.mode); });
+      if (!services.length) { toastErr({ message: 'No rate cards or matrices in this draft to test.' }); return; }
 
       var backdrop = el('div', { class: 'qf-modal-backdrop is-open' });
       var cardEl = el('div', { class: 'qf-modal-card qf-test-card', role: 'dialog', 'aria-modal': 'true' });
@@ -4155,6 +4169,9 @@
       function equipmentFor(svc) {
         var eqs = [];
         cards.forEach(function (c) { if (c.service === svc && c.equipment && eqs.indexOf(c.equipment) < 0) eqs.push(c.equipment); });
+        // Matrix blocks scope to a mode + equipment too (e.g. drayage reefer
+        // container) — offer those so a matrix-only lane can be test-quoted.
+        matrixBlocks.forEach(function (m) { if (m.mode === svc && m.equipment && eqs.indexOf(m.equipment) < 0) eqs.push(m.equipment); });
         return eqs;
       }
       function opts(list) {
@@ -4300,6 +4317,31 @@
     function laneZoneSummary(z) {
       return '<strong>' + escapeHtml(z.label || (z.anchorPortCode || z.anchorCity || 'zone')) + '</strong>'
         + '<div class="muted-small">' + escapeHtml('within ' + (z.radiusMiles ?? '?') + ' mi · $' + (z.flatPrice ?? '?')) + '</div>';
+    }
+    // A rate-matrix BLOCK holds many priced cells (an origin×dest grid, a
+    // zone×zone grid, or a drayage port→zone per-container matrix). Summarize the
+    // block: mode/equipment, cell + zone counts, unit basis, and a few sample
+    // cells ("USLAX → 90744 $355") so the owner can sanity-check the grid before
+    // applying — without scrolling hundreds of rows.
+    function rateMatrixSummary(m) {
+      var cells = Array.isArray(m.cells) ? m.cells : [];
+      var zones = Array.isArray(m.zones) ? m.zones : [];
+      var head = [String(m.mode || 'ftl').toUpperCase()];
+      if (m.equipment) head.push(String(m.equipment));
+      head.push(cells.length + (cells.length === 1 ? ' cell' : ' cells'));
+      var meta = [];
+      if (m.unitBasis) meta.push(String(m.unitBasis).replace(/_/g, ' '));
+      if (zones.length) meta.push(zones.length + (zones.length === 1 ? ' zone' : ' zones'));
+      if (m.currency) meta.push(String(m.currency));
+      if (m.sourceRef) meta.push(String(m.sourceRef));
+      var samples = cells.slice(0, 3).map(function (c) {
+        var unit = (c.unitBasis || m.unitBasis) === 'per_mile' ? '/mi' : '';
+        return escapeHtml(String(c.originKey) + ' → ' + String(c.destKey) + ' $' + (c.rate != null ? c.rate : '?') + unit);
+      });
+      if (cells.length > 3) samples.push('…+' + (cells.length - 3) + ' more');
+      return '<strong>' + escapeHtml(head.join(' · ')) + '</strong>'
+        + '<div class="muted-small">' + escapeHtml(meta.join(' · ')) + '</div>'
+        + (samples.length ? '<div class="muted-small" style="margin-top:2px;opacity:.85;">' + samples.join(' &nbsp;·&nbsp; ') + '</div>' : '');
     }
   }
 

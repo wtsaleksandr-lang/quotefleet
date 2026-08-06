@@ -632,8 +632,15 @@ export async function parseRateSheet(opts: {
     // across every ingest call. Anthropic ephemeral cache (5-min TTL)
     // makes subsequent calls within that window pay ~10% of the input
     // cost on the system block.
-    const res = await client.messages.create(
-      {
+    // STREAM the completion rather than a single blocking create(). A large
+    // multi-sheet / multi-port matrix workbook produces a big JSON body that can
+    // take well over 60s to generate; a non-streaming create() with a 60s cap
+    // aborted mid-generation, so those sheets (matrices especially) frequently
+    // failed to ingest at all. Streaming keeps the socket alive receiving tokens
+    // — no per-request wall — and we assemble the final message when it lands.
+    // The SDK's default (10-min) request timeout is the only ceiling now.
+    const res = await client.messages
+      .stream({
         model,
         // Raised from 4096: LTL class×weight-break configs + banded FSC scales
         // + conditional accessorials make a comprehended rate book's JSON larger.
@@ -642,9 +649,8 @@ export async function parseRateSheet(opts: {
         system: [{ type: 'text', text: SYSTEM_PROMPT, cache_control: { type: 'ephemeral' } } as any],
         tools: TOOLS,
         messages,
-      },
-      { timeout: 60_000 }
-    );
+      })
+      .finalMessage();
     // Per-call usage telemetry — same shape as ai/client.ts so a single
     // grep over logs covers all AI cost centers.
     try {

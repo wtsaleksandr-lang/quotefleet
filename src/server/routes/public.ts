@@ -20,6 +20,8 @@ import {
   rateCards,
   accessorials,
   laneZones,
+  rateMatrices,
+  rateZones,
   terminals,
   ports,
   brandConfigs,
@@ -29,6 +31,7 @@ import {
 } from '../../db/schema.js';
 import express from 'express';
 import { calculate, currencyForCountry, customerFacingLines, MAX_QUOTABLE_WEIGHT_LBS, type CalcRequest, type FscOptions } from '../../calc/engine.js';
+import type { MatrixCellInput, ZoneDefInput } from '../../calc/rateMatrix.js';
 import { resolveFscForTenant, asOfLabel } from '../../eia/dieselPrice.js';
 import { estimateTransit } from '../../calc/transit.js';
 import { distanceBetween } from '../../calc/distance.js';
@@ -259,8 +262,8 @@ async function resolvePickupForDistance(loc: {
   };
 }
 
-async function loadConfig(tenantId: number) {
-  const [cards, accs, zones, terms, brand] = await Promise.all([
+export async function loadConfig(tenantId: number) {
+  const [cards, accs, zones, terms, brand, matrixRows, matrixZoneRows] = await Promise.all([
     // Deterministic order so a tenant with duplicate enabled cards for the
     // same (service, equipment) always resolves to the SAME card (never a
     // random price). Winner: most-recently-updated enabled card wins; `id` is
@@ -275,8 +278,19 @@ async function loadConfig(tenantId: number) {
     db().select().from(laneZones).where(eq(laneZones.tenantId, tenantId)),
     db().select().from(terminals).where(eq(terminals.tenantId, tenantId)),
     db().select().from(brandConfigs).where(eq(brandConfigs.tenantId, tenantId)).limit(1),
+    // Tier 2 native matrix pricing: the tenant's origin×dest / zone / drayage
+    // per-container rate CELLS and the zip→zone legend rows. Loaded here so the
+    // live customer quote path prices the exact matrix cell — previously these
+    // were never selected, so every public quote silently defaulted matrices=[]
+    // and matrix lanes fell through to the per-mile card / lane-zone logic.
+    db().select().from(rateMatrices).where(eq(rateMatrices.tenantId, tenantId)),
+    db().select().from(rateZones).where(eq(rateZones.tenantId, tenantId)),
   ]);
-  return { cards, accs, zones, terms, brand: brand[0] ?? null };
+  // The DB rows are structural supersets of the engine's MatrixCellInput /
+  // ZoneDefInput (see rateMatrix.ts) — pass them straight through.
+  const matrices = matrixRows as unknown as MatrixCellInput[];
+  const matrixZones = matrixZoneRows as unknown as ZoneDefInput[];
+  return { cards, accs, zones, terms, brand: brand[0] ?? null, matrices, matrixZones };
 }
 
 /**
@@ -361,7 +375,7 @@ export function registerPublicRoutes(app: Express) {
     // Private-calculator gate — a private tenant's rates are not fetchable
     // without a valid access grant (invite cookie/token).
     if (!(await enforceTenantAccess(tenant, req, res))) return;
-    const { cards, accs, zones, terms, brand } = await loadConfig(tenant.id);
+    const { cards, accs, zones, terms, brand, matrices } = await loadConfig(tenant.id);
     // Carrier contact block shown in the widget header — same source of
     // truth as the hosted quote (tenant.contactPhone/Email/mc/dot +
     // carrier-profile address). Assembled here so widget.js just renders.
@@ -397,9 +411,18 @@ export function registerPublicRoutes(app: Express) {
     // least one enabled lane-zone or terminal so the dropdown stays short.
     const enabledZones = zones.filter((z) => z.enabled);
     const enabledTerms = terms.filter((t) => t.enabled);
+    // Drayage matrices anchor on a port/UN-LOCODE origin key (e.g. "USLAX").
+    // Surface those ports too so a matrix-only drayage tenant's port dropdown is
+    // populated (the `ports` filter below drops any key that isn't a real port).
+    const matrixPortKeys = matrices
+      .filter((m) => m.enabled !== false && String(m.mode).toLowerCase() === 'drayage')
+      .flatMap((m) => [m.originKey, m.destKey])
+      .filter((k): k is string => typeof k === 'string' && /^[A-Za-z]{5}$/.test(k))
+      .map((k) => k.toUpperCase());
     const portCodes = Array.from(new Set([
       ...enabledZones.map((z) => z.anchorPortCode).filter((x): x is string => !!x),
       ...enabledTerms.map((t) => t.portCode),
+      ...matrixPortKeys,
     ]));
     const portsRows = portCodes.length
       ? await db().select().from(ports)
@@ -457,8 +480,20 @@ export function registerPublicRoutes(app: Express) {
           ? { ...(brand ?? {}), themePreset: req.query.preset }
           : brand ?? null,
       ),
-      services: Array.from(new Set(cards.filter((c) => c.enabled).map((c) => c.service))),
-      equipmentByService: groupBy(cards.filter((c) => c.enabled), 'service', 'equipment', 'label'),
+      // Services + equipment the widget offers. UNION of what the tenant has
+      // rate CARDS for AND what their rate MATRICES price — a matrix-only tenant
+      // (or a matrix mode/equipment with no matching card, e.g. a reefer
+      // container drayage cell) must still be selectable, or the customer can
+      // never reach the lane the matrix prices. mergeMatrixEquipment folds each
+      // enabled matrix cell's (mode → equipment) into the card-derived map.
+      services: Array.from(new Set([
+        ...cards.filter((c) => c.enabled).map((c) => c.service),
+        ...matrices.filter((m) => m.enabled !== false).map((m) => String(m.mode)),
+      ])),
+      equipmentByService: mergeMatrixEquipment(
+        groupBy(cards.filter((c) => c.enabled), 'service', 'equipment', 'label'),
+        matrices,
+      ),
       accessorials: accs
         .filter((a) => a.enabled && a.trigger === 'optional')
         .map((a) => ({
@@ -494,7 +529,7 @@ export function registerPublicRoutes(app: Express) {
     if (typeof body.weightLbs === 'number' && body.weightLbs > MAX_QUOTABLE_WEIGHT_LBS) {
       return res.status(400).json({ error: OVER_LEGAL_WEIGHT_MESSAGE });
     }
-    const { cards, accs, zones, terms } = await loadConfig(tenant.id);
+    const { cards, accs, zones, terms, matrices, matrixZones } = await loadConfig(tenant.id);
 
     // Distance — for drayage with a known port, fall back to the port's
     // lat/lng when the user hasn't typed a pickup ZIP/city.
@@ -539,7 +574,7 @@ export function registerPublicRoutes(app: Express) {
       currency: currencyForCountry(tenant.countryFocus, body.delivery.country ?? body.pickup.country),
     };
     const fsc = await fscOptionsForTenant(tenant);
-    const result = calculate(cards, accs, zones, calcReq, terms, fsc);
+    const result = calculate(cards, accs, zones, calcReq, terms, fsc, matrices, matrixZones);
 
     // Customer-facing surface: never expose the carrier's margin line, and
     // don't ship the raw margin figure over the wire. The grand total is
@@ -713,7 +748,7 @@ export function registerPublicRoutes(app: Express) {
     if (!body.customerEmail && !body.customerPhone) {
       return res.status(400).json({ error: 'Please provide an email or phone so we can reach you.' });
     }
-    const { cards, accs, zones, terms } = await loadConfig(tenant.id);
+    const { cards, accs, zones, terms, matrices, matrixZones } = await loadConfig(tenant.id);
 
     const pickupForDistance = await resolvePickupForDistance(body.pickup);
     const dist = await distanceBetween(pickupForDistance, body.delivery);
@@ -752,7 +787,7 @@ export function registerPublicRoutes(app: Express) {
       currency: currencyForCountry(tenant.countryFocus, body.delivery.country ?? body.pickup.country),
     };
     const fsc = await fscOptionsForTenant(tenant);
-    const calc = calculate(cards, accs, zones, calcReq, terms, fsc);
+    const calc = calculate(cards, accs, zones, calcReq, terms, fsc, matrices, matrixZones);
 
     const refId = generateLeadRef();
     const sourceUrl = req.headers.referer ?? null;
@@ -1362,6 +1397,60 @@ export function registerPublicRoutes(app: Express) {
       brand: brand[0] ?? null,
     });
   });
+}
+
+// Human labels for the equipment codes a rate matrix can carry but a rate card
+// may not (so a matrix-derived dropdown option reads "40' Reefer Container"
+// rather than the raw code). Falls back to a title-cased code when unmapped.
+const MATRIX_EQUIPMENT_LABELS: Record<string, string> = {
+  dryvan: 'Dry Van',
+  reefer: 'Reefer (Refrigerated)',
+  flatbed: 'Flatbed',
+  step_deck: 'Step Deck',
+  conestoga: 'Conestoga',
+  container_20: "20' Container",
+  container_40: "40' Container",
+  container_40hc: "40' High-Cube Container",
+  container_45: "45' Container",
+  container_40re: "40' Reefer Container",
+  container_20re: "20' Reefer Container",
+  sprinter: 'Sprinter Van',
+  box_truck: 'Box Truck',
+  tractor_only: 'Power Only',
+  pallet: 'Pallet',
+};
+
+function matrixEquipmentLabel(code: string): string {
+  const c = String(code || '').trim();
+  if (MATRIX_EQUIPMENT_LABELS[c]) return MATRIX_EQUIPMENT_LABELS[c];
+  // Title-case the raw code as a fallback (container_40re → "Container 40re").
+  return c.replace(/[_-]+/g, ' ').replace(/\b\w/g, (m) => m.toUpperCase()).trim() || c;
+}
+
+/**
+ * Fold each enabled rate-matrix cell's (mode → equipment) into a card-derived
+ * equipmentByService map, so a lane the tenant prices ONLY via a matrix (and any
+ * equipment a matrix cell scopes to but no rate card offers — e.g. a reefer
+ * container) is still selectable in the widget. De-dupes by equipment value per
+ * mode; a card-supplied label wins over a synthesized one. Cells with a null
+ * equipment (applies to any) contribute no concrete option on their own.
+ */
+function mergeMatrixEquipment(
+  base: Record<string, Array<{ value: string; label: string; maxWeightLbs?: number }>>,
+  matrices: MatrixCellInput[],
+): Record<string, Array<{ value: string; label: string; maxWeightLbs?: number }>> {
+  const out: Record<string, Array<{ value: string; label: string; maxWeightLbs?: number }>> = {};
+  for (const k of Object.keys(base)) out[k] = base[k].slice();
+  for (const cell of matrices) {
+    if (cell.enabled === false) continue;
+    const mode = String(cell.mode || '').trim();
+    const equip = cell.equipment != null ? String(cell.equipment).trim() : '';
+    if (!mode || !equip) continue;
+    if (!out[mode]) out[mode] = [];
+    if (out[mode].some((e) => e.value === equip)) continue;
+    out[mode].push({ value: equip, label: matrixEquipmentLabel(equip) });
+  }
+  return out;
 }
 
 function groupBy<T extends Record<string, unknown>>(
