@@ -30,9 +30,12 @@ vi.mock('../config.js', () => ({
 const RUN = /^sk-ant-/.test(process.env.ANTHROPIC_API_KEY ?? '');
 
 describe.skipIf(!RUN)('LIVE ingest smoke (ANTHROPIC_API_KEY set)', () => {
-  it('comprehends an LTL class×weight-break grid → non-empty ltlConfig', async () => {
+  it('comprehends an LTL class×weight-break grid → populated ltlConfig that PRICES non-default', async () => {
     const { parseRateSheet } = await import('./ingestFile.js');
     const { RAW_CSV_LTL_GRID } = await import('./ingestFixtures.js');
+    const { draftToEngineConfig } = await import('../server/routes/ingest.js');
+    const { calculate } = await import('../calc/engine.js');
+
     const res = await parseRateSheet({
       tenantId: 1,
       filename: 'ltl.csv',
@@ -40,8 +43,28 @@ describe.skipIf(!RUN)('LIVE ingest smoke (ANTHROPIC_API_KEY set)', () => {
       dataBase64: Buffer.from(RAW_CSV_LTL_GRID, 'utf8').toString('base64'),
     });
     const ltlCard = res.parsed.rateCards.find((c) => c.service === 'ltl');
-    expect(ltlCard).toBeTruthy();
-    expect(ltlCard!.ltlConfig).toBeTruthy();
+    expect(ltlCard, 'model should emit an LTL rate card').toBeTruthy();
+    // The headline capability: a real LTL grid must yield a POPULATED class/
+    // weight-break config, not a null fallback.
+    const cfg = ltlCard!.ltlConfig as Record<string, unknown> | null | undefined;
+    expect(cfg, 'LTL card must carry a populated ltlConfig').toBeTruthy();
+    expect(Number(cfg!.baseRatePerCwt)).toBeGreaterThan(0);
+    expect(cfg!.classRates && Object.keys(cfg!.classRates as object).length).toBeGreaterThan(1);
+    expect(Array.isArray(cfg!.weightBreaks) && (cfg!.weightBreaks as unknown[]).length).toBeGreaterThan(1);
+
+    // And it must actually PRICE through the engine — a sane, non-default quote.
+    const { cards } = draftToEngineConfig({ rateCards: res.parsed.rateCards });
+    const req = { service: 'ltl', equipment: String(ltlCard!.equipment ?? 'pallet'), miles: 600, weightLbs: 6000, freightClass: 175 };
+    const extracted = calculate(cards, [], [], req);
+    expect(extracted.unsupported).toBeUndefined();
+    expect(extracted.subtotalLinehaul).toBeGreaterThan(0);
+
+    // vs the DEFAULT_LTL_CONFIG fallback (same card, ltlConfig stripped).
+    const { cards: defCards } = draftToEngineConfig({
+      rateCards: res.parsed.rateCards.map((c) => ({ ...c, ltlConfig: null })),
+    });
+    const def = calculate(defCards, [], [], req);
+    expect(Math.abs(extracted.subtotalLinehaul - def.subtotalLinehaul)).toBeGreaterThan(1);
   }, 90_000);
 
   it('comprehends an all-in FTL rate con → fuelSurchargePct 0', async () => {

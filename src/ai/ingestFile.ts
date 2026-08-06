@@ -234,7 +234,11 @@ E) Drayage per-container zone matrix: "Port of LA → Zone A (0-30mi): 20'=$385,
 ═══ TOOLS ═══
 Per-mile derivation: when a sheet shows a point-to-point total but no $/mi, call geocode_distance, divide, and fill derivedFrom. If unavailable, leave ratePerMile null + warn.
 
-Use null for unknowns — never invent numbers; lower confidence + warn instead. Emit each rate once. Output the JSON object and nothing else.`;
+Use null for unknowns — never invent numbers; lower confidence + warn instead. Emit each rate once.
+
+For an LTL class×weight-break grid you MUST emit a populated ltlConfig on the LTL rate card (never leave it null when a grid is present) following few-shot C's recipe exactly: baseRatePerCwt = class-100 lightest-break cell × (1 − discount); classRates[c] = cwt[c][lightest] ÷ cwt[100][lightest]; weightBreaks rateFactor[w] = cwt[100][w] ÷ cwt[100][lightest] with L5C→minLbs 0, 5C→500, 1M→1000, 2M→2000, 5M→5000, 10M→10000; distanceFactorPer1000Mi 0; absoluteMinCharge = AMC (and set minimumCharge to it). Set ratePerMile null for LTL.
+
+CRITICAL OUTPUT RULE: emit ONLY the raw JSON object — no code fences, and NO prose, notes, or markdown tables before OR after it. Put any explanation inside a "warnings" entry, never as trailing text.`;
 
 /* ────────────────────────────────────────────────────────────────── *
  * Zod validation of the model's JSON output.
@@ -271,12 +275,17 @@ const LtlWeightBreakSchema = z
 const LtlConfigSchema = z
   .object({
     baseRatePerCwt: zNum,
-    classRates: z.record(z.string(), zNum).optional(),
-    weightBreaks: z.array(LtlWeightBreakSchema).optional(),
+    // `.nullish()` (not `.optional()`) is LOAD-BEARING here: the model emits
+    // `null` for an absent optional field — exactly as our documented `| null`
+    // shape instructs — and a bare `.optional()` REJECTS null, which failed the
+    // whole LtlConfig and made validateParsed DROP the entire LTL rate card
+    // (observed live: a perfect ltlConfig discarded because `fakClassMap: null`).
+    classRates: z.record(z.string(), zNum).nullish(),
+    weightBreaks: z.array(LtlWeightBreakSchema).nullish(),
     distanceFactorPer1000Mi: zNum,
     discountPct: zNum,
     baseTariffName: zStr,
-    fakClassMap: z.record(z.string(), zNum).optional(),
+    fakClassMap: z.record(z.string(), zNum).nullish(),
     absoluteMinCharge: zNum,
   })
   .passthrough();
@@ -345,9 +354,11 @@ export const IngestParsedSchema = z
     effectiveDate: zStr,
     expirationDate: zStr,
     fscDetected: FscDetectedSchema.nullish(),
-    rateCards: z.array(z.unknown()).optional(),
-    accessorials: z.array(z.unknown()).optional(),
-    laneZones: z.array(z.unknown()).optional(),
+    // nullish so a model that emits `null` (vs `[]` / omitting) for an empty
+    // section still validates and salvages to an empty array rather than failing.
+    rateCards: z.array(z.unknown()).nullish(),
+    accessorials: z.array(z.unknown()).nullish(),
+    laneZones: z.array(z.unknown()).nullish(),
   })
   .passthrough();
 

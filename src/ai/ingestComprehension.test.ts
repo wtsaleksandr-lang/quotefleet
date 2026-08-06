@@ -77,6 +77,48 @@ describe('validateParsed — backward compatibility', () => {
   });
 });
 
+describe('validateParsed — tolerates `null` in optional container fields (regression)', () => {
+  // Live failure mode: the model emits `null` for absent optional fields exactly
+  // as the documented `| null` shape says (e.g. `fakClassMap: null`). A bare
+  // `.optional()` REJECTS null, which dropped the ENTIRE LTL rate card and left
+  // ltlConfig empty on a real extraction. Nulls must be accepted so the card +
+  // its ltlConfig survive.
+  const cardWithNulls = {
+    summary: 'ltl with null optionals',
+    confidence: 'high',
+    rateCards: [
+      {
+        service: 'ltl',
+        equipment: 'pallet',
+        ratePerMile: null,
+        minimumCharge: 95,
+        ltlConfig: {
+          baseRatePerCwt: 14.7,
+          classRates: { '100': 1.0, '175': 1.9 },
+          weightBreaks: [{ minLbs: 0, rateFactor: 1.0 }, { minLbs: 5000, rateFactor: 0.45 }],
+          distanceFactorPer1000Mi: 0,
+          discountPct: 65,
+          baseTariffName: 'CzarLite XL 2024',
+          fakClassMap: null,
+          absoluteMinCharge: 95,
+        },
+      },
+    ],
+    accessorials: [],
+    laneZones: [],
+  };
+
+  it('keeps an LTL card whose ltlConfig has null optional fields (fakClassMap: null)', () => {
+    const out = validateParsed(cardWithNulls);
+    expect(out.warnings.some((w) => /Dropped malformed/.test(w))).toBe(false);
+    expect(out.rateCards.length).toBe(1);
+    const cfg = out.rateCards[0].ltlConfig as Record<string, unknown>;
+    expect(cfg).toBeTruthy();
+    expect(cfg.baseRatePerCwt).toBe(14.7);
+    expect(Object.keys(cfg.classRates as object).length).toBe(2);
+  });
+});
+
 describe('validateParsed — rejects / salvages malformed output', () => {
   it('the schema REJECTS a structurally-malformed top-level object', () => {
     expect(IngestParsedSchema.safeParse(FIXTURE_MALFORMED_TOPLEVEL).success).toBe(false);
