@@ -17,6 +17,7 @@
  * shapes so applying changes is a straight DB upsert.
  */
 import Anthropic from '@anthropic-ai/sdk';
+import { z } from 'zod';
 import * as XLSX from 'xlsx';
 import { simpleParser, type Attachment } from 'mailparser';
 import { eq } from 'drizzle-orm';
@@ -94,101 +95,343 @@ const EXCEL_MIME = new Set([
 
 const EML_MIME = 'message/rfc822';
 
-const SYSTEM_PROMPT = `You are a freight-rate-sheet parser for a drayage/trucking carrier's quote calculator. The user uploads a rate sheet — image, PDF, spreadsheet, email — and you extract a structured rate book.
+const SYSTEM_PROMPT = `You are an expert freight-rate-sheet parser for a trucking/drayage carrier's quote calculator. The user uploads a rate sheet — image, PDF, spreadsheet, email, screenshot — in ANY carrier/broker format. Comprehend it and normalize it into ONE structured rate book. Output ONLY a single JSON object — no prose, no backticks.
 
-OUTPUT: a single JSON object with this exact shape. Output ONLY the JSON — no prose, no backticks.
-
+═══ OUTPUT SHAPE ═══
 {
-  "summary": "1-2 sentence description",
+  "summary": "1-2 sentences",
   "confidence": "high" | "medium" | "low",
-  "warnings": ["short bullets about anything ambiguous"],
+  "warnings": ["short bullets: ambiguities, assumptions, captured-but-approximated concepts, skipped scope"],
+  "currency": "USD" | "CAD" | null,
+  "effectiveDate": "YYYY-MM-DD" | null,
+  "expirationDate": "YYYY-MM-DD" | null,
   "fscDetected": {
-    "present": boolean,
-    "appearsIncludedInLinehaul": boolean,
-    "valuePct": number | null,
-    "valuePerMile": number | null,
+    "present": boolean | null,
+    "appearsIncludedInLinehaul": boolean | null,
+    "valuePct": number | null,          // representative FSC % (of net linehaul)
+    "valuePerMile": number | null,      // representative FSC $/mi (FTL cpm scale)
+    "fscScale": null | {                // populate ONLY if a BANDED scale table is present
+      "kind": "cpm" | "pct",
+      "index": "EIA national" | "PADD5" | string | null,
+      "bands": [{ "dieselMin": number|null, "dieselMax": number|null, "value": number }],
+      "resolvedValue": number | null,   // representative current value you resolved from the table
+      "resolvedNote": "which band you picked and why"
+    },
     "notes": "what made you decide"
   },
-  "rateCards": [
-    {
-      "service": "drayage" | "ftl" | "ltl" | "expedited" | "hotshot",
-      "equipment": "dryvan" | "reefer" | "flatbed" | "step_deck" | "conestoga"
-                 | "container_20" | "container_40" | "container_40hc" | "container_45"
-                 | "sprinter" | "box_truck" | "tractor_only" | "pallet",
-      "label": "e.g. 53' Dry Van",
-      "ratePerMile": number | null,
-      "minimumCharge": number | null,
-      "flatFee": number | null,
-      "fuelSurchargePct": number | null,
-      "marginPct": number | null,
-      "derivedFrom": null | {
-        "totalUsd": number,
-        "originAddress": "string",
-        "destinationAddress": "string",
-        "approxMiles": number,
-        "explanation": "how you computed ratePerMile"
-      }
-    }
-  ],
-  "accessorials": [
-    {
-      "code": "snake_case",
-      "label": "human label",
-      "kind": "flat" | "per_mile" | "pct_of_base" | "per_hour" | "per_day",
-      "amount": number,
-      "appliesToServices": ["drayage","ftl",...] | null
-    }
-  ],
-  "laneZones": [
-    {
-      "label": "e.g. LAX/LGB → Local LA Basin (0-30 mi)",
-      "anchorPortCode": "USLAX" | null,
-      "anchorCity": "Los Angeles" | null,
-      "anchorState": "CA" | null,
-      "radiusMiles": number,
-      "flatPrice": number,
-      "equipmentScope": ["container_20","container_40",...]
-    }
-  ]
+  "rateCards": [{
+    "service": "drayage" | "ftl" | "ltl" | "expedited" | "hotshot",
+    "equipment": "dryvan"|"reefer"|"flatbed"|"step_deck"|"conestoga"|"container_20"|"container_40"|"container_40hc"|"container_45"|"sprinter"|"box_truck"|"tractor_only"|"pallet",
+    "label": "e.g. 53' Dry Van",
+    "ratePerMile": number | null,       // null for LTL (priced by ltlConfig) and pure flat/zone cards
+    "minimumCharge": number | null,     // min charge / AMC floor
+    "flatFee": number | null,
+    "fuelSurchargePct": number | null,  // 0 when all-in; the FSC% when fuel is separate
+    "marginPct": number | null,
+    "maxWeightLbs": number | null,      // equipment capacity ceiling if stated
+    "maxMiles": number | null,          // service-range ceiling if stated (e.g. drayage 300)
+    "ltlConfig": null | {               // POPULATE for LTL cards (see LTL section)
+      "baseRatePerCwt": number,         // NET $/cwt at reference class 100, lightest weight break
+      "classRates": { "50":0.55, "100":1.0, "500":3.5 },   // class → multiplier vs class 100
+      "weightBreaks": [{ "minLbs": number, "rateFactor": number }], // rateFactor 1.0 at lightest break, falling as weight rises
+      "distanceFactorPer1000Mi": number, // 0 when grid rates are complete linehaul (typical zone grid)
+      "discountPct": number | null,     // discount off named base tariff (ALREADY folded into baseRatePerCwt)
+      "baseTariffName": string | null,  // e.g. "CzarLite XL 2024"
+      "fakClassMap": { "70":85, "110":85 } | null,  // FAK: actual class → rates-as class
+      "absoluteMinCharge": number | null            // AMC (also set minimumCharge to this)
+    },
+    "derivedFrom": null | { "totalUsd": number, "originAddress": string, "destinationAddress": string, "approxMiles": number, "explanation": string }
+  }],
+  "accessorials": [{
+    "code": "snake_case",
+    "label": "human label",
+    "kind": "flat" | "per_mile" | "pct_of_base" | "per_hour" | "per_day",
+    "amount": number,
+    "trigger": "optional" | "auto" | "auto_if_residential" | "auto_if_hazmat" | "auto_if_temp_controlled" | "auto_if_no_dock" | "auto_if_loose" | "auto_if_weight_over",
+    "freeHours": number | null,         // per_hour only: free window before billing (detention = 2, dray = 1)
+    "daysFlag": "storageDays" | "layoverDays" | null,  // per_day only: which day-count drives it
+    "conditionJson": { "weightLbsOver": number } | null,  // for auto_if_weight_over
+    "appliesToServices": ["drayage","ftl",...] | null
+  }],
+  "laneZones": [{
+    "label": "e.g. LAX/LGB → Local LA Basin (0-30 mi)",
+    "anchorPortCode": "USLAX" | null,
+    "anchorCity": "Los Angeles" | null,
+    "anchorState": "CA" | null,
+    "radiusMiles": number,
+    "flatPrice": number,
+    "equipmentScope": ["container_20","container_40",...]
+  }]
 }
 
-CRITICAL RULES:
+═══ DOMAIN KNOWLEDGE ═══
 
-1. **FSC detection.** Many rate sheets quote a single "all-in" total that already includes Fuel Surcharge. You MUST decide whether the rate is base-only or all-in:
-   - If the sheet says "rate includes FSC", "all-in", "linehaul + fuel", "ATF", "all fuel surcharges included", or shows fuel as a separate column / added line → set fscDetected.present=true, fscDetected.appearsIncludedInLinehaul accordingly.
-   - If the sheet says "plus fuel", "+FSC", "fuel separate", "as quoted by DOE", or has an explicit FSC table → fsc is separate; set fuelSurchargePct/valuePct on the rate card.
-   - If the sheet shows a base rate AND an "all-in rate" both, prefer the BASE rate for ratePerMile and set fuelSurchargePct from the implied difference.
-   - If you can't decide, set fscDetected.present=null (i.e. omit the field) and add a warning "FSC handling unclear — assumed all-in".
-   - When the rate IS all-in and you set ratePerMile from it, set fuelSurchargePct to 0 (don't double-charge).
+MODES & base pricing:
+- FTL: per-mile RPM OR flat lane rate OR zone matrix; min-charge floor. Total = max(RPM×mi + FSC + accessorials, min).
+- LTL: (weight/100)×CWT[class][break][zone], discount-off-named-base, then AMC floor.
+- Drayage: per-CONTAINER by distance band OR named-zone matrix; free-time accessorials.
+- Intermodal: origin-dray + rail-linehaul + dest-dray, each +FSC.
+- Specialized (flatbed/oversize/reefer/expedited): per-mile linehaul + surcharge stack.
 
-2. **Per-mile derivation when only totals are given.** Many sheets show point-to-point totals like "Long Beach → Phoenix, $1,200" without a $/mile rate. You can call the geocode_distance tool to look up the road distance, then divide. Always populate derivedFrom with the inputs. If the tool isn't available or distance is unavailable, leave ratePerMile null and add a warning.
+Equipment aliases → normalize: DV/V/Van→dryvan; R/RF/Reefer→reefer; F/FB/FD/Flatbed→flatbed; SD/Step-deck→step_deck; PO/Power-only→tractor_only; 20'/40'/40HC/45'→container_20/40/40hc/45; HC=high-cube; O/D=over-dimensional.
+Map specialized services (flatbed, reefer, oversize) to service="ftl" with the matching equipment. Map intermodal to service="drayage" (dray legs) or "ftl" and WARN that the rail leg was approximated.
 
-3. **Currency.** Assume USD unless the sheet clearly says CAD; convert nothing — leave the value as-stated and add a warning.
+#1 AMBIGUITY — all-in vs linehaul+FSC (decide BEFORE any FSC math):
+- Tokens "all-in"/"FSC included"/"incl fuel"/one bare number, no FSC line → included → fuelSurchargePct=0, fscDetected.appearsIncludedInLinehaul=true. NEVER re-apply FSC.
+- A separate Linehaul + FSC%/FSC column → linehaul-only → set fuelSurchargePct/valuePct.
+- Both base + all-in shown → use BASE for ratePerMile, set fuelSurchargePct from the implied gap.
+- Undecidable → fscDetected.present=null + warning "FSC handling unclear — assumed all-in".
 
-4. **Ambiguity.** Use null for unknowns. Don't guess. Lower the confidence and add to warnings instead of inventing numbers.
+MILEAGE BASIS varies (PC*MILER Practical vs Shortest vs HHG vs Google) → same RPM, different totals. WARN when unstated.
 
-5. **Duplicates.** If the sheet repeats the same rate in multiple places (e.g. summary + per-route), emit it once.
+LTL specifics:
+- 18 discrete classes: 50,55,60,65,70,77.5,85,92.5,100,110,125,150,175,200,250,300,400,500. NEVER round (77.5 & 92.5 are real).
+- density = weight_lbs ÷ (L×W×H_in / 1728); read ranges as ≥low,<high.
+- Weight-break notation (range floors [break,next)): MIN/AMC=flat floor; L5C=<500; 5C/M5C=500–999; 1M/M1M=1000–1999; 2M=2000–4999; 5M=5000–9999; 10M=10000–19999; 20M+=volume. $/CWT FALLS as weight rises.
+- Converting a class×weight-break CWT grid → ltlConfig: reference = class 100 at the LIGHTEST break (L5C). baseRatePerCwt = that cell's $/cwt. classRates[c] = cwt[c][L5C] ÷ cwt[100][L5C]. weightBreaks: rateFactor[w] = cwt[100][w] ÷ cwt[100][L5C] (so 1.0 at L5C, falling). distanceFactorPer1000Mi=0 (grid rates are complete linehaul). absoluteMinCharge = the AMC/MIN cell; also set minimumCharge to it.
+- Discount off a NAMED base tariff ("70% off CzarLite"): FOLD the discount into baseRatePerCwt (baseRatePerCwt = published_net = published × (1 − discount)); still record discountPct + baseTariffName for audit. "70% off X" vs "70% off Y" differ ~2× — the base tariff name is load-bearing; WARN if the base is unnamed.
+- FAK ("classes 70–125 all rate as 85"): put in fakClassMap; WARN it was captured.
+- Linear-foot / cubic-capacity rerating rules → capture in warnings (engine can't rerate).
 
-6. **Unsupported scope.** If you find ocean rates, customs fees, brokerage commission percentages, or anything that isn't a domestic trucking rate / accessorial / lane zone — skip it and add a warning saying "skipped: <what>".
+FSC (4 forms): (1) per-mile cpm step table → valuePerMile + fscScale.kind="cpm"; (2) %-of-linehaul band table → valuePct + fscScale.kind="pct"; (3) fixed cpm/% snapshot → valuePerMile/valuePct; (4) all-in → present, included. FSC applies to NET post-discount linehaul only — never accessorials/total. If a BANDED scale is present: capture bands in fscScale, resolve a representative current value into resolvedValue/valuePct/valuePerMile, and WARN "FSC scale captured; resolved to representative value — banded pricing not applied".
 
-Output the JSON object and nothing else.`;
+ACCESSORIAL basis is load-bearing — do NOT default everything to flat:
+- Detention/driver-assist = per_hour (freeHours: 2, dray 1). Layover/storage/demurrage/per-diem/chassis = per_day (daysFlag). TONU/residential/liftgate(flat)/limited-access/inside-delivery/redelivery/hazmat/tarping = flat. Stop-off = per stop (flat per occurrence). Out-of-route/team = per_mile. Liftgate/sort LTL often per cwt.
+- Conditional footnotes ("$50/hr IF detained") → trigger stays "optional" (or the right auto_if_*), never summed into base; WARN they're conditional.
+
+═══ 8 DOCUMENT PATTERNS (classify per tab/section, not per file) ═══
+1 Origin×Dest MATRIX 2 Lane/zip LIST 3 Zone tables (zip3→zone + zone×zone grid, two-hop join) 4 LTL class×weight-break GRID 5 Drayage port→zone per-container MATRIX 6 Accessorial/FSC schedule 7 Rate confirmation FORM (one load) 8 "Rate card" price list (mixed units per row).
+Quirks: multi-tab join · merged/multi-row headers · units stated once in a title · min charge hiding in a corner · code abbreviations · FSC step-functions · mixed modes/units · discount+base-tariff indirection · dropped leading-zero zips · spacer/footnote rows · USD/CAD ambiguity · effective/expiration dating.
+
+═══ DECISION RULES ═══
+1 all-in vs linehaul+FSC before FSC math. 2 always max(computed, min/AMC). 3 % vs cpm are different — never cross. 4 FSC on net post-discount linehaul only. 5 weight-break codes are range floors, not decimals. 6 LTL discount is off a NAMED base — capture the pair. 7 18 discrete classes, never round. 8 accessorial basis + free-time load-bearing. 9 zone matrices need the zip→zone legend joined; numeric columns may be carrier-groups not sizes — verify. 10 normalize zips/aliases/currency/dates. 11 mixed modes coexist — classify per section. 12 skip ocean/customs/brokerage% with a "skipped:" warning.
+
+NEVER silently drop a concept the engine can't natively price (full O×D matrices, banded FSC-scale, per-container drayage matrices). EXTRACT it, MAP to the closest supported shape (matrix cells → laneZones or the dominant lane rate; per-container drayage → laneZones), and add a clear WARNING that it was captured-and-approximated.
+
+═══ FEW-SHOT EXAMPLES (input → correct JSON fragment) ═══
+
+A) FTL all-in rate con: "LAX→PHX, 53' van, $1,850 all-in, 372 mi"
+→ rateCards:[{"service":"ftl","equipment":"dryvan","label":"53' Dry Van","ratePerMile":4.97,"minimumCharge":null,"flatFee":0,"fuelSurchargePct":0,"marginPct":null,"maxWeightLbs":null,"maxMiles":null,"ltlConfig":null,"derivedFrom":{"totalUsd":1850,"originAddress":"Los Angeles, CA","destinationAddress":"Phoenix, AZ","approxMiles":372,"explanation":"1850/372"}}]
+   fscDetected:{"present":true,"appearsIncludedInLinehaul":true,"valuePct":null,"valuePerMile":null,"fscScale":null,"notes":"'all-in' → fuel included, not re-applied"}
+
+B) FTL linehaul + separate FSC + min: "Dry van $2.10/mi linehaul, FSC 28%, $450 minimum"
+→ rateCards:[{"service":"ftl","equipment":"dryvan","ratePerMile":2.10,"minimumCharge":450,"flatFee":0,"fuelSurchargePct":28,"marginPct":null,"maxWeightLbs":null,"maxMiles":null,"ltlConfig":null,"derivedFrom":null}]
+   fscDetected:{"present":true,"appearsIncludedInLinehaul":false,"valuePct":28,"valuePerMile":null,"fscScale":null,"notes":"separate FSC column"}
+
+C) LTL class×weight-break grid (excerpt): AMC $95. Class100: L5C=$42.00/cwt, 1M=$30.24, 5M=$21.00. Class50 L5C=$23.10. Class500 L5C=$147.00. "65% off CzarLite XL 2024".
+→ rateCards:[{"service":"ltl","equipment":"pallet","label":"LTL (CzarLite XL, 65% off)","ratePerMile":null,"minimumCharge":95,"flatFee":0,"fuelSurchargePct":null,"marginPct":null,"maxWeightLbs":null,"maxMiles":null,"ltlConfig":{"baseRatePerCwt":14.70,"classRates":{"50":0.55,"100":1.0,"500":3.5},"weightBreaks":[{"minLbs":0,"rateFactor":1.0},{"minLbs":1000,"rateFactor":0.72},{"minLbs":5000,"rateFactor":0.5}],"distanceFactorPer1000Mi":0,"discountPct":65,"baseTariffName":"CzarLite XL 2024","fakClassMap":null,"absoluteMinCharge":95}}]
+   NOTE: baseRatePerCwt 14.70 = 42.00 × (1−0.65) net; classRates & weightBreaks are ratios of the class-100 row; distanceFactorPer1000Mi=0 (grid is full linehaul). warnings:["LTL rated off CzarLite XL 2024 base at 65% discount (folded into net CWT)"].
+
+D) Rate-card email (mixed): "Effective 3/1/26. Reefer $2.85/mi +fuel. Detention $75/hr after 2 hrs. Residential +$120."
+→ effectiveDate:"2026-03-01"; rateCards:[{"service":"ftl","equipment":"reefer","ratePerMile":2.85,"minimumCharge":null,"flatFee":0,"fuelSurchargePct":null,"marginPct":null,"maxWeightLbs":null,"maxMiles":null,"ltlConfig":null,"derivedFrom":null}]
+   accessorials:[{"code":"detention","label":"Detention","kind":"per_hour","amount":75,"trigger":"optional","freeHours":2,"daysFlag":null,"conditionJson":null,"appliesToServices":null},{"code":"residential","label":"Residential delivery","kind":"flat","amount":120,"trigger":"auto_if_residential","freeHours":null,"daysFlag":null,"conditionJson":null,"appliesToServices":null}]
+   fscDetected:{"present":true,"appearsIncludedInLinehaul":false,"valuePct":null,"valuePerMile":null,"fscScale":null,"notes":"'+fuel' → separate but % not stated"} warnings:["Reefer FSC separate but percentage not stated"].
+
+E) Drayage per-container zone matrix: "Port of LA → Zone A (0-30mi): 20'=$385, 40'=$425. Zone B (30-60mi): 40'=$540. FSC 40%."
+→ laneZones:[{"label":"USLAX → Zone A (0-30mi)","anchorPortCode":"USLAX","anchorCity":"Los Angeles","anchorState":"CA","radiusMiles":30,"flatPrice":425,"equipmentScope":["container_40"]},{"label":"USLAX → Zone A (0-30mi) 20'","anchorPortCode":"USLAX","anchorCity":"Los Angeles","anchorState":"CA","radiusMiles":30,"flatPrice":385,"equipmentScope":["container_20"]},{"label":"USLAX → Zone B (30-60mi)","anchorPortCode":"USLAX","anchorCity":"Los Angeles","anchorState":"CA","radiusMiles":60,"flatPrice":540,"equipmentScope":["container_40"]}]
+   warnings:["Drayage per-container zone matrix mapped to lane zones; FSC 40% captured on fscDetected"].
+
+═══ TOOLS ═══
+Per-mile derivation: when a sheet shows a point-to-point total but no $/mi, call geocode_distance, divide, and fill derivedFrom. If unavailable, leave ratePerMile null + warn.
+
+Use null for unknowns — never invent numbers; lower confidence + warn instead. Emit each rate once.
+
+For an LTL class×weight-break grid you MUST emit a populated ltlConfig on the LTL rate card (never leave it null when a grid is present) following few-shot C's recipe exactly: baseRatePerCwt = class-100 lightest-break cell × (1 − discount); classRates[c] = cwt[c][lightest] ÷ cwt[100][lightest]; weightBreaks rateFactor[w] = cwt[100][w] ÷ cwt[100][lightest] with L5C→minLbs 0, 5C→500, 1M→1000, 2M→2000, 5M→5000, 10M→10000; distanceFactorPer1000Mi 0; absoluteMinCharge = AMC (and set minimumCharge to it). Set ratePerMile null for LTL.
+
+CRITICAL OUTPUT RULE: emit ONLY the raw JSON object — no code fences, and NO prose, notes, or markdown tables before OR after it. Put any explanation inside a "warnings" entry, never as trailing text.`;
+
+/* ────────────────────────────────────────────────────────────────── *
+ * Zod validation of the model's JSON output.
+ *
+ * The model is non-deterministic, so we validate + SALVAGE rather than trust:
+ * every array member is validated individually and invalid members are dropped
+ * with a warning (a single malformed rate card must not sink the whole job).
+ * Every field is optional/lenient so the CURRENT simple output shape still
+ * passes unchanged — this only WIDENS the contract, it never tightens it. Extra
+ * keys are passed through (`.passthrough()`) so a richer model response is kept.
+ * ────────────────────────────────────────────────────────────────── */
+
+/** Coerce a JSON value to a finite number, else undefined (nulls tolerated). */
+const zNum = z.preprocess((v) => {
+  if (v === null || v === undefined || v === '') return undefined;
+  const n = Number(v);
+  return Number.isFinite(n) ? n : undefined;
+}, z.number().optional());
+
+const zStr = z.preprocess(
+  (v) => (v === null || v === undefined ? undefined : v),
+  z.string().optional(),
+);
+
+const zStrArr = z.preprocess(
+  (v) => (Array.isArray(v) ? v.filter((x) => typeof x === 'string') : undefined),
+  z.array(z.string()).optional(),
+);
+
+const LtlWeightBreakSchema = z
+  .object({ minLbs: zNum, rateFactor: zNum })
+  .passthrough();
+
+const LtlConfigSchema = z
+  .object({
+    baseRatePerCwt: zNum,
+    // `.nullish()` (not `.optional()`) is LOAD-BEARING here: the model emits
+    // `null` for an absent optional field — exactly as our documented `| null`
+    // shape instructs — and a bare `.optional()` REJECTS null, which failed the
+    // whole LtlConfig and made validateParsed DROP the entire LTL rate card
+    // (observed live: a perfect ltlConfig discarded because `fakClassMap: null`).
+    classRates: z.record(z.string(), zNum).nullish(),
+    weightBreaks: z.array(LtlWeightBreakSchema).nullish(),
+    distanceFactorPer1000Mi: zNum,
+    discountPct: zNum,
+    baseTariffName: zStr,
+    fakClassMap: z.record(z.string(), zNum).nullish(),
+    absoluteMinCharge: zNum,
+  })
+  .passthrough();
+
+export const RateCardDraftSchema = z
+  .object({
+    service: zStr,
+    equipment: zStr,
+    label: zStr,
+    ratePerMile: zNum,
+    minimumCharge: zNum,
+    flatFee: zNum,
+    fuelSurchargePct: zNum,
+    marginPct: zNum,
+    maxWeightLbs: zNum,
+    maxMiles: zNum,
+    ltlConfig: LtlConfigSchema.nullish(),
+    derivedFrom: z.unknown().optional(),
+  })
+  .passthrough();
+
+export const AccessorialDraftSchema = z
+  .object({
+    code: zStr,
+    label: zStr,
+    kind: zStr,
+    amount: zNum,
+    trigger: zStr,
+    freeHours: zNum,
+    daysFlag: zStr,
+    conditionJson: z.record(z.string(), z.unknown()).nullish(),
+    appliesToServices: zStrArr,
+  })
+  .passthrough();
+
+export const LaneZoneDraftSchema = z
+  .object({
+    label: zStr,
+    anchorPortCode: zStr,
+    anchorCity: zStr,
+    anchorState: zStr,
+    radiusMiles: zNum,
+    flatPrice: zNum,
+    equipmentScope: zStrArr,
+  })
+  .passthrough();
+
+const FscDetectedSchema = z
+  .object({
+    present: z.boolean().nullish(),
+    appearsIncludedInLinehaul: z.boolean().nullish(),
+    valuePct: zNum,
+    valuePerMile: zNum,
+    fscScale: z.record(z.string(), z.unknown()).nullish(),
+    notes: zStr,
+  })
+  .passthrough();
+
+/** Full top-level parsed shape. Arrays are validated per-member downstream. */
+export const IngestParsedSchema = z
+  .object({
+    summary: zStr,
+    confidence: z.enum(['high', 'medium', 'low']).optional(),
+    warnings: zStrArr,
+    currency: zStr,
+    effectiveDate: zStr,
+    expirationDate: zStr,
+    fscDetected: FscDetectedSchema.nullish(),
+    // nullish so a model that emits `null` (vs `[]` / omitting) for an empty
+    // section still validates and salvages to an empty array rather than failing.
+    rateCards: z.array(z.unknown()).nullish(),
+    accessorials: z.array(z.unknown()).nullish(),
+    laneZones: z.array(z.unknown()).nullish(),
+  })
+  .passthrough();
+
+export type IngestParsed = {
+  summary: string;
+  confidence: 'high' | 'medium' | 'low';
+  warnings: string[];
+  currency?: string | null;
+  effectiveDate?: string | null;
+  expirationDate?: string | null;
+  fscDetected?: {
+    present: boolean | null;
+    appearsIncludedInLinehaul: boolean | null;
+    valuePct: number | null;
+    valuePerMile: number | null;
+    fscScale?: Record<string, unknown> | null;
+    notes: string;
+  };
+  rateCards: Array<Record<string, unknown>>;
+  accessorials: Array<Record<string, unknown>>;
+  laneZones: Array<Record<string, unknown>>;
+};
+
+/**
+ * Validate + salvage the raw parsed object.
+ *
+ * Returns a normalized IngestParsed. Any array member that fails its item
+ * schema is DROPPED and a warning is appended (rather than failing the whole
+ * job). Backward-compatible: a simple `{ rateCards:[{service,ratePerMile}] }`
+ * validates and passes through untouched.
+ */
+export function validateParsed(raw: unknown): IngestParsed {
+  const top = IngestParsedSchema.safeParse(raw ?? {});
+  const base = top.success ? top.data : {};
+  const warnings: string[] = Array.isArray(base.warnings) ? [...base.warnings] : [];
+
+  const salvage = <T>(
+    arr: unknown,
+    schema: z.ZodType<T>,
+    kind: string,
+  ): T[] => {
+    if (!Array.isArray(arr)) return [];
+    const out: T[] = [];
+    arr.forEach((item, i) => {
+      const r = schema.safeParse(item);
+      if (r.success) out.push(r.data);
+      else warnings.push(`Dropped malformed ${kind} #${i + 1} (${r.error.issues[0]?.message ?? 'invalid'}).`);
+    });
+    return out;
+  };
+
+  const rateCards = salvage(base.rateCards, RateCardDraftSchema, 'rate card') as Array<Record<string, unknown>>;
+  const accessorials = salvage(base.accessorials, AccessorialDraftSchema, 'accessorial') as Array<Record<string, unknown>>;
+  const laneZones = salvage(base.laneZones, LaneZoneDraftSchema, 'lane zone') as Array<Record<string, unknown>>;
+
+  return {
+    summary: base.summary ?? '',
+    confidence: base.confidence ?? 'low',
+    warnings,
+    currency: base.currency ?? null,
+    effectiveDate: base.effectiveDate ?? null,
+    expirationDate: base.expirationDate ?? null,
+    ...(base.fscDetected
+      ? { fscDetected: base.fscDetected as IngestParsed['fscDetected'] }
+      : {}),
+    rateCards,
+    accessorials,
+    laneZones,
+  };
+}
 
 export interface IngestResult {
-  parsed: {
-    summary: string;
-    confidence: 'high' | 'medium' | 'low';
-    warnings: string[];
-    fscDetected?: {
-      present: boolean | null;
-      appearsIncludedInLinehaul: boolean | null;
-      valuePct: number | null;
-      valuePerMile: number | null;
-      notes: string;
-    };
-    rateCards: Array<Record<string, unknown>>;
-    accessorials: Array<Record<string, unknown>>;
-    laneZones: Array<Record<string, unknown>>;
-  };
+  parsed: IngestParsed;
   raw: string;
   modelUsed: string;
   /** How many times the model called the geocode_distance tool. */
@@ -298,7 +541,9 @@ export async function parseRateSheet(opts: {
     const res = await client.messages.create(
       {
         model,
-        max_tokens: 4096,
+        // Raised from 4096: LTL class×weight-break configs + banded FSC scales
+        // + conditional accessorials make a comprehended rate book's JSON larger.
+        max_tokens: 8192,
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
         system: [{ type: 'text', text: SYSTEM_PROMPT, cache_control: { type: 'ephemeral' } } as any],
         tools: TOOLS,
@@ -355,17 +600,10 @@ export async function parseRateSheet(opts: {
 
   // Strip optional code fences (model sometimes adds them despite instructions)
   const cleaned = finalText.replace(/^```(?:json)?\s*/i, '').replace(/```\s*$/i, '').trim();
-  // parseModelJson returns a generic object; the shape is validated/defaulted
-  // just below, matching the previous `JSON.parse` (any) behavior.
-  const parsed = parseModelJson(cleaned) as IngestResult['parsed'];
-
-  // Defensive defaults so callers can rely on shape.
-  parsed.summary ??= '';
-  parsed.confidence ??= 'low';
-  parsed.warnings ??= [];
-  parsed.rateCards ??= [];
-  parsed.accessorials ??= [];
-  parsed.laneZones ??= [];
+  // parseModelJson tolerates a prose preamble/suffix; validateParsed then Zod-
+  // validates + SALVAGES (drops malformed array members with a warning) and
+  // applies defensive defaults, so callers can always rely on the shape.
+  const parsed = validateParsed(parseModelJson(cleaned));
 
   return { parsed, raw: cleaned, modelUsed: model, toolCalls };
 }

@@ -132,6 +132,22 @@ export interface LtlConfig {
   weightBreaks: LtlWeightBreak[];
   /** Linehaul distance sensitivity: multiplier = 1 + (miles/1000)×this. */
   distanceFactorPer1000Mi: number;
+
+  // ─── OPTIONAL ingest-captured metadata ──────────────────────────────
+  // The rate-sheet parser fills these when an LTL tariff carries them. They
+  // are DESCRIPTIVE / audit fields — `ltlLinehaul` does NOT read them, so the
+  // core pricing math is unchanged. When a sheet quotes a "discount off a named
+  // base tariff", the parser folds that discount into `baseRatePerCwt` (a
+  // uniform % scalar → mathematically exact) so the STORED rates are already
+  // NET; `discountPct`/`baseTariffName` are then kept only for provenance.
+  /** Discount % off the named base tariff (already folded into baseRatePerCwt). */
+  discountPct?: number;
+  /** Named base tariff + edition the discount is quoted against (e.g. "CzarLite XL 2024"). */
+  baseTariffName?: string;
+  /** FAK agreement: actual freight class → the class it RATES AS (e.g. {"70":85,"110":85}). */
+  fakClassMap?: Record<string, number>;
+  /** Absolute minimum charge (AMC). Also mirrored to rate_cards.minimumCharge, which the engine enforces. */
+  absoluteMinCharge?: number;
 }
 
 /** Standard class multipliers (class 100 = 1.0), monotonic in class. */
@@ -232,4 +248,78 @@ export function ltlLinehaul(cfg: LtlConfig, input: LtlLinehaulInput): number {
   const distanceMult = 1 + (miles / 1000) * cfg.distanceFactorPer1000Mi;
   const linehaul = rated * distanceMult + (Number(input.flatFee) || 0);
   return Math.max(linehaul, Number(input.minimumCharge) || 0);
+}
+
+/**
+ * Build a valid `LtlConfig` from a loose object emitted by the rate-sheet
+ * parser (or an operator edit). Required numeric/shape fields fall back to
+ * DEFAULT_LTL_CONFIG so a partial extraction still prices credibly; optional
+ * ingest-metadata fields (discountPct / baseTariffName / fakClassMap /
+ * absoluteMinCharge) are carried through when present.
+ *
+ * Returns null only when the input carries NO usable LTL signal at all, so a
+ * caller can fall through to DEFAULT_LTL_CONFIG rather than store an empty shell.
+ */
+export function coerceLtlConfig(raw: unknown): LtlConfig | null {
+  if (!raw || typeof raw !== 'object') return null;
+  const o = raw as Record<string, unknown>;
+
+  const num = (v: unknown): number | undefined => {
+    const n = Number(v);
+    return Number.isFinite(n) ? n : undefined;
+  };
+
+  const classRates: Record<string, number> = {};
+  if (o.classRates && typeof o.classRates === 'object') {
+    for (const [k, v] of Object.entries(o.classRates as Record<string, unknown>)) {
+      const n = num(v);
+      if (n !== undefined && n > 0) classRates[k] = n;
+    }
+  }
+
+  const weightBreaks: LtlWeightBreak[] = [];
+  if (Array.isArray(o.weightBreaks)) {
+    for (const b of o.weightBreaks as unknown[]) {
+      if (!b || typeof b !== 'object') continue;
+      const minLbs = num((b as Record<string, unknown>).minLbs);
+      const rateFactor = num((b as Record<string, unknown>).rateFactor);
+      if (minLbs !== undefined && minLbs >= 0 && rateFactor !== undefined && rateFactor > 0) {
+        weightBreaks.push({ minLbs, rateFactor });
+      }
+    }
+    weightBreaks.sort((a, b) => a.minLbs - b.minLbs);
+  }
+
+  const baseRatePerCwt = num(o.baseRatePerCwt);
+  const distanceFactorPer1000Mi = num(o.distanceFactorPer1000Mi);
+
+  // No usable LTL signal → let the caller fall back to the default.
+  const hasSignal =
+    baseRatePerCwt !== undefined ||
+    Object.keys(classRates).length > 0 ||
+    weightBreaks.length > 0;
+  if (!hasSignal) return null;
+
+  const fakClassMap: Record<string, number> = {};
+  if (o.fakClassMap && typeof o.fakClassMap === 'object') {
+    for (const [k, v] of Object.entries(o.fakClassMap as Record<string, unknown>)) {
+      const n = num(v);
+      if (n !== undefined && n > 0) fakClassMap[k] = n;
+    }
+  }
+
+  const cfg: LtlConfig = {
+    baseRatePerCwt: baseRatePerCwt ?? DEFAULT_LTL_CONFIG.baseRatePerCwt,
+    classRates: Object.keys(classRates).length ? classRates : DEFAULT_LTL_CONFIG.classRates,
+    weightBreaks: weightBreaks.length ? weightBreaks : DEFAULT_LTL_CONFIG.weightBreaks,
+    distanceFactorPer1000Mi: distanceFactorPer1000Mi ?? DEFAULT_LTL_CONFIG.distanceFactorPer1000Mi,
+  };
+  const discountPct = num(o.discountPct);
+  if (discountPct !== undefined) cfg.discountPct = discountPct;
+  if (typeof o.baseTariffName === 'string' && o.baseTariffName.trim()) cfg.baseTariffName = o.baseTariffName.trim();
+  if (Object.keys(fakClassMap).length) cfg.fakClassMap = fakClassMap;
+  const amc = num(o.absoluteMinCharge);
+  if (amc !== undefined) cfg.absoluteMinCharge = amc;
+
+  return cfg;
 }
