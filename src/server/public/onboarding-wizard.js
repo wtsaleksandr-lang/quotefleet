@@ -265,6 +265,21 @@
         body.appendChild(el('div', 'qf-ob-kicker', 'Step 1 of 4'));
         body.appendChild(el('h1', 'qf-ob-title', 'What do you haul?'));
         body.appendChild(el('p', 'qf-ob-sub', 'Select every mode you run — we seed rates for all of them, so your customers can quote anything you actually haul.'));
+
+        // Fast path — upload a real rate sheet instead of starting from templates.
+        // Styled via .qf-ob-fastpath* theme-token classes (no inline hex), so it
+        // stays visually consistent with the wizard and passes the color guard.
+        var fast = el('div', 'qf-ob-fastpath');
+        var fastTxt = el('div', 'qf-ob-fastpath-txt');
+        fastTxt.appendChild(el('div', 'qf-ob-fastpath-title', 'Already have a rate sheet?'));
+        fastTxt.appendChild(el('div', 'qf-ob-fastpath-sub', 'Upload a PDF, Excel or screenshot — our AI reads it and builds your real rates. Skip the template estimates.'));
+        fast.appendChild(fastTxt);
+        var fastBtn = el('button', 'qf-ob-fastpath-btn', 'Upload a rate sheet →');
+        fastBtn.type = 'button';
+        fastBtn.addEventListener('click', finishToIngest);
+        fast.appendChild(fastBtn);
+        body.appendChild(fast);
+
         var grid = el('div', 'qf-ob-cards is-two');
         VERTICALS.forEach(function (v) {
           var on = state.verticals.indexOf(v.id) !== -1;
@@ -736,6 +751,28 @@
           nextBtn.disabled = false;
           skipBtn.disabled = false;
           showError('Something went wrong saving your setup. Please try again, or Skip for now.');
+        });
+    }
+
+    // Fast path: skip the template survey and go straight to AI import to load
+    // the carrier's REAL rate sheet. We still mark onboarding done (skip apply)
+    // so the wizard doesn't re-open, then hand off to the /app/ingest route.
+    function finishToIngest() {
+      if (state.submitting) return;
+      state.submitting = true;
+      fetch('/api/tenant/onboarding/apply', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
+        body: JSON.stringify({ skip: true })
+      })
+        .then(function () {
+          close();
+          if (window.QFApp && typeof window.QFApp.go === 'function') window.QFApp.go('ingest');
+          else window.location.href = '/app/ingest';
+        })
+        .catch(function () {
+          state.submitting = false;
+          showError('Could not open the importer. Please try again, or pick your modes below.');
         });
     }
 

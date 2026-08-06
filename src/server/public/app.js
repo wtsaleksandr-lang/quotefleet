@@ -297,6 +297,10 @@
     history.pushState({}, '', '/app/' + route);
     return render(route);
   }
+  // Expose the SPA router so other in-page modules (e.g. the onboarding wizard)
+  // can navigate client-side instead of a full page load.
+  window.QFApp = window.QFApp || {};
+  window.QFApp.go = go;
 
   // ── Theme toggle ──────────────────────────────────────────────
   // Lucide-style line icons (stroke=currentColor so they theme with the UI).
@@ -1395,6 +1399,23 @@
       c.innerHTML = '';
       c.appendChild(el('h1', { text: 'Rate cards' }));
 
+      // Prominent path to the AI importer — the fastest way to load REAL rates
+      // (typing them by hand is the slow fallback). Shown on the rates page
+      // itself, not just the empty state, because new tenants ship with seeded
+      // template cards and so never see the empty state.
+      var aiCta = el('div', { class: 'qf-ai-import-cta', style: {
+        display: 'flex', alignItems: 'center', gap: '14px', flexWrap: 'wrap',
+        margin: '0 0 16px', padding: '16px 18px', borderRadius: '14px',
+        border: '1px solid color-mix(in srgb, var(--accent) 32%, var(--border))',
+        background: 'color-mix(in srgb, var(--accent) 8%, var(--surface))'
+      } });
+      var aiTxt = el('div', { style: { flex: '1 1 260px', minWidth: '0' } });
+      aiTxt.appendChild(el('div', { style: { fontSize: '14.5px', fontWeight: '800' }, text: 'Have a rate sheet? Let AI fill these in' }));
+      aiTxt.appendChild(el('div', { class: 'muted-small', style: { marginTop: '4px', lineHeight: '1.5' }, text: 'Upload a PDF, Excel, screenshot or email — we read it and turn it into rate cards you can review in seconds. No manual typing.' }));
+      aiCta.appendChild(aiTxt);
+      aiCta.appendChild(el('a', { href: '/app/ingest', 'data-route': 'ingest', class: 'btn btn-primary', style: { flex: '0 0 auto', textDecoration: 'none', whiteSpace: 'nowrap' }, text: 'Import a rate sheet →' }));
+      c.appendChild(aiCta);
+
       // Make the rate-cards -> calculator-modes link explicit (Alex): a carrier's
       // calculator only offers a trucking mode when they have >=1 ENABLED rate
       // card for it. Show which modes are live right now, and why.
@@ -1501,7 +1522,8 @@
         // friendly empty-state that ties into the modes explanation up top.
         var emptyRates = el('div', { class: 'card', style: { marginTop: '12px', padding: '28px 20px', textAlign: 'center' } });
         emptyRates.appendChild(el('div', { style: { fontSize: '15px', fontWeight: '800' }, text: 'No rate cards yet' }));
-        emptyRates.appendChild(el('div', { class: 'muted-small', style: { margin: '6px auto 0', maxWidth: '440px', lineHeight: '1.5' }, text: 'Add your first lane below. Each service you set up here becomes a trucking mode customers can pick in your calculator.' }));
+        emptyRates.appendChild(el('div', { class: 'muted-small', style: { margin: '6px auto 14px', maxWidth: '440px', lineHeight: '1.5' }, text: 'Fastest way: upload your rate sheet and let AI build these for you. Or add a lane by hand below — each service becomes a trucking mode customers can pick.' }));
+        emptyRates.appendChild(el('a', { href: '/app/ingest', 'data-route': 'ingest', class: 'btn btn-primary', style: { textDecoration: 'none' }, text: 'Import a rate sheet with AI →' }));
         c.appendChild(emptyRates);
       }
 

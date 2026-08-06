@@ -450,6 +450,57 @@ html.qf-ob-open body {
   margin-top: var(--space-1);
 }
 
+/* ── step-1 fast path: skip templates, import a real rate sheet via AI ───────
+   Accent-tinted panel that mirrors the rates-page .qf-ai-import-cta. Built
+   entirely from theme tokens (color-mix over --accent / --surface / --border,
+   solid CTA via --cta-*), so it themes light/dark for free and passes the
+   hardcoded-color guard — no raw hex/rgba. */
+.qf-ob-fastpath {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  flex-wrap: wrap;
+  margin: 0 0 var(--space-3) 0;
+  padding: var(--space-2);
+  border-radius: var(--radius-lg);
+  border: 1px solid color-mix(in srgb, var(--accent) 32%, var(--border));
+  background: color-mix(in srgb, var(--accent) 8%, var(--surface));
+}
+.qf-ob-fastpath-txt {
+  flex: 1 1 240px;
+  min-width: 0;
+}
+.qf-ob-fastpath-title {
+  font-size: 14px;
+  font-weight: 800;
+  color: var(--ink);
+}
+.qf-ob-fastpath-sub {
+  margin-top: var(--space-0-5);
+  font-size: 12.5px;
+  line-height: 1.45;
+  color: var(--muted);
+}
+.qf-ob-fastpath-btn {
+  flex: 0 0 auto;
+  appearance: none;
+  cursor: pointer;
+  white-space: nowrap;
+  border: 1px solid var(--cta-bg);
+  background: var(--cta-bg);
+  color: var(--cta-text);
+  border-radius: var(--radius-btn);
+  padding: var(--space-1-5) var(--space-2);
+  min-height: 44px;
+  font-size: 13px;
+  font-weight: 700;
+  transition: background 0.15s ease, border-color 0.15s ease;
+}
+.qf-ob-fastpath-btn:hover {
+  background: var(--cta-bg-hover);
+  border-color: var(--cta-bg-hover);
+}
+
 /* ── confirm top-3 rates (step 5) ────────────────────────────────────────── */
 .qf-ob-rates {
   display: flex;
