@@ -24,7 +24,10 @@ vi.mock('../config.js', () => ({
   loadEnv: () => ({ ANTHROPIC_API_KEY: process.env.ANTHROPIC_API_KEY ?? '' }),
 }));
 
-const RUN = !!process.env.ANTHROPIC_API_KEY;
+// Only run against a REAL Anthropic key (prefix `sk-ant-`). CI injects a dummy
+// `sk-test`, so a mere presence check would run the test and 401 — gate on the
+// real prefix so this stays skipped in CI/the guard set and never spends money.
+const RUN = /^sk-ant-/.test(process.env.ANTHROPIC_API_KEY ?? '');
 
 describe.skipIf(!RUN)('LIVE ingest smoke (ANTHROPIC_API_KEY set)', () => {
   it('comprehends an LTL class×weight-break grid → non-empty ltlConfig', async () => {
