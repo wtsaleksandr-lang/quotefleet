@@ -17,7 +17,10 @@ import {
   rateCards,
   accessorials,
   laneZones,
+  rateMatrices,
+  rateZones,
 } from '../../db/schema.js';
+import type { MatrixCellInput, ZoneDefInput } from '../../calc/rateMatrix.js';
 import { requireAuth, requireTenant } from '../middleware.js';
 import { aiTenantBurstLimiter, aiTenantDailyLimiter } from '../rateLimits.js';
 import { rateAgentTurn, applyRateMutation } from '../../ai/rateAgent.js';
@@ -157,11 +160,15 @@ export function registerAiRoutes(app: Express) {
     const parse = PreviewSchema.safeParse(req.body);
     if (!parse.success) return res.status(400).json({ error: 'Invalid input' });
     const tid = req.tenant!.id;
-    const [cards, accs, zones] = await Promise.all([
+    const [cards, accs, zones, matrixRows, matrixZoneRows] = await Promise.all([
       db().select().from(rateCards).where(eq(rateCards.tenantId, tid)),
       db().select().from(accessorials).where(eq(accessorials.tenantId, tid)),
       db().select().from(laneZones).where(eq(laneZones.tenantId, tid)),
+      db().select().from(rateMatrices).where(eq(rateMatrices.tenantId, tid)),
+      db().select().from(rateZones).where(eq(rateZones.tenantId, tid)),
     ]);
+    const matrices = matrixRows as unknown as MatrixCellInput[];
+    const matrixZones = matrixZoneRows as unknown as ZoneDefInput[];
     const dist = await distanceBetween(parse.data.pickup, parse.data.delivery);
     if ('error' in dist) return res.status(400).json({ error: dist.error });
     const calcReq: CalcRequest = {
@@ -195,7 +202,7 @@ export function registerAiRoutes(app: Express) {
       perMileUsd: fscCtx.perMileUsd,
       dieselUsd: fscCtx.dieselUsd,
       asOfLabel: fscCtx.asOf ? asOfLabel(fscCtx.asOf) : undefined,
-    });
+    }, matrices, matrixZones);
     res.json({ miles: dist.miles, origin: dist.origin, destination: dist.destination, result });
   });
 }
