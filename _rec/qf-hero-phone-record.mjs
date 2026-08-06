@@ -69,10 +69,14 @@ const port = server.address().port;
 
 const browser = await chromium.launch();
 const ctx = await browser.newContext({
-  viewport: { width: 390, height: 844 },
-  deviceScaleFactor: 1,
+  // Video res == CSS viewport (Playwright screencast is CSS-px; DSF does NOT boost
+  // video res). Render at 520 CSS wide — still the ≤640 MOBILE layout (identical
+  // single-column widget), but ~33% more real pixels than 390 so it's crisp on the
+  // retina landing-page phone mockup. Same 0.462 portrait aspect as before.
+  viewport: { width: 520, height: 1126 },
+  deviceScaleFactor: 2,                       // 2x render → better antialiasing in the CSS-res capture
   isMobile: false,
-  recordVideo: { dir: OUTDIR, size: { width: 390, height: 844 } },
+  recordVideo: { dir: OUTDIR, size: { width: 520, height: 1126 } },
 });
 const page = await ctx.newPage();
 const errs = [];
@@ -322,4 +326,4 @@ server.close();
 const webm = fs.readdirSync(OUTDIR).find(f => f.endsWith('.webm'));
 const outPath = path.resolve('_rec/qf-hero-phone-raw.webm');
 fs.copyFileSync(path.join(OUTDIR, webm), outPath);
-console.log('RAW_WEBM', outPath, fs.statSync(outPath).size, '390x844');
+console.log('RAW_WEBM', outPath, fs.statSync(outPath).size, '520x1126');

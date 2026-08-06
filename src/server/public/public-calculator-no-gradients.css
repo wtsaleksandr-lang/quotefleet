@@ -433,11 +433,13 @@ body[data-qf-preset="mono"] #qf-equip-weight-row .qf-help {
 body[data-qf-preset="mono"] .qf-ma-pt,
 body[data-qf-preset="mono"] .qf-map-overlay,
 body[data-qf-preset="mono"] .qf-map-expand {
-  /* Apple-glass frost: LOW white fill (0.42) so the dark map reads through, but
-     a strong blur+saturate so the glass still separates from the busy lane. The
-     hairline + soft shadow define the edge; text legibility is restored below
-     via heavier weight + a light halo text-shadow (dark glyphs on thin frost). */
-  background: rgba(255, 255, 255, 0.42) !important;
+  /* Apple-glass frost: a HIGH white fill (0.92) so the badge reads as a near-solid
+     light surface — the dark route map no longer bleeds through and the dark
+     glyphs clear WCAG AA on every part of the lane (measured ≥15:1 values,
+     ≥5:1 small-caps labels over the darkest map areas). Strong blur+saturate
+     still gives it frosted-glass character; the hairline + soft shadow define the
+     edge. (Was 0.42, which failed AA — Alex's contrast benchmark.) */
+  background: rgba(255, 255, 255, 0.92) !important;
   background-image: none !important;
   -webkit-backdrop-filter: blur(18px) saturate(1.8);
   backdrop-filter: blur(18px) saturate(1.8);
@@ -503,7 +505,7 @@ body[data-qf-preset="mono"] .qf-map-ov-val {
   text-shadow: 0 1px 2px rgba(255, 255, 255, 0.6) !important;
 }
 body[data-qf-preset="mono"] .qf-map-ov-lbl {
-  color: rgba(17, 17, 17, 0.66) !important;
+  color: rgba(17, 17, 17, 0.74) !important;
   font-weight: 600 !important;
   text-shadow: 0 1px 2px rgba(255, 255, 255, 0.55) !important;
 }

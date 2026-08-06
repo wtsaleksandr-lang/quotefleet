@@ -7,8 +7,8 @@
 // CAMERA: instead of window scrolling, a CSS transform on #app-shell acts as a
 // camera. transform-origin is pinned to the shell's top-left (= document 0,0
 // while scroll is locked at 0), and every beat sets
-//   translate(640 - s*cx, 400 - s*cy) scale(s)
-// which maps the target center (cx,cy in DOC coords) to the 1280×800 frame
+//   translate(896 - s*cx, 560 - s*cy) scale(s)
+// which maps the target center (cx,cy in DOC coords) to the 1792×1120 frame
 // center at zoom s. window.__rect INVERTS the live camera transform so element
 // measurements are always in stable DOCUMENT coords — which lets the camera go
 // straight zoom→pan→zoom with NO bounce back to wide mid-sequence (the old flow
@@ -94,6 +94,10 @@ function handle(req, res) {
   const method = req.method || 'GET';
   const J = (o) => { res.writeHead(200, { 'Content-Type': 'application/json' }); res.end(JSON.stringify(o)); };
 
+  // Recorder-only control: reset the ingest job so the dropzone renders empty
+  // again for the seamless loop-out (beat 9 returns to the opening dropzone).
+  if (p === '/rec/reset-ingest') { ingestJob = null; return J({ ok: true }); }
+
   if (p === '/api/auth/me') return J(ME);
   if (p === '/api/tenant/setup-status') return J({ rates: true, brand: true });
   if (p === '/api/tenant/rate-cards') return J({ rateCards: RATE_CARDS });
@@ -167,11 +171,16 @@ const port = server.address().port;
 
 const browser = await chromium.launch();
 const ctx = await browser.newContext({
-  viewport: { width: 1280, height: 800 },
-  deviceScaleFactor: 1,
-  recordVideo: { dir: OUTDIR, size: { width: 1280, height: 800 } },
+  viewport: { width: 1792, height: 1120 },
+  deviceScaleFactor: 2,                       // 2x render → crisp antialiasing when captured
+  recordVideo: { dir: OUTDIR, size: { width: 1792, height: 1120 } }, // video res == CSS viewport (Playwright screencast is CSS-px; DSF does NOT boost video res)
 });
+// CRISPNESS: the video is captured at the CSS-viewport resolution (1792 wide), so
+// on a retina landing page (~786→972 CSS box → up to ~1944 physical px) the source
+// is large enough to avoid the upscale blur the old 1280-wide loop suffered.
+// The camera math uses a 1792×1120 LOGICAL frame → centre (896,560), height 1120.
 const page = await ctx.newPage();
+const _t0mark = Date.now(); // ~video-start reference; used to compute the encode trim (T0) to the tight beat-1 framing
 const errs = [];
 page.on('pageerror', e => errs.push('pageerror:' + e.message));
 page.on('console', m => { if (m.type() === 'error') errs.push('console:' + m.text()); });
@@ -257,7 +266,7 @@ const camReady = await page.evaluate(() => {
   window.__cam = (cx, cy, s, ms) => {
     const el = document.getElementById('app-shell');
     el.style.transition = ms ? ('transform ' + ms + 'ms cubic-bezier(0.4,0,0.2,1)') : 'none';
-    const tx = 640 - s * cx, ty = 400 - s * cy;
+    const tx = 896 - s * cx, ty = 560 - s * cy;
     window.__camState = { tx, ty, s };
     // eslint-disable-next-line no-void
     void el.offsetWidth;
@@ -280,23 +289,40 @@ if (!camReady) console.log('WARN camera not installed (no #app-shell)');
 const DROP_S = 1.3;   // punch-in zoom on the drop
 const REVIEW_MIN_S = 1.28, REVIEW_MAX_S = 1.4;
 
-// ── Beat 1: opening idle, wide (identity). Short — empty dropzone = no info. ──
-await page.evaluate(() => window.__cam(640, 400, 1.0, 0));
-await wait(900);
-
-// Measure the dropzone BEFORE dropping (it's replaced by the skeleton after).
+// ── Beat 1: OPENING framed TIGHT on the dropzone card — NOT the wide empty app.
+// This fills the loop-in frame with the import UI so there is no big empty white
+// browser window (the #1 complaint). Fit adaptively to the dropzone height,
+// capped so the card + its heading still read. This is also the loop-out framing
+// (beat 9 returns here) so the crossfade-wrap has matching, content-forward ends. ──
 const dz = await page.evaluate(() => window.__rect('.qf-dropzone'));
-const dzCx = dz ? (dz.left + dz.right) / 2 : 760;
-const dzCy = dz ? (dz.top + dz.bottom) / 2 : 400;
+const dzCx = dz ? (dz.left + dz.right) / 2 : 896;
+const dzCy = dz ? (dz.top + dz.bottom) / 2 : 560;
+const OPEN_S = await page.evaluate(() => {
+  const d = window.__rect('.qf-dropzone');
+  if (!d) { window.__cam(896, 560, 1.2, 0); return 1.2; }
+  const h = d.bottom - d.top;
+  let s = (1120 * 0.74) / h;                 // dropzone card ≈ 74% of frame height
+  s = Math.max(1.18, Math.min(1.42, s));
+  window.__cam((d.left + d.right) / 2, (d.top + d.bottom) / 2, s, 0); // instant (loop-in point)
+  return +s.toFixed(3);
+});
+console.log('CAM_OPEN', OPEN_S, 'BEAT1_MS', Date.now() - _t0mark); // set encode T0 ≈ BEAT1_MS/1000
+await wait(650); // short loop-in hold — a sparse beat gets the least time
 
-// ── Beat 2 (FIX 2 + FIX 3): VISIBLE drag-and-drop. Spawn the file chip off the
-// top-right, glide it into the dropzone; partway in, fire dragenter/dragover so
-// the dropzone lights up (accent bg/border). On landing: ripple, fade the chip,
-// then the REAL setInputFiles kicks off processing. Camera stays wide so the
-// whole chip travel reads; punch-in happens AFTER the chip lands. ──
+// ── Beat 2 (FIX 2 + FIX 3): VISIBLE drag-and-drop, held at the TIGHT framing (no
+// pull to a wide empty app). Spawn the file chip off the top-right, glide it to
+// the dropzone's ON-SCREEN centre (raw getBoundingClientRect = post-camera
+// viewport coords, since the chip is position:fixed and NOT under the camera
+// transform); partway in, fire dragenter/dragover so the dropzone lights up. On
+// landing: ripple, fade the chip, then the REAL setInputFiles kicks off parsing. ──
 await page.evaluate(() => window.__spawnChip());
-await wait(200);
-await page.evaluate(([x, y]) => window.__chipTo(x, y), [dzCx, dzCy]);
+const chipXY = await page.evaluate(() => {
+  const el = document.querySelector('.qf-dropzone');
+  const r = el.getBoundingClientRect();
+  return [Math.round(r.left + r.width / 2), Math.round(r.top + r.height / 2)];
+});
+await wait(180);
+await page.evaluate(([x, y]) => window.__chipTo(x, y), chipXY);
 await wait(430);
 await page.evaluate(() => { window.__fireDrag('.qf-dropzone', 'dragenter'); window.__fireDrag('.qf-dropzone', 'dragover'); });
 await wait(420); // chip settles onto the lit dropzone (~950ms glide total)
@@ -308,9 +334,10 @@ await page.setInputFiles('.qf-dropzone input[type="file"]', {
   mimeType: 'application/pdf',
   buffer: Buffer.from('%PDF-1.4 QuoteFleet — Q3 rate sheet (demo)\n'),
 });
-await page.evaluate(([cx, cy, s]) => window.__cam(cx, cy, s, 1000), [dzCx, dzCy, DROP_S]);
+// Gentle punch to the accepted state — small (we are ALREADY tight), no wide bounce.
+await page.evaluate(([cx, cy, s]) => window.__cam(cx, cy, s, 700), [dzCx, dzCy, Math.min(1.5, OPEN_S + 0.08)]);
 await page.waitForSelector('.qf-ingest-processing', { timeout: 5000 }).catch(() => {});
-await wait(650);
+await wait(600);
 
 // ── Beat 3: PREMIUM PROCESSING SEQUENCE — frame the rotating industry phrases +
 // gradient progress bar and HOLD so several phrases + the bar filling read. ──
@@ -323,14 +350,14 @@ const camProc = await page.evaluate(() => {
   const bottom = bar.bottom + 12;
   const bandH = bottom - top;
   const cx = (card.left + card.right) / 2;
-  let s = (800 - 2 * MARGIN) / bandH;
-  s = Math.max(1.14, Math.min(1.5, s));
+  let s = (1120 - 2 * MARGIN) / bandH;
+  s = Math.max(1.3, Math.min(1.5, s));   // higher floor → processing card fills the frame, no empty margins
   const cy = (top + bottom) / 2;
   window.__cam(cx, cy, s, 1150);
   return { cx: Math.round(cx), cy: Math.round(cy), s: +s.toFixed(3), bandH: Math.round(bandH) };
 });
 console.log('CAM_PROC', JSON.stringify(camProc));
-await wait(4400);
+await wait(3100);   // sparse "reading your rate sheet" beat → shorter; time goes to the content-rich payoffs
 
 // Wait for the review reveal (poll returns ready_for_review).
 await page.waitForSelector('#ingest-review .qf-autocheck', { timeout: 9000 }).catch(() => {});
@@ -353,14 +380,14 @@ const cam = await page.evaluate((cfg) => {
   const bottom = check.bottom;
   const bandH = bottom - top;
   const cx = (card.left + card.right) / 2;
-  let s = (800 - 2 * MARGIN) / bandH;
+  let s = (1120 - 2 * MARGIN) / bandH;
   let cy;
   if (s >= MIN) {
     s = Math.min(MAX, s);
     cy = (top + bottom) / 2;
   } else {
     s = MIN;
-    cy = top + (400 - MARGIN) / s;
+    cy = top + (560 - MARGIN) / s;
   }
   window.__cam(cx, cy, s, 1150);
   return { cx: Math.round(cx), cy: Math.round(cy), s: +s.toFixed(3), bandH: Math.round(bandH) };
@@ -376,7 +403,7 @@ const camNav1 = await page.evaluate(() => {
   if (!b) return { err: 'missing' };
   const cx = (b.left + b.right) / 2;
   const cy = (b.top + b.bottom) / 2;
-  window.__cam(cx, cy, 1.1, 1150);
+  window.__cam(cx, cy, 1.16, 1150);
   return { cx: Math.round(cx), cy: Math.round(cy) };
 });
 console.log('CAM_NAV1', JSON.stringify(camNav1));
@@ -448,8 +475,8 @@ const camLead = await page.evaluate(() => {
   const bottom = row.bottom + row.height * 2.2;
   const bandH = bottom - top;
   const cx = (table.left + table.right) / 2;
-  let s = (800 - 2 * MARGIN) / bandH;
-  s = Math.max(1.12, Math.min(1.32, s));
+  let s = (1120 - 2 * MARGIN) / bandH;
+  s = Math.max(1.18, Math.min(1.32, s));
   const cy = (top + bottom) / 2;
   window.__cam(cx, cy, s, 1150);
   return { cx: Math.round(cx), cy: Math.round(cy), s: +s.toFixed(3) };
@@ -466,7 +493,7 @@ const camNav2 = await page.evaluate(() => {
   if (!b) return { err: 'missing' };
   const cx = (b.left + b.right) / 2;
   const cy = (b.top + b.bottom) / 2;
-  window.__cam(cx, cy, 1.1, 1150);
+  window.__cam(cx, cy, 1.16, 1150);
   return { cx: Math.round(cx), cy: Math.round(cy) };
 });
 console.log('CAM_NAV2', JSON.stringify(camNav2));
@@ -498,8 +525,8 @@ const camFU = await page.evaluate(() => {
   const right = (r.right - cs.tx) / s0;
   const MARGIN = 150;
   const bandH = Math.max(120, bottom - top);
-  let s = (800 - 2 * MARGIN) / bandH;
-  s = Math.max(1.1, Math.min(1.42, s));
+  let s = (1120 - 2 * MARGIN) / bandH;
+  s = Math.max(1.2, Math.min(1.42, s));
   const cx = (left + right) / 2;
   const cy = (top + bottom) / 2;
   window.__cam(cx, cy, s, 1150);
@@ -523,9 +550,26 @@ await wait(300);
 await page.evaluate(() => { if (window.__fuTile) window.__fuTile.click(); });
 await wait(2600); // hold on the selected Standard tile + day-timing tiles
 
-// ── Beat 9: settle back to the opening WIDE framing for a clean crossfade-wrap. ──
-await page.evaluate(() => window.__cam(640, 400, 1.0, 1150));
-await wait(1100);
+// ── Beat 9: RETURN to the ingest dropzone, framed EXACTLY like the opening, so the
+// crossfade-wrap dissolves loop-out into loop-in with MATCHING, content-forward
+// ends (no wide empty-white settle). Reset the mock ingest job so the dropzone
+// renders empty again, SPA-navigate back to /app/ingest (client-side → the camera
+// install survives), then re-apply the tight opening framing (same OPEN_S). ──
+await page.evaluate(() => fetch('/rec/reset-ingest').catch(() => {}));
+await page.click('.sidebar [data-route="ingest"]', { timeout: 4000 }).catch(() => {});
+let backReady = await page.waitForSelector('.qf-dropzone', { timeout: 4000 }).then(() => true).catch(() => false);
+if (!backReady) {
+  await page.evaluate(() => { const a = document.createElement('a'); a.setAttribute('data-route', 'ingest'); a.href = '/app/ingest'; document.body.appendChild(a); a.click(); a.remove(); });
+  backReady = await page.waitForSelector('.qf-dropzone', { timeout: 4000 }).then(() => true).catch(() => false);
+}
+console.log('BACK_READY', backReady);
+await wait(350);
+await page.evaluate((s) => {
+  const d = window.__rect('.qf-dropzone');
+  if (!d) { window.__cam(896, 560, 1.2, 1150); return; }
+  window.__cam((d.left + d.right) / 2, (d.top + d.bottom) / 2, s, 1150);
+}, OPEN_S);
+await wait(1000); // static loop-out hold (matches loop-in dropzone → seamless wrap)
 
 console.log('ERRS', errs.length, errs.slice(0, 8));
 console.log('DZ', JSON.stringify(dz));
@@ -536,4 +580,4 @@ server.close();
 const webm = fs.readdirSync(OUTDIR).find(f => f.endsWith('.webm'));
 const outPath = path.resolve('_rec/qf-hero-laptop-raw.webm');
 fs.copyFileSync(path.join(OUTDIR, webm), outPath);
-console.log('RAW_WEBM', outPath, fs.statSync(outPath).size, '1280x800');
+console.log('RAW_WEBM', outPath, fs.statSync(outPath).size, '1792x1120');
