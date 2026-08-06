@@ -452,3 +452,39 @@ Detention: $60/hr after 2 hours free
 Storage: $150/day
 Layover: $350/day
 Overweight (>44,000 lbs): $200 flat`;
+
+/**
+ * Tier 2 live fixture (i): a zip3/zone FTL origin×dest matrix + a zone-legend
+ * tab (research pattern 3). All-in $/lane, ASYMMETRIC. Two tabs the model must
+ * JOIN: the legend maps zip3 ranges → zone ids, the grid keys cells by zone.
+ * Sample lanes → expected cell:
+ *   90045 (W) → 85003 (E) = 1900   | 85003 (E) → 90045 (W) = 1750 (asymmetric)
+ *   60601 (M) → 90045 (W) = 2350
+ */
+export const RAW_CSV_ZONE_MATRIX = `### Sheet: Zone Legend
+Zone,Zip3 From,Zip3 To
+W,900,902
+E,850,852
+M,600,606
+
+### Sheet: FTL Rate Grid (53' dry van, all-in $ per lane)
+From \\ To,W,E,M
+W,,1900,2400
+E,1750,,2100
+M,2350,2050,`;
+
+/**
+ * Tier 2 live fixture (ii): a drayage port→zone per-container matrix (research
+ * pattern 5). Rows = destination zip3, columns = container size, single FSC%.
+ * origin anchor = the port (USLAX). Sample lanes → expected cell:
+ *   USLAX → 90045 (900), 40'  = 425
+ *   USLAX → 92602 (926), 20'  = 560
+ *   USLAX → 90680 (906), 40HC = 545
+ */
+export const RAW_CSV_DRAYAGE_MATRIX = `### Sheet: Drayage Rate Matrix — Port of Los Angeles (USLAX)
+Per-container rates, USD. Origin: USLAX (Los Angeles / Long Beach).
+Dest Zip3,20ft,40ft,40HC
+900,385,425,445
+906,470,520,545
+926,560,610,640
+Fuel surcharge: 40% of linehaul applied to every lane.`;
