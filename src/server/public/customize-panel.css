@@ -341,3 +341,11 @@
 .qf-cz-frame-wrap[data-host="light"] .qf-cz-frame,
 .qf-cz-frame-wrap[data-host="dark"] .qf-cz-frame { border-radius: 8px; }
 .qf-cz-frame-wrap[data-device="mobile"] { max-width: 390px; margin-left: auto; margin-right: auto; }
+
+/* ── Grab-scroll carousel cursor (Fix: premium draggable selector) ─────────
+   The track reads grabbable (cursor:grab set above; .is-grabbing → grabbing
+   during a drag). The option cards are the actual click target, so they show
+   the pointer cursor. Appended at EOF so the line-based baselines above don't
+   renumber. */
+.qf-cz-carousel-track .qf-cz-preset,
+.qf-cz-carousel-track .qf-cz-mapstyle { cursor: pointer; }

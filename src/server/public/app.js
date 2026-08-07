@@ -2580,23 +2580,81 @@
         next.addEventListener('click', function () { track.scrollBy({ left: page(), behavior: reduce ? 'auto' : 'smooth' }); });
         track.addEventListener('scroll', update);
         window.addEventListener('resize', update);
-        // Mouse drag-to-scroll (touch relies on native horizontal overflow).
+        // Mouse drag-to-scroll with momentum + eased snap (touch relies on
+        // native horizontal overflow). The strip tracks the pointer 1:1 while
+        // dragging, then glides and settles on the nearest option on release so
+        // the user literally sees the row slide and snap. Reuses the shared
+        // grab-scroll cursor pattern (html.qf-grabbing) alongside a track-local
+        // .is-grabbing. Honours prefers-reduced-motion (no inertia/glide).
         var down = false, startX = 0, startScroll = 0, moved = 0;
+        var lastT = 0, vel = 0; // vel = scrollLeft px per ms during drag
+        var raf = 0;
+        function cancelGlide() { if (raf) { cancelAnimationFrame(raf); raf = 0; } }
+        function padLeft() { return parseFloat(getComputedStyle(track).paddingLeft) || 0; }
+        // Nearest child start-offset (in scrollLeft units) to a projected position.
+        function snapTarget(pos) {
+          var kids = track.children, tRect = track.getBoundingClientRect();
+          var sl = track.scrollLeft, pl = padLeft(), best = pos, bestD = Infinity;
+          for (var i = 0; i < kids.length; i++) {
+            var cand = sl + (kids[i].getBoundingClientRect().left - tRect.left) - pl;
+            var d = Math.abs(cand - pos);
+            if (d < bestD) { bestD = d; best = cand; }
+          }
+          var max = track.scrollWidth - track.clientWidth;
+          return Math.max(0, Math.min(max, best));
+        }
+        // Eased glide to a target scrollLeft; suspends CSS snap so it can't fight
+        // the JS animation, restoring it once we land exactly on a snap point.
+        function glideTo(target) {
+          cancelGlide();
+          var from = track.scrollLeft, dist = target - from;
+          if (Math.abs(dist) < 1) { track.scrollLeft = target; update(); return; }
+          var dur = Math.min(460, Math.max(200, Math.abs(dist) * 1.6)), t0 = 0;
+          var prevSnap = track.style.scrollSnapType; track.style.scrollSnapType = 'none';
+          function step(ts) {
+            if (!t0) t0 = ts;
+            var p = Math.min(1, (ts - t0) / dur);
+            var e = 1 - Math.pow(1 - p, 3); // easeOutCubic
+            track.scrollLeft = from + dist * e;
+            if (p < 1) { raf = requestAnimationFrame(step); }
+            else { raf = 0; track.style.scrollSnapType = prevSnap; update(); }
+          }
+          raf = requestAnimationFrame(step);
+        }
         track.addEventListener('pointerdown', function (e) {
           if (e.pointerType && e.pointerType !== 'mouse') return; // let touch/pen scroll natively
+          cancelGlide();
           down = true; moved = 0; startX = e.clientX; startScroll = track.scrollLeft;
+          lastT = (e.timeStamp || performance.now()); vel = 0;
           track.classList.add('is-grabbing');
+          document.documentElement.classList.add('qf-grabbing');
         });
         track.addEventListener('pointermove', function (e) {
           if (!down) return;
           var dx = e.clientX - startX;
           if (Math.abs(dx) > 3) {
             moved = Math.max(moved, Math.abs(dx));
+            var prevSL = track.scrollLeft;
             track.scrollLeft = startScroll - dx;
+            var now = (e.timeStamp || performance.now()), dt = now - lastT;
+            if (dt > 0) vel = (track.scrollLeft - prevSL) / dt;
+            lastT = now;
             e.preventDefault();
           }
         });
-        function endDrag() { down = false; track.classList.remove('is-grabbing'); }
+        function endDrag() {
+          if (!down) return;
+          down = false;
+          track.classList.remove('is-grabbing');
+          document.documentElement.classList.remove('qf-grabbing');
+          if (moved > 4) {
+            // Reduced motion: settle instantly. Else throw with a little
+            // inertia, then ease-and-snap to the nearest option.
+            var target = snapTarget(reduce ? track.scrollLeft : track.scrollLeft + vel * 120);
+            if (reduce) { track.scrollLeft = target; update(); }
+            else { glideTo(target); }
+          }
+        }
         track.addEventListener('pointerup', endDrag);
         track.addEventListener('pointercancel', endDrag);
         track.addEventListener('pointerleave', endDrag);
@@ -5057,14 +5115,6 @@
         (r.tenant && r.tenant.hostedUrl)
           ? r.tenant.hostedUrl.replace(/^https?:\/\//, '').replace(/\/$/, '')
           : (r.tenant && '/w/' + r.tenant.slug) || '';
-      // Top-bar slug link → the tenant's own live calculator (canonical hosted
-      // URL, falling back to /w/<slug>); shown as the host/slug text.
-      var slugLink = document.getElementById('qf-appbar-slug');
-      if (slugLink) {
-        var w = window.__qfWidget || {};
-        slugLink.href = w.url || ('/w/' + encodeURIComponent((r.tenant && r.tenant.slug) || ''));
-        slugLink.textContent = w.host || (r.tenant && r.tenant.slug) || '';
-      }
       $('#loading').style.display = 'none';
       $('#app-shell').hidden = false;
       renderTrialBanner(r.trial);
