@@ -226,6 +226,17 @@
       if (!d || !d.stats) return;
       setNavBadge('leads', d.stats.newLeads || 0);
       setNavBadge('callbacks', d.stats.pendingCallbacks || 0);
+      // Top-bar notifications bell — a dot when there are unactioned leads;
+      // the exact count rides the aria-label (the bell opens the Leads page).
+      var bellBtn = document.getElementById('qf-appbar-bell');
+      var bellDot = bellBtn && bellBtn.querySelector('.qf-appbar-badge');
+      if (bellDot) {
+        var nl = d.stats.newLeads || 0;
+        bellDot.hidden = nl <= 0;
+        bellBtn.setAttribute('aria-label', nl > 0
+          ? (nl + ' new lead' + (nl === 1 ? '' : 's'))
+          : 'No new leads');
+      }
     }).catch(function () { /* non-fatal — badges are a hint, not a blocker */ });
   }
   window.qfRefreshNavBadges = refreshNavBadges;
@@ -714,6 +725,10 @@
   // via CSS tokens (overview-kpis.css). `overview` is the /api/tenant/overview
   // payload, reused for the map card's most-recent lead (no extra fetch).
   var KPI_PERIODS = ['7d', '30d', '90d'];
+  // Human labels for the period toggle — the raw '7d/30d/90d' values still
+  // drive the fetch + storage; only the button text spells out the unit so
+  // "7 days" reads clearly instead of a cryptic "7D".
+  var KPI_PERIOD_LABELS = { '7d': '7 days', '30d': '30 days', '90d': '90 days' };
   function currentKpiPeriod() {
     try { var p = localStorage.getItem('qf-kpi-period'); if (KPI_PERIODS.indexOf(p) >= 0) return p; } catch (e) {}
     return '30d';
@@ -732,7 +747,8 @@
       var b = el('button', {
         type: 'button',
         class: 'qf-kpi-period-btn' + (p === period ? ' is-active' : ''),
-        text: p.toUpperCase(),
+        text: KPI_PERIOD_LABELS[p] || p,
+        'aria-label': 'Last ' + (KPI_PERIOD_LABELS[p] || p),
         'aria-pressed': p === period ? 'true' : 'false',
       });
       b.addEventListener('click', function () {
@@ -4643,7 +4659,20 @@
   function removeTrialBanner() {
     var bar = document.getElementById('qf-trial-bar');
     if (bar) bar.remove();
+    syncAppbarOffset();
   }
+
+  // The trial banner is a body-level sticky (top:0). The sticky portal top bar
+  // must sit BELOW it, so its own sticky offset tracks the banner's height —
+  // 0 when no banner is showing. Re-run after any banner change + on resize
+  // (the banner wraps taller on narrow screens).
+  function syncAppbarOffset() {
+    var bar = document.getElementById('qf-appbar');
+    if (!bar) return;
+    var banner = document.getElementById('qf-trial-bar');
+    bar.style.setProperty('--qf-appbar-top', (banner ? banner.offsetHeight : 0) + 'px');
+  }
+  window.qfSyncAppbarOffset = syncAppbarOffset;
 
   function renderTrialBanner(trial) {
     state.trial = trial || state.trial || null;
@@ -4732,6 +4761,9 @@
     // payment_issue keeps FULL access (paying tenant in grace) — never lock.
     if (view.variant === 'expired') document.body.classList.add('qf-trial-locked');
     else document.body.classList.remove('qf-trial-locked');
+
+    // Banner is now in the DOM at its final height — push the top bar below it.
+    syncAppbarOffset();
   }
 
   // Day-14 write-block escape: called from api() when a mutating request 403s
@@ -4828,9 +4860,18 @@
         (r.tenant && r.tenant.hostedUrl)
           ? r.tenant.hostedUrl.replace(/^https?:\/\//, '').replace(/\/$/, '')
           : (r.tenant && '/w/' + r.tenant.slug) || '';
+      // Top-bar slug link → the tenant's own live calculator (canonical hosted
+      // URL, falling back to /w/<slug>); shown as the host/slug text.
+      var slugLink = document.getElementById('qf-appbar-slug');
+      if (slugLink) {
+        var w = window.__qfWidget || {};
+        slugLink.href = w.url || ('/w/' + encodeURIComponent((r.tenant && r.tenant.slug) || ''));
+        slugLink.textContent = w.host || (r.tenant && r.tenant.slug) || '';
+      }
       $('#loading').style.display = 'none';
       $('#app-shell').hidden = false;
       renderTrialBanner(r.trial);
+      syncAppbarOffset();
       // Reveal the hamburger and wire its toggle now that the shell is visible.
       var t = document.getElementById('qf-mobile-nav-toggle');
       if (t) t.hidden = false;
@@ -4856,6 +4897,16 @@
       $('#sb-logout').addEventListener('click', function () {
         api('/api/auth/logout', { method: 'POST' }).finally(function () { location.href = '/login'; });
       });
+
+      // Top-bar right cluster: account settings + notifications bell (→ Leads).
+      var acctBtn = document.getElementById('qf-appbar-account');
+      if (acctBtn) acctBtn.addEventListener('click', function () { go('account'); });
+      var bellBtn = document.getElementById('qf-appbar-bell');
+      if (bellBtn) bellBtn.addEventListener('click', function () { go('leads'); });
+
+      // Keep the sticky top bar's offset in step with the (wrapping) trial
+      // banner as the viewport resizes.
+      window.addEventListener('resize', syncAppbarOffset);
 
       refreshNavBadges();
       syncZonesNav();
