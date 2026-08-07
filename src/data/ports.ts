@@ -11,6 +11,16 @@ export interface PortRow {
   lat: number;
   lng: number;
   teuRank: number;
+  /** Broad geographic region, e.g. "US Pacific", "CA Atlantic". */
+  region?: string;
+  /**
+   * Container-service accuracy flag. `false` = RoRo / breakbulk / bulk-only
+   * (no container drayage here); omitted/undefined = container-capable.
+   * Prevents advertising container service where none exists.
+   */
+  container?: boolean;
+  /** Accuracy caveat (RoRo-dominant, future/under-construction, approximate). */
+  note?: string;
 }
 
 export const PORTS_DATA: PortRow[] = [
@@ -55,8 +65,63 @@ export const PORTS_DATA: PortRow[] = [
   { code: 'CASTQ', name: 'Port of Quebec', city: 'Quebec City', state: 'QC', country: 'CA', lat: 46.8139, lng: -71.2080, teuRank: 31 },
   { code: 'CASJB', name: 'Port of Saint John', city: 'Saint John', state: 'NB', country: 'CA', lat: 45.2733, lng: -66.0633, teuRank: 33 },
   { code: 'CATOR', name: 'Port of Toronto', city: 'Toronto', state: 'ON', country: 'CA', lat: 43.6406, lng: -79.3712, teuRank: 35 },
+
+  // ── Secondary / regional ocean ports (directory fill 2026-08) ─────
+  { code: 'USSAN', name: 'Port of San Diego', city: 'San Diego', state: 'CA', country: 'US', lat: 32.6957, lng: -117.144, teuRank: 40, region: 'US Pacific' },
+  { code: 'USHUE', name: 'Port of Hueneme', city: 'Port Hueneme', state: 'CA', country: 'US', lat: 34.1478, lng: -119.2073, teuRank: 42, region: 'US Pacific', container: false, note: 'Autos + reefer produce (bananas, citrus); limited container.' },
+  { code: 'USGPT', name: 'Port of Gulfport', city: 'Gulfport', state: 'MS', country: 'US', lat: 30.3566, lng: -89.0911, teuRank: 38, region: 'US Gulf' },
+  { code: 'USPBI', name: 'Port of Palm Beach', city: 'Riviera Beach', state: 'FL', country: 'US', lat: 26.7717, lng: -80.045, teuRank: 39, region: 'US South Atlantic' },
+  { code: 'USFEB', name: 'Port of Fernandina', city: 'Fernandina Beach', state: 'FL', country: 'US', lat: 30.6697, lng: -81.467, teuRank: 44, region: 'US South Atlantic' },
+  { code: 'USGLC', name: 'Gloucester Marine Terminal (Delaware River)', city: 'Gloucester City', state: 'NJ', country: 'US', lat: 39.894, lng: -75.125, teuRank: 45, region: 'US Mid Atlantic', container: false, note: 'Reefer/fruit + breakbulk on the Delaware River (Holt).' },
+  { code: 'USCLE', name: 'Port of Cleveland', city: 'Cleveland', state: 'OH', country: 'US', lat: 41.51, lng: -81.705, teuRank: 48, region: 'US Great Lakes' },
+  { code: 'CANAI', name: 'Port of Nanaimo', city: 'Nanaimo', state: 'BC', country: 'CA', lat: 49.133, lng: -123.889, teuRank: 41, region: 'CA Pacific' },
+  { code: 'CAHAM', name: 'Port of Hamilton', city: 'Hamilton', state: 'ON', country: 'CA', lat: 43.29, lng: -79.8, teuRank: 47, region: 'CA Great Lakes' },
+
+  // ── Port-code reconciliation: drayage rate sheets key on these ────
+  // codes; adding them (and their alias groups below) makes an ingested
+  // matrix lane resolve against what the autosuggest picks.
+  { code: 'USEWR', name: 'Port Newark-Elizabeth (NY/NJ)', city: 'Newark', state: 'NJ', country: 'US', lat: 40.6857, lng: -74.1531, teuRank: 3, region: 'US North Atlantic', note: 'Marine-terminal complex inside the Port of NY/NJ; drayage rate sheets key on USEWR. Aliased to USNYC for matrix matching.' },
+  { code: 'USLALB', name: 'Los Angeles / Long Beach (San Pedro Bay)', city: 'Los Angeles / Long Beach', state: 'CA', country: 'US', lat: 33.7500, lng: -118.2500, teuRank: 1, region: 'US Pacific', note: 'Combined San Pedro Bay drayage pool; matrix lanes for either USLAX or USLGB resolve here.' },
 ];
 
 export function findPort(code: string): PortRow | undefined {
   return PORTS_DATA.find((p) => p.code.toUpperCase() === code.toUpperCase());
+}
+
+/**
+ * Port-code alias groups — codes in the same group refer to the same physical
+ * drayage gateway and must match interchangeably in matrix keying.
+ *
+ * WHY: an ingested drayage matrix keys a lane on whatever port code appears on
+ * the rate sheet (e.g. `USEWR` for Port Newark-Elizabeth), but the customer's
+ * autosuggest may resolve Newark to the umbrella `USNYC`. Without aliasing, the
+ * matrix cell's origin key never matches the shipment's resolved port and the
+ * lane silently fails to price. Grouping the equivalent codes fixes that in both
+ * directions, and folds LA + Long Beach into one San Pedro Bay pool.
+ */
+export const PORT_CODE_ALIAS_GROUPS: readonly string[][] = [
+  ['USNYC', 'USEWR'],
+  ['USLAX', 'USLGB', 'USLALB'],
+];
+
+const ALIAS_INDEX: Map<string, string[]> = (() => {
+  const m = new Map<string, string[]>();
+  for (const group of PORT_CODE_ALIAS_GROUPS) {
+    const upper = group.map((c) => c.toUpperCase());
+    for (const code of upper) m.set(code, upper);
+  }
+  return m;
+})();
+
+/**
+ * Expand a port code to every code it should match in matrix keying — itself
+ * plus any pooled/aliased codes. Returns `[]` for a null/empty code, and
+ * `[CODE]` (uppercased) for a code with no aliases. Order-stable, de-duped.
+ */
+export function expandPortAliases(code?: string | null): string[] {
+  const c = String(code ?? '').trim().toUpperCase();
+  if (!c) return [];
+  const group = ALIAS_INDEX.get(c);
+  if (!group) return [c];
+  return group.includes(c) ? group.slice() : [c, ...group];
 }

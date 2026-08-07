@@ -9,6 +9,10 @@
  *   GET /api/public/autocomplete/ports?q=norfolk
  *       → marine ports + inland intermodal hubs, search local data.
  *
+ *   GET /api/public/autocomplete/cfs?q=stg&gateway=USLAX
+ *       → bonded CFS + LCL-consolidation facilities, search local data.
+ *       Optional `gateway` filters to CFS serving that port code.
+ *
  *   GET /api/public/autocomplete/terminals?q=APM&port=USLAX
  *       → terminals at a given port (or all terminals if `port` omitted).
  *       Searches the platform's TERMINALS_DATA — does NOT filter by tenant
@@ -20,6 +24,7 @@ import { db } from '../../db/client.js';
 import { tenants, terminals as terminalsTable } from '../../db/schema.js';
 import { PORTS_DATA } from '../../data/ports.js';
 import { PORTS_INLAND, TERMINALS_DATA, type TerminalRow } from '../../data/terminals.js';
+import { CFS_DATA, LCL_NETWORKS } from '../../data/cfs.js';
 import { loadEnv } from '../../config.js';
 import { publicAutocompleteLimiter } from '../rateLimits.js';
 import { LruCache } from '../lruCache.js';
@@ -32,6 +37,36 @@ const locationCache = new LruCache<{ suggestions: AutocompleteSuggestion[] }>(20
 const ALL_PORTS = [
   ...PORTS_DATA.map((p) => ({ code: p.code, name: p.name, city: p.city, state: p.state ?? null, country: p.country })),
   ...PORTS_INLAND.map((p) => ({ code: p.code, name: p.name, city: p.city, state: p.state, country: p.country })),
+];
+
+// CFS directory, flattened for type-ahead. Specific bonded facilities first,
+// then the neutral NVOCC LCL networks (one row each, gateways joined into the
+// searchable text so "vanguard chicago" matches).
+const ALL_CFS = [
+  ...CFS_DATA.map((c) => ({
+    code: c.code,
+    name: c.name,
+    operator: c.operator,
+    city: c.city,
+    state: c.state,
+    country: c.country,
+    gatewayPort: c.gatewayPort,
+    type: c.type,
+    bonded: c.bonded,
+    address: c.address ?? null,
+  })),
+  ...LCL_NETWORKS.map((n) => ({
+    code: n.code,
+    name: n.name,
+    operator: n.operator,
+    city: n.gateways.join(', '),
+    state: null as string | null,
+    country: n.country,
+    gatewayPort: null as string | null,
+    type: n.type,
+    bonded: true,
+    address: null as string | null,
+  })),
 ];
 
 export function registerAutocompleteRoutes(app: Express) {
@@ -79,6 +114,25 @@ export function registerAutocompleteRoutes(app: Express) {
         p.city.toLowerCase().includes(q) ||
         p.code.toLowerCase().includes(q) ||
         (p.state ?? '').toLowerCase().includes(q)
+    ).slice(0, 12);
+    return res.json({ suggestions: matches });
+  });
+
+  // ── CFS / LCL consolidation facilities (local data, no external call) ─
+  app.get('/api/public/autocomplete/cfs', (req: Request, res: Response) => {
+    const q = String(req.query.q ?? '').trim().toLowerCase();
+    const gateway = String(req.query.gateway ?? '').trim().toUpperCase();
+    let pool = ALL_CFS;
+    if (gateway) pool = pool.filter((c) => (c.gatewayPort ?? '').toUpperCase() === gateway);
+    if (q.length < 1) return res.json({ suggestions: pool.slice(0, 12) });
+    const matches = pool.filter(
+      (c) =>
+        c.name.toLowerCase().includes(q) ||
+        c.operator.toLowerCase().includes(q) ||
+        c.city.toLowerCase().includes(q) ||
+        c.code.toLowerCase().includes(q) ||
+        (c.gatewayPort ?? '').toLowerCase().includes(q) ||
+        (c.state ?? '').toLowerCase().includes(q)
     ).slice(0, 12);
     return res.json({ suggestions: matches });
   });
