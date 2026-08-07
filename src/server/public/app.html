@@ -29,6 +29,7 @@
   <link rel="stylesheet" href="/embed-panel.css">
   <link rel="stylesheet" href="/onboarding-wizard.css">
   <link rel="stylesheet" href="/grab-scroll.css">
+  <link rel="stylesheet" href="/portal-appbar.css">
   <script>
     (function () {
       // Explicit user-controlled day/night theme. Default = dark (brand),
@@ -81,9 +82,32 @@
         <button class="nav-item" data-route="audit" aria-label="Audit log"><svg class="qf-ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"/><path d="M3 3v5h5"/><path d="M12 7v5l4 2"/></svg> Audit log</button>
       </details>
       <button class="nav-item" id="sb-logout" aria-label="Sign out"><svg class="qf-ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" x2="9" y1="12" y2="12"/></svg> Sign out</button>
-      <button class="qf-theme-toggle" id="qf-theme-toggle" type="button" aria-label="Switch to light theme"><span id="qf-theme-icon" aria-hidden="true"></span><span id="qf-theme-label">Dark</span></button>
     </aside>
-    <main class="app-main"><div id="page-content"></div></main>
+    <main class="app-main">
+      <!-- Portal top bar (sticky). Left: clickable truck logo → homepage (new
+           tab) + the tenant's hosted URL → their live calculator. Right cluster:
+           notifications bell (new-lead count) · day/night theme toggle · account
+           settings. The theme toggle was relocated here from the sidebar; it
+           keeps id="qf-theme-toggle" so wireThemeToggle() is untouched. -->
+      <header class="qf-appbar" id="qf-appbar">
+        <div class="qf-appbar-left">
+          <a class="qf-appbar-logo" href="https://quotefleet.net" target="_blank" rel="noopener" aria-label="QuoteFleet home (opens in a new tab)">
+            <img class="qf-appbar-logo-img qf-appbar-logo-ondark" src="/brand/logo-full-ondark.png" alt="" />
+            <img class="qf-appbar-logo-img qf-appbar-logo-onlight" src="/brand/logo-full.png" alt="" />
+          </a>
+          <a class="qf-appbar-slug" id="qf-appbar-slug" href="#" target="_blank" rel="noopener" title="Open your live calculator (opens in a new tab)">…</a>
+        </div>
+        <div class="qf-appbar-right">
+          <button class="qf-appbar-icon-btn" id="qf-appbar-bell" type="button" aria-label="New leads">
+            <svg class="qf-ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 8a6 6 0 0 1 12 0c0 7 3 9 3 9H3s3-2 3-9"/><path d="M10.3 21a1.94 1.94 0 0 0 3.4 0"/></svg>
+            <span class="qf-appbar-badge" data-badge="bell" aria-label="new leads" hidden></span>
+          </button>
+          <button class="qf-theme-toggle" id="qf-theme-toggle" type="button" aria-label="Switch to light theme"><span id="qf-theme-icon" aria-hidden="true"></span><span id="qf-theme-label">Dark</span></button>
+          <button class="qf-appbar-icon-btn" id="qf-appbar-account" type="button" data-route="account" aria-label="Account settings"><svg class="qf-ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M19 21v-2a4 4 0 0 0-4-4H9a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg></button>
+        </div>
+      </header>
+      <div id="page-content"></div>
+    </main>
   </div>
   <style>
     /* Progressive nav — the Advanced disclosure. The summary mimics a muted
@@ -103,7 +127,7 @@
        the toggle stays display:none (no stray floating control). */
     @media (max-width: 900px) { .qf-mobile-nav-toggle { display: inline-flex; } }
     @media (min-width: 901px) { .app-shell.qf-nav-collapsed .sidebar { display: none; } .app-shell.qf-nav-collapsed .app-main { margin-left: 0; } .qf-nav-scrim { display: none; } .app-shell.qf-nav-collapsed .qf-mobile-nav-toggle { display: inline-flex; } }
-    @media (max-width: 900px) { .app-shell .sidebar { position: fixed; top: 0; left: 0; bottom: 0; width: 260px; max-width: 80vw; padding-top: 56px; transform: translateX(-100%); transition: transform 0.18s ease; z-index: 1000; box-shadow: 4px 0 20px rgba(0,0,0,0.2); overflow-y: auto; } .app-shell.qf-nav-open .sidebar { transform: translateX(0); } .app-main { padding-top: 60px; }
+    @media (max-width: 900px) { .app-shell .sidebar { position: fixed; top: 0; left: 0; bottom: 0; width: 260px; max-width: 80vw; padding-top: 56px; transform: translateX(-100%); transition: transform 0.18s ease; z-index: 1000; box-shadow: 4px 0 20px rgba(0,0,0,0.2); overflow-y: auto; } .app-shell.qf-nav-open .sidebar { transform: translateX(0); }
       /* Backdrop behind the open drawer — dims the page, tap to close. */
       .qf-nav-scrim { position: fixed; inset: 0; background: rgba(8, 11, 20, 0.55); opacity: 0; visibility: hidden; transition: opacity 0.18s ease, visibility 0.18s ease; z-index: 999; }
       .app-shell.qf-nav-open .qf-nav-scrim { opacity: 1; visibility: visible; } }
