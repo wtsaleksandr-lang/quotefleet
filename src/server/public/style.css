@@ -1242,3 +1242,95 @@ html[data-theme="light"] .hero h1 .accent {
   font-size: 11px; font-weight: 600;
   border-radius: 999px; white-space: nowrap;
 }
+
+/* ── Floating AI copilot bubble (portal-wide) ─────────────────────
+   Persistent launcher + docked chat popover on every authed portal route.
+   Reuses the owner rate-chat surface (.chat-panel) inside .qf-copilot-panel.
+   Mounted in #app-shell so it survives SPA route swaps. Theme-aware via tokens;
+   both light + dark are covered because every color is a var(--*). */
+.qf-copilot-launcher {
+  position: fixed; right: 24px; bottom: 24px; z-index: 1200;
+  width: 56px; height: 56px; border-radius: var(--radius-pill);
+  display: flex; align-items: center; justify-content: center;
+  background: var(--cta-bg); color: var(--cta-text);
+  border: 1px solid var(--cta-bg);
+  box-shadow: var(--shadow-md); cursor: pointer;
+  transition: transform 0.16s ease, box-shadow 0.16s ease, background 0.16s ease, border-color 0.16s ease;
+}
+.qf-copilot-launcher:hover {
+  background: var(--cta-bg-hover); border-color: var(--cta-bg-hover);
+  transform: translateY(-2px); box-shadow: var(--shadow-lg);
+}
+.qf-copilot-launcher:active { transform: translateY(0) scale(0.96); }
+.qf-copilot-launcher:focus-visible { outline: 2px solid var(--accent); outline-offset: 3px; }
+.qf-copilot-launcher .qf-ico { width: 26px; height: 26px; }
+
+/* Backdrop — invisible on desktop (the popover is non-blocking), dimmed on
+   mobile where the panel becomes a bottom sheet. */
+.qf-copilot-scrim {
+  position: fixed; inset: 0; z-index: 1190;
+  background: rgba(8, 11, 20, 0.5);
+  opacity: 0; visibility: hidden;
+  transition: opacity 0.2s ease, visibility 0.2s ease;
+}
+
+.qf-copilot-panel {
+  position: fixed; right: 24px; bottom: calc(56px + var(--space-3) + var(--space-1));
+  z-index: 1200;
+  width: 384px; max-width: calc(100vw - 48px);
+  height: 560px; max-height: calc(100vh - 120px);
+  display: flex; flex-direction: column;
+  background: var(--surface); border: 1px solid var(--border-strong);
+  border-radius: var(--radius-lg); box-shadow: var(--shadow-lg);
+  overflow: hidden;
+  opacity: 0; transform: translateY(12px) scale(0.98);
+  transform-origin: bottom right;
+  transition: opacity 0.18s ease, transform 0.18s ease;
+}
+.qf-copilot-panel.is-open { opacity: 1; transform: translateY(0) scale(1); }
+
+.qf-copilot-head {
+  flex: 0 0 auto;
+  display: flex; align-items: center; justify-content: space-between;
+  gap: var(--space-1); padding: var(--space-1-5) var(--space-2);
+  border-bottom: 1px solid var(--border); background: var(--surface-2);
+}
+.qf-copilot-title {
+  display: flex; align-items: center; gap: var(--space-1);
+  font-weight: 700; font-size: 14px; color: var(--ink);
+}
+.qf-copilot-spark { display: inline-flex; color: var(--accent); }
+.qf-copilot-spark .qf-ico { width: 18px; height: 18px; }
+.qf-copilot-close {
+  display: inline-flex; align-items: center; justify-content: center;
+  width: 36px; height: 36px; border-radius: var(--radius-btn);
+  background: transparent; border: 1px solid transparent; color: var(--muted);
+  cursor: pointer; transition: background 0.15s ease, color 0.15s ease;
+}
+.qf-copilot-close:hover { background: var(--surface-3); color: var(--ink); }
+.qf-copilot-close:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+.qf-copilot-close .qf-ico { width: 18px; height: 18px; }
+
+/* The shared chat surface fills the popover — override the standalone card's
+   fixed 480px box, border, and radius so it docks flush inside the panel. */
+.qf-copilot-panel .qf-copilot-chat {
+  flex: 1 1 auto; min-height: 0; height: auto;
+  border: 0; border-radius: 0; background: transparent;
+  padding: var(--space-2);
+}
+
+@media (max-width: 640px) {
+  .qf-copilot-scrim { opacity: 0; }
+  body.qf-copilot-open .qf-copilot-scrim { opacity: 1; visibility: visible; }
+  .qf-copilot-panel {
+    right: 0; left: 0; bottom: 0; top: auto;
+    width: 100%; max-width: 100%;
+    height: 88vh; max-height: 88vh;
+    border-radius: var(--radius-lg) var(--radius-lg) 0 0;
+    border-left: 0; border-right: 0; border-bottom: 0;
+    transform-origin: bottom center;
+    transform: translateY(100%);
+  }
+  .qf-copilot-panel.is-open { transform: translateY(0); }
+  .qf-copilot-launcher { right: 16px; bottom: 16px; }
+}
