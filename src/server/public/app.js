@@ -164,16 +164,40 @@
     var card = el('div', { class: 'qf-modal-card', role: 'dialog', 'aria-modal': 'true' });
     card.appendChild(el('h3', { text: opts.title || 'Are you sure?' }));
     if (opts.body) card.appendChild(el('p', { text: opts.body }));
+    // Optional pre-escaped HTML block (e.g. a warning banner + list of the
+    // sample lanes that failed the auto-check). Callers MUST escape any
+    // user/tenant-derived text before passing it here.
+    if (opts.bodyHtml) {
+      var extra = el('div', { class: 'qf-modal-body-html' });
+      extra.innerHTML = opts.bodyHtml;
+      card.appendChild(extra);
+    }
     var actions = el('div', { class: 'qf-modal-actions' });
     var cancelBtn = el('button', { class: 'btn', text: opts.cancelText || 'Cancel' });
     var okBtn = el('button', { class: 'btn ' + (opts.danger ? 'btn-danger' : 'btn-primary'), text: opts.confirmText || 'Confirm' });
+    // Optional acknowledgment gate — the confirm button stays disabled until the
+    // operator ticks the checkbox, so a flagged ($0/failed) auto-check can't be
+    // applied on a silent click-through.
+    var ackInput = null;
+    if (opts.requireAck) {
+      var ackLabel = el('label', { class: 'qf-modal-ack' });
+      ackInput = el('input', { type: 'checkbox' });
+      ackLabel.appendChild(ackInput);
+      ackLabel.appendChild(el('span', { text: opts.requireAck }));
+      card.appendChild(ackLabel);
+      okBtn.disabled = true;
+      ackInput.addEventListener('change', function () { okBtn.disabled = !ackInput.checked; });
+    }
     var keydown;
     function close() {
       backdrop.remove();
       if (keydown) document.removeEventListener('keydown', keydown);
     }
     cancelBtn.addEventListener('click', function () { close(); if (opts.onCancel) opts.onCancel(); });
-    okBtn.addEventListener('click', function () { close(); if (opts.onConfirm) opts.onConfirm(); });
+    okBtn.addEventListener('click', function () {
+      if (opts.requireAck && ackInput && !ackInput.checked) return;
+      close(); if (opts.onConfirm) opts.onConfirm();
+    });
     actions.appendChild(cancelBtn);
     actions.appendChild(okBtn);
     card.appendChild(actions);
@@ -4091,11 +4115,15 @@
       // ── System auto-verification (reliability without manual labor) ──
       // We quote a spread of sample lanes against the draft automatically and
       // report a calm summary. The owner never has to hand-test anything.
+      // Holds the auto-check summary once it resolves, so the Apply flow can
+      // force an explicit acknowledgment when sample lanes failed to price.
+      var lastAutoCheck = null;
       var autocheck = el('div', { class: 'qf-autocheck qf-autocheck-loading', style: { marginTop: '14px' } });
       autocheck.innerHTML = '<span class="qf-autocheck-spin" aria-hidden="true"></span>'
         + '<span>Auto-checking a spread of sample lanes with your rates…</span>';
       card.appendChild(autocheck);
       api('/api/tenant/ingest/' + job.id + '/autocheck').then(function (r) {
+        lastAutoCheck = r;
         autocheck.className = 'qf-autocheck';
         var totalN = Number(r.total) || 0;
         if (r.flaggedCount > 0) {
@@ -4103,9 +4131,15 @@
             return '<li>' + escapeHtml(f.label) + ' — ' + escapeHtml(f.reason) + '</li>';
           }).join('');
           autocheck.classList.add('qf-autocheck-flag');
-          autocheck.innerHTML = '<div class="qf-autocheck-line"><strong>We auto-quoted <span data-count-total>' + (doAnim ? '0' : totalN) + '</span> sample lanes</strong> — '
-            + r.clean + ' clean, ' + r.flaggedCount + ' to look at:</div>'
-            + '<ul class="qf-autocheck-list">' + items + '</ul>';
+          autocheck.setAttribute('role', 'alert');
+          // A failed/$0 sample lane means a customer would get a blank/failed
+          // quote on that lane if these rates go live — surface it as an
+          // explicit WARNING the operator has to reckon with, not a soft
+          // "to look at" aside they can skim past.
+          autocheck.innerHTML = '<div class="qf-autocheck-line"><strong>⚠ ' + r.flaggedCount + ' of <span data-count-total>' + (doAnim ? '0' : totalN) + '</span> sample lanes did not price</strong> — '
+            + r.clean + ' priced cleanly. Applying these rates means customers may get a failed or $0 quote on the flagged lanes:</div>'
+            + '<ul class="qf-autocheck-list">' + items + '</ul>'
+            + '<div class="qf-autocheck-line qf-autocheck-hint">Review the imported rates for these services before you apply.</div>';
         } else {
           autocheck.classList.add('qf-autocheck-ok');
           // Green tick draws itself in (SVG stroke) on the animated poll path.
@@ -4179,10 +4213,28 @@
           var total = selectionTotal(body);
           if (total === 0) { toastErr({ message: 'Tick at least one item to apply.' }); return; }
           var noun = total === 1 ? 'item' : 'items';
+          // When the auto-check flagged sample lanes that priced at $0 / failed,
+          // don't let Apply be a silent click-through: show the failing lanes and
+          // require the operator to explicitly acknowledge before applying.
+          var flagged = lastAutoCheck && lastAutoCheck.flaggedCount > 0 ? lastAutoCheck : null;
+          var warnHtml = '';
+          if (flagged) {
+            var flagItems = (flagged.flagged || []).map(function (f) {
+              return '<li>' + escapeHtml(f.label) + ' — ' + escapeHtml(f.reason) + '</li>';
+            }).join('');
+            warnHtml = '<div class="qf-modal-warn"><strong>⚠ ' + flagged.flaggedCount + ' sample lane'
+              + (flagged.flaggedCount === 1 ? '' : 's') + ' did not price.</strong> Customers may get a failed or $0 quote on '
+              + (flagged.flaggedCount === 1 ? 'this lane' : 'these lanes') + ' once these rates are live:'
+              + '<ul class="qf-autocheck-list">' + flagItems + '</ul></div>';
+          }
           showConfirmModal({
-            title: 'Apply to your rate book?',
+            title: flagged ? 'Apply rates that failed the auto-check?' : 'Apply to your rate book?',
             body: 'This adds ' + total + ' ' + noun + ' to your live rate book. You can edit or remove them later.',
-            confirmText: 'Apply ' + total + ' ' + noun,
+            bodyHtml: warnHtml || undefined,
+            danger: !!flagged,
+            requireAck: flagged ? 'I understand ' + flagged.flaggedCount + ' sample lane'
+              + (flagged.flaggedCount === 1 ? '' : 's') + ' did not price and want to apply anyway.' : undefined,
+            confirmText: flagged ? 'Apply anyway' : 'Apply ' + total + ' ' + noun,
             cancelText: 'Cancel',
             onConfirm: function () {
               applyBtn.disabled = true; applyBtn.textContent = 'Applying…';
