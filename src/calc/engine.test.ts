@@ -448,6 +448,28 @@ describe('calculate', () => {
     expect(r.unsupported).toBeUndefined();
     expect(r.total).toBeGreaterThan(0);
   });
+
+  it('Unpriceable catch-all — a card whose rates net to $0 is unsupported, never a silent $0 quote', () => {
+    // A drayage/short-haul card with zero linehaul inputs (no per-mile rate, no
+    // flat fee, no minimum) must NOT surface a misleading $0 hero — it should
+    // flag as unpriceable so the widget shows "request a manual quote".
+    const c = rateCard({
+      service: 'drayage', equipment: 'container_40',
+      ratePerMile: 0, flatFee: 0, minimumCharge: 0,
+      fuelSurchargePct: 0, marginPct: 0, maxMiles: null,
+    });
+    const r = calculate([c], [], [], req({ service: 'drayage', equipment: 'container_40', miles: 268 }));
+    expect(r.unsupported).toBeDefined();
+    expect(r.unsupported?.reason).toMatch(/manual quote|can't price/i);
+    expect(r.total).toBe(0);
+  });
+
+  it('Unpriceable catch-all — a real priced card still prices (no false positive)', () => {
+    const c = rateCard({ service: 'ftl', equipment: 'dryvan', ratePerMile: 2.5, minimumCharge: 350 });
+    const r = calculate([c], [], [], req({ service: 'ftl', equipment: 'dryvan', miles: 500 }));
+    expect(r.unsupported).toBeUndefined();
+    expect(r.total).toBeGreaterThan(0);
+  });
 });
 
 describe('seed-template verticals — each computes a real quote with its default set', () => {

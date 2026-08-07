@@ -173,8 +173,13 @@ export interface CalcResult {
   margin: number;
   total: number;
   currency: Currency;
-  /** Set when no rate card / lane zone matches the request. */
-  unsupported?: { reason: string };
+  /**
+   * Set when the lane can't be priced. `reason` is customer-facing copy; `code`
+   * lets callers (e.g. the operator auto-check) distinguish the generic
+   * nets-to-$0 catch-all ('unpriceable') from the specific guards (over-range,
+   * over-capacity, no card) that carry their own tailored reason.
+   */
+  unsupported?: { reason: string; code?: 'unpriceable' };
   /** LTL only: the size/weight rating basis behind the price (credibility). */
   ltl?: FreightClassEstimate & { classSource: 'derived' | 'override' };
 }
@@ -740,6 +745,36 @@ export function calculate(
   }
 
   const total = round2(subtotal + margin);
+
+  // ── Unpriceable catch-all ─────────────────────────────────────────
+  // If we reach here with a non-positive total, NO rate source actually
+  // priced the lane: no card/matrix/zone branch matched, or the one that
+  // did nets to $0 (a card with zero ratePerMile+flatFee+minimumCharge, a
+  // $0 zone/matrix cell, etc.). A $0 freight quote is never a real customer
+  // price — it always means "can't price online". The specific guards above
+  // (over-maxMiles, over-capacity, no card configured) return their own
+  // tailored reasons and never fall through to here; this is the last-resort
+  // net so the widget shows a "request a manual quote" message instead of a
+  // misleading $0 hero + "Get this quote" CTA.
+  if (total <= 0) {
+    return {
+      request: req,
+      lines: [],
+      subtotalLinehaul: 0,
+      subtotalAccessorials: 0,
+      fuelSurcharge: 0,
+      margin: 0,
+      total: 0,
+      currency: req.currency ?? 'USD',
+      unsupported: {
+        reason:
+          `We can't price this ${req.service.toUpperCase()} lane online right now. ` +
+          `Please request a manual quote and our team will follow up with pricing.`,
+        code: 'unpriceable',
+      },
+      ...(ltlRating ? { ltl: ltlRating } : {}),
+    };
+  }
 
   return {
     request: req,

@@ -200,13 +200,38 @@
 .qf-autocheck-tick { flex: none; color: var(--success); font-weight: 700; }
 .qf-autocheck-flag {
   flex-direction: column;
-  border-color: color-mix(in srgb, var(--accent-2) 40%, var(--border));
-  background: color-mix(in srgb, var(--accent-2) 10%, var(--surface));
+  border-color: color-mix(in srgb, var(--error) 55%, var(--border));
+  background: color-mix(in srgb, var(--error) 12%, var(--surface));
 }
 .qf-autocheck-line { color: var(--ink); }
+.qf-autocheck-flag .qf-autocheck-line strong { color: var(--error); }
+.qf-autocheck-hint { margin-top: 4px; font-size: 12px; color: var(--ink-soft); }
 .qf-autocheck-list { margin: 4px 0 0 16px; padding: 0; color: var(--ink-soft); }
 .qf-autocheck-list li { margin: 4px 0; }
 .qf-try-lane { margin-left: auto; }
+
+/* ── Apply-confirm warning (flagged auto-check) ───────────────────── */
+.qf-modal-body-html { margin: 4px 0 0; }
+.qf-modal-warn {
+  margin: 8px 0 4px;
+  padding: 12px;
+  border-radius: 10px;
+  border: 1px solid color-mix(in srgb, var(--error) 55%, var(--border));
+  background: color-mix(in srgb, var(--error) 12%, var(--surface));
+  font-size: 13px;
+  color: var(--ink-soft);
+}
+.qf-modal-warn strong { color: var(--error); }
+.qf-modal-ack {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  margin: 12px 0 4px;
+  font-size: 13px;
+  color: var(--ink);
+  cursor: pointer;
+}
+.qf-modal-ack input { margin-top: 4px; flex: none; }
 
 /* ── AI import: "Try a lane yourself" (optional) modal ────────────── */
 .qf-test-grid {

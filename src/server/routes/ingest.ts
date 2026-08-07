@@ -1030,7 +1030,14 @@ export function runDraftAutoCheck(draft: {
     // label on a throwaway probe, not a converted amount.
     const r = calculate(cards, accs, zones, s.request, [], undefined, matrices, matrixZones);
     if (r.unsupported) {
-      return { label: s.label, service: s.request.service, ok: false, reason: r.unsupported.reason };
+      // The generic nets-to-$0 catch-all carries customer-facing "request a
+      // manual quote" copy; for the OPERATOR review the useful signal is that
+      // the imported rate priced at $0, so surface that instead. The specific
+      // guards (over-range / over-capacity / no card) keep their tailored reason.
+      const reason = r.unsupported.code === 'unpriceable'
+        ? 'Priced at $0 — check the imported rate for this service.'
+        : r.unsupported.reason;
+      return { label: s.label, service: s.request.service, ok: false, reason };
     }
     if (!(r.total > 0)) {
       return { label: s.label, service: s.request.service, ok: false, reason: 'Priced at $0 — check the imported rate for this service.' };

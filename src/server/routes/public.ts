@@ -35,6 +35,7 @@ import type { MatrixCellInput, ZoneDefInput } from '../../calc/rateMatrix.js';
 import { resolveFscForTenant, asOfLabel } from '../../eia/dieselPrice.js';
 import { estimateTransit } from '../../calc/transit.js';
 import { distanceBetween } from '../../calc/distance.js';
+import { dedupeEquipmentTypes, matrixEquipmentLabel } from './equipmentOptions.js';
 import { generateLeadReply } from '../../ai/replyAgent.js';
 import { leadChatTurn, quoteChatTurn, type QuoteChatContext } from '../../ai/chatAgent.js';
 import { sendEmail, brandedFrom, type EmailAttachment } from '../../email/send.js';
@@ -490,10 +491,10 @@ export function registerPublicRoutes(app: Express) {
         ...cards.filter((c) => c.enabled).map((c) => c.service),
         ...matrices.filter((m) => m.enabled !== false).map((m) => String(m.mode)),
       ])),
-      equipmentByService: mergeMatrixEquipment(
+      equipmentByService: dedupeEquipmentTypes(mergeMatrixEquipment(
         groupBy(cards.filter((c) => c.enabled), 'service', 'equipment', 'label'),
         matrices,
-      ),
+      )),
       accessorials: accs
         .filter((a) => a.enabled && a.trigger === 'optional')
         .map((a) => ({
@@ -1397,34 +1398,6 @@ export function registerPublicRoutes(app: Express) {
       brand: brand[0] ?? null,
     });
   });
-}
-
-// Human labels for the equipment codes a rate matrix can carry but a rate card
-// may not (so a matrix-derived dropdown option reads "40' Reefer Container"
-// rather than the raw code). Falls back to a title-cased code when unmapped.
-const MATRIX_EQUIPMENT_LABELS: Record<string, string> = {
-  dryvan: 'Dry Van',
-  reefer: 'Reefer (Refrigerated)',
-  flatbed: 'Flatbed',
-  step_deck: 'Step Deck',
-  conestoga: 'Conestoga',
-  container_20: "20' Container",
-  container_40: "40' Container",
-  container_40hc: "40' High-Cube Container",
-  container_45: "45' Container",
-  container_40re: "40' Reefer Container",
-  container_20re: "20' Reefer Container",
-  sprinter: 'Sprinter Van',
-  box_truck: 'Box Truck',
-  tractor_only: 'Power Only',
-  pallet: 'Pallet',
-};
-
-function matrixEquipmentLabel(code: string): string {
-  const c = String(code || '').trim();
-  if (MATRIX_EQUIPMENT_LABELS[c]) return MATRIX_EQUIPMENT_LABELS[c];
-  // Title-case the raw code as a fallback (container_40re → "Container 40re").
-  return c.replace(/[_-]+/g, ' ').replace(/\b\w/g, (m) => m.toUpperCase()).trim() || c;
 }
 
 /**
