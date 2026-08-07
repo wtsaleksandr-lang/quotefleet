@@ -34,10 +34,6 @@
     box.className = 'qf-suggestions qf-terminal-suggestions';
     box.id = 'qf-pickup-terminal-suggestions';
 
-    var help = document.createElement('div');
-    help.className = 'qf-terminal-search-help';
-    help.textContent = 'Start typing the terminal name, carrier, or code. Leave blank if you are not sure.';
-
     select.style.position = 'absolute';
     select.style.left = '-9999px';
     select.style.width = '1px';
@@ -46,7 +42,6 @@
 
     select.insertAdjacentElement('beforebegin', input);
     input.insertAdjacentElement('afterend', box);
-    box.insertAdjacentElement('afterend', help);
 
     function options() {
       return Array.from(select.options || []);

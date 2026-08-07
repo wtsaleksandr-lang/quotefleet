@@ -562,10 +562,17 @@ body { padding-left: var(--space-0-5); padding-right: var(--space-0-5); }
 #qf-equip-weight-row .qf-addr-col .qf-field {
   margin-top: auto;
 }
+/* Both title rows share ONE height so the label→input gap is identical in each
+   column. The Weight title carries the inline lbs/kg toggle (≈32px tall); the
+   Equipment title is a single text line (24px). With unequal title heights the
+   stretched row let margin-top:auto push the Equipment field down, opening a
+   larger label→input gap under Equipment than under Weight/Pickup/Delivery.
+   Pinning both titles to 32px equalises them, so the auto-margin has nothing to
+   push and every field's label sits the same 8px above its input. */
 #qf-equip-weight-row .qf-section-title {
   display: flex;
   align-items: center;
-  min-height: 24px;
+  min-height: 32px;
 }
 /* The base .qf-addr-row uses align-items:flex-start, so the two columns don't
    stretch and margin-top:auto had nothing to push against — stretch THIS row. */
@@ -593,6 +600,14 @@ html { scrollbar-width: thin; scrollbar-color: rgba(135, 138, 150, 0.38) transpa
    stacked fields in the left column an 8px gap. ── */
 #qf-drayage-left .qf-field + .qf-field { margin-top: var(--space-1); }
 
+/* The Terminal label sits INSIDE its .qf-field (unlike Pickup port / Delivery,
+   whose titles are siblings just above the field). That meant the field's own
+   flex row-gap (--label-gap, 8px) AND the title's margin-bottom (--space-1, 8px)
+   both applied → a doubled 16px label→input gap. Zero the title margin so only
+   the field's 8px gap governs, matching every other drayage label. !important
+   beats the demo app-calculator sheet's `margin: 16px 0 8px !important`. */
+#qf-drayage-left .qf-field > .qf-section-title { margin-bottom: 0 !important; }
+
 /* Balance the two drayage columns. The left column is taller (Pickup port +
    Terminal + terminal helper); the right column only carries the Delivery field
    + its hint, so a tall void opened under Delivery. Stretch the row and let the
@@ -602,7 +617,12 @@ html { scrollbar-width: thin; scrollbar-color: rgba(135, 138, 150, 0.38) transpa
    #qf-drayage-row so FTL/Expedite/Hotshot/LTL address rows are untouched. */
 #qf-drayage-row { align-items: stretch; }
 #qf-drayage-row #qf-default-delivery { display: flex; flex-direction: column; }
-#qf-drayage-row #qf-default-delivery .qf-addr-hint { margin-top: auto; }
+/* In drayage the shared address helper (JS re-parents it under Delivery) has no
+   field to describe on the right at the Terminal row, so it read as an orphaned,
+   floating line. Hide it in drayage ONLY — this selector requires the hint to be
+   inside #qf-drayage-row, which is true solely in drayage; in FTL/LTL/Hotshot/
+   Expedite the hint lives under #qf-default-addr-row and stays visible. */
+#qf-drayage-row #qf-addr-hint { display: none; }
 
 /* Booking details is now a collapsed expander matching the "Shipment options"
    summary. The reused .qf-options-summary is transparent, so give the trigger
@@ -614,7 +634,10 @@ html { scrollbar-width: thin; scrollbar-color: rgba(135, 138, 150, 0.38) transpa
 .qf-booking-summary {
   margin-top: 0;
   border: 1px solid rgba(148, 163, 184, 0.26);
-  border-radius: 16px;
+  /* Match the global control radius (equipment/port inputs use --w-radius-input)
+     so the Booking details bar reads as part of the same widget, not a rounder
+     outlier. Was a hardcoded 16px. */
+  border-radius: var(--w-radius-input, 9px);
   background: rgba(255, 255, 255, 0.72);
   box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.86), 0 12px 26px -24px rgba(15, 23, 42, 0.42);
 }
