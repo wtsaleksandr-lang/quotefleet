@@ -3671,6 +3671,78 @@
           text: 'Setup in progress — this address isn’t receiving mail yet. We’ll let you know when it’s live.',
         }));
       }
+
+      // ── Trust model, stated plainly ──────────────────────────────
+      panel.appendChild(el('div', {
+        style: {
+          marginTop: '12px', paddingTop: '10px', borderTop: '1px dashed var(--border)',
+          fontWeight: '600', fontSize: '13px', color: 'var(--ink)',
+        },
+        text: 'Trusted senders',
+      }));
+      panel.appendChild(el('div', {
+        class: 'field-hint',
+        style: { marginTop: '4px', lineHeight: '1.5' },
+        text: 'The first email from a new sender is held for your review; approve it once and future emails from that sender apply automatically.',
+      }));
+
+      // ── Current trusted senders (read + remove) ──────────────────
+      var sendersBox = el('div', { style: { marginTop: '10px' } });
+      panel.appendChild(sendersBox);
+      loadSenders(sendersBox);
+    }
+
+    // Fetch + render the trusted-sender allowlist. Each row has a ✕ that revokes
+    // auto-apply for that sender (its next email is held for review again). A
+    // 403/empty allowlist just shows the calm empty state.
+    function loadSenders(box) {
+      box.innerHTML = '';
+      api('/api/tenant/email-import/senders').then(function (r) {
+        renderSenders(box, (r && r.senders) || []);
+      }).catch(function () {
+        // Non-fatal: the card is still usable without the list.
+        box.appendChild(el('div', { class: 'muted-small', text: 'Couldn’t load your trusted senders just now.' }));
+      });
+    }
+
+    function renderSenders(box, senders) {
+      box.innerHTML = '';
+      if (!senders.length) {
+        box.appendChild(el('div', {
+          class: 'muted-small',
+          text: 'No trusted senders yet — the first approved email import will add one here.',
+        }));
+        return;
+      }
+      var list = el('div', { style: { display: 'flex', flexDirection: 'column', gap: '6px' } });
+      senders.forEach(function (addr) {
+        var row = el('div', {
+          class: 'qf-sender-row',
+          style: {
+            display: 'flex', gap: '8px', alignItems: 'center', justifyContent: 'space-between',
+            padding: '6px 10px', border: '1px solid var(--border)', borderRadius: '8px',
+          },
+        });
+        row.appendChild(el('span', {
+          text: addr,
+          style: { fontFamily: 'var(--font-mono)', fontSize: '12px', color: 'var(--ink-soft)', wordBreak: 'break-all' },
+        }));
+        var rm = el('button', {
+          class: 'btn btn-ghost btn-sm',
+          text: '✕',
+          title: 'Remove ' + addr,
+          'aria-label': 'Remove trusted sender ' + addr,
+          on: { click: function () {
+            rm.disabled = true;
+            api('/api/tenant/email-import/senders/' + encodeURIComponent(addr), { method: 'DELETE' })
+              .then(function (r) { toastOk('Removed'); renderSenders(box, (r && r.senders) || []); })
+              .catch(function (e) { rm.disabled = false; toastErr(e); });
+          } },
+        });
+        row.appendChild(rm);
+        list.appendChild(row);
+      });
+      box.appendChild(list);
     }
 
     function load() {
@@ -3695,6 +3767,16 @@
   }
 
   // ── AI Import (rate-sheet ingest) ─────────────────────────────
+  // Compact "Aug 6, 2:14 PM"-style timestamp for the review provenance line.
+  function fmtProvDate(d) {
+    if (!d) return 'unknown time';
+    try {
+      return new Date(d).toLocaleString(undefined, {
+        month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit',
+      });
+    } catch (e) { return String(d); }
+  }
+
   function renderIngest(c) {
     c.innerHTML = '';
     c.appendChild(el('h1', { text: 'AI import' }));
@@ -3925,8 +4007,21 @@
               api('/api/tenant/ingest/' + j.id).then(function (r) { showReview(r.job); window.scrollTo(0, document.body.scrollHeight); });
             } }
           });
+          // File cell: for email-sourced jobs, prepend a small ✉ badge and show
+          // the sender under the filename so the queue row is instantly readable
+          // as "came in by email from <who>" vs a manual upload.
+          var fileCell = el('td', {});
+          var fileTop = el('div', { style: { display: 'flex', gap: '6px', alignItems: 'center', flexWrap: 'wrap' } });
+          if (j.source === 'email') {
+            fileTop.appendChild(el('span', { class: 'qf-email-badge', text: '✉', title: 'Received by email' }));
+          }
+          fileTop.appendChild(el('span', { text: j.filename }));
+          fileCell.appendChild(fileTop);
+          if (j.source === 'email' && j.sourceEmail) {
+            fileCell.appendChild(el('div', { class: 'muted-small', text: j.sourceEmail, style: { marginTop: '2px' } }));
+          }
           tbody.appendChild(el('tr', {}, [
-            el('td', { text: j.filename }),
+            fileCell,
             el('td', {}, [statusBadge]),
             el('td', { text: fmtDate(j.createdAt) }),
             el('td', {}, [openBtn]),
@@ -3956,6 +4051,22 @@
       var card = el('div', { class: 'card' + (doAnim ? ' qf-reveal-in' : ''), style: { padding: '18px 22px' } });
 
       card.appendChild(el('h2', { text: 'Review: ' + job.filename }));
+      // Provenance line — makes an email-sourced draft instantly distinguishable
+      // from a manual upload and shows WHO sent it (trust/auditability).
+      if (job.source === 'email' && job.sourceEmail) {
+        var prov = el('div', {
+          class: 'qf-provenance',
+          style: {
+            display: 'flex', gap: '6px', alignItems: 'center', flexWrap: 'wrap',
+            marginBottom: '10px', fontSize: '13px', color: 'var(--muted)',
+          },
+        });
+        prov.appendChild(el('span', { class: 'qf-email-badge', text: '✉ Email' }));
+        var provTxt = 'From ' + job.sourceEmail + ' · received ' + fmtProvDate(job.createdAt);
+        if (job.subject) provTxt += ' · “' + job.subject + '”';
+        prov.appendChild(el('span', { text: provTxt }));
+        card.appendChild(prov);
+      }
       if (parsed.summary) card.appendChild(el('p', { class: 'muted', text: parsed.summary, style: { marginBottom: '10px' } }));
 
       if (parsed.confidence) {

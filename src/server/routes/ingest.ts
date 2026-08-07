@@ -171,6 +171,16 @@ export function registerIngestRoutes(app: Express) {
         errorMessage: job.errorMessage,
         appliedAt: job.appliedAt,
         createdAt: job.createdAt,
+        // Provenance (audit gap): the operator must be able to tell an
+        // email-sourced draft from a manual upload, and see WHO sent it. All of
+        // this is already stored; we simply surface it. `source` is derived so
+        // the UI never has to reason about null userId vs sourceEmail itself.
+        sourceEmail: job.sourceEmail ?? null,
+        source: deriveJobSource(job),
+        // For a body-email the retained raw content starts with `Subject: …`;
+        // pull it out cheaply so the review header can show it. Null for
+        // attachment-sourced or manual jobs (the filename covers those).
+        subject: emailSubjectFromStorageRef(job.storageRef),
       },
     });
   });
@@ -186,12 +196,29 @@ export function registerIngestRoutes(app: Express) {
         status: ingestJobs.status,
         appliedAt: ingestJobs.appliedAt,
         createdAt: ingestJobs.createdAt,
+        // Provenance fields (see detail endpoint). userId is selected only to
+        // derive `source`; it isn't returned. storageRef is intentionally NOT
+        // selected here (it can be multi-MB base64 × 50 rows) — subject is a
+        // detail-view-only field.
+        sourceEmail: ingestJobs.sourceEmail,
+        userId: ingestJobs.userId,
       })
       .from(ingestJobs)
       .where(eq(ingestJobs.tenantId, req.tenant!.id))
       .orderBy(desc(ingestJobs.createdAt))
       .limit(50);
-    return res.json({ jobs: rows });
+    const jobs = rows.map((j) => ({
+      id: j.id,
+      filename: j.filename,
+      mimeType: j.mimeType,
+      sizeBytes: j.sizeBytes,
+      status: j.status,
+      appliedAt: j.appliedAt,
+      createdAt: j.createdAt,
+      sourceEmail: j.sourceEmail ?? null,
+      source: deriveJobSource(j),
+    }));
+    return res.json({ jobs });
   });
 
   // ── Apply parsed changes ─────────────────────────────────────────
@@ -367,6 +394,39 @@ export function registerIngestRoutes(app: Express) {
       .where(and(eq(ingestJobs.id, id), eq(ingestJobs.tenantId, req.tenant!.id)));
     return res.json({ ok: true });
   });
+}
+
+/**
+ * Provenance marker for an ingest job. An email-originated import carries a
+ * `sourceEmail` (normalized From) and is created system-owned (no userId); a
+ * manual dashboard upload has neither. Either signal ⇒ 'email' so a job stays
+ * correctly classified even if one field is ever backfilled/absent.
+ */
+export function deriveJobSource(job: { sourceEmail?: string | null; userId?: number | null }): 'email' | 'upload' {
+  return job.sourceEmail != null || job.userId == null ? 'email' : 'upload';
+}
+
+/**
+ * Cheap subject extraction for a body-email ingest job. `pickBestContent`
+ * stores a forwarded email BODY as base64 of `Subject: <subj>\n\n<body>`; decode
+ * just the first ~300 bytes and pull the leading `Subject:` line. Returns null
+ * for attachment-sourced or manual uploads (whose storageRef is opaque file
+ * bytes that don't start with a Subject line) — the filename covers those.
+ */
+export function emailSubjectFromStorageRef(storageRef: string | null | undefined): string | null {
+  if (typeof storageRef !== 'string' || storageRef.length < 8) return null;
+  let head: string;
+  try {
+    // 400 base64 chars ≈ 300 decoded bytes — plenty for a subject line, and we
+    // never decode a multi-MB attachment just to look for one.
+    head = Buffer.from(storageRef.slice(0, 400), 'base64').toString('utf8');
+  } catch {
+    return null;
+  }
+  const m = head.match(/^Subject:\s*(.+)$/m);
+  if (!m) return null;
+  const subj = m[1].trim();
+  return subj ? subj.slice(0, 200) : null;
 }
 
 /** Count of rows written by an apply. */

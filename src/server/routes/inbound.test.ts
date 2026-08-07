@@ -102,6 +102,7 @@ async function getPostHandler(): Promise<Handler> {
       if (path === '/api/inbound/rate-email') handler = rest[rest.length - 1] as Handler;
     },
     get: () => {},
+    delete: () => {},
   } as unknown as import('express').Express;
   registerInboundRoutes(fakeApp);
   if (!handler) throw new Error('inbound handler not registered');

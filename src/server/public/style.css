@@ -1230,3 +1230,15 @@ html[data-theme="light"] .hero h1 .accent {
   .qf-getpaid-options { grid-template-columns: 1fr; }
   .qf-getpaid-actions .btn { width: 100%; justify-content: center; }
 }
+
+/* Email-provenance chip — marks an ingest job that arrived by forwarded email
+   (vs a manual upload). Brand-tinted, theme-aware; sits inline in the review
+   header and the ingest queue's File column. Appended at EOF so the line-based
+   spacing/color baselines above don't renumber. */
+.qf-email-badge {
+  display: inline-flex; align-items: center; gap: var(--space-0-5);
+  padding: var(--space-0-5) var(--space-1);
+  background: var(--accent-soft); color: var(--accent);
+  font-size: 11px; font-weight: 600;
+  border-radius: 999px; white-space: nowrap;
+}
