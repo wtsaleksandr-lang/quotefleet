@@ -305,11 +305,24 @@ body[data-qf-cta-hover="fill"] .qf-cta:not(.qf-secondary):hover { background: va
 .qf-map-img { display: block; width: 100%; height: auto; }
 .qf-map-img:not([src]) { display: none; }
 .qf-map-expand { position: absolute; right: var(--space-1); bottom: var(--space-1); display: flex; align-items: center; justify-content: center; width: 28px; height: 28px; color: rgba(255,255,255,0.95); background: rgba(15,23,42,0.55); border-radius: 8px; }
-/* Distance + transit embedded over the map (Alex): bottom gradient bar. */
-.qf-map-overlay { position: absolute; left: 0; right: 0; bottom: 0; display: flex; align-items: center; gap: var(--space-2); padding: var(--space-3) var(--space-1-5) var(--space-1-5); background: linear-gradient(rgba(15,23,42,0), rgba(15,23,42,0.82)); text-align: left; }
-.qf-map-ov-stat { display: flex; flex-direction: column; }
-.qf-map-ov-val { font-size: 12.5px; font-weight: 500; color: rgba(255,255,255,0.96); line-height: 1.4; }
-.qf-map-ov-lbl { font-size: 9px; font-weight: 400; letter-spacing: 0.04em; text-transform: uppercase; color: rgba(255,255,255,0.68); line-height: 1.4; }
+/* Distance + transit embedded over the map (Alex): a compact CENTER-bottom chip.
+   Centered (not a full-width bar) so the Google logo baked bottom-LEFT and the
+   "Map data ©…" attribution baked bottom-RIGHT of the static map stay fully
+   visible/unobscured (Google Maps ToS). max-width keeps a margin either side so
+   the chip never reaches those corners. */
+.qf-map-overlay { position: absolute; left: 50%; bottom: var(--space-2); transform: translateX(-50%); display: inline-flex; align-items: center; justify-content: center; gap: var(--space-2); max-width: calc(100% - var(--space-6)); padding: var(--space-1) var(--space-2); border-radius: 999px; background: rgba(15,23,42,0.72); text-align: center; }
+.qf-map-ov-stat { display: flex; flex-direction: column; align-items: center; }
+/* nowrap so each metric stays a single line — keeps the chip a tidy compact pill
+   instead of the long "Est. transit" value stacking into several lines. */
+.qf-map-ov-val { font-size: 12.5px; font-weight: 500; color: rgba(255,255,255,0.96); line-height: 1.4; white-space: nowrap; }
+.qf-map-ov-lbl { font-size: 9px; font-weight: 400; letter-spacing: 0.04em; text-transform: uppercase; color: rgba(255,255,255,0.68); line-height: 1.4; white-space: nowrap; }
+/* Narrow viewports: shrink the centered chip's gaps + type so the one-line pill
+   still fits inside the map width (and stays clear of the corner attribution). */
+@media (max-width: 640px) {
+  .qf-map-overlay { gap: var(--space-1); padding: var(--space-0-5) var(--space-1-5); max-width: calc(100% - var(--space-4)); }
+  .qf-map-ov-val { font-size: 11px; }
+  .qf-map-ov-lbl { font-size: 8px; }
+}
 .qf-map-ov-div { width: 1px; align-self: stretch; margin: var(--space-0-5) 0; background: rgba(255,255,255,0.28); }
 .qf-map-modal { position: fixed; inset: 0; z-index: 1000; display: flex; align-items: center; justify-content: center; }
 .qf-map-modal[hidden] { display: none; }
