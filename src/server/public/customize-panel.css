@@ -328,18 +328,15 @@
 .qf-cz-seg-btn.is-active { background: var(--accent-soft); color: var(--ink); }
 .qf-cz-seg-btn svg { display: block; }
 
-/* ── Auto-height + device/host framing of the preview ─────────────────────
+/* ── Auto-height + device framing of the preview ──────────────────────────
    Height is driven from JS (the widget posts QF_WIDGET_HEIGHT), so there is no
-   fixed-box inner scrollbar. data-device clamps the width; data-host paints a
-   FIXED light/dark backdrop the widget floats on — fixed rgba so it shows a
-   true light vs dark host regardless of the portal's own theme. */
+   fixed-box inner scrollbar. data-device clamps the width. The widget-theme
+   toggle (Auto/Light/Dark) ONLY re-skins the calculator via postMessage — it no
+   longer swaps a host backdrop/frame, so the preview container stays a constant
+   size across all three states (no apparent resize/reframe on toggle). */
 .qf-cz-frame-wrap {
-  transition: background .16s ease, padding .16s ease, max-width .18s ease;
+  transition: max-width .18s ease;
 }
-.qf-cz-frame-wrap[data-host="light"] { background: rgba(241, 242, 245, 1); padding: 16px; }
-.qf-cz-frame-wrap[data-host="dark"] { background: rgba(17, 18, 21, 1); padding: 16px; }
-.qf-cz-frame-wrap[data-host="light"] .qf-cz-frame,
-.qf-cz-frame-wrap[data-host="dark"] .qf-cz-frame { border-radius: 8px; }
 .qf-cz-frame-wrap[data-device="mobile"] { max-width: 390px; margin-left: auto; margin-right: auto; }
 
 /* ── Grab-scroll carousel cursor (Fix: premium draggable selector) ─────────
@@ -349,3 +346,135 @@
    renumber. */
 .qf-cz-carousel-track .qf-cz-preset,
 .qf-cz-carousel-track .qf-cz-mapstyle { cursor: pointer; }
+
+/* ── Fix B: mobile foldable control sheet (≤640px) ─────────────────────────
+   The live preview stays in the main viewport; the customization controls dock
+   into a foldable bottom sheet with a sticky shortcut row + drag handle.
+   Mirrors the WeFixTrades QuoteQuick #467 sticky widget shell — opaque surface
+   + hairline + rounded floating bar (no glass), premium eased fold on the iOS
+   sheet curve, honors prefers-reduced-motion. State lives on .qf-cz-sheet /
+   .is-open (no body classes), so a route swap that wipes #page-content
+   auto-resets the :has()-scoped rules below. Desktop is untouched. Appended at
+   EOF so the line-based baselines above don't renumber. Tokens/ramp/calc only. */
+.qf-cz-sheet {
+  position: fixed;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  z-index: 1150;
+  display: flex;
+  flex-direction: column;
+  height: 78vh;
+  max-height: 78vh;
+  background: var(--surface);
+  border-top: 1px solid var(--border-strong);
+  border-top-left-radius: var(--radius-lg);
+  border-top-right-radius: var(--radius-lg);
+  box-shadow: var(--shadow-lg);
+  transform: translateY(calc(100% - var(--qf-cz-peek, 96px)));
+  transition: transform 0.42s cubic-bezier(0.32, 0.72, 0, 1);
+  overflow: hidden;
+  padding-bottom: env(safe-area-inset-bottom);
+}
+.qf-cz-sheet.is-open { transform: translateY(0); }
+.qf-cz-sheet.is-dragging { transition: none; }
+@media (prefers-reduced-motion: reduce) {
+  .qf-cz-sheet { transition: none; }
+}
+
+.qf-cz-sheet-handle {
+  flex: 0 0 auto;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 100%;
+  height: 24px;
+  padding: 0;
+  border: 0;
+  background: none;
+  cursor: grab;
+  touch-action: none;
+}
+.qf-cz-sheet-handle:active { cursor: grabbing; }
+.qf-cz-sheet-handle:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+.qf-cz-sheet-grip {
+  width: 40px;
+  height: 4px;
+  border-radius: var(--radius-pill);
+  background: var(--border-strong);
+  transition: background 0.15s ease;
+}
+.qf-cz-sheet-handle:hover .qf-cz-sheet-grip { background: var(--muted); }
+
+.qf-cz-sheet-shortcuts {
+  flex: 0 0 auto;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 4px 16px 12px;
+  overflow-x: auto;
+  overflow-y: hidden;
+  scrollbar-width: none;
+  -webkit-overflow-scrolling: touch;
+}
+.qf-cz-sheet-shortcuts::-webkit-scrollbar { width: 0; height: 0; display: none; }
+.qf-cz-sheet-chip {
+  flex: 0 0 auto;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  height: 44px;
+  padding: 0 16px;
+  border-radius: var(--radius-pill);
+  border: 1px solid var(--border-strong);
+  background: var(--surface-2);
+  color: var(--ink-soft);
+  font-size: 12.5px;
+  font-weight: 650;
+  white-space: nowrap;
+  cursor: pointer;
+  transition: color 0.12s ease, border-color 0.12s ease, background 0.12s ease;
+}
+.qf-cz-sheet-chip:hover { color: var(--ink); border-color: var(--accent-fill); }
+.qf-cz-sheet-chip:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+.qf-cz-sheet-chip.is-active {
+  background: var(--accent-soft);
+  color: var(--ink);
+  border-color: var(--accent-fill);
+}
+.qf-cz-sheet-chip--tab { font-weight: 700; }
+
+.qf-cz-sheet-body {
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow-y: auto;
+  -webkit-overflow-scrolling: touch;
+  overscroll-behavior: contain;
+  padding: 4px 16px 24px;
+}
+/* The moved controls stack fills the sheet body; its own top tab bar is
+   redundant with the sticky shortcut chips, so hide it inside the sheet. */
+.qf-cz-sheet-body .qf-cz-tabs { display: none; }
+.qf-cz-sheet-body .qf-cz-controls { gap: 12px; }
+
+/* ≤640: preview owns the viewport; reserve room for the collapsed sheet peek so
+   the shortcut row never covers the preview's bottom. */
+@media (max-width: 640px) {
+  #page-content:has(.qf-cz-sheet) { padding-bottom: calc(var(--qf-cz-peek, 96px) + 24px); }
+}
+
+/* The floating copilot launcher must clear the collapsed sheet, and step aside
+   while the sheet is open (both descendants of #app-shell). Auto-resets when the
+   sheet is removed (route swap) because the :has() no longer matches. */
+#app-shell:has(.qf-cz-sheet) .qf-copilot-launcher {
+  bottom: calc(var(--qf-cz-peek, 96px) + 16px);
+  transition: bottom 0.42s cubic-bezier(0.32, 0.72, 0, 1), opacity 0.2s ease, transform 0.2s ease;
+}
+#app-shell:has(.qf-cz-sheet.is-open) .qf-copilot-launcher {
+  opacity: 0;
+  transform: translateY(8px) scale(0.9);
+  pointer-events: none;
+}
+@media (prefers-reduced-motion: reduce) {
+  #app-shell:has(.qf-cz-sheet) .qf-copilot-launcher { transition: opacity 0.2s ease; }
+}

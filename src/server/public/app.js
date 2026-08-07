@@ -2445,10 +2445,12 @@
     // on a coherent light/dark surface.
     var THEME_PRESETS = { light: 'mono', dark: 'midnight' };
     var themeMode = 'site';
-    var themeSeg = el('div', { class: 'qf-cz-seg', role: 'group', 'aria-label': 'Widget theme' });
+    var themeSeg = el('div', { class: 'qf-cz-seg', role: 'group', 'aria-label': 'Widget theme', title: 'Preview your calculator in light or dark' });
     var themeBtns = {};
-    [{ id: 'site', label: 'Your saved theme' }, { id: 'light', label: 'Light theme' }, { id: 'dark', label: 'Dark theme' }].forEach(function (h) {
-      var btn = el('button', { type: 'button', class: 'qf-cz-seg-btn qf-cz-seg-text', 'data-theme': h.id, 'aria-label': h.label, title: h.label, text: h.id === 'site' ? 'Site' : (h.id === 'light' ? 'Light' : 'Dark') });
+    // "Auto" = the tenant's own saved theme (internal id stays 'site' so the
+    // reset postMessage below is unchanged); Light/Dark force those presets.
+    [{ id: 'site', label: 'Auto — your saved theme' }, { id: 'light', label: 'Light theme' }, { id: 'dark', label: 'Dark theme' }].forEach(function (h) {
+      var btn = el('button', { type: 'button', class: 'qf-cz-seg-btn qf-cz-seg-text', 'data-theme': h.id, 'aria-label': h.label, title: h.label, text: h.id === 'site' ? 'Auto' : (h.id === 'light' ? 'Light' : 'Dark') });
       btn.addEventListener('click', function () { setTheme(h.id); });
       themeBtns[h.id] = btn; themeSeg.appendChild(btn);
     });
@@ -2478,9 +2480,10 @@
     function setTheme(id, skipPost) {
       if (id !== 'site' && !Object.prototype.hasOwnProperty.call(THEME_PRESETS, id)) id = 'site';
       themeMode = id;
-      // Secondary nicety: a neutral host backdrop that matches the chosen theme
-      // (site → plain, no framing). data-host CSS paints light/dark only.
-      frameWrap.setAttribute('data-host', id);
+      // This control ONLY re-themes the widget (via the postMessage below). It
+      // deliberately does NOT swap a host backdrop/frame anymore — that made the
+      // preview appear to resize/reframe between Auto/Light/Dark. The container
+      // now stays a constant size across all three states.
       Object.keys(themeBtns).forEach(function (k) {
         var on = k === id;
         themeBtns[k].classList.toggle('is-active', on);
@@ -3414,6 +3417,161 @@
 
       // Deep links / the retired Widget-settings route open straight on Behavior.
       selectTab(opts.tab === 'behavior' ? 'behavior' : (opts.tab === 'page' ? 'page' : 'design'));
+
+      // ── Fix B — mobile foldable control sheet (≤640px) ────────────────────
+      // The live preview stays in the viewport; the controls dock into a
+      // foldable bottom sheet with a sticky shortcut row (mirrors the WeFixTrades
+      // QuoteQuick #467 sticky widget shell: opaque surface + hairline + rounded
+      // floating bar, no glass; premium eased fold; honors reduced-motion).
+      // Desktop keeps the side-by-side .qf-cz-layout UNCHANGED. State lives on
+      // the sheet element (no body classes) so a route swap that wipes
+      // #page-content auto-resets the :has()-scoped CSS (launcher, padding).
+      (function setupCzMobileSheet() {
+        if (!window.matchMedia) return;
+        var mq = window.matchMedia('(max-width: 640px)');
+        var reduceMq = window.matchMedia('(prefers-reduced-motion: reduce)');
+        var sheet = null, sheetBody = null, handle = null, shortcutRow = null;
+        var active = false, expanded = false, tabChips = {};
+
+        // Key Design-tab sections surfaced as jump shortcuts, matched by their
+        // section-title text (built above). Order = chip order after the tabs.
+        var JUMPS = [
+          { label: 'Theme', re: /^theme$/i },
+          { label: 'Color', re: /^accent color$/i },
+          { label: 'Font', re: /^font$/i },
+          { label: 'Logo', re: /^logo$/i },
+          { label: 'Map', re: /^map style$/i },
+        ];
+        function findSection(re) {
+          var titles = $$('.qf-cz-section-title', designPanel);
+          for (var i = 0; i < titles.length; i++) {
+            if (re.test((titles[i].textContent || '').trim())) return titles[i].closest('.qf-cz-section');
+          }
+          return null;
+        }
+        function peekPx() {
+          if (!handle || !shortcutRow) return 96;
+          return handle.offsetHeight + shortcutRow.offsetHeight;
+        }
+        function measurePeek() {
+          var p = peekPx();
+          if (p > 0) document.documentElement.style.setProperty('--qf-cz-peek', p + 'px');
+        }
+        function syncTabChips(id) {
+          Object.keys(tabChips).forEach(function (k) { tabChips[k].classList.toggle('is-active', k === id); });
+        }
+        function setExpanded(open) {
+          expanded = open;
+          if (!sheet) return;
+          sheet.classList.toggle('is-open', open);
+          if (handle) {
+            handle.setAttribute('aria-expanded', open ? 'true' : 'false');
+            handle.setAttribute('aria-label', open ? 'Collapse controls' : 'Expand controls');
+          }
+        }
+        function scrollBodyTo(top) {
+          if (!sheetBody) return;
+          sheetBody.scrollTo({ top: top < 0 ? 0 : top, behavior: reduceMq.matches ? 'auto' : 'smooth' });
+        }
+        function buildShortcutRow() {
+          var row = el('div', { class: 'qf-cz-sheet-shortcuts', role: 'group', 'aria-label': 'Quick controls' });
+          [{ id: 'design', label: 'Design' }, { id: 'page', label: 'Page' }, { id: 'behavior', label: 'Behavior' }].forEach(function (t) {
+            var chip = el('button', { type: 'button', class: 'qf-cz-sheet-chip qf-cz-sheet-chip--tab', 'data-tab': t.id, text: t.label });
+            chip.addEventListener('click', function () {
+              selectTab(t.id); syncTabChips(t.id); setExpanded(true); scrollBodyTo(0);
+            });
+            tabChips[t.id] = chip;
+            row.appendChild(chip);
+          });
+          JUMPS.forEach(function (j) {
+            var sec = findSection(j.re);
+            if (!sec) return;
+            var chip = el('button', { type: 'button', class: 'qf-cz-sheet-chip', text: j.label });
+            chip.addEventListener('click', function () {
+              selectTab('design'); syncTabChips('design'); setExpanded(true);
+              // Wait for the sheet to open + design panel to show, then scroll.
+              requestAnimationFrame(function () { requestAnimationFrame(function () { scrollBodyTo(sec.offsetTop - 8); }); });
+            });
+            row.appendChild(chip);
+          });
+          return row;
+        }
+        function wireDrag() {
+          var startY = 0, baseY = 0, curY = 0, full = 0, peek = 0, dragging = false;
+          function closedY() { return Math.max(0, full - peek); }
+          handle.addEventListener('pointerdown', function (e) {
+            full = sheet.getBoundingClientRect().height; peek = peekPx();
+            dragging = true; startY = e.clientY; baseY = expanded ? 0 : closedY(); curY = baseY;
+            sheet.classList.add('is-dragging');
+            try { handle.setPointerCapture(e.pointerId); } catch (_e) {}
+          });
+          handle.addEventListener('pointermove', function (e) {
+            if (!dragging) return;
+            curY = Math.max(0, Math.min(closedY(), baseY + (e.clientY - startY)));
+            sheet.style.transform = 'translateY(' + curY + 'px)';
+          });
+          function endDrag(e) {
+            if (!dragging) return;
+            dragging = false;
+            sheet.classList.remove('is-dragging');
+            sheet.style.transform = '';
+            try { handle.releasePointerCapture(e.pointerId); } catch (_e) {}
+            var moved = curY - baseY;
+            if (Math.abs(moved) < 4) { setExpanded(!expanded); return; }  // tap → toggle
+            if (expanded) setExpanded(!(moved > full * 0.18));            // pulled down enough → collapse
+            else setExpanded(moved < -full * 0.12);                      // pulled up enough → expand
+          }
+          handle.addEventListener('pointerup', endDrag);
+          handle.addEventListener('pointercancel', endDrag);
+          handle.addEventListener('keydown', function (e) {
+            if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); setExpanded(!expanded); }
+          });
+        }
+        function activate() {
+          if (active || !root.isConnected) return;
+          active = true;
+          tabChips = {};
+          sheet = el('div', { class: 'qf-cz-sheet' });
+          handle = el('button', { type: 'button', class: 'qf-cz-sheet-handle', 'aria-label': 'Expand controls', 'aria-expanded': 'false' }, [
+            el('span', { class: 'qf-cz-sheet-grip', 'aria-hidden': 'true' }),
+          ]);
+          shortcutRow = buildShortcutRow();
+          sheetBody = el('div', { class: 'qf-cz-sheet-body' });
+          sheetBody.appendChild(leftCol); // move the controls column into the sheet
+          sheet.appendChild(handle);
+          sheet.appendChild(shortcutRow);
+          sheet.appendChild(sheetBody);
+          root.appendChild(sheet);
+          wireDrag();
+          syncTabChips('design');
+          setExpanded(false);
+          requestAnimationFrame(measurePeek);
+        }
+        function deactivate() {
+          if (!active) return;
+          active = false;
+          document.documentElement.style.removeProperty('--qf-cz-peek');
+          if (leftCol) {
+            if (preview && preview.col && preview.col.parentNode === layout) layout.insertBefore(leftCol, preview.col);
+            else layout.insertBefore(leftCol, layout.firstChild);
+          }
+          if (sheet) sheet.remove();
+          sheet = sheetBody = handle = shortcutRow = null;
+          tabChips = {};
+        }
+        function onChange() {
+          if (!root.isConnected) {
+            if (mq.removeEventListener) mq.removeEventListener('change', onChange);
+            else if (mq.removeListener) mq.removeListener(onChange);
+            return;
+          }
+          if (mq.matches) activate(); else deactivate();
+        }
+        if (mq.addEventListener) mq.addEventListener('change', onChange);
+        else if (mq.addListener) mq.addListener(onChange);
+        window.addEventListener('resize', function () { if (active) measurePeek(); });
+        if (mq.matches) activate();
+      })();
     }).catch(showErr(c));
   }
 
@@ -5286,6 +5444,58 @@
   }
   window.qfSyncAppbarOffset = syncAppbarOffset;
 
+  // ── Fix A: compact one-line mobile top bar ──────────────────────────────
+  // At ≤640px the full trial banner (its own sticky bar) is replaced by a
+  // single compact, tappable "Trial · Nd →" pill that lives in the app bar and
+  // IS the upgrade CTA. Desktop keeps the full banner + bar unchanged.
+  function compactTopbar() {
+    return !!(window.matchMedia && window.matchMedia('(max-width: 640px)').matches);
+  }
+  // The one upgrade action, shared by the desktop banner CTA and the mobile
+  // pill: payment_issue → open the Stripe portal to fix the card; trial/expired
+  // → start the subscribe Checkout flow.
+  function trialCtaAction(view, btn) {
+    if (view && view.variant === 'payment_issue') { openBillingPortal(); return; }
+    if (btn) btn.disabled = true;
+    startSubscribeCheckout('vital').then(
+      function () { if (btn) btn.disabled = false; },
+      function () { if (btn) btn.disabled = false; }
+    );
+  }
+  function removeTrialPill() {
+    var p = document.getElementById('qf-appbar-trial-pill');
+    if (p) p.remove();
+  }
+  function paintTrialPill(view, daysLeft) {
+    var right = document.querySelector('.qf-appbar-right');
+    if (!right) return;
+    var pill = document.getElementById('qf-appbar-trial-pill');
+    if (!pill) {
+      pill = el('button', { id: 'qf-appbar-trial-pill', class: 'qf-appbar-trial-pill', type: 'button' });
+      right.insertBefore(pill, right.firstChild);
+    }
+    pill.className = 'qf-appbar-trial-pill qf-appbar-trial-pill--' + view.variant + (view.urgent ? ' is-urgent' : '');
+    var label, aria;
+    if (view.variant === 'trial') {
+      var d = typeof daysLeft === 'number' ? daysLeft : null;
+      var days = d == null ? '' : (d <= 0 ? 'last day' : d + 'd');
+      label = days ? 'Trial · ' + days : 'Trial';
+      aria = 'Free trial' + (days ? ', ' + days + ' left' : '') + ' — subscribe to keep your calculator live';
+    } else if (view.variant === 'payment_issue') {
+      label = 'Update card';
+      aria = 'Payment issue — update your card';
+    } else {
+      label = 'Trial ended';
+      aria = 'Trial ended — subscribe to keep your calculator live';
+    }
+    pill.innerHTML = '';
+    pill.appendChild(el('span', { class: 'qf-appbar-trial-pill-dot', 'aria-hidden': 'true' }));
+    pill.appendChild(el('span', { class: 'qf-appbar-trial-pill-text', text: label }));
+    pill.appendChild(el('span', { class: 'arr', 'aria-hidden': 'true', text: '→' }));
+    pill.setAttribute('aria-label', aria);
+    pill.onclick = function () { trialCtaAction(view, pill); };
+  }
+
   function renderTrialBanner(trial) {
     state.trial = trial || state.trial || null;
     if (!state.trial) { removeTrialBanner(); document.body.classList.remove('qf-trial-locked'); return; }
@@ -5307,7 +5517,25 @@
       : { show: false };
 
     // Paid / unknown → no banner, and never leave inputs locked.
-    if (!view.show) { removeTrialBanner(); document.body.classList.remove('qf-trial-locked'); return; }
+    if (!view.show) { removeTrialBanner(); removeTrialPill(); document.body.classList.remove('qf-trial-locked'); return; }
+
+    // Fix A — mobile (≤640px): collapse the whole banner bar into one compact
+    // pill in the app bar (no separate sticky bar, so no --qf-appbar-top offset
+    // to reserve). The pill is always shown while the trial is live/urgent —
+    // it's the CTA, not a dismissible strip.
+    if (compactTopbar()) {
+      removeTrialBanner();
+      var dLeft = typeof trial.daysLeft === 'number'
+        ? trial.daysLeft
+        : (window.QFTrialBanner ? window.QFTrialBanner.daysLeftFrom(trial.trialEndsAt) : null);
+      paintTrialPill(view, dLeft);
+      if (view.variant === 'expired') document.body.classList.add('qf-trial-locked');
+      else document.body.classList.remove('qf-trial-locked');
+      syncAppbarOffset();
+      return;
+    }
+    removeTrialPill();
+
     // Trial + payment_issue are dismissible for the current page load (they
     // return on reload while unresolved); expired is not.
     if (view.variant === 'trial' && trialBannerDismissed) { removeTrialBanner(); return; }
@@ -5481,6 +5709,15 @@
       if (t) t.hidden = false;
       wireMobileNav();
       wireThemeToggle();
+      // Fix A — re-render the trial UI when crossing the compact-topbar
+      // breakpoint so the banner ↔ app-bar-pill swap follows viewport changes
+      // (rotate / resize between desktop and mobile).
+      if (window.matchMedia) {
+        var _topMq = window.matchMedia('(max-width: 640px)');
+        var _onTopMq = function () { if (state.trial) renderTrialBanner(state.trial); syncAppbarOffset(); };
+        if (_topMq.addEventListener) _topMq.addEventListener('change', _onTopMq);
+        else if (_topMq.addListener) _topMq.addListener(_onTopMq);
+      }
       // Floating AI copilot — persistent across every authed route.
       mountCopilotBubble();
       // Grab-to-scroll (drag-to-pan) on the dashboard's main content area. The
