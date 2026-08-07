@@ -445,7 +445,7 @@ body {
   box-shadow: inset 0 0 0 1px rgba(37, 99, 235, 0.35) !important;
 }
 /* Native checkbox tick uses the same brand blue as the chips/pills. */
-.qf-flags input { accent-color: #2563eb; }
+.qf-flags input, .qf-oog-toggle input { accent-color: #2563eb; }
 .qf-acc-chip.active .qf-acc-label::before {
   content: '\2713\00a0'; /* ✓ prefix marks the selection without a fill */
   color: #2563eb;
