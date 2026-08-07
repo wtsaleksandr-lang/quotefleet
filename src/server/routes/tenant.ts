@@ -63,6 +63,7 @@ import {
   FONT_COLOR_SWATCHES,
   MAP_BLEND_VALUES,
 } from '../widgetThemes.js';
+import { HOSTED_BG_PRESETS } from '../hostedPage.js';
 import { MAP_STYLE_KEYS, MAP_STYLE_LIST } from '../routeMap.js';
 import { loadEnv } from '../../config.js';
 import { resolveFeatures, sanitizeFeaturesPatch, sanitizeBookingPatch, sanitizeFollowUpPatch } from '../features.js';
@@ -825,7 +826,19 @@ export function registerTenantRoutes(app: Express) {
     const ctaHovers = CTA_HOVER_STYLES.map((id) => ({ id }));
     // Map-style options (key + label + hint) for the Customize "Map style" picker.
     const mapStyles = MAP_STYLE_LIST.map((m) => ({ key: m.key, label: m.label, hint: m.hint }));
-    res.json({ brand: row[0] ?? null, presets, fonts, ctaHovers, fontColors: FONT_COLOR_SWATCHES, mapStyles });
+    // Surface the carrier's USDOT / MC (from tenants, already collected) so the
+    // Customize → Page tab can show which credibility badges the trust-badge
+    // toggle will display. Read-only convenience; the numbers are edited under
+    // Company / Marketplace settings.
+    res.json({
+      brand: row[0] ?? null,
+      presets, fonts, ctaHovers,
+      fontColors: FONT_COLOR_SWATCHES,
+      mapStyles,
+      hostedBgPresets: HOSTED_BG_PRESETS.map((p) => ({ id: p.id, label: p.label })),
+      dotNumber: req.tenant!.dotNumber,
+      mcNumber: req.tenant!.mcNumber,
+    });
   });
 
   const BrandPatch = z.object({
@@ -883,6 +896,47 @@ export function registerTenantRoutes(app: Express) {
     // not a boolean — the sanitizers enforce the real shape. See
     // src/server/features.ts.
     featuresJson: z.record(z.string(), z.unknown()).optional(),
+    // ── Hosted trust-wrap (Phase 1) ──────────────────────────────────────
+    // The lean landing shell around the HOSTED calculator page (/w/:slug).
+    // All optional + nullable so a partial patch (one control at a time) never
+    // clobbers the rest; zod strips unknown keys so stored JSON stays clean.
+    // The embed snippet + /w/demo ignore these fields entirely.
+    hostedHeadline: z.string().max(120).nullable().optional(),
+    hostedSubhead: z.string().max(240).nullable().optional(),
+    hostedTrustBadges: z.boolean().optional(),
+    hostedTestimonialsJson: z
+      .array(
+        z.object({
+          quote: z.string().max(400),
+          author: z.string().max(80),
+          company: z.string().max(80).optional(),
+          rating: z.number().int().min(1).max(5).optional(),
+        }),
+      )
+      .max(4)
+      .nullable()
+      .optional(),
+    hostedCtasJson: z
+      .array(
+        z.object({
+          label: z.string().max(40),
+          type: z.enum(['call', 'email', 'url']),
+          value: z.string().max(300),
+        }),
+      )
+      .max(3)
+      .nullable()
+      .optional(),
+    hostedBackgroundJson: z
+      .object({
+        theme: z.enum(['light', 'dark']).optional(),
+        preset: z.string().max(40).optional(),
+        // Optional hero image as a downscaled data-URL (~500KB client budget).
+        imageUrl: z.string().max(700000).optional(),
+        scrim: z.number().int().min(0).max(100).optional(),
+      })
+      .nullable()
+      .optional(),
   });
 
   app.put('/api/tenant/brand', requireAuth, requireTenant, async (req, res) => {

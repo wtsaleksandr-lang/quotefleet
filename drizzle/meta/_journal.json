@@ -246,6 +246,13 @@
       "when": 1786492800000,
       "tag": "0034_rate_matrices",
       "breakpoints": true
+    },
+    {
+      "idx": 35,
+      "version": "7",
+      "when": 1786579200000,
+      "tag": "0035_hosted_trust_wrap",
+      "breakpoints": true
     }
   ]
 }

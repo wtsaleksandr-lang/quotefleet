@@ -16,6 +16,7 @@ import {
   setAccessCookie,
   renderGatePage,
 } from './access.js';
+import { renderHostedPage } from './hostedPage.js';
 import { registerAuthRoutes } from './routes/auth.js';
 import { registerOAuthRoutes } from './routes/oauth.js';
 import { registerPublicRoutes } from './routes/public.js';
@@ -171,6 +172,46 @@ export function createApp(): express.Express {
       .catch(next);
   }
 
+  // Hosted trust-wrap decision. The HOSTED page (the direct customer link:
+  // `/w/:slug`, the subdomain, custom domains) gets the lean landing shell that
+  // frames the calculator with the carrier's trust content. The EMBED path
+  // (`?embed=1`, the iframe the JS snippet mounts) and any `?raw=1` request stay
+  // the BARE calculator — the wrap must never leak into a third-party embed. The
+  // calculator inside the wrap is the SAME served widget (iframed with
+  // `?embed=1`), so its behaviour is unchanged. Non-breaking: if the brand read
+  // or render throws (e.g. a DB behind on migration 0035), we serve the bare
+  // widget, exactly as before.
+  async function serveHostedOrBare(
+    req: express.Request,
+    res: express.Response,
+    next: express.NextFunction,
+    tenant: { id: number; slug: string; name: string; dotNumber: string | null; mcNumber: string | null },
+    injectSlug: boolean
+  ): Promise<void> {
+    const isEmbed = req.query.embed !== undefined;
+    const isRaw = req.query.raw !== undefined;
+    if (isEmbed || isRaw) return void sendWidgetHtml(res, next, injectSlug ? tenant.slug : null);
+    try {
+      const brand =
+        (await db()
+          .select()
+          .from(brandConfigs)
+          .where(eq(brandConfigs.tenantId, tenant.id))
+          .limit(1))[0] ?? null;
+      // Inner calculator src = this same URL, forced to the bare embed widget.
+      // Forwarding the existing query (e.g. an owner-preview `?pk=` grant) keeps
+      // the nested widget authorised + in preview context.
+      const u = new URL(req.originalUrl, 'http://local');
+      u.searchParams.set('embed', '1');
+      u.searchParams.delete('raw');
+      const calcSrc = u.pathname + '?' + u.searchParams.toString();
+      res.type('html').send(renderHostedPage({ tenant, brand, calcSrc }));
+    } catch (err) {
+      console.warn('[hosted-wrap] render failed, serving bare widget:', (err as Error).message);
+      sendWidgetHtml(res, next, injectSlug ? tenant.slug : null);
+    }
+  }
+
   // Access-aware widget page. For a PRIVATE tenant, an invite token (`?key=`)
   // is consumed → signed cookie set → redirect to the clean URL; a valid
   // existing cookie passes straight through; otherwise the branded gate page
@@ -194,15 +235,23 @@ export function createApp(): express.Express {
           slug: tenants.slug,
           name: tenants.name,
           accessMode: tenants.accessMode,
+          // Surfaced by the hosted trust-wrap credibility badges (present since
+          // 0000_init, so this stays immune to later-migration schema drift).
+          dotNumber: tenants.dotNumber,
+          mcNumber: tenants.mcNumber,
         })
         .from(tenants)
         .where(eq(tenants.slug, slug))
         .limit(1);
       const tenant = rows[0];
-      // Unknown tenant or public mode → serve the widget as before (widget.js
-      // surfaces its own "tenant not found" state for missing slugs).
-      if (!tenant || tenant.accessMode !== 'private') {
+      // Unknown slug → serve the bare widget as before (widget.js surfaces its
+      // own "tenant not found" state).
+      if (!tenant) {
         return sendWidgetHtml(res, next, injectSlug ? slug : null);
+      }
+      // Public tenant → hosted trust-wrap (bare widget for ?embed=1 / ?raw=1).
+      if (tenant.accessMode !== 'private') {
+        return serveHostedOrBare(req, res, next, tenant, injectSlug);
       }
       // Private tenant. Consume an invite token if present.
       const token = accessTokenFromReq(req);
@@ -222,11 +271,11 @@ export function createApp(): express.Express {
       // one-shot invite token, because the SPA needs to keep reading it.
       if (hasValidPreviewGrant(tenant.id, req)) {
         setAccessCookie(res, tenant.id, PREVIEW_GRANT_TTL_MS);
-        return sendWidgetHtml(res, next, injectSlug ? slug : null);
+        return serveHostedOrBare(req, res, next, tenant, injectSlug);
       }
-      // Valid existing grant → serve the calculator.
+      // Valid existing grant → serve the calculator (wrapped on the hosted path).
       if (hasValidAccessCookie(tenant.id, req)) {
-        return sendWidgetHtml(res, next, injectSlug ? slug : null);
+        return serveHostedOrBare(req, res, next, tenant, injectSlug);
       }
       // No grant → branded private gate page.
       const brand =
