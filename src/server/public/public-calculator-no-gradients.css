@@ -1283,3 +1283,24 @@ body[data-qf-map-blend="on"] .qf-map-canvas::after {
 @media (prefers-reduced-motion: reduce) {
   body[data-qf-map-blend="on"] .qf-map-canvas::after { transition: none; }
 }
+
+/* ── Map-blend ⟷ bottom overlay-scrim reconcile ─────────────────────────────
+   The route-map overlay (.qf-map-overlay, widget-style.css) is a full-width
+   bottom scrim that already melts the map's bottom edge into a dark band and
+   carries the route summary + Google's "Map data" attribution. The map-blend
+   feather ALSO drew a bottom-edge gradient, and on LIGHT presets its
+   surface-coloured (white) wash sat between the map image and the scrim and
+   washed OUT the baked-in Google attribution (verified: legible with blend off,
+   gone at high blend on Harbor). Drop the feather's bottom-edge gradient so the
+   overlay scrim owns the bottom edge on every preset — the top/left/right
+   feathers are unchanged, dark presets look identical (both layers were dark
+   there anyway), and the attribution/overlay text stay crisp and legible.
+   Same selector + specificity as the feather block above, declared later so
+   this background wins; the opacity + transition declared above are untouched.
+   Token/var + transparent only — no colour literals, colour guard stays green. */
+body[data-qf-map-blend="on"] .qf-map-canvas::after {
+  background:
+    linear-gradient(to bottom, var(--w-surface, var(--w-page-bg)), transparent 38px), /* top edge   */
+    linear-gradient(to right,  var(--w-surface, var(--w-page-bg)), transparent 40px), /* left edge   */
+    linear-gradient(to left,   var(--w-surface, var(--w-page-bg)), transparent 40px); /* right edge  */
+}

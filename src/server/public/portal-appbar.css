@@ -191,3 +191,17 @@ html[data-theme="light"] .qf-appbar-logo-onlight {
     max-width: 120px;
   }
 }
+
+/* ── Full-bleed app bar ─────────────────────────────────────────────────────
+   style.css caps .app-main at max-width:1200px, which left-aligns the whole
+   column on wide screens and strands the top-right cluster (bell·theme·account)
+   short of the corner. Let the column stretch full width so the sticky bar
+   spans edge-to-edge (cluster flush to the corner, fully visible), and move the
+   1200px reading cap onto the page content instead so body layout is unchanged.
+   Appended at EOF — portal-appbar.css loads LAST, so these win the cascade. */
+.app-main {
+  max-width: none;
+}
+#page-content {
+  max-width: 1200px;
+}
