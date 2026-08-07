@@ -59,8 +59,10 @@ describe('customize panel — header logo fill (compact vs full-width)', () => {
 
   it('adds a Compact / Full-width control on the appearance-only Customize page', async () => {
     const js = await pub('app.js');
-    // Lives in renderBrand (appearance), not the behaviour/copy page.
-    const brandFn = js.slice(js.indexOf('function renderBrand'), js.indexOf('function renderWidgetSettings'));
+    // Lives in renderBrand's Design tab (appearance). Slice renderBrand up to
+    // the next helper (saveBrandPatch) so we capture only the Design controls,
+    // not the merged Behavior panel (buildBehaviorPanel) it also mounts.
+    const brandFn = js.slice(js.indexOf('function renderBrand'), js.indexOf('function saveBrandPatch'));
     expect(brandFn).toContain('Header logo');
     expect(brandFn).toContain("data-logofill");
     expect(brandFn).toContain("queueSave({ headerLogoFill: o.id }, true)");

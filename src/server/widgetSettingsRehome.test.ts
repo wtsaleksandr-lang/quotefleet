@@ -7,24 +7,25 @@ async function read(rel: string) {
   return readFile(resolve(root, rel), 'utf8');
 }
 
-// The "stupid-simple" Customize rebuild dropped the tenant-editable widget
-// behaviour/copy controls from the UI (their brand_configs columns still
-// exist). This suite guards that they were re-homed onto the Embed page and
-// that the Customize page did NOT re-absorb them.
-describe('widget settings re-homed onto the Embed page', () => {
-  it('exposes lead-capture, copy and powered-by controls on the Widget settings page (embedding stays on Embed)', async () => {
+// The unified Customize workspace (Alex's directive) merges the Design controls
+// and the tenant-editable Behaviour/copy controls into ONE tabbed page that
+// shares a single live preview. The standalone Widget-settings page is retired.
+// This suite guards that the behaviour/copy controls live in the Behavior tab
+// (buildBehaviorPanel), that embedding stays on the Embed page, and that the
+// retired route + nav item redirect cleanly instead of dangling.
+describe('unified Customize workspace — Behavior tab merge', () => {
+  it('exposes lead-capture, copy and powered-by controls in the Behavior panel (buildBehaviorPanel)', async () => {
     const js = await read('src/server/public/app.js');
-    // Lead capture / copy / powered-by were re-homed onto a dedicated Widget
-    // settings page (renderWidgetSettings); embedding (allowedDomains) stays on
-    // the Embed page (renderEmbed). Slice each surface between its own function
-    // boundaries (file order: renderBrand → renderWidgetSettings → renderEmbed).
-    const widgetFn = js.slice(js.indexOf('function renderWidgetSettings'), js.indexOf('function renderEmbed'));
+    // The behaviour/copy controls now live in buildBehaviorPanel, mounted as the
+    // Customize workspace's "Behavior" tab. Slice it between its own boundaries
+    // (file order: buildBehaviorPanel → renderEmbed).
+    const behaviorFn = js.slice(js.indexOf('function buildBehaviorPanel'), js.indexOf('function renderEmbed'));
     const embedFn = js.slice(js.indexOf('function renderEmbed'), js.indexOf('function renderAudit'));
 
-    // Section header on the Widget settings page.
-    expect(widgetFn).toContain('Lead capture & copy');
+    // Section header on the Behavior panel.
+    expect(behaviorFn).toContain('Lead capture & copy');
 
-    // Each re-exposed brand_configs behaviour/copy field is wired on the widget page.
+    // Each re-homed brand_configs behaviour/copy field is wired in the panel.
     for (const key of [
       'requireEmail',
       'requirePhone',
@@ -33,17 +34,46 @@ describe('widget settings re-homed onto the Embed page', () => {
       'ctaText',
       'footerNote',
     ]) {
-      expect(widgetFn).toContain(`'${key}'`);
+      expect(behaviorFn).toContain(`'${key}'`);
     }
 
-    // Widget settings page fetches the brand config to seed the controls.
-    expect(widgetFn).toContain("api('/api/tenant/brand')");
-    // Saves go through the existing brand PUT (shared saveBrandPatch helper).
+    // renderBrand mounts the Behavior panel + shares the one live preview.
+    const brandFn = js.slice(js.indexOf('function renderBrand'), js.indexOf('function saveBrandPatch'));
+    expect(brandFn).toContain('buildBehaviorPanel(behaviorPanel');
+    // Saves still go through the existing brand PUT (shared saveBrandPatch).
     expect(js).toContain("api('/api/tenant/brand', { method: 'PUT'");
 
     // Embedding controls live on the Embed page.
     expect(embedFn).toContain('Widget settings — embedding');
     expect(embedFn).toContain("'allowedDomains'");
+  });
+
+  it('shares ONE live preview and never reloads the iframe (no-blink live-apply)', async () => {
+    const js = await read('src/server/public/app.js');
+    // The shared preview component both surfaces reuse.
+    expect(js).toContain('function buildLivePreview');
+    // Design edits push an instant, in-place patch; saves re-skin without reload.
+    expect(js).toContain("qf: 'brand-preview'");
+    expect(js).toContain("qf: 'brand-refetch'");
+    // The old blink source (re-sourcing the iframe with a cache-buster) is gone.
+    expect(js).not.toContain("'?_t=' + Date.now()");
+    expect(js).not.toContain('function reloadPreview');
+    // Widget applies the messages live (no iframe reload) in a preview context.
+    const widget = await read('src/server/public/widget.js');
+    expect(widget).toContain('applyBrandPreviewPatch');
+    expect(widget).toContain('refetchAndReskin');
+    expect(widget).toContain("e.data.qf === 'brand-preview'");
+  });
+
+  it('retires the standalone Widget-settings route + nav item (redirects into the Behavior tab)', async () => {
+    const js = await read('src/server/public/app.js');
+    const html = await read('src/server/public/app.html');
+    // Route kept for old deep links, but it now opens the Customize Behavior tab.
+    expect(js).toContain("return renderBrand(c, { tab: 'behavior' });");
+    // The standalone renderer is gone.
+    expect(js).not.toContain('function renderWidgetSettings');
+    // No dangling nav item.
+    expect(html).not.toContain('data-route="widget-settings"');
   });
 
   it('does NOT duplicate appearance controls (theme/accent/font/logo/company) on the Embed page', async () => {
@@ -54,12 +84,11 @@ describe('widget settings re-homed onto the Embed page', () => {
     }
   });
 
-  it('keeps the Customize page appearance-only (no behaviour/copy controls)', async () => {
+  it('keeps the Design tab appearance-only (behaviour/copy live in the Behavior panel)', async () => {
     const js = await read('src/server/public/app.js');
-    // Slice renderBrand up to the NEXT function (renderWidgetSettings) — the
-    // behaviour/copy controls now live in renderWidgetSettings, so slicing to
-    // renderEmbed would sweep them in and give a false positive.
-    const brandFn = js.slice(js.indexOf('function renderBrand'), js.indexOf('function renderWidgetSettings'));
+    // Slice renderBrand up to the next helper (saveBrandPatch) — the Design
+    // controls only. Behaviour/copy literals live in buildBehaviorPanel, not here.
+    const brandFn = js.slice(js.indexOf('function renderBrand'), js.indexOf('function saveBrandPatch'));
     for (const key of ['requireEmail', 'requirePhone', 'showQuoteBeforeContact', 'ctaText', 'footerNote', 'allowedDomains', 'showPoweredBy']) {
       expect(brandFn).not.toContain(key);
     }

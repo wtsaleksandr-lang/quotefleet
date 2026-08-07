@@ -278,7 +278,9 @@
     ai: function (c) { return renderAi(c); },
     ingest: function (c) { return renderIngest(c); },
     brand: function (c) { return renderBrand(c); },
-    'widget-settings': function (c) { return renderWidgetSettings(c); },
+    // Retired standalone page — behaviour/copy controls are now the Customize
+    // workspace's "Behavior" tab. Keep the route so old deep links still land.
+    'widget-settings': function (c) { return renderBrand(c, { tab: 'behavior' }); },
     embed: function (c) { return renderEmbed(c); },
     audit: function (c) { return renderAudit(c); },
     account: function (c) { return renderAccount(c); },
@@ -2258,13 +2260,132 @@
   // route (see de-clutter guards in dashboard-setup.js, share-readiness.js,
   // dashboard-preview.js, brand-editor.js, brand-studio-preview.js and the
   // scoped rules in customize-panel.css).
-  function renderBrand(c) {
+  // ── Shared live-preview component (Customize + Embed) ─────────────────────
+  // ONE preview widget both surfaces reuse. It renders the tenant's REAL
+  // calculator (signed owner-preview URL) and provides the three approved
+  // upgrades:
+  //   A. No blink — brand edits are pushed into the widget via postMessage
+  //      ({qf:'brand-preview'} for instant fields, {qf:'brand-refetch'} after a
+  //      save) instead of reloading the iframe. The iframe is NEVER re-sourced.
+  //   B. Auto-height — the frame grows to the widget's reported content height
+  //      (QF_WIDGET_HEIGHT), so there is no fixed-box inner scrollbar.
+  //   C. Device (Desktop/Mobile) + host theme (Light/Dark) toggles in the head.
+  // Returns { col, postPatch(patch), notifySaved(), setUrl(url) }.
+  function buildLivePreview(opts) {
+    opts = opts || {};
+    var previewUrl = opts.previewUrl || '';
+    var openHref = opts.openHref || previewUrl;
+
+    var col = el('div', { class: 'qf-cz-preview-col' });
+    var pcard = el('div', { class: 'card qf-cz-preview' });
+    col.appendChild(pcard);
+
+    var head = el('div', { class: 'qf-cz-preview-head' });
+    head.appendChild(el('span', { class: 'qf-cz-preview-title', text: 'Live preview' }));
+
+    var tools = el('div', { class: 'qf-cz-preview-tools' });
+
+    // Device segmented toggle (Desktop | Mobile).
+    var device = 'desktop';
+    var devSeg = el('div', { class: 'qf-cz-seg', role: 'group', 'aria-label': 'Preview device' });
+    var DEV_ICONS = {
+      desktop: '<svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect width="20" height="14" x="2" y="3" rx="2"/><line x1="8" x2="16" y1="21" y2="21"/><line x1="12" x2="12" y1="17" y2="21"/></svg>',
+      mobile: '<svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect width="14" height="20" x="5" y="2" rx="2"/><line x1="12" x2="12.01" y1="18" y2="18"/></svg>',
+    };
+    var devBtns = {};
+    [{ id: 'desktop', label: 'Desktop' }, { id: 'mobile', label: 'Mobile' }].forEach(function (d) {
+      var btn = el('button', { type: 'button', class: 'qf-cz-seg-btn', 'data-device': d.id, 'aria-label': d.label, title: d.label, html: DEV_ICONS[d.id] });
+      btn.addEventListener('click', function () { setDevice(d.id); });
+      devBtns[d.id] = btn; devSeg.appendChild(btn);
+    });
+    tools.appendChild(devSeg);
+
+    // Host theme segmented toggle (Light | Dark) — swaps the neutral host
+    // background BEHIND the widget so the carrier can see how the calculator
+    // sits on a light vs dark website. "Site" = full-bleed (no host framing).
+    var host = 'site';
+    var hostSeg = el('div', { class: 'qf-cz-seg', role: 'group', 'aria-label': 'Host background' });
+    var hostBtns = {};
+    [{ id: 'site', label: 'Site' }, { id: 'light', label: 'Light host' }, { id: 'dark', label: 'Dark host' }].forEach(function (h) {
+      var btn = el('button', { type: 'button', class: 'qf-cz-seg-btn qf-cz-seg-text', 'data-host': h.id, 'aria-label': h.label, title: h.label, text: h.id === 'site' ? 'Site' : (h.id === 'light' ? 'Light' : 'Dark') });
+      btn.addEventListener('click', function () { setHost(h.id); });
+      hostBtns[h.id] = btn; hostSeg.appendChild(btn);
+    });
+    tools.appendChild(hostSeg);
+
+    head.appendChild(tools);
+    var openLink = el('a', { href: openHref, target: '_blank', rel: 'noopener', class: 'qf-cz-preview-open', text: 'Open ↗' });
+    head.appendChild(openLink);
+    pcard.appendChild(head);
+
+    var frameWrap = el('div', { class: 'qf-cz-frame-wrap', 'data-device': 'desktop', 'data-host': 'site' });
+    var iframe = el('iframe', { class: 'qf-cz-frame', src: previewUrl, title: 'Your live calculator' });
+    frameWrap.appendChild(iframe);
+    pcard.appendChild(frameWrap);
+    pcard.appendChild(el('div', { class: 'qf-cz-preview-note', text: 'This is exactly what your customers see. It updates live as you make changes.' }));
+
+    function setDevice(id) {
+      device = id;
+      frameWrap.setAttribute('data-device', id);
+      Object.keys(devBtns).forEach(function (k) {
+        var on = k === id;
+        devBtns[k].classList.toggle('is-active', on);
+        devBtns[k].setAttribute('aria-pressed', on ? 'true' : 'false');
+      });
+      // Width change reflows the widget → its ResizeObserver re-reports height.
+    }
+    function setHost(id) {
+      host = id;
+      frameWrap.setAttribute('data-host', id);
+      Object.keys(hostBtns).forEach(function (k) {
+        var on = k === id;
+        hostBtns[k].classList.toggle('is-active', on);
+        hostBtns[k].setAttribute('aria-pressed', on ? 'true' : 'false');
+      });
+    }
+    setDevice('desktop');
+    setHost('site');
+
+    // Auto-height: size the frame to the widget's real content height. Clamp to
+    // a sane band so a runaway report can't blow out the panel; the widget only
+    // ever reports its true in-flow height (see widget.js contentHeight()).
+    function onMsg(e) {
+      if (!iframe || !iframe.isConnected) { window.removeEventListener('message', onMsg); return; }
+      if (e.source !== iframe.contentWindow || !e.data) return;
+      if (e.data.type === 'QF_WIDGET_HEIGHT' && typeof e.data.height === 'number') {
+        var h = Math.max(320, Math.min(2200, Math.round(e.data.height)));
+        iframe.style.height = h + 'px';
+      }
+    }
+    window.addEventListener('message', onMsg);
+
+    function postToPreview(msg) {
+      try { if (iframe && iframe.contentWindow) iframe.contentWindow.postMessage(msg, '*'); } catch (_e) {}
+    }
+    return {
+      col: col,
+      // Instant, no-network apply of the given brand fields.
+      postPatch: function (patch) { postToPreview({ qf: 'brand-preview', patch: patch }); },
+      // Re-skin from the freshly-saved config (server-derived fields), no blink.
+      notifySaved: function () { postToPreview({ qf: 'brand-refetch' }); },
+      setUrl: function (url) { previewUrl = url; openLink.href = url; iframe.src = url; },
+    };
+  }
+
+  function renderBrand(c, opts) {
+    opts = opts || {};
     var slug = (state.me && state.me.tenant && state.me.tenant.slug) || '';
     // Fetch a signed owner-preview URL alongside the brand config so the live
-    // preview renders the REAL calculator even when the tenant is private.
-    Promise.all([api('/api/tenant/brand'), api('/api/tenant/preview-url')]).then(function (results) {
+    // preview renders the REAL calculator even when the tenant is private. The
+    // access config seeds the Behavior tab's public/private control.
+    Promise.all([
+      api('/api/tenant/brand'),
+      api('/api/tenant/preview-url'),
+      api('/api/tenant/access').catch(function () { return { accessMode: 'public', links: [] }; }),
+    ]).then(function (results) {
       var d = results[0];
       var previewUrl = (results[1] && results[1].previewUrl) || ('/w/' + encodeURIComponent(slug));
+      var access = results[2] || { accessMode: 'public', links: [] };
       var b = d.brand || {};
       var presets = d.presets || [];
       var fonts = d.fonts || [];
@@ -2306,30 +2427,51 @@
       root.appendChild(el('p', { class: 'page-sub', text: 'Pick a look, add your logo, and watch your live calculator update on the right.' }));
 
       var layout = el('div', { class: 'qf-cz-layout' });
-      var controls = el('div', { class: 'qf-cz-controls' });
-      var previewCol = el('div', { class: 'qf-cz-preview-col' });
-      layout.appendChild(controls);
-      layout.appendChild(previewCol);
+      var leftCol = el('div', { class: 'qf-cz-controls' });
+
+      // ── Tabbed workspace: Design + Behavior share ONE live preview ──────
+      var tabBar = el('div', { class: 'qf-cz-tabs', role: 'tablist', 'aria-label': 'Customize sections' });
+      var designPanel = el('div', { class: 'qf-cz-tabpanel', role: 'tabpanel', 'aria-label': 'Design' });
+      var behaviorPanel = el('div', { class: 'qf-cz-tabpanel is-hidden', role: 'tabpanel', 'aria-label': 'Behavior' });
+      // Design sections keep appending to `controls` (unchanged below).
+      var controls = designPanel;
+      var panels = { design: designPanel, behavior: behaviorPanel };
+      var tabBtns = {};
+      function selectTab(id) {
+        if (!panels[id]) id = 'design';
+        Object.keys(panels).forEach(function (k) {
+          panels[k].classList.toggle('is-hidden', k !== id);
+          tabBtns[k].classList.toggle('is-active', k === id);
+          tabBtns[k].setAttribute('aria-selected', k === id ? 'true' : 'false');
+        });
+      }
+      [{ id: 'design', label: 'Design' }, { id: 'behavior', label: 'Behavior' }].forEach(function (t) {
+        var btn = el('button', { type: 'button', class: 'qf-cz-tab', role: 'tab', 'data-tab': t.id, text: t.label });
+        btn.addEventListener('click', function () { selectTab(t.id); });
+        tabBtns[t.id] = btn; tabBar.appendChild(btn);
+      });
+      leftCol.appendChild(tabBar);
+      leftCol.appendChild(designPanel);
+      leftCol.appendChild(behaviorPanel);
+
+      // Shared live preview (no-blink apply, auto-height, device + host toggles).
+      var preview = buildLivePreview({ previewUrl: previewUrl, openHref: previewUrl });
+
+      layout.appendChild(leftCol);
+      layout.appendChild(preview.col);
       root.appendChild(layout);
 
-      // ── save queue (debounced) + preview reload ─────────────────
+      // ── save queue (debounced) + no-blink live preview ──────────
+      // Design edits post an INSTANT in-place patch to the preview (no reload),
+      // then debounce-save via the brand PUT; on save the widget re-skins from
+      // the fresh config (server-derived fields) — still no iframe reload.
       function kv(k, v) { var o = {}; o[k] = v; return o; }
-      function previewSrc() { return previewUrl; }
-      var iframe = null;
-      var pending = {}, saveTimer = null, previewTimer = null;
-      function reloadPreview() {
-        clearTimeout(previewTimer);
-        previewTimer = setTimeout(function () {
-          if (!iframe) return;
-          var base = previewSrc();
-          iframe.src = base + (base.indexOf('?') > -1 ? '&' : '?') + '_t=' + Date.now();
-        }, 250);
-      }
+      var pending = {}, saveTimer = null;
       function flush() {
         if (!Object.keys(pending).length) return;
         var body = pending; pending = {};
         api('/api/tenant/brand', { method: 'PUT', body: body })
-          .then(function () { reloadPreview(); })
+          .then(function () { preview.notifySaved(); })
           .catch(function (e) {
             if (e && e.status === 403) toast('A custom logo is a Core/Vital feature — upgrade to add your own logo.', 'warn');
             else toastErr(e);
@@ -2340,19 +2482,8 @@
         clearTimeout(saveTimer);
         saveTimer = setTimeout(flush, immediate ? 0 : 450);
       }
-
-      // ── live preview column ─────────────────────────────────────
-      var pcard = el('div', { class: 'card qf-cz-preview' });
-      pcard.appendChild(el('div', { class: 'qf-cz-preview-head' }, [
-        el('span', { class: 'qf-cz-preview-title', text: 'Live preview' }),
-        el('a', { href: previewSrc(), target: '_blank', rel: 'noopener', class: 'qf-cz-preview-open', text: 'Open ↗' }),
-      ]));
-      var frameWrap = el('div', { class: 'qf-cz-frame-wrap' });
-      iframe = el('iframe', { class: 'qf-cz-frame', src: previewSrc(), title: 'Your live calculator', loading: 'lazy' });
-      frameWrap.appendChild(iframe);
-      pcard.appendChild(frameWrap);
-      pcard.appendChild(el('div', { class: 'qf-cz-preview-note', text: 'This is exactly what your customers see. It updates as you make changes.' }));
-      previewCol.appendChild(pcard);
+      // Push an instant, no-network visual patch to the preview widget.
+      function livePatch(patch) { preview.postPatch(patch); }
 
       // ── Your company (name + tagline) ───────────────────────────
       function textField(label, key, val, hint) {
@@ -2360,7 +2491,7 @@
         f.appendChild(el('label', { class: 'qf-cz-label', text: label }));
         var inp = el('input', { class: 'input', type: 'text' });
         inp.value = val || '';
-        inp.addEventListener('input', function () { queueSave(kv(key, inp.value)); });
+        inp.addEventListener('input', function () { queueSave(kv(key, inp.value)); livePatch(kv(key, inp.value)); });
         inp.addEventListener('blur', function () { queueSave(kv(key, inp.value), true); });
         f.appendChild(inp);
         if (hint) f.appendChild(el('div', { class: 'qf-cz-hint', text: hint }));
@@ -2483,16 +2614,18 @@
       }
       var defChip = el('button', { type: 'button', class: 'qf-cz-swatch qf-cz-swatch-default', 'data-accent': '__default__', title: 'Use the theme accent' });
       defChip.appendChild(el('span', { text: 'Theme default' }));
+      // Theme default has no client-known accent hex — let the post-save
+      // re-skin (brand-refetch) pull the preset accent so it's authoritative.
       defChip.addEventListener('click', function () { currentAccent = null; paintAccent(); queueSave({ accentOverride: null }, true); repaintFontColors(); });
       accentRow.appendChild(defChip);
       ACCENTS.forEach(function (hex) {
         var sw = el('button', { type: 'button', class: 'qf-cz-swatch', 'data-accent': hex, title: hex, style: { background: hex } });
-        sw.addEventListener('click', function () { currentAccent = hex; paintAccent(); queueSave({ accentOverride: hex }, true); repaintFontColors(); });
+        sw.addEventListener('click', function () { currentAccent = hex; paintAccent(); livePatch({ accent: hex }); queueSave({ accentOverride: hex }, true); repaintFontColors(); });
         accentRow.appendChild(sw);
       });
       var customWrap = el('label', { class: 'qf-cz-swatch qf-cz-swatch-custom', title: 'Pick a custom color' });
       colorInput = el('input', { type: 'color', value: currentAccent || '#0D3CFC' });
-      colorInput.addEventListener('input', function () { currentAccent = colorInput.value; paintAccent(); queueSave({ accentOverride: colorInput.value }); repaintFontColors(); });
+      colorInput.addEventListener('input', function () { currentAccent = colorInput.value; paintAccent(); livePatch({ accent: colorInput.value }); queueSave({ accentOverride: colorInput.value }); repaintFontColors(); });
       customWrap.appendChild(colorInput);
       customWrap.appendChild(el('span', { text: 'Custom' }));
       accentRow.appendChild(customWrap);
@@ -2540,6 +2673,7 @@
             n.classList.toggle('is-selected', s);
             n.setAttribute('aria-pressed', s ? 'true' : 'false');
           });
+          livePatch({ ctaHover: id });
           queueSave({ ctaHover: id }, true);
         });
         hoverRow.appendChild(chip);
@@ -2603,6 +2737,7 @@
       blendInput.addEventListener('input', function () {
         var v = Math.max(0, Math.min(100, parseInt(blendInput.value, 10) || 0));
         blendVal.textContent = v + '%';
+        livePatch({ mapBlendOpacity: v });
         queueSave({ mapBlendOpacity: v });
       });
       blendInput.addEventListener('change', function () {
@@ -2635,6 +2770,7 @@
             n.classList.toggle('is-selected', s);
             n.setAttribute('aria-pressed', s ? 'true' : 'false');
           });
+          livePatch({ headerLogoFill: o.id });
           queueSave({ headerLogoFill: o.id }, true);
         });
         logoFillRow.appendChild(chip);
@@ -2719,7 +2855,7 @@
         if (url) {
           logoPreview.appendChild(el('img', { class: 'qf-cz-logo-img', src: url, alt: 'Current logo' }));
           var rm = el('button', { type: 'button', class: 'btn btn-secondary qf-cz-logo-remove', text: 'Remove logo' });
-          rm.addEventListener('click', function () { queueSave({ logoUrl: null }, true); paintLogo(''); });
+          rm.addEventListener('click', function () { livePatch({ logoUrl: null }); queueSave({ logoUrl: null }, true); paintLogo(''); });
           logoPreview.appendChild(rm);
         } else {
           logoPreview.appendChild(el('span', { class: 'qf-cz-hint', text: 'No logo yet.' }));
@@ -2758,6 +2894,9 @@
 
       function saveLogo(dataUrl) {
         if (dataUrl.length > 150 * 1024) { toast('That image is too large even after shrinking. Try a simpler logo.', 'warn'); return; }
+        // Data-URL swap is instant (no network) → apply live, no cross-fade
+        // reload needed. The debounced PUT persists it.
+        livePatch({ logoUrl: dataUrl });
         queueSave({ logoUrl: dataUrl }, true);
         paintLogo(dataUrl);
       }
@@ -2804,6 +2943,17 @@
       logoSec.appendChild(logoPreview);
       controls.appendChild(logoSec);
       paintLogo(b.logoUrl || '');
+
+      // ── Behavior tab — merged widget-settings controls (share ONE preview) ──
+      // Lead capture / copy / quote actions / booking / follow-up / access —
+      // the exact controls that lived on the old standalone Widget-settings
+      // page, re-homed here as a tab. Visible-facing fields (powered-by badge,
+      // CTA text, footer note, contact rules) re-skin the shared preview on
+      // save via preview.notifySaved (no blink).
+      buildBehaviorPanel(behaviorPanel, b, access, preview);
+
+      // Deep links / the retired Widget-settings route open straight on Behavior.
+      selectTab(opts.tab === 'behavior' ? 'behavior' : 'design');
     }).catch(showErr(c));
   }
 
@@ -2816,6 +2966,12 @@
   function saveBrandPatch(patch) {
     return api('/api/tenant/brand', { method: 'PUT', body: patch });
   }
+  // The live preview owned by the Behavior tab (set by buildBehaviorPanel while
+  // it builds). Visible-facing behaviour saves (powered-by badge, CTA text,
+  // footer note, contact rules) call this so the shared preview re-skins with
+  // NO iframe reload. Null on the Embed page's own behaviour-free surfaces.
+  var activeBrandPreview = null;
+  function notifyBrandPreview() { try { if (activeBrandPreview) activeBrandPreview.notifySaved(); } catch (_e) {} }
   // A labelled text/textarea input that saves on blur (only when changed).
   // `b` is the loaded brand object; saves write back into it so later blurs
   // diff against the fresh value.
@@ -2832,7 +2988,7 @@
       var next = inp.value;
       if (next === (b[key] != null ? b[key] : '')) return; // no change
       var p = {}; p[key] = next;
-      saveBrandPatch(p).then(function () { b[key] = next; toastOk('Saved'); }).catch(toastErr);
+      saveBrandPatch(p).then(function () { b[key] = next; toastOk('Saved'); notifyBrandPreview(); }).catch(toastErr);
     });
     f.appendChild(inp);
     if (opts.hint) f.appendChild(el('span', { class: 'field-hint', text: opts.hint }));
@@ -2852,7 +3008,7 @@
     cb.addEventListener('change', function () {
       var next = cb.checked;
       var p = {}; p[key] = next;
-      saveBrandPatch(p).then(function () { b[key] = next; toastOk('Saved'); }).catch(function (e) {
+      saveBrandPatch(p).then(function () { b[key] = next; toastOk('Saved'); notifyBrandPreview(); }).catch(function (e) {
         cb.checked = !next; // revert on failure
         if (e && e.status === 403 && gate) toast(gate.upgradeMsg, 'warn');
         else toastErr(e);
@@ -3303,31 +3459,16 @@
     return preview;
   }
 
-  // ── Widget settings page ────────────────────────────────────────
-  // Split out of the Embed page (portal simplification): Embed code keeps
-  // the install artifacts (snippet / hosted link / advanced); this page
-  // owns what the calculator asks for and who can open it.
-  function renderWidgetSettings(c) {
-    Promise.all([
-      api('/api/tenant/embed'),
-      api('/api/tenant/brand'),
-      api('/api/tenant/access'),
-      api('/api/tenant/preview-url'),
-    ]).then(function (results) {
-      var d = results[0];
-      var b = (results[1] && results[1].brand) || {};
-      var access = results[2] || { accessMode: 'public', links: [] };
-      var previewUrl = (results[3] && results[3].previewUrl) || (d.directLink || '/');
-      c.innerHTML = '';
-      // Same de-clutter marker as the Embed page — the scoped :has() net in
-      // embed-panel.css suppresses legacy injected clutter + shell styling.
-      var root = el('div', { class: 'qf-embed', 'data-qf-embed': '1' });
-      c.appendChild(root);
-      c = root;
-      c.appendChild(el('h1', { text: 'Widget settings' }));
-      c.appendChild(el('p', { class: 'page-sub', text: 'What your calculator asks for and who can open it.' }));
-
-      c.appendChild(buildWidgetPreviewCard(d.directLink, previewUrl));
+  // ── Behavior tab — the calculator's behaviour + copy controls ───────────
+  // Merged into the Customize workspace (Alex's choice): the old standalone
+  // Widget-settings page is retired; these controls now live behind the
+  // "Behavior" tab and share the ONE live preview passed in. `container` is the
+  // tab panel, `b` the already-loaded brand object, `access` the access config,
+  // and `preview` the shared buildLivePreview handle (visible-facing saves call
+  // preview.notifySaved via notifyBrandPreview, so the preview re-skins live).
+  function buildBehaviorPanel(container, b, access, preview) {
+    activeBrandPreview = preview || null;
+    var c = container;
 
       // Plan gate for the "Powered by" badge (removing it is a Vital+ perk;
       // trialing tenants resolve to Pro and pass). Mirrors the backend gate.
@@ -3341,7 +3482,7 @@
         meTenant.plan === 'pro';
 
       // Card 1 — Lead capture & copy.
-      var lc = el('div', { class: 'card', style: { marginTop: '14px' } });
+      var lc = el('div', { class: 'card qf-cz-section', style: { marginTop: '0' } });
       lc.appendChild(el('div', { class: 'card-title', text: 'Lead capture & copy' }));
       lc.appendChild(el('div', { class: 'card-subtitle', text: 'Control what contact details a customer must provide and the copy shown on your widget.' }));
       lc.appendChild(brandSettingToggle(b,
@@ -3411,7 +3552,6 @@
       var accCard = el('div', { class: 'card', style: { marginTop: '14px' } });
       c.appendChild(accCard);
       renderAccessCard(accCard, access);
-    }).catch(showErr(c));
   }
 
   function renderEmbed(c) {
@@ -3432,12 +3572,24 @@
       c.appendChild(root);
       c = root;
       c.appendChild(el('h1', { text: 'Embed code' }));
-      c.appendChild(el('p', { class: 'page-sub', text: 'Drop one line of HTML on any page of your website.' }));
+      c.appendChild(el('p', { class: 'page-sub', text: 'Drop one line of HTML on any page of your website — and see it live on the right.' }));
 
-      c.appendChild(buildWidgetPreviewCard(d.directLink, previewUrl));
+      // Same split layout as Customize: install artifacts on the LEFT, the ONE
+      // shared live preview on the RIGHT (Alex kept Embed as its own page). The
+      // preview reuses buildLivePreview, so it benefits from no-blink apply,
+      // auto-height, and the device + host toggles for free.
+      var layout = el('div', { class: 'qf-cz-layout' });
+      var leftCol = el('div', { class: 'qf-cz-controls' });
+      var preview = buildLivePreview({ previewUrl: previewUrl, openHref: d.directLink || previewUrl });
+      activeBrandPreview = preview;
+      layout.appendChild(leftCol);
+      layout.appendChild(preview.col);
+      c.appendChild(layout);
+      // Every install card below appends into the left column.
+      c = leftCol;
 
-      // Lead capture / copy / access moved to the Widget settings page
-      // (renderWidgetSettings) — this page keeps the install artifacts only.
+      // Lead capture / copy / access live on the Customize workspace's Behavior
+      // tab — this page keeps the install artifacts only.
 
       // Embedding (allowed domains) — lives in the Advanced expander
       // because it governs where the snippet is allowed to run.
