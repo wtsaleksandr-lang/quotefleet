@@ -344,6 +344,103 @@
   var SUN_SVG = '<svg class="qf-ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="4"/><path d="M12 2v2"/><path d="M12 20v2"/><path d="m4.93 4.93 1.41 1.41"/><path d="m17.66 17.66 1.41 1.41"/><path d="M2 12h2"/><path d="M20 12h2"/><path d="m6.34 17.66-1.41 1.41"/><path d="m19.07 4.93-1.41 1.41"/></svg>';
   var MOON_SVG = '<svg class="qf-ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 3a6 6 0 0 0 9 9 9 9 0 1 1-9-9Z"/></svg>';
   var WRENCH_SVG = '<svg class="qf-ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M14.7 6.3a1 1 0 0 0 0 1.4l1.6 1.6a1 1 0 0 0 1.4 0l3.77-3.77a6 6 0 0 1-7.94 7.94l-6.91 6.91a2.12 2.12 0 0 1-3-3l6.91-6.91a6 6 0 0 1 7.94-7.94l-3.76 3.76z"/></svg>';
+  // Sparkle (AI) + close glyphs for the floating copilot bubble.
+  var SPARKLE_SVG = '<svg class="qf-ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 3l1.8 4.7L18.5 9.5l-4.7 1.8L12 16l-1.8-4.7L5.5 9.5l4.7-1.8z"/><path d="M19 14l.7 1.9 1.9.7-1.9.7-.7 1.9-.7-1.9-1.9-.7 1.9-.7z"/></svg>';
+  var CLOSE_SVG = '<svg class="qf-ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>';
+
+  // ── Floating AI copilot bubble ────────────────────────────────
+  // A persistent launcher + docked chat popover on EVERY authed portal route.
+  // Reuses the owner rate-chat brain (buildRateChat → Apply/Discard proposals).
+  // Mounted in #app-shell (a sibling of #page-content) so it survives route
+  // swaps; #page-content is wiped on every render but the shell is not.
+  function mountCopilotBubble() {
+    var shell = document.getElementById('app-shell');
+    if (!shell || document.getElementById('qf-copilot-launcher')) return;
+
+    var launcher = el('button', {
+      id: 'qf-copilot-launcher', class: 'qf-copilot-launcher', type: 'button',
+      'aria-label': 'Open AI copilot', 'aria-haspopup': 'dialog', 'aria-expanded': 'false',
+      html: SPARKLE_SVG,
+    });
+    var scrim = el('div', { class: 'qf-copilot-scrim', 'aria-hidden': 'true' });
+
+    var closeBtn = el('button', { class: 'qf-copilot-close', type: 'button', 'aria-label': 'Close copilot', html: CLOSE_SVG });
+    var panel = el('div', {
+      id: 'qf-copilot-panel', class: 'qf-copilot-panel', role: 'dialog',
+      'aria-modal': 'false', 'aria-label': 'AI copilot',
+    });
+    panel.hidden = true;
+    panel.appendChild(el('div', { class: 'qf-copilot-head' }, [
+      el('div', { class: 'qf-copilot-title' }, [
+        el('span', { class: 'qf-copilot-spark', html: SPARKLE_SVG, 'aria-hidden': 'true' }),
+        el('span', { text: 'AI copilot' }),
+      ]),
+      closeBtn,
+    ]));
+
+    var chatUI = buildRateChat({
+      greeting: 'Hi — I can update your rate cards, accessorials, and lane zones. Tell me what to change.',
+    });
+    chatUI.root.classList.add('qf-copilot-chat');
+    panel.appendChild(chatUI.root);
+
+    shell.appendChild(scrim);
+    shell.appendChild(launcher);
+    shell.appendChild(panel);
+
+    var loaded = false;
+    var onDocDown = null;
+
+    function open() {
+      if (!panel.hidden) return;
+      panel.hidden = false;
+      launcher.setAttribute('aria-expanded', 'true');
+      document.body.classList.add('qf-copilot-open');
+      requestAnimationFrame(function () { panel.classList.add('is-open'); });
+      try { sessionStorage.setItem('qf-copilot-open', '1'); } catch (e) {}
+      // Refresh history on every open so the bubble reflects anything said on
+      // the AI-agent page (and vice-versa) — one continuous conversation.
+      chatUI.load().catch(function () { if (!loaded) chatUI.renderHistory([]); });
+      loaded = true;
+      setTimeout(function () { try { chatUI.input.focus(); } catch (e) {} }, 80);
+      // Click outside the panel/launcher closes (desktop popover + mobile scrim).
+      onDocDown = function (e) {
+        if (panel.contains(e.target) || launcher.contains(e.target)) return;
+        close();
+      };
+      setTimeout(function () { document.addEventListener('mousedown', onDocDown); }, 0);
+    }
+    function close() {
+      if (panel.hidden) return;
+      panel.classList.remove('is-open');
+      launcher.setAttribute('aria-expanded', 'false');
+      document.body.classList.remove('qf-copilot-open');
+      try { sessionStorage.setItem('qf-copilot-open', '0'); } catch (e) {}
+      if (onDocDown) { document.removeEventListener('mousedown', onDocDown); onDocDown = null; }
+      setTimeout(function () { panel.hidden = true; }, 200);
+      try { launcher.focus(); } catch (e) {}
+    }
+    function toggle() { if (panel.hidden) open(); else close(); }
+
+    launcher.addEventListener('click', toggle);
+    closeBtn.addEventListener('click', close);
+    scrim.addEventListener('click', close);
+
+    // Esc closes; Tab is trapped inside the open dialog for keyboard users.
+    panel.addEventListener('keydown', function (e) {
+      if (e.key === 'Escape') { e.preventDefault(); e.stopPropagation(); close(); return; }
+      if (e.key !== 'Tab') return;
+      var nodes = panel.querySelectorAll('button, textarea, input, a[href], [tabindex]:not([tabindex="-1"])');
+      var f = Array.prototype.filter.call(nodes, function (n) { return !n.disabled && n.offsetParent !== null; });
+      if (!f.length) return;
+      var first = f[0], last = f[f.length - 1];
+      if (e.shiftKey && document.activeElement === first) { e.preventDefault(); last.focus(); }
+      else if (!e.shiftKey && document.activeElement === last) { e.preventDefault(); first.focus(); }
+    });
+
+    // Remember open/closed within the session.
+    try { if (sessionStorage.getItem('qf-copilot-open') === '1') open(); } catch (e) {}
+  }
   function wireThemeToggle() {
     var btn = document.getElementById('qf-theme-toggle');
     var icon = document.getElementById('qf-theme-icon');
@@ -2094,7 +2191,7 @@
       applyBtn.addEventListener('click', function () {
         applyBtn.disabled = true; discardBtn.disabled = true;
         api('/api/ai/rate-proposals/' + p.id + '/apply', { method: 'POST' })
-          .then(function () { settle('applied', 'Applied — now live'); toastOk('Change applied'); })
+          .then(function () { settle('applied', 'Applied — now live'); toastOk('Change applied'); qfAfterProposalApplied(); })
           .catch(function (err) { applyBtn.disabled = false; discardBtn.disabled = false; toastErr(err); });
       });
       discardBtn.addEventListener('click', function () {
@@ -2114,6 +2211,92 @@
     return card;
   }
 
+  // After a proposal is applied server-side, refresh the ACTIVE data view so
+  // the change is visible immediately. The copilot launcher/panel live in
+  // #app-shell (outside #page-content), so re-rendering the route never
+  // disturbs an open bubble. Skip the AI-agent page itself — its proposal card
+  // already settles to "Applied — now live" in place.
+  function qfAfterProposalApplied() {
+    var base = state.route ? RouteUtil.baseSegment(state.route) : '';
+    if (['rates', 'accessorials', 'zones', 'brand', 'overview'].indexOf(base) !== -1) {
+      try { render(state.route); } catch (e) { /* non-fatal — a stale view is better than a throw */ }
+    }
+  }
+
+  // Shared owner-AI rate-chat surface. Backs BOTH the AI-agent page (renderAi)
+  // and the floating copilot bubble so they share one conversation, one history
+  // endpoint (GET/POST /api/ai/rate-chat), and one code path for proposals /
+  // tool bubbles. opts: { msgListId?, greeting? }.
+  function buildRateChat(opts) {
+    opts = opts || {};
+    var chat = el('div', { class: 'chat-panel' });
+    var msgAttrs = { class: 'chat-messages' };
+    if (opts.msgListId) msgAttrs.id = opts.msgListId;
+    var msgList = el('div', msgAttrs);
+    chat.appendChild(msgList);
+    var input = el('textarea', { class: 'textarea', rows: '2', placeholder: 'e.g. "raise dryvan rate to $2.65/mi and disable LTL"' });
+    var sendBtn = el('button', { class: 'btn btn-primary', text: 'Send' });
+    sendBtn.addEventListener('click', sendChat);
+    input.addEventListener('keydown', function (e) { if (e.key === 'Enter' && (e.metaKey || e.ctrlKey)) sendChat(); });
+    chat.appendChild(el('div', { class: 'chat-input-row' }, [input, sendBtn]));
+
+    function renderHistory(hist) {
+      msgList.innerHTML = '';
+      (hist || []).forEach(function (m) {
+        var meta = m.metadataJson || null;
+        if (meta && meta.kind === 'rate_proposal') {
+          msgList.appendChild(renderRateProposal({
+            id: m.id, title: meta.title, changes: meta.changes, reason: meta.reason,
+            op: meta.op, summary: meta.summary,
+          }, meta.status || 'pending'));
+          return;
+        }
+        if (m.role === 'tool') return; // non-proposal tool rows aren't shown
+        msgList.appendChild(el('div', { class: 'chat-bubble ' + (m.role === 'assistant' ? 'assistant' : 'user'), text: m.content }));
+      });
+      if (!(hist || []).length) {
+        msgList.appendChild(el('div', { class: 'chat-bubble assistant', text: opts.greeting || 'Hi — I can update your rate cards, accessorials, and lane zones. Tell me what to change.' }));
+      }
+      msgList.scrollTop = msgList.scrollHeight;
+    }
+
+    function load() {
+      return api('/api/ai/rate-chat').then(function (r) { renderHistory(r.messages); });
+    }
+
+    function sendChat() {
+      var msg = input.value.trim(); if (!msg) return;
+      input.value = ''; sendBtn.disabled = true;
+      msgList.appendChild(el('div', { class: 'chat-bubble user', text: msg }));
+      msgList.scrollTop = msgList.scrollHeight;
+      var pending = el('div', { class: 'chat-bubble assistant', text: '…' });
+      msgList.appendChild(pending);
+      api('/api/ai/rate-chat', { method: 'POST', body: { message: msg } })
+        .then(function (r) {
+          sendBtn.disabled = false;
+          pending.textContent = r.reply || '(no reply)';
+          // Mutation tools return proposals — render each as an Apply/Discard card.
+          if (r.proposals && r.proposals.length) {
+            r.proposals.forEach(function (p) { msgList.appendChild(renderRateProposal(p, 'pending')); });
+          }
+          // Only READ tools surface as tool bubbles (proposals are cards).
+          if (r.toolResults && r.toolResults.length) {
+            r.toolResults.forEach(function (t) {
+              if (t.result && t.result.proposal) return; // rendered as a card above
+              msgList.appendChild(el('div', { class: 'chat-bubble tool' }, [
+                el('span', { class: 'qf-tool-ico', html: WRENCH_SVG, 'aria-hidden': 'true' }),
+                ' ' + t.tool + ': ' + t.result.message,
+              ]));
+            });
+          }
+          msgList.scrollTop = msgList.scrollHeight;
+        })
+        .catch(function (err) { sendBtn.disabled = false; pending.textContent = 'Error: ' + err.message; });
+    }
+
+    return { root: chat, msgList: msgList, input: input, sendBtn: sendBtn, renderHistory: renderHistory, load: load };
+  }
+
   // ── AI agent panel ────────────────────────────────────────────
   function renderAi(c) {
     Promise.all([
@@ -2127,64 +2310,12 @@
 
       var grid = el('div', { class: 'grid-2', style: { alignItems: 'start' } });
 
-      // Chat panel
+      // Chat panel — shared rate-chat surface (same code path as the copilot
+      // bubble, so page + bubble stay one continuous conversation).
       var leftCol = el('div');
-      var chat = el('div', { class: 'chat-panel' });
-      var msgList = el('div', { class: 'chat-messages', id: 'rate-chat-msgs' });
-      hist.forEach(function (m) {
-        var meta = m.metadataJson || null;
-        if (meta && meta.kind === 'rate_proposal') {
-          msgList.appendChild(renderRateProposal({
-            id: m.id, title: meta.title, changes: meta.changes, reason: meta.reason,
-            op: meta.op, summary: meta.summary,
-          }, meta.status || 'pending'));
-          return;
-        }
-        if (m.role === 'tool') return; // non-proposal tool rows aren't shown
-        msgList.appendChild(el('div', { class: 'chat-bubble ' + (m.role === 'assistant' ? 'assistant' : 'user'), text: m.content }));
-      });
-      if (!hist.length) {
-        msgList.appendChild(el('div', { class: 'chat-bubble assistant', text: 'Hi — I can update your rate cards, accessorials, and lane zones. Tell me what to change.' }));
-      }
-      chat.appendChild(msgList);
-      var input = el('textarea', { class: 'textarea', rows: '2', placeholder: 'e.g. "raise dryvan rate to $2.65/mi and disable LTL"' });
-      var sendBtn = el('button', { class: 'btn btn-primary', text: 'Send' });
-      sendBtn.addEventListener('click', sendChat);
-      input.addEventListener('keydown', function (e) { if (e.key === 'Enter' && (e.metaKey || e.ctrlKey)) sendChat(); });
-      chat.appendChild(el('div', { class: 'chat-input-row' }, [input, sendBtn]));
-      leftCol.appendChild(chat);
-
-      function sendChat() {
-        var msg = input.value.trim(); if (!msg) return;
-        input.value = ''; sendBtn.disabled = true;
-        msgList.appendChild(el('div', { class: 'chat-bubble user', text: msg }));
-        msgList.scrollTop = msgList.scrollHeight;
-        var pending = el('div', { class: 'chat-bubble assistant', text: '…' });
-        msgList.appendChild(pending);
-        api('/api/ai/rate-chat', { method: 'POST', body: { message: msg } })
-          .then(function (r) {
-            sendBtn.disabled = false;
-            pending.textContent = r.reply || '(no reply)';
-            // Mutation tools no longer apply — they return proposals. Render
-            // each as a confirm card with Apply / Discard.
-            if (r.proposals && r.proposals.length) {
-              r.proposals.forEach(function (p) { msgList.appendChild(renderRateProposal(p, 'pending')); });
-            }
-            // Only READ tools surface as tool bubbles now (proposals are cards).
-            if (r.toolResults && r.toolResults.length) {
-              r.toolResults.forEach(function (t) {
-                if (t.result && t.result.proposal) return; // rendered as a card above
-                var tag = el('div', { class: 'chat-bubble tool' }, [
-                  el('span', { class: 'qf-tool-ico', html: WRENCH_SVG, 'aria-hidden': 'true' }),
-                  ' ' + t.tool + ': ' + t.result.message
-                ]);
-                msgList.appendChild(tag);
-              });
-            }
-            msgList.scrollTop = msgList.scrollHeight;
-          })
-          .catch(function (err) { sendBtn.disabled = false; pending.textContent = 'Error: ' + err.message; });
-      }
+      var chatUI = buildRateChat({ msgListId: 'rate-chat-msgs' });
+      chatUI.renderHistory(hist);
+      leftCol.appendChild(chatUI.root);
 
       // Right column: AI config form
       var rightCol = el('div');
@@ -5124,6 +5255,8 @@
       if (t) t.hidden = false;
       wireMobileNav();
       wireThemeToggle();
+      // Floating AI copilot — persistent across every authed route.
+      mountCopilotBubble();
       // Grab-to-scroll (drag-to-pan) on the dashboard's main content area. The
       // window is the scroll container (.app-shell is a min-height grid; only
       // the sidebar scrolls internally), so panning the .app-main background
