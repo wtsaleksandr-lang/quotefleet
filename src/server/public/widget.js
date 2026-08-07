@@ -382,6 +382,13 @@
     // the default branded overlay untouched. Re-runs on the demo ?mapStyle=
     // override because applyTheme runs after brandMapStyle is (re)resolved.
     document.body.setAttribute('data-qf-map-style', brandMapStyle || 'branded');
+    // ONE tone attribute (light|dark) drives all on-map overlay contrast in CSS
+    // instead of enumerating every style. Classify by the resolved base-map
+    // LIGHTNESS (see overlayMapTone). The two true-monochrome styles opt OUT
+    // (null) so their bespoke ink-on-mono overlay skin stays.
+    var _mapTone = overlayMapTone(brandMapStyle || 'branded');
+    if (_mapTone) document.body.setAttribute('data-qf-map-tone', _mapTone);
+    else document.body.removeAttribute('data-qf-map-tone');
     // Preset id → body attribute so the widget CSS can apply the handful of
     // preset-specific tweaks that aren't expressible as a single --w-* token
     // (e.g. neutralising stray brand-blue on the monochrome "mono" theme).
@@ -2242,6 +2249,21 @@
   // DARK calculator). Override is demo-scoped (see demoMapThemeOverride).
   function resolvedMapTheme() {
     return demoMapThemeOverride || (isDarkMapTheme() ? 'dark' : 'light');
+  }
+  // Overlay contrast tone for the on-map pills + bottom chip. Returns
+  // 'light'|'dark' for the resolved base-map lightness, or null for the two
+  // monochrome styles that carry their own overlay skin (CSS keys those off
+  // data-qf-map-style="blackwhite*"). Fixed-tone styles are classified directly
+  // (mirrors routeMap.ts styleSpecs: grayscale/mono/soft/etc. are LIGHT bases,
+  // dark_routes/tesla/stone/satellite are DARK); theme-aware styles
+  // (branded/standard + any unknown) follow the resolved day/night map theme.
+  function overlayMapTone(style) {
+    if (style === 'blackwhite' || style === 'blackwhite_inverted') return null;
+    var DARK = { dark_routes: 1, tesla: 1, stone: 1, satellite: 1 };
+    var LIGHT = { grayscale: 1, mono: 1, soft: 1, standard: 1, ironhorse: 1, harbor: 1, cupertino: 1, material: 1, booking: 1, stripe: 1, citron: 1, vault: 1 };
+    if (DARK[style]) return 'dark';
+    if (LIGHT[style]) return 'light';
+    return resolvedMapTheme();
   }
   var mapReqSeq = 0, mapDebounce = null;
   function scheduleRouteMap() {
