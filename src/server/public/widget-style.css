@@ -310,12 +310,12 @@ body[data-qf-cta-hover="fill"] .qf-cta:not(.qf-secondary):hover { background: va
    "Map data ©…" attribution baked bottom-RIGHT of the static map stay fully
    visible/unobscured (Google Maps ToS). max-width keeps a margin either side so
    the chip never reaches those corners. */
-.qf-map-overlay { position: absolute; left: 50%; bottom: var(--space-2); transform: translateX(-50%); display: inline-flex; align-items: center; justify-content: center; gap: var(--space-2); max-width: calc(100% - var(--space-6)); padding: var(--space-1) var(--space-2); border-radius: 999px; background: rgba(15,23,42,0.72); text-align: center; }
+.qf-map-overlay { position: absolute; left: 50%; bottom: var(--space-0-5); transform: translateX(-50%); display: inline-flex; align-items: center; justify-content: center; gap: var(--space-2); max-width: calc(100% - var(--space-6)); padding: var(--space-1) var(--space-2); border-radius: 999px; background: rgba(17,24,39,0.60); backdrop-filter: blur(7px) saturate(1.3); -webkit-backdrop-filter: blur(7px) saturate(1.3); border: 1px solid rgba(255,255,255,0.16); box-shadow: 0 2px 10px rgba(15,23,42,0.28); text-align: center; }
 .qf-map-ov-stat { display: flex; flex-direction: column; align-items: center; }
 /* nowrap so each metric stays a single line — keeps the chip a tidy compact pill
    instead of the long "Est. transit" value stacking into several lines. */
-.qf-map-ov-val { font-size: 12.5px; font-weight: 500; color: rgba(255,255,255,0.96); line-height: 1.4; white-space: nowrap; }
-.qf-map-ov-lbl { font-size: 9px; font-weight: 400; letter-spacing: 0.04em; text-transform: uppercase; color: rgba(255,255,255,0.68); line-height: 1.4; white-space: nowrap; }
+.qf-map-ov-val { font-size: 12.5px; font-weight: 600; color: rgba(255,255,255,0.98); line-height: 1.4; white-space: nowrap; text-shadow: 0 1px 2px rgba(15,23,42,0.55); }
+.qf-map-ov-lbl { font-size: 9px; font-weight: 500; letter-spacing: 0.04em; text-transform: uppercase; color: rgba(255,255,255,0.74); line-height: 1.4; white-space: nowrap; text-shadow: 0 1px 2px rgba(15,23,42,0.5); }
 /* Narrow viewports: shrink the centered chip's gaps + type so the one-line pill
    still fits inside the map width (and stays clear of the corner attribution). */
 @media (max-width: 640px) {
@@ -323,7 +323,7 @@ body[data-qf-cta-hover="fill"] .qf-cta:not(.qf-secondary):hover { background: va
   .qf-map-ov-val { font-size: 11px; }
   .qf-map-ov-lbl { font-size: 8px; }
 }
-.qf-map-ov-div { width: 1px; align-self: stretch; margin: var(--space-0-5) 0; background: rgba(255,255,255,0.28); }
+.qf-map-ov-div { width: 1px; align-self: stretch; margin: var(--space-0-5) 0; background: rgba(255,255,255,0.30); }
 .qf-map-modal { position: fixed; inset: 0; z-index: 1000; display: flex; align-items: center; justify-content: center; }
 .qf-map-modal[hidden] { display: none; }
 .qf-map-modal-backdrop { position: absolute; inset: 0; background: rgba(15,23,42,0.6); }
@@ -344,12 +344,34 @@ body[data-qf-cta-hover="fill"] .qf-cta:not(.qf-secondary):hover { background: va
 /* Selected addresses embedded over the top of the map (Alex): two columns side
    by side (in line on every viewport), ellipsis-truncated. Dots match the A/B
    markers (home green / coral-red). */
-.qf-map-addr { position: absolute; left: 0; right: 0; top: 0; display: flex; gap: var(--space-2); padding: var(--space-1-5) var(--space-1-5) var(--space-3); background: linear-gradient(rgba(15,23,42,0.85), rgba(15,23,42,0)); }
-.qf-ma-pt { display: flex; align-items: center; gap: var(--space-1); flex: 1 1 0; min-width: 0; }
+.qf-map-addr { position: absolute; left: 0; right: 0; top: 0; display: flex; align-items: center; gap: var(--space-1); padding: var(--space-0-5) var(--space-1-5) var(--space-3); background: linear-gradient(rgba(15,23,42,0.88), rgba(15,23,42,0)); }
+/* Pickup hugs the LEFT corner, destination hugs the RIGHT (dot on its right so
+   the lockup reads toward the corner). Pills shrink+ellipsis; the middle
+   connector claims the remaining width. */
+.qf-ma-pt { display: flex; align-items: center; gap: var(--space-1); flex: 0 1 auto; min-width: 0; max-width: 44%; }
+.qf-ma-pt-b { justify-content: flex-end; }
+.qf-ma-pt-b .qf-ma-txt { text-align: right; }
+/* Dashed connector + gliding-truck lockup (same truck as the transit timeline),
+   truck centered on the dashed line, pointing right toward the destination. On
+   very narrow widths the dashes collapse to a stub but the truck stays. */
+.qf-ma-link { position: relative; flex: 1 1 auto; min-width: 30px; align-self: center; height: 14px; display: flex; align-items: center; justify-content: center; }
+.qf-ma-link::before { content: ""; position: absolute; left: 0; right: 0; top: 50%; border-top: 1.5px dashed rgba(255,255,255,0.5); }
+.qf-ma-truck { position: relative; display: inline-flex; color: rgba(255,255,255,0.95); filter: drop-shadow(0 1px 1px rgba(15,23,42,0.5)); }
 .qf-ma-dot { width: 8px; height: 8px; border-radius: 999px; flex: 0 0 auto; }
 .qf-ma-a { background: #36c98b; }
 .qf-ma-b { background: #f97373; }
-.qf-ma-txt { font-size: 10px; font-weight: 400; color: rgba(255,255,255,0.92); line-height: 1.45; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; min-width: 0; }
+.qf-ma-txt { font-size: 10px; font-weight: 600; color: rgba(255,255,255,0.96); line-height: 1.45; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; min-width: 0; text-shadow: 0 1px 2px rgba(15,23,42,0.55); }
+/* Map-tone-aware frosted overlays — ONE attribute (data-qf-map-tone, set in
+   widget.js from the resolved base-map lightness) drives all overlay contrast
+   instead of enumerating every style. A dark charcoal glass chip + white text
+   reads on BOTH light and dark base maps; tuned per tone (light maps: darker/
+   more opaque + light hairline; dark maps: lighter fill + brighter hairline so
+   the chip edge separates). The two true-monochrome styles opt OUT (no tone
+   attr) and keep their bespoke ink-on-mono skin below. Numeric rgba only. */
+body[data-qf-map-tone="light"] .qf-map-overlay { background: rgba(17,24,39,0.66); border-color: rgba(255,255,255,0.18); }
+body[data-qf-map-tone="light"] .qf-map-addr { background: linear-gradient(rgba(15,23,42,0.92), rgba(15,23,42,0)); }
+body[data-qf-map-tone="dark"] .qf-map-overlay { background: rgba(17,24,39,0.54); border-color: rgba(255,255,255,0.24); }
+body[data-qf-map-tone="dark"] .qf-map-addr { background: linear-gradient(rgba(15,23,42,0.82), rgba(15,23,42,0)); }
 
 /* Reveal moment — transit timeline with a gliding truck (on the fixed light
    result card, so colours are fixed to read there). Appended at EOF. */
@@ -483,9 +505,13 @@ body[data-qf-map-style="blackwhite"] .qf-map-addr {
   background: linear-gradient(rgba(249,249,249,0.94), rgba(249,249,249,0));
   border-bottom: 1px solid rgba(17,17,17,0.08);
 }
-body[data-qf-map-style="blackwhite"] .qf-ma-txt { color: rgba(17,17,17,0.88); }
+body[data-qf-map-style="blackwhite"] .qf-ma-txt { color: rgba(17,17,17,0.88); text-shadow: none; }
 body[data-qf-map-style="blackwhite"] .qf-ma-a { background: rgba(17,17,17,0.90); }
 body[data-qf-map-style="blackwhite"] .qf-ma-b { background: transparent; box-shadow: inset 0 0 0 2px rgba(17,17,17,0.90); }
+body[data-qf-map-style="blackwhite"] .qf-ma-truck { color: rgba(17,17,17,0.82); filter: none; }
+body[data-qf-map-style="blackwhite"] .qf-ma-link::before { border-top-color: rgba(17,17,17,0.32); }
+body[data-qf-map-style="blackwhite"] .qf-map-ov-val { text-shadow: none; }
+body[data-qf-map-style="blackwhite"] .qf-map-ov-lbl { text-shadow: none; }
 body[data-qf-map-style="blackwhite"] .qf-map-expand {
   color: rgba(17,17,17,0.85);
   background: rgba(249,249,249,0.80);
@@ -508,6 +534,8 @@ body[data-qf-map-style="blackwhite_inverted"] .qf-map-addr {
 body[data-qf-map-style="blackwhite_inverted"] .qf-ma-txt { color: rgba(245,245,245,0.90); }
 body[data-qf-map-style="blackwhite_inverted"] .qf-ma-a { background: rgba(245,245,245,0.92); }
 body[data-qf-map-style="blackwhite_inverted"] .qf-ma-b { background: transparent; box-shadow: inset 0 0 0 2px rgba(245,245,245,0.92); }
+body[data-qf-map-style="blackwhite_inverted"] .qf-ma-truck { color: rgba(245,245,245,0.90); }
+body[data-qf-map-style="blackwhite_inverted"] .qf-ma-link::before { border-top-color: rgba(245,245,245,0.34); }
 body[data-qf-map-style="blackwhite_inverted"] .qf-map-expand {
   color: rgba(245,245,245,0.90);
   background: rgba(20,20,20,0.65);
