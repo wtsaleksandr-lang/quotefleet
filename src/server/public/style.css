@@ -1133,6 +1133,67 @@ html[data-theme="light"] .hero h1 .accent {
 .qf-rate-proposal[data-status="applied"]   { border-color: var(--success); }
 .qf-rate-proposal[data-status="discarded"] { opacity: 0.72; }
 
+/* ── Copilot Phase-2: inline field-prefill (useCopilotForm parity) ───────
+   The copilot writes proposed values into the REAL on-screen inputs; this
+   pending highlight + the .qf-fill-review Confirm/Undo card make the change
+   obviously reviewable before it's kept. Theme-aware tokens only; the ring
+   uses box-shadow (not a spacing/border prop) so it reads in both themes. */
+.qf-copilot-pending {
+  border-color: var(--accent) !important;
+  box-shadow: 0 0 0 3px var(--accent-soft);
+  animation: qf-fill-pulse 1.1s ease-out 1;
+}
+@keyframes qf-fill-pulse {
+  0%   { box-shadow: 0 0 0 6px var(--accent-soft); }
+  100% { box-shadow: 0 0 0 3px var(--accent-soft); }
+}
+
+.qf-fill-review {
+  align-self: stretch;
+  display: flex; flex-direction: column; gap: var(--space-1-5);
+  background: var(--surface-2); border: 1px solid var(--accent);
+  border-radius: var(--radius); padding: var(--space-2);
+}
+.qf-fr-head { display: flex; flex-wrap: wrap; align-items: center; gap: var(--space-1); }
+.qf-fr-badge {
+  display: inline-flex; align-items: center;
+  padding: var(--space-0-5) var(--space-1);
+  border-radius: var(--radius-pill);
+  background: var(--accent-soft); color: var(--accent);
+  font-size: 11px; font-weight: 700; letter-spacing: 0.02em; text-transform: uppercase;
+}
+.qf-fr-title { color: var(--ink); font-weight: 700; font-size: 13.5px; line-height: 1.4; }
+.qf-fr-changes {
+  display: flex; flex-direction: column; gap: var(--space-1);
+  background: var(--surface); border: 1px solid var(--border);
+  border-radius: var(--radius-btn); padding: var(--space-1-5);
+}
+.qf-fr-change {
+  display: flex; flex-wrap: wrap; align-items: baseline;
+  justify-content: space-between; gap: var(--space-1);
+}
+.qf-fr-field { color: var(--muted); font-size: 12.5px; line-height: 1.5; font-weight: 600; }
+.qf-fr-values {
+  display: inline-flex; align-items: baseline; flex-wrap: wrap;
+  gap: var(--space-1); font-size: 13px; line-height: 1.5;
+}
+.qf-fr-from { color: var(--muted); text-decoration: line-through; }
+.qf-fr-arrow { color: var(--muted-soft); font-weight: 700; }
+.qf-fr-to { color: var(--ink); font-weight: 700; }
+.qf-fr-foot {
+  display: flex; flex-wrap: wrap; align-items: center;
+  justify-content: flex-end; gap: var(--space-1);
+}
+.qf-fr-status {
+  display: inline-flex; align-items: center;
+  padding: var(--space-0-5) var(--space-1);
+  border-radius: var(--radius-pill); font-size: 12px; font-weight: 600;
+}
+.qf-fr-status-confirmed { background: var(--success-bg); color: var(--success); }
+.qf-fr-status-undone    { background: var(--surface-3); color: var(--muted); }
+.qf-fill-review[data-status="confirmed"] { border-color: var(--success); }
+.qf-fill-review[data-status="undone"]    { opacity: 0.72; }
+
 /* ── Admin overview stat tiles ─────────────────────────────────────
    The admin dashboard's overview counts (Tenants / Users / Total leads /
    MRR) live in `.features` cells with the class `.feature`. Give those
