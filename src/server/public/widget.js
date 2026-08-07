@@ -1155,7 +1155,7 @@
         var label = p.name;
         if (p.state) label += ', ' + p.state;
         item.innerHTML = label + '<span class="meta">' + escapeHtml(p.code) + '</span>';
-        item.addEventListener('mousedown', function (e) { e.preventDefault(); input.value = (p.state ? p.name + ', ' + p.state : p.name); state.pickupPortCode = p.code; close(); renderTerminals(); });
+        item.addEventListener('mousedown', function (e) { e.preventDefault(); input.value = (p.state ? p.name + ', ' + p.state : p.name); state.pickupPortCode = p.code; close(); renderTerminals(); scheduleRouteMap(); });
         box.appendChild(item);
       });
       box.classList.add('open');
@@ -1165,7 +1165,7 @@
       if (!q) return ports.slice(0, 10);
       return ports.filter(function (p) { return p.name.toLowerCase().includes(q) || (p.city || '').toLowerCase().includes(q) || p.code.toLowerCase().includes(q) || (p.state || '').toLowerCase().includes(q); });
     }
-    input.oninput = function () { state.pickupPortCode = ''; state.pickupTerminalCode = ''; render(filter(input.value)); };
+    input.oninput = function () { state.pickupPortCode = ''; state.pickupTerminalCode = ''; render(filter(input.value)); scheduleRouteMap(); };
     input.onfocus = function () { render(filter(input.value)); };
     input.onblur = function () { setTimeout(close, 120); };
     input.onkeydown = function (e) { if (e.key === 'Escape') close(); };
@@ -1280,7 +1280,7 @@
     var dunno = document.createElement('option'); dunno.value = ''; dunno.textContent = "— I don't know yet —"; sel.appendChild(dunno);
     list.forEach(function (t) { var opt = document.createElement('option'); opt.value = t.code; opt.textContent = t.name + (t.carrier ? '  (' + t.carrier + ')' : ''); sel.appendChild(opt); });
     sel.value = state.pickupTerminalCode || '';
-    sel.onchange = function () { state.pickupTerminalCode = sel.value; };
+    sel.onchange = function () { state.pickupTerminalCode = sel.value; scheduleRouteMap(); };
   }
 
   // Fallback one-line explanations for add-ons whose config row ships without a
@@ -2214,6 +2214,20 @@
     if (resolved && resolved.label) return resolved.label;
     return (($(id) && $(id).value) || '').trim() || '—';
   }
+  // Pickup label for the top-left map pill. In DRAYAGE the pickup is a PORT (held
+  // in state.pickupPortCode, not state.pickupResolved), so read the port label so
+  // the pickup pill is never blank in port mode; otherwise fall back to the
+  // resolved address / typed text like delivery.
+  function mapPickupLabel() {
+    if (state.service === 'drayage' && state.pickupPortCode) {
+      var ports = (state.config && state.config.drayagePorts) || [];
+      var p = ports.find(function (x) { return x.code === state.pickupPortCode; });
+      if (p) return p.name + (p.state ? ', ' + p.state : '');
+      var pin = $('qf-pickup-port-input');
+      if (pin && pin.value.trim()) return pin.value.trim();
+    }
+    return addrLabel(state.pickupResolved, 'qf-pickup-zip');
+  }
   function isDarkMapTheme() {
     try {
       var host = document.querySelector('.qf-widget') || document.body;
@@ -2283,7 +2297,7 @@
     var routeImg = $('qf-map-img'); if (routeImg) routeImg.alt = 'Route from pickup to delivery';
     var dEl = $('qf-map-distance'); if (dEl) dEl.textContent = (resp.miles != null) ? (Number(resp.miles).toLocaleString() + ' mi') : '—';
     var tEl = $('qf-map-transit'); if (tEl) tEl.textContent = (resp.transit && resp.transit.text) ? resp.transit.text : '—';
-    var pu = $('qf-map-pickup'); if (pu) pu.textContent = addrLabel(state.pickupResolved, 'qf-pickup-zip');
+    var pu = $('qf-map-pickup'); if (pu) pu.textContent = mapPickupLabel();
     var de = $('qf-map-delivery'); if (de) de.textContent = addrLabel(state.deliveryResolved, 'qf-delivery-zip');
     state.mapMiles = (resp.miles != null) ? Number(resp.miles) : null;
     updatePerMile();

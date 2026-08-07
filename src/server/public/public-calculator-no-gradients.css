@@ -473,20 +473,21 @@ body[data-qf-preset="mono"] .qf-ma-pt {
   padding: var(--space-0-5) var(--space-1) !important;
 }
 /* Distance + transit combined into ONE discrete frosted badge (not a full-width
-   bar): same padding/size character as the top badges and the SAME inset from
-   the map edge (space-0-5, mirroring the top badges), anchored bottom-left. */
+   bar): same padding/size character as the top badges, CENTERED at the map's
+   bottom edge. Centering keeps the Google logo (baked bottom-left) + "Map data ©…"
+   attribution (baked bottom-right) fully visible/unobscured — Google Maps ToS. */
 body[data-qf-preset="mono"] .qf-map-overlay {
-  left: var(--space-1) !important;
+  left: 50% !important;
   right: auto !important;
   top: auto !important;
-  bottom: var(--space-0-5) !important;
+  bottom: var(--space-1) !important;
   padding: var(--space-0-5) var(--space-1) !important;
   gap: var(--space-1) !important;
-  /* Now a 3-metric strip (Distance · Est. transit · $/mi). Scale the whole
-     badge down 20% from its pinned bottom-left corner so it stays a compact
-     chip — padding, type and gaps all shrink uniformly and stay crisp. */
-  transform: scale(0.8) !important;
-  transform-origin: bottom left !important;
+  /* A 3-metric strip (Distance · Est. transit · $/mi). Scale the whole badge
+     down from its centered anchor so it stays a compact chip — padding, type
+     and gaps all shrink uniformly and stay crisp. */
+  transform: translateX(-50%) scale(0.9) !important;
+  transform-origin: bottom center !important;
 }
 /* Expand icon: same frosted rounded-rect as the other badges (dark glyph on the
    frost), matched to the distance badge's bottom inset so the row lines up. */
