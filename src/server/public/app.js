@@ -317,6 +317,10 @@
   function render(route) {
     route = route || 'overview';
     state.route = route;
+    // Copilot form registry: routes re-render fully into #page-content, so
+    // clear any prior page's form registration here — each render fn that has
+    // an editable form re-registers it once its inputs exist. (Phase 2.)
+    try { if (window.__qfCopilotForm) window.__qfCopilotForm.clear(); } catch (e) {}
     var base = RouteUtil.baseSegment(route);
     setActiveNav(base);
     if (base === 'overview' || base === 'leads' || base === 'callbacks') refreshNavBadges();
@@ -1688,6 +1692,23 @@
       // Adding a drayage card should reveal the Drayage-zones nav item
       // without a reload (add re-renders this page, so this covers it).
       syncZonesNav(d.rateCards || []);
+
+      // Copilot form-fill (Phase 2): register the visible rate-card inputs so
+      // the AI can prefill a specific card's field ("set the FTL dry van
+      // per-mile to 2.75"). Bulk / global changes still go through the rate
+      // agent's Apply/Discard proposals (the copilot fill flow falls back to it).
+      (function registerRatesForm() {
+        var byId = {};
+        (rows || []).forEach(function (r) { byId[String(r.id)] = r; });
+        var FLABEL = { ratePerMile: '$/mi', minimumCharge: 'Minimum $', flatFee: 'Flat $', fuelSurchargePct: 'Fuel %', marginPct: 'Margin %', label: 'Label' };
+        var specs = $$('input[data-field][data-rate-id]', tbl).map(function (inp) {
+          var id = inp.dataset.rateId, field = inp.dataset.field;
+          var card = byId[id] || {};
+          var name = card.label || ((card.service || '') + ' ' + (card.equipment || '')).trim() || ('Rate #' + id);
+          return { key: 'card_' + id + '_' + field, label: name + ' — ' + (FLABEL[field] || field), el: inp };
+        });
+        qfRegisterCopilotForm('rates', 'Rate cards', specs);
+      })();
     }).catch(showErr(c));
   }
 
@@ -1755,6 +1776,10 @@
         inp.style.opacity = '0.5';
         inp.style.cursor = 'not-allowed';
       } else {
+        // Copilot form-fill hooks (Phase 2): tag editable cells so renderRates
+        // can register them and the AI can prefill a specific card's field.
+        inp.dataset.field = field;
+        inp.dataset.rateId = String(r.id);
         inp.addEventListener('blur', function () {
           var v = inp.value;
           if (opts && opts.type === 'number') v = v === '' ? null : Number(v);
@@ -1886,6 +1911,26 @@
         form.hidden = !form.hidden;
         if (!form.hidden) fName.focus();
       });
+
+      // Copilot form-fill (Phase 2): register the "add an add-on" form so the
+      // AI can prefill it ("add a $50 hazmat surcharge"). onApply reveals the
+      // (initially hidden) form; Confirm clicks Add to persist.
+      (function registerAccessorialForm() {
+        function revealAddon(elm) {
+          form.hidden = false;
+          try { elm.scrollIntoView({ block: 'center', behavior: 'smooth' }); } catch (e) { if (elm.scrollIntoView) elm.scrollIntoView(); }
+        }
+        var specs = [
+          { key: 'name', label: 'Name', el: fName, required: true, reveal: revealAddon },
+          { key: 'price', label: 'Price (number, no symbol)', el: fPrice, reveal: revealAddon },
+          { key: 'kind', label: "How it's charged", el: fKind, options: ADDON_KINDS.map(function (o) { return { value: o.value, label: o.label }; }), reveal: revealAddon },
+          { key: 'trigger', label: 'When it applies', el: fTrigger, options: ADDON_TRIGGERS.map(function (o) { return { value: o.value, label: o.label }; }), reveal: revealAddon },
+        ];
+        qfRegisterCopilotForm('accessorials', 'Add an add-on (accessorial)', specs, function onConfirm() {
+          // Persist via the form's own "Add" action (tenant-scoped + validated).
+          saveBtn.click();
+        });
+      })();
       cancelBtn.addEventListener('click', closeForm);
       saveBtn.addEventListener('click', function () {
         var name = fName.value.trim();
@@ -2006,6 +2051,22 @@
         var tb = $('tbody', tbl);
         d.laneZones.forEach(function (z) { tb.appendChild(zoneRow(z)); });
         c.appendChild(tbl);
+
+        // Copilot form-fill (Phase 2): register the visible zone inputs so the
+        // AI can prefill a specific zone's price/radius ("set the LAX 50-mile
+        // zone to $525").
+        (function registerZonesForm() {
+          var byId = {};
+          d.laneZones.forEach(function (z) { byId[String(z.id)] = z; });
+          var FLABEL = { label: 'Label', anchorPortCode: 'Anchor port', radiusMiles: 'Radius (mi)', flatPrice: 'Flat $' };
+          var specs = $$('input[data-field][data-zone-id]', tbl).map(function (inp) {
+            var id = inp.dataset.zoneId, field = inp.dataset.field;
+            var z = byId[id] || {};
+            var name = z.label || (z.anchorPortCode ? z.anchorPortCode + ' zone' : 'Zone #' + id);
+            return { key: 'zone_' + id + '_' + field, label: name + ' — ' + (FLABEL[field] || field), el: inp };
+          });
+          qfRegisterCopilotForm('zones', 'Drayage zones', specs);
+        })();
       } else {
         var emptyZ = el('div', { class: 'card', style: { padding: '24px 20px', textAlign: 'center' } });
         emptyZ.appendChild(el('div', { style: { fontSize: '15px', fontWeight: '800' }, text: 'No zones yet' }));
@@ -2127,6 +2188,9 @@
       var i = el('input', { class: 'input', value: val == null ? '' : val });
       if (opts && opts.type) i.type = opts.type; if (opts && opts.right) i.style.textAlign = 'right';
       i.style.width = (opts && opts.w) || '120px';
+      // Copilot form-fill hooks (Phase 2): tag zone cells for registration.
+      i.dataset.field = field;
+      i.dataset.zoneId = String(z.id);
       i.addEventListener('blur', function () { var v = i.value; if (opts && opts.type === 'number') v = Number(v); var p = {}; p[field] = v; api('/api/tenant/lane-zones/' + z.id, { method: 'PUT', body: p }).catch(toastErr); });
       var td = el('td'); td.appendChild(i);
       if (opts && opts.label) td.dataset.label = opts.label;
@@ -2150,6 +2214,20 @@
   // which re-validates server-side. `status` is 'pending' | 'applied' |
   // 'discarded' | 'invalid'. Pending renders Discard + Apply; a settled
   // proposal renders a read-only status pill instead.
+  // ── Copilot form-fill registration (Phase 2) ──────────────────────────
+  // Thin wrapper over the global registry (copilot-form.js). A render fn calls
+  // this once its inputs exist; render() clears the registry on every route
+  // swap, so no explicit unregister is needed. `specs` = [{key,label,el,...}].
+  function qfRegisterCopilotForm(id, formLabel, specs, onConfirm) {
+    if (!window.__qfCopilotForm || !window.__qfCopilotFormFactory) return null;
+    var clean = (specs || []).filter(function (s) { return s && s.key && s.el; });
+    if (!clean.length) return null;
+    var reg = window.__qfCopilotFormFactory(formLabel, clean);
+    if (typeof onConfirm === 'function') reg.onConfirm = onConfirm;
+    window.__qfCopilotForm.register(id, reg);
+    return reg;
+  }
+
   function renderRateProposal(p, status) {
     status = status || 'pending';
     var card = el('div', { class: 'qf-rate-proposal', 'data-proposal-id': String(p.id) });
@@ -2264,13 +2342,10 @@
       return api('/api/ai/rate-chat').then(function (r) { renderHistory(r.messages); });
     }
 
-    function sendChat() {
-      var msg = input.value.trim(); if (!msg) return;
-      input.value = ''; sendBtn.disabled = true;
-      msgList.appendChild(el('div', { class: 'chat-bubble user', text: msg }));
-      msgList.scrollTop = msgList.scrollHeight;
-      var pending = el('div', { class: 'chat-bubble assistant', text: '…' });
-      msgList.appendChild(pending);
+    // Phase-1 path: rate agent → Apply/Discard proposal cards (bulk / global
+    // rate changes). Reused directly (no active form) and as the fallback when
+    // a form-fill request turns out not to map to the visible form.
+    function runRateChat(msg, pending) {
       api('/api/ai/rate-chat', { method: 'POST', body: { message: msg } })
         .then(function (r) {
           sendBtn.disabled = false;
@@ -2292,6 +2367,102 @@
           msgList.scrollTop = msgList.scrollHeight;
         })
         .catch(function (err) { sendBtn.disabled = false; pending.textContent = 'Error: ' + err.message; });
+    }
+
+    // Phase-2 path: when a route registered an editable form, ask the fill
+    // endpoint for concrete values, prefill the REAL inputs (highlighted,
+    // pending), and show an inline Confirm / Undo card. `defer` (no fills) →
+    // fall back to the rate agent so proposals still work from any page.
+    function runFormFill(msg, pending, active) {
+      api('/api/ai/form-fill', {
+        method: 'POST',
+        body: { formLabel: active.formLabel, fields: active.fields, currentValues: active.getValues(), message: msg },
+      })
+        .then(function (r) {
+          if (r && r.fills && r.fills.length) {
+            sendBtn.disabled = false;
+            pending.textContent = r.reply || 'Here are the values — review the highlighted fields, then Confirm or Undo.';
+            renderFillReview(active, r.fills);
+            msgList.scrollTop = msgList.scrollHeight;
+          } else {
+            runRateChat(msg, pending); // not a field-fill → proposal path
+          }
+        })
+        .catch(function () { runRateChat(msg, pending); });
+    }
+
+    // The inline Confirm / Undo affordance. The fields are ALREADY prefilled +
+    // highlighted on the page when this renders; Confirm persists via the form's
+    // own save, Undo restores the prior values. No silent auto-commit.
+    function renderFillReview(reg, fills) {
+      var prior = reg.getValues();
+      var appliedKeys = fills.map(function (f) { return f.field_key; });
+      var labelByKey = {};
+      (reg.fields || []).forEach(function (f) { labelByKey[f.key] = f.label; });
+
+      reg.onApply(fills); // write into the real inputs + highlight + scroll into view
+
+      var card = el('div', { class: 'qf-fill-review', role: 'group', 'aria-label': 'Prefilled fields — review, then confirm or undo' });
+      card.appendChild(el('div', { class: 'qf-fr-head' }, [
+        el('span', { class: 'qf-fr-badge', text: 'Prefilled' }),
+        el('span', { class: 'qf-fr-title', text: (reg.formLabel || 'This form') + ' — review the highlighted fields' }),
+      ]));
+      var listWrap = el('div', { class: 'qf-fr-changes' });
+      fills.forEach(function (f) {
+        var row = el('div', { class: 'qf-fr-change' });
+        row.appendChild(el('span', { class: 'qf-fr-field', text: labelByKey[f.field_key] || f.field_key }));
+        var vals = el('span', { class: 'qf-fr-values' });
+        var pv = prior[f.field_key];
+        if (pv !== undefined && pv !== null && String(pv) !== '') {
+          vals.appendChild(el('span', { class: 'qf-fr-from', text: String(pv) }));
+          vals.appendChild(el('span', { class: 'qf-fr-arrow', text: '→', 'aria-label': 'changes to' }));
+        }
+        vals.appendChild(el('span', { class: 'qf-fr-to', text: f.value }));
+        row.appendChild(vals);
+        listWrap.appendChild(row);
+      });
+      card.appendChild(listWrap);
+
+      var foot = el('div', { class: 'qf-fr-foot' });
+      var undoBtn = el('button', { class: 'btn btn-secondary btn-sm qf-fr-undo', type: 'button', text: 'Undo' });
+      var confirmBtn = el('button', { class: 'btn btn-primary btn-sm qf-fr-confirm', type: 'button', text: 'Confirm' });
+      function settle(stateName, label) {
+        card.dataset.status = stateName;
+        foot.innerHTML = '';
+        foot.appendChild(el('span', { class: 'qf-fr-status qf-fr-status-' + stateName, text: label }));
+      }
+      confirmBtn.addEventListener('click', function () {
+        confirmBtn.disabled = true; undoBtn.disabled = true;
+        try { if (typeof reg.onConfirm === 'function') reg.onConfirm(appliedKeys); } catch (e) {}
+        try { reg.clearPending(); } catch (e) {}
+        settle('confirmed', 'Confirmed — saved');
+        toastOk('Applied to your form');
+      });
+      undoBtn.addEventListener('click', function () {
+        confirmBtn.disabled = true; undoBtn.disabled = true;
+        var undoFills = appliedKeys.map(function (k) { return { field_key: k, value: prior[k] == null ? '' : String(prior[k]) }; });
+        try { reg.onApply(undoFills, { pending: false }); } catch (e) {}
+        try { reg.clearPending(); } catch (e) {}
+        settle('undone', 'Undone — restored');
+      });
+      foot.appendChild(undoBtn);
+      foot.appendChild(confirmBtn);
+      card.appendChild(foot);
+      msgList.appendChild(card);
+      return card;
+    }
+
+    function sendChat() {
+      var msg = input.value.trim(); if (!msg) return;
+      input.value = ''; sendBtn.disabled = true;
+      msgList.appendChild(el('div', { class: 'chat-bubble user', text: msg }));
+      msgList.scrollTop = msgList.scrollHeight;
+      var pending = el('div', { class: 'chat-bubble assistant', text: '…' });
+      msgList.appendChild(pending);
+      var active = null;
+      try { active = window.__qfCopilotForm ? window.__qfCopilotForm.getActive() : null; } catch (e) {}
+      if (active && active.fields && active.fields.length) runFormFill(msg, pending, active);
+      else runRateChat(msg, pending);
     }
 
     return { root: chat, msgList: msgList, input: input, sendBtn: sendBtn, renderHistory: renderHistory, load: load };
@@ -2690,6 +2861,22 @@
       company.appendChild(textField('Company name', 'displayName', b.displayName, 'Shown above your calculator.'));
       company.appendChild(textField('Tagline', 'tagline', b.tagline, 'One short line under your name.'));
       controls.appendChild(company);
+
+      // Copilot form-fill (Phase 2): register the company name + tagline text
+      // fields so the AI can prefill them ("set my tagline to 'Fast freight,
+      // fair rates'"). On mobile the controls live in a foldable sheet — the
+      // reveal hook (set during sheet activation) opens + scrolls to the field.
+      (function registerCustomizeForm() {
+        function czReveal(elm) {
+          if (typeof root.__qfCzReveal === 'function') { root.__qfCzReveal(elm); return; }
+          try { elm.scrollIntoView({ block: 'center', behavior: 'smooth' }); } catch (e) { if (elm.scrollIntoView) elm.scrollIntoView(); }
+        }
+        var czInputs = company.querySelectorAll('input');
+        var specs = [];
+        if (czInputs[0]) specs.push({ key: 'displayName', label: 'Company name', el: czInputs[0], reveal: czReveal });
+        if (czInputs[1]) specs.push({ key: 'tagline', label: 'Tagline', el: czInputs[1], reveal: czReveal });
+        qfRegisterCopilotForm('customize', 'Customize your calculator', specs);
+      })();
 
       // ── Reusable drag-scroll carousel (theme presets + map styles) ──────
       // Wraps an existing item strip in a horizontally-scrollable track with
@@ -3546,10 +3733,23 @@
           syncTabChips('design');
           setExpanded(false);
           requestAnimationFrame(measurePeek);
+          // Copilot form-fill reveal hook: when a fill targets a control inside
+          // this sheet, expand it (design tab) and scroll the field into view.
+          root.__qfCzReveal = function (elm) {
+            selectTab('design'); syncTabChips('design'); setExpanded(true);
+            requestAnimationFrame(function () {
+              requestAnimationFrame(function () {
+                if (elm && elm.scrollIntoView) {
+                  try { elm.scrollIntoView({ block: 'center', behavior: reduceMq.matches ? 'auto' : 'smooth' }); } catch (e) { elm.scrollIntoView(); }
+                }
+              });
+            });
+          };
         }
         function deactivate() {
           if (!active) return;
           active = false;
+          try { delete root.__qfCzReveal; } catch (e) { root.__qfCzReveal = null; }
           document.documentElement.style.removeProperty('--qf-cz-peek');
           if (leftCol) {
             if (preview && preview.col && preview.col.parentNode === layout) layout.insertBefore(leftCol, preview.col);

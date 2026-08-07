@@ -24,6 +24,7 @@ import type { MatrixCellInput, ZoneDefInput } from '../../calc/rateMatrix.js';
 import { requireAuth, requireTenant } from '../middleware.js';
 import { aiTenantBurstLimiter, aiTenantDailyLimiter } from '../rateLimits.js';
 import { rateAgentTurn, applyRateMutation } from '../../ai/rateAgent.js';
+import { formFillTurn } from '../../ai/formFillAgent.js';
 import { calculate, currencyForCountry, type CalcRequest } from '../../calc/engine.js';
 import { resolveFscForTenant, asOfLabel } from '../../eia/dieselPrice.js';
 import { distanceBetween } from '../../calc/distance.js';
@@ -46,6 +47,55 @@ export function registerAiRoutes(app: Express) {
       // they expose model names, organization IDs, schema details. Log
       // the raw error server-side, return a generic message.
       console.error('[ai/rate-chat] error:', err);
+      return res.status(500).json({ error: 'AI request failed. Try again or contact support.' });
+    }
+  });
+
+  // ── Phase 2: on-screen form-fill ──────────────────────────────
+  // The owner is looking at an editable form (Customize, Accessorials, Rate
+  // cards, Drayage zones). The client sends the form's field list + current
+  // values + the owner's request; the model proposes concrete values for those
+  // fields. READ-ONLY on the server — it returns proposed values only; the
+  // client prefills the real inputs (pending) and the form's own save logic
+  // (already tenant-scoped + validated) persists on Confirm. Same per-tenant AI
+  // cost caps as rate-chat. `defer` tells the client to fall back to the rate
+  // agent (proposal cards) when the request wasn't a field-fill.
+  const FormFillSchema = z.object({
+    formLabel: z.string().max(200).optional(),
+    fields: z
+      .array(
+        z.object({
+          key: z.string().min(1).max(100),
+          label: z.string().min(1).max(200),
+          required: z.boolean().optional(),
+          options: z
+            .array(z.object({ value: z.string().max(160), label: z.string().max(200).optional() }))
+            .max(60)
+            .optional(),
+        })
+      )
+      .min(1)
+      .max(80),
+    currentValues: z.record(z.string(), z.unknown()).optional(),
+    message: z.string().min(1).max(2000),
+  });
+
+  app.post('/api/ai/form-fill', requireAuth, requireTenant, aiTenantBurstLimiter, aiTenantDailyLimiter, async (req, res) => {
+    const parse = FormFillSchema.safeParse(req.body);
+    if (!parse.success) return res.status(400).json({ error: 'Invalid input' });
+    try {
+      const { formLabel, fields, currentValues, message } = parse.data;
+      const out = await formFillTurn(req.tenant!.id, {
+        formLabel,
+        fields,
+        currentValues: currentValues ?? {},
+        message: message.trim(),
+      });
+      // defer: no fills mapped → the client re-sends to the rate agent so
+      // global rate changes still surface as Apply/Discard proposal cards.
+      return res.json({ ok: true, fills: out.fills, reply: out.reply, defer: out.fills.length === 0 });
+    } catch (err) {
+      console.error('[ai/form-fill] error:', err);
       return res.status(500).json({ error: 'AI request failed. Try again or contact support.' });
     }
   });
