@@ -1,19 +1,26 @@
-// HERO LAPTOP LOOP — rate-sheet upload flow on a laptop screen (1280×800), LIGHT
-// theme + DYNAMIC ZOOM choreography. Serves the REAL dashboard SPA with mocked
-// tenant APIs, forces LIGHT theme, drives a VISIBLE drag-drop → staged
-// processing → animated review reveal → leads money-moment → automated
-// follow-up scene → settle.
+// HERO LAPTOP LOOP — the OWNER story, 6 feature beats on a laptop (1792×1120),
+// LIGHT theme, DYNAMIC ZOOM choreography. Serves the REAL dashboard SPA with
+// mocked tenant APIs. Each beat is a real feature UI + a purposeful zoom-in +
+// pause on the key interaction (the caption for each beat is drawn as a live HTML
+// overlay on landing.html, synced to the final video time — NOT burned in here):
 //
-// CAMERA: instead of window scrolling, a CSS transform on #app-shell acts as a
-// camera. transform-origin is pinned to the shell's top-left (= document 0,0
-// while scroll is locked at 0), and every beat sets
-//   translate(896 - s*cx, 560 - s*cy) scale(s)
-// which maps the target center (cx,cy in DOC coords) to the 1792×1120 frame
-// center at zoom s. window.__rect INVERTS the live camera transform so element
-// measurements are always in stable DOCUMENT coords — which lets the camera go
-// straight zoom→pan→zoom with NO bounce back to wide mid-sequence (the old flow
-// pulled to scale 1.0 before every measure; removed). body overflow is hidden so
-// the scaled shell clips to the frame, and native scroll stays 0.
+//   1. Rate import   — /app/ingest: drag a rate-sheet chip into the dropzone →
+//                      processing.  (Drop in any rate sheet…)
+//   2. AI review     — the parsed rate cards + CONFIDENCE:HIGH review card.
+//                      (Read and organized in seconds…)
+//   3. Customize     — /app/brand: click a dark preset + a periwinkle accent and
+//                      the live-preview iframe reskins white→dark.  (Make it yours…)
+//   4. Share / Embed — /app/embed: copy the one-line snippet ("Copied ✓") beside
+//                      the hosted link.  (Your own link…)
+//   5. Leads         — /app/leads: a new lead (Marcus Webb · $3,950) lands in the
+//                      inbox.  (Every quote becomes a lead…)
+//   6. Auto follow-up— /app/widget-settings: pick the "Standard" follow-up cadence.
+//                      (Automatic follow-ups…)  → return to ingest for the loop wrap.
+//
+// CAMERA: a CSS transform on #app-shell acts as a camera (see __cam/__fitW/__rect
+// below). transform-origin pinned to the shell's top-left; __rect inverts the
+// live transform so measurements stay in stable DOCUMENT coords → the camera goes
+// straight zoom→pan→zoom with no bounce to wide mid-sequence.
 import http from 'node:http';
 import fs from 'node:fs';
 import path from 'node:path';
@@ -26,21 +33,37 @@ const _pw = await import(pathToFileURL(_require.resolve('@playwright/test')).hre
 const chromium = _pw.chromium || _pw.default?.chromium;
 
 const PUB = path.resolve('src/server/public');
-const CFG = {}; // /api/public/widget/* payload — unused by the ingest surface.
+const REC = path.resolve('_rec');
+// Live-preview widget configs: BEFORE = Clarity (white); AFTER = Midnight dark +
+// periwinkle accent (built by _gen-hero-assets.mjs). The Customize beat's preview
+// iframe swaps BEFORE→AFTER on reload once the owner picks the dark preset/accent.
+const CFG_BEFORE = JSON.parse(fs.readFileSync(path.join(REC, 'cfg-mono-qf.json'), 'utf8'));
+const CFG_AFTER = JSON.parse(fs.readFileSync(path.join(REC, 'cfg-after-qf.json'), 'utf8'));
+const BRAND_OPTS = JSON.parse(fs.readFileSync(path.join(REC, 'brand-options.json'), 'utf8'));
+// Branded maps for the live-preview widget iframe (borrowed from the phone loop).
+const BASE_MAP = fs.readFileSync(path.join(REC, 'na-branded-dark.png'));
+const ROUTE_MAP = fs.readFileSync(path.join(REC, 'mapstyle-dark_routes.png'));
 const OUTDIR = fs.mkdtempSync(path.join(os.tmpdir(), 'qfhero-laptop-'));
 const TYPES = { '.html':'text/html; charset=utf-8','.js':'text/javascript; charset=utf-8','.css':'text/css; charset=utf-8','.json':'application/json','.png':'image/png','.jpg':'image/jpeg','.svg':'image/svg+xml','.ico':'image/x-icon','.woff2':'font/woff2','.webmanifest':'application/manifest+json' };
 
 const ME = {
   user: { name: 'Alex Morgan', email: 'dispatch@quotefleet.net', role: 'tenant' },
-  tenant: { name: 'QuoteFleet', slug: 'quotefleet', hostedUrl: 'https://quotefleet.net/w/demo', needsOnboarding: false, plan: 'pro' },
+  tenant: { name: 'QuoteFleet', slug: 'demo', hostedUrl: 'https://quotefleet.net/w/demo', needsOnboarding: false, plan: 'pro' },
   trial: null,
 };
-// Brand payload for the widget-settings / automated-follow-up scene (FIX 7).
-// followUp is SEEDED (enabled + preset 'gentle') so the card renders POPULATED;
-// the recorder then clicks "Standard" for a visible selection change. quoteShare
-// on so the Quote-actions card is complete.
+// Brand payload for the Customize + Widget-settings scenes. followUp is SEEDED
+// (enabled + preset 'gentle') so the card renders POPULATED; the recorder then
+// clicks "Standard" for a visible selection change. quoteShare on so the
+// Quote-actions card is complete.
 const BRAND = {
   displayName: 'QuoteFleet',
+  tagline: 'Instant freight rates',
+  themePreset: 'mono',
+  accentOverride: null,
+  fontFamily: 'satoshi',
+  ctaHover: 'border',
+  mapStyle: 'dark_routes',
+  primaryColor: '#111111',
   requireEmail: true,
   requirePhone: false,
   showQuoteBeforeContact: false,
@@ -50,6 +73,17 @@ const BRAND = {
     followUp: { enabled: true, preset: 'gentle', day1: 3, day2: 7, day3: 12, discountPct: 5 },
   },
 };
+// Embed snippet artifacts (real GET /api/tenant/embed shape).
+const EMBED = {
+  snippet: '<script src="https://quotefleet.net/embed.js?t=qf_demo_8Kd21" defer></script>',
+  iframeFallback: '<iframe src="https://quotefleet.net/?embed=1" style="width:100%;max-width:560px;border:0;min-height:660px;" loading="lazy" title="Get a freight quote"></iframe>',
+  directLink: 'https://quotefleet.net/w/demo',
+  origin: 'https://quotefleet.net',
+  slug: 'demo',
+  hostDomain: 'quotefleet.net',
+  embedToken: 'qf_demo_8Kd21',
+};
+
 const RATE_CARDS = [
   { id:'r1', service:'drayage', equipment:'container_40hc', label:"40' HC import drayage", enabled:true,  ratePerMile:0, minimumCharge:475, flatFee:520, fuelSurchargePct:25, marginPct:12 },
   { id:'r3', service:'ftl',     equipment:'dryvan',         label:"53' Dry Van",             enabled:true,  ratePerMile:2.10, minimumCharge:350, flatFee:null, fuelSurchargePct:28, marginPct:15 },
@@ -75,9 +109,15 @@ const PARSED = {
     { label:'Inland Empire (Ontario / Fontana)', anchorCity:'Ontario',   radiusMiles:35, flatPrice:610 },
   ],
 };
+// Live-preview widget quote (used if the preview iframe ever calculates).
+const QUOTE = { result: { total: 3950, lines: [ { name:'Linehaul', amount:3210 }, { name:'Fuel surcharge', amount:605 }, { name:'Load / dispatch fee', amount:135 } ] }, miles: 2015, transit: { text: '3–4 days' } };
 
 let ingestJob = null;
 const READY_POLLS = 5;
+// Customize live-preview state — PUT /api/tenant/brand mutates it; the preview
+// widget cfg endpoint serves BEFORE until the owner customizes, then AFTER.
+const brandState = { themePreset: 'mono', accentOverride: null };
+function isCustomized() { return brandState.themePreset !== 'mono' || !!brandState.accentOverride; }
 
 const _now = Date.now();
 const _iso = (minsAgo) => new Date(_now - minsAgo * 60000).toISOString();
@@ -98,29 +138,43 @@ function handle(req, res) {
   const method = req.method || 'GET';
   const J = (o) => { res.writeHead(200, { 'Content-Type': 'application/json' }); res.end(JSON.stringify(o)); };
 
-  // Recorder-only control: reset the ingest job so the dropzone renders empty
-  // again for the seamless loop-out (beat 9 returns to the opening dropzone).
   if (p === '/rec/reset-ingest') { ingestJob = null; return J({ ok: true }); }
 
   if (p === '/api/auth/me') return J(ME);
   if (p === '/api/tenant/setup-status') return J({ rates: true, brand: true });
   if (p === '/api/tenant/rate-cards') return J({ rateCards: RATE_CARDS });
-  if (p === '/api/tenant/preview-url') return J({ previewUrl: '' });
-  // Latest main's renderLeads is server-backed + paginated: it gates the empty
-  // state on `total`, so the mock MUST return total/page/pageSize, not just leads.
+  // Owner live-preview URL → the LOCAL raw widget so the Customize/Embed preview
+  // iframes render from this mock (not the external quotefleet.net origin).
+  if (p === '/api/tenant/preview-url') return J({ previewUrl: '/w/demo?raw=1' });
   if (p === '/api/tenant/leads') return J({ leads: LEADS, total: LEADS.length, page: 1, pageSize: 25 });
 
-  // ── Widget-settings / automated-follow-up scene (FIX 7) ──
-  if (p === '/api/tenant/embed') return J({ directLink: 'https://quotefleet.net/w/demo', origin: 'https://quotefleet.net', slug: 'demo' });
+  // ── Share / Embed scene: full snippet artifacts ──
+  if (p === '/api/tenant/embed') return J(EMBED);
   if (p === '/api/tenant/access') return J({ accessMode: 'public', links: [] });
+
+  // ── Customize + Widget-settings: brand config + option universes ──
   if (p === '/api/tenant/brand') {
     if (method === 'PUT') {
-      // Merge-PUT persist of the follow-up patch — echo the merged brand so the
-      // tile-click's save() resolves cleanly (toastOk('Saved')).
-      return J({ ok: true, brand: BRAND });
+      // Persist the theme/accent/follow-up patch so the preview reskins live.
+      let body = {};
+      try { body = JSON.parse(req._body || '{}'); } catch (e) {}
+      if (Object.prototype.hasOwnProperty.call(body, 'themePreset')) brandState.themePreset = body.themePreset;
+      if (Object.prototype.hasOwnProperty.call(body, 'accentOverride')) brandState.accentOverride = body.accentOverride;
+      return J({ ok: true, brand: Object.assign({}, BRAND, { themePreset: brandState.themePreset, accentOverride: brandState.accentOverride }) });
     }
-    return J({ brand: BRAND });
+    const brand = Object.assign({}, BRAND, { themePreset: brandState.themePreset, accentOverride: brandState.accentOverride });
+    return J({ brand, presets: BRAND_OPTS.presets, fonts: BRAND_OPTS.fonts, ctaHovers: BRAND_OPTS.ctaHovers, fontColors: BRAND_OPTS.fontColors, mapStyles: BRAND_OPTS.mapStyles });
   }
+
+  // ── Live-preview widget (iframe) — serve the reskinnable config + maps ──
+  if (p === '/api/public/widget/demo' || /^\/api\/public\/widget\//.test(p)) {
+    return J(isCustomized() ? CFG_AFTER : CFG_BEFORE);
+  }
+  if (p === '/api/public/base-map.png') { res.writeHead(200, { 'Content-Type': 'image/png' }); res.end(BASE_MAP); return; }
+  if (p === '/api/public/route-map.png') { res.writeHead(200, { 'Content-Type': 'image/png' }); res.end(ROUTE_MAP); return; }
+  if (p.startsWith('/api/public/route-preview/')) return J({ ok:true, miles:2015, transit:{text:'3–4 days'}, origin:{lat:33.77,lng:-118.19}, destination:{lat:41.88,lng:-87.63}, mapUrl:'/api/public/route-map.png?lane=lgb-chi&theme=dark' });
+  if (p.startsWith('/api/public/autocomplete')) return J({ suggestions: [] });
+  if (p.startsWith('/api/public/quote/')) return J(QUOTE);
 
   // ── AI rate-sheet ingest ──
   if (p === '/api/tenant/ingest') {
@@ -133,9 +187,7 @@ function handle(req, res) {
     const status = j.polls < READY_POLLS ? 'parsing' : 'ready_for_review';
     return J({ jobs: [{ id: j.id, filename: j.filename, mimeType: j.mimeType, sizeBytes: j.sizeBytes, status, appliedAt: null, createdAt: j.createdAt }] });
   }
-  if (/^\/api\/tenant\/ingest\/\d+\/autocheck$/.test(p)) {
-    return J({ total: 12, clean: 12, flaggedCount: 0, flagged: [] });
-  }
+  if (/^\/api\/tenant\/ingest\/\d+\/autocheck$/.test(p)) return J({ total: 12, clean: 12, flaggedCount: 0, flagged: [] });
   if (p.startsWith('/api/tenant/ingest/')) {
     if (ingestJob) {
       ingestJob.polls++;
@@ -150,9 +202,14 @@ function handle(req, res) {
     return J({ job: null });
   }
 
-  if (p.startsWith('/api/public/widget/')) return J(CFG);
   if (p.startsWith('/api/')) return J({});
 
+  // Live-preview widget shell — raw widget.html (no demo marketing chrome).
+  if (p === '/w/demo') {
+    res.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8' });
+    res.end(fs.readFileSync(path.join(PUB, u.query.raw !== undefined ? 'widget.html' : 'widget-demo-shell.html')));
+    return;
+  }
   if (p === '/app' || p.startsWith('/app/')) {
     res.writeHead(200, { 'Content-Type':'text/html; charset=utf-8' });
     res.end(fs.readFileSync(path.join(PUB, 'app.html')));
@@ -167,7 +224,7 @@ function handle(req, res) {
 const server = http.createServer((req, res) => {
   let body = '';
   req.on('data', (c) => { body += c; });
-  req.on('end', () => { try { handle(req, res); } catch (e) { res.writeHead(500); res.end('err'); } });
+  req.on('end', () => { req._body = body; try { handle(req, res); } catch (e) { res.writeHead(500); res.end('err'); } });
 });
 const PORT = Number(process.env.REC_PORT || 0);
 await new Promise(r => server.listen(PORT, r));
@@ -176,30 +233,24 @@ const port = server.address().port;
 const browser = await chromium.launch();
 const ctx = await browser.newContext({
   viewport: { width: 1792, height: 1120 },
-  deviceScaleFactor: 2,                       // 2x render → crisp antialiasing when captured
-  recordVideo: { dir: OUTDIR, size: { width: 1792, height: 1120 } }, // video res == CSS viewport (Playwright screencast is CSS-px; DSF does NOT boost video res)
+  deviceScaleFactor: 2,
+  permissions: ['clipboard-read', 'clipboard-write'], // so "Copy snippet" → "Copied ✓" resolves
+  recordVideo: { dir: OUTDIR, size: { width: 1792, height: 1120 } },
 });
-// CRISPNESS: the video is captured at the CSS-viewport resolution (1792 wide), so
-// on a retina landing page (~786→972 CSS box → up to ~1944 physical px) the source
-// is large enough to avoid the upscale blur the old 1280-wide loop suffered.
-// The camera math uses a 1792×1120 LOGICAL frame → centre (896,560), height 1120.
 const page = await ctx.newPage();
-const _t0mark = Date.now(); // ~video-start reference; used to compute the encode trim (T0) to the tight beat-1 framing
+const _t0mark = Date.now();
+const marks = [];
+const mark = (name) => { const ms = Date.now() - _t0mark; marks.push([name, ms]); console.log('BEAT_MARK', name, ms); };
 const errs = [];
 page.on('pageerror', e => errs.push('pageerror:' + e.message));
 page.on('console', m => { if (m.type() === 'error') errs.push('console:' + m.text()); });
 
 const wait = (ms) => page.waitForTimeout(ms);
 
-// Force LIGHT theme before first paint (no dark flash).
 await page.addInitScript(() => { try { localStorage.setItem('qf-theme', 'light'); } catch (e) {} });
 
-// ── Staging helpers (ripple / drag-chip / drag-events) — installed before page
-// scripts so they're available all through the recording (FIX 2 + FIX 3). ──
+// ── Staging helpers (ripple / drag-chip / drag-events). ──
 await page.addInitScript(() => {
-  // FIX 3 — click ripple. A dark ring scales + fades over an element; the REAL
-  // click fires ~280ms later (recorder-side). Uses RAW getBoundingClientRect so
-  // the ring aligns with the element AS RENDERED (camera-transform aware).
   window.__ripple = (sel) => {
     const el = typeof sel === 'string' ? document.querySelector(sel) : sel;
     if (!el) return false;
@@ -211,8 +262,6 @@ await page.addInitScript(() => {
     ring.animate([{ transform: 'scale(1)', opacity: 0.95 }, { transform: 'scale(6)', opacity: 0 }], { duration: 520, easing: 'cubic-bezier(0.4,0,0.2,1)' }).onfinish = () => ring.remove();
     return true;
   };
-  // FIX 2 — a floating "file chip" (PDF icon + filename) that drags from off the
-  // top-right into the dropzone. position:fixed → viewport coords.
   window.__spawnChip = () => {
     const c = document.createElement('div');
     c.id = '__qfchip';
@@ -231,7 +280,6 @@ await page.addInitScript(() => {
     setTimeout(() => c.remove(), 300);
     window.__chip = null;
   };
-  // Fire a real drag event on an element so its dropzone hover style lights up.
   window.__fireDrag = (sel, type) => {
     const el = document.querySelector(sel); if (!el) return false;
     const r = el.getBoundingClientRect();
@@ -265,19 +313,15 @@ const camReady = await page.evaluate(() => {
   shell.style.backfaceVisibility = 'hidden';
   shell.style.transition = 'none';
   shell.style.transform = 'translate(0px,0px) scale(1)';
-  // Live camera state — lets __rect invert the transform to DOC coords.
   window.__camState = { tx: 0, ty: 0, s: 1 };
   window.__cam = (cx, cy, s, ms) => {
     const el = document.getElementById('app-shell');
     el.style.transition = ms ? ('transform ' + ms + 'ms cubic-bezier(0.4,0,0.2,1)') : 'none';
     const tx = 896 - s * cx, ty = 560 - s * cy;
     window.__camState = { tx, ty, s };
-    // eslint-disable-next-line no-void
     void el.offsetWidth;
     el.style.transform = 'translate(' + tx + 'px, ' + ty + 'px) scale(' + s + ')';
   };
-  // Rect of a selector in DOCUMENT coords — inverts the live camera transform,
-  // so measurements are correct at ANY zoom (no need to pull back to wide first).
   window.__rect = (sel) => {
     const el = typeof sel === 'string' ? document.querySelector(sel) : sel;
     if (!el) return null;
@@ -290,15 +334,8 @@ const camReady = await page.evaluate(() => {
 });
 if (!camReady) console.log('WARN camera not installed (no #app-shell)');
 
-
-// ── FIT-TO-WIDTH camera ─────────────────────────────────────────────────────
-// The dashboard content column (#page-content) is 1440px wide beside a 254px
-// sidebar. The old camera fit a VERTICAL band → it over-zoomed and CLIPPED text
-// at the left/right edges ("Leads"→"ads", "Export CSV"→"Export CS"). __fitW fits
-// the target element's WIDTH into the 1792 frame with a margin each side, so the
-// content is ALWAYS fully visible horizontally (never a clipped word). Vertically
-// it top-aligns tall content (fills the frame) or centres short content (symmetric
-// minimal bands — never a big white BOTTOM band). Sidebar sits just off-frame left.
+// ── FIT-TO-WIDTH camera — fit a target's WIDTH into the 1792 frame (never clip a
+// word); top-align tall content, centre short content. ──
 await page.evaluate(() => {
   const FW = 1792, FH = 1120;
   window.__fitW = (sel, opt) => {
@@ -306,15 +343,15 @@ await page.evaluate(() => {
     const el = typeof sel === 'string' ? document.querySelector(sel) : sel;
     const r = el ? window.__rect(el) : null;
     if (!r) return { err: 'missing' };
-    const marginX = o.marginX ?? 54;               // logical px margin each side (no edge clipping)
+    const marginX = o.marginX ?? 54;
     let s = (FW - 2 * marginX) / r.width;
     s = Math.max(o.minS ?? 1.0, Math.min(o.maxS ?? 1.34, s));
     const cx = (r.left + r.right) / 2;
     const visH = FH / s;
     const topPad = o.topPad ?? 34;
     let cy;
-    if (o.align === 'top' || r.height > visH - topPad) cy = r.top + visH / 2 - topPad; // top-align → the content below the target fills the lower frame
-    else cy = (r.top + r.bottom) / 2;                             // shorter → centre (symmetric bands)
+    if (o.align === 'top' || r.height > visH - topPad) cy = r.top + visH / 2 - topPad;
+    else cy = (r.top + r.bottom) / 2;
     window.__cam(cx, cy, s, o.ms ?? 1150);
     return { s: +s.toFixed(3), w: Math.round(r.width), h: Math.round(r.height), visH: Math.round(visH) };
   };
@@ -324,16 +361,11 @@ const navTo = async (route, waitSel) => {
   if (waitSel) await page.waitForSelector(waitSel, { timeout: 8000 }).catch(() => {});
 };
 
-// ── Beat 1: OPENING — fit the ingest content column (fully visible, no clip),
-// centred. This is also the loop-out framing (beat 6) so the crossfade-wrap has
-// matching, content-forward ends. ──
+// ══ BEAT 1 — RATE IMPORT: opening dropzone, then a visible drag-and-drop. ══
+mark('b1-import');
 const open1 = await page.evaluate(() => window.__fitW('#page-content', { ms: 0, maxS: 1.3 }));
-console.log('CAM_OPEN', JSON.stringify(open1), 'BEAT1_MS', Date.now() - _t0mark); // encode T0 ≈ BEAT1_MS/1000
+console.log('CAM_OPEN', JSON.stringify(open1));
 await wait(700);
-
-// ── Beat 2: VISIBLE drag-and-drop at the same framing. Chip glides from the
-// top-right to the dropzone's ON-SCREEN centre (raw rect = post-camera viewport
-// coords), lights the dropzone, ripple, then the REAL drop. ──
 await page.evaluate(() => window.__spawnChip());
 const chipXY = await page.evaluate(() => { const r = document.querySelector('.qf-dropzone').getBoundingClientRect(); return [Math.round(r.left + r.width / 2), Math.round(r.top + r.height / 2)]; });
 await wait(180);
@@ -346,30 +378,87 @@ await wait(240);
 await page.evaluate(() => { window.__fireDrag('.qf-dropzone', 'dragleave'); window.__chipFade(); });
 await page.setInputFiles('.qf-dropzone input[type="file"]', { name: 'QuoteFleet-Q3-Rates.pdf', mimeType: 'application/pdf', buffer: Buffer.from('%PDF-1.4 QuoteFleet — Q3 rate sheet (demo)\n') });
 await page.waitForSelector('.qf-ingest-processing', { timeout: 5000 }).catch(() => {});
-// Processing grows the page → refit so it fills (dropzone + parsing card + skeleton).
 const camProc = await page.evaluate(() => window.__fitW('#page-content', { ms: 700, maxS: 1.3 }));
 console.log('CAM_PROC', JSON.stringify(camProc));
-await wait(2800); // "reading your rate sheet…" — long enough to read, no longer
+await wait(2600);
 
-// ── Beat 3: REVIEW PAYOFF — fit the review card (fully visible, fills). ──
+// ══ BEAT 2 — AI REVIEW: parsed rate cards + CONFIDENCE:HIGH + 12/12 check. ══
+mark('b2-review');
 await page.waitForSelector('#ingest-review .card h2', { timeout: 9000 }).catch(() => {});
 await page.waitForSelector('#ingest-review .qf-autocheck', { timeout: 9000 }).catch(() => {});
-await wait(900);
+await wait(700);
 const camReview = await page.evaluate(() => window.__fitW('#ingest-review', { maxS: 1.3, topPad: 28 }));
 console.log('CAM_REVIEW', JSON.stringify(camReview));
-await wait(3200); // parsed rate cards + CONFIDENCE: HIGH + 12/12 green check
+await wait(3000);
 
-// ── Beat 4: LEADS — navigate, fit the leads content column (fully visible). ──
+// ══ BEAT 3 — CUSTOMIZE: pick a dark preset + periwinkle accent → the live
+// preview iframe reskins white→dark. ══
+mark('b3-customize');
+await navTo('brand', '.qf-customize');
+await page.waitForSelector('.qf-cz-preset[data-preset="midnight"]', { timeout: 8000 }).catch(() => {});
+await page.waitForSelector('.qf-cz-frame', { timeout: 8000 }).catch(() => {});
+// Let the preview iframe finish its first (light) render so the reskin reads as a change.
+await page.waitForTimeout(1600);
+// Fit the whole Customize layout (controls + preview) so the cause (clicks) and
+// effect (reskin) are both on screen; snap (cross-page nav is a cut).
+const camCz = await page.evaluate(() => window.__fitW('#page-content', { ms: 0, maxS: 1.28, align: 'top', topPad: 24 }));
+console.log('CAM_CZ', JSON.stringify(camCz));
+await wait(700);
+// Click a DARK preset tile (Midnight).
+await page.evaluate(() => window.__ripple('.qf-cz-preset[data-preset="midnight"]'));
+await wait(300);
+await page.evaluate(() => { const b = document.querySelector('.qf-cz-preset[data-preset="midnight"]'); if (b) b.click(); });
+await wait(1700); // preview reloads → dark reskin
+// Click a periwinkle accent swatch (#6E8BFF).
+const accentHit = await page.evaluate(() => {
+  const sw = [...document.querySelectorAll('.qf-cz-swatch[data-accent]')].find(n => (n.getAttribute('data-accent') || '').toLowerCase() === '#6e8bff');
+  if (!sw) return false;
+  window.__ripple(sw); window.__czAccent = sw; return true;
+});
+console.log('ACCENT_HIT', accentHit);
+await wait(300);
+await page.evaluate(() => { if (window.__czAccent) window.__czAccent.click(); });
+await wait(1500);
+// Purposeful punch-in on the reskinned live preview — hold so the dark calculator reads.
+const camCzP = await page.evaluate(() => window.__fitW('.qf-cz-preview', { maxS: 1.32, topPad: 26, align: 'top' }));
+console.log('CAM_CZ_PREVIEW', JSON.stringify(camCzP));
+await wait(2500);
+
+// ══ BEAT 4 — SHARE / EMBED: copy the one-line snippet ("Copied ✓"). ══
+mark('b4-embed');
+await navTo('embed', '.qf-embed');
+await page.waitForFunction(() => [].some.call(document.querySelectorAll('.btn'), b => /Copy snippet/.test(b.textContent)), { timeout: 8000 }).catch(() => {});
+await wait(500);
+// Frame the snippet card (Recommended JS embed) + hosted-link card together,
+// vertically CENTERED so the pair fills the frame (no big empty band).
+const camEmbed = await page.evaluate(() => {
+  const btn = [...document.querySelectorAll('.btn')].find(b => /Copy snippet/.test(b.textContent));
+  const snip = btn ? btn.closest('.card') : null;
+  if (!snip) return window.__fitW('#page-content', { ms: 0, maxS: 1.3 });
+  const hosted = [...document.querySelectorAll('.qf-embed .card')].find(c => /Direct hosted link/.test(c.textContent));
+  const a = window.__rect(snip);
+  const b = hosted ? window.__rect(hosted) : a;
+  const top = Math.min(a.top, b.top), bottom = Math.max(a.bottom, b.bottom);
+  const FW = 1792, FH = 1120, marginX = 54;
+  let s = (FW - 2 * marginX) / a.width;
+  s = Math.max(1.0, Math.min(1.3, s));
+  window.__cam((a.left + a.right) / 2, (top + bottom) / 2, s, 0);
+  return { s: +s.toFixed(3), groupH: Math.round(bottom - top), visH: Math.round(FH / s) };
+});
+console.log('CAM_EMBED', JSON.stringify(camEmbed));
+await wait(900);
+await page.evaluate(() => { const btn = [...document.querySelectorAll('.btn')].find(b => /Copy snippet/.test(b.textContent)); if (btn) window.__ripple(btn); });
+await wait(320);
+await page.evaluate(() => { const btn = [...document.querySelectorAll('.btn')].find(b => /Copy snippet/.test(b.textContent)); if (btn) btn.click(); });
+await wait(2500); // "Copied ✓" hold
+
+// ══ BEAT 5 — LEADS: a new lead lands (Marcus Webb · Long Beach → Chicago · $3,950). ══
+mark('b5-leads');
 await navTo('leads', '.qf-leads-table tbody tr');
 if (!await page.$('.qf-leads-table tbody tr')) { await navTo('leads', '.qf-leads-table tbody tr'); }
-// SNAP (ms:0) the moment the leads page renders — a cross-page nav is a CUT, so the
-// camera never holds the previous (review) scroll position over the new page (that
-// stale hold is what showed a white band below the shorter page).
 const camLeads = await page.evaluate(() => window.__fitW('#page-content', { maxS: 1.3, ms: 0 }));
 console.log('CAM_LEADS', JSON.stringify(camLeads));
-await wait(1600);
-
-// A NEW LEAD LANDS — Marcus Webb · Long Beach → Chicago · $3,950 (marketing staging).
+await wait(1400);
 const landed = await page.evaluate(() => {
   const tb = document.querySelector('.qf-leads-table tbody');
   if (!tb) return false;
@@ -403,16 +492,15 @@ const landed = await page.evaluate(() => {
   return true;
 });
 console.log('LEAD_LANDED', landed);
-// Refit (the new row grew the table) — still fully visible, no clip.
+// Refit the whole leads column (header + table) — the new row lands near the top,
+// fully visible, and the page fills the frame (no big empty band).
 await page.evaluate(() => window.__fitW('#page-content', { maxS: 1.3, ms: 700 }));
-await wait(2700); // money-moment hold
+await wait(2700);
 
-// ── Beat 5: AUTOMATED FOLLOW-UP — navigate, open the cadence fold, fit the card,
-// then ripple + click the "Standard" tile (a visible selection change). ──
+// ══ BEAT 6 — AUTO FOLLOW-UP: pick the "Standard" cadence tile. ══
+mark('b6-followup');
 await navTo('widget-settings');
 await page.waitForFunction(() => [].slice.call(document.querySelectorAll('.card')).some(c => /Automated follow-up/.test(c.textContent)), { timeout: 8000 }).catch(() => {});
-// Open the cadence fold + SNAP the camera to the follow-up card the moment the page
-// is ready — cross-page nav is a CUT, so no stale scroll position is ever held.
 const camFU = await page.evaluate(() => {
   const card = [...document.querySelectorAll('.card')].find(c => /Automated follow-up/.test(c.textContent));
   if (!card) return { err: 'no-card' };
@@ -432,20 +520,17 @@ const tileHit = await page.evaluate(() => {
 console.log('TILE_HIT', tileHit);
 await wait(300);
 await page.evaluate(() => { if (window.__fuTile) window.__fuTile.click(); });
-await wait(2500); // hold on the selected Standard cadence + day-timing tiles
+await wait(2500);
 
-// ── Beat 6: RETURN to the ingest dropzone, framed EXACTLY like the opening, for a
-// seamless crossfade-wrap (loop-out == loop-in). Reset the mock job so the
-// dropzone renders empty again. ──
+// ══ LOOP WRAP — return to the ingest dropzone, framed like the opening. ══
+mark('b7-wrap');
 await page.evaluate(() => fetch('/rec/reset-ingest').catch(() => {}));
 await navTo('ingest', '.qf-dropzone');
-// SNAP to the opening framing (cut) so the loop-out is instantly the empty dropzone
-// (no stale widget-settings position held over it) and holds static for the wrap.
 const back = await page.evaluate(() => window.__fitW('#page-content', { ms: 0, maxS: 1.3 }));
 console.log('BACK', JSON.stringify(back));
-await wait(1200); // static loop-out hold
+await wait(1200);
 
-
+console.log('MARKS', JSON.stringify(marks));
 console.log('ERRS', errs.length, errs.slice(0, 8));
 await ctx.close();
 await browser.close();

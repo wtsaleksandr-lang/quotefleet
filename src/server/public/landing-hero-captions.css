@@ -1,0 +1,127 @@
+/* ─────────────────────────────────────────────────────────────────────────
+   HERO MOCKUP CAPTIONS — live HTML captions pinned INSIDE each hero device,
+   synced to the video beat by landing-hero-captions.js. They stay crisp (live
+   text, not burned into the video) and move WITH the device.
+
+   Style mirrors the hero eyebrow (landing-home-fixes.css): a JetBrains-Mono
+   kicker with a leading dash in periwinkle #6E8BFF, plus a near-white Satoshi
+   title on a subtle dark scrim so it reads over any frame.
+
+   VISIBILITY: a caption only shows while its device is the FOREGROUND stage
+   (.stage-laptop / .stage-phone on .qf-hero-devices--video), so the dimmed +
+   blurred BACKGROUND device never shows a caption. The JS toggles data-show
+   on beat change for the cross-fade; the stage selector gates foreground-only.
+   ───────────────────────────────────────────────────────────────────────── */
+
+body.qf-wft .qf-hero-cap {
+  position: absolute;
+  left: 0;
+  right: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  align-items: flex-start;
+  text-align: left;
+  opacity: 0;
+  transition: opacity .32s ease;
+  pointer-events: none;
+  z-index: 6;
+  background: linear-gradient(180deg, rgba(9, 11, 20, .84) 0%, rgba(9, 11, 20, .60) 52%, rgba(9, 11, 20, 0) 100%);
+}
+
+/* Laptop caption sits flush under the browser chrome bar (~53px), as its OWN
+   clean dark band across the top of the video area. The band's scrim is strong
+   and near-opaque across the whole text zone so it (a) keeps the white Satoshi
+   title fully legible over ANY frame — including the LIGHT Customize app — and
+   (b) MASKS the app's own heading behind it, so the caption never collides with
+   or reads through the app's UI text. Only a short fade tail meets the app. */
+body.qf-wft .qf-hero-cap--laptop {
+  top: 48px;
+  padding: 16px 24px 24px;
+  z-index: 7;
+  background: linear-gradient(180deg,
+      rgba(9, 11, 20, 0.97) 0%,
+      rgba(9, 11, 20, 0.96) 52%,
+      rgba(9, 11, 20, 0.90) 78%,
+      rgba(9, 11, 20, 0) 100%);
+}
+
+/* Phone caption — a strong dark scrim BAND pinned to the very TOP of the phone
+   screen, spanning it edge-to-edge. It sits ABOVE the phone <video> (higher
+   z-index, and it lives inside the overflow-hidden screen so it is never
+   clipped), and its scrim is near-opaque so the kicker + title stay legible over
+   the busy widget frame on EVERY phone beat. Top corners are rounded to match the
+   phone screen; extra top padding clears the rounded corners + dynamic island. */
+body.qf-wft .qf-hero-cap--phone {
+  top: 0;
+  left: 0;
+  right: 0;
+  gap: 4px;
+  padding: 16px 12px 12px;
+  border-radius: 21px 21px 12px 12px;
+  z-index: 8;
+  background: linear-gradient(180deg,
+      rgba(9, 11, 20, 0.95) 0%,
+      rgba(9, 11, 20, 0.92) 66%,
+      rgba(9, 11, 20, 0.80) 100%);
+  box-shadow: 0 8px 18px rgba(0, 0, 0, .38);
+}
+
+body.qf-wft .qf-hero-cap__kicker {
+  display: inline-flex !important;
+  align-items: center;
+  gap: 8px;
+  font-family: "JetBrains Mono", ui-monospace, SFMono-Regular, Menlo, monospace !important;
+  font-weight: 600 !important;
+  letter-spacing: 0.16em !important;
+  text-transform: uppercase !important;
+  color: #6E8BFF !important;
+  white-space: nowrap;
+}
+body.qf-wft .qf-hero-cap__kicker::before {
+  content: "" !important;
+  display: inline-block !important;
+  flex: none;
+  border-radius: 2px;
+  background: #6E8BFF !important;
+}
+body.qf-wft .qf-hero-cap__title {
+  font-family: "Satoshi", "Inter", system-ui, -apple-system, "Segoe UI", Roboto, Arial, sans-serif !important;
+  font-weight: 800 !important;
+  letter-spacing: -0.02em !important;
+  color: #EEF2FF !important;
+  text-shadow: 0 1px 10px rgba(0, 0, 0, .55);
+}
+
+/* Laptop sizing (the laptop frame is large). */
+body.qf-wft .qf-hero-cap--laptop .qf-hero-cap__kicker { font-size: 12px; }
+body.qf-wft .qf-hero-cap--laptop .qf-hero-cap__kicker::before { width: 18px; height: 1.5px; }
+body.qf-wft .qf-hero-cap--laptop .qf-hero-cap__title { font-size: 18px; line-height: 1.22; max-width: 78%; }
+
+/* Phone sizing (the phone screen is small — keep it compact). */
+body.qf-wft .qf-hero-cap--phone .qf-hero-cap__kicker { font-size: 10px; letter-spacing: 0.14em; gap: 4px; }
+body.qf-wft .qf-hero-cap--phone .qf-hero-cap__kicker::before { width: 12px; height: 1.5px; }
+body.qf-wft .qf-hero-cap--phone .qf-hero-cap__title { font-size: 12.5px; line-height: 1.24; max-width: 96%; }
+
+/* FOREGROUND-ONLY reveal: only the staged device's caption fades in, and only
+   while the JS has marked the current beat visible (data-show="1"). */
+body.qf-wft .qf-hero-devices--video.stage-laptop .qf-hero-cap--laptop[data-show="1"] { opacity: 1; }
+body.qf-wft .qf-hero-devices--video.stage-phone  .qf-hero-cap--phone[data-show="1"]  { opacity: 1; }
+
+/* Mobile hero (≤640px): both devices shrink; scale the captions down so the
+   title never swamps the small screens. */
+@media (max-width: 640px) {
+  body.qf-wft .qf-hero-cap--laptop { top: 32px; padding: 12px 16px 24px; }
+  body.qf-wft .qf-hero-cap--laptop .qf-hero-cap__title { font-size: 14px; max-width: 84%; }
+  body.qf-wft .qf-hero-cap--laptop .qf-hero-cap__kicker { font-size: 10.5px; }
+  body.qf-wft .qf-hero-cap--phone { top: 0; left: 0; right: 0; padding: 12px 12px 12px; border-radius: 21px 21px 12px 12px; }
+  body.qf-wft .qf-hero-cap--phone .qf-hero-cap__title { font-size: 9.5px; line-height: 1.2; }
+  /* Small phone screen: let the kicker shrink + wrap instead of clipping. */
+  body.qf-wft .qf-hero-cap--phone .qf-hero-cap__kicker { font-size: 7.5px; letter-spacing: 0.1em; gap: 4px; white-space: normal; }
+  body.qf-wft .qf-hero-cap--phone .qf-hero-cap__kicker::before { width: 9px; }
+}
+
+/* Respect reduced-motion: no fade, just instant show/hide. */
+@media (prefers-reduced-motion: reduce) {
+  body.qf-wft .qf-hero-cap { transition: none; }
+}
