@@ -475,6 +475,74 @@
     }
   } catch (e) { /* ignore */ }
 
+  // ── Owner live-preview: apply brand changes with NO iframe reload ──────────
+  // The dashboard Customize/Embed live-preview posts brand edits into this
+  // widget instead of reloading the iframe (which caused an on/off blink). Two
+  // messages are honoured, ONLY in a preview context (an owner preview grant
+  // `?pk=` is present, or this is the /w/demo showcase config):
+  //   { qf:'brand-preview', patch:{…} } — apply cheap fields IN PLACE, instantly
+  //     (name/tagline/CTA text/logo/logo-fill via renderHeader; contact rules;
+  //     accent + CTA-hover + map-blend via the CSS custom properties applyTheme
+  //     already drives). No network, no teardown → zero flash.
+  //   { qf:'brand-refetch' } — after the debounced brand PUT lands, re-pull the
+  //     config and re-skin (applyTheme/applyBrand/header/contact) so
+  //     server-derived fields (theme preset, font, font-colour, authoritative
+  //     accent tokens, map style) finalise. The OLD rendering stays visible
+  //     until the new config resolves, so there is never a blank frame.
+  // The form/services are deliberately NOT re-rendered so in-progress input and
+  // scroll position survive — only the brand skin updates.
+  function applyBrandPreviewPatch(patch) {
+    if (!patch || !state.config) return;
+    var brand = state.config.brand || (state.config.brand = {});
+    var HEADER_KEYS = ['displayName', 'tagline', 'ctaText', 'logoUrl', 'headerLogoFill', 'showPoweredBy', 'footerNote'];
+    var touchedHeader = false;
+    HEADER_KEYS.forEach(function (k) {
+      if (Object.prototype.hasOwnProperty.call(patch, k)) { brand[k] = patch[k]; touchedHeader = true; }
+    });
+    if (touchedHeader) { try { renderHeader(state.config); } catch (_e) {} }
+    var CONTACT_KEYS = ['requireEmail', 'requirePhone', 'showQuoteBeforeContact'];
+    var touchedContact = false;
+    CONTACT_KEYS.forEach(function (k) {
+      if (Object.prototype.hasOwnProperty.call(patch, k)) { brand[k] = patch[k]; touchedContact = true; }
+    });
+    if (touchedContact) applyContactRules(brand);
+    var root = document.documentElement;
+    // Instant accent — a best-effort skin on the headline accent tokens so the
+    // change reads immediately; the full server-derived token set (hover/soft/
+    // on-surface/pill…) is finalised by the brand-refetch that follows the save.
+    if (typeof patch.accent === 'string' && /^#[0-9a-fA-F]{3,8}$/.test(patch.accent)) {
+      ['--w-accent', '--w-accent-solid', '--w-accent-hover', '--w-primary', '--w-primary-hover'].forEach(function (t) {
+        root.style.setProperty(t, patch.accent);
+      });
+    }
+    if (typeof patch.ctaHover === 'string') document.body.setAttribute('data-qf-cta-hover', patch.ctaHover);
+    if (typeof patch.mapBlendOpacity === 'number') {
+      var bo = Math.max(0, Math.min(100, patch.mapBlendOpacity));
+      document.body.setAttribute('data-qf-map-blend', bo > 0 ? 'on' : 'off');
+      document.body.style.setProperty('--qf-map-blend-opacity', String(bo / 100));
+    }
+    autoResize();
+  }
+
+  function refetchAndReskin() {
+    var url = '/api/public/widget/' + slug;
+    if (themePreset) url += (url.indexOf('?') > -1 ? '&' : '?') + 'preset=' + encodeURIComponent(themePreset);
+    fetch(withGrant(url))
+      .then(function (r) { return r.json(); })
+      .then(function (cfg) {
+        if (!cfg || cfg.error || !cfg.theme) return;
+        state.config = cfg;
+        brandMapStyle = normMapStyle(demoMapStyleOverride || (cfg.brand && cfg.brand.mapStyle));
+        try { window.QF_WIDGET_CONFIG = cfg; } catch (_e) {}
+        applyTheme(cfg.theme);
+        applyBrand(cfg.brand);
+        renderHeader(cfg);
+        renderContact(cfg.contact);
+        autoResize();
+      })
+      .catch(function () { /* keep the current skin on a failed refetch */ });
+  }
+
   function init() {
     var cfgUrl = '/api/public/widget/' + slug;
     if (themePreset) cfgUrl += (cfgUrl.indexOf('?') > -1 ? '&' : '?') + 'preset=' + encodeURIComponent(themePreset);
@@ -509,7 +577,15 @@
     // has cfg.demo falsy, so it ignores the message entirely and its saved theme
     // is never overridden. The config endpoint validates the preset id.
     window.addEventListener('message', function (e) {
-      if (!e || e.source !== window.parent || !e.data || e.data.qf !== 'theme') return;
+      if (!e || e.source !== window.parent || !e.data) return;
+      // Owner live-preview context: a signed preview grant (?pk=) OR the demo
+      // showcase config. Real customer embeds have neither, so they ignore
+      // brand-preview / brand-refetch entirely and their saved skin is never
+      // externally driven.
+      var previewCtx = !!previewGrant || !!(state.config && state.config.demo);
+      if (previewCtx && e.data.qf === 'brand-preview') { applyBrandPreviewPatch(e.data.patch); return; }
+      if (previewCtx && e.data.qf === 'brand-refetch') { refetchAndReskin(); return; }
+      if (e.data.qf !== 'theme') return;
       if (!(state.config && state.config.demo)) return;
       var preset = typeof e.data.preset === 'string' ? e.data.preset : '';
       if (!preset) return;
