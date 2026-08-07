@@ -434,13 +434,18 @@ body {
   transform: translateY(-1px);
 }
 /* Selected = OUTLINE + subtle tint + check, never a solid bright-blue fill
-   (standing UI rule). !important beats the brighter fill some theme sheets set. */
-.qf-acc-chip.active {
+   (standing UI rule). !important beats the brighter fill some theme sheets set.
+   The Residential/Hazmat/Temp-control flag pills share this EXACT selected look
+   so every add-on reads with the same blue when picked (Alex). */
+.qf-acc-chip.active,
+.qf-flags label:has(input:checked) {
   background: rgba(37, 99, 235, 0.10) !important;
   border-color: rgba(37, 99, 235, 0.60) !important;
   color: #1d4ed8 !important;
   box-shadow: inset 0 0 0 1px rgba(37, 99, 235, 0.35) !important;
 }
+/* Native checkbox tick uses the same brand blue as the chips/pills. */
+.qf-flags input { accent-color: #2563eb; }
 .qf-acc-chip.active .qf-acc-label::before {
   content: '\2713\00a0'; /* ✓ prefix marks the selection without a fill */
   color: #2563eb;
