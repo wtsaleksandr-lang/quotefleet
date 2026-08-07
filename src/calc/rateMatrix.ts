@@ -15,10 +15,13 @@
  *
  * PURE module — no DB, no side effects. Structural input types so the engine can
  * pass DB rows (RateMatrix / RateZone) OR the loose in-memory preview shapes.
+ * (The only import is the static port-code alias table — pure data, no I/O.)
  *
  * See docs/RATE-INGESTION-RESEARCH.md patterns 1 (origin×dest matrix),
  * 3 (zone defs + zone×zone grid) and 5 (drayage port→zone per-container).
  */
+
+import { expandPortAliases } from '../data/ports.js';
 
 /** Unit the matrix cell's `rate` is expressed in. */
 export type MatrixUnitBasis = 'flat' | 'per_mile' | 'per_container';
@@ -156,7 +159,11 @@ export function buildKeyRanks(
   };
   const z5 = normalizeZip5(loc.zip);
   const z3 = zip3Of(loc.zip);
-  add(loc.portCode ?? null, 0); // drayage port anchor — an exact key
+  // Drayage port anchor — an exact key. Expand through the port-code alias
+  // groups so a matrix lane keyed on one code (e.g. sheet's USEWR, or a
+  // combined USLAX/USLGB pool) matches a shipment resolved to any equivalent
+  // code (e.g. autosuggest's USNYC). Every alias is an exact-specificity key.
+  for (const pc of expandPortAliases(loc.portCode)) add(pc, 0);
   add(z5, 0); // exact zip5
   add(z3, 1); // zip3 prefix
   for (const z of zones) {

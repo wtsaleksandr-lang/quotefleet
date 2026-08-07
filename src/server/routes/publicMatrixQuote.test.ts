@@ -196,6 +196,37 @@ describe('POST /api/public/quote/:slug — prices the matrix cell', () => {
     expect((re.body as { result: { total: number } }).result.total).toBe(605);
   });
 
+  it('port-code reconciliation: a USEWR-keyed drayage lane prices whether the shipper picked USEWR or USNYC', async () => {
+    // The audit gap end-to-end: the ingested matrix keys the Newark lane on
+    // USEWR (what the rate sheet prints), but the autosuggest historically
+    // resolved Newark to the umbrella USNYC → the cell never matched. The
+    // alias fix makes BOTH selections hit the same cell.
+    h.state.matrixRows = [
+      { id: 1, tenantId: 1, mode: 'drayage', equipment: 'container_40', originKey: 'USEWR', destKey: '07114', rate: 395, unitBasis: 'per_container', minCharge: null, currency: 'USD', enabled: true },
+    ];
+    const drayBody = (portCode: string) => ({
+      service: 'drayage', equipment: 'container_40',
+      pickup: { portCode, country: 'US' },
+      delivery: { zip: '07114', country: 'US' },
+    });
+    const asEwr = await quote(drayBody('USEWR'));
+    const asNyc = await quote(drayBody('USNYC')); // the previously-broken case
+    expect((asEwr.body as { result: { total: number } }).result.total).toBe(395);
+    expect((asNyc.body as { result: { total: number } }).result.total).toBe(395);
+  });
+
+  it('LA/LB pool: a USLAX-keyed lane prices when the shipper picked Long Beach (USLGB)', async () => {
+    h.state.matrixRows = [
+      { id: 1, tenantId: 1, mode: 'drayage', equipment: 'container_40', originKey: 'USLAX', destKey: '90744', rate: 355, unitBasis: 'per_container', minCharge: null, currency: 'USD', enabled: true },
+    ];
+    const r = await quote({
+      service: 'drayage', equipment: 'container_40',
+      pickup: { portCode: 'USLGB', country: 'US' },
+      delivery: { zip: '90744', country: 'US' },
+    });
+    expect((r.body as { result: { total: number } }).result.total).toBe(355);
+  });
+
   it('without matrices a matrix lane no longer prices (proves the plumbing is load-bearing)', async () => {
     // No cards, no matrices → the lane is unsupported (control for the fix).
     const r = await quote(ftlBody('90045', '85003'));

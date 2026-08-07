@@ -145,3 +145,57 @@ describe('matrixLinehaul — per unit_basis + min-charge floor', () => {
     expect(p.floored).toBe(true);
   });
 });
+
+describe('port-code reconciliation — drayage matrix key aliasing', () => {
+  // The audit gap: a drayage matrix keys a lane on the port code printed on the
+  // rate sheet (e.g. USEWR for Port Newark-Elizabeth), but the autosuggest
+  // resolves Newark to the umbrella USNYC. Without aliasing the origin key never
+  // matches and the lane silently fails to price. These lock the fix.
+  const drayCell = (originKey: string): MatrixCellInput => ({
+    mode: 'drayage', equipment: 'container_40', originKey, destKey: '07114',
+    rate: 395, unitBasis: 'per_container',
+  });
+
+  it('buildKeyRanks expands USNYC ⇄ USEWR at exact (rank 0) specificity', () => {
+    const nyc = buildKeyRanks({ portCode: 'USNYC' }, []);
+    expect(nyc.get(normMatrixKey('USNYC'))).toBe(0);
+    expect(nyc.get(normMatrixKey('USEWR'))).toBe(0);
+    const ewr = buildKeyRanks({ portCode: 'USEWR' }, []);
+    expect(ewr.get(normMatrixKey('USNYC'))).toBe(0);
+    expect(ewr.get(normMatrixKey('USEWR'))).toBe(0);
+  });
+
+  it('buildKeyRanks folds USLAX / USLGB / USLALB into one San Pedro Bay pool', () => {
+    const lgb = buildKeyRanks({ portCode: 'USLGB' }, []);
+    for (const c of ['USLAX', 'USLGB', 'USLALB']) expect(lgb.get(normMatrixKey(c))).toBe(0);
+    const pool = buildKeyRanks({ portCode: 'USLALB' }, []);
+    for (const c of ['USLAX', 'USLGB', 'USLALB']) expect(pool.get(normMatrixKey(c))).toBe(0);
+  });
+
+  it('a USEWR-keyed cell matches a shipment whose origin resolved to USNYC (the fix)', () => {
+    const cells = [drayCell('USEWR')];
+    const asNyc = findMatrixCell(cells, [], {
+      origin: { portCode: 'USNYC' }, dest: { zip: '07114' }, service: 'drayage', equipment: 'container_40',
+    });
+    const asEwr = findMatrixCell(cells, [], {
+      origin: { portCode: 'USEWR' }, dest: { zip: '07114' }, service: 'drayage', equipment: 'container_40',
+    });
+    expect(asNyc?.cell.rate).toBe(395);
+    expect(asEwr?.cell.rate).toBe(395);
+  });
+
+  it('a USLAX-keyed LA/LB lane matches a shipment that picked Long Beach (USLGB)', () => {
+    const cells: MatrixCellInput[] = [{ mode: 'drayage', equipment: 'container_40', originKey: 'USLAX', destKey: '90744', rate: 355, unitBasis: 'per_container' }];
+    const m = findMatrixCell(cells, [], {
+      origin: { portCode: 'USLGB' }, dest: { zip: '90744' }, service: 'drayage', equipment: 'container_40',
+    });
+    expect(m?.cell.rate).toBe(355);
+  });
+
+  it('does NOT over-match: an unrelated port (USSAV) misses a USEWR-keyed cell', () => {
+    const m = findMatrixCell([drayCell('USEWR')], [], {
+      origin: { portCode: 'USSAV' }, dest: { zip: '07114' }, service: 'drayage', equipment: 'container_40',
+    });
+    expect(m).toBeUndefined();
+  });
+});
