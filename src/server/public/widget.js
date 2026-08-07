@@ -569,13 +569,14 @@
       })
       .catch(function () { $('qf-root').innerHTML = '<div class="qf-error">Failed to load widget. Please refresh.</div>'; });
 
-    // DEMO-ONLY live theme switch. The prospect demo showcase shell (demo.js)
-    // posts { qf:'theme', mode, preset } when its day/night toggle flips, so the
-    // calculator — isolated in its own iframe — follows the shell WITHOUT a
-    // reload (form state preserved). Strictly scoped: honoured only for a DEMO
-    // config (cfg.demo) AND only from our own parent window. A real tenant embed
-    // has cfg.demo falsy, so it ignores the message entirely and its saved theme
-    // is never overridden. The config endpoint validates the preset id.
+    // PREVIEW live theme switch. Two parents post { qf:'theme', preset }: the
+    // prospect demo showcase shell (demo.js, on its day/night toggle) AND the
+    // owner Customize/Embed live-preview's Site|Light|Dark control. The
+    // calculator — isolated in its own iframe — follows WITHOUT a reload (form
+    // state preserved). Strictly scoped: honoured only in a preview context
+    // (cfg.demo OR a signed ?pk= grant) AND only from our own parent window. A
+    // real tenant embed has neither, so it ignores the message entirely and its
+    // saved theme is never overridden. The config endpoint validates the preset.
     window.addEventListener('message', function (e) {
       if (!e || e.source !== window.parent || !e.data) return;
       // Owner live-preview context: a signed preview grant (?pk=) OR the demo
@@ -586,10 +587,19 @@
       if (previewCtx && e.data.qf === 'brand-preview') { applyBrandPreviewPatch(e.data.patch); return; }
       if (previewCtx && e.data.qf === 'brand-refetch') { refetchAndReskin(); return; }
       if (e.data.qf !== 'theme') return;
-      if (!(state.config && state.config.demo)) return;
+      // Honoured in ANY preview context — the /w/demo showcase (cfg.demo) OR the
+      // owner Customize/Embed live-preview (a signed ?pk= grant). A real customer
+      // embed has neither, so it ignores this and its saved theme is never
+      // externally overridden. The config endpoint still validates the preset id.
+      if (!previewCtx) return;
       var preset = typeof e.data.preset === 'string' ? e.data.preset : '';
-      if (!preset) return;
-      fetch(withGrant('/api/public/widget/' + slug + '?preset=' + encodeURIComponent(preset)))
+      // Empty / 'site' → clear the preset override and re-skin from the tenant's
+      // OWN saved theme (the truthful "what you shipped" view). A real preset id
+      // forces that preset while ?preset= keeps the tenant's accent + font.
+      themePreset = (preset && preset !== 'site') ? preset : '';
+      var turl = '/api/public/widget/' + slug;
+      if (themePreset) turl += '?preset=' + encodeURIComponent(themePreset);
+      fetch(withGrant(turl))
         .then(function (r) { return r.json(); })
         .then(function (cfg) {
           if (!cfg || cfg.error || !cfg.theme) return;
