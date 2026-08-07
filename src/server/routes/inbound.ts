@@ -127,6 +127,34 @@ export function registerInboundRoutes(app: Express) {
     });
   });
 
+  // ── Owner: trusted-sender allowlist (read) ───────────────────────
+  // Surfaces the trust model plainly: these are the senders whose future rate
+  // emails apply automatically (the first email from a new sender is always
+  // held for review; approving it adds the sender here — trust-on-approve).
+  app.get('/api/tenant/email-import/senders', requireAuth, requireTenant, async (req: Request, res: Response) => {
+    const list = req.tenant!.ingestTrustedSendersJson;
+    res.json({ senders: Array.isArray(list) ? list : [] });
+  });
+
+  // ── Owner: revoke a trusted sender ───────────────────────────────
+  // Removing a sender means its next email is HELD for review again (it never
+  // blocks receiving mail — only the auto-apply trust is revoked). Idempotent:
+  // removing an address that isn't on the list is a no-op success.
+  app.delete('/api/tenant/email-import/senders/:email', requireAuth, requireTenant, async (req: Request, res: Response) => {
+    const rawParam = Array.isArray(req.params.email) ? req.params.email[0] : req.params.email;
+    const target = normalizeSenderAddress(decodeURIComponent(String(rawParam || '')));
+    if (!target) return res.status(400).json({ error: 'Invalid sender address.' });
+    const current = Array.isArray(req.tenant!.ingestTrustedSendersJson) ? req.tenant!.ingestTrustedSendersJson : [];
+    const next = current.filter((a) => normalizeSenderAddress(a) !== target);
+    if (next.length !== current.length) {
+      await db()
+        .update(tenants)
+        .set({ ingestTrustedSendersJson: next, updatedAt: new Date() })
+        .where(eq(tenants.id, req.tenant!.id));
+    }
+    res.json({ ok: true, senders: next });
+  });
+
   // ── Provider webhook: a forwarded rate email arrives ─────────────
   app.post('/api/inbound/rate-email', inboundEmailLimiter, async (req: Request, res: Response) => {
     const env = loadEnv();
