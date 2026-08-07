@@ -1129,6 +1129,15 @@
     if (!firstSelect && state.service !== service) {
       var rb = $('qf-result'); if (rb) rb.style.display = 'none';
       showError('qf-error', null); resetCalcCta(); resetQuoteChat();
+      // Add-on flags describe THIS shipment — clear them on a mode switch so
+      // residential/hazmat/temp-control don't silently carry over to the next
+      // mode (Alex). The "N selected" badge is recomputed by
+      // refreshOptionsCount() at the end of this function.
+      ['qf-residential', 'qf-hazmat', 'qf-temp'].forEach(function (id) {
+        var c = $(id);
+        if (c && c.checked) { c.checked = false; c.dispatchEvent(new Event('change', { bubbles: true })); }
+      });
+      var hzPanel = $('qf-hazmat-panel'); if (hzPanel) hzPanel.style.display = 'none';
     }
     state.service = service;
     $$('#qf-services button').forEach(function (b) { var on = b.dataset.service === service; b.classList.toggle('active', on); b.setAttribute('aria-selected', on ? 'true' : 'false'); });
