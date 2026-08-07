@@ -2542,6 +2542,10 @@
       col: col,
       // Instant, no-network apply of the given brand fields.
       postPatch: function (patch) { postToPreview({ qf: 'brand-preview', patch: patch }); },
+      // Instant, no-network apply of hosted trust-wrap copy (headline, badges,
+      // testimonials, CTAs, background) — handled by the hosted-page shell, not
+      // the calculator. No-op when the preview is the bare widget (no shell).
+      postHosted: function (patch) { postToPreview({ qf: 'hosted-preview', patch: patch }); },
       // Re-skin from the freshly-saved config (server-derived fields), no blink.
       notifySaved: function () { postToPreview({ qf: 'brand-refetch' }); },
       setUrl: function (url) { previewUrl = url; openLink.href = url; iframe.src = url; },
@@ -2609,9 +2613,13 @@
       var tabBar = el('div', { class: 'qf-cz-tabs', role: 'tablist', 'aria-label': 'Customize sections' });
       var designPanel = el('div', { class: 'qf-cz-tabpanel', role: 'tabpanel', 'aria-label': 'Design' });
       var behaviorPanel = el('div', { class: 'qf-cz-tabpanel is-hidden', role: 'tabpanel', 'aria-label': 'Behavior' });
+      // The "Page" tab owns the HOSTED-page trust-wrap (headline, trust badges,
+      // testimonials, CTAs, background). It shares the SAME live preview, which
+      // renders /w/<slug> — so the wrap updates live as the carrier edits.
+      var pagePanel = el('div', { class: 'qf-cz-tabpanel is-hidden', role: 'tabpanel', 'aria-label': 'Page' });
       // Design sections keep appending to `controls` (unchanged below).
       var controls = designPanel;
-      var panels = { design: designPanel, behavior: behaviorPanel };
+      var panels = { design: designPanel, behavior: behaviorPanel, page: pagePanel };
       var tabBtns = {};
       function selectTab(id) {
         if (!panels[id]) id = 'design';
@@ -2621,13 +2629,14 @@
           tabBtns[k].setAttribute('aria-selected', k === id ? 'true' : 'false');
         });
       }
-      [{ id: 'design', label: 'Design' }, { id: 'behavior', label: 'Behavior' }].forEach(function (t) {
+      [{ id: 'design', label: 'Design' }, { id: 'page', label: 'Page' }, { id: 'behavior', label: 'Behavior' }].forEach(function (t) {
         var btn = el('button', { type: 'button', class: 'qf-cz-tab', role: 'tab', 'data-tab': t.id, text: t.label });
         btn.addEventListener('click', function () { selectTab(t.id); });
         tabBtns[t.id] = btn; tabBar.appendChild(btn);
       });
       leftCol.appendChild(tabBar);
       leftCol.appendChild(designPanel);
+      leftCol.appendChild(pagePanel);
       leftCol.appendChild(behaviorPanel);
 
       // Shared live preview (no-blink apply, auto-height, device + host toggles).
@@ -3178,6 +3187,223 @@
       controls.appendChild(logoSec);
       paintLogo(b.logoUrl || '');
 
+      // ── Page tab — the HOSTED-page trust-wrap (headline, trust badges,
+      // testimonials, CTAs, background). Shares queueSave (debounced brand PUT)
+      // + the ONE live preview; every edit posts an instant hosted-preview patch
+      // to the /w/<slug> shell so the wrap updates with no blink. Applies ONLY
+      // to the hosted page — the embed snippet + demo stay the bare calculator.
+      (function buildPagePanel() {
+        var pc = pagePanel;
+        // live-apply + debounced save, mirroring the Design tab's model.
+        function hostedSave(patch, immediate) { queueSave(patch, immediate); preview.postHosted(patch); }
+
+        pc.appendChild(el('p', { class: 'qf-cz-hint', style: { margin: '0 0 12px' },
+          text: 'These build the landing page around your calculator at your hosted link. Your embed snippet stays the bare calculator — unchanged.' }));
+
+        // 1 ── Headline + subhead ------------------------------------------
+        function hpText(label, key, val, hint, textarea) {
+          var f = el('div', { class: 'qf-cz-field' });
+          f.appendChild(el('label', { class: 'qf-cz-label', text: label }));
+          var inp = textarea ? el('textarea', { class: 'textarea', rows: '2' }) : el('input', { class: 'input', type: 'text' });
+          inp.value = (val != null ? val : '');
+          inp.addEventListener('input', function () { hostedSave(kv(key, inp.value)); });
+          inp.addEventListener('blur', function () { hostedSave(kv(key, inp.value), true); });
+          f.appendChild(inp);
+          if (hint) f.appendChild(el('div', { class: 'qf-cz-hint', text: hint }));
+          return f;
+        }
+        var headCard = el('div', { class: 'card qf-cz-section', style: { marginTop: '0' } });
+        headCard.appendChild(el('div', { class: 'qf-cz-section-title', text: 'Headline' }));
+        headCard.appendChild(hpText('Headline', 'hostedHeadline', b.hostedHeadline, 'A short marketing line above your calculator. Leave blank to hide.'));
+        headCard.appendChild(hpText('Subhead', 'hostedSubhead', b.hostedSubhead, 'One supporting sentence under the headline.', true));
+        pc.appendChild(headCard);
+
+        // 2 ── Trust badges -------------------------------------------------
+        var badgePreview = [];
+        if (d.dotNumber) badgePreview.push('USDOT ' + d.dotNumber);
+        if (d.mcNumber) badgePreview.push('MC ' + d.mcNumber);
+        if (badgePreview.length) badgePreview.push('Insured');
+        var trustCard = el('div', { class: 'card qf-cz-section' });
+        trustCard.appendChild(el('div', { class: 'qf-cz-section-title', text: 'Trust badges' }));
+        var trustRow = el('label', { style: { display: 'flex', gap: '12px', alignItems: 'flex-start', cursor: 'pointer' } });
+        var trustCb = el('input', { type: 'checkbox', style: { marginTop: '3px', flex: '0 0 auto' } });
+        trustCb.checked = !!b.hostedTrustBadges;
+        trustCb.addEventListener('change', function () { b.hostedTrustBadges = trustCb.checked; hostedSave({ hostedTrustBadges: trustCb.checked }, true); });
+        trustRow.appendChild(trustCb);
+        trustRow.appendChild(el('div', {}, [
+          el('div', { text: 'Show my authority & insurance badges', style: { fontWeight: '600' } }),
+          el('div', { class: 'field-hint', style: { marginTop: '2px' },
+            text: badgePreview.length ? ('Will show: ' + badgePreview.join(' · ')) : 'No USDOT/MC on file yet — add them in Account → Company so your credential badges can appear.' }),
+        ]));
+        trustCard.appendChild(trustRow);
+        pc.appendChild(trustCard);
+
+        // 3 ── Testimonials -------------------------------------------------
+        var testis = Array.isArray(b.hostedTestimonialsJson) ? b.hostedTestimonialsJson.map(function (t) { return Object.assign({}, t); }) : [];
+        var testiCard = el('div', { class: 'card qf-cz-section' });
+        testiCard.appendChild(el('div', { class: 'qf-cz-section-title', text: 'Testimonials' }));
+        testiCard.appendChild(el('div', { class: 'qf-cz-hint', text: 'Add 2–4 short customer reviews. On phones the first two show.' }));
+        var testiWrap = el('div');
+        var addTesti = el('button', { type: 'button', class: 'btn btn-secondary', style: { marginTop: '10px' }, text: '+ Add testimonial' });
+        function saveTesti() { hostedSave({ hostedTestimonialsJson: testis.map(function (t) { return Object.assign({}, t); }) }); }
+        function renderTesti() {
+          testiWrap.innerHTML = '';
+          testis.forEach(function (t, i) {
+            var row = el('div', { class: 'card', style: { padding: '12px', marginTop: '10px' } });
+            row.appendChild(el('label', { class: 'qf-cz-label', text: 'Quote' }));
+            var qta = el('textarea', { class: 'textarea', rows: '2', placeholder: 'They were fast and the price held.' });
+            qta.value = t.quote || '';
+            qta.addEventListener('input', function () { t.quote = qta.value; saveTesti(); });
+            row.appendChild(qta);
+            var grid = el('div', { style: { display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px', marginTop: '8px' } });
+            var author = el('input', { class: 'input', type: 'text', placeholder: 'Author' }); author.value = t.author || '';
+            author.addEventListener('input', function () { t.author = author.value; saveTesti(); });
+            var comp = el('input', { class: 'input', type: 'text', placeholder: 'Company (optional)' }); comp.value = t.company || '';
+            comp.addEventListener('input', function () { t.company = comp.value; saveTesti(); });
+            grid.appendChild(author); grid.appendChild(comp);
+            row.appendChild(grid);
+            var foot = el('div', { style: { display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: '8px', gap: '8px' } });
+            var rate = el('select', { class: 'input', style: { maxWidth: '140px' } });
+            [['0', 'No rating'], ['1', '1 ★'], ['2', '2 ★'], ['3', '3 ★'], ['4', '4 ★'], ['5', '5 ★']].forEach(function (o) {
+              rate.appendChild(el('option', { value: o[0], text: o[1] }));
+            });
+            rate.value = String(t.rating || 0);
+            rate.addEventListener('change', function () { var r = parseInt(rate.value, 10) || 0; if (r) t.rating = r; else delete t.rating; saveTesti(); });
+            var rm = el('button', { type: 'button', class: 'btn btn-secondary', text: 'Remove' });
+            rm.addEventListener('click', function () { testis.splice(i, 1); renderTesti(); saveTesti(); });
+            foot.appendChild(rate); foot.appendChild(rm);
+            row.appendChild(foot);
+            testiWrap.appendChild(row);
+          });
+          addTesti.style.display = testis.length >= 4 ? 'none' : '';
+        }
+        addTesti.addEventListener('click', function () { if (testis.length >= 4) return; testis.push({ quote: '', author: '' }); renderTesti(); });
+        testiCard.appendChild(testiWrap);
+        testiCard.appendChild(addTesti);
+        renderTesti();
+        pc.appendChild(testiCard);
+
+        // 4 ── CTA buttons --------------------------------------------------
+        var ctas = Array.isArray(b.hostedCtasJson) ? b.hostedCtasJson.map(function (c) { return Object.assign({}, c); }) : [];
+        var ctaCard = el('div', { class: 'card qf-cz-section' });
+        ctaCard.appendChild(el('div', { class: 'qf-cz-section-title', text: 'Action buttons' }));
+        ctaCard.appendChild(el('div', { class: 'qf-cz-hint', text: 'Up to 3 buttons — e.g. “Call dispatch”, “Email us”, “Visit site”.' }));
+        var ctaWrap = el('div');
+        var addCta = el('button', { type: 'button', class: 'btn btn-secondary', style: { marginTop: '10px' }, text: '+ Add button' });
+        function saveCtas() { hostedSave({ hostedCtasJson: ctas.map(function (c) { return Object.assign({}, c); }) }); }
+        function renderCtas() {
+          ctaWrap.innerHTML = '';
+          ctas.forEach(function (c, i) {
+            var row = el('div', { class: 'card', style: { padding: '12px', marginTop: '10px' } });
+            var grid = el('div', { style: { display: 'grid', gridTemplateColumns: '1fr 110px', gap: '8px' } });
+            var label = el('input', { class: 'input', type: 'text', placeholder: 'Button label' }); label.value = c.label || '';
+            label.addEventListener('input', function () { c.label = label.value; saveCtas(); });
+            var type = el('select', { class: 'input' });
+            [['call', 'Call'], ['email', 'Email'], ['url', 'Website']].forEach(function (o) { type.appendChild(el('option', { value: o[0], text: o[1] })); });
+            type.value = c.type || 'call';
+            var value = el('input', { class: 'input', type: 'text', style: { marginTop: '8px' } });
+            function valPlaceholder() { value.setAttribute('placeholder', type.value === 'email' ? 'name@company.com' : (type.value === 'url' ? 'https://yourcompany.com' : '+1 555 123 4567')); }
+            valPlaceholder(); value.value = c.value || '';
+            value.addEventListener('input', function () { c.value = value.value; saveCtas(); });
+            type.addEventListener('change', function () { c.type = type.value; valPlaceholder(); saveCtas(); });
+            grid.appendChild(label); grid.appendChild(type);
+            row.appendChild(grid); row.appendChild(value);
+            var rm = el('button', { type: 'button', class: 'btn btn-secondary', style: { marginTop: '8px' }, text: 'Remove' });
+            rm.addEventListener('click', function () { ctas.splice(i, 1); renderCtas(); saveCtas(); });
+            row.appendChild(rm);
+            ctaWrap.appendChild(row);
+          });
+          addCta.style.display = ctas.length >= 3 ? 'none' : '';
+        }
+        addCta.addEventListener('click', function () { if (ctas.length >= 3) return; ctas.push({ label: '', type: 'call', value: '' }); renderCtas(); });
+        ctaCard.appendChild(ctaWrap);
+        ctaCard.appendChild(addCta);
+        renderCtas();
+        pc.appendChild(ctaCard);
+
+        // 5 ── Background & theme -------------------------------------------
+        var bg = (b.hostedBackgroundJson && typeof b.hostedBackgroundJson === 'object') ? Object.assign({}, b.hostedBackgroundJson) : {};
+        function saveBg() { hostedSave({ hostedBackgroundJson: Object.assign({}, bg) }); }
+        var bgCard = el('div', { class: 'card qf-cz-section' });
+        bgCard.appendChild(el('div', { class: 'qf-cz-section-title', text: 'Page background' }));
+
+        var themeField = el('div', { class: 'qf-cz-field' });
+        themeField.appendChild(el('label', { class: 'qf-cz-label', text: 'Page theme' }));
+        var themeSel = el('select', { class: 'input' });
+        [['auto', 'Match calculator'], ['light', 'Light'], ['dark', 'Dark']].forEach(function (o) { themeSel.appendChild(el('option', { value: o[0], text: o[1] })); });
+        themeSel.value = bg.theme || 'auto';
+        themeSel.addEventListener('change', function () { if (themeSel.value === 'auto') delete bg.theme; else bg.theme = themeSel.value; saveBg(); });
+        themeField.appendChild(themeSel);
+        bgCard.appendChild(themeField);
+
+        var presetField = el('div', { class: 'qf-cz-field' });
+        presetField.appendChild(el('label', { class: 'qf-cz-label', text: 'Colour' }));
+        var presetSel = el('select', { class: 'input' });
+        (d.hostedBgPresets || [{ id: 'default', label: 'Solid' }]).forEach(function (p) { presetSel.appendChild(el('option', { value: p.id, text: p.label })); });
+        presetSel.value = bg.preset || 'default';
+        presetSel.addEventListener('change', function () { bg.preset = presetSel.value; saveBg(); });
+        presetField.appendChild(presetSel);
+        bgCard.appendChild(presetField);
+
+        // Hero image (reuses the client-downscale pipeline; a legibility scrim
+        // sits over it automatically so text stays readable).
+        bgCard.appendChild(el('label', { class: 'qf-cz-label', style: { marginTop: '12px' }, text: 'Hero image (optional)' }));
+        var heroPrev = el('div', { style: { marginTop: '6px' } });
+        var scrimField = el('div', { class: 'qf-cz-field', style: { marginTop: '10px' } });
+        scrimField.appendChild(el('label', { class: 'qf-cz-label', text: 'Text legibility (scrim)' }));
+        var scrim = el('input', { type: 'range', min: '0', max: '100', class: 'input', style: { padding: '0' } });
+        scrim.value = String(typeof bg.scrim === 'number' ? bg.scrim : 55);
+        scrim.addEventListener('input', function () { bg.scrim = parseInt(scrim.value, 10) || 0; saveBg(); });
+        scrimField.appendChild(scrim);
+        function paintHero() {
+          heroPrev.innerHTML = '';
+          scrimField.style.display = bg.imageUrl ? '' : 'none';
+          if (bg.imageUrl) {
+            heroPrev.appendChild(el('img', { src: bg.imageUrl, alt: 'Hero', style: { maxWidth: '100%', maxHeight: '120px', borderRadius: '10px', display: 'block', objectFit: 'cover' } }));
+            var rm = el('button', { type: 'button', class: 'btn btn-secondary', style: { marginTop: '8px' }, text: 'Remove image' });
+            rm.addEventListener('click', function () { delete bg.imageUrl; saveBg(); paintHero(); });
+            heroPrev.appendChild(rm);
+          }
+        }
+        function processHero(file) {
+          return new Promise(function (resolve, reject) {
+            var reader = new FileReader();
+            reader.onerror = reject;
+            reader.onload = function () {
+              var img = new Image();
+              img.onload = function () {
+                var max = 1600, scale = Math.min(1, max / Math.max(img.width || max, img.height || max));
+                var w = Math.max(1, Math.round((img.width || max) * scale)), h = Math.max(1, Math.round((img.height || max) * scale));
+                var canvas = document.createElement('canvas'); canvas.width = w; canvas.height = h;
+                canvas.getContext('2d').drawImage(img, 0, 0, w, h);
+                var out = ''; try { out = canvas.toDataURL('image/webp', 0.82); } catch (_e) { out = ''; }
+                if (!out || out.indexOf('data:image/webp') !== 0) out = canvas.toDataURL('image/jpeg', 0.82);
+                resolve(out);
+              };
+              img.onerror = reject; img.src = String(reader.result || '');
+            };
+            reader.readAsDataURL(file);
+          });
+        }
+        function handleHero(file) {
+          if (!file || !/^image\//.test(file.type)) { toast('Please choose an image file.', 'warn'); return; }
+          processHero(file).then(function (dataUrl) {
+            if (dataUrl.length > 680 * 1024) { toast('That image is too large even after shrinking. Try a simpler photo.', 'warn'); return; }
+            bg.imageUrl = dataUrl; saveBg(); paintHero();
+          }).catch(function () { toast('Could not read that image.', 'error'); });
+        }
+        var heroInput = el('input', { type: 'file', accept: 'image/*', style: { display: 'none' } });
+        var heroPick = el('button', { type: 'button', class: 'btn btn-secondary', style: { marginTop: '6px' }, text: 'Choose image' });
+        heroPick.addEventListener('click', function () { heroInput.click(); });
+        heroInput.addEventListener('change', function () { if (heroInput.files && heroInput.files[0]) handleHero(heroInput.files[0]); heroInput.value = ''; });
+        bgCard.appendChild(heroPick);
+        bgCard.appendChild(heroInput);
+        bgCard.appendChild(heroPrev);
+        bgCard.appendChild(scrimField);
+        paintHero();
+        pc.appendChild(bgCard);
+      })();
+
       // ── Behavior tab — merged widget-settings controls (share ONE preview) ──
       // Lead capture / copy / quote actions / booking / follow-up / access —
       // the exact controls that lived on the old standalone Widget-settings
@@ -3187,7 +3413,7 @@
       buildBehaviorPanel(behaviorPanel, b, access, preview);
 
       // Deep links / the retired Widget-settings route open straight on Behavior.
-      selectTab(opts.tab === 'behavior' ? 'behavior' : 'design');
+      selectTab(opts.tab === 'behavior' ? 'behavior' : (opts.tab === 'page' ? 'page' : 'design'));
     }).catch(showErr(c));
   }
 

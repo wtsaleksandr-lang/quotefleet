@@ -614,6 +614,43 @@ export const aiConfigs = pgTable('ai_configs', {
 });
 
 // ────────────────────────────────────────────────────────────────────
+// HOSTED TRUST-WRAP (Phase 1) — the lean conversion landing shell that
+// surrounds the calculator on a tenant's HOSTED page (/w/:slug). The
+// embedded JS-snippet widget + the /w/demo showcase are unaffected. All
+// three JSON shapes below are stored verbatim in brand_configs jsonb
+// columns; the render (src/server/hostedPage.ts) + the PUT sanitizer
+// (routes/tenant.ts) share these types so shape drift can't creep in.
+// ────────────────────────────────────────────────────────────────────
+/** One short social-proof review shown on the hosted page. */
+export interface HostedTestimonial {
+  quote: string;
+  author: string;
+  company?: string;
+  /** Optional 1–5 star rating. */
+  rating?: number;
+}
+/** A hosted-page call-to-action button. */
+export interface HostedCta {
+  label: string;
+  /** How the button acts: dial a number, open a mail client, or a URL. */
+  type: 'call' | 'email' | 'url';
+  /** The phone number / email address / URL the button targets. */
+  value: string;
+}
+/** Hosted-page background / theme settings. */
+export interface HostedBackground {
+  /** Page theme for the wrap chrome. Omitted → follows the widget theme mode. */
+  theme?: 'light' | 'dark';
+  /** A named colour/gradient preset id (see hostedPage.ts HOSTED_BG_PRESETS). */
+  preset?: string;
+  /** Optional hero background image (data-URL or URL). A legibility scrim is
+   *  always painted over it so headline/badge text stays readable. */
+  imageUrl?: string;
+  /** Scrim strength over the hero image, 0–100 (default 55). */
+  scrim?: number;
+}
+
+// ────────────────────────────────────────────────────────────────────
 // BRAND CONFIG — what the customer's calculator looks like.
 // ────────────────────────────────────────────────────────────────────
 export const brandConfigs = pgTable('brand_configs', {
@@ -695,6 +732,27 @@ export const brandConfigs = pgTable('brand_configs', {
    *  quoteShare (default ON) gates the customer share/email/print/PDF action
    *  bar; quoteBooking (default OFF) is reserved for a later booking wave. */
   featuresJson: jsonb('features_json').$type<Record<string, boolean>>(),
+  // ── Hosted trust-wrap (Phase 1) ──────────────────────────────────────
+  // The lean conversion landing shell around the HOSTED calculator page
+  // (/w/:slug). ALL nullable / safe-defaulted so the deploy is non-breaking
+  // and every existing tenant renders exactly as before (no headline, no
+  // badges, no testimonials → the wrap degrades to the bare calculator with
+  // only the theme background). The embed snippet + /w/demo are unaffected.
+  // See src/server/hostedPage.ts + migration 0035.
+  /** Marketing headline shown above/beside the calculator. */
+  hostedHeadline: text('hosted_headline'),
+  /** Supporting subhead under the headline. */
+  hostedSubhead: text('hosted_subhead'),
+  /** When true, surface the carrier's USDOT / MC / insurance credibility
+   *  badges from data already collected (tenants.dotNumber / mcNumber). No
+   *  new input required. Default false leaves existing tenants unchanged. */
+  hostedTrustBadges: boolean('hosted_trust_badges').notNull().default(false),
+  /** 2–4 short customer reviews. See HostedTestimonial. */
+  hostedTestimonialsJson: jsonb('hosted_testimonials_json').$type<HostedTestimonial[]>(),
+  /** 2–3 call-to-action buttons (call / email / URL). See HostedCta. */
+  hostedCtasJson: jsonb('hosted_ctas_json').$type<HostedCta[]>(),
+  /** Page background / theme + optional hero image. See HostedBackground. */
+  hostedBackgroundJson: jsonb('hosted_background_json').$type<HostedBackground>(),
   updatedAt: timestamp('updated_at', { mode: 'date' }).notNull().defaultNow(),
 });
 
