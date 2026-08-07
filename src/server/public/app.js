@@ -2269,7 +2269,9 @@
   //      save) instead of reloading the iframe. The iframe is NEVER re-sourced.
   //   B. Auto-height — the frame grows to the widget's reported content height
   //      (QF_WIDGET_HEIGHT), so there is no fixed-box inner scrollbar.
-  //   C. Device (Desktop/Mobile) + host theme (Light/Dark) toggles in the head.
+  //   C. Device (Desktop/Mobile) + widget-theme (Site/Light/Dark) toggles in
+  //      the head. On a real phone the device toggle is hidden and the preview
+  //      defaults to the mobile calculator.
   // Returns { col, postPatch(patch), notifySaved(), setUrl(url) }.
   function buildLivePreview(opts) {
     opts = opts || {};
@@ -2300,18 +2302,26 @@
     });
     tools.appendChild(devSeg);
 
-    // Host theme segmented toggle (Light | Dark) — swaps the neutral host
-    // background BEHIND the widget so the carrier can see how the calculator
-    // sits on a light vs dark website. "Site" = full-bleed (no host framing).
-    var host = 'site';
-    var hostSeg = el('div', { class: 'qf-cz-seg', role: 'group', 'aria-label': 'Host background' });
-    var hostBtns = {};
-    [{ id: 'site', label: 'Site' }, { id: 'light', label: 'Light host' }, { id: 'dark', label: 'Dark host' }].forEach(function (h) {
-      var btn = el('button', { type: 'button', class: 'qf-cz-seg-btn qf-cz-seg-text', 'data-host': h.id, 'aria-label': h.label, title: h.label, text: h.id === 'site' ? 'Site' : (h.id === 'light' ? 'Light' : 'Dark') });
-      btn.addEventListener('click', function () { setHost(h.id); });
-      hostBtns[h.id] = btn; hostSeg.appendChild(btn);
+    // Widget-theme segmented toggle (Site | Light | Dark) — re-themes the REAL
+    // calculator, not just the backdrop. It posts { qf:'theme', preset } into the
+    // iframe; the widget's preview-context listener refetches
+    // /api/public/widget/<slug>?preset=… and re-skins live (no reload, no blink):
+    //   · "Site"  → clear the override → the tenant's OWN saved theme (truthful).
+    //   · "Light" → a canonical LIGHT preset (Clarity/mono).
+    //   · "Dark"  → a canonical DARK preset (Midnight).
+    // Light/Dark keep the tenant's accent + font (that's what ?preset= does). A
+    // neutral host backdrop is swapped as a SECONDARY nicety so the widget sits
+    // on a coherent light/dark surface.
+    var THEME_PRESETS = { light: 'mono', dark: 'midnight' };
+    var themeMode = 'site';
+    var themeSeg = el('div', { class: 'qf-cz-seg', role: 'group', 'aria-label': 'Widget theme' });
+    var themeBtns = {};
+    [{ id: 'site', label: 'Your saved theme' }, { id: 'light', label: 'Light theme' }, { id: 'dark', label: 'Dark theme' }].forEach(function (h) {
+      var btn = el('button', { type: 'button', class: 'qf-cz-seg-btn qf-cz-seg-text', 'data-theme': h.id, 'aria-label': h.label, title: h.label, text: h.id === 'site' ? 'Site' : (h.id === 'light' ? 'Light' : 'Dark') });
+      btn.addEventListener('click', function () { setTheme(h.id); });
+      themeBtns[h.id] = btn; themeSeg.appendChild(btn);
     });
-    tools.appendChild(hostSeg);
+    tools.appendChild(themeSeg);
 
     head.appendChild(tools);
     var openLink = el('a', { href: openHref, target: '_blank', rel: 'noopener', class: 'qf-cz-preview-open', text: 'Open ↗' });
@@ -2334,17 +2344,52 @@
       });
       // Width change reflows the widget → its ResizeObserver re-reports height.
     }
-    function setHost(id) {
-      host = id;
+    function setTheme(id, skipPost) {
+      if (id !== 'site' && !Object.prototype.hasOwnProperty.call(THEME_PRESETS, id)) id = 'site';
+      themeMode = id;
+      // Secondary nicety: a neutral host backdrop that matches the chosen theme
+      // (site → plain, no framing). data-host CSS paints light/dark only.
       frameWrap.setAttribute('data-host', id);
-      Object.keys(hostBtns).forEach(function (k) {
+      Object.keys(themeBtns).forEach(function (k) {
         var on = k === id;
-        hostBtns[k].classList.toggle('is-active', on);
-        hostBtns[k].setAttribute('aria-pressed', on ? 'true' : 'false');
+        themeBtns[k].classList.toggle('is-active', on);
+        themeBtns[k].setAttribute('aria-pressed', on ? 'true' : 'false');
       });
+      // PRIMARY: re-theme the actual widget. '' → tenant's saved theme (reset);
+      // a preset id forces that light/dark preset (accent/font preserved).
+      if (!skipPost) postToPreview({ qf: 'theme', preset: id === 'site' ? '' : (THEME_PRESETS[id] || '') });
     }
     setDevice('desktop');
-    setHost('site');
+    setTheme('site', true);
+
+    // ── Fix 2: on a real phone, a desktop preview is pointless — hide the
+    // Desktop|Mobile toggle and default the preview to the mobile calculator.
+    // Reacts to viewport changes (rotate/resize) and is robust to teardown: once
+    // the preview is removed from the DOM the listener detaches itself.
+    var mobileMq = (window.matchMedia && window.matchMedia('(max-width: 640px)')) || null;
+    var forcedMobile = false;
+    function applyPreviewViewport(isPhone) {
+      if (isPhone) {
+        devSeg.style.display = 'none';
+        if (device !== 'mobile') { forcedMobile = true; setDevice('mobile'); }
+      } else {
+        devSeg.style.display = '';
+        if (forcedMobile) { forcedMobile = false; setDevice('desktop'); }
+      }
+    }
+    applyPreviewViewport(mobileMq ? mobileMq.matches : false);
+    if (mobileMq) {
+      var onMqChange = function (ev) {
+        if (!frameWrap.isConnected) {
+          if (mobileMq.removeEventListener) mobileMq.removeEventListener('change', onMqChange);
+          else if (mobileMq.removeListener) mobileMq.removeListener(onMqChange);
+          return;
+        }
+        applyPreviewViewport(ev.matches);
+      };
+      if (mobileMq.addEventListener) mobileMq.addEventListener('change', onMqChange);
+      else if (mobileMq.addListener) mobileMq.addListener(onMqChange);
+    }
 
     // Auto-height: size the frame to the widget's real content height. Clamp to
     // a sane band so a runaway report can't blow out the panel; the widget only
