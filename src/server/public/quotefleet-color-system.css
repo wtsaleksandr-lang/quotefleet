@@ -192,8 +192,6 @@ body.qf-auth-wft .btn-primary,
 body.qf-public-wft .btn-primary,
 body.qf-public-wft.qf-tools-marketplace .chip.active,
 body.qf-app-calculator .qf-cta,
-body.qf-app-calculator .qf-acc-chip.active,
-body.qf-app-calculator .qf-options-panel .qf-acc-chip.active,
 body.qf-app-calculator .qf-demo-logo-slot em,
 body.qf-wft .qf-mc-send,
 body.qf-public-wft .qf-mc-send,
@@ -201,6 +199,17 @@ body.qf-auth-wft .qf-mc-send {
   background: var(--qf-color-accent) !important;
   border: 1px solid var(--qf-color-accent) !important;
   color: var(--qf-color-white) !important;
+}
+
+/* Selected add-on chip = outline + subtle tint, never a solid fill (standing UI
+   rule). Pulled out of the solid-accent group above (which is for CTAs/buttons)
+   and kept in sync with the source-of-truth rule in
+   public-calculator-no-gradients.css, so no context flips the chip to a fill. */
+body.qf-app-calculator .qf-acc-chip.active,
+body.qf-app-calculator .qf-options-panel .qf-acc-chip.active {
+  background: rgba(37, 99, 235, 0.10) !important;
+  border: 1px solid var(--w-accent-solid, var(--w-accent, #0D3CFC)) !important;
+  color: var(--w-accent-solid, var(--w-accent, #0D3CFC)) !important;
 }
 
 body.qf-wft .btn-primary:hover,

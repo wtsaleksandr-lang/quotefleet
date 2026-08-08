@@ -28,16 +28,14 @@ body.qf-app-calculator .qf-options-panel .qf-acc-chip {
   box-shadow: none !important;
 }
 
-body.qf-app-calculator .qf-options-panel .qf-acc-chip.active {
-  background: var(--w-primary) !important;
-  border-color: var(--w-primary) !important;
-  color: #ffffff !important;
-}
-
+/* Selected add-ons (chips AND flags) share ONE look: outline + subtle tint,
+   never a solid fill (standing UI rule). Matches the source-of-truth rule in
+   public-calculator-no-gradients.css so no context can diverge. */
+body.qf-app-calculator .qf-options-panel .qf-acc-chip.active,
 body.qf-app-calculator .qf-options-panel .qf-flags label:has(input:checked) {
-  border-color: var(--w-primary) !important;
-  color: var(--w-primary) !important;
-  background: color-mix(in srgb, var(--w-primary) 9%, white) !important;
+  background: rgba(37, 99, 235, 0.10) !important;
+  border: 1px solid var(--w-accent-solid, var(--w-accent, #0D3CFC)) !important;
+  color: var(--w-accent-solid, var(--w-accent, #0D3CFC)) !important;
 }
 
 body.qf-demo-brand-preview .qf-header {
