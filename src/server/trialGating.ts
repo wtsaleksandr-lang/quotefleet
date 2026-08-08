@@ -28,10 +28,31 @@ import { effectivePlan, isTrialing } from './plans.js';
  */
 export const BILLING_PAST_DUE_KEY = 'billingPastDueSince';
 
+/**
+ * Key stored in the tenant's `lifecycle_emails_json` when the billing webhook
+ * SUSPENDS a tenant for non-payment (subscription reached a terminal-failure
+ * state: canceled / unpaid / incomplete_expired / deleted). Presence marks the
+ * suspension as **billing-driven** — the ONLY kind the webhook may later
+ * auto-reinstate when payment succeeds. A manual admin suspension (set from the
+ * admin panel) NEVER sets this key, so a Stripe payment event can never
+ * un-suspend a tenant an admin deliberately locked. Value is the ISO timestamp
+ * of the suspension. Cleared when the subscription returns to active/trialing
+ * and access is restored. Reuses the open-typed lifecycle jsonb (no migration).
+ */
+export const BILLING_SUSPENDED_KEY = 'billingSuspendedSince';
+
 /** True when the tenant is in the payment-grace window (card failed, still
  *  inside Stripe's retry schedule) per the persisted lifecycle marker. */
 export function isTenantBillingPastDue(tenant: Tenant): boolean {
   return !!tenant.lifecycleEmailsJson?.[BILLING_PAST_DUE_KEY];
+}
+
+/** True when the tenant's current `suspended` status was set by the billing
+ *  webhook for non-payment (as opposed to a manual admin suspension). Only a
+ *  billing-driven suspension is eligible for automatic reinstatement on a
+ *  successful payment — see billing.ts `applySubscription`. */
+export function isTenantBillingSuspended(tenant: Tenant): boolean {
+  return !!tenant.lifecycleEmailsJson?.[BILLING_SUSPENDED_KEY];
 }
 
 export interface TrialState {

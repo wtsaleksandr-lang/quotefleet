@@ -26,7 +26,7 @@ import { db } from '../../db/client.js';
 import { tenants, auditLog, type Tenant } from '../../db/schema.js';
 import { requireAuth, requireTenant } from '../middleware.js';
 import { loadEnv } from '../../config.js';
-import { BILLING_PAST_DUE_KEY } from '../trialGating.js';
+import { BILLING_PAST_DUE_KEY, BILLING_SUSPENDED_KEY } from '../trialGating.js';
 import {
   type PaidPlanId,
   type PlanId,
@@ -327,6 +327,41 @@ export async function applySubscription(sub: Stripe.Subscription): Promise<void>
     delete lifecycle[BILLING_PAST_DUE_KEY];
     lifecycleChanged = true;
   }
+
+  // ── AUTOMATIC ACCESS ENFORCEMENT ────────────────────────────────────────
+  // Flip the tenant's lifecycle `status` off the subscription's billing health.
+  //   inactive (terminal non-payment) → SUSPEND (public widget 404s).
+  //   active/trialing (paying)        → REINSTATE, but ONLY a suspension WE
+  //                                     set for billing (marker present).
+  //   grace (past_due/incomplete)     → NEVER touch status — the dunning
+  //                                     window keeps access (existing behavior).
+  // Safeguards: a manual admin suspension (no billing marker) and a 'churned'
+  // tenant are NEVER auto-un-suspended. Idempotent — re-derives from the freshly
+  // read row, so repeated/out-of-order events converge without thrashing status.
+  const hadBillingSuspend = !!lifecycle[BILLING_SUSPENDED_KEY];
+  let statusChange: 'suspended' | 'active' | undefined;
+  if (health === 'inactive') {
+    // Terminal failure (canceled/unpaid/incomplete_expired/deleted). Suspend a
+    // live tenant and stamp the billing marker so a later payment can reinstate
+    // it. Only transition from 'active': an already-suspended tenant keeps its
+    // existing marker (don't relabel a manual suspension as billing), and a
+    // 'churned' tenant is left untouched.
+    if (t.status === 'active') {
+      statusChange = 'suspended';
+      lifecycle[BILLING_SUSPENDED_KEY] = new Date().toISOString();
+      lifecycleChanged = true;
+    }
+  } else if (health === 'active') {
+    // Payment good again. Auto-reinstate ONLY a billing-driven suspension —
+    // never a manual admin suspension (marker absent) and never a churned
+    // tenant. Clearing the marker stops the app treating it as billing-locked.
+    if (t.status === 'suspended' && hadBillingSuspend) {
+      statusChange = 'active';
+      delete lifecycle[BILLING_SUSPENDED_KEY];
+      lifecycleChanged = true;
+    }
+  }
+  // health === 'grace' → deliberately leaves status as-is.
   // Keep the tenant's trialEndsAt aligned with Stripe's trial so the
   // all-inclusive trial (effectivePlan → pro) begins/ends exactly when
   // Stripe says. Once converted (trial_end null) we leave the stored date
@@ -345,11 +380,15 @@ export async function applySubscription(sub: Stripe.Subscription): Promise<void>
       stripeSubscriptionId: keepSubscriptionId ? sub.id : null,
       subscriptionEndsAt: periodEnd,
       ...(trialEnd ? { trialEndsAt: trialEnd } : {}),
+      ...(statusChange ? { status: statusChange } : {}),
       ...(lifecycleChanged ? { lifecycleEmailsJson: lifecycle } : {}),
       updatedAt: new Date(),
     })
     .where(eq(tenants.id, t.id));
-  console.log(`[billing.webhook] tenant ${t.slug} → ${plan} (sub ${sub.status}, health ${health})`);
+  console.log(
+    `[billing.webhook] tenant ${t.slug} → ${plan} (sub ${sub.status}, health ${health}` +
+      `${statusChange ? `, status ${statusChange}` : ''})`
+  );
   // Record entry into / exit from the dunning grace window so the app can
   // later surface an "update your card" nudge without losing access.
   if (health === 'grace') {
@@ -358,6 +397,22 @@ export async function applySubscription(sub: Stripe.Subscription): Promise<void>
       status: sub.status,
       plan,
       currentPeriodEnd: periodEnd ? periodEnd.toISOString() : null,
+    });
+  }
+  // Audit every automatic access change (suspend / reinstate + why).
+  if (statusChange === 'suspended') {
+    await recordBillingAudit(t.id, 'billing.suspended', {
+      subscriptionId: sub.id,
+      status: sub.status,
+      reason: 'non_payment',
+      plan,
+    });
+  } else if (statusChange === 'active') {
+    await recordBillingAudit(t.id, 'billing.reinstated', {
+      subscriptionId: sub.id,
+      status: sub.status,
+      reason: 'payment_recovered',
+      plan,
     });
   }
 }
@@ -441,22 +496,36 @@ export async function handleEvent(event: Stripe.Event): Promise<void> {
       await applySubscription(sub);
       return;
     }
+    case 'invoice.paid':
+    case 'invoice.payment_succeeded': {
+      // A charge SUCCEEDED (trial-end conversion, renewal, or dunning recovery
+      // after a past_due). Reconcile off the live subscription: applySubscription
+      // clears the past-due marker, restores the paid tier, and — if the tenant
+      // was suspended FOR BILLING — auto-reinstates access. Stripe also emits a
+      // paired customer.subscription.updated → active; handling both makes
+      // recovery order-independent and idempotent. A one-off invoice with no
+      // subscription (or an unknown one) no-ops.
+      const invoice = event.data.object as Stripe.Invoice;
+      const customerId = invoice.customer != null ? String(invoice.customer) : null;
+      if (!customerId) return;
+      const inv = invoice as unknown as { subscription?: string | { id?: string } | null };
+      const subscriptionId =
+        typeof inv.subscription === 'string' ? inv.subscription : inv.subscription?.id ?? null;
+      if (!subscriptionId) return;
+      const sub = await stripe().subscriptions.retrieve(subscriptionId);
+      await applySubscription(sub);
+      return;
+    }
     case 'customer.subscription.updated':
     case 'customer.subscription.created': {
       await applySubscription(event.data.object as Stripe.Subscription);
       return;
     }
     case 'customer.subscription.deleted': {
-      const sub = event.data.object as Stripe.Subscription;
-      const customerId = String(sub.customer);
-      const t = (
-        await db().select().from(tenants).where(eq(tenants.stripeCustomerId, customerId)).limit(1)
-      )[0];
-      if (!t) return;
-      await db()
-        .update(tenants)
-        .set({ plan: 'free', stripeSubscriptionId: null, updatedAt: new Date() })
-        .where(eq(tenants.id, t.id));
+      // Terminal cancellation. Route through the same mapper as every other
+      // subscription event so the terminal path (plan → free, drop sub id) AND
+      // the automatic suspend-for-non-payment enforcement both apply uniformly.
+      await applySubscription(event.data.object as Stripe.Subscription);
       return;
     }
     default:

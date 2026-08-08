@@ -27,6 +27,20 @@ const state = vi.hoisted(() => ({
   tenantRow: null as Record<string, unknown> | null,
   updates: [] as Record<string, unknown>[],
   inserts: [] as Record<string, unknown>[],
+  // Subscription the mocked Stripe client returns from subscriptions.retrieve —
+  // used by the invoice.paid recovery path (handleEvent retrieves the live sub).
+  retrieveSub: null as Stripe.Subscription | null,
+}));
+
+// Stripe client mock — only subscriptions.retrieve is exercised (invoice.paid
+// recovery). All other billing tests drive the pure mappers / subscription
+// events directly and never touch the network.
+vi.mock('stripe', () => ({
+  default: vi.fn(() => ({
+    subscriptions: {
+      retrieve: vi.fn(async () => state.retrieveSub),
+    },
+  })),
 }));
 
 // plans.ts → planForPriceId reads STRIPE_PRICE_* off loadEnv(); give it the
@@ -99,6 +113,7 @@ beforeEach(() => {
   };
   state.updates = [];
   state.inserts = [];
+  state.retrieveSub = null;
 });
 
 describe('deriveSubscriptionState — status → plan mapping', () => {
@@ -309,5 +324,260 @@ describe('handleEvent — webhook routing', () => {
     } as unknown as Stripe.Event;
     await expect(handleEvent(invoiceEvent)).resolves.toBeUndefined();
     expect(state.inserts).toHaveLength(0);
+  });
+});
+
+/**
+ * AUTOMATIC ACCESS ENFORCEMENT — the money path.
+ *
+ * Policy:
+ *   - GRACE (past_due / incomplete) → access RETAINED, status untouched. Stripe
+ *     is still dunning; suspending on the first failed renewal is wrong.
+ *   - TERMINAL non-payment (canceled / unpaid / incomplete_expired / deleted)
+ *     → SUSPEND (status:'suspended') + stamp the billing marker. The public
+ *     widget then 404s.
+ *   - PAYMENT good again (active / trialing, or invoice.paid) → REINSTATE
+ *     (status:'active') + clear the marker — but ONLY a billing-driven
+ *     suspension. A manual admin suspension and a 'churned' tenant are NEVER
+ *     auto-un-suspended.
+ */
+const BILLING_SUSPENDED_KEY = 'billingSuspendedSince';
+const BILLING_PAST_DUE_KEY = 'billingPastDueSince';
+
+/** The `status` written by the (single) tenant update in this test, or
+ *  undefined when the update didn't touch status. */
+function writtenStatus(): unknown {
+  const u = state.updates.find((u) => 'status' in u);
+  return u?.status;
+}
+
+describe('automatic access enforcement — suspend on non-payment', () => {
+  it.each<SubStatus>(['canceled', 'unpaid', 'incomplete_expired'])(
+    'terminal %s on an ACTIVE tenant → status suspended + billing marker + plan free',
+    async (status) => {
+      state.tenantRow = {
+        id: 7,
+        slug: 'acme',
+        status: 'active',
+        stripeCustomerId: 'cus_123',
+        plan: 'pro',
+        stripeSubscriptionId: 'sub_123',
+      };
+      await handleEvent(subEvent('customer.subscription.updated', makeSub(status)));
+      expect(writtenStatus()).toBe('suspended');
+      expect(state.updates[0].plan).toBe('free');
+      expect(state.updates[0].stripeSubscriptionId).toBeNull();
+      const life = state.updates[0].lifecycleEmailsJson as Record<string, unknown>;
+      expect(typeof life[BILLING_SUSPENDED_KEY]).toBe('string'); // marker set
+      // Access change is audited.
+      expect(state.inserts.some((i) => i.action === 'billing.suspended')).toBe(true);
+    }
+  );
+
+  it('customer.subscription.deleted on an ACTIVE tenant → suspended + marker + plan free', async () => {
+    state.tenantRow = {
+      id: 7,
+      slug: 'acme',
+      status: 'active',
+      stripeCustomerId: 'cus_123',
+      plan: 'pro',
+      stripeSubscriptionId: 'sub_123',
+    };
+    await handleEvent(subEvent('customer.subscription.deleted', makeSub('canceled')));
+    expect(writtenStatus()).toBe('suspended');
+    expect(state.updates[0].plan).toBe('free');
+    expect(state.updates[0].stripeSubscriptionId).toBeNull();
+    const life = state.updates[0].lifecycleEmailsJson as Record<string, unknown>;
+    expect(typeof life[BILLING_SUSPENDED_KEY]).toBe('string');
+    expect(state.inserts.some((i) => i.action === 'billing.suspended')).toBe(true);
+  });
+
+  it('GRACE past_due on an ACTIVE tenant → status NOT changed (access retained)', async () => {
+    state.tenantRow = {
+      id: 7,
+      slug: 'acme',
+      status: 'active',
+      stripeCustomerId: 'cus_123',
+      plan: 'pro',
+      stripeSubscriptionId: 'sub_123',
+    };
+    await handleEvent(subEvent('customer.subscription.updated', makeSub('past_due')));
+    expect(writtenStatus()).toBeUndefined(); // never suspended during grace
+    // No billing-suspend marker; the past-due (update-your-card) marker is set instead.
+    const life = state.updates[0].lifecycleEmailsJson as Record<string, unknown>;
+    expect(life?.[BILLING_SUSPENDED_KEY]).toBeUndefined();
+    expect(typeof life?.[BILLING_PAST_DUE_KEY]).toBe('string');
+    expect(state.inserts.some((i) => i.action === 'billing.suspended')).toBe(false);
+  });
+
+  it('terminal on an already-suspended tenant does NOT rewrite status or relabel the marker', async () => {
+    // Manually suspended (no billing marker). A terminal billing event must not
+    // flip it to a billing suspension — so it can never be auto-reinstated later.
+    state.tenantRow = {
+      id: 7,
+      slug: 'acme',
+      status: 'suspended',
+      stripeCustomerId: 'cus_123',
+      plan: 'pro',
+      stripeSubscriptionId: 'sub_123',
+    };
+    await handleEvent(subEvent('customer.subscription.updated', makeSub('canceled')));
+    expect(writtenStatus()).toBeUndefined(); // status left as-is
+    const life = (state.updates[0].lifecycleEmailsJson ?? {}) as Record<string, unknown>;
+    expect(life[BILLING_SUSPENDED_KEY]).toBeUndefined(); // marker NOT added
+  });
+
+  it('terminal on a CHURNED tenant never touches status', async () => {
+    state.tenantRow = {
+      id: 7,
+      slug: 'acme',
+      status: 'churned',
+      stripeCustomerId: 'cus_123',
+      plan: 'pro',
+      stripeSubscriptionId: 'sub_123',
+    };
+    await handleEvent(subEvent('customer.subscription.deleted', makeSub('canceled')));
+    expect(writtenStatus()).toBeUndefined();
+  });
+});
+
+describe('automatic access enforcement — reinstate on payment', () => {
+  const billingSuspendedTenant = () => ({
+    id: 7,
+    slug: 'acme',
+    status: 'suspended',
+    stripeCustomerId: 'cus_123',
+    plan: 'free',
+    stripeSubscriptionId: null,
+    lifecycleEmailsJson: { [BILLING_SUSPENDED_KEY]: '2026-01-01T00:00:00.000Z' },
+  });
+
+  it('active event on a BILLING-suspended tenant → status active + marker cleared + plan restored', async () => {
+    state.tenantRow = billingSuspendedTenant();
+    await handleEvent(subEvent('customer.subscription.updated', makeSub('active')));
+    expect(writtenStatus()).toBe('active');
+    expect(state.updates[0].plan).toBe('pro'); // reconciled from the price
+    const life = state.updates[0].lifecycleEmailsJson as Record<string, unknown>;
+    expect(life[BILLING_SUSPENDED_KEY]).toBeUndefined(); // marker cleared
+    expect(state.inserts.some((i) => i.action === 'billing.reinstated')).toBe(true);
+  });
+
+  it('invoice.paid on a BILLING-suspended tenant → retrieves sub → status active + marker cleared', async () => {
+    state.tenantRow = billingSuspendedTenant();
+    state.retrieveSub = makeSub('active');
+    const invoiceEvent = {
+      type: 'invoice.paid',
+      data: { object: { id: 'in_ok', customer: 'cus_123', subscription: 'sub_123' } },
+    } as unknown as Stripe.Event;
+    await handleEvent(invoiceEvent);
+    expect(writtenStatus()).toBe('active');
+    const life = state.updates[0].lifecycleEmailsJson as Record<string, unknown>;
+    expect(life[BILLING_SUSPENDED_KEY]).toBeUndefined();
+    expect(state.inserts.some((i) => i.action === 'billing.reinstated')).toBe(true);
+  });
+
+  it('invoice.payment_succeeded is treated the same as invoice.paid', async () => {
+    state.tenantRow = billingSuspendedTenant();
+    state.retrieveSub = makeSub('active');
+    const invoiceEvent = {
+      type: 'invoice.payment_succeeded',
+      data: { object: { id: 'in_ok2', customer: 'cus_123', subscription: 'sub_123' } },
+    } as unknown as Stripe.Event;
+    await handleEvent(invoiceEvent);
+    expect(writtenStatus()).toBe('active');
+  });
+
+  it('SAFEGUARD: a MANUALLY suspended tenant (no marker) is NOT reinstated by a stray active event', async () => {
+    state.tenantRow = {
+      id: 7,
+      slug: 'acme',
+      status: 'suspended',
+      stripeCustomerId: 'cus_123',
+      plan: 'pro',
+      stripeSubscriptionId: 'sub_123',
+      // NO billingSuspendedSince marker — this was an admin action.
+    };
+    await handleEvent(subEvent('customer.subscription.updated', makeSub('active')));
+    expect(writtenStatus()).toBeUndefined(); // stays suspended
+    expect(state.inserts.some((i) => i.action === 'billing.reinstated')).toBe(false);
+  });
+
+  it('SAFEGUARD: a MANUALLY suspended tenant is NOT reinstated by a stray invoice.paid', async () => {
+    state.tenantRow = {
+      id: 7,
+      slug: 'acme',
+      status: 'suspended',
+      stripeCustomerId: 'cus_123',
+      plan: 'pro',
+      stripeSubscriptionId: 'sub_123',
+    };
+    state.retrieveSub = makeSub('active');
+    const invoiceEvent = {
+      type: 'invoice.paid',
+      data: { object: { id: 'in_x', customer: 'cus_123', subscription: 'sub_123' } },
+    } as unknown as Stripe.Event;
+    await handleEvent(invoiceEvent);
+    expect(writtenStatus()).toBeUndefined();
+  });
+
+  it('SAFEGUARD: a CHURNED tenant is never auto-reinstated', async () => {
+    state.tenantRow = {
+      id: 7,
+      slug: 'acme',
+      status: 'churned',
+      stripeCustomerId: 'cus_123',
+      plan: 'free',
+      stripeSubscriptionId: null,
+      lifecycleEmailsJson: { [BILLING_SUSPENDED_KEY]: '2026-01-01T00:00:00.000Z' },
+    };
+    await handleEvent(subEvent('customer.subscription.updated', makeSub('active')));
+    expect(writtenStatus()).toBeUndefined(); // stays churned
+  });
+
+  it('active on an already-active tenant → no status write (idempotent)', async () => {
+    state.tenantRow = {
+      id: 7,
+      slug: 'acme',
+      status: 'active',
+      stripeCustomerId: 'cus_123',
+      plan: 'pro',
+      stripeSubscriptionId: 'sub_123',
+    };
+    await handleEvent(subEvent('customer.subscription.updated', makeSub('active')));
+    expect(writtenStatus()).toBeUndefined();
+    expect(state.inserts.some((i) => i.action === 'billing.reinstated')).toBe(false);
+  });
+});
+
+describe('automatic access enforcement — upgrade grants higher access', () => {
+  it('subscription.updated to the PRO price → plan pro (Pro-only features unlock)', async () => {
+    state.tenantRow = {
+      id: 7,
+      slug: 'acme',
+      status: 'active',
+      stripeCustomerId: 'cus_123',
+      plan: 'vital',
+      stripeSubscriptionId: 'sub_123',
+    };
+    await handleEvent(
+      subEvent('customer.subscription.updated', makeSub('active', { priceId: 'price_pro' }))
+    );
+    expect(state.updates[0].plan).toBe('pro');
+    expect(writtenStatus()).toBeUndefined(); // already active, no status thrash
+  });
+
+  it('subscription.updated to the VITAL price → plan vital', async () => {
+    state.tenantRow = {
+      id: 7,
+      slug: 'acme',
+      status: 'active',
+      stripeCustomerId: 'cus_123',
+      plan: 'pro',
+      stripeSubscriptionId: 'sub_123',
+    };
+    await handleEvent(
+      subEvent('customer.subscription.updated', makeSub('active', { priceId: 'price_vital' }))
+    );
+    expect(state.updates[0].plan).toBe('vital');
   });
 });
