@@ -91,12 +91,12 @@ export const SAMPLE_SERVICES: Record<DemoMode, DemoServiceSpec> = {
     service: 'drayage',
     label: 'Port Drayage',
     equipments: [
-      { equipment: 'container_40hc', label: "40' HC Container" },
       { equipment: 'container_20', label: "20' Container" },
+      { equipment: 'container_40hc', label: "40'HQ" },
     ],
     cards: [
-      { service: 'drayage', equipment: 'container_40hc', label: "40' HC Container", ratePerMile: 4.25, minimumCharge: 375, flatFee: 45, fuelSurchargePct: 18, marginPct: 10, maxMiles: 250, maxWeightLbs: 44000 },
       { service: 'drayage', equipment: 'container_20', label: "20' Container", ratePerMile: 3.95, minimumCharge: 350, flatFee: 45, fuelSurchargePct: 18, marginPct: 10, maxMiles: 250, maxWeightLbs: 44000 },
+      { service: 'drayage', equipment: 'container_40hc', label: "40'HQ", ratePerMile: 4.25, minimumCharge: 375, flatFee: 45, fuelSurchargePct: 18, marginPct: 10, maxMiles: 250, maxWeightLbs: 44000 },
     ],
     fields: ['port', 'terminal', 'container', 'chassis'],
   },

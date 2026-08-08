@@ -263,7 +263,8 @@ describe('GET /api/public/widget/:slug (prospect interceptor)', () => {
     // Equipment options carry `value` (the key widget.js consumes) — guards the
     // value="undefined" shipping-blocker end-to-end through the served response.
     const ebs = cfg.equipmentByService as Record<string, Array<{ value?: string }>>;
-    expect(ebs.drayage[0].value).toBe('container_40hc');
+    // Drayage defaults to the 20' container (first option → the widget's default).
+    expect(ebs.drayage[0].value).toBe('container_20');
     expect('equipment' in ebs.drayage[0]).toBe(false);
   });
 

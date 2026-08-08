@@ -200,7 +200,7 @@ export const DEFAULT_RATE_CARDS: Omit<NewRateCard, 'tenantId'>[] = [
   {
     service: 'drayage',
     equipment: 'container_40hc',
-    label: '40\' High-Cube Container',
+    label: '40\'HQ',
     ratePerMile: 4.50,
     minimumCharge: 400,
     flatFee: 50,
