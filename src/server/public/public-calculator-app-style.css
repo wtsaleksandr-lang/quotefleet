@@ -187,14 +187,21 @@ body.qf-app-calculator .qf-flags label {
   padding: 11px 12px;
 }
 
+/* Checkbox tick (flags + oog/genset/dimensions toggles) uses the SAME blue as
+   the selected chip/flag outline (--w-accent-solid), so every add-on control
+   reads with one consistent accent. --w-primary === --w-accent === p.accent;
+   --w-accent-solid is the minimally-hardened form the outline also uses. */
 body.qf-app-calculator input[type="checkbox"] {
-  accent-color: var(--w-primary);
+  accent-color: var(--w-accent-solid, var(--w-accent, var(--w-primary)));
 }
 
+/* Selected chip = outline + subtle tint, never a solid fill (standing UI rule).
+   Kept in sync with the source-of-truth rule in
+   public-calculator-no-gradients.css so no load order can flip it to a fill. */
 body.qf-app-calculator .qf-acc-chip.active {
-  background: var(--w-primary) !important;
-  border-color: var(--w-primary) !important;
-  color: #fff !important;
+  background: rgba(37, 99, 235, 0.10) !important;
+  border: 1px solid var(--w-accent-solid, var(--w-accent, #0D3CFC)) !important;
+  color: var(--w-accent-solid, var(--w-accent, #0D3CFC)) !important;
 }
 
 body.qf-app-calculator .qf-help {
