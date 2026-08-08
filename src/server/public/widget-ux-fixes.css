@@ -337,13 +337,13 @@ body.qf-modal-open { overflow: hidden; }
 .qf-cs-ico {
   flex: 0 0 auto;
   display: inline-flex;
-  width: 16px;
-  height: 16px;
+  width: 19px;
+  height: 19px;
   opacity: 0.8;
 }
 .qf-cs-ico svg {
-  width: 16px;
-  height: 16px;
+  width: 19px;
+  height: 19px;
 }
 /* Selected option already goes brand-colored + bold; let its icon follow. */
 .qf-cs-opt[aria-selected="true"] .qf-cs-ico {
