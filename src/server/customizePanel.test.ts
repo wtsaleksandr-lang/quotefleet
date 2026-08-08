@@ -85,6 +85,70 @@ describe('customize panel — header logo fill (compact vs full-width)', () => {
   });
 });
 
+describe('customize panel — confirm-rate CTA (customizable claim button)', () => {
+  it('persists claim_cta_text as a nullable brand_configs column', async () => {
+    const schema = await read('src/db/schema.ts');
+    // Nullable (no default) so the widget owns the fallback copy; kept separate
+    // from cta_text (the calculate button) so both CTAs edit independently.
+    expect(schema).toContain("claimCtaText: text('claim_cta_text')");
+  });
+
+  it('adds a NEW idempotent migration registered in the boot-migrator journal', async () => {
+    const mig = await read('drizzle/0036_claim_cta_text.sql');
+    expect(mig).toContain('ADD COLUMN IF NOT EXISTS "claim_cta_text" text');
+    const journal = await read('drizzle/meta/_journal.json');
+    expect(journal).toContain('0036_claim_cta_text');
+  });
+
+  it('validates claimCtaText (nullable) in the brand PUT schema', async () => {
+    const src = await read('src/server/routes/tenant.ts');
+    // Nullable string so null clears back to the default; spreads into the
+    // update `set` via columnPatch like every other scalar brand field (so a
+    // GET→PUT→GET round-trip persists it with no bespoke code).
+    expect(src).toContain('claimCtaText: z.string().max(120).nullable().optional()');
+    expect(src).toContain('const set: Record<string, unknown> = { ...columnPatch');
+    // GET returns the whole brand row, so the saved value round-trips back.
+    expect(src).toContain('brand: row[0] ?? null');
+  });
+
+  it('adds a Confirm-rate button label control beside the CTA text field', async () => {
+    const js = await pub('app.js');
+    expect(js).toContain("brandSettingField(b, 'Confirm-rate button', 'claimCtaText'");
+    expect(js).toContain('Get the rate confirmed'); // the placeholder / new default
+  });
+
+  it('applies the customizable label (default + variant) on the public widget', async () => {
+    const widgetJs = await pub('widget.js');
+    // A saved claimCtaText wins; else the new default, or the show-price variant.
+    expect(widgetJs).toContain('brand.claimCtaText');
+    expect(widgetJs).toContain("'Get the rate confirmed'");
+    expect(widgetJs).toContain("'Claim this quote →'");
+    // The old hardcoded string is gone.
+    expect(widgetJs).not.toContain('Get this quote in writing');
+    // Live-preview no-blink path carries the field.
+    expect(widgetJs).toContain("'showQuoteBeforeContact', 'claimCtaText'");
+  });
+
+  it('unfolds the contact form inline below the result instead of a step jump', async () => {
+    const widgetJs = await pub('widget.js');
+    const html = await pub('widget.html');
+    const css = await pub('widget-motion.css');
+    // The CTA now unfolds the drawer instead of switching steps.
+    expect(widgetJs).toContain('openInlineContact()');
+    expect(widgetJs).toContain('function openInlineContact');
+    expect(widgetJs).toContain('function closeInlineContact');
+    // Reuses the shared premium fold + reduced-motion aware helper.
+    expect(widgetJs).toContain('animateFold(drawer, true)');
+    // The contact form lives inside the result card as a folding drawer, and the
+    // old separate contact step is gone.
+    expect(html).toContain('id="qf-inline-contact"');
+    expect(html).not.toContain('id="qf-step-contact"');
+    // Drawer styling: eased reveal + hide the redundant CTA while open.
+    expect(css).toContain('.qf-inline-contact');
+    expect(css).toContain('.qf-result.qf-contact-open #qf-continue-btn { display: none; }');
+  });
+});
+
 describe('customize panel — dashboard UI', () => {
   it('renders a single-purpose Customize page with presets, accent, font, logo + live preview', async () => {
     const js = await pub('app.js');
