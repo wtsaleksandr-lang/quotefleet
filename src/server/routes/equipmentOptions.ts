@@ -18,7 +18,7 @@ export const MATRIX_EQUIPMENT_LABELS: Record<string, string> = {
   conestoga: 'Conestoga',
   container_20: "20' Container",
   container_40: "40' Container",
-  container_40hc: "40' High-Cube Container",
+  container_40hc: "40'HQ",
   container_45: "45' Container",
   container_40re: "40' Reefer Container",
   container_20re: "20' Reefer Container",
@@ -36,6 +36,25 @@ export function matrixEquipmentLabel(code: string): string {
 }
 
 export type EquipmentOption = { value: string; label: string; maxWeightLbs?: number };
+
+// Canonical display rank for CONTAINER equipment so a container list always
+// reads smallest→largest (20' → 40' → 40'HQ → 45') regardless of the order the
+// tenant's rate cards happen to arrive in (cards sort by updatedAt/id, which is
+// non-deterministic for a bulk-seeded tenant). This makes the widget default to
+// the 20' container for drayage. Non-container equipment gets a high rank and
+// keeps its original relative order (stable sort), so other modes are untouched.
+const CONTAINER_ORDER: Record<string, number> = {
+  container_20: 0,
+  container_20re: 1,
+  container_40: 2,
+  container_40hc: 3,
+  container_40re: 4,
+  container_45: 5,
+};
+function equipmentSortRank(value: string, index: number): number {
+  const r = CONTAINER_ORDER[value];
+  return r === undefined ? 100 + index : r;
+}
 
 /**
  * Collapse each service's equipment list to distinct equipment TYPES.
@@ -74,7 +93,16 @@ export function dedupeEquipmentTypes(
         existing.maxWeightLbs = item.maxWeightLbs;
       }
     }
-    out[service] = Array.from(seen.values());
+    // Stable canonical order: containers smallest→largest, everything else in
+    // arrival order. Sort by (rank, originalIndex) so it never shuffles
+    // non-container modes.
+    out[service] = Array.from(seen.values())
+      .map((opt, index) => ({ opt, index }))
+      .sort((a, b) =>
+        equipmentSortRank(a.opt.value, a.index) - equipmentSortRank(b.opt.value, b.index) ||
+        a.index - b.index,
+      )
+      .map((x) => x.opt);
   }
   return out;
 }

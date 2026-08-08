@@ -227,9 +227,12 @@ body[data-qf-cta-hover="fill"] .qf-cta:not(.qf-secondary):hover { background: va
 .qf-chat-bubble.user { align-self: flex-end; background: var(--w-primary, #2563eb); color: #fff; border-bottom-right-radius: 4px; }
 .qf-chat-bubble.assistant { align-self: flex-start; background: var(--w-surface-2, #f1f4f9); color: var(--w-fg); border-bottom-left-radius: 4px; }
 .qf-chat-bubble.thinking { align-self: flex-start; font-size: 12px; color: var(--w-muted); font-style: italic; }
-.qf-chat-input-row { display: flex; gap: var(--tap-gap); }
-.qf-chat-input-row input { flex: 1; }
-.qf-chat-send { padding: var(--space-1) var(--space-2); font-size: 13px; flex-shrink: 0; }
+.qf-chat-input-row { display: flex; gap: var(--tap-gap); align-items: stretch; }
+.qf-chat-input-row input { flex: 1; min-width: 0; }
+/* Send sits in a flex row, not stacked under a CTA — drop the .qf-cta margin-top
+   that was pushing it below the input, and stretch it to the input's height so
+   the two are the same height and vertically centered on desktop + mobile. */
+.qf-chat-send { margin-top: 0; padding: var(--space-1) var(--space-2); font-size: 13px; flex-shrink: 0; width: auto; align-self: stretch; }
 .qf-chat-toggle button { width: 100%; margin-top: var(--space-1); background: transparent; color: var(--w-primary, #2563eb); border: 1px dashed var(--w-border-strong, #c8cfdb); }
 
 @media (max-width: 640px) {
@@ -286,6 +289,31 @@ body[data-qf-cta-hover="fill"] .qf-cta:not(.qf-secondary):hover { background: va
   line-height: 1.5;
   color: var(--w-oncard-muted, var(--w-muted));
 }
+/* Collapsible Terms: the clip clamps to ~half height by default; the mask
+   softly fades the text out at the cut (theme-agnostic — masks alpha, no color,
+   so it blends onto whatever the card background is). .qf-fold on the element
+   supplies the shared max-height easing used by the fold JS. */
+.qf-disclaimer-clip { position: relative; overflow: hidden; }
+.qf-disclaimer-clip.is-collapsed {
+  -webkit-mask-image: linear-gradient(to bottom, black 68%, transparent 100%);
+  mask-image: linear-gradient(to bottom, black 68%, transparent 100%);
+}
+.qf-disclaimer-toggle {
+  display: inline-flex;
+  align-items: center;
+  margin-top: var(--space-1);
+  padding: 0;
+  background: transparent;
+  border: 0;
+  font-size: 11px;
+  font-weight: 700;
+  line-height: 1.4;
+  color: var(--w-oncard-accent, var(--w-primary));
+  cursor: pointer;
+}
+.qf-disclaimer-toggle:hover { text-decoration: underline; }
+.qf-disclaimer-toggle:focus-visible { outline: 2px solid var(--w-accent, var(--w-primary)); outline-offset: 2px; border-radius: 4px; }
+.qf-disclaimer-toggle[hidden] { display: none; }
 
 /* Pickup + Delivery side-by-side (Alex: keep on one line, both viewports).
    Flex (not grid) so when the Drayage service hides #qf-default-pickup, the

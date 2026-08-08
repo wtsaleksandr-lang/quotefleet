@@ -1862,8 +1862,102 @@
     box.innerHTML = '';
     if (!d) { box.style.display = 'none'; return; }
     box.appendChild(el('span', { class: 'qf-disclaimer-title', text: 'Terms' }));
-    box.appendChild(el('p', { class: 'qf-disclaimer-text', text: d }));
+    // The Terms read as neither fully shown nor fully hidden: a clip clamps the
+    // text to ~half height with a soft mask fade at the cut, and a Show more /
+    // Show less button folds it open/closed with the widget's own .qf-fold
+    // motion (mirrors animateFold — same easing, offsetWidth commit, and
+    // transitionend cleanup — clamping to the half-height instead of 0).
+    var clip = el('div', { class: 'qf-disclaimer-clip qf-fold', id: 'qf-disclaimer-clip' }, [
+      el('p', { class: 'qf-disclaimer-text', text: d }),
+    ]);
+    box.appendChild(clip);
+    var toggle = el('button', {
+      class: 'qf-disclaimer-toggle', type: 'button', id: 'qf-disclaimer-toggle',
+      'aria-controls': 'qf-disclaimer-clip', 'aria-expanded': 'false', text: 'Show more',
+      on: { click: function () {
+        foldDisclaimer(clip, toggle, toggle.getAttribute('aria-expanded') !== 'true');
+      } },
+    });
+    toggle.hidden = true; // revealed by setupDisclaimerClamp only when text overflows
+    box.appendChild(toggle);
     box.style.display = 'block';
+    // Measure once the result card is actually on screen. renderDisclaimer runs
+    // just BEFORE #qf-result is un-hidden in the same tick, so a naked scrollHeight
+    // here reads 0 — defer to the next frame when layout is real.
+    var setup = function () { setupDisclaimerClamp(clip, toggle); };
+    if (window.requestAnimationFrame) requestAnimationFrame(function () { requestAnimationFrame(setup); });
+    else setup();
+  }
+
+  // Clamp the Terms clip to ~half its natural height (collapsed default) and show
+  // the toggle only when the text is tall enough for hiding half to be meaningful.
+  function setupDisclaimerClamp(clip, toggle) {
+    if (!clip || !toggle) return;
+    clip.style.maxHeight = '';
+    clip.classList.remove('is-collapsed');
+    var full = clip.scrollHeight;
+    var textEl = clip.querySelector('.qf-disclaimer-text');
+    var lineH = 16;
+    try { lineH = parseFloat(getComputedStyle(textEl).lineHeight) || 16; } catch (e) {}
+    // Short terms (≲4 lines) show in full — no clamp, no toggle.
+    if (!full || full <= lineH * 4 + 4) {
+      toggle.hidden = true; clip.dataset.clamp = ''; clip.style.maxHeight = ''; autoResize(); return;
+    }
+    var clampPx = Math.max(Math.round(full * 0.5), Math.round(lineH * 2));
+    clip.dataset.clamp = String(clampPx);
+    clip.style.maxHeight = clampPx + 'px';
+    clip.classList.add('is-collapsed');
+    toggle.hidden = false;
+    toggle.setAttribute('aria-expanded', 'false');
+    toggle.textContent = 'Show more';
+    autoResize();
+  }
+
+  // Fold the Terms clip between its collapsed half-height and full height. Same
+  // motion contract as animateFold (the shared .qf-fold transition + reduced-
+  // motion snap), but the collapsed end is the measured half-height, not 0, and
+  // the mask fade toggles via .is-collapsed.
+  function foldDisclaimer(clip, toggle, open) {
+    if (!clip) return;
+    if (clip._foldEnd) { clip.removeEventListener('transitionend', clip._foldEnd); clip._foldEnd = null; }
+    var clampPx = Number(clip.dataset.clamp || 0);
+    var setBtn = function () {
+      if (!toggle) return;
+      toggle.setAttribute('aria-expanded', open ? 'true' : 'false');
+      toggle.textContent = open ? 'Show less' : 'Show more';
+    };
+    if (prefersReduce()) {
+      clip.classList.toggle('is-collapsed', !open);
+      clip.style.maxHeight = open ? '' : (clampPx ? clampPx + 'px' : '');
+      setBtn(); autoResize(); return;
+    }
+    if (open) {
+      clip.classList.remove('is-collapsed'); // fade off as it opens
+      var full = clip.scrollHeight;
+      clip.style.maxHeight = clampPx + 'px';
+      void clip.offsetWidth; // commit the collapsed start
+      clip.style.maxHeight = full + 'px';
+      clip._foldEnd = function (e) {
+        if (e.target !== clip || e.propertyName !== 'max-height') return;
+        clip.style.maxHeight = ''; // let content grow freely
+        clip.removeEventListener('transitionend', clip._foldEnd); clip._foldEnd = null;
+        autoResize();
+      };
+      clip.addEventListener('transitionend', clip._foldEnd);
+    } else {
+      clip.style.maxHeight = clip.scrollHeight + 'px';
+      void clip.offsetWidth;
+      clip.classList.add('is-collapsed'); // fade back on
+      clip.style.maxHeight = clampPx + 'px';
+      clip._foldEnd = function (e) {
+        if (e.target !== clip || e.propertyName !== 'max-height') return;
+        clip.removeEventListener('transitionend', clip._foldEnd); clip._foldEnd = null;
+        autoResize();
+      };
+      clip.addEventListener('transitionend', clip._foldEnd);
+    }
+    setBtn();
+    pumpResize(340);
   }
 
   // Show a validation message AND bring the offending field into view + focus it,

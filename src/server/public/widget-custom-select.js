@@ -59,8 +59,8 @@
     if (/\bltl\b|pallet|less.?than.?truck/.test(t)) return IC_PALLET;
     // Containers, sized — only when the label actually says container/HC/etc., so
     // a "40' Gooseneck" or "48' Flatbed" never gets mistaken for a container.
-    if (/container|high.?cube|hi.?cube|highcube|\bhc\b|intermodal|chassis|\bteu\b|drayage|ocean/.test(t)) {
-      var hc = /high.?cube|hi.?cube|highcube|\bhc\b/.test(t);
+    if (/container|high.?cube|hi.?cube|highcube|\bhc\b|\bhq\b|40.?hq|intermodal|chassis|\bteu\b|drayage|ocean/.test(t)) {
+      var hc = /high.?cube|hi.?cube|highcube|\bhc\b|\bhq\b|40.?hq/.test(t);
       if (/(^|\D)45(\D|$)/.test(t)) return IC_C45HC;
       if (/(^|\D)40(\D|$)/.test(t)) return hc ? IC_C40HC : IC_C40;
       if (/(^|\D)20(\D|$)/.test(t)) return IC_C20;
@@ -69,6 +69,28 @@
     if (/box.?truck|straight.?truck/.test(t)) return IC_TRUCK;
     if (/dry.?van|sprinter|cargo|\bvan\b|straight|\bbox\b/.test(t)) return IC_VAN;
     return IC_TRUCK;
+  }
+  // Compact display label for CONTAINER equipment only (Alex: icon + short size
+  // code in the dropdown). Maps a container option's full label to its size code
+  // — 20' / 40' / 40'HQ / 45' — while reefer / open-top / flat-rack containers
+  // keep a short type name (they read by type, not size). Non-container equipment
+  // (dry van, sprinter, flatbed, hotshot, LTL/pallet, box truck …) is returned
+  // unchanged. Purely a DISPLAY transform: the underlying <option> value + label
+  // stay intact, so the quote summary + lead still read the full label.
+  function containerShortLabel(label) {
+    var t = (label || '').toLowerCase();
+    var isContainer = /container|high.?cube|hi.?cube|highcube|\bhc\b|\bhq\b|40.?hq|intermodal|\bteu\b|drayage|ocean/.test(t);
+    if (!isContainer) return label;
+    // Type-named container variants keep a short word, not a size code.
+    if (/reefer|refriger|genset/.test(t)) return 'Reefer';
+    if (/open.?top/.test(t)) return 'Open-Top';
+    if (/flat.?rack|flatrack/.test(t)) return 'Flat-Rack';
+    // Sized dry containers → size code. High-cube 40' → 40'HQ.
+    var hc = /high.?cube|hi.?cube|highcube|\bhc\b|\bhq\b|40.?hq/.test(t);
+    if (/(^|\D)45(\D|$)/.test(t)) return "45'";
+    if (/(^|\D)40(\D|$)/.test(t)) return hc ? "40'HQ" : "40'";
+    if (/(^|\D)20(\D|$)/.test(t)) return "20'";
+    return label;
   }
   function makeIcon(label) {
     var span = document.createElement('span');
@@ -121,10 +143,10 @@
       if (!withIcons) { el.textContent = text; return; }
       el.textContent = '';
       el.classList.add('qf-cs-ico-row');
-      el.appendChild(makeIcon(text));
+      el.appendChild(makeIcon(text)); // icon resolves off the FULL label
       var lab = document.createElement('span');
       lab.className = 'qf-cs-txt';
-      lab.textContent = text;
+      lab.textContent = containerShortLabel(text); // containers show a short size code
       el.appendChild(lab);
     }
 
