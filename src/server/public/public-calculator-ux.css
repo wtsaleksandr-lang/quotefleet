@@ -664,4 +664,21 @@ body.qf-app-calculator .qf-rchat .qf-chat-send {
   flex: 0 0 auto !important;
   width: auto !important;
 }
+/* Alex: the assistant greeting bubble must be the SAME width as the text input +
+   Send button beneath it — its left/right edges flush with the input-row's edges
+   (input left ↔ Send right). The shared .qf-chat styling caps bubbles at 85% and
+   left-insets the assistant bubble, and .qf-chat-msgs adds its own horizontal
+   padding, so bubbles read narrower + inset vs the (padding-less) input-row.
+   Zero the msgs' horizontal padding so both are inset by the SAME amount, and let
+   every result-chat bubble span the full inner width. Long text still wraps via
+   word-wrap on the base .qf-chat-bubble. Scoped to .qf-rchat — the portal copilot
+   chat keeps its bubble styling. */
+body.qf-app-calculator .qf-rchat .qf-chat-msgs {
+  padding-left: 0;
+  padding-right: 0;
+}
+body.qf-app-calculator .qf-rchat .qf-chat-bubble {
+  max-width: 100%;
+  align-self: stretch;
+}
 .qf-rchat-launch { margin-top: 8px; text-align: center; }
