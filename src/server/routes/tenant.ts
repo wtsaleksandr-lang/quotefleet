@@ -852,6 +852,11 @@ export function registerTenantRoutes(app: Express) {
     // fits the logo with object-fit:contain in both modes. See renderHeader.
     headerLogoFill: z.enum(['half', 'full']).optional(),
     ctaText: z.string().optional(),
+    // Label for the post-quote "confirm the rate" CTA (#qf-continue-btn) that
+    // reveals the contact form. Nullable — null clears back to the widget's
+    // default copy ('Get the rate confirmed'). Persisted verbatim; spreads into
+    // the update `set` via columnPatch like every other scalar brand field.
+    claimCtaText: z.string().max(120).nullable().optional(),
     footerNote: z.string().nullable().optional(),
     showPoweredBy: z.boolean().optional(),
     allowedDomains: z.string().nullable().optional(),

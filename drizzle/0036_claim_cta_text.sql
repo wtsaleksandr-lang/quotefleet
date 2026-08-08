@@ -1,0 +1,17 @@
+-- Customizable "confirm the rate" CTA — the post-quote button (#qf-continue-btn)
+-- that reveals the contact form. Previously its label was hardcoded in widget.js
+-- ('Get this quote in writing'); this makes it tenant-editable alongside the
+-- calculate-button label (cta_text), while defaulting to the new copy
+-- 'Get the rate confirmed' when unset.
+--
+-- Nullable (no default) so the widget owns the fallback string: a NULL row keeps
+-- the platform default and, when the tenant has "show price before contact" on,
+-- the 'Claim this quote →' variant — exactly today's behaviour. A tenant value
+-- wins in both states.
+--
+-- ADD COLUMN IF NOT EXISTS so it is idempotent and safe to re-run on every boot
+-- via runMigrations() (src/db/migrate.ts) — the Replit deploy does not run
+-- db:migrate, so this makes the republish self-healing (same pattern as
+-- 0026/0029/0030/0031/0032/0034/0035). Existing rows get NULL, which renders the
+-- current CTA copy, so no tenant changes visually.
+ALTER TABLE "brand_configs" ADD COLUMN IF NOT EXISTS "claim_cta_text" text;

@@ -682,6 +682,13 @@ export const brandConfigs = pgTable('brand_configs', {
   headerLogoFill: text('header_logo_fill').notNull().default('half'),
   /** Optional CTA button text override. */
   ctaText: text('cta_text').notNull().default('Get instant quote'),
+  /** Optional label for the post-quote "confirm the rate" CTA (#qf-continue-btn)
+   *  that reveals the contact form. Nullable — when null the widget falls back to
+   *  its default ('Get the rate confirmed', or 'Claim this quote →' when
+   *  showQuoteBeforeContact is on). A tenant value wins in both states. Kept
+   *  separate from ctaText (the calculate button) so the two CTAs are
+   *  independently editable. See renderHeader/applyContactRules in widget.js. */
+  claimCtaText: text('claim_cta_text'),
   /** Footer text under the widget. */
   footerNote: text('footer_note'),
   /** Whether to show "Powered by QuoteFleet" branding. */

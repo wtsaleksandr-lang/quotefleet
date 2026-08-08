@@ -436,7 +436,14 @@
       }
     }
     var contBtn = $('qf-continue-btn');
-    if (contBtn) contBtn.textContent = rules.showQuoteBeforeContact ? 'Claim this quote →' : 'Get this quote in writing';
+    if (contBtn) {
+      // Tenant-customizable "confirm the rate" CTA. A saved claimCtaText wins in
+      // BOTH states; otherwise fall back to the platform default — the new
+      // 'Get the rate confirmed', or the 'Claim this quote →' variant when the
+      // tenant shows the price before asking for contact info.
+      var custom = brand && typeof brand.claimCtaText === 'string' ? brand.claimCtaText.trim() : '';
+      contBtn.textContent = custom || (rules.showQuoteBeforeContact ? 'Claim this quote →' : 'Get the rate confirmed');
+    }
   }
 
   // Demo-only light/dark preset override, forwarded to the config endpoint so
@@ -500,7 +507,7 @@
       if (Object.prototype.hasOwnProperty.call(patch, k)) { brand[k] = patch[k]; touchedHeader = true; }
     });
     if (touchedHeader) { try { renderHeader(state.config); } catch (_e) {} }
-    var CONTACT_KEYS = ['requireEmail', 'requirePhone', 'showQuoteBeforeContact'];
+    var CONTACT_KEYS = ['requireEmail', 'requirePhone', 'showQuoteBeforeContact', 'claimCtaText'];
     var touchedContact = false;
     CONTACT_KEYS.forEach(function (k) {
       if (Object.prototype.hasOwnProperty.call(patch, k)) { brand[k] = patch[k]; touchedContact = true; }
@@ -612,7 +619,7 @@
     });
 
     $('qf-calc-btn').addEventListener('click', onCalculate);
-    $('qf-continue-btn').addEventListener('click', function () { showStep('contact'); });
+    $('qf-continue-btn').addEventListener('click', function () { openInlineContact(); });
     // "Edit details" on the result — scroll back up to the form so the user can
     // change anything and re-calculate (the form stays live below the estimate).
     var editBtn = $('qf-edit-btn');
@@ -646,7 +653,7 @@
     window.addEventListener('resize', function () { positionTabIndicator(false); });
     if (document.fonts && document.fonts.ready) { document.fonts.ready.then(function () { positionTabIndicator(false); }); }
     setTimeout(function () { positionTabIndicator(false); }, 600);
-    $('qf-back-btn').addEventListener('click', function () { showStep('quote'); });
+    $('qf-back-btn').addEventListener('click', function () { closeInlineContact(); });
     $('qf-submit-btn').addEventListener('click', onSubmit);
     var leadFilesEl = $('qf-c-files');
     if (leadFilesEl) leadFilesEl.addEventListener('change', renderLeadFileList);
@@ -748,6 +755,7 @@
       ['qf-cb-phone', 'qf-cb-time', 'qf-cb-topic'].forEach(function (id) { var el = $(id); if (el) { el.value = ''; el.disabled = false; } });
       showCallbackError(null);
       $('qf-result').style.display = 'none';
+      resetInlineContact();
       resetCalcCta();
       ['qf-pickup-zip', 'qf-delivery-zip', 'qf-weight', 'qf-booking', 'qf-c-name', 'qf-c-email', 'qf-c-phone', 'qf-c-company', 'qf-c-notes', 'qf-oog-length', 'qf-oog-width', 'qf-oog-height', 'qf-oog-weight', 'qf-oog-notes', 'qf-c-files']
         .forEach(function (id) { var el = $(id); if (el) el.value = ''; });
@@ -1128,6 +1136,7 @@
     // restore the primary CTA (otherwise a stale result + "Recalculate" linger).
     if (!firstSelect && state.service !== service) {
       var rb = $('qf-result'); if (rb) rb.style.display = 'none';
+      resetInlineContact();
       showError('qf-error', null); resetCalcCta(); resetQuoteChat();
       // Add-on flags describe THIS shipment — clear them on a mode switch so
       // residential/hazmat/temp-control don't silently carry over to the next
@@ -1503,6 +1512,49 @@
   }
 
   function showStep(name) { ['quote', 'contact', 'thanks'].forEach(function (n) { var s = $('qf-step-' + n); if (s) s.classList.toggle('active', n === name); }); autoResize(); }
+
+  // ── Inline contact unfold ──────────────────────────────────────────────────
+  // The post-quote CTA (#qf-continue-btn) no longer jumps to a separate step; it
+  // smoothly unfolds the SAME contact form as a drawer directly below the result
+  // actions, so the estimate stays visible above it. The drawer (#qf-inline-contact)
+  // reuses animateFold (premium eased height+opacity, iframe-height pumped,
+  // reduced-motion aware). #qf-result gets .qf-contact-open so the CSS hides the
+  // now-redundant CTA while the form is open; "Back" folds it away again.
+  function openInlineContact() {
+    var drawer = $('qf-inline-contact');
+    var result = $('qf-result');
+    if (!drawer || !result) { showStep('contact'); return; }
+    result.classList.add('qf-contact-open');
+    animateFold(drawer, true);
+    var first = $('qf-c-name');
+    var bringIn = function () {
+      try { drawer.scrollIntoView({ behavior: prefersReduce() ? 'auto' : 'smooth', block: 'nearest' }); } catch (e) {}
+      if (first) { try { first.focus({ preventScroll: true }); } catch (e2) { try { first.focus(); } catch (e3) {} } }
+    };
+    if (prefersReduce()) bringIn(); else setTimeout(bringIn, 80);
+  }
+  function closeInlineContact() {
+    var drawer = $('qf-inline-contact');
+    var result = $('qf-result');
+    if (result) result.classList.remove('qf-contact-open');
+    if (drawer) animateFold(drawer, false);
+    showError('qf-submit-error', null);
+    var cont = $('qf-continue-btn');
+    var bringBack = function () { try { if (cont) cont.scrollIntoView({ behavior: prefersReduce() ? 'auto' : 'smooth', block: 'nearest' }); } catch (e) {} };
+    if (prefersReduce()) bringBack(); else setTimeout(bringBack, 80);
+  }
+  // Snap the drawer shut with no animation — used on restart, where the whole
+  // result card is being torn down and a fold-up would be wasted motion.
+  function resetInlineContact() {
+    var drawer = $('qf-inline-contact');
+    var result = $('qf-result');
+    if (result) result.classList.remove('qf-contact-open');
+    if (drawer) {
+      if (drawer._foldEnd) { drawer.removeEventListener('transitionend', drawer._foldEnd); drawer._foldEnd = null; }
+      drawer.hidden = true;
+      drawer.style.maxHeight = ''; drawer.style.opacity = ''; drawer.style.overflow = '';
+    }
+  }
   function showError(id, msg) { var e = $(id); if (msg) { e.textContent = msg; e.style.display = 'block'; } else { e.style.display = 'none'; } }
 
   function gatherQuoteRequest() {

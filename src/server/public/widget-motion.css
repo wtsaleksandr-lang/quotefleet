@@ -257,3 +257,25 @@ body.qf-app-calculator #qf-services button.active,
     transform: none !important;
   }
 }
+
+/* ════════════════════════════════════════════════════════════════════════
+   6. INLINE CONTACT UNFOLD (post-quote "confirm the rate" drawer)
+   #qf-continue-btn no longer jumps to a separate step — clicking it unfolds the
+   contact form as a drawer INSIDE the result card, so the estimate stays visible
+   above it (widget.js openInlineContact drives the shared animateFold: eased
+   max-height + opacity, iframe height pumped, reduced-motion aware). A slightly
+   longer duration than the generic .qf-fold makes the larger reveal feel
+   premium; the global reduced-motion block above still snaps it instantly.
+   ════════════════════════════════════════════════════════════════════════ */
+.qf-inline-contact {
+  --qf-dur: 380ms;
+  margin-top: 16px;
+  padding-top: 16px;
+  border-top: 1px solid var(--w-accent-pill-border, rgba(13, 60, 252, 0.18));
+}
+/* While the form is open, hide the now-redundant CTA (the drawer's own "Almost
+   done" heading + "Back" carry the flow) and collapse the actions grid so the
+   remaining sublinks (Edit details / Ask about this quote) sit centered rather
+   than stranded in a second column. */
+.qf-result.qf-contact-open .qf-result-actions { grid-template-columns: 1fr; }
+.qf-result.qf-contact-open #qf-continue-btn { display: none; }

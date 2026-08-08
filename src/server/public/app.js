@@ -4337,6 +4337,10 @@
         placeholder: 'Get instant quote',
         hint: 'The label on your widget’s main call-to-action button.',
       }));
+      copyWrap.appendChild(brandSettingField(b, 'Confirm-rate button', 'claimCtaText', {
+        placeholder: 'Get the rate confirmed',
+        hint: 'The button under the estimate that opens the contact form to lock in the rate. Leave blank for the default.',
+      }));
       copyWrap.appendChild(brandSettingField(b, 'Footer note', 'footerNote', {
         textarea: true,
         placeholder: 'e.g. Quotes are estimates — final pricing confirmed by our team.',
