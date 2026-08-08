@@ -9,6 +9,7 @@
   <link rel="stylesheet" href="/freight-premium-theme.css">
   <link rel="stylesheet" href="/widget-ux-fixes.css">
   <link rel="stylesheet" href="/widget-motion.css">
+  <link rel="stylesheet" href="/widget-hazmat-pill.css">
   <link rel="stylesheet" href="/grab-scroll.css">
   <link rel="icon" href="/favicon.ico" sizes="any">
   <link rel="icon" type="image/png" sizes="32x32" href="/brand/favicon-32.png">
@@ -149,11 +150,7 @@
       <div class="qf-modal-body" id="qf-options-body">
         <div class="qf-options-inner">
             <div class="qf-opt-group-label">Shipment conditions</div>
-            <div class="qf-flags"><label><input type="checkbox" id="qf-residential"> <span>Residential</span><span class="qf-help" data-tip="Delivery is to a home, not a business, dock, or warehouse. Residential delivery may require a surcharge.">?</span></label><label><input type="checkbox" id="qf-hazmat"> <span>Hazmat</span><span class="qf-help" data-tip="Cargo is classified hazardous and may require placards, eligible drivers, and carrier approval.">?</span></label><label><input type="checkbox" id="qf-temp"> <span>Temp-control</span><span class="qf-help" data-tip="Cargo needs a refrigerated or temperature-controlled unit.">?</span></label></div>
-            <div class="qf-conditional-panel qf-hazmat-panel" id="qf-hazmat-panel" style="display:none;">
-              <div class="qf-field"><label>Hazmat class</label><select class="qf-select" id="qf-hazmat-class"><option value="">Select class</option><option>Class 1 — Explosives</option><option>Class 2 — Gases</option><option>Class 3 — Flammable liquids</option><option>Class 4 — Flammable solids</option><option>Class 5 — Oxidizers / organic peroxides</option><option>Class 6 — Toxic / infectious substances</option><option>Class 7 — Radioactive material</option><option>Class 8 — Corrosives</option><option>Class 9 — Miscellaneous dangerous goods</option></select></div>
-              <div class="qf-field-hint">Hazmat class helps determine carrier eligibility, placards, routing, and approval requirements.</div>
-            </div>
+            <div class="qf-flags"><label><input type="checkbox" id="qf-residential"> <span>Residential</span><span class="qf-help" data-tip="Delivery is to a home, not a business, dock, or warehouse. Residential delivery may require a surcharge.">?</span></label><div class="qf-hazmat-control" id="qf-hazmat-control"><input type="checkbox" id="qf-hazmat" class="qf-hz-vh" tabindex="-1" aria-hidden="true"><select id="qf-hazmat-class" class="qf-hz-vh" tabindex="-1" aria-hidden="true"><option value="">Select class</option><option>Class 1 — Explosives</option><option>Class 2 — Gases</option><option>Class 3 — Flammable liquids</option><option>Class 4 — Flammable solids</option><option>Class 5 — Oxidizers / organic peroxides</option><option>Class 6 — Toxic / infectious substances</option><option>Class 7 — Radioactive material</option><option>Class 8 — Corrosives</option><option>Class 9 — Miscellaneous dangerous goods</option></select><button type="button" class="qf-hz-trigger" id="qf-hazmat-trigger" aria-haspopup="listbox" aria-expanded="false" aria-controls="qf-hazmat-listbox"><span class="qf-hz-label"><span class="qf-hz-name">Hazmat</span><span class="qf-hz-class" id="qf-hz-class-text"></span></span><span class="qf-hz-chev" aria-hidden="true">▾</span><span class="qf-help" data-tip="Cargo is classified hazardous and may require placards, eligible drivers, and carrier approval.">?</span></button><button type="button" class="qf-hz-clear" id="qf-hazmat-clear" aria-label="Remove hazmat and clear class" hidden>&times;</button><div class="qf-hz-list" id="qf-hazmat-listbox" role="listbox" aria-label="Hazmat class" tabindex="-1" hidden></div></div><label><input type="checkbox" id="qf-temp"> <span>Temp-control</span><span class="qf-help" data-tip="Cargo needs a refrigerated or temperature-controlled unit.">?</span></label></div>
             <div class="qf-opt-group-label qf-opt-group-sep">Optional add-ons</div>
             <div class="qf-accessorials" id="qf-accessorials"></div>
           </div>
@@ -163,6 +160,7 @@
   </div>
   <script src="/grab-scroll.js"></script>
   <script src="/widget.js"></script>
+  <script src="/widget-hazmat-pill.js"></script>
   <script src="/freight-brand-refresh.js"></script>
   <script src="/public-calculator-result.js"></script>
   <script src="/widget-terminal-search.js"></script>

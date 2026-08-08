@@ -130,6 +130,16 @@
     pumpResize(340);
   }
 
+  // Expose the premium fold + iframe-height pump to sibling widget scripts
+  // (e.g. widget-hazmat-pill.js) so the morphing hazmat control reuses the SAME
+  // eased motion + reduced-motion handling rather than re-implementing it.
+  if (typeof window !== 'undefined') {
+    window.QFAnimateFold = animateFold;
+    window.QFPumpResize = pumpResize;
+    window.QFAutoResize = autoResize;
+    window.QFPrefersReduce = prefersReduce;
+  }
+
   // Sliding service-tab indicator. A single positioned element under the tabs
   // that carries the active-pill look (reusing the theme's own active tokens via
   // CSS) and slides/resizes to the active button. `animate=false` snaps it
@@ -1146,7 +1156,9 @@
         var c = $(id);
         if (c && c.checked) { c.checked = false; c.dispatchEvent(new Event('change', { bubbles: true })); }
       });
-      var hzPanel = $('qf-hazmat-panel'); if (hzPanel) hzPanel.style.display = 'none';
+      // The hazmat class-selector control (widget-hazmat-pill.js) listens to the
+      // #qf-hazmat 'change' dispatched above and reverts its morph + clears the
+      // class on a mode switch — no separate panel to hide anymore.
     }
     state.service = service;
     $$('#qf-services button').forEach(function (b) { var on = b.dataset.service === service; b.classList.toggle('active', on); b.setAttribute('aria-selected', on ? 'true' : 'false'); });

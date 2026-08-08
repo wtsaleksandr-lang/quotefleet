@@ -6,7 +6,11 @@
   // The real <select> is kept in the DOM (visually hidden) so form submission and
   // all existing change/recalc logic + option lists stay intact. Options are read
   // live from the <select>, never hardcoded.
-  var TARGETS = ['qf-equipment', 'qf-ocean-carrier', 'qf-hazmat-class'];
+  // NOTE: qf-hazmat-class is intentionally NOT enhanced here — it is now a
+  // hidden source-of-truth <select> driven by the morphing hazmat pill control
+  // (widget-hazmat-pill.js), which renders its own themed listbox. Enhancing it
+  // would surface a duplicate visible dropdown.
+  var TARGETS = ['qf-equipment', 'qf-ocean-carrier'];
 
   function labelFor(opt) {
     return opt ? (opt.textContent || '').trim() : '';
