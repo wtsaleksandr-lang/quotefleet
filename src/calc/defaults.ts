@@ -381,8 +381,8 @@ export const DEFAULT_ACCESSORIALS: Omit<NewAccessorial, 'tenantId'>[] = [
   },
   {
     code: 'triaxle',
-    label: 'Triaxle (4+ axles / heavy)',
-    description: 'Triaxle chassis required for heavy container moves — applies to loads over ~37,550 lbs / 4+ axles.',
+    label: 'Triaxle (3-axle, heavy/overweight)',
+    description: 'Triaxle chassis (3 axles) required for heavy or overweight container moves — typically loads over ~37,550 lbs.',
     kind: 'per_day',
     amount: 85,
     trigger: 'optional',
