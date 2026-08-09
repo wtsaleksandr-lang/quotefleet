@@ -819,7 +819,10 @@ export async function fetchDirections(
   url.searchParams.set('key', apiKey);
 
   const controller = new AbortController();
-  const timeout = setTimeout(() => controller.abort(), 4500);
+  // 7s (was 4.5s): production Directions round-trips occasionally spike past
+  // 4.5s under Replit→Google latency; a premature abort dropped the lane to the
+  // straight-line fallback. Give real routes headroom before falling back.
+  const timeout = setTimeout(() => controller.abort(), 7000);
   try {
     const r = await fetchImpl(url, { signal: controller.signal });
     if (!r.ok) return null;
@@ -883,7 +886,14 @@ export async function getRouteMap(
         kind: 'straight',
       };
 
-  routeCache.set(key, result);
+  // Only cache REAL road routes. The straight-line fallback is produced whenever
+  // Directions transiently fails (timeout / quota blip / ZERO_RESULTS); caching
+  // it for 24h would pin the lane to a straight line long after Directions
+  // recovers. Leaving straight results uncached means the next request re-tries
+  // Directions and upgrades to the real route as soon as it succeeds. (Genuinely
+  // unroutable lanes simply re-attempt each load — rare, and the map is a
+  // background nicety, so the extra call is acceptable.)
+  if (result.kind === 'route') routeCache.set(key, result);
   return result;
 }
 
