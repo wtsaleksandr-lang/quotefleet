@@ -603,10 +603,14 @@ html { scrollbar-width: thin; scrollbar-color: rgba(135, 138, 150, 0.38) transpa
 /* The Terminal label sits INSIDE its .qf-field (unlike Pickup port / Delivery,
    whose titles are siblings just above the field). That meant the field's own
    flex row-gap (--label-gap, 8px) AND the title's margin-bottom (--space-1, 8px)
-   both applied → a doubled 16px label→input gap. Zero the title margin so only
-   the field's 8px gap governs, matching every other drayage label. !important
-   beats the demo app-calculator sheet's `margin: 16px 0 8px !important`. */
-#qf-drayage-left .qf-field > .qf-section-title { margin-bottom: 0 !important; }
+   both applied → a doubled label→input gap. Zero ALL margins on the title so
+   only the field's flex gap (--label-gap) governs the title→select spacing,
+   matching every other drayage label. Zeroing the TOP margin too removes the
+   app-calculator sheet's 16px `margin-top`, which had stacked with the field's
+   own `margin-top` (--space-1) to open a 24px void above the Terminal field
+   (Alex: "too large gap above Terminal") — now a clean 8px between the two
+   fields. !important beats the app-calculator sheet's `margin: 16px 0 …`. */
+#qf-drayage-left .qf-field > .qf-section-title { margin: 0 !important; }
 
 /* Balance the two drayage columns. The left column is taller (Pickup port +
    Terminal + terminal helper); the right column only carries the Delivery field
@@ -831,3 +835,11 @@ html { scrollbar-width: thin; scrollbar-color: rgba(135, 138, 150, 0.38) transpa
     padding-right: var(--space-1);
   }
 }
+
+/* ── "Optional" placeholder nudge (Alex) ──────────────────────────────────────
+   Fields whose placeholder is an "Optional…" hint (booking/container #, phone)
+   read a touch cramped against the input's left edge. Nudge the placeholder +
+   any typed value 4px to the right for a little breathing room. Attribute match
+   [placeholder^="optional" i] is case-insensitive so it catches both
+   "Optional — e.g. …" and "optional" without touching any other field. */
+.qf-input[placeholder^="optional" i] { text-indent: 4px; }

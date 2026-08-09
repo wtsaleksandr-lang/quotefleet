@@ -108,7 +108,9 @@ body.qf-app-calculator .qf-section-title {
   font-size: 12px !important;
   font-weight: 850 !important;
   letter-spacing: .075em !important;
-  margin: 16px 0 8px !important;
+  /* Bottom gap routed through --label-gap (5px, −40%) so section-title→input
+     matches .qf-field label→input; 16px top separation between groups kept. */
+  margin: 16px 0 var(--label-gap) !important;
 }
 
 body.qf-app-calculator .qf-field label {

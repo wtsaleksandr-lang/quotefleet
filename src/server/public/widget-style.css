@@ -30,7 +30,11 @@
   --tap-min: 24px;
   --tap-target: 44px;
   --tap-gap: 8px;
-  --label-gap: 8px;
+  /* Title→input gap. 5px (was 8px, −40%, Alex): tighter label/input rhythm.
+     Drives both `.qf-field` flex-gap AND every `.qf-section-title` bottom margin
+     (widget-style + app-calculator sheet route through this token) so the two
+     title mechanisms stay in lockstep. */
+  --label-gap: 5px;
 }
 
 * { box-sizing: border-box; }
@@ -98,7 +102,7 @@ a.qf-contact-value:hover { text-decoration: underline; }
   text-transform: uppercase;
   letter-spacing: 0.06em;
   color: var(--w-muted);
-  margin: 0 0 var(--space-1) 0;
+  margin: 0 0 var(--label-gap) 0;
 }
 .qf-title-inline { display: flex; align-items: center; gap: var(--space-1); }
 .qf-title-inline .qf-help { margin-left: 0; }
