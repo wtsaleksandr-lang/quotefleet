@@ -60,6 +60,12 @@
         <div class="hero-copy">
           <div class="eyebrow">For carriers, brokers &amp; forwarders</div>
           <h1>Quote every load in seconds — on a page that&rsquo;s branded yours.</h1>
+          <!-- Mobile only: rotating per-clip caption that REPLACES the static H1
+               above the mockup, synced by landing-hero-captions.js to whichever
+               hero clip (laptop/phone) is foreground. Hidden on desktop (the H1 +
+               in-device captions serve there). aria-hidden — the static H1 stays
+               in the DOM (visually-hidden on mobile) as the SEO/AT heading. -->
+          <div class="qf-hero-cap qf-hero-cap--headline" data-show="0" aria-hidden="true"><span class="qf-hero-cap__kicker"></span><span class="qf-hero-cap__title"></span></div>
           <p class="lead">QuoteFleet turns your rate sheet into an instant, branded quote calculator. Customers price their own loads; qualified leads hit your inbox — while your competition is still typing a reply.</p>
           <div class="hero-cta"><a class="btn btn-primary btn-lg" href="/signup">Start free <span class="arr">→</span></a><a class="demo-link" href="/w/demo">See a live demo <span class="arr">→</span></a></div>
           <p class="micro-copy hero-trial-note">14-day full-access trial · no contracts · <a href="/pricing">from $14.80/mo, unlimited quotes</a></p>
