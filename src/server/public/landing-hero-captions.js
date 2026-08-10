@@ -35,6 +35,8 @@
   var wrap = document.querySelector('.qf-hero-devices--video');
   if (!wrap) return;
 
+  var reduceGlobal = !!(window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches);
+
   function beatIndexAt(beats, t) {
     for (var i = 0; i < beats.length; i++) {
       if (t >= beats[i].t0 && t < beats[i].t1) return i;
@@ -42,8 +44,44 @@
     return beats.length - 1;
   }
 
+  // ── Mobile HEADLINE caption ──
+  // On mobile the static hero H1 is visually hidden (CSS) and this single caption
+  // node — pinned above the mockup where the H1 was — narrates the CURRENT clip.
+  // It mirrors whichever device is foreground: laptop beats during the rate-import
+  // clip, phone beats during the instant-quote clip. Cross-fades on beat change,
+  // exactly like the in-device captions. No-ops if the node is absent.
+  var hl = document.querySelector('.qf-hero-cap--headline');
+  var hlKicker = hl && hl.querySelector('.qf-hero-cap__kicker');
+  var hlTitle = hl && hl.querySelector('.qf-hero-cap__title');
+  if (hlKicker) { try { hlKicker.style.setProperty('font-family', "'JetBrains Mono', ui-monospace, SFMono-Regular, Menlo, monospace", 'important'); } catch (e) {} }
+  var hlKey = '';       // dedupe by kicker|title so identical beats don't re-fade
+  var hlSwapping = false;
+  function setHeadline(beat) {
+    if (!hl || !hlKicker || !hlTitle) return;
+    var key = beat.kicker + '|' + beat.title;
+    if (key === hlKey || hlSwapping) return;
+    var first = hlKey === '';
+    hlKey = key;
+    if (reduceGlobal || first) {
+      hlKicker.textContent = beat.kicker;
+      hlTitle.textContent = beat.title;
+      hl.setAttribute('data-show', '1');
+      return;
+    }
+    hlSwapping = true;
+    hl.setAttribute('data-show', '0');
+    window.setTimeout(function () {
+      hlKicker.textContent = beat.kicker;
+      hlTitle.textContent = beat.title;
+      hl.setAttribute('data-show', '1');
+      hlSwapping = false;
+    }, 260);
+  }
+
   // Wire one device: find its <video> + caption node, keep the caption in sync.
-  function wire(videoSel, capSel, beats) {
+  // stageClass = the foreground marker for this device ('stage-laptop' /
+  // 'stage-phone'); while it's set on wrap this device drives the mobile headline.
+  function wire(videoSel, capSel, beats, stageClass) {
     var video = wrap.querySelector(videoSel);
     var cap = wrap.querySelector(capSel);
     if (!video || !cap) return;
@@ -80,6 +118,12 @@
 
     function onTime() {
       var idx = beatIndexAt(beats, video.currentTime || 0);
+      // Headline tracks the FOREGROUND clip on every tick (its own dedupe makes
+      // this cheap). Kept OUT of the in-device early-return below so a stage swap
+      // back to the same beat index still refreshes the headline from the other
+      // device's text. Only the foreground video fires timeupdate, and the stage
+      // guard covers the reduced-motion case where both loop at once.
+      if (stageClass && wrap.classList.contains(stageClass)) setHeadline(beats[idx]);
       if (idx === current || swapping) return;
       if (current === -1) show(idx);       // first paint — no fade
       else change(idx);                    // beat change — cross-fade
@@ -90,8 +134,12 @@
     video.addEventListener('seeked', onTime);
     // Initial paint (covers the case where timeupdate hasn't fired yet).
     show(beatIndexAt(beats, video.currentTime || 0));
+    if (stageClass && wrap.classList.contains(stageClass)) setHeadline(beats[beatIndexAt(beats, video.currentTime || 0)]);
   }
 
-  wire('.qf-hero-laptop video', '.qf-hero-cap--laptop', LAPTOP_BEATS);
-  wire('.qf-hero-vphone video', '.qf-hero-cap--phone', PHONE_BEATS);
+  wire('.qf-hero-laptop video', '.qf-hero-cap--laptop', LAPTOP_BEATS, 'stage-laptop');
+  wire('.qf-hero-vphone video', '.qf-hero-cap--phone', PHONE_BEATS, 'stage-phone');
+  // Seed the mobile headline immediately if no stage class is set yet (script
+  // order with landing-hero-swap.js) so it's never blank before the first tick.
+  if (hl && hlKey === '') setHeadline(LAPTOP_BEATS[0]);
 })();
