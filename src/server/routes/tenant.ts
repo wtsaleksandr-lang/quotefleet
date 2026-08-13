@@ -66,7 +66,14 @@ import {
 import { HOSTED_BG_PRESETS } from '../hostedPage.js';
 import { MAP_STYLE_KEYS, MAP_STYLE_LIST } from '../routeMap.js';
 import { loadEnv } from '../../config.js';
-import { resolveFeatures, sanitizeFeaturesPatch, sanitizeBookingPatch, sanitizeFollowUpPatch } from '../features.js';
+import { resolveFeatures, sanitizeFeaturesPatch, sanitizeBookingPatch, sanitizeFollowUpPatch, resolveFollowUpConfig } from '../features.js';
+import {
+  renderFollowUpTouch,
+  samplePreviewLead,
+  FOLLOWUP_TOUCH_ORDER,
+  type FollowUpTouch,
+} from '../../email/followUp.js';
+import { leadUnsubscribeUrl } from '../../email/unsubscribe.js';
 import { makePreviewGrant, PREVIEW_GRANT_PARAM, PREVIEW_GRANT_TTL_MS } from '../access.js';
 import { syncTenantToMarketplace } from '../../marketplace/sync.js';
 import { DEFAULT_AI_SYSTEM_PROMPT, AUTO_FSC_DEFAULTS } from '../../calc/defaults.js';
@@ -839,6 +846,51 @@ export function registerTenantRoutes(app: Express) {
       dotNumber: req.tenant!.dotNumber,
       mcNumber: req.tenant!.mcNumber,
     });
+  });
+
+  // Follow-up email PREVIEW — renders a chosen touch (nudge | reminder |
+  // discount) with this tenant's CURRENT follow-up settings + custom copy,
+  // contact block and signature, using the SAME render the cron sends
+  // (renderFollowUpTouch), so what the owner previews is exactly what ships. A
+  // representative sample lead supplies realistic lane/total content. Returns
+  // { subject, html }; the portal shows the html in a sandboxed iframe.
+  app.get('/api/tenant/follow-up/preview', requireAuth, requireTenant, async (req, res) => {
+    const raw = String(req.query.touch ?? 'nudge').toLowerCase();
+    const touch = (FOLLOWUP_TOUCH_ORDER as readonly string[]).includes(raw)
+      ? (raw as FollowUpTouch)
+      : 'nudge';
+    const brandRow = await db()
+      .select()
+      .from(brandConfigs)
+      .where(eq(brandConfigs.tenantId, req.tenant!.id))
+      .limit(1);
+    const brand = brandRow[0] ?? null;
+    const cfg = resolveFollowUpConfig(brand);
+    // The discount touch's template refuses to render without a positive
+    // percent (there's nothing to offer at 0%). Surface that as a clear,
+    // previewable message rather than a 500.
+    if (touch === 'discount' && cfg.discountPct <= 0) {
+      res.json({
+        touch,
+        subject: null,
+        html: null,
+        note: 'The discount email only sends when the discount is above 0%. Raise it in the cadence settings to preview this touch.',
+      });
+      return;
+    }
+    const base = loadEnv().PUBLIC_BASE_URL.replace(/\/$/, '');
+    const lead = samplePreviewLead();
+    const { subject, html } = renderFollowUpTouch({
+      touch,
+      lead,
+      cfg,
+      brand,
+      tenantName: req.tenant!.name,
+      baseUrl: base,
+      // Sample lead id 0 → a valid (but harmless) preview unsubscribe URL.
+      unsubscribeUrl: leadUnsubscribeUrl(base, lead.id),
+    });
+    res.json({ touch, subject, html });
   });
 
   const BrandPatch = z.object({

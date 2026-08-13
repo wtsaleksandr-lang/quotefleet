@@ -201,11 +201,69 @@ export interface FollowUpCadence {
   discountPct: number;
 }
 
+/** Tenant-customizable follow-up COPY. Every field is optional; when unset the
+ *  templates render their own sensible carrier-branded defaults, so a tenant who
+ *  never touches these still gets good emails. Stored alongside the cadence in
+ *  the same `featuresJson.followUp` bag.
+ *
+ *  - `intro1/2/3` — a custom message/intro for the nudge / reminder / discount
+ *    touch respectively. Replaces ONLY that touch's lead paragraph; the quote
+ *    detail box + CTA are always rendered by the template.
+ *  - `showContact` + `contactPhone`/`contactEmail` — an optional contact block
+ *    the tenant can add (or leave off) at the foot of every touch.
+ *  - `signature` — an optional sign-off line appended to every touch. */
+export interface FollowUpCopy {
+  intro1?: string;
+  intro2?: string;
+  intro3?: string;
+  showContact?: boolean;
+  contactPhone?: string;
+  contactEmail?: string;
+  signature?: string;
+}
+
 /** Resolved per-tenant follow-up config: the on/off flag, the chosen preset,
- *  and the effective cadence (from the preset table unless preset='custom'). */
-export interface FollowUpConfig extends FollowUpCadence {
+ *  the effective cadence (from the preset table unless preset='custom'), and the
+ *  tenant's custom copy (intros / contact block / signature). */
+export interface FollowUpConfig extends FollowUpCadence, FollowUpCopy {
   enabled: boolean;
   preset: FollowUpPreset;
+}
+
+/** Max lengths for the free-text copy fields — generous enough for a real
+ *  message, tight enough that a paste-bomb can't bloat every email. */
+const COPY_LIMITS = { intro: 600, signature: 200, phone: 40, email: 120 } as const;
+
+/** Trim + length-cap a free-text copy value; returns undefined when empty so an
+ *  unset field falls through to the template default rather than an empty line. */
+function cleanCopyText(v: unknown, max: number): string | undefined {
+  if (typeof v !== 'string') return undefined;
+  const t = v.trim();
+  if (!t) return undefined;
+  return t.slice(0, max);
+}
+
+/** Extract + sanitize the optional copy fields from a raw stored/patched
+ *  followUp object. Only keys that carry a real value are set, so the resolved
+ *  config stays sparse and the templates own every default. */
+function sanitizeCopy(src: Record<string, unknown>): FollowUpCopy {
+  const copy: FollowUpCopy = {};
+  const i1 = cleanCopyText(src.intro1, COPY_LIMITS.intro);
+  const i2 = cleanCopyText(src.intro2, COPY_LIMITS.intro);
+  const i3 = cleanCopyText(src.intro3, COPY_LIMITS.intro);
+  if (i1) copy.intro1 = i1;
+  if (i2) copy.intro2 = i2;
+  if (i3) copy.intro3 = i3;
+  const phone = cleanCopyText(src.contactPhone, COPY_LIMITS.phone);
+  const email = cleanCopyText(src.contactEmail, COPY_LIMITS.email);
+  if (phone) copy.contactPhone = phone;
+  if (email) copy.contactEmail = email;
+  // showContact defaults false; only persist true (an explicit opt-in). The
+  // block also needs at least one channel to render — enforced at render time.
+  if (src.showContact === true) copy.showContact = true;
+  const sig = cleanCopyText(src.signature, COPY_LIMITS.signature);
+  if (sig) copy.signature = sig;
+  return copy;
 }
 
 /** The recommended-preset table. Offsets climb and the discount is always the
@@ -271,10 +329,11 @@ export function resolveFollowUpConfig(brand: BrandLike): FollowUpConfig {
   const preset = FOLLOWUP_PRESET_KEYS.includes(src.preset as FollowUpPreset)
     ? (src.preset as FollowUpPreset)
     : 'standard';
+  const copy = sanitizeCopy(src);
   if (preset !== 'custom') {
-    return { enabled, preset, ...FOLLOWUP_PRESETS[preset] };
+    return { enabled, preset, ...FOLLOWUP_PRESETS[preset], ...copy };
   }
-  return { enabled, preset: 'custom', ...normalizeCustomCadence(src) };
+  return { enabled, preset: 'custom', ...normalizeCustomCadence(src), ...copy };
 }
 
 /**
@@ -288,14 +347,18 @@ export function resolveFollowUpConfig(brand: BrandLike): FollowUpConfig {
 export function sanitizeFollowUpPatch(input: unknown): FollowUpConfig | undefined {
   if (!input || typeof input !== 'object') return undefined;
   const src = input as Record<string, unknown>;
-  const RELEVANT = ['enabled', 'preset', 'day1', 'day2', 'day3', 'discountPct'];
+  const RELEVANT = [
+    'enabled', 'preset', 'day1', 'day2', 'day3', 'discountPct',
+    'intro1', 'intro2', 'intro3', 'showContact', 'contactPhone', 'contactEmail', 'signature',
+  ];
   if (!RELEVANT.some((k) => k in src)) return undefined;
   const enabled = src.enabled === true;
   const preset = FOLLOWUP_PRESET_KEYS.includes(src.preset as FollowUpPreset)
     ? (src.preset as FollowUpPreset)
     : 'standard';
+  const copy = sanitizeCopy(src);
   if (preset !== 'custom') {
-    return { enabled, preset, ...FOLLOWUP_PRESETS[preset] };
+    return { enabled, preset, ...FOLLOWUP_PRESETS[preset], ...copy };
   }
-  return { enabled, preset: 'custom', ...normalizeCustomCadence(src) };
+  return { enabled, preset: 'custom', ...normalizeCustomCadence(src), ...copy };
 }
