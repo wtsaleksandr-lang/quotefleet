@@ -307,7 +307,7 @@ body {
   letter-spacing: -0.035em;
 }
 .qf-header .brand-name::after {
-  content: 'Instant freight estimate';
+  content: attr(data-eyebrow);
   display: inline-flex;
   align-items: center;
   border: 1px solid rgba(37, 99, 235, 0.15);
@@ -318,9 +318,9 @@ body {
   font-size: 10px;
   font-weight: 850;
   letter-spacing: 0.06em;
-  text-transform: uppercase;
-  white-space: nowrap;
+  white-space: normal; max-width: 240px;
 }
+.qf-header .brand-name:not([data-eyebrow])::after, .qf-header .brand-name[data-eyebrow=""]::after { display: none; }
 .qf-tagline {
   color: #526176;
   font-size: 13.5px;
