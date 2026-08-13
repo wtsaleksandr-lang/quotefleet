@@ -51,7 +51,7 @@ import { loadEnv } from '../../config.js';
 import { getTrialState } from '../trialGating.js';
 import { canUseProFeature } from '../plans.js';
 import { publicCalcLimiter, publicChatLimiter, publicLeadLimiter, quoteMapLimiter } from '../rateLimits.js';
-import { buildBaseMapUrl, getRouteMap, laneCacheKey, normalizeTheme, peekRouteMap, resolveMapStyle } from '../routeMap.js';
+import { buildBaseMapUrl, getRoutedMiles, getRouteMap, laneCacheKey, normalizeTheme, peekRouteMap, resolveMapStyle } from '../routeMap.js';
 import { resolveWidgetTheme, WIDGET_PRESETS } from '../widgetThemes.js';
 import { resolveQuoteDisclaimer } from '../quoteDisclaimer.js';
 import { loadCarrierProfile } from './carrierProfile.js';
@@ -539,11 +539,18 @@ export function registerPublicRoutes(app: Express) {
     if ('error' in dist) {
       return res.status(400).json({ error: dist.error });
     }
+    // Price off the REAL routed road distance (Google Directions), shared with
+    // the map card's lane cache so no duplicate API call. Falls back to the
+    // haversine estimate (dist.miles) whenever Directions is unavailable — no
+    // GOOGLE_MAPS_API_KEY, timeout, quota, or ZERO_RESULTS — so dev/test and
+    // un-keyed installs price exactly as before.
+    const routedMiles = await getRoutedMiles(dist.origin, dist.destination, loadEnv().GOOGLE_MAPS_API_KEY);
+    const miles = routedMiles ?? dist.miles;
 
     const calcReq: CalcRequest = {
       service: body.service,
       equipment: body.equipment,
-      miles: dist.miles,
+      miles,
       weightLbs: body.weightLbs,
       pieces: body.pieces,
       lengthIn: body.lengthIn,
@@ -587,13 +594,16 @@ export function registerPublicRoutes(app: Express) {
     };
 
     return res.json({
-      miles: dist.miles,
+      // Report the SAME miles the quote was priced on (routed when available,
+      // haversine fallback otherwise) so the displayed distance, the $/mi line,
+      // and the total all reconcile.
+      miles,
       origin: dist.origin,
       destination: dist.destination,
       result: customerResult,
       // Estimated transit window (days) from distance + service. Shown on the
       // calc result as an estimate; null when distance is unknown.
-      transit: estimateTransit(dist.miles, body.service),
+      transit: estimateTransit(miles, body.service),
     });
   });
 
@@ -632,10 +642,16 @@ export function registerPublicRoutes(app: Express) {
       // Route map for the widget's map card, rendered in the tenant's map style.
       const rm = await getRouteMap(dist.origin, dist.destination, loadEnv().GOOGLE_MAPS_API_KEY, theme, undefined, mapStyle);
       const lane = laneCacheKey(dist.origin, dist.destination);
+      // Show the SAME distance the quote will price on: the real routed miles
+      // when Directions resolved this lane (rm.distanceMiles), else the
+      // haversine estimate. Keeps the map card's mileage consistent with the
+      // priced total. (getRouteMap already seeded the shared routed-miles cache,
+      // so the subsequent quote/lead reuses it with no extra API call.)
+      const previewMiles = rm?.distanceMiles ?? dist.miles ?? null;
       return res.json({
         ok: true,
-        miles: dist.miles ?? null,
-        transit: estimateTransit(dist.miles, body.service),
+        miles: previewMiles,
+        transit: estimateTransit(previewMiles, body.service),
         origin: dist.origin,
         destination: dist.destination,
         // The style is carried on the PNG URL so route-map.png peeks the exact
@@ -754,11 +770,15 @@ export function registerPublicRoutes(app: Express) {
     const pickupForDistance = await resolvePickupForDistance(body.pickup);
     const dist = await distanceBetween(pickupForDistance, body.delivery);
     if ('error' in dist) return res.status(400).json({ error: dist.error });
+    // Price + persist off the REAL routed road distance (shared lane cache, no
+    // duplicate API call); haversine fallback when Directions is unavailable.
+    const routedMiles = await getRoutedMiles(dist.origin, dist.destination, loadEnv().GOOGLE_MAPS_API_KEY);
+    const miles = routedMiles ?? dist.miles;
 
     const calcReq: CalcRequest = {
       service: body.service,
       equipment: body.equipment,
-      miles: dist.miles,
+      miles,
       weightLbs: body.weightLbs,
       pieces: body.pieces,
       lengthIn: body.lengthIn,
@@ -848,7 +868,7 @@ export function registerPublicRoutes(app: Express) {
         // aggregate class, drayage OOG oversize dims) so the dispatcher sees
         // exactly what the customer entered — previously stripped by the schema.
         metaJson: body.meta ?? null,
-        distanceMiles: dist.miles,
+        distanceMiles: miles,
         breakdownJson: calc.lines.map((l) => ({
           name: l.name,
           amount: l.amount,
