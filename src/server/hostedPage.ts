@@ -423,10 +423,6 @@ export function renderHostedPage(opts: RenderHostedPageOpts): string {
     .qf-hp-frame-card { border-radius: 16px; overflow: clip; box-shadow: 0 30px 70px -34px rgba(0,0,0,0.55); background: transparent; }
     .qf-hp-frame { width: 100%; border: 0; display: block; min-height: 620px; background: transparent; }
 
-    .qf-hp-foot { position: relative; z-index: 1; text-align: center; font-size: 12px; color: var(--hp-muted); padding: 6px 0 22px; }
-    body[data-hp-hero] .qf-hp-foot { color: rgba(255,255,255,0.7); }
-    .qf-hp-foot a { color: inherit; }
-
     /* Mobile (≤640): calculator FIRST, then a condensed trust strip below. */
     @media (max-width: 640px) {
       .qf-hp-shell { padding: 22px 14px 36px; }
@@ -464,7 +460,6 @@ export function renderHostedPage(opts: RenderHostedPageOpts): string {
       </div>
     </div>
   </div>
-  <div class="qf-hp-foot">Powered by <a href="https://quotefleet.net" target="_blank" rel="noopener">QuoteFleet</a></div>
   <script>
   (function(){
     var HP = ${jsonForScript(hpState)};
