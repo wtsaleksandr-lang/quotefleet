@@ -26,6 +26,14 @@ export const MATRIX_EQUIPMENT_LABELS: Record<string, string> = {
   box_truck: 'Box Truck',
   tractor_only: 'Power Only',
   pallet: 'Pallet',
+  // Hotshot trailer-type bands — the customer picks a trailer type, so the
+  // dropdown reads the clean trailer name (dedupeEquipmentTypes forces these
+  // canonical labels over whatever the rate card happens to be titled).
+  hotshot_bumperpull: 'Bumper-pull flatbed',
+  hotshot_gooseneck: 'Gooseneck (30-35 ft)',
+  hotshot_gooseneck40: 'Gooseneck 40 ft (CDL)',
+  hotshot_dovetail: 'Dovetail / tilt',
+  hotshot_stepdeck: 'Step-deck / lowboy',
 };
 
 export function matrixEquipmentLabel(code: string): string {

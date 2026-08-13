@@ -20,6 +20,14 @@ describe('matrixEquipmentLabel', () => {
   it('title-cases an unmapped code as a fallback', () => {
     expect(matrixEquipmentLabel('container_53re')).toBe('Container 53re');
   });
+
+  it('gives each hotshot trailer-type band its clean trailer name', () => {
+    expect(matrixEquipmentLabel('hotshot_bumperpull')).toBe('Bumper-pull flatbed');
+    expect(matrixEquipmentLabel('hotshot_gooseneck')).toBe('Gooseneck (30-35 ft)');
+    expect(matrixEquipmentLabel('hotshot_gooseneck40')).toBe('Gooseneck 40 ft (CDL)');
+    expect(matrixEquipmentLabel('hotshot_dovetail')).toBe('Dovetail / tilt');
+    expect(matrixEquipmentLabel('hotshot_stepdeck')).toBe('Step-deck / lowboy');
+  });
 });
 
 describe('dedupeEquipmentTypes canonical container order', () => {

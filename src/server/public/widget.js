@@ -1004,6 +1004,14 @@
     'expedited|sprinter': 4000,
     'expedited|box_truck': 12000,
     'hotshot|flatbed': 16000,
+    // Hotshot trailer-type bands — payload ceiling grows with the trailer. The
+    // tenant's own rate-card maxWeightLbs (sent in the config) is preferred;
+    // these are the fallback when an older config omits it.
+    'hotshot|hotshot_bumperpull': 12000,
+    'hotshot|hotshot_gooseneck': 14000,
+    'hotshot|hotshot_gooseneck40': 25000,
+    'hotshot|hotshot_dovetail': 20000,
+    'hotshot|hotshot_stepdeck': 40000,
     'drayage|container_20': 44000,
     'drayage|container_40': 44000,
     'drayage|container_40hc': 44000,
@@ -1015,6 +1023,12 @@
     'expedited|sprinter': 'a box truck, or FTL / LTL freight',
     'expedited|box_truck': 'a hotshot, flatbed, or full truckload (FTL)',
     'hotshot|flatbed': 'a full-truckload flatbed or step-deck',
+    // Hotshot trailer-type bands upsize to the next-larger trailer, then FTL.
+    'hotshot|hotshot_bumperpull': 'a gooseneck or larger hotshot trailer',
+    'hotshot|hotshot_gooseneck': 'a 40-ft gooseneck, dovetail, or step-deck',
+    'hotshot|hotshot_gooseneck40': 'a step-deck / lowboy hotshot or full truckload (FTL)',
+    'hotshot|hotshot_dovetail': 'a step-deck / lowboy hotshot or full truckload (FTL)',
+    'hotshot|hotshot_stepdeck': 'a full-truckload flatbed or step-deck',
     'ltl|pallet': 'a full-truckload (FTL) service',
   };
   // Resolve the capacity for the current selection: tenant card value first,

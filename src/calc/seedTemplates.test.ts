@@ -160,18 +160,36 @@ describe('seedTemplates — vertical selection', () => {
     expect(t.pricingMode).toBe('per_mile');
   });
 
-  it('hotshot: hotshot+sprinter+box_truck, expedite/waiting set, no zones, per-mile', () => {
+  it('hotshot: generic hotshot + 5 trailer bands + sprinter/box_truck, expedite/waiting set, no zones, per-mile', () => {
     const t = getSeedTemplate('hotshot');
     expect(t.rateCards.map((c) => c.equipment).sort()).toEqual(
-      ['box_truck', 'flatbed', 'sprinter'].sort()
+      [
+        'box_truck', 'flatbed', 'sprinter',
+        'hotshot_bumperpull', 'hotshot_gooseneck', 'hotshot_gooseneck40',
+        'hotshot_dovetail', 'hotshot_stepdeck',
+      ].sort()
     );
-    const hotshotCard = t.rateCards.find((c) => c.service === 'hotshot');
+    // Generic hotshot/flatbed card is KEPT unchanged (existing tenants).
+    const hotshotCard = t.rateCards.find((c) => c.service === 'hotshot' && c.equipment === 'flatbed');
     expect(hotshotCard?.ratePerMile).toBe(2.6);
+    // Trailer bands carry their own $/mile, payload ceiling, and minimum.
+    const band = (eq: string) => t.rateCards.find((c) => c.equipment === eq)!;
+    expect(band('hotshot_bumperpull')).toMatchObject({ ratePerMile: 1.9, maxWeightLbs: 12000, minimumCharge: 300 });
+    expect(band('hotshot_gooseneck')).toMatchObject({ ratePerMile: 2.25, maxWeightLbs: 14000, minimumCharge: 400 });
+    expect(band('hotshot_gooseneck40')).toMatchObject({ ratePerMile: 2.75, maxWeightLbs: 25000, minimumCharge: 450 });
+    expect(band('hotshot_dovetail')).toMatchObject({ ratePerMile: 2.5, maxWeightLbs: 20000, minimumCharge: 400 });
+    expect(band('hotshot_stepdeck')).toMatchObject({ ratePerMile: 3.75, maxWeightLbs: 40000, minimumCharge: 600 });
+    // Every band is on the hotshot service so it edits through the same rate-card path.
+    for (const eq of ['hotshot_bumperpull', 'hotshot_gooseneck', 'hotshot_gooseneck40', 'hotshot_dovetail', 'hotshot_stepdeck']) {
+      expect(band(eq).service).toBe('hotshot');
+    }
     expect(t.accessorials.map((a) => a.code).sort()).toEqual(
-      ['detention', 'driver_wait_delivery', 'driver_wait_pickup', 'expedite_fee', 'extra_stop', 'liftgate', 'tonu', 'weekend_after_hours'].sort()
+      ['detention', 'driver_wait_delivery', 'driver_wait_pickup', 'expedite_fee', 'extra_stop', 'liftgate', 'oversize_permit', 'tonu', 'weekend_after_hours'].sort()
     );
     expect(accAmount('hotshot', 'expedite_fee')).toBe(150);
     expect(accAmount('hotshot', 'weekend_after_hours')).toBe(175);
+    // Oversize permit is the over-dimensional premium the customer opts into.
+    expect(accAmount('hotshot', 'oversize_permit')).toBe(250);
     expect(t.laneZones.length).toBe(0);
     expect(t.pricingMode).toBe('per_mile');
   });

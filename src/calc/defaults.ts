@@ -160,6 +160,87 @@ export const DEFAULT_RATE_CARDS: Omit<NewRateCard, 'tenantId'>[] = [
     enabled: true,
     sortOrder: 7,
   },
+  // ─── Hotshot trailer-type bands ──────────────────────────────────
+  // Real hotshot pricing is driven by TRAILER TYPE (payload ceiling,
+  // oversize capability, minimum), not one generic flatbed number. These
+  // five bands seed alongside the generic hotshot/flatbed card above (which
+  // is KEPT unchanged so existing tenants never lose their card — new
+  // tenants simply get the generic card PLUS these five, least-disruptive).
+  // Every field below is a 2026 directional DEFAULT the carrier edits through
+  // the SAME rate-card editor — rates are volatile, never hard truth. Other
+  // fields (flatFee/fuelSurchargePct/marginPct/maxMiles) copy the generic
+  // hotshot card so the per-mile + minimum + fuel + margin engine is reused
+  // as-is; only $/mile, payload ceiling (maxWeightLbs) and minimum differ.
+  {
+    service: 'hotshot',
+    equipment: 'hotshot_bumperpull',
+    label: 'Bumper-pull flatbed',
+    ratePerMile: 1.90,
+    minimumCharge: 300,
+    flatFee: 0,
+    fuelSurchargePct: 22,
+    marginPct: 15,
+    maxWeightLbs: 12000,
+    maxMiles: 3500,
+    enabled: true,
+    sortOrder: 8,
+  },
+  {
+    service: 'hotshot',
+    equipment: 'hotshot_gooseneck',
+    label: 'Gooseneck (30-35 ft)',
+    ratePerMile: 2.25,
+    minimumCharge: 400,
+    flatFee: 0,
+    fuelSurchargePct: 22,
+    marginPct: 15,
+    maxWeightLbs: 14000,
+    maxMiles: 3500,
+    enabled: true,
+    sortOrder: 9,
+  },
+  {
+    service: 'hotshot',
+    equipment: 'hotshot_gooseneck40',
+    label: 'Gooseneck 40 ft (CDL)',
+    ratePerMile: 2.75,
+    minimumCharge: 450,
+    flatFee: 0,
+    fuelSurchargePct: 22,
+    marginPct: 15,
+    maxWeightLbs: 25000,
+    maxMiles: 3500,
+    enabled: true,
+    sortOrder: 10,
+  },
+  {
+    service: 'hotshot',
+    equipment: 'hotshot_dovetail',
+    label: 'Dovetail / tilt (equipment)',
+    ratePerMile: 2.50,
+    minimumCharge: 400,
+    flatFee: 0,
+    fuelSurchargePct: 22,
+    marginPct: 15,
+    maxWeightLbs: 20000,
+    maxMiles: 3500,
+    enabled: true,
+    sortOrder: 11,
+  },
+  {
+    service: 'hotshot',
+    equipment: 'hotshot_stepdeck',
+    label: 'Step-deck / lowboy (oversize)',
+    ratePerMile: 3.75,
+    minimumCharge: 600,
+    flatFee: 0,
+    fuelSurchargePct: 22,
+    marginPct: 15,
+    maxWeightLbs: 40000,
+    maxMiles: 3500,
+    enabled: true,
+    sortOrder: 12,
+  },
   // ─── Drayage ─────────────────────────────────────────────────────
   // ratePerMile defaults are conservative — the lane_zones below
   // override with flat-tariff pricing within radius of major ports.

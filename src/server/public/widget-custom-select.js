@@ -45,6 +45,20 @@
   var IC_FLATRACK = SVG_HEAD + '<path d="M2.5 15.5h19"/><path d="M4.5 15.5V10M19.5 15.5V10"/><path d="M3.4 10h2.2M18.4 10h2.2"/></svg>';
   // Hotshot: a pickup (dually) towing a flat trailer — distinct from a full flatbed.
   var IC_HOTSHOT = SVG_HEAD + '<rect x="2" y="9.5" width="4.5" height="4.5" rx="0.6"/><path d="M6.5 14v-1.6h2.4V14"/><path d="M9 14h12.5"/><circle cx="4.2" cy="16.4" r="1.3"/><circle cx="14" cy="16.4" r="1.3"/><circle cx="18" cy="16.4" r="1.3"/></svg>';
+  // ── Hotshot trailer-type bands ─────────────────────────────────────
+  // Each is the same dually-cab silhouette as IC_HOTSHOT, differentiated by
+  // the trailer profile so the customer can tell the trailer types apart.
+  // Bumper-pull: short flat deck hitched low at the bumper, single axle.
+  var IC_HS_BUMPER = SVG_HEAD + '<rect x="2" y="9.5" width="4.5" height="4.5" rx="0.6"/><path d="M6.5 14h1.6"/><path d="M9 13.4h11.5"/><path d="M9 13.4V15M20.5 13.4V15"/><circle cx="4.2" cy="16.4" r="1.3"/><circle cx="16.3" cy="16.4" r="1.3"/></svg>';
+  // Gooseneck: raised neck arches over the truck bed then drops to the deck.
+  var IC_HS_GOOSE = SVG_HEAD + '<rect x="2" y="9.5" width="4.5" height="4.5" rx="0.6"/><path d="M6.6 10.3h1.8l1.3 3h10.8"/><circle cx="4.2" cy="16.4" r="1.3"/><circle cx="14.5" cy="16.4" r="1.3"/><circle cx="18" cy="16.4" r="1.3"/></svg>';
+  // Gooseneck 40' (CDL): same neck, longer deck + triple axle (heavier).
+  var IC_HS_GOOSE40 = SVG_HEAD + '<rect x="2" y="9.5" width="4.5" height="4.5" rx="0.6"/><path d="M6.6 10.3h1.8l1.3 3h11.8"/><circle cx="4.2" cy="16.4" r="1.3"/><circle cx="13.3" cy="16.4" r="1.3"/><circle cx="16.4" cy="16.4" r="1.3"/><circle cx="19.5" cy="16.4" r="1.3"/></svg>';
+  // Dovetail / tilt: flat deck that slopes down to the ground at the rear.
+  var IC_HS_DOVETAIL = SVG_HEAD + '<rect x="2" y="9.5" width="4.5" height="4.5" rx="0.6"/><path d="M6.5 14h1.6"/><path d="M9 13.5h8.5l3 2.8"/><circle cx="4.2" cy="16.4" r="1.3"/><circle cx="13" cy="16.4" r="1.3"/></svg>';
+  // Step-deck / lowboy: high front deck over the neck, step down to a low rear
+  // deck; wheels sit lower to read as the dropped deck.
+  var IC_HS_STEPDECK = SVG_HEAD + '<rect x="2" y="9.5" width="4.5" height="4.5" rx="0.6"/><path d="M6.6 11.5h4.4l1.4 2.4h8.1"/><circle cx="4.2" cy="16.6" r="1.3"/><circle cx="15.5" cy="17" r="1.3"/><circle cx="18.6" cy="17" r="1.3"/></svg>';
   // LTL: a box/load on a pallet (LTL ships palletized freight).
   var IC_PALLET = SVG_HEAD + '<rect x="6" y="7" width="12" height="6" rx="0.5"/><path d="M3.5 15.5h17M3.5 18h17"/><path d="M5 15.5v2.5M12 15.5v2.5M19 15.5v2.5"/></svg>';
   var IC_VAN = SVG_HEAD + '<rect x="2.5" y="6.5" width="15" height="9.5" rx="1"/><circle cx="6.5" cy="18.5" r="1.5"/><circle cx="13.5" cy="18.5" r="1.5"/></svg>';
@@ -53,6 +67,13 @@
     var t = (label || '').toLowerCase();
     if (/reefer|refriger|genset/.test(t)) return IC_REEFER;
     if (/open.?top/.test(t)) return IC_OPENTOP;
+    // Hotshot trailer-type bands FIRST — their labels contain "flatbed" /
+    // "step-deck" / "lowboy" tokens that the generic branches below also match,
+    // so each distinct trailer icon must win before them.
+    if (/bumper.?pull/.test(t)) return IC_HS_BUMPER;
+    if (/dovetail|tilt/.test(t)) return IC_HS_DOVETAIL;
+    if (/goose.?neck/.test(t)) return /\b40\b/.test(t) ? IC_HS_GOOSE40 : IC_HS_GOOSE;
+    if (/low.?boy/.test(t)) return IC_HS_STEPDECK;
     // Flat family, each distinct. Order matters: "flat rack" contains "flat".
     if (/flat.?rack|flatrack/.test(t)) return IC_FLATRACK;
     if (/step.?deck|drop.?deck|lowboy|rgn/.test(t)) return IC_STEPDECK;

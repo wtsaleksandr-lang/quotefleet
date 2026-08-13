@@ -449,6 +449,53 @@ describe('calculate', () => {
     expect(r.total).toBeGreaterThan(0);
   });
 
+  // ── Hotshot trailer-type bands: payload ceiling + minimum + oversize ──
+  const bumperPull = () => rateCard({
+    service: 'hotshot', equipment: 'hotshot_bumperpull',
+    ratePerMile: 1.9, minimumCharge: 300, maxWeightLbs: 12000, maxMiles: 3500,
+    fuelSurchargePct: 22, marginPct: 15,
+  });
+  const stepDeck = () => rateCard({
+    service: 'hotshot', equipment: 'hotshot_stepdeck',
+    ratePerMile: 3.75, minimumCharge: 600, maxWeightLbs: 40000, maxMiles: 3500,
+    fuelSurchargePct: 22, marginPct: 15,
+  });
+
+  it('Hotshot band — a load over the trailer payload ceiling is flagged (bumper-pull @ 12k, 15k load)', () => {
+    const r = calculate([bumperPull()], [], [], req({ service: 'hotshot', equipment: 'hotshot_bumperpull', miles: 200, weightLbs: 15000 }));
+    expect(r.unsupported).toBeDefined();
+    expect(r.unsupported?.reason).toMatch(/capacity|larger equipment|custom quote/i);
+    expect(r.total).toBe(0);
+  });
+
+  it('Hotshot band — a heavier load prices on the step-deck band whose ceiling covers it', () => {
+    const r = calculate([stepDeck()], [], [], req({ service: 'hotshot', equipment: 'hotshot_stepdeck', miles: 300, weightLbs: 30000 }));
+    expect(r.unsupported).toBeUndefined();
+    expect(r.total).toBeGreaterThan(0);
+  });
+
+  it('Hotshot band — a short lane honors the band minimum charge (bumper-pull min $300)', () => {
+    // 100 mi × $1.90 = $190, below the $300 minimum → minimum applies.
+    const r = calculate([bumperPull()], [], [], req({ service: 'hotshot', equipment: 'hotshot_bumperpull', miles: 100, weightLbs: 8000 }));
+    expect(r.unsupported).toBeUndefined();
+    expect(r.subtotalLinehaul).toBe(300);
+    expect(r.lines.some((l) => l.kind === 'minimum')).toBe(true);
+  });
+
+  it('Hotshot band — the oversize permit accessorial applies the premium when the customer selects it', () => {
+    const oversize = accessorial({
+      code: 'oversize_permit', label: 'Oversize Permit', kind: 'flat', amount: 250,
+      trigger: 'optional', appliesToServices: ['ftl', 'hotshot'],
+    });
+    const base = calculate([stepDeck()], [oversize], [], req({ service: 'hotshot', equipment: 'hotshot_stepdeck', miles: 300, weightLbs: 30000 }));
+    const withOversize = calculate([stepDeck()], [oversize], [], req({
+      service: 'hotshot', equipment: 'hotshot_stepdeck', miles: 300, weightLbs: 30000,
+      selectedAccessorialCodes: ['oversize_permit'],
+    }));
+    expect(withOversize.lines.some((l) => l.code === 'oversize_permit' && l.amount === 250)).toBe(true);
+    expect(withOversize.total).toBeGreaterThan(base.total);
+  });
+
   it('Unpriceable catch-all — a card whose rates net to $0 is unsupported, never a silent $0 quote', () => {
     // A drayage/short-haul card with zero linehaul inputs (no per-mile rate, no
     // flat fee, no minimum) must NOT surface a misleading $0 hero — it should
