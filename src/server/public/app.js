@@ -2870,11 +2870,13 @@
       // ── Reusable drag-scroll carousel (theme presets + map styles) ──────
       // Wraps an existing item strip in a horizontally-scrollable track with
       // subtle left/right chevron arrows — mirrors the QuoteQuick wizard's
-      // selector. Mouse drag scrolls the strip; touch uses native overflow
-      // scrolling. A drag (>4px) is distinguished from a tap so each item's
-      // EXISTING click/select handler + queueSave still fire on a click — this
-      // only changes LAYOUT/navigation, never the selection logic. Arrows page
-      // ~80% of the visible width and hide at each end; honours reduced-motion.
+      // selector. Grab anywhere on the strip and drag to move the selectors
+      // live (Pointer Events → mouse, touch and pen alike); the strip glides
+      // with momentum on release. A drag (>threshold px) is distinguished from
+      // a tap so each item's EXISTING click/select handler + queueSave still
+      // fire on a click — this only changes LAYOUT/navigation, never the
+      // selection logic. Arrows page ~80% of the visible width and hide at each
+      // end; honours reduced-motion.
       function makeCarousel(track) {
         track.classList.add('qf-cz-carousel-track');
         var wrap = el('div', { class: 'qf-cz-carousel' });
@@ -2899,87 +2901,93 @@
         next.addEventListener('click', function () { track.scrollBy({ left: page(), behavior: reduce ? 'auto' : 'smooth' }); });
         track.addEventListener('scroll', update);
         window.addEventListener('resize', update);
-        // Mouse drag-to-scroll with momentum + eased snap (touch relies on
-        // native horizontal overflow). The strip tracks the pointer 1:1 while
-        // dragging, then glides and settles on the nearest option on release so
-        // the user literally sees the row slide and snap. Reuses the shared
-        // grab-scroll cursor pattern (html.qf-grabbing) alongside a track-local
-        // .is-grabbing. Honours prefers-reduced-motion (no inertia/glide).
-        var down = false, startX = 0, startScroll = 0, moved = 0;
-        var lastT = 0, vel = 0; // vel = scrollLeft px per ms during drag
+        // Pointer drag-to-scroll with velocity-decay momentum (mouse, touch,
+        // pen — one code path via Pointer Events). Grab anywhere on the strip
+        // and it tracks the pointer 1:1 while dragging, then glides with inertia
+        // that eases to a stop on release; native proximity snap (CSS) tidies
+        // the final resting alignment. The pointer is CAPTURED on engage so the
+        // drag keeps tracking even when the cursor leaves the row. Reuses the
+        // shared grab-scroll cursor pattern (html.qf-grabbing) alongside a
+        // track-local .is-grabbing. Honours prefers-reduced-motion (no glide).
+        //
+        // Click vs drag: a press that stays under DRAG_THRESHOLD never engages,
+        // so its trailing click reaches the chip's own select handler untouched;
+        // a press that crosses it is a drag and the trailing click is swallowed
+        // so dragging can never accidentally select a preset.
+        var DRAG_THRESHOLD = 5;
+        var down = false, dragging = false, pid = null;
+        var startX = 0, startY = 0, startScroll = 0, moved = 0;
+        var lastT = 0, vel = 0; // vel = scrollLeft px per ms during the drag
         var raf = 0;
         function cancelGlide() { if (raf) { cancelAnimationFrame(raf); raf = 0; } }
-        function padLeft() { return parseFloat(getComputedStyle(track).paddingLeft) || 0; }
-        // Nearest child start-offset (in scrollLeft units) to a projected position.
-        function snapTarget(pos) {
-          var kids = track.children, tRect = track.getBoundingClientRect();
-          var sl = track.scrollLeft, pl = padLeft(), best = pos, bestD = Infinity;
-          for (var i = 0; i < kids.length; i++) {
-            var cand = sl + (kids[i].getBoundingClientRect().left - tRect.left) - pl;
-            var d = Math.abs(cand - pos);
-            if (d < bestD) { bestD = d; best = cand; }
-          }
+        // End of interaction: restore CSS proximity snap (gently aligns the
+        // resting position) and refresh the arrow visibility.
+        function settle() { track.style.scrollSnapType = ''; update(); }
+        // Inertial glide — decay the release velocity frame by frame so the strip
+        // coasts and eases to a stop, clamping at either end.
+        function glide() {
           var max = track.scrollWidth - track.clientWidth;
-          return Math.max(0, Math.min(max, best));
-        }
-        // Eased glide to a target scrollLeft; suspends CSS snap so it can't fight
-        // the JS animation, restoring it once we land exactly on a snap point.
-        function glideTo(target) {
-          cancelGlide();
-          var from = track.scrollLeft, dist = target - from;
-          if (Math.abs(dist) < 1) { track.scrollLeft = target; update(); return; }
-          var dur = Math.min(460, Math.max(200, Math.abs(dist) * 1.6)), t0 = 0;
-          var prevSnap = track.style.scrollSnapType; track.style.scrollSnapType = 'none';
-          function step(ts) {
-            if (!t0) t0 = ts;
-            var p = Math.min(1, (ts - t0) / dur);
-            var e = 1 - Math.pow(1 - p, 3); // easeOutCubic
-            track.scrollLeft = from + dist * e;
-            if (p < 1) { raf = requestAnimationFrame(step); }
-            else { raf = 0; track.style.scrollSnapType = prevSnap; update(); }
+          function step() {
+            vel *= 0.95; // per-frame friction
+            if (Math.abs(vel) < 0.015) { raf = 0; settle(); return; }
+            var nx = track.scrollLeft + vel * 16; // px this frame (~16ms)
+            if (nx <= 0) { track.scrollLeft = 0; raf = 0; settle(); return; }
+            if (nx >= max) { track.scrollLeft = max; raf = 0; settle(); return; }
+            track.scrollLeft = nx;
+            update();
+            raf = requestAnimationFrame(step);
           }
+          cancelGlide();
           raf = requestAnimationFrame(step);
         }
-        track.addEventListener('pointerdown', function (e) {
-          if (e.pointerType && e.pointerType !== 'mouse') return; // let touch/pen scroll natively
+        function onDown(e) {
+          if (e.button != null && e.button > 0) return; // primary button / touch / pen only
           cancelGlide();
-          down = true; moved = 0; startX = e.clientX; startScroll = track.scrollLeft;
+          down = true; dragging = false; pid = e.pointerId;
+          startX = e.clientX; startY = e.clientY; startScroll = track.scrollLeft; moved = 0;
           lastT = (e.timeStamp || performance.now()); vel = 0;
-          track.classList.add('is-grabbing');
-          document.documentElement.classList.add('qf-grabbing');
-        });
-        track.addEventListener('pointermove', function (e) {
-          if (!down) return;
-          var dx = e.clientX - startX;
-          if (Math.abs(dx) > 3) {
-            moved = Math.max(moved, Math.abs(dx));
-            var prevSL = track.scrollLeft;
-            track.scrollLeft = startScroll - dx;
-            var now = (e.timeStamp || performance.now()), dt = now - lastT;
-            if (dt > 0) vel = (track.scrollLeft - prevSL) / dt;
-            lastT = now;
-            e.preventDefault();
+        }
+        function onMove(e) {
+          if (!down || (pid != null && e.pointerId !== pid)) return;
+          var dx = e.clientX - startX, dy = e.clientY - startY;
+          if (!dragging) {
+            // Engage only once the gesture is clearly horizontal — a vertical
+            // swipe on the strip is left to scroll the page.
+            if (Math.abs(dx) < DRAG_THRESHOLD || Math.abs(dx) < Math.abs(dy)) return;
+            dragging = true;
+            track.style.scrollSnapType = 'none'; // don't let snap fight the drag
+            track.classList.add('is-grabbing');
+            document.documentElement.classList.add('qf-grabbing');
+            try { if (track.setPointerCapture && pid != null) track.setPointerCapture(pid); } catch (_) { }
           }
-        });
-        function endDrag() {
+          moved = Math.max(moved, Math.abs(dx));
+          var prevSL = track.scrollLeft;
+          track.scrollLeft = startScroll - dx;
+          var now = (e.timeStamp || performance.now()), dt = now - lastT;
+          if (dt > 0) { vel = (track.scrollLeft - prevSL) / dt; lastT = now; }
+          if (e.cancelable) e.preventDefault();
+        }
+        function onUp(e) {
           if (!down) return;
-          down = false;
+          if (pid != null && e.pointerId != null && e.pointerId !== pid) return;
+          var wasDragging = dragging;
+          down = false; dragging = false;
+          try { if (track.releasePointerCapture && pid != null) track.releasePointerCapture(pid); } catch (_) { }
+          pid = null;
+          if (!wasDragging) return;
           track.classList.remove('is-grabbing');
           document.documentElement.classList.remove('qf-grabbing');
-          if (moved > 4) {
-            // Reduced motion: settle instantly. Else throw with a little
-            // inertia, then ease-and-snap to the nearest option.
-            var target = snapTarget(reduce ? track.scrollLeft : track.scrollLeft + vel * 120);
-            if (reduce) { track.scrollLeft = target; update(); }
-            else { glideTo(target); }
-          }
+          // Throw with inertia; reduced-motion settles instantly.
+          if (!reduce && Math.abs(vel) > 0.02) glide();
+          else settle();
         }
-        track.addEventListener('pointerup', endDrag);
-        track.addEventListener('pointercancel', endDrag);
-        track.addEventListener('pointerleave', endDrag);
-        // Swallow the click that follows a real drag so a drag never selects.
+        track.addEventListener('pointerdown', onDown);
+        track.addEventListener('pointermove', onMove);
+        track.addEventListener('pointerup', onUp);
+        track.addEventListener('pointercancel', onUp);
+        // Swallow the click that closes a real drag so dragging never selects.
         track.addEventListener('click', function (e) {
-          if (moved > 4) { e.stopPropagation(); e.preventDefault(); }
+          if (moved > DRAG_THRESHOLD) { e.stopPropagation(); e.preventDefault(); }
           moved = 0;
         }, true);
         requestAnimationFrame(update);
