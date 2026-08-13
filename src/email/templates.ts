@@ -237,16 +237,25 @@ export function magicLinkEmail(opts: {
       The link is valid for <strong>${ttl} minutes</strong> and can only be used once.
     </p>
 
-    <!-- CTA — table-wrapped for Outlook structure, but ONLY the <a> paints the
-         blue and carries the radius, so its rounded corners always show (a
-         colored <td> would fill the corners square behind the button). Label
-         centered on both axes (align="center" + text-align + line-height matched
-         to the font for symmetric vertical padding); premium 10px radius. -->
+    <!-- CTA — bulletproof. Modern clients render the padded <a> (blue + 10px
+         radius on the <a> alone, so its rounded corners always show; no square
+         <td> fill bleeding through). Outlook desktop (Word engine, ignores
+         border-radius + <a> backgrounds) renders the mso-conditional VML
+         <roundrect> sibling as the SAME filled, rounded button (arcsize 21% ≈
+         10px). Label centered on both axes. -->
     <table role="presentation" cellspacing="0" cellpadding="0" border="0" style="margin:0 0 22px 0;">
       <tr>
-        <td align="center" style="border-radius:10px;">
+        <td align="center">
+          <!--[if mso]>
+          <v:roundrect xmlns:v="urn:schemas-microsoft-com:vml" xmlns:w="urn:schemas-microsoft-com:office:word" href="${escape(opts.link)}" style="height:48px;v-text-anchor:middle;width:220px;" arcsize="21%" strokecolor="${BRAND.primary}" fillcolor="${BRAND.primary}">
+            <w:anchorlock/>
+            <center style="color:#FFFFFF;font-family:'Inter','Helvetica Neue',Arial,sans-serif;font-size:15px;font-weight:600;">Sign me in →</center>
+          </v:roundrect>
+          <![endif]-->
+          <!--[if !mso]><!-->
           <a href="${escape(opts.link)}" align="center"
              style="display:inline-block;padding:14px 32px;font-size:15px;font-weight:600;line-height:20px;letter-spacing:-0.005em;color:#FFFFFF;background:${BRAND.primary};text-decoration:none;border-radius:10px;text-align:center;">Sign me in →</a>
+          <!--<![endif]-->
         </td>
       </tr>
     </table>
@@ -299,17 +308,35 @@ function paragraph(html: string): string {
   return `<p style="margin:0 0 16px 0;font-size:15px;line-height:1.6;color:${BRAND.inkSoft};">${html}</p>`;
 }
 
-/** Outlook-safe, table-wrapped primary CTA button. Only the <a> paints the blue
- *  and carries the radius so its rounded corners always show (a colored <td>
- *  would fill the corners square behind the button). Label centered on both axes
- *  (align="center" + text-align:center + line-height matched to the font for
- *  symmetric vertical padding); premium 10px radius. */
+/** Approximate pixel width for the Outlook/VML roundrect fallback of a primary
+ *  button, sized to the label (+ the appended " →") so the centered VML text is
+ *  never clipped. Outlook-desktop only; modern clients use the padded <a> and
+ *  size to content. ~9px per glyph at 15px/600 + horizontal padding, min 200. */
+function vmlButtonWidth(label: string): number {
+  return Math.max(200, Math.round((String(label).length + 2) * 9) + 64);
+}
+
+/** Bulletproof, table-wrapped primary CTA button. Modern clients render the
+ *  padded <a> — only it paints the blue and carries the 10px radius, so the
+ *  rounded corners always show (no square <td> fill bleeding through). Outlook
+ *  desktop (Word engine, ignores border-radius + <a> backgrounds) renders the
+ *  mso-conditional VML <roundrect> sibling as the SAME filled, rounded button
+ *  (arcsize 21% ≈ 10px). Label centered on both axes. */
 function ctaButton(label: string, href: string): string {
+  const w = vmlButtonWidth(label);
   return `
     <table role="presentation" cellspacing="0" cellpadding="0" border="0" style="margin:4px 0 22px 0;">
       <tr>
-        <td align="center" style="border-radius:10px;">
+        <td align="center">
+          <!--[if mso]>
+          <v:roundrect xmlns:v="urn:schemas-microsoft-com:vml" xmlns:w="urn:schemas-microsoft-com:office:word" href="${escape(href)}" style="height:48px;v-text-anchor:middle;width:${w}px;" arcsize="21%" strokecolor="${BRAND.primary}" fillcolor="${BRAND.primary}">
+            <w:anchorlock/>
+            <center style="color:#FFFFFF;font-family:'Inter','Helvetica Neue',Arial,sans-serif;font-size:15px;font-weight:600;">${escape(label)} →</center>
+          </v:roundrect>
+          <![endif]-->
+          <!--[if !mso]><!-->
           <a href="${escape(href)}" align="center" style="display:inline-block;padding:14px 32px;font-size:15px;font-weight:600;line-height:20px;letter-spacing:-0.005em;color:#FFFFFF;background:${BRAND.primary};text-decoration:none;border-radius:10px;text-align:center;">${escape(label)} →</a>
+          <!--<![endif]-->
         </td>
       </tr>
     </table>`;
@@ -337,11 +364,20 @@ function ctaActions(
     )
     .join('');
   const secBlock = secs ? `<div style="margin:0 0 22px 0;">${secs}</div>` : '';
+  const w = vmlButtonWidth(primary.label);
   return `
     <table role="presentation" cellspacing="0" cellpadding="0" border="0" style="margin:4px 0 ${secs ? '12px' : '22px'} 0;">
       <tr>
-        <td align="center" style="border-radius:10px;">
+        <td align="center">
+          <!--[if mso]>
+          <v:roundrect xmlns:v="urn:schemas-microsoft-com:vml" xmlns:w="urn:schemas-microsoft-com:office:word" href="${escape(primary.href)}" style="height:48px;v-text-anchor:middle;width:${w}px;" arcsize="21%" strokecolor="${BRAND.primary}" fillcolor="${BRAND.primary}">
+            <w:anchorlock/>
+            <center style="color:#FFFFFF;font-family:'Inter','Helvetica Neue',Arial,sans-serif;font-size:15px;font-weight:600;">${escape(primary.label)} →</center>
+          </v:roundrect>
+          <![endif]-->
+          <!--[if !mso]><!-->
           <a href="${escape(primary.href)}" align="center" style="display:inline-block;padding:14px 32px;font-size:15px;font-weight:600;line-height:20px;letter-spacing:-0.005em;color:#FFFFFF;background:${BRAND.primary};text-decoration:none;border-radius:10px;text-align:center;">${escape(primary.label)} →</a>
+          <!--<![endif]-->
         </td>
       </tr>
     </table>${secBlock}`;
