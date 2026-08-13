@@ -1226,11 +1226,14 @@ body[data-qf-preset="vault"] .qf-result .meta {
 }
 
 /* ============================================================================
-   MAP BLEND — feathered map edges (OPTIONAL, global, theme-agnostic toggle)
+   MAP BLEND — soft mask-faded map edges (OPTIONAL, global, theme-agnostic)
    ----------------------------------------------------------------------------
-   Dissolves the route-map's hard rectangular border and feathers all four
-   edges into the calculator surface, so the map "melts" into the card.
-   Verbatim from `_rec/map-blend.css`.
+   Dissolves the route-map's hard rectangular border and fades its own bitmap
+   edges to TRANSPARENT with a CSS mask — the SAME smooth shade the WeFixTrades
+   homepage reviews scroller uses (.clients__stopper), reused on the freight
+   route map so it reads as a softly framed map melting into the card surface.
+   (Supersedes the earlier surface-colour ::after feather; the mask IS the one
+   coherent edge treatment now — no competing overlay.)
 
    Toggle: body[data-qf-map-blend="on"]  (mirrors body[data-qf-cta-hover=…]).
    OFF / absent  → map renders exactly as today (this block adds nothing).
@@ -1245,68 +1248,59 @@ body[data-qf-preset="vault"] .qf-result .meta {
    they stay fully crisp and legible with the blend ON.
    ========================================================================== */
 
-/* Dissolve the hard rectangular border; card surface = the melt colour. */
+/* Dissolve the hard rectangular border; the card + canvas paint the melt colour
+   so the transparent edges the mask carves reveal the SAME surface the card
+   sits on (seamless dissolve on every preset, light or dark — token only). */
 body[data-qf-map-blend="on"] .qf-map-card {
   border-color: transparent;
   background: var(--w-surface, var(--w-page-bg));
 }
-
-/* Feather overlay: four stacked edge gradients fading the map into the
-   surface colour. pointer-events:none, sits ABOVE the map image (auto/0)
-   but BELOW every badge (z-index:2). ~36–40px feather = smooth, not muddy. */
-body[data-qf-map-blend="on"] .qf-map-canvas::after {
-  content: "";
-  position: absolute;
-  inset: 0;
-  z-index: 1;
-  pointer-events: none;
-  border-radius: inherit;
-  background:
-    linear-gradient(to bottom, var(--w-surface, var(--w-page-bg)), transparent 38px), /* top edge    */
-    linear-gradient(to top,    var(--w-surface, var(--w-page-bg)), transparent 38px), /* bottom edge */
-    linear-gradient(to right,  var(--w-surface, var(--w-page-bg)), transparent 40px), /* left edge   */
-    linear-gradient(to left,   var(--w-surface, var(--w-page-bg)), transparent 40px); /* right edge  */
+body[data-qf-map-blend="on"] .qf-map-canvas {
+  background: var(--w-surface, var(--w-page-bg));
+}
+/* The inline result-panel map is a bare <img>; drop its hard 1px frame too so
+   the mask fade is the only edge it has. */
+body[data-qf-map-blend="on"] .qf-route-map {
+  border-color: transparent;
 }
 
-/* Keep the overlay badges CRISP — lift them above the feather layer. */
+/* ── Map-blend INTENSITY → fade-ramp width ──────────────────────────────────
+   The Customize slider (0–100) is exposed by widget.js as --qf-map-blend-opacity
+   (0–1). Here it DRIVES the fade: the transparent→opaque ramp width scales with
+   it, so 0 = 0% (sharp map, no fade) and 1 = 18% (strong, large soft edges).
+   `calc(<number> * 18%)` is valid CSS (percentage × unitless number). Default 1
+   keeps legacy 'on' tenants at full fade. The on/off master stays
+   body[data-qf-map-blend="on"] (widget.js sets it only when opacity>0), so OFF
+   applies no mask at all and the map is pixel-sharp. */
+body[data-qf-map-blend="on"] {
+  --qf-map-fade: calc(var(--qf-map-blend-opacity, 1) * 18%);
+}
+
+/* WeFixTrades-style edge fade (.clients__stopper look) applied to the map BITMAP
+   itself — the <img>, NOT the .qf-map-canvas button — so the address pills, the
+   route-summary scrim, the expand control and Google's attribution (all siblings
+   of the <img>, drawn on top) are NOT masked and stay fully crisp.
+   Two masks composited to an INTERSECTION fade the left, right AND top edges to
+   transparent; the vertical mask deliberately stays opaque to the bottom so the
+   baked-in "Map data" attribution at the map's bottom edge is never faded out.
+   `currentColor` is the opaque stop (gradient masks use ALPHA, so the hue is
+   irrelevant — only opaque-vs-transparent matters); using it instead of a black
+   literal keeps the colour guard green. */
+body[data-qf-map-blend="on"] .qf-map-img,
+body[data-qf-map-blend="on"] .qf-route-map {
+  -webkit-mask-image:
+    linear-gradient(to right,  transparent 0, currentColor var(--qf-map-fade), currentColor calc(100% - var(--qf-map-fade)), transparent 100%),
+    linear-gradient(to bottom, transparent 0, currentColor var(--qf-map-fade), currentColor 100%);
+  -webkit-mask-composite: source-in;
+  mask-image:
+    linear-gradient(to right,  transparent 0, currentColor var(--qf-map-fade), currentColor calc(100% - var(--qf-map-fade)), transparent 100%),
+    linear-gradient(to bottom, transparent 0, currentColor var(--qf-map-fade), currentColor 100%);
+  mask-composite: intersect;
+}
+
+/* Keep the overlay badges CRISP and above any map layer. */
 body[data-qf-map-blend="on"] .qf-map-addr,
 body[data-qf-map-blend="on"] .qf-map-overlay,
 body[data-qf-map-blend="on"] .qf-map-expand {
   z-index: 2;
-}
-
-/* Map-blend INTENSITY — the Customize-panel slider (0–100 → 0–1) scales the
-   feather overlay's strength via --qf-map-blend-opacity. The on/off master stays
-   body[data-qf-map-blend="on"] (set by widget.js when opacity>0); this only dials
-   the feather strength. Default 1 keeps legacy 'on' tenants at full feather.
-   Same selector/specificity as the feather block above, declared later so this
-   opacity wins. Token/var only — no colour literals, so the colour guard stays
-   green. Respects reduced-motion via the transition guard below. */
-body[data-qf-map-blend="on"] .qf-map-canvas::after {
-  opacity: var(--qf-map-blend-opacity, 1);
-  transition: opacity .12s ease;
-}
-@media (prefers-reduced-motion: reduce) {
-  body[data-qf-map-blend="on"] .qf-map-canvas::after { transition: none; }
-}
-
-/* ── Map-blend ⟷ bottom overlay-scrim reconcile ─────────────────────────────
-   The route-map overlay (.qf-map-overlay, widget-style.css) is a full-width
-   bottom scrim that already melts the map's bottom edge into a dark band and
-   carries the route summary + Google's "Map data" attribution. The map-blend
-   feather ALSO drew a bottom-edge gradient, and on LIGHT presets its
-   surface-coloured (white) wash sat between the map image and the scrim and
-   washed OUT the baked-in Google attribution (verified: legible with blend off,
-   gone at high blend on Harbor). Drop the feather's bottom-edge gradient so the
-   overlay scrim owns the bottom edge on every preset — the top/left/right
-   feathers are unchanged, dark presets look identical (both layers were dark
-   there anyway), and the attribution/overlay text stay crisp and legible.
-   Same selector + specificity as the feather block above, declared later so
-   this background wins; the opacity + transition declared above are untouched.
-   Token/var + transparent only — no colour literals, colour guard stays green. */
-body[data-qf-map-blend="on"] .qf-map-canvas::after {
-  background:
-    linear-gradient(to bottom, var(--w-surface, var(--w-page-bg)), transparent 38px), /* top edge   */
-    linear-gradient(to right,  var(--w-surface, var(--w-page-bg)), transparent 40px), /* left edge   */
-    linear-gradient(to left,   var(--w-surface, var(--w-page-bg)), transparent 40px); /* right edge  */
 }
