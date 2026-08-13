@@ -175,15 +175,22 @@ const VERTICAL_SPECS: Record<FreightVertical, VerticalSpec> = {
     blurb: 'Hotshot dually plus sprinter / box truck, priced by the mile.',
     rateCardKeys: [
       { service: 'hotshot', equipment: 'flatbed' },
+      // Trailer-type bands — real hotshot pricing is driven by trailer type.
+      { service: 'hotshot', equipment: 'hotshot_bumperpull' },
+      { service: 'hotshot', equipment: 'hotshot_gooseneck' },
+      { service: 'hotshot', equipment: 'hotshot_gooseneck40' },
+      { service: 'hotshot', equipment: 'hotshot_dovetail' },
+      { service: 'hotshot', equipment: 'hotshot_stepdeck' },
       { service: 'expedited', equipment: 'sprinter' },
       { service: 'expedited', equipment: 'box_truck' },
     ],
     // Hotshot / expedited default set (carrier-editable industry defaults):
     // expedite/rush premium, after-hours/weekend, pickup & delivery waiting time,
-    // liftgate, extra stop, detention, TONU.
+    // liftgate, extra stop, detention, TONU, plus the oversize permit that turns
+    // an over-dimensional hotshot into the premium tier when the customer checks it.
     accessorialCodes: [
       'detention', 'tonu', 'extra_stop', 'liftgate', 'weekend_after_hours',
-      'driver_wait_pickup', 'driver_wait_delivery', 'expedite_fee',
+      'driver_wait_pickup', 'driver_wait_delivery', 'expedite_fee', 'oversize_permit',
     ],
     includeAllZones: false,
     pricingMode: 'per_mile',
