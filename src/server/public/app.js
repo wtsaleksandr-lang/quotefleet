@@ -4007,12 +4007,38 @@
     };
     function intOr(v, d) { var n = parseInt(v, 10); return isFinite(n) && n >= 0 ? n : d; }
 
+    // Tenant-customizable COPY — per-touch intro, an optional contact block, and
+    // a signature. Seeded from stored values; empty ⇒ the email templates render
+    // their own carrier-branded defaults. Saved into the same followUp bag.
+    function strOr(v) { return typeof v === 'string' ? v : ''; }
+    var copy = {
+      intro1: strOr(stored.intro1),
+      intro2: strOr(stored.intro2),
+      intro3: strOr(stored.intro3),
+      showContact: stored.showContact === true,
+      contactPhone: strOr(stored.contactPhone),
+      contactEmail: strOr(stored.contactEmail),
+      signature: strOr(stored.signature),
+    };
+
     function buildPayload() {
+      var base;
       if (fu.preset === 'custom') {
-        return { enabled: fu.enabled, preset: 'custom', day1: custom.day1, day2: custom.day2, day3: custom.day3, discountPct: custom.discountPct };
+        base = { enabled: fu.enabled, preset: 'custom', day1: custom.day1, day2: custom.day2, day3: custom.day3, discountPct: custom.discountPct };
+      } else {
+        var p = FU_PRESETS[fu.preset] || std;
+        base = { enabled: fu.enabled, preset: fu.preset, day1: p.day1, day2: p.day2, day3: p.day3, discountPct: p.discountPct };
       }
-      var p = FU_PRESETS[fu.preset] || std;
-      return { enabled: fu.enabled, preset: fu.preset, day1: p.day1, day2: p.day2, day3: p.day3, discountPct: p.discountPct };
+      // Only include copy fields that carry a value, so the resolved config
+      // stays sparse and the templates own every default.
+      base.showContact = copy.showContact;
+      if (copy.intro1.trim()) base.intro1 = copy.intro1.trim();
+      if (copy.intro2.trim()) base.intro2 = copy.intro2.trim();
+      if (copy.intro3.trim()) base.intro3 = copy.intro3.trim();
+      if (copy.contactPhone.trim()) base.contactPhone = copy.contactPhone.trim();
+      if (copy.contactEmail.trim()) base.contactEmail = copy.contactEmail.trim();
+      if (copy.signature.trim()) base.signature = copy.signature.trim();
+      return base;
     }
     function save() {
       var payload = buildPayload();
@@ -4155,6 +4181,131 @@
       syncPromoPrefill();
       if (doSave) save();
     }
+
+    // ── Message, contact & signature ───────────────────────────────────
+    // Tenant-editable copy for the three touches + an optional contact block +
+    // a signature. Empty fields fall back to the built-in carrier-branded copy.
+    var copySec = el('div', { style: { marginTop: '16px', paddingTop: '16px', borderTop: '1px solid var(--border)' } });
+    copySec.appendChild(el('div', { class: 'field-label', text: 'Message & signature', style: { marginBottom: '4px' } }));
+    copySec.appendChild(el('div', {
+      class: 'field-hint',
+      text: 'Personalize each email’s opening line. Leave any blank to use our written-for-you copy. Your carrier name, the quote details, and the price are always filled in automatically.',
+      style: { marginBottom: '12px' },
+    }));
+
+    // Field with the title in-field + help cue top-right + 2px gap (matches numField).
+    function textField(labelText, hintText, value, placeholder, maxLen, onCommit) {
+      var f = el('div', { class: 'field', style: { marginBottom: '12px' } });
+      var head = el('div', { style: { display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', gap: '8px' } });
+      head.appendChild(el('label', { class: 'field-label', text: labelText }));
+      if (hintText) head.appendChild(el('span', { class: 'field-hint', text: hintText, style: { marginTop: '0' } }));
+      f.appendChild(head);
+      var inp = el('textarea', { class: 'input', rows: '2', placeholder: placeholder || '', style: { resize: 'vertical', minHeight: '48px' } });
+      if (maxLen) inp.maxLength = maxLen;
+      inp.value = value || '';
+      inp.addEventListener('blur', function () { onCommit(inp.value); });
+      f.appendChild(inp);
+      return f;
+    }
+    copySec.appendChild(textField('1st email — gentle nudge', 'opening line', copy.intro1,
+      'e.g. Hi {name}, just checking in on your quote — happy to lock it in whenever you’re ready.', 600,
+      function (v) { copy.intro1 = v; save(); }));
+    copySec.appendChild(textField('2nd email — reminder', 'opening line', copy.intro2,
+      'e.g. Your rate is still held. Rates move fast — let’s get you booked.', 600,
+      function (v) { copy.intro2 = v; save(); }));
+    copySec.appendChild(textField('3rd email — discount', 'opening line', copy.intro3,
+      'e.g. Here’s a little off to get your load rolling.', 600,
+      function (v) { copy.intro3 = v; save(); }));
+
+    // Contact block — a checkbox to include it + phone/email inputs.
+    var contactToggle = el('label', {
+      style: { display: 'flex', gap: '12px', alignItems: 'flex-start', padding: '8px 0', cursor: 'pointer' },
+    });
+    var contactCb = el('input', { type: 'checkbox', style: { marginTop: '3px', flex: '0 0 auto' } });
+    contactCb.checked = copy.showContact;
+    contactToggle.appendChild(contactCb);
+    contactToggle.appendChild(el('div', { style: { flex: '1 1 auto' } }, [
+      el('div', { text: 'Add a contact line to every email', style: { fontWeight: '600' } }),
+      el('div', { class: 'field-hint', text: 'Shows “Questions? Reach us at …” with the number and address below.', style: { marginTop: '2px' } }),
+    ]));
+    copySec.appendChild(contactToggle);
+
+    var contactWrap = el('div', {
+      style: {
+        display: copy.showContact ? 'flex' : 'none', flexWrap: 'wrap', gap: '8px',
+        margin: '4px 0 12px 0', padding: '12px', borderRadius: '10px',
+        border: '1px dashed var(--border)', background: 'var(--surface)',
+      },
+    });
+    function plainField(labelText, value, placeholder, type, maxLen, onCommit) {
+      var f = el('div', { class: 'field', style: { marginBottom: '0', flex: '1 1 160px', minWidth: '160px' } });
+      f.appendChild(el('label', { class: 'field-label', text: labelText }));
+      var inp = el('input', { class: 'input', type: type || 'text', placeholder: placeholder || '' });
+      if (maxLen) inp.maxLength = maxLen;
+      inp.value = value || '';
+      inp.addEventListener('blur', function () { onCommit(inp.value); });
+      f.appendChild(inp);
+      return f;
+    }
+    contactWrap.appendChild(plainField('Phone', copy.contactPhone, 'e.g. (562) 555-0100', 'tel', 40,
+      function (v) { copy.contactPhone = v; save(); }));
+    contactWrap.appendChild(plainField('Email', copy.contactEmail, 'e.g. dispatch@yourco.com', 'email', 120,
+      function (v) { copy.contactEmail = v; save(); }));
+    copySec.appendChild(contactWrap);
+    contactCb.addEventListener('change', function () {
+      copy.showContact = contactCb.checked;
+      contactWrap.style.display = copy.showContact ? 'flex' : 'none';
+      save();
+    });
+
+    copySec.appendChild(textField('Signature', 'sign-off line', copy.signature,
+      'e.g. Sam — Dispatch, Harbor Link Logistics', 200,
+      function (v) { copy.signature = v; save(); }));
+    foldBody.appendChild(copySec);
+
+    // ── Preview ─────────────────────────────────────────────────────────
+    // Renders a touch with the CURRENT settings via the same template the cron
+    // sends, so what's shown here is exactly what ships. Uses the saved config,
+    // so blur-saves land before previewing.
+    var previewSec = el('div', { style: { marginTop: '16px', paddingTop: '16px', borderTop: '1px solid var(--border)' } });
+    previewSec.appendChild(el('div', { class: 'field-label', text: 'Preview', style: { marginBottom: '4px' } }));
+    previewSec.appendChild(el('div', {
+      class: 'field-hint',
+      text: 'See exactly what each email looks like with a sample quote.',
+      style: { marginBottom: '12px' },
+    }));
+    var previewBtns = el('div', { style: { display: 'flex', flexWrap: 'wrap', gap: '8px', marginBottom: '12px' } });
+    var previewNote = el('div', { class: 'field-hint', style: { display: 'none', marginBottom: '8px' } });
+    var previewFrame = el('iframe', {
+      style: {
+        display: 'none', width: '100%', height: '520px', border: '1px solid var(--border)',
+        borderRadius: '10px', background: 'var(--surface)',
+      },
+    });
+    previewFrame.setAttribute('sandbox', ''); // render HTML inert — no scripts, no navigation
+    previewFrame.setAttribute('title', 'Follow-up email preview');
+    function loadPreview(touch, label) {
+      previewNote.style.display = 'none';
+      api('/api/tenant/follow-up/preview?touch=' + encodeURIComponent(touch)).then(function (r) {
+        if (!r || !r.html) {
+          previewFrame.style.display = 'none';
+          previewNote.textContent = (r && r.note) || 'Nothing to preview for this touch.';
+          previewNote.style.display = 'block';
+          return;
+        }
+        previewFrame.srcdoc = r.html;
+        previewFrame.style.display = 'block';
+      }).catch(toastErr);
+    }
+    [['nudge', 'Preview nudge'], ['reminder', 'Preview reminder'], ['discount', 'Preview discount']].forEach(function (pair) {
+      var b = el('button', { class: 'btn', text: pair[1], style: { flex: '0 0 auto' } });
+      b.addEventListener('click', function () { loadPreview(pair[0], pair[1]); });
+      previewBtns.appendChild(b);
+    });
+    previewSec.appendChild(previewBtns);
+    previewSec.appendChild(previewNote);
+    previewSec.appendChild(previewFrame);
+    foldBody.appendChild(previewSec);
 
     // ── Promo-code sub-section (UI shell — CRUD routes land in a later wave) ─
     var promoSec = el('div', { style: { marginTop: '16px', paddingTop: '16px', borderTop: '1px solid var(--border)' } });

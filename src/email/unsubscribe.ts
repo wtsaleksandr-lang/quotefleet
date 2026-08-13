@@ -55,3 +55,50 @@ export function unsubscribeUrl(baseUrl: string, tenantId: number): string {
   const base = baseUrl.replace(/\/$/, '');
   return `${base}/unsubscribe?token=${encodeURIComponent(makeUnsubscribeToken(tenantId))}`;
 }
+
+/* ──────────────────────────────────────────────────────────────────────────
+ * LEAD-scoped unsubscribe — for the carrier-branded SHIPPER follow-up emails.
+ *
+ * A follow-up email goes to the carrier's END CUSTOMER, not the tenant, so its
+ * unsubscribe must opt THAT customer out of THAT carrier's follow-up sequence —
+ * never flip the tenant's own product-update opt-out. So follow-ups carry a
+ * distinct, lead-scoped token: `L<leadId>.<hexSig>`. The `L` prefix lets the
+ * shared /unsubscribe route tell the two token kinds apart. Same HMAC secret,
+ * different message string, so a tenant token can never be replayed as a lead
+ * token and vice-versa.
+ * ────────────────────────────────────────────────────────────────────────── */
+
+function signLead(leadId: number): string {
+  return createHmac('sha256', loadEnv().SESSION_SECRET)
+    .update(`unsubscribe-lead:${leadId}`)
+    .digest('hex');
+}
+
+/** Build a signed lead-scoped unsubscribe token (`L<leadId>.<hexSig>`). */
+export function makeLeadUnsubscribeToken(leadId: number): string {
+  return `L${leadId}.${signLead(leadId)}`;
+}
+
+/** Verify a lead token and return the leadId it authorizes, or null when the
+ *  token is missing, not a lead token (`L`-prefixed), malformed, or the
+ *  signature doesn't match. Constant-time comparison. */
+export function verifyLeadUnsubscribeToken(token: string | undefined | null): number | null {
+  if (!token || typeof token !== 'string' || token[0] !== 'L') return null;
+  const dot = token.indexOf('.');
+  if (dot <= 1) return null;
+  const leadId = Number(token.slice(1, dot));
+  if (!Number.isInteger(leadId) || leadId <= 0) return null;
+  const sig = token.slice(dot + 1);
+  const expected = signLead(leadId);
+  const a = Buffer.from(sig, 'utf8');
+  const b = Buffer.from(expected, 'utf8');
+  if (a.length !== b.length) return null;
+  if (!timingSafeEqual(a, b)) return null;
+  return leadId;
+}
+
+/** Full tokenized lead-scoped unsubscribe URL for a follow-up email. */
+export function leadUnsubscribeUrl(baseUrl: string, leadId: number): string {
+  const base = baseUrl.replace(/\/$/, '');
+  return `${base}/unsubscribe?token=${encodeURIComponent(makeLeadUnsubscribeToken(leadId))}`;
+}

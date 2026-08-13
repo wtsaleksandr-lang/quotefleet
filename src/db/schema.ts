@@ -871,6 +871,21 @@ export const leads = pgTable(
     autoReplySent: boolean('auto_reply_sent').notNull().default(false),
     autoReplyAt: timestamp('auto_reply_at', { mode: 'date' }),
 
+    /** Automated shipper follow-up bookkeeping (src/email/followUpCron.ts).
+     *  Records which touches have already been sent so the cron is idempotent
+     *  and can run every hour without ever double-sending. Keys mirror the
+     *  three touches: 'nudge' | 'reminder' | 'discount'. Values: ISO timestamp
+     *  of when that touch went out. Null/absent ⇒ nothing sent yet. Additive,
+     *  no backfill — existing leads read null and simply become eligible. */
+    followUpsSentJson: jsonb('follow_ups_sent_json').$type<Record<string, string>>(),
+    /** Customer opted OUT of this carrier's follow-up sequence (clicked the
+     *  tokenized unsubscribe link in a follow-up email → GET/POST /unsubscribe
+     *  with a lead-scoped `L<id>.<sig>` token). The follow-up cron SKIPS any
+     *  lead with this true. Scoped to the LEAD, not the tenant — one customer
+     *  opting out never silences the carrier's other customers. Default false;
+     *  existing leads read false. */
+    followUpOptOut: boolean('follow_up_opt_out').notNull().default(false),
+
     createdAt: timestamp('created_at', { mode: 'date' }).notNull().defaultNow(),
     updatedAt: timestamp('updated_at', { mode: 'date' }).notNull().defaultNow(),
   },
