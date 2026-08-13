@@ -99,13 +99,15 @@
 .qf-hz-class:not(:empty) {
   margin-left: var(--space-0-5);
 }
-/* Chevron appears only once the chip has morphed into the selector. */
+/* Chevron appears only once the chip has morphed into the selector. Sized and
+   full-opacity so it reads clearly as a real dropdown caret (the affordance that
+   tells the user "click to pick a class"), and flips on open. */
 .qf-hz-chev {
   display: none;
   flex: 0 0 auto;
   margin-left: auto;
-  font-size: 11px;
-  opacity: 0.8;
+  font-size: 15px;
+  opacity: 1;
   transition: transform var(--qf-dur) var(--qf-ease);
 }
 
@@ -160,6 +162,18 @@
   transform: rotate(180deg);
 }
 
+/* Un-clip the anchored popover: the options live in a modal whose body
+   (.qf-modal-body / #qf-options-body, widget-ux-fixes.css) is a scroll container
+   (overflow-y:auto), which crops the absolutely-positioned listbox so the lower
+   class rows get cut off. Only while the listbox is open, let that body render
+   overflow so the full popover escapes the clip. Scoped to the open state, so
+   normal modal scrolling is untouched and no other option content leaks. The
+   listbox stays position:absolute (out of flow), so this adds no layout height
+   and leaves zero residual gap on close. */
+#qf-options-body:has(.qf-hazmat-control.is-open) {
+  overflow: visible;
+}
+
 /* ── Class listbox — anchored popover that unfolds in place ────────────────── */
 .qf-hz-list {
   position: absolute;
@@ -171,11 +185,11 @@
   border: 1px solid var(--w-border);
   border-radius: 12px;
   box-shadow: 0 12px 30px rgba(15, 23, 42, 0.18);
-  /* Tall enough to hold all 9 classes without an internal scrollbar in the
-     common case, so animateFold's height target matches the settled height and
-     there is no end-of-animation snap. Taller content (very narrow screens where
-     descriptions wrap) still scrolls. */
-  max-height: 500px;
+  /* Tall enough to hold all 9 classes with NO internal scrollbar on desktop
+     (content ≈ 518px; ≈ 550px when descriptions wrap on narrow screens). Capped
+     to the viewport (min with a vh unit) so on short viewports it never runs off
+     screen — it scrolls internally instead of being clipped. */
+  max-height: min(72vh, 560px);
   overflow-y: auto;
 }
 .qf-hz-list[hidden] {
