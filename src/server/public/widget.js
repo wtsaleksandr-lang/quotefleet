@@ -52,6 +52,28 @@
     catch (e) { return '$' + fmtMoney(v); }
   }
 
+  // Whole-dollar money ("$2,300", "CA$2,300") for the estimated-range KPI —
+  // low/high already arrive snapped to clean dollars, so cents would be noise.
+  function fmtWhole(n, code) {
+    var v = (typeof n === 'number' && isFinite(n)) ? n : 0;
+    try {
+      return new Intl.NumberFormat(MONEY_LOCALE, {
+        style: 'currency', currency: code || activeCurrency(),
+        maximumFractionDigits: 0, minimumFractionDigits: 0,
+      }).format(v);
+    } catch (e) { return '$' + Math.round(v).toLocaleString('en-US'); }
+  }
+
+  // "Valid until" date = today + the quote-validity window (engine's
+  // QUOTE_VALIDITY_DAYS, surfaced as result.validityDays; falls back to 30 for
+  // an older server build). Aligns with the terms disclaimer's validity.
+  function fmtValidUntil(days) {
+    var n = Number(days); if (!(n > 0)) n = 30;
+    var dt = new Date(Date.now() + n * 86400000);
+    try { return dt.toLocaleDateString(MONEY_LOCALE, { year: 'numeric', month: 'short', day: 'numeric' }); }
+    catch (e) { return (dt.getMonth() + 1) + '/' + dt.getDate() + '/' + dt.getFullYear(); }
+  }
+
   // Just the symbol ("$" / "CA$"), for the hero total — which renders the
   // symbol in its own span so the digits can count up independently.
   function currencySymbol(code) {
@@ -931,6 +953,28 @@
     if (!(d > 0)) return null;
     for (var i = 0; i < LTL_DENSITY_SCALE.length; i++) { if (d >= LTL_DENSITY_SCALE[i][0]) return LTL_DENSITY_SCALE[i][1]; }
     return 500;
+  }
+  // Reclass/reweigh risk: is the aggregate density sitting close to an NMFC
+  // class boundary? The scale is densest-first [minPcf, class]. For the matched
+  // row i, dropping below its minPcf bumps to a HEAVIER (pricier) class; rising
+  // to the next-denser row's minPcf drops to a CHEAPER class. Within ~6% of
+  // either boundary, a carrier reweigh could flip the class — worth a heads-up.
+  // (density comes from the SAME client aggregate that set the quoted class, so
+  // it matches what the customer was priced on.) Returns true when borderline.
+  var LTL_BOUNDARY_PROXIMITY = 0.06;
+  function ltlDensityBorderline(density) {
+    var d = Number(density);
+    if (!(d > 0)) return false;
+    var i = -1;
+    for (var k = 0; k < LTL_DENSITY_SCALE.length; k++) { if (d >= LTL_DENSITY_SCALE[k][0]) { i = k; break; } }
+    if (i < 0) return false;
+    var lower = LTL_DENSITY_SCALE[i][0];
+    // Heavier-class boundary below (only if a heavier class exists: i is not the
+    // last / lightest row) — how far d sits above this row's floor.
+    var nearLower = i < LTL_DENSITY_SCALE.length - 1 && lower > 0 && (d - lower) / d <= LTL_BOUNDARY_PROXIMITY;
+    // Cheaper-class boundary above (only if a denser class exists: i > 0).
+    var nearUpper = i > 0 && (LTL_DENSITY_SCALE[i - 1][0] - d) / d <= LTL_BOUNDARY_PROXIMITY;
+    return nearLower || nearUpper;
   }
   var LB_PER_KG = 2.2046226, IN_PER_CM = 1 / 2.54;
   // Over-legal ceiling for an automated instant quote — mirrors the server's
@@ -1824,6 +1868,10 @@
         eta.style.display = '';
       } else { eta.textContent = ''; eta.style.display = 'none'; }
     }
+    // Premium KPI (estimated range · confidence · valid-until) + the LTL
+    // reclass/reweigh caution. Both no-op gracefully on an older server build.
+    renderKpi(r);
+    renderReclassNote(r);
     var lines = $('qf-lines'); lines.innerHTML = '';
     // Suppress a single line item that merely restates the total (a lone
     // "Line haul $X" directly above "Total $X") — show only the Total row.
@@ -1862,6 +1910,51 @@
       tl.classList.add('show');
     }
     autoResize();
+  }
+
+  // Premium KPI block: estimated range · confidence pill · valid-until date.
+  // Hidden entirely on an older server build that doesn't send low/high.
+  // Per-tenant gate for the whole confidence/range KPI panel. Default ON —
+  // only an explicit false disables it (mirrors resolveFeatures + shareFeatureOn).
+  function confidenceKpiOn() {
+    var f = (state.config && state.config.features) || {};
+    return f.showConfidenceKpi !== false;
+  }
+  function renderKpi(r) {
+    var box = $('qf-kpi'); if (!box) return;
+    // Feature OFF → the entire panel (pill + range + valid-until + help cue)
+    // stays hidden and the result card renders total + line items only.
+    if (!confidenceKpiOn()) { box.hidden = true; return; }
+    var cur = (r && r.currency) || 'USD';
+    var hasRange = r && typeof r.low === 'number' && typeof r.high === 'number' && r.high > r.low;
+    var rangeEl = $('qf-kpi-range');
+    if (rangeEl && hasRange) rangeEl.textContent = fmtWhole(r.low, cur) + ' – ' + fmtWhole(r.high, cur);
+    // Confidence pill — High / Medium, outline style (never a scary "low").
+    var conf = (r && r.confidence === 'high') ? 'high' : 'medium';
+    var pill = $('qf-kpi-conf'), pillTxt = $('qf-kpi-conf-txt');
+    if (pill) pill.setAttribute('data-level', conf);
+    if (pillTxt) pillTxt.textContent = conf === 'high' ? 'High confidence' : 'Medium confidence';
+    // Valid-until date from the quote-validity window (aligns with the terms).
+    var vd = $('qf-kpi-valid-date');
+    if (vd) vd.textContent = fmtValidUntil(r && r.validityDays);
+    box.hidden = !hasRange;
+  }
+
+  // LTL-only reclass/reweigh caution — a calm, non-blocking heads-up shown when
+  // the density behind the quoted class sits near an NMFC class boundary, or the
+  // server-priced class disagrees with the density-derived one. Hidden otherwise
+  // and on every non-LTL quote.
+  function renderReclassNote(r) {
+    var note = $('qf-reclass-note'); if (!note) return;
+    var show = false;
+    if (state.service === 'ltl') {
+      var t = ltlTotals();
+      if (ltlDensityBorderline(t.density)) show = true;
+      var derived = ltlClassFromDensity(t.density);
+      var priced = r && r.ltl && r.ltl.freightClass;
+      if (derived && priced && Number(priced) !== Number(derived)) show = true;
+    }
+    note.hidden = !show;
   }
 
   // Terms / disclaimer shown at the bottom of the result card. The server

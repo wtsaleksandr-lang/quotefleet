@@ -17,6 +17,8 @@
  * own specifics (per-diem, SSL/steamship-line terms, lane-specific clauses).
  */
 
+import { QUOTE_VALIDITY_DAYS } from '../calc/engine.js';
+
 export const DEFAULT_QUOTE_DISCLAIMER =
   "This quote is subject to the availability of the requested services and " +
   "equipment at the time of booking; if availability changes we'll notify you " +
@@ -29,7 +31,7 @@ export const DEFAULT_QUOTE_DISCLAIMER =
   "may be adjusted to reflect the actual services rendered, weight, " +
   "dimensions, and accessorial charges; any discrepancies identified at " +
   "pickup or delivery will be reviewed and may result in a revised invoice. " +
-  "This quote is valid for 30 days from the date of issue, after which " +
+  `This quote is valid for ${QUOTE_VALIDITY_DAYS} days from the date of issue, after which ` +
   "pricing and terms may change.";
 
 /**

@@ -843,3 +843,124 @@ html { scrollbar-width: thin; scrollbar-color: rgba(135, 138, 150, 0.38) transpa
    [placeholder^="optional" i] is case-insensitive so it catches both
    "Optional — e.g. …" and "optional" without touching any other field. */
 .qf-input[placeholder^="optional" i] { text-indent: 4px; }
+
+/* ── Premium result KPI: estimated range · confidence · valid-until ──────────
+   A trust panel under the headline total. Every colour is derived from the
+   on-card theme tokens (--w-oncard-*) through color-mix, so it stays readable
+   and brand-tinted on EVERY result-card background — the light premium
+   gradient, the app-calculator card, and any applied dark theme — without ever
+   hardcoding a colour. Spacing uses the 8px ramp tokens; the confidence pill is
+   outline, never a bright fill (house rule: selected = outline). */
+.qf-kpi {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+  margin-top: var(--space-1-5);
+  padding: var(--space-1-5);
+  border-radius: 14px;
+  border: 1px solid color-mix(in srgb, var(--w-oncard-accent, var(--w-primary)) 20%, transparent);
+  background: color-mix(in srgb, var(--w-oncard-accent, var(--w-primary)) 6%, transparent);
+}
+.qf-kpi[hidden] { display: none; }
+.qf-kpi-conf-row { display: flex; align-items: center; }
+/* The global ".qf-widget .qf-help { display:none !important }" clutter-removal
+   rule (top of this file) also swallowed THIS cue. The KPI "?" is intentional,
+   so restore it as a VISIBLE INLINE cue (not the absolute top-right badge the
+   other cues use) — same escape hatch as the .qf-booking-summary .qf-help rule.
+   Sits snug after the confidence label, vertically centred with it. */
+.qf-widget .qf-kpi .qf-help {
+  display: inline-flex !important;
+  position: relative;
+  top: auto;
+  right: auto;
+  margin-left: var(--space-0-5);
+}
+.qf-kpi-help { color: var(--w-oncard-muted, var(--w-muted)); }
+/* Confidence indicator: a small segmented signal meter + text label (replaces
+   the old pill). Filled bars are the brand accent; the empty bar stays muted. */
+.qf-kpi-conf {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-1);
+  color: var(--w-oncard-text, var(--w-fg));
+  font-size: 12px;
+  font-weight: 750;
+  letter-spacing: 0.02em;
+}
+.qf-kpi-meter {
+  display: inline-flex;
+  align-items: flex-end;
+  gap: var(--space-0-5);
+  flex: 0 0 auto;
+}
+.qf-kpi-bar {
+  width: 4px;
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--w-oncard-muted, var(--w-muted)) 30%, transparent);
+}
+.qf-kpi-bar:nth-child(1) { height: 8px; }
+.qf-kpi-bar:nth-child(2) { height: 12px; }
+.qf-kpi-bar:nth-child(3) { height: 16px; }
+/* High → all three bars lit in the brand accent. */
+.qf-kpi-conf[data-level="high"] .qf-kpi-bar {
+  background: var(--w-oncard-accent, var(--w-primary));
+}
+/* Medium → first two lit, the third stays muted/empty. */
+.qf-kpi-conf[data-level="medium"] .qf-kpi-bar:nth-child(1),
+.qf-kpi-conf[data-level="medium"] .qf-kpi-bar:nth-child(2) {
+  background: var(--w-oncard-accent, var(--w-primary));
+}
+.qf-kpi-cells {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-1) var(--space-3);
+}
+.qf-kpi-cell {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-0-5);
+  min-width: 0;
+}
+.qf-kpi-lbl {
+  font-size: 10px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--w-oncard-muted, var(--w-muted));
+}
+.qf-kpi-val {
+  font-size: 15px;
+  font-weight: 750;
+  color: var(--w-oncard-text, var(--w-fg));
+  overflow-wrap: anywhere;
+}
+.qf-kpi-valid { display: inline-flex; align-items: center; gap: var(--space-0-5); }
+.qf-kpi-clock { flex: 0 0 auto; opacity: 0.85; }
+
+/* ── LTL reclass / reweigh caution ───────────────────────────────────────────
+   Calm, non-blocking heads-up on LTL quotes whose density sits near an NMFC
+   class boundary. Neutral (muted-token) surface so it reads as a note, not an
+   error; theme-aware and mobile-correct. */
+.qf-reclass-note {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--space-1);
+  margin-top: var(--space-1);
+  margin-bottom: var(--space-1);
+  padding: var(--space-1) var(--space-1-5);
+  border-radius: 10px;
+  border: 1px solid color-mix(in srgb, var(--w-oncard-muted, var(--w-muted)) 28%, transparent);
+  background: color-mix(in srgb, var(--w-oncard-muted, var(--w-muted)) 8%, transparent);
+  color: var(--w-oncard-text, var(--w-fg));
+  font-size: 12px;
+  line-height: 1.45;
+}
+.qf-reclass-note[hidden] { display: none; }
+.qf-reclass-ic {
+  flex: 0 0 auto;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--w-oncard-accent, var(--w-primary));
+}
+.qf-reclass-txt { min-width: 0; }
