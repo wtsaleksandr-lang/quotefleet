@@ -99,13 +99,15 @@
 .qf-hz-class:not(:empty) {
   margin-left: var(--space-0-5);
 }
-/* Chevron appears only once the chip has morphed into the selector. */
+/* Chevron appears only once the chip has morphed into the selector. Sized and
+   full-opacity so it reads clearly as a real dropdown caret (the affordance that
+   tells the user "click to pick a class"), and flips on open. */
 .qf-hz-chev {
   display: none;
   flex: 0 0 auto;
   margin-left: auto;
-  font-size: 11px;
-  opacity: 0.8;
+  font-size: 15px;
+  opacity: 1;
   transition: transform var(--qf-dur) var(--qf-ease);
 }
 
@@ -158,6 +160,18 @@
 /* Chevron flips while the list is open. */
 .qf-hazmat-control.is-open .qf-hz-chev {
   transform: rotate(180deg);
+}
+
+/* Un-clip the anchored popover: the options live in a modal whose body
+   (.qf-modal-body / #qf-options-body, widget-ux-fixes.css) is a scroll container
+   (overflow-y:auto), which crops the absolutely-positioned listbox so the lower
+   class rows get cut off. Only while the listbox is open, let that body render
+   overflow so the full popover escapes the clip. Scoped to the open state, so
+   normal modal scrolling is untouched and no other option content leaks. The
+   listbox stays position:absolute (out of flow), so this adds no layout height
+   and leaves zero residual gap on close. */
+#qf-options-body:has(.qf-hazmat-control.is-open) {
+  overflow: visible;
 }
 
 /* ── Class listbox — anchored popover that unfolds in place ────────────────── */
