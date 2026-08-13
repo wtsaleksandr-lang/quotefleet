@@ -1,268 +1,61 @@
 /* ==========================================================================
-   Portal top bar (sticky) — the tenant dashboard's header.
-   Left  : clickable truck logo → quotefleet.net (new tab) + the tenant's
-           hosted URL → their live calculator (/w/<slug>, new tab).
-   Right : notifications bell (new-lead dot) · day/night theme toggle ·
-           account settings — a single right-aligned cluster.
-   The bar is position:sticky so it stays put while the page scrolls; its
-   top offset is synced to the trial banner's height at runtime
-   (--qf-appbar-top) so the two sticky elements never overlap.
+   Sidebar product logo — the tenant dashboard's brand mark.
+
+   The old sticky top app-bar (logo + notifications bell + theme toggle +
+   account) was removed: it stranded a mostly-empty band across the top and,
+   being a second sticky element, overlapped the page. Its three real controls
+   moved into the sidebar instead —
+     • logo        → top of the sidebar, above the tenant brand-block (below)
+     • theme toggle → sidebar footer (id kept; base .qf-theme-toggle styling)
+     • account     → a sidebar nav-item (data-route="account")
+   and the redundant bell was dropped (the Leads nav-item carries the new-lead
+   badge). With the bar gone, .app-main / #page-content return to their base
+   layout (style.css + dashboard-freight-shell.css) — no overrides needed here.
 
    Theme-aware via design tokens only (no raw colors). Spacing snapped to the
-   8px ramp {0,4,8,12,16,24,32,48,60,80,120}. Loaded LAST in app.html so the
-   .app-main padding relocation (below) wins the cascade over style.css and
-   dashboard-freight-shell.css.
+   8px ramp {0,4,8,12,16,24,32,48,60,80,120}. Loaded LAST in app.html; the id
+   selectors below win over the generic `.sidebar a` nav-row styling in both
+   themes.
    ========================================================================== */
 
-/* The main column becomes a flex stack: sticky bar on top, page content
-   below. Page padding moves off .app-main and onto #page-content so the bar
-   can sit flush at the very top edge of the column. */
-.app-main {
-  padding: 0;
-  display: flex;
-  flex-direction: column;
-}
-html[data-theme="light"] .app-main {
-  padding: 0;
-}
-#page-content {
-  padding: 32px;
-  min-width: 0;
-}
-html[data-theme="light"] #page-content {
-  padding: 32px 48px 48px;
-}
-
-/* ── The bar ─────────────────────────────────────────────────────────────── */
-.qf-appbar {
-  position: sticky;
-  top: var(--qf-appbar-top, 0px);
-  z-index: 50;
+/* The QuoteFleet product mark sits at the very top of the sidebar, above the
+   tenant's own name. It's a link to the homepage (new tab), NOT a nav row, so
+   these id-scoped rules undo the generic `.sidebar a` nav styling (padding,
+   min-height, border-left, hover fill) in both light and dark themes. */
+#qf-sidebar .qf-sb-logo {
   display: flex;
   align-items: center;
-  justify-content: space-between;
-  gap: 16px;
-  padding: 12px 32px;
-  background: var(--surface);
-  border-bottom: 1px solid var(--border);
+  width: auto;
+  min-height: 0;
+  margin: 0;
+  padding: 0 var(--space-2) var(--space-1-5);
+  border: 0;
+  border-radius: 0;
+  background: transparent;
 }
-
-.qf-appbar-left {
-  display: flex;
-  align-items: center;
-  gap: 16px;
-  min-width: 0;
+#qf-sidebar .qf-sb-logo:hover {
+  background: transparent;
 }
-
-/* Truck logo → homepage. Two source images; CSS shows the variant that reads
-   on the current surface (on-dark art in dark theme, full-color in light). */
-.qf-appbar-logo {
-  display: inline-flex;
-  align-items: center;
-  flex: 0 0 auto;
-  border-radius: var(--radius-btn);
-}
-.qf-appbar-logo:focus-visible {
+#qf-sidebar .qf-sb-logo:focus-visible {
   outline: 2px solid var(--accent);
   outline-offset: 2px;
 }
-.qf-appbar-logo-img {
-  height: 28px;
+
+/* Two source images; CSS shows the variant that reads on the current surface
+   (on-dark art in dark theme, full-color in light). */
+#qf-sidebar .qf-sb-logo-img {
+  height: 24px;
   width: auto;
+}
+#qf-sidebar .qf-sb-logo-ondark {
   display: block;
 }
-.qf-appbar-logo-onlight {
+#qf-sidebar .qf-sb-logo-onlight {
   display: none;
 }
-html[data-theme="light"] .qf-appbar-logo-ondark {
+html[data-theme="light"] #qf-sidebar .qf-sb-logo-ondark {
   display: none;
 }
-html[data-theme="light"] .qf-appbar-logo-onlight {
+html[data-theme="light"] #qf-sidebar .qf-sb-logo-onlight {
   display: block;
-}
-
-/* Hosted URL → the tenant's live calculator. Looks and behaves like a link. */
-.qf-appbar-slug {
-  min-width: 0;
-  max-width: 360px;
-  padding: 4px 8px;
-  border: 1px solid transparent;
-  border-radius: var(--radius-btn);
-  color: var(--muted);
-  font-family: var(--font-mono);
-  font-size: 12.5px;
-  letter-spacing: 0.02em;
-  text-decoration: none;
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  transition: color 0.15s ease, background 0.15s ease, border-color 0.15s ease;
-}
-.qf-appbar-slug:hover,
-.qf-appbar-slug:focus-visible {
-  color: var(--accent);
-  background: var(--surface-2);
-  border-color: var(--border);
-  outline: none;
-}
-
-.qf-appbar-right {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  flex: 0 0 auto;
-}
-
-/* Icon buttons (bell, account) — square, low-key, match the theme toggle. */
-.qf-appbar-icon-btn {
-  position: relative;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  padding: 8px;
-  border: 1px solid var(--border);
-  border-radius: var(--radius-btn);
-  background: transparent;
-  color: var(--muted);
-  cursor: pointer;
-  transition: color 0.15s ease, background 0.15s ease, border-color 0.15s ease;
-}
-.qf-appbar-icon-btn:hover {
-  color: var(--ink);
-  background: var(--surface-2);
-  border-color: var(--border-strong);
-}
-.qf-appbar-icon-btn .qf-ico {
-  width: 18px;
-  height: 18px;
-}
-
-/* New-lead indicator — a brand-blue dot in the bell's top-right corner.
-   Token-only (no white numerals to fight the theme); the exact count lives in
-   the button's aria-label and on the Leads page it opens. */
-.qf-appbar-badge {
-  position: absolute;
-  top: 0;
-  right: 0;
-  width: 8px;
-  height: 8px;
-  border-radius: var(--radius-pill);
-  background: var(--accent-fill);
-  transform: translate(35%, -35%);
-  box-shadow: 0 0 0 2px var(--surface);
-}
-.qf-appbar-badge[hidden] {
-  display: none;
-}
-
-/* Relocated theme toggle — the sidebar version is width:100%; in the bar it
-   sizes to its content and drops the top margin. */
-.qf-appbar .qf-theme-toggle {
-  width: auto;
-  margin-top: 0;
-}
-
-/* ── Mobile (≤900px) ─────────────────────────────────────────────────────── */
-@media (max-width: 900px) {
-  .app-main,
-  html[data-theme="light"] .app-main {
-    padding: 0;
-  }
-  #page-content,
-  html[data-theme="light"] #page-content {
-    padding: 24px;
-  }
-  /* Clear the fixed hamburger (top:12px, left:12px, 40px wide) on the left. */
-  .qf-appbar {
-    padding: 12px 16px 12px 60px;
-    gap: 8px;
-  }
-  .qf-appbar-slug {
-    max-width: 160px;
-  }
-}
-
-@media (max-width: 480px) {
-  /* Reclaim width: keep the theme-toggle glyph, drop its "Dark/Light" word. */
-  .qf-appbar .qf-theme-toggle #qf-theme-label {
-    display: none;
-  }
-  .qf-appbar-slug {
-    max-width: 120px;
-  }
-}
-
-/* ── Full-bleed app bar ─────────────────────────────────────────────────────
-   style.css caps .app-main at max-width:1200px, which left-aligns the whole
-   column on wide screens and strands the top-right cluster (bell·theme·account)
-   short of the corner. Let the column stretch full width so the sticky bar
-   spans edge-to-edge (cluster flush to the corner, fully visible), and move the
-   1200px reading cap onto the page content instead so body layout is unchanged.
-   Appended at EOF — portal-appbar.css loads LAST, so these win the cascade. */
-.app-main {
-  max-width: none;
-}
-#page-content {
-  max-width: 1200px;
-}
-
-/* ── Fix A: compact one-line mobile top bar (≤640px) ────────────────────────
-   Collapse the two stacked sticky bars (trial banner ABOVE the app bar) into
-   ONE line. The trial banner is replaced by a single tappable "Trial · Nd →"
-   pill that lives in the app bar and IS the upgrade CTA; the mobile logo is
-   dropped (the hamburger + sidebar already carry the brand) so the pill + bell
-   + theme + account sit on one line at 375px without wrapping. With no banner
-   bar on mobile there is no --qf-appbar-top offset to reserve. Desktop keeps
-   the full banner + bar unchanged. Appended at EOF (loads last, wins cascade).
-   Theme-aware via tokens; snapped to the 8px ramp. */
-.qf-appbar-trial-pill {
-  display: none; /* shown only ≤640px (see media query below) */
-  flex: 0 1 auto;
-  align-items: center;
-  gap: 8px;
-  height: 44px;
-  padding: 0 12px;
-  border-radius: var(--radius-pill);
-  border: 1px solid var(--accent-fill);
-  background: var(--accent-soft);
-  color: var(--ink);
-  font-size: 12.5px;
-  font-weight: 700;
-  white-space: nowrap;
-  min-width: 0;
-  cursor: pointer;
-  transition: border-color 0.15s ease, background 0.15s ease, color 0.15s ease;
-}
-.qf-appbar-trial-pill:hover { border-color: var(--accent); }
-.qf-appbar-trial-pill:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
-.qf-appbar-trial-pill-text { overflow: hidden; text-overflow: ellipsis; }
-.qf-appbar-trial-pill .arr { flex: 0 0 auto; }
-.qf-appbar-trial-pill-dot {
-  flex: 0 0 auto;
-  width: 8px;
-  height: 8px;
-  border-radius: var(--radius-pill);
-  background: var(--accent);
-}
-.qf-appbar-trial-pill.is-urgent .qf-appbar-trial-pill-dot { background: var(--warn); }
-.qf-appbar-trial-pill--expired {
-  border-color: var(--error);
-  background: var(--error-bg);
-}
-.qf-appbar-trial-pill--expired .qf-appbar-trial-pill-dot { background: var(--error); }
-.qf-appbar-trial-pill--payment_issue {
-  border-color: var(--warn);
-  background: var(--warn-bg);
-}
-.qf-appbar-trial-pill--payment_issue .qf-appbar-trial-pill-dot { background: var(--warn); }
-
-@media (max-width: 640px) {
-  /* One line: drop the logo, surface the pill, keep the icon trio as ~44px
-     finger targets with tight gaps. The flex row never wraps. */
-  .qf-appbar-logo { display: none; }
-  .qf-appbar-trial-pill { display: inline-flex; }
-  .qf-appbar-right { gap: 8px; }
-  .qf-appbar-icon-btn { width: 44px; height: 44px; padding: 8px; }
-  .qf-appbar .qf-theme-toggle { min-height: 44px; }
-  .qf-appbar .qf-theme-toggle #qf-theme-label { display: none; }
 }
