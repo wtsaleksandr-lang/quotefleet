@@ -185,11 +185,11 @@
   border: 1px solid var(--w-border);
   border-radius: 12px;
   box-shadow: 0 12px 30px rgba(15, 23, 42, 0.18);
-  /* Tall enough to hold all 9 classes without an internal scrollbar in the
-     common case, so animateFold's height target matches the settled height and
-     there is no end-of-animation snap. Taller content (very narrow screens where
-     descriptions wrap) still scrolls. */
-  max-height: 500px;
+  /* Tall enough to hold all 9 classes with NO internal scrollbar on desktop
+     (content ≈ 518px; ≈ 550px when descriptions wrap on narrow screens). Capped
+     to the viewport (min with a vh unit) so on short viewports it never runs off
+     screen — it scrolls internally instead of being clipped. */
+  max-height: min(72vh, 560px);
   overflow-y: auto;
 }
 .qf-hz-list[hidden] {
