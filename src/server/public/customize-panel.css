@@ -229,9 +229,10 @@
 /* ── Drag-scroll carousel (theme presets + map styles) ────────────────────
    A reusable horizontal strip with subtle chevron arrows, used by BOTH the
    theme-preset and map-style selectors (see makeCarousel in app.js). The track
-   scrolls on mouse drag (grab/grabbing cursor) and native touch overflow;
-   items scroll-snap for tidy alignment. Tokens/relative units only — colour +
-   spacing guards stay green. */
+   scrolls on pointer drag (grab/grabbing cursor) for mouse, touch and pen alike,
+   with momentum on release; items proximity-snap for tidy alignment. touch-action
+   is pan-y so a vertical swipe still scrolls the page while JS owns the horizontal
+   drag. Tokens/relative units only — colour + spacing guards stay green. */
 .qf-cz-carousel { display: flex; align-items: center; gap: 8px; }
 .qf-cz-carousel-track {
   display: flex; flex-wrap: nowrap; gap: 8px;
@@ -239,7 +240,7 @@
   overflow-x: auto; overflow-y: hidden;
   scroll-snap-type: x proximity;
   -webkit-overflow-scrolling: touch;
-  touch-action: pan-x;
+  touch-action: pan-y;
   cursor: grab;
   padding: 4px;
   scrollbar-width: none; /* Firefox — hide the native bar, still scrollable */
