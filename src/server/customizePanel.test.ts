@@ -278,3 +278,44 @@ describe('customize panel — drag-scroll carousels (theme presets + map styles)
     expect(css).toContain('.qf-cz-blend-slider');
   });
 });
+
+describe('customize panel — guided-editing pointer (active arrow + preview align)', () => {
+  it('maps each Design container to a widget section + activates one at a time', async () => {
+    const js = await pub('app.js');
+    // Containers are tagged with the widget section they govern…
+    expect(js).toContain('data-preview-target');
+    expect(js).toContain("[company, 'header']");
+    expect(js).toContain("[mapSec, 'map']");
+    expect(js).toContain("[blendSec, 'map']");
+    // …click + focus mark exactly one container active (via .is-cz-active).
+    expect(js).toContain("leftCol.addEventListener('click', onActivate)");
+    expect(js).toContain("leftCol.addEventListener('focusin', onActivate)");
+    expect(js).toContain("classList.toggle('is-cz-active', s === sec)");
+    expect(js).toContain("closest('.qf-cz-section[data-preview-target]')");
+    // The floating arrow element is appended to each targeted container.
+    expect(js).toContain("class: 'qf-cz-arrow'");
+  });
+
+  it('scroll-aligns the preview via the SAME-ORIGIN iframe doc, guarded', async () => {
+    const js = await pub('app.js');
+    // alignTo is exposed by the live preview and reads the widget section from
+    // the same-origin iframe document, guarded so cross-origin/missing no-ops.
+    expect(js).toContain('alignTo: alignTo');
+    expect(js).toContain('preview.alignTo(sec.getAttribute(\'data-preview-target\'), sec)');
+    expect(js).toContain('iframe.contentDocument');
+    expect(js).toContain('function alignTo(key, containerEl)');
+    // Reduced-motion aware smooth scroll of the preview viewport.
+    expect(js).toContain('behavior: czReduce ? \'auto\' : \'smooth\'');
+  });
+
+  it('ships the arrow + fixed-height scroll-viewport styling', async () => {
+    const css = await pub('customize-panel.css');
+    // The preview frame is a fixed-height, internally-scrollable viewport.
+    expect(css).toContain('overflow-y: auto');
+    expect(css).toContain('.qf-cz-section.is-cz-active .qf-cz-arrow');
+    expect(css).toContain('.qf-cz-arrow');
+    // Token-only accent styling (no raw hex) + reduced-motion guard.
+    expect(css).toContain('background: var(--accent-soft)');
+    expect(css).toContain('@keyframes qf-cz-arrow-nudge');
+  });
+});

@@ -2701,8 +2701,80 @@
     function postToPreview(msg) {
       try { if (iframe && iframe.contentWindow) iframe.contentWindow.postMessage(msg, '*'); } catch (_e) {}
     }
+
+    // ── Guided-editing preview alignment ──────────────────────────────────
+    // A config container calls alignTo(targetKey, containerEl) when it becomes
+    // active; we scroll the preview VIEWPORT (frameWrap is a fixed-height
+    // overflow-y:auto box) so the mapped widget section lands level with the
+    // active container ("directly across from it"). The widget section is found
+    // in the SAME-ORIGIN iframe document — access is fully guarded so a stray
+    // cross-origin throw or a missing/hidden section just no-ops (never breaks
+    // the page). Honours prefers-reduced-motion (instant scroll, no smooth).
+    var czReduce = !!(window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches);
+    // targetKey → candidate widget selectors, first VISIBLE wins. Kept broad so
+    // a section hidden in the current preview state (e.g. the route map before
+    // an address is entered) falls back to the nearest visible region.
+    var ALIGN_TARGETS = {
+      header: ['.qf-header', '#qf-header'],
+      map: ['.qf-map-card', '.qf-map-canvas', '#qf-default-addr-row', '.qf-addr-row'],
+      tabs: ['.qf-tabs', '#qf-services'],
+      root: ['.qf-widget', '.qf-header'],
+    };
+    function czVisible(node) {
+      if (!node) return false;
+      var r = node.getBoundingClientRect();
+      return !!(node.getClientRects().length && r.height > 0 && r.width > 0);
+    }
+    function czFindTarget(doc, key) {
+      var sels = ALIGN_TARGETS[key] || ALIGN_TARGETS.header;
+      for (var i = 0; i < sels.length; i++) {
+        var n = null;
+        try { n = doc.querySelector(sels[i]); } catch (_e) { n = null; }
+        if (czVisible(n)) return n;
+      }
+      return null;
+    }
+    function alignTo(key, containerEl) {
+      try {
+        if (!iframe || !iframe.isConnected) return;
+        var doc = iframe.contentDocument; // same-origin on prod + dev harness
+        if (!doc) return;                 // cross-origin → contentDocument is null
+        var target = czFindTarget(doc, key);
+        if (!target) return;
+        var docRoot = doc.documentElement || doc.body;
+        if (!docRoot) return;
+        var rootTop = docRoot.getBoundingClientRect().top;
+        var tRect = target.getBoundingClientRect();
+        // Target centre, measured from the top of the iframe content.
+        var targetCenter = (tRect.top - rootTop) + tRect.height / 2;
+        // The vertical level to line the section up with = the active config
+        // container's centre, expressed in the preview viewport's own coords.
+        var wrapRect = frameWrap.getBoundingClientRect();
+        var anchorY;
+        if (containerEl && containerEl.getBoundingClientRect) {
+          var cRect = containerEl.getBoundingClientRect();
+          anchorY = (cRect.top + cRect.height / 2) - wrapRect.top;
+        } else {
+          anchorY = frameWrap.clientHeight / 2;
+        }
+        // Keep the anchor inside the viewport so the section always lands visible.
+        anchorY = Math.max(0, Math.min(frameWrap.clientHeight, anchorY));
+        var desired = targetCenter - anchorY;
+        var maxScroll = Math.max(0, frameWrap.scrollHeight - frameWrap.clientHeight);
+        desired = Math.max(0, Math.min(maxScroll, Math.round(desired)));
+        if (typeof frameWrap.scrollTo === 'function') {
+          frameWrap.scrollTo({ top: desired, behavior: czReduce ? 'auto' : 'smooth' });
+        } else {
+          frameWrap.scrollTop = desired;
+        }
+      } catch (_e) { /* cross-origin or transient DOM error — no-op, never break */ }
+    }
+
     return {
       col: col,
+      // Scroll the preview so the widget section a config container controls
+      // lines up level with that container (guided-editing pointer).
+      alignTo: alignTo,
       // Instant, no-network apply of the given brand fields.
       postPatch: function (patch) { postToPreview({ qf: 'brand-preview', patch: patch }); },
       // Instant, no-network apply of hosted trust-wrap copy (headline, badges,
@@ -3373,6 +3445,51 @@
       logoSec.appendChild(logoPreview);
       controls.appendChild(logoSec);
       paintLogo(b.logoUrl || '');
+
+      // ── Guided-editing pointer (arrow + preview scroll-alignment) ─────────
+      // Tapping / clicking / focusing a Design config container marks it the
+      // single active one, reveals a floating brand-accent arrow at its RIGHT
+      // edge pointing toward the live preview, and scrolls the preview so the
+      // widget section that container controls lines up level with it. The
+      // container → widget-section map is stamped as data-preview-target; the
+      // scroll math + same-origin guard live in buildLivePreview.alignTo.
+      (function wireGuidedEditing() {
+        var CHEV_R = '<svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M9 6l6 6-6 6"/></svg>';
+        // Each Design container → the widget section it visually governs.
+        var mapping = [
+          [company, 'header'],
+          [themeSec, 'header'],
+          [logoFillSec, 'header'],
+          [logoSec, 'header'],
+          [mapSec, 'map'],
+          [blendSec, 'map'],
+          [accentSec, 'tabs'],
+          [hoverSec, 'tabs'],
+          [fontSec, 'header'],
+          [textSec, 'header'],
+        ];
+        var sections = [];
+        mapping.forEach(function (pair) {
+          var sec = pair[0];
+          if (!sec) return;
+          sec.setAttribute('data-preview-target', pair[1]);
+          // One arrow per targeted container; shown only while .is-cz-active.
+          sec.appendChild(el('span', { class: 'qf-cz-arrow', 'aria-hidden': 'true', html: CHEV_R }));
+          sections.push(sec);
+        });
+        function setActive(sec) {
+          sections.forEach(function (s) { s.classList.toggle('is-cz-active', s === sec); });
+          if (sec) preview.alignTo(sec.getAttribute('data-preview-target'), sec);
+        }
+        function onActivate(e) {
+          var t = e.target;
+          var sec = (t && t.closest) ? t.closest('.qf-cz-section[data-preview-target]') : null;
+          if (!sec) return; // clicks outside a targeted container don't change the active one
+          setActive(sec);
+        }
+        leftCol.addEventListener('click', onActivate);
+        leftCol.addEventListener('focusin', onActivate);
+      })();
 
       // ── Page tab — the HOSTED-page trust-wrap (headline, trust badges,
       // testimonials, CTAs, background). Shares queueSave (debounced brand PUT)
