@@ -846,7 +846,15 @@
       var bg = (cfg.brand && (cfg.brand.primaryColor || cfg.brand.accentColor)) || '#0D3CFC';
       h.appendChild(el('img', { src: initialsLogo(name, bg), alt: name, class: 'qf-brand-initials' }));
     }
-    h.appendChild(el('div', { class: 'brand-name', text: name }));
+    var brandNameEl = el('div', { class: 'brand-name', text: name });
+    // The eyebrow pill next to the company name (public-calculator-ux.css →
+    // .brand-name::after) now echoes the carrier's Tagline verbatim, live on
+    // every renderHeader() (each brand-preview patch recreates this element).
+    // Empty tagline falls back to the historic label so existing widgets look
+    // unchanged; an empty attribute would hide the pill via the CSS guard rule.
+    var eyebrow = (cfg.brand && cfg.brand.tagline) ? String(cfg.brand.tagline).trim() : '';
+    brandNameEl.setAttribute('data-eyebrow', eyebrow || 'Instant freight estimate');
+    h.appendChild(brandNameEl);
     var tagline = (cfg.brand && cfg.brand.tagline) || 'Get an instant freight quote';
     $('qf-tagline').textContent = tagline;
     if (cfg.brand && cfg.brand.showPoweredBy) $('qf-powered').innerHTML = 'Powered by <a href="' + location.origin + '" target="_blank">QuoteFleet</a>';

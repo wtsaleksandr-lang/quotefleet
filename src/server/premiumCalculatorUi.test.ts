@@ -25,7 +25,10 @@ describe('premium calculator UI', () => {
     expect(css).toContain('premium calculator visual system');
     expect(css).toContain('.qf-widget::before');
     expect(css).toContain('.qf-widget::after');
-    expect(css).toContain('Instant freight estimate');
+    // The header eyebrow badge is now data-driven (shows the carrier's tagline,
+    // live) instead of a hardcoded string; the "Instant freight estimate"
+    // fallback moved to renderHeader() in widget.js.
+    expect(css).toContain('attr(data-eyebrow)');
     expect(css).toContain('Quote estimate');
     expect(css).toContain('radial-gradient');
     expect(css).toContain('.qf-result::before');
