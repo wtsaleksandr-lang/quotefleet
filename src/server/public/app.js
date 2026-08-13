@@ -226,17 +226,6 @@
       if (!d || !d.stats) return;
       setNavBadge('leads', d.stats.newLeads || 0);
       setNavBadge('callbacks', d.stats.pendingCallbacks || 0);
-      // Top-bar notifications bell — a dot when there are unactioned leads;
-      // the exact count rides the aria-label (the bell opens the Leads page).
-      var bellBtn = document.getElementById('qf-appbar-bell');
-      var bellDot = bellBtn && bellBtn.querySelector('.qf-appbar-badge');
-      if (bellDot) {
-        var nl = d.stats.newLeads || 0;
-        bellDot.hidden = nl <= 0;
-        bellBtn.setAttribute('aria-label', nl > 0
-          ? (nl + ' new lead' + (nl === 1 ? '' : 's'))
-          : 'No new leads');
-      }
     }).catch(function () { /* non-fatal — badges are a hint, not a blocker */ });
   }
   window.qfRefreshNavBadges = refreshNavBadges;
@@ -5793,69 +5782,11 @@
     syncAppbarOffset();
   }
 
-  // The trial banner is a body-level sticky (top:0). The sticky portal top bar
-  // must sit BELOW it, so its own sticky offset tracks the banner's height —
-  // 0 when no banner is showing. Re-run after any banner change + on resize
-  // (the banner wraps taller on narrow screens).
-  function syncAppbarOffset() {
-    var bar = document.getElementById('qf-appbar');
-    if (!bar) return;
-    var banner = document.getElementById('qf-trial-bar');
-    bar.style.setProperty('--qf-appbar-top', (banner ? banner.offsetHeight : 0) + 'px');
-  }
+  // The top app-bar was removed; the trial banner is a body-level sticky (top:0)
+  // that reserves its own flow space, so there is no longer a second sticky bar
+  // to offset. Kept as a no-op so existing call sites stay valid.
+  function syncAppbarOffset() { /* no-op — app-bar removed */ }
   window.qfSyncAppbarOffset = syncAppbarOffset;
-
-  // ── Fix A: compact one-line mobile top bar ──────────────────────────────
-  // At ≤640px the full trial banner (its own sticky bar) is replaced by a
-  // single compact, tappable "Trial · Nd →" pill that lives in the app bar and
-  // IS the upgrade CTA. Desktop keeps the full banner + bar unchanged.
-  function compactTopbar() {
-    return !!(window.matchMedia && window.matchMedia('(max-width: 640px)').matches);
-  }
-  // The one upgrade action, shared by the desktop banner CTA and the mobile
-  // pill: payment_issue → open the Stripe portal to fix the card; trial/expired
-  // → start the subscribe Checkout flow.
-  function trialCtaAction(view, btn) {
-    if (view && view.variant === 'payment_issue') { openBillingPortal(); return; }
-    if (btn) btn.disabled = true;
-    startSubscribeCheckout('vital').then(
-      function () { if (btn) btn.disabled = false; },
-      function () { if (btn) btn.disabled = false; }
-    );
-  }
-  function removeTrialPill() {
-    var p = document.getElementById('qf-appbar-trial-pill');
-    if (p) p.remove();
-  }
-  function paintTrialPill(view, daysLeft) {
-    var right = document.querySelector('.qf-appbar-right');
-    if (!right) return;
-    var pill = document.getElementById('qf-appbar-trial-pill');
-    if (!pill) {
-      pill = el('button', { id: 'qf-appbar-trial-pill', class: 'qf-appbar-trial-pill', type: 'button' });
-      right.insertBefore(pill, right.firstChild);
-    }
-    pill.className = 'qf-appbar-trial-pill qf-appbar-trial-pill--' + view.variant + (view.urgent ? ' is-urgent' : '');
-    var label, aria;
-    if (view.variant === 'trial') {
-      var d = typeof daysLeft === 'number' ? daysLeft : null;
-      var days = d == null ? '' : (d <= 0 ? 'last day' : d + 'd');
-      label = days ? 'Trial · ' + days : 'Trial';
-      aria = 'Free trial' + (days ? ', ' + days + ' left' : '') + ' — subscribe to keep your calculator live';
-    } else if (view.variant === 'payment_issue') {
-      label = 'Update card';
-      aria = 'Payment issue — update your card';
-    } else {
-      label = 'Trial ended';
-      aria = 'Trial ended — subscribe to keep your calculator live';
-    }
-    pill.innerHTML = '';
-    pill.appendChild(el('span', { class: 'qf-appbar-trial-pill-dot', 'aria-hidden': 'true' }));
-    pill.appendChild(el('span', { class: 'qf-appbar-trial-pill-text', text: label }));
-    pill.appendChild(el('span', { class: 'arr', 'aria-hidden': 'true', text: '→' }));
-    pill.setAttribute('aria-label', aria);
-    pill.onclick = function () { trialCtaAction(view, pill); };
-  }
 
   function renderTrialBanner(trial) {
     state.trial = trial || state.trial || null;
@@ -5878,24 +5809,11 @@
       : { show: false };
 
     // Paid / unknown → no banner, and never leave inputs locked.
-    if (!view.show) { removeTrialBanner(); removeTrialPill(); document.body.classList.remove('qf-trial-locked'); return; }
+    if (!view.show) { removeTrialBanner(); document.body.classList.remove('qf-trial-locked'); return; }
 
-    // Fix A — mobile (≤640px): collapse the whole banner bar into one compact
-    // pill in the app bar (no separate sticky bar, so no --qf-appbar-top offset
-    // to reserve). The pill is always shown while the trial is live/urgent —
-    // it's the CTA, not a dismissible strip.
-    if (compactTopbar()) {
-      removeTrialBanner();
-      var dLeft = typeof trial.daysLeft === 'number'
-        ? trial.daysLeft
-        : (window.QFTrialBanner ? window.QFTrialBanner.daysLeftFrom(trial.trialEndsAt) : null);
-      paintTrialPill(view, dLeft);
-      if (view.variant === 'expired') document.body.classList.add('qf-trial-locked');
-      else document.body.classList.remove('qf-trial-locked');
-      syncAppbarOffset();
-      return;
-    }
-    removeTrialPill();
+    // The full banner renders at every width (it wraps/stacks on mobile via its
+    // own CSS). The old ≤640 "collapse into an app-bar pill" path was removed
+    // together with the app-bar.
 
     // Trial + payment_issue are dismissible for the current page load (they
     // return on reload while unresolved); expired is not.
@@ -6064,21 +5982,11 @@
       $('#loading').style.display = 'none';
       $('#app-shell').hidden = false;
       renderTrialBanner(r.trial);
-      syncAppbarOffset();
       // Reveal the hamburger and wire its toggle now that the shell is visible.
       var t = document.getElementById('qf-mobile-nav-toggle');
       if (t) t.hidden = false;
       wireMobileNav();
       wireThemeToggle();
-      // Fix A — re-render the trial UI when crossing the compact-topbar
-      // breakpoint so the banner ↔ app-bar-pill swap follows viewport changes
-      // (rotate / resize between desktop and mobile).
-      if (window.matchMedia) {
-        var _topMq = window.matchMedia('(max-width: 640px)');
-        var _onTopMq = function () { if (state.trial) renderTrialBanner(state.trial); syncAppbarOffset(); };
-        if (_topMq.addEventListener) _topMq.addEventListener('change', _onTopMq);
-        else if (_topMq.addListener) _topMq.addListener(_onTopMq);
-      }
       // Floating AI copilot — persistent across every authed route.
       mountCopilotBubble();
       // Grab-to-scroll (drag-to-pan) on the dashboard's main content area. The
@@ -6102,15 +6010,10 @@
         api('/api/auth/logout', { method: 'POST' }).finally(function () { location.href = '/login'; });
       });
 
-      // Top-bar right cluster: account settings + notifications bell (→ Leads).
-      var acctBtn = document.getElementById('qf-appbar-account');
-      if (acctBtn) acctBtn.addEventListener('click', function () { go('account'); });
-      var bellBtn = document.getElementById('qf-appbar-bell');
-      if (bellBtn) bellBtn.addEventListener('click', function () { go('leads'); });
-
-      // Keep the sticky top bar's offset in step with the (wrapping) trial
-      // banner as the viewport resizes.
-      window.addEventListener('resize', syncAppbarOffset);
+      // Account settings now lives in the sidebar (data-route="account"), so the
+      // generic .sidebar [data-route] handler above already wires it — no
+      // separate listener needed. The notifications bell was dropped (the Leads
+      // nav item carries the new-lead badge).
 
       refreshNavBadges();
       syncZonesNav();
