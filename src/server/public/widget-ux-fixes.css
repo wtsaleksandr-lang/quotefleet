@@ -964,3 +964,20 @@ html { scrollbar-width: thin; scrollbar-color: rgba(135, 138, 150, 0.38) transpa
   color: var(--w-oncard-accent, var(--w-primary));
 }
 .qf-reclass-txt { min-width: 0; }
+
+/* ── Guided-edit highlight ───────────────────────────────────────────────────
+   The dashboard Customize preview adds .qf-preview-highlight (from the parent,
+   same-origin) to the widget section that the active config container controls,
+   so the area being edited is unmistakable — it pairs with the arrow in the
+   config container. Accent outline + soft ring; theme-token driven. */
+.qf-preview-highlight {
+  outline: 2px solid var(--w-accent, #0D3CFC);
+  outline-offset: 4px;
+  border-radius: 10px;
+  box-shadow: 0 0 0 4px var(--w-accent-soft, rgba(37, 99, 235, 0.12));
+  transition: outline-color var(--qf-dur, 0.2s) var(--qf-ease, ease),
+    box-shadow var(--qf-dur, 0.2s) var(--qf-ease, ease);
+}
+@media (prefers-reduced-motion: reduce) {
+  .qf-preview-highlight { transition: none; }
+}

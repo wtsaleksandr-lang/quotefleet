@@ -2741,25 +2741,26 @@
         if (!doc) return;                 // cross-origin → contentDocument is null
         var target = czFindTarget(doc, key);
         if (!target) return;
+        // Highlight the mapped section in the preview so the control→section link
+        // is unmistakable regardless of scroll position (the arrow points here).
+        // Exact "line it up level with the container" is not achievable when the
+        // section sits at the top of the widget (nothing above it to scroll in),
+        // so the highlight — not the scroll — carries the connection.
+        try {
+          var prevH = doc.querySelectorAll('.qf-preview-highlight');
+          for (var h = 0; h < prevH.length; h++) prevH[h].classList.remove('qf-preview-highlight');
+          target.classList.add('qf-preview-highlight');
+        } catch (_hl) {}
         var docRoot = doc.documentElement || doc.body;
         if (!docRoot) return;
         var rootTop = docRoot.getBoundingClientRect().top;
         var tRect = target.getBoundingClientRect();
         // Target centre, measured from the top of the iframe content.
         var targetCenter = (tRect.top - rootTop) + tRect.height / 2;
-        // The vertical level to line the section up with = the active config
-        // container's centre, expressed in the preview viewport's own coords.
-        var wrapRect = frameWrap.getBoundingClientRect();
-        var anchorY;
-        if (containerEl && containerEl.getBoundingClientRect) {
-          var cRect = containerEl.getBoundingClientRect();
-          anchorY = (cRect.top + cRect.height / 2) - wrapRect.top;
-        } else {
-          anchorY = frameWrap.clientHeight / 2;
-        }
-        // Keep the anchor inside the viewport so the section always lands visible.
-        anchorY = Math.max(0, Math.min(frameWrap.clientHeight, anchorY));
-        var desired = targetCenter - anchorY;
+        // Best-effort scroll: bring the mapped section to the centre of the
+        // preview viewport. Sections near the widget top clamp to 0 (there is no
+        // content above them), which is fine — they are already fully visible.
+        var desired = targetCenter - frameWrap.clientHeight / 2;
         var maxScroll = Math.max(0, frameWrap.scrollHeight - frameWrap.clientHeight);
         desired = Math.max(0, Math.min(maxScroll, Math.round(desired)));
         if (typeof frameWrap.scrollTo === 'function') {
