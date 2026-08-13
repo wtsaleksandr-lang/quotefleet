@@ -479,3 +479,78 @@
 @media (prefers-reduced-motion: reduce) {
   #app-shell:has(.qf-cz-sheet) .qf-copilot-launcher { transition: opacity 0.2s ease; }
 }
+
+/* ── Guided-editing pointer: active container + arrow + preview alignment ───
+   Clicking / focusing a config container marks it active (.is-cz-active),
+   reveals a floating brand-accent arrow at the container's RIGHT edge pointing
+   toward the live preview, and scrolls the preview viewport so the mapped
+   widget section lines up level with it (see buildLivePreview.alignTo in
+   app.js). To scroll WITHIN the preview, the frame becomes a fixed-height
+   viewport (overflow-y:auto) while the iframe keeps its natural full-content
+   height (QF_WIDGET_HEIGHT), so any section can be scrolled to. Appended at EOF
+   so the line-based spacing/colour baselines above don't renumber. Tokens + 8px
+   ramp only; theme-aware (light + dark); honours prefers-reduced-motion. */
+.qf-cz-frame-wrap {
+  height: 620px;
+  max-height: calc(100vh - 120px);
+  overflow-y: auto;
+  overflow-x: hidden;
+  scroll-behavior: smooth;
+  -webkit-overflow-scrolling: touch;
+}
+@media (max-width: 900px) {
+  .qf-cz-frame-wrap { height: 520px; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .qf-cz-frame-wrap { scroll-behavior: auto; }
+}
+
+/* Positioning context for the absolutely-placed guide arrow. */
+.qf-cz-section { position: relative; }
+
+/* Floating guide arrow — hidden until its container is the active one. Matches
+   the .badge-info tint pattern (accent-soft fill + accent chevron), so contrast
+   holds in both themes. pointer-events:none so it never blocks the controls. */
+.qf-cz-arrow {
+  position: absolute;
+  top: 50%;
+  right: 8px;
+  transform: translateY(-50%) scale(0.8);
+  width: 32px;
+  height: 32px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: var(--radius-pill);
+  background: var(--accent-soft);
+  color: var(--accent);
+  border: 1px solid var(--accent-fill);
+  box-shadow: var(--shadow-sm);
+  opacity: 0;
+  pointer-events: none;
+  z-index: 2;
+  transition: opacity 0.18s ease, transform 0.18s ease;
+}
+.qf-cz-arrow svg { display: block; }
+.qf-cz-section.is-cz-active .qf-cz-arrow {
+  opacity: 1;
+  transform: translateY(-50%) scale(1);
+}
+/* Subtle nudge toward the preview so it reads as a pointer (motion on the icon
+   only, leaving the container transform for centring). */
+.qf-cz-section.is-cz-active .qf-cz-arrow svg {
+  animation: qf-cz-arrow-nudge 1.4s ease-in-out infinite;
+}
+@keyframes qf-cz-arrow-nudge {
+  0%, 100% { transform: translateX(0); }
+  50% { transform: translateX(3px); }
+}
+/* Mark the active container itself so it reads as the one being edited. */
+.qf-cz-section.is-cz-active {
+  border-color: var(--accent-fill);
+  box-shadow: 0 0 0 1px var(--accent-fill);
+}
+@media (prefers-reduced-motion: reduce) {
+  .qf-cz-arrow { transition: opacity 0.18s ease; }
+  .qf-cz-section.is-cz-active .qf-cz-arrow svg { animation: none; }
+}
