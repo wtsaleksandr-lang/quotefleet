@@ -9,6 +9,7 @@ import { runMigrations } from '../db/migrate.js';
 import { createApp } from './app.js';
 import { startMarketplaceCron } from '../marketplace/cron.js';
 import { startLifecycleEmailCron } from '../email/lifecycleCron.js';
+import { startFollowUpEmailCron } from '../email/followUpCron.js';
 import { startWeeklyDigestCron } from '../email/weeklyDigestCron.js';
 import { startFuelSurchargeCron } from '../eia/dieselPrice.js';
 
@@ -24,6 +25,7 @@ async function main() {
   });
   startMarketplaceCron();
   startLifecycleEmailCron();
+  startFollowUpEmailCron();
   startWeeklyDigestCron();
   startFuelSurchargeCron();
 }

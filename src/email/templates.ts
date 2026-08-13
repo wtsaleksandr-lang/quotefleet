@@ -791,6 +791,53 @@ interface FollowUpArgs {
    *  "CA$" so a Canadian customer is never shown an ambiguous symbol. */
   currency?: QuoteCurrency;
   unsubscribeUrl: string;
+  /** TENANT-CUSTOMIZED COPY (all optional — templates own the defaults).
+   *  `customIntro` replaces THIS touch's lead paragraph; the detail box + CTA
+   *  are still rendered by the template. `contact` renders an optional footer
+   *  contact block; `signature` an optional sign-off line. Plain text — every
+   *  field is HTML-escaped at render (newlines → <br>). */
+  customIntro?: string | null;
+  contact?: { phone?: string | null; email?: string | null } | null;
+  signature?: string | null;
+}
+
+/** Render a touch's lead paragraph: the tenant's `customIntro` when set
+ *  (escaped, newlines → <br>), otherwise the template's default markup. */
+function followUpIntro(customIntro: string | null | undefined, fallbackHtml: string): string {
+  const custom = typeof customIntro === 'string' ? customIntro.trim() : '';
+  if (!custom) return paragraph(fallbackHtml);
+  return paragraph(escape(custom).replace(/\n/g, '<br>'));
+}
+
+/** Optional footer contact block — rendered only when the tenant enabled it AND
+ *  supplied at least one channel. Phone dials via tel:, email opens via mailto:.
+ *  Returns '' when there's nothing to show. */
+function followUpContactBlock(contact: { phone?: string | null; email?: string | null } | null | undefined): string {
+  if (!contact) return '';
+  const phone = String(contact.phone ?? '').trim();
+  const email = String(contact.email ?? '').trim();
+  if (!phone && !email) return '';
+  const parts: string[] = [];
+  if (phone) {
+    parts.push(`<a href="${escape(telHref(phone))}" style="color:${BRAND.primary};text-decoration:none;">${escape(phone)}</a>`);
+  }
+  if (email) {
+    parts.push(`<a href="mailto:${escape(email)}" style="color:${BRAND.primary};text-decoration:none;">${escape(email)}</a>`);
+  }
+  return `<p style="margin:20px 0 8px 0;font-size:14px;line-height:1.6;color:${BRAND.muted};">Questions? Reach us at ${parts.join('&nbsp;·&nbsp;')}.</p>`;
+}
+
+/** Optional sign-off line appended after the contact block. Escaped; newlines
+ *  become <br>. Returns '' when unset. */
+function followUpSignature(signature: string | null | undefined): string {
+  const sig = String(signature ?? '').trim();
+  if (!sig) return '';
+  return `<p style="margin:8px 0 0 0;font-size:14px;line-height:1.6;color:${BRAND.inkSoft};">${escape(sig).replace(/\n/g, '<br>')}</p>`;
+}
+
+/** The custom contact block + signature, appended to every follow-up touch. */
+function followUpFooterBlocks(opts: FollowUpArgs): string {
+  return followUpContactBlock(opts.contact) + followUpSignature(opts.signature);
 }
 
 /** A centered, letter-spaced mono chip for a short code (promo / voucher).
@@ -818,13 +865,17 @@ export function followupNudgeEmail(opts: FollowUpArgs): { subject: string; html:
   const inner =
     eyebrow(`Quote ${opts.refId}`) +
     heading('Your quote is ready when you are') +
-    paragraph(`Hi ${escape(opts.customerName)}, just circling back — your ${escape(opts.brandName)} quote is saved and the price below is locked in. Whenever you're ready to move, you're one click from booking.`) +
+    followUpIntro(
+      opts.customIntro,
+      `Hi ${escape(opts.customerName)}, just circling back — your ${escape(opts.brandName)} quote is saved and the price below is locked in. Whenever you're ready to move, you're one click from booking.`,
+    ) +
     detailBox([
       ['Lane', `${opts.laneFrom} → ${opts.laneTo}`],
       ['Your locked total', total],
     ]) +
     ctaButton('View your quote', opts.quoteUrl) +
-    paragraph(`<span style="color:${BRAND.muted};">Questions about the lane, timing, or accessorials? Just reply to this email — a real person will help.</span>`);
+    paragraph(`<span style="color:${BRAND.muted};">Questions about the lane, timing, or accessorials? Just reply to this email — a real person will help.</span>`) +
+    followUpFooterBlocks(opts);
   return {
     subject,
     html: shell({
@@ -843,13 +894,17 @@ export function followupReminderEmail(opts: FollowUpArgs): { subject: string; ht
   const inner =
     eyebrow(`Quote ${opts.refId}`) +
     heading('This rate is still honored — for now') +
-    paragraph(`Freight rates move with the market, but we're still holding the price we quoted you. Lock it in before capacity or fuel shifts it.`) +
+    followUpIntro(
+      opts.customIntro,
+      `Freight rates move with the market, but we're still holding the price we quoted you. Lock it in before capacity or fuel shifts it.`,
+    ) +
     detailBox([
       ['Lane', `${opts.laneFrom} → ${opts.laneTo}`],
       ['Held total', total],
     ]) +
     ctaButton('Book this shipment', opts.quoteUrl) +
-    paragraph(`<span style="color:${BRAND.muted};">Need to adjust the pickup date, equipment, or stops? Reply and we'll re-quote in minutes.</span>`);
+    paragraph(`<span style="color:${BRAND.muted};">Need to adjust the pickup date, equipment, or stops? Reply and we'll re-quote in minutes.</span>`) +
+    followUpFooterBlocks(opts);
   return {
     subject,
     html: shell({
@@ -879,10 +934,14 @@ export function followupDiscountEmail(
   const inner =
     eyebrow(`${pct}% off`) +
     heading(`Here's ${pct}% off to get you rolling`) +
-    paragraph(`We'd love to move your load on ${escape(opts.laneFrom)} → ${escape(opts.laneTo)}. Use the code below at checkout for ${pct}% off your ${escape(total)}.`) +
+    followUpIntro(
+      opts.customIntro,
+      `We'd love to move your load on ${escape(opts.laneFrom)} → ${escape(opts.laneTo)}. Use the code below at checkout for ${pct}% off your ${escape(total)}.`,
+    ) +
     codeChip(code) +
     ctaButton(`Claim ${pct}% off`, withPromo(opts.quoteUrl, code)) +
-    paragraph(`<span style="color:${BRAND.muted};">Apply <strong style="color:${BRAND.inkSoft};">${escape(code)}</strong> at checkout, or just tap the button above and it's added for you.</span>`);
+    paragraph(`<span style="color:${BRAND.muted};">Apply <strong style="color:${BRAND.inkSoft};">${escape(code)}</strong> at checkout, or just tap the button above and it's added for you.</span>`) +
+    followUpFooterBlocks(opts);
   return {
     subject,
     html: shell({

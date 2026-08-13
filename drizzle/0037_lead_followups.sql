@@ -1,0 +1,22 @@
+-- Automated SHIPPER follow-up sender bookkeeping on the `leads` table.
+--
+-- The follow-up cadence CONFIG + carrier-branded TEMPLATES already existed
+-- (features.ts followUp config, templates.ts followupNudge/Reminder/Discount),
+-- but nothing sent them. src/email/followUpCron.ts now does; these two columns
+-- are its state.
+--
+--   follow_ups_sent_json — {"nudge":"<iso>","reminder":"<iso>","discount":"<iso>"}
+--     records which touches already went out so the hourly cron is idempotent
+--     and never double-sends a touch. Null ⇒ nothing sent yet.
+--
+--   follow_up_opt_out — set true when the customer clicks the tokenized
+--     unsubscribe link in a follow-up email (lead-scoped `L<id>.<sig>` token →
+--     /unsubscribe). The cron SKIPS any lead with this true. Scoped to the lead,
+--     never the tenant, so one customer's opt-out never silences the others.
+--
+-- ADD COLUMN IF NOT EXISTS so it is idempotent and safe to re-run on every boot
+-- via runMigrations() (src/db/migrate.ts) — the Replit deploy does not run
+-- db:migrate, so this makes the republish self-healing (same pattern as
+-- 0021/0026/0035/0036). Existing rows read null / false, so no lead changes.
+ALTER TABLE "leads" ADD COLUMN IF NOT EXISTS "follow_ups_sent_json" jsonb;
+ALTER TABLE "leads" ADD COLUMN IF NOT EXISTS "follow_up_opt_out" boolean DEFAULT false NOT NULL;

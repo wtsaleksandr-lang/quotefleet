@@ -14,8 +14,8 @@
 import type { Express, Request, Response } from 'express';
 import { eq } from 'drizzle-orm';
 import { db } from '../../db/client.js';
-import { tenants } from '../../db/schema.js';
-import { verifyUnsubscribeToken } from '../../email/unsubscribe.js';
+import { tenants, leads } from '../../db/schema.js';
+import { verifyUnsubscribeToken, verifyLeadUnsubscribeToken } from '../../email/unsubscribe.js';
 
 const BRAND_BLUE = '#0D3CFC';
 const INK = '#0B0F14';
@@ -76,7 +76,32 @@ function tokenFrom(req: Request): string | undefined {
 }
 
 async function handleUnsubscribe(req: Request, res: Response): Promise<void> {
-  const tenantId = verifyUnsubscribeToken(tokenFrom(req));
+  const token = tokenFrom(req);
+  // A lead-scoped token (`L<id>.<sig>`) opts the CUSTOMER out of the carrier's
+  // follow-up sequence — never the tenant's own product updates. Checked first
+  // because the `L` prefix makes it unambiguous.
+  const leadId = verifyLeadUnsubscribeToken(token);
+  if (leadId != null) {
+    try {
+      await db()
+        .update(leads)
+        .set({ followUpOptOut: true, updatedAt: new Date() })
+        .where(eq(leads.id, leadId));
+    } catch (err) {
+      console.error(`[unsubscribe] failed to set follow-up opt-out for lead ${leadId}:`, err);
+      res.status(500).type('html').send(
+        page({
+          title: 'Something went wrong',
+          heading: 'We hit a snag',
+          body: 'We couldn’t record your preference right now. Please try the link again in a minute.',
+        })
+      );
+      return;
+    }
+    res.status(200).type('html').send(CONFIRM_PAGE);
+    return;
+  }
+  const tenantId = verifyUnsubscribeToken(token);
   if (tenantId == null) {
     res.status(400).type('html').send(INVALID_PAGE);
     return;
