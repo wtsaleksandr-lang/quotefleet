@@ -122,7 +122,7 @@ function shell(opts: {
     : `
             ${opts.footerNote ? `<div style="margin:0 0 14px 0;">${opts.footerNote}</div>` : ''}
             <div>
-              <a href="${BRAND.supportUrl}" style="display:inline-block;padding:8px 16px;color:${BRAND.primary};text-decoration:none;font-size:13px;font-weight:600;line-height:1.2;border:1px solid rgba(0,0,0,0.18);border-radius:8px;">Questions? Chat with us&nbsp;→</a>
+              <a href="${BRAND.supportUrl}" style="display:inline-block;padding:10px 18px;color:${BRAND.primary};text-decoration:none;font-size:13px;font-weight:600;line-height:1.2;background:transparent;border:1.5px solid ${BRAND.primary};border-radius:10px;">Questions? Chat with us&nbsp;→</a>
             </div>
             <div style="margin-top:10px;">
               <a href="mailto:${BRAND.support}" style="color:${BRAND.muted};text-decoration:underline;">${escape(BRAND.support)}</a>
@@ -237,16 +237,16 @@ export function magicLinkEmail(opts: {
       The link is valid for <strong>${ttl} minutes</strong> and can only be used once.
     </p>
 
-    <!-- CTA — table-wrapped for Outlook. Label centered on both axes
-         (align="center" + text-align + line-height matched to the font so the
-         top/bottom padding is symmetric) and rounded to the brand radius (8px);
-         the same 8px on the <td> clips the corners so it reads as a clean pill,
-         not a near-square block. -->
+    <!-- CTA — table-wrapped for Outlook structure, but ONLY the <a> paints the
+         blue and carries the radius, so its rounded corners always show (a
+         colored <td> would fill the corners square behind the button). Label
+         centered on both axes (align="center" + text-align + line-height matched
+         to the font for symmetric vertical padding); premium 10px radius. -->
     <table role="presentation" cellspacing="0" cellpadding="0" border="0" style="margin:0 0 22px 0;">
       <tr>
-        <td align="center" bgcolor="${BRAND.primary}" style="border-radius:8px;background:${BRAND.primary};">
+        <td align="center" style="border-radius:10px;">
           <a href="${escape(opts.link)}" align="center"
-             style="display:inline-block;padding:14px 30px;font-size:15px;font-weight:600;line-height:20px;letter-spacing:-0.005em;color:#FFFFFF;background:${BRAND.primary};text-decoration:none;border-radius:8px;text-align:center;">Sign me in →</a>
+             style="display:inline-block;padding:14px 32px;font-size:15px;font-weight:600;line-height:20px;letter-spacing:-0.005em;color:#FFFFFF;background:${BRAND.primary};text-decoration:none;border-radius:10px;text-align:center;">Sign me in →</a>
         </td>
       </tr>
     </table>
@@ -299,15 +299,17 @@ function paragraph(html: string): string {
   return `<p style="margin:0 0 16px 0;font-size:15px;line-height:1.6;color:${BRAND.inkSoft};">${html}</p>`;
 }
 
-/** Outlook-safe, table-wrapped primary CTA button. Label is centered on both
- *  axes (align="center" + text-align:center + line-height matched to the font
- *  for symmetric vertical padding) and rounded to the brand radius (8px). */
+/** Outlook-safe, table-wrapped primary CTA button. Only the <a> paints the blue
+ *  and carries the radius so its rounded corners always show (a colored <td>
+ *  would fill the corners square behind the button). Label centered on both axes
+ *  (align="center" + text-align:center + line-height matched to the font for
+ *  symmetric vertical padding); premium 10px radius. */
 function ctaButton(label: string, href: string): string {
   return `
     <table role="presentation" cellspacing="0" cellpadding="0" border="0" style="margin:4px 0 22px 0;">
       <tr>
-        <td align="center" bgcolor="${BRAND.primary}" style="border-radius:8px;background:${BRAND.primary};">
-          <a href="${escape(href)}" align="center" style="display:inline-block;padding:14px 30px;font-size:15px;font-weight:600;line-height:20px;letter-spacing:-0.005em;color:#FFFFFF;background:${BRAND.primary};text-decoration:none;border-radius:8px;text-align:center;">${escape(label)} →</a>
+        <td align="center" style="border-radius:10px;">
+          <a href="${escape(href)}" align="center" style="display:inline-block;padding:14px 32px;font-size:15px;font-weight:600;line-height:20px;letter-spacing:-0.005em;color:#FFFFFF;background:${BRAND.primary};text-decoration:none;border-radius:10px;text-align:center;">${escape(label)} →</a>
         </td>
       </tr>
     </table>`;
@@ -338,8 +340,8 @@ function ctaActions(
   return `
     <table role="presentation" cellspacing="0" cellpadding="0" border="0" style="margin:4px 0 ${secs ? '12px' : '22px'} 0;">
       <tr>
-        <td align="center" bgcolor="${BRAND.primary}" style="border-radius:8px;background:${BRAND.primary};">
-          <a href="${escape(primary.href)}" align="center" style="display:inline-block;padding:14px 30px;font-size:15px;font-weight:600;line-height:20px;letter-spacing:-0.005em;color:#FFFFFF;background:${BRAND.primary};text-decoration:none;border-radius:8px;text-align:center;">${escape(primary.label)} →</a>
+        <td align="center" style="border-radius:10px;">
+          <a href="${escape(primary.href)}" align="center" style="display:inline-block;padding:14px 32px;font-size:15px;font-weight:600;line-height:20px;letter-spacing:-0.005em;color:#FFFFFF;background:${BRAND.primary};text-decoration:none;border-radius:10px;text-align:center;">${escape(primary.label)} →</a>
         </td>
       </tr>
     </table>${secBlock}`;
