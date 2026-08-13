@@ -4510,6 +4510,12 @@
         true,
         'Adds an action bar under the quote with “Email me this quote”, “Share with others”, Print, and Download PDF. Turn off to hide it.'
       ));
+      qa.appendChild(brandFeatureToggle(b,
+        'Show the confidence + estimated-range panel',
+        'showConfidenceKpi',
+        true,
+        'Adds a panel under the total with a confidence pill (High / Medium), an estimated price range, and a “Valid until” date. Turn off to show just the total and line items.'
+      ));
       // "Book this load" + per-tenant deposit config (default OFF).
       qa.appendChild(brandBookingConfig(b));
       c.appendChild(qa);

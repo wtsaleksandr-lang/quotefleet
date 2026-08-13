@@ -50,6 +50,28 @@ import {
 export const MAX_QUOTABLE_WEIGHT_LBS = 80000;
 
 /**
+ * Quote-validity window, in calendar days. SINGLE SOURCE OF TRUTH for how long
+ * an issued quote stays good. The terms text (src/server/quoteDisclaimer.ts)
+ * interpolates this same number, and the widget result card surfaces it as an
+ * explicit "Valid until <date>" — so the disclaimer's validity and the card's
+ * clock can never contradict each other. Kept in the calc layer (the lowest,
+ * shared by widget preview + lead ingest + AI builder) so every surface reads
+ * one value. A per-tenant override can be threaded through later when a tenant
+ * validity column exists; until then every quote defaults here.
+ */
+export const QUOTE_VALIDITY_DAYS = 30;
+
+/**
+ * Rate-confidence label, derived from MATCH QUALITY (which pricing tier actually
+ * resolved the lane), never shown as a scary "low":
+ *   - 'high'   : an exact rate-matrix cell priced the lane AND at least one end
+ *                carried a precise ZIP.
+ *   - 'medium' : a zone / flat tariff, a per-mile or LTL rate card, or a matrix
+ *                cell that only had coarse (city/state, no ZIP) inputs to match.
+ */
+export type QuoteConfidence = 'high' | 'medium';
+
+/**
  * Currency the carrier prices in.
  *
  * IMPORTANT: this LABELS the quote, it never converts it. A Canadian carrier
@@ -182,6 +204,55 @@ export interface CalcResult {
   unsupported?: { reason: string; code?: 'unpriceable' };
   /** LTL only: the size/weight rating basis behind the price (credibility). */
   ltl?: FreightClassEstimate & { classSource: 'derived' | 'override' };
+  /**
+   * Rate-confidence signal from match quality (see QuoteConfidence). Present on
+   * a priced result; absent on the unsupported/unpriceable returns (no total).
+   */
+  confidence?: QuoteConfidence;
+  /**
+   * Estimated range around `total` — total ± a confidence-scaled band (high
+   * ≈ ±4%, medium ≈ ±8%), in the quote's own currency, snapped to clean
+   * dollars. `total` stays the single headline number; the range communicates
+   * uncertainty without moving the price.
+   */
+  low?: number;
+  high?: number;
+  /**
+   * Quote-validity window in days (= QUOTE_VALIDITY_DAYS). The widget renders it
+   * as an explicit "Valid until" date aligned with the terms disclaimer.
+   */
+  validityDays?: number;
+}
+
+/** Snap a band edge to a "clean" dollar step that scales with the total, so a
+ *  range reads as $2,300 – $2,490, never $2,304.71 – $2,491.03. */
+function bandStep(total: number): number {
+  if (total >= 5000) return 50;
+  if (total >= 2000) return 25;
+  if (total >= 500) return 10;
+  if (total >= 100) return 5;
+  return 1;
+}
+
+/**
+ * Estimated range + confidence for a priced total. Confidence starts from which
+ * tier matched (an exact matrix cell is the only 'high' source) and is demoted
+ * to 'medium' when the matched lane had only coarse inputs (no ZIP on either
+ * end). The band widens with lower confidence; edges snap to clean dollars and
+ * always bracket the total (low floored, high ceiled).
+ */
+function confidenceAndRange(
+  total: number,
+  matchedExactCell: boolean,
+  hasPreciseInput: boolean
+): { confidence: QuoteConfidence; low: number; high: number } {
+  const confidence: QuoteConfidence =
+    matchedExactCell && hasPreciseInput ? 'high' : 'medium';
+  const band = confidence === 'high' ? 0.04 : 0.08;
+  const step = bandStep(total);
+  const low = Math.max(0, Math.floor((total * (1 - band)) / step) * step);
+  const high = Math.ceil((total * (1 + band)) / step) * step;
+  return { confidence, low, high };
 }
 
 function round2(n: number): number {
@@ -776,6 +847,19 @@ export function calculate(
     };
   }
 
+  // ── Confidence / range / validity (premium KPI) ───────────────────
+  // Match quality decides confidence: only an exact matrix cell with a precise
+  // (ZIP-bearing) lane earns 'high'; a zone/flat tariff, per-mile / LTL card, or
+  // a coarsely-matched matrix cell is 'medium'. The band scales off that.
+  const hasPreciseInput = Boolean(
+    String(req.pickupZip ?? '').trim() || String(req.deliveryZip ?? '').trim()
+  );
+  const { confidence, low, high } = confidenceAndRange(
+    total,
+    Boolean(matrixMatch),
+    hasPreciseInput
+  );
+
   return {
     request: req,
     lines,
@@ -785,6 +869,10 @@ export function calculate(
     margin,
     total,
     currency: req.currency ?? 'USD',
+    confidence,
+    low,
+    high,
+    validityDays: QUOTE_VALIDITY_DAYS,
     ...(ltlRating ? { ltl: ltlRating } : {}),
   };
 }

@@ -74,7 +74,9 @@ describe('transit-time estimate', () => {
   it('is computed from distance + service on both surfaces', async () => {
     const p = await route('public.ts');
     const q = await route('quoteDoc.ts');
-    expect(p).toContain('estimateTransit(dist.miles, body.service)');
+    // `miles` = routed Google road distance when available, else haversine
+    // (see getRoutedMiles) — transit is computed from the same priced distance.
+    expect(p).toContain('estimateTransit(miles, body.service)');
     expect(q).toContain('estimateTransit(lead.distanceMiles, lead.service)');
   });
 

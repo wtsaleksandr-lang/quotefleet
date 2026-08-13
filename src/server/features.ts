@@ -33,6 +33,11 @@ export interface WidgetFeatures {
    *  (opt-IN) — OFF means no inbound address is minted and the inbound webhook
    *  refuses mail for this tenant. */
   emailImport: boolean;
+  /** Show the premium confidence / estimated-range / valid-until KPI panel on
+   *  the widget result card (confidence pill + range line + valid-until date +
+   *  its help cue). Default true (opt-OUT); when off the result card renders
+   *  the total + line items only, as it did before the KPI shipped. */
+  showConfidenceKpi: boolean;
 }
 
 /** Default value for every known feature. */
@@ -40,6 +45,7 @@ export const FEATURE_DEFAULTS: WidgetFeatures = {
   quoteShare: true,
   quoteBooking: false,
   emailImport: false,
+  showConfidenceKpi: true,
 };
 
 /** The keys the dashboard toggle + PUT allow-list may write. Anything else in

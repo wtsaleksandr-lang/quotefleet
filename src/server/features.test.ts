@@ -12,8 +12,8 @@ import {
 } from './features.js';
 
 describe('resolveFeatures — defaults', () => {
-  it('null brand → defaults (share ON, booking OFF, emailImport OFF)', () => {
-    expect(resolveFeatures(null)).toEqual({ quoteShare: true, quoteBooking: false, emailImport: false });
+  it('null brand → defaults (share ON, booking OFF, emailImport OFF, confidenceKpi ON)', () => {
+    expect(resolveFeatures(null)).toEqual({ quoteShare: true, quoteBooking: false, emailImport: false, showConfidenceKpi: true });
   });
 
   it('null featuresJson column → defaults', () => {
@@ -43,6 +43,14 @@ describe('resolveFeatures — explicit overrides', () => {
   it('quoteBooking:true opts into the reserved booking feature', () => {
     expect(resolveFeatures({ featuresJson: { quoteBooking: true } }).quoteBooking).toBe(true);
   });
+
+  it('showConfidenceKpi defaults ON and only an explicit false disables it', () => {
+    expect(resolveFeatures(null).showConfidenceKpi).toBe(true);
+    expect(resolveFeatures({ featuresJson: {} }).showConfidenceKpi).toBe(true);
+    expect(resolveFeatures({ featuresJson: { showConfidenceKpi: false } }).showConfidenceKpi).toBe(false);
+    // A non-boolean can never accidentally turn the KPI off.
+    expect(resolveFeatures({ featuresJson: { showConfidenceKpi: 'off' as unknown as boolean } }).showConfidenceKpi).toBe(true);
+  });
 });
 
 describe('resolveFeatures — malformed input never disables a feature by accident', () => {
@@ -53,7 +61,7 @@ describe('resolveFeatures — malformed input never disables a feature by accide
 
   it('unknown keys are dropped from the resolved result', () => {
     const f = resolveFeatures({ featuresJson: { somethingElse: true } as Record<string, boolean> });
-    expect(Object.keys(f).sort()).toEqual(['emailImport', 'quoteBooking', 'quoteShare']);
+    expect(Object.keys(f).sort()).toEqual(['emailImport', 'quoteBooking', 'quoteShare', 'showConfidenceKpi']);
   });
 });
 
@@ -64,6 +72,10 @@ describe('sanitizeFeaturesPatch — only known boolean keys are persisted', () =
 
   it('drops unknown keys', () => {
     expect(sanitizeFeaturesPatch({ quoteShare: true, junk: true })).toEqual({ quoteShare: true });
+  });
+
+  it('persists the showConfidenceKpi toggle', () => {
+    expect(sanitizeFeaturesPatch({ showConfidenceKpi: false })).toEqual({ showConfidenceKpi: false });
   });
 
   it('drops non-boolean values', () => {
