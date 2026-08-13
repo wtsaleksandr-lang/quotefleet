@@ -262,7 +262,10 @@ describe('customize panel — drag-scroll carousels (theme presets + map styles)
     expect(js).toContain('qf-cz-carousel-track');
     // Drag distinguished from a tap so click-to-select still fires.
     expect(js).toContain("track.classList.add('is-grabbing')");
-    expect(js).toContain('if (moved > 4)');
+    // A movement threshold distinguishes a drag from a tap; on a drag the
+    // trailing click is suppressed so click-to-select only fires on a real tap.
+    expect(js).toContain('DRAG_THRESHOLD');
+    expect(js).toContain('if (moved > DRAG_THRESHOLD) { e.stopPropagation(); e.preventDefault(); }');
   });
 
   it('ships the carousel + slider styling (scrollable strip, hidden bar, arrows)', async () => {
