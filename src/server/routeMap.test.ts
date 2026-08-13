@@ -4,6 +4,7 @@ import {
   buildBaseMapUrl,
   fetchDirections,
   getRouteMap,
+  getRoutedMiles,
   laneCacheKey,
   resolveMapStyle,
   MAP_STYLE_KEYS,
@@ -152,6 +153,61 @@ describe('getRouteMap', () => {
     // Light theme has its own branded style (not the dark navy water).
     expect(lightStyles).not.toContain('feature:water|element:geometry|color:0x070c18');
     expect(lightStyles).toContain('feature:road.highway|element:geometry|color:0x9fbcf3');
+  });
+});
+
+describe('getRoutedMiles — routed distance for pricing (haversine fallback)', () => {
+  beforeEach(() => __clearRouteCache());
+
+  const okDirections = (meters: number) =>
+    mockFetch({
+      status: 'OK',
+      routes: [{ overview_polyline: { points: POLY }, legs: [{ distance: { value: meters } }] }],
+    });
+
+  it('returns the real routed miles when Directions returns a distance', async () => {
+    const f = okDirections(3_218_688); // ≈ 2000 mi
+    expect(await getRoutedMiles(LA, CHI, KEY, f)).toBe(2000);
+  });
+
+  it('returns null (→ caller uses haversine) when Directions fails', async () => {
+    const f = mockFetch({ status: 'ZERO_RESULTS', routes: [] });
+    expect(await getRoutedMiles(LA, CHI, KEY, f)).toBeNull();
+    // HTTP error path
+    expect(await getRoutedMiles(LA, CHI, KEY, mockFetch({}, false))).toBeNull();
+  });
+
+  it('returns null when the key or coordinates are missing (no API call)', async () => {
+    const f = okDirections(100_000);
+    expect(await getRoutedMiles(LA, CHI, undefined, f)).toBeNull();
+    expect(await getRoutedMiles(undefined, CHI, KEY, f)).toBeNull();
+    expect((f as unknown as ReturnType<typeof vi.fn>)).not.toHaveBeenCalled();
+  });
+
+  it('caches per lane — a repeat quote on the same lane does not re-call Directions', async () => {
+    const f = okDirections(100_000);
+    await getRoutedMiles(LA, CHI, KEY, f);
+    await getRoutedMiles(LA, CHI, KEY, f);
+    expect((f as unknown as ReturnType<typeof vi.fn>)).toHaveBeenCalledTimes(1);
+  });
+
+  it('SHARES the lane cache with getRouteMap: once the map fetched the lane, pricing adds no API call', async () => {
+    const f = okDirections(3_218_688); // ≈ 2000 mi
+    // The widget's map card fetches the lane first (any theme/style).
+    await getRouteMap(LA, CHI, KEY, 'dark', f, 'grayscale');
+    expect((f as unknown as ReturnType<typeof vi.fn>)).toHaveBeenCalledTimes(1);
+    // The subsequent quote prices off the SAME routed distance — no 2nd call.
+    expect(await getRoutedMiles(LA, CHI, KEY, f)).toBe(2000);
+    expect((f as unknown as ReturnType<typeof vi.fn>)).toHaveBeenCalledTimes(1);
+  });
+
+  it('rounds meters → miles consistently with getRouteMap', async () => {
+    // Same lane, same upstream distance → getRoutedMiles (pricing) and
+    // getRouteMap.distanceMiles (map card) report the identical mileage.
+    const rm = await getRouteMap(LA, CHI, KEY, 'light', okDirections(1_609_344), 'branded');
+    expect(rm?.distanceMiles).toBe(1000);
+    __clearRouteCache();
+    expect(await getRoutedMiles(LA, CHI, KEY, okDirections(1_609_344))).toBe(1000);
   });
 });
 

@@ -722,6 +722,14 @@ const MAP_SCALE = '2';
 // Lane cache: key = rounded origin+destination. 24h TTL, 500 lanes.
 const routeCache = new LruCache<RouteMap>(500, 24 * 60 * 60 * 1000);
 
+// Routed-distance cache: key = lane ONLY (no theme/style — a lane's driving
+// distance is identical regardless of how the map LOOKS). Populated by BOTH
+// getRouteMap (the widget's map card) and getRoutedMiles (the pricing path)
+// whenever a Directions fetch yields a distance, so the two share a single
+// upstream result: once the map has fetched a lane, pricing reuses the cached
+// routed miles with NO second Directions call. 24h TTL, 500 lanes.
+const routedMilesCache = new LruCache<number>(500, 24 * 60 * 60 * 1000);
+
 const METERS_PER_MILE = 1609.344;
 
 function round5(n: number): number {
@@ -872,6 +880,13 @@ export async function getRouteMap(
   if (cached) return cached;
 
   const directions = await fetchDirections(origin, destination, apiKey, fetchImpl);
+  // Share the routed distance with the pricing path: any successful Directions
+  // fetch (regardless of theme/style) seeds the lane-keyed routed-miles cache so
+  // getRoutedMiles reuses it with no second API call.
+  if (directions?.distanceMeters) {
+    const m = Math.round(directions.distanceMeters / METERS_PER_MILE);
+    if (m > 0) routedMilesCache.set(laneCacheKey(origin, destination), m);
+  }
   const result: RouteMap = directions
     ? {
         url: buildStaticMapUrl(apiKey, origin, destination, directions.polyline, theme, mapStyle),
@@ -897,6 +912,36 @@ export async function getRouteMap(
   return result;
 }
 
+/**
+ * Resolve the REAL routed driving distance (miles) for a lane, for PRICING.
+ *
+ * Cache → Directions. Returns the routed miles, or null when the distance is
+ * unavailable (missing key / missing coords / Directions timeout / quota /
+ * ZERO_RESULTS) so the caller can fall back to its straight-line estimate.
+ *
+ * Shares the lane-keyed routed-miles cache with getRouteMap, so a lane the
+ * widget's map card already fetched prices off that same cached distance with
+ * NO duplicate Directions call. On a cache miss it fetches once and seeds the
+ * cache for the map (and any later quote/lead on the same lane).
+ */
+export async function getRoutedMiles(
+  origin: LatLng | undefined,
+  destination: LatLng | undefined,
+  apiKey: string | undefined,
+  fetchImpl: typeof fetch = fetch
+): Promise<number | null> {
+  if (!origin || !destination || !apiKey) return null;
+  const key = laneCacheKey(origin, destination);
+  const cached = routedMilesCache.get(key);
+  if (cached != null) return cached;
+  const directions = await fetchDirections(origin, destination, apiKey, fetchImpl);
+  if (!directions?.distanceMeters) return null;
+  const miles = Math.round(directions.distanceMeters / METERS_PER_MILE);
+  if (miles <= 0) return null;
+  routedMilesCache.set(key, miles);
+  return miles;
+}
+
 /** Read-only peek at the lane cache. Lets the widget's preview PNG endpoint
  *  serve a map that a prior route-preview call already generated + cached, so
  *  it never renders an arbitrary map on demand. Key is `${laneCacheKey}|${theme}|${mapStyle}`. */
@@ -904,7 +949,8 @@ export function peekRouteMap(key: string): RouteMap | undefined {
   return routeCache.get(key);
 }
 
-// Test-only: clear the lane cache between cases.
+// Test-only: clear the lane caches between cases (route map + routed miles).
 export function __clearRouteCache(): void {
   routeCache.clear();
+  routedMilesCache.clear();
 }
