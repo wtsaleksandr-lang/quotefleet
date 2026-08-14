@@ -23,6 +23,8 @@ describe('dashboard freight shell polish', () => {
     // Avatar tile now renders the business's own initials (set via
     // data-initials in app.js), not a hardcoded 'QF'.
     expect(css).toContain('content: attr(data-initials)');
-    expect(css).toContain('--accent: #3b22f4');
+    // Light-shell accent remapped from violet to the brand blue (Alex: solid
+    // business-branded blue, not violet) — de-violets active nav, links, tints.
+    expect(css).toContain('--accent: #0D3CFC');
   });
 });

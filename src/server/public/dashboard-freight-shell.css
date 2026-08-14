@@ -10,9 +10,9 @@ html[data-theme="light"] {
   --ink-soft: #1f2937;
   --muted: #536174;
   --muted-soft: #8a96a8;
-  --accent: #3b22f4;
-  --accent-strong: #2917c9;
-  --accent-soft: rgba(59, 34, 244, 0.08);
+  --accent: #0D3CFC;
+  --accent-strong: #0A2FCB;
+  --accent-soft: rgba(13, 60, 252, 0.08);
   --accent-ink: #ffffff;
   --accent-2: #38bdf8;
   --accent-2-soft: rgba(56, 189, 248, 0.12);
