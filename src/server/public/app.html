@@ -58,6 +58,14 @@
 <body>
   <div class="app-shell" id="app-shell" hidden>
     <button class="qf-mobile-nav-toggle" id="qf-mobile-nav-toggle" aria-label="Open navigation menu" aria-controls="qf-sidebar" aria-expanded="false" hidden><svg class="qf-ico" viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><line x1="4" x2="20" y1="6" y2="6"/><line x1="4" x2="20" y1="12" y2="12"/><line x1="4" x2="20" y1="18" y2="18"/></svg></button>
+    <!-- Mobile-only QuoteFleet mark, pinned to the top-right of the viewport to
+         mirror the top-left hamburger. It's a fixed sibling of the toggle (NOT
+         inside the transformed sidebar, whose transform would break position:
+         fixed). Hidden ≥901px, where the in-sidebar .qf-sb-logo is shown. -->
+    <a class="qf-sb-logo-mobile" href="https://quotefleet.net" target="_blank" rel="noopener" aria-label="QuoteFleet home (opens in a new tab)">
+      <img class="qf-sb-logo-img qf-sb-logo-ondark" src="/brand/logo-full-ondark.png" alt="QuoteFleet" />
+      <img class="qf-sb-logo-img qf-sb-logo-onlight" src="/brand/logo-full.png" alt="QuoteFleet" />
+    </a>
     <aside class="sidebar" id="qf-sidebar">
       <!-- QuoteFleet product mark → homepage (new tab), above the tenant's own
            name. Two img variants + the on-dark/on-light swap in CSS. -->
@@ -107,6 +115,17 @@
     .qf-nav-advanced[open] > summary .qf-nav-adv-chevron { transform: rotate(90deg); }
     .qf-mobile-nav-toggle { display: none; align-items: center; justify-content: center; position: fixed; top: 12px; left: 12px; z-index: 1001; width: 40px; height: 40px; border-radius: 4px; border: 1px solid var(--border-strong); background: var(--surface); padding: 0; cursor: pointer; color: var(--ink); transition: background 0.15s ease; }
     .qf-mobile-nav-toggle:hover { background: var(--surface-2); }
+    /* Mobile-only QuoteFleet mark — fixed top-right, mirroring the top-left
+       hamburger (same 12px/40px band + z-index). Shown ≤900px; the in-sidebar
+       .qf-sb-logo is hidden there so the logo no longer stacks under the
+       hamburger inside the drawer. On-dark/on-light image swap as in the sidebar. */
+    .qf-sb-logo-mobile { display: none; align-items: center; justify-content: flex-end; position: fixed; top: 12px; right: 12px; z-index: 1001; height: 40px; padding: 0; text-decoration: none; }
+    .qf-sb-logo-mobile .qf-sb-logo-img { height: 24px; width: auto; display: block; }
+    .qf-sb-logo-mobile:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; border-radius: 4px; }
+    .qf-sb-logo-mobile .qf-sb-logo-onlight { display: none; }
+    html[data-theme="light"] .qf-sb-logo-mobile .qf-sb-logo-ondark { display: none; }
+    html[data-theme="light"] .qf-sb-logo-mobile .qf-sb-logo-onlight { display: block; }
+    @media (max-width: 900px) { .qf-sb-logo-mobile { display: inline-flex; } #qf-sidebar .qf-sb-logo { display: none; } }
     /* Hamburger and sidebar are mutually exclusive. The sidebar goes off-canvas
        at ≤900px — the same boundary JS uses for isDesktop() (≥901) — so the
        toggle is shown ONLY when the sidebar is not visible: off-canvas on mobile,

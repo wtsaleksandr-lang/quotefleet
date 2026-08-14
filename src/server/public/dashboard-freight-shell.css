@@ -56,7 +56,10 @@ html[data-theme="light"] .sidebar .brand-block .name {
 }
 
 html[data-theme="light"] .sidebar .brand-block .name::before {
-  content: 'QF';
+  /* Business initials, computed in app.js and set via data-initials on
+     #sb-tenant-name (falls back to 'QF' if the attribute is missing). Solid
+     brand blue — no violet gradient (token-only, blue in both themes). */
+  content: attr(data-initials);
   flex-shrink: 0;
   width: 34px;
   height: 34px;
@@ -64,12 +67,12 @@ html[data-theme="light"] .sidebar .brand-block .name::before {
   align-items: center;
   justify-content: center;
   border-radius: 11px;
-  background: linear-gradient(135deg, #3b22f4, #5b7cff);
-  color: #fff;
+  background: var(--accent-fill);
+  color: var(--accent-ink);
   font-size: 12px;
   font-weight: 950;
   letter-spacing: -0.04em;
-  box-shadow: 0 10px 22px rgba(59, 34, 244, 0.20);
+  box-shadow: 0 10px 22px color-mix(in srgb, var(--accent-fill) 20%, transparent);
 }
 
 html[data-theme="light"] .sidebar .brand-block .sub {
@@ -99,9 +102,12 @@ html[data-theme="light"] .sidebar button:hover {
 
 html[data-theme="light"] .sidebar a.active,
 html[data-theme="light"] .sidebar button.active {
-  background: linear-gradient(135deg, rgba(59, 34, 244, 0.10), rgba(56, 189, 248, 0.12));
-  color: #3b22f4;
-  box-shadow: inset 0 0 0 1px rgba(59, 34, 244, 0.14);
+  /* Solid brand-blue selection (no violet gradient): blue tint fill + blue
+     text + a blue ring. --accent-fill/--accent-soft stay brand blue in both
+     themes even though --accent is remapped to violet in this light shell. */
+  background: var(--accent-soft);
+  color: var(--accent-fill);
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--accent-fill) 22%, transparent);
 }
 
 html[data-theme="light"] .sidebar .group {

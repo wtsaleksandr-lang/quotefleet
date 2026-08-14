@@ -20,7 +20,9 @@ describe('dashboard freight shell polish', () => {
     expect(css).toContain('Phase AV: lighter premium freight dashboard shell');
     expect(css).toContain('html[data-theme="light"] .app-shell');
     expect(css).toContain('html[data-theme="light"] .sidebar');
-    expect(css).toContain("content: 'QF'");
+    // Avatar tile now renders the business's own initials (set via
+    // data-initials in app.js), not a hardcoded 'QF'.
+    expect(css).toContain('content: attr(data-initials)');
     expect(css).toContain('--accent: #3b22f4');
   });
 });
