@@ -2737,29 +2737,46 @@
     function alignTo(key, containerEl) {
       try {
         if (!iframe || !iframe.isConnected) return;
-        var doc = iframe.contentDocument; // same-origin on prod + dev harness
-        if (!doc) return;                 // cross-origin → contentDocument is null
+        var outerDoc = iframe.contentDocument; // same-origin on prod + dev harness
+        if (!outerDoc) return;                 // cross-origin → contentDocument is null
+        // The preview loads the HOSTED page, which embeds the actual calculator
+        // in a nested #qf-calc-frame — the widget sections (.qf-header/.qf-map-…)
+        // live one frame deeper. Descend into it (same-origin); fall back to the
+        // outer doc for the bare calculator. Neither frame scrolls internally
+        // (both sized to full content), so a section's offset in the hosted
+        // content = calc-frame offset + section offset within the calc.
+        var doc = outerDoc, calcFrameEl = null;
+        try {
+          var cfe = outerDoc.getElementById('qf-calc-frame');
+          if (cfe && cfe.contentDocument && cfe.contentDocument.querySelector('.qf-header, .qf-widget')) {
+            calcFrameEl = cfe; doc = cfe.contentDocument;
+          }
+        } catch (_d) { /* nested access blocked — use the outer doc */ }
         var target = czFindTarget(doc, key);
         if (!target) return;
-        // Highlight the mapped section in the preview so the control→section link
-        // is unmistakable regardless of scroll position (the arrow points here).
-        // Exact "line it up level with the container" is not achievable when the
-        // section sits at the top of the widget (nothing above it to scroll in),
-        // so the highlight — not the scroll — carries the connection.
+        // Brief pulse on the mapped section so the control→section link is clear
+        // on click (the arrow points here). Base state is transparent — the pulse
+        // flashes once and fades. Force a reflow before re-adding so re-selecting
+        // the same section replays it (isolated so a layout throw can't skip add).
         try {
           var prevH = doc.querySelectorAll('.qf-preview-highlight');
           for (var h = 0; h < prevH.length; h++) prevH[h].classList.remove('qf-preview-highlight');
+          try { void target.offsetWidth; } catch (_hf) {}
           target.classList.add('qf-preview-highlight');
         } catch (_hl) {}
-        var docRoot = doc.documentElement || doc.body;
-        if (!docRoot) return;
-        var rootTop = docRoot.getBoundingClientRect().top;
+        // Best-effort centre-scroll of the mapped section within the preview
+        // viewport. Absolute offset in the (scrollable) hosted content = calc-frame
+        // offset + section offset in the calc. Sections near the top clamp to 0
+        // (nothing above them) — fine; the pulse still marks them.
         var tRect = target.getBoundingClientRect();
-        // Target centre, measured from the top of the iframe content.
-        var targetCenter = (tRect.top - rootTop) + tRect.height / 2;
-        // Best-effort scroll: bring the mapped section to the centre of the
-        // preview viewport. Sections near the widget top clamp to 0 (there is no
-        // content above them), which is fine — they are already fully visible.
+        var frameOffset;
+        if (calcFrameEl) {
+          frameOffset = calcFrameEl.getBoundingClientRect().top;
+        } else {
+          var outerRoot = outerDoc.documentElement || outerDoc.body;
+          frameOffset = outerRoot ? -outerRoot.getBoundingClientRect().top : 0;
+        }
+        var targetCenter = frameOffset + tRect.top + tRect.height / 2;
         var desired = targetCenter - frameWrap.clientHeight / 2;
         var maxScroll = Math.max(0, frameWrap.scrollHeight - frameWrap.clientHeight);
         desired = Math.max(0, Math.min(maxScroll, Math.round(desired)));
