@@ -605,18 +605,28 @@
 }
 
 /* #3 — Header sits inline with the fixed hamburger: no subtitle, smaller title,
-   nudged up + padded left so it shares the hamburger's line (a 40px button at
-   top:12px left:12px, see app.html). */
+   padded left so it shares the hamburger's column (a 40px button at top:12px
+   left:12px, see app.html).
+   The ~64px dead gap above the title was dashboard-polish.css padding .app-main
+   72px at the top (leftover clearance for the removed top app-bar). On the
+   Customize page that band is pure dead space, so trim it to 12px — the title
+   then sits tight right under the sticky trial banner. Scoped via :has() so
+   every OTHER dashboard page keeps its top clearance (desktop untouched). */
 @media (max-width: 640px) {
+  .app-main:has(.qf-customize) { padding-top: 12px; }
   .qf-customize .page-sub { display: none; }
   .qf-customize h1 {
     font-size: 18px;
     line-height: 40px;
     min-height: 40px;
     padding-left: 48px;
-    margin-top: -8px;
+    margin-top: 0;
     margin-bottom: 8px;
   }
+  /* #4 finish — nothing but the widget in the preview area on mobile: drop the
+     "This is exactly what your customers see…" note (the subtle "Live preview"
+     caption is enough). Desktop keeps the note. */
+  .qf-cz-preview-note { display: none; }
 }
 
 /* #1 — Floating, repositionable + resizable control panel. On mobile the sheet

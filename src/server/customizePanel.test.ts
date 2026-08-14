@@ -364,9 +364,14 @@ describe('customize panel — mobile pass (floating panel, widget-only Design pr
     // #2 preview nearly full width (390px cap dropped on mobile).
     expect(css).toContain('.qf-cz-frame-wrap[data-device="mobile"]');
     expect(css).toContain('max-width: none');
-    // #3 header inline with hamburger: subtitle hidden, title padded past it.
+    // #3 header inline with hamburger: subtitle hidden, title padded past it,
+    // and the ~64px dead gap (dashboard-polish's 72px .app-main top pad) trimmed
+    // so the title sits compact right under the trial banner.
     expect(css).toContain('.qf-customize .page-sub { display: none; }');
     expect(css).toContain('padding-left: 48px');
+    expect(css).toContain('.app-main:has(.qf-customize) { padding-top: 12px; }');
+    // #4 finish — no note text in the preview area on mobile (widget only).
+    expect(css).toContain('.qf-cz-preview-note { display: none; }');
     // #5 quiet "Live preview" caption on mobile (muted, lighter, uppercase).
     expect(css).toContain('text-transform: uppercase');
     // #6 slightly-rounded (not pill) chips.
