@@ -2802,6 +2802,14 @@
       // Re-skin from the freshly-saved config (server-derived fields), no blink.
       notifySaved: function () { postToPreview({ qf: 'brand-refetch' }); },
       setUrl: function (url) { previewUrl = url; openLink.href = url; iframe.src = url; },
+      // Swap ONLY the iframe source (e.g. Design → bare widget, Page → hosted
+      // page) without touching the "Open ↗" link, which always points at the
+      // real hosted page. Guarded so re-selecting the same tab never reloads.
+      setPreviewSrc: function (url) {
+        if (!url || url === previewUrl) return;
+        previewUrl = url;
+        iframe.src = url;
+      },
     };
   }
 
@@ -2874,6 +2882,17 @@
       var controls = designPanel;
       var panels = { design: designPanel, behavior: behaviorPanel, page: pagePanel };
       var tabBtns = {};
+      // #4: the Design tab previews the BARE calculator widget (…?embed=1 →
+      // app.ts serves the bare widget: no hosted header/hero/footer, so the
+      // company name is NOT duplicated and no extra canvas text shows). The Page
+      // + Behavior tabs preview the HOSTED page (its trust-wrap is what they
+      // edit). The signed ?pk= grant already in previewUrl rides along, so the
+      // bare widget stays in preview context and still receives the live
+      // brand-preview / theme / brand-refetch messages.
+      function czPreviewUrlFor(id) {
+        if (id === 'design') return previewUrl + (previewUrl.indexOf('?') > -1 ? '&' : '?') + 'embed=1';
+        return previewUrl;
+      }
       function selectTab(id) {
         if (!panels[id]) id = 'design';
         Object.keys(panels).forEach(function (k) {
@@ -2881,6 +2900,9 @@
           tabBtns[k].classList.toggle('is-active', k === id);
           tabBtns[k].setAttribute('aria-selected', k === id ? 'true' : 'false');
         });
+        // Point the shared preview at the right source for this tab (Design =
+        // widget-only, Page/Behavior = hosted). Guarded no-op when unchanged.
+        if (preview && preview.setPreviewSrc) preview.setPreviewSrc(czPreviewUrlFor(id));
       }
       [{ id: 'design', label: 'Design' }, { id: 'page', label: 'Page' }, { id: 'behavior', label: 'Behavior' }].forEach(function (t) {
         var btn = el('button', { type: 'button', class: 'qf-cz-tab', role: 'tab', 'data-tab': t.id, text: t.label });
@@ -2893,7 +2915,10 @@
       leftCol.appendChild(behaviorPanel);
 
       // Shared live preview (no-blink apply, auto-height, device + host toggles).
-      var preview = buildLivePreview({ previewUrl: previewUrl, openHref: previewUrl });
+      // #4: seed the iframe with the CORRECT source for the initial tab so there
+      // is no hosted→widget reload flash (Design, the default, is widget-only).
+      var czInitialTab = opts.tab === 'behavior' ? 'behavior' : (opts.tab === 'page' ? 'page' : 'design');
+      var preview = buildLivePreview({ previewUrl: czPreviewUrlFor(czInitialTab), openHref: previewUrl });
 
       layout.appendChild(leftCol);
       layout.appendChild(preview.col);
@@ -3750,7 +3775,13 @@
         var mq = window.matchMedia('(max-width: 640px)');
         var reduceMq = window.matchMedia('(prefers-reduced-motion: reduce)');
         var sheet = null, sheetBody = null, handle = null, shortcutRow = null;
+        var shortcutWrap = null, resizeGrip = null;
         var active = false, expanded = false, tabChips = {};
+        // #1 floating-panel geometry (px). anchorLeft + anchorBottom pin the
+        // panel's bottom-left corner so a fold/resize keeps it put; floatW/floatH
+        // are the last expanded size (restored when re-expanding).
+        var anchorLeft = 8, anchorBottom = 0, floatW = 0, floatH = 0;
+        function czClamp(v, a, b) { return v < a ? a : (v > b ? b : v); }
 
         // Key Design-tab sections surfaced as jump shortcuts, matched by their
         // section-title text (built above). Order = chip order after the tabs.
@@ -3769,8 +3800,9 @@
           return null;
         }
         function peekPx() {
-          if (!handle || !shortcutRow) return 96;
-          return handle.offsetHeight + shortcutRow.offsetHeight;
+          if (!handle) return 96;
+          var row = shortcutWrap || shortcutRow;
+          return handle.offsetHeight + (row ? row.offsetHeight : 0);
         }
         function measurePeek() {
           var p = peekPx();
@@ -3787,6 +3819,43 @@
             handle.setAttribute('aria-expanded', open ? 'true' : 'false');
             handle.setAttribute('aria-label', open ? 'Collapse controls' : 'Expand controls');
           }
+          applyFloatGeometry();
+        }
+        // #1 — Position + size the floating panel from the current anchor + fold
+        // state. Collapsed height = the peek (handle + shortcut row); expanded =
+        // floatH. The bottom-left corner is held via anchorBottom/anchorLeft so
+        // folding or resizing never sends the panel off-screen; everything is
+        // clamped to the viewport so it can never get lost.
+        function applyFloatGeometry() {
+          if (!sheet) return;
+          var vw = window.innerWidth, vh = window.innerHeight;
+          var peek = peekPx();
+          if (!floatH) floatH = Math.min(Math.round(vh * 0.72), Math.max(peek + 120, vh - 16));
+          if (!floatW) floatW = Math.min(vw - 16, 520);
+          var h = czClamp(expanded ? floatH : peek, peek, vh - 16);
+          var w = czClamp(floatW, 240, vw - 16);
+          var top = czClamp(anchorBottom - h, 8, Math.max(8, vh - peek));
+          var left = czClamp(anchorLeft, 80 - w, vw - 80);
+          sheet.style.width = w + 'px';
+          sheet.style.height = h + 'px';
+          sheet.style.top = top + 'px';
+          sheet.style.left = left + 'px';
+        }
+        function syncAnchor() {
+          if (!sheet) return;
+          anchorLeft = sheet.offsetLeft;
+          anchorBottom = sheet.offsetTop + sheet.offsetHeight;
+        }
+        // Seed the floating panel: nearly full-width, docked to the bottom,
+        // collapsed. Called once the sheet is in the DOM so peekPx() can measure.
+        function initFloat() {
+          var vw = window.innerWidth, vh = window.innerHeight;
+          floatW = Math.min(vw - 16, 520);
+          floatH = Math.min(Math.round(vh * 0.72), vh - 16);
+          anchorLeft = Math.max(8, Math.round((vw - floatW) / 2));
+          anchorBottom = vh - 8;
+          sheet.style.width = floatW + 'px';
+          applyFloatGeometry();
         }
         function scrollBodyTo(top) {
           if (!sheetBody) return;
@@ -3815,30 +3884,37 @@
           });
           return row;
         }
+        // #1 — Grab the handle to move the panel ANYWHERE (both X and Y). Pointer
+        // capture keeps the drag tracking off-element; the position is clamped so
+        // at least 80px stays on screen (it can never be lost). A press that never
+        // crosses the move threshold is a tap → fold toggle; a real drag leaves
+        // the panel where it is dropped.
         function wireDrag() {
-          var startY = 0, baseY = 0, curY = 0, full = 0, peek = 0, dragging = false;
-          function closedY() { return Math.max(0, full - peek); }
+          var startX = 0, startY = 0, baseL = 0, baseT = 0, moved = 0, dragging = false;
           handle.addEventListener('pointerdown', function (e) {
-            full = sheet.getBoundingClientRect().height; peek = peekPx();
-            dragging = true; startY = e.clientY; baseY = expanded ? 0 : closedY(); curY = baseY;
+            dragging = true; moved = 0;
+            startX = e.clientX; startY = e.clientY;
+            baseL = sheet.offsetLeft; baseT = sheet.offsetTop;
             sheet.classList.add('is-dragging');
             try { handle.setPointerCapture(e.pointerId); } catch (_e) {}
           });
           handle.addEventListener('pointermove', function (e) {
             if (!dragging) return;
-            curY = Math.max(0, Math.min(closedY(), baseY + (e.clientY - startY)));
-            sheet.style.transform = 'translateY(' + curY + 'px)';
+            var dx = e.clientX - startX, dy = e.clientY - startY;
+            moved = Math.max(moved, Math.abs(dx) + Math.abs(dy));
+            var vw = window.innerWidth, vh = window.innerHeight;
+            var w = sheet.offsetWidth || floatW;
+            sheet.style.left = czClamp(baseL + dx, 80 - w, vw - 80) + 'px';
+            sheet.style.top = czClamp(baseT + dy, 0, vh - 80) + 'px';
+            if (e.cancelable) e.preventDefault();
           });
           function endDrag(e) {
             if (!dragging) return;
             dragging = false;
             sheet.classList.remove('is-dragging');
-            sheet.style.transform = '';
             try { handle.releasePointerCapture(e.pointerId); } catch (_e) {}
-            var moved = curY - baseY;
-            if (Math.abs(moved) < 4) { setExpanded(!expanded); return; }  // tap → toggle
-            if (expanded) setExpanded(!(moved > full * 0.18));            // pulled down enough → collapse
-            else setExpanded(moved < -full * 0.12);                      // pulled up enough → expand
+            if (moved < 5) { setExpanded(!expanded); return; }  // tap → fold toggle
+            syncAnchor();                                       // dragged → leave it put
           }
           handle.addEventListener('pointerup', endDrag);
           handle.addEventListener('pointercancel', endDrag);
@@ -3846,22 +3922,69 @@
             if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); setExpanded(!expanded); }
           });
         }
+        // #1 — Corner grip resizes the floating panel (width + height), clamped so
+        // it stays on-screen and never smaller than a usable minimum. Resizing
+        // implies expanded. Reuses Pointer Events + capture like the handle drag.
+        function wireResize() {
+          if (!resizeGrip) return;
+          var startX = 0, startY = 0, baseW = 0, baseH = 0, resizing = false;
+          resizeGrip.addEventListener('pointerdown', function (e) {
+            resizing = true;
+            startX = e.clientX; startY = e.clientY;
+            if (!expanded) setExpanded(true);
+            baseW = sheet.offsetWidth; baseH = sheet.offsetHeight;
+            sheet.classList.add('is-resizing');
+            try { resizeGrip.setPointerCapture(e.pointerId); } catch (_e) {}
+            e.stopPropagation();
+            if (e.cancelable) e.preventDefault();
+          });
+          resizeGrip.addEventListener('pointermove', function (e) {
+            if (!resizing) return;
+            var vw = window.innerWidth, vh = window.innerHeight;
+            var left = sheet.offsetLeft, top = sheet.offsetTop;
+            sheet.style.width = czClamp(baseW + (e.clientX - startX), 240, vw - left - 8) + 'px';
+            sheet.style.height = czClamp(baseH + (e.clientY - startY), peekPx() + 40, vh - top - 8) + 'px';
+            if (e.cancelable) e.preventDefault();
+          });
+          function endResize(e) {
+            if (!resizing) return;
+            resizing = false;
+            sheet.classList.remove('is-resizing');
+            try { resizeGrip.releasePointerCapture(e.pointerId); } catch (_e) {}
+            floatW = sheet.offsetWidth; floatH = sheet.offsetHeight;
+            syncAnchor();
+          }
+          resizeGrip.addEventListener('pointerup', endResize);
+          resizeGrip.addEventListener('pointercancel', endResize);
+        }
         function activate() {
           if (active || !root.isConnected) return;
           active = true;
           tabChips = {};
-          sheet = el('div', { class: 'qf-cz-sheet' });
+          sheet = el('div', { class: 'qf-cz-sheet is-floating' });
           handle = el('button', { type: 'button', class: 'qf-cz-sheet-handle', 'aria-label': 'Expand controls', 'aria-expanded': 'false' }, [
             el('span', { class: 'qf-cz-sheet-grip', 'aria-hidden': 'true' }),
           ]);
           shortcutRow = buildShortcutRow();
+          // #6 — wrap the chip row so it scrolls horizontally with two subtle,
+          // auto-hiding arrows and never wraps to a second line (reuses makeCarousel).
+          shortcutWrap = makeCarousel(shortcutRow);
           sheetBody = el('div', { class: 'qf-cz-sheet-body' });
           sheetBody.appendChild(leftCol); // move the controls column into the sheet
+          // #1 — corner grip to resize the floating panel.
+          resizeGrip = el('button', {
+            type: 'button', class: 'qf-cz-sheet-resize',
+            'aria-label': 'Resize controls panel', title: 'Drag to resize',
+            html: '<svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M21 15l-6 6"/><path d="M21 9L9 21"/></svg>',
+          });
           sheet.appendChild(handle);
-          sheet.appendChild(shortcutRow);
+          sheet.appendChild(shortcutWrap);
           sheet.appendChild(sheetBody);
+          sheet.appendChild(resizeGrip);
           root.appendChild(sheet);
+          initFloat();
           wireDrag();
+          wireResize();
           syncTabChips('design');
           setExpanded(false);
           requestAnimationFrame(measurePeek);
@@ -3889,6 +4012,7 @@
           }
           if (sheet) sheet.remove();
           sheet = sheetBody = handle = shortcutRow = null;
+          shortcutWrap = resizeGrip = null;
           tabChips = {};
         }
         function onChange() {
@@ -3901,7 +4025,7 @@
         }
         if (mq.addEventListener) mq.addEventListener('change', onChange);
         else if (mq.addListener) mq.addListener(onChange);
-        window.addEventListener('resize', function () { if (active) measurePeek(); });
+        window.addEventListener('resize', function () { if (active) { measurePeek(); applyFloatGeometry(); } });
         if (mq.matches) activate();
       })();
     }).catch(showErr(c));

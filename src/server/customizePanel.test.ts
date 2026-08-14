@@ -319,3 +319,62 @@ describe('customize panel — guided-editing pointer (active arrow + preview ali
     expect(css).toContain('@keyframes qf-cz-arrow-nudge');
   });
 });
+
+describe('customize panel — mobile pass (floating panel, widget-only Design preview)', () => {
+  it('previews ONLY the bare widget on the Design tab, hosted page on Page/Behavior', async () => {
+    const js = await pub('app.js');
+    // A tab→source resolver appends ?embed=1 for Design (app.ts then serves the
+    // BARE widget: no hosted header/hero → the company name is not duplicated).
+    expect(js).toContain('function czPreviewUrlFor(id)');
+    expect(js).toContain("if (id === 'design') return previewUrl");
+    expect(js).toContain("'embed=1'");
+    // selectTab swaps the shared preview source per tab (guarded no-op if same).
+    expect(js).toContain('preview.setPreviewSrc(czPreviewUrlFor(id))');
+    // The iframe is seeded with the initial tab's source (no hosted→widget flash).
+    expect(js).toContain('buildLivePreview({ previewUrl: czPreviewUrlFor(czInitialTab)');
+    // setPreviewSrc changes ONLY the iframe (the Open ↗ link stays on the hosted
+    // page) and is guarded so it never reloads on the same URL.
+    expect(js).toContain('setPreviewSrc: function (url)');
+    expect(js).toContain('if (!url || url === previewUrl) return;');
+  });
+
+  it('makes the mobile control sheet a freely draggable + resizable floating panel', async () => {
+    const js = await pub('app.js');
+    // Floating mode + a corner resize grip.
+    expect(js).toContain("class: 'qf-cz-sheet is-floating'");
+    expect(js).toContain("class: 'qf-cz-sheet-resize'");
+    // Handle drag moves BOTH axes with pointer capture, clamped on-screen.
+    expect(js).toContain('sheet.style.left = czClamp(baseL + dx');
+    expect(js).toContain('sheet.style.top = czClamp(baseT + dy');
+    expect(js).toContain('handle.setPointerCapture(e.pointerId)');
+    // Resize grip changes width + height, clamped to a usable min + the viewport.
+    expect(js).toContain('function wireResize()');
+    expect(js).toContain('sheet.style.width = czClamp(baseW');
+    expect(js).toContain('resizeGrip.setPointerCapture(e.pointerId)');
+    // The shortcut chips gain two auto-hiding arrows via makeCarousel (no wrap).
+    expect(js).toContain('shortcutWrap = makeCarousel(shortcutRow)');
+  });
+
+  it('ships the mobile CSS: floating panel, near-full-width preview, inline header, subtle caption, square chips', async () => {
+    const css = await pub('customize-panel.css');
+    // #1 floating panel + resize grip, reduced-motion aware.
+    expect(css).toContain('.qf-cz-sheet.is-floating');
+    expect(css).toContain('.qf-cz-sheet-resize');
+    expect(css).toContain('cursor: nwse-resize');
+    // #2 preview nearly full width (390px cap dropped on mobile).
+    expect(css).toContain('.qf-cz-frame-wrap[data-device="mobile"]');
+    expect(css).toContain('max-width: none');
+    // #3 header inline with hamburger: subtitle hidden, title padded past it,
+    // and the ~64px dead gap (dashboard-polish's 72px .app-main top pad) trimmed
+    // so the title sits compact right under the trial banner.
+    expect(css).toContain('.qf-customize .page-sub { display: none; }');
+    expect(css).toContain('padding-left: 48px');
+    expect(css).toContain('.app-main:has(.qf-customize) { padding-top: 12px; }');
+    // #4 finish — no note text in the preview area on mobile (widget only).
+    expect(css).toContain('.qf-cz-preview-note { display: none; }');
+    // #5 quiet "Live preview" caption on mobile (muted, lighter, uppercase).
+    expect(css).toContain('text-transform: uppercase');
+    // #6 slightly-rounded (not pill) chips.
+    expect(css).toContain('border-radius: var(--radius-btn)');
+  });
+});
