@@ -55,7 +55,7 @@ html body.qf-wft .qf-hero-devices > .qf-hero-laptop {
   position: absolute;
   top: 0;
   left: 0;
-  width: 101.2%;
+  width: 111.3%; /* desktop mockup +10% (was 101.2%) */
   z-index: 1;
 }
 /* Drop the component's own heavy drop-shadow so the wrapper's shadow leads
@@ -71,7 +71,7 @@ html body.qf-wft .qf-hero-devices > .qf-hero-vphone {
   position: absolute;
   right: 0%;
   bottom: -3%;
-  width: 34.1%; /* mobile mockup enlarged +10% (was 31%); overlay anchored right:0, stays in-column */
+  width: 42.6%; /* cellphone mockup +25% (was 34.1%); overlay anchored right:0, stays in-column */
   z-index: 2;
 }
 
