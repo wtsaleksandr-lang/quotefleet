@@ -554,3 +554,112 @@
   .qf-cz-arrow { transition: opacity 0.18s ease; }
   .qf-cz-section.is-cz-active .qf-cz-arrow svg { animation: none; }
 }
+
+/* ══════════════════════════════════════════════════════════════════════════
+   MOBILE CUSTOMIZE PASS (≤640px) — floating/resizable control panel, near-
+   full-bleed preview, header inline with the hamburger, a quiet "Live preview"
+   caption, and slightly-rounded (square-ish) chips. Appended at EOF so the
+   line-based spacing/colour baselines above never renumber. Tokens + 8px ramp
+   only; theme-aware (light + dark); honours prefers-reduced-motion.
+   ══════════════════════════════════════════════════════════════════════════ */
+
+/* #6 — Slightly-rounded (not pill) config buttons + bottom-menu chips, applied
+   across the customize surface's tappable chips for one consistent shape. */
+.qf-cz-sheet-chip,
+.qf-cz-hover-chip,
+.qf-cz-mapstyle,
+.qf-cz-textcolor,
+.qf-cz-seg { border-radius: var(--radius-btn); }
+
+/* #6 — The bottom-menu shortcut chips scroll horizontally with two subtle,
+   auto-hiding arrows (they never wrap to a second line). The row is wrapped by
+   makeCarousel → .qf-cz-carousel + .qf-cz-carousel-arrow. Neutralise the double
+   padding from stacking .qf-cz-sheet-shortcuts + .qf-cz-carousel-track and keep
+   the wrapper from flexing inside the sheet column. */
+.qf-cz-sheet > .qf-cz-carousel { flex: 0 0 auto; padding: 0 8px 8px; }
+.qf-cz-sheet-shortcuts.qf-cz-carousel-track { padding: 4px; }
+
+/* #5 — "Live preview" reads as a quiet caption on mobile (smaller, muted,
+   lighter weight), not a heading. */
+@media (max-width: 640px) {
+  .qf-cz-preview-title {
+    font-size: 11px;
+    font-weight: 500;
+    color: var(--muted);
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+  }
+}
+
+/* #2 — Preview takes nearly the full viewport width on mobile (small gutters):
+   drop the 390px cap + centring, trim the card padding, and pull the preview
+   column out past most of the .app-main gutter. */
+@media (max-width: 640px) {
+  .qf-cz-preview { padding: 8px; }
+  .qf-cz-preview-col { margin-left: -16px; margin-right: -16px; }
+  .qf-cz-frame-wrap[data-device="mobile"] {
+    max-width: none;
+    margin-left: 0;
+    margin-right: 0;
+  }
+}
+
+/* #3 — Header sits inline with the fixed hamburger: no subtitle, smaller title,
+   nudged up + padded left so it shares the hamburger's line (a 40px button at
+   top:12px left:12px, see app.html). */
+@media (max-width: 640px) {
+  .qf-customize .page-sub { display: none; }
+  .qf-customize h1 {
+    font-size: 18px;
+    line-height: 40px;
+    min-height: 40px;
+    padding-left: 48px;
+    margin-top: -8px;
+    margin-bottom: 8px;
+  }
+}
+
+/* #1 — Floating, repositionable + resizable control panel. On mobile the sheet
+   is positioned by explicit left/top/width/height (set in JS) instead of a
+   bottom-docked translateY fold, so the handle can drag it ANYWHERE (X + Y) and
+   a corner grip resizes it. It stays a rounded card in both themes; honours
+   prefers-reduced-motion (no eased reflow). */
+.qf-cz-sheet.is-floating {
+  right: auto;
+  bottom: auto;
+  height: auto;
+  max-height: none;
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius-lg);
+  transform: none;
+  transition:
+    top 0.32s cubic-bezier(0.32, 0.72, 0, 1),
+    left 0.32s cubic-bezier(0.32, 0.72, 0, 1),
+    width 0.32s cubic-bezier(0.32, 0.72, 0, 1),
+    height 0.32s cubic-bezier(0.32, 0.72, 0, 1);
+}
+.qf-cz-sheet.is-floating.is-open { transform: none; }
+.qf-cz-sheet.is-floating.is-dragging,
+.qf-cz-sheet.is-floating.is-resizing { transition: none; }
+@media (prefers-reduced-motion: reduce) {
+  .qf-cz-sheet.is-floating { transition: none; }
+}
+
+/* Corner resize grip (bottom-right). 24px hit box on the ramp. */
+.qf-cz-sheet-resize {
+  position: absolute;
+  right: 0;
+  bottom: 0;
+  width: 24px;
+  height: 24px;
+  padding: 0;
+  border: 0;
+  background: none;
+  color: var(--muted);
+  cursor: nwse-resize;
+  touch-action: none;
+  z-index: 2;
+}
+.qf-cz-sheet-resize:hover { color: var(--ink); }
+.qf-cz-sheet-resize:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+.qf-cz-sheet-resize svg { display: block; }
