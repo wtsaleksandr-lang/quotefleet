@@ -125,7 +125,7 @@ html.qf-ob-open body {
   border: 0;
   background: transparent;
   color: var(--muted);
-  border-radius: var(--radius-pill);
+  border-radius: var(--radius-btn);
   padding: var(--space-1) var(--space-1-5);
   min-height: 32px;
   font-size: 13px;

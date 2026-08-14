@@ -3174,7 +3174,11 @@
       customWrap.appendChild(colorInput);
       customWrap.appendChild(el('span', { text: 'Custom' }));
       accentRow.appendChild(customWrap);
-      accentSec.appendChild(accentRow);
+      // The accent-swatch row (Default + swatches + Custom) is the longest
+      // option strip and wraps on narrow widths; wrap it in the shared
+      // scroll-with-arrows carousel so it scrolls horizontally instead of
+      // wrapping to a second line (same proven pattern as the theme/map rows).
+      accentSec.appendChild(makeCarousel(accentRow));
       controls.appendChild(accentSec);
       paintAccent();
 

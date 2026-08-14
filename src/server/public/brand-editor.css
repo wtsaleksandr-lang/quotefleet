@@ -41,7 +41,7 @@
 .qf-brand-actions button,
 .qf-brand-actions a {
   border: 1px solid var(--border-strong);
-  border-radius: 999px;
+  border-radius: var(--radius-btn);
   padding: 9px 12px;
   background: rgba(255,255,255,.035);
   color: var(--ink-soft);

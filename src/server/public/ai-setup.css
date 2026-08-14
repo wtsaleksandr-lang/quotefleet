@@ -40,7 +40,7 @@
 }
 .qf-ai-actions button {
   border: 1px solid var(--border-strong);
-  border-radius: 999px;
+  border-radius: var(--radius-btn);
   padding: 9px 12px;
   background: rgba(255,255,255,.035);
   color: var(--ink-soft);
@@ -218,7 +218,7 @@ html[data-theme="light"] .qf-ai-bubble.agent::before {
 }
 .qf-ai-preset-buttons button {
   border: 1px dashed var(--border-strong);
-  border-radius: 999px;
+  border-radius: var(--radius-btn);
   background: rgba(255,255,255,.035);
   color: var(--ink-soft);
   padding: 9px 11px;
