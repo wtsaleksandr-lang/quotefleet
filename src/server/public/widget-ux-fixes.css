@@ -965,19 +965,34 @@ html { scrollbar-width: thin; scrollbar-color: rgba(135, 138, 150, 0.38) transpa
 }
 .qf-reclass-txt { min-width: 0; }
 
-/* ── Guided-edit highlight ───────────────────────────────────────────────────
+/* ── Guided-edit pulse ───────────────────────────────────────────────────────
    The dashboard Customize preview adds .qf-preview-highlight (from the parent,
-   same-origin) to the widget section that the active config container controls,
-   so the area being edited is unmistakable — it pairs with the arrow in the
-   config container. Accent outline + soft ring; theme-token driven. */
+   same-origin) to the widget section that the active config container controls.
+   It's a BRIEF pulse — an accent outline + soft ring that flashes once and fades
+   over ~1s, so it confirms "this control → that section" on click without any
+   lasting outline. Pairs with the arrow in the config container. Token-driven.
+   The base state is fully transparent (no persistent visual); the parent forces
+   a reflow before re-adding the class so re-selecting the same section replays. */
 .qf-preview-highlight {
-  outline: 2px solid var(--w-accent, #0D3CFC);
+  outline: 2px solid transparent;
   outline-offset: 4px;
   border-radius: 10px;
-  box-shadow: 0 0 0 4px var(--w-accent-soft, rgba(37, 99, 235, 0.12));
-  transition: outline-color var(--qf-dur, 0.2s) var(--qf-ease, ease),
-    box-shadow var(--qf-dur, 0.2s) var(--qf-ease, ease);
+  animation: qf-preview-pulse 1.1s var(--qf-ease, ease-out) 1;
+}
+@keyframes qf-preview-pulse {
+  0% {
+    outline-color: var(--w-accent, #0D3CFC);
+    box-shadow: 0 0 0 0 var(--w-accent-soft, rgba(37, 99, 235, 0.35));
+  }
+  22% {
+    outline-color: var(--w-accent, #0D3CFC);
+    box-shadow: 0 0 0 6px var(--w-accent-soft, rgba(37, 99, 235, 0.18));
+  }
+  100% {
+    outline-color: transparent;
+    box-shadow: 0 0 0 8px transparent;
+  }
 }
 @media (prefers-reduced-motion: reduce) {
-  .qf-preview-highlight { transition: none; }
+  .qf-preview-highlight { animation: none; }
 }
