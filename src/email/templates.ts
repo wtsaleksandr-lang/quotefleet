@@ -44,6 +44,9 @@ const BRAND = {
   // light one.) The mark is ~3:2 (374×252), so we render it height-first at
   // ~40px tall with auto width for a tasteful header size.
   logoIcon: 'https://quotefleet.net/brand/logo-full.png',
+  // White-truck-outline variant for dark clients — swapped in via the
+  // prefers-color-scheme:dark / [data-ogsc] rules in the email <head>.
+  logoIconDark: 'https://quotefleet.net/brand/logo-full-ondark.png',
   logoW: 60,
   logoH: 40,
 };
@@ -97,7 +100,11 @@ function shell(opts: {
                        major client. Rendered height-first (width auto) so the
                        ~3:2 truck mark never distorts. -->
                   <a href="https://quotefleet.net" target="_blank" rel="noopener" style="text-decoration:none;display:inline-block;">
-                    <img src="${BRAND.logoIcon}" height="${BRAND.logoH}" alt="${escape(BRAND.name)}" style="display:inline-block;vertical-align:middle;border:0;outline:none;text-decoration:none;margin-right:10px;height:${BRAND.logoH}px;width:auto;">
+                    <!-- Two logo variants: the light-header mark shows by default; in a
+                         dark client the white-truck-outline variant is swapped in via the
+                         @media (prefers-color-scheme: dark) / [data-ogsc] rules in <head>. -->
+                    <img class="qf-logo-light" src="${BRAND.logoIcon}" height="${BRAND.logoH}" alt="${escape(BRAND.name)}" style="display:inline-block;vertical-align:middle;border:0;outline:none;text-decoration:none;margin-right:10px;height:${BRAND.logoH}px;width:auto;">
+                    <img class="qf-logo-dark" src="${BRAND.logoIconDark}" height="${BRAND.logoH}" alt="${escape(BRAND.name)}" style="display:none;vertical-align:middle;border:0;outline:none;text-decoration:none;margin-right:10px;height:${BRAND.logoH}px;width:auto;">
                     <span style="font-size:19px;font-weight:700;letter-spacing:-0.01em;color:${BRAND.ink};vertical-align:middle;">${escape(BRAND.name)}</span>
                   </a>
                 </td>
@@ -122,7 +129,7 @@ function shell(opts: {
     : `
             ${opts.footerNote ? `<div style="margin:0 0 14px 0;">${opts.footerNote}</div>` : ''}
             <div>
-              <a href="${BRAND.supportUrl}" style="display:inline-block;padding:10px 18px;color:${BRAND.primary};text-decoration:none;font-size:13px;font-weight:600;line-height:1.2;background:transparent;border:1.5px solid ${BRAND.primary};border-radius:10px;">Questions? Chat with us&nbsp;→</a>
+              <a href="${BRAND.supportUrl}" class="qf-chat-link" style="display:inline-block;padding:10px 18px;color:${BRAND.primary};text-decoration:none;font-size:13px;font-weight:600;line-height:1.2;background:transparent;border:1.5px solid ${BRAND.primary};border-radius:10px;">Questions? Chat with us&nbsp;→</a>
             </div>
             <div style="margin-top:10px;">
               <a href="mailto:${BRAND.support}" style="color:${BRAND.muted};text-decoration:underline;">${escape(BRAND.support)}</a>
@@ -150,6 +157,21 @@ function shell(opts: {
 <meta name="color-scheme" content="light dark">
 <meta name="supported-color-schemes" content="light dark">
 <title>${escape(BRAND.name)}</title>
+<style>
+  /* Dark-mode adaptations for clients that honor prefers-color-scheme (Apple
+     Mail, iOS Mail, etc.) and Outlook.com dark mode ([data-ogsc]). Light clients
+     are unaffected: the light logo shows and the chat link stays brand-blue. In
+     dark clients the white-truck-outline logo is swapped in and the "Chat with
+     us" outline button turns white so both read on the dark surface. */
+  @media (prefers-color-scheme: dark) {
+    .qf-logo-light { display: none !important; }
+    .qf-logo-dark { display: inline-block !important; }
+    .qf-chat-link { color: #FFFFFF !important; border-color: rgba(255,255,255,0.55) !important; }
+  }
+  [data-ogsc] .qf-logo-light { display: none !important; }
+  [data-ogsc] .qf-logo-dark { display: inline-block !important; }
+  [data-ogsc] .qf-chat-link { color: #FFFFFF !important; border-color: rgba(255,255,255,0.55) !important; }
+</style>
 </head>
 <body style="margin:0;padding:0;background:${BRAND.bg};font-family:'Inter','Helvetica Neue',Arial,sans-serif;color:${BRAND.ink};-webkit-font-smoothing:antialiased;">
 <!-- Preheader: shows in inbox preview, hidden in body -->
