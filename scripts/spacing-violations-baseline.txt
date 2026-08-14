@@ -177,15 +177,15 @@ src/server/public/customize-panel.css:77	spacing	top: 14px
 src/server/public/customize-panel.css:81	spacing	bottom: 9px
 src/server/public/customize-panel.css:81	spacing	right: 9px
 src/server/public/customize-panel.css:98	spacing	gap: 7px
-src/server/public/dashboard-freight-shell.css:107	spacing	padding: 18px 22px 6px
-src/server/public/dashboard-freight-shell.css:120	spacing	padding: 34px 42px 42px
-src/server/public/dashboard-freight-shell.css:178	spacing	padding: 72px 18px 28px
+src/server/public/dashboard-freight-shell.css:113	spacing	padding: 18px 22px 6px
+src/server/public/dashboard-freight-shell.css:126	spacing	padding: 34px 42px 42px
+src/server/public/dashboard-freight-shell.css:184	spacing	padding: 72px 18px 28px
 src/server/public/dashboard-freight-shell.css:34	spacing	margin: 14px 0 14px 14px
 src/server/public/dashboard-freight-shell.css:45	spacing	padding: 16px 14px 18px
 src/server/public/dashboard-freight-shell.css:52	spacing	gap: 10px
-src/server/public/dashboard-freight-shell.css:75	spacing	padding-left: 44px
-src/server/public/dashboard-freight-shell.css:82	spacing	margin: 3px 10px
-src/server/public/dashboard-freight-shell.css:83	spacing	padding: 10px 12px
+src/server/public/dashboard-freight-shell.css:78	spacing	padding-left: 44px
+src/server/public/dashboard-freight-shell.css:85	spacing	margin: 3px 10px
+src/server/public/dashboard-freight-shell.css:86	spacing	padding: 10px 12px
 src/server/public/dashboard-polish.css:13	spacing	margin: 0 14px 14px
 src/server/public/dashboard-polish.css:136	tap	width: 18px
 src/server/public/dashboard-polish.css:137	tap	height: 18px

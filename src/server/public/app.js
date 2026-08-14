@@ -6246,6 +6246,21 @@
         window.__qfWidget = { url: url, host: host, slug: t ? t.slug : '' };
       })();
       $('#sb-tenant-name').textContent = (r.tenant && r.tenant.name) || r.user.name || r.user.email;
+      // Default avatar tile (light shell) shows the BUSINESS initials, not 'QF':
+      // first letters of the first two words, or the first two letters of a
+      // single-word name. Rendered via CSS content:attr(data-initials) on the
+      // name element; a real uploaded logo (handled elsewhere) still wins.
+      (function () {
+        var nameEl = document.getElementById('sb-tenant-name');
+        if (!nameEl) return;
+        var src = String((r.tenant && r.tenant.name) || r.user.name || r.user.email || '').trim();
+        var words = src.split(/\s+/).filter(function (w) { return w.length > 0; });
+        var initials = '';
+        if (words.length >= 2) initials = words[0].charAt(0) + words[1].charAt(0);
+        else if (words.length === 1) initials = words[0].slice(0, 2);
+        initials = initials.toUpperCase();
+        nameEl.setAttribute('data-initials', initials || src.charAt(0).toUpperCase() || 'QF');
+      })();
       $('#sb-tenant-slug').textContent =
         (r.tenant && r.tenant.hostedUrl)
           ? r.tenant.hostedUrl.replace(/^https?:\/\//, '').replace(/\/$/, '')
