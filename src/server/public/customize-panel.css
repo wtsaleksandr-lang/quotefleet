@@ -615,7 +615,7 @@
    then sits tight right under the sticky trial banner. Scoped via :has() so
    every OTHER dashboard page keeps its top clearance (desktop untouched). */
 @media (max-width: 640px) {
-  .app-main:has(.qf-customize) { padding-top: 12px; }
+  .app-main:has(.qf-customize) { padding-top: 60px; }
   .qf-customize .page-sub { display: none; }
   .qf-customize h1 {
     font-size: 18px;

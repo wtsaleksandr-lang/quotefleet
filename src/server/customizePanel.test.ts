@@ -372,7 +372,8 @@ describe('customize panel — mobile pass (floating panel, widget-only Design pr
     // so the title sits compact right under the trial banner.
     expect(css).toContain('.qf-customize .page-sub { display: none; }');
     expect(css).toContain('padding-left: 48px');
-    expect(css).toContain('.app-main:has(.qf-customize) { padding-top: 12px; }');
+    // Reserves the fixed top-bar title band (global unified top bar, ≤900px).
+    expect(css).toContain('.app-main:has(.qf-customize) { padding-top: 60px; }');
     // #4 finish — no note text in the preview area on mobile (widget only).
     expect(css).toContain('.qf-cz-preview-note { display: none; }');
     // #5 quiet "Live preview" caption on mobile (muted, lighter, uppercase).

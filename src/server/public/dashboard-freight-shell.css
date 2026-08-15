@@ -196,7 +196,7 @@ html[data-theme="light"] .btn-ghost {
   display: flex;
   align-items: center;
   justify-content: center;
-  flex-wrap: wrap;
+  flex-wrap: nowrap;
   gap: 8px 16px;
   padding: 12px 16px;
   background: var(--surface);
@@ -281,3 +281,56 @@ html[data-theme="light"] .btn-ghost {
   border-bottom-color: var(--warn);
 }
 .qf-trial-banner--payment_issue .qf-trial-banner-dot { background: var(--warn); }
+
+/* ══════════════════════════════════════════════════════════════════════════
+   UNIFIED PORTAL TOP BAR (≤900px) — every page's title sits on the hamburger's
+   row as a single line (the "Customize" treatment, now global). The trial
+   banner is a single line that OVERLAYS / covers the title; dismissing the
+   banner reveals the title beneath it. Appended at EOF so the line-based
+   spacing/colour guard baselines above never renumber. Tokens + 8px ramp only.
+   ══════════════════════════════════════════════════════════════════════════ */
+@media (max-width: 900px) {
+  /* Page title → fixed onto the hamburger's 12px/40px band, between the
+     hamburger (left, 40px) and the mobile logo (right, 40px). One line, ellipsised.
+     ID selector (#page-content) beats the per-page .qf-customize h1 rules, and
+     padding:0 neutralises the old customize-only padding-left. */
+  #page-content h1 {
+    position: fixed;
+    top: 12px;
+    left: 60px;
+    right: 60px;
+    height: 40px;
+    line-height: 40px;
+    margin: 0;
+    padding: 0;
+    z-index: 90;
+    font-size: 18px;
+    font-weight: 800;
+    letter-spacing: -0.02em;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+  /* Subtitles are dropped in the top-bar layout (as the Customize page already
+     did) so the title reads as one clean line. */
+  #page-content .page-sub { display: none; }
+  /* Reserve the fixed title band so page content never slips under it. The
+     .qf-customize variant ties + wins over the old customize padding rule. */
+  .app-main,
+  .app-main:has(.qf-customize) { padding-top: 60px; }
+  /* When the trial banner is shown it occupies (and covers) the band, so drop
+     the reserved padding — the sticky banner provides the offset itself. */
+  body:has(#qf-trial-bar) .app-main { padding-top: 0; }
+  /* Trial banner: strictly one line, tall enough to fully cover the title band.
+     The value-prop sub is dropped on narrow widths so headline + CTA + close fit. */
+  .qf-trial-banner {
+    flex-wrap: nowrap;
+  }
+  .qf-trial-banner-msg { flex-wrap: nowrap; }
+  .qf-trial-banner-headline {
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+  .qf-trial-banner-sub { display: none; }
+}
