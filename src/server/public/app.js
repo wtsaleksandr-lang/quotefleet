@@ -2995,8 +2995,8 @@
       function makeCarousel(track) {
         track.classList.add('qf-cz-carousel-track');
         var wrap = el('div', { class: 'qf-cz-carousel' });
-        var CHEV_L = '<svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M15 18l-6-6 6-6"/></svg>';
-        var CHEV_R = '<svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M9 6l6 6-6 6"/></svg>';
+        var CHEV_L = '<svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M15 18l-6-6 6-6"/></svg>';
+        var CHEV_R = '<svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M9 6l6 6-6 6"/></svg>';
         var prev = el('button', { type: 'button', class: 'qf-cz-carousel-arrow qf-cz-carousel-prev', 'aria-label': 'Scroll left', html: CHEV_L });
         var next = el('button', { type: 'button', class: 'qf-cz-carousel-arrow qf-cz-carousel-next', 'aria-label': 'Scroll right', html: CHEV_R });
         wrap.appendChild(prev); wrap.appendChild(track); wrap.appendChild(next);
@@ -3233,7 +3233,7 @@
         });
         hoverRow.appendChild(chip);
       });
-      hoverSec.appendChild(hoverRow);
+      hoverSec.appendChild(makeCarousel(hoverRow));
       controls.appendChild(hoverSec);
 
       // ── Map style ───────────────────────────────────────────────
@@ -3343,7 +3343,7 @@
       textSec.appendChild(el('div', { class: 'qf-cz-section-title', text: 'Text color' }));
       textSec.appendChild(el('div', { class: 'qf-cz-hint', text: 'Only readable choices for your background are shown. Auto is recommended.' }));
       var textRow = el('div', { class: 'qf-cz-textcolor-row' });
-      textSec.appendChild(textRow);
+      textSec.appendChild(makeCarousel(textRow));
       var currentFontColor = (b.fontColor && b.fontColor !== 'auto') ? String(b.fontColor).toLowerCase() : 'auto';
       repaintFontColors = function () {
         textRow.innerHTML = '';
@@ -3375,7 +3375,11 @@
           currentFontColor = 'auto';
           queueSave({ fontColor: 'auto' }, true);
           repaintFontColors();
+          return;
         }
+        // The text-colour row is a carousel; refresh its arrows now the chip
+        // set has been rebuilt (makeCarousel only re-checks on scroll/resize).
+        try { textRow.dispatchEvent(new Event('scroll')); } catch (_e) {}
       };
       repaintFontColors();
       controls.appendChild(textSec);
