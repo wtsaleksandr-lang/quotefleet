@@ -6261,10 +6261,29 @@
         initials = initials.toUpperCase();
         nameEl.setAttribute('data-initials', initials || src.charAt(0).toUpperCase() || 'QF');
       })();
-      $('#sb-tenant-slug').textContent =
-        (r.tenant && r.tenant.hostedUrl)
-          ? r.tenant.hostedUrl.replace(/^https?:\/\//, '').replace(/\/$/, '')
-          : (r.tenant && '/w/' + r.tenant.slug) || '';
+      // Slug row: display the hosted host (no protocol) AND make it a live
+      // link to the tenant's hosted calculator (new tab). Reuse the canonical
+      // window.__qfWidget computed above — url has the protocol, host is the
+      // display form — so the link matches the Embed/Open URL exactly.
+      (function () {
+        var slugEl = $('#sb-tenant-slug');
+        if (!slugEl) return;
+        var w = window.__qfWidget || {};
+        slugEl.textContent =
+          w.host ||
+          ((r.tenant && r.tenant.hostedUrl)
+            ? r.tenant.hostedUrl.replace(/^https?:\/\//, '').replace(/\/$/, '')
+            : (r.tenant && '/w/' + r.tenant.slug) || '');
+        if (slugEl.tagName === 'A') {
+          slugEl.setAttribute(
+            'href',
+            w.url ||
+              (r.tenant
+                ? new URL('/w/' + encodeURIComponent(r.tenant.slug), location.origin).toString()
+                : '#')
+          );
+        }
+      })();
       $('#loading').style.display = 'none';
       $('#app-shell').hidden = false;
       renderTrialBanner(r.trial);
