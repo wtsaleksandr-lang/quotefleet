@@ -2861,6 +2861,9 @@
       // Re-assigned once the Text-color section is built; called on theme/accent
       // change so the offered swatches update dynamically.
       var repaintFontColors = function () {};
+      // Assigned once the Map-style section is built; lets the theme-preset
+      // handler apply that theme's default map style + repaint the map chips.
+      var applyMapStyle = function () {};
 
       var root = el('div', { class: 'qf-customize', 'data-qf-customize': '1' });
       c.appendChild(root);
@@ -3016,6 +3019,10 @@
         next.addEventListener('click', function () { track.scrollBy({ left: page(), behavior: reduce ? 'auto' : 'smooth' }); });
         track.addEventListener('scroll', update);
         window.addEventListener('resize', update);
+        // The track often measures 0/no-overflow at creation (inside a not-yet
+        // laid-out sheet, or before webfonts settle), which wrongly hides the
+        // arrows. Re-check once the track gets its real size + on later reflows.
+        if (window.ResizeObserver) { try { new ResizeObserver(update).observe(track); } catch (_e) {} }
         // Pointer drag-to-scroll with velocity-decay momentum (mouse, touch,
         // pen — one code path via Pointer Events). Grab anywhere on the strip
         // and it tracks the pointer 1:1 while dragging, then glides with inertia
@@ -3137,7 +3144,11 @@
           // theme's accent stays baked onto the new theme.
           currentAccent = null;
           paintAccent();
-          queueSave({ themePreset: p.id, accentOverride: null }, true);
+          // Each theme carries a default map style — apply it (and repaint the
+          // map chips) so the map matches the new look. Carrier can still override.
+          var patch = { themePreset: p.id, accentOverride: null };
+          if (p.mapStyle) { applyMapStyle(p.mapStyle); patch.mapStyle = p.mapStyle; }
+          queueSave(patch, true);
           repaintFontColors();
         });
         grid.appendChild(btn);
@@ -3253,18 +3264,40 @@
       mapSec.appendChild(el('div', { class: 'qf-cz-hint', text: 'How the map on your calculator looks. The route line stays clear on every style. Drag or use the arrows to browse.' }));
       var mapRow = el('div', { class: 'qf-cz-mapstyle-strip' });
       var currentMapStyle = b.mapStyle || 'branded';
+      applyMapStyle = function (key) {
+        currentMapStyle = key;
+        $$('.qf-cz-mapstyle', mapRow).forEach(function (n) {
+          var s = n.getAttribute('data-mapstyle') === key;
+          n.classList.toggle('is-selected', s);
+          n.setAttribute('aria-pressed', s ? 'true' : 'false');
+        });
+      };
+      // Mini-map swatches that actually read like each map style — land, water,
+      // a road grid, and the route line, coloured per style.
+      var MAP_SWATCH = {
+        branded:     { land: '#16204a', water: '#0f1629', road: '#2c3a72', route: '#6E8BFF' },
+        grayscale:   { land: '#eceef1', water: '#dde1e6', road: '#c7ccd3', route: '#0D3CFC' },
+        standard:    { land: '#e8efe4', water: '#a9d1f0', road: '#ffffff', route: '#0D3CFC' },
+        soft:        { land: '#f3efe6', water: '#cfe0cf', road: '#e6ddce', route: '#0D3CFC' },
+        dark_routes: { land: '#1c1c1c', water: '#0e0e0e', road: '#3a3a3a', route: '#f4f6f8' },
+        satellite:   { land: '#4f6b3f', water: '#35597c', road: '#8f7d5a', route: '#f4f6f8' }
+      };
+      function mapSwatchSvg(key) {
+        var c = MAP_SWATCH[key] || MAP_SWATCH.branded;
+        return '<svg viewBox="0 0 28 20" preserveAspectRatio="none" aria-hidden="true">'
+          + '<rect width="28" height="20" fill="' + c.land + '"/>'
+          + '<path d="M0 13 L9 12 L17 15 L28 12 L28 20 L0 20 Z" fill="' + c.water + '"/>'
+          + '<path d="M0 7 H28 M9 0 V20 M19 0 V20" stroke="' + c.road + '" stroke-width="1.4" opacity="0.85" fill="none"/>'
+          + '<path d="M2 18 L11 9 L17 12 L26 3" stroke="' + c.route + '" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" fill="none"/>'
+          + '</svg>';
+      }
       mapStyles.forEach(function (m) {
         var on = m.key === currentMapStyle;
         var chip = el('button', { type: 'button', class: 'qf-cz-mapstyle' + (on ? ' is-selected' : ''), 'data-mapstyle': m.key, 'aria-pressed': on ? 'true' : 'false', title: m.hint || m.label });
-        chip.appendChild(el('span', { class: 'qf-cz-mapstyle-swatch qf-ms-' + m.key }));
+        chip.appendChild(el('span', { class: 'qf-cz-mapstyle-swatch qf-ms-' + m.key, html: mapSwatchSvg(m.key) }));
         chip.appendChild(el('span', { class: 'qf-cz-mapstyle-name', text: m.label + (m.key === 'branded' ? ' (default)' : '') }));
         chip.addEventListener('click', function () {
-          currentMapStyle = m.key;
-          $$('.qf-cz-mapstyle', mapRow).forEach(function (n) {
-            var s = n.getAttribute('data-mapstyle') === m.key;
-            n.classList.toggle('is-selected', s);
-            n.setAttribute('aria-pressed', s ? 'true' : 'false');
-          });
+          applyMapStyle(m.key);
           queueSave({ mapStyle: m.key }, true);
         });
         mapRow.appendChild(chip);
@@ -3930,6 +3963,10 @@
           // #6 — wrap the chip row so it scrolls horizontally with two subtle,
           // auto-hiding arrows and never wraps to a second line (reuses makeCarousel).
           shortcutWrap = makeCarousel(shortcutRow);
+          shortcutWrap.classList.add('qf-cz-carousel--nav');
+          // The arrows measure once at creation, before the sheet is laid out —
+          // refresh after layout so they appear whenever the chips overflow.
+          requestAnimationFrame(function () { requestAnimationFrame(function () { try { shortcutRow.dispatchEvent(new Event('scroll')); } catch (_e) {} }); });
           sheetBody = el('div', { class: 'qf-cz-sheet-body' });
           sheetBody.appendChild(leftCol); // move the controls column into the sheet
           sheet.appendChild(handle);

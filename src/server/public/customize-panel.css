@@ -458,7 +458,7 @@
 /* The moved controls stack fills the sheet body; its own top tab bar is
    redundant with the sticky shortcut chips, so hide it inside the sheet. */
 .qf-cz-sheet-body .qf-cz-tabs { display: none; }
-.qf-cz-sheet-body .qf-cz-controls { gap: 12px; }
+.qf-cz-sheet-body .qf-cz-controls { gap: 6px; }
 
 /* ≤640: preview owns the viewport; reserve room for the collapsed sheet peek so
    the shortcut row never covers the preview's bottom. */
@@ -630,4 +630,38 @@
      caption is enough). Desktop keeps the note. */
   .qf-cz-preview-note { display: none; }
 }
+
+/* ══════════════════════════════════════════════════════════════════════════
+   CUSTOMIZE ROUND 2 — carousel arrows pushed to the section's side borders, and
+   the mobile-sheet nav gets subtle borderless arrows. Appended at EOF so the
+   line-based spacing/colour guard baselines above never renumber. 8px ramp only.
+   ══════════════════════════════════════════════════════════════════════════ */
+/* Item 2 — the option carousels inside a section card pull their arrows out to
+   the card's inner edge (section side padding is 16px) so the left/right arrows
+   sit at the very border and the track spans the full width. */
+.qf-cz-section .qf-cz-carousel { margin-left: -12px; margin-right: -12px; }
+
+/* Item 3 — the bottom-sheet main nav (Design/Page/Behavior + jumps) is a
+   carousel; its arrows are subtle and borderless (no circle), unlike the section
+   arrows. The nav wrapper carries .qf-cz-carousel--nav (added in app.js). */
+.qf-cz-carousel--nav .qf-cz-carousel-arrow {
+  width: 24px;
+  border: 0;
+  background: transparent;
+  color: var(--muted);
+}
+.qf-cz-carousel--nav .qf-cz-carousel-arrow:hover {
+  background: transparent;
+  color: var(--ink);
+}
+/* .qf-cz-sheet-shortcuts sets flex:0 0 auto, which overrode the carousel track's
+   flex:1 — so the track grew to its full content width and overflowed the
+   container with NO internal scroll (chips clipped, undraggable, arrows hidden).
+   Restore the track flex so it stays within the carousel and scrolls. */
+.qf-cz-carousel--nav .qf-cz-carousel-track { flex: 1 1 auto; min-width: 0; }
+
+/* Item 1 — the map-style swatch is now a mini-map SVG (land / water / road grid
+   / route line); fill the swatch with it and drop the old abstract diagonal. */
+.qf-cz-mapstyle-swatch svg { display: block; width: 100%; height: 100%; }
+.qf-cz-mapstyle-swatch::after { display: none; }
 

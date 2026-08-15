@@ -59,6 +59,7 @@ import {
   WIDGET_PRESETS,
   WIDGET_FONTS,
   WIDGET_PRESET_LIST,
+  PRESET_MAP_STYLE,
   CTA_HOVER_STYLES,
   FONT_COLOR_SWATCHES,
   MAP_BLEND_VALUES,
@@ -825,6 +826,7 @@ export function registerTenantRoutes(app: Express) {
       bg: p.palette.pageBg,
       surface: p.palette.surface,
       accent: p.palette.accent,
+      mapStyle: PRESET_MAP_STYLE[p.id] || 'branded',
     }));
     const fonts = Object.values(WIDGET_FONTS).map((f) => ({ id: f.id, label: f.label }));
     // Option universes for the Customize panel's "Button hover" + "Text color"
