@@ -73,7 +73,7 @@
         <img class="qf-sb-logo-img qf-sb-logo-ondark" src="/brand/logo-full-ondark.png" alt="QuoteFleet" />
         <img class="qf-sb-logo-img qf-sb-logo-onlight" src="/brand/logo-full.png" alt="QuoteFleet" />
       </a>
-      <div class="brand-block"><div class="name" id="sb-tenant-name">…</div><div class="sub" id="sb-tenant-slug">…</div></div>
+      <div class="brand-block"><div class="name" id="sb-tenant-name">…</div><a class="sub" id="sb-tenant-slug" href="#" target="_blank" rel="noopener" title="Open your hosted quote calculator (new tab)">…</a></div>
       <button class="nav-item active" data-route="overview" aria-label="Overview"><svg class="qf-ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect width="7" height="9" x="3" y="3" rx="1"/><rect width="7" height="5" x="14" y="3" rx="1"/><rect width="7" height="9" x="14" y="12" rx="1"/><rect width="7" height="5" x="3" y="16" rx="1"/></svg> Overview</button>
       <button class="nav-item" data-route="leads" aria-label="Leads"><svg class="qf-ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polyline points="22 12 16 12 14 15 10 15 8 12 2 12"/><path d="M5.45 5.11 2 12v6a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2v-6l-3.45-6.89A2 2 0 0 0 16.76 4H7.24a2 2 0 0 0-1.79 1.11z"/></svg> Leads<span class="qf-nav-badge" data-badge="leads" aria-label="new leads" hidden></span></button>
       <button class="nav-item" data-route="callbacks" aria-label="Callbacks"><svg class="qf-ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72 12.84 12.84 0 0 0 .7 2.81 2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45 12.84 12.84 0 0 0 2.81.7A2 2 0 0 1 22 16.92z"/></svg> Callbacks<span class="qf-nav-badge" data-badge="callbacks" aria-label="pending callbacks" hidden></span></button>
@@ -133,7 +133,13 @@
        the toggle stays display:none (no stray floating control). */
     @media (max-width: 900px) { .qf-mobile-nav-toggle { display: inline-flex; } }
     @media (min-width: 901px) { .app-shell.qf-nav-collapsed .sidebar { display: none; } .app-shell.qf-nav-collapsed .app-main { margin-left: 0; } .qf-nav-scrim { display: none; } .app-shell.qf-nav-collapsed .qf-mobile-nav-toggle { display: inline-flex; } }
-    @media (max-width: 900px) { .app-shell .sidebar { position: fixed; top: 0; left: 0; bottom: 0; width: 260px; max-width: 80vw; padding-top: 56px; transform: translateX(-100%); transition: transform 0.18s ease; z-index: 1000; box-shadow: 4px 0 20px rgba(0,0,0,0.2); overflow-y: auto; } .app-shell.qf-nav-open .sidebar { transform: translateX(0); }
+    @media (max-width: 900px) { .app-shell .sidebar { position: fixed; top: 0; left: 0; bottom: 0; width: 260px; max-width: 80vw; padding-top: 8px; transform: translateX(-100%); transition: transform 0.18s ease; z-index: 1000; box-shadow: 4px 0 20px rgba(0,0,0,0.2); overflow-y: auto; } .app-shell.qf-nav-open .sidebar { transform: translateX(0); }
+      /* Lift the tenant brand-block onto the fixed hamburger's line (top:12px,
+         40px tall): the business name sits vertically centered in that band,
+         padded past the 40px hamburger (12+40=52 → start ~56px) so it clears
+         it and stays on ONE line. The slug link below stays full-width. */
+      #qf-sidebar .brand-block { padding: 4px 8px 16px; }
+      #qf-sidebar .brand-block .name { display: flex; align-items: center; min-height: 40px; padding-left: 56px; }
       /* Backdrop behind the open drawer — dims the page, tap to close. */
       .qf-nav-scrim { position: fixed; inset: 0; background: rgba(8, 11, 20, 0.55); opacity: 0; visibility: hidden; transition: opacity 0.18s ease, visibility 0.18s ease; z-index: 999; }
       .app-shell.qf-nav-open .qf-nav-scrim { opacity: 1; visibility: visible; } }

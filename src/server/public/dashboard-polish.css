@@ -13,9 +13,9 @@ html[data-theme="light"] .sidebar {
 .sidebar .brand-block {
   margin: 0 14px 14px;
   padding: 14px 14px 16px;
-  border: 1px solid var(--border);
-  border-radius: 16px;
-  background: linear-gradient(135deg, rgba(13, 60, 252, 0.08), rgba(13, 60, 252, 0.04));
+  border-bottom: 1px solid var(--border);
+  border-radius: 0;
+  background: none;
 }
 .sidebar .brand-block .sub {
   font-family: var(--font-mono);
