@@ -52,36 +52,44 @@ describe('customize panel — header logo fill (compact vs full-width)', () => {
     const src = await read('src/server/routes/tenant.ts');
     // Enum-validated in BrandPatch, so only the two allowed values persist.
     expect(src).toContain("headerLogoFill: z.enum(['half', 'full']).optional()");
+    // Header-redesign controls — a big logo can now KEEP the name + tagline.
+    expect(src).toContain("headerLogoSize: z.enum(['s', 'm', 'l', 'xl']).optional()");
+    expect(src).toContain("headerLayout: z.enum(['beside', 'stacked']).optional()");
+    expect(src).toContain("headerShowName: z.boolean().optional()");
     // BrandPatch column fields spread straight into the update `set` — the
     // field needs no bespoke persistence code, so this is all that's required.
     expect(src).toContain('const set: Record<string, unknown> = { ...columnPatch');
   });
 
-  it('adds a Compact / Full-width control on the appearance-only Customize page', async () => {
+  it('adds header logo size / layout / show-name controls on the Customize page', async () => {
     const js = await pub('app.js');
     // Lives in renderBrand's Design tab (appearance). Slice renderBrand up to
     // the next helper (saveBrandPatch) so we capture only the Design controls,
     // not the merged Behavior panel (buildBehaviorPanel) it also mounts.
     const brandFn = js.slice(js.indexOf('function renderBrand'), js.indexOf('function saveBrandPatch'));
     expect(brandFn).toContain('Header logo');
-    expect(brandFn).toContain("data-logofill");
-    expect(brandFn).toContain("queueSave({ headerLogoFill: o.id }, true)");
+    expect(brandFn).toContain('Logo size');
+    expect(brandFn).toContain('Layout');
+    expect(brandFn).toContain('headerLogoSize');
+    expect(brandFn).toContain('headerLayout');
+    expect(brandFn).toContain('headerShowName');
     // Reads the saved value to seed the current selection.
-    expect(brandFn).toContain('b.headerLogoFill');
+    expect(brandFn).toContain('b.headerLogoSize');
   });
 
-  it('renders the logo-fill attribute + robust contain-fit in the public widget', async () => {
+  it('renders the header layout attributes + always-contain fit (never crops) in the widget', async () => {
     const widgetJs = await pub('widget.js');
     const css = await pub('widget-ux-fixes.css');
-    // The widget stamps the mode onto the header bar.
-    expect(widgetJs).toContain("h.setAttribute('data-logo-fill'");
-    expect(widgetJs).toContain("cfg.brand.headerLogoFill === 'full'");
-    // CSS fits ANY logo without cropping/distortion (object-fit:contain) and
-    // switches the max-width budget per mode; full hides the redundant name.
+    // The widget stamps the layout controls onto the header bar.
+    expect(widgetJs).toContain("h.setAttribute('data-logo-size'");
+    expect(widgetJs).toContain("h.setAttribute('data-header-layout'");
+    expect(widgetJs).toContain("h.setAttribute('data-show-name'");
+    expect(widgetJs).toContain("h.setAttribute('data-logo-fill'"); // kept for back-compat
+    // The logo is ALWAYS object-fit:contain — never cropped/distorted — and size
+    // only changes its height; show-name off hides the name (logo only).
     expect(css).toContain('object-fit: contain');
-    expect(css).toContain('.qf-header[data-logo-fill="half"] img');
-    expect(css).toContain('.qf-header[data-logo-fill="full"] img');
-    expect(css).toContain('.qf-header[data-logo-fill="full"] .brand-name');
+    expect(css).toContain('#qf-header[data-logo-size="xl"] img');
+    expect(css).toContain('#qf-header[data-show-name="0"] .brand-name');
   });
 });
 

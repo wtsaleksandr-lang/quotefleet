@@ -267,6 +267,13 @@
       "when": 1786752000000,
       "tag": "0037_lead_followups",
       "breakpoints": true
+    },
+    {
+      "idx": 38,
+      "version": "7",
+      "when": 1786819706911,
+      "tag": "0038_header_layout",
+      "breakpoints": true
     }
   ]
 }
