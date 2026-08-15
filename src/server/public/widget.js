@@ -846,8 +846,18 @@
     // look. CSS (widget-ux-fixes.css) reads #qf-header[data-logo-fill] and, in
     // BOTH modes, fits the logo with object-fit:contain so any aspect ratio is
     // preserved and nothing is ever cropped/stretched.
-    h.setAttribute('data-logo-fill', (cfg.brand && cfg.brand.headerLogoFill === 'full') ? 'full' : 'half');
-    var name = (cfg.brand && cfg.brand.displayName) || cfg.tenant.name;
+    var brand = cfg.brand || {};
+    // Header layout controls — calculator-header.css reads these. The logo is
+    // ALWAYS object-fit:contain, so size only changes how TALL it renders (it is
+    // never cropped or stretched); show-name lets a big logo keep the name +
+    // tagline (the old 'full' mode could only hide them).
+    h.setAttribute('data-logo-fill', brand.headerLogoFill === 'full' ? 'full' : 'half');
+    var sz = String(brand.headerLogoSize || 'm');
+    h.setAttribute('data-logo-size', /^(s|m|l|xl)$/.test(sz) ? sz : 'm');
+    h.setAttribute('data-header-layout', brand.headerLayout === 'stacked' ? 'stacked' : 'beside');
+    h.setAttribute('data-header-align', brand.headerAlign === 'center' ? 'center' : 'left');
+    h.setAttribute('data-show-name', brand.headerShowName === false ? '0' : '1');
+    var name = brand.displayName || cfg.tenant.name;
     if (cfg.brand && cfg.brand.logoUrl) {
       h.appendChild(el('img', { src: cfg.brand.logoUrl, alt: name }));
     } else {

@@ -680,6 +680,18 @@ export const brandConfigs = pgTable('brand_configs', {
    *  See renderHeader (widget.js) + widget-ux-fixes.css. Default 'half' leaves
    *  existing tenants unchanged. */
   headerLogoFill: text('header_logo_fill').notNull().default('half'),
+  /** Header logo size — 's' | 'm' | 'l' | 'xl'. Independent of whether the name
+   *  shows, so a carrier can run a BIG logo AND keep the name + tagline. Logos
+   *  are always object-fit:contain (never cropped). Default 'm' matches today. */
+  headerLogoSize: text('header_logo_size').notNull().default('m'),
+  /** Header layout — 'beside' (logo next to name, today's look) or 'stacked'
+   *  (logo on its own line above the name + tagline — best for wide wordmarks). */
+  headerLayout: text('header_layout').notNull().default('beside'),
+  /** Whether the company name + tagline show alongside the logo. Off = logo-only
+   *  (for carriers whose logo already contains their name). Default on. */
+  headerShowName: boolean('header_show_name').notNull().default(true),
+  /** Header alignment — 'left' (default) or 'center'. */
+  headerAlign: text('header_align').notNull().default('left'),
   /** Optional CTA button text override. */
   ctaText: text('cta_text').notNull().default('Get instant quote'),
   /** Optional label for the post-quote "confirm the rate" CTA (#qf-continue-btn)

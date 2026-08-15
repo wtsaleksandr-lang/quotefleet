@@ -905,6 +905,10 @@ export function registerTenantRoutes(app: Express) {
     // 'full' (full-width contained banner). Persisted verbatim; the widget
     // fits the logo with object-fit:contain in both modes. See renderHeader.
     headerLogoFill: z.enum(['half', 'full']).optional(),
+    headerLogoSize: z.enum(['s', 'm', 'l', 'xl']).optional(),
+    headerLayout: z.enum(['beside', 'stacked']).optional(),
+    headerShowName: z.boolean().optional(),
+    headerAlign: z.enum(['left', 'center']).optional(),
     ctaText: z.string().optional(),
     // Label for the post-quote "confirm the rate" CTA (#qf-continue-btn) that
     // reveals the contact form. Nullable — null clears back to the widget's

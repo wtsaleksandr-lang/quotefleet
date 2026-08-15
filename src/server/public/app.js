@@ -3336,34 +3336,56 @@
       blendSec.appendChild(blendRow);
       controls.appendChild(blendSec);
 
-      // ── Header logo (how much of the bar the logo fills) ─────────
-      // Two options: Compact (logo beside the company name — today's look) vs
-      // Full-width (a full-width contained banner; the name hides). Both fit the
-      // logo with object-fit:contain so ANY logo shape stays un-cropped/undistorted.
-      // Saving reloads the live preview (same queueSave flow as Map blend).
-      var logoFillSec = el('div', { class: 'card qf-cz-section' });
-      logoFillSec.appendChild(el('div', { class: 'qf-cz-section-title', text: 'Header logo' }));
-      logoFillSec.appendChild(el('div', { class: 'qf-cz-hint', text: 'How much of the header bar your logo fills. Any logo shape fits cleanly — never cropped or stretched.' }));
-      var logoFillRow = el('div', { class: 'qf-cz-hover-row' });
-      var currentLogoFill = (b.headerLogoFill === 'full') ? 'full' : 'half';
-      [{ id: 'half', label: 'Compact' }, { id: 'full', label: 'Full-width' }].forEach(function (o) {
-        var on = o.id === currentLogoFill;
-        var chip = el('button', { type: 'button', class: 'qf-cz-hover-chip' + (on ? ' is-selected' : ''), 'data-logofill': o.id, 'aria-pressed': on ? 'true' : 'false', title: o.id === 'full' ? 'A full-width logo banner (company name hides)' : 'Compact logo beside your company name' });
-        chip.appendChild(el('span', { class: 'qf-cz-hover-name', text: o.label + (o.id === 'half' ? ' (default)' : '') }));
-        chip.addEventListener('click', function () {
-          currentLogoFill = o.id;
-          $$('.qf-cz-hover-chip', logoFillRow).forEach(function (n) {
-            var s = n.getAttribute('data-logofill') === o.id;
-            n.classList.toggle('is-selected', s);
-            n.setAttribute('aria-pressed', s ? 'true' : 'false');
+      // ── Header logo, name & layout ───────────────────────────────
+      // Independent controls so a carrier can run a BIG logo AND keep the name +
+      // tagline (the old compact/full toggle could only do one or the other).
+      // Logo size, layout (beside/stacked), alignment, and a show-name toggle.
+      // The logo is ALWAYS object-fit:contain — never cropped. Saving refetches
+      // the live preview (same flow as Theme/Map).
+      var headerSec = el('div', { class: 'card qf-cz-section' });
+      headerSec.appendChild(el('div', { class: 'qf-cz-section-title', text: 'Header logo' }));
+      headerSec.appendChild(el('div', { class: 'qf-cz-hint', text: 'Your logo, company name and tagline. Any logo shape fits cleanly — never cropped or stretched.' }));
+      function headerChipRow(labelText, field, cur, opts) {
+        headerSec.appendChild(el('div', { class: 'qf-cz-label', style: { marginTop: '10px' }, text: labelText }));
+        var row = el('div', { class: 'qf-cz-hover-row' });
+        opts.forEach(function (o) {
+          var on = o.id === cur;
+          var chip = el('button', { type: 'button', class: 'qf-cz-hover-chip' + (on ? ' is-selected' : ''), 'data-hv': o.id, 'aria-pressed': on ? 'true' : 'false', title: o.title || o.label });
+          chip.appendChild(el('span', { class: 'qf-cz-hover-name', text: o.label }));
+          chip.addEventListener('click', function () {
+            $$('.qf-cz-hover-chip', row).forEach(function (n) {
+              var s = n.getAttribute('data-hv') === o.id;
+              n.classList.toggle('is-selected', s);
+              n.setAttribute('aria-pressed', s ? 'true' : 'false');
+            });
+            var p = {}; p[field] = o.id;
+            queueSave(p, true);
           });
-          livePatch({ headerLogoFill: o.id });
-          queueSave({ headerLogoFill: o.id }, true);
+          row.appendChild(chip);
         });
-        logoFillRow.appendChild(chip);
-      });
-      logoFillSec.appendChild(logoFillRow);
-      controls.appendChild(logoFillSec);
+        headerSec.appendChild(makeCarousel(row));
+      }
+      headerChipRow('Logo size', 'headerLogoSize', (/^(s|m|l|xl)$/.test(String(b.headerLogoSize)) ? b.headerLogoSize : 'm'), [
+        { id: 's', label: 'Small' }, { id: 'm', label: 'Medium' }, { id: 'l', label: 'Large' }, { id: 'xl', label: 'Extra-large' },
+      ]);
+      headerChipRow('Layout', 'headerLayout', (b.headerLayout === 'stacked' ? 'stacked' : 'beside'), [
+        { id: 'beside', label: 'Beside name', title: 'Logo next to the company name' },
+        { id: 'stacked', label: 'On its own line', title: 'Logo above the name — best for wide wordmark logos' },
+      ]);
+      headerChipRow('Alignment', 'headerAlign', (b.headerAlign === 'center' ? 'center' : 'left'), [
+        { id: 'left', label: 'Left' }, { id: 'center', label: 'Center' },
+      ]);
+      var showNameWrap = el('label', { class: 'qf-cz-field', style: { display: 'flex', gap: '10px', alignItems: 'flex-start', cursor: 'pointer', marginTop: '12px' } });
+      var showNameCb = el('input', { type: 'checkbox', style: { marginTop: '3px', flex: '0 0 auto' } });
+      showNameCb.checked = b.headerShowName !== false;
+      showNameCb.addEventListener('change', function () { queueSave({ headerShowName: showNameCb.checked }, true); });
+      showNameWrap.appendChild(showNameCb);
+      showNameWrap.appendChild(el('div', {}, [
+        el('div', { text: 'Show company name + tagline', style: { fontWeight: '600' } }),
+        el('div', { class: 'field-hint', style: { marginTop: '2px' }, text: 'Turn off if your logo already includes your company name (logo only).' }),
+      ]));
+      headerSec.appendChild(showNameWrap);
+      controls.appendChild(headerSec);
 
       // ── Text color (background-aware, WCAG-limited) ──────────────
       // Only colours that clear WCAG AA against the CURRENT theme background
@@ -3548,7 +3570,7 @@
         var mapping = [
           [company, 'header'],
           [themeSec, 'header'],
-          [logoFillSec, 'header'],
+          [headerSec, 'header'],
           [logoSec, 'header'],
           [mapSec, 'map'],
           [blendSec, 'map'],

@@ -996,3 +996,43 @@ html { scrollbar-width: thin; scrollbar-color: rgba(135, 138, 150, 0.38) transpa
 @media (prefers-reduced-motion: reduce) {
   .qf-preview-highlight { animation: none; }
 }
+
+/* ══════════════════════════════════════════════════════════════════════════
+   CALCULATOR HEADER — authoritative layout via #qf-header[data-*]. An ID
+   selector + !important wins over every theme's .qf-header rules, so the header
+   renders consistently across presets: the logo is ALWAYS object-fit:contain
+   (never cropped), size only changes its HEIGHT, and a big logo can KEEP the
+   name + tagline (the old 'full' mode could only hide them).
+   Reads: data-logo-size (s|m|l|xl), data-header-layout (beside|stacked),
+   data-header-align (left|center), data-show-name (0|1). Ramp px only.
+   ══════════════════════════════════════════════════════════════════════════ */
+#qf-header {
+  display: flex !important;
+  flex-wrap: nowrap !important;
+  align-items: center !important;
+  gap: 12px !important;
+}
+#qf-header[data-header-layout="stacked"] {
+  flex-direction: column !important;
+  align-items: flex-start !important;
+}
+#qf-header[data-header-align="center"] { justify-content: center !important; text-align: center !important; }
+#qf-header[data-header-align="center"][data-header-layout="stacked"] { align-items: center !important; }
+
+/* Logo — contained (never cropped/stretched), transparent behind it; size sets
+   ONLY the height. Overrides the app-calculator theme's 36px square cover-crop. */
+#qf-header img {
+  object-fit: contain !important;
+  width: auto !important;
+  max-width: 100% !important;
+  background: transparent !important;
+  border-radius: 8px !important;
+}
+#qf-header[data-logo-size="s"]  img { height: 24px !important; max-height: 24px !important; }
+#qf-header[data-logo-size="m"]  img { height: 32px !important; max-height: 32px !important; }
+#qf-header[data-logo-size="l"]  img { height: 48px !important; max-height: 48px !important; }
+#qf-header[data-logo-size="xl"] img { height: 80px !important; max-height: 80px !important; }
+
+/* Name + tagline block — hidden entirely when data-show-name="0" (logo only). */
+#qf-header .brand-name { min-width: 0 !important; }
+#qf-header[data-show-name="0"] .brand-name { display: none !important; }
