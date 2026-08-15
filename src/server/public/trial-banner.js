@@ -81,7 +81,7 @@
         urgent: daysLeft <= 3,
         headline: trialHeadline(daysLeft),
         ctaShown: configured,
-        ctaLabel: configured ? 'Keep your calculator live →' : null,
+        ctaLabel: configured ? 'Subscribe →' : null,
       };
     }
     if (status === 'trial_expired') {
@@ -91,7 +91,7 @@
         urgent: true,
         headline: 'Your free trial has ended',
         ctaShown: configured,
-        ctaLabel: configured ? 'Add a card to continue →' : null,
+        ctaLabel: configured ? 'Subscribe →' : null,
       };
     }
     // 'paid', 'unknown', null, or anything else → the tenant is on a real plan
