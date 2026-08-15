@@ -15,7 +15,7 @@ describe('computeTrialBannerView', () => {
     expect(v.show).toBe(true);
     expect(v.variant).toBe('trial');
     expect(v.ctaShown).toBe(true);
-    expect(v.ctaLabel).toBe('Keep your calculator live →');
+    expect(v.ctaLabel).toBe('Subscribe →');
     expect(v.headline).toBe('Trial · 10 days left');
     expect(v.urgent).toBe(false);
   });
@@ -39,7 +39,7 @@ describe('computeTrialBannerView', () => {
     expect(v.urgent).toBe(true);
     expect(v.headline).toBe('Your free trial has ended');
     expect(v.ctaShown).toBe(true);
-    expect(v.ctaLabel).toBe('Add a card to continue →');
+    expect(v.ctaLabel).toBe('Subscribe →');
   });
 
   it('expired + NOT configured → "ended" headline, no CTA', () => {

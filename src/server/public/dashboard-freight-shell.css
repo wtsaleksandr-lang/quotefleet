@@ -325,12 +325,20 @@ html[data-theme="light"] .btn-ghost {
      The value-prop sub is dropped on narrow widths so headline + CTA + close fit. */
   .qf-trial-banner {
     flex-wrap: nowrap;
+    gap: 8px;
   }
-  .qf-trial-banner-msg { flex-wrap: nowrap; }
+  .qf-trial-banner-msg { flex-wrap: nowrap; gap: 8px; min-width: 0; }
+  /* The status dot is decorative — drop it on narrow widths so the countdown
+     headline AND the CTA button both fit fully on the single line. */
+  .qf-trial-banner-dot { display: none; }
   .qf-trial-banner-headline {
+    font-size: 13px;
     white-space: nowrap;
     overflow: hidden;
     text-overflow: ellipsis;
   }
+  /* Compact CTA + close so they never crowd the countdown off the line. */
+  .qf-trial-banner-cta.btn.btn-primary { padding: 8px 12px; font-size: 12px; }
+  .qf-trial-banner-close { width: 24px; height: 24px; }
   .qf-trial-banner-sub { display: none; }
 }
