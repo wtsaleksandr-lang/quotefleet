@@ -6283,6 +6283,23 @@
                 : '#')
           );
         }
+        // Auto-shrink the font so the FULL hosted URL always fits on ONE line
+        // within the sidebar — Alex: it must fit, not truncate with an ellipsis.
+        // Steps the size down until it no longer overflows (or hits a 7px floor).
+        function fitSlug() {
+          try {
+            slugEl.style.fontSize = ''; // reset to the CSS size, then shrink to fit
+            var size = parseFloat(getComputedStyle(slugEl).fontSize) || 11;
+            var guard = 0;
+            while (slugEl.scrollWidth > slugEl.clientWidth + 1 && size > 7 && guard < 40) {
+              size -= 0.5;
+              slugEl.style.fontSize = size + 'px';
+              guard++;
+            }
+          } catch (_e) {}
+        }
+        fitSlug();
+        if (window.requestAnimationFrame) requestAnimationFrame(fitSlug); // after layout settles
       })();
       $('#loading').style.display = 'none';
       $('#app-shell').hidden = false;
