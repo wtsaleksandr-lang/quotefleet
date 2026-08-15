@@ -2864,7 +2864,7 @@
 
       var root = el('div', { class: 'qf-customize', 'data-qf-customize': '1' });
       c.appendChild(root);
-      root.appendChild(el('h1', { text: 'Customize your calculator' }));
+      root.appendChild(el('h1', { text: 'Customize' }));
       root.appendChild(el('p', { class: 'page-sub', text: 'Pick a look, add your logo, and watch your live calculator update on the right.' }));
 
       var layout = el('div', { class: 'qf-cz-layout' });
@@ -3131,7 +3131,13 @@
             n.classList.toggle('is-selected', sel);
             n.setAttribute('aria-pressed', sel ? 'true' : 'false');
           });
-          queueSave({ themePreset: p.id }, true);
+          // Switching preset resets the accent to the NEW preset's default —
+          // clear any prior override so resolveWidgetTheme pulls the preset
+          // accent (mirrors the "Theme default" chip). Otherwise the previous
+          // theme's accent stays baked onto the new theme.
+          currentAccent = null;
+          paintAccent();
+          queueSave({ themePreset: p.id, accentOverride: null }, true);
           repaintFontColors();
         });
         grid.appendChild(btn);

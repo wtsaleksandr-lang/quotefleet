@@ -577,6 +577,15 @@
         applyBrand(cfg.brand);
         renderHeader(cfg);
         renderContact(cfg.contact);
+        // The map style is baked into the base-map / route PNG URL (built from
+        // brandMapStyle), which is loaded ONCE at init and never refreshed on a
+        // soft refetch. Re-render the currently shown map so a changed map style
+        // actually applies live — no iframe reload, no blink.
+        var mapCard = $('qf-map-card');
+        if (mapCard) {
+          if (mapCard.classList.contains('qf-map-base')) showBaseMap();
+          else scheduleRouteMap();
+        }
         autoResize();
       })
       .catch(function () { /* keep the current skin on a failed refetch */ });
