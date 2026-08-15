@@ -3779,13 +3779,21 @@
         var mq = window.matchMedia('(max-width: 640px)');
         var reduceMq = window.matchMedia('(prefers-reduced-motion: reduce)');
         var sheet = null, sheetBody = null, handle = null, shortcutRow = null;
-        var shortcutWrap = null, resizeGrip = null;
+        var shortcutWrap = null;
         var active = false, expanded = false, tabChips = {};
-        // #1 floating-panel geometry (px). anchorLeft + anchorBottom pin the
-        // panel's bottom-left corner so a fold/resize keeps it put; floatW/floatH
-        // are the last expanded size (restored when re-expanding).
-        var anchorLeft = 8, anchorBottom = 0, floatW = 0, floatH = 0;
+        // Bottom-docked, drag-to-RESIZE sheet (like the QuoteQuick wizard): the
+        // sheet is pinned to the bottom, full-width; dragging the HANDLE up/down
+        // changes its HEIGHT (up = taller, down = shorter) and it stays at whatever
+        // height you release. Height — not transform — so the page never jumps and
+        // the body scroll (overscroll-behavior:contain) doesn't chain to the page.
+        // expandedH remembers the last opened height so a tap toggles peek <-> that.
+        var expandedH = 0;
         function czClamp(v, a, b) { return v < a ? a : (v > b ? b : v); }
+        function czMaxH() { return Math.round((window.innerHeight || 800) * 0.92); }
+        function setSheetHeight(h) {
+          if (!sheet) return;
+          sheet.style.height = czClamp(Math.round(h), peekPx(), czMaxH()) + 'px';
+        }
 
         // Key Design-tab sections surfaced as jump shortcuts, matched by their
         // section-title text (built above). Order = chip order after the tabs.
@@ -3823,43 +3831,13 @@
             handle.setAttribute('aria-expanded', open ? 'true' : 'false');
             handle.setAttribute('aria-label', open ? 'Collapse controls' : 'Expand controls');
           }
-          applyFloatGeometry();
-        }
-        // #1 — Position + size the floating panel from the current anchor + fold
-        // state. Collapsed height = the peek (handle + shortcut row); expanded =
-        // floatH. The bottom-left corner is held via anchorBottom/anchorLeft so
-        // folding or resizing never sends the panel off-screen; everything is
-        // clamped to the viewport so it can never get lost.
-        function applyFloatGeometry() {
-          if (!sheet) return;
-          var vw = window.innerWidth, vh = window.innerHeight;
-          var peek = peekPx();
-          if (!floatH) floatH = Math.min(Math.round(vh * 0.72), Math.max(peek + 120, vh - 16));
-          if (!floatW) floatW = Math.min(vw - 16, 520);
-          var h = czClamp(expanded ? floatH : peek, peek, vh - 16);
-          var w = czClamp(floatW, 240, vw - 16);
-          var top = czClamp(anchorBottom - h, 8, Math.max(8, vh - peek));
-          var left = czClamp(anchorLeft, 80 - w, vw - 80);
-          sheet.style.width = w + 'px';
-          sheet.style.height = h + 'px';
-          sheet.style.top = top + 'px';
-          sheet.style.left = left + 'px';
-        }
-        function syncAnchor() {
-          if (!sheet) return;
-          anchorLeft = sheet.offsetLeft;
-          anchorBottom = sheet.offsetTop + sheet.offsetHeight;
-        }
-        // Seed the floating panel: nearly full-width, docked to the bottom,
-        // collapsed. Called once the sheet is in the DOM so peekPx() can measure.
-        function initFloat() {
-          var vw = window.innerWidth, vh = window.innerHeight;
-          floatW = Math.min(vw - 16, 520);
-          floatH = Math.min(Math.round(vh * 0.72), vh - 16);
-          anchorLeft = Math.max(8, Math.round((vw - floatW) / 2));
-          anchorBottom = vh - 8;
-          sheet.style.width = floatW + 'px';
-          applyFloatGeometry();
+          if (open) {
+            var vh = window.innerHeight || 800;
+            if (!expandedH || expandedH <= peekPx() + 24) expandedH = Math.round(vh * 0.6);
+            setSheetHeight(expandedH);
+          } else {
+            setSheetHeight(peekPx());
+          }
         }
         function scrollBodyTo(top) {
           if (!sheetBody) return;
@@ -3888,28 +3866,25 @@
           });
           return row;
         }
-        // #1 — Grab the handle to move the panel ANYWHERE (both X and Y). Pointer
-        // capture keeps the drag tracking off-element; the position is clamped so
-        // at least 80px stays on screen (it can never be lost). A press that never
-        // crosses the move threshold is a tap → fold toggle; a real drag leaves
-        // the panel where it is dropped.
-        function wireDrag() {
-          var startX = 0, startY = 0, baseL = 0, baseT = 0, moved = 0, dragging = false;
+        // Drag the handle to RESIZE the sheet's height (up = taller, down =
+        // shorter); it stays wherever you release. A press that never crosses the
+        // 5px threshold is a tap → toggle collapsed peek <-> last expanded height.
+        // Pointer capture keeps the drag tracking off-element; height is clamped
+        // between the peek and 92vh so it can never disappear or cover everything.
+        function wireHandleDrag() {
+          var startY = 0, baseH = 0, moved = 0, dragging = false;
           handle.addEventListener('pointerdown', function (e) {
             dragging = true; moved = 0;
-            startX = e.clientX; startY = e.clientY;
-            baseL = sheet.offsetLeft; baseT = sheet.offsetTop;
+            startY = e.clientY;
+            baseH = sheet.offsetHeight;
             sheet.classList.add('is-dragging');
             try { handle.setPointerCapture(e.pointerId); } catch (_e) {}
           });
           handle.addEventListener('pointermove', function (e) {
             if (!dragging) return;
-            var dx = e.clientX - startX, dy = e.clientY - startY;
-            moved = Math.max(moved, Math.abs(dx) + Math.abs(dy));
-            var vw = window.innerWidth, vh = window.innerHeight;
-            var w = sheet.offsetWidth || floatW;
-            sheet.style.left = czClamp(baseL + dx, 80 - w, vw - 80) + 'px';
-            sheet.style.top = czClamp(baseT + dy, 0, vh - 80) + 'px';
+            var dy = startY - e.clientY;             // drag up = positive = taller
+            moved = Math.max(moved, Math.abs(dy));
+            setSheetHeight(baseH + dy);
             if (e.cancelable) e.preventDefault();
           });
           function endDrag(e) {
@@ -3917,8 +3892,15 @@
             dragging = false;
             sheet.classList.remove('is-dragging');
             try { handle.releasePointerCapture(e.pointerId); } catch (_e) {}
-            if (moved < 5) { setExpanded(!expanded); return; }  // tap → fold toggle
-            syncAnchor();                                       // dragged → leave it put
+            if (moved < 5) { setExpanded(!expanded); return; }  // tap → toggle
+            // Dragged: leave it at this height + remember it as the expanded size.
+            var h = sheet.offsetHeight;
+            expanded = h > peekPx() + 24;
+            if (expanded) expandedH = h;
+            if (handle) {
+              handle.setAttribute('aria-expanded', expanded ? 'true' : 'false');
+              handle.setAttribute('aria-label', expanded ? 'Collapse controls' : 'Expand controls');
+            }
           }
           handle.addEventListener('pointerup', endDrag);
           handle.addEventListener('pointercancel', endDrag);
@@ -3926,46 +3908,11 @@
             if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); setExpanded(!expanded); }
           });
         }
-        // #1 — Corner grip resizes the floating panel (width + height), clamped so
-        // it stays on-screen and never smaller than a usable minimum. Resizing
-        // implies expanded. Reuses Pointer Events + capture like the handle drag.
-        function wireResize() {
-          if (!resizeGrip) return;
-          var startX = 0, startY = 0, baseW = 0, baseH = 0, resizing = false;
-          resizeGrip.addEventListener('pointerdown', function (e) {
-            resizing = true;
-            startX = e.clientX; startY = e.clientY;
-            if (!expanded) setExpanded(true);
-            baseW = sheet.offsetWidth; baseH = sheet.offsetHeight;
-            sheet.classList.add('is-resizing');
-            try { resizeGrip.setPointerCapture(e.pointerId); } catch (_e) {}
-            e.stopPropagation();
-            if (e.cancelable) e.preventDefault();
-          });
-          resizeGrip.addEventListener('pointermove', function (e) {
-            if (!resizing) return;
-            var vw = window.innerWidth, vh = window.innerHeight;
-            var left = sheet.offsetLeft, top = sheet.offsetTop;
-            sheet.style.width = czClamp(baseW + (e.clientX - startX), 240, vw - left - 8) + 'px';
-            sheet.style.height = czClamp(baseH + (e.clientY - startY), peekPx() + 40, vh - top - 8) + 'px';
-            if (e.cancelable) e.preventDefault();
-          });
-          function endResize(e) {
-            if (!resizing) return;
-            resizing = false;
-            sheet.classList.remove('is-resizing');
-            try { resizeGrip.releasePointerCapture(e.pointerId); } catch (_e) {}
-            floatW = sheet.offsetWidth; floatH = sheet.offsetHeight;
-            syncAnchor();
-          }
-          resizeGrip.addEventListener('pointerup', endResize);
-          resizeGrip.addEventListener('pointercancel', endResize);
-        }
         function activate() {
           if (active || !root.isConnected) return;
           active = true;
           tabChips = {};
-          sheet = el('div', { class: 'qf-cz-sheet is-floating' });
+          sheet = el('div', { class: 'qf-cz-sheet' });
           handle = el('button', { type: 'button', class: 'qf-cz-sheet-handle', 'aria-label': 'Expand controls', 'aria-expanded': 'false' }, [
             el('span', { class: 'qf-cz-sheet-grip', 'aria-hidden': 'true' }),
           ]);
@@ -3975,20 +3922,11 @@
           shortcutWrap = makeCarousel(shortcutRow);
           sheetBody = el('div', { class: 'qf-cz-sheet-body' });
           sheetBody.appendChild(leftCol); // move the controls column into the sheet
-          // #1 — corner grip to resize the floating panel.
-          resizeGrip = el('button', {
-            type: 'button', class: 'qf-cz-sheet-resize',
-            'aria-label': 'Resize controls panel', title: 'Drag to resize',
-            html: '<svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M21 15l-6 6"/><path d="M21 9L9 21"/></svg>',
-          });
           sheet.appendChild(handle);
           sheet.appendChild(shortcutWrap);
           sheet.appendChild(sheetBody);
-          sheet.appendChild(resizeGrip);
           root.appendChild(sheet);
-          initFloat();
-          wireDrag();
-          wireResize();
+          wireHandleDrag();
           syncTabChips('design');
           setExpanded(false);
           requestAnimationFrame(measurePeek);

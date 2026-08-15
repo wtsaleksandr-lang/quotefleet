@@ -338,29 +338,32 @@ describe('customize panel — mobile pass (floating panel, widget-only Design pr
     expect(js).toContain('if (!url || url === previewUrl) return;');
   });
 
-  it('makes the mobile control sheet a freely draggable + resizable floating panel', async () => {
+  it('makes the mobile control sheet a bottom-docked drag-to-resize sheet', async () => {
     const js = await pub('app.js');
-    // Floating mode + a corner resize grip.
-    expect(js).toContain("class: 'qf-cz-sheet is-floating'");
-    expect(js).toContain("class: 'qf-cz-sheet-resize'");
-    // Handle drag moves BOTH axes with pointer capture, clamped on-screen.
-    expect(js).toContain('sheet.style.left = czClamp(baseL + dx');
-    expect(js).toContain('sheet.style.top = czClamp(baseT + dy');
+    // Bottom-docked (no floating panel / corner grip); the HANDLE drag changes the
+    // sheet HEIGHT (up = taller, down = shorter) and it stays where released.
+    expect(js).toContain("class: 'qf-cz-sheet' }");
+    expect(js).not.toContain("class: 'qf-cz-sheet-resize'");
+    expect(js).toContain('function wireHandleDrag()');
+    expect(js).toContain('function setSheetHeight(h)');
+    expect(js).toContain('var dy = startY - e.clientY;'); // drag up = taller
+    expect(js).toContain('setSheetHeight(baseH + dy)');
     expect(js).toContain('handle.setPointerCapture(e.pointerId)');
-    // Resize grip changes width + height, clamped to a usable min + the viewport.
-    expect(js).toContain('function wireResize()');
-    expect(js).toContain('sheet.style.width = czClamp(baseW');
-    expect(js).toContain('resizeGrip.setPointerCapture(e.pointerId)');
+    // A sub-threshold press is a tap → toggle collapsed peek <-> expanded height.
+    expect(js).toContain('if (moved < 5) { setExpanded(!expanded); return; }');
     // The shortcut chips gain two auto-hiding arrows via makeCarousel (no wrap).
     expect(js).toContain('shortcutWrap = makeCarousel(shortcutRow)');
   });
 
-  it('ships the mobile CSS: floating panel, near-full-width preview, inline header, subtle caption, square chips', async () => {
+  it('ships the mobile CSS: bottom-docked height-resizable sheet, near-full-width preview, inline header, subtle caption, square chips', async () => {
     const css = await pub('customize-panel.css');
-    // #1 floating panel + resize grip, reduced-motion aware.
-    expect(css).toContain('.qf-cz-sheet.is-floating');
-    expect(css).toContain('.qf-cz-sheet-resize');
-    expect(css).toContain('cursor: nwse-resize');
+    // #1 bottom-docked, height-resizable sheet (no floating panel / corner grip):
+    // resized via HEIGHT (not transform) so the page never jumps, body scroll
+    // contained so a swipe never chains to the page.
+    expect(css).toContain('transition: height 0.3s');
+    expect(css).toContain('.qf-cz-sheet.is-dragging { transition: none; }');
+    expect(css).not.toContain('.qf-cz-sheet-resize');
+    expect(css).toContain('overscroll-behavior: contain');
     // #2 preview nearly full width (390px cap dropped on mobile).
     expect(css).toContain('.qf-cz-frame-wrap[data-device="mobile"]');
     expect(css).toContain('max-width: none');

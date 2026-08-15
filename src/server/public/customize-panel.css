@@ -365,19 +365,21 @@
   z-index: 1150;
   display: flex;
   flex-direction: column;
-  height: 78vh;
-  max-height: 78vh;
+  /* Height is driven inline by the drag handle (setSheetHeight in app.js) — drag
+     up = taller, down = shorter, stays where released. This is only the collapsed
+     peek fallback before JS measures. Bottom-docked + full-width; resizing via
+     HEIGHT (not transform) so the page never jumps and body scroll stays contained. */
+  height: var(--qf-cz-peek, 96px);
+  max-height: 92vh;
   background: var(--surface);
   border-top: 1px solid var(--border-strong);
   border-top-left-radius: var(--radius-lg);
   border-top-right-radius: var(--radius-lg);
   box-shadow: var(--shadow-lg);
-  transform: translateY(calc(100% - var(--qf-cz-peek, 96px)));
-  transition: transform 0.42s cubic-bezier(0.32, 0.72, 0, 1);
+  transition: height 0.3s cubic-bezier(0.32, 0.72, 0, 1);
   overflow: hidden;
   padding-bottom: env(safe-area-inset-bottom);
 }
-.qf-cz-sheet.is-open { transform: translateY(0); }
 .qf-cz-sheet.is-dragging { transition: none; }
 @media (prefers-reduced-motion: reduce) {
   .qf-cz-sheet { transition: none; }
@@ -629,47 +631,3 @@
   .qf-cz-preview-note { display: none; }
 }
 
-/* #1 — Floating, repositionable + resizable control panel. On mobile the sheet
-   is positioned by explicit left/top/width/height (set in JS) instead of a
-   bottom-docked translateY fold, so the handle can drag it ANYWHERE (X + Y) and
-   a corner grip resizes it. It stays a rounded card in both themes; honours
-   prefers-reduced-motion (no eased reflow). */
-.qf-cz-sheet.is-floating {
-  right: auto;
-  bottom: auto;
-  height: auto;
-  max-height: none;
-  border: 1px solid var(--border-strong);
-  border-radius: var(--radius-lg);
-  transform: none;
-  transition:
-    top 0.32s cubic-bezier(0.32, 0.72, 0, 1),
-    left 0.32s cubic-bezier(0.32, 0.72, 0, 1),
-    width 0.32s cubic-bezier(0.32, 0.72, 0, 1),
-    height 0.32s cubic-bezier(0.32, 0.72, 0, 1);
-}
-.qf-cz-sheet.is-floating.is-open { transform: none; }
-.qf-cz-sheet.is-floating.is-dragging,
-.qf-cz-sheet.is-floating.is-resizing { transition: none; }
-@media (prefers-reduced-motion: reduce) {
-  .qf-cz-sheet.is-floating { transition: none; }
-}
-
-/* Corner resize grip (bottom-right). 24px hit box on the ramp. */
-.qf-cz-sheet-resize {
-  position: absolute;
-  right: 0;
-  bottom: 0;
-  width: 24px;
-  height: 24px;
-  padding: 0;
-  border: 0;
-  background: none;
-  color: var(--muted);
-  cursor: nwse-resize;
-  touch-action: none;
-  z-index: 2;
-}
-.qf-cz-sheet-resize:hover { color: var(--ink); }
-.qf-cz-sheet-resize:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
-.qf-cz-sheet-resize svg { display: block; }
