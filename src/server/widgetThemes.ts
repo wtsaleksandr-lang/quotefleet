@@ -332,6 +332,24 @@ export const WIDGET_FONTS: Record<string, WidgetFont> = {
 export const DEFAULT_FONT_ID = 'satoshi';
 export const DEFAULT_PRESET_ID = 'midnight';
 
+// Each calculator theme carries a default map style that matches its world —
+// dark themes get dark maps, light themes get clean / soft / standard. Picking a
+// theme in Customize applies this map style; the carrier can still override it.
+export const PRESET_MAP_STYLE: Record<string, string> = {
+  midnight: 'branded',
+  mono: 'grayscale',
+  ironhorse: 'standard',
+  harbor: 'soft',
+  cupertino: 'grayscale',
+  booking: 'dark_routes',
+  tesla: 'dark_routes',
+  stripe: 'grayscale',
+  stone: 'soft',
+  citron: 'standard',
+  vault: 'grayscale',
+  cream: 'dark_routes',
+};
+
 // ── The curated preset set (12 — a premium light + dark lineup) ─────
 // Wave 4: each preset is now a DISTINCT DESIGN LANGUAGE, not a recolour. The
 // `structure` block drives corner radius, border weight, elevation and label

@@ -169,6 +169,7 @@ src/server/public/customize-panel.css:36	spacing	gap: 18px
 src/server/public/customize-panel.css:40	spacing	gap: 14px
 src/server/public/customize-panel.css:41	spacing	top: 18px
 src/server/public/customize-panel.css:44	spacing	padding: 16px 16px 18px
+src/server/public/customize-panel.css:461	spacing	gap: 6px
 src/server/public/customize-panel.css:52	spacing	gap: 6px
 src/server/public/customize-panel.css:53	spacing	margin-top: 10px
 src/server/public/customize-panel.css:55	spacing	margin-top: 2px
