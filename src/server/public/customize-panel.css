@@ -238,7 +238,7 @@
   display: flex; flex-wrap: nowrap; gap: 4px;
   flex: 1 1 auto; min-width: 0;
   overflow-x: auto; overflow-y: hidden;
-  scroll-snap-type: x proximity;
+  /* No scroll-snap: free drag-to-scroll; cropped edge chips are fine (snap jumped). */
   -webkit-overflow-scrolling: touch;
   touch-action: pan-y;
   cursor: grab;
@@ -247,7 +247,7 @@
 }
 .qf-cz-carousel-track::-webkit-scrollbar { width: 0; height: 0; display: none; }
 .qf-cz-carousel-track.is-grabbing { cursor: grabbing; }
-.qf-cz-carousel-track > * { flex: 0 0 auto; scroll-snap-align: start; }
+.qf-cz-carousel-track > * { flex: 0 0 auto; }
 /* In the carousel the preset cards take a fixed, comfortably-tappable width. */
 .qf-cz-carousel-track .qf-cz-preset { width: 120px; }
 
