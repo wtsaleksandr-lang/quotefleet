@@ -3042,9 +3042,9 @@
         var lastT = 0, vel = 0; // vel = scrollLeft px per ms during the drag
         var raf = 0;
         function cancelGlide() { if (raf) { cancelAnimationFrame(raf); raf = 0; } }
-        // End of interaction: restore CSS proximity snap (gently aligns the
-        // resting position) and refresh the arrow visibility.
-        function settle() { track.style.scrollSnapType = ''; update(); }
+        // End of interaction: refresh the arrow visibility. No scroll-snap — the
+        // strip rests wherever the drag/glide leaves it (cropped chips are fine).
+        function settle() { update(); }
         // Inertial glide — decay the release velocity frame by frame so the strip
         // coasts and eases to a stop, clamping at either end.
         function glide() {
@@ -3077,7 +3077,6 @@
             // swipe on the strip is left to scroll the page.
             if (Math.abs(dx) < DRAG_THRESHOLD || Math.abs(dx) < Math.abs(dy)) return;
             dragging = true;
-            track.style.scrollSnapType = 'none'; // don't let snap fight the drag
             track.classList.add('is-grabbing');
             document.documentElement.classList.add('qf-grabbing');
             try { if (track.setPointerCapture && pid != null) track.setPointerCapture(pid); } catch (_) { }
@@ -3840,20 +3839,6 @@
 
         // Key Design-tab sections surfaced as jump shortcuts, matched by their
         // section-title text (built above). Order = chip order after the tabs.
-        var JUMPS = [
-          { label: 'Theme', re: /^theme$/i },
-          { label: 'Color', re: /^accent color$/i },
-          { label: 'Font', re: /^font$/i },
-          { label: 'Logo', re: /^logo$/i },
-          { label: 'Map', re: /^map style$/i },
-        ];
-        function findSection(re) {
-          var titles = $$('.qf-cz-section-title', designPanel);
-          for (var i = 0; i < titles.length; i++) {
-            if (re.test((titles[i].textContent || '').trim())) return titles[i].closest('.qf-cz-section');
-          }
-          return null;
-        }
         function peekPx() {
           if (!handle) return 96;
           var row = shortcutWrap || shortcutRow;
@@ -3896,17 +3881,10 @@
             tabChips[t.id] = chip;
             row.appendChild(chip);
           });
-          JUMPS.forEach(function (j) {
-            var sec = findSection(j.re);
-            if (!sec) return;
-            var chip = el('button', { type: 'button', class: 'qf-cz-sheet-chip', text: j.label });
-            chip.addEventListener('click', function () {
-              selectTab('design'); syncTabChips('design'); setExpanded(true);
-              // Wait for the sheet to open + design panel to show, then scroll.
-              requestAnimationFrame(function () { requestAnimationFrame(function () { scrollBodyTo(sec.offsetTop - 8); }); });
-            });
-            row.appendChild(chip);
-          });
+          // The nav shows ONLY the dedicated-page tabs (Design / Page / Behavior).
+          // The old within-Design jump chips (Theme / Color / Font / Logo / Map)
+          // were removed — they pointed at the same Design page, so they were
+          // redundant clutter; you just scroll the Design panel to reach them.
           return row;
         }
         // Drag the handle to RESIZE the sheet's height (up = taller, down =

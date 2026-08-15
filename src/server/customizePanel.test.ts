@@ -273,7 +273,9 @@ describe('customize panel — drag-scroll carousels (theme presets + map styles)
     expect(css).toContain('.qf-cz-carousel-track');
     expect(css).toContain('overflow-x: auto');
     expect(css).toContain('flex-wrap: nowrap');
-    expect(css).toContain('scroll-snap-type: x proximity');
+    // Free drag-to-scroll, no scroll-snap (snap made the strip jump to re-align).
+    expect(css).toContain('cursor: grab');
+    expect(css).not.toContain('scroll-snap-type');
     expect(css).toContain('.qf-cz-carousel-arrow');
     expect(css).toContain('.qf-cz-blend-slider');
   });
