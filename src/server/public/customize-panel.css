@@ -233,9 +233,9 @@
    with momentum on release; items proximity-snap for tidy alignment. touch-action
    is pan-y so a vertical swipe still scrolls the page while JS owns the horizontal
    drag. Tokens/relative units only — colour + spacing guards stay green. */
-.qf-cz-carousel { display: flex; align-items: center; gap: 8px; }
+.qf-cz-carousel { display: flex; align-items: center; gap: 4px; }
 .qf-cz-carousel-track {
-  display: flex; flex-wrap: nowrap; gap: 8px;
+  display: flex; flex-wrap: nowrap; gap: 4px;
   flex: 1 1 auto; min-width: 0;
   overflow-x: auto; overflow-y: hidden;
   scroll-snap-type: x proximity;
@@ -252,7 +252,7 @@
 .qf-cz-carousel-track .qf-cz-preset { width: 120px; }
 
 .qf-cz-carousel-arrow {
-  flex: 0 0 auto; width: 32px; height: 32px;
+  flex: 0 0 auto; width: 24px; height: 24px;
   display: inline-flex; align-items: center; justify-content: center;
   padding: 0; border-radius: 999px;
   border: 1px solid var(--border-strong); background: var(--surface-2);
