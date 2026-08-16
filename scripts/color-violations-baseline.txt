@@ -63,7 +63,7 @@ src/server/public/public-pages-wefixtrades.css:68:3	border-color: #FFFFFF
 src/server/public/public-pages-wefixtrades.css:145:3	color: #FFFFFF
 src/server/public/public-pages-wefixtrades.css:162:3	color: #FFFFFF
 src/server/public/public-pages-wefixtrades.css:165:3	color: #FFFFFF
-src/server/public/quote-demo.html:33:83	color:#fff
+src/server/public/quote-demo.html:34:83	color:#fff
 src/server/public/quote-polish.css:1:487	color:#fff
 src/server/public/quote-polish.css:1:556	background:#fff
 src/server/public/quote-polish.css:1:2494	background:#fff
