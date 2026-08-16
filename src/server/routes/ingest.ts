@@ -596,17 +596,27 @@ function normalizeDraftRateCard(c: Record<string, unknown>): {
   // AMC on the LTL config is the minimum-charge floor the engine enforces.
   const minFromAmc = ltlConfig?.absoluteMinCharge ?? null;
   const minimumCharge = numOrNull(c.minimumCharge) ?? minFromAmc ?? 0;
+  // Bound imported values the same way the manual rate-card routes do (zRate /
+  // zMoney / zPercent). The AI parse (or a hand-edit) can otherwise emit a
+  // negative rate (mis-read "(2.50)") or a 5000% margin, which flows straight
+  // into miles × rate + margin and produces negative/absurd customer quotes.
+  const clampMoney = (v: number | null | undefined): number =>
+    v == null || !Number.isFinite(v) ? 0 : Math.max(0, Math.min(1_000_000, v));
+  const clampPct = (v: number | null | undefined): number =>
+    v == null || !Number.isFinite(v) ? 0 : Math.max(0, Math.min(100, v));
+  const clampCap = (v: number | null): number | null =>
+    v == null || !Number.isFinite(v) ? null : Math.max(0, v);
   return {
     service: String(c.service ?? 'ftl'),
     equipment: String(c.equipment ?? 'dryvan'),
     label: c.label != null ? String(c.label) : null,
-    ratePerMile: numOrNull(c.ratePerMile) ?? 0,
-    minimumCharge,
-    flatFee: numOrNull(c.flatFee) ?? 0,
-    fuelSurchargePct: numOrNull(c.fuelSurchargePct) ?? 0,
-    marginPct: numOrNull(c.marginPct) ?? 0,
-    maxWeightLbs: numOrNull(c.maxWeightLbs),
-    maxMiles: numOrNull(c.maxMiles),
+    ratePerMile: clampMoney(numOrNull(c.ratePerMile)),
+    minimumCharge: clampMoney(minimumCharge),
+    flatFee: clampMoney(numOrNull(c.flatFee)),
+    fuelSurchargePct: clampPct(numOrNull(c.fuelSurchargePct)),
+    marginPct: clampPct(numOrNull(c.marginPct)),
+    maxWeightLbs: clampCap(numOrNull(c.maxWeightLbs)),
+    maxMiles: clampCap(numOrNull(c.maxMiles)),
     ltlConfig,
   };
 }

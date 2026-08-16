@@ -39,7 +39,12 @@
     opts.headers = Object.assign({ 'Content-Type': 'application/json' }, opts.headers || {});
     if (opts.body && typeof opts.body !== 'string') opts.body = JSON.stringify(opts.body);
     return fetch(path, opts).then(function (r) {
-      return r.json().then(function (j) {
+      // Read as text first, then parse defensively: a Replit proxy 502/504, an
+      // HTML 429 rate-limit page, or a 204 No Content is NOT JSON, and a raw
+      // r.json() there throws "Unexpected token <" that masks the real status.
+      return r.text().then(function (body) {
+        var j = null;
+        if (body) { try { j = JSON.parse(body); } catch (_e) { j = null; } }
         if (!r.ok) {
           // Day-14 write-block escape: the trial-gating middleware answers any
           // mutating call from an expired free tenant with
@@ -48,12 +53,16 @@
           // CTA) instead of bubbling a raw "trial_expired" string to a toast.
           if (r.status === 403 && j && j.error === 'trial_expired') {
             try { handleTrialExpired(j); } catch (e) { /* non-fatal — never mask the throw */ }
-            var te = new Error(j.message || 'Your trial has ended. Subscribe to keep making changes.');
+            var te = new Error((j && j.message) || 'Your trial has ended. Subscribe to keep making changes.');
             te.status = r.status; te.code = 'trial_expired'; throw te;
           }
-          var err = new Error(j.error || ('HTTP ' + r.status)); err.status = r.status; throw err;
+          var msg = (j && j.error) ||
+            (r.status >= 500 ? 'Service temporarily unavailable — please try again (' + r.status + ').'
+              : r.status === 429 ? 'Too many requests — please wait a moment and try again.'
+              : 'HTTP ' + r.status);
+          var err = new Error(msg); err.status = r.status; throw err;
         }
-        return j;
+        return j; // null for an empty/204 body — callers already guard missing data
       });
     });
   }
@@ -254,7 +263,12 @@
 
   function setActiveNav(route) {
     $$('.sidebar .nav-item').forEach(function (b) {
-      b.classList.toggle('active', b.dataset.route === route);
+      var on = b.dataset.route === route;
+      b.classList.toggle('active', on);
+      // Zones/Ingest/Audit live inside a collapsed <details class="qf-nav-advanced">;
+      // open it when its item is active (e.g. a deep-link/refresh to /app/audit) so
+      // the user actually sees which page they're on.
+      if (on) { var d = b.closest('details.qf-nav-advanced'); if (d) d.open = true; }
     });
   }
 
@@ -1173,7 +1187,11 @@
       var tb = $('tbody', tbl);
       d.leads.forEach(function (l) {
         tb.appendChild(el('tr', {
-          on: { click: function () { go('leads/' + l.refId); } },
+          on: {
+            click: function () { go('leads/' + l.refId); },
+            keydown: function (e) { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); go('leads/' + l.refId); } },
+          },
+          tabindex: '0', role: 'link', 'aria-label': 'Open lead ' + l.refId,
           style: { cursor: 'pointer' },
           html: '<td data-label="Ref"><strong>' + escapeHtml(l.refId) + '</strong></td>' +
                 '<td data-label="Customer"><span class="qf-stack-cell">' + escapeHtml(l.customerName || '—') + '<br><span class="muted-small">' + escapeHtml(l.customerEmail || '') + '</span></span></td>' +
@@ -1255,7 +1273,12 @@
           LEAD_STATUSES.forEach(function (s) {
             var o = document.createElement('option'); o.value = s; o.textContent = statusLabel(s); if (l.status === s) o.selected = true; sel.appendChild(o);
           });
-          sel.addEventListener('change', function () { saved(api('/api/tenant/leads/' + encodeURIComponent(l.refId), { method: 'PATCH', body: { status: sel.value } })); });
+          sel.addEventListener('change', function () {
+            var prev = l.status;
+            saved(api('/api/tenant/leads/' + encodeURIComponent(l.refId), { method: 'PATCH', body: { status: sel.value } }))
+              .then(function () { l.status = sel.value; })
+              .catch(function () { sel.value = prev; }); // revert so the UI never shows an unsaved status
+          });
           f.appendChild(sel);
           return f;
         })(),
@@ -1337,7 +1360,7 @@
         row.innerHTML =
           '<td data-label="Customer"><span class="qf-stack-cell"><strong>' + escapeHtml(cb.customerName || '—') + '</strong>' +
             (cb.customerCompany ? '<br><span class="muted-small">' + escapeHtml(cb.customerCompany) + '</span>' : '') + '</span></td>' +
-          '<td data-label="Phone"><span class="qf-stack-cell"><a href="tel:' + encodeURIComponent(cb.customerPhone) + '">' + escapeHtml(cb.customerPhone) + '</a>' +
+          '<td data-label="Phone"><span class="qf-stack-cell"><a href="tel:' + String(cb.customerPhone || '').replace(/[^\d+]/g, '') + '">' + escapeHtml(cb.customerPhone || '—') + '</a>' +
             (cb.customerEmail ? '<br><span class="muted-small">' + escapeHtml(cb.customerEmail) + '</span>' : '') + '</span></td>' +
           '<td data-label="Quote">' + (cb.leadRefId ? '<a href="/app/leads/' + encodeURIComponent(cb.leadRefId) + '" data-route="leads/' + encodeURIComponent(cb.leadRefId) + '">' + escapeHtml(cb.leadRefId) + '</a>' : '<span class="muted-small">—</span>') + '</td>' +
           '<td data-label="Topic"><span class="muted-small">' + escapeHtml(topicLine || '—') + '</span>' +
@@ -1356,9 +1379,16 @@
           var o = document.createElement('option'); o.value = s; o.textContent = callbackStatusLabel(s); if (cb.status === s) o.selected = true; sel.appendChild(o);
         });
         sel.addEventListener('change', function () {
-          saved(api('/api/tenant/callbacks/' + cb.id, { method: 'PATCH', body: { status: sel.value } }))
-            .then(function () { setTimeout(function () { renderCallbacks(c); }, 80); })
-            .catch(function () { /* toastErr already fired via saved() */ });
+          var prev = cb.status, next = sel.value;
+          // Update just this row's badge in place — re-rendering the whole list
+          // destroyed other rows' open note editors + any unsaved text.
+          saved(api('/api/tenant/callbacks/' + cb.id, { method: 'PATCH', body: { status: next } }))
+            .then(function () {
+              cb.status = next;
+              statusBadge.className = 'badge ' + callbackStatusClass(next);
+              statusBadge.textContent = callbackStatusLabel(next);
+            })
+            .catch(function () { sel.value = prev; }); // toastErr already fired via saved()
         });
         statusWrap.appendChild(statusBadge);
         statusWrap.appendChild(sel);
@@ -1666,7 +1696,10 @@
         var svc = activeTab !== 'all' ? activeTab : 'ftl';
         api('/api/tenant/rate-cards', {
           method: 'POST',
-          body: { service: svc, equipment: 'dryvan', label: 'New rate', ratePerMile: 2.5 },
+          // Create DISABLED so it never collides with the existing enabled card
+          // for (service, dryvan) — that duplicate-enabled guard 409'd and no row
+          // appeared. The carrier picks equipment + enables it after.
+          body: { service: svc, equipment: 'dryvan', label: 'New rate', ratePerMile: 2.5, enabled: false },
         }).then(function () { renderRates(c); }).catch(toastErr);
       });
       c.appendChild(addBtn);
@@ -1771,7 +1804,10 @@
         inp.dataset.rateId = String(r.id);
         inp.addEventListener('blur', function () {
           var v = inp.value;
-          if (opts && opts.type === 'number') v = v === '' ? null : Number(v);
+          // Empty or non-numeric → 0 (the columns are NOT NULL and the schema
+          // rejects null): sending null 400'd and the field could never be
+          // cleared. Matches the drayage-zone cell behaviour.
+          if (opts && opts.type === 'number') { var n = Number(v); v = (v === '' || !isFinite(n)) ? 0 : n; }
           api('/api/tenant/rate-cards/' + r.id, { method: 'PUT', body: (function () { var p = {}; p[field] = v; return p; })() }).catch(toastErr);
         });
       }
@@ -4001,7 +4037,7 @@
           }
           if (sheet) sheet.remove();
           sheet = sheetBody = handle = shortcutRow = null;
-          shortcutWrap = resizeGrip = null;
+          shortcutWrap = null;
           tabChips = {};
         }
         function onChange() {
@@ -4014,7 +4050,7 @@
         }
         if (mq.addEventListener) mq.addEventListener('change', onChange);
         else if (mq.addListener) mq.addListener(onChange);
-        window.addEventListener('resize', function () { if (active) { measurePeek(); applyFloatGeometry(); } });
+        window.addEventListener('resize', function () { if (active) { measurePeek(); } });
         if (mq.matches) activate();
       })();
     }).catch(showErr(c));
@@ -4107,6 +4143,10 @@
         if (!b.featuresJson) b.featuresJson = {};
         b.featuresJson[featureKey] = next;
         toastOk('Saved');
+        // These flags visibly change the widget (quote-action bar, confidence
+        // panel, Book-this-load button) — refresh the live preview like the
+        // scalar brand toggles do, instead of leaving it stale until reload.
+        notifyBrandPreview();
       }).catch(function (e) { cb.checked = !next; toastErr(e); });
     });
     var txt = el('div', { style: { flex: '1 1 auto' } }, [
