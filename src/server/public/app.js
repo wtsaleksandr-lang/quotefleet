@@ -67,6 +67,29 @@
     });
   }
 
+  // Copy text to the clipboard with a fallback for non-secure contexts / in-app
+  // webviews where navigator.clipboard is missing or blocked (otherwise the copy
+  // buttons throw a synchronous TypeError and silently do nothing).
+  function legacyCopy(text) {
+    return new Promise(function (resolve, reject) {
+      try {
+        var ta = document.createElement('textarea');
+        ta.value = text; ta.setAttribute('readonly', '');
+        ta.style.position = 'fixed'; ta.style.top = '-9999px'; ta.style.opacity = '0';
+        document.body.appendChild(ta); ta.select();
+        var ok = document.execCommand('copy');
+        document.body.removeChild(ta);
+        if (ok) resolve(); else reject(new Error('copy failed'));
+      } catch (e) { reject(e); }
+    });
+  }
+  function copyText(text) {
+    if (navigator.clipboard && navigator.clipboard.writeText) {
+      return copyText(text).catch(function () { return legacyCopy(text); });
+    }
+    return legacyCopy(text);
+  }
+
   // ── Toast helper ──────────────────────────────────────────────
   // Replaces native alert() and silent .then() — gives users visible
   // feedback for save actions. Auto-dismisses after 2.5s for success,
@@ -339,7 +362,14 @@
   // any sub-path like "leads/QF-123", so the pushed URL carries the deep link.
   function go(route) {
     history.pushState({}, '', '/app/' + route);
-    return render(route);
+    var r = render(route);
+    // SPA focus management: move focus to the top of the freshly-rendered
+    // content region so keyboard/SR users don't stay parked on the sidebar
+    // link they just activated. tabindex=-1 makes the container focusable
+    // without adding it to the tab order.
+    var c = document.getElementById('page-content');
+    if (c) { c.setAttribute('tabindex', '-1'); try { c.focus({ preventScroll: true }); } catch (_e) { try { c.focus(); } catch (_e2) {} } }
+    return r;
   }
   // Expose the SPA router so other in-page modules (e.g. the onboarding wizard)
   // can navigate client-side instead of a full page load.
@@ -672,9 +702,15 @@
           addNote('Your free trial has ended — your calculator is read-only. Subscribe to keep making changes and capturing leads.');
           if (configured) addSubscribeBtn('Add a card to continue '); else addUnconfiguredNote();
         } else if (status === 'paid') {
+          // A paying tenant whose auto-renewal failed (Stripe past_due, kept in
+          // grace) needs a clear "update your card" nudge on the billing page.
+          var pastDue = !!(trial && trial.paymentPastDue);
+          if (pastDue) {
+            billBody.appendChild(el('p', { class: 'field-hint', style: { color: 'var(--warn)', marginTop: '0', marginBottom: '8px', fontWeight: '700' }, text: 'Your last payment failed — update your card to keep your service active.' }));
+          }
           addNote('Current plan: ' + planLabel + '. Update your card, change plan, or cancel anytime — no phone call needed.');
           // Only a real subscription can be "managed" — the portal 404s otherwise.
-          var mBtn = el('button', { class: 'btn btn-primary', type: 'button', text: 'Manage billing' });
+          var mBtn = el('button', { class: 'btn btn-primary', type: 'button', text: pastDue ? 'Update card' : 'Manage billing' });
           mBtn.addEventListener('click', function () { openBillingPortal(); });
           billBody.appendChild(mBtn);
         } else {
@@ -800,7 +836,7 @@
             '<td data-label="Lane">' + escapeHtml(l.pickupCity || '?') + ' → ' + escapeHtml(l.deliveryCity || '?') + '<br><span class="muted-small">' + (l.distanceMiles ? Math.round(l.distanceMiles) + ' mi' : '') + '</span></td>' +
             '<td data-label="Total" style="text-align:right;font-variant-numeric:tabular-nums;">$' + fmtMoney(l.quotedTotal) + '</td>' +
             '<td data-label="When"><span class="muted-small">' + fmtDate(l.createdAt) + '</span></td>' +
-            '<td data-label="Status"><span class="badge ' + statusClass(l.status) + '">' + statusLabel(l.status) + '</span></td>' +
+            '<td data-label="Status"><span class="badge ' + statusClass(l.status) + '">' + escapeHtml(statusLabel(l.status)) + '</span></td>' +
             '</tr>';
         });
         c.appendChild(tbl);
@@ -1198,7 +1234,7 @@
                 '<td data-label="Service">' + escapeHtml(l.service || '') + ' / ' + escapeHtml(l.equipment || '') + '</td>' +
                 '<td data-label="Lane">' + escapeHtml(l.pickupCity || '?') + ' → ' + escapeHtml(l.deliveryCity || '?') + '</td>' +
                 '<td data-label="Total" style="text-align:right;">$' + fmtMoney(l.quotedTotal) + '</td>' +
-                '<td data-label="Status"><span class="badge ' + statusClass(l.status) + '">' + statusLabel(l.status) + '</span></td>' +
+                '<td data-label="Status"><span class="badge ' + statusClass(l.status) + '">' + escapeHtml(statusLabel(l.status)) + '</span></td>' +
                 '<td data-label="When"><span class="muted-small">' + fmtDate(l.createdAt) + '</span></td>',
         }));
       });
@@ -4890,11 +4926,11 @@
       card.appendChild(pre);
       var copy = el('button', { class: 'btn btn-primary', text: 'Copy snippet', style: { marginTop: '8px' } });
       copy.addEventListener('click', function () {
-        navigator.clipboard.writeText(d.snippet).then(function () {
+        copyText(d.snippet).then(function () {
           copy.textContent = 'Copied ✓';
           toastOk('Copied to clipboard');
           setTimeout(function () { copy.textContent = 'Copy snippet'; }, 1500);
-        });
+        }).catch(function () { toastErr(new Error('Could not copy automatically — select the snippet and press Ctrl/⌘-C.')); });
       });
       card.appendChild(copy);
       c.appendChild(card);
@@ -5003,7 +5039,7 @@
         urlRow.appendChild(urlBox);
         if (l.active) {
           var copyBtn = el('button', { class: 'btn btn-secondary', text: 'Copy' });
-          copyBtn.addEventListener('click', function () { navigator.clipboard.writeText(l.url).then(function () { copyBtn.textContent = 'Copied ✓'; toastOk('Copied'); setTimeout(function () { copyBtn.textContent = 'Copy'; }, 1500); }); });
+          copyBtn.addEventListener('click', function () { copyText(l.url).then(function () { copyBtn.textContent = 'Copied ✓'; toastOk('Copied'); setTimeout(function () { copyBtn.textContent = 'Copy'; }, 1500); }); });
           urlRow.appendChild(copyBtn);
           var revBtn = el('button', { class: 'btn btn-danger', text: 'Revoke' });
           revBtn.addEventListener('click', function () {
@@ -5125,7 +5161,7 @@
       input.addEventListener('focus', function () { input.select(); });
       var copyBtn = el('button', { class: 'btn btn-secondary', text: 'Copy' });
       copyBtn.addEventListener('click', function () {
-        navigator.clipboard.writeText(data.address || '').then(function () {
+        copyText(data.address || '').then(function () {
           copyBtn.textContent = 'Copied ✓'; toastOk('Copied');
           setTimeout(function () { copyBtn.textContent = 'Copy'; }, 1500);
         });
@@ -6231,9 +6267,15 @@
     }
     function isDesktop() { return window.innerWidth >= 901; }
     function setOpenMobile(open) {
+      var wasOpen = shell.classList.contains('qf-nav-open');
       shell.classList.toggle('qf-nav-open', open);
       toggle.setAttribute('aria-expanded', open ? 'true' : 'false');
       toggle.setAttribute('aria-label', open ? 'Close navigation menu' : 'Open navigation menu');
+      // Move focus into the drawer on open so keyboard users land inside it;
+      // return focus to the toggle on close so they aren't stranded in a
+      // now-hidden off-canvas region.
+      if (open) { var first = document.querySelector('.sidebar .nav-item'); if (first) try { first.focus(); } catch (_e) {} }
+      else if (wasOpen) { try { toggle.focus(); } catch (_e2) {} }
     }
     scrim.addEventListener('click', function () { setOpenMobile(false); });
     document.addEventListener('keydown', function (e) {
@@ -6260,6 +6302,24 @@
     // Tap outside (anywhere in main) closes the mobile drawer.
     document.querySelector('.app-main').addEventListener('click', function () {
       if (!isDesktop()) setOpenMobile(false);
+    });
+    // Breakpoint change (rotate / window resize): clear stale state so the
+    // sidebar can't remain off-canvas-open after growing to desktop, or
+    // desktop-collapsed after shrinking to mobile, with a mismatched toggle.
+    var wasDesktop = isDesktop();
+    window.addEventListener('resize', function () {
+      var nowDesktop = isDesktop();
+      if (nowDesktop === wasDesktop) return;
+      wasDesktop = nowDesktop;
+      if (nowDesktop) {
+        shell.classList.remove('qf-nav-open');
+        toggle.setAttribute('aria-expanded', 'true');
+        toggle.setAttribute('aria-label', 'Hide sidebar');
+      } else {
+        shell.classList.remove('qf-nav-collapsed');
+        toggle.setAttribute('aria-expanded', 'false');
+        toggle.setAttribute('aria-label', 'Open navigation menu');
+      }
     });
   }
 

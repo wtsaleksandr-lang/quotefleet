@@ -196,9 +196,13 @@ export function registerTenantRoutes(app: Express) {
   // ── overview ──────────────────────────────────────────────────
   app.get('/api/tenant/overview', requireAuth, requireTenant, async (req: Request, res: Response) => {
     const tid = req.tenant!.id;
-    const [recent, allLeads, audit, openCallbacks] = await Promise.all([
+    // This endpoint is polled on boot + on every Leads/Callbacks nav, so it must
+    // stay bounded. The client only reads stats.newLeads + stats.pendingCallbacks
+    // (the KPI cards come from the separate indexed /overview-kpis endpoint), so
+    // count with SQL instead of loading the whole leads table into memory.
+    const [recent, newLeadRows, audit, openCallbacks] = await Promise.all([
       db().select().from(leads).where(eq(leads.tenantId, tid)).orderBy(desc(leads.createdAt)).limit(20),
-      db().select().from(leads).where(eq(leads.tenantId, tid)),
+      db().select({ n: count() }).from(leads).where(and(eq(leads.tenantId, tid), eq(leads.status, 'new'))),
       db().select().from(auditLog).where(eq(auditLog.tenantId, tid)).orderBy(desc(auditLog.createdAt)).limit(10),
       db()
         .select({ id: callbackRequests.id })
@@ -206,17 +210,9 @@ export function registerTenantRoutes(app: Express) {
         .where(and(eq(callbackRequests.tenantId, tid), eq(callbackRequests.status, 'open'))),
     ]);
     const stats = {
-      totalLeads: allLeads.length,
-      newLeads: allLeads.filter((l) => l.status === 'new').length,
+      newLeads: Number(newLeadRows[0]?.n ?? 0),
       // Unactioned callback requests — feeds the sidebar Callbacks badge.
       pendingCallbacks: openCallbacks.length,
-      wonLeads: allLeads.filter((l) => l.status === 'won').length,
-      avgQuote:
-        allLeads.length > 0
-          ? Math.round(
-              allLeads.reduce((s, l) => s + (l.quotedTotal ?? 0), 0) / allLeads.length
-            )
-          : 0,
     };
     return res.json({ tenant: req.tenant, stats, recentLeads: recent, audit });
   });
@@ -453,9 +449,12 @@ export function registerTenantRoutes(app: Express) {
 
   app.delete('/api/tenant/rate-cards/:id', requireAuth, requireTenant, async (req, res) => {
     const id = Number(req.params.id);
-    await db()
+    if (!Number.isFinite(id)) return res.status(400).json({ error: 'Invalid rate card id.' });
+    const deleted = await db()
       .delete(rateCards)
-      .where(and(eq(rateCards.id, id), eq(rateCards.tenantId, req.tenant!.id)));
+      .where(and(eq(rateCards.id, id), eq(rateCards.tenantId, req.tenant!.id)))
+      .returning({ id: rateCards.id });
+    if (!deleted.length) return res.status(404).json({ error: 'Rate card not found.' });
     bumpMarketplace(req.tenant!.id);
     res.json({ ok: true });
   });
@@ -1332,12 +1331,16 @@ export function registerTenantRoutes(app: Express) {
     // Prefer the tenant's chosen subdomain (slug.hostDomain). That's what
     // they picked at signup, what their customers see, what their cert
     // covers. Fall back to PUBLIC_BASE_URL only for legacy/unset hostDomain.
-    const base = t.hostDomain && t.slug
-      ? `https://${t.slug}.${t.hostDomain}`
-      : fallbackBase;
+    const hasHost = !!(t.hostDomain && t.slug);
+    const base = hasHost ? `https://${t.slug}.${t.hostDomain}` : fallbackBase;
+    // On the tenant's own subdomain, GET / IS the calculator. On the platform
+    // origin (unset hostDomain) GET / serves the MARKETING page — the calculator
+    // lives at /w/:slug there — so point the direct link + iframe at /w/:slug,
+    // never at QuoteFleet's marketing site. (The embed.js snippet works on either.)
+    const widgetUrl = hasHost ? `${base}/` : `${base}/w/${encodeURIComponent(t.slug)}`;
     const snippet = `<script src="${base}/embed.js?t=${t.embedToken}" defer></script>`;
-    const iframeFallback = `<iframe src="${base}/?embed=1" style="width:100%;max-width:560px;border:0;min-height:660px;" loading="lazy" title="Get a freight quote"></iframe>`;
-    const directLink = `${base}/`;
+    const iframeFallback = `<iframe src="${widgetUrl}${widgetUrl.includes('?') ? '&' : '?'}embed=1" style="width:100%;max-width:560px;border:0;min-height:660px;" loading="lazy" title="Get a freight quote"></iframe>`;
+    const directLink = widgetUrl;
     res.json({ snippet, iframeFallback, directLink, embedToken: t.embedToken, slug: t.slug, hostDomain: t.hostDomain });
   });
 
