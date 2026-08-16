@@ -772,6 +772,9 @@
         })
         .catch(function () {
           state.submitting = false;
+          // Re-enable so the user isn't stranded on a step with both Continue and
+          // Skip permanently disabled (matches finish()/finishRates()'s catch).
+          try { nextBtn.disabled = false; skipBtn.disabled = false; } catch (_e) {}
           showError('Could not open the importer. Please try again, or pick your modes below.');
         });
     }

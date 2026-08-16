@@ -36,4 +36,42 @@ describe('portal audit fixes', () => {
     const js = await read('src/server/public/app.js');
     expect(js).toContain('r.text().then(function (body)');
   });
+
+  // ── round 2 ────────────────────────────────────────────────────
+  it('the overview endpoint counts new leads with an aggregate, not a full-table load', async () => {
+    const t = await read('src/server/routes/tenant.ts');
+    // A full db().select().from(leads) pulled every row just to count the "new" ones.
+    expect(t).toContain('.from(leads)');
+    expect(t).toMatch(/count\(\)[\s\S]{0,80}\.from\(leads\)/);
+  });
+
+  it('deleting a rate card validates the id and 404s when nothing matched', async () => {
+    const t = await read('src/server/routes/tenant.ts');
+    expect(t).toContain("if (!Number.isFinite(id)) return res.status(400)");
+    expect(t).toContain("if (!deleted.length) return res.status(404)");
+  });
+
+  it('copy buttons route through the copyText fallback (no bare navigator.clipboard that throws off-HTTPS)', async () => {
+    const js = await read('src/server/public/app.js');
+    expect(js).toContain('function copyText(');
+    expect(js).toContain('function legacyCopy(');
+    // No raw clipboard write should remain — they all go through copyText().
+    expect(js).not.toContain('navigator.clipboard.writeText(');
+  });
+
+  it('the onboarding fast-path re-enables its buttons on failure so the user is not stranded', async () => {
+    const ob = await read('src/server/public/onboarding-wizard.js');
+    expect(ob).toMatch(/state\.submitting = false;[\s\S]{0,320}nextBtn\.disabled = false; skipBtn\.disabled = false;/);
+  });
+
+  it('lead status labels are HTML-escaped before injection', async () => {
+    const js = await read('src/server/public/app.js');
+    expect(js).toContain('escapeHtml(statusLabel(');
+  });
+
+  it('the portal exposes a skip link and a focusable content region for keyboard users', async () => {
+    const html = await read('src/server/public/app.html');
+    expect(html).toContain('class="qf-skip-link" href="#page-content"');
+    expect(html).toContain('id="page-content" tabindex="-1"');
+  });
 });
