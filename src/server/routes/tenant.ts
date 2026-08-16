@@ -909,6 +909,18 @@ export function registerTenantRoutes(app: Express) {
     headerLayout: z.enum(['beside', 'stacked']).optional(),
     headerShowName: z.boolean().optional(),
     headerAlign: z.enum(['left', 'center']).optional(),
+    // Quote validity window (days). Forgiving: '' / non-numeric → null (app
+    // default); a number is clamped to 1..365. Stored in the integer column.
+    quoteValidityDays: z.preprocess((v) => {
+      const n = Number(v);
+      return (v === '' || v == null || !Number.isFinite(n)) ? null : Math.max(1, Math.min(365, Math.round(n)));
+    }, z.number().int().nullable()).optional(),
+    // Lead-notification routing. Kept as loose strings (accept-any); the actual
+    // email validation happens where the notification is sent (invalid entries
+    // are ignored and it falls back to the account email), so a typo never 400s
+    // the save.
+    leadEmailTo: z.string().max(200).optional().nullable(),
+    leadEmailCc: z.string().max(500).optional().nullable(),
     ctaText: z.string().optional(),
     // Label for the post-quote "confirm the rate" CTA (#qf-continue-btn) that
     // reveals the contact form. Nullable — null clears back to the widget's

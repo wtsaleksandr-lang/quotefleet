@@ -110,6 +110,8 @@ export interface EmailAttachment {
 
 export interface EmailIn {
   to: string;
+  /** Optional CC recipients (e.g. a carrier CC'ing their team on a lead). */
+  cc?: string[];
   subject: string;
   text: string;
   html?: string;
@@ -205,6 +207,7 @@ export async function sendEmail(msg: EmailIn): Promise<EmailOut> {
         body: JSON.stringify({
           from: msg.from ?? env.RESEND_FROM_EMAIL ?? 'QuoteFleet <onboarding@resend.dev>',
           to: [msg.to],
+          ...(msg.cc?.length ? { cc: msg.cc } : {}),
           // RFC 2047-encode so non-Latin1 subjects (emoji/arrows) don't
           // throw a ByteString error in the header path downstream.
           subject: encodeEmailSubject(msg.subject),
@@ -259,6 +262,7 @@ export async function sendEmail(msg: EmailIn): Promise<EmailOut> {
       await t.sendMail({
         from: msg.from ?? env.SMTP_FROM ?? 'noreply@quotefleet.net',
         to: msg.to,
+        ...(msg.cc?.length ? { cc: msg.cc } : {}),
         subject: msg.subject,
         text: msg.text,
         html: msg.html,

@@ -703,6 +703,15 @@ export const brandConfigs = pgTable('brand_configs', {
   claimCtaText: text('claim_cta_text'),
   /** Footer text under the widget. */
   footerNote: text('footer_note'),
+  /** How long each quote's "Valid until" date lasts, in days. Null = the app
+   *  default (QUOTE_VALIDITY_DAYS). Lets rate-sensitive carriers shorten it. */
+  quoteValidityDays: integer('quote_validity_days'),
+  /** Where new quote-request lead notifications are emailed. Null/empty = the
+   *  account contact email (today's behavior). */
+  leadEmailTo: text('lead_email_to'),
+  /** Comma-separated extra addresses to CC on every lead notification (e.g. a
+   *  dispatch / sales inbox, or the wider team). */
+  leadEmailCc: text('lead_email_cc'),
   /** Whether to show "Powered by QuoteFleet" branding. */
   showPoweredBy: boolean('show_powered_by').notNull().default(true),
   /** Allowed origins for the embed (CSV of domains). Empty = any. */
