@@ -809,6 +809,11 @@ export function registerPublicRoutes(app: Express) {
     };
     const fsc = await fscOptionsForTenant(tenant);
     const calc = calculate(cards, accs, zones, calcReq, terms, fsc, matrices, matrixZones);
+    // Carrier-set quote-validity window (days) overrides the app default so the
+    // widget's "Valid until" date reflects how long THIS carrier's rates hold.
+    if (brand?.quoteValidityDays != null && Number.isFinite(brand.quoteValidityDays)) {
+      calc.validityDays = Math.max(1, Math.min(365, Math.round(brand.quoteValidityDays)));
+    }
 
     const refId = generateLeadRef();
     const sourceUrl = req.headers.referer ?? null;
@@ -944,8 +949,18 @@ export function registerPublicRoutes(app: Express) {
       // Currency LABEL for this quote — the calc already priced it in the
       // carrier's own currency; formatting never converts or alters the amount.
       const notifyTotal = formatEmailMoney(calc.total, calc.currency);
+      // Lead routing: the carrier can send quote requests to a chosen inbox and
+      // CC their team. Invalid/blank entries fall back to the account email so a
+      // typo never black-holes a lead. isEmail is a simple RFC-lite check.
+      const isEmail = (s: string) => /^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(s);
+      const leadTo = ((brand?.leadEmailTo || '').trim() && isEmail((brand!.leadEmailTo as string).trim()))
+        ? (brand!.leadEmailTo as string).trim()
+        : tenant.contactEmail;
+      const leadCc = String(brand?.leadEmailCc || '')
+        .split(',').map((s) => s.trim()).filter((s) => isEmail(s) && s !== leadTo);
       const notifyResult = await sendEmail({
-        to: tenant.contactEmail,
+        to: leadTo,
+        ...(leadCc.length ? { cc: leadCc } : {}),
         subject: `New lead ${refId} (${notifyTotal}) — ${body.customerName}`,
         text:
           `New quote request from ${body.customerName} ${contactLine}.\n` +

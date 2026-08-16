@@ -4745,6 +4745,24 @@
       lc.appendChild(copyWrap);
       c.appendChild(lc);
 
+      // Card 1b — Lead notifications & quote validity (routing + how long a quote holds).
+      var routing = el('div', { class: 'card qf-cz-section' });
+      routing.appendChild(el('div', { class: 'card-title', text: 'Lead notifications & quotes' }));
+      routing.appendChild(el('div', { class: 'card-subtitle', text: 'Where new quote requests are sent, and how long each quote stays valid.' }));
+      routing.appendChild(brandSettingField(b, 'Send new leads to', 'leadEmailTo', {
+        placeholder: 'you@company.com',
+        hint: 'The inbox that gets each quote request. Leave blank to use your account email.',
+      }));
+      routing.appendChild(brandSettingField(b, 'CC your team', 'leadEmailCc', {
+        placeholder: 'dispatch@company.com, sales@company.com',
+        hint: 'Comma-separated — copy additional people on every lead notification.',
+      }));
+      routing.appendChild(brandSettingField(b, 'Quotes valid for (days)', 'quoteValidityDays', {
+        placeholder: '30',
+        hint: 'How long the “Valid until” date on each quote lasts. Leave blank for the default (30 days).',
+      }));
+      c.appendChild(routing);
+
       // Card 2 — Quote actions (customer share / email / print / PDF bar).
       var qa = el('div', { class: 'card', style: { marginTop: '14px' } });
       qa.appendChild(el('div', { class: 'card-title', text: 'Quote actions' }));

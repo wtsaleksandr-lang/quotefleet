@@ -392,3 +392,39 @@ describe('customize panel — mobile pass (floating panel, widget-only Design pr
     expect(css).toContain('border-radius: var(--radius-btn)');
   });
 });
+
+describe('customize — lead routing + quote validity', () => {
+  it('allowlists the three new brand fields in the PUT schema', async () => {
+    const src = await read('src/server/routes/tenant.ts');
+    expect(src).toContain('quoteValidityDays: z.preprocess(');
+    expect(src).toContain('leadEmailTo: z.string().max(200).optional().nullable()');
+    expect(src).toContain('leadEmailCc: z.string().max(500).optional().nullable()');
+  });
+
+  it('adds the columns via a self-healing IF NOT EXISTS migration', async () => {
+    const mig = await read('drizzle/0039_lead_routing_validity.sql');
+    expect(mig).toContain('ADD COLUMN IF NOT EXISTS "quote_validity_days" integer');
+    expect(mig).toContain('ADD COLUMN IF NOT EXISTS "lead_email_to" text');
+    expect(mig).toContain('ADD COLUMN IF NOT EXISTS "lead_email_cc" text');
+  });
+
+  it('overrides quote validity + routes lead notifications in the public quote endpoint', async () => {
+    const src = await read('src/server/routes/public.ts');
+    expect(src).toContain('calc.validityDays = Math.max(1, Math.min(365, Math.round(brand.quoteValidityDays)))');
+    expect(src).toContain('brand?.leadEmailTo');
+    expect(src).toContain('leadCc.length ? { cc: leadCc }');
+  });
+
+  it('teaches sendEmail a cc list on both the Resend + SMTP paths', async () => {
+    const send = await read('src/email/send.ts');
+    expect(send).toContain('cc?: string[]');
+    expect((send.match(/msg\.cc\?\.length \? \{ cc: msg\.cc \}/g) || []).length).toBe(2);
+  });
+
+  it('renders the routing + validity controls in the Behavior tab', async () => {
+    const js = await pub('app.js');
+    expect(js).toContain("brandSettingField(b, 'Send new leads to', 'leadEmailTo'");
+    expect(js).toContain("brandSettingField(b, 'CC your team', 'leadEmailCc'");
+    expect(js).toContain("brandSettingField(b, 'Quotes valid for (days)', 'quoteValidityDays'");
+  });
+});
