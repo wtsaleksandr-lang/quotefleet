@@ -4,5 +4,7 @@ Disallow: /app
 Disallow: /admin
 Disallow: /api/
 Disallow: /w/
+Disallow: /quote/
+Disallow: /chat/
 
 Sitemap: https://quotefleet.net/sitemap.xml
