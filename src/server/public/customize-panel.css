@@ -665,3 +665,7 @@
 .qf-cz-mapstyle-swatch svg { display: block; width: 100%; height: 100%; }
 .qf-cz-mapstyle-swatch::after { display: none; }
 
+/* The Design / Page / Behavior tabs stretch to fill the bar so it reads as one
+   complete menu (was left-aligned with dead space on the right). */
+.qf-cz-tabs .qf-cz-tab { flex: 1 1 0; text-align: center; }
+
