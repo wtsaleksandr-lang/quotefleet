@@ -502,9 +502,23 @@ export function registerTenantRoutes(app: Express) {
     const id = Number(req.params.id);
     const parse = AccessorialPatch.safeParse(req.body);
     if (!parse.success) return invalidInput(res, parse.error);
+    const patch: Record<string, unknown> = { ...parse.data };
+    // Guard the kind→pct_of_base transition: switching to a percent kind WITHOUT
+    // a new amount leaves the STORED amount (a flat dollar figure, often >100) to
+    // be read as a percent → e.g. a $500 flat fee silently becomes 500%-of-base
+    // on every quote (the refine only clamps an amount present in the SAME patch).
+    if (patch.kind === 'pct_of_base' && patch.amount == null) {
+      const existing = await db()
+        .select({ amount: accessorials.amount })
+        .from(accessorials)
+        .where(and(eq(accessorials.id, id), eq(accessorials.tenantId, req.tenant!.id)))
+        .limit(1);
+      const cur = existing[0]?.amount;
+      if (typeof cur === 'number' && cur > 100) patch.amount = 100;
+    }
     await db()
       .update(accessorials)
-      .set({ ...parse.data, updatedAt: new Date() })
+      .set({ ...patch, updatedAt: new Date() })
       .where(and(eq(accessorials.id, id), eq(accessorials.tenantId, req.tenant!.id)));
     bumpMarketplace(req.tenant!.id);
     res.json({ ok: true });

@@ -6,7 +6,7 @@
  *   GET  /api/auth/me        — current user / tenant
  */
 import type { Express, Request, Response } from 'express';
-import { eq } from 'drizzle-orm';
+import { and, eq, ne } from 'drizzle-orm';
 import { nanoid } from 'nanoid';
 import { z } from 'zod';
 import { db } from '../../db/client.js';
@@ -450,6 +450,10 @@ export function registerAuthRoutes(app: Express) {
     if (!ok) return res.status(403).json({ error: 'Current password does not match.' });
     const newHash = await hashPassword(parse.data.next);
     await db().update(users).set({ passwordHash: newHash }).where(eq(users.id, ctx.user.id));
+    // Revoke every OTHER session so changing the password (esp. after a suspected
+    // cookie theft) actually signs out other devices. The current session stays
+    // valid — matching the Account UI's "You stay signed in here".
+    await db().delete(sessions).where(and(eq(sessions.userId, ctx.user.id), ne(sessions.token, token ?? '')));
     return res.json({ ok: true });
   });
 
