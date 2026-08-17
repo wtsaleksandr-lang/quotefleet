@@ -2750,6 +2750,13 @@
     col.appendChild(head);
     col.appendChild(pcard);
 
+    // The frame carries data-device (desktop|mobile) set by setDevice(); the
+    // TRUE-TO-LIFE presentation is CSS-driven (customize-panel.css): on desktop
+    // the widget is BORDERLESS and centered at the real hosted-page calc width
+    // (mirrors hostedPage.ts .qf-hp-shell margin:auto + the bare 560px calc
+    // column), mobile is a centered ~390px phone-width column — no artificial
+    // frame in either. Toggling data-device just reflows width; the widget's
+    // ResizeObserver re-reports height (autoResize below).
     var frameWrap = el('div', { class: 'qf-cz-frame-wrap', 'data-device': 'desktop', 'data-host': 'site' });
     var iframe = el('iframe', { class: 'qf-cz-frame', src: previewUrl, title: 'Your live calculator' });
     frameWrap.appendChild(iframe);

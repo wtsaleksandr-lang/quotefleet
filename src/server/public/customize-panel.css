@@ -209,8 +209,8 @@
 .qf-cz-preview-open { font-size: 12.5px; font-weight: 600; color: var(--accent); text-decoration: none; }
 .qf-cz-preview-open:hover { color: var(--accent-strong); text-decoration: underline; }
 .qf-cz-frame-wrap {
-  border: 1px solid var(--border); border-radius: var(--radius);
-  overflow: hidden; background: #fff;
+  border: 0; border-radius: var(--radius-lg);
+  overflow: hidden; background: transparent;
 }
 .qf-cz-frame { display: block; width: 100%; height: 620px; border: 0; }
 .qf-cz-preview-note { margin-top: 10px; font-size: 12px; color: var(--muted); line-height: 1.45; }
@@ -700,5 +700,55 @@
     height: auto;
     max-height: none;
   }
+}
+
+/* ══════════════════════════════════════════════════════════════════════════
+   REALISTIC BORDERLESS DESKTOP PREVIEW (≥901px) — make the live preview look
+   TRUE-TO-LIFE, exactly as customers see it on the hosted page (/w/<slug>).
+   The real hosted page (hostedPage.ts) centers the calculator in a plain shell
+   — `.qf-hp-shell { max-width: 1180px; margin: 0 auto }` — with only the
+   calculator's OWN soft-shadow card around it (`.qf-hp-frame-card`: rounded +
+   shadow, transparent bg), NOT a heavy outer frame. So on desktop we:
+     · strip the artificial preview-card chrome AROUND the widget (border / bg /
+       box-shadow on the preview pane) so the widget floats CENTERED on the
+       preview canvas, mirroring the shell's margin:auto centering; and
+     · give the widget frame the real page's minimal surface — borderless, a
+       soft elevation shadow + rounded corners (the widget's own card) — capped
+       at the real bare-page calc width (560px, matching `.qf-hp-grid` bare) and
+       centered, so it never over-stretches on wide viewports.
+   The Desktop|Mobile device toggle (buildLivePreview → data-device) keeps
+   driving width: desktop = natural 560px centered; mobile = 390px phone column
+   (from the base rule), both borderless + softly elevated. Desktop-only so the
+   ≤900 stacked layout and ≤640 bottom-sheet stay untouched. Appended at EOF so
+   the line-based spacing/colour baselines never renumber. Tokens only;
+   theme-aware (light + dark via style.css --radius-lg / --shadow-lg).
+   ══════════════════════════════════════════════════════════════════════════ */
+@media (min-width: 901px) {
+  /* The preview PANE becomes the plain canvas the widget centers on (like the
+     hosted page's shell/background) — no boxy card border around the widget. */
+  .qf-cz-preview {
+    background: transparent;
+    border: 0;
+    box-shadow: none;
+  }
+  /* The widget frame = the real page's own calculator card: borderless, softly
+     elevated + rounded, centered. No artificial preview border. width:100% gives
+     the flex item a definite cross-size so max-width + auto margins can cap and
+     centre it (without it, the auto cross-margins collapse the frame to the
+     iframe's 300px intrinsic width). */
+  .qf-cz-frame-wrap {
+    width: 100%;
+    border: 0;
+    background: transparent;
+    border-radius: var(--radius-lg);
+    box-shadow: var(--shadow-lg);
+    margin-left: auto;
+    margin-right: auto;
+  }
+  /* Desktop device view: cap to the real bare-page calc width (560px) and
+     centre — mirrors `body.qf-hp--bare .qf-hp-grid { grid-template-columns:
+     minmax(0, 560px); justify-content: center }`. Mobile keeps its 390px cap
+     from the base rule. */
+  .qf-cz-frame-wrap[data-device="desktop"] { max-width: 560px; }
 }
 
