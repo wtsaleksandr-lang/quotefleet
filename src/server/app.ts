@@ -321,14 +321,24 @@ export function createApp(): express.Express {
       index: false,
       extensions: ['html'],
       // Filenames aren't content-hashed, so keep conservative TTLs: long for
-      // fonts/images/video (rarely change), short for CSS/JS (change on
-      // deploy), and no caching for HTML so page edits go live immediately.
+      // fonts/images/video (rarely change), REVALIDATE for CSS/JS (change on
+      // deploy — see below), and no caching for HTML so page edits go live
+      // immediately.
       setHeaders: (res, filePath) => {
         const ext = filePath.slice(filePath.lastIndexOf('.')).toLowerCase();
         if (['.woff2', '.woff', '.ttf', '.otf', '.webp', '.png', '.jpg', '.jpeg', '.gif', '.svg', '.ico', '.webm', '.mp4'].includes(ext)) {
           res.setHeader('Cache-Control', 'public, max-age=604800'); // 7 days
         } else if (['.css', '.js', '.mjs'].includes(ext)) {
-          res.setHeader('Cache-Control', 'public, max-age=86400'); // 1 day
+          // The app/widget bundles (app.js, widget.js, *.css) are NOT
+          // content-hashed, so a positive max-age let a returning visitor keep
+          // running the PREVIOUS deploy's cached bundle for up to that TTL — a
+          // shipped fix (e.g. the CTA-hover + preview-scroll fix in #268) would
+          // silently NOT reach anyone who had loaded the portal within the day.
+          // `no-cache` = "store, but revalidate before every use": express.static
+          // still emits ETag/Last-Modified, so an UNCHANGED file is a tiny 304 and
+          // stays effectively free, while a CHANGED file (a new deploy) is fetched
+          // immediately. Correctness of what the user runs > a saved round-trip.
+          res.setHeader('Cache-Control', 'no-cache');
         } else if (ext === '.html') {
           res.setHeader('Cache-Control', 'no-cache');
         }
