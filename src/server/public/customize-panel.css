@@ -668,15 +668,21 @@
   .qf-cz-controls { gap: 16px; }
 
   /* Full-height preview: the column fills the viewport and flexes so the widget
-     frame grows into the space (no short floating card, no dead gap). 36px =
-     18px sticky top offset + 18px bottom breathing room — NOT a portal-chrome
-     offset. */
+     frame grows into the space (no short floating card, no dead gap). It must
+     account for the STATIC PORTAL TOP BAR (added in #264): --qf-bar-h is the
+     bar's real measured height (published by syncBarHeight in app.js; includes
+     the in-bar trial/announcement pill), with a 56px fallback for first paint.
+     · top: pin the sticky column just BELOW the bar (bar height + 18px breath),
+       so it no longer slides under the higher-z-index bar on scroll.
+     · height: fill the viewport UNDER the bar — 36px = 18px below the bar
+       (matching `top`) + 18px bottom breathing room. */
   .qf-cz-preview-col {
     display: flex;
     flex-direction: column;
     gap: 16px;
-    height: calc(100vh - 36px);
-    height: calc(100dvh - 36px);
+    top: calc(var(--qf-bar-h, 56px) + 18px);
+    height: calc(100vh - var(--qf-bar-h, 56px) - 36px);
+    height: calc(100dvh - var(--qf-bar-h, 56px) - 36px);
   }
   .qf-cz-preview {
     flex: 1 1 auto;
