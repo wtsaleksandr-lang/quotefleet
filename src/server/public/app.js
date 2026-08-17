@@ -2702,6 +2702,13 @@
 
     // Device segmented toggle (Desktop | Mobile).
     var device = 'desktop';
+    // The real hosted page's shell width (hostedPage.ts .qf-hp-shell max-width).
+    // The desktop hosted preview renders the iframe at this width and scales it
+    // down to the pane, so the user sees the TRUE desktop layout, just zoomed out.
+    var DESKTOP_HP_W = 1180;
+    // Latest height the preview reported (widget or hosted page). Drives both the
+    // plain iframe height (widget / mobile) and the scaled sizer height (hosted).
+    var lastContentH = 620;
     var devSeg = el('div', { class: 'qf-cz-seg', role: 'group', 'aria-label': 'Preview device' });
     var DEV_ICONS = {
       desktop: '<svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect width="20" height="14" x="2" y="3" rx="2"/><line x1="8" x2="16" y1="21" y2="21"/><line x1="12" x2="12" y1="17" y2="21"/></svg>',
@@ -2757,9 +2764,19 @@
     // column), mobile is a centered ~390px phone-width column — no artificial
     // frame in either. Toggling data-device just reflows width; the widget's
     // ResizeObserver re-reports height (autoResize below).
-    var frameWrap = el('div', { class: 'qf-cz-frame-wrap', 'data-device': 'desktop', 'data-host': 'site' });
+    // data-preview reflects WHAT the iframe is showing: 'widget' = the bare
+    // calculator (Design tab, …?embed=1), 'hosted' = the full hosted landing
+    // page (Page/Behavior tabs). On desktop the hosted page needs its REAL
+    // ~1180px layout (hero beside the widget), so we render the iframe at that
+    // width and CSS-transform it down to fit the ~500px preview pane (see
+    // applyHostedScale below + customize-panel.css). The bare widget stays at its
+    // natural calc width. A frame-sizer wraps the iframe so the scaled page keeps
+    // a correct (scaled) layout box — the wrap scrolls it without overflow.
+    var frameWrap = el('div', { class: 'qf-cz-frame-wrap', 'data-device': 'desktop', 'data-host': 'site', 'data-preview': 'widget' });
+    var frameSizer = el('div', { class: 'qf-cz-frame-sizer' });
     var iframe = el('iframe', { class: 'qf-cz-frame', src: previewUrl, title: 'Your live calculator' });
-    frameWrap.appendChild(iframe);
+    frameSizer.appendChild(iframe);
+    frameWrap.appendChild(frameSizer);
     pcard.appendChild(frameWrap);
     pcard.appendChild(el('div', { class: 'qf-cz-preview-note', text: 'This is exactly what your customers see. It updates live as you make changes.' }));
 
@@ -2772,6 +2789,41 @@
         devBtns[k].setAttribute('aria-pressed', on ? 'true' : 'false');
       });
       // Width change reflows the widget → its ResizeObserver re-reports height.
+      applyHostedScale();
+    }
+    // True only when the DESKTOP device view is showing the full HOSTED page
+    // (Page/Behavior tabs). The Design-tab bare widget and the mobile phone
+    // column are never scaled — they render at their natural width.
+    function isHostedDesktop() {
+      return frameWrap.getAttribute('data-preview') === 'hosted' && device === 'desktop';
+    }
+    // Render the hosted page at its real desktop width (DESKTOP_HP_W) and scale
+    // it down to the preview pane so the user sees the true desktop layout — hero
+    // beside the widget — zoomed to fit, never crammed into a phone column. The
+    // frame-sizer takes the SCALED dimensions as its layout box (the iframe is
+    // absolutely positioned + transformed inside it via CSS), so the wrap scrolls
+    // the page cleanly with no horizontal overflow. When not hosted-desktop we
+    // clear the inline styles and fall back to the plain full-width iframe.
+    function applyHostedScale() {
+      if (!isHostedDesktop()) {
+        iframe.style.width = '';
+        iframe.style.transform = '';
+        iframe.style.transformOrigin = '';
+        iframe.style.height = lastContentH + 'px';
+        frameSizer.style.width = '';
+        frameSizer.style.height = '';
+        return;
+      }
+      var w = frameSizer.clientWidth || frameWrap.clientWidth || 0;
+      if (!w) return;
+      var s = Math.min(1, w / DESKTOP_HP_W);
+      iframe.style.width = DESKTOP_HP_W + 'px';
+      iframe.style.height = lastContentH + 'px';
+      iframe.style.transformOrigin = 'top left';
+      iframe.style.transform = 'scale(' + s + ')';
+      // The sizer's real (unscaled) layout box collapses to the scaled height so
+      // the wrap's scroll range matches what's visible.
+      frameSizer.style.height = Math.round(lastContentH * s) + 'px';
     }
     function setTheme(id, skipPost) {
       if (id !== 'site' && !Object.prototype.hasOwnProperty.call(THEME_PRESETS, id)) id = 'site';
@@ -2829,10 +2881,19 @@
       if (e.source !== iframe.contentWindow || !e.data) return;
       if (e.data.type === 'QF_WIDGET_HEIGHT' && typeof e.data.height === 'number') {
         var h = Math.max(320, Math.min(2200, Math.round(e.data.height)));
-        iframe.style.height = h + 'px';
+        lastContentH = h;
+        if (isHostedDesktop()) applyHostedScale();
+        else iframe.style.height = h + 'px';
       }
     }
     window.addEventListener('message', onMsg);
+    // The scale factor is pane-width-relative, so recompute on viewport resize
+    // (self-detaching once the preview leaves the DOM).
+    var onWinResize = function () {
+      if (!frameWrap.isConnected) { window.removeEventListener('resize', onWinResize); return; }
+      applyHostedScale();
+    };
+    window.addEventListener('resize', onWinResize);
 
     function postToPreview(msg) {
       try { if (iframe && iframe.contentWindow) iframe.contentWindow.postMessage(msg, '*'); } catch (_e) {}
@@ -2946,6 +3007,13 @@
         previewUrl = url;
         iframe.src = url;
       },
+      // Tell the preview whether it is showing the HOSTED page (true, Page/
+      // Behavior tabs → desktop gets the scaled real-width layout) or the bare
+      // WIDGET (false, Design tab → natural calc width, no scaling).
+      setHostedMode: function (isHosted) {
+        frameWrap.setAttribute('data-preview', isHosted ? 'hosted' : 'widget');
+        applyHostedScale();
+      },
     };
   }
 
@@ -3041,6 +3109,9 @@
         // Point the shared preview at the right source for this tab (Design =
         // widget-only, Page/Behavior = hosted). Guarded no-op when unchanged.
         if (preview && preview.setPreviewSrc) preview.setPreviewSrc(czPreviewUrlFor(id));
+        // Desktop hosted preview renders at real width + scales to fit; the bare
+        // widget stays natural width. Gate that on which page is showing.
+        if (preview && preview.setHostedMode) preview.setHostedMode(id !== 'design');
       }
       [{ id: 'design', label: 'Design' }, { id: 'page', label: 'Page' }, { id: 'behavior', label: 'Behavior' }].forEach(function (t) {
         var btn = el('button', { type: 'button', class: 'qf-cz-tab', role: 'tab', 'data-tab': t.id, text: t.label });
