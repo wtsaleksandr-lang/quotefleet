@@ -294,10 +294,19 @@
     attachTypeahead(document.getElementById('qf-delivery'), document.getElementById('qf-delivery-suggestions'), function (s) { state.deliveryResolved = s; });
 
     function parseLoc(text, resolved) {
-      if (resolved) return {
-        city: resolved.city, state: resolved.state, zip: resolved.zip,
-        country: resolved.country || 'US', lat: resolved.lat, lng: resolved.lng,
-      };
+      if (resolved) {
+        // Only forward fields that actually carry a value. The autocomplete
+        // provider returns null for absent fields (e.g. a city suggestion has
+        // zip:null); sending {zip:null} makes the server's z.string().optional()
+        // schema reject the whole request with a 400, so no quote is produced.
+        var loc = { country: resolved.country || 'US' };
+        if (resolved.city) loc.city = resolved.city;
+        if (resolved.state) loc.state = resolved.state;
+        if (resolved.zip) loc.zip = resolved.zip;
+        if (typeof resolved.lat === 'number') loc.lat = resolved.lat;
+        if (typeof resolved.lng === 'number') loc.lng = resolved.lng;
+        return loc;
+      }
       // crude fallback parser
       var t = (text || '').trim();
       var zip = t.match(/^\d{5}$/);
