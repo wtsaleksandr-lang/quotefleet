@@ -15,10 +15,11 @@
   <meta name="twitter:description" content="Give customers a branded page that quotes them in seconds. Stop losing loads to slow, manual quoting.">
   <meta name="twitter:image" content="https://quotefleet.net/brand/og-image-1200x630.png">
   <link rel="canonical" href="https://quotefleet.net/">
+  <link rel="preload" as="image" href="/marketing/qf-hero-laptop-poster.jpg" fetchpriority="high">
   <script>document.documentElement.classList.add('js');</script>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="/style.css">
   <link rel="stylesheet" href="/landing-conversion.css">
   <link rel="stylesheet" href="/landing-s-polish.css">
@@ -43,6 +44,38 @@
   <link rel="apple-touch-icon" sizes="180x180" href="/brand/apple-touch-icon-180.png">
   <link rel="manifest" href="/site.webmanifest">
   <meta name="theme-color" content="#0b0f15">
+  <script type="application/ld+json">
+{
+  "@context": "https://schema.org",
+  "@graph": [
+    { "@type": "Organization", "@id": "https://quotefleet.net/#org", "name": "QuoteFleet", "legalName": "MR Holdings & Trade LLC", "url": "https://quotefleet.net/",
+      "logo": { "@type": "ImageObject", "url": "https://quotefleet.net/brand/logo-full-ondark.png", "width": 168, "height": 113 },
+      "image": "https://quotefleet.net/brand/og-image-1200x630.png",
+      "description": "Branded rate calculator pages, PDF quotes, and optional AI chat for trucking carriers, brokers, and freight forwarders.",
+      "contactPoint": [
+        { "@type": "ContactPoint", "contactType": "customer support", "email": "support@quotefleet.net", "availableLanguage": "en" },
+        { "@type": "ContactPoint", "contactType": "sales", "email": "hello@quotefleet.net", "availableLanguage": "en" }
+      ] },
+    { "@type": "WebSite", "@id": "https://quotefleet.net/#website", "url": "https://quotefleet.net/", "name": "QuoteFleet", "publisher": { "@id": "https://quotefleet.net/#org" } }
+  ]
+}
+  </script>
+  <script type="application/ld+json">
+{
+  "@context": "https://schema.org",
+  "@type": "FAQPage",
+  "mainEntity": [
+    { "@type": "Question", "name": "Do I need a website?", "acceptedAnswer": { "@type": "Answer", "text": "No. You can start with your own branded link and share it directly." } },
+    { "@type": "Question", "name": "Can I add it to my website later?", "acceptedAnswer": { "@type": "Answer", "text": "Yes. Start with the hosted page first, then embed it whenever you want." } },
+    { "@type": "Question", "name": "Do customers need an account?", "acceptedAnswer": { "@type": "Answer", "text": "No. They simply open your page and use it." } },
+    { "@type": "Question", "name": "Can the page match my company branding?", "acceptedAnswer": { "@type": "Answer", "text": "Yes. The hosted page can be customized for your company style." } },
+    { "@type": "Question", "name": "Do I need a contract or complicated setup?", "acceptedAnswer": { "@type": "Answer", "text": "No. It is designed to be quick to start and easy to use." } },
+    { "@type": "Question", "name": "Can I control who gets access?", "acceptedAnswer": { "@type": "Answer", "text": "Yes. You decide how and with whom the calculator link is shared." } },
+    { "@type": "Question", "name": "Are my rates shown publicly?", "acceptedAnswer": { "@type": "Answer", "text": "No. Your calculator is shared only through the links and access you choose." } },
+    { "@type": "Question", "name": "Does it work with my current TMS or workflow?", "acceptedAnswer": { "@type": "Answer", "text": "Yes. QuoteFleet is a standalone branded link — with an optional website embed — that works alongside whatever you use today. There's no TMS integration to set up and nothing to replace. Share it by link or embed it, and keep running your business exactly as you do now." } }
+  ]
+}
+  </script>
 </head>
 <body class="landing-v2 qf-wft">
   <header class="site-header">
@@ -197,7 +230,7 @@
       </ul></div></div></section>
   </main>
 
-  <footer class="premium-footer"><div class="premium-footer-inner"><div class="footer-brand"><a href="/" class="qf-footer-brand" aria-label="QuoteFleet home"><img class="qf-footer-logo" src="/brand/logo-full-ondark.png" alt="QuoteFleet — freight rate calculator" width="168" height="113" decoding="async"></a><div class="qf-footer-brandtext"><a href="/" class="qf-footer-wordmark">QuoteFleet</a><p class="qf-footer-tagline">Branded rate calculator pages, PDF quotes, and optional AI chat for trucking service providers.</p></div></div><div class="footer-col"><h4>Product</h4><a href="/w/demo">Demo</a><a href="/pricing">Pricing</a><a href="/signup">Start free</a><a href="#faq">FAQ</a></div><div class="footer-col"><h4>Company</h4><a href="mailto:hello@quotefleet.net">Contact</a><a href="/support">Support</a><a href="/login">Sign in</a><a href="/security">Security</a></div><div class="footer-col"><h4>Legal</h4><a href="/terms">Terms of Service</a><a href="/privacy">Privacy Policy</a><a href="/refund">Refund &amp; Cancellation</a><a href="/dpa">Data Processing (DPA)</a><a href="/cookie">Cookie Policy</a><a href="/.well-known/security.txt">security.txt</a></div></div><ul class="qf-footer-trustbar" role="list"><li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="11" width="18" height="10" rx="2"/><path d="M7 11V7.5a5 5 0 0 1 10 0V11"/></svg>Payments secured by Stripe</li><li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 3 4.5 6v6c0 4.4 3.2 7.4 7.5 8.9 4.3-1.5 7.5-4.5 7.5-8.9V6z"/><path d="m9 12 2 2 4-4"/></svg>SSL/TLS encrypted</li><li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 2.5 4 5.5v6c0 4.6 3.3 7.7 8 9.5 4.7-1.8 8-4.9 8-9.5v-6z"/><circle cx="12" cy="11" r="2.4"/><path d="M12 13.4V16"/></svg>GDPR &amp; CCPA-ready</li><li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="4" y="4" width="16" height="16" rx="2"/><path d="M4 10h16M10 4v16"/></svg>Per-tenant data isolation</li></ul><div class="footer-bottom"><span>© <span id="year"></span> QuoteFleet. All rights reserved.</span><span class="qf-foot-operator">QuoteFleet is a product of MR Holdings &amp; Trade LLC.</span></div></footer>
+  <footer class="premium-footer"><div class="premium-footer-inner"><div class="footer-brand"><a href="/" class="qf-footer-brand" aria-label="QuoteFleet home"><img class="qf-footer-logo" src="/brand/logo-full-ondark.png" alt="QuoteFleet — freight rate calculator" width="168" height="113" decoding="async"></a><div class="qf-footer-brandtext"><a href="/" class="qf-footer-wordmark">QuoteFleet</a><p class="qf-footer-tagline">Branded rate calculator pages, PDF quotes, and optional AI chat for trucking service providers.</p></div></div><div class="footer-col"><h4>Product</h4><a href="/w/demo">Demo</a><a href="/pricing">Pricing</a><a href="/signup">Start free</a><a href="#faq">FAQ</a></div><div class="footer-col"><h4>Solutions</h4><a href="/tools">Free rate calculator</a><a href="/for/brokers">For freight brokers</a><a href="/for/forwarders">For freight forwarders</a><a href="/for/ltl">For LTL</a><a href="/marketplace">Carrier marketplace</a></div><div class="footer-col"><h4>Company</h4><a href="mailto:hello@quotefleet.net">Contact</a><a href="/support">Support</a><a href="/login">Sign in</a><a href="/security">Security</a></div><div class="footer-col"><h4>Legal</h4><a href="/terms">Terms of Service</a><a href="/privacy">Privacy Policy</a><a href="/refund">Refund &amp; Cancellation</a><a href="/dpa">Data Processing (DPA)</a><a href="/cookie">Cookie Policy</a><a href="/.well-known/security.txt">security.txt</a></div></div><ul class="qf-footer-trustbar" role="list"><li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="11" width="18" height="10" rx="2"/><path d="M7 11V7.5a5 5 0 0 1 10 0V11"/></svg>Payments secured by Stripe</li><li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 3 4.5 6v6c0 4.4 3.2 7.4 7.5 8.9 4.3-1.5 7.5-4.5 7.5-8.9V6z"/><path d="m9 12 2 2 4-4"/></svg>SSL/TLS encrypted</li><li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 2.5 4 5.5v6c0 4.6 3.3 7.7 8 9.5 4.7-1.8 8-4.9 8-9.5v-6z"/><circle cx="12" cy="11" r="2.4"/><path d="M12 13.4V16"/></svg>GDPR &amp; CCPA-ready</li><li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="4" y="4" width="16" height="16" rx="2"/><path d="M4 10h16M10 4v16"/></svg>Per-tenant data isolation</li></ul><div class="footer-bottom"><span>© <span id="year"></span> QuoteFleet. All rights reserved.</span><span class="qf-foot-operator">QuoteFleet is a product of MR Holdings &amp; Trade LLC.</span></div></footer>
 
   <script src="/landing-hero-swap.js" defer></script>
   <script src="/landing-hero-captions.js" defer></script>
