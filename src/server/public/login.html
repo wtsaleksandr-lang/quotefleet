@@ -160,7 +160,7 @@
           body: JSON.stringify({ email: email }),
         });
         if (res.ok) {
-          msg.textContent = '✓ If that email exists, a link is on the way. Link expires in 15 minutes.';
+          msg.textContent = '✓ If that email exists, a link is on the way.';
           msg.classList.remove('hidden', 'error'); msg.classList.add('notice');
           var seconds = 30;
           btn.innerHTML = 'Resend in ' + seconds + 's';
