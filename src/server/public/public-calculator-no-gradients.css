@@ -783,6 +783,19 @@ body[data-qf-preset="booking"] .qf-tabs button.active {
   color: rgba(255, 255, 255, 1) !important;
   border: 2px solid rgba(255, 255, 255, 1) !important;
 }
+/* MOTION FIX (mirrors Stone/Vault): the sliding indicator paints --w-accent-
+   surface by default. Booking is a DARK preset, so a tenant accent override
+   makes accent-surface #FFFFFF (applyAccentOverride: dark mode → white surface)
+   — washing Booking's white active-tab label to white-on-white. Point the
+   indicator at Booking's real solid accent fill (--w-accent-solid, always
+   hardened so white text passes) so the white label + white border read in
+   EVERY case (default tonal-blue and any tenant accent). Higher specificity
+   than the motion default → wins; the slide is unaffected. White literals stay
+   rgba(255,255,255,x) so the hardcoded-colour guard stays at 0 new. */
+body[data-qf-preset="booking"] .qf-tabs-ind {
+  background: var(--w-accent-solid, #006CE4) !important;
+  border-color: rgba(255, 255, 255, 1) !important;
+}
 body[data-qf-preset="booking"] .qf-input:focus,
 body[data-qf-preset="booking"] .qf-select:focus {
   border-color: rgba(255, 255, 255, 1) !important;
@@ -1038,12 +1051,20 @@ body.qf-app-calculator .qf-oog-toggle span {
    eyebrow badge, sentence-case titles and neutralised blue leaks keep the
    identity accent. No #fff/#000/white/black literals (fallbacks live in var()).
    ========================================================================== */
-/* Active service tab -> token accent fill (default rule only tints it). */
+/* Active service tab -> token accent fill (default rule only tints it). The
+   LABEL routes to --w-tab-active-text (engine-hardened to read on the sliding
+   indicator's --w-accent-surface) rather than --w-accent-text: with a tenant
+   accent override, accent-text flips to white for the accent-solid fill, but
+   the indicator still paints the LIGHT accent-surface — so a raw accent-text
+   label washed to white-on-light. tab-active-text is guaranteed ≥AA on the
+   indicator surface in every case (default near-black stays near-black → no
+   visible default change). Fallback chain keeps the hardcoded-colour guard at
+   0 new (both fallbacks live inside var()). */
 body[data-qf-preset="citron"] .qf-tabs button.active {
   background: var(--w-accent-solid, #C3F832) !important;
   background-image: none !important;
   border-color: var(--w-accent-solid, #C3F832) !important;
-  color: var(--w-accent-text, #292928) !important;
+  color: var(--w-tab-active-text, var(--w-accent-text, #292928)) !important;
 }
 /* lbs/kg active segment -> token accent fill. */
 body[data-qf-preset="citron"] .qf-wt-unit button.is-on {
