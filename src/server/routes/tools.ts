@@ -87,27 +87,41 @@ const PLATFORM_LANE_ZONES: LaneZone[] = generateDefaultLaneZones().map((z, i) =>
   updatedAt: new Date(),
 }));
 
+// Location fields are optional, but callers (the public form's autocomplete,
+// the AI quote tool, future integrations) routinely send `null` for an absent
+// field rather than omitting it. Plain `.optional()` rejects `null`, which used
+// to 400 the whole quote — so accept `null` and normalize it to `undefined`,
+// keeping the parsed types as `string | undefined` for the code below.
+const optStr = z
+  .string()
+  .nullish()
+  .transform((v) => v ?? undefined);
+const optNum = z
+  .number()
+  .nullish()
+  .transform((v) => v ?? undefined);
+
 const QuoteSchema = z.object({
   service: z.string(),
   equipment: z.string(),
   pickup: z.object({
-    city: z.string().optional(),
-    state: z.string().optional(),
-    zip: z.string().optional(),
-    country: z.string().optional(),
-    portCode: z.string().optional(),
-    lat: z.number().optional(),
-    lng: z.number().optional(),
+    city: optStr,
+    state: optStr,
+    zip: optStr,
+    country: optStr,
+    portCode: optStr,
+    lat: optNum,
+    lng: optNum,
   }),
   delivery: z.object({
-    city: z.string().optional(),
-    state: z.string().optional(),
-    zip: z.string().optional(),
-    country: z.string().optional(),
-    lat: z.number().optional(),
-    lng: z.number().optional(),
+    city: optStr,
+    state: optStr,
+    zip: optStr,
+    country: optStr,
+    lat: optNum,
+    lng: optNum,
   }),
-  weightLbs: z.number().optional(),
+  weightLbs: optNum,
   selectedAccessorialCodes: z.array(z.string()).optional(),
   flags: z
     .object({
