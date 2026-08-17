@@ -845,3 +845,56 @@
   }
 }
 
+/* ══════════════════════════════════════════════════════════════════════════
+   MOBILE PREVIEW SCROLL FIX — scroll INSIDE the iframe on touch.
+   At ≤900px .qf-cz-frame-wrap is a FIXED-height pane (520px, set above). The
+   desktop auto-height model sizes the iframe to the widget's full content and
+   scrolls the OUTER wrap via JS — but on a phone the content-tall iframe ate the
+   touch and had nothing to scroll (its doc == its own height), while the outer
+   wrap was unreachable through the iframe, so the whole preview was frozen.
+   Filling the pane (sizer + iframe at 100%; iframe height forced to 100% inline
+   by app.js plainFrameHeight()) hands scrolling to the widget document inside
+   the iframe — a touch-drag now scrolls it naturally. The sizer needs an
+   explicit height so the iframe's height:100% resolves against the fixed pane.
+   Desktop (≥901px) keeps the auto-height + guided-scroll model untouched.
+   Appended at EOF so the line-based spacing/colour baselines never renumber. */
+@media (max-width: 900px) {
+  .qf-cz-frame-sizer { height: 100%; }
+  .qf-cz-frame { height: 100%; }
+}
+
+/* ══════════════════════════════════════════════════════════════════════════
+   MOBILE SHEET GRAB ZONE — bigger drag surface, tinted zone, dashed divider.
+   The collapsed sheet's 24px grip was too small to grab with a thumb, so the
+   whole TOP region — the grip handle AND the Design/Page/Behavior nav row — is
+   the drag surface (wireNavDrag in app.js resizes the sheet on a VERTICAL drag,
+   while a TAP still switches the tab and a HORIZONTAL drag still scrolls the nav
+   carousel). These rules ONLY exist inside the ≤640 bottom sheet — the
+   .qf-cz-sheet node is created by JS on mobile only — so the desktop split-
+   header Design/Page/Behavior tab bar is completely untouched. Tokens only;
+   theme-aware. Appended at EOF so the line-based baselines never renumber.
+   ══════════════════════════════════════════════════════════════════════════ */
+/* Grab-zone TINT: a subtle --ink overlay reads BRIGHTER than the sheet surface
+   in dark mode (--ink is near-white) and DARKER in light mode (--ink is near-
+   black) — one rule, correct in both themes, no hardcoded colours. */
+.qf-cz-sheet-handle,
+.qf-cz-sheet > .qf-cz-carousel--nav {
+  background: color-mix(in srgb, var(--ink) 5%, transparent);
+}
+/* Round the grip's top to sit flush inside the sheet's rounded top edge. */
+.qf-cz-sheet-handle {
+  border-top-left-radius: var(--radius-lg);
+  border-top-right-radius: var(--radius-lg);
+}
+/* Both drag axes are JS-owned in this zone (vertical = resize, horizontal =
+   carousel), so take the gestures away from the browser's native pan/scroll —
+   otherwise a native vertical scroll would fight the resize drag. */
+.qf-cz-sheet > .qf-cz-carousel--nav { cursor: grab; touch-action: none; }
+.qf-cz-sheet .qf-cz-carousel--nav .qf-cz-carousel-track { touch-action: none; }
+.qf-cz-sheet.is-dragging > .qf-cz-carousel--nav { cursor: grabbing; }
+/* Subtle DASHED divider beneath the three tab buttons (the nav row), marking the
+   bottom of the grab zone and separating it from the scrolling controls. */
+.qf-cz-sheet > .qf-cz-carousel--nav {
+  border-bottom: 1px dashed var(--border);
+}
+

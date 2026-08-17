@@ -282,7 +282,17 @@
          wrapping to a full-width row 2 (so nothing crowds at 375px). */
       .qf-topbar { flex-wrap: wrap; row-gap: 8px; gap: 12px; }
       .qf-topbar-center { order: 3; flex: 1 0 100%; }
+      /* Row 1 = logo/hamburger (left) + account (far right). Both zones are
+         `flex: 0 0 auto`, and the announcement (center) has wrapped to its own
+         full-width row 2 — so without this the account button clustered next to
+         the logo in the MIDDLE of the bar. margin-left:auto eats the free space
+         on row 1 and pins the account trigger to the TOP-RIGHT corner. */
+      .qf-topbar-right { margin-left: auto; }
       .qf-account-trigger { max-width: 160px; }
+      /* Keep the dropdown panel inside the 375px viewport: never wider than the
+         screen minus the bar's 16px side gutters, and clamp its min-width so a
+         narrow phone can't force horizontal overflow. */
+      .qf-account-menu { min-width: 0; width: max-content; max-width: calc(100vw - 32px); }
       .app-shell .sidebar { position: fixed; top: var(--qf-bar-h, 56px); left: 0; bottom: 0; width: 260px; max-width: 80vw; padding-top: 8px; transform: translateX(-100%); transition: transform 0.18s ease; z-index: 1000; box-shadow: 4px 0 20px rgba(0,0,0,0.2); overflow-y: auto; }
       .app-shell.qf-nav-open .sidebar { transform: translateX(0); }
       .qf-nav-scrim { position: fixed; inset: 0; background: rgba(8, 11, 20, 0.55); opacity: 0; visibility: hidden; transition: opacity 0.18s ease, visibility 0.18s ease; z-index: 999; }

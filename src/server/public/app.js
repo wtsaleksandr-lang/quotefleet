@@ -2709,6 +2709,20 @@
     // Latest height the preview reported (widget or hosted page). Drives both the
     // plain iframe height (widget / mobile) and the scaled sizer height (hosted).
     var lastContentH = 620;
+    // ── Mobile preview = scroll INSIDE the iframe ─────────────────────────────
+    // On desktop the preview uses an AUTO-HEIGHT model: the iframe is sized to the
+    // widget's full content height (QF_WIDGET_HEIGHT) and the outer .qf-cz-frame-wrap
+    // is a fixed viewport the JS guided-align scrolls (#265/#272). On a touch phone
+    // that model FROZE the preview: the content-tall iframe intercepted every touch
+    // but had nothing to scroll (its own document == its own height), and the outer
+    // wrap could never be reached through the iframe — so drags did nothing.
+    // At ≤900px customize-panel.css makes .qf-cz-frame-wrap a FIXED-height pane; we
+    // fill it with the iframe (height:100% + the sizer at 100%) so a touch-drag
+    // scrolls the widget document INSIDE the iframe — the natural iframe scroll
+    // model. matchMedia mirrors the CSS breakpoint exactly. Desktop untouched.
+    var czStackMq = (window.matchMedia && window.matchMedia('(max-width: 900px)')) || null;
+    function czStackedMobile() { return !!(czStackMq && czStackMq.matches); }
+    function plainFrameHeight() { return czStackedMobile() ? '100%' : (lastContentH + 'px'); }
     var devSeg = el('div', { class: 'qf-cz-seg', role: 'group', 'aria-label': 'Preview device' });
     var DEV_ICONS = {
       desktop: '<svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect width="20" height="14" x="2" y="3" rx="2"/><line x1="8" x2="16" y1="21" y2="21"/><line x1="12" x2="12" y1="17" y2="21"/></svg>',
@@ -2809,9 +2823,11 @@
         iframe.style.width = '';
         iframe.style.transform = '';
         iframe.style.transformOrigin = '';
-        iframe.style.height = lastContentH + 'px';
+        // Mobile: fill the fixed-height pane (100%) so the widget doc scrolls
+        // inside the iframe; desktop: size to content for the JS guided-align.
+        iframe.style.height = plainFrameHeight();
         frameSizer.style.width = '';
-        frameSizer.style.height = '';
+        frameSizer.style.height = czStackedMobile() ? '100%' : '';
         return;
       }
       var w = frameSizer.clientWidth || frameWrap.clientWidth || 0;
@@ -2883,7 +2899,7 @@
         var h = Math.max(320, Math.min(2200, Math.round(e.data.height)));
         lastContentH = h;
         if (isHostedDesktop()) applyHostedScale();
-        else iframe.style.height = h + 'px';
+        else { iframe.style.height = plainFrameHeight(); frameSizer.style.height = czStackedMobile() ? '100%' : ''; }
       }
     }
     window.addEventListener('message', onMsg);
@@ -4255,6 +4271,62 @@
             if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); setExpanded(!expanded); }
           });
         }
+        // Make the Design/Page/Behavior nav row a SECOND grab surface so the
+        // whole top region of the sheet — not just the 24px grip — resizes it.
+        // A clearly VERTICAL drag resizes the sheet (same height math as the
+        // handle); a HORIZONTAL drag is left to the carousel (chip scroll); a
+        // TAP falls through to the chip's own click (switch tab). Mirrors the
+        // carousel's drag-vs-tap thresholding so the three gestures never
+        // collide. The trailing click after a real vertical drag is swallowed so
+        // dragging can never accidentally switch the tab.
+        function wireNavDrag(navEl) {
+          var startY = 0, startX = 0, baseH = 0, dragging = false, moved = 0, pid = null;
+          var THRESH = 6;
+          navEl.addEventListener('pointerdown', function (e) {
+            if (e.button != null && e.button > 0) return;
+            startY = e.clientY; startX = e.clientX; baseH = sheet.offsetHeight;
+            dragging = false; moved = 0; pid = e.pointerId;
+          });
+          navEl.addEventListener('pointermove', function (e) {
+            if (pid == null || e.pointerId !== pid) return;
+            var dy = startY - e.clientY;            // drag up = positive = taller
+            var dx = e.clientX - startX;
+            if (!dragging) {
+              // Engage only on a clearly VERTICAL gesture; a horizontal swipe is
+              // the carousel's to scroll the chips.
+              if (Math.abs(dy) < THRESH || Math.abs(dy) <= Math.abs(dx)) return;
+              dragging = true;
+              sheet.classList.add('is-dragging');
+              try { navEl.setPointerCapture(pid); } catch (_e) {}
+            }
+            moved = Math.max(moved, Math.abs(dy));
+            setSheetHeight(baseH + dy);
+            if (e.cancelable) e.preventDefault();
+          });
+          function endNav(e) {
+            if (pid != null && e.pointerId !== pid) return;
+            var wasDragging = dragging;
+            dragging = false; pid = null;
+            if (!wasDragging) return;               // tap → chip click switches tab
+            sheet.classList.remove('is-dragging');
+            try { navEl.releasePointerCapture(e.pointerId); } catch (_e) {}
+            var h = sheet.offsetHeight;
+            expanded = h > peekPx() + 24;
+            if (expanded) expandedH = h;
+            if (handle) {
+              handle.setAttribute('aria-expanded', expanded ? 'true' : 'false');
+              handle.setAttribute('aria-label', expanded ? 'Collapse controls' : 'Expand controls');
+            }
+          }
+          navEl.addEventListener('pointerup', endNav);
+          navEl.addEventListener('pointercancel', endNav);
+          // Swallow the trailing click after a real vertical drag (capture phase,
+          // before the chip's own click) so a drag never also switches the tab.
+          navEl.addEventListener('click', function (e) {
+            if (moved > THRESH) { e.stopPropagation(); e.preventDefault(); }
+            moved = 0;
+          }, true);
+        }
         function activate() {
           if (active || !root.isConnected) return;
           active = true;
@@ -4278,6 +4350,7 @@
           sheet.appendChild(sheetBody);
           root.appendChild(sheet);
           wireHandleDrag();
+          wireNavDrag(shortcutWrap); // the nav row is a second, larger grab surface
           syncTabChips('design');
           setExpanded(false);
           requestAnimationFrame(measurePeek);
