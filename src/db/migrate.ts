@@ -37,3 +37,57 @@ export async function runMigrations(): Promise<void> {
     await migrationClient.end();
   }
 }
+
+/**
+ * Raw, journal-INDEPENDENT ensure step for at-risk `brand_configs` columns.
+ *
+ * WHY THIS EXISTS (separate from runMigrations above): Replit's publish
+ * "database migration" tool repeatedly proposes to DROP these 7 columns from
+ * prod — added by `drizzle/0038_header_layout.sql` (header_logo_size,
+ * header_layout, header_show_name, header_align) and
+ * `drizzle/0039_lead_routing_validity.sql` (quote_validity_days, lead_email_to,
+ * lead_email_cc). The problem is that runMigrations() uses Drizzle's migrator,
+ * which is JOURNAL-BASED: once 0038/0039 are recorded in `__drizzle_migrations`
+ * it SKIPS them forever. So if Replit externally drops the columns, Drizzle will
+ * NOT re-add them and every brand_configs query 500s.
+ *
+ * This function bypasses the journal entirely: it runs plain
+ * `ADD COLUMN IF NOT EXISTS` statements on EVERY boot, independent of what the
+ * migration journal records. `IF NOT EXISTS` makes each a no-op when the column
+ * is present, so on a healthy DB this costs one round-trip and changes nothing;
+ * on a DB that Replit just phantom-dropped a column from, it silently re-adds it
+ * before the server accepts traffic. This makes approving Replit's publish DROP
+ * safe — the column is restored on the next boot.
+ *
+ * Types/defaults MUST stay in sync with src/db/schema.ts (and 0038/0039).
+ * To protect a future at-risk column, append its `ADD COLUMN IF NOT EXISTS`
+ * statement to SELF_HEAL_COLUMN_STATEMENTS below.
+ */
+export const SELF_HEAL_COLUMN_STATEMENTS: readonly string[] = [
+  // 0038_header_layout.sql — header rendering controls (NOT NULL w/ defaults).
+  `ALTER TABLE "brand_configs" ADD COLUMN IF NOT EXISTS "header_logo_size" text DEFAULT 'm' NOT NULL`,
+  `ALTER TABLE "brand_configs" ADD COLUMN IF NOT EXISTS "header_layout" text DEFAULT 'beside' NOT NULL`,
+  `ALTER TABLE "brand_configs" ADD COLUMN IF NOT EXISTS "header_show_name" boolean DEFAULT true NOT NULL`,
+  `ALTER TABLE "brand_configs" ADD COLUMN IF NOT EXISTS "header_align" text DEFAULT 'left' NOT NULL`,
+  // 0039_lead_routing_validity.sql — lead routing + quote validity (nullable).
+  `ALTER TABLE "brand_configs" ADD COLUMN IF NOT EXISTS "quote_validity_days" integer`,
+  `ALTER TABLE "brand_configs" ADD COLUMN IF NOT EXISTS "lead_email_to" text`,
+  `ALTER TABLE "brand_configs" ADD COLUMN IF NOT EXISTS "lead_email_cc" text`,
+];
+
+export async function ensureSelfHealColumns(): Promise<void> {
+  const env = loadEnv();
+  // Dedicated one-shot connection (same pattern as runMigrations); `max: 1`,
+  // closed in `finally` so the app's own pool (src/db/client.ts) is untouched.
+  const sql = postgres(env.DATABASE_URL, { max: 1 });
+  try {
+    for (const statement of SELF_HEAL_COLUMN_STATEMENTS) {
+      // IF NOT EXISTS ⇒ a no-op when the column already exists; never an error.
+      // Any OTHER failure (bad DDL, connection loss) throws and fails boot loud.
+      await sql.unsafe(statement);
+    }
+    console.log('[server] brand_configs self-heal columns ensured');
+  } finally {
+    await sql.end();
+  }
+}
