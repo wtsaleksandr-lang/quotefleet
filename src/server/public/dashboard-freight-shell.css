@@ -186,35 +186,38 @@ html[data-theme="light"] .btn-ghost {
   }
 }
 
-/* ── Trial countdown banner ───────────────────────────────────────────────
-   Rendered by renderTrialBanner() in app.js; view logic in trial-banner.js.
-   A status dot + headline + subtext on the left, the subscribe CTA on the
-   right — intentional, not a warning strip. Theme-aware via tokens; wraps to
-   a centered stack at 375px so the CTA never overflows. Appended at EOF so the
-   line-based spacing/color guard baselines don't renumber (per project rule). */
+/* ── Trial / announcement banner ──────────────────────────────────────────
+   Lives INSIDE the portal top bar's center zone (#qf-trial-bar). Rendered by
+   renderTrialBanner() in app.js; view logic in trial-banner.js. A compact,
+   theme-aware pill: status dot + countdown headline + value sub + subscribe
+   CTA + a close (×). Manually closable — the trial variant's dismissal is
+   persisted in localStorage 'qf-trial-dismissed' (see app.js). No longer a
+   full-width body sticky (the top bar itself is the sticky chrome). Everything
+   from here to EOF sits below the last baselined line, so edits here never
+   renumber the spacing/color guard baselines (per project rule). */
 .qf-trial-banner {
   display: flex;
   align-items: center;
   justify-content: center;
   flex-wrap: nowrap;
-  gap: 8px 16px;
-  padding: 12px 16px;
-  background: var(--surface);
+  gap: 8px;
+  min-width: 0;
+  max-width: 100%;
+  padding: 4px 8px 4px 16px;
+  background: var(--accent-soft);
   color: var(--ink);
-  border-bottom: 1px solid var(--border);
-  position: sticky;
-  top: 0;
-  z-index: 100;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-pill);
   line-height: 1.5;
 }
 .qf-trial-banner--expired {
   background: var(--error-bg);
-  border-bottom-color: var(--error);
+  border-color: var(--error);
 }
 .qf-trial-banner-msg {
   display: flex;
   align-items: center;
-  flex-wrap: wrap;
+  flex-wrap: nowrap;
   gap: 8px;
   min-width: 0;
 }
@@ -229,28 +232,30 @@ html[data-theme="light"] .btn-ghost {
 .qf-trial-banner--expired .qf-trial-banner-dot { background: var(--error); }
 .qf-trial-banner-headline {
   font-weight: 700;
-  font-size: 14px;
+  font-size: 13px;
   color: var(--ink);
+  white-space: nowrap;
 }
 .qf-trial-banner-sub {
-  font-size: 13px;
+  font-size: 12px;
   color: var(--muted);
+  white-space: nowrap;
 }
 .qf-trial-banner-cta.btn.btn-primary {
   flex: 0 0 auto;
-  padding: 8px 16px;
-  font-size: 13px;
+  padding: 4px 12px;
+  font-size: 12px;
 }
 .qf-trial-banner-close {
   flex: 0 0 auto;
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  width: 32px;
-  height: 32px;
+  width: 24px;
+  height: 24px;
   padding: 0;
   border: 0;
-  border-radius: var(--radius-btn);
+  border-radius: var(--radius-pill);
   background: transparent;
   color: var(--muted);
   cursor: pointer;
@@ -260,85 +265,29 @@ html[data-theme="light"] .btn-ghost {
   background: var(--surface-2);
 }
 
-@media (max-width: 900px) {
-  .qf-trial-banner {
-    gap: 8px;
-    text-align: center;
-  }
-  .qf-trial-banner-msg {
-    justify-content: center;
-  }
-}
-
 /* Payment-issue banner (past_due / grace): a paying tenant whose last charge
    failed. Restrained amber --warn tint — a nudge, not the garish read-only
    --error strip — because the service is STILL active while they update the
-   card. Theme-aware via tokens; inherits the shared banner layout + the 375px
-   stacking rule above. Appended at EOF so the line-based guard baselines don't
-   renumber. */
+   card. Theme-aware via tokens; inherits the shared pill layout above. */
 .qf-trial-banner--payment_issue {
   background: var(--warn-bg);
-  border-bottom-color: var(--warn);
+  border-color: var(--warn);
 }
 .qf-trial-banner--payment_issue .qf-trial-banner-dot { background: var(--warn); }
 
-/* ══════════════════════════════════════════════════════════════════════════
-   UNIFIED PORTAL TOP BAR (≤900px) — every page's title sits on the hamburger's
-   row as a single line (the "Customize" treatment, now global). The trial
-   banner is a single line that OVERLAYS / covers the title; dismissing the
-   banner reveals the title beneath it. Appended at EOF so the line-based
-   spacing/colour guard baselines above never renumber. Tokens + 8px ramp only.
-   ══════════════════════════════════════════════════════════════════════════ */
+/* ≤900px — the announcement drops onto its own full-width row beneath the
+   logo/account row (the top bar becomes a two-row flex-wrap; see app.html's
+   inline top-bar styles). The value sub is dropped so the countdown headline +
+   CTA + close fit one clean line, and the pill spreads to fill the row. Tokens
+   + 8px ramp only. */
 @media (max-width: 900px) {
-  /* Page title → fixed onto the hamburger's 12px/40px band, between the
-     hamburger (left, 40px) and the mobile logo (right, 40px). One line, ellipsised.
-     ID selector (#page-content) beats the per-page .qf-customize h1 rules, and
-     padding:0 neutralises the old customize-only padding-left. */
-  #page-content h1 {
-    position: fixed;
-    top: 12px;
-    left: 60px;
-    right: 60px;
-    height: 40px;
-    line-height: 40px;
-    margin: 0;
-    padding: 0;
-    z-index: 90;
-    font-size: 18px;
-    font-weight: 800;
-    letter-spacing: -0.02em;
-    white-space: nowrap;
-    overflow: hidden;
-    text-overflow: ellipsis;
-  }
-  /* Subtitles are dropped in the top-bar layout (as the Customize page already
-     did) so the title reads as one clean line. */
-  #page-content .page-sub { display: none; }
-  /* Reserve the fixed title band so page content never slips under it. The
-     .qf-customize variant ties + wins over the old customize padding rule. */
-  .app-main,
-  .app-main:has(.qf-customize) { padding-top: 60px; }
-  /* When the trial banner is shown it occupies (and covers) the band, so drop
-     the reserved padding — the sticky banner provides the offset itself. */
-  body:has(#qf-trial-bar) .app-main { padding-top: 0; }
-  /* Trial banner: strictly one line, tall enough to fully cover the title band.
-     The value-prop sub is dropped on narrow widths so headline + CTA + close fit. */
   .qf-trial-banner {
-    flex-wrap: nowrap;
-    gap: 8px;
+    width: 100%;
+    justify-content: space-between;
   }
-  .qf-trial-banner-msg { flex-wrap: nowrap; gap: 8px; min-width: 0; }
-  /* The status dot is decorative — drop it on narrow widths so the countdown
-     headline AND the CTA button both fit fully on the single line. */
-  .qf-trial-banner-dot { display: none; }
+  .qf-trial-banner-sub { display: none; }
   .qf-trial-banner-headline {
-    font-size: 13px;
-    white-space: nowrap;
     overflow: hidden;
     text-overflow: ellipsis;
   }
-  /* Compact CTA + close so they never crowd the countdown off the line. */
-  .qf-trial-banner-cta.btn.btn-primary { padding: 8px 12px; font-size: 12px; }
-  .qf-trial-banner-close { width: 24px; height: 24px; }
-  .qf-trial-banner-sub { display: none; }
 }

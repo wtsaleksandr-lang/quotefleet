@@ -57,23 +57,50 @@
 </head>
 <body>
   <a class="qf-skip-link" href="#page-content">Skip to main content</a>
-  <div class="app-shell" id="app-shell" hidden>
-    <button class="qf-mobile-nav-toggle" id="qf-mobile-nav-toggle" aria-label="Open navigation menu" aria-controls="qf-sidebar" aria-expanded="false" hidden><svg class="qf-ico" viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><line x1="4" x2="20" y1="6" y2="6"/><line x1="4" x2="20" y1="12" y2="12"/><line x1="4" x2="20" y1="18" y2="18"/></svg></button>
-    <!-- Mobile-only QuoteFleet mark, pinned to the top-right of the viewport to
-         mirror the top-left hamburger. It's a fixed sibling of the toggle (NOT
-         inside the transformed sidebar, whose transform would break position:
-         fixed). Hidden ≥901px, where the in-sidebar .qf-sb-logo is shown. -->
-    <a class="qf-sb-logo-mobile" href="https://quotefleet.net" target="_blank" rel="noopener" aria-label="QuoteFleet home (opens in a new tab)">
-      <img class="qf-sb-logo-img qf-sb-logo-ondark" src="/brand/logo-full-ondark.png" alt="QuoteFleet" />
-      <img class="qf-sb-logo-img qf-sb-logo-onlight" src="/brand/logo-full.png" alt="QuoteFleet" />
-    </a>
-    <aside class="sidebar" id="qf-sidebar">
-      <!-- QuoteFleet product mark → homepage (new tab), above the tenant's own
-           name. Two img variants + the on-dark/on-light swap in CSS. -->
-      <a class="qf-sb-logo" href="https://quotefleet.net" target="_blank" rel="noopener" aria-label="QuoteFleet home (opens in a new tab)">
+  <!-- ══ STATIC PORTAL TOP BAR ══════════════════════════════════════════════
+       Sticky, full-width strip across the top of the portal. Three zones:
+         LEFT   — sidebar toggle (mobile) + QuoteFleet logo → marketing home (new tab)
+         CENTER — the trial / announcement banner (closable; dismissal persisted
+                  in localStorage 'qf-trial-dismissed'); #qf-trial-bar is the mount
+                  renderTrialBanner() paints into.
+         RIGHT  — tenant account dropdown: Account settings, a real Dark/Light
+                  switch, Sign out.
+       Replaces the old in-sidebar logo and the sidebar account/sign-out/theme
+       rows. Hidden until boot reveals it (mirrors #app-shell). -->
+  <header class="qf-topbar" id="qf-topbar" hidden>
+    <div class="qf-topbar-left">
+      <button class="qf-mobile-nav-toggle" id="qf-mobile-nav-toggle" type="button" aria-label="Open navigation menu" aria-controls="qf-sidebar" aria-expanded="false"><svg class="qf-ico" viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><line x1="4" x2="20" y1="6" y2="6"/><line x1="4" x2="20" y1="12" y2="12"/><line x1="4" x2="20" y1="18" y2="18"/></svg></button>
+      <a class="qf-topbar-logo" href="https://quotefleet.net" target="_blank" rel="noopener" aria-label="QuoteFleet home (opens in a new tab)">
         <img class="qf-sb-logo-img qf-sb-logo-ondark" src="/brand/logo-full-ondark.png" alt="QuoteFleet" />
         <img class="qf-sb-logo-img qf-sb-logo-onlight" src="/brand/logo-full.png" alt="QuoteFleet" />
       </a>
+    </div>
+    <div class="qf-topbar-center">
+      <div id="qf-trial-bar" hidden></div>
+    </div>
+    <div class="qf-topbar-right">
+      <div class="qf-account" id="qf-account">
+        <button class="qf-account-trigger" id="qf-account-trigger" type="button" aria-haspopup="true" aria-expanded="false" aria-controls="qf-account-menu">
+          <svg class="qf-ico qf-account-avatar" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M19 21v-2a4 4 0 0 0-4-4H9a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
+          <span class="qf-account-name" id="qf-account-name">…</span>
+          <svg class="qf-ico qf-account-caret" viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polyline points="6 9 12 15 18 9"/></svg>
+        </button>
+        <div class="qf-account-menu" id="qf-account-menu" role="menu" aria-labelledby="qf-account-trigger" hidden>
+          <button class="qf-account-item" id="qf-account-settings" type="button" role="menuitem" data-route="account"><svg class="qf-ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M19 21v-2a4 4 0 0 0-4-4H9a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg> Account settings</button>
+          <div class="qf-account-theme">
+            <span class="qf-account-theme-label">Theme</span>
+            <button class="qf-theme-toggle qf-theme-switch" id="qf-theme-toggle" type="button" role="switch" aria-checked="false" aria-label="Switch to light theme">
+              <span class="qf-theme-switch-name" id="qf-theme-label">Dark</span>
+              <span class="qf-theme-switch-track" aria-hidden="true"><span class="qf-theme-switch-knob"><span class="qf-theme-switch-ico" id="qf-theme-icon"></span></span></span>
+            </button>
+          </div>
+          <button class="qf-account-item" id="sb-logout" type="button" role="menuitem"><svg class="qf-ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" x2="9" y1="12" y2="12"/></svg> Sign out</button>
+        </div>
+      </div>
+    </div>
+  </header>
+  <div class="app-shell" id="app-shell" hidden>
+    <aside class="sidebar" id="qf-sidebar">
       <div class="brand-block"><div class="name" id="sb-tenant-name">…</div><a class="sub" id="sb-tenant-slug" href="#" target="_blank" rel="noopener" title="Open your hosted quote calculator (new tab)">…</a></div>
       <button class="nav-item active" data-route="overview" aria-label="Overview"><svg class="qf-ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect width="7" height="9" x="3" y="3" rx="1"/><rect width="7" height="5" x="14" y="3" rx="1"/><rect width="7" height="9" x="14" y="12" rx="1"/><rect width="7" height="5" x="3" y="16" rx="1"/></svg> Overview</button>
       <button class="nav-item" data-route="leads" aria-label="Leads"><svg class="qf-ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polyline points="22 12 16 12 14 15 10 15 8 12 2 12"/><path d="M5.45 5.11 2 12v6a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2v-6l-3.45-6.89A2 2 0 0 0 16.76 4H7.24a2 2 0 0 0-1.79 1.11z"/></svg> Leads<span class="qf-nav-badge" data-badge="leads" aria-label="new leads" hidden></span></button>
@@ -93,13 +120,6 @@
         <button class="nav-item" data-route="ingest" aria-label="AI import"><svg class="qf-ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" x2="12" y1="3" y2="15"/></svg> AI import</button>
         <button class="nav-item" data-route="audit" aria-label="Audit log"><svg class="qf-ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"/><path d="M3 3v5h5"/><path d="M12 7v5l4 2"/></svg> Audit log</button>
       </details>
-      <!-- Footer controls (relocated from the removed top app-bar). Account keeps
-           id + data-route so the generic .sidebar [data-route] wiring routes it;
-           the theme toggle keeps id="qf-theme-toggle" + its inner span ids so
-           wireThemeToggle() is untouched. -->
-      <button class="nav-item" id="qf-appbar-account" data-route="account" aria-label="Account settings"><svg class="qf-ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M19 21v-2a4 4 0 0 0-4-4H9a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg> Account</button>
-      <button class="nav-item" id="sb-logout" aria-label="Sign out"><svg class="qf-ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" x2="9" y1="12" y2="12"/></svg> Sign out</button>
-      <button class="qf-theme-toggle" id="qf-theme-toggle" type="button" aria-label="Switch to light theme"><span id="qf-theme-icon" aria-hidden="true"></span><span id="qf-theme-label">Dark</span></button>
     </aside>
     <main class="app-main">
       <div id="page-content" tabindex="-1"></div>
@@ -114,47 +134,166 @@
     .qf-nav-advanced > summary:hover { background: var(--surface-2); color: var(--ink); }
     .qf-nav-advanced .qf-nav-adv-chevron { flex: 0 0 auto; transition: transform 0.15s ease; }
     .qf-nav-advanced[open] > summary .qf-nav-adv-chevron { transform: rotate(90deg); }
-    .qf-mobile-nav-toggle { display: none; align-items: center; justify-content: center; position: fixed; top: 12px; left: 12px; z-index: 1001; width: 40px; height: 40px; border-radius: 4px; border: 1px solid var(--border-strong); background: var(--surface); padding: 0; cursor: pointer; color: var(--ink); transition: background 0.15s ease; }
+
+    /* ══ STATIC PORTAL TOP BAR ═══════════════════════════════════════════════
+       A sticky, full-width strip. Being position:sticky it reserves its own
+       height in normal flow, so the sidebar + content sit below it without any
+       manual body offset. Tokens only (this block is theme-aware via var(--*)).
+       Desktop height is pinned (--qf-topbar-h) so the sticky sidebar can offset
+       against it exactly; mobile height is content-driven (announcement wraps to
+       its own row). */
+    :root { --qf-topbar-h: 56px; }
+    .qf-topbar {
+      position: sticky; top: 0; z-index: 1002;
+      display: flex; align-items: center; gap: 16px;
+      min-height: var(--qf-topbar-h);
+      padding: 8px 16px;
+      background: var(--surface);
+      border-bottom: 1px solid var(--border);
+    }
+    .qf-topbar[hidden] { display: none; }
+    .qf-topbar-left { display: flex; align-items: center; gap: 12px; flex: 0 0 auto; min-width: 0; }
+    .qf-topbar-center { flex: 1 1 auto; display: flex; justify-content: center; min-width: 0; }
+    .qf-topbar-right { flex: 0 0 auto; display: flex; align-items: center; }
+    .qf-topbar-logo { display: inline-flex; align-items: center; text-decoration: none; }
+    .qf-topbar-logo .qf-sb-logo-img { height: 24px; width: auto; display: block; }
+    .qf-topbar-logo:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; border-radius: 4px; }
+    /* On-dark art in dark theme, full-color in light. */
+    .qf-topbar-logo .qf-sb-logo-onlight { display: none; }
+    .qf-topbar-logo .qf-sb-logo-ondark { display: block; }
+    html[data-theme="light"] .qf-topbar-logo .qf-sb-logo-ondark { display: none; }
+    html[data-theme="light"] .qf-topbar-logo .qf-sb-logo-onlight { display: block; }
+
+    /* Sidebar toggle — a flex child of the top bar's left zone (no longer a
+       floating fixed control). Hidden on desktop; shown ≤900px, or on desktop
+       only when the sidebar is explicitly collapsed (class mirrored onto the
+       top bar by wireMobileNav). */
+    .qf-mobile-nav-toggle { display: none; align-items: center; justify-content: center; width: 40px; height: 40px; border-radius: var(--radius-btn); border: 1px solid var(--border-strong); background: var(--surface); padding: 0; cursor: pointer; color: var(--ink); transition: background 0.15s ease; }
     .qf-mobile-nav-toggle:hover { background: var(--surface-2); }
+    @media (max-width: 900px) { .qf-mobile-nav-toggle { display: inline-flex; } }
+    @media (min-width: 901px) { .qf-topbar.qf-nav-collapsed .qf-mobile-nav-toggle { display: inline-flex; } }
+
+    /* ── Account dropdown ─────────────────────────────────────────────────── */
+    .qf-account { position: relative; }
+    .qf-account-trigger {
+      display: inline-flex; align-items: center; gap: 8px;
+      max-width: 220px;
+      padding: 8px 12px;
+      border: 1px solid var(--border);
+      border-radius: var(--radius-btn);
+      background: var(--surface);
+      color: var(--ink);
+      font-size: 13px; font-weight: 600;
+      cursor: pointer;
+      transition: background 0.15s ease, border-color 0.15s ease;
+    }
+    .qf-account-trigger:hover { background: var(--surface-2); border-color: var(--border-strong); }
+    .qf-account-trigger:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+    .qf-account-avatar { flex: 0 0 auto; width: 18px; height: 18px; color: var(--muted); }
+    .qf-account-name { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    .qf-account-caret { flex: 0 0 auto; color: var(--muted); transition: transform 0.15s ease; }
+    .qf-account-trigger[aria-expanded="true"] .qf-account-caret { transform: rotate(180deg); }
+    .qf-account-menu {
+      position: absolute; top: calc(100% + 8px); right: 0; z-index: 1003;
+      min-width: 240px;
+      padding: 8px;
+      background: var(--surface);
+      border: 1px solid var(--border-strong);
+      border-radius: var(--radius-lg);
+      box-shadow: var(--shadow-lg);
+      display: flex; flex-direction: column; gap: 4px;
+    }
+    .qf-account-menu[hidden] { display: none; }
+    .qf-account-item {
+      display: flex; align-items: center; gap: 10px;
+      width: 100%;
+      padding: 10px 12px;
+      border: 0; border-radius: var(--radius-btn);
+      background: transparent;
+      color: var(--ink);
+      font-size: 13px; font-weight: 600;
+      text-align: left; cursor: pointer;
+    }
+    .qf-account-item .qf-ico { flex: 0 0 auto; width: 16px; height: 16px; color: var(--muted); }
+    .qf-account-item:hover { background: var(--surface-2); }
+    .qf-account-item:focus-visible { outline: 2px solid var(--accent); outline-offset: -2px; }
+    .qf-account-theme {
+      display: flex; align-items: center; justify-content: space-between; gap: 12px;
+      padding: 8px 12px;
+      border-top: 1px solid var(--border);
+      border-bottom: 1px solid var(--border);
+      margin: 4px 0;
+    }
+    .qf-account-theme-label { font-size: 13px; font-weight: 600; color: var(--ink); }
+
+    /* Real Dark/Light SWITCH — a sliding track + knob. Reuses #qf-theme-toggle /
+       #qf-theme-icon / #qf-theme-label so wireThemeToggle() drives it; aria as a
+       role="switch" (aria-checked reflects Light). Base .qf-theme-toggle border/
+       padding from style.css are reset here. */
+    .qf-theme-switch {
+      display: inline-flex; align-items: center; gap: 10px;
+      padding: 0; border: 0; background: transparent; cursor: pointer;
+    }
+    .qf-theme-switch:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; border-radius: var(--radius-btn); }
+    .qf-theme-switch-name { font-size: 12px; font-weight: 700; color: var(--muted); min-width: 34px; text-align: right; }
+    .qf-theme-switch-track {
+      position: relative; flex: 0 0 auto;
+      width: 44px; height: 24px;
+      border-radius: var(--radius-pill);
+      background: var(--surface-3);
+      border: 1px solid var(--border-strong);
+      transition: background 0.18s ease, border-color 0.18s ease;
+    }
+    .qf-theme-switch[aria-checked="true"] .qf-theme-switch-track { background: var(--accent-fill); border-color: var(--accent-fill); }
+    .qf-theme-switch-knob {
+      position: absolute; top: 2px; left: 2px;
+      width: 18px; height: 18px;
+      display: inline-flex; align-items: center; justify-content: center;
+      border-radius: var(--radius-pill);
+      background: var(--surface);
+      box-shadow: var(--shadow-sm);
+      transition: transform 0.18s ease;
+    }
+    .qf-theme-switch[aria-checked="true"] .qf-theme-switch-knob { transform: translateX(20px); }
+    .qf-theme-switch-ico { display: inline-flex; align-items: center; justify-content: center; color: var(--muted); }
+    .qf-theme-switch-ico .qf-ico { width: 12px; height: 12px; }
+    .qf-theme-switch[aria-checked="true"] .qf-theme-switch-ico { color: var(--accent-fill); }
+
     /* Skip link — off-screen until keyboard-focused, then pinned top-left so a
        keyboard user can jump straight past the sidebar into the page content. */
     .qf-skip-link { position: fixed; top: 8px; left: 8px; z-index: 1100; transform: translateY(-150%); transition: transform 0.12s ease; background: var(--accent); color: var(--accent-ink); padding: 8px 16px; border-radius: 4px; font-size: 13px; font-weight: 700; text-decoration: none; }
     .qf-skip-link:focus { transform: translateY(0); outline: 2px solid var(--accent); outline-offset: 2px; }
-    /* Mobile-only QuoteFleet mark — fixed top-right, mirroring the top-left
-       hamburger (same 12px/40px band + z-index). Shown ≤900px; the in-sidebar
-       .qf-sb-logo is hidden there so the logo no longer stacks under the
-       hamburger inside the drawer. On-dark/on-light image swap as in the sidebar. */
-    .qf-sb-logo-mobile { display: none; align-items: center; justify-content: flex-end; position: fixed; top: 12px; right: 12px; z-index: 1001; height: 40px; padding: 0; text-decoration: none; }
-    .qf-sb-logo-mobile .qf-sb-logo-img { height: 24px; width: auto; display: block; }
-    .qf-sb-logo-mobile:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; border-radius: 4px; }
-    .qf-sb-logo-mobile .qf-sb-logo-onlight { display: none; }
-    html[data-theme="light"] .qf-sb-logo-mobile .qf-sb-logo-ondark { display: none; }
-    html[data-theme="light"] .qf-sb-logo-mobile .qf-sb-logo-onlight { display: block; }
-    @media (max-width: 900px) { .qf-sb-logo-mobile { display: inline-flex; } #qf-sidebar .qf-sb-logo { display: none; } }
-    /* Hamburger and sidebar are mutually exclusive. The sidebar goes off-canvas
-       at ≤900px — the same boundary JS uses for isDesktop() (≥901) — so the
-       toggle is shown ONLY when the sidebar is not visible: off-canvas on mobile,
-       or explicitly collapsed on desktop. Above 900px with the sidebar showing,
-       the toggle stays display:none (no stray floating control). */
-    @media (max-width: 900px) { .qf-mobile-nav-toggle { display: inline-flex; } }
-    @media (min-width: 901px) { .app-shell.qf-nav-collapsed .sidebar { display: none; } .app-shell.qf-nav-collapsed .app-main { margin-left: 0; } .qf-nav-scrim { display: none; } .app-shell.qf-nav-collapsed .qf-mobile-nav-toggle { display: inline-flex; } }
-    @media (max-width: 900px) { .app-shell .sidebar { position: fixed; top: 0; left: 0; bottom: 0; width: 260px; max-width: 80vw; padding-top: 8px; transform: translateX(-100%); transition: transform 0.18s ease; z-index: 1000; box-shadow: 4px 0 20px rgba(0,0,0,0.2); overflow-y: auto; } .app-shell.qf-nav-open .sidebar { transform: translateX(0); }
-      /* Lift the tenant brand-block onto the fixed hamburger's line (top:12px,
-         40px tall): the business name sits vertically centered in that band,
-         padded past the 40px hamburger (12+40=52 → start ~56px) so it clears
-         it and stays on ONE line. The slug link below stays full-width. */
-      #qf-sidebar .brand-block { padding: 4px 8px 16px; }
-      #qf-sidebar .brand-block .name { display: flex; align-items: center; min-height: 40px; padding-left: 56px; }
-      /* Backdrop behind the open drawer — dims the page, tap to close. */
+
+    /* Sidebar sits below the sticky bar. Its own sticky offset = the bar height
+       so it pins just under the bar on scroll (desktop). Light shell keeps its
+       14px inset. */
+    @media (min-width: 901px) {
+      .sidebar { top: var(--qf-topbar-h); height: calc(100vh - var(--qf-topbar-h)); }
+      html[data-theme="light"] .sidebar { top: calc(var(--qf-topbar-h) + 14px); height: calc(100vh - var(--qf-topbar-h) - 28px); }
+      .app-shell.qf-nav-collapsed .sidebar { display: none; }
+      .app-shell.qf-nav-collapsed .app-main { margin-left: 0; }
+      .qf-nav-scrim { display: none; }
+    }
+    /* ≤900px: sidebar is an off-canvas drawer. It slides UNDER the sticky bar
+       (top offset = bar height) so the logo + account stay reachable while open;
+       the scrim dims the rest. */
+    @media (max-width: 900px) {
+      /* Two-row bar: hamburger + logo + account on row 1, the announcement pill
+         wrapping to a full-width row 2 (so nothing crowds at 375px). */
+      .qf-topbar { flex-wrap: wrap; row-gap: 8px; gap: 12px; }
+      .qf-topbar-center { order: 3; flex: 1 0 100%; }
+      .qf-account-trigger { max-width: 160px; }
+      .app-shell .sidebar { position: fixed; top: var(--qf-bar-h, 56px); left: 0; bottom: 0; width: 260px; max-width: 80vw; padding-top: 8px; transform: translateX(-100%); transition: transform 0.18s ease; z-index: 1000; box-shadow: 4px 0 20px rgba(0,0,0,0.2); overflow-y: auto; }
+      .app-shell.qf-nav-open .sidebar { transform: translateX(0); }
       .qf-nav-scrim { position: fixed; inset: 0; background: rgba(8, 11, 20, 0.55); opacity: 0; visibility: hidden; transition: opacity 0.18s ease, visibility 0.18s ease; z-index: 999; }
-      .app-shell.qf-nav-open .qf-nav-scrim { opacity: 1; visibility: visible; } }
+      .app-shell.qf-nav-open .qf-nav-scrim { opacity: 1; visibility: visible; }
+      /* Sticky bar already reserves its own height in flow, so the old 72px
+         hamburger-band top padding is no longer needed — trim it to breathing room. */
+      .app-main { padding-top: 24px; }
+      html[data-theme="light"] .app-main { padding-top: 24px; }
+    }
     html[data-theme="light"] .qf-nav-scrim { background: rgba(15, 23, 42, 0.42); }
-    /* Trial bar spans full width and its text is centered; at mobile the fixed
-       hamburger (left:12px, 40px wide) sits over the banner's left edge. Pad
-       both sides symmetrically past the toggle so the centered text never tucks
-       under the hamburger (clipping the leading "TRI"). !important beats the
-       inline padding set in app.js. */
-    @media (max-width: 900px) { #qf-trial-bar { padding-left: 60px !important; padding-right: 60px !important; } }
+
     body.qf-trial-locked .app-main input, body.qf-trial-locked .app-main select, body.qf-trial-locked .app-main textarea { pointer-events: none; opacity: 0.55; cursor: not-allowed; }
     body.qf-trial-locked .app-main .btn-primary, body.qf-trial-locked .app-main .btn-danger, body.qf-trial-locked .app-main button[data-mutate] { pointer-events: none; opacity: 0.55; cursor: not-allowed; }
   </style>
