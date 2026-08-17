@@ -51,7 +51,7 @@ import { loadEnv } from '../../config.js';
 import { getTrialState } from '../trialGating.js';
 import { canUseProFeature } from '../plans.js';
 import { publicCalcLimiter, publicChatLimiter, publicLeadLimiter, quoteMapLimiter } from '../rateLimits.js';
-import { buildBaseMapUrl, getRoutedMiles, getRouteMap, laneCacheKey, normalizeTheme, peekRouteMap, resolveMapStyle } from '../routeMap.js';
+import { buildBaseMapUrl, getRoutedMiles, getRouteMap, laneCacheKey, normalizeBaseCenter, normalizeBaseZoom, normalizeTheme, peekRouteMap, resolveMapStyle } from '../routeMap.js';
 import { resolveWidgetTheme, WIDGET_PRESETS } from '../widgetThemes.js';
 import { resolveQuoteDisclaimer } from '../quoteDisclaimer.js';
 import { loadCarrierProfile } from './carrierProfile.js';
@@ -674,7 +674,14 @@ export function registerPublicRoutes(app: Express) {
     // resolveMapStyle guards any bad value back to 'branded'. The cache key
     // includes the style so styles never cross-contaminate the base-map cache.
     const mapStyle = resolveMapStyle(req.query.style);
-    const cacheKey = `${theme}|${mapStyle}`;
+    // Optional zoom/center override: the widget's Customize preview lets carriers
+    // zoom IN on the base map to inspect their style close-up. Because the map is
+    // a static bitmap, a crisp zoom means re-fetching at a higher Google zoom
+    // (+ shifted center for panning). Both are clamped/validated server-side and
+    // folded into the cache key so styles/zooms/centers never cross-contaminate.
+    const zoom = normalizeBaseZoom(req.query.zoom);
+    const center = normalizeBaseCenter(req.query.center);
+    const cacheKey = `${theme}|${mapStyle}|${zoom}|${center}`;
     const cached = baseMapCache.get(cacheKey);
     if (cached) {
       res.setHeader('content-type', 'image/png');
@@ -684,9 +691,15 @@ export function registerPublicRoutes(app: Express) {
     const key = loadEnv().GOOGLE_MAPS_API_KEY;
     if (!key) return res.status(404).end();
     try {
-      const img = await fetch(buildBaseMapUrl(key, theme, mapStyle));
+      const img = await fetch(buildBaseMapUrl(key, theme, mapStyle, zoom, center));
       if (!img.ok) return res.status(502).end();
       const buf = Buffer.from(await img.arrayBuffer());
+      // Zoom/pan mints one entry per (theme,style,zoom,center); bound the map so
+      // a long inspect session can't grow it without limit. Oldest-first evict.
+      if (baseMapCache.size >= 400) {
+        const oldest = baseMapCache.keys().next().value;
+        if (oldest !== undefined) baseMapCache.delete(oldest);
+      }
       baseMapCache.set(cacheKey, buf);
       res.setHeader('content-type', 'image/png');
       res.setHeader('cache-control', 'public, max-age=86400');

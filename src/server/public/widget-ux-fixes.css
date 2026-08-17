@@ -289,12 +289,21 @@ body.qf-modal-open { overflow: hidden; }
    this state, so hide them. Once both addresses resolve, JS removes .qf-map-base
    and the real routed lane + overlays return. ── */
 .qf-map-card.qf-map-base .qf-map-addr,
-.qf-map-card.qf-map-base .qf-map-overlay,
-.qf-map-card.qf-map-base .qf-map-expand {
+.qf-map-card.qf-map-base .qf-map-overlay {
   display: none;
 }
+/* The base map (incl. the Customize live preview) IS zoomable — keep the expand
+   affordance + zoom-in cursor so carriers can open it and inspect their chosen
+   map style close-up. Route overlays above stay hidden (no lane data yet). */
 .qf-map-card.qf-map-base .qf-map-canvas {
-  cursor: default;
+  cursor: zoom-in;
+}
+/* In the enlarge modal, the base map has no route addresses/metrics to show, so
+   hide those pills (the modal is a sibling of the card, so its own base flag
+   carries the state). Zoom controls + close stay visible. */
+.qf-map-modal.qf-map-base .qf-map-addr,
+.qf-map-modal.qf-map-base .qf-map-overlay {
+  display: none;
 }
 
 /* ── Top card (company name + contact block) + the "Instant freight estimate"
@@ -1040,3 +1049,16 @@ html { scrollbar-width: thin; scrollbar-color: rgba(135, 138, 150, 0.38) transpa
 /* Name + tagline block — hidden entirely when data-show-name="0" (logo only). */
 #qf-header .brand-name { min-width: 0 !important; }
 #qf-header[data-show-name="0"] .brand-name { display: none !important; }
+
+/* ── Scroll-chaining containment for the map ─────────────────────────────────
+   The widget map (inline preview + enlarge modal) captures the wheel to ZOOM,
+   never to scroll. overscroll-behavior:contain is the belt-and-suspenders so a
+   wheel/touch that reaches any scrollable widget surface can't chain up and
+   scroll the host page (the Customize preview host, or a customer's embed). The
+   wheel preventDefault in widget.js is the primary fix; this backs it up. ── */
+html, body { overscroll-behavior: contain; }
+.qf-widget { overscroll-behavior: contain; }
+.qf-map-card, .qf-map-viewport { overscroll-behavior: contain; }
+/* Clip the inline base map so any transient CSS zoom feedback stays inside the
+   card rather than spilling over the surrounding controls. */
+.qf-map-card.qf-map-base .qf-map-canvas { overflow: hidden; }
