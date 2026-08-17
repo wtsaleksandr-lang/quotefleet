@@ -331,6 +331,7 @@ export function renderHostedPage(opts: RenderHostedPageOpts): string {
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <meta name="robots" content="noindex,follow" />
   <title>${company} — instant freight quotes</title>
   <meta name="description" content="Get an instant freight rate from ${company}." />
   <style>
