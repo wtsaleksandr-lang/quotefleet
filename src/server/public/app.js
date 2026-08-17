@@ -3182,7 +3182,6 @@
         return f;
       }
       var company = el('div', { class: 'card qf-cz-section' });
-      company.appendChild(el('div', { class: 'qf-cz-section-title', text: 'Your company' }));
       company.appendChild(textField('Company name', 'displayName', b.displayName, 'Shown above your calculator.'));
       company.appendChild(textField('Tagline', 'tagline', b.tagline, 'One short line under your name.'));
       controls.appendChild(company);
@@ -3910,7 +3909,6 @@
           return f;
         }
         var headCard = el('div', { class: 'card qf-cz-section', style: { marginTop: '0' } });
-        headCard.appendChild(el('div', { class: 'qf-cz-section-title', text: 'Headline' }));
         headCard.appendChild(hpText('Headline', 'hostedHeadline', b.hostedHeadline, 'A short marketing line above your calculator. Leave blank to hide.'));
         headCard.appendChild(hpText('Subhead', 'hostedSubhead', b.hostedSubhead, 'One supporting sentence under the headline.', true));
         pc.appendChild(headCard);
