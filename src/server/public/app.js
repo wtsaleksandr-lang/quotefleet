@@ -3085,6 +3085,18 @@
       }
       // Push an instant, no-network visual patch to the preview widget.
       function livePatch(patch) { preview.postPatch(patch); }
+      // Persist a PURE-CSS field that livePatch already applied to its FINAL
+      // value (e.g. ctaHover) WITHOUT the post-save brand-refetch. flush() always
+      // fires preview.notifySaved() → brand-refetch, which re-pulls the config and
+      // re-skins the whole widget (re-rendering the map + header) to finalise
+      // SERVER-derived fields. A CSS attribute like the CTA-hover style has no
+      // server-derived half — livePatch already set the exact final attribute —
+      // so that heavy re-skin is pure waste AND a needless chance to disturb the
+      // preview's scroll position. The value is still saved here, so any LATER
+      // refetch (accent/font/theme) restores it authoritatively.
+      function saveNoRefetch(patch) {
+        api('/api/tenant/brand', { method: 'PUT', body: patch }).catch(function (e) { toastErr(e); });
+      }
 
       // ── Your company (name + tagline) ───────────────────────────
       function textField(label, key, val, hint) {
@@ -3378,7 +3390,10 @@
             n.setAttribute('aria-pressed', s ? 'true' : 'false');
           });
           livePatch({ ctaHover: id });
-          queueSave({ ctaHover: id }, true);
+          // Pure-CSS attribute — livePatch already applied its FINAL value, so
+          // persist WITHOUT the brand-refetch re-skin (avoids a wasted map/header
+          // re-render + any scroll disturbance on every hover pick).
+          saveNoRefetch({ ctaHover: id });
         });
         hoverRow.appendChild(chip);
       });
