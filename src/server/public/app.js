@@ -2690,8 +2690,11 @@
 
     var col = el('div', { class: 'qf-cz-preview-col' });
     var pcard = el('div', { class: 'card qf-cz-preview' });
-    col.appendChild(pcard);
 
+    // The toolbar (head) sits ABOVE the preview card as the right half of a
+    // split header — level with the left column's Design/Page/Behavior tab bar —
+    // so the preview card top aligns with the left column's first card. It is a
+    // direct child of the column (appended below, before pcard), NOT inside it.
     var head = el('div', { class: 'qf-cz-preview-head' });
     head.appendChild(el('span', { class: 'qf-cz-preview-title', text: 'Live preview' }));
 
@@ -2724,12 +2727,17 @@
     // on a coherent light/dark surface.
     var THEME_PRESETS = { light: 'mono', dark: 'midnight' };
     var themeMode = 'site';
-    var themeSeg = el('div', { class: 'qf-cz-seg', role: 'group', 'aria-label': 'Widget theme', title: 'Preview your calculator in light or dark' });
+    var themeSeg = el('div', { class: 'qf-cz-seg', role: 'group', 'aria-label': 'Widget theme', title: 'Preview your saved theme, or force light / dark' });
     var themeBtns = {};
-    // "Auto" = the tenant's own saved theme (internal id stays 'site' so the
-    // reset postMessage below is unchanged); Light/Dark force those presets.
-    [{ id: 'site', label: 'Auto — your saved theme' }, { id: 'light', label: 'Light theme' }, { id: 'dark', label: 'Dark theme' }].forEach(function (h) {
-      var btn = el('button', { type: 'button', class: 'qf-cz-seg-btn qf-cz-seg-text', 'data-theme': h.id, 'aria-label': h.label, title: h.label, text: h.id === 'site' ? 'Auto' : (h.id === 'light' ? 'Light' : 'Dark') });
+    // "Saved" = the tenant's OWN saved theme (internal id stays 'site' so the
+    // reset postMessage below is unchanged) — the truthful "what customers see"
+    // view. Deliberately NOT labelled "Auto": the deployed widget has no
+    // prefers-color-scheme / follow-the-host-site mode (verified — no
+    // prefers-color-scheme anywhere in widget.js or the widget CSS), so "Auto"
+    // would falsely imply host-adaptation. Light/Dark force those presets
+    // (tenant accent + font preserved via ?preset=).
+    [{ id: 'site', label: 'Your saved theme — what customers see' }, { id: 'light', label: 'Light theme' }, { id: 'dark', label: 'Dark theme' }].forEach(function (h) {
+      var btn = el('button', { type: 'button', class: 'qf-cz-seg-btn qf-cz-seg-text', 'data-theme': h.id, 'aria-label': h.label, title: h.label, text: h.id === 'site' ? 'Saved' : (h.id === 'light' ? 'Light' : 'Dark') });
       btn.addEventListener('click', function () { setTheme(h.id); });
       themeBtns[h.id] = btn; themeSeg.appendChild(btn);
     });
@@ -2738,7 +2746,9 @@
     head.appendChild(tools);
     var openLink = el('a', { href: openHref, target: '_blank', rel: 'noopener', class: 'qf-cz-preview-open', text: 'Open ↗' });
     head.appendChild(openLink);
-    pcard.appendChild(head);
+    // Split header: toolbar above the card, then the card (widget) below.
+    col.appendChild(head);
+    col.appendChild(pcard);
 
     var frameWrap = el('div', { class: 'qf-cz-frame-wrap', 'data-device': 'desktop', 'data-host': 'site' });
     var iframe = el('iframe', { class: 'qf-cz-frame', src: previewUrl, title: 'Your live calculator' });
@@ -3676,15 +3686,16 @@
       controls.appendChild(logoSec);
       paintLogo(b.logoUrl || '');
 
-      // ── Guided-editing pointer (arrow + preview scroll-alignment) ─────────
+      // ── Guided-editing pointer (preview scroll-alignment + highlight) ─────
       // Tapping / clicking / focusing a Design config container marks it the
-      // single active one, reveals a floating brand-accent arrow at its RIGHT
-      // edge pointing toward the live preview, and scrolls the preview so the
-      // widget section that container controls lines up level with it. The
-      // container → widget-section map is stamped as data-preview-target; the
-      // scroll math + same-origin guard live in buildLivePreview.alignTo.
+      // single active one and scrolls the preview so the widget section that
+      // container controls lines up level with it (the mapped section also
+      // pulses briefly). No visible arrow — it was confused with the horizontal
+      // carousel chevrons — the scroll-align + pulse + active-container outline
+      // carry the link. The container → widget-section map is stamped as
+      // data-preview-target; the scroll math + same-origin guard + pulse live in
+      // buildLivePreview.alignTo.
       (function wireGuidedEditing() {
-        var CHEV_R = '<svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M9 6l6 6-6 6"/></svg>';
         // Each Design container → the widget section it visually governs.
         var mapping = [
           [company, 'header'],
@@ -3703,8 +3714,6 @@
           var sec = pair[0];
           if (!sec) return;
           sec.setAttribute('data-preview-target', pair[1]);
-          // One arrow per targeted container; shown only while .is-cz-active.
-          sec.appendChild(el('span', { class: 'qf-cz-arrow', 'aria-hidden': 'true', html: CHEV_R }));
           sections.push(sec);
         });
         function setActive(sec) {

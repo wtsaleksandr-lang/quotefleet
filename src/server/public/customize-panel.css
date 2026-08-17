@@ -507,54 +507,17 @@
   .qf-cz-frame-wrap { scroll-behavior: auto; }
 }
 
-/* Positioning context for the absolutely-placed guide arrow. */
+/* The active container is marked with a subtle accent outline so it reads as the
+   one being edited; on activation the mapped preview section also pulses and the
+   preview scroll-aligns to it (see buildLivePreview.alignTo in app.js). There is
+   NO visible guide arrow — it was too easily confused with the horizontal
+   carousel chevrons — the outline + pulse + scroll-align carry the link.
+   position:relative is kept as a harmless positioning context for any
+   absolutely-placed children of a section. */
 .qf-cz-section { position: relative; }
-
-/* Floating guide arrow — hidden until its container is the active one. Matches
-   the .badge-info tint pattern (accent-soft fill + accent chevron), so contrast
-   holds in both themes. pointer-events:none so it never blocks the controls. */
-.qf-cz-arrow {
-  position: absolute;
-  top: 50%;
-  right: 8px;
-  transform: translateY(-50%) scale(0.8);
-  width: 32px;
-  height: 32px;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  border-radius: var(--radius-pill);
-  background: var(--accent-soft);
-  color: var(--accent);
-  border: 1px solid var(--accent-fill);
-  box-shadow: var(--shadow-sm);
-  opacity: 0;
-  pointer-events: none;
-  z-index: 2;
-  transition: opacity 0.18s ease, transform 0.18s ease;
-}
-.qf-cz-arrow svg { display: block; }
-.qf-cz-section.is-cz-active .qf-cz-arrow {
-  opacity: 1;
-  transform: translateY(-50%) scale(1);
-}
-/* Subtle nudge toward the preview so it reads as a pointer (motion on the icon
-   only, leaving the container transform for centring). */
-.qf-cz-section.is-cz-active .qf-cz-arrow svg {
-  animation: qf-cz-arrow-nudge 1.4s ease-in-out infinite;
-}
-@keyframes qf-cz-arrow-nudge {
-  0%, 100% { transform: translateX(0); }
-  50% { transform: translateX(3px); }
-}
-/* Mark the active container itself so it reads as the one being edited. */
 .qf-cz-section.is-cz-active {
   border-color: var(--accent-fill);
   box-shadow: 0 0 0 1px var(--accent-fill);
-}
-@media (prefers-reduced-motion: reduce) {
-  .qf-cz-arrow { transition: opacity 0.18s ease; }
-  .qf-cz-section.is-cz-active .qf-cz-arrow svg { animation: none; }
 }
 
 /* ══════════════════════════════════════════════════════════════════════════
@@ -668,4 +631,68 @@
 /* The Design / Page / Behavior tabs stretch to fill the bar so it reads as one
    complete menu (was left-aligned with dead space on the right). */
 .qf-cz-tabs .qf-cz-tab { flex: 1 1 0; text-align: center; }
+
+/* ══════════════════════════════════════════════════════════════════════════
+   CUSTOMIZE PREVIEW POLISH — full-height preview + aligned split header.
+   (1) The preview column fills the available viewport height (flex, no fixed
+       620px box, no wasted gap below the widget) — robust to the portal top-bar
+       height (viewport-relative, no hardcoded chrome offset). (2) The preview
+       toolbar (head) is lifted OUT of the card in app.js to sit as the RIGHT
+       half of a split header, level with the left column's Design/Page/Behavior
+       tab bar and with a matching bottom-border treatment; the preview card top
+       then aligns with the left column's first card. Desktop-only (min-width
+       901px) so the ≤900 stacked layout + ≤640 bottom-sheet stay untouched.
+       Appended at EOF so the line-based spacing/colour baselines never renumber.
+       Tokens + 8px ramp only; theme-aware (light + dark). ═══════════════════ */
+@media (min-width: 901px) {
+  /* Split-header treatment: the tab bar (left) and the preview toolbar (right)
+     share the same row height + a hairline bottom border, separated by the grid
+     column gap — so they read as one split header with a clear left/right
+     divide. min-height matches so the two cards below them start level. */
+  .qf-cz-tabs {
+    min-height: 40px;
+    margin-bottom: 4px;
+  }
+  .qf-cz-preview-head {
+    min-height: 40px;
+    align-items: center;
+    margin-bottom: 4px;
+    padding-bottom: 0;
+    border-bottom: 1px solid var(--border);
+  }
+
+  /* Both columns share a 16px header→card rhythm (on the 8px ramp) so the tab
+     bar's bottom and the preview toolbar's bottom sit level and the two cards
+     below them start at the EXACT same vertical position: tab/head margin-bottom
+     4px + column gap 16px = 20px on each side. */
+  .qf-cz-controls { gap: 16px; }
+
+  /* Full-height preview: the column fills the viewport and flexes so the widget
+     frame grows into the space (no short floating card, no dead gap). 36px =
+     18px sticky top offset + 18px bottom breathing room — NOT a portal-chrome
+     offset. */
+  .qf-cz-preview-col {
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+    height: calc(100vh - 36px);
+    height: calc(100dvh - 36px);
+  }
+  .qf-cz-preview {
+    flex: 1 1 auto;
+    min-height: 0;
+    display: flex;
+    flex-direction: column;
+  }
+  /* Fill the card; the frame becomes the flexible viewport (the guided-editing
+     scroll-align in app.js still works — it stays a bounded overflow-y:auto box
+     shorter than the widget's auto-reported content height). Overrides the fixed
+     620px + calc(100vh-120px) cap from the guided-editing block above. */
+  .qf-cz-frame-wrap {
+    flex: 1 1 auto;
+    min-height: 0;
+    height: auto;
+    max-height: none;
+  }
+}
 
