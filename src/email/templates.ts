@@ -39,14 +39,13 @@ const BRAND = {
   // Absolute HTTPS logo — the full QuoteFleet business mark (calculator squares
   // fused with a semi-truck), the same lockup used in the site footer. It reads
   // on the light email header. Lives at src/server/public/brand/logo-full.png →
-  // served at /brand/logo-full.png. (A `logo-full-ondark.png` variant exists for
-  // any future dark-header email; our current headers are light, so use the
-  // light one.) The mark is ~3:2 (374×252), so we render it height-first at
-  // ~40px tall with auto width for a tasteful header size.
+  // served at /brand/logo-full.png. The mark is ~3:2 (374×252), so we render it
+  // height-first at ~40px tall with auto width for a tasteful header size. It is
+  // the graphic shown where the client allows images; the live-text wordmark
+  // beside it is the reliable brand element that ALWAYS renders. (The old dual
+  // light/dark <img> swap was removed — it showed as two broken red-X boxes in
+  // Outlook. See shell() header.)
   logoIcon: 'https://quotefleet.net/brand/logo-full.png',
-  // White-truck-outline variant for dark clients — swapped in via the
-  // prefers-color-scheme:dark / [data-ogsc] rules in the email <head>.
-  logoIconDark: 'https://quotefleet.net/brand/logo-full-ondark.png',
   logoW: 60,
   logoH: 40,
 };
@@ -94,18 +93,23 @@ function shell(opts: {
     : `<table role="presentation" cellspacing="0" cellpadding="0" border="0">
               <tr>
                 <td valign="middle">
-                  <!-- Logo + wordmark wrapped together in one anchor so tapping
-                       the brand opens the homepage in a new tab. Inline-block +
-                       vertical-align keeps the img/span on one line in every
-                       major client. Rendered height-first (width auto) so the
-                       ~3:2 truck mark never distorts. -->
+                  <!-- QuoteFleet header: ONE hosted logo image + a live-text
+                       wordmark, wrapped in a single anchor to the homepage
+                       (new tab). The image is the graphic where the client
+                       allows images (Gmail / Apple Mail / Outlook.com); its
+                       ALT is styled (Inter, brand-blue) so a blocked-image
+                       client shows a clean "QuoteFleet" instead of a broken
+                       red-X box. The <span> wordmark ALWAYS renders — it is the
+                       reliable brand element — and is dark-mode-lightened via the
+                       .qf-wordmark rule in <head>. Inline-block + vertical-align
+                       keeps img + span on one line in every major client;
+                       height-first (width auto) so the ~3:2 mark never distorts. -->
                   <a href="https://quotefleet.net" target="_blank" rel="noopener" style="text-decoration:none;display:inline-block;">
-                    <!-- Two logo variants: the light-header mark shows by default; in a
-                         dark client the white-truck-outline variant is swapped in via the
-                         @media (prefers-color-scheme: dark) / [data-ogsc] rules in <head>. -->
-                    <img class="qf-logo-light" src="${BRAND.logoIcon}" height="${BRAND.logoH}" alt="${escape(BRAND.name)}" style="display:inline-block;vertical-align:middle;border:0;outline:none;text-decoration:none;margin-right:10px;height:${BRAND.logoH}px;width:auto;">
-                    <img class="qf-logo-dark" src="${BRAND.logoIconDark}" height="${BRAND.logoH}" alt="${escape(BRAND.name)}" style="display:none;vertical-align:middle;border:0;outline:none;text-decoration:none;margin-right:10px;height:${BRAND.logoH}px;width:auto;">
-                    <span style="font-size:19px;font-weight:700;letter-spacing:-0.01em;color:${BRAND.ink};vertical-align:middle;">${escape(BRAND.name)}</span>
+                    <!-- Decorative logo: alt="" so a blocked-image client shows
+                         NOTHING here (no broken-image glyph, no ALT text) — the
+                         live-text <span> beside it is the single wordmark. -->
+                    <img src="${BRAND.logoIcon}" width="${BRAND.logoW}" height="${BRAND.logoH}" alt="" style="display:inline-block;vertical-align:middle;border:0;outline:none;text-decoration:none;margin-right:10px;height:${BRAND.logoH}px;width:auto;font-family:'Inter','Helvetica Neue',Arial,sans-serif;font-size:19px;font-weight:700;color:${BRAND.primary};">
+                    <span class="qf-wordmark" style="font-size:19px;font-weight:700;letter-spacing:-0.01em;color:${BRAND.primary};vertical-align:middle;">${escape(BRAND.name)}</span>
                   </a>
                 </td>
               </tr>
@@ -133,9 +137,14 @@ function shell(opts: {
             </div>
             <div style="margin-top:10px;">
               <a href="mailto:${BRAND.support}" style="color:${BRAND.muted};text-decoration:underline;">${escape(BRAND.support)}</a>
-              &nbsp;·&nbsp; The ${escape(BRAND.name)} Team
             </div>
+            <!-- Legal/utility links — one single line, · -separated:
+                 Privacy · Terms · Security · DPA -->
             <div style="margin-top:10px;">
+              <a href="https://quotefleet.net/privacy" style="color:${BRAND.muted};text-decoration:underline;">Privacy</a>
+              &nbsp;·&nbsp;
+              <a href="https://quotefleet.net/terms" style="color:${BRAND.muted};text-decoration:underline;">Terms</a>
+              &nbsp;·&nbsp;
               <a href="https://quotefleet.net/security" style="color:${BRAND.muted};text-decoration:underline;">Security</a>
               &nbsp;·&nbsp;
               <a href="https://quotefleet.net/dpa" style="color:${BRAND.muted};text-decoration:underline;">DPA</a>
@@ -160,16 +169,15 @@ function shell(opts: {
 <style>
   /* Dark-mode adaptations for clients that honor prefers-color-scheme (Apple
      Mail, iOS Mail, etc.) and Outlook.com dark mode ([data-ogsc]). Light clients
-     are unaffected: the light logo shows and the chat link stays brand-blue. In
-     dark clients the white-truck-outline logo is swapped in and the "Chat with
-     us" outline button turns white so both read on the dark surface. */
+     are unaffected. In dark clients the live-text wordmark is lightened to a
+     legible tint of brand-blue, and the "Chat with us" outline button turns
+     white so both read on the dark surface. (Live text only — the single hosted
+     logo image is unchanged; the old dual-image swap was the Outlook red-X bug.) */
   @media (prefers-color-scheme: dark) {
-    .qf-logo-light { display: none !important; }
-    .qf-logo-dark { display: inline-block !important; }
+    .qf-wordmark { color: #7C93FF !important; }
     .qf-chat-link { color: #FFFFFF !important; border-color: rgba(255,255,255,0.55) !important; }
   }
-  [data-ogsc] .qf-logo-light { display: none !important; }
-  [data-ogsc] .qf-logo-dark { display: inline-block !important; }
+  [data-ogsc] .qf-wordmark { color: #7C93FF !important; }
   [data-ogsc] .qf-chat-link { color: #FFFFFF !important; border-color: rgba(255,255,255,0.55) !important; }
 </style>
 </head>

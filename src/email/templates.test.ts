@@ -12,6 +12,8 @@ import {
   followupNudgeEmail,
   followupReminderEmail,
   followupDiscountEmail,
+  magicLinkEmail,
+  lifecycleWelcomeEmail,
 } from './templates.js';
 
 const base = {
@@ -25,6 +27,52 @@ const base = {
   total: '$2,450.00',
   unsubscribeUrl: 'https://harborlink.quotefleet.net/unsub/abc123',
 };
+
+describe('QuoteFleet-branded shell — reliable live-text logo + single-line footer', () => {
+  it('renders the header as a single hosted logo image + a live-text "QuoteFleet" wordmark (no dual-image swap)', () => {
+    const { html } = magicLinkEmail({ link: 'https://quotefleet.net/m/abc', email: 'a@b.com' });
+    // Live-text wordmark ALWAYS renders — the reliable brand element.
+    expect(html).toContain('class="qf-wordmark"');
+    expect(html).toMatch(/qf-wordmark[^>]*>QuoteFleet</);
+    // Exactly one hosted logo image, and it is the light mark.
+    expect(html).toContain('https://quotefleet.net/brand/logo-full.png');
+    // The old dark-swap <img> and its variant are GONE from the email.
+    expect(html).not.toContain('logo-full-ondark.png');
+    expect(html).not.toContain('qf-logo-dark');
+    expect(html).not.toContain('qf-logo-light');
+  });
+
+  it('footer legal links are a single line: Privacy · Terms · Security · DPA (in order)', () => {
+    const { html } = magicLinkEmail({ link: 'https://quotefleet.net/m/abc', email: 'a@b.com' });
+    expect(html).toContain('quotefleet.net/privacy');
+    expect(html).toContain('quotefleet.net/terms');
+    expect(html).toContain('quotefleet.net/security');
+    expect(html).toContain('quotefleet.net/dpa');
+    // Order Privacy → Terms → Security → DPA on the one links line.
+    expect(html).toMatch(/\/privacy[\s\S]*\/terms[\s\S]*\/security[\s\S]*\/dpa/);
+  });
+
+  it('drops the "The QuoteFleet Team" footer line entirely', () => {
+    const { html } = magicLinkEmail({ link: 'https://quotefleet.net/m/abc', email: 'a@b.com' });
+    expect(html).not.toContain('The QuoteFleet Team');
+  });
+
+  it('marketing (lifecycle) shell keeps the same logo/footer treatment', () => {
+    const html = lifecycleWelcomeEmail({
+      hostedUrl: 'https://demo.quotefleet.net',
+      loginUrl: 'https://app.quotefleet.net',
+      unsubscribeUrl: 'https://app.quotefleet.net/unsub/xyz',
+    });
+    expect(html).toContain('class="qf-wordmark"');
+    expect(html).not.toContain('logo-full-ondark.png');
+    expect(html).not.toContain('The QuoteFleet Team');
+    expect(html).toContain('quotefleet.net/privacy');
+    expect(html).toContain('quotefleet.net/terms');
+    // CAN-SPAM legal footer still present on marketing sends.
+    expect(html).toContain('Sheridan, WY');
+    expect(html).toContain('unsub/xyz');
+  });
+});
 
 describe('followupNudgeEmail (FU1)', () => {
   it('renders the customer name in the subject and never shows a discount', () => {
