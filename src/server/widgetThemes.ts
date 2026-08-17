@@ -1038,7 +1038,11 @@ export const WIDGET_PRESET_LIST: WidgetPreset[] = PRESETS_RAW;
 // long-standing clean border-wrap on hover; the rest are subtle premium
 // alternatives. All are accent-aware (they reuse the contrast-computed
 // --w-* tokens) and keep an accessible focus ring regardless.
-export const CTA_HOVER_STYLES = ['border', 'lift', 'glow', 'fill', 'none'] as const;
+export const CTA_HOVER_STYLES = [
+  'border', 'lift', 'glow', 'fill',
+  'scale', 'brighten', 'sink', 'ring',
+  'none',
+] as const;
 export type CtaHover = (typeof CTA_HOVER_STYLES)[number];
 export const DEFAULT_CTA_HOVER: CtaHover = 'border';
 

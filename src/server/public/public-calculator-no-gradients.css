@@ -183,10 +183,13 @@ body.qf-app-calculator .qf-total-box .total .currency {
    All reuse the contrast-computed accent tokens. 'none' still shows a focus
    ring (see .qf-cta:focus-visible in widget-style.css). */
 body.qf-app-calculator[data-qf-cta-hover="none"] .qf-cta:not(.qf-secondary):hover {
+  /* Hover VISUALLY IDENTICAL to rest. Only counter what the base .qf-cta:hover
+     rules actually change (background + border-color + transform); DO NOT touch
+     box-shadow or filter — the rest .qf-cta drop-shadow (app-style.css) must
+     persist, else the shadow visibly disappears on hover. Focus ring untouched. */
   background: var(--w-accent-solid, var(--w-accent, #0D3CFC)) !important;
   border-color: var(--w-accent-solid, var(--w-accent, #0D3CFC)) !important;
   transform: none !important;
-  box-shadow: none !important;
 }
 body.qf-app-calculator[data-qf-cta-hover="border"] .qf-cta:not(.qf-secondary):hover {
   background: var(--w-accent-hover, #0B32D4) !important;
@@ -212,6 +215,40 @@ body.qf-app-calculator[data-qf-cta-hover="fill"] .qf-cta:not(.qf-secondary):hove
   transform: none !important;
   box-shadow: none !important;
   filter: saturate(1.08) !important;
+}
+/* Added options — kept consistent with the widget-style.css set so each id
+   renders the SAME effect in this app-calculator theme. Token-driven, subtle,
+   each visibly distinct. See CTA_HOVER_STYLES in widgetThemes.ts. */
+body.qf-app-calculator[data-qf-cta-hover="scale"] .qf-cta:not(.qf-secondary):hover {
+  background: var(--w-accent-hover, #0B32D4) !important;
+  border-color: var(--w-accent-hover, #0B32D4) !important;
+  transform: scale(1.03) !important;
+  box-shadow: none !important;
+}
+body.qf-app-calculator[data-qf-cta-hover="brighten"] .qf-cta:not(.qf-secondary):hover {
+  background: var(--w-accent-solid, var(--w-accent, #0D3CFC)) !important;
+  border-color: var(--w-accent-solid, var(--w-accent, #0D3CFC)) !important;
+  transform: none !important;
+  box-shadow: none !important;
+  filter: brightness(1.08) !important;
+}
+body.qf-app-calculator[data-qf-cta-hover="sink"] .qf-cta:not(.qf-secondary):hover {
+  background: var(--w-accent-hover, #0B32D4) !important;
+  border-color: var(--w-accent-hover, #0B32D4) !important;
+  transform: translateY(1px) !important;
+  box-shadow: 0 2px 6px rgba(0,0,0,0.28) inset !important;
+}
+body.qf-app-calculator[data-qf-cta-hover="ring"] .qf-cta:not(.qf-secondary):hover {
+  background: var(--w-accent-hover, #0B32D4) !important;
+  border-color: var(--w-accent-surface, #FFFFFF) !important;
+  transform: none !important;
+  box-shadow: 0 0 0 3px var(--w-accent-surface, #FFFFFF),
+              0 0 0 5px color-mix(in srgb, var(--w-accent, #0D3CFC) 45%, transparent) !important;
+}
+@media (prefers-reduced-motion: reduce) {
+  body.qf-app-calculator[data-qf-cta-hover="lift"] .qf-cta:not(.qf-secondary):hover,
+  body.qf-app-calculator[data-qf-cta-hover="scale"] .qf-cta:not(.qf-secondary):hover,
+  body.qf-app-calculator[data-qf-cta-hover="sink"] .qf-cta:not(.qf-secondary):hover { transform: none !important; }
 }
 
 body.qf-app-calculator .qf-error {

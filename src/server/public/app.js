@@ -2959,7 +2959,7 @@
       var b = d.brand || {};
       var presets = d.presets || [];
       var fonts = d.fonts || [];
-      var ctaHovers = d.ctaHovers || [{ id: 'border' }, { id: 'lift' }, { id: 'glow' }, { id: 'fill' }, { id: 'none' }];
+      var ctaHovers = d.ctaHovers || [{ id: 'border' }, { id: 'lift' }, { id: 'glow' }, { id: 'fill' }, { id: 'scale' }, { id: 'brighten' }, { id: 'sink' }, { id: 'ring' }, { id: 'none' }];
       var fontColorOpts = d.fontColors || [];
       var presetsById = {};
       presets.forEach(function (p) { presetsById[p.id] = p; });
@@ -3342,12 +3342,16 @@
       controls.appendChild(fontSec);
 
       // ── Button hover effect ─────────────────────────────────────
-      var HOVER_LABELS = { border: 'Border', lift: 'Lift', glow: 'Glow', fill: 'Fill', none: 'None' };
+      var HOVER_LABELS = { border: 'Border', lift: 'Lift', glow: 'Glow', fill: 'Fill', scale: 'Grow', brighten: 'Brighten', sink: 'Press', ring: 'Ring', none: 'None' };
       var HOVER_HINTS = {
         border: 'A clean border wraps the button.',
         lift: 'Gently lifts with a soft shadow.',
         glow: 'A soft accent glow.',
         fill: 'A subtle fill / shade shift.',
+        scale: 'Grows a touch on hover.',
+        brighten: 'Lightens slightly on hover.',
+        sink: 'Presses gently inward.',
+        ring: 'A crisp accent ring appears.',
         none: 'No hover change (keeps focus ring).',
       };
       var hoverSec = el('div', { class: 'card qf-cz-section' });
@@ -3705,7 +3709,11 @@
           [mapSec, 'map'],
           [blendSec, 'map'],
           [accentSec, 'tabs'],
-          [hoverSec, 'tabs'],
+          // NOTE: hoverSec is intentionally NOT guided-aligned. ctaHover is a pure
+          // CSS attribute change applied instantly via livePatch (brand-preview,
+          // no reload); firing alignTo() on chip click/focusin scrolled the preview
+          // (it re-centred an unrelated 'tabs' section → looked like a jump to top).
+          // Omitting it keeps the preview scroll position fixed on hover select.
           [fontSec, 'header'],
           [textSec, 'header'],
         ];
