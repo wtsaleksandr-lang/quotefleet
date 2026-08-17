@@ -113,6 +113,33 @@ export const HOSTED_BG_PRESETS: BgPreset[] = [
     light: 'linear-gradient(135deg, #E8F7F0 0%, #EDF5FF 100%)',
     dark: 'linear-gradient(135deg, #0C1A17 0%, #0D1622 100%)',
   },
+  // ── Patterned grids — a subtle repeating texture over a solid backdrop. The
+  // pattern line/dot colour is baked per theme (faint ink on light, faint light
+  // on dark) so the texture stays whisper-quiet and legible behind the card. A
+  // single CSS `background` shorthand → applied identically by the SSR body
+  // rule and the client applyBackground() (body.style.background = presetBg).
+  {
+    id: 'dot-grid',
+    label: 'Dot grid',
+    light: 'radial-gradient(rgba(15,23,32,0.07) 1px, transparent 1.4px) 0 0 / 22px 22px, #F4F6F9',
+    dark: 'radial-gradient(rgba(255,255,255,0.06) 1px, transparent 1.4px) 0 0 / 22px 22px, #0F1417',
+  },
+  {
+    id: 'line-grid',
+    label: 'Line grid',
+    light:
+      'linear-gradient(rgba(15,23,32,0.05) 1px, transparent 1px) 0 0 / 24px 24px, linear-gradient(90deg, rgba(15,23,32,0.05) 1px, transparent 1px) 0 0 / 24px 24px, #F4F6F9',
+    dark:
+      'linear-gradient(rgba(255,255,255,0.045) 1px, transparent 1px) 0 0 / 24px 24px, linear-gradient(90deg, rgba(255,255,255,0.045) 1px, transparent 1px) 0 0 / 24px 24px, #0F1417',
+  },
+  {
+    id: 'cross-hatch',
+    label: 'Cross-hatch',
+    light:
+      'repeating-linear-gradient(45deg, rgba(15,23,32,0.045) 0, rgba(15,23,32,0.045) 1px, transparent 1px, transparent 12px), repeating-linear-gradient(-45deg, rgba(15,23,32,0.045) 0, rgba(15,23,32,0.045) 1px, transparent 1px, transparent 12px), #F4F6F9',
+    dark:
+      'repeating-linear-gradient(45deg, rgba(255,255,255,0.04) 0, rgba(255,255,255,0.04) 1px, transparent 1px, transparent 12px), repeating-linear-gradient(-45deg, rgba(255,255,255,0.04) 0, rgba(255,255,255,0.04) 1px, transparent 1px, transparent 12px), #0F1417',
+  },
 ];
 const BG_PRESET_IDS = new Set(HOSTED_BG_PRESETS.map((p) => p.id));
 
@@ -473,8 +500,13 @@ export function renderHostedPage(opts: RenderHostedPageOpts): string {
     function esc(s){ return String(s==null?'':s).replace(/[&<>"']/g, function(ch){ return ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'})[ch]; }); }
 
     // ── size relay: inner calculator height → resize frame → report ours up ──
+    // Coalesce bursts (a render() + the ResizeObserver it triggers both call
+    // this) into ONE post per animation frame so height reports don't oscillate.
+    var _rhRaf = 0;
+    function postHeight(){ _rhRaf = 0; try { if (window.parent && window.parent !== window) window.parent.postMessage({ type:'QF_WIDGET_HEIGHT', height: document.documentElement.scrollHeight }, '*'); } catch(_e){} }
     function reportHeight(){
-      try { if (window.parent && window.parent !== window) window.parent.postMessage({ type:'QF_WIDGET_HEIGHT', height: document.documentElement.scrollHeight }, '*'); } catch(_e){}
+      if (_rhRaf) return;
+      if (window.requestAnimationFrame) { _rhRaf = window.requestAnimationFrame(postHeight); } else { postHeight(); }
     }
     function forwardToCalc(msg){ try { if (calc && calc.contentWindow) calc.contentWindow.postMessage(msg, '*'); } catch(_e){} }
     window.addEventListener('message', function(e){
@@ -539,13 +571,20 @@ export function renderHostedPage(opts: RenderHostedPageOpts): string {
           + '<blockquote>' + esc(t.quote) + '</blockquote>'
           + '<figcaption>' + esc(t.author||'') + (t.company ? ' · <span>' + esc(t.company) + '</span>' : '') + '</figcaption></figure>';
       }).join('');
-      // ctas
-      var ctas = (HP.ctas||[]).filter(function(c){ return c && c.label && c.value && c.type; }).slice(0,3);
+      // ctas — this LIVE render runs only in the portal preview (via applyHosted
+      // on a postMessage), never for a real visitor. So it is intentionally
+      // lenient: any added button shows at once with a "Button" placeholder +
+      // an inert '#' href until label/value are filled, giving the owner instant
+      // feedback. The REAL page is server-rendered through normalizeCtas, which
+      // stays strict (an incomplete button never ships).
+      var ctas = (HP.ctas||[]).filter(function(c){ return c && typeof c === 'object'; }).slice(0,3);
       var cEl = q('[data-hp="ctas"]');
       cEl.hidden = !ctas.length;
       cEl.innerHTML = ctas.map(function(c,i){
         var tgt = c.type === 'url' ? ' target="_blank" rel="noopener"' : '';
-        return '<a class="qf-hp-cta' + (i===0?' is-primary':'') + '" href="' + esc(ctaHref(c)) + '"' + tgt + '>' + esc(c.label) + '</a>';
+        var label = (c.label && String(c.label).trim()) ? c.label : 'Button';
+        var href = (c.value && String(c.value).trim()) ? ctaHref(c) : '#';
+        return '<a class="qf-hp-cta' + (i===0?' is-primary':'') + '" href="' + esc(href) + '"' + tgt + '>' + esc(label) + '</a>';
       }).join('');
       // bare vs framed
       var hasAside = hasHead || badges.length || revs.length || ctas.length;

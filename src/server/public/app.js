@@ -2967,7 +2967,6 @@
       var presets = d.presets || [];
       var fonts = d.fonts || [];
       var ctaHovers = d.ctaHovers || [{ id: 'border' }, { id: 'lift' }, { id: 'glow' }, { id: 'fill' }, { id: 'scale' }, { id: 'brighten' }, { id: 'sink' }, { id: 'ring' }, { id: 'none' }];
-      var fontColorOpts = d.fontColors || [];
       var presetsById = {};
       presets.forEach(function (p) { presetsById[p.id] = p; });
       c.innerHTML = '';
@@ -3527,54 +3526,108 @@
       headerSec.appendChild(showNameWrap);
       controls.appendChild(headerSec);
 
-      // ── Text color (background-aware, WCAG-limited) ──────────────
-      // Only colours that clear WCAG AA against the CURRENT theme background
-      // are offered; the set updates whenever the theme/accent changes.
-      // "Auto" (the contrast engine's safe pick) is the default. The server
-      // re-validates per surface and falls back to auto anywhere a colour
-      // would drop below threshold — so nothing ever renders unreadable.
+      // ── Text color (Auto + custom picker + a few distinct swatches) ──────
+      // The old control offered three near-identical dark neutrals (charcoal/
+      // ink/slate) which just added confusion. This keeps "Auto" (the contrast
+      // engine's safe pick, the default) plus a custom colour picker and a few
+      // GENUINELY-DISTINCT swatches (near-black / white / mid-neutral). Any pick
+      // applies instantly (livePatch, like accent — never reloads the preview,
+      // so scroll is preserved) and a lightweight contrast check warns (never
+      // blocks) if the chosen colour reads poorly on the current background.
       var textSec = el('div', { class: 'card qf-cz-section' });
       textSec.appendChild(el('div', { class: 'qf-cz-section-title', text: 'Text color' }));
-      textSec.appendChild(el('div', { class: 'qf-cz-hint', text: 'Only readable choices for your background are shown. Auto is recommended.' }));
+      textSec.appendChild(el('div', { class: 'qf-cz-hint', text: 'Auto picks a readable colour for your background. Or choose your own — we’ll warn if it’s hard to read.' }));
       var textRow = el('div', { class: 'qf-cz-textcolor-row' });
       textSec.appendChild(makeCarousel(textRow));
+      // Three genuinely-distinct choices: dark, light (inverted), mid-neutral.
+      var TEXT_SWATCHES = [
+        { hex: '#141414', label: 'Near-black' },
+        { hex: '#FFFFFF', label: 'White' },
+        { hex: '#64748B', label: 'Slate' },
+      ];
       var currentFontColor = (b.fontColor && b.fontColor !== 'auto') ? String(b.fontColor).toLowerCase() : 'auto';
+      // Custom picker (mirrors the accent picker's colour-input + hex pattern).
+      var textCustomRow = el('div', { class: 'qf-cz-textcolor-custom' });
+      var textColorWrap = el('label', { class: 'qf-cz-textcolor-customwrap', title: 'Pick a custom text colour' });
+      var textColorInput = el('input', { type: 'color', value: (currentFontColor !== 'auto' ? currentFontColor : '#141414'), 'aria-label': 'Custom text colour' });
+      textColorWrap.appendChild(textColorInput);
+      textColorWrap.appendChild(el('span', { text: 'Custom' }));
+      var textHex = el('input', { class: 'input qf-cz-textcolor-hex', type: 'text', 'aria-label': 'Text colour hex value', maxlength: '7', placeholder: '#141414' });
+      textCustomRow.appendChild(textColorWrap);
+      textCustomRow.appendChild(textHex);
+      textSec.appendChild(textCustomRow);
+      var textWarn = el('div', { class: 'qf-cz-textcolor-warn', role: 'status', text: 'Low contrast — may be hard to read on this background.' });
+      textWarn.hidden = true;
+      textSec.appendChild(textWarn);
+      // Contrast guard: warn (don't block) when the chosen colour fails AA on
+      // any current text surface. Auto is always safe → never warns.
+      function fontColorContrastOk(hex) {
+        var surfaces = currentTextSurfaces();
+        if (!surfaces.length) return true;
+        return surfaces.every(function (bg) { return wcagPasses(hex, bg, 4.5); });
+      }
+      function updateTextWarn() {
+        var bad = currentFontColor !== 'auto' && /^#[0-9a-f]{6}$/i.test(currentFontColor) && !fontColorContrastOk(currentFontColor);
+        textWarn.hidden = !bad;
+      }
+      // Apply a chosen colour: instant preview patch (no reload → scroll kept) +
+      // debounced/immediate save. `immediate` for discrete taps, debounced while
+      // dragging the native colour input.
+      function pickFontColor(hex, immediate) {
+        currentFontColor = String(hex).toLowerCase();
+        livePatch({ fontColor: hex });
+        queueSave({ fontColor: hex }, !!immediate);
+        repaintFontColors();
+      }
       repaintFontColors = function () {
         textRow.innerHTML = '';
-        var surfaces = currentTextSurfaces();
-        // "Auto (recommended)" — always available, always safe.
+        // "Auto (recommended)" — always available, always safe, the default.
         var autoOn = currentFontColor === 'auto';
         var autoChip = el('button', { type: 'button', class: 'qf-cz-textcolor qf-cz-textcolor-auto' + (autoOn ? ' is-selected' : ''), 'data-fontcolor': 'auto', 'aria-pressed': autoOn ? 'true' : 'false', title: 'Auto — a readable colour is picked for you' });
         autoChip.appendChild(el('span', { class: 'qf-cz-textcolor-dot', style: { background: 'linear-gradient(135deg,#fff 50%,#141414 50%)' } }));
         autoChip.appendChild(el('span', { text: 'Auto (recommended)' }));
-        autoChip.addEventListener('click', function () { currentFontColor = 'auto'; repaintFontColors(); queueSave({ fontColor: 'auto' }, true); });
+        // Auto is resolved server-side per surface — persist + reskin in place
+        // (brand-refetch re-applies tokens without reloading, so scroll stays).
+        autoChip.addEventListener('click', function () { currentFontColor = 'auto'; queueSave({ fontColor: 'auto' }, true); repaintFontColors(); });
         textRow.appendChild(autoChip);
-        // Curated swatches, filtered to those passing WCAG on ALL text surfaces.
-        var offered = fontColorOpts.filter(function (sw) {
-          return surfaces.every(function (bg) { return wcagPasses(sw.hex, bg, 4.5); });
-        });
-        var stillValid = false;
-        offered.forEach(function (sw) {
+        TEXT_SWATCHES.forEach(function (sw) {
           var on = currentFontColor === String(sw.hex).toLowerCase();
-          if (on) stillValid = true;
           var chip = el('button', { type: 'button', class: 'qf-cz-textcolor' + (on ? ' is-selected' : ''), 'data-fontcolor': sw.hex, 'aria-pressed': on ? 'true' : 'false', title: sw.label });
           chip.appendChild(el('span', { class: 'qf-cz-textcolor-dot', style: { background: sw.hex } }));
           chip.appendChild(el('span', { text: sw.label }));
-          chip.addEventListener('click', function () { currentFontColor = String(sw.hex).toLowerCase(); repaintFontColors(); queueSave({ fontColor: sw.hex }, true); });
+          chip.addEventListener('click', function () { pickFontColor(sw.hex, true); });
           textRow.appendChild(chip);
         });
-        // If the previously-chosen colour no longer passes the new background,
-        // snap back to Auto (and persist) so we never keep an unreadable pick.
-        if (currentFontColor !== 'auto' && !stillValid) {
-          currentFontColor = 'auto';
-          queueSave({ fontColor: 'auto' }, true);
-          repaintFontColors();
-          return;
+        // Keep the custom colour input + hex field in sync with the selection.
+        if (currentFontColor !== 'auto' && /^#[0-9a-f]{6}$/i.test(currentFontColor)) {
+          textColorInput.value = currentFontColor;
+          if (document.activeElement !== textHex) textHex.value = currentFontColor;
+        } else if (document.activeElement !== textHex) {
+          textHex.value = '';
         }
+        updateTextWarn();
         // The text-colour row is a carousel; refresh its arrows now the chip
         // set has been rebuilt (makeCarousel only re-checks on scroll/resize).
         try { textRow.dispatchEvent(new Event('scroll')); } catch (_e) {}
       };
+      textColorInput.addEventListener('input', function () { textHex.value = textColorInput.value; pickFontColor(textColorInput.value, false); });
+      textColorInput.addEventListener('change', function () { pickFontColor(textColorInput.value, true); });
+      textHex.addEventListener('input', function () {
+        var v = String(textHex.value || '').trim();
+        if (/^#?[0-9a-f]{6}$/i.test(v)) { if (v.charAt(0) !== '#') v = '#' + v; textColorInput.value = v; pickFontColor(v, false); }
+      });
+      textHex.addEventListener('blur', function () {
+        var v = String(textHex.value || '').trim();
+        // Only finalise (immediate save) when the typed hex IS the active
+        // selection — the `input` handler already applied it live. If another
+        // control (Auto / a swatch) has since changed the selection, DON'T
+        // resurrect this stale value; just re-sync the field to the selection.
+        if (/^#?[0-9a-f]{6}$/i.test(v)) {
+          if (v.charAt(0) !== '#') v = '#' + v;
+          if (currentFontColor === v.toLowerCase()) { queueSave({ fontColor: v }, true); return; }
+        }
+        repaintFontColors();
+      });
       repaintFontColors();
       controls.appendChild(textSec);
 
@@ -3803,7 +3856,18 @@
         testiCard.appendChild(el('div', { class: 'qf-cz-hint', text: 'Add 2–4 short customer reviews. On phones the first two show.' }));
         var testiWrap = el('div');
         var addTesti = el('button', { type: 'button', class: 'btn btn-secondary', style: { marginTop: '10px' }, text: '+ Add testimonial' });
-        function saveTesti() { hostedSave({ hostedTestimonialsJson: testis.map(function (t) { return Object.assign({}, t); }) }); }
+        function testiSnapshot() { return testis.map(function (t) { return Object.assign({}, t); }); }
+        // Pushing the hosted preview on EVERY keystroke re-rendered + re-measured
+        // the whole wrap per character, which read as a twitch/flicker. Debounce
+        // the live preview push (the network save is already debounced) so a
+        // burst of keystrokes coalesces into ONE smooth update — no iframe
+        // reload, scroll preserved.
+        var testiLiveTimer = null;
+        function saveTesti() {
+          queueSave({ hostedTestimonialsJson: testiSnapshot() });
+          clearTimeout(testiLiveTimer);
+          testiLiveTimer = setTimeout(function () { preview.postHosted({ hostedTestimonialsJson: testiSnapshot() }); }, 220);
+        }
         function renderTesti() {
           testiWrap.innerHTML = '';
           testis.forEach(function (t, i) {
@@ -3848,7 +3912,15 @@
         ctaCard.appendChild(el('div', { class: 'qf-cz-hint', text: 'Up to 3 buttons — e.g. “Call dispatch”, “Email us”, “Visit site”.' }));
         var ctaWrap = el('div');
         var addCta = el('button', { type: 'button', class: 'btn btn-secondary', style: { marginTop: '10px' }, text: '+ Add button' });
-        function saveCtas() { hostedSave({ hostedCtasJson: ctas.map(function (c) { return Object.assign({}, c); }) }); }
+        function ctaSnapshot() { return ctas.map(function (c) { return Object.assign({}, c); }); }
+        // Same debounce model as testimonials: coalesce keystrokes into one
+        // smooth hosted-preview push (network save already debounced).
+        var ctaLiveTimer = null;
+        function saveCtas() {
+          queueSave({ hostedCtasJson: ctaSnapshot() });
+          clearTimeout(ctaLiveTimer);
+          ctaLiveTimer = setTimeout(function () { preview.postHosted({ hostedCtasJson: ctaSnapshot() }); }, 220);
+        }
         function renderCtas() {
           ctaWrap.innerHTML = '';
           ctas.forEach(function (c, i) {
@@ -3873,7 +3945,10 @@
           });
           addCta.style.display = ctas.length >= 3 ? 'none' : '';
         }
-        addCta.addEventListener('click', function () { if (ctas.length >= 3) return; ctas.push({ label: '', type: 'call', value: '' }); renderCtas(); });
+        // Push to the preview on add so the new button appears immediately (the
+        // hosted preview renders incomplete buttons with a "Button" placeholder);
+        // it then updates live + smoothly as the label/type/value are filled in.
+        addCta.addEventListener('click', function () { if (ctas.length >= 3) return; ctas.push({ label: '', type: 'call', value: '' }); renderCtas(); saveCtas(); });
         ctaCard.appendChild(ctaWrap);
         ctaCard.appendChild(addCta);
         renderCtas();
@@ -3895,7 +3970,7 @@
         bgCard.appendChild(themeField);
 
         var presetField = el('div', { class: 'qf-cz-field' });
-        presetField.appendChild(el('label', { class: 'qf-cz-label', text: 'Colour' }));
+        presetField.appendChild(el('label', { class: 'qf-cz-label', text: 'Background style' }));
         var presetSel = el('select', { class: 'input' });
         (d.hostedBgPresets || [{ id: 'default', label: 'Solid' }]).forEach(function (p) { presetSel.appendChild(el('option', { value: p.id, text: p.label })); });
         presetSel.value = bg.preset || 'default';

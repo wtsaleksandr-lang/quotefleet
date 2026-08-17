@@ -554,6 +554,14 @@
         root.style.setProperty(t, patch.accent);
       });
     }
+    // Instant text colour — a best-effort skin on the main text token so the
+    // change reads immediately (matches the accent pattern). 'auto' is resolved
+    // server-side per surface, so the following brand-refetch restores the
+    // engine's safe colours; a hex is applied straight to --w-text now and the
+    // refetch finalises the WCAG-safe per-surface fallbacks (accent/total/pill).
+    if (typeof patch.fontColor === 'string' && /^#[0-9a-fA-F]{6}$/.test(patch.fontColor)) {
+      root.style.setProperty('--w-text', patch.fontColor);
+    }
     if (typeof patch.ctaHover === 'string') document.body.setAttribute('data-qf-cta-hover', patch.ctaHover);
     if (typeof patch.mapBlendOpacity === 'number') {
       var bo = Math.max(0, Math.min(100, patch.mapBlendOpacity));

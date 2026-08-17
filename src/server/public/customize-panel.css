@@ -752,3 +752,56 @@
   .qf-cz-frame-wrap[data-device="desktop"] { max-width: 560px; }
 }
 
+/* ── Text-colour custom picker + contrast warning ─────────────────────────
+   Appended at EOF so the line-based guard baselines above don't renumber.
+   Mirrors the accent picker's custom-swatch look; theme-token colours only. */
+.qf-cz-textcolor-custom {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  margin-top: 8px;
+}
+.qf-cz-textcolor-customwrap {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  height: 32px;
+  padding: 0 12px;
+  border-radius: 8px;
+  border: 1px solid var(--border-strong);
+  background: var(--surface-2);
+  color: var(--ink-soft);
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+}
+.qf-cz-textcolor-customwrap input[type="color"] {
+  width: 18px;
+  height: 18px;
+  padding: 0;
+  border: none;
+  background: none;
+  border-radius: 5px;
+  cursor: pointer;
+}
+.qf-cz-textcolor-customwrap input[type="color"]::-webkit-color-swatch-wrapper { padding: 0; }
+.qf-cz-textcolor-customwrap input[type="color"]::-webkit-color-swatch { border: none; border-radius: 4px; }
+.qf-cz-textcolor-hex {
+  width: 96px;
+  max-width: 96px;
+  height: 32px;
+  text-transform: lowercase;
+}
+.qf-cz-textcolor-warn {
+  margin-top: 8px;
+  padding: 8px 12px;
+  border-radius: 8px;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--warn);
+  background: var(--warn-bg);
+  border: 1px solid var(--warn);
+}
+.qf-cz-textcolor-warn[hidden] { display: none; }
+
