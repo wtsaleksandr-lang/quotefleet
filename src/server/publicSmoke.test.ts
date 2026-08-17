@@ -29,9 +29,10 @@ describe('public static page smoke checks', () => {
     expect(html).toContain('/landing-motion.js');
     expect(html).toContain('data-reveal');
     expect(html).toContain("document.documentElement.classList.add('js')");
-    expect(html).not.toContain('/for/forwarders');
-    expect(html).not.toContain('/for/brokers');
-    expect(html).not.toContain('/for/ltl');
+    expect(html).toContain('/for/brokers');
+    expect(html).toContain('/for/forwarders');
+    expect(html).toContain('/for/ltl');
+    expect(html).toContain('/tools');
     expect(html).not.toContain('simple-dock');
     expect(html).not.toContain('quote desk');
     expect(html).not.toContain('freight quote leads');
