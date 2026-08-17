@@ -289,7 +289,7 @@ describe('customize panel — drag-scroll carousels (theme presets + map styles)
   });
 });
 
-describe('customize panel — guided-editing pointer (active arrow + preview align)', () => {
+describe('customize panel — guided-editing pointer (preview scroll-align + highlight)', () => {
   it('maps each Design container to a widget section + activates one at a time', async () => {
     const js = await pub('app.js');
     // Containers are tagged with the widget section they govern…
@@ -302,8 +302,10 @@ describe('customize panel — guided-editing pointer (active arrow + preview ali
     expect(js).toContain("leftCol.addEventListener('focusin', onActivate)");
     expect(js).toContain("classList.toggle('is-cz-active', s === sec)");
     expect(js).toContain("closest('.qf-cz-section[data-preview-target]')");
-    // The floating arrow element is appended to each targeted container.
-    expect(js).toContain("class: 'qf-cz-arrow'");
+    // The guide ARROW was removed (it was confused with the carousel chevrons):
+    // no arrow element is created anywhere. The link now reads via the active
+    // outline + the mapped-section pulse + the scroll-align (asserted below).
+    expect(js).not.toContain("class: 'qf-cz-arrow'");
   });
 
   it('scroll-aligns the preview via the SAME-ORIGIN iframe doc, guarded', async () => {
@@ -316,17 +318,29 @@ describe('customize panel — guided-editing pointer (active arrow + preview ali
     expect(js).toContain('function alignTo(key, containerEl)');
     // Reduced-motion aware smooth scroll of the preview viewport.
     expect(js).toContain('behavior: czReduce ? \'auto\' : \'smooth\'');
+    // On activation the mapped widget section pulses (the arrow is gone, so this
+    // + the active outline carry the control→section link).
+    expect(js).toContain("classList.add('qf-preview-highlight')");
   });
 
-  it('ships the arrow + fixed-height scroll-viewport styling', async () => {
+  it('ships the full-height preview + aligned split-header + scroll-viewport (no guide arrow)', async () => {
     const css = await pub('customize-panel.css');
-    // The preview frame is a fixed-height, internally-scrollable viewport.
+    // The preview frame stays an internally-scrollable viewport for scroll-align.
     expect(css).toContain('overflow-y: auto');
-    expect(css).toContain('.qf-cz-section.is-cz-active .qf-cz-arrow');
-    expect(css).toContain('.qf-cz-arrow');
-    // Token-only accent styling (no raw hex) + reduced-motion guard.
-    expect(css).toContain('background: var(--accent-soft)');
-    expect(css).toContain('@keyframes qf-cz-arrow-nudge');
+    // The guide arrow + its nudge keyframes were removed entirely.
+    expect(css).not.toContain('.qf-cz-arrow');
+    expect(css).not.toContain('@keyframes qf-cz-arrow-nudge');
+    // The active container keeps its accent outline (token-only, no raw hex).
+    expect(css).toContain('.qf-cz-section.is-cz-active');
+    expect(css).toContain('box-shadow: 0 0 0 1px var(--accent-fill)');
+    // Full-height preview column, robust to the portal top bar height (#264):
+    // fills the viewport UNDER the bar via --qf-bar-h (56px fallback), no
+    // hardcoded chrome offset.
+    expect(css).toContain('var(--qf-bar-h, 56px)');
+    expect(css).toContain('height: calc(100dvh - var(--qf-bar-h, 56px) - 36px)');
+    // Split header: the preview toolbar mirrors the tab bar with a bottom border.
+    expect(css).toContain('.qf-cz-preview-head');
+    expect(css).toContain('border-bottom: 1px solid var(--border)');
   });
 });
 
