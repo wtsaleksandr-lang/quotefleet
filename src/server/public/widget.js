@@ -2703,7 +2703,9 @@
     if (!resp.mapUrl) { showBaseMap(); autoResize(); return; }
     // Route mode: drop the pre-input base state so overlays + expand return.
     card.classList.remove('qf-map-base');
-    var routeImg = $('qf-map-img'); if (routeImg) routeImg.alt = 'Route from pickup to delivery';
+    var routeModal = $('qf-map-modal'); if (routeModal) routeModal.classList.remove('qf-map-base');
+    var openBtn = $('qf-map-open'); if (openBtn) openBtn.setAttribute('aria-label', 'Open full route map');
+    var routeImg = $('qf-map-img'); if (routeImg) { routeImg.alt = 'Route from pickup to delivery'; routeImg.style.transform = 'none'; }
     var dEl = $('qf-map-distance'); if (dEl) dEl.textContent = (resp.miles != null) ? (Number(resp.miles).toLocaleString() + ' mi') : '—';
     var tEl = $('qf-map-transit'); if (tEl) tEl.textContent = (resp.transit && resp.transit.text) ? resp.transit.text : '—';
     var pu = $('qf-map-pickup'); if (pu) pu.textContent = mapPickupLabel();
@@ -2732,6 +2734,10 @@
   // is entered (Alex: "use a map, without a specific route, just point on North
   // America"). The .qf-map-base class hides the route overlays + expand and shows
   // a hint; renderRouteMap() removes it and swaps in the real routed lane.
+  // Assigned by initRouteMapCard: resets the shared inline/modal zoom state so a
+  // theme/style change (which re-enters showBaseMap) always re-frames the whole
+  // continent instead of leaving the preview stuck at a prior deep zoom.
+  var _resetBaseZoom = null;
   function showBaseMap() {
     var card = $('qf-map-card'); if (!card) return;
     var url = withGrant('/api/public/base-map.png?theme=' + mapThemeParam() + '&style=' + brandMapStyle);
@@ -2745,6 +2751,9 @@
     ].forEach(function (id) { var el = $(id); if (el) el.textContent = '—'; });
     state.mapMiles = null;
     card.classList.add('qf-map-base');
+    var modal = $('qf-map-modal'); if (modal) modal.classList.add('qf-map-base');
+    var openBtn = $('qf-map-open'); if (openBtn) openBtn.setAttribute('aria-label', 'Enlarge and zoom the map to inspect the style');
+    if (_resetBaseZoom) _resetBaseZoom();
     // Clear any display:none left by a prior hideMapCard() (see renderRouteMap).
     card.hidden = false; card.style.display = '';
   }
@@ -2758,25 +2767,194 @@
     // Show the North America base map immediately on load.
     showBaseMap();
     if (!open || !modal) return;
-    var vp = $('qf-map-viewport'), mimg = $('qf-map-modal-img');
+    var vp = $('qf-map-viewport'), mimg = $('qf-map-modal-img'), iimg = $('qf-map-img');
     var scale = 1, tx = 0, ty = 0, dragging = false, sx = 0, sy = 0;
     function apply() { if (mimg) mimg.style.transform = 'translate(' + tx + 'px,' + ty + 'px) scale(' + scale + ')'; }
-    function reset() { scale = 1; tx = 0; ty = 0; apply(); }
-    open.addEventListener('click', function () { if (card && card.classList.contains('qf-map-base')) return; modal.hidden = false; reset(); });
-    function closeModal() { modal.hidden = true; }
+    function isBase() { return !!(card && card.classList.contains('qf-map-base')); }
+
+    // ── Base-map CRISP zoom/pan ─────────────────────────────────────────────
+    // The base map is a static bitmap, so CSS-scaling pixelates. To inspect the
+    // STYLE close-up we re-fetch base-map.png at a higher Google zoom (+ shifted
+    // center for panning) — real tiles, crisp at every level. The CSS transform
+    // is used only as instant feedback while the crisp bitmap is debounced in.
+    var BASE_DEF_CENTER = { lat: 44, lng: -97 }; // mirrors server BASE_MAP_CENTER
+    var BASE_MIN_Z = 3, BASE_MAX_Z = 16;         // mirrors server clamp bounds
+    var gZoom = BASE_MIN_Z, loadedZoom = BASE_MIN_Z;
+    var center = { lat: BASE_DEF_CENTER.lat, lng: BASE_DEF_CENTER.lng };
+    var loadedCenter = { lat: center.lat, lng: center.lng };
+    var baseFetchTimer = null, baseSeq = 0;
+    // Web-Mercator project/unproject at the 256px world (zoom 0).
+    function project(lat, lng) {
+      var s = Math.sin(lat * Math.PI / 180);
+      s = Math.min(Math.max(s, -0.9999), 0.9999);
+      return { x: 256 * (0.5 + lng / 360), y: 256 * (0.5 - Math.log((1 + s) / (1 - s)) / (4 * Math.PI)) };
+    }
+    function unproject(x, y) {
+      var lng = (x / 256 - 0.5) * 360;
+      var n = Math.PI * (1 - 2 * y / 256);
+      var lat = Math.atan((Math.exp(n) - Math.exp(-n)) / 2) * 180 / Math.PI;
+      return { lat: lat, lng: lng };
+    }
+    // Shift `centerObj` by a pointer drag of (dxCss,dyCss) rendered px at Google
+    // zoom `zoom`, accounting for the current CSS feedback scale. The static map
+    // is 640 logical px wide (see MAP_SIZE), displayed at mimg.clientWidth.
+    function shiftedCenter(centerObj, zoom, dxCss, dyCss, curScale) {
+      var imgW = (mimg && mimg.clientWidth) || 640;
+      var mapPxPerCss = (640 / imgW) / (curScale || 1);
+      var world = Math.pow(2, zoom);
+      var p = project(centerObj.lat, centerObj.lng);
+      var px = p.x * world - dxCss * mapPxPerCss; // drag right → reveal west
+      var py = p.y * world - dyCss * mapPxPerCss; // drag down  → reveal north
+      var np = unproject(px / world, py / world);
+      np.lat = Math.min(85, Math.max(-85, np.lat));
+      np.lng = Math.min(180, Math.max(-180, np.lng));
+      return np;
+    }
+    function baseUrl(zoom, c) {
+      return withGrant('/api/public/base-map.png?theme=' + mapThemeParam() + '&style=' + brandMapStyle +
+        '&zoom=' + zoom + '&center=' + encodeURIComponent(c.lat.toFixed(4) + ',' + c.lng.toFixed(4)));
+    }
+    // Debounced crisp re-fetch: preload the new bitmap, then swap it in and drop
+    // the CSS feedback transform so the crisp tiles replace the scaled preview.
+    function fetchBaseCrisp() {
+      if (baseFetchTimer) clearTimeout(baseFetchTimer);
+      baseFetchTimer = setTimeout(function () {
+        var seq = ++baseSeq;
+        var zoom = gZoom, c = { lat: center.lat, lng: center.lng };
+        var url = baseUrl(zoom, c);
+        var probe = new Image();
+        probe.onload = function () {
+          if (seq !== baseSeq || !isBase()) return;
+          // Swap the crisp bitmap into BOTH the inline preview and the modal so
+          // the two surfaces share one zoom state, then drop the CSS feedback.
+          if (mimg) mimg.src = url;
+          if (iimg) iimg.src = url;
+          loadedZoom = zoom; loadedCenter = { lat: c.lat, lng: c.lng };
+          scale = 1; tx = 0; ty = 0; apply();
+        };
+        probe.onerror = function () { /* keep the current crisp frame on failure */ };
+        probe.src = url;
+      }, 180);
+    }
+    // Update the CSS feedback transform to preview the pending zoom/pan before
+    // the crisp bitmap arrives. scale = 2^(target−loaded), capped so a fast
+    // multi-step gesture can't blow up the preview.
+    function baseFeedback() {
+      var s = Math.pow(2, gZoom - loadedZoom);
+      scale = Math.min(6, Math.max(0.5, s));
+      apply();
+    }
+    function stepBaseZoom(dir) {
+      var next = Math.min(BASE_MAX_Z, Math.max(BASE_MIN_Z, gZoom + dir));
+      if (next === gZoom) return;
+      gZoom = next; baseFeedback(); fetchBaseCrisp();
+    }
+
+    // Reset the shared base-map zoom state to the default continental frame.
+    // Called on every style/theme change (via showBaseMap) so a newly-picked
+    // style always opens fully-framed, not stuck at a prior deep zoom.
+    function resetBaseZoom() {
+      scale = 1; tx = 0; ty = 0;
+      gZoom = BASE_MIN_Z; loadedZoom = BASE_MIN_Z;
+      center = { lat: BASE_DEF_CENTER.lat, lng: BASE_DEF_CENTER.lng };
+      loadedCenter = { lat: center.lat, lng: center.lng };
+      apply();
+    }
+    _resetBaseZoom = resetBaseZoom;
+    open.addEventListener('click', function () {
+      modal.hidden = false;
+      modal.classList.toggle('qf-map-base', isBase());
+      scale = 1; tx = 0; ty = 0;
+      // Base mode: reflect the CURRENT inline zoom (shared state) in the modal so
+      // opening the enlarge view continues where the inline preview left off.
+      // Route mode: just drop the CSS transform (existing behavior).
+      if (isBase() && mimg) mimg.src = baseUrl(loadedZoom, loadedCenter);
+      apply();
+    });
+    function closeModal() { modal.hidden = true; if (baseFetchTimer) { clearTimeout(baseFetchTimer); baseFetchTimer = null; } }
     var x = $('qf-map-modal-x'), bd = $('qf-map-modal-close');
     if (x) x.addEventListener('click', closeModal);
     if (bd) bd.addEventListener('click', closeModal);
     var zi = $('qf-map-zoom-in'), zo = $('qf-map-zoom-out');
-    if (zi) zi.addEventListener('click', function () { scale = Math.min(4, scale + 0.4); apply(); });
-    if (zo) zo.addEventListener('click', function () { scale = Math.max(1, scale - 0.4); if (scale === 1) { tx = 0; ty = 0; } apply(); });
+    // Route map = CSS zoom (existing behavior); base map = crisp Google-zoom step.
+    if (zi) zi.addEventListener('click', function () { if (isBase()) { stepBaseZoom(1); } else { scale = Math.min(4, scale + 0.4); apply(); } });
+    if (zo) zo.addEventListener('click', function () { if (isBase()) { stepBaseZoom(-1); } else { scale = Math.max(1, scale - 0.4); if (scale === 1) { tx = 0; ty = 0; } apply(); } });
     if (vp) {
-      vp.addEventListener('pointerdown', function (e) { dragging = true; sx = e.clientX - tx; sy = e.clientY - ty; if (vp.setPointerCapture) vp.setPointerCapture(e.pointerId); });
-      vp.addEventListener('pointermove', function (e) { if (!dragging) return; tx = e.clientX - sx; ty = e.clientY - sy; apply(); });
-      vp.addEventListener('pointerup', function () { dragging = false; });
-      vp.addEventListener('wheel', function (e) { e.preventDefault(); scale = Math.min(4, Math.max(1, scale + (e.deltaY < 0 ? 0.3 : -0.3))); if (scale === 1) { tx = 0; ty = 0; } apply(); }, { passive: false });
+      var pointers = {}, pinchStartDist = 0, pinchStartScale = 1, pinchStartZoom = BASE_MIN_Z, pinching = false;
+      function pointerCount() { var n = 0; for (var k in pointers) if (pointers.hasOwnProperty(k)) n++; return n; }
+      function pinchDist() {
+        var ids = Object.keys(pointers); if (ids.length < 2) return 0;
+        var a = pointers[ids[0]], b = pointers[ids[1]];
+        return Math.sqrt((a.x - b.x) * (a.x - b.x) + (a.y - b.y) * (a.y - b.y));
+      }
+      vp.addEventListener('pointerdown', function (e) {
+        pointers[e.pointerId] = { x: e.clientX, y: e.clientY };
+        if (pointerCount() === 2) {
+          pinching = true; dragging = false;
+          pinchStartDist = pinchDist(); pinchStartScale = scale; pinchStartZoom = gZoom;
+        } else {
+          dragging = true; sx = e.clientX - tx; sy = e.clientY - ty;
+        }
+        if (vp.setPointerCapture) { try { vp.setPointerCapture(e.pointerId); } catch (err) {} }
+      });
+      vp.addEventListener('pointermove', function (e) {
+        if (pointers[e.pointerId]) { pointers[e.pointerId].x = e.clientX; pointers[e.pointerId].y = e.clientY; }
+        if (pinching && pointerCount() >= 2) {
+          var d = pinchDist(); if (!pinchStartDist) return;
+          var ratio = d / pinchStartDist;
+          if (isBase()) {
+            var next = Math.min(BASE_MAX_Z, Math.max(BASE_MIN_Z, pinchStartZoom + Math.round(Math.log(ratio) / Math.log(2))));
+            if (next !== gZoom) { gZoom = next; baseFeedback(); fetchBaseCrisp(); }
+          } else {
+            scale = Math.min(4, Math.max(1, pinchStartScale * ratio)); if (scale === 1) { tx = 0; ty = 0; } apply();
+          }
+          return;
+        }
+        if (!dragging) return;
+        tx = e.clientX - sx; ty = e.clientY - sy; apply();
+      });
+      function endPointer(e) {
+        var wasDragging = dragging;
+        delete pointers[e.pointerId];
+        if (pointerCount() < 2) pinching = false;
+        if (pointerCount() === 0) {
+          dragging = false;
+          // Commit a base-map pan as a crisp re-fetch at the shifted center.
+          if (wasDragging && isBase() && (tx !== 0 || ty !== 0)) {
+            center = shiftedCenter(loadedCenter, loadedZoom, tx, ty, scale);
+            fetchBaseCrisp();
+          }
+        }
+      }
+      vp.addEventListener('pointerup', endPointer);
+      vp.addEventListener('pointercancel', endPointer);
+      vp.addEventListener('wheel', function (e) {
+        e.preventDefault();
+        if (isBase()) { stepBaseZoom(e.deltaY < 0 ? 1 : -1); return; }
+        scale = Math.min(4, Math.max(1, scale + (e.deltaY < 0 ? 0.3 : -0.3))); if (scale === 1) { tx = 0; ty = 0; } apply();
+      }, { passive: false });
     }
-    document.addEventListener('keydown', function (e) { if (e.key === 'Escape' && modal && !modal.hidden) closeModal(); });
+    // ── Inline preview: wheel-to-zoom + scroll-chaining fix ──────────────────
+    // The inline base map (Customize live preview) is a static <img> with no
+    // native wheel behavior, so a wheel over it used to CHAIN up and scroll the
+    // whole host page. Handle wheel here (inside the widget iframe, before it can
+    // chain) with preventDefault + stopPropagation: over the BASE map the wheel
+    // ZOOMS (crisp re-fetch) and the parent page never moves. In route mode we
+    // still trap the wheel so the map area never scrolls the host page.
+    if (card) {
+      card.addEventListener('wheel', function (e) {
+        e.preventDefault();
+        e.stopPropagation();
+        if (isBase()) stepBaseZoom(e.deltaY < 0 ? 1 : -1);
+      }, { passive: false });
+    }
+    document.addEventListener('keydown', function (e) {
+      if (!modal || modal.hidden) return;
+      if (e.key === 'Escape') { closeModal(); return; }
+      // Keyboard zoom on the base map for accessibility (+/− and =).
+      if (isBase() && (e.key === '+' || e.key === '=')) { e.preventDefault(); stepBaseZoom(1); }
+      else if (isBase() && (e.key === '-' || e.key === '_')) { e.preventDefault(); stepBaseZoom(-1); }
+    });
   }
 
   function initTypeaheads() {

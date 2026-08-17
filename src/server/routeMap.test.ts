@@ -7,6 +7,12 @@ import {
   getRoutedMiles,
   laneCacheKey,
   resolveMapStyle,
+  normalizeBaseZoom,
+  normalizeBaseCenter,
+  BASE_MAP_CENTER,
+  BASE_MAP_ZOOM,
+  BASE_MAP_MIN_ZOOM,
+  BASE_MAP_MAX_ZOOM,
   MAP_STYLE_KEYS,
   __clearRouteCache,
 } from './routeMap.js';
@@ -357,6 +363,47 @@ describe('buildBaseMapUrl — map styles', () => {
     expect(url.searchParams.getAll('style')).toEqual([]);
     // Non-satellite base maps stay on roadmap.
     expect(new URL(buildBaseMapUrl(KEY, 'light', 'branded')).searchParams.get('maptype')).toBe('roadmap');
+  });
+});
+
+describe('buildBaseMapUrl — zoom/center override (inspect-the-style)', () => {
+  it('defaults to the continental center + base zoom when no override is given', () => {
+    const url = new URL(buildBaseMapUrl(KEY, 'light', 'grayscale'));
+    expect(url.searchParams.get('center')).toBe(BASE_MAP_CENTER);
+    expect(url.searchParams.get('zoom')).toBe(String(BASE_MAP_ZOOM));
+  });
+
+  it('passes a higher zoom + shifted center through to the Static Maps URL', () => {
+    const url = new URL(buildBaseMapUrl(KEY, 'light', 'grayscale', 9, '40.7128,-74.0060'));
+    expect(url.searchParams.get('zoom')).toBe('9');
+    expect(url.searchParams.get('center')).toBe('40.7128,-74.0060');
+    // Style specs are still applied at the zoomed level (style must not be lost).
+    expect(url.searchParams.getAll('style')).toContain('feature:road|element:geometry|color:0xffffff');
+  });
+});
+
+describe('normalizeBaseZoom — clamp to sane bounds', () => {
+  it('clamps below min and above max, rounds, and falls back on garbage', () => {
+    expect(normalizeBaseZoom('9')).toBe(9);
+    expect(normalizeBaseZoom(9)).toBe(9);
+    expect(normalizeBaseZoom(1)).toBe(BASE_MAP_MIN_ZOOM);
+    expect(normalizeBaseZoom(99)).toBe(BASE_MAP_MAX_ZOOM);
+    expect(normalizeBaseZoom('7.6')).toBe(8);
+    expect(normalizeBaseZoom('abc')).toBe(BASE_MAP_ZOOM);
+    expect(normalizeBaseZoom(undefined)).toBe(BASE_MAP_ZOOM);
+  });
+});
+
+describe('normalizeBaseCenter — validate + round to bound cache keys', () => {
+  it('accepts a valid lat,lng and rounds to 4dp', () => {
+    expect(normalizeBaseCenter('40.71280001,-74.00600009')).toBe('40.7128,-74.0060');
+  });
+  it('rejects malformed / out-of-range values back to the default center', () => {
+    expect(normalizeBaseCenter('not,coords')).toBe(BASE_MAP_CENTER);
+    expect(normalizeBaseCenter('91,0')).toBe(BASE_MAP_CENTER); // lat out of range
+    expect(normalizeBaseCenter('0,200')).toBe(BASE_MAP_CENTER); // lng out of range
+    expect(normalizeBaseCenter(undefined)).toBe(BASE_MAP_CENTER);
+    expect(normalizeBaseCenter('44,-97; DROP')).toBe(BASE_MAP_CENTER); // no injection
   });
 });
 

@@ -784,22 +784,54 @@ export function buildStaticMapUrl(
 // ── North America base map (no route) ──────────────────────────────────────
 // The widget's map card shows this the moment it loads — before any address is
 // entered — then swaps to the real routed lane once pickup + delivery resolve.
-// A single deterministic map (fixed center/zoom, no markers or path), styled
+// A single deterministic map (default center/zoom, no markers or path), styled
 // identically to the route maps so the swap reads as a zoom-in, not a change.
-const BASE_MAP_CENTER = '44,-97'; // frames the contiguous US + southern Canada + N. Mexico
-const BASE_MAP_ZOOM = '3';
+// The widget can pass an optional zoom/center override so carriers can zoom in
+// on the CUSTOMIZE preview and inspect their chosen map style crisply — because
+// the map is a static bitmap, we re-fetch at a higher Google zoom (crisp tiles)
+// rather than CSS-scaling the pixels.
+export const BASE_MAP_CENTER = '44,-97'; // frames the contiguous US + southern Canada + N. Mexico
+export const BASE_MAP_ZOOM = 3;
+// Zoom bounds for the inspect-the-style re-fetch. Min stays at the continental
+// default; max is street-level (styles/labels stay crisp) while capping cost.
+export const BASE_MAP_MIN_ZOOM = 3;
+export const BASE_MAP_MAX_ZOOM = 16;
+
+/** Clamp any caller/query input to a valid base-map Google zoom level
+ *  [BASE_MAP_MIN_ZOOM..BASE_MAP_MAX_ZOOM]; bad/absent input → the default. */
+export function normalizeBaseZoom(raw: unknown): number {
+  const n =
+    typeof raw === 'number' ? raw : typeof raw === 'string' ? parseFloat(raw) : NaN;
+  if (!Number.isFinite(n)) return BASE_MAP_ZOOM;
+  return Math.min(BASE_MAP_MAX_ZOOM, Math.max(BASE_MAP_MIN_ZOOM, Math.round(n)));
+}
+
+/** Validate a "lat,lng" center override and round to 4dp so panning can't mint
+ *  unbounded distinct cache keys. Any malformed / out-of-range value → the
+ *  default continental center (so a bad query param is always safe + cheap). */
+export function normalizeBaseCenter(raw: unknown): string {
+  if (typeof raw !== 'string') return BASE_MAP_CENTER;
+  const m = raw.match(/^(-?\d{1,2}(?:\.\d{1,12})?),(-?\d{1,3}(?:\.\d{1,12})?)$/);
+  if (!m) return BASE_MAP_CENTER;
+  const lat = parseFloat(m[1]);
+  const lng = parseFloat(m[2]);
+  if (!(lat >= -85 && lat <= 85 && lng >= -180 && lng <= 180)) return BASE_MAP_CENTER;
+  return `${lat.toFixed(4)},${lng.toFixed(4)}`;
+}
 
 export function buildBaseMapUrl(
   apiKey: string,
   theme: MapTheme = 'light',
-  mapStyle: MapStyle = 'branded'
+  mapStyle: MapStyle = 'branded',
+  zoom: number = BASE_MAP_ZOOM,
+  center: string = BASE_MAP_CENTER
 ): string {
   const params = new URLSearchParams({
     size: MAP_SIZE,
     scale: MAP_SCALE,
     maptype: mapTypeFor(mapStyle),
-    center: BASE_MAP_CENTER,
-    zoom: BASE_MAP_ZOOM,
+    center,
+    zoom: String(zoom),
     key: apiKey,
   });
   for (const s of styleSpecs(theme, mapStyle)) params.append('style', s);
