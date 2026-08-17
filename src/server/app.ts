@@ -1,4 +1,5 @@
 import express from 'express';
+import compression from 'compression';
 import cookieParser from 'cookie-parser';
 import { resolve } from 'node:path';
 import { readFile } from 'node:fs/promises';
@@ -79,6 +80,11 @@ export function createApp(): express.Express {
   const app = express();
   app.set('trust proxy', 1);
   app.disable('x-powered-by');
+
+  // Gzip/brotli-compress all responses. Must run before the routes + static
+  // handler so their HTML/CSS/JS bodies are compressed on the way out — the
+  // origin was shipping ~280 KB of text uncompressed, the largest LCP cost.
+  app.use(compression());
 
   app.use((_req, res, next) => {
     res.setHeader('X-Content-Type-Options', 'nosniff');
@@ -310,7 +316,25 @@ export function createApp(): express.Express {
       .then((html) => res.type('html').send(applyToolsMarketplaceSkin(html)))
       .catch(next);
   });
-  app.use(express.static(publicDir, { index: false, extensions: ['html'] }));
+  app.use(
+    express.static(publicDir, {
+      index: false,
+      extensions: ['html'],
+      // Filenames aren't content-hashed, so keep conservative TTLs: long for
+      // fonts/images/video (rarely change), short for CSS/JS (change on
+      // deploy), and no caching for HTML so page edits go live immediately.
+      setHeaders: (res, filePath) => {
+        const ext = filePath.slice(filePath.lastIndexOf('.')).toLowerCase();
+        if (['.woff2', '.woff', '.ttf', '.otf', '.webp', '.png', '.jpg', '.jpeg', '.gif', '.svg', '.ico', '.webm', '.mp4'].includes(ext)) {
+          res.setHeader('Cache-Control', 'public, max-age=604800'); // 7 days
+        } else if (['.css', '.js', '.mjs'].includes(ext)) {
+          res.setHeader('Cache-Control', 'public, max-age=86400'); // 1 day
+        } else if (ext === '.html') {
+          res.setHeader('Cache-Control', 'no-cache');
+        }
+      },
+    }),
+  );
 
   app.get('/', (req, res, next) => {
     if (req.tenantCustomDomainSlug) {
