@@ -113,32 +113,68 @@ export const HOSTED_BG_PRESETS: BgPreset[] = [
     light: 'linear-gradient(135deg, #E8F7F0 0%, #EDF5FF 100%)',
     dark: 'linear-gradient(135deg, #0C1A17 0%, #0D1622 100%)',
   },
-  // ── Patterned grids — a subtle repeating texture over a solid backdrop. The
-  // pattern line/dot colour is baked per theme (faint ink on light, faint light
-  // on dark) so the texture stays whisper-quiet and legible behind the card. A
-  // single CSS `background` shorthand → applied identically by the SSR body
-  // rule and the client applyBackground() (body.style.background = presetBg).
+  // ── Brand-tinted gradients — richer, on-brand backdrops that pick up the
+  // tenant accent (via var(--hp-accent), defined on :root by the render) so each
+  // one is unique to their brand while staying readable behind the card in both
+  // themes. color-mix blends the accent into the theme's base so the tint stays
+  // gentle; the aside text/card contrast is unchanged.
+  {
+    id: 'brand-glow',
+    label: 'Brand glow',
+    light:
+      'radial-gradient(130% 120% at 50% -10%, color-mix(in srgb, var(--hp-accent) 22%, #FFFFFF) 0%, #F4F6F9 58%)',
+    dark:
+      'radial-gradient(130% 120% at 50% -10%, color-mix(in srgb, var(--hp-accent) 30%, #0F1417) 0%, #0B0F12 62%)',
+  },
+  {
+    id: 'brand-beam',
+    label: 'Brand beam',
+    light:
+      'linear-gradient(160deg, color-mix(in srgb, var(--hp-accent) 18%, #FFFFFF) 0%, #F4F6F9 55%, color-mix(in srgb, var(--hp-accent) 8%, #EEF2F7) 100%)',
+    dark:
+      'linear-gradient(160deg, color-mix(in srgb, var(--hp-accent) 26%, #0F1417) 0%, #0C1013 55%, color-mix(in srgb, var(--hp-accent) 12%, #0A0E11) 100%)',
+  },
+  {
+    id: 'duotone',
+    label: 'Duo-tone',
+    light: 'linear-gradient(135deg, #E6EEFF 0%, #F4ECFF 48%, #FFEAF1 100%)',
+    dark: 'linear-gradient(135deg, #101B34 0%, #1A1330 50%, #2A1422 100%)',
+  },
+  {
+    id: 'mesh',
+    label: 'Mesh',
+    light:
+      'radial-gradient(46% 42% at 12% 16%, color-mix(in srgb, var(--hp-accent) 20%, transparent) 0%, transparent 60%), radial-gradient(44% 40% at 88% 22%, rgba(16,185,129,0.16) 0%, transparent 58%), radial-gradient(52% 48% at 50% 100%, rgba(59,130,246,0.14) 0%, transparent 60%), #F4F6F9',
+    dark:
+      'radial-gradient(46% 42% at 12% 16%, color-mix(in srgb, var(--hp-accent) 32%, transparent) 0%, transparent 60%), radial-gradient(44% 40% at 88% 22%, rgba(16,185,129,0.22) 0%, transparent 58%), radial-gradient(52% 48% at 50% 100%, rgba(59,130,246,0.20) 0%, transparent 60%), #0F1417',
+  },
+  // ── Patterned grids — a repeating texture over a solid backdrop, baked per
+  // theme (ink on light, light on dark). Tuned to be clearly VISIBLE — the grid
+  // reads as a deliberate texture, not a whisper — while the card/text contrast
+  // over it is untouched. A single CSS `background` shorthand → applied
+  // identically by the SSR body rule and client applyBackground()
+  // (body.style.background = presetBg).
   {
     id: 'dot-grid',
     label: 'Dot grid',
-    light: 'radial-gradient(rgba(15,23,32,0.07) 1px, transparent 1.4px) 0 0 / 22px 22px, #F4F6F9',
-    dark: 'radial-gradient(rgba(255,255,255,0.06) 1px, transparent 1.4px) 0 0 / 22px 22px, #0F1417',
+    light: 'radial-gradient(rgba(15,23,32,0.20) 1.6px, transparent 2px) 0 0 / 20px 20px, #F1F4F8',
+    dark: 'radial-gradient(rgba(255,255,255,0.16) 1.6px, transparent 2px) 0 0 / 20px 20px, #0F1417',
   },
   {
     id: 'line-grid',
     label: 'Line grid',
     light:
-      'linear-gradient(rgba(15,23,32,0.05) 1px, transparent 1px) 0 0 / 24px 24px, linear-gradient(90deg, rgba(15,23,32,0.05) 1px, transparent 1px) 0 0 / 24px 24px, #F4F6F9',
+      'linear-gradient(rgba(15,23,32,0.13) 1px, transparent 1px) 0 0 / 22px 22px, linear-gradient(90deg, rgba(15,23,32,0.13) 1px, transparent 1px) 0 0 / 22px 22px, #F1F4F8',
     dark:
-      'linear-gradient(rgba(255,255,255,0.045) 1px, transparent 1px) 0 0 / 24px 24px, linear-gradient(90deg, rgba(255,255,255,0.045) 1px, transparent 1px) 0 0 / 24px 24px, #0F1417',
+      'linear-gradient(rgba(255,255,255,0.11) 1px, transparent 1px) 0 0 / 22px 22px, linear-gradient(90deg, rgba(255,255,255,0.11) 1px, transparent 1px) 0 0 / 22px 22px, #0F1417',
   },
   {
     id: 'cross-hatch',
     label: 'Cross-hatch',
     light:
-      'repeating-linear-gradient(45deg, rgba(15,23,32,0.045) 0, rgba(15,23,32,0.045) 1px, transparent 1px, transparent 12px), repeating-linear-gradient(-45deg, rgba(15,23,32,0.045) 0, rgba(15,23,32,0.045) 1px, transparent 1px, transparent 12px), #F4F6F9',
+      'repeating-linear-gradient(45deg, rgba(15,23,32,0.11) 0, rgba(15,23,32,0.11) 1.2px, transparent 1.2px, transparent 11px), repeating-linear-gradient(-45deg, rgba(15,23,32,0.11) 0, rgba(15,23,32,0.11) 1.2px, transparent 1.2px, transparent 11px), #F1F4F8',
     dark:
-      'repeating-linear-gradient(45deg, rgba(255,255,255,0.04) 0, rgba(255,255,255,0.04) 1px, transparent 1px, transparent 12px), repeating-linear-gradient(-45deg, rgba(255,255,255,0.04) 0, rgba(255,255,255,0.04) 1px, transparent 1px, transparent 12px), #0F1417',
+      'repeating-linear-gradient(45deg, rgba(255,255,255,0.09) 0, rgba(255,255,255,0.09) 1.2px, transparent 1.2px, transparent 11px), repeating-linear-gradient(-45deg, rgba(255,255,255,0.09) 0, rgba(255,255,255,0.09) 1.2px, transparent 1.2px, transparent 11px), #0F1417',
   },
 ];
 const BG_PRESET_IDS = new Set(HOSTED_BG_PRESETS.map((p) => p.id));
