@@ -324,11 +324,15 @@ body.qf-modal-open { overflow: hidden; }
    button label and each option row. ── */
 .qf-cs-ico-row {
   display: flex;
+  flex-wrap: nowrap; /* icon + label stay on ONE line, even with the 21px icon */
   align-items: center;
   gap: 8px;
   min-width: 0;
 }
+/* The label claims the remaining row width and stays single-line — long
+   equipment names (e.g. "40' High Cube Container") ellipsis rather than wrap. */
 .qf-cs-ico-row .qf-cs-txt {
+  flex: 1 1 auto;
   min-width: 0;
   overflow: hidden;
   text-overflow: ellipsis;
