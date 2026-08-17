@@ -805,3 +805,43 @@
 }
 .qf-cz-textcolor-warn[hidden] { display: none; }
 
+/* ══════════════════════════════════════════════════════════════════════════
+   DESKTOP HOSTED-PAGE PREVIEW — real width, scaled to fit (Page/Behavior tabs)
+   The bare calculator (Design tab, data-preview="widget") stays at its natural
+   ~560px calc width (rule above). But the HOSTED page (data-preview="hosted")
+   is a full landing layout — hero + aside BESIDE the widget — that only reads
+   correctly at its real desktop width (hostedPage.ts `.qf-hp-shell { max-width:
+   1180px }`). Cramming it into ~500px forces its ≤640 MOBILE layout, which is
+   wrong for a desktop preview. So on desktop we render the iframe at the real
+   1180px and CSS-transform it DOWN to fit the pane (scale factor + heights set
+   by applyHostedScale() in app.js): the sizer takes the SCALED layout box, the
+   iframe is positioned + transformed inside it, and the wrap scrolls it with no
+   overflow. Mobile keeps the real ~390px phone column (base rule). Appended at
+   EOF so the line-based spacing/colour guard baselines never renumber. Tokens
+   only; theme-aware via the shared style.css variables.
+   ══════════════════════════════════════════════════════════════════════════ */
+.qf-cz-frame-sizer { display: block; width: 100%; }
+@media (min-width: 901px) {
+  /* Let the hosted desktop preview use the FULL pane width (not the 560px calc
+     cap) and clip the oversized-then-scaled iframe cleanly. Higher specificity
+     (two attrs) beats the data-device="desktop" 560px cap above. */
+  .qf-cz-frame-wrap[data-preview="hosted"][data-device="desktop"] {
+    max-width: none;
+    overflow: hidden;
+  }
+  /* The sizer is the scaled layout box (height set by JS); center it in the pane. */
+  .qf-cz-frame-wrap[data-preview="hosted"][data-device="desktop"] .qf-cz-frame-sizer {
+    position: relative;
+    overflow: hidden;
+    margin-left: auto;
+    margin-right: auto;
+  }
+  /* The iframe renders at the real desktop width (set by JS) and is pulled out
+     of flow so only the transformed (scaled) sizer contributes to layout. */
+  .qf-cz-frame-wrap[data-preview="hosted"][data-device="desktop"] .qf-cz-frame {
+    position: absolute;
+    top: 0;
+    left: 0;
+  }
+}
+

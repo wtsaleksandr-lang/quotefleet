@@ -335,9 +335,12 @@ export function renderHostedPage(opts: RenderHostedPageOpts): string {
         .join('\n      ')}
     </div>`;
 
-  const logo = brand?.logoUrl
-    ? `<img class="qf-hp-logo" src="${esc(brand.logoUrl)}" alt="${company}" />`
-    : `<span class="qf-hp-logo-text">${company}</span>`;
+  // NOTE: the hosted page deliberately does NOT render a top brand header
+  // (company name / logo). The embedded calculator already shows the tenant's
+  // brand name + logo in its own header, so repeating it here duplicated the
+  // company name (once at the top, once inside the widget). The hosted hero is
+  // now the tenant's `hostedHeadline` (+ subhead) only — see headBlock — so a
+  // tenant sees their headline + the widget, never the company name twice.
 
   // Config the preview relay + live-apply script reads (mirrors the render so
   // edits re-render identically in the portal live preview).
@@ -392,9 +395,6 @@ export function renderHostedPage(opts: RenderHostedPageOpts): string {
         : ''
     }
     .qf-hp-shell { position: relative; z-index: 1; max-width: 1180px; margin: 0 auto; padding: 40px 20px 56px; }
-    .qf-hp-top { display: flex; align-items: center; gap: 12px; margin-bottom: 26px; }
-    .qf-hp-logo { max-height: 40px; max-width: 200px; object-fit: contain; display: block; }
-    .qf-hp-logo-text { font-weight: 800; font-size: 18px; letter-spacing: -0.01em; }
     /* Desktop: content around the calculator; calculator prominent on the right. */
     .qf-hp-grid {
       display: grid;
@@ -475,7 +475,6 @@ export function renderHostedPage(opts: RenderHostedPageOpts): string {
 </head>
 <body class="${hasAside ? '' : 'qf-hp--bare'}"${hasHero ? ' data-hp-hero' : ''}>
   <div class="qf-hp-shell">
-    <div class="qf-hp-top">${logo}</div>
     <div class="qf-hp-grid">
       ${headBlock}
       ${badgesBlock}
