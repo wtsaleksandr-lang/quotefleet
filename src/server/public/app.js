@@ -485,9 +485,11 @@
     if (!btn) return;
     function paint() {
       var isLight = document.documentElement.getAttribute('data-theme') === 'light';
-      // Icon + label both reflect the CURRENT theme.
-      icon.innerHTML = isLight ? SUN_SVG : MOON_SVG;
-      label.textContent = isLight ? 'Light' : 'Dark';
+      // Icon + label both reflect the CURRENT theme. The control is a real
+      // role="switch"; aria-checked (=Light) drives the sliding knob via CSS.
+      if (icon) icon.innerHTML = isLight ? SUN_SVG : MOON_SVG;
+      if (label) label.textContent = isLight ? 'Light' : 'Dark';
+      btn.setAttribute('aria-checked', isLight ? 'true' : 'false');
       btn.setAttribute('aria-label', 'Switch to ' + (isLight ? 'dark' : 'light') + ' theme');
     }
     paint();
@@ -502,6 +504,51 @@
       }
       paint();
     });
+  }
+
+  // ── Top-bar account dropdown ──────────────────────────────────
+  // Click the tenant-name trigger to open a menu: Account settings (→ route),
+  // the Dark/Light theme switch (wired by wireThemeToggle), and Sign out (the
+  // existing #sb-logout handler). Closes on outside-click + Escape; keyboard
+  // accessible (menuitems are real buttons, tab-through + Escape).
+  function wireAccountMenu() {
+    var wrap = document.getElementById('qf-account');
+    var trigger = document.getElementById('qf-account-trigger');
+    var menu = document.getElementById('qf-account-menu');
+    if (!wrap || !trigger || !menu) return;
+
+    function onDocClick(e) { if (!wrap.contains(e.target)) close(false); }
+    function onKey(e) { if (e.key === 'Escape') { e.preventDefault(); close(true); } }
+
+    function open() {
+      menu.hidden = false;
+      trigger.setAttribute('aria-expanded', 'true');
+      document.addEventListener('click', onDocClick, true);
+      document.addEventListener('keydown', onKey, true);
+      var first = menu.querySelector('[role="menuitem"]');
+      if (first) { try { first.focus(); } catch (e) {} }
+    }
+    function close(focusTrigger) {
+      menu.hidden = true;
+      trigger.setAttribute('aria-expanded', 'false');
+      document.removeEventListener('click', onDocClick, true);
+      document.removeEventListener('keydown', onKey, true);
+      if (focusTrigger) { try { trigger.focus(); } catch (e) {} }
+    }
+
+    trigger.addEventListener('click', function (e) {
+      e.stopPropagation();
+      if (menu.hidden) open(); else close(false);
+    });
+    // Account settings → route to the account page, then close.
+    var settings = document.getElementById('qf-account-settings');
+    if (settings) settings.addEventListener('click', function () { close(false); go('account'); });
+    // Toggling the theme switch must NOT collapse the menu — keep it open so the
+    // user can see the flip and adjust again.
+    var themeRow = menu.querySelector('.qf-account-theme');
+    if (themeRow) themeRow.addEventListener('click', function (e) { e.stopPropagation(); });
+    // Sign out closes then the existing #sb-logout handler logs out (navigates
+    // away). No extra wiring here.
   }
 
   // ── Account page ──────────────────────────────────────────────
@@ -6001,8 +6048,12 @@
   // with NO dead button (a button that 503s is worse than none). Paid
   // tenants get no banner. The visibility + CTA logic lives in the shared,
   // unit-tested QFTrialBanner module (trial-banner.js) so this is just DOM.
-  var trialBannerDismissed = false; // in-memory only → banner returns on reload
   var paymentBannerDismissed = false; // in-memory only → payment warning returns on reload
+  // Trial announcement dismissal PERSISTS across reloads (Alex: closable +
+  // stays closed). Expired is never dismissible; payment_issue stays in-memory.
+  var TRIAL_DISMISS_KEY = 'qf-trial-dismissed';
+  function isTrialDismissed() { try { return localStorage.getItem(TRIAL_DISMISS_KEY) === '1'; } catch (e) { return false; } }
+  function setTrialDismissed() { try { localStorage.setItem(TRIAL_DISMISS_KEY, '1'); } catch (e) {} }
 
   // Cache /api/billing/status once; the banner + Account card both read it.
   // ── Get paid (Stripe Connect Express onboarding) ──────────────
@@ -6126,17 +6177,33 @@
   }
   window.qfStartSubscribe = startSubscribeCheckout;
 
+  // #qf-trial-bar is now a PERMANENT mount inside the top bar's center zone
+  // (app.html), not a body-level element. "Removing" the banner just clears +
+  // hides it so the top bar keeps its logo + account menu (only the
+  // announcement content disappears).
   function removeTrialBanner() {
     var bar = document.getElementById('qf-trial-bar');
-    if (bar) bar.remove();
-    syncAppbarOffset();
+    if (bar) { bar.innerHTML = ''; bar.className = ''; bar.hidden = true; }
+    syncBarHeight();
   }
 
-  // The top app-bar was removed; the trial banner is a body-level sticky (top:0)
-  // that reserves its own flow space, so there is no longer a second sticky bar
-  // to offset. Kept as a no-op so existing call sites stay valid.
+  // Kept as a no-op so existing call sites stay valid (the old sticky app-bar
+  // offset is gone — the top bar reserves its own flow space via position:sticky).
   function syncAppbarOffset() { /* no-op — app-bar removed */ }
   window.qfSyncAppbarOffset = syncAppbarOffset;
+
+  // Publish the CURRENT top-bar height as --qf-bar-h so the ≤900px off-canvas
+  // sidebar drawer starts just below the bar (whose height grows when the
+  // announcement wraps to its own row). Desktop ignores it (fixed --qf-topbar-h).
+  function syncBarHeight() {
+    try {
+      var tb = document.getElementById('qf-topbar');
+      if (tb && !tb.hidden) {
+        document.documentElement.style.setProperty('--qf-bar-h', tb.offsetHeight + 'px');
+      }
+    } catch (e) { /* non-fatal */ }
+  }
+  window.qfSyncBarHeight = syncBarHeight;
 
   function renderTrialBanner(trial) {
     state.trial = trial || state.trial || null;
@@ -6165,17 +6232,18 @@
     // own CSS). The old ≤640 "collapse into an app-bar pill" path was removed
     // together with the app-bar.
 
-    // Trial + payment_issue are dismissible for the current page load (they
-    // return on reload while unresolved); expired is not.
-    if (view.variant === 'trial' && trialBannerDismissed) { removeTrialBanner(); return; }
+    // The trial announcement is manually closable and its dismissal PERSISTS
+    // across reloads (localStorage 'qf-trial-dismissed'). payment_issue stays
+    // in-memory dismissed (it must return on reload until the card is fixed);
+    // expired is never dismissible.
+    if (view.variant === 'trial' && isTrialDismissed()) { removeTrialBanner(); return; }
     if (view.variant === 'payment_issue' && paymentBannerDismissed) { removeTrialBanner(); return; }
 
+    // #qf-trial-bar is a permanent mount in the top bar (app.html). If it's
+    // absent (unexpected), do nothing rather than inject a stray body element.
     var bar = document.getElementById('qf-trial-bar');
-    if (!bar) {
-      bar = document.createElement('div');
-      bar.id = 'qf-trial-bar';
-      document.body.insertBefore(bar, document.body.firstChild);
-    }
+    if (!bar) return;
+    bar.hidden = false;
     bar.className = 'qf-trial-banner qf-trial-banner--' + view.variant + (view.urgent ? ' is-urgent' : '');
     bar.setAttribute('role', view.variant === 'expired' ? 'alert' : 'status');
     bar.innerHTML = '';
@@ -6219,7 +6287,7 @@
       });
       close.innerHTML = '<svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>';
       close.addEventListener('click', function () {
-        if (isPayment) paymentBannerDismissed = true; else trialBannerDismissed = true;
+        if (isPayment) paymentBannerDismissed = true; else setTrialDismissed();
         removeTrialBanner();
       });
       bar.appendChild(close);
@@ -6231,8 +6299,9 @@
     if (view.variant === 'expired') document.body.classList.add('qf-trial-locked');
     else document.body.classList.remove('qf-trial-locked');
 
-    // Banner is now in the DOM at its final height — push the top bar below it.
-    syncAppbarOffset();
+    // Announcement is now at its final size — re-measure the bar so the mobile
+    // drawer offset (--qf-bar-h) tracks the (possibly taller) two-row bar.
+    syncBarHeight();
   }
 
   // Day-14 write-block escape: called from api() when a mutating request 403s
@@ -6283,6 +6352,11 @@
     });
     function setCollapsedDesktop(collapsed) {
       shell.classList.toggle('qf-nav-collapsed', collapsed);
+      // The hamburger now lives in the top bar (sibling of #app-shell), so mirror
+      // the collapsed flag onto the bar for the ≥901px "show toggle when
+      // collapsed" CSS to reach it.
+      var tb = document.getElementById('qf-topbar');
+      if (tb) tb.classList.toggle('qf-nav-collapsed', collapsed);
       toggle.setAttribute('aria-expanded', collapsed ? 'false' : 'true');
       toggle.setAttribute('aria-label', collapsed ? 'Show sidebar' : 'Hide sidebar');
     }
@@ -6348,7 +6422,10 @@
           : (t ? t.slug : '');
         window.__qfWidget = { url: url, host: host, slug: t ? t.slug : '' };
       })();
-      $('#sb-tenant-name').textContent = (r.tenant && r.tenant.name) || r.user.name || r.user.email;
+      var tenantLabel = (r.tenant && r.tenant.name) || r.user.name || r.user.email;
+      $('#sb-tenant-name').textContent = tenantLabel;
+      // Mirror the tenant name into the top-bar account trigger.
+      (function () { var an = document.getElementById('qf-account-name'); if (an) an.textContent = tenantLabel; })();
       // Default avatar tile (light shell) shows the BUSINESS initials, not 'QF':
       // first letters of the first two words, or the first two letters of a
       // single-word name. Rendered via CSS content:attr(data-initials) on the
@@ -6406,12 +6483,19 @@
       })();
       $('#loading').style.display = 'none';
       $('#app-shell').hidden = false;
+      // Reveal the static top bar (logo + announcement mount + account menu).
+      var topbar = document.getElementById('qf-topbar');
+      if (topbar) topbar.hidden = false;
       renderTrialBanner(r.trial);
       // Reveal the hamburger and wire its toggle now that the shell is visible.
       var t = document.getElementById('qf-mobile-nav-toggle');
       if (t) t.hidden = false;
       wireMobileNav();
       wireThemeToggle();
+      wireAccountMenu();
+      syncBarHeight();
+      // Keep the mobile drawer offset (--qf-bar-h) in step with the bar height.
+      window.addEventListener('resize', syncBarHeight);
       // Floating AI copilot — persistent across every authed route.
       mountCopilotBubble();
       // Grab-to-scroll (drag-to-pan) on the dashboard's main content area. The
