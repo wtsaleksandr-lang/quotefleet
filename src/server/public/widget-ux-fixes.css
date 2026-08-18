@@ -1062,3 +1062,15 @@ html, body { overscroll-behavior: contain; }
 /* Clip the inline base map so any transient CSS zoom feedback stays inside the
    card rather than spilling over the surrounding controls. */
 .qf-map-card.qf-map-base .qf-map-canvas { overflow: hidden; }
+
+/* ── Equipment dropdown: premium bigger icon + bigger copy (Alex) ────────────
+   The redesigned container/trailer glyphs carry real detail (corrugation, corner
+   castings, door bars, reefer unit) so they get a larger render; the option copy
+   grows a tasteful step too. Overrides the 21px block above. Equipment-scoped:
+   only the equipment picker adds .qf-cs-ico-row + .qf-cs-txt (icons), so the
+   ocean-carrier picker is untouched. Applies to BOTH the option rows and the
+   collapsed selected-value button, which both carry .qf-cs-ico-row. Appended at
+   EOF so no baselined line shifts. */
+.qf-cs-ico { width: 27px; height: 27px; }
+.qf-cs-ico svg { width: 27px; height: 27px; }
+.qf-cs-ico-row .qf-cs-txt { font-size: 15px; }

@@ -22,47 +22,114 @@
   // Matched by keyword off the option label; every type resolves to an icon so
   // the list stays visually consistent. currentColor → inherits the row color.
   var SVG_HEAD = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">';
-  // Containers differ by real proportions: length grows with rib count / box
-  // width (20' < 40' < 45'), high-cube boxes are taller. Reefers get a
-  // white body + blue refrigeration unit + snowflake (their real-world look).
-  var IC_C20 = SVG_HEAD + '<rect x="6" y="8" width="12" height="8" rx="0.7"/><path d="M9.5 8v8M12 8v8M14.5 8v8"/></svg>';
-  var IC_C40 = SVG_HEAD + '<rect x="2.5" y="8" width="19" height="8" rx="0.7"/><path d="M6.4 8v8M10.2 8v8M14 8v8M17.6 8v8"/></svg>';
-  var IC_C40HC = SVG_HEAD + '<rect x="2.5" y="6" width="19" height="11" rx="0.7"/><path d="M6.4 6v11M10.2 6v11M14 6v11M17.6 6v11"/></svg>';
-  var IC_C45HC = SVG_HEAD + '<rect x="2" y="6" width="20" height="11" rx="0.7"/><path d="M5.3 6v11M8.6 6v11M11.9 6v11M15.2 6v11M18.5 6v11"/></svg>';
-  var IC_REEFER = '<svg viewBox="0 0 24 24" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">' +
-    '<rect x="2.5" y="7.5" width="19" height="9" rx="1" fill="#eef3ff" stroke="currentColor" stroke-width="1.5"/>' +
-    '<rect x="3.7" y="8.7" width="3.4" height="6.6" rx="0.5" fill="#3f5cc0"/>' +
-    '<g stroke="#3f5cc0" stroke-width="1.3" fill="none"><path d="M13 9.7v4.6"/><path d="M11 10.9l4 2.2"/><path d="M15 10.9l-4 2.2"/></g></svg>';
-  var IC_OPENTOP = SVG_HEAD + '<path d="M2.5 8v8.5M21.5 8v8.5M2.5 16.5h19"/><path d="M2.5 8h19" stroke-dasharray="2.4 2.4"/></svg>';
-  var IC_FLAT = SVG_HEAD + '<path d="M2 13.5h20M4.5 13.5V11M19.5 13.5V11"/><circle cx="7" cy="17" r="1.5"/><circle cx="16" cy="17" r="1.5"/></svg>';
+  // ── Premium container line-art (designed for the ~27px render) ───────────────
+  // Every container shares one visual language so the dropdown reads as a set:
+  //   • corrugated ribbing (evenly spaced vertical ribs, inset top/bottom → the
+  //     gap reads as the top + bottom rails),
+  //   • four cast-steel CORNER CASTINGS (small filled blocks at each corner),
+  //   • a DOOR END on the right (vertical door seam + two locking bars).
+  // Proportions carry the size: 20' short box, 40' long, 40'HQ / 45' high-cube
+  // (taller, with an extra top band line), 45' longest with the most ribs.
+  // CASTING = reusable filled-corner-block markup for a box (fill=currentColor).
+  var CAST = function (x1, x2, yT, yB) {
+    return '<g fill="currentColor" stroke="none">' +
+      '<rect x="' + x1 + '" y="' + yT + '" width="1.5" height="1.4" rx="0.2"/>' +
+      '<rect x="' + x2 + '" y="' + yT + '" width="1.5" height="1.4" rx="0.2"/>' +
+      '<rect x="' + x1 + '" y="' + yB + '" width="1.5" height="1.4" rx="0.2"/>' +
+      '<rect x="' + x2 + '" y="' + yB + '" width="1.5" height="1.4" rx="0.2"/></g>';
+  };
+  // 20' — short box.
+  var IC_C20 = SVG_HEAD + '<rect x="4.6" y="8.4" width="14.8" height="7.6" rx="0.6"/>' +
+    '<path d="M7.4 9.7v5M9.4 9.7v5M11.4 9.7v5M13.4 9.7v5" stroke-width="0.9"/>' +
+    '<path d="M15.4 8.4v7.6" stroke-width="1"/><path d="M16.6 9.8v4.8M17.9 9.8v4.8" stroke-width="1"/>' +
+    CAST('4.2', '18.3', '8', '14.6') + '</svg>';
+  // 40' — long box.
+  var IC_C40 = SVG_HEAD + '<rect x="2.6" y="8.4" width="18.8" height="7.6" rx="0.6"/>' +
+    '<path d="M5.4 9.7v5M7.4 9.7v5M9.4 9.7v5M11.4 9.7v5M13.4 9.7v5M15.4 9.7v5" stroke-width="0.9"/>' +
+    '<path d="M17.4 8.4v7.6" stroke-width="1"/><path d="M18.7 9.8v4.8M20 9.8v4.8" stroke-width="1"/>' +
+    CAST('2.2', '20.3', '8', '14.6') + '</svg>';
+  // 40'HQ — high-cube: taller box + a top band line marking the extra height.
+  var IC_C40HC = SVG_HEAD + '<rect x="2.6" y="6.2" width="18.8" height="11.2" rx="0.6"/>' +
+    '<path d="M2.6 8h18.8" stroke-width="0.9"/>' +
+    '<path d="M5.4 8.4v8.2M7.4 8.4v8.2M9.4 8.4v8.2M11.4 8.4v8.2M13.4 8.4v8.2M15.4 8.4v8.2" stroke-width="0.9"/>' +
+    '<path d="M17.4 6.2v11.2" stroke-width="1"/><path d="M18.7 8.4v7.8M20 8.4v7.8" stroke-width="1"/>' +
+    CAST('2.2', '20.3', '5.8', '16') + '</svg>';
+  // 45' — longest high-cube: most ribs + top band.
+  var IC_C45HC = SVG_HEAD + '<rect x="2" y="6.2" width="20" height="11.2" rx="0.6"/>' +
+    '<path d="M2 8h20" stroke-width="0.9"/>' +
+    '<path d="M4.4 8.4v8.2M6.4 8.4v8.2M8.4 8.4v8.2M10.4 8.4v8.2M12.4 8.4v8.2M14.4 8.4v8.2M16.4 8.4v8.2" stroke-width="0.9"/>' +
+    '<path d="M18 6.2v11.2" stroke-width="1"/><path d="M19.1 8.4v7.8M20.4 8.4v7.8" stroke-width="1"/>' +
+    CAST('1.6', '20.9', '5.8', '16') + '</svg>';
+  // Reefer: light body + blue LOUVRED refrigeration unit on one end (restrained
+  // 2-tone), corrugation on the body, corner castings — reads unmistakably reefer.
+  var IC_REEFER = '<svg viewBox="0 0 24 24" fill="none" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">' +
+    '<rect x="2.6" y="7.8" width="18.8" height="8.4" rx="0.7" fill="#eef3ff" stroke="currentColor" stroke-width="1.7"/>' +
+    '<rect x="3.4" y="8.7" width="3.6" height="6.6" rx="0.4" fill="#3f5cc0" stroke="none"/>' +
+    '<path d="M4.1 10.1h2.2M4.1 11.4h2.2M4.1 12.7h2.2M4.1 14h2.2" stroke="#dbe4ff" stroke-width="0.8"/>' +
+    '<path d="M9 9.4v5.2M11 9.4v5.2M13 9.4v5.2M15 9.4v5.2M17 9.4v5.2M19 9.4v5.2" stroke="currentColor" stroke-width="0.9"/>' +
+    '<g fill="currentColor" stroke="none"><rect x="2.2" y="7.4" width="1.5" height="1.4" rx="0.2"/><rect x="20.3" y="7.4" width="1.5" height="1.4" rx="0.2"/><rect x="2.2" y="15.2" width="1.5" height="1.4" rx="0.2"/><rect x="20.3" y="15.2" width="1.5" height="1.4" rx="0.2"/></g></svg>';
+  // Open-top: walls + floor + corrugation, but the top is a removable (dashed) lid.
+  var IC_OPENTOP = SVG_HEAD + '<path d="M2.8 8.2v7.8M21.2 8.2v7.8M2.8 16h18.4"/>' +
+    '<path d="M2.8 8.2h18.4" stroke-dasharray="2.2 2" stroke-width="1.3"/>' +
+    '<path d="M5.6 9.6v5.4M7.6 9.6v5.4M9.6 9.6v5.4M11.6 9.6v5.4M13.6 9.6v5.4M15.6 9.6v5.4M17.6 9.6v5.4M19.4 9.6v5.4" stroke-width="0.9"/>' +
+    '<g fill="currentColor" stroke="none"><rect x="2.4" y="15.2" width="1.5" height="1.4" rx="0.2"/><rect x="20.5" y="15.2" width="1.5" height="1.4" rx="0.2"/></g></svg>';
+  // Flat rack: a container base with raised end posts (no walls, no wheels — it
+  // rides on a chassis), corner castings under the deck set it apart from trailers.
+  var IC_FLATRACK = SVG_HEAD + '<path d="M2.4 15.4h19.2" stroke-width="1.9"/>' +
+    '<path d="M4.4 15.4V9.6M19.6 15.4V9.6" stroke-width="1.7"/>' +
+    '<path d="M3.2 9.6h2.4M18.4 9.6h2.4" stroke-width="1.5"/>' +
+    '<g fill="currentColor" stroke="none"><rect x="2.1" y="14.8" width="1.5" height="1.5" rx="0.2"/><rect x="20.4" y="14.8" width="1.5" height="1.5" rx="0.2"/></g></svg>';
+  // Flatbed: low deck + headboard/rear post, stake pockets, hubbed wheels.
+  var IC_FLAT = SVG_HEAD + '<path d="M2 13.6h20" stroke-width="1.9"/>' +
+    '<path d="M4.4 13.6V11M19.6 13.6V11" stroke-width="1.2"/>' +
+    '<path d="M8 13.6v-1.3M12 13.6v-1.3M16 13.6v-1.3" stroke-width="0.9"/>' +
+    '<circle cx="7" cy="17" r="1.6"/><circle cx="16" cy="17" r="1.6"/>' +
+    '<circle cx="7" cy="17" r="0.4" fill="currentColor" stroke="none"/><circle cx="16" cy="17" r="0.4" fill="currentColor" stroke="none"/></svg>';
   // Step deck (drop deck): two-level profile — low rear deck, raised front over
-  // the gooseneck; wheels only under the low deck.
-  var IC_STEPDECK = SVG_HEAD + '<path d="M2.5 15h10v-4h7.5"/><circle cx="6" cy="17.2" r="1.4"/><circle cx="9.5" cy="17.2" r="1.4"/></svg>';
-  // Conestoga: flat deck under a rolling-tarp canopy (the arched cover).
-  var IC_CONESTOGA = SVG_HEAD + '<path d="M3.5 15.5h17"/><path d="M4.5 15.5v-3.5a7.5 7.5 0 0 1 15 0v3.5"/><circle cx="7.5" cy="17.5" r="1.4"/><circle cx="16.5" cy="17.5" r="1.4"/></svg>';
-  // Flat rack: a container base with fixed/collapsible end posts (no wheels — it
-  // rides on a chassis), which sets it apart from the wheeled trailer flats.
-  var IC_FLATRACK = SVG_HEAD + '<path d="M2.5 15.5h19"/><path d="M4.5 15.5V10M19.5 15.5V10"/><path d="M3.4 10h2.2M18.4 10h2.2"/></svg>';
-  // Hotshot: a pickup (dually) towing a flat trailer — distinct from a full flatbed.
-  var IC_HOTSHOT = SVG_HEAD + '<rect x="2" y="9.5" width="4.5" height="4.5" rx="0.6"/><path d="M6.5 14v-1.6h2.4V14"/><path d="M9 14h12.5"/><circle cx="4.2" cy="16.4" r="1.3"/><circle cx="14" cy="16.4" r="1.3"/><circle cx="18" cy="16.4" r="1.3"/></svg>';
+  // the gooseneck; hubbed wheels only under the low deck.
+  var IC_STEPDECK = SVG_HEAD + '<path d="M2.4 15.2h9.6v-3.8h7.8"/>' +
+    '<path d="M19.8 11.4V9.4" stroke-width="1.2"/>' +
+    '<circle cx="6" cy="17.2" r="1.5"/><circle cx="9.6" cy="17.2" r="1.5"/>' +
+    '<circle cx="6" cy="17.2" r="0.35" fill="currentColor" stroke="none"/><circle cx="9.6" cy="17.2" r="0.35" fill="currentColor" stroke="none"/></svg>';
+  // Conestoga: flat deck under a rolling-tarp canopy (arched cover with tarp bows).
+  var IC_CONESTOGA = SVG_HEAD + '<path d="M3.4 15.6h17.2" stroke-width="1.7"/>' +
+    '<path d="M4.6 15.6v-3.4a7.4 7.4 0 0 1 14.8 0v3.4"/>' +
+    '<path d="M8.3 15.6V9.7M12 15.6V8.9M15.7 15.6V9.7" stroke-width="0.8"/>' +
+    '<circle cx="7.4" cy="17.4" r="1.5"/><circle cx="16.6" cy="17.4" r="1.5"/></svg>';
+  // Hotshot: a dually pickup towing a flat trailer — distinct from a full flatbed.
+  // Shared cab: box body + window notch + hood step; wheels get hub dots.
+  var IC_HOTSHOT = SVG_HEAD + '<rect x="2" y="9.5" width="4.5" height="4.5" rx="0.6"/><path d="M3.1 9.9h2.3v1.4" stroke-width="0.8"/><path d="M6.5 14v-1.6h2.4V14"/><path d="M9 14h12.5"/><circle cx="4.2" cy="16.4" r="1.3"/><circle cx="14" cy="16.4" r="1.3"/><circle cx="18" cy="16.4" r="1.3"/></svg>';
   // ── Hotshot trailer-type bands ─────────────────────────────────────
-  // Each is the same dually-cab silhouette as IC_HOTSHOT, differentiated by
-  // the trailer profile so the customer can tell the trailer types apart.
+  // Each is the same dually-cab silhouette as IC_HOTSHOT (box cab + window notch),
+  // differentiated by the trailer profile so the customer can tell them apart.
   // Bumper-pull: short flat deck hitched low at the bumper, single axle.
-  var IC_HS_BUMPER = SVG_HEAD + '<rect x="2" y="9.5" width="4.5" height="4.5" rx="0.6"/><path d="M6.5 14h1.6"/><path d="M9 13.4h11.5"/><path d="M9 13.4V15M20.5 13.4V15"/><circle cx="4.2" cy="16.4" r="1.3"/><circle cx="16.3" cy="16.4" r="1.3"/></svg>';
+  var IC_HS_BUMPER = SVG_HEAD + '<rect x="2" y="9.5" width="4.5" height="4.5" rx="0.6"/><path d="M3.1 9.9h2.3v1.4" stroke-width="0.8"/><path d="M6.5 14h1.6"/><path d="M9 13.4h11.5"/><path d="M9 13.4V15M20.5 13.4V15"/><circle cx="4.2" cy="16.4" r="1.3"/><circle cx="16.3" cy="16.4" r="1.3"/></svg>';
   // Gooseneck: raised neck arches over the truck bed then drops to the deck.
-  var IC_HS_GOOSE = SVG_HEAD + '<rect x="2" y="9.5" width="4.5" height="4.5" rx="0.6"/><path d="M6.6 10.3h1.8l1.3 3h10.8"/><circle cx="4.2" cy="16.4" r="1.3"/><circle cx="14.5" cy="16.4" r="1.3"/><circle cx="18" cy="16.4" r="1.3"/></svg>';
+  var IC_HS_GOOSE = SVG_HEAD + '<rect x="2" y="9.5" width="4.5" height="4.5" rx="0.6"/><path d="M3.1 9.9h2.3v1.4" stroke-width="0.8"/><path d="M6.6 10.3h1.8l1.3 3h10.8"/><circle cx="4.2" cy="16.4" r="1.3"/><circle cx="14.5" cy="16.4" r="1.3"/><circle cx="18" cy="16.4" r="1.3"/></svg>';
   // Gooseneck 40' (CDL): same neck, longer deck + triple axle (heavier).
-  var IC_HS_GOOSE40 = SVG_HEAD + '<rect x="2" y="9.5" width="4.5" height="4.5" rx="0.6"/><path d="M6.6 10.3h1.8l1.3 3h11.8"/><circle cx="4.2" cy="16.4" r="1.3"/><circle cx="13.3" cy="16.4" r="1.3"/><circle cx="16.4" cy="16.4" r="1.3"/><circle cx="19.5" cy="16.4" r="1.3"/></svg>';
+  var IC_HS_GOOSE40 = SVG_HEAD + '<rect x="2" y="9.5" width="4.5" height="4.5" rx="0.6"/><path d="M3.1 9.9h2.3v1.4" stroke-width="0.8"/><path d="M6.6 10.3h1.8l1.3 3h11.8"/><circle cx="4.2" cy="16.4" r="1.3"/><circle cx="13.3" cy="16.4" r="1.3"/><circle cx="16.4" cy="16.4" r="1.3"/><circle cx="19.5" cy="16.4" r="1.3"/></svg>';
   // Dovetail / tilt: flat deck that slopes down to the ground at the rear.
-  var IC_HS_DOVETAIL = SVG_HEAD + '<rect x="2" y="9.5" width="4.5" height="4.5" rx="0.6"/><path d="M6.5 14h1.6"/><path d="M9 13.5h8.5l3 2.8"/><circle cx="4.2" cy="16.4" r="1.3"/><circle cx="13" cy="16.4" r="1.3"/></svg>';
+  var IC_HS_DOVETAIL = SVG_HEAD + '<rect x="2" y="9.5" width="4.5" height="4.5" rx="0.6"/><path d="M3.1 9.9h2.3v1.4" stroke-width="0.8"/><path d="M6.5 14h1.6"/><path d="M9 13.5h8.5l3 2.8"/><circle cx="4.2" cy="16.4" r="1.3"/><circle cx="13" cy="16.4" r="1.3"/></svg>';
   // Step-deck / lowboy: high front deck over the neck, step down to a low rear
   // deck; wheels sit lower to read as the dropped deck.
-  var IC_HS_STEPDECK = SVG_HEAD + '<rect x="2" y="9.5" width="4.5" height="4.5" rx="0.6"/><path d="M6.6 11.5h4.4l1.4 2.4h8.1"/><circle cx="4.2" cy="16.6" r="1.3"/><circle cx="15.5" cy="17" r="1.3"/><circle cx="18.6" cy="17" r="1.3"/></svg>';
-  // LTL: a box/load on a pallet (LTL ships palletized freight).
-  var IC_PALLET = SVG_HEAD + '<rect x="6" y="7" width="12" height="6" rx="0.5"/><path d="M3.5 15.5h17M3.5 18h17"/><path d="M5 15.5v2.5M12 15.5v2.5M19 15.5v2.5"/></svg>';
-  var IC_VAN = SVG_HEAD + '<rect x="2.5" y="6.5" width="15" height="9.5" rx="1"/><circle cx="6.5" cy="18.5" r="1.5"/><circle cx="13.5" cy="18.5" r="1.5"/></svg>';
-  var IC_TRUCK = SVG_HEAD + '<path d="M2.5 7h9.5v8.5h-9.5z"/><path d="M12 10h3.6l2.9 2.9v2.6H12z"/><circle cx="6" cy="17.5" r="1.5"/><circle cx="15.5" cy="17.5" r="1.5"/></svg>';
+  var IC_HS_STEPDECK = SVG_HEAD + '<rect x="2" y="9.5" width="4.5" height="4.5" rx="0.6"/><path d="M3.1 9.9h2.3v1.4" stroke-width="0.8"/><path d="M6.6 11.5h4.4l1.4 2.4h8.1"/><circle cx="4.2" cy="16.6" r="1.3"/><circle cx="15.5" cy="17" r="1.3"/><circle cx="18.6" cy="17" r="1.3"/></svg>';
+  // LTL: a strapped box/load on a pallet (LTL ships palletized freight).
+  var IC_PALLET = SVG_HEAD + '<rect x="5.6" y="6.6" width="12.8" height="6.4" rx="0.5"/>' +
+    '<path d="M5.6 9.8h12.8" stroke-width="0.9"/>' +
+    '<path d="M3.4 15.4h17.2M3.4 18h17.2" stroke-width="1.5"/>' +
+    '<path d="M5 15.4v2.6M12 15.4v2.6M19 15.4v2.6" stroke-width="1.2"/></svg>';
+  // Dry van / sprinter: box body + roof rail + rear door seam & handle, hubbed wheels.
+  var IC_VAN = SVG_HEAD + '<rect x="2.4" y="6.6" width="15.4" height="9.6" rx="1"/>' +
+    '<path d="M2.4 8.6h15.4" stroke-width="0.9"/>' +
+    '<path d="M13.6 6.6v9.6" stroke-width="0.9"/><path d="M15.7 9.6v3.6" stroke-width="0.9"/>' +
+    '<circle cx="6.4" cy="18.4" r="1.6"/><circle cx="13.6" cy="18.4" r="1.6"/>' +
+    '<circle cx="6.4" cy="18.4" r="0.4" fill="currentColor" stroke="none"/><circle cx="13.6" cy="18.4" r="0.4" fill="currentColor" stroke="none"/></svg>';
+  // Box / straight truck (also power-only fallback): box body + cab + roof rail.
+  var IC_TRUCK = SVG_HEAD + '<path d="M2.6 7.2h9.2v8.6H2.6z"/>' +
+    '<path d="M11.8 10.2h3.4l2.8 2.9v2.7h-6.2z"/>' +
+    '<path d="M13 10.2v2.9h4.4" stroke-width="0.9"/><path d="M2.6 9h9.2" stroke-width="0.9"/>' +
+    '<circle cx="6" cy="17.6" r="1.6"/><circle cx="15.4" cy="17.6" r="1.6"/>' +
+    '<circle cx="6" cy="17.6" r="0.4" fill="currentColor" stroke="none"/><circle cx="15.4" cy="17.6" r="0.4" fill="currentColor" stroke="none"/></svg>';
   function equipIconSvg(label) {
     var t = (label || '').toLowerCase();
     if (/reefer|refriger|genset/.test(t)) return IC_REEFER;
