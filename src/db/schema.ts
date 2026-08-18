@@ -1715,6 +1715,65 @@ export const brokerLeads = pgTable(
 );
 
 // ────────────────────────────────────────────────────────────────────
+// CARRIER DIRECTORY — public, browsable US motor-carrier directory.
+//
+// Every row is one ACTIVE US motor CARRIER with operating authority
+// (common and/or contract, property) ingested from FMCSA's free public
+// data by scripts/ingestFmcsaCarriers.ts:
+//   - L&I Carrier file (6eyk-hxee) supplies authority (common_stat /
+//     contract_stat = 'A' + property_chk = 'Y'), the docket/MC number and
+//     the physical business address.
+//   - Company Census file (az4n-8mr2) supplies power_units, total_drivers,
+//     safety_rating, and the cargo-classification flags — notably
+//     crgo_intermodal ('X') which marks container/drayage carriers.
+//
+// UNLIKE broker_leads (a private outreach prospect list), this table backs
+// PUBLIC directory pages, so it carries a derived `nearest_port_code`
+// (ZIP → nearest major US container port) and a unique `public_slug`.
+// It is platform-level: no tenantId, no reference to tenants / users /
+// leads, so it never touches MRR, trials, or any tenant list.
+// ────────────────────────────────────────────────────────────────────
+export const carrierDirectory = pgTable(
+  'carrier_directory',
+  {
+    id: serial('id').primaryKey(),
+    /** USDOT number, leading zeros stripped — UNIQUE identity + dedupe key. */
+    usdot: text('usdot').notNull(),
+    /** L&I docket number (e.g. "MC012892"); may be null / non-MC prefix. */
+    mcNumber: text('mc_number'),
+    legalName: text('legal_name').notNull(),
+    dbaName: text('dba_name'),
+    city: text('city'),
+    /** Two-letter physical state (upper-cased); the primary browse facet. */
+    state: text('state'),
+    zip: text('zip'),
+    phone: text('phone'),
+    /** Census power_units — fleet size. */
+    powerUnits: integer('power_units'),
+    /** Census total_drivers. */
+    drivers: integer('drivers'),
+    /** Census safety_rating: 'S' satisfactory / 'C' conditional / 'U' unsatisfactory / null unrated. */
+    safetyRating: text('safety_rating'),
+    /** 'common' | 'contract' | 'common,contract' — from L&I *_stat flags. */
+    authorityType: text('authority_type'),
+    /** Census crgo_intermodal === 'X' — container/drayage carrier flag. */
+    intermodal: boolean('intermodal').notNull().default(false),
+    /** Derived: nearest major US container port UN/LOCODE (ZIP centroid). */
+    nearestPortCode: text('nearest_port_code'),
+    /** Unique URL slug for the public carrier page (slug(name)-usdot). */
+    publicSlug: text('public_slug').notNull(),
+    createdAt: timestamp('created_at', { mode: 'date' }).notNull().defaultNow(),
+    updatedAt: timestamp('updated_at', { mode: 'date' }).notNull().defaultNow(),
+  },
+  (t) => [
+    uniqueIndex('carrier_directory_usdot_idx').on(t.usdot),
+    uniqueIndex('carrier_directory_slug_idx').on(t.publicSlug),
+    index('carrier_directory_state_idx').on(t.state),
+    index('carrier_directory_port_idx').on(t.nearestPortCode),
+  ]
+);
+
+// ────────────────────────────────────────────────────────────────────
 // Type helpers for use in the rest of the codebase.
 // ────────────────────────────────────────────────────────────────────
 export type Tenant = typeof tenants.$inferSelect;
@@ -1742,6 +1801,8 @@ export type Lead = typeof leads.$inferSelect;
 export type NewLead = typeof leads.$inferInsert;
 export type BrokerLead = typeof brokerLeads.$inferSelect;
 export type NewBrokerLead = typeof brokerLeads.$inferInsert;
+export type CarrierDirectoryRow = typeof carrierDirectory.$inferSelect;
+export type NewCarrierDirectoryRow = typeof carrierDirectory.$inferInsert;
 export type CallbackRequest = typeof callbackRequests.$inferSelect;
 export type NewCallbackRequest = typeof callbackRequests.$inferInsert;
 export type Conversation = typeof conversations.$inferSelect;
