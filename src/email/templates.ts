@@ -46,6 +46,12 @@ const BRAND = {
   // light/dark <img> swap was removed — it showed as two broken red-X boxes in
   // Outlook. See shell() header.)
   logoIcon: 'https://quotefleet.net/brand/logo-full.png',
+  // Dark-optimized variant of the SAME mark: the truck is drawn with a WHITE
+  // outline so it reads on a dark email surface (the default dark-outlined truck
+  // in logoIcon vanishes on dark). Swapped in via the .qf-logo-light /
+  // .qf-logo-dark display swap under @media (prefers-color-scheme: dark) — see
+  // shell() header + the <head> <style>. Same absolute-host pattern as logoIcon.
+  logoIconDark: 'https://quotefleet.net/brand/logo-full-ondark.png',
   logoW: 60,
   logoH: 40,
 };
@@ -105,10 +111,17 @@ function shell(opts: {
                        keeps img + span on one line in every major client;
                        height-first (width auto) so the ~3:2 mark never distorts. -->
                   <a href="https://quotefleet.net" target="_blank" rel="noopener" style="text-decoration:none;display:inline-block;">
-                    <!-- Decorative logo: alt="" so a blocked-image client shows
-                         NOTHING here (no broken-image glyph, no ALT text) — the
-                         live-text <span> beside it is the single wordmark. -->
-                    <img src="${BRAND.logoIcon}" width="${BRAND.logoW}" height="${BRAND.logoH}" alt="" style="display:inline-block;vertical-align:middle;border:0;outline:none;text-decoration:none;margin-right:10px;height:${BRAND.logoH}px;width:auto;font-family:'Inter','Helvetica Neue',Arial,sans-serif;font-size:19px;font-weight:700;color:${BRAND.primary};">
+                    <!-- Decorative logo, light/dark swap: alt="" on both so a
+                         blocked-image client shows NOTHING here (no broken-image
+                         glyph, no ALT text) — the live-text <span> beside it is
+                         the single wordmark. .qf-logo-light (dark-outlined truck)
+                         shows by default; under @media (prefers-color-scheme:
+                         dark) it hides and .qf-logo-dark (WHITE-outlined truck,
+                         logo-full-ondark.png) shows so the mark reads on dark.
+                         MSO/Outlook-desktop ignores the media query and keeps the
+                         light image — accepted minority. -->
+                    <img src="${BRAND.logoIcon}" class="qf-logo-light qf-wordmark" width="${BRAND.logoW}" height="${BRAND.logoH}" alt="" style="display:inline-block;vertical-align:middle;border:0;outline:none;text-decoration:none;margin-right:10px;height:${BRAND.logoH}px;width:auto;font-family:'Inter','Helvetica Neue',Arial,sans-serif;font-size:19px;font-weight:700;color:${BRAND.primary};">
+                    <img src="${BRAND.logoIconDark}" class="qf-logo-dark qf-wordmark" width="${BRAND.logoW}" height="${BRAND.logoH}" alt="" style="display:none;vertical-align:middle;border:0;outline:none;text-decoration:none;margin-right:10px;height:${BRAND.logoH}px;width:auto;font-family:'Inter','Helvetica Neue',Arial,sans-serif;font-size:19px;font-weight:700;color:#FFFFFF;">
                     <span class="qf-wordmark" style="font-size:19px;font-weight:700;letter-spacing:-0.01em;color:${BRAND.primary};vertical-align:middle;">${escape(BRAND.name)}</span>
                   </a>
                 </td>
@@ -168,16 +181,22 @@ function shell(opts: {
 <title>${escape(BRAND.name)}</title>
 <style>
   /* Dark-mode adaptations for clients that honor prefers-color-scheme (Apple
-     Mail, iOS Mail, etc.) and Outlook.com dark mode ([data-ogsc]). Light clients
-     are unaffected. In dark clients the live-text wordmark is lightened to a
-     legible tint of brand-blue, and the "Chat with us" outline button turns
-     white so both read on the dark surface. (Live text only — the single hosted
-     logo image is unchanged; the old dual-image swap was the Outlook red-X bug.) */
+     Mail, iOS Mail, modern Outlook mobile) and Outlook.com dark mode
+     ([data-ogsc]). Light clients are unaffected. In dark clients the live-text
+     wordmark (and the img color fallback) turns WHITE, the header logo swaps
+     from the dark-outlined truck (.qf-logo-light) to the white-outlined
+     on-dark asset (.qf-logo-dark), and the "Chat with us" outline button turns
+     white — so all three read on the dark surface. MSO/Outlook-desktop ignores
+     these media queries and keeps the light logo; that's an accepted minority. */
   @media (prefers-color-scheme: dark) {
-    .qf-wordmark { color: #7C93FF !important; }
+    .qf-wordmark { color: #FFFFFF !important; }
+    .qf-logo-light { display: none !important; }
+    .qf-logo-dark { display: inline-block !important; }
     .qf-chat-link { color: #FFFFFF !important; border-color: rgba(255,255,255,0.55) !important; }
   }
-  [data-ogsc] .qf-wordmark { color: #7C93FF !important; }
+  [data-ogsc] .qf-wordmark { color: #FFFFFF !important; }
+  [data-ogsc] .qf-logo-light { display: none !important; }
+  [data-ogsc] .qf-logo-dark { display: inline-block !important; }
   [data-ogsc] .qf-chat-link { color: #FFFFFF !important; border-color: rgba(255,255,255,0.55) !important; }
 </style>
 </head>
