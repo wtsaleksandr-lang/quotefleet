@@ -2911,6 +2911,55 @@
     };
     window.addEventListener('resize', onWinResize);
 
+    // ── Wheel-hover scroll of the preview (Edit 7) ────────────────────────────
+    // The outer .qf-cz-frame-wrap is a BOUNDED, overflow-y:auto viewport, but the
+    // iframe inside is sized to the widget's FULL content height, so it has no
+    // internal scroll — and a wheel over an iframe is delivered to the iframe's
+    // OWN document, which (having nothing to scroll) neither moves nor chains to
+    // the parent. Result: hovering the tall calculator preview and wheeling did
+    // nothing. Fix: because the preview iframe is SAME-ORIGIN, forward the wheel
+    // from inside it to the outer wrap so wheeling scrolls THROUGH the calculator.
+    // The map card already traps its own wheel (widget.js: preventDefault +
+    // stopPropagation → base-map zoom), so map wheels never bubble to here and
+    // keep zooming. overscroll-behavior:contain on the wrap (CSS) stops any chain
+    // to the portal page. Works in BOTH desktop (borderless) and mobile (framed)
+    // modes since it targets the shared wrap.
+    function forwardWheelToWrap(e) {
+      if (e.defaultPrevented) return; // map (or any child) already handled it
+      var max = frameWrap.scrollHeight - frameWrap.clientHeight;
+      if (max <= 0) return;           // nothing to scroll (content fits)
+      var step = e.deltaY;
+      if (e.deltaMode === 1) step *= 16;        // lines → px
+      else if (e.deltaMode === 2) step *= frameWrap.clientHeight; // pages → px
+      var before = frameWrap.scrollTop;
+      var next = Math.max(0, Math.min(max, before + step));
+      if (next !== before) { frameWrap.scrollTop = next; e.preventDefault(); }
+    }
+    function attachPreviewWheel(win) {
+      if (!win) return;
+      try { win.removeEventListener('wheel', forwardWheelToWrap, { passive: false }); } catch (_r) {}
+      try { win.addEventListener('wheel', forwardWheelToWrap, { passive: false }); } catch (_a) {}
+    }
+    function wirePreviewWheel() {
+      try {
+        var d = iframe.contentDocument; // same-origin (prod + dev harness); null if cross-origin
+        if (!d) return;
+        attachPreviewWheel(iframe.contentWindow);
+        // Page/Behavior tabs load the HOSTED page, which nests the calculator in
+        // #qf-calc-frame — wheel over that deeper same-origin frame must forward too.
+        try {
+          var cf = d.getElementById('qf-calc-frame');
+          if (cf) {
+            attachPreviewWheel(cf.contentWindow);
+            cf.addEventListener('load', function () { try { attachPreviewWheel(cf.contentWindow); } catch (_c) {} });
+          }
+        } catch (_n) {}
+      } catch (_e) { /* cross-origin — the wrap still scrolls over its own padding */ }
+    }
+    iframe.addEventListener('load', wirePreviewWheel);
+    // The iframe may already be loaded (cached) before this listener attaches.
+    setTimeout(wirePreviewWheel, 0);
+
     function postToPreview(msg) {
       try { if (iframe && iframe.contentWindow) iframe.contentWindow.postMessage(msg, '*'); } catch (_e) {}
     }
@@ -3089,35 +3138,40 @@
       // previews faithful. No-op until the map section wires it.
       var refreshMapThumbs = function () {};
 
-      // Selected-tile checkmark (gallery). Inherits currentColor so it tints with
-      // the accent ring on the selected tile.
+      // Selected-tile checkmark (unfold grid). Inherits currentColor so it tints
+      // with the accent ring on the selected tile.
       var GALLERY_CHECK_SVG = '<svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20 6L9 17l-5-5"/></svg>';
-      var GALLERY_X_SVG = '<svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M18 6L6 18M6 6l12 12"/></svg>';
-      // Generic "see all at once" modal. Reuses the .qf-modal-backdrop/.qf-modal-card
-      // component (matches showConfirmModal) with a gallery skin: a title, a close
-      // (×) button, a responsive grid, backdrop-click + Esc to close. buildGrid
-      // (gridEl, close) fills the grid with clickable tiles.
-      function openGalleryModal(title, buildGrid) {
-        var backdrop = el('div', { class: 'qf-modal-backdrop qf-gallery-backdrop is-open' });
-        var card = el('div', { class: 'qf-modal-card qf-gallery-card', role: 'dialog', 'aria-modal': 'true', 'aria-label': title });
-        var head = el('div', { class: 'qf-gallery-head' });
-        head.appendChild(el('h3', { text: title }));
-        var xBtn = el('button', { type: 'button', class: 'qf-gallery-x', 'aria-label': 'Close', html: GALLERY_X_SVG });
-        head.appendChild(xBtn);
-        card.appendChild(head);
-        var gridEl = el('div', { class: 'qf-gallery-grid' });
-        card.appendChild(gridEl);
-        var keydown;
-        function close() { backdrop.remove(); if (keydown) document.removeEventListener('keydown', keydown); }
-        xBtn.addEventListener('click', close);
-        backdrop.addEventListener('click', function (ev) { if (ev.target === backdrop) close(); });
-        keydown = function (ev) { if (ev.key === 'Escape') close(); };
-        document.addEventListener('keydown', keydown);
-        buildGrid(gridEl, close);
-        card.appendChild(el('div', { class: 'qf-gallery-hint', text: 'Click any option to apply it instantly.' }));
-        backdrop.appendChild(card);
-        document.body.appendChild(backdrop);
-        setTimeout(function () { try { xBtn.focus(); } catch (e) { /* noop */ } }, 30);
+      var UNFOLD_CHEV_SVG = '<svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 9l6 6 6-6"/></svg>';
+      // Generic "see all at once" INLINE unfold (replaces the old modal). A subtle
+      // right-aligned "View all" link toggles an in-place expansion under the
+      // carousel — the section grows to reveal every option in a responsive grid,
+      // pushing content below downward (smooth height via grid-template-rows
+      // 0fr↔1fr). buildGrid(gridEl) fills the grid ONCE on first open, reusing the
+      // SAME tiles + select handlers. The link label toggles ("View all …" ↔
+      // "Show less") with aria-expanded and a rotating chevron. Returns { row,
+      // panel } so the caller appends both to its section (row above, panel below).
+      function makeInlineUnfold(showLabel, kind, buildGrid) {
+        var row = el('div', { class: 'qf-cz-viewall-row' });
+        var btn = el('button', { type: 'button', class: 'qf-cz-viewall qf-cz-unfold-toggle', 'aria-expanded': 'false' });
+        var lbl = el('span', { class: 'qf-cz-unfold-label', text: showLabel });
+        btn.appendChild(lbl);
+        btn.appendChild(el('span', { class: 'qf-cz-unfold-chev', 'aria-hidden': 'true', html: UNFOLD_CHEV_SVG }));
+        row.appendChild(btn);
+        var panel = el('div', { class: 'qf-cz-unfold' });
+        var inner = el('div', { class: 'qf-cz-unfold-inner' });
+        var gridEl = el('div', { class: 'qf-cz-unfold-grid qf-cz-unfold-grid--' + kind });
+        inner.appendChild(gridEl);
+        panel.appendChild(inner);
+        var built = false;
+        btn.addEventListener('click', function () {
+          var open = !panel.classList.contains('is-open');
+          if (open && !built) { built = true; buildGrid(gridEl); }
+          panel.classList.toggle('is-open', open);
+          btn.classList.toggle('is-open', open);
+          btn.setAttribute('aria-expanded', open ? 'true' : 'false');
+          lbl.textContent = open ? 'Show less' : showLabel;
+        });
+        return { row: row, panel: panel };
       }
 
       var root = el('div', { class: 'qf-customize', 'data-qf-customize': '1' });
@@ -3280,9 +3334,15 @@
           // A few px of slack: scroll-snap + the track's padding leave the strip
           // resting a hair off 0 at the start, so treat "near the edge" as the edge.
           var atStart = x <= 6, atEnd = x >= max - 6;
+          var scrollable = max > 1;
           prev.disabled = atStart; next.disabled = atEnd || max <= 1;
           prev.classList.toggle('is-hidden', atStart);
           next.classList.toggle('is-hidden', atEnd || max <= 1);
+          // Soft edge fades: left only when scrolled off the start, right only
+          // when more content remains — same atStart/atEnd logic as the arrows so
+          // items appear to slide behind a gradient shade, never a hard cut.
+          wrap.classList.toggle('has-fade-left', scrollable && !atStart);
+          wrap.classList.toggle('has-fade-right', scrollable && !atEnd);
         }
         prev.addEventListener('click', function () { track.scrollBy({ left: -page(), behavior: reduce ? 'auto' : 'smooth' }); });
         next.addEventListener('click', function () { track.scrollBy({ left: page(), behavior: reduce ? 'auto' : 'smooth' }); });
@@ -3412,6 +3472,12 @@
           n.classList.toggle('is-selected', sel);
           n.setAttribute('aria-pressed', sel ? 'true' : 'false');
         });
+        // Keep the inline unfold grid's selection in sync (same source of truth).
+        $$('.qf-cz-unfold-theme').forEach(function (n) {
+          var sel = n.getAttribute('data-preset') === p.id;
+          n.classList.toggle('is-selected', sel);
+          n.setAttribute('aria-pressed', sel ? 'true' : 'false');
+        });
         currentAccent = null;
         paintAccent();
         var patch = { themePreset: p.id, accentOverride: null };
@@ -3429,25 +3495,23 @@
         grid.appendChild(btn);
       });
       themeSec.appendChild(makeCarousel(grid));
-      // "View all themes" — a subtle text link that opens every preset at once in
-      // a responsive grid (see openGalleryModal). Understated, right-aligned.
-      var themeViewAll = el('div', { class: 'qf-cz-viewall-row' });
-      var themeViewAllBtn = el('button', { type: 'button', class: 'qf-cz-viewall', text: 'View all themes' });
-      themeViewAllBtn.addEventListener('click', function () {
-        openGalleryModal('Calculator themes', function (gridEl, close) {
-          presets.forEach(function (p) {
-            var on = p.id === currentPreset;
-            var tile = el('button', { type: 'button', class: 'qf-gallery-tile qf-gallery-theme' + (on ? ' is-selected' : ''), 'data-preset': p.id, 'aria-pressed': on ? 'true' : 'false', title: p.description || p.label });
-            tile.appendChild(themePresetSwatch(p));
-            tile.appendChild(el('span', { class: 'qf-gallery-tile-name', text: p.label }));
-            tile.appendChild(el('span', { class: 'qf-gallery-check', 'aria-hidden': 'true', html: GALLERY_CHECK_SVG }));
-            tile.addEventListener('click', function () { selectThemePreset(p); close(); });
-            gridEl.appendChild(tile);
-          });
+      // "View all themes" — a subtle text link that UNFOLDS every preset in place
+      // (no modal) as a responsive grid right under the carousel. Same swatch +
+      // the SAME selectThemePreset handler; picking stays expanded so the carrier
+      // can keep comparing. Understated, right-aligned.
+      var themeUnfold = makeInlineUnfold('View all themes', 'theme', function (gridEl) {
+        presets.forEach(function (p) {
+          var on = p.id === currentPreset;
+          var tile = el('button', { type: 'button', class: 'qf-cz-unfold-tile qf-cz-unfold-theme' + (on ? ' is-selected' : ''), 'data-preset': p.id, 'aria-pressed': on ? 'true' : 'false', title: p.description || p.label });
+          tile.appendChild(themePresetSwatch(p));
+          tile.appendChild(el('span', { class: 'qf-cz-unfold-tile-name', text: p.label }));
+          tile.appendChild(el('span', { class: 'qf-gallery-check', 'aria-hidden': 'true', html: GALLERY_CHECK_SVG }));
+          tile.addEventListener('click', function () { selectThemePreset(p); });
+          gridEl.appendChild(tile);
         });
       });
-      themeViewAll.appendChild(themeViewAllBtn);
-      themeSec.appendChild(themeViewAll);
+      themeSec.appendChild(themeUnfold.row);
+      themeSec.appendChild(themeUnfold.panel);
       controls.appendChild(themeSec);
 
       // ── Accent color ────────────────────────────────────────────
@@ -3572,6 +3636,12 @@
           n.classList.toggle('is-selected', s);
           n.setAttribute('aria-pressed', s ? 'true' : 'false');
         });
+        // Keep the inline unfold grid's selection in sync (same source of truth).
+        $$('.qf-cz-unfold-map').forEach(function (n) {
+          var s = n.getAttribute('data-mapstyle') === key;
+          n.classList.toggle('is-selected', s);
+          n.setAttribute('aria-pressed', s ? 'true' : 'false');
+        });
       };
       // ── Real map-image thumbnails ────────────────────────────────
       // Each chip's thumbnail is a REAL base-map render for that style (not a
@@ -3609,6 +3679,12 @@
           var key = chip && chip.getAttribute('data-mapstyle');
           if (key) img.src = mapThumbUrl(key);
         });
+        // Re-point the inline unfold grid's thumbnails too (cache-hit URLs).
+        $$('.qf-cz-unfold-map .qf-cz-mapstyle-thumb').forEach(function (img) {
+          var tile = img.closest('.qf-cz-unfold-map');
+          var key = tile && tile.getAttribute('data-mapstyle');
+          if (key) img.src = mapThumbUrl(key);
+        });
       };
       // Apply a map style — the ONE path shared by the inline chip AND the gallery
       // tile. livePatch swaps the preview map IN PLACE instantly (widget re-renders
@@ -3629,33 +3705,24 @@
         mapRow.appendChild(chip);
       });
       mapSec.appendChild(makeCarousel(mapRow));
-      // "View all styles" — subtle text link → gallery of every map (same URLs →
-      // instant from cache), each applied via the SAME selectMapStyle path.
-      var mapViewAll = el('div', { class: 'qf-cz-viewall-row' });
-      var mapViewAllBtn = el('button', { type: 'button', class: 'qf-cz-viewall', text: 'View all styles' });
-      mapViewAllBtn.addEventListener('click', function () {
-        openGalleryModal('Map styles', function (gridEl, close) {
-          mapStyles.forEach(function (m) {
-            var on = m.key === currentMapStyle;
-            var tile = el('button', { type: 'button', class: 'qf-gallery-tile qf-gallery-map' + (on ? ' is-selected' : ''), 'data-mapstyle': m.key, 'aria-pressed': on ? 'true' : 'false', title: m.hint || m.label });
-            tile.appendChild(el('img', { class: 'qf-gallery-map-thumb', src: mapThumbUrl(m.key), alt: '', loading: 'lazy' }));
-            tile.appendChild(el('span', { class: 'qf-gallery-tile-name', text: m.label + (m.key === 'branded' ? ' (default)' : '') }));
-            tile.appendChild(el('span', { class: 'qf-gallery-check', 'aria-hidden': 'true', html: GALLERY_CHECK_SVG }));
-            tile.addEventListener('click', function () {
-              selectMapStyle(m.key);
-              $$('.qf-gallery-map', gridEl).forEach(function (n) {
-                var s = n.getAttribute('data-mapstyle') === m.key;
-                n.classList.toggle('is-selected', s);
-                n.setAttribute('aria-pressed', s ? 'true' : 'false');
-              });
-              close();
-            });
-            gridEl.appendChild(tile);
-          });
+      // "View all styles" — subtle text link that UNFOLDS every map style in
+      // place (no modal) as a responsive grid under the carousel. Same real
+      // map-image tiles (cache-hit URLs) + the SAME selectMapStyle path;
+      // applyMapStyle keeps the unfold tiles' selected state in sync. Picking
+      // stays expanded so the carrier can keep comparing.
+      var mapUnfold = makeInlineUnfold('View all styles', 'map', function (gridEl) {
+        mapStyles.forEach(function (m) {
+          var on = m.key === currentMapStyle;
+          var tile = el('button', { type: 'button', class: 'qf-cz-unfold-tile qf-cz-unfold-map' + (on ? ' is-selected' : ''), 'data-mapstyle': m.key, 'aria-pressed': on ? 'true' : 'false', title: m.hint || m.label });
+          tile.appendChild(el('img', { class: 'qf-cz-mapstyle-thumb', src: mapThumbUrl(m.key), alt: '', loading: 'lazy' }));
+          tile.appendChild(el('span', { class: 'qf-cz-unfold-tile-name', text: m.label + (m.key === 'branded' ? ' (default)' : '') }));
+          tile.appendChild(el('span', { class: 'qf-gallery-check', 'aria-hidden': 'true', html: GALLERY_CHECK_SVG }));
+          tile.addEventListener('click', function () { selectMapStyle(m.key); });
+          gridEl.appendChild(tile);
         });
       });
-      mapViewAll.appendChild(mapViewAllBtn);
-      mapSec.appendChild(mapViewAll);
+      mapSec.appendChild(mapUnfold.row);
+      mapSec.appendChild(mapUnfold.panel);
       controls.appendChild(mapSec);
 
       // ── Map blend (opacity slider — feather map edges into the card) ─────
@@ -3699,8 +3766,17 @@
       var headerSec = el('div', { class: 'card qf-cz-section' });
       headerSec.appendChild(el('div', { class: 'qf-cz-section-title', text: 'Header logo' }));
       headerSec.appendChild(el('div', { class: 'qf-cz-hint', text: 'Your logo, company name and tagline. Any logo shape fits cleanly — never cropped or stretched.' }));
-      function headerChipRow(labelText, field, cur, opts) {
-        headerSec.appendChild(el('div', { class: 'qf-cz-label', style: { marginTop: '10px' }, text: labelText }));
+      // Arrange the control groups in a balanced grid that uses the FULL width
+      // (no large empty right side) AND shows EVERY option without scrolling
+      // (Edit 9). The chips WRAP within their group (no carousel), so nothing is
+      // ever clipped behind an arrow. "Logo size" (4 options) spans the full row
+      // so all four fit; the shorter "Layout" + "Alignment" pair on the next row;
+      // the show-name toggle spans full width below. Collapses to one column on
+      // mobile (≤560px) where the 4 size chips wrap 2×2. Handlers untouched.
+      var headerGrid = el('div', { class: 'qf-cz-header-grid' });
+      function headerChipGroup(labelText, field, cur, opts, full) {
+        var group = el('div', { class: 'qf-cz-header-group' + (full ? ' qf-cz-header-group--full' : '') });
+        group.appendChild(el('div', { class: 'qf-cz-label', text: labelText }));
         var row = el('div', { class: 'qf-cz-hover-row' });
         opts.forEach(function (o) {
           var on = o.id === cur;
@@ -3717,19 +3793,21 @@
           });
           row.appendChild(chip);
         });
-        headerSec.appendChild(makeCarousel(row));
+        group.appendChild(row);
+        headerGrid.appendChild(group);
       }
-      headerChipRow('Logo size', 'headerLogoSize', (/^(s|m|l|xl)$/.test(String(b.headerLogoSize)) ? b.headerLogoSize : 'm'), [
+      headerChipGroup('Logo size', 'headerLogoSize', (/^(s|m|l|xl)$/.test(String(b.headerLogoSize)) ? b.headerLogoSize : 'm'), [
         { id: 's', label: 'Small' }, { id: 'm', label: 'Medium' }, { id: 'l', label: 'Large' }, { id: 'xl', label: 'Extra-large' },
-      ]);
-      headerChipRow('Layout', 'headerLayout', (b.headerLayout === 'stacked' ? 'stacked' : 'beside'), [
+      ], true);
+      headerChipGroup('Layout', 'headerLayout', (b.headerLayout === 'stacked' ? 'stacked' : 'beside'), [
         { id: 'beside', label: 'Beside name', title: 'Logo next to the company name' },
         { id: 'stacked', label: 'On its own line', title: 'Logo above the name — best for wide wordmark logos' },
       ]);
-      headerChipRow('Alignment', 'headerAlign', (b.headerAlign === 'center' ? 'center' : 'left'), [
+      headerChipGroup('Alignment', 'headerAlign', (b.headerAlign === 'center' ? 'center' : 'left'), [
         { id: 'left', label: 'Left' }, { id: 'center', label: 'Center' },
       ]);
-      var showNameWrap = el('label', { class: 'qf-cz-field', style: { display: 'flex', gap: '10px', alignItems: 'flex-start', cursor: 'pointer', marginTop: '12px' } });
+      var showNameGroup = el('div', { class: 'qf-cz-header-group qf-cz-header-group--full' });
+      var showNameWrap = el('label', { class: 'qf-cz-field qf-cz-header-toggle', style: { display: 'flex', gap: '10px', alignItems: 'flex-start', cursor: 'pointer' } });
       var showNameCb = el('input', { type: 'checkbox', style: { marginTop: '3px', flex: '0 0 auto' } });
       showNameCb.checked = b.headerShowName !== false;
       showNameCb.addEventListener('change', function () { queueSave({ headerShowName: showNameCb.checked }, true); });
@@ -3738,7 +3816,9 @@
         el('div', { text: 'Show company name + tagline', style: { fontWeight: '600' } }),
         el('div', { class: 'field-hint', style: { marginTop: '2px' }, text: 'Turn off if your logo already includes your company name (logo only).' }),
       ]));
-      headerSec.appendChild(showNameWrap);
+      showNameGroup.appendChild(showNameWrap);
+      headerGrid.appendChild(showNameGroup);
+      headerSec.appendChild(headerGrid);
       controls.appendChild(headerSec);
 
       // ── Text color (Auto + custom picker + a few distinct swatches) ──────
