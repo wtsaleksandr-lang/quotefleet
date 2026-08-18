@@ -46,10 +46,10 @@ export function normalizeTheme(raw: unknown): MapTheme {
 //   satellite   — real aerial imagery (maptype=hybrid) + labels + white route
 // NOTE: the string KEYS stay stable so tenants' saved selections persist; only
 // the LOOK + label/hint of `grayscale`/`dark_routes` changed, `soft`+`satellite` are new.
-export type MapStyle = 'branded' | 'grayscale' | 'standard' | 'soft' | 'dark_routes' | 'mono' | 'satellite' | 'ironhorse' | 'harbor' | 'cupertino' | 'material' | 'booking' | 'tesla' | 'stripe' | 'stone' | 'citron' | 'vault' | 'blackwhite' | 'blackwhite_inverted';
+export type MapStyle = 'branded' | 'grayscale' | 'standard' | 'soft' | 'dark_routes' | 'mono' | 'satellite' | 'ironhorse' | 'harbor' | 'cupertino' | 'material' | 'booking' | 'tesla' | 'stripe' | 'stone' | 'citron' | 'vault' | 'blackwhite' | 'blackwhite_inverted' | 'marine';
 
 /** Canonical style keys (source of truth for the Zod enum + the picker). */
-export const MAP_STYLE_KEYS = ['branded', 'grayscale', 'standard', 'soft', 'dark_routes', 'mono', 'satellite', 'ironhorse', 'harbor', 'cupertino', 'material', 'booking', 'tesla', 'stripe', 'stone', 'citron', 'vault', 'blackwhite', 'blackwhite_inverted'] as const;
+export const MAP_STYLE_KEYS = ['branded', 'grayscale', 'standard', 'soft', 'dark_routes', 'mono', 'satellite', 'ironhorse', 'harbor', 'cupertino', 'material', 'booking', 'tesla', 'stripe', 'stone', 'citron', 'vault', 'blackwhite', 'blackwhite_inverted', 'marine'] as const;
 
 /** Human labels + one-line hints for the Customize picker. */
 export const MAP_STYLE_LIST: Array<{ key: MapStyle; label: string; hint: string }> = [
@@ -72,6 +72,7 @@ export const MAP_STYLE_LIST: Array<{ key: MapStyle; label: string; hint: string 
   { key: 'vault', label: 'Vault', hint: 'Warm cream map, vermillion route and pins.' },
   { key: 'blackwhite', label: 'Black & White', hint: 'True monochrome map — white land, black route and pins, no colour.' },
   { key: 'blackwhite_inverted', label: 'Black & White (Inverted)', hint: 'Inverted monochrome — black land, white roads, white route and pins.' },
+  { key: 'marine', label: 'Marine', hint: 'Nautical-chart look — light land, muted blue-grey water, minimal faint labels.' },
 ];
 
 /** Normalize any caller/tenant input to a valid style. null/unknown → branded,
@@ -94,7 +95,8 @@ export function resolveMapStyle(raw: unknown): MapStyle {
     raw === 'citron' ||
     raw === 'vault' ||
     raw === 'blackwhite' ||
-    raw === 'blackwhite_inverted'
+    raw === 'blackwhite_inverted' ||
+    raw === 'marine'
     ? raw
     : 'branded';
 }
@@ -595,6 +597,35 @@ const BLACKWHITE_INVERTED_STYLES: string[] = [
   'feature:road.highway|element:geometry.stroke|color:0x8a8a8a',
 ];
 
+// `marine` (label: "Marine") — a MarineTraffic / nautical-chart look. Near-white
+// warm-grey LAND (flat — no green parks, no beige), calm muted desaturated
+// BLUE-GREY water (slightly cool, NOT bright blue), very faint thin grey road
+// hairlines (visible against the land, not white-on-white, not bold), and
+// deliberately MINIMAL, low-contrast grey labels: all POI/business labels +
+// road labels hidden, only faint locality/administrative place names kept. Quiet
+// and chart-like, high legibility, low chroma — the cobalt route + green/red A·B
+// markers stay the one clearly-visible element on top.
+const MARINE_STYLES: string[] = [
+  'element:geometry|color:0xf4f3ef',
+  'element:labels.text.fill|color:0x8b9096',
+  'element:labels.text.stroke|color:0xf7f6f2',
+  'feature:administrative|element:geometry|color:0xd3d1cb',
+  'feature:administrative.country|element:geometry.stroke|color:0xbcc1c6',
+  'feature:administrative.province|element:geometry.stroke|color:0xceccc6',
+  'feature:administrative.locality|element:labels.text.fill|color:0x939aa2',
+  'feature:landscape|element:geometry|color:0xf4f3ef',
+  'feature:landscape.natural|element:geometry|color:0xf0eee8',
+  'feature:poi|visibility:off',
+  'feature:transit|visibility:off',
+  'feature:water|element:geometry|color:0xacbcca',
+  'feature:water|element:labels.text.fill|color:0x6f8494',
+  'feature:road|element:geometry|color:0xe5e3dd',
+  'feature:road|element:labels|visibility:off',
+  'feature:road.arterial|element:geometry|color:0xe1dfd8',
+  'feature:road.highway|element:geometry|color:0xdbd9d2',
+  'feature:road.highway|element:geometry.stroke|color:0xcdcac2',
+];
+
 /** Resolve the Static Maps `style=` spec list for a (theme, mapStyle) pair.
  *  `branded` follows the light/dark theme (unchanged); the others are fixed.
  *  `standard` and `satellite` return [] → no style overrides (satellite uses
@@ -637,6 +668,8 @@ function styleSpecs(theme: MapTheme, mapStyle: MapStyle): string[] {
       return BLACKWHITE_STYLES;
     case 'blackwhite_inverted':
       return BLACKWHITE_INVERTED_STYLES;
+    case 'marine':
+      return MARINE_STYLES;
     case 'branded':
     default:
       return themeStyles(theme);
