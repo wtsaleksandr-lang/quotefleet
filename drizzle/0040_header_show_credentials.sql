@@ -1,0 +1,17 @@
+-- Header credential meta-lines toggle — surface the carrier's USDOT/MC + public
+-- phone/email as muted secondary lines under the company name in the CALCULATOR
+-- header. Single source of truth: the numbers live on `tenants`
+-- (dot_number / mc_number / public_contact_email / contact_phone); this column is
+-- ONLY the on/off toggle.
+--
+--   header_show_credentials  boolean, DEFAULT true, NOT NULL — a carrier who
+--                            already has the data shows it unless they opt out.
+--
+-- ADD COLUMN IF NOT EXISTS with a NOT-NULL default so it is idempotent + safe to
+-- re-run on every boot via runMigrations() (src/db/migrate.ts) — the Replit
+-- deploy does not run db:migrate (same pattern as 0032 / 0038). Existing rows
+-- backfill to `true`, reproducing the intended default. This column is ALSO
+-- listed in SELF_HEAL_COLUMN_STATEMENTS (src/db/migrate.ts) because Replit's
+-- publish tool repeatedly proposes to DROP brand_configs columns — the journal-
+-- independent self-heal re-adds it on the next boot.
+ALTER TABLE "brand_configs" ADD COLUMN IF NOT EXISTS "header_show_credentials" boolean DEFAULT true NOT NULL;

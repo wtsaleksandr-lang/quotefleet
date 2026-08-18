@@ -281,6 +281,13 @@
       "when": 1786849616676,
       "tag": "0039_lead_routing_validity",
       "breakpoints": true
+    },
+    {
+      "idx": 40,
+      "version": "7",
+      "when": 1786936016676,
+      "tag": "0040_header_show_credentials",
+      "breakpoints": true
     }
   ]
 }

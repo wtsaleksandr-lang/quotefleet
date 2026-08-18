@@ -922,6 +922,11 @@ export function registerTenantRoutes(app: Express) {
     headerLayout: z.enum(['beside', 'stacked']).optional(),
     headerShowName: z.boolean().optional(),
     headerAlign: z.enum(['left', 'center']).optional(),
+    // Show the carrier's USDOT/MC + public phone/email as muted meta-lines under
+    // the company name in the calculator header. Only the toggle lives here; the
+    // numbers themselves are saved via the tenant profile (see PUT
+    // /api/tenant/profile). Persisted verbatim; spreads into the column set.
+    headerShowCredentials: z.boolean().optional(),
     // Quote validity window (days). Forgiving: '' / non-numeric → null (app
     // default); a number is clamped to 1..365. Stored in the integer column.
     quoteValidityDays: z.preprocess((v) => {
@@ -1098,6 +1103,68 @@ export function registerTenantRoutes(app: Express) {
       .set(set)
       .where(eq(brandConfigs.tenantId, req.tenant!.id));
     res.json({ ok: true });
+  });
+
+  // ── company profile (single source of truth for public credentials) ──
+  // The carrier's USDOT/MC + public phone/email. These four columns feed the
+  // calculator-header credential meta-lines (widget.js renderHeader), the hosted
+  // quote, and the marketplace profile, so this endpoint is the ONE place the
+  // portal Account card saves them. `contactPhone` + `publicContactEmail` are
+  // ALSO editable via PUT /api/auth/profile (the legacy Account form); both write
+  // the same tenant columns, so either path is safe. `publicContactEmail` is the
+  // OPT-IN public address — never the private login `contactEmail`.
+  app.get('/api/tenant/profile', requireAuth, requireTenant, (req, res) => {
+    res.json({
+      dotNumber: req.tenant!.dotNumber ?? null,
+      mcNumber: req.tenant!.mcNumber ?? null,
+      publicContactEmail: req.tenant!.publicContactEmail ?? null,
+      contactPhone: req.tenant!.contactPhone ?? null,
+    });
+  });
+
+  const ProfilePatch = z.object({
+    // Loose strings for the authority numbers (formats vary: "MC 748213",
+    // "748213", hyphens); trimmed + emptied-to-null below. Empty string clears.
+    dotNumber: z.string().max(40).nullable().optional(),
+    mcNumber: z.string().max(40).nullable().optional(),
+    // PUBLIC opt-in email — validated as an email (or '' to clear). Never seeded
+    // from the private login email.
+    publicContactEmail: z
+      .union([z.string().email().max(160), z.literal('')])
+      .nullable()
+      .optional(),
+    contactPhone: z.string().max(50).nullable().optional(),
+  });
+
+  app.put('/api/tenant/profile', requireAuth, requireTenant, async (req, res) => {
+    const parse = ProfilePatch.safeParse(req.body);
+    if (!parse.success) return res.status(400).json({ error: 'Invalid input' });
+    const b = parse.data;
+    // Trim, and treat a blank string as an explicit clear (→ null). An omitted
+    // key never touches the column.
+    const norm = (v: string | null | undefined): string | null => ((v ?? '').trim() || null);
+    const upd: Partial<typeof tenants.$inferInsert> = {};
+    if (b.dotNumber !== undefined) upd.dotNumber = norm(b.dotNumber);
+    if (b.mcNumber !== undefined) upd.mcNumber = norm(b.mcNumber);
+    if (b.publicContactEmail !== undefined) upd.publicContactEmail = norm(b.publicContactEmail);
+    if (b.contactPhone !== undefined) upd.contactPhone = norm(b.contactPhone);
+    if (Object.keys(upd).length > 0) {
+      upd.updatedAt = new Date();
+      await db().update(tenants).set(upd).where(eq(tenants.id, req.tenant!.id));
+      // USDOT/MC also surface on the public marketplace profile — refresh it.
+      if (b.dotNumber !== undefined || b.mcNumber !== undefined) bumpMarketplace(req.tenant!.id);
+    }
+    res.json({
+      ok: true,
+      dotNumber: b.dotNumber !== undefined ? (upd.dotNumber ?? null) : (req.tenant!.dotNumber ?? null),
+      mcNumber: b.mcNumber !== undefined ? (upd.mcNumber ?? null) : (req.tenant!.mcNumber ?? null),
+      publicContactEmail:
+        b.publicContactEmail !== undefined
+          ? (upd.publicContactEmail ?? null)
+          : (req.tenant!.publicContactEmail ?? null),
+      contactPhone:
+        b.contactPhone !== undefined ? (upd.contactPhone ?? null) : (req.tenant!.contactPhone ?? null),
+    });
   });
 
   // ── callback inbox ─────────────────────────────────────────────
