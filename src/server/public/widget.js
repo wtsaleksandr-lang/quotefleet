@@ -568,6 +568,22 @@
       document.body.setAttribute('data-qf-map-blend', bo > 0 ? 'on' : 'off');
       document.body.style.setProperty('--qf-map-blend-opacity', String(bo / 100));
     }
+    // Instant MAP STYLE swap (Customize → Map style chip / gallery). The map
+    // style is baked into the base-map / route PNG URL (built from
+    // brandMapStyle) which is loaded ONCE at init, so a saved-config refetch is
+    // NOT needed to see it: update brandMapStyle + the overlay-tone attribute and
+    // re-render the currently-shown map IN PLACE. showBaseMap() rebuilds the img
+    // src from the new style and re-frames to the default continent; a routed
+    // lane re-fetches via scheduleRouteMap(). No document reload, no white flash.
+    if (typeof patch.mapStyle === 'string') {
+      brandMapStyle = normMapStyle(patch.mapStyle);
+      try { document.body.setAttribute('data-qf-map-style', brandMapStyle); } catch (_e) {}
+      var mapCard = $('qf-map-card');
+      if (mapCard) {
+        if (mapCard.classList.contains('qf-map-base')) showBaseMap();
+        else scheduleRouteMap();
+      }
+    }
     autoResize();
   }
 

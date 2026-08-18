@@ -3083,6 +3083,42 @@
       // Assigned once the Map-style section is built; lets the theme-preset
       // handler apply that theme's default map style + repaint the map chips.
       var applyMapStyle = function () {};
+      // Assigned once the Map-style section is built; re-points every map-style
+      // thumbnail <img> at a fresh base-map URL for the currently-selected theme
+      // (light vs dark), so switching calculator theme keeps the mini map
+      // previews faithful. No-op until the map section wires it.
+      var refreshMapThumbs = function () {};
+
+      // Selected-tile checkmark (gallery). Inherits currentColor so it tints with
+      // the accent ring on the selected tile.
+      var GALLERY_CHECK_SVG = '<svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20 6L9 17l-5-5"/></svg>';
+      var GALLERY_X_SVG = '<svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M18 6L6 18M6 6l12 12"/></svg>';
+      // Generic "see all at once" modal. Reuses the .qf-modal-backdrop/.qf-modal-card
+      // component (matches showConfirmModal) with a gallery skin: a title, a close
+      // (×) button, a responsive grid, backdrop-click + Esc to close. buildGrid
+      // (gridEl, close) fills the grid with clickable tiles.
+      function openGalleryModal(title, buildGrid) {
+        var backdrop = el('div', { class: 'qf-modal-backdrop qf-gallery-backdrop is-open' });
+        var card = el('div', { class: 'qf-modal-card qf-gallery-card', role: 'dialog', 'aria-modal': 'true', 'aria-label': title });
+        var head = el('div', { class: 'qf-gallery-head' });
+        head.appendChild(el('h3', { text: title }));
+        var xBtn = el('button', { type: 'button', class: 'qf-gallery-x', 'aria-label': 'Close', html: GALLERY_X_SVG });
+        head.appendChild(xBtn);
+        card.appendChild(head);
+        var gridEl = el('div', { class: 'qf-gallery-grid' });
+        card.appendChild(gridEl);
+        var keydown;
+        function close() { backdrop.remove(); if (keydown) document.removeEventListener('keydown', keydown); }
+        xBtn.addEventListener('click', close);
+        backdrop.addEventListener('click', function (ev) { if (ev.target === backdrop) close(); });
+        keydown = function (ev) { if (ev.key === 'Escape') close(); };
+        document.addEventListener('keydown', keydown);
+        buildGrid(gridEl, close);
+        card.appendChild(el('div', { class: 'qf-gallery-hint', text: 'Click any option to apply it instantly.' }));
+        backdrop.appendChild(card);
+        document.body.appendChild(backdrop);
+        setTimeout(function () { try { xBtn.focus(); } catch (e) { /* noop */ } }, 30);
+      }
 
       var root = el('div', { class: 'qf-customize', 'data-qf-customize': '1' });
       c.appendChild(root);
@@ -3355,37 +3391,63 @@
       themeSec.appendChild(el('div', { class: 'qf-cz-hint', text: 'A curated look — sets the background, surfaces, and default accent. Drag or use the arrows to browse.' }));
       var grid = el('div', { class: 'qf-cz-preset-strip' });
       var currentPreset = b.themePreset || 'midnight';
-      presets.forEach(function (p) {
-        var on = p.id === currentPreset;
-        var btn = el('button', { type: 'button', class: 'qf-cz-preset' + (on ? ' is-selected' : ''), 'data-preset': p.id, 'aria-pressed': on ? 'true' : 'false', title: p.description || p.label });
+      // Preset preview swatch (bg + inset surface + accent dot). Shared by the
+      // inline strip AND the "View all themes" gallery so both read identically.
+      function themePresetSwatch(p) {
         var sw = el('div', { class: 'qf-cz-preset-swatch', style: { background: p.bg } });
         sw.appendChild(el('div', { class: 'qf-cz-preset-surface', style: { background: p.surface } }));
         sw.appendChild(el('div', { class: 'qf-cz-preset-accent', style: { background: p.accent } }));
-        btn.appendChild(sw);
-        btn.appendChild(el('div', { class: 'qf-cz-preset-name', text: p.label }));
-        btn.addEventListener('click', function () {
-          currentPreset = p.id;
-          $$('.qf-cz-preset', grid).forEach(function (n) {
-            var sel = n.getAttribute('data-preset') === p.id;
-            n.classList.toggle('is-selected', sel);
-            n.setAttribute('aria-pressed', sel ? 'true' : 'false');
-          });
-          // Switching preset resets the accent to the NEW preset's default —
-          // clear any prior override so resolveWidgetTheme pulls the preset
-          // accent (mirrors the "Theme default" chip). Otherwise the previous
-          // theme's accent stays baked onto the new theme.
-          currentAccent = null;
-          paintAccent();
-          // Each theme carries a default map style — apply it (and repaint the
-          // map chips) so the map matches the new look. Carrier can still override.
-          var patch = { themePreset: p.id, accentOverride: null };
-          if (p.mapStyle) { applyMapStyle(p.mapStyle); patch.mapStyle = p.mapStyle; }
-          queueSave(patch, true);
-          repaintFontColors();
+        return sw;
+      }
+      // Apply a theme preset — the ONE code path used by the inline chip AND the
+      // gallery tile. Updates the inline selected state, resets the accent to the
+      // new preset's default (clear any override so resolveWidgetTheme pulls the
+      // preset accent — mirrors the "Theme default" chip), applies the theme's
+      // default map style + refreshes the map thumbnails for the new light/dark,
+      // then persists (full refetch so server-derived tokens finalise).
+      function selectThemePreset(p) {
+        currentPreset = p.id;
+        $$('.qf-cz-preset', grid).forEach(function (n) {
+          var sel = n.getAttribute('data-preset') === p.id;
+          n.classList.toggle('is-selected', sel);
+          n.setAttribute('aria-pressed', sel ? 'true' : 'false');
         });
+        currentAccent = null;
+        paintAccent();
+        var patch = { themePreset: p.id, accentOverride: null };
+        if (p.mapStyle) { applyMapStyle(p.mapStyle); patch.mapStyle = p.mapStyle; }
+        refreshMapThumbs();
+        queueSave(patch, true);
+        repaintFontColors();
+      }
+      presets.forEach(function (p) {
+        var on = p.id === currentPreset;
+        var btn = el('button', { type: 'button', class: 'qf-cz-preset' + (on ? ' is-selected' : ''), 'data-preset': p.id, 'aria-pressed': on ? 'true' : 'false', title: p.description || p.label });
+        btn.appendChild(themePresetSwatch(p));
+        btn.appendChild(el('div', { class: 'qf-cz-preset-name', text: p.label }));
+        btn.addEventListener('click', function () { selectThemePreset(p); });
         grid.appendChild(btn);
       });
       themeSec.appendChild(makeCarousel(grid));
+      // "View all themes" — a subtle text link that opens every preset at once in
+      // a responsive grid (see openGalleryModal). Understated, right-aligned.
+      var themeViewAll = el('div', { class: 'qf-cz-viewall-row' });
+      var themeViewAllBtn = el('button', { type: 'button', class: 'qf-cz-viewall', text: 'View all themes' });
+      themeViewAllBtn.addEventListener('click', function () {
+        openGalleryModal('Calculator themes', function (gridEl, close) {
+          presets.forEach(function (p) {
+            var on = p.id === currentPreset;
+            var tile = el('button', { type: 'button', class: 'qf-gallery-tile qf-gallery-theme' + (on ? ' is-selected' : ''), 'data-preset': p.id, 'aria-pressed': on ? 'true' : 'false', title: p.description || p.label });
+            tile.appendChild(themePresetSwatch(p));
+            tile.appendChild(el('span', { class: 'qf-gallery-tile-name', text: p.label }));
+            tile.appendChild(el('span', { class: 'qf-gallery-check', 'aria-hidden': 'true', html: GALLERY_CHECK_SVG }));
+            tile.addEventListener('click', function () { selectThemePreset(p); close(); });
+            gridEl.appendChild(tile);
+          });
+        });
+      });
+      themeViewAll.appendChild(themeViewAllBtn);
+      themeSec.appendChild(themeViewAll);
       controls.appendChild(themeSec);
 
       // ── Accent color ────────────────────────────────────────────
@@ -3511,37 +3573,89 @@
           n.setAttribute('aria-pressed', s ? 'true' : 'false');
         });
       };
-      // Mini-map swatches that actually read like each map style — land, water,
-      // a road grid, and the route line, coloured per style.
-      var MAP_SWATCH = {
-        branded:     { land: '#16204a', water: '#0f1629', road: '#2c3a72', route: '#6E8BFF' },
-        grayscale:   { land: '#eceef1', water: '#dde1e6', road: '#c7ccd3', route: '#0D3CFC' },
-        standard:    { land: '#e8efe4', water: '#a9d1f0', road: '#ffffff', route: '#0D3CFC' },
-        soft:        { land: '#f3efe6', water: '#cfe0cf', road: '#e6ddce', route: '#0D3CFC' },
-        dark_routes: { land: '#1c1c1c', water: '#0e0e0e', road: '#3a3a3a', route: '#f4f6f8' },
-        satellite:   { land: '#4f6b3f', water: '#35597c', road: '#8f7d5a', route: '#f4f6f8' }
+      // ── Real map-image thumbnails ────────────────────────────────
+      // Each chip's thumbnail is a REAL base-map render for that style (not a
+      // stylised SVG), so the carrier sees the actual look before picking. The URL
+      // mirrors the widget's default continental frame EXACTLY (widget.js
+      // BASE_DEF_CENTER {44,-97} + BASE_MIN_Z 3) so the thumbnail matches the live
+      // preview, and the "View all" gallery reuses these SAME URLs → it opens
+      // instantly from the browser cache (base-map.png is max-age=86400, needs no
+      // grant token, rate-limited 60/min). The theme param (light/dark) is derived
+      // from the currently-selected preset's background lightness the same way the
+      // widget resolves it (isDarkMapTheme: perceptual luminance < 0.5 → dark).
+      var BASE_THUMB_CENTER = { lat: 44, lng: -97 }; // mirrors widget BASE_DEF_CENTER
+      var BASE_THUMB_ZOOM = 3;                        // mirrors widget BASE_MIN_Z
+      function mapThumbTheme() {
+        var p = presetsById[currentPreset] || {};
+        var m = /^#?([0-9a-f]{6})$/i.exec(String(p.bg || '').trim());
+        if (!m) return 'dark';
+        var n = parseInt(m[1], 16);
+        var lum = (0.299 * ((n >> 16) & 255) + 0.587 * ((n >> 8) & 255) + 0.114 * (n & 255)) / 255;
+        return lum < 0.5 ? 'dark' : 'light';
+      }
+      function mapThumbUrl(key) {
+        return '/api/public/base-map.png?theme=' + mapThumbTheme() + '&style=' + key +
+          '&zoom=' + BASE_THUMB_ZOOM +
+          '&center=' + BASE_THUMB_CENTER.lat.toFixed(4) + ',' + BASE_THUMB_CENTER.lng.toFixed(4);
+      }
+      function makeMapThumb(key) {
+        return el('img', { class: 'qf-cz-mapstyle-thumb', src: mapThumbUrl(key), alt: '', loading: 'lazy' });
+      }
+      // Re-point every thumbnail (inline strip) at a fresh URL when the theme's
+      // light/dark changes. Identical URLs are cache-hits, so this is ~free.
+      refreshMapThumbs = function () {
+        $$('.qf-cz-mapstyle-thumb', mapRow).forEach(function (img) {
+          var chip = img.closest('.qf-cz-mapstyle');
+          var key = chip && chip.getAttribute('data-mapstyle');
+          if (key) img.src = mapThumbUrl(key);
+        });
       };
-      function mapSwatchSvg(key) {
-        var c = MAP_SWATCH[key] || MAP_SWATCH.branded;
-        return '<svg viewBox="0 0 28 20" preserveAspectRatio="none" aria-hidden="true">'
-          + '<rect width="28" height="20" fill="' + c.land + '"/>'
-          + '<path d="M0 13 L9 12 L17 15 L28 12 L28 20 L0 20 Z" fill="' + c.water + '"/>'
-          + '<path d="M0 7 H28 M9 0 V20 M19 0 V20" stroke="' + c.road + '" stroke-width="1.4" opacity="0.85" fill="none"/>'
-          + '<path d="M2 18 L11 9 L17 12 L26 3" stroke="' + c.route + '" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" fill="none"/>'
-          + '</svg>';
+      // Apply a map style — the ONE path shared by the inline chip AND the gallery
+      // tile. livePatch swaps the preview map IN PLACE instantly (widget re-renders
+      // the base map from the new brandMapStyle — no reload/flash); saveNoRefetch
+      // persists WITHOUT the heavy brand-refetch reload (the map already re-rendered
+      // from the livePatch alone), matching the button-hover pattern.
+      function selectMapStyle(key) {
+        applyMapStyle(key);
+        livePatch({ mapStyle: key });
+        saveNoRefetch({ mapStyle: key });
       }
       mapStyles.forEach(function (m) {
         var on = m.key === currentMapStyle;
         var chip = el('button', { type: 'button', class: 'qf-cz-mapstyle' + (on ? ' is-selected' : ''), 'data-mapstyle': m.key, 'aria-pressed': on ? 'true' : 'false', title: m.hint || m.label });
-        chip.appendChild(el('span', { class: 'qf-cz-mapstyle-swatch qf-ms-' + m.key, html: mapSwatchSvg(m.key) }));
+        chip.appendChild(makeMapThumb(m.key));
         chip.appendChild(el('span', { class: 'qf-cz-mapstyle-name', text: m.label + (m.key === 'branded' ? ' (default)' : '') }));
-        chip.addEventListener('click', function () {
-          applyMapStyle(m.key);
-          queueSave({ mapStyle: m.key }, true);
-        });
+        chip.addEventListener('click', function () { selectMapStyle(m.key); });
         mapRow.appendChild(chip);
       });
       mapSec.appendChild(makeCarousel(mapRow));
+      // "View all styles" — subtle text link → gallery of every map (same URLs →
+      // instant from cache), each applied via the SAME selectMapStyle path.
+      var mapViewAll = el('div', { class: 'qf-cz-viewall-row' });
+      var mapViewAllBtn = el('button', { type: 'button', class: 'qf-cz-viewall', text: 'View all styles' });
+      mapViewAllBtn.addEventListener('click', function () {
+        openGalleryModal('Map styles', function (gridEl, close) {
+          mapStyles.forEach(function (m) {
+            var on = m.key === currentMapStyle;
+            var tile = el('button', { type: 'button', class: 'qf-gallery-tile qf-gallery-map' + (on ? ' is-selected' : ''), 'data-mapstyle': m.key, 'aria-pressed': on ? 'true' : 'false', title: m.hint || m.label });
+            tile.appendChild(el('img', { class: 'qf-gallery-map-thumb', src: mapThumbUrl(m.key), alt: '', loading: 'lazy' }));
+            tile.appendChild(el('span', { class: 'qf-gallery-tile-name', text: m.label + (m.key === 'branded' ? ' (default)' : '') }));
+            tile.appendChild(el('span', { class: 'qf-gallery-check', 'aria-hidden': 'true', html: GALLERY_CHECK_SVG }));
+            tile.addEventListener('click', function () {
+              selectMapStyle(m.key);
+              $$('.qf-gallery-map', gridEl).forEach(function (n) {
+                var s = n.getAttribute('data-mapstyle') === m.key;
+                n.classList.toggle('is-selected', s);
+                n.setAttribute('aria-pressed', s ? 'true' : 'false');
+              });
+              close();
+            });
+            gridEl.appendChild(tile);
+          });
+        });
+      });
+      mapViewAll.appendChild(mapViewAllBtn);
+      mapSec.appendChild(mapViewAll);
       controls.appendChild(mapSec);
 
       // ── Map blend (opacity slider — feather map edges into the card) ─────
