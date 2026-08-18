@@ -1677,6 +1677,11 @@
   function renderRates(c) {
     api('/api/tenant/rate-cards').then(function (d) {
       c.innerHTML = '';
+      // Let the rate-card-search decorator re-mount its search bar for the
+      // mode tab we're about to render (it mounts once per page and stamps this
+      // flag; clearing it on every render keeps search working after a tab
+      // switch instead of vanishing until a full reload).
+      try { var pc = document.getElementById('page-content'); if (pc) delete pc.dataset.qfRateSearch; } catch (e) {}
       c.appendChild(el('h1', { text: 'Rate cards' }));
 
       // Prominent path to the AI importer — the fastest way to load REAL rates
@@ -1733,115 +1738,260 @@
       // saw). Fold it into a collapsed panel so the rate table leads.
       var fscDetails = el('details', { class: 'qf-fsc-advanced', style: { marginBottom: '16px' } });
       var fscSum = el('summary', { style: { cursor: 'pointer', fontWeight: '700', fontSize: '13px', color: 'var(--ink)', padding: '10px 12px', borderRadius: '10px', background: 'var(--surface)', border: '1px solid var(--border)', userSelect: 'none' } });
-      fscSum.appendChild(el('span', { text: 'Fuel surcharge settings' }));
+      fscSum.appendChild(el('span', { text: 'Fuel surcharge — applies to all modes' }));
       fscSum.appendChild(el('span', { style: { color: 'var(--muted)', fontWeight: '500', fontSize: '12px', marginLeft: '6px' }, text: '— automatic weekly, or set your own %' }));
       fscDetails.appendChild(fscSum);
       var fscBody = buildFscCard(); fscBody.style.marginTop = '8px';
       fscDetails.appendChild(fscBody);
       c.appendChild(fscDetails);
-      var hasDrayage = (d.rateCards || []).some(function (r) { return r.service === 'drayage'; });
-      if (hasDrayage) {
-        c.appendChild(el('p', {
-          class: 'qf-rate-hint',
-          html: 'Drayage also needs <strong>per-port flat tariffs</strong> (e.g. LAX → 50mi zone = $475) — <a href="#" data-route="zones">set drayage zones</a>.'
-        }));
+      // ── Mode switcher (mode-first rate cards) ────────────────────
+      // Each tab is a purpose-built editor showing only the inputs that mode
+      // uses. Only modes the carrier actually runs get a tab; a "+ mode" strip
+      // starts one they don't run yet.
+      var view = getRatesView();
+      var cards = d.rateCards || [];
+      var byId = {};
+      cards.forEach(function (r) { byId[String(r.id)] = r; });
+      window.qfRateCardById = byId; // rate-builder.js duplicates a row from this
+
+      var MODE_DEFS = [
+        { id: 'drayage', label: 'Drayage', services: ['drayage'] },
+        { id: 'ftl', label: 'FTL / Reefer', services: ['ftl'] },
+        { id: 'ltl', label: 'LTL', services: ['ltl'] },
+        { id: 'expedite', label: 'Hotshot / Expedite', services: ['hotshot', 'expedited'] },
+      ];
+      var ADD_STARTER = {
+        drayage: { service: 'drayage', equipment: 'container_40', label: 'Drayage' },
+        ftl: { service: 'ftl', equipment: 'dryvan', label: 'FTL dry van' },
+        ltl: { service: 'ltl', equipment: 'pallet', label: 'LTL' },
+        expedite: { service: 'hotshot', equipment: 'sprinter', label: 'Hotshot' },
+      };
+      function modeCardCount(m) {
+        return cards.filter(function (r) { return m.services.indexOf(r.service) !== -1; }).length;
+      }
+      var runModes = MODE_DEFS.filter(function (m) { return modeCardCount(m) > 0; });
+      var offModes = MODE_DEFS.filter(function (m) { return modeCardCount(m) === 0; });
+
+      function startMode(m) {
+        var s = ADD_STARTER[m.id];
+        // Created DISABLED so it never collides with an existing enabled card
+        // for the same (service, equipment) — the duplicate-enabled guard 409s.
+        api('/api/tenant/rate-cards', { method: 'POST', body: { service: s.service, equipment: s.equipment, label: s.label, ratePerMile: 2.5, enabled: false } })
+          .then(function () { view.mode = m.id; setRatesView(view); renderRates(c); })
+          .catch(toastErr);
       }
 
-      // ── Service tabs ─────────────────────────────────────────────
-      var view = getRatesView();
-      var activeTab = view.tab || 'all';
-      var tabsBar = el('div', { class: 'qf-tabs' });
-      function tab(id, labelText, count) {
-        var b = el('button', { class: 'qf-tab' + (activeTab === id ? ' active' : ''), text: labelText + ' (' + count + ')' });
-        b.addEventListener('click', function () {
-          view.tab = id; setRatesView(view); renderRates(c);
+      // No modes yet → a clean "pick the modes you run" chooser.
+      if (!runModes.length) {
+        var pick = el('div', { class: 'card', style: { marginTop: '14px', padding: '24px 20px' } });
+        pick.appendChild(el('div', { style: { fontSize: '15px', fontWeight: '800' }, text: 'Which trucking modes do you run?' }));
+        pick.appendChild(el('div', { class: 'muted-small', style: { margin: '6px 0 14px', maxWidth: '520px', lineHeight: '1.5' }, text: 'Pick a mode to set up its rates — each becomes a lane your customers can quote. Or import a rate sheet above and we detect them for you.' }));
+        var pickRow = el('div', { style: { display: 'flex', flexWrap: 'wrap', gap: '8px' } });
+        MODE_DEFS.forEach(function (m) {
+          var b = el('button', { class: 'btn btn-secondary', text: '+ ' + m.label });
+          b.addEventListener('click', function () { startMode(m); });
+          pickRow.appendChild(b);
         });
-        return b;
+        pick.appendChild(pickRow);
+        c.appendChild(pick);
+        syncZonesNav(cards);
+        return;
       }
-      tabsBar.appendChild(tab('all', 'All', d.rateCards.length));
-      SERVICES.forEach(function (s) {
-        var n = d.rateCards.filter(function (r) { return r.service === s; }).length;
-        tabsBar.appendChild(tab(s, s.charAt(0).toUpperCase() + s.slice(1), n));
+
+      // Resolve the active mode from storage, else the first mode they run.
+      var activeMode = null;
+      runModes.forEach(function (m) { if (m.id === view.mode) activeMode = m; });
+      if (!activeMode) activeMode = runModes[0];
+
+      var tabsBar = el('div', { class: 'qf-tabs' });
+      runModes.forEach(function (m) {
+        var b = el('button', { class: 'qf-tab' + (activeMode.id === m.id ? ' active' : ''), text: m.label + ' (' + modeCardCount(m) + ')' });
+        b.addEventListener('click', function () { view.mode = m.id; setRatesView(view); renderRates(c); });
+        tabsBar.appendChild(b);
       });
       c.appendChild(tabsBar);
 
-      // Filter rows by active service tab.
-      var rows = activeTab === 'all'
-        ? d.rateCards
-        : d.rateCards.filter(function (r) { return r.service === activeTab; });
-
-      var tbl = el('table', { class: 'table', style: { marginTop: '12px' } });
-      var thead = el('thead');
-      thead.innerHTML =
-        '<tr><th data-col="service">Service</th><th data-col="equipment">Equipment</th><th data-col="label">Label</th>' +
-        '<th data-col="ratePerMile" style="text-align:right;">$/mi</th><th data-col="minimumCharge" style="text-align:right;">Min</th>' +
-        '<th data-col="flatFee" style="text-align:right;">Flat</th><th data-col="fuelSurchargePct" style="text-align:right;">Fuel %</th>' +
-        '<th data-col="marginPct" style="text-align:right;">Margin %</th><th data-col="enabled">Enabled</th><th></th></tr>';
-      tbl.appendChild(thead);
-
-      var tb = el('tbody');
-      tbl.appendChild(tb);
-      rows.forEach(function (r) {
-        tb.appendChild(rateRow(r));
-      });
-      // Row visibility is now driven only by the single text search
-      // (qf-rate-search-hidden) and the status-chip filter (row.hidden); both
-      // compose as AND. No inline style.display here so they never fight.
-      if (d.rateCards.length) {
-        // Wrap the wide rate grid in a scroll container so the TABLE scrolls
-        // sideways, never the page (rate-builder.css .qf-rate-table-wrap keeps
-        // overflow-x:auto + max-width:100% + min-width:0 at ALL widths). Wrapping
-        // here — rather than relying on rate-builder.js's async enhancer — means
-        // the container is present the instant the table renders, so a slow
-        // enhancer can't leave the desktop table spilling past the page edge.
-        var tblWrap = el('div', { class: 'qf-rate-table-wrap' });
-        tblWrap.appendChild(tbl);
-        c.appendChild(tblWrap);
-      } else {
-        // 0 rate cards used to render a bare header row (looked broken). Show a
-        // friendly empty-state that ties into the modes explanation up top.
-        var emptyRates = el('div', { class: 'card', style: { marginTop: '12px', padding: '28px 20px', textAlign: 'center' } });
-        emptyRates.appendChild(el('div', { style: { fontSize: '15px', fontWeight: '800' }, text: 'No rate cards yet' }));
-        emptyRates.appendChild(el('div', { class: 'muted-small', style: { margin: '6px auto 14px', maxWidth: '440px', lineHeight: '1.5' }, text: 'Fastest way: upload your rate sheet and let AI build these for you. Or add a lane by hand below — each service becomes a trucking mode customers can pick.' }));
-        emptyRates.appendChild(el('a', { href: '/app/ingest', 'data-route': 'ingest', class: 'btn btn-primary', style: { textDecoration: 'none' }, text: 'Import a rate sheet with AI →' }));
-        c.appendChild(emptyRates);
-      }
-
-      // ── Add row ──────────────────────────────────────────────────
-      var addBtn = el('button', { class: 'btn btn-secondary', text: '+ Add rate card', style: { marginTop: '14px' } });
-      addBtn.addEventListener('click', function () {
-        // If a service tab is active, default the new row to that service.
-        var svc = activeTab !== 'all' ? activeTab : 'ftl';
-        api('/api/tenant/rate-cards', {
-          method: 'POST',
-          // Create DISABLED so it never collides with the existing enabled card
-          // for (service, dryvan) — that duplicate-enabled guard 409'd and no row
-          // appeared. The carrier picks equipment + enables it after.
-          body: { service: svc, equipment: 'dryvan', label: 'New rate', ratePerMile: 2.5, enabled: false },
-        }).then(function () { renderRates(c); }).catch(toastErr);
-      });
-      c.appendChild(addBtn);
-
-      // ── LTL pricing (class + weight aware) ───────────────────────
-      if (activeTab === 'all' || activeTab === 'ltl') {
-        (d.rateCards || []).filter(function (r) { return r.service === 'ltl'; }).forEach(function (r) {
-          c.appendChild(ltlPricingEditor(r));
+      // "Also run:" — start a mode not yet set up (keeps the tab bar to only
+      // the modes the carrier actually runs, per the mode-first design).
+      if (offModes.length) {
+        var addModeRow = el('div', { class: 'qf-mode-add' });
+        addModeRow.appendChild(el('span', { class: 'muted-small', text: 'Also run:' }));
+        offModes.forEach(function (m) {
+          var b = el('button', { class: 'btn btn-secondary btn-sm', text: '+ ' + m.label });
+          b.addEventListener('click', function () { startMode(m); });
+          addModeRow.appendChild(b);
         });
+        c.appendChild(addModeRow);
       }
+
+      // ── Active-mode editor ───────────────────────────────────────
+      var editor = el('div', { class: 'qf-mode-editor' });
+      c.appendChild(editor);
+
+      function helpCue(title, bodyHtml) {
+        var det = el('details', { class: 'qf-help-cue' });
+        det.appendChild(el('summary', { 'aria-label': 'Help', title: 'Help', text: '?' }));
+        var body = el('div', { class: 'qf-help-cue-body' });
+        body.appendChild(el('strong', { text: title }));
+        body.appendChild(el('p', { html: bodyHtml }));
+        det.appendChild(body);
+        return det;
+      }
+      function modeHeader(title, sub, help) {
+        var row = el('div', { class: 'qf-mode-head' });
+        if (help) row.appendChild(help);
+        var t = el('div');
+        t.appendChild(el('div', { class: 'qf-mode-head-title', text: title }));
+        if (sub) t.appendChild(el('div', { class: 'muted-small', style: { marginTop: '2px', lineHeight: '1.5' }, text: sub }));
+        row.appendChild(t);
+        return row;
+      }
+      // Build one mode's rate grid: a table with only the columns that mode
+      // uses (+ Enabled + Delete, always) wrapped so the TABLE scrolls, plus an
+      // Add button. Empty modes show a friendly card, not a bare header row.
+      function modeGrid(gridCards, cfg) {
+        var host = el('div');
+        if (gridCards.length) {
+          var wrap = el('div', { class: 'qf-rate-table-wrap' });
+          var tbl = el('table', { class: 'table', style: { marginTop: '12px' } });
+          var thead = el('thead'); thead.innerHTML = rateThead(cfg.cols); tbl.appendChild(thead);
+          var tb = el('tbody'); tbl.appendChild(tb);
+          gridCards.forEach(function (r) { tb.appendChild(rateRow(r, cfg.cols, { equipmentOptions: cfg.equipment, serviceOptions: cfg.serviceOptions })); });
+          wrap.appendChild(tbl); host.appendChild(wrap);
+        } else if (cfg.empty !== false) {
+          var em = el('div', { class: 'card', style: { marginTop: '12px', padding: '20px', textAlign: 'center' } });
+          em.appendChild(el('div', { class: 'muted-small', style: { lineHeight: '1.5', maxWidth: '460px', margin: '0 auto' }, text: cfg.emptyText || 'No rates here yet — add one below, or import a rate sheet above.' }));
+          host.appendChild(em);
+        }
+        var addBtn = el('button', { class: 'btn btn-secondary', text: cfg.addLabel || '+ Add rate', style: { marginTop: '14px' } });
+        addBtn.addEventListener('click', function () {
+          api('/api/tenant/rate-cards', { method: 'POST', body: { service: cfg.addService, equipment: cfg.addEquipment, label: cfg.addCardLabel || 'New rate', ratePerMile: 2.5, enabled: false } })
+            .then(function () { renderRates(c); }).catch(toastErr);
+        });
+        host.appendChild(addBtn);
+        return host;
+      }
+
+      function buildFtlTab(host) {
+        host.appendChild(modeHeader('FTL / Reefer', 'One row per equipment type. Set the loaded $/mile and a minimum charge — fuel & margin apply from the shared settings above.',
+          helpCue('FTL / Reefer rates', 'One row per trailer type (dry van, reefer, flatbed, step deck). <strong>$/mi</strong> is your loaded per-mile rate; <strong>Min</strong> is the floor for short hauls. Edit a cell and click away to save.')));
+        host.appendChild(modeGrid(cards.filter(function (r) { return r.service === 'ftl'; }), {
+          cols: ['equipment', 'label', 'ratePerMile', 'minimumCharge'],
+          equipment: ['dryvan', 'reefer', 'flatbed', 'step_deck', 'conestoga'],
+          serviceOptions: ['ftl'], addService: 'ftl', addEquipment: 'dryvan',
+          addCardLabel: 'FTL rate', addLabel: '+ Add equipment',
+          emptyText: 'No FTL equipment yet — add dry van, reefer, flatbed…',
+        }));
+      }
+
+      function buildExpediteTab(host) {
+        host.appendChild(modeHeader('Hotshot / Expedite', 'One row per vehicle type. Set $/mile, a minimum, and an optional flat dispatch fee.',
+          helpCue('Hotshot / Expedite rates', 'One row per vehicle (sprinter, box truck, tractor-only, flatbed). Set <strong>$/mi</strong>, a <strong>Min</strong> floor, and an optional <strong>Flat</strong> dispatch fee. Use the per-row toggle to split standard Hotshot from time-critical Expedite.')));
+        host.appendChild(modeGrid(cards.filter(function (r) { return r.service === 'hotshot' || r.service === 'expedited'; }), {
+          cols: ['service', 'equipment', 'label', 'ratePerMile', 'minimumCharge', 'flatFee'],
+          equipment: ['sprinter', 'box_truck', 'tractor_only', 'dryvan', 'flatbed', 'step_deck'],
+          serviceOptions: ['hotshot', 'expedited'], addService: 'hotshot', addEquipment: 'sprinter',
+          addCardLabel: 'Hotshot rate', addLabel: '+ Add vehicle',
+          emptyText: 'No hotshot / expedite vehicles yet — add a sprinter, box truck…',
+        }));
+      }
+
+      function buildDrayageTab(host) {
+        host.appendChild(modeHeader('Drayage', 'Price container pulls as flat tariffs by distance band from each port. The per-mile fallback covers moves outside every zone.',
+          helpCue('Drayage rates', 'Drayage is priced as <strong>flat tariffs by distance from a port</strong> (e.g. LAX → 0–50 mi = $475). Add one zone per band below. The optional per-mile fallback prices moves that fall outside every zone.')));
+        // Primary surface: the port-zone flat-price editor (reused verbatim).
+        var zonesHost = el('div', { class: 'qf-drayage-zones' });
+        host.appendChild(zonesHost);
+        buildZonesEditor(zonesHost, { heading: false });
+        // Secondary: per-mile fallback rate cards (outside all zones).
+        var fb = el('details', { class: 'qf-fsc-details', style: { marginTop: '18px' } });
+        var sum = el('summary');
+        sum.appendChild(el('span', { text: 'Per-mile fallback (outside all zones)', style: { fontWeight: '700' } }));
+        fb.appendChild(sum);
+        var fbBody = el('div', { style: { marginTop: '8px' } });
+        fbBody.appendChild(el('p', { class: 'muted-small', style: { margin: '0 0 4px', lineHeight: '1.5' }, text: 'Used only when a move is outside every zone above — rate per loaded mile by container size.' }));
+        fbBody.appendChild(modeGrid(cards.filter(function (r) { return r.service === 'drayage'; }), {
+          cols: ['equipment', 'label', 'ratePerMile', 'minimumCharge'],
+          equipment: ['container_20', 'container_40', 'container_40hc', 'container_45', 'tractor_only'],
+          serviceOptions: ['drayage'], addService: 'drayage', addEquipment: 'container_40',
+          addCardLabel: 'Drayage fallback', addLabel: '+ Add container rate',
+          emptyText: 'No per-mile fallback — the zones above cover your priced moves.',
+        }));
+        fb.appendChild(fbBody);
+        host.appendChild(fb);
+      }
+
+      function buildLtlDiscount(hostEl, r) {
+        var cfg = r.ltlConfig || LTL_DEFAULT_CONFIG;
+        function save(patch) {
+          cfg = Object.assign({}, cfg, patch);
+          api('/api/tenant/rate-cards/' + r.id, { method: 'PUT', body: { ltlConfig: cfg } })
+            .then(function () { toastOk(); }).catch(toastErr);
+        }
+        function field(labelText, hint, value, type, onSave) {
+          var f = el('div', { class: 'field', style: { gap: '2px', marginTop: '8px' } });
+          var lr = el('div', { style: { display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', gap: '12px' } });
+          lr.appendChild(el('label', { class: 'field-label', text: labelText }));
+          if (hint) lr.appendChild(el('span', { class: 'field-hint', text: hint, style: { fontSize: '11px' } }));
+          f.appendChild(lr);
+          var i = el('input', { class: 'input', value: value == null ? '' : value });
+          if (type) i.type = type;
+          if (type === 'number') i.step = '0.5';
+          i.addEventListener('blur', function () {
+            var v = i.value;
+            if (type === 'number') { var n = Number(v); v = (v === '' || !isFinite(n)) ? 0 : n; }
+            onSave(v);
+          });
+          f.appendChild(i);
+          return f;
+        }
+        hostEl.appendChild(field('Base tariff name', 'e.g. SMC3 CzarLite', cfg.baseTariffName, 'text', function (v) { save({ baseTariffName: v }); }));
+        hostEl.appendChild(field('Discount %', 'off the base tariff', cfg.discountPct, 'number', function (v) { save({ discountPct: v }); }));
+        hostEl.appendChild(field('Net rate ($/cwt)', 'your price per 100 lb after discount', cfg.baseRatePerCwt, 'number', function (v) { save({ baseRatePerCwt: v }); }));
+      }
+
+      function buildLtlTab(host) {
+        host.appendChild(modeHeader('LTL', 'Two fast ways to price LTL: upload your tariff, or take a discount off a named base tariff. The class/weight table below is pre-seeded with standard defaults.',
+          helpCue('LTL rates', 'LTL is priced by <strong>freight class</strong> (from weight ÷ size) and weight break — not distance alone. Fastest setup: upload your carrier tariff and we read it, or enter a base tariff + your discount %. The class/weight table uses standard NMFC defaults you can fine-tune.')));
+        var ltlCards = cards.filter(function (r) { return r.service === 'ltl'; });
+        var shortcuts = el('div', { class: 'qf-ltl-shortcuts' });
+        var up = el('div', { class: 'qf-ltl-shortcut' });
+        up.appendChild(el('div', { class: 'qf-ltl-shortcut-title', text: 'Upload your tariff' }));
+        up.appendChild(el('div', { class: 'muted-small', style: { marginTop: '4px', lineHeight: '1.5' }, text: 'PDF, Excel, or a screenshot — the AI reads it straight into rate cards.' }));
+        up.appendChild(el('a', { href: '/app/ingest', 'data-route': 'ingest', class: 'btn btn-primary', style: { marginTop: '10px', textDecoration: 'none' }, text: 'Import a rate sheet →' }));
+        shortcuts.appendChild(up);
+        var disc = el('div', { class: 'qf-ltl-shortcut' });
+        disc.appendChild(el('div', { class: 'qf-ltl-shortcut-title', text: 'Discount off a base tariff' }));
+        if (ltlCards[0]) buildLtlDiscount(disc, ltlCards[0]);
+        else disc.appendChild(el('div', { class: 'muted-small', style: { marginTop: '4px', lineHeight: '1.5' }, text: 'Add an LTL rate below first, then set your base tariff + discount here.' }));
+        shortcuts.appendChild(disc);
+        host.appendChild(shortcuts);
+        // Class/weight multiplier editor (reused), secondary.
+        ltlCards.forEach(function (r) { host.appendChild(ltlPricingEditor(r)); });
+        // Minimal LTL card grid — enable it + set label & minimum.
+        host.appendChild(modeGrid(ltlCards, {
+          cols: ['label', 'minimumCharge'], serviceOptions: ['ltl'],
+          addService: 'ltl', addEquipment: 'pallet', addCardLabel: 'LTL', addLabel: '+ Add LTL rate',
+          emptyText: 'No LTL rate yet — add one to switch LTL on for customers.',
+        }));
+      }
+
+      if (activeMode.id === 'drayage') buildDrayageTab(editor);
+      else if (activeMode.id === 'ltl') buildLtlTab(editor);
+      else if (activeMode.id === 'expedite') buildExpediteTab(editor);
+      else buildFtlTab(editor);
 
       // Adding a drayage card should reveal the Drayage-zones nav item
       // without a reload (add re-renders this page, so this covers it).
-      syncZonesNav(d.rateCards || []);
+      syncZonesNav(cards);
 
       // Copilot form-fill (Phase 2): register the visible rate-card inputs so
       // the AI can prefill a specific card's field ("set the FTL dry van
-      // per-mile to 2.75"). Bulk / global changes still go through the rate
-      // agent's Apply/Discard proposals (the copilot fill flow falls back to it).
+      // per-mile to 2.75"). Scans the whole active-mode editor (multiple grids
+      // can be present, e.g. drayage's fallback under the zones editor).
       (function registerRatesForm() {
-        var byId = {};
-        (rows || []).forEach(function (r) { byId[String(r.id)] = r; });
         var FLABEL = { ratePerMile: '$/mi', minimumCharge: 'Minimum $', flatFee: 'Flat $', fuelSurchargePct: 'Fuel %', marginPct: 'Margin %', label: 'Label' };
-        var specs = $$('input[data-field][data-rate-id]', tbl).map(function (inp) {
+        var specs = $$('input[data-field][data-rate-id]', editor).map(function (inp) {
           var id = inp.dataset.rateId, field = inp.dataset.field;
           var card = byId[id] || {};
           var name = card.label || ((card.service || '') + ' ' + (card.equipment || '')).trim() || ('Rate #' + id);
@@ -1895,8 +2045,35 @@
     return wrap;
   }
 
-  function rateRow(r) {
+  // Column → table-header cell. A mode editor renders only the columns it
+  // needs (rateThead builds the matching <thead>); Enabled + the actions cell
+  // are always appended by rateRow so Delete/Enabled stay on-screen in every
+  // mode (preserves the reachable-columns + 409-revert fixes from #285).
+  var RATE_COL_TH = {
+    service: '<th data-col="service">Service</th>',
+    equipment: '<th data-col="equipment">Equipment</th>',
+    label: '<th data-col="label">Label</th>',
+    ratePerMile: '<th data-col="ratePerMile" style="text-align:right;">$/mi</th>',
+    minimumCharge: '<th data-col="minimumCharge" style="text-align:right;">Min</th>',
+    flatFee: '<th data-col="flatFee" style="text-align:right;">Flat</th>',
+    fuelSurchargePct: '<th data-col="fuelSurchargePct" style="text-align:right;">Fuel %</th>',
+    marginPct: '<th data-col="marginPct" style="text-align:right;">Margin %</th>',
+  };
+  var RATE_COLS_FULL = ['service', 'equipment', 'label', 'ratePerMile', 'minimumCharge', 'flatFee', 'fuelSurchargePct', 'marginPct'];
+  var EQUIP_ALL = ['dryvan', 'reefer', 'flatbed', 'step_deck', 'conestoga', 'container_20', 'container_40', 'container_40hc', 'container_45', 'sprinter', 'box_truck', 'tractor_only', 'pallet'];
+  function rateThead(cols) {
+    return '<tr>' + (cols || RATE_COLS_FULL).map(function (k) { return RATE_COL_TH[k] || ''; }).join('') +
+      '<th data-col="enabled">Enabled</th><th></th></tr>';
+  }
+
+  function rateRow(r, cols, opts) {
+    cols = cols || RATE_COLS_FULL;
+    opts = opts || {};
     var tr = el('tr');
+    // data-rate-id lets the rate-builder.js decorator duplicate a row from the
+    // full card object (window.qfRateCardById) regardless of which columns this
+    // mode shows — so hiding columns never corrupts a duplicate.
+    tr.setAttribute('data-rate-id', String(r.id));
     // data-label drives the mobile card reflow (rate-builder.css ≤640px):
     // each cell's column header is shown as an inline label via ::before.
     function inputCell(field, val, opts) {
@@ -1936,6 +2113,7 @@
     function selectCell(field, val, options, label) {
       var sel = el('select', { class: 'select' });
       sel.style.width = '120px';
+      sel.dataset.field = field; // lets the decorator read service/equipment by name
       options.forEach(function (o) { var op = document.createElement('option'); op.value = o; op.textContent = o; if (val === o) op.selected = true; sel.appendChild(op); });
       sel.addEventListener('change', function () {
         var p = {}; p[field] = sel.value;
@@ -1947,17 +2125,20 @@
       if (label) td.dataset.label = label;
       return td;
     }
-    tr.appendChild(selectCell('service', r.service, ['drayage', 'ftl', 'ltl', 'expedited', 'hotshot'], 'Service'));
-    tr.appendChild(selectCell('equipment', r.equipment, [
-      'dryvan', 'reefer', 'flatbed', 'step_deck', 'conestoga',
-      'container_20', 'container_40', 'container_40hc', 'container_45',
-      'sprinter', 'box_truck', 'tractor_only', 'pallet'], 'Equipment'));
-    tr.appendChild(inputCell('label', r.label, { w: '160px', label: 'Label' }));
-    tr.appendChild(inputCell('ratePerMile', r.ratePerMile, { type: 'number', step: '0.01', right: true, w: '80px', label: '$/mi', disabled: r.service === 'ltl', disabledPlaceholder: 'class', disabledTitle: 'LTL is priced by freight class and weight (set it in “LTL pricing” below), not $/mile.' }));
-    tr.appendChild(inputCell('minimumCharge', r.minimumCharge, { type: 'number', step: '1', right: true, w: '80px', label: 'Min' }));
-    tr.appendChild(inputCell('flatFee', r.flatFee, { type: 'number', step: '1', right: true, w: '80px', label: 'Flat' }));
-    tr.appendChild(inputCell('fuelSurchargePct', r.fuelSurchargePct, { type: 'number', step: '0.5', right: true, w: '70px', label: 'Fuel %' }));
-    tr.appendChild(inputCell('marginPct', r.marginPct, { type: 'number', step: '0.5', right: true, w: '70px', label: 'Margin %' }));
+    // Per-column cell builders. A mode editor passes only the columns it uses
+    // (e.g. FTL shows equipment/$-mi/min; the service select is dropped because
+    // the tab already fixes the mode).
+    var build = {
+      service: function () { return selectCell('service', r.service, opts.serviceOptions || ['drayage', 'ftl', 'ltl', 'expedited', 'hotshot'], 'Service'); },
+      equipment: function () { return selectCell('equipment', r.equipment, opts.equipmentOptions || EQUIP_ALL, 'Equipment'); },
+      label: function () { return inputCell('label', r.label, { w: '160px', label: 'Label' }); },
+      ratePerMile: function () { return inputCell('ratePerMile', r.ratePerMile, { type: 'number', step: '0.01', right: true, w: '80px', label: '$/mi', disabled: r.service === 'ltl', disabledPlaceholder: 'class', disabledTitle: 'LTL is priced by freight class and weight (set it in “LTL pricing” below), not $/mile.' }); },
+      minimumCharge: function () { return inputCell('minimumCharge', r.minimumCharge, { type: 'number', step: '1', right: true, w: '80px', label: 'Min' }); },
+      flatFee: function () { return inputCell('flatFee', r.flatFee, { type: 'number', step: '1', right: true, w: '80px', label: 'Flat' }); },
+      fuelSurchargePct: function () { return inputCell('fuelSurchargePct', r.fuelSurchargePct, { type: 'number', step: '0.5', right: true, w: '70px', label: 'Fuel %' }); },
+      marginPct: function () { return inputCell('marginPct', r.marginPct, { type: 'number', step: '0.5', right: true, w: '70px', label: 'Margin %' }); },
+    };
+    cols.forEach(function (k) { if (build[k]) tr.appendChild(build[k]()); });
     var chk = el('input', { type: 'checkbox' });
     chk.checked = r.enabled;
     var enabledCell = el('td', { 'data-label': 'Enabled' }, [chk]);
@@ -2235,17 +2416,26 @@
   }
 
   // ── Lane zones ────────────────────────────────────────────────
-  function renderZones(c) {
+  // Thin route wrapper — the standalone Drayage-zones page. The editor body is
+  // factored into buildZonesEditor so the Drayage MODE TAB can embed the very
+  // same zones surface (reuse, not rebuild).
+  function renderZones(c) { return buildZonesEditor(c, { heading: true }); }
+  function buildZonesEditor(c, opts) {
+    opts = opts || {};
     api('/api/tenant/lane-zones').then(function (d) {
       c.innerHTML = '';
-      c.appendChild(el('h1', { text: 'Drayage zones' }));
-      c.appendChild(el('p', { class: 'page-sub', text: 'Flat prices for pulling containers within a radius of a port. Only needed if you quote drayage / port-rail work — you can skip this otherwise.' }));
+      if (opts.heading) {
+        c.appendChild(el('h1', { text: 'Drayage zones' }));
+        c.appendChild(el('p', { class: 'page-sub', text: 'Flat prices for pulling containers within a radius of a port. Only needed if you quote drayage / port-rail work — you can skip this otherwise.' }));
+      }
       if (d.laneZones.length) {
         // qf-leads-table gives the ≤480px stacked-card reflow; the zone rows
         // already carry data-label on each cell, so on a phone the price, the
         // enabled toggle and delete stop hiding behind the shared .table
         // sideways scroll (they were off-screen at 375px).
-        var tbl = el('table', { class: 'table qf-leads-table qf-zones-table' });
+        // data-qf-norate keeps the rate-cards decorators (duplicate/status/
+        // search) off the zones grid when it's embedded on the Rate-cards page.
+        var tbl = el('table', { class: 'table qf-leads-table qf-zones-table', 'data-qf-norate': '1' });
         tbl.innerHTML = '<thead><tr><th>Label</th><th>Port</th><th>Radius (mi)</th><th>Flat $</th><th>Enabled</th><th></th></tr></thead><tbody></tbody>';
         var tb = $('tbody', tbl);
         d.laneZones.forEach(function (z) { tb.appendChild(zoneRow(z)); });
@@ -2354,7 +2544,7 @@
         }).then(function () {
           resetForm();
           closeForm();
-          renderZones(c);
+          buildZonesEditor(c, opts);
         }).catch(toastErr);
       }
       saveBtn.addEventListener('click', submitForm);

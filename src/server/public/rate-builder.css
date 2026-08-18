@@ -427,3 +427,54 @@
   .qf-addons-searchbar { grid-template-columns: 1fr; }
   .qf-addons-search-count { justify-self: start; }
 }
+
+/* ── Mode-first rate cards: the switcher shell + per-mode editors ─────────
+   The tab bar (.qf-tabs) is now a mode switcher (Drayage / FTL / LTL /
+   Hotshot). "Also run:" starts a mode the carrier doesn't yet run; the editor
+   below is a purpose-built surface for the active mode. Tokens only — keeps
+   check-hardcoded-colors baselines stable and stays theme-aware. */
+.qf-mode-add {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  margin: 12px 0 0;
+}
+.qf-mode-editor { margin-top: 16px; }
+/* Section header: help cue pinned TOP-LEFT (single ? disclosure), title right
+   of it — matches the one-help-affordance rule used across the rate page. */
+.qf-mode-head {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  margin: 0 0 12px;
+}
+.qf-mode-head-title {
+  font-size: 16px;
+  font-weight: 800;
+  letter-spacing: -.02em;
+  color: var(--ink);
+}
+.qf-drayage-zones { margin-top: 4px; }
+/* LTL fast-start: two equal shortcut cards (upload tariff · discount off a
+   base tariff), stacking to one column on a phone. */
+.qf-ltl-shortcuts {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 12px;
+  margin: 4px 0 12px;
+}
+.qf-ltl-shortcut {
+  border: 1px solid var(--border);
+  border-radius: 16px;
+  background: var(--surface);
+  padding: 16px;
+}
+.qf-ltl-shortcut-title {
+  font-size: 14px;
+  font-weight: 800;
+  color: var(--ink);
+}
+@media (max-width: 640px) {
+  .qf-ltl-shortcuts { grid-template-columns: 1fr; }
+}

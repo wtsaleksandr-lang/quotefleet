@@ -13,7 +13,7 @@
 
   function rows(root) {
     if (!isRates()) return [];
-    var table = one('table.table', root);
+    var table = one('table.table:not([data-qf-norate])', root);
     if (!table) return [];
     return all('tbody tr', table).filter(function (row) { return row.children.length > 0; });
   }
@@ -53,18 +53,19 @@
     if (!isRates()) return;
     var root = one('#page-content');
     if (!root || root.dataset.qfRateSearch === '1') return;
-    var table = one('table.table', root);
+    var table = one('table.table:not([data-qf-norate])', root);
     var list = rows(root);
     if (!table || !list.length) return;
 
-    root.dataset.qfRateSearch = '1';
     root.classList.add('qf-rate-card-search-page');
+    root.dataset.qfRateSearch = '1';
 
+    var wrap = table.closest('.qf-rate-table-wrap') || table;
     var section = document.createElement('section');
     section.className = 'qf-rate-searchbar';
     section.innerHTML = '<label><span>Search rate cards</span><input type="search" placeholder="Search service, lane, equipment, price…"></label><b class="qf-rate-search-count">' + list.length + ' visible</b>';
 
-    table.insertAdjacentElement('beforebegin', section);
+    wrap.insertAdjacentElement('beforebegin', section);
 
     var input = one('input', section);
     input.addEventListener('input', function () { applySearch(root, input.value); });

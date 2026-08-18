@@ -11,7 +11,9 @@
   }
 
   function rows() {
-    return Array.from(content.querySelectorAll('tbody tr'));
+    // Skip non-rate grids embedded on the Rate-cards page (e.g. the Drayage
+    // zones table on the Drayage mode tab is tagged [data-qf-norate]).
+    return Array.from(content.querySelectorAll('tbody tr')).filter((tr) => !tr.closest('[data-qf-norate]'));
   }
 
   function rowText(row) {
@@ -33,7 +35,7 @@
   }
 
   function tableWrap() {
-    const table = content.querySelector('.table');
+    const table = content.querySelector('.table:not([data-qf-norate])');
     if (!table || table.closest('.qf-rate-table-wrap')) return;
     const wrap = document.createElement('div');
     wrap.className = 'qf-rate-table-wrap';
@@ -199,7 +201,22 @@
   }
 
   function duplicateRate(row, button) {
-    const body = readRateRow(row);
+    // Prefer the full card object (app.js exposes it as window.qfRateCardById)
+    // so a duplicate copies every field even when the mode editor only shows a
+    // few columns; fall back to reading the visible cells positionally.
+    const id = row.getAttribute('data-rate-id');
+    const src = id && window.qfRateCardById ? window.qfRateCardById[id] : null;
+    const body = src ? {
+      service: src.service,
+      equipment: src.equipment,
+      label: (src.label || (src.service + ' ' + src.equipment)) + ' copy',
+      ratePerMile: src.ratePerMile || 0,
+      minimumCharge: src.minimumCharge || 0,
+      flatFee: src.flatFee || 0,
+      fuelSurchargePct: src.fuelSurchargePct || 0,
+      marginPct: src.marginPct || 0,
+      enabled: false,
+    } : readRateRow(row);
     const old = button.textContent;
     button.disabled = true;
     button.textContent = 'Copying…';
