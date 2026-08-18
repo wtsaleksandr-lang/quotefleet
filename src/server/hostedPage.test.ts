@@ -48,10 +48,26 @@ describe('renderHostedPage — calculator centrepiece', () => {
     // Scope element assertions to the server-rendered DOM — the live-preview
     // script below it legitimately contains these fragments as JS templates.
     const dom = html.slice(0, html.indexOf('<script>'));
-    expect(dom).toContain('qf-hp-head is-empty');
-    expect(dom).not.toContain('<h1 class="qf-hp-headline"');
+    // No carrier headline → a company-derived default fills it (never blank),
+    // but with no supporting blocks it stays a single centred column.
+    expect(dom).toContain('<h1 class="qf-hp-headline">');
     expect(dom).not.toContain('<figure class="qf-hp-rev"');
     expect(dom).not.toContain('<a class="qf-hp-cta');
+  });
+
+  it('synthesises a company-derived default headline when none is set', () => {
+    const html = renderHostedPage({ tenant: TENANT, brand: null, calcSrc: CALC_SRC });
+    // Never a blank or raw placeholder — a clean default built from the company.
+    expect(html).toContain('Instant freight quotes from Harbor Link Logistics');
+    // …but the carrier's own headline always wins when present.
+    const custom = renderHostedPage({
+      tenant: TENANT,
+      brand: brandWith({ hostedHeadline: 'Our own words' }),
+      calcSrc: CALC_SRC,
+    });
+    const dom = custom.slice(0, custom.indexOf('<script>'));
+    expect(dom).toContain('<h1 class="qf-hp-headline">Our own words</h1>');
+    expect(dom).not.toContain('Instant freight quotes from Harbor Link Logistics');
   });
 
   it('stays single-column centred when ONLY a headline is set (no rich hero)', () => {
@@ -71,6 +87,48 @@ describe('renderHostedPage — calculator centrepiece', () => {
     // … but no rich hero content exists to justify the side-by-side layout.
     expect(dom).not.toContain('<figure class="qf-hp-rev"');
     expect(dom).not.toContain('<a class="qf-hp-cta');
+  });
+
+  it('stays single-column with only a headline + subhead (one thin block)', () => {
+    // A lone subhead is a single supporting block — too thin to fill the left
+    // column beside a tall widget. It must NOT go two-column: that is exactly
+    // the sparse "empty left" bug (#277 missed the lone-subhead case).
+    const html = renderHostedPage({
+      tenant: TENANT,
+      brand: brandWith({ hostedHeadline: 'Test headline', hostedSubhead: 'We move freight fast.' }),
+      calcSrc: CALC_SRC,
+    });
+    expect(html).toContain('<body class="qf-hp--bare"');
+    const dom = html.slice(0, html.indexOf('<script>'));
+    expect(dom).toContain('We move freight fast.');
+  });
+
+  it('keeps a lone badge row or lone CTA row centred (single supporting block)', () => {
+    const badgesOnly = renderHostedPage({
+      tenant: TENANT,
+      brand: brandWith({ hostedTrustBadges: true }),
+      calcSrc: CALC_SRC,
+    });
+    expect(badgesOnly).toContain('<body class="qf-hp--bare"');
+    const ctasOnly = renderHostedPage({
+      tenant: TENANT,
+      brand: brandWith({ hostedCtasJson: [{ label: 'Call', type: 'call', value: '5551234' }] }),
+      calcSrc: CALC_SRC,
+    });
+    expect(ctasOnly).toContain('<body class="qf-hp--bare"');
+  });
+
+  it('splits into two columns once TWO supporting blocks exist (subhead + badges)', () => {
+    const html = renderHostedPage({
+      tenant: TENANT,
+      brand: brandWith({
+        hostedHeadline: 'Test headline',
+        hostedSubhead: 'Fast freight.',
+        hostedTrustBadges: true,
+      }),
+      calcSrc: CALC_SRC,
+    });
+    expect(html).not.toContain('<body class="qf-hp--bare"');
   });
 });
 

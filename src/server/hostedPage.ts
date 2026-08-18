@@ -310,8 +310,15 @@ export function renderHostedPage(opts: RenderHostedPageOpts): string {
   const preset = HOSTED_BG_PRESETS.find((p) => p.id === presetId) ?? HOSTED_BG_PRESETS[0];
   const presetBg = pageTheme === 'light' ? preset.light : preset.dark;
 
-  const company = esc(brand?.displayName || tenant.name || 'Instant freight quotes');
-  const headline = (brand?.hostedHeadline || '').trim();
+  const companyName = (brand?.displayName || tenant.name || '').trim();
+  const company = esc(companyName || 'Instant freight quotes');
+  // FIX B — the hosted hero must never show a blank or a raw placeholder title.
+  // When the carrier hasn't set a headline, synthesise a clean, professional
+  // default from their company name. The carrier's own headline always wins.
+  const defaultHeadline = companyName
+    ? `Instant freight quotes from ${companyName}`
+    : 'Instant freight quotes';
+  const headline = (brand?.hostedHeadline || '').trim() || defaultHeadline;
   const subhead = (brand?.hostedSubhead || '').trim();
   const badges = computeTrustBadges(tenant, brand?.hostedTrustBadges);
   const testimonials = normalizeTestimonials(brand?.hostedTestimonialsJson);
@@ -319,14 +326,25 @@ export function renderHostedPage(opts: RenderHostedPageOpts): string {
   const heroImg = bg.imageUrl || '';
   const scrim = typeof bg.scrim === 'number' ? bg.scrim : 55;
 
-  // A lone headline does NOT justify the side-by-side hero. Only "rich" hero
-  // content — a subhead, trust badges, testimonials, or CTAs — fills a left
-  // column enough to balance the widget on the right. With just a headline (or
-  // nothing) the two-column layout leaves a stranded headline beside an empty
-  // gutter, so we fall back to a single, CENTERED column (headline centred
-  // above the widget). See body class + `.qf-hp--bare` grid below.
-  const hasRichHero =
-    !!subhead || badges.length > 0 || testimonials.length > 0 || ctas.length > 0;
+  // FIX A — two-column hero (copy LEFT, widget RIGHT) vs a single CENTERED
+  // column (copy centred ABOVE the widget).
+  //
+  // The headline is NOT counted: one line can never fill a hero column, so a
+  // headline alone — OR a headline plus a single thin block (a lone subhead, a
+  // lone badge row, a lone button row) — still strands the left side next to a
+  // ~620px-tall widget. That sparse "empty left" is the bug (#277 only caught
+  // the truly-empty/headline-only case, not a lone subhead/badge/CTA). We now
+  // require at least TWO distinct supporting blocks among {subhead, trust
+  // badges, testimonials, CTAs} before splitting; with fewer, everything
+  // centres. A big empty left column is thus impossible: the left is either
+  // genuinely populated (2+ blocks) or nothing sits beside the widget at all.
+  // Mirrored verbatim in the client render() below.
+  const richSignals =
+    (subhead ? 1 : 0) +
+    (badges.length > 0 ? 1 : 0) +
+    (testimonials.length > 0 ? 1 : 0) +
+    (ctas.length > 0 ? 1 : 0);
+  const hasRichHero = richSignals >= 2;
 
   // Body background: hero image (with scrim) wins; else the preset backdrop.
   const scrimAlpha = Math.max(0, Math.min(100, scrim)) / 100;
@@ -388,6 +406,7 @@ export function renderHostedPage(opts: RenderHostedPageOpts): string {
   // edits re-render identically in the portal live preview).
   const hpState = {
     headline,
+    defaultHeadline,
     subhead,
     trustBadges: !!brand?.hostedTrustBadges,
     dot: (tenant.dotNumber || '').trim(),
@@ -446,12 +465,18 @@ export function renderHostedPage(opts: RenderHostedPageOpts): string {
       grid-template-areas: "head calc" "badges calc" "revs calc" "ctas calc";
       align-items: start;
     }
-    /* No rich hero content -> a single, CENTERED column: the headline (if any)
-       sits centred ABOVE the widget, never stranded beside an empty gutter. An
-       empty head collapses (.qf-hp-head.is-empty), leaving just the widget. */
-    body.qf-hp--bare .qf-hp-grid { grid-template-columns: minmax(0, 560px); grid-template-rows: auto auto; grid-template-areas: "head" "calc"; justify-content: center; }
+    /* Fewer than two supporting blocks -> a single, CENTERED column: the
+       headline sits centred ABOVE the widget, never stranded beside an empty
+       gutter. Any lone supporting block that can still reach this path (a
+       subhead, a badge row, or a CTA row — testimonials always push to two
+       columns) is centred too, so nothing hangs to one side. An empty head
+       collapses (.qf-hp-head.is-empty), leaving just the widget. */
+    body.qf-hp--bare .qf-hp-grid { grid-template-columns: minmax(0, 560px); grid-template-rows: none; grid-template-areas: "head" "badges" "revs" "ctas" "calc"; justify-content: center; }
     body.qf-hp--bare .qf-hp-head { text-align: center; }
     body.qf-hp--bare .qf-hp-headline { margin-bottom: 0; }
+    body.qf-hp--bare .qf-hp-subhead { margin-left: auto; margin-right: auto; }
+    body.qf-hp--bare .qf-hp-badges,
+    body.qf-hp--bare .qf-hp-ctas { justify-content: center; }
     .qf-hp-head { grid-area: head; }
     .qf-hp-head.is-empty { display: none; }
     .qf-hp-badges { grid-area: badges; display: flex; flex-wrap: wrap; gap: 8px; }
@@ -599,9 +624,12 @@ export function renderHostedPage(opts: RenderHostedPageOpts): string {
     function render(){
       // headline / subhead
       var head = q('[data-hp="head"]');
-      var hasHead = HP.headline || HP.subhead;
+      // FIX B mirror: fall back to the company-derived default when the carrier
+      // clears the headline, so the live preview never blanks out either.
+      var headline = HP.headline || HP.defaultHeadline || '';
+      var hasHead = headline || HP.subhead;
       head.classList.toggle('is-empty', !hasHead);
-      head.innerHTML = (HP.headline ? '<h1 class="qf-hp-headline">' + esc(HP.headline) + '</h1>' : '')
+      head.innerHTML = (headline ? '<h1 class="qf-hp-headline">' + esc(headline) + '</h1>' : '')
         + (HP.subhead ? '<p class="qf-hp-subhead">' + esc(HP.subhead) + '</p>' : '');
       // badges
       var badges = computeBadges();
@@ -632,10 +660,12 @@ export function renderHostedPage(opts: RenderHostedPageOpts): string {
         var href = (c.value && String(c.value).trim()) ? ctaHref(c) : '#';
         return '<a class="qf-hp-cta' + (i===0?' is-primary':'') + '" href="' + esc(href) + '"' + tgt + '>' + esc(label) + '</a>';
       }).join('');
-      // bare (single centred column) vs two-column hero. A lone headline does
-      // NOT justify the side-by-side layout — only rich content (subhead /
-      // badges / testimonials / CTAs) does. Mirrors hasRichHero server-side.
-      var hasRichHero = !!HP.subhead || badges.length || revs.length || ctas.length;
+      // bare (single centred column) vs two-column hero. The headline never
+      // counts, and a single thin block can't fill the left column, so we need
+      // at least TWO supporting blocks among {subhead, badges, testimonials,
+      // CTAs} before splitting. Mirrors hasRichHero (richSignals>=2) server-side.
+      var richSignals = (HP.subhead ? 1 : 0) + (badges.length ? 1 : 0) + (revs.length ? 1 : 0) + (ctas.length ? 1 : 0);
+      var hasRichHero = richSignals >= 2;
       body.classList.toggle('qf-hp--bare', !hasRichHero);
       applyBackground();
       reportHeight();
