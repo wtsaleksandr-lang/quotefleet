@@ -353,3 +353,77 @@
   .qf-rate-table-wrap tbody td:last-child::before { display: none; }
   .qf-rate-table-wrap tbody td:last-child .btn { flex: 1 1 auto; }
 }
+
+/* ── Rate grid: fit its container at desktop widths so the ENABLED checkbox
+   and the Delete action are always reachable without horizontal scrolling.
+   They previously sat past the right edge because the table grew to its
+   intrinsic ~1150–1413px via `width:max-content` (set earlier in this file);
+   this later, equal-specificity rule wins at desktop widths and lets the
+   inputs shrink to share the row instead of forcing a wide table. Scoped to
+   ≥641px so the ≤640 stacked-card reflow above is untouched. Appended at EOF
+   to keep the spacing/color guard line-based baselines stable. ──────────── */
+@media (min-width: 641px) {
+  .qf-rate-table-wrap .table { width: 100%; }
+  .qf-rate-table-wrap tbody td .input,
+  .qf-rate-table-wrap tbody td select {
+    width: 100% !important;
+    min-width: 0;
+  }
+}
+
+/* Inline reason shown by a rate row when toggling ENABLED is rejected (409:
+   another enabled card already covers this service+equipment). Reverts the box
+   and explains why, so the toggle is never a silent no-op. */
+.qf-rate-enabled-err {
+  display: block;
+  width: 100%;
+  margin-top: 8px;
+  color: var(--danger);
+  font-size: 12px;
+  line-height: 1.45;
+}
+
+/* ── Add-ons page search (mirrors the rate-cards / lead-queue portal search).
+   Global file, but .qf-addons-searchbar only renders on the Add-ons editor. */
+.qf-addons-searchbar {
+  display: grid;
+  grid-template-columns: minmax(240px, 1fr) auto;
+  gap: 12px;
+  align-items: center;
+  margin: 0 0 16px;
+  padding: 12px;
+  border: 1px solid var(--border);
+  border-radius: 16px;
+  background: rgba(255, 255, 255, .024);
+}
+.qf-addons-searchbar label { display: grid; gap: 4px; }
+.qf-addons-searchbar label span { color: var(--muted); font-size: 12px; }
+.qf-addons-searchbar input {
+  width: 100%;
+  border: 1px solid var(--border-strong);
+  border-radius: 999px;
+  background: var(--surface-2);
+  color: var(--ink);
+  padding: 12px 16px;
+  font-size: 13.5px;
+  outline: none;
+}
+.qf-addons-searchbar input:focus {
+  border-color: var(--accent);
+  box-shadow: 0 0 0 4px var(--accent-soft);
+}
+.qf-addons-search-count {
+  justify-self: end;
+  border: 1px solid var(--border-strong);
+  border-radius: 999px;
+  background: var(--accent-soft);
+  color: var(--accent);
+  padding: 8px 12px;
+  font-size: 12px;
+  white-space: nowrap;
+}
+.qf-addons-nomatch { margin-top: 4px; }
+@media (max-width: 560px) {
+  .qf-addons-searchbar { grid-template-columns: 1fr; }
+  .qf-addons-search-count { justify-self: start; }
+}

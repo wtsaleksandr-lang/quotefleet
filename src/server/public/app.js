@@ -1960,8 +1960,25 @@
     tr.appendChild(inputCell('marginPct', r.marginPct, { type: 'number', step: '0.5', right: true, w: '70px', label: 'Margin %' }));
     var chk = el('input', { type: 'checkbox' });
     chk.checked = r.enabled;
-    chk.addEventListener('change', function () { api('/api/tenant/rate-cards/' + r.id, { method: 'PUT', body: { enabled: chk.checked } }).catch(toastErr); });
-    tr.appendChild(el('td', { 'data-label': 'Enabled' }, [chk]));
+    var enabledCell = el('td', { 'data-label': 'Enabled' }, [chk]);
+    var enabledErr = null; // inline reason shown when the toggle is rejected
+    chk.addEventListener('change', function () {
+      var next = chk.checked;
+      if (enabledErr) { enabledErr.remove(); enabledErr = null; }
+      api('/api/tenant/rate-cards/' + r.id, { method: 'PUT', body: { enabled: next } })
+        .then(function () { r.enabled = next; })
+        .catch(function (err) {
+          // The server 409s when another ENABLED card already exists for this
+          // (service, equipment). Don't leave the box checked on a write that
+          // never persisted — revert to the last known-good state and surface
+          // the reason inline by the row so it isn't a silent no-op.
+          chk.checked = r.enabled;
+          enabledErr = el('div', { class: 'qf-rate-enabled-err', text: (err && err.message) || 'Could not change this setting.' });
+          enabledCell.appendChild(enabledErr);
+          toastErr(err);
+        });
+    });
+    tr.appendChild(enabledCell);
     var del = el('button', { class: 'btn btn-danger btn-sm', text: 'Delete' });
     del.addEventListener('click', function () {
       if (!confirm('Delete rate card "' + (r.label || r.equipment) + '"?')) return;
@@ -2091,6 +2108,21 @@
           .catch(toastErr);
       });
 
+      // ── Search: filter the add-on cards client-side by name as the user
+      // types. Mirrors the rate-cards / lead-queue portal search. Only shown
+      // when there is something to filter. ────────────────────────
+      var searchInput = null, searchCount = null, noMatch = null;
+      if (list.length) {
+        var searchBar = el('section', { class: 'qf-addons-searchbar' });
+        var searchLabel = el('label', null, [el('span', { text: 'Search add-ons' })]);
+        searchInput = el('input', { type: 'search', placeholder: 'Search add-ons by name…', 'aria-label': 'Search add-ons by name' });
+        searchLabel.appendChild(searchInput);
+        searchCount = el('b', { class: 'qf-addons-search-count', text: list.length + ' shown' });
+        searchBar.appendChild(searchLabel);
+        searchBar.appendChild(searchCount);
+        root.appendChild(searchBar);
+      }
+
       // ── List of the tenant's add-ons ────────────────────────────
       var listWrap = el('div', { class: 'qf-addons-list' });
       if (!list.length) {
@@ -2099,6 +2131,30 @@
         list.forEach(function (a) { listWrap.appendChild(addonCard(a, c)); });
       }
       root.appendChild(listWrap);
+
+      if (searchInput) {
+        searchInput.addEventListener('input', function () {
+          // Match against each card's live name field (the card renders the
+          // label as an <input value>, so its text isn't in textContent).
+          var q = searchInput.value.trim().toLowerCase();
+          var shown = 0;
+          $$('.qf-addon-card', listWrap).forEach(function (card) {
+            var nameInp = $('.qf-addon-name', card);
+            var hay = ((nameInp && nameInp.value) || '').toLowerCase();
+            var match = !q || hay.indexOf(q) >= 0;
+            card.hidden = !match;
+            if (match) shown++;
+          });
+          searchCount.textContent = shown + ' shown';
+          if (!shown && q) {
+            if (!noMatch) { noMatch = el('div', { class: 'qf-addons-empty qf-addons-nomatch' }); listWrap.appendChild(noMatch); }
+            noMatch.textContent = 'No add-ons match “' + q + '”.';
+            noMatch.hidden = false;
+          } else if (noMatch) {
+            noMatch.hidden = true;
+          }
+        });
+      }
     }).catch(showErr(c));
   }
 

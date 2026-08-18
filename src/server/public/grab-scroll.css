@@ -12,11 +12,42 @@
   cursor: grab;
 }
 
-/* Controls keep their normal cursor. :where() = 0 specificity, so any explicit
-   cursor rule (e.g. buttons/links set to pointer) still wins over `grab`. */
+/* Controls and content keep a correct, native-feeling cursor and OUT-SPECIFY
+   the surface's `grab` — each selector below is ≥ .qf-grab-surface's (0,1,0)
+   specificity, so a bare `.qf-grab-surface { cursor: grab }` on .app-main no
+   longer bleeds the palm cursor onto controls. `grab` now only reads over
+   genuine empty background. Clickables → pointer; text entry → text; table
+   cells + passive containers → auto. Disabled inputs keep their inline
+   `not-allowed` (inline style beats every rule here). */
+.qf-grab-surface button,
+.qf-grab-surface select,
+.qf-grab-surface a,
+.qf-grab-surface label,
+.qf-grab-surface summary,
+.qf-grab-surface [role="tab"],
+.qf-grab-surface [role="button"],
+.qf-grab-surface input[type="checkbox"],
+.qf-grab-surface input[type="radio"] {
+  cursor: pointer;
+}
+.qf-grab-surface input:not([type]),
+.qf-grab-surface input[type="text"],
+.qf-grab-surface input[type="number"],
+.qf-grab-surface input[type="email"],
+.qf-grab-surface input[type="search"],
+.qf-grab-surface input[type="password"],
+.qf-grab-surface input[type="tel"],
+.qf-grab-surface input[type="url"],
+.qf-grab-surface textarea,
+.qf-grab-surface [contenteditable] {
+  cursor: text;
+}
+/* Table cells + passive containers: native default, never the grab palm.
+   (grab-scroll.js already excludes td/th from the drag gesture.) */
+.qf-grab-surface td,
+.qf-grab-surface th,
 .qf-grab-surface :where(
-  input, textarea, select, button, a, label,
-  [contenteditable], [role="slider"], [role="tab"],
+  [role="slider"],
   .qf-tabs, .qf-tabs-ind, .qf-map, .qf-map-card, .qf-map-canvas,
   .qf-modal, .qf-modal-card, [data-no-grabscroll]
 ) {
