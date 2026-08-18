@@ -898,3 +898,42 @@
   border-bottom: 1px dashed var(--border);
 }
 
+
+/* ══════════════════════════════════════════════════════════════════════════
+   INTENTIONAL MOBILE-DEVICE PREVIEW (≥901px) — the 390px phone-width widget
+   previously floated in a wide, empty pane ("a straw in empty space"): the
+   desktop preview PANE is transparent/borderless (block above), so the centred
+   390px column sat surrounded by dead gutter that read as a bug. Present it as
+   a DELIBERATE, centred phone preview instead:
+     · the pane gains a SUBTLE device backdrop (soft inset surface tone) only
+       while the mobile device is showing, so the surrounding space reads as
+       intentional framing, not empty; and
+     · the mobile frame gets a LIGHT phone chrome — a thin rounded device edge
+       + a touch more elevation (NOT a chunky skeuomorphic bezel) — so it
+       obviously reads as a phone sitting on that backdrop.
+   Scoped with :has() so it applies ONLY in mobile-device mode; the desktop
+   device view (borderless scaled hosted, #272) is untouched. The base
+   data-device="mobile" 390px cap + centring still holds. Appended at EOF so
+   the line-based spacing/colour baselines never renumber. Tokens + 8px ramp
+   only; theme-aware (light + dark via style.css variables).
+   ══════════════════════════════════════════════════════════════════════════ */
+@media (min-width: 901px) {
+  /* Subtle device backdrop, only while the mobile phone preview is showing, so
+     the gutter around the 390px column reads as intentional framing. */
+  .qf-cz-preview:has(.qf-cz-frame-wrap[data-device="mobile"]) {
+    background: var(--surface-2);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-lg);
+    box-shadow: inset 0 1px 0 var(--border);
+    padding: 24px 16px;
+  }
+  /* Light phone chrome around the mobile widget — a thin rounded device edge,
+     not a heavy bezel — plus a little more elevation so it lifts off the
+     backdrop and clearly reads as a phone. */
+  .qf-cz-preview:has(.qf-cz-frame-wrap[data-device="mobile"]) .qf-cz-frame-wrap[data-device="mobile"] {
+    border: 1px solid var(--border-strong);
+    border-radius: var(--radius-xl);
+    box-shadow: var(--shadow-md);
+    background: var(--surface);
+  }
+}

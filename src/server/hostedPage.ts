@@ -319,8 +319,14 @@ export function renderHostedPage(opts: RenderHostedPageOpts): string {
   const heroImg = bg.imageUrl || '';
   const scrim = typeof bg.scrim === 'number' ? bg.scrim : 55;
 
-  const hasAside =
-    !!headline || !!subhead || badges.length > 0 || testimonials.length > 0 || ctas.length > 0;
+  // A lone headline does NOT justify the side-by-side hero. Only "rich" hero
+  // content — a subhead, trust badges, testimonials, or CTAs — fills a left
+  // column enough to balance the widget on the right. With just a headline (or
+  // nothing) the two-column layout leaves a stranded headline beside an empty
+  // gutter, so we fall back to a single, CENTERED column (headline centred
+  // above the widget). See body class + `.qf-hp--bare` grid below.
+  const hasRichHero =
+    !!subhead || badges.length > 0 || testimonials.length > 0 || ctas.length > 0;
 
   // Body background: hero image (with scrim) wins; else the preset backdrop.
   const scrimAlpha = Math.max(0, Math.min(100, scrim)) / 100;
@@ -440,7 +446,12 @@ export function renderHostedPage(opts: RenderHostedPageOpts): string {
       grid-template-areas: "head calc" "badges calc" "revs calc" "ctas calc";
       align-items: start;
     }
-    body.qf-hp--bare .qf-hp-grid { grid-template-columns: minmax(0, 560px); grid-template-areas: "calc"; justify-content: center; }
+    /* No rich hero content -> a single, CENTERED column: the headline (if any)
+       sits centred ABOVE the widget, never stranded beside an empty gutter. An
+       empty head collapses (.qf-hp-head.is-empty), leaving just the widget. */
+    body.qf-hp--bare .qf-hp-grid { grid-template-columns: minmax(0, 560px); grid-template-rows: auto auto; grid-template-areas: "head" "calc"; justify-content: center; }
+    body.qf-hp--bare .qf-hp-head { text-align: center; }
+    body.qf-hp--bare .qf-hp-headline { margin-bottom: 0; }
     .qf-hp-head { grid-area: head; }
     .qf-hp-head.is-empty { display: none; }
     .qf-hp-badges { grid-area: badges; display: flex; flex-wrap: wrap; gap: 8px; }
@@ -509,7 +520,7 @@ export function renderHostedPage(opts: RenderHostedPageOpts): string {
     }
   </style>
 </head>
-<body class="${hasAside ? '' : 'qf-hp--bare'}"${hasHero ? ' data-hp-hero' : ''}>
+<body class="${hasRichHero ? '' : 'qf-hp--bare'}"${hasHero ? ' data-hp-hero' : ''}>
   <div class="qf-hp-shell">
     <div class="qf-hp-grid">
       ${headBlock}
@@ -621,9 +632,11 @@ export function renderHostedPage(opts: RenderHostedPageOpts): string {
         var href = (c.value && String(c.value).trim()) ? ctaHref(c) : '#';
         return '<a class="qf-hp-cta' + (i===0?' is-primary':'') + '" href="' + esc(href) + '"' + tgt + '>' + esc(label) + '</a>';
       }).join('');
-      // bare vs framed
-      var hasAside = hasHead || badges.length || revs.length || ctas.length;
-      body.classList.toggle('qf-hp--bare', !hasAside);
+      // bare (single centred column) vs two-column hero. A lone headline does
+      // NOT justify the side-by-side layout — only rich content (subhead /
+      // badges / testimonials / CTAs) does. Mirrors hasRichHero server-side.
+      var hasRichHero = !!HP.subhead || badges.length || revs.length || ctas.length;
+      body.classList.toggle('qf-hp--bare', !hasRichHero);
       applyBackground();
       reportHeight();
     }
