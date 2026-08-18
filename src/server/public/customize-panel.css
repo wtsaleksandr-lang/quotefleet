@@ -497,6 +497,10 @@
   max-height: calc(100vh - 120px);
   overflow-y: auto;
   overflow-x: hidden;
+  /* Edit 7: keep wheel/touch scroll INSIDE the preview — never chain to the
+     portal page (the app-shell is overflow:hidden, but this makes it explicit
+     and robust for both desktop borderless + mobile framed modes). */
+  overscroll-behavior: contain;
   scroll-behavior: smooth;
   -webkit-overflow-scrolling: touch;
 }
@@ -918,23 +922,73 @@
    only; theme-aware (light + dark via style.css variables).
    ══════════════════════════════════════════════════════════════════════════ */
 @media (min-width: 901px) {
-  /* Subtle device backdrop, only while the mobile phone preview is showing, so
-     the gutter around the 390px column reads as intentional framing. */
+  /* Dimmed, neutral backdrop shown ONLY while the mobile phone preview is up, so
+     the gutter around the 390px column reads as an intentional stage — not a
+     narrow card floating in an empty pane. Edit 8: the pane HUGS the phone
+     (max-width ≈ frame + a thin margin) and centres in the column, so the frame
+     occupies most of the pane width instead of sitting in a wide empty band. The
+     phone itself stays centred via the base rule's margin:auto. */
   .qf-cz-preview:has(.qf-cz-frame-wrap[data-device="mobile"]) {
+    max-width: 430px;
+    margin-left: auto;
+    margin-right: auto;
     background: var(--surface-2);
     border: 1px solid var(--border);
     border-radius: var(--radius-lg);
     box-shadow: inset 0 1px 0 var(--border);
-    padding: 24px 16px;
+    padding: 32px 16px;
   }
-  /* Light phone chrome around the mobile widget — a thin rounded device edge,
-     not a heavy bezel — plus a little more elevation so it lifts off the
-     backdrop and clearly reads as a phone. */
+  /* Centre the toolbar above the narrowed phone card so the whole preview reads
+     as one tidy centred module (no toolbar hanging wider than the phone). */
+  .qf-cz-preview-col:has(.qf-cz-frame-wrap[data-device="mobile"]) .qf-cz-preview-head {
+    max-width: 430px;
+    margin-left: auto;
+    margin-right: auto;
+  }
+  .qf-cz-preview:has(.qf-cz-frame-wrap[data-device="mobile"]) .qf-cz-preview-note { align-self: stretch; }
+  /* Light, honest phone frame: a thin uniform bezel with a phone-like corner
+     radius + soft elevation, on the dimmed backdrop above. NO notch / buttons /
+     gloss / hand — CSS only, no image. The top bezel is a touch taller to hold a
+     faint status strip. Edit 8: bound the frame to a REALISTIC phone viewport
+     (~390×780 ≈ 2:1) so it reads like a phone, NOT a long strip — the tall
+     calculator SCROLLS inside it (Edit 7 wheel-forward + the wrap's overflow).
+     This is border + backdrop ONLY: the iframe inside stays fully interactive. */
   .qf-cz-preview:has(.qf-cz-frame-wrap[data-device="mobile"]) .qf-cz-frame-wrap[data-device="mobile"] {
+    position: relative;
+    height: 780px;
     border: 1px solid var(--border-strong);
-    border-radius: var(--radius-xl);
-    box-shadow: var(--shadow-md);
+    border-radius: 30px;
+    box-shadow: var(--shadow-lg);
     background: var(--surface);
+    padding: 16px 8px 12px;
+  }
+  /* Faint status strip in the top bezel (honest — reads as a phone's status bar,
+     not a speaker notch). Anchored to the PANE (which does NOT scroll), not the
+     frame-wrap (which is now the scroll container, Edit 7/8) — so it stays put
+     while the calculator scrolls behind it. The pane hugs the centred phone, so
+     left:50% lands over the frame; the on-grid top + a transform nudge drops it
+     into the 16px top bezel. Pointer-events off so it never blocks. */
+  .qf-cz-preview:has(.qf-cz-frame-wrap[data-device="mobile"])::after {
+    content: '';
+    position: absolute;
+    top: 32px;
+    left: 50%;
+    transform: translate(-50%, 8px);
+    width: 340px;
+    max-width: 66%;
+    height: 4px;
+    border-radius: 999px;
+    background: var(--border-strong);
+    opacity: .6;
+    pointer-events: none;
+    z-index: 1;
+  }
+  /* Round the live content to follow the phone's corners inside the bezel. The
+     frame-wrap already clips (overflow:hidden), so this just softens the inner
+     edge; interactivity is unaffected. */
+  .qf-cz-preview:has(.qf-cz-frame-wrap[data-device="mobile"]) .qf-cz-frame-wrap[data-device="mobile"] .qf-cz-frame-sizer,
+  .qf-cz-preview:has(.qf-cz-frame-wrap[data-device="mobile"]) .qf-cz-frame-wrap[data-device="mobile"] .qf-cz-frame {
+    border-radius: 18px;
   }
 }
 
@@ -1093,4 +1147,165 @@
   .qf-modal-card.qf-gallery-card { width: 100%; padding: 16px; }
   .qf-gallery-map-thumb { height: 80px; }
   .qf-gallery-tile .qf-cz-preset-swatch { height: 80px; }
+}
+
+/* ══════════════════════════════════════════════════════════════════════════
+   Customize carousel refinements + inline unfold + header-logo grid.
+   Appended at EOF so the line-based spacing/colour guard baselines never
+   renumber. Tokens + 8px ramp only; theme-aware (light + dark via style.css
+   CSS variables — no hardcoded colours).
+   ══════════════════════════════════════════════════════════════════════════ */
+
+/* ── Edit 1 — Bigger map-style thumbnails ──────────────────────────────────
+   The real base-map render was only ~46px tall, filling ~2/3 of its tile.
+   Fill most of the tile so it reads as clearly as the theme swatch. object-fit
+   /radius/border/shadow are inherited from the earlier .qf-cz-mapstyle-thumb
+   rule — only the height grows here. Applies to the inline carousel chips AND
+   the unfold grid (which reuses the same class). */
+.qf-cz-mapstyle-thumb { height: 70px; }
+
+/* ── Edit 2 — Soft dim/blur edge fades on every carousel ───────────────────
+   Gradient overlay pseudo-elements at the track's inner edges so items appear
+   to slide BEHIND a shade instead of hard-clipping. Blends to the section
+   surface in BOTH themes via the token (no hardcoded colour). Toggled by
+   has-fade-left / has-fade-right (set in makeCarousel.update() using the same
+   atStart/atEnd logic as the arrows). Offset ~24px inboard so each fade sits
+   over the track edge, just past the arrow slot; a faint backdrop blur softens
+   the sliding items. Because makeCarousel is shared this covers ALL customize
+   carousels (theme / map / accent / button-hover / text-colour / sheet nav). */
+.qf-cz-carousel { position: relative; --qf-cz-fade-bg: var(--surface); }
+.qf-cz-carousel::before,
+.qf-cz-carousel::after {
+  content: '';
+  position: absolute;
+  top: 4px;
+  bottom: 4px;
+  width: 40px;
+  pointer-events: none;
+  opacity: 0;
+  z-index: 1;
+  transition: opacity .16s ease;
+  backdrop-filter: blur(1.5px);
+  -webkit-backdrop-filter: blur(1.5px);
+}
+/* The mask matches each side's colour gradient so the faint backdrop blur fades
+   out inward with the shade (no hard blur seam), leaving only a soft edge. */
+.qf-cz-carousel::before {
+  left: 24px;
+  background: linear-gradient(to right, var(--qf-cz-fade-bg), transparent);
+  -webkit-mask-image: linear-gradient(to right, #000, transparent);
+  mask-image: linear-gradient(to right, #000, transparent);
+}
+.qf-cz-carousel::after {
+  right: 24px;
+  background: linear-gradient(to left, var(--qf-cz-fade-bg), transparent);
+  -webkit-mask-image: linear-gradient(to left, #000, transparent);
+  mask-image: linear-gradient(to left, #000, transparent);
+}
+.qf-cz-carousel.has-fade-left::before { opacity: 1; }
+.qf-cz-carousel.has-fade-right::after { opacity: 1; }
+@media (prefers-reduced-motion: reduce) {
+  .qf-cz-carousel::before,
+  .qf-cz-carousel::after { transition: none; }
+}
+
+/* ── Edit 3 — Minimal borderless arrows ────────────────────────────────────
+   Drop the circle (border / surface fill / shadow) — show only the chevron
+   glyph with a comfortable hit area. Hover = a subtle colour shift, no lift.
+   Sit above the edge-fade so the glyph stays crisp and clickable. The
+   .is-hidden / :disabled end-of-track behaviour (earlier rule) is untouched. */
+.qf-cz-carousel-arrow {
+  position: relative;
+  z-index: 2;
+  width: 26px;
+  height: 26px;
+  border: 0;
+  background: transparent;
+  box-shadow: none;
+  color: var(--muted);
+}
+.qf-cz-carousel-arrow:hover {
+  background: transparent;
+  color: var(--ink);
+  transform: none;
+}
+
+/* ── Edit 4 — Inline unfold (replaces the gallery modal) ───────────────────
+   A "View all" link expands the section in place. Smooth height via the
+   grid-template-rows 0fr↔1fr trick (no max-height guessing); the inner wrapper
+   clips while collapsed. Tiles reuse the swatch / map-thumb + the SAME select
+   handlers; selected = accent ring (never a bright fill). Mobile ≤560px = 2
+   columns. */
+.qf-cz-unfold {
+  display: grid;
+  grid-template-rows: 0fr;
+  transition: grid-template-rows .28s ease;
+}
+.qf-cz-unfold.is-open { grid-template-rows: 1fr; }
+.qf-cz-unfold-inner { overflow: hidden; min-height: 0; }
+.qf-cz-unfold-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 12px;
+  padding: 12px 4px 4px;
+}
+.qf-cz-unfold-tile {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 8px;
+  border-radius: var(--radius);
+  border: 1px solid var(--border);
+  background: var(--surface-2);
+  color: var(--ink);
+  cursor: pointer;
+  text-align: left;
+  transition: border-color .14s ease, transform .1s ease;
+}
+.qf-cz-unfold-tile:hover { transform: translateY(-1px); border-color: var(--border-strong); }
+.qf-cz-unfold-tile:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+.qf-cz-unfold-tile.is-selected {
+  border-color: var(--accent-fill);
+  box-shadow: 0 0 0 1px var(--accent-fill);
+}
+.qf-cz-unfold-tile.is-selected .qf-gallery-check { display: inline-flex; }
+.qf-cz-unfold-tile-name { font-size: 12.5px; font-weight: 600; color: var(--ink); }
+.qf-cz-unfold-tile .qf-cz-mapstyle-thumb { height: 92px; }
+.qf-cz-unfold-tile .qf-cz-preset-swatch { height: 92px; }
+/* "View all" toggle → label + rotating chevron. */
+.qf-cz-unfold-toggle { display: inline-flex; align-items: center; gap: 4px; }
+.qf-cz-unfold-chev { display: inline-flex; transition: transform .2s ease; }
+.qf-cz-unfold-toggle.is-open .qf-cz-unfold-chev { transform: rotate(180deg); }
+@media (prefers-reduced-motion: reduce) {
+  .qf-cz-unfold { transition: none; }
+  .qf-cz-unfold-chev { transition: none; }
+}
+@media (max-width: 560px) {
+  .qf-cz-unfold-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+}
+
+/* ── Edit 5/9 — Header-logo section: full-width grid, every option visible ──
+   The control groups (Logo size / Layout / Alignment / Show-name) were stacked
+   left-aligned, leaving the right ~40% of the card empty. Lay them in a 2-col
+   grid that uses the full width. Edit 9: chips WRAP (no carousel), so no option
+   is ever hidden behind a scroll arrow. "Logo size" (4 opts) + the show-name
+   toggle span the full row; Layout + Alignment pair on the middle row. Collapse
+   to one column on mobile — the 4 size chips wrap 2×2 (never 1-alone). */
+.qf-cz-header-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 16px;
+  margin-top: 8px;
+  align-items: start;
+}
+.qf-cz-header-group { display: flex; flex-direction: column; gap: 8px; min-width: 0; }
+.qf-cz-header-group > .qf-cz-label { margin: 0; }
+/* Full-width groups span both columns so all their options fit on one row. */
+.qf-cz-header-group--full { grid-column: 1 / -1; }
+/* Chips wrap freely within their group (no horizontal scroll / arrows). */
+.qf-cz-header-group .qf-cz-hover-row { flex-wrap: wrap; }
+.qf-cz-header-toggle { margin-top: 0; }
+@media (max-width: 560px) {
+  .qf-cz-header-grid { grid-template-columns: 1fr; }
 }
