@@ -2840,9 +2840,12 @@
     }
     // Debounced crisp re-fetch: preload the new bitmap, then swap it in and drop
     // the CSS feedback transform so the crisp tiles replace the scaled preview.
-    function fetchBaseCrisp() {
-      if (baseFetchTimer) clearTimeout(baseFetchTimer);
-      baseFetchTimer = setTimeout(function () {
+    // `immediate` runs the crisp re-fetch NOW (no debounce) — used on drag-release
+    // so the map settles at the dropped center at once with no lingering blank.
+    // Wheel/pinch zoom bursts still debounce (180ms) to coalesce rapid steps.
+    function fetchBaseCrisp(immediate) {
+      if (baseFetchTimer) { clearTimeout(baseFetchTimer); baseFetchTimer = null; }
+      function run() {
         var seq = ++baseSeq;
         var zoom = gZoom, c = { lat: center.lat, lng: center.lng };
         var url = baseUrl(zoom, c);
@@ -2858,7 +2861,8 @@
         };
         probe.onerror = function () { /* keep the current crisp frame on failure */ };
         probe.src = url;
-      }, 180);
+      }
+      if (immediate) run(); else baseFetchTimer = setTimeout(run, 180);
     }
     // Update the CSS feedback transform to preview the pending zoom/pan before
     // the crisp bitmap arrives. scale = 2^(target−loaded), capped so a fast
@@ -2887,6 +2891,10 @@
     _resetBaseZoom = resetBaseZoom;
     open.addEventListener('click', function () {
       modal.hidden = false;
+      // Paint a themed (never stark-white) backdrop behind the map image so a pan
+      // that briefly outruns the bitmap reveals a muted map-toned surface, not a
+      // white void. Theme-aware via tokens so it holds in light and dark.
+      if (vp) vp.style.background = 'color-mix(in srgb, var(--w-fg) 8%, var(--w-bg))';
       modal.classList.toggle('qf-map-base', isBase());
       scale = 1; tx = 0; ty = 0;
       // Base mode: reflect the CURRENT inline zoom (shared state) in the modal so
@@ -2912,6 +2920,19 @@
         return Math.sqrt((a.x - b.x) * (a.x - b.x) + (a.y - b.y) * (a.y - b.y));
       }
       vp.addEventListener('pointerdown', function (e) {
+        // A press that starts on an interactive control INSIDE the viewport (the
+        // close ✕ is a child of vp) must NOT begin a drag or grab pointer-capture:
+        // capturing the pointer retargets the ensuing click to vp so the button's
+        // own handler never fires — that is why ✕ was unclickable in the modal.
+        // (Buttons are also excluded from grab-scroll, so let them bubble.)
+        if (e.target && e.target.closest && e.target.closest('button')) return;
+        // The shared grab-scroll page-pan utility engages on any non-excluded
+        // background drag, and its exclude list does NOT cover THIS modal
+        // (.qf-map-modal). Left alone it re-captures the pointer to <body> mid-pan,
+        // which freezes the map drag and drops the release commit (blank map that
+        // only refreshes on the next click). Keep the press from reaching its
+        // document/surface handlers so the map owns its own drag end-to-end.
+        e.stopPropagation();
         pointers[e.pointerId] = { x: e.clientX, y: e.clientY };
         if (pointerCount() === 2) {
           pinching = true; dragging = false;
@@ -2946,7 +2967,7 @@
           // Commit a base-map pan as a crisp re-fetch at the shifted center.
           if (wasDragging && isBase() && (tx !== 0 || ty !== 0)) {
             center = shiftedCenter(loadedCenter, loadedZoom, tx, ty, scale);
-            fetchBaseCrisp();
+            fetchBaseCrisp(true); // commit the release NOW — no debounce, no blank
           }
         }
       }
@@ -2958,18 +2979,21 @@
         scale = Math.min(4, Math.max(1, scale + (e.deltaY < 0 ? 0.3 : -0.3))); if (scale === 1) { tx = 0; ty = 0; } apply();
       }, { passive: false });
     }
-    // ── Inline preview: wheel-to-zoom + scroll-chaining fix ──────────────────
-    // The inline base map (Customize live preview) is a static <img> with no
-    // native wheel behavior, so a wheel over it used to CHAIN up and scroll the
-    // whole host page. Handle wheel here (inside the widget iframe, before it can
-    // chain) with preventDefault + stopPropagation: over the BASE map the wheel
-    // ZOOMS (crisp re-fetch) and the parent page never moves. In route mode we
-    // still trap the wheel so the map area never scrolls the host page.
+    // ── Inline preview: wheel zooms ONLY over the actual base map ────────────
+    // The inline base map is a static <img>. Over the BASE map surface the wheel
+    // ZOOMS (crisp re-fetch) and we trap it so the host page never scroll-chains.
+    // EVERYWHERE ELSE — a routed map (no inline wheel-zoom) or any non-map area —
+    // we must NOT preventDefault/stopPropagation, or the wheel dead-zones and the
+    // calculator (and its Customize-panel preview) can't scroll. So bail early
+    // unless we're in base mode AND the pointer is over the map canvas itself.
     if (card) {
       card.addEventListener('wheel', function (e) {
+        if (!isBase()) return;
+        var t = e.target;
+        if (!(t && t.closest && t.closest('.qf-map-canvas'))) return;
         e.preventDefault();
         e.stopPropagation();
-        if (isBase()) stepBaseZoom(e.deltaY < 0 ? 1 : -1);
+        stepBaseZoom(e.deltaY < 0 ? 1 : -1);
       }, { passive: false });
     }
     document.addEventListener('keydown', function (e) {
