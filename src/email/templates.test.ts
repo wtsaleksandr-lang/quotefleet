@@ -29,17 +29,23 @@ const base = {
 };
 
 describe('QuoteFleet-branded shell — reliable live-text logo + single-line footer', () => {
-  it('renders the header as a single hosted logo image + a live-text "QuoteFleet" wordmark (no dual-image swap)', () => {
+  it('renders a live-text "QuoteFleet" wordmark + a CSS-driven light/dark logo swap (both marks hosted)', () => {
     const { html } = magicLinkEmail({ link: 'https://quotefleet.net/m/abc', email: 'a@b.com' });
     // Live-text wordmark ALWAYS renders — the reliable brand element.
     expect(html).toContain('class="qf-wordmark"');
     expect(html).toMatch(/qf-wordmark[^>]*>QuoteFleet</);
-    // Exactly one hosted logo image, and it is the light mark.
+    // Both hosted marks are present: light (dark-outlined truck) shown by
+    // default, dark (white-outlined truck) revealed under prefers-color-scheme:
+    // dark. This is a display: swap driven by the <head> media query (NOT the
+    // old broken dual-<src> that showed red-X in Outlook).
     expect(html).toContain('https://quotefleet.net/brand/logo-full.png');
-    // The old dark-swap <img> and its variant are GONE from the email.
-    expect(html).not.toContain('logo-full-ondark.png');
-    expect(html).not.toContain('qf-logo-dark');
-    expect(html).not.toContain('qf-logo-light');
+    expect(html).toContain('https://quotefleet.net/brand/logo-full-ondark.png');
+    expect(html).toContain('qf-logo-light');
+    expect(html).toContain('qf-logo-dark');
+    // The dark override is CSS-scoped: wordmark goes white, logos swap by display.
+    expect(html).toMatch(/@media \(prefers-color-scheme: dark\)[\s\S]*\.qf-wordmark \{ color: #FFFFFF/);
+    expect(html).toMatch(/\.qf-logo-light \{ display: none/);
+    expect(html).toMatch(/\.qf-logo-dark \{ display: inline-block/);
   });
 
   it('footer legal links are a single line: Privacy · Terms · Security · DPA (in order)', () => {
@@ -64,7 +70,8 @@ describe('QuoteFleet-branded shell — reliable live-text logo + single-line foo
       unsubscribeUrl: 'https://app.quotefleet.net/unsub/xyz',
     });
     expect(html).toContain('class="qf-wordmark"');
-    expect(html).not.toContain('logo-full-ondark.png');
+    // Marketing shell carries the same light/dark logo swap as transactional.
+    expect(html).toContain('logo-full-ondark.png');
     expect(html).not.toContain('The QuoteFleet Team');
     expect(html).toContain('quotefleet.net/privacy');
     expect(html).toContain('quotefleet.net/terms');
