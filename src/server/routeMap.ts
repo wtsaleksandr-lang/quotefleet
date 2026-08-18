@@ -597,33 +597,34 @@ const BLACKWHITE_INVERTED_STYLES: string[] = [
   'feature:road.highway|element:geometry.stroke|color:0x8a8a8a',
 ];
 
-// `marine` (label: "Marine") — a MarineTraffic / nautical-chart look. Near-white
-// warm-grey LAND (flat — no green parks, no beige), calm muted desaturated
-// BLUE-GREY water (slightly cool, NOT bright blue), very faint thin grey road
-// hairlines (visible against the land, not white-on-white, not bold), and
-// deliberately MINIMAL, low-contrast grey labels: all POI/business labels +
-// road labels hidden, only faint locality/administrative place names kept. Quiet
-// and chart-like, high legibility, low chroma — the cobalt route + green/red A·B
-// markers stay the one clearly-visible element on top.
+// `marine` (label: "Marine") — a MarineTraffic / nautical-chart look. BRIGHT,
+// near-white cool-grey WATER as the light "canvas" (the lightest area on the
+// map), noticeably DARKER muted grey-blue LAND (flat — no green parks, no beige)
+// so the water reads as the open field, faint PALE thin road hairlines (light on
+// the darker land, not bold), and deliberately MINIMAL low-contrast labels: all
+// POI/business labels + road labels hidden, only faint locality/administrative
+// place names kept (light grey text legible on the darker land). Quiet and
+// chart-like, low chroma — the cobalt route + green/red A·B markers stay the one
+// clearly-visible element, popping on the bright water.
 const MARINE_STYLES: string[] = [
-  'element:geometry|color:0xf4f3ef',
-  'element:labels.text.fill|color:0x8b9096',
-  'element:labels.text.stroke|color:0xf7f6f2',
-  'feature:administrative|element:geometry|color:0xd3d1cb',
-  'feature:administrative.country|element:geometry.stroke|color:0xbcc1c6',
-  'feature:administrative.province|element:geometry.stroke|color:0xceccc6',
-  'feature:administrative.locality|element:labels.text.fill|color:0x939aa2',
-  'feature:landscape|element:geometry|color:0xf4f3ef',
-  'feature:landscape.natural|element:geometry|color:0xf0eee8',
+  'element:geometry|color:0xa6afb8',
+  'element:labels.text.fill|color:0xdfe3e7',
+  'element:labels.text.stroke|color:0x7e8790',
+  'feature:administrative|element:geometry|color:0xb2bac2',
+  'feature:administrative.country|element:geometry.stroke|color:0xc6ccd2',
+  'feature:administrative.province|element:geometry.stroke|color:0xbcc3ca',
+  'feature:administrative.locality|element:labels.text.fill|color:0xe4e8ec',
+  'feature:landscape|element:geometry|color:0xa6afb8',
+  'feature:landscape.natural|element:geometry|color:0x9ea8b1',
   'feature:poi|visibility:off',
   'feature:transit|visibility:off',
-  'feature:water|element:geometry|color:0xacbcca',
-  'feature:water|element:labels.text.fill|color:0x6f8494',
-  'feature:road|element:geometry|color:0xe5e3dd',
+  'feature:water|element:geometry|color:0xeef1f4',
+  'feature:water|element:labels.text.fill|color:0x64798a',
+  'feature:road|element:geometry|color:0xdde2e7',
   'feature:road|element:labels|visibility:off',
-  'feature:road.arterial|element:geometry|color:0xe1dfd8',
-  'feature:road.highway|element:geometry|color:0xdbd9d2',
-  'feature:road.highway|element:geometry.stroke|color:0xcdcac2',
+  'feature:road.arterial|element:geometry|color:0xe1e6ea',
+  'feature:road.highway|element:geometry|color:0xe7ebee',
+  'feature:road.highway|element:geometry.stroke|color:0xcbd2d8',
 ];
 
 /** Resolve the Static Maps `style=` spec list for a (theme, mapStyle) pair.
