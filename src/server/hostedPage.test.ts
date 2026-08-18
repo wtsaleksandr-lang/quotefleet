@@ -53,6 +53,25 @@ describe('renderHostedPage — calculator centrepiece', () => {
     expect(dom).not.toContain('<figure class="qf-hp-rev"');
     expect(dom).not.toContain('<a class="qf-hp-cta');
   });
+
+  it('stays single-column centred when ONLY a headline is set (no rich hero)', () => {
+    // A lone headline must NOT trigger the two-column hero — that leaves the
+    // headline stranded beside an empty gutter. It stays bare (single centred
+    // column) with the headline rendered centred above the widget.
+    const html = renderHostedPage({
+      tenant: TENANT,
+      brand: brandWith({ hostedHeadline: 'Instant freight quotes' }),
+      calcSrc: CALC_SRC,
+    });
+    expect(html).toContain('<body class="qf-hp--bare"');
+    const dom = html.slice(0, html.indexOf('<script>'));
+    // Headline IS rendered (not the is-empty header) …
+    expect(dom).toContain('<h1 class="qf-hp-headline">Instant freight quotes</h1>');
+    expect(dom).not.toContain('qf-hp-head is-empty');
+    // … but no rich hero content exists to justify the side-by-side layout.
+    expect(dom).not.toContain('<figure class="qf-hp-rev"');
+    expect(dom).not.toContain('<a class="qf-hp-cta');
+  });
 });
 
 describe('renderHostedPage — trust content include vs exclude', () => {
