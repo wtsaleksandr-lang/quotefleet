@@ -578,9 +578,9 @@
       }
       pCard.appendChild(profileRow('Name', 'name'));
       pCard.appendChild(profileRow('Email', 'email', 'email'));
-      // Phone → tenant.contactPhone (also shown to customers on the widget
-      // + hosted quotes; see the Company details card below).
-      pCard.appendChild(profileRow('Phone', 'contactPhone', 'tel'));
+      // Public phone (tenant.contactPhone) now lives in the "Carrier credentials
+      // & contact" section of the Company details card below, so the whole
+      // customer-facing credential block is a single source of truth.
       var saveProfile = el('button', { class: 'btn btn-primary', text: 'Save profile', style: { marginTop: '8px' } });
       saveProfile.addEventListener('click', function () {
         var body = {};
@@ -603,7 +603,7 @@
       coCard.appendChild(el('div', { class: 'card-title', text: 'Company details' }));
       coCard.appendChild(el('p', {
         class: 'muted', style: { marginTop: 0 },
-        text: 'Shown to your customers on your calculator and quotes. Your phone (set in Profile above) appears here too.',
+        text: 'Shown to your customers on your calculator and quotes.',
       }));
       var coLoading = el('p', { class: 'muted-small', text: 'Loading…' });
       coCard.appendChild(coLoading);
@@ -626,16 +626,46 @@
           return f;
         }
 
+        // ── Carrier credentials & contact ─────────────────────────
+        // Single source of truth for the credential + contact block customers
+        // see. USDOT/MC + public email/phone are edited HERE and surface in the
+        // calculator header (toggle in Customize → Design) and on the hosted
+        // page via the embedded widget. All optional.
+        coCard.appendChild(el('div', {
+          class: 'card-title', style: { fontSize: '15px', marginTop: '4px', marginBottom: '2px' },
+          text: 'Carrier credentials & contact',
+        }));
+        coCard.appendChild(el('p', {
+          class: 'muted-small', style: { marginTop: 0 },
+          text: 'Turn these on in the calculator header from Customize → Design. All optional.',
+        }));
+
         // Public, opt-in contact email — bound to tenant.publicContactEmail, NOT
         // the private owner/login email. Blank = the email row is hidden from
         // customers on the calculator + quotes (we never expose the login email).
-        var emailField = coField('Public contact email', 'publicContactEmail', (r.tenant && r.tenant.publicContactEmail) || '', 'email');
+        var emailField = coField('Public email', 'publicContactEmail', (r.tenant && r.tenant.publicContactEmail) || '', 'email');
         emailField.appendChild(el('span', {
           class: 'muted-small',
           style: { display: 'block', marginTop: '4px' },
           text: 'Optional — shown to customers on your calculator and quotes. Leave blank to hide it.',
         }));
         coCard.appendChild(emailField);
+
+        // Public phone (tenant.contactPhone) — saved via /api/auth/profile,
+        // same as the other tenant contact fields. Prefilled from the tenant.
+        var phoneField = coField('Public phone', 'contactPhone', (r.tenant && r.tenant.contactPhone) || '', 'tel');
+        phoneField.appendChild(el('span', {
+          class: 'muted-small',
+          style: { display: 'block', marginTop: '4px' },
+          text: 'Optional — shown to customers on your calculator and quotes. Leave blank to hide it.',
+        }));
+        coCard.appendChild(phoneField);
+
+        // USDOT + MC authority numbers — bound to marketplace-settings.
+        var idGrid = el('div', { class: 'grid-2', style: { gap: '12px' } });
+        idGrid.appendChild(coField('USDOT number', 'dotNumber', mkt.dotNumber));
+        idGrid.appendChild(coField('MC number', 'mcNumber', mkt.mcNumber));
+        coCard.appendChild(idGrid);
 
         // Quote disclaimer / terms — bound to tenant.quoteDisclaimer via
         // /api/auth/profile. Shown at the bottom of every quote (widget result,
@@ -657,6 +687,11 @@
         }));
         coCard.appendChild(discField);
 
+        // ── Business address ──────────────────────────────────────
+        coCard.appendChild(el('div', {
+          class: 'card-title', style: { fontSize: '15px', marginTop: '6px', marginBottom: '2px' },
+          text: 'Business address',
+        }));
         var addrGrid = el('div', { class: 'grid-2', style: { gap: '12px' } });
         addrGrid.appendChild(coField('Address line 1', 'addressLine1', profile.addressLine1));
         addrGrid.appendChild(coField('Address line 2', 'addressLine2', profile.addressLine2));
@@ -666,22 +701,22 @@
         addrGrid.appendChild(coField('Country', 'country', profile.country));
         coCard.appendChild(addrGrid);
 
-        var idGrid = el('div', { class: 'grid-2', style: { gap: '12px' } });
-        idGrid.appendChild(coField('USDOT number', 'dotNumber', mkt.dotNumber));
-        idGrid.appendChild(coField('MC number', 'mcNumber', mkt.mcNumber));
-        coCard.appendChild(idGrid);
-
         var saveCo = el('button', { class: 'btn btn-primary', text: 'Save company details', style: { marginTop: '8px' } });
         saveCo.addEventListener('click', function () {
           var vals = {};
           $$('input[data-co]', coCard).forEach(function (i) { vals[i.dataset.co] = i.value.trim() || null; });
+          // Light, non-blocking-until-invalid validation. All fields optional;
+          // only reject an obviously-malformed non-empty value.
+          if (vals.dotNumber && !/^\d+$/.test(vals.dotNumber)) return toastErr({ message: 'USDOT number should be digits only.' });
+          if (vals.mcNumber && !/^\d+$/.test(vals.mcNumber)) return toastErr({ message: 'MC number should be digits only.' });
+          if (vals.publicContactEmail && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(vals.publicContactEmail)) return toastErr({ message: 'Please enter a valid public email address.' });
           // The disclaimer is a textarea (not [data-co]); collect it separately.
           // Blank → null so clearing it falls back to the platform default.
           var discEl = coCard.querySelector('textarea[data-co-disc]');
           var quoteDisclaimer = discEl ? (discEl.value.trim() || null) : undefined;
           saveCo.disabled = true;
           Promise.all([
-            api('/api/auth/profile', { method: 'PUT', body: { publicContactEmail: vals.publicContactEmail, quoteDisclaimer: quoteDisclaimer } }),
+            api('/api/auth/profile', { method: 'PUT', body: { publicContactEmail: vals.publicContactEmail, contactPhone: vals.contactPhone, quoteDisclaimer: quoteDisclaimer } }),
             api('/api/tenant/carrier-profile', { method: 'PUT', body: {
               addressLine1: vals.addressLine1, addressLine2: vals.addressLine2,
               city: vals.city, state: vals.state, postalCode: vals.postalCode, country: vals.country,
@@ -3818,6 +3853,23 @@
       ]));
       showNameGroup.appendChild(showNameWrap);
       headerGrid.appendChild(showNameGroup);
+
+      // Credentials & contact in the header — single source of truth lives in
+      // Account → Company details (USDOT/MC + public email/phone). This toggle
+      // only decides whether that block appears in the calculator header.
+      var showCredGroup = el('div', { class: 'qf-cz-header-group qf-cz-header-group--full' });
+      var showCredWrap = el('label', { class: 'qf-cz-field qf-cz-header-toggle', style: { display: 'flex', gap: '10px', alignItems: 'flex-start', cursor: 'pointer' } });
+      var showCredCb = el('input', { type: 'checkbox', style: { marginTop: '3px', flex: '0 0 auto' } });
+      showCredCb.checked = !!b.headerShowCredentials;
+      showCredCb.addEventListener('change', function () { queueSave({ headerShowCredentials: showCredCb.checked }, true); });
+      showCredWrap.appendChild(showCredCb);
+      showCredWrap.appendChild(el('div', {}, [
+        el('div', { text: 'Show credentials & contact in header', style: { fontWeight: '600' } }),
+        el('div', { class: 'field-hint', style: { marginTop: '2px' }, text: 'Shows your USDOT/MC and contact in the calculator header (sourced from your company profile).' }),
+      ]));
+      showCredGroup.appendChild(showCredWrap);
+      headerGrid.appendChild(showCredGroup);
+
       headerSec.appendChild(headerGrid);
       controls.appendChild(headerSec);
 
@@ -4123,27 +4175,11 @@
         headCard.appendChild(hpText('Subhead', 'hostedSubhead', b.hostedSubhead, 'One supporting sentence under the headline.', true));
         pc.appendChild(headCard);
 
-        // 2 ── Trust badges -------------------------------------------------
-        var badgePreview = [];
-        if (d.dotNumber) badgePreview.push('USDOT ' + d.dotNumber);
-        if (d.mcNumber) badgePreview.push('MC ' + d.mcNumber);
-        if (badgePreview.length) badgePreview.push('Insured');
-        var trustCard = el('div', { class: 'card qf-cz-section' });
-        trustCard.appendChild(el('div', { class: 'qf-cz-section-title', text: 'Trust badges' }));
-        var trustRow = el('label', { style: { display: 'flex', gap: '12px', alignItems: 'flex-start', cursor: 'pointer' } });
-        var trustCb = el('input', { type: 'checkbox', style: { marginTop: '3px', flex: '0 0 auto' } });
-        trustCb.checked = !!b.hostedTrustBadges;
-        trustCb.addEventListener('change', function () { b.hostedTrustBadges = trustCb.checked; hostedSave({ hostedTrustBadges: trustCb.checked }, true); });
-        trustRow.appendChild(trustCb);
-        trustRow.appendChild(el('div', {}, [
-          el('div', { text: 'Show my authority & insurance badges', style: { fontWeight: '600' } }),
-          el('div', { class: 'field-hint', style: { marginTop: '2px' },
-            text: badgePreview.length ? ('Will show: ' + badgePreview.join(' · ')) : 'No USDOT/MC on file yet — add them in Account → Company so your credential badges can appear.' }),
-        ]));
-        trustCard.appendChild(trustRow);
-        pc.appendChild(trustCard);
+        // Trust badges control retired — carrier credentials (USDOT/MC + contact)
+        // now live in the calculator header, toggled from Customize → Design, and
+        // appear on the hosted page via the embedded widget. Nothing to set here.
 
-        // 3 ── Testimonials -------------------------------------------------
+        // 2 ── Testimonials -------------------------------------------------
         var testis = Array.isArray(b.hostedTestimonialsJson) ? b.hostedTestimonialsJson.map(function (t) { return Object.assign({}, t); }) : [];
         var testiCard = el('div', { class: 'card qf-cz-section' });
         testiCard.appendChild(el('div', { class: 'qf-cz-section-title', text: 'Testimonials' }));
@@ -4199,7 +4235,7 @@
         renderTesti();
         pc.appendChild(testiCard);
 
-        // 4 ── CTA buttons --------------------------------------------------
+        // 3 ── CTA buttons --------------------------------------------------
         var ctas = Array.isArray(b.hostedCtasJson) ? b.hostedCtasJson.map(function (c) { return Object.assign({}, c); }) : [];
         var ctaCard = el('div', { class: 'card qf-cz-section' });
         ctaCard.appendChild(el('div', { class: 'qf-cz-section-title', text: 'Action buttons' }));
