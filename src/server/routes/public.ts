@@ -380,6 +380,10 @@ export function registerPublicRoutes(app: Express) {
     // Carrier contact block shown in the widget header — same source of
     // truth as the hosted quote (tenant.contactPhone/Email/mc/dot +
     // carrier-profile address). Assembled here so widget.js just renders.
+    // These same four fields (dotNumber/mcNumber/phone/email) ALSO feed the
+    // calculator-header credential meta-lines (widget.js renderHeader), gated by
+    // brand.headerShowCredentials — which rides along in the `brand` row below
+    // (brandConfigs is selected unprojected, so the new column is included).
     const carrierProfile = await loadCarrierProfile(tenant.id);
     const cp = carrierProfile as Record<string, string | null | undefined>;
     const addressParts = [

@@ -73,6 +73,10 @@ export const SELF_HEAL_COLUMN_STATEMENTS: readonly string[] = [
   `ALTER TABLE "brand_configs" ADD COLUMN IF NOT EXISTS "quote_validity_days" integer`,
   `ALTER TABLE "brand_configs" ADD COLUMN IF NOT EXISTS "lead_email_to" text`,
   `ALTER TABLE "brand_configs" ADD COLUMN IF NOT EXISTS "lead_email_cc" text`,
+  // 0040_header_show_credentials.sql — header credential meta-lines toggle
+  // (NOT NULL w/ default true). Same Replit phantom-drop risk as 0038's header
+  // columns, so it MUST be self-healed here too.
+  `ALTER TABLE "brand_configs" ADD COLUMN IF NOT EXISTS "header_show_credentials" boolean DEFAULT true NOT NULL`,
 ];
 
 export async function ensureSelfHealColumns(): Promise<void> {

@@ -320,7 +320,14 @@ export function renderHostedPage(opts: RenderHostedPageOpts): string {
     : 'Instant freight quotes';
   const headline = (brand?.hostedHeadline || '').trim() || defaultHeadline;
   const subhead = (brand?.hostedSubhead || '').trim();
-  const badges = computeTrustBadges(tenant, brand?.hostedTrustBadges);
+  // RETIRED: the standalone hosted trust-badge row is no longer emitted. The
+  // embedded calculator header now carries the carrier's USDOT/MC credentials
+  // (widget.js renderHeader → the "meta lines under name"), so a separate badge
+  // row on the hosted wrap would duplicate them. `hostedTrustBadges` (+ the
+  // computeTrustBadges helper) are kept for data-compat and unit coverage, but
+  // the render forces an empty set so no badge row is produced and it never
+  // counts toward the two-column "rich hero" split.
+  const badges: string[] = [];
   const testimonials = normalizeTestimonials(brand?.hostedTestimonialsJson);
   const ctas = normalizeCtas(brand?.hostedCtasJson);
   const heroImg = bg.imageUrl || '';
@@ -599,12 +606,10 @@ export function renderHostedPage(opts: RenderHostedPageOpts): string {
     // ── live-apply of hosted-copy edits (portal preview only) ──
     var SHIELD = ${jsonForScript(SHIELD_ICON)};
     function computeBadges(){
-      if (!HP.trustBadges) return [];
-      var b = [];
-      if (HP.dot) b.push('USDOT ' + HP.dot);
-      if (HP.mc) b.push('MC ' + HP.mc);
-      if (b.length) b.push('Insured');
-      return b;
+      // RETIRED (mirrors the server): the standalone hosted trust-badge row is no
+      // longer rendered — the embedded calculator header now carries USDOT/MC.
+      // Kept as a no-op so the live-preview render stays structurally identical.
+      return [];
     }
     function stars(n){
       n = Math.max(0, Math.min(5, n|0));

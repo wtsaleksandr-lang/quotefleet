@@ -2,10 +2,11 @@
  * Hosted trust-wrap render tests.
  *
  * Prove the wrap (a) always keeps the calculator as an embedded iframe, (b)
- * surfaces trust content ONLY when the tenant supplied it (headline, badges,
+ * surfaces trust content ONLY when the tenant supplied it (headline,
  * testimonials, CTAs) and degrades to a bare centred calculator otherwise, (c)
- * shows USDOT/MC badges from already-collected data only when the toggle is on,
- * (d) escapes untrusted copy, and (e) round-trips the stored JSON shapes through
+ * no longer emits the standalone USDOT/MC trust-badge row (retired — those
+ * credentials now render in the embedded calculator header), (d) escapes
+ * untrusted copy, and (e) round-trips the stored JSON shapes through
  * the defensive normalisers (caps + type-guards) that both the render and the
  * PUT sanitiser rely on.
  */
@@ -118,13 +119,15 @@ describe('renderHostedPage — calculator centrepiece', () => {
     expect(ctasOnly).toContain('<body class="qf-hp--bare"');
   });
 
-  it('splits into two columns once TWO supporting blocks exist (subhead + badges)', () => {
+  it('splits into two columns once TWO supporting blocks exist (subhead + testimonial)', () => {
+    // The retired trust-badge row no longer counts as a supporting block, so the
+    // split now needs two REAL blocks — here a subhead + a testimonial.
     const html = renderHostedPage({
       tenant: TENANT,
       brand: brandWith({
         hostedHeadline: 'Test headline',
         hostedSubhead: 'Fast freight.',
-        hostedTrustBadges: true,
+        hostedTestimonialsJson: [{ quote: 'Great rates.', author: 'Sam T.' }],
       }),
       calcSrc: CALC_SRC,
     });
@@ -162,22 +165,20 @@ describe('renderHostedPage — trust content include vs exclude', () => {
     expect(html).toContain('target="_blank"');
   });
 
-  it('renders trust badges from USDOT/MC only when the toggle is ON', () => {
+  it('RETIRES the standalone hosted trust-badge row (credentials now live in the widget header)', () => {
+    // Even with the toggle ON, the hosted wrap no longer emits its own USDOT/MC
+    // badge row — the embedded calculator header carries those credentials, so a
+    // duplicate row here is gone. Scope to the server-rendered DOM (the live
+    // preview script legitimately references badge class names as JS templates).
     const on = renderHostedPage({
       tenant: TENANT,
       brand: brandWith({ hostedTrustBadges: true }),
       calcSrc: CALC_SRC,
     });
-    expect(on).toContain('USDOT 2914776');
-    expect(on).toContain('MC 748213');
-    expect(on).toContain('Insured');
-
-    const off = renderHostedPage({
-      tenant: TENANT,
-      brand: brandWith({ hostedTrustBadges: false }),
-      calcSrc: CALC_SRC,
-    });
-    expect(off).not.toContain('USDOT 2914776');
+    const dom = on.slice(0, on.indexOf('<script>'));
+    expect(dom).not.toContain('USDOT 2914776');
+    expect(dom).not.toContain('MC 748213');
+    expect(dom).not.toContain('<span class="qf-hp-badge">');
   });
 
   it('escapes untrusted headline / testimonial copy', () => {

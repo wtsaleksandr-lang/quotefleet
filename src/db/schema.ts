@@ -692,6 +692,14 @@ export const brandConfigs = pgTable('brand_configs', {
   headerShowName: boolean('header_show_name').notNull().default(true),
   /** Header alignment — 'left' (default) or 'center'. */
   headerAlign: text('header_align').notNull().default('left'),
+  /** Whether the calculator header shows the carrier's credentials — USDOT/MC +
+   *  public phone/email — as muted "meta lines" under the company name/tagline.
+   *  Single source of truth: the numbers themselves live on `tenants`
+   *  (dotNumber/mcNumber/publicContactEmail/contactPhone); this is only the
+   *  on/off toggle. Default true so a carrier who already has the data shows it
+   *  unless they opt out. See renderHeader (widget.js) + public-calculator-ux.css
+   *  and migration 0040 (self-healed in src/db/migrate.ts). */
+  headerShowCredentials: boolean('header_show_credentials').notNull().default(true),
   /** Optional CTA button text override. */
   ctaText: text('cta_text').notNull().default('Get instant quote'),
   /** Optional label for the post-quote "confirm the rate" CTA (#qf-continue-btn)

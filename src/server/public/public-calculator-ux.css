@@ -682,3 +682,29 @@ body.qf-app-calculator .qf-rchat .qf-chat-bubble {
   align-self: stretch;
 }
 .qf-rchat-launch { margin-top: 8px; text-align: center; }
+
+/* ── Credential meta-lines (header) ──────────────────────────────────────
+   The "meta lines under name" layout: the carrier's USDOT/MC + public
+   phone/email shown as two muted secondary lines directly beneath the
+   company name/tagline. Rendered by renderCredMeta (widget.js) as a sibling
+   inserted right after #qf-tagline, and gated on brand.headerShowCredentials.
+   Theme-aware by construction — colour comes from the widget --w-muted token,
+   which the theme engine sets for BOTH light and dark presets. Negative
+   margin-top tightens the gap the tagline's margin-bottom would otherwise
+   leave, so the credentials read as a continuation of the name block. */
+.qf-cred-meta {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  margin: -8px 0 12px;
+}
+.qf-cred-line {
+  color: var(--w-muted);
+  font-size: 12px;
+  line-height: 1.45;
+  font-weight: 600;
+  letter-spacing: 0.01em;
+  /* A very long email can wrap as a whole rather than overflow the narrow
+     phone-mockup width; the NBSP-glued " · " separators never orphan a dot. */
+  overflow-wrap: anywhere;
+}

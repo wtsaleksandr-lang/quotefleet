@@ -533,12 +533,17 @@
   function applyBrandPreviewPatch(patch) {
     if (!patch || !state.config) return;
     var brand = state.config.brand || (state.config.brand = {});
-    var HEADER_KEYS = ['displayName', 'tagline', 'ctaText', 'logoUrl', 'headerLogoFill', 'showPoweredBy', 'footerNote'];
+    var HEADER_KEYS = ['displayName', 'tagline', 'ctaText', 'logoUrl', 'headerLogoFill', 'showPoweredBy', 'footerNote', 'headerShowCredentials'];
     var touchedHeader = false;
     HEADER_KEYS.forEach(function (k) {
       if (Object.prototype.hasOwnProperty.call(patch, k)) { brand[k] = patch[k]; touchedHeader = true; }
     });
     if (touchedHeader) { try { renderHeader(state.config); } catch (_e) {} }
+    // The credentials toggle also decides whether the contact block re-shows the
+    // clickable phone/email/authority fallback, so re-render it in place too.
+    if (Object.prototype.hasOwnProperty.call(patch, 'headerShowCredentials')) {
+      try { renderContact(state.config.contact); } catch (_e) {}
+    }
     var CONTACT_KEYS = ['requireEmail', 'requirePhone', 'showQuoteBeforeContact', 'claimCtaText'];
     var touchedContact = false;
     CONTACT_KEYS.forEach(function (k) {
@@ -900,6 +905,10 @@
     h.appendChild(brandNameEl);
     var tagline = (cfg.brand && cfg.brand.tagline) || 'Get an instant freight quote';
     $('qf-tagline').textContent = tagline;
+    // Credential meta-lines directly under the name/tagline (single source of
+    // truth = the tenant profile fields carried in cfg.contact). See
+    // renderCredMeta — gated on brand.headerShowCredentials + data presence.
+    renderCredMeta(cfg);
     if (cfg.brand && cfg.brand.showPoweredBy) $('qf-powered').innerHTML = 'Powered by <a href="' + location.origin + '" target="_blank">QuoteFleet</a>';
     else $('qf-powered').textContent = '';
     var noteEl = $('qf-footer-note');
@@ -909,6 +918,57 @@
       else { noteEl.textContent = ''; noteEl.style.display = 'none'; }
     }
     if (cfg.brand && cfg.brand.ctaText) $('qf-calc-btn').textContent = cfg.brand.ctaText;
+  }
+
+  // Credential meta-lines under the company name/tagline — the "meta lines under
+  // name" header layout. Two muted, small secondary lines:
+  //   line 1 (authority): USDOT {dot} · MC {mc}
+  //   line 2 (reach):     {phone} · {email}
+  // ONLY present items are shown (a missing datum is omitted; a single datum
+  // shows alone; none → nothing renders). The whole block is gated on
+  // brand.headerShowCredentials !== false AND at least one datum present. The
+  // element is a dynamically-created sibling inserted right after #qf-tagline, so
+  // the existing logo/name/tagline layout is untouched; it is reused (updated in
+  // place) across the repeated renderHeader() calls the brand-preview patch makes.
+  //
+  // Separators are glued to the PRECEDING token with a non-breaking space
+  // ( ) + middle dot, then a normal space — so a wrap at narrow widths can
+  // only break BEFORE the next item, never orphaning a lone "·" at a line start
+  // (global no-orphan-wrap rule). Labels use an internal NBSP ("USDOT …")
+  // so a number never splits from its label either.
+  function credLineText(parts) {
+    return parts.join(' · ');
+  }
+  function renderCredMeta(cfg) {
+    var brand = (cfg && cfg.brand) || {};
+    var contact = (cfg && cfg.contact) || {};
+    var show = brand.headerShowCredentials !== false;
+    var tag = $('qf-tagline');
+    var box = document.getElementById('qf-cred-meta');
+    var dot = show && contact.dotNumber ? String(contact.dotNumber).trim() : '';
+    var mc = show && contact.mcNumber ? String(contact.mcNumber).trim() : '';
+    var phone = show && contact.phone ? String(contact.phone).trim() : '';
+    var email = show && contact.email ? String(contact.email).trim() : '';
+    var authParts = [];
+    if (dot) authParts.push('USDOT ' + dot);
+    if (mc) authParts.push('MC ' + mc);
+    var reachParts = [];
+    if (phone) reachParts.push(phone);
+    if (email) reachParts.push(email);
+    if (!authParts.length && !reachParts.length) {
+      if (box && box.parentNode) box.parentNode.removeChild(box);
+      return;
+    }
+    if (!box) {
+      box = el('div', { class: 'qf-cred-meta', id: 'qf-cred-meta' });
+      box.setAttribute('aria-label', 'Carrier credentials');
+      if (tag && tag.parentNode) tag.parentNode.insertBefore(box, tag.nextSibling);
+      else { var h = $('qf-header'); if (h && h.parentNode) h.parentNode.insertBefore(box, h.nextSibling); }
+    }
+    box.innerHTML = '';
+    if (authParts.length) box.appendChild(el('div', { class: 'qf-cred-line', text: credLineText(authParts) }));
+    if (reachParts.length) box.appendChild(el('div', { class: 'qf-cred-line', text: credLineText(reachParts) }));
+    box.style.display = '';
   }
 
   // Carrier contact block under the header — same details customers see on
@@ -939,8 +999,18 @@
       }
       return row;
     }
-    if (contact.phone) rows.push(iconRow('Phone', contact.phone, 'tel:' + contact.phone.replace(/[^+0-9]/g, '')));
-    if (contact.email) rows.push(iconRow('Email', contact.email, 'mailto:' + contact.email));
+    // When the header credential meta-lines are active (renderCredMeta —
+    // headerShowCredentials !== false), the calculator header already owns the
+    // carrier's phone / email / USDOT / MC. Emitting them again in this labelled
+    // block would show the same four values twice, so they are suppressed here and
+    // this block keeps ONLY the details the header meta-lines do NOT carry:
+    // Address + "Chat with us". With the toggle OFF (credentials hidden in the
+    // header) the clickable phone/email/authority rows return as the fallback, so
+    // the info is always reachable somewhere and never duplicated.
+    var brand = (state.config && state.config.brand) || {};
+    var credsInHeader = brand.headerShowCredentials !== false;
+    if (!credsInHeader && contact.phone) rows.push(iconRow('Phone', contact.phone, 'tel:' + contact.phone.replace(/[^+0-9]/g, '')));
+    if (!credsInHeader && contact.email) rows.push(iconRow('Email', contact.email, 'mailto:' + contact.email));
     if (contact.chat) {
       var chatRow = el('span', { class: 'qf-contact-item' });
       chatRow.appendChild(el('span', { class: 'qf-contact-label', text: 'Chat' }));
@@ -950,10 +1020,14 @@
       rows.push(chatRow);
     }
     if (contact.address) rows.push(iconRow('Address', bindCountryToken(contact.address)));
-    var ids = [];
-    if (contact.dotNumber) ids.push('USDOT ' + contact.dotNumber);
-    if (contact.mcNumber) ids.push('MC ' + contact.mcNumber);
-    if (ids.length) rows.push(iconRow('Authority', ids.join(' · ')));
+    // Authority (USDOT/MC) only as the toggle-OFF fallback — otherwise it lives in
+    // the header credential meta-lines (see credsInHeader above).
+    if (!credsInHeader) {
+      var ids = [];
+      if (contact.dotNumber) ids.push('USDOT ' + contact.dotNumber);
+      if (contact.mcNumber) ids.push('MC ' + contact.mcNumber);
+      if (ids.length) rows.push(iconRow('Authority', ids.join(' · ')));
+    }
     if (!rows.length) { box.style.display = 'none'; return; }
     rows.forEach(function (r) { box.appendChild(r); });
     box.style.display = '';
