@@ -1,0 +1,14 @@
+-- Carrier directory — add domicile `country` column (North-America model).
+--
+-- Phase-1 FOUNDATION for ingesting Canadian carriers alongside the US set. The
+-- column defaults 'US' so every existing row (and every newly-ingested US row)
+-- is unchanged; Canadian carriers — gated behind the ingest's includeCanada
+-- flag — are tagged 'CA'. This lets the directory partition North America by
+-- country without disturbing the live US-only browse.
+--
+-- Idempotent (ADD COLUMN IF NOT EXISTS, NOT NULL w/ default) so it is safe to
+-- re-run on every boot via runMigrations() — the Replit deploy does not run
+-- db:migrate, so this makes the republish self-healing (same pattern as 0041).
+-- The same statement is mirrored in SELF_HEAL_COLUMN_STATEMENTS (src/db/migrate.ts)
+-- so a Replit phantom-drop of the column is re-added before the server serves.
+ALTER TABLE "carrier_directory" ADD COLUMN IF NOT EXISTS "country" text NOT NULL DEFAULT 'US';

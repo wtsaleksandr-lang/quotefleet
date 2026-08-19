@@ -38,8 +38,9 @@
 import { sql } from 'drizzle-orm';
 import { db } from '../../db/client.js';
 import { carrierDirectory, type CarrierDirectoryRow } from '../../db/schema.js';
-import { nearestPortForZip } from './containerPorts.js';
+import { nearestPortForZip, nearestCaPortForProvince } from './containerPorts.js';
 import { US_STATE_CODES } from './usStates.js';
+import { CA_PROVINCE_CODES } from './caProvinces.js';
 
 // ─── Socrata sources ──────────────────────────────────────────────────────
 const SOCRATA_BASE = 'https://data.transportation.gov/resource';
@@ -92,6 +93,8 @@ export interface CarrierRecord {
   dbaName: string | null;
   city: string | null;
   state: string | null;
+  /** Domicile country derived from state: 'US' or 'CA'. */
+  country: string;
   zip: string | null;
   phone: string | null;
   powerUnits: number | null;
@@ -164,6 +167,18 @@ export function isIntermodal(census: CensusRow | undefined): boolean {
   return census?.crgo_intermodal === 'X';
 }
 
+/**
+ * Domicile country for a (already upper-cased) physical state/province code:
+ * 'US' when it's a US state/territory, 'CA' when it's a Canadian province, else
+ * null (Mexico / other / no state) — unplaceable in the North-America browse.
+ */
+export function carrierCountry(state: string | null): 'US' | 'CA' | null {
+  if (!state) return null;
+  if (US_STATE_CODES.has(state)) return 'US';
+  if (CA_PROVINCE_CODES.has(state)) return 'CA';
+  return null;
+}
+
 /** URL-safe slug from the display name, suffixed with USDOT for uniqueness. */
 export function makeSlug(name: string, usdot: string): string {
   const base = name
@@ -184,6 +199,7 @@ export function makeSlug(name: string, usdot: string): string {
 export function normalizeCarrier(
   li: LiCarrierRow,
   census: CensusRow | undefined,
+  includeCanada = false,
 ): CarrierRecord | null {
   if (!isActivePropertyCarrier(li)) return null;
   if (!censusAllowsOperate(census)) return null;
@@ -197,13 +213,16 @@ export function normalizeCarrier(
 
   const zip = cleanStr(census?.phy_zip) ?? cleanStr(li.bus_zip_code);
   const state = (cleanStr(census?.phy_state) ?? cleanStr(li.bus_state_code))?.toUpperCase() ?? null;
-  // US-domicile only: the directory is organized by US state + US port, so a
-  // carrier physically domiciled outside the 50 states + DC + PR/VI/GU — or with
-  // no domicile state at all — can't be placed in the browse and would only
-  // inflate unfiltered/port counts (and desync the landing total, which sums the
-  // per-state grid, from the faceted count(*)). Drop it (Canada/Mexico cross-border
-  // carriers remain findable via the live /compliance lookup).
-  if (!state || !US_STATE_CODES.has(state)) return null;
+  // Country-aware domicile gate. The directory is organized by state/province +
+  // port, so a carrier must be placeable in a North-America country:
+  //   - US state / DC / PR-VI-GU  → country 'US' (kept, unchanged behavior).
+  //   - Canadian province          → country 'CA' (kept ONLY when includeCanada;
+  //     otherwise dropped — this preserves the EXACT current US-only output when
+  //     the flag is off, since the ~9k Canada carriers hold US cross-border authority).
+  //   - Mexico / other / no state  → country null (dropped — unchanged behavior).
+  const country = carrierCountry(state);
+  if (country === null) return null;
+  if (country === 'CA' && !includeCanada) return null;
 
   return {
     usdot,
@@ -212,6 +231,7 @@ export function normalizeCarrier(
     dbaName: cleanStr(li.dba_name) ?? cleanStr(census?.dba_name),
     city: cleanStr(census?.phy_city) ?? cleanStr(li.bus_city),
     state,
+    country,
     zip,
     phone: normalizePhone(census?.phone) ?? normalizePhone(li.bus_telno),
     powerUnits: toInt(census?.power_units),
@@ -222,7 +242,9 @@ export function normalizeCarrier(
     safetyRating: cleanStr(census?.safety_rating)?.toUpperCase() ?? null,
     authorityType: authorityType(li),
     intermodal: isIntermodal(census),
-    nearestPortCode: nearestPortForZip(zip),
+    // US carriers derive the port from the ZIP centroid; CA postal codes aren't in
+    // the US ZCTA table, so CA carriers map by province → nearest Canadian gateway.
+    nearestPortCode: country === 'CA' ? nearestCaPortForProvince(state) : nearestPortForZip(zip),
     publicSlug: makeSlug(legalName, usdot),
   };
 }
@@ -235,13 +257,14 @@ export function normalizeCarrier(
 export function filterAndNormalizeCarriers(
   liRows: LiCarrierRow[],
   censusByDot: Map<string, CensusRow>,
+  includeCanada = false,
 ): CarrierRecord[] {
   const out: CarrierRecord[] = [];
   const seen = new Set<string>();
   for (const li of liRows) {
     const dot = normalizeDot(li.dot_number);
     const census = dot ? censusByDot.get(dot) : undefined;
-    const rec = normalizeCarrier(li, census);
+    const rec = normalizeCarrier(li, census, includeCanada);
     if (rec && !seen.has(rec.usdot)) {
       seen.add(rec.usdot);
       out.push(rec);
@@ -283,6 +306,7 @@ export const dbCarrierStore: CarrierStore = {
             dbaName: sql`excluded.dba_name`,
             city: sql`excluded.city`,
             state: sql`excluded.state`,
+            country: sql`excluded.country`,
             zip: sql`excluded.zip`,
             phone: sql`excluded.phone`,
             powerUnits: sql`excluded.power_units`,
@@ -361,6 +385,13 @@ export interface IngestOptions {
   pageSize: number;
   states: string[];
   dryRun: boolean;
+  /**
+   * Include Canada-domiciled carriers (tagged country='CA'). DEFAULT false, so
+   * the ingest output is byte-for-byte the current US-only set unless explicitly
+   * enabled. When the field is omitted, runIngest falls back to the env switch
+   * INGEST_INCLUDE_CANADA=1. Leaving both off keeps the live directory US-only.
+   */
+  includeCanada?: boolean;
 }
 
 export interface IngestSummary {
@@ -383,6 +414,9 @@ export async function runIngest(
   const fetchCarriers = deps.fetchCarriers ?? fetchCarrierPage;
   const fetchCensus = deps.fetchCensus ?? fetchCensusByDots;
   const log = deps.log ?? ((m: string) => console.log(m));
+  // Effective Canada gate: explicit option wins; otherwise honor the env switch.
+  // Default OFF → the ingest produces the exact current US-only set.
+  const includeCanada = opts.includeCanada ?? process.env.INGEST_INCLUDE_CANADA === '1';
 
   let carriersSeen = 0;
   let ingested = 0;
@@ -399,7 +433,7 @@ export async function runIngest(
 
     const dots = liRows.map((r) => normalizeDot(r.dot_number)).filter((d): d is string => !!d);
     const censusByDot = await fetchCensus(dots);
-    let records = filterAndNormalizeCarriers(liRows, censusByDot);
+    let records = filterAndNormalizeCarriers(liRows, censusByDot, includeCanada);
 
     // Honor --limit at the page boundary: trim this page's records so the total
     // never exceeds the cap, then bulk-upsert the (trimmed) page in one go.

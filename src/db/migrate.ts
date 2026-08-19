@@ -132,6 +132,7 @@ export const SELF_HEAL_TABLE_STATEMENTS: readonly string[] = [
     "dba_name" text,
     "city" text,
     "state" text,
+    "country" text DEFAULT 'US' NOT NULL,
     "zip" text,
     "phone" text,
     "power_units" integer,
@@ -144,6 +145,13 @@ export const SELF_HEAL_TABLE_STATEMENTS: readonly string[] = [
     "created_at" timestamp DEFAULT now() NOT NULL,
     "updated_at" timestamp DEFAULT now() NOT NULL
   )`,
+  // 0042_carrier_country.sql — domicile country. Healed HERE (the carrier_directory
+  // self-heal step) rather than in SELF_HEAL_COLUMN_STATEMENTS because that step
+  // runs BEFORE this one at boot (src/server/index.ts) and the table can be absent
+  // there; this ALTER runs immediately after the CREATE TABLE above, so the table
+  // is guaranteed to exist and the IF NOT EXISTS no-ops on a healthy DB. Defaults
+  // 'US' so every existing row stays US — the live directory is unchanged.
+  `ALTER TABLE "carrier_directory" ADD COLUMN IF NOT EXISTS "country" text NOT NULL DEFAULT 'US'`,
   `CREATE UNIQUE INDEX IF NOT EXISTS "carrier_directory_usdot_idx" ON "carrier_directory" ("usdot")`,
   `CREATE UNIQUE INDEX IF NOT EXISTS "carrier_directory_slug_idx" ON "carrier_directory" ("public_slug")`,
   `CREATE INDEX IF NOT EXISTS "carrier_directory_state_idx" ON "carrier_directory" ("state")`,
