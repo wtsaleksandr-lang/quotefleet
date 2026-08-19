@@ -12,9 +12,10 @@ import type { Express } from 'express';
 import { eq, desc, sql } from 'drizzle-orm';
 import { z } from 'zod';
 import { db } from '../../db/client.js';
-import { tenants, leads, users, auditLog } from '../../db/schema.js';
+import { tenants, leads, users, auditLog, carrierDirectory, carrierOverrides, type NewCarrierOverrideRow } from '../../db/schema.js';
 import { requireAuth, requireSuperAdmin } from '../middleware.js';
 import { runAggregatesNow } from '../../marketplace/cron.js';
+import { normalizeDot } from '../directory/carrierIngest.js';
 import {
   PLAN_IDS,
   PLAN_PRICES_USD,
@@ -200,6 +201,105 @@ export function computeMrr(rows: MrrTenant[]): MrrBreakdown {
   };
 }
 
+/**
+ * Schema for `POST /api/admin/carrier/:usdot/override`. Every field is optional
+ * (partial upsert) and nullable (null clears the override → the profile falls
+ * back to the FMCSA value). `.strict()` rejects unknown keys with a clean 400.
+ * `capabilities` keys match CarrierCapabilities (schema.ts) 1:1.
+ */
+const CarrierOverridePatch = z
+  .object({
+    about: z.string().max(4000).nullable().optional(),
+    // `''` allowed so an admin can clear the email override; normalized to null.
+    email: z.string().max(320).email().or(z.literal('')).nullable().optional(),
+    phone: z.string().max(40).nullable().optional(),
+    hidden: z.boolean().nullable().optional(),
+    capabilities: z
+      .object({
+        uiia: z.boolean().optional(),
+        twic: z.boolean().optional(),
+        bonded: z.boolean().optional(),
+        reefer: z.boolean().optional(),
+        transload: z.boolean().optional(),
+        yard: z.boolean().optional(),
+      })
+      .strict()
+      .nullable()
+      .optional(),
+  })
+  .strict();
+export type CarrierOverridePatch = z.infer<typeof CarrierOverridePatch>;
+
+/**
+ * Core of `POST /api/admin/carrier/:usdot/override`, extracted so it is
+ * unit-testable (same pattern as patchTenantAdmin). Upserts a `carrier_overrides`
+ * row — the write path the future admin UI + AI-Copilot tool will call.
+ *
+ *  - Validates input; unknown/invalid field → 400.
+ *  - USDOT is normalized (leading zeros stripped) to match carrier_directory.
+ *  - A USDOT not present in carrier_directory → 404 (never orphan an override).
+ *  - On success, writes an audit row and returns the upserted override.
+ *
+ * This table is NEVER touched by the FMCSA re-ingest, so the override persists
+ * across every re-ingest (the merge re-applies it on read via carrierBySlug).
+ */
+export async function upsertCarrierOverride(opts: {
+  usdot: string;
+  body: unknown;
+  actorUserId?: number | null;
+  actorLabel?: string | null;
+}): Promise<{ status: number; json: Record<string, unknown> }> {
+  const usdot = normalizeDot(opts.usdot);
+  if (!usdot) return { status: 400, json: { error: 'Invalid USDOT number.' } };
+
+  const parse = CarrierOverridePatch.safeParse(opts.body);
+  if (!parse.success) {
+    return { status: 400, json: { error: 'Invalid input', details: parse.error.flatten() } };
+  }
+  if (Object.keys(parse.data).length === 0) {
+    return { status: 400, json: { error: 'No override fields provided.' } };
+  }
+
+  // Never create an override for a USDOT that isn't in the public directory.
+  const existing = await db()
+    .select({ usdot: carrierDirectory.usdot })
+    .from(carrierDirectory)
+    .where(eq(carrierDirectory.usdot, usdot))
+    .limit(1);
+  if (!existing[0]) {
+    return { status: 404, json: { error: `No carrier with USDOT '${usdot}'.` } };
+  }
+
+  const blankToNull = (v: string | null | undefined): string | null =>
+    v == null || v.trim() === '' ? null : v;
+  // Only the fields the caller SENT are written (partial upsert); updatedAt /
+  // updatedBy are always refreshed.
+  const set: Partial<NewCarrierOverrideRow> = {
+    updatedAt: new Date(),
+    updatedBy: opts.actorLabel ?? (opts.actorUserId != null ? String(opts.actorUserId) : null),
+  };
+  const d = parse.data;
+  if ('about' in d) set.aboutOverride = blankToNull(d.about ?? null);
+  if ('email' in d) set.emailOverride = blankToNull(d.email ?? null);
+  if ('phone' in d) set.phoneOverride = blankToNull(d.phone ?? null);
+  if ('hidden' in d) set.hidden = d.hidden ?? null;
+  if ('capabilities' in d) set.capabilities = d.capabilities ?? null;
+
+  const upserted = await db()
+    .insert(carrierOverrides)
+    .values({ usdot, ...set })
+    .onConflictDoUpdate({ target: carrierOverrides.usdot, set })
+    .returning();
+
+  // Global (not tenant-scoped) admin action → audit with a null tenantId.
+  await recordAdminAudit(null, opts.actorUserId, 'admin.carrier.override', {
+    usdot,
+    fields: Object.keys(d),
+  });
+
+  return { status: 200, json: { ok: true, override: upserted[0] ?? null } };
+}
+
 export function registerAdminRoutes(app: Express) {
   app.get('/api/admin/tenants', requireAuth, requireSuperAdmin, async (_req, res) => {
     const rows = await db().select().from(tenants).orderBy(desc(tenants.createdAt));
@@ -260,6 +360,19 @@ export function registerAdminRoutes(app: Express) {
       slug: String(req.params.slug),
       body: req.body,
       actorUserId: req.user?.id ?? null,
+    });
+    res.status(result.status).json(result.json);
+  });
+
+  // Upsert a carrier-card OVERRIDE (about / email / phone / hidden /
+  // capabilities). Write path for the future admin UI + AI-Copilot tool; the
+  // overrides survive the FMCSA re-ingest (separate table) and merge on read.
+  app.post('/api/admin/carrier/:usdot/override', requireAuth, requireSuperAdmin, async (req, res) => {
+    const result = await upsertCarrierOverride({
+      usdot: String(req.params.usdot),
+      body: req.body,
+      actorUserId: req.user?.id ?? null,
+      actorLabel: req.user?.email ?? null,
     });
     res.status(result.status).json(result.json);
   });

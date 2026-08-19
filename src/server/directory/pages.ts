@@ -83,8 +83,16 @@ function credBadge(opts: {
   tip: string;
   held: boolean;
   verified?: boolean;
+  /** A self-declared credential (e.g. from carrier_overrides.capabilities): even
+   *  when `held` (solid badge), the tooltip stays "Self-declared." — it is NOT
+   *  FMCSA-verified. */
+  selfDeclared?: boolean;
 }): string {
-  const suffix = opts.verified ? ' ✓ FMCSA-verified.' : opts.held ? '' : ' Self-declared.';
+  const suffix = opts.verified
+    ? ' ✓ FMCSA-verified.'
+    : opts.held && !opts.selfDeclared
+      ? ''
+      : ' Self-declared.';
   const full = opts.tip + suffix;
   const aria = `${opts.label} — ${full}`;
   const common = `tabindex="0" role="note" aria-label="${esc(aria)}" data-tip="${esc(full)}"`;
@@ -1275,7 +1283,14 @@ export function renderCarrierProfile(opts: {
         verified: true,
       }),
     );
-  const claimBadges = SELF_DECLARED_CREDENTIALS.map((b) => credBadge({ ...b, held: false })).join('');
+  // Self-declared credentials: a carrier_overrides.capabilities flag flips the
+  // matching badge from the muted "claim to add" affordance to an ACTIVE solid
+  // badge — still tooltip-labeled "Self-declared." (never FMCSA-verified). The
+  // credential `tone` ids match the CarrierCapabilities keys 1:1.
+  const caps = c.capabilities ?? {};
+  const claimBadges = SELF_DECLARED_CREDENTIALS.map((b) =>
+    credBadge({ ...b, held: !!caps[b.tone as keyof typeof caps], selfDeclared: true }),
+  ).join('');
   const capBadges = verifiedBadges.join('') + claimBadges;
 
   // ── §6 Contact — TIERED. Public block = FMCSA-sourced phone/email (encoded
@@ -1362,7 +1377,7 @@ export function renderCarrierProfile(opts: {
       <div class="cp-main">
         <section class="cp-card">
           <h2 class="cp-h">About</h2>
-          <p class="cp-about">${esc(carrierAbout(c))}</p>
+          <p class="cp-about">${esc(c.aboutOverride ?? carrierAbout(c))}</p>
         </section>
 
         <section class="cp-card">

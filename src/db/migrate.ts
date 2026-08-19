@@ -178,6 +178,42 @@ export const SELF_HEAL_TABLE_STATEMENTS: readonly string[] = [
   `CREATE UNIQUE INDEX IF NOT EXISTS "carrier_directory_slug_idx" ON "carrier_directory" ("public_slug")`,
   `CREATE INDEX IF NOT EXISTS "carrier_directory_state_idx" ON "carrier_directory" ("state")`,
   `CREATE INDEX IF NOT EXISTS "carrier_directory_port_idx" ON "carrier_directory" ("nearest_port_code")`,
+  // 0048_carrier_overrides.sql — human-editable OVERRIDES that survive the FMCSA
+  // re-ingest (the ingest touches carrier_directory ONLY, never this table).
+  // Healed HERE (like carrier_directory) because the Replit deploy skips
+  // db:migrate; IF NOT EXISTS no-ops on a healthy DB. MUST stay byte-for-byte
+  // equivalent to drizzle/0048_carrier_overrides.sql + schema.ts `carrierOverrides`.
+  `CREATE TABLE IF NOT EXISTS "carrier_overrides" (
+    "usdot" text PRIMARY KEY NOT NULL,
+    "about_override" text,
+    "email_override" text,
+    "phone_override" text,
+    "hidden" boolean,
+    "capabilities" jsonb,
+    "updated_at" timestamp DEFAULT now() NOT NULL,
+    "updated_by" text
+  )`,
+  // 0046_terminals.sql — canonical intermodal-terminal reference list backing the
+  // public directory. Healed HERE (a separate at-risk TABLE, same reasoning as
+  // carrier_directory): the seed (seedDirectoryTerminals) runs at boot after this
+  // step and needs the table to exist even on a prod DB that never received 0046.
+  // Must stay byte-for-byte equivalent to drizzle/0046_terminals.sql + schema.ts.
+  `CREATE TABLE IF NOT EXISTS "directory_terminals" (
+    "id" serial PRIMARY KEY NOT NULL,
+    "code" text NOT NULL,
+    "name" text NOT NULL,
+    "city" text NOT NULL,
+    "state" text NOT NULL,
+    "country" text DEFAULT 'US' NOT NULL,
+    "type" text NOT NULL,
+    "lat" double precision NOT NULL,
+    "lng" double precision NOT NULL,
+    "created_at" timestamp DEFAULT now() NOT NULL,
+    "updated_at" timestamp DEFAULT now() NOT NULL
+  )`,
+  `CREATE UNIQUE INDEX IF NOT EXISTS "directory_terminals_code_idx" ON "directory_terminals" ("code")`,
+  `CREATE INDEX IF NOT EXISTS "directory_terminals_country_idx" ON "directory_terminals" ("country")`,
+  `CREATE INDEX IF NOT EXISTS "directory_terminals_type_idx" ON "directory_terminals" ("type")`,
 ];
 
 export async function ensureSelfHealTables(): Promise<void> {
