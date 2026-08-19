@@ -36,6 +36,8 @@ export interface VisibleCarrier {
   safetyRating: string | null;
   authorityType: string | null;
   intermodal: boolean;
+  /** FMCSA-verified hazmat carrier (census hm_ind === 'Y'). */
+  hazmat: boolean;
   nearestPortCode: string | null;
 }
 
@@ -58,6 +60,7 @@ export function visibleCarrier(r: typeof carrierDirectory.$inferSelect): Visible
     safetyRating: r.safetyRating,
     authorityType: r.authorityType,
     intermodal: r.intermodal,
+    hazmat: r.hazmat,
     nearestPortCode: r.nearestPortCode,
   };
 }

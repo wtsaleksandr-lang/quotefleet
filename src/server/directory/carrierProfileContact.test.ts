@@ -24,6 +24,7 @@ function carrier(overrides: Partial<VisibleCarrier> = {}): VisibleCarrier {
     safetyRating: 'S',
     authorityType: 'common',
     intermodal: true,
+    hazmat: false,
     nearestPortCode: 'USSAV',
     ...overrides,
   };

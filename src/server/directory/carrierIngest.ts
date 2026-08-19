@@ -79,6 +79,9 @@ export interface CensusRow {
   safety_rating?: string;
   status_code?: string;
   crgo_intermodal?: string;
+  /** Census hazmat indicator: 'Y' when FMCSA-registered to haul hazardous
+   *  materials, else 'N'. Confirmed live on census az4n-8mr2. */
+  hm_ind?: string;
   phone?: string;
   phy_street?: string;
   phy_city?: string;
@@ -105,6 +108,8 @@ export interface CarrierRecord {
   safetyRating: string | null;
   authorityType: string | null;
   intermodal: boolean;
+  /** FMCSA-verified hazmat carrier (census hm_ind === 'Y'). */
+  hazmat: boolean;
   nearestPortCode: string | null;
   publicSlug: string;
 }
@@ -177,6 +182,15 @@ export function censusAllowsOperate(census: CensusRow | undefined): boolean {
 /** Census crgo_intermodal is 'X' when the carrier hauls intermodal containers. */
 export function isIntermodal(census: CensusRow | undefined): boolean {
   return census?.crgo_intermodal === 'X';
+}
+
+/** Census hm_ind marks an FMCSA-registered hazmat carrier. The census file
+ *  reports it as 'Y'/'N'; sibling cargo flags elsewhere use 'X', so accept
+ *  both truthy conventions and treat anything else (incl. missing census) as
+ *  not-hazmat. */
+export function isHazmat(census: CensusRow | undefined): boolean {
+  const v = census?.hm_ind?.trim().toUpperCase();
+  return v === 'Y' || v === 'X';
 }
 
 /**
@@ -255,6 +269,7 @@ export function normalizeCarrier(
     safetyRating: cleanStr(census?.safety_rating)?.toUpperCase() ?? null,
     authorityType: authorityType(li),
     intermodal: isIntermodal(census),
+    hazmat: isHazmat(census),
     // US carriers derive the port from the ZIP centroid; CA postal codes aren't in
     // the US ZCTA table, so CA carriers map by province → nearest Canadian gateway.
     nearestPortCode: country === 'CA' ? nearestCaPortForProvince(state) : nearestPortForZip(zip),
@@ -321,6 +336,7 @@ export const CARRIER_UPSERT_SET = {
   safetyRating: sql`excluded.safety_rating`,
   authorityType: sql`excluded.authority_type`,
   intermodal: sql`excluded.intermodal`,
+  hazmat: sql`excluded.hazmat`,
   nearestPortCode: sql`excluded.nearest_port_code`,
   publicSlug: sql`excluded.public_slug`,
   updatedAt: sql`excluded.updated_at`,
@@ -389,7 +405,7 @@ export async function fetchCensusByDots(dots: string[]): Promise<Map<string, Cen
     const inList = chunk.map((d) => `'${d}'`).join(',');
     const rows = await socrataJson<CensusRow>(CENSUS_ID, {
       $select:
-        'dot_number,legal_name,dba_name,email_address,power_units,total_drivers,safety_rating,status_code,crgo_intermodal,phone,phy_street,phy_city,phy_state,phy_zip',
+        'dot_number,legal_name,dba_name,email_address,power_units,total_drivers,safety_rating,status_code,crgo_intermodal,hm_ind,phone,phy_street,phy_city,phy_state,phy_zip',
       $where: `dot_number in (${inList})`,
       $limit: String(chunk.length),
     });

@@ -66,6 +66,45 @@ function authorityLabel(type: string | null): string {
   return nice.length ? nice.join(' + ') + ' authority' : 'Authority on file';
 }
 
+/**
+ * One credential badge for the carrier profile.
+ *
+ * `held` (a credential the carrier ACTUALLY has) → a distinct SOLID colour keyed
+ * by `tone`. `verified` (FMCSA-sourced) appends a "✓ FMCSA-verified." marker to
+ * the tooltip so the honest verified-vs-self-declared line is never blurred.
+ * A NOT-held self-declared credential → the muted "claim to add" affordance, its
+ * tooltip flagged "Self-declared." Every badge is keyboard-focusable and carries
+ * a pure-CSS hover/focus tooltip (data-tip) plus an aria-label combining the
+ * label and the explanation for screen readers.
+ */
+function credBadge(opts: {
+  tone: string;
+  label: string;
+  tip: string;
+  held: boolean;
+  verified?: boolean;
+}): string {
+  const suffix = opts.verified ? ' ✓ FMCSA-verified.' : opts.held ? '' : ' Self-declared.';
+  const full = opts.tip + suffix;
+  const aria = `${opts.label} — ${full}`;
+  const common = `tabindex="0" role="note" aria-label="${esc(aria)}" data-tip="${esc(full)}"`;
+  if (opts.held) {
+    return `<span class="cp-badge cp-badge--${opts.tone}" ${common}>${esc(opts.label)}</span>`;
+  }
+  return `<span class="cp-badge cp-badge--claim" ${common}>${esc(opts.label)} <span class="tag" aria-hidden="true">claim to add</span></span>`;
+}
+
+/** Self-declared credentials NOT derivable from FMCSA public data — shown muted
+ *  with a "claim to add" affordance, never asserted as fact. Order = display order. */
+const SELF_DECLARED_CREDENTIALS: Array<{ tone: string; label: string; tip: string }> = [
+  { tone: 'uiia', label: 'UIIA member', tip: 'Uniform Intermodal Interchange Agreement — permits interchange of containers/chassis with ocean carriers & railroads.' },
+  { tone: 'twic', label: 'TWIC', tip: 'Drivers hold TSA Transportation Worker Identification Credentials for secure port access.' },
+  { tone: 'bonded', label: 'Customs-bonded / C-TPAT', tip: 'Customs-bonded / C-TPAT for in-bond and secure cross-border moves.' },
+  { tone: 'reefer', label: 'Reefer', tip: 'Refrigerated container capability.' },
+  { tone: 'transload', label: 'Transload / warehouse', tip: 'Cross-docks and stores freight between the ocean move and the inland leg.' },
+  { tone: 'yard', label: 'Yard / parking', tip: 'Container yard and chassis / trailer parking.' },
+];
+
 // ─── Shared page shell ────────────────────────────────────────────────────
 const DIRECTORY_CSS = `
   .dir-shell { max-width: 1100px; margin: 0 auto; padding: 28px; }
@@ -220,6 +259,70 @@ const DIRECTORY_CSS = `
   .cp-gated p { margin: 0; font-size: 12px; color: var(--muted); line-height: 1.5; }
   .cp-actions { display: flex; flex-direction: column; gap: 8px; margin-top: 8px; }
   .cp-actions .btn { width: 100%; justify-content: center; }
+  /* ── Credential badges — distinct solid colours + pure-CSS hover/focus tooltip ─
+     Palette defined as tokens (bg + text colour chosen for AA contrast). Solid
+     colour = a credential the carrier ACTUALLY has (FMCSA-verified ones render
+     now); self-declared credentials the carrier hasn't verified stay muted with
+     a "claim to add" affordance. Every badge is keyboard-focusable and carries a
+     tooltip (data-tip → ::after on :hover/:focus). The badge rows clip horizontal
+     overflow so a tooltip never triggers page horizontal scroll at 375px. */
+  :root {
+    --badge-dray-bg: #2563eb;        --badge-dray-fg: #ffffff;
+    --badge-hazmat-bg: #ea580c;      --badge-hazmat-fg: #111827;
+    --badge-reefer-bg: #14b8a6;      --badge-reefer-fg: #111827;
+    --badge-authority-bg: #475569;   --badge-authority-fg: #ffffff;
+    --badge-safety-good-bg: #15803d; --badge-safety-good-fg: #ffffff;
+    --badge-safety-warn-bg: #d97706; --badge-safety-warn-fg: #111827;
+    --badge-safety-bad-bg: #b91c1c;  --badge-safety-bad-fg: #ffffff;
+    --badge-safety-none-bg: #6b7280; --badge-safety-none-fg: #ffffff;
+    --badge-uiia-bg: #7c3aed;        --badge-uiia-fg: #ffffff;
+    --badge-twic-bg: #4338ca;        --badge-twic-fg: #ffffff;
+    --badge-bonded-bg: #166534;      --badge-bonded-fg: #ffffff;
+    --badge-transload-bg: #92400e;   --badge-transload-fg: #ffffff;
+    --badge-yard-bg: #334155;        --badge-yard-fg: #ffffff;
+    --badge-tip-bg: #1f2937;         --badge-tip-fg: #f9fafb;
+    --badge-tip-border: rgba(148, 163, 184, 0.28);
+    --badge-focus: #2563eb;
+  }
+  .cp-chiprow, .cp-caps { overflow-x: clip; }
+  .cp-badge { position: relative; display: inline-flex; align-items: center; gap: 6px; font-size: 12px; font-family: var(--font-mono); letter-spacing: 0.02em; padding: 7px 12px; border-radius: 999px; border: 1px solid transparent; white-space: nowrap; cursor: help; }
+  .cp-badge:focus-visible { outline: 2px solid var(--badge-focus); outline-offset: 2px; }
+  .cp-badge--dray { background: var(--badge-dray-bg); color: var(--badge-dray-fg); }
+  .cp-badge--hazmat { background: var(--badge-hazmat-bg); color: var(--badge-hazmat-fg); }
+  .cp-badge--reefer { background: var(--badge-reefer-bg); color: var(--badge-reefer-fg); }
+  .cp-badge--authority { background: var(--badge-authority-bg); color: var(--badge-authority-fg); }
+  .cp-badge--safety-good { background: var(--badge-safety-good-bg); color: var(--badge-safety-good-fg); }
+  .cp-badge--safety-warn { background: var(--badge-safety-warn-bg); color: var(--badge-safety-warn-fg); }
+  .cp-badge--safety-bad { background: var(--badge-safety-bad-bg); color: var(--badge-safety-bad-fg); }
+  .cp-badge--safety-none { background: var(--badge-safety-none-bg); color: var(--badge-safety-none-fg); }
+  .cp-badge--uiia { background: var(--badge-uiia-bg); color: var(--badge-uiia-fg); }
+  .cp-badge--twic { background: var(--badge-twic-bg); color: var(--badge-twic-fg); }
+  .cp-badge--bonded { background: var(--badge-bonded-bg); color: var(--badge-bonded-fg); }
+  .cp-badge--transload { background: var(--badge-transload-bg); color: var(--badge-transload-fg); }
+  .cp-badge--yard { background: var(--badge-yard-bg); color: var(--badge-yard-fg); }
+  .cp-badge--claim { background: var(--surface-2); color: var(--muted); border-color: var(--border); }
+  .cp-badge--claim .tag { font-size: 9px; text-transform: uppercase; letter-spacing: 0.05em; color: var(--muted); border: 1px solid var(--border); border-radius: 4px; padding: 2px 6px; }
+  .cp-badge[data-tip]:hover::after,
+  .cp-badge[data-tip]:focus::after,
+  .cp-badge[data-tip]:focus-visible::after {
+    content: attr(data-tip);
+    position: absolute; top: calc(100% + 9px); left: 50%; transform: translateX(-50%);
+    z-index: 30; width: max-content; max-width: min(240px, 72vw);
+    white-space: normal; text-align: left; text-transform: none; letter-spacing: normal;
+    font-family: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif; font-size: 12px; line-height: 1.45;
+    padding: 9px 11px; border-radius: 8px;
+    background: var(--badge-tip-bg); color: var(--badge-tip-fg); border: 1px solid var(--badge-tip-border);
+    box-shadow: 0 8px 24px rgba(2, 6, 23, 0.35); pointer-events: none;
+  }
+  .cp-badge[data-tip]:hover::before,
+  .cp-badge[data-tip]:focus::before,
+  .cp-badge[data-tip]:focus-visible::before {
+    content: ''; position: absolute; top: calc(100% + 3px); left: 50%; transform: translateX(-50%);
+    border: 6px solid transparent; border-bottom-color: var(--badge-tip-bg); z-index: 31; pointer-events: none;
+  }
+  @media (prefers-reduced-motion: reduce) {
+    .cp-badge[data-tip]::after, .cp-badge[data-tip]::before { transition: none; }
+  }
   @media (max-width: 900px) {
     .cp-layout { grid-template-columns: 1fr; }
     .cp-side { position: static; }
@@ -1097,18 +1200,54 @@ export function renderCarrierProfile(opts: {
     .map(([k, v]) => `<div class="cp-dt"><span class="k">${esc(k)}</span><span class="v">${v}</span></div>`)
     .join('');
 
-  // ── §Capabilities — chips we can DERIVE from FMCSA render ACTIVE. ──────────
-  const activeCaps: string[] = [];
-  if (isActive) activeCaps.push(`<span class="cp-chip on">${esc(authorityLabel(c.authorityType))}</span>`);
-  if (c.intermodal) activeCaps.push('<span class="cp-chip on">Drayage / intermodal</span>');
+  // ── §Capabilities — credentials we can DERIVE from FMCSA (authority, drayage,
+  // HAZMAT, safety) render as distinct SOLID-colour badges tagged ✓ FMCSA in
+  // their tooltip; self-declared credentials the carrier hasn't verified stay
+  // muted with a "claim to add" affordance. Every badge is focusable and carries
+  // a pure-CSS hover/focus tooltip (see credBadge). ────────────────────────────
+  const verifiedBadges: string[] = [];
+  if (isActive)
+    verifiedBadges.push(
+      credBadge({
+        tone: 'authority',
+        label: authorityLabel(c.authorityType),
+        tip: 'Active FMCSA operating authority.',
+        held: true,
+        verified: true,
+      }),
+    );
+  if (c.intermodal)
+    verifiedBadges.push(
+      credBadge({
+        tone: 'dray',
+        label: 'Drayage / intermodal',
+        tip: 'Hauls containers to/from ports and rail ramps (FMCSA cargo classification).',
+        held: true,
+        verified: true,
+      }),
+    );
+  if (c.hazmat)
+    verifiedBadges.push(
+      credBadge({
+        tone: 'hazmat',
+        label: 'Hazmat',
+        tip: 'FMCSA-registered to transport hazardous materials.',
+        held: true,
+        verified: true,
+      }),
+    );
   if (sr.tone !== 'none')
-    activeCaps.push(`<span class="cp-chip ${sr.tone === 'good' ? 'good' : 'on'}">${esc(sr.text)} safety</span>`);
-  // Credentials NOT in FMCSA — rendered MUTED with a "claim to add" affordance,
-  // never asserted as fact (same honest pattern as the Tier-3 facet chips).
-  const mutedCaps = ['UIIA member', 'TWIC', 'Customs-bonded / C-TPAT', 'Reefer', 'Transload / warehouse', 'Yard / parking']
-    .map((n) => `<span class="cp-chip muted">${esc(n)} <span class="tag">claim to add</span></span>`)
-    .join('');
-  const capChips = activeCaps.join('') + mutedCaps;
+    verifiedBadges.push(
+      credBadge({
+        tone: `safety-${sr.tone}`,
+        label: `${sr.text} safety`,
+        tip: 'FMCSA safety rating.',
+        held: true,
+        verified: true,
+      }),
+    );
+  const claimBadges = SELF_DECLARED_CREDENTIALS.map((b) => credBadge({ ...b, held: false })).join('');
+  const capBadges = verifiedBadges.join('') + claimBadges;
 
   // ── §6 Contact — TIERED. Public block = FMCSA-sourced phone/email (encoded
   // href, escaped text), respecting the contactHidden opt-out. Gated block is
@@ -1163,7 +1302,7 @@ export function renderCarrierProfile(opts: {
       ${crumbsHtml(crumbs)}
       <div class="cp-caps">
         ${isActive ? '<span class="cp-badge-active">Active</span>' : ''}
-        ${activeCaps.join('')}
+        ${verifiedBadges.join('')}
       </div>
       <h1 style="margin-top: 6px;">${esc(carrierName(c))}</h1>
       <p class="lead">${esc(cityState)}${c.usdot ? ` · USDOT ${esc(c.usdot)}` : ''}${c.mcNumber ? ` · MC ${esc(c.mcNumber)}` : ''}</p>
@@ -1187,8 +1326,8 @@ export function renderCarrierProfile(opts: {
 
         <section class="cp-card">
           <h2 class="cp-h">Compliance &amp; capabilities</h2>
-          <div class="cp-chiprow">${capChips}</div>
-          <p class="cp-note">Blue tags are confirmed from FMCSA public data. Muted credentials (UIIA, TWIC, bonded / C-TPAT, reefer, transload, yard) are self-declared — claim this profile to verify and add them.</p>
+          <div class="cp-chiprow">${capBadges}</div>
+          <p class="cp-note">Solid-colour badges are confirmed from FMCSA public data (hover any badge for what it means and its source). Muted credentials (UIIA, TWIC, bonded / C-TPAT, reefer, transload, yard) are self-declared — claim this profile to verify and add them.</p>
         </section>
 
         <section class="cp-card">

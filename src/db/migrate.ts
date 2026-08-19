@@ -142,6 +142,7 @@ export const SELF_HEAL_TABLE_STATEMENTS: readonly string[] = [
     "safety_rating" text,
     "authority_type" text,
     "intermodal" boolean DEFAULT false NOT NULL,
+    "hazmat" boolean DEFAULT false NOT NULL,
     "nearest_port_code" text,
     "public_slug" text NOT NULL,
     "created_at" timestamp DEFAULT now() NOT NULL,
@@ -161,6 +162,11 @@ export const SELF_HEAL_TABLE_STATEMENTS: readonly string[] = [
   // carrier's opt-out (the column is only re-ADDed when missing, never reset).
   `ALTER TABLE "carrier_directory" ADD COLUMN IF NOT EXISTS "email" text`,
   `ALTER TABLE "carrier_directory" ADD COLUMN IF NOT EXISTS "contact_hidden" boolean NOT NULL DEFAULT false`,
+  // 0044_carrier_hazmat.sql — FMCSA-verified hazmat flag (census hm_ind='Y').
+  // Healed HERE (same reasoning as above): runs right after the CREATE TABLE so
+  // the table exists and IF NOT EXISTS no-ops on a healthy DB. Defaults false so
+  // every existing row is unchanged until the next re-ingest populates it.
+  `ALTER TABLE "carrier_directory" ADD COLUMN IF NOT EXISTS "hazmat" boolean NOT NULL DEFAULT false`,
   `CREATE UNIQUE INDEX IF NOT EXISTS "carrier_directory_usdot_idx" ON "carrier_directory" ("usdot")`,
   `CREATE UNIQUE INDEX IF NOT EXISTS "carrier_directory_slug_idx" ON "carrier_directory" ("public_slug")`,
   `CREATE INDEX IF NOT EXISTS "carrier_directory_state_idx" ON "carrier_directory" ("state")`,
