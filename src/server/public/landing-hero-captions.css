@@ -160,6 +160,13 @@ body.qf-wft .qf-hero-cap--headline[data-show="1"] { opacity: 1; }
   body.qf-wft .qf-hero-cap--headline .qf-hero-cap__kicker { font-size: 12px; letter-spacing: 0.16em; }
   body.qf-wft .qf-hero-cap--headline .qf-hero-cap__kicker::before { width: 18px; height: 1.5px; }
   body.qf-wft .qf-hero-cap--headline .qf-hero-cap__title { font-size: 30px; line-height: 1.13; max-width: 100%; }
+  /* The rotating caption's kicker ("AI REVIEW", etc.) IS the eyebrow above the
+     mobile hero title, so the persistent audience eyebrow above it is a redundant
+     second eyebrow line — hide it so the hero reads as one clean kicker + title.
+     (Desktop keeps the audience eyebrow above the static H1.) */
+  /* !important to beat landing-home-fixes.css's `display: inline-flex !important`
+     on the eyebrow; this file loads after it, so at ≤640px this wins. */
+  body.qf-wft .hero-copy .eyebrow { display: none !important; }
   /* In-device captions are redundant on mobile now — the headline above narrates
      the clip. Hide them so the mockup shows the clean product frame. */
   body.qf-wft .qf-hero-cap--laptop,

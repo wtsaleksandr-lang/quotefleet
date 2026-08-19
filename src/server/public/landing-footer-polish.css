@@ -226,16 +226,21 @@ body.qf-wft .premium-footer .qf-footer-wordmark:hover {
    burger panel. Matches the mono link styling defined in landing-home-fixes.css. */
 @media (max-width: 640px) {
   body.qf-wft .site-mobile-menu .mm-head {
-    margin: 12px 0 4px;
-    padding: 0 16px;
+    margin: 16px 0 8px;
+    padding: 16px 16px 0;
+    border-top: 1px solid rgba(255, 255, 255, 0.09);
     font-family: "JetBrains Mono", ui-monospace, monospace;
-    font-size: 10px;
-    letter-spacing: 0.12em;
+    font-size: 11px;
+    letter-spacing: 0.14em;
     text-transform: uppercase;
     font-weight: 700;
-    color: var(--muted);
+    color: rgba(249, 249, 249, 0.60);
   }
-  body.qf-wft .site-mobile-menu .mm-head:first-child { margin-top: 4px; }
+  body.qf-wft .site-mobile-menu .mm-head:first-child {
+    margin-top: 4px;
+    padding-top: 0;
+    border-top: 0;
+  }
 }
 
 /* ─────────────────────────────────────────────────────────────────────────
