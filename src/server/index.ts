@@ -7,6 +7,7 @@ import './bootstrapDoppler.js';
 import { loadEnv } from '../config.js';
 import { runMigrations, ensureSelfHealColumns, ensureSelfHealTables } from '../db/migrate.js';
 import { maybeAutoHealCarrierDirectory } from './directory/autoHeal.js';
+import { seedDirectoryTerminals } from './directory/terminals.js';
 import { createApp } from './app.js';
 import { startMarketplaceCron } from '../marketplace/cron.js';
 import { startLifecycleEmailCron } from '../email/lifecycleCron.js';
@@ -29,6 +30,16 @@ async function main() {
   // /compliance pages. CREATE TABLE IF NOT EXISTS every boot guarantees it exists
   // (empty if never ingested) before serving traffic.
   await ensureSelfHealTables();
+  // Seed/refresh the canonical intermodal-terminal reference list (a few dozen
+  // idempotent upserts). Non-critical to serving, so a failure is logged but
+  // NEVER crashes boot — the table (self-healed above) still renders, just
+  // possibly stale/empty until the next boot re-seeds.
+  try {
+    const n = await seedDirectoryTerminals();
+    console.log(`[server] directory_terminals seeded (${n} rows)`);
+  } catch (err) {
+    console.error('[server] directory_terminals seed failed (non-fatal):', err);
+  }
   // Journal-INDEPENDENT re-population of the carrier_directory DATA. The
   // ensureSelfHealTables step above restores the (empty) table after a Replit
   // phantom-drop, but the ~321k ingested FMCSA rows are gone. This kicks off a

@@ -189,6 +189,27 @@ export const SELF_HEAL_TABLE_STATEMENTS: readonly string[] = [
     "updated_at" timestamp DEFAULT now() NOT NULL,
     "updated_by" text
   )`,
+  // 0046_terminals.sql — canonical intermodal-terminal reference list backing the
+  // public directory. Healed HERE (a separate at-risk TABLE, same reasoning as
+  // carrier_directory): the seed (seedDirectoryTerminals) runs at boot after this
+  // step and needs the table to exist even on a prod DB that never received 0046.
+  // Must stay byte-for-byte equivalent to drizzle/0046_terminals.sql + schema.ts.
+  `CREATE TABLE IF NOT EXISTS "directory_terminals" (
+    "id" serial PRIMARY KEY NOT NULL,
+    "code" text NOT NULL,
+    "name" text NOT NULL,
+    "city" text NOT NULL,
+    "state" text NOT NULL,
+    "country" text DEFAULT 'US' NOT NULL,
+    "type" text NOT NULL,
+    "lat" double precision NOT NULL,
+    "lng" double precision NOT NULL,
+    "created_at" timestamp DEFAULT now() NOT NULL,
+    "updated_at" timestamp DEFAULT now() NOT NULL
+  )`,
+  `CREATE UNIQUE INDEX IF NOT EXISTS "directory_terminals_code_idx" ON "directory_terminals" ("code")`,
+  `CREATE INDEX IF NOT EXISTS "directory_terminals_country_idx" ON "directory_terminals" ("country")`,
+  `CREATE INDEX IF NOT EXISTS "directory_terminals_type_idx" ON "directory_terminals" ("type")`,
 ];
 
 export async function ensureSelfHealTables(): Promise<void> {

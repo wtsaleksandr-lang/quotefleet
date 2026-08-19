@@ -1853,6 +1853,42 @@ export const carrierOverrides = pgTable('carrier_overrides', {
 });
 
 // ────────────────────────────────────────────────────────────────────
+// DIRECTORY_TERMINALS — canonical, PLATFORM-LEVEL reference list of major
+// North-American intermodal terminal metros (coastal SEAPORT gateways +
+// inland RAIL intermodal metros). Distinct from the tenant-scoped `terminals`
+// table above (which lists the individual berths/ramps a specific carrier
+// serves): this one is a single global browse facet for the public carrier
+// directory, seeded from src/server/directory/terminals.ts. No tenantId — like
+// carrier_directory it never references tenants / users / leads, so it stays
+// out of MRR, trials, and every tenant list by construction.
+// ────────────────────────────────────────────────────────────────────
+export const directoryTerminals = pgTable(
+  'directory_terminals',
+  {
+    id: serial('id').primaryKey(),
+    /** UN/LOCODE (seaport) or `INL`-prefixed inland-rail code. UNIQUE identity. */
+    code: text('code').notNull(),
+    name: text('name').notNull(),
+    city: text('city').notNull(),
+    /** Two-letter US state / CA province (upper-cased); the primary browse facet. */
+    state: text('state').notNull(),
+    /** Domicile country: 'US' or 'CA'. */
+    country: text('country').notNull().default('US'),
+    /** 'seaport' (coastal container gateway) | 'rail' (inland rail intermodal metro). */
+    type: text('type').notNull(),
+    lat: doublePrecision('lat').notNull(),
+    lng: doublePrecision('lng').notNull(),
+    createdAt: timestamp('created_at', { mode: 'date' }).notNull().defaultNow(),
+    updatedAt: timestamp('updated_at', { mode: 'date' }).notNull().defaultNow(),
+  },
+  (t) => [
+    uniqueIndex('directory_terminals_code_idx').on(t.code),
+    index('directory_terminals_country_idx').on(t.country),
+    index('directory_terminals_type_idx').on(t.type),
+  ]
+);
+
+// ────────────────────────────────────────────────────────────────────
 // Type helpers for use in the rest of the codebase.
 // ────────────────────────────────────────────────────────────────────
 export type Tenant = typeof tenants.$inferSelect;
@@ -1874,6 +1910,8 @@ export type RateMatrix = typeof rateMatrices.$inferSelect;
 export type NewRateMatrix = typeof rateMatrices.$inferInsert;
 export type Terminal = typeof terminals.$inferSelect;
 export type NewTerminal = typeof terminals.$inferInsert;
+export type DirectoryTerminal = typeof directoryTerminals.$inferSelect;
+export type NewDirectoryTerminal = typeof directoryTerminals.$inferInsert;
 export type AiConfig = typeof aiConfigs.$inferSelect;
 export type BrandConfig = typeof brandConfigs.$inferSelect;
 export type Lead = typeof leads.$inferSelect;
