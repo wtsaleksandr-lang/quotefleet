@@ -2,9 +2,10 @@ import { describe, expect, it } from 'vitest';
 import { SELF_HEAL_COLUMN_STATEMENTS } from './migrate.js';
 
 /**
- * The eager, journal-independent self-heal step must always re-add the 7
+ * The eager, journal-independent self-heal step must always re-add the 8
  * at-risk brand_configs columns that Replit's publish tool keeps phantom-
- * dropping (from drizzle/0038_header_layout.sql + 0039_lead_routing_validity.sql).
+ * dropping (from drizzle/0038_header_layout.sql + 0039_lead_routing_validity.sql
+ * + 0040_header_show_credentials.sql).
  * We assert against the exact SQL the function runs — no live DB required.
  */
 describe('ensureSelfHealColumns — at-risk brand_configs columns', () => {
@@ -21,9 +22,11 @@ describe('ensureSelfHealColumns — at-risk brand_configs columns', () => {
     ['quote_validity_days', `ADD COLUMN IF NOT EXISTS "quote_validity_days" integer`],
     ['lead_email_to', `ADD COLUMN IF NOT EXISTS "lead_email_to" text`],
     ['lead_email_cc', `ADD COLUMN IF NOT EXISTS "lead_email_cc" text`],
+    // 0040 — NOT NULL with default; type/default match src/db/schema.ts.
+    ['header_show_credentials', `ADD COLUMN IF NOT EXISTS "header_show_credentials" boolean DEFAULT true NOT NULL`],
   ];
 
-  it('covers all 7 columns with matching types/defaults', () => {
+  it('covers all 8 columns with matching types/defaults', () => {
     expect(SELF_HEAL_COLUMN_STATEMENTS).toHaveLength(expected.length);
     for (const [, fragment] of expected) {
       expect(sql).toContain(fragment);
