@@ -237,3 +237,43 @@ body.qf-wft .premium-footer .qf-footer-wordmark:hover {
   }
   body.qf-wft .site-mobile-menu .mm-head:first-child { margin-top: 4px; }
 }
+
+/* ─────────────────────────────────────────────────────────────────────────
+   Footer even-gap + top-align fix (Alex feedback — appended last so it wins).
+
+   FIX 1 — Brand block sat too LOW. The inner grid defaulted to
+   `align-items: stretch`, so the brand cell was stretched to the full height of
+   the tall link row (Solutions has 7 links); the brand's own flex then centered
+   the logo+text inside that tall cell, dropping the logo well below the
+   PRODUCT/SOLUTIONS/… heading row. Set the grid to `align-items: start` and the
+   brand's flex to `align-items: flex-start` so the logo/wordmark top edge lines
+   up with the column headings.
+
+   FIX 2 — Uneven inter-column gaps, then full-width even distribution.
+   With `1.4fr repeat(4, 1fr)` the four link tracks were equal WIDTH, but the link
+   text differs in length (Solutions longest, Company shortest). Left-aligned
+   inside equal tracks, each column left a DIFFERENT amount of trailing whitespace
+   before the fixed gap, so the visual gaps varied. Sizing every track to its
+   content (`max-content`) makes the inter-column gaps identical. Then, to spread
+   the whole footer edge-to-edge instead of clustering the columns on the right,
+   `justify-content: space-between` distributes the leftover width EQUALLY between
+   all five items — brand pinned to the left edge, Legal to the right edge, the
+   four link columns evenly spaced across the remaining width. A small on-ramp
+   `column-gap` (16px) is the guaranteed MINIMUM spacing; space-between only
+   distributes the *leftover* space, so this floor prevents any crowding as the
+   viewport approaches the 981px boundary (where leftover space is smallest).
+
+   Scoped ≥981px so the ≤980px 2-col and ≤720px 1-col stacked grids defined in
+   landing-conversion.css stay intact. Spacing on the 8px ramp.
+   ───────────────────────────────────────────────────────────────────────── */
+@media (min-width: 981px) {
+  body.qf-wft .premium-footer .premium-footer-inner {
+    grid-template-columns: max-content repeat(4, max-content);
+    justify-content: space-between;
+    column-gap: 16px;
+    align-items: start;
+  }
+  body.qf-wft .premium-footer .footer-brand {
+    align-items: flex-start;
+  }
+}
