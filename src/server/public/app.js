@@ -3742,6 +3742,16 @@
       var company = el('div', { class: 'card qf-cz-section' });
       company.appendChild(textField('Company name', 'displayName', b.displayName, 'Shown above your calculator.'));
       company.appendChild(textField('Tagline', 'tagline', b.tagline, 'One short line under your name.'));
+      // Portal on/off for the tagline line. Defaults ON; when off the tagline is
+      // hidden entirely in the calculator header (widget.js renderHeader reads
+      // brand.showTagline). Saves via the shared brand-patch path + refreshes the
+      // live preview like the other display toggles.
+      company.appendChild(brandSettingToggle(b,
+        'Show tagline',
+        'showTagline',
+        true,
+        'Turn off to hide the tagline line under your company name in the calculator header.'
+      ));
       controls.appendChild(company);
 
       // Copilot form-fill (Phase 2): register the company name + tagline text

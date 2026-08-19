@@ -708,3 +708,33 @@ body.qf-app-calculator .qf-rchat .qf-chat-bubble {
      phone-mockup width; the NBSP-glued " · " separators never orphan a dot. */
   overflow-wrap: anywhere;
 }
+
+/* ── Maersk-clean header regroup (appended at EOF to preserve the line-based
+   spacing/color guard baselines) ─────────────────────────────────────────────
+   Three coordinated tweaks, tokens + on-grid spacing only (no new hex, no
+   off-ramp padding/margin/gap):
+     1. The tagline chip beside the brand name (the calculator's visible tagline —
+        simplifyHeader hides the #qf-tagline line) is de-rounded to a restrained
+        ~5px radius instead of the fully-rounded 999px pill. Its legible font size
+        is owned by widget-ux-fixes.css (11px !important) so it wins the cascade.
+     2. The #qf-tagline line (shown only in non-app contexts) gets a slightly
+        larger, calmer size with a tighter bottom gap.
+     3. The regrouped credential block (address → USDOT · MC → phone · email) is
+        one muted, evenly-spaced unit — tagline-independent top margin so it sits
+        cleanly whether the tagline shows or is toggled off. */
+.qf-header .brand-name::after {
+  border-radius: 5px;
+  padding: 4px 8px;
+  letter-spacing: 0.04em;
+}
+.qf-tagline {
+  font-size: 14px;
+  margin-bottom: 8px;
+}
+.qf-cred-meta {
+  margin: 4px 0 16px;
+  gap: 4px;
+}
+.qf-cred-line {
+  font-size: 12.5px;
+}

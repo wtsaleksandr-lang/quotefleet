@@ -927,6 +927,11 @@ export function registerTenantRoutes(app: Express) {
     // numbers themselves are saved via the tenant profile (see PUT
     // /api/tenant/profile). Persisted verbatim; spreads into the column set.
     headerShowCredentials: z.boolean().optional(),
+    // Show the carrier's tagline (the one short sentence under the company name)
+    // in the calculator header. Only the on/off toggle lives here; the tagline
+    // text itself is the `tagline` field. Persisted verbatim; spreads into the
+    // column set. Default true — see renderHeader (widget.js).
+    showTagline: z.boolean().optional(),
     // Quote validity window (days). Forgiving: '' / non-numeric → null (app
     // default); a number is clamped to 1..365. Stored in the integer column.
     quoteValidityDays: z.preprocess((v) => {

@@ -533,7 +533,7 @@
   function applyBrandPreviewPatch(patch) {
     if (!patch || !state.config) return;
     var brand = state.config.brand || (state.config.brand = {});
-    var HEADER_KEYS = ['displayName', 'tagline', 'ctaText', 'logoUrl', 'headerLogoFill', 'showPoweredBy', 'footerNote', 'headerShowCredentials'];
+    var HEADER_KEYS = ['displayName', 'tagline', 'showTagline', 'ctaText', 'logoUrl', 'headerLogoFill', 'showPoweredBy', 'footerNote', 'headerShowCredentials'];
     var touchedHeader = false;
     HEADER_KEYS.forEach(function (k) {
       if (Object.prototype.hasOwnProperty.call(patch, k)) { brand[k] = patch[k]; touchedHeader = true; }
@@ -895,19 +895,35 @@
       h.appendChild(el('img', { src: initialsLogo(name, bg), alt: name, class: 'qf-brand-initials' }));
     }
     var brandNameEl = el('div', { class: 'brand-name', text: name });
-    // The eyebrow pill next to the company name (public-calculator-ux.css →
-    // .brand-name::after) now echoes the carrier's Tagline verbatim, live on
-    // every renderHeader() (each brand-preview patch recreates this element).
-    // Empty tagline falls back to the historic label so existing widgets look
-    // unchanged; an empty attribute would hide the pill via the CSS guard rule.
-    var eyebrow = (cfg.brand && cfg.brand.tagline) ? String(cfg.brand.tagline).trim() : '';
-    brandNameEl.setAttribute('data-eyebrow', eyebrow || 'Instant freight estimate');
+    // The de-rounded chip beside the company name (public-calculator-ux.css →
+    // .brand-name::after, via data-eyebrow) is the calculator's VISIBLE tagline:
+    // the app-calculator experience (public-calculator-conditional-options.js →
+    // simplifyHeader) hides and clears the #qf-tagline sentence line, so this
+    // chip is the single tagline surface. It echoes the carrier's Tagline
+    // verbatim (falling back to a generic kicker when unset), and is gated by
+    // brand.showTagline (default true): when explicitly false, data-eyebrow is
+    // emptied so the CSS guard rule hides the chip entirely. The brand-preview
+    // toggle rides in via applyBrandPreviewPatch's HEADER_KEYS so it flips live.
+    var showTagline = !(cfg.brand && cfg.brand.showTagline === false);
+    var tagline = (cfg.brand && cfg.brand.tagline) ? String(cfg.brand.tagline).trim() : '';
+    brandNameEl.setAttribute('data-eyebrow', showTagline ? (tagline || 'Instant freight estimate') : '');
     h.appendChild(brandNameEl);
-    var tagline = (cfg.brand && cfg.brand.tagline) || 'Get an instant freight quote';
-    $('qf-tagline').textContent = tagline;
-    // Credential meta-lines directly under the name/tagline (single source of
-    // truth = the tenant profile fields carried in cfg.contact). See
-    // renderCredMeta — gated on brand.headerShowCredentials + data presence.
+    // Also keep the (normally hidden) #qf-tagline line in sync for any non-app
+    // context that shows it — same gating, so the tagline is never stale.
+    var tagEl = $('qf-tagline');
+    if (tagEl) {
+      if (showTagline) {
+        tagEl.textContent = tagline || 'Get an instant freight quote';
+        tagEl.style.display = '';
+      } else {
+        tagEl.textContent = '';
+        tagEl.style.display = 'none';
+      }
+    }
+    // Regrouped credential block directly under the name/tagline (single source
+    // of truth = the tenant profile fields carried in cfg.contact). One muted
+    // info unit — address → USDOT · MC → phone · email. See renderCredMeta —
+    // gated on brand.headerShowCredentials + data presence.
     renderCredMeta(cfg);
     if (cfg.brand && cfg.brand.showPoweredBy) $('qf-powered').innerHTML = 'Powered by <a href="' + location.origin + '" target="_blank">QuoteFleet</a>';
     else $('qf-powered').textContent = '';
@@ -945,6 +961,11 @@
     var show = brand.headerShowCredentials !== false;
     var tag = $('qf-tagline');
     var box = document.getElementById('qf-cred-meta');
+    // Address leads the block so the whole identity reads as ONE unit:
+    //   line 1: address     line 2: USDOT · MC     line 3: phone · email
+    // The server pre-joins the address parts with " · " (routes/public.ts); the
+    // trailing country token is NBSP-glued so it never orphans onto its own line.
+    var address = show && contact.address ? bindCountryToken(String(contact.address).trim()) : '';
     var dot = show && contact.dotNumber ? String(contact.dotNumber).trim() : '';
     var mc = show && contact.mcNumber ? String(contact.mcNumber).trim() : '';
     var phone = show && contact.phone ? String(contact.phone).trim() : '';
@@ -955,7 +976,7 @@
     var reachParts = [];
     if (phone) reachParts.push(phone);
     if (email) reachParts.push(email);
-    if (!authParts.length && !reachParts.length) {
+    if (!address && !authParts.length && !reachParts.length) {
       if (box && box.parentNode) box.parentNode.removeChild(box);
       return;
     }
@@ -966,6 +987,7 @@
       else { var h = $('qf-header'); if (h && h.parentNode) h.parentNode.insertBefore(box, h.nextSibling); }
     }
     box.innerHTML = '';
+    if (address) box.appendChild(el('div', { class: 'qf-cred-line qf-cred-address', text: address }));
     if (authParts.length) box.appendChild(el('div', { class: 'qf-cred-line', text: credLineText(authParts) }));
     if (reachParts.length) box.appendChild(el('div', { class: 'qf-cred-line', text: credLineText(reachParts) }));
     box.style.display = '';
@@ -999,14 +1021,15 @@
       }
       return row;
     }
-    // When the header credential meta-lines are active (renderCredMeta —
+    // When the header credential block is active (renderCredMeta —
     // headerShowCredentials !== false), the calculator header already owns the
-    // carrier's phone / email / USDOT / MC. Emitting them again in this labelled
-    // block would show the same four values twice, so they are suppressed here and
-    // this block keeps ONLY the details the header meta-lines do NOT carry:
-    // Address + "Chat with us". With the toggle OFF (credentials hidden in the
-    // header) the clickable phone/email/authority rows return as the fallback, so
-    // the info is always reachable somewhere and never duplicated.
+    // carrier's address / phone / email / USDOT / MC as one regrouped unit.
+    // Emitting them again in this labelled block would show the same values
+    // twice, so they are suppressed here and this block keeps ONLY "Chat with
+    // us" (the one affordance the header does not carry). With the toggle OFF
+    // (credentials hidden in the header) the clickable phone/email/authority/
+    // address rows return as the fallback, so the info is always reachable
+    // somewhere and never duplicated.
     var brand = (state.config && state.config.brand) || {};
     var credsInHeader = brand.headerShowCredentials !== false;
     if (!credsInHeader && contact.phone) rows.push(iconRow('Phone', contact.phone, 'tel:' + contact.phone.replace(/[^+0-9]/g, '')));
@@ -1019,7 +1042,10 @@
       chatRow.appendChild(chatLink);
       rows.push(chatRow);
     }
-    if (contact.address) rows.push(iconRow('Address', bindCountryToken(contact.address)));
+    // Address now leads the header credential block (renderCredMeta) when the
+    // credentials toggle is ON, so it is emitted here ONLY as the toggle-OFF
+    // fallback — never in both places at once.
+    if (!credsInHeader && contact.address) rows.push(iconRow('Address', bindCountryToken(contact.address)));
     // Authority (USDOT/MC) only as the toggle-OFF fallback — otherwise it lives in
     // the header credential meta-lines (see credsInHeader above).
     if (!credsInHeader) {
