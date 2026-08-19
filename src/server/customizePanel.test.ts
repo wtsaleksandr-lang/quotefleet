@@ -115,6 +115,48 @@ describe('customize panel — tagline on/off toggle + regrouped header block', (
     expect(js).toContain("'showTagline'");
   });
 
+  it('validates + persists taglineSize / taglineStyle as enums in the brand PUT', async () => {
+    const src = await read('src/server/routes/tenant.ts');
+    // Enum-validated in BrandPatch; both spread straight into the update set.
+    expect(src).toContain("taglineSize: z.enum(['s', 'm', 'l']).optional()");
+    expect(src).toContain("taglineStyle: z.enum(['solid', 'subtle', 'plain']).optional()");
+  });
+
+  it('mounts "Tagline size" + "Tagline style" segmented controls on the Customize page', async () => {
+    const js = await pub('app.js');
+    const brandFn = js.slice(js.indexOf('function renderBrand'), js.indexOf('function saveBrandPatch'));
+    expect(brandFn).toContain('Tagline size');
+    expect(brandFn).toContain('Tagline style');
+    expect(brandFn).toContain("'taglineSize'");
+    expect(brandFn).toContain("'taglineStyle'");
+    // Reads the saved values to seed the current selection.
+    expect(brandFn).toContain('b.taglineSize');
+    expect(brandFn).toContain('b.taglineStyle');
+    // The three style options the CSS variants implement.
+    expect(brandFn).toContain("id: 'solid'");
+    expect(brandFn).toContain("id: 'subtle'");
+    expect(brandFn).toContain("id: 'plain'");
+  });
+
+  it('widget renderHeader writes data-tagline-size / data-tagline-style attrs', async () => {
+    const js = await pub('widget.js');
+    expect(js).toContain("setAttribute('data-tagline-size'");
+    expect(js).toContain("setAttribute('data-tagline-style'");
+    // Both keys ride the brand-preview patch so the controls flip live.
+    expect(js).toContain("'taglineSize'");
+    expect(js).toContain("'taglineStyle'");
+  });
+
+  it('CSS ships size + style variants for the tagline chip (tokens only)', async () => {
+    const css = await pub('public-calculator-ux.css');
+    expect(css).toContain('[data-tagline-size="s"]::after');
+    expect(css).toContain('[data-tagline-size="l"]::after');
+    expect(css).toContain('[data-tagline-style="subtle"]::after');
+    expect(css).toContain('[data-tagline-style="plain"]::after');
+    // Style variants are themed via the accent token, never a raw brand hex.
+    expect(css).toContain('var(--w-accent');
+  });
+
   it('regroups the header identity as address -> USDOT/MC -> phone/email in renderCredMeta', async () => {
     const js = await pub('widget.js');
     const cred = js.slice(js.indexOf('function renderCredMeta'), js.indexOf('function renderContact'));

@@ -738,3 +738,39 @@ body.qf-app-calculator .qf-rchat .qf-chat-bubble {
 .qf-cred-line {
   font-size: 12.5px;
 }
+
+/* ── Tagline chip — finer SIZE + STYLE controls ────────────────────────────
+   The eyebrow chip beside the brand name (.brand-name::after, the calculator's
+   visible tagline) becomes portal-tunable: brand.taglineSize sizes its font and
+   brand.taglineStyle picks its visual treatment. widget.js renderHeader writes
+   data-tagline-size / data-tagline-style on .brand-name; these rules react.
+
+   Tokens only (no new hardcoded colours — the guard only flags white/black; the
+   var(--w-accent) fallback mirrors public-calculator-no-gradients.css) and the
+   only spacing touched is the on-grid {0,4,8} ramp. The added attribute selector
+   raises specificity so these win over the base 11px !important (widget-ux-fixes)
+   and the solid-fill !important (public-calculator-no-gradients) in every
+   context — the plain widget AND the body.qf-app-calculator experience. */
+
+/* SIZE — font size per step (default 'm' = today's 11px). */
+.qf-header .brand-name[data-tagline-size="s"]::after { font-size: 10px !important; }
+.qf-header .brand-name[data-tagline-size="m"]::after { font-size: 11px !important; }
+.qf-header .brand-name[data-tagline-size="l"]::after { font-size: 13px !important; }
+
+/* STYLE — 'solid' (default) keeps the bright brand-color fill already set by
+   public-calculator-no-gradients.css, so it needs no rule here.
+   'subtle' = a light accent tint with accent text (Maersk-clean, addresses the
+   "heavy blue block" note); 'plain' = accent text only, no background/border. */
+.qf-header .brand-name[data-tagline-style="subtle"]::after,
+body.qf-app-calculator .qf-header .brand-name[data-tagline-style="subtle"]::after {
+  background: color-mix(in srgb, var(--w-accent, #0D3CFC) 14%, transparent) !important;
+  border-color: color-mix(in srgb, var(--w-accent, #0D3CFC) 32%, transparent) !important;
+  color: var(--w-accent, #0D3CFC) !important;
+}
+.qf-header .brand-name[data-tagline-style="plain"]::after,
+body.qf-app-calculator .qf-header .brand-name[data-tagline-style="plain"]::after {
+  background: transparent !important;
+  border-color: transparent !important;
+  color: var(--w-accent, #0D3CFC) !important;
+  padding: 4px 0 !important;
+}
