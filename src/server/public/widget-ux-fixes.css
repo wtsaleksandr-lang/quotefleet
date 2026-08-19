@@ -317,8 +317,8 @@ body.qf-modal-open { overflow: hidden; }
   font-weight: 600 !important;
 }
 .qf-header .brand-name::after {
-  font-size: 9px !important; /* was 10px — ~10% smaller */
-  font-weight: 600 !important; /* was 850 — not bold */
+  font-size: 11px !important; /* legible tagline chip (Alex: 9px was too small) */
+  font-weight: 700 !important; /* semibold — reads as a clean label, not a shout */
 }
 .qf-contact {
   font-size: 12px !important;

@@ -1,0 +1,13 @@
+-- brand_configs — add the header tagline on/off toggle `show_tagline`.
+--
+-- The calculator header's tagline (the one short sentence under the company
+-- name, #qf-tagline) becomes portal-toggleable. Defaults true so every existing
+-- widget is unchanged; a carrier can switch it off to hide the tagline entirely.
+-- The de-rounded kicker chip beside the name is separate and always shown.
+--
+-- Idempotent (ADD COLUMN IF NOT EXISTS, NOT NULL w/ default) so it is safe to
+-- re-run on every boot via runMigrations() — the Replit deploy does not run
+-- db:migrate, so this makes the republish self-healing (same pattern as 0040).
+-- The same statement is mirrored in SELF_HEAL_COLUMN_STATEMENTS (src/db/migrate.ts)
+-- so a Replit phantom-drop of the column is re-added before the server serves.
+ALTER TABLE "brand_configs" ADD COLUMN IF NOT EXISTS "show_tagline" boolean NOT NULL DEFAULT true;

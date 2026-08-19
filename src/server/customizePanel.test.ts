@@ -93,6 +93,43 @@ describe('customize panel — header logo fill (compact vs full-width)', () => {
   });
 });
 
+describe('customize panel — tagline on/off toggle + regrouped header block', () => {
+  it('validates + persists showTagline as an optional boolean in the brand PUT', async () => {
+    const src = await read('src/server/routes/tenant.ts');
+    // Enum/boolean-validated in BrandPatch; spreads straight into the update set.
+    expect(src).toContain('showTagline: z.boolean().optional()');
+  });
+
+  it('mounts a "Show tagline" toggle bound to showTagline on the Customize page', async () => {
+    const js = await pub('app.js');
+    const brandFn = js.slice(js.indexOf('function renderBrand'), js.indexOf('function saveBrandPatch'));
+    expect(brandFn).toContain('Show tagline');
+    expect(brandFn).toContain("'showTagline'");
+  });
+
+  it('widget gates the tagline on brand.showTagline (hidden entirely when false)', async () => {
+    const js = await pub('widget.js');
+    // renderHeader hides the tagline line when the flag is explicitly false.
+    expect(js).toContain('cfg.brand.showTagline === false');
+    // The brand-preview patch carries the flag so the toggle flips live.
+    expect(js).toContain("'showTagline'");
+  });
+
+  it('regroups the header identity as address -> USDOT/MC -> phone/email in renderCredMeta', async () => {
+    const js = await pub('widget.js');
+    const cred = js.slice(js.indexOf('function renderCredMeta'), js.indexOf('function renderContact'));
+    // Address now leads the regrouped credential block (present/absent gated).
+    expect(cred).toContain('contact.address');
+    expect(cred).toContain('qf-cred-address');
+    // Whole block still hides when NO datum (address included) is present.
+    expect(cred).toContain('!address && !authParts.length && !reachParts.length');
+    // Authority + reach lines still follow (the USDOT label glues its number
+    // with an internal NBSP, so match up to the opening quote only).
+    expect(cred).toContain("authParts.push('USDOT");
+    expect(cred).toContain('credLineText(reachParts)');
+  });
+});
+
 describe('customize panel — confirm-rate CTA (customizable claim button)', () => {
   it('persists claim_cta_text as a nullable brand_configs column', async () => {
     const schema = await read('src/db/schema.ts');

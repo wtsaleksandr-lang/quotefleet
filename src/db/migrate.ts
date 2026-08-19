@@ -77,6 +77,9 @@ export const SELF_HEAL_COLUMN_STATEMENTS: readonly string[] = [
   // (NOT NULL w/ default true). Same Replit phantom-drop risk as 0038's header
   // columns, so it MUST be self-healed here too.
   `ALTER TABLE "brand_configs" ADD COLUMN IF NOT EXISTS "header_show_credentials" boolean DEFAULT true NOT NULL`,
+  // 0045_show_tagline.sql — header tagline on/off toggle (NOT NULL w/ default
+  // true). Same brand_configs phantom-drop risk as the header columns above.
+  `ALTER TABLE "brand_configs" ADD COLUMN IF NOT EXISTS "show_tagline" boolean DEFAULT true NOT NULL`,
 ];
 
 export async function ensureSelfHealColumns(): Promise<void> {

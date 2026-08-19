@@ -700,6 +700,13 @@ export const brandConfigs = pgTable('brand_configs', {
    *  unless they opt out. See renderHeader (widget.js) + public-calculator-ux.css
    *  and migration 0040 (self-healed in src/db/migrate.ts). */
   headerShowCredentials: boolean('header_show_credentials').notNull().default(true),
+  /** Whether the calculator header shows the carrier's tagline — the one short
+   *  sentence under the company name (#qf-tagline). Default true so existing
+   *  widgets are unchanged; a carrier can toggle it off to hide the tagline
+   *  entirely. The de-rounded kicker chip beside the name is separate and
+   *  always shown. See renderHeader (widget.js) + public-calculator-ux.css and
+   *  migration 0045 (self-healed in src/db/migrate.ts). */
+  showTagline: boolean('show_tagline').notNull().default(true),
   /** Optional CTA button text override. */
   ctaText: text('cta_text').notNull().default('Get instant quote'),
   /** Optional label for the post-quote "confirm the rate" CTA (#qf-continue-btn)
