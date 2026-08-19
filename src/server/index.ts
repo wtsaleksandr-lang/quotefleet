@@ -6,6 +6,7 @@
 import './bootstrapDoppler.js';
 import { loadEnv } from '../config.js';
 import { runMigrations, ensureSelfHealColumns, ensureSelfHealTables } from '../db/migrate.js';
+import { maybeAutoHealCarrierDirectory } from './directory/autoHeal.js';
 import { createApp } from './app.js';
 import { startMarketplaceCron } from '../marketplace/cron.js';
 import { startLifecycleEmailCron } from '../email/lifecycleCron.js';
@@ -28,6 +29,14 @@ async function main() {
   // /compliance pages. CREATE TABLE IF NOT EXISTS every boot guarantees it exists
   // (empty if never ingested) before serving traffic.
   await ensureSelfHealTables();
+  // Journal-INDEPENDENT re-population of the carrier_directory DATA. The
+  // ensureSelfHealTables step above restores the (empty) table after a Replit
+  // phantom-drop, but the ~321k ingested FMCSA rows are gone. This kicks off a
+  // background re-ingest when the table is empty. Deliberately NOT awaited: the
+  // ingest can run ~30 min and MUST NOT block the server from listening. It is
+  // fire-and-forget, single-flighted by a Postgres advisory lock, and never
+  // throws into boot (see src/server/directory/autoHeal.ts).
+  void maybeAutoHealCarrierDirectory();
   const app = createApp();
   app.listen(env.PORT, env.HOST, () => {
     console.log(`[server] QuoteFleet listening on http://${env.HOST}:${env.PORT}`);
