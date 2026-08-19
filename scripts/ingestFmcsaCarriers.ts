@@ -12,6 +12,8 @@
  *   --offset N      start at L&I page offset N (resume a partial run).
  *   --page N        L&I page size (default 1000).
  *   --state XX      restrict to one physical state (repeatable) — bounded loads.
+ *   --include-canada  also ingest Canada-domiciled carriers (tagged country='CA');
+ *                     DEFAULT OFF → US-only. Env INGEST_INCLUDE_CANADA=1 also enables it.
  *   --dry-run       parse + filter + summarize, but do NOT write to the DB.
  *
  * DO NOT run a full national load casually — there are ~370k active property
@@ -46,6 +48,8 @@ function parseArgs(argv: string[]): IngestOptions {
     pageSize: val('--page', 1000),
     states,
     dryRun: has('--dry-run'),
+    // Explicit flag wins; when absent, runIngest falls back to INGEST_INCLUDE_CANADA=1.
+    includeCanada: has('--include-canada') ? true : undefined,
   };
 }
 
@@ -54,7 +58,8 @@ async function main(): Promise<void> {
   console.log(
     `[ingest] FMCSA active property carriers → carrier_directory ` +
       `(limit=${opts.limit || 'ALL'}, offset=${opts.offset}, page=${opts.pageSize}` +
-      `${opts.states.length ? ', states=' + opts.states.join('+') : ''}${opts.dryRun ? ', DRY-RUN' : ''})`,
+      `${opts.states.length ? ', states=' + opts.states.join('+') : ''}` +
+      `${opts.includeCanada ? ', +CANADA' : ''}${opts.dryRun ? ', DRY-RUN' : ''})`,
   );
   const t0 = Date.now();
   const s = await runIngest(opts);

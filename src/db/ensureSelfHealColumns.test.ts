@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { SELF_HEAL_COLUMN_STATEMENTS } from './migrate.js';
+import { SELF_HEAL_COLUMN_STATEMENTS, SELF_HEAL_TABLE_STATEMENTS } from './migrate.js';
 
 /**
  * The eager, journal-independent self-heal step must always re-add the 8
@@ -7,6 +7,11 @@ import { SELF_HEAL_COLUMN_STATEMENTS } from './migrate.js';
  * dropping (from drizzle/0038_header_layout.sql + 0039_lead_routing_validity.sql
  * + 0040_header_show_credentials.sql).
  * We assert against the exact SQL the function runs — no live DB required.
+ *
+ * NOTE: the carrier_directory `country` column (0042) is self-healed in
+ * SELF_HEAL_TABLE_STATEMENTS (ensureSelfHealTables), NOT here — that step creates
+ * the table first, so its ADD COLUMN is safe even when the table was dropped;
+ * running it here (before ensureSelfHealTables at boot) could hit a missing table.
  */
 describe('ensureSelfHealColumns — at-risk brand_configs columns', () => {
   const sql = SELF_HEAL_COLUMN_STATEMENTS.join('\n');
@@ -42,5 +47,28 @@ describe('ensureSelfHealColumns — at-risk brand_configs columns', () => {
     for (const stmt of SELF_HEAL_COLUMN_STATEMENTS) {
       expect(stmt).toMatch(/^ALTER TABLE "brand_configs" ADD COLUMN IF NOT EXISTS /);
     }
+  });
+});
+
+describe('ensureSelfHealTables — carrier_directory country heal (0042)', () => {
+  const sql = SELF_HEAL_TABLE_STATEMENTS.join('\n');
+
+  it('CREATE TABLE seeds the country column NOT NULL DEFAULT US', () => {
+    expect(sql).toContain(`"country" text DEFAULT 'US' NOT NULL`);
+  });
+
+  it('adds an idempotent ADD COLUMN IF NOT EXISTS country for the drop-column case', () => {
+    expect(SELF_HEAL_TABLE_STATEMENTS).toContain(
+      `ALTER TABLE "carrier_directory" ADD COLUMN IF NOT EXISTS "country" text NOT NULL DEFAULT 'US'`,
+    );
+  });
+
+  it('the country ADD COLUMN comes AFTER the CREATE TABLE (table-first-safe)', () => {
+    const createIdx = SELF_HEAL_TABLE_STATEMENTS.findIndex((s) => s.startsWith('CREATE TABLE'));
+    const alterIdx = SELF_HEAL_TABLE_STATEMENTS.findIndex((s) =>
+      s.startsWith('ALTER TABLE "carrier_directory" ADD COLUMN IF NOT EXISTS "country"'),
+    );
+    expect(createIdx).toBeGreaterThanOrEqual(0);
+    expect(alterIdx).toBeGreaterThan(createIdx);
   });
 });

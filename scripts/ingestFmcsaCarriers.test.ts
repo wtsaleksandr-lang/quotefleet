@@ -17,10 +17,15 @@ import {
   makeSlug,
   buildCarrierWhere,
   filterAndNormalizeCarriers,
+  carrierCountry,
   type LiCarrierRow,
   type CensusRow,
 } from './ingestFmcsaCarriers.js';
-import { nearestPortToPoint, nearestPortForZip } from '../src/server/directory/containerPorts.js';
+import {
+  nearestPortToPoint,
+  nearestPortForZip,
+  nearestCaPortForProvince,
+} from '../src/server/directory/containerPorts.js';
 
 // ── Real-shaped fixtures ────────────────────────────────────────────────
 const activeCarrier: LiCarrierRow = {
@@ -231,5 +236,79 @@ describe('filterAndNormalizeCarriers', () => {
     ]);
     const [rec] = filterAndNormalizeCarriers([activeCarrier], lower);
     expect(rec.safetyRating).toBe('S');
+  });
+
+  it('tags a US carrier country="US" by default', () => {
+    const [rec] = filterAndNormalizeCarriers([activeCarrier], censusByDot);
+    expect(rec.country).toBe('US');
+  });
+});
+
+// ── country-aware Canada gate (GATED OFF by default) ─────────────────────
+describe('carrierCountry', () => {
+  it('maps US states/territories → US, CA provinces → CA, else null', () => {
+    expect(carrierCountry('GA')).toBe('US');
+    expect(carrierCountry('PR')).toBe('US'); // territory
+    expect(carrierCountry('ON')).toBe('CA');
+    expect(carrierCountry('BC')).toBe('CA');
+    expect(carrierCountry('AG')).toBeNull(); // Aguascalientes (Mexico)
+    expect(carrierCountry('ZZ')).toBeNull();
+    expect(carrierCountry(null)).toBeNull();
+  });
+});
+
+describe('nearestCaPortForProvince', () => {
+  it('maps each province group to its nearest Canadian gateway', () => {
+    expect(nearestCaPortForProvince('BC')).toBe('CAVAN');
+    expect(nearestCaPortForProvince('AB')).toBe('CAVAN');
+    expect(nearestCaPortForProvince('SK')).toBe('CAVAN');
+    expect(nearestCaPortForProvince('ON')).toBe('CAMTR');
+    expect(nearestCaPortForProvince('QC')).toBe('CAMTR');
+    expect(nearestCaPortForProvince('NS')).toBe('CAHAL');
+    expect(nearestCaPortForProvince('PE')).toBe('CAHAL');
+    expect(nearestCaPortForProvince('NL')).toBe('CAHAL');
+    expect(nearestCaPortForProvince('NB')).toBe('CASJB');
+    expect(nearestCaPortForProvince('on')).toBe('CAMTR'); // case-insensitive
+    expect(nearestCaPortForProvince('XX')).toBeNull();
+    expect(nearestCaPortForProvince(null)).toBeNull();
+  });
+});
+
+describe('Canada gate in filterAndNormalizeCarriers', () => {
+  // Same active carrier, but census places it in Ontario (a Canadian province).
+  const caCensus = new Map<string, CensusRow>([
+    ['107080', { dot_number: '107080', status_code: 'A', phy_state: 'ON', phy_city: 'TORONTO' }],
+  ]);
+  const mxCensus = new Map<string, CensusRow>([
+    ['107080', { dot_number: '107080', status_code: 'A', phy_state: 'AG' }], // Aguascalientes, MX
+  ]);
+
+  it('DROPS a Canada-province carrier when includeCanada is off (default) — US-only preserved', () => {
+    expect(filterAndNormalizeCarriers([activeCarrier], caCensus)).toHaveLength(0);
+    expect(filterAndNormalizeCarriers([activeCarrier], caCensus, false)).toHaveLength(0);
+  });
+
+  it('KEEPS + tags a Canada-province carrier when includeCanada is on', () => {
+    const [rec] = filterAndNormalizeCarriers([activeCarrier], caCensus, true);
+    expect(rec.country).toBe('CA');
+    expect(rec.state).toBe('ON');
+    expect(rec.nearestPortCode).toBe('CAMTR'); // ON → Montreal (province fallback)
+  });
+
+  it('DROPS a Mexico/other-domicile carrier regardless of includeCanada', () => {
+    expect(filterAndNormalizeCarriers([activeCarrier], mxCensus, false)).toHaveLength(0);
+    expect(filterAndNormalizeCarriers([activeCarrier], mxCensus, true)).toHaveLength(0);
+  });
+
+  it('produces the EXACT same US set from a mixed US+CA batch with the flag off', () => {
+    // Two carriers: one US (activeCarrier/GA), one CA (contractCarrier relocated to ON).
+    const caContract: LiCarrierRow = { ...contractCarrier, bus_state_code: 'ON', bus_zip_code: undefined };
+    const usOnly = filterAndNormalizeCarriers([activeCarrier, caContract], censusByDot); // flag off
+    expect(usOnly).toHaveLength(1);
+    expect(usOnly[0].usdot).toBe('107080');
+    expect(usOnly[0].country).toBe('US');
+    // Turning the flag on adds the CA carrier without disturbing the US one.
+    const withCa = filterAndNormalizeCarriers([activeCarrier, caContract], censusByDot, true);
+    expect(withCa.map((c) => c.country).sort()).toEqual(['CA', 'US']);
   });
 });
