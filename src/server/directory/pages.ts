@@ -15,9 +15,19 @@
  * / Hazmat / Reefer per-carrier flags — those are surfaced as external tools or
  * "coming soon", never faked.
  */
-import type { DirectorySummary, CarrierListResult, VisibleCarrier } from './queries.js';
+import type {
+  DirectorySummary,
+  CarrierListResult,
+  VisibleCarrier,
+  DirectoryFilters,
+  FacetCounts,
+  CityCount,
+  FleetBucketId,
+  SafetyId,
+} from './queries.js';
+import { FLEET_BUCKETS, SAFETY_OPTIONS, SORT_OPTIONS, citySlugify, titleCaseCity } from './queries.js';
 import { US_STATES, stateByCode, type UsState } from './usStates.js';
-import { CONTAINER_PORTS, portByCode } from './containerPorts.js';
+import { CONTAINER_PORTS, portByCode, type ContainerPort } from './containerPorts.js';
 
 const SITE = 'https://quotefleet.net';
 
@@ -115,6 +125,50 @@ const DIRECTORY_CSS = `
   .lookup-result .row:last-child { border-bottom: 0; }
   .lookup-result .row .k { color: var(--muted); }
   .lookup-result .row .v { font-family: var(--font-mono); text-align: right; }
+  /* Breadcrumbs */
+  .dir-crumbs { font-size: 12px; font-family: var(--font-mono); letter-spacing: 0.03em; color: var(--muted); margin: 0 0 4px; display: flex; flex-wrap: wrap; gap: 6px; align-items: center; }
+  .dir-crumbs a { color: var(--muted); text-decoration: none; }
+  .dir-crumbs a:hover { color: var(--accent); }
+  .dir-crumbs .sep { opacity: 0.5; }
+  .dir-crumbs .cur { color: var(--ink-soft); }
+  /* Faceted two-column layout */
+  .dir-layout { display: grid; grid-template-columns: 258px minmax(0, 1fr); gap: 24px; align-items: start; }
+  .dir-rail { position: sticky; top: 16px; }
+  .facet-group { border: 1px solid var(--border); border-radius: var(--radius-lg); background: var(--surface); padding: 14px 16px; margin-bottom: 12px; }
+  .facet-group h3 { margin: 0 0 4px; font-size: 12px; text-transform: uppercase; letter-spacing: 0.07em; color: var(--muted); font-family: var(--font-mono); }
+  .facet-src { font-size: 10px; font-family: var(--font-mono); letter-spacing: 0.04em; color: var(--muted); opacity: 0.8; display: block; margin: 0 0 8px; }
+  .facet-opt { display: flex; align-items: center; justify-content: space-between; gap: 8px; padding: 7px 8px; border-radius: 8px; text-decoration: none; color: var(--ink-soft); font-size: 13px; border: 1px solid transparent; }
+  .facet-opt:hover { background: var(--surface-2); }
+  .facet-opt .cb { font-family: var(--font-mono); font-size: 11px; color: var(--muted); background: var(--surface-2); border: 1px solid var(--border); border-radius: 999px; padding: 1px 8px; min-width: 20px; text-align: center; }
+  .facet-opt.active { border-color: var(--accent); background: var(--accent-soft); color: var(--accent); }
+  .facet-opt.active .cb { color: var(--accent); border-color: var(--accent); background: transparent; }
+  .facet-opt.disabled { opacity: 0.5; cursor: not-allowed; }
+  .facet-opt.disabled .cb { text-transform: uppercase; font-size: 9px; letter-spacing: 0.05em; }
+  .facet-opt .lbl { display: flex; align-items: center; gap: 7px; }
+  .facet-check { width: 14px; height: 14px; border: 1px solid var(--border-strong); border-radius: 4px; display: inline-block; flex: 0 0 auto; }
+  .facet-opt.active .facet-check { background: var(--accent); border-color: var(--accent); }
+  .rail-toggle { display: none; }
+  .results-head { display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap; margin: 0 0 14px; }
+  .results-head .rc { font-size: 15px; }
+  .results-head .rc b { font-family: var(--font-mono); color: var(--accent); font-size: 20px; }
+  .sort-row { display: flex; gap: 6px; flex-wrap: wrap; align-items: center; }
+  .sort-row .sl { font-size: 11px; color: var(--muted); font-family: var(--font-mono); text-transform: uppercase; letter-spacing: 0.05em; }
+  .applied-chips { display: flex; gap: 8px; flex-wrap: wrap; margin: 0 0 14px; align-items: center; }
+  .applied-chip { font-size: 12px; font-family: var(--font-mono); padding: 5px 10px; border-radius: 999px; border: 1px solid var(--accent); color: var(--accent); background: var(--accent-soft); text-decoration: none; display: inline-flex; gap: 6px; align-items: center; }
+  .applied-chip .x { opacity: 0.7; }
+  .applied-chip:hover .x { opacity: 1; }
+  .applied-clear { font-size: 12px; font-family: var(--font-mono); color: var(--muted); text-decoration: underline; }
+  .dir-pagenums { display: flex; gap: 6px; flex-wrap: wrap; align-items: center; justify-content: center; margin: 26px 0 8px; }
+  .dir-pagenums a, .dir-pagenums span { min-width: 38px; height: 38px; display: inline-flex; align-items: center; justify-content: center; border: 1px solid var(--border); border-radius: 8px; text-decoration: none; color: var(--ink-soft); font-family: var(--font-mono); font-size: 13px; padding: 0 8px; }
+  .dir-pagenums a:hover { border-color: var(--border-strong); }
+  .dir-pagenums .cur { border-color: var(--accent); color: var(--accent); background: var(--accent-soft); }
+  .dir-pagenums .gap { border: 0; min-width: 16px; color: var(--muted); }
+  @media (max-width: 900px) {
+    .dir-layout { grid-template-columns: 1fr; }
+    .dir-rail { position: static; }
+    .rail-toggle { display: block; width: 100%; text-align: left; background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius-lg); padding: 12px 16px; color: var(--ink); font-size: 14px; font-family: var(--font-mono); cursor: pointer; margin-bottom: 12px; }
+    .dir-rail[data-collapsed="1"] .facet-group { display: none; }
+  }
   @media (max-width: 640px) {
     .dir-hero h1 { font-size: 30px; }
     .dir-shell, .dir-hero { padding-left: 18px; padding-right: 18px; }
@@ -131,9 +185,15 @@ interface LayoutOpts {
   description: string;
   canonicalPath: string;
   bodyHtml: string;
+  /** JSON-LD blocks (already stringified objects) to inject into <head>. */
+  jsonLd?: string[];
 }
 
-function layout({ title, description, canonicalPath, bodyHtml }: LayoutOpts): string {
+function layout({ title, description, canonicalPath, bodyHtml, jsonLd }: LayoutOpts): string {
+  const ld = (jsonLd ?? [])
+    .filter(Boolean)
+    .map((j) => `<script type="application/ld+json">${j}</script>`)
+    .join('\n  ');
   return `<!doctype html>
 <html lang="en">
 <head>
@@ -158,6 +218,7 @@ function layout({ title, description, canonicalPath, bodyHtml }: LayoutOpts): st
   <meta property="og:image" content="${SITE}/brand/og-image-1200x630.png">
   <meta name="twitter:card" content="summary_large_image">
   <meta name="twitter:image" content="${SITE}/brand/og-image-1200x630.png">
+  ${ld}
 </head>
 <body>
   <header class="topnav">
@@ -209,6 +270,346 @@ function carrierCard(c: VisibleCarrier): string {
   </a>`;
 }
 
+// ─── JSON-LD helpers ──────────────────────────────────────────────────────
+/** Serialize an object as a JSON-LD-safe string (guards against </script>). */
+function ld(obj: unknown): string {
+  // Escaping '<' is enough to prevent a </script> breakout inside the block.
+  return JSON.stringify(obj).replace(/</g, '\\u003c');
+}
+
+export interface Crumb {
+  name: string;
+  path?: string; // omitted on the current (last) crumb
+}
+
+function jsonLdBreadcrumb(crumbs: Crumb[]): string {
+  return ld({
+    '@context': 'https://schema.org',
+    '@type': 'BreadcrumbList',
+    itemListElement: crumbs.map((c, i) => ({
+      '@type': 'ListItem',
+      position: i + 1,
+      name: c.name,
+      ...(c.path ? { item: SITE + c.path } : {}),
+    })),
+  });
+}
+
+function jsonLdItemListAndCollection(opts: {
+  name: string;
+  description: string;
+  path: string;
+  carriers: VisibleCarrier[];
+  total: number;
+}): string {
+  return ld({
+    '@context': 'https://schema.org',
+    '@type': 'CollectionPage',
+    name: opts.name,
+    description: opts.description,
+    url: SITE + opts.path,
+    mainEntity: {
+      '@type': 'ItemList',
+      numberOfItems: opts.total,
+      itemListElement: opts.carriers.map((c, i) => ({
+        '@type': 'ListItem',
+        position: i + 1,
+        url: `${SITE}/directory/carrier/${encodeURIComponent(c.slug)}`,
+        name: c.dbaName || c.legalName,
+      })),
+    },
+  });
+}
+
+function jsonLdFaq(faqs: Array<{ q: string; a: string }>): string {
+  return ld({
+    '@context': 'https://schema.org',
+    '@type': 'FAQPage',
+    mainEntity: faqs.map((f) => ({
+      '@type': 'Question',
+      name: f.q,
+      acceptedAnswer: { '@type': 'Answer', text: f.a },
+    })),
+  });
+}
+
+function jsonLdCarrier(c: VisibleCarrier): string {
+  const addr = {
+    '@type': 'PostalAddress',
+    addressCountry: 'US',
+    ...(c.city ? { addressLocality: c.city } : {}),
+    ...(c.state ? { addressRegion: c.state } : {}),
+    ...(c.zip ? { postalCode: c.zip } : {}),
+  };
+  return ld({
+    '@context': 'https://schema.org',
+    '@type': ['LocalBusiness', 'Organization'],
+    name: c.dbaName || c.legalName,
+    legalName: c.legalName,
+    url: `${SITE}/directory/carrier/${encodeURIComponent(c.slug)}`,
+    identifier: [
+      { '@type': 'PropertyValue', propertyID: 'USDOT', value: c.usdot },
+      ...(c.mcNumber ? [{ '@type': 'PropertyValue', propertyID: 'MC', value: c.mcNumber }] : []),
+    ],
+    ...(c.phone ? { telephone: c.phone } : {}),
+    address: addr,
+    ...(c.city || c.state ? { areaServed: [c.city, c.state].filter(Boolean).join(', ') } : {}),
+    knowsAbout: c.intermodal ? ['Container drayage', 'Intermodal trucking'] : ['Freight trucking'],
+  });
+}
+
+// ─── Faceted directory rendering ──────────────────────────────────────────
+interface FacetScope {
+  kind: 'all' | 'state' | 'port' | 'city';
+  basePath: string;
+  locked: Set<string>;
+  state?: UsState;
+  port?: ContainerPort;
+  city?: { name: string; slug: string };
+}
+
+/** Active facet dims serialized as query params (respecting path-locked dims). */
+function currentParams(f: DirectoryFilters, locked: Set<string>): Record<string, string> {
+  const p: Record<string, string> = {};
+  if (!locked.has('state') && f.state) p.state = f.state;
+  if (!locked.has('city') && f.citySlug) p.city = f.citySlug;
+  if (f.fleet) p.fleet = f.fleet;
+  if (f.safety) p.safety = f.safety;
+  if (f.authorityActive) p.authority = 'active';
+  if (f.intermodal) p.intermodal = '1';
+  if (f.recent) p.recent = '1';
+  if (f.sort && f.sort !== 'featured') p.sort = f.sort;
+  return p;
+}
+
+type FacetChange = Partial<Record<'state' | 'city' | 'fleet' | 'safety' | 'authority' | 'intermodal' | 'recent' | 'sort' | 'page', string | null>>;
+
+/** Build an href for the current scope with one dimension changed. */
+function hrefWith(scope: FacetScope, f: DirectoryFilters, change: FacetChange, opts?: { keepPage?: boolean }): string {
+  const p = currentParams(f, scope.locked);
+  if (opts?.keepPage && f.page > 1) p.page = String(f.page);
+  for (const [k, v] of Object.entries(change)) {
+    if (v == null || v === '') delete p[k];
+    else p[k] = v;
+  }
+  const qs = new URLSearchParams(p).toString();
+  return qs ? `${scope.basePath}?${qs}` : scope.basePath;
+}
+
+function facetOptionRow(active: boolean, href: string, label: string, count: number): string {
+  return `<a class="facet-opt ${active ? 'active' : ''}" href="${href}">
+    <span class="lbl"><span class="facet-check"></span>${esc(label)}</span>
+    <span class="cb">${fmtNum(count)}</span>
+  </a>`;
+}
+
+function disabledFacetRow(label: string): string {
+  return `<span class="facet-opt disabled"><span class="lbl"><span class="facet-check"></span>${esc(label)}</span><span class="cb">claim</span></span>`;
+}
+
+function renderSidebar(scope: FacetScope, f: DirectoryFilters, counts: FacetCounts, summary?: DirectorySummary): string {
+  // Tier 1 — Fleet size.
+  const fleet = FLEET_BUCKETS.map((b) =>
+    facetOptionRow(f.fleet === b.id, hrefWith(scope, f, { fleet: f.fleet === b.id ? null : b.id }), b.label, counts.fleet[b.id]),
+  ).join('\n');
+
+  // Tier 1 — Safety rating.
+  const safety = SAFETY_OPTIONS.map((s) =>
+    facetOptionRow(f.safety === s.id, hrefWith(scope, f, { safety: f.safety === s.id ? null : s.id }), s.label, counts.safety[s.id]),
+  ).join('\n');
+
+  // Tier 1 — Active authority (boolean).
+  const authority = facetOptionRow(
+    f.authorityActive,
+    hrefWith(scope, f, { authority: f.authorityActive ? null : 'active' }),
+    'Active authority only',
+    counts.authorityActive,
+  );
+
+  // Tier 2 — proxies (source-tagged).
+  const intermodal = facetOptionRow(
+    f.intermodal,
+    hrefWith(scope, f, { intermodal: f.intermodal ? null : '1' }),
+    'Drayage / intermodal',
+    counts.intermodal,
+  );
+  const recent = facetOptionRow(
+    f.recent,
+    hrefWith(scope, f, { recent: f.recent ? null : '1' }),
+    'Updated in last 12 mo',
+    counts.recent,
+  );
+
+  // 'all' scope only — quick state refine (links to canonical state pages / scope).
+  let stateGroup = '';
+  if (scope.kind === 'all' && summary) {
+    const top = summary.byState.filter((s) => US_STATE_CODES.has(s.state)).slice(0, 12);
+    if (top.length) {
+      const links = top
+        .map((s) => {
+          const st = stateByCode(s.state)!;
+          const active = f.state === s.state;
+          return `<a class="facet-opt ${active ? 'active' : ''}" href="${hrefWith(scope, f, { state: active ? null : s.state })}">
+            <span class="lbl"><span class="facet-check"></span>${esc(st.name)}</span>
+            <span class="cb">${fmtNum(s.count)}</span>
+          </a>`;
+        })
+        .join('\n');
+      stateGroup = `<div class="facet-group"><h3>State</h3><span class="facet-src">FMCSA physical state · top 12</span>${links}
+        <a class="facet-opt" href="/directory" style="justify-content:center;"><span class="lbl">All states &amp; ports →</span></a></div>`;
+    }
+  }
+
+  const tier3 = ['Hazmat', 'Reefer', 'UIIA member', 'TWIC-ready', 'C-TPAT / bonded', 'Verified profile']
+    .map(disabledFacetRow)
+    .join('\n');
+
+  return `<aside class="dir-rail" id="dir-rail">
+    <button type="button" class="rail-toggle" id="rail-toggle" aria-expanded="true">Filters ▾</button>
+    ${stateGroup}
+    <div class="facet-group"><h3>Fleet size</h3><span class="facet-src">FMCSA power units</span>${fleet}</div>
+    <div class="facet-group"><h3>Safety rating</h3><span class="facet-src">FMCSA safety rating</span>${safety}</div>
+    <div class="facet-group"><h3>Authority</h3><span class="facet-src">FMCSA operating authority</span>${authority}</div>
+    <div class="facet-group"><h3>Service type</h3><span class="facet-src">Proxy · FMCSA cargo &amp; MCS-150</span>${intermodal}${recent}</div>
+    <div class="facet-group"><h3>Credentials</h3><span class="facet-src">Self-declared · verify via profile claim</span>${tier3}</div>
+  </aside>
+  <script>
+    (function(){
+      var t=document.getElementById('rail-toggle'),r=document.getElementById('dir-rail');
+      if(!t||!r)return;
+      function apply(){var c=window.matchMedia('(max-width:900px)').matches;if(c){r.setAttribute('data-collapsed','1');t.setAttribute('aria-expanded','false');}else{r.removeAttribute('data-collapsed');t.setAttribute('aria-expanded','true');}}
+      apply();
+      t.addEventListener('click',function(){var c=r.getAttribute('data-collapsed')==='1';if(c){r.removeAttribute('data-collapsed');t.setAttribute('aria-expanded','true');t.textContent='Filters ▴';}else{r.setAttribute('data-collapsed','1');t.setAttribute('aria-expanded','false');t.textContent='Filters ▾';}});
+    })();
+  </script>`;
+}
+
+function appliedChips(scope: FacetScope, f: DirectoryFilters): string {
+  const chips: string[] = [];
+  const add = (label: string, change: FacetChange) =>
+    chips.push(`<a class="applied-chip" href="${hrefWith(scope, f, change)}">${esc(label)} <span class="x">✕</span></a>`);
+  if (!scope.locked.has('state') && f.state) add(stateByCode(f.state)?.name ?? f.state, { state: null });
+  if (!scope.locked.has('city') && f.citySlug) add(f.citySlug.replace(/-/g, ' '), { city: null });
+  if (f.fleet) add(FLEET_BUCKETS.find((b) => b.id === f.fleet)?.label ?? f.fleet, { fleet: null });
+  if (f.safety) add(SAFETY_OPTIONS.find((s) => s.id === f.safety)?.label ?? f.safety, { safety: null });
+  if (f.authorityActive) add('Active authority', { authority: null });
+  if (f.intermodal) add('Drayage / intermodal', { intermodal: null });
+  if (f.recent) add('Updated ≤12 mo', { recent: null });
+  if (!chips.length) return '';
+  return `<div class="applied-chips">${chips.join('\n')}<a class="applied-clear" href="${scope.basePath}">Clear all</a></div>`;
+}
+
+function sortRow(scope: FacetScope, f: DirectoryFilters): string {
+  const links = SORT_OPTIONS.map(
+    (s) =>
+      `<a class="dir-chip ${f.sort === s.id ? 'active' : ''}" href="${hrefWith(scope, f, { sort: s.id === 'featured' ? null : s.id })}">${esc(s.label)}</a>`,
+  ).join('\n');
+  return `<div class="sort-row"><span class="sl">Sort</span>${links}</div>`;
+}
+
+/** Windowed numbered pagination (1 … n-1 [n] n+1 … last). */
+function numberedPager(scope: FacetScope, f: DirectoryFilters, list: CarrierListResult): string {
+  if (list.totalPages <= 1) return '';
+  const cur = list.page;
+  const last = list.totalPages;
+  const link = (p: number, label?: string, cls = '') =>
+    `<a class="${cls}" href="${hrefWith(scope, f, { page: p > 1 ? String(p) : null }, { keepPage: false })}">${esc(label ?? String(p))}</a>`;
+  const nums: Array<number | '…'> = [];
+  const push = (p: number) => nums.push(p);
+  push(1);
+  const lo = Math.max(2, cur - 2);
+  const hi = Math.min(last - 1, cur + 2);
+  if (lo > 2) nums.push('…');
+  for (let p = lo; p <= hi; p++) push(p);
+  if (hi < last - 1) nums.push('…');
+  if (last > 1) push(last);
+  const body = nums
+    .map((n) => (n === '…' ? '<span class="gap">…</span>' : n === cur ? `<span class="cur">${n}</span>` : link(n)))
+    .join('\n');
+  return `<nav class="dir-pagenums" aria-label="Pagination">
+    ${cur > 1 ? link(cur - 1, '← Prev') : ''}
+    ${body}
+    ${cur < last ? link(cur + 1, 'Next →') : ''}
+  </nav>`;
+}
+
+function crumbsHtml(crumbs: Crumb[]): string {
+  return `<nav class="dir-crumbs" aria-label="Breadcrumb">${crumbs
+    .map((c, i) =>
+      i === crumbs.length - 1
+        ? `<span class="cur">${esc(c.name)}</span>`
+        : `<a href="${esc(c.path ?? '/directory')}">${esc(c.name)}</a><span class="sep">/</span>`,
+    )
+    .join('')}</nav>`;
+}
+
+interface FacetedCfg {
+  scope: FacetScope;
+  list: CarrierListResult;
+  counts: FacetCounts;
+  filters: DirectoryFilters;
+  crumbs: Crumb[];
+  h1: string;
+  intro: string;
+  title: string;
+  description: string;
+  canonicalPath: string;
+  summary?: DirectorySummary;
+  extraModulesHtml?: string;
+  faqsHtml?: string;
+  jsonLd: string[];
+}
+
+function renderFacetedResults(cfg: FacetedCfg): string {
+  const { scope, list, counts, filters } = cfg;
+  const cards = list.carriers.length
+    ? `<div class="dir-grid" style="grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));">${list.carriers
+        .map(carrierCard)
+        .join('\n')}</div>`
+    : `<div class="dir-empty">No carriers match these filters. <a href="${scope.basePath}" style="color:var(--accent);">Clear filters</a> to see all.</div>`;
+
+  const body = `
+  <section class="hero dir-hero">
+    <div class="container-narrow">
+      ${crumbsHtml(cfg.crumbs)}
+      <h1 style="margin-top: 6px;">${esc(cfg.h1)}</h1>
+      <p class="lead">${cfg.intro}</p>
+    </div>
+  </section>
+  <main class="dir-shell">
+    <div class="dir-layout">
+      ${renderSidebar(scope, filters, counts, cfg.summary)}
+      <div class="dir-results">
+        <div class="results-head">
+          <div class="rc"><b>${fmtNum(list.total)}</b> carrier${list.total === 1 ? '' : 's'} match${counts.intermodal ? ` · ${fmtNum(counts.intermodal)} run drayage` : ''}</div>
+          ${sortRow(scope, filters)}
+        </div>
+        ${appliedChips(scope, filters)}
+        ${cards}
+        ${numberedPager(scope, filters, list)}
+        ${cfg.extraModulesHtml ?? ''}
+      </div>
+    </div>
+    ${cfg.faqsHtml ?? ''}
+  </main>`;
+
+  return layout({
+    title: cfg.title,
+    description: cfg.description,
+    canonicalPath: cfg.canonicalPath,
+    bodyHtml: body,
+    jsonLd: cfg.jsonLd,
+  });
+}
+
+/** Canonical query suffix for a faceted URL (stable key order, no page dup). */
+function canonicalSuffix(f: DirectoryFilters, locked: Set<string>): string {
+  const p = currentParams(f, locked);
+  if (f.page > 1) p.page = String(f.page);
+  const qs = new URLSearchParams(p).toString();
+  return qs ? `?${qs}` : '';
+}
+
 // ─── 1. Directory landing ─────────────────────────────────────────────────
 export function renderDirectoryLanding(summary: DirectorySummary): string {
   const portCards = summary.byPort
@@ -256,6 +657,15 @@ export function renderDirectoryLanding(summary: DirectorySummary): string {
   </section>
   <main class="dir-shell">
     ${emptyNotice}
+    ${
+      isEmpty
+        ? ''
+        : `<div class="dir-card" style="display:flex; align-items:center; justify-content:space-between; gap:16px; flex-wrap:wrap;">
+        <div><h2 style="margin:0 0 4px; font-size:18px;">Search &amp; filter every carrier</h2>
+        <p class="muted-small" style="margin:0;">Filter ${fmtNum(summary.total)} carriers by state, city, fleet size, safety rating and authority — every filter is a shareable link.</p></div>
+        <a class="btn btn-primary" href="/directory?sort=featured">Open faceted search <span class="arr">→</span></a>
+      </div>`
+    }
     <div class="dir-section-h">
       <h2>Top US ports</h2>
       <a class="muted-small" href="/compliance">Compliance tools →</a>
@@ -274,142 +684,274 @@ export function renderDirectoryLanding(summary: DirectorySummary): string {
     description: `Browse ${summary.total.toLocaleString('en-US')} US trucking and drayage carriers by port and state. Fleet size, operating authority, safety ratings and intermodal status from FMCSA data.`,
     canonicalPath: '/directory',
     bodyHtml: body,
+    jsonLd: [
+      jsonLdBreadcrumb([{ name: 'Directory', path: '/directory' }]),
+      jsonLdItemListAndCollection({
+        name: 'US Freight & Drayage Carrier Directory',
+        description: `Browse ${summary.total} US motor carriers by port and state from FMCSA public data.`,
+        path: '/directory',
+        carriers: [],
+        total: summary.total,
+      }),
+    ],
   });
 }
 
-// ─── 2. State page ────────────────────────────────────────────────────────
+// ─── Shared cross-link modules ────────────────────────────────────────────
+/** "Cities in {state}" module — links to the city-tier pages with counts. */
+function citiesModule(state: UsState, cities: CityCount[]): string {
+  if (!cities.length) return '';
+  const cards = cities
+    .map(
+      (c) => `<a class="dir-card" href="/directory/${state.slug}/${encodeURIComponent(c.slug)}">
+        <h3>${esc(c.city)}</h3>
+        <div class="cnt">${fmtNum(c.count)}<small>carriers</small></div>
+      </a>`,
+    )
+    .join('\n');
+  return `<div class="dir-section-h"><h2 style="font-size: 18px;">Cities in ${esc(state.name)}</h2><span class="muted-small">${cities.length} cities</span></div>
+    <div class="dir-grid">${cards}</div>`;
+}
+
+/** "Browse by state" chip row (all US states except an optional current one). */
+function statesChipRow(exceptCode?: string): string {
+  const chips = US_STATES.filter((s) => s.code !== exceptCode)
+    .map((s) => `<a class="dir-chip" href="/directory/${s.slug}">${esc(s.name)}</a>`)
+    .join('\n');
+  return `<div class="dir-section-h"><h2 style="font-size: 18px;">Browse by state</h2></div><div class="dir-chips">${chips}</div>`;
+}
+
+// ─── Faceted directory results (/directory?…) ─────────────────────────────
+export function renderDirectoryResults(opts: {
+  filters: DirectoryFilters;
+  list: CarrierListResult;
+  counts: FacetCounts;
+  summary: DirectorySummary;
+}): string {
+  const { filters, list, counts, summary } = opts;
+  const scope: FacetScope = { kind: 'all', basePath: '/directory', locked: new Set() };
+  const st = filters.state ? stateByCode(filters.state) : null;
+  const focus = st ? st.name : 'US';
+  const h1 = st ? `${st.name} freight & drayage carriers` : 'Search US freight & drayage carriers';
+  const canonicalPath = `/directory${canonicalSuffix(filters, scope.locked)}`;
+  return renderFacetedResults({
+    scope,
+    list,
+    counts,
+    filters,
+    summary,
+    crumbs: [{ name: 'Directory', path: '/directory' }, { name: 'Search' }],
+    h1,
+    intro: `Filter ${fmtNum(list.total)} FMCSA-registered ${focus} motor carriers by state, city, fleet size, safety rating and authority. Every filter is a shareable, crawlable link.`,
+    title: `${st ? st.name + ' ' : ''}Carrier Search — Filter by Fleet, Safety & Authority | QuoteFleet`,
+    description: `Faceted search of ${list.total.toLocaleString('en-US')} ${st ? st.name + ' ' : 'US '}freight and drayage carriers — filter by fleet size, safety rating, active authority and drayage service. FMCSA data.`,
+    canonicalPath,
+    extraModulesHtml: statesChipRow(filters.state ?? undefined),
+    jsonLd: [
+      jsonLdBreadcrumb([{ name: 'Directory', path: '/directory' }, { name: 'Search' }]),
+      jsonLdItemListAndCollection({
+        name: h1,
+        description: `Filtered directory of ${list.total} carriers.`,
+        path: canonicalPath,
+        carriers: list.carriers,
+        total: list.total,
+      }),
+    ],
+  });
+}
+
+// ─── 2. State page (faceted) ──────────────────────────────────────────────
 export function renderStatePage(opts: {
   state: UsState;
   list: CarrierListResult;
-  intermodalOnly: boolean;
+  counts: FacetCounts;
+  filters: DirectoryFilters;
+  cities: CityCount[];
 }): string {
-  const { state, list, intermodalOnly } = opts;
-  const qsBase = intermodalOnly ? '?intermodal=1' : '';
-  const cards = list.carriers.length
-    ? `<div class="dir-grid" style="grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));">${list.carriers
-        .map(carrierCard)
-        .join('\n')}</div>`
-    : `<div class="dir-empty">No ${intermodalOnly ? 'drayage ' : ''}carriers found in ${esc(state.name)} yet.</div>`;
-
-  // Pagination links preserve the intermodal filter.
-  const pageLink = (p: number): string => {
-    const parts: string[] = [];
-    if (intermodalOnly) parts.push('intermodal=1');
-    if (p > 1) parts.push(`page=${p}`);
-    return `/directory/${state.slug}${parts.length ? '?' + parts.join('&') : ''}`;
+  const { state, list, counts, filters, cities } = opts;
+  const scope: FacetScope = {
+    kind: 'state',
+    basePath: `/directory/${state.slug}`,
+    locked: new Set(['state']),
+    state,
   };
-  const pager =
-    list.totalPages > 1
-      ? `<div class="dir-pager">
-          ${list.page > 1 ? `<a class="btn btn-secondary" href="${pageLink(list.page - 1)}">← Prev</a>` : ''}
-          <span class="muted-small">Page ${list.page} of ${list.totalPages}</span>
-          ${list.page < list.totalPages ? `<a class="btn btn-secondary" href="${pageLink(list.page + 1)}">Next →</a>` : ''}
-        </div>`
-      : '';
-
-  // "Browse other states" chip row — top states by count, minus this one.
-  const otherStates = US_STATES.filter((s) => s.code !== state.code).slice(0, 24);
-  const stateChips = otherStates
-    .map((s) => `<a class="dir-chip" href="/directory/${s.slug}">${esc(s.name)}</a>`)
-    .join('\n');
-
-  const body = `
-  <section class="hero dir-hero">
-    <div class="container-narrow">
-      <a class="muted-small" href="/directory">← All states &amp; ports</a>
-      <h1 style="margin-top: 10px;">${esc(state.name)} freight carriers</h1>
-      <p class="lead">${fmtNum(list.total)} ${intermodalOnly ? 'drayage / intermodal ' : ''}motor carriers based in ${esc(state.name)}, from FMCSA public data. Verify any carrier live on the <a href="/compliance">compliance tools</a> page.</p>
-      <div class="dir-chips" style="margin-top: 16px;">
-        <a class="dir-chip ${intermodalOnly ? '' : 'active'}" href="/directory/${state.slug}">All carriers</a>
-        <a class="dir-chip ${intermodalOnly ? 'active' : ''}" href="/directory/${state.slug}?intermodal=1">Drayage / intermodal only</a>
-      </div>
-    </div>
-  </section>
-  <main class="dir-shell">
-    ${cards}
-    ${pager}
-    <div class="dir-section-h"><h2 style="font-size: 18px;">Browse other states</h2></div>
-    <div class="dir-chips">${stateChips}</div>
-  </main>`;
-
-  const titleQual = intermodalOnly ? 'Drayage & Intermodal Carriers' : 'Trucking Carriers';
-  return layout({
-    title: `${state.name} ${titleQual} Directory — ${list.total.toLocaleString('en-US')} Carriers | QuoteFleet`,
-    description: `Directory of ${list.total.toLocaleString('en-US')} ${intermodalOnly ? 'drayage and intermodal' : 'freight'} carriers in ${state.name}. Fleet size, authority, and safety ratings from FMCSA data. Free to browse.`,
-    canonicalPath: `/directory/${state.slug}${qsBase}`,
-    bodyHtml: body,
+  const canonicalPath = `${scope.basePath}${canonicalSuffix(filters, scope.locked)}`;
+  return renderFacetedResults({
+    scope,
+    list,
+    counts,
+    filters,
+    crumbs: [{ name: 'Directory', path: '/directory' }, { name: state.name }],
+    h1: `${state.name} freight & drayage carriers`,
+    intro: `${fmtNum(list.total)} FMCSA-registered motor carriers based in ${esc(state.name)}. Filter by city, fleet size, safety rating and authority, or <a href="/compliance">verify any carrier live</a>.`,
+    title: `${state.name} Trucking & Drayage Carriers Directory — ${list.total.toLocaleString('en-US')} Carriers | QuoteFleet`,
+    description: `Directory of ${list.total.toLocaleString('en-US')} freight and drayage carriers in ${state.name}. Filter by fleet size, safety rating and authority. FMCSA data, free to browse.`,
+    canonicalPath,
+    extraModulesHtml: `${citiesModule(state, cities)}${statesChipRow(state.code)}`,
+    jsonLd: [
+      jsonLdBreadcrumb([{ name: 'Directory', path: '/directory' }, { name: state.name, path: `/directory/${state.slug}` }]),
+      jsonLdItemListAndCollection({
+        name: `${state.name} freight & drayage carriers`,
+        description: `Directory of ${list.total} carriers in ${state.name}.`,
+        path: canonicalPath,
+        carriers: list.carriers,
+        total: list.total,
+      }),
+    ],
   });
 }
 
-// ─── 4a. Port page ────────────────────────────────────────────────────────
-export function renderPortPage(opts: {
-  port: { code: string; name: string; city: string; state: string };
+// ─── 2b. City page (faceted) ──────────────────────────────────────────────
+export function renderCityPage(opts: {
+  state: UsState;
+  city: { name: string; slug: string };
   list: CarrierListResult;
-  intermodalOnly: boolean;
+  counts: FacetCounts;
+  filters: DirectoryFilters;
+  cities: CityCount[];
 }): string {
-  const { port, list, intermodalOnly } = opts;
-  const cards = list.carriers.length
-    ? `<div class="dir-grid" style="grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));">${list.carriers
-        .map(carrierCard)
-        .join('\n')}</div>`
-    : `<div class="dir-empty">No ${intermodalOnly ? 'drayage ' : ''}carriers mapped to ${esc(port.name)} yet.</div>`;
-
-  const pageLink = (p: number): string => {
-    const parts: string[] = [];
-    if (intermodalOnly) parts.push('intermodal=1');
-    if (p > 1) parts.push(`page=${p}`);
-    return `/directory/port/${port.code}${parts.length ? '?' + parts.join('&') : ''}`;
+  const { state, city, list, counts, filters, cities } = opts;
+  const scope: FacetScope = {
+    kind: 'city',
+    basePath: `/directory/${state.slug}/${city.slug}`,
+    locked: new Set(['state', 'city']),
+    state,
+    city,
   };
-  const pager =
-    list.totalPages > 1
-      ? `<div class="dir-pager">
-          ${list.page > 1 ? `<a class="btn btn-secondary" href="${pageLink(list.page - 1)}">← Prev</a>` : ''}
-          <span class="muted-small">Page ${list.page} of ${list.totalPages}</span>
-          ${list.page < list.totalPages ? `<a class="btn btn-secondary" href="${pageLink(list.page + 1)}">Next →</a>` : ''}
-        </div>`
-      : '';
+  const canonicalPath = `${scope.basePath}${canonicalSuffix(filters, scope.locked)}`;
+  const otherCities = cities.filter((c) => c.slug !== city.slug).slice(0, 23);
+  return renderFacetedResults({
+    scope,
+    list,
+    counts,
+    filters,
+    crumbs: [
+      { name: 'Directory', path: '/directory' },
+      { name: state.name, path: `/directory/${state.slug}` },
+      { name: city.name },
+    ],
+    h1: `Top Drayage Carriers in ${city.name}, ${state.name}`,
+    intro: `${fmtNum(list.total)} FMCSA-registered motor carriers based in ${esc(city.name)}, ${esc(state.name)}. Filter by fleet size, safety rating and authority, or <a href="/compliance">verify any carrier live</a>.`,
+    title: `${city.name}, ${state.code} Trucking & Drayage Carriers — ${list.total.toLocaleString('en-US')} Carriers | QuoteFleet`,
+    description: `Directory of ${list.total.toLocaleString('en-US')} freight and drayage carriers in ${city.name}, ${state.name}. Fleet size, safety rating and authority from FMCSA data.`,
+    canonicalPath,
+    extraModulesHtml: `${otherCities.length ? citiesModule(state, otherCities) : ''}
+      <div class="dir-section-h"><h2 style="font-size: 18px;">More in ${esc(state.name)}</h2></div>
+      <div class="dir-chips"><a class="dir-chip" href="/directory/${state.slug}">All ${esc(state.name)} carriers →</a></div>`,
+    jsonLd: [
+      jsonLdBreadcrumb([
+        { name: 'Directory', path: '/directory' },
+        { name: state.name, path: `/directory/${state.slug}` },
+        { name: city.name, path: `/directory/${state.slug}/${city.slug}` },
+      ]),
+      jsonLdItemListAndCollection({
+        name: `Drayage carriers in ${city.name}, ${state.name}`,
+        description: `Directory of ${list.total} carriers in ${city.name}, ${state.name}.`,
+        path: canonicalPath,
+        carriers: list.carriers,
+        total: list.total,
+      }),
+    ],
+  });
+}
 
+// ─── 4a. Port page (faceted, + FAQ schema) ────────────────────────────────
+function portFaqs(port: { name: string; city: string; state: string }): Array<{ q: string; a: string }> {
+  return [
+    {
+      q: `How many carriers serve ${port.name}?`,
+      a: `This directory maps every FMCSA-registered motor carrier whose physical location is nearest to ${port.name} in ${port.city}, ${port.state}, using ZIP-centroid proximity. Use the filters to narrow by fleet size, safety rating or drayage service.`,
+    },
+    {
+      q: `What is drayage at ${port.city}?`,
+      a: `Drayage is the short-haul trucking of ocean containers between ${port.name}'s marine terminals and nearby warehouses, rail ramps or transload facilities. Carriers flagged "Drayage / intermodal" here report intermodal container operations to FMCSA.`,
+    },
+    {
+      q: `How do I verify a carrier's authority and insurance?`,
+      a: `Every profile links to the official FMCSA SAFER Company Snapshot, and the on-page "Verify live now" button pulls a real-time authority, insurance and safety snapshot from FMCSA's QCMobile system. You can also use the free lookup on our compliance tools page.`,
+    },
+    {
+      q: `Is this directory free to use?`,
+      a: `Yes. Browsing, filtering and verifying carriers is free. Carrier data is sourced from FMCSA public records; carriers can claim their profile to publish live rates and take instant quotes.`,
+    },
+  ];
+}
+
+export function renderPortPage(opts: {
+  port: ContainerPort;
+  list: CarrierListResult;
+  counts: FacetCounts;
+  filters: DirectoryFilters;
+}): string {
+  const { port, list, counts, filters } = opts;
+  const scope: FacetScope = {
+    kind: 'port',
+    basePath: `/directory/port/${port.code}`,
+    locked: new Set(['port']),
+    port,
+  };
+  const canonicalPath = `${scope.basePath}${canonicalSuffix(filters, scope.locked)}`;
+  const faqs = portFaqs(port);
   const portChips = CONTAINER_PORTS.filter((p) => p.code !== port.code)
     .map((p) => `<a class="dir-chip" href="/directory/port/${p.code}">${esc(p.name)}</a>`)
     .join('\n');
-
-  const body = `
-  <section class="hero dir-hero">
-    <div class="container-narrow">
-      <a class="muted-small" href="/directory">← All states &amp; ports</a>
-      <h1 style="margin-top: 10px;">Carriers near ${esc(port.name)}</h1>
-      <p class="lead">${fmtNum(list.total)} ${intermodalOnly ? 'drayage / intermodal ' : ''}carriers whose nearest US container gateway is ${esc(port.name)} (${esc(port.city)}, ${esc(port.state)}), by ZIP proximity from FMCSA data.</p>
-      <div class="dir-chips" style="margin-top: 16px;">
-        <a class="dir-chip ${intermodalOnly ? '' : 'active'}" href="/directory/port/${port.code}">All carriers</a>
-        <a class="dir-chip ${intermodalOnly ? 'active' : ''}" href="/directory/port/${port.code}?intermodal=1">Drayage / intermodal only</a>
-      </div>
-    </div>
-  </section>
-  <main class="dir-shell">
-    ${cards}
-    ${pager}
-    <div class="dir-section-h"><h2 style="font-size: 18px;">Other US ports</h2></div>
-    <div class="dir-chips">${portChips}</div>
-  </main>`;
-
-  return layout({
+  const faqsHtml = `<div class="dir-section-h"><h2>Frequently asked questions</h2></div>
+    ${faqs
+      .map(
+        (f) => `<div class="dir-card" style="margin-bottom:12px;"><h3 style="margin:0 0 6px; font-size:16px;">${esc(f.q)}</h3><p class="muted" style="margin:0; line-height:1.55;">${esc(f.a)}</p></div>`,
+      )
+      .join('\n')}`;
+  return renderFacetedResults({
+    scope,
+    list,
+    counts,
+    filters,
+    crumbs: [{ name: 'Directory', path: '/directory' }, { name: port.name }],
+    h1: `Drayage & trucking carriers near ${port.name}`,
+    intro: `${fmtNum(list.total)} carriers whose nearest US container gateway is ${esc(port.name)} (${esc(port.city)}, ${esc(port.state)}), by ZIP proximity from FMCSA data.`,
     title: `${port.name} Drayage & Trucking Carriers — ${list.total.toLocaleString('en-US')} Near ${port.city} | QuoteFleet`,
-    description: `Directory of ${list.total.toLocaleString('en-US')} carriers near ${port.name} in ${port.city}, ${port.state}. Drayage, intermodal and trucking companies with fleet and authority data from FMCSA.`,
-    canonicalPath: `/directory/port/${port.code}`,
-    bodyHtml: body,
+    description: `Directory of ${list.total.toLocaleString('en-US')} carriers near ${port.name} in ${port.city}, ${port.state}. Filter by fleet size, safety rating and drayage service. FMCSA data.`,
+    canonicalPath,
+    extraModulesHtml: `<div class="dir-section-h"><h2 style="font-size: 18px;">Other US ports</h2></div><div class="dir-chips">${portChips}</div>`,
+    faqsHtml,
+    jsonLd: [
+      jsonLdBreadcrumb([{ name: 'Directory', path: '/directory' }, { name: port.name, path: `/directory/port/${port.code}` }]),
+      jsonLdItemListAndCollection({
+        name: `Carriers near ${port.name}`,
+        description: `Directory of ${list.total} carriers near ${port.name}.`,
+        path: canonicalPath,
+        carriers: list.carriers,
+        total: list.total,
+      }),
+      jsonLdFaq(faqs),
+    ],
   });
 }
 
 // ─── 4b. Carrier profile ──────────────────────────────────────────────────
-export function renderCarrierProfile(opts: { carrier: VisibleCarrier }): string {
+export function renderCarrierProfile(opts: {
+  carrier: VisibleCarrier;
+  related?: VisibleCarrier[];
+  cityCount?: number;
+  stateCount?: number;
+}): string {
   const c = opts.carrier;
+  const related = opts.related ?? [];
   const sr = safetyLabel(c.safetyRating);
   const cityState = [c.city, c.state].filter(Boolean).join(', ');
   const st = stateByCode(c.state);
   const port = portByCode(c.nearestPortCode);
+  const citySlug = c.city ? citySlugify(c.city) : '';
+  const cityName = c.city ? titleCaseCity(c.city) : '';
   const saferUrl = `https://safer.fmcsa.dot.gov/query.asp?searchtype=ANY&query_type=queryCarrierSnapshot&query_param=USDOT&query_string=${encodeURIComponent(
     c.usdot,
   )}`;
+
+  // Breadcrumb: Directory / State / City / Carrier.
+  const crumbs: Crumb[] = [{ name: 'Directory', path: '/directory' }];
+  if (st) crumbs.push({ name: st.name, path: `/directory/${st.slug}` });
+  if (st && citySlug && cityName) crumbs.push({ name: cityName, path: `/directory/${st.slug}/${citySlug}` });
+  crumbs.push({ name: c.dbaName || c.legalName });
 
   const facts: Array<[string, string]> = [
     ['USDOT', c.usdot ? esc(c.usdot) : '—'],
@@ -423,17 +965,39 @@ export function renderCarrierProfile(opts: { carrier: VisibleCarrier }): string 
   ];
   if (port) facts.push(['Nearest port', `${esc(port.name)}`]);
 
-  const factRows = facts
-    .map(
-      ([k, v]) =>
-        `<div class="lookup-result"><div class="row"><span class="k">${esc(k)}</span><span class="v">${v}</span></div></div>`,
-    )
-    .join('');
+  const factRows =
+    facts
+      .map(
+        ([k, v]) =>
+          `<div class="lookup-result"><div class="row"><span class="k">${esc(k)}</span><span class="v">${v}</span></div></div>`,
+      )
+      .join('') +
+    // Verify-on-SAFER link surfaced as a data-table row too.
+    `<div class="lookup-result"><div class="row"><span class="k">FMCSA record</span><span class="v"><a href="${saferUrl}" target="_blank" rel="noopener nofollow" style="color:var(--accent);">Verify on SAFER ↗</a></span></div></div>`;
+
+  // Count-bearing cross-links (city + state).
+  const crossLinks: string[] = [];
+  if (st && citySlug && cityName && (opts.cityCount ?? 0) > 1) {
+    crossLinks.push(
+      `<a class="dir-chip" href="/directory/${st.slug}/${citySlug}">${esc(cityName)} carriers (${fmtNum(opts.cityCount)})</a>`,
+    );
+  }
+  if (st && (opts.stateCount ?? 0) > 1) {
+    crossLinks.push(`<a class="dir-chip" href="/directory/${st.slug}">${esc(st.name)} carriers (${fmtNum(opts.stateCount)})</a>`);
+  }
+  if (port) crossLinks.push(`<a class="dir-chip" href="/directory/port/${port.code}">Near ${esc(port.name)}</a>`);
+
+  const relatedModule = related.length
+    ? `<div class="dir-section-h"><h2 style="font-size: 18px;">Other carriers in ${esc(cityName || st?.name || 'the area')}</h2></div>
+       <div class="dir-grid" style="grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));">${related
+         .map(carrierCard)
+         .join('\n')}</div>`
+    : '';
 
   const body = `
   <section class="hero dir-hero">
     <div class="container-narrow">
-      <a class="muted-small" href="${st ? `/directory/${st.slug}` : '/directory'}">← ${st ? esc(st.name) + ' carriers' : 'Directory'}</a>
+      ${crumbsHtml(crumbs)}
       <div class="dir-chips" style="margin: 12px 0 6px;">
         ${c.intermodal ? '<span class="pill pill-dray">Drayage</span>' : ''}
         <span class="pill pill-${sr.tone}">${esc(sr.text)}</span>
@@ -453,6 +1017,10 @@ export function renderCarrierProfile(opts: { carrier: VisibleCarrier }): string 
       </div>
       <div id="live-result" class="lookup-result" style="margin-top: 6px;"></div>
     </div>
+
+    ${crossLinks.length ? `<div class="dir-chips" style="margin-top: 18px;">${crossLinks.join('\n')}</div>` : ''}
+
+    ${relatedModule}
 
     <div class="dir-card" style="margin-top: 20px; text-align: center; padding: 26px;">
       <h2 style="font-size: 18px; margin: 0 0 8px;">Is this your company?</h2>
@@ -501,6 +1069,7 @@ export function renderCarrierProfile(opts: { carrier: VisibleCarrier }): string 
     }${authorityLabel(c.authorityType)}, ${sr.text} safety rating. Verify live with FMCSA.`,
     canonicalPath: `/directory/carrier/${encodeURIComponent(c.slug)}`,
     bodyHtml: body,
+    jsonLd: [jsonLdBreadcrumb(crumbs), jsonLdCarrier(c)],
   });
 }
 
