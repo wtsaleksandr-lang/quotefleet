@@ -1799,6 +1799,59 @@ export const carrierDirectory = pgTable(
   ]
 );
 
+/**
+ * Self-declared carrier capabilities stored on a `carrier_overrides` row.
+ *
+ * Each flag flips the matching profile credential badge from the muted "claim
+ * to add" affordance to an ACTIVE solid badge — but the badge stays labeled
+ * "Self-declared." in its tooltip (these are NOT FMCSA-verified). The keys
+ * intentionally match the `tone` ids of SELF_DECLARED_CREDENTIALS in
+ * src/server/directory/pages.ts so the merge maps one-to-one.
+ */
+export interface CarrierCapabilities {
+  uiia?: boolean;
+  twic?: boolean;
+  bonded?: boolean;
+  reefer?: boolean;
+  transload?: boolean;
+  yard?: boolean;
+}
+
+/**
+ * Human-editable OVERRIDES for a carrier card, keyed by USDOT.
+ *
+ * PROVENANCE LAYER. The nightly FMCSA re-ingest rewrites `carrier_directory`
+ * (see CARRIER_UPSERT_SET in carrierIngest.ts) but NEVER touches this table, so
+ * any admin/carrier edit here PERSISTS across every re-ingest — the same
+ * survive-the-ingest guarantee already proven by `carrier_directory.contact_hidden`,
+ * lifted out into a dedicated table so we can edit ANY card field (not just the
+ * opt-out) without the ingest clobbering it.
+ *
+ * Every column is nullable: a NULL override means "no override — fall back to
+ * the FMCSA value". The merge layer (src/server/directory/queries.ts) LEFT JOINs
+ * this table on the profile read and applies the non-null overrides, tagging
+ * each field's provenance so the card can tell FMCSA-sourced from admin-edited.
+ * Only the profile (carrierBySlug) merges overrides today; list/card queries are
+ * unchanged.
+ */
+export const carrierOverrides = pgTable('carrier_overrides', {
+  /** USDOT (leading zeros stripped, same normalization as carrier_directory.usdot). */
+  usdot: text('usdot').primaryKey(),
+  /** Replaces the auto-generated FMCSA "About" prose when present. */
+  aboutOverride: text('about_override'),
+  /** Replaces the FMCSA census email on the profile when present. */
+  emailOverride: text('email_override'),
+  /** Replaces the FMCSA census phone on the profile when present. */
+  phoneOverride: text('phone_override'),
+  /** When true, hides public contact on the profile (OR'd with the FMCSA opt-out). */
+  hidden: boolean('hidden'),
+  /** Self-declared credentials (UIIA / TWIC / bonded / reefer / transload / yard). */
+  capabilities: jsonb('capabilities').$type<CarrierCapabilities>(),
+  updatedAt: timestamp('updated_at', { mode: 'date' }).notNull().defaultNow(),
+  /** Actor identity (admin email / user id) that last wrote this override. */
+  updatedBy: text('updated_by'),
+});
+
 // ────────────────────────────────────────────────────────────────────
 // DIRECTORY_TERMINALS — canonical, PLATFORM-LEVEL reference list of major
 // North-American intermodal terminal metros (coastal SEAPORT gateways +
@@ -1867,6 +1920,8 @@ export type BrokerLead = typeof brokerLeads.$inferSelect;
 export type NewBrokerLead = typeof brokerLeads.$inferInsert;
 export type CarrierDirectoryRow = typeof carrierDirectory.$inferSelect;
 export type NewCarrierDirectoryRow = typeof carrierDirectory.$inferInsert;
+export type CarrierOverrideRow = typeof carrierOverrides.$inferSelect;
+export type NewCarrierOverrideRow = typeof carrierOverrides.$inferInsert;
 export type CallbackRequest = typeof callbackRequests.$inferSelect;
 export type NewCallbackRequest = typeof callbackRequests.$inferInsert;
 export type Conversation = typeof conversations.$inferSelect;
