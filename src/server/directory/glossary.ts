@@ -468,7 +468,7 @@ function layout({ title, description, canonicalPath, bodyHtml, jsonLd }: LayoutO
   </header>
   ${bodyHtml}
   <footer class="site-footer">
-    © <span id="year"></span> QuoteFleet · <a href="/directory">Directory</a> · <a href="/compliance">Compliance</a> · <a href="/glossary">Glossary</a> · <a href="/marketplace/">Marketplace</a> · <a href="/terms">Terms</a> · <a href="/privacy">Privacy</a> · <a href="/">Home</a>
+    © <span id="year"></span> QuoteFleet · <a href="/directory">Directory</a> · <a href="/compliance">Compliance</a> · <a href="/glossary">Glossary</a> · <a href="/services">Services</a> · <a href="/marketplace/">Marketplace</a> · <a href="/terms">Terms</a> · <a href="/privacy">Privacy</a> · <a href="/">Home</a>
   </footer>
   <script>document.getElementById('year').textContent = new Date().getFullYear();</script>
   <script src="/marketing-chat.js" defer></script>
