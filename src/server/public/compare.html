@@ -1,0 +1,350 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Why QuoteFleet — vs a TMS, form builders &amp; spreadsheets</title>
+  <meta name="description" content="How QuoteFleet compares to a traditional TMS (Samsara, Motive), B2B form builders (Jotform, Typeform), and Excel/Sheets templates for quoting freight — instant branded quote pages, lead capture, and the FMCSA carrier directory from $14.80/mo.">
+  <link rel="canonical" href="https://quotefleet.net/compare">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="/style.css">
+  <link rel="stylesheet" href="/public-pages-wefixtrades.css">
+  <link rel="icon" href="/favicon.ico" sizes="any">
+  <link rel="icon" type="image/png" sizes="32x32" href="/brand/favicon-32.png">
+  <link rel="apple-touch-icon" sizes="180x180" href="/brand/apple-touch-icon-180.png">
+  <meta name="theme-color" content="#0b0f15">
+  <style>
+    /* Compare page — scoped to .cmp-*, loaded after the linked sheets so it wins.
+       Left-aligned headers, blue (white-on-blue) + dark-grey buttons only.
+       Colors use tokens / rgba() — no raw #fff / #000 / white / black. */
+    .cmp-wrap { max-width: 1040px; margin: 0 auto; padding: 0 24px; }
+    .cmp-hero { text-align: left; padding: 64px 0 24px; }
+    .cmp-eyebrow {
+      display: inline-block;
+      font-family: var(--font-mono);
+      font-size: 12px; font-weight: 600; letter-spacing: 0.08em;
+      text-transform: uppercase;
+      color: var(--accent);
+      margin: 0 0 12px 0;
+    }
+    .cmp-hero h1 {
+      text-align: left;
+      font-size: 44px; font-weight: 800; letter-spacing: -0.03em; line-height: 1.1;
+      color: var(--ink); margin: 0 0 16px 0;
+    }
+    .cmp-hero p.cmp-lead {
+      text-align: left;
+      font-size: 18px; line-height: 1.6; color: var(--muted);
+      max-width: 720px; margin: 0;
+    }
+    .cmp-cta-row { display: flex; flex-wrap: wrap; gap: 12px; margin: 24px 0 0; }
+    .cmp-btn {
+      display: inline-flex; align-items: center; justify-content: center; gap: 8px;
+      font-family: var(--font-sans); font-size: 14px; font-weight: 700;
+      border-radius: var(--radius-btn); padding: 12px 24px; min-height: 44px;
+      border: 1px solid transparent; cursor: pointer; text-decoration: none;
+      transition: background 0.18s ease, transform 0.18s ease, border-color 0.18s ease;
+    }
+    .cmp-btn-blue { background: var(--accent-fill); color: rgba(255,255,255,1); border-color: var(--accent-fill); }
+    .cmp-btn-blue:hover { background: var(--accent-strong); transform: translateY(-1px); }
+    .cmp-btn-grey { background: var(--surface-3); color: var(--ink); border-color: var(--border-strong); }
+    .cmp-btn-grey:hover { background: var(--surface-2); border-color: var(--muted-soft); transform: translateY(-1px); }
+
+    .cmp-section { padding: 40px 0; }
+    .cmp-section h2 {
+      text-align: left;
+      font-size: 28px; font-weight: 800; letter-spacing: -0.02em;
+      color: var(--ink); margin: 0 0 8px 0;
+    }
+    .cmp-section .cmp-sub {
+      text-align: left; color: var(--muted); font-size: 16px; line-height: 1.6;
+      max-width: 720px; margin: 0 0 24px 0;
+    }
+
+    /* Comparison table */
+    .cmp-table-scroll { overflow-x: auto; -webkit-overflow-scrolling: touch; border-radius: var(--radius-lg); border: 1px solid var(--border); }
+    table.cmp-table { border-collapse: collapse; width: 100%; min-width: 720px; background: var(--surface); }
+    table.cmp-table th, table.cmp-table td {
+      text-align: left; padding: 14px 16px; font-size: 14px; line-height: 1.5;
+      border-bottom: 1px solid var(--border);
+    }
+    table.cmp-table thead th {
+      font-weight: 700; color: var(--ink); background: var(--surface-2);
+      position: sticky; top: 0;
+    }
+    table.cmp-table thead th.cmp-col-qf { color: var(--accent-strong); }
+    table.cmp-table tbody th {
+      font-weight: 600; color: var(--ink-soft); background: var(--surface);
+    }
+    table.cmp-table td.cmp-qf { background: var(--accent-2-soft); color: var(--ink-soft); font-weight: 600; }
+    table.cmp-table td { color: var(--muted); }
+    table.cmp-table tr:last-child th, table.cmp-table tr:last-child td { border-bottom: 0; }
+    .cmp-yes { color: var(--success); font-weight: 700; }
+    .cmp-no { color: var(--muted-soft); }
+    .cmp-mini { color: var(--muted); }
+
+    /* Edge cards */
+    .cmp-edge-grid {
+      display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 16px;
+    }
+    .cmp-edge-card {
+      background: var(--surface); border: 1px solid var(--border);
+      border-radius: var(--radius-lg); padding: 24px;
+    }
+    .cmp-edge-card h3 {
+      text-align: left; font-size: 17px; font-weight: 700; color: var(--ink);
+      margin: 0 0 8px 0; letter-spacing: -0.01em;
+    }
+    .cmp-edge-card p { text-align: left; color: var(--muted); font-size: 14px; line-height: 1.6; margin: 0; }
+
+    /* FAQ */
+    .cmp-faq { max-width: 760px; }
+    .cmp-faq-item {
+      border: 1px solid var(--border); border-radius: 12px;
+      background: rgba(255,255,255,0.02); margin: 0 0 12px 0; padding: 0 16px;
+    }
+    .cmp-faq-item summary {
+      cursor: pointer; list-style: none; padding: 16px 0; font-weight: 600;
+      color: var(--ink); font-size: 15px;
+    }
+    .cmp-faq-item summary::-webkit-details-marker { display: none; }
+    .cmp-faq-item[open] summary { color: var(--accent-strong); }
+    .cmp-faq-a { padding: 0 0 16px; color: var(--muted); font-size: 14px; line-height: 1.65; }
+
+    .cmp-final {
+      background: var(--surface); border: 1px solid var(--border-strong);
+      border-radius: var(--radius-xl); padding: 40px; text-align: left; margin: 40px 0;
+    }
+    .cmp-final h2 { text-align: left; margin: 0 0 8px 0; }
+    .cmp-final p { text-align: left; color: var(--muted); font-size: 16px; margin: 0 0 24px 0; max-width: 620px; }
+    .cmp-foot-note { color: var(--muted-soft); font-size: 13px; margin: 24px 0 0; }
+
+    @media (max-width: 640px) {
+      .cmp-hero { padding: 40px 0 16px; }
+      .cmp-hero h1 { font-size: 32px; }
+      .cmp-hero p.cmp-lead { font-size: 16px; }
+      .cmp-section h2 { font-size: 24px; }
+      .cmp-final { padding: 24px; }
+    }
+  </style>
+  <script type="application/ld+json">
+  {
+    "@context": "https://schema.org",
+    "@type": "Article",
+    "headline": "QuoteFleet vs a TMS, form builders, and spreadsheets for quoting freight",
+    "description": "An honest comparison of QuoteFleet against a traditional TMS, B2B form builders, and Excel/Sheets templates for quoting freight loads.",
+    "author": { "@type": "Organization", "name": "QuoteFleet", "url": "https://quotefleet.net/" },
+    "publisher": { "@type": "Organization", "name": "QuoteFleet", "logo": { "@type": "ImageObject", "url": "https://quotefleet.net/brand/logo-full-ondark.png" } },
+    "mainEntityOfPage": "https://quotefleet.net/compare"
+  }
+  </script>
+  <script type="application/ld+json">
+  {
+    "@context": "https://schema.org",
+    "@type": "FAQPage",
+    "mainEntity": [
+      { "@type": "Question", "name": "Is QuoteFleet a TMS?", "acceptedAnswer": { "@type": "Answer", "text": "No. A TMS (like Samsara or Motive) manages fleets, dispatch, ELD compliance, and tracking. QuoteFleet does one job extremely well: turning your rates into an instant, branded quote page that captures leads. It runs alongside whatever TMS or workflow you already use — there is nothing to rip out or integrate." } },
+      { "@type": "Question", "name": "Why not just use a form builder like Jotform or Typeform?", "acceptedAnswer": { "@type": "Answer", "text": "Form builders collect answers; they do not price freight. QuoteFleet reads your rate sheet and calculates a real per-mile, LTL-by-class, or port drayage rate instantly, then captures the lead. A form still leaves you to work out and send the number by hand." } },
+      { "@type": "Question", "name": "What about a shared Excel or Google Sheets rate template?", "acceptedAnswer": { "@type": "Answer", "text": "A spreadsheet can hold your rates, but your customer never sees a branded page, there is no lead capture, and every quote is a manual copy-paste. QuoteFleet gives customers a self-serve branded calculator and drops every request straight into your inbox." } },
+      { "@type": "Question", "name": "How much does QuoteFleet cost?", "acceptedAnswer": { "@type": "Answer", "text": "QuoteFleet starts at $14.80/mo with unlimited quotes, and every plan opens with a 14-day all-inclusive free trial. No per-quote fees and no long-term contract." } },
+      { "@type": "Question", "name": "Do you train AI on my rates or leads?", "acceptedAnswer": { "@type": "Answer", "text": "No. Your rates and customer leads are never used to fine-tune any AI model, and every tenant's data is isolated at the database query layer so your pricing is never exposed to another account." } }
+    ]
+  }
+  </script>
+</head>
+<body class="qf-public-wft">
+  <header class="topnav">
+    <div class="topnav-inner">
+      <a href="/" class="brand-mark">
+        <span class="logo">
+          <img class="qf-brand-mark" src="/brand/mark-keys-ondark.png" alt="QuoteFleet" width="28" height="30" decoding="async">
+        </span>
+        QuoteFleet
+      </a>
+      <span class="topnav-spacer"></span>
+      <a class="nav-link" href="/pricing">Pricing</a>
+      <a class="nav-link" href="/login">Sign in</a>
+      <a class="cmp-btn cmp-btn-blue always-show" href="/signup">Start free <span class="arr" aria-hidden="true">→</span></a>
+    </div>
+  </header>
+
+  <main>
+    <div class="cmp-wrap">
+      <section class="cmp-hero">
+        <p class="cmp-eyebrow">Why QuoteFleet</p>
+        <h1>The fastest way to quote a load — without a TMS, a form, or a spreadsheet.</h1>
+        <p class="cmp-lead">QuoteFleet is not trying to replace your fleet software. It does one thing the others don't: turns your rate sheet into an instant, branded quote page that prices freight and captures the lead — with the FMCSA carrier directory built in, from $14.80/mo.</p>
+        <div class="cmp-cta-row">
+          <a class="cmp-btn cmp-btn-blue" href="/signup">Start free <span class="arr" aria-hidden="true">→</span></a>
+          <a class="cmp-btn cmp-btn-grey" href="/w/demo">See a live demo <span class="arr" aria-hidden="true">→</span></a>
+        </div>
+      </section>
+
+      <section class="cmp-section">
+        <h2>How QuoteFleet compares</h2>
+        <p class="cmp-sub">The honest version. QuoteFleet wins on getting a branded, priced quote in front of a customer fast — not on managing your fleet.</p>
+        <div class="cmp-table-scroll">
+          <table class="cmp-table">
+            <thead>
+              <tr>
+                <th scope="col">Capability</th>
+                <th scope="col" class="cmp-col-qf">QuoteFleet</th>
+                <th scope="col">Traditional TMS<br><span class="cmp-mini">Samsara, Motive</span></th>
+                <th scope="col">Form builders<br><span class="cmp-mini">Jotform, Typeform</span></th>
+                <th scope="col">Excel / Sheets<br><span class="cmp-mini">rate template</span></th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr>
+                <th scope="row">Instant branded quote page</th>
+                <td class="cmp-qf"><span class="cmp-yes">Yes</span> — hosted &amp; embeddable</td>
+                <td><span class="cmp-no">No</span></td>
+                <td><span class="cmp-mini">Branded form, no pricing</span></td>
+                <td><span class="cmp-no">No</span></td>
+              </tr>
+              <tr>
+                <th scope="row">Prices freight (per-mile, LTL class, drayage)</th>
+                <td class="cmp-qf"><span class="cmp-yes">Yes</span></td>
+                <td><span class="cmp-mini">Not a quoting tool</span></td>
+                <td><span class="cmp-no">No</span></td>
+                <td><span class="cmp-mini">Manual formulas</span></td>
+              </tr>
+              <tr>
+                <th scope="row">Customer self-serve quoting</th>
+                <td class="cmp-qf"><span class="cmp-yes">Yes</span></td>
+                <td><span class="cmp-no">No</span></td>
+                <td><span class="cmp-mini">Answers only</span></td>
+                <td><span class="cmp-no">No</span></td>
+              </tr>
+              <tr>
+                <th scope="row">Lead capture &amp; inbox</th>
+                <td class="cmp-qf"><span class="cmp-yes">Yes</span></td>
+                <td><span class="cmp-mini">CRM add-on</span></td>
+                <td><span class="cmp-yes">Yes</span></td>
+                <td><span class="cmp-no">No</span></td>
+              </tr>
+              <tr>
+                <th scope="row">FMCSA carrier directory built in</th>
+                <td class="cmp-qf"><span class="cmp-yes">Yes</span> — 321,081 carriers</td>
+                <td><span class="cmp-no">No</span></td>
+                <td><span class="cmp-no">No</span></td>
+                <td><span class="cmp-no">No</span></td>
+              </tr>
+              <tr>
+                <th scope="row">Per-tenant data isolation</th>
+                <td class="cmp-qf"><span class="cmp-yes">Yes</span> — enforced at the DB</td>
+                <td><span class="cmp-mini">Varies</span></td>
+                <td><span class="cmp-mini">Shared platform</span></td>
+                <td><span class="cmp-mini">Local file</span></td>
+              </tr>
+              <tr>
+                <th scope="row">Your data never trains AI</th>
+                <td class="cmp-qf"><span class="cmp-yes">Yes</span></td>
+                <td><span class="cmp-mini">Varies</span></td>
+                <td><span class="cmp-mini">Varies</span></td>
+                <td><span class="cmp-mini">N/A</span></td>
+              </tr>
+              <tr>
+                <th scope="row">Setup time</th>
+                <td class="cmp-qf"><span class="cmp-yes">~5 minutes</span></td>
+                <td><span class="cmp-mini">Days to onboard</span></td>
+                <td><span class="cmp-mini">Hours</span></td>
+                <td><span class="cmp-mini">Hours</span></td>
+              </tr>
+              <tr>
+                <th scope="row">Starting price</th>
+                <td class="cmp-qf"><span class="cmp-yes">$14.80/mo</span></td>
+                <td><span class="cmp-mini">Per-vehicle, quote-based</span></td>
+                <td><span class="cmp-mini">~$29–99/mo</span></td>
+                <td><span class="cmp-mini">Free, but manual</span></td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </section>
+
+      <section class="cmp-section">
+        <h2>Where QuoteFleet is different</h2>
+        <p class="cmp-sub">Five things you won't get from a TMS, a form, or a spreadsheet.</p>
+        <div class="cmp-edge-grid">
+          <div class="cmp-edge-card">
+            <h3>An instant, branded quote page</h3>
+            <p>Your rate sheet becomes a hosted calculator on your own link. Customers price their own loads and see your logo and colors — not a generic form.</p>
+          </div>
+          <div class="cmp-edge-card">
+            <h3>Lead capture that actually captures</h3>
+            <p>Every quote request lands in your inbox with the lane, equipment, and contact details — ready to follow up while the lead is still warm.</p>
+          </div>
+          <div class="cmp-edge-card">
+            <h3>The FMCSA carrier directory</h3>
+            <p>321,081 FMCSA-registered carriers, searchable by port, equipment, and compliance status, with live authority and safety lookups — built in, not a bolt-on.</p>
+          </div>
+          <div class="cmp-edge-card">
+            <h3>Per-tenant data isolation</h3>
+            <p>Your rates and leads are isolated at the database query layer, so your pricing is never visible to another account or a competing broker.</p>
+          </div>
+          <div class="cmp-edge-card">
+            <h3>Your data never trains AI</h3>
+            <p>We don't fine-tune any AI model on your rates or customer leads. Your pricing stays yours.</p>
+          </div>
+          <div class="cmp-edge-card">
+            <h3>From $14.80/mo, unlimited quotes</h3>
+            <p>One simple price, unlimited quotes, no per-quote fees, and a 14-day all-inclusive free trial. Cancel anytime.</p>
+          </div>
+        </div>
+      </section>
+
+      <section class="cmp-section">
+        <h2>Questions, answered</h2>
+        <div class="cmp-faq">
+          <details class="cmp-faq-item">
+            <summary>Is QuoteFleet a TMS?</summary>
+            <div class="cmp-faq-a">No. A TMS like Samsara or Motive manages fleets, dispatch, ELD compliance, and tracking. QuoteFleet does one job extremely well: turning your rates into an instant, branded quote page that captures leads. It runs alongside whatever you already use — nothing to rip out or integrate.</div>
+          </details>
+          <details class="cmp-faq-item">
+            <summary>Why not just use a form builder like Jotform or Typeform?</summary>
+            <div class="cmp-faq-a">Form builders collect answers; they don't price freight. QuoteFleet reads your rate sheet and calculates a real per-mile, LTL-by-class, or port drayage rate instantly, then captures the lead. A form still leaves you to work out and send the number by hand.</div>
+          </details>
+          <details class="cmp-faq-item">
+            <summary>What about a shared Excel or Google Sheets rate template?</summary>
+            <div class="cmp-faq-a">A spreadsheet can hold your rates, but your customer never sees a branded page, there's no lead capture, and every quote is a manual copy-paste. QuoteFleet gives customers a self-serve branded calculator and drops every request straight into your inbox.</div>
+          </details>
+          <details class="cmp-faq-item">
+            <summary>How much does QuoteFleet cost?</summary>
+            <div class="cmp-faq-a">QuoteFleet starts at $14.80/mo with unlimited quotes, and every plan opens with a 14-day all-inclusive free trial. No per-quote fees and no long-term contract. See the <a href="/pricing">pricing page</a> for the full breakdown.</div>
+          </details>
+          <details class="cmp-faq-item">
+            <summary>Do you train AI on my rates or leads?</summary>
+            <div class="cmp-faq-a">No. Your rates and customer leads are never used to fine-tune any AI model, and every tenant's data is isolated at the database query layer so your pricing is never exposed to another account.</div>
+          </details>
+        </div>
+      </section>
+
+      <section class="cmp-final">
+        <h2>See it for yourself in 5 minutes.</h2>
+        <p>Drop in your rate sheet, brand the page, and share the link. Free for 14 days, every feature unlocked.</p>
+        <div class="cmp-cta-row">
+          <a class="cmp-btn cmp-btn-blue" href="/signup">Start free <span class="arr" aria-hidden="true">→</span></a>
+          <a class="cmp-btn cmp-btn-grey" href="/w/demo">See a live demo <span class="arr" aria-hidden="true">→</span></a>
+        </div>
+        <p class="cmp-foot-note">Comparison reflects typical positioning of each category; features of named products vary by plan and change over time. QuoteFleet facts verified against this site.</p>
+      </section>
+    </div>
+  </main>
+
+  <footer class="site-footer">
+    © <span id="year"></span> QuoteFleet ·
+    <a href="/">Home</a> ·
+    <a href="/pricing">Pricing</a> ·
+    <a href="/directory">Directory</a> ·
+    <a href="/terms">Terms</a> ·
+    <a href="/privacy">Privacy</a> ·
+    <a href="/login">Sign in</a> ·
+    <a href="mailto:hello@quotefleet.net">Contact</a>
+  </footer>
+  <script>document.getElementById('year').textContent = new Date().getFullYear();</script>
+  <script src="/marketing-chat.js" defer></script>
+</body>
+</html>
