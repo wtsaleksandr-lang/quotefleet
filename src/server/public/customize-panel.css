@@ -1309,3 +1309,31 @@
 @media (max-width: 560px) {
   .qf-cz-header-grid { grid-template-columns: 1fr; }
 }
+
+/* ── Map-style thumbnails fill their tile edge-to-edge ─────────────────────
+   The real base-map render sat inside the tile's 8px padding, framed by its
+   own border/radius — leaving an empty gap all around the map image. Drop the
+   tile padding and let the map go full-bleed to the top/left/right edges; the
+   tile's own overflow:clip + radius supplies the rounded corners, and the
+   label keeps its breathing room via its own padding. Applies to BOTH the
+   inline carousel chips (.qf-cz-mapstyle) and the unfold-grid MAP tiles
+   (.qf-cz-unfold-map) — not the theme tiles. Selected ring + check preserved. */
+.qf-cz-mapstyle,
+.qf-cz-unfold-tile.qf-cz-unfold-map {
+  padding: 0;
+  gap: 0;
+  overflow: clip;
+}
+.qf-cz-mapstyle .qf-cz-mapstyle-thumb,
+.qf-cz-unfold-tile.qf-cz-unfold-map .qf-cz-mapstyle-thumb {
+  width: 100%;
+  border: 0;
+  border-radius: 0;
+  box-shadow: none;
+}
+.qf-cz-mapstyle .qf-cz-mapstyle-name {
+  padding: 8px;
+}
+.qf-cz-unfold-tile.qf-cz-unfold-map .qf-cz-unfold-tile-name {
+  padding: 8px;
+}

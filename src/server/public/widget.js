@@ -493,7 +493,7 @@
   // pair ANY map with ANY calculator, so this passes through every valid style
   // (not just a subset) — otherwise a chosen style like 'tesla'/'vault'/'mono'
   // would be silently downgraded to 'branded' on the base-map + overlay paths.
-  var MAP_STYLE_KEYS = ['branded', 'grayscale', 'standard', 'soft', 'dark_routes', 'mono', 'satellite', 'ironhorse', 'harbor', 'cupertino', 'material', 'booking', 'tesla', 'stripe', 'stone', 'citron', 'vault', 'blackwhite', 'blackwhite_inverted'];
+  var MAP_STYLE_KEYS = ['branded', 'grayscale', 'standard', 'soft', 'dark_routes', 'mono', 'satellite', 'ironhorse', 'harbor', 'cupertino', 'material', 'booking', 'tesla', 'stripe', 'stone', 'citron', 'vault', 'blackwhite', 'blackwhite_inverted', 'marine'];
   function normMapStyle(s) {
     return MAP_STYLE_KEYS.indexOf(s) > -1 ? s : 'branded';
   }
@@ -2745,7 +2745,7 @@
   function overlayMapTone(style) {
     if (style === 'blackwhite' || style === 'blackwhite_inverted') return null;
     var DARK = { dark_routes: 1, tesla: 1, stone: 1, satellite: 1 };
-    var LIGHT = { grayscale: 1, mono: 1, soft: 1, standard: 1, ironhorse: 1, harbor: 1, cupertino: 1, material: 1, booking: 1, stripe: 1, citron: 1, vault: 1 };
+    var LIGHT = { grayscale: 1, mono: 1, soft: 1, standard: 1, ironhorse: 1, harbor: 1, cupertino: 1, material: 1, booking: 1, stripe: 1, citron: 1, vault: 1, marine: 1 };
     if (DARK[style]) return 'dark';
     if (LIGHT[style]) return 'light';
     return resolvedMapTheme();
