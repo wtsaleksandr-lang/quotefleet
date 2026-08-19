@@ -89,9 +89,20 @@ function credBadge(opts: {
   const aria = `${opts.label} — ${full}`;
   const common = `tabindex="0" role="note" aria-label="${esc(aria)}" data-tip="${esc(full)}"`;
   if (opts.held) {
-    return `<span class="cp-badge cp-badge--${opts.tone}" ${common}>${esc(opts.label)}</span>`;
+    return `<span class="cp-badge cp-tip cp-badge--${opts.tone}" ${common}>${esc(opts.label)}</span>`;
   }
-  return `<span class="cp-badge cp-badge--claim" ${common}>${esc(opts.label)} <span class="tag" aria-hidden="true">claim to add</span></span>`;
+  return `<span class="cp-badge cp-tip cp-badge--claim" ${common}>${esc(opts.label)} <span class="tag" aria-hidden="true">claim to add</span></span>`;
+}
+
+/** Up to two uppercase initials for the company monogram avatar, derived from
+ *  the display name: first letter of the first two words, or the first two
+ *  letters of a single-word name (e.g. "CEVA FREIGHT LLC" → "CF", "MOVERS" →
+ *  "MO"). Non-alphanumeric leading chars are skipped. */
+function monogramInitials(name: string): string {
+  const words = name.trim().split(/\s+/).map((w) => w.replace(/[^a-z0-9]/gi, '')).filter(Boolean);
+  if (words.length === 0) return '—';
+  if (words.length === 1) return (words[0].slice(0, 2) || '—').toUpperCase();
+  return ((words[0][0] ?? '') + (words[1][0] ?? '')).toUpperCase() || '—';
 }
 
 /** Self-declared credentials NOT derivable from FMCSA public data — shown muted
@@ -220,7 +231,7 @@ const DIRECTORY_CSS = `
   }
   /* ── Carrier profile (rich, DrayLocator-structured card) ────────────────── */
   .cp-caps { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; margin: 12px 0 4px; }
-  .cp-badge-active { font-size: 10px; font-family: var(--font-mono); letter-spacing: 0.06em; text-transform: uppercase; padding: 4px 10px; border-radius: 999px; background: var(--success-bg); color: var(--success); border: 1px solid var(--success); display: inline-flex; align-items: center; gap: 6px; }
+  .cp-badge-active { font-size: 10px; font-family: var(--font-mono); letter-spacing: 0.06em; text-transform: uppercase; padding: 5px 9px; border-radius: 4px; background: var(--success-bg); color: var(--success); border: 1px solid var(--success); display: inline-flex; align-items: center; gap: 6px; }
   .cp-badge-active::before { content: ''; width: 6px; height: 6px; border-radius: 50%; background: var(--success); display: inline-block; }
   .cp-claimline { margin: 14px 0 0; font-size: 13px; color: var(--muted); }
   .cp-claimline a { color: var(--accent); text-decoration: none; }
@@ -284,9 +295,9 @@ const DIRECTORY_CSS = `
     --badge-tip-border: rgba(148, 163, 184, 0.28);
     --badge-focus: #2563eb;
   }
-  .cp-chiprow, .cp-caps { overflow-x: clip; }
-  .cp-badge { position: relative; display: inline-flex; align-items: center; gap: 6px; font-size: 12px; font-family: var(--font-mono); letter-spacing: 0.02em; padding: 7px 12px; border-radius: 999px; border: 1px solid transparent; white-space: nowrap; cursor: help; }
-  .cp-badge:focus-visible { outline: 2px solid var(--badge-focus); outline-offset: 2px; }
+  .cp-chiprow, .cp-caps, .cp-nameline { overflow-x: clip; }
+  .cp-badge { position: relative; display: inline-flex; align-items: center; gap: 6px; font-size: 11px; font-family: var(--font-mono); letter-spacing: 0.05em; text-transform: uppercase; padding: 5px 9px; border-radius: 4px; border: 1px solid transparent; white-space: nowrap; cursor: help; }
+  .cp-badge:focus-visible, .cp-fmcsa:focus-visible { outline: 2px solid var(--badge-focus); outline-offset: 2px; }
   .cp-badge--dray { background: var(--badge-dray-bg); color: var(--badge-dray-fg); }
   .cp-badge--hazmat { background: var(--badge-hazmat-bg); color: var(--badge-hazmat-fg); }
   .cp-badge--reefer { background: var(--badge-reefer-bg); color: var(--badge-reefer-fg); }
@@ -302,9 +313,9 @@ const DIRECTORY_CSS = `
   .cp-badge--yard { background: var(--badge-yard-bg); color: var(--badge-yard-fg); }
   .cp-badge--claim { background: var(--surface-2); color: var(--muted); border-color: var(--border); }
   .cp-badge--claim .tag { font-size: 9px; text-transform: uppercase; letter-spacing: 0.05em; color: var(--muted); border: 1px solid var(--border); border-radius: 4px; padding: 2px 6px; }
-  .cp-badge[data-tip]:hover::after,
-  .cp-badge[data-tip]:focus::after,
-  .cp-badge[data-tip]:focus-visible::after {
+  .cp-tip[data-tip]:hover::after,
+  .cp-tip[data-tip]:focus::after,
+  .cp-tip[data-tip]:focus-visible::after {
     content: attr(data-tip);
     position: absolute; top: calc(100% + 9px); left: 50%; transform: translateX(-50%);
     z-index: 30; width: max-content; max-width: min(240px, 72vw);
@@ -314,14 +325,29 @@ const DIRECTORY_CSS = `
     background: var(--badge-tip-bg); color: var(--badge-tip-fg); border: 1px solid var(--badge-tip-border);
     box-shadow: 0 8px 24px rgba(2, 6, 23, 0.35); pointer-events: none;
   }
-  .cp-badge[data-tip]:hover::before,
-  .cp-badge[data-tip]:focus::before,
-  .cp-badge[data-tip]:focus-visible::before {
+  .cp-tip[data-tip]:hover::before,
+  .cp-tip[data-tip]:focus::before,
+  .cp-tip[data-tip]:focus-visible::before {
     content: ''; position: absolute; top: calc(100% + 3px); left: 50%; transform: translateX(-50%);
     border: 6px solid transparent; border-bottom-color: var(--badge-tip-bg); z-index: 31; pointer-events: none;
   }
   @media (prefers-reduced-motion: reduce) {
-    .cp-badge[data-tip]::after, .cp-badge[data-tip]::before { transition: none; }
+    .cp-tip[data-tip]::after, .cp-tip[data-tip]::before { transition: none; }
+  }
+  /* ── DrayLocator-structured header: [monogram] name · Active · FMCSA / claim
+     on the right, subtitle, then the squared badge row — all left-aligned. ──── */
+  .cp-headrow { display: flex; align-items: flex-start; justify-content: space-between; gap: 12px 24px; flex-wrap: wrap; text-align: left; margin: 14px 0 0; }
+  .cp-idblock { display: flex; align-items: center; gap: 14px; min-width: 0; }
+  .cp-monogram { flex: 0 0 auto; width: 46px; height: 46px; border-radius: 6px; background: var(--surface-2); border: 1px solid var(--border); color: var(--ink); display: inline-flex; align-items: center; justify-content: center; font-family: var(--font-mono); font-size: 18px; font-weight: 700; letter-spacing: 0.04em; }
+  .cp-idtext { min-width: 0; }
+  .cp-nameline { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+  .cp-nameline h1 { font-size: 30px; line-height: 1.15; margin: 0; }
+  .cp-fmcsa { position: relative; font-size: 10px; font-family: var(--font-mono); letter-spacing: 0.08em; text-transform: uppercase; padding: 3px 7px; border-radius: 4px; background: var(--surface-2); color: var(--muted); border: 1px solid var(--border); white-space: nowrap; cursor: help; }
+  .cp-subtitle { margin: 8px 0 0; }
+  .cp-headrow .cp-claimline { margin: 4px 0 0; }
+  @media (max-width: 640px) {
+    .cp-nameline h1 { font-size: 24px; }
+    .cp-monogram { width: 40px; height: 40px; font-size: 16px; }
   }
   @media (max-width: 900px) {
     .cp-layout { grid-template-columns: 1fr; }
@@ -1296,18 +1322,36 @@ export function renderCarrierProfile(opts: {
     : '';
 
   const locBased = cityState ? esc(cityState) : isCa ? 'Canada' : 'the United States';
+  // Subtitle line — DrayLocator order: USDOT · MC · City, State (each dropped when absent).
+  const headerSubtitle = [
+    c.usdot ? `USDOT ${esc(c.usdot)}` : '',
+    c.mcNumber ? `MC ${esc(c.mcNumber)}` : '',
+    cityState ? esc(cityState) : '',
+  ]
+    .filter(Boolean)
+    .join(' · ');
   const body = `
   <section class="hero dir-hero">
     <div class="container-narrow">
       ${crumbsHtml(crumbs)}
+      <div class="cp-headrow">
+        <div class="cp-idblock">
+          <div class="cp-monogram" aria-hidden="true">${esc(monogramInitials(carrierName(c)))}</div>
+          <div class="cp-idtext">
+            <div class="cp-nameline">
+              <h1>${esc(carrierName(c))}</h1>
+              ${isActive ? '<span class="cp-badge-active">Active</span>' : ''}
+              <span class="cp-fmcsa cp-tip" tabindex="0" role="note" aria-label="FMCSA — Profile built from FMCSA public records." data-tip="Profile built from FMCSA public records.">FMCSA</span>
+            </div>
+            <p class="lead cp-subtitle">${headerSubtitle}</p>
+            ${carrierName(c) !== c.legalName ? `<p class="muted-small" style="margin: 6px 0 0;">Legal name: ${esc(c.legalName)}</p>` : ''}
+          </div>
+        </div>
+        <p class="cp-claimline">Own this company? <a href="${claimHref}">Claim this profile →</a></p>
+      </div>
       <div class="cp-caps">
-        ${isActive ? '<span class="cp-badge-active">Active</span>' : ''}
         ${verifiedBadges.join('')}
       </div>
-      <h1 style="margin-top: 6px;">${esc(carrierName(c))}</h1>
-      <p class="lead">${esc(cityState)}${c.usdot ? ` · USDOT ${esc(c.usdot)}` : ''}${c.mcNumber ? ` · MC ${esc(c.mcNumber)}` : ''}</p>
-      ${carrierName(c) !== c.legalName ? `<p class="muted-small" style="margin: 6px 0 0;">Legal name: ${esc(c.legalName)}</p>` : ''}
-      <p class="cp-claimline">Own this company? <a href="${claimHref}">Claim this profile →</a></p>
     </div>
   </section>
   <main class="dir-shell">

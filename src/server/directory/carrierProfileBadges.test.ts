@@ -35,7 +35,7 @@ function carrier(overrides: Partial<VisibleCarrier> = {}): VisibleCarrier {
   };
 }
 
-const badge = (tone: string) => `class="cp-badge cp-badge--${tone}"`;
+const badge = (tone: string) => `class="cp-badge cp-tip cp-badge--${tone}"`;
 
 describe('renderCarrierProfile — credential badges', () => {
   it('renders a SOLID Hazmat badge, marked FMCSA-verified, for a hazmat carrier', () => {
@@ -89,5 +89,39 @@ describe('renderCarrierProfile — credential badges', () => {
     expect(html).toContain('data-tip=');
     expect(html).toContain('aria-label=');
     expect(html).toContain('role="note"');
+  });
+});
+
+describe('renderCarrierProfile — DrayLocator-structured header', () => {
+  it('renders a company monogram avatar with up to two uppercase initials', () => {
+    // "ACME DRAYAGE INC" → first letter of the first two words → "AD".
+    const html = renderCarrierProfile({ carrier: carrier() });
+    expect(html).toContain('class="cp-monogram" aria-hidden="true">AD<');
+  });
+
+  it('derives two letters from a single-word name', () => {
+    const html = renderCarrierProfile({ carrier: carrier({ legalName: 'MOVERS', dbaName: null }) });
+    expect(html).toContain('class="cp-monogram" aria-hidden="true">MO<');
+  });
+
+  it('shows an FMCSA source marker with NO fabricated date', () => {
+    const html = renderCarrierProfile({ carrier: carrier() });
+    // Visible marker face is exactly "FMCSA" (no "as of <date>" appended), and its
+    // tooltip carries an honest source note — never our ingest timestamp as a date.
+    expect(html).toContain(
+      '<span class="cp-fmcsa cp-tip" tabindex="0" role="note" aria-label="FMCSA — Profile built from FMCSA public records." data-tip="Profile built from FMCSA public records.">FMCSA</span>',
+    );
+  });
+
+  it('renders a left-aligned header row: name, Active badge, and claim link', () => {
+    const html = renderCarrierProfile({ carrier: carrier() });
+    expect(html).toContain('class="cp-headrow"');
+    expect(html).toContain('class="cp-badge-active"');
+    expect(html).toContain('Own this company?');
+  });
+
+  it('orders the subtitle USDOT · MC · City, State', () => {
+    const html = renderCarrierProfile({ carrier: carrier() });
+    expect(html).toContain('USDOT 107080 · MC MC012892 · SAVANNAH, GA');
   });
 });
