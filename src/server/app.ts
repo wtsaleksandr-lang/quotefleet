@@ -29,6 +29,7 @@ import { registerIngestRoutes } from './routes/ingest.js';
 import { registerInboundRoutes } from './routes/inbound.js';
 import { registerMarketplaceRoutes } from './routes/marketplace.js';
 import { registerDirectoryRoutes } from './routes/directory.js';
+import { registerGlossaryRoutes } from './directory/glossary.js';
 import { registerToolsRoutes } from './routes/tools.js';
 import { registerBillingRoutes, registerStripeWebhook } from './routes/billing.js';
 import { registerConnectRoutes, registerConnectWebhook } from './routes/connect.js';
@@ -135,6 +136,7 @@ export function createApp(): express.Express {
   registerInboundRoutes(app);
   registerMarketplaceRoutes(app);
   registerDirectoryRoutes(app);
+  registerGlossaryRoutes(app);
   registerToolsRoutes(app);
   registerBillingRoutes(app);
   registerConnectRoutes(app);
