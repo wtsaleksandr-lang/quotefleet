@@ -73,6 +73,7 @@ export interface CensusRow {
   dot_number?: string;
   legal_name?: string;
   dba_name?: string;
+  email_address?: string;
   power_units?: string;
   total_drivers?: string;
   safety_rating?: string;
@@ -97,6 +98,8 @@ export interface CarrierRecord {
   country: string;
   zip: string | null;
   phone: string | null;
+  /** Census email_address (normalized lower-case), or null when absent/implausible. */
+  email: string | null;
   powerUnits: number | null;
   drivers: number | null;
   safetyRating: string | null;
@@ -133,6 +136,15 @@ export function normalizePhone(v: unknown): string | null {
   if (!s) return null;
   const digits = s.replace(/\D/g, '');
   return digits.length >= 10 ? digits : null;
+}
+
+/** Trim + lower-case an email; keep only a plausible `x@y.z` shape (census
+ *  email_address is dirty — spaces, "N/A", etc.). Returns null otherwise. */
+export function normalizeEmail(v: unknown): string | null {
+  const s = cleanStr(v);
+  if (!s) return null;
+  const e = s.toLowerCase();
+  return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(e) ? e : null;
 }
 
 function toInt(v: unknown): number | null {
@@ -234,6 +246,7 @@ export function normalizeCarrier(
     country,
     zip,
     phone: normalizePhone(census?.phone) ?? normalizePhone(li.bus_telno),
+    email: normalizeEmail(census?.email_address),
     powerUnits: toInt(census?.power_units),
     drivers: toInt(census?.total_drivers),
     // Upper-case to match the exact 'S'/'C'/'U' the safety filter compares against
@@ -283,6 +296,36 @@ export interface CarrierStore {
  *  carriers) is written in ≤2 statements instead of ~2000 round-trips. */
 export const UPSERT_BATCH = 500;
 
+/**
+ * The ON CONFLICT (usdot) DO UPDATE SET map — every MUTABLE column refreshed
+ * from the incoming (EXCLUDED) row on a re-ingest.
+ *
+ * `contact_hidden` is DELIBERATELY ABSENT: it is the carrier opt-out flag and
+ * must NEVER be overwritten by an ingest (it is also never inserted — the column
+ * default false applies), so a carrier who emailed us to hide their contact
+ * STAYS hidden across every future re-ingest. Exported so a unit test can assert
+ * the opt-out is never in this SET.
+ */
+export const CARRIER_UPSERT_SET = {
+  mcNumber: sql`excluded.mc_number`,
+  legalName: sql`excluded.legal_name`,
+  dbaName: sql`excluded.dba_name`,
+  city: sql`excluded.city`,
+  state: sql`excluded.state`,
+  country: sql`excluded.country`,
+  zip: sql`excluded.zip`,
+  phone: sql`excluded.phone`,
+  email: sql`excluded.email`,
+  powerUnits: sql`excluded.power_units`,
+  drivers: sql`excluded.drivers`,
+  safetyRating: sql`excluded.safety_rating`,
+  authorityType: sql`excluded.authority_type`,
+  intermodal: sql`excluded.intermodal`,
+  nearestPortCode: sql`excluded.nearest_port_code`,
+  publicSlug: sql`excluded.public_slug`,
+  updatedAt: sql`excluded.updated_at`,
+} as const;
+
 export const dbCarrierStore: CarrierStore = {
   async upsertMany(records) {
     if (records.length === 0) return;
@@ -298,27 +341,7 @@ export const dbCarrierStore: CarrierStore = {
       await db()
         .insert(carrierDirectory)
         .values(chunk)
-        .onConflictDoUpdate({
-          target: carrierDirectory.usdot,
-          set: {
-            mcNumber: sql`excluded.mc_number`,
-            legalName: sql`excluded.legal_name`,
-            dbaName: sql`excluded.dba_name`,
-            city: sql`excluded.city`,
-            state: sql`excluded.state`,
-            country: sql`excluded.country`,
-            zip: sql`excluded.zip`,
-            phone: sql`excluded.phone`,
-            powerUnits: sql`excluded.power_units`,
-            drivers: sql`excluded.drivers`,
-            safetyRating: sql`excluded.safety_rating`,
-            authorityType: sql`excluded.authority_type`,
-            intermodal: sql`excluded.intermodal`,
-            nearestPortCode: sql`excluded.nearest_port_code`,
-            publicSlug: sql`excluded.public_slug`,
-            updatedAt: sql`excluded.updated_at`,
-          },
-        });
+        .onConflictDoUpdate({ target: carrierDirectory.usdot, set: CARRIER_UPSERT_SET });
     }
   },
 };
@@ -366,7 +389,7 @@ export async function fetchCensusByDots(dots: string[]): Promise<Map<string, Cen
     const inList = chunk.map((d) => `'${d}'`).join(',');
     const rows = await socrataJson<CensusRow>(CENSUS_ID, {
       $select:
-        'dot_number,legal_name,dba_name,power_units,total_drivers,safety_rating,status_code,crgo_intermodal,phone,phy_street,phy_city,phy_state,phy_zip',
+        'dot_number,legal_name,dba_name,email_address,power_units,total_drivers,safety_rating,status_code,crgo_intermodal,phone,phy_street,phy_city,phy_state,phy_zip',
       $where: `dot_number in (${inList})`,
       $limit: String(chunk.length),
     });

@@ -135,6 +135,8 @@ export const SELF_HEAL_TABLE_STATEMENTS: readonly string[] = [
     "country" text DEFAULT 'US' NOT NULL,
     "zip" text,
     "phone" text,
+    "email" text,
+    "contact_hidden" boolean DEFAULT false NOT NULL,
     "power_units" integer,
     "drivers" integer,
     "safety_rating" text,
@@ -152,6 +154,13 @@ export const SELF_HEAL_TABLE_STATEMENTS: readonly string[] = [
   // is guaranteed to exist and the IF NOT EXISTS no-ops on a healthy DB. Defaults
   // 'US' so every existing row stays US — the live directory is unchanged.
   `ALTER TABLE "carrier_directory" ADD COLUMN IF NOT EXISTS "country" text NOT NULL DEFAULT 'US'`,
+  // 0043_carrier_contact.sql — contact email + carrier opt-out. Healed HERE
+  // (same reasoning as country above): the ALTERs run right after the CREATE
+  // TABLE so the table is guaranteed to exist and IF NOT EXISTS no-ops on a
+  // healthy DB. `contact_hidden` defaults false so healing NEVER clears a
+  // carrier's opt-out (the column is only re-ADDed when missing, never reset).
+  `ALTER TABLE "carrier_directory" ADD COLUMN IF NOT EXISTS "email" text`,
+  `ALTER TABLE "carrier_directory" ADD COLUMN IF NOT EXISTS "contact_hidden" boolean NOT NULL DEFAULT false`,
   `CREATE UNIQUE INDEX IF NOT EXISTS "carrier_directory_usdot_idx" ON "carrier_directory" ("usdot")`,
   `CREATE UNIQUE INDEX IF NOT EXISTS "carrier_directory_slug_idx" ON "carrier_directory" ("public_slug")`,
   `CREATE INDEX IF NOT EXISTS "carrier_directory_state_idx" ON "carrier_directory" ("state")`,
