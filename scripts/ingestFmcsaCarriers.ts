@@ -201,10 +201,12 @@ export function normalizeCarrier(
   const zip = cleanStr(census?.phy_zip) ?? cleanStr(li.bus_zip_code);
   const state = (cleanStr(census?.phy_state) ?? cleanStr(li.bus_state_code))?.toUpperCase() ?? null;
   // US-domicile only: the directory is organized by US state + US port, so a
-  // carrier physically domiciled outside the 50 states + DC + PR/VI/GU can't be
-  // placed in the browse and would only inflate unfiltered/port counts. Drop it
-  // (Canada/Mexico cross-border carriers remain findable via /compliance lookup).
-  if (state && !US_STATE_CODES.has(state)) return null;
+  // carrier physically domiciled outside the 50 states + DC + PR/VI/GU — or with
+  // no domicile state at all — can't be placed in the browse and would only
+  // inflate unfiltered/port counts (and desync the landing total, which sums the
+  // per-state grid, from the faceted count(*)). Drop it (Canada/Mexico cross-border
+  // carriers remain findable via the live /compliance lookup).
+  if (!state || !US_STATE_CODES.has(state)) return null;
 
   return {
     usdot,
@@ -217,7 +219,10 @@ export function normalizeCarrier(
     phone: normalizePhone(census?.phone) ?? normalizePhone(li.bus_telno),
     powerUnits: toInt(census?.power_units),
     drivers: toInt(census?.total_drivers),
-    safetyRating: cleanStr(census?.safety_rating),
+    // Upper-case to match the exact 'S'/'C'/'U' the safety filter compares against
+    // (the facet badge groups on upper(safety_rating), so an un-normalized value
+    // would be counted in the badge but excluded by the filter).
+    safetyRating: cleanStr(census?.safety_rating)?.toUpperCase() ?? null,
     authorityType: authorityType(li),
     intermodal: isIntermodal(census),
     nearestPortCode: nearestPortForZip(zip),

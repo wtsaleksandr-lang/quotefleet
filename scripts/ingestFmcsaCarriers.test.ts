@@ -217,4 +217,19 @@ describe('filterAndNormalizeCarriers', () => {
     const [rec] = filterAndNormalizeCarriers([activeCarrier], pr);
     expect(rec.state).toBe('PR');
   });
+
+  it('drops a carrier with no domicile state at all (unplaceable in the geo browse)', () => {
+    // No census phy_state and no L&I bus_state_code → state null → dropped, so the
+    // landing per-state total and the faceted count(*) stay in agreement.
+    const noState = { ...activeCarrier, bus_state_code: undefined };
+    expect(filterAndNormalizeCarriers([noState], new Map())).toHaveLength(0);
+  });
+
+  it('upper-cases safety_rating so the badge count matches the exact-match filter', () => {
+    const lower = new Map<string, CensusRow>([
+      ['107080', { dot_number: '107080', status_code: 'A', phy_state: 'GA', safety_rating: 's' }],
+    ]);
+    const [rec] = filterAndNormalizeCarriers([activeCarrier], lower);
+    expect(rec.safetyRating).toBe('S');
+  });
 });
