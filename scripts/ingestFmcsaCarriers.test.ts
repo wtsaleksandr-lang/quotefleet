@@ -14,6 +14,7 @@ import {
   isActivePropertyCarrier,
   authorityType,
   isIntermodal,
+  isHazmat,
   censusAllowsOperate,
   makeSlug,
   buildCarrierWhere,
@@ -144,6 +145,16 @@ describe('normalizers', () => {
     expect(isIntermodal({ crgo_intermodal: undefined })).toBe(false);
     expect(isIntermodal(undefined)).toBe(false);
   });
+  it('isHazmat reads the census hm_ind flag (Y/X truthy, else false)', () => {
+    expect(isHazmat({ hm_ind: 'Y' })).toBe(true);
+    expect(isHazmat({ hm_ind: 'y' })).toBe(true); // case-insensitive
+    expect(isHazmat({ hm_ind: ' Y ' })).toBe(true); // trims whitespace
+    expect(isHazmat({ hm_ind: 'X' })).toBe(true); // tolerate the sibling 'X' convention
+    expect(isHazmat({ hm_ind: 'N' })).toBe(false);
+    expect(isHazmat({ hm_ind: '' })).toBe(false);
+    expect(isHazmat({ hm_ind: undefined })).toBe(false);
+    expect(isHazmat(undefined)).toBe(false); // missing census → not hazmat
+  });
   it('censusAllowsOperate drops status I, keeps A / missing', () => {
     expect(censusAllowsOperate({ status_code: 'A' })).toBe(true);
     expect(censusAllowsOperate({ status_code: 'I' })).toBe(false);
@@ -200,8 +211,17 @@ describe('filterAndNormalizeCarriers', () => {
     expect(rec.safetyRating).toBe('S');
     expect(rec.authorityType).toBe('common');
     expect(rec.intermodal).toBe(true);
+    expect(rec.hazmat).toBe(false); // census fixture has no hm_ind → not hazmat
     expect(rec.nearestPortCode).toBe('USSAV'); // ZIP 31401 → Savannah
     expect(rec.publicSlug).toBe('acme-drayage-inc-107080');
+  });
+
+  it('captures a census hazmat carrier (hm_ind=Y) as hazmat=true', () => {
+    const hazCensus = new Map<string, CensusRow>([
+      ['107080', { dot_number: '107080', status_code: 'A', phy_state: 'GA', hm_ind: 'Y' }],
+    ]);
+    const [rec] = filterAndNormalizeCarriers([activeCarrier], hazCensus);
+    expect(rec.hazmat).toBe(true);
   });
 
   it('keeps an active carrier with NO census match (fleet null, L&I address used)', () => {
@@ -278,6 +298,10 @@ describe('CARRIER_UPSERT_SET (opt-out preservation)', () => {
 
   it('refreshes email on a re-ingest', () => {
     expect(keys).toContain('email');
+  });
+
+  it('refreshes hazmat on a re-ingest (verified FMCSA fact, not an opt-out)', () => {
+    expect(keys).toContain('hazmat');
   });
 
   it('NEVER sets contact_hidden — a carrier who opted out stays hidden', () => {

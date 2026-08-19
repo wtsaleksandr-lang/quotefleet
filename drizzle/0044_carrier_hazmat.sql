@@ -1,0 +1,15 @@
+-- Carrier directory — add FMCSA-verified `hazmat` flag.
+--
+-- Sourced FREE from the FMCSA Company Census file (Socrata az4n-8mr2), column
+-- `hm_ind` — 'Y' when the carrier is FMCSA-registered to transport hazardous
+-- materials, else 'N'. Captured into this column on the next re-ingest; defaults
+-- false until then so every existing row is unchanged. Never touched by a carrier
+-- opt-out — it is a verified FMCSA fact, refreshed by the ingest upsert.
+--
+-- Idempotent (ADD COLUMN IF NOT EXISTS, NOT NULL w/ default) so it is safe to
+-- re-run on every boot via runMigrations() — the Replit deploy does not run
+-- db:migrate, so this makes the republish self-healing (same pattern as 0043).
+-- The same statement is mirrored in the carrier_directory SELF_HEAL_TABLE_STATEMENTS
+-- step (src/db/migrate.ts) so a Replit phantom-drop of the column is re-added
+-- before the server serves — table-first-safe (it runs right after CREATE TABLE).
+ALTER TABLE "carrier_directory" ADD COLUMN IF NOT EXISTS "hazmat" boolean NOT NULL DEFAULT false;

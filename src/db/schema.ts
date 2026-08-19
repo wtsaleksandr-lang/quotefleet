@@ -1774,6 +1774,9 @@ export const carrierDirectory = pgTable(
     authorityType: text('authority_type'),
     /** Census crgo_intermodal === 'X' — container/drayage carrier flag. */
     intermodal: boolean('intermodal').notNull().default(false),
+    /** Census hm_ind === 'Y' — FMCSA-registered hazmat carrier. Defaults false so
+     *  every existing row is unchanged until re-ingested (self-healed in migrate.ts). */
+    hazmat: boolean('hazmat').notNull().default(false),
     /** Derived: nearest major US container port UN/LOCODE (ZIP centroid). */
     nearestPortCode: text('nearest_port_code'),
     /** Unique URL slug for the public carrier page (slug(name)-usdot). */

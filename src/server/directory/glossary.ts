@@ -368,10 +368,12 @@ export function glossaryTermBySlug(slug: string): GlossaryTerm | undefined {
 // ─── Glossary-specific CSS (matches the directory design tokens) ───────────
 const GLOSSARY_CSS = `
   .gl-shell { max-width: 900px; margin: 0 auto; padding: 28px; }
-  .gl-hero { padding: 40px 28px 22px; }
-  .gl-hero .container-narrow { max-width: 900px; margin: 0 auto; }
+  /* Left-align the hero (shared .hero centers text; glossary must read left-aligned). */
+  .gl-hero { padding: 40px 28px 22px; text-align: left; }
+  .gl-hero .container-narrow { max-width: 900px; margin: 0; }
   .gl-hero h1 { font-size: 40px; line-height: 1.1; margin: 0 0 10px; }
-  .gl-hero .lead { max-width: 640px; }
+  .gl-hero p.lead { max-width: 640px; margin-left: 0; margin-right: 0; }
+  .gl-hero .hero-cta { justify-content: flex-start; }
   .gl-crumbs { font-size: 12px; font-family: var(--font-mono); letter-spacing: 0.04em; color: var(--muted); margin: 0 0 12px; }
   .gl-crumbs a { color: var(--muted); text-decoration: none; }
   .gl-crumbs a:hover { color: var(--accent); }
