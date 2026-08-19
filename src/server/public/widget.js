@@ -533,7 +533,7 @@
   function applyBrandPreviewPatch(patch) {
     if (!patch || !state.config) return;
     var brand = state.config.brand || (state.config.brand = {});
-    var HEADER_KEYS = ['displayName', 'tagline', 'showTagline', 'ctaText', 'logoUrl', 'headerLogoFill', 'showPoweredBy', 'footerNote', 'headerShowCredentials'];
+    var HEADER_KEYS = ['displayName', 'tagline', 'showTagline', 'taglineSize', 'taglineStyle', 'ctaText', 'logoUrl', 'headerLogoFill', 'showPoweredBy', 'footerNote', 'headerShowCredentials'];
     var touchedHeader = false;
     HEADER_KEYS.forEach(function (k) {
       if (Object.prototype.hasOwnProperty.call(patch, k)) { brand[k] = patch[k]; touchedHeader = true; }
@@ -907,6 +907,15 @@
     var showTagline = !(cfg.brand && cfg.brand.showTagline === false);
     var tagline = (cfg.brand && cfg.brand.tagline) ? String(cfg.brand.tagline).trim() : '';
     brandNameEl.setAttribute('data-eyebrow', showTagline ? (tagline || 'Instant freight estimate') : '');
+    // Finer tagline chip controls (portal). Size drives the chip font; style
+    // drives its fill (solid = bright brand-color, subtle = light accent tint,
+    // plain = accent text only). Both are CSS-only (.brand-name::after variants
+    // in public-calculator-ux.css) and ride applyBrandPreviewPatch's HEADER_KEYS
+    // so they flip live. Values are guarded to the known enums (default m/solid).
+    var tSize = String((cfg.brand && cfg.brand.taglineSize) || 'm');
+    brandNameEl.setAttribute('data-tagline-size', /^(s|m|l)$/.test(tSize) ? tSize : 'm');
+    var tStyle = String((cfg.brand && cfg.brand.taglineStyle) || 'solid');
+    brandNameEl.setAttribute('data-tagline-style', /^(solid|subtle|plain)$/.test(tStyle) ? tStyle : 'solid');
     h.appendChild(brandNameEl);
     // Also keep the (normally hidden) #qf-tagline line in sync for any non-app
     // context that shows it — same gating, so the tagline is never stale.

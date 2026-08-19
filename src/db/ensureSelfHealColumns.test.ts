@@ -2,10 +2,11 @@ import { describe, expect, it } from 'vitest';
 import { SELF_HEAL_COLUMN_STATEMENTS, SELF_HEAL_TABLE_STATEMENTS } from './migrate.js';
 
 /**
- * The eager, journal-independent self-heal step must always re-add the 9
+ * The eager, journal-independent self-heal step must always re-add the 11
  * at-risk brand_configs columns that Replit's publish tool keeps phantom-
  * dropping (from drizzle/0038_header_layout.sql + 0039_lead_routing_validity.sql
- * + 0040_header_show_credentials.sql + 0045_show_tagline.sql).
+ * + 0040_header_show_credentials.sql + 0045_show_tagline.sql
+ * + 0047_tagline_style.sql).
  * We assert against the exact SQL the function runs — no live DB required.
  *
  * NOTE: the carrier_directory `country` column (0042) is self-healed in
@@ -31,9 +32,12 @@ describe('ensureSelfHealColumns — at-risk brand_configs columns', () => {
     ['header_show_credentials', `ADD COLUMN IF NOT EXISTS "header_show_credentials" boolean DEFAULT true NOT NULL`],
     // 0045 — NOT NULL with default; type/default match src/db/schema.ts.
     ['show_tagline', `ADD COLUMN IF NOT EXISTS "show_tagline" boolean DEFAULT true NOT NULL`],
+    // 0047 — NOT NULL with defaults; types/defaults match src/db/schema.ts.
+    ['tagline_size', `ADD COLUMN IF NOT EXISTS "tagline_size" text DEFAULT 'm' NOT NULL`],
+    ['tagline_style', `ADD COLUMN IF NOT EXISTS "tagline_style" text DEFAULT 'solid' NOT NULL`],
   ];
 
-  it('covers all 9 columns with matching types/defaults', () => {
+  it('covers all 11 columns with matching types/defaults', () => {
     expect(SELF_HEAL_COLUMN_STATEMENTS).toHaveLength(expected.length);
     for (const [, fragment] of expected) {
       expect(sql).toContain(fragment);

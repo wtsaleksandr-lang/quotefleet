@@ -3752,6 +3752,45 @@
         true,
         'Turn off to hide the tagline line under your company name in the calculator header.'
       ));
+      // Finer tagline controls — SIZE + visual STYLE of the eyebrow chip beside
+      // the company name (brand.taglineSize / brand.taglineStyle). Same segmented
+      // chip pattern as the header "Logo size" control; each click pushes an
+      // instant live-preview patch (widget.js renderHeader sets data-tagline-size
+      // / data-tagline-style; both ride applyBrandPreviewPatch's HEADER_KEYS) and
+      // saves via the shared brand-patch path. Grouped with the tagline so the
+      // three controls read as one unit.
+      function taglineChipGroup(labelText, field, cur, opts, hint) {
+        var group = el('div', { class: 'qf-cz-field' });
+        group.appendChild(el('div', { class: 'qf-cz-label', text: labelText }));
+        var row = el('div', { class: 'qf-cz-hover-row' });
+        opts.forEach(function (o) {
+          var on = o.id === cur;
+          var chip = el('button', { type: 'button', class: 'qf-cz-hover-chip' + (on ? ' is-selected' : ''), 'data-hv': o.id, 'aria-pressed': on ? 'true' : 'false', title: o.title || o.label });
+          chip.appendChild(el('span', { class: 'qf-cz-hover-name', text: o.label }));
+          chip.addEventListener('click', function () {
+            $$('.qf-cz-hover-chip', row).forEach(function (n) {
+              var s = n.getAttribute('data-hv') === o.id;
+              n.classList.toggle('is-selected', s);
+              n.setAttribute('aria-pressed', s ? 'true' : 'false');
+            });
+            var p = {}; p[field] = o.id;
+            livePatch(p);
+            queueSave(p, true);
+          });
+          row.appendChild(chip);
+        });
+        group.appendChild(row);
+        if (hint) group.appendChild(el('div', { class: 'qf-cz-hint', text: hint }));
+        company.appendChild(group);
+      }
+      taglineChipGroup('Tagline size', 'taglineSize', (/^(s|m|l)$/.test(String(b.taglineSize)) ? b.taglineSize : 'm'), [
+        { id: 's', label: 'Small' }, { id: 'm', label: 'Medium' }, { id: 'l', label: 'Large' },
+      ]);
+      taglineChipGroup('Tagline style', 'taglineStyle', (/^(solid|subtle|plain)$/.test(String(b.taglineStyle)) ? b.taglineStyle : 'solid'), [
+        { id: 'solid', label: 'Solid', title: 'Filled brand-color chip' },
+        { id: 'subtle', label: 'Subtle', title: 'Light tinted chip with brand-color text' },
+        { id: 'plain', label: 'Plain', title: 'Brand-color text only, no background' },
+      ], 'Size and look of the tagline chip beside your company name.');
       controls.appendChild(company);
 
       // Copilot form-fill (Phase 2): register the company name + tagline text

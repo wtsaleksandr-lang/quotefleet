@@ -80,6 +80,10 @@ export const SELF_HEAL_COLUMN_STATEMENTS: readonly string[] = [
   // 0045_show_tagline.sql — header tagline on/off toggle (NOT NULL w/ default
   // true). Same brand_configs phantom-drop risk as the header columns above.
   `ALTER TABLE "brand_configs" ADD COLUMN IF NOT EXISTS "show_tagline" boolean DEFAULT true NOT NULL`,
+  // 0047_tagline_style.sql — tagline chip size + visual style (NOT NULL w/
+  // defaults). Same brand_configs phantom-drop risk as the header columns above.
+  `ALTER TABLE "brand_configs" ADD COLUMN IF NOT EXISTS "tagline_size" text DEFAULT 'm' NOT NULL`,
+  `ALTER TABLE "brand_configs" ADD COLUMN IF NOT EXISTS "tagline_style" text DEFAULT 'solid' NOT NULL`,
 ];
 
 export async function ensureSelfHealColumns(): Promise<void> {

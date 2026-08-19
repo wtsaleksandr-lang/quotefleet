@@ -707,6 +707,17 @@ export const brandConfigs = pgTable('brand_configs', {
    *  always shown. See renderHeader (widget.js) + public-calculator-ux.css and
    *  migration 0045 (self-healed in src/db/migrate.ts). */
   showTagline: boolean('show_tagline').notNull().default(true),
+  /** Tagline chip SIZE — 's' | 'm' | 'l'. Sizes the eyebrow chip's font in the
+   *  calculator header (widget.js renderHeader sets data-tagline-size; CSS in
+   *  public-calculator-ux.css sizes .brand-name::after per size). Default 'm'
+   *  matches today. See migration 0047 (self-healed in src/db/migrate.ts). */
+  taglineSize: text('tagline_size').notNull().default('m'),
+  /** Tagline chip visual STYLE — 'solid' (bright brand-color fill, today's look)
+   *  | 'subtle' (light accent tint + accent text) | 'plain' (accent text only,
+   *  no chrome). widget.js renderHeader sets data-tagline-style; CSS variants in
+   *  public-calculator-ux.css. Default 'solid' leaves existing widgets unchanged.
+   *  See migration 0047 (self-healed in src/db/migrate.ts). */
+  taglineStyle: text('tagline_style').notNull().default('solid'),
   /** Optional CTA button text override. */
   ctaText: text('cta_text').notNull().default('Get instant quote'),
   /** Optional label for the post-quote "confirm the rate" CTA (#qf-continue-btn)

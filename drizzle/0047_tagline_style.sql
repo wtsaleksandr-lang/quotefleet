@@ -1,0 +1,22 @@
+-- brand_configs — finer tagline chip controls `tagline_size` + `tagline_style`.
+--
+-- The calculator header's tagline is the de-rounded eyebrow chip beside the
+-- company name (.brand-name::after, via data-eyebrow). These two columns make
+-- its SIZE and visual STYLE portal-controllable (the finer controls deferred
+-- from the widget-header work, PR #314 / migration 0045):
+--   tagline_size  — 's' | 'm' | 'l'  (chip font size; default 'm' = today)
+--   tagline_style — 'solid' | 'subtle' | 'plain'
+--       solid  = current bright brand-color fill (default; unchanged)
+--       subtle = light accent tint background + accent text (Maersk-clean)
+--       plain  = accent text only, no background
+--
+-- Both default so every existing widget is byte-for-byte unchanged.
+--
+-- Idempotent (ADD COLUMN IF NOT EXISTS, NOT NULL w/ default) so it is safe to
+-- re-run on every boot via runMigrations() — the Replit deploy does not run
+-- db:migrate, so this makes the republish self-healing (same pattern as 0045).
+-- The same statements are mirrored in SELF_HEAL_COLUMN_STATEMENTS
+-- (src/db/migrate.ts) so a Replit phantom-drop is re-added before the server
+-- serves.
+ALTER TABLE "brand_configs" ADD COLUMN IF NOT EXISTS "tagline_size" text NOT NULL DEFAULT 'm';
+ALTER TABLE "brand_configs" ADD COLUMN IF NOT EXISTS "tagline_style" text NOT NULL DEFAULT 'solid';

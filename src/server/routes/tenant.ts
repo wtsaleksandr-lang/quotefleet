@@ -932,6 +932,13 @@ export function registerTenantRoutes(app: Express) {
     // text itself is the `tagline` field. Persisted verbatim; spreads into the
     // column set. Default true — see renderHeader (widget.js).
     showTagline: z.boolean().optional(),
+    // Tagline chip SIZE (font size of the eyebrow chip beside the company name)
+    // and visual STYLE. Enum-validated so only known values persist; both spread
+    // straight into the update `set` via columnPatch like every other scalar
+    // brand field. Defaults 'm' / 'solid' — see renderHeader (widget.js) + the
+    // .brand-name::after variants in public-calculator-ux.css.
+    taglineSize: z.enum(['s', 'm', 'l']).optional(),
+    taglineStyle: z.enum(['solid', 'subtle', 'plain']).optional(),
     // Quote validity window (days). Forgiving: '' / non-numeric → null (app
     // default); a number is clamped to 1..365. Stored in the integer column.
     quoteValidityDays: z.preprocess((v) => {
