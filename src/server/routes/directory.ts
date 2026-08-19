@@ -59,15 +59,6 @@ const pageNum = (v: unknown): number => Math.max(1, parseInt(String(v ?? '1'), 1
 const hasFacetParams = (q: Record<string, unknown>): boolean =>
   FACET_QUERY_KEYS.some((k) => q[k] != null && String(q[k]).trim() !== '');
 
-/** Any facet active besides the path-locked scope dims (state/port/city). */
-const hasActiveNonScopeFacet = (f: {
-  fleet: unknown;
-  safety: unknown;
-  authorityActive: boolean;
-  intermodal: boolean;
-  recent: boolean;
-}): boolean => Boolean(f.fleet || f.safety || f.authorityActive || f.intermodal || f.recent);
-
 /** "san-antonio" → "San Antonio" (fallback city display when no DB row seen). */
 const prettifySlug = (slug: string): string =>
   slug
@@ -169,14 +160,15 @@ export function registerDirectoryRoutes(app: Express) {
         citySlug,
         port: null,
       });
+      // Unknown city → always 302 to the state page, even with facets present.
+      // cityDisplayName is unfiltered, so it's the true "does this city exist"
+      // check; using the FILTERED list.total would wrongly render a thin, empty,
+      // indexable city page whenever a facet narrows a real city to zero rows.
+      const name = await cityDisplayName(state.code, citySlug);
+      if (!name) return res.redirect(302, `/directory/${state.slug}`);
       const list = await carriersByCity(state.code, citySlug, filters);
-      // Unknown / empty city (no unfiltered matches) → fall back to the state page.
-      if (list.total === 0 && !hasActiveNonScopeFacet(filters)) {
-        return res.redirect(302, `/directory/${state.slug}`);
-      }
-      const [counts, name, cities] = await Promise.all([
+      const [counts, cities] = await Promise.all([
         getFacetCounts(filters),
-        cityDisplayName(state.code, citySlug),
         citiesForState(state.code, 24),
       ]);
       res.type('html').send(
