@@ -119,10 +119,13 @@ const SELF_DECLARED_CREDENTIALS: Array<{ tone: string; label: string; tip: strin
 // ─── Shared page shell ────────────────────────────────────────────────────
 const DIRECTORY_CSS = `
   .dir-shell { max-width: 1100px; margin: 0 auto; padding: 28px; }
-  .dir-hero { padding: 40px 28px 22px; }
-  .dir-hero .container-narrow { max-width: 1100px; margin: 0 auto; }
+  /* Left-align the hero — the shared marketing .hero centers text; directory
+     pages must read as a left-aligned page/company card, never centered. */
+  .dir-hero { padding: 40px 28px 22px; text-align: left; }
+  .dir-hero .container-narrow { max-width: 1100px; margin: 0; }
   .dir-hero h1 { font-size: 40px; line-height: 1.1; margin: 0 0 10px; }
-  .dir-hero .lead { max-width: 640px; }
+  .dir-hero p.lead { max-width: 640px; margin-left: 0; margin-right: 0; }
+  .dir-hero .hero-cta, .dir-hero .hero-meta { justify-content: flex-start; }
   .dir-stats { display: flex; gap: 22px; flex-wrap: wrap; margin-top: 18px; }
   .dir-stat { display: flex; flex-direction: column; }
   .dir-stat b { font-size: 26px; font-family: var(--font-mono); color: var(--accent); }
@@ -337,8 +340,8 @@ const DIRECTORY_CSS = `
   /* ── DrayLocator-structured header: [monogram] name · Active · FMCSA / claim
      on the right, subtitle, then the squared badge row — all left-aligned. ──── */
   .cp-headrow { display: flex; align-items: flex-start; justify-content: space-between; gap: 12px 24px; flex-wrap: wrap; text-align: left; margin: 14px 0 0; }
-  .cp-idblock { display: flex; align-items: center; gap: 14px; min-width: 0; }
-  .cp-monogram { flex: 0 0 auto; width: 46px; height: 46px; border-radius: 6px; background: var(--surface-2); border: 1px solid var(--border); color: var(--ink); display: inline-flex; align-items: center; justify-content: center; font-family: var(--font-mono); font-size: 18px; font-weight: 700; letter-spacing: 0.04em; }
+  .cp-idblock { display: flex; align-items: flex-start; gap: 16px; min-width: 0; }
+  .cp-monogram { flex: 0 0 auto; width: 54px; height: 54px; border-radius: 8px; margin-top: 2px; background: var(--surface-2); border: 1px solid var(--border); color: var(--ink); display: inline-flex; align-items: center; justify-content: center; font-family: var(--font-mono); font-size: 21px; font-weight: 700; letter-spacing: 0.04em; }
   .cp-idtext { min-width: 0; }
   .cp-nameline { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
   .cp-nameline h1 { font-size: 30px; line-height: 1.15; margin: 0; }
@@ -347,7 +350,7 @@ const DIRECTORY_CSS = `
   .cp-headrow .cp-claimline { margin: 4px 0 0; }
   @media (max-width: 640px) {
     .cp-nameline h1 { font-size: 24px; }
-    .cp-monogram { width: 40px; height: 40px; font-size: 16px; }
+    .cp-monogram { width: 46px; height: 46px; font-size: 18px; }
   }
   @media (max-width: 900px) {
     .cp-layout { grid-template-columns: 1fr; }
