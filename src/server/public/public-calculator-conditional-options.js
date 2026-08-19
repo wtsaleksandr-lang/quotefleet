@@ -127,13 +127,26 @@
       card.className = 'qf-demo-brand-card';
       header.insertAdjacentElement('afterend', card);
     }
+    // De-dup with the calculator header credential meta-lines. When
+    // brand.headerShowCredentials !== false (the default), widget.js's
+    // renderCredMeta already prints USDOT/MC + phone/email directly under the
+    // company name, so repeating them on this trust card shows the same values
+    // twice (the live-demo bug). In that case the card keeps ONLY the detail the
+    // header does NOT carry — the address. With credentials hidden in the header
+    // (toggle off) the full set returns here as the fallback, so nothing is ever
+    // lost, and it is never shown twice. Mirrors widget.js renderContact().
+    const cfg = (typeof window !== 'undefined' && window.QF_WIDGET_CONFIG) || {};
+    const credsInHeader = !cfg.brand || cfg.brand.headerShowCredentials !== false;
     const mcText = [data.usdot ? 'USDOT ' + data.usdot : '', data.mc ? 'MC ' + data.mc : ''].filter(Boolean).join(' · ');
     const nextHtml = [
-      data.phone ? '<span>' + escapeHtml(data.phone) + '</span>' : '',
-      data.email ? '<span>' + escapeHtml(data.email) + '</span>' : '',
+      !credsInHeader && data.phone ? '<span>' + escapeHtml(data.phone) + '</span>' : '',
+      !credsInHeader && data.email ? '<span>' + escapeHtml(data.email) + '</span>' : '',
       data.address ? '<span>' + escapeHtml(data.address) + '</span>' : '',
-      mcText ? '<span>' + escapeHtml(mcText) + '</span>' : '',
+      !credsInHeader && mcText ? '<span>' + escapeHtml(mcText) + '</span>' : '',
     ].filter(Boolean).join('');
+    // Nothing unique to show (creds live in the header, no address set) → keep the
+    // card out of the flow entirely so it leaves no empty gap.
+    card.style.display = nextHtml ? '' : 'none';
     if (card.innerHTML !== nextHtml) card.innerHTML = nextHtml;
   }
   function ensureBrandEditor(data) {
