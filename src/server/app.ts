@@ -366,6 +366,7 @@ export function createApp(): express.Express {
   app.get('/login', (_req, res) => res.sendFile('login.html', { root: publicDir }));
   app.get('/signup', (_req, res) => res.sendFile('signup.html', { root: publicDir }));
   app.get('/pricing', (_req, res) => res.sendFile('pricing.html', { root: publicDir }));
+  app.get('/compare', (_req, res) => res.sendFile('compare.html', { root: publicDir }));
   app.get('/support', (_req, res) => res.sendFile('support.html', { root: publicDir }));
   app.get('/security', (_req, res) => res.sendFile('security.html', { root: publicDir }));
   app.get('/.well-known/security.txt', (_req, res) => {
