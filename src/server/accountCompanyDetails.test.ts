@@ -13,9 +13,11 @@ async function route(name: string) {
 }
 
 describe('account phone + company details consolidation', () => {
-  it('adds a phone field bound to contactPhone in the Profile card', async () => {
+  it('adds a phone field bound to contactPhone in the Company details card', async () => {
+    // Public phone moved out of the Profile card into the "Carrier credentials
+    // & contact" section of Company details; still bound to tenant.contactPhone.
     const app = await pub('app.js');
-    expect(app).toContain("profileRow('Phone', 'contactPhone', 'tel')");
+    expect(app).toContain("coField('Public phone', 'contactPhone'");
   });
 
   it('adds a Company details card wired to the real stores (no parallel copy)', async () => {
@@ -26,7 +28,7 @@ describe('account phone + company details consolidation', () => {
     expect(app).toContain("api('/api/tenant/carrier-profile'");
     expect(app).toContain("api('/api/tenant/marketplace-settings'");
     // Public, opt-in email — bound to publicContactEmail, never the login email.
-    expect(app).toContain("coField('Public contact email', 'publicContactEmail'");
+    expect(app).toContain("coField('Public email', 'publicContactEmail'");
     expect(app).toContain("coField('USDOT number', 'dotNumber'");
     expect(app).toContain("coField('MC number', 'mcNumber'");
     expect(app).toContain("coField('Address line 1', 'addressLine1'");
