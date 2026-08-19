@@ -463,7 +463,7 @@ function layout({ title, description, canonicalPath, bodyHtml, jsonLd }: LayoutO
       <a class="nav-link" href="/directory">Directory</a>
       <a class="nav-link" href="/compliance">Compliance</a>
       <a class="nav-link" href="/glossary">Glossary</a>
-      <a class="btn btn-primary always-show" href="/signup">List your company <span class="arr">→</span></a>
+      <a class="btn btn-primary always-show" href="/signup">Claim your listing <span class="arr">→</span></a>
       <button type="button" class="topnav-burger" aria-label="Open menu" aria-expanded="false" aria-controls="topnav-mobile-menu">
         <svg class="ico-open" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><line x1="4" y1="7" x2="20" y2="7"/><line x1="4" y1="12" x2="20" y2="12"/><line x1="4" y1="17" x2="20" y2="17"/></svg>
         <svg class="ico-close" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><line x1="6" y1="6" x2="18" y2="18"/><line x1="18" y1="6" x2="6" y2="18"/></svg>
@@ -477,7 +477,7 @@ function layout({ title, description, canonicalPath, bodyHtml, jsonLd }: LayoutO
       <a href="/tools">Rate calculator</a>
       <a href="/pricing">Pricing</a>
       <a href="/">Home</a>
-      <a class="tn-cta" href="/signup">List your company →</a>
+      <a class="tn-cta" href="/signup">Claim your listing →</a>
     </nav>
   </header>
   ${bodyHtml}

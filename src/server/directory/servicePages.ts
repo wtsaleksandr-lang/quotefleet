@@ -282,7 +282,7 @@ function honestyBanner(mode: DataMode, category: string): string {
     category,
   )} is self-declared — we do not verify it.</b> This credential is not part of FMCSA public data, so no carrier here is confirmed as ${esc(
     category,
-  )}. The carriers shown are real FMCSA drayage carriers listed only as a starting point. Run a fleet? <a href="/signup">Claim your profile</a> to self-declare it.</div>`;
+  )}. The carriers shown are real FMCSA drayage carriers listed only as a starting point. Run a fleet? <a href="/signup?claim=1">Claim your profile</a> to self-declare it.</div>`;
 }
 
 // ─── Page-specific CSS (small; layered on top of the directory shell CSS) ──
