@@ -2416,6 +2416,90 @@
   }
 
   // ── Lane zones ────────────────────────────────────────────────
+  // Known drayage ports — the SAME gateway list the widget's pickup-port field
+  // draws from (mirrors src/data/ports.ts PORTS_DATA / the public ports config).
+  // Kept here as a static list so the portal port dropdown is fully populated
+  // for a brand-new tenant (the widget config only surfaces ports a tenant
+  // already has zones/terminals for — useless for the FIRST zone). US + CA major
+  // container gateways; the alias-reconciliation combined codes (USEWR / USLALB)
+  // are folded into their umbrella ports to keep the dropdown clean.
+  var QF_DRAYAGE_PORTS = [
+    { code: 'USLAX', name: 'Port of Los Angeles', city: 'Los Angeles', state: 'CA' },
+    { code: 'USLGB', name: 'Port of Long Beach', city: 'Long Beach', state: 'CA' },
+    { code: 'USOAK', name: 'Port of Oakland', city: 'Oakland', state: 'CA' },
+    { code: 'USSEA', name: 'Port of Seattle', city: 'Seattle', state: 'WA' },
+    { code: 'USTIW', name: 'Port of Tacoma', city: 'Tacoma', state: 'WA' },
+    { code: 'USPDX', name: 'Port of Portland', city: 'Portland', state: 'OR' },
+    { code: 'USNYC', name: 'Port of New York and New Jersey', city: 'Newark', state: 'NJ' },
+    { code: 'USSAV', name: 'Port of Savannah', city: 'Savannah', state: 'GA' },
+    { code: 'USNOR', name: 'Port of Virginia (Norfolk)', city: 'Norfolk', state: 'VA' },
+    { code: 'USCHS', name: 'Port of Charleston', city: 'Charleston', state: 'SC' },
+    { code: 'USJAX', name: 'Port of Jacksonville (JAXPORT)', city: 'Jacksonville', state: 'FL' },
+    { code: 'USMIA', name: 'Port of Miami', city: 'Miami', state: 'FL' },
+    { code: 'USPEF', name: 'Port Everglades', city: 'Fort Lauderdale', state: 'FL' },
+    { code: 'USBAL', name: 'Port of Baltimore', city: 'Baltimore', state: 'MD' },
+    { code: 'USPHL', name: 'Port of Philadelphia (PhilaPort)', city: 'Philadelphia', state: 'PA' },
+    { code: 'USBOS', name: 'Port of Boston', city: 'Boston', state: 'MA' },
+    { code: 'USWIL', name: 'Port of Wilmington (DE)', city: 'Wilmington', state: 'DE' },
+    { code: 'USILM', name: 'Port of Wilmington (NC)', city: 'Wilmington', state: 'NC' },
+    { code: 'USHOU', name: 'Port of Houston', city: 'Houston', state: 'TX' },
+    { code: 'USGLS', name: 'Port of Galveston', city: 'Galveston', state: 'TX' },
+    { code: 'USFPO', name: 'Port Freeport', city: 'Freeport', state: 'TX' },
+    { code: 'USNOL', name: 'Port of New Orleans', city: 'New Orleans', state: 'LA' },
+    { code: 'USMOB', name: 'Port of Mobile', city: 'Mobile', state: 'AL' },
+    { code: 'USANC', name: 'Port of Anchorage', city: 'Anchorage', state: 'AK' },
+    { code: 'USHNL', name: 'Honolulu Harbor', city: 'Honolulu', state: 'HI' },
+    { code: 'USSAN', name: 'Port of San Diego', city: 'San Diego', state: 'CA' },
+    { code: 'USHUE', name: 'Port of Hueneme', city: 'Port Hueneme', state: 'CA' },
+    { code: 'USGPT', name: 'Port of Gulfport', city: 'Gulfport', state: 'MS' },
+    { code: 'USPBI', name: 'Port of Palm Beach', city: 'Riviera Beach', state: 'FL' },
+    { code: 'USFEB', name: 'Port of Fernandina', city: 'Fernandina Beach', state: 'FL' },
+    { code: 'USGLC', name: 'Gloucester Marine Terminal', city: 'Gloucester City', state: 'NJ' },
+    { code: 'USCLE', name: 'Port of Cleveland', city: 'Cleveland', state: 'OH' },
+    { code: 'CAVAN', name: 'Port of Vancouver', city: 'Vancouver', state: 'BC' },
+    { code: 'CAPRR', name: 'Port of Prince Rupert', city: 'Prince Rupert', state: 'BC' },
+    { code: 'CAMTR', name: 'Port of Montreal', city: 'Montreal', state: 'QC' },
+    { code: 'CAHAL', name: 'Port of Halifax', city: 'Halifax', state: 'NS' },
+    { code: 'CASTQ', name: 'Port of Quebec', city: 'Quebec City', state: 'QC' },
+    { code: 'CASJB', name: 'Port of Saint John', city: 'Saint John', state: 'NB' },
+    { code: 'CATOR', name: 'Port of Toronto', city: 'Toronto', state: 'ON' },
+    { code: 'CANAI', name: 'Port of Nanaimo', city: 'Nanaimo', state: 'BC' },
+    { code: 'CAHAM', name: 'Port of Hamilton', city: 'Hamilton', state: 'ON' },
+  ].sort(function (a, b) { return a.name.localeCompare(b.name); });
+  function qfPortByCode(code) {
+    if (!code) return null;
+    var up = String(code).toUpperCase();
+    for (var i = 0; i < QF_DRAYAGE_PORTS.length; i++) { if (QF_DRAYAGE_PORTS[i].code === up) return QF_DRAYAGE_PORTS[i]; }
+    return null;
+  }
+  // Auto-label a zone from its port + radius, e.g. "Port of Houston → 50 mi".
+  // Returns '' when either input is missing so callers can no-op.
+  function qfZoneAutoLabel(portCode, radius) {
+    var p = qfPortByCode(portCode);
+    var r = Number(radius);
+    if (!p || !r || r <= 0) return '';
+    return p.name + ' → ' + r + ' mi';
+  }
+  // Build a <select> of known ports (name + code). Preselects `current`, and if
+  // `current` is a legacy/custom code not in the list, injects it so we never
+  // silently drop an existing value. Empty option = no anchor port.
+  function qfPortSelect(current, emptyText) {
+    var sel = el('select', { class: 'input' });
+    sel.appendChild(el('option', { value: '', text: emptyText || '— Select a port —' }));
+    var known = false;
+    QF_DRAYAGE_PORTS.forEach(function (p) {
+      var o = el('option', { value: p.code, text: p.name + ' (' + p.code + ')' });
+      if (current && p.code === String(current).toUpperCase()) { o.selected = true; known = true; }
+      sel.appendChild(o);
+    });
+    if (current && !known) {
+      var oc = el('option', { value: current, text: current + ' (custom)' });
+      oc.selected = true;
+      sel.appendChild(oc);
+    }
+    return sel;
+  }
+
   // Thin route wrapper — the standalone Drayage-zones page. The editor body is
   // factored into buildZonesEditor so the Drayage MODE TAB can embed the very
   // same zones surface (reuse, not rebuild).
@@ -2435,11 +2519,49 @@
         // sideways scroll (they were off-screen at 375px).
         // data-qf-norate keeps the rate-cards decorators (duplicate/status/
         // search) off the zones grid when it's embedded on the Rate-cards page.
+        // Dedicated search/filter — the zones table carries data-qf-norate so
+        // the shared rate-card search skips it, yet it's the list that most
+        // needs one (drayage carriers seed dozens of port×zone rows). Mirrors
+        // the add-ons / lead-queue portal search: type-to-filter on label +
+        // port (name/city/code) + radius + flat price, a live "N shown" count,
+        // and a "no zones match…" note on zero results.
+        var zSearch = null, zCount = null, zNoMatch = null;
+        var zBar = el('section', { class: 'qf-addons-searchbar qf-zones-searchbar' });
+        var zLabel = el('label', null, [el('span', { text: 'Search zones' })]);
+        zSearch = el('input', { type: 'search', placeholder: 'Search zones by port, label, radius…', 'aria-label': 'Search drayage zones by label, port, radius or price' });
+        zLabel.appendChild(zSearch);
+        zCount = el('b', { class: 'qf-addons-search-count', text: d.laneZones.length + ' shown' });
+        zBar.appendChild(zLabel);
+        zBar.appendChild(zCount);
+        c.appendChild(zBar);
+
         var tbl = el('table', { class: 'table qf-leads-table qf-zones-table', 'data-qf-norate': '1' });
         tbl.innerHTML = '<thead><tr><th>Label</th><th>Port</th><th>Radius (mi)</th><th>Flat $</th><th>Enabled</th><th></th></tr></thead><tbody></tbody>';
         var tb = $('tbody', tbl);
         d.laneZones.forEach(function (z) { tb.appendChild(zoneRow(z)); });
         c.appendChild(tbl);
+
+        zNoMatch = el('div', { class: 'qf-addons-empty qf-addons-nomatch qf-zones-nomatch', hidden: 'hidden' });
+        c.appendChild(zNoMatch);
+        zSearch.addEventListener('input', function () {
+          var q = zSearch.value.trim().toLowerCase();
+          var shown = 0;
+          $$('tbody tr', tbl).forEach(function (tr) {
+            var parts = [];
+            $$('[data-field]', tr).forEach(function (f) { if (f.value) parts.push(String(f.value)); });
+            var codeEl = $('[data-field="anchorPortCode"]', tr);
+            if (codeEl && codeEl.value) {
+              var p = qfPortByCode(codeEl.value);
+              if (p) { parts.push(p.name); parts.push(p.city || ''); }
+            }
+            var match = !q || parts.join(' ').toLowerCase().indexOf(q) >= 0;
+            tr.hidden = !match;
+            if (match) shown++;
+          });
+          zCount.textContent = shown + ' shown';
+          if (!shown && q) { zNoMatch.textContent = 'No zones match “' + q + '”.'; zNoMatch.hidden = false; }
+          else { zNoMatch.hidden = true; }
+        });
 
         // Copilot form-fill (Phase 2): register the visible zone inputs so the
         // AI can prefill a specific zone's price/radius ("set the LAX 50-mile
@@ -2448,11 +2570,17 @@
           var byId = {};
           d.laneZones.forEach(function (z) { byId[String(z.id)] = z; });
           var FLABEL = { label: 'Label', anchorPortCode: 'Anchor port', radiusMiles: 'Radius (mi)', flatPrice: 'Flat $' };
-          var specs = $$('input[data-field][data-zone-id]', tbl).map(function (inp) {
+          // anchorPortCode is now a <select>; include selects so the AI can
+          // still set a zone's port, and hand it the valid option list.
+          var specs = $$('input[data-field][data-zone-id], select[data-field][data-zone-id]', tbl).map(function (inp) {
             var id = inp.dataset.zoneId, field = inp.dataset.field;
             var z = byId[id] || {};
             var name = z.label || (z.anchorPortCode ? z.anchorPortCode + ' zone' : 'Zone #' + id);
-            return { key: 'zone_' + id + '_' + field, label: name + ' — ' + (FLABEL[field] || field), el: inp };
+            var spec = { key: 'zone_' + id + '_' + field, label: name + ' — ' + (FLABEL[field] || field), el: inp };
+            if (inp.tagName === 'SELECT') {
+              spec.options = QF_DRAYAGE_PORTS.map(function (p) { return { value: p.code, label: p.name }; });
+            }
+            return spec;
           });
           qfRegisterCopilotForm('zones', 'Drayage zones', specs);
         })();
@@ -2480,7 +2608,8 @@
       });
       var grid = el('div', { class: 'grid-2', style: { gap: '14px' } });
 
-      function newField(labelText, hintText, inputOpts) {
+      // Field shell: label row (title top-left) + optional hint top-right.
+      function fieldShell(labelText, hintText) {
         var f = el('div', { class: 'field', style: { gap: '2px' } });
         var labelRow = el('div', {
           style: { display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', gap: '12px' },
@@ -2494,6 +2623,10 @@
           }));
         }
         f.appendChild(labelRow);
+        return f;
+      }
+      function newField(labelText, hintText, inputOpts) {
+        var f = fieldShell(labelText, hintText);
         var i = el('input', { class: 'input' });
         if (inputOpts && inputOpts.type) i.type = inputOpts.type;
         if (inputOpts && inputOpts.step) i.step = inputOpts.step;
@@ -2503,15 +2636,36 @@
         return { field: f, input: i };
       }
 
-      var labelF = newField('Zone label', '⌘/Ctrl+Enter to save', { placeholder: 'Houston → 50mi' });
-      var portF = newField('Nearest port', 'Optional', { placeholder: 'e.g. Houston, TX or USHOU' });
+      var labelF = newField('Zone label', 'Auto-fills — editable', { placeholder: 'Pick a port + radius' });
+      // Port is a picker, not free text: pick a known gateway, we store its CODE.
+      var portShell = fieldShell('Port', 'Sets anchor + fills label');
+      var portSel = qfPortSelect(null);
+      portShell.appendChild(portSel);
       var radiusF = newField('Radius (miles)', null, { type: 'number', step: '1', value: '50' });
       var priceF = newField('Flat price (USD)', null, { type: 'number', step: '1', value: '500' });
       grid.appendChild(labelF.field);
-      grid.appendChild(portF.field);
+      grid.appendChild(portShell);
       grid.appendChild(radiusF.field);
       grid.appendChild(priceF.field);
       form.appendChild(grid);
+
+      // Auto-label: as soon as a port + radius are set, prefill the label with
+      // "{Port name} → {radius} mi". Only fill when the label is empty or still
+      // equals a prior auto-value — never clobber a hand-edited label. `lastAuto`
+      // remembers the last string WE wrote so a user edit (label !== lastAuto)
+      // locks the field, while a further port/radius change re-derives it.
+      var lastAuto = '';
+      function maybeAutofillLabel() {
+        var auto = qfZoneAutoLabel(portSel.value, radiusF.input.value);
+        if (!auto) return;
+        var cur = labelF.input.value.trim();
+        if (cur === '' || cur === lastAuto) {
+          labelF.input.value = auto;
+          lastAuto = auto;
+        }
+      }
+      portSel.addEventListener('change', maybeAutofillLabel);
+      radiusF.input.addEventListener('input', maybeAutofillLabel);
 
       var actions = el('div', {
         style: { display: 'flex', gap: '8px', marginTop: '12px', justifyContent: 'flex-end' },
@@ -2524,18 +2678,22 @@
 
       function resetForm() {
         labelF.input.value = '';
-        portF.input.value = '';
+        portSel.value = '';
         radiusF.input.value = '50';
         priceF.input.value = '500';
+        lastAuto = '';
       }
       function closeForm() {
         form.style.display = 'none';
         addBtn.style.display = '';
       }
       function submitForm() {
+        // If the carrier left the label blank but a port + radius are set, fill
+        // the auto-label now so they truly only pick a port + radius + price.
+        if (!labelF.input.value.trim()) maybeAutofillLabel();
         var label = labelF.input.value.trim();
         if (!label) { labelF.input.focus(); return; }
-        var port = portF.input.value.trim() || null;
+        var port = portSel.value || null;
         var radius = Number(radiusF.input.value || 0);
         var price = Number(priceF.input.value || 0);
         api('/api/tenant/lane-zones', {
@@ -2549,7 +2707,7 @@
       }
       saveBtn.addEventListener('click', submitForm);
       cancelBtn.addEventListener('click', function () { resetForm(); closeForm(); });
-      [labelF.input, portF.input, radiusF.input, priceF.input].forEach(function (inp) {
+      [labelF.input, portSel, radiusF.input, priceF.input].forEach(function (inp) {
         inp.addEventListener('keydown', function (ev) {
           if ((ev.metaKey || ev.ctrlKey) && ev.key === 'Enter') {
             ev.preventDefault();
@@ -2564,7 +2722,7 @@
       addBtn.addEventListener('click', function () {
         form.style.display = '';
         addBtn.style.display = 'none';
-        labelF.input.focus();
+        portSel.focus(); // start by picking a port — label fills itself
       });
       c.appendChild(addBtn);
       c.appendChild(form);
@@ -2585,8 +2743,21 @@
       if (opts && opts.label) td.dataset.label = opts.label;
       return td;
     }
+    // Port is a dropdown of known gateways (not free text). Stores the CODE,
+    // preselects the row's current port, and preserves a legacy/custom code.
+    function portCell() {
+      var sel = qfPortSelect(z.anchorPortCode, '— none —'); // already class="input"
+      sel.style.width = '170px';
+      sel.dataset.field = 'anchorPortCode';
+      sel.dataset.zoneId = String(z.id);
+      sel.addEventListener('change', function () {
+        api('/api/tenant/lane-zones/' + z.id, { method: 'PUT', body: { anchorPortCode: sel.value || null } }).catch(toastErr);
+      });
+      var td = el('td', { 'data-label': 'Port' }); td.appendChild(sel);
+      return td;
+    }
     tr.appendChild(inp('label', z.label, { w: '300px', label: 'Label' }));
-    tr.appendChild(inp('anchorPortCode', z.anchorPortCode, { w: '90px', label: 'Anchor' }));
+    tr.appendChild(portCell());
     tr.appendChild(inp('radiusMiles', z.radiusMiles, { type: 'number', right: true, w: '80px', label: 'Radius (mi)' }));
     tr.appendChild(inp('flatPrice', z.flatPrice, { type: 'number', right: true, w: '90px', label: 'Flat $' }));
     var chk = el('input', { type: 'checkbox' }); chk.checked = z.enabled;
