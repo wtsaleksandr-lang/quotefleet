@@ -230,18 +230,29 @@ export function layout({ title, description, canonicalPath, bodyHtml, jsonLd }: 
       <span class="topnav-spacer"></span>
       <a class="nav-link" href="/directory">Directory</a>
       <a class="nav-link" href="/compliance">Compliance</a>
-      <a class="nav-link" href="/pricing">Pricing</a>
+      <a class="nav-link" href="/glossary">Glossary</a>
       <a class="btn btn-primary always-show" href="/signup">List your company <span class="arr">→</span></a>
     </div>
   </header>
   ${bodyHtml}
   <footer class="site-footer">
-    © <span id="year"></span> QuoteFleet · <a href="/directory">Directory</a> · <a href="/compliance">Compliance</a> · <a href="/marketplace/">Marketplace</a> · <a href="/terms">Terms</a> · <a href="/privacy">Privacy</a> · <a href="/">Home</a>
+    © <span id="year"></span> QuoteFleet · <a href="/directory">Directory</a> · <a href="/compliance">Compliance</a> · <a href="/glossary">Glossary</a> · <a href="/services">Services</a> · <a href="/marketplace/">Marketplace</a> · <a href="/terms">Terms</a> · <a href="/privacy">Privacy</a> · <a href="/">Home</a>
   </footer>
   <script>document.getElementById('year').textContent = new Date().getFullYear();</script>
   <script src="/marketing-chat.js" defer></script>
 </body>
 </html>`;
+}
+
+/**
+ * Display name for a carrier: prefer the DBA / trade name, but fall back to the
+ * legal name when the DBA is a bare single word too short to identify the
+ * carrier on its own (e.g. FMCSA lists "SELECT" for "SELECT WATER SOLUTIONS LLC").
+ */
+export function carrierName(c: { dbaName?: string | null; legalName: string }): string {
+  const dba = (c.dbaName ?? '').trim();
+  if (dba && (dba.includes(' ') || dba.length >= 8)) return dba;
+  return c.legalName;
 }
 
 // ─── Carrier card (shared by state + port pages) ──────────────────────────
@@ -254,7 +265,7 @@ export function carrierCard(c: VisibleCarrier): string {
   return `<a class="carrier-card" href="/directory/carrier/${encodeURIComponent(c.slug)}">
     <div class="top">
       <div>
-        <h3>${esc(c.dbaName || c.legalName)}</h3>
+        <h3>${esc(carrierName(c))}</h3>
         <div class="meta">${esc(cityState)}${idMeta ? ' · ' + idMeta : ''}</div>
       </div>
       ${c.intermodal ? '<span class="pill pill-dray">Drayage</span>' : ''}
@@ -315,7 +326,7 @@ function jsonLdItemListAndCollection(opts: {
         '@type': 'ListItem',
         position: i + 1,
         url: `${SITE}/directory/carrier/${encodeURIComponent(c.slug)}`,
-        name: c.dbaName || c.legalName,
+        name: carrierName(c),
       })),
     },
   });
@@ -344,7 +355,7 @@ function jsonLdCarrier(c: VisibleCarrier): string {
   return ld({
     '@context': 'https://schema.org',
     '@type': ['LocalBusiness', 'Organization'],
-    name: c.dbaName || c.legalName,
+    name: carrierName(c),
     legalName: c.legalName,
     url: `${SITE}/directory/carrier/${encodeURIComponent(c.slug)}`,
     identifier: [
@@ -951,7 +962,7 @@ export function renderCarrierProfile(opts: {
   const crumbs: Crumb[] = [{ name: 'Directory', path: '/directory' }];
   if (st) crumbs.push({ name: st.name, path: `/directory/${st.slug}` });
   if (st && citySlug && cityName) crumbs.push({ name: cityName, path: `/directory/${st.slug}/${citySlug}` });
-  crumbs.push({ name: c.dbaName || c.legalName });
+  crumbs.push({ name: carrierName(c) });
 
   const facts: Array<[string, string]> = [
     ['USDOT', c.usdot ? esc(c.usdot) : '—'],
@@ -1002,14 +1013,14 @@ export function renderCarrierProfile(opts: {
         ${c.intermodal ? '<span class="pill pill-dray">Drayage</span>' : ''}
         <span class="pill pill-${sr.tone}">${esc(sr.text)}</span>
       </div>
-      <h1 style="margin-top: 6px;">${esc(c.dbaName || c.legalName)}</h1>
+      <h1 style="margin-top: 6px;">${esc(carrierName(c))}</h1>
       <p class="lead">${esc(cityState)}${c.usdot ? ` · USDOT ${esc(c.usdot)}` : ''}${c.mcNumber ? ` · MC ${esc(c.mcNumber)}` : ''}</p>
     </div>
   </section>
   <main class="dir-shell">
     <div class="lookup-box">
       <h2 style="font-size: 16px; margin: 0 0 12px;">Carrier snapshot</h2>
-      ${c.dbaName && c.dbaName !== c.legalName ? `<p class="muted-small" style="margin: 0 0 12px;">Legal name: ${esc(c.legalName)}</p>` : ''}
+      ${carrierName(c) !== c.legalName ? `<p class="muted-small" style="margin: 0 0 12px;">Legal name: ${esc(c.legalName)}</p>` : ''}
       ${factRows}
       <div style="margin-top: 18px; display: flex; gap: 10px; flex-wrap: wrap;">
         <a class="btn btn-secondary" href="${saferUrl}" target="_blank" rel="noopener nofollow">Verify on FMCSA SAFER ↗</a>
@@ -1063,8 +1074,8 @@ export function renderCarrierProfile(opts: {
   </script>`;
 
   return layout({
-    title: `${c.dbaName || c.legalName} — USDOT ${c.usdot} Carrier Profile | QuoteFleet`,
-    description: `${c.dbaName || c.legalName}${cityState ? ' of ' + cityState : ''}: USDOT ${c.usdot}, ${
+    title: `${carrierName(c)} — USDOT ${c.usdot} Carrier Profile | QuoteFleet`,
+    description: `${carrierName(c)}${cityState ? ' of ' + cityState : ''}: USDOT ${c.usdot}, ${
       c.powerUnits ? c.powerUnits + ' power units, ' : ''
     }${authorityLabel(c.authorityType)}, ${sr.text} safety rating. Verify live with FMCSA.`,
     canonicalPath: `/directory/carrier/${encodeURIComponent(c.slug)}`,
