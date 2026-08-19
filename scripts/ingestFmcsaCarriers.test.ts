@@ -204,4 +204,17 @@ describe('filterAndNormalizeCarriers', () => {
     const out = filterAndNormalizeCarriers([activeCarrier, dupe], censusByDot);
     expect(out).toHaveLength(1);
   });
+
+  it('drops a carrier domiciled outside the US (Canada/Mexico), keeps US + territories', () => {
+    const foreign = new Map<string, CensusRow>([
+      ['107080', { dot_number: '107080', status_code: 'A', phy_state: 'ON' }], // Ontario, CA
+    ]);
+    expect(filterAndNormalizeCarriers([activeCarrier], foreign)).toHaveLength(0);
+    // A US territory (Puerto Rico) is kept.
+    const pr = new Map<string, CensusRow>([
+      ['107080', { dot_number: '107080', status_code: 'A', phy_state: 'PR' }],
+    ]);
+    const [rec] = filterAndNormalizeCarriers([activeCarrier], pr);
+    expect(rec.state).toBe('PR');
+  });
 });

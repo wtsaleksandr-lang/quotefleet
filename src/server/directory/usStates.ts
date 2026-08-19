@@ -53,6 +53,15 @@ const BY_CODE = new Map(US_STATES.map((s) => [s.code, s]));
 const BY_SLUG = new Map(US_STATES.map((s) => [s.slug, s]));
 
 /**
+ * The 2-letter codes the directory can actually place (50 states + DC + PR/VI/GU).
+ * A carrier whose physical-domicile state is not in this set is unreachable by
+ * the state/city browse and only inflates unfiltered/port counts, so the FMCSA
+ * ingester drops it (keeps the US directory internally consistent). Canada/Mexico
+ * cross-border carriers stay findable via the live /compliance DOT lookup.
+ */
+export const US_STATE_CODES: ReadonlySet<string> = new Set(US_STATES.map((s) => s.code));
+
+/**
  * Resolve a 2-letter code to a UsState. Unknown-but-valid 2-letter codes are
  * synthesized (name = code) so a page still renders instead of 404-ing.
  */
