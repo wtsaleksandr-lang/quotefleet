@@ -133,7 +133,7 @@ interface LayoutOpts {
   bodyHtml: string;
 }
 
-function layout({ title, description, canonicalPath, bodyHtml }: LayoutOpts): string {
+export function layout({ title, description, canonicalPath, bodyHtml }: LayoutOpts): string {
   return `<!doctype html>
 <html lang="en">
 <head>
@@ -184,7 +184,7 @@ function layout({ title, description, canonicalPath, bodyHtml }: LayoutOpts): st
 }
 
 // ─── Carrier card (shared by state + port pages) ──────────────────────────
-function carrierCard(c: VisibleCarrier): string {
+export function carrierCard(c: VisibleCarrier): string {
   const sr = safetyLabel(c.safetyRating);
   const cityState = [c.city, c.state].filter(Boolean).join(', ');
   const idMeta = [c.usdot ? `USDOT ${esc(c.usdot)}` : '', c.mcNumber ? `MC ${esc(c.mcNumber)}` : '']
