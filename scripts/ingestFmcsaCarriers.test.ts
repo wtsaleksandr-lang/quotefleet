@@ -10,6 +10,7 @@ import { describe, it, expect } from 'vitest';
 import {
   normalizeDot,
   normalizePhone,
+  normalizeEmail,
   isActivePropertyCarrier,
   authorityType,
   isIntermodal,
@@ -18,6 +19,7 @@ import {
   buildCarrierWhere,
   filterAndNormalizeCarriers,
   carrierCountry,
+  CARRIER_UPSERT_SET,
   type LiCarrierRow,
   type CensusRow,
 } from './ingestFmcsaCarriers.js';
@@ -89,6 +91,7 @@ const censusByDot = new Map<string, CensusRow>([
     {
       dot_number: '107080',
       legal_name: 'ACME DRAYAGE INC',
+      email_address: 'Dispatch@ACME.com',
       power_units: '25',
       total_drivers: '30',
       safety_rating: 'S',
@@ -113,6 +116,16 @@ describe('normalizers', () => {
   it('normalizePhone keeps ≥10-digit numbers as digits', () => {
     expect(normalizePhone('(912) 555-0921')).toBe('9125550921');
     expect(normalizePhone('12345')).toBeNull();
+  });
+  it('normalizeEmail lower-cases a valid address and rejects blank/garbage', () => {
+    expect(normalizeEmail('Dispatch@ACME.com')).toBe('dispatch@acme.com');
+    expect(normalizeEmail('  Ops@Acme.CO  ')).toBe('ops@acme.co');
+    expect(normalizeEmail('')).toBeNull();
+    expect(normalizeEmail(undefined)).toBeNull();
+    expect(normalizeEmail('N/A')).toBeNull();
+    expect(normalizeEmail('not-an-email')).toBeNull();
+    expect(normalizeEmail('a@b')).toBeNull(); // no TLD
+    expect(normalizeEmail('a b@c.com')).toBeNull(); // internal space
   });
   it('isActivePropertyCarrier gates on common/contract authority + property_chk', () => {
     expect(isActivePropertyCarrier(activeCarrier)).toBe(true);
@@ -181,6 +194,7 @@ describe('filterAndNormalizeCarriers', () => {
     expect(rec.state).toBe('GA'); // upper-cased
     expect(rec.city).toBe('SAVANNAH');
     expect(rec.phone).toBe('9125550921');
+    expect(rec.email).toBe('dispatch@acme.com'); // captured + lower-cased from census
     expect(rec.powerUnits).toBe(25);
     expect(rec.drivers).toBe(30);
     expect(rec.safetyRating).toBe('S');
@@ -194,6 +208,7 @@ describe('filterAndNormalizeCarriers', () => {
     const [rec] = filterAndNormalizeCarriers([activeCarrier], new Map());
     expect(rec.powerUnits).toBeNull();
     expect(rec.drivers).toBeNull();
+    expect(rec.email).toBeNull(); // no census → no email
     expect(rec.intermodal).toBe(false);
     expect(rec.state).toBe('GA'); // from L&I bus_state_code, upper-cased
     expect(rec.nearestPortCode).toBe('USSAV'); // still derived from L&I bus_zip_code
@@ -254,6 +269,31 @@ describe('carrierCountry', () => {
     expect(carrierCountry('AG')).toBeNull(); // Aguascalientes (Mexico)
     expect(carrierCountry('ZZ')).toBeNull();
     expect(carrierCountry(null)).toBeNull();
+  });
+});
+
+// ── opt-out preservation across re-ingests ───────────────────────────────
+describe('CARRIER_UPSERT_SET (opt-out preservation)', () => {
+  const keys = Object.keys(CARRIER_UPSERT_SET);
+
+  it('refreshes email on a re-ingest', () => {
+    expect(keys).toContain('email');
+  });
+
+  it('NEVER sets contact_hidden — a carrier who opted out stays hidden', () => {
+    // The opt-out flag must not appear in the ON CONFLICT DO UPDATE SET (by the
+    // drizzle column property name, or the raw column name), so a future
+    // re-ingest can never clear a carrier's opt-out.
+    expect(keys).not.toContain('contactHidden');
+    expect(keys).not.toContain('contact_hidden');
+  });
+
+  it('does not carry contact_hidden anywhere in its compiled SQL', () => {
+    // Belt-and-suspenders: none of the SET expressions reference contact_hidden.
+    const sqlText = JSON.stringify(
+      Object.values(CARRIER_UPSERT_SET).map((expr) => (expr as { queryChunks?: unknown }).queryChunks),
+    );
+    expect(sqlText).not.toContain('contact_hidden');
   });
 });
 

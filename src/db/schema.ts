@@ -1755,6 +1755,15 @@ export const carrierDirectory = pgTable(
     country: text('country').notNull().default('US'),
     zip: text('zip'),
     phone: text('phone'),
+    /** Census email_address (normalized lower-case); null until a re-ingest populates it. */
+    email: text('email'),
+    /**
+     * Carrier opt-out flag. When true the public profile hides BOTH phone and
+     * email (a carrier emailed us to hide their contact details). Defaults false.
+     * NEVER overwritten by the ingest upsert — a carrier who opted out stays
+     * hidden across every future re-ingest.
+     */
+    contactHidden: boolean('contact_hidden').notNull().default(false),
     /** Census power_units — fleet size. */
     powerUnits: integer('power_units'),
     /** Census total_drivers. */

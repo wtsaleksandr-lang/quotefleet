@@ -377,7 +377,9 @@ function jsonLdCarrier(c: VisibleCarrier): string {
       { '@type': 'PropertyValue', propertyID: 'USDOT', value: c.usdot },
       ...(c.mcNumber ? [{ '@type': 'PropertyValue', propertyID: 'MC', value: c.mcNumber }] : []),
     ],
-    ...(c.phone ? { telephone: c.phone } : {}),
+    // Suppress contact fields entirely when the carrier has opted out.
+    ...(!c.contactHidden && c.phone ? { telephone: c.phone } : {}),
+    ...(!c.contactHidden && c.email ? { email: c.email } : {}),
     address: addr,
     ...(c.city || c.state ? { areaServed: [c.city, c.state].filter(Boolean).join(', ') } : {}),
     knowsAbout: c.intermodal ? ['Container drayage', 'Intermodal trucking'] : ['Freight trucking'],
@@ -617,6 +619,7 @@ function renderFacetedResults(cfg: FacetedCfg): string {
       </div>
     </div>
     ${cfg.faqsHtml ?? ''}
+    <p class="muted-small" style="margin: 24px 0 0; max-width: 760px;">Carrier information is sourced from public FMCSA records and shown so shippers can contact carriers directly. Carriers: email us to update or hide your details.</p>
   </main>`;
 
   return layout({
@@ -991,6 +994,25 @@ export function renderCarrierProfile(opts: {
   ];
   if (port) facts.push(['Nearest port', `${esc(port.name)}`]);
 
+  // Contact rows (phone + email). Displayed for shipper→carrier connection only —
+  // QuoteFleet does not do outreach. Values are public FMCSA data; escape the text
+  // and encode the href. When the carrier has opted out, hide BOTH and show a
+  // single muted line instead (the rest of the profile still renders normally).
+  const contactRows = c.contactHidden
+    ? `<div class="lookup-result"><div class="row"><span class="k">Contact</span><span class="v muted-small">Contact details hidden at the carrier's request.</span></div></div>`
+    : [
+        c.phone
+          ? `<div class="lookup-result"><div class="row"><span class="k">Phone</span><span class="v"><a href="tel:${encodeURIComponent(
+              c.phone,
+            )}" style="color:var(--accent);">${esc(c.phone)}</a></span></div></div>`
+          : '',
+        c.email
+          ? `<div class="lookup-result"><div class="row"><span class="k">Email</span><span class="v"><a href="mailto:${encodeURIComponent(
+              c.email,
+            )}" style="color:var(--accent);">${esc(c.email)}</a></span></div></div>`
+          : '',
+      ].join('');
+
   const factRows =
     facts
       .map(
@@ -998,6 +1020,7 @@ export function renderCarrierProfile(opts: {
           `<div class="lookup-result"><div class="row"><span class="k">${esc(k)}</span><span class="v">${v}</span></div></div>`,
       )
       .join('') +
+    contactRows +
     // Verify-on-SAFER link surfaced as a data-table row too.
     `<div class="lookup-result"><div class="row"><span class="k">FMCSA record</span><span class="v"><a href="${saferUrl}" target="_blank" rel="noopener nofollow" style="color:var(--accent);">Verify on SAFER ↗</a></span></div></div>`;
 
@@ -1052,6 +1075,7 @@ export function renderCarrierProfile(opts: {
       <h2 style="font-size: 18px; margin: 0 0 8px;">Is this your company?</h2>
       <p class="muted" style="margin: 0 auto 16px; max-width: 460px;">Claim your profile to publish live rates, take instant quotes, and get booked directly by shippers — free to list.</p>
       <a class="btn btn-primary" href="/signup?claim=${encodeURIComponent(c.usdot)}&amp;name=${encodeURIComponent(carrierName(c))}">Claim this profile <span class="arr">→</span></a>
+      <p class="muted-small" style="margin: 16px auto 0; max-width: 460px;">Carrier data is sourced from public FMCSA records. To correct or hide your contact details, email support@quotefleet.net with your USDOT number.</p>
     </div>
   </main>
   <script>

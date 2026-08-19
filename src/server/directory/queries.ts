@@ -28,6 +28,9 @@ export interface VisibleCarrier {
   state: string | null;
   zip: string | null;
   phone: string | null;
+  email: string | null;
+  /** Carrier opt-out: when true the profile hides BOTH phone and email. */
+  contactHidden: boolean;
   powerUnits: number | null;
   drivers: number | null;
   safetyRating: string | null;
@@ -48,6 +51,8 @@ export function visibleCarrier(r: typeof carrierDirectory.$inferSelect): Visible
     state: r.state,
     zip: r.zip,
     phone: r.phone,
+    email: r.email,
+    contactHidden: r.contactHidden,
     powerUnits: r.powerUnits,
     drivers: r.drivers,
     safetyRating: r.safetyRating,
