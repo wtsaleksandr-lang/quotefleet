@@ -30,7 +30,8 @@
 
   <main style="display:flex; align-items:center; justify-content:center; min-height: calc(100vh - 80px); padding: 48px 24px;">
     <div class="card elevated" style="width: 100%; max-width: 560px;">
-      <h1 style="font-size: 28px; margin: 0 0 8px 0; letter-spacing: -0.025em;">Start your 14-day trial</h1>
+      <div id="claim-banner" class="notice" hidden style="margin-bottom:16px; line-height:1.5;"></div>
+      <h1 id="signup-title" style="font-size: 28px; margin: 0 0 8px 0; letter-spacing: -0.025em;">Start your 14-day trial</h1>
       <p class="muted-small" style="margin:0 0 20px;">Create your quote desk, then tune rates before going live.</p>
       <!-- Copy reflects current reality: billing is NOT configured on prod, so
            signup completes card-free (see src/server/routes/auth.ts — Stripe
@@ -111,6 +112,26 @@
     var preview = document.getElementById('url-preview').querySelector('.live');
     var hint = document.getElementById('slug-hint');
     var companyInput = form.querySelector('[name="companyName"]');
+    // Directory "Claim your listing" context (?claim=<usdot>&name=<carrier>): pre-fill
+    // the carrier name and show a claim banner so the flow reads as claiming an existing
+    // FMCSA directory listing, not a cold signup. (Profile linkage itself is Phase 2.)
+    (function () {
+      try {
+        var q = new URLSearchParams(location.search);
+        var claim = q.get('claim'), nm = (q.get('name') || '').slice(0, 120);
+        if (!claim) return;
+        if (nm && companyInput && !companyInput.value) companyInput.value = nm;
+        var banner = document.getElementById('claim-banner');
+        var title = document.getElementById('signup-title');
+        if (title) title.textContent = 'Claim your carrier listing';
+        if (banner) {
+          var who = nm ? nm : 'your company';
+          var dot = (claim && claim !== '1') ? ' · USDOT ' + claim : '';
+          banner.textContent = 'Claiming ' + who + dot + ' — finish signup to publish live rates, take instant quotes, and get booked from your directory profile.';
+          banner.removeAttribute('hidden');
+        }
+      } catch (e) { /* non-fatal: fall back to the standard signup */ }
+    })();
     var emailInput = form.querySelector('[name="email"]');
     var passwordInput = document.getElementById('password-input');
     var confirmInput = document.getElementById('confirm-password-input');
