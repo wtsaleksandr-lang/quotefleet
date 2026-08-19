@@ -81,10 +81,10 @@
   <header class="site-header">
     <div class="site-header-inner">
       <a href="/" class="site-brand" aria-label="QuoteFleet home"><span class="site-logo" aria-hidden="true"><img class="qf-brand-mark" src="/brand/mark-keys-ondark.png" alt="QuoteFleet" width="28" height="30" decoding="async"></span>QuoteFleet</a>
-      <nav class="site-nav" aria-label="Main navigation"><a href="#how">How it works</a><a href="/w/demo">Demo</a><a href="/directory">Directory</a><a href="/compliance">Compliance</a><a href="#faq">FAQ</a></nav>
+      <nav class="site-nav" aria-label="Main navigation"><div class="nav-dd" data-nav-dd><button type="button" class="nav-dd-trigger" id="solutions-trigger" aria-haspopup="true" aria-expanded="false" aria-controls="solutions-menu">Solutions<svg class="nav-dd-caret" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polyline points="6 9 12 15 18 9"/></svg></button><div class="nav-dd-panel" id="solutions-menu" hidden><div class="nav-dd-group"><p class="nav-dd-head">Tools</p><a href="/tools">Rate calculator</a><a href="/directory">Carrier directory</a><a href="/compliance">Compliance tools</a></div><div class="nav-dd-group"><p class="nav-dd-head">For your business</p><a href="/for/brokers">Freight brokers</a><a href="/for/forwarders">Freight forwarders</a><a href="/for/ltl">LTL</a><a href="/marketplace">Carrier marketplace</a></div></div></div><a href="/pricing">Pricing</a><a href="/w/demo">Demo</a></nav>
       <div class="site-actions"><a class="signin" href="/login">Sign in</a><a class="btn btn-secondary" href="/w/demo">View demo <span class="arr">→</span></a><button type="button" class="site-burger" id="site-burger" aria-label="Open menu" aria-expanded="false" aria-controls="site-mobile-menu"><svg class="ico-open" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><line x1="4" y1="7" x2="20" y2="7"/><line x1="4" y1="12" x2="20" y2="12"/><line x1="4" y1="17" x2="20" y2="17"/></svg><svg class="ico-close" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><line x1="6" y1="6" x2="18" y2="18"/><line x1="18" y1="6" x2="6" y2="18"/></svg></button></div>
     </div>
-    <div class="site-mobile-menu" id="site-mobile-menu" hidden><a href="#how">How it works</a><a href="/w/demo">Demo</a><a href="/directory">Directory</a><a href="/compliance">Compliance</a><a href="#faq">FAQ</a><a href="/login">Sign in</a></div>
+    <div class="site-mobile-menu" id="site-mobile-menu" hidden><p class="mm-head">Tools</p><a href="/tools">Rate calculator</a><a href="/directory">Carrier directory</a><a href="/compliance">Compliance tools</a><p class="mm-head">For your business</p><a href="/for/brokers">Freight brokers</a><a href="/for/forwarders">Freight forwarders</a><a href="/for/ltl">LTL</a><a href="/marketplace">Carrier marketplace</a><p class="mm-head">More</p><a href="/pricing">Pricing</a><a href="/w/demo">Demo</a><a href="/login">Sign in</a></div>
   </header>
 
   <main>
@@ -256,6 +256,57 @@
       if (!m.hasAttribute('hidden') && !m.contains(e.target) && !b.contains(e.target)) set(false);
     });
     document.addEventListener('keydown', function (e) { if (e.key === 'Escape') set(false); });
+  })();
+  </script>
+  <script>
+  (function () {
+    var dd = document.querySelector('[data-nav-dd]');
+    if (!dd) return;
+    var trigger = dd.querySelector('.nav-dd-trigger');
+    var panel = dd.querySelector('.nav-dd-panel');
+    if (!trigger || !panel) return;
+    var hoverable = window.matchMedia('(hover: hover) and (pointer: fine)');
+    var hoverTimer;
+    function isOpen() { return trigger.getAttribute('aria-expanded') === 'true'; }
+    function open(o) {
+      trigger.setAttribute('aria-expanded', o ? 'true' : 'false');
+      dd.classList.toggle('is-open', o);
+      if (o) panel.removeAttribute('hidden'); else panel.setAttribute('hidden', '');
+    }
+    trigger.addEventListener('click', function (e) {
+      e.stopPropagation();
+      // Hover devices already opened it on mouseenter — a click there just keeps
+      // it open (dismiss via move-away / outside-click / Esc), avoiding a
+      // hover-then-click race that would instantly re-close. Touch / no-hover
+      // (and keyboard Enter) toggle normally.
+      if (hoverable.matches) open(true); else open(!isOpen());
+    });
+    trigger.addEventListener('keydown', function (e) {
+      if (e.key === 'ArrowDown') {
+        e.preventDefault();
+        open(true);
+        var first = panel.querySelector('a');
+        if (first) first.focus();
+      }
+    });
+    dd.addEventListener('mouseenter', function () {
+      if (!hoverable.matches) return;
+      clearTimeout(hoverTimer);
+      open(true);
+    });
+    dd.addEventListener('mouseleave', function () {
+      if (!hoverable.matches) return;
+      hoverTimer = setTimeout(function () { open(false); }, 140);
+    });
+    dd.addEventListener('focusout', function (e) {
+      if (!dd.contains(e.relatedTarget)) open(false);
+    });
+    document.addEventListener('click', function (e) {
+      if (isOpen() && !dd.contains(e.target)) open(false);
+    });
+    document.addEventListener('keydown', function (e) {
+      if (e.key === 'Escape' && isOpen()) { open(false); trigger.focus(); }
+    });
   })();
   </script>
   <script>

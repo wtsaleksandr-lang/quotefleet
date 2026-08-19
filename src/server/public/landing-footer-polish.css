@@ -134,3 +134,106 @@ body.qf-wft .premium-footer .qf-footer-wordmark:hover {
     grid-template-columns: 1.4fr repeat(4, 1fr);
   }
 }
+
+/* ─────────────────────────────────────────────────────────────────────────
+   Header "Solutions" dropdown — surfaces the tools & business pages that used
+   to live only in the footer, behind ONE tidy hover/click menu. Kept quiet and
+   on-brand with the dark nav: a soft glass panel, subtle group headings, plain
+   text links — no images, no blurbs, no full-width mega-menu. Appended here
+   (loads last) to avoid shifting the line-based guard baselines in
+   landing-conversion.css, where the base .site-nav rules live.
+   Spacing stays on the 8px ramp; colors use style.css dark tokens (rgba only).
+   ───────────────────────────────────────────────────────────────────────── */
+.landing-v2 .nav-dd { position: relative; }
+
+.landing-v2 .nav-dd-trigger {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font: inherit;
+  font-size: 13px;
+  font-weight: 650;
+  color: var(--ink-soft);
+  background: transparent;
+  border: 0;
+  cursor: pointer;
+  padding: 8px 12px;
+  border-radius: 999px;
+}
+.landing-v2 .nav-dd-trigger:hover,
+.landing-v2 .nav-dd.is-open .nav-dd-trigger {
+  color: var(--ink);
+  background: rgba(255, 255, 255, 0.05);
+}
+.landing-v2 .nav-dd-caret {
+  width: 12px;
+  height: 12px;
+  transition: transform 0.18s ease;
+}
+.landing-v2 .nav-dd.is-open .nav-dd-caret { transform: rotate(180deg); }
+
+.landing-v2 .nav-dd-panel {
+  position: absolute;
+  top: calc(100% + 12px);
+  left: 0;
+  display: grid;
+  grid-template-columns: max-content max-content;
+  gap: 16px 24px;
+  margin: 0;
+  padding: 16px;
+  background: rgba(20, 24, 30, 0.97);
+  -webkit-backdrop-filter: blur(20px) saturate(1.2);
+  backdrop-filter: blur(20px) saturate(1.2);
+  border: 1px solid var(--border);
+  border-radius: 14px;
+  box-shadow: 0 18px 42px rgba(0, 0, 0, 0.42);
+  z-index: 80;
+}
+.landing-v2 .nav-dd-panel[hidden] { display: none; }
+
+.landing-v2 .nav-dd-group {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+.landing-v2 .nav-dd-head {
+  margin: 0 0 8px;
+  padding: 0 12px;
+  font-family: var(--font-mono);
+  font-size: 10px;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  font-weight: 700;
+  color: var(--muted);
+}
+.landing-v2 .nav-dd-panel a {
+  display: block;
+  color: var(--ink-soft);
+  font-size: 13px;
+  font-weight: 600;
+  text-decoration: none;
+  white-space: nowrap;
+  padding: 8px 12px;
+  border-radius: 8px;
+}
+.landing-v2 .nav-dd-panel a:hover,
+.landing-v2 .nav-dd-panel a:focus-visible {
+  color: var(--ink);
+  background: rgba(255, 255, 255, 0.06);
+}
+
+/* Mobile: the same links, grouped under subtle subheadings inside the existing
+   burger panel. Matches the mono link styling defined in landing-home-fixes.css. */
+@media (max-width: 640px) {
+  body.qf-wft .site-mobile-menu .mm-head {
+    margin: 12px 0 4px;
+    padding: 0 16px;
+    font-family: "JetBrains Mono", ui-monospace, monospace;
+    font-size: 10px;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    font-weight: 700;
+    color: var(--muted);
+  }
+  body.qf-wft .site-mobile-menu .mm-head:first-child { margin-top: 4px; }
+}
