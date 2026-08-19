@@ -119,3 +119,18 @@ body.qf-wft .premium-footer .qf-footer-brand:hover,
 body.qf-wft .premium-footer .qf-footer-wordmark:hover {
   opacity: 0.8;
 }
+
+/* ── Footer grid alignment fix. The base rule (landing-conversion.css) declared
+   only four tracks — `grid-template-columns: 1.4fr repeat(3, 1fr)` — but the
+   row holds FIVE children: the brand lockup plus four link columns (Product /
+   Solutions / Company / Legal). With one track short, the last column (Legal)
+   wrapped onto a second implicit row under the brand block, reading as a
+   misaligned/offset column. Add the fifth track so the brand block and all four
+   columns sit in one clean, balanced row. Scoped to ≥981px so the tablet
+   (≤980px → 2-col) and mobile (≤640px → 2-col, ≤720px → 1-col) stacked grids
+   defined elsewhere are left untouched. ── */
+@media (min-width: 981px) {
+  body.qf-wft .premium-footer .premium-footer-inner {
+    grid-template-columns: 1.4fr repeat(4, 1fr);
+  }
+}
