@@ -42,6 +42,7 @@ import { sql } from 'drizzle-orm';
 import { db } from '../src/db/client.js';
 import { carrierDirectory, type CarrierDirectoryRow } from '../src/db/schema.js';
 import { nearestPortForZip } from '../src/server/directory/containerPorts.js';
+import { US_STATE_CODES } from '../src/server/directory/usStates.js';
 
 // ─── Socrata sources ──────────────────────────────────────────────────────
 const SOCRATA_BASE = 'https://data.transportation.gov/resource';
@@ -198,6 +199,12 @@ export function normalizeCarrier(
   if (!legalName) return null; // legal_name is NOT NULL
 
   const zip = cleanStr(census?.phy_zip) ?? cleanStr(li.bus_zip_code);
+  const state = (cleanStr(census?.phy_state) ?? cleanStr(li.bus_state_code))?.toUpperCase() ?? null;
+  // US-domicile only: the directory is organized by US state + US port, so a
+  // carrier physically domiciled outside the 50 states + DC + PR/VI/GU can't be
+  // placed in the browse and would only inflate unfiltered/port counts. Drop it
+  // (Canada/Mexico cross-border carriers remain findable via /compliance lookup).
+  if (state && !US_STATE_CODES.has(state)) return null;
 
   return {
     usdot,
@@ -205,7 +212,7 @@ export function normalizeCarrier(
     legalName,
     dbaName: cleanStr(li.dba_name) ?? cleanStr(census?.dba_name),
     city: cleanStr(census?.phy_city) ?? cleanStr(li.bus_city),
-    state: (cleanStr(census?.phy_state) ?? cleanStr(li.bus_state_code))?.toUpperCase() ?? null,
+    state,
     zip,
     phone: normalizePhone(census?.phone) ?? normalizePhone(li.bus_telno),
     powerUnits: toInt(census?.power_units),
