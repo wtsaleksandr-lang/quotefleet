@@ -28,6 +28,9 @@ function carrier(overrides: Partial<VisibleCarrier> = {}): VisibleCarrier {
     intermodal: true,
     hazmat: false,
     nearestPortCode: 'USSAV',
+    aboutOverride: null,
+    capabilities: {},
+    provenance: { about: 'fmcsa', email: 'fmcsa', phone: 'fmcsa', hidden: 'fmcsa', capabilities: 'fmcsa' },
     ...overrides,
   };
 }

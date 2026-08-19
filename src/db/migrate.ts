@@ -174,6 +174,21 @@ export const SELF_HEAL_TABLE_STATEMENTS: readonly string[] = [
   `CREATE UNIQUE INDEX IF NOT EXISTS "carrier_directory_slug_idx" ON "carrier_directory" ("public_slug")`,
   `CREATE INDEX IF NOT EXISTS "carrier_directory_state_idx" ON "carrier_directory" ("state")`,
   `CREATE INDEX IF NOT EXISTS "carrier_directory_port_idx" ON "carrier_directory" ("nearest_port_code")`,
+  // 0048_carrier_overrides.sql — human-editable OVERRIDES that survive the FMCSA
+  // re-ingest (the ingest touches carrier_directory ONLY, never this table).
+  // Healed HERE (like carrier_directory) because the Replit deploy skips
+  // db:migrate; IF NOT EXISTS no-ops on a healthy DB. MUST stay byte-for-byte
+  // equivalent to drizzle/0048_carrier_overrides.sql + schema.ts `carrierOverrides`.
+  `CREATE TABLE IF NOT EXISTS "carrier_overrides" (
+    "usdot" text PRIMARY KEY NOT NULL,
+    "about_override" text,
+    "email_override" text,
+    "phone_override" text,
+    "hidden" boolean,
+    "capabilities" jsonb,
+    "updated_at" timestamp DEFAULT now() NOT NULL,
+    "updated_by" text
+  )`,
 ];
 
 export async function ensureSelfHealTables(): Promise<void> {

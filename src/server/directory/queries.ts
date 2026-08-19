@@ -11,8 +11,35 @@
  */
 import { and, asc, desc, eq, gt, gte, isNotNull, isNull, ne, sql, type SQL } from 'drizzle-orm';
 import { db } from '../../db/client.js';
-import { carrierDirectory } from '../../db/schema.js';
+import { carrierDirectory, carrierOverrides, type CarrierCapabilities, type CarrierOverrideRow } from '../../db/schema.js';
 import { CONTAINER_PORTS } from './containerPorts.js';
+
+export type { CarrierCapabilities } from '../../db/schema.js';
+
+/**
+ * Where a displayed card field came from. `'fmcsa'` = straight from the FMCSA
+ * public record; `'admin'` = replaced by an admin edit in `carrier_overrides`;
+ * `'carrier'` = reserved for the LATER carrier-self-edit phase (not written yet).
+ */
+export type FieldSource = 'fmcsa' | 'admin' | 'carrier';
+
+/** Per-field provenance for a merged carrier card — lets the profile tell an
+ *  FMCSA-sourced value from an admin/carrier-edited one. */
+export interface CarrierProvenance {
+  about: FieldSource;
+  email: FieldSource;
+  phone: FieldSource;
+  hidden: FieldSource;
+  capabilities: FieldSource;
+}
+
+const FMCSA_PROVENANCE: CarrierProvenance = {
+  about: 'fmcsa',
+  email: 'fmcsa',
+  phone: 'fmcsa',
+  hidden: 'fmcsa',
+  capabilities: 'fmcsa',
+};
 
 export const DEFAULT_PER_PAGE = 24;
 export const MAX_PER_PAGE = 50;
@@ -39,6 +66,20 @@ export interface VisibleCarrier {
   /** FMCSA-verified hazmat carrier (census hm_ind === 'Y'). */
   hazmat: boolean;
   nearestPortCode: string | null;
+  /**
+   * Admin/carrier "About" override, applied ONLY on the profile (carrierBySlug).
+   * `null` on list/card rows and whenever no override exists → the profile falls
+   * back to the FMCSA-derived prose (carrierAbout).
+   */
+  aboutOverride: string | null;
+  /**
+   * Self-declared credential flags from `carrier_overrides.capabilities`. Empty
+   * `{}` on list/card rows and when no override exists. A `true` flag flips the
+   * matching profile credential badge to ACTIVE (still labeled "self-declared").
+   */
+  capabilities: CarrierCapabilities;
+  /** Per-field source (FMCSA vs admin/carrier-edited). All `'fmcsa'` on list/card. */
+  provenance: CarrierProvenance;
 }
 
 /** Shape one carrier row for the public list/profile (drops internal ids). */
@@ -62,7 +103,56 @@ export function visibleCarrier(r: typeof carrierDirectory.$inferSelect): Visible
     intermodal: r.intermodal,
     hazmat: r.hazmat,
     nearestPortCode: r.nearestPortCode,
+    // FMCSA-only base shape: no override applied. The profile read
+    // (carrierBySlug) merges carrier_overrides on top via mergeCarrierOverride;
+    // list/card rows keep these FMCSA defaults so those surfaces are unchanged.
+    aboutOverride: null,
+    capabilities: {},
+    provenance: FMCSA_PROVENANCE,
   };
+}
+
+/**
+ * Apply a `carrier_overrides` row onto an FMCSA base card (PURE — unit-tested).
+ *
+ * Non-null overrides win over the FMCSA value and stamp that field's provenance;
+ * a null/empty override leaves the FMCSA value + `'fmcsa'` provenance untouched.
+ * `hidden` is OR'd with the FMCSA contact opt-out (an admin can hide, but can't
+ * un-hide a carrier who opted out). Because overrides live in a separate table
+ * the FMCSA re-ingest never touches, this merge is the ONLY place edits re-enter
+ * the card — so edits survive every re-ingest by construction.
+ */
+export function mergeCarrierOverride(
+  base: VisibleCarrier,
+  ov: CarrierOverrideRow | null | undefined,
+): VisibleCarrier {
+  if (!ov) return base;
+  // Foundation attributes every override write to 'admin' (the only write path
+  // in this phase). The carrier-self-edit phase will distinguish 'carrier'.
+  const src: FieldSource = 'admin';
+  const provenance: CarrierProvenance = { ...FMCSA_PROVENANCE };
+  const out: VisibleCarrier = { ...base, provenance };
+  if (ov.aboutOverride != null && ov.aboutOverride.trim() !== '') {
+    out.aboutOverride = ov.aboutOverride;
+    provenance.about = src;
+  }
+  if (ov.emailOverride != null && ov.emailOverride.trim() !== '') {
+    out.email = ov.emailOverride;
+    provenance.email = src;
+  }
+  if (ov.phoneOverride != null && ov.phoneOverride.trim() !== '') {
+    out.phone = ov.phoneOverride;
+    provenance.phone = src;
+  }
+  if (ov.hidden === true) {
+    out.contactHidden = true;
+    provenance.hidden = src;
+  }
+  if (ov.capabilities && typeof ov.capabilities === 'object') {
+    out.capabilities = { ...ov.capabilities };
+    if (Object.values(ov.capabilities).some(Boolean)) provenance.capabilities = src;
+  }
+  return out;
 }
 
 export interface DirectorySummary {
@@ -650,15 +740,24 @@ export async function stateCarrierCount(stateCode: string): Promise<number> {
   }
 }
 
-/** Look up a single carrier by its public slug (for the profile page). */
+/**
+ * Look up a single carrier by its public slug (for the profile page), MERGING
+ * any `carrier_overrides` row on top (LEFT JOIN by usdot). This is the only
+ * query that applies overrides — the list/card queries stay FMCSA-only. A
+ * missing `carrier_overrides` table (never migrated) still LEFT JOINs to NULL
+ * overrides, so the profile degrades to the pure FMCSA card, never a 500.
+ */
 export async function carrierBySlug(slug: string): Promise<VisibleCarrier | null> {
   try {
     const rows = await db()
       .select()
       .from(carrierDirectory)
+      .leftJoin(carrierOverrides, eq(carrierOverrides.usdot, carrierDirectory.usdot))
       .where(eq(carrierDirectory.publicSlug, slug))
       .limit(1);
-    return rows[0] ? visibleCarrier(rows[0]) : null;
+    const row = rows[0];
+    if (!row) return null;
+    return mergeCarrierOverride(visibleCarrier(row.carrier_directory), row.carrier_overrides);
   } catch (err) {
     // Missing table / read failure ⇒ treated as "not found" (404), never a 500.
     console.warn('[directory] carrierBySlug failed; treating as not found:', err);
