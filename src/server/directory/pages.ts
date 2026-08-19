@@ -221,7 +221,7 @@ export function layout({ title, description, canonicalPath, bodyHtml, jsonLd }: 
   ${ld}
 </head>
 <body>
-  <header class="topnav">
+  <header class="topnav topnav--mobile-menu">
     <div class="topnav-inner">
       <a href="/" class="brand-mark">
         <span class="logo"><img class="qf-brand-mark" src="/brand/mark-keys-ondark.png" alt="QuoteFleet" width="28" height="30" decoding="async"></span>
@@ -232,13 +232,28 @@ export function layout({ title, description, canonicalPath, bodyHtml, jsonLd }: 
       <a class="nav-link" href="/compliance">Compliance</a>
       <a class="nav-link" href="/glossary">Glossary</a>
       <a class="btn btn-primary always-show" href="/signup">List your company <span class="arr">→</span></a>
+      <button type="button" class="topnav-burger" aria-label="Open menu" aria-expanded="false" aria-controls="topnav-mobile-menu">
+        <svg class="ico-open" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><line x1="4" y1="7" x2="20" y2="7"/><line x1="4" y1="12" x2="20" y2="12"/><line x1="4" y1="17" x2="20" y2="17"/></svg>
+        <svg class="ico-close" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><line x1="6" y1="6" x2="18" y2="18"/><line x1="18" y1="6" x2="6" y2="18"/></svg>
+      </button>
     </div>
+    <nav class="topnav-mobile" id="topnav-mobile-menu" hidden aria-label="Site navigation">
+      <a href="/directory">Directory</a>
+      <a href="/compliance">Compliance</a>
+      <a href="/glossary">Glossary</a>
+      <a href="/services">Services</a>
+      <a href="/tools">Rate calculator</a>
+      <a href="/pricing">Pricing</a>
+      <a href="/">Home</a>
+      <a class="tn-cta" href="/signup">List your company →</a>
+    </nav>
   </header>
   ${bodyHtml}
   <footer class="site-footer">
     © <span id="year"></span> QuoteFleet · <a href="/directory">Directory</a> · <a href="/compliance">Compliance</a> · <a href="/glossary">Glossary</a> · <a href="/services">Services</a> · <a href="/marketplace/">Marketplace</a> · <a href="/terms">Terms</a> · <a href="/privacy">Privacy</a> · <a href="/">Home</a>
   </footer>
   <script>document.getElementById('year').textContent = new Date().getFullYear();</script>
+  <script>(function(){var b=document.querySelector('.topnav-burger'),m=document.getElementById('topnav-mobile-menu');if(!b||!m)return;function set(o){b.setAttribute('aria-expanded',o?'true':'false');b.setAttribute('aria-label',o?'Close menu':'Open menu');if(o)m.removeAttribute('hidden');else m.setAttribute('hidden','');}b.addEventListener('click',function(e){e.stopPropagation();set(b.getAttribute('aria-expanded')!=='true');});document.addEventListener('click',function(e){if(b.getAttribute('aria-expanded')==='true'&&!m.contains(e.target)&&!b.contains(e.target))set(false);});document.addEventListener('keydown',function(e){if(e.key==='Escape')set(false);});})();</script>
   <script src="/marketing-chat.js" defer></script>
 </body>
 </html>`;

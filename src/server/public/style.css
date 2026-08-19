@@ -1395,3 +1395,47 @@ html[data-theme="light"] .hero h1 .accent {
   .qf-copilot-panel.is-open { transform: translateY(0); }
   .qf-copilot-launcher { right: 16px; bottom: 16px; }
 }
+
+/* ── Mobile hamburger for the .topnav shell (directory / glossary / services /
+   compliance and other secondary pages). Appended at EOF to avoid shifting the
+   line-based guard baselines. On mobile the .nav-links above are display:none;
+   without this they simply vanish with no way to reach them. The burger toggles a
+   dropdown that reveals them. Theme-aware via --surface (adapts light/dark). */
+.topnav-burger { display: none; }
+.topnav-mobile { display: none; }
+@media (max-width: 720px) {
+  .topnav-burger {
+    display: inline-flex; align-items: center; justify-content: center;
+    width: 40px; height: 40px; padding: 0; margin-left: var(--space-1); flex: none;
+    background: transparent; border: 1px solid var(--border);
+    border-radius: var(--radius-btn); color: var(--ink); cursor: pointer;
+  }
+  .topnav-burger svg { width: 20px; height: 20px; display: block; }
+  .topnav-burger .ico-close { display: none; }
+  .topnav-burger[aria-expanded="true"] .ico-open { display: none; }
+  .topnav-burger[aria-expanded="true"] .ico-close { display: block; }
+  .topnav-mobile:not([hidden]) {
+    display: flex; flex-direction: column; gap: var(--space-0-5);
+    position: absolute; top: 100%; left: var(--space-1-5); right: var(--space-1-5);
+    margin-top: var(--space-1); padding: var(--space-1);
+    background: var(--surface); border: 1px solid var(--border);
+    border-radius: var(--radius-lg); box-shadow: 0 12px 28px rgba(0, 0, 0, 0.32);
+    z-index: 70;
+  }
+  .topnav-mobile a {
+    font-family: var(--font-mono); font-size: 13px; font-weight: 500;
+    text-transform: uppercase; letter-spacing: 0.06em;
+    color: var(--ink-soft); text-decoration: none;
+    padding: var(--space-1-5) var(--space-2); border-radius: var(--radius-btn);
+    transition: color 0.15s ease, background 0.15s ease;
+  }
+  .topnav-mobile a:hover, .topnav-mobile a:focus-visible {
+    color: var(--accent); background: var(--accent-soft);
+  }
+  .topnav-mobile .tn-cta { color: var(--accent); font-weight: 700; }
+  /* On shells that carry the burger menu, the "List your company" CTA lives inside
+     the dropdown (.tn-cta), so hide the inline button on mobile — keeps the bar to
+     brand + burger and prevents overflow at 375px. Scoped to .topnav--mobile-menu
+     so plain .topnav pages (login, marketplace) keep their always-show CTA. */
+  .topnav--mobile-menu .btn.always-show { display: none; }
+}
