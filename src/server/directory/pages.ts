@@ -28,6 +28,7 @@ import type {
 import { FLEET_BUCKETS, SAFETY_OPTIONS, SORT_OPTIONS, citySlugify, titleCaseCity } from './queries.js';
 import { US_STATES, stateByCode, type UsState } from './usStates.js';
 import { CONTAINER_PORTS, portByCode, type ContainerPort } from './containerPorts.js';
+import { CA_PROVINCE_CODES } from './caProvinces.js';
 
 const SITE = 'https://quotefleet.net';
 
@@ -178,6 +179,57 @@ const DIRECTORY_CSS = `
   @media (max-width: 420px) {
     .dir-grid { grid-template-columns: 1fr; }
   }
+  /* ── Carrier profile (rich, DrayLocator-structured card) ────────────────── */
+  .cp-caps { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; margin: 12px 0 4px; }
+  .cp-badge-active { font-size: 10px; font-family: var(--font-mono); letter-spacing: 0.06em; text-transform: uppercase; padding: 4px 10px; border-radius: 999px; background: var(--success-bg); color: var(--success); border: 1px solid var(--success); display: inline-flex; align-items: center; gap: 6px; }
+  .cp-badge-active::before { content: ''; width: 6px; height: 6px; border-radius: 50%; background: var(--success); display: inline-block; }
+  .cp-claimline { margin: 14px 0 0; font-size: 13px; color: var(--muted); }
+  .cp-claimline a { color: var(--accent); text-decoration: none; }
+  .cp-claimline a:hover { text-decoration: underline; }
+  .cp-layout { display: grid; grid-template-columns: minmax(0, 1fr) 328px; gap: 24px; align-items: start; margin-top: 24px; }
+  .cp-main { display: flex; flex-direction: column; gap: 16px; min-width: 0; }
+  .cp-side { display: flex; flex-direction: column; gap: 16px; position: sticky; top: 16px; }
+  .cp-card { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius-lg); padding: 24px; }
+  .cp-card > h2.cp-h { margin-top: 0; }
+  .cp-h { font-size: 12px; text-transform: uppercase; letter-spacing: 0.08em; color: var(--muted); font-family: var(--font-mono); margin: 0 0 16px; }
+  .cp-about { margin: 0; line-height: 1.6; color: var(--ink-soft); font-size: 15px; }
+  .cp-datagrid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 16px; }
+  .cp-dt { display: flex; flex-direction: column; gap: 4px; min-width: 0; }
+  .cp-dt .k { font-size: 11px; text-transform: uppercase; letter-spacing: 0.06em; color: var(--muted); font-family: var(--font-mono); }
+  .cp-dt .v { font-size: 16px; color: var(--ink); font-family: var(--font-mono); font-variant-numeric: tabular-nums; word-break: break-word; }
+  .cp-verify-link { display: inline-block; margin-top: 16px; font-size: 13px; font-family: var(--font-mono); color: var(--accent); text-decoration: none; }
+  .cp-verify-link:hover { text-decoration: underline; }
+  .cp-chiprow { display: flex; flex-wrap: wrap; gap: 8px; }
+  .cp-chip { font-size: 12px; font-family: var(--font-mono); letter-spacing: 0.02em; padding: 8px 12px; border-radius: 999px; border: 1px solid var(--border); background: var(--surface-2); color: var(--ink-soft); display: inline-flex; align-items: center; gap: 8px; white-space: nowrap; }
+  .cp-chip.on { border-color: var(--accent); color: var(--accent); background: var(--accent-soft); }
+  .cp-chip.good { border-color: var(--success); color: var(--success); background: var(--success-bg); }
+  .cp-chip.muted { opacity: 0.6; }
+  .cp-chip .tag { font-size: 9px; text-transform: uppercase; letter-spacing: 0.05em; color: var(--muted); border: 1px solid var(--border); border-radius: 4px; padding: 2px 6px; }
+  .cp-note { margin: 16px 0 0; font-size: 12px; color: var(--muted); line-height: 1.5; }
+  .cp-loc { margin: 0 0 8px; line-height: 1.6; color: var(--ink-soft); font-size: 14px; }
+  .cp-loc:last-child { margin-bottom: 0; }
+  .cp-loc .lk { color: var(--muted); font-family: var(--font-mono); font-size: 12px; }
+  .cp-contact-row { display: flex; justify-content: space-between; gap: 12px; padding: 12px 0; border-bottom: 1px solid var(--border); font-size: 14px; }
+  .cp-contact-row:last-of-type { border-bottom: 0; }
+  .cp-contact-row .k { color: var(--muted); }
+  .cp-contact-row .v { font-family: var(--font-mono); text-align: right; word-break: break-word; }
+  .cp-contact-row .v a { color: var(--accent); text-decoration: none; }
+  .cp-hidden { margin: 0; color: var(--muted); font-size: 13px; line-height: 1.5; }
+  .cp-gated { margin-top: 16px; border: 1px dashed var(--border-strong); border-radius: var(--radius); background: var(--surface-2); padding: 16px; }
+  .cp-gated h3 { margin: 0 0 4px; font-size: 13px; color: var(--ink-soft); }
+  .cp-gated p { margin: 0; font-size: 12px; color: var(--muted); line-height: 1.5; }
+  .cp-actions { display: flex; flex-direction: column; gap: 8px; margin-top: 8px; }
+  .cp-actions .btn { width: 100%; justify-content: center; }
+  @media (max-width: 900px) {
+    .cp-layout { grid-template-columns: 1fr; }
+    .cp-side { position: static; }
+  }
+  @media (max-width: 640px) {
+    .cp-card { padding: 16px; }
+  }
+  @media (max-width: 380px) {
+    .cp-datagrid { grid-template-columns: 1fr; }
+  }
 `;
 
 interface LayoutOpts {
@@ -268,6 +320,50 @@ export function carrierName(c: { dbaName?: string | null; legalName: string }): 
   const dba = (c.dbaName ?? '').trim();
   if (dba && (dba.includes(' ') || dba.length >= 8)) return dba;
   return c.legalName;
+}
+
+/**
+ * Deterministic 2–3 sentence "About" summary built ONLY from the carrier's own
+ * FMCSA facts — no external AI, no invented capabilities. Every clause is
+ * omitted when its underlying data is missing, so a sparse record still yields
+ * a clean, factual sentence. Plain text (the caller escapes it once).
+ */
+export function carrierAbout(c: VisibleCarrier): string {
+  const name = carrierName(c);
+  const isCa = !!(c.state && CA_PROVINCE_CODES.has(c.state));
+  const typeWord = c.intermodal ? 'drayage and intermodal carrier' : 'motor carrier';
+  // "active" only when FMCSA authority is on file; "an FMCSA" reads correctly.
+  const lead = c.authorityType ? 'an active FMCSA-registered' : 'an FMCSA-registered';
+  let s1 = `${name} is ${lead} ${typeWord}`;
+
+  const cityDisp = c.city ? titleCaseCity(c.city) : '';
+  const stName = (isCa ? null : stateByCode(c.state))?.name ?? c.state ?? '';
+  if (cityDisp && c.state) s1 += ` based in ${cityDisp}, ${c.state}`;
+  else if (stName) s1 += ` based in ${stName}`;
+  else if (cityDisp) s1 += ` based in ${cityDisp}`;
+
+  const puTxt =
+    c.powerUnits != null ? `${c.powerUnits.toLocaleString('en-US')} power unit${c.powerUnits === 1 ? '' : 's'}` : '';
+  const drTxt = c.drivers != null ? `${c.drivers.toLocaleString('en-US')} driver${c.drivers === 1 ? '' : 's'}` : '';
+  const fleet = puTxt && drTxt ? `${puTxt} and ${drTxt}` : puTxt || drTxt;
+  const authPhrase = c.authorityType
+    ? authorityLabel(c.authorityType).replace(/ authority$/i, '').toLowerCase()
+    : '';
+  if (fleet) s1 += `, operating ${fleet}`;
+  if (authPhrase) s1 += `${fleet ? ' under ' : ' operating under '}${authPhrase} authority`;
+  s1 += '.';
+
+  const sr = safetyLabel(c.safetyRating);
+  const s2 = sr.tone !== 'none' ? ` Its FMCSA safety rating is ${sr.text}.` : '';
+
+  let s3 = '';
+  if (c.intermodal) {
+    const p = portByCode(c.nearestPortCode);
+    const ports = isCa ? 'North American container ports' : 'US container ports';
+    s3 = ` It runs container drayage and intermodal moves, serving shippers at ${ports}${p ? ` such as ${p.name}` : ''}.`;
+  }
+
+  return `${s1}${s2}${s3}`.trim();
 }
 
 // ─── Carrier card (shared by state + port pages) ──────────────────────────
@@ -982,47 +1078,64 @@ export function renderCarrierProfile(opts: {
   if (st && citySlug && cityName) crumbs.push({ name: cityName, path: `/directory/${st.slug}/${citySlug}` });
   crumbs.push({ name: carrierName(c) });
 
-  const facts: Array<[string, string]> = [
+  const isCa = !!(c.state && CA_PROVINCE_CODES.has(c.state));
+  const isActive = !!c.authorityType;
+  const claimHref = `/signup?claim=${encodeURIComponent(c.usdot)}&amp;name=${encodeURIComponent(carrierName(c))}`;
+
+  // ── §3 FMCSA DATA — clean labeled grid (numbers tabular via CSS). ──────────
+  const dataItems: Array<[string, string]> = [
     ['USDOT', c.usdot ? esc(c.usdot) : '—'],
     ['MC / Docket', c.mcNumber ? esc(c.mcNumber) : '—'],
-    ['Location', cityState ? esc(cityState) : '—'],
     ['Power units', fmtNum(c.powerUnits)],
     ['Drivers', fmtNum(c.drivers)],
     ['Authority', esc(authorityLabel(c.authorityType))],
     ['Safety rating', esc(sr.text)],
-    ['Container drayage', c.intermodal ? 'Yes — intermodal' : 'Not flagged'],
+    ['Status', isActive ? 'Active' : 'On file'],
   ];
-  if (port) facts.push(['Nearest port', `${esc(port.name)}`]);
+  // Data-as-of date is not carried on VisibleCarrier today — omit rather than fake.
+  const dataGrid = dataItems
+    .map(([k, v]) => `<div class="cp-dt"><span class="k">${esc(k)}</span><span class="v">${v}</span></div>`)
+    .join('');
 
-  // Contact rows (phone + email). Displayed for shipper→carrier connection only —
-  // QuoteFleet does not do outreach. Values are public FMCSA data; escape the text
-  // and encode the href. When the carrier has opted out, hide BOTH and show a
-  // single muted line instead (the rest of the profile still renders normally).
-  const contactRows = c.contactHidden
-    ? `<div class="lookup-result"><div class="row"><span class="k">Contact</span><span class="v muted-small">Contact details hidden at the carrier's request.</span></div></div>`
+  // ── §Capabilities — chips we can DERIVE from FMCSA render ACTIVE. ──────────
+  const activeCaps: string[] = [];
+  if (isActive) activeCaps.push(`<span class="cp-chip on">${esc(authorityLabel(c.authorityType))}</span>`);
+  if (c.intermodal) activeCaps.push('<span class="cp-chip on">Drayage / intermodal</span>');
+  if (sr.tone !== 'none')
+    activeCaps.push(`<span class="cp-chip ${sr.tone === 'good' ? 'good' : 'on'}">${esc(sr.text)} safety</span>`);
+  // Credentials NOT in FMCSA — rendered MUTED with a "claim to add" affordance,
+  // never asserted as fact (same honest pattern as the Tier-3 facet chips).
+  const mutedCaps = ['UIIA member', 'TWIC', 'Customs-bonded / C-TPAT', 'Reefer', 'Transload / warehouse', 'Yard / parking']
+    .map((n) => `<span class="cp-chip muted">${esc(n)} <span class="tag">claim to add</span></span>`)
+    .join('');
+  const capChips = activeCaps.join('') + mutedCaps;
+
+  // ── §6 Contact — TIERED. Public block = FMCSA-sourced phone/email (encoded
+  // href, escaped text), respecting the contactHidden opt-out. Gated block is
+  // structure-only for now; Phase 2 will gate it behind real auth and render
+  // additional dispatch contacts to signed-in users.
+  const publicContact = c.contactHidden
+    ? `<p class="cp-hidden">Contact details hidden at the carrier's request.</p>`
     : [
         c.phone
-          ? `<div class="lookup-result"><div class="row"><span class="k">Phone</span><span class="v"><a href="tel:${encodeURIComponent(
+          ? `<div class="cp-contact-row"><span class="k">Phone</span><span class="v"><a href="tel:${encodeURIComponent(
               c.phone,
-            )}" style="color:var(--accent);">${esc(c.phone)}</a></span></div></div>`
+            )}">${esc(c.phone)}</a></span></div>`
           : '',
         c.email
-          ? `<div class="lookup-result"><div class="row"><span class="k">Email</span><span class="v"><a href="mailto:${encodeURIComponent(
+          ? `<div class="cp-contact-row"><span class="k">Email</span><span class="v"><a href="mailto:${encodeURIComponent(
               c.email,
-            )}" style="color:var(--accent);">${esc(c.email)}</a></span></div></div>`
+            )}">${esc(c.email)}</a></span></div>`
+          : '',
+        !c.phone && !c.email
+          ? `<p class="cp-hidden">No public contact details on the FMCSA record.</p>`
           : '',
       ].join('');
-
-  const factRows =
-    facts
-      .map(
-        ([k, v]) =>
-          `<div class="lookup-result"><div class="row"><span class="k">${esc(k)}</span><span class="v">${v}</span></div></div>`,
-      )
-      .join('') +
-    contactRows +
-    // Verify-on-SAFER link surfaced as a data-table row too.
-    `<div class="lookup-result"><div class="row"><span class="k">FMCSA record</span><span class="v"><a href="${saferUrl}" target="_blank" rel="noopener nofollow" style="color:var(--accent);">Verify on SAFER ↗</a></span></div></div>`;
+  // Phase 2: gate this panel behind auth and render real additional contacts.
+  const gatedContact = `<div class="cp-gated">
+        <h3>More dispatch contacts</h3>
+        <p>Additional dispatch contacts are available to registered users — create a free QuoteFleet account to view.</p>
+      </div>`;
 
   // Count-bearing cross-links (city + state).
   const crossLinks: string[] = [];
@@ -1043,38 +1156,72 @@ export function renderCarrierProfile(opts: {
          .join('\n')}</div>`
     : '';
 
+  const locBased = cityState ? esc(cityState) : isCa ? 'Canada' : 'the United States';
   const body = `
   <section class="hero dir-hero">
     <div class="container-narrow">
       ${crumbsHtml(crumbs)}
-      <div class="dir-chips" style="margin: 12px 0 6px;">
-        ${c.intermodal ? '<span class="pill pill-dray">Drayage</span>' : ''}
-        <span class="pill pill-${sr.tone}">${esc(sr.text)}</span>
+      <div class="cp-caps">
+        ${isActive ? '<span class="cp-badge-active">Active</span>' : ''}
+        ${activeCaps.join('')}
       </div>
       <h1 style="margin-top: 6px;">${esc(carrierName(c))}</h1>
       <p class="lead">${esc(cityState)}${c.usdot ? ` · USDOT ${esc(c.usdot)}` : ''}${c.mcNumber ? ` · MC ${esc(c.mcNumber)}` : ''}</p>
+      ${carrierName(c) !== c.legalName ? `<p class="muted-small" style="margin: 6px 0 0;">Legal name: ${esc(c.legalName)}</p>` : ''}
+      <p class="cp-claimline">Own this company? <a href="${claimHref}">Claim this profile →</a></p>
     </div>
   </section>
   <main class="dir-shell">
-    <div class="lookup-box">
-      <h2 style="font-size: 16px; margin: 0 0 12px;">Carrier snapshot</h2>
-      ${carrierName(c) !== c.legalName ? `<p class="muted-small" style="margin: 0 0 12px;">Legal name: ${esc(c.legalName)}</p>` : ''}
-      ${factRows}
-      <div style="margin-top: 18px; display: flex; gap: 10px; flex-wrap: wrap;">
-        <a class="btn btn-secondary" href="${saferUrl}" target="_blank" rel="noopener nofollow">Verify on FMCSA SAFER ↗</a>
-        <button class="btn btn-primary" id="live-verify" data-usdot="${esc(c.usdot)}">Verify live now</button>
+    <div class="cp-layout">
+      <div class="cp-main">
+        <section class="cp-card">
+          <h2 class="cp-h">About</h2>
+          <p class="cp-about">${esc(carrierAbout(c))}</p>
+        </section>
+
+        <section class="cp-card">
+          <h2 class="cp-h">FMCSA data</h2>
+          <div class="cp-datagrid">${dataGrid}</div>
+          <a class="cp-verify-link" href="${saferUrl}" target="_blank" rel="noopener nofollow">Verify on FMCSA SAFER ↗</a>
+        </section>
+
+        <section class="cp-card">
+          <h2 class="cp-h">Compliance &amp; capabilities</h2>
+          <div class="cp-chiprow">${capChips}</div>
+          <p class="cp-note">Blue tags are confirmed from FMCSA public data. Muted credentials (UIIA, TWIC, bonded / C-TPAT, reefer, transload, yard) are self-declared — claim this profile to verify and add them.</p>
+        </section>
+
+        <section class="cp-card">
+          <h2 class="cp-h">Location &amp; service area</h2>
+          <p class="cp-loc">Based in ${locBased}.</p>
+          <p class="cp-loc">Serving shippers, brokers and forwarders ${isCa ? 'across Canadian trade lanes' : 'at US container ports'}.</p>
+          ${port ? `<p class="cp-loc"><span class="lk">Nearest port</span> ${esc(port.name)}${port.city || port.state ? ` · ${esc([port.city, port.state].filter(Boolean).join(', '))}` : ''}</p>` : ''}
+        </section>
       </div>
-      <div id="live-result" class="lookup-result" style="margin-top: 6px;"></div>
+
+      <aside class="cp-side">
+        <section class="cp-card">
+          <h2 class="cp-h">Contact</h2>
+          ${publicContact}
+          ${gatedContact}
+          <div class="cp-actions">
+            <a class="btn btn-secondary" href="${saferUrl}" target="_blank" rel="noopener nofollow">Verify on FMCSA SAFER ↗</a>
+            <button class="btn btn-primary" id="live-verify" data-usdot="${esc(c.usdot)}">Verify live now</button>
+          </div>
+          <div id="live-result" class="lookup-result" style="margin-top: 8px;"></div>
+          <p class="cp-note">Carrier information is sourced from public FMCSA records. To correct or hide your details, email support@quotefleet.net with your USDOT number.</p>
+        </section>
+      </aside>
     </div>
 
-    ${crossLinks.length ? `<div class="dir-chips" style="margin-top: 18px;">${crossLinks.join('\n')}</div>` : ''}
+    ${crossLinks.length ? `<div class="dir-chips" style="margin-top: 24px;">${crossLinks.join('\n')}</div>` : ''}
 
     ${relatedModule}
 
-    <div class="dir-card" style="margin-top: 20px; text-align: center; padding: 26px;">
+    <div class="dir-card" style="margin-top: 24px; text-align: center; padding: 24px;">
       <h2 style="font-size: 18px; margin: 0 0 8px;">Is this your company?</h2>
       <p class="muted" style="margin: 0 auto 16px; max-width: 460px;">Claim your profile to publish live rates, take instant quotes, and get booked directly by shippers — free to list.</p>
-      <a class="btn btn-primary" href="/signup?claim=${encodeURIComponent(c.usdot)}&amp;name=${encodeURIComponent(carrierName(c))}">Claim this profile <span class="arr">→</span></a>
+      <a class="btn btn-primary" href="${claimHref}">Claim this profile <span class="arr">→</span></a>
       <p class="muted-small" style="margin: 16px auto 0; max-width: 460px;">Carrier data is sourced from public FMCSA records. To correct or hide your contact details, email support@quotefleet.net with your USDOT number.</p>
     </div>
   </main>
