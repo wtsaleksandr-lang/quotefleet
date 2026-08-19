@@ -65,8 +65,44 @@ export interface DirectorySummary {
   byPort: { code: string; name: string; city: string; state: string; count: number }[];
 }
 
+/**
+ * Empty-but-valid summary — every port listed with a 0 count, no states.
+ *
+ * Returned when the underlying `carrier_directory` read fails (e.g. the table
+ * is missing on a prod DB that never received migration 0041). The public
+ * /directory + /compliance pages MUST render a clean empty state, never 500, so
+ * the query layer degrades to this instead of throwing. Boot self-heal
+ * (ensureSelfHealTables) normally guarantees the table exists, so this is a
+ * belt-and-suspenders fallback for any residual read failure.
+ */
+function emptyDirectorySummary(): DirectorySummary {
+  return {
+    total: 0,
+    intermodalTotal: 0,
+    states: 0,
+    byState: [],
+    byPort: CONTAINER_PORTS.map((p) => ({
+      code: p.code,
+      name: p.name,
+      city: p.city,
+      state: p.state,
+      count: 0,
+    })),
+  };
+}
+
 /** Carrier counts per state + per port (+ intermodal total) for the index/facets. */
 export async function getDirectorySummary(): Promise<DirectorySummary> {
+  try {
+    return await getDirectorySummaryUnsafe();
+  } catch (err) {
+    // Missing table / read failure ⇒ serve an empty directory, never a 500.
+    console.warn('[directory] getDirectorySummary failed; serving empty summary:', err);
+    return emptyDirectorySummary();
+  }
+}
+
+async function getDirectorySummaryUnsafe(): Promise<DirectorySummary> {
   const byStateRows = await db()
     .select({ state: carrierDirectory.state, n: sql<number>`count(*)::int` })
     .from(carrierDirectory)
@@ -132,6 +168,31 @@ export async function listCarriers(opts: ListCarriersOpts): Promise<CarrierListR
   const page = Math.max(1, Math.floor(opts.page ?? 1) || 1);
   const perPage = Math.min(MAX_PER_PAGE, Math.max(5, Math.floor(opts.perPage ?? DEFAULT_PER_PAGE) || DEFAULT_PER_PAGE));
 
+  try {
+    return await listCarriersUnsafe({ state, port, intermodalOnly, page, perPage });
+  } catch (err) {
+    // Missing table / read failure ⇒ empty result set, never a 500.
+    console.warn('[directory] listCarriers failed; serving empty list:', err);
+    return {
+      carriers: [],
+      total: 0,
+      page,
+      perPage,
+      totalPages: 1,
+      filters: { state, port, intermodal: intermodalOnly },
+    };
+  }
+}
+
+async function listCarriersUnsafe(args: {
+  state: string | null;
+  port: string | null;
+  intermodalOnly: boolean;
+  page: number;
+  perPage: number;
+}): Promise<CarrierListResult> {
+  const { state, port, intermodalOnly, page, perPage } = args;
+
   const conditions = [];
   if (state) conditions.push(eq(carrierDirectory.state, state));
   if (port) conditions.push(eq(carrierDirectory.nearestPortCode, port));
@@ -165,10 +226,16 @@ export async function listCarriers(opts: ListCarriersOpts): Promise<CarrierListR
 
 /** Look up a single carrier by its public slug (for the profile page). */
 export async function carrierBySlug(slug: string): Promise<VisibleCarrier | null> {
-  const rows = await db()
-    .select()
-    .from(carrierDirectory)
-    .where(eq(carrierDirectory.publicSlug, slug))
-    .limit(1);
-  return rows[0] ? visibleCarrier(rows[0]) : null;
+  try {
+    const rows = await db()
+      .select()
+      .from(carrierDirectory)
+      .where(eq(carrierDirectory.publicSlug, slug))
+      .limit(1);
+    return rows[0] ? visibleCarrier(rows[0]) : null;
+  } catch (err) {
+    // Missing table / read failure ⇒ treated as "not found" (404), never a 500.
+    console.warn('[directory] carrierBySlug failed; treating as not found:', err);
+    return null;
+  }
 }
