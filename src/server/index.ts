@@ -17,19 +17,26 @@ import { startFuelSurchargeCron } from '../eia/dieselPrice.js';
 
 async function main() {
   const env = loadEnv();
+  // Journal-INDEPENDENT re-create of at-risk TABLES — MUST run BEFORE
+  // runMigrations(). The public carrier_directory table (0041) can be missing on
+  // prod entirely (Replit doesn't run db:migrate and its publish tool phantom-
+  // drops tables), while Drizzle's journal still records 0041 as applied. If
+  // migrations run first, the very next migration that ALTERs carrier_directory
+  // (0042 ADD COLUMN country) throws 42P01 on the missing table and the unguarded
+  // throw crash-loops boot → "deployment could not be reached" on every domain
+  // (prod outage 2026-08-19). Creating the at-risk tables first makes the pending
+  // migrations — all idempotent (ADD COLUMN / CREATE TABLE IF NOT EXISTS) — safe
+  // no-ops. CREATE TABLE IF NOT EXISTS is itself a no-op on a healthy DB.
+  await ensureSelfHealTables();
   // Apply any pending DB migrations BEFORE serving — the Replit deploy doesn't
   // run db:migrate, so this makes every republish self-healing (see db/migrate).
   await runMigrations();
   // Journal-INDEPENDENT re-add of at-risk brand_configs columns (Replit's
   // publish tool keeps phantom-dropping them; Drizzle's journal won't re-add
-  // migrations it already recorded). Runs every boot, before serving traffic.
+  // migrations it already recorded). Runs AFTER runMigrations so it never races
+  // the (non-IF-NOT-EXISTS) brand_configs column migrations into a duplicate-
+  // column error; here it only re-adds columns a phantom-drop actually removed.
   await ensureSelfHealColumns();
-  // Journal-INDEPENDENT re-create of at-risk TABLES. The public carrier_directory
-  // table (0041) can be missing on prod entirely (Replit doesn't run db:migrate
-  // and its journal flow is unreliable), which 500s the public /directory and
-  // /compliance pages. CREATE TABLE IF NOT EXISTS every boot guarantees it exists
-  // (empty if never ingested) before serving traffic.
-  await ensureSelfHealTables();
   // Seed/refresh the canonical intermodal-terminal reference list (a few dozen
   // idempotent upserts). Non-critical to serving, so a failure is logged but
   // NEVER crashes boot — the table (self-healed above) still renders, just
