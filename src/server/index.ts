@@ -5,7 +5,7 @@
 // (soft no-op when DOPPLER_TOKEN is unset) BEFORE config.ts / db read env.
 import './bootstrapDoppler.js';
 import { loadEnv } from '../config.js';
-import { runMigrations, ensureSelfHealColumns } from '../db/migrate.js';
+import { runMigrations, ensureSelfHealColumns, ensureSelfHealTables } from '../db/migrate.js';
 import { createApp } from './app.js';
 import { startMarketplaceCron } from '../marketplace/cron.js';
 import { startLifecycleEmailCron } from '../email/lifecycleCron.js';
@@ -22,6 +22,12 @@ async function main() {
   // publish tool keeps phantom-dropping them; Drizzle's journal won't re-add
   // migrations it already recorded). Runs every boot, before serving traffic.
   await ensureSelfHealColumns();
+  // Journal-INDEPENDENT re-create of at-risk TABLES. The public carrier_directory
+  // table (0041) can be missing on prod entirely (Replit doesn't run db:migrate
+  // and its journal flow is unreliable), which 500s the public /directory and
+  // /compliance pages. CREATE TABLE IF NOT EXISTS every boot guarantees it exists
+  // (empty if never ingested) before serving traffic.
+  await ensureSelfHealTables();
   const app = createApp();
   app.listen(env.PORT, env.HOST, () => {
     console.log(`[server] QuoteFleet listening on http://${env.HOST}:${env.PORT}`);

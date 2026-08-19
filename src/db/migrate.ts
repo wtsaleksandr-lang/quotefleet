@@ -95,3 +95,75 @@ export async function ensureSelfHealColumns(): Promise<void> {
     await sql.end();
   }
 }
+
+/**
+ * Raw, journal-INDEPENDENT ensure step for at-risk TABLES.
+ *
+ * WHY THIS EXISTS (separate from ensureSelfHealColumns above, which only heals
+ * COLUMNS on an existing table): the public `carrier_directory` table — created
+ * by `drizzle/0041_carrier_directory.sql` and backing the public `/directory`
+ * and `/compliance` pages — can be MISSING on prod entirely. Replit's deploy
+ * does not run `db:migrate`, and its journal-based migration flow is unreliable,
+ * so the CREATE TABLE from 0041 may never have been applied to the prod DB even
+ * though runMigrations() thinks the journal is "up to date". A missing table
+ * makes every directory query throw → the public pages 500.
+ *
+ * This bypasses the journal entirely: it runs plain `CREATE TABLE IF NOT EXISTS`
+ * + `CREATE INDEX IF NOT EXISTS` on EVERY boot, independent of what the journal
+ * records. `IF NOT EXISTS` makes each a no-op when the object already exists, so
+ * on a healthy DB this costs a few round-trips and changes nothing; on a DB that
+ * never received 0041 (or where the table was dropped) it silently (re)creates
+ * an EMPTY table + its indexes before the server accepts traffic. The table is
+ * later populated by scripts/ingestFmcsaCarriers.ts; an empty table renders a
+ * clean empty state, never a 500.
+ *
+ * These statements MUST stay byte-for-byte equivalent to
+ * drizzle/0041_carrier_directory.sql (and src/db/schema.ts `carrierDirectory`).
+ * To protect a future at-risk table, append its `CREATE TABLE IF NOT EXISTS`
+ * (+ indexes) here.
+ */
+export const SELF_HEAL_TABLE_STATEMENTS: readonly string[] = [
+  // 0041_carrier_directory.sql — public carrier directory table.
+  `CREATE TABLE IF NOT EXISTS "carrier_directory" (
+    "id" serial PRIMARY KEY NOT NULL,
+    "usdot" text NOT NULL,
+    "mc_number" text,
+    "legal_name" text NOT NULL,
+    "dba_name" text,
+    "city" text,
+    "state" text,
+    "zip" text,
+    "phone" text,
+    "power_units" integer,
+    "drivers" integer,
+    "safety_rating" text,
+    "authority_type" text,
+    "intermodal" boolean DEFAULT false NOT NULL,
+    "nearest_port_code" text,
+    "public_slug" text NOT NULL,
+    "created_at" timestamp DEFAULT now() NOT NULL,
+    "updated_at" timestamp DEFAULT now() NOT NULL
+  )`,
+  `CREATE UNIQUE INDEX IF NOT EXISTS "carrier_directory_usdot_idx" ON "carrier_directory" ("usdot")`,
+  `CREATE UNIQUE INDEX IF NOT EXISTS "carrier_directory_slug_idx" ON "carrier_directory" ("public_slug")`,
+  `CREATE INDEX IF NOT EXISTS "carrier_directory_state_idx" ON "carrier_directory" ("state")`,
+  `CREATE INDEX IF NOT EXISTS "carrier_directory_port_idx" ON "carrier_directory" ("nearest_port_code")`,
+];
+
+export async function ensureSelfHealTables(): Promise<void> {
+  const env = loadEnv();
+  // Dedicated one-shot connection (same pattern as runMigrations); `max: 1`,
+  // closed in `finally` so the app's own pool (src/db/client.ts) is untouched.
+  const sql = postgres(env.DATABASE_URL, { max: 1 });
+  try {
+    for (const statement of SELF_HEAL_TABLE_STATEMENTS) {
+      // IF NOT EXISTS ⇒ a no-op when the table/index already exists; never an
+      // error. Any OTHER failure (bad DDL, connection loss) throws and fails
+      // boot loud — same fail-fast contract as ensureSelfHealColumns.
+      await sql.unsafe(statement);
+    }
+    console.log('[server] carrier_directory self-heal table ensured');
+  } finally {
+    await sql.end();
+  }
+}

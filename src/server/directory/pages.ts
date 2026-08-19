@@ -233,6 +233,14 @@ export function renderDirectoryLanding(summary: DirectorySummary): string {
     })
     .join('\n');
 
+  // When the directory has no carriers yet (fresh/empty table, e.g. a prod DB
+  // still being ingested), show a clean "being set up" notice instead of empty
+  // grids — the page must never look broken and must never 500.
+  const isEmpty = summary.total === 0;
+  const emptyNotice = isEmpty
+    ? `<div class="dir-empty">The carrier directory is being set up — carriers are loading. Check back shortly.</div>`
+    : '';
+
   const body = `
   <section class="hero dir-hero">
     <div class="container-narrow">
@@ -247,6 +255,7 @@ export function renderDirectoryLanding(summary: DirectorySummary): string {
     </div>
   </section>
   <main class="dir-shell">
+    ${emptyNotice}
     <div class="dir-section-h">
       <h2>Top US ports</h2>
       <a class="muted-small" href="/compliance">Compliance tools →</a>
