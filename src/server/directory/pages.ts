@@ -25,12 +25,14 @@ import type {
   FleetBucketId,
   DriversBucketId,
   EquipmentId,
+  CargoId,
   SafetyId,
 } from './queries.js';
 import {
   FLEET_BUCKETS,
   DRIVERS_BUCKETS,
   EQUIPMENT_OPTIONS,
+  CARGO_OPTIONS,
   SAFETY_OPTIONS,
   SORT_OPTIONS,
   citySlugify,
@@ -765,6 +767,7 @@ function currentParams(f: DirectoryFilters, locked: Set<string>): Record<string,
   // round-trips as `equipment=drayage` (normalizeFilters still accepts the legacy
   // `intermodal=1` param on input, so old deep-links keep working).
   if (f.equipment) p.equipment = f.equipment;
+  if (f.cargo) p.cargo = f.cargo;
   if (f.recent) p.recent = '1';
   if (f.sort && f.sort !== 'featured') p.sort = f.sort;
   return p;
@@ -772,7 +775,7 @@ function currentParams(f: DirectoryFilters, locked: Set<string>): Record<string,
 
 type FacetChange = Partial<
   Record<
-    'state' | 'city' | 'fleet' | 'drivers' | 'safety' | 'authority' | 'equipment' | 'intermodal' | 'recent' | 'sort' | 'page',
+    'state' | 'city' | 'fleet' | 'drivers' | 'safety' | 'authority' | 'equipment' | 'cargo' | 'intermodal' | 'recent' | 'sort' | 'page',
     string | null
   >
 >;
@@ -804,9 +807,13 @@ function disabledFacetRow(label: string): string {
  *  disabled/"claim" rows, grouped by kind — they drive listing claims, they are
  *  never applied as working filters (we don't assert data we don't have). */
 const CARRIER_CAPABILITY_GROUPS: ReadonlyArray<{ label: string; items: string[] }> = [
+  // NOTE: "Household goods" + "Liquor" were MOVED OUT of this claim group into the
+  // real FMCSA-backed "Cargo specialties" facet group (crgo_household / crgo_beverages,
+  // migration 0050) — they are now working filters with live counts. ISO tank / open
+  // top / flatrack stay claim-driven (FMCSA doesn't distinguish trailer subtypes).
   { label: 'Equipment specialties', items: ['ISO tank', 'Open top', 'Flatrack', 'Overweight', 'Tank-endorsed'] },
   { label: 'Services', items: ['Transload', 'Warehouse', 'Container storage'] },
-  { label: 'Cargo', items: ['Household goods', 'Liquor', 'Customs-bonded'] },
+  { label: 'Cargo', items: ['Customs-bonded'] },
   { label: 'Retail / partner programs', items: ['Menards-approved', 'Amazon warehouse delivery'] },
 ];
 
@@ -832,6 +839,17 @@ function renderSidebar(scope: FacetScope, f: DirectoryFilters, counts: FacetCoun
       hrefWith(scope, f, { equipment: f.equipment === o.id ? null : o.id }),
       o.label,
       counts.equipment[o.id],
+    ),
+  ).join('\n');
+
+  // Tier 1 — Cargo specialties (FMCSA crgo_* columns; single-select toggle,
+  // orthogonal to the equipment facet via the separate `cargo` param).
+  const cargo = CARGO_OPTIONS.map((o) =>
+    facetOptionRow(
+      f.cargo === o.id,
+      hrefWith(scope, f, { cargo: f.cargo === o.id ? null : o.id }),
+      o.label,
+      counts.cargo[o.id],
     ),
   ).join('\n');
 
@@ -893,6 +911,7 @@ function renderSidebar(scope: FacetScope, f: DirectoryFilters, counts: FacetCoun
     <button type="button" class="rail-toggle" id="rail-toggle" aria-expanded="true">Filters ▾</button>
     ${stateGroup}
     <div class="facet-group"><h3>Equipment &amp; cargo</h3><span class="facet-src">FMCSA cargo-type flags</span>${equipment}</div>
+    <div class="facet-group"><h3>Cargo specialties</h3><span class="facet-src">FMCSA cargo-class flags</span>${cargo}</div>
     <div class="facet-group"><h3>Fleet size</h3><span class="facet-src">FMCSA power units (trucks)</span>${fleet}</div>
     <div class="facet-group"><h3>Drivers</h3><span class="facet-src">FMCSA total drivers</span>${drivers}</div>
     <div class="facet-group"><h3>Safety rating</h3><span class="facet-src">FMCSA safety rating</span>${safety}</div>
@@ -917,6 +936,7 @@ function appliedChips(scope: FacetScope, f: DirectoryFilters): string {
   if (!scope.locked.has('state') && f.state) add(stateByCode(f.state)?.name ?? f.state, { state: null });
   if (!scope.locked.has('city') && f.citySlug) add(f.citySlug.replace(/-/g, ' '), { city: null });
   if (f.equipment) add(EQUIPMENT_OPTIONS.find((e) => e.id === f.equipment)?.label ?? f.equipment, { equipment: null });
+  if (f.cargo) add(CARGO_OPTIONS.find((c) => c.id === f.cargo)?.label ?? f.cargo, { cargo: null });
   if (f.fleet) add(FLEET_BUCKETS.find((b) => b.id === f.fleet)?.label ?? f.fleet, { fleet: null });
   if (f.drivers) add(DRIVERS_BUCKETS.find((b) => b.id === f.drivers)?.label ?? f.drivers, { drivers: null });
   if (f.safety) add(SAFETY_OPTIONS.find((s) => s.id === f.safety)?.label ?? f.safety, { safety: null });

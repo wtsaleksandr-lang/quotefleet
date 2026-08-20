@@ -351,6 +351,13 @@
       "when": 1787510877221,
       "tag": "0049_carrier_equipment",
       "breakpoints": true
+    },
+    {
+      "idx": 50,
+      "version": "7",
+      "when": 1787597277221,
+      "tag": "0050_carrier_cargo_classes",
+      "breakpoints": true
     }
   ]
 }

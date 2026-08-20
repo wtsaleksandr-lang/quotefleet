@@ -183,6 +183,23 @@ export const SELF_HEAL_TABLE_STATEMENTS: readonly string[] = [
   `ALTER TABLE "carrier_directory" ADD COLUMN IF NOT EXISTS "tanker" boolean NOT NULL DEFAULT false`,
   `ALTER TABLE "carrier_directory" ADD COLUMN IF NOT EXISTS "flatbed" boolean NOT NULL DEFAULT false`,
   `ALTER TABLE "carrier_directory" ADD COLUMN IF NOT EXISTS "dry_bulk" boolean NOT NULL DEFAULT false`,
+  // 0050_carrier_cargo_classes.sql — additional FMCSA cargo-CLASS specialties
+  // (crgo_*). Healed HERE (same reasoning as 0049 above): they run right after the
+  // CREATE TABLE so the table exists and IF NOT EXISTS no-ops on a healthy DB. Each
+  // defaults false so every existing row is unchanged until the next re-ingest.
+  `ALTER TABLE "carrier_directory" ADD COLUMN IF NOT EXISTS "household_goods" boolean NOT NULL DEFAULT false`,
+  `ALTER TABLE "carrier_directory" ADD COLUMN IF NOT EXISTS "beverages" boolean NOT NULL DEFAULT false`,
+  `ALTER TABLE "carrier_directory" ADD COLUMN IF NOT EXISTS "produce" boolean NOT NULL DEFAULT false`,
+  `ALTER TABLE "carrier_directory" ADD COLUMN IF NOT EXISTS "motor_vehicles" boolean NOT NULL DEFAULT false`,
+  `ALTER TABLE "carrier_directory" ADD COLUMN IF NOT EXISTS "livestock" boolean NOT NULL DEFAULT false`,
+  `ALTER TABLE "carrier_directory" ADD COLUMN IF NOT EXISTS "grain_feed" boolean NOT NULL DEFAULT false`,
+  `ALTER TABLE "carrier_directory" ADD COLUMN IF NOT EXISTS "oilfield" boolean NOT NULL DEFAULT false`,
+  `ALTER TABLE "carrier_directory" ADD COLUMN IF NOT EXISTS "meat" boolean NOT NULL DEFAULT false`,
+  `ALTER TABLE "carrier_directory" ADD COLUMN IF NOT EXISTS "paper" boolean NOT NULL DEFAULT false`,
+  `ALTER TABLE "carrier_directory" ADD COLUMN IF NOT EXISTS "construction" boolean NOT NULL DEFAULT false`,
+  `ALTER TABLE "carrier_directory" ADD COLUMN IF NOT EXISTS "farm_supplies" boolean NOT NULL DEFAULT false`,
+  `ALTER TABLE "carrier_directory" ADD COLUMN IF NOT EXISTS "coal_coke" boolean NOT NULL DEFAULT false`,
+  `ALTER TABLE "carrier_directory" ADD COLUMN IF NOT EXISTS "building_materials" boolean NOT NULL DEFAULT false`,
   `CREATE UNIQUE INDEX IF NOT EXISTS "carrier_directory_usdot_idx" ON "carrier_directory" ("usdot")`,
   `CREATE UNIQUE INDEX IF NOT EXISTS "carrier_directory_slug_idx" ON "carrier_directory" ("public_slug")`,
   `CREATE INDEX IF NOT EXISTS "carrier_directory_state_idx" ON "carrier_directory" ("state")`,

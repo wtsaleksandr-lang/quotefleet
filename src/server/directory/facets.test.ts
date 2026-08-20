@@ -14,6 +14,7 @@ import {
   SORT_OPTIONS,
   FACET_QUERY_KEYS,
   EQUIPMENT_OPTIONS,
+  CARGO_OPTIONS,
 } from './queries.js';
 
 describe('normalizeFilters — GET-param facet parsing', () => {
@@ -99,6 +100,71 @@ describe('equipment facet — single `equipment` param + legacy `intermodal` com
   it('every equipment option is backed by a real carrier_directory column', () => {
     const cols = new Set(['intermodal', 'hazmat', 'dryVan', 'reefer', 'tanker', 'flatbed', 'dryBulk']);
     for (const opt of EQUIPMENT_OPTIONS) expect(cols.has(opt.column)).toBe(true);
+  });
+});
+
+describe('cargo-specialty facet — separate `cargo` param, all real FMCSA columns', () => {
+  it('parses every valid cargo id', () => {
+    for (const opt of CARGO_OPTIONS) {
+      expect(normalizeFilters({ cargo: opt.id }).cargo).toBe(opt.id);
+    }
+  });
+  it('collapses an unknown cargo value to null (never throws)', () => {
+    expect(normalizeFilters({ cargo: 'unobtanium' }).cargo).toBeNull();
+    expect(normalizeFilters({}).cargo).toBeNull();
+  });
+  it('cargo is orthogonal to equipment (both can be set at once)', () => {
+    const f = normalizeFilters({ equipment: 'reefer', cargo: 'produce' });
+    expect(f.equipment).toBe('reefer');
+    expect(f.cargo).toBe('produce');
+  });
+  it('cargo does not touch the legacy intermodal boolean', () => {
+    expect(normalizeFilters({ cargo: 'household' }).intermodal).toBe(false);
+  });
+  it('cargo is a recognized facet query key (shareable/crawlable)', () => {
+    expect(FACET_QUERY_KEYS).toContain('cargo');
+  });
+  it('exposes all thirteen FMCSA cargo-class specialties in order', () => {
+    expect(CARGO_OPTIONS.map((o) => o.id)).toEqual([
+      'household',
+      'beverages',
+      'produce',
+      'motorvehicles',
+      'livestock',
+      'grainfeed',
+      'oilfield',
+      'meat',
+      'paper',
+      'construction',
+      'farmsupplies',
+      'coalcoke',
+      'buildingmaterials',
+    ]);
+  });
+  it('every cargo option has a non-empty label and a real carrier_directory column', () => {
+    const cols = new Set([
+      'householdGoods',
+      'beverages',
+      'produce',
+      'motorVehicles',
+      'livestock',
+      'grainFeed',
+      'oilfield',
+      'meat',
+      'paper',
+      'construction',
+      'farmSupplies',
+      'coalCoke',
+      'buildingMaterials',
+    ]);
+    for (const o of CARGO_OPTIONS) {
+      expect(o.label.length).toBeGreaterThan(0);
+      expect(cols.has(o.column)).toBe(true);
+    }
+  });
+  it('household + beverages are real cargo columns (moved out of the claim group)', () => {
+    expect(CARGO_OPTIONS.find((o) => o.id === 'household')?.column).toBe('householdGoods');
+    expect(CARGO_OPTIONS.find((o) => o.id === 'beverages')?.column).toBe('beverages');
   });
 });
 
