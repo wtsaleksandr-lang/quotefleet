@@ -560,7 +560,14 @@ const DIRECTORY_CSS = `
     .cp-crosslinks { margin-top: 16px; }
     .cp-claimcard { margin-top: 16px; padding: 16px; }
     main.dir-shell--cp { padding-bottom: 8px; }
-    main.dir-shell--cp ~ .site-footer { margin-top: 16px; padding-top: 24px; }
+    /* Generalized from the profile-only trim: EVERY directory footer (results,
+       state, profile) gets the same tight gap + trimmed top/bottom padding on
+       mobile, killing the ~110px dead band the base 104px bottom padding left
+       below the © / links row. The scoped line re-asserts 16px on the profile,
+       whose desktop-scoped rule above (0,2,1) would otherwise win over this
+       general selector on mobile too. */
+    .site-footer { margin-top: 16px; padding-top: 24px; padding-bottom: 32px; }
+    main.dir-shell--cp ~ .site-footer { margin-top: 16px; }
   }
   @media (max-width: 380px) {
     .cp-datagrid { grid-template-columns: 1fr; }

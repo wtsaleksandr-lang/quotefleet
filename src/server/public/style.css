@@ -1474,3 +1474,14 @@ html[data-theme="light"] .site-footer { color: var(--muted); }
 html[data-theme="light"] .site-footer a { color: var(--ink-soft); }
 html[data-theme="light"] .site-footer a:hover { color: var(--accent); }
 html[data-theme="light"] .site-footer strong { color: var(--ink); }
+
+/* ── Footer — mobile tightening (Alex: "too big empty space in the footer area
+   of the mobile version"). The base .site-footer carries generous marketing
+   spacing — a 72px top gap and a tall 104px bottom padding — that reads as a
+   dead band on phones (a ~110px empty strip below the © / links row). Trim it
+   on ≤640px only; desktop marketing spacing is untouched. Values on the 8px
+   ramp. Directory pages tighten the top gap further to 16px in DIRECTORY_CSS
+   (directory/pages.ts) so every directory footer matches the profile. ─────── */
+@media (max-width: 640px) {
+  .site-footer { margin-top: 32px; padding: 24px 16px 32px; }
+}
