@@ -293,3 +293,13 @@ html body.qf-wft .qf-dir-card__port span {
 @media (max-width: 640px) {
   html body.qf-wft .qf-aud-panel[data-aud-panel="carriers"] .qf-hero-media { margin-top: 16px !important; }
 }
+
+/* Light theme: the receded background laptop in the phone-forward stage is dimmed
+   to ~34% + blurred — designed for the DARK hero, where it reads as subtle depth.
+   On the white light-mode surface that washes out to a broken grey square. Lift
+   its opacity and ease the blur so it reads as a genuine (blurred) product
+   screenshot sitting behind the phone. Dark mode keeps its original subtle dim. */
+html[data-theme="light"] body.qf-wft .qf-hero-devices--video.stage-phone > .qf-hero-laptop {
+  opacity: 0.62 !important;
+  filter: blur(1.5px) saturate(1) !important;
+}
