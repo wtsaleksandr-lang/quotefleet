@@ -29,7 +29,7 @@
     { t0: 0.0,  t1: 12.8, kicker: 'Instant quote',  title: 'Customers self-quote in seconds.' },
     { t0: 12.8, t1: 20.0, kicker: 'AI assistant',   title: 'Built-in AI answers instantly.' },
     { t0: 20.0, t1: 23.8, kicker: 'Lead capture',   title: 'Every request, a qualified lead.' },
-    { t0: 23.8, t1: 999,  kicker: 'Deposit to book', title: 'Take a deposit — right in the quote.' }
+    { t0: 23.8, t1: 999,  kicker: 'Payments',       title: 'Integrated with Stripe & PayPal.' }
   ];
 
   var wrap = document.querySelector('.qf-hero-devices--video');
