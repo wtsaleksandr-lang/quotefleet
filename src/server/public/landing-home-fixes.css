@@ -638,3 +638,22 @@ body.qf-wft.landing-v2 .hiw-card .hiw-body p {
     max-width: none !important;
   }
 }
+
+/* ── Brand mark hover (both themes) — the logo mark pops slightly on hover of
+   the brand lockup, matching the subtle-motion language of the nav. Respects
+   prefers-reduced-motion. Transform only (no color), so it is theme-agnostic
+   and guard-safe. ── */
+body.qf-wft .site-logo .qf-brand-mark {
+  transform-origin: center;
+  transition: transform 0.18s ease;
+  will-change: transform;
+}
+body.qf-wft .site-brand:hover .qf-brand-mark,
+body.qf-wft .site-brand:focus-visible .qf-brand-mark {
+  transform: scale(1.08);
+}
+@media (prefers-reduced-motion: reduce) {
+  body.qf-wft .site-logo .qf-brand-mark { transition: none; }
+  body.qf-wft .site-brand:hover .qf-brand-mark,
+  body.qf-wft .site-brand:focus-visible .qf-brand-mark { transform: none; }
+}
