@@ -102,6 +102,138 @@ export function portByCode(code: string | null | undefined): ContainerPort | nul
   return PORT_BY_CODE.get(code) ?? null;
 }
 
+// ─── Port GROUPS (presentation-layer consolidation) ─────────────────────────
+//
+// Co-located gateways (e.g. Los Angeles + Long Beach across San Pedro Bay) are
+// separate FMCSA nearest-port codes in the DATA — carriers still store USLAX or
+// USLGB individually and the ingest derivation is untouched — but the directory
+// UI shows ONE hub with a "/" label. A PortGroup maps one display hub → ≥1
+// underlying member code; the facet/filter matches ANY member code. This is
+// pure presentation + query-time grouping: NO re-ingest, NO data change.
+
+export interface PortGroup {
+  /** Canonical group code — the URL slug + facet value. Equals the sole member
+   *  code for a single-port hub; a distinct combined code for a merged hub. */
+  code: string;
+  /** Display label (uses "/" to join co-located ports, e.g. "Los Angeles / Long Beach"). */
+  label: string;
+  city: string;
+  state: string;
+  country: string;
+  /** Underlying stored nearest_port_code values this hub represents (≥1). */
+  memberCodes: string[];
+}
+
+/**
+ * Explicit merges of genuinely co-located gateways into one display hub. Only
+ * truly adjacent ports are merged — distinct metros stay separate. Members must
+ * exist in ALL_HUBS. `city/state/country` name the hub; `at` is the member code
+ * whose position in ALL_HUBS the merged group takes (keeps a stable order).
+ */
+const PORT_GROUP_MERGES: ReadonlyArray<{
+  code: string;
+  label: string;
+  city: string;
+  state: string;
+  country: string;
+  at: string;
+  members: string[];
+}> = [
+  // San Pedro Bay complex — the two largest US container ports share one metro.
+  { code: 'USLALB', label: 'Los Angeles / Long Beach', city: 'Los Angeles', state: 'CA', country: 'US', at: 'USLAX', members: ['USLAX', 'USLGB'] },
+];
+
+/** Presentation relabels for single-port hubs (already-combined authorities). */
+const PORT_GROUP_RELABEL: Readonly<Record<string, string>> = {
+  // USNYC is one authority spanning NY + NJ (Newark terminals).
+  USNYC: 'New York / New Jersey',
+};
+
+/**
+ * The canonical DISPLAY hub list — ALL_HUBS with co-located ports merged into a
+ * single "/" hub. Order follows ALL_HUBS (a merged group takes its `at` member's
+ * slot). Every ALL_HUBS code is represented by exactly one group.
+ */
+export const PORT_GROUPS: readonly PortGroup[] = (() => {
+  const mergeByMember = new Map<string, (typeof PORT_GROUP_MERGES)[number]>();
+  for (const m of PORT_GROUP_MERGES) for (const code of m.members) mergeByMember.set(code, m);
+  const emitted = new Set<string>();
+  const out: PortGroup[] = [];
+  for (const hub of ALL_HUBS) {
+    const merge = mergeByMember.get(hub.code);
+    if (merge) {
+      if (emitted.has(merge.code)) continue;
+      // Emit the merged group at its anchor member's position.
+      if (hub.code !== merge.at) continue;
+      emitted.add(merge.code);
+      out.push({
+        code: merge.code,
+        label: merge.label,
+        city: merge.city,
+        state: merge.state,
+        country: merge.country,
+        memberCodes: merge.members.slice(),
+      });
+      continue;
+    }
+    out.push({
+      code: hub.code,
+      label: PORT_GROUP_RELABEL[hub.code] ?? hub.name,
+      city: hub.city,
+      state: hub.state,
+      country: hub.country,
+      memberCodes: [hub.code],
+    });
+  }
+  return out;
+})();
+
+const PORT_GROUP_BY_CODE = new Map(PORT_GROUPS.map((g) => [g.code, g]));
+const PORT_GROUP_BY_MEMBER = (() => {
+  const m = new Map<string, PortGroup>();
+  for (const g of PORT_GROUPS) for (const code of g.memberCodes) m.set(code, g);
+  return m;
+})();
+
+/** Resolve a display hub by its canonical group code (null when unknown). */
+export function portGroupByCode(code: string | null | undefined): PortGroup | null {
+  if (!code) return null;
+  return PORT_GROUP_BY_CODE.get(String(code).toUpperCase()) ?? null;
+}
+
+/** Resolve the display hub that OWNS a stored member code (e.g. USLAX → LA/LB). */
+export function portGroupForMemberCode(code: string | null | undefined): PortGroup | null {
+  if (!code) return null;
+  return PORT_GROUP_BY_MEMBER.get(String(code).toUpperCase()) ?? null;
+}
+
+/**
+ * Resolve a port facet/URL value to the member codes it should filter on.
+ * Accepts a group code (→ its members) or a bare member code (→ its group's
+ * members, so a legacy `?port=USLAX` deep-link consolidates like the hub). An
+ * unknown value returns itself so the query still filters literally, never crashes.
+ */
+export function portFilterCodes(port: string | null | undefined): string[] {
+  if (!port) return [];
+  const up = String(port).toUpperCase();
+  const g = PORT_GROUP_BY_CODE.get(up) ?? PORT_GROUP_BY_MEMBER.get(up);
+  return g ? g.memberCodes.slice() : [up];
+}
+
+/** Present a display hub as a ContainerPort (name = the "/" label, code = group code). */
+export function portGroupAsPort(g: PortGroup): ContainerPort {
+  const anchor = PORT_BY_CODE.get(g.memberCodes[0]);
+  return {
+    code: g.code,
+    name: g.label,
+    city: g.city,
+    state: g.state,
+    country: g.country,
+    lat: anchor?.lat ?? 0,
+    lng: anchor?.lng ?? 0,
+  };
+}
+
 /** Great-circle distance in miles between two lat/lng points (haversine). */
 function haversineMiles(aLat: number, aLng: number, bLat: number, bLng: number): number {
   const R = 3958.7613; // Earth radius, miles

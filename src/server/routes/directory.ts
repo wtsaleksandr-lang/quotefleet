@@ -37,7 +37,7 @@ import {
   FACET_QUERY_KEYS,
   DEFAULT_PER_PAGE,
 } from '../directory/queries.js';
-import { CONTAINER_PORTS, portByCode } from '../directory/containerPorts.js';
+import { portByCode, portGroupByCode, portGroupForMemberCode, portGroupAsPort } from '../directory/containerPorts.js';
 import { stateBySlug } from '../directory/usStates.js';
 import { lookupCarrierCompliance } from '../directory/fmcsaLookup.js';
 import {
@@ -117,13 +117,20 @@ export function registerDirectoryRoutes(app: Express) {
     }
   });
 
-  // Port page (registered BEFORE the :stateSlug route so it wins).
+  // Port page (registered BEFORE the :stateSlug route so it wins). Co-located
+  // ports are ONE display hub: a request for a member slug (or any non-canonical
+  // code) 301-redirects to the group's canonical slug so there's no link rot.
   app.get('/directory/port/:port', async (req: Request, res: Response, next) => {
     try {
       const code = String(req.params.port).toUpperCase();
-      const port = portByCode(code) ?? CONTAINER_PORTS.find((p) => p.code === code) ?? null;
-      if (!port) return res.redirect(302, '/directory');
-      const filters = normalizeFilters(req.query as Record<string, unknown>, { port: code, state: null, citySlug: null });
+      const group = portGroupByCode(code) ?? portGroupForMemberCode(code);
+      if (!group) return res.redirect(302, '/directory');
+      if (code !== group.code) {
+        const qs = req.originalUrl.includes('?') ? req.originalUrl.slice(req.originalUrl.indexOf('?')) : '';
+        return res.redirect(301, `/directory/port/${group.code}${qs}`);
+      }
+      const port = portGroupAsPort(group);
+      const filters = normalizeFilters(req.query as Record<string, unknown>, { port: group.code, state: null, citySlug: null });
       const [list, counts] = await Promise.all([listCarriers({ filters }), getFacetCounts(filters)]);
       res.type('html').send(renderPortPage({ port, list, counts, filters }));
     } catch (err) {
