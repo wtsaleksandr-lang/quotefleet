@@ -1,0 +1,272 @@
+/* ─────────────────────────────────────────────────────────────────────────
+   landing-hero-fixes-v2.css — hero fix wave (Aug 2026).
+
+   Loaded LAST (after landing-nav-consistency.css) so it wins the cascade over
+   the earlier hero sheets AND the JS-injected landing-wefixtrades-cleanup.css.
+   Because cleanup.css is appended to <head> at runtime (landing-motion.js), it
+   sits AFTER this <link> in DOM order — so every rule here that must beat it
+   carries `html body.qf-wft` specificity + `!important`.
+
+   Four fixes:
+     1. Carrier hero device pair no longer overflows the viewport right edge
+        (laptop capped to its media column; no horizontal page scroll).
+     2. Audience toggle: selected = quiet OUTLINE chip (not a bright blue pill);
+        squared corners (Maersk), not a lozenge.
+     3. Shippers hero: real two-column layout with a directory-preview visual on
+        the right; eyebrow matches the carriers dash-kicker; left-aligned at all
+        breakpoints; squared search + cards.
+     4. Squared corners throughout the elements this wave touches.
+
+   Tokens only (no raw hex). Spacing on the 8px ramp so both guards stay green.
+   ───────────────────────────────────────────────────────────────────────── */
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   FIX 1 — Carrier hero: contain the device pair (no right-edge clipping).
+   The laptop was 111.3% of its media column at left:0, pushing its right edge
+   ~49px past the viewport (h-scroll + visual clip). Cap it to the column width
+   so laptop + phone compose tidily inside the hero. ≥981px only; the stacked
+   layout (≤980) already takes the laptop in-flow at 100%.
+   ═══════════════════════════════════════════════════════════════════════════ */
+@media (min-width: 981px) {
+  html body.qf-wft .visual-flow.qf-hero-media {
+    max-width: 100% !important;
+    overflow: visible !important;
+  }
+  html body.qf-wft .qf-hero-devices > .qf-hero-laptop {
+    width: 99% !important;
+  }
+  /* Phone overlay: pull it a touch off the wrapper's right edge so it can never
+     poke past the viewport (its right:0% anchor was clearing the media box by a
+     few px → 5px of h-scroll). */
+  html body.qf-wft .qf-hero-devices > .qf-hero-vphone {
+    right: 8px !important;
+    width: 40% !important;
+  }
+  /* Lone-laptop pose (stage-laptop): the laptop now fills the column at left:0,
+     so no horizontal recenter is needed — keep only the vertical drop that
+     aligns its top edge with the headline. */
+  html body.qf-wft .qf-hero-devices--video.stage-laptop > .qf-hero-laptop {
+    transform: translate(0%, 52px) !important;
+  }
+  /* Phone-forward pose (stage-phone): keep the enlarged phone fully on-screen
+     and the shrunk background laptop from drifting past the right edge. */
+  html body.qf-wft .qf-hero-devices--video.stage-phone > .qf-hero-vphone {
+    transform: translate(-84%, -7%) scale(1.12) !important;
+  }
+  html body.qf-wft .qf-hero-devices--video.stage-phone > .qf-hero-laptop {
+    transform: translate(14%, -8%) scale(.58) !important;
+  }
+}
+
+/* Tablet band (641–980px, single-column stack): the desktop stage-laptop phone
+   pose keeps a `translate(15%)` rightward push. The phone is opacity:0 here, but
+   its box still extends ~7px past the viewport → phantom h-scroll. Zero out the
+   horizontal push so the hidden phone stays inside the column. */
+@media (min-width: 641px) and (max-width: 980px) {
+  html body.qf-wft .qf-hero-devices--video.stage-laptop > .qf-hero-vphone {
+    transform: translate(0%, 7%) scale(.72) !important;
+  }
+}
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   FIX 2 — Audience toggle: outlined selected chip + squared corners.
+   ═══════════════════════════════════════════════════════════════════════════ */
+html body.qf-wft .qf-aud-toggle {
+  border-radius: var(--radius-btn) !important; /* 10px — squared segmented control */
+}
+html body.qf-wft .qf-aud-seg {
+  border-radius: 8px !important; /* squared chip, not a pill */
+}
+/* Selected = quiet raised OUTLINE chip (global rule: selected = outline, not a
+   bright fill). Reads clearly as active but stays calm. */
+html body.qf-wft .qf-aud-seg.is-active {
+  color: var(--ink) !important;
+  background: var(--surface) !important;
+  box-shadow: inset 0 0 0 1px var(--border-strong) !important;
+}
+html body.qf-wft .qf-aud-seg.is-active:hover {
+  color: var(--ink) !important;
+}
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   FIX 3 — Shippers hero: two-column layout + matching eyebrow + squared corners.
+   ═══════════════════════════════════════════════════════════════════════════ */
+
+/* Match the carrier hero-grid rhythm: same max-width + centering so both heroes
+   share a left edge; single column below 981px. */
+html body.qf-wft .qf-shipper-hero {
+  max-width: min(1340px, calc(100vw - 56px)) !important;
+  margin: 0 auto !important;
+  text-align: left !important;
+}
+@media (min-width: 981px) {
+  html body.qf-wft .qf-shipper-hero {
+    display: grid !important;
+    grid-template-columns: minmax(0, 1.02fr) minmax(0, 0.86fr) !important;
+    gap: clamp(48px, 5vw, 80px) !important;
+    align-items: center !important;
+  }
+}
+
+/* Left column keeps the natural flow; the copy caps so long lines sit left of
+   the preview visual. */
+html body.qf-wft .qf-shipper-copy { min-width: 0; }
+
+/* ── Eyebrow: match the carriers dash-kicker EXACTLY (drop the bordered pill) ── */
+html body.qf-wft .qf-shipper-hero .eyebrow {
+  display: inline-flex !important;
+  align-items: center !important;
+  gap: 8px !important;
+  border: none !important;
+  background: transparent !important;
+  padding: 0 !important;
+  margin: 0 0 24px 0 !important;
+  color: var(--accent) !important;
+  font-family: var(--font-mono) !important;
+  font-size: 11px !important;
+  font-weight: 600 !important;
+  letter-spacing: 0.16em !important;
+  text-transform: uppercase !important;
+  text-align: left !important;
+}
+html body.qf-wft .qf-shipper-hero .eyebrow::before {
+  content: "" !important;
+  display: inline-block !important;
+  flex: none !important;
+  width: 16px !important;
+  height: 2px !important;
+  border-radius: 2px !important;
+  background: var(--accent) !important;
+}
+
+/* ── Left-align everything at ALL breakpoints (override hero-polish centering) ── */
+html body.qf-wft .qf-shipper-hero,
+html body.qf-wft .qf-shipper-hero .eyebrow,
+html body.qf-wft .qf-shipper-hero h1,
+html body.qf-wft .qf-shipper-hero .qf-shipper-lead,
+html body.qf-wft .qf-shipper-hero .qf-dir-stats {
+  text-align: left !important;
+  margin-left: 0 !important;
+  margin-right: 0 !important;
+}
+html body.qf-wft .qf-shipper-hero .eyebrow { margin-right: auto !important; }
+html body.qf-wft .qf-shipper-hero h1 { margin: 0 0 16px 0 !important; }
+html body.qf-wft .qf-shipper-hero .qf-shipper-lead { margin: 0 0 24px 0 !important; }
+html body.qf-wft .qf-shipper-hero .qf-dir-stats { margin: 24px 0 0 0 !important; }
+
+/* ── Search bar + fields: squared (Maersk) ── */
+html body.qf-wft .qf-shipper-hero .qf-dir-search {
+  border-radius: var(--radius-btn) !important; /* was --radius-lg (16px) */
+  max-width: 100% !important;
+}
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   Directory-preview visual (right column) — a stack of squared "carrier result"
+   cards echoing the real /directory listing. Built from tokens; no image asset.
+   ═══════════════════════════════════════════════════════════════════════════ */
+html body.qf-wft .qf-shipper-preview {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  min-width: 0;
+}
+html body.qf-wft .qf-shipper-preview__label {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  margin: 0 0 4px 0;
+  color: var(--muted);
+  font-family: var(--font-mono);
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+}
+html body.qf-wft .qf-dir-card {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  padding: 16px;
+  background: var(--surface-2);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-btn);
+}
+html body.qf-wft .qf-dir-card--featured {
+  border-color: var(--border-strong);
+  box-shadow: inset 3px 0 0 0 var(--accent);
+}
+html body.qf-wft .qf-dir-card__head {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  min-width: 0;
+}
+html body.qf-wft .qf-dir-card__name {
+  color: var(--ink);
+  font-family: var(--font-sans);
+  font-size: 15px;
+  font-weight: 700;
+  line-height: 1.4;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+html body.qf-wft .qf-dir-card__ids {
+  color: var(--muted);
+  font-family: var(--font-mono);
+  font-size: 12px;
+  line-height: 1.4;
+}
+html body.qf-wft .qf-dir-card__chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+html body.qf-wft .qf-dir-chip {
+  display: inline-flex;
+  align-items: center;
+  padding: 4px 8px;
+  border-radius: 6px; /* squared, not a pill */
+  border: 1px solid var(--border);
+  background: var(--accent-soft);
+  color: var(--accent);
+  font-family: var(--font-sans);
+  font-size: 11px;
+  font-weight: 600;
+  line-height: 1.4;
+  white-space: nowrap;
+}
+html body.qf-wft .qf-dir-chip--muted {
+  background: var(--surface-3);
+  border-color: var(--border);
+  color: var(--muted);
+}
+html body.qf-wft .qf-dir-card__port {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  color: var(--ink-soft);
+  font-family: var(--font-sans);
+  font-size: 13px;
+  line-height: 1.4;
+}
+html body.qf-wft .qf-dir-card__port span {
+  color: var(--muted);
+}
+
+/* ── Mobile (≤640px): single column, keep the copy tight — hide the preview
+   stack so the reflowed shipper hero stays clean (search + stats carry it). ── */
+@media (max-width: 640px) {
+  html body.qf-wft .qf-shipper-hero {
+    display: block !important;
+    max-width: none !important;
+  }
+  html body.qf-wft .qf-shipper-preview { display: none !important; }
+  html body.qf-wft .qf-shipper-hero .eyebrow,
+  html body.qf-wft .qf-shipper-hero h1,
+  html body.qf-wft .qf-shipper-hero .qf-shipper-lead {
+    text-align: left !important;
+    margin-left: 0 !important;
+    margin-right: auto !important;
+  }
+}
