@@ -379,6 +379,39 @@ const DIRECTORY_CSS = `
   @media (prefers-reduced-motion: reduce) {
     .cp-tip[data-tip]::after, .cp-tip[data-tip]::before { transition: none; }
   }
+  /* ── JS-positioned tooltip (directory-tooltip.js) ──────────────────────────
+     When the script runs it flags <html class="js-tips"> and disables the CSS
+     ::after/::before tooltip above (avoids a double tooltip). The .qf-tip node
+     lives on <body> so it escapes every overflow:clip badge-row ancestor, and
+     the embedded "✓" renders in the green success token via .qf-tip-check.
+     No-JS users keep the CSS tooltip; aria-label carries the name regardless. */
+  html.js-tips .cp-tip[data-tip]:hover::after,
+  html.js-tips .cp-tip[data-tip]:focus::after,
+  html.js-tips .cp-tip[data-tip]:focus-visible::after,
+  html.js-tips .cp-tip[data-tip]:hover::before,
+  html.js-tips .cp-tip[data-tip]:focus::before,
+  html.js-tips .cp-tip[data-tip]:focus-visible::before { display: none !important; }
+  .qf-tip {
+    position: fixed; left: 0; top: 0; z-index: 9999; visibility: hidden;
+    width: max-content; max-width: min(240px, 72vw);
+    white-space: normal; text-align: left; text-transform: none; letter-spacing: normal;
+    font-family: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif; font-size: 12px; line-height: 1.45;
+    padding: 8px 11px; border-radius: 8px;
+    background: var(--badge-tip-bg); color: var(--badge-tip-fg); border: 1px solid var(--badge-tip-border);
+    box-shadow: 0 8px 24px rgba(2, 6, 23, 0.35); pointer-events: none;
+    opacity: 0; transition: opacity 0.12s ease;
+  }
+  .qf-tip.is-open { opacity: 1; }
+  .qf-tip::after {
+    content: ''; position: absolute; left: var(--tip-arrow-x, 50%); transform: translateX(-50%);
+    border: 6px solid transparent;
+  }
+  .qf-tip[data-pos="above"]::after { top: 100%; border-top-color: var(--badge-tip-bg); }
+  .qf-tip[data-pos="below"]::after { bottom: 100%; border-bottom-color: var(--badge-tip-bg); }
+  .qf-tip-check { color: var(--success); font-weight: 700; }
+  @media (prefers-reduced-motion: reduce) {
+    .qf-tip { transition: none; }
+  }
   /* ── DrayLocator-structured header: [monogram] name · Active · FMCSA / claim
      on the right, subtitle, then the squared badge row — all left-aligned. ──── */
   .cp-headrow { display: flex; align-items: flex-start; justify-content: space-between; gap: 12px 24px; flex-wrap: wrap; text-align: left; margin: 14px 0 0; }
@@ -484,6 +517,7 @@ export function layout({ title, description, canonicalPath, bodyHtml, jsonLd }: 
   <script>(function(){var b=document.querySelector('.topnav-burger'),m=document.getElementById('topnav-mobile-menu');if(!b||!m)return;function set(o){b.setAttribute('aria-expanded',o?'true':'false');b.setAttribute('aria-label',o?'Close menu':'Open menu');if(o)m.removeAttribute('hidden');else m.setAttribute('hidden','');}b.addEventListener('click',function(e){e.stopPropagation();set(b.getAttribute('aria-expanded')!=='true');});document.addEventListener('click',function(e){if(b.getAttribute('aria-expanded')==='true'&&!m.contains(e.target)&&!b.contains(e.target))set(false);});document.addEventListener('keydown',function(e){if(e.key==='Escape')set(false);});})();</script>
   <script src="/marketing-chat.js" defer></script>
   <script src="/theme-toggle.js" defer></script>
+  <script src="/directory-tooltip.js" defer></script>
 </body>
 </html>`;
 }
