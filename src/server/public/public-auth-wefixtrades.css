@@ -336,3 +336,82 @@ body.qf-auth-wft .qf-oauth-or::after {
   height: 1px;
   background: var(--border);
 }
+
+/* ─────────────────────────────────────────────────────────────────
+   LIGHT THEME (login / signup) — Maersk-clean. This sheet (and color-
+   system.css) force a dark palette via body.qf-auth-wft token overrides
+   + hardcoded !important rules that fire in BOTH themes, so light needs
+   an explicit block. Step 1: re-point the theme tokens to the global
+   light palette (matches style.css html[data-theme="light"]) so all
+   var()-driven rules flip. Step 2: override the rules that hardcode dark
+   hex. Higher specificity (html[data-theme] body.qf-auth-wft) + !important
+   beats color-system's !important. Guard-exempt scope; DARK is untouched.
+   The .qf-oauth "Continue with…" chips stay light in both themes (correct).
+   ───────────────────────────────────────────────────────────────── */
+html[data-theme="light"] body.qf-auth-wft {
+  --accent: #0D3CFC !important;
+  --accent-soft: rgba(13, 60, 252, .08) !important;
+  --surface: #FFFFFF !important;
+  --surface-2: #EFF3F7 !important;
+  --ink: #0A2540 !important;
+  --ink-soft: #223549 !important;
+  --muted: #5A6B7B !important;
+  --border: #E1E7ED !important;
+  --border-strong: #C7D0D9 !important;
+  background: #F6F8FA !important;
+  color: #0A2540 !important;
+}
+html[data-theme="light"] body.qf-auth-wft .topnav {
+  background: var(--surface) !important;
+  border-bottom-color: var(--border) !important;
+}
+html[data-theme="light"] body.qf-auth-wft .brand-mark,
+html[data-theme="light"] body.qf-auth-wft .nav-link,
+html[data-theme="light"] body.qf-auth-wft h1 {
+  color: var(--ink) !important;
+}
+html[data-theme="light"] body.qf-auth-wft .logo {
+  border-color: var(--border-strong) !important;
+  color: var(--ink) !important;
+}
+html[data-theme="light"] body.qf-auth-wft main {
+  background: transparent !important;
+}
+html[data-theme="light"] body.qf-auth-wft .card.elevated,
+html[data-theme="light"] body.qf-auth-wft .plan-opt,
+html[data-theme="light"] body.qf-auth-wft .consent-opt,
+html[data-theme="light"] body.qf-auth-wft .qf-mc-bubble.open {
+  background: var(--surface) !important;
+  border-color: var(--border) !important;
+}
+html[data-theme="light"] body.qf-auth-wft .card.elevated {
+  box-shadow: var(--shadow-md) !important;
+}
+html[data-theme="light"] body.qf-auth-wft .plan-opt strong,
+html[data-theme="light"] body.qf-auth-wft .consent-opt,
+html[data-theme="light"] body.qf-auth-wft .consent-opt a {
+  color: var(--ink) !important;
+}
+html[data-theme="light"] body.qf-auth-wft .muted-small,
+html[data-theme="light"] body.qf-auth-wft .field-hint,
+html[data-theme="light"] body.qf-auth-wft .field-label,
+html[data-theme="light"] body.qf-auth-wft .plan-opt .muted {
+  color: var(--muted) !important;
+}
+html[data-theme="light"] body.qf-auth-wft a {
+  color: var(--ink-soft) !important;
+}
+/* Selected plan: DS = accent outline + faint tint over the WHITE card. */
+html[data-theme="light"] body.qf-auth-wft .plan-opt:has(input:checked) {
+  border-color: var(--accent) !important;
+  background: var(--accent-soft) !important;
+  box-shadow: 0 0 0 1px var(--accent) !important;
+}
+/* Notice/security callout: dark #FFFFFF text on the pale-blue tint is
+   unreadable in light — re-ink to navy (bg tint stays, reads AA). */
+html[data-theme="light"] body.qf-auth-wft .notice {
+  color: var(--ink) !important;
+}
+html[data-theme="light"] body.qf-auth-wft .field-hint.ok {
+  color: var(--accent) !important;
+}

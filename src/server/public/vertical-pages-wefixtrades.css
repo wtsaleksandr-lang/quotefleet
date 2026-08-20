@@ -97,3 +97,33 @@
   .qf-vertical-wft .features { grid-template-columns: 1fr; }
   .qf-vertical-wft .hero h1 { font-size: 41px; }
 }
+
+/* LIGHT THEME — the hero/section canvases + feature cards hardcode dark hex;
+   re-point them to light tokens. Heading/paragraph colors are handled by the
+   body.qf-public-wft rules in public-pages-wefixtrades.css (these pages carry
+   both classes), except the .accent span which sets its own color. Guard-
+   exempt scope; DARK above is untouched. */
+html[data-theme="light"] .qf-vertical-wft .hero,
+html[data-theme="light"] .qf-vertical-wft .section {
+  background: var(--bg);
+}
+html[data-theme="light"] .qf-vertical-wft .hero h1,
+html[data-theme="light"] .qf-vertical-wft .hero h1 .accent {
+  color: var(--ink);
+}
+html[data-theme="light"] .qf-vertical-wft .feature-card,
+html[data-theme="light"] .qf-vertical-wft .section[style*="text-align: center"] .container-narrow {
+  background: var(--surface);
+  border-color: var(--border);
+  box-shadow: var(--shadow-md);
+}
+html[data-theme="light"] .qf-vertical-wft .feature-card:hover {
+  border-color: var(--border-strong);
+  background: var(--surface);
+}
+html[data-theme="light"] .qf-vertical-wft .code,
+html[data-theme="light"] .qf-vertical-wft code {
+  color: var(--accent);
+  background: var(--accent-soft);
+  border-color: rgba(13, 60, 252, .20);
+}
