@@ -9,7 +9,7 @@
  * Read-only + platform-level (no tenant scope). All bounds (page size, code
  * lengths) are clamped here so callers can pass raw query values safely.
  */
-import { and, asc, desc, eq, gt, gte, isNotNull, isNull, ne, sql, type SQL } from 'drizzle-orm';
+import { and, asc, desc, eq, gt, gte, isNotNull, isNull, ne, or, sql, type SQL } from 'drizzle-orm';
 import { db } from '../../db/client.js';
 import { carrierDirectory, carrierOverrides, type CarrierCapabilities, type CarrierOverrideRow } from '../../db/schema.js';
 import { CONTAINER_PORTS } from './containerPorts.js';
@@ -299,7 +299,10 @@ async function getDirectorySummaryUnsafe(): Promise<DirectorySummary> {
 export type FleetBucketId = '1-25' | '26-100' | '101-500' | '500+';
 export type DriversBucketId = '1-10' | '11-50' | '51-250' | '250+';
 export type SafetyId = 'satisfactory' | 'conditional' | 'unsatisfactory' | 'unrated';
-export type SortId = 'featured' | 'safety' | 'fleet' | 'recent';
+export type SortId = 'featured' | 'safety' | 'fleet' | 'drivers' | 'recent';
+/** Sort direction — asc = Low→High (numeric) / best-first (safety) / oldest
+ *  (recent); desc = the inverse. Ignored for the `featured` composite sort. */
+export type SortDir = 'asc' | 'desc';
 
 /**
  * Equipment / cargo-type filter — a SINGLE `equipment` GET param whose value is
@@ -411,8 +414,35 @@ export const SORT_OPTIONS: ReadonlyArray<{ id: SortId; label: string }> = [
   { id: 'featured', label: 'Featured' },
   { id: 'safety', label: 'Safety rating' },
   { id: 'fleet', label: 'Fleet size' },
+  { id: 'drivers', label: 'Drivers' },
   { id: 'recent', label: 'Recently updated' },
 ];
+
+/**
+ * Default sort direction per sort id. Numeric sorts (fleet / drivers) default
+ * High→Low (desc), `recent` defaults newest-first (desc), `safety` defaults
+ * best-first (asc). `featured` is a fixed composite — direction never applies.
+ * The URL only carries `dir` when it DIFFERS from this default, keeping the
+ * canonical form stable + shareable.
+ */
+export const SORT_DIR_DEFAULTS: Readonly<Record<SortId, SortDir>> = {
+  featured: 'desc',
+  safety: 'asc',
+  fleet: 'desc',
+  drivers: 'desc',
+  recent: 'desc',
+};
+
+/** Whether a sort id honors an asc/desc direction toggle (all but `featured`). */
+export function sortIsDirectional(sort: SortId): boolean {
+  return sort !== 'featured';
+}
+
+/** Resolve the effective direction for a sort, falling back to its default. */
+export function resolveSortDir(sort: SortId, dir?: SortDir | null): SortDir {
+  if (!sortIsDirectional(sort)) return SORT_DIR_DEFAULTS[sort];
+  return dir === 'asc' || dir === 'desc' ? dir : SORT_DIR_DEFAULTS[sort];
+}
 
 /** MCS-150 "recently updated" proxy window. */
 const RECENT_DAYS = 365;
@@ -431,12 +461,17 @@ export interface DirectoryFilters {
    *  `intermodal=1` param is set. Kept so existing surfaces (featured sort,
    *  profile badge, `intermodal=1` deep-links) keep working unchanged. */
   intermodal: boolean;
-  /** Single equipment/cargo-type filter (see EQUIPMENT_OPTIONS). null = any. */
-  equipment: EquipmentId | null;
-  /** Single cargo-specialty filter (see CARGO_OPTIONS). null = any. */
-  cargo: CargoId | null;
+  /** Selected equipment/cargo-type filters (see EQUIPMENT_OPTIONS). MULTI-select:
+   *  OR within the facet. Empty array = any. Stable canonical order (matches
+   *  EQUIPMENT_OPTIONS order) so the URL is shareable + crawlable. */
+  equipment: EquipmentId[];
+  /** Selected cargo-specialty filters (see CARGO_OPTIONS). MULTI-select: OR within
+   *  the facet. Empty array = any. Stable canonical order (CARGO_OPTIONS order). */
+  cargo: CargoId[];
   recent: boolean;
   sort: SortId;
+  /** Sort direction (asc/desc). Meaningful only when `sort` is directional. */
+  dir: SortDir;
   page: number;
   perPage: number;
 }
@@ -450,6 +485,29 @@ const EQUIPMENT_COLUMN = new Map(EQUIPMENT_OPTIONS.map((e) => [e.id, e.column] a
 const CARGO_IDS = new Set(CARGO_OPTIONS.map((c) => c.id));
 const CARGO_COLUMN = new Map(CARGO_OPTIONS.map((c) => [c.id, c.column] as const));
 const truthy = (v: unknown): boolean => ['1', 'true', 'yes', 'on'].includes(String(v ?? '').toLowerCase());
+
+/**
+ * Parse a loosely-typed multi-select facet value into a clean, de-duplicated,
+ * canonically-ordered id list. Accepts a single string, a comma-separated string
+ * (`reefer,flatbed`), or a repeated-param array (Express `?equipment=a&equipment=b`).
+ * Junk / unknown ids are dropped, dupes collapsed, and the surviving ids are
+ * returned in `order` (the option-table order) so the URL is stable + shareable.
+ * A single legacy value (`?equipment=reefer`) still parses to `['reefer']`.
+ */
+function parseMultiFacet<T extends string>(raw: unknown, valid: ReadonlySet<T>, order: ReadonlyArray<T>): T[] {
+  const parts: string[] = [];
+  const push = (v: unknown) => {
+    for (const piece of String(v ?? '').split(',')) {
+      const t = piece.trim().toLowerCase();
+      if (t) parts.push(t);
+    }
+  };
+  if (Array.isArray(raw)) for (const v of raw) push(v);
+  else push(raw);
+  const seen = new Set<T>();
+  for (const p of parts) if (valid.has(p as T)) seen.add(p as T);
+  return order.filter((id) => seen.has(id));
+}
 
 /** Turn a raw name/slug into the directory's canonical city slug form. */
 export function citySlugify(s: string): string {
@@ -472,20 +530,22 @@ export function normalizeFilters(
   const driversRaw = str(raw.drivers) as DriversBucketId;
   const safetyRaw = str(raw.safety).toLowerCase() as SafetyId;
   const sortRaw = str(raw.sort).toLowerCase() as SortId;
-  // Equipment: the new single `equipment` param wins; otherwise the legacy
-  // `intermodal=1` param maps to 'drayage' so old bookmarks/deep-links keep
-  // working. `intermodal` (boolean) stays true whenever the resolved equipment
-  // is drayage OR the legacy flag was set.
-  const equipRaw = str(raw.equipment).toLowerCase() as EquipmentId;
+  const dirRaw = str(raw.dir).toLowerCase();
+  const sort: SortId = SORT_IDS.has(sortRaw) ? sortRaw : 'featured';
+  const dir: SortDir = resolveSortDir(sort, dirRaw === 'asc' || dirRaw === 'desc' ? (dirRaw as SortDir) : null);
+  // Equipment: MULTI-select comma-list (OR within the facet). The legacy
+  // `intermodal=1` param maps to an implicit 'drayage' selection so old
+  // bookmarks/deep-links keep working. `intermodal` (boolean) stays true whenever
+  // the resolved equipment set includes drayage OR the legacy flag was set.
   const legacyIntermodal = truthy(raw.intermodal);
-  const equipment: EquipmentId | null = EQUIPMENT_IDS.has(equipRaw)
-    ? equipRaw
-    : legacyIntermodal
-      ? 'drayage'
-      : null;
-  // Cargo specialty: a separate single-select param, orthogonal to equipment.
-  const cargoRaw = str(raw.cargo).toLowerCase() as CargoId;
-  const cargo: CargoId | null = CARGO_IDS.has(cargoRaw) ? cargoRaw : null;
+  const equipmentIds = parseMultiFacet<EquipmentId>(raw.equipment, EQUIPMENT_IDS, EQUIPMENT_OPTIONS.map((e) => e.id));
+  const equipment: EquipmentId[] =
+    legacyIntermodal && !equipmentIds.includes('drayage')
+      ? // Fold the legacy flag in at its canonical position (drayage is first).
+        (EQUIPMENT_OPTIONS.map((e) => e.id).filter((id) => id === 'drayage' || equipmentIds.includes(id)) as EquipmentId[])
+      : equipmentIds;
+  // Cargo specialty: a separate MULTI-select comma-list, orthogonal to equipment.
+  const cargo: CargoId[] = parseMultiFacet<CargoId>(raw.cargo, CARGO_IDS, CARGO_OPTIONS.map((c) => c.id));
   return {
     state: overrides && 'state' in overrides ? overrides.state ?? null : /^[A-Z]{2}$/.test(stateRaw) ? stateRaw : null,
     port: overrides && 'port' in overrides ? overrides.port ?? null : portRaw || null,
@@ -495,11 +555,12 @@ export function normalizeFilters(
     drivers: DRIVERS_IDS.has(driversRaw) ? driversRaw : null,
     safety: SAFETY_IDS.has(safetyRaw) ? safetyRaw : null,
     authorityActive: String(raw.authority ?? '').toLowerCase() === 'active' || truthy(raw.authority),
-    intermodal: equipment === 'drayage' || legacyIntermodal,
+    intermodal: equipment.includes('drayage') || legacyIntermodal,
     equipment,
     cargo,
     recent: truthy(raw.recent),
-    sort: SORT_IDS.has(sortRaw) ? sortRaw : 'featured',
+    sort,
+    dir,
     page: Math.max(1, parseInt(str(raw.page), 10) || 1),
     perPage: DEFAULT_PER_PAGE,
   };
@@ -518,6 +579,7 @@ export const FACET_QUERY_KEYS = [
   'cargo',
   'recent',
   'sort',
+  'dir',
   'page',
   'hazmat',
   'reefer',
@@ -551,33 +613,55 @@ function safetyCondition(id: SafetyId): SQL | null {
 }
 
 /**
- * Equipment filter → a single `eq(<column>, true)` on the FMCSA-derived boolean
- * column for that equipment id. `drayage` is intentionally handled by the
- * separate `intermodal` predicate in buildConditions (it maps to the same
- * `intermodal` column), so this returns null for it to avoid a redundant clause.
+ * One equipment id → an `eq(<column>, true)` on its FMCSA-derived boolean column.
+ * `drayage` maps to the `intermodal` column (its data home), so — unlike the old
+ * single-select path — it IS included here: with multi-select the drayage option
+ * has to participate in the equipment OR-group, not sit in a separate predicate.
  */
-function equipmentCondition(id: EquipmentId): SQL | null {
-  if (id === 'drayage') return null; // handled via the intermodal predicate
+function equipmentColCondition(id: EquipmentId): SQL | null {
   const column = EQUIPMENT_COLUMN.get(id);
   if (!column) return null;
   return eq(carrierDirectory[column], true);
 }
 
-/** Cargo-specialty filter → a single `eq(<column>, true)` on the FMCSA-derived
- *  boolean column for that cargo id. */
-function cargoCondition(id: CargoId): SQL | null {
+/**
+ * Multi-select equipment filter → OR of each selected column
+ * (`reefer OR flatbed`). Empty selection → null (no clause). Single selection →
+ * the bare `eq` (no redundant OR wrapper).
+ */
+function equipmentCondition(ids: EquipmentId[]): SQL | null {
+  const cols = ids.map(equipmentColCondition).filter((x): x is SQL => x != null);
+  if (cols.length === 0) return null;
+  return cols.length === 1 ? cols[0] : (or(...cols) as SQL);
+}
+
+/** One cargo id → an `eq(<column>, true)` on its FMCSA-derived boolean column. */
+function cargoColCondition(id: CargoId): SQL | null {
   const column = CARGO_COLUMN.get(id);
   if (!column) return null;
   return eq(carrierDirectory[column], true);
 }
 
+/** Multi-select cargo-specialty filter → OR of each selected column. */
+function cargoCondition(ids: CargoId[]): SQL | null {
+  const cols = ids.map(cargoColCondition).filter((x): x is SQL => x != null);
+  if (cols.length === 0) return null;
+  return cols.length === 1 ? cols[0] : (or(...cols) as SQL);
+}
+
 const recentCutoff = (): Date => new Date(Date.now() - RECENT_DAYS * 24 * 60 * 60 * 1000);
 
 /**
- * Build the WHERE condition list from active filters. `exclude` drops one
- * dimension so facet-count queries can show "how many if you picked this".
+ * Build the WHERE condition list from active filters — one entry per ACTIVE
+ * facet, AND-ed together by the caller. Multi-select facets (equipment / cargo)
+ * contribute a SINGLE OR-group entry, so the semantics are **OR within a facet,
+ * AND across facets** (matches any selected equipment AND any selected cargo).
+ * `exclude` drops one dimension so facet-count queries can show "how many if you
+ * picked this". Exported for query-shape unit tests. `drayage` no longer has a
+ * standalone `intermodal` predicate — it rides inside the equipment OR-group
+ * (its column IS `intermodal`), which keeps OR-within-facet honest.
  */
-function buildConditions(f: DirectoryFilters, exclude: Set<string> = new Set()): SQL[] {
+export function buildConditions(f: DirectoryFilters, exclude: Set<string> = new Set()): SQL[] {
   const c: SQL[] = [];
   if (f.state && !exclude.has('state')) c.push(eq(carrierDirectory.state, f.state));
   if (f.port && !exclude.has('port')) c.push(eq(carrierDirectory.nearestPortCode, f.port));
@@ -597,12 +681,11 @@ function buildConditions(f: DirectoryFilters, exclude: Set<string> = new Set()):
   if (f.authorityActive && !exclude.has('authority')) {
     c.push(and(isNotNull(carrierDirectory.authorityType), ne(carrierDirectory.authorityType, '')) as SQL);
   }
-  if (f.intermodal && !exclude.has('intermodal')) c.push(eq(carrierDirectory.intermodal, true));
-  if (f.equipment && !exclude.has('equipment')) {
+  if (f.equipment.length && !exclude.has('equipment')) {
     const ec = equipmentCondition(f.equipment);
     if (ec) c.push(ec);
   }
-  if (f.cargo && !exclude.has('cargo')) {
+  if (f.cargo.length && !exclude.has('cargo')) {
     const cc = cargoCondition(f.cargo);
     if (cc) c.push(cc);
   }
@@ -610,19 +693,38 @@ function buildConditions(f: DirectoryFilters, exclude: Set<string> = new Set()):
   return c;
 }
 
-function orderForSort(sort: SortId) {
+/**
+ * ORDER BY chunks for a sort + direction. Numeric sorts (fleet / drivers) flip
+ * the column direction (`asc` = Low→High, `desc` = High→Low), always NULLs last
+ * so blanks never lead. `safety` flips the quality ranking (asc = best-first
+ * Satisfactory→…, desc = worst-first). `recent` flips the recency (desc =
+ * newest-first). `featured` is a fixed composite and ignores direction.
+ * Exported for unit tests. `dir` defaults per SORT_DIR_DEFAULTS.
+ */
+export function orderForSort(sort: SortId, dir?: SortDir | null) {
+  const d = resolveSortDir(sort, dir);
+  const numeric = (col: Parameters<typeof asc>[0]) =>
+    d === 'asc' ? sql`${col} asc nulls last` : sql`${col} desc nulls last`;
   switch (sort) {
     case 'fleet':
-      return [sql`${carrierDirectory.powerUnits} desc nulls last`, asc(carrierDirectory.legalName), asc(carrierDirectory.id)];
-    case 'safety':
-      // Satisfactory → Conditional → Unrated → Unsatisfactory, then name.
+      return [numeric(carrierDirectory.powerUnits), asc(carrierDirectory.legalName), asc(carrierDirectory.id)];
+    case 'drivers':
+      return [numeric(carrierDirectory.drivers), asc(carrierDirectory.legalName), asc(carrierDirectory.id)];
+    case 'safety': {
+      // Quality rank S=0 → C=1 → Unrated=2 → U=3. asc = best-first (default),
+      // desc = worst-first. Name/id keep a stable secondary order either way.
+      const rank = sql`case upper(coalesce(${carrierDirectory.safetyRating}, '')) when 'S' then 0 when 'C' then 1 when 'U' then 3 else 2 end`;
       return [
-        sql`case upper(coalesce(${carrierDirectory.safetyRating}, '')) when 'S' then 0 when 'C' then 1 when 'U' then 3 else 2 end asc`,
+        d === 'asc' ? sql`${rank} asc` : sql`${rank} desc`,
         asc(carrierDirectory.legalName),
         asc(carrierDirectory.id),
       ];
+    }
     case 'recent':
-      return [desc(carrierDirectory.updatedAt), asc(carrierDirectory.id)];
+      return [
+        d === 'asc' ? asc(carrierDirectory.updatedAt) : desc(carrierDirectory.updatedAt),
+        asc(carrierDirectory.id),
+      ];
     case 'featured':
     default:
       return [
@@ -688,7 +790,7 @@ async function listCarriersUnsafe(filters: DirectoryFilters): Promise<CarrierLis
     .select()
     .from(carrierDirectory)
     .where(where)
-    .orderBy(...orderForSort(filters.sort))
+    .orderBy(...orderForSort(filters.sort, filters.dir))
     .limit(perPage)
     .offset((page - 1) * perPage);
 
@@ -851,7 +953,7 @@ export async function getFacetCounts(filters: DirectoryFilters): Promise<FacetCo
       db()
         .select({ n: sql<number>`count(*)::int` })
         .from(carrierDirectory)
-        .where(and(...buildConditions(filters, new Set(['intermodal'])), eq(carrierDirectory.intermodal, true))),
+        .where(and(...buildConditions(filters, new Set(['equipment', 'intermodal'])), eq(carrierDirectory.intermodal, true))),
       db()
         .select({ n: sql<number>`count(*)::int` })
         .from(carrierDirectory)

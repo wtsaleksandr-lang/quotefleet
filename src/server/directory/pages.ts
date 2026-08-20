@@ -27,6 +27,8 @@ import type {
   EquipmentId,
   CargoId,
   SafetyId,
+  SortId,
+  SortDir,
 } from './queries.js';
 import {
   FLEET_BUCKETS,
@@ -35,6 +37,8 @@ import {
   CARGO_OPTIONS,
   SAFETY_OPTIONS,
   SORT_OPTIONS,
+  SORT_DIR_DEFAULTS,
+  sortIsDirectional,
   citySlugify,
   titleCaseCity,
 } from './queries.js';
@@ -161,7 +165,7 @@ const DIRECTORY_CSS = `
   .dir-card .cnt { margin-top: 12px; font-size: 22px; font-family: var(--font-mono); color: var(--accent); }
   .dir-card .cnt small { font-size: 11px; color: var(--muted); letter-spacing: 0.06em; text-transform: uppercase; margin-left: 4px; }
   .dir-chips { display: flex; gap: 8px; flex-wrap: wrap; margin: 8px 0 4px; }
-  .dir-chip { font-size: 12px; font-family: var(--font-mono); letter-spacing: 0.04em; padding: 6px 12px; border-radius: 999px; border: 1px solid var(--border); background: var(--surface); color: var(--ink-soft); text-decoration: none; white-space: nowrap; }
+  .dir-chip { font-size: 12px; font-family: var(--font-mono); letter-spacing: 0.04em; padding: 6px 12px; border-radius: var(--radius-chip); border: 1px solid var(--border); background: var(--surface); color: var(--ink-soft); text-decoration: none; white-space: nowrap; }
   .dir-chip:hover { border-color: var(--border-strong); }
   .dir-chip.active { border-color: var(--accent); color: var(--accent); background: var(--accent-soft); }
   .carrier-card { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius-lg); padding: 18px 20px; text-decoration: none; color: inherit; display: block; transition: border-color 0.15s ease; }
@@ -173,7 +177,7 @@ const DIRECTORY_CSS = `
   .carrier-facts .f { display: flex; flex-direction: column; }
   .carrier-facts .f b { font-size: 15px; font-family: var(--font-mono); }
   .carrier-facts .f span { font-size: 10px; text-transform: uppercase; letter-spacing: 0.07em; color: var(--muted); }
-  .pill { font-size: 10px; font-family: var(--font-mono); letter-spacing: 0.06em; text-transform: uppercase; padding: 4px 8px; border-radius: 4px; white-space: nowrap; }
+  .pill { font-size: 10px; font-family: var(--font-mono); letter-spacing: 0.06em; text-transform: uppercase; padding: 4px 8px; border-radius: var(--radius-chip); white-space: nowrap; }
   .pill-dray { background: var(--accent-soft); color: var(--accent); border: 1px solid var(--accent); }
   .pill-good { background: rgba(46, 160, 87, 0.14); color: #57c274; border: 1px solid rgba(46, 160, 87, 0.4); }
   .pill-warn { background: rgba(214, 158, 46, 0.14); color: #e0b054; border: 1px solid rgba(214, 158, 46, 0.4); }
@@ -222,7 +226,7 @@ const DIRECTORY_CSS = `
   .facet-src { font-size: 10px; font-family: var(--font-mono); letter-spacing: 0.04em; color: var(--muted); opacity: 0.8; display: block; margin: 0 0 8px; }
   .facet-opt { display: flex; align-items: center; justify-content: space-between; gap: 8px; padding: 7px 8px; border-radius: 8px; text-decoration: none; color: var(--ink-soft); font-size: 13px; border: 1px solid transparent; }
   .facet-opt:hover { background: var(--surface-2); }
-  .facet-opt .cb { font-family: var(--font-mono); font-size: 11px; color: var(--muted); background: var(--surface-2); border: 1px solid var(--border); border-radius: 999px; padding: 1px 8px; min-width: 20px; text-align: center; }
+  .facet-opt .cb { font-family: var(--font-mono); font-size: 11px; color: var(--muted); background: var(--surface-2); border: 1px solid var(--border); border-radius: var(--radius-chip); padding: 1px 8px; min-width: 20px; text-align: center; }
   .facet-opt.active { border-color: var(--accent); background: var(--accent-soft); color: var(--accent); }
   .facet-opt.active .cb { color: var(--accent); border-color: var(--accent); background: transparent; }
   .facet-opt.disabled { opacity: 0.5; cursor: not-allowed; }
@@ -254,10 +258,16 @@ const DIRECTORY_CSS = `
   .sort-select select { appearance: none; -webkit-appearance: none; background: var(--surface); color: var(--ink); border: 1px solid var(--border); border-radius: 8px; padding: 8px 30px 8px 12px; font-family: var(--font-mono); font-size: 13px; line-height: 1.2; cursor: pointer; min-width: 168px; }
   .sort-select select:hover { border-color: var(--border-strong); }
   .sort-select select:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; border-color: var(--accent); }
+  /* Squared asc/desc direction toggle — pairs with the sort <select> (same
+     height + squared 8px corners, never pill-round). Theme-aware via tokens. */
+  .sort-dir { display: inline-flex; align-items: center; gap: 6px; flex: 0 0 auto; background: var(--surface); color: var(--ink-soft); border: 1px solid var(--border); border-radius: 8px; padding: 8px 12px; font-family: var(--font-mono); font-size: 12px; line-height: 1.2; text-decoration: none; white-space: nowrap; cursor: pointer; }
+  .sort-dir:hover { border-color: var(--border-strong); color: var(--ink); }
+  .sort-dir:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; border-color: var(--accent); }
+  .sort-dir-ico { color: var(--accent); font-size: 10px; line-height: 1; }
   .sort-noscript { display: inline-flex; gap: 8px; flex-wrap: wrap; }
   .sort-noscript a { font-size: 12px; font-family: var(--font-mono); color: var(--accent); text-decoration: none; }
   .applied-chips { display: flex; gap: 8px; flex-wrap: wrap; margin: 0 0 14px; align-items: center; }
-  .applied-chip { font-size: 12px; font-family: var(--font-mono); padding: 5px 10px; border-radius: 999px; border: 1px solid var(--accent); color: var(--accent); background: var(--accent-soft); text-decoration: none; display: inline-flex; gap: 6px; align-items: center; }
+  .applied-chip { font-size: 12px; font-family: var(--font-mono); padding: 5px 10px; border-radius: var(--radius-chip); border: 1px solid var(--accent); color: var(--accent); background: var(--accent-soft); text-decoration: none; display: inline-flex; gap: 6px; align-items: center; }
   .applied-chip .x { opacity: 0.7; }
   .applied-chip:hover .x { opacity: 1; }
   .applied-clear { font-size: 12px; font-family: var(--font-mono); color: var(--muted); text-decoration: underline; }
@@ -277,6 +287,14 @@ const DIRECTORY_CSS = `
     .dir-shell, .dir-hero { padding-left: 18px; padding-right: 18px; }
     .dir-grid { grid-template-columns: 1fr 1fr; gap: 10px; }
     .carrier-facts { gap: 14px; }
+    /* Sort bar: count on its own row, then the full sort control (label + select
+       + direction toggle) together on the next — never stacks mid-control, never
+       leaves the toggle orphaned. */
+    .results-bar { align-items: flex-start; }
+    .sort-ctl { flex: 1 1 100%; justify-content: flex-start; }
+    .sort-select { flex: 1 1 auto; }
+    .sort-select select { min-width: 0; width: 100%; }
+    .sort-dir { flex: 0 0 auto; }
   }
   @media (max-width: 420px) {
     .dir-grid { grid-template-columns: 1fr; }
@@ -300,7 +318,7 @@ const DIRECTORY_CSS = `
     .cp-badgegroup[data-n="2"], .cp-badgegroup[data-n="4"] { grid-template-columns: repeat(2, minmax(0, 1fr)); }
     .cp-badgegroup[data-n="3"], .cp-badgegroup[data-n="5"], .cp-badgegroup[data-n="6"] { grid-template-columns: repeat(3, minmax(0, 1fr)); }
   }
-  .cp-badge-active { font-size: 10px; font-family: var(--font-mono); letter-spacing: 0.06em; text-transform: uppercase; padding: 5px 9px; border-radius: 4px; background: var(--success-bg); color: var(--success); border: 1px solid var(--success); display: inline-flex; align-items: center; gap: 6px; }
+  .cp-badge-active { font-size: 10px; font-family: var(--font-mono); letter-spacing: 0.06em; text-transform: uppercase; padding: 5px 9px; border-radius: var(--radius-chip); background: var(--success-bg); color: var(--success); border: 1px solid var(--success); display: inline-flex; align-items: center; gap: 6px; }
   .cp-badge-active::before { content: ''; width: 6px; height: 6px; border-radius: 50%; background: var(--success); display: inline-block; }
   .cp-claimline { margin: 14px 0 0; font-size: 13px; color: var(--muted); }
   .cp-claimline a { color: var(--accent); text-decoration: none; }
@@ -319,7 +337,7 @@ const DIRECTORY_CSS = `
   .cp-verify-link { display: inline-block; margin-top: 16px; font-size: 13px; font-family: var(--font-mono); color: var(--accent); text-decoration: none; }
   .cp-verify-link:hover { text-decoration: underline; }
   .cp-chiprow { display: flex; flex-wrap: wrap; gap: 8px; }
-  .cp-chip { font-size: 12px; font-family: var(--font-mono); letter-spacing: 0.02em; padding: 8px 12px; border-radius: 999px; border: 1px solid var(--border); background: var(--surface-2); color: var(--ink-soft); display: inline-flex; align-items: center; gap: 8px; white-space: nowrap; }
+  .cp-chip { font-size: 12px; font-family: var(--font-mono); letter-spacing: 0.02em; padding: 8px 12px; border-radius: var(--radius-chip); border: 1px solid var(--border); background: var(--surface-2); color: var(--ink-soft); display: inline-flex; align-items: center; gap: 8px; white-space: nowrap; }
   .cp-chip.on { border-color: var(--accent); color: var(--accent); background: var(--accent-soft); }
   .cp-chip.good { border-color: var(--success); color: var(--success); background: var(--success-bg); }
   .cp-chip.muted { opacity: 0.6; }
@@ -347,6 +365,9 @@ const DIRECTORY_CSS = `
      tooltip (data-tip → ::after on :hover/:focus). The badge rows clip horizontal
      overflow so a tooltip never triggers page horizontal scroll at 375px. */
   :root {
+    /* Maersk-corner rule: EVERY directory badge / chip / pill uses this one small
+       squared radius — no fully-rounded pills anywhere in the directory. */
+    --radius-chip: 4px;
     --badge-dray-bg: #2563eb;        --badge-dray-fg: #ffffff;
     --badge-hazmat-bg: #ea580c;      --badge-hazmat-fg: #111827;
     --badge-reefer-bg: #14b8a6;      --badge-reefer-fg: #111827;
@@ -369,7 +390,7 @@ const DIRECTORY_CSS = `
     --badge-focus: #2563eb;
   }
   .cp-chiprow, .cp-caps, .cp-nameline { overflow-x: clip; }
-  .cp-badge { position: relative; display: inline-flex; align-items: center; gap: 6px; font-size: 11px; font-family: var(--font-mono); letter-spacing: 0.05em; text-transform: uppercase; padding: 5px 9px; border-radius: 4px; border: 1px solid transparent; white-space: nowrap; cursor: help; }
+  .cp-badge { position: relative; display: inline-flex; align-items: center; gap: 6px; font-size: 11px; font-family: var(--font-mono); letter-spacing: 0.05em; text-transform: uppercase; padding: 5px 9px; border-radius: var(--radius-chip); border: 1px solid transparent; white-space: nowrap; cursor: help; }
   .cp-badge:focus-visible, .cp-fmcsa:focus-visible { outline: 2px solid var(--badge-focus); outline-offset: 2px; }
   .cp-badge--dray { background: var(--badge-dray-bg); color: var(--badge-dray-fg); }
   .cp-badge--hazmat { background: var(--badge-hazmat-bg); color: var(--badge-hazmat-fg); }
@@ -763,22 +784,50 @@ function currentParams(f: DirectoryFilters, locked: Set<string>): Record<string,
   if (f.drivers) p.drivers = f.drivers;
   if (f.safety) p.safety = f.safety;
   if (f.authorityActive) p.authority = 'active';
-  // Equipment is the single source for the drayage/cargo dimension; drayage
-  // round-trips as `equipment=drayage` (normalizeFilters still accepts the legacy
-  // `intermodal=1` param on input, so old deep-links keep working).
-  if (f.equipment) p.equipment = f.equipment;
-  if (f.cargo) p.cargo = f.cargo;
+  // Equipment / cargo are MULTI-select → a stable comma-list (canonical option
+  // order, set by normalizeFilters). Drayage round-trips as `equipment=drayage`
+  // (normalizeFilters still accepts the legacy `intermodal=1` on input).
+  if (f.equipment.length) p.equipment = f.equipment.join(',');
+  if (f.cargo.length) p.cargo = f.cargo.join(',');
   if (f.recent) p.recent = '1';
   if (f.sort && f.sort !== 'featured') p.sort = f.sort;
+  // `dir` only when it differs from the sort's default → canonical stays minimal.
+  if (sortIsDirectional(f.sort) && f.dir !== SORT_DIR_DEFAULTS[f.sort]) p.dir = f.dir;
   return p;
 }
 
 type FacetChange = Partial<
   Record<
-    'state' | 'city' | 'fleet' | 'drivers' | 'safety' | 'authority' | 'equipment' | 'cargo' | 'intermodal' | 'recent' | 'sort' | 'page',
+    | 'state'
+    | 'city'
+    | 'fleet'
+    | 'drivers'
+    | 'safety'
+    | 'authority'
+    | 'equipment'
+    | 'cargo'
+    | 'intermodal'
+    | 'recent'
+    | 'sort'
+    | 'dir'
+    | 'page',
     string | null
   >
 >;
+
+/** Toggle one id in a multi-select facet list → the new comma-list for the URL
+ *  (canonical order preserved) or null when the toggle empties the facet. */
+function toggleMulti<T extends string>(order: ReadonlyArray<T>, current: T[], id: T): string | null {
+  const next = current.includes(id) ? current.filter((x) => x !== id) : [...current, id];
+  const ordered = order.filter((o) => next.includes(o));
+  return ordered.length ? ordered.join(',') : null;
+}
+
+/** Remove one id from a multi-select facet list → the new comma-list or null. */
+function removeMulti<T extends string>(order: ReadonlyArray<T>, current: T[], id: T): string | null {
+  const ordered = order.filter((o) => o !== id && current.includes(o));
+  return ordered.length ? ordered.join(',') : null;
+}
 
 /** Build an href for the current scope with one dimension changed. */
 function hrefWith(scope: FacetScope, f: DirectoryFilters, change: FacetChange, opts?: { keepPage?: boolean }): string {
@@ -832,22 +881,25 @@ function capabilitiesGroup(): string {
 }
 
 function renderSidebar(scope: FacetScope, f: DirectoryFilters, counts: FacetCounts, summary?: DirectorySummary): string {
-  // Tier 1 — Equipment & cargo (FMCSA crgo_* columns; single-select toggle).
+  // Tier 1 — Equipment & cargo (FMCSA crgo_* columns; MULTI-select checkboxes,
+  // OR within the facet). Each row toggles its id in/out of the comma-list.
+  const eqOrder = EQUIPMENT_OPTIONS.map((o) => o.id);
   const equipment = EQUIPMENT_OPTIONS.map((o) =>
     facetOptionRow(
-      f.equipment === o.id,
-      hrefWith(scope, f, { equipment: f.equipment === o.id ? null : o.id }),
+      f.equipment.includes(o.id),
+      hrefWith(scope, f, { equipment: toggleMulti(eqOrder, f.equipment, o.id) }),
       o.label,
       counts.equipment[o.id],
     ),
   ).join('\n');
 
-  // Tier 1 — Cargo specialties (FMCSA crgo_* columns; single-select toggle,
-  // orthogonal to the equipment facet via the separate `cargo` param).
+  // Tier 1 — Cargo specialties (FMCSA crgo_* columns; MULTI-select checkboxes,
+  // OR within the facet, orthogonal to equipment via the separate `cargo` param).
+  const cargoOrder = CARGO_OPTIONS.map((o) => o.id);
   const cargo = CARGO_OPTIONS.map((o) =>
     facetOptionRow(
-      f.cargo === o.id,
-      hrefWith(scope, f, { cargo: f.cargo === o.id ? null : o.id }),
+      f.cargo.includes(o.id),
+      hrefWith(scope, f, { cargo: toggleMulti(cargoOrder, f.cargo, o.id) }),
       o.label,
       counts.cargo[o.id],
     ),
@@ -935,8 +987,16 @@ function appliedChips(scope: FacetScope, f: DirectoryFilters): string {
     chips.push(`<a class="applied-chip" href="${hrefWith(scope, f, change)}">${esc(label)} <span class="x">✕</span></a>`);
   if (!scope.locked.has('state') && f.state) add(stateByCode(f.state)?.name ?? f.state, { state: null });
   if (!scope.locked.has('city') && f.citySlug) add(f.citySlug.replace(/-/g, ' '), { city: null });
-  if (f.equipment) add(EQUIPMENT_OPTIONS.find((e) => e.id === f.equipment)?.label ?? f.equipment, { equipment: null });
-  if (f.cargo) add(CARGO_OPTIONS.find((c) => c.id === f.cargo)?.label ?? f.cargo, { cargo: null });
+  // One removable chip per selected equipment / cargo value — removing one leaves
+  // the rest in the URL (removeMulti rebuilds the comma-list minus that id).
+  const eqOrder = EQUIPMENT_OPTIONS.map((e) => e.id);
+  for (const id of f.equipment) {
+    add(EQUIPMENT_OPTIONS.find((e) => e.id === id)?.label ?? id, { equipment: removeMulti(eqOrder, f.equipment, id) });
+  }
+  const cargoOrder = CARGO_OPTIONS.map((c) => c.id);
+  for (const id of f.cargo) {
+    add(CARGO_OPTIONS.find((c) => c.id === id)?.label ?? id, { cargo: removeMulti(cargoOrder, f.cargo, id) });
+  }
   if (f.fleet) add(FLEET_BUCKETS.find((b) => b.id === f.fleet)?.label ?? f.fleet, { fleet: null });
   if (f.drivers) add(DRIVERS_BUCKETS.find((b) => b.id === f.drivers)?.label ?? f.drivers, { drivers: null });
   if (f.safety) add(SAFETY_OPTIONS.find((s) => s.id === f.safety)?.label ?? f.safety, { safety: null });
@@ -946,26 +1006,66 @@ function appliedChips(scope: FacetScope, f: DirectoryFilters): string {
   return `<div class="applied-chips">${chips.join('\n')}<a class="applied-clear" href="${scope.basePath}">Clear all</a></div>`;
 }
 
+/** Direction-toggle label pair per sort — asc-label / desc-label — so the arrow
+ *  control reads naturally for each dimension (numeric vs recency vs safety). */
+function dirLabels(sort: SortId): { asc: string; desc: string } {
+  switch (sort) {
+    case 'recent':
+      return { asc: 'Oldest first', desc: 'Newest first' };
+    case 'safety':
+      return { asc: 'Best first', desc: 'Worst first' };
+    default: // fleet / drivers (numeric)
+      return { asc: 'Low → High', desc: 'High → Low' };
+  }
+}
+
 /**
- * Compact sort control — a single native <select> instead of a wrapping row of
- * chips (Alex flagged the old chips as stacking/overflowing). Each option's value
- * is the destination href; a tiny bound script navigates on change. No-JS users
- * still get a labelled, focusable control (the current sort stays `selected`), and
- * the noscript links keep every sort crawlable.
+ * Squared asc/desc direction toggle shown next to the sort <select> for the
+ * directional (numeric / recency / safety) sorts. It's an anchor (keyboard-
+ * accessible, crawlable, works with no JS) whose href flips `dir`; the URL only
+ * carries `dir` when it differs from the sort's default so canonical stays clean.
+ * `featured` has no direction → the control is omitted entirely.
+ */
+function dirControl(scope: FacetScope, f: DirectoryFilters): string {
+  if (!sortIsDirectional(f.sort)) return '';
+  const labels = dirLabels(f.sort);
+  const cur: SortDir = f.dir;
+  const next: SortDir = cur === 'asc' ? 'desc' : 'asc';
+  const curLabel = cur === 'asc' ? labels.asc : labels.desc;
+  const nextLabel = next === 'asc' ? labels.asc : labels.desc;
+  // Minimal canonical: drop `dir` when the flip lands back on the sort default.
+  const change: FacetChange = { dir: next === SORT_DIR_DEFAULTS[f.sort] ? null : next };
+  const href = hrefWith(scope, f, change);
+  const arrow = cur === 'asc' ? '▲' : '▼';
+  return `<a class="sort-dir" href="${href}" role="button"
+    aria-label="Sort direction: ${esc(curLabel)}. Activate to sort ${esc(nextLabel)}."
+    title="${esc(curLabel)} — switch to ${esc(nextLabel)}">
+    <span class="sort-dir-ico" aria-hidden="true">${arrow}</span>
+    <span class="sort-dir-txt">${esc(curLabel)}</span>
+  </a>`;
+}
+
+/**
+ * Compact sort control — a native <select> for the sort key plus a squared
+ * asc/desc direction toggle (numeric sorts go Low→High or High→Low). Each option's
+ * value is the destination href; a tiny bound script navigates on change. Changing
+ * the sort key resets `dir` to that sort's default (dir:null drops the param).
+ * No-JS users still get a labelled, focusable control + crawlable links.
  */
 function sortRow(scope: FacetScope, f: DirectoryFilters): string {
   const opts = SORT_OPTIONS.map((s) => {
-    const href = hrefWith(scope, f, { sort: s.id === 'featured' ? null : s.id });
+    const href = hrefWith(scope, f, { sort: s.id === 'featured' ? null : s.id, dir: null });
     return `<option value="${esc(href)}"${f.sort === s.id ? ' selected' : ''}>${esc(s.label)}</option>`;
   }).join('');
   const crawlLinks = SORT_OPTIONS.map(
-    (s) => `<a href="${hrefWith(scope, f, { sort: s.id === 'featured' ? null : s.id })}">${esc(s.label)}</a>`,
+    (s) => `<a href="${hrefWith(scope, f, { sort: s.id === 'featured' ? null : s.id, dir: null })}">${esc(s.label)}</a>`,
   ).join('');
   return `<div class="sort-ctl">
     <label class="sort-lbl" for="dir-sort">Sort</label>
     <span class="sort-select">
       <select id="dir-sort" aria-label="Sort carriers" data-sort-nav>${opts}</select>
     </span>
+    ${dirControl(scope, f)}
     <noscript><span class="sort-noscript">${crawlLinks}</span></noscript>
   </div>
   <script>(function(){var s=document.getElementById('dir-sort');if(s)s.addEventListener('change',function(){if(this.value)window.location.href=this.value;});})();</script>`;
