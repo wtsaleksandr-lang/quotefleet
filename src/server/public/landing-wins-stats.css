@@ -159,6 +159,25 @@ body.qf-wft .qf-wins-section {
 }
 .qf-wins-svg .w-txt-strong { fill: var(--ink-soft); font-weight: 600; }
 
+/* ── Light theme ──────────────────────────────────────────────
+   The periwinkle #6E8BFF was tuned for the dark page; on white it washes out
+   (fails AA). Re-point the section's accent token to the real brand blue so
+   the big stats, marks, chips, and lines carry on light. Dark unchanged. */
+html[data-theme="light"] body.qf-wft .qf-wins-section {
+  --wins-accent: var(--accent);
+  --wins-accent-soft: var(--accent-soft);
+  --wins-accent-line: var(--accent);
+}
+html[data-theme="light"] .qf-wins-svg .w-line { stroke: var(--accent-soft); }
+html[data-theme="light"] .qf-wins-svg .w-wash { fill: var(--accent-soft); }
+html[data-theme="light"] .qf-wins-svg .w-dot-soft { fill: var(--accent); }
+html[data-theme="light"] .qf-wins-svg .w-grid { stroke: var(--border); }
+html[data-theme="light"] .qf-wins-svg .w-bar-b { fill: var(--surface-3); }
+/* The big stat numbers are <p>, so quotefleet-color-system's `body.qf-wft p`
+   !important paints them muted; lift them to the brand blue on light for punch. */
+html[data-theme="light"] body.qf-wft .qf-wins-hero { color: var(--accent) !important; }
+html[data-theme="light"] body.qf-wft .qf-wins-unit { color: var(--ink-soft) !important; }
+
 /* ── Responsive ───────────────────────────────────────────── */
 @media (max-width: 960px) {
   .qf-wins-stats { grid-template-columns: 1fr; gap: 24px; margin-top: 32px; }

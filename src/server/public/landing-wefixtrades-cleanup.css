@@ -1025,3 +1025,244 @@ body.qf-wft .qf-included-tag {
     width: min(100%, calc(100vw - 32px)) !important;
   }
 }
+
+/* ════════════════════════════════════════════════════════════════════════
+   LIGHT THEME — Maersk-clean white/navy/blue.
+   Purely ADDITIVE: no dark rule above is edited, so dark stays pixel-identical.
+   These selectors carry higher specificity (html[data-theme="light"] body.qf-wft)
+   + !important so they win over the dark `body.qf-wft … !important` chain.
+   Colors resolve to the global theme tokens (style.css light block) — no new
+   hardcoded colors. Device mockups / video frames (qf-browser*, phone screens,
+   caption overlays) are intentionally left dark: they read as product
+   screenshots on white (Maersk-style). ════════════════════════════════════ */
+
+/* 1 ── Flip the bespoke --qf-wft-* palette to light tokens. This fixes every
+   rule in landing-wefixtrades.css that already uses these vars. */
+html[data-theme="light"] body.qf-wft {
+  --qf-wft-bg: var(--bg) !important;
+  --qf-wft-panel: var(--surface) !important;
+  --qf-wft-panel-2: var(--surface-2) !important;
+  --qf-wft-footer: var(--surface-2) !important;
+  --qf-wft-line: var(--border) !important;
+  --qf-wft-line-strong: var(--border-strong) !important;
+  --qf-wft-text: var(--ink) !important;
+  --qf-wft-muted: var(--ink-soft) !important;
+  --qf-wft-faint: var(--muted) !important;
+  /* quotefleet-color-system.css forces body.qf-wft p / .muted to this token
+     (#B1C5CE, tuned for dark). Re-point it to the light muted so all body copy
+     that isn't explicitly overridden below reads correctly on white. */
+  --qf-color-muted: var(--muted) !important;
+  /* brand blue + cream paper sheet stay identical across themes */
+  background: var(--bg) !important;
+  color: var(--ink) !important;
+}
+/* quotefleet-color-system.css forces every body.qf-wft heading to white
+   !important; on light that's invisible. Reset all headings to ink (specific
+   copy tweaks above still win on their higher-specificity selectors). */
+html[data-theme="light"] body.qf-wft h1,
+html[data-theme="light"] body.qf-wft h2,
+html[data-theme="light"] body.qf-wft h3,
+html[data-theme="light"] body.qf-wft h4 {
+  color: var(--ink) !important;
+}
+/* Kill the white dot-grid / dark radial overlay on light (invisible + muddying). */
+html[data-theme="light"] body.qf-wft::before {
+  opacity: 0 !important;
+}
+
+/* 2 ── Page + section backgrounds. A broad `body.qf-wft .section { … #181D1F }`
+   rule in quotefleet-color-system.css (+ #1f2628/#12161d elsewhere) forces every
+   section dark; this generic light rule resets them to the page bg, then the
+   alt-band group below lifts specific sections to surface-2. */
+html[data-theme="light"] body.qf-wft .section,
+html[data-theme="light"] body.qf-wft .section-alt,
+html[data-theme="light"] body.qf-wft .hero,
+html[data-theme="light"] body.qf-wft #faq,
+html[data-theme="light"] body.qf-wft .final-section,
+html[data-theme="light"] body.qf-wft .qf-included-section {
+  background: var(--bg) !important;
+}
+html[data-theme="light"] body.qf-wft .how-section,
+html[data-theme="light"] body.qf-wft .qf-trust-section,
+html[data-theme="light"] body.qf-wft .qf-showcase-section,
+html[data-theme="light"] body.qf-wft .qf-setup-section,
+html[data-theme="light"] body.qf-wft .site-footer,
+html[data-theme="light"] body.qf-wft .premium-footer {
+  background: var(--surface-2) !important;
+}
+
+/* 3 ── Cards / panels (were #151a1c / #0e1314 / #0f1416 etc). */
+html[data-theme="light"] body.qf-wft .visual-flow,
+html[data-theme="light"] body.qf-wft .faq-item,
+html[data-theme="light"] body.qf-wft .simple-step,
+html[data-theme="light"] body.qf-wft .final-cta-card,
+html[data-theme="light"] body.qf-wft .qf-trust-card,
+html[data-theme="light"] body.qf-wft .qf-trust-security,
+html[data-theme="light"] body.qf-wft .qf-included-card {
+  background: var(--surface) !important;
+  border-color: var(--border) !important;
+}
+html[data-theme="light"] body.qf-wft .flow-page,
+html[data-theme="light"] body.qf-wft .flow-customer,
+html[data-theme="light"] body.qf-wft .mini-browser,
+html[data-theme="light"] body.qf-wft .mini-result,
+html[data-theme="light"] body.qf-wft .step-art,
+html[data-theme="light"] body.qf-wft .site-mini,
+html[data-theme="light"] body.qf-wft .email-mini,
+html[data-theme="light"] body.qf-wft .url-chip,
+html[data-theme="light"] body.qf-wft .share-strip span,
+html[data-theme="light"] body.qf-wft .mini-checks span,
+html[data-theme="light"] body.qf-wft .qf-included-media {
+  background: var(--surface-2) !important;
+  border-color: var(--border) !important;
+  color: var(--ink-soft) !important;
+}
+/* Card hover borders (were rgba(255,255,255,.24)). */
+html[data-theme="light"] body.qf-wft .faq-item:hover,
+html[data-theme="light"] body.qf-wft .simple-step:hover,
+html[data-theme="light"] body.qf-wft .qf-trust-card:hover,
+html[data-theme="light"] body.qf-wft .qf-included-card:hover {
+  border-color: var(--border-strong) !important;
+}
+/* Cream "rate sheet" card: keep the warm paper look, just give it a visible
+   edge + shadow on white. */
+html[data-theme="light"] body.qf-wft .flow-rates {
+  border-color: var(--border-strong) !important;
+}
+
+/* 4 ── Text — headings/strong were #f5fcff; body was rgba(245,252,255,.66-.82). */
+html[data-theme="light"] body.qf-wft .hero h1,
+html[data-theme="light"] body.qf-wft .section-head h2,
+html[data-theme="light"] body.qf-wft .section h2,
+html[data-theme="light"] body.qf-wft .final-cta-card h2,
+html[data-theme="light"] body.qf-wft .simple-step strong,
+html[data-theme="light"] body.qf-wft .faq-item strong,
+html[data-theme="light"] body.qf-wft .qf-trust-card strong,
+html[data-theme="light"] body.qf-wft .qf-trust-security-copy strong,
+html[data-theme="light"] body.qf-wft .qf-included-card strong,
+html[data-theme="light"] body.qf-wft .qf-feature-copy h3,
+html[data-theme="light"] body.qf-wft .qf-setup-text h3,
+html[data-theme="light"] body.qf-wft .qf-ba-tag,
+html[data-theme="light"] body.qf-wft .qf-ba-proof-lead,
+html[data-theme="light"] body.qf-wft .flow-page strong,
+html[data-theme="light"] body.qf-wft .flow-customer strong,
+html[data-theme="light"] body.qf-wft .mini-result b,
+html[data-theme="light"] body.qf-wft .mini-browser p {
+  color: var(--ink) !important;
+}
+html[data-theme="light"] body.qf-wft .hero .lead,
+html[data-theme="light"] body.qf-wft .faq-item p,
+html[data-theme="light"] body.qf-wft .simple-step p,
+html[data-theme="light"] body.qf-wft .qf-trust-lead,
+html[data-theme="light"] body.qf-wft .qf-trust-card p,
+html[data-theme="light"] body.qf-wft .qf-trust-security-copy p,
+html[data-theme="light"] body.qf-wft .qf-included-card p,
+html[data-theme="light"] body.qf-wft .qf-included-section .section-head p,
+html[data-theme="light"] body.qf-wft .qf-feature-copy p,
+html[data-theme="light"] body.qf-wft .qf-setup-text p,
+html[data-theme="light"] body.qf-wft .qf-ba-subhead,
+html[data-theme="light"] body.qf-wft .qf-ba-msg,
+html[data-theme="light"] body.qf-wft .qf-ba-before .qf-ba-msg,
+html[data-theme="light"] body.qf-wft .qf-ba-stat span,
+html[data-theme="light"] body.qf-wft .final-cta-card p {
+  color: var(--ink-soft) !important;
+}
+html[data-theme="light"] body.qf-wft .micro-copy,
+html[data-theme="light"] body.qf-wft .qf-ba-sub,
+html[data-theme="light"] body.qf-wft .qf-ba-time,
+html[data-theme="light"] body.qf-wft .qf-ba-msg b,
+html[data-theme="light"] body.qf-wft .qf-ba-proof-src,
+html[data-theme="light"] body.qf-wft .qf-trust-operator {
+  color: var(--muted) !important;
+}
+html[data-theme="light"] body.qf-wft .qf-trust-operator strong {
+  color: var(--ink-soft) !important;
+}
+
+/* 5 ── Eyebrows / kickers / tags / icon tiles — periwinkle #9aaeff was for dark;
+   on white it fails AA, so use the real brand blue on a soft tint. */
+html[data-theme="light"] body.qf-wft .eyebrow,
+html[data-theme="light"] body.qf-wft .section-kicker,
+html[data-theme="light"] body.qf-wft .tag,
+html[data-theme="light"] body.qf-wft .flow-label,
+html[data-theme="light"] body.qf-wft .use-badge,
+html[data-theme="light"] body.qf-wft .qf-included-tag {
+  color: var(--accent) !important;
+  background: var(--accent-soft) !important;
+  border-color: var(--accent-soft) !important;
+}
+html[data-theme="light"] body.qf-wft .flow-icon,
+html[data-theme="light"] body.qf-wft .qf-trust-ico {
+  background: var(--accent-soft) !important;
+  color: var(--accent) !important;
+}
+/* Big proof stats (#6e8bff on dark) → brand blue on white. */
+html[data-theme="light"] body.qf-wft .qf-ba-stat b {
+  color: var(--accent) !important;
+}
+/* Before/after outcome ticks. */
+html[data-theme="light"] body.qf-wft .qf-ba-out-bad { color: var(--error) !important; }
+html[data-theme="light"] body.qf-wft .qf-ba-out-good { color: var(--success) !important; }
+
+/* 6 ── Blue-tint surfaces (before/after cards, stat tiles, rate chips). */
+html[data-theme="light"] body.qf-wft .qf-ba-before {
+  background: var(--surface-2) !important;
+  border-color: var(--border) !important;
+}
+html[data-theme="light"] body.qf-wft .qf-ba-after,
+html[data-theme="light"] body.qf-wft .qf-ba-stat {
+  background: var(--accent-soft) !important;
+}
+html[data-theme="light"] body.qf-wft .qf-ba-card {
+  border-color: var(--border) !important;
+}
+html[data-theme="light"] body.qf-wft .qf-ba-out {
+  border-top-color: var(--border) !important;
+}
+html[data-theme="light"] body.qf-wft .mini-rate-table b,
+html[data-theme="light"] body.qf-wft .mini-actions span {
+  color: var(--accent) !important;
+  background: var(--accent-soft) !important;
+  border-color: var(--accent-soft) !important;
+}
+
+/* 7 ── Secondary / ghost buttons (were translucent-white on dark). */
+html[data-theme="light"] body.qf-wft .btn-secondary,
+html[data-theme="light"] body.qf-wft .demo-link.final-demo,
+html[data-theme="light"] body.qf-wft .qf-trust-security-actions .btn-secondary {
+  background: var(--surface) !important;
+  border-color: var(--border-strong) !important;
+  color: var(--ink) !important;
+}
+html[data-theme="light"] body.qf-wft .btn-secondary:hover,
+html[data-theme="light"] body.qf-wft .qf-trust-security-actions .btn-secondary:hover {
+  border-color: var(--accent) !important;
+}
+
+/* 8 ── Text links. quotefleet-color-system.css forces every `body.qf-wft a`
+   to white !important — invisible on light. Recolor non-button links (buttons
+   keep their own white-on-blue text, so they're excluded). */
+html[data-theme="light"] body.qf-wft a:not(.btn):not(.nav-link):not(.signin):not(.demo-link) {
+  color: var(--accent) !important;
+}
+html[data-theme="light"] body.qf-wft .site-footer a,
+html[data-theme="light"] body.qf-wft .premium-footer a,
+html[data-theme="light"] body.qf-wft .footer-col a,
+html[data-theme="light"] body.qf-wft .footer-bottom a {
+  color: var(--ink-soft) !important;
+}
+html[data-theme="light"] body.qf-wft .site-footer a:hover,
+html[data-theme="light"] body.qf-wft .premium-footer a:hover,
+html[data-theme="light"] body.qf-wft .footer-col a:hover,
+html[data-theme="light"] body.qf-wft .footer-bottom a:hover {
+  color: var(--accent) !important;
+}
+/* Hero + final secondary CTA (ghost text buttons; were translucent white). */
+html[data-theme="light"] body.qf-wft .hero-cta .demo-link,
+html[data-theme="light"] body.qf-wft .qf-cta-secondary {
+  color: var(--ink) !important;
+}
+html[data-theme="light"] body.qf-wft .hero-cta .demo-link:hover,
+html[data-theme="light"] body.qf-wft .qf-cta-secondary:hover {
+  color: var(--accent) !important;
+}
