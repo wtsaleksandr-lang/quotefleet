@@ -269,6 +269,7 @@ async function getDirectorySummaryUnsafe(): Promise<DirectorySummary> {
 //     applied as filters here — we will not assert data we don't have.
 
 export type FleetBucketId = '1-25' | '26-100' | '101-500' | '500+';
+export type DriversBucketId = '1-10' | '11-50' | '51-250' | '250+';
 export type SafetyId = 'satisfactory' | 'conditional' | 'unsatisfactory' | 'unrated';
 export type SortId = 'featured' | 'safety' | 'fleet' | 'recent';
 
@@ -304,6 +305,15 @@ export const FLEET_BUCKETS: ReadonlyArray<{ id: FleetBucketId; label: string; mi
   { id: '500+', label: '500+ trucks', min: 501, max: null },
 ];
 
+/** Drivers-count buckets — FMCSA census `total_drivers` (schema column `drivers`),
+ *  the driver-headcount analog of FLEET_BUCKETS' power-unit (truck) buckets. */
+export const DRIVERS_BUCKETS: ReadonlyArray<{ id: DriversBucketId; label: string; min: number; max: number | null }> = [
+  { id: '1-10', label: '1–10 drivers', min: 1, max: 10 },
+  { id: '11-50', label: '11–50 drivers', min: 11, max: 50 },
+  { id: '51-250', label: '51–250 drivers', min: 51, max: 250 },
+  { id: '250+', label: '250+ drivers', min: 251, max: null },
+];
+
 export const SAFETY_OPTIONS: ReadonlyArray<{ id: SafetyId; label: string; letter: string | null }> = [
   { id: 'satisfactory', label: 'Satisfactory', letter: 'S' },
   { id: 'conditional', label: 'Conditional', letter: 'C' },
@@ -327,6 +337,8 @@ export interface DirectoryFilters {
   port: string | null;
   citySlug: string | null;
   fleet: FleetBucketId | null;
+  /** Drivers-count bucket (FMCSA total_drivers). null = any. */
+  drivers: DriversBucketId | null;
   safety: SafetyId | null;
   authorityActive: boolean;
   /** Legacy drayage flag — true when equipment==='drayage' OR the legacy
@@ -342,6 +354,7 @@ export interface DirectoryFilters {
 }
 
 const FLEET_IDS = new Set(FLEET_BUCKETS.map((b) => b.id));
+const DRIVERS_IDS = new Set(DRIVERS_BUCKETS.map((b) => b.id));
 const SAFETY_IDS = new Set(SAFETY_OPTIONS.map((s) => s.id));
 const SORT_IDS = new Set(SORT_OPTIONS.map((s) => s.id));
 const EQUIPMENT_IDS = new Set(EQUIPMENT_OPTIONS.map((e) => e.id));
@@ -366,6 +379,7 @@ export function normalizeFilters(
   const stateRaw = str(raw.state).toUpperCase();
   const portRaw = str(raw.port).toUpperCase().slice(0, 8);
   const fleetRaw = str(raw.fleet) as FleetBucketId;
+  const driversRaw = str(raw.drivers) as DriversBucketId;
   const safetyRaw = str(raw.safety).toLowerCase() as SafetyId;
   const sortRaw = str(raw.sort).toLowerCase() as SortId;
   // Equipment: the new single `equipment` param wins; otherwise the legacy
@@ -385,6 +399,7 @@ export function normalizeFilters(
     citySlug:
       overrides && 'citySlug' in overrides ? overrides.citySlug ?? null : str(raw.city) ? citySlugify(str(raw.city)) : null,
     fleet: FLEET_IDS.has(fleetRaw) ? fleetRaw : null,
+    drivers: DRIVERS_IDS.has(driversRaw) ? driversRaw : null,
     safety: SAFETY_IDS.has(safetyRaw) ? safetyRaw : null,
     authorityActive: String(raw.authority ?? '').toLowerCase() === 'active' || truthy(raw.authority),
     intermodal: equipment === 'drayage' || legacyIntermodal,
@@ -401,6 +416,7 @@ export const FACET_QUERY_KEYS = [
   'state',
   'city',
   'fleet',
+  'drivers',
   'safety',
   'authority',
   'intermodal',
@@ -423,6 +439,14 @@ function fleetCondition(id: FleetBucketId): SQL | null {
   return b.max == null
     ? gt(carrierDirectory.powerUnits, b.min - 1)
     : (and(gte(carrierDirectory.powerUnits, b.min), sql`${carrierDirectory.powerUnits} <= ${b.max}`) as SQL);
+}
+
+function driversCondition(id: DriversBucketId): SQL | null {
+  const b = DRIVERS_BUCKETS.find((x) => x.id === id);
+  if (!b) return null;
+  return b.max == null
+    ? gt(carrierDirectory.drivers, b.min - 1)
+    : (and(gte(carrierDirectory.drivers, b.min), sql`${carrierDirectory.drivers} <= ${b.max}`) as SQL);
 }
 
 function safetyCondition(id: SafetyId): SQL | null {
@@ -458,6 +482,10 @@ function buildConditions(f: DirectoryFilters, exclude: Set<string> = new Set()):
   if (f.fleet && !exclude.has('fleet')) {
     const fc = fleetCondition(f.fleet);
     if (fc) c.push(fc);
+  }
+  if (f.drivers && !exclude.has('drivers')) {
+    const dc = driversCondition(f.drivers);
+    if (dc) c.push(dc);
   }
   if (f.safety && !exclude.has('safety')) {
     const sc = safetyCondition(f.safety);
@@ -570,6 +598,9 @@ async function listCarriersUnsafe(filters: DirectoryFilters): Promise<CarrierLis
 // ─── Facet counts ─────────────────────────────────────────────────────────
 export interface FacetCounts {
   fleet: Record<FleetBucketId, number>;
+  drivers: Record<DriversBucketId, number>;
+  /** Per-equipment/cargo-type counts, keyed by EquipmentId (all FMCSA columns). */
+  equipment: Record<EquipmentId, number>;
   safety: Record<SafetyId, number>;
   authorityActive: number;
   intermodal: number;
@@ -579,6 +610,8 @@ export interface FacetCounts {
 function emptyFacetCounts(): FacetCounts {
   return {
     fleet: { '1-25': 0, '26-100': 0, '101-500': 0, '500+': 0 },
+    drivers: { '1-10': 0, '11-50': 0, '51-250': 0, '250+': 0 },
+    equipment: { drayage: 0, dryvan: 0, reefer: 0, hazmat: 0, tanker: 0, flatbed: 0, drybulk: 0 },
     safety: { satisfactory: 0, conditional: 0, unsatisfactory: 0, unrated: 0 },
     authorityActive: 0,
     intermodal: 0,
@@ -614,6 +647,39 @@ export async function getFacetCounts(filters: DirectoryFilters): Promise<FacetCo
       .where(whereOf('fleet'))
       .groupBy(sql`1`);
 
+    // Drivers buckets — one grouped scan (mirrors fleet).
+    const driversRows = await db()
+      .select({
+        bucket: sql<string>`case
+          when ${carrierDirectory.drivers} between 1 and 10 then '1-10'
+          when ${carrierDirectory.drivers} between 11 and 50 then '11-50'
+          when ${carrierDirectory.drivers} between 51 and 250 then '51-250'
+          when ${carrierDirectory.drivers} > 250 then '250+'
+          else 'none' end`,
+        n: sql<number>`count(*)::int`,
+      })
+      .from(carrierDirectory)
+      .where(whereOf('drivers'))
+      .groupBy(sql`1`);
+
+    // Equipment / cargo — one scan with a filtered count per FMCSA column. The
+    // equipment dimension excludes ITSELF *and* the legacy intermodal predicate
+    // (drayage maps onto the intermodal column) so each option's count is honest.
+    const eqBase = buildConditions(filters, new Set(['equipment', 'intermodal']));
+    const eqWhere = eqBase.length ? and(...eqBase) : undefined;
+    const equipmentRows = await db()
+      .select({
+        drayage: sql<number>`count(*) filter (where ${carrierDirectory.intermodal})::int`,
+        dryvan: sql<number>`count(*) filter (where ${carrierDirectory.dryVan})::int`,
+        reefer: sql<number>`count(*) filter (where ${carrierDirectory.reefer})::int`,
+        hazmat: sql<number>`count(*) filter (where ${carrierDirectory.hazmat})::int`,
+        tanker: sql<number>`count(*) filter (where ${carrierDirectory.tanker})::int`,
+        flatbed: sql<number>`count(*) filter (where ${carrierDirectory.flatbed})::int`,
+        drybulk: sql<number>`count(*) filter (where ${carrierDirectory.dryBulk})::int`,
+      })
+      .from(carrierDirectory)
+      .where(eqWhere);
+
     // Safety — one grouped scan.
     const safetyRows = await db()
       .select({
@@ -647,6 +713,19 @@ export async function getFacetCounts(filters: DirectoryFilters): Promise<FacetCo
 
     const out = emptyFacetCounts();
     for (const r of fleetRows) if (r.bucket in out.fleet) out.fleet[r.bucket as FleetBucketId] = r.n;
+    for (const r of driversRows) if (r.bucket in out.drivers) out.drivers[r.bucket as DriversBucketId] = r.n;
+    const eqCounts = equipmentRows[0];
+    if (eqCounts) {
+      out.equipment = {
+        drayage: eqCounts.drayage ?? 0,
+        dryvan: eqCounts.dryvan ?? 0,
+        reefer: eqCounts.reefer ?? 0,
+        hazmat: eqCounts.hazmat ?? 0,
+        tanker: eqCounts.tanker ?? 0,
+        flatbed: eqCounts.flatbed ?? 0,
+        drybulk: eqCounts.drybulk ?? 0,
+      };
+    }
     const sMap: Record<string, SafetyId> = { S: 'satisfactory', C: 'conditional', U: 'unsatisfactory', UNRATED: 'unrated' };
     for (const r of safetyRows) {
       const id = sMap[r.s];
