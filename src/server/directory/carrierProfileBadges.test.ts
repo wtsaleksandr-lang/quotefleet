@@ -8,8 +8,22 @@
  * attribute (which only occurs on a real badge), never the bare class token.
  */
 import { describe, it, expect } from 'vitest';
-import { renderCarrierProfile } from './pages.js';
+import { renderCarrierProfile, carrierCard } from './pages.js';
 import type { VisibleCarrier } from './queries.js';
+
+/** A carrier holding EVERY equipment/credential flag — the maximal case the
+ *  no-orphan wrap rule must survive (header groups + list card). */
+const MAXIMAL: Partial<VisibleCarrier> = {
+  intermodal: true,
+  hazmat: true,
+  dryVan: true,
+  reefer: true,
+  tanker: true,
+  flatbed: true,
+  dryBulk: true,
+  safetyRating: 'S',
+  authorityType: 'common',
+};
 
 function carrier(overrides: Partial<VisibleCarrier> = {}): VisibleCarrier {
   return {
@@ -97,6 +111,57 @@ describe('renderCarrierProfile — credential badges', () => {
     expect(html).toContain('data-tip=');
     expect(html).toContain('aria-label=');
     expect(html).toContain('role="note"');
+  });
+});
+
+describe('badge groups — no single badge is ever stranded on a line (global rule)', () => {
+  // The count-aware grid partitions each group by its data-n so no line ends
+  // with exactly one badge: 2→2, 3→3, 4→2×2, 5→3+2, 6→3×2. A data-n of 1 is a
+  // lone group (nothing to strand), and any n in 2..6 has an orphan-free layout.
+  const ORPHAN_SAFE = new Set([1, 2, 3, 4, 5, 6]);
+
+  it('profile header splits credentials + equipment into two orphan-safe groups', () => {
+    const html = renderCarrierProfile({ carrier: carrier(MAXIMAL) });
+    const groups = [...html.matchAll(/class="cp-badgegroup[^"]*" data-n="(\d+)"/g)].map((m) => Number(m[1]));
+    // Two groups: credentials (authority + drayage + hazmat + safety = 4) and
+    // equipment (dry van + reefer + tanker + flatbed + dry bulk = 5).
+    expect(groups).toEqual([4, 5]);
+    for (const n of groups) expect(ORPHAN_SAFE.has(n)).toBe(true);
+  });
+
+  it('equipment badges live in the SECOND group, credentials in the first', () => {
+    const html = renderCarrierProfile({ carrier: carrier(MAXIMAL) });
+    const equipWrap = html.indexOf('cp-badgegroup--equip');
+    // Drayage (a credential) precedes the equipment group; dry van (equipment) follows it.
+    expect(html.indexOf(badge('dray'))).toBeLessThan(equipWrap);
+    expect(html.indexOf(badge('dryvan'))).toBeGreaterThan(equipWrap);
+    expect(html).toContain('class="cp-eqlabel">Equipment<');
+  });
+
+  it('never emits a badge group with a stranded count (data-n of 0 or >6)', () => {
+    for (const sample of [carrier(), carrier(MAXIMAL), carrier({ intermodal: false, safetyRating: null })]) {
+      const html = renderCarrierProfile({ carrier: sample });
+      for (const m of html.matchAll(/class="cp-badgegroup[^"]*" data-n="(\d+)"/g)) {
+        expect(ORPHAN_SAFE.has(Number(m[1]))).toBe(true);
+      }
+    }
+  });
+
+  it('list card caps its chip row to an orphan-safe count and shows "+N more"', () => {
+    const html = carrierCard(carrier(MAXIMAL));
+    const m = html.match(/class="card-chips" data-n="(\d+)"/);
+    expect(m).not.toBeNull();
+    const n = Number(m![1]);
+    expect(n).toBe(6); // safety + hazmat + 4 shown + "+2 more" → capped at 6 (clean 3×2)
+    expect(ORPHAN_SAFE.has(n)).toBe(true);
+    expect(html).toContain('+2 more');
+  });
+
+  it('list card leaves a small chip set uncapped and orphan-safe', () => {
+    // Safety + 2 equipment = 3 pills → data-n 3 (one 3-wide row, no orphan), no "+N".
+    const html = carrierCard(carrier({ dryVan: true, reefer: true, hazmat: false, tanker: false, flatbed: false, dryBulk: false }));
+    expect(html).toMatch(/class="card-chips" data-n="3"/);
+    expect(html).not.toContain('more');
   });
 });
 
