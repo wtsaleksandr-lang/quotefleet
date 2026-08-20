@@ -29,6 +29,7 @@ import { registerIngestRoutes } from './routes/ingest.js';
 import { registerInboundRoutes } from './routes/inbound.js';
 import { registerMarketplaceRoutes } from './routes/marketplace.js';
 import { registerDirectoryRoutes } from './routes/directory.js';
+import { registerDirectoryExportRoutes } from './routes/directoryExport.js';
 import { registerRfqRoutes } from './routes/rfq.js';
 import { registerServiceRoutes } from './directory/servicePages.js';
 import { registerGlossaryRoutes } from './directory/glossary.js';
@@ -137,6 +138,10 @@ export function createApp(): express.Express {
   registerIngestRoutes(app);
   registerInboundRoutes(app);
   registerMarketplaceRoutes(app);
+  // Export routes MUST precede the directory routes: their specific paths
+  // (/directory/export/view, /directory/export.xlsx|.csv) would otherwise be
+  // swallowed by /directory/:stateSlug(/:citySlug).
+  registerDirectoryExportRoutes(app);
   registerDirectoryRoutes(app);
   registerRfqRoutes(app);
   registerServiceRoutes(app);
