@@ -26,7 +26,6 @@ import type {
   DriversBucketId,
   EquipmentId,
   CargoId,
-  SafetyId,
   SortId,
   SortDir,
 } from './queries.js';
@@ -35,7 +34,6 @@ import {
   DRIVERS_BUCKETS,
   EQUIPMENT_OPTIONS,
   CARGO_OPTIONS,
-  SAFETY_OPTIONS,
   SORT_OPTIONS,
   SORT_DIR_DEFAULTS,
   sortIsDirectional,
@@ -43,7 +41,7 @@ import {
   titleCaseCity,
 } from './queries.js';
 import { US_STATES, stateByCode, type UsState } from './usStates.js';
-import { CONTAINER_PORTS, portByCode, type ContainerPort } from './containerPorts.js';
+import { CONTAINER_PORTS, portByCode, PORT_GROUPS, portGroupForMemberCode, type ContainerPort } from './containerPorts.js';
 import { CA_PROVINCE_CODES } from './caProvinces.js';
 
 const SITE = 'https://quotefleet.net';
@@ -247,6 +245,27 @@ const DIRECTORY_CSS = `
   .facet-opt .lbl { display: flex; align-items: center; gap: 7px; }
   .facet-check { width: 14px; height: 14px; border: 1px solid var(--border-strong); border-radius: 4px; display: inline-block; flex: 0 0 auto; }
   .facet-opt.active .facet-check { background: var(--accent); border-color: var(--accent); }
+  /* Ports & terminals unfolding picker — ONE combined list (seaports + inland
+     rail ramps), grouped US / Canada, with a client-side free-text filter. */
+  details.port-picker { padding: 0; overflow: hidden; }
+  .port-picker-sum { list-style: none; cursor: pointer; display: flex; align-items: baseline; gap: 8px; padding: 14px 16px; }
+  .port-picker-sum::-webkit-details-marker { display: none; }
+  .port-picker-sum::after { content: '▾'; color: var(--muted); font-size: 11px; margin-left: auto; align-self: center; transition: transform 0.15s ease; }
+  details[open] .port-picker-sum::after { transform: rotate(180deg); }
+  @media (prefers-reduced-motion: reduce) { .port-picker-sum::after { transition: none; } }
+  .port-picker-sum .pp-title { font-size: 12px; text-transform: uppercase; letter-spacing: 0.07em; color: var(--muted); font-family: var(--font-mono); }
+  .port-picker-sum .pp-hint { font-size: 10px; font-family: var(--font-mono); color: var(--muted); opacity: 0.7; }
+  .port-picker-sum:focus-visible { outline: 2px solid var(--accent); outline-offset: -2px; border-radius: var(--radius-lg); }
+  .port-picker-body { padding: 0 16px 14px; }
+  .pp-search { display: flex; flex-direction: column; gap: 4px; margin: 0 0 10px; }
+  .pp-search-lbl { font-size: 10px; font-family: var(--font-mono); letter-spacing: 0.04em; text-transform: uppercase; color: var(--muted); }
+  .pp-search-input { width: 100%; box-sizing: border-box; background: var(--surface-2); color: var(--ink); border: 1px solid var(--border); border-radius: 8px; padding: 8px 10px; font-size: 13px; font-family: inherit; }
+  .pp-search-input::placeholder { color: var(--muted); }
+  .pp-search-input:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; border-color: var(--accent); }
+  .pp-list { max-height: 320px; overflow-y: auto; }
+  .pp-country + .pp-country { margin-top: 6px; }
+  .pp-country-h { margin: 6px 0 2px; font-size: 10px; font-family: var(--font-mono); letter-spacing: 0.06em; text-transform: uppercase; color: var(--muted); opacity: 0.85; }
+  .pp-empty { font-size: 12px; color: var(--muted); padding: 8px 2px; }
   .rail-toggle { display: none; }
   /* Slim breadcrumb bar for the hero-less results view. */
   .dir-crumbbar { padding-top: 22px; padding-bottom: 0; }
@@ -788,10 +807,11 @@ interface FacetScope {
 function currentParams(f: DirectoryFilters, locked: Set<string>): Record<string, string> {
   const p: Record<string, string> = {};
   if (!locked.has('state') && f.state) p.state = f.state;
+  if (!locked.has('port') && f.port) p.port = f.port;
   if (!locked.has('city') && f.citySlug) p.city = f.citySlug;
   if (f.fleet) p.fleet = f.fleet;
   if (f.drivers) p.drivers = f.drivers;
-  if (f.safety) p.safety = f.safety;
+  if (f.goodStandingOnly) p.standing = 'good';
   if (f.authorityActive) p.authority = 'active';
   // Equipment / cargo are MULTI-select → a stable comma-list (canonical option
   // order, set by normalizeFilters). Drayage round-trips as `equipment=drayage`
@@ -808,10 +828,11 @@ function currentParams(f: DirectoryFilters, locked: Set<string>): Record<string,
 type FacetChange = Partial<
   Record<
     | 'state'
+    | 'port'
     | 'city'
     | 'fleet'
     | 'drivers'
-    | 'safety'
+    | 'standing'
     | 'authority'
     | 'equipment'
     | 'cargo'
@@ -889,6 +910,64 @@ function capabilitiesGroup(): string {
   </div>`;
 }
 
+/** One row inside the ports/terminals picker (data-pk drives the client filter). */
+function portPickerRow(scope: FacetScope, f: DirectoryFilters, counts: FacetCounts, g: (typeof PORT_GROUPS)[number]): string {
+  const active = f.port === g.code;
+  const href = hrefWith(scope, f, { port: active ? null : g.code });
+  const search = `${g.label} ${g.city} ${g.state}`.toLowerCase();
+  return `<a class="facet-opt${active ? ' active' : ''}" href="${href}" data-pk="${esc(search)}">
+    <span class="lbl"><span class="facet-check"></span>${esc(g.label)}</span>
+    <span class="cb">${fmtNum(counts.ports[g.code] ?? 0)}</span>
+  </a>`;
+}
+
+/**
+ * The combined "Ports & terminals" unfolding picker — ONE list (seaports AND
+ * inland rail ramps together, deduped via the canonical PORT_GROUPS set), split
+ * only into United States / Canada sections, with a client-side free-text filter
+ * at the top. Co-located ports show as one "/" hub. No-JS: the <details> still
+ * unfolds natively and the full list is present; the search input is simply inert.
+ */
+function portsPickerGroup(scope: FacetScope, f: DirectoryFilters, counts: FacetCounts): string {
+  const section = (country: 'US' | 'CA', heading: string): string => {
+    const rows = PORT_GROUPS.filter((g) => g.country === country)
+      .map((g) => portPickerRow(scope, f, counts, g))
+      .join('\n');
+    if (!rows) return '';
+    return `<div class="pp-country" data-country="${country}"><h4 class="pp-country-h">${esc(heading)}</h4>${rows}</div>`;
+  };
+  return `<details class="facet-group port-picker" id="port-picker"${f.port ? ' open' : ''}>
+    <summary class="port-picker-sum">
+      <span class="pp-title">Ports &amp; terminals</span>
+      <span class="pp-hint">seaports + rail ramps</span>
+    </summary>
+    <div class="port-picker-body">
+      <div class="pp-search">
+        <label class="pp-search-lbl" for="port-search">Search ports &amp; terminals</label>
+        <input type="search" id="port-search" class="pp-search-input" placeholder="Search by name, city or state…" autocomplete="off" aria-controls="port-picker-list">
+      </div>
+      <div id="port-picker-list" class="pp-list">
+        ${section('US', 'United States')}
+        ${section('CA', 'Canada')}
+        <div class="pp-empty" hidden>No ports or terminals match your search.</div>
+      </div>
+    </div>
+  </details>
+  <script>
+    (function(){
+      var inp=document.getElementById('port-search'),list=document.getElementById('port-picker-list');
+      if(!inp||!list)return;
+      var rows=list.querySelectorAll('.facet-opt'),countries=list.querySelectorAll('.pp-country'),empty=list.querySelector('.pp-empty');
+      inp.addEventListener('input',function(){
+        var q=inp.value.trim().toLowerCase(),any=false;
+        rows.forEach(function(r){var m=!q||(r.getAttribute('data-pk')||'').indexOf(q)!==-1;r.hidden=!m;if(m)any=true;});
+        countries.forEach(function(c){c.hidden=c.querySelectorAll('.facet-opt:not([hidden])').length===0;});
+        if(empty)empty.hidden=any;
+      });
+    })();
+  </script>`;
+}
+
 function renderSidebar(scope: FacetScope, f: DirectoryFilters, counts: FacetCounts, summary?: DirectorySummary): string {
   // Tier 1 — Equipment & cargo (FMCSA crgo_* columns; MULTI-select checkboxes,
   // OR within the facet). Each row toggles its id in/out of the comma-list.
@@ -929,10 +1008,15 @@ function renderSidebar(scope: FacetScope, f: DirectoryFilters, counts: FacetCoun
     ),
   ).join('\n');
 
-  // Tier 1 — Safety rating.
-  const safety = SAFETY_OPTIONS.map((s) =>
-    facetOptionRow(f.safety === s.id, hrefWith(scope, f, { safety: f.safety === s.id ? null : s.id }), s.label, counts.safety[s.id]),
-  ).join('\n');
+  // Tier 1 — Safety: ONE "good standing" toggle. Excludes Conditional +
+  // Unsatisfactory; keeps Satisfactory + Not-rated (most carriers are unrated,
+  // so the useful filter is dropping the known-bad, not a satisfactory-only one).
+  const goodStanding = facetOptionRow(
+    f.goodStandingOnly,
+    hrefWith(scope, f, { standing: f.goodStandingOnly ? null : 'good' }),
+    'Good standing only',
+    counts.goodStanding,
+  );
 
   // Tier 1/2 — Active authority + recently-updated (status/activity).
   const authority = facetOptionRow(
@@ -968,14 +1052,19 @@ function renderSidebar(scope: FacetScope, f: DirectoryFilters, counts: FacetCoun
     }
   }
 
+  // Ports & terminals picker — only where port isn't the page's locked subject
+  // (i.e. everywhere except the dedicated /directory/port/:port page).
+  const portsGroup = scope.locked.has('port') ? '' : portsPickerGroup(scope, f, counts);
+
   return `<aside class="dir-rail" id="dir-rail">
     <button type="button" class="rail-toggle" id="rail-toggle" aria-expanded="true">Filters ▾</button>
     ${stateGroup}
+    ${portsGroup}
     <div class="facet-group"><h3>Equipment &amp; cargo</h3><span class="facet-src">FMCSA cargo-type flags</span>${equipment}</div>
     <div class="facet-group"><h3>Cargo specialties</h3><span class="facet-src">FMCSA cargo-class flags</span>${cargo}</div>
     <div class="facet-group"><h3>Fleet size</h3><span class="facet-src">FMCSA power units (trucks)</span>${fleet}</div>
     <div class="facet-group"><h3>Drivers</h3><span class="facet-src">FMCSA total drivers</span>${drivers}</div>
-    <div class="facet-group"><h3>Safety rating</h3><span class="facet-src">FMCSA safety rating</span>${safety}</div>
+    <div class="facet-group"><h3>Safety</h3><span class="facet-src">FMCSA safety rating</span>${goodStanding}</div>
     <div class="facet-group"><h3>Authority &amp; activity</h3><span class="facet-src">FMCSA authority &amp; MCS-150</span>${authority}${recent}</div>
     ${capabilitiesGroup()}
   </aside>
@@ -995,6 +1084,10 @@ function appliedChips(scope: FacetScope, f: DirectoryFilters): string {
   const add = (label: string, change: FacetChange) =>
     chips.push(`<a class="applied-chip" href="${hrefWith(scope, f, change)}">${esc(label)} <span class="x">✕</span></a>`);
   if (!scope.locked.has('state') && f.state) add(stateByCode(f.state)?.name ?? f.state, { state: null });
+  if (!scope.locked.has('port') && f.port) {
+    const g = PORT_GROUPS.find((x) => x.code === f.port) ?? portGroupForMemberCode(f.port);
+    add(g?.label ?? f.port, { port: null });
+  }
   if (!scope.locked.has('city') && f.citySlug) add(f.citySlug.replace(/-/g, ' '), { city: null });
   // One removable chip per selected equipment / cargo value — removing one leaves
   // the rest in the URL (removeMulti rebuilds the comma-list minus that id).
@@ -1008,7 +1101,7 @@ function appliedChips(scope: FacetScope, f: DirectoryFilters): string {
   }
   if (f.fleet) add(FLEET_BUCKETS.find((b) => b.id === f.fleet)?.label ?? f.fleet, { fleet: null });
   if (f.drivers) add(DRIVERS_BUCKETS.find((b) => b.id === f.drivers)?.label ?? f.drivers, { drivers: null });
-  if (f.safety) add(SAFETY_OPTIONS.find((s) => s.id === f.safety)?.label ?? f.safety, { safety: null });
+  if (f.goodStandingOnly) add('Good standing', { standing: null });
   if (f.authorityActive) add('Active authority', { authority: null });
   if (f.recent) add('Updated ≤12 mo', { recent: null });
   if (!chips.length) return '';
@@ -1477,8 +1570,11 @@ export function renderPortPage(opts: {
   };
   const canonicalPath = `${scope.basePath}${canonicalSuffix(filters, scope.locked)}`;
   const faqs = portFaqs(port);
-  const portChips = CONTAINER_PORTS.filter((p) => p.code !== port.code)
-    .map((p) => `<a class="dir-chip" href="/directory/port/${p.code}">${esc(p.name)}</a>`)
+  // Other US gateways as their DISPLAY groups (co-located ports as one "/" hub),
+  // linking to the canonical group slug so no chip lands on a redirect.
+  const usGroupCodes = new Set(CONTAINER_PORTS.map((p) => portGroupForMemberCode(p.code)?.code ?? p.code));
+  const portChips = PORT_GROUPS.filter((g) => usGroupCodes.has(g.code) && g.code !== port.code)
+    .map((g) => `<a class="dir-chip" href="/directory/port/${g.code}">${esc(g.label)}</a>`)
     .join('\n');
   const faqsHtml = `<div class="dir-section-h"><h2>Frequently asked questions</h2></div>
     ${faqs
