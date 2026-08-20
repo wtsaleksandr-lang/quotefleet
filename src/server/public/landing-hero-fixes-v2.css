@@ -270,3 +270,16 @@ html body.qf-wft .qf-dir-card__port span {
     margin-right: auto !important;
   }
 }
+
+/* Tablet band: the full desktop nav + the longer "Browse directory" CTA (shippers
+   state) overflowed the header by ~11px around 768px (horizontal scroll). Trim the
+   header's edge padding in this band to reclaim room — no breakpoint/mobile-menu
+   change. Above 900px the full 20px padding is unaffected; ≤640px the burger takes
+   over. Values on the 8px-ish ramp; no new colors. */
+@media (min-width: 641px) and (max-width: 900px) {
+  html body.qf-wft header,
+  html body.landing-v2.qf-wft header { padding-left: 12px !important; padding-right: 12px !important; }
+  html body.qf-wft .site-nav a,
+  html body.qf-wft .nav-dd-trigger { padding-left: 8px !important; padding-right: 8px !important; }
+  html body.qf-wft .site-actions .signin { white-space: nowrap !important; }
+}
