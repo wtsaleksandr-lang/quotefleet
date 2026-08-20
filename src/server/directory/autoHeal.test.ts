@@ -11,6 +11,7 @@ import {
   AUTOHEAL_LOCK_KEY,
   AUTOHEAL_MIN_ROWS,
   maybeAutoHealCarrierDirectory,
+  forceReingestCarrierDirectory,
   type AutoHealDeps,
 } from './autoHeal.js';
 import type { IngestSummary } from './carrierIngest.js';
@@ -123,6 +124,32 @@ describe('maybeAutoHealCarrierDirectory — decision logic', () => {
     });
     const outcome = await maybeAutoHealCarrierDirectory(deps);
     expect(outcome).toBe('error');
+    expect(deps.runFullIngest).not.toHaveBeenCalled();
+  });
+});
+
+describe('forceReingestCarrierDirectory — no empty-table gate', () => {
+  it('is disabled when auto-heal is gated off (never locks/ingests)', async () => {
+    const deps = mockDeps({ isDisabled: vi.fn(() => true) });
+    expect(await forceReingestCarrierDirectory(deps)).toBe('disabled');
+    expect(deps.tryAdvisoryLock).not.toHaveBeenCalled();
+    expect(deps.runFullIngest).not.toHaveBeenCalled();
+  });
+
+  it('starts a re-ingest even when the table is FULL (skips the count gate)', async () => {
+    // countCarriers returns a healthy 321k — maybeAutoHeal would no-op here, but
+    // the force path ingests regardless.
+    const deps = mockDeps({ countCarriers: vi.fn(async () => 321_000) });
+    expect(await forceReingestCarrierDirectory(deps)).toBe('started');
+    expect(deps.countCarriers).not.toHaveBeenCalled();
+    expect(deps.runFullIngest).toHaveBeenCalledTimes(1);
+    await flush();
+    expect(deps.advisoryUnlock).toHaveBeenCalledTimes(1);
+  });
+
+  it('skips when another ingest already holds the lock', async () => {
+    const deps = mockDeps({ tryAdvisoryLock: vi.fn(async () => false) });
+    expect(await forceReingestCarrierDirectory(deps)).toBe('lock-held');
     expect(deps.runFullIngest).not.toHaveBeenCalled();
   });
 });

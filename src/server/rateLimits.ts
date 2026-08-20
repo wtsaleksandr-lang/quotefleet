@@ -240,6 +240,49 @@ export const signupLimiter: RateLimitRequestHandler = rateLimit({
   message: { error: 'Too many signups from this IP. Try again in an hour.' },
 });
 
+/** POST /directory/rfq — a shipper sending a multi-carrier rate request fans out
+ *  up to RFQ_MAX_RECIPIENTS carrier emails, so it must be abuse-capped on TWO
+ *  axes: per IP (stop a bot loop) and per shipper email (stop one address from
+ *  blasting request after request). Real shippers send a handful of requests, so
+ *  these caps never touch legitimate use. Applied as an array on the route. */
+export const rfqSubmitIpLimiter: RateLimitRequestHandler = rateLimit({
+  windowMs: minutes(15),
+  limit: 8,
+  standardHeaders: 'draft-7',
+  legacyHeaders: false,
+  message: { error: 'Too many rate requests from this network. Try again in a few minutes.' },
+});
+
+export const rfqSubmitEmailLimiter: RateLimitRequestHandler = rateLimit({
+  windowMs: minutes(60),
+  limit: 12,
+  standardHeaders: 'draft-7',
+  legacyHeaders: false,
+  // Key by the shipper's email so an attacker rotating IPs still can't spam
+  // requests under one identity. Falls back to IP when no email is present.
+  keyGenerator: (req) => {
+    const email =
+      req.body && typeof req.body.shipper_email === 'string' ? req.body.shipper_email.trim().toLowerCase() : '';
+    return email ? `rfq:${email}` : `rfq-ip:${req.ip}`;
+  },
+  message: { error: 'Too many rate requests for this email. Please wait a bit.' },
+});
+
+/** POST /directory/rfq/quote/:token — a carrier submitting/updating a quote. One
+ *  token = one carrier; a tight cap stops a hammer/replay loop on a leaked link
+ *  while allowing a few edits. Keyed by the quote token (falls back to IP). */
+export const rfqQuoteLimiter: RateLimitRequestHandler = rateLimit({
+  windowMs: minutes(10),
+  limit: 20,
+  standardHeaders: 'draft-7',
+  legacyHeaders: false,
+  keyGenerator: (req) => {
+    const token = typeof req.params?.token === 'string' ? req.params.token : '';
+    return token ? `rfq-quote:${token}` : `rfq-quote-ip:${req.ip}`;
+  },
+  message: { error: 'Too many submissions. Slow down and try again shortly.' },
+});
+
 /** /api/auth/login — anti-credential-stuffing. */
 export const loginLimiter: RateLimitRequestHandler = rateLimit({
   windowMs: minutes(15),
