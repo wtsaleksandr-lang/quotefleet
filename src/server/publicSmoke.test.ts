@@ -11,7 +11,7 @@ async function file(name: string) {
 describe('public static page smoke checks', () => {
   it('landing page has simple visual-first positioning and no placeholder links', async () => {
     const html = await file('landing.html');
-    expect(html).toContain('Quote every load in seconds');
+    expect(html).toContain('Quote every load. Fully your brand.');
     expect(html).toContain('Stop losing loads to slow, manual quoting.');
     expect(html).toContain('For carriers, brokers');
     expect(html).toContain('acmetrucking.yourquote.net');
