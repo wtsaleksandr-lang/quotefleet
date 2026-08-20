@@ -18,18 +18,18 @@
 
   // ── FINAL-video beat tables (seconds) ──
   var LAPTOP_BEATS = [
-    { t0: 0.0,  t1: 6.0,  kicker: 'Rate import',    title: 'Drop in any rate sheet — a secure AI engine builds your quote calculator.' },
-    { t0: 6.0,  t1: 11.2, kicker: 'AI review',      title: 'Read and organized in seconds — no manual entry.' },
-    { t0: 11.2, t1: 20.9, kicker: 'Customize',      title: 'Make it yours — logo, colors, live preview.' },
-    { t0: 20.9, t1: 24.9, kicker: 'Share & embed', title: 'Your own link — share it anywhere, or embed it with one snippet.' },
-    { t0: 24.9, t1: 29.3, kicker: 'Leads',          title: 'Every quote becomes a lead in your inbox.' },
-    { t0: 29.3, t1: 999,  kicker: 'Auto follow-up', title: 'Automatic follow-ups on your schedule — no lead goes cold.' }
+    { t0: 0.0,  t1: 6.0,  kicker: 'Rate import',    title: 'Any rate sheet in. A calculator out.' },
+    { t0: 6.0,  t1: 11.2, kicker: 'AI review',      title: 'Read and organized in seconds.' },
+    { t0: 11.2, t1: 20.9, kicker: 'Customize',      title: 'Your logo. Your colors. Live.' },
+    { t0: 20.9, t1: 24.9, kicker: 'Share & embed', title: 'One link. Share or embed anywhere.' },
+    { t0: 24.9, t1: 29.3, kicker: 'Leads',          title: 'Every quote, a lead in your inbox.' },
+    { t0: 29.3, t1: 999,  kicker: 'Auto follow-up', title: 'Follow-ups on autopilot.' }
   ];
   var PHONE_BEATS = [
-    { t0: 0.0,  t1: 12.8, kicker: 'Instant quote',  title: 'Your customers price their own load in seconds — fully your brand.' },
-    { t0: 12.8, t1: 20.0, kicker: 'AI assistant',   title: 'A built-in AI agent answers their questions instantly.' },
-    { t0: 20.0, t1: 23.8, kicker: 'Lead capture',   title: 'Every request lands with you as a qualified lead.' },
-    { t0: 23.8, t1: 999,  kicker: 'Deposit to book', title: 'Optionally collect a deposit — or full payment — right inside the quote.' }
+    { t0: 0.0,  t1: 12.8, kicker: 'Instant quote',  title: 'Customers self-quote in seconds.' },
+    { t0: 12.8, t1: 20.0, kicker: 'AI assistant',   title: 'Built-in AI answers instantly.' },
+    { t0: 20.0, t1: 23.8, kicker: 'Lead capture',   title: 'Every request, a qualified lead.' },
+    { t0: 23.8, t1: 999,  kicker: 'Payments',       title: 'Integrated with Stripe & PayPal.' }
   ];
 
   var wrap = document.querySelector('.qf-hero-devices--video');

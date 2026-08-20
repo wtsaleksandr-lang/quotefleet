@@ -283,3 +283,11 @@ html body.qf-wft .qf-dir-card__port span {
   html body.qf-wft .nav-dd-trigger { padding-left: 8px !important; padding-right: 8px !important; }
   html body.qf-wft .site-actions .signin { white-space: nowrap !important; }
 }
+
+/* Mobile: guarantee clearance between the rotating headline caption and the
+   device stage, so the foregrounded phone (stage-phone scale-up) can never touch
+   the title text — even on a two-line caption. Pairs with the shortened premium
+   captions in landing-hero-captions.js. 16px = on the spacing ramp. */
+@media (max-width: 640px) {
+  html body.qf-wft .qf-aud-panel[data-aud-panel="carriers"] .qf-hero-media { margin-top: 16px !important; }
+}
