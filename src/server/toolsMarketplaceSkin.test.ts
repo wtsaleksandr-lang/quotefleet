@@ -14,15 +14,29 @@ async function publicFile(name: string) {
 }
 
 describe('tools and marketplace WeFixTrades styling', () => {
-  it('injects shared styling for tools and marketplace routes before static serving', async () => {
+  it('injects shared styling for the tools route before static serving', async () => {
     const app = await file('src/server/app.ts');
 
     expect(app).toContain('applyToolsMarketplaceSkin');
     expect(app).toContain('/tools-marketplace-wefixtrades.css');
     expect(app).toContain('qf-tools-marketplace');
     expect(app.indexOf("app.get(['/tools', '/tools/']")).toBeLessThan(app.indexOf('express.static'));
-    expect(app.indexOf("app.get(['/marketplace', '/marketplace/']")).toBeLessThan(app.indexOf('express.static'));
-    expect(app.indexOf("app.get('/marketplace/carrier/:slug'")).toBeLessThan(app.indexOf('express.static'));
+    // The tools route still serves skinned HTML...
+    expect(app.indexOf("app.get(['/tools', '/tools/']")).toBeLessThan(
+      app.indexOf('applyToolsMarketplaceSkin(html)'),
+    );
+  });
+
+  it('301-redirects the retired marketplace pages to the directory (before static serving)', async () => {
+    const app = await file('src/server/app.ts');
+    const redirect = await file('src/server/routes/marketplaceRedirect.ts');
+
+    // The redirects are registered (via the helper) ahead of express.static so
+    // they win over any leftover marketplace.html on disk.
+    expect(app.indexOf('registerMarketplaceRedirects(app)')).toBeLessThan(app.indexOf('express.static'));
+    // Both marketplace URLs 301 to /directory (page retired; backend untouched).
+    expect(redirect).toContain("app.get(['/marketplace', '/marketplace/'], (_req, res) => res.redirect(301, '/directory'))");
+    expect(redirect).toContain("app.get('/marketplace/carrier/:slug', (_req, res) => res.redirect(301, '/directory'))");
   });
 
   it('keeps route HTML files unchanged while adding external styling hooks', async () => {
