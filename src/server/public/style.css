@@ -144,32 +144,34 @@ html { scrollbar-width: thin; scrollbar-color: rgba(135, 138, 150, 0.38) transpa
    Only color tokens flip — radius / shadow / typography stay identical
    so layout is pixel-stable across themes.  */
 html[data-theme="light"] {
-  --bg:           #F7F8FA;
+  /* Maersk-clean: white surfaces, deep-navy ink, cool hairlines, calm space.
+     QuoteFleet blue stays the one confident accent (not Maersk cyan). */
+  --bg:           #F6F8FA;
   --surface:      #FFFFFF;
-  --surface-2:    #F1F3F6;
-  --surface-3:    #E5E7EB;
-  --border:        #E5E7EB;
-  --border-strong: #CBD0D6;
-  --ink:        #0B0F14;
-  --ink-soft:   #1E2530;
-  --muted:      #5A6470;
-  --muted-soft: #8F98A4;
+  --surface-2:    #EFF3F7;
+  --surface-3:    #E3E9EF;
+  --border:        #E1E7ED;
+  --border-strong: #C7D0D9;
+  --ink:        #0A2540;   /* deep navy */
+  --ink-soft:   #223549;
+  --muted:      #5A6B7B;
+  --muted-soft: #8996A3;
   /* On light surfaces the brand blue reads as itself (no lightened step). */
   --accent:        #0D3CFC;
-  --accent-strong: #0B34D6;
+  --accent-strong: #0A30CC;
   --accent-soft:   rgba(13, 60, 252, 0.08);
   --accent-fill:   #0D3CFC;
   --accent-ink:    #FFFFFF;
   --accent-2:      #0D3CFC;
   --accent-2-soft: rgba(13, 60, 252, 0.08);
-  /* Light dashboard: primary CTA uses solid brand blue (cream lacks contrast
-     on a white surface). Ghost secondary stays outlined. */
-  --cta-bg:              #0D3CFC;
-  --cta-bg-hover:        #0B34D6;
+  /* Light: primary CTA is a confident deep-navy fill with white text
+     (Maersk-style). Ghost secondary stays outlined in navy. */
+  --cta-bg:              #0A2540;
+  --cta-bg-hover:        #071A2E;
   --cta-text:            #FFFFFF;
-  --cta-sec-text:        #0B0F14;
-  --cta-sec-border:      rgba(11, 15, 20, 0.18);
-  --cta-sec-border-hover:rgba(11, 15, 20, 0.34);
+  --cta-sec-text:        #0A2540;
+  --cta-sec-border:      rgba(10, 37, 64, 0.18);
+  --cta-sec-border-hover:rgba(10, 37, 64, 0.34);
   --cta-sec-bg-hover:    rgba(13, 60, 252, 0.06);
   --success:    #059669;
   --success-bg: rgba(5, 150, 105, 0.10);
@@ -193,6 +195,25 @@ html[data-theme="light"] {
   transition: background 0.15s, color 0.15s, border-color 0.15s;
 }
 .qf-theme-toggle:hover { background: var(--surface-2); color: var(--ink); border-color: var(--border-strong); }
+
+/* ── Header theme toggle — compact icon button for the marketing / directory
+   topnav shells. Sun shows in dark (click → light); moon shows in light
+   (click → dark). Hairline, low-key, tracks currentColor. ── */
+.qf-theme-btn {
+  display: inline-flex; align-items: center; justify-content: center;
+  width: 40px; height: 40px; flex: 0 0 auto;
+  border: 1px solid var(--border); border-radius: var(--radius-btn);
+  background: transparent; color: var(--muted);
+  cursor: pointer;
+  transition: background 0.15s, color 0.15s, border-color 0.15s;
+}
+.qf-theme-btn:hover { background: var(--surface-2); color: var(--ink); border-color: var(--border-strong); }
+.qf-theme-btn:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+.qf-theme-btn svg { width: 18px; height: 18px; display: block; }
+.qf-theme-btn .qf-ico-moon { display: none; }
+.qf-theme-btn .qf-ico-sun  { display: block; }
+html[data-theme="light"] .qf-theme-btn .qf-ico-sun  { display: none; }
+html[data-theme="light"] .qf-theme-btn .qf-ico-moon { display: block; }
 
 /* Lucide-style inline line icons — inherit currentColor so they track the
    theme + active/hover state. One consistent 18px weight across the shell. */
@@ -1439,3 +1460,17 @@ html[data-theme="light"] .hero h1 .accent {
      so plain .topnav pages (login, marketplace) keep their always-show CTA. */
   .topnav--mobile-menu .btn.always-show { display: none; }
 }
+
+/* ── Light-theme shell overrides ──────────────────────────────────────
+   The marketing / directory topnav and the site-footer bake in dark
+   translucent backgrounds and white text. Under data-theme="light" they
+   must read as clean white surfaces with navy ink. These selectors are
+   [data-theme]-scoped, so the hardcoded-color guard exempts them, and they
+   live at EOF so the line-based guard baselines above stay stable. */
+html[data-theme="light"] .topnav {
+  background: rgba(255, 255, 255, 0.78);
+}
+html[data-theme="light"] .site-footer { color: var(--muted); }
+html[data-theme="light"] .site-footer a { color: var(--ink-soft); }
+html[data-theme="light"] .site-footer a:hover { color: var(--accent); }
+html[data-theme="light"] .site-footer strong { color: var(--ink); }
