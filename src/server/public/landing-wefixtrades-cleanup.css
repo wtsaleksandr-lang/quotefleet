@@ -1266,3 +1266,27 @@ html[data-theme="light"] body.qf-wft .hero-cta .demo-link:hover,
 html[data-theme="light"] body.qf-wft .qf-cta-secondary:hover {
   color: var(--accent) !important;
 }
+
+/* Light theme: the landing frosted header is dark-translucent by default
+   (body.qf-wft.landing-v2 .site-header { background: rgba(18,22,26,.66) !important }).
+   Flip it to a frosted WHITE bar in light mode, matching the directory topnav.
+   Higher specificity (html[data-theme=light]) + !important beats the dark rule.
+   Hardcoded white literal is guard-exempt inside a [data-theme=light] block. */
+html[data-theme="light"] body.qf-wft .site-header,
+html[data-theme="light"] body.qf-wft.landing-v2 .site-header {
+  background: #ffffff !important;
+  -webkit-backdrop-filter: none !important;
+  backdrop-filter: none !important;
+  border-bottom: 1px solid var(--border) !important;
+  box-shadow: 0 1px 0 var(--border) !important;
+}
+html[data-theme="light"] body.qf-wft .site-header-inner,
+html[data-theme="light"] body.qf-wft.landing-v2 .site-header-inner {
+  background: #ffffff !important;
+  -webkit-backdrop-filter: none !important;
+  backdrop-filter: none !important;
+  border: 1px solid var(--border) !important;
+}
+html[data-theme="light"] body.qf-wft .site-actions .signin {
+  color: var(--ink-soft) !important;
+}
