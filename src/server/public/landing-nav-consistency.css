@@ -1,0 +1,65 @@
+/* Nav consistency — one readable Title-Case system across the whole header.
+ *
+ * Before: `body.qf-wft .site-nav a` (in landing-home-fixes.css / quotefleet-
+ * font-system.css) forced JetBrains-Mono + UPPERCASE on every <a> in the nav —
+ * which caught the top-level links (Pricing / Compare / Demo), Sign in, AND the
+ * dropdown links (they're descendants of .site-nav). But the "Solutions"
+ * <button> and the "View demo" .btn are not <a>, so they stayed Title-Case sans
+ * → the header looked like two different type systems, and the all-caps
+ * dropdown list was hard to scan.
+ *
+ * After: every header link + the dropdown links render Title-Case sans at one
+ * scale, matching the Solutions/View-demo treatment. The small uppercase mono
+ * section labels (TOOLS / FOR YOUR BUSINESS) stay — they give the dropdown its
+ * hierarchy now that the links below them are sentence-cased.
+ *
+ * Loaded LAST + high specificity (body.landing-v2.qf-wft) + !important so it
+ * beats the earlier !important rules. No new colors/spacing tokens introduced.
+ */
+
+/* Top-level nav links + Sign in — Title-Case sans, one scale */
+body.landing-v2.qf-wft .site-nav a,
+body.landing-v2.qf-wft .site-actions .signin {
+  font-family: inherit !important;
+  text-transform: none !important;
+  letter-spacing: -0.005em !important;
+  font-size: 14px !important;
+  font-weight: 600 !important;
+}
+
+/* Match the Solutions dropdown trigger to the exact same scale/weight */
+body.landing-v2.qf-wft .nav-dd-trigger {
+  font-size: 14px !important;
+  font-weight: 600 !important;
+  letter-spacing: -0.005em !important;
+}
+
+/* Dropdown links — comfortable, scannable Title-Case list */
+body.landing-v2.qf-wft .nav-dd-panel a {
+  font-family: inherit !important;
+  text-transform: none !important;
+  letter-spacing: 0 !important;
+  font-size: 14px !important;
+  font-weight: 500 !important;
+  padding: 8px 12px !important;
+}
+
+/* Section labels stay small uppercase for hierarchy */
+body.landing-v2.qf-wft .nav-dd-head {
+  font-size: 10.5px !important;
+  color: var(--muted) !important;
+  margin-bottom: 8px !important;
+}
+
+/* A little more air between the two dropdown columns so groups read as distinct */
+body.landing-v2.qf-wft .nav-dd-panel {
+  gap: 16px 32px !important;
+  padding: 16px 24px !important;
+}
+
+/* Mobile burger menu — same Title-Case treatment for the links */
+body.landing-v2.qf-wft .site-mobile-menu a {
+  font-family: inherit !important;
+  text-transform: none !important;
+  letter-spacing: -0.005em !important;
+}
