@@ -8,7 +8,6 @@ src/server/public/brand-editor.css:121:29	color: #fff
 src/server/public/brand-editor.css:134:3	color: #fff
 src/server/public/brand-studio-preview.css:31:3	background: #fff
 src/server/public/brand-studio-preview.css:85:3	color: #fff
-src/server/public/customize-panel.css:213:21	background: #fff
 src/server/public/dashboard-preview.css:106:28	color: #fff
 src/server/public/dashboard-preview.css:135:3	color: #fff
 src/server/public/dashboard-setup.css:274:3	color: #fff
@@ -97,10 +96,10 @@ src/server/public/quote.css:1:9043	background:#fff
 src/server/public/quote.css:1:9772	background:#fff
 src/server/public/quote.css:1:10334	background:#fff
 src/server/public/quote.css:1:10350	color:#000
-src/server/public/style.css:894:35	color: #FFFFFF
-src/server/public/style.css:964:3	color: #fff
-src/server/public/style.css:1010:57	color: #FFFFFF
-src/server/public/tools.html:64:28	color: #fff
+src/server/public/style.css:915:35	color: #FFFFFF
+src/server/public/style.css:985:3	color: #fff
+src/server/public/style.css:1031:57	color: #FFFFFF
+src/server/public/tools.html:65:28	color: #fff
 src/server/public/vertical-pages-wefixtrades.css:18:3	color: #FFFFFF
 src/server/public/vertical-pages-wefixtrades.css:21:3	color: #FFFFFF
 src/server/public/vertical-pages-wefixtrades.css:43:3	color: #FFFFFF
