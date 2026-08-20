@@ -22,6 +22,7 @@ import {
   EQUIPMENT_OPTIONS,
   CARGO_OPTIONS,
 } from './queries.js';
+import { portFilterCodes, portGroupByCode, portGroupForMemberCode } from './containerPorts.js';
 
 /** Render a WHERE/ORDER SQL fragment to a lowercase string for shape assertions. */
 const dialect = new PgDialect();
@@ -37,7 +38,7 @@ describe('normalizeFilters — GET-param facet parsing', () => {
       state: 'tx',
       city: 'Houston',
       fleet: '26-100',
-      safety: 'satisfactory',
+      standing: 'good',
       authority: 'active',
       intermodal: '1',
       recent: 'yes',
@@ -48,7 +49,7 @@ describe('normalizeFilters — GET-param facet parsing', () => {
     expect(f.citySlug).toBe('houston');
     expect(f.fleet).toBe('26-100');
     expect(f.drivers).toBeNull();
-    expect(f.safety).toBe('satisfactory');
+    expect(f.goodStandingOnly).toBe(true);
     expect(f.authorityActive).toBe(true);
     expect(f.intermodal).toBe(true);
     expect(f.recent).toBe(true);
@@ -60,13 +61,13 @@ describe('normalizeFilters — GET-param facet parsing', () => {
     const f = normalizeFilters({
       state: 'texas', // too long → rejected (not 2 letters)
       fleet: 'huge',
-      safety: 'green',
+      standing: 'maybe', // junk → toggle stays off
       sort: 'random',
       page: '-5',
     });
     expect(f.state).toBeNull();
     expect(f.fleet).toBeNull();
-    expect(f.safety).toBeNull();
+    expect(f.goodStandingOnly).toBe(false);
     expect(f.sort).toBe('featured');
     expect(f.page).toBe(1);
     expect(f.authorityActive).toBe(false);
@@ -353,6 +354,86 @@ describe('query shape — OR within a facet, AND across facets', () => {
     const conds = buildConditions({ ...base, equipment: ['reefer'], cargo: ['produce'] }, new Set(['equipment']));
     expect(conds).toHaveLength(1); // only cargo survives
     expect(sqlText(conds[0])).toContain('produce');
+  });
+});
+
+describe('port groups — facet matches ANY co-located member code', () => {
+  const base = normalizeFilters({});
+
+  it('normalizeFilters passes a port group code straight through (upper-cased)', () => {
+    expect(normalizeFilters({ port: 'uslalb' }).port).toBe('USLALB');
+  });
+
+  it('the LA / Long Beach group resolves to BOTH member codes', () => {
+    expect(portFilterCodes('USLALB').sort()).toEqual(['USLAX', 'USLGB']);
+  });
+
+  it('a bare legacy member code consolidates to the whole hub (USLAX → LA/LB pair)', () => {
+    expect(portFilterCodes('USLAX').sort()).toEqual(['USLAX', 'USLGB']);
+    expect(portFilterCodes('USLGB').sort()).toEqual(['USLAX', 'USLGB']);
+  });
+
+  it('a standalone port resolves to just itself', () => {
+    expect(portFilterCodes('USMIA')).toEqual(['USMIA']);
+  });
+
+  it('an unknown port value filters literally (never throws / empties)', () => {
+    expect(portFilterCodes('ZZZZ')).toEqual(['ZZZZ']);
+    expect(portFilterCodes('')).toEqual([]);
+  });
+
+  it('a group port contributes exactly ONE WHERE condition (the member OR-set)', () => {
+    const conds = buildConditions({ ...base, port: 'USLALB' });
+    expect(conds).toHaveLength(1);
+    // (member codes are bound params, so we assert the count + the members via the helper)
+    expect(portFilterCodes('USLALB')).toHaveLength(2);
+  });
+
+  it('excluding the port dimension drops its condition (facet-count self-exclude)', () => {
+    const conds = buildConditions({ ...base, port: 'USLALB' }, new Set(['port']));
+    expect(conds).toHaveLength(0);
+  });
+
+  it('port is a recognized facet query key (shareable/crawlable results view)', () => {
+    expect(FACET_QUERY_KEYS).toContain('port');
+  });
+
+  it('a merged member code maps to a DIFFERENT group code (drives the 301 redirect)', () => {
+    const g = portGroupForMemberCode('USLAX');
+    expect(g?.code).toBe('USLALB');
+    expect(g?.code).not.toBe('USLAX'); // route sees code !== group.code → 301
+    // A standalone code is its own group code → no redirect.
+    expect(portGroupByCode('USMIA')?.code).toBe('USMIA');
+  });
+});
+
+describe('safety → single "good standing" toggle', () => {
+  const base = normalizeFilters({});
+
+  it('the toggle is OFF by default', () => {
+    expect(normalizeFilters({}).goodStandingOnly).toBe(false);
+  });
+
+  it('?standing=good turns it on; a truthy 1 also works', () => {
+    expect(normalizeFilters({ standing: 'good' }).goodStandingOnly).toBe(true);
+    expect(normalizeFilters({ standing: '1' }).goodStandingOnly).toBe(true);
+  });
+
+  it('emits ONE condition that excludes Conditional + Unsatisfactory but keeps unrated', () => {
+    const conds = buildConditions({ ...base, goodStandingOnly: true });
+    expect(conds).toHaveLength(1);
+    const s = sqlText(conds[0]);
+    expect(s).toContain('safety_rating');
+    expect(s).toContain('is null'); // not-rated (null) is KEPT
+    expect(s).toContain("not in ('c', 'u')"); // conditional + unsatisfactory dropped
+  });
+
+  it('off → no safety condition at all', () => {
+    expect(buildConditions({ ...base, goodStandingOnly: false })).toHaveLength(0);
+  });
+
+  it('standing is a recognized facet query key', () => {
+    expect(FACET_QUERY_KEYS).toContain('standing');
   });
 });
 
