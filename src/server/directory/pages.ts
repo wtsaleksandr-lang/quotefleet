@@ -145,8 +145,13 @@ const DIRECTORY_CSS = `
   .dir-shell { max-width: 1100px; margin: 0 auto; padding: 28px; }
   /* Left-align the hero — the shared marketing .hero centers text; directory
      pages must read as a left-aligned page/company card, never centered. */
-  .dir-hero { padding: 40px 28px 22px; text-align: left; }
-  .dir-hero .container-narrow { max-width: 1100px; margin: 0; }
+  /* Section keeps only vertical padding; the full-width gradient bg still spans
+     edge-to-edge (via .hero::before). All horizontal work lives on the inner
+     container so it mirrors .dir-shell's content column exactly (same max-width,
+     same margin:0 auto centering, same 28px inset) → header and body cards share
+     one left edge at every width. */
+  .dir-hero { padding: 40px 0 22px; text-align: left; }
+  .dir-hero .container-narrow { max-width: 1100px; margin: 0 auto; padding-left: 28px; padding-right: 28px; }
   .dir-hero h1 { font-size: 40px; line-height: 1.1; margin: 0 0 10px; }
   .dir-hero p.lead { max-width: 640px; margin-left: 0; margin-right: 0; }
   .dir-hero .hero-cta, .dir-hero .hero-meta { justify-content: flex-start; }
@@ -284,7 +289,11 @@ const DIRECTORY_CSS = `
   }
   @media (max-width: 640px) {
     .dir-hero h1 { font-size: 30px; }
-    .dir-shell, .dir-hero { padding-left: 18px; padding-right: 18px; }
+    /* Mobile inset: pad the CONTENT containers (not the full-width .dir-hero
+       section, whose horizontal padding is 0) so the header's inner container
+       and the body share the same 18px left edge — no double-padding. */
+    .dir-shell { padding-left: 18px; padding-right: 18px; }
+    .dir-hero .container-narrow { padding-left: 18px; padding-right: 18px; }
     .dir-grid { grid-template-columns: 1fr 1fr; gap: 10px; }
     .carrier-facts { gap: 14px; }
     /* Sort bar: count on its own row, then the full sort control (label + select
