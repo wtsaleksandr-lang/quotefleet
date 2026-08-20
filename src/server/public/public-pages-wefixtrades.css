@@ -171,3 +171,150 @@
   .qf-public-wft .support-shell,
   .qf-public-wft .sec-shell { padding-inline: var(--space-2); }
 }
+
+/* ─────────────────────────────────────────────────────────────────
+   LIGHT THEME — Maersk-clean (white surfaces, deep-navy ink, blue
+   accent, navy CTAs). Opted in via html[data-theme="light"]. All rules
+   below are [data-theme]-scoped, so they are exempt from the hardcoded-
+   color guard and never touch the DARK default above. The strategy:
+   (1) re-point the local --qf-wft-* palette vars to the global light
+   tokens so every var()-driven rule (incl. the sibling dpa / tools /
+   marketplace sheets) flips automatically, then (2) explicitly override
+   the rules that hardcode dark hex — here and in quotefleet-color-
+   system.css — using html[data-theme="light"] body.qf-public-wft … so
+   the higher specificity + !important beats color-system's !important.
+   ───────────────────────────────────────────────────────────────── */
+html[data-theme="light"] .qf-public-wft {
+  --accent: #0D3CFC;                    /* on light, brand blue reads as itself */
+  --accent-soft: rgba(13, 60, 252, .10);
+  --qf-wft-bg: var(--bg);
+  --qf-wft-panel: var(--surface);
+  --qf-wft-panel-2: var(--surface);
+  --qf-wft-line: var(--border);
+  --qf-wft-line-strong: var(--border-strong);
+  --qf-wft-text: var(--ink);
+  --qf-wft-muted: var(--muted);
+  --qf-wft-faint: var(--muted-soft);
+  --qf-wft-cream: var(--accent);        /* paired dark-on-cream rules re-inked below */
+}
+
+/* Page canvas + base text (beats color-system body.qf-public-wft). */
+html[data-theme="light"] body.qf-public-wft {
+  background: var(--bg) !important;
+  color: var(--ink-soft) !important;
+}
+html[data-theme="light"] body.qf-public-wft .topnav,
+html[data-theme="light"] .qf-public-wft .topnav {
+  background: var(--surface) !important;
+  border-color: var(--border) !important;
+}
+html[data-theme="light"] body.qf-public-wft .hero,
+html[data-theme="light"] body.qf-public-wft .section,
+html[data-theme="light"] body.qf-public-wft main {
+  background: var(--bg) !important;
+}
+
+/* Headings / brand / strong text → deep navy. */
+html[data-theme="light"] body.qf-public-wft h1,
+html[data-theme="light"] body.qf-public-wft h2,
+html[data-theme="light"] body.qf-public-wft h3,
+html[data-theme="light"] body.qf-public-wft h4,
+html[data-theme="light"] body.qf-public-wft .brand-mark,
+html[data-theme="light"] body.qf-public-wft .price,
+html[data-theme="light"] body.qf-public-wft .sec-shell .lead-line {
+  color: var(--ink) !important;
+}
+
+/* Body copy / muted / list text → cool grey (AA on white). */
+html[data-theme="light"] body.qf-public-wft p,
+html[data-theme="light"] body.qf-public-wft li,
+html[data-theme="light"] body.qf-public-wft .muted,
+html[data-theme="light"] body.qf-public-wft .muted-small,
+html[data-theme="light"] body.qf-public-wft .price .per,
+html[data-theme="light"] body.qf-public-wft .support-table td,
+html[data-theme="light"] body.qf-public-wft .sec-shell h3 {
+  color: var(--muted) !important;
+}
+
+/* Links → navy body-link (was white-on-dark). */
+html[data-theme="light"] body.qf-public-wft a {
+  color: var(--ink-soft) !important;
+}
+html[data-theme="light"] body.qf-public-wft a:hover {
+  color: var(--accent) !important;
+}
+/* …but keep WHITE label on the solid brand-blue primary button (the generic
+   anchor rule above would otherwise paint its text navy-on-blue). */
+html[data-theme="light"] body.qf-public-wft a.btn-primary,
+html[data-theme="light"] body.qf-public-wft .btn-primary,
+html[data-theme="light"] body.qf-public-wft a.btn-primary:hover,
+html[data-theme="light"] body.qf-public-wft .btn-primary .arr {
+  color: var(--accent-ink) !important;
+}
+
+/* Cards / panels / tables → white surface, hairline border, soft shadow
+   (beats both color-system and the local #22282A !important card rule). */
+html[data-theme="light"] body.qf-public-wft .price-card,
+html[data-theme="light"] body.qf-public-wft .support-card,
+html[data-theme="light"] body.qf-public-wft .support-note,
+html[data-theme="light"] body.qf-public-wft .support-table,
+html[data-theme="light"] body.qf-public-wft .sec-shell .ct-card,
+html[data-theme="light"] body.qf-public-wft .sec-shell .footer-note,
+html[data-theme="light"] body.qf-public-wft main.container > div[style*="text-align: center"] {
+  background: var(--surface) !important;
+  border-color: var(--border) !important;
+  color: var(--ink-soft) !important;
+  box-shadow: var(--shadow-md) !important;
+}
+html[data-theme="light"] body.qf-public-wft .price-card.featured {
+  border-color: var(--accent) !important;
+  box-shadow: 0 0 0 1px var(--accent-soft), var(--shadow-lg) !important;
+}
+html[data-theme="light"] body.qf-public-wft .support-card h3,
+html[data-theme="light"] body.qf-public-wft .price-card h3,
+html[data-theme="light"] body.qf-public-wft .sec-shell .ct-card h4 {
+  color: var(--ink) !important;
+}
+
+/* Pills / tags / eyebrows → accent text on a faint accent tint. */
+html[data-theme="light"] body.qf-public-wft .support-pill,
+html[data-theme="light"] body.qf-public-wft .sec-shell .pill,
+html[data-theme="light"] body.qf-public-wft .tag {
+  color: var(--accent) !important;
+  background: var(--accent-soft) !important;
+  border-color: rgba(13, 60, 252, .28) !important;
+}
+
+/* Table header tint (was rgba(255,255,255,.04) — invisible on white). */
+html[data-theme="light"] body.qf-public-wft .support-table th {
+  background: var(--surface-2) !important;
+  color: var(--ink) !important;
+  border-color: var(--border) !important;
+}
+html[data-theme="light"] body.qf-public-wft .support-table td {
+  border-color: var(--border) !important;
+}
+
+/* Footer. */
+html[data-theme="light"] body.qf-public-wft .site-footer {
+  background: var(--surface) !important;
+  border-color: var(--border) !important;
+  color: var(--muted) !important;
+}
+html[data-theme="light"] body.qf-public-wft .site-footer a {
+  color: var(--ink-soft) !important;
+}
+html[data-theme="light"] body.qf-public-wft .site-footer a:hover {
+  color: var(--accent) !important;
+}
+
+/* Secondary button: white-on-white is invisible in light → ghost w/ border. */
+html[data-theme="light"] body.qf-public-wft .btn-secondary {
+  background: var(--surface) !important;
+  border-color: var(--border-strong) !important;
+  color: var(--ink) !important;
+}
+html[data-theme="light"] body.qf-public-wft .btn-secondary:hover {
+  border-color: var(--accent) !important;
+  color: var(--accent) !important;
+}

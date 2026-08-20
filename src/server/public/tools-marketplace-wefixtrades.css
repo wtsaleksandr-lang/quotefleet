@@ -132,3 +132,40 @@
     grid-template-columns: 1fr !important;
   }
 }
+
+/* LIGHT THEME — override the hardcoded dark card/input/chip fills (the
+   var(--qf-wft-*) text/border rules flip automatically via the palette
+   redefinition in public-pages-wefixtrades.css). Guard-exempt scope; the
+   DARK rules above are untouched. */
+html[data-theme="light"] .qf-tools-marketplace .tool-card,
+html[data-theme="light"] .qf-tools-marketplace .mp-card,
+html[data-theme="light"] .qf-tools-marketplace .mp-empty,
+html[data-theme="light"] .qf-tools-marketplace #qf-result-card {
+  background: var(--surface) !important;
+  box-shadow: var(--shadow-md) !important;
+}
+html[data-theme="light"] .qf-tools-marketplace .mp-card:hover {
+  background: var(--surface-2) !important;
+}
+html[data-theme="light"] .qf-tools-marketplace .input,
+html[data-theme="light"] .qf-tools-marketplace .select,
+html[data-theme="light"] .qf-tools-marketplace .typeahead-list {
+  background: var(--surface) !important;
+  color: var(--ink) !important;
+  /* Light native chrome: select arrow + number spinners render dark. */
+  color-scheme: light !important;
+}
+html[data-theme="light"] .qf-tools-marketplace .chip,
+html[data-theme="light"] .qf-tools-marketplace .mp-pill {
+  background: var(--surface-2) !important;
+  color: var(--ink-soft) !important;
+}
+html[data-theme="light"] .qf-tools-marketplace .chip.active {
+  background: var(--accent) !important;
+  border-color: var(--accent) !important;
+  color: var(--accent-ink) !important;
+}
+html[data-theme="light"] .qf-tools-marketplace .tool-tip-bubble,
+html[data-theme="light"] .qf-tools-marketplace .tool-tip-bubble::before {
+  background: var(--surface-2) !important;
+}

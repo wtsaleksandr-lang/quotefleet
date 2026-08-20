@@ -70,3 +70,22 @@
     font-size: 38px !important;
   }
 }
+
+/* LIGHT THEME — the --qf-wft-* text/line vars flip via the redefinition in
+   public-pages-wefixtrades.css; only the hardcoded dark panel/table fills and
+   the cream download button need explicit light overrides. Guard-exempt
+   (html[data-theme="light"] scope); DARK above is untouched. */
+html[data-theme="light"] .qf-public-wft .dpa-shell .meta-strip,
+html[data-theme="light"] .qf-public-wft .dpa-shell .sig-block,
+html[data-theme="light"] .qf-public-wft .dpa-shell .footer-note,
+html[data-theme="light"] .qf-public-wft .dpa-shell table {
+  background: var(--surface) !important;
+}
+html[data-theme="light"] .qf-public-wft .dpa-shell table th {
+  background: var(--surface-2) !important;
+}
+html[data-theme="light"] .qf-public-wft .dpa-shell .download {
+  background: var(--cta-bg) !important;
+  color: var(--cta-text) !important;
+  border-color: var(--cta-bg) !important;
+}
