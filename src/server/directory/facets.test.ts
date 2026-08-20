@@ -4,18 +4,32 @@
  * crawlable filter URLs stay stable and can never throw on junk input.
  */
 import { describe, it, expect } from 'vitest';
+import { and } from 'drizzle-orm';
+import { PgDialect } from 'drizzle-orm/pg-core';
 import {
   normalizeFilters,
+  buildConditions,
+  orderForSort,
+  resolveSortDir,
   citySlugify,
   titleCaseCity,
   FLEET_BUCKETS,
   DRIVERS_BUCKETS,
   SAFETY_OPTIONS,
   SORT_OPTIONS,
+  SORT_DIR_DEFAULTS,
   FACET_QUERY_KEYS,
   EQUIPMENT_OPTIONS,
   CARGO_OPTIONS,
 } from './queries.js';
+
+/** Render a WHERE/ORDER SQL fragment to a lowercase string for shape assertions. */
+const dialect = new PgDialect();
+const sqlText = (frag: { getSQL?: () => unknown } | unknown): string => {
+  // buildConditions entries + orderForSort chunks are SQL objects.
+  const q = dialect.sqlToQuery((frag as { getSQL: () => import('drizzle-orm').SQL }).getSQL());
+  return q.sql.toLowerCase();
+};
 
 describe('normalizeFilters — GET-param facet parsing', () => {
   it('parses a full valid facet URL', () => {
@@ -66,35 +80,35 @@ describe('normalizeFilters — GET-param facet parsing', () => {
   });
 });
 
-describe('equipment facet — single `equipment` param + legacy `intermodal` compat', () => {
-  it('parses every valid equipment id', () => {
+describe('equipment facet — MULTI-select `equipment` param + legacy `intermodal` compat', () => {
+  it('parses every valid equipment id (single value → 1-element list)', () => {
     for (const opt of EQUIPMENT_OPTIONS) {
-      expect(normalizeFilters({ equipment: opt.id }).equipment).toBe(opt.id);
+      expect(normalizeFilters({ equipment: opt.id }).equipment).toEqual([opt.id]);
     }
   });
-  it('collapses an unknown equipment value to null (never throws)', () => {
-    expect(normalizeFilters({ equipment: 'spaceship' }).equipment).toBeNull();
-    expect(normalizeFilters({}).equipment).toBeNull();
+  it('collapses an unknown equipment value to an empty list (never throws)', () => {
+    expect(normalizeFilters({ equipment: 'spaceship' }).equipment).toEqual([]);
+    expect(normalizeFilters({}).equipment).toEqual([]);
   });
   it('drayage sets the legacy intermodal boolean true (keeps featured sort / badge working)', () => {
     const f = normalizeFilters({ equipment: 'drayage' });
-    expect(f.equipment).toBe('drayage');
+    expect(f.equipment).toEqual(['drayage']);
     expect(f.intermodal).toBe(true);
   });
   it('a non-drayage equipment leaves the intermodal boolean false', () => {
     const f = normalizeFilters({ equipment: 'reefer' });
-    expect(f.equipment).toBe('reefer');
+    expect(f.equipment).toEqual(['reefer']);
     expect(f.intermodal).toBe(false);
   });
   it('the legacy `intermodal=1` param still maps to drayage', () => {
     const f = normalizeFilters({ intermodal: '1' });
-    expect(f.equipment).toBe('drayage');
+    expect(f.equipment).toEqual(['drayage']);
     expect(f.intermodal).toBe(true);
   });
-  it('an explicit equipment value wins over the legacy intermodal param', () => {
+  it('an explicit equipment value combines with the legacy intermodal param (drayage folded in, canonical order)', () => {
     const f = normalizeFilters({ equipment: 'flatbed', intermodal: '1' });
-    expect(f.equipment).toBe('flatbed');
-    // legacyIntermodal is still honored for the boolean (old deep-link semantics)
+    // drayage is first in EQUIPMENT_OPTIONS, so it leads the canonical list.
+    expect(f.equipment).toEqual(['drayage', 'flatbed']);
     expect(f.intermodal).toBe(true);
   });
   it('every equipment option is backed by a real carrier_directory column', () => {
@@ -104,19 +118,19 @@ describe('equipment facet — single `equipment` param + legacy `intermodal` com
 });
 
 describe('cargo-specialty facet — separate `cargo` param, all real FMCSA columns', () => {
-  it('parses every valid cargo id', () => {
+  it('parses every valid cargo id (single value → 1-element list)', () => {
     for (const opt of CARGO_OPTIONS) {
-      expect(normalizeFilters({ cargo: opt.id }).cargo).toBe(opt.id);
+      expect(normalizeFilters({ cargo: opt.id }).cargo).toEqual([opt.id]);
     }
   });
-  it('collapses an unknown cargo value to null (never throws)', () => {
-    expect(normalizeFilters({ cargo: 'unobtanium' }).cargo).toBeNull();
-    expect(normalizeFilters({}).cargo).toBeNull();
+  it('collapses an unknown cargo value to an empty list (never throws)', () => {
+    expect(normalizeFilters({ cargo: 'unobtanium' }).cargo).toEqual([]);
+    expect(normalizeFilters({}).cargo).toEqual([]);
   });
   it('cargo is orthogonal to equipment (both can be set at once)', () => {
     const f = normalizeFilters({ equipment: 'reefer', cargo: 'produce' });
-    expect(f.equipment).toBe('reefer');
-    expect(f.cargo).toBe('produce');
+    expect(f.equipment).toEqual(['reefer']);
+    expect(f.cargo).toEqual(['produce']);
   });
   it('cargo does not touch the legacy intermodal boolean', () => {
     expect(normalizeFilters({ cargo: 'household' }).intermodal).toBe(false);
@@ -239,5 +253,119 @@ describe('facet option tables', () => {
   it('every facet query key is a non-empty string', () => {
     expect(FACET_QUERY_KEYS.length).toBeGreaterThan(0);
     for (const k of FACET_QUERY_KEYS) expect(typeof k).toBe('string');
+  });
+});
+
+describe('multi-select parsing — comma-list, junk, dedupe, canonical order', () => {
+  it('parses a comma-separated equipment list', () => {
+    expect(normalizeFilters({ equipment: 'reefer,flatbed' }).equipment).toEqual(['reefer', 'flatbed']);
+  });
+  it('parses a comma-separated cargo list', () => {
+    expect(normalizeFilters({ cargo: 'household,beverages' }).cargo).toEqual(['household', 'beverages']);
+  });
+  it('accepts a repeated-param array (Express ?equipment=a&equipment=b)', () => {
+    expect(normalizeFilters({ equipment: ['reefer', 'flatbed'] }).equipment).toEqual(['reefer', 'flatbed']);
+  });
+  it('drops junk ids but keeps the valid ones (never throws)', () => {
+    expect(normalizeFilters({ equipment: 'reefer,spaceship,flatbed' }).equipment).toEqual(['reefer', 'flatbed']);
+    expect(normalizeFilters({ cargo: 'produce,unobtanium' }).cargo).toEqual(['produce']);
+  });
+  it('de-duplicates repeated ids', () => {
+    expect(normalizeFilters({ equipment: 'reefer,reefer,flatbed,reefer' }).equipment).toEqual(['reefer', 'flatbed']);
+  });
+  it('normalizes to canonical (option-table) order regardless of input order', () => {
+    // Input reversed vs EQUIPMENT_OPTIONS order → output still canonical.
+    expect(normalizeFilters({ equipment: 'flatbed,reefer,dryvan' }).equipment).toEqual(['dryvan', 'reefer', 'flatbed']);
+    expect(normalizeFilters({ cargo: 'produce,household' }).cargo).toEqual(['household', 'produce']);
+  });
+  it('trims whitespace and lower-cases ids', () => {
+    expect(normalizeFilters({ equipment: ' Reefer , FLATBED ' }).equipment).toEqual(['reefer', 'flatbed']);
+  });
+  it('a drayage member in a multi-list still flips the intermodal boolean', () => {
+    expect(normalizeFilters({ equipment: 'reefer,drayage' }).intermodal).toBe(true);
+    expect(normalizeFilters({ equipment: 'reefer,flatbed' }).intermodal).toBe(false);
+  });
+});
+
+describe('sort direction — dir param parse + per-sort defaults', () => {
+  it('defaults: fleet/drivers/recent = desc, safety = asc, featured = desc (unused)', () => {
+    expect(SORT_DIR_DEFAULTS).toEqual({ featured: 'desc', safety: 'asc', fleet: 'desc', drivers: 'desc', recent: 'desc' });
+  });
+  it('uses the sort default direction when no dir param is given', () => {
+    expect(normalizeFilters({ sort: 'fleet' }).dir).toBe('desc');
+    expect(normalizeFilters({ sort: 'drivers' }).dir).toBe('desc');
+    expect(normalizeFilters({ sort: 'safety' }).dir).toBe('asc');
+    expect(normalizeFilters({ sort: 'recent' }).dir).toBe('desc');
+  });
+  it('honors an explicit asc/desc dir param', () => {
+    expect(normalizeFilters({ sort: 'fleet', dir: 'asc' }).dir).toBe('asc');
+    expect(normalizeFilters({ sort: 'safety', dir: 'desc' }).dir).toBe('desc');
+  });
+  it('collapses a junk dir to the sort default (never throws)', () => {
+    expect(normalizeFilters({ sort: 'fleet', dir: 'sideways' }).dir).toBe('desc');
+  });
+  it('featured always resolves to its (unused) default direction', () => {
+    expect(normalizeFilters({ sort: 'featured', dir: 'asc' }).dir).toBe('desc');
+    expect(resolveSortDir('featured', 'asc')).toBe('desc');
+  });
+  it('drivers is a selectable sort option', () => {
+    expect(SORT_OPTIONS.map((s) => s.id)).toContain('drivers');
+  });
+});
+
+describe('query shape — OR within a facet, AND across facets', () => {
+  const base = normalizeFilters({});
+
+  it('multi-select equipment collapses to ONE OR-group condition', () => {
+    const conds = buildConditions({ ...base, equipment: ['reefer', 'flatbed'] });
+    expect(conds).toHaveLength(1);
+    const s = sqlText(conds[0]);
+    expect(s).toContain(' or ');
+    expect(s).toContain('reefer');
+    expect(s).toContain('flatbed');
+  });
+
+  it('a single equipment value is a bare eq (no redundant OR wrapper)', () => {
+    const conds = buildConditions({ ...base, equipment: ['reefer'] });
+    expect(conds).toHaveLength(1);
+    expect(sqlText(conds[0])).not.toContain(' or ');
+  });
+
+  it('equipment + cargo → TWO conditions (AND across facets), each an OR within', () => {
+    const conds = buildConditions({ ...base, equipment: ['reefer', 'flatbed'], cargo: ['produce', 'household'] });
+    expect(conds).toHaveLength(2);
+    // Combined WHERE ANDs the two facet groups together.
+    const whole = sqlText(and(...conds));
+    expect(whole).toContain(' and ');
+    expect(whole).toContain(' or ');
+  });
+
+  it('drayage rides inside the equipment OR-group (maps to the intermodal column)', () => {
+    const conds = buildConditions({ ...base, equipment: ['drayage', 'reefer'], intermodal: true });
+    expect(conds).toHaveLength(1);
+    const s = sqlText(conds[0]);
+    expect(s).toContain(' or ');
+    expect(s).toContain('intermodal');
+    expect(s).toContain('reefer');
+  });
+
+  it('excluding a facet drops its condition (facet-count self-exclude)', () => {
+    const conds = buildConditions({ ...base, equipment: ['reefer'], cargo: ['produce'] }, new Set(['equipment']));
+    expect(conds).toHaveLength(1); // only cargo survives
+    expect(sqlText(conds[0])).toContain('produce');
+  });
+});
+
+describe('orderForSort — direction is reflected in the ORDER BY', () => {
+  it('fleet asc vs desc flips the power_units direction', () => {
+    expect(sqlText(orderForSort('fleet', 'asc')[0])).toContain('asc');
+    expect(sqlText(orderForSort('fleet', 'desc')[0])).toContain('desc');
+  });
+  it('drivers sort orders by the drivers column', () => {
+    expect(sqlText(orderForSort('drivers', 'desc')[0])).toContain('drivers');
+  });
+  it('recent asc vs desc flips the updated_at direction', () => {
+    expect(sqlText(orderForSort('recent', 'asc')[0])).toContain('asc');
+    expect(sqlText(orderForSort('recent', 'desc')[0])).toContain('desc');
   });
 });
