@@ -1943,6 +1943,113 @@ export const directoryTerminals = pgTable(
 );
 
 // ────────────────────────────────────────────────────────────────────
+// MULTI-CARRIER RFQ (rate request) — the "beat LoadMatch" flow. A shipper
+// filters carriers in the public directory, then sends ONE rate request that
+// fans out to every filtered/selected carrier and collects quotes back in one
+// place. PLATFORM-LEVEL (no tenantId — this lives on the public directory
+// surface, not inside a tenant workspace), exactly like carrier_directory.
+//
+// Tokens (view_token on a request, quote_token per recipient) are unguessable
+// (nanoid, 32 chars) — they ARE the auth for the shipper's responses page and
+// each carrier's private quote page, so no login is required for either side.
+// ────────────────────────────────────────────────────────────────────
+export const rfqRequests = pgTable(
+  'rfq_requests',
+  {
+    id: serial('id').primaryKey(),
+    /** Unguessable token — the shipper's private responses link (/directory/rfq/:viewToken). */
+    viewToken: text('view_token').notNull(),
+    shipperName: text('shipper_name').notNull(),
+    shipperCompany: text('shipper_company'),
+    shipperEmail: text('shipper_email').notNull(),
+    shipperPhone: text('shipper_phone'),
+    origin: text('origin').notNull(),
+    destination: text('destination').notNull(),
+    /** Equipment id/label (e.g. 'reefer', 'flatbed', 'drayage'). */
+    equipment: text('equipment'),
+    /** Container type when drayage/intermodal (e.g. "40ft HC"). */
+    containerType: text('container_type'),
+    commodity: text('commodity'),
+    /** Free-text weight (e.g. "42,000 lbs") — kept as text so units survive. */
+    weight: text('weight'),
+    /** Free-text ready date (e.g. "2026-09-01" or "ASAP"). */
+    readyDate: text('ready_date'),
+    /** Optional shipper target rate (free-text so "$2,400" / "2400" both work). */
+    targetRate: text('target_rate'),
+    notes: text('notes'),
+    /** The directory selection that generated the recipient set: explicit dots
+     *  and/or the normalized filter querystring — recorded for provenance. */
+    filterSnapshot: jsonb('filter_snapshot').$type<RfqFilterSnapshot>(),
+    /** 'open' | 'closed'. */
+    status: text('status').notNull().default('open'),
+    createdAt: timestamp('created_at', { mode: 'date' }).notNull().defaultNow(),
+  },
+  (t) => [uniqueIndex('rfq_requests_view_token_idx').on(t.viewToken)]
+);
+
+export const rfqRecipients = pgTable(
+  'rfq_recipients',
+  {
+    id: serial('id').primaryKey(),
+    rfqId: integer('rfq_id').notNull(),
+    /** Carrier USDOT (leading zeros stripped, same normalization as carrier_directory). */
+    carrierDot: text('carrier_dot').notNull(),
+    carrierName: text('carrier_name').notNull(),
+    /** Public carrier email at fan-out time; null when the carrier has no email on file. */
+    carrierEmail: text('carrier_email'),
+    /** 'pending' | 'sent' | 'no_email' | 'opted_out' | 'quoted' | 'failed'. */
+    status: text('status').notNull().default('pending'),
+    /** Unguessable token — the carrier's private quote page (/directory/rfq/quote/:quoteToken). */
+    quoteToken: text('quote_token').notNull(),
+    sentAt: timestamp('sent_at', { mode: 'date' }),
+    createdAt: timestamp('created_at', { mode: 'date' }).notNull().defaultNow(),
+  },
+  (t) => [
+    uniqueIndex('rfq_recipients_quote_token_idx').on(t.quoteToken),
+    index('rfq_recipients_rfq_idx').on(t.rfqId),
+  ]
+);
+
+export const rfqQuotes = pgTable(
+  'rfq_quotes',
+  {
+    id: serial('id').primaryKey(),
+    rfqId: integer('rfq_id').notNull(),
+    recipientId: integer('recipient_id').notNull(),
+    carrierDot: text('carrier_dot').notNull(),
+    /** Free-text price (e.g. "$2,400") — units/formatting preserved as the carrier typed. */
+    price: text('price'),
+    transitDays: integer('transit_days'),
+    notes: text('notes'),
+    /** Free-text quote validity (e.g. "2026-09-15" or "7 days"). */
+    validUntil: text('valid_until'),
+    createdAt: timestamp('created_at', { mode: 'date' }).notNull().defaultNow(),
+  },
+  (t) => [
+    index('rfq_quotes_rfq_idx').on(t.rfqId),
+    uniqueIndex('rfq_quotes_recipient_idx').on(t.recipientId),
+  ]
+);
+
+/** The directory selection that generated an RFQ's recipient set (stored on
+ *  rfq_requests.filter_snapshot for provenance / later re-resolution). */
+export interface RfqFilterSnapshot {
+  /** Explicitly selected carrier USDOTs (the `?dots=` path). */
+  dots?: string[];
+  /** The directory filter querystring (the `?state=…&equipment=…` path). */
+  filterQuery?: string;
+}
+
+export type RfqRequest = typeof rfqRequests.$inferSelect;
+export type NewRfqRequest = typeof rfqRequests.$inferInsert;
+export type RfqRecipient = typeof rfqRecipients.$inferSelect;
+export type NewRfqRecipient = typeof rfqRecipients.$inferInsert;
+export type RfqQuote = typeof rfqQuotes.$inferSelect;
+export type NewRfqQuote = typeof rfqQuotes.$inferInsert;
+/** The lifecycle states a recipient row moves through. */
+export type RfqRecipientStatus = 'pending' | 'sent' | 'no_email' | 'opted_out' | 'quoted' | 'failed';
+
+// ────────────────────────────────────────────────────────────────────
 // Type helpers for use in the rest of the codebase.
 // ────────────────────────────────────────────────────────────────────
 export type Tenant = typeof tenants.$inferSelect;

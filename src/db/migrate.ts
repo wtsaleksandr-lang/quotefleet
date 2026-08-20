@@ -240,6 +240,58 @@ export const SELF_HEAL_TABLE_STATEMENTS: readonly string[] = [
   `CREATE UNIQUE INDEX IF NOT EXISTS "directory_terminals_code_idx" ON "directory_terminals" ("code")`,
   `CREATE INDEX IF NOT EXISTS "directory_terminals_country_idx" ON "directory_terminals" ("country")`,
   `CREATE INDEX IF NOT EXISTS "directory_terminals_type_idx" ON "directory_terminals" ("type")`,
+  // 0051_rfq.sql — multi-carrier RFQ (rate request) tables. Healed HERE (same
+  // reasoning as carrier_directory): the Replit deploy skips db:migrate and its
+  // publish tool can drop tables, so these CREATE TABLE IF NOT EXISTS statements
+  // run on every boot and no-op on a healthy DB. MUST stay byte-for-byte
+  // equivalent to drizzle/0051_rfq.sql + schema.ts (rfqRequests/Recipients/Quotes).
+  `CREATE TABLE IF NOT EXISTS "rfq_requests" (
+    "id" serial PRIMARY KEY NOT NULL,
+    "view_token" text NOT NULL,
+    "shipper_name" text NOT NULL,
+    "shipper_company" text,
+    "shipper_email" text NOT NULL,
+    "shipper_phone" text,
+    "origin" text NOT NULL,
+    "destination" text NOT NULL,
+    "equipment" text,
+    "container_type" text,
+    "commodity" text,
+    "weight" text,
+    "ready_date" text,
+    "target_rate" text,
+    "notes" text,
+    "filter_snapshot" jsonb,
+    "status" text DEFAULT 'open' NOT NULL,
+    "created_at" timestamp DEFAULT now() NOT NULL
+  )`,
+  `CREATE TABLE IF NOT EXISTS "rfq_recipients" (
+    "id" serial PRIMARY KEY NOT NULL,
+    "rfq_id" integer NOT NULL,
+    "carrier_dot" text NOT NULL,
+    "carrier_name" text NOT NULL,
+    "carrier_email" text,
+    "status" text DEFAULT 'pending' NOT NULL,
+    "quote_token" text NOT NULL,
+    "sent_at" timestamp,
+    "created_at" timestamp DEFAULT now() NOT NULL
+  )`,
+  `CREATE TABLE IF NOT EXISTS "rfq_quotes" (
+    "id" serial PRIMARY KEY NOT NULL,
+    "rfq_id" integer NOT NULL,
+    "recipient_id" integer NOT NULL,
+    "carrier_dot" text NOT NULL,
+    "price" text,
+    "transit_days" integer,
+    "notes" text,
+    "valid_until" text,
+    "created_at" timestamp DEFAULT now() NOT NULL
+  )`,
+  `CREATE UNIQUE INDEX IF NOT EXISTS "rfq_requests_view_token_idx" ON "rfq_requests" ("view_token")`,
+  `CREATE UNIQUE INDEX IF NOT EXISTS "rfq_recipients_quote_token_idx" ON "rfq_recipients" ("quote_token")`,
+  `CREATE INDEX IF NOT EXISTS "rfq_recipients_rfq_idx" ON "rfq_recipients" ("rfq_id")`,
+  `CREATE INDEX IF NOT EXISTS "rfq_quotes_rfq_idx" ON "rfq_quotes" ("rfq_id")`,
+  `CREATE UNIQUE INDEX IF NOT EXISTS "rfq_quotes_recipient_idx" ON "rfq_quotes" ("recipient_id")`,
 ];
 
 export async function ensureSelfHealTables(): Promise<void> {

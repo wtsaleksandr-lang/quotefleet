@@ -165,3 +165,60 @@ export async function maybeAutoHealCarrierDirectory(
     return 'error';
   }
 }
+
+/** Outcome of a FORCE re-ingest kick (no empty-table gate). */
+export type ForceReingestOutcome = 'disabled' | 'lock-held' | 'started';
+
+/**
+ * FORCE a full FMCSA re-ingest in the background, regardless of the current row
+ * count. Used to BACKFILL new census columns (e.g. the crgo_* equipment/cargo
+ * flags) onto an already-populated directory — the exact case
+ * maybeAutoHealCarrierDirectory() deliberately skips (its count gate no-ops on a
+ * populated table). Same safety contract as the auto-heal: single-flight via the
+ * shared advisory lock, fire-and-forget (never awaited), never throws.
+ *
+ * Deps are injected (same seams as maybeAutoHealCarrierDirectory) so it is
+ * unit-testable with no DB / no network. Returns:
+ *   - 'disabled'  — auto-heal is gated off (NODE_ENV=test / opt-out).
+ *   - 'lock-held' — another ingest already holds the advisory lock.
+ *   - 'started'   — acquired the lock → background re-ingest kicked off.
+ */
+export async function forceReingestCarrierDirectory(
+  overrides: Partial<AutoHealDeps> = {},
+): Promise<ForceReingestOutcome> {
+  const deps: AutoHealDeps = { ...defaultDeps(), ...overrides };
+  try {
+    if (deps.isDisabled()) {
+      deps.log('[autoheal] force re-ingest requested but auto-heal disabled — skipping');
+      return 'disabled';
+    }
+
+    const acquired = await deps.tryAdvisoryLock();
+    if (!acquired) {
+      deps.log('[autoheal] force re-ingest requested but an ingest is already running — skipping');
+      return 'lock-held';
+    }
+
+    deps.log('[autoheal] force re-ingest — starting background FMCSA re-ingest (no empty gate)');
+
+    void deps
+      .runFullIngest()
+      .then((summary) => {
+        deps.log(`[autoheal] force re-ingest complete — ${summary.ingested} carriers`);
+      })
+      .catch((err) => {
+        deps.log(`[autoheal] force re-ingest FAILED: ${String(err)}`);
+      })
+      .finally(() => {
+        void deps.advisoryUnlock().catch((err) => {
+          deps.log(`[autoheal] failed to release advisory lock after force re-ingest: ${String(err)}`);
+        });
+      });
+
+    return 'started';
+  } catch (err) {
+    // Deciding/locking failed — swallow (best-effort admin convenience).
+    deps.log(`[autoheal] force re-ingest check failed (non-fatal): ${String(err)}`);
+    return 'lock-held';
+  }
+}
