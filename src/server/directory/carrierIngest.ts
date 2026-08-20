@@ -103,6 +103,35 @@ export interface CensusRow {
   crgo_logpole?: string;
   /** Dry bulk (aggregates, grain-in-bulk, etc.). */
   crgo_drybulk?: string;
+  // ── Additional FMCSA cargo-CLASS specialties ('X' when set) — all confirmed
+  //    live on az4n-8mr2 (probed 2026-08-20). Shipper-relevant specialties beyond
+  //    the equipment flags above.
+  /** Household goods / HHG. */
+  crgo_household?: string;
+  /** Liquor / beverages. */
+  crgo_beverages?: string;
+  /** Fresh produce. */
+  crgo_produce?: string;
+  /** Motor vehicles. */
+  crgo_motoveh?: string;
+  /** Livestock. */
+  crgo_livestock?: string;
+  /** Grain & feed. */
+  crgo_grainfeed?: string;
+  /** Oilfield equipment / supplies. */
+  crgo_oilfield?: string;
+  /** Meat / perishable. */
+  crgo_meat?: string;
+  /** Paper products. */
+  crgo_paperprod?: string;
+  /** Construction. */
+  crgo_construct?: string;
+  /** Farm supplies. */
+  crgo_farmsupp?: string;
+  /** Coal / coke. */
+  crgo_coalcoke?: string;
+  /** Building materials. */
+  crgo_bldgmat?: string;
   phone?: string;
   phy_street?: string;
   phy_city?: string;
@@ -144,6 +173,34 @@ export interface CarrierRecord {
   flatbed: boolean;
   /** Dry bulk (crgo_drybulk). */
   dryBulk: boolean;
+  // ── Additional FMCSA cargo-CLASS specialties (crgo_* columns). Default false
+  //    (no census match ⇒ all false), unchanged until a re-ingest populates them.
+  /** Household goods / HHG (crgo_household). */
+  householdGoods: boolean;
+  /** Liquor / beverages (crgo_beverages). */
+  beverages: boolean;
+  /** Fresh produce (crgo_produce). */
+  produce: boolean;
+  /** Motor vehicles (crgo_motoveh). */
+  motorVehicles: boolean;
+  /** Livestock (crgo_livestock). */
+  livestock: boolean;
+  /** Grain & feed (crgo_grainfeed). */
+  grainFeed: boolean;
+  /** Oilfield equipment / supplies (crgo_oilfield). */
+  oilfield: boolean;
+  /** Meat / perishable (crgo_meat). */
+  meat: boolean;
+  /** Paper products (crgo_paperprod). */
+  paper: boolean;
+  /** Construction (crgo_construct). */
+  construction: boolean;
+  /** Farm supplies (crgo_farmsupp). */
+  farmSupplies: boolean;
+  /** Coal / coke (crgo_coalcoke). */
+  coalCoke: boolean;
+  /** Building materials (crgo_bldgmat). */
+  buildingMaterials: boolean;
   nearestPortCode: string | null;
   publicSlug: string;
 }
@@ -265,6 +322,44 @@ export function isDryBulk(census: CensusRow | undefined): boolean {
 }
 
 /**
+ * Additional FMCSA cargo-CLASS specialties, each a straight census crgo_* === 'X'
+ * flag (no OR-combining like the equipment helpers above — every one maps to a
+ * single verified column). Returns all-false for a missing census row. Exported
+ * so the ingest + unit tests share the exact mapping.
+ */
+export function cargoClassFlags(census: CensusRow | undefined): {
+  householdGoods: boolean;
+  beverages: boolean;
+  produce: boolean;
+  motorVehicles: boolean;
+  livestock: boolean;
+  grainFeed: boolean;
+  oilfield: boolean;
+  meat: boolean;
+  paper: boolean;
+  construction: boolean;
+  farmSupplies: boolean;
+  coalCoke: boolean;
+  buildingMaterials: boolean;
+} {
+  return {
+    householdGoods: cargoFlag(census?.crgo_household),
+    beverages: cargoFlag(census?.crgo_beverages),
+    produce: cargoFlag(census?.crgo_produce),
+    motorVehicles: cargoFlag(census?.crgo_motoveh),
+    livestock: cargoFlag(census?.crgo_livestock),
+    grainFeed: cargoFlag(census?.crgo_grainfeed),
+    oilfield: cargoFlag(census?.crgo_oilfield),
+    meat: cargoFlag(census?.crgo_meat),
+    paper: cargoFlag(census?.crgo_paperprod),
+    construction: cargoFlag(census?.crgo_construct),
+    farmSupplies: cargoFlag(census?.crgo_farmsupp),
+    coalCoke: cargoFlag(census?.crgo_coalcoke),
+    buildingMaterials: cargoFlag(census?.crgo_bldgmat),
+  };
+}
+
+/**
  * Domicile country for a (already upper-cased) physical state/province code:
  * 'US' when it's a US state/territory, 'CA' when it's a Canadian province, else
  * null (Mexico / other / no state) — unplaceable in the North-America browse.
@@ -346,6 +441,7 @@ export function normalizeCarrier(
     tanker: isTanker(census),
     flatbed: isFlatbed(census),
     dryBulk: isDryBulk(census),
+    ...cargoClassFlags(census),
     // US carriers derive the port from the ZIP centroid; CA postal codes aren't in
     // the US ZCTA table, so CA carriers map by province → nearest Canadian gateway.
     nearestPortCode: country === 'CA' ? nearestCaPortForProvince(state) : nearestPortForZip(zip),
@@ -418,6 +514,19 @@ export const CARRIER_UPSERT_SET = {
   tanker: sql`excluded.tanker`,
   flatbed: sql`excluded.flatbed`,
   dryBulk: sql`excluded.dry_bulk`,
+  householdGoods: sql`excluded.household_goods`,
+  beverages: sql`excluded.beverages`,
+  produce: sql`excluded.produce`,
+  motorVehicles: sql`excluded.motor_vehicles`,
+  livestock: sql`excluded.livestock`,
+  grainFeed: sql`excluded.grain_feed`,
+  oilfield: sql`excluded.oilfield`,
+  meat: sql`excluded.meat`,
+  paper: sql`excluded.paper`,
+  construction: sql`excluded.construction`,
+  farmSupplies: sql`excluded.farm_supplies`,
+  coalCoke: sql`excluded.coal_coke`,
+  buildingMaterials: sql`excluded.building_materials`,
   nearestPortCode: sql`excluded.nearest_port_code`,
   publicSlug: sql`excluded.public_slug`,
   updatedAt: sql`excluded.updated_at`,
@@ -486,7 +595,7 @@ export async function fetchCensusByDots(dots: string[]): Promise<Map<string, Cen
     const inList = chunk.map((d) => `'${d}'`).join(',');
     const rows = await socrataJson<CensusRow>(CENSUS_ID, {
       $select:
-        'dot_number,legal_name,dba_name,email_address,power_units,total_drivers,safety_rating,status_code,crgo_intermodal,hm_ind,crgo_genfreight,crgo_coldfood,crgo_liqgas,crgo_chem,crgo_metalsheet,crgo_machlrg,crgo_logpole,crgo_drybulk,phone,phy_street,phy_city,phy_state,phy_zip',
+        'dot_number,legal_name,dba_name,email_address,power_units,total_drivers,safety_rating,status_code,crgo_intermodal,hm_ind,crgo_genfreight,crgo_coldfood,crgo_liqgas,crgo_chem,crgo_metalsheet,crgo_machlrg,crgo_logpole,crgo_drybulk,crgo_household,crgo_beverages,crgo_produce,crgo_motoveh,crgo_livestock,crgo_grainfeed,crgo_oilfield,crgo_meat,crgo_paperprod,crgo_construct,crgo_farmsupp,crgo_coalcoke,crgo_bldgmat,phone,phy_street,phy_city,phy_state,phy_zip',
       $where: `dot_number in (${inList})`,
       $limit: String(chunk.length),
     });

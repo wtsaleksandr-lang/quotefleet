@@ -72,6 +72,21 @@ export interface VisibleCarrier {
   tanker: boolean;
   flatbed: boolean;
   dryBulk: boolean;
+  /** FMCSA cargo-CLASS specialties (crgo_* census columns). All default false
+   *  until a re-ingest backfills them. */
+  householdGoods: boolean;
+  beverages: boolean;
+  produce: boolean;
+  motorVehicles: boolean;
+  livestock: boolean;
+  grainFeed: boolean;
+  oilfield: boolean;
+  meat: boolean;
+  paper: boolean;
+  construction: boolean;
+  farmSupplies: boolean;
+  coalCoke: boolean;
+  buildingMaterials: boolean;
   nearestPortCode: string | null;
   /**
    * Admin/carrier "About" override, applied ONLY on the profile (carrierBySlug).
@@ -114,6 +129,19 @@ export function visibleCarrier(r: typeof carrierDirectory.$inferSelect): Visible
     tanker: r.tanker,
     flatbed: r.flatbed,
     dryBulk: r.dryBulk,
+    householdGoods: r.householdGoods,
+    beverages: r.beverages,
+    produce: r.produce,
+    motorVehicles: r.motorVehicles,
+    livestock: r.livestock,
+    grainFeed: r.grainFeed,
+    oilfield: r.oilfield,
+    meat: r.meat,
+    paper: r.paper,
+    construction: r.construction,
+    farmSupplies: r.farmSupplies,
+    coalCoke: r.coalCoke,
+    buildingMaterials: r.buildingMaterials,
     nearestPortCode: r.nearestPortCode,
     // FMCSA-only base shape: no override applied. The profile read
     // (carrierBySlug) merges carrier_overrides on top via mergeCarrierOverride;
@@ -298,6 +326,64 @@ export const EQUIPMENT_OPTIONS: ReadonlyArray<{
   { id: 'drybulk', label: 'Dry bulk', column: 'dryBulk' },
 ];
 
+/**
+ * Cargo-SPECIALTY filter — a SEPARATE `cargo` GET param (parallel to `equipment`,
+ * so a shipper can combine a truck/equipment type with a cargo specialty). Each id
+ * is backed by a REAL FMCSA-derived boolean column on carrier_directory (verified
+ * crgo_* census flags — see carrierIngest.ts / migration 0050), so every option is
+ * an honest filter with live counts, not a proxy. Single-select, mirroring the
+ * equipment facet. "Household goods" + "Liquor / beverages" moved here from the
+ * Tier-3 claim group now that they are real FMCSA columns.
+ */
+export type CargoId =
+  | 'household'
+  | 'beverages'
+  | 'produce'
+  | 'motorvehicles'
+  | 'livestock'
+  | 'grainfeed'
+  | 'oilfield'
+  | 'meat'
+  | 'paper'
+  | 'construction'
+  | 'farmsupplies'
+  | 'coalcoke'
+  | 'buildingmaterials';
+
+/** The carrier_directory boolean column each cargo id filters on. */
+export const CARGO_OPTIONS: ReadonlyArray<{
+  id: CargoId;
+  label: string;
+  column:
+    | 'householdGoods'
+    | 'beverages'
+    | 'produce'
+    | 'motorVehicles'
+    | 'livestock'
+    | 'grainFeed'
+    | 'oilfield'
+    | 'meat'
+    | 'paper'
+    | 'construction'
+    | 'farmSupplies'
+    | 'coalCoke'
+    | 'buildingMaterials';
+}> = [
+  { id: 'household', label: 'Household goods', column: 'householdGoods' },
+  { id: 'beverages', label: 'Liquor / beverages', column: 'beverages' },
+  { id: 'produce', label: 'Fresh produce', column: 'produce' },
+  { id: 'motorvehicles', label: 'Motor vehicles', column: 'motorVehicles' },
+  { id: 'livestock', label: 'Livestock', column: 'livestock' },
+  { id: 'grainfeed', label: 'Grain & feed', column: 'grainFeed' },
+  { id: 'oilfield', label: 'Oilfield', column: 'oilfield' },
+  { id: 'meat', label: 'Meat / perishable', column: 'meat' },
+  { id: 'paper', label: 'Paper products', column: 'paper' },
+  { id: 'construction', label: 'Construction', column: 'construction' },
+  { id: 'farmsupplies', label: 'Farm supplies', column: 'farmSupplies' },
+  { id: 'coalcoke', label: 'Coal / coke', column: 'coalCoke' },
+  { id: 'buildingmaterials', label: 'Building materials', column: 'buildingMaterials' },
+];
+
 export const FLEET_BUCKETS: ReadonlyArray<{ id: FleetBucketId; label: string; min: number; max: number | null }> = [
   { id: '1-25', label: '1–25 trucks', min: 1, max: 25 },
   { id: '26-100', label: '26–100 trucks', min: 26, max: 100 },
@@ -347,6 +433,8 @@ export interface DirectoryFilters {
   intermodal: boolean;
   /** Single equipment/cargo-type filter (see EQUIPMENT_OPTIONS). null = any. */
   equipment: EquipmentId | null;
+  /** Single cargo-specialty filter (see CARGO_OPTIONS). null = any. */
+  cargo: CargoId | null;
   recent: boolean;
   sort: SortId;
   page: number;
@@ -359,6 +447,8 @@ const SAFETY_IDS = new Set(SAFETY_OPTIONS.map((s) => s.id));
 const SORT_IDS = new Set(SORT_OPTIONS.map((s) => s.id));
 const EQUIPMENT_IDS = new Set(EQUIPMENT_OPTIONS.map((e) => e.id));
 const EQUIPMENT_COLUMN = new Map(EQUIPMENT_OPTIONS.map((e) => [e.id, e.column] as const));
+const CARGO_IDS = new Set(CARGO_OPTIONS.map((c) => c.id));
+const CARGO_COLUMN = new Map(CARGO_OPTIONS.map((c) => [c.id, c.column] as const));
 const truthy = (v: unknown): boolean => ['1', 'true', 'yes', 'on'].includes(String(v ?? '').toLowerCase());
 
 /** Turn a raw name/slug into the directory's canonical city slug form. */
@@ -393,6 +483,9 @@ export function normalizeFilters(
     : legacyIntermodal
       ? 'drayage'
       : null;
+  // Cargo specialty: a separate single-select param, orthogonal to equipment.
+  const cargoRaw = str(raw.cargo).toLowerCase() as CargoId;
+  const cargo: CargoId | null = CARGO_IDS.has(cargoRaw) ? cargoRaw : null;
   return {
     state: overrides && 'state' in overrides ? overrides.state ?? null : /^[A-Z]{2}$/.test(stateRaw) ? stateRaw : null,
     port: overrides && 'port' in overrides ? overrides.port ?? null : portRaw || null,
@@ -404,6 +497,7 @@ export function normalizeFilters(
     authorityActive: String(raw.authority ?? '').toLowerCase() === 'active' || truthy(raw.authority),
     intermodal: equipment === 'drayage' || legacyIntermodal,
     equipment,
+    cargo,
     recent: truthy(raw.recent),
     sort: SORT_IDS.has(sortRaw) ? sortRaw : 'featured',
     page: Math.max(1, parseInt(str(raw.page), 10) || 1),
@@ -421,6 +515,7 @@ export const FACET_QUERY_KEYS = [
   'authority',
   'intermodal',
   'equipment',
+  'cargo',
   'recent',
   'sort',
   'page',
@@ -468,6 +563,14 @@ function equipmentCondition(id: EquipmentId): SQL | null {
   return eq(carrierDirectory[column], true);
 }
 
+/** Cargo-specialty filter → a single `eq(<column>, true)` on the FMCSA-derived
+ *  boolean column for that cargo id. */
+function cargoCondition(id: CargoId): SQL | null {
+  const column = CARGO_COLUMN.get(id);
+  if (!column) return null;
+  return eq(carrierDirectory[column], true);
+}
+
 const recentCutoff = (): Date => new Date(Date.now() - RECENT_DAYS * 24 * 60 * 60 * 1000);
 
 /**
@@ -498,6 +601,10 @@ function buildConditions(f: DirectoryFilters, exclude: Set<string> = new Set()):
   if (f.equipment && !exclude.has('equipment')) {
     const ec = equipmentCondition(f.equipment);
     if (ec) c.push(ec);
+  }
+  if (f.cargo && !exclude.has('cargo')) {
+    const cc = cargoCondition(f.cargo);
+    if (cc) c.push(cc);
   }
   if (f.recent && !exclude.has('recent')) c.push(gte(carrierDirectory.updatedAt, recentCutoff()));
   return c;
@@ -601,6 +708,8 @@ export interface FacetCounts {
   drivers: Record<DriversBucketId, number>;
   /** Per-equipment/cargo-type counts, keyed by EquipmentId (all FMCSA columns). */
   equipment: Record<EquipmentId, number>;
+  /** Per-cargo-specialty counts, keyed by CargoId (all FMCSA crgo_* columns). */
+  cargo: Record<CargoId, number>;
   safety: Record<SafetyId, number>;
   authorityActive: number;
   intermodal: number;
@@ -612,6 +721,21 @@ function emptyFacetCounts(): FacetCounts {
     fleet: { '1-25': 0, '26-100': 0, '101-500': 0, '500+': 0 },
     drivers: { '1-10': 0, '11-50': 0, '51-250': 0, '250+': 0 },
     equipment: { drayage: 0, dryvan: 0, reefer: 0, hazmat: 0, tanker: 0, flatbed: 0, drybulk: 0 },
+    cargo: {
+      household: 0,
+      beverages: 0,
+      produce: 0,
+      motorvehicles: 0,
+      livestock: 0,
+      grainfeed: 0,
+      oilfield: 0,
+      meat: 0,
+      paper: 0,
+      construction: 0,
+      farmsupplies: 0,
+      coalcoke: 0,
+      buildingmaterials: 0,
+    },
     safety: { satisfactory: 0, conditional: 0, unsatisfactory: 0, unrated: 0 },
     authorityActive: 0,
     intermodal: 0,
@@ -680,6 +804,29 @@ export async function getFacetCounts(filters: DirectoryFilters): Promise<FacetCo
       .from(carrierDirectory)
       .where(eqWhere);
 
+    // Cargo specialties — one scan with a filtered count per FMCSA crgo_* column.
+    // Excludes ITSELF so each option's count is honest faceted-search semantics.
+    const cargoBase = buildConditions(filters, new Set(['cargo']));
+    const cargoWhere = cargoBase.length ? and(...cargoBase) : undefined;
+    const cargoRows = await db()
+      .select({
+        household: sql<number>`count(*) filter (where ${carrierDirectory.householdGoods})::int`,
+        beverages: sql<number>`count(*) filter (where ${carrierDirectory.beverages})::int`,
+        produce: sql<number>`count(*) filter (where ${carrierDirectory.produce})::int`,
+        motorvehicles: sql<number>`count(*) filter (where ${carrierDirectory.motorVehicles})::int`,
+        livestock: sql<number>`count(*) filter (where ${carrierDirectory.livestock})::int`,
+        grainfeed: sql<number>`count(*) filter (where ${carrierDirectory.grainFeed})::int`,
+        oilfield: sql<number>`count(*) filter (where ${carrierDirectory.oilfield})::int`,
+        meat: sql<number>`count(*) filter (where ${carrierDirectory.meat})::int`,
+        paper: sql<number>`count(*) filter (where ${carrierDirectory.paper})::int`,
+        construction: sql<number>`count(*) filter (where ${carrierDirectory.construction})::int`,
+        farmsupplies: sql<number>`count(*) filter (where ${carrierDirectory.farmSupplies})::int`,
+        coalcoke: sql<number>`count(*) filter (where ${carrierDirectory.coalCoke})::int`,
+        buildingmaterials: sql<number>`count(*) filter (where ${carrierDirectory.buildingMaterials})::int`,
+      })
+      .from(carrierDirectory)
+      .where(cargoWhere);
+
     // Safety — one grouped scan.
     const safetyRows = await db()
       .select({
@@ -724,6 +871,24 @@ export async function getFacetCounts(filters: DirectoryFilters): Promise<FacetCo
         tanker: eqCounts.tanker ?? 0,
         flatbed: eqCounts.flatbed ?? 0,
         drybulk: eqCounts.drybulk ?? 0,
+      };
+    }
+    const cargoCounts = cargoRows[0];
+    if (cargoCounts) {
+      out.cargo = {
+        household: cargoCounts.household ?? 0,
+        beverages: cargoCounts.beverages ?? 0,
+        produce: cargoCounts.produce ?? 0,
+        motorvehicles: cargoCounts.motorvehicles ?? 0,
+        livestock: cargoCounts.livestock ?? 0,
+        grainfeed: cargoCounts.grainfeed ?? 0,
+        oilfield: cargoCounts.oilfield ?? 0,
+        meat: cargoCounts.meat ?? 0,
+        paper: cargoCounts.paper ?? 0,
+        construction: cargoCounts.construction ?? 0,
+        farmsupplies: cargoCounts.farmsupplies ?? 0,
+        coalcoke: cargoCounts.coalcoke ?? 0,
+        buildingmaterials: cargoCounts.buildingmaterials ?? 0,
       };
     }
     const sMap: Record<string, SafetyId> = { S: 'satisfactory', C: 'conditional', U: 'unsatisfactory', UNRATED: 'unrated' };

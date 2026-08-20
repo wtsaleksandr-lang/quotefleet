@@ -1808,6 +1808,36 @@ export const carrierDirectory = pgTable(
     flatbed: boolean('flatbed').notNull().default(false),
     /** crgo_drybulk === 'X' — dry bulk. */
     dryBulk: boolean('dry_bulk').notNull().default(false),
+    // ── Additional FMCSA cargo-CLASS specialties from the census crgo_* columns
+    //    (0050_carrier_cargo_classes.sql). Shipper-relevant specialties beyond the
+    //    equipment flags above. All default false so existing rows stay valid until
+    //    a re-ingest backfills them; self-healed in migrate.ts.
+    /** crgo_household === 'X' — household goods / HHG. */
+    householdGoods: boolean('household_goods').notNull().default(false),
+    /** crgo_beverages === 'X' — liquor / beverages. */
+    beverages: boolean('beverages').notNull().default(false),
+    /** crgo_produce === 'X' — fresh produce. */
+    produce: boolean('produce').notNull().default(false),
+    /** crgo_motoveh === 'X' — motor vehicles. */
+    motorVehicles: boolean('motor_vehicles').notNull().default(false),
+    /** crgo_livestock === 'X' — livestock. */
+    livestock: boolean('livestock').notNull().default(false),
+    /** crgo_grainfeed === 'X' — grain & feed. */
+    grainFeed: boolean('grain_feed').notNull().default(false),
+    /** crgo_oilfield === 'X' — oilfield equipment / supplies. */
+    oilfield: boolean('oilfield').notNull().default(false),
+    /** crgo_meat === 'X' — meat / perishable. */
+    meat: boolean('meat').notNull().default(false),
+    /** crgo_paperprod === 'X' — paper products. */
+    paper: boolean('paper').notNull().default(false),
+    /** crgo_construct === 'X' — construction. */
+    construction: boolean('construction').notNull().default(false),
+    /** crgo_farmsupp === 'X' — farm supplies. */
+    farmSupplies: boolean('farm_supplies').notNull().default(false),
+    /** crgo_coalcoke === 'X' — coal / coke. */
+    coalCoke: boolean('coal_coke').notNull().default(false),
+    /** crgo_bldgmat === 'X' — building materials. */
+    buildingMaterials: boolean('building_materials').notNull().default(false),
     /** Derived: nearest major container/rail hub UN/LOCODE (ZIP centroid). */
     nearestPortCode: text('nearest_port_code'),
     /** Unique URL slug for the public carrier page (slug(name)-usdot). */
