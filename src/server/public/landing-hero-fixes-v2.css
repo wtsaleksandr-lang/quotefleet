@@ -121,9 +121,11 @@ html body.qf-wft .qf-shipper-hero .eyebrow {
   background: transparent !important;
   padding: 0 !important;
   margin: 0 0 24px 0 !important;
-  color: var(--accent) !important;
+  /* Quiet, subtle label — muted grey (not the loud accent blue) + a notch
+     smaller, matching the carriers hero eyebrow. */
+  color: var(--muted) !important;
   font-family: var(--font-mono) !important;
-  font-size: 11px !important;
+  font-size: 10px !important;
   font-weight: 600 !important;
   letter-spacing: 0.16em !important;
   text-transform: uppercase !important;
@@ -136,7 +138,7 @@ html body.qf-wft .qf-shipper-hero .eyebrow::before {
   width: 16px !important;
   height: 2px !important;
   border-radius: 2px !important;
-  background: var(--accent) !important;
+  background: var(--muted) !important;
 }
 
 /* ── Left-align everything at ALL breakpoints (override hero-polish centering) ── */

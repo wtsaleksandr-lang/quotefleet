@@ -391,15 +391,15 @@ src/server/public/landing-home-fixes.css:109	spacing	gap: 14px
 src/server/public/landing-home-fixes.css:123	spacing	padding: 9px 18px
 src/server/public/landing-home-fixes.css:147	spacing	gap: 10px
 src/server/public/landing-home-fixes.css:151	spacing	margin-bottom: 22px
-src/server/public/landing-home-fixes.css:173	spacing	gap: clamp(50px, 5.8vw, 92px)
-src/server/public/landing-home-fixes.css:197	spacing	gap: 20px
-src/server/public/landing-home-fixes.css:207	spacing	column-gap: 18px
-src/server/public/landing-home-fixes.css:253	spacing	gap: 26px
-src/server/public/landing-home-fixes.css:267	spacing	padding: 22px
+src/server/public/landing-home-fixes.css:175	spacing	gap: clamp(50px, 5.8vw, 92px)
+src/server/public/landing-home-fixes.css:199	spacing	gap: 20px
+src/server/public/landing-home-fixes.css:209	spacing	column-gap: 18px
+src/server/public/landing-home-fixes.css:255	spacing	gap: 26px
+src/server/public/landing-home-fixes.css:269	spacing	padding: 22px
 src/server/public/landing-home-fixes.css:27	spacing	padding: 12px 20px 0
 src/server/public/landing-home-fixes.css:33	spacing	padding: 10px 22px
-src/server/public/landing-home-fixes.css:399	spacing	gap: 2px
-src/server/public/landing-home-fixes.css:417	spacing	padding: 12px 14px
+src/server/public/landing-home-fixes.css:401	spacing	gap: 2px
+src/server/public/landing-home-fixes.css:419	spacing	padding: 12px 14px
 src/server/public/landing-home-fixes.css:45	spacing	gap: 9px
 src/server/public/landing-s-polish.css:106	spacing	padding: 5px 8px
 src/server/public/landing-s-polish.css:119	spacing	padding: 10px

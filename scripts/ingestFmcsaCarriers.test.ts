@@ -15,6 +15,11 @@ import {
   authorityType,
   isIntermodal,
   isHazmat,
+  isDryVan,
+  isReefer,
+  isTanker,
+  isFlatbed,
+  isDryBulk,
   censusAllowsOperate,
   makeSlug,
   buildCarrierWhere,
@@ -28,6 +33,7 @@ import {
   nearestPortToPoint,
   nearestPortForZip,
   nearestCaPortForProvince,
+  portByCode,
 } from '../src/server/directory/containerPorts.js';
 
 // ── Real-shaped fixtures ────────────────────────────────────────────────
@@ -155,6 +161,27 @@ describe('normalizers', () => {
     expect(isHazmat({ hm_ind: undefined })).toBe(false);
     expect(isHazmat(undefined)).toBe(false); // missing census → not hazmat
   });
+  it('equipment flags read their FMCSA crgo_* census columns (X = set)', () => {
+    // Dry van ← crgo_genfreight
+    expect(isDryVan({ crgo_genfreight: 'X' })).toBe(true);
+    expect(isDryVan({ crgo_genfreight: undefined })).toBe(false);
+    expect(isDryVan(undefined)).toBe(false);
+    // Reefer ← crgo_coldfood (there is NO crgo_reefer column on az4n-8mr2)
+    expect(isReefer({ crgo_coldfood: 'X' })).toBe(true);
+    expect(isReefer({ crgo_coldfood: 'N' })).toBe(false);
+    // Tanker ← crgo_liqgas OR crgo_chem
+    expect(isTanker({ crgo_liqgas: 'X' })).toBe(true);
+    expect(isTanker({ crgo_chem: 'X' })).toBe(true);
+    expect(isTanker({ crgo_liqgas: undefined, crgo_chem: undefined })).toBe(false);
+    // Flatbed ← crgo_metalsheet OR crgo_machlrg OR crgo_logpole
+    expect(isFlatbed({ crgo_metalsheet: 'X' })).toBe(true);
+    expect(isFlatbed({ crgo_machlrg: 'X' })).toBe(true);
+    expect(isFlatbed({ crgo_logpole: 'X' })).toBe(true);
+    expect(isFlatbed({ crgo_genfreight: 'X' })).toBe(false); // general freight is not flatbed
+    // Dry bulk ← crgo_drybulk
+    expect(isDryBulk({ crgo_drybulk: 'X' })).toBe(true);
+    expect(isDryBulk({ crgo_drybulk: '' })).toBe(false);
+  });
   it('censusAllowsOperate drops status I, keeps A / missing', () => {
     expect(censusAllowsOperate({ status_code: 'A' })).toBe(true);
     expect(censusAllowsOperate({ status_code: 'I' })).toBe(false);
@@ -182,6 +209,20 @@ describe('nearest container port', () => {
     expect(nearestPortForZip('31401')).toBe('USSAV'); // Savannah, GA
     expect(nearestPortForZip('00000')).toBeNull(); // not a real ZCTA
     expect(nearestPortForZip(null)).toBeNull();
+  });
+  it('maps an INTERIOR point to its nearest INLAND rail hub (not a coastal seaport)', () => {
+    // Columbus, OH → Rickenbacker inland hub, not a far-off seaport.
+    expect(nearestPortToPoint(39.9612, -82.9988)).toBe('INLCMH');
+    // Memphis, TN → Memphis inland hub.
+    expect(nearestPortToPoint(35.1495, -90.049)).toBe('INLMEM');
+    // Minneapolis, MN → MSP inland hub.
+    expect(nearestPortToPoint(44.9778, -93.265)).toBe('INLMSP');
+  });
+  it('resolves an inland-hub code back to a named hub (portByCode covers inland)', () => {
+    expect(portByCode('INLMEM')?.city).toBe('Memphis');
+    expect(portByCode('INLCMH')?.name).toContain('Columbus');
+    expect(portByCode('INLTOR')?.country).toBe('CA');
+    expect(portByCode('USSAV')?.city).toBe('Savannah'); // seaports still resolve
   });
 });
 
@@ -222,6 +263,39 @@ describe('filterAndNormalizeCarriers', () => {
     ]);
     const [rec] = filterAndNormalizeCarriers([activeCarrier], hazCensus);
     expect(rec.hazmat).toBe(true);
+  });
+
+  it('captures the FMCSA equipment / cargo-type flags from the crgo_* columns', () => {
+    const eqCensus = new Map<string, CensusRow>([
+      [
+        '107080',
+        {
+          dot_number: '107080',
+          status_code: 'A',
+          phy_state: 'GA',
+          crgo_genfreight: 'X', // dry van
+          crgo_coldfood: 'X', // reefer
+          crgo_chem: 'X', // tanker (via chem)
+          crgo_logpole: 'X', // flatbed (via logpole)
+          crgo_drybulk: 'X', // dry bulk
+        },
+      ],
+    ]);
+    const [rec] = filterAndNormalizeCarriers([activeCarrier], eqCensus);
+    expect(rec.dryVan).toBe(true);
+    expect(rec.reefer).toBe(true);
+    expect(rec.tanker).toBe(true);
+    expect(rec.flatbed).toBe(true);
+    expect(rec.dryBulk).toBe(true);
+  });
+
+  it('defaults every equipment flag to false with no census match', () => {
+    const [rec] = filterAndNormalizeCarriers([activeCarrier], new Map());
+    expect(rec.dryVan).toBe(false);
+    expect(rec.reefer).toBe(false);
+    expect(rec.tanker).toBe(false);
+    expect(rec.flatbed).toBe(false);
+    expect(rec.dryBulk).toBe(false);
   });
 
   it('keeps an active carrier with NO census match (fleet null, L&I address used)', () => {
@@ -304,6 +378,12 @@ describe('CARRIER_UPSERT_SET (opt-out preservation)', () => {
     expect(keys).toContain('hazmat');
   });
 
+  it('refreshes every equipment / cargo-type flag on a re-ingest', () => {
+    for (const k of ['dryVan', 'reefer', 'tanker', 'flatbed', 'dryBulk']) {
+      expect(keys).toContain(k);
+    }
+  });
+
   it('NEVER sets contact_hidden — a carrier who opted out stays hidden', () => {
     // The opt-out flag must not appear in the ON CONFLICT DO UPDATE SET (by the
     // drizzle column property name, or the raw column name), so a future
@@ -322,17 +402,18 @@ describe('CARRIER_UPSERT_SET (opt-out preservation)', () => {
 });
 
 describe('nearestCaPortForProvince', () => {
-  it('maps each province group to its nearest Canadian gateway', () => {
-    expect(nearestCaPortForProvince('BC')).toBe('CAVAN');
-    expect(nearestCaPortForProvince('AB')).toBe('CAVAN');
-    expect(nearestCaPortForProvince('SK')).toBe('CAVAN');
-    expect(nearestCaPortForProvince('ON')).toBe('CAMTR');
-    expect(nearestCaPortForProvince('QC')).toBe('CAMTR');
+  it('maps each province to its dominant Canadian hub (seaport OR inland rail)', () => {
+    expect(nearestCaPortForProvince('BC')).toBe('CAVAN'); // Pacific gateway
+    expect(nearestCaPortForProvince('AB')).toBe('INLCGY'); // Calgary inland ramp
+    expect(nearestCaPortForProvince('SK')).toBe('INLWPG'); // Winnipeg inland ramp
+    expect(nearestCaPortForProvince('MB')).toBe('INLWPG');
+    expect(nearestCaPortForProvince('ON')).toBe('INLTOR'); // Toronto inland ramp
+    expect(nearestCaPortForProvince('QC')).toBe('CAMTR'); // Montreal seaport
     expect(nearestCaPortForProvince('NS')).toBe('CAHAL');
     expect(nearestCaPortForProvince('PE')).toBe('CAHAL');
     expect(nearestCaPortForProvince('NL')).toBe('CAHAL');
     expect(nearestCaPortForProvince('NB')).toBe('CASJB');
-    expect(nearestCaPortForProvince('on')).toBe('CAMTR'); // case-insensitive
+    expect(nearestCaPortForProvince('on')).toBe('INLTOR'); // case-insensitive
     expect(nearestCaPortForProvince('XX')).toBeNull();
     expect(nearestCaPortForProvince(null)).toBeNull();
   });
@@ -356,7 +437,7 @@ describe('Canada gate in filterAndNormalizeCarriers', () => {
     const [rec] = filterAndNormalizeCarriers([activeCarrier], caCensus, true);
     expect(rec.country).toBe('CA');
     expect(rec.state).toBe('ON');
-    expect(rec.nearestPortCode).toBe('CAMTR'); // ON → Montreal (province fallback)
+    expect(rec.nearestPortCode).toBe('INLTOR'); // ON → Toronto inland ramp (province fallback)
   });
 
   it('DROPS a Mexico/other-domicile carrier regardless of includeCanada', () => {

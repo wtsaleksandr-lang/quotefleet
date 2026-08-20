@@ -174,6 +174,15 @@ export const SELF_HEAL_TABLE_STATEMENTS: readonly string[] = [
   // the table exists and IF NOT EXISTS no-ops on a healthy DB. Defaults false so
   // every existing row is unchanged until the next re-ingest populates it.
   `ALTER TABLE "carrier_directory" ADD COLUMN IF NOT EXISTS "hazmat" boolean NOT NULL DEFAULT false`,
+  // 0049_carrier_equipment.sql — FMCSA equipment / cargo-type flags (crgo_*).
+  // Healed HERE (same reasoning as hazmat above): they run right after the CREATE
+  // TABLE so the table exists and IF NOT EXISTS no-ops on a healthy DB. Each
+  // defaults false so every existing row is unchanged until the next re-ingest.
+  `ALTER TABLE "carrier_directory" ADD COLUMN IF NOT EXISTS "dry_van" boolean NOT NULL DEFAULT false`,
+  `ALTER TABLE "carrier_directory" ADD COLUMN IF NOT EXISTS "reefer" boolean NOT NULL DEFAULT false`,
+  `ALTER TABLE "carrier_directory" ADD COLUMN IF NOT EXISTS "tanker" boolean NOT NULL DEFAULT false`,
+  `ALTER TABLE "carrier_directory" ADD COLUMN IF NOT EXISTS "flatbed" boolean NOT NULL DEFAULT false`,
+  `ALTER TABLE "carrier_directory" ADD COLUMN IF NOT EXISTS "dry_bulk" boolean NOT NULL DEFAULT false`,
   `CREATE UNIQUE INDEX IF NOT EXISTS "carrier_directory_usdot_idx" ON "carrier_directory" ("usdot")`,
   `CREATE UNIQUE INDEX IF NOT EXISTS "carrier_directory_slug_idx" ON "carrier_directory" ("public_slug")`,
   `CREATE INDEX IF NOT EXISTS "carrier_directory_state_idx" ON "carrier_directory" ("state")`,

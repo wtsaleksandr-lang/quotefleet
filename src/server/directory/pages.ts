@@ -167,6 +167,7 @@ const DIRECTORY_CSS = `
   .pill-warn { background: rgba(214, 158, 46, 0.14); color: #e0b054; border: 1px solid rgba(214, 158, 46, 0.4); }
   .pill-bad { background: rgba(220, 76, 76, 0.14); color: #e88; border: 1px solid rgba(220, 76, 76, 0.4); }
   .pill-none { background: var(--surface-2); color: var(--muted); border: 1px solid var(--border); }
+  .pill-eq { background: var(--surface-2); color: var(--ink-soft); border: 1px solid var(--border); }
   .dir-pager { display: flex; align-items: center; justify-content: center; gap: 14px; margin: 28px 0 8px; }
   .dir-pager .muted-small { font-family: var(--font-mono); }
   .dir-empty { padding: 60px 24px; text-align: center; color: var(--muted); }
@@ -292,6 +293,10 @@ const DIRECTORY_CSS = `
     --badge-dray-bg: #2563eb;        --badge-dray-fg: #ffffff;
     --badge-hazmat-bg: #ea580c;      --badge-hazmat-fg: #111827;
     --badge-reefer-bg: #14b8a6;      --badge-reefer-fg: #111827;
+    --badge-dryvan-bg: #0f766e;      --badge-dryvan-fg: #ffffff;
+    --badge-tanker-bg: #0369a1;      --badge-tanker-fg: #ffffff;
+    --badge-flatbed-bg: #b45309;     --badge-flatbed-fg: #ffffff;
+    --badge-drybulk-bg: #6d28d9;     --badge-drybulk-fg: #ffffff;
     --badge-authority-bg: #475569;   --badge-authority-fg: #ffffff;
     --badge-safety-good-bg: #15803d; --badge-safety-good-fg: #ffffff;
     --badge-safety-warn-bg: #d97706; --badge-safety-warn-fg: #111827;
@@ -312,6 +317,10 @@ const DIRECTORY_CSS = `
   .cp-badge--dray { background: var(--badge-dray-bg); color: var(--badge-dray-fg); }
   .cp-badge--hazmat { background: var(--badge-hazmat-bg); color: var(--badge-hazmat-fg); }
   .cp-badge--reefer { background: var(--badge-reefer-bg); color: var(--badge-reefer-fg); }
+  .cp-badge--dryvan { background: var(--badge-dryvan-bg); color: var(--badge-dryvan-fg); }
+  .cp-badge--tanker { background: var(--badge-tanker-bg); color: var(--badge-tanker-fg); }
+  .cp-badge--flatbed { background: var(--badge-flatbed-bg); color: var(--badge-flatbed-fg); }
+  .cp-badge--drybulk { background: var(--badge-drybulk-bg); color: var(--badge-drybulk-fg); }
   .cp-badge--authority { background: var(--badge-authority-bg); color: var(--badge-authority-fg); }
   .cp-badge--safety-good { background: var(--badge-safety-good-bg); color: var(--badge-safety-good-fg); }
   .cp-badge--safety-warn { background: var(--badge-safety-warn-bg); color: var(--badge-safety-warn-fg); }
@@ -513,6 +522,20 @@ export function carrierCard(c: VisibleCarrier): string {
   const idMeta = [c.usdot ? `USDOT ${esc(c.usdot)}` : '', c.mcNumber ? `MC ${esc(c.mcNumber)}` : '']
     .filter(Boolean)
     .join(' · ');
+  // Equipment / cargo-type pills (FMCSA-derived facts). Drayage stays the
+  // accent pill top-right; the rest render neutrally in the chip row so a
+  // multi-equipment carrier wraps tidily without a wall of colour.
+  const eqPills = [
+    c.dryVan ? 'Dry van' : '',
+    c.reefer ? 'Reefer' : '',
+    c.tanker ? 'Tanker / bulk' : '',
+    c.flatbed ? 'Flatbed' : '',
+    c.dryBulk ? 'Dry bulk' : '',
+  ]
+    .filter(Boolean)
+    .map((label) => `<span class="pill pill-eq">${esc(label)}</span>`)
+    .join('');
+  const hazPill = c.hazmat ? '<span class="pill pill-warn">Hazmat</span>' : '';
   return `<a class="carrier-card" href="/directory/carrier/${encodeURIComponent(c.slug)}">
     <div class="top">
       <div>
@@ -527,7 +550,7 @@ export function carrierCard(c: VisibleCarrier): string {
       <div class="f"><b>${esc(authorityLabel(c.authorityType).replace(' authority', ''))}</b><span>Authority</span></div>
     </div>
     <div class="dir-chips" style="margin-top: 12px;">
-      <span class="pill pill-${sr.tone}">${esc(sr.text)}</span>
+      <span class="pill pill-${sr.tone}">${esc(sr.text)}</span>${eqPills}${hazPill}
     </div>
   </a>`;
 }
@@ -1263,6 +1286,58 @@ export function renderCarrierProfile(opts: {
         verified: true,
       }),
     );
+  // Equipment / cargo-type flags from the FMCSA census crgo_* columns — verified
+  // facts, so they render as solid ✓ FMCSA badges (not "self-declared").
+  if (c.dryVan)
+    verifiedBadges.push(
+      credBadge({
+        tone: 'dryvan',
+        label: 'Dry van',
+        tip: 'Hauls dry van / general freight (FMCSA cargo classification).',
+        held: true,
+        verified: true,
+      }),
+    );
+  if (c.reefer)
+    verifiedBadges.push(
+      credBadge({
+        tone: 'reefer',
+        label: 'Reefer',
+        tip: 'Temperature-controlled / refrigerated freight (FMCSA cargo classification).',
+        held: true,
+        verified: true,
+      }),
+    );
+  if (c.tanker)
+    verifiedBadges.push(
+      credBadge({
+        tone: 'tanker',
+        label: 'Tanker / bulk',
+        tip: 'Hauls bulk liquids, gases or chemicals in tank equipment (FMCSA cargo classification).',
+        held: true,
+        verified: true,
+      }),
+    );
+  if (c.flatbed)
+    verifiedBadges.push(
+      credBadge({
+        tone: 'flatbed',
+        label: 'Flatbed / oversized',
+        tip: 'Hauls heavy or dimensional freight on flatbed / open-deck equipment (FMCSA cargo classification).',
+        held: true,
+        verified: true,
+      }),
+    );
+  if (c.dryBulk)
+    verifiedBadges.push(
+      credBadge({
+        tone: 'drybulk',
+        label: 'Dry bulk',
+        tip: 'Hauls dry bulk commodities (FMCSA cargo classification).',
+        held: true,
+        verified: true,
+      }),
+    );
   if (c.hazmat)
     verifiedBadges.push(
       credBadge({
@@ -1288,9 +1363,12 @@ export function renderCarrierProfile(opts: {
   // badge — still tooltip-labeled "Self-declared." (never FMCSA-verified). The
   // credential `tone` ids match the CarrierCapabilities keys 1:1.
   const caps = c.capabilities ?? {};
-  const claimBadges = SELF_DECLARED_CREDENTIALS.map((b) =>
-    credBadge({ ...b, held: !!caps[b.tone as keyof typeof caps], selfDeclared: true }),
-  ).join('');
+  const claimBadges = SELF_DECLARED_CREDENTIALS
+    // The self-declared "Reefer" claim is redundant once the carrier's FMCSA
+    // reefer flag is verified above — drop it to avoid a duplicate Reefer badge.
+    .filter((b) => !(b.tone === 'reefer' && c.reefer))
+    .map((b) => credBadge({ ...b, held: !!caps[b.tone as keyof typeof caps], selfDeclared: true }))
+    .join('');
   const capBadges = verifiedBadges.join('') + claimBadges;
 
   // ── §6 Contact — TIERED. Public block = FMCSA-sourced phone/email (encoded

@@ -150,9 +150,11 @@ body.qf-wft .hero-copy .eyebrow {
   background: transparent !important;
   padding: 0 !important;
   margin-bottom: 22px !important;
-  color: #6E8BFF !important;
+  /* Quiet, subtle label — muted grey (not the loud accent blue) + a notch
+     smaller, so the eyebrow reads as a soft kicker, not a bright line. */
+  color: var(--muted) !important;
   font-family: "JetBrains Mono", ui-monospace, monospace !important;
-  font-size: 11px !important;
+  font-size: 10px !important;
   font-weight: 600 !important;
   letter-spacing: 0.16em !important;
   text-transform: uppercase !important;
@@ -165,7 +167,7 @@ body.qf-wft .hero-copy .eyebrow::before {
   width: 18px !important;
   height: 1.5px !important;
   border-radius: 2px !important;
-  background: #6E8BFF !important;
+  background: var(--muted) !important;
 }
 
 body.qf-wft .hero-grid {
