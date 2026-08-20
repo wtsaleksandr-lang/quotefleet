@@ -9,6 +9,7 @@ import {
   citySlugify,
   titleCaseCity,
   FLEET_BUCKETS,
+  DRIVERS_BUCKETS,
   SAFETY_OPTIONS,
   SORT_OPTIONS,
   FACET_QUERY_KEYS,
@@ -31,6 +32,7 @@ describe('normalizeFilters — GET-param facet parsing', () => {
     expect(f.state).toBe('TX');
     expect(f.citySlug).toBe('houston');
     expect(f.fleet).toBe('26-100');
+    expect(f.drivers).toBeNull();
     expect(f.safety).toBe('satisfactory');
     expect(f.authorityActive).toBe(true);
     expect(f.intermodal).toBe(true);
@@ -97,6 +99,51 @@ describe('equipment facet — single `equipment` param + legacy `intermodal` com
   it('every equipment option is backed by a real carrier_directory column', () => {
     const cols = new Set(['intermodal', 'hazmat', 'dryVan', 'reefer', 'tanker', 'flatbed', 'dryBulk']);
     for (const opt of EQUIPMENT_OPTIONS) expect(cols.has(opt.column)).toBe(true);
+  });
+});
+
+describe('drivers-count facet — FMCSA total_drivers buckets', () => {
+  it('parses every valid drivers bucket id', () => {
+    for (const b of DRIVERS_BUCKETS) {
+      expect(normalizeFilters({ drivers: b.id }).drivers).toBe(b.id);
+    }
+  });
+  it('collapses an unknown drivers value to null (never throws)', () => {
+    expect(normalizeFilters({ drivers: 'lots' }).drivers).toBeNull();
+    expect(normalizeFilters({}).drivers).toBeNull();
+  });
+  it('drivers is independent of the fleet (power-units) facet', () => {
+    const f = normalizeFilters({ fleet: '26-100', drivers: '11-50' });
+    expect(f.fleet).toBe('26-100');
+    expect(f.drivers).toBe('11-50');
+  });
+  it('drivers buckets are contiguous and cover the open-ended top', () => {
+    expect(DRIVERS_BUCKETS.map((b) => b.id)).toEqual(['1-10', '11-50', '51-250', '250+']);
+    expect(DRIVERS_BUCKETS[3].max).toBeNull();
+    // No gaps between adjacent buckets.
+    for (let i = 1; i < DRIVERS_BUCKETS.length; i++) {
+      expect(DRIVERS_BUCKETS[i].min).toBe((DRIVERS_BUCKETS[i - 1].max ?? 0) + 1);
+    }
+  });
+  it('drivers is a recognized facet query key (shareable/crawlable)', () => {
+    expect(FACET_QUERY_KEYS).toContain('drivers');
+  });
+});
+
+describe('equipment facet surfacing — every option is a real FMCSA column', () => {
+  it('exposes all seven cargo/equipment options', () => {
+    expect(EQUIPMENT_OPTIONS.map((o) => o.id)).toEqual([
+      'drayage',
+      'dryvan',
+      'reefer',
+      'hazmat',
+      'tanker',
+      'flatbed',
+      'drybulk',
+    ]);
+  });
+  it('every equipment option has a non-empty display label', () => {
+    for (const o of EQUIPMENT_OPTIONS) expect(o.label.length).toBeGreaterThan(0);
   });
 });
 

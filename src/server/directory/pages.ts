@@ -23,9 +23,19 @@ import type {
   FacetCounts,
   CityCount,
   FleetBucketId,
+  DriversBucketId,
+  EquipmentId,
   SafetyId,
 } from './queries.js';
-import { FLEET_BUCKETS, SAFETY_OPTIONS, SORT_OPTIONS, citySlugify, titleCaseCity } from './queries.js';
+import {
+  FLEET_BUCKETS,
+  DRIVERS_BUCKETS,
+  EQUIPMENT_OPTIONS,
+  SAFETY_OPTIONS,
+  SORT_OPTIONS,
+  citySlugify,
+  titleCaseCity,
+} from './queries.js';
 import { US_STATES, stateByCode, type UsState } from './usStates.js';
 import { CONTAINER_PORTS, portByCode, type ContainerPort } from './containerPorts.js';
 import { CA_PROVINCE_CODES } from './caProvinces.js';
@@ -215,15 +225,35 @@ const DIRECTORY_CSS = `
   .facet-opt.active .cb { color: var(--accent); border-color: var(--accent); background: transparent; }
   .facet-opt.disabled { opacity: 0.5; cursor: not-allowed; }
   .facet-opt.disabled .cb { text-transform: uppercase; font-size: 9px; letter-spacing: 0.05em; }
+  /* Carrier-capabilities (Tier-3, claim-driven) group — visually secondary to
+     the working FMCSA facets: subdued surface, per-kind sub-labels, claim CTA. */
+  .facet-group--claim { background: var(--surface-2); border-style: dashed; }
+  .facet-group--claim .cap-sub { margin-top: 10px; }
+  .facet-group--claim .cap-sub:first-of-type { margin-top: 6px; }
+  .cap-sublabel { display: block; font-size: 10px; font-family: var(--font-mono); letter-spacing: 0.05em; text-transform: uppercase; color: var(--muted); opacity: 0.85; margin: 0 0 3px 8px; }
+  .cap-claim-cta { display: inline-block; margin-top: 12px; font-size: 12px; font-family: var(--font-mono); color: var(--accent); text-decoration: none; }
+  .cap-claim-cta:hover { text-decoration: underline; }
   .facet-opt .lbl { display: flex; align-items: center; gap: 7px; }
   .facet-check { width: 14px; height: 14px; border: 1px solid var(--border-strong); border-radius: 4px; display: inline-block; flex: 0 0 auto; }
   .facet-opt.active .facet-check { background: var(--accent); border-color: var(--accent); }
   .rail-toggle { display: none; }
-  .results-head { display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap; margin: 0 0 14px; }
-  .results-head .rc { font-size: 15px; }
-  .results-head .rc b { font-family: var(--font-mono); color: var(--accent); font-size: 20px; }
-  .sort-row { display: flex; gap: 6px; flex-wrap: wrap; align-items: center; }
-  .sort-row .sl { font-size: 11px; color: var(--muted); font-family: var(--font-mono); text-transform: uppercase; letter-spacing: 0.05em; }
+  /* Slim breadcrumb bar for the hero-less results view. */
+  .dir-crumbbar { padding-top: 22px; padding-bottom: 0; }
+  .dir-shell--tight { padding-top: 14px; }
+  /* Single tidy control bar: count on the left, compact sort <select> on the
+     right. Wraps to two rows only at very narrow widths (never mid-control). */
+  .results-bar { display: flex; align-items: center; justify-content: space-between; gap: 12px 16px; flex-wrap: wrap; margin: 0 0 14px; }
+  .results-bar .rc { font-size: 15px; min-width: 0; }
+  .results-bar .rc b { font-family: var(--font-mono); color: var(--accent); font-size: 20px; }
+  .sort-ctl { display: inline-flex; align-items: center; gap: 8px; flex: 0 0 auto; }
+  .sort-lbl { font-size: 11px; color: var(--muted); font-family: var(--font-mono); text-transform: uppercase; letter-spacing: 0.05em; }
+  .sort-select { position: relative; display: inline-flex; align-items: center; }
+  .sort-select::after { content: '▾'; position: absolute; right: 10px; top: 50%; transform: translateY(-50%); font-size: 10px; color: var(--muted); pointer-events: none; }
+  .sort-select select { appearance: none; -webkit-appearance: none; background: var(--surface); color: var(--ink); border: 1px solid var(--border); border-radius: 8px; padding: 8px 30px 8px 12px; font-family: var(--font-mono); font-size: 13px; line-height: 1.2; cursor: pointer; min-width: 168px; }
+  .sort-select select:hover { border-color: var(--border-strong); }
+  .sort-select select:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; border-color: var(--accent); }
+  .sort-noscript { display: inline-flex; gap: 8px; flex-wrap: wrap; }
+  .sort-noscript a { font-size: 12px; font-family: var(--font-mono); color: var(--accent); text-decoration: none; }
   .applied-chips { display: flex; gap: 8px; flex-wrap: wrap; margin: 0 0 14px; align-items: center; }
   .applied-chip { font-size: 12px; font-family: var(--font-mono); padding: 5px 10px; border-radius: 999px; border: 1px solid var(--accent); color: var(--accent); background: var(--accent-soft); text-decoration: none; display: inline-flex; gap: 6px; align-items: center; }
   .applied-chip .x { opacity: 0.7; }
@@ -728,15 +758,24 @@ function currentParams(f: DirectoryFilters, locked: Set<string>): Record<string,
   if (!locked.has('state') && f.state) p.state = f.state;
   if (!locked.has('city') && f.citySlug) p.city = f.citySlug;
   if (f.fleet) p.fleet = f.fleet;
+  if (f.drivers) p.drivers = f.drivers;
   if (f.safety) p.safety = f.safety;
   if (f.authorityActive) p.authority = 'active';
-  if (f.intermodal) p.intermodal = '1';
+  // Equipment is the single source for the drayage/cargo dimension; drayage
+  // round-trips as `equipment=drayage` (normalizeFilters still accepts the legacy
+  // `intermodal=1` param on input, so old deep-links keep working).
+  if (f.equipment) p.equipment = f.equipment;
   if (f.recent) p.recent = '1';
   if (f.sort && f.sort !== 'featured') p.sort = f.sort;
   return p;
 }
 
-type FacetChange = Partial<Record<'state' | 'city' | 'fleet' | 'safety' | 'authority' | 'intermodal' | 'recent' | 'sort' | 'page', string | null>>;
+type FacetChange = Partial<
+  Record<
+    'state' | 'city' | 'fleet' | 'drivers' | 'safety' | 'authority' | 'equipment' | 'intermodal' | 'recent' | 'sort' | 'page',
+    string | null
+  >
+>;
 
 /** Build an href for the current scope with one dimension changed. */
 function hrefWith(scope: FacetScope, f: DirectoryFilters, change: FacetChange, opts?: { keepPage?: boolean }): string {
@@ -761,10 +800,54 @@ function disabledFacetRow(label: string): string {
   return `<span class="facet-opt disabled"><span class="lbl"><span class="facet-check"></span>${esc(label)}</span><span class="cb">claim</span></span>`;
 }
 
+/** Carrier-declared (Tier-3) capabilities NOT in FMCSA public data. Rendered as
+ *  disabled/"claim" rows, grouped by kind — they drive listing claims, they are
+ *  never applied as working filters (we don't assert data we don't have). */
+const CARRIER_CAPABILITY_GROUPS: ReadonlyArray<{ label: string; items: string[] }> = [
+  { label: 'Equipment specialties', items: ['ISO tank', 'Open top', 'Flatrack', 'Overweight', 'Tank-endorsed'] },
+  { label: 'Services', items: ['Transload', 'Warehouse', 'Container storage'] },
+  { label: 'Cargo', items: ['Household goods', 'Liquor', 'Customs-bonded'] },
+  { label: 'Retail / partner programs', items: ['Menards-approved', 'Amazon warehouse delivery'] },
+];
+
+/** The full "Carrier capabilities" rail block — a visually-secondary Tier-3
+ *  section of claim-driven options with per-kind sub-labels + a claim CTA. */
+function capabilitiesGroup(): string {
+  const blocks = CARRIER_CAPABILITY_GROUPS.map(
+    (g) => `<div class="cap-sub"><span class="cap-sublabel">${esc(g.label)}</span>${g.items.map(disabledFacetRow).join('\n')}</div>`,
+  ).join('\n');
+  return `<div class="facet-group facet-group--claim">
+    <h3>Carrier capabilities</h3>
+    <span class="facet-src">Carrier-verified — shown as carriers claim their profiles.</span>
+    ${blocks}
+    <a class="cap-claim-cta" href="/signup">Claim a listing to verify these →</a>
+  </div>`;
+}
+
 function renderSidebar(scope: FacetScope, f: DirectoryFilters, counts: FacetCounts, summary?: DirectorySummary): string {
-  // Tier 1 — Fleet size.
+  // Tier 1 — Equipment & cargo (FMCSA crgo_* columns; single-select toggle).
+  const equipment = EQUIPMENT_OPTIONS.map((o) =>
+    facetOptionRow(
+      f.equipment === o.id,
+      hrefWith(scope, f, { equipment: f.equipment === o.id ? null : o.id }),
+      o.label,
+      counts.equipment[o.id],
+    ),
+  ).join('\n');
+
+  // Tier 1 — Fleet size (trucks / power units).
   const fleet = FLEET_BUCKETS.map((b) =>
     facetOptionRow(f.fleet === b.id, hrefWith(scope, f, { fleet: f.fleet === b.id ? null : b.id }), b.label, counts.fleet[b.id]),
+  ).join('\n');
+
+  // Tier 1 — Drivers count.
+  const drivers = DRIVERS_BUCKETS.map((b) =>
+    facetOptionRow(
+      f.drivers === b.id,
+      hrefWith(scope, f, { drivers: f.drivers === b.id ? null : b.id }),
+      b.label,
+      counts.drivers[b.id],
+    ),
   ).join('\n');
 
   // Tier 1 — Safety rating.
@@ -772,20 +855,12 @@ function renderSidebar(scope: FacetScope, f: DirectoryFilters, counts: FacetCoun
     facetOptionRow(f.safety === s.id, hrefWith(scope, f, { safety: f.safety === s.id ? null : s.id }), s.label, counts.safety[s.id]),
   ).join('\n');
 
-  // Tier 1 — Active authority (boolean).
+  // Tier 1/2 — Active authority + recently-updated (status/activity).
   const authority = facetOptionRow(
     f.authorityActive,
     hrefWith(scope, f, { authority: f.authorityActive ? null : 'active' }),
     'Active authority only',
     counts.authorityActive,
-  );
-
-  // Tier 2 — proxies (source-tagged).
-  const intermodal = facetOptionRow(
-    f.intermodal,
-    hrefWith(scope, f, { intermodal: f.intermodal ? null : '1' }),
-    'Drayage / intermodal',
-    counts.intermodal,
   );
   const recent = facetOptionRow(
     f.recent,
@@ -814,18 +889,15 @@ function renderSidebar(scope: FacetScope, f: DirectoryFilters, counts: FacetCoun
     }
   }
 
-  const tier3 = ['Hazmat', 'Reefer', 'UIIA member', 'TWIC-ready', 'C-TPAT / bonded', 'Verified profile']
-    .map(disabledFacetRow)
-    .join('\n');
-
   return `<aside class="dir-rail" id="dir-rail">
     <button type="button" class="rail-toggle" id="rail-toggle" aria-expanded="true">Filters ▾</button>
     ${stateGroup}
-    <div class="facet-group"><h3>Fleet size</h3><span class="facet-src">FMCSA power units</span>${fleet}</div>
+    <div class="facet-group"><h3>Equipment &amp; cargo</h3><span class="facet-src">FMCSA cargo-type flags</span>${equipment}</div>
+    <div class="facet-group"><h3>Fleet size</h3><span class="facet-src">FMCSA power units (trucks)</span>${fleet}</div>
+    <div class="facet-group"><h3>Drivers</h3><span class="facet-src">FMCSA total drivers</span>${drivers}</div>
     <div class="facet-group"><h3>Safety rating</h3><span class="facet-src">FMCSA safety rating</span>${safety}</div>
-    <div class="facet-group"><h3>Authority</h3><span class="facet-src">FMCSA operating authority</span>${authority}</div>
-    <div class="facet-group"><h3>Service type</h3><span class="facet-src">Proxy · FMCSA cargo &amp; MCS-150</span>${intermodal}${recent}</div>
-    <div class="facet-group"><h3>Credentials</h3><span class="facet-src">Self-declared · verify via profile claim</span>${tier3}</div>
+    <div class="facet-group"><h3>Authority &amp; activity</h3><span class="facet-src">FMCSA authority &amp; MCS-150</span>${authority}${recent}</div>
+    ${capabilitiesGroup()}
   </aside>
   <script>
     (function(){
@@ -844,21 +916,39 @@ function appliedChips(scope: FacetScope, f: DirectoryFilters): string {
     chips.push(`<a class="applied-chip" href="${hrefWith(scope, f, change)}">${esc(label)} <span class="x">✕</span></a>`);
   if (!scope.locked.has('state') && f.state) add(stateByCode(f.state)?.name ?? f.state, { state: null });
   if (!scope.locked.has('city') && f.citySlug) add(f.citySlug.replace(/-/g, ' '), { city: null });
+  if (f.equipment) add(EQUIPMENT_OPTIONS.find((e) => e.id === f.equipment)?.label ?? f.equipment, { equipment: null });
   if (f.fleet) add(FLEET_BUCKETS.find((b) => b.id === f.fleet)?.label ?? f.fleet, { fleet: null });
+  if (f.drivers) add(DRIVERS_BUCKETS.find((b) => b.id === f.drivers)?.label ?? f.drivers, { drivers: null });
   if (f.safety) add(SAFETY_OPTIONS.find((s) => s.id === f.safety)?.label ?? f.safety, { safety: null });
   if (f.authorityActive) add('Active authority', { authority: null });
-  if (f.intermodal) add('Drayage / intermodal', { intermodal: null });
   if (f.recent) add('Updated ≤12 mo', { recent: null });
   if (!chips.length) return '';
   return `<div class="applied-chips">${chips.join('\n')}<a class="applied-clear" href="${scope.basePath}">Clear all</a></div>`;
 }
 
+/**
+ * Compact sort control — a single native <select> instead of a wrapping row of
+ * chips (Alex flagged the old chips as stacking/overflowing). Each option's value
+ * is the destination href; a tiny bound script navigates on change. No-JS users
+ * still get a labelled, focusable control (the current sort stays `selected`), and
+ * the noscript links keep every sort crawlable.
+ */
 function sortRow(scope: FacetScope, f: DirectoryFilters): string {
-  const links = SORT_OPTIONS.map(
-    (s) =>
-      `<a class="dir-chip ${f.sort === s.id ? 'active' : ''}" href="${hrefWith(scope, f, { sort: s.id === 'featured' ? null : s.id })}">${esc(s.label)}</a>`,
-  ).join('\n');
-  return `<div class="sort-row"><span class="sl">Sort</span>${links}</div>`;
+  const opts = SORT_OPTIONS.map((s) => {
+    const href = hrefWith(scope, f, { sort: s.id === 'featured' ? null : s.id });
+    return `<option value="${esc(href)}"${f.sort === s.id ? ' selected' : ''}>${esc(s.label)}</option>`;
+  }).join('');
+  const crawlLinks = SORT_OPTIONS.map(
+    (s) => `<a href="${hrefWith(scope, f, { sort: s.id === 'featured' ? null : s.id })}">${esc(s.label)}</a>`,
+  ).join('');
+  return `<div class="sort-ctl">
+    <label class="sort-lbl" for="dir-sort">Sort</label>
+    <span class="sort-select">
+      <select id="dir-sort" aria-label="Sort carriers" data-sort-nav>${opts}</select>
+    </span>
+    <noscript><span class="sort-noscript">${crawlLinks}</span></noscript>
+  </div>
+  <script>(function(){var s=document.getElementById('dir-sort');if(s)s.addEventListener('change',function(){if(this.value)window.location.href=this.value;});})();</script>`;
 }
 
 /** Windowed numbered pagination (1 … n-1 [n] n+1 … last). */
@@ -912,6 +1002,11 @@ interface FacetedCfg {
   extraModulesHtml?: string;
   faqsHtml?: string;
   jsonLd: string[];
+  /** Faceted master-search view (/directory?…): drop the hero H1 + intro (the
+   *  shipper already knows what the directory is) and keep only the breadcrumb +
+   *  the result count. SEO pages (state/city/port) leave this false → keep their
+   *  hero H1/intro, which they need for indexing. */
+  hideHero?: boolean;
 }
 
 function renderFacetedResults(cfg: FacetedCfg): string {
@@ -922,19 +1017,24 @@ function renderFacetedResults(cfg: FacetedCfg): string {
         .join('\n')}</div>`
     : `<div class="dir-empty">No carriers match these filters. <a href="${scope.basePath}" style="color:var(--accent);">Clear filters</a> to see all.</div>`;
 
-  const body = `
-  <section class="hero dir-hero">
+  // Results view: breadcrumb-only slim header, no hero. SEO pages: full hero.
+  const heroHtml = cfg.hideHero
+    ? `<div class="dir-shell dir-crumbbar">${crumbsHtml(cfg.crumbs)}</div>`
+    : `<section class="hero dir-hero">
     <div class="container-narrow">
       ${crumbsHtml(cfg.crumbs)}
       <h1 style="margin-top: 6px;">${esc(cfg.h1)}</h1>
       <p class="lead">${cfg.intro}</p>
     </div>
-  </section>
-  <main class="dir-shell">
+  </section>`;
+
+  const body = `
+  ${heroHtml}
+  <main class="dir-shell${cfg.hideHero ? ' dir-shell--tight' : ''}">
     <div class="dir-layout">
       ${renderSidebar(scope, filters, counts, cfg.summary)}
       <div class="dir-results">
-        <div class="results-head">
+        <div class="results-bar">
           <div class="rc"><b>${fmtNum(list.total)}</b> carrier${list.total === 1 ? '' : 's'} match${counts.intermodal ? ` · ${fmtNum(counts.intermodal)} run drayage` : ''}</div>
           ${sortRow(scope, filters)}
         </div>
@@ -1096,6 +1196,7 @@ export function renderDirectoryResults(opts: {
     filters,
     summary,
     crumbs: [{ name: 'Directory', path: '/directory' }, { name: 'Search' }],
+    hideHero: true,
     h1,
     intro: `Filter ${fmtNum(list.total)} FMCSA-registered ${focus} motor carriers by state, city, fleet size, safety rating and authority. Every filter is a shareable, crawlable link.`,
     title: `${st ? st.name + ' ' : ''}Carrier Search — Filter by Fleet, Safety & Authority | QuoteFleet`,
