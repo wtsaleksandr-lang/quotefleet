@@ -182,7 +182,7 @@ html body.qf-wft .qf-hero-devices--video.stage-laptop > .qf-hero-vphone {
    calculator content is clearly legible; laptop shrinks to a small, dimmed,
    blurred card behind the top-left (the one background-blur we keep). */
 html body.qf-wft .qf-hero-devices--video.stage-phone > .qf-hero-vphone {
-  z-index: 3; transform: translate(-92%, -7%) scale(1.18); opacity: 1; filter: none;
+  z-index: 3; transform: translate(-92%, 11%) scale(1.05); opacity: 1; filter: none;
 }
 html body.qf-wft .qf-hero-devices--video.stage-phone > .qf-hero-laptop {
   /* Tuck the dimmed background laptop to the RIGHT (behind the phone) instead of
