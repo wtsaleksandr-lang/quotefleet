@@ -1795,7 +1795,20 @@ export const carrierDirectory = pgTable(
     /** Census hm_ind === 'Y' — FMCSA-registered hazmat carrier. Defaults false so
      *  every existing row is unchanged until re-ingested (self-healed in migrate.ts). */
     hazmat: boolean('hazmat').notNull().default(false),
-    /** Derived: nearest major US container port UN/LOCODE (ZIP centroid). */
+    // ── Equipment / cargo-type flags from the FMCSA census crgo_* columns
+    //    (0049_carrier_equipment.sql). All default false so existing rows stay
+    //    valid until a re-ingest backfills them; self-healed in migrate.ts.
+    /** crgo_genfreight === 'X' — dry van / general freight. */
+    dryVan: boolean('dry_van').notNull().default(false),
+    /** crgo_coldfood === 'X' — reefer / temperature-controlled. */
+    reefer: boolean('reefer').notNull().default(false),
+    /** crgo_liqgas OR crgo_chem === 'X' — tanker (bulk liquids/gas/chemicals). */
+    tanker: boolean('tanker').notNull().default(false),
+    /** crgo_metalsheet OR crgo_machlrg OR crgo_logpole === 'X' — flatbed / oversized. */
+    flatbed: boolean('flatbed').notNull().default(false),
+    /** crgo_drybulk === 'X' — dry bulk. */
+    dryBulk: boolean('dry_bulk').notNull().default(false),
+    /** Derived: nearest major container/rail hub UN/LOCODE (ZIP centroid). */
     nearestPortCode: text('nearest_port_code'),
     /** Unique URL slug for the public carrier page (slug(name)-usdot). */
     publicSlug: text('public_slug').notNull(),

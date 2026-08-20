@@ -167,6 +167,15 @@ const DIRECTORY_CSS = `
   .pill-warn { background: rgba(214, 158, 46, 0.14); color: #e0b054; border: 1px solid rgba(214, 158, 46, 0.4); }
   .pill-bad { background: rgba(220, 76, 76, 0.14); color: #e88; border: 1px solid rgba(220, 76, 76, 0.4); }
   .pill-none { background: var(--surface-2); color: var(--muted); border: 1px solid var(--border); }
+  .pill-eq { background: var(--surface-2); color: var(--ink-soft); border: 1px solid var(--border); }
+  /* Carrier-card chip row — always narrow, so it always uses the count-aware
+     grid partition (>=2 pills per line, never a stranded orphan). 1 pill keeps
+     its natural width (left-aligned); 2+ fill equal columns. */
+  .card-chips { display: grid; gap: 8px; margin-top: 12px; align-items: stretch; }
+  .card-chips .pill { display: flex; align-items: center; justify-content: center; text-align: center; white-space: normal; }
+  .card-chips[data-n="1"] { grid-template-columns: max-content; }
+  .card-chips[data-n="2"], .card-chips[data-n="4"] { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .card-chips[data-n="3"], .card-chips[data-n="5"], .card-chips[data-n="6"] { grid-template-columns: repeat(3, minmax(0, 1fr)); }
   .dir-pager { display: flex; align-items: center; justify-content: center; gap: 14px; margin: 28px 0 8px; }
   .dir-pager .muted-small { font-family: var(--font-mono); }
   .dir-empty { padding: 60px 24px; text-align: center; color: var(--muted); }
@@ -241,7 +250,24 @@ const DIRECTORY_CSS = `
     .dir-grid { grid-template-columns: 1fr; }
   }
   /* ── Carrier profile (rich, DrayLocator-structured card) ────────────────── */
-  .cp-caps { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; margin: 12px 0 4px; }
+  .cp-caps { display: flex; flex-direction: column; align-items: flex-start; gap: 8px; margin: 12px 0 4px; }
+  /* Each badge GROUP (credentials / equipment) lays out on its own row. Desktop:
+     a simple flex row — 4 credential or 5 equipment badges fit one line, so no
+     wrap + no orphan. Narrow widths switch to a count-aware grid below so every
+     line keeps >=2 badges (never a stranded single). */
+  .cp-badgegroup { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; overflow-x: clip; width: 100%; }
+  .cp-eqwrap { display: flex; flex-direction: column; align-items: flex-start; gap: 4px; width: 100%; }
+  .cp-eqlabel { font-size: 10px; font-family: var(--font-mono); letter-spacing: 0.08em; text-transform: uppercase; color: var(--muted); }
+  @media (max-width: 640px) {
+    /* Count-aware partition: columns chosen so no line ends with exactly one
+       badge — 2→2, 3→3, 4→2×2, 5→3+2, 6→3×2. Equal 1fr columns + wrapping text
+       (white-space:normal) means long labels never overflow the clipped group. */
+    .cp-badgegroup { display: grid; gap: 8px; align-items: stretch; }
+    .cp-badgegroup .cp-badge { justify-content: center; text-align: center; white-space: normal; font-size: 10px; padding: 4px 8px; min-width: 0; }
+    .cp-badgegroup[data-n="1"] { grid-template-columns: max-content; }
+    .cp-badgegroup[data-n="2"], .cp-badgegroup[data-n="4"] { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+    .cp-badgegroup[data-n="3"], .cp-badgegroup[data-n="5"], .cp-badgegroup[data-n="6"] { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+  }
   .cp-badge-active { font-size: 10px; font-family: var(--font-mono); letter-spacing: 0.06em; text-transform: uppercase; padding: 5px 9px; border-radius: 4px; background: var(--success-bg); color: var(--success); border: 1px solid var(--success); display: inline-flex; align-items: center; gap: 6px; }
   .cp-badge-active::before { content: ''; width: 6px; height: 6px; border-radius: 50%; background: var(--success); display: inline-block; }
   .cp-claimline { margin: 14px 0 0; font-size: 13px; color: var(--muted); }
@@ -292,6 +318,10 @@ const DIRECTORY_CSS = `
     --badge-dray-bg: #2563eb;        --badge-dray-fg: #ffffff;
     --badge-hazmat-bg: #ea580c;      --badge-hazmat-fg: #111827;
     --badge-reefer-bg: #14b8a6;      --badge-reefer-fg: #111827;
+    --badge-dryvan-bg: #0f766e;      --badge-dryvan-fg: #ffffff;
+    --badge-tanker-bg: #0369a1;      --badge-tanker-fg: #ffffff;
+    --badge-flatbed-bg: #b45309;     --badge-flatbed-fg: #ffffff;
+    --badge-drybulk-bg: #6d28d9;     --badge-drybulk-fg: #ffffff;
     --badge-authority-bg: #475569;   --badge-authority-fg: #ffffff;
     --badge-safety-good-bg: #15803d; --badge-safety-good-fg: #ffffff;
     --badge-safety-warn-bg: #d97706; --badge-safety-warn-fg: #111827;
@@ -312,6 +342,10 @@ const DIRECTORY_CSS = `
   .cp-badge--dray { background: var(--badge-dray-bg); color: var(--badge-dray-fg); }
   .cp-badge--hazmat { background: var(--badge-hazmat-bg); color: var(--badge-hazmat-fg); }
   .cp-badge--reefer { background: var(--badge-reefer-bg); color: var(--badge-reefer-fg); }
+  .cp-badge--dryvan { background: var(--badge-dryvan-bg); color: var(--badge-dryvan-fg); }
+  .cp-badge--tanker { background: var(--badge-tanker-bg); color: var(--badge-tanker-fg); }
+  .cp-badge--flatbed { background: var(--badge-flatbed-bg); color: var(--badge-flatbed-fg); }
+  .cp-badge--drybulk { background: var(--badge-drybulk-bg); color: var(--badge-drybulk-fg); }
   .cp-badge--authority { background: var(--badge-authority-bg); color: var(--badge-authority-fg); }
   .cp-badge--safety-good { background: var(--badge-safety-good-bg); color: var(--badge-safety-good-fg); }
   .cp-badge--safety-warn { background: var(--badge-safety-warn-bg); color: var(--badge-safety-warn-fg); }
@@ -513,6 +547,27 @@ export function carrierCard(c: VisibleCarrier): string {
   const idMeta = [c.usdot ? `USDOT ${esc(c.usdot)}` : '', c.mcNumber ? `MC ${esc(c.mcNumber)}` : '']
     .filter(Boolean)
     .join(' · ');
+  // Compliance + capability pills. Safety leads, then hazmat, then the FMCSA
+  // equipment/cargo-type flags. Drayage stays the accent pill top-right (out of
+  // this row + count). The row is capped so the count-aware grid always
+  // partitions cleanly (>=2 per line, never an orphan); any overflow collapses
+  // into a "+N more" pill and the full set stays on the profile.
+  const cardPills: string[] = [`<span class="pill pill-${sr.tone}">${esc(sr.text)}</span>`];
+  if (c.hazmat) cardPills.push('<span class="pill pill-warn">Hazmat</span>');
+  const eqDefs: Array<[boolean, string]> = [
+    [c.dryVan, 'Dry van'],
+    [c.reefer, 'Reefer'],
+    [c.tanker, 'Tanker / bulk'],
+    [c.flatbed, 'Flatbed'],
+    [c.dryBulk, 'Dry bulk'],
+  ];
+  for (const [on, label] of eqDefs) if (on) cardPills.push(`<span class="pill pill-eq">${esc(label)}</span>`);
+  const CARD_MAX = 6; // 6 → clean 3×2 grid; higher counts would strand a pill
+  let shown = cardPills;
+  if (cardPills.length > CARD_MAX) {
+    const hidden = cardPills.length - (CARD_MAX - 1);
+    shown = [...cardPills.slice(0, CARD_MAX - 1), `<span class="pill pill-eq">+${hidden} more</span>`];
+  }
   return `<a class="carrier-card" href="/directory/carrier/${encodeURIComponent(c.slug)}">
     <div class="top">
       <div>
@@ -526,9 +581,7 @@ export function carrierCard(c: VisibleCarrier): string {
       <div class="f"><b>${fmtNum(c.drivers)}</b><span>Drivers</span></div>
       <div class="f"><b>${esc(authorityLabel(c.authorityType).replace(' authority', ''))}</b><span>Authority</span></div>
     </div>
-    <div class="dir-chips" style="margin-top: 12px;">
-      <span class="pill pill-${sr.tone}">${esc(sr.text)}</span>
-    </div>
+    <div class="card-chips" data-n="${shown.length}">${shown.join('')}</div>
   </a>`;
 }
 
@@ -1242,9 +1295,16 @@ export function renderCarrierProfile(opts: {
   // their tooltip; self-declared credentials the carrier hasn't verified stay
   // muted with a "claim to add" affordance. Every badge is focusable and carries
   // a pure-CSS hover/focus tooltip (see credBadge). ────────────────────────────
-  const verifiedBadges: string[] = [];
+  // Two SEPARATE badge groups so neither wraps a single badge onto a line of its
+  // own (the global no-orphan rule): credential/compliance badges (authority,
+  // drayage, hazmat, safety) render on their own row; the FMCSA equipment/
+  // cargo-type badges render on their own row below. Each group is laid out with
+  // a count-aware grid on narrow widths (see .cp-badgegroup CSS) so every line
+  // keeps >=2 badges — never a stranded orphan — at desktop AND 390px.
+  const credentialBadges: string[] = [];
+  const equipmentBadges: string[] = [];
   if (isActive)
-    verifiedBadges.push(
+    credentialBadges.push(
       credBadge({
         tone: 'authority',
         label: authorityLabel(c.authorityType),
@@ -1254,7 +1314,7 @@ export function renderCarrierProfile(opts: {
       }),
     );
   if (c.intermodal)
-    verifiedBadges.push(
+    credentialBadges.push(
       credBadge({
         tone: 'dray',
         label: 'Drayage / intermodal',
@@ -1263,8 +1323,60 @@ export function renderCarrierProfile(opts: {
         verified: true,
       }),
     );
+  // Equipment / cargo-type flags from the FMCSA census crgo_* columns — verified
+  // facts, so they render as solid ✓ FMCSA badges (not "self-declared").
+  if (c.dryVan)
+    equipmentBadges.push(
+      credBadge({
+        tone: 'dryvan',
+        label: 'Dry van',
+        tip: 'Hauls dry van / general freight (FMCSA cargo classification).',
+        held: true,
+        verified: true,
+      }),
+    );
+  if (c.reefer)
+    equipmentBadges.push(
+      credBadge({
+        tone: 'reefer',
+        label: 'Reefer',
+        tip: 'Temperature-controlled / refrigerated freight (FMCSA cargo classification).',
+        held: true,
+        verified: true,
+      }),
+    );
+  if (c.tanker)
+    equipmentBadges.push(
+      credBadge({
+        tone: 'tanker',
+        label: 'Tanker / bulk',
+        tip: 'Hauls bulk liquids, gases or chemicals in tank equipment (FMCSA cargo classification).',
+        held: true,
+        verified: true,
+      }),
+    );
+  if (c.flatbed)
+    equipmentBadges.push(
+      credBadge({
+        tone: 'flatbed',
+        label: 'Flatbed / oversized',
+        tip: 'Hauls heavy or dimensional freight on flatbed / open-deck equipment (FMCSA cargo classification).',
+        held: true,
+        verified: true,
+      }),
+    );
+  if (c.dryBulk)
+    equipmentBadges.push(
+      credBadge({
+        tone: 'drybulk',
+        label: 'Dry bulk',
+        tip: 'Hauls dry bulk commodities (FMCSA cargo classification).',
+        held: true,
+        verified: true,
+      }),
+    );
   if (c.hazmat)
-    verifiedBadges.push(
+    credentialBadges.push(
       credBadge({
         tone: 'hazmat',
         label: 'Hazmat',
@@ -1274,7 +1386,7 @@ export function renderCarrierProfile(opts: {
       }),
     );
   if (sr.tone !== 'none')
-    verifiedBadges.push(
+    credentialBadges.push(
       credBadge({
         tone: `safety-${sr.tone}`,
         label: `${sr.text} safety`,
@@ -1288,10 +1400,23 @@ export function renderCarrierProfile(opts: {
   // badge — still tooltip-labeled "Self-declared." (never FMCSA-verified). The
   // credential `tone` ids match the CarrierCapabilities keys 1:1.
   const caps = c.capabilities ?? {};
-  const claimBadges = SELF_DECLARED_CREDENTIALS.map((b) =>
-    credBadge({ ...b, held: !!caps[b.tone as keyof typeof caps], selfDeclared: true }),
-  ).join('');
-  const capBadges = verifiedBadges.join('') + claimBadges;
+  const claimBadges = SELF_DECLARED_CREDENTIALS
+    // The self-declared "Reefer" claim is redundant once the carrier's FMCSA
+    // reefer flag is verified above — drop it to avoid a duplicate Reefer badge.
+    .filter((b) => !(b.tone === 'reefer' && c.reefer))
+    .map((b) => credBadge({ ...b, held: !!caps[b.tone as keyof typeof caps], selfDeclared: true }))
+    .join('');
+  // The "Compliance & capabilities" section lists EVERYTHING (both verified
+  // groups + the self-declared claim badges) as the full enumeration.
+  const capBadges = credentialBadges.join('') + equipmentBadges.join('') + claimBadges;
+  // Header badge groups, each wrapped with a data-n count so the count-aware grid
+  // (mobile) partitions them without ever stranding a lone badge.
+  const credentialGroup = credentialBadges.length
+    ? `<div class="cp-badgegroup" data-n="${credentialBadges.length}">${credentialBadges.join('')}</div>`
+    : '';
+  const equipmentGroup = equipmentBadges.length
+    ? `<div class="cp-eqwrap"><span class="cp-eqlabel">Equipment</span><div class="cp-badgegroup cp-badgegroup--equip" data-n="${equipmentBadges.length}">${equipmentBadges.join('')}</div></div>`
+    : '';
 
   // ── §6 Contact — TIERED. Public block = FMCSA-sourced phone/email (encoded
   // href, escaped text), respecting the contactHidden opt-out. Gated block is
@@ -1368,7 +1493,8 @@ export function renderCarrierProfile(opts: {
         <p class="cp-claimline">Own this company? <a href="${claimHref}">Claim this profile →</a></p>
       </div>
       <div class="cp-caps">
-        ${verifiedBadges.join('')}
+        ${credentialGroup}
+        ${equipmentGroup}
       </div>
     </div>
   </section>

@@ -172,36 +172,76 @@
           <form class="qf-dir-search" action="/directory" method="get" role="search" aria-label="Search the carrier directory">
             <input type="hidden" name="sort" value="featured">
             <label class="qf-dir-field">
-              <span class="visually-hidden">Port</span>
-              <select name="port" aria-label="Port">
-                <option value="">All US ports</option>
-                <option value="USLAX">Los Angeles</option>
-                <option value="USLGB">Long Beach</option>
-                <option value="USNYC">New York &amp; New Jersey</option>
-                <option value="USHOU">Houston</option>
-                <option value="USSAV">Savannah</option>
-                <option value="USSEA">Seattle / Tacoma</option>
-                <option value="USCHS">Charleston</option>
-                <option value="USORF">Norfolk (Virginia)</option>
-                <option value="USCHI">Chicago (inland hub)</option>
-                <option value="USBAL">Baltimore</option>
-                <option value="USMIA">Miami</option>
+              <span class="visually-hidden">Port or inland hub</span>
+              <select name="port" aria-label="Port or inland hub">
+                <option value="">All ports &amp; hubs</option>
+                <optgroup label="US seaports">
+                  <option value="USLAX">Los Angeles</option>
+                  <option value="USLGB">Long Beach</option>
+                  <option value="USNYC">New York &amp; New Jersey</option>
+                  <option value="USSAV">Savannah</option>
+                  <option value="USHOU">Houston</option>
+                  <option value="USSEA">Seattle / Tacoma</option>
+                  <option value="USOAK">Oakland</option>
+                  <option value="USCHS">Charleston</option>
+                  <option value="USORF">Norfolk (Virginia)</option>
+                  <option value="USBAL">Baltimore</option>
+                  <option value="USMIA">Miami</option>
+                  <option value="USPDX">Portland</option>
+                  <option value="USNOL">New Orleans</option>
+                  <option value="USJAX">Jacksonville</option>
+                </optgroup>
+                <optgroup label="US inland rail hubs">
+                  <option value="USCHI">Chicago</option>
+                  <option value="INLMEM">Memphis</option>
+                  <option value="INLKCK">Kansas City</option>
+                  <option value="INLDFW">Dallas / Fort Worth</option>
+                  <option value="INLDEN">Denver</option>
+                  <option value="INLATL">Atlanta</option>
+                  <option value="INLDET">Detroit</option>
+                  <option value="INLCMH">Columbus</option>
+                  <option value="INLCVG">Cincinnati</option>
+                  <option value="INLIND">Indianapolis</option>
+                  <option value="INLLOU">Louisville</option>
+                  <option value="INLBNA">Nashville</option>
+                  <option value="INLSLC">Salt Lake City</option>
+                  <option value="INLSTL">St. Louis</option>
+                  <option value="INLMSP">Minneapolis / St. Paul</option>
+                </optgroup>
+                <optgroup label="Canada — seaports">
+                  <option value="CAVAN">Vancouver</option>
+                  <option value="CAPRR">Prince Rupert</option>
+                  <option value="CAMTR">Montreal</option>
+                  <option value="CAHAL">Halifax</option>
+                  <option value="CASJB">Saint John</option>
+                </optgroup>
+                <optgroup label="Canada — inland rail hubs">
+                  <option value="INLTOR">Toronto</option>
+                  <option value="INLCGY">Calgary</option>
+                  <option value="INLWPG">Winnipeg</option>
+                  <option value="INLEDM">Edmonton</option>
+                </optgroup>
               </select>
             </label>
             <label class="qf-dir-field">
               <span class="visually-hidden">Equipment</span>
-              <select name="intermodal" aria-label="Equipment">
+              <select name="equipment" aria-label="Equipment">
                 <option value="">Any equipment</option>
-                <option value="1">Container / drayage</option>
+                <option value="drayage">Container / drayage</option>
+                <option value="dryvan">Dry van</option>
+                <option value="reefer">Reefer</option>
+                <option value="hazmat">Hazmat</option>
+                <option value="tanker">Tanker / bulk</option>
+                <option value="flatbed">Flatbed / oversized</option>
               </select>
             </label>
             <label class="qf-dir-field">
-              <span class="visually-hidden">Compliance</span>
-              <select name="safety" aria-label="Compliance">
-                <option value="">Any compliance status</option>
-                <option value="satisfactory">Satisfactory rated</option>
+              <span class="visually-hidden">Safety rating</span>
+              <select name="safety" aria-label="Safety rating">
+                <option value="">Any safety rating</option>
+                <option value="satisfactory">Satisfactory</option>
                 <option value="conditional">Conditional</option>
-                <option value="unrated">Not rated</option>
+                <option value="unrated">Not yet rated</option>
               </select>
             </label>
             <button type="submit" class="qf-dir-submit">Search <span class="arr" aria-hidden="true">→</span></button>

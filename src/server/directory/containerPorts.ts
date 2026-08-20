@@ -15,6 +15,7 @@
  * and the read API (src/server/routes/directory.ts) import it.
  */
 import { ZIP5_CENTROIDS } from '../../calc/zip5Centroids.js';
+import { INTERMODAL_TERMINALS } from './terminals.js';
 
 export interface ContainerPort {
   /** UN/LOCODE (or USCHI for the Chicago inland hub). */
@@ -61,11 +62,39 @@ export const CA_CONTAINER_PORTS: readonly ContainerPort[] = [
   { code: 'CASJB', name: 'Port of Saint John', city: 'Saint John', state: 'NB', country: 'CA', lat: 45.2652, lng: -66.0763 },
 ];
 
-// Resolve a port by code across BOTH the US and CA gateways (US-only iteration
-// of CONTAINER_PORTS elsewhere is unaffected).
-const PORT_BY_CODE = new Map(
-  [...CONTAINER_PORTS, ...CA_CONTAINER_PORTS].map((p) => [p.code, p]),
-);
+/**
+ * The FULL hub set the directory maps carriers to: the coastal seaport gateways
+ * PLUS the inland rail-intermodal metros (Memphis, KC, Dallas, Atlanta, Columbus,
+ * Minneapolis, Toronto, Calgary, …), sourced from the canonical terminals dataset
+ * (terminals.ts). Shaped as ContainerPort (drop the terminal `type`). Deduped by
+ * code — a code already present in CONTAINER_PORTS / CA_CONTAINER_PORTS wins, so
+ * the existing seaport coordinates stay authoritative.
+ */
+export const ALL_HUBS: readonly ContainerPort[] = (() => {
+  const seen = new Map<string, ContainerPort>();
+  for (const p of [...CONTAINER_PORTS, ...CA_CONTAINER_PORTS]) seen.set(p.code, p);
+  for (const t of INTERMODAL_TERMINALS) {
+    if (seen.has(t.code)) continue;
+    seen.set(t.code, {
+      code: t.code,
+      name: t.name,
+      city: t.city,
+      state: t.state,
+      country: t.country,
+      lat: t.lat,
+      lng: t.lng,
+    });
+  }
+  return [...seen.values()];
+})();
+
+/** US hubs (seaports + inland rail metros) — the candidate set a US carrier's
+ *  ZIP centroid maps to. Precomputed once (runs per-carrier over 321k rows). */
+const US_HUBS: readonly ContainerPort[] = ALL_HUBS.filter((p) => p.country === 'US');
+
+// Resolve a hub by code across the US + CA seaport gateways AND the inland rail
+// metros, so a stored nearest_port_code (seaport OR inland) always renders a name.
+const PORT_BY_CODE = new Map(ALL_HUBS.map((p) => [p.code, p]));
 
 /** Look up a port by code (for the API to attach name/city to a count). */
 export function portByCode(code: string | null | undefined): ContainerPort | null {
@@ -85,11 +114,16 @@ function haversineMiles(aLat: number, aLng: number, bLat: number, bLng: number):
   return 2 * R * Math.asin(Math.min(1, Math.sqrt(s)));
 }
 
-/** Resolve the nearest container-port code to a lat/lng. Never null (11 ports). */
+/**
+ * Resolve the nearest US hub code to a lat/lng — the nearest of the coastal
+ * seaport gateways OR the inland rail-intermodal metros (US_HUBS). Never null.
+ * A carrier near a coast still maps to its seaport; an interior carrier maps to
+ * its nearest inland ramp (e.g. Columbus → INLCMH, Memphis → INLMEM).
+ */
 export function nearestPortToPoint(lat: number, lng: number): string {
-  let best = CONTAINER_PORTS[0].code;
+  let best = US_HUBS[0].code;
   let bestD = Infinity;
-  for (const p of CONTAINER_PORTS) {
+  for (const p of US_HUBS) {
     const d = haversineMiles(lat, lng, p.lat, p.lng);
     if (d < bestD) {
       bestD = d;
@@ -114,22 +148,26 @@ export function nearestPortForZip(zip: string | null | undefined): string | null
 }
 
 /**
- * Province → nearest Canadian container-port code. Canadian postal codes are NOT
- * in the US ZCTA centroid table (ZIP5_CENTROIDS), so nearestPortForZip can't
- * resolve a Canadian carrier — we map by province instead. West → Vancouver
- * (CAVAN, the dominant Pacific gateway), Central/QC → Montreal (CAMTR), Atlantic
- * → Halifax (CAHAL), NB → Saint John (CASJB). Prince Rupert (CAPRR) is seeded for
- * port pages but not a province default (Vancouver is the practical BC gateway).
+ * Province → nearest Canadian hub code. Canadian postal codes are NOT in the US
+ * ZCTA centroid table (ZIP5_CENTROIDS), so nearestPortForZip can't resolve a
+ * Canadian carrier — we map by province to that province's dominant intermodal
+ * metro, which may be a seaport OR an inland rail hub:
+ *   BC → Vancouver (CAVAN, the Pacific gateway); Prairies map to their inland
+ *   rail ramps — AB → Calgary (INLCGY), SK/MB → Winnipeg (INLWPG); ON → Toronto
+ *   (INLTOR, the country's largest inland ramp); QC → Montreal (CAMTR);
+ *   Atlantic → Halifax (CAHAL); NB → Saint John (CASJB); the territories default
+ *   to Vancouver. Prince Rupert (CAPRR) / Edmonton (INLEDM) are seeded for hub
+ *   pages but are not a province default.
  */
 const CA_PROVINCE_PORT: Readonly<Record<string, string>> = {
   BC: 'CAVAN',
-  AB: 'CAVAN',
-  SK: 'CAVAN',
-  MB: 'CAVAN',
+  AB: 'INLCGY',
+  SK: 'INLWPG',
+  MB: 'INLWPG',
   YT: 'CAVAN',
   NT: 'CAVAN',
   NU: 'CAVAN',
-  ON: 'CAMTR',
+  ON: 'INLTOR',
   QC: 'CAMTR',
   NS: 'CAHAL',
   PE: 'CAHAL',

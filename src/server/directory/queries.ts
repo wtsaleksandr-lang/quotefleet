@@ -65,6 +65,13 @@ export interface VisibleCarrier {
   intermodal: boolean;
   /** FMCSA-verified hazmat carrier (census hm_ind === 'Y'). */
   hazmat: boolean;
+  /** FMCSA equipment / cargo-type flags (crgo_* census columns). All default
+   *  false until a re-ingest backfills them. */
+  dryVan: boolean;
+  reefer: boolean;
+  tanker: boolean;
+  flatbed: boolean;
+  dryBulk: boolean;
   nearestPortCode: string | null;
   /**
    * Admin/carrier "About" override, applied ONLY on the profile (carrierBySlug).
@@ -102,6 +109,11 @@ export function visibleCarrier(r: typeof carrierDirectory.$inferSelect): Visible
     authorityType: r.authorityType,
     intermodal: r.intermodal,
     hazmat: r.hazmat,
+    dryVan: r.dryVan,
+    reefer: r.reefer,
+    tanker: r.tanker,
+    flatbed: r.flatbed,
+    dryBulk: r.dryBulk,
     nearestPortCode: r.nearestPortCode,
     // FMCSA-only base shape: no override applied. The profile read
     // (carrierBySlug) merges carrier_overrides on top via mergeCarrierOverride;
@@ -260,6 +272,31 @@ export type FleetBucketId = '1-25' | '26-100' | '101-500' | '500+';
 export type SafetyId = 'satisfactory' | 'conditional' | 'unsatisfactory' | 'unrated';
 export type SortId = 'featured' | 'safety' | 'fleet' | 'recent';
 
+/**
+ * Equipment / cargo-type filter — a SINGLE `equipment` GET param whose value is
+ * one of these ids. Each is backed by a REAL FMCSA-derived boolean column on
+ * carrier_directory (verified crgo_* census flags — see carrierIngest.ts), so
+ * every option is an honest filter, not a proxy. `drayage` maps to the existing
+ * `intermodal` column (kept for backward-compat with the legacy `intermodal=1`
+ * param + the profile "Drayage / intermodal" badge).
+ */
+export type EquipmentId = 'drayage' | 'dryvan' | 'reefer' | 'hazmat' | 'tanker' | 'flatbed' | 'drybulk';
+
+/** The carrier_directory boolean column each equipment id filters on. */
+export const EQUIPMENT_OPTIONS: ReadonlyArray<{
+  id: EquipmentId;
+  label: string;
+  column: 'intermodal' | 'hazmat' | 'dryVan' | 'reefer' | 'tanker' | 'flatbed' | 'dryBulk';
+}> = [
+  { id: 'drayage', label: 'Container / drayage', column: 'intermodal' },
+  { id: 'dryvan', label: 'Dry van', column: 'dryVan' },
+  { id: 'reefer', label: 'Reefer', column: 'reefer' },
+  { id: 'hazmat', label: 'Hazmat', column: 'hazmat' },
+  { id: 'tanker', label: 'Tanker / bulk', column: 'tanker' },
+  { id: 'flatbed', label: 'Flatbed / oversized', column: 'flatbed' },
+  { id: 'drybulk', label: 'Dry bulk', column: 'dryBulk' },
+];
+
 export const FLEET_BUCKETS: ReadonlyArray<{ id: FleetBucketId; label: string; min: number; max: number | null }> = [
   { id: '1-25', label: '1–25 trucks', min: 1, max: 25 },
   { id: '26-100', label: '26–100 trucks', min: 26, max: 100 },
@@ -292,7 +329,12 @@ export interface DirectoryFilters {
   fleet: FleetBucketId | null;
   safety: SafetyId | null;
   authorityActive: boolean;
+  /** Legacy drayage flag — true when equipment==='drayage' OR the legacy
+   *  `intermodal=1` param is set. Kept so existing surfaces (featured sort,
+   *  profile badge, `intermodal=1` deep-links) keep working unchanged. */
   intermodal: boolean;
+  /** Single equipment/cargo-type filter (see EQUIPMENT_OPTIONS). null = any. */
+  equipment: EquipmentId | null;
   recent: boolean;
   sort: SortId;
   page: number;
@@ -302,6 +344,8 @@ export interface DirectoryFilters {
 const FLEET_IDS = new Set(FLEET_BUCKETS.map((b) => b.id));
 const SAFETY_IDS = new Set(SAFETY_OPTIONS.map((s) => s.id));
 const SORT_IDS = new Set(SORT_OPTIONS.map((s) => s.id));
+const EQUIPMENT_IDS = new Set(EQUIPMENT_OPTIONS.map((e) => e.id));
+const EQUIPMENT_COLUMN = new Map(EQUIPMENT_OPTIONS.map((e) => [e.id, e.column] as const));
 const truthy = (v: unknown): boolean => ['1', 'true', 'yes', 'on'].includes(String(v ?? '').toLowerCase());
 
 /** Turn a raw name/slug into the directory's canonical city slug form. */
@@ -324,6 +368,17 @@ export function normalizeFilters(
   const fleetRaw = str(raw.fleet) as FleetBucketId;
   const safetyRaw = str(raw.safety).toLowerCase() as SafetyId;
   const sortRaw = str(raw.sort).toLowerCase() as SortId;
+  // Equipment: the new single `equipment` param wins; otherwise the legacy
+  // `intermodal=1` param maps to 'drayage' so old bookmarks/deep-links keep
+  // working. `intermodal` (boolean) stays true whenever the resolved equipment
+  // is drayage OR the legacy flag was set.
+  const equipRaw = str(raw.equipment).toLowerCase() as EquipmentId;
+  const legacyIntermodal = truthy(raw.intermodal);
+  const equipment: EquipmentId | null = EQUIPMENT_IDS.has(equipRaw)
+    ? equipRaw
+    : legacyIntermodal
+      ? 'drayage'
+      : null;
   return {
     state: overrides && 'state' in overrides ? overrides.state ?? null : /^[A-Z]{2}$/.test(stateRaw) ? stateRaw : null,
     port: overrides && 'port' in overrides ? overrides.port ?? null : portRaw || null,
@@ -332,7 +387,8 @@ export function normalizeFilters(
     fleet: FLEET_IDS.has(fleetRaw) ? fleetRaw : null,
     safety: SAFETY_IDS.has(safetyRaw) ? safetyRaw : null,
     authorityActive: String(raw.authority ?? '').toLowerCase() === 'active' || truthy(raw.authority),
-    intermodal: truthy(raw.intermodal),
+    intermodal: equipment === 'drayage' || legacyIntermodal,
+    equipment,
     recent: truthy(raw.recent),
     sort: SORT_IDS.has(sortRaw) ? sortRaw : 'featured',
     page: Math.max(1, parseInt(str(raw.page), 10) || 1),
@@ -348,6 +404,7 @@ export const FACET_QUERY_KEYS = [
   'safety',
   'authority',
   'intermodal',
+  'equipment',
   'recent',
   'sort',
   'page',
@@ -374,6 +431,19 @@ function safetyCondition(id: SafetyId): SQL | null {
   return o.letter == null ? isNull(carrierDirectory.safetyRating) : eq(carrierDirectory.safetyRating, o.letter);
 }
 
+/**
+ * Equipment filter → a single `eq(<column>, true)` on the FMCSA-derived boolean
+ * column for that equipment id. `drayage` is intentionally handled by the
+ * separate `intermodal` predicate in buildConditions (it maps to the same
+ * `intermodal` column), so this returns null for it to avoid a redundant clause.
+ */
+function equipmentCondition(id: EquipmentId): SQL | null {
+  if (id === 'drayage') return null; // handled via the intermodal predicate
+  const column = EQUIPMENT_COLUMN.get(id);
+  if (!column) return null;
+  return eq(carrierDirectory[column], true);
+}
+
 const recentCutoff = (): Date => new Date(Date.now() - RECENT_DAYS * 24 * 60 * 60 * 1000);
 
 /**
@@ -397,6 +467,10 @@ function buildConditions(f: DirectoryFilters, exclude: Set<string> = new Set()):
     c.push(and(isNotNull(carrierDirectory.authorityType), ne(carrierDirectory.authorityType, '')) as SQL);
   }
   if (f.intermodal && !exclude.has('intermodal')) c.push(eq(carrierDirectory.intermodal, true));
+  if (f.equipment && !exclude.has('equipment')) {
+    const ec = equipmentCondition(f.equipment);
+    if (ec) c.push(ec);
+  }
   if (f.recent && !exclude.has('recent')) c.push(gte(carrierDirectory.updatedAt, recentCutoff()));
   return c;
 }

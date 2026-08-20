@@ -12,6 +12,7 @@ import {
   SAFETY_OPTIONS,
   SORT_OPTIONS,
   FACET_QUERY_KEYS,
+  EQUIPMENT_OPTIONS,
 } from './queries.js';
 
 describe('normalizeFilters — GET-param facet parsing', () => {
@@ -59,6 +60,43 @@ describe('normalizeFilters — GET-param facet parsing', () => {
     expect(f.state).toBe('TX');
     expect(f.citySlug).toBe('dallas');
     expect(f.port).toBeNull();
+  });
+});
+
+describe('equipment facet — single `equipment` param + legacy `intermodal` compat', () => {
+  it('parses every valid equipment id', () => {
+    for (const opt of EQUIPMENT_OPTIONS) {
+      expect(normalizeFilters({ equipment: opt.id }).equipment).toBe(opt.id);
+    }
+  });
+  it('collapses an unknown equipment value to null (never throws)', () => {
+    expect(normalizeFilters({ equipment: 'spaceship' }).equipment).toBeNull();
+    expect(normalizeFilters({}).equipment).toBeNull();
+  });
+  it('drayage sets the legacy intermodal boolean true (keeps featured sort / badge working)', () => {
+    const f = normalizeFilters({ equipment: 'drayage' });
+    expect(f.equipment).toBe('drayage');
+    expect(f.intermodal).toBe(true);
+  });
+  it('a non-drayage equipment leaves the intermodal boolean false', () => {
+    const f = normalizeFilters({ equipment: 'reefer' });
+    expect(f.equipment).toBe('reefer');
+    expect(f.intermodal).toBe(false);
+  });
+  it('the legacy `intermodal=1` param still maps to drayage', () => {
+    const f = normalizeFilters({ intermodal: '1' });
+    expect(f.equipment).toBe('drayage');
+    expect(f.intermodal).toBe(true);
+  });
+  it('an explicit equipment value wins over the legacy intermodal param', () => {
+    const f = normalizeFilters({ equipment: 'flatbed', intermodal: '1' });
+    expect(f.equipment).toBe('flatbed');
+    // legacyIntermodal is still honored for the boolean (old deep-link semantics)
+    expect(f.intermodal).toBe(true);
+  });
+  it('every equipment option is backed by a real carrier_directory column', () => {
+    const cols = new Set(['intermodal', 'hazmat', 'dryVan', 'reefer', 'tanker', 'flatbed', 'dryBulk']);
+    for (const opt of EQUIPMENT_OPTIONS) expect(cols.has(opt.column)).toBe(true);
   });
 });
 

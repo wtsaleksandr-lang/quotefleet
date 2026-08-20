@@ -82,6 +82,27 @@ export interface CensusRow {
   /** Census hazmat indicator: 'Y' when FMCSA-registered to haul hazardous
    *  materials, else 'N'. Confirmed live on census az4n-8mr2. */
   hm_ind?: string;
+  // ── FMCSA cargo-classification flags ('X' when set) — all confirmed live on
+  //    az4n-8mr2 (probed 2026-08-20). NOTE: there is NO `crgo_reefer` column on
+  //    this resource — refrigerated freight is `crgo_coldfood`. Tanker/liquids is
+  //    `crgo_liqgas` (+ `crgo_chem`); flatbed/oversized has no single column so
+  //    we OR the heavy/dimensional flags (metalsheet / machlrg / logpole).
+  /** Dry van / general freight. */
+  crgo_genfreight?: string;
+  /** Reefer / temperature-controlled (refrigerated food). */
+  crgo_coldfood?: string;
+  /** Tanker — bulk liquids / gases. */
+  crgo_liqgas?: string;
+  /** Tanker — chemicals (OR'd into the tanker flag). */
+  crgo_chem?: string;
+  /** Flatbed — metal / coils / sheet. */
+  crgo_metalsheet?: string;
+  /** Flatbed — large machinery. */
+  crgo_machlrg?: string;
+  /** Flatbed — logs / poles / lumber. */
+  crgo_logpole?: string;
+  /** Dry bulk (aggregates, grain-in-bulk, etc.). */
+  crgo_drybulk?: string;
   phone?: string;
   phy_street?: string;
   phy_city?: string;
@@ -110,6 +131,19 @@ export interface CarrierRecord {
   intermodal: boolean;
   /** FMCSA-verified hazmat carrier (census hm_ind === 'Y'). */
   hazmat: boolean;
+  // ── Equipment / cargo-type flags derived from the FMCSA census crgo_* columns.
+  //    Default false (no census match ⇒ all false), so a carrier is unchanged
+  //    until a re-ingest populates the flags.
+  /** Dry van / general freight (crgo_genfreight). */
+  dryVan: boolean;
+  /** Reefer / temperature-controlled (crgo_coldfood). */
+  reefer: boolean;
+  /** Tanker — bulk liquids / gas / chemicals (crgo_liqgas OR crgo_chem). */
+  tanker: boolean;
+  /** Flatbed / oversized (crgo_metalsheet OR crgo_machlrg OR crgo_logpole). */
+  flatbed: boolean;
+  /** Dry bulk (crgo_drybulk). */
+  dryBulk: boolean;
   nearestPortCode: string | null;
   publicSlug: string;
 }
@@ -193,6 +227,43 @@ export function isHazmat(census: CensusRow | undefined): boolean {
   return v === 'Y' || v === 'X';
 }
 
+/** True when a census crgo_* flag is set. FMCSA marks these with 'X'. */
+function cargoFlag(v: string | undefined): boolean {
+  return v?.trim().toUpperCase() === 'X';
+}
+
+/** Dry van / general freight — census crgo_genfreight === 'X'. */
+export function isDryVan(census: CensusRow | undefined): boolean {
+  return cargoFlag(census?.crgo_genfreight);
+}
+
+/** Reefer / temperature-controlled — census crgo_coldfood === 'X'.
+ *  (There is NO crgo_reefer column on az4n-8mr2; crgo_coldfood is the
+ *  refrigerated-freight classification.) */
+export function isReefer(census: CensusRow | undefined): boolean {
+  return cargoFlag(census?.crgo_coldfood);
+}
+
+/** Tanker — bulk liquids/gas OR chemicals (crgo_liqgas OR crgo_chem === 'X'). */
+export function isTanker(census: CensusRow | undefined): boolean {
+  return cargoFlag(census?.crgo_liqgas) || cargoFlag(census?.crgo_chem);
+}
+
+/** Flatbed / oversized — heavy/dimensional freight. Best-effort OR of the
+ *  metal-sheet, large-machinery and log/pole flags (no single flatbed column). */
+export function isFlatbed(census: CensusRow | undefined): boolean {
+  return (
+    cargoFlag(census?.crgo_metalsheet) ||
+    cargoFlag(census?.crgo_machlrg) ||
+    cargoFlag(census?.crgo_logpole)
+  );
+}
+
+/** Dry bulk — census crgo_drybulk === 'X'. */
+export function isDryBulk(census: CensusRow | undefined): boolean {
+  return cargoFlag(census?.crgo_drybulk);
+}
+
 /**
  * Domicile country for a (already upper-cased) physical state/province code:
  * 'US' when it's a US state/territory, 'CA' when it's a Canadian province, else
@@ -270,6 +341,11 @@ export function normalizeCarrier(
     authorityType: authorityType(li),
     intermodal: isIntermodal(census),
     hazmat: isHazmat(census),
+    dryVan: isDryVan(census),
+    reefer: isReefer(census),
+    tanker: isTanker(census),
+    flatbed: isFlatbed(census),
+    dryBulk: isDryBulk(census),
     // US carriers derive the port from the ZIP centroid; CA postal codes aren't in
     // the US ZCTA table, so CA carriers map by province → nearest Canadian gateway.
     nearestPortCode: country === 'CA' ? nearestCaPortForProvince(state) : nearestPortForZip(zip),
@@ -337,6 +413,11 @@ export const CARRIER_UPSERT_SET = {
   authorityType: sql`excluded.authority_type`,
   intermodal: sql`excluded.intermodal`,
   hazmat: sql`excluded.hazmat`,
+  dryVan: sql`excluded.dry_van`,
+  reefer: sql`excluded.reefer`,
+  tanker: sql`excluded.tanker`,
+  flatbed: sql`excluded.flatbed`,
+  dryBulk: sql`excluded.dry_bulk`,
   nearestPortCode: sql`excluded.nearest_port_code`,
   publicSlug: sql`excluded.public_slug`,
   updatedAt: sql`excluded.updated_at`,
@@ -405,7 +486,7 @@ export async function fetchCensusByDots(dots: string[]): Promise<Map<string, Cen
     const inList = chunk.map((d) => `'${d}'`).join(',');
     const rows = await socrataJson<CensusRow>(CENSUS_ID, {
       $select:
-        'dot_number,legal_name,dba_name,email_address,power_units,total_drivers,safety_rating,status_code,crgo_intermodal,hm_ind,phone,phy_street,phy_city,phy_state,phy_zip',
+        'dot_number,legal_name,dba_name,email_address,power_units,total_drivers,safety_rating,status_code,crgo_intermodal,hm_ind,crgo_genfreight,crgo_coldfood,crgo_liqgas,crgo_chem,crgo_metalsheet,crgo_machlrg,crgo_logpole,crgo_drybulk,phone,phy_street,phy_city,phy_state,phy_zip',
       $where: `dot_number in (${inList})`,
       $limit: String(chunk.length),
     });
@@ -425,10 +506,11 @@ export interface IngestOptions {
   states: string[];
   dryRun: boolean;
   /**
-   * Include Canada-domiciled carriers (tagged country='CA'). DEFAULT false, so
-   * the ingest output is byte-for-byte the current US-only set unless explicitly
-   * enabled. When the field is omitted, runIngest falls back to the env switch
-   * INGEST_INCLUDE_CANADA=1. Leaving both off keeps the live directory US-only.
+   * Include Canada-domiciled carriers (tagged country='CA'). When the field is
+   * omitted, runIngest DEFAULTS this ON (the directory is North-America-wide);
+   * set INGEST_INCLUDE_CANADA=0 to force the legacy US-only ingest. The pure
+   * normalize helpers (normalizeCarrier / filterAndNormalizeCarriers) still
+   * default their own param to false, so only runIngest changes the live default.
    */
   includeCanada?: boolean;
 }
@@ -453,9 +535,10 @@ export async function runIngest(
   const fetchCarriers = deps.fetchCarriers ?? fetchCarrierPage;
   const fetchCensus = deps.fetchCensus ?? fetchCensusByDots;
   const log = deps.log ?? ((m: string) => console.log(m));
-  // Effective Canada gate: explicit option wins; otherwise honor the env switch.
-  // Default OFF → the ingest produces the exact current US-only set.
-  const includeCanada = opts.includeCanada ?? process.env.INGEST_INCLUDE_CANADA === '1';
+  // Effective Canada gate: explicit option wins; otherwise DEFAULT ON so the
+  // ingest produces the full North-America set. INGEST_INCLUDE_CANADA=0 forces
+  // the legacy US-only ingest.
+  const includeCanada = opts.includeCanada ?? process.env.INGEST_INCLUDE_CANADA !== '0';
 
   let carriersSeen = 0;
   let ingested = 0;
