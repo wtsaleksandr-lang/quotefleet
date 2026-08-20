@@ -282,3 +282,12 @@ body.qf-wft .premium-footer .qf-footer-wordmark:hover {
     align-items: flex-start;
   }
 }
+
+/* ── Footer hover underline: track the link's own color so it stays visible in
+   LIGHT too (the earlier rule used a white underline that vanished on the light
+   footer). currentColor works in both themes. Appended last → wins over the
+   rgba-white decoration above at equal specificity. ── */
+body.qf-wft .premium-footer .footer-col a:hover,
+body.qf-wft .premium-footer .footer-bottom a:hover {
+  text-decoration-color: currentColor;
+}

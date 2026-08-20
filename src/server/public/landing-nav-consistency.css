@@ -63,3 +63,23 @@ body.landing-v2.qf-wft .site-mobile-menu a {
   text-transform: none !important;
   letter-spacing: -0.005em !important;
 }
+
+/* ── Subtle hover underline on the top-bar nav links + Solutions trigger + Sign
+   in (both themes, Alex). currentColor underline so it tracks the link's own
+   text color in dark AND light. No raw colors, no spacing props off-ramp. ── */
+body.landing-v2.qf-wft .site-nav a,
+body.landing-v2.qf-wft .nav-dd-trigger,
+body.landing-v2.qf-wft .site-actions .signin {
+  text-decoration-line: none;
+  text-underline-offset: 4px;
+  text-decoration-thickness: 1px;
+}
+body.landing-v2.qf-wft .site-nav a:hover,
+body.landing-v2.qf-wft .site-nav a:focus-visible,
+body.landing-v2.qf-wft .nav-dd-trigger:hover,
+body.landing-v2.qf-wft .nav-dd-trigger:focus-visible,
+body.landing-v2.qf-wft .site-actions .signin:hover,
+body.landing-v2.qf-wft .site-actions .signin:focus-visible {
+  text-decoration-line: underline;
+  text-decoration-color: currentColor;
+}

@@ -1290,3 +1290,105 @@ html[data-theme="light"] body.qf-wft.landing-v2 .site-header-inner {
 html[data-theme="light"] body.qf-wft .site-actions .signin {
   color: var(--ink-soft) !important;
 }
+
+/* ════════════════════════════════════════════════════════════════════════
+   LIGHT THEME — landing polish pass (Alex's 7 fixes). Additive, light-only:
+   every selector is html[data-theme="light"]-scoped so dark stays untouched
+   and the hardcoded-color guard exempts this block. Colors resolve to the
+   style.css light tokens; the few rgba() shadows are navy (#0A2540) tints.
+   ════════════════════════════════════════════════════════════════════════ */
+
+/* FIX 1 ── "Solutions" dropdown panel: was a dark glass panel (rgba(20,24,30))
+   with dark ink in light mode (2.6:1). Flip to a white surface with dark ink;
+   links + hover + section heads all read AA on it. */
+html[data-theme="light"] body.qf-wft .nav-dd-panel {
+  background: var(--surface) !important;
+  border-color: var(--border) !important;
+  -webkit-backdrop-filter: none !important;
+  backdrop-filter: none !important;
+  box-shadow: 0 18px 42px rgba(10, 37, 64, 0.14) !important;
+}
+html[data-theme="light"] body.qf-wft .nav-dd-panel a:hover,
+html[data-theme="light"] body.qf-wft .nav-dd-panel a:focus-visible {
+  background: var(--surface-2) !important;
+  color: var(--ink) !important;
+}
+html[data-theme="light"] body.qf-wft .nav-dd-head {
+  color: var(--muted) !important;
+}
+
+/* FIX 3 ── Header "View demo" CTA arrow was near-white (#F9F9F9 → 1.05:1) on the
+   white light-mode header. Inherit the button's dark ink so it is visible. */
+html[data-theme="light"] body.qf-wft .site-actions .btn-secondary .arr,
+html[data-theme="light"] body.qf-wft .site-actions [data-aud-cta] .arr {
+  color: var(--ink) !important;
+}
+
+/* FIX 4 ── Brand wordmark + header nav links + footer menu links were forced to
+   brand-blue by the generic `a:not(.btn)…` accent rule in this file. In LIGHT
+   they should read as the deep navy --ink (same as the hero H1). Mirror that
+   rule's :not() chain so these targeted overrides out-specify it. Dark is
+   untouched. Hover lifts to accent for feedback (pairs with the underline). */
+html[data-theme="light"] body.qf-wft a.site-brand:not(.btn):not(.nav-link):not(.signin):not(.demo-link),
+html[data-theme="light"] body.qf-wft a.qf-footer-wordmark:not(.btn):not(.nav-link):not(.signin):not(.demo-link),
+html[data-theme="light"] body.qf-wft .site-nav a:not(.btn):not(.nav-link):not(.signin):not(.demo-link),
+html[data-theme="light"] body.qf-wft .footer-col a:not(.btn):not(.nav-link):not(.signin):not(.demo-link),
+html[data-theme="light"] body.qf-wft .footer-bottom a:not(.btn):not(.nav-link):not(.signin):not(.demo-link) {
+  color: var(--ink) !important;
+}
+html[data-theme="light"] body.qf-wft .site-nav a:not(.btn):not(.nav-link):not(.signin):not(.demo-link):hover,
+html[data-theme="light"] body.qf-wft .site-nav a:not(.btn):not(.nav-link):not(.signin):not(.demo-link):focus-visible,
+html[data-theme="light"] body.qf-wft .footer-col a:not(.btn):not(.nav-link):not(.signin):not(.demo-link):hover,
+html[data-theme="light"] body.qf-wft .footer-bottom a:not(.btn):not(.nav-link):not(.signin):not(.demo-link):hover {
+  color: var(--accent) !important;
+}
+
+/* FIX 6 ── Pre-footer final-CTA card trust badges: tiles/labels/icons were
+   dark-theme near-white on the white card (≈1.04:1). Give them a light surface,
+   visible hairline, dark ink label + accent icon, and a light popover. */
+html[data-theme="light"] body.qf-wft .qf-badge-tile {
+  background: var(--surface-2) !important;
+  border-color: var(--border) !important;
+  color: var(--ink) !important;
+}
+html[data-theme="light"] body.qf-wft .qf-badge-tile:hover,
+html[data-theme="light"] body.qf-wft .qf-badge-tile:focus-visible {
+  border-color: var(--accent) !important;
+  background: var(--accent-soft) !important;
+}
+html[data-theme="light"] body.qf-wft .qf-badge-label {
+  color: var(--ink) !important;
+}
+html[data-theme="light"] body.qf-wft .qf-badge-ico {
+  background: var(--accent-soft) !important;
+  border-color: var(--accent-soft) !important;
+}
+html[data-theme="light"] body.qf-wft .qf-badge-ico svg {
+  stroke: var(--accent) !important;
+}
+html[data-theme="light"] body.qf-wft .qf-badge-pop {
+  background: var(--surface) !important;
+  border-color: var(--border) !important;
+  box-shadow: 0 24px 60px -30px rgba(10, 37, 64, 0.35) !important;
+}
+html[data-theme="light"] body.qf-wft .qf-badge-pop p {
+  color: var(--ink-soft) !important;
+}
+html[data-theme="light"] body.qf-wft .qf-badge-pop::after {
+  background: var(--surface) !important;
+  border-right-color: var(--border) !important;
+  border-bottom-color: var(--border) !important;
+}
+
+/* FIX 7 ── "Built for trucking…" showcase reinforcement pills: frosted dark
+   chips with near-white text (≈1:1) on the light section. Give them a white
+   surface, hairline, and dark ink so the labels read AA. Icons are brand PNGs
+   (locked) — left as-is. */
+html[data-theme="light"] body.qf-wft .qf-showcase-pills .qf-chip {
+  background: var(--surface) !important;
+  border: 1px solid var(--border) !important;
+  color: var(--ink) !important;
+  -webkit-backdrop-filter: none !important;
+  backdrop-filter: none !important;
+  box-shadow: 0 1px 2px rgba(10, 37, 64, 0.06) !important;
+}
