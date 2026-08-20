@@ -43,7 +43,6 @@ import {
   CARGO_OPTIONS,
   FLEET_BUCKETS,
   DRIVERS_BUCKETS,
-  SAFETY_OPTIONS,
   titleCaseCity,
   type DirectoryFilters,
   type VisibleCarrier,
@@ -213,7 +212,7 @@ export function describeFilters(filters: DirectoryFilters): string {
   }
   if (filters.fleet) bits.push(FLEET_BUCKETS.find((b) => b.id === filters.fleet)?.label ?? filters.fleet);
   if (filters.drivers) bits.push(DRIVERS_BUCKETS.find((b) => b.id === filters.drivers)?.label ?? filters.drivers);
-  if (filters.safety) bits.push((SAFETY_OPTIONS.find((s) => s.id === filters.safety)?.label ?? filters.safety) + ' safety');
+  if (filters.goodStandingOnly) bits.push('Good standing');
   if (filters.authorityActive) bits.push('Active authority');
   if (filters.recent) bits.push('Recently updated');
   return bits.length ? bits.join(' · ') : 'All carriers';

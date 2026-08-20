@@ -280,10 +280,10 @@ describe('branded HTML view', () => {
 
 describe('describeFilters', () => {
   it('summarizes a multi-facet selection', () => {
-    const s = describeFilters(normalizeFilters({ state: 'TX', equipment: 'reefer', safety: 'satisfactory' }));
+    const s = describeFilters(normalizeFilters({ state: 'TX', equipment: 'reefer', standing: 'good' }));
     expect(s).toContain('Texas');
     expect(s).toContain('Reefer');
-    expect(s).toContain('Satisfactory safety');
+    expect(s).toContain('Good standing');
   });
   it('falls back to "All carriers" when empty', () => {
     expect(describeFilters(normalizeFilters({}))).toBe('All carriers');
