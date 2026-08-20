@@ -300,6 +300,35 @@ const DIRECTORY_CSS = `
   .dir-pagenums a:hover { border-color: var(--border-strong); }
   .dir-pagenums .cur { border-color: var(--accent); color: var(--accent); background: var(--accent-soft); }
   .dir-pagenums .gap { border: 0; min-width: 16px; color: var(--muted); }
+  /* ── Selectable carrier cards + sticky directory action bar ─────────────── */
+  .cc-sel { position: relative; }
+  /* Make room at the card top-right so the checkbox never sits on the Drayage
+     pill (the pill is the right item of .top; padding shifts it left). */
+  .cc-sel .carrier-card .top { padding-right: 28px; }
+  .cc-check { position: absolute; top: 12px; right: 12px; z-index: 3; margin: 0; display: inline-flex; line-height: 0; cursor: pointer; }
+  .cc-cb { width: 20px; height: 20px; margin: 0; cursor: pointer; accent-color: var(--accent-fill); }
+  .cc-cb:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; border-radius: 4px; }
+  .qf-actionbar { position: sticky; bottom: 12px; z-index: 20; display: flex; align-items: center; justify-content: space-between; gap: 10px 16px; flex-wrap: wrap; margin: 20px 0 0; padding: 12px 14px; background: var(--surface-2); border: 1px solid var(--border-strong); border-radius: 8px; box-shadow: var(--shadow-md); }
+  .qf-ab-info { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+  .qf-ab-count { font-size: 14px; color: var(--ink); }
+  .qf-ab-count b { font-family: var(--font-mono); color: var(--accent); font-size: 18px; }
+  .qf-ab-hint { font-size: 11px; color: var(--muted); }
+  .qf-actionbar[data-mode="dots"] .qf-ab-hint { visibility: hidden; }
+  .qf-ab-actions { display: flex; align-items: center; gap: 8px 10px; flex-wrap: wrap; }
+  .qf-ab-btn { flex: 0 0 auto; }
+  .qf-ab-fmts { display: inline-flex; align-items: center; gap: 8px; flex: 0 0 auto; }
+  .qf-ab-fmt { font-size: 11px; font-family: var(--font-mono); letter-spacing: 0.04em; color: var(--accent); text-decoration: none; padding: 6px 8px; border: 1px solid var(--border); border-radius: 6px; }
+  .qf-ab-fmt:hover { border-color: var(--accent); }
+  .qf-ab-fmt:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+  /* "— free" suffix on the topnav Claim CTA: drop it on small screens so the
+     always-visible CTA never widens the header into horizontal overflow. */
+  @media (max-width: 560px) { .topnav .tn-free { display: none; } }
+  @media (max-width: 640px) {
+    .qf-actionbar { flex-direction: column; align-items: stretch; gap: 10px; bottom: 8px; padding: 12px; }
+    .qf-ab-actions { flex-direction: column; align-items: stretch; }
+    .qf-ab-btn { width: 100%; }
+    .qf-ab-fmts { justify-content: center; }
+  }
   @media (max-width: 900px) {
     .dir-layout { grid-template-columns: 1fr; }
     .dir-rail { position: static; }
@@ -504,6 +533,16 @@ const DIRECTORY_CSS = `
   .cp-fmcsa { position: relative; font-size: 10px; font-family: var(--font-mono); letter-spacing: 0.08em; text-transform: uppercase; padding: 3px 7px; border-radius: 4px; background: var(--surface-2); color: var(--muted); border: 1px solid var(--border); white-space: nowrap; cursor: help; }
   .cp-subtitle { margin: 8px 0 0; }
   .cp-headrow .cp-claimline { margin: 4px 0 0; }
+  /* Profile trailing blocks — desktop defaults (classes replace former inline
+     styles so mobile can tighten them below). */
+  .cp-crosslinks { margin-top: 24px; }
+  .cp-claimcard { margin-top: 24px; padding: 24px; text-align: center; }
+  /* The global .site-footer carries a generous marketing gap (72px margin-top +
+     44px padding-top). On a short carrier profile that reads as a dead band
+     between the claim card and the footer. Trim it — SCOPED to the profile via
+     the profile's sibling footer, so every other page's footer is untouched.
+     Uses ~ (not +) because a <script> sits between <main> and the footer. */
+  main.dir-shell--cp ~ .site-footer { margin-top: 32px; }
   @media (max-width: 640px) {
     .cp-nameline h1 { font-size: 24px; }
     .cp-monogram { width: 46px; height: 46px; font-size: 18px; }
@@ -514,11 +553,58 @@ const DIRECTORY_CSS = `
   }
   @media (max-width: 640px) {
     .cp-card { padding: 16px; }
+    /* Tighten the profile on mobile so it reads dense — no airy section gaps,
+       no dead band before the footer (see the base rules above). */
+    .cp-layout { margin-top: 16px; gap: 12px; }
+    .cp-main, .cp-side { gap: 12px; }
+    .cp-crosslinks { margin-top: 16px; }
+    .cp-claimcard { margin-top: 16px; padding: 16px; }
+    main.dir-shell--cp { padding-bottom: 8px; }
+    main.dir-shell--cp ~ .site-footer { margin-top: 16px; padding-top: 24px; }
   }
   @media (max-width: 380px) {
     .cp-datagrid { grid-template-columns: 1fr; }
   }
 `;
+
+/**
+ * Progressive-enhancement for the results action bar. No-JS renders links that
+ * act on ALL filtered carriers (the filter querystring baked into data-filter-qs);
+ * this swaps the count + all four hrefs to `?dots=…` the moment ≥1 card is ticked,
+ * and reverts to the filter querystring when the selection is cleared. Kept as a
+ * plain IIFE string (no build step) and defensively null-guarded throughout.
+ */
+const ACTION_BAR_SCRIPT = `(function(){
+  var bar=document.querySelector('.qf-actionbar');
+  var results=document.querySelector('.dir-results');
+  if(!bar||!results)return;
+  var filterQs=bar.getAttribute('data-filter-qs')||'';
+  var total=parseInt(bar.getAttribute('data-total')||'0',10)||0;
+  var nEl=bar.querySelector('.qf-ab-n');
+  var lblEl=bar.querySelector('.qf-ab-lbl');
+  var rfqnEl=bar.querySelector('.qf-ab-rfqn');
+  var rfqwEl=bar.querySelector('.qf-ab-rfqw');
+  var countEl=bar.querySelector('.qf-ab-count');
+  var links={rfq:'/directory/rfq','export-view':'/directory/export/view','export-xlsx':'/directory/export.xlsx','export-csv':'/directory/export.csv'};
+  function fmt(n){try{return n.toLocaleString('en-US');}catch(e){return String(n);}}
+  function suffix(dots){return dots.length?'?dots='+dots.join(','):(filterQs?'?'+filterQs:'');}
+  function selected(){var out=[];var cbs=results.querySelectorAll('.cc-cb');for(var i=0;i<cbs.length;i++){if(cbs[i].checked){var d=cbs[i].getAttribute('data-dot');if(d)out.push(d);}}return out;}
+  function apply(){
+    var dots=selected();
+    var s=suffix(dots);
+    var n=dots.length?dots.length:total;
+    var word='carrier'+(n===1?'':'s');
+    if(nEl)nEl.textContent=fmt(n);
+    if(rfqnEl)rfqnEl.textContent=fmt(n);
+    if(rfqwEl)rfqwEl.textContent=word;
+    if(lblEl)lblEl.textContent=word+(dots.length?' selected':' filtered');
+    if(countEl)countEl.setAttribute('data-selected',String(dots.length));
+    bar.setAttribute('data-mode',dots.length?'dots':'filter');
+    for(var key in links){if(!links.hasOwnProperty(key))continue;var a=bar.querySelector('[data-role="'+key+'"]');if(a)a.setAttribute('href',links[key]+s);}
+  }
+  results.addEventListener('change',function(e){var t=e.target;if(t&&t.classList&&t.classList.contains('cc-cb'))apply();});
+  apply();
+})();`;
 
 interface LayoutOpts {
   title: string;
@@ -572,7 +658,7 @@ export function layout({ title, description, canonicalPath, bodyHtml, jsonLd }: 
       <a class="nav-link" href="/directory">Directory</a>
       <a class="nav-link" href="/compliance">Compliance</a>
       <a class="nav-link" href="/glossary">Glossary</a>
-      <a class="btn btn-primary always-show" href="/signup">Claim your listing <span class="arr">→</span></a>
+      <a class="btn btn-primary always-show" href="/signup">Claim your listing<span class="tn-free"> — free</span> <span class="arr">→</span></a>
       <button type="button" class="qf-theme-btn" aria-label="Toggle light/dark theme" aria-pressed="false" title="Toggle theme"><svg class="qf-ico-sun" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M2 12h2M20 12h2M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4"/></svg><svg class="qf-ico-moon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 12.8A9 9 0 1 1 11.2 3a7 7 0 0 0 9.8 9.8z"/></svg></button>
       <button type="button" class="topnav-burger" aria-label="Open menu" aria-expanded="false" aria-controls="topnav-mobile-menu">
         <svg class="ico-open" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><line x1="4" y1="7" x2="20" y2="7"/><line x1="4" y1="12" x2="20" y2="12"/><line x1="4" y1="17" x2="20" y2="17"/></svg>
@@ -587,12 +673,12 @@ export function layout({ title, description, canonicalPath, bodyHtml, jsonLd }: 
       <a href="/tools">Rate calculator</a>
       <a href="/pricing">Pricing</a>
       <a href="/">Home</a>
-      <a class="tn-cta" href="/signup">Claim your listing →</a>
+      <a class="tn-cta" href="/signup">Claim your listing — it's free →</a>
     </nav>
   </header>
   ${bodyHtml}
   <footer class="site-footer">
-    © <span id="year"></span> QuoteFleet · <a href="/directory">Directory</a> · <a href="/compliance">Compliance</a> · <a href="/glossary">Glossary</a> · <a href="/services">Services</a> · <a href="/marketplace/">Marketplace</a> · <a href="/terms">Terms</a> · <a href="/privacy">Privacy</a> · <a href="/">Home</a>
+    © <span id="year"></span> QuoteFleet · <a href="/directory">Directory</a> · <a href="/compliance">Compliance</a> · <a href="/glossary">Glossary</a> · <a href="/services">Services</a> · <a href="/terms">Terms</a> · <a href="/privacy">Privacy</a> · <a href="/">Home</a>
   </footer>
   <script>document.getElementById('year').textContent = new Date().getFullYear();</script>
   <script>(function(){var b=document.querySelector('.topnav-burger'),m=document.getElementById('topnav-mobile-menu');if(!b||!m)return;function set(o){b.setAttribute('aria-expanded',o?'true':'false');b.setAttribute('aria-label',o?'Close menu':'Open menu');if(o)m.removeAttribute('hidden');else m.setAttribute('hidden','');}b.addEventListener('click',function(e){e.stopPropagation();set(b.getAttribute('aria-expanded')!=='true');});document.addEventListener('click',function(e){if(b.getAttribute('aria-expanded')==='true'&&!m.contains(e.target)&&!b.contains(e.target))set(false);});document.addEventListener('keydown',function(e){if(e.key==='Escape')set(false);});})();</script>
@@ -701,6 +787,38 @@ export function carrierCard(c: VisibleCarrier): string {
     </div>
     <div class="card-chips" data-n="${shown.length}">${shown.join('')}</div>
   </a>`;
+}
+
+// ─── Directory action-bar (RFQ + Export) link building ────────────────────
+/**
+ * Build the RFQ + Export action-bar hrefs for a directory selection.
+ *
+ *   - 0 selected  → act on ALL currently filtered carriers: carry the current
+ *     directory FILTER querystring (`filterQuery`, no leading '?').
+ *   - ≥1 selected → act on exactly those carriers: `?dots=D1,D2,…`.
+ *
+ * Pure + exported so the 0-vs-N logic is unit-tested directly. Returns RAW hrefs
+ * (callers esc() them before embedding in HTML). Dots take precedence over the
+ * filter querystring — mirroring how the RFQ/export routes resolve a selection.
+ */
+export function actionBarLinks(opts: { filterQuery?: string; dots?: string[] }): {
+  rfq: string;
+  exportView: string;
+  exportXlsx: string;
+  exportCsv: string;
+} {
+  const dots = (opts.dots ?? []).filter((d) => d != null && String(d).trim() !== '');
+  const suffix = dots.length
+    ? `?dots=${dots.map((d) => encodeURIComponent(String(d))).join(',')}`
+    : opts.filterQuery
+      ? `?${opts.filterQuery}`
+      : '';
+  return {
+    rfq: `/directory/rfq${suffix}`,
+    exportView: `/directory/export/view${suffix}`,
+    exportXlsx: `/directory/export.xlsx${suffix}`,
+    exportCsv: `/directory/export.csv${suffix}`,
+  };
 }
 
 // ─── JSON-LD helpers ──────────────────────────────────────────────────────
@@ -823,6 +941,15 @@ function currentParams(f: DirectoryFilters, locked: Set<string>): Record<string,
   // `dir` only when it differs from the sort's default → canonical stays minimal.
   if (sortIsDirectional(f.sort) && f.dir !== SORT_DIR_DEFAULTS[f.sort]) p.dir = f.dir;
   return p;
+}
+
+/** Filter querystring (no leading '?') reproducing the CURRENTLY DISPLAYED set
+ *  for the action bar. Unlike canonicalSuffix it includes path-locked dims
+ *  (state/port/city) so an RFQ/export launched from a /directory/texas or a
+ *  /directory/port/... page still scopes to that state/port — the routes only
+ *  see the querystring, not the URL path. Paging is intentionally dropped. */
+function actionBarFilterQuery(f: DirectoryFilters): string {
+  return new URLSearchParams(currentParams(f, new Set<string>())).toString();
 }
 
 type FacetChange = Partial<
@@ -1231,13 +1358,44 @@ interface FacetedCfg {
   hideHero?: boolean;
 }
 
+/** A carrier card with a top-right selection checkbox (sibling of the card link
+ *  so ticking it never navigates). data-dot carries the USDOT for the client
+ *  progressive-enhancement script. */
+function selectableCard(c: VisibleCarrier): string {
+  const name = carrierName(c);
+  return `<div class="cc-sel"><label class="cc-check" title="Select ${esc(name)}"><input type="checkbox" class="cc-cb" data-dot="${esc(c.usdot)}" aria-label="Select ${esc(name)}"></label>${carrierCard(c)}</div>`;
+}
+
 function renderFacetedResults(cfg: FacetedCfg): string {
   const { scope, list, counts, filters } = cfg;
-  const cards = list.carriers.length
+  const hasCarriers = list.carriers.length > 0;
+  const cards = hasCarriers
     ? `<div class="dir-grid" style="grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));">${list.carriers
-        .map(carrierCard)
+        .map(selectableCard)
         .join('\n')}</div>`
     : `<div class="dir-empty">No carriers match these filters. <a href="${scope.basePath}" style="color:var(--accent);">Clear filters</a> to see all.</div>`;
+
+  // Action bar: no-JS fallback links act on ALL filtered carriers (the filter
+  // querystring); the enhancement script below swaps to ?dots= when ≥1 card is
+  // ticked. Only rendered when there is at least one carrier to act on.
+  const total = list.total;
+  const plural = total === 1 ? '' : 's';
+  const filterQs = actionBarFilterQuery(filters);
+  const links0 = actionBarLinks({ filterQuery: filterQs });
+  const actionBar = hasCarriers
+    ? `<div class="qf-actionbar" data-mode="filter" data-filter-qs="${esc(filterQs)}" data-total="${total}" role="region" aria-label="Carrier actions">
+        <div class="qf-ab-info">
+          <span class="qf-ab-count" data-selected="0"><b class="qf-ab-n">${fmtNum(total)}</b> <span class="qf-ab-lbl">carrier${plural} filtered</span></span>
+          <span class="qf-ab-hint">Tick cards to target specific carriers</span>
+        </div>
+        <div class="qf-ab-actions">
+          <a class="btn btn-primary btn-sm qf-ab-btn" data-role="rfq" href="${esc(links0.rfq)}">Request rates from <span class="qf-ab-rfqn">${fmtNum(total)}</span>&nbsp;<span class="qf-ab-rfqw">carrier${plural}</span> <span class="arr">→</span></a>
+          <a class="btn btn-secondary btn-sm qf-ab-btn" data-role="export-view" href="${esc(links0.exportView)}">Export list</a>
+          <span class="qf-ab-fmts"><a class="qf-ab-fmt" data-role="export-xlsx" href="${esc(links0.exportXlsx)}">XLSX</a><a class="qf-ab-fmt" data-role="export-csv" href="${esc(links0.exportCsv)}">CSV</a></span>
+        </div>
+      </div>
+      <script>${ACTION_BAR_SCRIPT}</script>`
+    : '';
 
   // Results view: breadcrumb-only slim header, no hero. SEO pages: full hero.
   const heroHtml = cfg.hideHero
@@ -1264,6 +1422,7 @@ function renderFacetedResults(cfg: FacetedCfg): string {
         ${cards}
         ${numberedPager(scope, filters, list)}
         ${cfg.extraModulesHtml ?? ''}
+        ${actionBar}
       </div>
     </div>
     ${cfg.faqsHtml ?? ''}
@@ -1853,7 +2012,7 @@ export function renderCarrierProfile(opts: {
             ${carrierName(c) !== c.legalName ? `<p class="muted-small" style="margin: 6px 0 0;">Legal name: ${esc(c.legalName)}</p>` : ''}
           </div>
         </div>
-        <p class="cp-claimline">Own this company? <a href="${claimHref}">Claim this profile →</a></p>
+        <p class="cp-claimline">Own this company? <a href="${claimHref}">Claim this profile — it's free →</a></p>
       </div>
       <div class="cp-caps">
         ${credentialGroup}
@@ -1861,7 +2020,7 @@ export function renderCarrierProfile(opts: {
       </div>
     </div>
   </section>
-  <main class="dir-shell">
+  <main class="dir-shell dir-shell--cp">
     <div class="cp-layout">
       <div class="cp-main">
         <section class="cp-card">
@@ -1904,11 +2063,11 @@ export function renderCarrierProfile(opts: {
       </aside>
     </div>
 
-    ${crossLinks.length ? `<div class="dir-chips" style="margin-top: 24px;">${crossLinks.join('\n')}</div>` : ''}
+    ${crossLinks.length ? `<div class="dir-chips cp-crosslinks">${crossLinks.join('\n')}</div>` : ''}
 
     ${relatedModule}
 
-    <div class="dir-card" style="margin-top: 24px; text-align: center; padding: 24px;">
+    <div class="dir-card cp-claimcard">
       <h2 style="font-size: 18px; margin: 0 0 8px;">Is this your company?</h2>
       <p class="muted" style="margin: 0 auto 16px; max-width: 460px;">Claim your profile to publish live rates, take instant quotes, and get booked directly by shippers — free to list.</p>
       <a class="btn btn-primary" href="${claimHref}">Claim this profile <span class="arr">→</span></a>

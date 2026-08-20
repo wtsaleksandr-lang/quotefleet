@@ -28,6 +28,7 @@ import { registerAutocompleteRoutes } from './routes/autocomplete.js';
 import { registerIngestRoutes } from './routes/ingest.js';
 import { registerInboundRoutes } from './routes/inbound.js';
 import { registerMarketplaceRoutes } from './routes/marketplace.js';
+import { registerMarketplaceRedirects } from './routes/marketplaceRedirect.js';
 import { registerDirectoryRoutes } from './routes/directory.js';
 import { registerDirectoryExportRoutes } from './routes/directoryExport.js';
 import { registerRfqRoutes } from './routes/rfq.js';
@@ -319,16 +320,11 @@ export function createApp(): express.Express {
       .then((html) => res.type('html').send(applyToolsMarketplaceSkin(html)))
       .catch(next);
   });
-  app.get(['/marketplace', '/marketplace/'], (_req, res, next) => {
-    readFile(resolve(publicDir, 'marketplace.html'), 'utf8')
-      .then((html) => res.type('html').send(applyToolsMarketplaceSkin(html)))
-      .catch(next);
-  });
-  app.get('/marketplace/carrier/:slug', (_req, res, next) => {
-    readFile(resolve(publicDir, 'marketplace-carrier.html'), 'utf8')
-      .then((html) => res.type('html').send(applyToolsMarketplaceSkin(html)))
-      .catch(next);
-  });
+  // The standalone /marketplace page has been retired in favour of the richer,
+  // faceted /directory (same carriers, filters, RFQ + export). See
+  // registerMarketplaceRedirects — only the PAGE is retired; the marketplace
+  // BACKEND (marketplace/sync.ts, aggregates, calculator medians) is untouched.
+  registerMarketplaceRedirects(app);
   app.use(
     express.static(publicDir, {
       index: false,
