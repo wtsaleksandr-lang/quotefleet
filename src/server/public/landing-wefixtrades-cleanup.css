@@ -97,7 +97,7 @@ body.qf-wft .use-badge {
 }
 
 body.qf-wft .hero {
-  padding: clamp(80px, 8vw, 120px) 28px clamp(32px, 4vw, 48px) !important;
+  padding: clamp(24px, 2.5vw, 32px) 28px clamp(32px, 4vw, 48px) !important;
   background: #1f2628 !important;
 }
 
