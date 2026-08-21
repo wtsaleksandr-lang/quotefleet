@@ -253,12 +253,27 @@ function haversineMiles(aLat: number, aLng: number, bLat: number, bLng: number):
 }
 
 /**
+ * Max distance (miles) a carrier may sit from a hub and still be considered to
+ * serve it. Drayage/intermodal is regional-to-local port work, so a carrier
+ * hundreds of miles from every hub is NOT a drayage provider for any of them —
+ * mapping it to the "nearest" one anyway is what put Phoenix/Mesa AZ carriers
+ * under the Los Angeles / Long Beach filter (~356 mi away) before the Phoenix
+ * hub existed. Beyond this radius we return null so the carrier appears under NO
+ * port facet rather than a misleading distant one. 250 mi keeps legitimate
+ * regional ramp-drayage (which can run 150–200 mi to an inland terminal) while
+ * cutting cross-region mismatches; with the denser 61-hub set most real carriers
+ * sit well inside it.
+ */
+export const MAX_HUB_RADIUS_MI = 250;
+
+/**
  * Resolve the nearest US hub code to a lat/lng — the nearest of the coastal
- * seaport gateways OR the inland rail-intermodal metros (US_HUBS). Never null.
- * A carrier near a coast still maps to its seaport; an interior carrier maps to
+ * seaport gateways OR the inland rail-intermodal metros (US_HUBS). Returns null
+ * when the nearest hub is farther than MAX_HUB_RADIUS_MI (the carrier serves no
+ * hub). A carrier near a coast maps to its seaport; an interior carrier maps to
  * its nearest inland ramp (e.g. Columbus → INLCMH, Memphis → INLMEM).
  */
-export function nearestPortToPoint(lat: number, lng: number): string {
+export function nearestPortToPoint(lat: number, lng: number): string | null {
   let best = US_HUBS[0].code;
   let bestD = Infinity;
   for (const p of US_HUBS) {
@@ -268,7 +283,7 @@ export function nearestPortToPoint(lat: number, lng: number): string {
       best = p.code;
     }
   }
-  return best;
+  return bestD <= MAX_HUB_RADIUS_MI ? best : null;
 }
 
 /**

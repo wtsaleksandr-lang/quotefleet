@@ -12,7 +12,33 @@ import {
   portGroupForMemberCode,
   portGroupAsPort,
   portFilterCodes,
+  nearestPortToPoint,
+  MAX_HUB_RADIUS_MI,
 } from './containerPorts.js';
+
+describe('nearestPortToPoint — service-radius cap', () => {
+  it('maps a Phoenix-area point to the Phoenix inland hub, not distant LA/LB', () => {
+    // Phoenix, AZ (~356 mi from LA/Long Beach). Before the Phoenix hub existed
+    // this fell to USLAX/USLGB; now it must resolve to the Phoenix hub.
+    expect(nearestPortToPoint(33.4484, -112.074)).toBe('INLPHX');
+  });
+
+  it('maps an LA point to a San Pedro Bay seaport', () => {
+    expect(['USLAX', 'USLGB']).toContain(nearestPortToPoint(33.7395, -118.2597));
+  });
+
+  it('returns null when the nearest hub is beyond MAX_HUB_RADIUS_MI', () => {
+    // Mid-Pacific — thousands of miles from every hub.
+    expect(nearestPortToPoint(30, -160)).toBeNull();
+    // A point just past the cap from all hubs (far northern Montana wilderness).
+    expect(nearestPortToPoint(48.9, -110.0)).toBeNull();
+  });
+
+  it('cap is a sane drayage radius', () => {
+    expect(MAX_HUB_RADIUS_MI).toBeGreaterThanOrEqual(150);
+    expect(MAX_HUB_RADIUS_MI).toBeLessThanOrEqual(400);
+  });
+});
 
 describe('PORT_GROUPS — the combined, deduped display-hub list', () => {
   it('has unique group codes', () => {
