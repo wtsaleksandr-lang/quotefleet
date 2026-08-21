@@ -9,10 +9,14 @@ async function read(path: string) {
 }
 
 describe('public support page', () => {
-  it('mounts the support route', async () => {
+  it('mounts the support route with the full site header, before static serving', async () => {
     const app = await read('src/server/app.ts');
-    expect(app).toContain("app.get('/support'");
-    expect(app).toContain("support.html");
+    // /support is served through the shared full-header page list (Solutions
+    // dropdown + mobile hamburger + premium footer), registered ahead of the
+    // express.static handler so the skinned HTML wins over the raw file.
+    expect(app).toContain("['/support', 'support.html']");
+    expect(app).toContain('applyFullSiteHeader(html)');
+    expect(app.indexOf("['/support', 'support.html']")).toBeLessThan(app.indexOf('express.static'));
   });
 
   it('documents support channels and safe request guidance', async () => {
