@@ -1485,3 +1485,14 @@ html[data-theme="light"] .site-footer strong { color: var(--ink); }
 @media (max-width: 640px) {
   .site-footer { margin-top: 32px; padding: 24px 16px 32px; }
 }
+
+/* ── Tools topnav CTA — narrow-phone overflow fix ──────────────────────────
+   At ≤430px the always-show primary CTA ("Free for carriers →") plus the brand
+   + theme toggle overran the sticky bar by ~30px at 375. Tighten the row gap
+   and collapse the CTA's secondary label to just "Free →" — the button stays
+   fully tappable and keeps its primary meaning, with 0 horizontal overflow.
+   Appended at EOF to keep the line-based spacing/color baselines stable. */
+@media (max-width: 430px) {
+  .topnav-inner { gap: var(--space-1-5); }
+  .topnav .topnav-cta .topnav-cta-label { display: none; }
+}
