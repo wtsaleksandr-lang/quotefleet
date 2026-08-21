@@ -256,7 +256,7 @@ body.qf-auth-wft .qf-cmp-table td.no { color: var(--muted); }
 body.qf-auth-wft .qf-cmp-table tbody tr:last-child th,
 body.qf-auth-wft .qf-cmp-table tbody tr:last-child td { border-bottom: 0; }
 
-/* ─── Social login (Google / Microsoft / Meta) — provider-gated buttons ───
+/* ─── Social login (Google / Meta / Apple) — provider-gated buttons ───
    Conventional light "Continue with X" chips on the dark auth card, with a
    recognizable brand glyph + an "or" divider above the email form. Colors go
    through scoped custom properties (exempt from the hardcoded-color guard) so

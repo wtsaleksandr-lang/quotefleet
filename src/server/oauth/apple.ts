@@ -1,6 +1,6 @@
 /**
  * Sign in with Apple — the three things Apple does differently from the other
- * OAuth providers (Google / Microsoft / Meta live in ./providers.ts):
+ * OAuth providers (Google / Meta live in ./providers.ts):
  *
  *   1. The callback is a POST (response_mode=form_post), not a GET — handled by
  *      the dedicated app.post('/auth/oauth/apple/callback') route in
@@ -17,7 +17,7 @@
  *      which we VERIFY against Apple's JWKS (verifyAppleIdToken) — audience is
  *      our Services ID, issuer is https://appleid.apple.com. The verified `sub`
  *      is the stable Apple user id; `email` may be a private relay address
- *      (@privaterelay.appleid.com). Unlike Google/Microsoft there is no userinfo
+ *      (@privaterelay.appleid.com). Unlike Google there is no userinfo
  *      endpoint — the signed, verified token IS the profile source.
  *
  * All network + crypto touch-points (fetch, JWKS) are injectable via the deps

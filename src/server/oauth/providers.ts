@@ -1,8 +1,8 @@
 /**
- * Social-login provider registry — Google / Microsoft (Entra) / Meta (Facebook).
+ * Social-login provider registry — Google / Meta (Facebook) / Apple.
  *
  * Ported from WeFixTrades' hand-rolled OAuth2 sign-in (server/lib/googleSignin.ts
- * + the inlined Microsoft/Facebook flows in server/routes/authRoutes.ts) and
+ * + the inlined Facebook flow in server/routes/authRoutes.ts) and
  * adapted to QuoteFleet. Deliberately NO new dependency: the whole
  * authorization-code flow is `fetch` against each provider's public token /
  * userinfo endpoints. The profile is read from the userinfo endpoint using the
@@ -17,7 +17,6 @@
  *
  * Env var names (set later in Doppler quotefleet/prd to activate):
  *   Google      GOOGLE_OAUTH_CLIENT_ID     GOOGLE_OAUTH_CLIENT_SECRET     [GOOGLE_OAUTH_REDIRECT_URI]
- *   Microsoft   MICROSOFT_OAUTH_CLIENT_ID  MICROSOFT_OAUTH_CLIENT_SECRET  [MICROSOFT_OAUTH_REDIRECT_URI]
  *   Meta        META_OAUTH_CLIENT_ID       META_OAUTH_CLIENT_SECRET       [META_OAUTH_REDIRECT_URI]
  *               (FACEBOOK_OAUTH_CLIENT_ID / _SECRET / _REDIRECT_URI accepted as aliases)
  * Redirect URI defaults to `<PUBLIC_BASE_URL>/auth/oauth/<provider>/callback`.
@@ -25,14 +24,13 @@
 import crypto from 'crypto';
 import type { OAuthSubColumn } from '../routes/tenantProvision.js';
 
-export type OAuthProviderId = 'google' | 'microsoft' | 'meta' | 'apple';
+export type OAuthProviderId = 'google' | 'meta' | 'apple';
 
-export const OAUTH_PROVIDER_IDS: OAuthProviderId[] = ['google', 'microsoft', 'meta', 'apple'];
+export const OAUTH_PROVIDER_IDS: OAuthProviderId[] = ['google', 'meta', 'apple'];
 
 /** Human labels for the buttons (kept server-side so the client just renders). */
 export const OAUTH_PROVIDER_LABELS: Record<OAuthProviderId, string> = {
   google: 'Google',
-  microsoft: 'Microsoft',
   meta: 'Meta',
   apple: 'Apple',
 };
@@ -40,7 +38,6 @@ export const OAUTH_PROVIDER_LABELS: Record<OAuthProviderId, string> = {
 /** Provider → the nullable users.* column that stores its stable subject id. */
 export const OAUTH_SUB_COLUMN: Record<OAuthProviderId, OAuthSubColumn> = {
   google: 'googleSub',
-  microsoft: 'microsoftSub',
   meta: 'metaSub',
   apple: 'appleSub',
 };
@@ -91,10 +88,6 @@ export function getProviderConfig(provider: OAuthProviderId): ProviderConfig {
     clientId = firstEnv('GOOGLE_OAUTH_CLIENT_ID');
     clientSecret = firstEnv('GOOGLE_OAUTH_CLIENT_SECRET');
     redirectOverride = firstEnv('GOOGLE_OAUTH_REDIRECT_URI');
-  } else if (provider === 'microsoft') {
-    clientId = firstEnv('MICROSOFT_OAUTH_CLIENT_ID');
-    clientSecret = firstEnv('MICROSOFT_OAUTH_CLIENT_SECRET');
-    redirectOverride = firstEnv('MICROSOFT_OAUTH_REDIRECT_URI');
   } else if (provider === 'apple') {
     // Apple has NO static client secret — it's a signed ES256 JWT minted per
     // token-exchange (see src/server/oauth/apple.ts). The provider is
@@ -218,7 +211,6 @@ export function verifyState(signed: string, provider: OAuthProviderId): boolean 
 
 const AUTH_URLS: Record<OAuthProviderId, string> = {
   google: 'https://accounts.google.com/o/oauth2/auth',
-  microsoft: 'https://login.microsoftonline.com/common/oauth2/v2.0/authorize',
   meta: 'https://www.facebook.com/v18.0/dialog/oauth',
   apple: 'https://appleid.apple.com/auth/authorize',
 };
@@ -260,7 +252,6 @@ export function buildAuthorizeUrl(provider: OAuthProviderId, mode: 'login' | 'si
     state,
     // Show the account chooser so users on multiple accounts can pick.
     prompt: 'select_account',
-    ...(provider === 'microsoft' ? { response_mode: 'query' } : {}),
   });
   return `${AUTH_URLS[provider]}?${params.toString()}`;
 }
@@ -269,7 +260,6 @@ export function buildAuthorizeUrl(provider: OAuthProviderId, mode: 'login' | 'si
 
 const TOKEN_URLS: Record<OAuthProviderId, string> = {
   google: 'https://oauth2.googleapis.com/token',
-  microsoft: 'https://login.microsoftonline.com/common/oauth2/v2.0/token',
   meta: 'https://graph.facebook.com/v18.0/oauth/access_token',
   apple: 'https://appleid.apple.com/auth/token',
 };
@@ -279,26 +269,8 @@ const TOKEN_URLS: Record<OAuthProviderId, string> = {
 // access-token → userinfo providers appear here.
 const USERINFO_URLS: Record<Exclude<OAuthProviderId, 'apple'>, string> = {
   google: 'https://openidconnect.googleapis.com/v1/userinfo',
-  microsoft: 'https://graph.microsoft.com/oidc/userinfo',
   meta: 'https://graph.facebook.com/v18.0/me',
 };
-
-/** Decode a JWT payload WITHOUT verifying its signature. Safe here: the token
- *  came straight from the provider's HTTPS token endpoint (TLS is the trust
- *  anchor). Only used to read Microsoft's email_verified / xms_edov claim. */
-function decodeJwtPayload(jwt: string): Record<string, unknown> | null {
-  try {
-    const parts = jwt.split('.');
-    if (parts.length < 2) return null;
-    const json = Buffer.from(
-      parts[1].replace(/-/g, '+').replace(/_/g, '/') + '='.repeat((4 - (parts[1].length % 4)) % 4),
-      'base64'
-    ).toString('utf-8');
-    return JSON.parse(json) as Record<string, unknown>;
-  } catch {
-    return null;
-  }
-}
 
 /**
  * Exchange an authorization code for the user's verified profile.
@@ -320,7 +292,7 @@ export async function exchangeCodeForProfile(
 
   if (provider === 'meta') return exchangeMeta(cfg, code);
 
-  // Google + Microsoft: OIDC — POST form to the token endpoint, then GET userinfo.
+  // Google: OIDC — POST form to the token endpoint, then GET userinfo.
   const tokenRes = await fetch(TOKEN_URLS[provider], {
     method: 'POST',
     headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
@@ -340,7 +312,7 @@ export async function exchangeCodeForProfile(
       `${provider} token exchange failed: ${String(err.error_description || err.error || tokenRes.statusText)}`
     );
   }
-  const tokenData = (await tokenRes.json()) as { access_token?: string; id_token?: string };
+  const tokenData = (await tokenRes.json()) as { access_token?: string };
   if (!tokenData.access_token) throw new Error(`${provider} token exchange returned no access_token`);
 
   const infoRes = await fetch(USERINFO_URLS[provider], {
@@ -358,14 +330,7 @@ export async function exchangeCodeForProfile(
   };
   if (!info.sub || !info.email) throw new Error(`${provider} userinfo missing sub or email`);
 
-  let emailVerified = info.email_verified === true || info.email_verified === 'true';
-  if (provider === 'microsoft' && !emailVerified && tokenData.id_token) {
-    // Graph /oidc/userinfo omits email_verified. Read it from the id_token:
-    // xms_edov (email domain owner verified) is the canonical signal; standard
-    // email_verified is honored as a fallback.
-    const claims = decodeJwtPayload(tokenData.id_token);
-    if (claims) emailVerified = claims.email_verified === true || claims.xms_edov === true;
-  }
+  const emailVerified = info.email_verified === true || info.email_verified === 'true';
 
   return {
     sub: info.sub,

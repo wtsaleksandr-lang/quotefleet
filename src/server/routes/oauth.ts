@@ -1,5 +1,5 @@
 /**
- * Social login routes — "Continue with Google / Microsoft / Meta".
+ * Social login routes — "Continue with Google / Meta / Apple".
  *
  * Ported from WeFixTrades and adapted to QuoteFleet's cookie-session, multi-
  * tenant model. Two flow routes plus a tiny config endpoint:
@@ -53,7 +53,6 @@ import { exchangeAppleCodeForProfile, parseAppleUserName } from '../oauth/apple.
 /** Drizzle column that stores this provider's stable subject id. */
 function subColumn(provider: OAuthProviderId) {
   if (provider === 'google') return users.googleSub;
-  if (provider === 'microsoft') return users.microsoftSub;
   if (provider === 'apple') return users.appleSub;
   return users.metaSub;
 }
@@ -61,7 +60,6 @@ function subColumn(provider: OAuthProviderId) {
 /** Type-safe update patch that sets this provider's sub column. */
 function subPatch(provider: OAuthProviderId, sub: string) {
   if (provider === 'google') return { googleSub: sub };
-  if (provider === 'microsoft') return { microsoftSub: sub };
   if (provider === 'apple') return { appleSub: sub };
   return { metaSub: sub };
 }
@@ -69,9 +67,8 @@ function subPatch(provider: OAuthProviderId, sub: string) {
 /** Provider → the users.* column name provisionTrialTenant stamps at signup. */
 function subColumnName(
   provider: OAuthProviderId
-): 'googleSub' | 'microsoftSub' | 'metaSub' | 'appleSub' {
+): 'googleSub' | 'metaSub' | 'appleSub' {
   if (provider === 'google') return 'googleSub';
-  if (provider === 'microsoft') return 'microsoftSub';
   if (provider === 'apple') return 'appleSub';
   return 'metaSub';
 }
@@ -198,7 +195,7 @@ export function registerOAuthRoutes(app: Express) {
 
 /**
  * Identity → account resolution, shared by every provider callback (GET for
- * google/microsoft/meta, POST for apple). Handles its own errors by redirecting.
+ * google/meta, POST for apple). Handles its own errors by redirecting.
  *   1. Known provider sub            → log into that user.
  *   2. Email matches an existing user → link the sub (verified email only).
  *   3. No match                       → OAuth SIGNUP: new trial tenant + owner.
