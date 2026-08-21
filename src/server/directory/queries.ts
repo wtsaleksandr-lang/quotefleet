@@ -89,6 +89,12 @@ export interface VisibleCarrier {
   buildingMaterials: boolean;
   nearestPortCode: string | null;
   /**
+   * FMCSA record freshness — the directory row's `updated_at` (set on ingest /
+   * re-ingest). Optional so the many hand-built `VisibleCarrier` fixtures stay
+   * valid; the profile renders a "FMCSA data as of …" line only when present.
+   */
+  updatedAt?: Date | null;
+  /**
    * Admin/carrier "About" override, applied ONLY on the profile (carrierBySlug).
    * `null` on list/card rows and whenever no override exists → the profile falls
    * back to the FMCSA-derived prose (carrierAbout).
@@ -143,6 +149,7 @@ export function visibleCarrier(r: typeof carrierDirectory.$inferSelect): Visible
     coalCoke: r.coalCoke,
     buildingMaterials: r.buildingMaterials,
     nearestPortCode: r.nearestPortCode,
+    updatedAt: r.updatedAt,
     // FMCSA-only base shape: no override applied. The profile read
     // (carrierBySlug) merges carrier_overrides on top via mergeCarrierOverride;
     // list/card rows keep these FMCSA defaults so those surfaces are unchanged.
