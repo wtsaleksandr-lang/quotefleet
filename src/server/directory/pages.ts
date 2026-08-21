@@ -270,6 +270,21 @@ const DIRECTORY_CSS = `
   /* Slim breadcrumb bar for the hero-less results view. */
   .dir-crumbbar { padding-top: 22px; padding-bottom: 0; }
   .dir-shell--tight { padding-top: 14px; }
+  /* Carrier-name free-text search — sits above the results bar. Squared 4px
+     corners, 8px grid, theme-aware tokens; the input + button never wrap apart
+     awkwardly (button drops full-width under the field at ≤640px). */
+  .dir-search { margin: 0 0 14px; }
+  .dir-search-lbl { display: block; font-size: 12px; font-family: var(--font-mono); color: var(--muted); margin: 0 0 6px; }
+  .dir-search-row { display: flex; gap: 8px; align-items: stretch; }
+  .dir-search-input { flex: 1 1 auto; min-width: 0; font-family: var(--font-sans); font-size: 14px; color: var(--ink); background: var(--surface); border: 1px solid var(--border-strong); border-radius: 4px; padding: 10px 12px; min-height: 44px; }
+  .dir-search-input::placeholder { color: var(--muted); }
+  .dir-search-input:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; border-color: var(--accent); }
+  .dir-search-btn { flex: 0 0 auto; border-radius: 4px; }
+  .dir-search-hint { display: block; font-size: 11px; color: var(--muted); margin: 6px 0 0; }
+  @media (max-width: 640px) {
+    .dir-search-row { flex-wrap: wrap; }
+    .dir-search-btn { width: 100%; }
+  }
   /* Single tidy control bar: count on the left, compact sort <select> on the
      right. Wraps to two rows only at very narrow widths (never mid-control). */
   .results-bar { display: flex; align-items: center; justify-content: space-between; gap: 12px 16px; flex-wrap: wrap; margin: 0 0 14px; }
@@ -302,12 +317,25 @@ const DIRECTORY_CSS = `
   .dir-pagenums .gap { border: 0; min-width: 16px; color: var(--muted); }
   /* ── Selectable carrier cards + sticky directory action bar ─────────────── */
   .cc-sel { position: relative; }
-  /* Make room at the card top-right so the checkbox never sits on the Drayage
-     pill (the pill is the right item of .top; padding shifts it left). */
-  .cc-sel .carrier-card .top { padding-right: 28px; }
-  .cc-check { position: absolute; top: 12px; right: 12px; z-index: 3; margin: 0; display: inline-flex; line-height: 0; cursor: pointer; }
-  .cc-cb { width: 20px; height: 20px; margin: 0; cursor: pointer; accent-color: var(--accent-fill); }
-  .cc-cb:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; border-radius: 4px; }
+  /* Make room at the card top-right so the checkbox chip never sits on the
+     Drayage pill (the pill is the right item of .top; padding shifts it left). */
+  .cc-sel .carrier-card .top { padding-right: 40px; }
+  /* Selection control: a ≥44px tap target stacked ABOVE the card link (z-index)
+     so a tap toggles selection and never navigates. The visible 18px checkbox
+     lives inside a bordered chip pinned top-right; the label's asymmetric padding
+     extends the hit area DOWN + LEFT (away from the card title) to a comfortable
+     44px without visually growing the chip. onclick stopPropagation is belt-and-
+     suspenders (the link is a SIBLING, so a checkbox click never bubbles to it). */
+  .cc-check { position: absolute; top: 6px; right: 6px; z-index: 4; margin: 0; display: inline-flex; align-items: flex-start; padding: 6px 6px 20px 20px; line-height: 0; cursor: pointer; -webkit-tap-highlight-color: transparent; }
+  .cc-box { display: inline-flex; padding: 4px; background: var(--surface-2); border: 1px solid var(--border-strong); border-radius: 4px; box-shadow: var(--shadow-sm); transition: border-color 0.15s ease, background 0.15s ease; }
+  .cc-check:hover .cc-box { border-color: var(--accent); }
+  .cc-check:has(.cc-cb:checked) .cc-box { border-color: var(--accent); background: var(--accent-soft); }
+  .cc-check:has(.cc-cb:focus-visible) .cc-box { outline: 2px solid var(--accent); outline-offset: 2px; }
+  .cc-cb { width: 18px; height: 18px; margin: 0; cursor: pointer; accent-color: var(--accent-fill); }
+  /* One-line legend above the grid — makes the per-card checkbox's purpose
+     obvious without crowding each card. Mirrors the action-bar hint wording. */
+  .cc-legend { display: flex; align-items: center; gap: 8px; margin: 0 0 12px; font-size: 12px; color: var(--muted); }
+  .cc-legend-box { flex: 0 0 auto; width: 16px; height: 16px; border: 1px solid var(--border-strong); border-radius: 3px; background: var(--surface-2); }
   .qf-actionbar { position: sticky; bottom: 12px; z-index: 20; display: flex; align-items: center; justify-content: space-between; gap: 10px 16px; flex-wrap: wrap; margin: 20px 0 0; padding: 12px 14px; background: var(--surface-2); border: 1px solid var(--border-strong); border-radius: 8px; box-shadow: var(--shadow-md); }
   .qf-ab-info { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
   .qf-ab-count { font-size: 14px; color: var(--ink); }
@@ -944,6 +972,7 @@ function currentParams(f: DirectoryFilters, locked: Set<string>): Record<string,
   if (f.equipment.length) p.equipment = f.equipment.join(',');
   if (f.cargo.length) p.cargo = f.cargo.join(',');
   if (f.recent) p.recent = '1';
+  if (f.q) p.q = f.q;
   if (f.sort && f.sort !== 'featured') p.sort = f.sort;
   // `dir` only when it differs from the sort's default → canonical stays minimal.
   if (sortIsDirectional(f.sort) && f.dir !== SORT_DIR_DEFAULTS[f.sort]) p.dir = f.dir;
@@ -972,6 +1001,7 @@ type FacetChange = Partial<
     | 'cargo'
     | 'intermodal'
     | 'recent'
+    | 'q'
     | 'sort'
     | 'dir'
     | 'page',
@@ -1217,6 +1247,7 @@ function appliedChips(scope: FacetScope, f: DirectoryFilters): string {
   const chips: string[] = [];
   const add = (label: string, change: FacetChange) =>
     chips.push(`<a class="applied-chip" href="${hrefWith(scope, f, change)}">${esc(label)} <span class="x">✕</span></a>`);
+  if (f.q) add(`Name: “${f.q}”`, { q: null });
   if (!scope.locked.has('state') && f.state) add(stateByCode(f.state)?.name ?? f.state, { state: null });
   if (!scope.locked.has('port') && f.port) {
     const g = PORT_GROUPS.find((x) => x.code === f.port) ?? portGroupForMemberCode(f.port);
@@ -1370,14 +1401,44 @@ interface FacetedCfg {
  *  progressive-enhancement script. */
 function selectableCard(c: VisibleCarrier): string {
   const name = carrierName(c);
-  return `<div class="cc-sel"><label class="cc-check" title="Select ${esc(name)}"><input type="checkbox" class="cc-cb" data-dot="${esc(c.usdot)}" aria-label="Select ${esc(name)}"></label>${carrierCard(c)}</div>`;
+  // The checkbox <label> is a large (≥44px) tap target stacked ABOVE the card
+  // link (z-index) with a click handler that stops propagation, so a tap toggles
+  // selection and never opens the profile — even on mobile where a fat-finger tap
+  // used to land on the underlying card <a>. A visible chip + "Select" caption
+  // make it read as a selection control (see .cc-check styles + the grid legend).
+  return `<div class="cc-sel"><label class="cc-check" title="Select ${esc(name)} — tick to request rates or export" onclick="event.stopPropagation()"><span class="cc-box"><input type="checkbox" class="cc-cb" data-dot="${esc(c.usdot)}" aria-label="Select ${esc(name)} to request rates or export" onclick="event.stopPropagation()"></span></label>${carrierCard(c)}</div>`;
+}
+
+/** Free-text carrier-name search box shown above the results bar. A plain GET
+ *  form → `scope.basePath?q=…`, carrying every OTHER active filter as hidden
+ *  inputs so a search AND-combines with the current facets (page is dropped so a
+ *  new search lands on page 1). Works with no JS; `q` is fully shareable/crawlable. */
+function nameSearchBox(scope: FacetScope, f: DirectoryFilters): string {
+  const carried = currentParams(f, scope.locked);
+  delete carried.q; // the visible input owns `q`
+  const hidden = Object.entries(carried)
+    .map(([k, v]) => `<input type="hidden" name="${esc(k)}" value="${esc(v)}">`)
+    .join('');
+  const val = f.q ? ` value="${esc(f.q)}"` : '';
+  return `<form class="dir-search" role="search" method="get" action="${esc(scope.basePath)}" aria-label="Search carriers by company name">
+    ${hidden}
+    <label class="dir-search-lbl" for="dir-q">Search by company name</label>
+    <div class="dir-search-row">
+      <input type="search" id="dir-q" name="q" class="dir-search-input"${val}
+        placeholder="e.g. Harbor Link Logistics" minlength="2" maxlength="100"
+        autocomplete="off" enterkeyhint="search" aria-describedby="dir-search-hint">
+      <button type="submit" class="btn btn-primary btn-sm dir-search-btn">Search</button>
+    </div>
+    <span class="dir-search-hint" id="dir-search-hint">Matches legal or DBA name. Combine with the filters at left.</span>
+  </form>`;
 }
 
 function renderFacetedResults(cfg: FacetedCfg): string {
   const { scope, list, counts, filters } = cfg;
   const hasCarriers = list.carriers.length > 0;
   const cards = hasCarriers
-    ? `<div class="dir-grid" style="grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));">${list.carriers
+    ? `<p class="cc-legend"><span class="cc-legend-box" aria-hidden="true"></span> Tick a card's box to request rates from — or export — specific carriers. The bar below acts on all matches.</p>
+      <div class="dir-grid" style="grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));">${list.carriers
         .map(selectableCard)
         .join('\n')}</div>`
     : `<div class="dir-empty">No carriers match these filters. <a href="${scope.basePath}" style="color:var(--accent);">Clear filters</a> to see all.</div>`;
@@ -1421,6 +1482,7 @@ function renderFacetedResults(cfg: FacetedCfg): string {
     <div class="dir-layout">
       ${renderSidebar(scope, filters, counts, cfg.summary)}
       <div class="dir-results">
+        ${nameSearchBox(scope, filters)}
         <div class="results-bar">
           <div class="rc"><b>${fmtNum(list.total)}</b> carrier${list.total === 1 ? '' : 's'} match${counts.intermodal ? ` · ${fmtNum(counts.intermodal)} run drayage` : ''}</div>
           ${sortRow(scope, filters)}

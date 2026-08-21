@@ -8,6 +8,9 @@ import { and } from 'drizzle-orm';
 import { PgDialect } from 'drizzle-orm/pg-core';
 import {
   normalizeFilters,
+  normalizeNameQuery,
+  nameSearchCondition,
+  NAME_SEARCH_MIN,
   buildConditions,
   orderForSort,
   resolveSortDir,
@@ -354,6 +357,80 @@ describe('query shape — OR within a facet, AND across facets', () => {
     const conds = buildConditions({ ...base, equipment: ['reefer'], cargo: ['produce'] }, new Set(['equipment']));
     expect(conds).toHaveLength(1); // only cargo survives
     expect(sqlText(conds[0])).toContain('produce');
+  });
+});
+
+describe('carrier-name search — q parse / normalize', () => {
+  it('trims and keeps a valid term', () => {
+    expect(normalizeNameQuery('  Harbor Link  ')).toBe('Harbor Link');
+  });
+  it('collapses interior whitespace', () => {
+    expect(normalizeNameQuery('Harbor    Link   Logistics')).toBe('Harbor Link Logistics');
+  });
+  it('rejects sub-minimum-length terms (→ null)', () => {
+    expect(normalizeNameQuery('a')).toBeNull();
+    expect(normalizeNameQuery(' x ')).toBeNull();
+    expect(NAME_SEARCH_MIN).toBe(2);
+  });
+  it('treats blank / junk / nullish as null (never throws)', () => {
+    expect(normalizeNameQuery('')).toBeNull();
+    expect(normalizeNameQuery('   ')).toBeNull();
+    expect(normalizeNameQuery(undefined)).toBeNull();
+    expect(normalizeNameQuery(null)).toBeNull();
+  });
+  it('caps an over-long term at 100 chars', () => {
+    const long = 'x'.repeat(250);
+    expect(normalizeNameQuery(long)!.length).toBe(100);
+  });
+  it('normalizeFilters exposes the parsed term on f.q (and nulls junk)', () => {
+    expect(normalizeFilters({ q: '  acme  ' }).q).toBe('acme');
+    expect(normalizeFilters({ q: 'a' }).q).toBeNull();
+    expect(normalizeFilters({}).q).toBeNull();
+  });
+});
+
+describe('carrier-name search — SQL clause', () => {
+  const base = normalizeFilters({});
+
+  it('produces an ILIKE OR over legal_name + dba_name', () => {
+    const cond = nameSearchCondition('harbor');
+    expect(cond).not.toBeNull();
+    const s = sqlText(cond);
+    expect(s).toContain('ilike');
+    expect(s).toContain(' or ');
+    expect(s).toContain('legal_name');
+    expect(s).toContain('dba_name');
+  });
+
+  it('escapes LIKE metacharacters so wildcards match literally', () => {
+    const q = dialect.sqlToQuery(
+      (nameSearchCondition('50%_off\\deal') as { getSQL: () => import('drizzle-orm').SQL }).getSQL(),
+    );
+    // The bound param carries the escaped, wrapped pattern.
+    expect(q.params.some((p) => p === '%50\\%\\_off\\\\deal%')).toBe(true);
+  });
+
+  it('returns null for a too-short term', () => {
+    expect(nameSearchCondition('a')).toBeNull();
+  });
+
+  it('buildConditions adds the q clause and AND-combines it with other facets', () => {
+    const conds = buildConditions({ ...base, q: 'harbor', equipment: ['reefer'] });
+    expect(conds).toHaveLength(2);
+    const whole = sqlText(and(...conds));
+    expect(whole).toContain(' and ');
+    expect(whole).toContain('ilike');
+    expect(whole).toContain('reefer');
+  });
+
+  it('excluding q drops only the name clause (facet-count self-exclude)', () => {
+    const conds = buildConditions({ ...base, q: 'harbor', equipment: ['reefer'] }, new Set(['q']));
+    expect(conds).toHaveLength(1);
+    expect(sqlText(conds[0])).not.toContain('ilike');
+  });
+
+  it('no q → no name clause', () => {
+    expect(buildConditions({ ...base, q: null })).toHaveLength(0);
   });
 });
 

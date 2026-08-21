@@ -172,6 +172,10 @@
           <p class="qf-shipper-lead">Search <strong>330,000+ FMCSA-registered carriers</strong> by port, equipment, and safety rating &mdash; drayage, dry van, reefer, flatbed and more, mapped to every major US &amp; Canadian gateway and inland hub. Synced daily from FMCSA data.</p>
           <form class="qf-dir-search" action="/directory" method="get" role="search" aria-label="Search the carrier directory">
             <input type="hidden" name="sort" value="featured">
+            <label class="qf-dir-field qf-dir-field--text">
+              <span class="visually-hidden">Company name</span>
+              <input type="search" name="q" class="qf-dir-name" placeholder="Search by company name…" minlength="2" maxlength="100" autocomplete="off" enterkeyhint="search" aria-label="Search carriers by company name">
+            </label>
             <label class="qf-dir-field">
               <span class="visually-hidden">Port or inland hub</span>
               <select name="port" aria-label="Port or inland hub">

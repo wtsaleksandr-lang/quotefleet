@@ -141,7 +141,38 @@ describe('renderDirectoryResults — selection + action bar', () => {
   it('adds an accessible selection checkbox (data-dot) to each carrier card', () => {
     expect(html).toContain('class="cc-cb" data-dot="107080"');
     expect(html).toContain('class="cc-cb" data-dot="880880"');
-    expect(html).toContain('aria-label="Select ACME DRAYAGE INC"');
+    expect(html).toContain('aria-label="Select ACME DRAYAGE INC to request rates or export"');
+  });
+
+  it('checkbox toggles WITHOUT navigating: label wraps the input (not the card <a>) + stops click propagation', () => {
+    // The selection control is a <label> sibling of the card <a>, so a tap
+    // toggles the checkbox and never reaches the card link. Both the label and
+    // the input stop click propagation as belt-and-suspenders.
+    expect(html).toContain('<label class="cc-check"');
+    expect(html).toMatch(/<label class="cc-check"[^>]*onclick="event\.stopPropagation\(\)"/);
+    expect(html).toMatch(/<input type="checkbox" class="cc-cb"[^>]*onclick="event\.stopPropagation\(\)"/);
+    // The checkbox is NOT an anchor and carries no href — ticking it can't be a nav.
+    const label = html.slice(html.indexOf('<label class="cc-check"'));
+    const labelEnd = label.indexOf('</label>');
+    expect(label.slice(0, labelEnd)).not.toContain('href');
+    expect(label.slice(0, labelEnd)).not.toContain('<a ');
+  });
+
+  it('checkbox reads as a selection control (visible chip + grid legend explaining it)', () => {
+    expect(html).toContain('class="cc-box"'); // bordered chip around the box
+    expect(html).toContain('class="cc-legend"');
+    expect(html).toContain("Tick a card's box to request rates");
+  });
+
+  it('renders a company-name search box wired to q, preserving active facets as hidden inputs', () => {
+    expect(html).toContain('class="dir-search"');
+    expect(html).toContain('name="q"');
+    expect(html).toContain('type="search" id="dir-q"');
+    // The active facets (state, equipment) ride along as hidden inputs so a search
+    // AND-combines with them; `q` is NOT duplicated as a hidden input.
+    expect(html).toContain('<input type="hidden" name="equipment" value="reefer">');
+    expect(html).toMatch(/<input type="hidden" name="state" value="[^"]+">/);
+    expect(html).not.toContain('<input type="hidden" name="q"');
   });
 
   it('renders the sticky action bar with the count + both CTAs', () => {
@@ -172,5 +203,32 @@ describe('renderDirectoryResults — selection + action bar', () => {
   it('ships the progressive-enhancement script that swaps to ?dots= on selection', () => {
     expect(html).toContain("bar.setAttribute('data-mode',dots.length?'dots':'filter')");
     expect(html).toContain("'?dots='+dots.join(',')");
+  });
+});
+
+// ─── renderDirectoryResults — carrier-name search (q) ──────────────────────
+describe('renderDirectoryResults — name search chip + input echo', () => {
+  function renderWithQuery(): string {
+    const filters = normalizeFilters({ q: 'harbor link' });
+    const list: CarrierListResult = {
+      carriers: [carrier({ legalName: 'HARBOR LINK LOGISTICS', usdot: '107080' })],
+      total: 1,
+      page: 1,
+      perPage: 24,
+      totalPages: 1,
+      filters,
+    };
+    return renderDirectoryResults({ filters, list, counts: COUNTS, summary: SUMMARY });
+  }
+  const html = renderWithQuery();
+
+  it('echoes the active query back into the search input value', () => {
+    expect(html).toContain('name="q" class="dir-search-input" value="harbor link"');
+  });
+
+  it('renders a removable applied chip for the active name query', () => {
+    expect(html).toContain('class="applied-chip"');
+    expect(html).toContain('Name:');
+    expect(html).toContain('harbor link');
   });
 });
