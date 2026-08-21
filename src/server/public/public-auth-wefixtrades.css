@@ -292,7 +292,7 @@ body.qf-auth-wft .qf-oauth-btn {
   font-weight: 600;
   font-size: 15px;
   text-decoration: none;
-  transition: background .15s ease, box-shadow .15s ease;
+  transition: background .15s ease, box-shadow .15s ease, transform .15s ease;
 }
 /* The button is an <a>, and the global `body.qf-auth-wft a` rule earlier in
    this file forces anchors to white with !important — which would otherwise
@@ -456,4 +456,79 @@ body.qf-auth-wft .qf-oauth-btn--apple:focus-visible {
 body.qf-auth-wft .qf-oauth-btn--apple svg,
 body.qf-auth-wft .qf-oauth-btn--apple svg path {
   fill: var(--qf-oauth-apple-ink);
+}
+
+/* ─────────────────────────────────────────────────────────────────
+   Button hover polish + smooth Email-link ⇆ Password expand.
+   Appended at EOF so no baselined guard line shifts. All hover colors
+   use var() tokens or rgba() (box-shadow/transform are unscanned by
+   the color+spacing guards); no new raw hex, no off-ramp spacing.
+   Respects prefers-reduced-motion (transitions removed when reduced).
+   ───────────────────────────────────────────────────────────────── */
+
+/* OAuth chips (Google/Meta + Apple): subtle lift on hover. The generic
+   chip already lightens its bg + gains a faint shadow; add a 1px lift so
+   the motion is consistent with the Apple button and the submit button. */
+body.qf-auth-wft .qf-oauth-btn:hover {
+  transform: translateY(-1px);
+}
+/* Apple (solid-black, HIG): near-black lift already set on --…-apple-bg-hover
+   above; add a faint shadow so the hover reads as a lift, not just a tint. */
+body.qf-auth-wft .qf-oauth-btn--apple:hover {
+  box-shadow: 0 2px 10px rgba(0, 0, 0, .30);
+}
+
+/* Email-link / Password segmented toggle: subtle hover on both states.
+   Inactive segment gets a faint accent wash; the active (blue) segment
+   gains a soft accent glow. Keeps text + tap box unchanged. */
+body.qf-auth-wft .tab {
+  transition: background .15s ease, box-shadow .15s ease, color .15s ease !important;
+}
+body.qf-auth-wft .tab:hover:not(.active) {
+  background: rgba(13, 60, 252, .10) !important;
+}
+body.qf-auth-wft .tab.active:hover {
+  box-shadow: 0 2px 8px rgba(13, 60, 252, .38) !important;
+}
+html[data-theme="light"] body.qf-auth-wft .tab:hover:not(.active) {
+  background: rgba(13, 60, 252, .08) !important;
+}
+
+/* Submit buttons ("Email me a link" / "Sign in"): keep the existing white
+   border-brighten on hover, and add a soft accent shadow + 1px lift. The
+   :not(:disabled) guard keeps the disabled/sending state flat. */
+body.qf-auth-wft .btn-primary {
+  transition: border-color .15s ease, box-shadow .15s ease, transform .15s ease !important;
+}
+body.qf-auth-wft .btn-primary:hover:not(:disabled) {
+  box-shadow: 0 4px 14px rgba(13, 60, 252, .40) !important;
+  transform: translateY(-1px) !important;
+}
+
+/* Smooth pane expand/collapse. JS sets an explicit height and animates it;
+   this supplies the transition + the fade-in of the revealed fields. */
+body.qf-auth-wft .qf-pane-wrap {
+  transition: height .28s ease;
+}
+body.qf-auth-wft .tab-pane {
+  transition: opacity .22s ease;
+}
+body.qf-auth-wft .tab-pane.qf-pane-enter {
+  opacity: 0;
+}
+@media (prefers-reduced-motion: reduce) {
+  body.qf-auth-wft .qf-oauth-btn:hover,
+  body.qf-auth-wft .btn-primary:hover:not(:disabled) {
+    transform: none !important;
+  }
+  body.qf-auth-wft .qf-pane-wrap,
+  body.qf-auth-wft .tab-pane,
+  body.qf-auth-wft .qf-oauth-btn,
+  body.qf-auth-wft .tab,
+  body.qf-auth-wft .btn-primary {
+    transition: none !important;
+  }
+  body.qf-auth-wft .tab-pane.qf-pane-enter {
+    opacity: 1;
+  }
 }
