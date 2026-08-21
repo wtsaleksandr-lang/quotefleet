@@ -138,6 +138,38 @@ const SELF_DECLARED_CREDENTIALS: Array<{ tone: string; label: string; tip: strin
   { tone: 'yard', label: 'Yard / parking', tip: 'Container yard and chassis / trailer parking.' },
 ];
 
+/** FMCSA cargo-CLASS specialties (census crgo_* flags) → human labels, in
+ *  display order. These are FMCSA-verified facts already stored on the carrier
+ *  row but never surfaced before; only the flags that are `true` render, as a
+ *  neutral chip group in the Services & Equipment tab. Keys map 1:1 to the
+ *  boolean fields on VisibleCarrier. */
+const CARGO_CLASS_SPECIALTIES: Array<[keyof VisibleCarrier, string]> = [
+  ['householdGoods', 'Household goods'],
+  ['beverages', 'Beverages'],
+  ['produce', 'Produce'],
+  ['motorVehicles', 'Motor vehicles'],
+  ['livestock', 'Livestock'],
+  ['grainFeed', 'Grain & feed'],
+  ['oilfield', 'Oilfield'],
+  ['meat', 'Meat'],
+  ['paper', 'Paper products'],
+  ['construction', 'Construction'],
+  ['farmSupplies', 'Farm supplies'],
+  ['coalCoke', 'Coal / coke'],
+  ['buildingMaterials', 'Building materials'],
+];
+
+/** FMCSA record freshness → "Aug 21, 2026". Formatted from UTC parts so the
+ *  rendered date is deterministic regardless of the server's timezone. Returns
+ *  '' when the timestamp is missing/invalid so the caller omits the line. */
+function fmtDataAsOf(d?: Date | null): string {
+  if (!d) return '';
+  const dt = d instanceof Date ? d : new Date(d);
+  if (Number.isNaN(dt.getTime())) return '';
+  const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+  return `${MONTHS[dt.getUTCMonth()]} ${dt.getUTCDate()}, ${dt.getUTCFullYear()}`;
+}
+
 // ─── Shared page shell ────────────────────────────────────────────────────
 const DIRECTORY_CSS = `
   .dir-shell { max-width: 1100px; margin: 0 auto; padding: 28px; }
@@ -402,6 +434,19 @@ const DIRECTORY_CSS = `
     .cp-badgegroup[data-n="1"] { grid-template-columns: max-content; }
     .cp-badgegroup[data-n="2"], .cp-badgegroup[data-n="4"] { grid-template-columns: repeat(2, minmax(0, 1fr)); }
     .cp-badgegroup[data-n="3"], .cp-badgegroup[data-n="5"], .cp-badgegroup[data-n="6"] { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+    /* Variable-length chip rows (cargo specialties up to 13, self-declared
+       capabilities) can't use a per-count data-n map, so enforce the same
+       no-orphan rule structurally: a 2-column grid, and when the count is ODD
+       the first chip spans both columns — so the remaining even count fills
+       clean pairs and the last row always has ≥2 (a sole chip is fine alone). */
+    /* Doubled class (.cp-chiprow.cp-chiprow, specificity 0,2,0) so these beat the
+       base .cp-chiprow flex rule, which is defined LATER in source order — media
+       queries add no specificity, so an equal-specificity base rule further down
+       would otherwise win the cascade and leave this grid dead. */
+    .cp-chiprow.cp-chiprow { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); align-items: stretch; }
+    .cp-chiprow.cp-chiprow > * { min-width: 0; }
+    .cp-chiprow.cp-chiprow > .cp-badge, .cp-chiprow.cp-chiprow > .cp-chip { justify-content: center; text-align: center; white-space: normal; }
+    .cp-chiprow.cp-chiprow > :first-child:nth-last-child(odd) { grid-column: 1 / -1; }
   }
   .cp-badge-active { font-size: 10px; font-family: var(--font-mono); letter-spacing: 0.06em; text-transform: uppercase; padding: 5px 9px; border-radius: var(--radius-chip); background: var(--success-bg); color: var(--success); border: 1px solid var(--success); display: inline-flex; align-items: center; gap: 6px; }
   .cp-badge-active::before { content: ''; width: 6px; height: 6px; border-radius: 50%; background: var(--success); display: inline-block; }
@@ -599,6 +644,48 @@ const DIRECTORY_CSS = `
   }
   @media (max-width: 380px) {
     .cp-datagrid { grid-template-columns: 1fr; }
+  }
+  /* ── Carrier-profile TABS ─────────────────────────────────────────────────
+     Pure-CSS, no-framework, SEO-safe tabs. The four section panels are ALL
+     present in the HTML (crawlers index every field); CSS only hides the
+     inactive ones. The mechanism is a native radio group: four visually-hidden
+     but keyboard-FOCUSABLE radio inputs sit as siblings before the labels +
+     panels. Selecting a radio (click a label, or Arrow-key within the group —
+     native radio behaviour) flips :checked, and the general-sibling combinator
+     reveals the matching panel. Works with zero JS; Arrow keys navigate + switch
+     tabs for free; focus is shown on the label via :focus-visible. Theme-aware
+     tokens only — no hardcoded colours. */
+  .cp-tabs { display: flex; flex-wrap: wrap; position: relative; margin-top: 24px; }
+  /* Visually hidden, still focusable (not display:none / visibility:hidden). */
+  .cp-tab-input { position: absolute; width: 1px; height: 1px; margin: -1px; padding: 0; border: 0; clip: rect(0 0 0 0); clip-path: inset(50%); overflow: hidden; white-space: nowrap; }
+  .cp-tab {
+    flex: 1 1 0; min-width: 0; text-align: center; cursor: pointer; user-select: none;
+    padding: 13px 14px; font-size: 13px; font-family: var(--font-mono); letter-spacing: 0.04em;
+    color: var(--muted); background: var(--surface);
+    border: 1px solid var(--border); border-bottom-width: 2px; border-right: 0;
+    white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+  }
+  .cp-tab:first-of-type { border-top-left-radius: var(--radius-lg); }
+  .cp-tab:last-of-type { border-right: 1px solid var(--border); border-top-right-radius: var(--radius-lg); }
+  .cp-tab:hover { color: var(--ink-soft); background: var(--surface-2); }
+  .cp-tab-input:checked + .cp-tab { color: var(--accent); background: var(--surface); border-bottom-color: var(--accent); }
+  .cp-tab-input:focus-visible + .cp-tab { outline: 2px solid var(--accent); outline-offset: -2px; }
+  .cp-tab-sm { display: none; }
+  .cp-panel { flex: 0 0 100%; width: 100%; min-width: 0; display: none; padding-top: 16px; }
+  #cp-tab-overview:checked ~ .cp-panel--overview,
+  #cp-tab-services:checked ~ .cp-panel--services,
+  #cp-tab-safety:checked ~ .cp-panel--safety,
+  #cp-tab-contact:checked ~ .cp-panel--contact { display: flex; flex-direction: column; gap: 16px; }
+  /* Cargo-class specialties: a neutral chip group (variable length → the same
+     flex-wrap chip row the full-enumeration list already uses). */
+  .cp-badge--cargo { background: var(--surface-2); color: var(--ink-soft); border-color: var(--border); text-transform: none; letter-spacing: 0.02em; }
+  .cp-cargorow { margin-top: 2px; }
+  .cp-asof { margin-top: 14px; }
+  @media (max-width: 640px) {
+    .cp-tabs { margin-top: 16px; }
+    .cp-tab { padding: 10px 6px; font-size: 11px; letter-spacing: 0.02em; }
+    .cp-tab-lg { display: none; }
+    .cp-tab-sm { display: inline; }
   }
 `;
 
@@ -1997,17 +2084,26 @@ export function renderCarrierProfile(opts: {
     .filter((b) => !(b.tone === 'reefer' && c.reefer))
     .map((b) => credBadge({ ...b, held: !!caps[b.tone as keyof typeof caps], selfDeclared: true }))
     .join('');
-  // The "Compliance & capabilities" section lists EVERYTHING (both verified
-  // groups + the self-declared claim badges) as the full enumeration.
-  const capBadges = credentialBadges.join('') + equipmentBadges.join('') + claimBadges;
-  // Header badge groups, each wrapped with a data-n count so the count-aware grid
-  // (mobile) partitions them without ever stranding a lone badge.
+  // Badge groups, each wrapped with a data-n count so the count-aware grid
+  // (mobile) partitions them without ever stranding a lone badge. The credential
+  // strip lives on the Overview tab; the equipment strip on Services & Equipment.
   const credentialGroup = credentialBadges.length
     ? `<div class="cp-badgegroup" data-n="${credentialBadges.length}">${credentialBadges.join('')}</div>`
     : '';
   const equipmentGroup = equipmentBadges.length
     ? `<div class="cp-eqwrap"><span class="cp-eqlabel">Equipment</span><div class="cp-badgegroup cp-badgegroup--equip" data-n="${equipmentBadges.length}">${equipmentBadges.join('')}</div></div>`
     : '';
+  // NEW — FMCSA cargo-CLASS specialties (13 census crgo_* flags, already stored,
+  // never surfaced before). Only render the ones that are true, with human
+  // labels, as a neutral chip group (flex-wrap chip row — variable length).
+  const cargoSpecs = CARGO_CLASS_SPECIALTIES.filter(([key]) => c[key] === true);
+  const cargoGroup = cargoSpecs.length
+    ? `<div class="cp-eqwrap"><span class="cp-eqlabel">Cargo specialties</span><div class="cp-chiprow cp-cargorow">${cargoSpecs
+        .map(([, label]) => `<span class="cp-badge cp-badge--cargo">${esc(label)}</span>`)
+        .join('')}</div></div>`
+    : '';
+  // NEW — FMCSA record freshness (updatedAt threaded onto VisibleCarrier). '' when absent.
+  const dataAsOf = fmtDataAsOf(c.updatedAt);
 
   // ── §6 Contact — TIERED. Public block = FMCSA-sourced phone/email (encoded
   // href, escaped text), respecting the contactHidden opt-out. Gated block is
@@ -2055,7 +2151,9 @@ export function renderCarrierProfile(opts: {
          .join('\n')}</div>`
     : '';
 
-  const locBased = cityState ? esc(cityState) : isCa ? 'Canada' : 'the United States';
+  // Location line — NEW: append ZIP (stored, never shown before) after City, State.
+  const cityStateZip = [cityState, c.zip].filter(Boolean).join(' ');
+  const locBased = cityStateZip ? esc(cityStateZip) : isCa ? 'Canada' : 'the United States';
   // Subtitle line — DrayLocator order: USDOT · MC · City, State (each dropped when absent).
   const headerSubtitle = [
     c.usdot ? `USDOT ${esc(c.usdot)}` : '',
@@ -2083,30 +2181,77 @@ export function renderCarrierProfile(opts: {
         </div>
         <p class="cp-claimline">Own this company? <a href="${claimHref}">Claim this profile — it's free →</a></p>
       </div>
-      <div class="cp-caps">
-        ${credentialGroup}
-        ${equipmentGroup}
-      </div>
     </div>
   </section>
   <main class="dir-shell dir-shell--cp">
-    <div class="cp-layout">
-      <div class="cp-main">
+    <div class="cp-tabs" role="group" aria-label="Carrier profile sections">
+      <input type="radio" name="cp-tab" id="cp-tab-overview" class="cp-tab-input" checked>
+      <label class="cp-tab" for="cp-tab-overview"><span class="cp-tab-lg">Overview</span><span class="cp-tab-sm">Overview</span></label>
+      <input type="radio" name="cp-tab" id="cp-tab-services" class="cp-tab-input">
+      <label class="cp-tab" for="cp-tab-services"><span class="cp-tab-lg">Services &amp; equipment</span><span class="cp-tab-sm">Services</span></label>
+      <input type="radio" name="cp-tab" id="cp-tab-safety" class="cp-tab-input">
+      <label class="cp-tab" for="cp-tab-safety"><span class="cp-tab-lg">Safety &amp; compliance</span><span class="cp-tab-sm">Safety</span></label>
+      <input type="radio" name="cp-tab" id="cp-tab-contact" class="cp-tab-input">
+      <label class="cp-tab" for="cp-tab-contact"><span class="cp-tab-lg">Contact &amp; location</span><span class="cp-tab-sm">Contact</span></label>
+
+      <div class="cp-panel cp-panel--overview">
         <section class="cp-card">
           <h2 class="cp-h">About</h2>
           <p class="cp-about">${esc(c.aboutOverride ?? carrierAbout(c))}</p>
         </section>
 
         <section class="cp-card">
-          <h2 class="cp-h">FMCSA data</h2>
+          <h2 class="cp-h">FMCSA snapshot</h2>
           <div class="cp-datagrid">${dataGrid}</div>
+          ${dataAsOf ? `<p class="cp-note cp-asof">FMCSA data as of ${esc(dataAsOf)}.</p>` : ''}
           <a class="cp-verify-link" href="${saferUrl}" target="_blank" rel="noopener nofollow">Verify on FMCSA SAFER ↗</a>
         </section>
 
+        ${credentialGroup ? `<section class="cp-card">
+          <h2 class="cp-h">Credentials</h2>
+          ${credentialGroup}
+          <p class="cp-note">Solid-colour badges are confirmed from FMCSA public data — hover any badge for what it means and its source.</p>
+        </section>` : ''}
+      </div>
+
+      <div class="cp-panel cp-panel--services">
         <section class="cp-card">
-          <h2 class="cp-h">Compliance &amp; capabilities</h2>
-          <div class="cp-chiprow">${capBadges}</div>
-          <p class="cp-note">Solid-colour badges are confirmed from FMCSA public data (hover any badge for what it means and its source). Muted credentials (UIIA, TWIC, bonded / C-TPAT, reefer, transload, yard) are self-declared — claim this profile to verify and add them.</p>
+          <h2 class="cp-h">Services &amp; equipment</h2>
+          ${equipmentGroup || cargoGroup ? `${equipmentGroup}${cargoGroup}` : `<p class="cp-loc">No FMCSA equipment or cargo-class flags on this carrier's record yet.</p>`}
+          ${c.intermodal ? `<p class="cp-loc" style="margin-top: 12px;"><span class="lk">Container drayage / intermodal</span>${port ? ` · nearest port ${esc(port.name)}` : ''}</p>` : ''}
+        </section>
+
+        <section class="cp-card">
+          <h2 class="cp-h">Self-declared capabilities</h2>
+          <div class="cp-chiprow">${claimBadges}</div>
+          <p class="cp-note">Muted credentials (UIIA, TWIC, bonded / C-TPAT, reefer, transload, yard) are self-declared — claim this profile to verify and add them.</p>
+        </section>
+      </div>
+
+      <div class="cp-panel cp-panel--safety">
+        <section class="cp-card">
+          <h2 class="cp-h">Safety &amp; compliance</h2>
+          <div class="cp-datagrid">
+            <div class="cp-dt"><span class="k">Safety rating</span><span class="v">${esc(sr.text)}</span></div>
+            <div class="cp-dt"><span class="k">Operating authority</span><span class="v">${esc(authorityLabel(c.authorityType))}</span></div>
+            <div class="cp-dt"><span class="k">Authority status</span><span class="v">${isActive ? 'Active' : 'On file'}</span></div>
+            <div class="cp-dt"><span class="k">Hazmat registration</span><span class="v">${c.hazmat ? 'Registered' : 'Not registered'}</span></div>
+          </div>
+          <div class="cp-actions">
+            <a class="btn btn-secondary" href="${saferUrl}" target="_blank" rel="noopener nofollow">Verify on FMCSA SAFER ↗</a>
+            <button class="btn btn-primary" id="live-verify" data-usdot="${esc(c.usdot)}">Verify live now</button>
+          </div>
+          <div id="live-result" class="lookup-result" style="margin-top: 8px;"></div>
+          <p class="cp-note">Insurance on file and out-of-service status are pulled from the live FMCSA QCMobile check above.</p>
+        </section>
+      </div>
+
+      <div class="cp-panel cp-panel--contact">
+        <section class="cp-card">
+          <h2 class="cp-h">Contact</h2>
+          ${publicContact}
+          ${gatedContact}
+          <p class="cp-note">Carrier information is sourced from public FMCSA records. To correct or hide your details, email support@quotefleet.net with your USDOT number.</p>
         </section>
 
         <section class="cp-card">
@@ -2116,20 +2261,6 @@ export function renderCarrierProfile(opts: {
           ${port ? `<p class="cp-loc"><span class="lk">Nearest port</span> ${esc(port.name)}${port.city || port.state ? ` · ${esc([port.city, port.state].filter(Boolean).join(', '))}` : ''}</p>` : ''}
         </section>
       </div>
-
-      <aside class="cp-side">
-        <section class="cp-card">
-          <h2 class="cp-h">Contact</h2>
-          ${publicContact}
-          ${gatedContact}
-          <div class="cp-actions">
-            <a class="btn btn-secondary" href="${saferUrl}" target="_blank" rel="noopener nofollow">Verify on FMCSA SAFER ↗</a>
-            <button class="btn btn-primary" id="live-verify" data-usdot="${esc(c.usdot)}">Verify live now</button>
-          </div>
-          <div id="live-result" class="lookup-result" style="margin-top: 8px;"></div>
-          <p class="cp-note">Carrier information is sourced from public FMCSA records. To correct or hide your details, email support@quotefleet.net with your USDOT number.</p>
-        </section>
-      </aside>
     </div>
 
     ${crossLinks.length ? `<div class="dir-chips cp-crosslinks">${crossLinks.join('\n')}</div>` : ''}
