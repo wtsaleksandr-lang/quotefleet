@@ -410,6 +410,51 @@
       ]));
       card.appendChild(field('Display name', 'name'));
       card.appendChild(field('Contact email', 'contactEmail'));
+
+      // ── Trial extension shortcut ──────────────────────────────────────
+      //   Quick +7 / +14 / +21 / +30d buttons that POST to the admin
+      //   extend-trial endpoint. Server extends from the LATER of now or the
+      //   existing end, so a lapsed trial restarts and an active one adds on.
+      //   The displayed trial-end line refreshes in place from the response.
+      var trialField = el('div', { class: 'field', style: { marginBottom: '10px' } });
+      trialField.appendChild(el('label', { class: 'field-label', text: 'Trial' }));
+      var trialLine = el('div', { class: 'muted-small', style: { marginBottom: '8px' } });
+      function renderTrialLine() {
+        trialLine.textContent = t.trialEndsAt ? 'Trial ends ' + fmtDate(t.trialEndsAt) : 'Not on trial';
+      }
+      renderTrialLine();
+      trialField.appendChild(trialLine);
+      var trialActions = el('div', { style: { display: 'flex', gap: '6px', flexWrap: 'wrap', alignItems: 'center' } });
+      var trialStatus = el('span', { class: 'muted-small' });
+      function setTrialBtnsDisabled(v) {
+        Array.prototype.forEach.call(trialActions.querySelectorAll('button'), function (b) { b.disabled = v; });
+      }
+      [7, 14, 21, 30].forEach(function (d) {
+        var b = el('button', {
+          class: 'btn btn-secondary',
+          type: 'button',
+          text: '+' + d + 'd',
+          style: { padding: '4px 10px' },
+        });
+        b.addEventListener('click', function () {
+          setTrialBtnsDisabled(true);
+          trialStatus.textContent = 'Extending…';
+          api('/api/admin/tenants/' + encodeURIComponent(slug) + '/extend-trial', { method: 'POST', body: { days: d } })
+            .then(function (r) {
+              t.trialEndsAt = r.trialEndsAt;
+              renderTrialLine();
+              trialStatus.textContent = 'Extended +' + d + 'd ✓';
+              setTimeout(function () { trialStatus.textContent = ''; }, 2000);
+            })
+            .catch(function (e) { trialStatus.textContent = e.message; })
+            .finally(function () { setTrialBtnsDisabled(false); });
+        });
+        trialActions.appendChild(b);
+      });
+      trialActions.appendChild(trialStatus);
+      trialField.appendChild(trialActions);
+      card.appendChild(trialField);
+
       c.appendChild(card);
 
       c.appendChild(el('h2', { text: 'Users (' + d.users.length + ')', style: { marginTop: '20px' } }));

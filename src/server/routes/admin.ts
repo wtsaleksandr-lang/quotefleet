@@ -44,6 +44,21 @@ const AdminTenantPatch = z.object({
 });
 export type AdminTenantPatch = z.infer<typeof AdminTenantPatch>;
 
+/** The only trial-extension increments the admin shortcut offers. Validated as
+ *  a closed set so a hand-crafted request can't push an arbitrary (or negative)
+ *  number of days onto a tenant's trial. */
+export const EXTEND_TRIAL_DAYS = [7, 14, 21, 30] as const;
+export type ExtendTrialDays = (typeof EXTEND_TRIAL_DAYS)[number];
+
+/** Body schema for the "extend trial" shortcut. `days` must be one of the
+ *  fixed set (7/14/21/30); anything else is a clean 400. */
+const AdminExtendTrial = z.object({
+  days: z.union([z.literal(7), z.literal(14), z.literal(21), z.literal(30)]),
+});
+export type AdminExtendTrial = z.infer<typeof AdminExtendTrial>;
+
+const MS_PER_DAY = 24 * 60 * 60 * 1000;
+
 /** Best-effort audit write for super-admin mutations. Mirrors the app-wide
  *  `insert(auditLog)` shape (tenant.ts / inbound.ts) but stamps
  *  `actorKind: 'super_admin'` and the acting operator's user id. Scoped to the
@@ -121,6 +136,73 @@ export async function patchTenantAdmin(opts: {
   });
 
   return { status: 200, json: { ok: true, tenant: after } };
+}
+
+/**
+ * Core of `POST /api/admin/tenants/:slug/extend-trial`, extracted so it is
+ * unit-testable against a mocked db (same pattern as `patchTenantAdmin`).
+ *
+ * Semantics: the new `trial_ends_at` is (the LATER of now or the existing
+ * `trial_ends_at`) + N days. So extending a LAPSED trial restarts it from now
+ * (+N days of fresh runway); extending an ACTIVE trial adds N days onto its
+ * remaining tail. `now` is injectable purely so tests are deterministic.
+ *
+ *  - Validates `days` against the fixed set → 400 on anything else.
+ *  - A slug that matches 0 rows → 404 (mirrors patchTenantAdmin's H3).
+ *  - On success, writes an audit row scoped to the target tenant and returns
+ *    the new `trialEndsAt` (ISO string).
+ */
+export async function extendTenantTrialAdmin(opts: {
+  slug: string;
+  body: unknown;
+  actorUserId?: number | null;
+  now?: Date;
+}): Promise<{ status: number; json: Record<string, unknown> }> {
+  const parse = AdminExtendTrial.safeParse(opts.body);
+  if (!parse.success) {
+    return { status: 400, json: { error: 'Invalid input', details: parse.error.flatten() } };
+  }
+  const days = parse.data.days;
+  const now = opts.now ?? new Date();
+
+  // Load the current row: existence check (404) + before-value for the audit.
+  const existing = await db()
+    .select()
+    .from(tenants)
+    .where(eq(tenants.slug, opts.slug))
+    .limit(1);
+  const before = existing[0] as Record<string, unknown> | undefined;
+  if (!before) {
+    return { status: 404, json: { error: `No tenant with slug '${opts.slug}'.` } };
+  }
+
+  const rawTrialEnd = before.trialEndsAt as Date | string | null | undefined;
+  const currentTrialEnd = rawTrialEnd ? new Date(rawTrialEnd) : null;
+  // Extend from the later of now or the existing end — lapsed → from now,
+  // active → onto the tail.
+  const base =
+    currentTrialEnd && currentTrialEnd.getTime() > now.getTime() ? currentTrialEnd : now;
+  const newTrialEndsAt = new Date(base.getTime() + days * MS_PER_DAY);
+
+  const updated = await db()
+    .update(tenants)
+    .set({ trialEndsAt: newTrialEndsAt, updatedAt: now })
+    .where(eq(tenants.slug, opts.slug))
+    .returning();
+  if (updated.length === 0) {
+    return { status: 404, json: { error: `No tenant with slug '${opts.slug}'.` } };
+  }
+
+  await recordAdminAudit(before.id as number, opts.actorUserId, 'admin.tenant.extendTrial', {
+    slug: opts.slug,
+    days,
+    trialEndsAt: {
+      before: currentTrialEnd ? currentTrialEnd.toISOString() : null,
+      after: newTrialEndsAt.toISOString(),
+    },
+  });
+
+  return { status: 200, json: { ok: true, trialEndsAt: newTrialEndsAt.toISOString() } };
 }
 
 /** The minimal tenant shape MRR needs: the billed/selected `plan`, the
@@ -362,6 +444,23 @@ export function registerAdminRoutes(app: Express) {
       actorUserId: req.user?.id ?? null,
     });
     res.status(result.status).json(result.json);
+  });
+
+  // Extend a tenant's trial by a fixed number of days (7/14/21/30) from the
+  // admin tenant-detail shortcut. Never throws to the client — a DB failure is
+  // logged and returned as a clean 500.
+  app.post('/api/admin/tenants/:slug/extend-trial', requireAuth, requireSuperAdmin, async (req, res) => {
+    try {
+      const result = await extendTenantTrialAdmin({
+        slug: String(req.params.slug),
+        body: req.body,
+        actorUserId: req.user?.id ?? null,
+      });
+      res.status(result.status).json(result.json);
+    } catch (err) {
+      console.error('[admin] extend-trial failed:', err);
+      res.status(500).json({ error: 'Failed to extend trial' });
+    }
   });
 
   // Upsert a carrier-card OVERRIDE (about / email / phone / hidden /
