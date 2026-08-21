@@ -240,6 +240,14 @@ export const SELF_HEAL_TABLE_STATEMENTS: readonly string[] = [
   `CREATE UNIQUE INDEX IF NOT EXISTS "directory_terminals_code_idx" ON "directory_terminals" ("code")`,
   `CREATE INDEX IF NOT EXISTS "directory_terminals_country_idx" ON "directory_terminals" ("country")`,
   `CREATE INDEX IF NOT EXISTS "directory_terminals_type_idx" ON "directory_terminals" ("type")`,
+  // 0054_terminal_address_operator.sql — nullable anchor-facility address +
+  // operator on directory_terminals. Healed HERE (right after the CREATE TABLE
+  // above, same reasoning as the carrier_directory ALTERs): the seed
+  // (seedDirectoryTerminals) writes these on boot and needs the columns to exist
+  // even on a prod DB that never received 0054 or where Replit phantom-dropped
+  // them. Both nullable, no backfill, so IF NOT EXISTS no-ops on a healthy DB.
+  `ALTER TABLE "directory_terminals" ADD COLUMN IF NOT EXISTS "address" text`,
+  `ALTER TABLE "directory_terminals" ADD COLUMN IF NOT EXISTS "operator" text`,
   // 0051_rfq.sql — multi-carrier RFQ (rate request) tables. Healed HERE (same
   // reasoning as carrier_directory): the Replit deploy skips db:migrate and its
   // publish tool can drop tables, so these CREATE TABLE IF NOT EXISTS statements

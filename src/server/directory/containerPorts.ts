@@ -33,14 +33,20 @@ export interface ContainerPort {
 export const CONTAINER_PORTS: readonly ContainerPort[] = [
   { code: 'USLAX', name: 'Port of Los Angeles', city: 'Los Angeles', state: 'CA', country: 'US', lat: 33.7395, lng: -118.2597 },
   { code: 'USLGB', name: 'Port of Long Beach', city: 'Long Beach', state: 'CA', country: 'US', lat: 33.755, lng: -118.216 },
-  { code: 'USNYC', name: 'Port of New York & New Jersey', city: 'Newark', state: 'NJ', country: 'US', lat: 40.6626, lng: -74.045 },
-  { code: 'USHOU', name: 'Port of Houston', city: 'Houston', state: 'TX', country: 'US', lat: 29.7264, lng: -95.227 },
-  { code: 'USSAV', name: 'Port of Savannah', city: 'Savannah', state: 'GA', country: 'US', lat: 32.0835, lng: -81.0998 },
+  // Coords must match terminals.ts (duplicated) so ALL_HUBS dedup stays exact.
+  // FIX: was 40.6626,-74.045 (Bayonne/Upper Bay) → Port Newark-Elizabeth container complex.
+  { code: 'USNYC', name: 'Port of New York & New Jersey', city: 'Newark', state: 'NJ', country: 'US', lat: 40.6816, lng: -74.1505 },
+  // FIX: was 29.7264,-95.227 (Turning Basin) → Barbours Cut Container Terminal.
+  { code: 'USHOU', name: 'Port of Houston', city: 'Houston', state: 'TX', country: 'US', lat: 29.6819, lng: -94.9983 },
+  // FIX: was 32.0835,-81.0998 (downtown Savannah) → Garden City Terminal.
+  { code: 'USSAV', name: 'Port of Savannah', city: 'Savannah', state: 'GA', country: 'US', lat: 32.121, lng: -81.135 },
   { code: 'USSEA', name: 'Northwest Seaport Alliance (Seattle/Tacoma)', city: 'Seattle', state: 'WA', country: 'US', lat: 47.5952, lng: -122.3316 },
-  { code: 'USCHS', name: 'Port of Charleston', city: 'Charleston', state: 'SC', country: 'US', lat: 32.81, lng: -79.92 },
+  // FIX: was 32.81,-79.92 (downtown Charleston) → Wando Welch Terminal.
+  { code: 'USCHS', name: 'Port of Charleston', city: 'Charleston', state: 'SC', country: 'US', lat: 32.848, lng: -79.873 },
   { code: 'USORF', name: 'Port of Virginia (Norfolk)', city: 'Norfolk', state: 'VA', country: 'US', lat: 36.873, lng: -76.33 },
   { code: 'USCHI', name: 'Chicago Intermodal Hub', city: 'Chicago', state: 'IL', country: 'US', lat: 41.837, lng: -87.67 },
-  { code: 'USBAL', name: 'Port of Baltimore', city: 'Baltimore', state: 'MD', country: 'US', lat: 39.24, lng: -76.57 },
+  // FIX: was 39.24,-76.57 → Seagirt Marine Terminal.
+  { code: 'USBAL', name: 'Port of Baltimore', city: 'Baltimore', state: 'MD', country: 'US', lat: 39.2592, lng: -76.5436 },
   { code: 'USMIA', name: 'Port of Miami (PortMiami)', city: 'Miami', state: 'FL', country: 'US', lat: 25.778, lng: -80.174 },
 ];
 

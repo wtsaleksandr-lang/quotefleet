@@ -66,6 +66,24 @@ describe('PORT_GROUPS — the combined, deduped display-hub list', () => {
     expect(codes.has('USCHI')).toBe(true); // inland rail ramp
     expect(codes.has('INLMEM')).toBe(true); // inland rail ramp
   });
+
+  it('exposes the newly-added metros as their own standalone display hubs', () => {
+    for (const code of ['USMOB', 'USTPA', 'INLOMA', 'INLCLT', 'INLSAS', 'INLREG']) {
+      const g = portGroupByCode(code);
+      expect(g?.memberCodes).toEqual([code]);
+    }
+  });
+});
+
+describe('ALL_HUBS — corrected seaport coordinates (must match terminals.ts)', () => {
+  const hubByCode = new Map(ALL_HUBS.map((h) => [h.code, h]));
+  it('carries the five fixed container-terminal coordinates', () => {
+    expect(hubByCode.get('USNYC')).toMatchObject({ lat: 40.6816, lng: -74.1505 });
+    expect(hubByCode.get('USSAV')).toMatchObject({ lat: 32.121, lng: -81.135 });
+    expect(hubByCode.get('USHOU')).toMatchObject({ lat: 29.6819, lng: -94.9983 });
+    expect(hubByCode.get('USBAL')).toMatchObject({ lat: 39.2592, lng: -76.5436 });
+    expect(hubByCode.get('USCHS')).toMatchObject({ lat: 32.848, lng: -79.873 });
+  });
 });
 
 describe('portGroupForMemberCode / portGroupAsPort', () => {
