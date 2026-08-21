@@ -439,10 +439,14 @@ const DIRECTORY_CSS = `
        no-orphan rule structurally: a 2-column grid, and when the count is ODD
        the first chip spans both columns — so the remaining even count fills
        clean pairs and the last row always has ≥2 (a sole chip is fine alone). */
-    .cp-chiprow { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); align-items: stretch; }
-    .cp-chiprow > * { min-width: 0; }
-    .cp-chiprow > .cp-badge, .cp-chiprow > .cp-chip { justify-content: center; text-align: center; white-space: normal; }
-    .cp-chiprow > :first-child:nth-last-child(odd) { grid-column: 1 / -1; }
+    /* Doubled class (.cp-chiprow.cp-chiprow, specificity 0,2,0) so these beat the
+       base .cp-chiprow flex rule, which is defined LATER in source order — media
+       queries add no specificity, so an equal-specificity base rule further down
+       would otherwise win the cascade and leave this grid dead. */
+    .cp-chiprow.cp-chiprow { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); align-items: stretch; }
+    .cp-chiprow.cp-chiprow > * { min-width: 0; }
+    .cp-chiprow.cp-chiprow > .cp-badge, .cp-chiprow.cp-chiprow > .cp-chip { justify-content: center; text-align: center; white-space: normal; }
+    .cp-chiprow.cp-chiprow > :first-child:nth-last-child(odd) { grid-column: 1 / -1; }
   }
   .cp-badge-active { font-size: 10px; font-family: var(--font-mono); letter-spacing: 0.06em; text-transform: uppercase; padding: 5px 9px; border-radius: var(--radius-chip); background: var(--success-bg); color: var(--success); border: 1px solid var(--success); display: inline-flex; align-items: center; gap: 6px; }
   .cp-badge-active::before { content: ''; width: 6px; height: 6px; border-radius: 50%; background: var(--success); display: inline-block; }
