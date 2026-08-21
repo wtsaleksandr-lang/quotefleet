@@ -132,3 +132,44 @@ body.landing-v2.qf-wft .hero .qf-hero-media > .qf-hero-devices {
     background-size: 20px 20px;
   }
 }
+
+/* ── LIGHT-THEME frame (subtle BLACK) ─────────────────────────────────────
+   The dark frame above is drawn in low-opacity WHITE, so it vanishes on the
+   light canvas (--bg #F6F8FA). Re-draw the SAME three layers in low-opacity
+   BLACK, scoped to html[data-theme="light"] so the dark landing is untouched.
+   These selectors add one class over the dark ones (higher specificity) and
+   only override the paint colour — position, size, mask, and the mobile rules
+   (display:none rails, softened dots) all inherit from the base rules above.
+   rgba only (never #000/black); tuned a hair above the dark alphas because a
+   dark hairline reads fainter on the bright light bg than a white one does on
+   near-black. ── */
+
+/* 1. Vertical rails → subtle black */
+html[data-theme="light"] body.landing-v2.qf-wft main::before,
+html[data-theme="light"] body.landing-v2.qf-wft main::after {
+  background: rgba(0, 0, 0, 0.10);
+}
+
+/* 2. Horizontal section dividers → subtle black */
+html[data-theme="light"] body.landing-v2.qf-wft main > section::after {
+  background: rgba(0, 0, 0, 0.09);
+}
+
+/* 3. Hero dotted grid → subtle black dots (size / position / mask unchanged) */
+html[data-theme="light"] body.landing-v2.qf-wft .hero .qf-hero-media::before {
+  background-image: radial-gradient(rgba(0, 0, 0, 0.14) 1px, transparent 1px);
+}
+
+/* ── Theme toggle — read as a distinct CONTROL in the top-right cluster ────
+   The .qf-theme-btn already ships a 40×40 hairline-bordered icon button
+   (style.css). Sitting flush among the text nav links it still read as "just
+   another link", so give it clear breathing room from the links on its left
+   and the Sign in / View demo actions on its right, and firm the resting
+   border up to the strong hairline token so the container reads at rest (not
+   only on hover). Theme-aware via tokens; applies in BOTH themes and regresses
+   neither (sun in dark, moon in light unchanged). ── */
+body.landing-v2.qf-wft .site-actions .qf-theme-btn {
+  margin-left: 4px;
+  margin-right: 8px;
+  border-color: var(--border-strong);
+}

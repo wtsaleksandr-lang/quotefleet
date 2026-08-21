@@ -56,6 +56,7 @@
         <button class="tab" data-pane="pwd" id="tab-pwd" type="button" role="tab" aria-selected="false" aria-controls="pane-pwd">Password</button>
       </div>
 
+      <div id="pane-wrap" class="qf-pane-wrap">
       <div class="tab-pane active" id="pane-link" role="tabpanel" aria-labelledby="tab-link">
         <form id="magic-form" style="display:flex; flex-direction:column; gap: 16px;" novalidate>
           <div class="field">
@@ -89,6 +90,7 @@
           </p>
         </form>
       </div>
+      </div>
 
       <div class="notice" style="margin-top: 18px; line-height:1.5;">Security note: sign-in links expire after 15 minutes and can be used once.</div>
       <p class="muted-small" style="text-align:center; margin-top: 20px;">
@@ -107,15 +109,42 @@
     document.querySelectorAll('input[type="email"]').forEach(function (input) {
       input.addEventListener('blur', function () { input.value = normalizeEmail(input.value); copyEmailToForms(input.value); });
     });
-    document.querySelectorAll('.tab').forEach(function (t) {
-      t.addEventListener('click', function () {
-        document.querySelectorAll('.tab').forEach(function (x) { x.classList.remove('active'); x.setAttribute('aria-selected', 'false'); });
+    // Tab switch with a smooth height expand/collapse + fade-in of the revealed
+    // fields. We measure the outgoing height, swap the active pane, measure the
+    // incoming natural height, then animate the wrapper between the two. Honors
+    // prefers-reduced-motion (instant, no fade). overflow is only clamped during
+    // the animation so focus rings are never clipped at rest.
+    var paneWrap = document.getElementById('pane-wrap');
+    var reduceMotion = !!(window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches);
+    function selectTab(t) {
+      var target = document.getElementById('pane-' + t.dataset.pane);
+      document.querySelectorAll('.tab').forEach(function (x) { x.classList.remove('active'); x.setAttribute('aria-selected', 'false'); });
+      t.classList.add('active');
+      t.setAttribute('aria-selected', 'true');
+      if (!paneWrap || !target) {
         document.querySelectorAll('.tab-pane').forEach(function (x) { x.classList.remove('active'); });
-        t.classList.add('active');
-        t.setAttribute('aria-selected', 'true');
-        var p = document.getElementById('pane-' + t.dataset.pane);
-        if (p) p.classList.add('active');
-      });
+        if (target) target.classList.add('active');
+        return;
+      }
+      if (target.classList.contains('active')) return; // already showing
+      var startH = paneWrap.offsetHeight;
+      document.querySelectorAll('.tab-pane').forEach(function (x) { x.classList.remove('active'); });
+      target.classList.add('active');
+      if (reduceMotion) { paneWrap.style.height = ''; paneWrap.style.overflow = ''; return; }
+      var endH = paneWrap.scrollHeight;
+      target.classList.add('qf-pane-enter');            // start faded out
+      paneWrap.style.overflow = 'hidden';
+      paneWrap.style.height = startH + 'px';
+      void paneWrap.offsetHeight;                       // force reflow so the next height animates
+      paneWrap.style.height = endH + 'px';
+      requestAnimationFrame(function () { requestAnimationFrame(function () { target.classList.remove('qf-pane-enter'); }); });
+      var reset = function () { paneWrap.style.height = ''; paneWrap.style.overflow = ''; };
+      var onEnd = function (e) { if (e.propertyName !== 'height') return; paneWrap.removeEventListener('transitionend', onEnd); reset(); };
+      paneWrap.addEventListener('transitionend', onEnd);
+      setTimeout(function () { paneWrap.removeEventListener('transitionend', onEnd); reset(); }, 450); // safety net
+    }
+    document.querySelectorAll('.tab').forEach(function (t) {
+      t.addEventListener('click', function () { selectTab(t); });
     });
     var qErr = new URLSearchParams(location.search).get('error');
     if (qErr) {
