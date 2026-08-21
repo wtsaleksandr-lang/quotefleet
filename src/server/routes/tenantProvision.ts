@@ -78,7 +78,7 @@ export async function deriveAvailableSlug(companyName: string): Promise<string> 
 }
 
 /** Which nullable users.* column stores this provider's stable subject id. */
-export type OAuthSubColumn = 'googleSub' | 'microsoftSub' | 'metaSub';
+export type OAuthSubColumn = 'googleSub' | 'microsoftSub' | 'metaSub' | 'appleSub';
 
 export interface ProvisionTenantInput {
   companyName: string;

@@ -257,6 +257,11 @@ export const users = pgTable(
     googleSub: text('google_sub'),
     microsoftSub: text('microsoft_sub'),
     metaSub: text('meta_sub'),
+    /** Sign in with Apple stable subject id (see src/server/oauth/apple.ts).
+     *  Same nullable + unique-index pattern as the other *_sub columns:
+     *  minted the first time a user signs in with Apple; password-only users
+     *  read null and never collide under the UNIQUE index. */
+    appleSub: text('apple_sub'),
     createdAt: timestamp('created_at', { mode: 'date' }).notNull().defaultNow(),
     lastLoginAt: timestamp('last_login_at', { mode: 'date' }),
   },
@@ -266,6 +271,7 @@ export const users = pgTable(
     uniqueIndex('users_google_sub_idx').on(t.googleSub),
     uniqueIndex('users_microsoft_sub_idx').on(t.microsoftSub),
     uniqueIndex('users_meta_sub_idx').on(t.metaSub),
+    uniqueIndex('users_apple_sub_idx').on(t.appleSub),
   ]
 );
 

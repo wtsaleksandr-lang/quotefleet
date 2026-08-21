@@ -365,6 +365,13 @@
       "when": 1787683677221,
       "tag": "0051_rfq",
       "breakpoints": true
+    },
+    {
+      "idx": 52,
+      "version": "7",
+      "when": 1787770077221,
+      "tag": "0052_apple_signin",
+      "breakpoints": true
     }
   ]
 }
