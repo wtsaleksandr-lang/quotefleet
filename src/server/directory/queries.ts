@@ -9,7 +9,7 @@
  * Read-only + platform-level (no tenant scope). All bounds (page size, code
  * lengths) are clamped here so callers can pass raw query values safely.
  */
-import { and, asc, desc, eq, gt, gte, inArray, isNotNull, isNull, ne, or, sql, type SQL } from 'drizzle-orm';
+import { and, asc, desc, eq, gt, gte, ilike, inArray, isNotNull, isNull, ne, or, sql, type SQL } from 'drizzle-orm';
 import { db } from '../../db/client.js';
 import { carrierDirectory, carrierOverrides, type CarrierCapabilities, type CarrierOverrideRow } from '../../db/schema.js';
 import { CONTAINER_PORTS, PORT_GROUPS, portFilterCodes, portGroupForMemberCode } from './containerPorts.js';
@@ -483,11 +483,45 @@ export interface DirectoryFilters {
    *  the facet. Empty array = any. Stable canonical order (CARGO_OPTIONS order). */
   cargo: CargoId[];
   recent: boolean;
+  /** Free-text carrier-name search (ILIKE over legal_name / dba_name). Trimmed
+   *  and required ≥2 chars by normalizeFilters; null when absent/too short. ANDed
+   *  with every other active facet. Shareable/crawlable via the `q` GET param. */
+  q: string | null;
   sort: SortId;
   /** Sort direction (asc/desc). Meaningful only when `sort` is directional. */
   dir: SortDir;
   page: number;
   perPage: number;
+}
+
+/** Minimum accepted length for the `q` carrier-name search (after trim). */
+export const NAME_SEARCH_MIN = 2;
+/** Cap so a pathological `q` can never blow up the ILIKE pattern. */
+const NAME_SEARCH_MAX = 100;
+
+/**
+ * Normalize a raw `q` value into the trimmed, length-bounded search term (or null
+ * when absent / shorter than NAME_SEARCH_MIN). Pure + total. Interior whitespace
+ * is collapsed so "  Harbor   Link " → "Harbor Link".
+ */
+export function normalizeNameQuery(raw: unknown): string | null {
+  const term = String(raw ?? '').replace(/\s+/g, ' ').trim();
+  if (term.length < NAME_SEARCH_MIN) return null;
+  return term.slice(0, NAME_SEARCH_MAX);
+}
+
+/**
+ * WHERE clause for a carrier-name search: case-insensitive substring match over
+ * legal_name OR dba_name. LIKE metacharacters (% _ \) in user input are escaped
+ * so they match literally (no wildcard injection). Returns null for a too-short
+ * term. Exported for query-shape unit tests.
+ */
+export function nameSearchCondition(rawTerm: string): SQL | null {
+  const term = normalizeNameQuery(rawTerm);
+  if (!term) return null;
+  const escaped = term.replace(/[\\%_]/g, (ch) => `\\${ch}`);
+  const pattern = `%${escaped}%`;
+  return or(ilike(carrierDirectory.legalName, pattern), ilike(carrierDirectory.dbaName, pattern)) as SQL;
 }
 
 const FLEET_IDS = new Set(FLEET_BUCKETS.map((b) => b.id));
@@ -572,6 +606,7 @@ export function normalizeFilters(
     equipment,
     cargo,
     recent: truthy(raw.recent),
+    q: normalizeNameQuery(raw.q),
     sort,
     dir,
     page: Math.max(1, parseInt(str(raw.page), 10) || 1),
@@ -595,6 +630,7 @@ export const FACET_QUERY_KEYS = [
   'equipment',
   'cargo',
   'recent',
+  'q',
   'sort',
   'dir',
   'page',
@@ -720,6 +756,10 @@ export function buildConditions(f: DirectoryFilters, exclude: Set<string> = new 
     if (cc) c.push(cc);
   }
   if (f.recent && !exclude.has('recent')) c.push(gte(carrierDirectory.updatedAt, recentCutoff()));
+  if (f.q && !exclude.has('q')) {
+    const nc = nameSearchCondition(f.q);
+    if (nc) c.push(nc);
+  }
   return c;
 }
 

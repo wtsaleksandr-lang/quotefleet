@@ -111,6 +111,32 @@
   flex: 1 1 160px;
   min-width: 0;
 }
+/* Company-name free-text field spans the full first row of the search bar, above
+   the port/equipment/safety selects. Submits to /directory?q=<name>. */
+.qf-dir-field--text {
+  flex: 1 1 100%;
+}
+/* Higher specificity than `.qf-dir-field::after` (defined below) so the select
+   chevron never renders on the free-text company-name field. */
+.qf-dir-search .qf-dir-field--text::after { content: none; }
+.qf-dir-name {
+  width: 100%;
+  font-family: var(--font-sans);
+  font-size: 14px;
+  font-weight: 500;
+  color: var(--ink);
+  background: var(--surface-2);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-btn);
+  padding: 8px 12px;
+  min-height: 44px;
+}
+.qf-dir-name::placeholder { color: var(--muted); }
+.qf-dir-name:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 1px;
+  border-color: var(--accent);
+}
 .qf-dir-field select {
   appearance: none;
   -webkit-appearance: none;
