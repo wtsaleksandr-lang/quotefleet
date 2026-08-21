@@ -108,7 +108,8 @@ describe('authorize URL shape (apple)', () => {
     expect(q.get('response_type')).toBe('code');
     expect(q.get('response_mode')).toBe('form_post');
     expect(q.get('scope')).toBe('name email');
-    expect(q.get('redirect_uri')).toBe('http://localhost:5000/auth/oauth/apple/callback');
+    // Host depends on ambient PUBLIC_BASE_URL (differs local vs CI); assert the path is right.
+    expect(q.get('redirect_uri')?.endsWith('/auth/oauth/apple/callback')).toBe(true);
     expect((q.get('state') || '').split('.').length).toBe(2); // payload.hmac
   });
 });
