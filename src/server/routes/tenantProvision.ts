@@ -34,6 +34,7 @@ import {
 } from '../../calc/defaults.js';
 import { TERMINALS_DATA } from '../../data/terminals.js';
 import { defaultHostDomain } from '../../config.js';
+import { mintUniqueCode } from '../affiliate/codes.js';
 
 export const TRIAL_DAYS = 14;
 
@@ -122,6 +123,16 @@ export async function provisionTrialTenant(
   const trialEndsAt = new Date(Date.now() + TRIAL_DAYS * 24 * 60 * 60 * 1000);
   const embedToken = nanoid(24);
   const ownerName = input.ownerName?.trim() || input.companyName;
+  // Every tenant gets a shareable referral code at creation (like slug/embedToken).
+  // Minted before the transaction; the UNIQUE(referral_code) constraint is the
+  // final race guard. Non-fatal if it somehow fails — a null code is backfilled
+  // lazily by ensureTenantReferralCode() on first use of the referral surface.
+  let referralCode: string | null = null;
+  try {
+    referralCode = await mintUniqueCode();
+  } catch (err) {
+    console.warn('[provision] referral code mint failed (non-fatal):', err);
+  }
 
   const result = await db().transaction(async (tx) => {
     const [t] = await tx
@@ -134,6 +145,7 @@ export async function provisionTrialTenant(
         contactPhone: input.contactPhone ?? null,
         countryFocus: input.countryFocus,
         embedToken,
+        referralCode,
         plan: 'free',
         status: 'active',
         trialEndsAt,

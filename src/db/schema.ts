@@ -74,6 +74,16 @@ export const tenants = pgTable(
     countryFocus: text('country_focus').notNull().default('US'),
     /** Random unguessable token used in <script src="...embed.js?t=..."> */
     embedToken: text('embed_token').notNull().unique(),
+    /** Short, shareable REFERRAL code minted on tenant creation (see
+     *  src/server/affiliate/codes.ts). Every tenant's referral link is
+     *  `https://quotefleet.net/?ref=<referralCode>`; a peer who signs up through
+     *  it gets the referee reward (30-day trial + intro discount) and this tenant
+     *  is queued a "1 free month" account credit (referral_credits). Distinct from
+     *  embedToken (public widget loader) and ingestEmailToken (inbound email
+     *  secret) — this one is meant to be shared. Nullable + minted lazily so
+     *  existing rows read null until backfilled/self-healed; unique so a code
+     *  resolves to exactly one tenant. */
+    referralCode: text('referral_code').unique(),
     /** Secret token for the tenant's dedicated inbound rate-email address
      *  (`rates-<token>@<INBOUND_EMAIL_DOMAIN>`). DISTINCT from embedToken —
      *  embedToken is public (it ships in the widget <script> src), so it must
@@ -2113,3 +2123,180 @@ export type NewMarketplaceRateSnapshot = typeof marketplaceRateSnapshots.$inferI
 export type MarketplaceAggregate = typeof marketplaceAggregates.$inferSelect;
 export type IngestJob = typeof ingestJobs.$inferSelect;
 export type NewIngestJob = typeof ingestJobs.$inferInsert;
+
+// ════════════════════════════════════════════════════════════════════
+// AFFILIATE + REFERRAL PROGRAM (Phase 1)
+//
+// Two related growth programs share these tables:
+//   1. REFERRAL (existing tenants → peers, double-sided). Every tenant owns a
+//      `tenants.referral_code`; a peer who signs up through
+//      `/?ref=<code>` gets the referee reward (30-day trial + intro discount)
+//      and the referrer is queued a "1 free month" account credit
+//      (referral_credits).
+//   2. AFFILIATE (public marketers/creators, tiered recurring cash). Anyone can
+//      self-serve register an `affiliates` row (email + minted code) and earn a
+//      recurring % commission on customers they refer. A 90-day cookie attributes
+//      a click → a signup (referral_attributions), and a phase-2 billing job
+//      writes affiliate_commissions rows for payout.
+//
+// Payouts + the commission-accrual job are PHASE 2 — these tables + the
+// self-serve signup + the dashboards are phase 1. See src/server/affiliate/*.
+// ════════════════════════════════════════════════════════════════════
+
+// ── AFFILIATES — a partner earning recurring commission on referred tenants. ──
+// The owner is EITHER an existing customer (ownerTenantId/ownerUserId set) OR a
+// standalone marketer with no QuoteFleet account (both null; identified by
+// `email`). `code` is the shareable slug used in `/?ref=<code>`.
+export const affiliates = pgTable(
+  'affiliates',
+  {
+    id: serial('id').primaryKey(),
+    /** Optional link to an existing tenant (a customer who is also an affiliate). */
+    ownerTenantId: integer('owner_tenant_id').references(() => tenants.id, {
+      onDelete: 'set null',
+    }),
+    /** Optional link to a specific user account. */
+    ownerUserId: integer('owner_user_id').references(() => users.id, {
+      onDelete: 'set null',
+    }),
+    /** Contact/login email — always set (the standalone affiliate's identity). */
+    email: text('email').notNull(),
+    /** Optional display / payout name. */
+    name: text('name'),
+    /** Unique short code used in the referral link (`/?ref=<code>`). */
+    code: text('code').notNull().unique(),
+    /** Commission tier: 'base' (25%) | 'pro' (30% for 12mo once 10+ active) |
+     *  'partner' (negotiated lifetime % for top partners). */
+    tier: text('tier').notNull().default('base'),
+    /** Current commission rate as a fraction (0.25 = 25%). Denormalized from
+     *  `tier` so a phase-2 billing job reads one authoritative number, and a
+     *  hand-negotiated 'partner' rate can differ from the tier default. */
+    commissionRate: doublePrecision('commission_rate').notNull().default(0.25),
+    /** Lifecycle: 'pending' (self-registered, not yet approved) | 'active' |
+     *  'suspended'. */
+    status: text('status').notNull().default('pending'),
+    /** How the affiliate wants to be paid: 'paypal' | 'stripe' | 'bank' | null. */
+    payoutMethod: text('payout_method'),
+    /** Free-form payout target (PayPal email, etc.). Nullable until they set it. */
+    payoutDetails: text('payout_details'),
+    createdAt: timestamp('created_at', { mode: 'date' }).notNull().defaultNow(),
+    updatedAt: timestamp('updated_at', { mode: 'date' }).notNull().defaultNow(),
+  },
+  (t) => [
+    uniqueIndex('affiliates_code_idx').on(t.code),
+    index('affiliates_email_idx').on(t.email),
+    index('affiliates_owner_tenant_idx').on(t.ownerTenantId),
+  ]
+);
+
+// ── REFERRAL ATTRIBUTIONS — one click of a `?ref=<code>` link. ──────────────
+// Written when a visitor lands with `?ref` (or `/r/:code`); `referredTenantId`
+// is filled in on signup, `convertedAt` when that tenant becomes paying.
+export const referralAttributions = pgTable(
+  'referral_attributions',
+  {
+    id: serial('id').primaryKey(),
+    /** The referral/affiliate code that was clicked (tenants.referral_code OR
+     *  affiliates.code). Denormalized so the row survives even if the code is
+     *  later rotated. */
+    code: text('code').notNull(),
+    /** Which program the code belonged to at capture: 'referral' (a tenant's
+     *  peer code) | 'affiliate' (a public affiliate) | 'unknown'. */
+    kind: text('kind').notNull().default('unknown'),
+    /** The tenant that signed up through this click — null until signup links it. */
+    referredTenantId: integer('referred_tenant_id').references(() => tenants.id, {
+      onDelete: 'set null',
+    }),
+    /** Opaque per-visitor token stored in the `qf_ref` cookie; dedupes repeat
+     *  clicks from the same browser before signup. */
+    visitorToken: text('visitor_token').notNull(),
+    landedAt: timestamp('landed_at', { mode: 'date' }).notNull().defaultNow(),
+    /** When the referred tenant converted to a PAYING subscription (phase-2
+     *  billing job). Null while trialing / free. */
+    convertedAt: timestamp('converted_at', { mode: 'date' }),
+    /** Reward pipeline state: 'pending' (click only) | 'signed_up' (linked to a
+     *  tenant, referee reward applied, referrer credit queued) | 'converted'
+     *  (tenant paying) | 'rewarded' (referrer credit granted) | 'ignored'
+     *  (self-referral / invalid). */
+    rewardStatus: text('reward_status').notNull().default('pending'),
+    createdAt: timestamp('created_at', { mode: 'date' }).notNull().defaultNow(),
+  },
+  (t) => [
+    index('referral_attributions_code_idx').on(t.code),
+    index('referral_attributions_tenant_idx').on(t.referredTenantId),
+    index('referral_attributions_visitor_idx').on(t.visitorToken),
+  ]
+);
+
+// ── REFERRAL CREDITS — the "1 free month" reward owed to a REFERRER. ─────────
+// Queued (appliedAt null) when a referred peer signs up; a phase-2 billing job
+// grants the free month (sets appliedAt + status 'applied') once the referee is
+// paying.
+export const referralCredits = pgTable(
+  'referral_credits',
+  {
+    id: serial('id').primaryKey(),
+    /** The REFERRER tenant that earns the free month. */
+    tenantId: integer('tenant_id')
+      .notNull()
+      .references(() => tenants.id, { onDelete: 'cascade' }),
+    /** The attribution that produced this credit. */
+    sourceAttributionId: integer('source_attribution_id').references(
+      () => referralAttributions.id,
+      { onDelete: 'set null' }
+    ),
+    /** How many free months this credit grants (default 1). */
+    monthsGranted: integer('months_granted').notNull().default(1),
+    /** 'pending' (queued, awaiting referee payment) | 'applied' | 'void'. */
+    status: text('status').notNull().default('pending'),
+    /** When the free month was actually applied to the referrer's subscription
+     *  (phase-2). Null while pending. */
+    appliedAt: timestamp('applied_at', { mode: 'date' }),
+    createdAt: timestamp('created_at', { mode: 'date' }).notNull().defaultNow(),
+  },
+  (t) => [
+    index('referral_credits_tenant_idx').on(t.tenantId),
+    index('referral_credits_status_idx').on(t.status),
+  ]
+);
+
+// ── AFFILIATE COMMISSIONS — monthly accrual per referred customer. ──────────
+// Created by a PHASE-2 billing job (one row per affiliate × referred tenant ×
+// billing month). Created empty in phase 1 so the schema + payout dashboard
+// seam exists; nothing writes to it yet.
+export const affiliateCommissions = pgTable(
+  'affiliate_commissions',
+  {
+    id: serial('id').primaryKey(),
+    affiliateId: integer('affiliate_id')
+      .notNull()
+      .references(() => affiliates.id, { onDelete: 'cascade' }),
+    /** The referred paying tenant this commission is for. */
+    tenantId: integer('tenant_id')
+      .notNull()
+      .references(() => tenants.id, { onDelete: 'cascade' }),
+    /** Billing month, 'YYYY-MM'. One accrual row per affiliate/tenant/month. */
+    periodMonth: text('period_month').notNull(),
+    /** Commission amount in cents (integer money — never floats for payouts). */
+    amountCents: integer('amount_cents').notNull().default(0),
+    /** Rate applied for this row (fraction), snapshotted for audit. */
+    rate: doublePrecision('rate').notNull().default(0.25),
+    /** 'pending' (accrued) | 'approved' (cleared for payout) | 'paid'. */
+    status: text('status').notNull().default('pending'),
+    createdAt: timestamp('created_at', { mode: 'date' }).notNull().defaultNow(),
+  },
+  (t) => [
+    index('affiliate_commissions_affiliate_idx').on(t.affiliateId),
+    index('affiliate_commissions_tenant_idx').on(t.tenantId),
+    uniqueIndex('affiliate_commissions_uniq_idx').on(t.affiliateId, t.tenantId, t.periodMonth),
+  ]
+);
+
+export type Affiliate = typeof affiliates.$inferSelect;
+export type NewAffiliate = typeof affiliates.$inferInsert;
+export type ReferralAttribution = typeof referralAttributions.$inferSelect;
+export type NewReferralAttribution = typeof referralAttributions.$inferInsert;
+export type ReferralCredit = typeof referralCredits.$inferSelect;
+export type NewReferralCredit = typeof referralCredits.$inferInsert;
+export type AffiliateCommission = typeof affiliateCommissions.$inferSelect;
+export type NewAffiliateCommission = typeof affiliateCommissions.$inferInsert;
