@@ -41,17 +41,20 @@ import {
   buildAuthorizeUrl,
   configuredProviders,
   exchangeCodeForProfile,
+  getAppleConfig,
   isConfigured,
   isValidProviderId,
   verifyState,
   type OAuthProviderId,
   type OAuthProfile,
 } from '../oauth/providers.js';
+import { exchangeAppleCodeForProfile, parseAppleUserName } from '../oauth/apple.js';
 
 /** Drizzle column that stores this provider's stable subject id. */
 function subColumn(provider: OAuthProviderId) {
   if (provider === 'google') return users.googleSub;
   if (provider === 'microsoft') return users.microsoftSub;
+  if (provider === 'apple') return users.appleSub;
   return users.metaSub;
 }
 
@@ -59,13 +62,17 @@ function subColumn(provider: OAuthProviderId) {
 function subPatch(provider: OAuthProviderId, sub: string) {
   if (provider === 'google') return { googleSub: sub };
   if (provider === 'microsoft') return { microsoftSub: sub };
+  if (provider === 'apple') return { appleSub: sub };
   return { metaSub: sub };
 }
 
 /** Provider → the users.* column name provisionTrialTenant stamps at signup. */
-function subColumnName(provider: OAuthProviderId): 'googleSub' | 'microsoftSub' | 'metaSub' {
+function subColumnName(
+  provider: OAuthProviderId
+): 'googleSub' | 'microsoftSub' | 'metaSub' | 'appleSub' {
   if (provider === 'google') return 'googleSub';
   if (provider === 'microsoft') return 'microsoftSub';
+  if (provider === 'apple') return 'appleSub';
   return 'metaSub';
 }
 
@@ -106,10 +113,12 @@ export function registerOAuthRoutes(app: Express) {
     }
   });
 
-  /** Callback: exchange the code, resolve the account, set the cookie. */
+  /** Callback (GET): exchange the code, resolve the account, set the cookie.
+   *  Apple is EXCLUDED here — it uses response_mode=form_post, so its callback
+   *  is the app.post('/auth/oauth/apple/callback') handler below. */
   app.get('/auth/oauth/:provider/callback', async (req: Request, res: Response) => {
     const provider = String(req.params.provider);
-    if (!isValidProviderId(provider) || !isConfigured(provider)) {
+    if (!isValidProviderId(provider) || provider === 'apple' || !isConfigured(provider)) {
       return res.status(404).json({ error: 'Not found' });
     }
 
@@ -134,66 +143,130 @@ export function registerOAuthRoutes(app: Express) {
       return res.redirect('/login?oauth_error=exchange_failed');
     }
 
+    return resolveOAuthAndLogin(res, provider, profile);
+  });
+
+  /** Callback (POST): Sign in with Apple. Apple sends response_mode=form_post,
+   *  so the code/state (and, on FIRST consent only, a `user` JSON blob with the
+   *  display name) arrive as an application/x-www-form-urlencoded POST body —
+   *  parsed by the global express.urlencoded() middleware. The client_secret is
+   *  a signed ES256 JWT and the id_token is verified against Apple's JWKS inside
+   *  exchangeAppleCodeForProfile. Account resolution is the SAME as every other
+   *  provider (resolveOAuthAndLogin). */
+  app.post('/auth/oauth/apple/callback', async (req: Request, res: Response) => {
+    if (!isConfigured('apple')) {
+      return res.status(404).json({ error: 'Not found' });
+    }
+    const body = (req.body ?? {}) as Record<string, unknown>;
+    const { code, state, error: oauthError, user } = body;
+    if (oauthError) {
+      return res.redirect(`/login?oauth_error=${encodeURIComponent(String(oauthError))}`);
+    }
+    if (!code || typeof code !== 'string') {
+      return res.redirect('/login?oauth_error=missing_code');
+    }
+    if (!verifyState(String(state ?? ''), 'apple')) {
+      console.warn('[oauth] apple callback: state verification failed');
+      return res.redirect('/login?oauth_error=invalid_state');
+    }
+
+    const cfg = getAppleConfig();
+    if (!cfg.servicesId || !cfg.teamId || !cfg.keyId || !cfg.privateKey) {
+      return res.status(404).json({ error: 'Not found' });
+    }
+
+    // The display name is delivered ONLY on the first consent, in `user`.
+    const appleName = parseAppleUserName(user);
+
+    let profile: OAuthProfile;
     try {
-      // 1. Known provider identity → straight in.
-      const bySub = (
-        await db().select().from(users).where(eq(subColumn(provider), profile.sub) as SQL).limit(1)
-      )[0];
-      if (bySub) return await loginAndRedirect(res, bySub.id, bySub.role);
+      profile = await exchangeAppleCodeForProfile(code, appleName, {
+        servicesId: cfg.servicesId,
+        teamId: cfg.teamId,
+        keyId: cfg.keyId,
+        privateKey: cfg.privateKey,
+        redirectUri: cfg.redirectUri,
+      });
+    } catch (err) {
+      console.error('[oauth] apple code exchange failed:', err);
+      return res.redirect('/login?oauth_error=exchange_failed');
+    }
 
-      // 2. Email matches an existing account.
-      const byEmail = (
-        await db().select().from(users).where(eq(users.email, profile.email)).limit(1)
-      )[0];
-      if (byEmail) {
-        if (!profile.emailVerified) {
-          // Never attach a provider identity to an existing account on an
-          // unverified email — that would let an attacker who controls an
-          // unverified provider account hijack a QuoteFleet login by email.
-          return res.redirect('/login?oauth_error=email_unverified');
-        }
-        await db().update(users).set(subPatch(provider, profile.sub)).where(eq(users.id, byEmail.id));
-        return await loginAndRedirect(res, byEmail.id, byEmail.role);
-      }
+    return resolveOAuthAndLogin(res, 'apple', profile);
+  });
+}
 
-      // 3. Brand-new → OAuth SIGNUP. Only create on a provider-verified email.
+/**
+ * Identity → account resolution, shared by every provider callback (GET for
+ * google/microsoft/meta, POST for apple). Handles its own errors by redirecting.
+ *   1. Known provider sub            → log into that user.
+ *   2. Email matches an existing user → link the sub (verified email only).
+ *   3. No match                       → OAuth SIGNUP: new trial tenant + owner.
+ */
+async function resolveOAuthAndLogin(
+  res: Response,
+  provider: OAuthProviderId,
+  profile: OAuthProfile
+) {
+  try {
+    // 1. Known provider identity → straight in.
+    const bySub = (
+      await db().select().from(users).where(eq(subColumn(provider), profile.sub) as SQL).limit(1)
+    )[0];
+    if (bySub) return await loginAndRedirect(res, bySub.id, bySub.role);
+
+    // 2. Email matches an existing account.
+    const byEmail = (
+      await db().select().from(users).where(eq(users.email, profile.email)).limit(1)
+    )[0];
+    if (byEmail) {
       if (!profile.emailVerified) {
+        // Never attach a provider identity to an existing account on an
+        // unverified email — that would let an attacker who controls an
+        // unverified provider account hijack a QuoteFleet login by email.
         return res.redirect('/login?oauth_error=email_unverified');
       }
-      const companyName = deriveCompanyName(profile);
-      const slug = await deriveAvailableSlug(companyName);
-      // OAuth users get a random unusable password; they can claim a real one
-      // later via magic-link → change password.
-      const passwordHash = await hashPassword(randomBytes(32).toString('hex'));
-      try {
-        const result = await provisionTrialTenant({
-          companyName,
-          email: profile.email,
-          passwordHash,
-          countryFocus: 'US',
-          ownerName: profile.name,
-          // Continuing through the provider from a page that states the terms
-          // records DPA consent at the current version (no mid-OAuth checkbox).
-          dpaVersion: CURRENT_DPA_VERSION,
-          slug,
-          oauth: { column: subColumnName(provider), sub: profile.sub },
-        });
-        return await loginAndRedirect(res, result.userId, 'tenant_owner');
-      } catch (err) {
-        // Race: another tab/retry may have created the account between our
-        // lookups and the insert. Fall back to logging into whatever now exists.
-        console.error(`[oauth] ${provider} signup insert failed:`, err);
-        const raced =
-          (await db().select().from(users).where(eq(subColumn(provider), profile.sub) as SQL).limit(1))[0] ??
-          (await db().select().from(users).where(eq(users.email, profile.email)).limit(1))[0];
-        if (raced) return await loginAndRedirect(res, raced.id, raced.role);
-        return res.redirect('/login?oauth_error=signup_failed');
-      }
-    } catch (err) {
-      console.error(`[oauth] ${provider} callback error:`, err);
-      return res.redirect('/login?oauth_error=internal');
+      await db().update(users).set(subPatch(provider, profile.sub)).where(eq(users.id, byEmail.id));
+      return await loginAndRedirect(res, byEmail.id, byEmail.role);
     }
-  });
+
+    // 3. Brand-new → OAuth SIGNUP. Only create on a provider-verified email.
+    if (!profile.emailVerified) {
+      return res.redirect('/login?oauth_error=email_unverified');
+    }
+    const companyName = deriveCompanyName(profile);
+    const slug = await deriveAvailableSlug(companyName);
+    // OAuth users get a random unusable password; they can claim a real one
+    // later via magic-link → change password.
+    const passwordHash = await hashPassword(randomBytes(32).toString('hex'));
+    try {
+      const result = await provisionTrialTenant({
+        companyName,
+        email: profile.email,
+        passwordHash,
+        countryFocus: 'US',
+        ownerName: profile.name,
+        // Continuing through the provider from a page that states the terms
+        // records DPA consent at the current version (no mid-OAuth checkbox).
+        dpaVersion: CURRENT_DPA_VERSION,
+        slug,
+        oauth: { column: subColumnName(provider), sub: profile.sub },
+      });
+      return await loginAndRedirect(res, result.userId, 'tenant_owner');
+    } catch (err) {
+      // Race: another tab/retry may have created the account between our
+      // lookups and the insert. Fall back to logging into whatever now exists.
+      console.error(`[oauth] ${provider} signup insert failed:`, err);
+      const raced =
+        (await db().select().from(users).where(eq(subColumn(provider), profile.sub) as SQL).limit(1))[0] ??
+        (await db().select().from(users).where(eq(users.email, profile.email)).limit(1))[0];
+      if (raced) return await loginAndRedirect(res, raced.id, raced.role);
+      return res.redirect('/login?oauth_error=signup_failed');
+    }
+  } catch (err) {
+    console.error(`[oauth] ${provider} callback error:`, err);
+    return res.redirect('/login?oauth_error=internal');
+  }
 }
 
 /** Issue the session cookie (same createSession/setCookie as the password

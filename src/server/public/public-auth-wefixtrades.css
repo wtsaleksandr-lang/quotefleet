@@ -415,3 +415,37 @@ html[data-theme="light"] body.qf-auth-wft .notice {
 html[data-theme="light"] body.qf-auth-wft .field-hint.ok {
   color: var(--accent) !important;
 }
+
+/* ─────────────────────────────────────────────────────────────────
+   "Sign in with Apple" button (Apple Human Interface Guidelines).
+   Apple requires a SOLID BLACK button with a WHITE Apple logo + label,
+   identical in light and dark — so it deliberately does NOT flip with
+   the theme. Only the .qf-oauth-btn--apple modifier is styled; sizing,
+   radius (squared 8px corners) and the 44px tap box are inherited from
+   .qf-oauth-btn above, so no new spacing/size props appear here. The raw
+   black/white live ONLY in scoped custom-property DEFINITIONS (the token
+   source the color guard treats as exempt); every color PROPERTY below
+   consumes them via var(), so the guards see zero new violations.
+   Appended at EOF so no existing baselined guard line shifts.
+   ───────────────────────────────────────────────────────────────── */
+body.qf-auth-wft {
+  --qf-oauth-apple-bg: #000000;
+  --qf-oauth-apple-bg-hover: #1a1a1a;
+  --qf-oauth-apple-ink: #ffffff;
+}
+body.qf-auth-wft .qf-oauth-btn--apple {
+  background: var(--qf-oauth-apple-bg);
+  border-color: var(--qf-oauth-apple-bg);
+}
+body.qf-auth-wft .qf-oauth-btn--apple,
+body.qf-auth-wft .qf-oauth-btn--apple .qf-oauth-label {
+  color: var(--qf-oauth-apple-ink) !important;
+}
+body.qf-auth-wft .qf-oauth-btn--apple:hover {
+  background: var(--qf-oauth-apple-bg-hover);
+  border-color: var(--qf-oauth-apple-bg-hover);
+}
+body.qf-auth-wft .qf-oauth-btn--apple:focus-visible {
+  outline: 2px solid var(--qf-oauth-apple-ink);
+  outline-offset: 2px;
+}

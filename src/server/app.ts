@@ -383,6 +383,18 @@ export function createApp(): express.Express {
       '',
     ].join('\n'));
   });
+  // Sign in with Apple domain verification. Apple fetches this file to confirm
+  // we own the domain before it will POST OAuth callbacks here. The content is
+  // issued by Apple and pasted into the APPLE_DOMAIN_ASSOCIATION env var (kept
+  // out of the repo); until it is set the file 404s, so this is a no-op with no
+  // Apple app configured — exactly like the OAuth routes themselves.
+  app.get('/.well-known/apple-developer-domain-association.txt', (_req, res) => {
+    const content = process.env.APPLE_DOMAIN_ASSOCIATION;
+    if (!content || !content.trim()) {
+      return res.status(404).type('text/plain').send('Not found');
+    }
+    return res.type('text/plain').send(content);
+  });
   app.get('/app', (_req, res) => res.sendFile('app.html', { root: publicDir }));
   app.get('/app/*splat', (_req, res) => res.sendFile('app.html', { root: publicDir }));
   app.get('/admin', (_req, res) => res.sendFile('admin.html', { root: publicDir }));
