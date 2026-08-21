@@ -93,7 +93,6 @@ function enableGoogle() {
 function disableAllProviders() {
   for (const k of [
     GOOGLE_ID, GOOGLE_SECRET,
-    'MICROSOFT_OAUTH_CLIENT_ID', 'MICROSOFT_OAUTH_CLIENT_SECRET',
     'META_OAUTH_CLIENT_ID', 'META_OAUTH_CLIENT_SECRET',
     'FACEBOOK_OAUTH_CLIENT_ID', 'FACEBOOK_OAUTH_CLIENT_SECRET',
   ]) {
@@ -147,11 +146,11 @@ describe('provider-gating', () => {
     enableGoogle();
     // Config detection (both directions of the gate).
     expect(isConfigured('google')).toBe(true);
-    expect(isConfigured('microsoft')).toBe(false);
+    expect(isConfigured('meta')).toBe(false);
 
     const list: any = await (await fetch(`${baseUrl}/api/auth/oauth/providers`)).json();
     expect(list.providers.map((p: any) => p.id)).toContain('google');
-    expect(list.providers.map((p: any) => p.id)).not.toContain('microsoft');
+    expect(list.providers.map((p: any) => p.id)).not.toContain('meta');
 
     // The authorize URL is a real Google consent URL carrying our signed state.
     const url = buildAuthorizeUrl('google', 'login');
