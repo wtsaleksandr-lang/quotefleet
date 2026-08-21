@@ -48,13 +48,25 @@
   html body.qf-wft .qf-hero-devices--video.stage-laptop > .qf-hero-laptop {
     transform: translate(0%, 52px) !important;
   }
-  /* Phone-forward pose (stage-phone): keep the enlarged phone fully on-screen
-     and the shrunk background laptop from drifting past the right edge. */
+  /* Phone-forward pose (stage-phone): BUG #1 FIX — the phone was lifted so far up
+     (translate -7% + scale 1.12 on a bottom-anchored 590px frame) that its top
+     rose to y≈-5, behind the sticky header (z-index 70) which then clipped it.
+     Lower it (translateY -7% → +9%) and ease the scale (1.12 → 1.05) so the whole
+     phone sits cleanly below the header (top ≈ +100) while still reading as the
+     enlarged focus. */
   html body.qf-wft .qf-hero-devices--video.stage-phone > .qf-hero-vphone {
-    transform: translate(-84%, -7%) scale(1.12) !important;
+    transform: translate(-84%, 9%) scale(1.05) !important;
   }
+  /* BUG #2 FIX — the receded background laptop was opacity:.32 + blur(2px) over the
+     dark hero, so its real (blurred) desktop frame washed out to an empty grey
+     device box. Lift its opacity so the softly-blurred screenshot actually reads,
+     ease the blur a touch, and enlarge/recenter it (scale .58 → .66) so a genuine
+     desktop peeks around the phone instead of a bare grey sliver. (Light theme has
+     its own opacity/blur pair at the bottom of this file.) */
   html body.qf-wft .qf-hero-devices--video.stage-phone > .qf-hero-laptop {
-    transform: translate(14%, -8%) scale(.58) !important;
+    transform: translate(12%, -4%) scale(.66) !important;
+    opacity: .7 !important;
+    filter: blur(1.8px) saturate(.92) !important;
   }
 }
 
@@ -300,6 +312,43 @@ html body.qf-wft .qf-dir-card__port span {
    its opacity and ease the blur so it reads as a genuine (blurred) product
    screenshot sitting behind the phone. Dark mode keeps its original subtle dim. */
 html[data-theme="light"] body.qf-wft .qf-hero-devices--video.stage-phone > .qf-hero-laptop {
-  opacity: 0.62 !important;
+  opacity: 0.7 !important;
   filter: blur(1.5px) saturate(1) !important;
+}
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   FIX 4 (BUG #3) — Kill the stray card behind the hero device composite.
+   `landing-wefixtrades-cleanup.css` gives the generic `.visual-flow` demo card a
+   solid surface + border + radius, and its LIGHT-theme rule
+   `html[data-theme="light"] body.qf-wft .visual-flow { background: var(--surface) }`
+   (specificity 0,3,2) out-ranks the hero's own `.visual-flow.qf-hero-media
+   { background:none }` (0,3,1) — so in light mode a white rounded box was painted
+   behind the laptop/phone (the "bizarre background container"). Re-assert a
+   transparent, borderless, shadowless media box at HIGHER specificity (adds the
+   .qf-hero-media class → 0,4,2 light / robust in dark too) so the composite always
+   sits on the bare hero (dot grid), never inside a card, in BOTH themes.
+   ═══════════════════════════════════════════════════════════════════════════ */
+html body.qf-wft .visual-flow.qf-hero-media,
+html[data-theme="light"] body.qf-wft .visual-flow.qf-hero-media,
+html[data-theme="dark"] body.qf-wft .visual-flow.qf-hero-media {
+  background: none !important;
+  border: 0 !important;
+  box-shadow: none !important;
+  padding: 0 !important;
+  border-radius: 0 !important;
+}
+
+/* BUG #2 (mobile): the ≤640 stage-phone laptop pose (landing-hero-devices.css)
+   keeps opacity .32, so behind the phone it read as the same empty grey box on
+   phones. Match the desktop fix — lift the opacity so the softly-blurred desktop
+   is a real screenshot, not a grey ghost, on mobile in both themes. */
+@media (max-width: 640px) {
+  html body.qf-wft .qf-hero-devices--video.stage-phone > .qf-hero-laptop {
+    opacity: .6 !important;
+    filter: blur(1.8px) saturate(.92) !important;
+  }
+  html[data-theme="light"] body.qf-wft .qf-hero-devices--video.stage-phone > .qf-hero-laptop {
+    opacity: .68 !important;
+    filter: blur(1.5px) saturate(1) !important;
+  }
 }
