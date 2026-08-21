@@ -449,3 +449,11 @@ body.qf-auth-wft .qf-oauth-btn--apple:focus-visible {
   outline: 2px solid var(--qf-oauth-apple-ink);
   outline-offset: 2px;
 }
+/* Force the Apple mark to render as a crisp, pure-white glyph (not a dimmed
+   inherited off-white). Consumes the same white token as the label, so no new
+   raw hex appears here; the explicit fill on the SVG path wins over the glyph's
+   currentColor and any anti-aliased inheritance. */
+body.qf-auth-wft .qf-oauth-btn--apple svg,
+body.qf-auth-wft .qf-oauth-btn--apple svg path {
+  fill: var(--qf-oauth-apple-ink);
+}
