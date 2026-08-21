@@ -12,7 +12,33 @@ import {
   portGroupForMemberCode,
   portGroupAsPort,
   portFilterCodes,
+  nearestPortToPoint,
+  MAX_HUB_RADIUS_MI,
 } from './containerPorts.js';
+
+describe('nearestPortToPoint — service-radius cap', () => {
+  it('maps a Phoenix-area point to the Phoenix inland hub, not distant LA/LB', () => {
+    // Phoenix, AZ (~356 mi from LA/Long Beach). Before the Phoenix hub existed
+    // this fell to USLAX/USLGB; now it must resolve to the Phoenix hub.
+    expect(nearestPortToPoint(33.4484, -112.074)).toBe('INLPHX');
+  });
+
+  it('maps an LA point to a San Pedro Bay seaport', () => {
+    expect(['USLAX', 'USLGB']).toContain(nearestPortToPoint(33.7395, -118.2597));
+  });
+
+  it('returns null when the nearest hub is beyond MAX_HUB_RADIUS_MI', () => {
+    // Mid-Pacific — thousands of miles from every hub.
+    expect(nearestPortToPoint(30, -160)).toBeNull();
+    // A point just past the cap from all hubs (far northern Montana wilderness).
+    expect(nearestPortToPoint(48.9, -110.0)).toBeNull();
+  });
+
+  it('cap is a sane drayage radius', () => {
+    expect(MAX_HUB_RADIUS_MI).toBeGreaterThanOrEqual(150);
+    expect(MAX_HUB_RADIUS_MI).toBeLessThanOrEqual(400);
+  });
+});
 
 describe('PORT_GROUPS — the combined, deduped display-hub list', () => {
   it('has unique group codes', () => {
@@ -65,6 +91,24 @@ describe('PORT_GROUPS — the combined, deduped display-hub list', () => {
     expect(codes.has('USLALB')).toBe(true); // seaport hub
     expect(codes.has('USCHI')).toBe(true); // inland rail ramp
     expect(codes.has('INLMEM')).toBe(true); // inland rail ramp
+  });
+
+  it('exposes the newly-added metros as their own standalone display hubs', () => {
+    for (const code of ['USMOB', 'USTPA', 'INLOMA', 'INLCLT', 'INLSAS', 'INLREG']) {
+      const g = portGroupByCode(code);
+      expect(g?.memberCodes).toEqual([code]);
+    }
+  });
+});
+
+describe('ALL_HUBS — corrected seaport coordinates (must match terminals.ts)', () => {
+  const hubByCode = new Map(ALL_HUBS.map((h) => [h.code, h]));
+  it('carries the five fixed container-terminal coordinates', () => {
+    expect(hubByCode.get('USNYC')).toMatchObject({ lat: 40.6816, lng: -74.1505 });
+    expect(hubByCode.get('USSAV')).toMatchObject({ lat: 32.121, lng: -81.135 });
+    expect(hubByCode.get('USHOU')).toMatchObject({ lat: 29.6819, lng: -94.9983 });
+    expect(hubByCode.get('USBAL')).toMatchObject({ lat: 39.2592, lng: -76.5436 });
+    expect(hubByCode.get('USCHS')).toMatchObject({ lat: 32.848, lng: -79.873 });
   });
 });
 

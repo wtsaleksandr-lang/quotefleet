@@ -33,14 +33,20 @@ export interface ContainerPort {
 export const CONTAINER_PORTS: readonly ContainerPort[] = [
   { code: 'USLAX', name: 'Port of Los Angeles', city: 'Los Angeles', state: 'CA', country: 'US', lat: 33.7395, lng: -118.2597 },
   { code: 'USLGB', name: 'Port of Long Beach', city: 'Long Beach', state: 'CA', country: 'US', lat: 33.755, lng: -118.216 },
-  { code: 'USNYC', name: 'Port of New York & New Jersey', city: 'Newark', state: 'NJ', country: 'US', lat: 40.6626, lng: -74.045 },
-  { code: 'USHOU', name: 'Port of Houston', city: 'Houston', state: 'TX', country: 'US', lat: 29.7264, lng: -95.227 },
-  { code: 'USSAV', name: 'Port of Savannah', city: 'Savannah', state: 'GA', country: 'US', lat: 32.0835, lng: -81.0998 },
+  // Coords must match terminals.ts (duplicated) so ALL_HUBS dedup stays exact.
+  // FIX: was 40.6626,-74.045 (Bayonne/Upper Bay) → Port Newark-Elizabeth container complex.
+  { code: 'USNYC', name: 'Port of New York & New Jersey', city: 'Newark', state: 'NJ', country: 'US', lat: 40.6816, lng: -74.1505 },
+  // FIX: was 29.7264,-95.227 (Turning Basin) → Barbours Cut Container Terminal.
+  { code: 'USHOU', name: 'Port of Houston', city: 'Houston', state: 'TX', country: 'US', lat: 29.6819, lng: -94.9983 },
+  // FIX: was 32.0835,-81.0998 (downtown Savannah) → Garden City Terminal.
+  { code: 'USSAV', name: 'Port of Savannah', city: 'Savannah', state: 'GA', country: 'US', lat: 32.121, lng: -81.135 },
   { code: 'USSEA', name: 'Northwest Seaport Alliance (Seattle/Tacoma)', city: 'Seattle', state: 'WA', country: 'US', lat: 47.5952, lng: -122.3316 },
-  { code: 'USCHS', name: 'Port of Charleston', city: 'Charleston', state: 'SC', country: 'US', lat: 32.81, lng: -79.92 },
+  // FIX: was 32.81,-79.92 (downtown Charleston) → Wando Welch Terminal.
+  { code: 'USCHS', name: 'Port of Charleston', city: 'Charleston', state: 'SC', country: 'US', lat: 32.848, lng: -79.873 },
   { code: 'USORF', name: 'Port of Virginia (Norfolk)', city: 'Norfolk', state: 'VA', country: 'US', lat: 36.873, lng: -76.33 },
   { code: 'USCHI', name: 'Chicago Intermodal Hub', city: 'Chicago', state: 'IL', country: 'US', lat: 41.837, lng: -87.67 },
-  { code: 'USBAL', name: 'Port of Baltimore', city: 'Baltimore', state: 'MD', country: 'US', lat: 39.24, lng: -76.57 },
+  // FIX: was 39.24,-76.57 → Seagirt Marine Terminal.
+  { code: 'USBAL', name: 'Port of Baltimore', city: 'Baltimore', state: 'MD', country: 'US', lat: 39.2592, lng: -76.5436 },
   { code: 'USMIA', name: 'Port of Miami (PortMiami)', city: 'Miami', state: 'FL', country: 'US', lat: 25.778, lng: -80.174 },
 ];
 
@@ -247,12 +253,27 @@ function haversineMiles(aLat: number, aLng: number, bLat: number, bLng: number):
 }
 
 /**
+ * Max distance (miles) a carrier may sit from a hub and still be considered to
+ * serve it. Drayage/intermodal is regional-to-local port work, so a carrier
+ * hundreds of miles from every hub is NOT a drayage provider for any of them —
+ * mapping it to the "nearest" one anyway is what put Phoenix/Mesa AZ carriers
+ * under the Los Angeles / Long Beach filter (~356 mi away) before the Phoenix
+ * hub existed. Beyond this radius we return null so the carrier appears under NO
+ * port facet rather than a misleading distant one. 250 mi keeps legitimate
+ * regional ramp-drayage (which can run 150–200 mi to an inland terminal) while
+ * cutting cross-region mismatches; with the denser 61-hub set most real carriers
+ * sit well inside it.
+ */
+export const MAX_HUB_RADIUS_MI = 250;
+
+/**
  * Resolve the nearest US hub code to a lat/lng — the nearest of the coastal
- * seaport gateways OR the inland rail-intermodal metros (US_HUBS). Never null.
- * A carrier near a coast still maps to its seaport; an interior carrier maps to
+ * seaport gateways OR the inland rail-intermodal metros (US_HUBS). Returns null
+ * when the nearest hub is farther than MAX_HUB_RADIUS_MI (the carrier serves no
+ * hub). A carrier near a coast maps to its seaport; an interior carrier maps to
  * its nearest inland ramp (e.g. Columbus → INLCMH, Memphis → INLMEM).
  */
-export function nearestPortToPoint(lat: number, lng: number): string {
+export function nearestPortToPoint(lat: number, lng: number): string | null {
   let best = US_HUBS[0].code;
   let bestD = Infinity;
   for (const p of US_HUBS) {
@@ -262,7 +283,7 @@ export function nearestPortToPoint(lat: number, lng: number): string {
       best = p.code;
     }
   }
-  return best;
+  return bestD <= MAX_HUB_RADIUS_MI ? best : null;
 }
 
 /**

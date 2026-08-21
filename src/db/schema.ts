@@ -1948,6 +1948,15 @@ export const directoryTerminals = pgTable(
     type: text('type').notNull(),
     lat: doublePrecision('lat').notNull(),
     lng: doublePrecision('lng').notNull(),
+    /** Primary-facility street address for the metro's anchor terminal — the
+     *  specific marine terminal / rail ramp (e.g. "Garden City Terminal, 2 Main
+     *  St, Garden City, GA 31408"). Nullable: some inland metros are seeded as a
+     *  multi-carrier anchor with no single facility address. Lets calculators
+     *  auto-fill a real terminal address from a port/hub code. */
+    address: text('address'),
+    /** Port-authority / Class-I rail operator of the anchor facility (e.g.
+     *  "Georgia Ports Authority", "BNSF / UP / NS / CSX"). Nullable. */
+    operator: text('operator'),
     createdAt: timestamp('created_at', { mode: 'date' }).notNull().defaultNow(),
     updatedAt: timestamp('updated_at', { mode: 'date' }).notNull().defaultNow(),
   },
