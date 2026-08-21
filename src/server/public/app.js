@@ -855,6 +855,37 @@
   }
 
   // ── Overview ──────────────────────────────────────────────────
+  // "Refer & earn" card for the overview — the logged-in tenant's referral link
+  // + copy button + simple stats. Reads GET /api/tenant/referral. Fails quietly
+  // (removes itself) so a referral outage never breaks the dashboard.
+  function renderReferralCard(host) {
+    api('/api/tenant/referral').then(function (r) {
+      if (!r || !r.link) { host.remove(); return; }
+      var months = r.freeMonthsPerReferral || 1;
+      var card = el('div', { class: 'card', style: { margin: '32px 0 0', padding: '20px' } });
+      card.appendChild(el('h2', { text: 'Refer & earn — ' + months + ' free month' + (months === 1 ? '' : 's') + ' per referral', style: { margin: '0 0 4px', fontSize: '18px' } }));
+      card.appendChild(el('div', { class: 'muted-small', style: { margin: '0 0 14px' }, text: 'Share your link with another carrier. They get a 30-day trial + 20% off their first 3 months; you get a free month for each one that becomes a paying customer.' }));
+      var box = el('div', { style: { display: 'flex', gap: '8px', alignItems: 'stretch', flexWrap: 'wrap' } });
+      var input = el('input', { class: 'input', style: { flex: '1 1 260px', fontFamily: 'var(--font-mono)', fontSize: '13px' } });
+      input.value = r.link; input.readOnly = true;
+      input.addEventListener('focus', function () { input.select(); });
+      var copyBtn = el('button', { class: 'btn btn-secondary', type: 'button', text: 'Copy link', style: { flex: '0 0 auto' } });
+      copyBtn.addEventListener('click', function () {
+        copyText(r.link).then(function () { copyBtn.textContent = 'Copied ✓'; toastOk('Referral link copied'); setTimeout(function () { copyBtn.textContent = 'Copy link'; }, 1500); });
+      });
+      box.appendChild(input); box.appendChild(copyBtn);
+      card.appendChild(box);
+      var s = r.stats || {};
+      var stats = el('div', { class: 'muted-small', style: { display: 'flex', gap: '24px', flexWrap: 'wrap', marginTop: '14px' } });
+      stats.appendChild(el('span', { html: '<strong>' + (s.clicks || 0) + '</strong> clicks' }));
+      stats.appendChild(el('span', { html: '<strong>' + (s.signups || 0) + '</strong> signups' }));
+      stats.appendChild(el('span', { html: '<strong>' + (s.creditsPendingMonths || 0) + '</strong> free month' + ((s.creditsPendingMonths || 0) === 1 ? '' : 's') + ' pending' }));
+      if (s.creditsAppliedMonths) stats.appendChild(el('span', { html: '<strong>' + s.creditsAppliedMonths + '</strong> applied' }));
+      card.appendChild(stats);
+      host.appendChild(card);
+    }).catch(function () { host.remove(); });
+  }
+
   function renderOverview(c) {
     Promise.all([
       api('/api/tenant/overview'),
@@ -897,6 +928,12 @@
       var kpiSection = el('div', { class: 'qf-kpi-section' });
       c.appendChild(kpiSection);
       renderKpiBlock(kpiSection, d);
+
+      // Refer & earn — 1 free month per referral. Injected async so a slow/failed
+      // referral fetch never blocks the overview render.
+      var referSection = el('div', {});
+      c.appendChild(referSection);
+      renderReferralCard(referSection);
 
       c.appendChild(el('h2', { text: 'Recent leads', style: { marginTop: '32px' } }));
       if (!d.recentLeads.length) {

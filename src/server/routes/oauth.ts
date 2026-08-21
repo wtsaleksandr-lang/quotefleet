@@ -36,6 +36,7 @@ import { hashPassword } from '../../auth/password.js';
 import { createSession } from '../../auth/session.js';
 import { setCookie, CURRENT_DPA_VERSION } from './auth.js';
 import { deriveAvailableSlug, provisionTrialTenant } from './tenantProvision.js';
+import { linkReferralOnSignup } from '../affiliate/attribution.js';
 import {
   OAUTH_PROVIDER_LABELS,
   buildAuthorizeUrl,
@@ -140,7 +141,7 @@ export function registerOAuthRoutes(app: Express) {
       return res.redirect('/login?oauth_error=exchange_failed');
     }
 
-    return resolveOAuthAndLogin(res, provider, profile);
+    return resolveOAuthAndLogin(req, res, provider, profile);
   });
 
   /** Callback (POST): Sign in with Apple. Apple sends response_mode=form_post,
@@ -189,7 +190,7 @@ export function registerOAuthRoutes(app: Express) {
       return res.redirect('/login?oauth_error=exchange_failed');
     }
 
-    return resolveOAuthAndLogin(res, 'apple', profile);
+    return resolveOAuthAndLogin(req, res, 'apple', profile);
   });
 }
 
@@ -201,6 +202,7 @@ export function registerOAuthRoutes(app: Express) {
  *   3. No match                       → OAuth SIGNUP: new trial tenant + owner.
  */
 async function resolveOAuthAndLogin(
+  req: Request,
   res: Response,
   provider: OAuthProviderId,
   profile: OAuthProfile
@@ -249,6 +251,10 @@ async function resolveOAuthAndLogin(
         slug,
         oauth: { column: subColumnName(provider), sub: profile.sub },
       });
+      // Referral/affiliate attribution for OAuth signups (same as password
+      // signup): link a pending `?ref` click, apply referee reward, ignore
+      // self-referral. Non-fatal.
+      await linkReferralOnSignup({ req, tenantId: result.tenantId, signupEmail: profile.email });
       return await loginAndRedirect(res, result.userId, 'tenant_owner');
     } catch (err) {
       // Race: another tab/retry may have created the account between our

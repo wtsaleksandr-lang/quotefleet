@@ -27,6 +27,7 @@ const baseT: Tenant = {
   contactPhone: null,
   countryFocus: 'US',
   embedToken: 'tok',
+  referralCode: null,
   ingestEmailToken: null,
   ingestTrustedSendersJson: [],
   plan: 'free',

@@ -36,6 +36,8 @@ import { DEFAULT_QUOTE_DISCLAIMER } from '../quoteDisclaimer.js';
 import { getTrialState, type TrialState } from '../trialGating.js';
 import { magicLinkLimiter, signupLimiter, loginLimiter } from '../rateLimits.js';
 import { parsePaidPlan } from '../plans.js';
+import { linkReferralOnSignup } from '../affiliate/attribution.js';
+import { REFEREE_TRIAL_DAYS } from '../affiliate/programs.js';
 
 /** Current DPA version published at /dpa. Bumped when the DPA's
  *  substantive terms change; existing tenants are forced to re-accept
@@ -227,8 +229,21 @@ export function registerAuthRoutes(app: Express) {
       }
       return res.status(500).json({ error: 'Failed to create account. Try again.' });
     }
-    const trialEndsAt = result.trialEndsAt;
+    let trialEndsAt = result.trialEndsAt;
     const embedToken = result.embedToken;
+
+    // Referral/affiliate attribution: link any pending `?ref` click to this new
+    // tenant, apply the referee reward (peer referrals → 30-day trial + queued
+    // referrer credit) and ignore self-referral. Non-fatal — never blocks signup.
+    const referral = await linkReferralOnSignup({
+      req,
+      tenantId: result.tenantId,
+      signupEmail: email,
+    });
+    if (referral?.kind === 'referral') {
+      // Mirror the extended trial the linker wrote to the DB into the response.
+      trialEndsAt = new Date(Date.now() + REFEREE_TRIAL_DAYS * 24 * 60 * 60 * 1000);
+    }
 
     const token = await createSession(result.userId);
     setCookie(res, token);
