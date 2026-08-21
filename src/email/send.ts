@@ -166,8 +166,37 @@ export interface EmailOut {
   error?: string;
 }
 
+/**
+ * RFC 2606 / RFC 6761 reserved domains that can NEVER receive real mail:
+ * example.com/.net/.org (and any subdomain), and the reserved TLDs .test,
+ * .example, .invalid, .localhost. A placeholder/test tenant with such an
+ * address (e.g. `qf-verify+abc@example.com`) is otherwise driven all the way
+ * through Resend (→ HTTP 422 "use a testing address") and the SMTP fallback
+ * (→ a bounce), producing an alarming `[email] all providers failed` stack that
+ * reads like an outage even though real delivery is unaffected. A send to one
+ * of these is a guaranteed non-delivery, so we treat it as a logged no-op.
+ */
+export function isUndeliverableReservedRecipient(to: string): boolean {
+  const domain = String(to || '').trim().toLowerCase().split('@')[1] ?? '';
+  if (!domain) return false;
+  const tld = domain.split('.').pop() ?? '';
+  if (tld === 'test' || tld === 'example' || tld === 'invalid' || tld === 'localhost') return true;
+  // example.com / example.net / example.org and any subdomain of them.
+  return /(^|\.)example\.(com|net|org)$/.test(domain);
+}
+
 export async function sendEmail(msg: EmailIn): Promise<EmailOut> {
   const env = loadEnv();
+
+  // Skip reserved/test-domain recipients (RFC 2606/6761) BEFORE touching any
+  // provider — they can never be delivered, so attempting a real send only
+  // burns provider quota and emits misleading "all providers failed" errors.
+  if (isUndeliverableReservedRecipient(msg.to)) {
+    console.log(
+      `[email] skipped reserved/test-domain recipient <${msg.to}> — RFC 2606/6761, never deliverable (no-op)`,
+    );
+    return { ok: true, logged: true, provider: 'stdout' };
+  }
 
   // Present only for marketing/lifecycle sends; null for transactional email.
   const listHeaders = unsubscribeHeaders(msg.listUnsubscribeUrl);
