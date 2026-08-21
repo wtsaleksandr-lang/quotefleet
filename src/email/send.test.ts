@@ -403,3 +403,36 @@ describe('brandedFrom', () => {
     expect(brandedFrom('')).toBe('QuoteFleet <hello@quotefleet.net>');
   });
 });
+
+describe('isUndeliverableReservedRecipient — RFC 2606/6761 guard', () => {
+  it('flags reserved/test domains (never deliverable)', async () => {
+    const { isUndeliverableReservedRecipient: r } = await import('./send.js');
+    expect(r('qf-verify+gtwo17@example.com')).toBe(true);
+    expect(r('user@example.net')).toBe(true);
+    expect(r('user@example.org')).toBe(true);
+    expect(r('user@rates.example.com')).toBe(true); // subdomain
+    expect(r('user@foo.test')).toBe(true);
+    expect(r('user@bar.invalid')).toBe(true);
+    expect(r('root@localhost')).toBe(true);
+    expect(r('user@anything.localhost')).toBe(true);
+    expect(r('DEV@Example.COM')).toBe(true); // case-insensitive
+  });
+
+  it('passes real deliverable domains through', async () => {
+    const { isUndeliverableReservedRecipient: r } = await import('./send.js');
+    expect(r('owner@smithplumbing.com')).toBe(false);
+    expect(r('dispatch@quotefleet.net')).toBe(false);
+    expect(r('a@gmail.com')).toBe(false);
+    expect(r('')).toBe(false);
+    expect(r('not-an-email')).toBe(false);
+  });
+
+  it('sendEmail no-ops a reserved-domain recipient without touching any provider', async () => {
+    const { sendEmail } = await import('./send.js');
+    mockSendMail.mockClear();
+    const out = await sendEmail({ to: 'qf-verify+abc@example.com', subject: 'Welcome', text: 'hi' });
+    expect(out.ok).toBe(true);
+    expect(out.logged).toBe(true);
+    expect(mockSendMail).not.toHaveBeenCalled(); // SMTP fallback never attempted
+  });
+});
