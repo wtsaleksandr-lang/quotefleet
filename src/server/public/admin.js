@@ -68,6 +68,7 @@
     if (r === 'overview') return renderOverview(c);
     if (r === 'tenants') return renderTenants(c);
     if (r === 'outreach') return renderOutreach(c);
+    if (r === 'affiliates') return renderAffiliates(c);
     if (r.indexOf('tenants/') === 0) return renderTenantDetail(c, r.split('/')[1]);
   }
 
@@ -377,6 +378,136 @@
       c.innerHTML = '';
       c.appendChild(el('div', { class: 'notice error', text: err.message }));
     });
+  }
+
+  // ── Affiliates — operator view over the self-serve affiliate program. ──
+  // List + per-affiliate stats, with inline Activate/Suspend, a tier select and
+  // a commission-rate edit that PATCH /api/admin/affiliates/:id and refresh the
+  // list in place. Mirrors the tenant table/field idiom + existing CSS classes.
+  function renderAffiliates(c) {
+    var currentStatus = '';
+
+    function pct(rate) { return (Number(rate) * 100).toFixed(0) + '%'; }
+
+    function patchAffiliate(id, body) {
+      return api('/api/admin/affiliates/' + encodeURIComponent(id), { method: 'PATCH', body: body })
+        .then(function () { load(); })
+        .catch(function (e) { alert(e.message); });
+    }
+
+    function renderTable(wrap, d) {
+      wrap.innerHTML = '';
+      var list = (d && d.data) || [];
+      wrap.appendChild(el('p', { class: 'page-sub', text: (d.total || 0) + ' affiliate' + ((d.total === 1) ? '' : 's') }));
+      if (!list.length) {
+        wrap.appendChild(el('div', { class: 'muted', text: 'No affiliates yet.' }));
+        return;
+      }
+      var tbl = el('table', { class: 'table' });
+      tbl.appendChild(el('thead', { html: '<tr><th>Affiliate</th><th>Code</th><th>Tier</th><th>Status</th><th>Rate</th><th>Clicks / Signups</th><th>Commission</th></tr>' }));
+      var tb = el('tbody');
+      tbl.appendChild(tb);
+
+      list.forEach(function (a) {
+        // Affiliate identity cell (name + email).
+        var idCell = el('div');
+        idCell.appendChild(document.createTextNode(a.name || '—'));
+        idCell.appendChild(el('br'));
+        idCell.appendChild(muted(a.email || ''));
+
+        // Tier select.
+        var tierSel = el('select', { class: 'select' });
+        ['base', 'pro', 'partner'].forEach(function (o) {
+          var op = document.createElement('option');
+          op.value = o; op.textContent = o;
+          if (a.tier === o) op.selected = true;
+          tierSel.appendChild(op);
+        });
+        tierSel.addEventListener('change', function () { patchAffiliate(a.id, { tier: tierSel.value }); });
+
+        // Status badge + Activate / Suspend actions.
+        var statusCell = el('div', { style: { display: 'flex', gap: '6px', flexWrap: 'wrap', alignItems: 'center' } });
+        statusCell.appendChild(badge(a.status, a.status === 'active' ? 'badge-success' : (a.status === 'suspended' ? 'badge-error' : 'badge-muted')));
+        if (a.status !== 'active') {
+          var actBtn = el('button', { class: 'btn btn-secondary', type: 'button', text: 'Activate', style: { padding: '4px 10px' } });
+          actBtn.addEventListener('click', function () { patchAffiliate(a.id, { status: 'active' }); });
+          statusCell.appendChild(actBtn);
+        }
+        if (a.status !== 'suspended') {
+          var suspBtn = el('button', { class: 'btn btn-secondary', type: 'button', text: 'Suspend', style: { padding: '4px 10px' } });
+          suspBtn.addEventListener('click', function () { patchAffiliate(a.id, { status: 'suspended' }); });
+          statusCell.appendChild(suspBtn);
+        }
+
+        // Commission-rate edit (stored as a fraction; edited as a percent 0–100).
+        var rateInput = el('input', {
+          class: 'input',
+          type: 'number',
+          min: '0', max: '100', step: '1',
+          value: String(Math.round(Number(a.commissionRate) * 100)),
+          style: { width: '72px' },
+        });
+        function commitRate() {
+          var pctVal = parseFloat(rateInput.value);
+          if (isNaN(pctVal)) { rateInput.value = String(Math.round(Number(a.commissionRate) * 100)); return; }
+          var frac = Math.max(0, Math.min(1, pctVal / 100));
+          if (frac === Number(a.commissionRate)) return; // no-op
+          patchAffiliate(a.id, { commissionRate: frac });
+        }
+        rateInput.addEventListener('blur', commitRate);
+        rateInput.addEventListener('keydown', function (ev) { if (ev.key === 'Enter') { ev.preventDefault(); rateInput.blur(); } });
+        var rateCell = el('div', { style: { display: 'flex', gap: '4px', alignItems: 'center' } }, [rateInput, el('span', { class: 'muted-small', text: '%' })]);
+
+        var commCell = el('div');
+        commCell.appendChild(document.createTextNode(fmtMoney((a.pendingCents || 0) / 100) + ' pending'));
+        commCell.appendChild(el('br'));
+        commCell.appendChild(muted(fmtMoney((a.paidCents || 0) / 100) + ' paid'));
+
+        row(tb, [
+          idCell,
+          el('strong', { text: a.code || '' }),
+          tierSel,
+          statusCell,
+          rateCell,
+          String(a.clicks || 0) + ' / ' + String(a.signups || 0),
+          commCell,
+        ]);
+      });
+      wrap.appendChild(tbl);
+    }
+
+    function load() {
+      c.innerHTML = '';
+      c.appendChild(el('h1', { text: 'Affiliates' }));
+
+      // Status filter.
+      var filter = el('div', { class: 'field', style: { maxWidth: '220px', marginBottom: '12px' } });
+      filter.appendChild(el('label', { class: 'field-label', text: 'Filter by status' }));
+      var fsel = el('select', { class: 'select' });
+      [['', 'All'], ['pending', 'Pending'], ['active', 'Active'], ['suspended', 'Suspended']].forEach(function (o) {
+        var op = document.createElement('option');
+        op.value = o[0]; op.textContent = o[1];
+        if (currentStatus === o[0]) op.selected = true;
+        fsel.appendChild(op);
+      });
+      fsel.addEventListener('change', function () { currentStatus = fsel.value; load(); });
+      filter.appendChild(fsel);
+      c.appendChild(filter);
+
+      var wrap = el('div');
+      wrap.appendChild(el('div', { class: 'muted', text: 'Loading…' }));
+      c.appendChild(wrap);
+
+      var q = currentStatus ? ('?status=' + encodeURIComponent(currentStatus)) : '';
+      api('/api/admin/affiliates' + q)
+        .then(function (d) { renderTable(wrap, d); })
+        .catch(function (err) {
+          wrap.innerHTML = '';
+          wrap.appendChild(el('div', { class: 'notice error', text: err.message }));
+        });
+    }
+
+    load();
   }
 
   function renderTenantDetail(c, slug) {

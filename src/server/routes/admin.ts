@@ -9,10 +9,10 @@
  *                                         (does not change session — frontend stores slug)
  */
 import type { Express } from 'express';
-import { eq, desc, sql } from 'drizzle-orm';
+import { eq, desc, sql, and, inArray } from 'drizzle-orm';
 import { z } from 'zod';
 import { db } from '../../db/client.js';
-import { tenants, leads, users, auditLog, carrierDirectory, carrierOverrides, type NewCarrierOverrideRow } from '../../db/schema.js';
+import { tenants, leads, users, auditLog, carrierDirectory, carrierOverrides, affiliates, referralAttributions, affiliateCommissions, type NewCarrierOverrideRow } from '../../db/schema.js';
 import { requireAuth, requireSuperAdmin } from '../middleware.js';
 import { runAggregatesNow } from '../../marketplace/cron.js';
 import { normalizeDot } from '../directory/carrierIngest.js';
@@ -382,6 +382,141 @@ export async function upsertCarrierOverride(opts: {
   return { status: 200, json: { ok: true, override: upserted[0] ?? null } };
 }
 
+// ════════════════════════════════════════════════════════════════════
+// AFFILIATE ADMIN — operator view over the self-serve affiliate program.
+//   - GET   /api/admin/affiliates          — list + per-affiliate stats
+//   - PATCH /api/admin/affiliates/:id       — status / tier / commissionRate
+// Self-serve affiliates are created active; this is the only surface to
+// suspend one, grant the hand-negotiated `partner` tier, or override the
+// denormalized commission rate. Mirrors patchTenantAdmin's shape.
+// ════════════════════════════════════════════════════════════════════
+
+/** Affiliate lifecycle states (schema.ts: affiliates.status). */
+export const AFFILIATE_STATUS_VALUES = ['pending', 'active', 'suspended'] as const;
+/** Commission tiers (schema.ts: affiliates.tier). 'partner' is granted here. */
+export const AFFILIATE_TIER_VALUES = ['base', 'pro', 'partner'] as const;
+
+/**
+ * Schema for the affiliate PATCH. `status`/`tier` are enum-validated against
+ * the ACTUAL accepted values; `commissionRate` is a fraction in [0,1] (0.25 =
+ * 25%). All optional (partial PATCH), but at least one field must be present —
+ * an empty body is a clean 400.
+ */
+const AdminAffiliatePatch = z
+  .object({
+    status: z.enum(AFFILIATE_STATUS_VALUES).optional(),
+    tier: z.enum(AFFILIATE_TIER_VALUES).optional(),
+    commissionRate: z.number().min(0).max(1).optional(),
+  })
+  .refine((d) => Object.values(d).some((v) => v !== undefined), {
+    message: 'At least one of status, tier, commissionRate is required.',
+  });
+export type AdminAffiliatePatch = z.infer<typeof AdminAffiliatePatch>;
+
+/** The subset of an affiliate row the diff planner needs. */
+export interface AffiliateBefore {
+  status: string;
+  tier: string;
+  commissionRate: number;
+}
+
+export type AffiliatePatchPlan =
+  | { ok: false; status: number; json: Record<string, unknown> }
+  | {
+      ok: true;
+      set: Record<string, unknown>;
+      changed: Record<string, { before: unknown; after: unknown }>;
+    };
+
+/**
+ * PURE core of the affiliate PATCH: Zod-validates the body, then computes the
+ * before→after diff so ONLY genuinely-changed columns are written and audited.
+ * No DB, no IO — unit-testable in isolation (same idea as computeMrr).
+ *
+ *  - Invalid body (bad enum / rate out of [0,1] / no fields) → 400.
+ *  - A body whose values all equal the current row → 400 (nothing to change).
+ *  - Otherwise → { set, changed } where both cover exactly the differing fields.
+ */
+export function planAffiliateUpdate(before: AffiliateBefore, body: unknown): AffiliatePatchPlan {
+  const parse = AdminAffiliatePatch.safeParse(body);
+  if (!parse.success) {
+    return { ok: false, status: 400, json: { error: 'Invalid input', details: parse.error.flatten() } };
+  }
+  const data = parse.data;
+  const set: Record<string, unknown> = {};
+  const changed: Record<string, { before: unknown; after: unknown }> = {};
+  for (const key of Object.keys(data) as (keyof typeof data)[]) {
+    const next = data[key];
+    if (next === undefined) continue;
+    const cur = (before as unknown as Record<string, unknown>)[key];
+    if (cur !== next) {
+      set[key] = next;
+      changed[key] = { before: cur, after: next };
+    }
+  }
+  if (Object.keys(set).length === 0) {
+    return { ok: false, status: 400, json: { error: 'No changes — submitted values match the current ones.' } };
+  }
+  return { ok: true, set, changed };
+}
+
+/**
+ * Core of `PATCH /api/admin/affiliates/:id`, extracted so it is unit-testable
+ * against a mocked db (same pattern as `patchTenantAdmin`). Returns `{ status,
+ * json }`.
+ *
+ *  - Non-numeric id → 400.
+ *  - id that matches 0 rows → 404 (no silent success).
+ *  - Validation + diff via `planAffiliateUpdate`; invalid / no-op → its status.
+ *  - On success, writes ONLY the changed columns and an `affiliate.update` audit
+ *    row (before→after), scoped to the affiliate's owner tenant when known.
+ */
+export async function patchAffiliateAdmin(opts: {
+  id: string | number;
+  body: unknown;
+  actorUserId?: number | null;
+}): Promise<{ status: number; json: Record<string, unknown> }> {
+  const id = Number(opts.id);
+  if (!Number.isInteger(id) || id <= 0) {
+    return { status: 400, json: { error: 'Invalid affiliate id.' } };
+  }
+
+  // Load current row: existence check (404) + before-values for the diff/audit.
+  const existing = await db().select().from(affiliates).where(eq(affiliates.id, id)).limit(1);
+  const before = existing[0] as Record<string, unknown> | undefined;
+  if (!before) {
+    return { status: 404, json: { error: `No affiliate with id '${id}'.` } };
+  }
+
+  const plan = planAffiliateUpdate(
+    {
+      status: before.status as string,
+      tier: before.tier as string,
+      commissionRate: before.commissionRate as number,
+    },
+    opts.body
+  );
+  if (!plan.ok) return { status: plan.status, json: plan.json };
+
+  const updated = await db()
+    .update(affiliates)
+    .set({ ...plan.set, updatedAt: new Date() })
+    .where(eq(affiliates.id, id))
+    .returning();
+  if (updated.length === 0) {
+    return { status: 404, json: { error: `No affiliate with id '${id}'.` } };
+  }
+
+  await recordAdminAudit(
+    (before.ownerTenantId as number | null) ?? null,
+    opts.actorUserId,
+    'affiliate.update',
+    { affiliateId: id, code: before.code, changed: plan.changed }
+  );
+
+  return { status: 200, json: { ok: true, affiliate: updated[0] } };
+}
+
 export function registerAdminRoutes(app: Express) {
   app.get('/api/admin/tenants', requireAuth, requireSuperAdmin, async (_req, res) => {
     const rows = await db().select().from(tenants).orderBy(desc(tenants.createdAt));
@@ -474,6 +609,110 @@ export function registerAdminRoutes(app: Express) {
       actorLabel: req.user?.email ?? null,
     });
     res.status(result.status).json(result.json);
+  });
+
+  // ── AFFILIATES — list with per-affiliate stats. ──────────────────────
+  // One page query + one count + two GROUP-BY aggregates over ONLY the page's
+  // codes/ids → no N+1 regardless of page size. `?status=` filters the list;
+  // `limit`/`offset` paginate. Returns `{ data, total }`.
+  app.get('/api/admin/affiliates', requireAuth, requireSuperAdmin, async (req, res) => {
+    try {
+      const statusRaw = String(req.query.status ?? '').trim();
+      const statusFilter = (AFFILIATE_STATUS_VALUES as readonly string[]).includes(statusRaw)
+        ? statusRaw
+        : null;
+      const limit = Math.min(Math.max(Number(req.query.limit) || 50, 1), 200);
+      const offset = Math.max(Number(req.query.offset) || 0, 0);
+      const whereClause = statusFilter ? eq(affiliates.status, statusFilter) : undefined;
+
+      const [page, totalRows] = await Promise.all([
+        db()
+          .select({
+            id: affiliates.id,
+            email: affiliates.email,
+            name: affiliates.name,
+            code: affiliates.code,
+            tier: affiliates.tier,
+            status: affiliates.status,
+            commissionRate: affiliates.commissionRate,
+            payoutMethod: affiliates.payoutMethod,
+            createdAt: affiliates.createdAt,
+          })
+          .from(affiliates)
+          .where(whereClause)
+          .orderBy(desc(affiliates.createdAt))
+          .limit(limit)
+          .offset(offset),
+        db().select({ n: sql<number>`count(*)::int` }).from(affiliates).where(whereClause),
+      ]);
+
+      const codes = page.map((a) => a.code);
+      const ids = page.map((a) => a.id);
+
+      // Attribution stats keyed by code (denormalized in referral_attributions);
+      // signups = attributions that linked to a signed-up tenant.
+      const attrRows = codes.length
+        ? await db()
+            .select({
+              code: referralAttributions.code,
+              clicks: sql<number>`count(*)::int`,
+              signups: sql<number>`count(${referralAttributions.referredTenantId})::int`,
+            })
+            .from(referralAttributions)
+            .where(
+              and(inArray(referralAttributions.code, codes), eq(referralAttributions.kind, 'affiliate'))
+            )
+            .groupBy(referralAttributions.code)
+        : [];
+      const attrByCode = new Map(attrRows.map((r) => [r.code, r]));
+
+      // Commission cents keyed by affiliate id — pending (not yet paid) vs paid.
+      const commRows = ids.length
+        ? await db()
+            .select({
+              affiliateId: affiliateCommissions.affiliateId,
+              pendingCents: sql<number>`coalesce(sum(case when ${affiliateCommissions.status} <> 'paid' then ${affiliateCommissions.amountCents} else 0 end), 0)::int`,
+              paidCents: sql<number>`coalesce(sum(case when ${affiliateCommissions.status} = 'paid' then ${affiliateCommissions.amountCents} else 0 end), 0)::int`,
+            })
+            .from(affiliateCommissions)
+            .where(inArray(affiliateCommissions.affiliateId, ids))
+            .groupBy(affiliateCommissions.affiliateId)
+        : [];
+      const commById = new Map(commRows.map((r) => [r.affiliateId, r]));
+
+      const data = page.map((a) => {
+        const at = attrByCode.get(a.code);
+        const cm = commById.get(a.id);
+        return {
+          ...a,
+          clicks: at?.clicks ?? 0,
+          signups: at?.signups ?? 0,
+          pendingCents: cm?.pendingCents ?? 0,
+          paidCents: cm?.paidCents ?? 0,
+        };
+      });
+
+      res.json({ data, total: totalRows[0]?.n ?? 0 });
+    } catch (err) {
+      console.error('[admin] list affiliates failed:', err);
+      res.status(500).json({ error: 'Failed to list affiliates' });
+    }
+  });
+
+  // Update an affiliate's status / tier / commissionRate. Never throws to the
+  // client — a DB failure is logged and returned as a clean 500.
+  app.patch('/api/admin/affiliates/:id', requireAuth, requireSuperAdmin, async (req, res) => {
+    try {
+      const result = await patchAffiliateAdmin({
+        id: String(req.params.id),
+        body: req.body,
+        actorUserId: req.user?.id ?? null,
+      });
+      res.status(result.status).json(result.json);
+    } catch (err) {
+      console.error('[admin] patch affiliate failed:', err);
+      res.status(500).json({ error: 'Failed to update affiliate' });
+    }
   });
 
   app.get('/api/admin/stats', requireAuth, requireSuperAdmin, async (_req, res) => {
