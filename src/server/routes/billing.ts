@@ -37,6 +37,7 @@ import {
   TRIAL_DAYS,
 } from '../plans.js';
 import { isDepositSession, handleDepositCheckoutCompleted } from './depositCharge.js';
+import { runReferralFulfillmentForInvoice } from '../affiliate/fulfillment.js';
 
 let stripeClient: Stripe | null = null;
 function stripe(): Stripe {
@@ -514,6 +515,16 @@ export async function handleEvent(event: Stripe.Event): Promise<void> {
       if (!subscriptionId) return;
       const sub = await stripe().subscriptions.retrieve(subscriptionId);
       await applySubscription(sub);
+      // Close the referral/affiliate value loop: a REAL paid invoice means the
+      // referred tenant converted. Mark conversion, apply the referrer's queued
+      // free-month credit, and accrue the affiliate commission — all idempotent
+      // under Stripe's at-least-once delivery. Wrapped so it can NEVER break the
+      // webhook (it also never throws internally). See affiliate/fulfillment.ts.
+      try {
+        await runReferralFulfillmentForInvoice(invoice, stripe());
+      } catch (err) {
+        console.error('[billing.webhook] referral fulfillment failed (non-fatal):', err);
+      }
       return;
     }
     case 'customer.subscription.updated':
