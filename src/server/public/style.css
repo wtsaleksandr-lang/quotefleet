@@ -1496,3 +1496,9 @@ html[data-theme="light"] .site-footer strong { color: var(--ink); }
   .topnav-inner { gap: var(--space-1-5); }
   .topnav .topnav-cta .topnav-cta-label { display: none; }
 }
+
+/* Affiliate tier select — keep the tier label visible (not caret-only) on
+   narrow/mobile widths where the admin affiliates table scrolls horizontally. */
+.table .select.aff-tier {
+  min-width: 96px;
+}
