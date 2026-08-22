@@ -49,6 +49,8 @@ const RFQ_CSS = `
     border-radius: 4px; padding: 12px 22px; cursor: pointer; text-decoration: none;
   }
   .rfq-btn:hover { opacity: 0.92; }
+  .rfq-btn[disabled], .rfq-btn:disabled { opacity: 0.55; cursor: not-allowed; }
+  .rfq-btn[disabled]:hover, .rfq-btn:disabled:hover { opacity: 0.55; }
   .rfq-btn--ghost { background: transparent; color: var(--ink); border-color: var(--border-strong); }
   .rfq-btn--ghost:hover { background: var(--surface-2); }
   .rfq-linkbox { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; background: var(--surface-2); border: 1px solid var(--border); border-radius: 4px; padding: 14px 16px; margin: 12px 0 0; }
