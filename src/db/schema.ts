@@ -1888,6 +1888,21 @@ export interface CarrierCapabilities {
 }
 
 /**
+ * One carrier-DECLARED operating city/terminal metro, stored on a
+ * `carrier_overrides` row's `operating_locations` array.
+ *
+ * FMCSA public data gives a carrier ONE physical HQ location; a claimed carrier
+ * declares the additional metros it actually serves via the override system, and
+ * the profile renders them as an "Also operating in" list. Never fabricated —
+ * only what the carrier has declared. `state` is a 2-letter US/CA code.
+ */
+export interface CarrierOperatingLocation {
+  city: string;
+  /** Two-letter US state / CA province code (upper-cased). */
+  state: string;
+}
+
+/**
  * Human-editable OVERRIDES for a carrier card, keyed by USDOT.
  *
  * PROVENANCE LAYER. The nightly FMCSA re-ingest rewrites `carrier_directory`
@@ -1917,6 +1932,10 @@ export const carrierOverrides = pgTable('carrier_overrides', {
   hidden: boolean('hidden'),
   /** Self-declared credentials (UIIA / TWIC / bonded / reefer / transload / yard). */
   capabilities: jsonb('capabilities').$type<CarrierCapabilities>(),
+  /** Carrier-declared OTHER operating cities/terminals (metros beyond the single
+   *  FMCSA HQ). JSONB array of `{ city, state }`; null = none declared. Rendered
+   *  as the profile's "Also operating in" list — never fabricated. */
+  operatingLocations: jsonb('operating_locations').$type<CarrierOperatingLocation[]>(),
   updatedAt: timestamp('updated_at', { mode: 'date' }).notNull().defaultNow(),
   /** Actor identity (admin email / user id) that last wrote this override. */
   updatedBy: text('updated_by'),

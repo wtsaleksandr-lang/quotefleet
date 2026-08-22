@@ -59,6 +59,7 @@ function base(overrides: Partial<VisibleCarrier> = {}): VisibleCarrier {
     nearestPortCode: 'USSAV',
     aboutOverride: null,
     capabilities: {},
+    operatingLocations: [], // mirrors visibleCarrier() — the real base merge receives
     provenance: { about: 'fmcsa', email: 'fmcsa', phone: 'fmcsa', hidden: 'fmcsa', capabilities: 'fmcsa' },
     ...overrides,
   };
@@ -72,6 +73,7 @@ function override(o: Partial<CarrierOverrideRow> = {}): CarrierOverrideRow {
     phoneOverride: null,
     hidden: null,
     capabilities: null,
+    operatingLocations: null,
     updatedAt: new Date('2026-08-19T00:00:00Z'),
     updatedBy: 'admin@quotefleet.net',
     ...o,
@@ -139,6 +141,37 @@ describe('mergeCarrierOverride', () => {
     expect(b.contactHidden).toBe(false);
     expect(b.capabilities).toEqual({});
     expect(b.provenance).toEqual({ about: 'fmcsa', email: 'fmcsa', phone: 'fmcsa', hidden: 'fmcsa', capabilities: 'fmcsa' });
+  });
+
+  it('carries carrier-declared operatingLocations onto the card, normalizing state to upper-case', () => {
+    const out = mergeCarrierOverride(
+      base(),
+      override({ operatingLocations: [{ city: 'Atlanta', state: 'ga' }, { city: 'Jacksonville', state: 'FL' }] }),
+    );
+    expect(out.operatingLocations).toEqual([
+      { city: 'Atlanta', state: 'GA' },
+      { city: 'Jacksonville', state: 'FL' },
+    ]);
+  });
+
+  it('drops malformed operatingLocations entries (missing/blank city or state)', () => {
+    const out = mergeCarrierOverride(
+      base(),
+      override({
+        operatingLocations: [
+          { city: 'Memphis', state: 'TN' },
+          { city: '', state: 'TN' } as never,
+          { city: 'Nowhere', state: '' } as never,
+        ],
+      }),
+    );
+    expect(out.operatingLocations).toEqual([{ city: 'Memphis', state: 'TN' }]);
+  });
+
+  it('leaves operatingLocations empty when the override is null or an empty array', () => {
+    expect(mergeCarrierOverride(base(), override({ operatingLocations: null })).operatingLocations).toEqual([]);
+    expect(mergeCarrierOverride(base(), override({ operatingLocations: [] })).operatingLocations).toEqual([]);
+    expect(mergeCarrierOverride(base(), null).operatingLocations).toEqual([]);
   });
 
   it('SURVIVES a re-ingest: a new FMCSA base + the SAME override still shows the edited values', () => {

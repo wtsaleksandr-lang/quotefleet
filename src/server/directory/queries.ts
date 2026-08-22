@@ -11,10 +11,16 @@
  */
 import { and, asc, desc, eq, gt, gte, ilike, inArray, isNotNull, isNull, ne, or, sql, type SQL } from 'drizzle-orm';
 import { db } from '../../db/client.js';
-import { carrierDirectory, carrierOverrides, type CarrierCapabilities, type CarrierOverrideRow } from '../../db/schema.js';
+import {
+  carrierDirectory,
+  carrierOverrides,
+  type CarrierCapabilities,
+  type CarrierOperatingLocation,
+  type CarrierOverrideRow,
+} from '../../db/schema.js';
 import { CONTAINER_PORTS, PORT_GROUPS, portFilterCodes, portGroupForMemberCode } from './containerPorts.js';
 
-export type { CarrierCapabilities } from '../../db/schema.js';
+export type { CarrierCapabilities, CarrierOperatingLocation } from '../../db/schema.js';
 
 /**
  * Where a displayed card field came from. `'fmcsa'` = straight from the FMCSA
@@ -106,6 +112,14 @@ export interface VisibleCarrier {
    * matching profile credential badge to ACTIVE (still labeled "self-declared").
    */
   capabilities: CarrierCapabilities;
+  /**
+   * Carrier-DECLARED other operating cities/terminals from
+   * `carrier_overrides.operating_locations`, applied ONLY on the profile
+   * (carrierBySlug). Optional/`[]` on list/card rows and when no override
+   * exists → the profile omits the "Also operating in" block. Never fabricated:
+   * FMCSA gives one HQ; these are metros a claimed carrier declared it serves.
+   */
+  operatingLocations?: CarrierOperatingLocation[];
   /** Per-field source (FMCSA vs admin/carrier-edited). All `'fmcsa'` on list/card. */
   provenance: CarrierProvenance;
 }
@@ -155,6 +169,7 @@ export function visibleCarrier(r: typeof carrierDirectory.$inferSelect): Visible
     // list/card rows keep these FMCSA defaults so those surfaces are unchanged.
     aboutOverride: null,
     capabilities: {},
+    operatingLocations: [],
     provenance: FMCSA_PROVENANCE,
   };
 }
@@ -198,6 +213,18 @@ export function mergeCarrierOverride(
   if (ov.capabilities && typeof ov.capabilities === 'object') {
     out.capabilities = { ...ov.capabilities };
     if (Object.values(ov.capabilities).some(Boolean)) provenance.capabilities = src;
+  }
+  // Carrier-declared other operating cities. Defensive-normalize (trim, upper-
+  // case state) and drop malformed entries so a bad row can never render a
+  // broken chip. Empty/absent → leave the base's [] (block omitted on render).
+  if (Array.isArray(ov.operatingLocations)) {
+    const cleaned = ov.operatingLocations
+      .filter(
+        (l): l is CarrierOperatingLocation =>
+          !!l && typeof l.city === 'string' && typeof l.state === 'string' && l.city.trim() !== '' && l.state.trim() !== '',
+      )
+      .map((l) => ({ city: l.city.trim(), state: l.state.trim().toUpperCase() }));
+    if (cleaned.length) out.operatingLocations = cleaned;
   }
   return out;
 }

@@ -219,6 +219,14 @@ export const SELF_HEAL_TABLE_STATEMENTS: readonly string[] = [
     "updated_at" timestamp DEFAULT now() NOT NULL,
     "updated_by" text
   )`,
+  // 0055_carrier_operating_locations.sql — carrier-declared OTHER operating
+  // cities/terminals (metros beyond the single FMCSA HQ), rendered as the
+  // profile's "Also operating in" list. Healed HERE (right after the
+  // carrier_overrides CREATE above, same reasoning as the directory_terminals
+  // ALTERs): the Replit deploy skips db:migrate and its publish tool can drop
+  // the column, so this ADD COLUMN IF NOT EXISTS runs on every boot and no-ops
+  // on a healthy DB. Nullable, no backfill.
+  `ALTER TABLE "carrier_overrides" ADD COLUMN IF NOT EXISTS "operating_locations" jsonb`,
   // 0046_terminals.sql — canonical intermodal-terminal reference list backing the
   // public directory. Healed HERE (a separate at-risk TABLE, same reasoning as
   // carrier_directory): the seed (seedDirectoryTerminals) runs at boot after this
