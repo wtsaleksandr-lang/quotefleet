@@ -14,6 +14,8 @@ import { startLifecycleEmailCron } from '../email/lifecycleCron.js';
 import { startFollowUpEmailCron } from '../email/followUpCron.js';
 import { startWeeklyDigestCron } from '../email/weeklyDigestCron.js';
 import { startFuelSurchargeCron } from '../eia/dieselPrice.js';
+import { startDirectoryRefreshCron } from './directoryRefreshCron.js';
+import { runCronSafely } from './cronSafety.js';
 
 async function main() {
   const env = loadEnv();
@@ -60,11 +62,24 @@ async function main() {
     console.log(`[server] QuoteFleet listening on http://${env.HOST}:${env.PORT}`);
     console.log(`[server] Public base URL: ${env.PUBLIC_BASE_URL}`);
   });
-  startMarketplaceCron();
-  startLifecycleEmailCron();
-  startFollowUpEmailCron();
-  startWeeklyDigestCron();
-  startFuelSurchargeCron();
+  // Register every scheduled cron through runCronSafely. This wrapper (a) catches
+  // a throw at registration so one cron failing to register can NEVER stop the
+  // siblings below it from registering, and (b) sends a de-duped admin alert +
+  // logs the failure instead of it dying silently on an unwatched Replit deploy.
+  // Additive: each cron keeps its own internal per-tick try/catch; this only adds
+  // the registration-boundary safety + alerting.
+  //
+  // NOTE for merges: this list is intentionally one runCronSafely call per cron —
+  // a wave-2 agent adding another cron should add ONE more line in the same shape.
+  await runCronSafely('marketplace-cron', () => startMarketplaceCron());
+  await runCronSafely('lifecycle-email-cron', () => startLifecycleEmailCron());
+  await runCronSafely('followup-email-cron', () => startFollowUpEmailCron());
+  await runCronSafely('weekly-digest-cron', () => startWeeklyDigestCron());
+  await runCronSafely('fuel-surcharge-cron', () => startFuelSurchargeCron());
+  // NEW: weekly FMCSA carrier-directory refresh (keeps ~321k rows from going
+  // stale — see src/server/directoryRefreshCron.ts). Its own tick is wrapped in
+  // runCronSafely internally, so a re-ingest throw/hang alerts the admin too.
+  await runCronSafely('directory-refresh-cron', () => startDirectoryRefreshCron());
 }
 
 main().catch((err) => {
