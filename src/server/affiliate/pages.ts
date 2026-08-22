@@ -276,15 +276,12 @@ export function renderAffiliateDashboard(d: AffiliateDashboard): string {
         : `You&#8217;re a <strong>Partner</strong> at ${pct(d.affiliate.commissionRate)}.`;
 
   const statusBadge = esc(d.affiliate.status);
-  const payout = d.affiliate.payoutMethod
-    ? esc(d.affiliate.payoutMethod)
-    : 'Not set — add a payout method before your first payout';
 
   const body = `
   <section class="pt-hero">
     <span class="pt-eyebrow">Affiliate dashboard</span>
     <h1>Your partner performance</h1>
-    <p class="lead">${esc(d.affiliate.name || d.affiliate.email)} &middot; status: <strong>${statusBadge}</strong> &middot; current rate: <strong>${pct(d.affiliate.commissionRate)}</strong> (${esc(d.affiliate.tier)} tier)</p>
+    <p class="lead">Status: <strong>${statusBadge}</strong> &middot; current rate: <strong>${pct(d.affiliate.commissionRate)}</strong> (${esc(d.affiliate.tier)} tier)</p>
   </section>
   <main class="pt-shell">
     <div class="pt-card" style="max-width:640px;">
@@ -322,7 +319,7 @@ export function renderAffiliateDashboard(d: AffiliateDashboard): string {
         <div class="pt-stat"><div class="pt-stat-n">${money(d.earnings.approvedCents)}</div><div class="pt-stat-l">Approved</div></div>
         <div class="pt-stat"><div class="pt-stat-n">${money(d.earnings.paidCents)}</div><div class="pt-stat-l">Paid out</div></div>
       </div>
-      <p class="pt-muted" style="margin-top:16px;">Payout method: <strong>${payout}</strong>. Payouts run monthly once your balance reaches ${money(AFFILIATE_MIN_PAYOUT_CENTS)}. Commission accrual and payouts are being rolled out &mdash; your clicks and signups are tracked now and will be reconciled into earnings automatically.</p>
+      <p class="pt-muted" style="margin-top:16px;">Payouts run monthly once your balance reaches ${money(AFFILIATE_MIN_PAYOUT_CENTS)}. Commission accrual and payouts are being rolled out &mdash; your clicks and signups are tracked now and will be reconciled into earnings automatically.</p>
       <p class="pt-muted">See the full <a href="/partners/terms">program terms</a>.</p>
     </div>
   </main>

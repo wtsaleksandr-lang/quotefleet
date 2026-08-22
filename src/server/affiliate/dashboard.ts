@@ -24,15 +24,16 @@ export const AVG_MONTHLY_REVENUE_CENTS = 2480;
 
 export interface AffiliateDashboard {
   affiliate: {
+    // PRIVACY: this view-model backs the PUBLIC `?code=`-gated dashboard, where
+    // the code is the same value shared in every ?ref= link. It must therefore
+    // carry NO PII — no email, no name, no payout method. Aggregate stats + tier
+    // + rate + link only. A future authed dashboard can expose the rest.
     id: number;
-    email: string;
-    name: string | null;
     code: string;
     tier: AffiliateTier;
     status: string;
     commissionRate: number;
     link: string;
-    payoutMethod: string | null;
   };
   stats: {
     clicks: number;
@@ -130,15 +131,13 @@ export async function computeAffiliateDashboard(
 
   return {
     affiliate: {
+      // No PII here — see the AffiliateDashboard interface note.
       id: affiliate.id,
-      email: affiliate.email,
-      name: affiliate.name ?? null,
       code: affiliate.code,
       tier: progress.tier,
       status: affiliate.status,
       commissionRate: rate,
       link: affiliateLink(affiliate.code, base),
-      payoutMethod: affiliate.payoutMethod ?? null,
     },
     stats: { clicks, signups, convertedCustomers, activeReferredCustomers },
     tier: progress,

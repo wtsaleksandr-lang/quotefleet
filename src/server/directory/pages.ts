@@ -60,6 +60,16 @@ export function esc(s: unknown): string {
 const fmtNum = (n: number | null | undefined): string =>
   n == null ? '—' : Number(n).toLocaleString('en-US');
 
+/** RFQ recipient cap — mirrors rfqMaxRecipients() in routes/rfq.ts (default 25).
+ *  Read locally (not imported) to avoid a routes→resolve→pages import cycle. The
+ *  send flow enforces the same cap; the action-bar label reflects it so the CTA
+ *  never promises to email more carriers than the request actually sends. */
+function rfqRecipientCap(): number {
+  const raw = process.env.RFQ_MAX_RECIPIENTS;
+  const n = raw != null ? Number(raw) : NaN;
+  return Number.isFinite(n) && n > 0 ? Math.floor(n) : 25;
+}
+
 function safetyLabel(code: string | null): { text: string; tone: 'good' | 'warn' | 'bad' | 'none' } {
   switch ((code || '').toUpperCase()) {
     case 'S':
@@ -702,9 +712,11 @@ const ACTION_BAR_SCRIPT = `(function(){
   if(!bar||!results)return;
   var filterQs=bar.getAttribute('data-filter-qs')||'';
   var total=parseInt(bar.getAttribute('data-total')||'0',10)||0;
+  var cap=parseInt(bar.getAttribute('data-rfq-cap')||'0',10)||0;
   var nEl=bar.querySelector('.qf-ab-n');
   var lblEl=bar.querySelector('.qf-ab-lbl');
   var rfqnEl=bar.querySelector('.qf-ab-rfqn');
+  var rfqofEl=bar.querySelector('.qf-ab-rfqof');
   var rfqwEl=bar.querySelector('.qf-ab-rfqw');
   var countEl=bar.querySelector('.qf-ab-count');
   var links={rfq:'/directory/rfq','export-view':'/directory/export/view','export-xlsx':'/directory/export.xlsx','export-csv':'/directory/export.csv'};
@@ -715,11 +727,15 @@ const ACTION_BAR_SCRIPT = `(function(){
     var dots=selected();
     var s=suffix(dots);
     var n=dots.length?dots.length:total;
-    var word='carrier'+(n===1?'':'s');
+    // The RFQ button reflects the send cap; the count label shows the true total.
+    var shown=(cap>0&&n>cap)?cap:n;
+    var word='carrier'+(shown===1?'':'s');
+    var ofClause=(cap>0&&n>cap)?(' of '+fmt(n)):'';
     if(nEl)nEl.textContent=fmt(n);
-    if(rfqnEl)rfqnEl.textContent=fmt(n);
+    if(rfqnEl)rfqnEl.textContent=fmt(shown);
+    if(rfqofEl)rfqofEl.textContent=ofClause;
     if(rfqwEl)rfqwEl.textContent=word;
-    if(lblEl)lblEl.textContent=word+(dots.length?' selected':' filtered');
+    if(lblEl)lblEl.textContent='carrier'+(n===1?'':'s')+(dots.length?' selected':' filtered');
     if(countEl)countEl.setAttribute('data-selected',String(dots.length));
     bar.setAttribute('data-mode',dots.length?'dots':'filter');
     for(var key in links){if(!links.hasOwnProperty(key))continue;var a=bar.querySelector('[data-role="'+key+'"]');if(a)a.setAttribute('href',links[key]+s);}
@@ -1535,16 +1551,23 @@ function renderFacetedResults(cfg: FacetedCfg): string {
   // ticked. Only rendered when there is at least one carrier to act on.
   const total = list.total;
   const plural = total === 1 ? '' : 's';
+  // The RFQ send flow caps recipients at rfqRecipientCap() (default 25). When the
+  // filtered set is larger, the button must show what actually gets emailed
+  // ("Request rates from 25 of N carriers") rather than over-promising the full N.
+  const rfqCap = rfqRecipientCap();
+  const rfqShown = total > rfqCap ? rfqCap : total;
+  const rfqPlural = rfqShown === 1 ? '' : 's';
+  const rfqOf = total > rfqCap ? ` of ${fmtNum(total)}` : '';
   const filterQs = actionBarFilterQuery(filters);
   const links0 = actionBarLinks({ filterQuery: filterQs });
   const actionBar = hasCarriers
-    ? `<div class="qf-actionbar" data-mode="filter" data-filter-qs="${esc(filterQs)}" data-total="${total}" role="region" aria-label="Carrier actions">
+    ? `<div class="qf-actionbar" data-mode="filter" data-filter-qs="${esc(filterQs)}" data-total="${total}" data-rfq-cap="${rfqCap}" role="region" aria-label="Carrier actions">
         <div class="qf-ab-info">
           <span class="qf-ab-count" data-selected="0"><b class="qf-ab-n">${fmtNum(total)}</b> <span class="qf-ab-lbl">carrier${plural} filtered</span></span>
           <span class="qf-ab-hint">Tick cards to target specific carriers</span>
         </div>
         <div class="qf-ab-actions">
-          <a class="btn btn-primary btn-sm qf-ab-btn" data-role="rfq" href="${esc(links0.rfq)}">Request rates from <span class="qf-ab-rfqn">${fmtNum(total)}</span>&nbsp;<span class="qf-ab-rfqw">carrier${plural}</span> <span class="arr">→</span></a>
+          <a class="btn btn-primary btn-sm qf-ab-btn" data-role="rfq" href="${esc(links0.rfq)}">Request rates from <span class="qf-ab-rfqn">${fmtNum(rfqShown)}</span><span class="qf-ab-rfqof">${rfqOf}</span>&nbsp;<span class="qf-ab-rfqw">carrier${rfqPlural}</span> <span class="arr">→</span></a>
           <a class="btn btn-secondary btn-sm qf-ab-btn" data-role="export-view" href="${esc(links0.exportView)}">Export list</a>
           <span class="qf-ab-fmts"><a class="qf-ab-fmt" data-role="export-xlsx" href="${esc(links0.exportXlsx)}">XLSX</a><a class="qf-ab-fmt" data-role="export-csv" href="${esc(links0.exportCsv)}">CSV</a></span>
         </div>

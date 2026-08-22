@@ -70,12 +70,21 @@ export async function resolveCodeOwner(rawCode: string): Promise<CodeOwner> {
   if (t) return { kind: 'referral', tenantId: t.id, ownerEmail: t.email ?? null };
   const a = (
     await db()
-      .select({ id: affiliates.id, email: affiliates.email, ownerTenantId: affiliates.ownerTenantId })
+      .select({
+        id: affiliates.id,
+        email: affiliates.email,
+        ownerTenantId: affiliates.ownerTenantId,
+        status: affiliates.status,
+      })
       .from(affiliates)
       .where(eq(affiliates.code, code))
       .limit(1)
   )[0];
   if (a) {
+    // Only an ACTIVE affiliate attributes. A suspended/pending affiliate's link
+    // must not track signups or estimate earnings — treat it as no-owner so the
+    // click resolves like any unknown code. Tenant referral codes are unaffected.
+    if (a.status !== 'active') return null;
     return {
       kind: 'affiliate',
       affiliateId: a.id,
