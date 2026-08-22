@@ -12,6 +12,7 @@ import { createApp } from './app.js';
 import { startMarketplaceCron } from '../marketplace/cron.js';
 import { startLifecycleEmailCron } from '../email/lifecycleCron.js';
 import { startFollowUpEmailCron } from '../email/followUpCron.js';
+import { startDunningEmailCron } from '../email/dunningCron.js';
 import { startWeeklyDigestCron } from '../email/weeklyDigestCron.js';
 import { startFuelSurchargeCron } from '../eia/dieselPrice.js';
 import { startDirectoryRefreshCron } from './directoryRefreshCron.js';
@@ -70,10 +71,13 @@ async function main() {
   // the registration-boundary safety + alerting.
   //
   // NOTE for merges: this list is intentionally one runCronSafely call per cron —
-  // a wave-2 agent adding another cron should add ONE more line in the same shape.
+  // a future agent adding another cron should add ONE more line in the same shape.
   await runCronSafely('marketplace-cron', () => startMarketplaceCron());
   await runCronSafely('lifecycle-email-cron', () => startLifecycleEmailCron());
   await runCronSafely('followup-email-cron', () => startFollowUpEmailCron());
+  // Dunning: emails the card-update sequence to tenants whose subscription
+  // payment failed (self-contained — reads the billing past-due marker).
+  await runCronSafely('dunning-email-cron', () => startDunningEmailCron());
   await runCronSafely('weekly-digest-cron', () => startWeeklyDigestCron());
   await runCronSafely('fuel-surcharge-cron', () => startFuelSurchargeCron());
   // NEW: weekly FMCSA carrier-directory refresh (keeps ~321k rows from going
