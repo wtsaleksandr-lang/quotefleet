@@ -182,6 +182,8 @@ describe('renderDirectoryResults — selection + action bar', () => {
     // Default count = filtered TOTAL (3), not the 2 shown cards.
     expect(html).toContain('data-total="3"');
     expect(html).toContain('<span class="qf-ab-rfqn">3</span>');
+    // Total (3) is under the RFQ cap → no "of N" over-promise clause.
+    expect(html).toContain('<span class="qf-ab-rfqof"></span>');
   });
 
   it('no-JS default links act on ALL filtered carriers (filter querystring, not dots)', () => {
@@ -203,6 +205,39 @@ describe('renderDirectoryResults — selection + action bar', () => {
   it('ships the progressive-enhancement script that swaps to ?dots= on selection', () => {
     expect(html).toContain("bar.setAttribute('data-mode',dots.length?'dots':'filter')");
     expect(html).toContain("'?dots='+dots.join(',')");
+  });
+});
+
+// ─── renderDirectoryResults — RFQ button honours the send cap ──────────────
+describe('renderDirectoryResults — RFQ CTA reflects the recipient cap', () => {
+  function renderBig(): string {
+    const filters = normalizeFilters({ state: 'TX' });
+    const list: CarrierListResult = {
+      // Only a couple of cards are on the page, but the FILTERED total (300) far
+      // exceeds the default RFQ_MAX_RECIPIENTS (25) — the button must not promise
+      // to email all 300.
+      carriers: [carrier(), carrier({ slug: 'blue-line-88', usdot: '880880' })],
+      total: 300,
+      page: 1,
+      perPage: 24,
+      totalPages: 13,
+      filters,
+    };
+    return renderDirectoryResults({ filters, list, counts: COUNTS, summary: SUMMARY });
+  }
+  const html = renderBig();
+
+  it('caps the button count and shows "of N" when the total exceeds the cap', () => {
+    expect(html).toContain('data-rfq-cap="25"');
+    // Button promises only the 25 that actually get emailed…
+    expect(html).toContain('<span class="qf-ab-rfqn">25</span>');
+    expect(html).toContain('<span class="qf-ab-rfqof"> of 300</span>');
+  });
+
+  it('still surfaces the TRUE filtered total in the info count (not the cap)', () => {
+    expect(html).toContain('data-total="300"');
+    expect(html).toContain('<b class="qf-ab-n">300</b>');
+    expect(html).toContain('carriers filtered');
   });
 });
 

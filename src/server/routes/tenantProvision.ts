@@ -78,8 +78,10 @@ export async function deriveAvailableSlug(companyName: string): Promise<string> 
   return slug;
 }
 
-/** Which nullable users.* column stores this provider's stable subject id. */
-export type OAuthSubColumn = 'googleSub' | 'microsoftSub' | 'metaSub' | 'appleSub';
+/** Which nullable users.* column stores this provider's stable subject id.
+ *  (Microsoft OAuth was removed; the dormant `microsoft_sub` DB column is left
+ *  in place intentionally — dropping a prod column is riskier than harmless.) */
+export type OAuthSubColumn = 'googleSub' | 'metaSub' | 'appleSub';
 
 export interface ProvisionTenantInput {
   companyName: string;

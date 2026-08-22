@@ -56,15 +56,14 @@ describe('/partners/terms', () => {
 describe('/partners/dashboard', () => {
   const sample: AffiliateDashboard = {
     affiliate: {
+      // NOTE: no email/name/payoutMethod — the by-code dashboard view-model is
+      // PII-free (the code is public, shared in every ?ref= link).
       id: 1,
-      email: 'creator@example.com',
-      name: 'Creator Co',
       code: 'ABCD2345',
       tier: 'base',
       status: 'active',
       commissionRate: 0.25,
       link: 'https://quotefleet.net/?ref=ABCD2345',
-      payoutMethod: null,
     },
     stats: { clicks: 120, signups: 8, convertedCustomers: 3, activeReferredCustomers: 8 },
     tier: { tier: 'base', activeReferredCustomers: 8, toNextTier: 2, nextTier: 'pro', rate: 0.25 },
@@ -79,6 +78,15 @@ describe('/partners/dashboard', () => {
     expect(html).toContain('120');
     expect(html).toContain('$123.45'); // estimated monthly earnings
     expect(html).toContain('2 more active customer'); // progress to Pro
+  });
+
+  it('PRIVACY: the by-code dashboard renders NO PII (email, name, payout method)', () => {
+    // The dashboard is gated only by the PUBLIC code, so it must never expose the
+    // affiliate's email, personal/brand name, or payout method to anyone holding
+    // a ?ref= link. Only aggregate stats + tier + rate + link are shown.
+    expect(html).not.toContain('creator@example.com');
+    expect(html).not.toContain('Creator Co');
+    expect(html.toLowerCase()).not.toContain('payout method');
   });
 
   it('gate page renders for a missing code', () => {
