@@ -545,7 +545,7 @@ const DIRECTORY_CSS = `
   .cp-reveal-note { margin: 0 0 4px; font-size: 12px; color: var(--muted); }
   .cp-reveal-card { border: 1px solid var(--border); border-radius: var(--radius); padding: 12px; background: var(--surface-2); }
   .cp-reveal-name { font-size: 13px; font-weight: 600; color: var(--ink); display: flex; align-items: center; gap: 8px; flex-wrap: wrap; margin-bottom: 4px; }
-  .cp-reveal-conf { font-size: 11px; font-weight: 500; padding: 2px 8px; border-radius: 999px; border: 1px solid var(--border); color: var(--muted); }
+  .cp-reveal-conf { font-size: 11px; font-weight: 500; padding: 2px 8px; border-radius: var(--radius-chip); border: 1px solid var(--border); color: var(--muted); }
   .cp-reveal-conf--high { color: var(--accent); border-color: var(--accent); }
   .cp-reveal-msg { margin: 0; font-size: 13px; color: var(--muted); }
   .cp-reveal-msg--error { color: var(--ink-soft); font-weight: 500; }
