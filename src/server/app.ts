@@ -36,6 +36,8 @@ import { registerServiceRoutes } from './directory/servicePages.js';
 import { registerGlossaryRoutes } from './directory/glossary.js';
 import { registerToolsRoutes } from './routes/tools.js';
 import { registerBillingRoutes, registerStripeWebhook } from './routes/billing.js';
+import { registerDirectoryAuthRoutes } from './routes/directoryAuth.js';
+import { registerDirectoryBillingRoutes } from './routes/directoryBilling.js';
 import { registerConnectRoutes, registerConnectWebhook } from './routes/connect.js';
 import { registerMarketingChatRoute } from './routes/marketingChat.js';
 import { registerQuoteDocRoutes } from './routes/quoteDoc.js';
@@ -132,6 +134,9 @@ export function createApp(): express.Express {
   });
 
   registerAuthRoutes(app);
+  // Directory Pro shipper auth (tenant-less `shipper` users). Registered next to
+  // the tenant auth routes; both share the qf_sess cookie + sessions table.
+  registerDirectoryAuthRoutes(app);
   registerOAuthRoutes(app);
   // Prospect-demo routes MUST precede the tenant public routes: they get first
   // crack at the shared /api/public/{widget,quote,lead,route-preview}/:slug
@@ -159,6 +164,7 @@ export function createApp(): express.Express {
   registerGlossaryRoutes(app);
   registerToolsRoutes(app);
   registerBillingRoutes(app);
+  registerDirectoryBillingRoutes(app);
   registerConnectRoutes(app);
   registerMarketingChatRoute(app);
   registerQuoteDocRoutes(app);

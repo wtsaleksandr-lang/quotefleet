@@ -381,6 +381,26 @@ export const SELF_HEAL_TABLE_STATEMENTS: readonly string[] = [
   `CREATE INDEX IF NOT EXISTS "affiliate_commissions_affiliate_idx" ON "affiliate_commissions" ("affiliate_id")`,
   `CREATE INDEX IF NOT EXISTS "affiliate_commissions_tenant_idx" ON "affiliate_commissions" ("tenant_id")`,
   `CREATE UNIQUE INDEX IF NOT EXISTS "affiliate_commissions_uniq_idx" ON "affiliate_commissions" ("affiliate_id","tenant_id","period_month")`,
+  // 0057_directory_subscriptions.sql — "Directory Pro" ($19/mo) per-SHIPPER
+  // entitlement (a `users` row with tenant_id=null, role='shipper'). Healed HERE
+  // (same reasoning as carrier_directory/rfq above): the Replit deploy skips
+  // db:migrate and its publish tool can drop tables, so this CREATE TABLE / INDEX
+  // IF NOT EXISTS runs on every boot and no-ops on a healthy DB. MUST stay
+  // byte-for-byte equivalent to drizzle/0057_directory_subscriptions.sql +
+  // schema.ts `directorySubscriptions`. References `users` only, never `tenants`.
+  `CREATE TABLE IF NOT EXISTS "directory_subscriptions" (
+    "id" serial PRIMARY KEY NOT NULL,
+    "user_id" integer NOT NULL,
+    "status" text DEFAULT 'inactive' NOT NULL,
+    "stripe_customer_id" text,
+    "stripe_subscription_id" text,
+    "price_id" text,
+    "current_period_end" timestamp,
+    "created_at" timestamp DEFAULT now() NOT NULL,
+    "updated_at" timestamp DEFAULT now() NOT NULL
+  )`,
+  `CREATE UNIQUE INDEX IF NOT EXISTS "directory_subscriptions_user_idx" ON "directory_subscriptions" ("user_id")`,
+  `CREATE UNIQUE INDEX IF NOT EXISTS "directory_subscriptions_customer_idx" ON "directory_subscriptions" ("stripe_customer_id")`,
 ];
 
 export async function ensureSelfHealTables(): Promise<void> {
