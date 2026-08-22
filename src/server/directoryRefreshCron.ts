@@ -1,0 +1,90 @@
+/**
+ * Weekly FMCSA carrier-directory refresh cron.
+ *
+ * WHY THIS EXISTS:
+ * The public carrier_directory (~321k rows) is only ever (re)populated when the
+ * table is EMPTY — maybeAutoHealCarrierDirectory() on boot re-ingests a wiped
+ * table, but on a healthy, already-populated table it is a deliberate no-op.
+ * That means once loaded, the directory NEVER refreshes: carriers that go out
+ * of service, revoke authority, or change equipment/contact data go stale and
+ * linger indefinitely. forceReingestCarrierDirectory() already exists (it skips
+ * the empty-table gate and re-runs the full FMCSA ingest, single-flighted via
+ * the shared advisory lock) — this cron simply calls it on a WEEKLY cadence.
+ *
+ * SCHEDULING (mirrors weeklyDigestCron): hourly tick from boot; the tick only
+ * fires the actual re-ingest on the weekly OFF-PEAK slot (Sunday 09:00 UTC). A
+ * 6-day cooldown guard makes the pass idempotent across the hour the slot is
+ * open and across restarts, so a bouncing instance can't kick multiple ingests.
+ *
+ * LONG-JOB SAFETY: the re-ingest runs ~15–30 min but does NOT block the
+ * scheduler — forceReingestCarrierDirectory() is fire-and-forget (it returns as
+ * soon as the background job is STARTED and never awaits the ingest), so the
+ * hourly tick returns immediately and sibling crons keep ticking. It is also
+ * single-flighted by a Postgres advisory lock, so an overlap with the boot-time
+ * auto-heal just returns 'lock-held'.
+ *
+ * KILL-SWITCH: DISABLE_WEEKLY_REINGEST=1 disables the cron entirely (tests /
+ * second instance). NODE_ENV=test is also honored downstream (forceReingest
+ * returns 'disabled').
+ *
+ * The tick is routed through runCronSafely so a throw/hang raises an admin alert
+ * instead of silently dying.
+ */
+import { runCronSafely } from './cronSafety.js';
+import { forceReingestCarrierDirectory } from './directory/autoHeal.js';
+
+const TICK_MS = 60 * 60 * 1000; // hourly
+const STARTUP_DELAY_MS = 2 * 60 * 1000; // 2 min after boot before the first tick
+
+/** Weekly slot: Sunday (UTC day 0), 09:00 UTC — off-peak for freight ops. */
+export const REFRESH_DOW = 0;
+export const REFRESH_HOUR = 9;
+
+/** Don't re-kick within this window — the double-run guard. */
+export const REFRESH_COOLDOWN_MS = 6 * 24 * 60 * 60 * 1000;
+
+/**
+ * Pure scheduling predicate: should the weekly re-ingest fire at `now`, given
+ * when it last fired? True only inside the weekly slot AND outside the cooldown.
+ * Exported + injectable so the cadence is unit-testable with no timers.
+ */
+export function shouldRunWeeklyRefresh(
+  now: Date,
+  lastRunMs: number | undefined,
+  cooldownMs: number = REFRESH_COOLDOWN_MS,
+): boolean {
+  if (now.getUTCDay() !== REFRESH_DOW || now.getUTCHours() !== REFRESH_HOUR) return false;
+  if (lastRunMs !== undefined && now.getTime() - lastRunMs < cooldownMs) return false;
+  return true;
+}
+
+let started = false;
+let lastRunMs: number | undefined;
+
+export function startDirectoryRefreshCron(): void {
+  if (started) return;
+  if (process.env.DISABLE_WEEKLY_REINGEST === '1') {
+    console.log('[directoryRefresh.cron] disabled via DISABLE_WEEKLY_REINGEST=1');
+    return;
+  }
+  started = true;
+  setTimeout(() => void maybeRun('startup'), STARTUP_DELAY_MS);
+  setInterval(() => void maybeRun('tick'), TICK_MS);
+  console.log(
+    `[directoryRefresh.cron] scheduled — hourly tick; re-ingest slot Sun ${REFRESH_HOUR}:00 UTC`,
+  );
+}
+
+/** Gate the hourly tick to the weekly slot, then kick the re-ingest (safely). */
+async function maybeRun(reason: string): Promise<void> {
+  const now = new Date();
+  if (!shouldRunWeeklyRefresh(now, lastRunMs)) return;
+  // Record BEFORE the run so the cooldown guard holds even if the tick re-enters
+  // within the same open hour (the ingest itself is single-flighted anyway).
+  lastRunMs = now.getTime();
+  await runCronSafely('directory-refresh', async () => {
+    console.log(`[directoryRefresh.cron] weekly FMCSA re-ingest starting (${reason})`);
+    const outcome = await forceReingestCarrierDirectory();
+    console.log(`[directoryRefresh.cron] weekly FMCSA re-ingest kicked — outcome=${outcome}`);
+  });
+}
