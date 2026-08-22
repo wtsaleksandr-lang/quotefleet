@@ -1246,6 +1246,156 @@ export async function relatedCarriers(carrier: VisibleCarrier, limit = 6): Promi
   }
 }
 
+// ─── Hero social-proof carriers (homepage) ────────────────────────────────
+//
+// Feeds the homepage hero's directory-preview cards with REAL, varied carriers
+// (live social proof + free advertising for listed carriers) instead of the
+// hardcoded fictional demo cards. Every load re-queries with ORDER BY random()
+// so the featured set rotates. The projection is deliberately tiny and
+// contact-free (name / ids / equipment badges / location + the public slug) —
+// no phone, email, or internal id ever leaves this layer.
+
+/** One equipment/standing badge on a hero card. `muted` = the quiet grey chip. */
+export interface HeroCarrierChip {
+  label: string;
+  muted?: boolean;
+}
+
+/** Safe, render-ready projection of one carrier for a hero preview card. */
+export interface HeroCarrierCard {
+  /** publicSlug → links to /directory/carrier/<slug>. */
+  slug: string;
+  /** Display name (DBA when meaningful, else legal name). */
+  name: string;
+  /** Public FMCSA identifiers, pre-formatted ("USDOT 123456 · MC 654321"). */
+  ids: string;
+  /** Up to ~2 equipment badges + an optional muted "Satisfactory" chip. */
+  chips: HeroCarrierChip[];
+  /** Location line label ("Nearest port" | "Based in") or null when unknown. */
+  locLabel: string | null;
+  /** Location line value (port city or "City, ST") or null when unknown. */
+  locValue: string | null;
+}
+
+/** Default hero card count fetched (client renders the first few). */
+export const HERO_CARRIER_LIMIT = 8;
+
+/** Display name for a hero card — mirrors pages.ts `carrierName` (DBA-preferred,
+ *  falling back to the legal name when the DBA is too short to identify). Kept
+ *  local to avoid a queries→pages import cycle. */
+function heroDisplayName(legalName: string, dbaName: string | null): string {
+  const dba = (dbaName ?? '').trim();
+  if (dba && (dba.includes(' ') || dba.length >= 8)) return dba;
+  return legalName;
+}
+
+/**
+ * carrier_directory WHERE predicates for a display-worthy hero carrier
+ * (exported for query-shape unit tests). Good standing (keep Satisfactory +
+ * unrated, drop Conditional/Unsatisfactory), contact NOT opted out, a real
+ * city/state, an actual fleet (a headline stat), US domicile. AND-ed by the
+ * caller. The `carrier_overrides.hidden` exclusion is applied in getHeroCarriers
+ * (it needs the LEFT JOIN) so this stays a pure single-table predicate list.
+ */
+export function heroCarrierConditions(): SQL[] {
+  return [
+    goodStandingCondition(),
+    eq(carrierDirectory.contactHidden, false),
+    isNotNull(carrierDirectory.city),
+    ne(carrierDirectory.city, ''),
+    isNotNull(carrierDirectory.state),
+    ne(carrierDirectory.state, ''),
+    gt(carrierDirectory.powerUnits, 0),
+    eq(carrierDirectory.country, 'US'),
+  ];
+}
+
+/** ORDER BY for the hero set — random, so the featured carriers vary each load. */
+export function heroCarrierOrder(): SQL[] {
+  return [sql`random()`];
+}
+
+/** Equipment/standing badges for a hero card, derived from the FMCSA flags. */
+function heroChips(r: typeof carrierDirectory.$inferSelect): HeroCarrierChip[] {
+  const chips: HeroCarrierChip[] = [];
+  const equip: ReadonlyArray<[boolean, string]> = [
+    [r.intermodal, 'Drayage'],
+    [r.reefer, 'Reefer'],
+    [r.flatbed, 'Flatbed'],
+    [r.tanker, 'Tanker'],
+    [r.dryVan, 'Dry van'],
+    [r.dryBulk, 'Dry bulk'],
+    [r.hazmat, 'Hazmat'],
+  ];
+  for (const [on, label] of equip) {
+    if (on && chips.length < 2) chips.push({ label });
+  }
+  // No FMCSA equipment flag set yet (rows pre-backfill) → one honest fallback.
+  if (chips.length === 0) chips.push({ label: 'Motor carrier' });
+  if (String(r.safetyRating ?? '').toUpperCase() === 'S') chips.push({ label: 'Satisfactory', muted: true });
+  return chips;
+}
+
+/** Location line for a hero card: nearest port when known, else "City, ST". */
+function heroLocation(r: typeof carrierDirectory.$inferSelect): { locLabel: string | null; locValue: string | null } {
+  const g = r.nearestPortCode ? portGroupForMemberCode(r.nearestPortCode) : null;
+  if (g) return { locLabel: 'Nearest port', locValue: g.city || g.label };
+  if (r.city && r.state) return { locLabel: 'Based in', locValue: `${titleCaseCity(r.city)}, ${r.state}` };
+  return { locLabel: null, locValue: null };
+}
+
+/**
+ * Shape one carrier row into the safe hero-card projection (PURE — unit-tested).
+ * Emits ONLY public, contact-free fields; internal ids, phone + email never
+ * appear. USDOT/MC are public FMCSA identifiers already shown across the
+ * directory, so they are safe to surface here.
+ */
+export function heroCarrierCard(r: typeof carrierDirectory.$inferSelect): HeroCarrierCard {
+  // Mirror the directory's own id rendering (`MC ${mcNumber}`) — mcNumber is
+  // stored as the bare docket number, prefixed with "MC " for display.
+  const mc = String(r.mcNumber ?? '').trim();
+  const ids = mc ? `USDOT ${r.usdot} · MC ${mc}` : `USDOT ${r.usdot}`;
+  const { locLabel, locValue } = heroLocation(r);
+  return {
+    slug: r.publicSlug,
+    name: heroDisplayName(r.legalName, r.dbaName),
+    ids,
+    chips: heroChips(r),
+    locLabel,
+    locValue,
+  };
+}
+
+/**
+ * Random set of display-worthy real carriers for the homepage hero preview.
+ * Re-randomized on every call (variation-per-load is the whole point), so the
+ * caller should serve it uncached. Degrades to an empty array on any read
+ * failure — the client keeps the static fallback cards, never a broken hero.
+ */
+export async function getHeroCarriers(limit = HERO_CARRIER_LIMIT): Promise<HeroCarrierCard[]> {
+  const n = Math.min(12, Math.max(1, Math.floor(limit) || HERO_CARRIER_LIMIT));
+  try {
+    const rows = await db()
+      .select()
+      .from(carrierDirectory)
+      .leftJoin(carrierOverrides, eq(carrierOverrides.usdot, carrierDirectory.usdot))
+      .where(
+        and(
+          ...heroCarrierConditions(),
+          // Honor an admin "hidden" override (kept out even though the hero shows
+          // no contact) — surviving-the-ingest hide flag on carrier_overrides.
+          or(isNull(carrierOverrides.hidden), ne(carrierOverrides.hidden, true)) as SQL,
+        ),
+      )
+      .orderBy(...heroCarrierOrder())
+      .limit(n);
+    return rows.map((row) => heroCarrierCard(row.carrier_directory));
+  } catch (err) {
+    console.warn('[directory] getHeroCarriers failed; serving none:', err);
+    return [];
+  }
+}
+
 /** Count carriers in the same city as a carrier (for a count-bearing link). */
 export async function cityCarrierCount(stateCode: string, citySlug: string): Promise<number> {
   const code = String(stateCode).toUpperCase().slice(0, 2);
