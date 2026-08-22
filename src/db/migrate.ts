@@ -401,6 +401,21 @@ export const SELF_HEAL_TABLE_STATEMENTS: readonly string[] = [
   )`,
   `CREATE UNIQUE INDEX IF NOT EXISTS "directory_subscriptions_user_idx" ON "directory_subscriptions" ("user_id")`,
   `CREATE UNIQUE INDEX IF NOT EXISTS "directory_subscriptions_customer_idx" ON "directory_subscriptions" ("stripe_customer_id")`,
+  // 0058_directory_rfq_usage.sql — per-account monthly RFQ send meter (the
+  // un-gameable quota behind RFQ gating). Healed HERE (same reasoning as
+  // directory_subscriptions above): the Replit deploy skips db:migrate and its
+  // publish tool can drop tables, so this CREATE TABLE / INDEX IF NOT EXISTS runs
+  // on every boot and no-ops on a healthy DB. MUST stay byte-for-byte equivalent
+  // to drizzle/0058_directory_rfq_usage.sql + schema.ts `directoryRfqUsage`. A
+  // phantom-drop loses the current month's counts only (a bounded, self-refilling
+  // meter) — never any subscription/entitlement state.
+  `CREATE TABLE IF NOT EXISTS "directory_rfq_usage" (
+    "id" serial PRIMARY KEY NOT NULL,
+    "account_key" text NOT NULL,
+    "period" text NOT NULL,
+    "sends" integer DEFAULT 0 NOT NULL
+  )`,
+  `CREATE UNIQUE INDEX IF NOT EXISTS "directory_rfq_usage_account_period_idx" ON "directory_rfq_usage" ("account_key","period")`,
 ];
 
 export async function ensureSelfHealTables(): Promise<void> {

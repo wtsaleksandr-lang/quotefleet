@@ -52,6 +52,7 @@ import {
   renderCompliancePage,
 } from '../directory/pages.js';
 import { publicAutocompleteLimiter, publicCalcLimiter } from '../rateLimits.js';
+import { hasDirectoryPro } from '../directory/entitlement.js';
 
 const isIntermodal = (v: unknown): boolean => ['1', 'true', 'yes'].includes(String(v ?? '').toLowerCase());
 const pageNum = (v: unknown): number => Math.max(1, parseInt(String(v ?? '1'), 10) || 1);
@@ -152,12 +153,13 @@ export function registerDirectoryRoutes(app: Express) {
       const carrier = await carrierBySlug(String(req.params.slug));
       if (!carrier) return res.status(404).type('html').send(renderCarrierNotFound());
       const citySlug = carrier.city ? citySlugify(carrier.city) : '';
-      const [related, cityCount, stateCount] = await Promise.all([
+      const [related, cityCount, stateCount, isPro] = await Promise.all([
         relatedCarriers(carrier, 6),
         carrier.state && citySlug ? cityCarrierCount(carrier.state, citySlug) : Promise.resolve(0),
         carrier.state ? stateCarrierCount(carrier.state) : Promise.resolve(0),
+        hasDirectoryPro(req),
       ]);
-      res.type('html').send(renderCarrierProfile({ carrier, related, cityCount, stateCount }));
+      res.type('html').send(renderCarrierProfile({ carrier, related, cityCount, stateCount, isPro }));
     } catch (err) {
       next(err);
     }

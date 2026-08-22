@@ -407,6 +407,13 @@
       "when": 1788202077221,
       "tag": "0057_directory_subscriptions",
       "breakpoints": true
+    },
+    {
+      "idx": 58,
+      "version": "7",
+      "when": 1788288477221,
+      "tag": "0058_directory_rfq_usage",
+      "breakpoints": true
     }
   ]
 }

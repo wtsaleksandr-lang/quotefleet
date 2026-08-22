@@ -2384,3 +2384,38 @@ export type DirectorySubscription = typeof directorySubscriptions.$inferSelect;
 export type NewDirectorySubscription = typeof directorySubscriptions.$inferInsert;
 /** The lifecycle states a Directory Pro subscription moves through. */
 export type DirectorySubscriptionStatus = 'active' | 'trialing' | 'past_due' | 'inactive';
+
+/**
+ * directory_rfq_usage — per-account monthly RFQ (rate-request) send meter.
+ *
+ * The un-gameable meter behind RFQ gating: sending a multi-carrier rate request
+ * requires a logged-in shipper account, and each account gets a monthly BLAST
+ * allowance (free tier small, Directory Pro larger). One POST /directory/rfq =
+ * ONE increment regardless of how many carriers it fans out to.
+ *
+ *   account_key — the identified account, `user:<id>` (never anonymous — RFQ
+ *                 requires an account, so there is always a key to meter on).
+ *   period      — the billing month, `YYYY-MM` in UTC.
+ *   sends       — blasts started this period (incremented once per blast).
+ *
+ * UNIQUE(account_key, period) so the counter is a single upsert-and-increment
+ * row per account per month. Platform-level (references neither `tenants` nor a
+ * FK) so it stays out of tenant MRR/plan by construction — same posture as
+ * directory_subscriptions.
+ */
+export const directoryRfqUsage = pgTable(
+  'directory_rfq_usage',
+  {
+    id: serial('id').primaryKey(),
+    /** The identified account this meter belongs to (`user:<id>`). */
+    accountKey: text('account_key').notNull(),
+    /** Billing period, `YYYY-MM` (UTC). */
+    period: text('period').notNull(),
+    /** Blasts started this period — one POST /directory/rfq = one increment. */
+    sends: integer('sends').notNull().default(0),
+  },
+  (t) => [uniqueIndex('directory_rfq_usage_account_period_idx').on(t.accountKey, t.period)]
+);
+
+export type DirectoryRfqUsage = typeof directoryRfqUsage.$inferSelect;
+export type NewDirectoryRfqUsage = typeof directoryRfqUsage.$inferInsert;

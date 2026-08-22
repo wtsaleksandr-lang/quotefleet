@@ -123,3 +123,36 @@ describe('renderCarrierProfile — contact display', () => {
     expect(html).toContain('&lt;'); // angle brackets HTML-escaped
   });
 });
+
+describe('renderCarrierProfile — Directory Pro contacts gate', () => {
+  it('free / anonymous: renders the teaser + "Unlock with Directory Pro — $19/mo" CTA + disabled reveal', () => {
+    const html = renderCarrierProfile({ carrier: carrier() }); // isPro defaults to false
+    expect(html).toContain('<div class="cp-gated">');
+    expect(html).toContain('Unlock with Directory Pro — $19/mo');
+    expect(html).toContain('href="/signup?plan=directory-pro"');
+    // A disabled "Reveal contacts" affordance (the real reveal is Pro-only, PR C).
+    expect(html).toContain('Reveal contacts');
+    expect(html).toMatch(/<button[^>]*disabled[^>]*>Reveal contacts<\/button>/);
+    // NOT the live Pro reveal button/endpoint.
+    expect(html).not.toContain('Reveal additional contacts');
+    expect(html).not.toContain('/reveal"');
+  });
+
+  it('Pro: renders a live "Reveal additional contacts" button posting to the reveal endpoint, no upgrade CTA', () => {
+    const html = renderCarrierProfile({ carrier: carrier(), isPro: true });
+    expect(html).toContain('cp-gated--pro');
+    expect(html).toContain('Reveal additional contacts');
+    expect(html).toContain('action="/api/directory/carrier/107080/reveal"');
+    // No upgrade wall for a paying subscriber.
+    expect(html).not.toContain('Unlock with Directory Pro');
+    expect(html).not.toContain('/signup?plan=directory-pro');
+  });
+
+  it('the gate NEVER hides the public FMCSA phone/email (free data stays free) in either state', () => {
+    for (const isPro of [false, true]) {
+      const html = renderCarrierProfile({ carrier: carrier(), isPro });
+      expect(html).toContain('href="tel:9125550921"');
+      expect(html).toContain('href="mailto:dispatch%40acme.com"');
+    }
+  });
+});

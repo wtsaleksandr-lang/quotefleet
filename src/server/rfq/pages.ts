@@ -49,6 +49,8 @@ const RFQ_CSS = `
     border-radius: 4px; padding: 12px 22px; cursor: pointer; text-decoration: none;
   }
   .rfq-btn:hover { opacity: 0.92; }
+  .rfq-btn[disabled], .rfq-btn:disabled { opacity: 0.55; cursor: not-allowed; }
+  .rfq-btn[disabled]:hover, .rfq-btn:disabled:hover { opacity: 0.55; }
   .rfq-btn--ghost { background: transparent; color: var(--ink); border-color: var(--border-strong); }
   .rfq-btn--ghost:hover { background: var(--surface-2); }
   .rfq-linkbox { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; background: var(--surface-2); border: 1px solid var(--border); border-radius: 4px; padding: 14px 16px; margin: 12px 0 0; }
@@ -133,6 +135,15 @@ export interface RfqFormOpts {
   prefill?: Record<string, string>;
   /** Field-level or top-level error message. */
   error?: string;
+  /** Entitlement/quota gate state — renders a sign-in / upgrade banner and
+   *  disables the submit when blocked. Absent → no gating shown (open form). */
+  gate?: {
+    ok: boolean;
+    needsAccount?: boolean;
+    needsUpgrade?: boolean;
+    used?: number;
+    allowance?: number;
+  };
 }
 
 function field(opts: {
@@ -173,6 +184,26 @@ export function renderRfqForm(opts: RfqFormOpts): string {
         opts.error,
       )}</div>`
     : '';
+  // Gate banner — sign-in required (no account) or monthly allowance reached.
+  // Theme-aware, token-only styling; the submit is disabled while blocked.
+  const g = opts.gate;
+  const blocked = !!g && !g.ok;
+  const proHref = '/signup?plan=directory-pro';
+  let gateHtml = '';
+  if (blocked) {
+    if (g!.needsAccount) {
+      gateHtml = `<div class="rfq-note rfq-gate" role="alert" style="background:var(--accent-soft);border-color:var(--accent);color:var(--ink);"><strong>Sign in to send.</strong> Rate requests go out under your account so carriers know who's asking. <a href="${proHref}" style="color:var(--accent);">Create a free account →</a></div>`;
+    } else {
+      const used = esc(String(g!.used ?? 0));
+      const allow = esc(String(g!.allowance ?? 0));
+      const upgrade = g!.needsUpgrade
+        ? ` <a href="${proHref}" style="color:var(--accent);">Upgrade to Directory Pro →</a>`
+        : '';
+      const tail = g!.needsUpgrade ? ' — upgrade to Directory Pro to send more.' : ' — your monthly limit is reached.';
+      gateHtml = `<div class="rfq-note rfq-gate" role="alert" style="background:var(--accent-soft);border-color:var(--accent);color:var(--ink);"><strong>You've used ${used} of ${allow} rate requests this month${tail}</strong>${upgrade}</div>`;
+    }
+  }
+  const submitAttrs = blocked ? ' disabled aria-disabled="true"' : '';
   const hidden = [
     opts.dots ? `<input type="hidden" name="dots" value="${esc(opts.dots)}">` : '',
     opts.filterQuery ? `<input type="hidden" name="filters" value="${esc(opts.filterQuery)}">` : '',
@@ -183,6 +214,7 @@ export function renderRfqForm(opts: RfqFormOpts): string {
     <p class="rfq-eyebrow">Multi-carrier rate request</p>
     <h1>Request rates from ${esc(String(n))} carrier${n === 1 ? '' : 's'}</h1>
     <p class="rfq-lede">Send one rate request to every carrier you selected. Each gets a private link to submit a quote, and you'll see the responses come back in one place — no phone tag, no re-typing your lane.</p>
+    ${gateHtml}
     ${errorHtml}
     <div class="rfq-note">Requesting rates from <strong>${esc(
       String(n),
@@ -214,7 +246,7 @@ export function renderRfqForm(opts: RfqFormOpts): string {
         </div>
       </div>
       <div class="rfq-actions">
-        <button type="submit" class="rfq-btn">Send rate request <span aria-hidden="true">→</span></button>
+        <button type="submit" class="rfq-btn"${submitAttrs}>Send rate request <span aria-hidden="true">→</span></button>
         <a class="rfq-btn rfq-btn--ghost" href="/directory">Back to directory</a>
       </div>
     </form>
