@@ -400,6 +400,13 @@
       "when": 1788115677221,
       "tag": "0056_rfq_email_drafts",
       "breakpoints": true
+    },
+    {
+      "idx": 57,
+      "version": "7",
+      "when": 1788202077221,
+      "tag": "0057_directory_subscriptions",
+      "breakpoints": true
     }
   ]
 }

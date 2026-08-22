@@ -38,6 +38,7 @@ import {
 } from '../plans.js';
 import { isDepositSession, handleDepositCheckoutCompleted } from './depositCharge.js';
 import { runReferralFulfillmentForInvoice } from '../affiliate/fulfillment.js';
+import { isDirectorySubscription, applyDirectorySubscription } from '../directory/subscription.js';
 
 let stripeClient: Stripe | null = null;
 function stripe(): Stripe {
@@ -418,6 +419,21 @@ export async function applySubscription(sub: Stripe.Subscription): Promise<void>
   }
 }
 
+/**
+ * Route a subscription webhook to the right handler. Directory Pro subscriptions
+ * (matched by price id / metadata) upsert the per-USER `directory_subscriptions`
+ * table; everything else flows to the existing tenant `applySubscription`. The
+ * two are mutually exclusive, so the tenant path stays untouched. Checked BEFORE
+ * the tenant path so a directory sub never hits a tenant lookup.
+ */
+async function routeSubscription(sub: Stripe.Subscription): Promise<void> {
+  if (isDirectorySubscription(sub)) {
+    await applyDirectorySubscription(sub);
+    return;
+  }
+  await applySubscription(sub);
+}
+
 export async function handleEvent(event: Stripe.Event): Promise<void> {
   switch (event.type) {
     case 'invoice.payment_failed': {
@@ -494,7 +510,7 @@ export async function handleEvent(event: Stripe.Event): Promise<void> {
       // Retrieve the subscription so we can map its Price → tier. This also
       // covers the case where subscription.created hasn't arrived yet.
       const sub = await stripe().subscriptions.retrieve(subscriptionId);
-      await applySubscription(sub);
+      await routeSubscription(sub);
       return;
     }
     case 'invoice.paid':
@@ -514,7 +530,7 @@ export async function handleEvent(event: Stripe.Event): Promise<void> {
         typeof inv.subscription === 'string' ? inv.subscription : inv.subscription?.id ?? null;
       if (!subscriptionId) return;
       const sub = await stripe().subscriptions.retrieve(subscriptionId);
-      await applySubscription(sub);
+      await routeSubscription(sub);
       // Close the referral/affiliate value loop: a REAL paid invoice means the
       // referred tenant converted. Mark conversion, apply the referrer's queued
       // free-month credit, and accrue the affiliate commission — all idempotent
@@ -529,14 +545,14 @@ export async function handleEvent(event: Stripe.Event): Promise<void> {
     }
     case 'customer.subscription.updated':
     case 'customer.subscription.created': {
-      await applySubscription(event.data.object as Stripe.Subscription);
+      await routeSubscription(event.data.object as Stripe.Subscription);
       return;
     }
     case 'customer.subscription.deleted': {
       // Terminal cancellation. Route through the same mapper as every other
       // subscription event so the terminal path (plan → free, drop sub id) AND
       // the automatic suspend-for-non-payment enforcement both apply uniformly.
-      await applySubscription(event.data.object as Stripe.Subscription);
+      await routeSubscription(event.data.object as Stripe.Subscription);
       return;
     }
     default:

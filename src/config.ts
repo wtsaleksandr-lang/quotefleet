@@ -45,6 +45,10 @@ export interface Env {
   STRIPE_CONNECT_WEBHOOK_SECRET?: string;
   STRIPE_PRICE_VITAL_MONTHLY?: string;
   STRIPE_PRICE_PRO_MONTHLY?: string;
+  /** Stripe Price id for the "Directory Pro" ($19/mo) shipper subscription —
+   *  a per-USER access entitlement, fully separate from the tenant plan prices
+   *  above. When unset, Directory Pro checkout returns "billing not configured". */
+  STRIPE_PRICE_DIRECTORY_PRO?: string;
   /** Platform fee percent QuoteFleet takes from each booking deposit (a
    *  destination charge's application_fee). Optional string override of the
    *  2.9% default (see PLATFORM_FEE_PCT in routes/depositCharge.ts). Parsed +
@@ -157,6 +161,7 @@ export function loadEnv(): Env {
     STRIPE_CONNECT_WEBHOOK_SECRET: opt('STRIPE_CONNECT_WEBHOOK_SECRET'),
     STRIPE_PRICE_VITAL_MONTHLY: opt('STRIPE_PRICE_VITAL_MONTHLY'),
     STRIPE_PRICE_PRO_MONTHLY: opt('STRIPE_PRICE_PRO_MONTHLY'),
+    STRIPE_PRICE_DIRECTORY_PRO: opt('STRIPE_PRICE_DIRECTORY_PRO'),
     PLATFORM_FEE_PCT: opt('PLATFORM_FEE_PCT'),
     RESEND_API_KEY: opt('RESEND_API_KEY'),
     RESEND_FROM_EMAIL: opt('RESEND_FROM_EMAIL'),

@@ -2335,3 +2335,52 @@ export type ReferralCredit = typeof referralCredits.$inferSelect;
 export type NewReferralCredit = typeof referralCredits.$inferInsert;
 export type AffiliateCommission = typeof affiliateCommissions.$inferSelect;
 export type NewAffiliateCommission = typeof affiliateCommissions.$inferInsert;
+
+// ────────────────────────────────────────────────────────────────────
+// DIRECTORY SUBSCRIPTIONS — "Directory Pro" ($19/mo) per-SHIPPER entitlement.
+//
+// The buyer is a SHIPPER persona: a `users` row with `tenantId = null` and
+// `role = 'shipper'` (reusing the existing auth/session stack). This table is
+// FULLY DECOUPLED from `tenants.plan` — Directory Pro is an access subscription
+// on a user account, NOT the QuoteQuick calculator tenant's plan. One row per
+// user (userId UNIQUE). The Stripe webhook (applyDirectorySubscription) upserts
+// this by `stripe_customer_id`; entitlement is `status IN ('active','trialing')`
+// AND (`current_period_end IS NULL OR > now`).
+//
+// Platform-level like carrier_directory: it references `users` only, never
+// `tenants`, so a Directory Pro subscription stays out of tenant MRR/plan/trial
+// by construction. Self-healed in src/db/migrate.ts (Replit skips db:migrate).
+// ────────────────────────────────────────────────────────────────────
+export const directorySubscriptions = pgTable(
+  'directory_subscriptions',
+  {
+    id: serial('id').primaryKey(),
+    /** The shipper user this entitlement belongs to. One row per user. */
+    userId: integer('user_id')
+      .notNull()
+      .references(() => users.id, { onDelete: 'cascade' }),
+    /** 'active' | 'trialing' | 'past_due' | 'inactive'. Default 'inactive'
+     *  until the Stripe webhook confirms a live subscription. */
+    status: text('status').notNull().default('inactive'),
+    /** Stripe Customer id — the join key the webhook upserts by. UNIQUE. */
+    stripeCustomerId: text('stripe_customer_id'),
+    /** Stripe Subscription id (kept for portal / reference). */
+    stripeSubscriptionId: text('stripe_subscription_id'),
+    /** The Stripe Price id ($19/mo Directory Pro price) on the subscription. */
+    priceId: text('price_id'),
+    /** Current billing period end — entitlement lapses after this when the
+     *  subscription is no longer live. Null when unknown. */
+    currentPeriodEnd: timestamp('current_period_end', { mode: 'date' }),
+    createdAt: timestamp('created_at', { mode: 'date' }).notNull().defaultNow(),
+    updatedAt: timestamp('updated_at', { mode: 'date' }).notNull().defaultNow(),
+  },
+  (t) => [
+    uniqueIndex('directory_subscriptions_user_idx').on(t.userId),
+    uniqueIndex('directory_subscriptions_customer_idx').on(t.stripeCustomerId),
+  ]
+);
+
+export type DirectorySubscription = typeof directorySubscriptions.$inferSelect;
+export type NewDirectorySubscription = typeof directorySubscriptions.$inferInsert;
+/** The lifecycle states a Directory Pro subscription moves through. */
+export type DirectorySubscriptionStatus = 'active' | 'trialing' | 'past_due' | 'inactive';
