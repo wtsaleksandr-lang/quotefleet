@@ -416,7 +416,7 @@
         idCell.appendChild(muted(a.email || ''));
 
         // Tier select.
-        var tierSel = el('select', { class: 'select' });
+        var tierSel = el('select', { class: 'select aff-tier' });
         ['base', 'pro', 'partner'].forEach(function (o) {
           var op = document.createElement('option');
           op.value = o; op.textContent = o;
