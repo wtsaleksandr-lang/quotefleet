@@ -1,0 +1,12 @@
+-- carrier_overrides — add a nullable `operating_locations` JSONB array of
+-- `{ city, state }` (2-letter state). FMCSA public data gives a carrier ONE
+-- physical HQ location; a CLAIMED carrier declares the additional metros it
+-- serves via this override column, which the profile renders as an "Also
+-- operating in" list. Null = none declared; never fabricated.
+--
+-- Idempotent (ADD COLUMN IF NOT EXISTS, no backfill) so it is safe to re-run on
+-- every boot via runMigrations() — the Replit deploy does not run db:migrate.
+-- Also mirrored byte-for-byte in src/db/migrate.ts SELF_HEAL_TABLE_STATEMENTS
+-- (right after the carrier_overrides CREATE TABLE) so a Replit phantom-drop of
+-- the column is re-added before the server serves.
+ALTER TABLE "carrier_overrides" ADD COLUMN IF NOT EXISTS "operating_locations" jsonb;

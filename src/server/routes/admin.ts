@@ -308,6 +308,24 @@ const CarrierOverridePatch = z
       .strict()
       .nullable()
       .optional(),
+    // Carrier-declared OTHER operating cities/terminals (metros beyond the single
+    // FMCSA HQ). Array of `{ city, state }` with a 2-letter state; capped at 25.
+    // `[]` / null clears it. City trimmed; state upper-cased in the write below.
+    operatingLocations: z
+      .array(
+        z
+          .object({
+            city: z.string().trim().min(1).max(80),
+            state: z
+              .string()
+              .trim()
+              .regex(/^[A-Za-z]{2}$/, 'state must be a 2-letter code'),
+          })
+          .strict(),
+      )
+      .max(25)
+      .nullable()
+      .optional(),
   })
   .strict();
 export type CarrierOverridePatch = z.infer<typeof CarrierOverridePatch>;
@@ -366,6 +384,12 @@ export async function upsertCarrierOverride(opts: {
   if ('phone' in d) set.phoneOverride = blankToNull(d.phone ?? null);
   if ('hidden' in d) set.hidden = d.hidden ?? null;
   if ('capabilities' in d) set.capabilities = d.capabilities ?? null;
+  if ('operatingLocations' in d) {
+    // Normalize state to upper-case; an empty array clears the override (→ null).
+    const list = d.operatingLocations;
+    set.operatingLocations =
+      list && list.length ? list.map((l) => ({ city: l.city, state: l.state.toUpperCase() })) : null;
+  }
 
   const upserted = await db()
     .insert(carrierOverrides)

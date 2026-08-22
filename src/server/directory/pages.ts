@@ -486,6 +486,10 @@ const DIRECTORY_CSS = `
   .cp-loc { margin: 0 0 8px; line-height: 1.6; color: var(--ink-soft); font-size: 14px; }
   .cp-loc:last-child { margin-bottom: 0; }
   .cp-loc .lk { color: var(--muted); font-family: var(--font-mono); font-size: 12px; }
+  /* "Also operating in" — carrier-declared other metros. Sits below the base
+     location lines; reuses .cp-eqlabel + .cp-chip / .cp-chiprow (which carries
+     the no-orphan mobile grid). Small top gap separates it from the port line. */
+  .cp-alsoloc { margin-top: 12px; }
   .cp-contact-row { display: flex; justify-content: space-between; gap: 12px; padding: 12px 0; border-bottom: 1px solid var(--border); font-size: 14px; }
   .cp-contact-row:last-of-type { border-bottom: 0; }
   .cp-contact-row .k { color: var(--muted); }
@@ -2177,6 +2181,22 @@ export function renderCarrierProfile(opts: {
   // Location line — NEW: append ZIP (stored, never shown before) after City, State.
   const cityStateZip = [cityState, c.zip].filter(Boolean).join(' ');
   const locBased = cityStateZip ? esc(cityStateZip) : isCa ? 'Canada' : 'the United States';
+  // ── Also operating in — CLAIM-DRIVEN other operating cities/terminals. FMCSA
+  // gives one physical HQ; a claimed carrier declares the extra metros it serves
+  // via carrier_overrides.operating_locations (already normalized in the merge).
+  // Render only when present + non-empty — no fabrication, no empty state. Reuse
+  // the existing chip styling; .cp-chiprow carries the no-orphan mobile grid.
+  const operatingLocations = (c.operatingLocations ?? []).filter(
+    (l) => l && typeof l.city === 'string' && l.city.trim() !== '' && typeof l.state === 'string' && l.state.trim() !== '',
+  );
+  const alsoOperatingBlock = operatingLocations.length
+    ? `<div class="cp-eqwrap cp-alsoloc">
+            <span class="cp-eqlabel">Also operating in</span>
+            <div class="cp-chiprow cp-alsoloc-row">${operatingLocations
+              .map((l) => `<span class="cp-chip">${esc(`${titleCaseCity(l.city)}, ${l.state.trim().toUpperCase()}`)}</span>`)
+              .join('')}</div>
+          </div>`
+    : '';
   // Subtitle line — DrayLocator order: USDOT · MC · City, State (each dropped when absent).
   const headerSubtitle = [
     c.usdot ? `USDOT ${esc(c.usdot)}` : '',
@@ -2282,6 +2302,7 @@ export function renderCarrierProfile(opts: {
           <p class="cp-loc">Based in ${locBased}.</p>
           <p class="cp-loc">Serving shippers, brokers and forwarders ${isCa ? 'across Canadian trade lanes' : 'at US container ports'}.</p>
           ${port ? `<p class="cp-loc"><span class="lk">Nearest port</span> ${esc(port.name)}${port.city || port.state ? ` · ${esc([port.city, port.state].filter(Boolean).join(', '))}` : ''}</p>` : ''}
+          ${alsoOperatingBlock}
         </section>
       </div>
     </div>

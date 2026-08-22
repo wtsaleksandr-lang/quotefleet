@@ -112,6 +112,42 @@ describe('upsertCarrierOverride', () => {
     expect(h.state.upserts[0].set.capabilities).toEqual({ uiia: true, twic: true, reefer: false });
   });
 
+  it('accepts operatingLocations, trims city + upper-cases state into the upsert SET', async () => {
+    const r = await upsertCarrierOverride({
+      usdot: '107080',
+      body: { operatingLocations: [{ city: '  Atlanta ', state: 'ga' }, { city: 'Jacksonville', state: 'FL' }] },
+      actorUserId: 7,
+    });
+    expect(r.status).toBe(200);
+    expect(h.state.upserts[0].set.operatingLocations).toEqual([
+      { city: 'Atlanta', state: 'GA' },
+      { city: 'Jacksonville', state: 'FL' },
+    ]);
+  });
+
+  it('clears operatingLocations to null when given an empty array', async () => {
+    const r = await upsertCarrierOverride({ usdot: '107080', body: { operatingLocations: [] }, actorUserId: 7 });
+    expect(r.status).toBe(200);
+    expect(h.state.upserts[0].set.operatingLocations).toBeNull();
+  });
+
+  it('rejects a bad operatingLocations state (not a 2-letter code) with 400', async () => {
+    const r = await upsertCarrierOverride({
+      usdot: '107080',
+      body: { operatingLocations: [{ city: 'Atlanta', state: 'Georgia' }] },
+      actorUserId: 7,
+    });
+    expect(r.status).toBe(400);
+    expect(h.state.upserts).toHaveLength(0);
+  });
+
+  it('rejects more than 25 operatingLocations (cap) with 400', async () => {
+    const many = Array.from({ length: 26 }, (_, i) => ({ city: `City${i}`, state: 'GA' }));
+    const r = await upsertCarrierOverride({ usdot: '107080', body: { operatingLocations: many }, actorUserId: 7 });
+    expect(r.status).toBe(400);
+    expect(h.state.upserts).toHaveLength(0);
+  });
+
   it('normalizes a zero-padded USDOT before the directory lookup', async () => {
     const r = await upsertCarrierOverride({ usdot: '00107080', body: { hidden: true }, actorUserId: 7 });
     expect(r.status).toBe(200);

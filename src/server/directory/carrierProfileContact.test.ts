@@ -92,4 +92,34 @@ describe('renderCarrierProfile — contact display', () => {
     expect(html).toContain('sourced from public FMCSA records');
     expect(html).toContain('support@quotefleet.net');
   });
+
+  it('renders the "Also operating in" block with a chip per declared city when present', () => {
+    const html = renderCarrierProfile({
+      carrier: carrier({
+        operatingLocations: [
+          { city: 'ATLANTA', state: 'GA' },
+          { city: 'jacksonville', state: 'FL' },
+        ],
+      }),
+    });
+    expect(html).toContain('cp-alsoloc-row'); // the render-only block wrapper
+    expect(html).toContain('>Also operating in<'); // the label element (not just the CSS comment)
+    // City title-cased, state upper 2-letter; each in its own chip.
+    expect(html).toContain('>Atlanta, GA<');
+    expect(html).toContain('>Jacksonville, FL<');
+  });
+
+  it('omits the "Also operating in" block entirely when there are no declared locations', () => {
+    // Assert on the render-only class (the phrase also appears in a CSS comment).
+    expect(renderCarrierProfile({ carrier: carrier() })).not.toContain('cp-alsoloc-row');
+    expect(renderCarrierProfile({ carrier: carrier({ operatingLocations: [] }) })).not.toContain('cp-alsoloc-row');
+  });
+
+  it('escapes declared city values (no raw HTML injection)', () => {
+    const html = renderCarrierProfile({
+      carrier: carrier({ operatingLocations: [{ city: '<b>x</b>', state: 'GA' }] }),
+    });
+    expect(html).not.toContain('<b>x</b>');
+    expect(html).toContain('&lt;'); // angle brackets HTML-escaped
+  });
 });
