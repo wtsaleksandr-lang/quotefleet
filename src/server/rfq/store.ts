@@ -49,6 +49,9 @@ export interface CreateRecipientInput {
   carrierName: string;
   carrierEmail: string | null;
   status: RfqRecipientStatus;
+  /** Per-carrier AI/template email draft, generated in the review phase. */
+  draftSubject?: string | null;
+  draftBody?: string | null;
 }
 
 export interface SubmitQuoteInput {
@@ -77,6 +80,8 @@ export interface RfqStore {
   createRequest(input: CreateRequestInput): Promise<RfqRequest>;
   addRecipients(rfqId: number, recipients: CreateRecipientInput[]): Promise<RfqRecipient[]>;
   markRecipientStatus(recipientId: number, status: RfqRecipientStatus, sentAt?: Date | null): Promise<void>;
+  /** Persist a shipper-edited draft (subject + body) on a recipient row before send. */
+  updateRecipientDraft(recipientId: number, draftSubject: string, draftBody: string): Promise<void>;
   getByViewToken(viewToken: string): Promise<RfqView | null>;
   getByQuoteToken(quoteToken: string): Promise<RecipientContext | null>;
   submitQuote(quoteToken: string, input: SubmitQuoteInput): Promise<boolean>;
@@ -121,6 +126,8 @@ export const dbRfqStore: RfqStore = {
           carrierName: r.carrierName,
           carrierEmail: r.carrierEmail,
           status: r.status,
+          draftSubject: r.draftSubject ?? null,
+          draftBody: r.draftBody ?? null,
           quoteToken: generateRfqToken(),
         })),
       )
@@ -132,6 +139,13 @@ export const dbRfqStore: RfqStore = {
     await db()
       .update(rfqRecipients)
       .set({ status, ...(sentAt !== undefined ? { sentAt } : {}) })
+      .where(eq(rfqRecipients.id, recipientId));
+  },
+
+  async updateRecipientDraft(recipientId, draftSubject, draftBody) {
+    await db()
+      .update(rfqRecipients)
+      .set({ draftSubject, draftBody })
       .where(eq(rfqRecipients.id, recipientId));
   },
 

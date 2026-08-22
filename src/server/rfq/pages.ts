@@ -37,7 +37,7 @@ const RFQ_CSS = `
     font: inherit; font-size: 14px; color: var(--ink); background: var(--bg);
     border: 1px solid var(--border-strong); border-radius: 4px; padding: 10px 12px; width: 100%;
   }
-  .rfq-field textarea { min-height: 88px; resize: vertical; }
+  .rfq-field textarea { min-height: 140px; resize: vertical; }
   .rfq-field input:focus, .rfq-field select:focus, .rfq-field textarea:focus {
     outline: 2px solid var(--accent); outline-offset: 1px; border-color: var(--accent);
   }
@@ -53,6 +53,7 @@ const RFQ_CSS = `
   .rfq-btn--ghost:hover { background: var(--surface-2); }
   .rfq-linkbox { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; background: var(--surface-2); border: 1px solid var(--border); border-radius: 4px; padding: 14px 16px; margin: 12px 0 0; }
   .rfq-linkbox code { font-family: var(--font-mono, monospace); font-size: 13px; color: var(--ink); word-break: break-all; }
+  .rfq-help code { word-break: break-all; overflow-wrap: anywhere; }
   .rfq-counts { display: flex; gap: 12px; flex-wrap: wrap; margin: 20px 0 0; }
   .rfq-count { flex: 1 1 120px; background: var(--surface); border: 1px solid var(--border); border-radius: 4px; padding: 14px 16px; text-align: left; }
   .rfq-count b { display: block; font-size: 24px; color: var(--ink); line-height: 1.1; }
@@ -77,10 +78,20 @@ const RFQ_CSS = `
   .rfq-quote-cell b { color: var(--ink); }
   .rfq-quote-cell span { color: var(--muted); }
   .rfq-empty { color: var(--muted); font-size: 14px; padding: 24px 16px; text-align: left; }
+  .rfq-draft { background: var(--surface); border: 1px solid var(--border); border-radius: 4px; padding: 20px; margin: 0 0 16px; }
+  .rfq-draft-head { display: flex; align-items: baseline; justify-content: space-between; gap: 12px; flex-wrap: wrap; margin: 0 0 12px; }
+  .rfq-draft-name { color: var(--ink); font-weight: 600; font-size: 15px; }
+  .rfq-draft-meta { color: var(--muted); font-size: 12px; }
+  .rfq-draft-to { color: var(--muted); font-size: 12px; word-break: break-all; }
+  .rfq-ai-tag { display: inline-block; font-size: 11px; font-weight: 600; padding: 2px 8px; border-radius: 4px; background: var(--accent-soft); color: var(--accent); }
+  .rfq-skip { background: var(--surface-2); border: 1px dashed var(--border); border-radius: 4px; padding: 12px 16px; margin: 0 0 12px; color: var(--muted); font-size: 13px; }
+  .rfq-skip b { color: var(--ink); font-weight: 600; }
+  .rfq-review-actions { position: sticky; bottom: 0; background: var(--bg); border-top: 1px solid var(--border); padding: 16px 0; margin: 24px 0 0; display: flex; align-items: center; gap: 16px; flex-wrap: wrap; }
   @media (max-width: 640px) {
     .rfq-wrap { padding: 28px 16px 56px; }
     .rfq-wrap h1 { font-size: 24px; }
     .rfq-grid { grid-template-columns: 1fr; }
+    .rfq-draft-head { flex-direction: column; }
   }
 `;
 
@@ -211,6 +222,122 @@ export function renderRfqForm(opts: RfqFormOpts): string {
   return page(
     `Request rates from ${n} carriers · QuoteFleet`,
     'Send one rate request to every carrier you selected and collect quotes in one place.',
+    '/directory/rfq',
+    body,
+  );
+}
+
+// ─── 1b. Review screen (generate → REVIEW/EDIT → confirm & send) ────────────
+export interface RfqReviewOpts {
+  request: RfqRequest;
+  recipients: RfqRecipient[];
+  /** Absolute URL to re-open this review later (shown as a bookmarkable link). */
+  reviewUrl: string;
+  /** Where the confirm-&-send form posts (phase 2). */
+  actionUrl: string;
+  noEmail: number;
+  optedOut: number;
+  cappedOut: number;
+  total: number;
+  dryRun: boolean;
+}
+
+/**
+ * The two-phase review gate: every carrier's individual, AI-personalized draft is
+ * listed with an editable subject + body. The shipper edits any of them, then
+ * confirms — nothing is sent until this form is submitted. Non-sendable rows
+ * (no email / opted out) are shown as skipped so the coverage is transparent.
+ */
+export function renderRfqReview(opts: RfqReviewOpts): string {
+  const { request, recipients } = opts;
+  const sendable = recipients.filter((r) => r.status === 'pending');
+  const skipped = recipients.filter((r) => r.status !== 'pending');
+
+  const dryRunNote = opts.dryRun
+    ? `<div class="rfq-note"><strong>Preview mode.</strong> Live sending is off — confirming will run the full flow and log each would-send without emailing any carrier.</div>`
+    : '';
+
+  const capNote =
+    opts.cappedOut > 0
+      ? `<div class="rfq-note">Your selection matched <strong>${esc(
+          String(opts.total),
+        )}</strong> carriers; this request covers the first <strong>${esc(
+          String(sendable.length + opts.noEmail + opts.optedOut),
+        )}</strong> (the per-request cap).</div>`
+      : '';
+
+  const draftCards = sendable
+    .map((r) => {
+      return `
+      <div class="rfq-draft">
+        <div class="rfq-draft-head">
+          <div>
+            <div class="rfq-draft-name">${esc(r.carrierName)}</div>
+            <div class="rfq-draft-to">To: ${esc(r.carrierEmail ?? '—')} · USDOT ${esc(r.carrierDot)}</div>
+          </div>
+          <span class="rfq-ai-tag">Personalized draft</span>
+        </div>
+        ${field({
+          name: `subject_${r.id}`,
+          label: 'Subject',
+          required: true,
+          value: r.draftSubject ?? '',
+        })}
+        ${field({
+          name: `body_${r.id}`,
+          label: 'Message',
+          textarea: true,
+          required: true,
+          col2: true,
+          value: r.draftBody ?? '',
+        })}
+      </div>`;
+    })
+    .join('');
+
+  const skippedHtml = skipped.length
+    ? `<div class="rfq-section-title">Not contacted</div>${skipped
+        .map(
+          (r) =>
+            `<div class="rfq-skip"><b>${esc(r.carrierName)}</b> — ${
+              r.status === 'no_email' ? 'no public email on file' : 'opted out of rate requests'
+            }.</div>`,
+        )
+        .join('')}`
+    : '';
+
+  const n = sendable.length;
+  const body = `
+  <main class="rfq-wrap rfq-wide">
+    <p class="rfq-eyebrow">Review before sending</p>
+    <h1>${esc(String(n))} personalized draft${n === 1 ? '' : 's'} ready</h1>
+    <p class="rfq-lede">Each carrier gets its own email, addressed to them and written from your lane and their equipment. Read every draft, tweak anything, then send. Nothing goes out until you confirm.</p>
+    ${dryRunNote}
+    ${capNote}
+    <div class="rfq-card">
+      <div class="rfq-section-title">Shipment</div>
+      ${requestSummary(request)}
+    </div>
+    <form method="post" action="${esc(opts.actionUrl)}" novalidate>
+      <div class="rfq-section-title">Carrier drafts</div>
+      ${draftCards || `<div class="rfq-empty">No carriers with an email to contact on this request.</div>`}
+      ${skippedHtml}
+      <div class="rfq-review-actions">
+        ${
+          n > 0
+            ? `<button type="submit" class="rfq-btn">Confirm &amp; send ${esc(String(n))} request${
+                n === 1 ? '' : 's'
+              } <span aria-hidden="true">→</span></button>`
+            : ''
+        }
+        <a class="rfq-btn rfq-btn--ghost" href="/directory">Back to directory</a>
+      </div>
+    </form>
+    <p class="rfq-help" style="margin:16px 0 0;">Come back to these drafts any time: <code>${esc(opts.reviewUrl)}</code></p>
+  </main>`;
+  return page(
+    `Review ${n} rate-request draft${n === 1 ? '' : 's'} · QuoteFleet`,
+    'Review and edit each carrier’s personalized rate request before sending.',
     '/directory/rfq',
     body,
   );

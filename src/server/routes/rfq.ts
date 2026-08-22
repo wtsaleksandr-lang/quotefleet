@@ -39,9 +39,12 @@ import {
   type ResolveDeps,
 } from '../rfq/resolve.js';
 import { sendRfqToCarrier, rfqLiveSendEnabled, type SendRfqDeps } from '../rfq/email.js';
+import { draftRfqEmail, type RfqCarrierFacts } from '../rfq/draftEmail.js';
+import type { complete } from '../../ai/client.js';
 import { isValidRfqToken } from '../rfq/tokens.js';
 import {
   renderRfqForm,
+  renderRfqReview,
   renderRfqConfirmation,
   renderShipperView,
   renderCarrierQuotePage,
@@ -84,6 +87,10 @@ export interface RfqRouteDeps {
   throttleMs?: number;
   /** Force-reingest kicker (defaults to the real autoHeal fn). */
   forceReingest?: () => Promise<'started' | 'lock-held' | 'disabled'>;
+  /** Injected AI client for the per-carrier drafter (defaults to the app client). */
+  aiComplete?: typeof complete;
+  /** Presence gates the AI draft step (defaults to ANTHROPIC_API_KEY). */
+  anthropicKey?: string;
 }
 
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
@@ -248,58 +255,49 @@ export function registerRfqRoutes(app: Express, deps: RfqRouteDeps = {}) {
           filterSnapshot: snapshot,
         });
 
-        // Create recipient rows (each with its classified initial status).
+        // PHASE 1 — GENERATE. Draft a personalized "Dear <Company>," letter per
+        // PENDING recipient (AI-drafted, else the deterministic template). This
+        // does NOT send anything: the shipper reviews/edits on the next screen and
+        // confirms send in phase 2. Non-pending rows (no_email/opted_out) get no
+        // draft. A per-carrier draft failure never blocks — draftRfqEmail always
+        // returns a usable letter (template fallback).
+        const aiComplete = deps.aiComplete;
+        const anthropicKey = deps.anthropicKey;
+        const drafts = await Promise.all(
+          resolved.recipients.map(async (r) => {
+            if (r.status !== 'pending') return { subject: null as string | null, body: null as string | null };
+            const facts: RfqCarrierFacts = r.facts ?? { name: r.name };
+            const d = await draftRfqEmail(request, facts, { aiComplete, anthropicKey });
+            return { subject: d.subject, body: d.body };
+          }),
+        );
+
+        // Create recipient rows (each with its classified status + its draft).
         const created = await store.addRecipients(
           request.id,
-          resolved.recipients.map((r) => ({
+          resolved.recipients.map((r, i) => ({
             carrierDot: r.usdot,
             carrierName: r.name,
             carrierEmail: r.email,
             status: r.status,
+            draftSubject: drafts[i].subject,
+            draftBody: drafts[i].body,
           })),
         );
 
-        // Fan out: email each 'pending' recipient (dry-run unless RFQ_LIVE_SEND).
-        const liveSend = deps.liveSend ?? rfqLiveSendEnabled();
-        const throttleMs = deps.throttleMs ?? rfqThrottleMs();
         const baseUrl = baseUrlOf(deps, req);
-        const finalStatus = new Map<number, RfqRecipientStatus>();
-        for (const rec of created) finalStatus.set(rec.id, rec.status as RfqRecipientStatus);
-
-        for (const rec of created) {
-          if (rec.status !== 'pending') continue;
-          const result = await sendRfqToCarrier(
-            request,
-            { carrierName: rec.carrierName, carrierEmail: rec.carrierEmail, quoteToken: rec.quoteToken },
-            { send: deps.send, isEmailSuppressed, liveSend, baseUrl },
-          );
-          const next: RfqRecipientStatus =
-            result.status === 'sent' ? 'sent' : result.status === 'opted_out' ? 'opted_out' : 'failed';
-          await store.markRecipientStatus(rec.id, next, next === 'sent' ? new Date() : null);
-          finalStatus.set(rec.id, next);
-          if (liveSend && throttleMs > 0) await sleep(throttleMs);
-        }
-
-        // Tally the outcome for the confirmation page.
-        let sent = 0;
-        let noEmail = 0;
-        let optedOut = 0;
-        for (const s of finalStatus.values()) {
-          if (s === 'sent') sent++;
-          else if (s === 'no_email') noEmail++;
-          else if (s === 'opted_out') optedOut++;
-        }
-
-        const viewUrl = `${baseUrl.replace(/\/$/, '')}/directory/rfq/${request.viewToken}`;
+        const reviewUrl = `${baseUrl.replace(/\/$/, '')}/directory/rfq/${request.viewToken}/review`;
         res.type('html').send(
-          renderRfqConfirmation({
-            viewUrl,
-            sent,
-            noEmail,
-            optedOut,
+          renderRfqReview({
+            request,
+            recipients: created,
+            reviewUrl,
+            actionUrl: `/directory/rfq/${request.viewToken}/send`,
+            noEmail: created.filter((r) => r.status === 'no_email').length,
+            optedOut: created.filter((r) => r.status === 'opted_out').length,
             cappedOut: resolved.cappedOut,
             total: resolved.totalMatched,
-            dryRun: !liveSend,
+            dryRun: !(deps.liveSend ?? rfqLiveSendEnabled()),
           }),
         );
       } catch (err) {
@@ -370,6 +368,111 @@ export function registerRfqRoutes(app: Express, deps: RfqRouteDeps = {}) {
       const result = await store.optOutByQuoteToken(token);
       if (!result.ok) return res.status(404).type('html').send(renderRfqNotFound());
       res.type('html').send(renderOptOutConfirmation({ carrierName: result.carrierName }));
+    } catch (err) {
+      next(err);
+    }
+  });
+
+  // ── PHASE 1 review screen (GET) — re-open the editable drafts for a request.
+  //    Registered before the bare :viewToken GET (extra /review segment). ─────
+  app.get('/directory/rfq/:viewToken/review', async (req: Request, res: Response, next) => {
+    try {
+      const token = String(req.params.viewToken);
+      if (!isValidRfqToken(token)) return res.status(404).type('html').send(renderRfqNotFound());
+      const view = await store.getByViewToken(token);
+      if (!view) return res.status(404).type('html').send(renderRfqNotFound());
+      const baseUrl = baseUrlOf(deps, req);
+      res.type('html').send(
+        renderRfqReview({
+          request: view.request,
+          recipients: view.recipients,
+          reviewUrl: `${baseUrl.replace(/\/$/, '')}/directory/rfq/${view.request.viewToken}/review`,
+          actionUrl: `/directory/rfq/${view.request.viewToken}/send`,
+          noEmail: view.recipients.filter((r) => r.status === 'no_email').length,
+          optedOut: view.recipients.filter((r) => r.status === 'opted_out').length,
+          cappedOut: 0,
+          total: view.recipients.length,
+          dryRun: !(deps.liveSend ?? rfqLiveSendEnabled()),
+        }),
+      );
+    } catch (err) {
+      next(err);
+    }
+  });
+
+  // ── PHASE 2 — CONFIRM & SEND. Persist the shipper's (possibly-edited) drafts,
+  //    then run the fan-out over ONLY the approved/pending recipients (dry-run
+  //    unless RFQ_LIVE_SEND), honoring suppression + one-click opt-out. ────────
+  app.post('/directory/rfq/:viewToken/send', async (req: Request, res: Response, next) => {
+    try {
+      const token = String(req.params.viewToken);
+      if (!isValidRfqToken(token)) return res.status(404).type('html').send(renderRfqNotFound());
+      const view = await store.getByViewToken(token);
+      if (!view) return res.status(404).type('html').send(renderRfqNotFound());
+
+      const { request } = view;
+      const body = (req.body ?? {}) as Record<string, unknown>;
+      const str = (v: unknown) => String(v ?? '').trim();
+
+      const liveSend = deps.liveSend ?? rfqLiveSendEnabled();
+      const throttleMs = deps.throttleMs ?? rfqThrottleMs();
+      const baseUrl = baseUrlOf(deps, req);
+
+      const finalStatus = new Map<number, RfqRecipientStatus>();
+      for (const rec of view.recipients) finalStatus.set(rec.id, rec.status as RfqRecipientStatus);
+
+      // Skip anything already terminal for THIS send (only pending rows are sent).
+      // Re-sending a request whose recipients are already 'sent' is a no-op.
+      for (const rec of view.recipients) {
+        if (rec.status !== 'pending') continue;
+
+        // Persist the shipper's edit (falls back to the stored draft when the
+        // form omitted the field). The edited value is what actually gets sent.
+        const editedSubject = body[`subject_${rec.id}`] !== undefined ? str(body[`subject_${rec.id}`]) : rec.draftSubject ?? '';
+        const editedBody = body[`body_${rec.id}`] !== undefined ? str(body[`body_${rec.id}`]) : rec.draftBody ?? '';
+        if (editedSubject !== (rec.draftSubject ?? '') || editedBody !== (rec.draftBody ?? '')) {
+          await store.updateRecipientDraft(rec.id, editedSubject, editedBody);
+        }
+
+        const result = await sendRfqToCarrier(
+          request,
+          {
+            carrierName: rec.carrierName,
+            carrierEmail: rec.carrierEmail,
+            quoteToken: rec.quoteToken,
+            draftSubject: editedSubject || null,
+            draftBody: editedBody || null,
+          },
+          { send: deps.send, isEmailSuppressed, liveSend, baseUrl },
+        );
+        const nextStatus: RfqRecipientStatus =
+          result.status === 'sent' ? 'sent' : result.status === 'opted_out' ? 'opted_out' : 'failed';
+        await store.markRecipientStatus(rec.id, nextStatus, nextStatus === 'sent' ? new Date() : null);
+        finalStatus.set(rec.id, nextStatus);
+        if (liveSend && throttleMs > 0) await sleep(throttleMs);
+      }
+
+      let sent = 0;
+      let noEmail = 0;
+      let optedOut = 0;
+      for (const s of finalStatus.values()) {
+        if (s === 'sent') sent++;
+        else if (s === 'no_email') noEmail++;
+        else if (s === 'opted_out') optedOut++;
+      }
+
+      const viewUrl = `${baseUrl.replace(/\/$/, '')}/directory/rfq/${request.viewToken}`;
+      res.type('html').send(
+        renderRfqConfirmation({
+          viewUrl,
+          sent,
+          noEmail,
+          optedOut,
+          cappedOut: 0,
+          total: view.recipients.length,
+          dryRun: !liveSend,
+        }),
+      );
     } catch (err) {
       next(err);
     }
