@@ -2514,3 +2514,62 @@ export const directoryRevealUsage = pgTable(
 
 export type DirectoryRevealUsage = typeof directoryRevealUsage.$inferSelect;
 export type NewDirectoryRevealUsage = typeof directoryRevealUsage.$inferInsert;
+
+// ────────────────────────────────────────────────────────────────────
+// SAVED LISTS — Directory Pro shippers save carriers into named lists (PR D).
+//
+// A logged-in SHIPPER (a `users` row, tenant-less, role='shipper') groups
+// carriers into named lists and revisits them. Directory Pro feature — the
+// entitlement is enforced at the route layer (hasDirectoryPro); the tables
+// themselves reference `users` only, never `tenants`, so saved lists stay out of
+// tenant MRR/plan by construction (same posture as directory_subscriptions).
+//
+//   saved_lists       — one row per (user, list name). Indexed by user_id for
+//                       the "my lists" query.
+//   saved_list_items  — carriers saved into a list, keyed by carrier USDOT (the
+//                       carrier_directory identity). UNIQUE(list_id, carrier_dot)
+//                       makes an add idempotent; indexed by list_id.
+//
+// Self-healed in src/db/migrate.ts (Replit skips db:migrate). A phantom-drop
+// loses saved lists (user data, not billing state); the CREATE TABLE IF NOT
+// EXISTS self-heal re-creates the empty tables on boot.
+// ────────────────────────────────────────────────────────────────────
+export const savedLists = pgTable(
+  'saved_lists',
+  {
+    id: serial('id').primaryKey(),
+    /** The shipper user this list belongs to. */
+    userId: integer('user_id')
+      .notNull()
+      .references(() => users.id, { onDelete: 'cascade' }),
+    /** The list's display name (trimmed, 1–80 chars; enforced at the route). */
+    name: text('name').notNull(),
+    createdAt: timestamp('created_at', { withTimezone: true, mode: 'date' }).notNull().defaultNow(),
+    updatedAt: timestamp('updated_at', { withTimezone: true, mode: 'date' }).notNull().defaultNow(),
+  },
+  (t) => [index('saved_lists_user_idx').on(t.userId)]
+);
+
+export type SavedList = typeof savedLists.$inferSelect;
+export type NewSavedList = typeof savedLists.$inferInsert;
+
+export const savedListItems = pgTable(
+  'saved_list_items',
+  {
+    id: serial('id').primaryKey(),
+    /** The parent list. Cascade-deleted with the list. */
+    listId: integer('list_id')
+      .notNull()
+      .references(() => savedLists.id, { onDelete: 'cascade' }),
+    /** The saved carrier's USDOT (the carrier_directory identity). */
+    carrierDot: text('carrier_dot').notNull(),
+    addedAt: timestamp('added_at', { withTimezone: true, mode: 'date' }).notNull().defaultNow(),
+  },
+  (t) => [
+    uniqueIndex('saved_list_items_list_dot_idx').on(t.listId, t.carrierDot),
+    index('saved_list_items_list_idx').on(t.listId),
+  ]
+);
+
+export type SavedListItem = typeof savedListItems.$inferSelect;
+export type NewSavedListItem = typeof savedListItems.$inferInsert;
