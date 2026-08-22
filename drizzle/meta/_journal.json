@@ -414,6 +414,13 @@
       "when": 1788288477221,
       "tag": "0058_directory_rfq_usage",
       "breakpoints": true
+    },
+    {
+      "idx": 59,
+      "version": "7",
+      "when": 1788374877221,
+      "tag": "0059_carrier_contacts",
+      "breakpoints": true
     }
   ]
 }

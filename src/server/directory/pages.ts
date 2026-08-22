@@ -60,6 +60,35 @@ export function esc(s: unknown): string {
 const fmtNum = (n: number | null | undefined): string =>
   n == null ? '—' : Number(n).toLocaleString('en-US');
 
+/**
+ * PR C — progressive-enhancement script for the Directory Pro "Reveal additional
+ * contacts" button. Intercepts the form POST, fetches the reveal endpoint, and
+ * swaps the returned HTML fragment into `.cp-reveal-result` — with loading +
+ * error states. With JS disabled the form still POSTs and the endpoint returns
+ * the same fragment as a standalone response, so the feature degrades cleanly.
+ */
+const REVEAL_ENHANCE_SCRIPT = `
+(function(){
+  var forms = document.querySelectorAll('form[data-reveal-form]');
+  Array.prototype.forEach.call(forms, function(f){
+    if (f.__revealBound) return; f.__revealBound = true;
+    var result = f.parentElement ? f.parentElement.querySelector('[data-reveal-result]') : null;
+    var btn = f.querySelector('button');
+    var label = btn ? btn.textContent : 'Reveal additional contacts';
+    f.addEventListener('submit', function(e){
+      e.preventDefault();
+      if (btn) { btn.disabled = true; btn.textContent = 'Revealing…'; }
+      if (result) { result.innerHTML = '<p class="cp-reveal-msg" role="status">Revealing additional contacts…</p>'; }
+      fetch(f.action, { method: 'POST', headers: { 'Accept': 'text/html' }, credentials: 'same-origin' })
+        .then(function(r){ return r.text(); })
+        .then(function(html){ if (result) result.innerHTML = html; })
+        .catch(function(){ if (result) result.innerHTML = '<p class="cp-reveal-msg cp-reveal-msg--error" role="status">Could not load additional contacts. Please try again.</p>'; })
+        .then(function(){ if (btn) { btn.disabled = false; btn.textContent = label; } });
+    });
+  });
+})();
+`.trim();
+
 /** RFQ recipient cap — mirrors rfqMaxRecipients() in routes/rfq.ts (default 25).
  *  Read locally (not imported) to avoid a routes→resolve→pages import cycle. The
  *  send flow enforces the same cap; the action-bar label reflects it so the CTA
@@ -508,6 +537,18 @@ const DIRECTORY_CSS = `
   .cp-gated .cp-unlock-btn { margin-bottom: 8px; }
   .cp-gated .cp-reveal-btn[disabled] { opacity: 0.55; cursor: not-allowed; }
   .cp-gated .cp-reveal-form { margin: 10px 0 0; }
+  /* PR C — the revealed enriched-contacts result (swapped in by the inline
+     enhancement script). Token-only + theme-aware; cards stack full-width so
+     the no-orphan-wrap rule is moot. */
+  .cp-reveal-result { margin-top: 12px; }
+  .cp-reveal-list { display: flex; flex-direction: column; gap: 12px; }
+  .cp-reveal-note { margin: 0 0 4px; font-size: 12px; color: var(--muted); }
+  .cp-reveal-card { border: 1px solid var(--border); border-radius: var(--radius); padding: 12px; background: var(--surface-2); }
+  .cp-reveal-name { font-size: 13px; font-weight: 600; color: var(--ink); display: flex; align-items: center; gap: 8px; flex-wrap: wrap; margin-bottom: 4px; }
+  .cp-reveal-conf { font-size: 11px; font-weight: 500; padding: 2px 8px; border-radius: var(--radius-chip); border: 1px solid var(--border); color: var(--muted); }
+  .cp-reveal-conf--high { color: var(--accent); border-color: var(--accent); }
+  .cp-reveal-msg { margin: 0; font-size: 13px; color: var(--muted); }
+  .cp-reveal-msg--error { color: var(--ink-soft); font-weight: 500; }
   .cp-actions { display: flex; flex-direction: column; gap: 8px; margin-top: 8px; }
   .cp-actions .btn { width: 100%; justify-content: center; }
   /* ── Credential badges — distinct solid colours + pure-CSS hover/focus tooltip ─
@@ -2180,10 +2221,12 @@ export function renderCarrierProfile(opts: {
     ? `<div class="cp-gated cp-gated--pro">
         <h3>Additional contacts</h3>
         <p>Direct dispatch and decision-maker contacts beyond the public FMCSA record — part of your Directory Pro plan.</p>
-        <form class="cp-reveal-form" method="post" action="${revealAction}">
+        <form class="cp-reveal-form" method="post" action="${revealAction}" data-reveal-form>
           <button type="submit" class="btn btn-primary cp-reveal-btn">Reveal additional contacts</button>
         </form>
-      </div>`
+        <div class="cp-reveal-result" data-reveal-result aria-live="polite"></div>
+      </div>
+      <script>${REVEAL_ENHANCE_SCRIPT}</script>`
     : `<div class="cp-gated">
         <h3>More dispatch contacts</h3>
         <p>Direct dispatch and decision-maker contacts beyond the public FMCSA phone and email are part of Directory Pro.</p>

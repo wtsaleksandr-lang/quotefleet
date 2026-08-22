@@ -416,6 +416,43 @@ export const SELF_HEAL_TABLE_STATEMENTS: readonly string[] = [
     "sends" integer DEFAULT 0 NOT NULL
   )`,
   `CREATE UNIQUE INDEX IF NOT EXISTS "directory_rfq_usage_account_period_idx" ON "directory_rfq_usage" ("account_key","period")`,
+  // 0059_carrier_contacts.sql — the ENRICHED-CONTACTS layer behind the Directory
+  // Pro "Reveal additional contacts" button (PR C). Three tables: the cached
+  // additional contacts, the per-DOT attempt marker (TTL cache), and the daily
+  // fresh-reveal cost meter. Healed HERE (same reasoning as the directory tables
+  // above): the Replit deploy skips db:migrate and its publish tool can drop
+  // tables, so these CREATE TABLE / INDEX IF NOT EXISTS run on every boot and
+  // no-op on a healthy DB. MUST stay byte-for-byte equivalent to
+  // drizzle/0059_carrier_contacts.sql + schema.ts. A phantom-drop loses only a
+  // self-refilling cache/meter — never any subscription/entitlement state.
+  `CREATE TABLE IF NOT EXISTS "carrier_contacts" (
+    "id" serial PRIMARY KEY NOT NULL,
+    "carrier_dot" text NOT NULL,
+    "source" text NOT NULL,
+    "contact_name" text,
+    "title" text,
+    "email" text,
+    "phone" text,
+    "confidence" text,
+    "enriched_at" timestamp with time zone DEFAULT now() NOT NULL,
+    "raw_json" jsonb
+  )`,
+  `CREATE UNIQUE INDEX IF NOT EXISTS "carrier_contacts_dot_email_idx" ON "carrier_contacts" ("carrier_dot","email")`,
+  `CREATE INDEX IF NOT EXISTS "carrier_contacts_dot_idx" ON "carrier_contacts" ("carrier_dot")`,
+  `CREATE TABLE IF NOT EXISTS "carrier_enrichment_state" (
+    "id" serial PRIMARY KEY NOT NULL,
+    "carrier_dot" text NOT NULL,
+    "attempted_at" timestamp with time zone DEFAULT now() NOT NULL,
+    "contact_count" integer DEFAULT 0 NOT NULL
+  )`,
+  `CREATE UNIQUE INDEX IF NOT EXISTS "carrier_enrichment_state_dot_idx" ON "carrier_enrichment_state" ("carrier_dot")`,
+  `CREATE TABLE IF NOT EXISTS "directory_reveal_usage" (
+    "id" serial PRIMARY KEY NOT NULL,
+    "account_key" text NOT NULL,
+    "period" text NOT NULL,
+    "reveals" integer DEFAULT 0 NOT NULL
+  )`,
+  `CREATE UNIQUE INDEX IF NOT EXISTS "directory_reveal_usage_account_period_idx" ON "directory_reveal_usage" ("account_key","period")`,
 ];
 
 export async function ensureSelfHealTables(): Promise<void> {
