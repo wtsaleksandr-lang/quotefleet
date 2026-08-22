@@ -27,13 +27,18 @@ import { normalizeEmailAddress } from '../outreach/outreachEmailStore.js';
 import { dbOutreachEmailStore, type OutreachEmailStore } from '../outreach/outreachEmailStore.js';
 import { carrierName } from '../directory/pages.js';
 import { listCarriers, type DirectoryFilters, type VisibleCarrier } from '../directory/queries.js';
+import type { RfqCarrierFacts } from './draftEmail.js';
 
-/** Minimal carrier shape the resolver needs (drops everything render-only). */
+/** Minimal carrier shape the resolver needs (drops everything render-only), plus
+ *  the directory `facts` the AI drafter personalizes each rate request from. */
 export interface CarrierLite {
   usdot: string;
   name: string;
   email: string | null;
   contactHidden: boolean;
+  /** Directory facts (equipment/cargo/mode/location/port) for the AI drafter.
+   *  Optional so hand-built fixtures stay valid; the drafter degrades gracefully. */
+  facts?: RfqCarrierFacts;
 }
 
 export type RfqCandidateStatus = 'pending' | 'no_email' | 'opted_out';
@@ -83,13 +88,73 @@ export function parseDots(raw: unknown): string[] {
   return [...new Set(parts)];
 }
 
+/** Extract the AI-drafter facts from any carrier row carrying the FMCSA flag set
+ *  (a VisibleCarrier or a raw carrier_directory row — same field names). */
+export function carrierFactsFrom(
+  name: string,
+  c: {
+    city?: string | null;
+    state?: string | null;
+    intermodal?: boolean;
+    hazmat?: boolean;
+    dryVan?: boolean;
+    reefer?: boolean;
+    tanker?: boolean;
+    flatbed?: boolean;
+    dryBulk?: boolean;
+    householdGoods?: boolean;
+    beverages?: boolean;
+    produce?: boolean;
+    motorVehicles?: boolean;
+    livestock?: boolean;
+    grainFeed?: boolean;
+    oilfield?: boolean;
+    meat?: boolean;
+    paper?: boolean;
+    construction?: boolean;
+    farmSupplies?: boolean;
+    coalCoke?: boolean;
+    buildingMaterials?: boolean;
+    nearestPortCode?: string | null;
+  },
+): RfqCarrierFacts {
+  return {
+    name,
+    city: c.city ?? null,
+    state: c.state ?? null,
+    intermodal: !!c.intermodal,
+    hazmat: !!c.hazmat,
+    dryVan: !!c.dryVan,
+    reefer: !!c.reefer,
+    tanker: !!c.tanker,
+    flatbed: !!c.flatbed,
+    dryBulk: !!c.dryBulk,
+    householdGoods: !!c.householdGoods,
+    beverages: !!c.beverages,
+    produce: !!c.produce,
+    motorVehicles: !!c.motorVehicles,
+    livestock: !!c.livestock,
+    grainFeed: !!c.grainFeed,
+    oilfield: !!c.oilfield,
+    meat: !!c.meat,
+    paper: !!c.paper,
+    construction: !!c.construction,
+    farmSupplies: !!c.farmSupplies,
+    coalCoke: !!c.coalCoke,
+    buildingMaterials: !!c.buildingMaterials,
+    nearestPortCode: c.nearestPortCode ?? null,
+  };
+}
+
 /** Map a full VisibleCarrier row to the minimal CarrierLite the resolver uses. */
 export function toCarrierLite(c: VisibleCarrier): CarrierLite {
+  const name = carrierName(c);
   return {
     usdot: c.usdot,
-    name: carrierName(c),
+    name,
     email: c.email && c.email.trim() ? c.email.trim() : null,
     contactHidden: c.contactHidden,
+    facts: carrierFactsFrom(name, c),
   };
 }
 
@@ -184,13 +249,18 @@ export function dbResolveDeps(store: OutreachEmailStore = dbOutreachEmailStore):
           .select()
           .from(carrierDirectory)
           .where(inArray(carrierDirectory.usdot, dots));
-        // visibleCarrier isn't needed — map the raw row directly to CarrierLite.
-        return rows.map((r) => ({
-          usdot: r.usdot,
-          name: carrierName({ dbaName: r.dbaName, legalName: r.legalName }),
-          email: r.email && r.email.trim() ? r.email.trim() : null,
-          contactHidden: r.contactHidden,
-        }));
+        // visibleCarrier isn't needed — map the raw row directly to CarrierLite
+        // (the raw carrier_directory row carries the same FMCSA flag field names).
+        return rows.map((r) => {
+          const name = carrierName({ dbaName: r.dbaName, legalName: r.legalName });
+          return {
+            usdot: r.usdot,
+            name,
+            email: r.email && r.email.trim() ? r.email.trim() : null,
+            contactHidden: r.contactHidden,
+            facts: carrierFactsFrom(name, r),
+          };
+        });
       } catch (err) {
         console.warn('[rfq] listByDots failed; treating as no carriers:', err);
         return [];

@@ -75,6 +75,8 @@ class MemStore implements RfqStore {
       carrierName: r.carrierName,
       carrierEmail: r.carrierEmail,
       status: r.status,
+      draftSubject: r.draftSubject ?? null,
+      draftBody: r.draftBody ?? null,
       quoteToken: generateRfqToken(),
       sentAt: null,
       createdAt: new Date(),
@@ -88,6 +90,14 @@ class MemStore implements RfqStore {
     if (r) {
       r.status = status;
       if (sentAt !== undefined) r.sentAt = sentAt;
+    }
+  }
+
+  async updateRecipientDraft(id: number, draftSubject: string, draftBody: string): Promise<void> {
+    const r = this.recipients.find((x) => x.id === id);
+    if (r) {
+      r.draftSubject = draftSubject;
+      r.draftBody = draftBody;
     }
   }
 
@@ -182,6 +192,9 @@ async function boot(over: Partial<RfqRouteDeps> = {}): Promise<Harness> {
     baseUrl: 'https://test.local',
     throttleMs: 0,
     forceReingest,
+    // Force the deterministic template drafter in tests (never a real AI call),
+    // regardless of any ANTHROPIC_API_KEY in the ambient env.
+    anthropicKey: '',
     ...over,
   });
   const server = await new Promise<Server>((resolve) => {
@@ -231,20 +244,68 @@ describe('RFQ routes', () => {
     expect(r.headers.get('location')).toBe('/directory');
   });
 
-  it('POST /directory/rfq creates request + recipients, DRY-RUN (no send), shows link', async () => {
-    const r = await postForm(h.baseUrl, '/directory/rfq', { ...validShipper, dots: '1,2,3' });
+  it('PHASE 1: POST /directory/rfq drafts per carrier + renders the review gate, sends NOTHING', async () => {
+    const hh = await boot();
+    const r = await postForm(hh.baseUrl, '/directory/rfq', { ...validShipper, dots: '1,2,3' });
+    expect(r.status).toBe(200);
+    const html = await r.text();
+    // The review gate — NOT the confirmation/responses link.
+    expect(html).toContain('Review before sending');
+    expect(html).toContain('personalized draft');
+    expect(html).not.toContain('Your responses link');
+    // Nothing sent in phase 1, ever.
+    expect(hh.send).not.toHaveBeenCalled();
+    // One request + three recipients, all still PENDING/no_email (not sent).
+    expect(hh.store.requests).toHaveLength(1);
+    expect(hh.store.recipients).toHaveLength(3);
+    const statuses = hh.store.recipients.map((x) => x.status).sort();
+    expect(statuses).toEqual(['no_email', 'pending', 'pending']);
+    // The two pending recipients each got an INDIVIDUAL "Dear <Company>," draft.
+    const drafted = hh.store.recipients.filter((x) => x.status === 'pending');
+    for (const d of drafted) {
+      expect(d.draftBody ?? '').toContain(`Dear ${d.carrierName},`);
+      expect((d.draftSubject ?? '').length).toBeGreaterThan(0);
+    }
+    hh.server.close();
+  });
+
+  it('PHASE 2: POST /{viewToken}/send sends the approved drafts + shows the responses link (dry-run)', async () => {
+    const hh = await boot();
+    await postForm(hh.baseUrl, '/directory/rfq', { ...validShipper, dots: '1,2,3' });
+    const viewToken = hh.store.requests.at(-1)!.viewToken;
+    const r = await postForm(hh.baseUrl, `/directory/rfq/${viewToken}/send`, {});
     expect(r.status).toBe(200);
     const html = await r.text();
     expect(html).toContain('responses link');
     expect(html).toContain('https://test.local/directory/rfq/');
-    // DRY-RUN: sender NEVER called.
-    expect(h.send).not.toHaveBeenCalled();
-    // One request + three recipients created.
-    expect(h.store.requests).toHaveLength(1);
-    expect(h.store.recipients).toHaveLength(3);
-    const statuses = h.store.recipients.map((x) => x.status).sort();
-    // 2 pending → sent (dry-run), 1 no_email.
+    // DRY-RUN default: sender never called, pending → sent.
+    expect(hh.send).not.toHaveBeenCalled();
+    const statuses = hh.store.recipients.map((x) => x.status).sort();
     expect(statuses).toEqual(['no_email', 'sent', 'sent']);
+    hh.server.close();
+  });
+
+  it('PHASE 2: an EDITED draft is what gets sent', async () => {
+    const hh = await boot({ liveSend: true });
+    await postForm(hh.baseUrl, '/directory/rfq', { ...validShipper, dots: '1,2,3' });
+    const req = hh.store.requests.at(-1)!;
+    const pending = hh.store.recipients.filter((x) => x.rfqId === req.id && x.status === 'pending');
+    const target = pending[0];
+    const edited = `Dear ${target.carrierName},\n\nEDITED BODY — my hand-tuned ask.\n\nDana`;
+    await postForm(hh.baseUrl, `/directory/rfq/${req.viewToken}/send`, {
+      [`subject_${target.id}`]: 'EDITED SUBJECT',
+      [`body_${target.id}`]: edited,
+    });
+    // The edit is persisted…
+    const saved = hh.store.recipients.find((x) => x.id === target.id);
+    expect(saved?.draftSubject).toBe('EDITED SUBJECT');
+    expect(saved?.draftBody).toBe(edited);
+    // …and the edited copy is what the sender received.
+    const sentMsgs = hh.send.mock.calls.map((c) => c[0] as { subject: string; text: string });
+    const editedSend = sentMsgs.find((m) => m.subject === 'EDITED SUBJECT');
+    expect(editedSend).toBeTruthy();
+    expect(editedSend!.text).toContain('EDITED BODY — my hand-tuned ask.');
+    hh.server.close();
   });
 
   it('POST validation: bad email re-renders the form with an error (no rows)', async () => {
@@ -259,11 +320,16 @@ describe('RFQ routes', () => {
     expect(h.store.requests).toHaveLength(before);
   });
 
-  it('live send calls the injected sender for pending recipients', async () => {
+  it('live send calls the injected sender for pending recipients (phase 2)', async () => {
     const h2 = await boot({ liveSend: true });
-    const r = await postForm(h2.baseUrl, '/directory/rfq', { ...validShipper, dots: '1,2,3' });
+    // Phase 1 drafts, sends nothing.
+    const gen = await postForm(h2.baseUrl, '/directory/rfq', { ...validShipper, dots: '1,2,3' });
+    expect(gen.status).toBe(200);
+    expect(h2.send).not.toHaveBeenCalled();
+    // Phase 2 confirm & send → the two pending recipients (3rd has no email) send.
+    const viewToken = h2.store.requests.at(-1)!.viewToken;
+    const r = await postForm(h2.baseUrl, `/directory/rfq/${viewToken}/send`, {});
     expect(r.status).toBe(200);
-    // 2 pending recipients (the 3rd has no email) → 2 sends.
     expect(h2.send).toHaveBeenCalledTimes(2);
     h2.server.close();
   });

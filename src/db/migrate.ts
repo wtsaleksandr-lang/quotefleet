@@ -303,6 +303,13 @@ export const SELF_HEAL_TABLE_STATEMENTS: readonly string[] = [
     "valid_until" text,
     "created_at" timestamp DEFAULT now() NOT NULL
   )`,
+  // 0056_rfq_email_drafts.sql — per-carrier AI/template email drafts persisted on
+  // the recipient row for the two-phase (generate → review/edit → send) flow.
+  // Both nullable, no backfill, so IF NOT EXISTS no-ops on a healthy DB and
+  // re-adds them after a Replit phantom-drop. Byte-for-byte with the drizzle
+  // migration + schema.ts (rfqRecipients.draftSubject / draftBody).
+  `ALTER TABLE "rfq_recipients" ADD COLUMN IF NOT EXISTS "draft_subject" text`,
+  `ALTER TABLE "rfq_recipients" ADD COLUMN IF NOT EXISTS "draft_body" text`,
   `CREATE UNIQUE INDEX IF NOT EXISTS "rfq_requests_view_token_idx" ON "rfq_requests" ("view_token")`,
   `CREATE UNIQUE INDEX IF NOT EXISTS "rfq_recipients_quote_token_idx" ON "rfq_recipients" ("quote_token")`,
   `CREATE INDEX IF NOT EXISTS "rfq_recipients_rfq_idx" ON "rfq_recipients" ("rfq_id")`,

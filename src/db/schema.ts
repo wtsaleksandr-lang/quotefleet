@@ -2043,6 +2043,13 @@ export const rfqRecipients = pgTable(
     carrierEmail: text('carrier_email'),
     /** 'pending' | 'sent' | 'no_email' | 'opted_out' | 'quoted' | 'failed'. */
     status: text('status').notNull().default('pending'),
+    /** AI-drafted (or template) per-carrier email subject, generated in the
+     *  review phase and editable by the shipper before send. Null until drafted. */
+    draftSubject: text('draft_subject'),
+    /** AI-drafted (or template) per-carrier email body — the personalized
+     *  "Dear <Company>," letter the shipper reviews/edits, then sends. Null until
+     *  drafted; the (possibly-edited) value is what the send path renders. */
+    draftBody: text('draft_body'),
     /** Unguessable token — the carrier's private quote page (/directory/rfq/quote/:quoteToken). */
     quoteToken: text('quote_token').notNull(),
     sentAt: timestamp('sent_at', { mode: 'date' }),

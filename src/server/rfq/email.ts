@@ -148,6 +148,72 @@ export function buildCarrierRfqEmail(
   return { subject, text, html };
 }
 
+/**
+ * Build the carrier-facing email from a per-carrier DRAFT (the AI-drafted,
+ * shipper-reviewed "Dear <Company>," letter) instead of the static template. The
+ * letter body carries the personalization + the ask; this wrapper only adds the
+ * factual quote-submission CTA and the SAME compliance chrome (one-click opt-out
+ * + physical address) as buildCarrierRfqEmail — so the two-phase send keeps every
+ * guardrail intact.
+ */
+export function buildDraftedRfqEmail(
+  request: RfqRequest,
+  recipient: Pick<RfqRecipient, 'quoteToken'>,
+  baseUrl: string,
+  draft: { subject: string; body: string },
+): BuiltEmail {
+  const qUrl = quoteUrl(baseUrl, recipient.quoteToken);
+  const oUrl = optOutUrl(baseUrl, recipient.quoteToken);
+  const subject = (draft.subject || '').trim() || `Rate request: ${laneSummary(request)}`;
+  const bodyText = (draft.body || '').trim();
+
+  // ── Plaintext ────────────────────────────────────────────────────────────
+  const text = [
+    bodyText,
+    '',
+    'Submit your quote here:',
+    qUrl,
+    '',
+    `If you'd rather not receive rate requests, opt out here:`,
+    oUrl,
+    '',
+    `${SENDER_NAME} · ${SENDER_ADDRESS}`,
+  ].join('\n');
+
+  // ── HTML — the letter as paragraphs, then the CTA + compliance footer. ─────
+  const paras = bodyText
+    .split(/\n\s*\n/)
+    .map((p) => p.trim())
+    .filter(Boolean)
+    .map(
+      (p) =>
+        `<p style="margin:0 0 14px;color:#0b0f15;font-size:14px;line-height:1.6;white-space:pre-line;">${esc(
+          p,
+        )}</p>`,
+    )
+    .join('');
+  const html = `<!doctype html>
+<html><body style="margin:0;padding:0;background:#f4f5f7;">
+  <div style="max-width:560px;margin:0 auto;padding:24px 16px;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Arial,sans-serif;color:#0b0f15;">
+    <p style="margin:0 0 4px;font-size:12px;letter-spacing:.08em;text-transform:uppercase;color:#5b6472;">Rate request</p>
+    <h1 style="margin:0 0 16px;font-size:20px;line-height:1.25;color:#0b0f15;">${esc(laneSummary(request))}</h1>
+    ${paras}
+    <div style="margin:24px 0;">
+      <a href="${esc(qUrl)}" style="display:inline-block;background:#0b0f15;color:#ffffff;text-decoration:none;font-size:15px;font-weight:600;padding:12px 22px;border-radius:4px;">Submit your quote →</a>
+    </div>
+    <hr style="border:none;border-top:1px solid #e3e6ea;margin:24px 0 12px;">
+    <p style="margin:0 0 6px;color:#8a919e;font-size:12px;line-height:1.5;">You received this because your carrier is listed in the public FMCSA-sourced ${esc(
+      SENDER_NAME,
+    )} directory. Don't want rate requests? <a href="${esc(
+      oUrl,
+    )}" style="color:#5b6472;">Opt out in one click</a>.</p>
+    <p style="margin:0;color:#8a919e;font-size:12px;">${esc(SENDER_NAME)} · ${esc(SENDER_ADDRESS)}</p>
+  </div>
+</body></html>`;
+
+  return { subject, text, html };
+}
+
 export type RfqSendStatus = 'sent' | 'failed' | 'opted_out';
 
 export interface RfqSendResult {
@@ -177,7 +243,8 @@ export interface SendRfqDeps {
  */
 export async function sendRfqToCarrier(
   request: RfqRequest,
-  recipient: Pick<RfqRecipient, 'carrierName' | 'carrierEmail' | 'quoteToken'>,
+  recipient: Pick<RfqRecipient, 'carrierName' | 'carrierEmail' | 'quoteToken'> &
+    Partial<Pick<RfqRecipient, 'draftSubject' | 'draftBody'>>,
   deps: SendRfqDeps = {},
 ): Promise<RfqSendResult> {
   const send = deps.send ?? realSendEmail;
@@ -193,7 +260,15 @@ export async function sendRfqToCarrier(
     return { status: 'opted_out', dryRun: !liveSend };
   }
 
-  const built = buildCarrierRfqEmail(request, recipient, baseUrl);
+  // Prefer the per-carrier drafted (AI/edited) letter when one is persisted;
+  // otherwise fall back to the static template (keeps old callers working).
+  const draftBody = (recipient.draftBody ?? '').trim();
+  const built = draftBody
+    ? buildDraftedRfqEmail(request, recipient, baseUrl, {
+        subject: (recipient.draftSubject ?? '').trim(),
+        body: draftBody,
+      })
+    : buildCarrierRfqEmail(request, recipient, baseUrl);
 
   // Gate OFF → dry-run: render + log, but DO NOT touch the network sender.
   if (!liveSend) {

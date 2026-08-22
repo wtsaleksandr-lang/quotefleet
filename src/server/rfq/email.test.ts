@@ -4,7 +4,7 @@
  * the network sender, live send does, and suppression short-circuits both.
  */
 import { describe, it, expect, vi } from 'vitest';
-import { buildCarrierRfqEmail, sendRfqToCarrier, quoteUrl, optOutUrl } from './email.js';
+import { buildCarrierRfqEmail, buildDraftedRfqEmail, sendRfqToCarrier, quoteUrl, optOutUrl } from './email.js';
 import { SENDER_ADDRESS } from '../outreach/draftEmail.js';
 import type { EmailOut } from '../../email/send.js';
 import type { RfqRequest, RfqRecipient } from '../../db/schema.js';
@@ -45,6 +45,8 @@ const recipient = (over: Partial<RfqRecipient> = {}): RfqRecipient => ({
   carrierName: 'Acme Freight',
   carrierEmail: 'ops@acme.example',
   status: 'pending',
+  draftSubject: null,
+  draftBody: null,
   quoteToken: 'quote-token-xyz',
   sentAt: null,
   createdAt: new Date('2026-08-20T00:00:00Z'),
@@ -73,6 +75,49 @@ describe('buildCarrierRfqEmail', () => {
     const built = buildCarrierRfqEmail(request({ commodity: null, weight: null, notes: null }), recipient(), BASE);
     expect(built.text).not.toContain('Commodity:');
     expect(built.text).not.toContain('Notes:');
+  });
+});
+
+describe('buildDraftedRfqEmail', () => {
+  it('renders the drafted letter body + quote link + opt-out + address', () => {
+    const draft = {
+      subject: 'Rate request: LA to Dallas, reefer',
+      body: 'Dear Acme Freight,\n\nSaw your reefer freight. I have a load LA to Dallas.\n\nDana Shipper, Dana Logistics',
+    };
+    const built = buildDraftedRfqEmail(request(), recipient(), BASE, draft);
+    expect(built.subject).toBe('Rate request: LA to Dallas, reefer');
+    // The personalized greeting + body survive into both text and html.
+    expect(built.text).toContain('Dear Acme Freight,');
+    expect(built.html).toContain('Dear Acme Freight,');
+    // Compliance chrome is still attached.
+    expect(built.text).toContain(quoteUrl(BASE, 'quote-token-xyz'));
+    expect(built.text).toContain(optOutUrl(BASE, 'quote-token-xyz'));
+    expect(built.text).toContain(SENDER_ADDRESS);
+  });
+
+  it('falls back to a lane subject when the draft subject is blank', () => {
+    const built = buildDraftedRfqEmail(request(), recipient(), BASE, { subject: '', body: 'Dear X,\n\nhi' });
+    expect(built.subject).toContain('Los Angeles, CA → Dallas, TX');
+  });
+});
+
+describe('sendRfqToCarrier — uses the persisted draft when present', () => {
+  it('LIVE send renders the drafted body, not the static template', async () => {
+    let captured: { text?: string; subject?: string } = {};
+    const send = vi.fn(async (msg: { text?: string; subject?: string }) => {
+      captured = msg;
+      return okOut;
+    });
+    const res = await sendRfqToCarrier(
+      request(),
+      recipient({ draftSubject: 'Custom subject', draftBody: 'Dear Acme Freight,\n\nCustom personalized ask.\n\nDana' }),
+      { send, liveSend: true, baseUrl: BASE },
+    );
+    expect(res.status).toBe('sent');
+    expect(captured.subject).toBe('Custom subject');
+    expect(captured.text).toContain('Custom personalized ask.');
+    // The static template opener must NOT appear when a draft is used.
+    expect(captured.text).not.toContain('A shipper is requesting a rate for the following shipment');
   });
 });
 
