@@ -23,6 +23,7 @@ import {
   isTrialing,
   type PaidPlanId,
 } from '../plans.js';
+import { notifyAffiliateApproved, isTransitionToActive } from '../affiliate/notifications.js';
 
 /** Valid tenant lifecycle statuses. 'active' is the only one that serves a
  *  public quote page — 'suspended'/'churned' 404 the widget (see public.ts's
@@ -537,6 +538,22 @@ export async function patchAffiliateAdmin(opts: {
     'affiliate.update',
     { affiliateId: id, code: before.code, changed: plan.changed }
   );
+
+  // Best-effort: on a genuine transition INTO `active` (pending/suspended →
+  // active), email the affiliate their approved welcome. isTransitionToActive
+  // gates it so a no-op PATCH, a non-status edit, or an already-active row never
+  // emails. Uses the (possibly just-updated) commission rate for the headline.
+  if (isTransitionToActive(plan.changed)) {
+    const newRate = (updated[0] as Record<string, unknown>).commissionRate;
+    void notifyAffiliateApproved({
+      to: (before.email as string | null) ?? null,
+      affiliateName: (before.name as string | null) ?? null,
+      code: String(before.code ?? ''),
+      commissionRate: typeof newRate === 'number' ? newRate : null,
+    }).catch((err) => {
+      console.warn('[admin] affiliate-approved notify failed (non-fatal):', err);
+    });
+  }
 
   return { status: 200, json: { ok: true, affiliate: updated[0] } };
 }

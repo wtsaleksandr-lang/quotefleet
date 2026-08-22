@@ -27,6 +27,7 @@ import {
   isValidCodeShape,
 } from './programs.js';
 import { resolveCodeOwner } from './codes.js';
+import { notifyReferrerCreditEarned } from './notifications.js';
 
 interface RefCookie {
   code: string;
@@ -201,6 +202,21 @@ export async function linkReferralOnSignup(opts: {
           status: 'pending',
         });
       }
+
+      // Best-effort: tell the referrer they earned a free month. Gated on a
+      // GENUINELY-new credit (creditAlreadyExisted=!!already) so a retried
+      // signup that finds the credit already queued never re-emails. The email
+      // is one-per-conversion (the credit is one-per-attribution). Fire-and-
+      // forget — never block or fail the signup on the mail send.
+      void notifyReferrerCreditEarned({
+        creditAlreadyExisted: !!already,
+        to: owner.ownerEmail,
+        referralCode: cookie.code,
+        freeMonths: REFERRER_FREE_MONTHS,
+      }).catch((err) => {
+        console.warn('[affiliate] referral-credit notify failed (non-fatal):', err);
+      });
+
       return {
         kind: 'referral',
         attributionId: attribution.id,
