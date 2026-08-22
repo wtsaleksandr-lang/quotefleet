@@ -32,6 +32,7 @@ import {
   stateCarrierCount,
   relatedCarriers,
   getFacetCounts,
+  getHeroCarriers,
   normalizeFilters,
   citySlugify,
   FACET_QUERY_KEYS,
@@ -82,6 +83,13 @@ export function registerDirectoryRoutes(app: Express) {
 
   app.get('/api/public/directory/summary', publicAutocompleteLimiter, async (_req: Request, res: Response) => {
     return res.json(await getDirectorySummary());
+  });
+
+  // Random real carriers for the homepage hero preview cards (live social proof).
+  // Uncached so the featured set rotates every load (getHeroCarriers is random).
+  app.get('/api/directory/hero-carriers', publicAutocompleteLimiter, async (_req: Request, res: Response) => {
+    res.set('Cache-Control', 'no-store');
+    return res.json({ carriers: await getHeroCarriers() });
   });
 
   // Live FMCSA lookup — external per-call, so the tighter cost limiter applies.
