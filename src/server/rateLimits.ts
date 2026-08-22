@@ -283,6 +283,19 @@ export const rfqQuoteLimiter: RateLimitRequestHandler = rateLimit({
   message: { error: 'Too many submissions. Slow down and try again shortly.' },
 });
 
+/** POST /api/directory/carrier/:usdot/reveal — a FRESH reveal costs 1 AI call +
+ *  up to 3 HTTP fetches, so this coarse per-IP burst cap stops a hammer loop
+ *  from one network before the per-user DAILY meter (the real cost lever) even
+ *  runs. Real Pro use is a click or two per carrier page. Keyed by IP; the
+ *  limit is env-tunable (DIRECTORY_REVEAL_BURST_LIMIT). */
+export const directoryRevealLimiter: RateLimitRequestHandler = rateLimit({
+  windowMs: minutes(1),
+  limit: envInt('DIRECTORY_REVEAL_BURST_LIMIT', 20),
+  standardHeaders: 'draft-7',
+  legacyHeaders: false,
+  message: { error: 'Too many reveal requests. Slow down and try again in a minute.' },
+});
+
 /** /api/auth/login — anti-credential-stuffing. */
 export const loginLimiter: RateLimitRequestHandler = rateLimit({
   windowMs: minutes(15),

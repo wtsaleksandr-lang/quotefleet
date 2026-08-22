@@ -31,6 +31,7 @@ import { registerMarketplaceRoutes } from './routes/marketplace.js';
 import { registerMarketplaceRedirects } from './routes/marketplaceRedirect.js';
 import { registerDirectoryRoutes } from './routes/directory.js';
 import { registerDirectoryExportRoutes } from './routes/directoryExport.js';
+import { registerDirectoryRevealRoutes } from './routes/directoryReveal.js';
 import { registerRfqRoutes } from './routes/rfq.js';
 import { registerServiceRoutes } from './directory/servicePages.js';
 import { registerGlossaryRoutes } from './directory/glossary.js';
@@ -159,6 +160,8 @@ export function createApp(): express.Express {
   // swallowed by /directory/:stateSlug(/:citySlug).
   registerDirectoryExportRoutes(app);
   registerDirectoryRoutes(app);
+  // Directory Pro "Reveal additional contacts" — POST /api/directory/carrier/:usdot/reveal.
+  registerDirectoryRevealRoutes(app);
   registerRfqRoutes(app);
   registerServiceRoutes(app);
   registerGlossaryRoutes(app);

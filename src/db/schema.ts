@@ -2419,3 +2419,98 @@ export const directoryRfqUsage = pgTable(
 
 export type DirectoryRfqUsage = typeof directoryRfqUsage.$inferSelect;
 export type NewDirectoryRfqUsage = typeof directoryRfqUsage.$inferInsert;
+
+// ────────────────────────────────────────────────────────────────────
+// CARRIER CONTACTS — cached ENRICHED contacts behind the Directory Pro
+// "Reveal additional contacts" button (PR C).
+//
+// These are the ADDITIONAL / enriched dispatch contacts a Pro reveal turns up
+// (scraped from the carrier's own website via `enrichCompany`) — SEPARATE from
+// and never a re-tiering of the free FMCSA phone/email on `carrier_directory`.
+// The free public contact stays free; nothing here duplicates it (the reveal
+// pipeline dedupes any scraped value equal to the census phone/email).
+//
+// Keyed by normalized USDOT (leading zeros stripped) so it joins the public
+// directory without a FK to it. UNIQUE(carrier_dot, email) makes an upsert
+// idempotent across re-reveals. Platform-level (no tenant / user FK) like the
+// rest of the directory. Self-healed in src/db/migrate.ts (Replit skips
+// db:migrate and can phantom-drop tables); a phantom-drop only loses a cache
+// that the next reveal re-fills — never any entitlement/billing state.
+// ────────────────────────────────────────────────────────────────────
+export const carrierContacts = pgTable(
+  'carrier_contacts',
+  {
+    id: serial('id').primaryKey(),
+    /** Normalized USDOT (leading zeros stripped) — the join key to carrier_directory. */
+    carrierDot: text('carrier_dot').notNull(),
+    /** 'enrich' (auto, from the website scrape) | 'manual' (admin-entered). */
+    source: text('source').notNull(),
+    contactName: text('contact_name'),
+    title: text('title'),
+    email: text('email'),
+    phone: text('phone'),
+    /** 'high' | 'low' — confidence in the derived contact. */
+    confidence: text('confidence'),
+    enrichedAt: timestamp('enriched_at', { withTimezone: true, mode: 'date' }).notNull().defaultNow(),
+    /** The raw enrichment payload (AI insights / fetch notes) for provenance. */
+    rawJson: jsonb('raw_json').$type<Record<string, unknown>>(),
+  },
+  (t) => [
+    uniqueIndex('carrier_contacts_dot_email_idx').on(t.carrierDot, t.email),
+    index('carrier_contacts_dot_idx').on(t.carrierDot),
+  ]
+);
+
+export type CarrierContact = typeof carrierContacts.$inferSelect;
+export type NewCarrierContact = typeof carrierContacts.$inferInsert;
+
+// ────────────────────────────────────────────────────────────────────
+// CARRIER ENRICHMENT STATE — per-DOT "we already tried" marker.
+//
+// Records that a USDOT was ATTEMPTED (with how many contacts it yielded) so a
+// dead / bot-walled / no-email domain is NOT re-scraped on every reveal. The
+// reveal endpoint treats a marker younger than DIRECTORY_ENRICH_TTL_DAYS as
+// FRESH and serves the cache (even when that cache is empty), never re-hitting
+// the network / AI. One row per carrier_dot (UNIQUE). Self-healed like the rest.
+// ────────────────────────────────────────────────────────────────────
+export const carrierEnrichmentState = pgTable(
+  'carrier_enrichment_state',
+  {
+    id: serial('id').primaryKey(),
+    carrierDot: text('carrier_dot').notNull(),
+    attemptedAt: timestamp('attempted_at', { withTimezone: true, mode: 'date' }).notNull().defaultNow(),
+    /** How many contacts the last attempt yielded (0 = attempted-and-empty). */
+    contactCount: integer('contact_count').notNull().default(0),
+  },
+  (t) => [uniqueIndex('carrier_enrichment_state_dot_idx').on(t.carrierDot)]
+);
+
+export type CarrierEnrichmentState = typeof carrierEnrichmentState.$inferSelect;
+export type NewCarrierEnrichmentState = typeof carrierEnrichmentState.$inferInsert;
+
+// ────────────────────────────────────────────────────────────────────
+// DIRECTORY REVEAL USAGE — per-account DAILY reveal meter (cost governor).
+//
+// Each FRESH reveal costs 1 AI call + up to 3 HTTP fetches, so a paying Pro
+// account is capped at DIRECTORY_REVEAL_DAILY_CAP fresh reveals per UTC day. A
+// cached reveal (marker fresh) is free and never increments this. Same
+// upsert-and-increment shape as directory_rfq_usage, bucketed by DAY. One row
+// per account per day (UNIQUE(account_key, period)). A phantom-drop loses only
+// the current day's counts (a bounded, self-refilling meter).
+// ────────────────────────────────────────────────────────────────────
+export const directoryRevealUsage = pgTable(
+  'directory_reveal_usage',
+  {
+    id: serial('id').primaryKey(),
+    /** The identified account this meter belongs to (`user:<id>`). */
+    accountKey: text('account_key').notNull(),
+    /** Billing bucket, `YYYY-MM-DD` (UTC). */
+    period: text('period').notNull(),
+    /** Fresh reveals this account has run today — one increment per fresh reveal. */
+    reveals: integer('reveals').notNull().default(0),
+  },
+  (t) => [uniqueIndex('directory_reveal_usage_account_period_idx').on(t.accountKey, t.period)]
+);
+
+export type DirectoryRevealUsage = typeof directoryRevealUsage.$inferSelect;
+export type NewDirectoryRevealUsage = typeof directoryRevealUsage.$inferInsert;
