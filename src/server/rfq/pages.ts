@@ -37,7 +37,7 @@ const RFQ_CSS = `
     font: inherit; font-size: 14px; color: var(--ink); background: var(--bg);
     border: 1px solid var(--border-strong); border-radius: 4px; padding: 10px 12px; width: 100%;
   }
-  .rfq-field textarea { min-height: 88px; resize: vertical; }
+  .rfq-field textarea { min-height: 140px; resize: vertical; }
   .rfq-field input:focus, .rfq-field select:focus, .rfq-field textarea:focus {
     outline: 2px solid var(--accent); outline-offset: 1px; border-color: var(--accent);
   }
@@ -53,6 +53,7 @@ const RFQ_CSS = `
   .rfq-btn--ghost:hover { background: var(--surface-2); }
   .rfq-linkbox { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; background: var(--surface-2); border: 1px solid var(--border); border-radius: 4px; padding: 14px 16px; margin: 12px 0 0; }
   .rfq-linkbox code { font-family: var(--font-mono, monospace); font-size: 13px; color: var(--ink); word-break: break-all; }
+  .rfq-help code { word-break: break-all; overflow-wrap: anywhere; }
   .rfq-counts { display: flex; gap: 12px; flex-wrap: wrap; margin: 20px 0 0; }
   .rfq-count { flex: 1 1 120px; background: var(--surface); border: 1px solid var(--border); border-radius: 4px; padding: 14px 16px; text-align: left; }
   .rfq-count b { display: block; font-size: 24px; color: var(--ink); line-height: 1.1; }
@@ -286,6 +287,7 @@ export function renderRfqReview(opts: RfqReviewOpts): string {
           name: `body_${r.id}`,
           label: 'Message',
           textarea: true,
+          required: true,
           col2: true,
           value: r.draftBody ?? '',
         })}
