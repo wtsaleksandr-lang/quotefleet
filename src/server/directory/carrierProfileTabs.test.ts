@@ -161,10 +161,13 @@ describe('renderCarrierProfile — ZIP + FMCSA freshness (NEW render)', () => {
 });
 
 describe('renderCarrierProfile — NO new gating (public FMCSA data stays free)', () => {
-  it('keeps the enriched "More dispatch contacts" panel exactly as-is', () => {
+  it('renders the additional-contacts gate (free teaser) without touching public FMCSA contact', () => {
     const html = renderCarrierProfile({ carrier: carrier() });
     expect(html).toContain('More dispatch contacts');
-    expect(html).toContain('Additional dispatch contacts are available to registered users — create a free QuoteFleet account to view.');
+    expect(html).toContain('Unlock with Directory Pro — $19/mo');
+    // Public FMCSA phone + email stay FREE + visible regardless of the gate.
+    expect(html).toContain('href="tel:9125550921"');
+    expect(html).toContain('href="mailto:dispatch%40acme.com"');
   });
 
   it('does not gate the cargo classes, ZIP, freshness line or credential/equipment strips', () => {

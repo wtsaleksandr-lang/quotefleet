@@ -499,6 +499,15 @@ const DIRECTORY_CSS = `
   .cp-gated { margin-top: 16px; border: 1px dashed var(--border-strong); border-radius: var(--radius); background: var(--surface-2); padding: 16px; }
   .cp-gated h3 { margin: 0 0 4px; font-size: 13px; color: var(--ink-soft); }
   .cp-gated p { margin: 0; font-size: 12px; color: var(--muted); line-height: 1.5; }
+  /* Directory Pro contacts gate — blurred teaser + upgrade CTA (free) / reveal
+     affordance (Pro). Token-only + theme-aware; buttons stack full-width so the
+     no-orphan-wrap rule is moot (never an inline pill group). */
+  .cp-gated .cp-gated-teaser { display: flex; flex-direction: column; gap: 6px; margin: 10px 0 12px; }
+  .cp-gated-blur { font-family: var(--font-mono); font-size: 12px; color: var(--muted); filter: blur(3px); user-select: none; letter-spacing: 0.5px; }
+  .cp-gated .btn { width: 100%; justify-content: center; }
+  .cp-gated .cp-unlock-btn { margin-bottom: 8px; }
+  .cp-gated .cp-reveal-btn[disabled] { opacity: 0.55; cursor: not-allowed; }
+  .cp-gated .cp-reveal-form { margin: 10px 0 0; }
   .cp-actions { display: flex; flex-direction: column; gap: 8px; margin-top: 8px; }
   .cp-actions .btn { width: 100%; justify-content: center; }
   /* ── Credential badges — distinct solid colours + pure-CSS hover/focus tooltip ─
@@ -1957,6 +1966,10 @@ export function renderCarrierProfile(opts: {
   related?: VisibleCarrier[];
   cityCount?: number;
   stateCount?: number;
+  /** True when the caller holds a live Directory Pro entitlement — unlocks the
+   *  additional-contacts affordance. Defaults to false (free/anonymous). The
+   *  public FMCSA phone/email block is unaffected either way. */
+  isPro?: boolean;
 }): string {
   const c = opts.carrier;
   const related = opts.related ?? [];
@@ -2153,10 +2166,33 @@ export function renderCarrierProfile(opts: {
           ? `<p class="cp-hidden">No public contact details on the FMCSA record.</p>`
           : '',
       ].join('');
-  // Phase 2: gate this panel behind auth and render real additional contacts.
-  const gatedContact = `<div class="cp-gated">
+  // Additional (enriched) dispatch contacts are a Directory Pro feature, SEPARATE
+  // from the public FMCSA phone/email above (which stays free + unchanged).
+  //   • Free / anonymous → a blurred teaser + an "Unlock with Directory Pro"
+  //     upgrade CTA + a disabled "Reveal contacts" affordance.
+  //   • Directory Pro → a live "Reveal additional contacts" button that POSTs to
+  //     the reveal endpoint (built in PR C; the button is wired + ready now).
+  // The enriched data + the reveal endpoint itself are PR C — this renders the
+  // gate surface only, never real enriched contacts.
+  const isPro = opts.isPro === true;
+  const revealAction = `/api/directory/carrier/${encodeURIComponent(c.usdot)}/reveal`;
+  const gatedContact = isPro
+    ? `<div class="cp-gated cp-gated--pro">
+        <h3>Additional contacts</h3>
+        <p>Direct dispatch and decision-maker contacts beyond the public FMCSA record — part of your Directory Pro plan.</p>
+        <form class="cp-reveal-form" method="post" action="${revealAction}">
+          <button type="submit" class="btn btn-primary cp-reveal-btn">Reveal additional contacts</button>
+        </form>
+      </div>`
+    : `<div class="cp-gated">
         <h3>More dispatch contacts</h3>
-        <p>Additional dispatch contacts are available to registered users — create a free QuoteFleet account to view.</p>
+        <p>Direct dispatch and decision-maker contacts beyond the public FMCSA phone and email are part of Directory Pro.</p>
+        <div class="cp-gated-teaser" aria-hidden="true">
+          <span class="cp-gated-blur">Dispatch direct · ••• ••• ••••</span>
+          <span class="cp-gated-blur">Ops email · ●●●●●@●●●●●●</span>
+        </div>
+        <a class="btn btn-primary cp-unlock-btn" href="/signup?plan=directory-pro">Unlock with Directory Pro — $19/mo</a>
+        <button type="button" class="btn btn-secondary cp-reveal-btn" disabled aria-disabled="true" title="Available on Directory Pro">Reveal contacts</button>
       </div>`;
 
   // Count-bearing cross-links (city + state).

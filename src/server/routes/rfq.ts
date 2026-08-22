@@ -54,13 +54,100 @@ import {
 } from '../rfq/pages.js';
 import { dbOutreachEmailStore, normalizeEmailAddress } from '../outreach/outreachEmailStore.js';
 import { forceReingestCarrierDirectory } from '../directory/autoHeal.js';
+import { directoryIdentity } from '../directory/entitlement.js';
+import { dbRfqUsageStore, currentRfqPeriod, type RfqUsageStore } from '../directory/rfqUsage.js';
 import type { RfqFilterSnapshot, RfqRecipientStatus } from '../../db/schema.js';
 
-/** Default recipient cap (env-overridable, RFQ_MAX_RECIPIENTS). */
-export function rfqMaxRecipients(): number {
-  const raw = process.env.RFQ_MAX_RECIPIENTS;
+/** Positive-int env reader with a fallback (shared by the RFQ cap/quota knobs). */
+function envPosInt(name: string, fallback: number): number {
+  const raw = process.env[name];
   const n = raw != null ? Number(raw) : NaN;
-  return Number.isFinite(n) && n > 0 ? Math.floor(n) : 25;
+  return Number.isFinite(n) && n > 0 ? Math.floor(n) : fallback;
+}
+
+/** Default (Directory Pro) recipient cap per blast (env RFQ_MAX_RECIPIENTS). */
+export function rfqMaxRecipients(): number {
+  return envPosInt('RFQ_MAX_RECIPIENTS', 25);
+}
+
+/** Free-account recipient cap per blast (env RFQ_FREE_RECIPIENTS, default 5). */
+export function rfqFreeRecipients(): number {
+  return envPosInt('RFQ_FREE_RECIPIENTS', 5);
+}
+
+/** Free-account monthly blast allowance (env RFQ_FREE_MONTHLY, default 2). */
+export function rfqFreeMonthly(): number {
+  return envPosInt('RFQ_FREE_MONTHLY', 2);
+}
+
+/** Directory Pro monthly blast quota (env RFQ_PRO_MONTHLY, default 50). */
+export function rfqProMonthly(): number {
+  return envPosInt('RFQ_PRO_MONTHLY', 50);
+}
+
+/** The decision a gate returns for one RFQ attempt. */
+export interface RfqGateResult {
+  /** True → the blast may proceed. */
+  ok: boolean;
+  /** Recipient cap to apply to THIS blast (free < Pro). */
+  cap: number;
+  /** Machine reason when blocked ('needs_account' | 'monthly_allowance' | 'monthly_quota'). */
+  reason?: string;
+  /** Blocked because there is no logged-in account (RFQ requires one). */
+  needsAccount?: boolean;
+  /** Blocked and a Directory Pro upgrade would raise the allowance. */
+  needsUpgrade?: boolean;
+  /** Blasts already used this period (when identified). */
+  used?: number;
+  /** Monthly blast allowance for this account's tier (when identified). */
+  allowance?: number;
+  /** Usage-meter key for the post-create increment (`user:<id>`; absent when anonymous). */
+  accountKey?: string;
+  /** Billing period (`YYYY-MM` UTC) for the increment. */
+  period?: string;
+}
+
+/** A gate: given the request + how many carriers it would fan out to, decide. */
+export type RfqGate = (req: Request, plannedRecipients: number) => Promise<RfqGateResult>;
+
+/**
+ * Default RFQ gate. RFQ is the metered, signup-driving surface:
+ *   • No logged-in account → BLOCKED (needsAccount). RFQ is the one un-gameable
+ *     meter, so it is never anonymous — a free account is the minimum.
+ *   • Free account → small cap (rfqFreeRecipients) + small monthly allowance
+ *     (rfqFreeMonthly); over allowance → BLOCKED (needsUpgrade).
+ *   • Directory Pro → full cap (rfqMaxRecipients) + the Pro quota (rfqProMonthly);
+ *     over quota → BLOCKED (no upgrade path — a hard monthly ceiling).
+ * Free browsing + the public FMCSA phone/email are never touched by this.
+ */
+export function defaultRfqGate(usage: RfqUsageStore = dbRfqUsageStore): RfqGate {
+  return async (req: Request, _plannedRecipients: number): Promise<RfqGateResult> => {
+    const id = await directoryIdentity(req);
+    if (id.userId == null) {
+      // No account → block, but hand back the free cap so the form preview still
+      // shows a sensible recipient count behind the "sign in to send" state.
+      return { ok: false, cap: rfqFreeRecipients(), needsAccount: true, reason: 'needs_account' };
+    }
+    const accountKey = `user:${id.userId}`;
+    const period = currentRfqPeriod();
+    const isPro = id.isPro;
+    const cap = isPro ? rfqMaxRecipients() : rfqFreeRecipients();
+    const allowance = isPro ? rfqProMonthly() : rfqFreeMonthly();
+    const used = await usage.getSends(accountKey, period);
+    if (used >= allowance) {
+      return {
+        ok: false,
+        cap,
+        used,
+        allowance,
+        accountKey,
+        period,
+        needsUpgrade: !isPro,
+        reason: isPro ? 'monthly_quota' : 'monthly_allowance',
+      };
+    }
+    return { ok: true, cap, used, allowance, accountKey, period };
+  };
 }
 
 /** Per-send throttle (ms) between LIVE sends so one RFQ can't blast a burst. */
@@ -91,6 +178,10 @@ export interface RfqRouteDeps {
   aiComplete?: typeof complete;
   /** Presence gates the AI draft step (defaults to ANTHROPIC_API_KEY). */
   anthropicKey?: string;
+  /** Entitlement/quota gate (defaults to defaultRfqGate over the usage store). */
+  gate?: RfqGate;
+  /** Monthly send meter (defaults to dbRfqUsageStore). */
+  usage?: RfqUsageStore;
 }
 
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
@@ -154,15 +245,29 @@ export function registerRfqRoutes(app: Express, deps: RfqRouteDeps = {}) {
       }
     });
   const forceReingest = deps.forceReingest ?? forceReingestCarrierDirectory;
+  const usage = deps.usage ?? dbRfqUsageStore;
+  const gate: RfqGate = deps.gate ?? defaultRfqGate(usage);
+
+  /** Public gate fields for the form (drops the internal accountKey/period). */
+  const gateView = (g: RfqGateResult) => ({
+    ok: g.ok,
+    needsAccount: g.needsAccount,
+    needsUpgrade: g.needsUpgrade,
+    used: g.used,
+    allowance: g.allowance,
+  });
 
   // ── GET the form ─────────────────────────────────────────────────────────
   app.get('/directory/rfq', async (req: Request, res: Response, next) => {
     try {
-      const cap = deps.maxRecipients ?? rfqMaxRecipients();
       const dots = parseDots(req.query.dots);
       const filterQuery = dots.length ? '' : serializeFacetQuery(req.query as Record<string, unknown>);
       // No selection at all → nothing to request; send them to the directory.
       if (!dots.length && !hasAnyFacet(filterQuery)) return res.redirect(302, '/directory');
+      // Gate FIRST so the recipient cap (and the sign-in / upgrade state) reflect
+      // the caller's tier — a free account previews fewer recipients than Pro.
+      const g = await gate(req, 0);
+      const cap = deps.maxRecipients ?? g.cap;
       const resolved = await resolveSelection(dots, filterQuery, cap, resolveDeps);
       res.type('html').send(
         renderRfqForm({
@@ -172,6 +277,7 @@ export function registerRfqRoutes(app: Express, deps: RfqRouteDeps = {}) {
           capped: resolved.capped,
           dots: dots.length ? dots.join(',') : undefined,
           filterQuery: filterQuery || undefined,
+          gate: gateView(g),
         }),
       );
     } catch (err) {
@@ -186,7 +292,8 @@ export function registerRfqRoutes(app: Express, deps: RfqRouteDeps = {}) {
     rfqSubmitEmailLimiter,
     async (req: Request, res: Response, next) => {
       try {
-        const cap = deps.maxRecipients ?? rfqMaxRecipients();
+        const g = await gate(req, 0);
+        const cap = deps.maxRecipients ?? g.cap;
         const body = (req.body ?? {}) as Record<string, unknown>;
         const str = (v: unknown) => String(v ?? '').trim();
 
@@ -226,6 +333,24 @@ export function registerRfqRoutes(app: Express, deps: RfqRouteDeps = {}) {
               error: msg,
             }),
           );
+
+        // HARD-enforce the gate BEFORE creating anything: no account / over
+        // allowance never starts a blast. Re-render the form carrying the gate
+        // state (sign-in or upgrade CTA) alongside the prefilled values.
+        if (!g.ok) {
+          return res.status(403).type('html').send(
+            renderRfqForm({
+              recipientCount: resolved.recipients.length,
+              totalMatched: resolved.totalMatched,
+              cap: resolved.cap,
+              capped: resolved.capped,
+              dots: dots.length ? dots.join(',') : undefined,
+              filterQuery: filterQuery || undefined,
+              prefill,
+              gate: gateView(g),
+            }),
+          );
+        }
 
         // Validate.
         if (!prefill.origin || !prefill.destination) return reRenderError('Origin and destination are required.');
@@ -284,6 +409,19 @@ export function registerRfqRoutes(app: Express, deps: RfqRouteDeps = {}) {
             draftBody: drafts[i].body,
           })),
         );
+
+        // One BLAST = one increment, recorded AFTER the blast is persisted and
+        // only ONCE per POST (phase-1 create) — the fan-out size is irrelevant,
+        // and phase-2 send never re-counts. accountKey/period are guaranteed once
+        // g.ok (RFQ requires an account). Best-effort: a meter write must never
+        // fail an already-accepted blast.
+        if (g.accountKey && g.period) {
+          try {
+            await usage.increment(g.accountKey, g.period);
+          } catch (err) {
+            console.warn('[rfq] usage increment failed (non-fatal):', err);
+          }
+        }
 
         const baseUrl = baseUrlOf(deps, req);
         const reviewUrl = `${baseUrl.replace(/\/$/, '')}/directory/rfq/${request.viewToken}/review`;

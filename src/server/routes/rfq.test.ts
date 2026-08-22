@@ -13,11 +13,13 @@
  *   - the reingest endpoint: 404 without the admin token, 202 (+ kick) with it;
  *   - the submit rate-limit eventually 429s.
  */
-import { describe, it, expect, beforeAll, afterAll, vi } from 'vitest';
+import { describe, it, expect, beforeAll, beforeEach, afterAll, vi } from 'vitest';
 import express from 'express';
+import { rfqSubmitIpLimiter, rfqSubmitEmailLimiter } from '../rateLimits.js';
 import type { AddressInfo } from 'node:net';
 import type { Server } from 'node:http';
-import { registerRfqRoutes, type RfqRouteDeps } from './rfq.js';
+import { registerRfqRoutes, type RfqRouteDeps, type RfqGate } from './rfq.js';
+import type { RfqUsageStore } from '../directory/rfqUsage.js';
 import { generateRfqToken } from '../rfq/tokens.js';
 import type {
   RfqStore,
@@ -158,6 +160,33 @@ const carrier = (over: Partial<CarrierLite> = {}): CarrierLite => ({
   ...over,
 });
 
+// In-memory monthly send meter (implements the RfqUsageStore seam).
+class MemUsage implements RfqUsageStore {
+  map = new Map<string, number>();
+  private k(a: string, p: string) {
+    return `${a}|${p}`;
+  }
+  async getSends(a: string, p: string) {
+    return this.map.get(this.k(a, p)) ?? 0;
+  }
+  async increment(a: string, p: string) {
+    const v = (this.map.get(this.k(a, p)) ?? 0) + 1;
+    this.map.set(this.k(a, p), v);
+    return v;
+  }
+}
+
+/** A permissive gate (an identified account under quota) — the default so the
+ *  broad flow tests exercise the happy path; individual tests override it. */
+const openGate: RfqGate = async () => ({
+  ok: true,
+  cap: 25,
+  allowance: 50,
+  used: 0,
+  accountKey: 'user:test',
+  period: '2026-08',
+});
+
 /** ResolveDeps that hand back a fixed carrier set for the dots path. */
 function fixedResolveDeps(carriers: CarrierLite[]): ResolveDeps {
   return {
@@ -172,6 +201,7 @@ interface Harness {
   server: Server;
   baseUrl: string;
   store: MemStore;
+  usage: MemUsage;
   send: ReturnType<typeof vi.fn>;
   forceReingest: ReturnType<typeof vi.fn>;
 }
@@ -181,6 +211,7 @@ async function boot(over: Partial<RfqRouteDeps> = {}): Promise<Harness> {
   app.use(express.json());
   app.use(express.urlencoded({ extended: true }));
   const store = new MemStore();
+  const usage = new MemUsage();
   const send = vi.fn(async (): Promise<EmailOut> => ({ ok: true, provider: 'resend', id: 'msg_1' }));
   const forceReingest = vi.fn(async () => 'started' as const);
   registerRfqRoutes(app, {
@@ -195,13 +226,16 @@ async function boot(over: Partial<RfqRouteDeps> = {}): Promise<Harness> {
     // Force the deterministic template drafter in tests (never a real AI call),
     // regardless of any ANTHROPIC_API_KEY in the ambient env.
     anthropicKey: '',
+    // Default to a permissive gate + in-memory meter; gating tests override.
+    gate: openGate,
+    usage,
     ...over,
   });
   const server = await new Promise<Server>((resolve) => {
     const s = app.listen(0, () => resolve(s));
   });
   const { port } = server.address() as AddressInfo;
-  return { server, baseUrl: `http://127.0.0.1:${port}`, store, send, forceReingest };
+  return { server, baseUrl: `http://127.0.0.1:${port}`, store, usage, send, forceReingest };
 }
 
 const form = (fields: Record<string, string>) =>
@@ -220,6 +254,16 @@ const validShipper = {
   shipper_name: 'Dana Shipper',
   shipper_email: 'dana@shipper.example',
 };
+
+/** The RFQ submit limiters are module-level singletons with a shared store, so
+ *  POST budget carries across boot()s within this file. Reset the relevant keys
+ *  to isolate a describe that needs a fresh budget (mirrors aiRateLimit.test). */
+function resetRfqLimiters() {
+  for (const ip of ['127.0.0.1', '::1', '::ffff:127.0.0.1']) {
+    try { rfqSubmitIpLimiter.resetKey(ip); } catch { /* no-op for absent keys */ }
+  }
+  try { rfqSubmitEmailLimiter.resetKey(`rfq:${validShipper.shipper_email.toLowerCase()}`); } catch { /* no-op */ }
+}
 
 describe('RFQ routes', () => {
   let h: Harness;
@@ -454,7 +498,83 @@ describe('RFQ reingest endpoint guard', () => {
   });
 });
 
+describe('RFQ gating enforcement (route wiring)', () => {
+  // Fresh submit budget per test — this block runs after other POST tests have
+  // partly consumed the shared IP limiter.
+  beforeEach(() => resetRfqLimiters());
+
+  it('POST blocked with needsAccount → 403, creates NOTHING, never increments usage', async () => {
+    const gate: RfqGate = async () => ({ ok: false, cap: 5, needsAccount: true });
+    const h = await boot({ gate });
+    const r = await postForm(h.baseUrl, '/directory/rfq', { ...validShipper, dots: '1,2,3' });
+    expect(r.status).toBe(403);
+    const html = await r.text();
+    expect(html).toContain('Sign in to send');
+    expect(h.store.requests).toHaveLength(0);
+    expect(h.store.recipients).toHaveLength(0);
+    expect([...h.usage.map.values()]).toHaveLength(0);
+    h.server.close();
+  });
+
+  it('POST blocked over allowance → 403 with the upgrade CTA, creates nothing', async () => {
+    const gate: RfqGate = async () => ({ ok: false, cap: 5, needsUpgrade: true, used: 2, allowance: 2 });
+    const h = await boot({ gate });
+    const r = await postForm(h.baseUrl, '/directory/rfq', { ...validShipper, dots: '1,2,3' });
+    expect(r.status).toBe(403);
+    const html = await r.text();
+    expect(html).toContain('Upgrade to Directory Pro');
+    expect(html).toContain('2 of 2');
+    expect(h.store.requests).toHaveLength(0);
+    h.server.close();
+  });
+
+  it('POST allowed → increments the meter EXACTLY once for the whole blast (3 carriers)', async () => {
+    const gate: RfqGate = async () => ({ ok: true, cap: 25, accountKey: 'user:42', period: '2026-08' });
+    const h = await boot({ gate });
+    const r = await postForm(h.baseUrl, '/directory/rfq', { ...validShipper, dots: '1,2,3' });
+    expect(r.status).toBe(200);
+    expect(h.store.recipients).toHaveLength(3); // fanned out to 3
+    expect(await h.usage.getSends('user:42', '2026-08')).toBe(1); // but ONE blast
+    h.server.close();
+  });
+
+  it('phase-2 send does NOT double-count usage (increment is phase-1 only)', async () => {
+    const gate: RfqGate = async () => ({ ok: true, cap: 25, accountKey: 'user:42', period: '2026-08' });
+    const h = await boot({ gate });
+    await postForm(h.baseUrl, '/directory/rfq', { ...validShipper, dots: '1,2,3' });
+    const viewToken = h.store.requests.at(-1)!.viewToken;
+    await postForm(h.baseUrl, `/directory/rfq/${viewToken}/send`, {});
+    expect(await h.usage.getSends('user:42', '2026-08')).toBe(1); // still 1 after send
+    h.server.close();
+  });
+
+  it('the gate cap (not RFQ_MAX_RECIPIENTS) drives the recipient resolution', async () => {
+    const gate: RfqGate = async () => ({ ok: true, cap: 2, accountKey: 'user:42', period: '2026-08' });
+    const h = await boot({ gate });
+    // Three dots selected, but a free cap of 2 → only 2 recipients created.
+    await postForm(h.baseUrl, '/directory/rfq', { ...validShipper, dots: '1,2,3' });
+    expect(h.store.recipients).toHaveLength(2);
+    h.server.close();
+  });
+
+  it('GET renders the sign-in state + a disabled submit when the gate blocks (needsAccount)', async () => {
+    const gate: RfqGate = async () => ({ ok: false, cap: 5, needsAccount: true });
+    const h = await boot({ gate });
+    const r = await fetch(`${h.baseUrl}/directory/rfq?dots=1,2,3`);
+    expect(r.status).toBe(200);
+    const html = await r.text();
+    expect(html).toContain('Sign in to send');
+    expect(html).toContain('/signup?plan=directory-pro');
+    expect(html).toMatch(/<button[^>]*type="submit"[^>]*disabled/);
+    h.server.close();
+  });
+});
+
 describe('RFQ submit rate-limit', () => {
+  // Start from a fresh budget so the hammer sees the 200→429 boundary regardless
+  // of how many POSTs the preceding describes consumed.
+  beforeAll(() => resetRfqLimiters());
+
   it('eventually 429s a hammering client', async () => {
     const h = await boot();
     let saw429 = false;

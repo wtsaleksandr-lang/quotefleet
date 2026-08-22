@@ -14,10 +14,11 @@
  * authority, recent) OR from an explicit `?dots=D1,D2,…` shortlist. Every export
  * is capped at EXPORT_MAX_ROWS with a visible "showing first N of M" note.
  *
- * Account-gating seam: `canExport(req)` is a single true-returning stub — Pro
- * limits / auth attach here later (e.g. gate .xlsx behind a plan, lower the cap
- * for anonymous users) without reshaping the generator. The row cap already
- * reads `EXPORT_MAX_ROWS` from the environment via the generator.
+ * Account-gating seam: `canExport(req)` gates the DOWNLOADS (.xlsx / .csv)
+ * behind Directory Pro entitlement. The branded HTML VIEW (/export/view) stays
+ * free — it is the shareable/SEO surface and is only capped by EXPORT_MAX_ROWS.
+ * A `DIRECTORY_EXPORT_FREE=1` env kill-switch reopens the downloads to everyone
+ * (launch fallback) without a code change.
  */
 import type { Express, Request, Response } from 'express';
 import {
@@ -27,14 +28,18 @@ import {
   buildExportCsv,
 } from '../directory/exportSheet.js';
 import { publicAutocompleteLimiter } from '../rateLimits.js';
+import { hasDirectoryPro } from '../directory/entitlement.js';
 
 /**
- * Account-gating stub. Returns true for everyone today. Pro limits / auth land
- * here later — return false (or a reason) to deny an export without changing any
- * generation code. Kept as a single function so the gate has ONE home.
+ * Download gate: spreadsheet exports (.xlsx / .csv) are Directory Pro-only.
+ *   • `DIRECTORY_EXPORT_FREE=1` → open to everyone (env kill-switch), else
+ *   • a live Directory Pro entitlement (hasDirectoryPro) is required.
+ * Never throws — hasDirectoryPro degrades a DB hiccup to "not Pro" (deny), so a
+ * gate failure can't 500 the route. The branded HTML view stays ungated.
  */
-export function canExport(_req: Request): boolean {
-  return true;
+export async function canExport(req: Request): Promise<boolean> {
+  if (process.env.DIRECTORY_EXPORT_FREE === '1') return true;
+  return await hasDirectoryPro(req);
 }
 
 /** Raw querystring (no leading "?") from the request, for the download links. */
@@ -49,10 +54,10 @@ function fileStamp(d: Date): string {
 }
 
 export function registerDirectoryExportRoutes(app: Express) {
-  // Branded printable / shareable HTML sheet.
+  // Branded printable / shareable HTML sheet — FREE (the shareable/SEO surface).
+  // Downloads below are Pro-gated; the view is only capped by EXPORT_MAX_ROWS.
   app.get('/directory/export/view', publicAutocompleteLimiter, async (req: Request, res: Response, next) => {
     try {
-      if (!canExport(req)) return res.status(403).type('html').send('<h1>Export unavailable</h1>');
       const resolved = await resolveExport(req.query as Record<string, unknown>, { query: queryOf(req) });
       res.type('html').send(renderExportHtml(resolved));
     } catch (err) {
@@ -63,7 +68,7 @@ export function registerDirectoryExportRoutes(app: Express) {
   // XLSX download.
   app.get('/directory/export.xlsx', publicAutocompleteLimiter, async (req: Request, res: Response, next) => {
     try {
-      if (!canExport(req)) return res.status(403).json({ error: 'Export unavailable' });
+      if (!(await canExport(req))) return res.status(403).json({ error: 'Export is a Directory Pro feature.' });
       const resolved = await resolveExport(req.query as Record<string, unknown>);
       const buf = buildExportXlsx(resolved);
       res
@@ -79,7 +84,7 @@ export function registerDirectoryExportRoutes(app: Express) {
   // CSV download.
   app.get('/directory/export.csv', publicAutocompleteLimiter, async (req: Request, res: Response, next) => {
     try {
-      if (!canExport(req)) return res.status(403).json({ error: 'Export unavailable' });
+      if (!(await canExport(req))) return res.status(403).json({ error: 'Export is a Directory Pro feature.' });
       const resolved = await resolveExport(req.query as Record<string, unknown>);
       const csv = buildExportCsv(resolved);
       res
