@@ -934,6 +934,119 @@ export function lifecycleExpiredEmail(opts: {
   });
 }
 
+/* ── Referral + affiliate program emails (tenant/affiliate-facing) ─────────
+ * Event-triggered account notifications — NOT a marketing drip — so they render
+ * through the standard QuoteFleet-branded shell as TRANSACTIONAL email (no
+ * unsubscribeUrl → no CAN-SPAM footer; they fire once on a discrete account
+ * event, like a booking/lead alert). Every dynamic value is escaped. The
+ * program terms (free-month count, commission rates, pro threshold) are passed
+ * in by the caller, which sources them from src/server/affiliate/programs.ts —
+ * never hardcoded here — so the copy can never drift from the real program.
+ * ────────────────────────────────────────────────────────────────────────── */
+
+/** Sent to the REFERRER when a referred signup links + their free-month credit
+ *  is queued (a real conversion — never on a bare click). `freeMonths` comes
+ *  from REFERRER_FREE_MONTHS. */
+export function referralCreditEarnedEmail(opts: {
+  referrerName?: string | null;
+  freeMonths: number;
+  dashboardUrl: string;
+  referralUrl?: string | null;
+}): { subject: string; text: string; html: string } {
+  const months = Math.max(1, Math.floor(Number(opts.freeMonths) || 1));
+  const monthWord = months === 1 ? 'month' : 'months';
+  const name = String(opts.referrerName ?? '').trim();
+  const greeting = name ? `Hi ${name},` : 'Hi,';
+  const subject =
+    months === 1
+      ? 'You earned a free month of QuoteFleet'
+      : `You earned ${months} free months of QuoteFleet`;
+  const headline = months === 1 ? 'You earned a free month' : `You earned ${months} free months`;
+
+  const inner =
+    eyebrow('Referral reward') +
+    heading(headline) +
+    paragraph(
+      `Someone just signed up for QuoteFleet with your referral link — so you've earned ` +
+        `<strong style="color:${BRAND.ink};">${months} free ${monthWord}</strong>, credited to your ` +
+        `account and applied automatically to an upcoming invoice.`,
+    ) +
+    ctaButton('View your referral dashboard', opts.dashboardUrl) +
+    (opts.referralUrl
+      ? paragraph(
+          `Keep sharing your link and earn another free month for every business that signs up:<br>` +
+            `<a href="${escape(opts.referralUrl)}" style="color:${BRAND.primary};text-decoration:underline;word-break:break-all;">${escape(opts.referralUrl)}</a>`,
+        )
+      : paragraph('Keep sharing your link and earn another free month for every business that signs up.'));
+
+  const text =
+    `${greeting}\n\n` +
+    `Someone just signed up for QuoteFleet with your referral link, so you've earned ` +
+    `${months} free ${monthWord} — credited to your account and applied automatically to an ` +
+    `upcoming invoice.\n\n` +
+    `View your referral dashboard: ${opts.dashboardUrl}\n` +
+    (opts.referralUrl ? `Your referral link: ${opts.referralUrl}\n` : '') +
+    `\nKeep sharing to earn another free month for every business that signs up.\n\n` +
+    `— QuoteFleet\n`;
+
+  return { subject, text, html: shell({ preheader: subject, inner }) };
+}
+
+/** Sent to an AFFILIATE the moment their account becomes `active` (self-serve
+ *  signup auto-activates, or an admin flips status → active). `commissionRatePct`
+ *  is the affiliate's own headline rate; `proRatePct`/`proThreshold` describe the
+ *  next rung so the ladder is honest. All sourced from programs.ts by the caller. */
+export function affiliateApprovedEmail(opts: {
+  affiliateName?: string | null;
+  code: string;
+  link: string;
+  dashboardUrl: string;
+  commissionRatePct: number;
+  proRatePct: number;
+  proThreshold: number;
+}): { subject: string; text: string; html: string } {
+  const name = String(opts.affiliateName ?? '').trim();
+  const greeting = name ? `Hi ${name},` : 'Hi,';
+  const ratePct = Math.max(0, Math.round(Number(opts.commissionRatePct) || 0));
+  const proPct = Math.max(0, Math.round(Number(opts.proRatePct) || 0));
+  const threshold = Math.max(0, Math.floor(Number(opts.proThreshold) || 0));
+  const subject = "You're approved — your QuoteFleet affiliate link is live";
+  // Only pitch the pro rung when there's genuinely a higher rate to climb to
+  // (a hand-set partner rate can already exceed the pro rate).
+  const showLadder = proPct > ratePct && threshold > 0;
+
+  const inner =
+    eyebrow('Affiliate approved') +
+    heading("You're approved — start earning") +
+    paragraph(
+      `Your QuoteFleet affiliate account is active. Share your link below and earn ` +
+        `<strong style="color:${BRAND.ink};">${ratePct}% recurring commission</strong> on every ` +
+        `customer you refer.` +
+        (showLadder
+          ? ` Refer ${threshold}+ active customers and your rate rises to <strong style="color:${BRAND.ink};">${proPct}%</strong>.`
+          : ''),
+    ) +
+    codeChip(opts.code) +
+    ctaButton('Open your affiliate dashboard', opts.dashboardUrl) +
+    paragraph(
+      `Your referral link:<br>` +
+        `<a href="${escape(opts.link)}" style="color:${BRAND.primary};text-decoration:underline;word-break:break-all;">${escape(opts.link)}</a>`,
+    );
+
+  const text =
+    `${greeting}\n\n` +
+    `Your QuoteFleet affiliate account is active. Share your link and earn ${ratePct}% ` +
+    `recurring commission on every customer you refer.` +
+    (showLadder ? ` Refer ${threshold}+ active customers and your rate rises to ${proPct}%.` : '') +
+    `\n\n` +
+    `Your affiliate code: ${opts.code}\n` +
+    `Your referral link: ${opts.link}\n` +
+    `Your affiliate dashboard: ${opts.dashboardUrl}\n\n` +
+    `— QuoteFleet\n`;
+
+  return { subject, text, html: shell({ preheader: subject, inner }) };
+}
+
 /* ──────────────────────────────────────────────────────────────────────
  * Automated follow-up sequence (Wave 1) — carrier-branded, customer-facing.
  *

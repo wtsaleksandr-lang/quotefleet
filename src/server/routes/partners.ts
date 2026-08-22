@@ -27,6 +27,7 @@ import {
   isValidCodeShape,
 } from '../affiliate/programs.js';
 import { captureRefClick } from '../affiliate/attribution.js';
+import { notifyAffiliateApproved } from '../affiliate/notifications.js';
 import { mintUniqueCode, ensureTenantReferralCode } from '../affiliate/codes.js';
 import {
   affiliateLink,
@@ -150,6 +151,20 @@ export function registerPartnersRoutes(app: Express): void {
           .returning({ id: affiliates.id, code: affiliates.code })
       )[0];
       if (!inserted) throw new Error('affiliate insert returned no row');
+
+      // Best-effort welcome: self-serve affiliates are born `active`, so THIS is
+      // the once-per-affiliate "you're approved" moment for this path (the
+      // idempotent `existing` branch above returns before here, so a repeat
+      // submit never re-emails). Fire-and-forget — never block signup on mail.
+      void notifyAffiliateApproved({
+        to: email,
+        affiliateName: name,
+        code: inserted.code,
+        commissionRate: AFFILIATE_BASE_RATE,
+      }).catch((err) => {
+        console.warn('[partners.signup] approved-email notify failed (non-fatal):', err);
+      });
+
       return res.json({
         ok: true,
         code: inserted.code,
