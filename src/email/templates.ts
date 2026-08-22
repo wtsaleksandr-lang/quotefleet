@@ -760,6 +760,91 @@ export function trialReminderDay14Email(opts: {
   });
 }
 
+/* ── Dunning: failed-payment card-update sequence (tenant-facing) ──────────
+ * TRANSACTIONAL billing notices sent to an EXISTING paying customer whose
+ * renewal charge failed (Stripe `past_due`). Escalates day 0 → day 3 → day 6,
+ * each with a single clear CTA to the in-app billing page (/app → Plan
+ * settings) that opens the Stripe Customer Portal to update the card. Rendered
+ * through the transactional shell (no unsubscribeUrl) — a failed-payment notice
+ * concerns an active transaction and must always deliver, so it is NOT gated on
+ * the marketing opt-out and carries no unsubscribe header (like the magic-link
+ * email). See src/email/dunning.ts for the stage/recovery logic.
+ * ────────────────────────────────────────────────────────────────────────── */
+
+/** Per-stage copy for the dunning sequence. Keyed by DunningStage.id. */
+const DUNNING_COPY: Record<'0' | '3' | '6', {
+  eyebrow: string;
+  subject: string;
+  preheader: string;
+  heading: string;
+  intro: string;
+  cta: string;
+  closing: string;
+}> = {
+  '0': {
+    eyebrow: 'Payment issue',
+    subject: 'Action needed: your QuoteFleet payment didn\'t go through',
+    preheader: 'Your last QuoteFleet payment failed — update your card to avoid interruption',
+    heading: 'Your last payment didn\'t go through',
+    intro:
+      'We tried to charge the card on file for your QuoteFleet subscription and it was declined. ' +
+      'No need to worry — your calculator, hosted page, and lead inbox are still running. ' +
+      'Just update your card and we\'ll take care of the rest.',
+    cta: 'Update your card',
+    closing:
+      'Common causes are an expired card, a new card number, or a temporary hold from your bank. ' +
+      'We\'ll automatically retry over the next few days. Questions? Just reply — a real person will help.',
+  },
+  '3': {
+    eyebrow: 'Reminder',
+    subject: 'Reminder: update your card to keep QuoteFleet running',
+    preheader: 'Your QuoteFleet payment is still failing — a quick card update fixes it',
+    heading: 'Your QuoteFleet payment is still failing',
+    intro:
+      'It\'s been a few days and we still couldn\'t process payment for your QuoteFleet subscription. ' +
+      'Your account is active for now, but to avoid any interruption to your calculator and lead inbox, ' +
+      'please update your card.',
+    cta: 'Update your card',
+    closing:
+      'It takes less than a minute — update your card and everything keeps running exactly as it is. ' +
+      'If you need a hand, just reply to this email.',
+  },
+  '6': {
+    eyebrow: 'Final notice',
+    subject: 'Final notice: your QuoteFleet account is about to pause',
+    preheader: 'Last reminder — update your card now to keep your QuoteFleet account active',
+    heading: 'Last reminder before your account pauses',
+    intro:
+      'We still haven\'t been able to process payment for your QuoteFleet subscription. ' +
+      'This is the final reminder: if the card isn\'t updated soon, your account will be paused — ' +
+      'your hosted page will stop accepting new leads until payment succeeds.',
+    cta: 'Update your card now',
+    closing:
+      'You won\'t lose any of your data or settings — updating your card reactivates everything instantly. ' +
+      'If something\'s changed or you\'d like to talk it through, just reply and we\'ll help.',
+  },
+};
+
+/** Failed-payment dunning email for the given stage. `appUrl` is the in-app
+ *  billing page (/app → Plan settings) that opens the Stripe Customer Portal. */
+export function billingDunningEmail(opts: {
+  stageId: '0' | '3' | '6';
+  appUrl: string;
+}): { subject: string; html: string } {
+  const c = DUNNING_COPY[opts.stageId];
+  const inner =
+    eyebrow(c.eyebrow) +
+    heading(c.heading) +
+    paragraph(c.intro) +
+    ctaButton(c.cta, opts.appUrl) +
+    paragraph(c.closing);
+  return {
+    subject: c.subject,
+    // Transactional: no unsubscribeUrl → always-deliver footer, no unsubscribe.
+    html: shell({ preheader: c.preheader, inner }),
+  };
+}
+
 /* ── Weekly performance digest (tenant-facing, recurring) ──────────────── */
 
 /** One big-number stat tile. `delta` (optional) renders a small +N / −N chip
