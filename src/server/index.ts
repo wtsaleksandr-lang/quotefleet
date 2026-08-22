@@ -12,6 +12,7 @@ import { createApp } from './app.js';
 import { startMarketplaceCron } from '../marketplace/cron.js';
 import { startLifecycleEmailCron } from '../email/lifecycleCron.js';
 import { startFollowUpEmailCron } from '../email/followUpCron.js';
+import { startDunningEmailCron } from '../email/dunningCron.js';
 import { startWeeklyDigestCron } from '../email/weeklyDigestCron.js';
 import { startFuelSurchargeCron } from '../eia/dieselPrice.js';
 
@@ -63,6 +64,10 @@ async function main() {
   startMarketplaceCron();
   startLifecycleEmailCron();
   startFollowUpEmailCron();
+  // Dunning: emails the card-update sequence to tenants whose subscription
+  // payment failed (self-contained — reads the billing past-due marker, no
+  // shared state with the other crons).
+  startDunningEmailCron();
   startWeeklyDigestCron();
   startFuelSurchargeCron();
 }
