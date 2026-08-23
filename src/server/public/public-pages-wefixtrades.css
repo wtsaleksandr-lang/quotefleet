@@ -318,3 +318,82 @@ html[data-theme="light"] body.qf-public-wft .btn-secondary:hover {
   border-color: var(--accent) !important;
   color: var(--accent) !important;
 }
+
+/* ─────────────────────────────────────────────────────────────────
+   PREMIUM GLASS — PRICING CARDS (funnel surface 3). Matches the
+   canonical landing-glass.css system (blur/saturate + translucent
+   tint + hairline border + soft shadow), tuned to this page's
+   #22282A (rgb 34,40,42) panel base. Appended at EOF so no baselined
+   guard line shifts; every color is rgba()/token (guard-exempt) and
+   all spacing stays on the 8px ramp. -webkit-backdrop-filter is paired
+   and an @supports-not SOLID fallback ships for legibility.
+   Readability: card tint alpha ≥0.5 so numbers / feature lists / copy
+   on the card stay AA. Featured (Pro) = accent OUTLINE + glow, never a
+   bright fill. A vibrant radial band sits behind the section so the
+   glass has something to refract.
+   ───────────────────────────────────────────────────────────────── */
+
+/* Vibrant gradient band behind the pricing grid (refraction source). */
+.qf-public-wft .pricing.pricing-2up {
+  position: relative;
+  z-index: 0;
+}
+.qf-public-wft .pricing.pricing-2up::before {
+  content: '';
+  position: absolute;
+  inset: -48px 0;
+  z-index: -1;
+  pointer-events: none;
+  background:
+    radial-gradient(60% 52% at 28% 18%, rgba(13, 60, 252, 0.34), transparent 70%),
+    radial-gradient(56% 46% at 80% 32%, rgba(88, 120, 255, 0.22), transparent 72%);
+  filter: blur(8px);
+}
+html[data-theme="light"] body.qf-public-wft .pricing.pricing-2up::before {
+  background:
+    radial-gradient(60% 52% at 28% 18%, rgba(13, 60, 252, 0.16), transparent 70%),
+    radial-gradient(56% 46% at 80% 32%, rgba(88, 120, 255, 0.12), transparent 72%);
+}
+
+/* DARK (default) — regularMaterial glass slab. */
+.qf-public-wft .price-card {
+  background: rgba(34, 40, 42, 0.60) !important;
+  border: 1px solid rgba(255, 255, 255, 0.13) !important;
+  border-radius: 18px !important;
+  -webkit-backdrop-filter: blur(14px) saturate(1.4) !important;
+  backdrop-filter: blur(14px) saturate(1.4) !important;
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.32), inset 0 1px 0 rgba(255, 255, 255, 0.05) !important;
+}
+.qf-public-wft .price-card.featured {
+  border-color: rgba(13, 60, 252, 0.62) !important;
+  box-shadow:
+    0 0 0 1px rgba(13, 60, 252, 0.36),
+    0 10px 34px rgba(13, 60, 252, 0.22),
+    0 8px 32px rgba(0, 0, 0, 0.30) !important;
+}
+
+/* LIGHT — frosted white glass. */
+html[data-theme="light"] body.qf-public-wft .price-card {
+  background: rgba(255, 255, 255, 0.68) !important;
+  border: 1px solid rgba(15, 37, 64, 0.10) !important;
+  border-radius: 18px !important;
+  -webkit-backdrop-filter: blur(14px) saturate(1.4) !important;
+  backdrop-filter: blur(14px) saturate(1.4) !important;
+  box-shadow: 0 8px 32px rgba(10, 37, 64, 0.10) !important;
+}
+html[data-theme="light"] body.qf-public-wft .price-card.featured {
+  border-color: var(--accent) !important;
+  box-shadow:
+    0 0 0 1px rgba(13, 60, 252, 0.22),
+    0 12px 40px rgba(13, 60, 252, 0.14) !important;
+}
+
+/* SOLID fallback where backdrop-filter is unsupported (stays legible). */
+@supports not ((backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px))) {
+  .qf-public-wft .price-card {
+    background: rgba(34, 40, 42, 0.98) !important;
+  }
+  html[data-theme="light"] body.qf-public-wft .price-card {
+    background: rgba(255, 255, 255, 0.98) !important;
+  }
+}

@@ -27,12 +27,27 @@
       transition: border-color 0.18s ease, transform 0.18s ease, box-shadow 0.18s ease;
     }
     .qf-public-wft .price-card .btn-block { margin-top: auto; }
+    /* Glass hover-lift: rise + deeper shadow + accent border (matches the
+       canonical landing-glass card hover). */
     .qf-public-wft .price-card:hover {
-      border-color: rgba(255, 255, 255, 0.7) !important;
-      transform: translateY(-4px);
+      transform: translateY(-6px);
+      border-color: rgba(110, 139, 255, 0.62) !important;
+      box-shadow: 0 16px 44px rgba(0, 0, 0, 0.42), inset 0 1px 0 rgba(255, 255, 255, 0.06) !important;
     }
     .qf-public-wft .price-card.featured:hover {
-      border-color: rgba(255, 255, 255, 0.7) !important;
+      border-color: rgba(13, 60, 252, 0.80) !important;
+      box-shadow:
+        0 0 0 1px rgba(13, 60, 252, 0.44),
+        0 16px 44px rgba(13, 60, 252, 0.30),
+        0 16px 44px rgba(0, 0, 0, 0.34) !important;
+    }
+    html[data-theme="light"] body.qf-public-wft .price-card:hover {
+      border-color: var(--accent) !important;
+      box-shadow: 0 16px 44px rgba(10, 37, 64, 0.16) !important;
+    }
+    @media (prefers-reduced-motion: reduce) {
+      .qf-public-wft .price-card { transition: none; }
+      .qf-public-wft .price-card:hover { transform: none; }
     }
 
     /* Vital CTA hover: base rule left the label near-white on a white fill
@@ -74,12 +89,24 @@
       content: '+';
       font-size: 22px; font-weight: 400; line-height: 1;
       color: var(--qf-wft-muted); flex-shrink: 0;
+      transition: transform 0.2s ease, color 0.2s ease;
     }
-    .qf-faq-item[open] summary::after { content: '\2212'; }
+    .qf-faq-item[open] summary::after { content: '\2212'; transform: rotate(180deg); color: var(--accent); }
     .qf-faq-a { padding: 0 0 16px 0; }
+    /* Height/opacity fold when the answer reveals (details unhides on open). */
+    .qf-faq-item[open] .qf-faq-a { animation: qf-faq-fold 0.24s ease both; }
+    @keyframes qf-faq-fold {
+      from { opacity: 0; transform: translateY(-6px); }
+      to   { opacity: 1; transform: translateY(0); }
+    }
     .qf-faq-a p {
       margin: 0; font-size: 14px; line-height: 1.6;
       color: var(--qf-wft-muted);
+    }
+    @media (prefers-reduced-motion: reduce) {
+      .qf-faq-item summary::after { transition: none; }
+      .qf-faq-item[open] summary::after { transform: none; }
+      .qf-faq-item[open] .qf-faq-a { animation: none; }
     }
 
     /* No cobalt TEXT on the dark bg. Inline content links (e.g. "Talk to us")
@@ -92,6 +119,23 @@
       text-underline-offset: 2px;
     }
     .qf-public-wft main a:not(.btn):hover { color: var(--qf-wft-muted); }
+
+    /* CTA micro-interactions: soft press + accent glow on the Pro CTA. */
+    .qf-public-wft .btn-primary,
+    .qf-public-wft .btn-secondary {
+      transition: transform 0.15s ease, box-shadow 0.15s ease, background 0.15s ease, border-color 0.15s ease, color 0.15s ease;
+    }
+    .qf-public-wft .btn-primary:active,
+    .qf-public-wft .btn-secondary:active { transform: translateY(1px); }
+    .qf-public-wft .price-card.featured .btn-primary:hover {
+      box-shadow: 0 8px 24px rgba(13, 60, 252, 0.42);
+    }
+    @media (prefers-reduced-motion: reduce) {
+      .qf-public-wft .btn-primary,
+      .qf-public-wft .btn-secondary { transition: none; }
+      .qf-public-wft .btn-primary:active,
+      .qf-public-wft .btn-secondary:active { transform: none; }
+    }
   </style>
   <link rel="icon" href="/favicon.ico" sizes="any">
   <link rel="icon" type="image/png" sizes="32x32" href="/brand/favicon-32.png">
@@ -184,7 +228,7 @@
   }
   </script>
 </head>
-<body class="qf-public-wft">
+<body class="qf-public-wft qf-mc-hide-sm">
   <header class="topnav">
     <div class="topnav-inner">
       <a href="/" class="brand-mark">

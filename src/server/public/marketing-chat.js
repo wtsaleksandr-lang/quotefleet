@@ -271,6 +271,19 @@
       }
     }
 
+    /* Pages that opt in with body.qf-mc-hide-sm (signup, pricing) hide the
+       floating launcher on narrow phones (<=420px). On those two funnel
+       surfaces the fixed bottom-right bubble overlapped real content — the
+       signup "Your link" slug field and the mobile pricing Vital feature list.
+       Every link/action on both pages is reachable without the chat, so the
+       cleanest fix is to drop the launcher (and any open panel) at phone width.
+       Desktop and 421px+ are untouched (the 84px lift above still applies). */
+    @media (max-width: 420px) {
+      body.qf-mc-hide-sm .qf-mc-fab,
+      body.qf-mc-hide-sm .qf-mc-panel,
+      body.qf-mc-hide-sm .qf-mc-backdrop { display: none !important; }
+    }
+
     @media (prefers-reduced-motion: reduce) {
       .qf-mc-panel, .qf-mc-fab, .qf-mc-submit { transition: none; }
       .qf-mc-typing span { animation: none; opacity: 0.7; }

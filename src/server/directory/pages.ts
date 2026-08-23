@@ -852,6 +852,37 @@ const DIRECTORY_CSS = `
   .join-msg--ok { color: var(--success); }
   .join-msg--err { color: var(--error); }
 
+  /* Premium GLASS on the shipper subscribe panel (funnel surface 3) — the
+     $19/mo Directory Pro path should read as premium as the trucker pricing
+     flagship. Regular-material glass + accent outline/glow; the input FIELDS
+     (.join-field) keep their SOLID --surface-2 fill (glass never sits behind
+     typed text). Directory is dark by default (style.css :root) with a
+     html[data-theme="light"] override. -webkit-backdrop-filter is paired and
+     an @supports-not SOLID fallback ships. */
+  .join-panel {
+    background: rgba(34, 40, 42, 0.60);
+    border: 1px solid rgba(13, 60, 252, 0.55);
+    border-radius: 18px;
+    -webkit-backdrop-filter: blur(16px) saturate(1.3);
+    backdrop-filter: blur(16px) saturate(1.3);
+    box-shadow:
+      0 0 0 1px rgba(13, 60, 252, 0.22),
+      0 10px 34px rgba(13, 60, 252, 0.16),
+      0 8px 32px rgba(0, 0, 0, 0.30);
+  }
+  html[data-theme="light"] .join-panel {
+    background: rgba(255, 255, 255, 0.70);
+    border: 1px solid rgba(13, 60, 252, 0.45);
+    box-shadow:
+      0 0 0 1px rgba(13, 60, 252, 0.14),
+      0 12px 40px rgba(13, 60, 252, 0.12),
+      0 8px 32px rgba(10, 37, 64, 0.10);
+  }
+  @supports not ((backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px))) {
+    .join-panel { background: rgba(34, 40, 42, 0.98); }
+    html[data-theme="light"] .join-panel { background: rgba(255, 255, 255, 0.98); }
+  }
+
   .dir-upgrade-banner { border: 1px solid var(--border); border-radius: var(--radius-card, 16px); padding: 16px; margin-bottom: 16px; font-size: 15px; line-height: 1.5; color: var(--ink); }
   .dir-upgrade-banner strong { color: var(--ink); }
   .dir-upgrade-banner a { color: var(--accent); }
