@@ -137,6 +137,14 @@
       publicContactEmail: '',
       rates: null,
       ratesLoaded: false,
+      // Zone-priced verticals (drayage) quote by a FLAT per-load tariff the
+      // engine reads from lane_zones — NOT the rate card's $/mile (engine.ts
+      // ignores ratePerMile on any zone-matched move). So for those tenants the
+      // confirm step must surface + edit the zone flat prices, not a $/mile
+      // headline the engine never uses. Loaded alongside rates after apply.
+      zones: null,
+      zonesLoaded: false,
+      zonesTotal: 0,
       submitting: false
     };
     // 4 steps: modes → service area → quoting rules → confirm rates. The pricing
@@ -159,6 +167,34 @@
       if (row.label) return row.label;
       var s = row.service || 'Rate';
       return row.equipment ? s + ' · ' + row.equipment : s;
+    }
+
+    // True when the tenant's headline pricing model is a ZONE tariff (drayage).
+    // For these the engine sets linehaul = matched zone.flatPrice and ignores
+    // the rate card's $/mile, so the confirm step must edit the zone flat prices.
+    function isZonePricing() {
+      return state.pricing === 'zone' && Array.isArray(state.zones) && state.zones.length > 0;
+    }
+
+    // Normalised descriptors for the confirm step, so one render + one save path
+    // handle BOTH pricing shapes. Zone-priced tenants edit lane_zones.flatPrice
+    // ("per load"); everyone else edits the rate card's headline $/mile|flat|min.
+    // Each descriptor's `field`/`endpoint` are stamped back onto the raw row so
+    // finishRates() PUTs the edited value to exactly where the engine reads it.
+    function confirmItems() {
+      if (isZonePricing()) {
+        return state.zones.map(function (z) {
+          z.__field = 'flatPrice';
+          z.__endpoint = 'lane-zones';
+          return { raw: z, name: z.label || 'Zone tariff', unit: 'per load', field: 'flatPrice' };
+        });
+      }
+      return (state.rates || []).map(function (r) {
+        var f = r.__field || primaryPriceField(r);
+        r.__field = f;
+        r.__endpoint = 'rate-cards';
+        return { raw: r, name: rowName(r), unit: PRICE_FIELD_LABELS[f] || f, field: f };
+      });
     }
 
     var overlay = el('div', 'qf-ob-overlay');
@@ -418,23 +454,29 @@
           body.appendChild(radWrap);
         }
       } else if (state.step === 3) {
+        var zoneMode = isZonePricing();
         body.appendChild(el('div', 'qf-ob-kicker', 'Step 4 of 4'));
-        body.appendChild(el('h1', 'qf-ob-title', 'Confirm your top 3 rates'));
-        body.appendChild(el('p', 'qf-ob-sub', 'These seeded from your pick. Tweak the headline price on each, then copy your calculator link to share it.'));
+        // Zone-priced tenants (drayage) quote by a flat per-load tariff, so the
+        // headline they confirm is a per-load price, not a $/mile — showing the
+        // latter would ask them to edit a number the engine ignores.
+        body.appendChild(el('h1', 'qf-ob-title', zoneMode ? 'Confirm your top zone rates' : 'Confirm your top 3 rates'));
+        body.appendChild(el('p', 'qf-ob-sub', zoneMode
+          ? 'Drayage is priced by a flat rate per load within each port zone. These seeded from your pick — set the per-load price on each, then copy your calculator link to share it.'
+          : 'These seeded from your pick. Tweak the headline price on each, then copy your calculator link to share it.'));
 
-        var rows = state.rates || [];
-        if (rows.length === 0) {
+        var items = confirmItems();
+        if (items.length === 0) {
           body.appendChild(el('p', 'qf-ob-sub', 'No rates to confirm yet — you can add them from the dashboard.'));
         }
         var list = el('div', 'qf-ob-rates');
-        rows.forEach(function (row) {
-          var fieldKey = row.__field || primaryPriceField(row);
-          row.__field = fieldKey;
+        items.forEach(function (item) {
+          var row = item.raw;
+          var fieldKey = item.field;
           var rowEl = el('div', 'qf-ob-rate-row');
 
           var name = el('div', 'qf-ob-rate-name');
-          name.appendChild(el('span', 'qf-ob-rate-label', rowName(row)));
-          name.appendChild(el('span', 'qf-ob-rate-unit', PRICE_FIELD_LABELS[fieldKey] || fieldKey));
+          name.appendChild(el('span', 'qf-ob-rate-label', item.name));
+          name.appendChild(el('span', 'qf-ob-rate-unit', item.unit));
           rowEl.appendChild(name);
 
           var priceWrap = el('div', 'qf-ob-rate-price');
@@ -445,7 +487,7 @@
           price.step = 'any';
           price.inputMode = 'decimal';
           price.value = row[fieldKey] != null ? row[fieldKey] : 0;
-          price.setAttribute('aria-label', rowName(row) + ' ' + (PRICE_FIELD_LABELS[fieldKey] || fieldKey));
+          price.setAttribute('aria-label', item.name + ' ' + item.unit);
           price.addEventListener('input', function () {
             var n = parseFloat(price.value);
             row[fieldKey] = isNaN(n) ? 0 : n;
@@ -456,6 +498,15 @@
           list.appendChild(rowEl);
         });
         body.appendChild(list);
+
+        // Zone tenants have one flat rate PER port-radius zone (the seed ships
+        // ~39). We surface a representative top few here; the rest are editable
+        // in Zones on the dashboard. Say so, so nobody thinks these are all of
+        // them.
+        if (zoneMode && state.zonesTotal > items.length) {
+          body.appendChild(el('p', 'qf-ob-hint',
+            'Showing ' + items.length + ' of ' + state.zonesTotal + ' port zones — fine-tune every zone under Zones on your dashboard.'));
+        }
 
         // ── OPTIONAL trust details ───────────────────────────────────────
         // Authority numbers + a public contact address are the two things a
@@ -666,6 +717,26 @@
           rows.sort(function (a, b) { return (a.sortOrder || 0) - (b.sortOrder || 0); });
           state.rates = rows.slice(0, 3);
           state.ratesLoaded = true;
+          // Zone-priced tenants (drayage) also need their lane_zones — the flat
+          // per-load tariffs the engine actually reads. Load them so the confirm
+          // step edits those instead of an engine-ignored $/mile. Any other
+          // vertical keeps the per-mile/flat rate-card confirm untouched.
+          if (state.pricing === 'zone') {
+            return fetch('/api/tenant/lane-zones', { headers: { Accept: 'application/json' } })
+              .then(function (r) {
+                if (!r.ok) throw new Error('lane-zones load failed (' + r.status + ')');
+                return r.json();
+              })
+              .then(function (zdata) {
+                var zrows = (zdata && zdata.laneZones) || [];
+                zrows.sort(function (a, b) { return (a.sortOrder || 0) - (b.sortOrder || 0); });
+                state.zonesTotal = zrows.length;
+                state.zones = zrows.slice(0, 3);
+                state.zonesLoaded = true;
+              });
+          }
+        })
+        .then(function () {
           state.submitting = false;
           skipBtn.disabled = false;
           state.step = 3; // confirm-rates is the last step (index 3 of 4)
@@ -697,12 +768,17 @@
         if (!r.ok) throw new Error('apply failed (' + r.status + ')');
       });
 
-      var puts = (state.rates || [])
-        .filter(function (row) { return row.__dirty && row.__field; })
+      // Persist every edited row to the SAME table the engine reads: rate-card
+      // edits → /rate-cards, zone flat-price edits → /lane-zones. Each row was
+      // stamped with __endpoint/__field when rendered, so a drayage carrier's
+      // per-load edits land in lane_zones.flatPrice (what the engine uses) and
+      // never in an ignored $/mile.
+      var puts = [].concat(state.rates || [], state.zones || [])
+        .filter(function (row) { return row.__dirty && row.__field && row.__endpoint; })
         .map(function (row) {
           var patch = {};
           patch[row.__field] = Number(row[row.__field]) || 0;
-          return fetch('/api/tenant/rate-cards/' + row.id, {
+          return fetch('/api/tenant/' + row.__endpoint + '/' + row.id, {
             method: 'PUT',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify(patch)

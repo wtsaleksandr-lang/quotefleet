@@ -92,4 +92,29 @@ describe('real drayage quote — engine over shipped defaults', () => {
     // 32% of the $425 zone tariff.
     expect(r.fuelSurcharge).toBe(136);
   });
+
+  // Guards the onboarding-wizard confirm-step fix: for a zone-matched drayage
+  // move the engine reads lane_zones.flatPrice and IGNORES the rate card's
+  // ratePerMile. So the wizard must edit flatPrice (what changes the quote), not
+  // the $/mile headline (which does nothing here).
+  it('linehaul follows the zone flatPrice — editing $/mile is inert, editing flatPrice moves it', () => {
+    // Baseline: USLAX 0-30 container_40 → $425 flat, regardless of $/mile.
+    const base = calculate(cards, accs, zones, drayReq({}));
+    expect(base.subtotalLinehaul).toBe(425);
+
+    // Doubling the card's $/mile changes NOTHING for a zone-matched move.
+    const bumpedPerMile = cards.map((c) =>
+      c.service === 'drayage' ? ({ ...c, ratePerMile: c.ratePerMile * 2 } as RateCard) : c,
+    );
+    const rPerMile = calculate(bumpedPerMile, accs, zones, drayReq({}));
+    expect(rPerMile.subtotalLinehaul).toBe(425);
+
+    // Editing the matched zone's flatPrice DOES change the quote — this is where
+    // the wizard now routes the carrier's edits.
+    const editedZones = zones.map((z) =>
+      z.label.startsWith('LAX/LGB → Local') ? ({ ...z, flatPrice: 500 } as LaneZone) : z,
+    );
+    const rZone = calculate(cards, accs, editedZones, drayReq({}));
+    expect(rZone.subtotalLinehaul).toBe(500);
+  });
 });
