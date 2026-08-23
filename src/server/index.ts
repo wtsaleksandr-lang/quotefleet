@@ -7,6 +7,7 @@ import './bootstrapDoppler.js';
 import { loadEnv } from '../config.js';
 import { runMigrations, ensureSelfHealColumns, ensureSelfHealTables } from '../db/migrate.js';
 import { maybeAutoHealCarrierDirectory } from './directory/autoHeal.js';
+import { maybeBackfillNearestPortCodes } from './directory/backfillNearestPort.js';
 import { seedDirectoryTerminals } from './directory/terminals.js';
 import { createApp } from './app.js';
 import { startMarketplaceCron } from '../marketplace/cron.js';
@@ -58,6 +59,16 @@ async function main() {
   // fire-and-forget, single-flighted by a Postgres advisory lock, and never
   // throws into boot (see src/server/directory/autoHeal.ts).
   void maybeAutoHealCarrierDirectory();
+  // Journal-INDEPENDENT RE-DERIVATION of carrier_directory.nearest_port_code.
+  // The stored column is derived (ZIP/province → nearest hub) but only written at
+  // ingest time, so rows loaded under an OLDER hub set kept stale codes (e.g. Bay-
+  // Area carriers pinned to USLAX instead of USOAK). This recomputes the column in
+  // place using the SAME current derivation — no FMCSA re-download. Version-gated
+  // (skips when already at the current derivation version), single-flighted by its
+  // own advisory lock, batched, fire-and-forget, and never throws into boot (see
+  // src/server/directory/backfillNearestPort.ts). Runs alongside the auto-heal on
+  // a distinct lock so the two never block each other.
+  void maybeBackfillNearestPortCodes();
   const app = createApp();
   app.listen(env.PORT, env.HOST, () => {
     console.log(`[server] QuoteFleet listening on http://${env.HOST}:${env.PORT}`);
