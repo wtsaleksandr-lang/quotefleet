@@ -401,6 +401,16 @@ html[data-theme="light"] body.qf-auth-wft .plan-opt .muted {
 html[data-theme="light"] body.qf-auth-wft a {
   color: var(--ink-soft) !important;
 }
+/* A primary button rendered as an <a> (e.g. the reset-password success-state
+   "Go to sign in" CTA) must keep WHITE label text on the blue button surface.
+   The rule just above repaints ALL auth-page anchors to dark ink-soft and
+   out-specifies `body.qf-auth-wft .btn-primary`(0,2,1), which would drop the
+   label to ~1.6:1 dark-navy-on-blue (WCAG AA fail). Re-assert white at higher
+   specificity (0,3,3) — same workaround the OAuth anchor-buttons use above.
+   <button> primary CTAs are unaffected (they never matched the anchor rule). */
+html[data-theme="light"] body.qf-auth-wft a.btn-primary {
+  color: #FFFFFF !important;
+}
 /* Selected plan: DS = accent outline + faint tint over the WHITE card. */
 html[data-theme="light"] body.qf-auth-wft .plan-opt:has(input:checked) {
   border-color: var(--accent) !important;

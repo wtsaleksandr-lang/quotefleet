@@ -428,6 +428,13 @@
       "when": 1788461277221,
       "tag": "0060_saved_lists",
       "breakpoints": true
+    },
+    {
+      "idx": 61,
+      "version": "7",
+      "when": 1788547677221,
+      "tag": "0061_password_reset_tokens",
+      "breakpoints": true
     }
   ]
 }

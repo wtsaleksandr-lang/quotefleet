@@ -231,6 +231,50 @@ export const magicLinkLimiter: RateLimitRequestHandler = rateLimit({
   message: { error: 'Too many sign-in link requests. Try again in an hour.' },
 });
 
+/** /api/auth/password/forgot — anti-email-bomb on the reset-link request.
+ *  Same posture as magicLinkLimiter: keyed per EMAIL (not IP) so an attacker
+ *  rotating IPs still can't flood one inbox with reset emails; falls back to IP
+ *  when no email is present. 5 / hour is generous for a real forgetful user. */
+export const passwordResetRequestLimiter: RateLimitRequestHandler = rateLimit({
+  windowMs: minutes(60),
+  limit: 5,
+  standardHeaders: 'draft-7',
+  legacyHeaders: false,
+  keyGenerator: (req) => {
+    const email = (req.body && typeof req.body.email === 'string')
+      ? req.body.email.trim().toLowerCase()
+      : '';
+    return email ? `pwreset:${email}` : `pwreset-ip:${req.ip}`;
+  },
+  message: { error: 'Too many password-reset requests. Try again in an hour.' },
+});
+
+/** /api/auth/password/forgot — per-IP companion to the per-email limiter above.
+ *  The per-email cap alone lets a single host probe UNLIMITED distinct emails
+ *  (enumeration + reset-spam) because each address has its own bucket. This caps
+ *  total reset requests from ONE IP regardless of which addresses it targets.
+ *  Keyed by the real client IP (default `req.ip` behind trust-proxy, same as the
+ *  login/verify limiters). Stacked alongside passwordResetRequestLimiter. */
+export const passwordResetIpLimiter: RateLimitRequestHandler = rateLimit({
+  windowMs: minutes(60),
+  limit: 25,
+  standardHeaders: 'draft-7',
+  legacyHeaders: false,
+  message: { error: 'Too many password-reset requests. Try again in an hour.' },
+});
+
+/** POST /api/auth/password/reset — the token-verify + set-new-password step.
+ *  Per-IP cap that stops a bot brute-forcing reset tokens (the token is 48-char
+ *  nanoid ~285 bits so it's already infeasible, but a hard cap makes it
+ *  moot). Same shape as loginLimiter. */
+export const passwordResetVerifyLimiter: RateLimitRequestHandler = rateLimit({
+  windowMs: minutes(15),
+  limit: 10,
+  standardHeaders: 'draft-7',
+  legacyHeaders: false,
+  message: { error: 'Too many attempts. Try again in 15 minutes.' },
+});
+
 /** /api/auth/signup — anti-orphan-tenant-spam. */
 export const signupLimiter: RateLimitRequestHandler = rateLimit({
   windowMs: minutes(60),

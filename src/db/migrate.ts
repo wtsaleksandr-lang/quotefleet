@@ -476,6 +476,21 @@ export const SELF_HEAL_TABLE_STATEMENTS: readonly string[] = [
   )`,
   `CREATE UNIQUE INDEX IF NOT EXISTS "saved_list_items_list_dot_idx" ON "saved_list_items" ("list_id","carrier_dot")`,
   `CREATE INDEX IF NOT EXISTS "saved_list_items_list_idx" ON "saved_list_items" ("list_id")`,
+  // 0061_password_reset_tokens.sql — single-use "forgot password" reset links.
+  // Replit's deploy skips db:migrate and its publish tool can drop tables, so
+  // this CREATE TABLE / INDEX IF NOT EXISTS runs on every boot and no-ops on a
+  // healthy DB — a phantom-dropped table is re-created (empty) before the server
+  // serves, so the forgot-password flow can never 500 on a missing table. MUST
+  // stay byte-for-byte equivalent to drizzle/0061_password_reset_tokens.sql +
+  // schema.ts (passwordResetTokens). References `users` only, never `tenants`.
+  `CREATE TABLE IF NOT EXISTS "password_reset_tokens" (
+    "token_hash" text PRIMARY KEY NOT NULL,
+    "user_id" integer NOT NULL,
+    "expires_at" timestamp NOT NULL,
+    "used_at" timestamp,
+    "created_at" timestamp DEFAULT now() NOT NULL
+  )`,
+  `CREATE INDEX IF NOT EXISTS "password_reset_tokens_user_idx" ON "password_reset_tokens" ("user_id")`,
 ];
 
 export async function ensureSelfHealTables(): Promise<void> {

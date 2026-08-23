@@ -424,6 +424,11 @@ export function createApp(): express.Express {
 
   app.get('/login', (_req, res) => res.sendFile('login.html', { root: publicDir }));
   app.get('/signup', (_req, res) => res.sendFile('signup.html', { root: publicDir }));
+  // Forgot-password: one page, two modes. No ?token → "request a reset link"
+  // form (POST /api/auth/password/forgot). With ?token → "set a new password"
+  // form (POST /api/auth/password/reset). Static page; the token is read from
+  // the URL client-side and never rendered by the server.
+  app.get('/reset-password', (_req, res) => res.sendFile('reset-password.html', { root: publicDir }));
   // /pricing, /compare, /support, /security are served with the full site
   // header + premium footer earlier (see fullHeaderPages, before the static
   // handler); no plain sendFile fallbacks here.
