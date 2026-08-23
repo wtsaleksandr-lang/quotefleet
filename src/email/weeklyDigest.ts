@@ -25,23 +25,21 @@
 import { and, eq, gte } from 'drizzle-orm';
 import { db } from '../db/client.js';
 import { auditLog, callbackRequests, conversations, leads } from '../db/schema.js';
-// Single source of truth for what counts as a conversion — shared with the
-// dashboard KPI overview so the digest and the dashboard never disagree.
-import { CONVERTED_STATUSES } from '../server/overviewStats.js';
+// Single source of truth for what counts as a conversion AND for the on-page
+// engagement rollup — shared with the dashboard KPI overview so the digest and
+// the dashboard never disagree.
+import {
+  CONVERTED_STATUSES,
+  summarizeEngagement,
+  type EngagementCounts,
+} from '../server/overviewStats.js';
+
+// Re-export so existing importers of `EngagementCounts` from this module keep
+// working; the canonical definition now lives in overviewStats.ts.
+export type { EngagementCounts } from '../server/overviewStats.js';
 
 const DAY_MS = 24 * 60 * 60 * 1000;
 export const WEEK_MS = 7 * DAY_MS;
-
-/** On-page engagement rollup pulled from the quote.activity audit events.
- *  Mirrors the event vocabulary in routes/quoteActivity.ts. */
-export interface EngagementCounts {
-  views: number;
-  pdfSaves: number;
-  chatOpens: number;
-  copyLinks: number;
-  prints: number;
-  callbackOpens: number;
-}
 
 export interface WeeklyDigestStats {
   /** Inclusive-start / exclusive-end ISO strings of the 7-day window. */
@@ -131,40 +129,9 @@ export function summarizeWeeklyActivity(input: WeeklyActivityInput): WeeklyDiges
     }
   }
 
-  const engagement: EngagementCounts = {
-    views: 0,
-    pdfSaves: 0,
-    chatOpens: 0,
-    copyLinks: 0,
-    prints: 0,
-    callbackOpens: 0,
-  };
-  for (const row of activityRows) {
-    if (!inWindow(row.createdAt, windowStart, windowEnd)) continue;
-    const event = typeof row.detailsJson?.event === 'string' ? row.detailsJson.event : '';
-    switch (event) {
-      case 'view':
-        engagement.views++;
-        break;
-      case 'save_pdf':
-        engagement.pdfSaves++;
-        break;
-      case 'chat_open':
-        engagement.chatOpens++;
-        break;
-      case 'copy_link':
-        engagement.copyLinks++;
-        break;
-      case 'print':
-        engagement.prints++;
-        break;
-      case 'callback_open':
-        engagement.callbackOpens++;
-        break;
-      default:
-        break;
-    }
-  }
+  // Reuse the shared engagement rollup so the digest and the dashboard KPI
+  // Engagement card count identical events over their window.
+  const engagement: EngagementCounts = summarizeEngagement(activityRows, windowStart, windowEnd);
 
   const conversionPct = quotesThisWeek > 0 ? Math.round((conversions / quotesThisWeek) * 100) : 0;
   const chatConversations = chatLeadIds.size;

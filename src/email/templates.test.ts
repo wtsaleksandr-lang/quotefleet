@@ -14,6 +14,7 @@ import {
   followupDiscountEmail,
   magicLinkEmail,
   lifecycleWelcomeEmail,
+  weeklyDigestEmail,
 } from './templates.js';
 
 const base = {
@@ -132,5 +133,80 @@ describe('followupDiscountEmail (FU3) — NEVER renders a discount without a cod
     expect(() =>
       followupDiscountEmail({ ...base, promoCode: 'SAVE8', percentOff: NaN as unknown as number }),
     ).toThrow();
+  });
+});
+
+/**
+ * Premium weekly stats-digest — the redesigned recap renders its gradient hero
+ * (with the Outlook solid-color fallback), the four individual stat cards, the
+ * engagement strip, and the CTA — and stays honest about email opens/clicks
+ * (never fabricated). Trial tenants get the light "days left" band; live-paid
+ * tenants don't.
+ */
+describe('weeklyDigestEmail — premium recap layout', () => {
+  const digestBase = {
+    companyName: 'Harbor Link Logistics',
+    dateRange: 'Jul 7 – Jul 14',
+    quotes: 5,
+    quotesDelta: 2,
+    conversions: 2,
+    conversionPct: 40,
+    callbacks: 3,
+    autoReplies: 4,
+    chatConversations: 6,
+    views: 20,
+    pdfSaves: 3,
+    copyLinks: 2,
+    prints: 1,
+    dashboardUrl: 'https://quotefleet.net/app/overview',
+    unsubscribeUrl: 'https://quotefleet.net/unsubscribe?token=abc',
+  };
+
+  it('renders the gradient hero WITH an Outlook solid bgcolor fallback', () => {
+    const html = weeklyDigestEmail(digestBase);
+    // CSS gradient (modern clients) + solid bgcolor (Word engine fallback).
+    expect(html).toContain('linear-gradient(135deg,#0D3CFC,#6E8BFF)');
+    expect(html).toContain('bgcolor="#0D3CFC"');
+    // Hero eyebrow + headline number + WoW delta pill.
+    expect(html).toContain('Your widget this week');
+    expect(html).toContain('5 quotes this week');
+    expect(html).toContain('+2 vs last week');
+    expect(html).toContain('Harbor Link Logistics');
+  });
+
+  it('renders the four standalone stat cards (each its own bordered/rounded card, no shared grid border)', () => {
+    const html = weeklyDigestEmail(digestBase);
+    expect(html).toContain('Quotes requested');
+    expect(html).toContain('Booked / won (40%)');
+    expect(html).toContain('Callbacks requested');
+    expect(html).toContain('Chat conversations');
+    // Per-card premium chrome: rounded + shadow (with a 1px border fallback).
+    expect(html).toContain('border-radius:14px');
+    expect(html).toContain('box-shadow:0 6px 20px rgba(13,60,252,0.10)');
+  });
+
+  it('renders the engagement strip from the computed counts', () => {
+    const html = weeklyDigestEmail(digestBase);
+    expect(html).toContain('How visitors interacted');
+    expect(html).toContain('Page views');
+    expect(html).toContain('PDF saves');
+    expect(html).toContain('Copied link');
+    expect(html).toContain('Printed');
+  });
+
+  it('uses the single dashboard CTA and never fabricates email opens/clicks', () => {
+    const html = weeklyDigestEmail(digestBase);
+    expect(html).toContain('View your full dashboard');
+    expect(html).toContain('https://quotefleet.net/app/overview');
+    expect(html.toLowerCase()).not.toContain('email opens');
+    expect(html.toLowerCase()).not.toContain('click-through');
+    expect(html.toLowerCase()).not.toContain('coming soon');
+  });
+
+  it('shows the trial band only when trialDaysLeft is set', () => {
+    const withTrial = weeklyDigestEmail({ ...digestBase, trialDaysLeft: 6 });
+    expect(withTrial).toContain('6 days left in your trial');
+    const paid = weeklyDigestEmail(digestBase);
+    expect(paid).not.toContain('left in your trial');
   });
 });

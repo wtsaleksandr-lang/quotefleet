@@ -1319,6 +1319,34 @@
     return card;
   }
 
+  // Engagement card — how visitors interacted with the tenant's hosted quotes
+  // in the selected period, from the SAME quote.activity rollup the weekly
+  // digest email surfaces (so the email's "view your dashboard" CTA lands on
+  // the same numbers). Numbers sit on the card's ≥0.5 glass tint (readability).
+  function engagementCard(engagement) {
+    var e = engagement || {};
+    var items = [
+      { label: 'Page views', value: e.views || 0 },
+      { label: 'PDF saves', value: e.pdfSaves || 0 },
+      { label: 'Chat opens', value: e.chatOpens || 0 },
+      { label: 'Copied link', value: e.copyLinks || 0 },
+      { label: 'Callbacks', value: e.callbackOpens || 0 },
+    ];
+    var total = items.reduce(function (s, it) { return s + (it.value || 0); }, 0);
+    var grid = el('div', { class: 'qf-kpi-engage' });
+    if (!total) {
+      grid.appendChild(el('p', { class: 'muted-small', style: { margin: '0' }, text: 'No visitor interactions in this period yet.' }));
+    } else {
+      items.forEach(function (it) {
+        var cell = el('div', { class: 'qf-kpi-engage-cell' });
+        cell.appendChild(el('div', { class: 'qf-kpi-engage-value', text: fmtInt(it.value) }));
+        cell.appendChild(el('div', { class: 'qf-kpi-engage-label', text: it.label }));
+        grid.appendChild(cell);
+      });
+    }
+    return kpiCard('Engagement', grid);
+  }
+
   function renderKpiBody(body, k, overview) {
     body.innerHTML = '';
     var t = k.tiles;
@@ -1335,6 +1363,7 @@
     if (k.equipmentMix && k.equipmentMix.length) {
       charts.appendChild(kpiCard('Equipment mix', barList(k.equipmentMix, 'equipment', 'count', { empty: 'No equipment yet.' })));
     }
+    charts.appendChild(engagementCard(k.engagement));
     var mapCard = latestLaneCard(overview);
     if (mapCard) charts.appendChild(mapCard);
     body.appendChild(charts);

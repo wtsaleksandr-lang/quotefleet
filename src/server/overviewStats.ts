@@ -19,6 +19,75 @@ const DAY_MS = 24 * 60 * 60 * 1000;
  *  the dashboard KPIs and the weekly digest so both surfaces always agree. */
 export const CONVERTED_STATUSES = new Set(['won', 'booking_requested']);
 
+/* ── On-page engagement rollup (shared) ────────────────────────────────────
+ * Counts of how visitors interacted with a tenant's hosted quotes, derived
+ * from the `quote.activity` audit events (event vocabulary mirrors
+ * routes/quoteActivity.ts). This is the SINGLE rollup used by BOTH the weekly
+ * digest email (src/email/weeklyDigest.ts) and the dashboard Overview KPIs, so
+ * the email's "how visitors interacted" strip and the on-page Engagement card
+ * can never disagree.
+ * ────────────────────────────────────────────────────────────────────────── */
+
+export interface EngagementCounts {
+  views: number;
+  pdfSaves: number;
+  chatOpens: number;
+  copyLinks: number;
+  prints: number;
+  callbackOpens: number;
+}
+
+/** A quote.activity audit row — narrowed so tests can seed plain objects. */
+export interface EngagementActivityRow {
+  createdAt: Date;
+  detailsJson: Record<string, unknown> | null;
+}
+
+/** All-zero engagement — the shape returned when there are no activity rows. */
+export function emptyEngagement(): EngagementCounts {
+  return { views: 0, pdfSaves: 0, chatOpens: 0, copyLinks: 0, prints: 0, callbackOpens: 0 };
+}
+
+/** Pure rollup of quote.activity events within [windowStart, windowEnd) into
+ *  per-interaction counts. No DB, no clock — fully deterministic. */
+export function summarizeEngagement(
+  activityRows: EngagementActivityRow[],
+  windowStart: Date,
+  windowEnd: Date,
+): EngagementCounts {
+  const e = emptyEngagement();
+  const startMs = windowStart.getTime();
+  const endMs = windowEnd.getTime();
+  for (const row of activityRows) {
+    const t = row.createdAt.getTime();
+    if (t < startMs || t >= endMs) continue;
+    const event = typeof row.detailsJson?.event === 'string' ? row.detailsJson.event : '';
+    switch (event) {
+      case 'view':
+        e.views++;
+        break;
+      case 'save_pdf':
+        e.pdfSaves++;
+        break;
+      case 'chat_open':
+        e.chatOpens++;
+        break;
+      case 'copy_link':
+        e.copyLinks++;
+        break;
+      case 'print':
+        e.prints++;
+        break;
+      case 'callback_open':
+        e.callbackOpens++;
+        break;
+      default:
+        break;
+    }
+  }
+  return e;
+}
+
 export type KpiPeriod = '7d' | '30d' | '90d';
 
 /** period key → window length in days. */
@@ -85,6 +154,9 @@ export interface KpiResult {
   series: KpiSeriesPoint[];
   topLanes: KpiLane[];
   equipmentMix: KpiEquipment[];
+  /** On-page engagement over the CURRENT window — the same rollup the weekly
+   *  digest email surfaces, so the dashboard and the email agree. */
+  engagement: EngagementCounts;
 }
 
 export interface KpiInput {
@@ -92,6 +164,9 @@ export interface KpiInput {
   period: KpiPeriod;
   /** Leads created since 2*period ago (both windows) for ONE tenant. */
   leadRows: KpiLeadRow[];
+  /** quote.activity audit events since the CURRENT window start (optional —
+   *  omitted → engagement is all-zero). Rolled up via summarizeEngagement. */
+  activityRows?: EngagementActivityRow[];
 }
 
 function isoDate(d: Date): string {
@@ -173,6 +248,11 @@ export function summarizeKpis(input: KpiInput): KpiResult {
     .map(([equipment, count]) => ({ equipment, count }))
     .sort((a, b) => b.count - a.count);
 
+  // Engagement is rolled up over the CURRENT window only (the same window the
+  // tiles count) via the shared summarizer, so the dashboard Engagement card
+  // reads identically to the weekly digest's "how visitors interacted" strip.
+  const engagement = summarizeEngagement(input.activityRows ?? [], windowStart, now);
+
   return {
     period,
     tiles: {
@@ -189,5 +269,6 @@ export function summarizeKpis(input: KpiInput): KpiResult {
     series,
     topLanes,
     equipmentMix,
+    engagement,
   };
 }

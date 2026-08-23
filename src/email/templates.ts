@@ -898,23 +898,103 @@ export function billingDunningEmail(opts: {
 
 /* ── Weekly performance digest (tenant-facing, recurring) ──────────────── */
 
-/** One big-number stat tile. `delta` (optional) renders a small +N / −N chip
- *  under the value, colored green for a gain and muted for flat/down. */
-function statTile(opts: { value: string; label: string; delta?: string; deltaUp?: boolean }): string {
-  const deltaHtml = opts.delta
-    ? `<div style="margin-top:6px;font-size:12px;font-weight:600;color:${opts.deltaUp ? '#0E7C3A' : BRAND.mutedSoft};">${escape(opts.delta)}</div>`
-    : '';
-  return `<td width="33%" valign="top" style="padding:16px 12px;text-align:center;">
-    <div style="font-size:32px;line-height:1.1;font-weight:700;letter-spacing:-0.02em;color:${BRAND.primary};">${escape(opts.value)}</div>
-    <div style="margin-top:4px;font-size:12px;line-height:1.4;color:${BRAND.muted};">${escape(opts.label)}</div>
-    ${deltaHtml}
-  </td>`;
+/* Premium recap palette — the cobalt→periwinkle used ONLY in the digest hero.
+ * Every gradient/shadow below carries a SOLID fallback (bgcolor / 1px border)
+ * so the email degrades to a clean card on Outlook's Word engine and on dark
+ * clients (which keep the white card per the shell()'s documented pattern).
+ * NOTE: `backdrop-filter` (real glass) does NOT render in email — the "glass"
+ * look here is SIMULATED via gradients + rounded, shadowed cards + a painted
+ * translucent-white pill, never a real blur. */
+const DIGEST_GRAD_FROM = '#0D3CFC';
+const DIGEST_GRAD_TO = '#6E8BFF';
+
+/** Small mono uppercase section label inside the digest body (left-aligned). */
+function sectionLabel(label: string): string {
+  return `<p style="margin:0 0 10px 0;font-size:12px;font-weight:700;letter-spacing:0.06em;text-transform:uppercase;color:${BRAND.muted};font-family:'JetBrains Mono','SF Mono',Menlo,Consolas,monospace;">${escape(label)}</p>`;
 }
 
-/** A row of big-number stat tiles (email-safe table). */
-function statGrid(tiles: string[]): string {
-  return `<table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0" style="margin:0 0 20px 0;border:1px solid ${BRAND.border};border-radius:10px;background:${BRAND.bg};">
-    <tr>${tiles.join('')}</tr>
+/** The premium gradient recap hero band. Cobalt→periwinkle CSS gradient WITH a
+ *  solid `bgcolor="#0D3CFC"` fallback (Word engine ignores CSS gradients →
+ *  reads the bgcolor). White eyebrow + company + date range + the HEADLINE
+ *  number, whose WoW delta rides in a painted translucent-white pill (NOT real
+ *  glass — a solid-ish rgba paint that simply shows the delta text on Outlook). */
+function digestHero(opts: { companyName: string; dateRange: string; headline: string; delta?: string }): string {
+  const pill = opts.delta
+    ? `&nbsp;<span style="display:inline-block;background:rgba(255,255,255,0.18);color:#FFFFFF;font-size:13px;font-weight:700;line-height:1.2;border-radius:999px;padding:4px 12px;vertical-align:middle;white-space:nowrap;">${escape(opts.delta)}</span>`
+    : '';
+  return `<table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0" style="margin:0 0 20px 0;">
+    <tr>
+      <td bgcolor="${DIGEST_GRAD_FROM}" style="background:${DIGEST_GRAD_FROM};background:linear-gradient(135deg,${DIGEST_GRAD_FROM},${DIGEST_GRAD_TO});border-radius:16px;padding:26px 24px;">
+        <div style="font-size:12px;font-weight:700;letter-spacing:0.10em;text-transform:uppercase;color:#FFFFFF;font-family:'JetBrains Mono','SF Mono',Menlo,Consolas,monospace;">Your widget this week</div>
+        <div style="margin-top:10px;font-size:17px;font-weight:700;letter-spacing:-0.01em;color:#FFFFFF;">${escape(opts.companyName)}</div>
+        <div style="margin-top:2px;font-size:13px;color:#DCE4FF;">${escape(opts.dateRange)}</div>
+        <div style="margin-top:16px;font-size:30px;line-height:1.15;font-weight:800;letter-spacing:-0.02em;color:#FFFFFF;">${escape(opts.headline)}${pill}</div>
+      </td>
+    </tr>
+  </table>`;
+}
+
+/** One primary stat as its OWN rounded, shadowed card (email-safe). Emitted as
+ *  a <td> holding a nested `bgcolor` table so Outlook — which drops box-shadow
+ *  and border-radius — still renders a solid card with a 1px border fallback.
+ *  The outer <td> padding is the inter-card GAP (no shared border). */
+function statCard(opts: { value: string; label: string; delta?: string; deltaUp?: boolean }): string {
+  const deltaHtml = opts.delta
+    ? `<div style="margin-top:8px;"><span style="display:inline-block;font-size:12px;font-weight:700;line-height:1.2;color:${opts.deltaUp ? '#0E7C3A' : BRAND.mutedSoft};background:${opts.deltaUp ? '#E7F6EC' : BRAND.bg};border-radius:999px;padding:3px 10px;">${escape(opts.delta)}</span></div>`
+    : '';
+  return `<td width="50%" valign="top" style="padding:6px;">
+      <table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0" style="border-radius:14px;box-shadow:0 6px 20px rgba(13,60,252,0.10);">
+        <tr>
+          <td bgcolor="${BRAND.card}" align="center" style="background:${BRAND.card};border:1px solid ${BRAND.border};border-radius:14px;padding:20px 14px;text-align:center;">
+            <div style="font-size:30px;line-height:1.1;font-weight:800;letter-spacing:-0.02em;color:${BRAND.primary};">${escape(opts.value)}</div>
+            <div style="margin-top:6px;font-size:12px;line-height:1.4;color:${BRAND.muted};">${escape(opts.label)}</div>
+            ${deltaHtml}
+          </td>
+        </tr>
+      </table>
+    </td>`;
+}
+
+/** A 2-up grid of standalone stat cards (email-safe). Cards are paired per row;
+ *  an odd final card gets an empty spacer cell so widths stay even. */
+function statCardGrid(cards: string[]): string {
+  const rows: string[] = [];
+  for (let i = 0; i < cards.length; i += 2) {
+    const right = cards[i + 1] ?? '<td width="50%" style="padding:6px;"></td>';
+    rows.push(`<tr>${cards[i]}${right}</tr>`);
+  }
+  return `<table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0" style="margin:0 0 12px 0;">${rows.join('')}</table>`;
+}
+
+/** Engagement strip — "How visitors interacted": a light 4-cell mini-tile row
+ *  built from the already-computed engagement counts. Solid light card (no
+ *  gradient) so it reads everywhere; numbers on the ${BRAND.bg} tint. */
+function engagementStrip(cells: Array<{ value: number; label: string }>): string {
+  const tds = cells
+    .map(
+      (c) => `<td width="25%" valign="top" align="center" style="padding:14px 8px;text-align:center;">
+          <div style="font-size:20px;line-height:1.1;font-weight:800;letter-spacing:-0.02em;color:${BRAND.ink};">${escape(String(c.value))}</div>
+          <div style="margin-top:4px;font-size:11px;line-height:1.35;color:${BRAND.muted};">${escape(c.label)}</div>
+        </td>`,
+    )
+    .join('');
+  return `<table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0" style="margin:0 0 22px 0;border:1px solid ${BRAND.border};border-radius:12px;background:${BRAND.bg};">
+    <tr>${tds}</tr>
+  </table>`;
+}
+
+/** Light trial-reinforcement band — momentum, NOT a duplicate of the
+ *  trialReminderDay11/14 "add a card" nudges. Solid tinted card. */
+function trialBand(daysLeft: number): string {
+  const d = Math.max(0, Math.round(daysLeft));
+  const label = d === 1 ? '1 day left in your trial' : `${d} days left in your trial`;
+  return `<table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0" style="margin:0 0 20px 0;">
+    <tr>
+      <td bgcolor="#EEF2FF" style="background:#EEF2FF;border:1px solid #DDE3FF;border-radius:12px;padding:14px 16px;">
+        <span style="font-size:14px;font-weight:700;color:${BRAND.primary};">${escape(label)}.</span>
+        <span style="font-size:14px;color:${BRAND.inkSoft};"> Your calculator is already working — keep the momentum going.</span>
+      </td>
+    </tr>
   </table>`;
 }
 
@@ -928,37 +1008,46 @@ export function weeklyDigestEmail(opts: {
   conversions: number;
   conversionPct: number;
   callbacks: number;
+  /** Retained for the call site / plain-text parity; not rendered as a card. */
   autoReplies: number;
   chatConversations: number;
   views: number;
   pdfSaves: number;
+  copyLinks?: number;
+  prints?: number;
+  /** When set (active-trial tenants), renders a light "N days left in your
+   *  trial" reinforcement band. Omitted for live-paid tenants. */
+  trialDaysLeft?: number;
   dashboardUrl: string;
   unsubscribeUrl?: string;
 }): string {
-  const deltaChip =
+  const headline = `${opts.quotes} quote${opts.quotes === 1 ? '' : 's'} this week`;
+  const deltaText =
     opts.quotesDelta != null && opts.quotesDelta !== 0
-      ? { delta: `${opts.quotesDelta > 0 ? '+' : ''}${opts.quotesDelta} vs last week`, deltaUp: opts.quotesDelta > 0 }
-      : {};
+      ? `${opts.quotesDelta > 0 ? '+' : ''}${opts.quotesDelta} vs last week`
+      : undefined;
 
-  const secondaryRows: Array<[string, string | null]> = [
-    ['Auto-replies sent', opts.autoReplies > 0 ? String(opts.autoReplies) : null],
-    ['Chat conversations', opts.chatConversations > 0 ? String(opts.chatConversations) : null],
-    ['Quote page views', opts.views > 0 ? String(opts.views) : null],
-    ['PDF quotes saved', opts.pdfSaves > 0 ? String(opts.pdfSaves) : null],
+  const cards = [
+    statCard({ value: String(opts.quotes), label: 'Quotes requested', delta: deltaText, deltaUp: (opts.quotesDelta ?? 0) > 0 }),
+    statCard({ value: String(opts.conversions), label: `Booked / won (${opts.conversionPct}%)` }),
+    statCard({ value: String(opts.callbacks), label: 'Callbacks requested' }),
+    statCard({ value: String(opts.chatConversations), label: 'Chat conversations' }),
   ];
 
   const inner =
-    eyebrow('Weekly recap') +
-    heading('Your week on QuoteFleet') +
-    paragraph(`Here's how <strong style="color:${BRAND.ink};">${escape(opts.companyName)}</strong> did over the last 7 days (${escape(opts.dateRange)}).`) +
-    statGrid([
-      statTile({ value: String(opts.quotes), label: 'Quotes requested', ...deltaChip }),
-      statTile({ value: String(opts.conversions), label: `Booked / won (${opts.conversionPct}%)` }),
-      statTile({ value: String(opts.callbacks), label: 'Callbacks requested' }),
+    digestHero({ companyName: opts.companyName, dateRange: opts.dateRange, headline, delta: deltaText }) +
+    (opts.trialDaysLeft != null ? trialBand(opts.trialDaysLeft) : '') +
+    sectionLabel('Your numbers') +
+    statCardGrid(cards) +
+    sectionLabel('How visitors interacted') +
+    engagementStrip([
+      { value: opts.views, label: 'Page views' },
+      { value: opts.pdfSaves, label: 'PDF saves' },
+      { value: opts.copyLinks ?? 0, label: 'Copied link' },
+      { value: opts.prints ?? 0, label: 'Printed' },
     ]) +
-    detailBox(secondaryRows) +
-    ctaButton('View your dashboard', opts.dashboardUrl) +
-    paragraph(`See the full breakdown — every lead, chat, and callback — in your analytics dashboard.`);
+    ctaButton('View your full dashboard', opts.dashboardUrl) +
+    paragraph(`See every lead, chat, and callback — plus these engagement numbers — in your dashboard.`);
 
   return shell({
     preheader: `${opts.quotes} quote${opts.quotes === 1 ? '' : 's'} this week — your QuoteFleet recap`,

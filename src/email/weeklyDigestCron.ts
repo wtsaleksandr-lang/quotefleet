@@ -30,18 +30,31 @@ import { sendEmail } from './send.js';
 import { weeklyDigestEmail } from './templates.js';
 import { unsubscribeUrl } from './unsubscribe.js';
 import { computeWeeklyStats, type WeeklyDigestStats } from './weeklyDigest.js';
-import { hasCoreAccess } from '../server/plans.js';
+import { hasCoreAccess, isTrialing } from '../server/plans.js';
 import { loadEnv } from '../config.js';
 
 const TICK_MS = 60 * 60 * 1000; // hourly
 const STARTUP_DELAY_MS = 90 * 1000;
+const DAY_MS = 24 * 60 * 60 * 1000;
 
-/** Send window: Monday (UTC day 1), 14:00 UTC. */
-const SEND_DOW = 1;
+/** Primary send slot: Monday (UTC day 1), 14:00 UTC — ALL audiences. */
+const PRIMARY_DOW = 1;
 const SEND_HOUR = 14;
+/** Second slot: Thursday (UTC day 4), 14:00 UTC — ACTIVE-TRIAL tenants only.
+ *  Live-paid tenants keep the Monday-only weekly cadence. */
+const TRIAL_DOW = 4;
 
-/** Don't re-send within this many days — the double-send guard. */
-const RESEND_COOLDOWN_MS = 6 * 24 * 60 * 60 * 1000;
+/** Don't re-send within this many days — the double-send guard.
+ *  Live-paid: weekly (6d). Active trial: more frequent (3d) so a trialing
+ *  carrier gets both the Monday and the Thursday recap during their 14 days. */
+const RESEND_COOLDOWN_MS = 6 * DAY_MS;
+const TRIAL_RESEND_COOLDOWN_MS = 3 * DAY_MS;
+
+/** The extra Thursday trial slot + shorter trial cooldown are ON by default;
+ *  set WEEKLY_DIGEST_TRIAL_EXTRA=0 to disable (all tenants → Monday weekly). */
+function trialExtraEnabled(): boolean {
+  return process.env.WEEKLY_DIGEST_TRIAL_EXTRA !== '0';
+}
 
 let started = false;
 
@@ -55,15 +68,22 @@ export function startWeeklyDigestCron(): void {
   setTimeout(() => void maybeRun('startup'), STARTUP_DELAY_MS);
   setInterval(() => void maybeRun('tick'), TICK_MS);
   console.log(
-    `[weeklyDigest.cron] scheduled — hourly tick; send slot Mon ${SEND_HOUR}:00 UTC`
+    `[weeklyDigest.cron] scheduled — hourly tick; slots Mon ${SEND_HOUR}:00 UTC (all)` +
+      (trialExtraEnabled() ? ` + Thu ${SEND_HOUR}:00 UTC (trial only)` : '')
   );
 }
 
-/** Gate the hourly tick to the weekly send slot, then run the pass. */
+/** Gate the hourly tick to a send slot, then run the pass. Monday fires for all
+ *  audiences; Thursday (when enabled) fires the trial-only second slot. */
 async function maybeRun(reason: string): Promise<void> {
   const now = new Date();
-  if (now.getUTCDay() !== SEND_DOW || now.getUTCHours() !== SEND_HOUR) return;
-  await runWeeklyDigestOnce(reason);
+  if (now.getUTCHours() !== SEND_HOUR) return;
+  const dow = now.getUTCDay();
+  if (dow === PRIMARY_DOW) {
+    await runWeeklyDigestOnce(reason, now);
+  } else if (dow === TRIAL_DOW && trialExtraEnabled()) {
+    await runWeeklyDigestOnce(reason, now);
+  }
 }
 
 /**
@@ -80,6 +100,12 @@ export async function runWeeklyDigestOnce(reason: string, now: Date = new Date()
     // Fetch all active tenants and filter for core access in JS — access is
     // computed from (plan + trialEndsAt) via hasCoreAccess, not a single
     // column. Tenant count is small; this is a once-a-week scan.
+    // Thursday is the trial-only second slot; Monday serves all audiences.
+    // When the trial-extra cadence is disabled there is nothing to send on the
+    // Thursday slot (it exists ONLY for trials), so bail before the tenant scan.
+    const isTrialSlot = now.getUTCDay() === TRIAL_DOW;
+    if (isTrialSlot && !trialExtraEnabled()) return;
+
     const rows = await db().select().from(tenants).where(eq(tenants.status, 'active'));
 
     for (const t of rows) {
@@ -87,13 +113,22 @@ export async function runWeeklyDigestOnce(reason: string, now: Date = new Date()
       if (!hasCoreAccess(t)) continue;
       // Audience gate 2: marketing opt-out (CAN-SPAM / CASL) → skip.
       if (t.marketingOptOut) continue;
-      // Audience gate 3: double-send cooldown.
-      if (t.lastWeeklyDigestAt && now.getTime() - t.lastWeeklyDigestAt.getTime() < RESEND_COOLDOWN_MS) {
+
+      const trialing = isTrialing(t);
+      // Audience gate 3: the Thursday slot is trial-only — live-paid tenants
+      // keep the Monday weekly and are skipped here.
+      if (isTrialSlot && !trialing) continue;
+
+      // Audience gate 4: double-send cooldown — shorter for active trials so
+      // they can receive both the Monday and the Thursday recap.
+      const cooldown = trialing && trialExtraEnabled() ? TRIAL_RESEND_COOLDOWN_MS : RESEND_COOLDOWN_MS;
+      if (t.lastWeeklyDigestAt && now.getTime() - t.lastWeeklyDigestAt.getTime() < cooldown) {
         continue;
       }
 
       const stats = await computeWeeklyStats(t.id, now);
-      // Audience gate 4: don't email empty/inactive accounts a "0 quotes" recap.
+      // Audience gate 5: don't email empty/inactive accounts a "0 quotes" recap
+      // (applies to BOTH slots — trialing tenants are never sent an empty one).
       if (stats.isEmpty) {
         skippedEmpty++;
         continue;
@@ -133,6 +168,12 @@ async function sendOne(t: Tenant, stats: WeeklyDigestStats, now: Date): Promise<
   const base = publicBaseUrl();
   const unsub = unsubscribeUrl(base, t.id);
   const dashboardUrl = `${base}/app/overview`;
+  // Trial tenants get a light "N days left" reinforcement band (momentum, not a
+  // card-nudge); live-paid tenants get no band.
+  const trialDaysLeft =
+    isTrialing(t) && t.trialEndsAt
+      ? Math.max(0, Math.ceil((t.trialEndsAt.getTime() - now.getTime()) / DAY_MS))
+      : undefined;
   const html = weeklyDigestEmail({
     companyName: t.name,
     dateRange: formatDateRange(now),
@@ -145,6 +186,9 @@ async function sendOne(t: Tenant, stats: WeeklyDigestStats, now: Date): Promise<
     chatConversations: stats.chatConversations,
     views: stats.engagement.views,
     pdfSaves: stats.engagement.pdfSaves,
+    copyLinks: stats.engagement.copyLinks,
+    prints: stats.engagement.prints,
+    trialDaysLeft,
     dashboardUrl,
     unsubscribeUrl: unsub,
   });
