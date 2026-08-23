@@ -283,6 +283,29 @@ describe('RFQ routes', () => {
     expect(html).toContain('3'); // 3 carriers resolved
   });
 
+  it('GET /directory/rfq prefills the contact email from the signed-in identity (H3)', async () => {
+    // The gate resolves the account; when it hands back the shipper's email the
+    // form prefills the (mandatory) contact email so the highest-intent step
+    // doesn't re-ask what the account already knows.
+    const gate: RfqGate = async () => ({
+      ok: true,
+      cap: 25,
+      accountKey: 'user:42',
+      period: '2026-08',
+      email: 'dana@acme.example',
+      name: 'Dana Shipper',
+    });
+    const hh = await boot({ gate });
+    const r = await fetch(`${hh.baseUrl}/directory/rfq?dots=1,2,3`);
+    expect(r.status).toBe(200);
+    const html = await r.text();
+    expect(html).toContain('name="shipper_email"');
+    expect(html).toContain('value="dana@acme.example"');
+    expect(html).toContain('value="Dana Shipper"');
+    expect(html).toContain('Sending as <strong>dana@acme.example</strong>');
+    hh.server.close();
+  });
+
   it('GET /directory/rfq with no selection redirects to /directory', async () => {
     const r = await fetch(`${h.baseUrl}/directory/rfq`, { redirect: 'manual' });
     expect(r.status).toBe(302);

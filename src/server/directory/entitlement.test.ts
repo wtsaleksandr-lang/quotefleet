@@ -107,7 +107,7 @@ describe('hasDirectoryPro — entitlement decision', () => {
 describe('directoryIdentity — no session is free, not an error', () => {
   it('no cookie → anonymous free identity', async () => {
     const id = await directoryIdentity(reqWith(undefined));
-    expect(id).toEqual({ userId: null, email: null, isPro: false, status: null, currentPeriodEnd: null });
+    expect(id).toEqual({ userId: null, email: null, name: null, isPro: false, status: null, currentPeriodEnd: null });
   });
 
   it('invalid session (lookup returns null) → anonymous free', async () => {
