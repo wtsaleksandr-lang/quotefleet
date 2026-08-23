@@ -15,6 +15,11 @@
   /* landing-hero-redesign.css is now a static <link> in landing.html's <head>
      (loads reliably, no FOUC) — no longer injected here. */
 
+  /* Premium glass material — injected LAST so it out-cascades every cleanup
+     sheet above (it re-glasses the light-mode nav/dropdown those sheets flatten
+     and applies the glass card/toggle treatment). See landing-glass.css. */
+  loadStylesheet('/landing-glass.css');
+
   const reduceMotion = window.matchMedia?.('(prefers-reduced-motion: reduce)').matches;
   const items = document.querySelectorAll('[data-reveal]');
   if (!items.length) return;

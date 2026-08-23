@@ -1,21 +1,18 @@
-/* Hero device SWAP choreography.
+/* Hero device RESTING COMPOSITION.
 
-   Instead of the laptop + phone looping side-by-side, they tell one story with a
-   foreground/background depth swap:
-     1. Laptop in front — the user drops in a rate sheet and QuoteFleet's AI
-        accepts + processes it (the qf-hero-laptop clip).
-     2. When that clip finishes, the laptop slides BACK and dims while the phone
-        scales UP into the foreground.
-     3. Phone in front — the live customer calculator produces an instant quote
-        (the qf-hero-phone clip).
-     4. When that finishes, it swaps back to the laptop and the loop repeats.
+   The hero pair no longer swaps between a lone laptop and a phone-forward stage.
+   The RESTING pose is now the premium depth composition Alex asked for: the phone
+   SHARP in the foreground, the desktop VISIBLE-BUT-BLURRED behind it (the
+   `stage-phone` pose, tuned in landing-hero-devices.css + landing-hero-fixes-v2.css
+   for desktop, tablet and mobile). Both device videos keep looping continuously so
+   the whole story stays alive — the laptop clip plays softly behind the phone, the
+   phone clip plays sharp in front.
 
-   The swap is CSS (transform/opacity/filter transitions on .qf-hero-laptop /
-   .qf-hero-vphone); this file only toggles .stage-laptop / .stage-phone on
-   .qf-hero-devices--video and drives playback off each clip's `ended` event
-   (with a watchdog timer for browsers that stall). If this script never runs the
-   markup falls back to the static side-by-side layout, so the hero is never
-   blank. Honors prefers-reduced-motion by skipping the motion. */
+   This script only pins the `stage-phone` class on `.qf-hero-devices--video` and
+   keeps both <video>s playing (pausing while the hero is scrolled out of view). If
+   it never runs, the markup falls back to the static side-by-side layout, so the
+   hero is never blank. window.qfHeroSwap stays exposed so landing-video-controls.js
+   can play/pause both hero videos as one unit. */
 (function () {
   'use strict';
 
@@ -25,133 +22,55 @@
   var phV = wrap.querySelector('.qf-hero-vphone video');
   if (!lapV || !phV) return;
 
-  // Pause on the finished payoff frame before the swap, so the key moment reads.
-  var DWELL = 550;
-  var reduce = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
-
-  // Manual control — no independent looping. Keep muted so autoplay is allowed.
-  lapV.loop = false; phV.loop = false;
+  // Both clips loop independently; muted so autoplay is allowed.
+  lapV.loop = true; phV.loop = true;
   lapV.muted = true; phV.muted = true;
 
-  var timer = null;
-  function clearT() { if (timer) { clearTimeout(timer); timer = null; } }
+  // Phone foreground is the standing pose — never swap back to a lone laptop.
+  function stagePhone() {
+    wrap.classList.remove('stage-laptop');
+    wrap.classList.add('stage-phone');
+  }
+  stagePhone();
 
-  // User play/pause (set via window.qfHeroSwap, driven by
-  // landing-video-controls.js). While paused, the choreography holds its
-  // current frame and neither the watchdog nor the IntersectionObserver
-  // resumes playback.
   var userPaused = false;
 
-  function stage(name) {
-    wrap.classList.remove('stage-laptop', 'stage-phone');
-    wrap.classList.add(name === 'phone' ? 'stage-phone' : 'stage-laptop');
-  }
-
-  // Prefer the real 'ended' event; a watchdog covers browsers that don't fire it.
-  function schedule(video, next) {
-    var done = false;
-    function fire() {
-      if (done) return;
-      done = true;
-      video.removeEventListener('ended', fire);
-      next();
-    }
-    video.addEventListener('ended', fire, { once: true });
-    var dur = (isFinite(video.duration) && video.duration > 0) ? video.duration : 10;
-    timer = setTimeout(fire, (dur - (video.currentTime || 0) + 0.7) * 1000);
-  }
-
-  function playLaptop() {
+  function playBoth() {
     if (userPaused) return;
-    clearT();
-    stage('laptop');
-    try { phV.pause(); phV.currentTime = 0; } catch (e) {}
-    try { lapV.currentTime = 0; } catch (e) {}
-    var p = lapV.play(); if (p && p.catch) p.catch(function () {});
-    schedule(lapV, function () { clearT(); timer = setTimeout(playPhone, DWELL); });
+    var a = lapV.play(); if (a && a.catch) a.catch(function () {});
+    var b = phV.play(); if (b && b.catch) b.catch(function () {});
   }
-
-  function playPhone() {
-    if (userPaused) return;
-    clearT();
-    stage('phone');
-    try { lapV.pause(); } catch (e) {}
-    try { phV.currentTime = 0; } catch (e) {}
-    var p = phV.play(); if (p && p.catch) p.catch(function () {});
-    schedule(phV, function () { clearT(); timer = setTimeout(playLaptop, DWELL); });
-  }
-
-  // Freeze the whole story on the current frame.
-  function pauseAll() {
-    userPaused = true;
-    clearT();
+  function pauseBoth() {
     try { lapV.pause(); } catch (e) {}
     try { phV.pause(); } catch (e) {}
   }
-  // Resume from wherever we paused (continue the current stage's clip).
-  function resumeAll() {
-    userPaused = false;
-    if (wrap.classList.contains('stage-phone')) {
-      var p = phV.play(); if (p && p.catch) p.catch(function () {});
-      schedule(phV, function () { clearT(); timer = setTimeout(playLaptop, DWELL); });
-    } else {
-      var q = lapV.play(); if (q && q.catch) q.catch(function () {});
-      schedule(lapV, function () { clearT(); timer = setTimeout(playPhone, DWELL); });
-    }
-  }
 
-  if (reduce) {
-    // No motion: keep both playing gently in the static layout.
-    lapV.loop = true; phV.loop = true; stage('laptop');
-    var pl = lapV.play(); if (pl && pl.catch) pl.catch(function () {});
-    var pp = phV.play(); if (pp && pp.catch) pp.catch(function () {});
-    // Reduced-motion pause/resume just stops/starts both loops.
-    window.qfHeroSwap = {
-      isPaused: function () { return userPaused; },
-      pause: function () {
-        userPaused = true;
-        try { lapV.pause(); } catch (e) {}
-        try { phV.pause(); } catch (e) {}
-      },
-      resume: function () {
-        userPaused = false;
-        var a = lapV.play(); if (a && a.catch) a.catch(function () {});
-        var b = phV.play(); if (b && b.catch) b.catch(function () {});
-      },
-      toggle: function () { if (userPaused) this.resume(); else this.pause(); return !userPaused; }
-    };
-    return;
-  }
+  // User play/pause — driven by landing-video-controls.js. Controls BOTH videos
+  // as one choreographed unit so the resting composition freezes/resumes together.
+  window.qfHeroSwap = {
+    isPaused: function () { return userPaused; },
+    pause: function () { userPaused = true; pauseBoth(); },
+    resume: function () { userPaused = false; playBoth(); },
+    toggle: function () { if (userPaused) { this.resume(); } else { this.pause(); } return !userPaused; }
+  };
 
-  // Pause the loop when the hero scrolls out of view (saves work; resumes clean).
-  var io = null;
+  // Pause the loops when the hero scrolls out of view (saves work; resumes clean).
   if ('IntersectionObserver' in window) {
-    io = new IntersectionObserver(function (entries) {
+    var io = new IntersectionObserver(function (entries) {
       var e = entries[0];
-      if (!e) return;
-      if (userPaused) return;
-      if (e.isIntersecting) {
-        if (!wrap.classList.contains('stage-phone')) { var q = lapV.play(); if (q && q.catch) q.catch(function () {}); }
-        else { var r = phV.play(); if (r && r.catch) r.catch(function () {}); }
-      } else {
-        clearT(); try { lapV.pause(); } catch (e2) {} try { phV.pause(); } catch (e3) {}
-      }
+      if (!e || userPaused) return;
+      if (e.isIntersecting) playBoth(); else pauseBoth();
     }, { threshold: 0.15 });
     io.observe(wrap);
   }
 
-  // Expose user play/pause so landing-video-controls.js can drive both hero
-  // videos as one choreographed unit.
-  window.qfHeroSwap = {
-    isPaused: function () { return userPaused; },
-    pause: pauseAll,
-    resume: resumeAll,
-    toggle: function () { if (userPaused) resumeAll(); else pauseAll(); return !userPaused; }
-  };
-
   function start() {
-    if (lapV.readyState >= 1) playLaptop();
-    else lapV.addEventListener('loadedmetadata', playLaptop, { once: true });
+    stagePhone();
+    playBoth();
   }
-  start();
+  if (lapV.readyState >= 1 || phV.readyState >= 1) start();
+  else {
+    lapV.addEventListener('loadedmetadata', start, { once: true });
+    phV.addEventListener('loadedmetadata', start, { once: true });
+  }
 })();
