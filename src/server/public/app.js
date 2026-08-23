@@ -34,6 +34,160 @@
       return m === '&' ? '&amp;' : m === '<' ? '&lt;' : m === '>' ? '&gt;' : m === '"' ? '&quot;' : '&#39;';
     });
   }
+  // Title-case an ALL-CAPS FMCSA company name for the prefill, but keep common
+  // company suffixes upper-cased (LLC / INC / LLP …) so we don't render "Llc".
+  // FMCSA legal/DBA names arrive shouty ("HARBOR LINK LOGISTICS LLC").
+  var COMPANY_SUFFIX_UPPER = {
+    LLC: 1, 'L.L.C.': 1, LLP: 1, 'L.L.P.': 1, LP: 1, 'L.P.': 1, PLLC: 1,
+    INC: 1, 'INC.': 1, CORP: 1, 'CORP.': 1, CO: 1, 'CO.': 1, LTD: 1, 'LTD.': 1,
+    PC: 1, DBA: 1, USA: 1, US: 1,
+  };
+  function titleCaseCompany(s) {
+    if (!s) return '';
+    return String(s).trim().replace(/\s+/g, ' ').split(' ').map(function (w) {
+      if (!w) return w;
+      var up = w.toUpperCase();
+      if (COMPANY_SUFFIX_UPPER[up]) return up;
+      // Preserve intra-word case for tokens with digits/ampersands (e.g. "A1",
+      // "3PL") by only recasing pure-alpha words.
+      if (/[^a-zA-Z]/.test(w)) return w;
+      return w.charAt(0).toUpperCase() + w.slice(1).toLowerCase();
+    }).join(' ');
+  }
+  // Strip an MC/docket value down to bare digits (no leading zeros) so it lands
+  // in an input that validates /^\d+$/. "MC012892" → "12892".
+  function mcToBareDigits(s) {
+    return String(s == null ? '' : s).replace(/\D/g, '').replace(/^0+/, '');
+  }
+
+  // ── "Find your company" typeahead ────────────────────────────────────────
+  // Searches OUR local FMCSA directory (GET /api/tenant/carrier-search) and calls
+  // onSelect(result) with the chosen slim carrier row. Debounced + min-length so
+  // it never hammers the endpoint; every injected value is escaped. Returns the
+  // wrapper element (a .field) — the caller drops it above the fields it fills.
+  function carrierSearchRequest(params) {
+    var qs = Object.keys(params).filter(function (k) { return params[k]; })
+      .map(function (k) { return k + '=' + encodeURIComponent(params[k]); }).join('&');
+    if (!qs) return Promise.resolve([]);
+    return api('/api/tenant/carrier-search?' + qs).then(function (r) {
+      return (r && r.results) || [];
+    });
+  }
+  // Route one raw query to the right endpoint param(s):
+  //  - "MC…"/"MC-012892" → mc lookup (bare digits)
+  //  - pure digits       → USDOT OR MC (query both, merge — a trucker may know
+  //                        either number), deduped by usdot
+  //  - anything else      → free-text name search (min 2 chars)
+  function carrierSearchLookup(raw) {
+    var term = String(raw || '').trim();
+    if (!term) return Promise.resolve([]);
+    var mcMatch = /^mc[\s-]*0*(\d+)$/i.exec(term.replace(/\s+/g, ' '));
+    if (mcMatch) return carrierSearchRequest({ mc: mcMatch[1] });
+    var compact = term.replace(/[\s-]/g, '');
+    if (/^\d+$/.test(compact)) {
+      if (compact.length < 3) return Promise.resolve([]);
+      return Promise.all([
+        carrierSearchRequest({ dot: compact }),
+        carrierSearchRequest({ mc: compact }),
+      ]).then(function (pair) {
+        var seen = {}; var out = [];
+        pair[0].concat(pair[1]).forEach(function (row) {
+          if (row && !seen[row.usdot]) { seen[row.usdot] = 1; out.push(row); }
+        });
+        return out;
+      });
+    }
+    if (term.length < 2) return Promise.resolve([]);
+    return carrierSearchRequest({ q: term });
+  }
+  function carrierResultLabel(row) {
+    var name = titleCaseCompany(row.dbaName || row.legalName || '');
+    var ids = ['USDOT ' + row.usdot];
+    if (row.mcNumber) ids.push('MC ' + mcToBareDigits(row.mcNumber));
+    var loc = [titleCaseCompany(row.city || ''), row.state || ''].filter(Boolean).join(', ');
+    var meta = ids.join(' · ') + (loc ? ' · ' + loc : '');
+    return { name: name, meta: meta };
+  }
+  function createCarrierFinder(onSelect, cfg) {
+    cfg = cfg || {};
+    var wrap = el('div', { class: 'field', style: { position: 'relative', marginBottom: '14px' } });
+    if (cfg.label !== null) wrap.appendChild(el('label', { class: 'field-label', text: cfg.label || 'Find your company' }));
+    var input = el('input', {
+      class: 'input', type: 'search', autocomplete: 'off', spellcheck: 'false',
+      placeholder: cfg.placeholder || 'USDOT #, MC #, or company name',
+    });
+    wrap.appendChild(input);
+    wrap.appendChild(el('span', {
+      class: 'muted-small', style: { display: 'block', marginTop: '4px' },
+      text: cfg.hint || 'Search the FMCSA directory to autofill your details below — everything stays editable before you save.',
+    }));
+    var menu = el('div', {
+      style: {
+        position: 'absolute', left: '0', right: '0', top: '100%', zIndex: '50',
+        marginTop: '4px', background: 'var(--surface)', border: '1px solid var(--border-strong)',
+        borderRadius: '10px', boxShadow: '0 8px 24px rgba(0,0,0,0.18)', overflow: 'hidden',
+        maxHeight: '320px', overflowY: 'auto', display: 'none',
+      },
+    });
+    wrap.appendChild(menu);
+
+    var timer = null; var reqSeq = 0;
+    function closeMenu() { menu.style.display = 'none'; menu.innerHTML = ''; }
+    function showMsg(text) {
+      menu.innerHTML = '';
+      menu.appendChild(el('div', { class: 'muted-small', style: { padding: '10px 12px' }, text: text }));
+      menu.style.display = 'block';
+    }
+    function renderResults(rows) {
+      menu.innerHTML = '';
+      if (!rows.length) { showMsg('No matching carrier found.'); return; }
+      rows.forEach(function (row) {
+        var lbl = carrierResultLabel(row);
+        var item = el('button', {
+          type: 'button',
+          style: {
+            display: 'block', width: '100%', textAlign: 'left', border: '0',
+            background: 'transparent', padding: '10px 12px', cursor: 'pointer',
+            borderBottom: '1px solid var(--border)', color: 'inherit', font: 'inherit',
+          },
+        });
+        item.appendChild(el('div', { style: { fontWeight: '600', fontSize: '14px' }, text: lbl.name || '(unnamed carrier)' }));
+        item.appendChild(el('div', { class: 'muted-small', style: { marginTop: '2px' }, text: lbl.meta }));
+        item.addEventListener('mouseenter', function () { item.style.background = 'var(--surface-3)'; });
+        item.addEventListener('mouseleave', function () { item.style.background = 'transparent'; });
+        item.addEventListener('click', function () {
+          closeMenu();
+          input.value = lbl.name || input.value;
+          try { onSelect(row); } catch (e) { toastErr(e); }
+        });
+        menu.appendChild(item);
+      });
+      menu.style.display = 'block';
+    }
+    function run() {
+      var term = input.value.trim();
+      if (term.length < 2) { closeMenu(); return; }
+      var seq = ++reqSeq;
+      showMsg('Searching…');
+      carrierSearchLookup(term).then(function (rows) {
+        if (seq !== reqSeq) return; // stale response — a newer query superseded it
+        renderResults(rows);
+      }, function () {
+        if (seq !== reqSeq) return;
+        showMsg('Search is unavailable right now.');
+      });
+    }
+    input.addEventListener('input', function () {
+      if (timer) clearTimeout(timer);
+      timer = setTimeout(run, 250);
+    });
+    input.addEventListener('keydown', function (e) { if (e.key === 'Escape') closeMenu(); });
+    document.addEventListener('click', function (e) {
+      if (!wrap.contains(e.target)) closeMenu();
+    });
+    return wrap;
+  }
+
   function api(path, opts) {
     opts = opts || {};
     opts.headers = Object.assign({ 'Content-Type': 'application/json' }, opts.headers || {});
@@ -605,6 +759,33 @@
         class: 'muted', style: { marginTop: 0 },
         text: 'Shown to your customers on your calculator and quotes.',
       }));
+
+      // "Find your company" autofill — searches the FMCSA directory and PREFILLS
+      // the editable inputs below (name + USDOT/MC + public phone/email + city/
+      // state/ZIP). Nothing is persisted here; the user reviews and clicks the
+      // existing Save buttons. Placed at the top of the card so it's the first
+      // thing a carrier sees when filling this out.
+      var finder = createCarrierFinder(function (row) {
+        // Company name → Profile card's Name input (DBA preferred, title-cased).
+        var nameInput = pCard.querySelector('input[data-key="name"]');
+        if (nameInput) nameInput.value = titleCaseCompany(row.dbaName || row.legalName || '');
+        // The rest live in the Company-details inputs (created below, async).
+        var setCo = function (key, val) {
+          var i = coCard.querySelector('input[data-co="' + key + '"]');
+          if (i) i.value = val == null ? '' : String(val);
+        };
+        setCo('dotNumber', row.usdot || '');
+        setCo('mcNumber', row.mcNumber ? mcToBareDigits(row.mcNumber) : '');
+        setCo('contactPhone', row.phone || '');
+        // publicContactEmail may be null (contactHidden / no FMCSA email) → blank.
+        setCo('publicContactEmail', row.email || '');
+        setCo('city', row.city ? titleCaseCompany(row.city) : '');
+        setCo('state', row.state || '');
+        setCo('postalCode', row.zip || '');
+        // FMCSA has no street address — nudge them to add their own.
+        toast('Prefilled from FMCSA. Add your street address, then Save.', 'success');
+      });
+      coCard.appendChild(finder);
       var coLoading = el('p', { class: 'muted-small', text: 'Loading…' });
       coCard.appendChild(coLoading);
       c.appendChild(coCard);
