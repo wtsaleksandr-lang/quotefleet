@@ -1070,7 +1070,13 @@ html, body { overscroll-behavior: contain; }
    only the equipment picker adds .qf-cs-ico-row + .qf-cs-txt (icons), so the
    ocean-carrier picker is untouched. Applies to BOTH the option rows and the
    collapsed selected-value button, which both carry .qf-cs-ico-row. Appended at
-   EOF so no baselined line shifts. */
-.qf-cs-ico { width: 27px; height: 27px; }
-.qf-cs-ico svg { width: 27px; height: 27px; }
-.qf-cs-ico-row .qf-cs-txt { font-size: 15px; }
+   EOF so no baselined line shifts.
+   FIX: the big 27px icon + 15px copy must apply to the OPEN panel option rows
+   ONLY — leaking them into the COLLAPSED button made it 53px vs siblings' 48px
+   (icon/text taller than the 14px input line). Scope big to .qf-cs-opt, and pin
+   the collapsed .qf-cs-btn icon + copy to input sizing so it matches .qf-input. */
+.qf-cs-opt .qf-cs-ico { width: 27px; height: 27px; }
+.qf-cs-opt .qf-cs-ico svg { width: 27px; height: 27px; }
+.qf-cs-opt .qf-cs-txt { font-size: 15px; }
+.qf-cs-btn .qf-cs-ico, .qf-cs-btn .qf-cs-ico svg { width: 20px; height: 20px; }
+.qf-cs-btn .qf-cs-txt { font-size: 12px; }
