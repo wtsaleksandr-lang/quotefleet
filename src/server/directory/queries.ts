@@ -1455,7 +1455,10 @@ export async function carrierBySlug(slug: string): Promise<VisibleCarrier | null
 // record (by USDOT, MC #, or company name) and prefills their calculator-widget
 // company details. Deliberately SLIM: only the handful of fields those inputs
 // need — no fleet/equipment/safety payload. Contact fields respect the carrier
-// opt-out (contactHidden ⇒ phone/email nulled) exactly like the public surfaces.
+// opt-out: this feature PULLS contact data, so it merges carrier_overrides on
+// top (via mergeCarrierOverride, exactly like the carrierBySlug profile path)
+// and nulls phone/email when EITHER the base contact_hidden column OR the
+// carrier_overrides.hidden opt-out is set — not just the base column.
 
 /** Slim projection returned by carrierLookup — one row per matched carrier. */
 export interface CarrierLookupResult {
@@ -1545,13 +1548,21 @@ export async function carrierLookup(params: CarrierLookupParams): Promise<Carrie
   if (!where) return [];
 
   try {
+    // LEFT JOIN carrier_overrides so an admin/claim opt-out written to
+    // carrier_overrides.hidden is honored, not just the base contact_hidden
+    // column. mergeCarrierOverride ORs the two hidden flags (and applies any
+    // admin email/phone edits) exactly like the carrierBySlug profile path;
+    // toLookupResult then nulls phone/email when the merged carrier is hidden.
+    // A missing carrier_overrides table still LEFT JOINs to NULL, so this
+    // degrades to the pure FMCSA card — never a 500.
     const rows = await db()
       .select()
       .from(carrierDirectory)
+      .leftJoin(carrierOverrides, eq(carrierOverrides.usdot, carrierDirectory.usdot))
       .where(where)
       .orderBy(...orderForSort('featured'))
       .limit(limit);
-    return rows.map((r) => toLookupResult(visibleCarrier(r)));
+    return rows.map((r) => toLookupResult(mergeCarrierOverride(visibleCarrier(r.carrier_directory), r.carrier_overrides)));
   } catch (err) {
     console.warn('[directory] carrierLookup failed; serving no matches:', err);
     return [];

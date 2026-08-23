@@ -19,21 +19,21 @@ vi.mock('../../db/client.js', () => ({
   db: () => ({
     select: () => {
       h.state.selectCalls++;
-      return {
-        from: () => ({
-          where: (w: unknown) => {
-            h.state.where = w;
-            return {
-              orderBy: () => ({
-                limit: (n: number) => {
-                  h.state.limit = n;
-                  return Promise.resolve(h.state.rows);
-                },
-              }),
-            };
-          },
-        }),
+      // carrierLookup does: select().from().leftJoin().where().orderBy().limit()
+      const tail = {
+        where: (w: unknown) => {
+          h.state.where = w;
+          return {
+            orderBy: () => ({
+              limit: (n: number) => {
+                h.state.limit = n;
+                return Promise.resolve(h.state.rows);
+              },
+            }),
+          };
+        },
       };
+      return { from: () => ({ leftJoin: () => tail }) };
     },
   }),
 }));
@@ -91,6 +91,11 @@ function row(o: Record<string, unknown> = {}): Record<string, unknown> {
   };
 }
 
+/** A joined result row as the leftJoin(carrierOverrides) select returns it. */
+function joined(base: Record<string, unknown> = {}, override: Record<string, unknown> | null = null) {
+  return { carrier_directory: row(base), carrier_overrides: override };
+}
+
 beforeEach(() => {
   h.state.rows = [];
   h.state.where = undefined;
@@ -116,7 +121,7 @@ describe('normalize helpers', () => {
 
 describe('carrierLookup — dot lookup', () => {
   it('matches usdot exactly (zeros stripped) as a single row', async () => {
-    h.state.rows = [row()];
+    h.state.rows = [joined()];
     await carrierLookup({ dot: '00123456' });
     const r = render(h.state.where);
     expect(r.sql).toContain('usdot');
@@ -154,15 +159,28 @@ describe('carrierLookup — name lookup (ILIKE)', () => {
 });
 
 describe('carrierLookup — contact opt-out + slim shape', () => {
-  it('nulls phone + email for a contactHidden carrier', async () => {
-    h.state.rows = [row({ contactHidden: true, phone: '5625551234', email: 'ops@harbor.example' })];
+  it('nulls phone + email for a base contact_hidden carrier', async () => {
+    h.state.rows = [joined({ contactHidden: true, phone: '5625551234', email: 'ops@harbor.example' })];
+    const res = await carrierLookup({ dot: '2841196' });
+    expect(res).toHaveLength(1);
+    expect(res[0].phone).toBeNull();
+    expect(res[0].email).toBeNull();
+  });
+  it('honors carrier_overrides.hidden (opt-out written by admin/claim) even when the base column is false', async () => {
+    // Base row shows contact; the opt-out lives only in carrier_overrides.hidden.
+    h.state.rows = [
+      joined(
+        { contactHidden: false, phone: '5625551234', email: 'ops@harbor.example' },
+        { usdot: '2841196', hidden: true, capabilities: {}, operatingLocations: [] },
+      ),
+    ];
     const res = await carrierLookup({ dot: '2841196' });
     expect(res).toHaveLength(1);
     expect(res[0].phone).toBeNull();
     expect(res[0].email).toBeNull();
   });
   it('returns the slim projection for a visible carrier', async () => {
-    h.state.rows = [row()];
+    h.state.rows = [joined()];
     const res = await carrierLookup({ dot: '2841196' });
     expect(res[0]).toEqual({
       usdot: '2841196',
