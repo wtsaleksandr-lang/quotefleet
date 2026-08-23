@@ -922,6 +922,23 @@ const DIRECTORY_CSS = `
   .sl-row .lk:hover { color: var(--accent); }
   .sl-row .sub { font-size: 12px; color: var(--muted); font-family: var(--font-mono); }
   .sl-rm { flex: 0 0 auto; }
+
+  /* ── Two-audience band (directory landing) ──────────────────────────────
+     Shipper value-prop + RFQ/Directory Pro entry, shown as a peer to the
+     carrier "Claim your listing" path. Tokens only, theme-aware, left-aligned.
+     auto-fit → 2 columns on desktop, a clean single-column stack on mobile. */
+  .dir-audience { display: grid; gap: 14px; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); }
+  .aud-card { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius-lg); padding: 22px 24px; }
+  .aud-eyebrow { font-size: 12px; font-family: var(--font-mono); letter-spacing: 0.08em; text-transform: uppercase; color: var(--accent); margin-bottom: 8px; }
+  .aud-card h3 { margin: 0 0 8px; font-size: 20px; line-height: 1.2; text-align: left; }
+  .aud-lead { margin: 0; color: var(--ink-soft); font-size: 15px; line-height: 1.55; }
+  .aud-card .join-features { margin-top: 14px; }
+  .aud-cta-row { display: flex; flex-wrap: wrap; gap: 10px; margin-top: 18px; }
+  .aud-cta-row .btn { flex: 1 1 180px; justify-content: center; }
+  @media (max-width: 640px) {
+    .aud-card { padding: 18px; }
+    .aud-cta-row .btn { flex: 1 1 100%; }
+  }
 `;
 
 /**
@@ -2108,6 +2125,7 @@ export function renderDirectoryLanding(
         <a class="btn btn-primary" href="/directory?sort=featured">Open faceted search <span class="arr">→</span></a>
       </div>`
     }
+    ${shipperCarrierBand(summary)}
     <div class="dir-section-h">
       <h2>Top US ports</h2>
       <a class="muted-small" href="/compliance">Compliance tools →</a>
@@ -2137,6 +2155,50 @@ export function renderDirectoryLanding(
       }),
     ],
   });
+}
+
+/**
+ * Two-audience band for the directory landing. The directory serves BOTH
+ * shippers (source carriers + send one rate request to many) and carriers
+ * (claim the FMCSA listing). The carrier SEO hero above stays intact; this
+ * band surfaces the shipper product — the RFQ entry point and Directory Pro —
+ * as a peer to the existing "Claim your listing" path, without burying it.
+ */
+function shipperCarrierBand(summary: DirectorySummary): string {
+  const cap = rfqRecipientCap();
+  const total = fmtNum(summary.total);
+  return `
+    <div class="dir-section-h"><h2>For shippers &amp; carriers</h2></div>
+    <div class="dir-audience">
+      <section class="aud-card">
+        <div class="aud-eyebrow">For shippers</div>
+        <h3>Get freight rates from many carriers — one request</h3>
+        <p class="aud-lead">Search ${total} FMCSA carriers, shortlist the ones you want, and send a single rate request to all of them. Directory Pro adds direct contacts, exports, and saved lists.</p>
+        <ul class="join-features">
+          <li>Send one rate request to up to ${cap} carriers at once</li>
+          <li>Reveal direct dispatch &amp; decision-maker contacts</li>
+          <li>Export filtered carrier lists to CSV</li>
+          <li>Save carrier lists to reuse across searches</li>
+        </ul>
+        <div class="aud-cta-row">
+          <a class="btn btn-primary" href="/directory?sort=featured">Get freight quotes <span class="arr">→</span></a>
+          <a class="btn btn-secondary" href="/directory/join">Directory Pro — $19/mo</a>
+        </div>
+      </section>
+      <section class="aud-card">
+        <div class="aud-eyebrow">For carriers</div>
+        <h3>Get found by shippers sourcing capacity</h3>
+        <p class="aud-lead">Your FMCSA record is already listed. Claim it — free — to control your profile, add lanes and contact details, and receive rate requests directly.</p>
+        <ul class="join-features">
+          <li>Control how your carrier profile reads</li>
+          <li>Add the lanes and equipment you run</li>
+          <li>Receive shipper rate requests directly</li>
+        </ul>
+        <div class="aud-cta-row">
+          <a class="btn btn-primary" href="/signup">Claim your listing — free <span class="arr">→</span></a>
+        </div>
+      </section>
+    </div>`;
 }
 
 // ─── Shared cross-link modules ────────────────────────────────────────────
