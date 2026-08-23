@@ -426,6 +426,12 @@
     // (e.g. neutralising stray brand-blue on the monochrome "mono" theme).
     // Absent/empty for a null theme; harmless for every other preset.
     if (theme.preset) document.body.setAttribute('data-qf-preset', theme.preset);
+    // Resolved theme lightness (dark|light) → body attribute so the glass layer
+    // (widget-glass.css) can flip its shadow depth + rim tint per preset without
+    // hardcoding a white tint. Absent for a null theme; the glass frost fills
+    // themselves derive from the runtime --w-* surface tokens, so they stay
+    // correct even before this resolves.
+    if (theme.mode) document.body.setAttribute('data-qf-mode', theme.mode);
   }
 
   function applyBrand(brand) {

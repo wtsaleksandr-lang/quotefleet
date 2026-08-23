@@ -1,0 +1,194 @@
+/* ═══════════════════════════════════════════════════════════════════════════
+   QuoteFleet widget — PREMIUM "GLASS" MATERIAL (funnel overhaul, surface 2)
+   ---------------------------------------------------------------------------
+   The widget's counterpart to landing-glass.css (PR #384). It brings the same
+   Apple/Tesla-grade frosted-glass system to the embeddable calculator's chrome,
+   floating popovers, modals and map overlays — matching the CANONICAL landing
+   values (blur/saturate radii, shadow, radius) codified in DESIGN-SYSTEM.md.
+
+   LOAD ORDER (critical): injected LAST by public-calculator-conditional-
+   options.js — AFTER public-calculator-no-gradients.css (the widget's final
+   !important token layer, which paints .qf-suggestions / summaries with the
+   solid --w-* surface). Every rule here that must beat that layer carries
+   matching-or-higher specificity (body.qf-app-calculator …) + wins on source
+   order, with !important only where no-gradients used !important.
+
+   WIDGET CAVEAT vs. the landing: the widget is PRESET-driven (13 themes, 8
+   dark) — NOT html[data-theme]. So the glass tint is NOT a hardcoded white.
+   Each frosted fill is derived by color-mix() from the SAME runtime --w-*
+   token the element already paints with (input-bg for the dropdowns, surface
+   for the shell chrome), so the frost's lightness always tracks the resolved
+   preset and its text contrast is preserved on ALL 13 presets automatically
+   (e.g. Midnight's dropdown stays a LIGHT cream frost carrying dark text; a
+   dark-input preset like Voltage frosts dark carrying white text). The
+   shadow/rim tokens additionally flip on body[data-qf-mode] (set from the
+   resolved theme.mode in widget.js#applyTheme): a lighter shadow + bright rim
+   in light presets, a deep shadow + faint white rim in dark presets.
+
+   READABILITY (hard rule): glass ONLY on chrome / popovers / modals / map
+   overlays. NEVER the quote total, line items, KPI values, form inputs, body
+   copy or the tip bubble — those keep their solid high-contrast fills. The
+   OUTER .qf-widget card also stays fully OPAQUE (it runs in a customer iframe;
+   a translucent shell would blur the host page through it).
+
+   GUARD-SAFE: every colour is rgba() / var() / color-mix() (the hardcoded-
+   colour guard only flags raw #fff/#000/white/black); hex fallbacks used are
+   neutral tokens (#E6E3E0 / #1E2528), never a flagged value. All ramp spacing
+   is on the 8px grid via tokens; backdrop-filter / border-radius / box-shadow
+   are not scanned. Every frosted element ships an @supports-not SOLID fallback
+   for embedded WebViews / privacy modes that disable backdrop-filter.
+   ═══════════════════════════════════════════════════════════════════════════ */
+
+body.qf-app-calculator {
+  /* Blur convention — matches landing-glass.css / DESIGN-SYSTEM.md. */
+  --wg-blur-ultra: blur(20px) saturate(1.4);   /* floating popovers, toolbars */
+  --wg-blur-thin: blur(15px) saturate(1.28);   /* bars / summaries / modal chrome */
+  --wg-blur-card: blur(16px) saturate(1.3);    /* card frames */
+  --wg-blur-map: blur(8px) saturate(1.2);      /* on-map frosted chips */
+  /* Depth + rim — light-preset defaults; dark override below. */
+  --wg-shadow: 0 8px 32px rgba(10, 37, 64, 0.10);
+  --wg-rim: rgba(255, 255, 255, 0.45);
+  --wg-radius-chrome: 12px;
+  --wg-radius-card: 16px;
+}
+body.qf-app-calculator[data-qf-mode="dark"] {
+  --wg-shadow: 0 8px 32px rgba(0, 0, 0, 0.35);
+  --wg-rim: rgba(255, 255, 255, 0.10);
+}
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   1 — ultraThin: FLOATING DROPDOWNS / POPOVERS  (highest impact, lowest risk)
+   .qf-suggestions covers the address autosuggest, the branded custom-<select>
+   panel (.qf-cs-panel) AND the terminal search (.qf-terminal-suggestions) —
+   all three share the .qf-suggestions class. .qf-hz-list is the hazmat-class
+   popover. Frost the PANEL; the suggestion ROWS keep their solid text + tinted
+   hover (unchanged), so text stays crisp on the frost.
+   no-gradients paints .qf-suggestions background with !important → we match.
+   ═══════════════════════════════════════════════════════════════════════════ */
+body.qf-app-calculator .qf-suggestions {
+  background: color-mix(in srgb, var(--w-input-bg, #E6E3E0) 78%, transparent) !important;
+  -webkit-backdrop-filter: var(--wg-blur-ultra);
+  backdrop-filter: var(--wg-blur-ultra);
+  box-shadow: var(--wg-shadow);
+}
+body.qf-app-calculator .qf-hz-list {
+  background: color-mix(in srgb, var(--w-bg, #E6E3E0) 82%, transparent);
+  -webkit-backdrop-filter: var(--wg-blur-ultra);
+  backdrop-filter: var(--wg-blur-ultra);
+  box-shadow: var(--wg-shadow);
+}
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   2 — ultraThin / thin: BARS & CHROME
+   The "Booking details" summary carried a HARDCODED light fill
+   (rgba(255,255,255,0.72)) in widget-ux-fixes.css — illegible-tinted on dark
+   presets. Re-derive it from the shell surface so it is theme-aware, and frost
+   it. The "Shipment options & add-ons" trigger gets a light frost that does not
+   fight the per-preset bg rules (blur + rim only, no bg override).
+   ═══════════════════════════════════════════════════════════════════════════ */
+body.qf-app-calculator .qf-booking-summary {
+  background: color-mix(in srgb, var(--w-surface, #1E2528) 62%, transparent);
+  border: 1px solid var(--wg-rim);
+  box-shadow: var(--wg-shadow);
+  -webkit-backdrop-filter: var(--wg-blur-thin);
+  backdrop-filter: var(--wg-blur-thin);
+}
+body.qf-app-calculator .qf-options-summary {
+  border-radius: var(--wg-radius-chrome);
+  -webkit-backdrop-filter: var(--wg-blur-thin);
+  backdrop-filter: var(--wg-blur-thin);
+}
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   3 — thin: MODAL CHROME  (options modal head/foot; map-enlarge panel frame)
+   The modal HEAD + FOOT frost; the BODY stays solid (it holds the labelled
+   option chips). The map-enlarge modal gets a glass FRAME; the map <img> inside
+   is opaque, so the map itself never blurs.
+   ═══════════════════════════════════════════════════════════════════════════ */
+body.qf-app-calculator .qf-modal-head,
+body.qf-app-calculator .qf-modal-foot {
+  background: color-mix(in srgb, var(--w-surface, #1E2528) 62%, transparent);
+  -webkit-backdrop-filter: var(--wg-blur-thin);
+  backdrop-filter: var(--wg-blur-thin);
+}
+body.qf-app-calculator .qf-map-modal-panel {
+  background: color-mix(in srgb, var(--w-surface, #1E2528) 70%, transparent);
+  border: 1px solid var(--wg-rim);
+  -webkit-backdrop-filter: var(--wg-blur-card);
+  backdrop-filter: var(--wg-blur-card);
+}
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   4 — MAP OVERLAY CHIPS — frost the map beneath, KEEP white text + text-shadow
+   (Google-ToS legibility, already on the elements). Skip mono + cupertino: they
+   ship their own tuned overlay blur in no-gradients.css (don't fork them).
+   ═══════════════════════════════════════════════════════════════════════════ */
+body.qf-app-calculator:not([data-qf-preset="mono"]):not([data-qf-preset="cupertino"]) .qf-map-overlay,
+body.qf-app-calculator:not([data-qf-preset="mono"]):not([data-qf-preset="cupertino"]) .qf-map-addr {
+  -webkit-backdrop-filter: var(--wg-blur-map);
+  backdrop-filter: var(--wg-blur-map);
+}
+/* ATTRIBUTION CLEARANCE: the metric chip is centered; widen the overlay's side
+   padding so it never reaches the baked-in "Google" logo (bottom-LEFT) or
+   "Map data ©Google" (bottom-RIGHT). Applies to every preset + the inline base
+   map (one selector covers inline route + modal overlay). */
+body.qf-app-calculator .qf-map-overlay {
+  padding-left: var(--space-6);
+  padding-right: var(--space-6);
+}
+@media (max-width: 640px) {
+  body.qf-app-calculator .qf-map-overlay {
+    padding-left: var(--space-4);
+    padding-right: var(--space-4);
+  }
+}
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   5 — MOTION: ease the backdrop-filter in with the existing reveals. Registered
+   in a reduced-motion disable block below (authoritative here because this sheet
+   loads AFTER widget-motion.css, so its transition would otherwise re-enable a
+   disable placed only there).
+   ═══════════════════════════════════════════════════════════════════════════ */
+body.qf-app-calculator .qf-suggestions,
+body.qf-app-calculator .qf-hz-list,
+body.qf-app-calculator .qf-options-summary,
+body.qf-app-calculator .qf-booking-summary,
+body.qf-app-calculator .qf-modal-head,
+body.qf-app-calculator .qf-modal-foot {
+  transition:
+    backdrop-filter var(--qf-dur, 200ms) var(--qf-ease-out, ease),
+    -webkit-backdrop-filter var(--qf-dur, 200ms) var(--qf-ease-out, ease),
+    opacity var(--qf-dur, 200ms) var(--qf-ease-out, ease);
+}
+@media (prefers-reduced-motion: reduce) {
+  body.qf-app-calculator .qf-suggestions,
+  body.qf-app-calculator .qf-hz-list,
+  body.qf-app-calculator .qf-options-summary,
+  body.qf-app-calculator .qf-booking-summary,
+  body.qf-app-calculator .qf-modal-head,
+  body.qf-app-calculator .qf-modal-foot {
+    transition: none !important;
+  }
+}
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   SOLID FALLBACK — embedded WebViews / privacy modes that disable backdrop-
+   filter get an OPAQUE surface (never a see-through tint). Each restores the
+   element's own runtime token; hex fallbacks are neutral, never a flagged
+   colour. Map overlays already carry an opaque-enough gradient, so they are
+   left as-is.
+   ═══════════════════════════════════════════════════════════════════════════ */
+@supports not ((backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px))) {
+  body.qf-app-calculator .qf-suggestions {
+    background: var(--w-input-bg, #E6E3E0) !important;
+  }
+  body.qf-app-calculator .qf-hz-list {
+    background: var(--w-bg, #E6E3E0);
+  }
+  body.qf-app-calculator .qf-booking-summary,
+  body.qf-app-calculator .qf-modal-head,
+  body.qf-app-calculator .qf-modal-foot,
+  body.qf-app-calculator .qf-map-modal-panel {
+    background: var(--w-surface, #1E2528);
+  }
+}
