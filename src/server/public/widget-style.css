@@ -334,7 +334,10 @@ body[data-qf-cta-hover="fill"] .qf-cta:not(.qf-secondary):hover { background: va
    keep the line-numbered baselines stable. */
 .qf-map-card { margin-top: var(--space-2); border: 1px solid var(--w-border); border-radius: 12px; overflow: hidden; background: var(--w-bg); }
 .qf-map-canvas { display: block; width: 100%; border: 0; padding: 0; margin: 0; background: var(--w-bg); cursor: zoom-in; position: relative; font-size: 0; }
-.qf-map-img { display: block; width: 100%; height: auto; }
+/* Fixed 640/360 box (NOT height:auto): the static-map bitmaps are all 16:9, so
+   reserving the aspect keeps the card height stable across every base↔route +
+   zoom/pan swap — no per-load height churn, no iframe re-post, no flicker. */
+.qf-map-img { display: block; width: 100%; aspect-ratio: 640 / 360; object-fit: cover; }
 .qf-map-img:not([src]) { display: none; }
 .qf-map-expand { position: absolute; right: var(--space-1); bottom: var(--space-1); display: flex; align-items: center; justify-content: center; width: 28px; height: 28px; color: rgba(255,255,255,0.95); background: rgba(15,23,42,0.55); border-radius: 8px; }
 /* Distance + transit embedded over the map (Alex): a compact CENTER-bottom chip.

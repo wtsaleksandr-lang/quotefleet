@@ -9,6 +9,7 @@ import {
   resolveMapStyle,
   normalizeBaseZoom,
   normalizeBaseCenter,
+  normalizeBaseScale,
   BASE_MAP_CENTER,
   BASE_MAP_ZOOM,
   BASE_MAP_MIN_ZOOM,
@@ -379,6 +380,35 @@ describe('buildBaseMapUrl — zoom/center override (inspect-the-style)', () => {
     expect(url.searchParams.get('center')).toBe('40.7128,-74.0060');
     // Style specs are still applied at the zoomed level (style must not be lost).
     expect(url.searchParams.getAll('style')).toContain('feature:road|element:geometry|color:0xffffff');
+  });
+});
+
+describe('buildBaseMapUrl — interactive scale param', () => {
+  it('defaults to the retina scale=2 (crisp modal / snapshot)', () => {
+    const url = new URL(buildBaseMapUrl(KEY, 'light', 'grayscale', 9, '40.7128,-74.0060'));
+    expect(url.searchParams.get('scale')).toBe('2');
+  });
+  it('threads an explicit scale=1 for the lighter interactive frame', () => {
+    const url = new URL(buildBaseMapUrl(KEY, 'light', 'grayscale', 9, '40.7128,-74.0060', '1'));
+    expect(url.searchParams.get('scale')).toBe('1');
+    // Everything else is unchanged — same zoom, center, and style specs.
+    expect(url.searchParams.get('zoom')).toBe('9');
+    expect(url.searchParams.get('center')).toBe('40.7128,-74.0060');
+    expect(url.searchParams.getAll('style')).toContain('feature:road|element:geometry|color:0xffffff');
+  });
+});
+
+describe('normalizeBaseScale — only 1 opts down, else crisp default', () => {
+  it('accepts "1" / 1 → the light interactive frame', () => {
+    expect(normalizeBaseScale('1')).toBe('1');
+    expect(normalizeBaseScale(1)).toBe('1');
+  });
+  it('falls back to the retina scale=2 for absent / bad / 2 input', () => {
+    expect(normalizeBaseScale('2')).toBe('2');
+    expect(normalizeBaseScale(undefined)).toBe('2');
+    expect(normalizeBaseScale('retina')).toBe('2');
+    expect(normalizeBaseScale('4')).toBe('2');
+    expect(normalizeBaseScale(3)).toBe('2');
   });
 });
 

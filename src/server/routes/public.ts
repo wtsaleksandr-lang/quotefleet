@@ -51,7 +51,7 @@ import { loadEnv } from '../../config.js';
 import { getTrialState } from '../trialGating.js';
 import { canUseProFeature } from '../plans.js';
 import { publicCalcLimiter, publicChatLimiter, publicLeadLimiter, quoteMapLimiter } from '../rateLimits.js';
-import { buildBaseMapUrl, getRoutedMiles, getRouteMap, laneCacheKey, normalizeBaseCenter, normalizeBaseZoom, normalizeTheme, peekRouteMap, resolveMapStyle } from '../routeMap.js';
+import { buildBaseMapUrl, getRoutedMiles, getRouteMap, laneCacheKey, normalizeBaseCenter, normalizeBaseScale, normalizeBaseZoom, normalizeTheme, peekRouteMap, resolveMapStyle } from '../routeMap.js';
 import { resolveWidgetTheme, WIDGET_PRESETS } from '../widgetThemes.js';
 import { resolveQuoteDisclaimer } from '../quoteDisclaimer.js';
 import { loadCarrierProfile } from './carrierProfile.js';
@@ -685,7 +685,11 @@ export function registerPublicRoutes(app: Express) {
     // folded into the cache key so styles/zooms/centers never cross-contaminate.
     const zoom = normalizeBaseZoom(req.query.zoom);
     const center = normalizeBaseCenter(req.query.center);
-    const cacheKey = `${theme}|${mapStyle}|${zoom}|${center}`;
+    // Interactive pan/zoom frames request the lighter scale=1 PNG; the modal +
+    // snapshots keep the retina scale=2. Part of the cache key so the two never
+    // cross-contaminate (a scale=1 frame must not be served for a scale=2 ask).
+    const scale = normalizeBaseScale(req.query.scale);
+    const cacheKey = `${theme}|${mapStyle}|${zoom}|${center}|${scale}`;
     const cached = baseMapCache.get(cacheKey);
     if (cached) {
       res.setHeader('content-type', 'image/png');
@@ -695,7 +699,7 @@ export function registerPublicRoutes(app: Express) {
     const key = loadEnv().GOOGLE_MAPS_API_KEY;
     if (!key) return res.status(404).end();
     try {
-      const img = await fetch(buildBaseMapUrl(key, theme, mapStyle, zoom, center));
+      const img = await fetch(buildBaseMapUrl(key, theme, mapStyle, zoom, center, scale));
       if (!img.ok) return res.status(502).end();
       const buf = Buffer.from(await img.arrayBuffer());
       // Zoom/pan mints one entry per (theme,style,zoom,center); bound the map so

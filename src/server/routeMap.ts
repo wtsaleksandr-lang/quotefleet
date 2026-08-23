@@ -831,6 +831,15 @@ export const BASE_MAP_ZOOM = 3;
 export const BASE_MAP_MIN_ZOOM = 3;
 export const BASE_MAP_MAX_ZOOM = 16;
 
+/** Render scale for an interactive base-map frame. The pan/zoom preview fetches
+ *  the ~4× lighter `scale=1` PNG (640×360, faster to transfer + decode per
+ *  interaction); the enlarged modal and any PDF/hosted snapshot keep the retina
+ *  `scale=2` (1280×720) for crispness. Only an explicit '1' opts down; anything
+ *  else (absent / bad / '2') → the crisp default. */
+export function normalizeBaseScale(raw: unknown): string {
+  return raw === '1' || raw === 1 ? '1' : MAP_SCALE;
+}
+
 /** Clamp any caller/query input to a valid base-map Google zoom level
  *  [BASE_MAP_MIN_ZOOM..BASE_MAP_MAX_ZOOM]; bad/absent input → the default. */
 export function normalizeBaseZoom(raw: unknown): number {
@@ -858,11 +867,15 @@ export function buildBaseMapUrl(
   theme: MapTheme = 'light',
   mapStyle: MapStyle = 'branded',
   zoom: number = BASE_MAP_ZOOM,
-  center: string = BASE_MAP_CENTER
+  center: string = BASE_MAP_CENTER,
+  // Interactive pan/zoom frames pass '1' (lighter/faster); modal + snapshots
+  // default to the retina MAP_SCALE. Kept as a string so it threads straight
+  // onto the Static Maps query.
+  scale: string = MAP_SCALE
 ): string {
   const params = new URLSearchParams({
     size: MAP_SIZE,
-    scale: MAP_SCALE,
+    scale,
     maptype: mapTypeFor(mapStyle),
     center,
     zoom: String(zoom),
