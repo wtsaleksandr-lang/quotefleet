@@ -167,10 +167,9 @@
     input.placeholder = 'USDOT #, MC #, or company name';
     wrap.appendChild(input);
     wrap.appendChild(el('p', 'qf-ob-hint', 'Search the FMCSA directory to autofill the details below — everything stays editable.'));
-    var menu = el('div');
-    menu.style.cssText = 'position:absolute;left:0;right:0;top:100%;z-index:60;margin-top:4px;'
-      + 'background:var(--qf-ob-surface,#fff);border:1px solid rgba(0,0,0,0.14);border-radius:10px;'
-      + 'box-shadow:0 8px 24px rgba(0,0,0,0.18);overflow:hidden;max-height:300px;overflow-y:auto;display:none;';
+    // thinMaterial floating panel — styled via .qf-ob-finder-menu (glass tint +
+    // blur + rounded). Only display is toggled inline; all visuals live in CSS.
+    var menu = el('div', 'qf-ob-finder-menu');
     wrap.appendChild(menu);
 
     var timer = null; var reqSeq = 0;
@@ -190,14 +189,11 @@
         var loc = [obTitleCaseCompany(row.city || ''), row.state || ''].filter(Boolean).join(', ');
         var item = document.createElement('button');
         item.type = 'button';
-        item.style.cssText = 'display:block;width:100%;text-align:left;border:0;background:transparent;'
-          + 'padding:10px 12px;cursor:pointer;border-bottom:1px solid rgba(0,0,0,0.08);color:inherit;font:inherit;';
-        var t1 = document.createElement('div'); t1.style.cssText = 'font-weight:600;font-size:14px;'; t1.textContent = name;
-        var t2 = document.createElement('div'); t2.className = 'qf-ob-hint'; t2.style.marginTop = '2px';
+        item.className = 'qf-ob-finder-item';
+        var t1 = el('div', 'qf-ob-finder-item-name'); t1.textContent = name;
+        var t2 = el('div', 'qf-ob-hint qf-ob-finder-item-meta');
         t2.textContent = ids.join(' · ') + (loc ? ' · ' + loc : '');
         item.appendChild(t1); item.appendChild(t2);
-        item.addEventListener('mouseenter', function () { item.style.background = 'rgba(0,0,0,0.05)'; });
-        item.addEventListener('mouseleave', function () { item.style.background = 'transparent'; });
         item.addEventListener('click', function () {
           closeMenu();
           input.value = name;
@@ -273,7 +269,10 @@
       zones: null,
       zonesLoaded: false,
       zonesTotal: 0,
-      submitting: false
+      submitting: false,
+      // Id of the option card just picked — read by optionCard() to pop that
+      // card's check exactly once, then cleared at the end of render().
+      _justPicked: null
     };
     // 4 steps: modes → service area → quoting rules → confirm rates. The pricing
     // step was dropped (mode-derived + engine-ignored) and the brand-color step
@@ -349,13 +348,18 @@
     head.appendChild(brand);
 
     var headRight = el('div', 'qf-ob-head-right');
-    // Thin top-right progress bar: a track with an accent fill grown by
-    // setProgress() as the carrier advances the 4 steps.
+    // Top-right progress: FOUR discrete glass segments (one per step). Each fills
+    // with the accent as its step is reached — setProgress() toggles .is-on.
     var progress = el('div', 'qf-ob-progress');
     progress.setAttribute('role', 'progressbar');
     progress.setAttribute('aria-label', 'Setup progress');
-    var progressFill = el('div', 'qf-ob-progress-fill');
-    progress.appendChild(progressFill);
+    var progressSegs = [];
+    for (var si = 0; si < 4; si++) {
+      var seg = el('div', 'qf-ob-seg');
+      seg.appendChild(el('span', 'qf-ob-seg-fill'));
+      progress.appendChild(seg);
+      progressSegs.push(seg);
+    }
     headRight.appendChild(progress);
 
     var skipBtn = el('button', 'qf-ob-skip', 'Skip for now');
@@ -382,7 +386,14 @@
     foot.appendChild(nextBtn);
     shell.appendChild(foot);
 
+    // Entrance handoff: mount with .is-entering (overlay faded, shell scaled +
+    // lifted), then clear on the next frames so it fades/scales in. Reduced
+    // motion neutralises the shell transform in CSS (opacity-only cross-fade).
+    overlay.classList.add('is-entering');
     document.body.appendChild(overlay);
+    requestAnimationFrame(function () {
+      requestAnimationFrame(function () { overlay.classList.remove('is-entering'); });
+    });
     // Lock the page behind the modal. The overlay is position:fixed and covers
     // the viewport, but the underlying dashboard shell stays in the document
     // flow — without this, a user could scroll the ~tens of px of page underflow
@@ -393,10 +404,11 @@
     document.documentElement.classList.add('qf-ob-open');
 
     function setProgress() {
-      // Fill the top-right bar left-to-right: one completed step-width per step
-      // reached (step 0 → 25%, the final step → 100%).
-      var pct = Math.round(((state.step + 1) / STEPS) * 100);
-      progressFill.style.width = pct + '%';
+      // Light up one segment per step reached (step 0 → seg 1 on, final → all on).
+      // The per-step fill transition lives in CSS.
+      for (var i = 0; i < progressSegs.length; i++) {
+        progressSegs[i].classList.toggle('is-on', i <= state.step);
+      }
       progress.setAttribute('aria-valuenow', String(state.step + 1));
       progress.setAttribute('aria-valuemin', '1');
       progress.setAttribute('aria-valuemax', String(STEPS));
@@ -407,11 +419,115 @@
       card.type = 'button';
       var title = el('div', 'qf-ob-card-title');
       title.appendChild(el('span', null, item.label));
-      title.appendChild(el('span', 'qf-ob-check', selected ? '✓' : ''));
+      // Pop the check ONLY on the card just picked (not on every re-render).
+      var popped = selected && state._justPicked === item.id;
+      title.appendChild(el('span', 'qf-ob-check' + (popped ? ' is-pop' : ''), selected ? '✓' : ''));
       card.appendChild(title);
       if (item.blurb) card.appendChild(el('div', 'qf-ob-card-blurb', item.blurb));
-      card.addEventListener('click', onClick);
+      card.addEventListener('click', function (e) {
+        state._justPicked = item.id; // marks the pop target for the next render
+        onClick(e);
+      });
       return card;
+    }
+
+    // Title-in-field input (DESIGN-SYSTEM rule): the title sits INSIDE a
+    // near-solid field box, the value on the line below, with an optional in-field
+    // suffix (e.g. "%"). A field is never glass — the wrapper carries the fill.
+    function ifield(titleText, opts) {
+      opts = opts || {};
+      var wrap = el('div', 'qf-ob-ifield' + (opts.wrapCls ? ' ' + opts.wrapCls : ''));
+      wrap.appendChild(el('span', 'qf-ob-ifield-title', titleText));
+      var input = el('input', 'qf-ob-input');
+      input.type = opts.type || 'text';
+      if (opts.placeholder != null) input.placeholder = opts.placeholder;
+      if (opts.value != null) input.value = opts.value;
+      if (opts.inputMode) input.inputMode = opts.inputMode;
+      if (opts.min != null) input.min = String(opts.min);
+      if (opts.max != null) input.max = String(opts.max);
+      if (opts.step != null) input.step = String(opts.step);
+      if (opts.readOnly) input.readOnly = true;
+      if (opts.ariaLabel) input.setAttribute('aria-label', opts.ariaLabel);
+      if (opts.suffix) {
+        var row = el('div', 'qf-ob-ifield-row');
+        row.appendChild(input);
+        row.appendChild(el('span', 'qf-ob-ifield-suffix', opts.suffix));
+        wrap.appendChild(row);
+      } else {
+        wrap.appendChild(input);
+      }
+      if (opts.onInput) input.addEventListener('input', function () { opts.onInput(input); });
+      return { wrap: wrap, input: input };
+    }
+
+    // ── Step-transition + conditional-unfold motion state ────────────────────
+    var currentStepEl = null;   // the mounted .qf-ob-step
+    var renderedStep = -1;      // step index at the last render (drives direction)
+    var pendingFinalize = null; // clean-up for an in-flight slide
+    var curOpenReveals = {};    // reveal ids built this render
+    var prevOpenReveals = {};   // reveal ids built last render
+    var stepAtPrevRender = -1;  // step index last render (reveal re-animate guard)
+
+    // Slide the incoming step in over the outgoing one. dir: +1 forward (enter
+    // from right), -1 back (enter from left), 0 instant (same-step re-render or
+    // first mount). Reduced-motion neutralises the transforms in CSS → an
+    // opacity-only cross-fade; the JS path is unchanged.
+    function mountStep(incoming, dir) {
+      if (pendingFinalize) pendingFinalize();
+      var prev = currentStepEl;
+      currentStepEl = incoming;
+      if (!prev || dir === 0) {
+        body.textContent = '';
+        body.appendChild(incoming);
+        return;
+      }
+      // Overlap the two absolutely so the height never jumps; lock the body to
+      // the taller of the two for the transition, then release.
+      var h0 = body.offsetHeight;
+      body.appendChild(incoming);
+      var h1 = incoming.offsetHeight;
+      body.style.height = Math.max(h0, h1) + 'px';
+      body.classList.add('qf-ob-anim');
+      incoming.classList.add(dir > 0 ? 'is-enter-from-right' : 'is-enter-from-left');
+      requestAnimationFrame(function () {
+        requestAnimationFrame(function () {
+          incoming.classList.remove('is-enter-from-right', 'is-enter-from-left');
+          prev.classList.add(dir > 0 ? 'is-leave-to-left' : 'is-leave-to-right');
+        });
+      });
+      var done = false;
+      function finalize() {
+        if (done) return;
+        done = true;
+        pendingFinalize = null;
+        if (prev && prev.parentNode) prev.parentNode.removeChild(prev);
+        body.classList.remove('qf-ob-anim');
+        body.style.height = '';
+      }
+      pendingFinalize = finalize;
+      prev.addEventListener('transitionend', finalize, { once: true });
+      setTimeout(finalize, 420);
+    }
+
+    // Wrap a conditional sub-block so it UNFOLDS (grid-rows 0fr→1fr + fade) the
+    // first time it appears on a step, but mounts already-open on a same-step
+    // re-render where it was already showing (so toggling a chip inside it never
+    // re-collapses the whole block).
+    function reveal(id, contentNode) {
+      var wrap = el('div', 'qf-ob-reveal');
+      var inner = el('div', 'qf-ob-reveal-inner');
+      inner.appendChild(contentNode);
+      wrap.appendChild(inner);
+      curOpenReveals[id] = true;
+      var alreadyOpen = stepAtPrevRender === state.step && prevOpenReveals[id];
+      if (alreadyOpen) {
+        wrap.classList.add('is-open');
+      } else {
+        requestAnimationFrame(function () {
+          requestAnimationFrame(function () { wrap.classList.add('is-open'); });
+        });
+      }
+      return wrap;
     }
 
     // Live "that email looks wrong" note on the final step. Re-created by
@@ -423,12 +539,18 @@
       setProgress();
       backBtn.style.visibility = state.step === 0 ? 'hidden' : 'visible';
       nextLabel.textContent = state.step === STEPS - 1 ? 'Finish' : 'Continue';
-      body.innerHTML = '';
+      // Build this step DETACHED into `pane`, then slide/fade it in over the
+      // outgoing one (mountStep). Direction: forward when the index grew, back
+      // when it shrank, instant on a same-step re-render (a card toggle).
+      var dir = renderedStep === -1 ? 0
+        : (state.step === renderedStep ? 0 : (state.step > renderedStep ? 1 : -1));
+      curOpenReveals = {};
+      var pane = el('div', 'qf-ob-step');
 
       if (state.step === 0) {
-        body.appendChild(el('div', 'qf-ob-kicker', 'Step 1 of 4'));
-        body.appendChild(el('h1', 'qf-ob-title', 'What do you haul?'));
-        body.appendChild(el('p', 'qf-ob-sub', 'Select every mode you run — we seed rates for all of them, so your customers can quote anything you actually haul.'));
+        pane.appendChild(el('div', 'qf-ob-kicker', 'Step 1 of 4'));
+        pane.appendChild(el('h1', 'qf-ob-title', 'What do you haul?'));
+        pane.appendChild(el('p', 'qf-ob-sub', 'Select every mode you run — we seed rates for all of them, so your customers can quote anything you actually haul.'));
 
         // Fast path — upload a real rate sheet instead of starting from templates.
         // Styled via .qf-ob-fastpath* theme-token classes (no inline hex), so it
@@ -442,7 +564,7 @@
         fastBtn.type = 'button';
         fastBtn.addEventListener('click', finishToIngest);
         fast.appendChild(fastBtn);
-        body.appendChild(fast);
+        pane.appendChild(fast);
 
         var grid = el('div', 'qf-ob-cards is-two');
         VERTICALS.forEach(function (v) {
@@ -460,18 +582,18 @@
             render();
           }));
         });
-        body.appendChild(grid);
+        pane.appendChild(grid);
         if (state.verticals.length > 1) {
-          body.appendChild(el('p', 'qf-ob-sub', state.verticals.length + ' modes selected — rates will be seeded for each.'));
+          pane.appendChild(el('p', 'qf-ob-sub', state.verticals.length + ' modes selected — rates will be seeded for each.'));
         }
       } else if (state.step === 2) {
-        body.appendChild(el('div', 'qf-ob-kicker', 'Step 3 of 4'));
-        body.appendChild(el('h1', 'qf-ob-title', 'How should we quote?'));
-        body.appendChild(el('p', 'qf-ob-sub', 'Two rules that change what every customer sees. Both are editable later in Settings.'));
+        pane.appendChild(el('div', 'qf-ob-kicker', 'Step 3 of 4'));
+        pane.appendChild(el('h1', 'qf-ob-title', 'How should we quote?'));
+        pane.appendChild(el('p', 'qf-ob-sub', 'Two rules that change what every customer sees. Both are editable later in Settings.'));
 
         // ── fuel surcharge ───────────────────────────────────────────────
-        body.appendChild(el('div', 'qf-ob-group-label', 'Fuel surcharge'));
-        body.appendChild(el('p', 'qf-ob-hint', 'Applied on top of the base rate on every quote.'));
+        pane.appendChild(el('div', 'qf-ob-group-label', 'Fuel surcharge'));
+        pane.appendChild(el('p', 'qf-ob-hint', 'Applied on top of the base rate on every quote.'));
         var fgrid = el('div', 'qf-ob-cards is-two');
         FSC_MODES.forEach(function (f) {
           fgrid.appendChild(optionCard(f, state.fscMode === f.id, function () {
@@ -479,32 +601,28 @@
             render();
           }));
         });
-        body.appendChild(fgrid);
+        pane.appendChild(fgrid);
 
         if (state.fscMode === 'manual') {
-          var pctWrap = el('div', 'qf-ob-field qf-ob-pct');
-          pctWrap.appendChild(el('label', null, 'Your fuel surcharge (%)'));
-          var pctIn = el('input', 'qf-ob-input');
-          pctIn.type = 'number';
-          pctIn.min = '0';
-          pctIn.max = '100';
-          pctIn.step = 'any';
-          pctIn.inputMode = 'decimal';
-          pctIn.value = state.fscPercent;
-          pctIn.setAttribute('aria-label', 'Fuel surcharge percent');
-          // gateNext() only — a full render() here would steal focus mid-typing.
-          pctIn.addEventListener('input', function () {
-            var n = parseFloat(pctIn.value);
-            state.fscPercent = isNaN(n) ? null : n;
-            gateNext();
+          // Title-in-field number with an in-field "%" suffix (it showed a bare
+          // "25" before). gateNext() only on input — a full render() would steal
+          // focus mid-typing. Unfolds via reveal() the first time it appears.
+          var pct = ifield('Fuel surcharge', {
+            type: 'number', min: '0', max: '100', step: 'any', inputMode: 'decimal',
+            suffix: '%', value: state.fscPercent, ariaLabel: 'Fuel surcharge percent',
+            onInput: function (inp) {
+              var n = parseFloat(inp.value);
+              state.fscPercent = isNaN(n) ? null : n;
+              gateNext();
+            }
           });
-          pctWrap.appendChild(pctIn);
-          body.appendChild(pctWrap);
+          pct.wrap.classList.add('qf-ob-pct');
+          pane.appendChild(reveal('fsc-pct', pct.wrap));
         }
 
         // ── who sees prices ──────────────────────────────────────────────
-        body.appendChild(el('div', 'qf-ob-group-label', 'Who sees your prices'));
-        body.appendChild(el('p', 'qf-ob-hint', 'You can switch this at any time without touching your rates.'));
+        pane.appendChild(el('div', 'qf-ob-group-label', 'Who sees your prices'));
+        pane.appendChild(el('p', 'qf-ob-hint', 'You can switch this at any time without touching your rates.'));
         var acgrid = el('div', 'qf-ob-cards is-two');
         ACCESS_MODES.forEach(function (a) {
           acgrid.appendChild(optionCard(a, state.accessMode === a.id, function () {
@@ -512,11 +630,11 @@
             render();
           }));
         });
-        body.appendChild(acgrid);
+        pane.appendChild(acgrid);
       } else if (state.step === 1) {
-        body.appendChild(el('div', 'qf-ob-kicker', 'Step 2 of 4'));
-        body.appendChild(el('h1', 'qf-ob-title', 'Where do you operate?'));
-        body.appendChild(el('p', 'qf-ob-sub', 'Your coverage area. This tunes examples and your carrier profile — it never blocks a customer from requesting a quote.'));
+        pane.appendChild(el('div', 'qf-ob-kicker', 'Step 2 of 4'));
+        pane.appendChild(el('h1', 'qf-ob-title', 'Where do you operate?'));
+        pane.appendChild(el('p', 'qf-ob-sub', 'Your coverage area. This tunes examples and your carrier profile — it never blocks a customer from requesting a quote.'));
         var agrid = el('div', 'qf-ob-cards');
         AREAS.forEach(function (a) {
           agrid.appendChild(optionCard(a, state.areaKind === a.id, function () {
@@ -524,7 +642,7 @@
             render();
           }));
         });
-        body.appendChild(agrid);
+        pane.appendChild(agrid);
 
         if (state.areaKind === 'regions') {
           var rf = el('div', 'qf-ob-field');
@@ -551,50 +669,50 @@
           addGroup(US_STATES, 'United States');
           addGroup(CA_PROVINCES, 'Canada');
           rf.appendChild(chips);
-          body.appendChild(rf);
+          pane.appendChild(reveal('regions', rf));
         } else if (state.areaKind === 'radius') {
+          // Title-in-field for both the radius and the base city; the "miles of"
+          // connector stays between them. Unfolds via reveal() on first appear.
           var radWrap = el('div', 'qf-ob-lane');
-          var milesWrap = el('div', 'qf-ob-field');
-          milesWrap.appendChild(el('label', null, 'Radius'));
-          var milesIn = el('input', 'qf-ob-input');
-          milesIn.type = 'number';
-          milesIn.min = '1';
-          milesIn.max = '3000';
-          milesIn.inputMode = 'numeric';
-          milesIn.value = state.radiusMiles;
-          milesIn.addEventListener('input', function () {
-            var n = parseInt(milesIn.value, 10);
-            state.radiusMiles = isNaN(n) ? 0 : n;
-            gateNext();
+          var miles = ifield('Radius (miles)', {
+            type: 'number', min: '1', max: '3000', inputMode: 'numeric',
+            value: state.radiusMiles, ariaLabel: 'Radius in miles',
+            onInput: function (inp) {
+              var n = parseInt(inp.value, 10);
+              state.radiusMiles = isNaN(n) ? 0 : n;
+              gateNext();
+            }
           });
-          milesWrap.appendChild(milesIn);
-          radWrap.appendChild(milesWrap);
+          radWrap.appendChild(miles.wrap);
           radWrap.appendChild(el('div', 'qf-ob-lane-arrow', 'miles of'));
-          var baseWrap = el('div', 'qf-ob-field');
-          baseWrap.appendChild(el('label', null, 'Base city'));
-          var baseIn = el('input', 'qf-ob-input');
-          baseIn.type = 'text';
-          baseIn.placeholder = 'e.g. Long Beach, CA';
-          baseIn.value = state.baseCity;
-          baseIn.addEventListener('input', function () { state.baseCity = baseIn.value; gateNext(); });
-          baseWrap.appendChild(baseIn);
-          radWrap.appendChild(baseWrap);
-          body.appendChild(radWrap);
+          var base = ifield('Base city', {
+            type: 'text', placeholder: 'e.g. Long Beach, CA', value: state.baseCity,
+            onInput: function (inp) { state.baseCity = inp.value; gateNext(); }
+          });
+          radWrap.appendChild(base.wrap);
+          pane.appendChild(reveal('radius', radWrap));
         }
       } else if (state.step === 3) {
         var zoneMode = isZonePricing();
-        body.appendChild(el('div', 'qf-ob-kicker', 'Step 4 of 4'));
+        pane.appendChild(el('div', 'qf-ob-kicker', 'Step 4 of 4'));
         // Zone-priced tenants (drayage) quote by a flat per-load tariff, so the
         // headline they confirm is a per-load price, not a $/mile — showing the
         // latter would ask them to edit a number the engine ignores.
-        body.appendChild(el('h1', 'qf-ob-title', zoneMode ? 'Confirm your top zone rates' : 'Confirm your top 3 rates'));
-        body.appendChild(el('p', 'qf-ob-sub', zoneMode
+        var items = confirmItems();
+        // Heading counts the ACTUAL rows (it hardcoded "top 3" before, wrong when
+        // a 2-mode carrier seeds only 2). Zone tenants keep their own wording.
+        var rateHeading = zoneMode
+          ? 'Confirm your top zone rates'
+          : (items.length === 0
+              ? 'Confirm your rates'
+              : 'Confirm your top ' + items.length + ' rate' + (items.length === 1 ? '' : 's'));
+        pane.appendChild(el('h1', 'qf-ob-title', rateHeading));
+        pane.appendChild(el('p', 'qf-ob-sub', zoneMode
           ? 'Drayage is priced by a flat rate per load within each port zone. These seeded from your pick — set the per-load price on each, then copy your calculator link to share it.'
           : 'These seeded from your pick. Tweak the headline price on each, then copy your calculator link to share it.'));
 
-        var items = confirmItems();
         if (items.length === 0) {
-          body.appendChild(el('p', 'qf-ob-sub', 'No rates to confirm yet — you can add them from the dashboard.'));
+          pane.appendChild(el('p', 'qf-ob-sub', 'No rates to confirm yet — you can add them from the dashboard.'));
         }
         var list = el('div', 'qf-ob-rates');
         items.forEach(function (item) {
@@ -625,14 +743,14 @@
           rowEl.appendChild(priceWrap);
           list.appendChild(rowEl);
         });
-        body.appendChild(list);
+        pane.appendChild(list);
 
         // Zone tenants have one flat rate PER port-radius zone (the seed ships
         // ~39). We surface a representative top few here; the rest are editable
         // in Zones on the dashboard. Say so, so nobody thinks these are all of
         // them.
         if (zoneMode && state.zonesTotal > items.length) {
-          body.appendChild(el('p', 'qf-ob-hint',
+          pane.appendChild(el('p', 'qf-ob-hint',
             'Showing ' + items.length + ' of ' + state.zonesTotal + ' port zones — fine-tune every zone under Zones on your dashboard.'));
         }
 
@@ -642,8 +760,8 @@
         // all three render on the customer-facing calculator. publicContactEmail
         // is deliberately NOT pre-filled from the login email — that address is
         // private (see the comment above tenants.contactEmail in schema.ts).
-        body.appendChild(el('div', 'qf-ob-group-label', 'Trust details — optional'));
-        body.appendChild(el('p', 'qf-ob-hint', 'Shown on your customer-facing calculator so shippers know who they are quoting. Leave blank and we simply omit them.'));
+        pane.appendChild(el('div', 'qf-ob-group-label', 'Trust details — optional'));
+        pane.appendChild(el('p', 'qf-ob-hint', 'Shown on your customer-facing calculator so shippers know who they are quoting. Leave blank and we simply omit them.'));
 
         // "Find your company" — autofill MC / DOT / public email from the FMCSA
         // directory so a brand-new carrier doesn't hand-type them at first touch.
@@ -656,7 +774,7 @@
         // set via textContent (never innerHTML), so any FMCSA value is escaped.
         var extraNote = el('p', 'qf-ob-hint qf-ob-autofill-note');
         extraNote.style.display = 'none';
-        body.appendChild(createObCarrierFinder(function (row) {
+        pane.appendChild(createObCarrierFinder(function (row) {
           if (dotInput) { dotInput.value = row.usdot || ''; state.dotNumber = dotInput.value; }
           if (mcInput) { mcInput.value = row.mcNumber ? obMcToBareDigits(row.mcNumber) : ''; state.mcNumber = mcInput.value; }
           // publicContactEmail may be null (contactHidden / no FMCSA email) → leave blank.
@@ -680,35 +798,32 @@
           }
           gateNext();
         }));
-        body.appendChild(extraNote);
+        pane.appendChild(extraNote);
 
         var trust = el('div', 'qf-ob-trust');
         var addTrustField = function (labelText, placeholder, key, extraCls) {
-          var wrap = el('div', 'qf-ob-field' + (extraCls ? ' ' + extraCls : ''));
-          wrap.appendChild(el('label', null, labelText));
-          var input = el('input', 'qf-ob-input');
-          input.type = key === 'publicContactEmail' ? 'email' : 'text';
-          input.placeholder = placeholder;
-          input.value = state[key];
-          input.addEventListener('input', function () {
-            state[key] = input.value;
-            gateNext();
+          // Title-in-field per DESIGN-SYSTEM input rules.
+          var f = ifield(labelText, {
+            type: key === 'publicContactEmail' ? 'email' : 'text',
+            placeholder: placeholder,
+            value: state[key],
+            wrapCls: extraCls,
+            onInput: function (inp) { state[key] = inp.value; gateNext(); }
           });
-          wrap.appendChild(input);
-          trust.appendChild(wrap);
-          return input;
+          trust.appendChild(f.wrap);
+          return f.input;
         };
         // MC + DOT sit side-by-side from 480px so neither is ever stranded
         // alone on a line; the email spans the full row beneath them.
         mcInput = addTrustField('MC number', 'e.g. MC-123456', 'mcNumber');
         dotInput = addTrustField('DOT number', 'e.g. 1234567', 'dotNumber');
         emailInput = addTrustField('Public contact email', 'quotes@yourcompany.com', 'publicContactEmail', 'qf-ob-trust-wide');
-        body.appendChild(trust);
+        pane.appendChild(trust);
         // Live validity note. Held as a reference and toggled from gateNext()
         // rather than re-rendered, so typing never loses focus — and so a
         // disabled Finish always says WHY it is disabled.
         emailHint = el('p', 'qf-ob-hint qf-ob-hint-error', 'That email doesn’t look right yet — fix it, or clear the field to continue.');
-        body.appendChild(emailHint);
+        pane.appendChild(emailHint);
 
         // Share link (copy-to-clipboard). Prefer the hosted vanity URL; fall
         // back to the generic /w/<slug> embed route if it's not present.
@@ -717,13 +832,13 @@
         var link = t.hostedUrl || new URL('/w/' + encodeURIComponent(t.slug || ''), location.origin).toString();
 
         var copyField = el('div', 'qf-ob-field');
-        copyField.appendChild(el('label', null, 'Your calculator link'));
         var copyRow = el('div', 'qf-ob-copyrow');
-        var linkIn = el('input', 'qf-ob-input');
-        linkIn.type = 'text';
-        linkIn.readOnly = true;
-        linkIn.value = link;
-        copyRow.appendChild(linkIn);
+        // Title-in-field readonly link + the copy button beside it.
+        var linkField = ifield('Your calculator link', {
+          type: 'text', readOnly: true, value: link, wrapCls: 'qf-ob-copy-field'
+        });
+        var linkIn = linkField.input;
+        copyRow.appendChild(linkField.wrap);
         var copyBtn = el('button', 'qf-ob-copy-btn', 'Copy link');
         copyBtn.type = 'button';
         copyBtn.addEventListener('click', function () {
@@ -745,9 +860,17 @@
         });
         copyRow.appendChild(copyBtn);
         copyField.appendChild(copyRow);
-        body.appendChild(copyField);
+        pane.appendChild(copyField);
       }
 
+      // Slide/fade the freshly-built step in, then record this render's reveal
+      // set + step so the NEXT render knows the direction and which reveals were
+      // already open. Clear the one-shot check-pop marker.
+      mountStep(pane, dir);
+      prevOpenReveals = curOpenReveals;
+      stepAtPrevRender = state.step;
+      renderedStep = state.step;
+      state._justPicked = null;
       gateNext();
     }
 
@@ -796,7 +919,7 @@
     function showError(msg) {
       var old = body.querySelector('.qf-ob-error');
       if (old) old.remove();
-      body.appendChild(el('div', 'qf-ob-error', msg));
+      (currentStepEl || body).appendChild(el('div', 'qf-ob-error', msg));
     }
 
     // Shape the service-area answer for the API — only the fields that belong to
@@ -1048,9 +1171,25 @@
 
     function close() {
       var o = document.getElementById('qf-ob-overlay');
-      if (o && o.parentNode) o.parentNode.removeChild(o);
-      // Release the scroll-lock added on mount.
-      document.documentElement.classList.remove('qf-ob-open');
+      var release = function () {
+        if (o && o.parentNode) o.parentNode.removeChild(o);
+        // Release the scroll-lock added on mount.
+        document.documentElement.classList.remove('qf-ob-open');
+      };
+      if (!o) { release(); return; }
+      // Portal handoff: fade the backdrop + scale-fade the shell, THEN remove
+      // (a handoff to the dashboard, not a hard cut). Reduced motion → a quick
+      // opacity-only fade (the shell transform is neutralised in CSS).
+      var reduce = false;
+      try { reduce = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches; }
+      catch (e) { reduce = false; }
+      o.classList.add('is-closing');
+      if (reduce) { setTimeout(release, 130); return; }
+      var shellEl = o.querySelector('.qf-ob-shell');
+      var done = false;
+      var fin = function () { if (done) return; done = true; release(); };
+      if (shellEl) shellEl.addEventListener('transitionend', fin, { once: true });
+      setTimeout(fin, 380);
     }
 
     render();

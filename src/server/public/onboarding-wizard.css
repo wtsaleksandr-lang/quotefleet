@@ -53,6 +53,32 @@ html.qf-ob-open body {
   --error:      #B91C1C;
   --shadow-lg:  0 24px 60px -16px rgba(15, 23, 42, 0.18);
 
+  /* ── Glass material tokens (canonical DESIGN-SYSTEM values, scoped here so the
+     wizard subtree is self-contained). Every value is rgba()/hex-in-a-custom-
+     property-DEFINITION, so BOTH guards skip them (color guard scans only
+     color/background props for raw white/black; spacing guard skips --* defs).
+     Each frosted surface pairs a *-bg (translucent) with a *-solid (opaque
+     @supports-not fallback). Light defaults below; the dark-OS override sits in
+     its own @media block after this rule. */
+  --ob-backdrop:    #0a0e1a;
+  --ob-shell-bg:    rgba(255, 255, 255, 0.72);
+  --ob-shell-brd:   rgba(255, 255, 255, 0.55);
+  --ob-shell-solid: rgba(255, 255, 255, 0.98);
+  --ob-hairline:    rgba(255, 255, 255, 0.55);
+  --ob-ultra-bg:    rgba(255, 255, 255, 0.60);
+  --ob-ultra-brd:   rgba(255, 255, 255, 0.50);
+  --ob-ultra-solid: rgba(255, 255, 255, 0.94);
+  --ob-thin-bg:     rgba(255, 255, 255, 0.55);
+  --ob-thin-brd:    rgba(255, 255, 255, 0.40);
+  --ob-thin-solid:  rgba(255, 255, 255, 0.97);
+  --ob-card-bg:     rgba(255, 255, 255, 0.55);
+  --ob-card-hover:  rgba(255, 255, 255, 0.74);
+  --ob-card-solid:  rgba(255, 255, 255, 0.97);
+  --ob-input-bg:    rgba(255, 255, 255, 0.90);
+  --ob-glow:        rgba(13, 60, 252, 0.35);
+  --ob-shell-shadow: 0 24px 60px -16px rgba(15, 23, 42, 0.28);
+  --ob-float-shadow: 0 16px 40px -12px rgba(15, 23, 42, 0.28);
+
   position: fixed;
   inset: 0;
   z-index: 2000;
@@ -60,15 +86,86 @@ html.qf-ob-open body {
   align-items: center;
   justify-content: center;
   padding: var(--space-3);
-  background-color: color-mix(in srgb, var(--bg) 92%, transparent);
-  background-image: radial-gradient(
-    circle,
-    color-mix(in srgb, var(--ink) 7%, transparent) 1px,
-    transparent 1px
-  );
-  background-size: 24px 24px;
+  /* Vibrant mesh backdrop: a deep base with three brand-tinted radial hotspots
+     and a faint dot grid — so the frosted sheet floating on top has real colour
+     to refract (the premium moment). The flat light scrim is kept as the
+     prefers-reduced-transparency fallback below. */
+  background-color: var(--ob-backdrop);
+  background-image:
+    radial-gradient(60% 55% at 18% 14%, rgba(13, 60, 252, 0.42), transparent 70%),
+    radial-gradient(55% 52% at 84% 20%, rgba(99, 102, 241, 0.34), transparent 72%),
+    radial-gradient(64% 60% at 50% 96%, rgba(56, 189, 248, 0.20), transparent 74%),
+    radial-gradient(circle, rgba(255, 255, 255, 0.05) 1px, transparent 1px);
+  background-size: auto, auto, auto, 24px 24px;
   overflow-y: auto;
   -webkit-overflow-scrolling: touch;
+  /* Portal open/close handoff — the overlay fades, the shell scale-fades (below). */
+  transition: opacity 0.3s ease;
+}
+
+/* Entrance + close handoff (item 10/portal). JS toggles .is-entering on mount
+   and .is-closing on finish; the shell transforms are on .qf-ob-shell. */
+.qf-ob-overlay.is-entering { opacity: 0; }
+.qf-ob-overlay.is-closing  { opacity: 0; }
+
+/* ── Theme-aware DARK-OS sheet ───────────────────────────────────────────────
+   Fixes the white-flash-over-dark-dashboard: a dark-OS user gets a dark frosted
+   sheet, and --ink/--muted/--surface flip to light values so text stays legible
+   on it (no dark-on-dark). Scoped to the overlay only — the dashboard behind is
+   untouched. These are custom-property DEFINITIONS, exempt from both guards. */
+@media (prefers-color-scheme: dark) {
+  .qf-ob-overlay {
+    --bg:            #0A0E1A;
+    --surface:       #111827;
+    --surface-2:     #1B2230;
+    --surface-3:     #2A3342;
+    --border:        rgba(255, 255, 255, 0.14);
+    --border-strong: rgba(255, 255, 255, 0.26);
+    --ink:        #F4F6FA;
+    --ink-soft:   #E4E8EF;
+    --muted:      #AEB6C2;
+    --muted-soft: #7E8794;
+    --accent:        #7DA0FF;
+    --accent-strong: #9BB6FF;
+    --accent-soft:   rgba(125, 160, 255, 0.16);
+    --accent-fill:   #2E5BFF;
+    --accent-ink:    #FFFFFF;
+    --cta-bg:        #2E5BFF;
+    --cta-bg-hover:  #4A72FF;
+    --cta-text:      #FFFFFF;
+    --error:      #F87171;
+    --ob-shell-bg:    rgba(17, 24, 39, 0.62);
+    --ob-shell-brd:   rgba(255, 255, 255, 0.12);
+    --ob-shell-solid: rgba(17, 24, 39, 0.97);
+    --ob-hairline:    rgba(255, 255, 255, 0.10);
+    --ob-ultra-bg:    rgba(18, 22, 26, 0.58);
+    --ob-ultra-brd:   rgba(255, 255, 255, 0.10);
+    --ob-ultra-solid: rgba(18, 22, 26, 0.94);
+    --ob-thin-bg:     rgba(26, 32, 43, 0.58);
+    --ob-thin-brd:    rgba(255, 255, 255, 0.10);
+    --ob-thin-solid:  rgba(24, 30, 40, 0.97);
+    --ob-card-bg:     rgba(30, 37, 50, 0.55);
+    --ob-card-hover:  rgba(40, 48, 63, 0.70);
+    --ob-card-solid:  rgba(26, 32, 43, 0.97);
+    --ob-input-bg:    rgba(15, 20, 30, 0.92);
+    --ob-glow:        rgba(46, 91, 255, 0.45);
+    --ob-shell-shadow: 0 24px 60px -16px rgba(0, 0, 0, 0.55);
+    --ob-float-shadow: 0 16px 44px -12px rgba(0, 0, 0, 0.6);
+  }
+}
+
+/* Reduced-transparency users get the original calm flat scrim (no vibrant mesh),
+   still theme-token driven so it dims light or dark correctly. */
+@media (prefers-reduced-transparency: reduce) {
+  .qf-ob-overlay {
+    background-color: color-mix(in srgb, var(--bg) 94%, transparent);
+    background-image: radial-gradient(
+      circle,
+      color-mix(in srgb, var(--ink) 7%, transparent) 1px,
+      transparent 1px
+    );
+    background-size: 24px 24px;
+  }
 }
 
 /* The floating card itself — rounded, soft-shadowed, capped to the viewport so
@@ -81,11 +178,24 @@ html.qf-ob-open body {
   display: flex;
   flex-direction: column;
   max-height: calc(100dvh - var(--space-6));
-  background: var(--surface);
-  border: 1px solid var(--border);
-  border-radius: var(--radius-lg);
-  box-shadow: var(--shadow-lg);
+  /* regularMaterial frosted sheet — high opacity (≥0.72) so question text sits
+     safely on it. Inset top highlight reads as a lit glass edge. */
+  background: var(--ob-shell-bg);
+  -webkit-backdrop-filter: blur(28px) saturate(1.4);
+  backdrop-filter: blur(28px) saturate(1.4);
+  border: 1px solid var(--ob-shell-brd);
+  border-radius: 24px;
+  box-shadow: var(--ob-shell-shadow), inset 0 1px 0 var(--ob-hairline);
   padding: var(--space-4);
+  transition: transform 0.32s cubic-bezier(0.2, 0.8, 0.2, 1), opacity 0.3s ease;
+}
+/* Entrance rises + scales in; close hands off with a scale-fade. */
+.qf-ob-overlay.is-entering .qf-ob-shell { transform: scale(0.97) translateY(8px); opacity: 0; }
+.qf-ob-overlay.is-closing .qf-ob-shell  { transform: scale(0.96); opacity: 0; }
+
+/* No-backdrop-filter browsers get an opaque legible sheet (never see-through). */
+@supports not ((backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px))) {
+  .qf-ob-shell { background: var(--ob-shell-solid); }
 }
 
 /* ── header: brand mark (left) + progress bar & skip (right) ─────────────── */
@@ -138,21 +248,39 @@ html.qf-ob-open body {
   background: var(--surface-2);
 }
 
-/* Thin top-right progress bar — a short rounded track whose accent fill grows
-   left-to-right as the carrier advances the 4 steps (width set by setProgress). */
+/* Top-right progress — FOUR discrete ultraThin glass segments (one per step),
+   each filling with the accent + glow as its step is reached. Per-step reads as
+   real progress, not a vague continuous bar. */
 .qf-ob-progress {
-  width: 88px;
+  display: flex;
+  gap: var(--space-0-5);
+  width: 108px;
+}
+.qf-ob-seg {
+  flex: 1 1 0;
   height: 4px;
   border-radius: var(--radius-pill);
-  background: var(--surface-3);
+  background: var(--ob-ultra-bg);
+  -webkit-backdrop-filter: blur(16px);
+  backdrop-filter: blur(16px);
+  border: 1px solid var(--ob-ultra-brd);
   overflow: hidden;
 }
-.qf-ob-progress-fill {
+.qf-ob-seg-fill {
+  display: block;
   height: 100%;
-  width: 25%;
-  background: var(--accent);
+  width: 0;
   border-radius: var(--radius-pill);
-  transition: width 0.25s ease;
+  background: var(--accent);
+  box-shadow: 0 0 8px var(--ob-glow);
+  transition: width 0.45s cubic-bezier(0.2, 0.8, 0.2, 1);
+}
+.qf-ob-seg.is-on .qf-ob-seg-fill { width: 100%; }
+@supports not ((backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px))) {
+  .qf-ob-seg { background: var(--surface-3); }
+}
+@media (prefers-reduced-motion: reduce) {
+  .qf-ob-seg-fill { transition: none; }
 }
 
 /* ── step body ────────────────────────────────────────────────────────────
@@ -202,22 +330,83 @@ html.qf-ob-open body {
   text-align: left;
   appearance: none;
   cursor: pointer;
-  background: var(--surface);
+  /* thinMaterial glass card (fill ≥0.5 so labels stay legible). */
+  background: var(--ob-card-bg);
+  -webkit-backdrop-filter: blur(8px);
+  backdrop-filter: blur(8px);
   border: 1px solid var(--border);
-  border-radius: var(--radius-lg);
+  border-radius: 16px;
   padding: var(--space-2);
   min-height: 44px;
-  transition: border-color 0.15s ease, background 0.15s ease, box-shadow 0.15s ease;
+  transition: transform 0.18s cubic-bezier(0.2, 0.8, 0.2, 1),
+    border-color 0.15s ease, background 0.15s ease, box-shadow 0.15s ease;
   color: var(--ink);
 }
 .qf-ob-card:hover {
   border-color: var(--border-strong);
-  background: var(--surface-2);
+  background: var(--ob-card-hover);
+  transform: translateY(-2px);
+  box-shadow: var(--ob-float-shadow);
 }
+/* Selected = accent OUTLINE + tint, NEVER a bright solid fill (preserved). */
 .qf-ob-card.is-selected {
   border-color: var(--accent);
   box-shadow: 0 0 0 1px var(--accent);
   background: var(--accent-soft);
+  transform: none;
+}
+@supports not ((backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px))) {
+  .qf-ob-card { background: var(--ob-card-solid); }
+}
+@media (prefers-reduced-motion: reduce) {
+  .qf-ob-card { transition: border-color 0.15s ease, background 0.15s ease; }
+  .qf-ob-card:hover { transform: none; }
+}
+
+/* Check-mark pop when a card is picked (JS adds .is-pop to the just-picked one). */
+@keyframes qf-ob-check-pop {
+  0%   { transform: scale(0.6); }
+  60%  { transform: scale(1.12); }
+  100% { transform: scale(1); }
+}
+.qf-ob-check.is-pop { animation: qf-ob-check-pop 0.22s cubic-bezier(0.2, 0.8, 0.2, 1); }
+@media (prefers-reduced-motion: reduce) {
+  .qf-ob-check.is-pop { animation: none; }
+}
+
+/* ── Step slide/fade + conditional unfold + finder panel (motion + glass) ──── */
+/* Each step is built detached and swapped in; the two overlap (absolute) only
+   while animating so heights don't jump. Forward = enter from right / leave to
+   left; Back = the mirror. */
+.qf-ob-step {
+  transition: transform 0.28s cubic-bezier(0.2, 0.8, 0.2, 1), opacity 0.28s ease;
+}
+.qf-ob-body.qf-ob-anim { position: relative; overflow: hidden; }
+.qf-ob-body.qf-ob-anim .qf-ob-step { position: absolute; top: 0; left: 0; right: 0; }
+.qf-ob-step.is-enter-from-right { transform: translateX(24px); opacity: 0; }
+.qf-ob-step.is-enter-from-left  { transform: translateX(-24px); opacity: 0; }
+.qf-ob-step.is-leave-to-left    { transform: translateX(-24px); opacity: 0; }
+.qf-ob-step.is-leave-to-right   { transform: translateX(24px); opacity: 0; }
+@media (prefers-reduced-motion: reduce) {
+  .qf-ob-step { transition: opacity 0.2s ease; }
+  .qf-ob-step.is-enter-from-right,
+  .qf-ob-step.is-enter-from-left,
+  .qf-ob-step.is-leave-to-left,
+  .qf-ob-step.is-leave-to-right { transform: none; opacity: 0; }
+}
+
+/* Conditional sub-blocks (manual %, region grid, radius inputs) unfold via a
+   clip-free grid-rows height animation instead of a hard pop. */
+.qf-ob-reveal {
+  display: grid;
+  grid-template-rows: 0fr;
+  opacity: 0;
+  transition: grid-template-rows 0.32s cubic-bezier(0.2, 0.8, 0.2, 1), opacity 0.28s ease;
+}
+.qf-ob-reveal.is-open { grid-template-rows: 1fr; opacity: 1; }
+.qf-ob-reveal-inner { overflow: hidden; min-height: 0; }
+@media (prefers-reduced-motion: reduce) {
+  .qf-ob-reveal { transition: opacity 0.2s ease; grid-template-rows: 1fr; }
 }
 .qf-ob-card-title {
   display: flex;
@@ -313,7 +502,8 @@ html.qf-ob-open body {
 .qf-ob-input {
   width: 100%;
   box-sizing: border-box;
-  background: var(--surface);
+  /* A field is NEVER glass — near-solid fill so typed text always stays crisp. */
+  background: var(--ob-input-bg);
   border: 1px solid var(--border);
   border-radius: var(--radius-btn);
   color: var(--ink);
@@ -381,14 +571,24 @@ html.qf-ob-open body {
   padding: var(--space-1);
   border-radius: var(--radius-sm);
   border: 1px solid var(--border);
-  background: transparent;
-  color: var(--text);
+  background: var(--ob-thin-bg);
+  -webkit-backdrop-filter: blur(8px);
+  backdrop-filter: blur(8px);
+  color: var(--ink);
   font-size: 13px;
   font-weight: 600;
   cursor: pointer;
-  transition: border-color 0.12s ease, background 0.12s ease;
+  transition: transform 0.14s cubic-bezier(0.2, 0.8, 0.2, 1),
+    border-color 0.12s ease, background 0.12s ease;
 }
-.qf-ob-region:hover { border-color: var(--accent); }
+.qf-ob-region:hover { border-color: var(--accent); transform: translateY(-1px); }
+@supports not ((backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px))) {
+  .qf-ob-region { background: var(--ob-thin-solid); }
+}
+@media (prefers-reduced-motion: reduce) {
+  .qf-ob-region { transition: border-color 0.12s ease, background 0.12s ease; }
+  .qf-ob-region:hover { transform: none; }
+}
 /* Selected = outline + tint, never a bright solid fill. */
 .qf-ob-region.is-selected {
   border-color: var(--accent);
@@ -396,15 +596,23 @@ html.qf-ob-open body {
   background: color-mix(in srgb, var(--accent) 12%, transparent);
 }
 
-/* ── footer nav ──────────────────────────────────────────────────────────── */
+/* ── footer nav — ultraThin frosted sticky toolbar ─────────────────────────── */
 .qf-ob-foot {
+  position: sticky;
+  bottom: 0;
   display: flex;
   align-items: center;
   justify-content: space-between;
   gap: var(--space-2);
   margin-top: var(--space-3);
   padding-top: var(--space-2);
-  border-top: 1px solid var(--border);
+  border-top: 1px solid var(--ob-ultra-brd);
+  background: linear-gradient(to top, var(--ob-ultra-bg), transparent);
+  -webkit-backdrop-filter: blur(16px);
+  backdrop-filter: blur(16px);
+}
+@supports not ((backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px))) {
+  .qf-ob-foot { background: var(--ob-ultra-solid); }
 }
 .qf-ob-btn {
   display: inline-flex;
@@ -417,7 +625,8 @@ html.qf-ob-open body {
   min-height: 44px;
   font-size: 15px;
   font-weight: 600;
-  transition: background 0.15s ease, border-color 0.15s ease, opacity 0.15s ease;
+  transition: background 0.15s ease, border-color 0.15s ease, opacity 0.15s ease,
+    transform 0.15s cubic-bezier(0.2, 0.8, 0.2, 1), box-shadow 0.15s ease;
 }
 /* Back, bottom-left: ghost/outlined with a leading left-arrow. */
 .qf-ob-btn-back {
@@ -432,9 +641,17 @@ html.qf-ob-open body {
   border: 1px solid var(--cta-bg);
   background: var(--cta-bg);
   color: var(--cta-text);
+  box-shadow: 0 8px 20px var(--ob-glow);
 }
-.qf-ob-btn-next:hover { background: var(--cta-bg-hover); border-color: var(--cta-bg-hover); }
-.qf-ob-btn:disabled { opacity: 0.5; cursor: not-allowed; }
+.qf-ob-btn-next:hover {
+  background: var(--cta-bg-hover);
+  border-color: var(--cta-bg-hover);
+  transform: translateY(-1px);
+}
+.qf-ob-btn:disabled { opacity: 0.5; cursor: not-allowed; box-shadow: none; transform: none; }
+@media (prefers-reduced-motion: reduce) {
+  .qf-ob-btn-next:hover { transform: none; }
+}
 /* Inline arrow icons — inherit the button's currentColor. */
 .qf-ob-btn-ico {
   width: 16px;
@@ -559,7 +776,8 @@ html.qf-ob-open body {
   align-items: stretch;
   gap: var(--space-1);
 }
-.qf-ob-copyrow .qf-ob-input {
+.qf-ob-copyrow .qf-ob-input,
+.qf-ob-copyrow .qf-ob-copy-field {
   flex: 1 1 auto;
   min-width: 0;
 }
@@ -618,3 +836,90 @@ html.qf-ob-open body {
   color: var(--accent-strong);
   text-align: left;
 }
+
+/* ── "Find your company" finder — thinMaterial floating panel ────────────────
+   Glass tint + blur + rounded, floating over the shell. The finder INPUT itself
+   stays a solid .qf-ob-input (never glass a field); only the results panel is
+   frosted. Rows are transparent over the panel and read on --ink. */
+.qf-ob-finder-menu {
+  position: absolute;
+  left: 0;
+  right: 0;
+  top: 100%;
+  z-index: 60;
+  margin-top: var(--space-0-5);
+  background: var(--ob-thin-bg);
+  -webkit-backdrop-filter: blur(20px) saturate(1.4);
+  backdrop-filter: blur(20px) saturate(1.4);
+  border: 1px solid var(--ob-thin-brd);
+  border-radius: 14px;
+  box-shadow: var(--ob-float-shadow);
+  overflow: hidden;
+  overflow-y: auto;
+  max-height: 300px;
+  display: none;
+}
+@supports not ((backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px))) {
+  .qf-ob-finder-menu { background: var(--ob-thin-solid); }
+}
+.qf-ob-finder-item {
+  display: block;
+  width: 100%;
+  text-align: left;
+  border: 0;
+  border-bottom: 1px solid var(--border);
+  background: transparent;
+  color: var(--ink);
+  font: inherit;
+  padding: var(--space-1-5) var(--space-2);
+  cursor: pointer;
+  transition: background 0.12s ease;
+}
+.qf-ob-finder-item:last-child { border-bottom: 0; }
+.qf-ob-finder-item:hover,
+.qf-ob-finder-item:focus-visible { background: var(--ob-card-hover); }
+.qf-ob-finder-item-name { font-size: 14px; font-weight: 600; color: var(--ink); }
+.qf-ob-finder-item-meta { margin-top: var(--space-0-5); }
+
+/* ── Title-in-field inputs (DESIGN-SYSTEM input rule) ────────────────────────
+   The field's title sits INSIDE the near-solid field box, top-left, with the
+   value on the line below; an optional in-field suffix (e.g. "%") trails the
+   value. The wrapper carries the fill + border so the field is never glass. */
+.qf-ob-ifield {
+  border: 1px solid var(--border);
+  border-radius: var(--radius-btn);
+  background: var(--ob-input-bg);
+  padding: var(--space-1) var(--space-1-5);
+  transition: border-color 0.15s ease;
+}
+.qf-ob-ifield:focus-within { border-color: var(--accent); }
+.qf-ob-ifield-title {
+  display: block;
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+  color: var(--muted);
+}
+.qf-ob-ifield-row {
+  display: flex;
+  align-items: center;
+  gap: var(--space-1);
+}
+.qf-ob-ifield-row .qf-ob-input { flex: 1 1 auto; }
+.qf-ob-ifield .qf-ob-input {
+  border: 0;
+  background: transparent;
+  border-radius: 0;
+  padding: 0;
+  min-height: 28px;
+  font-size: 15px;
+}
+.qf-ob-ifield .qf-ob-input:focus { border-color: transparent; }
+.qf-ob-ifield-suffix {
+  flex: 0 0 auto;
+  color: var(--muted);
+  font-size: 14px;
+  font-weight: 600;
+}
+/* In the trust grid the gap owns the rhythm; the field's own margin would double it. */
+.qf-ob-trust .qf-ob-ifield { margin-bottom: 0; }
