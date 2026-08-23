@@ -249,6 +249,20 @@ export const passwordResetRequestLimiter: RateLimitRequestHandler = rateLimit({
   message: { error: 'Too many password-reset requests. Try again in an hour.' },
 });
 
+/** /api/auth/password/forgot — per-IP companion to the per-email limiter above.
+ *  The per-email cap alone lets a single host probe UNLIMITED distinct emails
+ *  (enumeration + reset-spam) because each address has its own bucket. This caps
+ *  total reset requests from ONE IP regardless of which addresses it targets.
+ *  Keyed by the real client IP (default `req.ip` behind trust-proxy, same as the
+ *  login/verify limiters). Stacked alongside passwordResetRequestLimiter. */
+export const passwordResetIpLimiter: RateLimitRequestHandler = rateLimit({
+  windowMs: minutes(60),
+  limit: 25,
+  standardHeaders: 'draft-7',
+  legacyHeaders: false,
+  message: { error: 'Too many password-reset requests. Try again in an hour.' },
+});
+
 /** POST /api/auth/password/reset — the token-verify + set-new-password step.
  *  Per-IP cap that stops a bot brute-forcing reset tokens (the token is 48-char
  *  nanoid ~285 bits so it's already infeasible, but a hard cap makes it

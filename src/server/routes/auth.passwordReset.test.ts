@@ -46,6 +46,11 @@ function chain(getRows: () => unknown[]): any {
 
 /** FIFO queue of results for successive `db().select()` calls; each test seeds it. */
 let selectResults: unknown[][] = [];
+/** FIFO queue of results for successive `db().update(...)...` calls. The reset
+ *  handler's atomic burn reads its `.returning()` rows to count how many rows
+ *  the conditional `WHERE usedAt IS NULL` UPDATE affected (1 = claimed, 0 =
+ *  lost the race / already used). Other updates ignore their result. */
+let updateResults: unknown[][] = [];
 /** Captured `.values(...)` payloads from every `db().insert()` in the run. */
 let insertedRows: any[] = [];
 
@@ -75,7 +80,7 @@ function recordingInsertChain(): any {
 
 const dbStub: any = {
   select: () => chain(() => (selectResults.length ? selectResults.shift()! : [])),
-  update: () => chain(() => []),
+  update: () => chain(() => (updateResults.length ? updateResults.shift()! : [])),
   insert: () => recordingInsertChain(),
   delete: () => chain(() => []),
 };
@@ -126,6 +131,7 @@ afterAll(async () => {
 
 beforeEach(() => {
   selectResults = [];
+  updateResults = [];
   insertedRows = [];
   sentEmails.length = 0;
 });
@@ -198,11 +204,35 @@ describe('POST /api/auth/password/reset', () => {
     await postForgot('reset-ok@carrier.test');
     const token = lastEmailedToken();
 
-    // The reset lookup finds the matching, unused, unexpired row.
+    // The reset lookup finds the matching, unused, unexpired row; the atomic
+    // burn then claims exactly one row (returning 1 → proceed).
     selectResults = [[{ tokenHash: sha256(token), userId: 42, usedAt: null, expiresAt: future() }]];
+    updateResults = [[{ tokenHash: sha256(token) }]];
     const { status, json } = await postReset({ token, password: 'a-brand-new-password' });
     expect(status).toBe(200);
     expect(json.ok).toBe(true);
+  });
+
+  it('is atomically single-use: a second reset with the same token is rejected even if the row still reads unused', async () => {
+    const token = 'race-token-value';
+    const hash = sha256(token);
+    // Winner: the read sees unused + unexpired, and the conditional burn claims
+    // exactly one row (returning length 1) → the reset succeeds.
+    selectResults = [[{ tokenHash: hash, userId: 5, usedAt: null, expiresAt: future() }]];
+    updateResults = [[{ tokenHash: hash }]];
+    const first = await postReset({ token, password: 'a-brand-new-password' });
+    expect(first.status).toBe(200);
+
+    // Loser/replay: even though the mocked read STILL reports the token unused
+    // (simulating the check-then-act gap), the conditional UPDATE
+    // `WHERE usedAt IS NULL` now affects ZERO rows → the burn returns empty →
+    // rejected. This proves single-use is enforced by the atomic burn, not the
+    // read.
+    selectResults = [[{ tokenHash: hash, userId: 5, usedAt: null, expiresAt: future() }]];
+    updateResults = [[]];
+    const second = await postReset({ token, password: 'a-brand-new-password' });
+    expect(second.status).toBe(400);
+    expect(second.json.error).toMatch(/invalid or has expired/i);
   });
 
   it('rejects an EXPIRED token', async () => {
@@ -247,6 +277,23 @@ describe('rate limiting', () => {
     for (let i = 0; i < 7; i++) {
       selectResults = [[]]; // unknown email each time (no side effects)
       const { status } = await postForgot(email);
+      if (status === 429) {
+        sawLimited = true;
+        break;
+      }
+    }
+    expect(sawLimited).toBe(true);
+  });
+
+  it('trips the per-IP limiter even across DISTINCT emails (enumeration/spam guard)', async () => {
+    // Each request uses a UNIQUE unknown email, so the per-EMAIL limiter (fresh
+    // bucket each time) can never trip — any 429 here must come from the per-IP
+    // limiter, proving one host can't probe unlimited addresses. The per-IP cap
+    // is 25/hr; firing well past it from the shared test IP guarantees a trip.
+    let sawLimited = false;
+    for (let i = 0; i < 40; i++) {
+      selectResults = [[]]; // unknown email → no side effects
+      const { status } = await postForgot(`ip-probe-${i}-${Math.random().toString(36).slice(2)}@carrier.test`);
       if (status === 429) {
         sawLimited = true;
         break;

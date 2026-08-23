@@ -41,6 +41,7 @@ import {
   signupLimiter,
   loginLimiter,
   passwordResetRequestLimiter,
+  passwordResetIpLimiter,
   passwordResetVerifyLimiter,
 } from '../rateLimits.js';
 import { parsePaidPlan } from '../plans.js';
@@ -409,6 +410,7 @@ export function registerAuthRoutes(app: Express) {
   const ForgotPasswordSchema = z.object({ email: z.string().email() });
   app.post(
     '/api/auth/password/forgot',
+    passwordResetIpLimiter,
     passwordResetRequestLimiter,
     async (req: Request, res: Response) => {
       // One identical response for every outcome (bad input / unknown email /
@@ -443,29 +445,35 @@ export function registerAuthRoutes(app: Express) {
       const link = `${base}/reset-password?token=${rawToken}`;
       const ttlMinutes = Math.round(PASSWORD_RESET_TTL_MS / 60000);
       const tpl = passwordResetEmail({ link, email, ttlMinutes });
-      try {
-        const result = await sendEmail({
-          to: email,
-          subject: tpl.subject,
-          text: tpl.text,
-          html: tpl.html,
+      // CONSTANT-TIME response: do NOT await delivery. Awaiting the email
+      // round-trip only on the existing-user branch would make that branch
+      // measurably slower than the unknown-email branch — a timing oracle that
+      // re-introduces enumeration. Fire-and-forget so both branches return the
+      // generic 200 in the same time; log the outcome from the settled promise.
+      void sendEmail({
+        to: email,
+        subject: tpl.subject,
+        text: tpl.text,
+        html: tpl.html,
+      })
+        .then((result) => {
+          if (result.logged) {
+            // Dev fallback (no provider) — the link was NOT delivered. Log the
+            // recipient (never the token) so an operator notices a dead provider.
+            console.warn(
+              `[password-reset] delivered to STDOUT only — no email provider configured. ` +
+                `Set RESEND_API_KEY (preferred) or SMTP_HOST/USER/PASS in env to actually send. ` +
+                `Recipient: ${email}`,
+            );
+          } else if (!result.ok) {
+            console.error(
+              `[email] password-reset send FAILED for user: ${result.error ?? 'unknown error'}`,
+            );
+          }
+        })
+        .catch((err) => {
+          console.warn('[password-reset] send failed:', err);
         });
-        if (result.logged) {
-          // Dev fallback (no provider) — the link was NOT delivered. Log the
-          // recipient (never the token) so an operator notices a dead provider.
-          console.warn(
-            `[password-reset] delivered to STDOUT only — no email provider configured. ` +
-              `Set RESEND_API_KEY (preferred) or SMTP_HOST/USER/PASS in env to actually send. ` +
-              `Recipient: ${email}`,
-          );
-        } else if (!result.ok) {
-          console.error(
-            `[email] password-reset send FAILED for user: ${result.error ?? 'unknown error'}`,
-          );
-        }
-      } catch (err) {
-        console.warn('[password-reset] send failed:', err);
-      }
       return genericOk();
     },
   );
@@ -508,13 +516,22 @@ export function registerAuthRoutes(app: Express) {
       if (row.usedAt) return invalid();
       if (row.expiresAt < new Date()) return invalid();
 
-      const newHash = await hashPassword(parse.data.password);
-      await db().update(users).set({ passwordHash: newHash }).where(eq(users.id, row.userId));
-      // Single-use: burn the token so the same link can't reset again.
-      await db()
+      // ATOMIC single-use: CLAIM the token before doing any work. The read above
+      // is only a fast-fail; the real guard is this conditional burn. Two
+      // concurrent requests with the same token both pass the read (usedAt is
+      // still NULL for both), but `WHERE usedAt IS NULL` means exactly ONE
+      // UPDATE flips it — the loser affects zero rows and is rejected. We claim
+      // FIRST (before the slow bcrypt hash + password write) so only the winner
+      // proceeds and no duplicate reset can slip through the check-then-act gap.
+      const burned = await db()
         .update(passwordResetTokens)
         .set({ usedAt: new Date() })
-        .where(eq(passwordResetTokens.tokenHash, tokenHash));
+        .where(and(eq(passwordResetTokens.tokenHash, tokenHash), isNull(passwordResetTokens.usedAt)))
+        .returning({ tokenHash: passwordResetTokens.tokenHash });
+      if (burned.length !== 1) return invalid();
+
+      const newHash = await hashPassword(parse.data.password);
+      await db().update(users).set({ passwordHash: newHash }).where(eq(users.id, row.userId));
       // Revoke every session for this user (all devices) — the reset invalidates
       // any prior session, incl. one an attacker may hold.
       await db().delete(sessions).where(eq(sessions.userId, row.userId));

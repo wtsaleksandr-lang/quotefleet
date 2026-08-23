@@ -344,9 +344,12 @@ export const passwordResetTokens = pgTable(
   {
     /** SHA-256 hex of the random token. The raw token is never stored. */
     tokenHash: text('token_hash').primaryKey(),
-    userId: integer('user_id')
-      .notNull()
-      .references(() => users.id, { onDelete: 'cascade' }),
+    /** Owning user. No FK constraint by design — this table is healed via
+     *  SELF_HEAL_TABLE_STATEMENTS (a bare CREATE TABLE IF NOT EXISTS that can't
+     *  retrofit constraints), so schema + DDL stay consistent by both omitting
+     *  the FK (same convention as saved_lists / rfq_* / carrier_* healed
+     *  tables). References `users` only, never `tenants`. */
+    userId: integer('user_id').notNull(),
     expiresAt: timestamp('expires_at', { mode: 'date' }).notNull(),
     usedAt: timestamp('used_at', { mode: 'date' }),
     createdAt: timestamp('created_at', { mode: 'date' }).notNull().defaultNow(),
