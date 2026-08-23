@@ -32,6 +32,7 @@ import { registerMarketplaceRedirects } from './routes/marketplaceRedirect.js';
 import { registerDirectoryRoutes } from './routes/directory.js';
 import { registerDirectoryExportRoutes } from './routes/directoryExport.js';
 import { registerDirectoryRevealRoutes } from './routes/directoryReveal.js';
+import { registerSavedListsRoutes } from './routes/savedLists.js';
 import { registerRfqRoutes } from './routes/rfq.js';
 import { registerServiceRoutes } from './directory/servicePages.js';
 import { registerGlossaryRoutes } from './directory/glossary.js';
@@ -166,6 +167,10 @@ export function createApp(): express.Express {
   // button). Keep RFQ registered here, before registerDirectoryRoutes.
   registerDirectoryExportRoutes(app);
   registerRfqRoutes(app);
+  // Saved lists (Directory Pro) — the /directory/lists page + /api/directory/lists*
+  // API. MUST precede registerDirectoryRoutes so the page path is not swallowed
+  // by /directory/:stateSlug.
+  registerSavedListsRoutes(app);
   registerDirectoryRoutes(app);
   // Directory Pro "Reveal additional contacts" — POST /api/directory/carrier/:usdot/reveal.
   registerDirectoryRevealRoutes(app);
