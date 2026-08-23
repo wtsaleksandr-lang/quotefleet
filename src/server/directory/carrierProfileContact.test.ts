@@ -129,7 +129,7 @@ describe('renderCarrierProfile — Directory Pro contacts gate', () => {
     const html = renderCarrierProfile({ carrier: carrier() }); // isPro defaults to false
     expect(html).toContain('<div class="cp-gated">');
     expect(html).toContain('Unlock with Directory Pro — $19/mo');
-    expect(html).toContain('href="/signup?plan=directory-pro"');
+    expect(html).toContain('href="/directory/join?intent=subscribe"');
     // A disabled "Reveal contacts" affordance (the real reveal is Pro-only, PR C).
     expect(html).toContain('Reveal contacts');
     expect(html).toMatch(/<button[^>]*disabled[^>]*>Reveal contacts<\/button>/);
@@ -143,9 +143,12 @@ describe('renderCarrierProfile — Directory Pro contacts gate', () => {
     expect(html).toContain('cp-gated--pro');
     expect(html).toContain('Reveal additional contacts');
     expect(html).toContain('action="/api/directory/carrier/107080/reveal"');
-    // No upgrade wall for a paying subscriber.
+    // No upgrade wall for a paying subscriber. (The shared nav script carries a
+    // generic /directory/join?intent=subscribe link on every page, and the
+    // .cp-unlock-btn CLASS lives in the inlined stylesheet, so assert the absence
+    // of the profile's OWN rendered upsell ELEMENT instead.)
     expect(html).not.toContain('Unlock with Directory Pro');
-    expect(html).not.toContain('/signup?plan=directory-pro');
+    expect(html).not.toContain('class="btn btn-primary cp-unlock-btn"');
   });
 
   it('the gate NEVER hides the public FMCSA phone/email (free data stays free) in either state', () => {

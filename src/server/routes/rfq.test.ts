@@ -565,7 +565,7 @@ describe('RFQ gating enforcement (route wiring)', () => {
     expect(r.status).toBe(200);
     const html = await r.text();
     expect(html).toContain('Sign in to send');
-    expect(html).toContain('/signup?plan=directory-pro');
+    expect(html).toContain('/directory/join');
     expect(html).toMatch(/<button[^>]*type="submit"[^>]*disabled/);
     h.server.close();
   });
