@@ -2900,7 +2900,23 @@
     if (!open || !modal) return;
     var vp = $('qf-map-viewport'), mimg = $('qf-map-modal-img'), iimg = $('qf-map-img');
     var scale = 1, tx = 0, ty = 0, dragging = false, sx = 0, sy = 0;
-    function apply() { if (mimg) mimg.style.transform = 'translate(' + tx + 'px,' + ty + 'px) scale(' + scale + ')'; }
+    function apply() {
+      var t = 'translate(' + tx + 'px,' + ty + 'px) scale(' + scale + ')';
+      if (mimg) mimg.style.transform = t;
+      // Give the INLINE base image the SAME instant CSS-transform feedback the
+      // enlarged modal image already gets, so a wheel notch is visible AT ONCE
+      // instead of waiting ~120ms for the debounced crisp scale=1 PNG swap. We
+      // reuse the modal's exact mechanism (this transform + baseFeedback()) rather
+      // than forking a parallel one. Only touch iimg while the inline map is the
+      // ACTIVE surface — base mode AND modal closed: when the modal is open the
+      // inline <img> sits hidden behind it (blank it to identity), and in ROUTE
+      // mode renderRouteMap() owns the inline transform (sets it to none), so we
+      // must never write it here. The commit in fetchBaseCrisp() resets
+      // scale/tx/ty to 0 then calls apply(), so this transient transform settles
+      // cleanly to identity the instant the crisp bitmap swaps in — no stuck or
+      // offset image, no double-transform.
+      if (iimg && isBase()) iimg.style.transform = (modal && !modal.hidden) ? '' : t;
+    }
     function isBase() { return !!(card && card.classList.contains('qf-map-base')); }
 
     // ── Base-map CRISP zoom/pan ─────────────────────────────────────────────
