@@ -188,7 +188,7 @@ html[data-theme="light"] .app-main {
 @media (max-width: 640px) {
   .qf-copilot-launcher {
     right: 16px;
-    bottom: 24px;
+    bottom: 32px;
   }
 }
 
