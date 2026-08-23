@@ -271,17 +271,16 @@
       }
     }
 
-    /* Directory results carry a sticky bottom action bar (Save selected /
-       Export / RFQ). On mobile that bar stacks full-width (<=640px) and the
-       corner launcher lands on the right edge of its buttons. Float the
-       launcher ABOVE the bar so the two never overlap. --qf-ab-h is the bar's
-       measured height (set in JS below); the bar sits at bottom:8px, so its
-       top is 8px + height — we clear that plus a 12px gap. Scoped to
-       body:has(.qf-actionbar), so desktop (bar is a single row, no collision)
-       and every page WITHOUT the bar keep the snug 12px corner unchanged. */
-    @media (max-width: 640px) {
+    /* Directory results carry a sticky bottom action bar (Save / Export / RFQ).
+       Alex wants the launcher in the bottom-right CORNER on these pages too —
+       NOT lifted mid-screen. So the FAB stays snug in the corner (base 12px);
+       the action bar gets right-side clearance in its own CSS (pages.ts) so its
+       rightmost button never sits under the corner FAB. On phones <=480px the
+       generic 84px lift above would push the launcher up — counter it back to
+       the corner on directory pages (body:has(.qf-actionbar)). */
+    @media (max-width: 480px) {
       body:has(.qf-actionbar) .qf-mc-fab {
-        bottom: calc(var(--qf-ab-h, 220px) + 20px + env(safe-area-inset-bottom, 0px));
+        bottom: calc(12px + env(safe-area-inset-bottom, 0px));
       }
     }
 
@@ -314,22 +313,6 @@
   btn.setAttribute('aria-label', 'Open chat with QuoteFleet');
   btn.innerHTML = ICON_CHAT + '<span class="qf-mc-badge">1</span>';
   document.body.appendChild(btn);
-
-  // Directory results page only: publish the sticky action bar's live height as
-  // --qf-ab-h so the mobile CSS rule above can float the launcher just above it.
-  // No-op on every other page (the bar is absent → querySelector is null).
-  var qfBar = document.querySelector('.qf-actionbar');
-  if (qfBar) {
-    var syncBarH = function () {
-      document.body.style.setProperty('--qf-ab-h', qfBar.offsetHeight + 'px');
-    };
-    syncBarH();
-    if (window.ResizeObserver) {
-      new ResizeObserver(syncBarH).observe(qfBar);
-    } else {
-      window.addEventListener('resize', syncBarH);
-    }
-  }
 
   var backdrop = document.createElement('div');
   backdrop.className = 'qf-mc-backdrop';
