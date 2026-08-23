@@ -262,6 +262,30 @@
       };
       var state = { device: 'desktop', theme: 'dark' };
 
+      // "Find your company" carrier prefill: the outer page can arrive as
+      // /w/demo?company=…&usdot=…&mc=…&city=…&state=…&phone=… (from the landing
+      // hero finder). Those params must be FORWARDED onto the framed widget's
+      // src — otherwise the iframe loads the default demo and the carrier is
+      // lost. buildFrameSrc() re-reads them on every rebuild so a theme toggle
+      // (which reloads the iframe) keeps the carrier instead of resetting it.
+      var CARRIER_PARAMS = ['company', 'usdot', 'mc', 'city', 'state', 'phone'];
+      function carrierQuery() {
+        var out = '';
+        try {
+          var p = new URLSearchParams(location.search);
+          for (var i = 0; i < CARRIER_PARAMS.length; i++) {
+            var k = CARRIER_PARAMS[i];
+            var v = p.get(k);
+            if (v) out += '&' + encodeURIComponent(k) + '=' + encodeURIComponent(v);
+          }
+        } catch (e) {}
+        return out;
+      }
+      function buildFrameSrc(theme) {
+        return '/w/demo?raw=1&preset=' + encodeURIComponent(THEME[theme] || THEME.dark) +
+          (MAP[theme] || '') + carrierQuery();
+      }
+
       function press(id, on) {
         var el = document.getElementById(id);
         if (el) el.setAttribute('aria-pressed', on ? 'true' : 'false');
@@ -279,14 +303,20 @@
         press('qfd-dark', t === 'dark');
         press('qfd-light', t === 'light');
         // Reload the widget with the chosen preset (config re-resolves theme)
-        // plus this version's pinned map style/theme override.
-        frame.src = '/w/demo?raw=1&preset=' + encodeURIComponent(THEME[t]) + (MAP[t] || '');
+        // plus this version's pinned map style/theme override — and re-forward
+        // any carrier prefill params so the toggle never resets the carrier.
+        frame.src = buildFrameSrc(t);
       }
 
       document.getElementById('qfd-desktop').addEventListener('click', function () { setDevice('desktop'); });
       document.getElementById('qfd-mobile').addEventListener('click', function () { setDevice('mobile'); });
       document.getElementById('qfd-dark').addEventListener('click', function () { setTheme('dark'); });
       document.getElementById('qfd-light').addEventListener('click', function () { setTheme('light'); });
+
+      // If the page arrived with carrier prefill params, rebuild the iframe src
+      // ONCE so the initial load carries them (the hardcoded HTML src attribute
+      // omits them). No params → leave the HTML src as-is (no wasted reload).
+      if (carrierQuery()) frame.src = buildFrameSrc(state.theme);
 
       // Auto-size the iframe to the widget's own content height so there is NO
       // inner scrollbar — the widget reports its height via postMessage on every

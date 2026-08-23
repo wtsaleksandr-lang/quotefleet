@@ -130,7 +130,15 @@
                in-device captions serve there). aria-hidden — the static H1 stays
                in the DOM (visually-hidden on mobile) as the SEO/AT heading. -->
           <div class="qf-hero-cap qf-hero-cap--headline" data-show="0" aria-hidden="true"><span class="qf-hero-cap__kicker"></span><span class="qf-hero-cap__title"></span></div>
-          <p class="lead">QuoteFleet turns your rate sheet into an instant, branded quote calculator. Customers price their own loads; qualified leads hit your inbox — while your competition is still typing a reply.</p>
+          <p class="lead">The most advanced quoting tool in trucking, and the easiest to use &mdash; customers price their own loads and qualified leads hit your inbox. Type your company name and a live demo loads instantly, already set up with your USDOT, MC, and business details.</p>
+          <div class="qf-finder" data-carrier-finder>
+            <div class="qf-finder__field">
+              <input id="qf-finder-input" class="qf-dir-name qf-finder__input" type="text" role="combobox" aria-expanded="false" aria-autocomplete="list" aria-controls="qf-finder-listbox" aria-label="Find your trucking company by name" placeholder="Enter your trucking company name" autocomplete="off" enterkeyhint="search" minlength="2" maxlength="100" spellcheck="false">
+              <ul class="qf-finder__listbox" id="qf-finder-listbox" role="listbox" aria-label="Matching carriers" hidden></ul>
+            </div>
+            <p class="micro-copy qf-finder__micro">No sign-up. We pull your details from public FMCSA records.</p>
+            <span class="qf-finder__status" data-finder-status role="status" aria-live="polite"></span>
+          </div>
           <div class="hero-cta"><a class="btn btn-primary btn-lg" href="/signup">Start free <span class="arr">→</span></a><a class="demo-link" href="/w/demo">See a live demo <span class="arr">→</span></a></div>
           <p class="micro-copy hero-trial-note">14-day full-access trial · no contracts · <a href="/pricing">from $14.80/mo, unlimited quotes</a></p>
         </div>
@@ -404,6 +412,7 @@
   <script src="/landing-video-controls.js" defer></script>
   <script src="/landing-motion.js" defer></script>
   <script src="/landing-audience-toggle.js" defer></script>
+  <script src="/landing-carrier-finder.js" defer></script>
   <script>document.getElementById('year').textContent = new Date().getFullYear();</script>
   <script>
   (function () {

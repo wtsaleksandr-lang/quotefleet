@@ -45,13 +45,38 @@
       logo: b.logoUrl || '',
     };
   }
+  // URL-param prefill layer for the "Find your company" hero. When the demo is
+  // opened as /w/demo?company=…&usdot=…&mc=…&city=…&state=…&phone=…, these map
+  // onto the brand fields so the demo reads as THAT carrier. Only fields present
+  // in the URL are returned (so a param-less load falls straight through to
+  // localStorage → configDefaults() → the default demo, unchanged). This is a
+  // read-only layer — it is NOT written to localStorage, so it never "sticks"
+  // past a param-less reload.
+  function urlBrand() {
+    const out = {};
+    try {
+      const p = new URLSearchParams(location.search);
+      const company = (p.get('company') || '').trim();
+      if (company) out.name = company;
+      const usdot = (p.get('usdot') || '').trim();
+      if (usdot) out.usdot = usdot;
+      const mc = (p.get('mc') || '').trim();
+      if (mc) out.mc = mc;
+      const phone = (p.get('phone') || '').trim();
+      if (phone) out.phone = phone;
+      const city = (p.get('city') || '').trim();
+      const state = (p.get('state') || '').trim();
+      const address = [city, state].filter(Boolean).join(', ');
+      if (address) out.address = address;
+    } catch (_) {}
+    return out;
+  }
   function readBrand() {
     const fallback = configDefaults();
-    try {
-      return Object.assign(fallback, JSON.parse(localStorage.getItem(DEMO_BRAND_KEY) || '{}'));
-    } catch (_) {
-      return fallback;
-    }
+    let stored = {};
+    try { stored = JSON.parse(localStorage.getItem(DEMO_BRAND_KEY) || '{}'); } catch (_) {}
+    // Priority: URL params (highest) > localStorage > configDefaults().
+    return Object.assign(fallback, stored, urlBrand());
   }
   function writeBrand(data) {
     try { localStorage.setItem(DEMO_BRAND_KEY, JSON.stringify(data)); } catch (_) {}

@@ -271,3 +271,57 @@ describe('public static page smoke checks', () => {
     expect(html).toContain('qdoc-print-hint');
   });
 });
+
+describe('"Find your company" carrier finder', () => {
+  it('landing carrier hero renders the finder input + accessible listbox + microcopy', async () => {
+    const html = await file('landing.html');
+    // Input, placeholder, combobox/listbox wiring, and the FMCSA microcopy.
+    expect(html).toContain('data-carrier-finder');
+    expect(html).toContain('id="qf-finder-input"');
+    expect(html).toContain('placeholder="Enter your trucking company name"');
+    expect(html).toContain('role="combobox"');
+    expect(html).toContain('id="qf-finder-listbox"');
+    expect(html).toContain('role="listbox"');
+    expect(html).toContain('No sign-up. We pull your details from public FMCSA records.');
+    // The client script is registered on the page.
+    expect(html).toContain('/landing-carrier-finder.js');
+  });
+
+  it('landing finder client calls the public endpoint and redirects to the prefilled demo', async () => {
+    const js = await file('landing-carrier-finder.js');
+    expect(js).toContain('/api/public/carrier-search');
+    // Debounced + min-length so it never hammers the endpoint.
+    expect(js).toContain('250');
+    // Redirects to the demo with the carrier params (company/usdot/mc/city/state/phone).
+    expect(js).toContain("'/w/demo'");
+    expect(js).toContain("add('company'");
+    expect(js).toContain("add('usdot'");
+    expect(js).toContain("add('mc'");
+    // Escapes injected values via textContent, never an .innerHTML assignment.
+    expect(js).not.toContain('.innerHTML');
+    expect(js).toContain('textContent');
+  });
+
+  it('demo calculator reads a URL-param prefill layer above localStorage/defaults', async () => {
+    const js = await file('public-calculator-conditional-options.js');
+    expect(js).toContain('function urlBrand()');
+    expect(js).toContain("p.get('company')");
+    expect(js).toContain("p.get('usdot')");
+    expect(js).toContain("p.get('mc')");
+    expect(js).toContain("p.get('city')");
+    expect(js).toContain("p.get('state')");
+    expect(js).toContain("p.get('phone')");
+    // URL layer is applied LAST in readBrand, so it wins over localStorage/defaults.
+    expect(js).toContain('Object.assign(fallback, stored, urlBrand())');
+  });
+
+  it('demo shell FORWARDS the carrier params onto the iframe (initial + theme toggle)', async () => {
+    const html = await file('widget-demo-shell.html');
+    expect(html).toContain('buildFrameSrc');
+    expect(html).toContain("CARRIER_PARAMS = ['company', 'usdot', 'mc', 'city', 'state', 'phone']");
+    // The theme-toggle rebuild uses buildFrameSrc, so a theme click keeps the carrier.
+    expect(html).toContain('frame.src = buildFrameSrc(t)');
+    // Initial load rebuilds ONCE when carrier params are present.
+    expect(html).toContain('if (carrierQuery()) frame.src = buildFrameSrc(state.theme)');
+  });
+});
