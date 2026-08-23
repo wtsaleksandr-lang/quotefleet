@@ -336,6 +336,33 @@ describe('"Find your company" carrier finder', () => {
     expect(js).toContain('renderHeader(state.config)');
   });
 
+  it('personalized demo neutralizes the Harbor Link logo + tagline', async () => {
+    const js = await file('public-calculator-conditional-options.js');
+    // urlBrand paints a visitor-initials logo badge (no FMCSA logo asset exists).
+    expect(js).toContain('out.logo = initialsBadgeDataUri(company)');
+    // The brand patch clears the demo-tenant logo + tagline and sets the name.
+    expect(js).toContain('b.logoUrl = ');
+    expect(js).toContain("b.tagline = ''");
+    expect(js).toContain('b.displayName = u.name');
+  });
+
+  it('carrierInitials derives the logo badge from the visitor name, skipping legal suffixes', async () => {
+    const js = await file('public-calculator-conditional-options.js');
+    const suffixes = js.match(/const LOGO_SUFFIXES = \{[\s\S]*?\};/);
+    const fnSrc = js.match(/function carrierInitials\(name\) \{[\s\S]*?\n {2}\}/);
+    expect(suffixes).toBeTruthy();
+    expect(fnSrc).toBeTruthy();
+    // Reconstruct the pure function and assert the mapping the coordinator signed off.
+    const carrierInitials = new Function(
+      `${suffixes![0]}\n${fnSrc![0]}\nreturn carrierInitials;`,
+    )() as (name: string) => string;
+    expect(carrierInitials('Poole')).toBe('P');
+    expect(carrierInitials('Sky Harbor Trucking LLC')).toBe('SH');
+    expect(carrierInitials('Harbor Link Logistics')).toBe('HL');
+    expect(carrierInitials('POOLE CHEM')).toBe('PC');
+    expect(carrierInitials('')).toBe('Q');
+  });
+
   it('demo shell FORWARDS the carrier params onto the iframe (initial + theme toggle)', async () => {
     const html = await file('widget-demo-shell.html');
     expect(html).toContain('buildFrameSrc');

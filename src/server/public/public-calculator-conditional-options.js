@@ -45,6 +45,33 @@
       logo: b.logoUrl || '',
     };
   }
+  // FMCSA has no carrier logo, so a personalized demo can't show Harbor Link's
+  // "HL" badge. Derive a 1–2 letter initials tile from the VISITOR's company
+  // name instead (skipping legal suffixes like LLC/INC/CO), matching widget.js's
+  // initialsLogo look (rounded brand-blue tile, white initials) so it reads as a
+  // real logo. "Poole" → "P"; "Sky Harbor Trucking LLC" → "SH".
+  const LOGO_SUFFIXES = {
+    LLC: 1, 'L.L.C.': 1, LLP: 1, 'L.L.P.': 1, LP: 1, 'L.P.': 1, PLLC: 1,
+    INC: 1, 'INC.': 1, CORP: 1, 'CORP.': 1, CO: 1, 'CO.': 1, LTD: 1, 'LTD.': 1,
+    PC: 1, DBA: 1, USA: 1, US: 1, THE: 1, AND: 1, OF: 1,
+  };
+  function carrierInitials(name) {
+    const parts = String(name || '').trim().split(/[\s.,\-/&]+/).filter(Boolean);
+    const words = parts.filter((w) => !LOGO_SUFFIXES[w.toUpperCase()]);
+    const use = words.length ? words : parts;
+    if (!use.length) return 'Q';
+    if (use.length === 1) return use[0].charAt(0).toUpperCase();
+    return (use[0].charAt(0) + use[1].charAt(0)).toUpperCase();
+  }
+  function initialsBadgeDataUri(name) {
+    const ini = carrierInitials(name);
+    const svg = "<svg xmlns='http://www.w3.org/2000/svg' width='96' height='96' viewBox='0 0 96 96'>" +
+      "<rect width='96' height='96' rx='22' fill='#0D3CFC'/>" +
+      "<text x='48' y='48' dy='.35em' text-anchor='middle' font-family='Satoshi,Inter,system-ui,sans-serif' font-size='40' font-weight='800' fill='#ffffff'>" +
+      ini + "</text></svg>";
+    return 'data:image/svg+xml;utf8,' + encodeURIComponent(svg);
+  }
+
   // URL-param prefill layer for the "Find your company" hero. When the demo is
   // opened as /w/demo?company=…&usdot=…&mc=…&city=…&state=…&phone=…, these map
   // onto the brand fields so the demo reads as THAT carrier. Only fields present
@@ -57,7 +84,10 @@
     try {
       const p = new URLSearchParams(location.search);
       const company = (p.get('company') || '').trim();
-      if (company) out.name = company;
+      // Personalize the name AND the logo badge: FMCSA has no logo asset, so the
+      // demo logo slot (painted from data.logo) gets the visitor's initials tile
+      // instead of Harbor Link's stored "HL" logo.
+      if (company) { out.name = company; out.logo = initialsBadgeDataUri(company); }
       const usdot = (p.get('usdot') || '').trim();
       if (usdot) out.usdot = usdot;
       const mc = (p.get('mc') || '').trim();
@@ -140,10 +170,11 @@
     const cfg = (typeof window !== 'undefined' && window.QF_WIDGET_CONFIG) || null;
     if (!cfg) return;
     const c = cfg.contact || (cfg.contact = {});
-    const sig = [u.usdot || '', u.mc || '', u.phone || '', u.address || ''].join('|');
+    const b = cfg.brand || (cfg.brand = {});
+    const sig = [u.name || '', u.usdot || '', u.mc || '', u.phone || '', u.address || ''].join('|');
     // Already applied to the live config → nothing to rebuild (also breaks the
     // render → MutationObserver → sync → render loop). Re-applies after a soft
-    // config refetch resets contact back to the Harbor Link default.
+    // config refetch resets contact/brand back to the Harbor Link default.
     if (c.__qfCarrierSig === sig && c.email === '') return;
     // Replace the demo-tenant identity wholesale so NO Harbor Link credential
     // leaks under the visitor's name: each field from the URL (blank when the
@@ -154,6 +185,15 @@
     c.address = u.address || '';
     c.email = '';
     c.__qfCarrierSig = sig;
+    // Neutralize the demo-tenant BRAND so the header logo + tagline stop reading
+    // as Harbor Link. displayName ← visitor (drives the header name + initials);
+    // logoUrl cleared so renderHeader falls back to a visitor-initials tile (the
+    // visible demo logo slot is separately painted from urlBrand().logo); tagline
+    // cleared so the chip falls back to the widget's generic default, NOT Harbor
+    // Link's drayage-specific line.
+    if (u.name) b.displayName = u.name;
+    b.logoUrl = '';
+    b.tagline = '';
     if (typeof window.QF_RERENDER_HEADER === 'function') window.QF_RERENDER_HEADER();
   }
   function applyDemoBrand() {
