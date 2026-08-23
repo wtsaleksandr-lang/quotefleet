@@ -220,13 +220,16 @@ function credBadge(opts: {
     : opts.held && !opts.selfDeclared
       ? ''
       : ' Self-declared.';
-  const full = opts.tip + suffix;
+  // A not-held credential shows the compact "Claim" affordance; the terse word is
+  // explained by the tooltip's claim call-to-action (hover AND keyboard focus).
+  const claimHint = !opts.held ? ' Claim this profile to verify & add this credential.' : '';
+  const full = opts.tip + suffix + claimHint;
   const aria = `${opts.label} — ${full}`;
   const common = `tabindex="0" role="note" aria-label="${esc(aria)}" data-tip="${esc(full)}"`;
   if (opts.held) {
     return `<span class="cp-badge cp-tip cp-badge--${opts.tone}" ${common}>${esc(opts.label)}</span>`;
   }
-  return `<span class="cp-badge cp-tip cp-badge--claim" ${common}>${esc(opts.label)} <span class="tag" aria-hidden="true">claim to add</span></span>`;
+  return `<span class="cp-badge cp-tip cp-badge--claim" ${common}><span class="cp-badge-label">${esc(opts.label)}</span> <span class="tag" aria-hidden="true">Claim</span></span>`;
 }
 
 /** Up to two uppercase initials for the company monogram avatar, derived from
@@ -629,7 +632,7 @@ const DIRECTORY_CSS = `
      Palette defined as tokens (bg + text colour chosen for AA contrast). Solid
      colour = a credential the carrier ACTUALLY has (FMCSA-verified ones render
      now); self-declared credentials the carrier hasn't verified stay muted with
-     a "claim to add" affordance. Every badge is keyboard-focusable and carries a
+     a compact "Claim" affordance. Every badge is keyboard-focusable and carries a
      tooltip (data-tip → ::after on :hover/:focus). The badge rows clip horizontal
      overflow so a tooltip never triggers page horizontal scroll at 375px. */
   :root {
@@ -678,7 +681,18 @@ const DIRECTORY_CSS = `
   .cp-badge--transload { background: var(--badge-transload-bg); color: var(--badge-transload-fg); }
   .cp-badge--yard { background: var(--badge-yard-bg); color: var(--badge-yard-fg); }
   .cp-badge--claim { background: var(--surface-2); color: var(--muted); border-color: var(--border); }
-  .cp-badge--claim .tag { font-size: 9px; text-transform: uppercase; letter-spacing: 0.05em; color: var(--muted); border: 1px solid var(--border); border-radius: 4px; padding: 2px 6px; }
+  .cp-badge--claim .tag { font-size: 9px; text-transform: uppercase; letter-spacing: 0.05em; color: var(--muted); border: 1px solid var(--border); border-radius: 4px; padding: 2px 6px; white-space: nowrap; flex: 0 0 auto; }
+  /* Self-declared credentials → a UNIFORM card grid: 2-up on desktop, 1-up on
+     narrow mobile. Each card is the same height per row (align-items:stretch),
+     credential name left + compact "Claim" button right, so long labels
+     (Customs-bonded / C-TPAT, Transload / warehouse) wrap gracefully WITHIN the
+     card without making its row ragged. */
+  .cp-claimgrid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; align-items: stretch; }
+  .cp-claimgrid .cp-badge--claim { display: flex; justify-content: space-between; align-items: center; gap: 8px; height: 100%; white-space: normal; text-align: left; padding: 10px 12px; }
+  .cp-claimgrid .cp-badge-label { min-width: 0; overflow-wrap: anywhere; }
+  @media (max-width: 480px) {
+    .cp-claimgrid { grid-template-columns: 1fr; }
+  }
   .cp-tip[data-tip]:hover::after,
   .cp-tip[data-tip]:focus::after,
   .cp-tip[data-tip]:focus-visible::after {
@@ -769,6 +783,14 @@ const DIRECTORY_CSS = `
     .cp-layout { margin-top: 16px; gap: 12px; }
     .cp-main, .cp-side { gap: 12px; }
     .cp-crosslinks { margin-top: 16px; }
+    /* Nearby shortcut chips: on narrow widths the nowrap pills used to stack
+       one-per-row (dead space on the right). Pack them into a 2-up grid that
+       fills the width; when the count is ODD the first chip spans both columns
+       so the last row always keeps >=2 (no orphaned single) — the same
+       no-orphan pattern .cp-chiprow uses. */
+    .cp-crosslinks { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; }
+    .cp-crosslinks .dir-chip { white-space: normal; text-align: center; }
+    .cp-crosslinks .dir-chip:first-child:nth-last-child(odd) { grid-column: 1 / -1; }
     .cp-claimcard { margin-top: 16px; padding: 16px; }
     main.dir-shell--cp { padding-bottom: 8px; }
     /* Generalized from the profile-only trim: EVERY directory footer (results,
@@ -3036,7 +3058,7 @@ export function renderCarrierProfile(opts: {
 
         <section class="cp-card">
           <h2 class="cp-h">Self-declared capabilities</h2>
-          <div class="cp-chiprow">${claimBadges}</div>
+          <div class="cp-claimgrid">${claimBadges}</div>
           <p class="cp-note">Muted credentials (UIIA, TWIC, bonded / C-TPAT, reefer, transload, yard) are self-declared — claim this profile to verify and add them.</p>
         </section>
       </div>
