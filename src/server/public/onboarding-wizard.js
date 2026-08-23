@@ -107,6 +107,125 @@
     return n;
   }
 
+  // Strip an MC/docket value to bare digits (no leading zeros) for the input
+  // that validates /^\d+$/. "MC012892" → "12892".
+  function obMcToBareDigits(s) {
+    return String(s == null ? '' : s).replace(/\D/g, '').replace(/^0+/, '');
+  }
+  // Title-case an ALL-CAPS FMCSA name, keeping common suffixes upper-cased.
+  var OB_SUFFIX_UPPER = { LLC: 1, LLP: 1, LP: 1, INC: 1, 'INC.': 1, CORP: 1, 'CORP.': 1, CO: 1, 'CO.': 1, LTD: 1, PC: 1, USA: 1, US: 1 };
+  function obTitleCaseCompany(s) {
+    if (!s) return '';
+    return String(s).trim().replace(/\s+/g, ' ').split(' ').map(function (w) {
+      if (!w) return w;
+      var up = w.toUpperCase();
+      if (OB_SUFFIX_UPPER[up]) return up;
+      if (/[^a-zA-Z]/.test(w)) return w;
+      return w.charAt(0).toUpperCase() + w.slice(1).toLowerCase();
+    }).join(' ');
+  }
+  function obCarrierRequest(params) {
+    var qs = Object.keys(params).filter(function (k) { return params[k]; })
+      .map(function (k) { return k + '=' + encodeURIComponent(params[k]); }).join('&');
+    if (!qs) return Promise.resolve([]);
+    return fetch('/api/tenant/carrier-search?' + qs, { headers: { Accept: 'application/json' } })
+      .then(function (r) { return r.ok ? r.json() : { results: [] }; })
+      .then(function (j) { return (j && j.results) || []; })
+      .catch(function () { return []; });
+  }
+  // Route a raw query to the right param(s): "MC…" → mc, pure digits → dot+mc
+  // merged (a trucker may know either number), else free-text name search.
+  function obCarrierLookup(raw) {
+    var term = String(raw || '').trim();
+    if (!term) return Promise.resolve([]);
+    var mcMatch = /^mc[\s-]*0*(\d+)$/i.exec(term.replace(/\s+/g, ' '));
+    if (mcMatch) return obCarrierRequest({ mc: mcMatch[1] });
+    var compact = term.replace(/[\s-]/g, '');
+    if (/^\d+$/.test(compact)) {
+      if (compact.length < 3) return Promise.resolve([]);
+      return Promise.all([obCarrierRequest({ dot: compact }), obCarrierRequest({ mc: compact })])
+        .then(function (pair) {
+          var seen = {}; var out = [];
+          pair[0].concat(pair[1]).forEach(function (row) {
+            if (row && !seen[row.usdot]) { seen[row.usdot] = 1; out.push(row); }
+          });
+          return out;
+        });
+    }
+    if (term.length < 2) return Promise.resolve([]);
+    return obCarrierRequest({ q: term });
+  }
+  // "Find your company" typeahead for the wizard's trust step. onSelect(row)
+  // fills the fields this step supports (mc / dot / email). Returns a DOM node.
+  function createObCarrierFinder(onSelect) {
+    var wrap = el('div', 'qf-ob-field');
+    wrap.style.position = 'relative';
+    wrap.appendChild(el('label', null, 'Find your company'));
+    var input = el('input', 'qf-ob-input');
+    input.type = 'search';
+    input.autocomplete = 'off';
+    input.placeholder = 'USDOT #, MC #, or company name';
+    wrap.appendChild(input);
+    wrap.appendChild(el('p', 'qf-ob-hint', 'Search the FMCSA directory to autofill the details below — everything stays editable.'));
+    var menu = el('div');
+    menu.style.cssText = 'position:absolute;left:0;right:0;top:100%;z-index:60;margin-top:4px;'
+      + 'background:var(--qf-ob-surface,#fff);border:1px solid rgba(0,0,0,0.14);border-radius:10px;'
+      + 'box-shadow:0 8px 24px rgba(0,0,0,0.18);overflow:hidden;max-height:300px;overflow-y:auto;display:none;';
+    wrap.appendChild(menu);
+
+    var timer = null; var reqSeq = 0;
+    function closeMenu() { menu.style.display = 'none'; menu.textContent = ''; }
+    function showMsg(text) {
+      menu.textContent = '';
+      var m = el('div', 'qf-ob-hint'); m.style.padding = '10px 12px'; m.textContent = text;
+      menu.appendChild(m); menu.style.display = 'block';
+    }
+    function renderResults(rows) {
+      menu.textContent = '';
+      if (!rows.length) { showMsg('No matching carrier found.'); return; }
+      rows.forEach(function (row) {
+        var name = obTitleCaseCompany(row.dbaName || row.legalName || '') || '(unnamed carrier)';
+        var ids = ['USDOT ' + row.usdot];
+        if (row.mcNumber) ids.push('MC ' + obMcToBareDigits(row.mcNumber));
+        var loc = [obTitleCaseCompany(row.city || ''), row.state || ''].filter(Boolean).join(', ');
+        var item = document.createElement('button');
+        item.type = 'button';
+        item.style.cssText = 'display:block;width:100%;text-align:left;border:0;background:transparent;'
+          + 'padding:10px 12px;cursor:pointer;border-bottom:1px solid rgba(0,0,0,0.08);color:inherit;font:inherit;';
+        var t1 = document.createElement('div'); t1.style.cssText = 'font-weight:600;font-size:14px;'; t1.textContent = name;
+        var t2 = document.createElement('div'); t2.className = 'qf-ob-hint'; t2.style.marginTop = '2px';
+        t2.textContent = ids.join(' · ') + (loc ? ' · ' + loc : '');
+        item.appendChild(t1); item.appendChild(t2);
+        item.addEventListener('mouseenter', function () { item.style.background = 'rgba(0,0,0,0.05)'; });
+        item.addEventListener('mouseleave', function () { item.style.background = 'transparent'; });
+        item.addEventListener('click', function () {
+          closeMenu();
+          input.value = name;
+          try { onSelect(row); } catch (e) { /* non-fatal: prefill is best-effort */ void e; }
+        });
+        menu.appendChild(item);
+      });
+      menu.style.display = 'block';
+    }
+    function run() {
+      var term = input.value.trim();
+      if (term.length < 2) { closeMenu(); return; }
+      var seq = ++reqSeq;
+      showMsg('Searching…');
+      obCarrierLookup(term).then(function (rows) {
+        if (seq !== reqSeq) return;
+        renderResults(rows);
+      });
+    }
+    input.addEventListener('input', function () {
+      if (timer) clearTimeout(timer);
+      timer = setTimeout(run, 250);
+    });
+    input.addEventListener('keydown', function (e) { if (e.key === 'Escape') closeMenu(); });
+    document.addEventListener('click', function (e) { if (!wrap.contains(e.target)) closeMenu(); });
+    return wrap;
+  }
+
   function open(opts) {
     opts = opts || {};
     var onDone = typeof opts.onDone === 'function' ? opts.onDone : function () {};
@@ -517,6 +636,18 @@
         body.appendChild(el('div', 'qf-ob-group-label', 'Trust details — optional'));
         body.appendChild(el('p', 'qf-ob-hint', 'Shown on your customer-facing calculator so shippers know who they are quoting. Leave blank and we simply omit them.'));
 
+        // "Find your company" — autofill MC / DOT / public email from the FMCSA
+        // directory so a brand-new carrier doesn't hand-type them at first touch.
+        // References to the three inputs are captured below so a pick can fill them.
+        var mcInput, dotInput, emailInput;
+        body.appendChild(createObCarrierFinder(function (row) {
+          if (dotInput) { dotInput.value = row.usdot || ''; state.dotNumber = dotInput.value; }
+          if (mcInput) { mcInput.value = row.mcNumber ? obMcToBareDigits(row.mcNumber) : ''; state.mcNumber = mcInput.value; }
+          // publicContactEmail may be null (contactHidden / no FMCSA email) → leave blank.
+          if (emailInput && row.email) { emailInput.value = row.email; state.publicContactEmail = row.email; }
+          gateNext();
+        }));
+
         var trust = el('div', 'qf-ob-trust');
         var addTrustField = function (labelText, placeholder, key, extraCls) {
           var wrap = el('div', 'qf-ob-field' + (extraCls ? ' ' + extraCls : ''));
@@ -535,9 +666,9 @@
         };
         // MC + DOT sit side-by-side from 480px so neither is ever stranded
         // alone on a line; the email spans the full row beneath them.
-        addTrustField('MC number', 'e.g. MC-123456', 'mcNumber');
-        addTrustField('DOT number', 'e.g. 1234567', 'dotNumber');
-        addTrustField('Public contact email', 'quotes@yourcompany.com', 'publicContactEmail', 'qf-ob-trust-wide');
+        mcInput = addTrustField('MC number', 'e.g. MC-123456', 'mcNumber');
+        dotInput = addTrustField('DOT number', 'e.g. 1234567', 'dotNumber');
+        emailInput = addTrustField('Public contact email', 'quotes@yourcompany.com', 'publicContactEmail', 'qf-ob-trust-wide');
         body.appendChild(trust);
         // Live validity note. Held as a reference and toggled from gateNext()
         // rather than re-rendered, so typing never loses focus — and so a

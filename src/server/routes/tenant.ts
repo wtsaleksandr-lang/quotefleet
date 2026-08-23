@@ -77,6 +77,8 @@ import {
 import { leadUnsubscribeUrl } from '../../email/unsubscribe.js';
 import { makePreviewGrant, PREVIEW_GRANT_PARAM, PREVIEW_GRANT_TTL_MS } from '../access.js';
 import { syncTenantToMarketplace } from '../../marketplace/sync.js';
+import { carrierLookup } from '../directory/queries.js';
+import { publicAutocompleteLimiter } from '../rateLimits.js';
 import { DEFAULT_AI_SYSTEM_PROMPT, AUTO_FSC_DEFAULTS } from '../../calc/defaults.js';
 import {
   FREIGHT_VERTICALS,
@@ -1177,6 +1179,21 @@ export function registerTenantRoutes(app: Express) {
       contactPhone:
         b.contactPhone !== undefined ? (upd.contactPhone ?? null) : (req.tenant!.contactPhone ?? null),
     });
+  });
+
+  // ── carrier self-lookup ("Find your company" autofill) ─────────
+  // Authed convenience: a carrier searches OUR local FMCSA directory (by USDOT,
+  // MC #, or company name) and prefills their own company-detail inputs, instead
+  // of hand-typing. Behind the same auth as every /api/tenant/* route (kept off
+  // the public surface so rate-limit exposure stays low) + the shared public
+  // autocomplete limiter (keyed per IP). Returns the SLIM carrierLookup shape;
+  // contactHidden carriers null their phone/email inside the query.
+  app.get('/api/tenant/carrier-search', requireAuth, requireTenant, publicAutocompleteLimiter, async (req, res) => {
+    const q = typeof req.query.q === 'string' ? req.query.q : undefined;
+    const dot = typeof req.query.dot === 'string' ? req.query.dot : undefined;
+    const mc = typeof req.query.mc === 'string' ? req.query.mc : undefined;
+    const results = await carrierLookup({ q, dot, mc });
+    res.json({ results });
   });
 
   // ── callback inbox ─────────────────────────────────────────────

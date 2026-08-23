@@ -1448,3 +1448,112 @@ export async function carrierBySlug(slug: string): Promise<VisibleCarrier | null
     return null;
   }
 }
+
+// ─── Carrier self-service lookup ("Find your company" autofill) ─────────────
+//
+// Backs the authed setup convenience where a carrier finds THEIR OWN FMCSA
+// record (by USDOT, MC #, or company name) and prefills their calculator-widget
+// company details. Deliberately SLIM: only the handful of fields those inputs
+// need — no fleet/equipment/safety payload. Contact fields respect the carrier
+// opt-out (contactHidden ⇒ phone/email nulled) exactly like the public surfaces.
+
+/** Slim projection returned by carrierLookup — one row per matched carrier. */
+export interface CarrierLookupResult {
+  usdot: string;
+  mcNumber: string | null;
+  legalName: string;
+  dbaName: string | null;
+  phone: string | null;
+  email: string | null;
+  city: string | null;
+  state: string | null;
+  zip: string | null;
+}
+
+export interface CarrierLookupParams {
+  q?: unknown;
+  dot?: unknown;
+  mc?: unknown;
+}
+
+/** Max name-search rows returned to the typeahead. */
+export const CARRIER_LOOKUP_LIMIT = 8;
+
+/**
+ * Normalize a raw USDOT value to the stored form (digits only, leading zeros
+ * stripped — same normalization carrier_directory.usdot is ingested with). Null
+ * when there is no digit. Pure + total. Exported for unit tests.
+ */
+export function normalizeUsdotQuery(raw: unknown): string | null {
+  const digits = String(raw ?? '').replace(/\D/g, '').replace(/^0+/, '');
+  return digits.length ? digits : null;
+}
+
+/**
+ * Normalize a raw MC/docket value to bare digits with leading zeros stripped, so
+ * a user typing "12892", "MC12892", "MC-012892" or "012892" all reduce to the
+ * same key. The DB stores mc_number verbatim ("MC012892"), so the match strips
+ * MC's non-digits + leading zeros on the column side too (see carrierLookup).
+ * Null when there is no digit. Pure + total. Exported for unit tests.
+ */
+export function normalizeMcQuery(raw: unknown): string | null {
+  const digits = String(raw ?? '').replace(/\D/g, '').replace(/^0+/, '');
+  return digits.length ? digits : null;
+}
+
+/** Shape a VisibleCarrier into the slim lookup result, enforcing the contact
+ *  opt-out (contactHidden ⇒ phone + email nulled) so a hidden carrier's contact
+ *  never leaks through the prefill. */
+function toLookupResult(v: VisibleCarrier): CarrierLookupResult {
+  return {
+    usdot: v.usdot,
+    mcNumber: v.mcNumber,
+    legalName: v.legalName,
+    dbaName: v.dbaName,
+    phone: v.contactHidden ? null : v.phone,
+    email: v.contactHidden ? null : v.email,
+    city: v.city,
+    state: v.state,
+    zip: v.zip,
+  };
+}
+
+/**
+ * Look up carriers for the self-service prefill. Precedence: `dot` (exact,
+ * single row) → `mc` (normalized match) → `q` (free-text name ILIKE, capped at
+ * CARRIER_LOOKUP_LIMIT). Returns `[]` for an empty/too-short query and degrades
+ * to `[]` on any read failure — never throws, never 500s the endpoint.
+ */
+export async function carrierLookup(params: CarrierLookupParams): Promise<CarrierLookupResult[]> {
+  const dot = normalizeUsdotQuery(params.dot);
+  const mc = normalizeMcQuery(params.mc);
+  const nameTerm = normalizeNameQuery(params.q);
+
+  let where: SQL | null = null;
+  let limit = CARRIER_LOOKUP_LIMIT;
+  if (dot) {
+    where = eq(carrierDirectory.usdot, dot);
+    limit = 1;
+  } else if (mc) {
+    // Column side: strip mc_number's non-digits then leading zeros, compare to
+    // the equally-normalized user value. "MC012892" ⇒ "12892" = mc.
+    where = sql`ltrim(regexp_replace(coalesce(${carrierDirectory.mcNumber}, ''), '[^0-9]', '', 'g'), '0') = ${mc}`;
+    limit = CARRIER_LOOKUP_LIMIT;
+  } else if (nameTerm) {
+    where = nameSearchCondition(nameTerm);
+  }
+  if (!where) return [];
+
+  try {
+    const rows = await db()
+      .select()
+      .from(carrierDirectory)
+      .where(where)
+      .orderBy(...orderForSort('featured'))
+      .limit(limit);
+    return rows.map((r) => toLookupResult(visibleCarrier(r)));
+  } catch (err) {
+    console.warn('[directory] carrierLookup failed; serving no matches:', err);
+    return [];
+  }
+}
