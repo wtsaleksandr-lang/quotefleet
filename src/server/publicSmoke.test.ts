@@ -11,12 +11,12 @@ async function file(name: string) {
 describe('public static page smoke checks', () => {
   it('landing page has simple visual-first positioning and no placeholder links', async () => {
     const html = await file('landing.html');
-    expect(html).toContain('Quote every load. Fully your brand.');
+    expect(html).toContain('See your own freight quote calculator &mdash; in seconds.');
     expect(html).toContain('Stop losing loads to slow, manual quoting.');
     expect(html).toContain('For carriers, brokers');
     expect(html).toContain('acmetrucking.yourquote.net');
     expect(html).toContain('email signature');
-    expect(html).toContain('qualified leads hit your inbox');
+    expect(html).toContain('a live demo loads instantly');
     expect(html).toContain('Branded PDF quotes');
     expect(html).toContain('Automatic follow-ups');
     expect(html).toContain('24/7 AI service agent');
@@ -313,6 +313,27 @@ describe('"Find your company" carrier finder', () => {
     expect(js).toContain("p.get('phone')");
     // URL layer is applied LAST in readBrand, so it wins over localStorage/defaults.
     expect(js).toContain('Object.assign(fallback, stored, urlBrand())');
+  });
+
+  it('demo calculator patches the credential block (USDOT/MC/phone/address) and clears email', async () => {
+    const js = await file('public-calculator-conditional-options.js');
+    // Patches window.QF_WIDGET_CONFIG.contact in place from the URL identity so
+    // the credential block reads as the visitor, not the demo tenant.
+    expect(js).toContain('applyUrlCarrierCredentials');
+    expect(js).toContain('c.dotNumber = u.usdot');
+    expect(js).toContain('c.mcNumber = u.mc');
+    expect(js).toContain('c.phone = u.phone');
+    expect(js).toContain('c.address = u.address');
+    // Email is CLEARED (visitor's is unknown — never show the demo tenant's).
+    expect(js).toContain("c.email = ''");
+    // Re-renders the header from the patched config via the widget.js hook.
+    expect(js).toContain('window.QF_RERENDER_HEADER');
+  });
+
+  it('widget exposes the QF_RERENDER_HEADER hook that rebuilds the header from config', async () => {
+    const js = await file('widget.js');
+    expect(js).toContain('window.QF_RERENDER_HEADER');
+    expect(js).toContain('renderHeader(state.config)');
   });
 
   it('demo shell FORWARDS the carrier params onto the iframe (initial + theme toggle)', async () => {

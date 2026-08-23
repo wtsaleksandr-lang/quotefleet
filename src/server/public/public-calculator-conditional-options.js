@@ -123,9 +123,46 @@
     if (first) setTimeout(() => first.focus(), 40);
     postHeight();
   }
+  // When the demo is opened as THIS visitor's carrier (/w/demo?company=…&usdot=…
+  // &mc=…&city=…&state=…&phone=… from the landing "Find your company" hero), the
+  // visible header NAME is handled by applyDemoBrand below, but the credential
+  // block (address · USDOT · MC · phone · email) is rendered separately by
+  // widget.js renderCredMeta() straight from window.QF_WIDGET_CONFIG.contact —
+  // i.e. the demo-tenant (Harbor Link) values. Patch that config IN PLACE with
+  // the URL carrier identity, then re-render the header, so the credentials read
+  // as the visitor instead of Harbor Link. Idempotent + loop-safe (a signature
+  // guard skips the rebuild once the live config already carries it). With no
+  // carrier params we never touch the config → the default demo is unchanged.
+  function applyUrlCarrierCredentials() {
+    const u = urlBrand();
+    const personalizing = !!(u.name || u.usdot || u.mc || u.phone || u.address);
+    if (!personalizing) return;
+    const cfg = (typeof window !== 'undefined' && window.QF_WIDGET_CONFIG) || null;
+    if (!cfg) return;
+    const c = cfg.contact || (cfg.contact = {});
+    const sig = [u.usdot || '', u.mc || '', u.phone || '', u.address || ''].join('|');
+    // Already applied to the live config → nothing to rebuild (also breaks the
+    // render → MutationObserver → sync → render loop). Re-applies after a soft
+    // config refetch resets contact back to the Harbor Link default.
+    if (c.__qfCarrierSig === sig && c.email === '') return;
+    // Replace the demo-tenant identity wholesale so NO Harbor Link credential
+    // leaks under the visitor's name: each field from the URL (blank when the
+    // FMCSA record omits it), and CLEAR email (the visitor's is unknown).
+    c.dotNumber = u.usdot || '';
+    c.mcNumber = u.mc || '';
+    c.phone = u.phone || '';
+    c.address = u.address || '';
+    c.email = '';
+    c.__qfCarrierSig = sig;
+    if (typeof window.QF_RERENDER_HEADER === 'function') window.QF_RERENDER_HEADER();
+  }
   function applyDemoBrand() {
     if (!isDemoExperience()) return;
     document.body.classList.add('qf-demo-brand-preview');
+    // Patch the widget config's contact block from the URL carrier params BEFORE
+    // reading/setting the visible name, so a header re-render triggered here
+    // can't leave Harbor Link's name (the name set below re-asserts the visitor).
+    applyUrlCarrierCredentials();
     const data = readBrand();
     const header = $('qf-header');
     const name = header && header.querySelector('.brand-name');
