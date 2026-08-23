@@ -14,18 +14,26 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 const DAY = 24 * 60 * 60 * 1000;
 
 const h = vi.hoisted(() => {
-  const state = { leadRows: [] as Record<string, unknown>[] };
+  const state = {
+    leadRows: [] as Record<string, unknown>[],
+    activityRows: [] as Record<string, unknown>[],
+  };
   return { state };
 });
 
-// Mock the DB — the KPI handler does db().select({...}).from(leads).where(...).orderBy(...)
-// and awaits the result. The chain resolves the seeded lead rows.
+// Mock the DB — the KPI handler now issues TWO reads in a Promise.all:
+//   leads:    db().select({...}).from(leads).where(...).orderBy(...)  → leadRows
+//   activity: db().select({...}).from(auditLog).where(...)            → activityRows
+// The leads read ends in .orderBy() (resolves leadRows); the activity read ends
+// in .where(), so the chain itself is awaited — make it a thenable resolving to
+// the seeded activityRows.
 vi.mock('../../db/client.js', () => {
   function makeSelect() {
     const chain: Record<string, unknown> = {
       from() { return chain; },
       where() { return chain; },
       orderBy() { return Promise.resolve(h.state.leadRows); },
+      then(resolve: (v: unknown) => void) { resolve(h.state.activityRows); },
     };
     return chain;
   }
@@ -66,6 +74,7 @@ function req(query: Record<string, unknown> = {}): MockReq {
 
 beforeEach(() => {
   h.state.leadRows = [];
+  h.state.activityRows = [];
   process.env.SESSION_SECRET ||= 'test'.repeat(16);
   process.env.DATABASE_URL ||= 'postgresql://x';
   process.env.ANTHROPIC_API_KEY ||= 'sk-test';
@@ -86,6 +95,13 @@ describe('GET /api/tenant/overview/kpis', () => {
       // outside both windows
       { createdAt: ago(75), status: 'new', quotedTotal: 9999, equipment: 'Flatbed', pickupCity: 'X', deliveryCity: 'Y' },
     ];
+    // Engagement events — 2 in-window views + 1 pdf save, 1 stale (out of 30d).
+    h.state.activityRows = [
+      { createdAt: ago(2), detailsJson: { event: 'view' } },
+      { createdAt: ago(3), detailsJson: { event: 'view' } },
+      { createdAt: ago(5), detailsJson: { event: 'save_pdf' } },
+      { createdAt: ago(45), detailsJson: { event: 'view' } },
+    ];
     const res = new MockRes();
     await getHandler().then((fn) => fn(req(), res));
 
@@ -102,8 +118,11 @@ describe('GET /api/tenant/overview/kpis', () => {
       series: unknown[];
       topLanes: Array<{ lane: string; count: number }>;
       equipmentMix: Array<{ equipment: string; count: number }>;
+      engagement: { views: number; pdfSaves: number };
     };
 
+    expect(body.engagement.views).toBe(2);
+    expect(body.engagement.pdfSaves).toBe(1);
     expect(body.period).toBe('30d'); // default
     expect(body.tiles.quotes.current).toBe(3);
     expect(body.tiles.quotes.previous).toBe(1);

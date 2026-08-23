@@ -7,7 +7,12 @@
  * mirrors the weeklyDigest pure-summarizer test pattern.
  */
 import { describe, it, expect } from 'vitest';
-import { summarizeKpis, CONVERTED_STATUSES, type KpiLeadRow } from './overviewStats.js';
+import {
+  summarizeKpis,
+  summarizeEngagement,
+  CONVERTED_STATUSES,
+  type KpiLeadRow,
+} from './overviewStats.js';
 
 const DAY = 24 * 60 * 60 * 1000;
 const now = new Date('2026-07-15T12:00:00.000Z');
@@ -159,5 +164,61 @@ describe('CONVERTED_STATUSES', () => {
     expect(CONVERTED_STATUSES.has('won')).toBe(true);
     expect(CONVERTED_STATUSES.has('booking_requested')).toBe(true);
     expect(CONVERTED_STATUSES.has('new')).toBe(false);
+  });
+});
+
+describe('summarizeEngagement — shared quote.activity rollup', () => {
+  it('counts each interaction type within the window only', () => {
+    const windowStart = daysAgo(30);
+    const e = summarizeEngagement(
+      [
+        { createdAt: daysAgo(1), detailsJson: { event: 'view' } },
+        { createdAt: daysAgo(2), detailsJson: { event: 'view' } },
+        { createdAt: daysAgo(3), detailsJson: { event: 'save_pdf' } },
+        { createdAt: daysAgo(4), detailsJson: { event: 'chat_open' } },
+        { createdAt: daysAgo(5), detailsJson: { event: 'copy_link' } },
+        { createdAt: daysAgo(6), detailsJson: { event: 'print' } },
+        { createdAt: daysAgo(7), detailsJson: { event: 'callback_open' } },
+        { createdAt: daysAgo(40), detailsJson: { event: 'view' } }, // before window
+        { createdAt: daysAgo(1), detailsJson: { event: 'unknown_event' } }, // ignored
+        { createdAt: daysAgo(1), detailsJson: null }, // ignored
+      ],
+      windowStart,
+      now,
+    );
+    expect(e).toEqual({ views: 2, pdfSaves: 1, chatOpens: 1, copyLinks: 1, prints: 1, callbackOpens: 1 });
+  });
+
+  it('is all-zero for no rows', () => {
+    expect(summarizeEngagement([], daysAgo(7), now)).toEqual({
+      views: 0, pdfSaves: 0, chatOpens: 0, copyLinks: 0, prints: 0, callbackOpens: 0,
+    });
+  });
+});
+
+describe('summarizeKpis — engagement wired from activityRows', () => {
+  it('includes engagement rolled up over the current window', () => {
+    const result = summarizeKpis({
+      now,
+      period: '30d',
+      leadRows: [],
+      activityRows: [
+        { createdAt: daysAgo(1), detailsJson: { event: 'view' } },
+        { createdAt: daysAgo(2), detailsJson: { event: 'view' } },
+        { createdAt: daysAgo(3), detailsJson: { event: 'save_pdf' } },
+        { createdAt: daysAgo(4), detailsJson: { event: 'callback_open' } },
+        { createdAt: daysAgo(45), detailsJson: { event: 'view' } }, // outside current window
+      ],
+    });
+    expect(result.engagement.views).toBe(2);
+    expect(result.engagement.pdfSaves).toBe(1);
+    expect(result.engagement.callbackOpens).toBe(1);
+  });
+
+  it('defaults engagement to all-zero when activityRows is omitted', () => {
+    const result = summarizeKpis({ now, period: '7d', leadRows: [] });
+    expect(result.engagement).toEqual({
+      views: 0, pdfSaves: 0, chatOpens: 0, copyLinks: 0, prints: 0, callbackOpens: 0,
+    });
   });
 });

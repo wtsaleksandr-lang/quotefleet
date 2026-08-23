@@ -231,19 +231,35 @@ export function registerTenantRoutes(app: Express) {
     const period: KpiPeriod = isKpiPeriod(req.query.period) ? req.query.period : '30d';
     const now = new Date();
     const since = new Date(now.getTime() - 2 * PERIOD_DAYS[period] * DAY_MS);
-    const rows = await db()
-      .select({
-        createdAt: leads.createdAt,
-        status: leads.status,
-        quotedTotal: leads.quotedTotal,
-        equipment: leads.equipment,
-        pickupCity: leads.pickupCity,
-        deliveryCity: leads.deliveryCity,
-      })
-      .from(leads)
-      .where(and(eq(leads.tenantId, tid), gte(leads.createdAt, since)))
-      .orderBy(desc(leads.createdAt));
-    return res.json(summarizeKpis({ now, period, leadRows: rows }));
+    // Engagement is only rolled up over the CURRENT window, so the audit read
+    // only needs events since the current window start (indexed by tenant_id +
+    // created_at, filtered to the quote.activity action).
+    const windowStart = new Date(now.getTime() - PERIOD_DAYS[period] * DAY_MS);
+    const [rows, activityRows] = await Promise.all([
+      db()
+        .select({
+          createdAt: leads.createdAt,
+          status: leads.status,
+          quotedTotal: leads.quotedTotal,
+          equipment: leads.equipment,
+          pickupCity: leads.pickupCity,
+          deliveryCity: leads.deliveryCity,
+        })
+        .from(leads)
+        .where(and(eq(leads.tenantId, tid), gte(leads.createdAt, since)))
+        .orderBy(desc(leads.createdAt)),
+      db()
+        .select({ createdAt: auditLog.createdAt, detailsJson: auditLog.detailsJson })
+        .from(auditLog)
+        .where(
+          and(
+            eq(auditLog.tenantId, tid),
+            eq(auditLog.action, 'quote.activity'),
+            gte(auditLog.createdAt, windowStart),
+          ),
+        ),
+    ]);
+    return res.json(summarizeKpis({ now, period, leadRows: rows, activityRows }));
   });
 
   // ── guided-setup status ───────────────────────────────────────

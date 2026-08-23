@@ -147,4 +147,68 @@ describe('weekly digest cron audience + compliance', () => {
     await runWeeklyDigestOnce('test', NOW);
     expect(sendMock).not.toHaveBeenCalled();
   });
+
+  // ── Trial cadence — second (Thursday) slot + shorter 3-day cooldown ───────
+  // Active-trial tenants get a second recap on Thursday and a 3-day cooldown;
+  // live-paid tenants keep the Monday-only weekly. `isTrialing` reads the real
+  // clock, so trialEndsAt is set relative to Date.now().
+  const NOW_THU = new Date('2026-07-16T14:00:00.000Z'); // a Thursday 14:00 UTC
+  const activeTrialEnds = () => new Date(Date.now() + 10 * 864e5);
+
+  it('Thursday slot: sends to an active-trial tenant WITH activity, and stamps lastWeeklyDigestAt', async () => {
+    rowsRef.current = [tenant({ id: 20, plan: 'free', trialEndsAt: activeTrialEnds() })];
+    const { runWeeklyDigestOnce } = await import('./weeklyDigestCron.js');
+    await runWeeklyDigestOnce('test', NOW_THU);
+    expect(sendMock).toHaveBeenCalledTimes(1);
+    expect(updateMock).toHaveBeenCalledTimes(1);
+  });
+
+  it('Thursday slot: skips a live-paid (non-trial) tenant — they keep the Monday weekly', async () => {
+    rowsRef.current = [tenant({ id: 21, plan: 'pro', trialEndsAt: null })];
+    const { runWeeklyDigestOnce } = await import('./weeklyDigestCron.js');
+    await runWeeklyDigestOnce('test', NOW_THU);
+    expect(sendMock).not.toHaveBeenCalled();
+  });
+
+  it('Thursday slot: still skips an EMPTY active-trial tenant (never a "0 quotes" recap)', async () => {
+    rowsRef.current = [tenant({ id: 22, plan: 'free', trialEndsAt: activeTrialEnds() })];
+    statsMock.mockResolvedValue(
+      nonEmptyStats({ quotesThisWeek: 0, conversions: 0, callbacks: 0, chatConversations: 0, autoRepliesSent: 0, isEmpty: true })
+    );
+    const { runWeeklyDigestOnce } = await import('./weeklyDigestCron.js');
+    await runWeeklyDigestOnce('test', NOW_THU);
+    expect(sendMock).not.toHaveBeenCalled();
+  });
+
+  it('trial cooldown is shorter (3d): a trial tenant sent 3 days ago fires again in the second slot', async () => {
+    rowsRef.current = [
+      tenant({ id: 23, plan: 'free', trialEndsAt: activeTrialEnds(), lastWeeklyDigestAt: new Date(NOW_THU.getTime() - 3 * 864e5) }),
+    ];
+    const { runWeeklyDigestOnce } = await import('./weeklyDigestCron.js');
+    await runWeeklyDigestOnce('test', NOW_THU);
+    expect(sendMock).toHaveBeenCalledTimes(1);
+  });
+
+  it('trial cooldown still guards double-sends: a trial tenant sent 2 days ago is skipped', async () => {
+    rowsRef.current = [
+      tenant({ id: 24, plan: 'free', trialEndsAt: activeTrialEnds(), lastWeeklyDigestAt: new Date(NOW_THU.getTime() - 2 * 864e5) }),
+    ];
+    const { runWeeklyDigestOnce } = await import('./weeklyDigestCron.js');
+    await runWeeklyDigestOnce('test', NOW_THU);
+    expect(sendMock).not.toHaveBeenCalled();
+  });
+
+  it('WEEKLY_DIGEST_TRIAL_EXTRA=0 disables the Thursday slot (trial tenant skipped)', async () => {
+    const prev = process.env.WEEKLY_DIGEST_TRIAL_EXTRA;
+    process.env.WEEKLY_DIGEST_TRIAL_EXTRA = '0';
+    try {
+      rowsRef.current = [tenant({ id: 25, plan: 'free', trialEndsAt: activeTrialEnds() })];
+      const { runWeeklyDigestOnce } = await import('./weeklyDigestCron.js');
+      await runWeeklyDigestOnce('test', NOW_THU);
+      expect(sendMock).not.toHaveBeenCalled();
+    } finally {
+      if (prev === undefined) delete process.env.WEEKLY_DIGEST_TRIAL_EXTRA;
+      else process.env.WEEKLY_DIGEST_TRIAL_EXTRA = prev;
+    }
+  });
 });
