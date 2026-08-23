@@ -367,6 +367,10 @@
   loadStylesheet('/maersk-radius-system.css');
   loadStylesheet('/quotefleet-color-system.css');
   loadStylesheet('/public-calculator-no-gradients.css');
+  // Premium glass material — MUST load AFTER no-gradients.css (the final token
+  // layer) so its frosted popover/chrome/modal/map backgrounds out-cascade the
+  // solid --w-* surfaces no-gradients paints. See widget-glass.css.
+  loadStylesheet('/widget-glass.css');
   simplifyHeader();
   document.addEventListener('change', (event) => {
     if (event.target && ['qf-equipment', 'qf-hazmat'].includes(event.target.id)) sync();
