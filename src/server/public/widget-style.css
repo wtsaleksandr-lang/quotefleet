@@ -644,3 +644,13 @@ body[data-qf-cta-hover="ring"] .qf-cta:not(.qf-secondary):hover { background: va
   body[data-qf-cta-hover="scale"] .qf-cta:not(.qf-secondary):hover,
   body[data-qf-cta-hover="sink"] .qf-cta:not(.qf-secondary):hover { transform: none; }
 }
+/* Inline base-map instant-feedback parity (see widget.js apply()): the inline base
+   <img> now receives the same transient CSS transform as the enlarged modal image
+   on a wheel notch, so it must scale from its centre (a wheel zoom) and ride its own
+   compositor layer for a jank-free snap — mirroring .qf-map-modal-img. Scoped to
+   base mode so the route inline image (which sets transform:none) is untouched. The
+   .qf-map-base canvas already clips overflow and the box keeps a fixed 640/360
+   aspect, so the transient scale never spills the card nor shifts its height. No
+   CSS transition is used (matching the modal's instant snap), so a
+   prefers-reduced-motion viewer gets an immediate, non-animated update for free. */
+.qf-map-card.qf-map-base .qf-map-img { transform-origin: center center; will-change: transform; }
