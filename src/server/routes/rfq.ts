@@ -105,6 +105,13 @@ export interface RfqGateResult {
   accountKey?: string;
   /** Billing period (`YYYY-MM` UTC) for the increment. */
   period?: string;
+  /** Signed-in shipper's stored email — prefills the form's contact email so the
+   *  highest-intent step doesn't ask for identity the account already knows.
+   *  Absent when anonymous (needsAccount). */
+  email?: string | null;
+  /** Signed-in shipper's stored display name (usually null — shippers sign up
+   *  with email only), prefilled when the account carries one. */
+  name?: string | null;
 }
 
 /** A gate: given the request + how many carriers it would fan out to, decide. */
@@ -142,11 +149,13 @@ export function defaultRfqGate(usage: RfqUsageStore = dbRfqUsageStore): RfqGate 
         allowance,
         accountKey,
         period,
+        email: id.email,
+        name: id.name ?? null,
         needsUpgrade: !isPro,
         reason: isPro ? 'monthly_quota' : 'monthly_allowance',
       };
     }
-    return { ok: true, cap, used, allowance, accountKey, period };
+    return { ok: true, cap, used, allowance, accountKey, period, email: id.email, name: id.name ?? null };
   };
 }
 
@@ -257,6 +266,12 @@ export function registerRfqRoutes(app: Express, deps: RfqRouteDeps = {}) {
     allowance: g.allowance,
   });
 
+  /** Signed-in shipper identity for form prefill (undefined when anonymous). The
+   *  gate resolves the account, so we source prefill from the SAME decision that
+   *  meters the send — the metered identity and the prefilled contact stay one. */
+  const identityView = (g: RfqGateResult) =>
+    g.email ? { email: g.email, name: g.name ?? null } : undefined;
+
   // ── GET the form ─────────────────────────────────────────────────────────
   app.get('/directory/rfq', async (req: Request, res: Response, next) => {
     try {
@@ -278,6 +293,7 @@ export function registerRfqRoutes(app: Express, deps: RfqRouteDeps = {}) {
           dots: dots.length ? dots.join(',') : undefined,
           filterQuery: filterQuery || undefined,
           gate: gateView(g),
+          identity: identityView(g),
         }),
       );
     } catch (err) {
@@ -330,6 +346,7 @@ export function registerRfqRoutes(app: Express, deps: RfqRouteDeps = {}) {
               dots: dots.length ? dots.join(',') : undefined,
               filterQuery: filterQuery || undefined,
               prefill,
+              identity: identityView(g),
               error: msg,
             }),
           );
@@ -348,6 +365,7 @@ export function registerRfqRoutes(app: Express, deps: RfqRouteDeps = {}) {
               filterQuery: filterQuery || undefined,
               prefill,
               gate: gateView(g),
+              identity: identityView(g),
             }),
           );
         }

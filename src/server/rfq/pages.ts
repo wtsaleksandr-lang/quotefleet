@@ -133,6 +133,13 @@ export interface RfqFormOpts {
   filterQuery?: string;
   /** Prefill from a bounced-back POST (validation error). */
   prefill?: Record<string, string>;
+  /** Signed-in shipper identity — prefills the "Your contact" fields so the
+   *  highest-intent step doesn't re-ask what the account already knows. Email is
+   *  always present when signed in; name only when the account carries one.
+   *  Company/phone aren't stored, so they stay empty-but-editable. A bounced-back
+   *  POST value (in `prefill`) always wins over the identity default. Absent →
+   *  anonymous (no prefill). */
+  identity?: { email: string | null; name: string | null };
   /** Field-level or top-level error message. */
   error?: string;
   /** Entitlement/quota gate state — renders a sign-in / upgrade banner and
@@ -173,6 +180,18 @@ function field(opts: {
 
 export function renderRfqForm(opts: RfqFormOpts): string {
   const p = opts.prefill ?? {};
+  const ident = opts.identity;
+  const signedIn = !!(ident && ident.email);
+  // Contact-field values: a bounced-back POST value (in `prefill`) wins over the
+  // signed-in identity default; identity fills the field on the first GET. Only
+  // email + name are known from the account — company/phone have no source.
+  const vName = p.shipper_name ?? ident?.name ?? '';
+  const vCompany = p.shipper_company ?? '';
+  const vEmail = p.shipper_email ?? ident?.email ?? '';
+  const vPhone = p.shipper_phone ?? '';
+  const contactHelp = signedIn
+    ? `Sending as <strong>${esc(ident!.email!)}</strong> — from your account. Edit any field below before sending.`
+    : `So carriers know who's requesting and where to send their quote.`;
   const n = opts.recipientCount;
   const capNotice = opts.capped
     ? ` Your selection matched <strong>${esc(String(opts.totalMatched))}</strong> carriers; this request goes to the first <strong>${esc(
@@ -241,12 +260,12 @@ export function renderRfqForm(opts: RfqFormOpts): string {
       </div>
       <div class="rfq-card">
         <div class="rfq-section-title">Your contact</div>
-        <p class="rfq-help" style="margin:-4px 0 12px;">So carriers know who's requesting and where to send their quote.</p>
+        <p class="rfq-help" style="margin:-4px 0 12px;">${contactHelp}</p>
         <div class="rfq-grid">
-          ${field({ name: 'shipper_name', label: 'Your name', required: true, value: p.shipper_name })}
-          ${field({ name: 'shipper_company', label: 'Company', value: p.shipper_company })}
-          ${field({ name: 'shipper_email', label: 'Email', type: 'email', required: true, value: p.shipper_email, help: 'We send your responses link here.' })}
-          ${field({ name: 'shipper_phone', label: 'Phone', type: 'tel', value: p.shipper_phone })}
+          ${field({ name: 'shipper_name', label: 'Your name', required: true, value: vName })}
+          ${field({ name: 'shipper_company', label: 'Company', value: vCompany })}
+          ${field({ name: 'shipper_email', label: 'Email', type: 'email', required: true, value: vEmail, help: 'We send your responses link here.' })}
+          ${field({ name: 'shipper_phone', label: 'Phone', type: 'tel', value: vPhone })}
         </div>
       </div>
       <div class="rfq-actions">

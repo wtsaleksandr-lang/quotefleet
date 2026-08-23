@@ -30,6 +30,12 @@ export interface DirectoryIdentity {
   userId: number | null;
   /** The logged-in user's email, or null when there is no valid session. */
   email: string | null;
+  /** The logged-in user's display name, or null when unknown / no session.
+   *  Directory shippers sign up with email only, so this is usually null; a
+   *  pre-existing account (e.g. a carrier owner who added Directory Pro) may
+   *  carry one. Consumers prefill it when present. Optional so older callers
+   *  that build a bare identity literal keep type-checking. */
+  name?: string | null;
   /** True only when a live Directory Pro subscription entitles this user. */
   isPro: boolean;
   /** Raw subscription status ('active' | 'trialing' | 'past_due' | 'inactive'),
@@ -42,6 +48,7 @@ export interface DirectoryIdentity {
 const ANONYMOUS: Readonly<DirectoryIdentity> = Object.freeze({
   userId: null,
   email: null,
+  name: null,
   isPro: false,
   status: null,
   currentPeriodEnd: null,
@@ -70,12 +77,13 @@ async function computeIdentity(req: Request): Promise<DirectoryIdentity> {
         .limit(1)
     )[0];
     if (!sub) {
-      return { userId: ctx.user.id, email: ctx.user.email, isPro: false, status: null, currentPeriodEnd: null };
+      return { userId: ctx.user.id, email: ctx.user.email, name: ctx.user.name ?? null, isPro: false, status: null, currentPeriodEnd: null };
     }
     const currentPeriodEnd = sub.currentPeriodEnd ?? null;
     return {
       userId: ctx.user.id,
       email: ctx.user.email,
+      name: ctx.user.name ?? null,
       isPro: isLive(sub.status, currentPeriodEnd),
       status: sub.status,
       currentPeriodEnd,
