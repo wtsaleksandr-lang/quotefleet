@@ -326,6 +326,37 @@ export const magicLinks = pgTable(
 );
 
 // ────────────────────────────────────────────────────────────────────
+// PASSWORD RESET TOKENS — single-use, short-lived "forgot password" links.
+//
+// Created on POST /api/auth/password/forgot (only when the email maps to a
+// real user — the endpoint's HTTP response is identical either way, so it never
+// leaks whether an account exists), consumed on POST /api/auth/password/reset
+// (validates + sets the new password + revokes every session).
+//
+// SECURITY: unlike magic_links (which store the raw token), we store ONLY the
+// SHA-256 hash of the token — the raw token lives solely in the emailed link,
+// so a leak of this table cannot be replayed to reset anyone's password. The
+// primary key IS the hash, so a lookup is a hash-then-point-read. `usedAt`
+// makes a token single-use; `expiresAt` bounds its lifetime (~45 min).
+// ────────────────────────────────────────────────────────────────────
+export const passwordResetTokens = pgTable(
+  'password_reset_tokens',
+  {
+    /** SHA-256 hex of the random token. The raw token is never stored. */
+    tokenHash: text('token_hash').primaryKey(),
+    userId: integer('user_id')
+      .notNull()
+      .references(() => users.id, { onDelete: 'cascade' }),
+    expiresAt: timestamp('expires_at', { mode: 'date' }).notNull(),
+    usedAt: timestamp('used_at', { mode: 'date' }),
+    createdAt: timestamp('created_at', { mode: 'date' }).notNull().defaultNow(),
+  },
+  (t) => [index('password_reset_tokens_user_idx').on(t.userId)]
+);
+
+export type PasswordResetToken = typeof passwordResetTokens.$inferSelect;
+
+// ────────────────────────────────────────────────────────────────────
 // ACCESS LINKS — per-customer invite links for a PRIVATE calculator.
 //
 // When a tenant sets `tenants.access_mode = 'private'`, the calculator

@@ -335,6 +335,57 @@ export function magicLinkEmail(opts: {
   };
 }
 
+/** Password-reset link email — both HTML and plain-text variants. Sent by
+ *  POST /api/auth/password/forgot when the address maps to a real account. The
+ *  link carries a single-use, short-lived token; the copy states the expiry and
+ *  reassures a recipient who didn't request it (no action = nothing happens). */
+export function passwordResetEmail(opts: {
+  link: string;
+  email: string;
+  ttlMinutes?: number;
+}): { subject: string; text: string; html: string } {
+  const ttl = opts.ttlMinutes ?? 45;
+  const subject = 'Reset your QuoteFleet password';
+  const text =
+    `Hi,\n\n` +
+    `We received a request to reset the password for your QuoteFleet account ` +
+    `(${opts.email}). Click the link below to choose a new password. ` +
+    `It expires in ${ttl} minutes and can be used only once:\n\n` +
+    `${opts.link}\n\n` +
+    `If you didn't request this, you can safely ignore this email — your ` +
+    `password won't change until you open the link and set a new one.\n\n` +
+    `— QuoteFleet (a product of MR Holdings & Trade LLC)\n` +
+    `https://quotefleet.net`;
+
+  const inner =
+    eyebrow('Password reset') +
+    heading('Choose a new password') +
+    paragraph(
+      `We received a request to reset the password for ` +
+        `<strong style="color:${BRAND.ink};">${escape(opts.email)}</strong>. ` +
+        `This link is valid for <strong>${ttl} minutes</strong> and can only be used once.`,
+    ) +
+    ctaButton('Reset my password', opts.link) +
+    `<p style="margin:0 0 8px 0;font-size:12px;color:${BRAND.muted};">Or copy this URL into your browser:</p>` +
+    `<p style="margin:0;font-family:'JetBrains Mono','SF Mono',Menlo,Consolas,monospace;font-size:12px;line-height:1.55;color:${BRAND.inkSoft};word-break:break-all;background:${BRAND.bg};border:1px solid ${BRAND.border};border-radius:6px;padding:10px 12px;">${escape(opts.link)}</p>`;
+
+  const footerNote = `
+    <strong style="color:${BRAND.inkSoft};">Didn't request this?</strong>
+    You can ignore this email — your password stays the same until you open the
+    link and set a new one. We will never ask for your password by email.
+  `;
+
+  return {
+    subject,
+    text,
+    html: shell({
+      preheader: `Reset your QuoteFleet password — link expires in ${ttl} minutes`,
+      inner,
+      footerNote,
+    }),
+  };
+}
+
 /* ──────────────────────────────────────────────────────────────────────
  * Shared content building blocks — used by every transactional template
  * below so they stay brand-consistent (blue accent, same spacing scale,

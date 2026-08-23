@@ -6,8 +6,9 @@
  *   GET  /api/auth/me        — current user / tenant
  */
 import type { Express, Request, Response } from 'express';
-import { and, eq, ne } from 'drizzle-orm';
+import { and, eq, ne, isNull } from 'drizzle-orm';
 import { nanoid } from 'nanoid';
+import { createHash } from 'node:crypto';
 import { z } from 'zod';
 import { db } from '../../db/client.js';
 import {
@@ -15,9 +16,10 @@ import {
   users,
   sessions,
   magicLinks,
+  passwordResetTokens,
 } from '../../db/schema.js';
 import { sendEmail } from '../../email/send.js';
-import { magicLinkEmail } from '../../email/templates.js';
+import { magicLinkEmail, passwordResetEmail } from '../../email/templates.js';
 import { hashPassword, verifyPassword } from '../../auth/password.js';
 import {
   RESERVED_SLUGS,
@@ -34,7 +36,13 @@ import {
 import { loadEnv, defaultHostDomain } from '../../config.js';
 import { DEFAULT_QUOTE_DISCLAIMER } from '../quoteDisclaimer.js';
 import { getTrialState, type TrialState } from '../trialGating.js';
-import { magicLinkLimiter, signupLimiter, loginLimiter } from '../rateLimits.js';
+import {
+  magicLinkLimiter,
+  signupLimiter,
+  loginLimiter,
+  passwordResetRequestLimiter,
+  passwordResetVerifyLimiter,
+} from '../rateLimits.js';
 import { parsePaidPlan } from '../plans.js';
 import { linkReferralOnSignup } from '../affiliate/attribution.js';
 import { REFEREE_TRIAL_DAYS } from '../affiliate/programs.js';
@@ -95,6 +103,19 @@ const MagicLinkSendSchema = z.object({
  *  short enough that a leaked link is mostly stale by the time anyone
  *  notices. */
 const MAGIC_LINK_TTL_MS = 15 * 60 * 1000;
+
+/** Password-reset links live for 45 minutes — long enough to find the email and
+ *  switch to a laptop, short enough that a leaked link is mostly stale. */
+const PASSWORD_RESET_TTL_MS = 45 * 60 * 1000;
+
+/** Hash a raw reset token for storage/lookup. We persist ONLY this SHA-256 hash
+ *  (never the raw token), so a dump of password_reset_tokens can't be replayed.
+ *  SHA-256 is correct here (not bcrypt): the token is high-entropy random
+ *  (48-char nanoid ~285 bits), so it isn't brute-forceable and doesn't need a
+ *  slow KDF — and the lookup must be a fast, deterministic point-read by PK. */
+function hashResetToken(raw: string): string {
+  return createHash('sha256').update(raw).digest('hex');
+}
 
 const LoginSchema = z.object({
   email: z.string().email(),
@@ -378,6 +399,128 @@ export function registerAuthRoutes(app: Express) {
     const dest = isSafeRelativeRedirect(row.redirectTo) ? row.redirectTo! : '/app';
     return res.redirect(dest);
   });
+
+  // ── Forgot password: request a reset link ───────────────────────
+  // Always returns the SAME 200 body regardless of whether the email maps to a
+  // real account (or is even well-formed) — no probe can enumerate accounts.
+  // Closes the "magic-link login but can't set a password" dead-end: a user who
+  // forgot their password gets an emailed link to set a NEW one without knowing
+  // the old one. Rate-limited per-email (anti-bomb).
+  const ForgotPasswordSchema = z.object({ email: z.string().email() });
+  app.post(
+    '/api/auth/password/forgot',
+    passwordResetRequestLimiter,
+    async (req: Request, res: Response) => {
+      // One identical response for every outcome (bad input / unknown email /
+      // sent). Never reveals whether an account exists.
+      const genericOk = () =>
+        res.json({
+          ok: true,
+          message: "If that email has an account, we've sent a reset link.",
+        });
+      const parse = ForgotPasswordSchema.safeParse(req.body);
+      if (!parse.success) return genericOk();
+      const email = parse.data.email.trim().toLowerCase();
+      const u = (await db().select().from(users).where(eq(users.email, email)).limit(1))[0];
+      if (!u) return genericOk();
+
+      // Neutralise any still-valid earlier reset tokens for this user, so only
+      // the newest emailed link works (a previously-leaked link is burned on
+      // re-request).
+      await db()
+        .update(passwordResetTokens)
+        .set({ usedAt: new Date() })
+        .where(and(eq(passwordResetTokens.userId, u.id), isNull(passwordResetTokens.usedAt)));
+
+      const rawToken = nanoid(48);
+      const tokenHash = hashResetToken(rawToken);
+      const expiresAt = new Date(Date.now() + PASSWORD_RESET_TTL_MS);
+      await db().insert(passwordResetTokens).values({ tokenHash, userId: u.id, expiresAt });
+
+      const env = loadEnv();
+      const base = env.PUBLIC_BASE_URL.replace(/\/$/, '');
+      // Raw token in the link ONLY — it is never stored or logged.
+      const link = `${base}/reset-password?token=${rawToken}`;
+      const ttlMinutes = Math.round(PASSWORD_RESET_TTL_MS / 60000);
+      const tpl = passwordResetEmail({ link, email, ttlMinutes });
+      try {
+        const result = await sendEmail({
+          to: email,
+          subject: tpl.subject,
+          text: tpl.text,
+          html: tpl.html,
+        });
+        if (result.logged) {
+          // Dev fallback (no provider) — the link was NOT delivered. Log the
+          // recipient (never the token) so an operator notices a dead provider.
+          console.warn(
+            `[password-reset] delivered to STDOUT only — no email provider configured. ` +
+              `Set RESEND_API_KEY (preferred) or SMTP_HOST/USER/PASS in env to actually send. ` +
+              `Recipient: ${email}`,
+          );
+        } else if (!result.ok) {
+          console.error(
+            `[email] password-reset send FAILED for user: ${result.error ?? 'unknown error'}`,
+          );
+        }
+      } catch (err) {
+        console.warn('[password-reset] send failed:', err);
+      }
+      return genericOk();
+    },
+  );
+
+  // ── Forgot password: set a new password with a reset token ──────
+  // Validates the token (exists, unused, unexpired), sets the new password with
+  // the SAME hashing + strength rules as signup/change-password, burns the
+  // token, and revokes EVERY session for the user (a reset is the moment to sign
+  // out any stale/attacker device). The user then signs in fresh with the new
+  // password. Rate-limited per-IP.
+  const ResetPasswordSchema = z.object({
+    token: z.string().min(1),
+    // Same strength rule as SignupSchema.password / PasswordSchema.next.
+    password: z.string().min(10).max(200),
+  });
+  app.post(
+    '/api/auth/password/reset',
+    passwordResetVerifyLimiter,
+    async (req: Request, res: Response) => {
+      const parse = ResetPasswordSchema.safeParse(req.body);
+      if (!parse.success) {
+        return res.status(400).json({ error: 'New password must be at least 10 characters.' });
+      }
+      const tokenHash = hashResetToken(parse.data.token);
+      const row = (
+        await db()
+          .select()
+          .from(passwordResetTokens)
+          .where(eq(passwordResetTokens.tokenHash, tokenHash))
+          .limit(1)
+      )[0];
+      // One message for every bad-token case (missing / used / expired) — no
+      // signal about which. The token is random, so this leaks nothing about
+      // accounts.
+      const invalid = () =>
+        res
+          .status(400)
+          .json({ error: 'This reset link is invalid or has expired. Request a new one.' });
+      if (!row) return invalid();
+      if (row.usedAt) return invalid();
+      if (row.expiresAt < new Date()) return invalid();
+
+      const newHash = await hashPassword(parse.data.password);
+      await db().update(users).set({ passwordHash: newHash }).where(eq(users.id, row.userId));
+      // Single-use: burn the token so the same link can't reset again.
+      await db()
+        .update(passwordResetTokens)
+        .set({ usedAt: new Date() })
+        .where(eq(passwordResetTokens.tokenHash, tokenHash));
+      // Revoke every session for this user (all devices) — the reset invalidates
+      // any prior session, incl. one an attacker may hold.
+      await db().delete(sessions).where(eq(sessions.userId, row.userId));
+      return res.json({ ok: true });
+    },
+  );
 
   app.post('/api/auth/logout', async (req: Request, res: Response) => {
     const token = req.cookies[SESSION_COOKIE_NAME];
