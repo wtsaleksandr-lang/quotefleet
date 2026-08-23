@@ -110,3 +110,28 @@ describe('renderDirectoryLanding — post-checkout confirmation banner', () => {
     expect(html).not.toContain("You're on Directory Pro");
   });
 });
+
+describe('renderDirectoryLanding — shipper discoverability (H1)', () => {
+  const html = renderDirectoryLanding(summary);
+  it('renders the shipper value-prop (one rate request to many carriers)', () => {
+    expect(html).toContain('Get freight rates from many carriers');
+    expect(html).toContain('class="aud-card"');
+    // Directory Pro feature summary is present on the landing.
+    expect(html).toContain('carriers at once');
+  });
+  it('exposes an RFQ / get-quotes entry point + a Directory Pro CTA', () => {
+    expect(html).toContain('Get freight quotes');
+    expect(html).toContain('href="/directory?sort=featured"');
+    expect(html).toContain('href="/directory/join"');
+    expect(html).toContain('Directory Pro — $19/mo');
+  });
+  it('carries a "For shippers" nav link reaching /directory/join', () => {
+    expect(html).toContain('href="/directory/join">For shippers');
+  });
+  it('coexists with the carrier "Claim your listing — free" path', () => {
+    // Both audiences framed; the carrier claim path is not buried.
+    expect(html).toContain('For carriers');
+    expect(html).toContain('Claim your listing');
+    expect(html).toContain('href="/signup"');
+  });
+});
