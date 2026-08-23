@@ -873,7 +873,15 @@ const DIRECTORY_CSS = `
      The "Save" affordance on cards + profile, its popover, and the saved-lists
      page rows. Theme-aware, tokens only. */
   .cp-headactions { display: flex; flex-direction: column; align-items: flex-end; gap: 8px; }
-  @media (max-width: 640px) { .cp-headactions { align-items: flex-start; } }
+  /* Primary shipper action group (Request a rate + Save). flex-wrap keeps >=2 per
+     line where they fit and stacks each control full-width otherwise — never a
+     stranded orphan, no horizontal overflow at 375px. */
+  .cp-headcta { display: flex; flex-wrap: wrap; align-items: center; justify-content: flex-end; gap: 8px; }
+  .cp-rfq-btn { white-space: nowrap; }
+  @media (max-width: 640px) {
+    .cp-headactions { align-items: flex-start; }
+    .cp-headcta { justify-content: flex-start; }
+  }
   .qf-save { position: relative; display: inline-flex; }
   .cc-sel { display: flex; flex-direction: column; }
   .cc-sel .carrier-card { flex: 1 1 auto; }
@@ -2649,6 +2657,14 @@ export function renderCarrierProfile(opts: {
   ]
     .filter(Boolean)
     .join(' · ');
+  // Highest-intent shipper action on this page: start a one-recipient RFQ
+  // pre-seeded with THIS carrier. Links to the same /directory/rfq?dots= flow the
+  // results action bar uses — a single USDOT resolves to a one-recipient request
+  // (parseDots). The RFQ route handles the anonymous→account gate downstream, so
+  // this is just a link. Guard on a missing USDOT so we never render a broken one.
+  const rfqButton = c.usdot
+    ? `<a class="btn btn-primary btn-sm cp-rfq-btn" href="/directory/rfq?dots=${esc(c.usdot)}" title="Request a freight rate from ${esc(carrierName(c))}">Request a rate <span class="arr">→</span></a>`
+    : '';
   const body = `
   <section class="hero dir-hero">
     <div class="container-narrow">
@@ -2667,7 +2683,10 @@ export function renderCarrierProfile(opts: {
           </div>
         </div>
         <div class="cp-headactions">
-          ${saveControl(c)}
+          <div class="cp-headcta">
+            ${rfqButton}
+            ${saveControl(c)}
+          </div>
           <p class="cp-claimline">Own this company? <a href="${claimHref}">Claim this profile — it's free →</a></p>
         </div>
       </div>
