@@ -177,8 +177,10 @@ describe('renderDirectoryResults — selection + action bar', () => {
 
   it('renders the sticky action bar with the count + both CTAs', () => {
     expect(html).toContain('class="qf-actionbar"');
-    expect(html).toContain('Request rates from ');
-    expect(html).toContain('>Export list<');
+    // Labels carry mobile-shortenable spans (the full words hide at <=640px so
+    // all three actions fit one compact row): "Request rates[ from]", "Export[ list]".
+    expect(html).toContain('>Request rates<span class="qf-ab-rfqfull"> from</span>');
+    expect(html).toContain('>Export<span class="qf-ab-exportfull"> list</span>');
     // Default count = filtered TOTAL (3), not the 2 shown cards.
     expect(html).toContain('data-total="3"');
     expect(html).toContain('<span class="qf-ab-rfqn">3</span>');
@@ -244,7 +246,8 @@ describe('renderDirectoryResults — multi-select save in the action bar (D2)', 
 
   it('adds a "Save selected" button to the action bar', () => {
     expect(html).toContain('data-role="save-selected"');
-    expect(html).toContain('Save selected');
+    // "selected" is a mobile-hideable span (short label "Save (N)" on phones).
+    expect(html).toContain('>Save<span class="qf-ab-savefull"> selected</span>');
     expect(html).toContain('class="qf-ab-saven"');
   });
 

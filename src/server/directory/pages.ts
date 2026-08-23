@@ -481,7 +481,7 @@ const DIRECTORY_CSS = `
      obvious without crowding each card. Mirrors the action-bar hint wording. */
   .cc-legend { display: flex; align-items: center; gap: 8px; margin: 0 0 12px; font-size: 12px; color: var(--muted); }
   .cc-legend-box { flex: 0 0 auto; width: 16px; height: 16px; border: 1px solid var(--border-strong); border-radius: 3px; background: var(--surface-2); }
-  .qf-actionbar { position: sticky; bottom: 12px; z-index: 20; display: flex; align-items: center; justify-content: space-between; gap: 10px 16px; flex-wrap: wrap; margin: 20px 0 0; padding: 12px 14px; background: var(--surface-2); border: 1px solid var(--border-strong); border-radius: 8px; box-shadow: var(--shadow-md); }
+  .qf-actionbar { position: sticky; bottom: 12px; z-index: 20; display: flex; align-items: center; justify-content: space-between; gap: 8px 16px; flex-wrap: wrap; margin: 20px 0 0; padding: 10px 14px; background: var(--surface-2); border: 1px solid var(--border-strong); border-radius: 8px; box-shadow: var(--shadow-md); }
   .qf-ab-info { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
   .qf-ab-count { font-size: 14px; color: var(--ink); }
   .qf-ab-count b { font-family: var(--font-mono); color: var(--accent); font-size: 18px; }
@@ -489,6 +489,9 @@ const DIRECTORY_CSS = `
   .qf-actionbar[data-mode="dots"] .qf-ab-hint { visibility: hidden; }
   .qf-ab-actions { display: flex; align-items: center; gap: 8px 10px; flex-wrap: wrap; }
   .qf-ab-btn { flex: 0 0 auto; }
+  /* Desktop shows the full labels ("Request rates from N carriers →", "Save
+     selected (N)", "Export list"); the compact "(N)" parens are mobile-only. */
+  .qf-ab-rfqpar { display: none; }
   .qf-ab-fmts { display: inline-flex; align-items: center; gap: 8px; flex: 0 0 auto; }
   .qf-ab-fmt { font-size: 11px; font-family: var(--font-mono); letter-spacing: 0.04em; color: var(--accent); text-decoration: none; padding: 6px 8px; border: 1px solid var(--border); border-radius: 6px; }
   .qf-ab-fmt:hover { border-color: var(--accent); }
@@ -497,10 +500,22 @@ const DIRECTORY_CSS = `
      always-visible CTA never widens the header into horizontal overflow. */
   @media (max-width: 560px) { .topnav .tn-free { display: none; } }
   @media (max-width: 640px) {
-    .qf-actionbar { flex-direction: column; align-items: stretch; gap: 10px; bottom: 8px; padding: 12px; }
-    .qf-ab-actions { flex-direction: column; align-items: stretch; }
-    .qf-ab-btn { width: 100%; }
-    .qf-ab-fmts { justify-content: center; }
+    /* Compact slim card: count on top, then all three actions on ONE row (no
+       longer full-width stacked). Short labels ("Request rates (N)", "Save (N)",
+       "Export") keep them on one line down to 360px. padding-right on the button
+       row reserves the bottom-right corner for the chat FAB (which stays snug in
+       the corner) so its rightmost button never sits under the launcher. XLSX/CSV
+       drop to their own left-aligned line, clear of the corner FAB. */
+    .qf-actionbar { flex-direction: column; align-items: stretch; gap: 8px; bottom: 8px; padding: 10px 12px; }
+    .qf-ab-hint { display: none; }
+    .qf-ab-actions { flex-direction: row; flex-wrap: wrap; align-items: stretch; gap: 6px; padding-right: 66px; }
+    .qf-ab-btn { flex: 1 1 auto; min-width: 0; padding-left: 8px; padding-right: 8px; font-size: 12px; white-space: nowrap; justify-content: center; text-align: center; }
+    .qf-ab-rfq { flex: 1.5 1 auto; }
+    /* Drop the count from the RFQ button on phones (it's redundant with the
+       "N carriers filtered/selected" line above) so all three fit one row. */
+    .qf-ab-rfqfull, .qf-ab-rfqw, .qf-ab-rfqof, .qf-ab-rfqn, .qf-ab-rfqpar { display: none; }
+    .qf-ab-savefull, .qf-ab-exportfull { display: none; }
+    .qf-ab-fmts { flex: 1 1 100%; justify-content: flex-start; gap: 12px; }
   }
   @media (max-width: 900px) {
     .dir-layout { grid-template-columns: 1fr; }
@@ -1014,6 +1029,22 @@ const DIRECTORY_CSS = `
   .facet-more .facet-more-ico { font-size: 9px; transition: transform 0.18s ease; }
   .facet-more[aria-expanded="true"] .facet-more-ico { transform: rotate(180deg); }
   @media (prefers-reduced-motion: reduce) { .facet-fold, .facet-more .facet-more-ico { transition: none; } }
+
+  /* ── Category accordions — each facet-group's <h3> header toggles its body.
+     Rendered OPEN (no-JS + crawlers see every facet link); ACCORDION_SCRIPT
+     folds them all on load so the rail is compact and results lead. Height
+     animates via grid-template-rows 0fr↔1fr, reduced-motion guarded. */
+  .facet-acc-h { margin: 0; }
+  .facet-acc-btn { display: flex; align-items: center; justify-content: space-between; gap: 10px; width: 100%; padding: 0; margin: 0; background: transparent; border: 0; cursor: pointer; text-align: left; color: inherit; font: inherit; }
+  .facet-acc-ttl { font-size: 12px; text-transform: uppercase; letter-spacing: 0.07em; color: var(--muted); font-family: var(--font-mono); }
+  .facet-acc-btn:hover .facet-acc-ttl { color: var(--ink-soft); }
+  .facet-acc-btn:focus-visible { outline: 2px solid var(--accent); outline-offset: 3px; border-radius: 4px; }
+  .facet-acc-ico { flex: 0 0 auto; font-size: 9px; color: var(--muted); transition: transform 0.18s ease; }
+  .facet-group[data-acc="open"] .facet-acc-ico { transform: rotate(180deg); }
+  .facet-acc-body { display: grid; grid-template-rows: 1fr; transition: grid-template-rows 0.22s ease; margin-top: 8px; }
+  .facet-group[data-acc="closed"] .facet-acc-body { grid-template-rows: 0fr; margin-top: 0; }
+  .facet-acc-body > .facet-acc-inner { overflow: hidden; min-height: 0; }
+  @media (prefers-reduced-motion: reduce) { .facet-acc-body, .facet-acc-ico { transition: none; } }
 
   /* ── D2: multi-select save — action-bar "Save selected (N)" + list-picker /
      empty-state modal. The (N) suffix only shows once ≥1 card is ticked. */
@@ -1649,12 +1680,13 @@ function capabilitiesGroup(): string {
   const blocks = CARRIER_CAPABILITY_GROUPS.map(
     (g) => `<div class="cap-sub"><span class="cap-sublabel">${esc(g.label)}</span>${g.items.map(disabledFacetRow).join('\n')}</div>`,
   ).join('\n');
-  return `<div class="facet-group facet-group--claim">
-    <h3>Carrier capabilities</h3>
-    <span class="facet-src">Carrier-verified — shown as carriers claim their profiles.</span>
+  return facetGroup(
+    'Carrier capabilities',
+    `<span class="facet-src">Carrier-verified — shown as carriers claim their profiles.</span>
     ${blocks}
-    <a class="cap-claim-cta" href="/signup">Claim a listing to verify these →</a>
-  </div>`;
+    <a class="cap-claim-cta" href="/signup">Claim a listing to verify these →</a>`,
+    'facet-group--claim',
+  );
 }
 
 /** One row inside the ports/terminals picker (data-pk drives the client filter). */
@@ -1745,6 +1777,34 @@ const FOLD_SCRIPT = `(function(){
   });
 })();`;
 
+/** Collapses every facet-group into an accordion on load: the <h3> header toggles
+ *  its body open/closed. Rendered OPEN (no-JS + crawlers see every facet link);
+ *  this folds them all on load so the rail is compact and the results lead (Alex:
+ *  "each category for filters must be folded by default"). Height animates via the
+ *  same grid-rows 0fr↔1fr pattern as the D4 fold, reduced-motion guarded in CSS. */
+const ACCORDION_SCRIPT = `(function(){
+  if(window.__qfAccBound)return; window.__qfAccBound=true;
+  var groups=document.querySelectorAll('.facet-group[data-acc]');
+  Array.prototype.forEach.call(groups,function(g){
+    var btn=g.querySelector('.facet-acc-btn'); var body=g.querySelector('[data-acc-body]');
+    if(!btn||!body||btn.__accBound)return; btn.__accBound=1;
+    function set(o){ g.setAttribute('data-acc',o?'open':'closed'); btn.setAttribute('aria-expanded',o?'true':'false'); }
+    set(false);
+    btn.addEventListener('click',function(){ set(g.getAttribute('data-acc')!=='open'); });
+  });
+})();`;
+
+/** One collapsible facet category. Header is a heading-wrapped button (a11y: a
+ *  heading containing the disclosure control); the body holds the source label +
+ *  option rows and folds under the accordion. `data-acc` marks it for the script. */
+function facetGroup(title: string, inner: string, extraClass = ''): string {
+  const cls = 'facet-group' + (extraClass ? ' ' + extraClass : '');
+  return `<div class="${cls}" data-acc>
+    <h3 class="facet-acc-h"><button type="button" class="facet-acc-btn" aria-expanded="true"><span class="facet-acc-ttl">${title}</span><span class="facet-acc-ico" aria-hidden="true">▾</span></button></h3>
+    <div class="facet-acc-body" data-acc-body><div class="facet-acc-inner">${inner}</div></div>
+  </div>`;
+}
+
 function renderSidebar(scope: FacetScope, f: DirectoryFilters, counts: FacetCounts, summary?: DirectorySummary): string {
   // Tier 1 — Equipment & cargo (FMCSA crgo_* columns; MULTI-select checkboxes,
   // OR within the facet). Each row toggles its id in/out of the comma-list.
@@ -1827,8 +1887,11 @@ function renderSidebar(scope: FacetScope, f: DirectoryFilters, counts: FacetCoun
       });
       // Up to 12 states — keep the top 6 visible, fold the rest.
       const links = foldableRows(stateRows, 6, 'fold-state');
-      stateGroup = `<div class="facet-group"><h3>State</h3><span class="facet-src">FMCSA physical state · top 12</span>${links}
-        <a class="facet-opt" href="/directory" style="justify-content:center;"><span class="lbl">All states &amp; ports →</span></a></div>`;
+      stateGroup = facetGroup(
+        'State',
+        `<span class="facet-src">FMCSA physical state · top 12</span>${links}
+        <a class="facet-opt" href="/directory" style="justify-content:center;"><span class="lbl">All states &amp; ports →</span></a>`,
+      );
     }
   }
 
@@ -1841,24 +1904,32 @@ function renderSidebar(scope: FacetScope, f: DirectoryFilters, counts: FacetCoun
   return `<aside class="dir-rail" id="dir-rail">
     ${stateGroup}
     ${portsGroup}
-    <div class="facet-group"><h3>Equipment &amp; cargo</h3><span class="facet-src">FMCSA cargo-type flags</span>${equipment}</div>
-    <div class="facet-group"><h3>Cargo specialties</h3><span class="facet-src">FMCSA cargo-class flags</span>${cargo}</div>
-    <div class="facet-group"><h3>Fleet size</h3><span class="facet-src">FMCSA power units (trucks)</span>${fleet}</div>
-    <div class="facet-group"><h3>Drivers</h3><span class="facet-src">FMCSA total drivers</span>${drivers}</div>
-    <div class="facet-group"><h3>Safety</h3><span class="facet-src">FMCSA safety rating</span>${goodStanding}</div>
-    <div class="facet-group"><h3>Authority &amp; activity</h3><span class="facet-src">FMCSA authority &amp; MCS-150</span>${authority}${recent}</div>
+    ${facetGroup('Equipment &amp; cargo', `<span class="facet-src">FMCSA cargo-type flags</span>${equipment}`)}
+    ${facetGroup('Cargo specialties', `<span class="facet-src">FMCSA cargo-class flags</span>${cargo}`)}
+    ${facetGroup('Fleet size', `<span class="facet-src">FMCSA power units (trucks)</span>${fleet}`)}
+    ${facetGroup('Drivers', `<span class="facet-src">FMCSA total drivers</span>${drivers}`)}
+    ${facetGroup('Safety', `<span class="facet-src">FMCSA safety rating</span>${goodStanding}`)}
+    ${facetGroup('Authority &amp; activity', `<span class="facet-src">FMCSA authority &amp; MCS-150</span>${authority}${recent}`)}
     ${capabilitiesGroup()}
   </aside>
   <script>
     (function(){
-      var t=document.getElementById('rail-toggle'),r=document.getElementById('dir-rail');
-      if(!t||!r)return;
-      function apply(){var c=window.matchMedia('(max-width:900px)').matches;if(c){r.setAttribute('data-collapsed','1');t.setAttribute('aria-expanded','false');}else{r.removeAttribute('data-collapsed');t.setAttribute('aria-expanded','true');}}
-      apply();
-      t.addEventListener('click',function(){var c=r.getAttribute('data-collapsed')==='1';if(c){r.removeAttribute('data-collapsed');t.setAttribute('aria-expanded','true');t.textContent='Filters ▴';}else{r.setAttribute('data-collapsed','1');t.setAttribute('aria-expanded','false');t.textContent='Filters ▾';}});
+      // #rail-toggle lives in the results toolbar, which is parsed AFTER this
+      // sidebar — so defer wiring until DOMContentLoaded, else getElementById
+      // returns null and the rail never collapses on mobile (the bug Alex saw:
+      // every facet group sat expanded at the top of the phone screen).
+      function init(){
+        var t=document.getElementById('rail-toggle'),r=document.getElementById('dir-rail');
+        if(!t||!r)return;
+        function apply(){var c=window.matchMedia('(max-width:900px)').matches;if(c){r.setAttribute('data-collapsed','1');t.setAttribute('aria-expanded','false');t.textContent='Filters ▾';}else{r.removeAttribute('data-collapsed');t.setAttribute('aria-expanded','true');}}
+        apply();
+        t.addEventListener('click',function(){var c=r.getAttribute('data-collapsed')==='1';if(c){r.removeAttribute('data-collapsed');t.setAttribute('aria-expanded','true');t.textContent='Filters ▴';}else{r.setAttribute('data-collapsed','1');t.setAttribute('aria-expanded','false');t.textContent='Filters ▾';}});
+      }
+      if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',init);else init();
     })();
   </script>
-  <script>${FOLD_SCRIPT}</script>`;
+  <script>${FOLD_SCRIPT}</script>
+  <script>${ACCORDION_SCRIPT}</script>`;
 }
 
 function appliedChips(scope: FacetScope, f: DirectoryFilters): string {
@@ -2085,9 +2156,9 @@ function renderFacetedResults(cfg: FacetedCfg): string {
           <span class="qf-ab-hint">Tick cards to target specific carriers</span>
         </div>
         <div class="qf-ab-actions">
-          <a class="btn btn-primary btn-sm qf-ab-btn" data-role="rfq" href="${esc(links0.rfq)}">Request rates from <span class="qf-ab-rfqn">${fmtNum(rfqShown)}</span><span class="qf-ab-rfqof">${rfqOf}</span>&nbsp;<span class="qf-ab-rfqw">carrier${rfqPlural}</span> <span class="arr">→</span></a>
-          <button type="button" class="btn btn-secondary btn-sm qf-ab-btn qf-ab-save" data-role="save-selected" data-count="0" aria-haspopup="dialog">Save selected<span class="qf-ab-saven"> (0)</span></button>
-          <a class="btn btn-secondary btn-sm qf-ab-btn" data-role="export-view" href="${esc(links0.exportView)}">Export list</a>
+          <a class="btn btn-primary btn-sm qf-ab-btn qf-ab-rfq" data-role="rfq" href="${esc(links0.rfq)}">Request rates<span class="qf-ab-rfqfull"> from</span> <span class="qf-ab-rfqpar">(</span><span class="qf-ab-rfqn">${fmtNum(rfqShown)}</span><span class="qf-ab-rfqof">${rfqOf}</span><span class="qf-ab-rfqw">&nbsp;carrier${rfqPlural}</span><span class="qf-ab-rfqpar">)</span> <span class="arr">→</span></a>
+          <button type="button" class="btn btn-secondary btn-sm qf-ab-btn qf-ab-save" data-role="save-selected" data-count="0" aria-haspopup="dialog">Save<span class="qf-ab-savefull"> selected</span><span class="qf-ab-saven"> (0)</span></button>
+          <a class="btn btn-secondary btn-sm qf-ab-btn" data-role="export-view" href="${esc(links0.exportView)}">Export<span class="qf-ab-exportfull"> list</span></a>
           <span class="qf-ab-fmts"><a class="qf-ab-fmt" data-role="export-xlsx" href="${esc(links0.exportXlsx)}">XLSX</a><a class="qf-ab-fmt" data-role="export-csv" href="${esc(links0.exportCsv)}">CSV</a></span>
         </div>
       </div>
