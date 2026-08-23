@@ -129,19 +129,22 @@
     }
     // De-dup with the calculator header credential meta-lines. When
     // brand.headerShowCredentials !== false (the default), widget.js's
-    // renderCredMeta already prints USDOT/MC + phone/email directly under the
-    // company name, so repeating them on this trust card shows the same values
-    // twice (the live-demo bug). In that case the card keeps ONLY the detail the
-    // header does NOT carry — the address. With credentials hidden in the header
-    // (toggle off) the full set returns here as the fallback, so nothing is ever
-    // lost, and it is never shown twice. Mirrors widget.js renderContact().
+    // renderCredMeta already prints the FULL identity unit under the company
+    // name — address (line 1), USDOT/MC (line 2), phone/email (line 3) — so
+    // repeating ANY of them on this trust card shows the same values twice (the
+    // live-demo bug: the address orphaned in a grey pill above the header block
+    // that already carries it). renderCredMeta now owns the address too, so in
+    // the default (creds-in-header) case this card has nothing unique to add and
+    // stays out of the flow. Only with credentials hidden in the header (toggle
+    // off) does the full set — address included — return here as the fallback, so
+    // nothing is ever lost and nothing is ever shown twice. Mirrors renderContact().
     const cfg = (typeof window !== 'undefined' && window.QF_WIDGET_CONFIG) || {};
     const credsInHeader = !cfg.brand || cfg.brand.headerShowCredentials !== false;
     const mcText = [data.usdot ? 'USDOT ' + data.usdot : '', data.mc ? 'MC ' + data.mc : ''].filter(Boolean).join(' · ');
     const nextHtml = [
       !credsInHeader && data.phone ? '<span>' + escapeHtml(data.phone) + '</span>' : '',
       !credsInHeader && data.email ? '<span>' + escapeHtml(data.email) + '</span>' : '',
-      data.address ? '<span>' + escapeHtml(data.address) + '</span>' : '',
+      !credsInHeader && data.address ? '<span>' + escapeHtml(data.address) + '</span>' : '',
       !credsInHeader && mcText ? '<span>' + escapeHtml(mcText) + '</span>' : '',
     ].filter(Boolean).join('');
     // Nothing unique to show (creds live in the header, no address set) → keep the
