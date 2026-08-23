@@ -141,7 +141,7 @@ describe('renderDirectoryResults — selection + action bar', () => {
   it('adds an accessible selection checkbox (data-dot) to each carrier card', () => {
     expect(html).toContain('class="cc-cb" data-dot="107080"');
     expect(html).toContain('class="cc-cb" data-dot="880880"');
-    expect(html).toContain('aria-label="Select ACME DRAYAGE INC to request rates or export"');
+    expect(html).toContain('aria-label="Select ACME DRAYAGE INC to save, request rates or export"');
   });
 
   it('checkbox toggles WITHOUT navigating: label wraps the input (not the card <a>) + stops click propagation', () => {
@@ -161,7 +161,7 @@ describe('renderDirectoryResults — selection + action bar', () => {
   it('checkbox reads as a selection control (visible chip + grid legend explaining it)', () => {
     expect(html).toContain('class="cc-box"'); // bordered chip around the box
     expect(html).toContain('class="cc-legend"');
-    expect(html).toContain("Tick a card's box to request rates");
+    expect(html).toContain("Tick a card's box to save");
   });
 
   it('renders a company-name search box wired to q, preserving active facets as hidden inputs', () => {
@@ -205,6 +205,78 @@ describe('renderDirectoryResults — selection + action bar', () => {
   it('ships the progressive-enhancement script that swaps to ?dots= on selection', () => {
     expect(html).toContain("bar.setAttribute('data-mode',dots.length?'dots':'filter')");
     expect(html).toContain("'?dots='+dots.join(',')");
+  });
+});
+
+// ─── D1 — unified filter+sort toolbar ──────────────────────────────────────
+describe('renderDirectoryResults — filter + sort co-located in one toolbar (D1)', () => {
+  const html = renderResults();
+
+  it('renders a single results-toolbar containing BOTH the sort control and the count', () => {
+    expect(html).toContain('class="results-toolbar"');
+    const tb = html.slice(html.indexOf('class="results-toolbar"'));
+    const end = tb.indexOf('class="dir-grid"'); // toolbar precedes the card grid
+    const toolbar = tb.slice(0, end);
+    expect(toolbar).toContain('class="sort-ctl"'); // sort lives INSIDE the toolbar
+    expect(toolbar).toContain('carriers match'); // as does the result count
+  });
+
+  it('relocates the mobile "Filters" toggle INTO the toolbar (co-located with sort)', () => {
+    // Exactly one rail-toggle button, and it sits inside the toolbar (not the aside).
+    expect(html.match(/id="rail-toggle"/g)?.length).toBe(1);
+    const tbStart = html.indexOf('class="results-toolbar"');
+    const railIdx = html.indexOf('id="rail-toggle"');
+    const gridIdx = html.indexOf('class="dir-grid"');
+    expect(railIdx).toBeGreaterThan(tbStart);
+    expect(railIdx).toBeLessThan(gridIdx);
+  });
+
+  it('folds the applied-filter chips into the toolbar (not a separate region)', () => {
+    const tb = html.slice(html.indexOf('class="results-toolbar"'), html.indexOf('class="dir-grid"'));
+    // state=TX is active in the fixture → a removable chip renders inside the toolbar.
+    expect(tb).toContain('class="applied-chip"');
+  });
+});
+
+// ─── D2 — multi-select save moved to the action bar ────────────────────────
+describe('renderDirectoryResults — multi-select save in the action bar (D2)', () => {
+  const html = renderResults();
+
+  it('adds a "Save selected" button to the action bar', () => {
+    expect(html).toContain('data-role="save-selected"');
+    expect(html).toContain('Save selected');
+    expect(html).toContain('class="qf-ab-saven"');
+  });
+
+  it('removes the redundant per-card save control from the results grid', () => {
+    // The old per-card "Save to list" popover control is gone from the CARD grid
+    // (the .qf-save-* CSS classes still exist for the profile page's single save).
+    const grid = html.slice(html.indexOf('class="dir-grid"'), html.indexOf('class="qf-actionbar"'));
+    expect(grid).not.toContain('qf-save');
+    expect(grid).not.toContain('Save to list');
+  });
+
+  it('ships the save script wired to the batch API, with an empty-state modal path', () => {
+    expect(html).toContain('/items/batch'); // batch save endpoint
+    expect(html).toContain('carrierDots'); // posts the selected DOTs
+    expect(html).toContain('function renderEmpty'); // 0-selected how-it-works modal
+    expect(html).toContain('aria-modal'); // accessible dialog
+    expect(html).toContain("e.key==='Escape'"); // keyboard-dismissible
+  });
+});
+
+// ─── D4 — long facet lists fold ────────────────────────────────────────────
+describe('renderDirectoryResults — long facet lists fold (D4)', () => {
+  const html = renderResults();
+
+  it('wraps the 13-option cargo facet in a Show-more fold (all rows still rendered)', () => {
+    expect(html).toContain('id="fold-cargo"');
+    expect(html).toContain('data-fold');
+    expect(html).toContain('class="facet-more"');
+    expect(html).toContain('data-fold-toggle');
+    // All 13 cargo options are present in the HTML (crawlable / no-JS safe).
+    expect(html).toContain('Household goods');
+    expect(html).toContain('Building materials');
   });
 });
 

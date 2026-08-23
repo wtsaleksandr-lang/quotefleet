@@ -61,7 +61,7 @@
   // ── styles ─────────────────────────────────────────────────────
   var css = `
     .qf-mc-fab {
-      position: fixed; right: 20px; bottom: 20px;
+      position: fixed; right: 12px; bottom: 12px;
       width: 56px; height: 56px;
       border-radius: 16px;
       background: linear-gradient(135deg, #0D3CFC, #0A2FC4);

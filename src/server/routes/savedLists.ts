@@ -57,6 +57,9 @@ const dotSchema = z
   .min(1)
   .max(15)
   .regex(/^[0-9]+$/);
+// Multi-select batch save: a bounded array of carrier DOTs. Deduped + capped in
+// the handler; 200 is a generous ceiling (well above any single results page).
+const dotsArraySchema = z.array(dotSchema).min(1).max(200);
 
 const listIdParam = (raw: unknown): number | null => {
   const n = Number.parseInt(String(raw ?? ''), 10);
@@ -176,6 +179,57 @@ export async function handleAddItem(req: Request, res: Response, deps: SavedList
   }
 }
 
+/**
+ * Multi-select SAVE — add MANY carriers to one list in a single request (the
+ * results action-bar "Save selected (N)" flow). Reuses the same store as the
+ * single add: dedupes the input, skips carriers already in the list (idempotent),
+ * and stops with a 409 the moment the per-list cap would be exceeded (reporting
+ * how many were added before the cap). Same gate + ownership checks as every
+ * other route. Never 500s on a duplicate.
+ */
+export async function handleAddItemsBatch(req: Request, res: Response, deps: SavedListsDeps = {}): Promise<void> {
+  try {
+    const auth = await gate(req, res);
+    if (!auth) return;
+    const listId = listIdParam(req.params.id);
+    if (listId == null) {
+      res.status(404).json({ ok: false, reason: 'not-found' });
+      return;
+    }
+    const parsed = dotsArraySchema.safeParse((req.body ?? {}).carrierDots);
+    if (!parsed.success) {
+      res.status(422).json({ ok: false, reason: 'invalid-dots' });
+      return;
+    }
+    const store = deps.store ?? dbSavedListsStore;
+    const meta = await store.getListMeta(auth.userId, listId); // ownership check
+    if (!meta) {
+      res.status(404).json({ ok: false, reason: 'not-found' });
+      return;
+    }
+    const maxItems = deps.maxItems ?? DEFAULT_MAX_ITEMS_PER_LIST;
+    const unique = [...new Set(parsed.data)];
+    let count = await store.countItems(listId);
+    let added = 0;
+    for (const dot of unique) {
+      // Idempotent: an already-saved carrier is a no-op and doesn't count toward
+      // the cap. Only genuinely-new adds are gated by the per-list ceiling.
+      if (await store.hasItem(listId, dot)) continue;
+      if (count >= maxItems) {
+        res.status(409).json({ ok: false, reason: 'item-cap', max: maxItems, added, count });
+        return;
+      }
+      await store.addItem(listId, dot);
+      count += 1;
+      added += 1;
+    }
+    res.json({ ok: true, listId, added, count });
+  } catch (err) {
+    console.error('[directory.savedLists] addItemsBatch failed:', err);
+    res.status(500).json({ ok: false, reason: 'error' });
+  }
+}
+
 export async function handleRemoveItem(req: Request, res: Response, deps: SavedListsDeps = {}): Promise<void> {
   try {
     const auth = await gate(req, res);
@@ -284,6 +338,7 @@ export function registerSavedListsRoutes(app: Express, deps: SavedListsDeps = {}
   app.post('/api/directory/lists', (req, res) => handleCreateList(req, res, deps));
   app.get('/api/directory/lists/:id', (req, res) => handleGetList(req, res, deps));
   app.delete('/api/directory/lists/:id', (req, res) => handleDeleteList(req, res, deps));
+  app.post('/api/directory/lists/:id/items/batch', (req, res) => handleAddItemsBatch(req, res, deps));
   app.post('/api/directory/lists/:id/items', (req, res) => handleAddItem(req, res, deps));
   app.delete('/api/directory/lists/:id/items/:carrierDot', (req, res) => handleRemoveItem(req, res, deps));
 }

@@ -17,6 +17,7 @@ import {
   handleCreateList,
   handleDeleteList,
   handleAddItem,
+  handleAddItemsBatch,
   handleRemoveItem,
   handleGetList,
   type SavedListsDeps,
@@ -196,6 +197,81 @@ describe('savedLists — CRUD', () => {
     const g = res();
     await handleGetLists(req(), g, deps);
     expect(g.body.lists).toHaveLength(0);
+  });
+});
+
+// ─── Multi-select batch save ───────────────────────────────────────────────
+describe('savedLists — batch add (multi-select save)', () => {
+  async function makeList(deps: SavedListsDeps): Promise<string> {
+    const c = res();
+    await handleCreateList(req({ body: { name: 'Batch shortlist' } }), c, deps);
+    return String(c.body.list.id);
+  }
+
+  it('adds every selected carrier to the list in one request', async () => {
+    const deps: SavedListsDeps = { store: memStore(), carriers };
+    const id = await makeList(deps);
+    const b = res();
+    await handleAddItemsBatch(req({ params: { id }, body: { carrierDots: ['107080', '880880', '999'] } }), b, deps);
+    expect(b.statusCode).toBe(200);
+    expect(b.body.ok).toBe(true);
+    expect(b.body.added).toBe(3);
+    expect(b.body.count).toBe(3);
+    // The list now really holds all three (verify the write path via GET).
+    const g = res();
+    await handleGetList(req({ params: { id } }), g, deps);
+    expect(g.body.carriers.map((c: { usdot: string }) => c.usdot).sort()).toEqual(['107080', '880880', '999']);
+  });
+
+  it('is idempotent + dedupes: re-saving overlapping selections never double-counts', async () => {
+    const deps: SavedListsDeps = { store: memStore(), carriers };
+    const id = await makeList(deps);
+    await handleAddItemsBatch(req({ params: { id }, body: { carrierDots: ['111', '222'] } }), res(), deps);
+    const again = res();
+    // '111' repeats within the payload AND is already saved; only '333' is new.
+    await handleAddItemsBatch(req({ params: { id }, body: { carrierDots: ['111', '111', '222', '333'] } }), again, deps);
+    expect(again.statusCode).toBe(200);
+    expect(again.body.added).toBe(1); // only 333
+    expect(again.body.count).toBe(3); // 111,222,333 — no duplicates
+  });
+
+  it('gates like every other route: 401 anon, 403 non-Pro', async () => {
+    const deps: SavedListsDeps = { store: memStore(), carriers };
+    asUser(null, false);
+    const anon = res();
+    await handleAddItemsBatch(req({ params: { id: '1' }, body: { carrierDots: ['1'] } }), anon, deps);
+    expect(anon.statusCode).toBe(401);
+    asUser(7, false);
+    const free = res();
+    await handleAddItemsBatch(req({ params: { id: '1' }, body: { carrierDots: ['1'] } }), free, deps);
+    expect(free.statusCode).toBe(403);
+  });
+
+  it("404s on another user's list (ownership) and 422s an empty/invalid selection", async () => {
+    const deps: SavedListsDeps = { store: memStore(), carriers };
+    asUser(7, true);
+    const id = await makeList(deps);
+    asUser(9, true);
+    const foreign = res();
+    await handleAddItemsBatch(req({ params: { id }, body: { carrierDots: ['1'] } }), foreign, deps);
+    expect(foreign.statusCode).toBe(404);
+    asUser(7, true);
+    const empty = res();
+    await handleAddItemsBatch(req({ params: { id }, body: { carrierDots: [] } }), empty, deps);
+    expect(empty.statusCode).toBe(422);
+    const bad = res();
+    await handleAddItemsBatch(req({ params: { id }, body: { carrierDots: ['not-a-dot'] } }), bad, deps);
+    expect(bad.statusCode).toBe(422);
+  });
+
+  it('stops with 409 item-cap when the batch would exceed the per-list limit', async () => {
+    const deps: SavedListsDeps = { store: memStore(), carriers, maxItems: 2 };
+    const id = await makeList(deps);
+    const capped = res();
+    await handleAddItemsBatch(req({ params: { id }, body: { carrierDots: ['1', '2', '3'] } }), capped, deps);
+    expect(capped.statusCode).toBe(409);
+    expect(capped.body.reason).toBe('item-cap');
+    expect(capped.body.added).toBe(2); // filled to the cap, then stopped
   });
 });
 
