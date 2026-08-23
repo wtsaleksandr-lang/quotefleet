@@ -15,6 +15,7 @@
  *   POST /directory/rfq/quote/:token        → submit/update a quote
  *   GET  /directory/rfq/optout/:token       → carrier one-click opt-out
  *   POST /api/public/directory/reingest     → admin force FMCSA re-ingest (guarded)
+ *   POST /api/public/directory/backfill-ports → admin force nearest_port_code re-derive (guarded)
  *
  * Everything is behind injectable deps (store / resolve / sender / gate) so the
  * whole flow unit-tests with no DB and no network.
@@ -54,6 +55,10 @@ import {
 } from '../rfq/pages.js';
 import { dbOutreachEmailStore, normalizeEmailAddress } from '../outreach/outreachEmailStore.js';
 import { forceReingestCarrierDirectory } from '../directory/autoHeal.js';
+import {
+  forceBackfillNearestPortCodes,
+  type ForceBackfillOutcome,
+} from '../directory/backfillNearestPort.js';
 import { directoryIdentity } from '../directory/entitlement.js';
 import { dbRfqUsageStore, currentRfqPeriod, type RfqUsageStore } from '../directory/rfqUsage.js';
 import type { RfqFilterSnapshot, RfqRecipientStatus } from '../../db/schema.js';
@@ -183,6 +188,8 @@ export interface RfqRouteDeps {
   throttleMs?: number;
   /** Force-reingest kicker (defaults to the real autoHeal fn). */
   forceReingest?: () => Promise<'started' | 'lock-held' | 'disabled'>;
+  /** Force nearest_port_code re-derivation kicker (defaults to the real backfill fn). */
+  forceBackfillPorts?: () => Promise<ForceBackfillOutcome>;
   /** Injected AI client for the per-carrier drafter (defaults to the app client). */
   aiComplete?: typeof complete;
   /** Presence gates the AI draft step (defaults to ANTHROPIC_API_KEY). */
@@ -254,6 +261,7 @@ export function registerRfqRoutes(app: Express, deps: RfqRouteDeps = {}) {
       }
     });
   const forceReingest = deps.forceReingest ?? forceReingestCarrierDirectory;
+  const forceBackfillPorts = deps.forceBackfillPorts ?? forceBackfillNearestPortCodes;
   const usage = deps.usage ?? dbRfqUsageStore;
   const gate: RfqGate = deps.gate ?? defaultRfqGate(usage);
 
@@ -660,6 +668,30 @@ export function registerRfqRoutes(app: Express, deps: RfqRouteDeps = {}) {
       }
       const outcome = await forceReingest();
       return res.status(202).json({ status: outcome });
+    } catch (err) {
+      next(err);
+    }
+  });
+
+  // ── Admin: force nearest_port_code re-derivation (no FMCSA re-download) ────
+  // Recomputes the derived nearest_port_code column in place (fixes stale codes
+  // like Bay-Area carriers pinned to USLAX instead of USOAK) using the current
+  // derivation. Same token guard as /reingest (x-ingest-token vs INGEST_ADMIN_
+  // TOKEN); missing/mismatch → 404. Fire-and-forget (single-flighted by its own
+  // advisory lock, never throws), returns 202. Bypasses the version marker so it
+  // can be re-run on demand without bumping the derivation constant.
+  app.post('/api/public/directory/backfill-ports', async (req: Request, res: Response, next) => {
+    try {
+      const expected = process.env.INGEST_ADMIN_TOKEN;
+      const provided = req.header('x-ingest-token');
+      if (!secretMatches(provided, expected)) {
+        return res.status(404).json({ error: 'not found' });
+      }
+      // Detached: the scan may touch thousands of rows; don't hold the request.
+      void forceBackfillPorts().catch(() => {
+        /* backfill logs its own errors; never rejects into the handler */
+      });
+      return res.status(202).json({ status: 'started' });
     } catch (err) {
       next(err);
     }

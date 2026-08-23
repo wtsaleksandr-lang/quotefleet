@@ -371,6 +371,25 @@ export function carrierCountry(state: string | null): 'US' | 'CA' | null {
   return null;
 }
 
+/**
+ * Derive a carrier's nearest hub code from its domicile — the SINGLE source of
+ * truth for the ZIP/province → port mapping. US carriers resolve via the ZIP
+ * centroid (nearestPortForZip); CA postal codes aren't in the US ZCTA table, so
+ * CA carriers map by province → nearest Canadian gateway (nearestCaPortForProvince).
+ *
+ * Both the ingest (normalizeCarrier, below) AND the boot-time re-derivation
+ * backfill (src/server/directory/backfillNearestPort.ts) call THIS function, so
+ * the two can never disagree: a change to the derivation (a new hub, a radius
+ * tweak) flows into both at once. `country`/`state` are expected upper-cased.
+ */
+export function deriveNearestPortCode(
+  country: string | null | undefined,
+  state: string | null | undefined,
+  zip: string | null | undefined,
+): string | null {
+  return country === 'CA' ? nearestCaPortForProvince(state) : nearestPortForZip(zip);
+}
+
 /** URL-safe slug from the display name, suffixed with USDOT for uniqueness. */
 export function makeSlug(name: string, usdot: string): string {
   const base = name
@@ -444,7 +463,8 @@ export function normalizeCarrier(
     ...cargoClassFlags(census),
     // US carriers derive the port from the ZIP centroid; CA postal codes aren't in
     // the US ZCTA table, so CA carriers map by province → nearest Canadian gateway.
-    nearestPortCode: country === 'CA' ? nearestCaPortForProvince(state) : nearestPortForZip(zip),
+    // Shared with the re-derivation backfill via deriveNearestPortCode().
+    nearestPortCode: deriveNearestPortCode(country, state, zip),
     publicSlug: makeSlug(legalName, usdot),
   };
 }
