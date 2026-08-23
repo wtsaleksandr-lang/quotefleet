@@ -916,7 +916,6 @@ const DIRECTORY_CSS = `
   .qf-save { position: relative; display: inline-flex; }
   .cc-sel { display: flex; flex-direction: column; }
   .cc-sel .carrier-card { flex: 1 1 auto; }
-  .cc-sel .qf-save { margin-top: 8px; }
   .qf-save-btn { display: inline-flex; align-items: center; gap: 6px; }
   .qf-save-ic { font-size: 15px; line-height: 1; font-weight: 700; }
   .qf-save-pop { position: absolute; z-index: 40; left: 0; top: calc(100% + 8px); width: 260px; max-width: 80vw;
@@ -970,6 +969,87 @@ const DIRECTORY_CSS = `
     .aud-card { padding: 18px; }
     .aud-cta-row .btn { flex: 1 1 100%; }
   }
+
+  /* ── Glass tokens (directory-local; canonical DESIGN-SYSTEM values) ────────
+     landing-glass.css isn't linked on directory pages, so we define the few
+     glass tokens the toolbar / action bar / modal need here. rgba() literals are
+     NOT flagged by the hardcoded-color guard. Dark-default base + light override
+     (mirrors style.css theming). Solid fallbacks (*-solid) feed the @supports
+     no-backdrop-filter path so embedded / privacy contexts stay readable. */
+  :root {
+    --glass-ultra-bg: rgba(18, 22, 26, 0.62);
+    --glass-ultra-brd: rgba(255, 255, 255, 0.10);
+    --glass-ultra-solid: rgba(18, 22, 26, 0.97);
+    --glass-shadow: 0 8px 32px rgba(0, 0, 0, 0.35);
+  }
+  html[data-theme="light"] {
+    --glass-ultra-bg: rgba(255, 255, 255, 0.64);
+    --glass-ultra-brd: rgba(255, 255, 255, 0.55);
+    --glass-ultra-solid: rgba(255, 255, 255, 0.98);
+    --glass-shadow: 0 8px 32px rgba(10, 37, 64, 0.12);
+  }
+
+  /* ── D1: unified results toolbar — filters entry + count + sort as ONE cluster.
+     Replaces the old separate results-bar + applied-chips rows. The mobile rail
+     "Filters" toggle is relocated INTO this bar (see .rt-main .rail-toggle) so the
+     filter entry point and the sort control read as one control group. */
+  .results-toolbar { display: flex; flex-direction: column; gap: 10px; margin: 0 0 16px; padding: 12px 14px; background: var(--surface-2); border: 1px solid var(--border); border-radius: 10px; }
+  .rt-main { display: flex; align-items: center; gap: 10px 16px; flex-wrap: wrap; }
+  .rt-main .rc { font-size: 15px; min-width: 0; margin-right: auto; }
+  .rt-main .rc b { font-family: var(--font-mono); color: var(--accent); font-size: 20px; }
+  .rt-main .sort-ctl { flex: 0 0 auto; }
+  .rt-main .rail-toggle { display: none; } /* desktop: rail always visible, no toggle */
+  .results-toolbar .applied-chips { margin: 0; padding-top: 12px; border-top: 1px solid var(--border); }
+
+  /* ── D4: fold long facet lists (Show more / Show less). Rendered OPEN so no-JS
+     + crawlers see every facet link; the fold script collapses it and reveals the
+     toggle. True height animation via grid-template-rows 0fr↔1fr, reduced-motion
+     guarded. Selected/again = accent text, never a bright fill. */
+  .facet-fold { display: grid; grid-template-rows: 1fr; transition: grid-template-rows 0.22s ease; }
+  .facet-fold[data-collapsed="1"] { grid-template-rows: 0fr; }
+  .facet-fold > .facet-fold-inner { overflow: hidden; min-height: 0; }
+  .facet-more { display: inline-flex; align-items: center; gap: 6px; margin: 8px 2px 2px; padding: 4px 6px; background: transparent; border: 0; color: var(--accent); font-family: var(--font-mono); font-size: 12px; cursor: pointer; }
+  .facet-more:hover { text-decoration: underline; }
+  .facet-more:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; border-radius: 4px; }
+  .facet-more .facet-more-ico { font-size: 9px; transition: transform 0.18s ease; }
+  .facet-more[aria-expanded="true"] .facet-more-ico { transform: rotate(180deg); }
+  @media (prefers-reduced-motion: reduce) { .facet-fold, .facet-more .facet-more-ico { transition: none; } }
+
+  /* ── D2: multi-select save — action-bar "Save selected (N)" + list-picker /
+     empty-state modal. The (N) suffix only shows once ≥1 card is ticked. */
+  .qf-ab-save[data-count="0"] .qf-ab-saven { display: none; }
+  .qf-modal-backdrop { position: fixed; inset: 0; z-index: 2147482600; display: flex; align-items: center; justify-content: center; padding: 20px; background: rgba(4, 7, 12, 0.55); -webkit-backdrop-filter: blur(4px); backdrop-filter: blur(4px); opacity: 0; visibility: hidden; transition: opacity 0.18s ease, visibility 0s linear 0.18s; }
+  .qf-modal-backdrop.open { opacity: 1; visibility: visible; transition: opacity 0.18s ease; }
+  .qf-modal { width: 100%; max-width: 440px; max-height: calc(100vh - 40px); overflow-y: auto; background: var(--glass-ultra-bg); -webkit-backdrop-filter: blur(20px) saturate(1.4); backdrop-filter: blur(20px) saturate(1.4); border: 1px solid var(--glass-ultra-brd); border-radius: 16px; box-shadow: var(--glass-shadow); padding: 22px; transform: translateY(10px) scale(0.98); transition: transform 0.18s ease; }
+  .qf-modal-backdrop.open .qf-modal { transform: none; }
+  @supports not ((backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px))) { .qf-modal { background: var(--glass-ultra-solid); } }
+  @media (prefers-reduced-motion: reduce) { .qf-modal-backdrop, .qf-modal { transition: opacity 0.18s ease; } .qf-modal { transform: none; } }
+  .qf-modal-head { display: flex; align-items: flex-start; justify-content: space-between; gap: 12px; margin: 0 0 12px; }
+  .qf-modal-head h2 { margin: 0; font-size: 18px; line-height: 1.25; color: var(--ink); }
+  .qf-modal-x { flex: 0 0 auto; background: transparent; border: 0; color: var(--muted); font-size: 22px; line-height: 1; cursor: pointer; padding: 0 6px; border-radius: 6px; }
+  .qf-modal-x:hover { color: var(--ink); }
+  .qf-modal-x:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+  .qf-modal p { margin: 0 0 12px; font-size: 14px; color: var(--ink-soft); line-height: 1.55; }
+  .qf-modal-steps { margin: 0 0 16px; padding: 0; list-style: none; display: flex; flex-direction: column; gap: 10px; }
+  .qf-modal-steps li { display: flex; gap: 10px; align-items: flex-start; font-size: 13px; color: var(--ink-soft); line-height: 1.45; }
+  .qf-modal-steps .n { flex: 0 0 auto; width: 20px; height: 20px; border-radius: 50%; background: var(--accent-soft); color: var(--accent); border: 1px solid var(--accent); font-family: var(--font-mono); font-size: 11px; display: inline-flex; align-items: center; justify-content: center; }
+  .qf-modal-lists { display: flex; flex-direction: column; gap: 6px; max-height: 220px; overflow-y: auto; margin: 4px 0 14px; }
+  .qf-modal-list { display: flex; align-items: center; justify-content: space-between; gap: 10px; padding: 10px 12px; background: var(--surface); border: 1px solid var(--border); border-radius: 8px; color: var(--ink); font-size: 14px; text-align: left; cursor: pointer; }
+  .qf-modal-list:hover, .qf-modal-list:focus-visible { border-color: var(--accent); outline: none; }
+  .qf-modal-list .n { font-size: 11px; color: var(--muted); font-family: var(--font-mono); }
+  .qf-modal-newlbl { display: block; font-size: 12px; font-family: var(--font-mono); color: var(--muted); margin: 0 0 6px; }
+  .qf-modal-new { display: flex; gap: 8px; }
+  .qf-modal-new input { flex: 1 1 auto; min-width: 0; background: var(--surface); color: var(--ink); border: 1px solid var(--border-strong); border-radius: 6px; padding: 10px 12px; font-size: 14px; font-family: inherit; min-height: 44px; }
+  .qf-modal-new input:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; border-color: var(--accent); }
+  .qf-modal-msg { margin: 12px 0 0; font-size: 13px; color: var(--accent); }
+  .qf-modal-msg--err { color: var(--ink-soft); }
+  .qf-modal-actions { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 4px; }
+
+  @media (max-width: 900px) {
+    /* Relocated rail toggle sits inline in the toolbar (not the old full-width
+       bar): auto width, no bottom margin, squared to match the sort control. */
+    .rt-main .rail-toggle { display: inline-flex; width: auto; margin: 0; }
+  }
 `;
 
 /**
@@ -1012,9 +1092,98 @@ const ACTION_BAR_SCRIPT = `(function(){
     if(countEl)countEl.setAttribute('data-selected',String(dots.length));
     bar.setAttribute('data-mode',dots.length?'dots':'filter');
     for(var key in links){if(!links.hasOwnProperty(key))continue;var a=bar.querySelector('[data-role="'+key+'"]');if(a)a.setAttribute('href',links[key]+s);}
+    // "Save selected (N)" — reflect the live selection count (only ticked cards
+    // are ever saved; with 0 ticked the button opens the how-it-works modal).
+    var saveBtn=bar.querySelector('[data-role="save-selected"]');
+    if(saveBtn){saveBtn.setAttribute('data-count',String(dots.length));var sn=saveBtn.querySelector('.qf-ab-saven');if(sn)sn.textContent=' ('+dots.length+')';}
   }
   results.addEventListener('change',function(e){var t=e.target;if(t&&t.classList&&t.classList.contains('cc-cb'))apply();});
   apply();
+})();`;
+
+/**
+ * D2 — multi-select SAVE from the action bar. The "Save selected (N)" button:
+ *   • 0 ticked  → opens a glass how-it-works MODAL (select carriers, then save).
+ *   • ≥1 ticked → opens the list-picker MODAL: fetch the caller's lists, gate on
+ *     401 (sign-in) / 403 (Directory Pro upsell), else add ALL selected carriers
+ *     to a chosen (or newly-created) list via the batch endpoint in ONE request.
+ * The modal is keyboard-dismissible (Esc / backdrop / ×), focus-trapped, and
+ * reuses the same Pro-gated saved-lists API as the (profile-only) single save.
+ * Inert without JS — Save is a pure enhancement over the JSON API.
+ */
+const SAVE_SELECTED_SCRIPT = `(function(){
+  if(window.__qfSaveSelBound)return; window.__qfSaveSelBound=true;
+  function esc(s){return String(s==null?'':s).replace(/[&<>"']/g,function(m){return ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[m]);});}
+  var results=document.querySelector('.dir-results');
+  var bar=document.querySelector('.qf-actionbar');
+  if(!results||!bar)return;
+  var saveBtn=bar.querySelector('[data-role="save-selected"]');
+  if(!saveBtn)return;
+  var backdrop=document.createElement('div'); backdrop.className='qf-modal-backdrop';
+  var modal=document.createElement('div'); modal.className='qf-modal'; modal.setAttribute('role','dialog'); modal.setAttribute('aria-modal','true'); modal.setAttribute('aria-labelledby','qf-modal-title');
+  backdrop.appendChild(modal); document.body.appendChild(backdrop);
+  var isOpen=false,lastFocus=null;
+  function focusables(){return modal.querySelectorAll('a[href],button:not([disabled]),input,select,textarea,[tabindex]:not([tabindex="-1"])');}
+  function openModal(){ if(isOpen)return; isOpen=true; lastFocus=document.activeElement; backdrop.classList.add('open'); var f=focusables(); if(f.length)f[0].focus(); }
+  function closeModal(){ if(!isOpen)return; isOpen=false; backdrop.classList.remove('open'); if(lastFocus&&lastFocus.focus)try{lastFocus.focus();}catch(e){} }
+  backdrop.addEventListener('click',function(e){ if(e.target===backdrop)closeModal(); });
+  document.addEventListener('keydown',function(e){
+    if(!isOpen)return;
+    if(e.key==='Escape'){ e.preventDefault(); closeModal(); return; }
+    if(e.key==='Tab'){ var f=focusables(); if(!f.length)return; var first=f[0],last=f[f.length-1];
+      if(e.shiftKey&&document.activeElement===first){ e.preventDefault(); last.focus(); }
+      else if(!e.shiftKey&&document.activeElement===last){ e.preventDefault(); first.focus(); } }
+  });
+  function selected(){ var out=[]; var cbs=results.querySelectorAll('.cc-cb'); for(var i=0;i<cbs.length;i++){ if(cbs[i].checked){ var d=cbs[i].getAttribute('data-dot'); if(d)out.push(d); } } return out; }
+  function head(title){ return '<div class="qf-modal-head"><h2 id="qf-modal-title">'+esc(title)+'</h2><button type="button" class="qf-modal-x" data-close aria-label="Close">\\u00d7</button></div>'; }
+  function wireClose(){ Array.prototype.forEach.call(modal.querySelectorAll('[data-close]'),function(b){ b.addEventListener('click',closeModal); }); var f=focusables(); if(f.length)f[0].focus(); }
+  function msg(text,err){ var m=modal.querySelector('.qf-modal-msg'); if(!m){ m=document.createElement('p'); modal.appendChild(m); } m.hidden=false; m.textContent=text; m.className='qf-modal-msg'+(err?' qf-modal-msg--err':''); }
+  function renderEmpty(){
+    modal.innerHTML=head('Save carriers to a list')+
+      '<p>Pick the carriers you want to keep, then save them all to a list in one step.</p>'+
+      '<ol class="qf-modal-steps">'+
+        '<li><span class="n">1</span><span>Tick the box on each carrier card you want.</span></li>'+
+        '<li><span class="n">2</span><span>Come back here and choose <b>Save selected</b>.</span></li>'+
+        '<li><span class="n">3</span><span>Add them to a new list, or one you already have.</span></li>'+
+      '</ol>'+
+      '<div class="qf-modal-actions"><button type="button" class="btn btn-primary btn-sm" data-close>Got it</button></div>';
+    wireClose();
+  }
+  function renderPicker(dots){
+    modal.innerHTML=head('Save '+dots.length+' carrier'+(dots.length===1?'':'s'))+'<p class="qf-modal-msg">Loading your lists…</p>';
+    fetch('/api/directory/lists',{headers:{'Accept':'application/json'},credentials:'same-origin'})
+      .then(function(r){ return r.json().then(function(j){ return {status:r.status,body:j}; }); })
+      .then(function(res){ renderLists(res,dots); })
+      .catch(function(){ modal.innerHTML=head('Save carriers')+'<p class="qf-modal-msg qf-modal-msg--err">Could not load your lists. Please try again.</p><div class="qf-modal-actions"><button type="button" class="btn btn-secondary btn-sm" data-close>Close</button></div>'; wireClose(); });
+  }
+  function renderLists(res,dots){
+    if(res.status===401){ modal.innerHTML=head('Save carriers')+'<p>Sign in to save carriers to your lists.</p><div class="qf-modal-actions"><a class="btn btn-primary btn-sm" href="/login">Sign in</a><a class="btn btn-secondary btn-sm" href="/signup">Create an account</a></div>'; wireClose(); return; }
+    if(res.status===403){ var up=(res.body&&res.body.upgradeUrl)||'/signup'; modal.innerHTML=head('Save carriers with Directory Pro')+'<p>Build named lists of carriers and revisit them anytime — $19/mo.</p><div class="qf-modal-actions"><a class="btn btn-primary btn-sm" href="'+esc(up)+'">Upgrade to Directory Pro</a><button type="button" class="btn btn-secondary btn-sm" data-close>Not now</button></div>'; wireClose(); return; }
+    if(!res.body||res.body.ok!==true){ modal.innerHTML=head('Save carriers')+'<p class="qf-modal-msg qf-modal-msg--err">Could not load your lists. Please try again.</p><div class="qf-modal-actions"><button type="button" class="btn btn-secondary btn-sm" data-close>Close</button></div>'; wireClose(); return; }
+    var lists=res.body.lists||[];
+    var listHtml=lists.length?('<div class="qf-modal-lists">'+lists.map(function(l){ return '<button type="button" class="qf-modal-list" data-id="'+esc(l.id)+'"><span>'+esc(l.name)+'</span><span class="n">'+esc(l.count)+'</span></button>'; }).join('')+'</div>'):'<p>You have no lists yet — create one below.</p>';
+    modal.innerHTML=head('Save '+dots.length+' carrier'+(dots.length===1?'':'s'))+
+      '<p>Add the selected carrier'+(dots.length===1?'':'s')+' to a list.</p>'+
+      listHtml+
+      '<label class="qf-modal-newlbl" for="qf-modal-newname">New list name</label>'+
+      '<div class="qf-modal-new"><input type="text" id="qf-modal-newname" maxlength="80" placeholder="e.g. Savannah drayage" aria-label="New list name"><button type="button" class="btn btn-primary btn-sm" data-create>Create &amp; save</button></div>'+
+      '<p class="qf-modal-msg" hidden></p>';
+    wireClose();
+    Array.prototype.forEach.call(modal.querySelectorAll('.qf-modal-list'),function(b){ b.addEventListener('click',function(){ saveTo(b.getAttribute('data-id'),dots,null); }); });
+    var input=modal.querySelector('#qf-modal-newname'); var createBtn=modal.querySelector('[data-create]');
+    createBtn.addEventListener('click',function(){ var nm=(input.value||'').trim(); if(!nm){ input.focus(); return; } createBtn.disabled=true; msg('Creating…',false);
+      fetch('/api/directory/lists',{method:'POST',headers:{'Content-Type':'application/json','Accept':'application/json'},credentials:'same-origin',body:JSON.stringify({name:nm})})
+        .then(function(r){ return r.json(); })
+        .then(function(j){ if(j&&j.ok&&j.list){ saveTo(j.list.id,dots,nm); } else { msg((j&&j.reason==='list-cap')?'You have reached the list limit.':'Could not create the list.',true); createBtn.disabled=false; } })
+        .catch(function(){ msg('Could not create the list.',true); createBtn.disabled=false; }); });
+    input.addEventListener('keydown',function(e){ if(e.key==='Enter'){ e.preventDefault(); createBtn.click(); } });
+  }
+  function saveTo(id,dots,listName){ msg('Saving…',false);
+    fetch('/api/directory/lists/'+encodeURIComponent(id)+'/items/batch',{method:'POST',headers:{'Content-Type':'application/json','Accept':'application/json'},credentials:'same-origin',body:JSON.stringify({carrierDots:dots})})
+      .then(function(r){ return r.json().then(function(j){ return {status:r.status,body:j}; }); })
+      .then(function(res){ if(res.body&&res.body.ok){ msg('Saved '+dots.length+' carrier'+(dots.length===1?'':'s')+(listName?(' to '+listName):'')+'.',false); } else if(res.status===409){ msg('That list is full.',true); } else { msg('Could not save. Please try again.',true); } })
+      .catch(function(){ msg('Could not save. Please try again.',true); }); }
+  saveBtn.addEventListener('click',function(e){ e.preventDefault(); var dots=selected(); if(!dots.length){ renderEmpty(); } else { renderPicker(dots); } openModal(); });
 })();`;
 
 interface LayoutOpts {
@@ -1546,6 +1715,36 @@ function portsPickerGroup(scope: FacetScope, f: DirectoryFilters, counts: FacetC
   </script>`;
 }
 
+/** D4 — progressive-enhancement fold for a long facet option list. EVERY row
+ *  renders (crawlable + works with no JS); the first `visible` stay in view and
+ *  the overflow goes inside a collapsible region that FOLD_SCRIPT collapses on
+ *  load and toggles via the revealed "Show N more / Show less" button. `id` links
+ *  the button to the region (aria-controls). Below the threshold → a plain list. */
+function foldableRows(rows: string[], visible: number, id: string): string {
+  if (rows.length <= visible) return rows.join('\n');
+  const head = rows.slice(0, visible).join('\n');
+  const rest = rows.slice(visible);
+  return `${head}
+    <div class="facet-fold" id="${esc(id)}" data-fold><div class="facet-fold-inner">${rest.join('\n')}</div></div>
+    <button type="button" class="facet-more" data-fold-toggle aria-controls="${esc(id)}" aria-expanded="true" data-more="${rest.length}" hidden><span class="facet-more-txt">Show ${rest.length} more</span><span class="facet-more-ico" aria-hidden="true">▾</span></button>`;
+}
+
+/** Collapses each [data-fold] region on load and wires its sibling toggle. Runs
+ *  once (idempotent). Reduced-motion is handled purely in CSS. */
+const FOLD_SCRIPT = `(function(){
+  if(window.__qfFoldBound)return; window.__qfFoldBound=true;
+  var folds=document.querySelectorAll('[data-fold]');
+  Array.prototype.forEach.call(folds,function(fold){
+    var parent=fold.parentNode; if(!parent)return;
+    var btn=parent.querySelector('[data-fold-toggle][aria-controls="'+fold.id+'"]')||parent.querySelector('[data-fold-toggle]');
+    if(!btn||btn.__foldBound)return; btn.__foldBound=1;
+    var more=btn.getAttribute('data-more')||''; var txt=btn.querySelector('.facet-more-txt');
+    function set(open){ fold.setAttribute('data-collapsed',open?'0':'1'); btn.setAttribute('aria-expanded',open?'true':'false'); if(txt)txt.textContent=open?'Show less':('Show '+more+' more'); }
+    set(false); btn.hidden=false;
+    btn.addEventListener('click',function(){ set(fold.getAttribute('data-collapsed')==='1'); });
+  });
+})();`;
+
 function renderSidebar(scope: FacetScope, f: DirectoryFilters, counts: FacetCounts, summary?: DirectorySummary): string {
   // Tier 1 — Equipment & cargo (FMCSA crgo_* columns; MULTI-select checkboxes,
   // OR within the facet). Each row toggles its id in/out of the comma-list.
@@ -1562,14 +1761,17 @@ function renderSidebar(scope: FacetScope, f: DirectoryFilters, counts: FacetCoun
   // Tier 1 — Cargo specialties (FMCSA crgo_* columns; MULTI-select checkboxes,
   // OR within the facet, orthogonal to equipment via the separate `cargo` param).
   const cargoOrder = CARGO_OPTIONS.map((o) => o.id);
-  const cargo = CARGO_OPTIONS.map((o) =>
+  // 13 cargo specialties clutter the rail — keep the first 6 visible and fold the
+  // rest under "Show more" (all still render for no-JS / crawlers).
+  const cargoRows = CARGO_OPTIONS.map((o) =>
     facetOptionRow(
       f.cargo.includes(o.id),
       hrefWith(scope, f, { cargo: toggleMulti(cargoOrder, f.cargo, o.id) }),
       o.label,
       counts.cargo[o.id],
     ),
-  ).join('\n');
+  );
+  const cargo = foldableRows(cargoRows, 6, 'fold-cargo');
 
   // Tier 1 — Fleet size (trucks / power units).
   const fleet = FLEET_BUCKETS.map((b) =>
@@ -1615,16 +1817,16 @@ function renderSidebar(scope: FacetScope, f: DirectoryFilters, counts: FacetCoun
   if (scope.kind === 'all' && summary) {
     const top = summary.byState.filter((s) => US_STATE_CODES.has(s.state)).slice(0, 12);
     if (top.length) {
-      const links = top
-        .map((s) => {
-          const st = stateByCode(s.state)!;
-          const active = f.state === s.state;
-          return `<a class="facet-opt ${active ? 'active' : ''}" href="${hrefWith(scope, f, { state: active ? null : s.state })}">
+      const stateRows = top.map((s) => {
+        const st = stateByCode(s.state)!;
+        const active = f.state === s.state;
+        return `<a class="facet-opt ${active ? 'active' : ''}" href="${hrefWith(scope, f, { state: active ? null : s.state })}">
             <span class="lbl"><span class="facet-check"></span>${esc(st.name)}</span>
             <span class="cb">${fmtNum(s.count)}</span>
           </a>`;
-        })
-        .join('\n');
+      });
+      // Up to 12 states — keep the top 6 visible, fold the rest.
+      const links = foldableRows(stateRows, 6, 'fold-state');
       stateGroup = `<div class="facet-group"><h3>State</h3><span class="facet-src">FMCSA physical state · top 12</span>${links}
         <a class="facet-opt" href="/directory" style="justify-content:center;"><span class="lbl">All states &amp; ports →</span></a></div>`;
     }
@@ -1634,8 +1836,9 @@ function renderSidebar(scope: FacetScope, f: DirectoryFilters, counts: FacetCoun
   // (i.e. everywhere except the dedicated /directory/port/:port page).
   const portsGroup = scope.locked.has('port') ? '' : portsPickerGroup(scope, f, counts);
 
+  // NOTE: the mobile "Filters" toggle button now lives in the results toolbar
+  // (co-located with sort — D1); it still drives this rail by id (#rail-toggle).
   return `<aside class="dir-rail" id="dir-rail">
-    <button type="button" class="rail-toggle" id="rail-toggle" aria-expanded="true">Filters ▾</button>
     ${stateGroup}
     ${portsGroup}
     <div class="facet-group"><h3>Equipment &amp; cargo</h3><span class="facet-src">FMCSA cargo-type flags</span>${equipment}</div>
@@ -1654,7 +1857,8 @@ function renderSidebar(scope: FacetScope, f: DirectoryFilters, counts: FacetCoun
       apply();
       t.addEventListener('click',function(){var c=r.getAttribute('data-collapsed')==='1';if(c){r.removeAttribute('data-collapsed');t.setAttribute('aria-expanded','true');t.textContent='Filters ▴';}else{r.setAttribute('data-collapsed','1');t.setAttribute('aria-expanded','false');t.textContent='Filters ▾';}});
     })();
-  </script>`;
+  </script>
+  <script>${FOLD_SCRIPT}</script>`;
 }
 
 function appliedChips(scope: FacetScope, f: DirectoryFilters): string {
@@ -1820,7 +2024,10 @@ function selectableCard(c: VisibleCarrier): string {
   // selection and never opens the profile — even on mobile where a fat-finger tap
   // used to land on the underlying card <a>. A visible chip + "Select" caption
   // make it read as a selection control (see .cc-check styles + the grid legend).
-  return `<div class="cc-sel"><label class="cc-check" title="Select ${esc(name)} — tick to request rates or export" onclick="event.stopPropagation()"><span class="cc-box"><input type="checkbox" class="cc-cb" data-dot="${esc(c.usdot)}" aria-label="Select ${esc(name)} to request rates or export" onclick="event.stopPropagation()"></span></label>${carrierCard(c)}${saveControl(c, { compact: true })}</div>`;
+  // Save is NO LONGER per-card (it was redundant above+below every card). The
+  // checkbox selects carriers; Save lives once in the bottom action bar
+  // ("Save selected (N)"). Single-carrier save stays on the carrier PROFILE page.
+  return `<div class="cc-sel"><label class="cc-check" title="Select ${esc(name)} — tick to save, request rates or export" onclick="event.stopPropagation()"><span class="cc-box"><input type="checkbox" class="cc-cb" data-dot="${esc(c.usdot)}" aria-label="Select ${esc(name)} to save, request rates or export" onclick="event.stopPropagation()"></span></label>${carrierCard(c)}</div>`;
 }
 
 /** Free-text carrier-name search box shown above the results bar. A plain GET
@@ -1851,11 +2058,10 @@ function renderFacetedResults(cfg: FacetedCfg): string {
   const { scope, list, counts, filters } = cfg;
   const hasCarriers = list.carriers.length > 0;
   const cards = hasCarriers
-    ? `<p class="cc-legend"><span class="cc-legend-box" aria-hidden="true"></span> Tick a card's box to request rates from — or export — specific carriers. The bar below acts on all matches.</p>
+    ? `<p class="cc-legend"><span class="cc-legend-box" aria-hidden="true"></span> Tick a card's box to save, request rates from, or export specific carriers. The bar below acts on all matches when nothing is ticked.</p>
       <div class="dir-grid" style="grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));">${list.carriers
         .map(selectableCard)
-        .join('\n')}</div>
-      <script>${SAVE_WIDGET_SCRIPT}</script>`
+        .join('\n')}</div>`
     : `<div class="dir-empty">No carriers match these filters. <a href="${scope.basePath}" style="color:var(--accent);">Clear filters</a> to see all.</div>`;
 
   // Action bar: no-JS fallback links act on ALL filtered carriers (the filter
@@ -1880,11 +2086,13 @@ function renderFacetedResults(cfg: FacetedCfg): string {
         </div>
         <div class="qf-ab-actions">
           <a class="btn btn-primary btn-sm qf-ab-btn" data-role="rfq" href="${esc(links0.rfq)}">Request rates from <span class="qf-ab-rfqn">${fmtNum(rfqShown)}</span><span class="qf-ab-rfqof">${rfqOf}</span>&nbsp;<span class="qf-ab-rfqw">carrier${rfqPlural}</span> <span class="arr">→</span></a>
+          <button type="button" class="btn btn-secondary btn-sm qf-ab-btn qf-ab-save" data-role="save-selected" data-count="0" aria-haspopup="dialog">Save selected<span class="qf-ab-saven"> (0)</span></button>
           <a class="btn btn-secondary btn-sm qf-ab-btn" data-role="export-view" href="${esc(links0.exportView)}">Export list</a>
           <span class="qf-ab-fmts"><a class="qf-ab-fmt" data-role="export-xlsx" href="${esc(links0.exportXlsx)}">XLSX</a><a class="qf-ab-fmt" data-role="export-csv" href="${esc(links0.exportCsv)}">CSV</a></span>
         </div>
       </div>
-      <script>${ACTION_BAR_SCRIPT}</script>`
+      <script>${ACTION_BAR_SCRIPT}</script>
+      <script>${SAVE_SELECTED_SCRIPT}</script>`
     : '';
 
   // Results view: breadcrumb-only slim header, no hero. SEO pages: full hero.
@@ -1905,11 +2113,14 @@ function renderFacetedResults(cfg: FacetedCfg): string {
       ${renderSidebar(scope, filters, counts, cfg.summary)}
       <div class="dir-results">
         ${nameSearchBox(scope, filters)}
-        <div class="results-bar">
-          <div class="rc"><b>${fmtNum(list.total)}</b> carrier${list.total === 1 ? '' : 's'} match${counts.intermodal ? ` · ${fmtNum(counts.intermodal)} run drayage` : ''}</div>
-          ${sortRow(scope, filters)}
+        <div class="results-toolbar" role="group" aria-label="Filter and sort controls">
+          <div class="rt-main">
+            <button type="button" class="rail-toggle" id="rail-toggle" aria-expanded="true" aria-controls="dir-rail">Filters ▾</button>
+            <div class="rc"><b>${fmtNum(list.total)}</b> carrier${list.total === 1 ? '' : 's'} match${counts.intermodal ? ` · ${fmtNum(counts.intermodal)} run drayage` : ''}</div>
+            ${sortRow(scope, filters)}
+          </div>
+          ${appliedChips(scope, filters)}
         </div>
-        ${appliedChips(scope, filters)}
         ${cards}
         ${numberedPager(scope, filters, list)}
         ${cfg.extraModulesHtml ?? ''}
