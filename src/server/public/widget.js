@@ -945,6 +945,17 @@
     if (cfg.brand && cfg.brand.ctaText) $('qf-calc-btn').textContent = cfg.brand.ctaText;
   }
 
+  // Re-render hook for the /w/demo "Find your company" prefill: the landing
+  // finder patches window.QF_WIDGET_CONFIG.contact (same object as state.config)
+  // with the visitor's carrier credentials, then calls this to rebuild the
+  // header credential block from the patched config. Kept minimal + idempotent —
+  // renderHeader reuses #qf-cred-meta in place. Safe no-op before config loads.
+  try {
+    window.QF_RERENDER_HEADER = function () {
+      try { if (state && state.config) renderHeader(state.config); } catch (_e) { /* ignore */ }
+    };
+  } catch (_e) { /* ignore */ }
+
   // Credential meta-lines under the company name/tagline — the "meta lines under
   // name" header layout. Two muted, small secondary lines:
   //   line 1 (authority): USDOT {dot} · MC {mc}

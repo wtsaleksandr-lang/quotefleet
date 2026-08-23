@@ -50,7 +50,8 @@ import {
 import { loadEnv } from '../../config.js';
 import { getTrialState } from '../trialGating.js';
 import { canUseProFeature } from '../plans.js';
-import { publicCalcLimiter, publicChatLimiter, publicLeadLimiter, quoteMapLimiter } from '../rateLimits.js';
+import { publicAutocompleteLimiter, publicCalcLimiter, publicChatLimiter, publicLeadLimiter, quoteMapLimiter } from '../rateLimits.js';
+import { carrierLookup } from '../directory/queries.js';
 import { buildBaseMapUrl, getRoutedMiles, getRouteMap, laneCacheKey, normalizeBaseCenter, normalizeBaseScale, normalizeBaseZoom, normalizeTheme, peekRouteMap, resolveMapStyle } from '../routeMap.js';
 import { resolveWidgetTheme, WIDGET_PRESETS } from '../widgetThemes.js';
 import { resolveQuoteDisclaimer } from '../quoteDisclaimer.js';
@@ -365,6 +366,43 @@ export function registerPublicRoutes(app: Express) {
   });
 })();
 `);
+  });
+
+  // ── public carrier search ("Find your company" hero) ───────────
+  // Powers the marketing-landing typeahead: a visiting carrier types their own
+  // company name (or USDOT / MC) and picks their FMCSA record to open the demo
+  // calculator prefilled as THEM. PUBLIC + rate-limited (per-IP autocomplete
+  // limiter). Reuses carrierLookup, which merges carrier_overrides.hidden so the
+  // contact opt-out is honored (phone already null for a hidden carrier). The
+  // response is a SLIM public projection — NO email, no fleet/safety payload —
+  // and NEVER 500s: carrierLookup degrades to [] on any read failure, and a
+  // too-short query returns []. Mirrors the authed /api/tenant/carrier-search
+  // wiring, minus auth, so the hero can call it before sign-up.
+  app.get('/api/public/carrier-search', publicAutocompleteLimiter, async (req: Request, res: Response) => {
+    try {
+      const q = typeof req.query.q === 'string' ? req.query.q : undefined;
+      const dot = typeof req.query.dot === 'string' ? req.query.dot : undefined;
+      const mc = typeof req.query.mc === 'string' ? req.query.mc : undefined;
+      const rows = await carrierLookup({ q, dot, mc });
+      // Slim PUBLIC projection: only the fields the demo prefill needs. Email is
+      // deliberately dropped (never exposed on the public surface); phone is
+      // already nulled by carrierLookup when the carrier opted out of contact.
+      const results = rows.map((r) => ({
+        legalName: r.legalName,
+        dbaName: r.dbaName,
+        usdot: r.usdot,
+        mcNumber: r.mcNumber,
+        city: r.city,
+        state: r.state,
+        phone: r.phone,
+      }));
+      res.json({ results });
+    } catch (err) {
+      // Belt-and-suspenders: carrierLookup already swallows read failures, but a
+      // public endpoint must never 500 — degrade to an empty result set.
+      console.warn('[public] carrier-search failed; serving no matches:', (err as Error).message);
+      res.json({ results: [] });
+    }
   });
 
   // ── widget config (read-only, no PII) ──────────────────────────

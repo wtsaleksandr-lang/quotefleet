@@ -242,3 +242,86 @@
   .qf-dir-search .qf-dir-submit { width: 100%; }
   .qf-dir-stats { font-size: 12px; }
 }
+
+/* ── "Find your company" carrier finder (carrier hero) ─────────────────────
+   The trucker-facing typeahead that opens the demo prefilled as THEIR carrier.
+   The field reuses .qf-dir-name (design-system input); this adds the anchored
+   listbox + option rows. Left-aligned, theme-token colors, 8px-ramp spacing.
+   ───────────────────────────────────────────────────────────────────────── */
+.qf-finder {
+  margin: 0 0 24px 0;
+  max-width: 480px;
+  text-align: left;
+}
+.qf-finder__field {
+  position: relative;
+}
+.qf-finder__micro {
+  margin: 8px 0 0 0;
+  color: var(--muted);
+}
+/* Screen-reader-only live status (results count) — margin/border-free so the
+   spacing guard stays green. */
+.qf-finder__status {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  border: 0;
+  clip-path: inset(50%);
+  overflow: hidden;
+  white-space: nowrap;
+}
+
+/* Anchored results listbox. */
+.qf-finder__listbox {
+  position: absolute;
+  left: 0;
+  right: 0;
+  top: 100%;
+  z-index: 60;
+  margin: 4px 0 0 0;
+  padding: 4px;
+  list-style: none;
+  max-height: 336px;
+  overflow-y: auto;
+  background: var(--surface);
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius);
+  box-shadow: var(--shadow-md);
+}
+.qf-finder__listbox[hidden] { display: none; }
+
+.qf-finder__opt {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding: 8px 12px;
+  border-radius: var(--radius-btn);
+  cursor: pointer;
+}
+.qf-finder__opt.is-active,
+.qf-finder__opt:hover {
+  background: var(--accent-soft);
+}
+.qf-finder__opt-name {
+  font-family: var(--font-sans);
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--ink);
+  line-height: 1.4;
+}
+.qf-finder__opt-meta {
+  font-family: var(--font-sans);
+  font-size: 12px;
+  font-weight: 500;
+  color: var(--muted);
+  line-height: 1.4;
+}
+.qf-finder__msg {
+  padding: 12px;
+  font-family: var(--font-sans);
+  font-size: 13px;
+  color: var(--muted);
+  line-height: 1.5;
+}
