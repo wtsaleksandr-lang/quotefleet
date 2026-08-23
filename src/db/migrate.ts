@@ -453,6 +453,29 @@ export const SELF_HEAL_TABLE_STATEMENTS: readonly string[] = [
     "reveals" integer DEFAULT 0 NOT NULL
   )`,
   `CREATE UNIQUE INDEX IF NOT EXISTS "directory_reveal_usage_account_period_idx" ON "directory_reveal_usage" ("account_key","period")`,
+  // 0060_saved_lists.sql — Directory Pro "saved lists": a logged-in shipper
+  // groups carriers into named lists (PR D). Healed HERE (same reasoning as the
+  // directory tables above): the Replit deploy skips db:migrate and its publish
+  // tool can drop tables, so these CREATE TABLE / INDEX IF NOT EXISTS run on
+  // every boot and no-op on a healthy DB. MUST stay byte-for-byte equivalent to
+  // drizzle/0060_saved_lists.sql + schema.ts (savedLists / savedListItems).
+  // References `users` only, never `tenants`.
+  `CREATE TABLE IF NOT EXISTS "saved_lists" (
+    "id" serial PRIMARY KEY NOT NULL,
+    "user_id" integer NOT NULL,
+    "name" text NOT NULL,
+    "created_at" timestamp with time zone DEFAULT now() NOT NULL,
+    "updated_at" timestamp with time zone DEFAULT now() NOT NULL
+  )`,
+  `CREATE INDEX IF NOT EXISTS "saved_lists_user_idx" ON "saved_lists" ("user_id")`,
+  `CREATE TABLE IF NOT EXISTS "saved_list_items" (
+    "id" serial PRIMARY KEY NOT NULL,
+    "list_id" integer NOT NULL,
+    "carrier_dot" text NOT NULL,
+    "added_at" timestamp with time zone DEFAULT now() NOT NULL
+  )`,
+  `CREATE UNIQUE INDEX IF NOT EXISTS "saved_list_items_list_dot_idx" ON "saved_list_items" ("list_id","carrier_dot")`,
+  `CREATE INDEX IF NOT EXISTS "saved_list_items_list_idx" ON "saved_list_items" ("list_id")`,
 ];
 
 export async function ensureSelfHealTables(): Promise<void> {

@@ -90,6 +90,79 @@ const REVEAL_ENHANCE_SCRIPT = `
 })();
 `.trim();
 
+/**
+ * PR D — progressive-enhancement for the "Save to list" control (cards +
+ * profile). One delegated handler for the whole page (idempotent bind). A click
+ * opens a popover anchored to the button and fetches the caller's lists:
+ *   • 401 → a sign-in prompt   • 403 → the Directory Pro upgrade CTA
+ *   • 200 → the user's lists (click to add) + a "new list" input.
+ * All list/carrier ids come from data-* attributes; every interpolation is
+ * escaped. Server-side the control is inert without JS (it's a pure enhancement
+ * over the Pro-gated JSON API — the saved-lists page itself works with no JS).
+ */
+const SAVE_WIDGET_SCRIPT = `
+(function(){
+  if (window.__qfSaveBound) return; window.__qfSaveBound = true;
+  function esc(s){return String(s==null?'':s).replace(/[&<>"']/g,function(m){return ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[m]);});}
+  var open = null;
+  function close(){ if(open){ open.pop.remove(); open.btn.setAttribute('aria-expanded','false'); open=null; } }
+  function msg(pop, text, err){ var m = pop.querySelector('.qf-save-msg'); if(!m){ m=document.createElement('p'); pop.appendChild(m); } m.hidden=false; m.textContent=text; m.className='qf-save-msg'+(err?' qf-save-msg--err':''); }
+  document.addEventListener('click', function(e){
+    var t = e.target; if(!t || !t.closest){ return; }
+    var btn = t.closest('.qf-save-btn');
+    if (btn){ e.preventDefault(); e.stopPropagation(); var wrap = btn.closest('.qf-save'); if(open && open.wrap===wrap){ close(); return; } close(); openPop(wrap, btn); return; }
+    if (open && !t.closest('.qf-save-pop')) close();
+  });
+  document.addEventListener('keydown', function(e){ if(e.key==='Escape') close(); });
+  function openPop(wrap, btn){
+    var dot = wrap.getAttribute('data-dot')||''; var name = wrap.getAttribute('data-name')||'this carrier';
+    var pop = document.createElement('div'); pop.className='qf-save-pop'; pop.setAttribute('role','dialog'); pop.setAttribute('aria-label','Save '+name);
+    pop.innerHTML = '<p class="qf-save-msg">Loading your lists…</p>'; wrap.appendChild(pop); btn.setAttribute('aria-expanded','true');
+    open = { wrap: wrap, btn: btn, pop: pop };
+    fetch('/api/directory/lists', { headers:{ 'Accept':'application/json' }, credentials:'same-origin' })
+      .then(function(r){ return r.json().then(function(j){ return { status:r.status, body:j }; }); })
+      .then(function(res){ render(pop, res, dot, name); })
+      .catch(function(){ msg(pop, 'Could not load your lists. Try again.', true); });
+  }
+  function render(pop, res, dot, name){
+    if (res.status === 401){ pop.innerHTML = '<h4>Save '+esc(name)+'</h4><p>Sign in to save carriers to your lists.</p><a class="btn btn-primary btn-sm qf-save-cta" href="/login">Sign in</a><a class="btn btn-secondary btn-sm qf-save-cta" href="/signup">Create an account</a>'; return; }
+    if (res.status === 403){ var up = (res.body&&res.body.upgradeUrl)||'/signup'; pop.innerHTML = '<h4>Save carriers with Directory Pro</h4><p>Build named lists of carriers and revisit them anytime — $19/mo.</p><a class="btn btn-primary btn-sm qf-save-cta" href="'+esc(up)+'">Upgrade to Directory Pro — $19/mo</a>'; return; }
+    if (!res.body || res.body.ok !== true){ msg(pop, 'Could not load your lists. Try again.', true); return; }
+    var lists = res.body.lists || [];
+    var listHtml = lists.length ? '<div class="qf-save-lists">'+lists.map(function(l){ return '<button type="button" class="qf-save-list" data-id="'+esc(l.id)+'"><span>'+esc(l.name)+'</span><span class="n">'+esc(l.count)+'</span></button>'; }).join('')+'</div>' : '<p>You have no lists yet — create one below.</p>';
+    pop.innerHTML = '<h4>Save '+esc(name)+'</h4>'+listHtml+'<div class="qf-save-new"><input type="text" maxlength="80" placeholder="New list name" aria-label="New list name"><button type="button" class="btn btn-primary btn-sm qf-save-create">Create</button></div><p class="qf-save-msg" hidden></p>';
+    Array.prototype.forEach.call(pop.querySelectorAll('.qf-save-list'), function(b){ b.addEventListener('click', function(){ addTo(pop, b.getAttribute('data-id'), dot, b, null); }); });
+    var create = pop.querySelector('.qf-save-create'); var input = pop.querySelector('.qf-save-new input');
+    create.addEventListener('click', function(){ var nm=(input.value||'').trim(); if(!nm){ input.focus(); return; } create.disabled=true;
+      fetch('/api/directory/lists', { method:'POST', headers:{ 'Content-Type':'application/json','Accept':'application/json' }, credentials:'same-origin', body: JSON.stringify({ name: nm }) })
+        .then(function(r){ return r.json(); })
+        .then(function(j){ if(j&&j.ok&&j.list){ addTo(pop, j.list.id, dot, null, nm); } else { msg(pop, (j&&j.reason==='list-cap')?'You have reached the list limit.':'Could not create the list.', true); } })
+        .catch(function(){ msg(pop, 'Could not create the list.', true); })
+        .then(function(){ create.disabled=false; });
+    });
+    input.addEventListener('keydown', function(e){ if(e.key==='Enter'){ e.preventDefault(); create.click(); } });
+  }
+  function addTo(pop, id, dot, btnEl, listName){
+    if (btnEl) btnEl.setAttribute('aria-pressed','true');
+    fetch('/api/directory/lists/'+encodeURIComponent(id)+'/items', { method:'POST', headers:{ 'Content-Type':'application/json','Accept':'application/json' }, credentials:'same-origin', body: JSON.stringify({ carrierDot: dot }) })
+      .then(function(r){ return r.json().then(function(j){ return { status:r.status, body:j }; }); })
+      .then(function(res){ if(res.body&&res.body.ok){ msg(pop, 'Saved'+(listName?(' to '+listName):'')+'.', false); } else if(res.status===409){ msg(pop, 'That list is full.', true); } else { msg(pop, 'Could not save. Try again.', true); } })
+      .catch(function(){ msg(pop, 'Could not save. Try again.', true); });
+  }
+})();
+`.trim();
+
+/** The "Save to list" control for a carrier (card or profile). A single button;
+ *  the shared SAVE_WIDGET_SCRIPT builds its popover on click and drives gating
+ *  (sign-in / upgrade / real lists) off the Pro-gated JSON API. */
+function saveControl(c: VisibleCarrier, opts: { compact?: boolean } = {}): string {
+  const name = carrierName(c);
+  const label = opts.compact ? 'Save' : 'Save to list';
+  return `<div class="qf-save" data-dot="${esc(c.usdot)}" data-name="${esc(name)}">
+    <button type="button" class="btn btn-secondary btn-sm qf-save-btn" aria-haspopup="dialog" aria-expanded="false" title="Save ${esc(name)} to a list"><span class="qf-save-ic" aria-hidden="true">+</span> ${esc(label)}</button>
+  </div>`;
+}
+
 /** RFQ recipient cap — mirrors rfqMaxRecipients() in routes/rfq.ts (default 25).
  *  Read locally (not imported) to avoid a routes→resolve→pages import cycle. The
  *  send flow enforces the same cap; the action-bar label reflects it so the CTA
@@ -796,6 +869,51 @@ const DIRECTORY_CSS = `
     .join-panel { padding: 16px; }
     .join-actions .btn { flex: 1 1 100%; }
   }
+  /* ── Saved lists (Directory Pro, PR D) ──────────────────────────────────
+     The "Save" affordance on cards + profile, its popover, and the saved-lists
+     page rows. Theme-aware, tokens only. */
+  .cp-headactions { display: flex; flex-direction: column; align-items: flex-end; gap: 8px; }
+  @media (max-width: 640px) { .cp-headactions { align-items: flex-start; } }
+  .qf-save { position: relative; display: inline-flex; }
+  .cc-sel { display: flex; flex-direction: column; }
+  .cc-sel .carrier-card { flex: 1 1 auto; }
+  .cc-sel .qf-save { margin-top: 8px; }
+  .qf-save-btn { display: inline-flex; align-items: center; gap: 6px; }
+  .qf-save-ic { font-size: 15px; line-height: 1; font-weight: 700; }
+  .qf-save-pop { position: absolute; z-index: 40; left: 0; top: calc(100% + 8px); width: 260px; max-width: 80vw;
+    background: var(--surface); border: 1px solid var(--border-strong); border-radius: var(--radius-lg);
+    box-shadow: 0 12px 32px rgba(0,0,0,0.28); padding: 12px; }
+  .qf-save-pop h4 { margin: 0 0 8px; font-size: 13px; color: var(--ink); }
+  .qf-save-pop p { margin: 0 0 8px; font-size: 12px; color: var(--muted); line-height: 1.5; }
+  .qf-save-lists { display: flex; flex-direction: column; gap: 4px; max-height: 180px; overflow-y: auto; margin-bottom: 8px; }
+  .qf-save-list { display: flex; align-items: center; justify-content: space-between; gap: 8px;
+    width: 100%; text-align: left; background: var(--surface-2); border: 1px solid var(--border);
+    border-radius: var(--radius); padding: 8px 12px; font-size: 13px; color: var(--ink); cursor: pointer; }
+  .qf-save-list:hover, .qf-save-list:focus-visible { border-color: var(--accent); }
+  .qf-save-list .n { font-size: 11px; color: var(--muted); font-family: var(--font-mono); }
+  .qf-save-list[aria-pressed="true"] { border-color: var(--accent); color: var(--accent); }
+  .qf-save-new { display: flex; gap: 8px; margin-top: 8px; }
+  .qf-save-new input { flex: 1 1 auto; min-width: 0; background: var(--surface-2); border: 1px solid var(--border);
+    border-radius: var(--radius); padding: 8px 12px; font-size: 13px; color: var(--ink); }
+  .qf-save-msg { margin: 8px 0 0; font-size: 12px; color: var(--accent); }
+  .qf-save-msg--err { color: var(--ink-soft); }
+  .qf-save-cta { display: block; margin-top: 8px; }
+
+  /* Saved-lists page */
+  .sl-wrap { display: flex; flex-direction: column; gap: 16px; }
+  .sl-list { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius-lg); overflow: hidden; }
+  .sl-list > summary { list-style: none; cursor: pointer; display: flex; align-items: center; justify-content: space-between;
+    gap: 16px; padding: 16px 20px; font-size: 16px; font-weight: 600; color: var(--ink); }
+  .sl-list > summary::-webkit-details-marker { display: none; }
+  .sl-list > summary .n { font-size: 12px; color: var(--muted); font-family: var(--font-mono); font-weight: 500; }
+  .sl-body { padding: 0 20px 20px; }
+  .sl-empty { color: var(--muted); font-size: 13px; margin: 0; }
+  .sl-row { display: flex; align-items: center; justify-content: space-between; gap: 16px;
+    padding: 12px 0; border-top: 1px solid var(--border); }
+  .sl-row .lk { color: var(--ink); text-decoration: none; font-weight: 600; font-size: 14px; }
+  .sl-row .lk:hover { color: var(--accent); }
+  .sl-row .sub { font-size: 12px; color: var(--muted); font-family: var(--font-mono); }
+  .sl-rm { flex: 0 0 auto; }
 `;
 
 /**
@@ -1646,7 +1764,7 @@ function selectableCard(c: VisibleCarrier): string {
   // selection and never opens the profile — even on mobile where a fat-finger tap
   // used to land on the underlying card <a>. A visible chip + "Select" caption
   // make it read as a selection control (see .cc-check styles + the grid legend).
-  return `<div class="cc-sel"><label class="cc-check" title="Select ${esc(name)} — tick to request rates or export" onclick="event.stopPropagation()"><span class="cc-box"><input type="checkbox" class="cc-cb" data-dot="${esc(c.usdot)}" aria-label="Select ${esc(name)} to request rates or export" onclick="event.stopPropagation()"></span></label>${carrierCard(c)}</div>`;
+  return `<div class="cc-sel"><label class="cc-check" title="Select ${esc(name)} — tick to request rates or export" onclick="event.stopPropagation()"><span class="cc-box"><input type="checkbox" class="cc-cb" data-dot="${esc(c.usdot)}" aria-label="Select ${esc(name)} to request rates or export" onclick="event.stopPropagation()"></span></label>${carrierCard(c)}${saveControl(c, { compact: true })}</div>`;
 }
 
 /** Free-text carrier-name search box shown above the results bar. A plain GET
@@ -1680,7 +1798,8 @@ function renderFacetedResults(cfg: FacetedCfg): string {
     ? `<p class="cc-legend"><span class="cc-legend-box" aria-hidden="true"></span> Tick a card's box to request rates from — or export — specific carriers. The bar below acts on all matches.</p>
       <div class="dir-grid" style="grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));">${list.carriers
         .map(selectableCard)
-        .join('\n')}</div>`
+        .join('\n')}</div>
+      <script>${SAVE_WIDGET_SCRIPT}</script>`
     : `<div class="dir-empty">No carriers match these filters. <a href="${scope.basePath}" style="color:var(--accent);">Clear filters</a> to see all.</div>`;
 
   // Action bar: no-JS fallback links act on ALL filtered carriers (the filter
@@ -2547,7 +2666,10 @@ export function renderCarrierProfile(opts: {
             ${carrierName(c) !== c.legalName ? `<p class="muted-small" style="margin: 6px 0 0;">Legal name: ${esc(c.legalName)}</p>` : ''}
           </div>
         </div>
-        <p class="cp-claimline">Own this company? <a href="${claimHref}">Claim this profile — it's free →</a></p>
+        <div class="cp-headactions">
+          ${saveControl(c)}
+          <p class="cp-claimline">Own this company? <a href="${claimHref}">Claim this profile — it's free →</a></p>
+        </div>
       </div>
     </div>
   </section>
@@ -2675,7 +2797,8 @@ export function renderCarrierProfile(opts: {
         }).join('');
       }
     })();
-  </script>`;
+  </script>
+  <script>${SAVE_WIDGET_SCRIPT}</script>`;
 
   return layout({
     title: `${carrierName(c)} — USDOT ${c.usdot} Carrier Profile | QuoteFleet`,
@@ -2698,6 +2821,109 @@ export function renderCarrierNotFound(): string {
     title: 'Carrier not found | QuoteFleet',
     description: 'This carrier is not in the QuoteFleet directory.',
     canonicalPath: '/directory',
+    bodyHtml: body,
+  });
+}
+
+// ─── Saved lists (Directory Pro, PR D) ─────────────────────────────────────
+/** Wire the saved-lists page remove buttons (DELETE → drop the row + update the
+ *  count). Pure progressive enhancement: viewing the lists works with no JS. */
+const SAVED_LISTS_PAGE_SCRIPT = `
+(function(){
+  document.addEventListener('click', function(e){
+    var t = e.target; if(!t || !t.closest) return;
+    var btn = t.closest('.sl-rm'); if(!btn) return;
+    var listId = btn.getAttribute('data-list'); var dot = btn.getAttribute('data-dot');
+    btn.disabled = true; btn.textContent = 'Removing…';
+    fetch('/api/directory/lists/'+encodeURIComponent(listId)+'/items/'+encodeURIComponent(dot), { method:'DELETE', headers:{ 'Accept':'application/json' }, credentials:'same-origin' })
+      .then(function(r){ return r.json(); })
+      .then(function(j){ if(j&&j.ok){ var row=btn.closest('.sl-row'); var det=btn.closest('.sl-list'); if(row) row.remove(); update(det, j.count); } else { btn.disabled=false; btn.textContent='Remove'; } })
+      .catch(function(){ btn.disabled=false; btn.textContent='Remove'; });
+  });
+  function update(det, count){ if(!det) return; var n=det.querySelector('summary .n'); if(n && typeof count==='number'){ n.textContent = count+' carrier'+(count===1?'':'s'); } var body=det.querySelector('.sl-body'); if(body && count===0){ body.innerHTML='<p class="sl-empty">No carriers in this list yet.</p>'; } }
+})();
+`.trim();
+
+/** One saved carrier as a directory-style row with a remove button. */
+function savedCarrierRow(listId: number, c: VisibleCarrier): string {
+  const cityState = [c.city ? titleCaseCity(c.city) : '', c.state].filter(Boolean).join(', ');
+  const sub = [c.usdot ? `USDOT ${esc(c.usdot)}` : '', cityState ? esc(cityState) : ''].filter(Boolean).join(' · ');
+  const name = carrierName(c);
+  return `<div class="sl-row" data-dot="${esc(c.usdot)}">
+    <div>
+      <a class="lk" href="/directory/carrier/${encodeURIComponent(c.slug)}">${esc(name)}</a>
+      ${sub ? `<div class="sub">${sub}</div>` : ''}
+    </div>
+    <button type="button" class="btn btn-secondary btn-sm sl-rm" data-list="${listId}" data-dot="${esc(c.usdot)}" aria-label="Remove ${esc(name)} from this list">Remove</button>
+  </div>`;
+}
+
+/** One saved list as an expandable block of carrier rows. */
+function savedListBlock(list: { id: number; name: string; carriers: VisibleCarrier[] }): string {
+  const n = list.carriers.length;
+  const rows = n ? list.carriers.map((c) => savedCarrierRow(list.id, c)).join('\n') : `<p class="sl-empty">No carriers in this list yet.</p>`;
+  return `<details class="sl-list" open data-list-id="${list.id}">
+    <summary><span>${esc(list.name)}</span><span class="n">${n} carrier${n === 1 ? '' : 's'}</span></summary>
+    <div class="sl-body">${rows}</div>
+  </details>`;
+}
+
+/** The Pro-gated saved-lists view: the user's lists + their saved carriers. */
+export function renderSavedListsPage(opts: { lists: Array<{ id: number; name: string; carriers: VisibleCarrier[] }> }): string {
+  const lists = opts.lists ?? [];
+  const total = lists.reduce((sum, l) => sum + l.carriers.length, 0);
+  const listsHtml = lists.length
+    ? `<div class="sl-wrap">${lists.map(savedListBlock).join('\n')}</div>
+       <script>${SAVED_LISTS_PAGE_SCRIPT}</script>`
+    : `<div class="dir-card" style="padding: 32px; max-width: 560px;">
+        <h2 style="margin: 0 0 8px; font-size: 18px;">No saved lists yet</h2>
+        <p class="muted" style="margin: 0 0 16px; line-height: 1.55;">Save carriers from the <a href="/directory">directory</a> or any carrier profile to build a shortlist you can revisit whenever you're sourcing capacity.</p>
+        <a class="btn btn-primary" href="/directory">Browse the directory <span class="arr">→</span></a>
+      </div>`;
+  const body = `
+  <section class="hero dir-hero">
+    <div class="container-narrow">
+      ${crumbsHtml([{ name: 'Directory', path: '/directory' }, { name: 'Saved lists' }])}
+      <h1 style="margin-top: 6px;">Your saved carrier lists</h1>
+      <p class="lead">${total ? `${fmtNum(total)} carrier${total === 1 ? '' : 's'} across ${fmtNum(lists.length)} list${lists.length === 1 ? '' : 's'}.` : 'Build named shortlists of carriers and revisit them anytime.'}</p>
+    </div>
+  </section>
+  <main class="dir-shell dir-shell--tight">
+    ${listsHtml}
+  </main>`;
+  return layout({
+    title: 'Your saved carrier lists | QuoteFleet',
+    description: 'Your saved carrier shortlists on QuoteFleet Directory Pro.',
+    canonicalPath: '/directory/lists',
+    bodyHtml: body,
+  });
+}
+
+/** Upsell shown on /directory/lists to callers without Directory Pro: a sign-in
+ *  prompt (no session) or the $19/mo upgrade CTA (free account). */
+export function renderSavedListsUpsell(reason: 'needs-account' | 'needs-pro'): string {
+  const isAccount = reason === 'needs-account';
+  const body = `
+  <section class="hero dir-hero">
+    <div class="container-narrow">
+      ${crumbsHtml([{ name: 'Directory', path: '/directory' }, { name: 'Saved lists' }])}
+      <h1 style="margin-top: 6px;">Saved carrier lists</h1>
+      <p class="lead">${isAccount ? 'Sign in to save carriers into named lists and revisit them anytime.' : 'Saving carriers into named lists is a Directory Pro feature.'}</p>
+    </div>
+  </section>
+  <main class="dir-shell dir-shell--tight">
+    <div class="dir-card" style="padding: 32px; max-width: 560px;">
+      <h2 style="margin: 0 0 8px; font-size: 18px;">${isAccount ? 'Sign in to build saved lists' : 'Save carriers with Directory Pro'}</h2>
+      <p class="muted" style="margin: 0 0 16px; line-height: 1.55;">Build named shortlists of carriers from the directory and any carrier profile, then come back to them whenever you're sourcing capacity.${isAccount ? '' : ' Directory Pro is $19/mo.'}</p>
+      ${isAccount
+        ? `<a class="btn btn-primary" href="/login">Sign in</a> <a class="btn btn-secondary" href="/signup?plan=directory-pro">Create an account</a>`
+        : `<a class="btn btn-primary" href="/signup?plan=directory-pro">Upgrade to Directory Pro — $19/mo <span class="arr">→</span></a>`}
+    </div>
+  </main>`;
+  return layout({
+    title: 'Saved carrier lists | QuoteFleet',
+    description: 'Save carriers into named lists with QuoteFleet Directory Pro.',
+    canonicalPath: '/directory/lists',
     bodyHtml: body,
   });
 }
