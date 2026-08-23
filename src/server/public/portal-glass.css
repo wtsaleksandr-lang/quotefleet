@@ -186,9 +186,13 @@ html[data-theme="light"] .app-main {
   padding-bottom: 80px;
 }
 @media (max-width: 640px) {
+  /* bottom:24px keeps the 56px launcher's footprint (24 + 56 = 80px) exactly
+     within the 80px .app-main gutter above, so the last KPI tile corner clears
+     the FAB on short viewports instead of grazing it. At bottom:32px the 88px
+     footprint overran the gutter by 8px. right stays tight into the corner. */
   .qf-copilot-launcher {
     right: 16px;
-    bottom: 32px;
+    bottom: 24px;
   }
 }
 

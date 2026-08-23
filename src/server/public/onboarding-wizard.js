@@ -112,6 +112,21 @@
   function obMcToBareDigits(s) {
     return String(s == null ? '' : s).replace(/\D/g, '').replace(/^0+/, '');
   }
+  // Format a raw phone for DISPLAY ONLY (never for the persisted value): strip
+  // non-digits; 10 digits → "(NNN) NNN-NNNN"; 11 with a leading 1 →
+  // "+1 (NNN) NNN-NNNN"; anything else (already formatted / short /
+  // international) passes through trimmed and unchanged.
+  function formatPhoneDisplay(raw) {
+    var s = String(raw == null ? '' : raw).trim();
+    var d = s.replace(/\D/g, '');
+    if (d.length === 10) {
+      return '(' + d.slice(0, 3) + ') ' + d.slice(3, 6) + '-' + d.slice(6);
+    }
+    if (d.length === 11 && d.charAt(0) === '1') {
+      return '+1 (' + d.slice(1, 4) + ') ' + d.slice(4, 7) + '-' + d.slice(7);
+    }
+    return s;
+  }
   // Title-case an ALL-CAPS FMCSA name, keeping common suffixes upper-cased.
   var OB_SUFFIX_UPPER = { LLC: 1, LLP: 1, LP: 1, INC: 1, 'INC.': 1, CORP: 1, 'CORP.': 1, CO: 1, 'CO.': 1, LTD: 1, PC: 1, USA: 1, US: 1 };
   function obTitleCaseCompany(s) {
@@ -788,7 +803,9 @@
           state.postalCode = row.zip ? String(row.zip).trim() : '';
           var loc = [state.city ? obTitleCaseCompany(state.city) : '', state.state]
             .filter(Boolean).join(', ');
-          var extras = [state.contactPhone, loc].filter(Boolean);
+          // Persisted value (state.contactPhone) stays raw; only the note text
+          // shows the human-formatted phone.
+          var extras = [formatPhoneDisplay(state.contactPhone), loc].filter(Boolean);
           if (extras.length) {
             extraNote.textContent = 'Also added: ' + extras.join(' · ') + ' — edit anytime in Account.';
             extraNote.style.display = '';
