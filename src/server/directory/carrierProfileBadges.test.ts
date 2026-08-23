@@ -105,17 +105,21 @@ describe('renderCarrierProfile — credential badges', () => {
     expect(unrated).not.toContain(badge('safety-bad'));
   });
 
-  it('keeps self-declared credentials muted with a "claim to add" affordance + tooltip', () => {
+  it('keeps self-declared credentials muted with a compact "Claim" affordance + explanatory tooltip', () => {
     const html = renderCarrierProfile({ carrier: carrier() });
     expect(html).toContain(badge('claim'));
-    expect(html).toContain('claim to add');
+    // Compact one-word affordance (was "claim to add"), same size on every card.
+    expect(html).toContain('>Claim</span>');
+    expect(html).not.toContain('claim to add');
+    // Terse "Claim" is explained by the tooltip's claim call-to-action.
+    expect(html).toContain('Claim this profile to verify &amp; add this credential.');
     // Each self-declared badge names the credential and flags it self-declared.
-    expect(html).toContain('>UIIA member ');
+    expect(html).toContain('>UIIA member</span>');
     expect(html).toContain('Uniform Intermodal Interchange Agreement');
     expect(html).toContain('Self-declared.');
-    expect(html).toContain('>TWIC ');
-    expect(html).toContain('>Customs-bonded / C-TPAT ');
-    expect(html).toContain('>Reefer ');
+    expect(html).toContain('>TWIC</span>');
+    expect(html).toContain('>Customs-bonded / C-TPAT</span>');
+    expect(html).toContain('>Reefer</span>');
   });
 
   it('makes every badge keyboard-focusable with a tooltip + aria-label', () => {
