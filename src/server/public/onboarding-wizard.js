@@ -254,6 +254,15 @@
       mcNumber: '',
       dotNumber: '',
       publicContactEmail: '',
+      // Extra first-touch autofill pulled by the "Find your company" finder but
+      // NOT given a visible input on this step (kept uncluttered). Only ever set
+      // by a finder pick; empty otherwise, so a carrier who ignores the finder
+      // never persists a blank over anything. Phone → tenants.contactPhone at
+      // finish; city/state/postalCode → carrier-profile at finish.
+      contactPhone: '',
+      city: '',
+      state: '',
+      postalCode: '',
       rates: null,
       ratesLoaded: false,
       // Zone-priced verticals (drayage) quote by a FLAT per-load tariff the
@@ -640,13 +649,38 @@
         // directory so a brand-new carrier doesn't hand-type them at first touch.
         // References to the three inputs are captured below so a pick can fill them.
         var mcInput, dotInput, emailInput;
+        // A subtle, friendly confirmation of the EXTRA details a finder pick
+        // pulled that have no visible input here — phone + city/state — so the
+        // carrier is aware they were captured (transparency) and knows where to
+        // edit them. Hidden until a pick actually provides at least one. Text is
+        // set via textContent (never innerHTML), so any FMCSA value is escaped.
+        var extraNote = el('p', 'qf-ob-hint qf-ob-autofill-note');
+        extraNote.style.display = 'none';
         body.appendChild(createObCarrierFinder(function (row) {
           if (dotInput) { dotInput.value = row.usdot || ''; state.dotNumber = dotInput.value; }
           if (mcInput) { mcInput.value = row.mcNumber ? obMcToBareDigits(row.mcNumber) : ''; state.mcNumber = mcInput.value; }
           // publicContactEmail may be null (contactHidden / no FMCSA email) → leave blank.
           if (emailInput && row.email) { emailInput.value = row.email; state.publicContactEmail = row.email; }
+          // Extra autofill carried in state + persisted at finish (no visible
+          // input). Each guarded: a contact-opt-out carrier nulls phone, and a
+          // record may lack city/state — never persist a blank over anything.
+          state.contactPhone = row.phone ? String(row.phone).trim() : '';
+          state.city = row.city ? String(row.city).trim() : '';
+          state.state = row.state ? String(row.state).trim() : '';
+          state.postalCode = row.zip ? String(row.zip).trim() : '';
+          var loc = [state.city ? obTitleCaseCompany(state.city) : '', state.state]
+            .filter(Boolean).join(', ');
+          var extras = [state.contactPhone, loc].filter(Boolean);
+          if (extras.length) {
+            extraNote.textContent = 'Also added: ' + extras.join(' · ') + ' — edit anytime in Account.';
+            extraNote.style.display = '';
+          } else {
+            extraNote.textContent = '';
+            extraNote.style.display = 'none';
+          }
           gateNext();
         }));
+        body.appendChild(extraNote);
 
         var trust = el('div', 'qf-ob-trust');
         var addTrustField = function (labelText, placeholder, key, extraCls) {
@@ -813,6 +847,12 @@
         payload.mcNumber = orNull(state.mcNumber);
         payload.dotNumber = orNull(state.dotNumber);
         payload.publicContactEmail = orNull(state.publicContactEmail);
+        // Phone has NO visible input on this step (the step stays uncluttered);
+        // it is only ever set by a finder pick. Send it ONLY when the finder
+        // actually supplied one — never a null that would clobber a phone the
+        // carrier set in Account, and never a blank for an opt-out carrier.
+        var phone = (state.contactPhone || '').trim();
+        if (phone) payload.contactPhone = phone;
       }
       return payload;
     }
@@ -899,6 +939,26 @@
         if (!r.ok) throw new Error('apply failed (' + r.status + ')');
       });
 
+      // Company address (city / state / ZIP) lives in the carrier-profile store,
+      // NOT on the tenants row — so it's persisted via a separate PUT, mirroring
+      // how the Account "Company details" card writes it. Only fired when the
+      // finder actually supplied a location: a carrier who ignored the finder,
+      // or a record with no city/state, never triggers an empty address write
+      // (the endpoint merges, so a partial patch here won't wipe other fields).
+      var addr = {};
+      if ((state.city || '').trim()) addr.city = state.city.trim();
+      if ((state.state || '').trim()) addr.state = state.state.trim();
+      if ((state.postalCode || '').trim()) addr.postalCode = state.postalCode.trim();
+      var saveLocation = Object.keys(addr).length === 0
+        ? Promise.resolve()
+        : fetch('/api/tenant/carrier-profile', {
+            method: 'PUT',
+            headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
+            body: JSON.stringify(addr)
+          }).then(function (r) {
+            if (!r.ok) throw new Error('carrier-profile save failed (' + r.status + ')');
+          });
+
       // Persist every edited row to the SAME table the engine reads: rate-card
       // edits → /rate-cards, zone flat-price edits → /lane-zones. Each row was
       // stamped with __endpoint/__field when rendered, so a drayage carrier's
@@ -921,7 +981,7 @@
       // Attached synchronously so neither branch can reject unhandled while the
       // other is still in flight. The two touch different rows, so order is
       // irrelevant and they run in parallel.
-      Promise.all([applyTrust, Promise.all(puts)])
+      Promise.all([applyTrust, saveLocation, Promise.all(puts)])
         .then(function () { close(); onDone(); })
         .catch(function () {
           state.submitting = false;
