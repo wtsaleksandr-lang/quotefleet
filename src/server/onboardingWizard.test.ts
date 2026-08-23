@@ -20,7 +20,9 @@ describe('onboarding wizard — client overlay', () => {
     expect(js).toContain('What do you haul?');
     expect(js).toContain('Where do you operate?');
     expect(js).toContain('How should we quote?');
-    expect(js).toContain('Confirm your top 3 rates');
+    // The confirm heading is now dynamic — "top N rate(s)" from the actual row
+    // count (it hardcoded "top 3" before, wrong for a 2-mode carrier).
+    expect(js).toContain("'Confirm your top '");
     // The standalone pricing-mode step was dropped — the pricing model is
     // DERIVED from the first mode and the engine ignores an explicit choice, so
     // asking it as its own screen read as dummy filler.
@@ -47,7 +49,8 @@ describe('onboarding wizard — client overlay', () => {
     // pricing-mode screen was removed (mode-derived + engine-ignored).
     expect(js).toContain('var STEPS = 4');
     for (const n of [1, 2, 3, 4]) expect(js).toContain(`Step ${n} of 4`);
-    expect(js).toContain('Confirm your top 3 rates');
+    // Confirm heading is dynamic on the row count ("top N rate(s)").
+    expect(js).toContain("'Confirm your top '");
     // No stale "of 5" kicker strings survive the removal.
     expect(js).not.toContain('of 5');
 
