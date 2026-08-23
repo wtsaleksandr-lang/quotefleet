@@ -155,14 +155,20 @@ export function createApp(): express.Express {
   registerIngestRoutes(app);
   registerInboundRoutes(app);
   registerMarketplaceRoutes(app);
-  // Export routes MUST precede the directory routes: their specific paths
-  // (/directory/export/view, /directory/export.xlsx|.csv) would otherwise be
-  // swallowed by /directory/:stateSlug(/:citySlug).
+  // Export AND RFQ routes MUST precede the directory routes: their specific
+  // paths (/directory/export/view, /directory/export.xlsx|.csv, /directory/rfq,
+  // /directory/rfq/:viewToken) would otherwise be swallowed by the directory
+  // catch-alls /directory/:stateSlug(/:citySlug). Express matches in
+  // registration order, so a /directory/rfq GET registered AFTER the catch-all
+  // matches /directory/:stateSlug (stateSlug="rfq"), finds no such state, and
+  // 302-redirects to /directory — which killed the shipper's RFQ form and the
+  // RFQ responses/quotes view in prod (the flagship shipper feature was a dead
+  // button). Keep RFQ registered here, before registerDirectoryRoutes.
   registerDirectoryExportRoutes(app);
+  registerRfqRoutes(app);
   registerDirectoryRoutes(app);
   // Directory Pro "Reveal additional contacts" — POST /api/directory/carrier/:usdot/reveal.
   registerDirectoryRevealRoutes(app);
-  registerRfqRoutes(app);
   registerServiceRoutes(app);
   registerGlossaryRoutes(app);
   registerToolsRoutes(app);
