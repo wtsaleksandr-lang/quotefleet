@@ -82,13 +82,13 @@ describe('renderCarrierProfile — override wiring', () => {
     expect(html).toContain('Self-declared.');
   });
 
-  it('leaves an unset capability as the muted "claim to add" affordance', () => {
+  it('leaves an unset capability as the muted compact "Claim" affordance', () => {
     const html = renderCarrierProfile({ carrier: carrier() });
     // No solid UIIA badge…
     expect(html).not.toContain('class="cp-badge cp-tip cp-badge--uiia"');
-    // …the muted claim badge with the affordance is shown instead.
+    // …the muted claim badge with the compact affordance is shown instead.
     expect(html).toContain('cp-badge--claim');
-    expect(html).toContain('claim to add');
+    expect(html).toContain('>Claim</span>');
   });
 
   it('a hidden override suppresses public contact on the profile', () => {
