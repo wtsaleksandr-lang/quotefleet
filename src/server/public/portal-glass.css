@@ -1,0 +1,227 @@
+/* ==========================================================================
+   PORTAL GLASS — premium "liquid glass" chrome for the QuoteFleet dashboard
+   (surface 5). Matches DESIGN-SYSTEM.md and the widget / landing / onboarding
+   glass systems already shipped.
+
+   Loaded LAST in app.html so it out-cascades the base shell. Where a target is
+   defined by the inline <style> in app.html (top bar, sidebar, account menu) —
+   which sits AFTER the head links in document order and would otherwise win at
+   equal specificity — these rules use the element's #id (or a theme-prefixed
+   id) so they win by specificity regardless of source order.
+
+   Dark is the default (no attribute); light is opt-in via html[data-theme="light"].
+   Per memory: the light subtree has NO global reset, so light glass tokens are
+   scoped explicitly below. Every glass surface pairs backdrop-filter with a
+   -webkit- prefix AND an @supports-not SOLID fallback (restores var(--surface),
+   never a see-through tint over text). Colours are rgba()/tokens only — no raw
+   hex — so the spacing/colour guards stay green. This block sits at EOF-scope
+   of the portal CSS load order; edits here never renumber other files' guards.
+   ========================================================================== */
+
+:root {
+  --glass-ultrathin-bg: rgba(18, 22, 30, 0.62);
+  --glass-bg: rgba(22, 27, 36, 0.55);
+  --glass-border: rgba(255, 255, 255, 0.10);
+  --glass-shadow: 0 8px 32px rgba(0, 0, 0, 0.36);
+  --glass-blur: 12px;
+  /* KPI tiles/cards carry big numbers + charts → keep the tint ≥0.5 so the
+     value stays crisp (readability HARD rule). */
+  --glass-tile-bg: rgba(22, 27, 36, 0.58);
+  --glass-lift-shadow: 0 12px 40px rgba(0, 0, 0, 0.42);
+}
+html[data-theme="light"] {
+  --glass-ultrathin-bg: rgba(255, 255, 255, 0.62);
+  --glass-bg: rgba(255, 255, 255, 0.45);
+  --glass-border: rgba(255, 255, 255, 0.28);
+  --glass-shadow: 0 8px 32px rgba(15, 23, 42, 0.10);
+  --glass-tile-bg: rgba(255, 255, 255, 0.55);
+  --glass-lift-shadow: 0 12px 40px rgba(15, 23, 42, 0.16);
+}
+
+/* ── Reusable glass primitives (canonical) ─────────────────────────────── */
+.qf-glass-ultrathin {
+  background: var(--glass-ultrathin-bg);
+  backdrop-filter: blur(var(--glass-blur)) saturate(1.4);
+  -webkit-backdrop-filter: blur(var(--glass-blur)) saturate(1.4);
+  border: 1px solid var(--glass-border);
+}
+.qf-glass {
+  background: var(--glass-bg);
+  backdrop-filter: blur(var(--glass-blur)) saturate(1.3);
+  -webkit-backdrop-filter: blur(var(--glass-blur)) saturate(1.3);
+  border: 1px solid var(--glass-border);
+  box-shadow: var(--glass-shadow);
+  border-radius: var(--radius-lg);
+}
+
+/* ══ 1 — GRADIENT FIELD (foundation) ═══════════════════════════════════════
+   A low-cost, fixed CSS gradient wash behind everything. Making the field
+   colourful is what lets the blur read as GLASS rather than flat frosting. It
+   sits on <body> (which wraps both the sticky top bar and the app shell) with
+   background-attachment:fixed so it never repaints on scroll, and the shell is
+   made transparent so the field shows behind the sidebar + main. No image →
+   CSP-safe. */
+body {
+  background:
+    radial-gradient(1200px 600px at 15% -10%, rgba(110, 139, 255, 0.16), transparent 60%),
+    radial-gradient(900px 500px at 100% 0%, rgba(13, 60, 252, 0.12), transparent 55%),
+    var(--bg);
+  background-attachment: fixed;
+}
+html[data-theme="light"] body {
+  background:
+    radial-gradient(1200px 600px at 15% -10%, rgba(110, 139, 255, 0.06), transparent 60%),
+    radial-gradient(900px 500px at 100% 0%, rgba(13, 60, 252, 0.06), transparent 55%),
+    var(--bg);
+  background-attachment: fixed;
+}
+.app-shell,
+html[data-theme="light"] .app-shell {
+  background: transparent;
+}
+
+/* ══ 2 — ultraThin CHROME (top bar / sidebar / drawer / account menu) ══════ */
+
+/* Top bar — sticky; content slides under it (the classic ultraThin case). Its
+   scroll ancestor is <body> with no overflow:hidden, so sticky already works;
+   nothing to change there (see overflow-clip-for-sticky memory). */
+#qf-topbar {
+  background: var(--glass-ultrathin-bg);
+  backdrop-filter: blur(var(--glass-blur)) saturate(1.4);
+  -webkit-backdrop-filter: blur(var(--glass-blur)) saturate(1.4);
+  border-bottom: 1px solid var(--glass-border);
+}
+
+/* Sidebar (desktop rail + mobile off-canvas drawer are the same #qf-sidebar).
+   Light keeps its rounded floating card (margin/radius/shadow live on the
+   .sidebar rule in dashboard-freight-shell.css); only the tint/blur/border are
+   swapped to the canonical glass token here. */
+#qf-sidebar,
+html[data-theme="light"] #qf-sidebar {
+  background: var(--glass-ultrathin-bg);
+  backdrop-filter: blur(var(--glass-blur)) saturate(1.4);
+  -webkit-backdrop-filter: blur(var(--glass-blur)) saturate(1.4);
+  border-right: 1px solid var(--glass-border);
+}
+html[data-theme="light"] #qf-sidebar {
+  /* light shell draws it as a detached card → hairline all around, not a rail */
+  border-right: 0;
+  border: 1px solid var(--glass-border);
+}
+
+/* Account dropdown — ultraThin, but KEEP its drop shadow (it floats free). */
+#qf-account-menu {
+  background: var(--glass-ultrathin-bg);
+  backdrop-filter: blur(var(--glass-blur)) saturate(1.4);
+  -webkit-backdrop-filter: blur(var(--glass-blur)) saturate(1.4);
+  border-color: var(--glass-border);
+}
+
+/* ══ 3 — thin/regular GLASS + hover-lift (KPI tiles & chart cards) ═════════
+   Theme-prefixed selectors are included so they beat the light shell's
+   html[data-theme="light"] .card override at equal specificity via load order.
+   Tint ≥0.5 (--glass-tile-bg) keeps the big .qf-kpi-value legible. */
+.qf-kpi-tile,
+.qf-kpi-card,
+html[data-theme="light"] .qf-kpi-tile,
+html[data-theme="light"] .qf-kpi-card {
+  background: var(--glass-tile-bg);
+  backdrop-filter: blur(var(--glass-blur)) saturate(1.3);
+  -webkit-backdrop-filter: blur(var(--glass-blur)) saturate(1.3);
+  border: 1px solid var(--glass-border);
+  box-shadow: var(--glass-shadow);
+  border-radius: var(--radius-lg);
+}
+.qf-kpi-tile,
+.qf-kpi-card {
+  transition: transform 0.18s ease, box-shadow 0.18s ease;
+}
+.qf-kpi-tile:hover,
+.qf-kpi-card:hover {
+  transform: translateY(-2px);
+  box-shadow: var(--glass-lift-shadow);
+}
+
+/* ══ 5 — Setup checklist + Referral cards → regular glass ══════════════════
+   Both render as class="card qf-glass" (app.js). Compound + theme-prefixed
+   selectors out-specify base .card and the light-shell .card override. */
+.card.qf-glass,
+html[data-theme="light"] .card.qf-glass {
+  background: var(--glass-bg);
+  backdrop-filter: blur(var(--glass-blur)) saturate(1.3);
+  -webkit-backdrop-filter: blur(var(--glass-blur)) saturate(1.3);
+  border: 1px solid var(--glass-border);
+  box-shadow: var(--glass-shadow);
+}
+
+/* ══ 4 — Fold/unfold motion ════════════════════════════════════════════════
+   The "Advanced" sidebar <details>: its nav rows fade + slide in when the
+   disclosure opens (was instant). Click-triggered only — never animates during
+   a wheel gesture (wizard-scroll-model memory). The chevron rotation already
+   lives in app.html's inline block. */
+.qf-nav-advanced > .nav-item {
+  opacity: 0;
+  transform: translateY(-4px);
+  transition: opacity 0.18s ease, transform 0.18s ease;
+}
+.qf-nav-advanced[open] > .nav-item {
+  opacity: 1;
+  transform: translateY(0);
+}
+
+/* ══ 6 — AI copilot FAB overlap fix ════════════════════════════════════════
+   The floating sparkle launcher is position:fixed bottom-right. Two fixes so it
+   never covers content: (a) a higher stacking context so it always sits ABOVE
+   tiles/inputs, and (b) a bottom gutter reserved on the scroll area (.app-main)
+   so the page's last rows — the WON KPI tile, the account form's MC-number
+   field + Save button — always clear the launcher instead of hiding under it.
+   On mobile the launcher is nudged up/in, tight into the corner. */
+.qf-copilot-launcher {
+  z-index: 1250;
+}
+.app-main,
+html[data-theme="light"] .app-main {
+  /* 56px launcher + its 24px bottom offset = an 80px safe gutter under the last
+     content row (on-ramp). */
+  padding-bottom: 80px;
+}
+@media (max-width: 640px) {
+  .qf-copilot-launcher {
+    right: 16px;
+    bottom: 24px;
+  }
+}
+
+/* ── Reduced-motion: drop the lift + fold transitions ──────────────────── */
+@media (prefers-reduced-motion: reduce) {
+  .qf-kpi-tile,
+  .qf-kpi-card,
+  .qf-nav-advanced > .nav-item {
+    transition: none;
+  }
+  .qf-kpi-tile:hover,
+  .qf-kpi-card:hover {
+    transform: none;
+  }
+}
+
+/* ══ SOLID FALLBACK ════════════════════════════════════════════════════════
+   Embedded WebViews / privacy modes that disable backdrop-filter get an OPAQUE
+   surface (var(--surface) — theme-aware, the element's original tint) instead
+   of a see-through wash over text. */
+@supports not ((backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px))) {
+  #qf-topbar,
+  #qf-account-menu,
+  #qf-sidebar,
+  html[data-theme="light"] #qf-sidebar,
+  .qf-kpi-tile,
+  .qf-kpi-card,
+  html[data-theme="light"] .qf-kpi-tile,
+  html[data-theme="light"] .qf-kpi-card,
+  .card.qf-glass,
+  html[data-theme="light"] .card.qf-glass,
+  .qf-glass,
+  .qf-glass-ultrathin {
+    background: var(--surface);
+  }
+}

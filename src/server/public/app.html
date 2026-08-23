@@ -30,6 +30,10 @@
   <link rel="stylesheet" href="/onboarding-wizard.css">
   <link rel="stylesheet" href="/grab-scroll.css">
   <link rel="stylesheet" href="/portal-appbar.css">
+  <!-- Premium "glass" chrome for the portal (surface 5). Loaded LAST so it
+       out-cascades the shell; id-scoped rules also beat the inline <style>
+       below at equal specificity. -->
+  <link rel="stylesheet" href="/portal-glass.css">
   <script>
     (function () {
       // Explicit user-controlled day/night theme. Default = dark (brand),

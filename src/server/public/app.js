@@ -1043,7 +1043,7 @@
     api('/api/tenant/referral').then(function (r) {
       if (!r || !r.link) { host.remove(); return; }
       var months = r.freeMonthsPerReferral || 1;
-      var card = el('div', { class: 'card', style: { margin: '32px 0 0', padding: '20px' } });
+      var card = el('div', { class: 'card qf-glass', style: { margin: '32px 0 0', padding: '20px' } });
       card.appendChild(el('h2', { text: 'Refer & earn — ' + months + ' free month' + (months === 1 ? '' : 's') + ' per referral', style: { margin: '0 0 4px', fontSize: '18px' } }));
       card.appendChild(el('div', { class: 'muted-small', style: { margin: '0 0 14px' }, text: 'Share your link with another carrier. They get a 30-day trial + 20% off their first 3 months; you get a free month for each one that becomes a paying customer.' }));
       var box = el('div', { style: { display: 'flex', gap: '8px', alignItems: 'stretch', flexWrap: 'wrap' } });
@@ -1086,7 +1086,7 @@
         { label: 'Share your calculator', hint: 'Copy your link or embed code and put it in front of customers.', route: 'embed', done: false },
       ];
       if (!(setup.rates && setup.brand)) {
-        var chk = el('div', { class: 'card', style: { margin: '0 0 24px', padding: '18px 20px' } });
+        var chk = el('div', { class: 'card qf-glass', style: { margin: '0 0 24px', padding: '18px 20px' } });
         chk.appendChild(el('div', { style: { fontSize: '16px', fontWeight: '800', letterSpacing: '-0.01em' }, text: 'Get your calculator live' }));
         chk.appendChild(el('div', { class: 'muted-small', style: { margin: '2px 0 14px' }, text: 'Three quick steps and you can start quoting customers.' }));
         steps.forEach(function (st, i) {
