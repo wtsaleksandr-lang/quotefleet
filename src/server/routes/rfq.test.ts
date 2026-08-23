@@ -19,6 +19,7 @@ import { rfqSubmitIpLimiter, rfqSubmitEmailLimiter } from '../rateLimits.js';
 import type { AddressInfo } from 'node:net';
 import type { Server } from 'node:http';
 import { registerRfqRoutes, type RfqRouteDeps, type RfqGate } from './rfq.js';
+import { registerDirectoryRoutes } from './directory.js';
 import type { RfqUsageStore } from '../directory/rfqUsage.js';
 import { generateRfqToken } from '../rfq/tokens.js';
 import type {
@@ -599,3 +600,67 @@ function toCreate(f: Record<string, string>): CreateRequestInput {
     destination: f.destination,
   };
 }
+
+// ── Route-ordering regression ────────────────────────────────────────────────
+// The shipper RFQ GET routes (/directory/rfq, /directory/rfq/:viewToken) live
+// under the same /directory prefix as the directory catch-alls
+// /directory/:stateSlug(/:citySlug). Express matches in REGISTRATION order, so
+// if registerRfqRoutes runs AFTER registerDirectoryRoutes, GET /directory/rfq
+// matches /directory/:stateSlug (slug="rfq"), finds no such state, and 302s to
+// /directory — which made the shipper's RFQ form + responses view dead in prod.
+// registerRfqRoutes MUST be registered before registerDirectoryRoutes in
+// src/server/app.ts. The existing tests above mount RFQ in isolation, so they
+// never exercised the collision; these two mount BOTH, in each order.
+describe('RFQ route ordering — /directory/rfq is not shadowed by the directory catch-all', () => {
+  function buildApp(order: 'rfq-first' | 'directory-first') {
+    const app = express();
+    app.use(express.json());
+    app.use(express.urlencoded({ extended: true }));
+    const deps: RfqRouteDeps = {
+      store: new MemStore(),
+      resolveDeps: fixedResolveDeps([carrier({ usdot: '1', email: 'a@x.example' })]),
+      isEmailSuppressed: async () => false,
+      send: vi.fn(async (): Promise<EmailOut> => ({ ok: true, provider: 'resend', id: 'm' })),
+      liveSend: false,
+      baseUrl: 'https://test.local',
+      throttleMs: 0,
+      forceReingest: vi.fn(async () => 'started' as const),
+      anthropicKey: '',
+      gate: openGate,
+      usage: new MemUsage(),
+    };
+    if (order === 'rfq-first') {
+      registerRfqRoutes(app, deps);
+      registerDirectoryRoutes(app);
+    } else {
+      registerDirectoryRoutes(app);
+      registerRfqRoutes(app, deps);
+    }
+    return app;
+  }
+  async function listen(app: ReturnType<typeof buildApp>) {
+    const server = await new Promise<Server>((resolve) => { const s = app.listen(0, () => resolve(s)); });
+    const { port } = server.address() as AddressInfo;
+    return { url: `http://127.0.0.1:${port}`, server };
+  }
+
+  it('serves the RFQ form at GET /directory/rfq in production order (rfq before directory)', async () => {
+    const { url, server } = await listen(buildApp('rfq-first'));
+    try {
+      const res = await fetch(`${url}/directory/rfq?dots=1`, { redirect: 'manual' });
+      expect(res.status).toBe(200);
+      const html = await res.text();
+      expect(html).toContain('action="/directory/rfq"'); // the real RFQ form rendered
+      expect(html).toContain('Request rates');
+    } finally { server.close(); }
+  });
+
+  it('(control) 302s to /directory when misordered (directory before rfq) — the prod bug this guards against', async () => {
+    const { url, server } = await listen(buildApp('directory-first'));
+    try {
+      const res = await fetch(`${url}/directory/rfq?dots=1`, { redirect: 'manual' });
+      expect(res.status).toBe(302);
+      expect(res.headers.get('location')).toBe('/directory');
+    } finally { server.close(); }
+  });
+});
