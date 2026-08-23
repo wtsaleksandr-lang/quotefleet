@@ -143,6 +143,20 @@ describe('POST /api/auth/signup — card-after-trial (card-free signup)', () => 
     expect(json.role).toBe('tenant_owner');
   });
 
+  it('defaults the selected plan to Vital (cheaper tier) when none is submitted', async () => {
+    // The signup form now pre-selects Vital, but the server must ALSO default
+    // to the cheaper tier for any request that omits `plan` — so the trial→bill
+    // intent can never silently resolve to the pricier Pro tier.
+    const body = signupBody();
+    delete (body as Record<string, unknown>).plan;
+
+    const { status, json } = await postSignup(body);
+
+    expect(status).toBe(200);
+    expect(json.ok).toBe(true);
+    expect(json.plan).toBe('vital');
+  });
+
   it('is also card-free when billing is NOT configured (degraded path unchanged)', async () => {
     billingConfigured.mockReturnValue(false);
 
