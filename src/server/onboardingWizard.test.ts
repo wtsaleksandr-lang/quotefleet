@@ -78,6 +78,29 @@ describe('onboarding wizard — client overlay', () => {
     expect(css).toContain('.qf-ob-copy-btn');
   });
 
+  it('confirms ZONE flat prices (not an engine-ignored $/mile) for zone-priced verticals', async () => {
+    const js = await pub('onboarding-wizard.js');
+
+    // Drayage is priced by a flat per-load zone tariff: engine.ts sets
+    // linehaul = zone.flatPrice and IGNORES the rate card's ratePerMile on any
+    // zone-matched move. So the confirm step must load + edit lane_zones, not a
+    // $/mile headline the engine never uses.
+    expect(js).toContain("state.pricing === 'zone'");
+    // It fetches the lane zones (the flat tariffs the engine reads) after apply.
+    expect(js).toContain('/api/tenant/lane-zones');
+    // Zone rows are labeled per-load and edit the flatPrice field.
+    expect(js).toContain("field: 'flatPrice'");
+    expect(js).toContain("unit: 'per load'");
+    expect(js).toContain('Confirm your top zone rates');
+
+    // Edits are routed to the SAME table the engine reads via a per-row
+    // __endpoint — zone edits PUT to /lane-zones/:id, rate edits to /rate-cards.
+    expect(js).toContain('__endpoint');
+    expect(js).toContain("'/api/tenant/' + row.__endpoint + '/' + row.id");
+    // Both sources are drained on Finish, so a zone edit is never dropped.
+    expect(js).toContain('[].concat(state.rates || [], state.zones || [])');
+  });
+
   it('asks the quoting rules (fuel surcharge + who sees prices) on step 3', async () => {
     const js = await pub('onboarding-wizard.js');
     const css = await pub('onboarding-wizard.css');
