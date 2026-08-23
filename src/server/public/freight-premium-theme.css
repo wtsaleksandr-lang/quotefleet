@@ -29,7 +29,7 @@
   --w-shadow: 0 24px 70px rgba(37, 34, 99, 0.10), 0 2px 10px rgba(15, 23, 42, 0.05);
 }
 
-body {
+html[data-theme="light"] body, body:has(.qf-widget) { /* guarded: see EOF note — never the dark portal */
   background:
     radial-gradient(circle at 18% 0%, rgba(158, 232, 255, 0.32), transparent 30%),
     linear-gradient(180deg, #ffffff 0%, #f8fbff 100%);
@@ -175,3 +175,17 @@ body {
     border-radius: 20px;
   }
 }
+
+/* ── Page-wash scope note (rule near top of file) ──────────────────────────
+   The `body { background: <light gradient> }` rule up top is guarded as
+   `html[data-theme="light"] body, body:has(.qf-widget)` so the LIGHT page wash
+   applies to the public widget (widget.html — its static markup contains
+   .qf-widget, so :has() matches at first paint, no FOUC) and the LIGHT portal,
+   but NOT the dark-default portal. This sheet is runtime-injected into the
+   portal by premium-saas-polish.js AFTER portal-glass.css; a bare global body{}
+   here would out-cascade the portal's dark glass field and paint the dark
+   portal white (illegible H1s, muddy cards). The portal only ever renders
+   .qf-widget inside a nested same-origin iframe, never in its own document, so
+   :has(.qf-widget) is false on the portal doc. The dark portal matches neither
+   selector → portal-glass.css's dark radial field wins. Kept as a single-line
+   selector to preserve the file's line-based guard baselines. */
