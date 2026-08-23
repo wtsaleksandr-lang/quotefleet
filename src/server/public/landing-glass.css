@@ -1,0 +1,341 @@
+/* ─────────────────────────────────────────────────────────────────────────
+   LANDING GLASS — premium "liquid glass" material for the QuoteFleet marketing
+   landing + hero. This sheet is the CANONICAL source of the glass design system
+   (first surface of a full-funnel overhaul); the token values below are meant to
+   be codified in DESIGN-SYSTEM.md and reused on every other surface.
+
+   Load order: injected LAST by landing-motion.js — AFTER landing-wefixtrades-
+   cleanup.css (which force-FLATTENS the light-mode nav + dropdown to solid white)
+   and after the static hero sheets. So every rule here that must beat those
+   carries matching-or-higher specificity + `!important` + wins on source order.
+
+   Guard notes:
+     • The hardcoded-color guard only flags raw #fff / #ffffff / white / #000 /
+       #000000 / black. Every color here is rgba() or a var(--*) token → exempt.
+     • The spacing guard only flags padding/margin/gap/inset px OFF the 8px ramp
+       {0,4,8,12,16,24,32,48,60,80,120}. border-radius, box-shadow, backdrop-
+       filter and transform are NOT scanned. All spacing here is on the ramp.
+
+   Theme model: dark is the default (bare :root = LIGHT tokens; the dark override
+   applies to html[data-theme="dark"] AND html:not([data-theme="light"]), i.e.
+   the un-set "system" state renders dark like the rest of the landing).
+   Every glass element pairs -webkit-backdrop-filter and ships an
+   @supports-not SOLID fallback so browsers without backdrop-filter stay legible.
+   ───────────────────────────────────────────────────────────────────────── */
+
+:root {
+  /* Ultra-thin (nav bar, Solutions dropdown — chrome that content slides under) */
+  --glass-ultra-bg: rgba(255, 255, 255, 0.60);
+  --glass-ultra-brd: rgba(255, 255, 255, 0.50);
+  /* Thin (finder / search shells, toggle track — chrome around inputs) */
+  --glass-thin-bg: rgba(255, 255, 255, 0.50);
+  --glass-thin-brd: rgba(255, 255, 255, 0.35);
+  /* Regular (content cards that hold body paragraphs — kept ≥0.55 for AA text) */
+  --glass-card-bg: rgba(255, 255, 255, 0.72);
+  --glass-card-brd: rgba(15, 37, 64, 0.10);
+  /* Shared depth + geometry */
+  --glass-shadow: 0 8px 32px rgba(10, 37, 64, 0.10);
+  --glass-shadow-hover: 0 14px 40px rgba(10, 37, 64, 0.16);
+  --glass-radius: 18px;
+  /* Opaque fallbacks (no backdrop-filter support) — legible, not translucent */
+  --glass-ultra-solid: rgba(255, 255, 255, 0.94);
+  --glass-thin-solid: rgba(255, 255, 255, 0.96);
+  --glass-card-solid: rgba(255, 255, 255, 0.98);
+}
+
+html[data-theme="dark"],
+html:not([data-theme="light"]) {
+  --glass-ultra-bg: rgba(18, 22, 26, 0.58);
+  --glass-ultra-brd: rgba(255, 255, 255, 0.10);
+  --glass-thin-bg: rgba(22, 27, 33, 0.52);
+  --glass-thin-brd: rgba(255, 255, 255, 0.08);
+  --glass-card-bg: rgba(22, 27, 33, 0.66);
+  --glass-card-brd: rgba(255, 255, 255, 0.10);
+  --glass-shadow: 0 8px 32px rgba(0, 0, 0, 0.35);
+  --glass-shadow-hover: 0 16px 44px rgba(0, 0, 0, 0.46);
+  --glass-ultra-solid: rgba(18, 22, 26, 0.94);
+  --glass-thin-solid: rgba(22, 27, 33, 0.96);
+  --glass-card-solid: rgba(24, 29, 35, 0.98);
+}
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   1 — VIBRANT GRADIENT WASH behind the hero (so the glass has something to
+   refract). Enhances the existing `.hero::before` gradient layer — which sits
+   BEHIND the dot grid (main::before / .qf-hero-media::before), so the dots stay
+   on top. Only `background` is overridden; the layer's position/inset/content
+   come from the base .hero::before rule.
+   ═══════════════════════════════════════════════════════════════════════════ */
+html:not([data-theme="light"]) body.qf-wft .hero.visual-hero::before {
+  background:
+    radial-gradient(58% 48% at 16% 12%, rgba(13, 60, 252, 0.20), transparent 70%),
+    radial-gradient(52% 44% at 84% 20%, rgba(80, 120, 255, 0.14), transparent 72%) !important;
+}
+html[data-theme="light"] body.qf-wft .hero.visual-hero::before {
+  background:
+    radial-gradient(58% 48% at 16% 12%, rgba(13, 60, 252, 0.14), transparent 70%),
+    radial-gradient(52% 44% at 84% 20%, rgba(80, 120, 255, 0.10), transparent 72%) !important;
+}
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   2 — TOP NAV → ultraThin frosted glass.
+   Dark desktop pill is already glass (landing-s-polish / landing-home-fixes);
+   light mode was force-flattened to solid white by cleanup.css (~L1275-1289) and
+   the Solutions dropdown to solid --surface (~L1304-1310). Re-glass both, at
+   matching specificity + !important so this later sheet wins.
+   ═══════════════════════════════════════════════════════════════════════════ */
+
+/* Dark desktop pill: unify the blur toward the canonical ultraThin (20 / 1.4). */
+html:not([data-theme="light"]) body.qf-wft.landing-v2 .site-header-inner {
+  background: var(--glass-ultra-bg) !important;
+  -webkit-backdrop-filter: blur(20px) saturate(1.4) !important;
+  backdrop-filter: blur(20px) saturate(1.4) !important;
+  border: 1px solid var(--glass-ultra-brd) !important;
+  box-shadow: var(--glass-shadow) !important;
+}
+
+/* Light desktop: the floating pill (.site-header-inner) becomes frosted white;
+   the outer bar goes transparent so the pill floats (cleanup forced it white). */
+html[data-theme="light"] body.qf-wft.landing-v2 .site-header {
+  background: transparent !important;
+  -webkit-backdrop-filter: none !important;
+  backdrop-filter: none !important;
+  border-bottom: 0 !important;
+  box-shadow: none !important;
+}
+html[data-theme="light"] body.qf-wft.landing-v2 .site-header-inner {
+  background: var(--glass-ultra-bg) !important;
+  -webkit-backdrop-filter: blur(20px) saturate(1.4) !important;
+  backdrop-filter: blur(20px) saturate(1.4) !important;
+  border: 1px solid var(--glass-ultra-brd) !important;
+  box-shadow: var(--glass-shadow) !important;
+}
+
+/* Mobile (≤640px): the header ITSELF is the full-width frosted bar and the inner
+   is transparent (landing-home-fixes). Re-assert that split in light mode. */
+@media (max-width: 640px) {
+  html[data-theme="light"] body.qf-wft.landing-v2 .site-header {
+    background: var(--glass-ultra-bg) !important;
+    -webkit-backdrop-filter: blur(20px) saturate(1.4) !important;
+    backdrop-filter: blur(20px) saturate(1.4) !important;
+    border-bottom: 1px solid var(--glass-ultra-brd) !important;
+    box-shadow: none !important;
+  }
+  html[data-theme="light"] body.qf-wft.landing-v2 .site-header-inner {
+    background: transparent !important;
+    -webkit-backdrop-filter: none !important;
+    backdrop-filter: none !important;
+    border: 0 !important;
+    box-shadow: none !important;
+  }
+}
+
+/* Solutions dropdown panel → ultraThin frosted (light was solid --surface). */
+html[data-theme="light"] body.qf-wft .nav-dd-panel {
+  background: var(--glass-ultra-bg) !important;
+  -webkit-backdrop-filter: blur(20px) saturate(1.4) !important;
+  backdrop-filter: blur(20px) saturate(1.4) !important;
+  border: 1px solid var(--glass-ultra-brd) !important;
+  box-shadow: var(--glass-shadow) !important;
+}
+html:not([data-theme="light"]) body.qf-wft .nav-dd-panel {
+  -webkit-backdrop-filter: blur(20px) saturate(1.4) !important;
+  backdrop-filter: blur(20px) saturate(1.4) !important;
+}
+
+/* Nav / dropdown solid fallback where backdrop-filter is unsupported. */
+@supports not ((backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px))) {
+  html[data-theme="light"] body.qf-wft.landing-v2 .site-header-inner,
+  html[data-theme="light"] body.qf-wft .nav-dd-panel {
+    background: var(--glass-ultra-solid) !important;
+  }
+  html:not([data-theme="light"]) body.qf-wft.landing-v2 .site-header-inner,
+  html:not([data-theme="light"]) body.qf-wft .nav-dd-panel {
+    background: var(--glass-ultra-solid) !important;
+  }
+  @media (max-width: 640px) {
+    html[data-theme="light"] body.qf-wft.landing-v2 .site-header {
+      background: var(--glass-ultra-solid) !important;
+    }
+  }
+}
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   3 — HERO FINDER + SHIPPER SEARCH shells → thin glass.
+   The shell is glass; the INPUTS/SELECTS inside stay on their solid opaque fill
+   (.qf-dir-name / select already use var(--surface-2)) — readability rule: glass
+   never sits directly behind typed text.
+   ═══════════════════════════════════════════════════════════════════════════ */
+html body.qf-wft .qf-finder {
+  padding: 16px !important;
+  border-radius: 16px !important;
+  background: var(--glass-thin-bg) !important;
+  border: 1px solid var(--glass-thin-brd) !important;
+  -webkit-backdrop-filter: blur(16px) saturate(1.3) !important;
+  backdrop-filter: blur(16px) saturate(1.3) !important;
+  box-shadow: var(--glass-shadow) !important;
+}
+html body.qf-wft .qf-dir-search {
+  background: var(--glass-thin-bg) !important;
+  border: 1px solid var(--glass-thin-brd) !important;
+  -webkit-backdrop-filter: blur(16px) saturate(1.3) !important;
+  backdrop-filter: blur(16px) saturate(1.3) !important;
+  box-shadow: var(--glass-shadow) !important;
+}
+@supports not ((backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px))) {
+  html body.qf-wft .qf-finder,
+  html body.qf-wft .qf-dir-search {
+    background: var(--glass-thin-solid) !important;
+  }
+}
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   4 — AUDIENCE TOGGLE → glass track + frosted raised OUTLINE chip.
+   Selected = frosted raised chip with a 1px brand-blue outline (design-system
+   rule: selected = outline, NOT a bright fill). Beats hero-fixes-v2.
+   ═══════════════════════════════════════════════════════════════════════════ */
+html body.qf-wft .qf-aud-toggle {
+  background: var(--glass-thin-bg) !important;
+  border: 1px solid var(--glass-thin-brd) !important;
+  -webkit-backdrop-filter: blur(14px) saturate(1.25) !important;
+  backdrop-filter: blur(14px) saturate(1.25) !important;
+}
+html body.qf-wft .qf-aud-seg.is-active {
+  color: var(--ink) !important;
+  background: var(--glass-thin-bg) !important;
+  -webkit-backdrop-filter: blur(10px) saturate(1.2) !important;
+  backdrop-filter: blur(10px) saturate(1.2) !important;
+  box-shadow: inset 0 0 0 1px var(--accent), 0 2px 8px rgba(10, 37, 64, 0.12) !important;
+}
+html body.qf-wft .qf-aud-seg.is-active:hover { color: var(--ink) !important; }
+@supports not ((backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px))) {
+  html body.qf-wft .qf-aud-toggle,
+  html body.qf-wft .qf-aud-seg.is-active {
+    background: var(--glass-thin-solid) !important;
+  }
+}
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   5 — CONTENT CARDS → regular glass (≥0.55 so body paragraphs stay AA) + a
+   subtle hover-lift. Two blocks per group: a default/dark block (beats the
+   cleanup dark rule on source order) and a light block (matches cleanup's light
+   specificity so this later sheet wins). Directory-preview cards, before/after,
+   included, trust, wins, use, and the final-CTA card.
+   ═══════════════════════════════════════════════════════════════════════════ */
+html body.qf-wft .qf-dir-card,
+html body.qf-wft .qf-included-card,
+html body.qf-wft .qf-trust-card,
+html body.qf-wft .qf-wins-card,
+html body.qf-wft .use-card,
+html body.qf-wft .qf-ba-card,
+html body.qf-wft .final-cta-card,
+html[data-theme="light"] body.qf-wft .qf-dir-card,
+html[data-theme="light"] body.qf-wft .qf-included-card,
+html[data-theme="light"] body.qf-wft .qf-trust-card,
+html[data-theme="light"] body.qf-wft .qf-wins-card,
+html[data-theme="light"] body.qf-wft .use-card,
+html[data-theme="light"] body.qf-wft .qf-ba-card,
+html[data-theme="light"] body.qf-wft .final-cta-card {
+  background: var(--glass-card-bg) !important;
+  border: 1px solid var(--glass-card-brd) !important;
+  -webkit-backdrop-filter: blur(16px) saturate(1.3) !important;
+  backdrop-filter: blur(16px) saturate(1.3) !important;
+  box-shadow: var(--glass-shadow) !important;
+  transition: transform 0.2s ease, box-shadow 0.2s ease, border-color 0.2s ease !important;
+}
+@supports not ((backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px))) {
+  html body.qf-wft .qf-dir-card,
+  html body.qf-wft .qf-included-card,
+  html body.qf-wft .qf-trust-card,
+  html body.qf-wft .qf-wins-card,
+  html body.qf-wft .use-card,
+  html body.qf-wft .qf-ba-card,
+  html body.qf-wft .final-cta-card {
+    background: var(--glass-card-solid) !important;
+  }
+}
+
+/* Hover-lift (guarded for reduced-motion below). */
+html body.qf-wft .qf-dir-card:hover,
+html body.qf-wft .qf-included-card:hover,
+html body.qf-wft .qf-trust-card:hover,
+html body.qf-wft .qf-wins-card:hover,
+html body.qf-wft .use-card:hover,
+html body.qf-wft .qf-ba-card:hover,
+html[data-theme="light"] body.qf-wft .qf-dir-card:hover,
+html[data-theme="light"] body.qf-wft .qf-included-card:hover,
+html[data-theme="light"] body.qf-wft .qf-trust-card:hover,
+html[data-theme="light"] body.qf-wft .qf-wins-card:hover,
+html[data-theme="light"] body.qf-wft .use-card:hover,
+html[data-theme="light"] body.qf-wft .qf-ba-card:hover {
+  transform: translateY(-3px) !important;
+  box-shadow: var(--glass-shadow-hover) !important;
+  border-color: var(--accent) !important;
+}
+
+/* Smaller chrome (finder / search / directory preview cards) lift a touch less. */
+html body.qf-wft .qf-finder:hover,
+html body.qf-wft .qf-dir-search:hover {
+  transform: translateY(-2px) !important;
+  box-shadow: var(--glass-shadow-hover) !important;
+}
+html body.qf-wft .qf-finder,
+html body.qf-wft .qf-dir-search {
+  transition: transform 0.2s ease, box-shadow 0.2s ease, border-color 0.2s ease !important;
+}
+
+/* Directory-preview featured card keeps its brand-blue rail on top of the glass. */
+html body.qf-wft .qf-dir-card--featured {
+  box-shadow: var(--glass-shadow), inset 3px 0 0 0 var(--accent) !important;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  html body.qf-wft .qf-dir-card,
+  html body.qf-wft .qf-included-card,
+  html body.qf-wft .qf-trust-card,
+  html body.qf-wft .qf-wins-card,
+  html body.qf-wft .use-card,
+  html body.qf-wft .qf-ba-card,
+  html body.qf-wft .final-cta-card,
+  html body.qf-wft .qf-finder,
+  html body.qf-wft .qf-dir-search {
+    transition: none !important;
+  }
+  html body.qf-wft .qf-dir-card:hover,
+  html body.qf-wft .qf-included-card:hover,
+  html body.qf-wft .qf-trust-card:hover,
+  html body.qf-wft .qf-wins-card:hover,
+  html body.qf-wft .use-card:hover,
+  html body.qf-wft .qf-ba-card:hover,
+  html body.qf-wft .qf-finder:hover,
+  html body.qf-wft .qf-dir-search:hover {
+    transform: none !important;
+  }
+}
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   6 — BUG FIX: 375px header overflow (~22px). Below 420px the "View demo"
+   secondary CTA (+ any lingering Sign in) overflow .site-actions; drop them so
+   only the theme toggle + burger remain. Every link is still reachable via the
+   burger's mobile menu (which includes Sign in). Mirrors the ≤720px .signin hide.
+   ═══════════════════════════════════════════════════════════════════════════ */
+@media (max-width: 420px) {
+  html body.qf-wft .site-actions [data-aud-cta],
+  html body.qf-wft .site-actions .signin {
+    display: none !important;
+  }
+}
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   7 — BUG FIX: blurry mobile hero caption headline. The rotating headline
+   (.qf-hero-cap--headline) inherits the in-device caption's near-white color +
+   a 10px dark text-shadow — designed for a dark scrim. On mobile it sits on the
+   bare (light) page surface, so that near-white glyph + dark blur halo reads as
+   an out-of-focus glow. Make it a crisp, theme-aware headline: real ink color,
+   no blur shadow. Kicker stays the periwinkle eyebrow.
+   ═══════════════════════════════════════════════════════════════════════════ */
+@media (max-width: 640px) {
+  html body.qf-wft .qf-hero-cap--headline .qf-hero-cap__title {
+    color: var(--ink) !important;
+    text-shadow: none !important;
+  }
+}

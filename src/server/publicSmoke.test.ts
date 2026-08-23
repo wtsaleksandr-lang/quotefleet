@@ -255,6 +255,39 @@ describe('public static page smoke checks', () => {
     expect(js).toContain('is-visible');
   });
 
+  it('landing glass system is injected LAST and defines the canonical tokens', async () => {
+    // landing-motion.js must load the glass sheet AFTER the cleanup sheets so it
+    // out-cascades them (re-glasses the light nav/dropdown those sheets flatten).
+    const motion = await file('landing-motion.js');
+    const cleanupIdx = motion.indexOf('/landing-wefixtrades-cleanup.css');
+    const glassIdx = motion.indexOf('/landing-glass.css');
+    expect(cleanupIdx).toBeGreaterThan(-1);
+    expect(glassIdx).toBeGreaterThan(cleanupIdx);
+
+    const css = await file('landing-glass.css');
+    // Canonical glass tokens (codified in DESIGN-SYSTEM.md for other surfaces).
+    expect(css).toContain('--glass-ultra-bg: rgba(255, 255, 255, 0.60)');
+    expect(css).toContain('--glass-thin-bg: rgba(255, 255, 255, 0.50)');
+    expect(css).toContain('--glass-radius: 18px');
+    expect(css).toContain('rgba(18, 22, 26, 0.58)'); // dark ultra override
+    // Every glass element pairs the -webkit- prefix and ships a solid fallback.
+    expect(css).toContain('-webkit-backdrop-filter');
+    expect(css).toContain('@supports not ((backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px)))');
+    // Selected audience segment = brand-blue OUTLINE, not a bright fill.
+    expect(css).toContain('inset 0 0 0 1px var(--accent)');
+  });
+
+  it('hero device pair rests phone-front with both videos looping', async () => {
+    const js = await file('landing-hero-swap.js');
+    // Resting composition is pinned to stage-phone (phone sharp, laptop blurred
+    // behind) — no swap-back to a lone laptop; both clips keep looping.
+    expect(js).toContain("wrap.classList.add('stage-phone')");
+    expect(js).not.toContain("stage('laptop')");
+    expect(js).toContain('lapV.loop = true; phV.loop = true;');
+    // Player API stays exposed for landing-video-controls.js.
+    expect(js).toContain('window.qfHeroSwap');
+  });
+
   it('widget loads required scripts and controls', async () => {
     const html = await file('widget.html');
     expect(html).toContain('/widget.js');
