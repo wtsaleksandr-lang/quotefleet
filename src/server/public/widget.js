@@ -2849,13 +2849,11 @@
     var mm = { 'qf-map-m-distance': dEl, 'qf-map-m-transit': tEl, 'qf-map-m-pickup': pu, 'qf-map-m-delivery': de };
     Object.keys(mm).forEach(function (id) { var t = $(id); if (t && mm[id]) t.textContent = mm[id].textContent; });
     var img = $('qf-map-img'), mimg = $('qf-map-modal-img');
-    // Re-report height once the map image actually loads: it has height:auto, so
-    // the card grows only after the bitmap arrives — without this the host iframe
-    // stays sized to the pre-image height and shows an inner scrollbar.
-    // If the bitmap is already in cache, setting src can leave img.complete true
-    // with onload never firing — report immediately so the card's grown height
-    // is picked up (ResizeObserver also covers this; belt-and-suspenders).
-    if (img) { img.onload = scheduleAutoResize; img.onerror = hideMapCard; img.src = resp.mapUrl; if (img.complete && img.naturalWidth) scheduleAutoResize(); }
+    // The map <img> now sits in a fixed aspect-ratio box (see .qf-map-img), so a
+    // same-aspect bitmap swap never changes the card height — no onload height
+    // re-post needed (that per-swap churn caused the flicker). The card-level
+    // autoResize() below still settles the iframe when the card first reveals.
+    if (img) { img.onload = null; img.onerror = hideMapCard; img.src = resp.mapUrl; }
     if (mimg) mimg.src = resp.mapUrl;
     // Clear any display:none left by a prior hideMapCard() so a recovered map
     // (key restored / retry succeeds) re-appears rather than staying collapsed.
@@ -2875,9 +2873,9 @@
     var card = $('qf-map-card'); if (!card) return;
     var url = withGrant('/api/public/base-map.png?theme=' + mapThemeParam() + '&style=' + brandMapStyle);
     var img = $('qf-map-img'), mimg = $('qf-map-modal-img');
-    // height:auto image → re-report height on load so the host iframe expands to
-    // fit the base map instead of leaving an inner scrollbar (see renderRouteMap).
-    if (img) { img.onload = scheduleAutoResize; img.onerror = hideMapCard; img.src = url; img.alt = 'Map of North America'; if (img.complete && img.naturalWidth) scheduleAutoResize(); }
+    // Fixed aspect-ratio box (see renderRouteMap): the base-map bitmap swap keeps
+    // the card height constant, so no onload height re-post is needed here either.
+    if (img) { img.onload = null; img.onerror = hideMapCard; img.src = url; img.alt = 'Map of North America'; }
     if (mimg) { mimg.src = url; mimg.alt = 'Map of North America'; }
     ['qf-map-distance', 'qf-map-transit', 'qf-map-permile', 'qf-map-pickup', 'qf-map-delivery',
      'qf-map-m-distance', 'qf-map-m-transit', 'qf-map-m-permile', 'qf-map-m-pickup', 'qf-map-m-delivery'
@@ -2943,35 +2941,83 @@
       np.lng = Math.min(180, Math.max(-180, np.lng));
       return np;
     }
-    function baseUrl(zoom, c) {
+    // Coarsen the FETCH center onto a zoom-scaled grid so continuous panning
+    // reuses cache entries instead of minting a unique URL on every release.
+    // Street zooms stay precise (4dp ≈ 11m); continental zooms snap harder (2dp)
+    // where a fraction of a degree is sub-pixel anyway. The VISIBLE center (the
+    // live tx/ty CSS feedback) is untouched — only the committed fetch snaps.
+    function coarseCenter(c, zoom) {
+      var d = zoom >= 12 ? 4 : zoom >= 8 ? 3 : 2;
+      var f = Math.pow(10, d);
+      return { lat: Math.round(c.lat * f) / f, lng: Math.round(c.lng * f) / f };
+    }
+    function baseUrl(zoom, c, scaleParam) {
       return withGrant('/api/public/base-map.png?theme=' + mapThemeParam() + '&style=' + brandMapStyle +
-        '&zoom=' + zoom + '&center=' + encodeURIComponent(c.lat.toFixed(4) + ',' + c.lng.toFixed(4)));
+        '&zoom=' + zoom + '&center=' + encodeURIComponent(c.lat.toFixed(4) + ',' + c.lng.toFixed(4)) +
+        (scaleParam ? '&scale=' + scaleParam : ''));
+    }
+    // Client bitmap LRU: recently-loaded {url → Image}. Back-and-forth pan/zoom
+    // then re-swaps straight from memory — no network round-trip, no re-decode.
+    // Bounded to 24 entries (oldest-first evict).
+    var bmpLru = new Map(), BMP_LRU_MAX = 24;
+    function lruGet(k) { var v = bmpLru.get(k); if (v) { bmpLru.delete(k); bmpLru.set(k, v); } return v; }
+    function lruPut(k, v) {
+      if (bmpLru.has(k)) bmpLru.delete(k);
+      bmpLru.set(k, v);
+      while (bmpLru.size > BMP_LRU_MAX) { var o = bmpLru.keys().next().value; bmpLru.delete(o); }
+    }
+    // After a crisp swap, warm zoom±1 at the current center (same scale) so the
+    // NEXT wheel step is an instant browser-cache + LRU hit. Guarded to fire once
+    // per settled {scale,zoom,center} frame so it never over-fetches.
+    var lastPreloadKey = '';
+    function preloadNeighbors(zoom, c, scaleParam) {
+      var gk = scaleParam + '@' + zoom + ':' + c.lat.toFixed(4) + ',' + c.lng.toFixed(4);
+      if (gk === lastPreloadKey) return;
+      lastPreloadKey = gk;
+      [zoom - 1, zoom + 1].forEach(function (z) {
+        if (z < BASE_MIN_Z || z > BASE_MAX_Z) return;
+        var u = baseUrl(z, coarseCenter(c, z), scaleParam);
+        if (lruGet(u)) return;
+        var im = new Image();
+        im.onload = function () { lruPut(u, im); };
+        im.src = u;
+      });
     }
     // Debounced crisp re-fetch: preload the new bitmap, then swap it in and drop
     // the CSS feedback transform so the crisp tiles replace the scaled preview.
     // `immediate` runs the crisp re-fetch NOW (no debounce) — used on drag-release
     // so the map settles at the dropped center at once with no lingering blank.
-    // Wheel/pinch zoom bursts still debounce (180ms) to coalesce rapid steps.
+    // Wheel/pinch bursts coalesce: each notch resets a 120ms timer + updates the
+    // CSS feedback instantly, so ONE fetch fires per gesture (reads the FINAL
+    // gZoom), not one per notch. Interactive frames fetch scale=1 (light/fast);
+    // the enlarged modal fetches scale=2 (crisp). A same-frame LRU hit swaps with
+    // no network at all.
     function fetchBaseCrisp(immediate) {
       if (baseFetchTimer) { clearTimeout(baseFetchTimer); baseFetchTimer = null; }
       function run() {
         var seq = ++baseSeq;
-        var zoom = gZoom, c = { lat: center.lat, lng: center.lng };
-        var url = baseUrl(zoom, c);
-        var probe = new Image();
-        probe.onload = function () {
+        var zoom = gZoom;
+        var sc = (modal && !modal.hidden) ? '2' : '1';
+        var cc = coarseCenter({ lat: center.lat, lng: center.lng }, zoom);
+        var url = baseUrl(zoom, cc, sc);
+        function commit() {
           if (seq !== baseSeq || !isBase()) return;
           // Swap the crisp bitmap into BOTH the inline preview and the modal so
           // the two surfaces share one zoom state, then drop the CSS feedback.
           if (mimg) mimg.src = url;
           if (iimg) iimg.src = url;
-          loadedZoom = zoom; loadedCenter = { lat: c.lat, lng: c.lng };
+          loadedZoom = zoom; loadedCenter = { lat: cc.lat, lng: cc.lng };
           scale = 1; tx = 0; ty = 0; apply();
-        };
+          preloadNeighbors(zoom, { lat: center.lat, lng: center.lng }, sc);
+        }
+        var hit = lruGet(url);
+        if (hit && hit.complete && hit.naturalWidth) { commit(); return; }
+        var probe = new Image();
+        probe.onload = function () { lruPut(url, probe); commit(); };
         probe.onerror = function () { /* keep the current crisp frame on failure */ };
         probe.src = url;
       }
-      if (immediate) run(); else baseFetchTimer = setTimeout(run, 180);
+      if (immediate) run(); else baseFetchTimer = setTimeout(run, 120);
     }
     // Update the CSS feedback transform to preview the pending zoom/pan before
     // the crisp bitmap arrives. scale = 2^(target−loaded), capped so a fast
@@ -3009,7 +3055,9 @@
       // Base mode: reflect the CURRENT inline zoom (shared state) in the modal so
       // opening the enlarge view continues where the inline preview left off.
       // Route mode: just drop the CSS transform (existing behavior).
-      if (isBase() && mimg) mimg.src = baseUrl(loadedZoom, loadedCenter);
+      // Enlarged view → fetch the crisp retina scale=2 frame (not the light
+      // scale=1 interactive frame) at the shared inline zoom/center.
+      if (isBase() && mimg) mimg.src = baseUrl(loadedZoom, loadedCenter, '2');
       apply();
     });
     function closeModal() { modal.hidden = true; if (baseFetchTimer) { clearTimeout(baseFetchTimer); baseFetchTimer = null; } }
