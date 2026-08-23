@@ -148,6 +148,37 @@ describe('onboarding wizard — client overlay', () => {
     expect(css).toContain('.qf-ob-trust-wide');
   });
 
+  it('pulls the FULL company detail set from the finder (phone + city/state) — uncluttered', async () => {
+    const js = await pub('onboarding-wizard.js');
+    const css = await pub('onboarding-wizard.css');
+
+    // The finder pick captures the extra details into wizard state (no new
+    // visible inputs — the step stays uncluttered).
+    expect(js).toContain('state.contactPhone = row.phone');
+    expect(js).toContain('state.city = row.city');
+    expect(js).toContain('state.state = row.state');
+    expect(js).toContain('state.postalCode = row.zip');
+
+    // A subtle, transparent confirmation of what was pulled — set via
+    // textContent (escaped), never innerHTML.
+    expect(js).toContain('Also added: ');
+    expect(js).toContain('edit anytime in Account.');
+    expect(js).toContain('qf-ob-autofill-note');
+    expect(css).toContain('.qf-ob-autofill-note');
+
+    // Phone is sent to apply ONLY when the finder actually supplied one — never
+    // a null that would clobber a phone the carrier set in Account, and never a
+    // blank for an opt-out (contactHidden) carrier whose phone is null.
+    expect(js).toContain('if (phone) payload.contactPhone = phone');
+
+    // City/state/ZIP persist via the SAME carrier-profile store the Account card
+    // writes — and ONLY when the finder supplied a location (guarded so a carrier
+    // who ignored the finder never triggers an empty address write).
+    expect(js).toContain("fetch('/api/tenant/carrier-profile'");
+    expect(js).toContain('Object.keys(addr).length === 0');
+    expect(js).toContain('Promise.all([applyTrust, saveLocation, Promise.all(puts)])');
+  });
+
   it('is loaded + gated in the dashboard shell', async () => {
     const html = await pub('app.html');
     const appjs = await pub('app.js');
@@ -192,6 +223,12 @@ describe('onboarding wizard — server apply endpoint', () => {
     expect(tenant).toContain('settingsPatch.dotNumber = norm(body.dotNumber)');
     expect(tenant).toContain('settingsPatch.publicContactEmail = norm(body.publicContactEmail)');
     expect(tenant).toContain('...settingsPatch,');
+
+    // contactPhone joins the trust set: accepted, normalised, and persisted only
+    // when the client sent the key (an omitted phone never overwrites the one the
+    // Account card set).
+    expect(tenant).toContain('contactPhone: z.string().max(50).nullable().optional()');
+    expect(tenant).toContain('if (body.contactPhone !== undefined) settingsPatch.contactPhone = norm(body.contactPhone)');
 
     // There is no tenant-level FSC percentage column: manual mode reads each
     // rate card's fuel_surcharge_pct, so the single number is written there —

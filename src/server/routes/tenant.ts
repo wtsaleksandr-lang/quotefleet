@@ -1642,6 +1642,10 @@ export function registerTenantRoutes(app: Express) {
       .union([z.string().email().max(160), z.literal('')])
       .nullable()
       .optional(),
+    /** PUBLIC contact phone (tenants.contactPhone) — the wizard sends it ONLY
+     *  when the "Find your company" finder supplied one, so an omitted key never
+     *  overwrites a phone the carrier set in the Account card. */
+    contactPhone: z.string().max(50).nullable().optional(),
   });
 
   app.post('/api/tenant/onboarding/apply', requireAuth, requireTenant, async (req, res) => {
@@ -1719,6 +1723,7 @@ export function registerTenantRoutes(app: Express) {
     if (body.publicContactEmail !== undefined) {
       settingsPatch.publicContactEmail = norm(body.publicContactEmail);
     }
+    if (body.contactPhone !== undefined) settingsPatch.contactPhone = norm(body.contactPhone);
 
     // A manual fuel surcharge has NO tenant-level column: manual mode reads each
     // rate card's fuel_surcharge_pct (see tenants.fscMode in schema.ts). So the
@@ -1822,6 +1827,7 @@ export function registerTenantRoutes(app: Express) {
             mcNumber: settingsPatch.mcNumber != null,
             dotNumber: settingsPatch.dotNumber != null,
             publicContactEmail: settingsPatch.publicContactEmail != null,
+            contactPhone: settingsPatch.contactPhone != null,
           },
         },
       });

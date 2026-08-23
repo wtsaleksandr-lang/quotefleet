@@ -604,3 +604,17 @@ html.qf-ob-open body {
   .qf-ob-title { font-size: 20px; }
   .qf-ob-shell { padding: var(--space-3) var(--space-2); }
 }
+
+/* "Find your company" pulled extra details (phone + city/state) that have no
+   visible input on the trust step — this subtle, left-aligned, theme-aware line
+   confirms what was captured so the carrier is aware and knows to edit it in
+   Account. Uses the accent-soft token so it reads as a friendly confirmation,
+   not an error. Shown only after a finder pick supplies at least one extra. */
+.qf-ob-autofill-note {
+  margin: calc(-1 * var(--space-1)) 0 var(--space-2) 0;
+  padding: var(--space-1-5) var(--space-2);
+  background: var(--accent-soft);
+  border-radius: 8px;
+  color: var(--accent-strong);
+  text-align: left;
+}
