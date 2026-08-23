@@ -283,9 +283,17 @@ html body.qf-wft .qf-dir-search {
   transition: transform 0.2s ease, box-shadow 0.2s ease, border-color 0.2s ease !important;
 }
 
-/* Directory-preview featured card keeps its brand-blue rail on top of the glass. */
-html body.qf-wft .qf-dir-card--featured {
+/* Directory-preview featured card keeps its brand-blue rail on top of the glass,
+   at REST and on HOVER, in BOTH themes. The light variant matches the light base
+   card specificity (0,3,2) so the rail paints in light (the base rule would else
+   win); the hover variants re-include the inset rail the generic hover drops. */
+html body.qf-wft .qf-dir-card--featured,
+html[data-theme="light"] body.qf-wft .qf-dir-card--featured {
   box-shadow: var(--glass-shadow), inset 3px 0 0 0 var(--accent) !important;
+}
+html body.qf-wft .qf-dir-card--featured:hover,
+html[data-theme="light"] body.qf-wft .qf-dir-card--featured:hover {
+  box-shadow: var(--glass-shadow-hover), inset 3px 0 0 0 var(--accent) !important;
 }
 
 @media (prefers-reduced-motion: reduce) {
@@ -338,4 +346,31 @@ html body.qf-wft .qf-dir-card--featured {
     color: var(--ink) !important;
     text-shadow: none !important;
   }
+}
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   8 — BUG FIX: light-mode mobile burger was near-invisible. .site-burger is
+   color:#F9F9F9 (near-white) — fine on the dark bar, but this PR makes the
+   light mobile header a frosted WHITE bar, so a white glyph on white glass.
+   The burger SVGs stroke with currentColor, so a dark ink color fixes the icon;
+   also darken the box border. Light-only; dark keeps its near-white glyph.
+   ═══════════════════════════════════════════════════════════════════════════ */
+@media (max-width: 640px) {
+  html[data-theme="light"] body.qf-wft .site-burger {
+    color: var(--ink) !important;
+    border-color: var(--border) !important;
+  }
+}
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   9 — BUG FIX: mobile finder helper text overlapped the input. The FMCSA micro
+   line (.qf-finder__micro, a .micro-copy) inherits landing-hero-polish.css's
+   mobile `margin-top:-16px` cluster rule — meant for the trust lines under the
+   CTA, not the helper inside the finder card — which yanked it up over the field.
+   Restore a positive on-ramp gap so it sits cleanly below the input. Specificity
+   (0,4,2) beats the hero-polish rule (0,4,1); applies at every width (the finder
+   card always wants 8px between field and helper).
+   ═══════════════════════════════════════════════════════════════════════════ */
+html body.qf-wft .hero .qf-finder .qf-finder__micro {
+  margin-top: 8px !important;
 }

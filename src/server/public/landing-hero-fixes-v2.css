@@ -328,7 +328,9 @@ html body.qf-wft .qf-dir-card__port span {
    its opacity and ease the blur so it reads as a genuine (blurred) product
    screenshot sitting behind the phone. Dark mode keeps its original subtle dim. */
 html[data-theme="light"] body.qf-wft .qf-hero-devices--video.stage-phone > .qf-hero-laptop {
-  opacity: 0.7 !important;
+  /* Bumped 0.7 → 0.85 so the blurred desktop reads as clearly present-behind-the-
+     phone depth in light mode (matching the dark theme's clarity); stays blurred. */
+  opacity: 0.85 !important;
   filter: blur(1.5px) saturate(1) !important;
 }
 
@@ -364,7 +366,7 @@ html[data-theme="dark"] body.qf-wft .visual-flow.qf-hero-media {
     filter: blur(1.8px) saturate(.92) !important;
   }
   html[data-theme="light"] body.qf-wft .qf-hero-devices--video.stage-phone > .qf-hero-laptop {
-    opacity: .68 !important;
+    opacity: .82 !important;
     filter: blur(1.5px) saturate(1) !important;
   }
 }
