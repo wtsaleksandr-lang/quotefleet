@@ -77,6 +77,18 @@ body.qf-app-calculator .qf-hz-list {
   backdrop-filter: var(--wg-blur-ultra);
   box-shadow: var(--wg-shadow);
 }
+/* Secondary sub-label ("CA, USA", city/region) inside an address row. It reads
+   --w-muted, which on a DARK preset is a LIGHT grey tuned for the dark SHELL —
+   soft on the light/cream frost the dropdown now uses. On dark presets only,
+   route it to --w-oncard-muted: the contrast-engine muted GUARANTEED ≥AA on the
+   --w-input-bg surface (= the frost's own base), so it darkens to comfortable
+   contrast on a light-input dark preset (Midnight/Cream) and stays a readable
+   light muted on a dark-input dark preset (Voltage/Voyage). Light presets
+   (data-qf-mode="light", e.g. Cupertino) are untouched — their --w-muted is
+   already dark and reads fine on the light frost. Primary row text unchanged. */
+body.qf-app-calculator[data-qf-mode="dark"] .qf-suggestion .meta {
+  color: var(--w-oncard-muted, var(--w-muted)) !important;
+}
 
 /* ═══════════════════════════════════════════════════════════════════════════
    2 — ultraThin / thin: BARS & CHROME
