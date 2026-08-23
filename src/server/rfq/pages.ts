@@ -188,16 +188,20 @@ export function renderRfqForm(opts: RfqFormOpts): string {
   // Theme-aware, token-only styling; the submit is disabled while blocked.
   const g = opts.gate;
   const blocked = !!g && !g.ok;
-  const proHref = '/signup?plan=directory-pro';
+  // Shipper account creation is the free, passwordless email sign-in (NOT the
+  // carrier /signup, and NOT implying payment); the upgrade CTA lands on the
+  // same surface pre-set to the subscribe intent.
+  const joinHref = '/directory/join';
+  const upgradeHref = '/directory/join?intent=subscribe';
   let gateHtml = '';
   if (blocked) {
     if (g!.needsAccount) {
-      gateHtml = `<div class="rfq-note rfq-gate" role="alert" style="background:var(--accent-soft);border-color:var(--accent);color:var(--ink);"><strong>Sign in to send.</strong> Rate requests go out under your account so carriers know who's asking. <a href="${proHref}" style="color:var(--accent);">Create a free account →</a></div>`;
+      gateHtml = `<div class="rfq-note rfq-gate" role="alert" style="background:var(--accent-soft);border-color:var(--accent);color:var(--ink);"><strong>Sign in to send.</strong> Rate requests go out under your account so carriers know who's asking. <a href="${joinHref}" style="color:var(--accent);">Create a free account →</a></div>`;
     } else {
       const used = esc(String(g!.used ?? 0));
       const allow = esc(String(g!.allowance ?? 0));
       const upgrade = g!.needsUpgrade
-        ? ` <a href="${proHref}" style="color:var(--accent);">Upgrade to Directory Pro →</a>`
+        ? ` <a href="${upgradeHref}" style="color:var(--accent);">Upgrade to Directory Pro →</a>`
         : '';
       const tail = g!.needsUpgrade ? ' — upgrade to Directory Pro to send more.' : ' — your monthly limit is reached.';
       gateHtml = `<div class="rfq-note rfq-gate" role="alert" style="background:var(--accent-soft);border-color:var(--accent);color:var(--ink);"><strong>You've used ${used} of ${allow} rate requests this month${tail}</strong>${upgrade}</div>`;

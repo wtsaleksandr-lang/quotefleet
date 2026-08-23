@@ -50,9 +50,10 @@ import {
   renderCarrierProfile,
   renderCarrierNotFound,
   renderCompliancePage,
+  renderDirectoryJoin,
 } from '../directory/pages.js';
 import { publicAutocompleteLimiter, publicCalcLimiter } from '../rateLimits.js';
-import { hasDirectoryPro } from '../directory/entitlement.js';
+import { hasDirectoryPro, directoryIdentity } from '../directory/entitlement.js';
 
 const isIntermodal = (v: unknown): boolean => ['1', 'true', 'yes'].includes(String(v ?? '').toLowerCase());
 const pageNum = (v: unknown): number => Math.max(1, parseInt(String(v ?? '1'), 10) || 1);
@@ -111,7 +112,10 @@ export function registerDirectoryRoutes(app: Express) {
   app.get(['/directory', '/directory/'], async (req: Request, res: Response, next) => {
     try {
       if (!hasFacetParams(req.query as Record<string, unknown>)) {
-        res.type('html').send(renderDirectoryLanding(await getDirectorySummary()));
+        // Post-checkout confirmation (Stripe success_url / cancel_url land here).
+        const up = String(req.query.upgrade ?? '').toLowerCase();
+        const upgrade = up === 'success' ? 'success' : up === 'cancelled' ? 'cancelled' : null;
+        res.type('html').send(renderDirectoryLanding(await getDirectorySummary(), { upgrade }));
         return;
       }
       const filters = normalizeFilters(req.query as Record<string, unknown>);
@@ -121,6 +125,19 @@ export function registerDirectoryRoutes(app: Express) {
         getDirectorySummary(),
       ]);
       res.type('html').send(renderDirectoryResults({ filters, list, counts, summary }));
+    } catch (err) {
+      next(err);
+    }
+  });
+
+  // Shipper Directory Pro join / sign-in / subscribe surface. Registered BEFORE
+  // /directory/:stateSlug so "join" isn't parsed as a state slug. Soft-auth:
+  // anonymous → email form; signed-in free → subscribe; Pro → manage.
+  app.get('/directory/join', async (req: Request, res: Response, next) => {
+    try {
+      const identity = await directoryIdentity(req);
+      const intent = String(req.query.intent ?? '').toLowerCase() === 'subscribe' ? 'subscribe' : 'signin';
+      res.type('html').send(renderDirectoryJoin({ identity, intent }));
     } catch (err) {
       next(err);
     }

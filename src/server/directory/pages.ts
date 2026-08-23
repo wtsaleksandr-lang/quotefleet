@@ -43,6 +43,7 @@ import {
 import { US_STATES, stateByCode, type UsState } from './usStates.js';
 import { CONTAINER_PORTS, portByCode, PORT_GROUPS, portGroupForMemberCode, type ContainerPort } from './containerPorts.js';
 import { CA_PROVINCE_CODES } from './caProvinces.js';
+import type { DirectoryIdentity } from './entitlement.js';
 
 const SITE = 'https://quotefleet.net';
 
@@ -751,6 +752,50 @@ const DIRECTORY_CSS = `
     .cp-tab-lg { display: none; }
     .cp-tab-sm { display: inline; }
   }
+
+  /* ── Shipper nav state + Directory Pro join/checkout surface ───────────── */
+  .nav-shipper { display: inline-flex; align-items: center; }
+  .nav-shipper--auth { gap: 12px; }
+  .nav-email { font-size: 13px; color: var(--ink-soft); max-width: 200px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .nav-pro-chip { font-size: 11px; font-family: var(--font-mono); letter-spacing: 0.04em; text-transform: uppercase; padding: 4px 8px; border-radius: var(--radius-chip); background: var(--success-bg); color: var(--success); border: 1px solid var(--success); white-space: nowrap; }
+  .nav-upgrade, .nav-manage { white-space: nowrap; }
+
+  .join-shell { max-width: 720px; }
+  .join-panel { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius-card, 16px); padding: 24px; }
+  .join-panel h2 { margin: 0 0 8px; font-size: 22px; text-align: left; }
+  .join-sub { margin: 0 0 16px; color: var(--ink-soft); font-size: 15px; line-height: 1.5; }
+  .join-badge-row { margin-bottom: 12px; }
+  .join-features { list-style: none; margin: 16px 0 0; padding: 0; display: grid; gap: 8px; }
+  .join-features li { position: relative; padding-left: 24px; font-size: 14px; color: var(--ink); line-height: 1.5; }
+  .join-features li::before { content: '✓'; position: absolute; left: 0; top: 0; color: var(--success); font-weight: 700; }
+  .join-form { display: grid; gap: 12px; margin: 0 0 12px; }
+  .join-field { display: block; position: relative; border: 1px solid var(--border); border-radius: var(--radius-input, 12px); background: var(--surface-2); padding: 8px 12px; }
+  .join-field:focus-within { border-color: var(--accent); }
+  .join-field-label { display: block; font-size: 11px; font-family: var(--font-mono); letter-spacing: 0.04em; text-transform: uppercase; color: var(--ink-soft); }
+  .join-field input { width: 100%; border: 0; background: transparent; color: var(--ink); font-size: 16px; padding: 2px 0 0; outline: none; }
+  .join-actions { display: flex; flex-wrap: wrap; gap: 12px; margin-top: 16px; }
+  .join-actions .btn { flex: 1 1 auto; min-width: 180px; justify-content: center; }
+  .join-msg { margin: 12px 0 0; font-size: 14px; color: var(--ink-soft); min-height: 20px; }
+  .join-msg--ok { color: var(--success); }
+  .join-msg--err { color: var(--error); }
+
+  .dir-upgrade-banner { border: 1px solid var(--border); border-radius: var(--radius-card, 16px); padding: 16px; margin-bottom: 16px; font-size: 15px; line-height: 1.5; color: var(--ink); }
+  .dir-upgrade-banner strong { color: var(--ink); }
+  .dir-upgrade-banner a { color: var(--accent); }
+  .dir-upgrade-banner--ok { background: var(--success-bg); border-color: var(--success); }
+  .dir-upgrade-banner--info { background: var(--accent-soft); border-color: var(--accent); }
+
+  /* The mobile burger menu carries its own "For shippers" link, so the desktop
+     shipper nav slot (incl. the hydrated email / Pro chip / Manage) is hidden
+     on mobile to avoid crowding + horizontal overflow in the top bar. */
+  @media (max-width: 720px) {
+    .nav-shipper { display: none; }
+  }
+  @media (max-width: 640px) {
+    .nav-email { display: none; }
+    .join-panel { padding: 16px; }
+    .join-actions .btn { flex: 1 1 100%; }
+  }
 `;
 
 /**
@@ -850,6 +895,7 @@ export function layout({ title, description, canonicalPath, bodyHtml, jsonLd }: 
       <a class="nav-link" href="/directory">Directory</a>
       <a class="nav-link" href="/compliance">Compliance</a>
       <a class="nav-link" href="/glossary">Glossary</a>
+      <span class="nav-shipper" id="nav-shipper"><a class="nav-link" href="/directory/join">For shippers</a></span>
       <a class="btn btn-primary always-show" href="/signup">Claim your listing<span class="tn-free"> — free</span> <span class="arr">→</span></a>
       <button type="button" class="qf-theme-btn" aria-label="Toggle light/dark theme" aria-pressed="false" title="Toggle theme"><svg class="qf-ico-sun" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M2 12h2M20 12h2M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4"/></svg><svg class="qf-ico-moon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 12.8A9 9 0 1 1 11.2 3a7 7 0 0 0 9.8 9.8z"/></svg></button>
       <button type="button" class="topnav-burger" aria-label="Open menu" aria-expanded="false" aria-controls="topnav-mobile-menu">
@@ -864,6 +910,7 @@ export function layout({ title, description, canonicalPath, bodyHtml, jsonLd }: 
       <a href="/services">Services</a>
       <a href="/tools">Rate calculator</a>
       <a href="/pricing">Pricing</a>
+      <a href="/directory/join">For shippers</a>
       <a href="/">Home</a>
       <a class="tn-cta" href="/signup">Claim your listing — it's free →</a>
     </nav>
@@ -877,9 +924,45 @@ export function layout({ title, description, canonicalPath, bodyHtml, jsonLd }: 
   <script src="/marketing-chat.js" defer></script>
   <script src="/theme-toggle.js" defer></script>
   <script src="/directory-tooltip.js" defer></script>
+  <script>${NAV_SHIPPER_SCRIPT}</script>
 </body>
 </html>`;
 }
+
+/**
+ * Hydrates the "For shippers" nav slot from GET /api/directory/auth/me (soft
+ * auth — never 401). Anonymous keeps the static "For shippers" link; a signed-in
+ * free shipper gets their email + an Upgrade link; a Directory Pro shipper gets
+ * their email + a "Directory Pro ✓" chip + a "Manage" link that opens the Stripe
+ * billing portal. Degrades silently on any error (nav stays as server-rendered).
+ */
+const NAV_SHIPPER_SCRIPT = `
+(function(){
+  var slot=document.getElementById('nav-shipper'); if(!slot) return;
+  fetch('/api/directory/auth/me',{headers:{'Accept':'application/json'},credentials:'same-origin'})
+    .then(function(r){return r.ok?r.json():null;})
+    .then(function(d){
+      if(!d||!d.user) return;
+      var s=d.directoryPro&&d.directoryPro.status;
+      var pro=s==='active'||s==='trialing';
+      var email=String(d.user.email||'').replace(/[<>&"']/g,'');
+      var parts='<span class="nav-email" title="'+email+'">'+email+'</span>';
+      if(pro){ parts+='<span class="nav-pro-chip">Directory Pro \\u2713</span><a class="nav-link nav-manage" href="#" data-nav-portal>Manage</a>'; }
+      else { parts+='<a class="nav-link nav-upgrade" href="/directory/join?intent=subscribe">Upgrade</a>'; }
+      slot.classList.add('nav-shipper--auth');
+      slot.innerHTML=parts;
+      var p=slot.querySelector('[data-nav-portal]');
+      if(p){ p.addEventListener('click',function(e){
+        e.preventDefault();
+        fetch('/api/directory/billing/portal',{headers:{'Accept':'application/json'},credentials:'same-origin'})
+          .then(function(r){return r.json();})
+          .then(function(j){ if(j&&j.url) window.location.href=j.url; })
+          .catch(function(){});
+      }); }
+    })
+    .catch(function(){});
+})();
+`.trim();
 
 /**
  * Display name for a carrier: prefer the DBA / trade name, but fall back to the
@@ -1680,7 +1763,158 @@ function canonicalSuffix(f: DirectoryFilters, locked: Set<string>): string {
 }
 
 // ─── 1. Directory landing ─────────────────────────────────────────────────
-export function renderDirectoryLanding(summary: DirectorySummary): string {
+// ─── Shipper join / Directory Pro checkout (/directory/join) ──────────────
+/**
+ * Progressive-enhancement for /directory/join.
+ *   • The email form POSTs to /api/directory/auth/signup. A NEW email logs the
+ *     shipper in immediately (session cookie); an EXISTING email gets a magic
+ *     link ("check your email"). With intent=subscribe, a fresh account is sent
+ *     straight to Stripe Checkout.
+ *   • The Subscribe button (signed-in free) POSTs /api/directory/billing/checkout
+ *     and redirects to the returned hosted-checkout URL.
+ *   • The Manage button (Pro) GETs /api/directory/billing/portal and redirects.
+ * Buttons need JS; the email form still POSTs without it (endpoint returns JSON).
+ */
+const JOIN_SCRIPT = `
+(function(){
+  var root=document.querySelector('[data-join]'); if(!root) return;
+  var intent=root.getAttribute('data-intent')||'signin';
+  var msg=root.querySelector('[data-join-msg]');
+  function say(t,cls){ if(msg){ msg.textContent=t; msg.className='join-msg'+(cls?' '+cls:''); } }
+  function startCheckout(){
+    return fetch('/api/directory/billing/checkout',{method:'POST',headers:{'Accept':'application/json'},credentials:'same-origin'})
+      .then(function(r){return r.json().then(function(j){return {ok:r.ok,j:j};});})
+      .then(function(res){ if(res.ok&&res.j&&res.j.url){ window.location.href=res.j.url; } else { throw new Error((res.j&&res.j.error)||'Could not start checkout.'); } });
+  }
+  var form=root.querySelector('[data-join-signup-form]');
+  if(form){ form.addEventListener('submit',function(e){
+    e.preventDefault();
+    var input=form.querySelector('input[type="email"]');
+    var btn=form.querySelector('button[type="submit"]');
+    var email=input?input.value.trim():'';
+    if(!email){ return; }
+    if(btn){ btn.disabled=true; }
+    say('Working\\u2026');
+    fetch('/api/directory/auth/signup',{method:'POST',headers:{'Content-Type':'application/json','Accept':'application/json'},credentials:'same-origin',body:JSON.stringify({email:email})})
+      .then(function(r){return r.json().then(function(j){return {ok:r.ok,j:j};});})
+      .then(function(res){
+        if(!res.ok){ throw new Error((res.j&&res.j.error)||'Something went wrong.'); }
+        if(res.j.existing){ say('We emailed you a sign-in link \\u2014 click it to continue.','join-msg--ok'); if(btn){btn.disabled=false;} return; }
+        if(intent==='subscribe'){ say('Account created \\u2014 taking you to secure checkout\\u2026','join-msg--ok'); return startCheckout().catch(function(){ say('Account created, but checkout could not start. Reload this page and click Subscribe.','join-msg--err'); if(btn){btn.disabled=false;} }); }
+        say('You\\u2019re signed in.','join-msg--ok'); window.location.reload();
+      })
+      .catch(function(err){ say((err&&err.message)||'Something went wrong. Try again.','join-msg--err'); if(btn){btn.disabled=false;} });
+  }); }
+  var sub=root.querySelector('[data-subscribe-btn]');
+  if(sub){ sub.addEventListener('click',function(e){ e.preventDefault(); sub.disabled=true; say('Starting secure checkout\\u2026'); startCheckout().catch(function(err){ say((err&&err.message)||'Could not start checkout. Try again.','join-msg--err'); sub.disabled=false; }); }); }
+  var mng=root.querySelector('[data-manage-btn]');
+  if(mng){ mng.addEventListener('click',function(e){ e.preventDefault(); mng.setAttribute('aria-busy','true'); say('Opening billing portal\\u2026');
+    fetch('/api/directory/billing/portal',{headers:{'Accept':'application/json'},credentials:'same-origin'})
+      .then(function(r){return r.json().then(function(j){return {ok:r.ok,j:j};});})
+      .then(function(res){ if(res.ok&&res.j&&res.j.url){ window.location.href=res.j.url; } else { throw new Error(); } })
+      .catch(function(){ mng.removeAttribute('aria-busy'); say('Could not open the billing portal. Try again.','join-msg--err'); }); }); }
+})();
+`.trim();
+
+/** The Directory Pro value bullets (shared across the join surfaces). */
+function directoryProFeatures(): string {
+  const cap = rfqRecipientCap();
+  const items = [
+    'Reveal direct dispatch &amp; decision-maker contacts beyond the FMCSA record',
+    'Export filtered carrier lists to CSV',
+    'Save carrier lists to reuse across searches',
+    `Send one rate request to up to ${cap} carriers at once`,
+  ];
+  return `<ul class="join-features">${items.map((i) => `<li>${i}</li>`).join('')}</ul>`;
+}
+
+/**
+ * Shipper-facing "Directory Pro" join / sign-in / subscribe surface (/directory/join).
+ * Dedicated shipper flow — NEVER the carrier /signup. Server-branches on the
+ * soft-auth identity: anonymous → passwordless email form; signed-in free →
+ * Subscribe ($19/mo → Stripe Checkout); Directory Pro → manage subscription.
+ */
+export function renderDirectoryJoin(opts: {
+  identity: DirectoryIdentity;
+  intent?: 'subscribe' | 'signin';
+}): string {
+  const { identity } = opts;
+  const intent: 'subscribe' | 'signin' = opts.intent === 'subscribe' ? 'subscribe' : 'signin';
+  const signedIn = identity.userId != null;
+  const isPro = identity.isPro;
+  const email = identity.email ?? '';
+
+  let panel: string;
+  if (isPro) {
+    panel = `<div class="join-panel" data-join>
+      <div class="join-badge-row"><span class="nav-pro-chip">Directory Pro ✓</span></div>
+      <h2>You're on Directory Pro</h2>
+      <p class="join-sub">Signed in as <strong>${esc(email)}</strong>. Your exports, contact reveal, saved lists, and multi-carrier RFQs are unlocked.</p>
+      ${directoryProFeatures()}
+      <div class="join-actions">
+        <a class="btn btn-primary" href="/directory">Browse the directory <span class="arr">→</span></a>
+        <button type="button" class="btn btn-secondary" data-manage-btn>Manage subscription</button>
+      </div>
+      <p class="join-msg" data-join-msg role="status" aria-live="polite"></p>
+    </div>`;
+  } else if (signedIn) {
+    panel = `<div class="join-panel" data-join data-intent="subscribe">
+      <h2>Subscribe to Directory Pro</h2>
+      <p class="join-sub">Signed in as <strong>${esc(email)}</strong>. Unlock the full directory for <strong>$19/mo</strong> — cancel anytime.</p>
+      ${directoryProFeatures()}
+      <div class="join-actions">
+        <button type="button" class="btn btn-primary" data-subscribe-btn>Subscribe — $19/mo</button>
+        <a class="btn btn-secondary" href="/directory">Keep browsing free</a>
+      </div>
+      <p class="join-msg" data-join-msg role="status" aria-live="polite"></p>
+    </div>`;
+  } else {
+    const heading = intent === 'subscribe' ? 'Sign in to subscribe to Directory Pro' : 'Sign in or create your shipper account';
+    const sub =
+      intent === 'subscribe'
+        ? `Directory Pro is <strong>$19/mo</strong>, cancel anytime. Enter your email — we'll sign you in, then take you to secure checkout.`
+        : `Shippers sign in with a magic link — no password. Enter your work email and we'll email you a secure sign-in link.`;
+    const btnLabel = intent === 'subscribe' ? 'Continue' : 'Email me a sign-in link';
+    panel = `<div class="join-panel" data-join data-intent="${intent}">
+      <h2>${esc(heading)}</h2>
+      <p class="join-sub">${sub}</p>
+      <form class="join-form" data-join-signup-form method="post" action="/api/directory/auth/signup" novalidate>
+        <label class="join-field">
+          <span class="join-field-label">Work email</span>
+          <input type="email" name="email" autocomplete="email" required placeholder="you@company.com">
+        </label>
+        <button type="submit" class="btn btn-primary">${esc(btnLabel)}</button>
+      </form>
+      <p class="join-msg" data-join-msg role="status" aria-live="polite"></p>
+      ${directoryProFeatures()}
+    </div>`;
+  }
+
+  const body = `
+  <section class="hero dir-hero">
+    <div class="container-narrow">
+      <div class="eyebrow" style="color: var(--accent); font-family: var(--font-mono); font-size: 12px; letter-spacing: 0.08em; text-transform: uppercase; margin-bottom: 10px;">For shippers</div>
+      <h1>Directory Pro</h1>
+      <p class="lead">The full carrier directory — direct contacts, CSV exports, saved lists, and multi-carrier rate requests.</p>
+    </div>
+  </section>
+  <main class="dir-shell join-shell">
+    ${panel}
+  </main>
+  <script>${JOIN_SCRIPT}</script>`;
+
+  return layout({
+    title: 'Directory Pro for Shippers — Sign in & Subscribe | QuoteFleet',
+    description: 'Sign in or subscribe to QuoteFleet Directory Pro: direct carrier contacts, CSV exports, saved lists, and multi-carrier rate requests. $19/mo, cancel anytime.',
+    canonicalPath: '/directory/join',
+    bodyHtml: body,
+  });
+}
+
+export function renderDirectoryLanding(
+  summary: DirectorySummary,
+  opts?: { upgrade?: 'success' | 'cancelled' | null },
+): string {
   const portCards = summary.byPort
     .map(
       (p) => `<a class="dir-card" href="/directory/port/${encodeURIComponent(p.code)}">
@@ -1711,6 +1945,17 @@ export function renderDirectoryLanding(summary: DirectorySummary): string {
     ? `<div class="dir-empty">The carrier directory is being set up — carriers are loading. Check back shortly.</div>`
     : '';
 
+  // Post-checkout confirmation banner (Stripe returns here via success_url /
+  // cancel_url). Directory Pro success reflects the shipper feature set; a
+  // cancel is a soft "no charge" note with a retry link.
+  const upgrade = opts?.upgrade ?? null;
+  const upgradeBanner =
+    upgrade === 'success'
+      ? `<div class="dir-upgrade-banner dir-upgrade-banner--ok" role="status"><strong>You're on Directory Pro.</strong> Exports, contact reveal, saved lists, and ${rfqRecipientCap()}-recipient RFQs are unlocked.</div>`
+      : upgrade === 'cancelled'
+        ? `<div class="dir-upgrade-banner dir-upgrade-banner--info" role="status"><strong>Checkout cancelled — no charge was made.</strong> <a href="/directory/join?intent=subscribe">Subscribe to Directory Pro →</a></div>`
+        : '';
+
   const body = `
   <section class="hero dir-hero">
     <div class="container-narrow">
@@ -1725,6 +1970,7 @@ export function renderDirectoryLanding(summary: DirectorySummary): string {
     </div>
   </section>
   <main class="dir-shell">
+    ${upgradeBanner}
     ${emptyNotice}
     ${
       isEmpty
@@ -2234,7 +2480,7 @@ export function renderCarrierProfile(opts: {
           <span class="cp-gated-blur">Dispatch direct · ••• ••• ••••</span>
           <span class="cp-gated-blur">Ops email · ●●●●●@●●●●●●</span>
         </div>
-        <a class="btn btn-primary cp-unlock-btn" href="/signup?plan=directory-pro">Unlock with Directory Pro — $19/mo</a>
+        <a class="btn btn-primary cp-unlock-btn" href="/directory/join?intent=subscribe">Unlock with Directory Pro — $19/mo</a>
         <button type="button" class="btn btn-secondary cp-reveal-btn" disabled aria-disabled="true" title="Available on Directory Pro">Reveal contacts</button>
       </div>`;
 
