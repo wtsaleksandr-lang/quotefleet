@@ -435,6 +435,13 @@
       "when": 1788547677221,
       "tag": "0061_password_reset_tokens",
       "breakpoints": true
+    },
+    {
+      "idx": 62,
+      "version": "7",
+      "when": 1787590493980,
+      "tag": "0062_certain_maverick",
+      "breakpoints": true
     }
   ]
 }
