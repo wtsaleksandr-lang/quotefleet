@@ -162,14 +162,20 @@ body.qf-wft .qf-hero-devices--video.stage-phone  .qf-hero-cap--phone[data-show="
         rgba(9, 11, 20, 0.86) 100%);
     box-shadow: 0 10px 22px rgba(0, 0, 0, .42);
   }
+  /* REFINE v2 — TASK 4: the prior bump (title 16px) read too small. Increase it
+     SUBSTANTIALLY so the top-of-phone caption is prominently readable: title to
+     24px, kicker to 14px (proportionally larger), dash to 24px. Position + style
+     are unchanged — size only. The caption card spans the phone screen (left/right
+     0) with max-width:100%, so the title wraps within the phone if needed and
+     never overflows/clips the frame. */
   body.qf-wft .qf-hero-cap--phone .qf-hero-cap__kicker {
-    font-size: 12px;
+    font-size: 14px;
     letter-spacing: 0.16em;
     gap: 8px;
   }
-  body.qf-wft .qf-hero-cap--phone .qf-hero-cap__kicker::before { width: 16px; height: 2px; }
+  body.qf-wft .qf-hero-cap--phone .qf-hero-cap__kicker::before { width: 24px; height: 2px; }
   body.qf-wft .qf-hero-cap--phone .qf-hero-cap__title {
-    font-size: 16px;
+    font-size: 24px;
     line-height: 1.2;
     max-width: 100%;
     color: #F5F8FF;
