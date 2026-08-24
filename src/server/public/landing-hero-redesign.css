@@ -151,11 +151,25 @@ body.qf-wft .hero-cta .demo-link .arr {
 
   body.qf-wft .hero-copy .eyebrow {
     order: 1;
+    /* The audience detail now lives in the eyebrow (CRO), so it's long enough to
+       wrap to 2 lines at 375px. Keep the desktop inline-flex chip (content-hug,
+       so the light-theme soft-tint kicker pill still hugs its text rather than
+       spanning full width) and let it wrap normally. Alignment (centered on
+       mobile) is owned by landing-hero-polish.css — matching the centered H1,
+       lead and trust lines under the phone. */
     margin: 0 0 4px !important;
-    margin-left: 0 !important;
-    margin-right: auto !important;
-    text-align: left !important;
-    white-space: nowrap !important;
+    white-space: normal !important;
+    max-width: 100% !important;
+  }
+  /* The audience eyebrow now wraps to 2 lines and spans the column width on
+     mobile. In light theme the global kicker rule (landing-wefixtrades-cleanup)
+     paints every eyebrow on a soft-tint fill — at full width that reads as a
+     heavy full-bleed bar. Drop the fill on the hero eyebrow at ≤640 so it stays
+     a clean, centered accent-blue kicker (dark theme is already fill-free);
+     higher specificity than the cleanup rule so it wins in light mode. */
+  html[data-theme="light"] body.qf-wft .hero-copy .eyebrow {
+    background: transparent !important;
+    border-color: transparent !important;
   }
 
   html body.qf-wft .hero h1 {
@@ -176,11 +190,23 @@ body.qf-wft .hero-cta .demo-link .arr {
      this now-static <link>), mirroring the .hero h1 fix — keeps the mobile
      widget visible as it was before the static-link change. */
   html body.qf-wft .visual-flow.qf-hero-media {
-    order: 3;
+    order: 5;
     display: block !important;
     max-width: 320px !important;
     width: 100% !important;
     margin: 4px auto !important;
+  }
+
+  /* CRO order (mobile): eyebrow(1) → H1(2) → subhead(3) → FINDER(4) → mockup(5)
+     → Start free(6) + trial note(7) → trust line(8). The finder is the primary
+     action and must sit AFTER the headline+subhead, never above them (it used to
+     default to order:0 and float to the very top, leaving a dead gap). Zero its
+     bottom margin here — the 24px hero-grid gap is the single source of rhythm,
+     so the finder no longer double-spaces into the mockup below it. */
+  html body.qf-wft .qf-finder {
+    order: 4;
+    margin: 0 !important;
+    max-width: 100% !important;
   }
 
   /* Mobile keeps the compact widget; the desktop composite is hidden here. */
@@ -198,7 +224,7 @@ body.qf-wft .hero-cta .demo-link .arr {
      which otherwise stacks on top of the grid gap and bloats the space under
      the hero phone. The 24px grid gap alone is the intended breathing room. */
   html body.qf-wft .hero .lead {
-    order: 4;
+    order: 3;
     margin: 0 !important;
     max-width: 100% !important;
     text-align: left !important;
@@ -212,29 +238,28 @@ body.qf-wft .hero-cta .demo-link .arr {
     display: contents !important;
   }
 
+  /* Single secondary CTA now (the "See a live demo" link was removed — the finder
+     is the primary action, "Start free" the lone secondary). */
+  body.qf-wft .hero-cta .btn-secondary,
   body.qf-wft .hero-cta .btn-primary {
-    order: 5;
+    order: 6;
     width: 100% !important;
     margin-top: 8px !important;
   }
 
-  body.qf-wft .hero-cta .demo-link {
-    order: 8;
-    align-self: flex-start !important;
-    justify-content: flex-start !important;
-    padding: 4px 0 !important;
-    margin-top: 4px !important;
-  }
-
-  /* Trust/reassurance lines land after the button and before the demo-link.
-     .hero-trial-note is also a .micro-copy, so its rule follows to win the tie. */
+  /* Trial note (7) then the FMCSA trust line (8) close the mobile hero. */
   body.qf-wft .hero .micro-copy {
     order: 7;
     text-align: left !important;
   }
 
   body.qf-wft .hero .hero-trial-note {
-    order: 6;
+    order: 7;
+    text-align: left !important;
+  }
+
+  body.qf-wft .hero .hero-trust-line {
+    order: 8;
     text-align: left !important;
   }
 }
