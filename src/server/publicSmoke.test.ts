@@ -11,12 +11,19 @@ async function file(name: string) {
 describe('public static page smoke checks', () => {
   it('landing page has simple visual-first positioning and no placeholder links', async () => {
     const html = await file('landing.html');
-    expect(html).toContain('See your own freight quote calculator &mdash; in seconds.');
+    expect(html).toContain('See your own freight quote calculator &mdash; live in seconds.');
     expect(html).toContain('Stop losing loads to slow, manual quoting.');
-    expect(html).toContain('For carriers, brokers');
+    expect(html).toContain('For carriers, brokers, dispatchers &amp; forwarders');
     expect(html).toContain('acmetrucking.yourquote.net');
     expect(html).toContain('email signature');
-    expect(html).toContain('a live demo loads instantly');
+    // CRO hero: outcome-first subhead, short toggle labels, FMCSA trust line,
+    // and the redundant "See a live demo" link removed from the hero.
+    expect(html).toContain('A branded quote page your customers fill out themselves');
+    expect(html).toContain('>Carriers</button>');
+    expect(html).toContain('>Shippers</button>');
+    expect(html).toContain('Set up in ~5 minutes · sourced from FMCSA public data.');
+    // The hero's redundant "See a live demo" link (class="demo-link") is gone.
+    expect(html).not.toContain('class="demo-link"');
     expect(html).toContain('Branded PDF quotes');
     expect(html).toContain('Automatic follow-ups');
     expect(html).toContain('24/7 AI service agent');

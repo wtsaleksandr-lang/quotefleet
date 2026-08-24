@@ -25,8 +25,9 @@ describe('homepage final cleanup styles', () => {
 
     expect(html).toContain('/brand/mark-keys-ondark.png');
     expect(html).toContain('View demo <span class="arr">→</span>');
-    expect(html).toContain('<a class="btn btn-primary btn-lg" href="/signup">Start free');
-    expect(html).not.toContain('<a class="btn btn-primary" href="/signup">Start free');
+    // CRO hero: the finder is the primary action; "Start free" is the single
+    // secondary hero CTA (was btn-primary btn-lg).
+    expect(html).toContain('<a class="btn btn-secondary" href="/signup">Start free');
   });
 
   it('widens the hero title, hero visual cards, and under-hero step containers', async () => {

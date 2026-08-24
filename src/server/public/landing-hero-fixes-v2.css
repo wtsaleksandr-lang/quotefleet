@@ -64,9 +64,12 @@
      desktop peeks around the phone instead of a bare grey sliver. (Light theme has
      its own opacity/blur pair at the bottom of this file.) */
   html body.qf-wft .qf-hero-devices--video.stage-phone > .qf-hero-laptop {
-    transform: translate(12%, -4%) scale(.66) !important;
-    opacity: .7 !important;
-    filter: blur(1.8px) saturate(.92) !important;
+    /* CRO: Alex flagged the desktop-behind-the-phone as nearly invisible. Pull it
+       out from behind the phone a touch (12% → 4%) and lift opacity .7 → .9 so a
+       real (still-blurred) desktop clearly reads behind the sharp phone. */
+    transform: translate(4%, -4%) scale(.66) !important;
+    opacity: .9 !important;
+    filter: blur(1.6px) saturate(.94) !important;
   }
 }
 
@@ -328,10 +331,10 @@ html body.qf-wft .qf-dir-card__port span {
    its opacity and ease the blur so it reads as a genuine (blurred) product
    screenshot sitting behind the phone. Dark mode keeps its original subtle dim. */
 html[data-theme="light"] body.qf-wft .qf-hero-devices--video.stage-phone > .qf-hero-laptop {
-  /* Bumped 0.7 → 0.85 so the blurred desktop reads as clearly present-behind-the-
+  /* Bumped 0.85 → 0.94 so the blurred desktop reads as clearly present-behind-the-
      phone depth in light mode (matching the dark theme's clarity); stays blurred. */
-  opacity: 0.85 !important;
-  filter: blur(1.5px) saturate(1) !important;
+  opacity: 0.94 !important;
+  filter: blur(1.4px) saturate(1) !important;
 }
 
 /* ═══════════════════════════════════════════════════════════════════════════
