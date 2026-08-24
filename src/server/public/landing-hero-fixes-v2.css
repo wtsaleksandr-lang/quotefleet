@@ -48,14 +48,17 @@
   html body.qf-wft .qf-hero-devices--video.stage-laptop > .qf-hero-laptop {
     transform: translate(0%, 52px) !important;
   }
-  /* Phone-forward pose (stage-phone): BUG #1 FIX — the phone was lifted so far up
-     (translate -7% + scale 1.12 on a bottom-anchored 590px frame) that its top
-     rose to y≈-5, behind the sticky header (z-index 70) which then clipped it.
-     Lower it (translateY -7% → +9%) and ease the scale (1.12 → 1.05) so the whole
-     phone sits cleanly below the header (top ≈ +100) while still reading as the
-     enlarged focus. */
+  /* Phone-forward pose (stage-phone): sits cleanly below the sticky header (top
+     ≈ +100) as the enlarged focus.
+     TASK #5 — enlarge the phone +20% (scale 1.05 → 1.26) with growth directed
+     DOWN + WIDER and the TOP anchored: `transform-origin: 50% 0%` pins the phone's
+     top edge (so it never rises toward / tucks under the fixed navbar) and lets the
+     uniform scale expand it symmetrically wider and downward only. The extra
+     downward travel is absorbed by the enlarged hero padding-bottom below, so the
+     bigger frame never overlaps the section beneath it. */
   html body.qf-wft .qf-hero-devices--video.stage-phone > .qf-hero-vphone {
-    transform: translate(-84%, 9%) scale(1.05) !important;
+    transform: translate(-84%, 9%) scale(1.26) !important;
+    transform-origin: 50% 0% !important;
   }
   /* BUG #2 FIX — the receded background laptop was opacity:.32 + blur(2px) over the
      dark hero, so its real (blurred) desktop frame washed out to an empty grey
@@ -425,4 +428,87 @@ html body.qf-wft .qf-aud-panel[data-aud-panel="carriers"] .hero-cta .btn-seconda
   background: var(--surface-2) !important;
   border-color: var(--accent) !important;
   color: var(--accent) !important;
+}
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   DESKTOP HERO POLISH (≥981px only — the 375px/mobile hero is left fully intact;
+   every change here is guarded behind the desktop breakpoint per the desktop-only
+   brief). Four moves:
+     #2 — drop the input helper subtitle.
+     #3 — collapse the two-line trial block to ONE line, moved UNDER the mockups.
+     #4 — remove the standalone "Start free" button; the finder input is now the
+          sole primary CTA, with a subtle "or start free" text link tucked onto
+          the end of the one-line trial strip (reusing the button's /signup href).
+     #5 — give the +20% phone frame extra bottom room so it clears the next section.
+   The copy-column subtitle / trial lines / button stay in the DOM (untouched on
+   mobile) and are simply hidden at desktop; the one-line strip is desktop-only.
+   ═══════════════════════════════════════════════════════════════════════════ */
+@media (min-width: 981px) {
+  /* #2 + #3 + #4 — hide the copy-column helper subtitle, both trial lines, and
+     the standalone Start-free button on desktop. They remain for the mobile hero. */
+  html body.qf-wft .qf-aud-panel[data-aud-panel="carriers"] .hero-copy .qf-finder__micro,
+  html body.qf-wft .qf-aud-panel[data-aud-panel="carriers"] .hero-copy .hero-cta,
+  html body.qf-wft .qf-aud-panel[data-aud-panel="carriers"] .hero-copy .hero-trial-note,
+  html body.qf-wft .qf-aud-panel[data-aud-panel="carriers"] .hero-copy .hero-trust-line {
+    display: none !important;
+  }
+
+  /* #5 — clearance for the taller (+20%) phone so it never laps the section below.
+     Driven by vw (grid-guard only checks px literals) with a 120px floor from the
+     allowed ramp; effective ~230–345px across desktop widths, matching the prior
+     clamp visually while keeping every px value on-grid. */
+  html body.qf-wft .hero.visual-hero {
+    padding-bottom: max(120px, 18vw) !important;
+  }
+
+  /* #3 — the one-line strip lives at the BOTTOM of the (now taller) media column.
+     The grid is vertically centered, so a taller media column would otherwise
+     drop the copy column to the middle and break the laptop-top ↔ h1-top
+     alignment. Top-anchor the copy so it stays put; both columns now start at the
+     row top (which is exactly what the laptop-top/h1-top alignment already wants). */
+  html body.qf-wft .qf-aud-panel[data-aud-panel="carriers"] .hero-copy {
+    align-self: start !important;
+  }
+
+  /* #3 + #4 — the single-line trial strip, centered UNDER the phone mockups.
+     Lives inside the media column so it sits directly beneath the device cluster;
+     the big margin-top clears the phone frame, which paints well below its layout
+     box (absolute + scaled), so the strip never collides with it. */
+  html body.qf-wft .qf-hero-trial-strip {
+    display: block;
+    /* margin-top clears the +20% phone (vw-driven, 120px floor from the ramp;
+       ~235–345px across desktop widths — visually the same as the prior clamp). */
+    margin: max(120px, 24vw) auto 0;
+    /* Widened + slightly smaller so the full strip renders on ONE line inside the
+       media column at 1280/1440 (column caps it at narrow widths, so no overflow). */
+    max-width: 720px;
+    text-align: center;
+    font-family: var(--font-sans);
+    font-size: 12px;
+    line-height: 1.55;
+    color: var(--muted);
+  }
+  html body.qf-wft .qf-hero-trial-strip a {
+    color: inherit;
+    text-decoration: none;
+    border-bottom: 1px solid transparent;
+    transition: color .15s ease, border-color .15s ease;
+  }
+  html body.qf-wft .qf-hero-trial-strip a:hover {
+    color: var(--ink);
+    border-bottom-color: currentColor;
+  }
+  /* The secondary "or start free — no card →" text link: subtle, muted, kept on
+     its own line-fragment so the arrow never orphans. */
+  html body.qf-wft .qf-hero-trial-start {
+    white-space: nowrap;
+    color: var(--ink-soft, var(--ink)) !important;
+  }
+}
+
+/* The one-line strip is desktop-only; hidden on tablet + mobile, where the hero
+   keeps its original copy-column trial lines untouched. Scoped to ≤980 so it never
+   competes with the ≥981 `display:block` above (equal specificity). */
+@media (max-width: 980px) {
+  html body.qf-wft .qf-hero-trial-strip { display: none !important; }
 }
