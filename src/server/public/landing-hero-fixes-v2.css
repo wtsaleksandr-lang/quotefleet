@@ -482,7 +482,11 @@ html body.qf-wft .qf-aud-panel[data-aud-panel="carriers"] .hero-cta .btn-seconda
   html body.qf-wft .qf-hero-trial-strip {
     display: block;
     margin: 0;
-    max-width: calc(100% + 48px);
+    /* `width` (not max-width) is the real lever so the box grows 48px past the
+       copy column into the dotted gap and its right end sits OVER the dots, like
+       the H1. 48px < the ≥80px gap → never reaches the phone. calc() → guard-skipped. */
+    width: calc(100% + 48px);
+    max-width: none;
     text-align: left;
     font-family: var(--font-sans);
     font-size: 12px;
@@ -543,10 +547,17 @@ html body.qf-wft .qf-aud-panel[data-aud-panel="carriers"] .hero-cta .btn-seconda
     z-index: 2 !important;
     max-width: none !important;
   }
-  /* Title fills the cell + 80px into the dotted gap (reaches toward centre,
-     before the phone). No background → dots stay visible behind the letters. */
+  /* Title box actually GROWS 80px past the copy column into the dotted gap so its
+     lines break later and its right portion sits OVER the dots (no background →
+     dots show through the letters). `width` (not max-width) is the real lever —
+     max-width can't expand a block that already fills its column. `max-width:none`
+     clears the inherited `.hero h1 { max-width:620px }` cap so nothing clamps it.
+     Safe at every width: the column gap is always ≥80px, so the +80px right edge
+     lands INSIDE the gap (or at most the media boundary at gap=80) — never on the
+     phone (which sits ~20% inside the media column). calc() → guard-skipped. */
   html body.qf-wft .qf-aud-panel[data-aud-panel="carriers"] .hero-copy h1 {
-    max-width: calc(100% + 80px) !important;
+    width: calc(100% + 80px) !important;
+    max-width: none !important;
   }
   /* Dot field reaches a bit further left so it clearly sits behind the widened
      title's right region (percentages, not px → no ramp concern). */
