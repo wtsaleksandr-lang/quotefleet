@@ -547,6 +547,14 @@ const DIRECTORY_CSS = `
   @media (max-width: 420px) {
     .dir-grid { grid-template-columns: 1fr; }
   }
+  /* Sub-375px phones (360/320): a single long browse-chip label (e.g. a full
+     port-group name) has a nowrap min-content wider than the results column,
+     which forces ~14px of horizontal page scroll at 360px. Let these chips
+     wrap on the narrowest phones so they fit the column — no effect at ≥375px,
+     where the chip already fits within the viewport. */
+  @media (max-width: 374px) {
+    .dir-chips .dir-chip { white-space: normal; }
+  }
   /* ── Carrier profile (rich, DrayLocator-structured card) ────────────────── */
   .cp-caps { display: flex; flex-direction: column; align-items: flex-start; gap: 8px; margin: 12px 0 4px; }
   /* Each badge GROUP (credentials / equipment) lays out on its own row. Desktop:
