@@ -127,22 +127,29 @@ describe('production health endpoint', () => {
     expect(app).not.toContain('causeMessage');
   });
 
-  it('opens the compiled production listener before optional startup work', async () => {
+  it('configures production probes to use the dedicated health endpoint', async () => {
+    const replitConfig = await read('.replit');
+    const app = await read('src/server/app.ts');
+
+    expect(replitConfig).toContain('healthcheckPath = "/healthz"');
+    expect(replitConfig).not.toContain('healthcheckPath = "/"');
+    expect(app).toContain("res.json({ ok: true, status: 'up'");
+  });
+
+  it('opens the compiled production listener before post-listen jobs', async () => {
     const index = await read('src/server/index.ts');
     const listenerPosition = index.search(/^[ \t]*app\.listen\(env\.PORT, env\.HOST,/m);
-    const backgroundBootPosition = index.search(/^[ \t]*void runBackgroundBoot\(\);/m);
-    const backgroundBoot = index.slice(
-      index.indexOf('async function runBackgroundBoot'),
+    const postListenJobsPosition = index.search(/^[ \t]*void runPostListenJobs\(\);/m);
+    const postListenJobs = index.slice(
+      index.indexOf('async function runPostListenJobs'),
       index.indexOf('\nasync function main'),
     );
 
     expect(listenerPosition).toBeGreaterThanOrEqual(0);
-    expect(backgroundBootPosition).toBeGreaterThan(listenerPosition);
-    expect(backgroundBoot).toContain('await ensureSelfHealTables()');
-    expect(backgroundBoot).toContain('await runMigrations()');
-    expect(backgroundBoot).toContain('await seedDirectoryTerminals()');
-    expect(backgroundBoot).toContain('void maybeAutoHealCarrierDirectory()');
-    expect(backgroundBoot).toContain('void maybeBackfillNearestPortCodes()');
+    expect(postListenJobsPosition).toBeGreaterThan(listenerPosition);
+    expect(postListenJobs).toContain('await seedDirectoryTerminals()');
+    expect(postListenJobs).toContain('void maybeAutoHealCarrierDirectory()');
+    expect(postListenJobs).toContain('void maybeBackfillNearestPortCodes()');
 
     const port = await unusedLocalPort();
     const databaseBlackhole = await startDatabaseBlackhole();

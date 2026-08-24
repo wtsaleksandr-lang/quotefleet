@@ -1,1 +1,2 @@
 - [Production startup reliability](production-startup-reliability.md) — Keep readiness independent of schema work that can block behind production locks.
+- [Deployment health check rollout](deployment-health-check-rollout.md) — Probe path changes apply to the next production publish, not a development workflow restart.
