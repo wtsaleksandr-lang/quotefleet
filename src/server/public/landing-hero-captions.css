@@ -139,3 +139,40 @@ body.qf-wft .qf-hero-devices--video.stage-phone  .qf-hero-cap--phone[data-show="
 @media (prefers-reduced-motion: reduce) {
   body.qf-wft .qf-hero-cap { transition: none; }
 }
+
+/* ─────────────────────────────────────────────────────────────────────────
+   DESKTOP (≥981px) — phone caption promoted to a PROMINENT, top-anchored card.
+   Alex ask: the rotating feature-caption ("PAYMENTS" / "Integrated with Stripe
+   & PayPal.") should sit at the TOP of the phone mockup and read easily —
+   noticeably larger + higher-contrast than the old compact label. Kept INSIDE
+   the phone screen at top:0 (so it moves + scales WITH the +20% phone and the
+   swap animation is untouched); font sizes materially bumped and the scrim
+   pushed near-opaque so the mono kicker + bold title stay crisp over any beat.
+   Desktop-scoped so the 375px mobile hero (captions hidden ≤640) is untouched.
+   ───────────────────────────────────────────────────────────────────────── */
+@media (min-width: 981px) {
+  body.qf-wft .qf-hero-cap--phone {
+    top: 0;
+    gap: 6px;
+    padding: 18px 16px 16px;
+    border-radius: 21px 21px 14px 14px;
+    background: linear-gradient(180deg,
+        rgba(9, 11, 20, 0.97) 0%,
+        rgba(9, 11, 20, 0.95) 68%,
+        rgba(9, 11, 20, 0.86) 100%);
+    box-shadow: 0 10px 22px rgba(0, 0, 0, .42);
+  }
+  body.qf-wft .qf-hero-cap--phone .qf-hero-cap__kicker {
+    font-size: 12px;
+    letter-spacing: 0.16em;
+    gap: 6px;
+  }
+  body.qf-wft .qf-hero-cap--phone .qf-hero-cap__kicker::before { width: 16px; height: 2px; }
+  body.qf-wft .qf-hero-cap--phone .qf-hero-cap__title {
+    font-size: 16px;
+    line-height: 1.2;
+    max-width: 100%;
+    color: #F5F8FF;
+    text-shadow: 0 1px 12px rgba(0, 0, 0, .6);
+  }
+}
