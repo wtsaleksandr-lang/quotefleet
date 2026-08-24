@@ -19,6 +19,18 @@ import { startFuelSurchargeCron } from '../eia/dieselPrice.js';
 import { startDirectoryRefreshCron } from './directoryRefreshCron.js';
 import { runCronSafely } from './cronSafety.js';
 
+// Global crash guards (log-and-survive). The app is otherwise healthy (DB +
+// memory fine); surviving a transient async error — most likely a dropped Neon
+// idle DB connection — is strictly better than crash-looping. NO process.exit:
+// the log line reveals the real thrower in Replit deployment logs next cycle.
+// Registered BEFORE main() runs so it covers all DB/cron work.
+process.on('unhandledRejection', (reason) => {
+  console.error('[server] UNHANDLED REJECTION (surviving):', reason);
+});
+process.on('uncaughtException', (err) => {
+  console.error('[server] UNCAUGHT EXCEPTION (surviving):', err);
+});
+
 async function main() {
   const env = loadEnv();
   // Journal-INDEPENDENT re-create of at-risk TABLES — MUST run BEFORE
