@@ -19,16 +19,22 @@ import { startFuelSurchargeCron } from '../eia/dieselPrice.js';
 import { startDirectoryRefreshCron } from './directoryRefreshCron.js';
 import { runCronSafely } from './cronSafety.js';
 
-// Global crash guards (log-and-survive). The app is otherwise healthy (DB +
-// memory fine); surviving a transient async error — most likely a dropped Neon
-// idle DB connection — is strictly better than crash-looping. NO process.exit:
-// the log line reveals the real thrower in Replit deployment logs next cycle.
+// Global crash guards: LOG the real thrower, then EXIT for a clean restart.
+// These faults originate OUTSIDE the promise main() awaits, so swallowing them
+// (an earlier attempt) neither resolves nor rejects that await — main() hangs
+// forever, app.listen() is never reached, and the process lingers half-booted
+// serving 500s without ever restarting. Exiting restores self-healing: Replit
+// restarts the process → a clean boot that skips the transient. uncaughtException
+// MUST exit (Node's guidance: the process is in an undefined state after one);
+// we exit unhandledRejection too. The log line still names the thrower first.
 // Registered BEFORE main() runs so it covers all DB/cron work.
 process.on('unhandledRejection', (reason) => {
-  console.error('[server] UNHANDLED REJECTION (surviving):', reason);
+  console.error('[server] UNHANDLED REJECTION (fatal, exiting for clean restart):', reason);
+  process.exit(1);
 });
 process.on('uncaughtException', (err) => {
-  console.error('[server] UNCAUGHT EXCEPTION (surviving):', err);
+  console.error('[server] UNCAUGHT EXCEPTION (fatal, exiting for clean restart):', err);
+  process.exit(1);
 });
 
 async function main() {
