@@ -373,3 +373,56 @@ html[data-theme="dark"] body.qf-wft .visual-flow.qf-hero-media {
     filter: blur(1.5px) saturate(1) !important;
   }
 }
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   CRO v3 — (1) LEFT-ALIGN the mobile carriers hero, (2) quiet the "Start free"
+   CTA to a ghost so the finder is clearly the primary action.
+   ═══════════════════════════════════════════════════════════════════════════ */
+
+/* (1) landing-hero-polish.css centers the whole mobile hero (eyebrow, H1, lead,
+   micro-copy, trust lines). The DESIGN-SYSTEM rule is left-aligned headers
+   (eyebrow top-left, title-left) — desktop already is. Re-assert left alignment
+   on the CARRIERS hero copy column at ≤640 (scoped to the carriers panel so the
+   shippers panel is untouched); higher specificity + later load than hero-polish
+   so it wins. The phone mockup keeps its own centered placement. */
+@media (max-width: 640px) {
+  html body.qf-wft .qf-aud-panel[data-aud-panel="carriers"] .hero-copy .eyebrow {
+    /* Hug content and sit at the left edge instead of stretching + centering. */
+    align-self: flex-start !important;
+    margin-left: 0 !important;
+    margin-right: auto !important;
+    text-align: left !important;
+  }
+  html body.qf-wft .qf-aud-panel[data-aud-panel="carriers"] .hero-copy h1,
+  html body.qf-wft .qf-aud-panel[data-aud-panel="carriers"] .hero-copy .lead {
+    text-align: left !important;
+    margin-left: 0 !important;
+    margin-right: auto !important;
+  }
+  html body.qf-wft .qf-aud-panel[data-aud-panel="carriers"] .qf-finder__micro,
+  html body.qf-wft .qf-aud-panel[data-aud-panel="carriers"] .hero-trial-note,
+  html body.qf-wft .qf-aud-panel[data-aud-panel="carriers"] .hero-trust-line {
+    text-align: left !important;
+  }
+}
+
+/* (2) quotefleet-color-system.css paints EVERY .btn-secondary as a solid white
+   fill (both themes) — in the hero that out-shouts the dark-glass finder and
+   inverts the intended hierarchy. In the carriers hero the finder is the primary
+   action, so restyle "Start free" as a quiet ghost: transparent fill, hairline
+   border, neutral ink label — clearly clickable + AA in both themes, but visually
+   subordinate so the eye lands on the finder first. */
+html body.qf-wft .qf-aud-panel[data-aud-panel="carriers"] .hero-cta .btn-secondary {
+  background: transparent !important;
+  border: 1px solid var(--border-strong) !important;
+  color: var(--ink) !important;
+  box-shadow: none !important;
+}
+html body.qf-wft .qf-aud-panel[data-aud-panel="carriers"] .hero-cta .btn-secondary .arr {
+  color: inherit !important;
+}
+html body.qf-wft .qf-aud-panel[data-aud-panel="carriers"] .hero-cta .btn-secondary:hover {
+  background: var(--surface-2) !important;
+  border-color: var(--accent) !important;
+  color: var(--accent) !important;
+}
