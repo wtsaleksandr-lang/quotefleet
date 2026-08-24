@@ -275,22 +275,72 @@ function emptyDirectorySummary(): DirectorySummary {
  */
 const DIRECTORY_AGG_TTL_MS = 5 * 60_000;
 
-/** Single-value TTL cache for the arg-less global summary. */
+/** Single-value TTL cache for the arg-less global summary. `at` is the staleness
+ *  clock; a value older than DIRECTORY_AGG_TTL_MS is served STALE while one
+ *  background refresh recomputes it (stale-while-revalidate). */
 let directorySummaryCache: { at: number; val: DirectorySummary } | null = null;
+/** In-flight refresh/cold-miss compute for the summary (single-flight). At most
+ *  ONE recompute runs at a time: concurrent callers reuse this promise instead of
+ *  each firing their own full-table scans. null when no refresh is running. */
+let directorySummaryInflight: Promise<DirectorySummary> | null = null;
 
-/** Carrier counts per state + per port (+ intermodal total) for the index/facets. */
-export async function getDirectorySummary(): Promise<DirectorySummary> {
-  const now = Date.now();
-  if (directorySummaryCache && now - directorySummaryCache.at < DIRECTORY_AGG_TTL_MS) {
-    return directorySummaryCache.val;
-  }
+/**
+ * Recompute the summary and (on success) refresh the cache. Rejects on DB error,
+ * leaving the existing cache untouched (stale value preserved, never poisoned).
+ * Always clears the in-flight slot in `finally` so no promise ever leaks and a
+ * later request can retry. Never runs its `finally` synchronously — the awaited
+ * `...Unsafe()` is async, so the caller has already stored this promise in
+ * `directorySummaryInflight` before the slot is cleared.
+ */
+async function refreshDirectorySummary(): Promise<DirectorySummary> {
   try {
     const val = await getDirectorySummaryUnsafe();
-    // Cache only a successfully computed value; an error must NOT poison the cache.
     directorySummaryCache = { at: Date.now(), val };
     return val;
+  } finally {
+    directorySummaryInflight = null;
+  }
+}
+
+/**
+ * Carrier counts per state + per port (+ intermodal total) for the index/facets.
+ *
+ * Stale-while-revalidate + single-flight: a cached value (fresh OR stale) is
+ * returned IMMEDIATELY without ever awaiting a recompute. If it is stale and no
+ * refresh is already running, ONE background refresh is kicked off (fire-and-
+ * forget; its rejection is caught so it can never surface as an unhandled
+ * rejection, and a failed refresh keeps the stale value). Only a COLD MISS (no
+ * cached value at all, e.g. right after a deploy) awaits — and then all
+ * concurrent callers await the SAME single-flight promise, so only one scan runs.
+ */
+export async function getDirectorySummary(): Promise<DirectorySummary> {
+  const cached = directorySummaryCache;
+  if (cached) {
+    // Serve stale immediately; refresh in the background if expired.
+    if (Date.now() - cached.at >= DIRECTORY_AGG_TTL_MS && !directorySummaryInflight) {
+      const p = refreshDirectorySummary();
+      directorySummaryInflight = p;
+      // Fire-and-forget: swallow rejection so a failed refresh keeps the stale
+      // value and never becomes an unhandled promise rejection.
+      void p.catch((err) =>
+        console.warn('[directory] getDirectorySummary background refresh failed; keeping stale summary:', err),
+      );
+    }
+    return cached.val;
+  }
+  // Cold miss — single-flight: first caller starts the compute, concurrent
+  // callers await the same promise. Only the cold path may await a recompute.
+  let inflight = directorySummaryInflight;
+  if (!inflight) {
+    inflight = refreshDirectorySummary();
+    directorySummaryInflight = inflight;
+  }
+  try {
+    return await inflight;
   } catch (err) {
     // Missing table / read failure ⇒ serve an empty directory, never a 500.
+    // The in-flight slot was already cleared in refreshDirectorySummary's
+    // finally, so a later request retries.
     console.warn('[directory] getDirectorySummary failed; serving empty summary:', err);
     return emptyDirectorySummary();
   }
@@ -971,16 +1021,14 @@ function emptyFacetCounts(): FacetCounts {
   };
 }
 
-/**
- * Live per-value counts for the filter sidebar. Each dimension is counted with
- * ITSELF excluded from the WHERE, so a badge shows how many carriers you'd get
- * if you picked that value (standard faceted-search semantics). Degrades to
- * zeros on any read failure — never throws, never 500s the page.
- */
 /** Bounded TTL cache for the global facet counts, keyed by the filter set.
  *  Filter combos are limited in practice, but a crafted query could vary them,
  *  so the Map is capped (oldest evicted) to prevent unbounded growth. */
 const facetCountsCache = new Map<string, { at: number; val: FacetCounts }>();
+/** In-flight refresh/cold-miss compute per filter key (single-flight). At most
+ *  ONE recompute per key runs at a time; entries are always removed in a
+ *  `finally` so nothing leaks. */
+const facetCountsInflight = new Map<string, Promise<FacetCounts>>();
 const FACET_COUNTS_CACHE_MAX = 200;
 
 /** Stable JSON key for a filter set — top-level keys sorted so key ordering can't
@@ -991,18 +1039,81 @@ function facetCacheKey(filters: DirectoryFilters): string {
   return JSON.stringify(filters, Object.keys(filters).sort());
 }
 
-export async function getFacetCounts(filters: DirectoryFilters): Promise<FacetCounts> {
-  const key = facetCacheKey(filters);
-  const now = Date.now();
-  const hit = facetCountsCache.get(key);
-  if (hit && now - hit.at < DIRECTORY_AGG_TTL_MS) {
-    return hit.val;
+/**
+ * Recompute the facet counts for one filter key and (on success) refresh + bound
+ * the cache. Rejects on DB error, leaving any existing cache entry untouched
+ * (stale value preserved, never poisoned). Always clears the in-flight slot for
+ * this key in `finally` so no promise ever leaks and a later request can retry.
+ * Never runs its `finally` synchronously — the awaited `...Unsafe()` is async, so
+ * the caller has already registered this promise in `facetCountsInflight` before
+ * the slot is cleared.
+ */
+async function refreshFacetCounts(filters: DirectoryFilters, key: string): Promise<FacetCounts> {
+  try {
+    const val = await getFacetCountsUnsafe(filters);
+    // Cache only a successfully computed value; an error must NOT poison the cache.
+    // Evict the oldest entry (insertion order) once over the cap.
+    facetCountsCache.set(key, { at: Date.now(), val });
+    if (facetCountsCache.size > FACET_COUNTS_CACHE_MAX) {
+      const oldest = facetCountsCache.keys().next().value;
+      if (oldest !== undefined) facetCountsCache.delete(oldest);
+    }
+    return val;
+  } finally {
+    facetCountsInflight.delete(key);
   }
-  return getFacetCountsUnsafe(filters, key);
 }
 
-async function getFacetCountsUnsafe(filters: DirectoryFilters, cacheKey: string): Promise<FacetCounts> {
+/**
+ * Live per-value counts for the filter sidebar — cached per filter key with the
+ * same stale-while-revalidate + single-flight discipline as getDirectorySummary.
+ * A cached value (fresh OR stale) returns IMMEDIATELY; a stale one triggers ONE
+ * background refresh per key (fire-and-forget, rejection caught, stale kept on
+ * failure). Only a COLD MISS awaits, and concurrent callers for the same key
+ * await the SAME single-flight promise, so only one set of scans runs.
+ */
+export async function getFacetCounts(filters: DirectoryFilters): Promise<FacetCounts> {
+  const key = facetCacheKey(filters);
+  const cached = facetCountsCache.get(key);
+  if (cached) {
+    // Serve stale immediately; refresh in the background if expired.
+    if (Date.now() - cached.at >= DIRECTORY_AGG_TTL_MS && !facetCountsInflight.has(key)) {
+      const p = refreshFacetCounts(filters, key);
+      facetCountsInflight.set(key, p);
+      // Fire-and-forget: swallow rejection so a failed refresh keeps the stale
+      // counts and never becomes an unhandled promise rejection.
+      void p.catch((err) =>
+        console.warn('[directory] getFacetCounts background refresh failed; keeping stale counts:', err),
+      );
+    }
+    return cached.val;
+  }
+  // Cold miss — single-flight: first caller starts the compute, concurrent
+  // callers for the same key await the same promise. Only the cold path awaits.
+  let inflight = facetCountsInflight.get(key);
+  if (!inflight) {
+    inflight = refreshFacetCounts(filters, key);
+    facetCountsInflight.set(key, inflight);
+  }
   try {
+    return await inflight;
+  } catch (err) {
+    // Read failure ⇒ serve zero counts, never a 500. The in-flight slot was
+    // already cleared in refreshFacetCounts's finally, so a later request retries.
+    console.warn('[directory] getFacetCounts failed; serving zero counts:', err);
+    return emptyFacetCounts();
+  }
+}
+
+/**
+ * Pure recompute of the facet counts (no caching). Throws on any DB read failure
+ * so the caller (refreshFacetCounts) can preserve the stale value / fall back to
+ * empty counts and manage the single-flight slot. All the faceted-count query
+ * logic is unchanged from #406 — only the cache-set + error swallowing moved out
+ * to the SWR wrapper above.
+ */
+async function getFacetCountsUnsafe(filters: DirectoryFilters): Promise<FacetCounts> {
+  {
     const whereOf = (excl: string) => {
       const c = buildConditions(filters, new Set([excl]));
       return c.length ? and(...c) : undefined;
@@ -1157,17 +1268,7 @@ async function getFacetCountsUnsafe(filters: DirectoryFilters, cacheKey: string)
     out.authorityActive = authRow[0]?.n ?? 0;
     out.intermodal = imRow[0]?.n ?? 0;
     out.recent = recentRow[0]?.n ?? 0;
-    // Cache only a successfully computed value; an error must NOT poison the cache.
-    // Evict the oldest entry (insertion order) once over the cap.
-    facetCountsCache.set(cacheKey, { at: Date.now(), val: out });
-    if (facetCountsCache.size > FACET_COUNTS_CACHE_MAX) {
-      const oldest = facetCountsCache.keys().next().value;
-      if (oldest !== undefined) facetCountsCache.delete(oldest);
-    }
     return out;
-  } catch (err) {
-    console.warn('[directory] getFacetCounts failed; serving zero counts:', err);
-    return emptyFacetCounts();
   }
 }
 
