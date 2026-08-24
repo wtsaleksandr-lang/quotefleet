@@ -470,19 +470,24 @@ html body.qf-wft .qf-aud-panel[data-aud-panel="carriers"] .hero-cta .btn-seconda
     align-self: start !important;
   }
 
-  /* #3 + #4 — the single-line trial strip, centered UNDER the phone mockups.
-     Lives inside the media column so it sits directly beneath the device cluster;
-     the big margin-top clears the phone frame, which paints well below its layout
-     box (absolute + scaled), so the strip never collides with it. */
+  /* #3 (v2) — the single-line trial strip now lives in the LEFT copy column,
+     directly UNDER the finder input (moved there in the markup). Left-aligned;
+     the finder's own 24px bottom-margin is the gap to the input, so no extra top
+     margin is needed. `max-width: calc(100% + 48px)` lets the strip run 48px past
+     the copy column's right edge into the dotted gap — so, like the H1, its right
+     end OVERLAPS the dot grid (the copy column is z-lifted above the grid below,
+     so the dots stay visible behind the text; no opaque box). The +48px never
+     reaches the phone (the gap is 80–120px wide at every desktop width). calc()
+     is skipped by the spacing guard, so no off-grid literal is introduced. */
   html body.qf-wft .qf-hero-trial-strip {
     display: block;
-    /* margin-top clears the +20% phone (vw-driven, 120px floor from the ramp;
-       ~235–345px across desktop widths — visually the same as the prior clamp). */
-    margin: max(120px, 24vw) auto 0;
-    /* Widened + slightly smaller so the full strip renders on ONE line inside the
-       media column at 1280/1440 (column caps it at narrow widths, so no overflow). */
-    max-width: 720px;
-    text-align: center;
+    margin: 0;
+    /* `width` (not max-width) is the real lever so the box grows 48px past the
+       copy column into the dotted gap and its right end sits OVER the dots, like
+       the H1. 48px < the ≥80px gap → never reaches the phone. calc() → guard-skipped. */
+    width: calc(100% + 48px);
+    max-width: none;
+    text-align: left;
     font-family: var(--font-sans);
     font-size: 12px;
     line-height: 1.55;
@@ -511,4 +516,72 @@ html body.qf-wft .qf-aud-panel[data-aud-panel="carriers"] .hero-cta .btn-seconda
    competes with the ≥981 `display:block` above (equal specificity). */
 @media (max-width: 980px) {
   html body.qf-wft .qf-hero-trial-strip { display: none !important; }
+}
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   REFINE v2 — TASK 1: WIDEN the H1 so the carriers-hero title extends further
+   RIGHT, across the column gap, and OVERLAPS the dotted grid.
+
+   Levers (≥981px only — the 375px hero is untouched):
+     • .hero-copy max-width was capped at 535px (landing-hero-devices.css), well
+       INSIDE its grid cell — the title never used the room it had. Uncap it so
+       the copy column fills its full ~0.83fr cell; the lead + finder keep their
+       own narrower caps, so only the H1 (and the trial strip) widen.
+     • The H1 then runs `calc(100% + 80px)` — its full cell PLUS 80px into the
+       80–120px dotted gap, so its longest lines break later and reach toward the
+       horizontal centre, stopping short of the phone (which sits well inside the
+       media column). calc() is skipped by the spacing guard → no px-ramp issue.
+     • .qf-hero-media is position:relative + isolate, so it paints ABOVE the
+       non-positioned copy column — the overflowing title would otherwise hide
+       BEHIND the dot grid. Lift the copy column with position:relative + z-index
+       so the title (and trial strip) sit ABOVE the grid, letting the subtle dots
+       show through/around the letters — NO opaque box behind the text.
+     • Extend the dot field a touch further LEFT (inset -14% → -24% of the media
+       box) so a clear band of dots sits behind the widened title's right portion.
+   ═══════════════════════════════════════════════════════════════════════════ */
+@media (min-width: 981px) {
+  /* Copy column paints above the media column's dot grid; uncapped so the H1 can
+     use its whole cell before overflowing into the dotted gap. */
+  html body.qf-wft .qf-aud-panel[data-aud-panel="carriers"] .hero-copy {
+    position: relative !important;
+    z-index: 2 !important;
+    max-width: none !important;
+  }
+  /* Title box actually GROWS 80px past the copy column into the dotted gap so its
+     lines break later and its right portion sits OVER the dots (no background →
+     dots show through the letters). `width` (not max-width) is the real lever —
+     max-width can't expand a block that already fills its column. `max-width:none`
+     clears the inherited `.hero h1 { max-width:620px }` cap so nothing clamps it.
+     Safe at every width: the column gap is always ≥80px, so the +80px right edge
+     lands INSIDE the gap (or at most the media boundary at gap=80) — never on the
+     phone (which sits ~20% inside the media column). calc() → guard-skipped. */
+  html body.qf-wft .qf-aud-panel[data-aud-panel="carriers"] .hero-copy h1 {
+    width: calc(100% + 80px) !important;
+    max-width: none !important;
+  }
+  /* Dot field reaches a bit further left so it clearly sits behind the widened
+     title's right region (percentages, not px → no ramp concern). */
+  html body.landing-v2.qf-wft .hero .qf-hero-media::before {
+    inset: -8% -2% -8% -24% !important;
+  }
+}
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   REFINE v2 — TASK 2: make the Carriers / Shippers segmented toggle MUCH BIGGER
+   (top-left, above the eyebrow) — a prominent control, not a small chip. ~1.6×
+   scale-up of the existing style (selected treatment unchanged, set in FIX 2
+   above). Desktop-only (≥981px) so the 375px full-width toggle stays untouched.
+   All padding/gap values stay on the 8px ramp {8,16,24,32}; font-size + radius
+   are not spacing-guard properties. ═══════════════════════════════════════════ */
+@media (min-width: 981px) {
+  html body.qf-wft .qf-aud-toggle {
+    gap: 8px !important;        /* was 4px */
+    padding: 8px !important;    /* was 4px */
+    margin: 0 0 24px 0 !important;
+  }
+  html body.qf-wft .qf-aud-seg {
+    font-size: 22px !important;     /* was 14px (~1.6×) */
+    padding: 16px 32px !important;  /* was 8px 16px (2×) */
+    min-height: 60px !important;    /* was 44px — taller pill */
+  }
 }
