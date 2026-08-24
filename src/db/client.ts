@@ -21,7 +21,8 @@ export function db() {
   const client = postgres(env.DATABASE_URL, {
     idle_timeout: 30,        // close idle conns before Neon reaps them
     max_lifetime: 60 * 30,   // recycle conns every 30 min
-    connect_timeout: 10,
+    connect_timeout: 30,     // tolerate Neon serverless cold-wake during boot's
+                             // DDL/migration storm (10s was too tight → threw)
     max: 10,
     onnotice: () => {},
   });
