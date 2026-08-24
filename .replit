@@ -43,3 +43,7 @@ build = ["sh", "-c", "pnpm install --frozen-lockfile && pnpm build"]
 [agent]
 expertMode = true
 stack = "BEST_EFFORT_FALLBACK"
+
+[postMerge]
+path = "scripts/post-merge.sh"
+timeoutMs = 180000
