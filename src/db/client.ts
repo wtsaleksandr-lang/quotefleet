@@ -15,7 +15,16 @@ export function db() {
   if (cached) return cached;
   const env = loadEnv();
   // Let the URL's sslmode parameter control SSL — don't override it.
-  const client = postgres(env.DATABASE_URL);
+  // Resilience options harden the pool for Neon: close idle conns before Neon
+  // reaps them (silent drop → stray async rejection that used to kill the
+  // process), and recycle long-lived conns.
+  const client = postgres(env.DATABASE_URL, {
+    idle_timeout: 30,        // close idle conns before Neon reaps them
+    max_lifetime: 60 * 30,   // recycle conns every 30 min
+    connect_timeout: 10,
+    max: 10,
+    onnotice: () => {},
+  });
   cached = drizzle(client, { schema });
   return cached;
 }
