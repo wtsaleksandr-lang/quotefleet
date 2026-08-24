@@ -109,7 +109,7 @@ export function registerDirectoryRoutes(app: Express) {
 
   // ── Server-rendered pages ──────────────────────────────────────────────
   // Landing (no facet params) OR faceted master search (any facet param).
-  app.get(['/directory', '/directory/'], async (req: Request, res: Response, next) => {
+  app.get(['/directory', '/directory/'], publicAutocompleteLimiter, async (req: Request, res: Response, next) => {
     try {
       if (!hasFacetParams(req.query as Record<string, unknown>)) {
         // Post-checkout confirmation (Stripe success_url / cancel_url land here).
@@ -146,7 +146,7 @@ export function registerDirectoryRoutes(app: Express) {
   // Port page (registered BEFORE the :stateSlug route so it wins). Co-located
   // ports are ONE display hub: a request for a member slug (or any non-canonical
   // code) 301-redirects to the group's canonical slug so there's no link rot.
-  app.get('/directory/port/:port', async (req: Request, res: Response, next) => {
+  app.get('/directory/port/:port', publicAutocompleteLimiter, async (req: Request, res: Response, next) => {
     try {
       const code = String(req.params.port).toUpperCase();
       const group = portGroupByCode(code) ?? portGroupForMemberCode(code);
@@ -183,7 +183,7 @@ export function registerDirectoryRoutes(app: Express) {
   });
 
   // City tier (registered BEFORE :stateSlug; port/carrier already win above).
-  app.get('/directory/:stateSlug/:citySlug', async (req: Request, res: Response, next) => {
+  app.get('/directory/:stateSlug/:citySlug', publicAutocompleteLimiter, async (req: Request, res: Response, next) => {
     try {
       const state = stateBySlug(String(req.params.stateSlug));
       if (!state) return res.redirect(302, '/directory');
@@ -221,7 +221,7 @@ export function registerDirectoryRoutes(app: Express) {
   });
 
   // State page.
-  app.get('/directory/:stateSlug', async (req: Request, res: Response, next) => {
+  app.get('/directory/:stateSlug', publicAutocompleteLimiter, async (req: Request, res: Response, next) => {
     try {
       const state = stateBySlug(String(req.params.stateSlug));
       if (!state) return res.redirect(302, '/directory');
