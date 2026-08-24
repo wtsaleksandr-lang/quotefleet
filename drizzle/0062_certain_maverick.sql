@@ -1,0 +1,1 @@
+-- Snapshot reconciliation only: all objects already applied via migrations 0046-0061 + self-heal. This migration exists solely to advance drizzle/meta to match schema.ts.
