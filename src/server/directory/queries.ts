@@ -267,10 +267,28 @@ function emptyDirectorySummary(): DirectorySummary {
   };
 }
 
+/**
+ * TTL for the cached global directory aggregates (summary + facet counts).
+ * These values are IDENTICAL for every visitor and only change on the weekly
+ * FMCSA ingest, so a short cache eliminates the per-request full-table scans
+ * that were saturating the DB connection pool under crawler load.
+ */
+const DIRECTORY_AGG_TTL_MS = 5 * 60_000;
+
+/** Single-value TTL cache for the arg-less global summary. */
+let directorySummaryCache: { at: number; val: DirectorySummary } | null = null;
+
 /** Carrier counts per state + per port (+ intermodal total) for the index/facets. */
 export async function getDirectorySummary(): Promise<DirectorySummary> {
+  const now = Date.now();
+  if (directorySummaryCache && now - directorySummaryCache.at < DIRECTORY_AGG_TTL_MS) {
+    return directorySummaryCache.val;
+  }
   try {
-    return await getDirectorySummaryUnsafe();
+    const val = await getDirectorySummaryUnsafe();
+    // Cache only a successfully computed value; an error must NOT poison the cache.
+    directorySummaryCache = { at: Date.now(), val };
+    return val;
   } catch (err) {
     // Missing table / read failure ⇒ serve an empty directory, never a 500.
     console.warn('[directory] getDirectorySummary failed; serving empty summary:', err);
@@ -959,7 +977,31 @@ function emptyFacetCounts(): FacetCounts {
  * if you picked that value (standard faceted-search semantics). Degrades to
  * zeros on any read failure — never throws, never 500s the page.
  */
+/** Bounded TTL cache for the global facet counts, keyed by the filter set.
+ *  Filter combos are limited in practice, but a crafted query could vary them,
+ *  so the Map is capped (oldest evicted) to prevent unbounded growth. */
+const facetCountsCache = new Map<string, { at: number; val: FacetCounts }>();
+const FACET_COUNTS_CACHE_MAX = 200;
+
+/** Stable JSON key for a filter set — top-level keys sorted so key ordering can't
+ *  produce distinct strings for equivalent filters. DirectoryFilters is a flat
+ *  object whose only nested values (equipment, cargo) are order-canonical arrays,
+ *  which JSON.stringify serializes in place. */
+function facetCacheKey(filters: DirectoryFilters): string {
+  return JSON.stringify(filters, Object.keys(filters).sort());
+}
+
 export async function getFacetCounts(filters: DirectoryFilters): Promise<FacetCounts> {
+  const key = facetCacheKey(filters);
+  const now = Date.now();
+  const hit = facetCountsCache.get(key);
+  if (hit && now - hit.at < DIRECTORY_AGG_TTL_MS) {
+    return hit.val;
+  }
+  return getFacetCountsUnsafe(filters, key);
+}
+
+async function getFacetCountsUnsafe(filters: DirectoryFilters, cacheKey: string): Promise<FacetCounts> {
   try {
     const whereOf = (excl: string) => {
       const c = buildConditions(filters, new Set([excl]));
@@ -1115,6 +1157,13 @@ export async function getFacetCounts(filters: DirectoryFilters): Promise<FacetCo
     out.authorityActive = authRow[0]?.n ?? 0;
     out.intermodal = imRow[0]?.n ?? 0;
     out.recent = recentRow[0]?.n ?? 0;
+    // Cache only a successfully computed value; an error must NOT poison the cache.
+    // Evict the oldest entry (insertion order) once over the cap.
+    facetCountsCache.set(cacheKey, { at: Date.now(), val: out });
+    if (facetCountsCache.size > FACET_COUNTS_CACHE_MAX) {
+      const oldest = facetCountsCache.keys().next().value;
+      if (oldest !== undefined) facetCountsCache.delete(oldest);
+    }
     return out;
   } catch (err) {
     console.warn('[directory] getFacetCounts failed; serving zero counts:', err);

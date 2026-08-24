@@ -33,7 +33,7 @@ export function db() {
     // Value is milliseconds; postgres.js's ConnectionParameters type declares
     // statement_timeout as a number, so it's passed numerically (serialized to
     // the wire protocol identically to a string).
-    connection: { statement_timeout: 15000 },
+    connection: { statement_timeout: 8000 },
     onnotice: () => {},
   });
   cached = drizzle(client, { schema });
