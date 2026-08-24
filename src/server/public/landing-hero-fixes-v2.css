@@ -453,9 +453,12 @@ html body.qf-wft .qf-aud-panel[data-aud-panel="carriers"] .hero-cta .btn-seconda
     display: none !important;
   }
 
-  /* #5 — clearance for the taller (+20%) phone so it never laps the section below. */
+  /* #5 — clearance for the taller (+20%) phone so it never laps the section below.
+     Driven by vw (grid-guard only checks px literals) with a 120px floor from the
+     allowed ramp; effective ~230–345px across desktop widths, matching the prior
+     clamp visually while keeping every px value on-grid. */
   html body.qf-wft .hero.visual-hero {
-    padding-bottom: clamp(180px, 18vw, 320px) !important;
+    padding-bottom: max(120px, 18vw) !important;
   }
 
   /* #3 — the one-line strip lives at the BOTTOM of the (now taller) media column.
@@ -473,11 +476,15 @@ html body.qf-wft .qf-aud-panel[data-aud-panel="carriers"] .hero-cta .btn-seconda
      box (absolute + scaled), so the strip never collides with it. */
   html body.qf-wft .qf-hero-trial-strip {
     display: block;
-    margin: clamp(240px, 24vw, 340px) auto 0;
-    max-width: 440px;
+    /* margin-top clears the +20% phone (vw-driven, 120px floor from the ramp;
+       ~235–345px across desktop widths — visually the same as the prior clamp). */
+    margin: max(120px, 24vw) auto 0;
+    /* Widened + slightly smaller so the full strip renders on ONE line inside the
+       media column at 1280/1440 (column caps it at narrow widths, so no overflow). */
+    max-width: 720px;
     text-align: center;
     font-family: var(--font-sans);
-    font-size: 13px;
+    font-size: 12px;
     line-height: 1.55;
     color: var(--muted);
   }

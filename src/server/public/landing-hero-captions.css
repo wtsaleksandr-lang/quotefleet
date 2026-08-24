@@ -153,8 +153,8 @@ body.qf-wft .qf-hero-devices--video.stage-phone  .qf-hero-cap--phone[data-show="
 @media (min-width: 981px) {
   body.qf-wft .qf-hero-cap--phone {
     top: 0;
-    gap: 6px;
-    padding: 18px 16px 16px;
+    gap: 8px;
+    padding: 16px 16px 16px;
     border-radius: 21px 21px 14px 14px;
     background: linear-gradient(180deg,
         rgba(9, 11, 20, 0.97) 0%,
@@ -165,7 +165,7 @@ body.qf-wft .qf-hero-devices--video.stage-phone  .qf-hero-cap--phone[data-show="
   body.qf-wft .qf-hero-cap--phone .qf-hero-cap__kicker {
     font-size: 12px;
     letter-spacing: 0.16em;
-    gap: 6px;
+    gap: 8px;
   }
   body.qf-wft .qf-hero-cap--phone .qf-hero-cap__kicker::before { width: 16px; height: 2px; }
   body.qf-wft .qf-hero-cap--phone .qf-hero-cap__title {
