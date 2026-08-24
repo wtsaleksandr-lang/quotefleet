@@ -110,6 +110,14 @@ export function createApp(): express.Express {
     next();
   });
 
+  // Deployment readiness must never wait on the database, tenant host lookup, or
+  // other request middleware. Keep this liveness response ahead of hostInfo so a
+  // stalled optional startup dependency cannot make a process that already bound
+  // its port appear unavailable.
+  app.get('/healthz', (_req, res) => {
+    res.json({ ok: true, status: 'up', time: new Date().toISOString() });
+  });
+
   registerStripeWebhook(app);
   registerConnectWebhook(app);
 
@@ -191,7 +199,7 @@ export function createApp(): express.Express {
   registerInboundReviewRoutes(app);
   registerInboundWebhookRoutes(app);
 
-  app.get(['/healthz', '/api/health'], async (_req, res) => {
+  app.get('/api/health', async (_req, res) => {
     const time = new Date().toISOString();
     try {
       await db().select({ id: tenants.id }).from(tenants).limit(1);

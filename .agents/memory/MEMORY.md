@@ -1,1 +1,1 @@
-- [Production startup reliability](production-startup-reliability.md) — Keep runtime readiness independent of database schema operations that can block on production locks.
+- [Production startup reliability](production-startup-reliability.md) — Keep readiness independent of schema work that can block behind production locks.

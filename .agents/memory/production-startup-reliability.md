@@ -1,10 +1,10 @@
 ---
 name: Production startup reliability
-description: Avoid web-service downtime caused by schema operations in the runtime startup path.
+description: Prevent readiness failures caused by startup-time database schema operations.
 ---
 
-Do not run Drizzle migrations, `CREATE TABLE`, `ALTER TABLE`, or other production schema changes from the application process. Bind the HTTP listener first and keep post-listen tasks non-destructive and independently error-handled.
+Bind the HTTP listener before optional background work that may wait on database locks. Keep liveness paths independent of database work, and make detached startup tasks catch and log their own errors.
 
-**Why:** On 2026-08-24, runtime schema-repair work waited on database locks and caused deployment probes to time out even after the service had started.
+**Why:** On 2026-08-24, production schema-repair operations blocked before port 5000 opened. The deployment supervisor repeatedly restarted the process after its readiness timeout, resulting in sustained 0% uptime.
 
-**How to apply:** Apply production schema changes through Replit's Publish database-diff flow. Keep liveness paths free of migrations and DDL; background refreshes and seeds must not reject into the main server process.
+**How to apply:** Use Replit's Publish database-diff flow for planned production schema changes. Keep boot work limited to configuration, app construction, and listening; run legacy schema safeguards, seeding, refreshes, and backfills after readiness without allowing them to reject unhandled.
