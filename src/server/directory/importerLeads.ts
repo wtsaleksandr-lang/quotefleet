@@ -459,15 +459,19 @@ function applyPostFilters(leads: ImporterLead[], f: ImporterFilters): ImporterLe
 export async function findImporterLeads({
   filters = {},
   maxLeads = MAX_LEADS,
+  page = 1,
   withEnrichment = false,
   withEmails = false,
   concurrency = ENRICH_CONCURRENCY,
   bolCache,
   cacheKey,
   cacheTtlMs = 14 * 24 * 60 * 60 * 1000,
+  allowLivePull = true,
 }: {
   filters?: ImporterFilters;
   maxLeads?: number;
+  /** 1-based ImportYeti page — pagination / "Load more" threads through here. */
+  page?: number;
   withEnrichment?: boolean;
   withEmails?: boolean;
   concurrency?: number;
@@ -477,14 +481,27 @@ export async function findImporterLeads({
   cacheKey?: string;
   /** Cache TTL — a cached row younger than this skips the ImportYeti pull. */
   cacheTtlMs?: number;
-} = {}): Promise<{ leads: ImporterLead[]; creditsRemaining: number | null; cached: boolean }> {
+  /** When false, a cache MISS returns empty (no credit spent) — the free-search
+   *  quota gate. A cache HIT is still served (costs nothing). */
+  allowLivePull?: boolean;
+} = {}): Promise<{
+  leads: ImporterLead[];
+  creditsRemaining: number | null;
+  cached: boolean;
+  /** True only when this call actually hit ImportYeti (a credit was spent). */
+  pulledLive: boolean;
+  /** Raw BOL records scanned this pull (0 on a blocked miss). */
+  recordsScanned: number;
+}> {
   const cap = Math.max(1, Math.min(maxLeads, MAX_LEADS));
+  const pg = Math.max(1, Math.floor(page) || 1);
   const pageSize = Math.max(50, cap * 4);
 
   // ── Cache-first: a fresh cached result set spends ZERO ImportYeti credits ──
   let rows: BolRow[] | null = null;
   let creditsRemaining: number | null = null;
   let cached = false;
+  let pulledLive = false;
   if (bolCache && cacheKey) {
     try {
       const hit = await bolCache.get(cacheKey);
@@ -499,10 +516,16 @@ export async function findImporterLeads({
   }
 
   if (rows == null) {
+    // Cache miss. The quota gate can veto the live pull to protect credits — the
+    // caller then shows the subscribe wall instead of us spending a credit.
+    if (!allowLivePull) {
+      return { leads: [], creditsRemaining: null, cached: false, pulledLive: false, recordsScanned: 0 };
+    }
     // Pull generously (dedup collapses many BOL rows per importer), then cap.
-    const pulled = await pullImportBols(filters, { pageSize });
+    const pulled = await pullImportBols(filters, { pageSize, page: pg });
     rows = pulled.rows;
     creditsRemaining = pulled.creditsRemaining;
+    pulledLive = true;
     if (bolCache && cacheKey) {
       // Write fresh rows back for the next repeat search. Never let a cache
       // write failure break the response.
@@ -513,12 +536,13 @@ export async function findImporterLeads({
       }
     }
   }
+  const recordsScanned = rows.length;
   const importers = dedupImporters(rows);
   // Base leads (no enrichment) — cheap, so build all then post-filter, then cap.
   const base = applyPostFilters(importers.map((r) => toLead(r)), filters).slice(0, cap);
 
   if (!withEnrichment && !withEmails) {
-    return { leads: base, creditsRemaining, cached };
+    return { leads: base, creditsRemaining, cached, pulledLive, recordsScanned };
   }
 
   // Enrichment / drafting fan-out — bounded concurrency, never unbounded.
@@ -530,7 +554,7 @@ export async function findImporterLeads({
     if (withEmails) merged.draft_email = await draftEmail(merged).catch(() => null);
     return merged;
   });
-  return { leads, creditsRemaining, cached };
+  return { leads, creditsRemaining, cached, pulledLive, recordsScanned };
 }
 
 /* ── CSV export (LOCKED / paid feature) ─────────────────────────────────────*/

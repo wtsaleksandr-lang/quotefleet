@@ -3,13 +3,20 @@
  */
 import { describe, it, expect, vi, afterEach } from 'vitest';
 import type { Request, Response } from 'express';
-import { renderImporterSearchPage, handleImporterSearch } from './importerPages.js';
+import {
+  renderImporterSearchPage,
+  handleImporterSearch,
+  handleImporterSuggest,
+  portToStateCode,
+} from './importerPages.js';
+import { FREE_SEARCH_QUOTA, QUOTA_COOKIE, __resetQuotaStateForTests } from './importerQuota.js';
 
 const realFetch = globalThis.fetch;
 afterEach(() => {
   globalThis.fetch = realFetch;
   vi.restoreAllMocks();
   delete process.env.IMPORTYETI_API_KEY;
+  __resetQuotaStateForTests();
 });
 
 /** Minimal Express res double capturing status + json/html body. */
@@ -169,7 +176,58 @@ describe('handleImporterSearch', () => {
 
     expect((r1._json as { cached: boolean }).cached).toBe(false);
     expect((r2._json as { cached: boolean }).cached).toBe(true);
+    // The cache hit spent NO credit — it was NOT a live pull.
+    expect((r2._json as { pulledLive: boolean }).pulledLive).toBe(false);
     // Only the FIRST search hit ImportYeti; the second was fully cache-served.
     expect((fetchSpy as unknown as { mock: { calls: unknown[] } }).mock.calls).toHaveLength(1);
+  });
+
+  it('past the free-search quota, a cache MISS shows the subscribe wall and spends NO credit', async () => {
+    process.env.IMPORTYETI_API_KEY = 'test';
+    const fetchSpy = vi.fn(async () => ({
+      ok: true,
+      json: async () => ({ requestCost: 1, creditsRemaining: 5, data: { data: [{ company_name: 'X', company_shipments_12m: 1 }] } }),
+    })) as unknown as typeof fetch;
+    globalThis.fetch = fetchSpy;
+    // A visitor whose cookie is already at the quota → the gate is closed.
+    const req = { body: { entryPort: 'Newark, NJ' }, ip: '9.9.9.9', headers: { cookie: `${QUOTA_COOKIE}=${FREE_SEARCH_QUOTA}` } } as unknown as Request;
+    const res = fakeRes();
+    await handleImporterSearch(req, res, memDeps());
+    const body = res._json as { quotaExhausted?: boolean; leads: unknown[]; message?: string };
+    expect(body.quotaExhausted).toBe(true);
+    expect(body.leads).toHaveLength(0);
+    expect(String(body.message)).toMatch(/subscribe/i);
+    // Credit guardrail: a blocked live pull never touched ImportYeti.
+    expect((fetchSpy as unknown as { mock: { calls: unknown[] } }).mock.calls).toHaveLength(0);
+  });
+});
+
+describe('portToStateCode (port → state lock)', () => {
+  it('maps a port to its single US state', () => {
+    expect(portToStateCode('Newark, NJ')).toBe('NJ');
+    expect(portToStateCode('Long Beach, CA')).toBe('CA');
+    expect(portToStateCode('Savannah, GA')).toBe('GA');
+  });
+  it('is case-insensitive and null for an unknown port', () => {
+    expect(portToStateCode('savannah, ga')).toBe('GA');
+    expect(portToStateCode('Nowhere, ZZ')).toBeNull();
+    expect(portToStateCode('')).toBeNull();
+  });
+});
+
+describe('handleImporterSuggest', () => {
+  it('returns curated HS/commodity suggestions (never calls ImportYeti)', () => {
+    const fetchSpy = vi.fn();
+    globalThis.fetch = fetchSpy as unknown as typeof fetch;
+    const res = fakeRes();
+    handleImporterSuggest({ query: { field: 'commodity', q: '8202' } } as unknown as Request, res);
+    const items = (res._json as { items: Array<{ value: string }> }).items;
+    expect(items[0].value).toBe('8202');
+    expect(fetchSpy).not.toHaveBeenCalled();
+  });
+  it('returns an empty list for an unknown field', () => {
+    const res = fakeRes();
+    handleImporterSuggest({ query: { field: 'nope', q: 'x' } } as unknown as Request, res);
+    expect((res._json as { items: unknown[] }).items).toEqual([]);
   });
 });

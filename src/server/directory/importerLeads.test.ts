@@ -308,4 +308,52 @@ describe('findImporterLeads (browse path)', () => {
     const { leads } = await findImporterLeads({ filters: { state: 'GA', minShipments12m: 100 } });
     expect(leads.map((l) => l.company)).toEqual(['GA Co']);
   });
+
+  it('threads the page number through to the ImportYeti pull (pagination)', async () => {
+    const calls: string[] = [];
+    globalThis.fetch = vi.fn(async (url: string) => {
+      calls.push(url);
+      return { ok: true, json: async () => ({ data: { data: [{ company_name: 'P2 Co', company_shipments_12m: 1 }] } }) } as Response;
+    }) as unknown as typeof fetch;
+    const { pulledLive, recordsScanned } = await findImporterLeads({ filters: { entryPort: 'Savannah, GA' }, page: 3 });
+    expect(pulledLive).toBe(true);
+    expect(recordsScanned).toBe(1);
+    expect(calls[0]).toContain('page=3');
+  });
+
+  it('allowLivePull=false vetoes a cache MISS — ZERO ImportYeti calls, empty result', async () => {
+    const fetchSpy = vi.fn();
+    globalThis.fetch = fetchSpy as unknown as typeof fetch;
+    const store = { get: vi.fn(async () => null), put: vi.fn(async () => {}) };
+    const out = await findImporterLeads({
+      filters: { entryPort: 'Savannah, GA' },
+      bolCache: store,
+      cacheKey: 'blocked',
+      allowLivePull: false,
+    });
+    expect(out.leads).toEqual([]);
+    expect(out.pulledLive).toBe(false);
+    expect(out.cached).toBe(false);
+    expect(fetchSpy).not.toHaveBeenCalled();
+    expect(store.put).not.toHaveBeenCalled();
+  });
+
+  it('allowLivePull=false still serves a fresh CACHE HIT (cache costs nothing)', async () => {
+    const fetchSpy = vi.fn();
+    globalThis.fetch = fetchSpy as unknown as typeof fetch;
+    const store = {
+      get: vi.fn(async () => ({ rows: [{ company_name: 'Cached Co', company_shipments_12m: 5 }], creditsRemaining: 9, fetchedAt: new Date() })),
+      put: vi.fn(async () => {}),
+    };
+    const out = await findImporterLeads({
+      filters: { entryPort: 'Savannah, GA' },
+      bolCache: store,
+      cacheKey: 'hit',
+      allowLivePull: false,
+    });
+    expect(out.cached).toBe(true);
+    expect(out.pulledLive).toBe(false);
+    expect(out.leads[0].company).toBe('Cached Co');
+    expect(fetchSpy).not.toHaveBeenCalled();
+  });
 });
