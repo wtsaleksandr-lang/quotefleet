@@ -61,6 +61,7 @@ import {
   logCreditSpend,
 } from './importerQuota.js';
 import { importerSearchLimiter, publicAutocompleteLimiter } from '../rateLimits.js';
+import { registerImporterProfileRoutes } from './importerProfile.js';
 
 const SITE = 'https://quotefleet.net';
 
@@ -198,6 +199,8 @@ const IMPORTERS_CSS = `
 .imp-card{border:1px solid var(--border);border-left:3px solid var(--accent);border-radius:var(--radius-lg);background:var(--surface);padding:18px 20px;box-shadow:var(--shadow-sm)}
 .imp-card-h{display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin-bottom:4px}
 .imp-co{font-size:17px;font-weight:700;color:var(--ink)}
+a.imp-co-link{color:var(--accent);text-decoration:none}
+a.imp-co-link:hover{text-decoration:underline}
 .imp-flag{font-size:16px;line-height:1}
 .imp-pill{font-size:10px;font-weight:700;letter-spacing:.04em;text-transform:uppercase;padding:4px 8px;border-radius:4px;background:var(--accent);color:var(--bg)}
 .imp-win{font-size:11px;font-weight:700;padding:4px 9px;border-radius:5px;white-space:nowrap}
@@ -592,7 +595,15 @@ const CLIENT_JS = `
   function card(l){
     var c=T('div','imp-card');
     var h=T('div','imp-card-h');
-    h.appendChild(T('span','imp-co',l.company));
+    // Company name links to the Phase-2 profile page when we have a slug.
+    if(l.slug){
+      var coA=document.createElement('a'); coA.className='imp-co imp-co-link';
+      coA.href='/importers/company/'+encodeURIComponent(l.slug);
+      coA.textContent=l.company; coA.title='Open '+l.company+'\\u2019s importer profile';
+      h.appendChild(coA);
+    } else {
+      h.appendChild(T('span','imp-co',l.company));
+    }
     if(l.supplier_country){ h.appendChild(T('span','imp-flag',flag(l.supplier_country))); }
     h.appendChild(T('span','imp-pill','Importer'));
     var w=l.winnability||{}; var win=T('span','imp-win '+(w.label==='High'?'hi':'md'),'Winnability '+(w.score||'')+' \\u00b7 '+(w.label||''));
@@ -810,6 +821,9 @@ function hasAnyFilter(f: ImporterFilters): boolean {
 function toPublicCard(l: ImporterLead, tier: ContactConfidence): Record<string, unknown> {
   return {
     company: l.company,
+    // Slug drives the profile-page link (/importers/company/:slug); null when the
+    // BOL row carried no company_link, in which case the card is not clickable.
+    slug: l.slug,
     state: l.state,
     supplier: l.supplier,
     supplier_country: l.supplier_country,
@@ -982,4 +996,6 @@ export function registerImporterRoutes(app: Express): void {
   app.post('/api/importers/search', importerSearchLimiter, (req: Request, res: Response) =>
     handleImporterSearch(req, res),
   );
+  // Phase 2 — the server-rendered company profile page (freemium-gated).
+  registerImporterProfileRoutes(app);
 }

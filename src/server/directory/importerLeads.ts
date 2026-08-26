@@ -66,6 +66,10 @@ export interface EnrichedContact {
 
 export interface ImporterLead {
   company: string;
+  /** ImportYeti company slug (from company_link, e.g. "valbruna-stainless").
+   *  The ONLY value the bols endpoint's `company` param filters on, so it is
+   *  what the Phase-2 profile route (`/importers/company/:slug`) is keyed by. */
+  slug: string | null;
   state: string | null;
   address: string | null;
   supplier: string | null;
@@ -158,6 +162,20 @@ const num = (v: unknown): number => {
 };
 const str = (v: unknown): string => (v == null ? '' : String(v));
 
+/** ImportYeti company slug from its `company_link` ("/company/valbruna-stainless"
+ *  → "valbruna-stainless"). This slug — NOT the basename — is the only value the
+ *  bols endpoint's `company` param actually filters on (verified against the live
+ *  API: `company=<slug>` returns exactly one company; basename/link are ignored).
+ *  Returns '' when no link is present. */
+export function companySlugFromLink(link: unknown): string {
+  const s = str(link).trim();
+  if (!s) return '';
+  const m = s.match(/\/company\/([^/?#]+)/i);
+  const slug = (m ? m[1] : s).toLowerCase().trim();
+  // Only allow the safe slug charset ImportYeti uses; reject anything else.
+  return /^[a-z0-9][a-z0-9-]*$/.test(slug) ? slug : '';
+}
+
 /* ── 1. ImportYeti: pull US-import bill-of-lading records ───────────────────
  * GET https://data.importyeti.com/v1.0/powerquery/us-import/bols (Bearer auth).
  * bol_type="H" = house bill = the REAL consignee (not the NVOCC master).
@@ -171,11 +189,19 @@ export async function pullImportBols(
     startDate,
     endDate,
   }: Pick<ImporterFilters, 'entryPort' | 'product' | 'hsCode' | 'supplierCountry' | 'startDate' | 'endDate'> = {},
-  { bolType = 'H', pageSize = 50, page = 1 }: { bolType?: string; pageSize?: number; page?: number } = {},
+  {
+    bolType = 'H',
+    pageSize = 50,
+    page = 1,
+    companySlug,
+  }: { bolType?: string; pageSize?: number; page?: number; companySlug?: string } = {},
 ): Promise<{ rows: BolRow[]; cost: number | null; creditsRemaining: number | null }> {
   const key = process.env.IMPORTYETI_API_KEY;
   if (!key) throw new Error('IMPORTYETI_API_KEY not set');
   const qs = new URLSearchParams();
+  // `company` = the ImportYeti company SLUG (from company_link). When present it
+  // scopes the pull to ONE importer's full history — the profile-page pull.
+  if (companySlug) qs.set('company', companySlug);
   if (entryPort) qs.set('entry_port', entryPort);
   if (product) qs.set('product_description', product);
   if (hsCode) qs.set('hs_code', hsCode);
@@ -361,6 +387,7 @@ export function toLead(r: BolRow, contact?: EnrichedContact | null): ImporterLea
   const derivedState = (addr.match(/,\s*([A-Z]{2})\s/) || [])[1] || (r.company_state as string) || null;
   return {
     company: str(r.company_name),
+    slug: companySlugFromLink(r.company_link) || null,
     state: derivedState,
     address: addr || null,
     supplier: (r.supplier_name as string) || null,
