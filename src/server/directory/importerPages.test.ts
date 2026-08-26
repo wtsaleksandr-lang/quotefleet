@@ -9,7 +9,13 @@ import {
   handleImporterSuggest,
   portToStateCode,
 } from './importerPages.js';
-import { FREE_SEARCH_QUOTA, QUOTA_COOKIE, __resetQuotaStateForTests } from './importerQuota.js';
+import {
+  IP_DAILY_LIVE_SEARCH_CAP,
+  DETAIL_COOKIE,
+  FREE_DETAIL_QUOTA,
+  recordLiveSearch,
+  __resetQuotaStateForTests,
+} from './importerQuota.js';
 
 const realFetch = globalThis.fetch;
 afterEach(() => {
@@ -182,22 +188,43 @@ describe('handleImporterSearch', () => {
     expect((fetchSpy as unknown as { mock: { calls: unknown[] } }).mock.calls).toHaveLength(1);
   });
 
-  it('past the free-search quota, a cache MISS shows the subscribe wall and spends NO credit', async () => {
+  it('search is FREE — a visitor at the detail-open quota can still search live', async () => {
+    process.env.IMPORTYETI_API_KEY = 'test';
+    const fetchSpy = vi.fn(async () => ({
+      ok: true,
+      json: async () => ({ requestCost: 1, creditsRemaining: 5, data: { data: [{ company_name: 'X Co', company_shipments_12m: 1, entry_port: 'Newark, NJ' }] } }),
+    })) as unknown as typeof fetch;
+    globalThis.fetch = fetchSpy;
+    // Detail cookie is maxed out — must NOT gate searching.
+    const req = { body: { entryPort: 'Newark, NJ' }, ip: '9.9.9.9', headers: { cookie: `${DETAIL_COOKIE}=${FREE_DETAIL_QUOTA}` } } as unknown as Request;
+    const res = fakeRes();
+    await handleImporterSearch(req, res, memDeps());
+    const body = res._json as { leads: unknown[]; searchLimited?: boolean; pulledLive?: boolean };
+    expect(body.searchLimited).toBeUndefined();
+    expect(body.leads).toHaveLength(1);
+    expect(body.pulledLive).toBe(true);
+    // No subscribe-wall fields leak onto the search response.
+    expect('quotaExhausted' in (res._json as object)).toBe(false);
+  });
+
+  it('the generous anti-abuse cap soft-limits a cache MISS without spending a credit', async () => {
     process.env.IMPORTYETI_API_KEY = 'test';
     const fetchSpy = vi.fn(async () => ({
       ok: true,
       json: async () => ({ requestCost: 1, creditsRemaining: 5, data: { data: [{ company_name: 'X', company_shipments_12m: 1 }] } }),
     })) as unknown as typeof fetch;
     globalThis.fetch = fetchSpy;
-    // A visitor whose cookie is already at the quota → the gate is closed.
-    const req = { body: { entryPort: 'Newark, NJ' }, ip: '9.9.9.9', headers: { cookie: `${QUOTA_COOKIE}=${FREE_SEARCH_QUOTA}` } } as unknown as Request;
+    const ip = '8.8.4.4';
+    // Exhaust the per-IP daily live-search cap first.
+    for (let i = 0; i < IP_DAILY_LIVE_SEARCH_CAP; i++) recordLiveSearch({ ip, headers: {} } as unknown as Request);
+    const req = { body: { entryPort: 'Newark, NJ' }, ip, headers: {} } as unknown as Request;
     const res = fakeRes();
     await handleImporterSearch(req, res, memDeps());
-    const body = res._json as { quotaExhausted?: boolean; leads: unknown[]; message?: string };
-    expect(body.quotaExhausted).toBe(true);
+    const body = res._json as { searchLimited?: boolean; leads: unknown[]; message?: string };
+    expect(body.searchLimited).toBe(true);
     expect(body.leads).toHaveLength(0);
-    expect(String(body.message)).toMatch(/subscribe/i);
-    // Credit guardrail: a blocked live pull never touched ImportYeti.
+    expect(String(body.message)).not.toMatch(/subscribe/i); // NOT a paywall
+    // A blocked live pull never touched ImportYeti.
     expect((fetchSpy as unknown as { mock: { calls: unknown[] } }).mock.calls).toHaveLength(0);
   });
 });

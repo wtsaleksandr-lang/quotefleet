@@ -56,10 +56,9 @@ import {
   type BolCacheStore,
 } from './importerCache.js';
 import {
-  checkSearchQuota,
+  checkLiveSearchAllowed,
   recordLiveSearch,
   logCreditSpend,
-  FREE_SEARCH_QUOTA,
 } from './importerQuota.js';
 import { importerSearchLimiter, publicAutocompleteLimiter } from '../rateLimits.js';
 
@@ -164,8 +163,6 @@ const IMPORTERS_CSS = `
 .imp-more-name .hint{display:block;font-size:12px;color:var(--muted);margin-top:8px}
 
 .imp-actions{display:flex;flex-wrap:wrap;gap:12px;align-items:center;margin-top:24px}
-.imp-freecount{font-size:12px;color:var(--muted)}
-.imp-freecount b{color:var(--ink-soft)}
 .imp-export{margin-left:auto}
 
 .imp-status{color:var(--muted);font-size:13px;margin:22px 0 8px}
@@ -237,13 +234,6 @@ const IMPORTERS_CSS = `
 .imp-loadmore{font-family:var(--font-sans);font-size:14px;font-weight:600;color:var(--ink);background:var(--surface-2);border:1px solid var(--border-strong);border-radius:10px;padding:12px 22px;min-height:44px;cursor:pointer}
 .imp-loadmore:hover{border-color:var(--accent)}
 .imp-loadmore:disabled{opacity:.6;cursor:not-allowed}
-
-/* ── subscribe wall (free quota exhausted) ── */
-.imp-wall{display:none;border:1px solid color-mix(in srgb,var(--accent) 34%,transparent);border-radius:var(--radius-lg);background:color-mix(in srgb,var(--accent) 7%,transparent);padding:28px 24px;text-align:center;margin:8px 0}
-.imp-wall.on{display:block}
-.imp-wall h3{color:var(--ink);margin:0 0 8px;font-size:18px}
-.imp-wall p{color:var(--ink-soft);margin:0 auto 16px;max-width:460px;font-size:14px}
-.imp-wall .btn{min-height:44px}
 
 .imp-locknote{font-size:12px;color:var(--muted);margin:20px 0 0;line-height:1.5}
 .imp-locknote b{color:var(--ink-soft)}
@@ -360,7 +350,6 @@ export function renderImporterSearchPage(): string {
 
         <div class="imp-actions">
           <button type="submit" class="btn btn-primary" id="imp-search">Search importers <span class="arr">&rarr;</span></button>
-          <span class="imp-freecount" id="imp-freecount" hidden></span>
           <a class="imp-lock imp-export" id="imp-export" href="/signup" title="CSV export is a paid feature">
             <span class="ico" aria-hidden="true">&#128274;</span> Export CSV
           </a>
@@ -368,12 +357,6 @@ export function renderImporterSearchPage(): string {
       </form>
 
       <p class="imp-status" id="imp-status" role="status" aria-live="polite" hidden></p>
-
-      <div class="imp-wall" id="imp-wall">
-        <h3>Subscribe to keep searching</h3>
-        <p id="imp-wall-msg">You've used your free live searches. Subscribe to keep searching live customs records &mdash; cached searches stay free to browse.</p>
-        <a class="btn btn-primary" href="/signup">Subscribe to keep searching &rarr;</a>
-      </div>
 
       <div class="imp-toolbar" id="imp-toolbar">
         <span class="imp-count" id="imp-count"></span>
@@ -411,7 +394,6 @@ export function renderImporterSearchPage(): string {
     window.__IMP_STATES=${stateData};
     window.__IMP_COUNTRIES=${countryData};
     window.__IMP_PAGE_SIZE=${MAX_LEADS};
-    window.__IMP_FREE_QUOTA=${FREE_SEARCH_QUOTA};
   </script>
   <script>${CLIENT_JS}</script>`;
 
@@ -460,13 +442,9 @@ const CLIENT_JS = `
   var facetsEl=document.getElementById('imp-facets');
   var moreWrap=document.getElementById('imp-more-wrap');
   var loadMoreBtn=document.getElementById('imp-loadmore');
-  var wall=document.getElementById('imp-wall');
-  var wallMsg=document.getElementById('imp-wall-msg');
-  var freeCountEl=document.getElementById('imp-freecount');
   if(!form||!results)return;
 
   var PAGE_SIZE=window.__IMP_PAGE_SIZE||25;
-  var FREE_QUOTA=window.__IMP_FREE_QUOTA||3;
 
   // ── tiny helpers ──
   function flag(cc){ if(!cc)return ''; cc=String(cc).toUpperCase();
@@ -721,19 +699,6 @@ const CLIENT_JS = `
       (totalScanned?(' \\u00b7 '+totalScanned.toLocaleString('en-US')+' records scanned'):'')));
   }
 
-  function updateFreeCount(q){
-    if(q&&typeof q.freeRemaining==='number'){
-      freeCountEl.hidden=false; freeCountEl.innerHTML='';
-      var b=document.createElement('b'); b.textContent=String(q.freeRemaining);
-      freeCountEl.appendChild(document.createTextNode('Free live searches left: ')); freeCountEl.appendChild(b);
-    }
-  }
-  function showWall(msg){
-    if(msg){ wallMsg.textContent=msg; }
-    wall.classList.add('on');
-  }
-  function hideWall(){ wall.classList.remove('on'); }
-
   function ingest(res){
     var leads=res.leads||[];
     var added=0;
@@ -741,7 +706,7 @@ const CLIENT_JS = `
     if(typeof res.recordsScanned==='number') totalScanned+=res.recordsScanned;
     // more pages likely if this page came back full (before client dedup)
     var full=leads.length>=PAGE_SIZE;
-    moreWrap.classList.toggle('on', full && !res.quotaExhausted);
+    moreWrap.classList.toggle('on', full);
     return added;
   }
 
@@ -754,14 +719,9 @@ const CLIENT_JS = `
       .then(function(out){
         btn.disabled=false; loadMoreBtn.disabled=false;
         var j=out.j||{};
-        updateFreeCount(j);
         if(out.status===429){ setStatus((j&&j.message)||'Too many searches. Slow down and try again in a minute.',false); return; }
-        if(j.quotaExhausted){
-          setStatus('',false); statusEl.hidden=true;
-          showWall(j.message); moreWrap.classList.remove('on'); return;
-        }
+        if(j.searchLimited){ setStatus((j&&j.message)||'Live-search limit reached for today — cached searches stay free.',false); moreWrap.classList.remove('on'); return; }
         if(!out.ok||j.error){ setStatus((j&&j.message)||'Importer search is temporarily unavailable. Try again shortly.',false); return; }
-        hideWall();
         if(!append){ allLeads=[]; seenCos={}; totalScanned=0; }
         var added=ingest(j);
         toolbar.classList.add('on');
@@ -790,7 +750,6 @@ const CLIENT_JS = `
 
   form.addEventListener('submit',function(ev){
     ev.preventDefault();
-    hideWall();
     var payload=collectPayload();
     if(!payload.entryPort&&!payload.state&&!payload.hsCode&&!payload.product&&!payload.supplierCountry&&!payload.company){
       setStatus('Pick a port, state or commodity (or enter a company name) to search.',false); return;
@@ -929,11 +888,12 @@ export async function handleImporterSearch(
     const bolCache = deps.bolCache ?? dbBolCacheStore;
     const contactCache = deps.contactCache ?? dbContactCacheStore;
 
-    // ── Free-search quota gate (credit guardrail #7) ──────────────────────────
-    // A LIVE ImportYeti pull spends a credit; a cache HIT costs nothing and is
-    // always served. So the gate only VETOES the live pull (allowLivePull); a
-    // cache hit sails through regardless of quota.
-    const quota = checkSearchQuota(req);
+    // ── Credit guardrail #7 — searching is FREE + generous ────────────────────
+    // Cache-first: a cache HIT costs nothing and is ALWAYS served (never counts).
+    // The only search guard is a GENEROUS per-IP/day soft cap on LIVE (uncached)
+    // pulls as pure anti-abuse — it vetoes the live pull, it is NOT a paywall.
+    // (The FREE quota lives on opening detailed PROFILES — see importerQuota.ts.)
+    const searchGate = checkLiveSearchAllowed(req);
 
     const result = await findImporterLeads({
       filters,
@@ -944,29 +904,26 @@ export async function handleImporterSearch(
       bolCache,
       cacheKey: bolCacheKey(filters, page),
       cacheTtlMs: IMPORTER_CACHE_TTL_MS,
-      allowLivePull: quota.allowed,
+      allowLivePull: searchGate.allowed,
     });
 
-    // Cache miss that we vetoed to protect credits → subscribe wall (not an error).
-    if (!result.cached && !result.pulledLive && result.leads.length === 0 && !quota.allowed) {
+    // Cache miss vetoed by the generous anti-abuse cap → a soft "try later" note,
+    // NOT a subscribe wall. Cached searches stay free.
+    if (!result.cached && !result.pulledLive && result.leads.length === 0 && !searchGate.allowed) {
       res.json({
         leads: [],
         count: 0,
-        quotaExhausted: true,
-        freeRemaining: 0,
-        freeLimit: quota.limit,
+        searchLimited: true,
         cached: false,
         message:
-          "You've used your free live searches. Subscribe to keep searching live customs records — cached searches stay free to browse.",
+          'Live-search limit reached for today — repeat and cached searches are still free. Try again later or narrow your lane.',
       });
       return;
     }
 
-    // A live pull actually happened → decrement the quota + meter the credit.
-    let freeRemaining = quota.remaining;
+    // A live pull actually happened → count it for anti-abuse + meter the credit.
     if (result.pulledLive) {
-      const after = recordLiveSearch(req, res);
-      freeRemaining = after.remaining;
+      recordLiveSearch(req);
       logCreditSpend(result.creditsRemaining, `page=${page}`);
     }
 
@@ -980,8 +937,6 @@ export async function handleImporterSearch(
       creditsRemaining: result.creditsRemaining,
       cached: result.cached,
       pulledLive: result.pulledLive,
-      freeRemaining,
-      freeLimit: quota.limit,
     });
   } catch (err) {
     // Never 500 the browse path. A missing key / provider timeout / upstream
