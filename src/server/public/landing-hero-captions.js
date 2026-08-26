@@ -26,21 +26,33 @@
   var caps = Array.prototype.slice.call(stage.querySelectorAll('.qf-scenecap'));
   if (!video || !caps.length) return;
 
-  // FINAL-video scene windows (seconds) — one per floating caption, in order.
-  var SCENES = [
-    { t0: 0.0,  t1: 12.8 }, // self-quote form
-    { t0: 12.8, t1: 20.0 }, // AI assistant
-    { t0: 20.0, t1: 23.8 }, // lead capture
-    { t0: 23.8, t1: 1e9 }   // payments
-  ];
+  // Scene boundaries measured from the REAL published loop (qf-hero-phone.mp4 /
+  // .webm, both 33.566s), verified frame-by-frame with ffmpeg:
+  //   0  self-quote form + instant $3,950 quote  → 0.000 … ~11.3s
+  //   1  built-in AI answers the estimate        → ~11.3 … ~20.4s
+  //   2  "Almost done" lead-capture + confirm    → ~20.4 … ~26.5s
+  //   3  deposit / booking (Stripe & PayPal)      → ~26.5 … end
+  // Stored as PROPORTIONS of the clip's duration (not hardcoded seconds) so the
+  // sync survives a re-encode at different pacing — the windows are rebuilt from
+  // the live video.duration. FRACTS[i] is scene i's start; scene i spans
+  // [FRACTS[i], FRACTS[i+1]) with an implicit 1.0 after the last.
+  var FRACTS = [0, 0.337, 0.608, 0.789];
+  var MEASURED_DURATION = 33.566; // fallback if video.duration isn't ready yet
 
   var reduce = !!(window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches);
 
+  function duration() {
+    var d = video.duration;
+    return (typeof d === 'number' && isFinite(d) && d > 0) ? d : MEASURED_DURATION;
+  }
+
   function sceneAt(t) {
-    for (var i = 0; i < SCENES.length; i++) {
-      if (t >= SCENES[i].t0 && t < SCENES[i].t1) return i;
+    var dur = duration();
+    for (var i = 0; i < FRACTS.length; i++) {
+      var t1 = (i + 1 < FRACTS.length) ? FRACTS[i + 1] * dur : dur + 1;
+      if (t >= FRACTS[i] * dur && t < t1) return i;
     }
-    return SCENES.length - 1;
+    return FRACTS.length - 1;
   }
 
   function show(idx) {
