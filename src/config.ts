@@ -49,6 +49,13 @@ export interface Env {
    *  a per-USER access entitlement, fully separate from the tenant plan prices
    *  above. When unset, Directory Pro checkout returns "billing not configured". */
   STRIPE_PRICE_DIRECTORY_PRO?: string;
+  /** Stripe Price ids for the Manifest Privacy tiers (annual): Basic $79,
+   *  Professional $249, Enterprise $599. Per-USER access subscriptions, fully
+   *  separate from the tenant plan prices. When a tier's id is UNSET, that
+   *  tier's checkout degrades gracefully to "coming soon" — never crashes. */
+  STRIPE_PRICE_MANIFEST_BASIC?: string;
+  STRIPE_PRICE_MANIFEST_PRO?: string;
+  STRIPE_PRICE_MANIFEST_ENT?: string;
   /** Platform fee percent QuoteFleet takes from each booking deposit (a
    *  destination charge's application_fee). Optional string override of the
    *  2.9% default (see PLATFORM_FEE_PCT in routes/depositCharge.ts). Parsed +
@@ -162,6 +169,9 @@ export function loadEnv(): Env {
     STRIPE_PRICE_VITAL_MONTHLY: opt('STRIPE_PRICE_VITAL_MONTHLY'),
     STRIPE_PRICE_PRO_MONTHLY: opt('STRIPE_PRICE_PRO_MONTHLY'),
     STRIPE_PRICE_DIRECTORY_PRO: opt('STRIPE_PRICE_DIRECTORY_PRO'),
+    STRIPE_PRICE_MANIFEST_BASIC: opt('STRIPE_PRICE_MANIFEST_BASIC'),
+    STRIPE_PRICE_MANIFEST_PRO: opt('STRIPE_PRICE_MANIFEST_PRO'),
+    STRIPE_PRICE_MANIFEST_ENT: opt('STRIPE_PRICE_MANIFEST_ENT'),
     PLATFORM_FEE_PCT: opt('PLATFORM_FEE_PCT'),
     RESEND_API_KEY: opt('RESEND_API_KEY'),
     RESEND_FROM_EMAIL: opt('RESEND_FROM_EMAIL'),
