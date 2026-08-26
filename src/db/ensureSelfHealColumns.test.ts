@@ -1,3 +1,5 @@
+import { readFileSync } from 'node:fs';
+import { fileURLToPath } from 'node:url';
 import { describe, expect, it } from 'vitest';
 import { SELF_HEAL_COLUMN_STATEMENTS, SELF_HEAL_TABLE_STATEMENTS } from './migrate.js';
 
@@ -76,5 +78,60 @@ describe('ensureSelfHealTables — carrier_directory country heal (0042)', () =>
     );
     expect(createIdx).toBeGreaterThanOrEqual(0);
     expect(alterIdx).toBeGreaterThan(createIdx);
+  });
+
+  it('creates the directory_aggregate_cache singleton table (the never-created regression)', () => {
+    expect(SELF_HEAL_TABLE_STATEMENTS).toContain(
+      `CREATE TABLE IF NOT EXISTS "directory_aggregate_cache" (
+    "id" integer PRIMARY KEY NOT NULL,
+    "summary" jsonb NOT NULL,
+    "base_facets" jsonb NOT NULL,
+    "computed_at" timestamp DEFAULT now() NOT NULL
+  )`,
+    );
+  });
+
+  it('contains ONLY idempotent IF NOT EXISTS DDL — no backfill/heavy ALTER that could hold locks on the boot path', () => {
+    for (const s of SELF_HEAL_TABLE_STATEMENTS) {
+      // Every statement is a CREATE TABLE/INDEX or an ADD COLUMN, each IF NOT EXISTS.
+      expect(s).toMatch(/^(CREATE TABLE IF NOT EXISTS|CREATE (UNIQUE )?INDEX IF NOT EXISTS|ALTER TABLE)/);
+      expect(s).toContain('IF NOT EXISTS');
+      // No data-moving / rewriting operations may sneak onto the boot self-heal.
+      expect(s).not.toMatch(/\b(UPDATE|DELETE|INSERT|DROP|TRUNCATE)\b/);
+    }
+  });
+});
+
+/**
+ * Boot-path WIRING guard — the regression was that the boot path NEVER called
+ * ensureSelfHealTables, so directory_aggregate_cache was never created in prod
+ * and the persisted-aggregate outage fix was silently disabled. This asserts the
+ * fix stays wired, and stays wired the SAFE way: POST-LISTEN and NON-BLOCKING, so
+ * a DDL lock can never delay a healthz probe (src/server/index.ts:45-48 rationale).
+ */
+describe('src/server/index.ts — self-heal is wired into boot, post-listen + non-blocking', () => {
+  const src = readFileSync(fileURLToPath(new URL('../server/index.ts', import.meta.url)), 'utf8');
+
+  it('imports ensureSelfHealTables from the migrate module', () => {
+    expect(src).toMatch(/import\s*\{[^}]*ensureSelfHealTables[^}]*\}\s*from\s*'\.\.\/db\/migrate\.js'/);
+  });
+
+  it('invokes ensureSelfHealTables fire-and-forget (void ... .catch — never throws into boot)', () => {
+    expect(src).toMatch(/void\s+ensureSelfHealTables\(\)/);
+    expect(src).toContain('.catch(');
+  });
+
+  it('runs the self-heal from POST-LISTEN work, not before app.listen (healthz-safe)', () => {
+    // ensureSelfHealTables must appear inside runPostListenJobs (fired after listen),
+    // which lives strictly before main()/app.listen in the file.
+    const healIdx = src.indexOf('ensureSelfHealTables()');
+    const postListenIdx = src.indexOf('async function runPostListenJobs');
+    const mainIdx = src.indexOf('async function main(');
+    expect(healIdx).toBeGreaterThan(postListenIdx);
+    expect(healIdx).toBeLessThan(mainIdx);
+  });
+
+  it('chains the aggregate precompute AFTER the table heal (table exists before the singleton write)', () => {
+    expect(src).toMatch(/ensureSelfHealTables\(\)\s*\n?\s*\.then\(\(\)\s*=>\s*ensureFreshDirectoryAggregates\(\)\)/);
   });
 });

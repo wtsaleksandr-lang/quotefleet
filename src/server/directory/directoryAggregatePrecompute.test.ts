@@ -259,3 +259,19 @@ describe('(c) populate path computes + persists a valid singleton row', () => {
     expect(h.inserted.length).toBe(1);
   });
 });
+
+describe('(d) off-path recompute is bounded by a total wall-clock budget', () => {
+  it('withWallClockDeadline REJECTS a promise that never settles, at the budget', async () => {
+    const q = await import('./queries.js');
+    const never = new Promise<number>(() => {}); // never resolves/rejects
+    // Real 15ms timer (setTimeout is not faked here) → the deadline wins the race.
+    await expect(q.withWallClockDeadline(never, 15, 'test recompute')).rejects.toThrow(
+      /test recompute exceeded 15ms wall-clock budget/,
+    );
+  });
+
+  it('withWallClockDeadline RESOLVES fast work well within budget', async () => {
+    const q = await import('./queries.js');
+    await expect(q.withWallClockDeadline(Promise.resolve(42), 5000, 'test')).resolves.toBe(42);
+  });
+});

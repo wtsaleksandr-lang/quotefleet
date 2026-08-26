@@ -5,6 +5,7 @@
 // (soft no-op when DOPPLER_TOKEN is unset) BEFORE config.ts / db read env.
 import './bootstrapDoppler.js';
 import { loadEnv } from '../config.js';
+import { ensureSelfHealTables, ensureSelfHealColumns } from '../db/migrate.js';
 import { maybeAutoHealCarrierDirectory } from './directory/autoHeal.js';
 import { maybeBackfillNearestPortCodes } from './directory/backfillNearestPort.js';
 import { ensureFreshDirectoryAggregates } from './directory/queries.js';
@@ -68,14 +69,36 @@ async function runPostListenJobs(): Promise<void> {
     void maybeBackfillNearestPortCodes().catch((err) => {
       console.error('[directory-backfill] startup check failed (non-fatal):', err);
     });
-    // LAZY PRECOMPUTE of the persisted global directory aggregates. If the
-    // singleton directory_aggregate_cache row is missing or stale (>24h), compute
-    // it ONCE here (off the request path, limiter+timeout bounded) and persist it,
-    // so the very first /directory hit after a deploy serves a single-row lookup
-    // instead of triggering the 330k-row scan stampede that took all domains down.
-    // Fire-and-forget, never throws into boot; the weekly cron keeps it fresh.
-    void ensureFreshDirectoryAggregates().catch((err) => {
-      console.error('[directory-aggregates] startup precompute failed (non-fatal):', err);
+    // JOURNAL-INDEPENDENT SCHEMA SELF-HEAL. Replit's deploy skips db:migrate and
+    // its publish tool can DROP tables/columns, so these idempotent
+    // CREATE/ALTER ... IF NOT EXISTS statements must re-assert the at-risk schema
+    // on EVERY boot (exactly what their own docstrings promise). This wiring was
+    // MISSING on the boot path, so directory_aggregate_cache was never created in
+    // prod — silently disabling the persisted-aggregate precompute (the recurring
+    // all-domains-down outage fix) and making the hourly aggregate-refresh cron
+    // full-table-scan then fail its INSERT into the absent table.
+    //
+    // Fired POST-LISTEN and non-blocking (`void ... .catch`) — identical to the
+    // data heals above — so a brief DDL lock can NEVER delay a healthz probe. Each
+    // heal contains ONLY idempotent CREATE TABLE / CREATE INDEX / ADD COLUMN
+    // IF NOT EXISTS statements (no backfill / heavy ALTER), each a no-op round-trip
+    // on a healthy DB. The directory TABLE heal is chained to the aggregate
+    // precompute so directory_aggregate_cache exists before the precompute writes
+    // its singleton row; the precompute itself is limiter+timeout bounded and
+    // never throws into boot, and the weekly cron keeps the row fresh thereafter.
+    void ensureSelfHealTables()
+      .then(() => ensureFreshDirectoryAggregates())
+      .catch((err) => {
+        console.error(
+          '[server] directory table self-heal + aggregate precompute failed (non-fatal):',
+          err,
+        );
+      });
+    // brand_configs at-risk columns — same journal-independent phantom-drop guard,
+    // independent of the table heal above (different tables → no lock contention),
+    // so it neither blocks nor is blocked by it.
+    void ensureSelfHealColumns().catch((err) => {
+      console.error('[server] brand_configs column self-heal failed (non-fatal):', err);
     });
     // Register every scheduled cron through runCronSafely. This wrapper (a) catches
     // a throw at registration so one cron failing to register can NEVER stop the
