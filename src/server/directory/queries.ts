@@ -275,6 +275,98 @@ function emptyDirectorySummary(): DirectorySummary {
  */
 const DIRECTORY_AGG_TTL_MS = 5 * 60_000;
 
+// ─── Aggregate hardening: per-statement timeout + bounded recompute concurrency
+//
+// TWO production outages (all QuoteFleet domains down, every request hanging
+// ~20s → HTTP 000) traced to the heavy directory aggregate scans below
+// (getDirectorySummaryUnsafe + getFacetCountsUnsafe) over the ~330k-row
+// carrier_directory table. On a COLD cache (right after every deploy/restart) a
+// burst of /directory requests with DIFFERENT filter keys each triggers a
+// DISTINCT facet recompute; the per-key single-flight only dedupes IDENTICAL
+// concurrent computes, so N distinct keys still stampede the small Neon compute
+// at once. With no per-statement ceiling, one CPU-starved aggregate ran for
+// ~31 MINUTES holding a pooled connection; six of those pinned the whole pool →
+// the app couldn't get a connection → total outage. Two additive guards make
+// that impossible:
+//
+//   1. Every aggregate scan runs under `SET LOCAL statement_timeout` so it can
+//      NEVER hold a connection longer than AGG_STATEMENT_TIMEOUT_MS. A timed-out
+//      scan aborts (Postgres 57014) and rejects, flowing through the SAME error
+//      paths the SWR/single-flight layer already has (keep stale on error, serve
+//      empty on a cold miss) — never a 500, never a minutes-long connection hold.
+//   2. A single in-process semaphore caps how many aggregate recomputes may hit
+//      the DB concurrently, so a cold-cache burst of distinct filter keys can use
+//      at most AGG_MAX_CONCURRENCY connections at once (excess recomputes queue).
+//
+// ADDITIVE to the #406/#407 TTL + stale-while-revalidate + single-flight caching
+// — that layer's semantics are UNCHANGED. NB: db/client.ts also sets a pool-wide
+// statement_timeout; this per-aggregate SET LOCAL is defense-in-depth that is
+// independent of the pool config and unit-testable in isolation.
+
+/** Per-statement server-side timeout (ms) for the directory aggregate scans. */
+const AGG_STATEMENT_TIMEOUT_MS = 8000;
+/** Max directory aggregate recomputes allowed to touch the DB concurrently. */
+const AGG_MAX_CONCURRENCY = 2;
+
+/** Transaction handle type for withAggregateTimeout's callback (drizzle tx). */
+type AggregateTx = Parameters<Parameters<ReturnType<typeof db>['transaction']>[0]>[0];
+
+/**
+ * Minimal in-process FIFO counting semaphore. Bounds how many `run()` callbacks
+ * execute concurrently; excess callers wait (in arrival order) for a freed slot.
+ * No timers, no external state — just enough to stop a cold-cache facet stampede
+ * from opening more than AGG_MAX_CONCURRENCY aggregate transactions at once.
+ * Exported for a deterministic concurrency unit test.
+ */
+export class AggregateLimiter {
+  private active = 0;
+  private readonly waiters: Array<() => void> = [];
+  constructor(private readonly max: number) {}
+  async run<T>(fn: () => Promise<T>): Promise<T> {
+    await this.acquire();
+    try {
+      return await fn();
+    } finally {
+      this.release();
+    }
+  }
+  private acquire(): Promise<void> {
+    if (this.active < this.max) {
+      this.active += 1;
+      return Promise.resolve();
+    }
+    return new Promise<void>((resolve) => this.waiters.push(resolve));
+  }
+  private release(): void {
+    const next = this.waiters.shift();
+    // Hand the just-freed slot straight to the next waiter (the active count is
+    // conserved); only when nobody is waiting does the active count drop.
+    if (next) next();
+    else this.active -= 1;
+  }
+}
+
+/** Shared limiter for ALL directory aggregate recomputes (summary + every facet
+ *  key) so distinct-key computes can never stampede the DB pool together. */
+const aggregateLimiter = new AggregateLimiter(AGG_MAX_CONCURRENCY);
+
+/**
+ * Run a directory aggregate read under a per-statement timeout. Opens a
+ * transaction, applies `SET LOCAL statement_timeout`, then runs `fn` with the tx
+ * handle. Any scan exceeding the timeout aborts server-side (Postgres error
+ * 57014) and REJECTS this promise, releasing the pooled connection at once — the
+ * caller's existing try/catch then keeps the stale cached value or serves the
+ * empty/degraded result. `SET LOCAL` scopes the timeout to this transaction and
+ * auto-resets on commit, so it never leaks onto other pooled work.
+ */
+async function withAggregateTimeout<T>(fn: (tx: AggregateTx) => Promise<T>): Promise<T> {
+  return db().transaction(async (tx) => {
+    // SET does not accept bind params; the value is our own integer constant.
+    await tx.execute(sql.raw(`SET LOCAL statement_timeout = ${AGG_STATEMENT_TIMEOUT_MS}`));
+    return fn(tx);
+  });
+}
+
 /** Single-value TTL cache for the arg-less global summary. `at` is the staleness
  *  clock; a value older than DIRECTORY_AGG_TTL_MS is served STALE while one
  *  background refresh recomputes it (stale-while-revalidate). */
@@ -294,7 +386,9 @@ let directorySummaryInflight: Promise<DirectorySummary> | null = null;
  */
 async function refreshDirectorySummary(): Promise<DirectorySummary> {
   try {
-    const val = await getDirectorySummaryUnsafe();
+    // Gate the recompute through the shared limiter so a cold-cache burst can
+    // never open more than AGG_MAX_CONCURRENCY aggregate transactions at once.
+    const val = await aggregateLimiter.run(() => getDirectorySummaryUnsafe());
     directorySummaryCache = { at: Date.now(), val };
     return val;
   } finally {
@@ -347,20 +441,27 @@ export async function getDirectorySummary(): Promise<DirectorySummary> {
 }
 
 async function getDirectorySummaryUnsafe(): Promise<DirectorySummary> {
-  const byStateRows = await db()
-    .select({ state: carrierDirectory.state, n: sql<number>`count(*)::int` })
-    .from(carrierDirectory)
-    .groupBy(carrierDirectory.state);
+  // All three heavy scans run inside ONE transaction under a per-statement
+  // timeout; a timed-out scan rejects and is absorbed by getDirectorySummary's
+  // keep-stale / serve-empty error paths. Folding stays pure JS below.
+  const { byStateRows, byPortRows, intermodalRow } = await withAggregateTimeout(async (tx) => {
+    const byStateRows = await tx
+      .select({ state: carrierDirectory.state, n: sql<number>`count(*)::int` })
+      .from(carrierDirectory)
+      .groupBy(carrierDirectory.state);
 
-  const byPortRows = await db()
-    .select({ port: carrierDirectory.nearestPortCode, n: sql<number>`count(*)::int` })
-    .from(carrierDirectory)
-    .groupBy(carrierDirectory.nearestPortCode);
+    const byPortRows = await tx
+      .select({ port: carrierDirectory.nearestPortCode, n: sql<number>`count(*)::int` })
+      .from(carrierDirectory)
+      .groupBy(carrierDirectory.nearestPortCode);
 
-  const intermodalRow = await db()
-    .select({ n: sql<number>`count(*)::int` })
-    .from(carrierDirectory)
-    .where(eq(carrierDirectory.intermodal, true));
+    const intermodalRow = await tx
+      .select({ n: sql<number>`count(*)::int` })
+      .from(carrierDirectory)
+      .where(eq(carrierDirectory.intermodal, true));
+
+    return { byStateRows, byPortRows, intermodalRow };
+  });
 
   const byState = byStateRows
     .filter((r) => r.state)
@@ -1050,7 +1151,10 @@ function facetCacheKey(filters: DirectoryFilters): string {
  */
 async function refreshFacetCounts(filters: DirectoryFilters, key: string): Promise<FacetCounts> {
   try {
-    const val = await getFacetCountsUnsafe(filters);
+    // Gate the recompute through the shared limiter so a cold-cache burst of
+    // DISTINCT filter keys can never open more than AGG_MAX_CONCURRENCY
+    // aggregate transactions at once (the stampede that pinned the pool).
+    const val = await aggregateLimiter.run(() => getFacetCountsUnsafe(filters));
     // Cache only a successfully computed value; an error must NOT poison the cache.
     // Evict the oldest entry (insertion order) once over the cap.
     facetCountsCache.set(key, { at: Date.now(), val });
@@ -1113,14 +1217,17 @@ export async function getFacetCounts(filters: DirectoryFilters): Promise<FacetCo
  * to the SWR wrapper above.
  */
 async function getFacetCountsUnsafe(filters: DirectoryFilters): Promise<FacetCounts> {
-  {
+  // Every scan runs inside ONE transaction under a per-statement timeout; a
+  // timed-out scan rejects and is absorbed by getFacetCounts' keep-stale /
+  // serve-empty error paths.
+  return withAggregateTimeout(async (tx) => {
     const whereOf = (excl: string) => {
       const c = buildConditions(filters, new Set([excl]));
       return c.length ? and(...c) : undefined;
     };
 
     // Fleet buckets — one grouped scan.
-    const fleetRows = await db()
+    const fleetRows = await tx
       .select({
         bucket: sql<string>`case
           when ${carrierDirectory.powerUnits} between 1 and 25 then '1-25'
@@ -1135,7 +1242,7 @@ async function getFacetCountsUnsafe(filters: DirectoryFilters): Promise<FacetCou
       .groupBy(sql`1`);
 
     // Drivers buckets — one grouped scan (mirrors fleet).
-    const driversRows = await db()
+    const driversRows = await tx
       .select({
         bucket: sql<string>`case
           when ${carrierDirectory.drivers} between 1 and 10 then '1-10'
@@ -1154,7 +1261,7 @@ async function getFacetCountsUnsafe(filters: DirectoryFilters): Promise<FacetCou
     // (drayage maps onto the intermodal column) so each option's count is honest.
     const eqBase = buildConditions(filters, new Set(['equipment', 'intermodal']));
     const eqWhere = eqBase.length ? and(...eqBase) : undefined;
-    const equipmentRows = await db()
+    const equipmentRows = await tx
       .select({
         drayage: sql<number>`count(*) filter (where ${carrierDirectory.intermodal})::int`,
         dryvan: sql<number>`count(*) filter (where ${carrierDirectory.dryVan})::int`,
@@ -1171,7 +1278,7 @@ async function getFacetCountsUnsafe(filters: DirectoryFilters): Promise<FacetCou
     // Excludes ITSELF so each option's count is honest faceted-search semantics.
     const cargoBase = buildConditions(filters, new Set(['cargo']));
     const cargoWhere = cargoBase.length ? and(...cargoBase) : undefined;
-    const cargoRows = await db()
+    const cargoRows = await tx
       .select({
         household: sql<number>`count(*) filter (where ${carrierDirectory.householdGoods})::int`,
         beverages: sql<number>`count(*) filter (where ${carrierDirectory.beverages})::int`,
@@ -1193,20 +1300,20 @@ async function getFacetCountsUnsafe(filters: DirectoryFilters): Promise<FacetCou
     // Ports & terminals — one grouped scan on the stored nearest_port_code, with
     // the port dimension self-excluded. Member counts are folded into their
     // DISPLAY group below (co-located ports sum into one hub).
-    const portRows = await db()
+    const portRows = await tx
       .select({ code: carrierDirectory.nearestPortCode, n: sql<number>`count(*)::int` })
       .from(carrierDirectory)
       .where(whereOf('port'))
       .groupBy(carrierDirectory.nearestPortCode);
 
     // Good-standing count — self-excluded so the toggle badge reads honestly.
-    const goodRow = await db()
+    const goodRow = await tx
       .select({ n: sql<number>`count(*)::int` })
       .from(carrierDirectory)
       .where(and(...buildConditions(filters, new Set(['standing'])), goodStandingCondition()));
 
     const [authRow, imRow, recentRow] = await Promise.all([
-      db()
+      tx
         .select({ n: sql<number>`count(*)::int` })
         .from(carrierDirectory)
         .where(
@@ -1216,11 +1323,11 @@ async function getFacetCountsUnsafe(filters: DirectoryFilters): Promise<FacetCou
             ne(carrierDirectory.authorityType, ''),
           ),
         ),
-      db()
+      tx
         .select({ n: sql<number>`count(*)::int` })
         .from(carrierDirectory)
         .where(and(...buildConditions(filters, new Set(['equipment', 'intermodal'])), eq(carrierDirectory.intermodal, true))),
-      db()
+      tx
         .select({ n: sql<number>`count(*)::int` })
         .from(carrierDirectory)
         .where(and(...buildConditions(filters, new Set(['recent'])), gte(carrierDirectory.updatedAt, recentCutoff()))),
@@ -1269,7 +1376,7 @@ async function getFacetCountsUnsafe(filters: DirectoryFilters): Promise<FacetCou
     out.intermodal = imRow[0]?.n ?? 0;
     out.recent = recentRow[0]?.n ?? 0;
     return out;
-  }
+  });
 }
 
 // ─── City tier ────────────────────────────────────────────────────────────
