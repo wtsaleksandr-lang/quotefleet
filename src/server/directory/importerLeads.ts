@@ -46,8 +46,14 @@ export interface ImporterFilters {
   supplierCountry?: string;
   startDate?: string;
   endDate?: string;
-  /** Post-pull filters (ImportYeti has no server-side param for these). */
+  /** Entry/port geography — NOT the importer's HQ/company state. Realized
+   *  upstream by expanding the state to its entry ports (see
+   *  importerPages.entryPortsForState + runSearch). It is deliberately NOT a
+   *  post-pull HQ filter here: filtering by company address wrongly excluded
+   *  valid importers whose HQ sits in a different state than the port they enter
+   *  through (e.g. a New-York-HQ'd company clearing freight at Newark, NJ). */
   state?: string;
+  /** Post-pull filter (ImportYeti has no server-side param for this). */
   company?: string;
   /** Minimum 12-month shipment count (frequency band). */
   minShipments12m?: number;
@@ -66,6 +72,10 @@ export interface EnrichedContact {
 
 export interface ImporterLead {
   company: string;
+  /** ImportYeti company slug (from company_link, e.g. "valbruna-stainless").
+   *  The ONLY value the bols endpoint's `company` param filters on, so it is
+   *  what the Phase-2 profile route (`/importers/company/:slug`) is keyed by. */
+  slug: string | null;
   state: string | null;
   address: string | null;
   supplier: string | null;
@@ -158,6 +168,20 @@ const num = (v: unknown): number => {
 };
 const str = (v: unknown): string => (v == null ? '' : String(v));
 
+/** ImportYeti company slug from its `company_link` ("/company/valbruna-stainless"
+ *  → "valbruna-stainless"). This slug — NOT the basename — is the only value the
+ *  bols endpoint's `company` param actually filters on (verified against the live
+ *  API: `company=<slug>` returns exactly one company; basename/link are ignored).
+ *  Returns '' when no link is present. */
+export function companySlugFromLink(link: unknown): string {
+  const s = str(link).trim();
+  if (!s) return '';
+  const m = s.match(/\/company\/([^/?#]+)/i);
+  const slug = (m ? m[1] : s).toLowerCase().trim();
+  // Only allow the safe slug charset ImportYeti uses; reject anything else.
+  return /^[a-z0-9][a-z0-9-]*$/.test(slug) ? slug : '';
+}
+
 /* ── 1. ImportYeti: pull US-import bill-of-lading records ───────────────────
  * GET https://data.importyeti.com/v1.0/powerquery/us-import/bols (Bearer auth).
  * bol_type="H" = house bill = the REAL consignee (not the NVOCC master).
@@ -171,11 +195,19 @@ export async function pullImportBols(
     startDate,
     endDate,
   }: Pick<ImporterFilters, 'entryPort' | 'product' | 'hsCode' | 'supplierCountry' | 'startDate' | 'endDate'> = {},
-  { bolType = 'H', pageSize = 50, page = 1 }: { bolType?: string; pageSize?: number; page?: number } = {},
+  {
+    bolType = 'H',
+    pageSize = 50,
+    page = 1,
+    companySlug,
+  }: { bolType?: string; pageSize?: number; page?: number; companySlug?: string } = {},
 ): Promise<{ rows: BolRow[]; cost: number | null; creditsRemaining: number | null }> {
   const key = process.env.IMPORTYETI_API_KEY;
   if (!key) throw new Error('IMPORTYETI_API_KEY not set');
   const qs = new URLSearchParams();
+  // `company` = the ImportYeti company SLUG (from company_link). When present it
+  // scopes the pull to ONE importer's full history — the profile-page pull.
+  if (companySlug) qs.set('company', companySlug);
   if (entryPort) qs.set('entry_port', entryPort);
   if (product) qs.set('product_description', product);
   if (hsCode) qs.set('hs_code', hsCode);
@@ -361,6 +393,7 @@ export function toLead(r: BolRow, contact?: EnrichedContact | null): ImporterLea
   const derivedState = (addr.match(/,\s*([A-Z]{2})\s/) || [])[1] || (r.company_state as string) || null;
   return {
     company: str(r.company_name),
+    slug: companySlugFromLink(r.company_link) || null,
     state: derivedState,
     address: addr || null,
     supplier: (r.supplier_name as string) || null,
@@ -436,13 +469,14 @@ export async function draftEmail(
   throw new Error(last);
 }
 
-/* ── post-pull filters (ImportYeti has no server-side param for these) ──────*/
+/* ── post-pull filters (ImportYeti has no server-side param for these) ──────
+ * NOTE: `state` is intentionally NOT applied here. It is the ENTRY/port state,
+ * not the importer's HQ state — an HQ-state post-filter wrongly dropped valid
+ * importers whose company address differs from the port's state. State is
+ * realized upstream by pulling each of the state's entry ports (see
+ * importerPages.runSearch). */
 function applyPostFilters(leads: ImporterLead[], f: ImporterFilters): ImporterLead[] {
   let out = leads;
-  if (f.state) {
-    const st = f.state.trim().toUpperCase();
-    out = out.filter((l) => (l.state || '').toUpperCase() === st);
-  }
   if (f.company) {
     const q = f.company.trim().toLowerCase();
     if (q) out = out.filter((l) => l.company.toLowerCase().includes(q));
@@ -459,15 +493,19 @@ function applyPostFilters(leads: ImporterLead[], f: ImporterFilters): ImporterLe
 export async function findImporterLeads({
   filters = {},
   maxLeads = MAX_LEADS,
+  page = 1,
   withEnrichment = false,
   withEmails = false,
   concurrency = ENRICH_CONCURRENCY,
   bolCache,
   cacheKey,
   cacheTtlMs = 14 * 24 * 60 * 60 * 1000,
+  allowLivePull = true,
 }: {
   filters?: ImporterFilters;
   maxLeads?: number;
+  /** 1-based ImportYeti page — pagination / "Load more" threads through here. */
+  page?: number;
   withEnrichment?: boolean;
   withEmails?: boolean;
   concurrency?: number;
@@ -477,14 +515,27 @@ export async function findImporterLeads({
   cacheKey?: string;
   /** Cache TTL — a cached row younger than this skips the ImportYeti pull. */
   cacheTtlMs?: number;
-} = {}): Promise<{ leads: ImporterLead[]; creditsRemaining: number | null; cached: boolean }> {
+  /** When false, a cache MISS returns empty (no credit spent) — the free-search
+   *  quota gate. A cache HIT is still served (costs nothing). */
+  allowLivePull?: boolean;
+} = {}): Promise<{
+  leads: ImporterLead[];
+  creditsRemaining: number | null;
+  cached: boolean;
+  /** True only when this call actually hit ImportYeti (a credit was spent). */
+  pulledLive: boolean;
+  /** Raw BOL records scanned this pull (0 on a blocked miss). */
+  recordsScanned: number;
+}> {
   const cap = Math.max(1, Math.min(maxLeads, MAX_LEADS));
+  const pg = Math.max(1, Math.floor(page) || 1);
   const pageSize = Math.max(50, cap * 4);
 
   // ── Cache-first: a fresh cached result set spends ZERO ImportYeti credits ──
   let rows: BolRow[] | null = null;
   let creditsRemaining: number | null = null;
   let cached = false;
+  let pulledLive = false;
   if (bolCache && cacheKey) {
     try {
       const hit = await bolCache.get(cacheKey);
@@ -499,10 +550,16 @@ export async function findImporterLeads({
   }
 
   if (rows == null) {
+    // Cache miss. The quota gate can veto the live pull to protect credits — the
+    // caller then shows the subscribe wall instead of us spending a credit.
+    if (!allowLivePull) {
+      return { leads: [], creditsRemaining: null, cached: false, pulledLive: false, recordsScanned: 0 };
+    }
     // Pull generously (dedup collapses many BOL rows per importer), then cap.
-    const pulled = await pullImportBols(filters, { pageSize });
+    const pulled = await pullImportBols(filters, { pageSize, page: pg });
     rows = pulled.rows;
     creditsRemaining = pulled.creditsRemaining;
+    pulledLive = true;
     if (bolCache && cacheKey) {
       // Write fresh rows back for the next repeat search. Never let a cache
       // write failure break the response.
@@ -513,12 +570,13 @@ export async function findImporterLeads({
       }
     }
   }
+  const recordsScanned = rows.length;
   const importers = dedupImporters(rows);
   // Base leads (no enrichment) — cheap, so build all then post-filter, then cap.
   const base = applyPostFilters(importers.map((r) => toLead(r)), filters).slice(0, cap);
 
   if (!withEnrichment && !withEmails) {
-    return { leads: base, creditsRemaining, cached };
+    return { leads: base, creditsRemaining, cached, pulledLive, recordsScanned };
   }
 
   // Enrichment / drafting fan-out — bounded concurrency, never unbounded.
@@ -530,7 +588,7 @@ export async function findImporterLeads({
     if (withEmails) merged.draft_email = await draftEmail(merged).catch(() => null);
     return merged;
   });
-  return { leads, creditsRemaining, cached };
+  return { leads, creditsRemaining, cached, pulledLive, recordsScanned };
 }
 
 /* ── CSV export (LOCKED / paid feature) ─────────────────────────────────────*/

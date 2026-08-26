@@ -1,0 +1,100 @@
+/**
+ * Credit guardrails — two separate concerns:
+ *   1. SEARCH: free + generous, only a per-IP/day anti-abuse cap on live pulls.
+ *   2. DETAIL OPEN: the FREE quota (default 3) that gates opening a profile.
+ */
+import { describe, it, expect, beforeEach } from 'vitest';
+import type { Request, Response } from 'express';
+import {
+  checkLiveSearchAllowed,
+  recordLiveSearch,
+  checkDetailQuota,
+  recordDetailOpen,
+  FREE_DETAIL_QUOTA,
+  IP_DAILY_LIVE_SEARCH_CAP,
+  IP_DAILY_DETAIL_CAP,
+  DETAIL_COOKIE,
+  __resetQuotaStateForTests,
+} from './importerQuota.js';
+
+beforeEach(() => __resetQuotaStateForTests());
+
+function req(ip: string, detailCookie?: number): Request {
+  const headers: Record<string, string> = {};
+  if (detailCookie != null) headers.cookie = `${DETAIL_COOKIE}=${detailCookie}`;
+  return { ip, headers } as unknown as Request;
+}
+function res(): Response & { _cookies: Record<string, string> } {
+  const store: Record<string, string> = {};
+  return {
+    _cookies: store,
+    cookie(name: string, value: string) {
+      store[name] = value;
+      return this as unknown as Response;
+    },
+  } as unknown as Response & { _cookies: Record<string, string> };
+}
+
+describe('search gate (free + generous, anti-abuse only)', () => {
+  it('the free-search cap is generous (>= 50) so we never push users to ImportYeti', () => {
+    expect(IP_DAILY_LIVE_SEARCH_CAP).toBeGreaterThanOrEqual(50);
+  });
+
+  it('a fresh IP may search live', () => {
+    expect(checkLiveSearchAllowed(req('1.1.1.1')).allowed).toBe(true);
+  });
+
+  it('only closes after the generous per-IP daily cap of live pulls', () => {
+    const ip = '2.2.2.2';
+    for (let i = 0; i < IP_DAILY_LIVE_SEARCH_CAP - 1; i++) recordLiveSearch(req(ip));
+    expect(checkLiveSearchAllowed(req(ip)).allowed).toBe(true); // still under the cap
+    recordLiveSearch(req(ip));
+    expect(checkLiveSearchAllowed(req(ip)).allowed).toBe(false); // now at the cap
+    // a different IP is unaffected
+    expect(checkLiveSearchAllowed(req('3.3.3.3')).allowed).toBe(true);
+  });
+
+  it('search and detail counters are independent', () => {
+    const ip = '4.4.4.4';
+    for (let i = 0; i < IP_DAILY_LIVE_SEARCH_CAP; i++) recordLiveSearch(req(ip));
+    // search is capped, but detail opens for the same IP are still available
+    expect(checkLiveSearchAllowed(req(ip)).allowed).toBe(false);
+    expect(checkDetailQuota(req(ip)).allowed).toBe(true);
+  });
+});
+
+describe('detail-open quota (the free quota is on PROFILES)', () => {
+  it('a fresh visitor gets FREE_DETAIL_QUOTA (default 3) profile opens', () => {
+    const q = checkDetailQuota(req('5.5.5.5'));
+    expect(q.allowed).toBe(true);
+    expect(q.remaining).toBe(FREE_DETAIL_QUOTA);
+    expect(q.limit).toBe(FREE_DETAIL_QUOTA);
+    expect(FREE_DETAIL_QUOTA).toBe(3);
+  });
+
+  it('a visitor whose cookie is at the quota is NOT allowed to open more', () => {
+    const q = checkDetailQuota(req('6.6.6.6', FREE_DETAIL_QUOTA));
+    expect(q.allowed).toBe(false);
+    expect(q.remaining).toBe(0);
+  });
+
+  it('recordDetailOpen bumps the cookie and decrements remaining', () => {
+    const r = res();
+    const after = recordDetailOpen(req('7.7.7.7'), r);
+    expect(r._cookies[DETAIL_COOKIE]).toBe('1');
+    expect(after.remaining).toBe(FREE_DETAIL_QUOTA - 1);
+  });
+
+  it('checkDetailQuota never mutates state (pure read)', () => {
+    const r = req('8.8.8.8');
+    checkDetailQuota(r);
+    checkDetailQuota(r);
+    expect(checkDetailQuota(r).remaining).toBe(FREE_DETAIL_QUOTA);
+  });
+
+  it('the per-IP daily backstop bounds cookie-clearing abuse', () => {
+    const ip = '9.9.9.9';
+    for (let i = 0; i < IP_DAILY_DETAIL_CAP; i++) recordDetailOpen(req(ip), res());
+    expect(checkDetailQuota(req(ip)).allowed).toBe(false);
+  });
+});
