@@ -13,7 +13,7 @@ describe('public static page smoke checks', () => {
     const html = await file('landing.html');
     expect(html).toContain('See your own freight quote calculator &mdash; live in seconds.');
     expect(html).toContain('Stop losing loads to slow, manual quoting.');
-    expect(html).toContain('For carriers, brokers, dispatchers &amp; forwarders');
+    expect(html).toContain('For carriers, brokers &amp; forwarders');
     expect(html).toContain('acmetrucking.yourquote.net');
     expect(html).toContain('email signature');
     // CRO hero: outcome-first subhead, short toggle labels, FMCSA trust line,

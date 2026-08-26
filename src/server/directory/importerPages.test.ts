@@ -87,7 +87,8 @@ describe('renderImporterSearchPage', () => {
   it('renders a server-rendered page with the right SEO + canonical', () => {
     expect(html).toContain('<title>US Importer Database');
     expect(html).toContain('href="https://quotefleet.net/importers"');
-    expect(html).toContain('US importer database');
+    // directory-portal redesign: visible eyebrow removed; SEO h1 is now sr-only
+    expect(html).toContain('Find US importers to pitch');
   });
   it('leads with the provider-first pickers (port / state / commodity)', () => {
     expect(html).toContain('id="imp-port"');
