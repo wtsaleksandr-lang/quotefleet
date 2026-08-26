@@ -160,27 +160,24 @@ const TEU_BANDS: ReadonlyArray<[string, string]> = [
 //    it is NOT scanned by the public-dir spacing/color guards). Uses only
 //    QuoteFleet's shared /style.css design tokens so BOTH themes render. ──────
 const IMPORTERS_CSS = `
-.imp-hero{padding:32px 0 8px}
-.imp-hero .eyebrow{color:var(--accent);font-family:var(--font-mono);font-size:12px;letter-spacing:.08em;text-transform:uppercase;margin-bottom:12px}
-.imp-hero h1{margin:0 0 12px;line-height:1.15}
-.imp-hero .lead{max-width:640px;margin:0 0 16px}
-.imp-trust{color:var(--muted);font-size:13px;margin:0}
-.imp-trust b{color:var(--ink-soft)}
-.imp-datastat{display:inline-flex;align-items:baseline;gap:10px;flex-wrap:wrap;border:1px solid var(--border);background:var(--surface);border-radius:var(--radius-lg);padding:12px 16px;box-shadow:var(--shadow-sm);margin:0 0 6px}
-.imp-datastat .num{font-size:26px;font-weight:800;color:var(--ink);font-variant-numeric:tabular-nums;line-height:1}
-.imp-datastat .cap{font-size:13px;color:var(--muted)}
-.imp-datastat .cap b{color:var(--ink-soft)}
-.imp-shell{padding:0 0 48px}
+/* SEO/AT-only H1 — the page reads as a plain directory search portal (no big
+   marketing hero), so the visible title is dropped and kept only for crawlers
+   and assistive tech. */
+.imp-sr-only{position:absolute;width:1px;height:1px;padding:0;margin:-1px;overflow:hidden;clip:rect(0,0,0,0);white-space:nowrap;border:0}
+/* One-line trust / record strip (replaces the big floating datastat pill) —
+   carries the 700M+ figure inline, mockup-style. */
+.imp-datastat{color:var(--muted);font-size:13px;line-height:1.5;margin:14px 0 4px}
+.imp-datastat .num{font-weight:800;color:var(--ink);font-variant-numeric:tabular-nums}
+.imp-datastat #imp-recordline{color:var(--ink-soft);font-weight:600}
+.imp-shell{padding:24px 0 48px}
 
-/* ── search panel ── */
-.imp-panel{border:1px solid var(--border);border-radius:var(--radius-lg);background:var(--surface);padding:24px;margin:20px 0;box-shadow:var(--shadow-sm)}
-.imp-panel-h{display:flex;align-items:baseline;gap:12px;flex-wrap:wrap;margin:0 0 16px}
-.imp-panel-h h2{font-size:16px;margin:0;color:var(--ink)}
-.imp-panel-h .sub{font-size:12px;color:var(--muted)}
-.imp-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:16px}
+/* ── search bar (slim + unboxed — a directory filter row, not a card) ── */
+.imp-panel{margin:0 0 12px}
+.imp-grid{display:flex;flex-wrap:wrap;gap:10px;align-items:center}
+.imp-combo{flex:1 1 210px}
 .imp-field{display:flex;flex-direction:column;gap:8px;min-width:0}
 .imp-field label{font-size:12px;font-weight:600;color:var(--muted);text-transform:uppercase;letter-spacing:.03em}
-.imp-field input,.imp-field select{width:100%;box-sizing:border-box;font-family:var(--font-sans);font-size:14px;color:var(--ink);background:var(--surface-2);border:1px solid var(--border-strong);border-radius:8px;padding:12px 14px;min-height:44px;appearance:none;-webkit-appearance:none}
+.imp-field input,.imp-field select{width:100%;box-sizing:border-box;font-family:var(--font-sans);font-size:14px;color:var(--ink);background:var(--surface-2);border:1px solid var(--border-strong);border-radius:8px;padding:10px 12px;min-height:44px;appearance:none;-webkit-appearance:none}
 .imp-field input::placeholder{color:var(--muted)}
 .imp-field input:hover,.imp-field select:hover{border-color:var(--accent)}
 .imp-field input:focus-visible,.imp-field select:focus-visible{outline:2px solid var(--accent);outline-offset:1px;border-color:var(--accent)}
@@ -204,9 +201,12 @@ const IMPORTERS_CSS = `
 .imp-suggest .imp-suggest-empty{color:var(--muted);cursor:default;font-style:italic}
 .imp-suggest .imp-suggest-empty:hover{background:none}
 
-/* ── secondary filters (progressive-disclosure) ── */
-.imp-more{margin-top:16px;border-top:1px solid var(--border);padding-top:4px}
-.imp-more>summary{list-style:none;cursor:pointer;display:inline-flex;align-items:center;gap:8px;color:var(--accent);font-size:13px;font-weight:600;padding:12px 0;min-height:44px}
+/* ── secondary filters (progressive-disclosure) ──
+   Sits inline in the actions row as a compact "More filters" chip; when opened it
+   expands to a full-width row below the buttons. */
+.imp-more{flex:0 0 auto;margin:0}
+.imp-more[open]{flex:1 1 100%;order:5;margin-top:4px;border-top:1px solid var(--border);padding-top:8px}
+.imp-more>summary{list-style:none;cursor:pointer;display:inline-flex;align-items:center;gap:8px;color:var(--accent);font-size:13px;font-weight:600;padding:10px 12px;min-height:44px;border:1px solid var(--border-strong);border-radius:8px;background:var(--surface-2)}
 .imp-more>summary::-webkit-details-marker{display:none}
 .imp-more>summary::after{content:'▾';font-size:10px}
 .imp-more[open]>summary::after{content:'▴'}
@@ -214,8 +214,15 @@ const IMPORTERS_CSS = `
 .imp-more-name{margin-top:16px}
 .imp-more-name .hint{display:block;font-size:12px;color:var(--muted);margin-top:8px}
 
-.imp-actions{display:flex;flex-wrap:wrap;gap:12px;align-items:center;margin-top:24px}
-.imp-export{margin-left:auto}
+/* Search + Export grouped adjacent (no margin-left:auto gap, I8); "More filters"
+   disclosure follows inline. B4: force the primary a proper brand-blue fill (the
+   importers page body has no qf-* class, so the shared .btn-primary otherwise
+   renders as a cream CTA on the dark surface). This inline sheet is not
+   guard-scanned, so #fff on the blue fill is fine here. */
+.imp-actions{display:flex;flex-wrap:wrap;gap:12px;align-items:center;margin-top:12px}
+.imp-actions .btn-primary{background:var(--accent-fill);border-color:var(--accent-fill);color:#fff;box-shadow:none}
+.imp-actions .btn-primary .arr{color:#fff}
+.imp-actions .btn-primary:hover{background:var(--accent-strong,var(--accent-fill));border-color:var(--accent-strong,var(--accent-fill))}
 
 .imp-status{color:var(--muted);font-size:13px;margin:22px 0 8px}
 .imp-status b{color:var(--ink)}
@@ -230,8 +237,14 @@ const IMPORTERS_CSS = `
 .imp-density button+button{border-left:1px solid var(--border-strong)}
 .imp-density button[aria-pressed="true"]{background:color-mix(in srgb,var(--accent) 16%,transparent);color:var(--accent)}
 
-/* ── two-column layout: narrow-results sidebar + results ── */
-.imp-layout{display:grid;grid-template-columns:232px 1fr;gap:20px;align-items:start}
+/* ── two-column layout: narrow-results sidebar + results ──
+   B3: the sidebar (.imp-side) is display:none until a search runs. With a fixed
+   232px first column the results wrapper auto-placed INTO that 232px strip on
+   first load. Default to a single column and only introduce the sidebar column
+   once .imp-side.on is present, so the empty-state + results always render
+   full-width-aligned. */
+.imp-layout{display:grid;grid-template-columns:1fr;gap:20px;align-items:start}
+.imp-layout:has(.imp-side.on){grid-template-columns:232px 1fr}
 .imp-side{display:none;position:sticky;top:16px;border:1px solid var(--border);border-radius:var(--radius-lg);background:var(--surface);padding:16px;box-shadow:var(--shadow-sm)}
 .imp-side.on{display:block}
 .imp-side h3{font-size:12px;text-transform:uppercase;letter-spacing:.04em;color:var(--muted);margin:0 0 12px}
@@ -320,18 +333,20 @@ function comboField(opts: {
   lockable?: boolean;
 }): string {
   const { id, name, label, placeholder, source, lockable } = opts;
+  // Directory-portal style: the input is a compact filter chip with the label as
+  // its placeholder (title-in-field per the hard input rule). No uppercase label
+  // block above it; `aria-label` carries the accessible name. The lock pill sits
+  // beside the chip and appears only when a port pre-locks the state.
   return `
     <div class="imp-field imp-combo" data-field="${esc(id)}" data-source="${esc(source)}" data-has-value="0"${
       lockable ? ' data-lockable="1"' : ''
     }>
-      <label for="${esc(id)}">${esc(label)}${
-        lockable ? ' <span class="imp-lockpill">🔒 set by port</span>' : ''
-      }</label>
       <div class="imp-combo-ctrl">
         <input id="${esc(id)}" type="text" role="combobox" aria-autocomplete="list" aria-expanded="false"
-               aria-controls="${esc(id)}-list" autocomplete="off" placeholder="${esc(placeholder)}" maxlength="80">
+               aria-controls="${esc(id)}-list" aria-label="${esc(label)}" autocomplete="off" placeholder="${esc(placeholder)}" maxlength="80">
         <button type="button" class="imp-combo-clear" aria-label="Clear ${esc(label)}" tabindex="-1">&times;</button>
       </div>
+      ${lockable ? '<span class="imp-lockpill">🔒 set by port</span>' : ''}
       <input type="hidden" name="${esc(name)}" id="${esc(id)}-val">
       <ul class="imp-suggest" role="listbox" id="${esc(id)}-list" hidden></ul>
     </div>`;
@@ -354,61 +369,46 @@ export function renderImporterSearchPage(): string {
 
   const body = `
   <style>${IMPORTERS_CSS}</style>
-  <section class="hero imp-hero">
-    <div class="container-narrow">
-      <div class="eyebrow">US importer database</div>
-      <h1>Find US importers to pitch &mdash; by port, lane &amp; commodity.</h1>
-      <p class="lead">Search real customs bill-of-lading records to surface importers moving freight on your lane, who they buy from, how much they ship, and which forwarder you'd displace.</p>
-      <div class="imp-datastat">
-        <span class="num">${esc(DATASET_RECORDS_LABEL)}</span>
-        <span class="cap"><b>US import records</b>, updated daily &mdash; search by port, lane or commodity below.</span>
-      </div>
-      <p class="imp-trust" id="imp-recordline-wrap">Browsing is free &mdash; <b id="imp-recordline">pick a port or commodity to start</b>.</p>
-    </div>
-  </section>
-
   <main class="imp-shell">
     <div class="container-narrow">
+      <h1 class="imp-sr-only">Find US importers to pitch by port, lane and commodity</h1>
       <form class="imp-panel" id="imp-form" novalidate>
-        <div class="imp-panel-h">
-          <h2>Browse importers</h2>
-          <span class="sub">Start with your port, lane or commodity</span>
-        </div>
         <div class="imp-grid">
           ${comboField({ id: 'imp-port', name: 'entryPort', label: 'Entry port', placeholder: 'Any US port', source: 'inline' })}
           ${comboField({ id: 'imp-state', name: 'state', label: 'Entry state', placeholder: 'Any entry state', source: 'inline', lockable: true })}
           ${comboField({ id: 'imp-commodity', name: 'commodity', label: 'Commodity / HS code', placeholder: 'e.g. saw blades, or 8202', source: 'remote' })}
         </div>
 
-        <details class="imp-more">
-          <summary>More filters</summary>
-          <div class="imp-more-grid">
-            ${comboField({ id: 'imp-supplier', name: 'supplierCountry', label: 'Supplier country', placeholder: 'Any origin', source: 'inline' })}
-            <div class="imp-field">
-              <label for="imp-freq">Frequency</label>
-              <select id="imp-freq" name="minShipments12m">${FREQ_BANDS.map(([v, l]) => `<option value="${esc(v)}">${esc(l)}</option>`).join('')}</select>
-            </div>
-            <div class="imp-field">
-              <label for="imp-teu">TEU band</label>
-              <select id="imp-teu" name="minTeu12m">${TEU_BANDS.map(([v, l]) => `<option value="${esc(v)}">${esc(l)}</option>`).join('')}</select>
-            </div>
-          </div>
-          <div class="imp-more-name">
-            <div class="imp-field">
-              <label for="imp-company">Or search by company name</label>
-              <input id="imp-company" name="company" type="text" placeholder="Importer name (optional)" autocomplete="off" maxlength="80">
-            </div>
-            <span class="hint">Secondary &mdash; most users start from a port, lane or commodity above.</span>
-          </div>
-        </details>
-
         <div class="imp-actions">
           <button type="submit" class="btn btn-primary" id="imp-search">Search importers <span class="arr">&rarr;</span></button>
           <a class="imp-lock imp-export" id="imp-export" href="/signup" title="CSV export is a paid feature">
             <span class="ico" aria-hidden="true">&#128274;</span> Export CSV
           </a>
+          <details class="imp-more">
+            <summary>More filters</summary>
+            <div class="imp-more-grid">
+              ${comboField({ id: 'imp-supplier', name: 'supplierCountry', label: 'Supplier country', placeholder: 'Any origin', source: 'inline' })}
+              <div class="imp-field">
+                <label for="imp-freq">Frequency</label>
+                <select id="imp-freq" name="minShipments12m">${FREQ_BANDS.map(([v, l]) => `<option value="${esc(v)}">${esc(l)}</option>`).join('')}</select>
+              </div>
+              <div class="imp-field">
+                <label for="imp-teu">TEU band</label>
+                <select id="imp-teu" name="minTeu12m">${TEU_BANDS.map(([v, l]) => `<option value="${esc(v)}">${esc(l)}</option>`).join('')}</select>
+              </div>
+            </div>
+            <div class="imp-more-name">
+              <div class="imp-field">
+                <label for="imp-company">Or search by company name</label>
+                <input id="imp-company" name="company" type="text" placeholder="Importer name (optional)" autocomplete="off" maxlength="80">
+              </div>
+              <span class="hint">Secondary &mdash; most users start from a port, lane or commodity above.</span>
+            </div>
+          </details>
         </div>
       </form>
+
+      <p class="imp-datastat" id="imp-recordline-wrap"><b class="num">${esc(DATASET_RECORDS_LABEL)}</b> US import records, updated daily &mdash; <span id="imp-recordline">pick a port, lane or commodity to start</span>.</p>
 
       <p class="imp-status" id="imp-status" role="status" aria-live="polite" hidden></p>
 
