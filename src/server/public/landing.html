@@ -42,6 +42,8 @@
   <link rel="stylesheet" href="/landing-audience-toggle.css">
 <link rel="stylesheet" href="/landing-nav-consistency.css">
   <link rel="stylesheet" href="/landing-hero-fixes-v2.css">
+  <link rel="stylesheet" href="/landing-hero-composite.css">
+  <link rel="preload" as="image" href="/marketing/qf-hero-phone-poster.jpg">
   <link rel="icon" href="/favicon.ico" sizes="any">
   <link rel="icon" type="image/png" sizes="32x32" href="/brand/favicon-32.png">
   <link rel="icon" type="image/png" sizes="16x16" href="/brand/favicon-16.png">
@@ -173,34 +175,45 @@
 
         <div class="visual-flow qf-hero-media" aria-label="QuoteFleet — a customer getting an instant branded freight quote on a phone">
           <div class="qf-hero-stage">
-            <div class="qf-hero-vphone">
-              <div class="qf-hero-vphone__frame">
-                <span class="qf-hero-vphone__island" aria-hidden="true"></span>
-                <div class="qf-hero-vphone__screen">
-                  <video class="qf-hero-vphone__vid" autoplay loop muted playsinline preload="metadata" poster="/marketing/qf-hero-phone-poster.jpg" aria-label="A customer entering pickup, delivery and weight and getting an instant branded freight quote">
-                    <source src="/marketing/qf-hero-phone.webm" type="video/webm">
-                    <source src="/marketing/qf-hero-phone.mp4" type="video/mp4">
+            <div class="qf-hero-composite">
+              <div class="qf-hero-laptop">
+                <div class="qf-browser">
+                  <div class="qf-browser-bar">
+                    <span class="qf-browser-dots"><i></i><i></i><i></i></span>
+                    <span class="qf-browser-url">app.quotefleet.net/import</span>
+                  </div>
+                  <video class="qf-hero-laptop__vid qf-browser-vid" autoplay loop muted playsinline preload="metadata" poster="/marketing/qf-hero-laptop-poster.jpg" aria-label="An operator importing a rate sheet, the AI reading it, auto-quoting lanes, branding the calculator, embedding it, and following up leads">
+                    <source src="/marketing/qf-hero-laptop.webm" type="video/webm">
+                    <source src="/marketing/qf-hero-laptop.mp4" type="video/mp4">
                   </video>
                 </div>
+                <div class="qf-caps qf-caps--laptop" aria-hidden="true">
+                  <span class="qf-cap qf-cap--lap0 qf-cap--down is-on" data-scene="0"><span class="qf-cap__chip">Import any rate sheet</span><i class="qf-cap__tip"></i></span>
+                  <span class="qf-cap qf-cap--lap1 qf-cap--down" data-scene="1"><span class="qf-cap__chip">AI reads it in seconds</span><i class="qf-cap__tip"></i></span>
+                  <span class="qf-cap qf-cap--lap2 qf-cap--left" data-scene="2"><span class="qf-cap__chip">Auto-quotes your lanes</span><i class="qf-cap__tip"></i></span>
+                  <span class="qf-cap qf-cap--lap3 qf-cap--right" data-scene="3"><span class="qf-cap__chip">Brand it in a click</span><i class="qf-cap__tip"></i></span>
+                  <span class="qf-cap qf-cap--lap4 qf-cap--down" data-scene="4"><span class="qf-cap__chip">Embed anywhere</span><i class="qf-cap__tip"></i></span>
+                  <span class="qf-cap qf-cap--lap5 qf-cap--down" data-scene="5"><span class="qf-cap__chip">Every request becomes a lead</span><i class="qf-cap__tip"></i></span>
+                  <span class="qf-cap qf-cap--lap6 qf-cap--down" data-scene="6"><span class="qf-cap__chip">Auto-follow-up that books</span><i class="qf-cap__tip"></i></span>
+                </div>
               </div>
-            </div>
-            <div class="qf-scenecaps" aria-hidden="true">
-              <span class="qf-scenecap qf-scenecap--l qf-scenecap--s0 is-on" data-scene="0">
-                <span class="qf-scenecap__text">Customers self-quote in seconds</span>
-                <svg class="qf-scenecap__arrow" width="46" height="30" viewBox="0 0 46 30" fill="none" aria-hidden="true"><path d="M2 6c18 0 27 2 40 20" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/><path d="M42 26l-10-2M42 26l2-10" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
-              </span>
-              <span class="qf-scenecap qf-scenecap--r qf-scenecap--s1" data-scene="1">
-                <svg class="qf-scenecap__arrow" width="46" height="30" viewBox="0 0 46 30" fill="none" aria-hidden="true"><path d="M2 6c18 0 27 2 40 20" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/><path d="M42 26l-10-2M42 26l2-10" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
-                <span class="qf-scenecap__text">Built-in AI answers instantly</span>
-              </span>
-              <span class="qf-scenecap qf-scenecap--l qf-scenecap--s2" data-scene="2">
-                <span class="qf-scenecap__text">Every request becomes a lead</span>
-                <svg class="qf-scenecap__arrow" width="46" height="30" viewBox="0 0 46 30" fill="none" aria-hidden="true"><path d="M2 24c18 0 27-2 40-20" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/><path d="M42 4l-10 2M42 4l2 10" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
-              </span>
-              <span class="qf-scenecap qf-scenecap--r qf-scenecap--s3" data-scene="3">
-                <svg class="qf-scenecap__arrow" width="46" height="30" viewBox="0 0 46 30" fill="none" aria-hidden="true"><path d="M2 24c18 0 27-2 40-20" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/><path d="M42 4l-10 2M42 4l2 10" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
-                <span class="qf-scenecap__text">Integrated with Stripe &amp; PayPal</span>
-              </span>
+              <div class="qf-hero-vphone">
+                <div class="qf-hero-vphone__frame">
+                  <span class="qf-hero-vphone__island" aria-hidden="true"></span>
+                  <div class="qf-hero-vphone__screen">
+                    <video class="qf-hero-vphone__vid" autoplay loop muted playsinline preload="metadata" poster="/marketing/qf-hero-phone-poster.jpg" aria-label="A customer entering pickup, delivery and weight and getting an instant branded freight quote">
+                      <source src="/marketing/qf-hero-phone.webm" type="video/webm">
+                      <source src="/marketing/qf-hero-phone.mp4" type="video/mp4">
+                    </video>
+                  </div>
+                </div>
+              </div>
+              <div class="qf-caps qf-caps--phone" aria-hidden="true">
+                <span class="qf-cap qf-cap--ph0 qf-cap--right is-on" data-scene="0"><span class="qf-cap__chip">Customers self-quote in seconds</span><i class="qf-cap__tip"></i></span>
+                <span class="qf-cap qf-cap--ph1 qf-cap--left" data-scene="1"><span class="qf-cap__chip">Built-in AI answers instantly</span><i class="qf-cap__tip"></i></span>
+                <span class="qf-cap qf-cap--ph2 qf-cap--right" data-scene="2"><span class="qf-cap__chip">Every request becomes a lead</span><i class="qf-cap__tip"></i></span>
+                <span class="qf-cap qf-cap--ph3 qf-cap--left" data-scene="3"><span class="qf-cap__chip">Integrated with Stripe &amp; PayPal</span><i class="qf-cap__tip"></i></span>
+              </div>
             </div>
           </div>
         </div>

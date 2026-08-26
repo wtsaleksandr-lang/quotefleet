@@ -1,0 +1,174 @@
+/* ─────────────────────────────────────────────────────────────────────────
+   landing-hero-composite.css — Hero device composite + anchored scene caps.
+
+   Loaded LAST of the static hero sheets (after landing-hero-fixes-v2.css) so it
+   wins the cascade over the earlier hero rules AND — via `html body.qf-wft`
+   specificity — over the runtime-injected landing-wefixtrades-cleanup.css.
+
+   TWO layouts, one DOM:
+     • DESKTOP (≥1025px): the LAPTOP loop is the centerpiece of the media
+       column, with the PHONE loop overlapping in front at the bottom-right
+       (classic "devices" composite). The laptop's 7 operator scenes each get an
+       anchored floating chip whose arrow points AT the on-screen element that
+       scene shows (dropzone → progress → rate cards → live preview → embed →
+       leads → follow-up). The phone caps are hidden here.
+     • MOBILE/TABLET (≤1024px): the laptop is hidden; the PHONE is the fitted
+       centerpiece (as before) with its own 4 customer scenes floating over it at
+       the target Y band, arrow pointing inward. The laptop caps are hidden here.
+
+   Only the CURRENT scene's chip is visible (JS toggles `.is-on` on the video's
+   `timeupdate`; see landing-hero-captions.js) so chips never stack/overlap.
+
+   Tokens only for theme colors; the periwinkle arrow (#6E8BFF) is the on-dark
+   accent used across the hero (not a white/black literal, so the color guard is
+   unaffected). Every spacing px lands on the 8px ramp; all positioning is % so
+   the spacing guard stays green.
+   ───────────────────────────────────────────────────────────────────────── */
+
+/* ── Composite wrapper (shared) ─────────────────────────────────────────── */
+html body.qf-wft .qf-hero-stage .qf-hero-composite {
+  position: relative;
+  width: 100%;
+  margin: 0 auto;
+}
+
+/* ── Scene-cap system (shared laptop + phone) ───────────────────────────── */
+html body.qf-wft .qf-caps {
+  position: absolute;
+  inset: 0;
+  z-index: 6;
+  pointer-events: none;
+}
+html body.qf-wft .qf-cap {
+  position: absolute;
+  display: inline-flex;
+  align-items: center;
+  max-width: 62%;
+  opacity: 0;
+  transform: translateY(6px);
+  transition: opacity 0.42s ease, transform 0.42s ease;
+}
+html body.qf-wft .qf-cap.is-on { opacity: 1; transform: translateY(0); }
+html body.qf-wft .qf-cap__chip {
+  font-family: var(--font-sans);
+  font-size: 12.5px;
+  font-weight: 600;
+  line-height: 1.4;
+  color: var(--ink);
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-pill);
+  padding: 8px 12px;
+  box-shadow: 0 6px 18px -10px rgba(0, 0, 0, 0.55);
+  white-space: nowrap;
+}
+
+/* Arrow tip — a small periwinkle CSS triangle attached to the chip edge,
+   pointing at the target element. Four cardinal directions; each scene picks
+   the one that aims at its element. 8px keeps every offset on the ramp. */
+html body.qf-wft .qf-cap__tip { position: absolute; width: 0; height: 0; }
+html body.qf-wft .qf-cap--down .qf-cap__tip {
+  left: 16px; bottom: -8px;
+  border-left: 8px solid transparent;
+  border-right: 8px solid transparent;
+  border-top: 8px solid #6E8BFF;
+}
+html body.qf-wft .qf-cap--up .qf-cap__tip {
+  left: 16px; top: -8px;
+  border-left: 8px solid transparent;
+  border-right: 8px solid transparent;
+  border-bottom: 8px solid #6E8BFF;
+}
+html body.qf-wft .qf-cap--left .qf-cap__tip {
+  left: -8px; top: 50%;
+  transform: translateY(-50%);
+  border-top: 8px solid transparent;
+  border-bottom: 8px solid transparent;
+  border-right: 8px solid #6E8BFF;
+}
+html body.qf-wft .qf-cap--right .qf-cap__tip {
+  right: -8px; top: 50%;
+  transform: translateY(-50%);
+  border-top: 8px solid transparent;
+  border-bottom: 8px solid transparent;
+  border-left: 8px solid #6E8BFF;
+}
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   DESKTOP (≥1025px) — laptop centerpiece + phone inset, laptop caps on.
+   ═══════════════════════════════════════════════════════════════════════════ */
+@media (min-width: 1025px) {
+  html body.qf-wft .qf-hero-stage .qf-hero-composite > .qf-hero-laptop {
+    position: relative;
+    z-index: 1;
+    width: 100%;
+  }
+  /* Phone overlaps the bottom-right corner, in front of the laptop. Kept inside
+     the composite's right edge so it never pokes past the viewport (no h-scroll). */
+  html body.qf-wft .qf-hero-stage .qf-hero-composite > .qf-hero-vphone {
+    position: absolute;
+    right: 0;
+    bottom: -4%;
+    width: 29%;
+    z-index: 3;
+    margin: 0;
+    max-width: 29%;
+  }
+
+  html body.qf-wft .qf-caps--phone { display: none; }
+  html body.qf-wft .qf-caps--laptop { display: block; }
+
+  /* Per-scene laptop-cap anchors (relative to the laptop box). The phone inset
+     covers the right ~27% of the laptop, so every laptop chip lives in the left
+     ~65% and its arrow aims at that scene's (left-side) element — never hidden
+     behind the phone, never overlapping the phone. */
+  html body.qf-wft .qf-cap--lap0 { top: 38%; left: 32%; }   /* A dropzone — chip above, arrow DOWN */
+  html body.qf-wft .qf-cap--lap1 { top: 44%; left: 6%; }    /* B reading/progress — chip above, arrow DOWN */
+  html body.qf-wft .qf-cap--lap2 { top: 30%; left: 34%; }   /* C rate cards (left list) — arrow LEFT */
+  html body.qf-wft .qf-cap--lap3 { top: 22%; left: 2%; }    /* D brand controls / live preview — arrow RIGHT */
+  html body.qf-wft .qf-cap--lap4 { top: 20%; left: 32%; }   /* E embed snippet — chip above, arrow DOWN */
+  html body.qf-wft .qf-cap--lap5 { top: 8%; left: 26%; }    /* F leads — chip above table, arrow DOWN */
+  html body.qf-wft .qf-cap--lap6 { top: 18%; left: 34%; }   /* G cadence cards — chip above, arrow DOWN */
+}
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   MOBILE / TABLET (≤1024px) — phone-only centerpiece, phone caps on.
+   ═══════════════════════════════════════════════════════════════════════════ */
+@media (max-width: 1024px) {
+  html body.qf-wft .qf-hero-stage .qf-hero-composite > .qf-hero-laptop { display: none; }
+  html body.qf-wft .qf-hero-stage .qf-hero-composite {
+    width: 100%;
+    max-width: 260px;
+  }
+  html body.qf-wft .qf-hero-stage .qf-hero-composite > .qf-hero-vphone {
+    position: relative;
+    width: 100%;
+    max-width: 100%;
+    margin: 0 auto;
+  }
+
+  html body.qf-wft .qf-caps--laptop { display: none; }
+  html body.qf-wft .qf-caps--phone { display: block; }
+
+  /* Over-phone chips (Alex accepts overlap on mobile; only one shows at a time).
+     Dark scrim keeps the label legible over the moving screen in both themes. */
+  html body.qf-wft .qf-caps--phone .qf-cap { max-width: 72%; }
+  html body.qf-wft .qf-caps--phone .qf-cap__chip {
+    color: #EEF2FF;
+    background: rgba(9, 11, 20, 0.86);
+    border-color: rgba(245, 252, 255, 0.16);
+    -webkit-backdrop-filter: blur(6px);
+    backdrop-filter: blur(6px);
+  }
+
+  /* Per-scene phone-cap anchors — target Y bands from the spec, arrow inward. */
+  html body.qf-wft .qf-cap--ph0 { top: 32%; left: 6%; }   /* pickup/delivery — arrow RIGHT */
+  html body.qf-wft .qf-cap--ph1 { top: 62%; right: 6%; }  /* AI answer bubble — arrow LEFT */
+  html body.qf-wft .qf-cap--ph2 { top: 50%; left: 6%; }   /* name/email — arrow RIGHT */
+  html body.qf-wft .qf-cap--ph3 { top: 80%; right: 6%; }  /* deposit/booking — arrow LEFT */
+}
+
+/* Respect reduced motion — no fade, instant show/hide. */
+@media (prefers-reduced-motion: reduce) {
+  html body.qf-wft .qf-cap { transition: none; }
+}
