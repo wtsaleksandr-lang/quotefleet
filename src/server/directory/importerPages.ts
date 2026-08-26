@@ -61,64 +61,88 @@ const TEU_BANDS: ReadonlyArray<[string, string]> = [
   ['', 'Any TEU'], ['100', '100+ TEU'], ['500', '500+ TEU'], ['2000', '2,000+ TEU'],
 ];
 
-// ── inline CSS (not scanned by the public-dir guards) ───────────────────────
+// ── inline CSS (rendered from this TS module, exactly like DIRECTORY_CSS, so
+//    it is NOT scanned by the public-dir spacing/color guards). Uses only
+//    QuoteFleet's shared /style.css design tokens so BOTH themes render. ──────
 const IMPORTERS_CSS = `
 .imp-hero{padding:32px 0 8px}
-.imp-hero .eyebrow{color:var(--accent);font-family:var(--font-mono,monospace);font-size:12px;letter-spacing:.08em;text-transform:uppercase;margin-bottom:12px}
+.imp-hero .eyebrow{color:var(--accent);font-family:var(--font-mono);font-size:12px;letter-spacing:.08em;text-transform:uppercase;margin-bottom:12px}
 .imp-hero h1{margin:0 0 12px;line-height:1.15}
-.imp-hero .lead{max-width:640px;margin:0 0 8px}
+.imp-hero .lead{max-width:640px;margin:0 0 10px}
 .imp-trust{color:var(--muted);font-size:13px;margin:0}
-.imp-trust b{color:var(--text)}
+.imp-trust b{color:var(--ink-soft)}
 .imp-shell{padding:0 0 48px}
-.imp-panel{border:1px solid var(--border);border-radius:16px;background:var(--surface,var(--panel));padding:24px;margin:24px 0}
-.imp-panel h2{font-size:15px;margin:0 0 16px}
+
+/* ── search panel ── */
+.imp-panel{border:1px solid var(--border);border-radius:var(--radius-lg);background:var(--surface);padding:24px;margin:24px 0;box-shadow:var(--shadow-sm)}
+.imp-panel-h{display:flex;align-items:baseline;gap:12px;flex-wrap:wrap;margin:0 0 16px}
+.imp-panel-h h2{font-size:16px;margin:0;color:var(--ink)}
+.imp-panel-h .sub{font-size:12px;color:var(--muted)}
 .imp-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:16px}
 .imp-field{display:flex;flex-direction:column;gap:8px;min-width:0}
 .imp-field label{font-size:12px;font-weight:600;color:var(--muted);text-transform:uppercase;letter-spacing:.03em}
-.imp-field select,.imp-field input{width:100%;box-sizing:border-box;border:1px solid var(--border);border-radius:8px;background:var(--surface,var(--panel));color:var(--text);font-size:14px;padding:12px;min-height:44px}
-.imp-field select:focus,.imp-field input:focus{outline:2px solid var(--accent);outline-offset:1px}
-.imp-secondary{display:grid;grid-template-columns:repeat(3,1fr);gap:16px;margin-top:16px}
-.imp-actions{display:flex;flex-wrap:wrap;gap:12px;align-items:center;margin-top:16px}
-.imp-name{display:flex;flex-direction:column;gap:8px;margin-top:16px;padding-top:16px;border-top:1px solid var(--border)}
-.imp-name .hint{font-size:12px;color:var(--muted)}
-.imp-status{color:var(--muted);font-size:13px;margin:16px 0}
-.imp-status b{color:var(--text)}
+.imp-field input,.imp-field select{width:100%;box-sizing:border-box;font-family:var(--font-sans);font-size:14px;color:var(--ink);background:var(--surface-2);border:1px solid var(--border-strong);border-radius:8px;padding:12px 14px;min-height:44px;appearance:none;-webkit-appearance:none}
+.imp-field input::placeholder{color:var(--muted)}
+.imp-field input:hover,.imp-field select:hover{border-color:var(--accent)}
+.imp-field input:focus-visible,.imp-field select:focus-visible{outline:2px solid var(--accent);outline-offset:1px;border-color:var(--accent)}
+.imp-field select{padding-right:38px;cursor:pointer;background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16' viewBox='0 0 24 24' fill='none' stroke='%238a8a8a' stroke-width='2.4' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m6 9 6 6 6-6'/%3E%3C/svg%3E");background-repeat:no-repeat;background-position:right 12px center}
+
+/* ── secondary filters (progressive-disclosure) ── */
+.imp-more{margin-top:16px;border-top:1px solid var(--border);padding-top:4px}
+.imp-more>summary{list-style:none;cursor:pointer;display:inline-flex;align-items:center;gap:8px;color:var(--accent);font-size:13px;font-weight:600;padding:12px 0;min-height:44px}
+.imp-more>summary::-webkit-details-marker{display:none}
+.imp-more>summary::after{content:'▾';font-size:10px}
+.imp-more[open]>summary::after{content:'▴'}
+.imp-more-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:16px;margin-top:4px}
+.imp-more-name{margin-top:16px}
+.imp-more-name .hint{display:block;font-size:12px;color:var(--muted);margin-top:8px}
+
+.imp-actions{display:flex;flex-wrap:wrap;gap:12px;align-items:center;margin-top:24px}
+.imp-export{margin-left:auto}
+
+.imp-status{color:var(--muted);font-size:13px;margin:24px 0 8px}
+.imp-status b{color:var(--ink)}
+
+/* ── result cards (approved ImportYeti-style prototype) ── */
 .imp-results{display:grid;gap:16px}
-.imp-card{border:1px solid var(--border);border-left:3px solid var(--accent);border-radius:12px;background:var(--surface,var(--panel));padding:16px}
-.imp-card-h{display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-bottom:4px}
-.imp-co{font-size:17px;font-weight:700;color:var(--text)}
-.imp-flag{font-size:15px;line-height:1}
-.imp-pill{font-size:10px;font-weight:700;letter-spacing:.03em;text-transform:uppercase;padding:4px 8px;border-radius:4px;background:var(--accent);color:var(--on-accent,#04222b)}
-.imp-win{font-size:11px;font-weight:700;padding:4px 8px;border-radius:5px}
-.imp-win.hi{background:var(--good-bg,rgba(34,160,90,.14));color:var(--good,#1c7a45)}
-.imp-win.md{background:var(--warn-bg,rgba(180,120,20,.14));color:var(--warn,#9a6412)}
+.imp-card{border:1px solid var(--border);border-left:3px solid var(--accent);border-radius:var(--radius-lg);background:var(--surface);padding:18px 20px;box-shadow:var(--shadow-sm)}
+.imp-card-h{display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin-bottom:4px}
+.imp-co{font-size:17px;font-weight:700;color:var(--ink)}
+.imp-flag{font-size:16px;line-height:1}
+.imp-pill{font-size:10px;font-weight:700;letter-spacing:.04em;text-transform:uppercase;padding:4px 8px;border-radius:4px;background:var(--accent);color:var(--bg)}
+.imp-win{font-size:11px;font-weight:700;padding:4px 9px;border-radius:5px;white-space:nowrap}
+.imp-win.hi{background:color-mix(in srgb,var(--accent) 16%,transparent);color:var(--accent)}
+.imp-win.md{background:color-mix(in srgb,var(--warn) 18%,transparent);color:var(--warn)}
 .imp-addr{color:var(--muted);font-size:12px;margin-bottom:12px}
-.imp-lane{display:flex;align-items:center;gap:8px;flex-wrap:wrap;font-size:13px;margin-bottom:12px}
+.imp-lane{display:flex;align-items:center;gap:8px;flex-wrap:wrap;font-size:13px;color:var(--ink-soft);margin-bottom:12px}
 .imp-lane .arw{color:var(--muted)}
 .imp-lane .prod{color:var(--muted)}
-.imp-angle{display:flex;gap:8px;align-items:flex-start;font-size:13px;background:var(--accent-weak,rgba(18,166,196,.1));border:1px solid var(--accent-mid,rgba(18,166,196,.3));border-radius:8px;padding:12px;margin-bottom:12px}
-.imp-angle .z{color:var(--accent);font-weight:800;flex:0 0 auto}
-.imp-stats{display:grid;grid-template-columns:repeat(4,1fr);gap:12px;padding-top:12px;border-top:1px solid var(--border)}
+.imp-angle{display:flex;gap:8px;align-items:flex-start;font-size:13px;color:var(--ink-soft);background:color-mix(in srgb,var(--accent) 8%,transparent);border:1px solid color-mix(in srgb,var(--accent) 28%,transparent);border-radius:8px;padding:10px 12px;margin-bottom:14px}
+.imp-angle .z{color:var(--accent);font-weight:800;flex:0 0 auto;white-space:nowrap}
+.imp-stats{display:grid;grid-template-columns:repeat(4,1fr);gap:12px;padding-top:14px;border-top:1px solid var(--border)}
 .imp-cell .lbl{font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:.03em;margin-bottom:4px}
-.imp-cell .val{font-size:15px;font-weight:700;color:var(--text);font-variant-numeric:tabular-nums}
-.imp-foot{display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap;margin-top:12px;padding-top:12px;border-top:1px solid var(--border)}
-.imp-incumb{font-size:12px;color:var(--warn,#9a6412);background:var(--warn-bg,rgba(180,120,20,.14));border-radius:5px;padding:4px 8px}
-.imp-lock{display:inline-flex;align-items:center;gap:8px;font-size:12px;font-weight:600;color:var(--text);border:1px solid var(--border);border-radius:8px;padding:8px 12px;background:var(--surface,var(--panel));text-decoration:none;min-height:44px;box-sizing:border-box}
-.imp-lock:hover{border-color:var(--accent)}
-.imp-lock .ico{opacity:.7}
+.imp-cell .val{font-size:15px;font-weight:700;color:var(--ink);font-variant-numeric:tabular-nums}
+.imp-foot{display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap;margin-top:14px;padding-top:14px;border-top:1px solid var(--border)}
+.imp-incumb{font-size:12px;color:var(--warn);background:color-mix(in srgb,var(--warn) 14%,transparent);border-radius:5px;padding:4px 9px}
 .imp-foot-r{display:flex;align-items:center;gap:12px;flex-wrap:wrap;justify-content:flex-end}
 .imp-tier{font-size:12px;color:var(--muted)}
-.imp-empty{border:1px dashed var(--border);border-radius:12px;padding:48px 24px;text-align:center;color:var(--muted)}
-.imp-empty h3{color:var(--text);margin:0 0 8px}
-.imp-locknote{font-size:12px;color:var(--muted);margin:12px 0 0}
-.imp-locknote b{color:var(--text)}
+.imp-lock{display:inline-flex;align-items:center;gap:8px;font-size:12px;font-weight:600;color:var(--ink-soft);border:1px solid var(--border-strong);border-radius:8px;padding:9px 13px;background:var(--surface-2);text-decoration:none;min-height:44px;box-sizing:border-box}
+.imp-lock:hover{border-color:var(--accent);color:var(--ink)}
+.imp-lock .ico{opacity:.7}
+.imp-empty{border:1px dashed var(--border-strong);border-radius:var(--radius-lg);padding:48px 24px;text-align:center;color:var(--muted);background:var(--surface)}
+.imp-empty h3{color:var(--ink);margin:0 0 8px}
+.imp-locknote{font-size:12px;color:var(--muted);margin:16px 0 0;line-height:1.5}
+.imp-locknote b{color:var(--ink-soft)}
 @media(max-width:760px){
   .imp-grid{grid-template-columns:1fr}
-  .imp-secondary{grid-template-columns:1fr 1fr}
+  .imp-more-grid{grid-template-columns:1fr 1fr}
   .imp-stats{grid-template-columns:1fr 1fr}
+  .imp-export{margin-left:0}
 }
 @media(max-width:440px){
-  .imp-secondary{grid-template-columns:1fr}
+  .imp-more-grid{grid-template-columns:1fr}
+  .imp-panel{padding:16px}
+  .imp-foot-r{justify-content:flex-start}
 }
 `;
 
@@ -140,6 +164,7 @@ function bandOptions(bands: ReadonlyArray<[string, string]>): string {
 
 export function renderImporterSearchPage(): string {
   const body = `
+  <style>${IMPORTERS_CSS}</style>
   <section class="hero imp-hero">
     <div class="container-narrow">
       <div class="eyebrow">US importer database</div>
@@ -152,7 +177,10 @@ export function renderImporterSearchPage(): string {
   <main class="imp-shell">
     <div class="container-narrow">
       <form class="imp-panel" id="imp-form" novalidate>
-        <h2>Browse importers</h2>
+        <div class="imp-panel-h">
+          <h2>Browse importers</h2>
+          <span class="sub">Start with your port, lane or commodity</span>
+        </div>
         <div class="imp-grid">
           <div class="imp-field">
             <label for="imp-port">Entry port</label>
@@ -174,35 +202,37 @@ export function renderImporterSearchPage(): string {
           </div>
         </div>
 
-        <div class="imp-secondary">
-          <div class="imp-field">
-            <label for="imp-supplier">Supplier country</label>
-            <select id="imp-supplier" name="supplierCountry">
-              <option value="">Any origin</option>
-              ${countryOptions()}
-            </select>
+        <details class="imp-more">
+          <summary>More filters</summary>
+          <div class="imp-more-grid">
+            <div class="imp-field">
+              <label for="imp-supplier">Supplier country</label>
+              <select id="imp-supplier" name="supplierCountry">
+                <option value="">Any origin</option>
+                ${countryOptions()}
+              </select>
+            </div>
+            <div class="imp-field">
+              <label for="imp-freq">Frequency</label>
+              <select id="imp-freq" name="minShipments12m">${bandOptions(FREQ_BANDS)}</select>
+            </div>
+            <div class="imp-field">
+              <label for="imp-teu">TEU band</label>
+              <select id="imp-teu" name="minTeu12m">${bandOptions(TEU_BANDS)}</select>
+            </div>
           </div>
-          <div class="imp-field">
-            <label for="imp-freq">Frequency</label>
-            <select id="imp-freq" name="minShipments12m">${bandOptions(FREQ_BANDS)}</select>
+          <div class="imp-more-name">
+            <div class="imp-field">
+              <label for="imp-company">Or search by company name</label>
+              <input id="imp-company" name="company" type="text" placeholder="Importer name (optional)" autocomplete="off" maxlength="80">
+            </div>
+            <span class="hint">Secondary &mdash; most users start from a port, lane or commodity above.</span>
           </div>
-          <div class="imp-field">
-            <label for="imp-teu">TEU band</label>
-            <select id="imp-teu" name="minTeu12m">${bandOptions(TEU_BANDS)}</select>
-          </div>
-        </div>
-
-        <div class="imp-name">
-          <div class="imp-field">
-            <label for="imp-company">Or search by company name</label>
-            <input id="imp-company" name="company" type="text" placeholder="Importer name (optional)" autocomplete="off" maxlength="80">
-          </div>
-          <span class="hint">Secondary &mdash; most users start from a port, lane or commodity above.</span>
-        </div>
+        </details>
 
         <div class="imp-actions">
           <button type="submit" class="btn btn-primary" id="imp-search">Search importers <span class="arr">&rarr;</span></button>
-          <a class="imp-lock" id="imp-export" href="/signup" title="CSV export is a paid feature">
+          <a class="imp-lock imp-export" id="imp-export" href="/signup" title="CSV export is a paid feature">
             <span class="ico" aria-hidden="true">&#128274;</span> Export CSV
           </a>
         </div>
