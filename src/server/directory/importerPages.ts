@@ -97,6 +97,57 @@ export function portToStateCode(portValue: string | null | undefined): string | 
   return PORT_VALUE_TO_STATE.get(String(portValue).trim().toLowerCase()) ?? null;
 }
 
+/**
+ * Curated supplement of additional real US entry ports that are NOT in the
+ * container-gateway directory (CONTAINER_PORTS is container-only, so it lists
+ * just one port for several states). `entry_port` on ImportYeti is a SUBSTRING
+ * match on the city token (verified against the live API: `entry_port=Savannah`
+ * and `entry_port=Savannah, GA` both match "Savannah, Ga." rows), so a
+ * "City, ST" value here matches that city's bills regardless of the state
+ * formatting upstream. Kept SEPARATE from CONTAINER_PORTS so the directory's
+ * nearest-port derivation and port facets stay byte-for-byte unchanged.
+ */
+const EXTRA_STATE_ENTRY_PORTS: Readonly<Record<string, readonly string[]>> = {
+  GA: ['Brunswick, GA'],
+  CA: ['Oakland, CA'],
+  WA: ['Tacoma, WA'],
+  NY: ['New York, NY'],
+};
+
+/** Cap the ports pulled for a single state-alone search (credit guard — each
+ *  port is one cache-first ImportYeti pull on a miss). */
+export const MAX_STATE_PORTS = 6;
+
+/**
+ * State code → its entry-port values. Built by INVERTING the port→state lock map
+ * (US_PORT_ITEMS, the same data that auto-fills + locks the State field), then
+ * merging the curated supplement above. This is what a State-only search expands
+ * to: an importer "in GA" means one ENTERING through a GA port (Savannah,
+ * Brunswick), never one whose HQ address happens to read GA.
+ */
+const STATE_TO_PORT_VALUES: ReadonlyMap<string, readonly string[]> = (() => {
+  const m = new Map<string, string[]>();
+  for (const p of US_PORT_ITEMS) {
+    const arr = m.get(p.state) ?? [];
+    if (!arr.includes(p.value)) arr.push(p.value);
+    m.set(p.state, arr);
+  }
+  for (const [st, extra] of Object.entries(EXTRA_STATE_ENTRY_PORTS)) {
+    const arr = m.get(st) ?? [];
+    for (const v of extra) if (!arr.includes(v)) arr.push(v);
+    m.set(st, arr);
+  }
+  return m;
+})();
+
+/** Resolve a US state code to the entry ports to query for it (capped for
+ *  credits). Empty for a state with no known port. */
+export function entryPortsForState(stateCode: string | null | undefined): string[] {
+  const st = String(stateCode ?? '').trim().toUpperCase();
+  if (!st) return [];
+  return (STATE_TO_PORT_VALUES.get(st) ?? []).slice(0, MAX_STATE_PORTS);
+}
+
 /** Volume (12-mo shipments) bands for the narrow-results pane. */
 const FREQ_BANDS: ReadonlyArray<[string, string]> = [
   ['', 'Any frequency'], ['50', '50+ / yr'], ['200', '200+ / yr'], ['800', '800+ / yr'], ['2000', '2,000+ / yr'],
@@ -325,7 +376,7 @@ export function renderImporterSearchPage(): string {
         </div>
         <div class="imp-grid">
           ${comboField({ id: 'imp-port', name: 'entryPort', label: 'Entry port', placeholder: 'Any US port', source: 'inline' })}
-          ${comboField({ id: 'imp-state', name: 'state', label: 'US state (importer)', placeholder: 'Any state', source: 'inline', lockable: true })}
+          ${comboField({ id: 'imp-state', name: 'state', label: 'Entry state', placeholder: 'Any entry state', source: 'inline', lockable: true })}
           ${comboField({ id: 'imp-commodity', name: 'commodity', label: 'Commodity / HS code', placeholder: 'e.g. saw blades, or 8202', source: 'remote' })}
         </div>
 
@@ -884,6 +935,100 @@ async function browseTiers(
   return out;
 }
 
+/**
+ * One search → one result set, resolving the State ⇄ Port ENTRY-geography pair:
+ *
+ *  • Port selected (with or without the auto-locked State) → a single pull
+ *    filtered by that PORT. The locked State is display-only and is NOT used to
+ *    HQ-filter (that wrongly excluded importers HQ'd elsewhere).
+ *  • State only (no Port) → expand the State to its entry ports
+ *    (entryPortsForState) and pull each, deduping importers across them. This
+ *    returns everyone ENTERING through the state, whatever their HQ state.
+ *  • Neither (commodity / company only) → a single pull as before.
+ *
+ * Credit-bounded: cache-first per port, the port list is capped
+ * (MAX_STATE_PORTS), and expansion stops once MAX_LEADS unique importers are in
+ * hand. Returns the same shape as findImporterLeads so the caller is unchanged.
+ */
+async function runSearch(
+  filters: ImporterFilters,
+  page: number,
+  opts: { bolCache: BolCacheStore; allowLivePull: boolean },
+): Promise<{
+  leads: ImporterLead[];
+  creditsRemaining: number | null;
+  cached: boolean;
+  pulledLive: boolean;
+  recordsScanned: number;
+}> {
+  const common = {
+    maxLeads: MAX_LEADS,
+    page,
+    withEnrichment: false,
+    withEmails: false,
+    bolCache: opts.bolCache,
+    cacheTtlMs: IMPORTER_CACHE_TTL_MS,
+    allowLivePull: opts.allowLivePull,
+  };
+
+  // Single-pull path: a port is chosen, or the state maps to ≤1 entry port.
+  const ports = filters.entryPort ? [] : entryPortsForState(filters.state);
+  if (filters.entryPort || ports.length <= 1) {
+    let f: ImporterFilters;
+    if (filters.entryPort) {
+      f = filters; // port pull; any locked state is display-only (no HQ filter)
+    } else if (ports.length === 1) {
+      f = { ...filters, state: undefined, entryPort: ports[0] }; // fold sole port
+    } else {
+      // State set but no entry port maps to it (e.g. an inland state): drop it so
+      // it can't act as a stray param, and pull by whatever else was given.
+      f = { ...filters, state: undefined };
+    }
+    // Nothing left to pull (an unmappable state with no other filter) → empty,
+    // spending zero credits rather than an unrelated broad pull.
+    if (!hasAnyFilter(f)) {
+      return { leads: [], creditsRemaining: null, cached: false, pulledLive: false, recordsScanned: 0 };
+    }
+    return findImporterLeads({ ...common, filters: f, cacheKey: bolCacheKey(f, page) });
+  }
+
+  // State-alone expansion: pull each of the state's entry ports, dedup across.
+  const { state: _entryState, ...rest } = filters;
+  const merged: ImporterLead[] = [];
+  const seen = new Set<string>();
+  let creditsRemaining: number | null = null;
+  let recordsScanned = 0;
+  let anyLive = false;
+  let allCached = true;
+  for (const portValue of ports) {
+    if (merged.length >= MAX_LEADS) break; // enough unique importers → stop (credits)
+    const pf: ImporterFilters = { ...rest, entryPort: portValue };
+    const r = await findImporterLeads({ ...common, filters: pf, cacheKey: bolCacheKey(pf, page) });
+    recordsScanned += r.recordsScanned;
+    if (r.creditsRemaining != null) creditsRemaining = r.creditsRemaining;
+    if (r.pulledLive) anyLive = true;
+    if (!r.cached) allCached = false;
+    for (const l of r.leads) {
+      const k = l.company.toLowerCase();
+      if (k && !seen.has(k)) {
+        seen.add(k);
+        merged.push(l);
+      }
+    }
+  }
+  // Re-rank the merged set by recent volume (each port came back sorted, but the
+  // interleave isn't) and cap to MAX_LEADS.
+  merged.sort((a, b) => (b.ships_12m ?? 0) - (a.ships_12m ?? 0));
+  return {
+    leads: merged.slice(0, MAX_LEADS),
+    creditsRemaining,
+    // "cached" (free) only when every contributing port was a cache hit.
+    cached: merged.length > 0 && allCached,
+    pulledLive: anyLive,
+    recordsScanned,
+  };
+}
+
 export async function handleImporterSearch(
   req: Request,
   res: Response,
@@ -909,17 +1054,7 @@ export async function handleImporterSearch(
     // (The FREE quota lives on opening detailed PROFILES — see importerQuota.ts.)
     const searchGate = checkLiveSearchAllowed(req);
 
-    const result = await findImporterLeads({
-      filters,
-      maxLeads: MAX_LEADS,
-      page,
-      withEnrichment: false,
-      withEmails: false,
-      bolCache,
-      cacheKey: bolCacheKey(filters, page),
-      cacheTtlMs: IMPORTER_CACHE_TTL_MS,
-      allowLivePull: searchGate.allowed,
-    });
+    const result = await runSearch(filters, page, { bolCache, allowLivePull: searchGate.allowed });
 
     // Cache miss vetoed by the generous anti-abuse cap → a soft "try later" note,
     // NOT a subscribe wall. Cached searches stay free.

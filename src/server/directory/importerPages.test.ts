@@ -8,6 +8,8 @@ import {
   handleImporterSearch,
   handleImporterSuggest,
   portToStateCode,
+  entryPortsForState,
+  MAX_STATE_PORTS,
 } from './importerPages.js';
 import {
   IP_DAILY_LIVE_SEARCH_CAP,
@@ -226,6 +228,77 @@ describe('handleImporterSearch', () => {
     expect(String(body.message)).not.toMatch(/subscribe/i); // NOT a paywall
     // A blocked live pull never touched ImportYeti.
     expect((fetchSpy as unknown as { mock: { calls: unknown[] } }).mock.calls).toHaveLength(0);
+  });
+});
+
+describe('State ⇄ Port entry-geography pair', () => {
+  it('State-only search expands to the state’s entry ports and dedups across them', async () => {
+    process.env.IMPORTYETI_API_KEY = 'test';
+    const seenPorts: string[] = [];
+    globalThis.fetch = vi.fn(async (url: string) => {
+      const port = new URL(url).searchParams.get('entry_port') || '';
+      seenPorts.push(port);
+      const co = /brunswick/i.test(port) ? 'Brunswick Importer' : 'Savannah Importer';
+      const rows = [
+        { company_name: co, company_shipments_12m: 100, entry_port: port },
+        // Shared across ports → must be deduped to a single card.
+        { company_name: 'Shared Importer', company_shipments_12m: 500, entry_port: port },
+      ];
+      return { ok: true, json: async () => ({ requestCost: 1, creditsRemaining: 20, data: { data: rows } }) };
+    }) as unknown as typeof fetch;
+
+    const res = fakeRes();
+    await handleImporterSearch(fakeReq({ state: 'GA' }), res, memDeps());
+    expect(res._status).toBe(200);
+    const body = res._json as { leads: Array<{ company: string }> };
+    // Both GA entry ports were queried (Savannah from the lock map + Brunswick).
+    expect(seenPorts.some((p) => /savannah/i.test(p))).toBe(true);
+    expect(seenPorts.some((p) => /brunswick/i.test(p))).toBe(true);
+    // Shared importer appears exactly once (deduped across the two port pulls).
+    expect(body.leads.map((l) => l.company).sort()).toEqual([
+      'Brunswick Importer', 'Savannah Importer', 'Shared Importer',
+    ]);
+  });
+
+  it('Port + locked State does NOT HQ-filter — a Newark importer HQ’d in NY is still returned', async () => {
+    process.env.IMPORTYETI_API_KEY = 'test';
+    const calls: string[] = [];
+    globalThis.fetch = vi.fn(async (url: string) => {
+      calls.push(new URL(url).searchParams.get('entry_port') || '');
+      const rows = [
+        { company_name: 'NJ HQ Co', company_address: '1 Dock Rd, Newark, NJ 07114', company_shipments_12m: 300, entry_port: 'Newark, NJ' },
+        { company_name: 'NY HQ Co', company_address: '5 Wall St, New York, NY 10005', company_shipments_12m: 400, entry_port: 'Newark, NJ' },
+      ];
+      return { ok: true, json: async () => ({ requestCost: 1, creditsRemaining: 20, data: { data: rows } }) };
+    }) as unknown as typeof fetch;
+
+    // The client locks State=NJ when the Newark port is chosen; both must survive.
+    const res = fakeRes();
+    await handleImporterSearch(fakeReq({ entryPort: 'Newark, NJ', state: 'NJ' }), res, memDeps());
+    const body = res._json as { leads: Array<{ company: string; state: string }> };
+    expect(body.leads.map((l) => l.company).sort()).toEqual(['NJ HQ Co', 'NY HQ Co']);
+    // A single PORT pull — not a per-port state fan-out.
+    expect(calls).toHaveLength(1);
+    expect(calls[0]).toBe('Newark, NJ');
+  });
+});
+
+describe('entryPortsForState (state → entry ports: inverted lock map + supplement)', () => {
+  it('expands GA to Savannah + Brunswick', () => {
+    const ga = entryPortsForState('GA');
+    expect(ga).toContain('Savannah, GA');
+    expect(ga).toContain('Brunswick, GA');
+  });
+  it('includes both LA and Long Beach for CA (multi-port state), case-insensitive', () => {
+    const ca = entryPortsForState('ca');
+    expect(ca).toContain('Los Angeles, CA');
+    expect(ca).toContain('Long Beach, CA');
+  });
+  it('is capped and empty for an unknown / blank state', () => {
+    expect(entryPortsForState('ZZ')).toEqual([]);
+    expect(entryPortsForState('')).toEqual([]);
+    expect(entryPortsForState(null)).toEqual([]);
+    expect(entryPortsForState('GA').length).toBeLessThanOrEqual(MAX_STATE_PORTS);
   });
 });
 

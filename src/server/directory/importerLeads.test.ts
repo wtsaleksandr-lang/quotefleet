@@ -297,16 +297,32 @@ describe('findImporterLeads (browse path)', () => {
     expect(fetchSpy).toHaveBeenCalledTimes(1);
   });
 
-  it('post-filters by state and by minimum 12-mo shipments', async () => {
+  it('no longer HQ-filters by state — state is ENTRY-geography, not the company HQ', async () => {
+    // Both importers enter through Newark but are HQ'd in different states. The
+    // old HQ post-filter dropped the NY-HQ'd one when the state locked to NJ;
+    // it must now be returned (state is realized via the port upstream).
     const rows: BolRow[] = [
-      { company_name: 'GA Co', company_address: 'x, GA 30000', company_shipments_12m: 500, entry_port: 'Savannah, GA' },
-      { company_name: 'SC Co', company_address: 'y, SC 29000', company_shipments_12m: 50, entry_port: 'Savannah, GA' },
+      { company_name: 'NJ HQ Co', company_address: '1 Dock Rd, Newark, NJ 07114', company_shipments_12m: 300, entry_port: 'Newark, NJ' },
+      { company_name: 'NY HQ Co', company_address: '5 Wall St, New York, NY 10005', company_shipments_12m: 200, entry_port: 'Newark, NJ' },
     ];
     globalThis.fetch = vi.fn(async () => ({
       ok: true, json: async () => ({ data: { data: rows } }),
     })) as unknown as typeof fetch;
-    const { leads } = await findImporterLeads({ filters: { state: 'GA', minShipments12m: 100 } });
-    expect(leads.map((l) => l.company)).toEqual(['GA Co']);
+    const { leads } = await findImporterLeads({ filters: { entryPort: 'Newark, NJ', state: 'NJ' } });
+    // The NY-HQ'd importer is NOT dropped by the locked NJ state.
+    expect(leads.map((l) => l.company).sort()).toEqual(['NJ HQ Co', 'NY HQ Co']);
+  });
+
+  it('still post-filters by minimum 12-mo shipments (unaffected by the state change)', async () => {
+    const rows: BolRow[] = [
+      { company_name: 'Big Co', company_shipments_12m: 500, entry_port: 'Savannah, GA' },
+      { company_name: 'Small Co', company_shipments_12m: 50, entry_port: 'Savannah, GA' },
+    ];
+    globalThis.fetch = vi.fn(async () => ({
+      ok: true, json: async () => ({ data: { data: rows } }),
+    })) as unknown as typeof fetch;
+    const { leads } = await findImporterLeads({ filters: { entryPort: 'Savannah, GA', minShipments12m: 100 } });
+    expect(leads.map((l) => l.company)).toEqual(['Big Co']);
   });
 
   it('threads the page number through to the ImportYeti pull (pagination)', async () => {

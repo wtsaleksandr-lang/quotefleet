@@ -46,8 +46,14 @@ export interface ImporterFilters {
   supplierCountry?: string;
   startDate?: string;
   endDate?: string;
-  /** Post-pull filters (ImportYeti has no server-side param for these). */
+  /** Entry/port geography — NOT the importer's HQ/company state. Realized
+   *  upstream by expanding the state to its entry ports (see
+   *  importerPages.entryPortsForState + runSearch). It is deliberately NOT a
+   *  post-pull HQ filter here: filtering by company address wrongly excluded
+   *  valid importers whose HQ sits in a different state than the port they enter
+   *  through (e.g. a New-York-HQ'd company clearing freight at Newark, NJ). */
   state?: string;
+  /** Post-pull filter (ImportYeti has no server-side param for this). */
   company?: string;
   /** Minimum 12-month shipment count (frequency band). */
   minShipments12m?: number;
@@ -463,13 +469,14 @@ export async function draftEmail(
   throw new Error(last);
 }
 
-/* ── post-pull filters (ImportYeti has no server-side param for these) ──────*/
+/* ── post-pull filters (ImportYeti has no server-side param for these) ──────
+ * NOTE: `state` is intentionally NOT applied here. It is the ENTRY/port state,
+ * not the importer's HQ state — an HQ-state post-filter wrongly dropped valid
+ * importers whose company address differs from the port's state. State is
+ * realized upstream by pulling each of the state's entry ports (see
+ * importerPages.runSearch). */
 function applyPostFilters(leads: ImporterLead[], f: ImporterFilters): ImporterLead[] {
   let out = leads;
-  if (f.state) {
-    const st = f.state.trim().toUpperCase();
-    out = out.filter((l) => (l.state || '').toUpperCase() === st);
-  }
   if (f.company) {
     const q = f.company.trim().toLowerCase();
     if (q) out = out.filter((l) => l.company.toLowerCase().includes(q));
