@@ -30,6 +30,10 @@ import {
   index,
 } from 'drizzle-orm/pg-core';
 import type { LtlConfig } from '../calc/freightClass.js';
+// Type-only imports (erased at runtime — no module cycle) so the precomputed
+// directory_aggregate_cache JSONB columns stay in lock-step with the shapes the
+// query layer computes. See directoryAggregateCache below.
+import type { DirectorySummary as DirectorySummaryJson, FacetCounts as FacetCountsJson } from '../server/directory/queries.js';
 
 // ────────────────────────────────────────────────────────────────────
 // TENANTS — one per customer company.
@@ -1902,6 +1906,40 @@ export const carrierDirectory = pgTable(
     index('carrier_directory_port_idx').on(t.nearestPortCode),
   ]
 );
+
+/**
+ * PRECOMPUTED global directory aggregates — a single-row table that removes the
+ * ~330k-row `carrier_directory` scan from the /directory request path.
+ *
+ * WHY THIS EXISTS: the directory index page's `summary` (per-state / per-port /
+ * intermodal totals) and its UNFILTERED base `facet counts` are IDENTICAL for
+ * every visitor and only change on the weekly FMCSA ingest. Computing them on
+ * the request path (even single-flighted + cached) meant that after every
+ * deploy/restart a cold-cache burst of concurrent /directory hits stampeded the
+ * small Neon compute + connection pool and took ALL QuoteFleet domains down
+ * (every request hanging → HTTP 000). Persisting the two global aggregates lets
+ * the request path serve them from a single-row PK lookup and NEVER run the
+ * heavy scan itself; it is (re)populated OFF the request path by the FMCSA
+ * ingest, the weekly refresh cron, and a lazy boot check (see
+ * src/server/directory/aggregateCache.ts). FILTERED facet combos still compute
+ * live (rare + already capped by the aggregate limiter/timeout).
+ *
+ * Single row, pinned at id=1 (SINGLETON_ID). Self-healed on every boot via
+ * ensureSelfHealTables() (Replit skips db:migrate), so a phantom-drop just loses
+ * a cache that the next ingest/cron/boot recomputes — never any real data.
+ */
+export const directoryAggregateCache = pgTable('directory_aggregate_cache', {
+  /** Pinned singleton key — always 1. There is at most one row. */
+  id: integer('id').primaryKey(),
+  /** Precomputed global DirectorySummary (JSON) — see queries.ts. */
+  summary: jsonb('summary').$type<DirectorySummaryJson>().notNull(),
+  /** Precomputed UNFILTERED FacetCounts (JSON) — the /directory index base case. */
+  baseFacets: jsonb('base_facets').$type<FacetCountsJson>().notNull(),
+  /** When these aggregates were last recomputed (staleness clock for the boot check). */
+  computedAt: timestamp('computed_at', { mode: 'date' }).notNull().defaultNow(),
+});
+
+export type DirectoryAggregateCacheRow = typeof directoryAggregateCache.$inferSelect;
 
 /**
  * Self-declared carrier capabilities stored on a `carrier_overrides` row.

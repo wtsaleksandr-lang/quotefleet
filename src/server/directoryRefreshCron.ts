@@ -32,6 +32,7 @@
  */
 import { runCronSafely } from './cronSafety.js';
 import { forceReingestCarrierDirectory } from './directory/autoHeal.js';
+import { ensureFreshDirectoryAggregates } from './directory/queries.js';
 
 const TICK_MS = 60 * 60 * 1000; // hourly
 const STARTUP_DELAY_MS = 2 * 60 * 1000; // 2 min after boot before the first tick
@@ -77,6 +78,20 @@ export function startDirectoryRefreshCron(): void {
 
 /** Gate the hourly tick to the weekly slot, then kick the re-ingest (safely). */
 async function maybeRun(reason: string): Promise<void> {
+  // SAFETY NET (every hourly tick, independent of the weekly slot): keep the
+  // PRECOMPUTED global directory aggregates (directory_aggregate_cache) fresh so
+  // the /directory request path always has a persisted row to serve and never
+  // falls back to a live 330k-row scan. This is the durable fix for the recurring
+  // all-domains-down outage. ensureFreshDirectoryAggregates only recomputes when
+  // the row is missing or older than its max-age (a cheap PK read otherwise) and
+  // never throws, so it is safe to call on every tick.
+  await runCronSafely('directory-aggregate-refresh', async () => {
+    const outcome = await ensureFreshDirectoryAggregates();
+    if (outcome === 'recomputed') {
+      console.log('[directoryRefresh.cron] directory aggregates recomputed + persisted (safety net)');
+    }
+  });
+
   const now = new Date();
   if (!shouldRunWeeklyRefresh(now, lastRunMs)) return;
   // Record BEFORE the run so the cooldown guard holds even if the tick re-enters

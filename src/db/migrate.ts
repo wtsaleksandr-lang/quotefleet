@@ -491,6 +491,22 @@ export const SELF_HEAL_TABLE_STATEMENTS: readonly string[] = [
     "created_at" timestamp DEFAULT now() NOT NULL
   )`,
   `CREATE INDEX IF NOT EXISTS "password_reset_tokens_user_idx" ON "password_reset_tokens" ("user_id")`,
+  // 0063_directory_aggregate_cache.sql — the PRECOMPUTED single-row global
+  // directory aggregates (summary + unfiltered base facet counts) that remove
+  // the ~330k-row carrier_directory scan from the /directory request path (the
+  // recurring all-domains-down outage). Healed HERE (same reasoning as the
+  // directory tables above): the Replit deploy skips db:migrate and its publish
+  // tool can drop tables, so this CREATE TABLE IF NOT EXISTS runs on every boot
+  // and no-ops on a healthy DB. A phantom-drop loses ONLY a derived cache that
+  // the next ingest/cron/boot recomputes — never any real carrier data. MUST
+  // stay byte-for-byte equivalent to drizzle/0063_directory_aggregate_cache.sql
+  // + schema.ts `directoryAggregateCache`.
+  `CREATE TABLE IF NOT EXISTS "directory_aggregate_cache" (
+    "id" integer PRIMARY KEY NOT NULL,
+    "summary" jsonb NOT NULL,
+    "base_facets" jsonb NOT NULL,
+    "computed_at" timestamp DEFAULT now() NOT NULL
+  )`,
 ];
 
 export async function ensureSelfHealTables(): Promise<void> {

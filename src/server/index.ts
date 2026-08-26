@@ -7,6 +7,7 @@ import './bootstrapDoppler.js';
 import { loadEnv } from '../config.js';
 import { maybeAutoHealCarrierDirectory } from './directory/autoHeal.js';
 import { maybeBackfillNearestPortCodes } from './directory/backfillNearestPort.js';
+import { ensureFreshDirectoryAggregates } from './directory/queries.js';
 import { seedDirectoryTerminals } from './directory/terminals.js';
 import { createApp } from './app.js';
 import { startMarketplaceCron } from '../marketplace/cron.js';
@@ -66,6 +67,15 @@ async function runPostListenJobs(): Promise<void> {
     // batched, fire-and-forget, never throws into boot (see backfillNearestPort.ts).
     void maybeBackfillNearestPortCodes().catch((err) => {
       console.error('[directory-backfill] startup check failed (non-fatal):', err);
+    });
+    // LAZY PRECOMPUTE of the persisted global directory aggregates. If the
+    // singleton directory_aggregate_cache row is missing or stale (>24h), compute
+    // it ONCE here (off the request path, limiter+timeout bounded) and persist it,
+    // so the very first /directory hit after a deploy serves a single-row lookup
+    // instead of triggering the 330k-row scan stampede that took all domains down.
+    // Fire-and-forget, never throws into boot; the weekly cron keeps it fresh.
+    void ensureFreshDirectoryAggregates().catch((err) => {
+      console.error('[directory-aggregates] startup precompute failed (non-fatal):', err);
     });
     // Register every scheduled cron through runCronSafely. This wrapper (a) catches
     // a throw at registration so one cron failing to register can NEVER stop the

@@ -705,6 +705,24 @@ export async function runIngest(
     if (liRows.length < opts.pageSize) break; // last page
   }
 
+  // The FMCSA data just changed → PRECOMPUTE + PERSIST the global directory
+  // aggregates (summary + unfiltered base facet counts) OFF the request path so
+  // the /directory index serves them from a single-row lookup and never runs a
+  // 330k-row scan on a user request (the recurring all-domains-down outage). Only
+  // on a real write run (never a dry run). Best-effort: a recompute failure must
+  // NEVER fail the ingest — the boot/cron safety nets will retry. Imported lazily
+  // so the pure normalize/filter helpers (unit-tested without a DB) don't pull in
+  // the query layer.
+  if (!opts.dryRun) {
+    try {
+      const { recomputeAndPersistDirectoryAggregates } = await import('./queries.js');
+      await recomputeAndPersistDirectoryAggregates();
+      log('  …precomputed + persisted global directory aggregates');
+    } catch (err) {
+      log(`  …WARN: failed to persist directory aggregates (non-fatal): ${String(err)}`);
+    }
+  }
+
   const sortDesc = (m: Map<string, number>) => [...m.entries()].sort((a, b) => b[1] - a[1]);
   return {
     carriersSeen,
