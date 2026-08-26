@@ -86,25 +86,10 @@
   }
 }
 
-/* ═══════════════════════════════════════════════════════════════════════════
-   FIX 2 — Audience toggle: outlined selected chip + squared corners.
-   ═══════════════════════════════════════════════════════════════════════════ */
-html body.qf-wft .qf-aud-toggle {
-  border-radius: var(--radius-btn) !important; /* 10px — squared segmented control */
-}
-html body.qf-wft .qf-aud-seg {
-  border-radius: 8px !important; /* squared chip, not a pill */
-}
-/* Selected = quiet raised OUTLINE chip (global rule: selected = outline, not a
-   bright fill). Reads clearly as active but stays calm. */
-html body.qf-wft .qf-aud-seg.is-active {
-  color: var(--ink) !important;
-  background: var(--surface) !important;
-  box-shadow: inset 0 0 0 1px var(--border-strong) !important;
-}
-html body.qf-wft .qf-aud-seg.is-active:hover {
-  color: var(--ink) !important;
-}
+/* FIX 2 — Audience toggle: see the single consolidated AUDIENCE TOGGLE block at
+   the BOTTOM of this file. The three earlier fighting definitions (this FIX 2
+   block, REFINE v2 TASK 2, and the first CARRIER-REDESIGN pass) were collapsed
+   into one so the file no longer contradicts itself. */
 
 /* ═══════════════════════════════════════════════════════════════════════════
    FIX 3 — Shippers hero: two-column layout + matching eyebrow + squared corners.
@@ -559,32 +544,20 @@ html body.qf-wft .qf-aud-panel[data-aud-panel="carriers"] .hero-cta .btn-seconda
     width: calc(100% + 80px) !important;
     max-width: none !important;
   }
-  /* Dot field reaches a bit further left so it clearly sits behind the widened
-     title's right region (percentages, not px → no ramp concern). */
+  /* A2 — the H1 is no longer widened into the gap (CARRIER REDESIGN reset it to
+     width:auto), so the old leftward dot extension now only served to push the
+     dot field UNDER the copy column's H1 + lead (Alex's repeat "frame overlaps
+     content" complaint). Pull the LEFT edge back to the media box (0%) so the
+     dot field starts to the RIGHT of the copy column — the ≥48px column gap
+     guarantees the dots never reach the title/lead. Top/bottom/right keep their
+     small bleed (away from the copy column). */
   html body.landing-v2.qf-wft .hero .qf-hero-media::before {
-    inset: -8% -2% -8% -24% !important;
+    inset: -8% -2% -8% 0% !important;
   }
 }
 
-/* ═══════════════════════════════════════════════════════════════════════════
-   REFINE v2 — TASK 2: make the Carriers / Shippers segmented toggle MUCH BIGGER
-   (top-left, above the eyebrow) — a prominent control, not a small chip. ~1.6×
-   scale-up of the existing style (selected treatment unchanged, set in FIX 2
-   above). Desktop-only (≥981px) so the 375px full-width toggle stays untouched.
-   All padding/gap values stay on the 8px ramp {8,16,24,32}; font-size + radius
-   are not spacing-guard properties. ═══════════════════════════════════════════ */
-@media (min-width: 981px) {
-  html body.qf-wft .qf-aud-toggle {
-    gap: 8px !important;        /* was 4px */
-    padding: 8px !important;    /* was 4px */
-    margin: 0 0 24px 0 !important;
-  }
-  html body.qf-wft .qf-aud-seg {
-    font-size: 22px !important;     /* was 14px (~1.6×) */
-    padding: 16px 32px !important;  /* was 8px 16px (2×) */
-    min-height: 60px !important;    /* was 44px — taller pill */
-  }
-}
+/* REFINE v2 — TASK 2 (audience toggle sizing) removed: superseded by the single
+   consolidated AUDIENCE TOGGLE block at the bottom of this file. */
 
 /* ═══════════════════════════════════════════════════════════════════════════
    CARRIER HERO REDESIGN (2026-08) — "super huge" fix.
@@ -602,25 +575,47 @@ html body.qf-wft .qf-aud-panel[data-aud-panel="carriers"] .hero-cta .btn-seconda
    Tokens only; every px on the 8px ramp {0,4,8,12,16,24,32,48,60,80,120}.
    ═══════════════════════════════════════════════════════════════════════════ */
 
-/* ── Compact pill toggle ─────────────────────────────────────────────────── */
-html body.qf-wft .qf-aud-toggle { border-radius: var(--radius-pill) !important; }
-html body.qf-wft .qf-aud-seg { border-radius: var(--radius-pill) !important; }
-/* Active tab: understated raised chip on the track (not a bright fill). */
-html body.qf-wft .qf-aud-seg.is-active {
+/* ═══════════════════════════════════════════════════════════════════════════
+   AUDIENCE TOGGLE — SINGLE consolidated definition (A1). Replaces the three
+   fighting blocks that used to live in this file. landing-glass.css is injected
+   at RUNTIME by landing-motion.js (AFTER every static <link>, this file
+   included) and paints BOTH the track `.qf-aud-toggle` AND the active segment
+   `.qf-aud-seg.is-active` with the same translucent `--glass-thin-bg`, so the
+   selected side lost all fill contrast and read as a bare floating blue ring.
+
+   The active rule below adds the `.qf-aud-toggle` ancestor + `body.landing-v2`
+   (specificity 0,5,2) so it out-specifies landing-glass's active rule (0,3,2)
+   and restores a SOLID raised chip: selected reads via FILL (design-system §4:
+   selected = fill + subtle 1px border), NOT a bright ring. The blue
+   :focus-visible ring (base sheet) stays distinct from this resting fill.
+   Compact segmented pill: ~44px track, ~36px chip, pill radius, both themes.
+   ═══════════════════════════════════════════════════════════════════════════ */
+html body.landing-v2.qf-wft .qf-aud-toggle {
+  border-radius: var(--radius-pill) !important;
+  gap: 4px !important;
+  padding: 4px !important;
+}
+html body.landing-v2.qf-wft .qf-aud-toggle .qf-aud-seg {
+  border-radius: var(--radius-pill) !important;
+  font-size: 14px !important;
+  padding: 8px 16px !important;
+  min-height: 36px !important;
+}
+/* Active = SOLID raised chip — beats landing-glass's translucent active seg and
+   its backdrop-filter blur, so "selected" is obvious by fill, not the ring. */
+html body.landing-v2.qf-wft .qf-aud-toggle .qf-aud-seg.is-active {
   color: var(--ink) !important;
   background: var(--surface) !important;
+  -webkit-backdrop-filter: none !important;
+  backdrop-filter: none !important;
   box-shadow: 0 1px 2px rgba(0, 0, 0, 0.18), inset 0 0 0 1px var(--border) !important;
 }
+html body.landing-v2.qf-wft .qf-aud-toggle .qf-aud-seg.is-active:hover {
+  color: var(--ink) !important;
+}
 @media (min-width: 981px) {
-  html body.qf-wft .qf-aud-toggle {
-    gap: 4px !important;
-    padding: 4px !important;
+  html body.landing-v2.qf-wft .qf-aud-toggle {
     margin: 0 0 24px 0 !important;
-  }
-  html body.qf-wft .qf-aud-seg {
-    font-size: 14px !important;
-    padding: 8px 16px !important;
-    min-height: 44px !important;
   }
 }
 
@@ -724,8 +719,12 @@ html body.qf-wft .qf-aud-panel[data-aud-panel="carriers"] .qf-hero-media {
   .qf-scenecap { max-width: 72%; }
   .qf-scenecap--l { left: 6%; right: auto; }
   .qf-scenecap--r { right: 6%; left: auto; }
+  /* A4 — the first (scene-0) caption at top:8% sat over the phone's
+     "QuoteFleet / INSTANT FREIGHT ESTIMATE" brand header (scene 0's key content).
+     Lower the top-anchored captions toward mid-phone so they clear the top brand
+     bar; overlap lower on the screen is acceptable per Alex. */
   .qf-scenecap--s0,
-  .qf-scenecap--s1 { top: 8%; bottom: auto; }
+  .qf-scenecap--s1 { top: 34%; bottom: auto; }
   .qf-scenecap--s2,
   .qf-scenecap--s3 { top: auto; bottom: 8%; }
   .qf-scenecap__text {

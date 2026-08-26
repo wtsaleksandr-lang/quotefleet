@@ -19,11 +19,12 @@
    never any horizontal overflow).
    ───────────────────────────────────────────────────────────────────────── */
 
-/* Shared horizontal offset = 632px from centre — i.e. ~32px OUTSIDE the 1200px
-   content column (whose edge is at 600px) and ~42px clear of the widest real
-   content (text/cards reach ±590px from centre). Clamped with max(0px, …) so on
-   viewports with no gutter the rails simply pull flush to the viewport edge —
-   still outside the content (which never reaches 0px) and never overflowing. */
+/* Shared horizontal offset = 712px from centre — i.e. well OUTSIDE the content
+   column and clear of the widest real content (the hero grid is width min(1180px,
+   92vw), so content reaches ≤±590px from centre; the rails at ±712px sit ~122px
+   beyond it). Clamped with max(0px, …) so on viewports with no gutter the rails
+   simply pull flush to the viewport edge — still outside the content (which never
+   reaches 0px) and never overflowing. */
 
 /* ── 1. Vertical frame rails (left + right, OUTSIDE the content column) ───── */
 body.landing-v2.qf-wft main {
@@ -47,19 +48,25 @@ body.landing-v2.qf-wft main::after {
   right: max(0px, calc(50% - 712px));
 }
 
-/* ── 2. Horizontal section dividers (in the GAP above each section) ────────
+/* ── 2. Horizontal section dividers (at each section's top boundary) ───────
    Uses ::after because .hero and .qf-globe-section already claim ::before; no
    rendered section defines a section-level ::after, so this never collides.
-   Inset to the same rail offset → the horizontals meet the verticals. Pulled UP
-   one --space-3 (24px) into the inter-section gap so the line lands in empty
-   padding — never across a section whose content starts flush at its top. */
+   Inset to the same rail offset → the horizontals meet the verticals.
+
+   H6 (robust mechanism): the divider is anchored at THIS section's own top edge
+   (top:0), which lands inside its 72px top padding (`.section { padding:72px 0 }`)
+   — always empty space above the heading. It is drawn on the section it belongs
+   to, so it can NEVER be pulled up onto the *previous* section's content, no
+   matter how that section's bottom is spaced. That removes the old
+   `-1×--space-3` pull and the per-section flush-bottom exceptions it needed —
+   the mechanism is now self-contained and survives future section edits. */
 body.landing-v2.qf-wft main > section {
   position: relative;
 }
 body.landing-v2.qf-wft main > section::after {
   content: "";
   position: absolute;
-  top: calc(var(--space-3) * -1);
+  top: 0;
   left: max(0px, calc(50% - 712px));
   right: max(0px, calc(50% - 712px));
   height: 1px;
@@ -71,18 +78,6 @@ body.landing-v2.qf-wft main > section::after {
    header. Suppress it; the header already caps the top of the frame. */
 body.landing-v2.qf-wft main > section.hero::after {
   display: none;
-}
-
-/* A few sections run their content FLUSH to their bottom edge (no bottom gap):
-   the before/after compare block (.compare-simple-section) and the wins-stats
-   block (.qf-wins-section). For those, the default -1×space-3 pull would drop the
-   NEXT section's divider onto that flush content. So for the section that follows
-   each of them, place the divider just INSIDE its own (generous) top padding
-   instead — the line still reads as a boundary but lands in the empty band above
-   the heading, never on the previous section's content. */
-body.landing-v2.qf-wft main > .compare-simple-section + section::after,
-body.landing-v2.qf-wft main > .qf-wins-section + section::after {
-  top: var(--space-3);
 }
 
 /* ── 3. Dotted grid behind the hero device composite ──────────────────────
@@ -97,9 +92,11 @@ body.landing-v2.qf-wft .hero .qf-hero-media {
 body.landing-v2.qf-wft .hero .qf-hero-media::before {
   content: "";
   position: absolute;
-  /* Extend a little LEFT + up/down beyond the media box so a band of dots reads
-     in the open hero space beside/behind the devices, not only under them. */
-  inset: -8% -2% -8% -14%;
+  /* Extend a little up/down/right beyond the media box so a band of dots reads
+     in the open hero space beside/behind the device. The LEFT edge stays at the
+     media box (0%) so the dot field never bleeds into the copy column and under
+     the H1/lead — the ≥48px column gap keeps a clean margin (A2). */
+  inset: -8% -2% -8% 0%;
   background-image: radial-gradient(rgba(255, 255, 255, 0.15) 1px, transparent 1px);
   background-size: 22px 22px;
   background-position: 0 0;
