@@ -1942,6 +1942,65 @@ export const directoryAggregateCache = pgTable('directory_aggregate_cache', {
 export type DirectoryAggregateCacheRow = typeof directoryAggregateCache.$inferSelect;
 
 /**
+ * Persistent cache of ImportYeti bill-of-lading result sets for the Importer
+ * Search feature (/importers). ImportYeti's ToS permits storing AND reselling
+ * the purchased data, so this is a deliberate, licensed strategic asset — and a
+ * hard cost guard: a repeat search inside the TTL spends ZERO external credits.
+ *
+ * Keyed by a stable hash of the pull-affecting filters (entry_port + hs/product
+ * + supplier_country + page_size, normalized). ALWAYS read by the UNIQUE index
+ * on `search_key` — never a table scan (we just had repeated prod outages from
+ * unbounded scans). A phantom-drop loses only a re-fetchable cache, never real
+ * data; self-healed on every boot (Replit skips db:migrate).
+ */
+export const importerBolCache = pgTable(
+  'importer_bol_cache',
+  {
+    id: serial('id').primaryKey(),
+    /** sha256 hex of the normalized pull filters — the lookup key. */
+    searchKey: text('search_key').notNull(),
+    /** The raw ImportYeti BOL rows (JSON array). */
+    rows: jsonb('rows').$type<Record<string, unknown>[]>().notNull(),
+    /** Last-known ImportYeti credit balance (informational). */
+    creditsRemaining: integer('credits_remaining'),
+    /** Staleness clock — rows older than the 14-day TTL trigger a refetch. */
+    fetchedAt: timestamp('fetched_at', { withTimezone: true, mode: 'date' }).notNull().defaultNow(),
+  },
+  (t) => ({
+    searchKeyIdx: uniqueIndex('importer_bol_cache_key_idx').on(t.searchKey),
+  }),
+);
+export type ImporterBolCacheRow = typeof importerBolCache.$inferSelect;
+
+/**
+ * Persistent cache of resolved decision-maker / role-based contacts for the
+ * Importer Search reveal path, keyed by a normalized company key (basename).
+ * A cache hit inside the TTL spends ZERO Hunter credits. Negative results are
+ * cached too (contact NULL, confidence='phone_only') so a fruitless lookup is
+ * not repeated. ALWAYS read by the UNIQUE index on `company_key` — never a scan.
+ */
+export const importerContactCache = pgTable(
+  'importer_contact_cache',
+  {
+    id: serial('id').primaryKey(),
+    /** Normalized company basename — the lookup key. */
+    companyKey: text('company_key').notNull(),
+    /** Resolved domain, if any. */
+    domain: text('domain'),
+    /** Confidence tier: 'verified' | 'role_based' | 'phone_only'. */
+    confidence: text('confidence').notNull(),
+    /** The resolved contact payload (JSON) — NULL for a phone-only/negative hit. */
+    contact: jsonb('contact').$type<Record<string, unknown> | null>(),
+    /** Staleness clock — older than the 14-day TTL triggers a re-resolve. */
+    fetchedAt: timestamp('fetched_at', { withTimezone: true, mode: 'date' }).notNull().defaultNow(),
+  },
+  (t) => ({
+    companyKeyIdx: uniqueIndex('importer_contact_cache_key_idx').on(t.companyKey),
+  }),
+);
+export type ImporterContactCacheRow = typeof importerContactCache.$inferSelect;
+
+/**
  * Self-declared carrier capabilities stored on a `carrier_overrides` row.
  *
  * Each flag flips the matching profile credential badge from the muted "claim

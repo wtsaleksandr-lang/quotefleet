@@ -507,6 +507,34 @@ export const SELF_HEAL_TABLE_STATEMENTS: readonly string[] = [
     "base_facets" jsonb NOT NULL,
     "computed_at" timestamp DEFAULT now() NOT NULL
   )`,
+  // 0064_importer_cache.sql — persistent cache for the Importer Search feature
+  // (/importers). Two tables: pulled ImportYeti BOL result sets (keyed by a
+  // normalized-filter hash) and resolved contacts (keyed by company basename).
+  // ImportYeti's ToS permits storing + reselling the data, so caching is a
+  // licensed cost guard: a repeat search inside the 14-day TTL spends ZERO
+  // external credits. Both are read ONLY by their UNIQUE key index (never a
+  // scan). Healed HERE (Replit skips db:migrate + its publish tool can drop
+  // tables): these CREATE TABLE / INDEX IF NOT EXISTS run on every boot and
+  // no-op on a healthy DB; a phantom-drop loses only a re-fetchable cache, never
+  // real data. MUST stay byte-for-byte equivalent to drizzle/0064_importer_cache.sql
+  // + schema.ts `importerBolCache` / `importerContactCache`.
+  `CREATE TABLE IF NOT EXISTS "importer_bol_cache" (
+    "id" serial PRIMARY KEY NOT NULL,
+    "search_key" text NOT NULL,
+    "rows" jsonb NOT NULL,
+    "credits_remaining" integer,
+    "fetched_at" timestamp with time zone DEFAULT now() NOT NULL
+  )`,
+  `CREATE UNIQUE INDEX IF NOT EXISTS "importer_bol_cache_key_idx" ON "importer_bol_cache" ("search_key")`,
+  `CREATE TABLE IF NOT EXISTS "importer_contact_cache" (
+    "id" serial PRIMARY KEY NOT NULL,
+    "company_key" text NOT NULL,
+    "domain" text,
+    "confidence" text NOT NULL,
+    "contact" jsonb,
+    "fetched_at" timestamp with time zone DEFAULT now() NOT NULL
+  )`,
+  `CREATE UNIQUE INDEX IF NOT EXISTS "importer_contact_cache_key_idx" ON "importer_contact_cache" ("company_key")`,
 ];
 
 export async function ensureSelfHealTables(): Promise<void> {

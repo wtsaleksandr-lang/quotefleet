@@ -340,6 +340,21 @@ export const directoryRevealLimiter: RateLimitRequestHandler = rateLimit({
   message: { error: 'Too many reveal requests. Slow down and try again in a minute.' },
 });
 
+/** POST /api/importers/search — each search costs ONE ImportYeti pull (~1
+ *  credit / ~10 records). This coarse per-IP burst cap stops a hammer loop from
+ *  draining credits; real browse use is a handful of searches. Keyed by IP;
+ *  limit is env-tunable (IMPORTER_SEARCH_BURST_LIMIT). */
+export const importerSearchLimiter: RateLimitRequestHandler = rateLimit({
+  windowMs: minutes(1),
+  limit: envInt('IMPORTER_SEARCH_BURST_LIMIT', 15),
+  standardHeaders: 'draft-7',
+  legacyHeaders: false,
+  message: {
+    error: 'rate_limited',
+    message: 'Too many searches. Slow down and try again in a minute.',
+  },
+});
+
 /** /api/auth/login — anti-credential-stuffing. */
 export const loginLimiter: RateLimitRequestHandler = rateLimit({
   windowMs: minutes(15),
