@@ -585,3 +585,253 @@ html body.qf-wft .qf-aud-panel[data-aud-panel="carriers"] .hero-cta .btn-seconda
     min-height: 60px !important;    /* was 44px — taller pill */
   }
 }
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   CARRIER HERO REDESIGN (2026-08) — "super huge" fix.
+
+   Consolidated override (this file loads LAST, so it wins the cascade). Rebuilds
+   the carriers hero to Alex's target:
+     • a compact, clean PILL toggle (undo the 22px/60px blow-up above);
+     • a MODERATE H1 (undo the widened calc(100%+80px) + oversize);
+     • a SINGLE fitted phone (the old laptop is gone from the markup, so every
+       `.qf-hero-devices*` rule is inert; the swap script no-ops);
+     • DYNAMIC, scene-synced feature callouts in the gutters on BOTH sides of the
+       phone (desktop) / floating over it (mobile), driven by landing-hero-captions.js;
+     • a trust-badge + stat cluster under the finder input;
+     • the "Find importers" promo pinned BELOW the copy on mobile (never above H1).
+   Tokens only; every px on the 8px ramp {0,4,8,12,16,24,32,48,60,80,120}.
+   ═══════════════════════════════════════════════════════════════════════════ */
+
+/* ── Compact pill toggle ─────────────────────────────────────────────────── */
+html body.qf-wft .qf-aud-toggle { border-radius: var(--radius-pill) !important; }
+html body.qf-wft .qf-aud-seg { border-radius: var(--radius-pill) !important; }
+/* Active tab: understated raised chip on the track (not a bright fill). */
+html body.qf-wft .qf-aud-seg.is-active {
+  color: var(--ink) !important;
+  background: var(--surface) !important;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.18), inset 0 0 0 1px var(--border) !important;
+}
+@media (min-width: 981px) {
+  html body.qf-wft .qf-aud-toggle {
+    gap: 4px !important;
+    padding: 4px !important;
+    margin: 0 0 24px 0 !important;
+  }
+  html body.qf-wft .qf-aud-seg {
+    font-size: 14px !important;
+    padding: 8px 16px !important;
+    min-height: 44px !important;
+  }
+}
+
+/* ── Moderate H1 + balanced two-column grid ──────────────────────────────── */
+@media (min-width: 981px) {
+  html body.qf-wft .hero-grid {
+    grid-template-columns: minmax(0, 1.02fr) minmax(0, 0.98fr) !important;
+    gap: clamp(48px, 4vw, 80px) !important;
+    align-items: start !important;
+    width: min(1180px, 92vw) !important;
+    max-width: min(1180px, 92vw) !important;
+  }
+  html body.qf-wft .qf-aud-panel[data-aud-panel="carriers"] .hero-copy {
+    max-width: 600px !important;
+  }
+  html body.qf-wft .qf-aud-panel[data-aud-panel="carriers"] .hero-copy h1 {
+    width: auto !important;
+    max-width: 100% !important;
+    font-size: clamp(34px, 3.4vw, 46px) !important;
+    line-height: 1.05 !important;
+  }
+  /* Undo the +20% phone's huge bottom padding — the fitted phone needs far less. */
+  html body.qf-wft .hero.visual-hero { padding-bottom: 80px !important; }
+}
+
+/* ── Right column: single fitted phone ───────────────────────────────────── */
+html body.qf-wft .qf-aud-panel[data-aud-panel="carriers"] .qf-hero-media {
+  position: relative;
+  z-index: 1;
+}
+.qf-hero-stage {
+  position: relative;
+  z-index: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+}
+.qf-hero-stage .qf-hero-vphone {
+  position: relative;
+  z-index: 2;
+  flex: none;
+  width: 236px;
+  max-width: 74%;
+  margin: 0 auto;
+}
+@media (min-width: 981px) {
+  .qf-hero-stage { justify-content: center; }
+  .qf-hero-stage .qf-hero-vphone { width: 240px; max-width: 60%; }
+}
+
+/* ── Scene callouts (dynamic; one per phone scene, synced by JS) ──────────── */
+.qf-scenecaps {
+  position: absolute;
+  inset: 0;
+  z-index: 4;
+  pointer-events: none;
+}
+.qf-scenecap {
+  position: absolute;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  max-width: 78%;
+  opacity: 0;
+  transform: translateY(6px);
+  transition: opacity 0.42s ease, transform 0.42s ease;
+}
+.qf-scenecap.is-on { opacity: 1; transform: translateY(0); }
+.qf-scenecap__text {
+  font-family: var(--font-sans);
+  font-size: 13px;
+  font-weight: 600;
+  line-height: 1.4;
+  color: var(--ink);
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-pill);
+  padding: 8px 12px;
+  box-shadow: 0 6px 18px -10px rgba(0, 0, 0, 0.55);
+}
+.qf-scenecap__arrow { flex: none; color: #6E8BFF; }
+.qf-scenecap--r .qf-scenecap__arrow { transform: scaleX(-1); }
+
+/* Desktop: captions live in the LEFT + RIGHT gutters beside the centered phone,
+   never overlapping it. Widths capped to the gutter (half the stage minus half
+   the phone) so a caption can never reach the device. */
+@media (min-width: 981px) {
+  .qf-scenecap { max-width: calc(50% - 132px); }
+  .qf-scenecap--l { left: 0; right: auto; flex-direction: row; }
+  .qf-scenecap--r { right: 0; left: auto; flex-direction: row; }
+  .qf-scenecap--s0 { top: 8%; }
+  .qf-scenecap--s1 { top: 30%; }
+  .qf-scenecap--s2 { top: 54%; }
+  .qf-scenecap--s3 { bottom: 10%; }
+}
+
+/* Mobile: no room in the gutters, so the callout floats OVER the phone (Alex
+   accepts overlap here). Only one shows at a time, so they never collide; a dark
+   scrim keeps the label legible over the moving screen in both themes. */
+@media (max-width: 640px) {
+  .qf-scenecap { max-width: 72%; }
+  .qf-scenecap--l { left: 6%; right: auto; }
+  .qf-scenecap--r { right: 6%; left: auto; }
+  .qf-scenecap--s0,
+  .qf-scenecap--s1 { top: 8%; bottom: auto; }
+  .qf-scenecap--s2,
+  .qf-scenecap--s3 { top: auto; bottom: 8%; }
+  .qf-scenecap__text {
+    color: #EEF2FF;
+    background: rgba(9, 11, 20, 0.86);
+    border-color: rgba(245, 252, 255, 0.16);
+    -webkit-backdrop-filter: blur(6px);
+    backdrop-filter: blur(6px);
+  }
+}
+
+/* ── Trust-badge + stat cluster (under the finder input) ─────────────────── */
+.qf-hero-proof {
+  margin-top: 24px;
+  max-width: 520px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+.qf-hero-proof__top {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px 16px;
+}
+.qf-proof-rank {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 12px;
+  border-radius: var(--radius-pill);
+  background: var(--surface);
+  border: 1px solid var(--border);
+  font-family: var(--font-sans);
+  font-size: 13px;
+  font-weight: 600;
+  line-height: 1.4;
+  color: var(--ink);
+}
+.qf-proof-rank b { color: #6E8BFF; font-weight: 800; }
+.qf-proof-ico { width: 16px; height: 16px; flex: none; color: #6E8BFF; }
+.qf-proof-reviews {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  font-family: var(--font-sans);
+  font-size: 13px;
+  line-height: 1.4;
+  color: var(--muted);
+}
+.qf-proof-reviews b { color: var(--ink); font-weight: 700; font-size: 14px; }
+.qf-proof-stars { color: #6E8BFF; letter-spacing: 0.08em; font-size: 13px; }
+.qf-hero-proof__stats {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+}
+.qf-proof-stat {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  align-items: center;
+  column-gap: 8px;
+  padding: 12px;
+  border-radius: var(--radius-btn);
+  background: var(--surface);
+  border: 1px solid var(--border);
+}
+.qf-proof-stat .qf-proof-ico {
+  grid-row: 1 / span 2;
+  width: 20px;
+  height: 20px;
+  align-self: center;
+}
+.qf-proof-stat__val {
+  font-family: var(--font-sans);
+  font-size: 20px;
+  font-weight: 800;
+  line-height: 1.4;
+  letter-spacing: -0.02em;
+  color: var(--ink);
+}
+.qf-proof-stat__lbl {
+  font-family: var(--font-sans);
+  font-size: 12px;
+  line-height: 1.4;
+  color: var(--muted);
+}
+
+/* ── Mobile stacking order (deterministic; keeps the importer promo out of the
+   top of the page and the phone/badges in a sensible reading order). ──────── */
+@media (max-width: 640px) {
+  html body.qf-wft .qf-aud-panel[data-aud-panel="carriers"] .hero-copy .eyebrow { order: 1 !important; }
+  html body.qf-wft .qf-aud-panel[data-aud-panel="carriers"] .hero-copy h1 { order: 2 !important; }
+  html body.qf-wft .qf-aud-panel[data-aud-panel="carriers"] .hero-copy .lead { order: 3 !important; }
+  html body.qf-wft .qf-aud-panel[data-aud-panel="carriers"] .hero-copy .qf-finder { order: 4 !important; }
+  html body.qf-wft .qf-aud-panel[data-aud-panel="carriers"] .hero-copy .qf-hero-proof { order: 5 !important; }
+  html body.qf-wft .qf-aud-panel[data-aud-panel="carriers"] .qf-hero-media { order: 6 !important; }
+  html body.qf-wft .qf-aud-panel[data-aud-panel="carriers"] .hero-copy .hero-cta { order: 7 !important; }
+  html body.qf-wft .qf-aud-panel[data-aud-panel="carriers"] .hero-copy .hero-cta .btn-secondary,
+  html body.qf-wft .qf-aud-panel[data-aud-panel="carriers"] .hero-copy .hero-cta .btn-primary { order: 7 !important; }
+  html body.qf-wft .qf-aud-panel[data-aud-panel="carriers"] .hero-copy .hero-trial-note,
+  html body.qf-wft .qf-aud-panel[data-aud-panel="carriers"] .hero-copy .qf-finder__micro { order: 8 !important; }
+  html body.qf-wft .qf-aud-panel[data-aud-panel="carriers"] .hero-copy .hero-trust-line { order: 9 !important; }
+  html body.qf-wft .qf-aud-panel[data-aud-panel="carriers"] .hero-copy .qf-importer-promo { order: 10 !important; }
+  /* Quiet the importer promo a touch so it reads as a secondary link, not a
+     second hero. */
+  html body.qf-wft .qf-aud-panel[data-aud-panel="carriers"] .qf-importer-promo { margin-top: 16px !important; }
+  .qf-hero-proof { max-width: 100%; }
+}
