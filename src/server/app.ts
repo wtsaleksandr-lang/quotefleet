@@ -36,6 +36,7 @@ import { registerSavedListsRoutes } from './routes/savedLists.js';
 import { registerRfqRoutes } from './routes/rfq.js';
 import { registerServiceRoutes } from './directory/servicePages.js';
 import { registerGlossaryRoutes } from './directory/glossary.js';
+import { registerImporterRoutes } from './directory/importerPages.js';
 import { registerToolsRoutes } from './routes/tools.js';
 import { registerBillingRoutes, registerStripeWebhook } from './routes/billing.js';
 import { registerDirectoryAuthRoutes } from './routes/directoryAuth.js';
@@ -184,6 +185,10 @@ export function createApp(): express.Express {
   registerDirectoryRevealRoutes(app);
   registerServiceRoutes(app);
   registerGlossaryRoutes(app);
+  // Importer Search (/importers page + POST /api/importers/search). Registered
+  // next to the other directory surfaces; its paths don't collide with the
+  // /directory/:stateSlug catch-alls.
+  registerImporterRoutes(app);
   registerToolsRoutes(app);
   registerBillingRoutes(app);
   registerDirectoryBillingRoutes(app);

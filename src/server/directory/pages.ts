@@ -1297,6 +1297,7 @@ export function layout({ title, description, canonicalPath, bodyHtml, jsonLd }: 
       </a>
       <span class="topnav-spacer"></span>
       <a class="nav-link" href="/directory">Directory</a>
+      <a class="nav-link" href="/importers">Importers</a>
       <a class="nav-link" href="/compliance">Compliance</a>
       <a class="nav-link" href="/glossary">Glossary</a>
       <span class="nav-shipper" id="nav-shipper"><a class="nav-link" href="/directory/join">For shippers</a></span>
@@ -1309,6 +1310,7 @@ export function layout({ title, description, canonicalPath, bodyHtml, jsonLd }: 
     </div>
     <nav class="topnav-mobile" id="topnav-mobile-menu" hidden aria-label="Site navigation">
       <a href="/directory">Directory</a>
+      <a href="/importers">Importer Search</a>
       <a href="/compliance">Compliance</a>
       <a href="/glossary">Glossary</a>
       <a href="/services">Services</a>
@@ -1321,7 +1323,7 @@ export function layout({ title, description, canonicalPath, bodyHtml, jsonLd }: 
   </header>
   ${bodyHtml}
   <footer class="site-footer">
-    © <span id="year"></span> QuoteFleet · <a href="/directory">Directory</a> · <a href="/compliance">Compliance</a> · <a href="/glossary">Glossary</a> · <a href="/services">Services</a> · <a href="/terms">Terms</a> · <a href="/privacy">Privacy</a> · <a href="/">Home</a>
+    © <span id="year"></span> QuoteFleet · <a href="/directory">Directory</a> · <a href="/importers">Importer Search</a> · <a href="/compliance">Compliance</a> · <a href="/glossary">Glossary</a> · <a href="/services">Services</a> · <a href="/terms">Terms</a> · <a href="/privacy">Privacy</a> · <a href="/">Home</a>
   </footer>
   <script>document.getElementById('year').textContent = new Date().getFullYear();</script>
   <script>(function(){var b=document.querySelector('.topnav-burger'),m=document.getElementById('topnav-mobile-menu');if(!b||!m)return;function set(o){b.setAttribute('aria-expanded',o?'true':'false');b.setAttribute('aria-label',o?'Close menu':'Open menu');if(o)m.removeAttribute('hidden');else m.setAttribute('hidden','');}b.addEventListener('click',function(e){e.stopPropagation();set(b.getAttribute('aria-expanded')!=='true');});document.addEventListener('click',function(e){if(b.getAttribute('aria-expanded')==='true'&&!m.contains(e.target)&&!b.contains(e.target))set(false);});document.addEventListener('keydown',function(e){if(e.key==='Escape')set(false);});})();</script>
