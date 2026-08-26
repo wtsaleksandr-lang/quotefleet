@@ -14,6 +14,7 @@ import { db } from '../../db/client.js';
 import {
   carrierDirectory,
   carrierOverrides,
+  directoryAggregateCache,
   type CarrierCapabilities,
   type CarrierOperatingLocation,
   type CarrierOverrideRow,
@@ -396,6 +397,173 @@ async function refreshDirectorySummary(): Promise<DirectorySummary> {
   }
 }
 
+// ─── Persisted global aggregates: the durable outage fix ────────────────────
+//
+// ROOT CAUSE of the recurring all-domains-down outage: even with the TTL cache
+// (#406), stale-while-revalidate + single-flight (#407), and the per-statement
+// timeout + limiter (#409), the global directory SUMMARY and the UNFILTERED base
+// FACET COUNTS were still COMPUTED on the request path over the ~330k-row
+// carrier_directory table. After every deploy/restart the caches are COLD, so a
+// burst of concurrent /directory hits each triggered a full-table aggregate scan
+// on the small Neon compute → the pool saturated → every request hung → HTTP 000.
+//
+// THE DURABLE FIX: these two aggregates are IDENTICAL for every visitor and only
+// change on the weekly FMCSA ingest, so we PRECOMPUTE + PERSIST them in a single
+// row (directory_aggregate_cache) OFF the request path (at the end of an ingest,
+// on the weekly refresh cron, and lazily on boot). The request path then serves
+// them from a near-instant single-row PK lookup and NEVER runs the 330k-row scan
+// itself. Only when the persisted row is MISSING (a cold DB that has never been
+// ingested) does it fall back to the existing live-compute-with-cache path — so
+// all of #406/#407/#409's semantics remain intact as the fallback.
+//
+// FILTERED facet combos (getFacetCounts with actual filters) are NOT precomputed
+// (their space is combinatorial); they keep the live SWR path, now capped by
+// #409's timeout + limiter. Only the UNFILTERED base case is served persisted.
+
+/** The one and only row id in directory_aggregate_cache (a singleton table). */
+export const AGG_SINGLETON_ID = 1;
+
+/** Boot/cron staleness threshold: recompute the persisted aggregates when the
+ *  row is missing or older than this. The weekly ingest is the real refresh; this
+ *  is a safety net that keeps the row from ever being pathologically stale. */
+export const AGG_PERSIST_MAX_AGE_MS = 24 * 60 * 60 * 1000;
+
+/**
+ * The precomputed global aggregates as served to the request path. Mirrors the
+ * two JSONB columns + freshness stamp of directory_aggregate_cache.
+ */
+export interface PersistedAggregates {
+  summary: DirectorySummary;
+  baseFacets: FacetCounts;
+  computedAt: Date;
+}
+
+/** Short in-memory shield in FRONT of the persisted-row PK lookup so a warm
+ *  request serves from memory (zero DB round-trips) and a cold/stale one does a
+ *  SINGLE single-flighted PK read — never the 330k-row scan. */
+let persistedAggCache: { at: number; val: PersistedAggregates | null } | null = null;
+let persistedAggInflight: Promise<PersistedAggregates | null> | null = null;
+
+/** Raw single-row PK read of the persisted aggregates. Returns null when the row
+ *  is absent (cold DB / never populated) or on ANY read error (missing table,
+ *  transient blip) so the caller degrades to the live path — never a throw. This
+ *  is a PK lookup, NOT an aggregate scan, so it is safe on the request path. */
+async function readPersistedAggregates(): Promise<PersistedAggregates | null> {
+  try {
+    const rows = await db()
+      .select({
+        summary: directoryAggregateCache.summary,
+        baseFacets: directoryAggregateCache.baseFacets,
+        computedAt: directoryAggregateCache.computedAt,
+      })
+      .from(directoryAggregateCache)
+      .where(eq(directoryAggregateCache.id, AGG_SINGLETON_ID))
+      .limit(1);
+    const r = rows[0];
+    if (!r || !r.summary || !r.baseFacets) return null;
+    return { summary: r.summary, baseFacets: r.baseFacets, computedAt: r.computedAt };
+  } catch (err) {
+    console.warn('[directory] readPersistedAggregates failed; falling back to live path:', err);
+    return null;
+  }
+}
+
+/**
+ * Load the persisted aggregates with the same stale-while-revalidate discipline
+ * as the live caches: a cached value (fresh OR stale) returns IMMEDIATELY; a
+ * stale one triggers ONE background PK re-read; only a COLD MISS awaits, and
+ * concurrent callers share the single-flight promise. A `null` (row absent) is
+ * cached too, so a truly cold DB doesn't hammer the PK read every request — it
+ * falls through to the live path until boot/cron populates the row.
+ */
+async function loadPersistedAggregates(): Promise<PersistedAggregates | null> {
+  const cached = persistedAggCache;
+  if (cached) {
+    if (Date.now() - cached.at >= DIRECTORY_AGG_TTL_MS && !persistedAggInflight) {
+      const p = readPersistedAggregates().then((val) => {
+        persistedAggCache = { at: Date.now(), val };
+        return val;
+      });
+      persistedAggInflight = p;
+      void p.catch(() => {}).finally(() => {
+        persistedAggInflight = null;
+      });
+    }
+    return cached.val;
+  }
+  let inflight = persistedAggInflight;
+  if (!inflight) {
+    inflight = readPersistedAggregates().then((val) => {
+      persistedAggCache = { at: Date.now(), val };
+      return val;
+    });
+    persistedAggInflight = inflight;
+    void inflight.catch(() => {}).finally(() => {
+      persistedAggInflight = null;
+    });
+  }
+  try {
+    return await inflight;
+  } catch {
+    return null;
+  }
+}
+
+/** Test/ops seam: drop the in-memory persisted-aggregate shield so the next read
+ *  re-hits the persisted row (used right after a recompute so a long-lived process
+ *  picks up the fresh row without waiting out the TTL). */
+export function invalidatePersistedAggregatesCache(): void {
+  persistedAggCache = null;
+}
+
+/**
+ * Recompute BOTH global aggregates and PERSIST them to the singleton row. Runs
+ * OFF the request path (ingest end / refresh cron / boot). The computation reuses
+ * the EXACT live `...Unsafe()` scans — still wrapped in withAggregateTimeout +
+ * the shared limiter — but its result is written once to the table instead of per
+ * request. On success the in-memory shield is invalidated so this process serves
+ * the fresh row immediately. Throws on a compute/DB failure so the caller can log
+ * it; it never partially writes (summary + base facets are written in one upsert).
+ */
+export async function recomputeAndPersistDirectoryAggregates(): Promise<PersistedAggregates> {
+  // Both computes go through the shared limiter so an off-path recompute can
+  // never open more than AGG_MAX_CONCURRENCY aggregate transactions at once —
+  // identical back-pressure to the live refresh paths.
+  const summary = await aggregateLimiter.run(() => getDirectorySummaryUnsafe());
+  const baseFacets = await aggregateLimiter.run(() => getFacetCountsUnsafe(normalizeFilters({})));
+  const computedAt = new Date();
+  await db()
+    .insert(directoryAggregateCache)
+    .values({ id: AGG_SINGLETON_ID, summary, baseFacets, computedAt })
+    .onConflictDoUpdate({
+      target: directoryAggregateCache.id,
+      set: { summary, baseFacets, computedAt },
+    });
+  invalidatePersistedAggregatesCache();
+  return { summary, baseFacets, computedAt };
+}
+
+/**
+ * Safety-net populate for boot + the refresh cron: recompute+persist ONLY when
+ * the persisted row is missing or older than `maxAgeMs`. Never throws (best-
+ * effort). Returns what it did, for logging/tests.
+ */
+export async function ensureFreshDirectoryAggregates(
+  maxAgeMs: number = AGG_PERSIST_MAX_AGE_MS,
+): Promise<'fresh' | 'recomputed' | 'error'> {
+  try {
+    const existing = await readPersistedAggregates();
+    if (existing && Date.now() - existing.computedAt.getTime() < maxAgeMs) {
+      return 'fresh';
+    }
+    await recomputeAndPersistDirectoryAggregates();
+    return 'recomputed';
+  } catch (err) {
+    console.warn('[directory] ensureFreshDirectoryAggregates failed (non-fatal):', err);
+    return 'error';
+  }
+}
+
 /**
  * Carrier counts per state + per port (+ intermodal total) for the index/facets.
  *
@@ -408,6 +576,13 @@ async function refreshDirectorySummary(): Promise<DirectorySummary> {
  * concurrent callers await the SAME single-flight promise, so only one scan runs.
  */
 export async function getDirectorySummary(): Promise<DirectorySummary> {
+  // PERSISTED-FIRST: serve the precomputed global summary from the singleton row
+  // (a near-instant PK lookup, memory-shielded) so the request path NEVER runs
+  // the 330k-row scan. Only a MISSING row (cold DB / never populated) falls
+  // through to the live in-memory-cache + SWR + single-flight path below.
+  const persisted = await loadPersistedAggregates();
+  if (persisted) return persisted.summary;
+
   const cached = directorySummaryCache;
   if (cached) {
     // Serve stale immediately; refresh in the background if expired.
@@ -1141,6 +1316,18 @@ function facetCacheKey(filters: DirectoryFilters): string {
 }
 
 /**
+ * True when NO condition-contributing facet is active — i.e. the facet counts
+ * equal the precomputed global BASE counts and can be served from the persisted
+ * singleton row instead of scanning carrier_directory. Defined as "buildConditions
+ * yields no WHERE clause" so it stays automatically in sync with the filter model
+ * (sort / dir / page / perPage never add a condition, so a sort-only or paged
+ * /directory URL is still the unfiltered base case). Exported for unit tests.
+ */
+export function isUnfilteredFacets(filters: DirectoryFilters): boolean {
+  return buildConditions(filters).length === 0;
+}
+
+/**
  * Recompute the facet counts for one filter key and (on success) refresh + bound
  * the cache. Rejects on DB error, leaving any existing cache entry untouched
  * (stale value preserved, never poisoned). Always clears the in-flight slot for
@@ -1177,6 +1364,17 @@ async function refreshFacetCounts(filters: DirectoryFilters, key: string): Promi
  * await the SAME single-flight promise, so only one set of scans runs.
  */
 export async function getFacetCounts(filters: DirectoryFilters): Promise<FacetCounts> {
+  // PERSISTED-FIRST for the UNFILTERED base case (the /directory index +
+  // sort-only / page-only crawl URLs — the highest-traffic path and the stampede
+  // source): when NO condition-contributing facet is active, buildConditions is
+  // empty so the counts equal the precomputed global base facets. Serve them from
+  // the singleton row (memory-shielded PK lookup) and skip the 330k-row scan
+  // entirely. Any FILTERED combo keeps the live SWR path (capped by #409).
+  if (isUnfilteredFacets(filters)) {
+    const persisted = await loadPersistedAggregates();
+    if (persisted) return persisted.baseFacets;
+  }
+
   const key = facetCacheKey(filters);
   const cached = facetCountsCache.get(key);
   if (cached) {
