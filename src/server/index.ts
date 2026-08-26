@@ -16,6 +16,7 @@ import { startLifecycleEmailCron } from '../email/lifecycleCron.js';
 import { startFollowUpEmailCron } from '../email/followUpCron.js';
 import { startDunningEmailCron } from '../email/dunningCron.js';
 import { startWeeklyDigestCron } from '../email/weeklyDigestCron.js';
+import { startManifestRenewalCron } from '../email/manifestRenewalCron.js';
 import { startFuelSurchargeCron } from '../eia/dieselPrice.js';
 import { startDirectoryRefreshCron } from './directoryRefreshCron.js';
 import { runCronSafely } from './cronSafety.js';
@@ -116,6 +117,7 @@ async function runPostListenJobs(): Promise<void> {
     // payment failed (self-contained — reads the billing past-due marker).
     await runCronSafely('dunning-email-cron', () => startDunningEmailCron());
     await runCronSafely('weekly-digest-cron', () => startWeeklyDigestCron());
+    await runCronSafely('manifest-renewal-cron', () => startManifestRenewalCron());
     await runCronSafely('fuel-surcharge-cron', () => startFuelSurchargeCron());
     // NEW: weekly FMCSA carrier-directory refresh (keeps ~321k rows from going
     // stale — see src/server/directoryRefreshCron.ts). Its own tick is wrapped in

@@ -62,6 +62,7 @@ import {
 } from './importerQuota.js';
 import { importerSearchLimiter, publicAutocompleteLimiter } from '../rateLimits.js';
 import { registerImporterProfileRoutes } from './importerProfile.js';
+import { activeRedactionKeys } from './manifestRedactions.js';
 
 const SITE = 'https://quotefleet.net';
 
@@ -292,7 +293,7 @@ a.imp-co-link:hover{text-decoration:underline}
 .imp-results.compact .imp-stats{grid-template-columns:repeat(2,1fr);gap:8px}
 .imp-results.compact .imp-co{font-size:15px}
 
-.imp-empty{border:1px dashed var(--border-strong);border-radius:var(--radius-lg);padding:48px 24px;text-align:center;color:var(--muted);background:var(--surface)}
+.imp-empty{border:1px dashed var(--border-strong);border-radius:var(--radius-lg);padding:48px 24px;text-align:left;color:var(--muted);background:var(--surface)}
 .imp-empty h3{color:var(--ink);margin:0 0 8px}
 
 /* ── load more ── */
@@ -303,6 +304,13 @@ a.imp-co-link:hover{text-decoration:underline}
 .imp-loadmore:disabled{opacity:.6;cursor:not-allowed}
 
 .imp-locknote{font-size:12px;color:var(--muted);margin:20px 0 0;line-height:1.5}
+.imp-privacy-banner{display:flex;align-items:center;gap:12px 18px;flex-wrap:wrap;margin:20px 0 0;padding:16px 18px;border:1px solid var(--border);border-radius:var(--radius-lg);background:var(--surface)}
+.imp-privacy-copy{display:flex;flex-direction:column;gap:4px;flex:1 1 300px;min-width:0}
+.imp-privacy-h{font-size:14px;font-weight:700;color:var(--ink)}
+.imp-privacy-p{font-size:12.5px;color:var(--muted);line-height:1.5}
+.imp-privacy-btn{display:inline-flex;align-items:center;gap:6px;white-space:nowrap;border-radius:8px;padding:10px 16px;font-size:13px;font-weight:600;text-decoration:none;background:var(--accent);color:var(--bg);min-height:44px;box-sizing:border-box}
+.imp-privacy-btn .arr{transition:transform .15s ease}
+.imp-privacy-btn:hover .arr{transform:translateX(3px)}
 .imp-locknote b{color:var(--ink-soft)}
 
 @media(max-width:900px){
@@ -440,6 +448,14 @@ export function renderImporterSearchPage(): string {
       </div>
 
       <p class="imp-locknote"><b>Free to view:</b> importer, lane, volumes, incumbent forwarder, winnability &amp; the AI angle. <b>Unlock with a free account:</b> the decision-maker contact, an AI-drafted opener, and CSV export.</p>
+
+      <div class="imp-privacy-banner">
+        <div class="imp-privacy-copy">
+          <span class="imp-privacy-h">Is your company listed here?</span>
+          <span class="imp-privacy-p">Manifest Privacy hides your shipment data from competitors on QuoteFleet &mdash; we prepare &amp; submit your U.S. Customs confidentiality request on your behalf.</span>
+        </div>
+        <a class="imp-privacy-btn" href="/manifest-privacy">Hide my data <span class="arr">&rarr;</span></a>
+      </div>
     </div>
   </main>
 
@@ -961,6 +977,10 @@ async function runSearch(
   pulledLive: boolean;
   recordsScanned: number;
 }> {
+  // Resolve the active Manifest Privacy redaction set once (cached) so every
+  // per-port pull in the state-expansion loop shares it — a CBP-confirmed
+  // confidentiality customer is dropped from the search results.
+  const redactKeys = await activeRedactionKeys();
   const common = {
     maxLeads: MAX_LEADS,
     page,
@@ -969,6 +989,7 @@ async function runSearch(
     bolCache: opts.bolCache,
     cacheTtlMs: IMPORTER_CACHE_TTL_MS,
     allowLivePull: opts.allowLivePull,
+    redactKeys,
   };
 
   // Single-pull path: a port is chosen, or the state maps to ≤1 entry port.

@@ -50,6 +50,7 @@ import {
   DETAIL_WALL_MESSAGE,
   type QuotaState,
 } from './importerQuota.js';
+import { activeRedactionKeys, isKeyRedacted } from './manifestRedactions.js';
 
 const SITE = 'https://quotefleet.net';
 
@@ -422,6 +423,12 @@ const PROFILE_CSS = `
 .impp-head-act{margin-left:auto;display:flex;gap:8px;flex-wrap:wrap}
 .impp-meta{display:flex;gap:8px 20px;flex-wrap:wrap;color:var(--muted);font-size:13px;margin:12px 0 2px}
 .impp-meta .mi{display:inline-flex;align-items:center;gap:6px}
+.impp-privacy{display:flex;align-items:center;gap:8px 14px;flex-wrap:wrap;margin:14px 0 2px;padding:12px 14px;border:1px solid var(--border);border-radius:10px;background:var(--surface)}
+.impp-privacy-t{font-size:13px;font-weight:700;color:var(--ink)}
+.impp-privacy-d{font-size:12.5px;color:var(--muted);flex:1 1 260px;min-width:0}
+.impp-privacy-cta{display:inline-flex;align-items:center;gap:6px;white-space:nowrap;border-radius:8px;padding:9px 14px;font-size:13px;font-weight:600;text-decoration:none;background:var(--accent);color:var(--bg);min-height:44px;box-sizing:border-box}
+.impp-privacy-cta .arr{transition:transform .15s ease}
+.impp-privacy-cta:hover .arr{transform:translateX(3px)}
 .impp-samplenote{color:var(--muted);font-size:12px;margin:10px 0 0}
 .impp-samplenote b{color:var(--ink-soft)}
 
@@ -622,6 +629,19 @@ function identityHeader(p: ProfileData, opts: { showActions: boolean }): string 
       ${opts.showActions ? '<div class="impp-head-act"><a class="btn btn-primary" href="/tools">Quote this lane <span class="arr">&rarr;</span></a></div>' : ''}
     </div>
     ${meta ? `<div class="impp-meta">${meta}</div>` : ''}
+    ${opts.showActions ? privacyCta(p) : ''}
+  </div>`;
+}
+
+/** "Is this your company?" → Manifest Privacy onboarding CTA. Honest copy: we
+ *  hide them on QuoteFleet and prepare/submit their CBP confidentiality request —
+ *  no "remove from CBP" or "verified" claim. */
+function privacyCta(p: ProfileData): string {
+  const href = `/privacy/apply?slug=${encodeURIComponent(p.slug)}&name=${encodeURIComponent(p.company)}`;
+  return `<div class="impp-privacy">
+    <span class="impp-privacy-t">Is this your company?</span>
+    <span class="impp-privacy-d">Hide your shipment data from competitors on QuoteFleet — we prepare &amp; submit your CBP confidentiality request on your behalf.</span>
+    <a class="impp-privacy-cta" href="${href}">Hide my data <span class="arr">&rarr;</span></a>
   </div>`;
 }
 
@@ -842,6 +862,31 @@ function renderProfileUnavailable(slug: string, configured: boolean): string {
   });
 }
 
+/**
+ * Neutral "not available" page for a redacted (Manifest Privacy) importer. It
+ * deliberately reveals NOTHING — not the company name, not that the profile was
+ * hidden by a confidentiality customer — and spends no ImportYeti credit. Honest
+ * and neutral: a plain "isn't available", not an error the visitor should retry.
+ */
+function renderProfileRedacted(): string {
+  const body = `
+  <style>${PROFILE_CSS}</style>
+  <main class="impp-wrap"><div class="container-narrow">
+    <a class="impp-back" href="/importers">&larr; Back to importer search</a>
+    <div class="impp-wall">
+      <h2>This importer profile isn&rsquo;t available</h2>
+      <p>This company&rsquo;s profile can&rsquo;t be shown on QuoteFleet. Searching importers still works.</p>
+      <div class="impp-wall-actions"><a class="impp-btn-o" href="/importers">Back to importer search</a></div>
+    </div>
+  </div></main>`;
+  return layout({
+    title: 'Importer profile | QuoteFleet',
+    description: 'Importer profile on QuoteFleet.',
+    canonicalPath: '/importers',
+    bodyHtml: body,
+  });
+}
+
 // ── client JS (fold/unfold + dot scroll-spy + chart tooltip) ─────────────────
 const PROFILE_JS = `
 (function(){
@@ -940,6 +985,24 @@ export async function handleImporterProfile(
     res.redirect(302, '/importers');
     return;
   }
+  // Manifest Privacy redaction choke-point: if this importer is a CBP-confirmed
+  // confidentiality customer, short-circuit to a neutral "not available" page
+  // BEFORE any ImportYeti pull — a redacted profile must NEVER spend a credit.
+  try {
+    const redactSet = await activeRedactionKeys();
+    if (
+      isKeyRedacted(redactSet, titleFromSlug(slug)) ||
+      isKeyRedacted(redactSet, slug.replace(/-/g, ' '))
+    ) {
+      res.status(404).type('html').send(renderProfileRedacted());
+      return;
+    }
+  } catch (err) {
+    // Fail-open on the redaction check (never block a normal profile because the
+    // redaction lookup hiccuped) — the set load itself already degrades to empty.
+    console.warn('[importers.profile] redaction check failed (continuing):', err);
+  }
+
   const bolCache = deps.bolCache ?? dbBolCacheStore;
   const quota = checkDetailQuota(req);
 

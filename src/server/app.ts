@@ -41,6 +41,8 @@ import { registerToolsRoutes } from './routes/tools.js';
 import { registerBillingRoutes, registerStripeWebhook } from './routes/billing.js';
 import { registerDirectoryAuthRoutes } from './routes/directoryAuth.js';
 import { registerDirectoryBillingRoutes } from './routes/directoryBilling.js';
+import { registerManifestPrivacyRoutes } from './routes/manifestPrivacy.js';
+import { registerManifestBillingRoutes } from './routes/manifestBilling.js';
 import { registerConnectRoutes, registerConnectWebhook } from './routes/connect.js';
 import { registerMarketingChatRoute } from './routes/marketingChat.js';
 import { registerQuoteDocRoutes } from './routes/quoteDoc.js';
@@ -189,6 +191,8 @@ export function createApp(): express.Express {
   // next to the other directory surfaces; its paths don't collide with the
   // /directory/:stateSlug catch-alls.
   registerImporterRoutes(app);
+  registerManifestPrivacyRoutes(app);
+  registerManifestBillingRoutes(app);
   registerToolsRoutes(app);
   registerBillingRoutes(app);
   registerDirectoryBillingRoutes(app);
