@@ -34,6 +34,11 @@ export const EXTERNAL_TIMEOUT_MS = 12_000;
 /** A raw ImportYeti bill-of-lading row (loose — the upstream schema is wide). */
 export type BolRow = Record<string, unknown>;
 
+/** Contact fallback tiers, highest confidence first. A lead is NEVER empty:
+ *  phone_only is always available (ImportYeti gives phone + address on every
+ *  record). */
+export type ContactConfidence = 'verified' | 'role_based' | 'phone_only';
+
 export interface ImporterFilters {
   entryPort?: string;
   product?: string;
@@ -62,6 +67,7 @@ export interface EnrichedContact {
 export interface ImporterLead {
   company: string;
   state: string | null;
+  address: string | null;
   supplier: string | null;
   supplier_country: string | null;
   product: string | null;
@@ -78,8 +84,35 @@ export interface ImporterLead {
   title: string | null;
   email: string | null;
   email_confidence: number | null;
+  /** Which contact fallback tier is available for this lead (never empty). */
+  contact_confidence?: ContactConfidence | null;
   draft_email?: string | null;
 }
+
+/** A resolved contact in one of the three confidence tiers. Always non-empty:
+ *  the phone_only tier falls back to the ImportYeti phone + address. */
+export interface TieredContact {
+  contact_confidence: ContactConfidence;
+  domain: string | null;
+  contact_name: string | null;
+  title: string | null;
+  email: string | null;
+  email_confidence: number | null;
+  /** role_based tier: constructed purchasing@/logistics@/sales@/info@ + domain. */
+  role_emails: string[];
+  phone: string | null;
+  address: string | null;
+}
+
+/** Minimal structural view of the BOL cache store (real impl in importerCache.ts).
+ *  Type-only — importing it never pulls the DB layer into this pure module. */
+export interface BolCacheLike {
+  get(key: string): Promise<{ rows: BolRow[]; creditsRemaining: number | null; fetchedAt: Date } | null>;
+  put(key: string, rows: BolRow[], creditsRemaining: number | null): Promise<void>;
+}
+
+/** Local-part prefixes for the role-based (unverified) contact tier. */
+export const ROLE_LOCALPARTS = ['purchasing', 'logistics', 'sales', 'info'] as const;
 
 /* ── timeout wrapper ─────────────────────────────────────────────────────────
  * Every external call goes through here so a hung provider trips an AbortError
@@ -227,10 +260,14 @@ export function domainMatchesCompany(companyName: string, domain: string | null 
   for (const t of want) if (t.length >= 4 && joined.includes(t)) return true;
   return false;
 }
-export async function enrichContact(companyName: string): Promise<EnrichedContact | null> {
+/** Low-level Hunter resolve: company → { domain, indexed emails }, precision-
+ *  guarded. Throws only on an unset key; a Hunter error / drift / no-domain
+ *  returns null. `limit` MUST be <= 10. */
+async function hunterDomainSearch(
+  companyName: string,
+): Promise<{ domain: string; emails: Array<Record<string, unknown>> } | null> {
   const key = process.env.HUNTER_API_KEY;
   if (!key) throw new Error('HUNTER_API_KEY not set');
-  // limit MUST be <= 10 (Hunter free/starter cap + our cost guard).
   const r = await fetchWithTimeout(
     `https://api.hunter.io/v2/domain-search?company=${encodeURIComponent(companyName)}&api_key=${key}&limit=10`,
   );
@@ -238,19 +275,83 @@ export async function enrichContact(companyName: string): Promise<EnrichedContac
   const j = (await r.json()) as { data?: { domain?: string; emails?: Array<Record<string, unknown>> } };
   const d = j.data || {};
   const domain = d.domain || null;
-  const emails = d.emails || [];
-  if (!domain || !emails.length) return null;
+  if (!domain) return null;
   if (!domainMatchesCompany(companyName, domain)) return null; // fuzzy-drift guard
-  const ranked = [...emails].sort((a, b) => num(b.confidence) - num(a.confidence));
+  return { domain, emails: d.emails || [] };
+}
+
+export async function enrichContact(companyName: string): Promise<EnrichedContact | null> {
+  const res = await hunterDomainSearch(companyName);
+  if (!res || !res.emails.length) return null;
+  const ranked = [...res.emails].sort((a, b) => num(b.confidence) - num(a.confidence));
   const dm = ranked.find((e) => TARGET_TITLE_RX.test(str(e.position))) || ranked[0];
   const name = [dm.first_name, dm.last_name].filter(Boolean).join(' ') || null;
   return {
-    domain,
+    domain: res.domain,
     contact_name: name,
     title: (dm.position as string) || null,
     email: (dm.value as string) || null,
     email_confidence: dm.confidence == null ? null : num(dm.confidence),
     linkedin: (dm.linkedin as string) || null,
+  };
+}
+
+/* ── Tiered contact resolution (the paid REVEAL path) ────────────────────────
+ * A lead is NEVER empty. Returns the best available tier:
+ *   1. verified   — a named decision-maker email (Hunter, DM title match)
+ *   2. role_based — domain resolved but no named person → purchasing@/logistics@
+ *                   /sales@/info@ + domain, clearly UNVERIFIED
+ *   3. phone_only — no domain → ImportYeti phone + physical address (always on
+ *                   the record, so the user can still call / mail them)
+ * Never throws — any Hunter failure (incl. a missing key) degrades to
+ * phone_only, so the reveal is always answerable. */
+export async function resolveContactTiered(
+  companyName: string,
+  { phone = null, address = null }: { phone?: string | null; address?: string | null } = {},
+): Promise<TieredContact> {
+  const base: TieredContact = {
+    contact_confidence: 'phone_only',
+    domain: null,
+    contact_name: null,
+    title: null,
+    email: null,
+    email_confidence: null,
+    role_emails: [],
+    phone,
+    address,
+  };
+  let res: { domain: string; emails: Array<Record<string, unknown>> } | null = null;
+  try {
+    res = await hunterDomainSearch(companyName);
+  } catch {
+    res = null; // missing key / network → fall through to phone_only
+  }
+  if (!res) return base;
+
+  const ranked = [...res.emails].sort((a, b) => num(b.confidence) - num(a.confidence));
+  const dm = ranked.find((e) => TARGET_TITLE_RX.test(str(e.position)) && e.value);
+  if (dm) {
+    return {
+      ...base,
+      contact_confidence: 'verified',
+      domain: res.domain,
+      contact_name: [dm.first_name, dm.last_name].filter(Boolean).join(' ') || null,
+      title: str(dm.position) || null,
+      email: str(dm.value) || null,
+      email_confidence: dm.confidence == null ? null : num(dm.confidence),
+    };
+  }
+  // Domain resolved but no named decision-maker → role-based (unverified).
+  const any = ranked[0];
+  return {
+    ...base,
+    contact_confidence: 'role_based',
+    domain: res.domain,
+    contact_name: any ? [any.first_name, any.last_name].filter(Boolean).join(' ') || null : null,
+    title: any ? str(any.position) || null : null,
+    email: any ? str(any.value) || null : null,
+    email_confidence: any && any.confidence != null ? num(any.confidence) : null,
+    role_emails: ROLE_LOCALPARTS.map((lp) => `${lp}@${res!.domain}`),
   };
 }
 
@@ -261,6 +362,7 @@ export function toLead(r: BolRow, contact?: EnrichedContact | null): ImporterLea
   return {
     company: str(r.company_name),
     state: derivedState,
+    address: addr || null,
     supplier: (r.supplier_name as string) || null,
     supplier_country: (r.supplier_country_code as string) || null,
     product: (r.product_description as string) || (r.hs_code_description as string) || null,
@@ -360,24 +462,63 @@ export async function findImporterLeads({
   withEnrichment = false,
   withEmails = false,
   concurrency = ENRICH_CONCURRENCY,
+  bolCache,
+  cacheKey,
+  cacheTtlMs = 14 * 24 * 60 * 60 * 1000,
 }: {
   filters?: ImporterFilters;
   maxLeads?: number;
   withEnrichment?: boolean;
   withEmails?: boolean;
   concurrency?: number;
-} = {}): Promise<{ leads: ImporterLead[]; creditsRemaining: number | null }> {
+  /** Optional persistent BOL cache (DB-backed in the route). */
+  bolCache?: BolCacheLike;
+  /** Precomputed cache key for this pull (route computes it via searchKey()). */
+  cacheKey?: string;
+  /** Cache TTL — a cached row younger than this skips the ImportYeti pull. */
+  cacheTtlMs?: number;
+} = {}): Promise<{ leads: ImporterLead[]; creditsRemaining: number | null; cached: boolean }> {
   const cap = Math.max(1, Math.min(maxLeads, MAX_LEADS));
-  // Pull generously (dedup collapses many BOL rows per importer), then cap.
-  const { rows, creditsRemaining } = await pullImportBols(filters, {
-    pageSize: Math.max(50, cap * 4),
-  });
+  const pageSize = Math.max(50, cap * 4);
+
+  // ── Cache-first: a fresh cached result set spends ZERO ImportYeti credits ──
+  let rows: BolRow[] | null = null;
+  let creditsRemaining: number | null = null;
+  let cached = false;
+  if (bolCache && cacheKey) {
+    try {
+      const hit = await bolCache.get(cacheKey);
+      if (hit && Date.now() - hit.fetchedAt.getTime() < cacheTtlMs) {
+        rows = hit.rows;
+        creditsRemaining = hit.creditsRemaining;
+        cached = true;
+      }
+    } catch {
+      /* cache miss/failure → fall through to a live pull (never break search) */
+    }
+  }
+
+  if (rows == null) {
+    // Pull generously (dedup collapses many BOL rows per importer), then cap.
+    const pulled = await pullImportBols(filters, { pageSize });
+    rows = pulled.rows;
+    creditsRemaining = pulled.creditsRemaining;
+    if (bolCache && cacheKey) {
+      // Write fresh rows back for the next repeat search. Never let a cache
+      // write failure break the response.
+      try {
+        await bolCache.put(cacheKey, rows, creditsRemaining);
+      } catch {
+        /* ignore */
+      }
+    }
+  }
   const importers = dedupImporters(rows);
   // Base leads (no enrichment) — cheap, so build all then post-filter, then cap.
   const base = applyPostFilters(importers.map((r) => toLead(r)), filters).slice(0, cap);
 
   if (!withEnrichment && !withEmails) {
-    return { leads: base, creditsRemaining };
+    return { leads: base, creditsRemaining, cached };
   }
 
   // Enrichment / drafting fan-out — bounded concurrency, never unbounded.
@@ -389,7 +530,7 @@ export async function findImporterLeads({
     if (withEmails) merged.draft_email = await draftEmail(merged).catch(() => null);
     return merged;
   });
-  return { leads, creditsRemaining };
+  return { leads, creditsRemaining, cached };
 }
 
 /* ── CSV export (LOCKED / paid feature) ─────────────────────────────────────*/

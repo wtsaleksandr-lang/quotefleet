@@ -21,8 +21,10 @@ import {
   fetchWithTimeout,
   pullImportBols,
   enrichContact,
+  resolveContactTiered,
   findImporterLeads,
   MAX_LEADS,
+  ROLE_LOCALPARTS,
   type BolRow,
 } from './importerLeads.js';
 
@@ -182,6 +184,48 @@ describe('pullImportBols / enrichContact key guards', () => {
   });
 });
 
+describe('resolveContactTiered (never-empty fallback tiers)', () => {
+  it('tier 1 — verified decision-maker email from Hunter', async () => {
+    process.env.HUNTER_API_KEY = 'test';
+    globalThis.fetch = vi.fn(async () => ({
+      ok: true,
+      json: async () => ({
+        data: { domain: 'bosch.com', emails: [{ value: 'j.smith@bosch.com', first_name: 'J', last_name: 'Smith', position: 'Head of Logistics', confidence: 95 }] },
+      }),
+    })) as unknown as typeof fetch;
+    const c = await resolveContactTiered('Robert Bosch Tool Corp', { phone: '555', address: 'A' });
+    expect(c.contact_confidence).toBe('verified');
+    expect(c.email).toBe('j.smith@bosch.com');
+  });
+
+  it('tier 2 — role-based (unverified) when the domain resolves but no named DM', async () => {
+    process.env.HUNTER_API_KEY = 'test';
+    globalThis.fetch = vi.fn(async () => ({
+      ok: true,
+      json: async () => ({ data: { domain: 'bosch.com', emails: [] } }),
+    })) as unknown as typeof fetch;
+    const c = await resolveContactTiered('Robert Bosch Tool Corp', { phone: '555', address: 'A' });
+    expect(c.contact_confidence).toBe('role_based');
+    expect(c.role_emails).toEqual(ROLE_LOCALPARTS.map((lp) => `${lp}@bosch.com`));
+  });
+
+  it('tier 3 — phone_only fallback (never empty) when Hunter has nothing / no key', async () => {
+    // No HUNTER_API_KEY set → resolveContactTiered must NOT throw, degrade to phone_only.
+    const c = await resolveContactTiered('Some Importer', { phone: '555-123', address: '1 Main St' });
+    expect(c.contact_confidence).toBe('phone_only');
+    expect(c.phone).toBe('555-123');
+    expect(c.address).toBe('1 Main St');
+  });
+});
+
+describe('toLead address', () => {
+  it('carries the physical address (phone_only tier source)', () => {
+    const lead = toLead({ company_name: 'X', company_address: '1 Main St, Newberry, SC 29108', company_main_phone_number: '555' });
+    expect(lead.address).toBe('1 Main St, Newberry, SC 29108');
+    expect(lead.phone).toBe('555');
+  });
+});
+
 describe('findImporterLeads (browse path)', () => {
   beforeEach(() => {
     process.env.IMPORTYETI_API_KEY = 'test';
@@ -207,6 +251,52 @@ describe('findImporterLeads (browse path)', () => {
     expect(calls[0]).toContain('data.importyeti.com');
     expect(calls.some((u) => /hunter\.io|anthropic\.com/.test(u))).toBe(false);
   });
+  it('serves a fresh cached result set WITHOUT calling ImportYeti', async () => {
+    const fetchSpy = vi.fn();
+    globalThis.fetch = fetchSpy as unknown as typeof fetch;
+    const cachedRows: BolRow[] = [{ company_name: 'Cached Co', company_shipments_12m: 5, entry_port: 'Savannah, GA' }];
+    const store = {
+      get: vi.fn(async () => ({ rows: cachedRows, creditsRemaining: 42, fetchedAt: new Date() })),
+      put: vi.fn(async () => {}),
+    };
+    const { leads, creditsRemaining, cached } = await findImporterLeads({
+      filters: { entryPort: 'Savannah, GA' },
+      bolCache: store,
+      cacheKey: 'k1',
+    });
+    expect(cached).toBe(true);
+    expect(creditsRemaining).toBe(42);
+    expect(leads[0].company).toBe('Cached Co');
+    expect(fetchSpy).not.toHaveBeenCalled(); // ZERO external credits on a cache hit
+    expect(store.put).not.toHaveBeenCalled();
+  });
+
+  it('on a cache MISS pulls ImportYeti and writes the result back', async () => {
+    const rows: BolRow[] = [{ company_name: 'Fresh Co', company_shipments_12m: 9, entry_port: 'Savannah, GA' }];
+    globalThis.fetch = vi.fn(async () => ({
+      ok: true, json: async () => ({ requestCost: 1, creditsRemaining: 7, data: { data: rows } }),
+    })) as unknown as typeof fetch;
+    const store = { get: vi.fn(async () => null), put: vi.fn(async () => {}) };
+    const { cached } = await findImporterLeads({ filters: { entryPort: 'Savannah, GA' }, bolCache: store, cacheKey: 'k2' });
+    expect(cached).toBe(false);
+    expect(store.put).toHaveBeenCalledWith('k2', rows, 7);
+  });
+
+  it('treats a STALE cache row as a miss (TTL)', async () => {
+    const rows: BolRow[] = [{ company_name: 'Fresh Co', company_shipments_12m: 9 }];
+    const fetchSpy = vi.fn(async () => ({ ok: true, json: async () => ({ data: { data: rows } }) }));
+    globalThis.fetch = fetchSpy as unknown as typeof fetch;
+    const old = new Date(Date.now() - 20 * 24 * 60 * 60 * 1000); // 20d old > 14d TTL
+    const store = {
+      get: vi.fn(async () => ({ rows: [{ company_name: 'Stale Co' }], creditsRemaining: 1, fetchedAt: old })),
+      put: vi.fn(async () => {}),
+    };
+    const { leads, cached } = await findImporterLeads({ filters: { entryPort: 'x' }, bolCache: store, cacheKey: 'k3' });
+    expect(cached).toBe(false);
+    expect(leads[0].company).toBe('Fresh Co');
+    expect(fetchSpy).toHaveBeenCalledTimes(1);
+  });
+
   it('post-filters by state and by minimum 12-mo shipments', async () => {
     const rows: BolRow[] = [
       { company_name: 'GA Co', company_address: 'x, GA 30000', company_shipments_12m: 500, entry_port: 'Savannah, GA' },

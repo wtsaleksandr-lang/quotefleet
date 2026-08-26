@@ -30,7 +30,17 @@ import {
   MAX_LEADS,
   type ImporterFilters,
   type ImporterLead,
+  type ContactConfidence,
 } from './importerLeads.js';
+import {
+  dbBolCacheStore,
+  dbContactCacheStore,
+  searchKey,
+  companyKey,
+  IMPORTER_CACHE_TTL_MS,
+  type ContactCacheStore,
+  type BolCacheStore,
+} from './importerCache.js';
 import { importerSearchLimiter } from '../rateLimits.js';
 
 const SITE = 'https://quotefleet.net';
@@ -96,6 +106,8 @@ const IMPORTERS_CSS = `
 .imp-lock{display:inline-flex;align-items:center;gap:8px;font-size:12px;font-weight:600;color:var(--text);border:1px solid var(--border);border-radius:8px;padding:8px 12px;background:var(--surface,var(--panel));text-decoration:none;min-height:44px;box-sizing:border-box}
 .imp-lock:hover{border-color:var(--accent)}
 .imp-lock .ico{opacity:.7}
+.imp-foot-r{display:flex;align-items:center;gap:12px;flex-wrap:wrap;justify-content:flex-end}
+.imp-tier{font-size:12px;color:var(--muted)}
 .imp-empty{border:1px dashed var(--border);border-radius:12px;padding:48px 24px;text-align:center;color:var(--muted)}
 .imp-empty h3{color:var(--text);margin:0 0 8px}
 .imp-locknote{font-size:12px;color:var(--muted);margin:12px 0 0}
@@ -292,11 +304,15 @@ const CLIENT_JS = `
     if(l.incumbent_forwarder){ var inc=T('span','imp-incumb'); inc.appendChild(document.createTextNode('Displacing: '));
       var b=document.createElement('b'); b.textContent=l.incumbent_forwarder; inc.appendChild(b); foot.appendChild(inc); }
     else { foot.appendChild(T('span',null,'')); }
+    var right=T('div','imp-foot-r');
+    var tierTxt={verified:'\\u2713 Verified decision-maker on file',role_based:'Role-based email available (unverified)',phone_only:'Phone & address on file'};
+    right.appendChild(T('span','imp-tier',tierTxt[l.contact_confidence]||tierTxt.phone_only));
     var lock=document.createElement('a'); lock.className='imp-lock'; lock.href='/signup';
     lock.title='Unlock the decision-maker contact + an AI-drafted opener with a free account';
     var ico=T('span','ico','\\ud83d\\udd12'); ico.setAttribute('aria-hidden','true');
     lock.appendChild(ico); lock.appendChild(document.createTextNode(' Unlock contact \\u2014 sign up'));
-    foot.appendChild(lock);
+    right.appendChild(lock);
+    foot.appendChild(right);
     c.appendChild(foot);
     return c;
   }
@@ -363,8 +379,10 @@ function hasAnyFilter(f: ImporterFilters): boolean {
   return !!(f.entryPort || f.state || f.hsCode || f.product || f.supplierCountry || f.company);
 }
 
-/** FREE browse projection — never leak locked contact fields to the client. */
-function toPublicCard(l: ImporterLead): Record<string, unknown> {
+/** FREE browse projection — never leak locked contact fields (phone / email /
+ *  name / address) to the client; only the TIER LABEL (what the user would
+ *  unlock) plus a boolean that a phone is on file. */
+function toPublicCard(l: ImporterLead, tier: ContactConfidence): Record<string, unknown> {
   return {
     company: l.company,
     state: l.state,
@@ -380,11 +398,56 @@ function toPublicCard(l: ImporterLead): Record<string, unknown> {
     incumbent_forwarder: l.incumbent_forwarder,
     winnability: winnability(l),
     aiAngle: aiAngle(l),
+    // Freemium: the tier is shown honestly, the CONTACT itself stays locked.
+    contact_confidence: tier,
+    hasPhone: !!l.phone,
     contactLocked: true,
   };
 }
 
-export async function handleImporterSearch(req: Request, res: Response): Promise<void> {
+/** The pull-affecting filters (state / company / bands are POST-filters on the
+ *  same pulled set, so they are intentionally NOT part of the cache key). */
+function bolCacheKey(f: ImporterFilters): string {
+  return searchKey({
+    entryPort: f.entryPort,
+    product: f.product,
+    hsCode: f.hsCode,
+    supplierCountry: f.supplierCountry,
+    pageSize: Math.max(50, MAX_LEADS * 4),
+  });
+}
+
+/** Cheap, guaranteed-non-empty contact tier for the free browse card. Every
+ *  lead has AT LEAST phone_only (ImportYeti phone + address on every record). A
+ *  prior paid reveal cached in importer_contact_cache upgrades the label for
+ *  free — via a single indexed IN() lookup (never a scan). Degrades to
+ *  phone_only on any cache failure. */
+async function browseTiers(
+  leads: readonly ImporterLead[],
+  cache: ContactCacheStore,
+): Promise<Map<string, ContactConfidence>> {
+  const out = new Map<string, ContactConfidence>();
+  for (const l of leads) out.set(l.company, 'phone_only');
+  try {
+    const keyed = leads.map((l) => [l.company, companyKey(l.company)] as const);
+    const hits = await cache.getMany(keyed.map(([, k]) => k));
+    for (const [company, k] of keyed) {
+      const hit = hits.get(k);
+      if (hit && Date.now() - hit.fetchedAt.getTime() < IMPORTER_CACHE_TTL_MS) {
+        out.set(company, hit.confidence);
+      }
+    }
+  } catch {
+    /* cache down → everyone keeps the phone_only floor */
+  }
+  return out;
+}
+
+export async function handleImporterSearch(
+  req: Request,
+  res: Response,
+  deps: { bolCache?: BolCacheStore; contactCache?: ContactCacheStore } = {},
+): Promise<void> {
   try {
     const filters = parseFilters(req.body);
     if (!hasAnyFilter(filters)) {
@@ -394,18 +457,26 @@ export async function handleImporterSearch(req: Request, res: Response): Promise
       });
       return;
     }
-    // Browse path: ImportYeti ONLY — no enrichment (Hunter) or drafts (Anthropic).
-    const { leads, creditsRemaining } = await findImporterLeads({
+    const bolCache = deps.bolCache ?? dbBolCacheStore;
+    const contactCache = deps.contactCache ?? dbContactCacheStore;
+    // Browse path: ImportYeti ONLY (no Hunter / Anthropic) + cache-first so a
+    // repeat search inside the TTL spends ZERO external credits.
+    const { leads, creditsRemaining, cached } = await findImporterLeads({
       filters,
       maxLeads: MAX_LEADS,
       withEnrichment: false,
       withEmails: false,
+      bolCache,
+      cacheKey: bolCacheKey(filters),
+      cacheTtlMs: IMPORTER_CACHE_TTL_MS,
     });
+    const tiers = await browseTiers(leads, contactCache);
     res.json({
-      leads: leads.map(toPublicCard),
+      leads: leads.map((l) => toPublicCard(l, tiers.get(l.company) ?? 'phone_only')),
       count: leads.length,
       recordsScanned: leads.reduce((a, l) => a + (l.total_shipments ?? 0), 0),
       creditsRemaining,
+      cached,
     });
   } catch (err) {
     // Never 500 the browse path. A missing key / provider timeout / upstream
