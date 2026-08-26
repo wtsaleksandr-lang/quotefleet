@@ -1,0 +1,587 @@
+<title>Supply Chain Leads</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Nunito:wght@400;600;700;800&family=Nunito+Sans:opsz,wght@6..12,400;6..12,600;6..12,700&display=swap">
+<style>
+  /* ImportYeti is a bright, always-white tool — this design is deliberately
+     LIGHT-ONLY (no dark theme) so it reads the same on any device, and the
+     accent is a Yeti-style teal (shifted from their exact cyan) rather than
+     a saturated blue. */
+  :root{
+    color-scheme:light;
+    --bg:#ffffff; --alt:#f4f8fa; --panel:#ffffff;
+    --ink:#123243; --text:#3b4a54; --muted:#6a7883; --faint:#9aa6b0;
+    --line:#e7ecef; --line2:#d6dfe4;
+    --nav:#0f3b4d;                      /* dark teal-navy — logo/header text */
+    --accent:#12a6c4; --accent-weak:#e4f6fa; --accent-mid:#bfe8f0;
+    --link:#1f7fc4;                     /* friendly blue — company-name links */
+    --pill-imp:#0f3b4d; --pill-sup:#e7ecef;
+    --good:#0f7a52; --good-weak:#e7f4ee;
+    --warn:#9a5b12; --warn-weak:#fbf1e3;
+    --shadow:0 1px 3px rgba(18,50,67,.06);
+  }
+  *{box-sizing:border-box}
+  html,body{margin:0}
+  body{background:var(--bg);color:var(--text);
+    font-family:"Nunito Sans","Nunito",-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif;
+    font-size:14px;line-height:1.55;-webkit-font-smoothing:antialiased;}
+  .logo .wm,.c-name,.sec-h,.p-title h1,.stat .sv,.cell .val,.sv{font-family:"Nunito","Nunito Sans",sans-serif}
+  a{color:var(--link);text-decoration:none}
+  a:hover{text-decoration:underline}
+  .num{font-variant-numeric:tabular-nums}
+  .wrap{max-width:1080px;margin:0 auto;padding:0 20px}
+
+  /* ── top bar ─────────────────────────────────────────── */
+  .top{border-bottom:1px solid var(--line);background:var(--panel);position:sticky;top:0;z-index:20}
+  .top-in{max-width:1080px;margin:0 auto;padding:11px 20px;display:flex;align-items:center;gap:18px}
+  .logo{display:flex;align-items:center;gap:8px;flex:0 0 auto;text-decoration:none}
+  .logo .mk{width:30px;height:30px;border-radius:8px;background:var(--nav);display:flex;align-items:center;justify-content:center;flex:0 0 auto}
+  .logo .mk svg{width:17px;height:17px}
+  .logo .wm{font-weight:800;font-size:18px;color:var(--nav);letter-spacing:-.01em;white-space:nowrap}
+  .logo .wm b{color:var(--accent);font-weight:800}
+  .searchbar{flex:1 1 auto;display:flex;align-items:center;border:1px solid var(--line2);border-radius:999px;padding:2px 3px 2px 16px;background:var(--panel);min-width:0}
+  .searchbar input{flex:1 1 auto;border:0;outline:0;background:transparent;color:var(--ink);font-size:14px;padding:8px 0;min-width:0}
+  .searchbar input::placeholder{color:var(--faint)}
+  .sbtn{flex:0 0 auto;width:34px;height:34px;border-radius:999px;background:var(--accent);border:0;display:flex;align-items:center;justify-content:center;cursor:pointer}
+  .sbtn svg{width:16px;height:16px;stroke:#fff}
+  .top-nav{display:flex;align-items:center;gap:16px;flex:0 0 auto}
+  .top-nav a{color:var(--nav);font-weight:500;font-size:13.5px}
+  .acct{border:1.5px solid var(--accent);color:var(--accent);border-radius:999px;padding:6px 14px;font-weight:600;font-size:13px}
+  .acct:hover{text-decoration:none;background:var(--accent-weak)}
+  @media(max-width:720px){.top-nav a:not(.acct){display:none}.logo .wm{display:none}}
+
+  /* ── view switch (mockup convenience) ─────────────────── */
+  .vswitch{border-bottom:1px solid var(--line);background:var(--panel)}
+  .vswitch-in{max-width:1080px;margin:0 auto;padding:0 20px;display:flex;gap:2px}
+  .vtab{appearance:none;border:0;background:transparent;padding:12px 4px;margin-right:22px;cursor:pointer;
+    font-size:14px;font-weight:600;color:var(--muted);border-bottom:2px solid transparent;margin-bottom:-1px}
+  .vtab.on{color:var(--accent);border-bottom-color:var(--accent)}
+  .vtab:hover{color:var(--ink)}
+
+  /* ── filters ─────────────────────────────────────────── */
+  .subnav{display:flex;gap:24px;padding:10px 0 0;border-bottom:1px solid var(--line);margin-bottom:14px;flex-wrap:wrap}
+  .subnav a{color:var(--muted);font-weight:600;font-size:13.5px;padding-bottom:10px;border-bottom:2px solid transparent;margin-bottom:-1px}
+  .subnav a.on{color:var(--nav);border-bottom-color:var(--accent)}
+  .filters{display:flex;gap:10px;align-items:center;flex-wrap:wrap;margin:16px 0 6px}
+  .sel{display:inline-flex;align-items:center;gap:7px;border:1px solid var(--line2);border-radius:8px;padding:8px 12px;background:var(--panel);font-size:13px;color:var(--text);cursor:pointer;white-space:nowrap}
+  .sel .cv{font-weight:600;color:var(--ink)}
+  .sel svg{width:12px;height:12px;stroke:var(--muted)}
+  .filters .adv{margin-left:auto;color:var(--accent);font-weight:600;font-size:13px}
+  .aud{display:inline-flex;border:1px solid var(--line2);border-radius:8px;overflow:hidden;background:var(--panel)}
+  .aud button{appearance:none;border:0;background:transparent;padding:8px 13px;font-size:12.5px;font-weight:600;color:var(--muted);cursor:pointer;border-right:1px solid var(--line)}
+  .aud button:last-child{border-right:0}
+  .aud button.on{background:var(--accent);color:#fff}
+  .incl{display:flex;align-items:center;gap:7px;color:var(--muted);font-size:12.5px;margin:8px 0 0}
+  .incl input{accent-color:var(--accent)}
+  .audhint{background:var(--accent-weak);border:1px solid var(--accent-mid);border-radius:8px;padding:8px 12px;font-size:12.5px;color:var(--nav);margin:12px 0 2px}
+  .audhint b{color:var(--accent)}
+  .rescount{color:var(--muted);font-size:12.5px;margin:16px 0 12px}
+  .rescount b{color:var(--ink);font-weight:600}
+
+  /* ── result card ─────────────────────────────────────── */
+  .card{border:1px solid var(--line);border-left:3px solid var(--accent);border-radius:8px;background:var(--panel);
+    padding:16px 18px;margin-bottom:12px;box-shadow:var(--shadow)}
+  .c-h{display:flex;align-items:center;gap:9px;flex-wrap:wrap;margin-bottom:3px}
+  .c-name{font-size:17px;font-weight:700;color:var(--link)}
+  .c-name:hover{text-decoration:underline;cursor:pointer}
+  .flag{font-size:15px;line-height:1}
+  .pill{font-size:10.5px;font-weight:700;letter-spacing:.03em;text-transform:uppercase;padding:2px 8px;border-radius:4px}
+  .pill.imp{background:var(--pill-imp);color:#fff}
+  .c-addr{color:var(--muted);font-size:12.5px;margin-bottom:12px}
+  .c-lane{display:flex;align-items:center;gap:6px;flex-wrap:wrap;font-size:12.5px;color:var(--text);margin-bottom:11px}
+  .c-lane .fl{color:var(--muted)}
+  .c-lane .arw{color:var(--faint)}
+  .c-lane .prod{color:var(--muted)}
+  .grid3{display:grid;grid-template-columns:repeat(4,1fr);gap:12px;padding-top:12px;border-top:1px solid var(--line)}
+  .cell .lbl{font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:.03em;margin-bottom:3px}
+  .cell .val{font-size:15px;font-weight:700;color:var(--ink)}
+  .cell .val.sm{font-size:13.5px;font-weight:600}
+  .cell .sub{font-size:11.5px;color:var(--faint)}
+  .c-foot{display:flex;align-items:center;justify-content:space-between;gap:12px;margin-top:13px;padding-top:12px;border-top:1px solid var(--line);flex-wrap:wrap}
+  .incumb{font-size:12px;color:var(--warn);background:var(--warn-weak);border-radius:5px;padding:3px 9px}
+  .incumb b{font-weight:700}
+  .contact-lo{display:inline-flex;align-items:center;gap:6px;font-size:12.5px;color:var(--nav);border:1px solid var(--line2);border-radius:6px;padding:5px 10px;background:var(--panel);cursor:pointer;font-weight:600}
+  .contact-ok{display:inline-flex;align-items:center;gap:7px;font-size:12.5px;color:var(--good);background:var(--good-weak);border-radius:6px;padding:5px 10px;font-weight:600}
+  .contact-ok .who{color:var(--text);font-weight:500}
+  .qlane{appearance:none;border:0;background:var(--accent);color:#fff;font-size:12.5px;font-weight:600;border-radius:6px;padding:7px 13px;cursor:pointer;white-space:nowrap}
+  .qlane:hover{filter:brightness(.94)}
+  @media(max-width:640px){.grid3{grid-template-columns:repeat(2,1fr)}}
+
+  /* ── profile ─────────────────────────────────────────── */
+  .p-head{padding:18px 0 0}
+  .p-title{display:flex;align-items:center;gap:10px;flex-wrap:wrap}
+  .p-title h1{font-size:27px;font-weight:800;color:var(--nav);margin:0;letter-spacing:-.015em}
+  .p-actions{margin-left:auto;display:flex;gap:8px}
+  .btn-o{border:1px solid var(--line2);background:var(--panel);color:var(--text);border-radius:7px;padding:7px 12px;font-size:12.5px;font-weight:600;cursor:pointer;display:inline-flex;gap:6px;align-items:center}
+  .btn-p{border:0;background:var(--accent);color:#fff;border-radius:7px;padding:8px 14px;font-size:13px;font-weight:600;cursor:pointer}
+  .p-meta{display:flex;gap:8px 18px;flex-wrap:wrap;color:var(--muted);font-size:12.5px;margin:9px 0 2px}
+  .p-meta .mi{display:inline-flex;align-items:center;gap:6px}
+  .p-meta a{font-weight:600}
+
+  /* our two subtle add-ons */
+  .addons{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin:16px 0 4px}
+  .ad{border:1px solid var(--line);border-radius:8px;background:var(--panel);padding:13px 15px}
+  .ad .k{font-size:11px;text-transform:uppercase;letter-spacing:.04em;color:var(--muted);margin-bottom:7px;display:flex;align-items:center;gap:6px}
+  .ad .lock{display:flex;align-items:center;gap:10px}
+  .ad .blur{filter:blur(4px);user-select:none;font-weight:600;color:var(--ink)}
+  .ad .unlockbtn{border:1px solid var(--accent);color:var(--accent);background:var(--accent-weak);border-radius:6px;padding:5px 10px;font-size:12px;font-weight:600;cursor:pointer;white-space:nowrap}
+  .ad .disp{font-size:14px;font-weight:700;color:var(--ink)}
+  .ad .disp-s{font-size:12px;color:var(--muted);margin-top:2px}
+  @media(max-width:640px){.addons{grid-template-columns:1fr}}
+
+  /* stat strip */
+  .stats{display:grid;grid-template-columns:repeat(5,1fr);gap:10px;margin:18px 0 6px}
+  .stat{border:1px solid var(--line);border-radius:10px;background:var(--panel);padding:12px 13px;display:flex;gap:11px;align-items:center}
+  .stat .si{width:40px;height:40px;border-radius:50%;background:var(--alt);display:flex;align-items:center;justify-content:center;flex:0 0 auto}
+  .stat .si svg{width:19px;height:19px;stroke:var(--nav)}
+  .stat .stxt{min-width:0}
+  .stat .sl{font-size:11px;color:var(--muted);line-height:1.22}
+  .stat .sv{font-size:18px;font-weight:800;color:var(--ink);letter-spacing:-.01em;margin-top:2px}
+  .stat .sx{font-size:10.5px;color:var(--faint)}
+  @media(max-width:860px){.stats{grid-template-columns:repeat(3,1fr)}}
+  @media(max-width:520px){.stats{grid-template-columns:repeat(2,1fr)}}
+
+  /* section */
+  .sec{margin:26px 0 0}
+  .sec-h{font-size:16px;font-weight:700;color:var(--ink);margin:0 0 3px}
+  .sec-s{font-size:12px;color:var(--muted);margin:0 0 12px}
+  .panel{border:1px solid var(--line);border-radius:8px;background:var(--panel);padding:16px}
+
+  /* bar chart */
+  .chartwrap{display:flex;gap:8px}
+  .chart-y{display:flex;flex-direction:column;justify-content:space-between;color:var(--faint);font-size:10.5px;padding-bottom:14px;text-align:right;flex:0 0 auto;width:22px}
+  .chart{flex:1 1 auto;display:flex;align-items:flex-end;gap:1.5px;height:190px;min-width:0;
+    background:linear-gradient(to top, var(--line) 1px, transparent 1px);background-size:100% 47px;background-position:left bottom;border-bottom:1px solid var(--line2)}
+  .bar{flex:1 1 0;background:#12889e;border-radius:1px 1px 0 0;min-width:0;transition:opacity .1s}
+  .bar:hover{opacity:.7}
+  .xaxis{display:flex;justify-content:space-between;color:var(--muted);font-size:11px;margin:8px 0 0 30px}
+
+  /* suppliers table */
+  .tbl-wrap{overflow-x:auto;border:1px solid var(--line);border-radius:8px}
+  table{border-collapse:collapse;width:100%;min-width:640px;font-size:13px}
+  thead th{background:var(--alt);text-align:left;padding:9px 14px;font-size:10.5px;font-weight:700;letter-spacing:.04em;text-transform:uppercase;color:var(--muted);border-bottom:1px solid var(--line)}
+  tbody td{padding:11px 14px;border-bottom:1px solid var(--line);vertical-align:middle}
+  tbody tr:last-child td{border-bottom:0}
+  .sup-n{font-weight:700;color:var(--link)}
+  .sup-c{font-size:11.5px;color:var(--muted)}
+  .spark{display:flex;align-items:flex-end;gap:1.5px;height:26px}
+  .spark i{width:3px;background:var(--line2);border-radius:1px}
+  .spark i.g{background:#3aa564}
+  .volbar{position:relative;height:16px;background:var(--alt);border-radius:3px;overflow:hidden;min-width:80px}
+  .volbar i{position:absolute;left:0;top:0;bottom:0;background:var(--accent);border-radius:3px}
+  .prodtxt{color:var(--text);font-size:12px;max-width:240px}
+  .hschip{font-family:ui-monospace,SFMono-Regular,Menlo,monospace;font-size:11px;color:var(--muted);background:var(--alt);border:1px solid var(--line);border-radius:4px;padding:1px 6px;margin-right:4px;display:inline-block}
+  .bol-link{font-size:11.5px}
+
+  /* heatmap */
+  .heat{display:grid;grid-template-columns:repeat(6,1fr);gap:8px}
+  .hcell{border-radius:8px;padding:10px 12px;border:1px solid rgba(30,50,40,.06);border-left-width:4px}
+  .hcell .hm{font-size:10.5px;font-weight:700;color:#4a5a52;text-transform:uppercase;letter-spacing:.03em}
+  .hcell .hn{font-size:19px;font-weight:800;color:#213228;margin-top:3px;line-height:1}
+  .hcell .hi{font-size:10.5px;color:#5f6f66;margin-top:1px}
+  .heat-leg{display:flex;align-items:center;gap:13px;color:var(--muted);font-size:11px;margin-top:12px;flex-wrap:wrap}
+  .heat-leg .lg{display:flex;align-items:center;gap:5px}
+  .heat-leg i{width:15px;height:12px;border-radius:2px;display:inline-block}
+  @media(max-width:560px){.heat{grid-template-columns:repeat(3,1fr)}}
+
+  /* treemap */
+  .tree{display:flex;gap:6px;height:230px}
+  .tcol{display:flex;flex-direction:column;gap:6px;min-width:0}
+  .tbox{border-radius:6px;padding:10px;color:#fff;min-width:0;overflow:hidden;display:flex;flex-direction:column;justify-content:flex-end}
+  .tbox .tc{font-family:ui-monospace,monospace;font-size:12px;font-weight:700;opacity:.9}
+  .tbox .td{font-size:11px;opacity:.85;margin-top:2px;line-height:1.3}
+  .tbox .tn{font-size:12px;font-weight:700;margin-top:4px}
+  @media(max-width:640px){.tree{height:auto;flex-direction:column}.tcol{flex-direction:row}}
+
+  /* relationships */
+  .rel{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+  .relrow{border:1px solid var(--line);border-radius:8px;padding:12px 14px;background:var(--panel)}
+  .relrow .rs{font-weight:600;color:var(--ink);font-size:13px;display:flex;align-items:center;gap:7px}
+  .relrow .rd{font-size:12px;color:var(--muted);margin-top:5px}
+  .relrow .rd b{color:var(--accent);font-weight:700}
+  @media(max-width:640px){.rel{grid-template-columns:1fr}}
+
+  /* origin countries */
+  .origin{display:flex;flex-direction:column;gap:9px}
+  .orow{display:grid;grid-template-columns:150px 1fr 70px;align-items:center;gap:12px}
+  .orow .oc{display:flex;align-items:center;gap:8px;font-weight:600;color:var(--ink);font-size:13px}
+  .orow .ob{height:14px;background:var(--alt);border-radius:3px;overflow:hidden}
+  .orow .ob i{display:block;height:100%;background:var(--accent);border-radius:3px}
+  .orow .ov{text-align:right;font-size:12.5px;color:var(--muted)}
+  @media(max-width:560px){.orow{grid-template-columns:110px 1fr 56px}}
+
+  /* pies */
+  .pierow{display:grid;grid-template-columns:repeat(3,1fr);gap:14px}
+  .piecard{border:1px solid var(--line);border-radius:10px;background:var(--panel);padding:16px;text-align:center}
+  .piecard h3{font-size:13px;font-weight:700;color:var(--ink);margin:0 0 12px}
+  .pie{border-radius:50%;margin:0 auto 12px}
+  .pie-leg{display:flex;flex-direction:column;gap:5px;text-align:left;font-size:12px;color:var(--text)}
+  .pie-leg .pl{display:flex;align-items:center;gap:7px}
+  .pie-leg i{width:11px;height:11px;border-radius:2px;flex:0 0 auto}
+  .pie-leg b{color:var(--ink)}
+  @media(max-width:720px){.pierow{grid-template-columns:1fr;max-width:340px}}
+  /* toplists */
+  .twocol{display:grid;grid-template-columns:1fr 1fr;gap:16px}
+  @media(max-width:720px){.twocol{grid-template-columns:1fr}}
+  .tl-row{display:grid;grid-template-columns:1fr auto 52px 16px;align-items:center;gap:9px;padding:7px 0;border-bottom:1px solid var(--line);font-size:13px}
+  .tl-row:last-child{border-bottom:0}
+  .tl-name{position:relative;padding:5px 9px;min-width:0;overflow:hidden;border-radius:5px}
+  .tl-bar{position:absolute;left:0;top:0;bottom:0;background:var(--accent-weak);border-radius:5px}
+  .tl-lbl{position:relative;color:var(--link);font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;display:block}
+  .tl-ct{font-weight:700;color:var(--ink);white-space:nowrap;font-variant-numeric:tabular-nums;text-align:right}
+  .tl-pct{color:var(--muted);white-space:nowrap;font-variant-numeric:tabular-nums;text-align:right}
+  .up{color:#2fa35a}.dn{color:#d1483a}.eq{color:var(--faint)}
+  /* lanes */
+  .lane-row{display:grid;grid-template-columns:1fr 66px 1fr auto;align-items:center;gap:10px;padding:9px 0;border-bottom:1px solid var(--line);font-size:12.5px}
+  .lane-row:last-child{border-bottom:0}
+  .lane-p{border:1px solid var(--line2);border-radius:6px;padding:6px 10px;color:var(--link);font-weight:600;background:var(--panel);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .lane-mid{text-align:center;color:var(--muted);font-size:11px}
+  .lane-arw{height:5px;background:var(--accent);border-radius:3px;margin:3px auto 0}
+  .lane-x{color:var(--muted);white-space:nowrap;font-variant-numeric:tabular-nums;text-align:right}
+  /* contact tabs */
+  .ctabs{display:flex;gap:16px;flex-wrap:wrap;border-bottom:1px solid var(--line);margin-bottom:12px}
+  .ctab{appearance:none;border:0;background:transparent;padding:9px 2px;font-size:12.5px;font-weight:600;color:var(--muted);cursor:pointer;border-bottom:2px solid transparent;margin-bottom:-1px;display:inline-flex;align-items:center;gap:6px}
+  .ctab.on{color:var(--link);border-bottom-color:var(--accent)}
+  .ctab .cnt{background:var(--accent-weak);color:var(--accent);border-radius:10px;padding:0 7px;font-size:11px;font-weight:700}
+  .unlockmini{border:1px solid var(--line2);border-radius:5px;padding:2px 9px;font-size:11px;color:var(--nav);cursor:pointer;background:var(--panel);font-weight:600}
+  .sec-hrow{display:flex;justify-content:space-between;align-items:baseline;flex-wrap:wrap;gap:8px}
+  /* AI / winnability differentiators (our edge over ImportYeti) */
+  .win{font-size:10.5px;font-weight:700;padding:2px 8px;border-radius:5px;white-space:nowrap}
+  .win-hi{background:#e5f6ec;color:#1c7a45}
+  .win-md{background:#fdf3e2;color:#9a6412}
+  .ai-angle{display:flex;gap:8px;align-items:flex-start;font-size:12.5px;color:var(--text);background:var(--accent-weak);border:1px solid var(--accent-mid);border-radius:7px;padding:8px 11px;margin:11px 0 0}
+  .ai-angle .z{color:var(--accent);flex:0 0 auto;font-weight:800}
+  .card{transition:box-shadow .12s,border-color .12s}
+  .card:hover{box-shadow:0 7px 22px -12px rgba(18,50,67,.3);border-color:var(--line2)}
+  .c-name:hover,.sup-n:hover,.lane-p:hover,.bol-link:hover,.tl-lbl:hover{cursor:pointer}
+  .help{display:inline-flex;width:14px;height:14px;border-radius:50%;background:var(--line);color:var(--muted);font-size:9.5px;font-weight:700;align-items:center;justify-content:center;cursor:help;margin-left:4px;vertical-align:middle}
+  .help:hover{background:var(--accent);color:#fff}
+  .aibrief{border:1px solid var(--accent-mid);border-radius:12px;background:linear-gradient(180deg,var(--accent-weak),#fff);padding:16px 18px;margin:16px 0 4px}
+  .aibrief .abh{display:flex;align-items:center;gap:9px;font-size:14px;font-weight:800;color:var(--nav);margin-bottom:11px}
+  .aibrief .abh .tag{font-size:10px;font-weight:700;letter-spacing:.04em;text-transform:uppercase;background:var(--accent);color:#fff;padding:3px 9px;border-radius:5px}
+  .aibrief ul{margin:0;padding:0;list-style:none;display:grid;gap:8px}
+  .aibrief li{position:relative;padding-left:20px;font-size:13px;color:var(--text);line-height:1.5}
+  .aibrief li::before{content:"";position:absolute;left:4px;top:8px;width:7px;height:7px;border-radius:50%;background:var(--accent)}
+  .aibrief li b{color:var(--ink)}
+  .aibrief .quote{margin-top:13px;display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap;background:#fff;border:1px solid var(--line);border-radius:9px;padding:11px 14px}
+  .aibrief .quote .ql{font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:.03em}
+  .aibrief .quote .qv{font-size:18px;font-weight:800;color:var(--ink)}
+  footer{margin:34px 0 40px;padding-top:16px;border-top:1px solid var(--line);color:var(--faint);font-size:11.5px}
+  .proto{display:inline-block;background:var(--alt);border:1px solid var(--line);border-radius:4px;padding:1px 7px;font-weight:600;color:var(--muted);margin-right:8px}
+  .hide{display:none!important}
+</style>
+
+<div class="top">
+  <div class="top-in">
+    <a class="logo" href="#">
+      <span class="mk"><svg viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"/></svg></span>
+      <span class="wm">Quote<b>Fleet</b></span>
+    </a>
+    <div class="searchbar">
+      <input id="q" placeholder="Find importers, suppliers, or a lane" value="Port of Savannah, GA">
+      <button class="sbtn" aria-label="Search"><svg viewBox="0 0 24 24" fill="none" stroke-width="2.4" stroke-linecap="round"><circle cx="11" cy="11" r="7"/><path d="m21 21-4.3-4.3"/></svg></button>
+    </div>
+    <div class="top-nav">
+      <a href="#">Directory</a>
+      <a href="#">Compliance</a>
+      <a class="acct" href="#">My Account</a>
+    </div>
+  </div>
+</div>
+
+<div class="vswitch"><div class="vswitch-in">
+  <button class="vtab on" data-v="search">Search results</button>
+  <button class="vtab" data-v="profile">Company profile</button>
+</div></div>
+
+<div class="wrap">
+  <div id="view-search"></div>
+  <div id="view-profile" class="hide"></div>
+</div>
+
+<footer class="wrap">
+  <span class="proto">Prototype</span>Real ImportYeti importers &amp; headline stats; supplier breakdown and the monthly series are representative. QuoteFleet · Supply Chain Leads — design mockup.
+</footer>
+
+<script>
+const DATA = {"results":[{"company":"Robert Bosch Tool Corp","country_code":"US","tag":"Importer","address":"1980 Indian Creek Rd, Lincolnton, NC 28092","total_shipments":169818,"ships_12m":10761,"teu_12m":18910,"last_shipment":"07/31/2026","supplier":"Scintilla AG","supplier_country":"DE","entry_port":"Savannah, GA","product":"Saw blades & parts","hs":"820299","incumbent":null,"contact":null,"email":null,"title":null,"aliases":"12 names, 9 addresses"},
+{"company":"Komatsu America Corp","country_code":"US","tag":"Importer","address":"535 Mawsons Way, Newberry, SC 29108","total_shipments":68033,"ships_12m":6644,"teu_12m":19715,"last_shipment":"07/31/2026","supplier":"Komatsu Changzhou Construction","supplier_country":"CN","entry_port":"Savannah, GA","product":"Wheel-loader frames & booms","hs":"843149","incumbent":null,"contact":null,"email":null,"title":null,"aliases":"7 names, 5 addresses"},
+{"company":"Axis Communications AB","country_code":"US","tag":"Importer","address":"4535 Hamilton Mill Rd, Buford, GA 30518","total_shipments":7277,"ships_12m":1010,"teu_12m":1487,"last_shipment":"07/31/2026","supplier":"Axis Communications AB c/o LGI","supplier_country":"DE","entry_port":"Savannah, GA","product":"Network video recorders","hs":"853890","incumbent":"Scanfil / Axis Communications","contact":"Peter Rietz","email":"peter.rietz@axis.com","title":"Director, Product Management","aliases":"4 names, 3 addresses"},
+{"company":"Ube America Inc","country_code":"US","tag":"Importer","address":"38777 Six Mile Rd, Ste 400, Livonia, MI","total_shipments":8163,"ships_12m":843,"teu_12m":1838,"last_shipment":"07/31/2026","supplier":"Ube Polimers & Chemicals Europe","supplier_country":"ES","entry_port":"Savannah, GA","product":"Ube Nylon (polyamide)","hs":"390810","incumbent":null,"contact":null,"email":"contact_pr@ube.com","title":"General contact","aliases":"6 names, 4 addresses"},
+{"company":"Premier Specialty Brands","country_code":"US","tag":"Importer","address":"5367 New Peachtree Rd, Ste 150, Chamblee, GA 30341","total_shipments":3384,"ships_12m":331,"teu_12m":1235,"last_shipment":"07/31/2026","supplier":"Guangdong Canbo Electrical","supplier_country":"CN","entry_port":"Savannah, GA","product":"Gas / charcoal grills","hs":"732111","incumbent":null,"contact":null,"email":null,"title":null,"aliases":"3 names, 2 addresses"},
+{"company":"Global Stone Impex LLC","country_code":"US","tag":"Importer","address":"3311 Sandy Ridge Rd, Colfax, NC 27235","total_shipments":4255,"ships_12m":169,"teu_12m":163,"last_shipment":"07/31/2026","supplier":"AA Stone Impex Private Limited","supplier_country":"IN","entry_port":"Savannah, GA","product":"Sandstone","hs":"251620","incumbent":"Global Stone Impex LLC","contact":null,"email":"raj@globalstoneimpex.com","title":"General contact","aliases":"No alternate names"},
+{"company":"Orafol America Inc","country_code":"US","tag":"Importer","address":"1100 Oracal Pkwy, Black Creek, GA 31308","total_shipments":1526,"ships_12m":151,"teu_12m":319,"last_shipment":"07/31/2026","supplier":"Orafol Europe GmbH","supplier_country":"DE","entry_port":"Savannah, GA","product":"Adhesive films & papers","hs":"391990","incumbent":null,"contact":null,"email":null,"title":null,"aliases":"1 name, 7 addresses"},
+{"company":"Prodesa North America Corp","country_code":"US","tag":"Importer","address":"6590 Shiloh Rd E, Alpharetta, GA","total_shipments":535,"ships_12m":57,"teu_12m":104,"last_shipment":"07/31/2026","supplier":"Prodesa Equipment SLU","supplier_country":"ES","entry_port":"Savannah, GA","product":"Wood-pelleting line machinery","hs":"843890","incumbent":null,"contact":null,"email":null,"title":null,"aliases":"2 names, 2 addresses"},
+{"company":"Mahlo America Inc","country_code":"US","tag":"Importer","address":"575 Simuel Rd, Spartanburg, SC 29303","total_shipments":414,"ships_12m":29,"teu_12m":35,"last_shipment":"07/31/2026","supplier":"Mahlo GmbH & Co KG","supplier_country":"DE","entry_port":"Savannah, GA","product":"Textile measuring equipment","hs":"950300","incumbent":"Milliken & Company","contact":"Eric Reber","email":"eric.reber@mahloamerica.com","title":"Technical Director","aliases":"1 name, 2 addresses"}],
+"profile":{"company":"Robert Bosch Tool Corp","address":"1980 Indian Creek Rd, Lincolnton, NC 28092","phone":"+1 ***-***-6693","total_shipments":169818,"ships_12m":10761,"teu_12m":18910,"avg_teu":1.76,"incumbent":"Expeditors Intl (notify party)","entry_port":"Savannah, GA",
+"months":[1170,2107,2018,1840,1578,1246,866,612,1678,1766,1793,1741,1600,1373,1069,1648,1251,1302,1409,1464,1447,1345,2095,1822,1481,1096,921,1042,1122,2080,2015,1861,1621,1307,937,538],
+"suppliers":[{"name":"Scintilla AG","country":"DE","city":"Solothurn","ships":10761,"product":"Saw blades & parts","hs":"820299"},{"name":"Komatsu Changzhou Construction","country":"CN","city":"Changzhou","ships":6644,"product":"Wheel-loader frames & booms","hs":"843149"},{"name":"Axis Communications AB c/o LGI","country":"DE","city":"Hamburg","ships":1010,"product":"Network video recorders","hs":"853890"},{"name":"Ube Polimers & Chemicals Europe","country":"ES","city":"Castellón","ships":843,"product":"Ube Nylon (polyamide)","hs":"390810"},{"name":"Guangdong Canbo Electrical","country":"CN","city":"Foshan","ships":331,"product":"Gas / charcoal grills","hs":"732111"},{"name":"AA Stone Impex Private Limited","country":"IN","city":"Jaipur","ships":169,"product":"Sandstone crates","hs":"251620"},{"name":"Orafol Europe GmbH","country":"DE","city":"Oranienburg","ships":151,"product":"Adhesive films & papers","hs":"391990"},{"name":"Prodesa Equipment SLU","country":"ES","city":"Zaragoza","ships":57,"product":"Wood-pelleting machinery","hs":"843890"}],
+"hs_breakdown":[{"hs":"820299","chap":"82 · Tools","desc":"Saw blades & parts","n":10761},{"hs":"843149","chap":"84 · Machinery","desc":"Loader parts","n":6644},{"hs":"853890","chap":"85 · Electrical","desc":"Recorder parts","n":1010},{"hs":"390810","chap":"39 · Plastics","desc":"Polyamide resin","n":843},{"hs":"732111","chap":"73 · Iron/steel","desc":"Gas grills","n":331},{"hs":"251620","chap":"25 · Stone","desc":"Sandstone","n":169}],
+"origin":[{"cc":"DE","name":"Germany","ships":11922},{"cc":"CN","name":"China","ships":6975},{"cc":"ES","name":"Spain","ships":900},{"cc":"IN","name":"India","ships":169}]}};
+
+const FLAG = cc => cc ? cc.toUpperCase().replace(/./g,c=>String.fromCodePoint(127397+c.charCodeAt())) : "";
+const N = n => (n==null?"—":Number(n).toLocaleString("en-US"));
+const el = (t,c,h)=>{const e=document.createElement(t);if(c)e.className=c;if(h!=null)e.innerHTML=h;return e;};
+
+/* ── SEARCH VIEW ── */
+function renderSearch(){
+  const root = document.getElementById("view-search");
+  const AUD = [["trucker","Trucker"],["broker","Broker"],["forwarder","Forwarder"],["supplier","Supplier"]];
+  const HINT = {trucker:'<b>Trucker view</b> — surfacing destination port &amp; containers/mo so you can price the drayage move.',
+    broker:'<b>Broker view</b> — emphasizing HS code &amp; entry port to match the commodity to your carrier network.',
+    forwarder:'<b>Forwarder view</b> — leading with the full lane, the incumbent forwarder you’d displace, and the decision-maker.',
+    supplier:'<b>Supplier view</b> — flipped to show US importers buying your product category, i.e. your buyers.'};
+  let aud = "broker";
+  root.innerHTML = `
+    <div class="subnav">
+      <a class="on">Companies &amp; Suppliers</a><a>Addresses</a><a>Product Finder by HS Code</a><a>Product Finder</a>
+    </div>
+    <div class="filters">
+      <span class="aud" id="aud">${AUD.map(a=>`<button data-a="${a[0]}" class="${a[0]===aud?'on':''}">${a[1]}</button>`).join("")}</span>
+      <span class="sel"><span>Entry port</span><span class="cv">Savannah, GA</span><svg viewBox="0 0 24 24" fill="none"><path d="m6 9 6 6 6-6"/></svg></span>
+      <span class="sel"><span>HS code</span><span class="cv">Any</span><svg viewBox="0 0 24 24" fill="none"><path d="m6 9 6 6 6-6"/></svg></span>
+      <span class="sel"><span>Supplier country</span><span class="cv">Any</span><svg viewBox="0 0 24 24" fill="none"><path d="m6 9 6 6 6-6"/></svg></span>
+      <span class="sel"><span>Frequency</span><span class="cv">Any</span><svg viewBox="0 0 24 24" fill="none"><path d="m6 9 6 6 6-6"/></svg></span>
+      <span class="sel"><span>TEU band</span><span class="cv">Any</span><svg viewBox="0 0 24 24" fill="none"><path d="m6 9 6 6 6-6"/></svg></span>
+      <a class="adv">Advanced search</a>
+    </div>
+    <div class="incl"><input type="checkbox" id="rel"><label for="rel">Include related companies</label><span class="help" title="Also show subsidiaries and alternate names that roll up to the same parent importer.">i</span></div>
+    <div class="audhint" id="audhint">${HINT[aud]}</div>
+    <div class="rescount">Showing <b>1-9</b> of <b>9</b> importer profiles built from <b>12,842</b> shipments into Savannah, GA <span style="color:var(--faint)">(3 milliseconds)</span></div>
+    <div id="cards"></div>`;
+  const cards = root.querySelector("#cards");
+  DATA.results.forEach(r=>{
+    const contact = r.email
+      ? `<span class="contact-ok"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"/></svg>Contact unlocked · <span class="who">${r.contact||r.title} &lt;${r.email}&gt;</span></span>`
+      : `<span class="contact-lo"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><rect x="5" y="11" width="14" height="9" rx="1.5"/><path d="M8 11V8a4 4 0 0 1 8 0v3"/></svg>Unlock decision-maker · 1 credit</span>`;
+    const incumb = r.incumbent ? `<span class="incumb">Displacing: <b>${r.incumbent}</b></span>` : `<span></span>`;
+    // Winnability — our AI score (volume + switchable incumbent + recency + contact-on-file)
+    const vol = r.ships_12m || 0;
+    const score = Math.max(53, Math.min(94, 57 + (r.incumbent?12:2) + (vol>800?16:vol>200?9:4) + (r.email?8:0) + (r.company.length%5)));
+    const win = {score, cls: score>=75?'win-hi':'win-md', lab: score>=75?'High':'Medium'};
+    const port = r.entry_port.split(",")[0];
+    const angle = `${r.supplier_country} lane, ~${N(vol)} shipments/yr` + (r.incumbent?`, routed via ${r.incumbent} — a switchable incumbent` : `, no forwarder named on the bill`) + `. ${r.email?'Decision-maker email on file':'Enrich the buyer'} → pitch a sharper ${port} rate this quarter.`;
+    const c = el("div","card",`
+      <div class="c-h"><span class="c-name">${r.company}</span><span class="flag">${FLAG(r.country_code)}</span><span class="pill imp">Importer</span><span class="win ${win.cls}" title="Our AI winnability score — how switchable this account looks (volume + named incumbent + recency + contact on file)">Winnability ${win.score} · ${win.lab}</span></div>
+      <div class="c-addr">${r.address}</div>
+      <div class="c-lane"><span class="flag">${FLAG(r.supplier_country)}</span><span class="fl">${r.supplier}</span><span class="arw">→</span><span>${r.entry_port}</span><span class="arw">·</span><span class="prod">${r.product} · HS ${r.hs}</span></div>
+      <div class="ai-angle"><span class="z">⚡ AI angle</span><span>${angle}</span></div>
+      <div class="grid3">
+        <div class="cell"><div class="lbl">Total shipments</div><div class="val num">${N(r.total_shipments)}</div></div>
+        <div class="cell"><div class="lbl">Shipments · 12 mo</div><div class="val num">${N(r.ships_12m)}</div></div>
+        <div class="cell"><div class="lbl">TEU · 12 mo</div><div class="val num">${N(r.teu_12m)}</div></div>
+        <div class="cell"><div class="lbl">Last shipment</div><div class="val sm num">${r.last_shipment}</div><div class="sub">Also under ${r.aliases}</div></div>
+      </div>
+      <div class="c-foot">${incumb}<div style="display:flex;gap:9px;align-items:center;flex-wrap:wrap">${contact}<button class="qlane">Quote this lane →</button></div></div>`);
+    cards.appendChild(c);
+  });
+  const audEl = root.querySelector("#aud"), hintEl = root.querySelector("#audhint");
+  audEl.addEventListener("click",e=>{const b=e.target.closest("button");if(!b)return;
+    audEl.querySelectorAll("button").forEach(x=>x.classList.remove("on"));b.classList.add("on");
+    hintEl.innerHTML = HINT[b.dataset.a];});
+}
+
+/* ── PROFILE VIEW ── */
+function renderProfile(){
+  const p = DATA.profile, root = document.getElementById("view-profile");
+  const maxM = Math.max(...p.months);
+  const topY = Math.ceil(maxM/250)*250;
+  const bars = p.months.map((m)=>`<div class="bar" style="height:${Math.round(m/topY*100)}%" title="${N(m)} shipments"></div>`).join("");
+  const yLabels = [topY, Math.round(topY*2/3), Math.round(topY/3), 0].map(v=>`<span>${N(v)}</span>`).join("");
+  const supMax = Math.max(...p.suppliers.map(s=>s.ships));
+  const supRows = p.suppliers.map(s=>{
+    const spark = Array.from({length:16},(_,i)=>{const h=22+Math.round(Math.abs(Math.sin(i*1.3+s.ships))*62+(i%3)*10);return `<i class="${i%5===3?'g':''}" style="height:${Math.min(100,h)}%"></i>`;}).join("");
+    return `<tr>
+      <td><div class="sup-n">${FLAG(s.country)} ${s.name}</div><div class="sup-c">${s.city}, ${s.country}</div></td>
+      <td><div class="spark">${spark}</div></td>
+      <td><div style="display:flex;align-items:center;gap:9px"><div class="volbar" style="flex:1"><i style="width:${Math.round(s.ships/supMax*100)}%"></i></div><span class="num" style="font-weight:600;color:var(--ink)">${N(s.ships)}</span></div></td>
+      <td><div class="prodtxt">${s.product}</div><div style="margin-top:5px"><span class="hschip">${s.hs}</span><a class="bol-link">See all bills of lading →</a></div></td>
+    </tr>`;}).join("");
+  // heatmap: fold 36-month series into 12 calendar slots
+  const months12 = Array(12).fill(0); p.months.forEach((m,i)=>months12[i%12]+=m);
+  const hMax = Math.max(...months12), hMin = Math.min(...months12);
+  const MO = ["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"];
+  const BANDS = [
+    {bg:"#f6f0d2",bd:"#e0d494",lab:"Low"},
+    {bg:"#e8f0cb",bd:"#c7dc8d",lab:"Med-low"},
+    {bg:"#d2e7b8",bd:"#a1d07f",lab:"Medium"},
+    {bg:"#a7d998",bd:"#6abf6d",lab:"High"},
+    {bg:"#74c483",bd:"#41a058",lab:"Very high"},
+  ];
+  const band = v=>BANDS[Math.min(4,Math.floor(((v-hMin)/((hMax-hMin)||1))*5))];
+  const heat = months12.map((v,i)=>{const b=band(v);return `<div class="hcell" style="background:${b.bg};border-left-color:${b.bd}"><div class="hm">${MO[i]}</div><div class="hn num">${N(v)}</div><div class="hi">imports</div></div>`;}).join("");
+  // treemap
+  const TCOL=["#0f3b4d","#12a6c4","#2f8f6b","#c08a3a","#7a6cc4","#c0655d"];
+  const totHs = p.hs_breakdown.reduce((a,b)=>a+b.n,0);
+  const big = p.hs_breakdown.slice(0,2), small = p.hs_breakdown.slice(2);
+  const tbox=(h,i)=>`<div class="tbox" style="background:${TCOL[i%TCOL.length]};flex:${h.n}"><div class="tc">${h.hs}</div><div class="td">${h.chap}</div><div class="tn num">${N(h.n)}</div></div>`;
+  const tree=`<div class="tcol" style="flex:${big.reduce((a,b)=>a+b.n,0)}">${big.map((h,i)=>tbox(h,i)).join("")}</div>
+    <div class="tcol" style="flex:${small.reduce((a,b)=>a+b.n,0)}">${small.map((h,i)=>tbox(h,i+2)).join("")}</div>`;
+  // HTS table rows
+  const htsRows = p.hs_breakdown.map((h,i)=>`<tr><td><span class="hschip">${h.hs}</span></td><td>${h.desc}</td><td><a class="bol-link">SCFLS00${270160+i*137} →</a></td><td class="prodtxt">${p.suppliers[i]?p.suppliers[i].product:h.desc}</td></tr>`).join("");
+  // relationships
+  const rel = p.suppliers.slice(0,4).map((s,i)=>`<div class="relrow"><div class="rs">${FLAG(s.country)} ${s.name}</div><div class="rd">Also supplies <b>${[7,4,3,2][i]} other US importers</b> into East-coast ports — look-alike leads on the same lane.</div></div>`).join("");
+  // origin
+  const oMax = Math.max(...p.origin.map(o=>o.ships));
+  const origin = p.origin.map(o=>`<div class="orow"><span class="oc">${FLAG(o.cc)} ${o.name}</span><span class="ob"><i style="width:${Math.round(o.ships/oMax*100)}%"></i></span><span class="ov num">${N(o.ships)}</span></div>`).join("");
+
+  /* ── extra ImportYeti sections — every count derived from the total (T) so the stats stay consistent ── */
+  const T = p.total_shipments;
+  const cnt = pc => Math.round(pc/100*T);
+  const trend = t => t>0?'<span class="up">▲</span>':t<0?'<span class="dn">▼</span>':'<span class="eq">—</span>';
+  const pie = (size, segs) => {
+    let a=0; const stops=segs.map(s=>{const s0=a;a+=s.pct;return `${s.color} ${s0}% ${a}%`;}).join(",");
+    return `<div class="pie" style="width:${size}px;height:${size}px;background:conic-gradient(${stops})"></div>
+      <div class="pie-leg">${segs.map(s=>`<div class="pl"><i style="background:${s.color}"></i>${s.label}: <b>${N(s.val)}</b> (${s.pct}%)</div>`).join("")}</div>`;
+  };
+  const tlRows = rows => {const mx=Math.max(...rows.map(r=>r.c));return rows.map(r=>`<div class="tl-row">
+    <div class="tl-name"><span class="tl-bar" style="width:${Math.round(r.c/mx*100)}%"></span><span class="tl-lbl">${r.f?FLAG(r.f)+' ':''}${r.n}</span></div>
+    <div class="tl-ct num">${N(r.c)}</div><div class="tl-pct">(${r.p}%)</div><div>${trend(r.t)}</div></div>`).join("");};
+  const tlInner = (title,rows) => `<h2 class="sec-h" style="margin-top:0">${title}</h2><div class="panel">${tlRows(rows)}</div>`;
+  const tlSec = (title,sub,rows) => `<div class="sec"><h2 class="sec-h">${title}</h2>${sub?`<p class="sec-s">${sub}</p>`:''}<div class="panel">${tlRows(rows)}</div></div>`;
+  const D = arr => arr.map(x=>({...x,c:cnt(x.p)}));
+
+  const lcl=cnt(6.7), fcl=T-lcl;
+  const house=cnt(63.9), reg=cnt(31.3), inbond=T-house-reg;
+  const withNP=cnt(81.5), noNP=T-withNP;
+  const pc1 = v => +(v/T*100).toFixed(1);
+  const portsFrom = D([{n:"Genova",f:"IT",p:15,t:-1},{n:"Yarraville",f:"AU",p:13,t:-1},{n:"Bremerhaven",f:"DE",p:11,t:-1},{n:"La Spezia",f:"IT",p:7,t:-1},{n:"Stadersand",f:"DE",p:7,t:-1}]);
+  const portsTo = D([{n:"Savannah, GA",f:"US",p:22,t:-1},{n:"Charleston, SC",f:"US",p:19,t:0},{n:"Norfolk, VA",f:"US",p:12,t:1},{n:"New York, NY",f:"US",p:9,t:-1},{n:"Houston, TX",f:"US",p:9,t:1}]);
+  const states = D([{n:"Georgia",f:"US",p:25,t:0},{n:"South Carolina",f:"US",p:22,t:-1},{n:"Virginia",f:"US",p:12,t:1},{n:"Texas",f:"US",p:9,t:1},{n:"New Jersey",f:"US",p:9,t:1}]);
+  const containers = D([{n:"40ft (4510) — GP w/ ventilation",p:26,t:-1},{n:"20ft (2210) — GP w/ ventilation",p:15,t:0},{n:"40ft (45G0) — GP no ventilation",p:10,t:-1},{n:"40ft (45G1) — GP no ventilation",p:10,t:1},{n:"Not specified",p:9,t:-1}]);
+  const notifyP = D([{n:p.incumbent,p:48,t:1},{n:"Intercom Division Transporte",p:6,t:0},{n:"Transgroup Worldwide Logistics",p:4,t:-1},{n:"Scan Global Logistics",p:3,t:0},{n:"Highland Forwarding",p:2,t:1}]);
+  const scac = D([{n:"HLCU — Hapag-Lloyd A G",p:21,t:-1},{n:"BANQ — Kuehne & Nagel Inc.",p:11,t:0},{n:"MEDU — MSC Mediterranean",p:11,t:1},{n:"MAEU — Maersk Line",p:7,t:1},{n:"DSVF — DSV Ocean Transport",p:7,t:1}]);
+
+  const lanes = p.suppliers.slice(0,5).map((s,i)=>({from:s.name.split(" ").slice(0,2).join(" "), ff:s.country, to:"Savannah, GA", tf:"US", shp:[301,184,121,114,93][i], pct:[13,8,5,5,4][i], spend:["","$222,342","","$575,980","$370,981"][i]}));
+  const laneMax = lanes[0].shp;
+  const lanesSec = `<div class="sec"><h2 class="sec-h">Top lanes used</h2><p class="sec-s">Port of lading → port of unlading · arrow length relative to the top lane</p>
+    <div class="panel">${lanes.map(l=>`<div class="lane-row">
+      <div class="lane-p">${FLAG(l.ff)} ${l.from}</div>
+      <div class="lane-mid">${N(l.shp)}<div class="lane-arw" style="width:${Math.round(l.shp/laneMax*54)}px"></div></div>
+      <div class="lane-p">${FLAG(l.tf)} ${l.to}</div>
+      <div class="lane-x">(${l.pct}%)${l.spend?` · ${l.spend}`:''}</div></div>`).join("")}</div></div>`;
+
+  const QU=["pkg","ctn","box","wdc","pkg","pcs","box","pcs"];
+  const recent = p.suppliers.map((s,i)=>({date:["08/18","08/18","08/16","08/13","08/12","08/10","08/07","08/03"][i]+"/2026",
+    bol:["SHPTS040037","SHPT836348","HLCUGDY2607","MAEU2741195","COSU6506956","HLCUGDY2607","MEDUYK88894","CMDUGEN1134"][i]+(22+i),
+    n:s.name, f:s.country, city:s.city, wt:[8100,140,6580,6133,6520,4360,2210,980][i], qu:[600,30,635,21,626,859,120,45][i], qunit:QU[i], cont:[1,1,1,1,1,1,2,1][i], prod:s.product}));
+  const recentSec = `<div class="sec"><div class="sec-hrow"><h2 class="sec-h">Most recent sea shipments</h2><a class="bol-link">Unlock the full shipment list →</a></div>
+    <div class="tbl-wrap"><table><thead><tr><th>Date</th><th>Bill of lading</th><th>Supplier</th><th>Weight</th><th>Qty</th><th>Cntrs</th><th>Description</th></tr></thead>
+    <tbody>${recent.map(r=>`<tr><td class="num">${r.date}</td><td><a class="bol-link">${r.bol}</a></td><td><span class="sup-n">${FLAG(r.f)} ${r.n}</span><div class="sup-c">${r.city}</div></td><td class="num">${N(r.wt)} kg</td><td class="num">${N(r.qu)} ${r.qunit}</td><td class="num">${r.cont}</td><td class="prodtxt">${r.prod}</td></tr>`).join("")}</tbody></table></div></div>`;
+
+  const contactTabs=[["captured","Captured company contact info",18],["notify","Notify party contact info",24],["addresses","Other addresses",83],["names","Other names",83],["websites","Other websites",3],["trademarks","Trademarks",30]];
+  const addrRows=[{a:"2300 S Watney Way, Ste A, Lincolnton, NC 28092",ph:"6693",d:"08/16/2026"},{a:"1980 Indian Creek Rd, Lincolnton, NC 28092",ph:"2792",d:"07/26/2026"},{a:"Robert Bosch Tool Corp, Mt Prospect, IL",ph:"0101",d:"07/11/2026"},{a:"Robert Bosch GmbH, Gerlingen-Schillerhoehe, DE",ph:"",d:"06/20/2026"},{a:"Scintilla AG, Solothurn, CH",ph:"4415",d:"01/03/2026"},{a:"Robert Bosch Tool Corp, Farmington Hills, MI",ph:"5581",d:"12/11/2025"}];
+  const contactSec = `<div class="sec"><h2 class="sec-h">Other addresses, names &amp; contact information</h2>
+    <div class="ctabs" id="ctabs">${contactTabs.map((t,i)=>`<button class="ctab${i===0?' on':''}" data-ct="${t[0]}">${t[1]} <span class="cnt">${t[2]}</span></button>`).join("")}</div>
+    <p class="sec-s">Most recent contact info: <b>XXX-XXX-6693</b> found on <b>16/08/2026</b> in BOL <a class="bol-link">HLCUGDY260718862</a></p>
+    <div class="tbl-wrap"><table><thead><tr><th>Address / name captured</th><th>Email</th><th>Phone</th><th>Date captured</th></tr></thead>
+    <tbody>${addrRows.map(r=>`<tr><td><a class="bol-link">${r.a}</a></td><td><button class="unlockmini">🔒 Unlock</button></td><td class="num">${r.ph?`XXX-XXX-${r.ph}`:'—'}</td><td class="num">${r.d}</td></tr>`).join("")}</tbody></table></div></div>`;
+
+  const moreSections = `
+    ${lanesSec}
+    <div class="sec"><div class="twocol"><div>${tlInner("Top containers used",containers)}</div><div>${tlInner("Top notify parties",notifyP)}</div></div></div>
+    ${tlSec("Top SCAC codes (carriers)","",scac)}
+    <div class="sec"><div class="twocol"><div>${tlInner("Top ports shipped from",portsFrom)}</div><div>${tlInner("Top ports shipped to",portsTo)}</div></div></div>
+    ${tlSec("Top states shipped to","",states)}
+    <div class="sec"><h2 class="sec-h">Shipment composition</h2><p class="sec-s">Of ${N(T)} total sea shipments on record</p><div class="pierow">
+      <div class="piecard"><h3>FCL vs LCL</h3>${pie(130,[{label:"FCL",val:fcl,pct:pc1(fcl),color:"#3fbfe0"},{label:"LCL",val:lcl,pct:pc1(lcl),color:"#0f4c5c"}])}</div>
+      <div class="piecard"><h3>By bill type</h3>${pie(130,[{label:"House",val:house,pct:pc1(house),color:"#0f4c5c"},{label:"Regular",val:reg,pct:pc1(reg),color:"#3fbfe0"},{label:"In-Bond",val:inbond,pct:pc1(inbond),color:"#2f9e8f"}])}</div>
+      <div class="piecard"><h3>Notify party</h3>${pie(130,[{label:"With notify party",val:withNP,pct:pc1(withNP),color:"#3fbfe0"},{label:"Without",val:noNP,pct:pc1(noNP),color:"#0f4c5c"}])}</div>
+    </div></div>
+    ${recentSec}
+    ${contactSec}`;
+
+  // ── AI Opportunity Brief — our headline differentiator vs ImportYeti ──
+  const peak = "Sep–Nov";
+  const qLo = 485, qHi = 640;
+  const brief = `<div class="aibrief">
+    <div class="abh"><span class="tag">AI opportunity brief</span> Why this importer is winnable now</div>
+    <ul>
+      <li><b>High, steady volume —</b> ~${N(p.ships_12m)} shipments (${N(p.teu_12m)} TEU) into ${p.entry_port} in the last 12 months; a consistent, sticky lane worth pursuing.</li>
+      <li><b>Displaceable incumbent —</b> currently routing through <b>${p.incumbent}</b>; a named target to undercut on the ${p.origin[0].name}→${p.entry_port.split(",")[0]} lane.</li>
+      <li><b>Best timing —</b> import volume peaks around <b>${peak}</b> (see frequency); reach out 4–6 weeks ahead.</li>
+      <li><b>Who to reach —</b> 3 verified contacts on file (logistics · procurement · ops); unlock and send the AI-drafted opener below.</li>
+    </ul>
+    <div class="quote"><div><div class="ql">Suggested drayage quote · this lane</div><div class="qv">$${qLo}–$${qHi} / container</div></div><button class="btn-p">Draft the pitch →</button></div>
+  </div>`;
+
+  root.innerHTML = `
+    <div class="p-head">
+      <div class="p-title">
+        <h1>${p.company}</h1><span class="flag" style="font-size:20px">${FLAG("US")}</span><span class="pill imp">Importer</span>
+        <div class="p-actions"><button class="btn-o">☆ Save</button><button class="btn-p">Quote this lane →</button></div>
+      </div>
+      <div class="p-meta">
+        <span class="mi">📍 ${p.address}</span>
+        <span class="mi">📞 ${p.phone}</span>
+        <span class="mi">🚢 Enters via ${p.entry_port}</span>
+        <span class="mi"><a>Also imports under 12 names →</a></span>
+      </div>
+    </div>
+
+    <div class="addons">
+      <div class="ad"><div class="k"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><rect x="5" y="11" width="14" height="9" rx="1.5"/><path d="M8 11V8a4 4 0 0 1 8 0v3"/></svg>Decision-maker contacts</div>
+        <div class="lock"><span class="blur">Jennifer&nbsp;Har…&nbsp;· Logistics</span><span style="font-size:12px;color:var(--muted)"><b>3 verified contacts</b> (logistics · procurement · ops) — hidden until unlocked</span><button class="unlockbtn" style="margin-left:auto">Unlock · 1 credit</button></div></div>
+      <div class="ad"><div class="k">Displacing</div>
+        <div style="display:flex;align-items:center;justify-content:space-between;gap:12px"><div><div class="disp">${p.incumbent}</div><div class="disp-s">current forwarder / notify party on the bills of lading</div></div><button class="btn-p" style="white-space:nowrap">Quote this lane →</button></div></div>
+    </div>
+    ${brief}
+
+    <div class="stats">
+      ${statCard("box","Total sea shipments",N(p.total_shipments),"")}
+      ${statCard("cal","Shipments · last 12 mo",N(p.ships_12m),"")}
+      ${statCard("layers","Avg TEU / shipment",p.avg_teu,"")}
+      ${statCard("stack","TEU · last 12 mo",N(p.teu_12m),"")}
+      ${statCard("dollar","Est. shipping spend",'~$45.4M',"est. · 12 mo")}
+    </div>
+
+    <div class="sec"><h2 class="sec-h">Total sea shipments over time</h2><p class="sec-s">Last 36 months · monthly bill-of-lading count</p>
+      <div class="panel"><div class="chartwrap"><div class="chart-y">${yLabels}</div><div class="chart">${bars}</div></div>
+        <div class="xaxis"><span>2024</span><span>2025</span><span>2026</span></div></div></div>
+
+    <div class="sec"><h2 class="sec-h">Suppliers</h2><p class="sec-s">Who this importer buys from · 8 of 8</p>
+      <div class="tbl-wrap"><table>
+        <thead><tr><th>Supplier</th><th>Shipment activity</th><th>Shipments · 12 mo</th><th>Product &amp; HS code</th></tr></thead>
+        <tbody>${supRows}</tbody></table></div></div>
+
+    <div class="sec"><h2 class="sec-h">Annual importing frequency</h2><p class="sec-s">All-time shipments by calendar month — when to time the pitch</p>
+      <div class="panel"><div class="heat">${heat}</div>
+        <div class="heat-leg">${BANDS.map(b=>`<span class="lg"><i style="background:${b.bg};border:1px solid ${b.bd}"></i>${b.lab}</span>`).join("")}</div></div></div>
+
+    <div class="sec"><h2 class="sec-h">Product breakdown</h2><p class="sec-s">By HS code · share of 12-month shipments</p>
+      <div class="panel"><div class="tree">${tree}</div></div></div>
+
+    <div class="sec"><h2 class="sec-h">HTS codes pulled from product descriptions</h2><p class="sec-s">Top 6 · with a sample bill of lading</p>
+      <div class="tbl-wrap"><table>
+        <thead><tr><th>HS code</th><th>Description</th><th>BOL number</th><th>Product description</th></tr></thead>
+        <tbody>${htsRows}</tbody></table></div></div>
+
+    <div class="sec"><h2 class="sec-h">Top supplier relationships</h2><p class="sec-s">Every shared supplier is a look-alike lead — importers you can pitch the same route</p>
+      <div class="rel">${rel}</div></div>
+
+    <div class="sec"><h2 class="sec-h">Imports by origin country</h2><p class="sec-s">Origin → Savannah, GA</p>
+      <div class="panel"><div class="origin">${origin}</div></div></div>
+    ${moreSections}
+    <div style="height:16px"></div>`;
+  const ct=root.querySelector("#ctabs");
+  if(ct)ct.addEventListener("click",e=>{const b=e.target.closest(".ctab");if(!b)return;ct.querySelectorAll(".ctab").forEach(x=>x.classList.remove("on"));b.classList.add("on");});
+}
+function statCard(ic,label,val,sub){
+  const I={box:'<rect x="3" y="7" width="18" height="13" rx="1.5"/><path d="M3 10h18M9 7V4h6v3"/>',
+    cal:'<rect x="3" y="5" width="18" height="16" rx="2"/><path d="M3 9h18M8 3v4M16 3v4"/>',
+    layers:'<path d="m12 3 9 5-9 5-9-5 9-5Z"/><path d="m3 13 9 5 9-5"/>',
+    stack:'<rect x="4" y="4" width="16" height="16" rx="1.5"/><path d="M4 9h16M4 14h16"/>',
+    dollar:'<path d="M12 2v20M17 6.5A4 4 0 0 0 13 4h-2a3.5 3.5 0 0 0 0 7h2a3.5 3.5 0 0 1 0 7h-2a4 4 0 0 1-4-2.5"/>'};
+  return `<div class="stat"><div class="si"><svg viewBox="0 0 24 24" fill="none" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">${I[ic]}</svg></div><div class="stxt"><div class="sl">${label}</div><div class="sv num">${val}</div>${sub?`<div class="sx">${sub}</div>`:''}</div></div>`;
+}
+
+/* ── view switch ── */
+document.querySelectorAll(".vtab").forEach(t=>t.addEventListener("click",()=>{
+  document.querySelectorAll(".vtab").forEach(x=>x.classList.remove("on"));t.classList.add("on");
+  const v=t.dataset.v;
+  document.getElementById("view-search").classList.toggle("hide",v!=="search");
+  document.getElementById("view-profile").classList.toggle("hide",v!=="profile");
+  window.scrollTo(0,0);
+}));
+renderSearch(); renderProfile();
+</script>
