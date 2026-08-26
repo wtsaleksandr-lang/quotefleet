@@ -61,10 +61,12 @@ const envInt = (name: string, fallback: number): number => {
 };
 /** Rows per ImportYeti page for a profile pull. */
 export const PROFILE_PAGE_SIZE = envInt('IMPORTER_PROFILE_PAGE_SIZE', 50);
-/** Hard cap on pages pulled per profile (cost guard). ~5 credits/page; the pull
- *  is cached 14 days + gated behind the 3-free-profile quota, so a deeper sample
- *  (a richer shipments-over-time chart) is a one-time cost per company. */
-export const PROFILE_MAX_PAGES = envInt('IMPORTER_PROFILE_MAX_PAGES', 6);
+/** Hard cap on pages pulled per profile (cost guard). ~5 credits/page. Cut from 6
+ *  to 2 to bound cost: ~10 credits (~$0.90) per UNIQUE company on first open, then
+ *  the pull is cached 14 days (every later open of that company is $0) and gated
+ *  behind the 3-free-profile quota. Raise IMPORTER_PROFILE_MAX_PAGES for a longer
+ *  shipments-over-time chart at higher per-company cost once credits allow. */
+export const PROFILE_MAX_PAGES = envInt('IMPORTER_PROFILE_MAX_PAGES', 2);
 
 // ── slug + small utils ───────────────────────────────────────────────────────
 const SLUG_RX = /^[a-z0-9][a-z0-9-]{0,80}$/;
