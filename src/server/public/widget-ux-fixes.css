@@ -1056,8 +1056,8 @@ html { scrollbar-width: thin; scrollbar-color: rgba(135, 138, 150, 0.38) transpa
    wheel/touch that reaches any scrollable widget surface can't chain up and
    scroll the host page (the Customize preview host, or a customer's embed). The
    wheel preventDefault in widget.js is the primary fix; this backs it up. ── */
-html, body { overscroll-behavior: contain; }
-.qf-widget { overscroll-behavior: contain; }
+html, body { overscroll-behavior: auto; }
+.qf-widget { overscroll-behavior: auto; }
 .qf-map-card, .qf-map-viewport { overscroll-behavior: contain; }
 /* Clip the inline base map so any transient CSS zoom feedback stays inside the
    card rather than spilling over the surrounding controls. */
