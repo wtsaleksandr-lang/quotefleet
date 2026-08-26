@@ -325,6 +325,52 @@ const AGG_MAX_CONCURRENCY = 2;
  */
 const REQUEST_AGG_BUDGET_MS = 8000;
 
+/**
+ * OFF-PATH (boot / cron / ingest-end) recompute budgets. The persisted-aggregate
+ * recompute runs the full 330k-row scans behind the limiter, so historically it
+ * passed NO budget at all — a starved recompute could then wait UNBOUNDED on a
+ * pooled connection / the 2-slot limiter and drag the whole run past the 15-min
+ * cron slow-run watchdog (CRON_SLOW_RUN_MS in cronSafety.ts), firing the "cron
+ * slow >15min" alerts. Two additive bounds fix that without raising the (correct)
+ * watchdog:
+ *   - OFFPATH_SCAN_BUDGET_MS: a per-transaction statement-timeout budget for each
+ *     scan-set (summary + base facets). Generous vs the 8s request path because
+ *     the off-path scan legitimately covers the whole table, but still finite so a
+ *     starved scan aborts (Postgres 57014) and releases its connection.
+ *   - OFFPATH_RECOMPUTE_BUDGET_MS: a TOTAL wall-clock cap over the entire
+ *     recompute (limiter + connection acquire + both scan-sets + the upsert), so
+ *     even an unbounded connection/limiter wait — which a statement_timeout can
+ *     NOT bound — aborts well before the watchdog. Sized above the sum of the two
+ *     scan budgets plus acquire slack, and far below CRON_SLOW_RUN_MS.
+ */
+const OFFPATH_SCAN_BUDGET_MS = 30_000;
+const OFFPATH_RECOMPUTE_BUDGET_MS = 90_000;
+
+/**
+ * Reject if `p` has not settled within `ms`. The underlying work keeps running
+ * (JS cannot cancel an in-flight promise), but its DB statements are independently
+ * bounded by the statement_timeout armed via withAggregateTimeout, so the pooled
+ * connection is released server-side regardless; this race only lets the CALLER
+ * (the boot heal / the refresh cron) settle before the 15-min slow-run watchdog.
+ * The timer is unref'd (never keeps the process alive) and always cleared on
+ * settle so it can never leak. Exported for a deterministic unit test.
+ */
+export function withWallClockDeadline<T>(p: Promise<T>, ms: number, label: string): Promise<T> {
+  let timer: ReturnType<typeof setTimeout> | undefined;
+  const timeout = new Promise<never>((_resolve, reject) => {
+    timer = setTimeout(
+      () => reject(new Error(`${label} exceeded ${ms}ms wall-clock budget`)),
+      ms,
+    );
+    if (timer && typeof (timer as { unref?: () => void }).unref === 'function') {
+      (timer as { unref: () => void }).unref();
+    }
+  });
+  return Promise.race([p, timeout]).finally(() => {
+    if (timer) clearTimeout(timer);
+  }) as Promise<T>;
+}
+
 /** Transaction handle type for withAggregateTimeout's callback (drizzle tx). */
 type AggregateTx = Parameters<Parameters<ReturnType<typeof db>['transaction']>[0]>[0];
 
@@ -563,11 +609,31 @@ export function invalidatePersistedAggregatesCache(): void {
  * it; it never partially writes (summary + base facets are written in one upsert).
  */
 export async function recomputeAndPersistDirectoryAggregates(): Promise<PersistedAggregates> {
+  // Bound the WHOLE off-path recompute with a total wall-clock cap so a starved
+  // run (unbounded pooled-connection / limiter wait — which a statement_timeout
+  // can NOT bound) aborts cleanly instead of dragging past the 15-min cron
+  // slow-run watchdog (cronSafety.ts). The per-scan-set statement budgets below
+  // release the DB connection server-side; this outer cap settles the caller.
+  return withWallClockDeadline(
+    recomputeAndPersistDirectoryAggregatesInner(),
+    OFFPATH_RECOMPUTE_BUDGET_MS,
+    'directory aggregate recompute',
+  );
+}
+
+async function recomputeAndPersistDirectoryAggregatesInner(): Promise<PersistedAggregates> {
   // Both computes go through the shared limiter so an off-path recompute can
   // never open more than AGG_MAX_CONCURRENCY aggregate transactions at once —
-  // identical back-pressure to the live refresh paths.
-  const summary = await aggregateLimiter.run(() => getDirectorySummaryUnsafe());
-  const baseFacets = await aggregateLimiter.run(() => getFacetCountsUnsafe(normalizeFilters({})));
+  // identical back-pressure to the live refresh paths. Each scan-set now carries
+  // a finite per-transaction statement budget (OFFPATH_SCAN_BUDGET_MS) so a
+  // starved scan aborts (Postgres 57014) and frees its connection rather than
+  // pinning it — the off-path used to pass no budget at all.
+  const summary = await aggregateLimiter.run(() =>
+    getDirectorySummaryUnsafe(OFFPATH_SCAN_BUDGET_MS),
+  );
+  const baseFacets = await aggregateLimiter.run(() =>
+    getFacetCountsUnsafe(normalizeFilters({}), OFFPATH_SCAN_BUDGET_MS),
+  );
   const computedAt = new Date();
   await db()
     .insert(directoryAggregateCache)
@@ -652,10 +718,12 @@ export async function getDirectorySummary(): Promise<DirectorySummary> {
   }
 }
 
-async function getDirectorySummaryUnsafe(): Promise<DirectorySummary> {
+async function getDirectorySummaryUnsafe(budgetMs?: number): Promise<DirectorySummary> {
   // All three heavy scans run inside ONE transaction under a per-statement
   // timeout; a timed-out scan rejects and is absorbed by getDirectorySummary's
-  // keep-stale / serve-empty error paths. Folding stays pure JS below.
+  // keep-stale / serve-empty error paths. Folding stays pure JS below. The
+  // REQUEST path passes no budget (unchanged 8s-per-statement ceiling); the
+  // OFF-path recompute passes a total budget so the whole transaction is bounded.
   const { byStateRows, byPortRows, intermodalRow } = await withAggregateTimeout(async (tx) => {
     const byStateRows = await tx
       .select({ state: carrierDirectory.state, n: sql<number>`count(*)::int` })
@@ -673,7 +741,7 @@ async function getDirectorySummaryUnsafe(): Promise<DirectorySummary> {
       .where(eq(carrierDirectory.intermodal, true));
 
     return { byStateRows, byPortRows, intermodalRow };
-  });
+  }, budgetMs);
 
   const byState = byStateRows
     .filter((r) => r.state)
