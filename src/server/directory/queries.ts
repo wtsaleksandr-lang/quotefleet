@@ -309,8 +309,35 @@ const AGG_STATEMENT_TIMEOUT_MS = 8000;
 /** Max directory aggregate recomputes allowed to touch the DB concurrently. */
 const AGG_MAX_CONCURRENCY = 2;
 
+/**
+ * TOTAL wall-clock budget (ms) for a REQUEST-PATH multi-scan aggregate (the
+ * filtered facet-count transaction + the list count/select transaction). The
+ * per-statement `statement_timeout` bounds ONE scan to 8s, but the filtered facet
+ * compute issues ~9 sequential scans in a single transaction — so their SUM was
+ * unbounded (up to ~72s). On a cold/contended Neon compute those stacked to the
+ * ~25s hang that took the page to HTTP 000. This budget re-arms statement_timeout
+ * to the REMAINING budget before each scan, so the WHOLE transaction can never
+ * pin a connection longer than this; when it's exhausted the next scan aborts
+ * (Postgres 57014) and the caller degrades (stale/empty facets, empty list) — the
+ * page still renders. OFF-path recomputes (persisted base aggregates) pass no
+ * budget and keep the per-statement-only ceiling so the full-table scan is free
+ * to take the time it legitimately needs behind the limiter.
+ */
+const REQUEST_AGG_BUDGET_MS = 8000;
+
 /** Transaction handle type for withAggregateTimeout's callback (drizzle tx). */
 type AggregateTx = Parameters<Parameters<ReturnType<typeof db>['transaction']>[0]>[0];
+
+/**
+ * Re-arm the transaction's `statement_timeout` to the remaining wall-clock budget.
+ * Called before each scan of a multi-scan request-path aggregate so the SUM of
+ * its statements is bounded (not just each one). Once the budget is spent the
+ * ceiling collapses to ~1ms, so the very next scan aborts immediately (57014) and
+ * releases the pooled connection instead of the transaction dragging on. A no-op
+ * of re-setting the constant 8s ceiling when there is no total budget (off-path
+ * recomputes), which preserves the original per-statement-only semantics.
+ */
+type ArmTimeout = () => Promise<void>;
 
 /**
  * Minimal in-process FIFO counting semaphore. Bounds how many `run()` callbacks
@@ -360,11 +387,21 @@ const aggregateLimiter = new AggregateLimiter(AGG_MAX_CONCURRENCY);
  * empty/degraded result. `SET LOCAL` scopes the timeout to this transaction and
  * auto-resets on commit, so it never leaks onto other pooled work.
  */
-async function withAggregateTimeout<T>(fn: (tx: AggregateTx) => Promise<T>): Promise<T> {
+async function withAggregateTimeout<T>(
+  fn: (tx: AggregateTx, arm: ArmTimeout) => Promise<T>,
+  totalBudgetMs?: number,
+): Promise<T> {
+  // A total budget bounds the WHOLE transaction (sum of its scans); without one
+  // the original per-statement 8s ceiling applies to each statement unchanged.
+  const deadline = totalBudgetMs != null ? Date.now() + totalBudgetMs : null;
   return db().transaction(async (tx) => {
-    // SET does not accept bind params; the value is our own integer constant.
-    await tx.execute(sql.raw(`SET LOCAL statement_timeout = ${AGG_STATEMENT_TIMEOUT_MS}`));
-    return fn(tx);
+    const arm: ArmTimeout = async () => {
+      const ms = deadline != null ? Math.max(1, deadline - Date.now()) : AGG_STATEMENT_TIMEOUT_MS;
+      // SET does not accept bind params; the value is our own integer constant.
+      await tx.execute(sql.raw(`SET LOCAL statement_timeout = ${Math.ceil(ms)}`));
+    };
+    await arm();
+    return fn(tx, arm);
   });
 }
 
@@ -1231,16 +1268,25 @@ async function listCarriersUnsafe(filters: DirectoryFilters): Promise<CarrierLis
   const conditions = buildConditions(filters);
   const where = conditions.length ? and(...conditions) : undefined;
 
-  const totalRow = await db().select({ n: sql<number>`count(*)::int` }).from(carrierDirectory).where(where);
-  const total = totalRow[0]?.n ?? 0;
-
-  const rows = await db()
-    .select()
-    .from(carrierDirectory)
-    .where(where)
-    .orderBy(...orderForSort(filters.sort, filters.dir))
-    .limit(perPage)
-    .offset((page - 1) * perPage);
+  // Both the filtered count and the ordered page run in ONE transaction under a
+  // shared wall-clock budget (re-armed before each), so the list path — like the
+  // facet path — can never pin a connection past REQUEST_AGG_BUDGET_MS. Running
+  // them on one connection (instead of two auto-commit reads) also halves this
+  // request's pool footprint under crawler/state-click bursts. On a budget/scan
+  // failure the transaction rejects and listCarriers' catch serves an empty list.
+  const { total, rows } = await withAggregateTimeout(async (tx, arm) => {
+    await arm();
+    const totalRow = await tx.select({ n: sql<number>`count(*)::int` }).from(carrierDirectory).where(where);
+    await arm();
+    const rows = await tx
+      .select()
+      .from(carrierDirectory)
+      .where(where)
+      .orderBy(...orderForSort(filters.sort, filters.dir))
+      .limit(perPage)
+      .offset((page - 1) * perPage);
+    return { total: totalRow[0]?.n ?? 0, rows };
+  }, REQUEST_AGG_BUDGET_MS);
 
   return {
     carriers: rows.map(visibleCarrier),
@@ -1340,8 +1386,10 @@ async function refreshFacetCounts(filters: DirectoryFilters, key: string): Promi
   try {
     // Gate the recompute through the shared limiter so a cold-cache burst of
     // DISTINCT filter keys can never open more than AGG_MAX_CONCURRENCY
-    // aggregate transactions at once (the stampede that pinned the pool).
-    const val = await aggregateLimiter.run(() => getFacetCountsUnsafe(filters));
+    // aggregate transactions at once (the stampede that pinned the pool). The
+    // REQUEST_AGG_BUDGET_MS total budget bounds the whole ~9-scan filtered facet
+    // compute so it can never pin a connection for the ~25s that hung the page.
+    const val = await aggregateLimiter.run(() => getFacetCountsUnsafe(filters, REQUEST_AGG_BUDGET_MS));
     // Cache only a successfully computed value; an error must NOT poison the cache.
     // Evict the oldest entry (insertion order) once over the cap.
     facetCountsCache.set(key, { at: Date.now(), val });
@@ -1414,17 +1462,22 @@ export async function getFacetCounts(filters: DirectoryFilters): Promise<FacetCo
  * logic is unchanged from #406 — only the cache-set + error swallowing moved out
  * to the SWR wrapper above.
  */
-async function getFacetCountsUnsafe(filters: DirectoryFilters): Promise<FacetCounts> {
-  // Every scan runs inside ONE transaction under a per-statement timeout; a
-  // timed-out scan rejects and is absorbed by getFacetCounts' keep-stale /
-  // serve-empty error paths.
-  return withAggregateTimeout(async (tx) => {
+async function getFacetCountsUnsafe(filters: DirectoryFilters, budgetMs?: number): Promise<FacetCounts> {
+  // Every scan runs inside ONE transaction. `arm()` re-arms statement_timeout to
+  // the remaining budget before each scan, so on the REQUEST path (budgetMs set)
+  // the SUM of these ~9 scans is bounded — not just each one — and the whole
+  // compute can never pin a connection for the ~25s that took the page to 000.
+  // A budget/scan timeout rejects and is absorbed by getFacetCounts' keep-stale /
+  // serve-empty paths (the list still renders — the sidebar counts just degrade).
+  // OFF-path (no budgetMs) keeps the per-statement-only 8s ceiling per scan.
+  return withAggregateTimeout(async (tx, arm) => {
     const whereOf = (excl: string) => {
       const c = buildConditions(filters, new Set([excl]));
       return c.length ? and(...c) : undefined;
     };
 
     // Fleet buckets — one grouped scan.
+    await arm();
     const fleetRows = await tx
       .select({
         bucket: sql<string>`case
@@ -1440,6 +1493,7 @@ async function getFacetCountsUnsafe(filters: DirectoryFilters): Promise<FacetCou
       .groupBy(sql`1`);
 
     // Drivers buckets — one grouped scan (mirrors fleet).
+    await arm();
     const driversRows = await tx
       .select({
         bucket: sql<string>`case
@@ -1459,6 +1513,7 @@ async function getFacetCountsUnsafe(filters: DirectoryFilters): Promise<FacetCou
     // (drayage maps onto the intermodal column) so each option's count is honest.
     const eqBase = buildConditions(filters, new Set(['equipment', 'intermodal']));
     const eqWhere = eqBase.length ? and(...eqBase) : undefined;
+    await arm();
     const equipmentRows = await tx
       .select({
         drayage: sql<number>`count(*) filter (where ${carrierDirectory.intermodal})::int`,
@@ -1476,6 +1531,7 @@ async function getFacetCountsUnsafe(filters: DirectoryFilters): Promise<FacetCou
     // Excludes ITSELF so each option's count is honest faceted-search semantics.
     const cargoBase = buildConditions(filters, new Set(['cargo']));
     const cargoWhere = cargoBase.length ? and(...cargoBase) : undefined;
+    await arm();
     const cargoRows = await tx
       .select({
         household: sql<number>`count(*) filter (where ${carrierDirectory.householdGoods})::int`,
@@ -1498,6 +1554,7 @@ async function getFacetCountsUnsafe(filters: DirectoryFilters): Promise<FacetCou
     // Ports & terminals — one grouped scan on the stored nearest_port_code, with
     // the port dimension self-excluded. Member counts are folded into their
     // DISPLAY group below (co-located ports sum into one hub).
+    await arm();
     const portRows = await tx
       .select({ code: carrierDirectory.nearestPortCode, n: sql<number>`count(*)::int` })
       .from(carrierDirectory)
@@ -1505,11 +1562,13 @@ async function getFacetCountsUnsafe(filters: DirectoryFilters): Promise<FacetCou
       .groupBy(carrierDirectory.nearestPortCode);
 
     // Good-standing count — self-excluded so the toggle badge reads honestly.
+    await arm();
     const goodRow = await tx
       .select({ n: sql<number>`count(*)::int` })
       .from(carrierDirectory)
       .where(and(...buildConditions(filters, new Set(['standing'])), goodStandingCondition()));
 
+    await arm();
     const [authRow, imRow, recentRow] = await Promise.all([
       tx
         .select({ n: sql<number>`count(*)::int` })
