@@ -25,7 +25,7 @@
  * confirm; uploaded docs flagged "on file" / self-reported, never "verified".
  */
 import type { Express, Request, Response } from 'express';
-import { and, desc, eq } from 'drizzle-orm';
+import { and, desc, eq, isNull, sql } from 'drizzle-orm';
 import { nanoid } from 'nanoid';
 import { db } from '../../db/client.js';
 import {
@@ -49,8 +49,11 @@ import {
   renderPrivacyLanding,
   renderPrivacyApply,
   renderAdminPrivacyQueue,
+  renderPrivacyAccount,
+  renderPrivacyLogin,
 } from '../directory/manifestPages.js';
 import { manifestIdentity } from '../directory/manifestEntitlement.js';
+import { loadEnv } from '../../config.js';
 import {
   currentManifestPeriod,
   dbManifestUsageStore,
@@ -94,6 +97,39 @@ async function getByToken(token: string): Promise<PoaApplication | null> {
 async function getById(id: number): Promise<PoaApplication | null> {
   const rows = await db().select().from(poaApplications).where(eq(poaApplications.id, id)).limit(1);
   return rows[0] ?? null;
+}
+
+/**
+ * Account-linking: associate any ownerless POA applications (created via the
+ * anonymous token flow) to this signed-in user by matching signer_email to the
+ * account email. Idempotent — only claims rows whose user_id IS NULL, so a
+ * token-based resume for a not-yet-registered visitor keeps working until they
+ * sign in. Best-effort: a failure here must never block the account page.
+ */
+async function claimApplicationsForUser(userId: number, email: string | null): Promise<void> {
+  if (!email) return;
+  try {
+    await db()
+      .update(poaApplications)
+      .set({ userId, updatedAt: new Date() })
+      .where(
+        and(
+          isNull(poaApplications.userId),
+          sql`lower(${poaApplications.signerEmail}) = lower(${email})`,
+        ),
+      );
+  } catch (err) {
+    console.warn('[manifest.account.claim] link-by-email failed (non-fatal):', err);
+  }
+}
+
+/** All POA applications owned by a user, newest first. */
+async function applicationsForUser(userId: number): Promise<PoaApplication[]> {
+  return db()
+    .select()
+    .from(poaApplications)
+    .where(eq(poaApplications.userId, userId))
+    .orderBy(desc(poaApplications.createdAt));
 }
 
 async function audit(
@@ -207,7 +243,70 @@ export function registerManifestPrivacyRoutes(app: Express): void {
       slug: str((req.query as Record<string, unknown>)?.slug, 120) ?? undefined,
       name: str((req.query as Record<string, unknown>)?.name, 200) ?? undefined,
     };
-    res.type('html').send(renderPrivacyApply({ app: application, prefill }));
+    // Whether the caller is a paying subscriber decides the honest Done-screen
+    // copy: an unpaid signer must NOT be told we submit to CBP (nothing is filed
+    // until they choose a plan).
+    const ident = await manifestIdentity(req);
+    res.type('html').send(
+      renderPrivacyApply({ app: application, prefill, isSubscriber: ident.isSubscriber }),
+    );
+  });
+
+  // ── customer sign-in gate (magic-link) ──────────────────────────────────────
+  app.get('/privacy/login', (_req: Request, res: Response) => {
+    res.type('html').send(renderPrivacyLogin());
+  });
+
+  // ── customer account portal (page) ──────────────────────────────────────────
+  // Requires login. An unauthenticated visitor is REDIRECTED to the sign-in page
+  // (never a raw JSON 401 on a browser navigation).
+  app.get('/privacy/account', async (req: Request, res: Response) => {
+    const ident = await manifestIdentity(req);
+    if (ident.userId == null) {
+      return res.redirect('/privacy/login');
+    }
+    // Claim any ownerless applications filed under this email, then list them.
+    await claimApplicationsForUser(ident.userId, ident.email);
+    const applications = await applicationsForUser(ident.userId);
+    return res
+      .type('html')
+      .send(renderPrivacyAccount({ email: ident.email ?? '', identity: ident, applications }));
+  });
+
+  // ── customer account API (soft-auth, mirrors /api/directory/auth/me) ─────────
+  // Never 401s: an anonymous caller gets { user: null }. A signed-in caller gets
+  // their subscription identity + every entity they've filed (after linking any
+  // ownerless applications by email).
+  app.get('/api/privacy/me', async (req: Request, res: Response) => {
+    const ident = await manifestIdentity(req);
+    if (ident.userId == null) {
+      return res.json({ user: null, subscription: null, applications: [] });
+    }
+    await claimApplicationsForUser(ident.userId, ident.email);
+    const applications = await applicationsForUser(ident.userId);
+    return res.json({
+      user: { id: ident.userId, email: ident.email, name: ident.name ?? null },
+      subscription: {
+        tier: ident.tier,
+        status: ident.status,
+        isSubscriber: ident.isSubscriber,
+        entityQuota: ident.entityQuota,
+        currentPeriodEnd: ident.currentPeriodEnd,
+      },
+      applications: applications.map((a) => ({
+        token: a.publicToken,
+        status: a.status,
+        grantorLegalName: a.grantorLegalName,
+        nameVariations: a.nameVariations ?? [],
+        signerEmail: a.signerEmail,
+        docSha256: a.docSha256,
+        signedAt: a.signedAt,
+        cbpSubmittedAt: a.cbpSubmittedAt,
+        cbpConfirmedAt: a.cbpConfirmedAt,
+        effectiveAt: a.effectiveAt,
+        expiresAt: a.expiresAt,
+      })),
+    });
   });
 
   // ── create draft ───────────────────────────────────────────────────────────
@@ -342,12 +441,19 @@ export function registerManifestPrivacyRoutes(app: Express): void {
 
       // Email the signer a copy of the signed PDF (best-effort; never blocks).
       if (withSigner.signerEmail) {
+        const base = loadEnv().PUBLIC_BASE_URL.replace(/\/$/, '');
+        const resumeUrl = `${base}/privacy/apply/${existing.publicToken}`;
+        const accountUrl = `${base}/privacy/account`;
         sendEmail({
           to: withSigner.signerEmail,
           subject: 'Your signed Manifest Privacy authorization',
           text:
             `Attached is your signed Limited Power of Attorney for a U.S. Customs vessel manifest ` +
-            `confidentiality request.\n\nDocument SHA-256: ${sha256}\n\nWe prepare and submit your ` +
+            `confidentiality request.\n\nDocument SHA-256: ${sha256}\n\n` +
+            `Pick up where you left off (choose a plan or review your request):\n${resumeUrl}\n\n` +
+            `Manage all your protected entities and track status any time in your account:\n${accountUrl}\n` +
+            `(Sign in with this email — no password needed.)\n\n` +
+            `We prepare and submit your ` +
             `request to CBP on your behalf and will keep you posted as your status moves from ` +
             `Signed to Submitted to Confirmed. — QuoteFleet`,
           attachments: [
