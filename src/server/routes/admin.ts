@@ -12,8 +12,27 @@ import type { Express } from 'express';
 import { eq, desc, sql, and, inArray } from 'drizzle-orm';
 import { z } from 'zod';
 import { db } from '../../db/client.js';
-import { tenants, leads, users, auditLog, carrierDirectory, carrierOverrides, affiliates, referralAttributions, affiliateCommissions, type NewCarrierOverrideRow } from '../../db/schema.js';
+import {
+  tenants,
+  leads,
+  users,
+  auditLog,
+  carrierDirectory,
+  carrierOverrides,
+  affiliates,
+  referralAttributions,
+  affiliateCommissions,
+  directorySubscriptions,
+  manifestSubscriptions,
+  importerBolCache,
+  importerContactCache,
+  type NewCarrierOverrideRow,
+} from '../../db/schema.js';
 import { requireAuth, requireSuperAdmin } from '../middleware.js';
+import { creditMeter } from '../directory/importerQuota.js';
+import { companyKey } from '../directory/importerCache.js';
+import { loadEnv } from '../../config.js';
+import Stripe from 'stripe';
 import { runAggregatesNow } from '../../marketplace/cron.js';
 import { normalizeDot } from '../directory/carrierIngest.js';
 import {
@@ -281,6 +300,109 @@ export function computeMrr(rows: MrrTenant[]): MrrBreakdown {
     byPlan,
     trialingCount,
     potentialTrialMrr: roundCents(potentialTrialMrr),
+  };
+}
+
+// ════════════════════════════════════════════════════════════════════
+// PRODUCT-LINE MRR — the two per-SHIPPER revenue lines that live OUTSIDE
+// `tenants` and were invisible to computeMrr: Directory Pro ($19/mo) and
+// Manifest Privacy (annual $79/$249/$599 → ÷12 monthly). Both are fully
+// decoupled from tenants.plan, so the tenant scan above never saw a cent of
+// them and the admin MRR was understating real revenue by two whole products.
+// ════════════════════════════════════════════════════════════════════
+
+/** Directory Pro is a flat $19/mo subscription. */
+export const DIRECTORY_PRO_MONTHLY_USD = 19;
+
+/** The manifest tiers, as (tier → annual USD). Kept here (not imported) so the
+ *  MRR math is a pure function with zero DB/entitlement coupling — mirrors how
+ *  computeMrr owns PLAN_PRICES_USD via the plans module. */
+export const MANIFEST_ANNUAL_USD: Record<'basic' | 'professional' | 'enterprise', number> = {
+  basic: 79,
+  professional: 249,
+  enterprise: 599,
+};
+
+/** Normalize a manifest tier string onto the three known tiers (default basic). */
+function normalizeManifestTier(tier: string | null | undefined): 'basic' | 'professional' | 'enterprise' {
+  return tier === 'professional' || tier === 'enterprise' ? tier : 'basic';
+}
+
+/** The minimal shape the product-MRR math needs from a subscription row. */
+export interface ProductSubRow {
+  status: string | null;
+  currentPeriodEnd: Date | null;
+  /** A super-admin comp/free-grant — real entitlement, but NOT recognized revenue. */
+  comp?: boolean | null;
+  /** Manifest only — the annual tier bought. */
+  tier?: string | null;
+}
+
+export interface ProductMrrBreakdown {
+  directory: { activeCount: number; mrr: number };
+  manifest: {
+    activeCount: number;
+    mrr: number;
+    byTier: Record<'basic' | 'professional' | 'enterprise', { count: number; mrr: number }>;
+  };
+  /** Directory + Manifest recognized MRR (does NOT include tenant SaaS MRR). */
+  total: number;
+}
+
+/** A subscription contributes recognized revenue only when it is genuinely
+ *  paying: status 'active' (trialing/past_due/inactive never bill), still inside
+ *  its period (or unknown end), and NOT a comp grant. Mirrors computeMrr's
+ *  active-past-trial-paid rule for the tenant world. */
+function subIsRecognizedRevenue(s: ProductSubRow): boolean {
+  if (s.comp) return false;
+  if (s.status !== 'active') return false;
+  if (s.currentPeriodEnd != null && s.currentPeriodEnd.getTime() <= Date.now()) return false;
+  return true;
+}
+
+/**
+ * Pure, unit-testable product-line MRR over the two per-shipper subscription
+ * tables. Directory Pro is a flat $19/mo; each annual Manifest tier is amortized
+ * to a monthly figure (annual ÷ 12) so all three revenue lines are expressed on
+ * one comparable monthly basis. Comp grants and non-active subs are excluded.
+ */
+export function computeProductMrr(
+  directoryRows: ProductSubRow[],
+  manifestRows: ProductSubRow[]
+): ProductMrrBreakdown {
+  const directory = { activeCount: 0, mrr: 0 };
+  for (const s of directoryRows) {
+    if (!subIsRecognizedRevenue(s)) continue;
+    directory.activeCount += 1;
+    directory.mrr += DIRECTORY_PRO_MONTHLY_USD;
+  }
+
+  const byTier = {
+    basic: { count: 0, mrr: 0 },
+    professional: { count: 0, mrr: 0 },
+    enterprise: { count: 0, mrr: 0 },
+  };
+  let manifestCount = 0;
+  let manifestMrr = 0;
+  for (const s of manifestRows) {
+    if (!subIsRecognizedRevenue(s)) continue;
+    const tier = normalizeManifestTier(s.tier);
+    const monthly = MANIFEST_ANNUAL_USD[tier] / 12;
+    byTier[tier].count += 1;
+    byTier[tier].mrr += monthly;
+    manifestCount += 1;
+    manifestMrr += monthly;
+  }
+
+  byTier.basic.mrr = roundCents(byTier.basic.mrr);
+  byTier.professional.mrr = roundCents(byTier.professional.mrr);
+  byTier.enterprise.mrr = roundCents(byTier.enterprise.mrr);
+  directory.mrr = roundCents(directory.mrr);
+  const manifest = { activeCount: manifestCount, mrr: roundCents(manifestMrr), byTier };
+  return {
+    directory,
+    manifest,
+    total: roundCents(directory.mrr + manifest.mrr),
   };
 }
 
@@ -558,6 +680,245 @@ export async function patchAffiliateAdmin(opts: {
   return { status: 200, json: { ok: true, affiliate: updated[0] } };
 }
 
+// ════════════════════════════════════════════════════════════════════
+// SUBSCRIPTION OPS — comp/free-grant + refund over the two per-shipper
+// revenue tables (directory_subscriptions, manifest_subscriptions). Both are
+// webhook-write-only in normal operation; these are the ONLY super-admin write
+// paths, so a partner comp or a support-case fix no longer requires touching
+// the DB by hand. All are superadmin-only + audited.
+// ════════════════════════════════════════════════════════════════════
+
+/** Entity quota per manifest tier (mirrors manifestEntitlement.tierMeta). */
+const MANIFEST_TIER_QUOTA: Record<'basic' | 'professional' | 'enterprise', number> = {
+  basic: 1,
+  professional: 5,
+  enterprise: 100,
+};
+
+const AdminCompBody = z.object({
+  email: z.string().email(),
+  /** Comp length in (30-day) months; default 12. Sets currentPeriodEnd = now + N months. */
+  months: z.number().int().min(1).max(120).optional(),
+  /** Manifest only — the tier to grant. Ignored for directory. */
+  tier: z.enum(['basic', 'professional', 'enterprise']).optional(),
+  note: z.string().max(500).optional(),
+});
+
+/**
+ * Core of the comp/free-grant upsert for a product subscription. Looks up the
+ * shipper user by email, then upserts an ACTIVE, comp-flagged entitlement keyed
+ * by user id (no Stripe ids — a comp is not a paid subscription). Excluded from
+ * recognized MRR by the `comp` flag. Unit-testable against a mocked db.
+ */
+export async function upsertCompSubscription(opts: {
+  product: 'directory' | 'manifest';
+  body: unknown;
+  actorUserId?: number | null;
+  now?: Date;
+}): Promise<{ status: number; json: Record<string, unknown> }> {
+  const parse = AdminCompBody.safeParse(opts.body);
+  if (!parse.success) {
+    return { status: 400, json: { error: 'Invalid input', details: parse.error.flatten() } };
+  }
+  const { email, note } = parse.data;
+  const months = parse.data.months ?? 12;
+  const now = opts.now ?? new Date();
+  const expiresAt = new Date(now.getTime() + months * 30 * MS_PER_DAY);
+
+  const userRows = await db()
+    .select({ id: users.id })
+    .from(users)
+    .where(sql`lower(${users.email}) = lower(${email})`)
+    .limit(1);
+  const user = userRows[0];
+  if (!user) {
+    return { status: 404, json: { error: `No user with email '${email}'. They must have an account first.` } };
+  }
+
+  if (opts.product === 'directory') {
+    const upserted = await db()
+      .insert(directorySubscriptions)
+      .values({
+        userId: user.id,
+        status: 'active',
+        comp: true,
+        compNote: note ?? null,
+        currentPeriodEnd: expiresAt,
+      })
+      .onConflictDoUpdate({
+        target: directorySubscriptions.userId,
+        set: { status: 'active', comp: true, compNote: note ?? null, currentPeriodEnd: expiresAt, updatedAt: now },
+      })
+      .returning();
+    await recordAdminAudit(null, opts.actorUserId, 'admin.subscription.comp', {
+      product: 'directory',
+      email,
+      months,
+      expiresAt: expiresAt.toISOString(),
+    });
+    return { status: 200, json: { ok: true, subscription: upserted[0] ?? null } };
+  }
+
+  const tier = parse.data.tier ?? 'basic';
+  const upserted = await db()
+    .insert(manifestSubscriptions)
+    .values({
+      userId: user.id,
+      status: 'active',
+      tier,
+      entityQuota: MANIFEST_TIER_QUOTA[tier],
+      comp: true,
+      compNote: note ?? null,
+      currentPeriodEnd: expiresAt,
+    })
+    .onConflictDoUpdate({
+      target: manifestSubscriptions.userId,
+      set: {
+        status: 'active',
+        tier,
+        entityQuota: MANIFEST_TIER_QUOTA[tier],
+        comp: true,
+        compNote: note ?? null,
+        currentPeriodEnd: expiresAt,
+        updatedAt: now,
+      },
+    })
+    .returning();
+  await recordAdminAudit(null, opts.actorUserId, 'admin.subscription.comp', {
+    product: 'manifest',
+    email,
+    tier,
+    months,
+    expiresAt: expiresAt.toISOString(),
+  });
+  return { status: 200, json: { ok: true, subscription: upserted[0] ?? null } };
+}
+
+/** Minimal Stripe surface the refund core needs — lets tests inject a fake. */
+export interface RefundCapableStripe {
+  refunds: { create: (args: Record<string, unknown>) => Promise<{ id: string; status: string | null; amount: number }> };
+}
+
+let refundStripeClient: Stripe | null = null;
+function refundStripe(): RefundCapableStripe | null {
+  if (refundStripeClient) return refundStripeClient as unknown as RefundCapableStripe;
+  const env = loadEnv();
+  if (!env.STRIPE_SECRET_KEY) return null;
+  refundStripeClient = new Stripe(env.STRIPE_SECRET_KEY);
+  return refundStripeClient as unknown as RefundCapableStripe;
+}
+
+const AdminRefundBody = z
+  .object({
+    paymentIntentId: z.string().trim().min(1).optional(),
+    chargeId: z.string().trim().min(1).optional(),
+    /** Optional partial-refund amount in cents; omit for a full refund. */
+    amountCents: z.number().int().positive().optional(),
+    reason: z.enum(['duplicate', 'fraudulent', 'requested_by_customer']).optional(),
+    /** Free-text operator note stored on the audit row (not sent to Stripe). */
+    note: z.string().max(500).optional(),
+  })
+  .refine((d) => !!(d.paymentIntentId || d.chargeId), {
+    message: 'A paymentIntentId or chargeId is required.',
+  });
+
+/**
+ * Core of the admin Stripe refund. REAL MONEY — superadmin-only, audited, and
+ * defensively validated (must name a payment_intent or charge). The Stripe
+ * client is injectable so the money-moving call is unit-tested against a fake.
+ */
+export async function issueRefundAdmin(opts: {
+  body: unknown;
+  actorUserId?: number | null;
+  stripe?: RefundCapableStripe | null;
+}): Promise<{ status: number; json: Record<string, unknown> }> {
+  const parse = AdminRefundBody.safeParse(opts.body);
+  if (!parse.success) {
+    return { status: 400, json: { error: 'Invalid input', details: parse.error.flatten() } };
+  }
+  const client = opts.stripe ?? refundStripe();
+  if (!client) {
+    return { status: 400, json: { error: 'Stripe is not configured (STRIPE_SECRET_KEY unset).' } };
+  }
+  const d = parse.data;
+  const args: Record<string, unknown> = {};
+  if (d.paymentIntentId) args.payment_intent = d.paymentIntentId;
+  else if (d.chargeId) args.charge = d.chargeId;
+  if (d.amountCents != null) args.amount = d.amountCents;
+  if (d.reason) args.reason = d.reason;
+
+  try {
+    const refund = await client.refunds.create(args);
+    await recordAdminAudit(null, opts.actorUserId, 'admin.subscription.refund', {
+      paymentIntentId: d.paymentIntentId ?? null,
+      chargeId: d.chargeId ?? null,
+      amountCents: d.amountCents ?? null,
+      reason: d.reason ?? null,
+      note: d.note ?? null,
+      refundId: refund.id,
+      refundStatus: refund.status,
+    });
+    return { status: 200, json: { ok: true, refundId: refund.id, status: refund.status, amount: refund.amount } };
+  } catch (err) {
+    console.error('[admin] refund failed:', err);
+    const message = err instanceof Error ? err.message : 'Refund failed';
+    return { status: 502, json: { error: `Stripe refund failed: ${message}` } };
+  }
+}
+
+const AdminCachePurgeBody = z
+  .object({
+    /** Purge the Hunter contact cache for this company (indexed unique key). */
+    company: z.string().trim().min(1).max(200).optional(),
+    /** Optionally purge one BOL result-set by its exact search key (hash). */
+    searchKey: z.string().trim().min(1).max(200).optional(),
+  })
+  .refine((d) => !!(d.company || d.searchKey), { message: 'A company or searchKey is required.' });
+
+/**
+ * Core of the importer cache purge. Deletes the resolved-contact cache row for a
+ * company by its normalized key (the credit-heavy, PII-bearing cache) so the
+ * next open re-resolves fresh; optionally also deletes ONE BOL result set by its
+ * exact search key. Both are UNIQUE-index deletes — never a table scan (the
+ * importer cache MUST never reintroduce the unbounded-scan outages).
+ */
+export async function purgeImporterCacheAdmin(opts: {
+  body: unknown;
+  actorUserId?: number | null;
+}): Promise<{ status: number; json: Record<string, unknown> }> {
+  const parse = AdminCachePurgeBody.safeParse(opts.body);
+  if (!parse.success) {
+    return { status: 400, json: { error: 'Invalid input', details: parse.error.flatten() } };
+  }
+  const { company, searchKey } = parse.data;
+  let contactPurged = 0;
+  let bolPurged = 0;
+  if (company) {
+    const key = companyKey(company);
+    if (key) {
+      const del = await db()
+        .delete(importerContactCache)
+        .where(eq(importerContactCache.companyKey, key))
+        .returning({ id: importerContactCache.id });
+      contactPurged = del.length;
+    }
+  }
+  if (searchKey) {
+    const del = await db()
+      .delete(importerBolCache)
+      .where(eq(importerBolCache.searchKey, searchKey))
+      .returning({ id: importerBolCache.id });
+    bolPurged = del.length;
+  }
+  await recordAdminAudit(null, opts.actorUserId, 'admin.importers.cachePurge', {
+    company: company ?? null,
+    searchKey: searchKey ?? null,
+    contactPurged,
+    bolPurged,
+  });
+  return { status: 200, json: { ok: true, contactPurged, bolPurged } };
+}
+
 export function registerAdminRoutes(app: Express) {
   app.get('/api/admin/tenants', requireAuth, requireSuperAdmin, async (_req, res) => {
     const rows = await db().select().from(tenants).orderBy(desc(tenants.createdAt));
@@ -757,7 +1118,7 @@ export function registerAdminRoutes(app: Express) {
   });
 
   app.get('/api/admin/stats', requireAuth, requireSuperAdmin, async (_req, res) => {
-    const [tenantCount, userCount, leadCount, mrrRows] = await Promise.all([
+    const [tenantCount, userCount, leadCount, mrrRows, dirSubs, manSubs] = await Promise.all([
       db().select({ n: sql<number>`count(*)::int` }).from(tenants),
       db().select({ n: sql<number>`count(*)::int` }).from(users),
       db().select({ n: sql<number>`count(*)::int` }).from(leads),
@@ -770,8 +1131,30 @@ export function registerAdminRoutes(app: Express) {
           trialEndsAt: tenants.trialEndsAt,
         })
         .from(tenants),
+      // The two per-shipper revenue lines that live OUTSIDE tenants — small
+      // per-subscriber tables, flat-scanned for the same in-code MRR math.
+      db()
+        .select({
+          status: directorySubscriptions.status,
+          currentPeriodEnd: directorySubscriptions.currentPeriodEnd,
+          comp: directorySubscriptions.comp,
+        })
+        .from(directorySubscriptions),
+      db()
+        .select({
+          status: manifestSubscriptions.status,
+          currentPeriodEnd: manifestSubscriptions.currentPeriodEnd,
+          comp: manifestSubscriptions.comp,
+          tier: manifestSubscriptions.tier,
+        })
+        .from(manifestSubscriptions),
     ]);
     const revenue = computeMrr(mrrRows);
+    const products = computeProductMrr(dirSubs, manSubs);
+    // The corrected, all-products headline MRR: QuoteFleet SaaS + Directory Pro
+    // + Manifest Privacy. `mrr` stays the tenant-only figure for back-compat;
+    // `totalMrr` + `byProduct` are the new source of truth for the dashboard.
+    const totalMrr = roundCents(revenue.mrr + products.total);
     res.json({
       tenants: tenantCount[0]?.n ?? 0,
       users: userCount[0]?.n ?? 0,
@@ -780,6 +1163,12 @@ export function registerAdminRoutes(app: Express) {
       byPlan: revenue.byPlan,
       trialingCount: revenue.trialingCount,
       potentialTrialMrr: revenue.potentialTrialMrr,
+      totalMrr,
+      byProduct: {
+        quotefleet: { mrr: revenue.mrr, activeCount: revenue.byPlan.vital.count + revenue.byPlan.pro.count },
+        directory: products.directory,
+        manifest: products.manifest,
+      },
     });
   });
 
@@ -793,5 +1182,140 @@ export function registerAdminRoutes(app: Express) {
     });
     if (!result.ok) return res.status(500).json(result);
     return res.json(result);
+  });
+
+  // ── SUBSCRIPTIONS — visibility over the two per-shipper revenue tables. ──
+  // JOIN users so ops sees WHO is subscribed (email/name) alongside product,
+  // tier, status, renewal, and the Stripe ids. `?status=` filters; `limit`/
+  // `offset` paginate. Comp grants surface with `comp: true`.
+  app.get('/api/admin/subscriptions/directory', requireAuth, requireSuperAdmin, async (req, res) => {
+    try {
+      const statusRaw = String(req.query.status ?? '').trim();
+      const statusFilter = ['active', 'trialing', 'past_due', 'inactive'].includes(statusRaw) ? statusRaw : null;
+      const limit = Math.min(Math.max(Number(req.query.limit) || 100, 1), 500);
+      const offset = Math.max(Number(req.query.offset) || 0, 0);
+      const whereClause = statusFilter ? eq(directorySubscriptions.status, statusFilter) : undefined;
+      const [rows, totalRows] = await Promise.all([
+        db()
+          .select({
+            id: directorySubscriptions.id,
+            userId: directorySubscriptions.userId,
+            email: users.email,
+            name: users.name,
+            status: directorySubscriptions.status,
+            comp: directorySubscriptions.comp,
+            compNote: directorySubscriptions.compNote,
+            priceId: directorySubscriptions.priceId,
+            stripeCustomerId: directorySubscriptions.stripeCustomerId,
+            stripeSubscriptionId: directorySubscriptions.stripeSubscriptionId,
+            currentPeriodEnd: directorySubscriptions.currentPeriodEnd,
+            createdAt: directorySubscriptions.createdAt,
+          })
+          .from(directorySubscriptions)
+          .leftJoin(users, eq(users.id, directorySubscriptions.userId))
+          .where(whereClause)
+          .orderBy(desc(directorySubscriptions.createdAt))
+          .limit(limit)
+          .offset(offset),
+        db().select({ n: sql<number>`count(*)::int` }).from(directorySubscriptions).where(whereClause),
+      ]);
+      res.json({ data: rows, total: totalRows[0]?.n ?? 0, priceMonthlyUsd: DIRECTORY_PRO_MONTHLY_USD });
+    } catch (err) {
+      console.error('[admin] list directory subscriptions failed:', err);
+      res.status(500).json({ error: 'Failed to list directory subscriptions' });
+    }
+  });
+
+  app.get('/api/admin/subscriptions/manifest', requireAuth, requireSuperAdmin, async (req, res) => {
+    try {
+      const statusRaw = String(req.query.status ?? '').trim();
+      const statusFilter = ['active', 'trialing', 'past_due', 'inactive'].includes(statusRaw) ? statusRaw : null;
+      const limit = Math.min(Math.max(Number(req.query.limit) || 100, 1), 500);
+      const offset = Math.max(Number(req.query.offset) || 0, 0);
+      const whereClause = statusFilter ? eq(manifestSubscriptions.status, statusFilter) : undefined;
+      const [rows, totalRows] = await Promise.all([
+        db()
+          .select({
+            id: manifestSubscriptions.id,
+            userId: manifestSubscriptions.userId,
+            email: users.email,
+            name: users.name,
+            tier: manifestSubscriptions.tier,
+            status: manifestSubscriptions.status,
+            comp: manifestSubscriptions.comp,
+            compNote: manifestSubscriptions.compNote,
+            entityQuota: manifestSubscriptions.entityQuota,
+            priceId: manifestSubscriptions.priceId,
+            stripeCustomerId: manifestSubscriptions.stripeCustomerId,
+            stripeSubscriptionId: manifestSubscriptions.stripeSubscriptionId,
+            currentPeriodEnd: manifestSubscriptions.currentPeriodEnd,
+            createdAt: manifestSubscriptions.createdAt,
+          })
+          .from(manifestSubscriptions)
+          .leftJoin(users, eq(users.id, manifestSubscriptions.userId))
+          .where(whereClause)
+          .orderBy(desc(manifestSubscriptions.createdAt))
+          .limit(limit)
+          .offset(offset),
+        db().select({ n: sql<number>`count(*)::int` }).from(manifestSubscriptions).where(whereClause),
+      ]);
+      res.json({ data: rows, total: totalRows[0]?.n ?? 0, annualUsd: MANIFEST_ANNUAL_USD });
+    } catch (err) {
+      console.error('[admin] list manifest subscriptions failed:', err);
+      res.status(500).json({ error: 'Failed to list manifest subscriptions' });
+    }
+  });
+
+  // Comp / free-grant a product subscription (partner, support case). Upserts an
+  // active, comp-flagged (NOT revenue-counted) entitlement by user email.
+  app.post('/api/admin/subscriptions/:product/comp', requireAuth, requireSuperAdmin, async (req, res) => {
+    try {
+      const product = String(req.params.product);
+      if (product !== 'directory' && product !== 'manifest') {
+        return res.status(400).json({ error: 'Unknown product.' });
+      }
+      const result = await upsertCompSubscription({
+        product,
+        body: req.body,
+        actorUserId: req.user?.id ?? null,
+      });
+      res.status(result.status).json(result.json);
+    } catch (err) {
+      console.error('[admin] comp subscription failed:', err);
+      res.status(500).json({ error: 'Failed to comp subscription' });
+    }
+  });
+
+  // Issue a Stripe refund from admin — REAL MONEY, superadmin-only + audited.
+  app.post('/api/admin/refund', requireAuth, requireSuperAdmin, async (req, res) => {
+    const result = await issueRefundAdmin({ body: req.body, actorUserId: req.user?.id ?? null });
+    res.status(result.status).json(result.json);
+  });
+
+  // ── IMPORTER SEARCH admin — credits/usage meter + cache purge. ──
+  app.get('/api/admin/importers/usage', requireAuth, requireSuperAdmin, async (_req, res) => {
+    try {
+      const [bolCount, contactCount] = await Promise.all([
+        db().select({ n: sql<number>`count(*)::int` }).from(importerBolCache),
+        db().select({ n: sql<number>`count(*)::int` }).from(importerContactCache),
+      ]);
+      res.json({
+        meter: creditMeter(),
+        cache: { bolRows: bolCount[0]?.n ?? 0, contactRows: contactCount[0]?.n ?? 0 },
+      });
+    } catch (err) {
+      console.error('[admin] importer usage failed:', err);
+      res.status(500).json({ error: 'Failed to load importer usage' });
+    }
+  });
+
+  app.post('/api/admin/importers/cache/purge', requireAuth, requireSuperAdmin, async (req, res) => {
+    try {
+      const result = await purgeImporterCacheAdmin({ body: req.body, actorUserId: req.user?.id ?? null });
+      res.status(result.status).json(result.json);
+    } catch (err) {
+      console.error('[admin] importer cache purge failed:', err);
+      res.status(500).json({ error: 'Failed to purge importer cache' });
+    }
   });
 }

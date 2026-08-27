@@ -25,17 +25,18 @@
  * confirm; uploaded docs flagged "on file" / self-reported, never "verified".
  */
 import type { Express, Request, Response } from 'express';
-import { and, desc, eq, isNull, sql } from 'drizzle-orm';
+import { and, desc, eq, isNull, isNotNull, inArray, lte, or, sql } from 'drizzle-orm';
 import { nanoid } from 'nanoid';
 import { db } from '../../db/client.js';
 import {
   poaApplications,
   poaAuditEvents,
   manifestRedactions,
+  manifestSubscriptions,
   type PoaApplication,
   type NewPoaApplication,
 } from '../../db/schema.js';
-import { requireAuth, requireSuperAdmin } from '../middleware.js';
+import { requireAuth, requireSuperAdmin, requireSuperAdminPage } from '../middleware.js';
 import { lookupSession, SESSION_COOKIE_NAME } from '../../auth/session.js';
 import { sendEmail } from '../../email/send.js';
 import { companyKey } from '../directory/importerCache.js';
@@ -529,16 +530,58 @@ export function registerManifestPrivacyRoutes(app: Express): void {
   );
 
   // ── admin: review page ───────────────────────────────────────────────────────
+  // `requireSuperAdminPage` REDIRECTS an unauthenticated browser to /login (never
+  // a raw JSON 401 on a white page). `?filter=renewals` narrows to filings that
+  // need re-filing (status renewal_due/expired OR expiring within 90 days).
   app.get(
     '/admin/privacy',
-    requireAuth,
-    requireSuperAdmin,
-    async (_req: Request, res: Response) => {
+    requireSuperAdminPage,
+    async (req: Request, res: Response) => {
+      const filter = String((req.query as Record<string, unknown>)?.filter ?? '') === 'renewals' ? 'renewals' : 'all';
+      const in90 = new Date(Date.now() + 90 * 24 * 60 * 60 * 1000);
+      const whereClause =
+        filter === 'renewals'
+          ? or(
+              eq(poaApplications.status, 'renewal_due'),
+              eq(poaApplications.status, 'expired'),
+              and(isNotNull(poaApplications.expiresAt), lte(poaApplications.expiresAt, in90)),
+            )
+          : undefined;
       const apps = await db()
         .select()
         .from(poaApplications)
+        .where(whereClause)
         .orderBy(desc(poaApplications.createdAt))
         .limit(200);
+
+      // JOIN the payer state so ops never files for a non-payer: gather the
+      // owning user ids, look up their manifest subscription in ONE indexed IN()
+      // query, and mark each filing paid = a live (or comped) subscription.
+      const userIds = [...new Set(apps.map((a) => a.userId).filter((v): v is number => v != null))];
+      const subs = userIds.length
+        ? await db()
+            .select({
+              userId: manifestSubscriptions.userId,
+              tier: manifestSubscriptions.tier,
+              status: manifestSubscriptions.status,
+              comp: manifestSubscriptions.comp,
+              currentPeriodEnd: manifestSubscriptions.currentPeriodEnd,
+            })
+            .from(manifestSubscriptions)
+            .where(inArray(manifestSubscriptions.userId, userIds))
+        : [];
+      const subByUser = new Map(subs.map((s) => [s.userId, s]));
+      const nowMs = Date.now();
+      const subFor = (userId: number | null): { tier: string | null; paid: boolean } => {
+        if (userId == null) return { tier: null, paid: false };
+        const s = subByUser.get(userId);
+        if (!s) return { tier: null, paid: false };
+        const live =
+          (s.status === 'active' || s.status === 'trialing') &&
+          (s.currentPeriodEnd == null || s.currentPeriodEnd.getTime() > nowMs);
+        return { tier: s.tier ?? null, paid: !!s.comp || live };
+      };
+
       const withEvents = await Promise.all(
         apps.map(async (a) => {
           const events = await db()
@@ -547,10 +590,10 @@ export function registerManifestPrivacyRoutes(app: Express): void {
             .where(eq(poaAuditEvents.applicationId, a.id))
             .orderBy(desc(poaAuditEvents.createdAt))
             .limit(10);
-          return { app: a, events };
+          return { app: a, events, sub: subFor(a.userId) };
         }),
       );
-      res.type('html').send(renderAdminPrivacyQueue(withEvents));
+      res.type('html').send(renderAdminPrivacyQueue(withEvents, { filter }));
     },
   );
 
@@ -585,6 +628,14 @@ export function registerManifestPrivacyRoutes(app: Express): void {
       const existing = await getById(id);
       if (!existing) return res.status(404).json({ error: 'Not found.' });
 
+      // Capture the CBP receipt/confirmation reference + the channel it was filed
+      // through — the proof-of-filing that makes the 2-year term auditable. A
+      // confirm with no reference is still allowed (some channels don't issue one)
+      // but the reference is stored whenever provided.
+      const body = (req.body ?? {}) as Record<string, unknown>;
+      const reference = str(body.reference, 120);
+      const channel = str(body.channel, 20) || existing.cbpChannel || 'portal';
+
       const now = new Date();
       const expiresAt = new Date(now.getTime() + TWO_YEARS_MS);
       await db()
@@ -594,6 +645,8 @@ export function registerManifestPrivacyRoutes(app: Express): void {
           cbpConfirmedAt: now,
           effectiveAt: now,
           expiresAt,
+          cbpReference: reference ?? existing.cbpReference ?? null,
+          cbpChannel: channel,
           updatedAt: now,
         })
         .where(eq(poaApplications.id, id));
@@ -611,8 +664,86 @@ export function registerManifestPrivacyRoutes(app: Express): void {
           });
       }
       invalidateRedactionCache();
-      await audit(id, 'confirmed', req, { expiresAt: expiresAt.toISOString(), redactionKeys: keys.length });
-      return res.json({ ok: true, status: 'active', expiresAt: expiresAt.toISOString(), redactions: keys.length });
+      await audit(id, 'confirmed', req, {
+        expiresAt: expiresAt.toISOString(),
+        redactionKeys: keys.length,
+        reference: reference ?? null,
+        channel,
+      });
+      return res.json({
+        ok: true,
+        status: 'active',
+        expiresAt: expiresAt.toISOString(),
+        redactions: keys.length,
+        reference: reference ?? null,
+      });
+    },
+  );
+
+  // ── admin: re-file → clone the filing for a fresh 2-year term ─────────────────
+  // A CBP confidentiality request is valid 2 years; renewing means filing again.
+  // The signed POA authorizes "preparing, submitting, maintaining, AND renewing"
+  // the request, so re-filing under the same authorization is in-scope. This
+  // clones the application (grantor + signer + retained signature/hash) into a
+  // NEW row with a fresh public token, status 'submitted', and the channel/
+  // reference the operator just filed under. On the next confirm the new row gets
+  // its own +2-year expiry. The original is left intact (historical record) and
+  // stamped with a 'refiled' audit event pointing at the clone.
+  app.post(
+    '/api/admin/privacy/:id/refile',
+    requireAuth,
+    requireSuperAdmin,
+    async (req: Request, res: Response) => {
+      const id = Number((req.params as Record<string, unknown>)?.id);
+      if (!Number.isInteger(id)) return res.status(400).json({ error: 'Bad id.' });
+      const existing = await getById(id);
+      if (!existing) return res.status(404).json({ error: 'Not found.' });
+      if (!existing.signedAt || !existing.docSha256) {
+        return res.status(409).json({ error: 'Only a signed authorization can be re-filed.' });
+      }
+      const body = (req.body ?? {}) as Record<string, unknown>;
+      const channel = str(body.channel, 20) || existing.cbpChannel || 'portal';
+      const reference = str(body.reference, 120);
+
+      const now = new Date();
+      const token = nanoid(24);
+      const inserted = (
+        await db()
+          .insert(poaApplications)
+          .values({
+            publicToken: token,
+            userId: existing.userId ?? undefined,
+            status: 'submitted',
+            grantorLegalName: existing.grantorLegalName,
+            entityType: existing.entityType,
+            stateOfOrg: existing.stateOfOrg,
+            grantorAddress: existing.grantorAddress,
+            einOrImporterNo: existing.einOrImporterNo,
+            nameVariations: existing.nameVariations ?? undefined,
+            addressVariations: existing.addressVariations ?? undefined,
+            importerSlug: existing.importerSlug,
+            signerName: existing.signerName,
+            signerTitle: existing.signerTitle,
+            signerEmail: existing.signerEmail,
+            consentDisclosureVersion: existing.consentDisclosureVersion,
+            signatureTyped: existing.signatureTyped,
+            signatureDrawnPng: existing.signatureDrawnPng,
+            signedAt: existing.signedAt,
+            signerIp: existing.signerIp,
+            signerUa: existing.signerUa,
+            docSha256: existing.docSha256,
+            cbpChannel: channel,
+            cbpReference: reference ?? undefined,
+            cbpSubmittedAt: now,
+            docs: existing.docs ?? undefined,
+          })
+          .returning()
+      )[0];
+
+      await audit(inserted.id, 'created', req, { source: 'refile', fromApplicationId: id });
+      await audit(inserted.id, 'submitted', req, { channel, reference: reference ?? null, refileOf: id });
+      await audit(id, 'refiled', req, { newApplicationId: inserted.id, newToken: token });
+      return res.json({ ok: true, status: 'submitted', newId: inserted.id, newToken: token });
     },
   );
 

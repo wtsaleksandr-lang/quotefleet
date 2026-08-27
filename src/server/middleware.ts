@@ -189,6 +189,40 @@ export async function requireSuperAdmin(
 }
 
 /**
+ * Super-admin guard for HTML PAGE routes (not JSON APIs).
+ *
+ * The JSON `requireAuth`/`requireSuperAdmin` chain answers an unauthenticated
+ * browser navigation with a raw `{"error":"Unauthorized"}` on a white page —
+ * a dead-end for a human hitting e.g. `/admin/privacy` directly. This variant
+ * does the SAME auth+role check but, on failure, REDIRECTS a browser to the
+ * login page (unauthenticated) or the home page (authenticated non-admin)
+ * instead of dumping JSON. Single self-contained middleware (does its own
+ * session lookup) so it can replace the `requireAuth, requireSuperAdmin` pair
+ * on a page route.
+ */
+export async function requireSuperAdminPage(
+  req: Request,
+  res: Response,
+  next: NextFunction
+): Promise<void> {
+  const token = req.cookies[SESSION_COOKIE_NAME];
+  const ctx = await lookupSession(token);
+  if (!ctx) {
+    // Not signed in → send the browser to login, preserving the intended path
+    // so a post-login bounce-back can land them where they were headed.
+    res.redirect(`/login?next=${encodeURIComponent(req.originalUrl)}`);
+    return;
+  }
+  req.user = ctx.user;
+  if (ctx.user.role !== 'super_admin') {
+    // Signed in but not an operator → home, never a 403 JSON blob on a page nav.
+    res.redirect('/');
+    return;
+  }
+  next();
+}
+
+/**
  * Owner-or-super-admin guard. Use on tenant settings that should not be
  * editable by lower-privileged staff accounts (Anthropic key, billing,
  * embed regen, custom domain, etc.). Must be chained AFTER requireAuth.
