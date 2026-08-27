@@ -98,13 +98,16 @@ describe('renderImporterSearchPage', () => {
     expect(html).toContain('id="imp-company"');
     expect(html).toContain('Or search by company name');
   });
-  it('shows the honest freemium state (CSV export + save free, contact reveal coming soon)', () => {
+  it('shows the honest freemium state (CSV export + save free, real gated contact reveal)', () => {
     // CSV export + saved-importers surfaces are present (free with an account).
     expect(html).toContain('Export CSV');
     expect(html).toContain('/importers/saved');
-    // Contact reveal is HONEST: a "coming soon" state, NOT a dead /signup unlock.
-    expect(html).toContain('Contact reveal');
-    expect(html).toContain('coming soon');
+    // The decision-maker reveal is now REAL + gated: the free-taste + Leads Pro
+    // model is stated honestly, and the card routes to the profile to reveal
+    // (NOT a fabricated inline contact).
+    expect(html).toContain('free decision-maker contact reveals');
+    expect(html).toContain('Leads Pro');
+    expect(html).toContain('Reveal contact ');
   });
   it('carries the nav Importer link (discovery wiring)', () => {
     expect(html).toContain('href="/importers"');

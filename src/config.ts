@@ -56,6 +56,12 @@ export interface Env {
   STRIPE_PRICE_MANIFEST_BASIC?: string;
   STRIPE_PRICE_MANIFEST_PRO?: string;
   STRIPE_PRICE_MANIFEST_ENT?: string;
+  /** Stripe Price id for the "Leads Pro" ($49/mo suggested) shipper subscription
+   *  behind the Importer Search decision-maker CONTACT REVEAL — a per-USER access
+   *  entitlement with a monthly reveal allowance, fully separate from the tenant
+   *  plan prices. When UNSET, Leads Pro checkout degrades gracefully to "coming
+   *  soon" (disabled, never crashes) — exactly the manifest pattern. */
+  STRIPE_PRICE_LEADS_PRO?: string;
   /** Platform fee percent QuoteFleet takes from each booking deposit (a
    *  destination charge's application_fee). Optional string override of the
    *  2.9% default (see PLATFORM_FEE_PCT in routes/depositCharge.ts). Parsed +
@@ -172,6 +178,7 @@ export function loadEnv(): Env {
     STRIPE_PRICE_MANIFEST_BASIC: opt('STRIPE_PRICE_MANIFEST_BASIC'),
     STRIPE_PRICE_MANIFEST_PRO: opt('STRIPE_PRICE_MANIFEST_PRO'),
     STRIPE_PRICE_MANIFEST_ENT: opt('STRIPE_PRICE_MANIFEST_ENT'),
+    STRIPE_PRICE_LEADS_PRO: opt('STRIPE_PRICE_LEADS_PRO'),
     PLATFORM_FEE_PCT: opt('PLATFORM_FEE_PCT'),
     RESEND_API_KEY: opt('RESEND_API_KEY'),
     RESEND_FROM_EMAIL: opt('RESEND_FROM_EMAIL'),

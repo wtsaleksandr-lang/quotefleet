@@ -541,6 +541,39 @@ export const SELF_HEAL_TABLE_STATEMENTS: readonly string[] = [
     "fetched_at" timestamp with time zone DEFAULT now() NOT NULL
   )`,
   `CREATE UNIQUE INDEX IF NOT EXISTS "importer_contact_cache_key_idx" ON "importer_contact_cache" ("company_key")`,
+  // leads_subscriptions + leads_reveal_usage — the "Leads Pro" contact-reveal
+  // subscription (per-USER, cloned from directory/manifest) and its per-account
+  // reveal allowance meter. Healed HERE (same reasoning as the directory tables
+  // above): the Replit deploy skips db:migrate and its publish tool can drop
+  // tables, so these CREATE TABLE / INDEX IF NOT EXISTS run on every boot and
+  // no-op on a healthy DB. MUST stay byte-for-byte equivalent to schema.ts
+  // (leadsSubscriptions / leadsRevealUsage). leads_subscriptions references
+  // `users` only, never `tenants`; a phantom-drop of leads_reveal_usage loses
+  // only the current reveal counts (self-refilling) — never entitlement state.
+  `CREATE TABLE IF NOT EXISTS "leads_subscriptions" (
+    "id" serial PRIMARY KEY NOT NULL,
+    "user_id" integer NOT NULL,
+    "tier" text DEFAULT 'pro' NOT NULL,
+    "status" text DEFAULT 'inactive' NOT NULL,
+    "stripe_customer_id" text,
+    "stripe_subscription_id" text,
+    "price_id" text,
+    "current_period_end" timestamp,
+    "reveal_allowance" integer DEFAULT 50 NOT NULL,
+    "comp" boolean DEFAULT false NOT NULL,
+    "comp_note" text,
+    "created_at" timestamp DEFAULT now() NOT NULL,
+    "updated_at" timestamp DEFAULT now() NOT NULL
+  )`,
+  `CREATE UNIQUE INDEX IF NOT EXISTS "leads_subscriptions_user_idx" ON "leads_subscriptions" ("user_id")`,
+  `CREATE UNIQUE INDEX IF NOT EXISTS "leads_subscriptions_customer_idx" ON "leads_subscriptions" ("stripe_customer_id")`,
+  `CREATE TABLE IF NOT EXISTS "leads_reveal_usage" (
+    "id" serial PRIMARY KEY NOT NULL,
+    "account_key" text NOT NULL,
+    "period" text NOT NULL,
+    "reveals" integer DEFAULT 0 NOT NULL
+  )`,
+  `CREATE UNIQUE INDEX IF NOT EXISTS "leads_reveal_usage_account_period_idx" ON "leads_reveal_usage" ("account_key","period")`,
   // 0065_manifest_privacy.sql — the managed CBP vessel-manifest-confidentiality
   // service (Manifest Privacy). Four tables: the cloned SHIPPER subscription, the
   // e-signed POA applications (the RETAINED ESIGN record), its append-only audit
