@@ -122,6 +122,9 @@ beforeEach(() => {
 });
 
 describe('loadConfig — loads rate matrices + zones', () => {
+  // First test to import ./public.js pulls in the whole pricing-engine module
+  // graph (~2.4s cold). Under full-suite parallel CPU contention that can exceed
+  // vitest's 5s default, so give the cold-import path explicit headroom.
   it('returns matrices and matrixZones from the DB', async () => {
     h.state.matrixRows = [
       { id: 1, tenantId: 1, mode: 'ftl', equipment: 'dryvan', originKey: '900', destKey: '850', rate: 1900, unitBasis: 'flat', minCharge: null, currency: 'USD', enabled: true },
@@ -135,7 +138,7 @@ describe('loadConfig — loads rate matrices + zones', () => {
     expect(cfg.matrices[0]).toMatchObject({ originKey: '900', destKey: '850', rate: 1900 });
     expect(cfg.matrixZones).toHaveLength(1);
     expect(cfg.matrixZones[0]).toMatchObject({ zoneId: 'W', matchKind: 'zip3' });
-  });
+  }, 20_000);
 });
 
 describe('POST /api/public/quote/:slug — prices the matrix cell', () => {

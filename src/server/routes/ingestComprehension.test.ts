@@ -32,7 +32,9 @@ vi.mock('../../db/client.js', () => ({
     },
   }),
 }));
-vi.mock('../../marketplace/sync.js', () => ({ syncTenantToMarketplace: vi.fn() }));
+// The real syncTenantToMarketplace returns Promise<void>; apply chains .catch()
+// on it (ingest.ts:783), so the mock MUST resolve a promise, not bare undefined.
+vi.mock('../../marketplace/sync.js', () => ({ syncTenantToMarketplace: vi.fn().mockResolvedValue(undefined) }));
 
 import { applyDraftToTenant, draftToEngineConfig } from './ingest.js';
 import { calculate, type CalcRequest } from '../../calc/engine.js';
