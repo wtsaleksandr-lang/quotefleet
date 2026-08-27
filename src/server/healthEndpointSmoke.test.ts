@@ -41,6 +41,10 @@ async function startDatabaseBlackhole(): Promise<{
   const server: TcpServer = createTcpServer((socket) => {
     sockets.add(socket);
     socket.on('close', () => sockets.delete(socket));
+    // The child's postgres client is killed mid-connection during teardown,
+    // which resets this accepted socket. Without an 'error' listener that
+    // ECONNRESET surfaces as an unhandled exception and fails the run.
+    socket.on('error', () => {});
     markConnected?.();
     // Intentionally accept PostgreSQL connections but never send a protocol
     // response. This recreates a blocked startup dependency without relying on

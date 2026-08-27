@@ -32,7 +32,9 @@ vi.mock('../../db/client.js', () => {
   }
   return { db: () => chain() };
 });
-vi.mock('../../marketplace/sync.js', () => ({ syncTenantToMarketplace: vi.fn() }));
+// The real syncTenantToMarketplace returns Promise<void>; apply chains .catch()
+// on it (ingest.ts:783), so the mock MUST resolve a promise, not bare undefined.
+vi.mock('../../marketplace/sync.js', () => ({ syncTenantToMarketplace: vi.fn().mockResolvedValue(undefined) }));
 
 type Handler = (req: MockReq, res: MockRes) => unknown;
 interface MockReq { params: { id: string }; tenant: { id: number }; user: { id: number } }
