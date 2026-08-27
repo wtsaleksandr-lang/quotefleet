@@ -135,3 +135,38 @@ describe('detail-open quota (the free quota is on PROFILES)', () => {
     expect(q.allowed).toBe(false);
   });
 });
+
+describe('detail-open quota keyed to the ACCOUNT (logged-in users)', () => {
+  it('a fresh account gets the full free quota, independent of cookie/IP', () => {
+    // Same IP, NO cookie — but keyed to userId=42.
+    const q = checkDetailQuota(req('20.20.20.20'), undefined, 42);
+    expect(q.allowed).toBe(true);
+    expect(q.remaining).toBe(FREE_DETAIL_QUOTA);
+  });
+
+  it('opens decrement the account quota and it persists across DIFFERENT IPs', () => {
+    // Open three DISTINCT companies for the same account from three different IPs.
+    recordDetailOpen(req('1.0.0.1'), res(), 'aaa', 7);
+    recordDetailOpen(req('1.0.0.2'), res(), 'bbb', 7);
+    recordDetailOpen(req('1.0.0.3'), res(), 'ccc', 7);
+    // Quota is now exhausted for the account, on ANY IP…
+    expect(checkDetailQuota(req('9.9.9.1'), 'ddd', 7).allowed).toBe(false);
+    // …but a re-open of an already-opened company is still free (slug dedup).
+    expect(checkDetailQuota(req('9.9.9.2'), 'aaa', 7).allowed).toBe(true);
+  });
+
+  it('re-opening the same company does not consume another account profile', () => {
+    const a1 = recordDetailOpen(req('2.0.0.1'), res(), 'valbruna', 8);
+    expect(a1.used).toBe(1);
+    const a2 = recordDetailOpen(req('2.0.0.9'), res(), 'valbruna', 8);
+    expect(a2.used).toBe(1); // unchanged — dedup by slug
+  });
+
+  it('two different accounts have independent quotas', () => {
+    recordDetailOpen(req('3.0.0.1'), res(), 'x', 100);
+    recordDetailOpen(req('3.0.0.1'), res(), 'y', 100);
+    recordDetailOpen(req('3.0.0.1'), res(), 'z', 100);
+    expect(checkDetailQuota(req('3.0.0.1'), 'w', 100).allowed).toBe(false); // account 100 exhausted
+    expect(checkDetailQuota(req('3.0.0.1'), 'w', 101).allowed).toBe(true); // account 101 fresh
+  });
+});

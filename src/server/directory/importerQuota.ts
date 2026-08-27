@@ -65,6 +65,26 @@ const UTC_DAY = (): string => new Date().toISOString().slice(0, 10);
 const searchIpDaily = new Map<string, { day: string; count: number }>();
 const detailIpDaily = new Map<string, { day: string; count: number }>();
 
+// ── account-keyed detail quota (logged-in users) ─────────────────────────────
+// For a LOGGED-IN user the free-profile quota is keyed to their ACCOUNT rather
+// than the browser cookie / IP, so it follows them across devices (within this
+// instance's uptime) and can't be reset by clearing cookies. Deliberately
+// in-memory + soft (resets on redeploy), consistent with the existing soft
+// posture of this whole gate — the goal is conversion + a spend ceiling, not
+// perfect DRM. Durable per-account billing/quota is a separate (deferred) Alex
+// product decision. `slugs` dedups re-opens of the same company (served from
+// cache — no credit), exactly like the cookie path.
+const detailByUser = new Map<number, { used: number; slugs: Set<string> }>();
+
+function accountRecord(userId: number): { used: number; slugs: Set<string> } {
+  let rec = detailByUser.get(userId);
+  if (!rec) {
+    rec = { used: 0, slugs: new Set<string>() };
+    detailByUser.set(userId, rec);
+  }
+  return rec;
+}
+
 function ipUsedToday(map: Map<string, { day: string; count: number }>, ip: string): number {
   const b = map.get(ip);
   return b && b.day === UTC_DAY() ? b.count : 0;
@@ -166,7 +186,15 @@ export function readDetailUsed(req: Request): number {
  * DETAILED importer profile and how many free opens remain. Pure read — never
  * mutates (recording an open is the caller's explicit recordDetailOpen()).
  */
-export function checkDetailQuota(req: Request, slug?: string): QuotaState {
+export function checkDetailQuota(req: Request, slug?: string, userId?: number | null): QuotaState {
+  // Logged-in → the quota is keyed to the ACCOUNT (cross-device, cookie-clear
+  // proof), not the browser cookie / IP backstop.
+  if (userId != null) {
+    const rec = accountRecord(userId);
+    const reopen = !!slug && rec.slugs.has(slug.toLowerCase());
+    const remaining = Math.max(0, FREE_DETAIL_QUOTA - rec.used);
+    return { allowed: reopen || remaining > 0, remaining, used: rec.used, limit: FREE_DETAIL_QUOTA };
+  }
   const { used, slugs } = parseDetailCookie(req);
   // Re-opening a company the visitor ALREADY opened never counts — it is served
   // from cache (no credit) — so it is allowed even past the free quota.
@@ -182,7 +210,19 @@ export function checkDetailQuota(req: Request, slug?: string): QuotaState {
  * backstop. Call this only once a profile has actually been served. Returns the
  * post-increment quota state.
  */
-export function recordDetailOpen(req: Request, res: Response, slug?: string): QuotaState {
+export function recordDetailOpen(req: Request, res: Response, slug?: string, userId?: number | null): QuotaState {
+  // Logged-in → record against the ACCOUNT-keyed quota (see checkDetailQuota).
+  if (userId != null) {
+    const rec = accountRecord(userId);
+    const key = slug ? slug.toLowerCase() : '';
+    // Re-open of an already-opened company → dedup: no extra consumption.
+    if (!(key && rec.slugs.has(key))) {
+      rec.used += 1;
+      if (key) rec.slugs.add(key);
+    }
+    const remaining = Math.max(0, FREE_DETAIL_QUOTA - rec.used);
+    return { allowed: remaining > 0, remaining, used: rec.used, limit: FREE_DETAIL_QUOTA };
+  }
   const { used, slugs } = parseDetailCookie(req);
   const key = slug ? slug.toLowerCase() : '';
 
@@ -249,6 +289,7 @@ export function creditMeter(): { sessionLivePulls: number; lastCreditsRemaining:
 export function __resetQuotaStateForTests(): void {
   searchIpDaily.clear();
   detailIpDaily.clear();
+  detailByUser.clear();
   creditsSpentSession = 0;
   lastCreditsRemaining = null;
 }

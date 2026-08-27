@@ -98,11 +98,13 @@ describe('renderImporterSearchPage', () => {
     expect(html).toContain('id="imp-company"');
     expect(html).toContain('Or search by company name');
   });
-  it('shows the freemium locked state (contact + CSV export gated)', () => {
+  it('shows the honest freemium state (CSV export + save free, contact reveal coming soon)', () => {
+    // CSV export + saved-importers surfaces are present (free with an account).
     expect(html).toContain('Export CSV');
-    expect(html.toLowerCase()).toContain('unlock');
-    // CTA points at signup (placeholder unlock, no payment wired).
-    expect(html).toContain('href="/signup"');
+    expect(html).toContain('/importers/saved');
+    // Contact reveal is HONEST: a "coming soon" state, NOT a dead /signup unlock.
+    expect(html).toContain('Contact reveal');
+    expect(html).toContain('coming soon');
   });
   it('carries the nav Importer link (discovery wiring)', () => {
     expect(html).toContain('href="/importers"');
