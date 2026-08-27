@@ -194,7 +194,7 @@ export function renderRfqForm(opts: RfqFormOpts): string {
     : `So carriers know who's requesting and where to send their quote.`;
   const n = opts.recipientCount;
   const capNotice = opts.capped
-    ? ` Your selection matched <strong>${esc(String(opts.totalMatched))}</strong> carriers; this request goes to the first <strong>${esc(
+    ? ` Your selection matched <strong>${esc(opts.totalMatched.toLocaleString('en-US'))}</strong> carriers; this request goes to the first <strong>${esc(
         String(opts.cap),
       )}</strong> (the per-request cap).`
     : '';

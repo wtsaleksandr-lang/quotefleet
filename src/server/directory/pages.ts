@@ -323,6 +323,7 @@ const DIRECTORY_CSS = `
   .carrier-card:hover { border-color: var(--border-strong); }
   .carrier-card .top { display: flex; justify-content: space-between; gap: 10px; align-items: flex-start; }
   .carrier-card h3 { margin: 0 0 3px; font-size: 16px; line-height: 1.3; }
+  .carrier-card-legal { font-size: 12px; color: var(--muted); margin: 0 0 4px; line-height: 1.3; }
   .carrier-card .meta { font-size: 12px; color: var(--muted); font-family: var(--font-mono); letter-spacing: 0.04em; }
   .carrier-facts { display: flex; gap: 18px; flex-wrap: wrap; margin-top: 12px; }
   .carrier-facts .f { display: flex; flex-direction: column; }
@@ -886,6 +887,16 @@ const DIRECTORY_CSS = `
   .join-features { list-style: none; margin: 16px 0 0; padding: 0; display: grid; gap: 8px; }
   .join-features li { position: relative; padding-left: 24px; font-size: 14px; color: var(--ink); line-height: 1.5; }
   .join-features li::before { content: '✓'; position: absolute; left: 0; top: 0; color: var(--success); font-weight: 700; }
+  .join-price { display: inline-flex; align-items: baseline; gap: 8px; margin: 0 0 16px; }
+  .join-price b { font-size: 24px; font-weight: 700; color: var(--ink); }
+  .join-price span { font-size: 13px; color: var(--ink-soft); }
+  .join-split { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin: 16px 0 0; }
+  .join-plan { border: 1px solid var(--border); border-radius: var(--radius-input, 12px); background: var(--surface-2); padding: 16px; }
+  .join-plan--pro { border-color: var(--accent); }
+  .join-plan-head { font-size: 11px; font-family: var(--font-mono); letter-spacing: 0.04em; text-transform: uppercase; color: var(--ink-soft); margin: 0 0 4px; }
+  .join-plan-price { font-size: 13px; font-weight: 600; color: var(--ink); margin: 0 0 12px; }
+  .join-plan .join-features { margin-top: 0; }
+  @media (max-width: 560px) { .join-split { grid-template-columns: 1fr; } }
   .join-form { display: grid; gap: 12px; margin: 0 0 12px; }
   .join-field { display: block; position: relative; border: 1px solid var(--border); border-radius: var(--radius-input, 12px); background: var(--surface-2); padding: 8px 12px; }
   .join-field:focus-within { border-color: var(--accent); }
@@ -1458,6 +1469,7 @@ export function carrierCard(c: VisibleCarrier): string {
     <div class="top">
       <div>
         <h3>${esc(carrierName(c))}</h3>
+        ${carrierName(c) !== c.legalName ? `<div class="carrier-card-legal">Legal name: ${esc(c.legalName)}</div>` : ''}
         <div class="meta">${esc(cityState)}${idMeta ? ' · ' + idMeta : ''}</div>
       </div>
       ${c.intermodal ? '<span class="pill pill-dray">Drayage</span>' : ''}
@@ -2319,6 +2331,41 @@ function directoryProFeatures(): string {
 }
 
 /**
+ * Free-vs-Pro split for the shipper join surface — so an anonymous visitor sees
+ * the price AND what a free account gets before entering their email. Free =
+ * the passwordless shipper account (browse everything, limited rate requests);
+ * Pro ($19/mo) adds contact reveal, exports, saved lists and the full RFQ cap.
+ */
+function freeVsProSplit(): string {
+  const cap = rfqRecipientCap();
+  const free = [
+    'Browse all US &amp; Canadian FMCSA carriers',
+    'See authority, safety rating &amp; fleet on every profile',
+    'Send a starter rate request',
+  ];
+  const pro = [
+    'Reveal direct dispatch &amp; decision-maker contacts',
+    'Export filtered carrier lists to CSV',
+    'Save carrier lists to reuse across searches',
+    `Send one rate request to up to ${cap} carriers at once`,
+  ];
+  return `
+    <div class="join-price"><b>$19/mo</b><span>· cancel anytime</span></div>
+    <div class="join-split">
+      <div class="join-plan">
+        <p class="join-plan-head">Free account</p>
+        <p class="join-plan-price">$0 — magic-link sign-in</p>
+        <ul class="join-features">${free.map((i) => `<li>${i}</li>`).join('')}</ul>
+      </div>
+      <div class="join-plan join-plan--pro">
+        <p class="join-plan-head">Directory Pro</p>
+        <p class="join-plan-price">$19/mo · cancel anytime · everything in Free, plus:</p>
+        <ul class="join-features">${pro.map((i) => `<li>${i}</li>`).join('')}</ul>
+      </div>
+    </div>`;
+}
+
+/**
  * Shipper-facing "Directory Pro" join / sign-in / subscribe surface (/directory/join).
  * Dedicated shipper flow — NEVER the carrier /signup. Server-branches on the
  * soft-auth identity: anonymous → passwordless email form; signed-in free →
@@ -2376,7 +2423,7 @@ export function renderDirectoryJoin(opts: {
         <button type="submit" class="btn btn-primary">${esc(btnLabel)}</button>
       </form>
       <p class="join-msg" data-join-msg role="status" aria-live="polite"></p>
-      ${directoryProFeatures()}
+      ${freeVsProSplit()}
     </div>`;
   }
 
@@ -2468,7 +2515,7 @@ export function renderDirectoryLanding(
         : `<div class="dir-card" style="display:flex; align-items:center; justify-content:space-between; gap:16px; flex-wrap:wrap;">
         <div><h2 style="margin:0 0 4px; font-size:18px;">Search &amp; filter every carrier</h2>
         <p class="muted-small" style="margin:0;">Filter ${fmtNum(summary.total)} carriers by state, city, fleet size, safety rating and authority — every filter is a shareable link.</p></div>
-        <a class="btn btn-primary" href="/directory?sort=featured">Open faceted search <span class="arr">→</span></a>
+        <a class="btn btn-primary" href="/directory?sort=featured">Browse &amp; filter carriers <span class="arr">→</span></a>
       </div>`
     }
     ${shipperCarrierBand(summary)}
@@ -2527,7 +2574,7 @@ function shipperCarrierBand(summary: DirectorySummary): string {
           <li>Save carrier lists to reuse across searches</li>
         </ul>
         <div class="aud-cta-row">
-          <a class="btn btn-primary" href="/directory?sort=featured">Get freight quotes <span class="arr">→</span></a>
+          <a class="btn btn-primary" href="/directory/rfq?sort=featured">Get freight quotes <span class="arr">→</span></a>
           <a class="btn btn-secondary" href="/directory/join">Directory Pro — $19/mo</a>
         </div>
       </section>
@@ -3211,11 +3258,12 @@ export function renderCarrierProfile(opts: {
         if(!j||!j.found){return '<p class="muted-small" style="margin-top:12px;">'+esc((j&&j.note)||'No live FMCSA record found.')+'</p>';}
         function yn(v){return v==='Y'?'Yes':v==='N'?'No':(v||'—');}
         function auth(v){return v==='A'?'Active':v==='I'?'Inactive':v==='N'?'None':(v||'—');}
+        function fmtBipd(v){var n=Number(String(v==null?'':v).replace(/[^0-9.]/g,''));if(!isFinite(n)||n<=0)return '—';var d=n*1000;return d%1000000===0?('$'+(d/1000000)+'M'):('$'+d.toLocaleString('en-US'));}
         var rows=[
           ['Allowed to operate', j.allowedToOperate==='Y'?'Yes':j.allowedToOperate==='N'?'No':'—'],
           ['Common authority', auth(j.authority&&j.authority.common)],
           ['Contract authority', auth(j.authority&&j.authority.contract)],
-          ['BIPD insurance on file', j.insurance&&j.insurance.bipdOnFile?('$'+esc(j.insurance.bipdOnFile)+'k'):'—'],
+          ['BIPD insurance on file', j.insurance&&j.insurance.bipdOnFile?fmtBipd(j.insurance.bipdOnFile):'—'],
           ['Out of service', j.outOfService?('Yes'+(j.outOfServiceDate?' ('+esc(j.outOfServiceDate)+')':'')):'No'],
           ['Power units', j.powerUnits==null?'—':esc(String(j.powerUnits))]
         ];
@@ -3460,6 +3508,7 @@ export function renderCompliancePage(summary: DirectorySummary): string {
       go.addEventListener('click', run);
       input.addEventListener('keydown', function (e) { if (e.key === 'Enter') run(); });
       function auth(v){return v==='A'?'Active':v==='I'?'Inactive':v==='N'?'None':(v||'—');}
+      function fmtBipd(v){var n=Number(String(v==null?'':v).replace(/[^0-9.]/g,''));if(!isFinite(n)||n<=0)return '—';var d=n*1000;return d%1000000===0?('$'+(d/1000000)+'M'):('$'+d.toLocaleString('en-US'));}
       function render(j) {
         if (!j || !j.found) { return '<p class="muted-small" style="margin-top:14px;">' + esc((j && j.note) || 'No FMCSA record found.') + '</p>'; }
         var rows = [
@@ -3471,7 +3520,7 @@ export function renderCompliancePage(summary: DirectorySummary): string {
           ['Allowed to operate', j.allowedToOperate === 'Y' ? '✓ Yes' : j.allowedToOperate === 'N' ? '✗ No' : '—'],
           ['Common authority', auth(j.authority && j.authority.common)],
           ['Contract authority', auth(j.authority && j.authority.contract)],
-          ['BIPD insurance on file', j.insurance && j.insurance.bipdOnFile ? ('$' + esc(j.insurance.bipdOnFile) + 'k') : '—'],
+          ['BIPD insurance on file', j.insurance && j.insurance.bipdOnFile ? fmtBipd(j.insurance.bipdOnFile) : '—'],
           ['Safety rating', esc(j.safetyRating || 'Not rated')],
           ['Out of service', j.outOfService ? ('Yes' + (j.outOfServiceDate ? ' (' + esc(j.outOfServiceDate) + ')' : '')) : 'No'],
           ['Power units', j.powerUnits == null ? '—' : esc(String(j.powerUnits))],
