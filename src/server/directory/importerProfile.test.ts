@@ -197,8 +197,10 @@ describe('handleImporterProfile', () => {
     expect(String(res._html)).toContain('Shipments over time');
     // the detailed open was counted → slug-aware cookie records the opened slug
     expect(res._cookies[DETAIL_COOKIE]).toBe('s:1:valbruna-stainless');
-    // real contact data is NEVER rendered — only the honest "coming soon" reveal
-    expect(String(res._html)).toContain('Contact reveal');
+    // real contact data is NEVER rendered on load — only the gated reveal CTA;
+    // the decision-maker contact is resolved server-side only on an explicit,
+    // allowance-metered POST to the reveal endpoint.
+    expect(String(res._html)).toContain('Reveal the decision-maker');
     expect(String(res._html)).not.toContain('2604342910'); // raw phone never leaks
   });
 

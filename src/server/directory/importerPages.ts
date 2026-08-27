@@ -476,7 +476,7 @@ export function renderImporterSearchPage(): string {
         </div>
       </div>
 
-      <p class="imp-locknote"><b>Free to view:</b> importer, lane, volumes, incumbent forwarder, winnability &amp; the AI angle. <b>Free with an account:</b> save importers to your lead list and export the results to CSV. <b>Coming soon:</b> the decision-maker contact reveal + an AI-drafted opener.</p>
+      <p class="imp-locknote"><b>Free to view:</b> importer, lane, volumes, incumbent forwarder, winnability &amp; the AI angle. <b>Free with an account:</b> save importers to your lead list, export the results to CSV, and 2 free decision-maker contact reveals to start. <b>Leads Pro:</b> 50 decision-maker reveals every month — open any importer profile to reveal.</p>
 
       <div class="imp-privacy-banner">
         <div class="imp-privacy-copy">
@@ -757,15 +757,17 @@ const CLIENT_JS = `
     var right=T('div','imp-foot-r');
     var tierTxt={verified:'\\u2713 Verified decision-maker on file',role_based:'Role-based email available (unverified)',phone_only:'Phone & address on file'};
     right.appendChild(T('span','imp-tier',tierTxt[l.contact_confidence]||tierTxt.phone_only));
-    // Honest contact-reveal state: no fulfillment is wired yet (contactLocked is
-    // always true, no reveal endpoint) so this is NOT a dead /signup link — it
-    // states plainly that the decision-maker reveal is coming soon.
-    var soon=T('span','imp-soon');
-    var sico=T('span','ico','\\ud83d\\udd52'); sico.setAttribute('aria-hidden','true');
-    soon.appendChild(sico); soon.appendChild(document.createTextNode(' Contact reveal '));
-    soon.appendChild(T('span','tag','coming soon'));
-    soon.title='A decision-maker contact reveal + AI-drafted opener is coming soon.';
-    right.appendChild(soon); foot.appendChild(right); c.appendChild(foot);
+    // The decision-maker reveal is LIVE and lives on the importer profile (the
+    // gated, allowance-metered point of use). The card links there rather than
+    // revealing inline — honest, no fabricated contact on the card itself.
+    if(l.slug){
+      var reveal=document.createElement('a'); reveal.className='imp-soon'; reveal.href='/importers/company/'+encodeURIComponent(l.slug);
+      reveal.appendChild(document.createTextNode('Reveal contact '));
+      reveal.appendChild(T('span','tag','on profile \\u2192'));
+      reveal.title='Open the importer profile to reveal the decision-maker contact.';
+      right.appendChild(reveal);
+    }
+    foot.appendChild(right); c.appendChild(foot);
     return c;
   }
 

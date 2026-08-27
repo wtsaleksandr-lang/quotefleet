@@ -2001,6 +2001,75 @@ export const importerContactCache = pgTable(
 export type ImporterContactCacheRow = typeof importerContactCache.$inferSelect;
 
 /**
+ * leads_subscriptions — the "Leads Pro" per-USER subscription behind the
+ * Importer Search decision-maker CONTACT REVEAL. Cloned from directory/manifest
+ * subscriptions: a subscriber is a SHIPPER (`users` row, tenant_id=null),
+ * entitled via this row, FULLY DECOUPLED from `tenants.plan`. One tier ('pro')
+ * with a monthly reveal allowance. NEVER touches `tenants`.
+ */
+export const leadsSubscriptions = pgTable(
+  'leads_subscriptions',
+  {
+    id: serial('id').primaryKey(),
+    /** The shipper user this entitlement belongs to. One row per user. */
+    userId: integer('user_id')
+      .notNull()
+      .references(() => users.id, { onDelete: 'cascade' }),
+    /** Only 'pro' today; kept as text for future tiers. */
+    tier: text('tier').notNull().default('pro'),
+    /** 'active' | 'trialing' | 'past_due' | 'inactive'. Default 'inactive'
+     *  until the Stripe webhook confirms a live subscription. */
+    status: text('status').notNull().default('inactive'),
+    stripeCustomerId: text('stripe_customer_id'),
+    stripeSubscriptionId: text('stripe_subscription_id'),
+    priceId: text('price_id'),
+    currentPeriodEnd: timestamp('current_period_end', { mode: 'date' }),
+    /** Included decision-maker reveals per month for this plan. */
+    revealAllowance: integer('reveal_allowance').notNull().default(50),
+    /** True when this entitlement is a super-admin free grant (comp), NOT a paid
+     *  Stripe subscription. A comped row has no stripe ids and is EXCLUDED from
+     *  recognized MRR. */
+    comp: boolean('comp').notNull().default(false),
+    compNote: text('comp_note'),
+    createdAt: timestamp('created_at', { mode: 'date' }).notNull().defaultNow(),
+    updatedAt: timestamp('updated_at', { mode: 'date' }).notNull().defaultNow(),
+  },
+  (t) => [
+    uniqueIndex('leads_subscriptions_user_idx').on(t.userId),
+    uniqueIndex('leads_subscriptions_customer_idx').on(t.stripeCustomerId),
+  ]
+);
+export type LeadsSubscription = typeof leadsSubscriptions.$inferSelect;
+export type NewLeadsSubscription = typeof leadsSubscriptions.$inferInsert;
+export type LeadsSubscriptionStatus = 'active' | 'trialing' | 'past_due' | 'inactive';
+
+/**
+ * leads_reveal_usage — per-account contact-reveal meter. The allowance counter
+ * behind the reveal gate: FREE accounts get a fixed 'free' bucket (a small taste
+ * allowance, all-time); Leads Pro subscribers get a fresh `YYYY-MM` bucket each
+ * month. One reveal of a NEW company for the account = one increment (a re-reveal
+ * of a company the account already revealed is deduped and never increments).
+ * Platform-level (references neither `tenants` nor an FK) — same posture as
+ * directory_rfq_usage / directory_reveal_usage. A phantom-drop loses only the
+ * current counts (self-refilling) — never subscription/entitlement state.
+ */
+export const leadsRevealUsage = pgTable(
+  'leads_reveal_usage',
+  {
+    id: serial('id').primaryKey(),
+    /** The identified account this meter belongs to (`user:<id>`). */
+    accountKey: text('account_key').notNull(),
+    /** Bucket: `free` (free-taste, all-time) or `YYYY-MM` (Leads Pro monthly). */
+    period: text('period').notNull(),
+    /** Distinct-company reveals recorded in this bucket. */
+    reveals: integer('reveals').notNull().default(0),
+  },
+  (t) => [uniqueIndex('leads_reveal_usage_account_period_idx').on(t.accountKey, t.period)]
+);
+export type LeadsRevealUsage = typeof leadsRevealUsage.$inferSelect;
+export type NewLeadsRevealUsage = typeof leadsRevealUsage.$inferInsert;
+
+/**
  * Self-declared carrier capabilities stored on a `carrier_overrides` row.
  *
  * Each flag flips the matching profile credential badge from the muted "claim

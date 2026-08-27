@@ -53,6 +53,14 @@ import {
 } from './importerQuota.js';
 import { activeRedactionKeys, isKeyRedacted } from './manifestRedactions.js';
 import { directoryIdentity } from './entitlement.js';
+import {
+  leadsIdentity,
+  FREE_REVEAL_TASTE,
+  LEADS_PRO_MONTHLY_ALLOWANCE,
+  LEADS_PRO_PRICE_USD,
+  leadsProPurchasable,
+} from './leadsEntitlement.js';
+import { dbLeadsRevealMeter, revealBucket, leadsAccountKey } from './leadsRevealUsage.js';
 
 const SITE = 'https://quotefleet.net';
 
@@ -585,6 +593,25 @@ const PROFILE_CSS = `
 .impp-lockcard .lk{flex:1 1 240px;min-width:0}
 .impp-lockcard .lk .lt{font-weight:700;color:var(--ink);font-size:14px}
 .impp-lockcard .lk .ls{font-size:12.5px;color:var(--muted);margin-top:4px}
+.impp-reveal-act{margin-left:auto;display:flex;align-items:center}
+.impp-revchip{display:inline-flex;align-items:center;gap:5px;font-size:11px;font-weight:700;letter-spacing:.02em;color:var(--accent);background:color-mix(in srgb,var(--accent) 12%,transparent);border-radius:999px;padding:2px 9px;margin-left:8px;vertical-align:middle}
+.impp-revchip.out{color:var(--warn);background:color-mix(in srgb,var(--warn) 16%,transparent)}
+/* revealed-contact result */
+.impp-reveal-result{margin:12px 0 0}
+.impp-reveal-result[hidden]{display:none}
+.impp-rvc{border:1px solid color-mix(in srgb,var(--accent) 34%,transparent);border-radius:12px;background:color-mix(in srgb,var(--accent) 6%,transparent);padding:16px 18px}
+.impp-rvc-badge{display:inline-flex;align-items:center;gap:6px;font-size:10px;font-weight:700;letter-spacing:.04em;text-transform:uppercase;padding:3px 9px;border-radius:5px;margin-bottom:10px}
+.impp-rvc-badge.verified{background:var(--accent);color:var(--bg)}
+.impp-rvc-badge.role_based{background:color-mix(in srgb,var(--accent) 18%,transparent);color:var(--accent)}
+.impp-rvc-badge.phone_only{background:var(--surface-2);color:var(--muted);border:1px solid var(--border)}
+.impp-rvc-name{font-size:15px;font-weight:800;color:var(--ink)}
+.impp-rvc-title{font-size:12.5px;color:var(--muted);margin-top:2px}
+.impp-rvc-row{display:flex;align-items:center;gap:8px;flex-wrap:wrap;font-size:13px;color:var(--ink-soft);margin-top:8px}
+.impp-rvc-row a{color:var(--accent);text-decoration:none;font-weight:600;word-break:break-all}
+.impp-rvc-row a:hover{text-decoration:underline}
+.impp-rvc-conf{font-size:11px;color:var(--muted)}
+.impp-rvc-none{font-size:13px;color:var(--muted)}
+.impp-rvc-err{font-size:13px;color:var(--warn)}
 
 /* left dot shortcut pane */
 .impp-dots{position:fixed;left:14px;top:50%;transform:translateY(-50%);z-index:30}
@@ -731,8 +758,66 @@ function statStrip(p: ProfileData): string {
   </div>`;
 }
 
+// ── contact-reveal render state ──────────────────────────────────────────────
+/** Point-of-use state for the decision-maker reveal CTA. Computed by the profile
+ *  handler from the Leads Pro identity + the per-account reveal allowance meter. */
+export interface RevealState {
+  loggedIn: boolean;
+  isSubscriber: boolean;
+  /** Reveals remaining (free-taste total, or monthly allowance). */
+  remaining: number;
+  /** The tier cap (FREE_REVEAL_TASTE or the monthly allowance). */
+  cap: number;
+  /** True when Leads Pro checkout is not enabled yet (price id unset). */
+  comingSoon: boolean;
+}
+
+/** Whether Leads Pro checkout is NOT enabled yet — throw-proof (a config hiccup
+ *  degrades to "coming soon" rather than 500-ing the page). */
+function comingSoonSafe(): boolean {
+  try {
+    return !leadsProPurchasable();
+  } catch {
+    return true;
+  }
+}
+
+/** Neutral default reveal state (treated as an anonymous free visitor). */
+export function anonRevealState(): RevealState {
+  return {
+    loggedIn: false,
+    isSubscriber: false,
+    remaining: FREE_REVEAL_TASTE,
+    cap: FREE_REVEAL_TASTE,
+    comingSoon: comingSoonSafe(),
+  };
+}
+
+/** Resolve the caller's point-of-use reveal state (Leads Pro identity + the
+ *  per-account reveal allowance). Never throws — degrades to the anon state so a
+ *  meter/DB/config hiccup can never 500 the profile page. */
+export async function computeRevealState(req: Request): Promise<RevealState> {
+  const comingSoon = comingSoonSafe();
+  try {
+    const id = await leadsIdentity(req);
+    if (id.userId == null) {
+      return { loggedIn: false, isSubscriber: false, remaining: FREE_REVEAL_TASTE, cap: FREE_REVEAL_TASTE, comingSoon };
+    }
+    const cap = id.isSubscriber ? id.revealAllowance || LEADS_PRO_MONTHLY_ALLOWANCE : FREE_REVEAL_TASTE;
+    let used = 0;
+    try {
+      used = await dbLeadsRevealMeter.getReveals(leadsAccountKey(id.userId), revealBucket(id.isSubscriber));
+    } catch {
+      used = 0;
+    }
+    return { loggedIn: true, isSubscriber: id.isSubscriber, remaining: Math.max(0, cap - used), cap, comingSoon };
+  } catch {
+    return { loggedIn: false, isSubscriber: false, remaining: FREE_REVEAL_TASTE, cap: FREE_REVEAL_TASTE, comingSoon };
+  }
+}
+
 // ── the full profile page ────────────────────────────────────────────────────
-export function renderImporterProfilePage(p: ProfileData, quota: QuotaState): string {
+export function renderImporterProfilePage(p: ProfileData, quota: QuotaState, reveal: RevealState = anonRevealState()): string {
   const port = (p.entryPort || 'their US port').split(',')[0];
   const originName = p.origins[0]?.name;
   const brief = `
@@ -742,7 +827,7 @@ export function renderImporterProfilePage(p: ProfileData, quota: QuotaState): st
       <li><b>Steady, sticky volume —</b> ${N(p.ships12m)} shipments (${N(p.teu12m)} TEU) in the last 12 months${p.entryPort ? ' into ' + esc(p.entryPort) : ''}; a consistent lane worth pursuing.</li>
       ${p.incumbent ? `<li><b>Displaceable incumbent —</b> notify party <b>${esc(p.incumbent)}</b> shows on the bills; a named target to undercut${originName ? ' on the ' + esc(originName) + '→' + esc(port) + ' lane' : ''}.</li>` : '<li><b>No forwarder named —</b> the bills show no dominant notify party; an open lane to win with a sharper rate.</li>'}
       <li><b>Best timing —</b> pitch ahead of their busiest months (see the shipments chart) to land the next booking cycle.</li>
-      <li><b>Who to reach —</b> a decision-maker contact reveal + an AI-drafted opener on this exact lane is coming soon; save this importer to be ready.</li>
+      <li><b>Who to reach —</b> reveal the decision-maker contact (verified email, role or phone tier) below — ${reveal.isSubscriber ? 'included with your Leads Pro plan' : `${reveal.remaining} free reveal${reveal.remaining === 1 ? '' : 's'} to start`}.</li>
     </ul>
   </div>`;
 
@@ -806,26 +891,52 @@ export function renderImporterProfilePage(p: ProfileData, quota: QuotaState): st
         .join('')}</tbody></table></div>`
     : '<p class="lead">No recent shipments in the sample.</p>';
 
-  // Contact reveal — HONEST "coming soon" state. There is no fulfillment wired:
-  // `contactLocked` is always true and no reveal endpoint exists yet. So the CTA
-  // does NOT promise an unlock (no dead /signup) — it states plainly that the
-  // decision-maker reveal is coming soon, mirroring the manifest "coming soon"
-  // pattern. Saving the importer (free) is the real action a broker can take now.
-  //
-  // TODO: wire paid contact reveal — pricing TBD by Alex (per-reveal credit vs
-  // subscription). When built, a reveal endpoint calls resolveContactTiered()
-  // (importerLeads.ts) with the importer's phone/address fallback and swaps this
-  // block for the resolved verified/role_based/phone_only contact.
+  // Contact reveal — the REAL gated reveal (Leads Pro). The CTA adapts to the
+  // caller's state: signed-out → sign-in prompt; free with taste → "Reveal
+  // contact (N free)"; free out of taste → upgrade (or "coming soon" until the
+  // price is set); subscriber → reveal against the monthly allowance. The reveal
+  // itself POSTs to /api/importers/company/:slug/reveal, which calls
+  // resolveContactTiered() (cache-first, allowance-metered) and returns the real
+  // verified / role_based / phone_only tier — NEVER a fabricated contact.
+  const revealChip = reveal.loggedIn
+    ? `<span class="impp-revchip${reveal.remaining <= 0 ? ' out' : ''}" id="impp-rev-left">${
+        reveal.isSubscriber
+          ? `${reveal.remaining} reveal${reveal.remaining === 1 ? '' : 's'} left this month`
+          : `${reveal.remaining} free reveal${reveal.remaining === 1 ? '' : 's'} left`
+      }</span>`
+    : '';
+
+  let revealAction: string;
+  if (!reveal.loggedIn) {
+    revealAction = `<a class="btn btn-primary" href="/login?next=${encodeURIComponent('/importers/company/' + p.slug)}">Sign in to reveal contact <span class="arr">&rarr;</span></a>`;
+  } else if (reveal.remaining > 0) {
+    const label = reveal.isSubscriber
+      ? `Reveal contact (${reveal.remaining} left)`
+      : `Reveal contact (${reveal.remaining} free)`;
+    revealAction = `<button type="button" class="btn btn-primary" id="impp-reveal-btn" data-slug="${esc(p.slug)}">${esc(label)}</button>`;
+  } else if (reveal.comingSoon) {
+    revealAction = `<span class="impp-soon"><span class="ico" aria-hidden="true">\u{1F552}</span> Leads Pro <span class="tag">coming soon</span></span>`;
+  } else {
+    revealAction = `<button type="button" class="btn btn-primary" id="impp-upgrade-btn">Upgrade to Leads Pro to reveal contacts <span class="arr">&rarr;</span></button>`;
+  }
+
+  const revealLead = reveal.isSubscriber
+    ? `Reveal the decision-maker on this lane — included with Leads Pro. <b>${reveal.remaining}</b> of ${reveal.cap} reveals left this month.`
+    : reveal.remaining > 0
+      ? `Reveal the decision-maker on this lane — a verified email, a role-based email, or the phone &amp; address on file. You have <b>${reveal.remaining}</b> free reveal${reveal.remaining === 1 ? '' : 's'} to start; Leads Pro includes ${LEADS_PRO_MONTHLY_ALLOWANCE} reveals every month.`
+      : `You've used your ${FREE_REVEAL_TASTE} free contact reveals. Leads Pro includes <b>${LEADS_PRO_MONTHLY_ALLOWANCE}</b> decision-maker reveals every month${reveal.comingSoon ? ' — coming soon.' : ` for $${LEADS_PRO_PRICE_USD}/mo.`}`;
+
   const contactBody = `
-    <p class="lead">Decision-maker contact reveal is on the way — the importer, lane and volumes above stay free to view.</p>
-    <div class="impp-lockcard">
-      <span class="ico" aria-hidden="true" style="font-size:22px">\u{1F512}</span>
+    <p class="lead">${revealLead}</p>
+    <div class="impp-lockcard" id="impp-reveal-card">
+      <span class="ico" aria-hidden="true" style="font-size:22px">\u{1F513}</span>
       <div class="lk">
-        <div class="lt"><span class="blur">Logistics decision-maker</span> · reveal coming soon</div>
-        <div class="ls">We're building a decision-maker reveal — a verified email plus an AI-drafted opener on this exact lane. Save this importer to your list and it'll be one click away when it ships.</div>
+        <div class="lt">Decision-maker contact ${revealChip}</div>
+        <div class="ls">We resolve the best available tier — a verified decision-maker email, a role-based email, or the phone &amp; address on file. We never show a fabricated contact.</div>
       </div>
-      <span class="impp-soon"><span class="ico" aria-hidden="true">\u{1F552}</span> Contact reveal <span class="tag">coming soon</span></span>
-    </div>`;
+      <div class="impp-reveal-act">${revealAction}</div>
+    </div>
+    <div class="impp-reveal-result" id="impp-reveal-result" hidden></div>`;
 
   // Aliases / other names + addresses (ImportYeti's signature de-dup): the same
   // importer files under many name spellings and addresses across their bills.
@@ -1113,6 +1224,73 @@ const PROFILE_JS = `
       }).catch(function(){ saveBtn.disabled = false; });
     });
   }
+
+  // ── Decision-maker contact reveal (Leads Pro) ──────────────────────────────
+  var revBtn = document.getElementById('impp-reveal-btn');
+  var upBtn = document.getElementById('impp-upgrade-btn');
+  var revResult = document.getElementById('impp-reveal-result');
+  var revLeft = document.getElementById('impp-rev-left');
+  function e2(s){ var d=document.createElement('div'); d.textContent = (s==null?'':String(s)); return d.innerHTML; }
+  function showMsg(cls, txt){ if(revResult){ revResult.innerHTML = '<div class="'+cls+'">'+e2(txt)+'</div>'; revResult.hidden=false; } }
+  function setLeft(n, isSub){
+    if(!revLeft) return;
+    revLeft.textContent = isSub ? (n+' reveal'+(n===1?'':'s')+' left this month') : (n+' free reveal'+(n===1?'':'s')+' left');
+    revLeft.className = 'impp-revchip' + (n<=0 ? ' out' : '');
+  }
+  function renderContact(c){
+    if(!revResult||!c) return;
+    var conf = c.confidence || 'phone_only';
+    var badge = conf==='verified' ? 'Verified decision-maker' : (conf==='role_based' ? 'Role-based email (unverified)' : 'Phone & address on file');
+    var out = ['<div class="impp-rvc">','<span class="impp-rvc-badge '+conf+'">'+e2(badge)+'</span>'];
+    if(c.contact_name){ out.push('<div class="impp-rvc-name">'+e2(c.contact_name)+'</div>'); }
+    if(c.title){ out.push('<div class="impp-rvc-title">'+e2(c.title)+'</div>'); }
+    if(c.email){
+      var cf = (c.email_confidence!=null) ? ' <span class="impp-rvc-conf">('+e2(c.email_confidence)+'% confidence)</span>' : '';
+      out.push('<div class="impp-rvc-row">Email: <a href="mailto:'+e2(c.email)+'">'+e2(c.email)+'</a>'+cf+'</div>');
+    }
+    if(c.role_emails && c.role_emails.length){
+      out.push('<div class="impp-rvc-row">Role inboxes: '+c.role_emails.map(function(x){return '<a href="mailto:'+e2(x)+'">'+e2(x)+'</a>';}).join(' &middot; ')+'</div>');
+    }
+    if(c.phone){ out.push('<div class="impp-rvc-row">Phone: <a href="tel:'+e2(c.phone)+'">'+e2(c.phone)+'</a></div>'); }
+    if(c.address){ out.push('<div class="impp-rvc-row">Address: '+e2(c.address)+'</div>'); }
+    if(!c.email && (!c.role_emails||!c.role_emails.length) && !c.phone){
+      out.push('<div class="impp-rvc-none">No verified contact found for this importer — no email or phone resolved. Their supplier lanes above are still your strongest outreach angle.</div>');
+    }
+    out.push('</div>');
+    revResult.innerHTML = out.join('');
+    revResult.hidden = false;
+    var card = document.getElementById('impp-reveal-card');
+    if(card){ var act = card.querySelector('.impp-reveal-act'); if(act) act.style.display='none'; }
+  }
+  function startUpgrade(){
+    fetch('/api/importers/billing/checkout',{method:'POST',headers:{'Accept':'application/json','Content-Type':'application/json'},body:'{}'})
+      .then(function(r){ return r.json().then(function(j){ return {s:r.status,j:j}; }); })
+      .then(function(o){
+        if(o.s===401){ window.location.href='/login?next='+encodeURIComponent(window.location.pathname); return; }
+        if(o.j && o.j.url){ window.location.href=o.j.url; return; }
+        showMsg('impp-rvc-none', (o.j && o.j.error) || 'Leads Pro is coming soon.');
+      }).catch(function(){ showMsg('impp-rvc-err','Could not start checkout. Try again.'); });
+  }
+  if(upBtn){ upBtn.addEventListener('click', startUpgrade); }
+  if(revBtn){
+    revBtn.addEventListener('click', function(){
+      var slug = revBtn.getAttribute('data-slug');
+      var orig = revBtn.textContent;
+      revBtn.disabled = true; revBtn.textContent = 'Revealing\\u2026';
+      fetch('/api/importers/company/'+encodeURIComponent(slug)+'/reveal',{method:'POST',headers:{'Accept':'application/json'}})
+        .then(function(r){ return r.json().then(function(j){ return {s:r.status,j:j}; }); })
+        .then(function(o){
+          revBtn.disabled = false;
+          if(o.s===401){ window.location.href='/login?next='+encodeURIComponent(window.location.pathname); return; }
+          var j = o.j || {};
+          if(j.ok){ renderContact(j.contact); setLeft(j.remaining, j.tier==='pro'); return; }
+          revBtn.textContent = orig;
+          if(j.reason==='upgrade'){ if(j.comingSoon){ showMsg('impp-rvc-none','You\\u2019ve used your free reveals. Leads Pro is coming soon.'); } else { startUpgrade(); } }
+          else if(j.reason==='allowance_exhausted'){ showMsg('impp-rvc-none','You\\u2019ve used all your reveals this month. More unlock next month.'); }
+          else { showMsg('impp-rvc-err','Could not reveal the contact. Try again.'); }
+        }).catch(function(){ revBtn.disabled=false; revBtn.textContent=orig; showMsg('impp-rvc-err','Could not reveal the contact. Try again.'); });
+    });
+  }
 })();
 `.trim();
 
@@ -1171,7 +1349,8 @@ export async function handleImporterProfile(
     // Count this detailed open (bumps the visitor cookie + per-IP backstop).
     // Passing the slug dedups re-opens of the SAME company (no double-charge).
     const after = recordDetailOpen(req, res, slug, userId);
-    res.type('html').send(renderImporterProfilePage(profile, after));
+    const reveal = await computeRevealState(req);
+    res.type('html').send(renderImporterProfilePage(profile, after, reveal));
   } catch (err) {
     const msg = (err as Error)?.message || 'unknown error';
     const missingKey = /API_KEY not set/i.test(msg);

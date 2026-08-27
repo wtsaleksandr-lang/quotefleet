@@ -37,6 +37,8 @@ import { registerRfqRoutes } from './routes/rfq.js';
 import { registerServiceRoutes } from './directory/servicePages.js';
 import { registerGlossaryRoutes } from './directory/glossary.js';
 import { registerImporterRoutes } from './directory/importerPages.js';
+import { registerImporterRevealRoutes } from './directory/importerReveal.js';
+import { registerLeadsBillingRoutes } from './routes/leadsBilling.js';
 import { registerToolsRoutes } from './routes/tools.js';
 import { registerBillingRoutes, registerStripeWebhook } from './routes/billing.js';
 import { registerDirectoryAuthRoutes } from './routes/directoryAuth.js';
@@ -191,6 +193,11 @@ export function createApp(): express.Express {
   // next to the other directory surfaces; its paths don't collide with the
   // /directory/:stateSlug catch-alls.
   registerImporterRoutes(app);
+  // Leads Pro contact reveal — POST /api/importers/company/:slug/reveal — and its
+  // billing routes (checkout + portal). Registered after the importer pages so
+  // the reveal path doesn't collide with the /importers page routes.
+  registerImporterRevealRoutes(app);
+  registerLeadsBillingRoutes(app);
   registerManifestPrivacyRoutes(app);
   registerManifestBillingRoutes(app);
   registerToolsRoutes(app);

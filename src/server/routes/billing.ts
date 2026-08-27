@@ -40,6 +40,7 @@ import { isDepositSession, handleDepositCheckoutCompleted } from './depositCharg
 import { runReferralFulfillmentForInvoice } from '../affiliate/fulfillment.js';
 import { isDirectorySubscription, applyDirectorySubscription } from '../directory/subscription.js';
 import { isManifestSubscription, applyManifestSubscription } from '../directory/manifestSubscription.js';
+import { isLeadsSubscription, applyLeadsSubscription } from '../directory/leadsSubscription.js';
 
 let stripeClient: Stripe | null = null;
 function stripe(): Stripe {
@@ -428,8 +429,13 @@ export async function applySubscription(sub: Stripe.Subscription): Promise<void>
  * the tenant path so a directory sub never hits a tenant lookup.
  */
 async function routeSubscription(sub: Stripe.Subscription): Promise<void> {
-  // Manifest Privacy subs first (own per-USER table), then Directory Pro, then
-  // the tenant path. All three are mutually exclusive by price id / metadata.
+  // Per-USER shipper subs first (own tables), then the tenant path. All are
+  // mutually exclusive by price id / metadata kind, so the tenant path stays
+  // untouched: Leads Pro, then Manifest Privacy, then Directory Pro.
+  if (isLeadsSubscription(sub)) {
+    await applyLeadsSubscription(sub);
+    return;
+  }
   if (isManifestSubscription(sub)) {
     await applyManifestSubscription(sub);
     return;
