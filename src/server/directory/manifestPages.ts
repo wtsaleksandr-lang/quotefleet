@@ -111,6 +111,14 @@ const MCP_CSS = `
 .mcp-tbl tr:last-child td{border-bottom:0}
 .mcp-mono{font-family:var(--font-mono,'JetBrains Mono',monospace);font-size:11px;color:var(--muted);word-break:break-all;white-space:normal;max-width:220px}
 .mcp-varlist{white-space:normal;max-width:260px;font-size:12px;color:var(--ink-soft)}
+.mcp-badge.unpaid{background:#fdecec;color:#b42318;border-color:#f3b4ae}
+.mcp-exp{display:inline-block;font-size:11px;font-weight:600;color:var(--muted);margin-top:2px}
+.mcp-exp.soon{color:#b54708}
+.mcp-exp.due{color:#b42318;font-weight:700}
+/* filter tabs */
+.mcp-tabs{display:flex;gap:8px;margin:14px 0 0;flex-wrap:wrap}
+.mcp-tab{font-size:12.5px;font-weight:600;padding:6px 14px;border-radius:999px;border:1px solid var(--border-strong);color:var(--ink-soft);text-decoration:none;background:var(--surface)}
+.mcp-tab.on{background:var(--accent);color:var(--bg);border-color:var(--accent)}
 `;
 
 /** Human status label — the honest vocabulary. */
@@ -500,19 +508,42 @@ const CBP_CERT_HINT =
   'Copy the CBP certification text, then file it through CBP’s Vessel Manifest Confidentiality Online ' +
   'Application (or the vesselmanifestconfidentiality@cbp.dhs.gov mailbox). There is no automated filing API — this is a human step.';
 
-export function renderAdminPrivacyQueue(rows: Array<{ app: PoaApplication; events: PoaAuditEvent[] }>): string {
+export function renderAdminPrivacyQueue(
+  rows: Array<{ app: PoaApplication; events: PoaAuditEvent[]; sub?: { tier: string | null; paid: boolean } }>,
+  opts?: { filter?: 'all' | 'renewals' },
+): string {
+  const filter = opts?.filter === 'renewals' ? 'renewals' : 'all';
   const fmt = (d: Date | null | undefined) =>
     d ? new Date(d).toISOString().slice(0, 16).replace('T', ' ') : '—';
+  const fmtDay = (d: Date | null | undefined) =>
+    d ? new Date(d).toISOString().slice(0, 10) : '—';
+  const DAY_MS = 24 * 60 * 60 * 1000;
 
   const rowsHtml = rows.length
     ? rows
-        .map(({ app, events }) => {
+        .map(({ app, events, sub }) => {
           const names = (app.nameVariations ?? []).join('; ') || app.grantorLegalName || '—';
           const audit = events
             .slice(0, 8)
             .map((e) => `${esc(e.event)} @ ${fmt(e.createdAt)}`)
             .join('<br>');
           const certText = buildCbpCertText(app);
+          // Expiry cell — days-to-expiry with a "due soon"/"expired" flag so ops
+          // can see at a glance which 2-year terms need re-filing.
+          let expiryHtml = '<span class="mcp-mono">—</span>';
+          if (app.expiresAt) {
+            const days = Math.round((new Date(app.expiresAt).getTime() - Date.now()) / DAY_MS);
+            const flag = days < 0 ? ' due' : days <= 90 ? ' soon' : '';
+            const note = days < 0 ? `expired ${-days}d ago` : `in ${days}d`;
+            expiryHtml = `<div class="mcp-mono">${esc(fmtDay(app.expiresAt))}</div><span class="mcp-exp${flag}">${esc(note)}</span>`;
+          }
+          // Paid/tier cell — JOINed manifest subscription so ops never files for
+          // a non-payer. paid=false renders a loud "UNPAID" flag.
+          const paid = sub?.paid ?? false;
+          const tierLabel = sub?.tier ? sub.tier[0].toUpperCase() + sub.tier.slice(1) : null;
+          const paidHtml = paid
+            ? `<span class="mcp-badge on">Paid${tierLabel ? ` · ${esc(tierLabel)}` : ''}</span>`
+            : `<span class="mcp-badge unpaid">Unpaid</span>`;
           return `<tr>
       <td>
         <div><b>${esc(app.grantorLegalName || '—')}</b></div>
@@ -520,10 +551,13 @@ export function renderAdminPrivacyQueue(rows: Array<{ app: PoaApplication; event
         <div class="mcp-mono">token ${esc(app.publicToken)}</div>
       </td>
       <td><span class="mcp-badge${app.status === 'active' ? ' on' : ''}">${esc(statusLabel(app.status))}</span></td>
+      <td>${paidHtml}</td>
+      <td>${expiryHtml}</td>
       <td class="mcp-varlist">${esc(names)}</td>
       <td>
         ${app.docSha256 ? `<div class="mcp-mono">${esc(app.docSha256)}</div>` : '<span class="mcp-mono">unsigned</span>'}
         ${app.docSha256 ? `<a class="mcp-linkbtn" href="/api/privacy/application/${esc(app.publicToken)}/pdf" target="_blank" rel="noopener">View PDF</a>` : ''}
+        ${app.cbpReference ? `<div class="mcp-mono">ref ${esc(app.cbpReference)}</div>` : ''}
       </td>
       <td class="mcp-mono">${audit || '—'}</td>
       <td>
@@ -532,13 +566,17 @@ export function renderAdminPrivacyQueue(rows: Array<{ app: PoaApplication; event
         <div class="mcp-actions" style="margin-top:8px">
           <button type="button" class="mcp-btn" data-act="submit" data-id="${app.id}">Mark submitted</button>
           <button type="button" class="mcp-btn primary" data-act="confirm" data-id="${app.id}">Confirm + hide</button>
+          <button type="button" class="mcp-btn" data-act="refile" data-id="${app.id}">Re-file (renew)</button>
           <button type="button" class="mcp-btn" data-act="revoke" data-id="${app.id}">Revoke</button>
         </div>
       </td>
     </tr>`;
         })
         .join('')
-    : `<tr><td colspan="6" style="color:var(--muted)">No applications yet.</td></tr>`;
+    : `<tr><td colspan="8" style="color:var(--muted)">${filter === 'renewals' ? 'No filings due for renewal.' : 'No applications yet.'}</td></tr>`;
+
+  const tab = (key: 'all' | 'renewals', label: string) =>
+    `<a class="mcp-tab${filter === key ? ' on' : ''}" href="/admin/privacy${key === 'renewals' ? '?filter=renewals' : ''}">${esc(label)}</a>`;
 
   const body = `
   <style>${MCP_CSS}</style>
@@ -546,9 +584,10 @@ export function renderAdminPrivacyQueue(rows: Array<{ app: PoaApplication; event
     <p class="mcp-eyebrow">Admin · Manifest Privacy</p>
     <h1 class="mcp-h1">CBP filing queue</h1>
     <p class="mcp-sub">${esc(CBP_CERT_HINT)}</p>
+    <div class="mcp-tabs">${tab('all', 'All')}${tab('renewals', 'Renewals due')}</div>
     <div class="mcp-tbl-wrap">
       <table class="mcp-tbl">
-        <thead><tr><th>Applicant</th><th>Status</th><th>Variations</th><th>Signed PDF · SHA-256</th><th>Audit trail</th><th>Actions</th></tr></thead>
+        <thead><tr><th>Applicant</th><th>Status</th><th>Paid</th><th>Expiry</th><th>Variations</th><th>Signed PDF · SHA-256</th><th>Audit trail</th><th>Actions</th></tr></thead>
         <tbody>${rowsHtml}</tbody>
       </table>
     </div>
@@ -593,10 +632,28 @@ const ADMIN_JS = `
   });});
   [].slice.call(document.querySelectorAll('[data-act]')).forEach(function(b){b.addEventListener('click',function(){
     var act=b.getAttribute('data-act'),id=b.getAttribute('data-id');
-    if(act==='confirm'&&!window.confirm('Confirm CBP receipt and hide this importer on QuoteFleet?'))return;
+    var payload={};
+    if(act==='submit'){
+      var ch=window.prompt('How was this filed with CBP? (portal / email / mail)','portal');
+      if(ch===null)return; payload.channel=(ch||'portal').trim().toLowerCase();
+    }
+    if(act==='confirm'){
+      if(!window.confirm('Confirm CBP receipt and hide this importer on QuoteFleet?'))return;
+      var ref=window.prompt('CBP confirmation / receipt reference (leave blank if none issued):','');
+      if(ref===null)return; if(ref.trim())payload.reference=ref.trim();
+      var cch=window.prompt('Channel it was filed through (portal / email / mail):','portal');
+      if(cch===null)return; payload.channel=(cch||'portal').trim().toLowerCase();
+    }
+    if(act==='refile'){
+      if(!window.confirm('Re-file this authorization for a fresh 2-year term? This clones the signed filing into a new Submitted request.'))return;
+      var rch=window.prompt('How are you re-filing with CBP? (portal / email / mail)','portal');
+      if(rch===null)return; payload.channel=(rch||'portal').trim().toLowerCase();
+      var rref=window.prompt('CBP reference for this re-filing (optional):','');
+      if(rref===null)return; if(rref.trim())payload.reference=rref.trim();
+    }
     if(act==='revoke'&&!window.confirm('Revoke this authorization?'))return;
     b.disabled=true;
-    fetch('/api/admin/privacy/'+id+'/'+act,{method:'POST',headers:{'Content-Type':'application/json'},credentials:'same-origin',body:'{}'})
+    fetch('/api/admin/privacy/'+id+'/'+act,{method:'POST',headers:{'Content-Type':'application/json'},credentials:'same-origin',body:JSON.stringify(payload)})
       .then(function(r){return r.json().then(function(j){return {ok:r.ok,body:j};});})
       .then(function(r){b.disabled=false;if(r.ok){msg('Done — reloading…','ok');setTimeout(function(){location.reload();},600);}else{msg(r.body.error||'Action failed','err');}})
       .catch(function(){b.disabled=false;msg('Action failed','err');});

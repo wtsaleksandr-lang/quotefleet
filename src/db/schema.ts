@@ -2500,8 +2500,15 @@ export const directorySubscriptions = pgTable(
     /** The Stripe Price id ($19/mo Directory Pro price) on the subscription. */
     priceId: text('price_id'),
     /** Current billing period end — entitlement lapses after this when the
-     *  subscription is no longer live. Null when unknown. */
+     *  subscription is no longer live. Null when unknown. For a COMPED grant
+     *  this doubles as the comp expiry. */
     currentPeriodEnd: timestamp('current_period_end', { mode: 'date' }),
+    /** True when this entitlement is a super-admin free grant (comp), NOT a paid
+     *  Stripe subscription. A comped row has no stripe ids and is EXCLUDED from
+     *  recognized MRR. */
+    comp: boolean('comp').notNull().default(false),
+    /** Free-text note on why this was comped + who granted it (audit convenience). */
+    compNote: text('comp_note'),
     createdAt: timestamp('created_at', { mode: 'date' }).notNull().defaultNow(),
     updatedAt: timestamp('updated_at', { mode: 'date' }).notNull().defaultNow(),
   },
@@ -2743,6 +2750,12 @@ export const manifestSubscriptions = pgTable(
     /** How many distinct legal entities this plan may protect (1 for Basic;
      *  higher for Professional/Enterprise multi-entity). */
     entityQuota: integer('entity_quota').notNull().default(1),
+    /** True when this entitlement is a super-admin free grant (comp), NOT a paid
+     *  Stripe subscription. A comped row has no stripe ids and is EXCLUDED from
+     *  recognized MRR. */
+    comp: boolean('comp').notNull().default(false),
+    /** Free-text note on why this was comped + who granted it (audit convenience). */
+    compNote: text('comp_note'),
     createdAt: timestamp('created_at', { mode: 'date' }).notNull().defaultNow(),
     updatedAt: timestamp('updated_at', { mode: 'date' }).notNull().defaultNow(),
   },
@@ -2807,6 +2820,9 @@ export const poaApplications = pgTable(
     docSha256: text('doc_sha256'),
     /** How the human ops step filed it: 'portal' | 'email' | 'mail'. */
     cbpChannel: text('cbp_channel'),
+    /** The CBP-issued receipt / confirmation reference captured on confirm — the
+     *  proof-of-filing an operator records so the 2-year term is auditable. */
+    cbpReference: text('cbp_reference'),
     cbpSubmittedAt: timestamp('cbp_submitted_at', { withTimezone: true, mode: 'date' }),
     cbpConfirmedAt: timestamp('cbp_confirmed_at', { withTimezone: true, mode: 'date' }),
     /** When protection took effect (== cbpConfirmedAt) and when it expires

@@ -401,6 +401,12 @@ export const SELF_HEAL_TABLE_STATEMENTS: readonly string[] = [
   )`,
   `CREATE UNIQUE INDEX IF NOT EXISTS "directory_subscriptions_user_idx" ON "directory_subscriptions" ("user_id")`,
   `CREATE UNIQUE INDEX IF NOT EXISTS "directory_subscriptions_customer_idx" ON "directory_subscriptions" ("stripe_customer_id")`,
+  // Super-admin comp/free-grant columns (admin subscription ops). ALTER runs
+  // right after the CREATE TABLE so the table is guaranteed present; IF NOT EXISTS
+  // no-ops on a healthy DB and back-fills an existing table. Keep in sync with
+  // schema.ts `directorySubscriptions`.
+  `ALTER TABLE "directory_subscriptions" ADD COLUMN IF NOT EXISTS "comp" boolean NOT NULL DEFAULT false`,
+  `ALTER TABLE "directory_subscriptions" ADD COLUMN IF NOT EXISTS "comp_note" text`,
   // 0058_directory_rfq_usage.sql — per-account monthly RFQ send meter (the
   // un-gameable quota behind RFQ gating). Healed HERE (same reasoning as
   // directory_subscriptions above): the Replit deploy skips db:migrate and its
@@ -559,6 +565,10 @@ export const SELF_HEAL_TABLE_STATEMENTS: readonly string[] = [
   )`,
   `CREATE UNIQUE INDEX IF NOT EXISTS "manifest_subscriptions_user_idx" ON "manifest_subscriptions" ("user_id")`,
   `CREATE UNIQUE INDEX IF NOT EXISTS "manifest_subscriptions_customer_idx" ON "manifest_subscriptions" ("stripe_customer_id")`,
+  // Super-admin comp/free-grant columns (admin subscription ops). Keep in sync
+  // with schema.ts `manifestSubscriptions`.
+  `ALTER TABLE "manifest_subscriptions" ADD COLUMN IF NOT EXISTS "comp" boolean NOT NULL DEFAULT false`,
+  `ALTER TABLE "manifest_subscriptions" ADD COLUMN IF NOT EXISTS "comp_note" text`,
   `CREATE TABLE IF NOT EXISTS "poa_applications" (
     "id" serial PRIMARY KEY NOT NULL,
     "public_token" text NOT NULL,
@@ -596,6 +606,9 @@ export const SELF_HEAL_TABLE_STATEMENTS: readonly string[] = [
   `CREATE INDEX IF NOT EXISTS "poa_applications_user_idx" ON "poa_applications" ("user_id")`,
   `CREATE INDEX IF NOT EXISTS "poa_applications_status_idx" ON "poa_applications" ("status")`,
   `CREATE INDEX IF NOT EXISTS "poa_applications_expires_idx" ON "poa_applications" ("expires_at")`,
+  // CBP receipt/confirmation reference captured on confirm (admin renewal-ops).
+  // Keep in sync with schema.ts `poaApplications`.
+  `ALTER TABLE "poa_applications" ADD COLUMN IF NOT EXISTS "cbp_reference" text`,
   `CREATE TABLE IF NOT EXISTS "poa_audit_events" (
     "id" serial PRIMARY KEY NOT NULL,
     "application_id" integer NOT NULL,
