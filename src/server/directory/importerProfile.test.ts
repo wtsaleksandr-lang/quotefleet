@@ -195,10 +195,10 @@ describe('handleImporterProfile', () => {
     expect(res._status).toBe(200);
     expect(String(res._html)).toContain('Valbruna Stainless');
     expect(String(res._html)).toContain('Shipments over time');
-    // the detailed open was counted → cookie set to 1
-    expect(res._cookies[DETAIL_COOKIE]).toBe('1');
-    // real contact data is NEVER rendered — only the locked teaser card
-    expect(String(res._html)).toContain('Unlock contact');
+    // the detailed open was counted → slug-aware cookie records the opened slug
+    expect(res._cookies[DETAIL_COOKIE]).toBe('s:1:valbruna-stainless');
+    // real contact data is NEVER rendered — only the honest "coming soon" reveal
+    expect(String(res._html)).toContain('Contact reveal');
     expect(String(res._html)).not.toContain('2604342910'); // raw phone never leaks
   });
 

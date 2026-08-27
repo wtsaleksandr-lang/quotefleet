@@ -628,6 +628,25 @@ export const SELF_HEAL_TABLE_STATEMENTS: readonly string[] = [
     "created_at" timestamp with time zone DEFAULT now() NOT NULL
   )`,
   `CREATE UNIQUE INDEX IF NOT EXISTS "manifest_redactions_name_key_idx" ON "manifest_redactions" ("name_key")`,
+  // importer_saved — a logged-in user's saved importers (broker workflow), the
+  // importer-search analogue of saved_lists. Healed HERE (same reasoning as the
+  // directory tables above): the Replit deploy skips db:migrate and its publish
+  // tool can drop tables, so this CREATE TABLE / INDEX IF NOT EXISTS runs on every
+  // boot and no-ops on a healthy DB; a phantom-drop loses saved importers (user
+  // data, not billing state) and is re-created empty on the next boot. MUST stay
+  // byte-for-byte equivalent to schema.ts `importerSaved`. References `users` only.
+  `CREATE TABLE IF NOT EXISTS "importer_saved" (
+    "id" serial PRIMARY KEY NOT NULL,
+    "user_id" integer NOT NULL,
+    "slug" text NOT NULL,
+    "company" text NOT NULL,
+    "note" text,
+    "status" text,
+    "created_at" timestamp with time zone DEFAULT now() NOT NULL,
+    "updated_at" timestamp with time zone DEFAULT now() NOT NULL
+  )`,
+  `CREATE UNIQUE INDEX IF NOT EXISTS "importer_saved_user_slug_idx" ON "importer_saved" ("user_id","slug")`,
+  `CREATE INDEX IF NOT EXISTS "importer_saved_user_idx" ON "importer_saved" ("user_id")`,
 ];
 
 export async function ensureSelfHealTables(): Promise<void> {

@@ -2713,6 +2713,48 @@ export type SavedListItem = typeof savedListItems.$inferSelect;
 export type NewSavedListItem = typeof savedListItems.$inferInsert;
 
 // ────────────────────────────────────────────────────────────────────
+// IMPORTER SAVED — a logged-in user's saved importers (broker workflow).
+//
+// The importer-search analogue of saved_lists, but deliberately SIMPLER: a flat
+// per-user set of saved importers (no named lists), each keyed by the ImportYeti
+// company SLUG (the /importers/company/:slug identity) with a free-text note and
+// a pipeline status the broker manages. Free for any logged-in user (NOT gated
+// behind Directory Pro — saving importers is a lead-workflow convenience, not a
+// premium tier). Distinct table from saved_lists (carriers) by construction.
+//
+// Self-healed in src/db/migrate.ts (Replit skips db:migrate). A phantom-drop
+// loses saved importers (user data, not billing state); the CREATE TABLE IF NOT
+// EXISTS self-heal re-creates the empty table on boot. References `users` only.
+// ────────────────────────────────────────────────────────────────────
+export const importerSaved = pgTable(
+  'importer_saved',
+  {
+    id: serial('id').primaryKey(),
+    /** The user this saved importer belongs to. */
+    userId: integer('user_id')
+      .notNull()
+      .references(() => users.id, { onDelete: 'cascade' }),
+    /** The ImportYeti company slug (the /importers/company/:slug identity). */
+    slug: text('slug').notNull(),
+    /** Display-name snapshot at save time (the slug is the stable key). */
+    company: text('company').notNull(),
+    /** Broker's free-text note on this importer (trimmed, ≤2000; nullable). */
+    note: text('note'),
+    /** Pipeline status the broker manages (e.g. new/contacted/quoted/won/lost). */
+    status: text('status'),
+    createdAt: timestamp('created_at', { withTimezone: true, mode: 'date' }).notNull().defaultNow(),
+    updatedAt: timestamp('updated_at', { withTimezone: true, mode: 'date' }).notNull().defaultNow(),
+  },
+  (t) => [
+    uniqueIndex('importer_saved_user_slug_idx').on(t.userId, t.slug),
+    index('importer_saved_user_idx').on(t.userId),
+  ]
+);
+
+export type ImporterSaved = typeof importerSaved.$inferSelect;
+export type NewImporterSaved = typeof importerSaved.$inferInsert;
+
+// ────────────────────────────────────────────────────────────────────
 // MANIFEST PRIVACY — the managed CBP vessel-manifest-confidentiality service.
 //
 // Sold as a QuoteFleet upsell off the importer-profile funnel: an importer who

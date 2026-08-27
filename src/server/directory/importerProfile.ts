@@ -52,6 +52,7 @@ import {
   type QuotaState,
 } from './importerQuota.js';
 import { activeRedactionKeys, isKeyRedacted } from './manifestRedactions.js';
+import { directoryIdentity } from './entitlement.js';
 
 const SITE = 'https://quotefleet.net';
 
@@ -172,7 +173,16 @@ export interface ProfileData {
   countryCode: string | null;
   entryPort: string | null;
   incumbent: string | null;
+  /** Count of DISTINCT company-name spellings seen across the sampled bills
+   *  (ImportYeti's signature de-dup: the same importer files under many name
+   *  variants). 1 (or 0) means no alternate names were seen. */
   aliasesCount: number;
+  /** Distinct alternate company-name spellings (excludes the primary display
+   *  name), most-frequent first, capped for display. */
+  otherNames: string[];
+  /** Distinct alternate addresses seen on the sampled bills (excludes the primary
+   *  displayed address), most-frequent first, capped for display. */
+  otherAddresses: string[];
   totalShipments: number | null;
   ships12m: number | null;
   teu12m: number | null;
@@ -256,9 +266,27 @@ export function aggregateProfile(rawRows: readonly BolRow[], slug: string): Prof
   const contMap = new Map<string, { type: string; n: number }>();
   const portFromMap = new Map<string, { port: string; cc: string | null; n: number }>();
   const notifyMap = new Map<string, { name: string; n: number }>();
+  // Alias de-dup: distinct company-name spellings + distinct addresses seen on
+  // the sampled bills (ImportYeti's signature "also known as / other addresses").
+  const nameMap = new Map<string, { name: string; n: number }>();
+  const addrMap = new Map<string, { addr: string; n: number }>();
   let entryPort: string | null = null;
 
   for (const r of rows) {
+    const rawName = str(r.company_name) || str(r.company_basename);
+    if (rawName) {
+      const nk = rawName.toLowerCase().replace(/\s+/g, ' ').trim();
+      const curN = nameMap.get(nk);
+      if (curN) curN.n += 1;
+      else nameMap.set(nk, { name: rawName, n: 1 });
+    }
+    const rawAddr = fixCodeCasing(str(r.company_address));
+    if (rawAddr) {
+      const ak = rawAddr.toLowerCase().replace(/\s+/g, ' ').trim();
+      const curA = addrMap.get(ak);
+      if (curA) curA.n += 1;
+      else addrMap.set(ak, { addr: rawAddr, n: 1 });
+    }
     const mo = monthOf(str(r.arrival_date));
     if (mo) {
       const cur = monthMap.get(mo.ym);
@@ -332,6 +360,21 @@ export function aggregateProfile(rawRows: readonly BolRow[], slug: string): Prof
   // The incumbent forwarder / notify party = the top non-self notify party.
   const incumbent = notifyParties.length ? notifyParties[0].name : null;
 
+  // Aliases: distinct name spellings + addresses. aliasesCount is the number of
+  // distinct company-name spellings (incl. the primary). The "other" lists drop
+  // the primary display name / address so the UI shows genuine alternates only.
+  const primaryNameKey = company.toLowerCase().replace(/\s+/g, ' ').trim();
+  const primaryAddrKey = fixCodeCasing(str(first.company_address)).toLowerCase().replace(/\s+/g, ' ').trim();
+  const aliasesCount = nameMap.size;
+  const otherNames = topBy(nameMap, (v) => v.n, 12)
+    .map(([k, v]) => (k === primaryNameKey ? null : v.name))
+    .filter((s): s is string => !!s)
+    .slice(0, 8);
+  const otherAddresses = topBy(addrMap, (v) => v.n, 12)
+    .map(([k, v]) => (k === primaryAddrKey ? null : v.addr))
+    .filter((s): s is string => !!s)
+    .slice(0, 8);
+
   return {
     slug,
     company,
@@ -341,7 +384,9 @@ export function aggregateProfile(rawRows: readonly BolRow[], slug: string): Prof
     countryCode: str(first.company_country_code).toUpperCase() || 'US',
     entryPort,
     incumbent,
-    aliasesCount: 0,
+    aliasesCount,
+    otherNames,
+    otherAddresses,
     totalShipments,
     ships12m,
     teu12m,
@@ -367,7 +412,7 @@ export function aggregateProfile(rawRows: readonly BolRow[], slug: string): Prof
 export function minimalTeaser(slug: string): ProfileData {
   return {
     slug, company: titleFromSlug(slug), address: null, phoneMasked: null, website: null,
-    countryCode: 'US', entryPort: null, incumbent: null, aliasesCount: 0,
+    countryCode: 'US', entryPort: null, incumbent: null, aliasesCount: 0, otherNames: [], otherAddresses: [],
     totalShipments: null, ships12m: null, teu12m: null, avgTeu: null, estSpend: null,
     firstShipment: null, months: [], suppliers: [], hsBreakdown: [], origins: [],
     carriers: [], containers: [], portsFrom: [], notifyParties: [], recent: [], sampleSize: 0,
@@ -436,7 +481,17 @@ const PROFILE_CSS = `
 .impp-title h1{font-size:28px;line-height:1.15;margin:0;color:var(--ink);letter-spacing:-.015em}
 .impp-flag{font-size:22px;line-height:1}
 .impp-pill{font-size:10px;font-weight:700;letter-spacing:.04em;text-transform:uppercase;padding:4px 8px;border-radius:4px;background:var(--accent);color:var(--bg)}
-.impp-head-act{margin-left:auto;display:flex;gap:8px;flex-wrap:wrap}
+.impp-head-act{margin-left:auto;display:flex;gap:8px;flex-wrap:wrap;align-items:center}
+.impp-save{display:inline-flex;align-items:center;gap:7px;font-family:var(--font-sans);font-size:13px;font-weight:600;color:var(--ink-soft);background:var(--surface-2);border:1px solid var(--border-strong);border-radius:8px;padding:9px 14px;min-height:44px;cursor:pointer}
+.impp-save:hover{border-color:var(--accent);color:var(--ink)}
+.impp-save .star{font-size:15px;line-height:1;color:var(--muted)}
+.impp-save.saved{border-color:var(--accent);color:var(--accent);background:color-mix(in srgb,var(--accent) 10%,transparent)}
+.impp-save.saved .star{color:var(--accent)}
+.impp-save[disabled]{opacity:.6;cursor:default}
+/* honest "coming soon" contact reveal chip (no fulfillment wired yet) */
+.impp-soon{display:inline-flex;align-items:center;gap:8px;font-size:13px;font-weight:600;color:var(--ink-soft);border:1px dashed var(--border-strong);border-radius:8px;padding:9px 14px;background:var(--surface-2)}
+.impp-soon .ico{opacity:.7}
+.impp-soon .tag{font-size:10px;font-weight:700;letter-spacing:.04em;text-transform:uppercase;color:var(--muted);background:var(--surface);border:1px solid var(--border);border-radius:4px;padding:2px 7px}
 .impp-meta{display:flex;gap:8px 20px;flex-wrap:wrap;color:var(--muted);font-size:13px;margin:12px 0 2px}
 .impp-meta .mi{display:inline-flex;align-items:center;gap:6px}
 .impp-privacy{display:flex;align-items:center;gap:8px 14px;flex-wrap:wrap;margin:14px 0 2px;padding:12px 14px;border:1px solid var(--border);border-radius:10px;background:var(--surface)}
@@ -633,16 +688,20 @@ function identityHeader(p: ProfileData, opts: { showActions: boolean }): string 
     p.phoneMasked ? `<span class="mi">\u{1F4DE} ${esc(p.phoneMasked)}</span>` : '',
     p.entryPort ? `<span class="mi">\u{1F6A2} Enters via ${esc(p.entryPort)}</span>` : '',
     p.firstShipment ? `<span class="mi">\u{1F4C5} Importing since ${esc(p.firstShipment)}</span>` : '',
+    p.aliasesCount > 1 ? `<span class="mi">\u{1F3F7}\u{FE0F} ${N(p.aliasesCount)} names on file</span>` : '',
   ]
     .filter(Boolean)
     .join('');
+  // "☆ Save" is a real, free logged-in action (see importerSaved routes); the
+  // client wires it (PROFILE_JS) — a signed-out click routes to /login.
+  const saveBtn = `<button type="button" class="impp-save" id="impp-save" data-slug="${esc(p.slug)}" data-company="${esc(p.company)}" aria-pressed="false"><span class="star" aria-hidden="true">☆</span> <span class="lbl">Save</span></button>`;
   return `
   <div class="impp-head">
     <div class="impp-title">
       <h1>${esc(p.company)}</h1>
       <span class="impp-flag" aria-hidden="true">${flag(p.countryCode)}</span>
       <span class="impp-pill">Importer</span>
-      ${opts.showActions ? '<div class="impp-head-act"><a class="btn btn-primary" href="/tools">Quote this lane <span class="arr">&rarr;</span></a></div>' : ''}
+      ${opts.showActions ? `<div class="impp-head-act">${saveBtn}<a class="btn btn-primary" href="/tools">Quote this lane <span class="arr">&rarr;</span></a></div>` : ''}
     </div>
     ${meta ? `<div class="impp-meta">${meta}</div>` : ''}
     ${opts.showActions ? privacyCta(p) : ''}
@@ -683,7 +742,7 @@ export function renderImporterProfilePage(p: ProfileData, quota: QuotaState): st
       <li><b>Steady, sticky volume —</b> ${N(p.ships12m)} shipments (${N(p.teu12m)} TEU) in the last 12 months${p.entryPort ? ' into ' + esc(p.entryPort) : ''}; a consistent lane worth pursuing.</li>
       ${p.incumbent ? `<li><b>Displaceable incumbent —</b> notify party <b>${esc(p.incumbent)}</b> shows on the bills; a named target to undercut${originName ? ' on the ' + esc(originName) + '→' + esc(port) + ' lane' : ''}.</li>` : '<li><b>No forwarder named —</b> the bills show no dominant notify party; an open lane to win with a sharper rate.</li>'}
       <li><b>Best timing —</b> pitch ahead of their busiest months (see the shipments chart) to land the next booking cycle.</li>
-      <li><b>Who to reach —</b> unlock the decision-maker contact below and send an AI-drafted opener on this exact lane.</li>
+      <li><b>Who to reach —</b> a decision-maker contact reveal + an AI-drafted opener on this exact lane is coming soon; save this importer to be ready.</li>
     </ul>
   </div>`;
 
@@ -747,20 +806,55 @@ export function renderImporterProfilePage(p: ProfileData, quota: QuotaState): st
         .join('')}</tbody></table></div>`
     : '<p class="lead">No recent shipments in the sample.</p>';
 
-  // contact lock (separately locked, paid unlock — regardless of quota)
+  // Contact reveal — HONEST "coming soon" state. There is no fulfillment wired:
+  // `contactLocked` is always true and no reveal endpoint exists yet. So the CTA
+  // does NOT promise an unlock (no dead /signup) — it states plainly that the
+  // decision-maker reveal is coming soon, mirroring the manifest "coming soon"
+  // pattern. Saving the importer (free) is the real action a broker can take now.
+  //
+  // TODO: wire paid contact reveal — pricing TBD by Alex (per-reveal credit vs
+  // subscription). When built, a reveal endpoint calls resolveContactTiered()
+  // (importerLeads.ts) with the importer's phone/address fallback and swaps this
+  // block for the resolved verified/role_based/phone_only contact.
   const contactBody = `
-    <p class="lead">Decision-maker contacts are a paid unlock — the importer, lane and volumes above stay free.</p>
+    <p class="lead">Decision-maker contact reveal is on the way — the importer, lane and volumes above stay free to view.</p>
     <div class="impp-lockcard">
       <span class="ico" aria-hidden="true" style="font-size:22px">\u{1F512}</span>
       <div class="lk">
-        <div class="lt"><span class="blur">Logistics decision-maker</span> · hidden until unlocked</div>
-        <div class="ls">Verified decision-maker email + an AI-drafted opener on this exact lane, hidden until unlocked.</div>
+        <div class="lt"><span class="blur">Logistics decision-maker</span> · reveal coming soon</div>
+        <div class="ls">We're building a decision-maker reveal — a verified email plus an AI-drafted opener on this exact lane. Save this importer to your list and it'll be one click away when it ships.</div>
       </div>
-      <a class="btn btn-primary" href="/signup">Unlock contact <span class="arr">&rarr;</span></a>
+      <span class="impp-soon"><span class="ico" aria-hidden="true">\u{1F552}</span> Contact reveal <span class="tag">coming soon</span></span>
     </div>`;
+
+  // Aliases / other names + addresses (ImportYeti's signature de-dup): the same
+  // importer files under many name spellings and addresses across their bills.
+  const otherNamesHtml = p.otherNames.length
+    ? `<div class="impp-list"><h4>Other names on the bills</h4>${p.otherNames
+        .map((n2) => `<div class="impp-lrow"><span>${esc(n2)}</span></div>`)
+        .join('')}</div>`
+    : '<div class="impp-list"><h4>Other names on the bills</h4><p class="lead">No alternate name spellings in the sample.</p></div>';
+  const otherAddrHtml = p.otherAddresses.length
+    ? `<div class="impp-list"><h4>Other addresses</h4>${p.otherAddresses
+        .map((a) => `<div class="impp-lrow"><span>${esc(a)}</span></div>`)
+        .join('')}</div>`
+    : '<div class="impp-list"><h4>Other addresses</h4><p class="lead">No alternate addresses in the sample.</p></div>';
+  const aliasesBody = `
+    <p class="lead">${
+      p.aliasesCount > 1
+        ? `This importer appears under <b>${N(p.aliasesCount)}</b> name spelling${p.aliasesCount === 1 ? '' : 's'}${p.otherAddresses.length ? ` and <b>${N(p.otherAddresses.length + 1)}</b> addresses` : ''} across the sampled customs bills — a single account behind several variants.`
+        : 'Only one company-name spelling appears on the sampled bills.'
+    }</p>
+    <div class="impp-two">${otherNamesHtml}${otherAddrHtml}</div>`;
 
   const secs: Array<SecDef> = [
     { id: 'overview', label: 'Overview', sub: 'headline stats + AI brief', body: statStrip(p) + brief + sampleNote },
+    {
+      id: 'aliases',
+      label: 'Also known as / other addresses',
+      sub: p.aliasesCount > 1 ? `${p.aliasesCount} names · ${p.otherAddresses.length + 1} addresses` : undefined,
+      body: aliasesBody,
+    },
     { id: 'chart', label: 'Shipments over time', sub: 'monthly bill-of-lading count', body: chartSvg(p.months) },
     { id: 'suppliers', label: 'Suppliers', body: supBody },
     { id: 'products', label: 'Product breakdown', body: hsBody },
@@ -987,6 +1081,38 @@ const PROFILE_JS = `
       if(b) tip.hidden = true;
     });
   }
+
+  // ── ☆ Save this importer (free, logged-in). Reflects saved state on load. ──
+  var saveBtn = document.getElementById('impp-save');
+  if(saveBtn){
+    var slug = saveBtn.getAttribute('data-slug');
+    var company = saveBtn.getAttribute('data-company');
+    var saved = false;
+    function paint(){
+      saveBtn.classList.toggle('saved', saved);
+      saveBtn.setAttribute('aria-pressed', saved ? 'true' : 'false');
+      var star = saveBtn.querySelector('.star'); var lbl = saveBtn.querySelector('.lbl');
+      if(star) star.textContent = saved ? '\\u2605' : '\\u2606';
+      if(lbl) lbl.textContent = saved ? 'Saved' : 'Save';
+    }
+    // Hydrate current saved state (anonymous → loggedIn:false, empty slugs).
+    fetch('/api/importers/saved/slugs',{headers:{'Accept':'application/json'}})
+      .then(function(r){ return r.ok ? r.json() : null; })
+      .then(function(j){ if(j && j.slugs && j.slugs.indexOf(slug) > -1){ saved = true; paint(); } })
+      .catch(function(){ /* ignore — button still works, defaults to unsaved */ });
+    saveBtn.addEventListener('click', function(){
+      saveBtn.disabled = true;
+      var method = saved ? 'DELETE' : 'POST';
+      var url = saved ? ('/api/importers/saved/'+encodeURIComponent(slug)) : '/api/importers/saved';
+      var opts = { method: method, headers: { 'Accept':'application/json' } };
+      if(!saved){ opts.headers['Content-Type']='application/json'; opts.body=JSON.stringify({slug:slug,company:company}); }
+      fetch(url, opts).then(function(r){
+        saveBtn.disabled = false;
+        if(r.status === 401){ window.location.href = '/login?next=' + encodeURIComponent(window.location.pathname); return; }
+        if(r.ok){ saved = !saved; paint(); }
+      }).catch(function(){ saveBtn.disabled = false; });
+    });
+  }
 })();
 `.trim();
 
@@ -1020,7 +1146,10 @@ export async function handleImporterProfile(
   }
 
   const bolCache = deps.bolCache ?? dbBolCacheStore;
-  const quota = checkDetailQuota(req, slug);
+  // For a logged-in user the free-profile quota is keyed to their ACCOUNT (see
+  // importerQuota); anonymous visitors fall back to the cookie/IP gate.
+  const userId = (await directoryIdentity(req).catch(() => null))?.userId ?? null;
+  const quota = checkDetailQuota(req, slug, userId);
 
   try {
     // Over quota → NEVER spend a credit. Use a cached teaser if we already have
@@ -1041,7 +1170,7 @@ export async function handleImporterProfile(
     const profile = aggregateProfile(fetched.rows, slug);
     // Count this detailed open (bumps the visitor cookie + per-IP backstop).
     // Passing the slug dedups re-opens of the SAME company (no double-charge).
-    const after = recordDetailOpen(req, res, slug);
+    const after = recordDetailOpen(req, res, slug, userId);
     res.type('html').send(renderImporterProfilePage(profile, after));
   } catch (err) {
     const msg = (err as Error)?.message || 'unknown error';

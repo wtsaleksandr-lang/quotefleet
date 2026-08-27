@@ -59,10 +59,13 @@ import {
   checkLiveSearchAllowed,
   recordLiveSearch,
   logCreditSpend,
+  checkDetailQuota,
 } from './importerQuota.js';
 import { importerSearchLimiter, publicAutocompleteLimiter } from '../rateLimits.js';
 import { registerImporterProfileRoutes } from './importerProfile.js';
 import { activeRedactionKeys } from './manifestRedactions.js';
+import { directoryIdentity } from './entitlement.js';
+import { registerImporterSavedRoutes } from '../routes/importerSaved.js';
 
 const SITE = 'https://quotefleet.net';
 
@@ -293,6 +296,24 @@ a.imp-co-link:hover{text-decoration:underline}
 .imp-results.compact .imp-stats{grid-template-columns:repeat(2,1fr);gap:8px}
 .imp-results.compact .imp-co{font-size:15px}
 
+/* "N free profiles left" chip (point-of-use quota surfacing) */
+.imp-profiles-left{display:none;align-items:center;gap:6px;font-size:12px;font-weight:600;color:var(--accent);background:color-mix(in srgb,var(--accent) 12%,transparent);border-radius:999px;padding:5px 12px}
+.imp-profiles-left.on{display:inline-flex}
+.imp-profiles-left.out{color:var(--warn);background:color-mix(in srgb,var(--warn) 16%,transparent)}
+.imp-profiles-left a{color:inherit;text-decoration:underline}
+
+/* ☆ Save button on a result card */
+.imp-save{display:inline-flex;align-items:center;gap:6px;font-family:var(--font-sans);font-size:12px;font-weight:600;color:var(--ink-soft);background:var(--surface-2);border:1px solid var(--border-strong);border-radius:8px;padding:7px 11px;min-height:40px;cursor:pointer;margin-left:auto}
+.imp-save:hover{border-color:var(--accent);color:var(--ink)}
+.imp-save .star{font-size:14px;line-height:1;color:var(--muted)}
+.imp-save.saved{border-color:var(--accent);color:var(--accent);background:color-mix(in srgb,var(--accent) 10%,transparent)}
+.imp-save.saved .star{color:var(--accent)}
+.imp-save[disabled]{opacity:.6;cursor:default}
+
+/* honest "contact reveal — coming soon" chip (no fulfillment wired) */
+.imp-soon{display:inline-flex;align-items:center;gap:8px;font-size:12px;font-weight:600;color:var(--ink-soft);border:1px dashed var(--border-strong);border-radius:8px;padding:9px 12px;background:var(--surface-2)}
+.imp-soon .tag{font-size:9px;font-weight:700;letter-spacing:.04em;text-transform:uppercase;color:var(--muted);background:var(--surface);border:1px solid var(--border);border-radius:4px;padding:2px 6px}
+
 .imp-empty{border:1px dashed var(--border-strong);border-radius:var(--radius-lg);padding:48px 24px;text-align:left;color:var(--muted);background:var(--surface)}
 .imp-empty h3{color:var(--ink);margin:0 0 8px}
 
@@ -393,8 +414,11 @@ export function renderImporterSearchPage(): string {
 
         <div class="imp-actions">
           <button type="submit" class="btn btn-primary" id="imp-search">Search importers <span class="arr">&rarr;</span></button>
-          <a class="imp-lock imp-export" id="imp-export" href="/signup" title="CSV export is a paid feature">
-            <span class="ico" aria-hidden="true">&#128274;</span> Export CSV
+          <a class="imp-lock imp-export" id="imp-export" href="/importers/saved" title="Export the current results as CSV (free with an account)">
+            <span class="ico" aria-hidden="true">&#11123;</span> Export CSV
+          </a>
+          <a class="imp-lock" id="imp-saved-link" href="/importers/saved" title="Your saved importers">
+            <span class="ico" aria-hidden="true">&#9733;</span> Saved
           </a>
           <details class="imp-more">
             <summary>More filters</summary>
@@ -426,6 +450,7 @@ export function renderImporterSearchPage(): string {
 
       <div class="imp-toolbar" id="imp-toolbar">
         <span class="imp-count" id="imp-count"></span>
+        <span class="imp-profiles-left" id="imp-profiles-left" role="status" aria-live="polite"></span>
         <div class="imp-density" role="group" aria-label="Result density">
           <button type="button" id="imp-den-comf" aria-pressed="true">Comfortable</button>
           <button type="button" id="imp-den-comp" aria-pressed="false">Compact</button>
@@ -451,7 +476,7 @@ export function renderImporterSearchPage(): string {
         </div>
       </div>
 
-      <p class="imp-locknote"><b>Free to view:</b> importer, lane, volumes, incumbent forwarder, winnability &amp; the AI angle. <b>Unlock with a free account:</b> the decision-maker contact, an AI-drafted opener, and CSV export.</p>
+      <p class="imp-locknote"><b>Free to view:</b> importer, lane, volumes, incumbent forwarder, winnability &amp; the AI angle. <b>Free with an account:</b> save importers to your lead list and export the results to CSV. <b>Coming soon:</b> the decision-maker contact reveal + an AI-drafted opener.</p>
 
       <div class="imp-privacy-banner">
         <div class="imp-privacy-copy">
@@ -516,9 +541,34 @@ const CLIENT_JS = `
   var facetsEl=document.getElementById('imp-facets');
   var moreWrap=document.getElementById('imp-more-wrap');
   var loadMoreBtn=document.getElementById('imp-loadmore');
+  var profilesLeftEl=document.getElementById('imp-profiles-left');
+  var exportBtn=document.getElementById('imp-export');
   if(!form||!results)return;
 
   var PAGE_SIZE=window.__IMP_PAGE_SIZE||25;
+
+  // ── saved-importers state (broker workflow) ──
+  var savedSlugs={};       // slug -> true (hydrated from the account)
+  var savedLoggedIn=false; // whether the visitor is signed in
+  function hydrateSaved(){
+    fetch('/api/importers/saved/slugs',{headers:{'Accept':'application/json'}})
+      .then(function(r){ return r.ok?r.json():null; })
+      .then(function(j){ if(!j)return; savedLoggedIn=!!j.loggedIn;
+        var arr=j.slugs||[]; for(var i=0;i<arr.length;i++) savedSlugs[arr[i]]=true;
+        // Repaint any already-rendered save buttons.
+        var btns=document.querySelectorAll('.imp-save[data-slug]');
+        for(var k=0;k<btns.length;k++){ paintSave(btns[k], !!savedSlugs[btns[k].getAttribute('data-slug')]); }
+      })
+      .catch(function(){ /* ignore — save still works, defaults to unsaved */ });
+  }
+  function paintSave(btn,on){
+    if(!btn)return;
+    btn.classList.toggle('saved', on);
+    btn.setAttribute('aria-pressed', on?'true':'false');
+    var star=btn.querySelector('.star'); var lbl=btn.querySelector('.lbl');
+    if(star) star.textContent = on?'\\u2605':'\\u2606';
+    if(lbl) lbl.textContent = on?'Saved':'Save';
+  }
 
   // ── tiny helpers ──
   function flag(cc){ if(!cc)return ''; cc=String(cc).toUpperCase();
@@ -679,7 +729,10 @@ const CLIENT_JS = `
     h.appendChild(T('span','imp-pill','Importer'));
     var w=l.winnability||{}; var win=T('span','imp-win '+(w.label==='High'?'hi':'md'),'Winnability '+(w.score||'')+' \\u00b7 '+(w.label||''));
     win.title='How switchable this account looks (volume + named incumbent + contact on file)';
-    h.appendChild(win); c.appendChild(h);
+    h.appendChild(win);
+    // ☆ Save (free, logged-in). Only when we have a slug to key the save on.
+    if(l.slug){ h.appendChild(saveButton(l)); }
+    c.appendChild(h);
     if(l.state){ c.appendChild(T('div','imp-addr','United States \\u00b7 '+l.state)); }
     var lane=T('div','imp-lane');
     if(l.supplier_country) lane.appendChild(T('span','imp-flag',flag(l.supplier_country)));
@@ -704,12 +757,41 @@ const CLIENT_JS = `
     var right=T('div','imp-foot-r');
     var tierTxt={verified:'\\u2713 Verified decision-maker on file',role_based:'Role-based email available (unverified)',phone_only:'Phone & address on file'};
     right.appendChild(T('span','imp-tier',tierTxt[l.contact_confidence]||tierTxt.phone_only));
-    var lock=document.createElement('a'); lock.className='imp-lock'; lock.href='/signup';
-    lock.title='Unlock the decision-maker contact + an AI-drafted opener with a free account';
-    var ico=T('span','ico','\\ud83d\\udd12'); ico.setAttribute('aria-hidden','true');
-    lock.appendChild(ico); lock.appendChild(document.createTextNode(' Unlock contact \\u2014 sign up'));
-    right.appendChild(lock); foot.appendChild(right); c.appendChild(foot);
+    // Honest contact-reveal state: no fulfillment is wired yet (contactLocked is
+    // always true, no reveal endpoint) so this is NOT a dead /signup link — it
+    // states plainly that the decision-maker reveal is coming soon.
+    var soon=T('span','imp-soon');
+    var sico=T('span','ico','\\ud83d\\udd52'); sico.setAttribute('aria-hidden','true');
+    soon.appendChild(sico); soon.appendChild(document.createTextNode(' Contact reveal '));
+    soon.appendChild(T('span','tag','coming soon'));
+    soon.title='A decision-maker contact reveal + AI-drafted opener is coming soon.';
+    right.appendChild(soon); foot.appendChild(right); c.appendChild(foot);
     return c;
+  }
+
+  // Build a ☆ Save button for a result card. Toggles the importer in the user's
+  // saved list (free, logged-in); a signed-out click routes to /login.
+  function saveButton(l){
+    var btn=document.createElement('button'); btn.type='button'; btn.className='imp-save';
+    btn.setAttribute('data-slug', l.slug);
+    var star=T('span','star','\\u2606'); star.setAttribute('aria-hidden','true');
+    var lbl=T('span','lbl','Save');
+    btn.appendChild(star); btn.appendChild(document.createTextNode(' ')); btn.appendChild(lbl);
+    paintSave(btn, !!savedSlugs[l.slug]);
+    btn.addEventListener('click',function(){
+      var on=!!savedSlugs[l.slug];
+      btn.disabled=true;
+      var method=on?'DELETE':'POST';
+      var url=on?('/api/importers/saved/'+encodeURIComponent(l.slug)):'/api/importers/saved';
+      var opts={method:method,headers:{'Accept':'application/json'}};
+      if(!on){ opts.headers['Content-Type']='application/json'; opts.body=JSON.stringify({slug:l.slug,company:l.company}); }
+      fetch(url,opts).then(function(r){
+        btn.disabled=false;
+        if(r.status===401){ window.location.href='/login?next='+encodeURIComponent('/importers'); return; }
+        if(r.ok){ if(on){ delete savedSlugs[l.slug]; } else { savedSlugs[l.slug]=true; } paintSave(btn, !!savedSlugs[l.slug]); }
+      }).catch(function(){ btn.disabled=false; });
+    });
+    return btn;
   }
 
   // ── narrow-results facets (client-side over the accumulated set) ──
@@ -794,6 +876,21 @@ const CLIENT_JS = `
     return added;
   }
 
+  // "N free profiles left" chip — surfaced from the search response so the wall
+  // is visible BEFORE it's hit. Hidden until we have a number.
+  function updateProfilesLeft(j){
+    if(!profilesLeftEl||!j||typeof j.profilesRemaining!=='number')return;
+    var n=j.profilesRemaining;
+    profilesLeftEl.className='imp-profiles-left on'+(n<=0?' out':'');
+    profilesLeftEl.innerHTML='';
+    if(n>0){
+      profilesLeftEl.appendChild(document.createTextNode('\\u2605 '+n+' free profile'+(n===1?'':'s')+' left'));
+    } else {
+      profilesLeftEl.appendChild(document.createTextNode('\\u2605 Free profile views used \\u2014 '));
+      var a=document.createElement('a'); a.href='/signup'; a.textContent='subscribe for unlimited'; profilesLeftEl.appendChild(a);
+    }
+  }
+
   function doSearch(payload,page,append){
     setStatus('Searching live customs records\\u2026',true);
     loadMoreBtn.disabled=true;
@@ -809,6 +906,7 @@ const CLIENT_JS = `
         if(!append){ allLeads=[]; seenCos={}; totalScanned=0; }
         var added=ingest(j);
         toolbar.classList.add('on');
+        updateProfilesLeft(j);
         if(!allLeads.length){
           side.classList.remove('on'); results.innerHTML='';
           // Commodity / HS-code searches need an entry geography to scope the
@@ -861,6 +959,36 @@ const CLIENT_JS = `
     curPage++;
     doSearch(curPayload,curPage,true);
   });
+
+  // ── Export CSV of the CURRENT result set (login-gated, free) ──
+  if(exportBtn){
+    exportBtn.addEventListener('click',function(ev){
+      ev.preventDefault();
+      if(!allLeads.length){ setStatus('Run a search first, then export the results to CSV.',false); return; }
+      exportBtn.setAttribute('aria-busy','true');
+      fetch('/api/importers/export.csv',{method:'POST',
+        headers:{'Content-Type':'application/json','Accept':'text/csv'},
+        body:JSON.stringify({leads:allLeads})})
+        .then(function(r){
+          exportBtn.removeAttribute('aria-busy');
+          if(r.status===401){ window.location.href='/login?next='+encodeURIComponent('/importers'); return null; }
+          if(!r.ok) throw new Error('export failed');
+          return r.blob();
+        })
+        .then(function(blob){
+          if(!blob)return;
+          var url=URL.createObjectURL(blob);
+          var a=document.createElement('a'); a.href=url;
+          a.download='quotefleet-importers-'+new Date().toISOString().slice(0,10)+'.csv';
+          document.body.appendChild(a); a.click(); document.body.removeChild(a);
+          setTimeout(function(){ URL.revokeObjectURL(url); },1500);
+        })
+        .catch(function(){ exportBtn.removeAttribute('aria-busy'); setStatus('Could not export the results \\u2014 please try again.',false); });
+    });
+  }
+
+  // Hydrate saved-importer state so card stars reflect the account on load.
+  hydrateSaved();
 })();
 `.trim();
 
@@ -1117,6 +1245,27 @@ export async function handleImporterSearch(
     }
 
     const tiers = await browseTiers(result.leads, contactCache);
+
+    // Surface the FREE-PROFILE quota at point-of-use: `profilesRemaining` powers
+    // the "N free profiles left" chip so users see the wall coming instead of
+    // hitting it blind. Keyed to the ACCOUNT for a logged-in user, else the
+    // cookie/IP gate. Pure READ (never records) — opening a profile is what
+    // decrements it. Degrades to the configured quota on any lookup failure.
+    let profilesRemaining: number;
+    let profilesLimit: number;
+    try {
+      const userId = (await directoryIdentity(req).catch(() => null))?.userId ?? null;
+      const q = checkDetailQuota(req, undefined, userId);
+      profilesRemaining = q.remaining;
+      profilesLimit = q.limit;
+    } catch {
+      // Never let the quota read break search — fall back to the configured free
+      // quota so the chip still renders a sensible number.
+      const q = checkDetailQuota(req);
+      profilesRemaining = q.remaining;
+      profilesLimit = q.limit;
+    }
+
     res.json({
       leads: result.leads.map((l) => toPublicCard(l, tiers.get(l.company) ?? 'phone_only')),
       count: result.leads.length,
@@ -1126,6 +1275,8 @@ export async function handleImporterSearch(
       creditsRemaining: result.creditsRemaining,
       cached: result.cached,
       pulledLive: result.pulledLive,
+      profilesRemaining,
+      profilesLimit,
     });
   } catch (err) {
     // Never 500 the browse path. A missing key / provider timeout / upstream
@@ -1157,6 +1308,106 @@ export function handleImporterSuggest(req: Request, res: Response): void {
   res.json({ items: [] });
 }
 
+// ── CSV export of the current search result set (login-gated, FREE) ──────────
+/** Column model for the importer-search CSV — the FREE card fields only (never
+ *  the locked contact). Mirrors the buildExportCsv shape used by the carrier
+ *  directory export (title rows → header → data, CRLF, UTF-8 BOM on the wire). */
+const IMPORTER_CSV_COLUMNS: ReadonlyArray<readonly [string, (c: Record<string, unknown>) => string | number]> = [
+  ['Company', (c) => str(c.company)],
+  ['State', (c) => str(c.state)],
+  ['Supplier', (c) => str(c.supplier)],
+  ['Supplier country', (c) => str(c.supplier_country)],
+  ['Entry port', (c) => str(c.entry_port)],
+  ['Product', (c) => str(c.product)],
+  ['HS code', (c) => str(c.hs_code)],
+  ['Shipments (12 mo)', (c) => numOrBlank(c.ships_12m)],
+  ['Total shipments', (c) => numOrBlank(c.total_shipments)],
+  ['TEU (12 mo)', (c) => numOrBlank(c.teu_12m)],
+  ['Last shipment', (c) => str(c.last_shipment)],
+  ['Incumbent forwarder', (c) => str(c.incumbent_forwarder)],
+  ['Winnability score', (c) => winnabilityOf(c).score],
+  ['Winnability', (c) => winnabilityOf(c).label],
+];
+
+const str = (v: unknown): string => (v == null ? '' : String(v));
+const numOrBlank = (v: unknown): string | number => {
+  const n = Number(v);
+  return Number.isFinite(n) && v != null && v !== '' ? n : '';
+};
+/** Recompute winnability from the FREE card fields (single source of truth — the
+ *  same deterministic score the cards render), never trusting a client value. */
+function winnabilityOf(c: Record<string, unknown>): { score: number; label: 'High' | 'Medium' } {
+  const lead = {
+    company: str(c.company),
+    ships_12m: numOrBlank(c.ships_12m) === '' ? null : Number(c.ships_12m),
+    incumbent_forwarder: c.incumbent_forwarder ? str(c.incumbent_forwarder) : null,
+    email: null,
+  } as unknown as ImporterLead;
+  return winnability(lead);
+}
+
+/** CSV cell escaping — quote on comma/quote/newline, double embedded quotes. */
+function csvCell(v: string | number): string {
+  const s = String(v ?? '');
+  return /[",\n\r]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s;
+}
+
+/** Build the importer-search CSV from the client's current result cards. */
+export function buildImporterSearchCsv(cards: ReadonlyArray<Record<string, unknown>>, now = new Date()): string {
+  const lines: string[] = [];
+  lines.push(csvCell('QuoteFleet — Importer search results'));
+  lines.push(csvCell(`Showing ${cards.length} importer${cards.length === 1 ? '' : 's'} · Generated ${now.toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' })}`));
+  lines.push('');
+  lines.push(IMPORTER_CSV_COLUMNS.map(([label]) => csvCell(label)).join(','));
+  for (const c of cards) {
+    lines.push(IMPORTER_CSV_COLUMNS.map(([, fn]) => csvCell(fn(c))).join(','));
+  }
+  return lines.join('\r\n');
+}
+
+/** Max rows accepted for a single CSV export (matches the client accumulation
+ *  ceiling of a few pages × MAX_LEADS, with headroom). */
+export const IMPORTER_CSV_MAX_ROWS = 1000;
+
+/**
+ * POST /api/importers/export.csv — export the CURRENT (client-accumulated) result
+ * set as a CSV. Login-gated but FREE: the exported columns are exactly the FREE
+ * card fields (company, lane, volumes, HS, incumbent, winnability) — never the
+ * locked contact — so this leaks nothing the browse cards don't already show. The
+ * client posts its accumulated public cards so the export matches EXACTLY what the
+ * user sees (including client-side narrow filters), and it spends ZERO ImportYeti
+ * credits (nothing is re-pulled).
+ */
+export async function handleImporterExportCsv(req: Request, res: Response): Promise<void> {
+  try {
+    const identity = await directoryIdentity(req).catch(() => null);
+    if (!identity || identity.userId == null) {
+      res.status(401).json({ ok: false, reason: 'needs-account', loginUrl: '/login' });
+      return;
+    }
+    const body = (req.body && typeof req.body === 'object' ? req.body : {}) as Record<string, unknown>;
+    const rawLeads = Array.isArray(body.leads) ? body.leads : [];
+    const cards = rawLeads
+      .filter((l): l is Record<string, unknown> => !!l && typeof l === 'object')
+      .slice(0, IMPORTER_CSV_MAX_ROWS);
+    if (!cards.length) {
+      res.status(400).json({ ok: false, reason: 'no-results', message: 'Run a search first, then export.' });
+      return;
+    }
+    const now = new Date();
+    const csv = buildImporterSearchCsv(cards, now);
+    res
+      .status(200)
+      .type('text/csv; charset=utf-8')
+      .setHeader('Content-Disposition', `attachment; filename="quotefleet-importers-${now.toISOString().slice(0, 10)}.csv"`);
+    // Prepend a UTF-8 BOM so Excel opens accented / em-dash cells correctly.
+    res.send('﻿' + csv);
+  } catch (err) {
+    console.error('[importers.export] csv export failed:', err);
+    res.status(500).json({ ok: false, reason: 'error' });
+  }
+}
+
 export function registerImporterRoutes(app: Express): void {
   app.get(['/importers', '/importers/'], (_req: Request, res: Response, next) => {
     try {
@@ -1171,6 +1422,10 @@ export function registerImporterRoutes(app: Express): void {
   app.post('/api/importers/search', importerSearchLimiter, (req: Request, res: Response) =>
     handleImporterSearch(req, res),
   );
+  // CSV export of the current result set (login-gated, free).
+  app.post('/api/importers/export.csv', (req: Request, res: Response) => handleImporterExportCsv(req, res));
+  // Broker workflow — saved importers (saved page + JSON API; login-gated, free).
+  registerImporterSavedRoutes(app);
   // Phase 2 — the server-rendered company profile page (freemium-gated).
   registerImporterProfileRoutes(app);
 }
