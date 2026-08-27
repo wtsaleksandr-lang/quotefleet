@@ -19,27 +19,53 @@ import { startWeeklyDigestCron } from '../email/weeklyDigestCron.js';
 import { startFuelSurchargeCron } from '../eia/dieselPrice.js';
 import { startDirectoryRefreshCron } from './directoryRefreshCron.js';
 import { runCronSafely } from './cronSafety.js';
+import {
+  decideUncaughtExceptionAction,
+  isServerListening,
+  markServerListening,
+  maybeScheduleCrashProofSelfTest,
+} from './backgroundSafety.js';
 
-// Global crash guards. The two Node fault classes need OPPOSITE handling:
+// Global crash guards. The two Node fault classes are handled by the SAME
+// principle: once the server is LISTENING, a fault bubbling out of background
+// work must NEVER take the process down — degrade, don't die. A fault BEFORE
+// listen is a genuine startup failure and still fails fast.
 //
-// unhandledRejection → LOG and SURVIVE. The dominant source in prod is a
+// unhandledRejection → ALWAYS LOG and SURVIVE. The dominant source in prod is a
 // transient Neon idle-connection drop during serving (a pooled socket Neon
 // reaps async → a stray rejection with no local catch). That is fully
 // recoverable — the driver reconnects on the next query — so killing the
 // process over it is self-inflicted downtime (an earlier attempt exited here
-// and it drove the flap: every idle drop became a restart). Since the boot DB
-// work no longer runs on the path that exits the process (it lives in the
-// background heal block below, which has its own try/catch), a stray rejection
-// no longer means a half-booted server either. Log the thrower and keep serving.
+// and it drove the flap: every idle drop became a restart). Boot DB work runs in
+// the background heal block below (its own try/catch), so a stray rejection
+// never means a half-booted server either. Log the thrower and keep serving.
 //
-// uncaughtException → LOG and EXIT. Per Node's guidance the process is in an
-// undefined state after an uncaught synchronous throw; a clean restart is the
-// only safe response. Registered BEFORE main() so it covers all DB/cron work.
+// uncaughtException → GATED on whether the server is already listening:
+//   • BEFORE listen (still booting): fail fast. Per Node's guidance the process
+//     is in an undefined state after an uncaught synchronous throw, and nothing
+//     is serving yet — a genuinely-unrecoverable startup error (can't bind port,
+//     can't load config) belongs here, so a clean restart is correct.
+//   • AFTER listen (serving traffic): LOG and SURVIVE. A throw escaping from a
+//     background path — a cron tick, an SWR refresh, a post-listen precompute, a
+//     stray DB callback — must NOT exit a healthy server. Exiting would 500
+//     every route (including the zero-logic /healthz) and crash-loop under
+//     Replit's restart — the exact outage this file's guards exist to prevent.
+// Registered BEFORE main() so it covers all DB/cron/background work.
 process.on('unhandledRejection', (reason) => {
   console.error('[server] UNHANDLED REJECTION (non-fatal, surviving):', reason);
 });
 process.on('uncaughtException', (err) => {
-  console.error('[server] UNCAUGHT EXCEPTION (fatal, exiting for clean restart):', err);
+  if (decideUncaughtExceptionAction(isServerListening()) === 'survive') {
+    console.error(
+      '[server] UNCAUGHT EXCEPTION after listen (non-fatal, surviving — background fault must not crash a serving process):',
+      err,
+    );
+    return;
+  }
+  console.error(
+    '[server] UNCAUGHT EXCEPTION during startup (fatal, exiting for clean restart):',
+    err,
+  );
   process.exit(1);
 });
 
@@ -133,10 +159,19 @@ async function main() {
   // reachable as soon as Express is constructed.
   const app = createApp();
   app.listen(env.PORT, env.HOST, () => {
+    // The server is now serving traffic. Flip the boot-vs-serving gate BEFORE any
+    // background work starts so that from here on an uncaughtException escaping a
+    // background path is SURVIVED (see the process.on('uncaughtException') guard
+    // above) instead of crash-looping a healthy, listening process.
+    markServerListening();
     console.log(`[server] QuoteFleet listening on http://${env.HOST}:${env.PORT}`);
     console.log(`[server] Public base URL: ${env.PUBLIC_BASE_URL}`);
     // Fire-and-forget post-listen work; this function catches its own errors.
     void runPostListenJobs();
+    // Chaos probe — inert unless CRASHPROOF_SELFTEST=1 (never set in any deploy).
+    // When armed it raises a simulated background uncaughtException shortly after
+    // listen; the guard above must swallow it and /healthz must stay 200.
+    maybeScheduleCrashProofSelfTest();
   });
 }
 

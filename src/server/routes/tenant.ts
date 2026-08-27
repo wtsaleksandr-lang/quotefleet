@@ -77,6 +77,7 @@ import {
 import { leadUnsubscribeUrl } from '../../email/unsubscribe.js';
 import { makePreviewGrant, PREVIEW_GRANT_PARAM, PREVIEW_GRANT_TTL_MS } from '../access.js';
 import { syncTenantToMarketplace } from '../../marketplace/sync.js';
+import { logAndSwallow } from '../backgroundSafety.js';
 import { carrierLookup } from '../directory/queries.js';
 import { publicAutocompleteLimiter } from '../rateLimits.js';
 import { DEFAULT_AI_SYSTEM_PROMPT, AUTO_FSC_DEFAULTS } from '../../calc/defaults.js';
@@ -178,7 +179,7 @@ const SEED_BRAND_TAGLINE = 'Instant freight quotes';
 
 /** Fire-and-forget marketplace sync. Logs but never throws. */
 function bumpMarketplace(tenantId: number) {
-  void syncTenantToMarketplace(tenantId);
+  void syncTenantToMarketplace(tenantId).catch(logAndSwallow('tenant syncTenantToMarketplace'));
 }
 
 /** Deterministic per-tenant verification token. Derived from

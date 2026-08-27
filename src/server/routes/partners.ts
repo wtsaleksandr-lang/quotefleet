@@ -27,6 +27,7 @@ import {
   isValidCodeShape,
 } from '../affiliate/programs.js';
 import { captureRefClick } from '../affiliate/attribution.js';
+import { logAndSwallow } from '../backgroundSafety.js';
 import { notifyAffiliateApproved } from '../affiliate/notifications.js';
 import { mintUniqueCode, ensureTenantReferralCode } from '../affiliate/codes.js';
 import {
@@ -56,7 +57,7 @@ export function registerPartnersRoutes(app: Express): void {
   app.use((req: Request, res: Response, next: NextFunction) => {
     if (req.method === 'GET' && typeof req.query?.ref === 'string' && req.query.ref) {
       // Fire-and-forget — never block the response on attribution.
-      void captureRefClick(req, res);
+      void captureRefClick(req, res).catch(logAndSwallow('partners captureRefClick'));
     }
     next();
   });
