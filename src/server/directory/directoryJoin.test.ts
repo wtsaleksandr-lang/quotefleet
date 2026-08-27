@@ -43,6 +43,13 @@ describe('renderDirectoryJoin — anonymous', () => {
     expect(html).not.toContain('data-subscribe-btn>');
     expect(html).not.toContain('data-manage-btn>');
   });
+  it('shows the $19/mo price and a free-vs-paid split before sign-in', () => {
+    expect(html).toContain('$19/mo');
+    expect(html).toContain('cancel anytime');
+    expect(html).toContain('Free account');
+    expect(html).toContain('Directory Pro');
+    expect(html).toContain('join-split');
+  });
   it('subscribe intent frames the email step as leading to checkout', () => {
     const sub = renderDirectoryJoin({ identity: anon, intent: 'subscribe' });
     expect(sub).toContain('data-intent="subscribe"');
@@ -121,6 +128,9 @@ describe('renderDirectoryLanding — shipper discoverability (H1)', () => {
   });
   it('exposes an RFQ / get-quotes entry point + a Directory Pro CTA', () => {
     expect(html).toContain('Get freight quotes');
+    // "Get freight quotes" starts a real rate request (RFQ flow), not a re-sort.
+    expect(html).toContain('href="/directory/rfq?sort=featured"');
+    // The browse/filter CTA keeps the faceted-search destination (distinct).
     expect(html).toContain('href="/directory?sort=featured"');
     expect(html).toContain('href="/directory/join"');
     expect(html).toContain('Directory Pro — $19/mo');

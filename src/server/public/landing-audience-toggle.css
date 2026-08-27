@@ -220,6 +220,18 @@
   margin-right: 8px;
 }
 
+.qf-shipper-browse {
+  margin: 16px 0 0 0;
+  font-size: 14px;
+}
+.qf-shipper-browse a {
+  color: var(--accent);
+  text-decoration: none;
+  font-weight: 600;
+}
+.qf-shipper-browse a:hover { text-decoration: underline; }
+.qf-shipper-browse .arr { margin-left: 4px; }
+
 /* Contextual header CTA swap keeps the secondary button styling; no extra CSS. */
 
 /* ── Responsive (375px) ────────────────────────────────────────────────── */
