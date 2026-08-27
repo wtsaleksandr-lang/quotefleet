@@ -26,6 +26,7 @@ import { ZIP_CENTROIDS } from './zipCentroids.js';
 import { ZIP5_CENTROIDS } from './zip5Centroids.js';
 import { CANADA_FSA_CENTROIDS } from './canadaFsa.js';
 import { PORTS_DATA } from '../data/ports.js';
+import { releaseBody } from '../http/responseBody.js';
 
 export interface GeoPoint {
   lat: number;
@@ -224,7 +225,10 @@ export async function geocode(input: {
         'Accept-Language': 'en',
       },
     });
-    if (!res.ok) return null;
+    if (!res.ok) {
+      releaseBody(res); // free the socket — body is never read on the error path
+      return null;
+    }
     const arr = (await res.json()) as Array<{
       lat: string;
       lon: string;

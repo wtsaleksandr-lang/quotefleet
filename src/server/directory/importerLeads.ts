@@ -24,6 +24,8 @@
  * Env: IMPORTYETI_API_KEY, HUNTER_API_KEY, ANTHROPIC_API_KEY
  */
 
+import { releaseBody } from '../../http/responseBody.js';
+
 /** Hard cap on leads returned per request (cost + latency guard). */
 export const MAX_LEADS = 25;
 /** Max concurrent enrichment / draft calls (bounded fan-out). */
@@ -303,7 +305,10 @@ async function hunterDomainSearch(
   const r = await fetchWithTimeout(
     `https://api.hunter.io/v2/domain-search?company=${encodeURIComponent(companyName)}&api_key=${key}&limit=10`,
   );
-  if (!r.ok) return null;
+  if (!r.ok) {
+    releaseBody(r); // free the socket — body is never read on the error path
+    return null;
+  }
   const j = (await r.json()) as { data?: { domain?: string; emails?: Array<Record<string, unknown>> } };
   const d = j.data || {};
   const domain = d.domain || null;

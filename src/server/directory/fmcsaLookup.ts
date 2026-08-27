@@ -16,6 +16,8 @@
  * server-side.
  */
 
+import { releaseBody } from '../../http/responseBody.js';
+
 const QC_BASE = 'https://mobile.fmcsa.dot.gov/qc/services/carriers';
 const DEFAULT_TIMEOUT_MS = 8_000;
 
@@ -59,7 +61,10 @@ async function safeJson(fetchFn: typeof fetch, url: string, timeoutMs: number): 
   const timer = setTimeout(() => controller.abort(), timeoutMs);
   try {
     const res = await fetchFn(url, { redirect: 'follow', signal: controller.signal, headers: { Accept: 'application/json' } });
-    if (!res.ok) return null;
+    if (!res.ok) {
+      releaseBody(res); // free the socket — body is never read on the error path
+      return null;
+    }
     return await res.json();
   } catch {
     return null;
