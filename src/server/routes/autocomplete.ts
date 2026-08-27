@@ -29,6 +29,25 @@ import { loadEnv } from '../../config.js';
 import { publicAutocompleteLimiter } from '../rateLimits.js';
 import { LruCache } from '../lruCache.js';
 import { enforceTenantAccess } from '../access.js';
+import { releaseBody } from '../../http/responseBody.js';
+
+/** Abort a provider autocomplete request that hangs, so a stalled upstream can
+ *  never pin a socket indefinitely (FD-leak guard). Generous vs. the ~sub-second
+ *  typical latency; the caller degrades to empty suggestions on abort. */
+const AUTOCOMPLETE_TIMEOUT_MS = 6000;
+
+/** fetch() with a guaranteed-cleared abort timeout. The timer is always cleared
+ *  in `finally` so it can never leak, and a timed-out request aborts (freeing its
+ *  socket) instead of hanging. */
+async function fetchWithTimeout(input: URL | string) {
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), AUTOCOMPLETE_TIMEOUT_MS);
+  try {
+    return await fetch(input, { signal: controller.signal });
+  } finally {
+    clearTimeout(timer);
+  }
+}
 
 // Cache provider results for 1 hour. 2,000 distinct queries fit
 // comfortably in memory and cover days of normal traffic.
@@ -232,8 +251,11 @@ async function googleAutocomplete(q: string, apiKey: string): Promise<{ suggesti
   url.searchParams.set('types', looksPostal ? '(regions)' : 'geocode'); // regions for ZIP/FSA; geocode (+addresses) for free text
   url.searchParams.set('language', 'en');
   url.searchParams.set('key', apiKey);
-  const r = await fetch(url);
-  if (!r.ok) throw new Error(`Google Places HTTP ${r.status}`);
+  const r = await fetchWithTimeout(url);
+  if (!r.ok) {
+    releaseBody(r); // free the socket — body is never read on the error path
+    throw new Error(`Google Places HTTP ${r.status}`);
+  }
   type GoogleResp = {
     status: string;
     error_message?: string;
@@ -288,8 +310,11 @@ async function mapboxAutocomplete(q: string, token: string): Promise<{ suggestio
   url.searchParams.set('types', looksPostal ? 'postcode,place,locality,district' : 'postcode,place,locality,address,district');
   url.searchParams.set('autocomplete', 'true');
   url.searchParams.set('limit', '6');
-  const r = await fetch(url);
-  if (!r.ok) throw new Error(`Mapbox HTTP ${r.status}`);
+  const r = await fetchWithTimeout(url);
+  if (!r.ok) {
+    releaseBody(r); // free the socket — body is never read on the error path
+    throw new Error(`Mapbox HTTP ${r.status}`);
+  }
   type MapboxFeature = {
     id: string;
     place_name: string;

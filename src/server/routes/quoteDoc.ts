@@ -6,6 +6,7 @@ import { enforceTenantAccess, tenantAccessAllowed } from '../access.js';
 import { resolveFeatures } from '../features.js';
 import { loadEnv } from '../../config.js';
 import { publicDocLimiter, quoteEmailSendLimiter } from '../rateLimits.js';
+import { releaseBody } from '../../http/responseBody.js';
 import { requireAuth, requireTenant } from '../middleware.js';
 import { sendEmail, brandedFrom } from '../../email/send.js';
 import { loadCarrierProfile } from './carrierProfile.js';
@@ -324,9 +325,15 @@ export async function fetchLogoBytes(url: string): Promise<Buffer | null> {
   const timer = setTimeout(() => controller.abort(), LOGO_FETCH_TIMEOUT_MS);
   try {
     const resp = await fetch(src, { signal: controller.signal, redirect: 'follow' });
-    if (!resp.ok) return null;
+    if (!resp.ok) {
+      releaseBody(resp); // free the socket — bytes are never read on the error path
+      return null;
+    }
     const type = (resp.headers.get('content-type') || '').toLowerCase();
-    if (!/^image\/(png|jpe?g)/.test(type)) return null;
+    if (!/^image\/(png|jpe?g)/.test(type)) {
+      releaseBody(resp); // wrong content-type — free the socket without reading bytes
+      return null;
+    }
     const buf = Buffer.from(await resp.arrayBuffer());
     if (buf.length === 0 || buf.length > MAX_LOGO_BYTES) return null;
     return buf;

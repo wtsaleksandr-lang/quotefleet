@@ -23,6 +23,7 @@ import { db } from '../../db/client.js';
 import { tenants, leads, routeMapCache, brandConfigs } from '../../db/schema.js';
 import { loadEnv } from '../../config.js';
 import { quoteMapLimiter } from '../rateLimits.js';
+import { releaseBody } from '../../http/responseBody.js';
 import { getRouteMap, laneCacheKey, normalizeTheme, resolveMapStyle, type LatLng, type MapStyle, type MapTheme } from '../routeMap.js';
 
 // Browsers/proxies may cache the rendered snapshot for a week — the lane
@@ -126,7 +127,10 @@ export async function resolveRouteMapPng(params: {
   let png: Buffer;
   try {
     const upstream = await fetchImpl(route.url, { signal: controller.signal });
-    if (!upstream.ok) return null;
+    if (!upstream.ok) {
+      releaseBody(upstream); // free the socket — bytes are never read on the error path
+      return null;
+    }
     png = Buffer.from(await upstream.arrayBuffer());
     if (png.length === 0) return null;
   } catch {
@@ -190,6 +194,7 @@ export function registerQuoteMapRoutes(app: Express): void {
     try {
       const upstream = await fetch(route.url);
       if (!upstream.ok) {
+        releaseBody(upstream); // free the socket — bytes are never read on the error path
         console.warn(`[quote-map] upstream ${upstream.status} for ${refId} (${theme})`);
         return res.status(502).json({ error: 'Map render failed' });
       }

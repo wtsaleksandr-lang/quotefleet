@@ -15,6 +15,7 @@
  * on the same lane don't re-hit the Directions/Static APIs. Cost control.
  */
 import { LruCache } from './lruCache.js';
+import { releaseBody } from '../http/responseBody.js';
 
 export type LatLng = { lat: number; lng: number };
 
@@ -912,7 +913,10 @@ export async function fetchDirections(
   const timeout = setTimeout(() => controller.abort(), 7000);
   try {
     const r = await fetchImpl(url, { signal: controller.signal });
-    if (!r.ok) return null;
+    if (!r.ok) {
+      releaseBody(r); // free the socket — body is never read on the error path
+      return null;
+    }
     type DirResp = {
       status: string;
       routes?: Array<{

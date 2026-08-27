@@ -57,6 +57,7 @@ import { resolveWidgetTheme, WIDGET_PRESETS } from '../widgetThemes.js';
 import { resolveQuoteDisclaimer } from '../quoteDisclaimer.js';
 import { loadCarrierProfile } from './carrierProfile.js';
 import { enforceTenantAccess } from '../access.js';
+import { releaseBody } from '../../http/responseBody.js';
 import { resolveFeatures, resolveBookingConfig, computeDeposit } from '../features.js';
 import {
   tenantCanCharge,
@@ -738,7 +739,10 @@ export function registerPublicRoutes(app: Express) {
     if (!key) return res.status(404).end();
     try {
       const img = await fetch(buildBaseMapUrl(key, theme, mapStyle, zoom, center, scale));
-      if (!img.ok) return res.status(502).end();
+      if (!img.ok) {
+        releaseBody(img); // free the socket — bytes are never read on the error path
+        return res.status(502).end();
+      }
       const buf = Buffer.from(await img.arrayBuffer());
       // Zoom/pan mints one entry per (theme,style,zoom,center); bound the map so
       // a long inspect session can't grow it without limit. Oldest-first evict.
@@ -767,7 +771,10 @@ export function registerPublicRoutes(app: Express) {
     if (!rm) return res.status(404).end();
     try {
       const img = await fetch(rm.url);
-      if (!img.ok) return res.status(502).end();
+      if (!img.ok) {
+        releaseBody(img); // free the socket — bytes are never read on the error path
+        return res.status(502).end();
+      }
       res.setHeader('content-type', 'image/png');
       res.setHeader('cache-control', 'public, max-age=86400');
       return res.end(Buffer.from(await img.arrayBuffer()));

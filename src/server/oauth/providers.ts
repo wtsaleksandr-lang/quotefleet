@@ -23,6 +23,7 @@
  */
 import crypto from 'crypto';
 import type { OAuthSubColumn } from '../routes/tenantProvision.js';
+import { releaseBody } from '../../http/responseBody.js';
 
 export type OAuthProviderId = 'google' | 'meta' | 'apple';
 
@@ -320,6 +321,7 @@ export async function exchangeCodeForProfile(
     signal: AbortSignal.timeout(HTTP_TIMEOUT_MS),
   });
   if (!infoRes.ok) {
+    releaseBody(infoRes); // free the socket — body is never read on the error path
     throw new Error(`${provider} userinfo fetch failed: ${infoRes.status} ${infoRes.statusText}`);
   }
   const info = (await infoRes.json()) as {
@@ -365,7 +367,10 @@ async function exchangeMeta(
   const infoRes = await fetch(`${USERINFO_URLS.meta}?${infoParams.toString()}`, {
     signal: AbortSignal.timeout(HTTP_TIMEOUT_MS),
   });
-  if (!infoRes.ok) throw new Error(`meta /me fetch failed: ${infoRes.status} ${infoRes.statusText}`);
+  if (!infoRes.ok) {
+    releaseBody(infoRes); // free the socket — body is never read on the error path
+    throw new Error(`meta /me fetch failed: ${infoRes.status} ${infoRes.statusText}`);
+  }
   const info = (await infoRes.json()) as { id?: string; email?: string; name?: string };
   if (!info.id) throw new Error('meta /me missing id');
   if (!info.email) throw new Error('meta /me missing email (email permission declined)');

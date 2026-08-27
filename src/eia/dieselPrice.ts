@@ -21,6 +21,7 @@ import { db } from '../db/client.js';
 import { platformSettings, type Tenant } from '../db/schema.js';
 import { AUTO_FSC_DEFAULTS } from '../calc/defaults.js';
 import { autoFscPerMile } from '../calc/fuelSurcharge.js';
+import { releaseBody } from '../http/responseBody.js';
 
 const CACHE_KEY = 'eia_diesel_weekly';
 const EIA_SERIES = 'EMD_EPD2D_PTE_NUS_DPG';
@@ -74,7 +75,10 @@ async function fetchFromEia(): Promise<{ usdPerGal: number; asOf: string } | nul
     });
     const url = `https://api.eia.gov/v2/petroleum/pri/gnd/data/?${params.toString()}`;
     const res = await withTimeout(url, { headers: { Accept: 'application/json' } });
-    if (!res.ok) return null;
+    if (!res.ok) {
+      releaseBody(res); // free the socket — body is never read on the error path
+      return null;
+    }
     const json = (await res.json()) as {
       response?: { data?: Array<{ period?: string; value?: number | string }> };
     };
@@ -103,7 +107,10 @@ async function fetchFromUsda(): Promise<{ usdPerGal: number; asOf: string } | nu
     });
     const url = `https://agtransport.usda.gov/resource/x88w-atzp.json?${params.toString()}`;
     const res = await withTimeout(url, { headers: { Accept: 'application/json' } });
-    if (!res.ok) return null;
+    if (!res.ok) {
+      releaseBody(res); // free the socket — body is never read on the error path
+      return null;
+    }
     const arr = (await res.json()) as Array<{ date?: string; diesel_price?: number | string }>;
     const row = Array.isArray(arr) ? arr[0] : undefined;
     if (!row) return null;
