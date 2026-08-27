@@ -39,6 +39,7 @@ import {
   tenants,
 } from '../../db/schema.js';
 import { requireAuth, requireTenant } from '../middleware.js';
+import { logAndSwallow } from '../backgroundSafety.js';
 import { aiTenantBurstLimiter, aiTenantDailyLimiter } from '../rateLimits.js';
 import { addTrustedSender } from '../emailImport.js';
 import {
@@ -145,7 +146,12 @@ export function registerIngestRoutes(app: Express) {
     if (!job) return res.status(500).json({ error: 'Failed to create job' });
 
     // Fire-and-forget the parse. Caller polls GET /:id for the result.
-    void runParse(job.id, req.tenant!.id, filename, mimeType, dataBase64);
+    // runParse catches its own errors, but its catch block itself does an async
+    // db().update (mark job failed) that can ALSO reject — so guard the whole
+    // fire-and-forget so a background rejection can never surface unhandled.
+    void runParse(job.id, req.tenant!.id, filename, mimeType, dataBase64).catch(
+      logAndSwallow('ingest runParse'),
+    );
 
     return res.json({ ok: true, jobId: job.id, status: 'parsing' });
   });
@@ -774,7 +780,7 @@ export async function applyDraftToTenant(
       .where(eq(ingestJobs.id, jobId));
   });
 
-  void syncTenantToMarketplace(tenantId);
+  void syncTenantToMarketplace(tenantId).catch(logAndSwallow('ingest syncTenantToMarketplace'));
   return inserted;
 }
 
