@@ -50,7 +50,7 @@ export const MANIFEST_TIERS: readonly ManifestTierMeta[] = [
       '1 business entity, unlimited name variations',
       'We prepare & submit your CBP request on your behalf',
       '2-year renewal tracking & refile reminders',
-      'FMCSA carrier check',
+      'Signed POA + audit trail retained',
     ],
   },
   {

@@ -16,7 +16,13 @@
  *   • Uploaded docs are "on file" / "self-reported" — never "Verified".
  */
 import { layout, esc } from './pages.js';
-import { MANIFEST_TIERS, manifestTierPurchasable, type ManifestTierMeta } from './manifestEntitlement.js';
+import {
+  MANIFEST_TIERS,
+  manifestTierPurchasable,
+  tierMeta,
+  type ManifestTierMeta,
+  type ManifestIdentity,
+} from './manifestEntitlement.js';
 import type { PoaApplication, PoaAuditEvent, PoaStatus } from '../../db/schema.js';
 
 const SITE = 'https://quotefleet.net';
@@ -167,6 +173,7 @@ export function renderPrivacyLanding(): string {
     <p class="mcp-eyebrow">Manifest Privacy</p>
     <h1 class="mcp-h1">Hide your shipment data from competitors</h1>
     <p class="mcp-sub">Your ocean imports are public in U.S. Customs vessel-manifest data — visible to competitors on trackers like ImportYeti and Panjiva. Manifest Privacy prepares and submits a confidentiality request to CBP on your behalf, and hides your company on QuoteFleet.</p>
+    <p class="mcp-sub">CBP protection lasts 2 years and CBP won’t remind you when it lapses — we watch the clock and refile before it expires, so your data never quietly goes public again.</p>
     <div class="mcp-actions">
       <a class="mcp-btn primary" href="/privacy/apply">Start my request <span class="arr">&rarr;</span></a>
       <a class="mcp-btn" href="/importers">Find my company first</a>
@@ -203,9 +210,14 @@ export function renderPrivacyLanding(): string {
 }
 
 /** JSON-safe embed of the current application state for the client flow. */
-function appState(app: PoaApplication | null, prefill: { slug?: string; name?: string }): string {
+function appState(
+  app: PoaApplication | null,
+  prefill: { slug?: string; name?: string },
+  isSubscriber: boolean,
+): string {
   const s = app
     ? {
+        isSubscriber,
         token: app.publicToken,
         status: app.status,
         grantorLegalName: app.grantorLegalName ?? '',
@@ -222,6 +234,7 @@ function appState(app: PoaApplication | null, prefill: { slug?: string; name?: s
         docSha256: app.docSha256 ?? '',
       }
     : {
+        isSubscriber,
         token: '',
         status: 'draft',
         grantorLegalName: prefill.name ?? '',
@@ -244,8 +257,10 @@ function appState(app: PoaApplication | null, prefill: { slug?: string; name?: s
 export function renderPrivacyApply(opts: {
   app: PoaApplication | null;
   prefill: { slug?: string; name?: string };
+  isSubscriber?: boolean;
 }): string {
   const { app, prefill } = opts;
+  const isSubscriber = opts.isSubscriber ?? false;
   const steps = ['Your business', 'What to protect', 'Authorize & e-sign', 'Plan', 'Done'];
   const body = `
   <style>${MCP_CSS}</style>
@@ -311,9 +326,9 @@ export function renderPrivacyApply(opts: {
         <div class="mcp-field"><label for="f-title">Your title / capacity</label><input id="f-title" type="text" placeholder="Owner / CFO"></div>
       </div>
       <div class="mcp-field"><label for="f-email">Your email (for your signed copy)</label><input id="f-email" type="email" placeholder="jane@acme.com" autocomplete="email"></div>
-      <div class="mcp-field"><label>Draw your signature</label>
-        <canvas class="mcp-sig" id="f-sig" width="600" height="120" aria-label="Signature pad"></canvas>
-        <div class="mcp-sigrow"><span>Draw with your mouse or finger.</span><button type="button" class="mcp-linkbtn" id="f-sig-clear">Clear</button></div>
+      <div class="mcp-field"><label>Draw your signature <span style="font-weight:500;color:var(--muted)">(optional)</span></label>
+        <canvas class="mcp-sig" id="f-sig" width="600" height="120" aria-label="Signature pad (optional)"></canvas>
+        <div class="mcp-sigrow"><span>Optional — your typed name above is your legal signature (ESIGN/UETA). Draw here only if you prefer.</span><button type="button" class="mcp-linkbtn" id="f-sig-clear">Clear</button></div>
       </div>
       <p class="mcp-hint">On signing we generate your PDF, record a tamper-evident SHA-256 and an audit trail (time, IP), and email you a copy. This template is a DRAFT pending attorney review before live use.</p>
       <div class="mcp-actions"><button type="button" class="mcp-btn" data-prev="1">Back</button><button type="button" class="mcp-btn primary" id="mcp-sign">Sign &amp; continue <span class="arr">&rarr;</span></button></div>
@@ -336,13 +351,14 @@ export function renderPrivacyApply(opts: {
       <ul class="mcp-timeline" id="mcp-done-timeline"></ul>
       <div class="mcp-actions">
         <a class="mcp-btn primary" id="mcp-dl" href="#" target="_blank" rel="noopener">Download signed PDF</a>
+        <a class="mcp-btn" id="mcp-account-link" href="/privacy/account">View my account</a>
         <a class="mcp-btn" href="/manifest-privacy">Done</a>
       </div>
-      <p class="mcp-honest"><b>What happens next:</b> We prepare and submit your request to CBP on your behalf (a human files it through CBP’s official channels). Your status stays honest — you’ll see Submitted, then Confirmed, then Active. We’ll track your 2-year renewal and refile before it lapses.</p>
+      <p class="mcp-honest" id="mcp-done-next"><b>What happens next:</b> We prepare and submit your request to CBP on your behalf (a human files it through CBP’s official channels). Your status stays honest — you’ll see Submitted, then Confirmed, then Active. We’ll track your 2-year renewal and refile before it lapses.</p>
       <p class="mcp-msg" data-msg="4"></p>
     </section>
   </main>
-  <script>window.__MCP_STATE=${appState(app, prefill)};</script>
+  <script>window.__MCP_STATE=${appState(app, prefill, isSubscriber)};</script>
   <script>${FLOW_JS}</script>`;
   return layout({
     title: 'Hide My Shipment Data — Manifest Privacy | QuoteFleet',
@@ -425,9 +441,11 @@ const FLOW_JS = `
     collect();
     if(!$('#f-consent').checked){msg(2,'Please check the consent box to continue.','err');return;}
     if(!S.signerName){msg(2,'Type your full name as your signature.','err');return;}
-    if(!drawn){msg(2,'Please draw your signature.','err');return;}
+    // The drawn signature is OPTIONAL — typed name + consent satisfies ESIGN/UETA
+    // (keyboard/AT users can sign without a pointer). Include the canvas only if
+    // the signer actually drew on it.
     signBtn.disabled=true;msg(2,'Signing…','');
-    var sig=canvas.toDataURL('image/png');
+    var sig=(drawn&&canvas)?canvas.toDataURL('image/png'):null;
     save().then(function(){return api('POST','/api/privacy/application/'+S.token+'/consent',{disclosureVersion:'shown'});})
       .then(function(){return api('POST','/api/privacy/application/'+S.token+'/sign',{signerName:S.signerName,signerTitle:S.signerTitle,signerEmail:S.signerEmail,signatureDrawnPng:sig});})
       .then(function(r){signBtn.disabled=false;if(!r.ok){throw new Error(r.body.error||'Could not sign');}
@@ -450,6 +468,17 @@ const FLOW_JS = `
   // ---- done timeline ----
   function renderDone(){
     var dl=$('#mcp-dl');if(dl&&S.token)dl.href='/api/privacy/application/'+S.token+'/pdf';
+    // HONEST-CLAIMS: only a PAID subscriber is actually filed with CBP. An unpaid
+    // signer ("I'll decide later") must NOT be told we submit to CBP — nothing is
+    // submitted until they choose a plan.
+    var nx=$('#mcp-done-next');
+    if(nx){
+      if(S.isSubscriber){
+        nx.innerHTML='<b>What happens next:</b> We prepare and submit your request to CBP on your behalf (a human files it through CBP\\u2019s official channels). Your status stays honest \\u2014 you\\u2019ll see Submitted, then Confirmed, then Active. We\\u2019ll track your 2-year renewal and refile before it lapses.';
+      }else{
+        nx.innerHTML='<b>What happens next:</b> Your authorization is saved. Choose a plan and we\\u2019ll file it with CBP on your behalf \\u2014 until then nothing is submitted to CBP. You can pick a plan any time from your account.';
+      }
+    }
     var order=['signed','submitted','confirmed','active'];
     var labels={signed:['Signed',(S.docSha256?('Tamper-evident SHA-256 recorded: '+S.docSha256.slice(0,16)+'…'):'Your authorization is signed and saved.')],
       submitted:['Submitted to CBP','We prepare and submit your request to CBP on your behalf.'],
@@ -572,6 +601,221 @@ const ADMIN_JS = `
       .then(function(r){b.disabled=false;if(r.ok){msg('Done — reloading…','ok');setTimeout(function(){location.reload();},600);}else{msg(r.body.error||'Action failed','err');}})
       .catch(function(){b.disabled=false;msg('Action failed','err');});
   });});
+})();
+`.trim();
+
+// ── customer account portal ──────────────────────────────────────────────────
+/** Format a date as "Aug 22, 2026" (or an em-dash when absent). */
+function fmtDate(d: Date | null | undefined): string {
+  if (!d) return '—';
+  try {
+    return new Date(d).toLocaleDateString('en-US', { year: 'numeric', month: 'short', day: 'numeric' });
+  } catch {
+    return '—';
+  }
+}
+
+/** The ordered protection lifecycle for the account timeline. */
+const ACCOUNT_STAGES: ReadonlyArray<{ key: PoaStatus; label: string }> = [
+  { key: 'draft', label: 'Draft' },
+  { key: 'signed', label: 'Signed' },
+  { key: 'submitted', label: 'Submitted to CBP' },
+  { key: 'confirmed', label: 'Confirmed by CBP' },
+  { key: 'active', label: 'Active — hidden on QuoteFleet' },
+];
+
+/** Render one entity's status timeline (Draft→Signed→Submitted→Confirmed→Active,
+ *  plus a Renewal-due note). Honest vocabulary; never claims "hidden" pre-confirm. */
+function accountTimeline(app: PoaApplication): string {
+  const isRevoked = app.status === 'revoked';
+  const isRenewal = app.status === 'renewal_due' || app.status === 'expired';
+  // Effective progress index: renewal/expired sit at the "active" stage.
+  let idx = ACCOUNT_STAGES.findIndex((s) => s.key === app.status);
+  if (isRenewal) idx = 4;
+  if (idx < 0) idx = 0;
+
+  const dateFor = (key: PoaStatus): string => {
+    switch (key) {
+      case 'signed':
+        return app.signedAt ? `Signed ${fmtDate(app.signedAt)}` : '';
+      case 'submitted':
+        return app.cbpSubmittedAt ? `Submitted ${fmtDate(app.cbpSubmittedAt)}` : '';
+      case 'confirmed':
+        return app.cbpConfirmedAt ? `Confirmed ${fmtDate(app.cbpConfirmedAt)}` : '';
+      case 'active':
+        return app.effectiveAt ? `Effective ${fmtDate(app.effectiveAt)}` : '';
+      default:
+        return '';
+    }
+  };
+
+  const items = ACCOUNT_STAGES.map((s, i) => {
+    const cls = isRevoked ? 'pending' : i < idx ? 'done' : i === idx ? 'cur' : 'pending';
+    const sub = dateFor(s.key);
+    return `<li class="mcp-tl ${cls}"><span class="dot"></span><div><div class="tl-t">${esc(s.label)}</div>${sub ? `<div class="tl-d">${esc(sub)}</div>` : ''}</div></li>`;
+  }).join('');
+
+  let renewalNote = '';
+  if (app.expiresAt && (app.status === 'active' || isRenewal)) {
+    const verb = isRenewal ? 'Renewal due' : 'Renews';
+    renewalNote = `<li class="mcp-tl ${isRenewal ? 'cur' : 'pending'}"><span class="dot"></span><div><div class="tl-t">${verb} ${esc(fmtDate(app.expiresAt))}</div><div class="tl-d">We track your 2-year renewal and refile before protection lapses — you don’t have to remember.</div></div></li>`;
+  }
+  return `<ul class="mcp-timeline">${items}${renewalNote}</ul>`;
+}
+
+/** The logged-in customer's account portal — every entity they filed, its status,
+ *  its signed POA, plus account-level plan + manage-billing + protect-another. */
+export function renderPrivacyAccount(opts: {
+  email: string;
+  identity: ManifestIdentity;
+  applications: PoaApplication[];
+}): string {
+  const { email, identity, applications } = opts;
+  const hasPlan = !!identity.tier || (identity.status != null && identity.status !== 'inactive');
+  const planName = identity.tier ? tierMeta(identity.tier).name : null;
+  const planLine = planName
+    ? `${esc(planName)} plan${identity.isSubscriber ? '' : ` (${esc(identity.status || 'inactive')})`}`
+    : 'No active plan yet';
+  const renewLine =
+    identity.isSubscriber && identity.currentPeriodEnd
+      ? `Renews ${esc(fmtDate(identity.currentPeriodEnd))}`
+      : '';
+
+  const entityCards = applications.length
+    ? applications
+        .map((app) => {
+          const name = app.grantorLegalName || 'Unnamed entity';
+          const badgeOn = app.status === 'active';
+          const variations = (app.nameVariations ?? []).length
+            ? `${(app.nameVariations ?? []).length} name variation${(app.nameVariations ?? []).length === 1 ? '' : 's'} protected`
+            : '';
+          const pdf = app.docSha256
+            ? `<a class="mcp-btn" href="/api/privacy/application/${esc(app.publicToken)}/pdf" target="_blank" rel="noopener">Download signed POA</a>`
+            : '';
+          const resume =
+            app.status === 'draft'
+              ? `<a class="mcp-btn primary" href="/privacy/apply/${esc(app.publicToken)}">Finish &amp; sign <span class="arr">&rarr;</span></a>`
+              : `<a class="mcp-btn" href="/privacy/apply/${esc(app.publicToken)}">Open</a>`;
+          return `<div class="mcp-card">
+      <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:12px;flex-wrap:wrap">
+        <div>
+          <h2 style="margin:0 0 4px">${esc(name)}</h2>
+          ${variations ? `<p class="mcp-steplead" style="margin:0">${esc(variations)}</p>` : ''}
+        </div>
+        <span class="mcp-badge${badgeOn ? ' on' : ''}">${esc(statusLabel(app.status))}</span>
+      </div>
+      ${accountTimeline(app)}
+      <div class="mcp-actions">${resume}${pdf}</div>
+    </div>`;
+        })
+        .join('')
+    : `<div class="mcp-card"><h2>No entities yet</h2><p class="mcp-steplead" style="margin:0 0 12px">You haven’t filed a confidentiality authorization yet. Start one — it takes a few minutes.</p><div class="mcp-actions"><a class="mcp-btn primary" href="/privacy/apply">Protect an entity <span class="arr">&rarr;</span></a></div></div>`;
+
+  const manageBilling = hasPlan
+    ? `<button type="button" class="mcp-btn" id="mcp-portal">Manage billing</button>`
+    : `<a class="mcp-btn primary" href="/privacy/apply">Choose a plan</a>`;
+
+  const body = `
+  <style>${MCP_CSS}</style>
+  <main class="mcp-wrap">
+    <a class="mcp-back" href="/manifest-privacy">&larr; Manifest Privacy</a>
+    <p class="mcp-eyebrow">Manifest Privacy · Account</p>
+    <h1 class="mcp-h1">Your protected entities</h1>
+    <p class="mcp-sub">Signed in as ${esc(email)}. Track each entity’s status, download your signed authorizations, and manage your plan.</p>
+
+    <div class="mcp-card">
+      <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:12px;flex-wrap:wrap">
+        <div>
+          <h2 style="margin:0 0 2px">${esc(planLine)}</h2>
+          ${renewLine ? `<p class="mcp-steplead" style="margin:0">${renewLine}</p>` : `<p class="mcp-steplead" style="margin:0">Multi-entity plans let you protect more than one business under one subscription.</p>`}
+        </div>
+      </div>
+      <div class="mcp-actions">
+        ${manageBilling}
+        <a class="mcp-btn${hasPlan ? ' primary' : ''}" href="/privacy/apply">Protect another entity <span class="arr">&rarr;</span></a>
+      </div>
+      <p class="mcp-msg" id="mcp-account-msg"></p>
+    </div>
+
+    ${entityCards}
+
+    <p class="mcp-honest"><b>How this works, honestly:</b> We prepare and submit your request to CBP on your behalf — QuoteFleet is not CBP and has no automated filing connection to it. Being “Hidden on QuoteFleet” is not the same as removal from CBP’s feed; the CBP filing is what removes your future shipments from third-party trackers (it is not retroactive).</p>
+  </main>
+  <script>${ACCOUNT_JS}</script>`;
+  return layout({
+    title: 'Your Account — Manifest Privacy | QuoteFleet',
+    description: 'Manage your Manifest Privacy protection: entity status, signed authorizations, plan, and renewals.',
+    canonicalPath: '/privacy/account',
+    bodyHtml: body,
+  });
+}
+
+const ACCOUNT_JS = `
+(function(){
+  var btn=document.getElementById('mcp-portal');
+  var msg=document.getElementById('mcp-account-msg');
+  function say(t,kind){if(msg){msg.textContent=t||'';msg.className='mcp-msg'+(kind?' '+kind:'');}}
+  if(btn)btn.addEventListener('click',function(){
+    btn.disabled=true;say('Opening billing…','');
+    fetch('/api/privacy/billing/portal',{credentials:'same-origin'})
+      .then(function(r){return r.json().then(function(j){return {ok:r.ok,status:r.status,body:j};});})
+      .then(function(r){btn.disabled=false;
+        if(r.ok&&r.body.url){window.location.href=r.body.url;return;}
+        if(r.status===404){say('No billing set up yet — choose a plan to subscribe.','err');return;}
+        say(r.body.error||'Billing is unavailable right now.','err');})
+      .catch(function(){btn.disabled=false;say('Billing is unavailable right now.','err');});
+  });
+})();
+`.trim();
+
+/** The magic-link sign-in gate for the account portal. Reuses the platform
+ *  magic-link endpoint (/api/auth/magic-link/send) with a redirect back to
+ *  /privacy/account — the same passwordless flow directory shippers use. */
+export function renderPrivacyLogin(): string {
+  const body = `
+  <style>${MCP_CSS}</style>
+  <main class="mcp-wrap mcp-narrow">
+    <a class="mcp-back" href="/manifest-privacy">&larr; Manifest Privacy</a>
+    <p class="mcp-eyebrow">Manifest Privacy · Sign in</p>
+    <h1 class="mcp-h1">Sign in to your account</h1>
+    <p class="mcp-sub">Enter the email you used to sign your authorization. We’ll email you a secure sign-in link — no password needed.</p>
+    <div class="mcp-card">
+      <form id="mcp-login-form">
+        <div class="mcp-field"><label for="mcp-email">Email</label><input id="mcp-email" name="email" type="email" placeholder="you@company.com" autocomplete="email" required></div>
+        <div class="mcp-actions"><button type="submit" class="mcp-btn primary" id="mcp-login-btn">Email me a sign-in link</button></div>
+        <p class="mcp-msg" id="mcp-login-msg"></p>
+      </form>
+      <p class="mcp-hint">Prefer a password? <a href="/login" style="color:var(--accent)">Use the full sign-in page</a>.</p>
+    </div>
+  </main>
+  <script>${LOGIN_JS}</script>`;
+  return layout({
+    title: 'Sign in — Manifest Privacy | QuoteFleet',
+    description: 'Sign in to manage your Manifest Privacy protection.',
+    canonicalPath: '/privacy/login',
+    bodyHtml: body,
+  });
+}
+
+const LOGIN_JS = `
+(function(){
+  var form=document.getElementById('mcp-login-form');
+  var msg=document.getElementById('mcp-login-msg');
+  var btn=document.getElementById('mcp-login-btn');
+  function say(t,kind){if(msg){msg.textContent=t||'';msg.className='mcp-msg'+(kind?' '+kind:'');}}
+  if(form)form.addEventListener('submit',function(e){
+    e.preventDefault();
+    var email=(document.getElementById('mcp-email')||{}).value;
+    email=(email||'').trim();
+    if(!email||email.indexOf('@')<1){say('Enter a valid email address.','err');return;}
+    btn.disabled=true;say('Sending…','');
+    fetch('/api/auth/magic-link/send',{method:'POST',headers:{'Content-Type':'application/json'},credentials:'same-origin',body:JSON.stringify({email:email,redirectTo:'/privacy/account'})})
+      .then(function(r){return r.json().then(function(j){return {ok:r.ok,body:j};});})
+      .then(function(r){btn.disabled=false;
+        if(r.ok){say('\\u2713 If that email has an account, a sign-in link is on the way.','ok');return;}
+        say(r.body.error||'Could not send the link. Try again.','err');})
+      .catch(function(){btn.disabled=false;say('Network error — try again.','err');});
+  });
 })();
 `.trim();
 
