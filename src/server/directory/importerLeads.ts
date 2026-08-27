@@ -475,7 +475,11 @@ export async function draftEmail(
  * importers whose company address differs from the port's state. State is
  * realized upstream by pulling each of the state's entry ports (see
  * importerPages.runSearch). */
-function applyPostFilters(leads: ImporterLead[], f: ImporterFilters): ImporterLead[] {
+function applyPostFilters(
+  leads: ImporterLead[],
+  f: ImporterFilters,
+  redactKeys?: Set<string>,
+): ImporterLead[] {
   let out = leads;
   if (f.company) {
     const q = f.company.trim().toLowerCase();
@@ -483,7 +487,25 @@ function applyPostFilters(leads: ImporterLead[], f: ImporterFilters): ImporterLe
   }
   if (f.minShipments12m) out = out.filter((l) => (l.ships_12m ?? 0) >= f.minShipments12m!);
   if (f.minTeu12m) out = out.filter((l) => (l.teu_12m ?? 0) >= f.minTeu12m!);
+  // Manifest Privacy redaction choke-point: drop any importer that has an active
+  // "Hidden on QuoteFleet" redaction (CBP-confirmed confidentiality customer).
+  // The set is resolved by the caller (this module stays DB-free) and normalized
+  // with companyKey() — the same normalization used to store the redaction.
+  if (redactKeys && redactKeys.size) {
+    out = out.filter((l) => !redactKeys.has(redactionKey(l.company)));
+  }
   return out;
+}
+
+/** Normalize a company name to the redaction key. MUST match companyKey() in
+ *  importerCache.ts byte-for-byte (this module is deliberately import-free, so
+ *  the logic is replicated rather than imported). */
+function redactionKey(name: string): string {
+  return String(name || '')
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, ' ')
+    .trim()
+    .replace(/\s+/g, ' ');
 }
 
 /* ── Orchestration: one request → leads (+ optional enrichment / drafts) ────
@@ -501,6 +523,7 @@ export async function findImporterLeads({
   cacheKey,
   cacheTtlMs = 14 * 24 * 60 * 60 * 1000,
   allowLivePull = true,
+  redactKeys,
 }: {
   filters?: ImporterFilters;
   maxLeads?: number;
@@ -518,6 +541,9 @@ export async function findImporterLeads({
   /** When false, a cache MISS returns empty (no credit spent) — the free-search
    *  quota gate. A cache HIT is still served (costs nothing). */
   allowLivePull?: boolean;
+  /** Active Manifest Privacy redaction keys (companyKey-normalized). Resolved by
+   *  the caller so this module stays DB-free; redacted importers are dropped. */
+  redactKeys?: Set<string>;
 } = {}): Promise<{
   leads: ImporterLead[];
   creditsRemaining: number | null;
@@ -573,7 +599,7 @@ export async function findImporterLeads({
   const recordsScanned = rows.length;
   const importers = dedupImporters(rows);
   // Base leads (no enrichment) — cheap, so build all then post-filter, then cap.
-  const base = applyPostFilters(importers.map((r) => toLead(r)), filters).slice(0, cap);
+  const base = applyPostFilters(importers.map((r) => toLead(r)), filters, redactKeys).slice(0, cap);
 
   if (!withEnrichment && !withEmails) {
     return { leads: base, creditsRemaining, cached, pulledLive, recordsScanned };

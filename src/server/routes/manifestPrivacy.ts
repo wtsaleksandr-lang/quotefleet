@@ -1,0 +1,536 @@
+/**
+ * Manifest Privacy routes — the managed CBP vessel-manifest-confidentiality
+ * service. Soft-auth (public_token) onboarding like the importer profiles, plus
+ * a super-admin filing queue.
+ *
+ * Public:
+ *   GET  /privacy                              marketing + tiers
+ *   GET  /privacy/apply[/:token]               stepped onboarding (new / resume)
+ *   POST /api/privacy/application              create draft
+ *   PATCH/api/privacy/application/:token       autosave
+ *   POST /api/privacy/application/:token/consent   record ESIGN consent
+ *   POST /api/privacy/application/:token/sign      capture signature → PDF → sha256 → email
+ *   GET  /api/privacy/application/:token/pdf       stream the retained POA PDF
+ *   POST /api/privacy/application/:token/upload     zero-storage doc-on-file flag (never "verified")
+ *
+ * Admin (requireAuth + requireSuperAdmin):
+ *   GET  /api/admin/privacy/queue
+ *   GET  /admin/privacy
+ *   POST /api/admin/privacy/:id/submit         record CBP channel, status=submitted
+ *   POST /api/admin/privacy/:id/confirm        cbp_confirmed_at, +2yr expiry, status=active, INSERT redactions
+ *   POST /api/admin/privacy/:id/revoke         status=revoked, deactivate redactions
+ *
+ * HONEST-CLAIMS: no automated CBP API (filing is a human ops step); status walks
+ * Draft→Signed→Submitted→Confirmed→Active→Renewal due; redaction inserted ONLY on
+ * confirm; uploaded docs flagged "on file" / self-reported, never "verified".
+ */
+import type { Express, Request, Response } from 'express';
+import { and, desc, eq } from 'drizzle-orm';
+import { nanoid } from 'nanoid';
+import { db } from '../../db/client.js';
+import {
+  poaApplications,
+  poaAuditEvents,
+  manifestRedactions,
+  type PoaApplication,
+  type NewPoaApplication,
+} from '../../db/schema.js';
+import { requireAuth, requireSuperAdmin } from '../middleware.js';
+import { lookupSession, SESSION_COOKIE_NAME } from '../../auth/session.js';
+import { sendEmail } from '../../email/send.js';
+import { companyKey } from '../directory/importerCache.js';
+import { titleFromSlug } from '../directory/importerProfile.js';
+import {
+  buildPoaPdf,
+  decodeSignaturePng,
+  CONSENT_DISCLOSURE_VERSION,
+} from '../manifestPoaPdf.js';
+import {
+  renderPrivacyLanding,
+  renderPrivacyApply,
+  renderAdminPrivacyQueue,
+} from '../directory/manifestPages.js';
+import { manifestIdentity } from '../directory/manifestEntitlement.js';
+import {
+  currentManifestPeriod,
+  dbManifestUsageStore,
+  manifestAccountKey,
+  canStartPoa,
+} from '../directory/manifestUsage.js';
+import { invalidateRedactionCache } from '../directory/manifestRedactions.js';
+
+/** QuoteFleet's legal filing entity named as Agent on the POA. */
+const AGENT_LEGAL_NAME = 'QuoteFleet, Inc.';
+/** CBP confidentiality is valid 2 years from receipt. */
+const TWO_YEARS_MS = 2 * 365 * 24 * 60 * 60 * 1000;
+
+function clientIp(req: Request): string | null {
+  return (req.ip || (req.socket && req.socket.remoteAddress) || null) as string | null;
+}
+function clientUa(req: Request): string | null {
+  return req.get('user-agent') || null;
+}
+
+async function sessionUserId(req: Request): Promise<number | null> {
+  try {
+    const token = req.cookies?.[SESSION_COOKIE_NAME] as string | undefined;
+    const ctx = await lookupSession(token);
+    return ctx?.user.id ?? null;
+  } catch {
+    return null;
+  }
+}
+
+async function getByToken(token: string): Promise<PoaApplication | null> {
+  if (!token) return null;
+  const rows = await db()
+    .select()
+    .from(poaApplications)
+    .where(eq(poaApplications.publicToken, token))
+    .limit(1);
+  return rows[0] ?? null;
+}
+
+async function getById(id: number): Promise<PoaApplication | null> {
+  const rows = await db().select().from(poaApplications).where(eq(poaApplications.id, id)).limit(1);
+  return rows[0] ?? null;
+}
+
+async function audit(
+  applicationId: number,
+  event: string,
+  req: Request,
+  meta?: Record<string, unknown>,
+): Promise<void> {
+  try {
+    await db().insert(poaAuditEvents).values({
+      applicationId,
+      event,
+      ip: clientIp(req),
+      userAgent: clientUa(req),
+      meta: meta ?? null,
+    });
+  } catch (err) {
+    // The audit trail is best-effort at the boundary but must not fail the
+    // request; a write error is logged loudly, never swallowed silently.
+    console.error('[manifest.audit] failed to write event', event, err);
+  }
+}
+
+/** Sanitize a string field (trim, cap length). */
+function str(v: unknown, max = 400): string | null {
+  if (typeof v !== 'string') return null;
+  const s = v.trim();
+  return s ? s.slice(0, max) : null;
+}
+function strArr(v: unknown, max = 60): string[] {
+  if (!Array.isArray(v)) return [];
+  return v
+    .filter((x): x is string => typeof x === 'string')
+    .map((x) => x.trim())
+    .filter(Boolean)
+    .slice(0, max);
+}
+
+/** Merge autosave fields from a request body onto an insert/update shape. */
+function fieldsFromBody(b: Record<string, unknown>): Partial<NewPoaApplication> {
+  return {
+    grantorLegalName: str(b.grantorLegalName, 200) ?? undefined,
+    entityType: str(b.entityType, 80) ?? undefined,
+    stateOfOrg: str(b.stateOfOrg, 80) ?? undefined,
+    grantorAddress: str(b.grantorAddress, 400) ?? undefined,
+    einOrImporterNo: str(b.einOrImporterNo, 40) ?? undefined,
+    nameVariations: strArr(b.nameVariations),
+    addressVariations: strArr(b.addressVariations),
+    importerSlug: str(b.importerSlug, 120) ?? undefined,
+    signerName: str(b.signerName, 120) ?? undefined,
+    signerTitle: str(b.signerTitle, 120) ?? undefined,
+    signerEmail: str(b.signerEmail, 160) ?? undefined,
+  };
+}
+
+/** Build the deterministic PDF input from a stored application. */
+function pdfInputFromApp(app: PoaApplication, signedAt: Date) {
+  return {
+    grantorLegalName: app.grantorLegalName || '',
+    entityType: app.entityType,
+    stateOfOrg: app.stateOfOrg,
+    grantorAddress: app.grantorAddress,
+    einOrImporterNo: app.einOrImporterNo,
+    nameVariations: app.nameVariations ?? [],
+    addressVariations: app.addressVariations ?? [],
+    signerName: app.signerName || '',
+    signerTitle: app.signerTitle,
+    signerEmail: app.signerEmail,
+    signedAt,
+    signerIp: app.signerIp,
+    signerUa: app.signerUa,
+    consentDisclosureVersion: app.consentDisclosureVersion || CONSENT_DISCLOSURE_VERSION,
+    signatureImage: decodeSignaturePng(app.signatureDrawnPng),
+    agentLegalName: AGENT_LEGAL_NAME,
+    expiresAt: app.expiresAt ?? null,
+    // DRAFT band stays until the template is attorney-reviewed for live use.
+    draftWatermark: true,
+  };
+}
+
+/** The redaction keys for an application: legal name + every variation + the
+ *  slug-derived name (so both search-by-company and profile-by-slug match). */
+function redactionKeysFor(app: PoaApplication): string[] {
+  const raw = [
+    app.grantorLegalName || '',
+    ...(app.nameVariations ?? []),
+    app.importerSlug ? titleFromSlug(app.importerSlug) : '',
+    app.importerSlug ? app.importerSlug.replace(/-/g, ' ') : '',
+  ];
+  const keys = new Set<string>();
+  for (const r of raw) {
+    const k = companyKey(r);
+    if (k) keys.add(k);
+  }
+  return [...keys];
+}
+
+export function registerManifestPrivacyRoutes(app: Express): void {
+  // ── public pages ───────────────────────────────────────────────────────────
+  // NOTE: the landing lives at /manifest-privacy — /privacy is the legal Privacy
+  // Policy (static privacy.html) and must not be shadowed. Onboarding at
+  // /privacy/apply is a distinct subpath and does not collide with it.
+  app.get('/manifest-privacy', (_req: Request, res: Response) => {
+    res.type('html').send(renderPrivacyLanding());
+  });
+
+  app.get(['/privacy/apply', '/privacy/apply/:token'], async (req: Request, res: Response) => {
+    const token = str((req.params as Record<string, unknown>)?.token, 40);
+    const application = token ? await getByToken(token) : null;
+    const prefill = {
+      slug: str((req.query as Record<string, unknown>)?.slug, 120) ?? undefined,
+      name: str((req.query as Record<string, unknown>)?.name, 200) ?? undefined,
+    };
+    res.type('html').send(renderPrivacyApply({ app: application, prefill }));
+  });
+
+  // ── create draft ───────────────────────────────────────────────────────────
+  app.post('/api/privacy/application', async (req: Request, res: Response) => {
+    try {
+      const body = (req.body ?? {}) as Record<string, unknown>;
+      const userId = await sessionUserId(req);
+
+      // Free-tier meter: a logged-in NON-subscriber may start FREE_POA_PER_MONTH
+      // per month. Anonymous drafts are cheap (no external credit) and not gated.
+      if (userId != null) {
+        const ident = await manifestIdentity(req);
+        const period = currentManifestPeriod();
+        const started = await dbManifestUsageStore.getStarted(manifestAccountKey(userId, null), period);
+        if (!canStartPoa({ isSubscriber: ident.isSubscriber, startedThisPeriod: started })) {
+          return res.status(403).json({
+            error: 'You’ve used your free authorization this month. Subscribe to protect more entities.',
+          });
+        }
+      }
+
+      const token = nanoid(24);
+      const fields = fieldsFromBody(body);
+      const inserted = (
+        await db()
+          .insert(poaApplications)
+          .values({ publicToken: token, userId: userId ?? undefined, status: 'draft', ...fields })
+          .returning()
+      )[0];
+      await audit(inserted.id, 'created', req, { source: 'onboarding' });
+      return res.json({ token, status: 'draft' });
+    } catch (err) {
+      console.error('[manifest.application.create] failed:', err);
+      return res.status(500).json({ error: 'Could not start your request. Try again.' });
+    }
+  });
+
+  // ── autosave ───────────────────────────────────────────────────────────────
+  app.patch('/api/privacy/application/:token', async (req: Request, res: Response) => {
+    try {
+      const token = str((req.params as Record<string, unknown>)?.token, 40) || '';
+      const existing = await getByToken(token);
+      if (!existing) return res.status(404).json({ error: 'Not found.' });
+      // Once signed, the record is immutable (retained ESIGN record).
+      if (existing.status !== 'draft') {
+        return res.status(409).json({ error: 'This request is already signed and can’t be edited.' });
+      }
+      const fields = fieldsFromBody((req.body ?? {}) as Record<string, unknown>);
+      await db()
+        .update(poaApplications)
+        .set({ ...fields, updatedAt: new Date() })
+        .where(eq(poaApplications.id, existing.id));
+      return res.json({ ok: true });
+    } catch (err) {
+      console.error('[manifest.application.patch] failed:', err);
+      return res.status(500).json({ error: 'Save failed.' });
+    }
+  });
+
+  // ── record consent (ESIGN element) ──────────────────────────────────────────
+  app.post('/api/privacy/application/:token/consent', async (req: Request, res: Response) => {
+    try {
+      const token = str((req.params as Record<string, unknown>)?.token, 40) || '';
+      const existing = await getByToken(token);
+      if (!existing) return res.status(404).json({ error: 'Not found.' });
+      await db()
+        .update(poaApplications)
+        .set({ consentDisclosureVersion: CONSENT_DISCLOSURE_VERSION, updatedAt: new Date() })
+        .where(eq(poaApplications.id, existing.id));
+      await audit(existing.id, 'consent', req, { disclosureVersion: CONSENT_DISCLOSURE_VERSION });
+      return res.json({ ok: true, disclosureVersion: CONSENT_DISCLOSURE_VERSION });
+    } catch (err) {
+      console.error('[manifest.application.consent] failed:', err);
+      return res.status(500).json({ error: 'Could not record consent.' });
+    }
+  });
+
+  // ── sign: capture signature → generate PDF → sha256 → email → status=signed ──
+  app.post('/api/privacy/application/:token/sign', async (req: Request, res: Response) => {
+    try {
+      const token = str((req.params as Record<string, unknown>)?.token, 40) || '';
+      const body = (req.body ?? {}) as Record<string, unknown>;
+      const existing = await getByToken(token);
+      if (!existing) return res.status(404).json({ error: 'Not found.' });
+      if (existing.status !== 'draft') {
+        // Idempotent: already signed → return the stored hash rather than erroring.
+        return res.json({ status: existing.status, docSha256: existing.docSha256 ?? '' });
+      }
+      const signerName = str(body.signerName, 120);
+      const signatureDrawnPng = typeof body.signatureDrawnPng === 'string' ? body.signatureDrawnPng : null;
+      if (!signerName) return res.status(400).json({ error: 'Type your full name as your signature.' });
+      if (!existing.grantorLegalName) return res.status(400).json({ error: 'Add your legal business name first.' });
+
+      const signedAt = new Date();
+      // Persist the signer + attribution BEFORE generating the PDF so the PDF is
+      // built from the stored, retained record (reproducible).
+      const withSigner: PoaApplication = {
+        ...existing,
+        signerName,
+        signerTitle: str(body.signerTitle, 120),
+        signerEmail: str(body.signerEmail, 160),
+        signatureDrawnPng,
+        consentDisclosureVersion: existing.consentDisclosureVersion || CONSENT_DISCLOSURE_VERSION,
+        signerIp: clientIp(req),
+        signerUa: clientUa(req),
+        signedAt,
+      };
+      const { buffer, sha256 } = await buildPoaPdf(pdfInputFromApp(withSigner, signedAt));
+
+      await db()
+        .update(poaApplications)
+        .set({
+          status: 'signed',
+          signerName: withSigner.signerName,
+          signerTitle: withSigner.signerTitle,
+          signerEmail: withSigner.signerEmail,
+          signatureDrawnPng,
+          consentDisclosureVersion: withSigner.consentDisclosureVersion,
+          signerIp: withSigner.signerIp,
+          signerUa: withSigner.signerUa,
+          signedAt,
+          docSha256: sha256,
+          updatedAt: new Date(),
+        })
+        .where(eq(poaApplications.id, existing.id));
+
+      await audit(existing.id, 'signed', req, {
+        docHash: sha256,
+        disclosureVersion: withSigner.consentDisclosureVersion,
+      });
+      await audit(existing.id, 'pdf_generated', req, { docHash: sha256, bytes: buffer.length });
+
+      // Email the signer a copy of the signed PDF (best-effort; never blocks).
+      if (withSigner.signerEmail) {
+        sendEmail({
+          to: withSigner.signerEmail,
+          subject: 'Your signed Manifest Privacy authorization',
+          text:
+            `Attached is your signed Limited Power of Attorney for a U.S. Customs vessel manifest ` +
+            `confidentiality request.\n\nDocument SHA-256: ${sha256}\n\nWe prepare and submit your ` +
+            `request to CBP on your behalf and will keep you posted as your status moves from ` +
+            `Signed to Submitted to Confirmed. — QuoteFleet`,
+          attachments: [
+            {
+              filename: 'manifest-privacy-authorization.pdf',
+              contentBase64: buffer.toString('base64'),
+              contentType: 'application/pdf',
+            },
+          ],
+        }).catch((e) => console.warn('[manifest.sign] email failed (non-fatal):', e));
+      }
+
+      return res.json({ status: 'signed', docSha256: sha256 });
+    } catch (err) {
+      console.error('[manifest.application.sign] failed:', err);
+      return res.status(500).json({ error: 'Could not sign. Try again.' });
+    }
+  });
+
+  // ── stream the retained PDF (regenerated deterministically) ──────────────────
+  app.get('/api/privacy/application/:token/pdf', async (req: Request, res: Response) => {
+    try {
+      const token = str((req.params as Record<string, unknown>)?.token, 40) || '';
+      const existing = await getByToken(token);
+      if (!existing || !existing.signedAt) {
+        return res.status(404).type('text/plain').send('Not available.');
+      }
+      const { buffer } = await buildPoaPdf(pdfInputFromApp(existing, existing.signedAt));
+      res.setHeader('Content-Type', 'application/pdf');
+      res.setHeader('Content-Disposition', 'inline; filename="manifest-privacy-authorization.pdf"');
+      return res.send(buffer);
+    } catch (err) {
+      console.error('[manifest.application.pdf] failed:', err);
+      return res.status(500).type('text/plain').send('Could not render the document.');
+    }
+  });
+
+  // ── zero-storage doc-on-file flag (NEVER "verified") ─────────────────────────
+  app.post('/api/privacy/application/:token/upload', async (req: Request, res: Response) => {
+    try {
+      const token = str((req.params as Record<string, unknown>)?.token, 40) || '';
+      const existing = await getByToken(token);
+      if (!existing) return res.status(404).json({ error: 'Not found.' });
+      const kind = str((req.body as Record<string, unknown>)?.kind, 40) || 'document';
+      // We store NOTHING here — only a self-reported "on file" marker. Honest-
+      // claims: this is never a "verified" status.
+      const docs = { ...(existing.docs ?? {}), [`${kind}OnFile`]: true, verified: false };
+      await db()
+        .update(poaApplications)
+        .set({ docs, updatedAt: new Date() })
+        .where(eq(poaApplications.id, existing.id));
+      await audit(existing.id, 'doc_on_file', req, { kind });
+      return res.json({ ok: true, status: 'on_file' });
+    } catch (err) {
+      console.error('[manifest.application.upload] failed:', err);
+      return res.status(500).json({ error: 'Could not record the document.' });
+    }
+  });
+
+  // ── admin: queue JSON ────────────────────────────────────────────────────────
+  app.get(
+    '/api/admin/privacy/queue',
+    requireAuth,
+    requireSuperAdmin,
+    async (_req: Request, res: Response) => {
+      const rows = await db()
+        .select()
+        .from(poaApplications)
+        .orderBy(desc(poaApplications.createdAt))
+        .limit(200);
+      return res.json({ applications: rows });
+    },
+  );
+
+  // ── admin: review page ───────────────────────────────────────────────────────
+  app.get(
+    '/admin/privacy',
+    requireAuth,
+    requireSuperAdmin,
+    async (_req: Request, res: Response) => {
+      const apps = await db()
+        .select()
+        .from(poaApplications)
+        .orderBy(desc(poaApplications.createdAt))
+        .limit(200);
+      const withEvents = await Promise.all(
+        apps.map(async (a) => {
+          const events = await db()
+            .select()
+            .from(poaAuditEvents)
+            .where(eq(poaAuditEvents.applicationId, a.id))
+            .orderBy(desc(poaAuditEvents.createdAt))
+            .limit(10);
+          return { app: a, events };
+        }),
+      );
+      res.type('html').send(renderAdminPrivacyQueue(withEvents));
+    },
+  );
+
+  // ── admin: submit (record CBP channel) ───────────────────────────────────────
+  app.post(
+    '/api/admin/privacy/:id/submit',
+    requireAuth,
+    requireSuperAdmin,
+    async (req: Request, res: Response) => {
+      const id = Number((req.params as Record<string, unknown>)?.id);
+      if (!Number.isInteger(id)) return res.status(400).json({ error: 'Bad id.' });
+      const existing = await getById(id);
+      if (!existing) return res.status(404).json({ error: 'Not found.' });
+      const channel = str((req.body as Record<string, unknown>)?.channel, 20) || 'portal';
+      await db()
+        .update(poaApplications)
+        .set({ status: 'submitted', cbpChannel: channel, cbpSubmittedAt: new Date(), updatedAt: new Date() })
+        .where(eq(poaApplications.id, id));
+      await audit(id, 'submitted', req, { channel });
+      return res.json({ ok: true, status: 'submitted' });
+    },
+  );
+
+  // ── admin: confirm (CBP receipt) → activate + insert redactions ──────────────
+  app.post(
+    '/api/admin/privacy/:id/confirm',
+    requireAuth,
+    requireSuperAdmin,
+    async (req: Request, res: Response) => {
+      const id = Number((req.params as Record<string, unknown>)?.id);
+      if (!Number.isInteger(id)) return res.status(400).json({ error: 'Bad id.' });
+      const existing = await getById(id);
+      if (!existing) return res.status(404).json({ error: 'Not found.' });
+
+      const now = new Date();
+      const expiresAt = new Date(now.getTime() + TWO_YEARS_MS);
+      await db()
+        .update(poaApplications)
+        .set({
+          status: 'active',
+          cbpConfirmedAt: now,
+          effectiveAt: now,
+          expiresAt,
+          updatedAt: now,
+        })
+        .where(eq(poaApplications.id, id));
+
+      // Insert a redaction row for every protected name variation. This is the
+      // ONLY place redactions are created — never before CBP confirm.
+      const keys = redactionKeysFor(existing);
+      for (const nameKey of keys) {
+        await db()
+          .insert(manifestRedactions)
+          .values({ nameKey, applicationId: id, reason: 'cbp_confirmed', active: true })
+          .onConflictDoUpdate({
+            target: manifestRedactions.nameKey,
+            set: { active: true, applicationId: id, reason: 'cbp_confirmed' },
+          });
+      }
+      invalidateRedactionCache();
+      await audit(id, 'confirmed', req, { expiresAt: expiresAt.toISOString(), redactionKeys: keys.length });
+      return res.json({ ok: true, status: 'active', expiresAt: expiresAt.toISOString(), redactions: keys.length });
+    },
+  );
+
+  // ── admin: revoke → deactivate redactions ────────────────────────────────────
+  app.post(
+    '/api/admin/privacy/:id/revoke',
+    requireAuth,
+    requireSuperAdmin,
+    async (req: Request, res: Response) => {
+      const id = Number((req.params as Record<string, unknown>)?.id);
+      if (!Number.isInteger(id)) return res.status(400).json({ error: 'Bad id.' });
+      const existing = await getById(id);
+      if (!existing) return res.status(404).json({ error: 'Not found.' });
+      await db()
+        .update(poaApplications)
+        .set({ status: 'revoked', updatedAt: new Date() })
+        .where(eq(poaApplications.id, id));
+      await db()
+        .update(manifestRedactions)
+        .set({ active: false })
+        .where(and(eq(manifestRedactions.applicationId, id), eq(manifestRedactions.active, true)));
+      invalidateRedactionCache();
+      await audit(id, 'revoked', req, {});
+      return res.json({ ok: true, status: 'revoked' });
+    },
+  );
+}

@@ -2704,3 +2704,183 @@ export const savedListItems = pgTable(
 
 export type SavedListItem = typeof savedListItems.$inferSelect;
 export type NewSavedListItem = typeof savedListItems.$inferInsert;
+
+// ────────────────────────────────────────────────────────────────────
+// MANIFEST PRIVACY — the managed CBP vessel-manifest-confidentiality service.
+//
+// Sold as a QuoteFleet upsell off the importer-profile funnel: an importer who
+// finds their exposed customs profile on /importers can pay us to prepare +
+// submit a 19 CFR 103.31(d) confidentiality request to CBP on their behalf, and
+// we then HIDE them from OUR directory. Four platform-level tables, all
+// referencing `users` only (never `tenants`) so they stay out of tenant
+// MRR/plan by construction — exactly like directory_subscriptions.
+//
+// The subscription stack is CLONED from directory_subscriptions (the SHIPPER
+// stack), NOT the tenant plans.ts stack. Self-healed in src/db/migrate.ts
+// (Replit skips db:migrate + can phantom-drop tables) — a phantom-drop only
+// loses a re-derivable meter/cache, never the signed-POA record or its audit
+// trail (both are real, retained data, so a drop of poa_applications is a
+// genuine data-loss event the self-heal CREATE re-establishes the shape for).
+// ────────────────────────────────────────────────────────────────────
+
+/** Manifest Privacy subscription — clone of directory_subscriptions plus a
+ *  `tier` (basic|professional|enterprise) and `entity_quota`. One row per user. */
+export const manifestSubscriptions = pgTable(
+  'manifest_subscriptions',
+  {
+    id: serial('id').primaryKey(),
+    userId: integer('user_id')
+      .notNull()
+      .references(() => users.id, { onDelete: 'cascade' }),
+    /** 'basic' | 'professional' | 'enterprise' — the plan bought. */
+    tier: text('tier').notNull().default('basic'),
+    /** 'active' | 'trialing' | 'past_due' | 'inactive'. */
+    status: text('status').notNull().default('inactive'),
+    stripeCustomerId: text('stripe_customer_id'),
+    stripeSubscriptionId: text('stripe_subscription_id'),
+    priceId: text('price_id'),
+    currentPeriodEnd: timestamp('current_period_end', { mode: 'date' }),
+    /** How many distinct legal entities this plan may protect (1 for Basic;
+     *  higher for Professional/Enterprise multi-entity). */
+    entityQuota: integer('entity_quota').notNull().default(1),
+    createdAt: timestamp('created_at', { mode: 'date' }).notNull().defaultNow(),
+    updatedAt: timestamp('updated_at', { mode: 'date' }).notNull().defaultNow(),
+  },
+  (t) => [
+    uniqueIndex('manifest_subscriptions_user_idx').on(t.userId),
+    uniqueIndex('manifest_subscriptions_customer_idx').on(t.stripeCustomerId),
+  ]
+);
+
+export type ManifestSubscription = typeof manifestSubscriptions.$inferSelect;
+export type NewManifestSubscription = typeof manifestSubscriptions.$inferInsert;
+export type ManifestTier = 'basic' | 'professional' | 'enterprise';
+export type ManifestSubscriptionStatus = 'active' | 'trialing' | 'past_due' | 'inactive';
+
+/**
+ * POA applications — the in-house e-signed Limited Power of Attorney authorizing
+ * QuoteFleet to file the CBP confidentiality request. This is the RETAINED,
+ * reproducible ESIGN/UETA record: consent + typed/drawn signature + IP/UA/UTC +
+ * the SHA-256 of the generated PDF. Status walks Draft → Signed → Submitted →
+ * Confirmed → Active → Renewal due (honest-status vocabulary; never shows
+ * "Hidden/Protected" before CBP confirms).
+ *
+ * `docs` is a free-form bag for uploaded supporting documents — it is stamped
+ * ONLY with "on file" / "self-reported" flags, NEVER a "verified" claim (FTC §5).
+ */
+export const poaApplications = pgTable(
+  'poa_applications',
+  {
+    id: serial('id').primaryKey(),
+    /** Unguessable nanoid — the soft-auth handle for the public onboarding flow
+     *  (like an importer profile's public token). UNIQUE. */
+    publicToken: text('public_token').notNull(),
+    /** The owning shipper user once they sign in / subscribe; null for an
+     *  anonymous draft (a free visitor can build + e-sign one POA). */
+    userId: integer('user_id').references(() => users.id, { onDelete: 'set null' }),
+    /** draft | signed | submitted | confirmed | active | renewal_due | expired | revoked */
+    status: text('status').notNull().default('draft'),
+    grantorLegalName: text('grantor_legal_name'),
+    entityType: text('entity_type'),
+    stateOfOrg: text('state_of_org'),
+    grantorAddress: text('grantor_address'),
+    einOrImporterNo: text('ein_or_importer_no'),
+    /** The name variations to protect — the product differentiator; captured
+     *  liberally. string[]. */
+    nameVariations: jsonb('name_variations').$type<string[]>(),
+    addressVariations: jsonb('address_variations').$type<string[]>(),
+    /** The /importers directory slug this POA was started from (for redaction). */
+    importerSlug: text('importer_slug'),
+    signerName: text('signer_name'),
+    signerTitle: text('signer_title'),
+    signerEmail: text('signer_email'),
+    /** Version tag of the consent + ESIGN disclosure the signer accepted. */
+    consentDisclosureVersion: text('consent_disclosure_version'),
+    /** Typed legal name entered as the e-signature. */
+    signatureTyped: text('signature_typed'),
+    /** Drawn-signature canvas as a data: PNG (base64). */
+    signatureDrawnPng: text('signature_drawn_png'),
+    signedAt: timestamp('signed_at', { withTimezone: true, mode: 'date' }),
+    signerIp: text('signer_ip'),
+    signerUa: text('signer_ua'),
+    /** SHA-256 (hex) of the generated POA PDF bytes — tamper-evidence. */
+    docSha256: text('doc_sha256'),
+    /** How the human ops step filed it: 'portal' | 'email' | 'mail'. */
+    cbpChannel: text('cbp_channel'),
+    cbpSubmittedAt: timestamp('cbp_submitted_at', { withTimezone: true, mode: 'date' }),
+    cbpConfirmedAt: timestamp('cbp_confirmed_at', { withTimezone: true, mode: 'date' }),
+    /** When protection took effect (== cbpConfirmedAt) and when it expires
+     *  (+2 years) — CBP confidentiality is valid 2 years from receipt. */
+    effectiveAt: timestamp('effective_at', { withTimezone: true, mode: 'date' }),
+    expiresAt: timestamp('expires_at', { withTimezone: true, mode: 'date' }),
+    /** Last renewal reminder sent — the cron double-send guard. */
+    lastReminderAt: timestamp('last_reminder_at', { withTimezone: true, mode: 'date' }),
+    /** Uploaded supporting docs, "on file"/"self-reported" only — NEVER verified. */
+    docs: jsonb('docs').$type<Record<string, unknown>>(),
+    createdAt: timestamp('created_at', { withTimezone: true, mode: 'date' }).notNull().defaultNow(),
+    updatedAt: timestamp('updated_at', { withTimezone: true, mode: 'date' }).notNull().defaultNow(),
+  },
+  (t) => [
+    uniqueIndex('poa_applications_token_idx').on(t.publicToken),
+    index('poa_applications_user_idx').on(t.userId),
+    index('poa_applications_status_idx').on(t.status),
+    index('poa_applications_expires_idx').on(t.expiresAt),
+  ]
+);
+
+export type PoaApplication = typeof poaApplications.$inferSelect;
+export type NewPoaApplication = typeof poaApplications.$inferInsert;
+export type PoaStatus =
+  | 'draft'
+  | 'signed'
+  | 'submitted'
+  | 'confirmed'
+  | 'active'
+  | 'renewal_due'
+  | 'expired'
+  | 'revoked';
+
+/** Append-only audit trail for each POA application (ESIGN attribution +
+ *  lifecycle events). Never updated or deleted — one INSERT per event. */
+export const poaAuditEvents = pgTable(
+  'poa_audit_events',
+  {
+    id: serial('id').primaryKey(),
+    applicationId: integer('application_id')
+      .notNull()
+      .references(() => poaApplications.id, { onDelete: 'cascade' }),
+    /** e.g. 'created' | 'consent' | 'signed' | 'pdf_generated' | 'submitted' |
+     *  'confirmed' | 'renewal_reminded' | 'revoked'. */
+    event: text('event').notNull(),
+    ip: text('ip'),
+    userAgent: text('user_agent'),
+    meta: jsonb('meta').$type<Record<string, unknown>>(),
+    createdAt: timestamp('created_at', { withTimezone: true, mode: 'date' }).notNull().defaultNow(),
+  },
+  (t) => [index('poa_audit_events_application_idx').on(t.applicationId)]
+);
+
+export type PoaAuditEvent = typeof poaAuditEvents.$inferSelect;
+export type NewPoaAuditEvent = typeof poaAuditEvents.$inferInsert;
+
+/** Active redactions — the in-app "Hidden on QuoteFleet" set. One row per
+ *  companyKey-normalized name variation; the redaction choke-points load the
+ *  active set into memory. Inserted ONLY on CBP confirm (never before). */
+export const manifestRedactions = pgTable(
+  'manifest_redactions',
+  {
+    id: serial('id').primaryKey(),
+    /** companyKey()-normalized name (or variation) to hide from the directory. */
+    nameKey: text('name_key').notNull(),
+    applicationId: integer('application_id').references(() => poaApplications.id, {
+      onDelete: 'cascade',
+    }),
+    reason: text('reason'),
+    active: boolean('active').notNull().default(true),
+    createdAt: timestamp('created_at', { withTimezone: true, mode: 'date' }).notNull().defaultNow(),
+  },
+  (t) => [uniqueIndex('manifest_redactions_name_key_idx').on(t.nameKey)]
+);
+
+export type ManifestRedaction = typeof manifestRedactions.$inferSelect;
+export type NewManifestRedaction = typeof manifestRedactions.$inferInsert;

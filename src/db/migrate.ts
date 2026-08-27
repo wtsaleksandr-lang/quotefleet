@@ -535,6 +535,86 @@ export const SELF_HEAL_TABLE_STATEMENTS: readonly string[] = [
     "fetched_at" timestamp with time zone DEFAULT now() NOT NULL
   )`,
   `CREATE UNIQUE INDEX IF NOT EXISTS "importer_contact_cache_key_idx" ON "importer_contact_cache" ("company_key")`,
+  // 0065_manifest_privacy.sql — the managed CBP vessel-manifest-confidentiality
+  // service (Manifest Privacy). Four tables: the cloned SHIPPER subscription, the
+  // e-signed POA applications (the RETAINED ESIGN record), its append-only audit
+  // trail, and the active in-app redaction set. Healed HERE (same reasoning as the
+  // directory tables above): the Replit deploy skips db:migrate and its publish
+  // tool can drop tables, so these CREATE TABLE / INDEX IF NOT EXISTS run on every
+  // boot and no-op on a healthy DB. MUST stay byte-for-byte equivalent to
+  // src/db/schema.ts (manifestSubscriptions / poaApplications / poaAuditEvents /
+  // manifestRedactions). These reference `users` only, never `tenants`.
+  `CREATE TABLE IF NOT EXISTS "manifest_subscriptions" (
+    "id" serial PRIMARY KEY NOT NULL,
+    "user_id" integer NOT NULL,
+    "tier" text DEFAULT 'basic' NOT NULL,
+    "status" text DEFAULT 'inactive' NOT NULL,
+    "stripe_customer_id" text,
+    "stripe_subscription_id" text,
+    "price_id" text,
+    "current_period_end" timestamp,
+    "entity_quota" integer DEFAULT 1 NOT NULL,
+    "created_at" timestamp DEFAULT now() NOT NULL,
+    "updated_at" timestamp DEFAULT now() NOT NULL
+  )`,
+  `CREATE UNIQUE INDEX IF NOT EXISTS "manifest_subscriptions_user_idx" ON "manifest_subscriptions" ("user_id")`,
+  `CREATE UNIQUE INDEX IF NOT EXISTS "manifest_subscriptions_customer_idx" ON "manifest_subscriptions" ("stripe_customer_id")`,
+  `CREATE TABLE IF NOT EXISTS "poa_applications" (
+    "id" serial PRIMARY KEY NOT NULL,
+    "public_token" text NOT NULL,
+    "user_id" integer,
+    "status" text DEFAULT 'draft' NOT NULL,
+    "grantor_legal_name" text,
+    "entity_type" text,
+    "state_of_org" text,
+    "grantor_address" text,
+    "ein_or_importer_no" text,
+    "name_variations" jsonb,
+    "address_variations" jsonb,
+    "importer_slug" text,
+    "signer_name" text,
+    "signer_title" text,
+    "signer_email" text,
+    "consent_disclosure_version" text,
+    "signature_typed" text,
+    "signature_drawn_png" text,
+    "signed_at" timestamp with time zone,
+    "signer_ip" text,
+    "signer_ua" text,
+    "doc_sha256" text,
+    "cbp_channel" text,
+    "cbp_submitted_at" timestamp with time zone,
+    "cbp_confirmed_at" timestamp with time zone,
+    "effective_at" timestamp with time zone,
+    "expires_at" timestamp with time zone,
+    "last_reminder_at" timestamp with time zone,
+    "docs" jsonb,
+    "created_at" timestamp with time zone DEFAULT now() NOT NULL,
+    "updated_at" timestamp with time zone DEFAULT now() NOT NULL
+  )`,
+  `CREATE UNIQUE INDEX IF NOT EXISTS "poa_applications_token_idx" ON "poa_applications" ("public_token")`,
+  `CREATE INDEX IF NOT EXISTS "poa_applications_user_idx" ON "poa_applications" ("user_id")`,
+  `CREATE INDEX IF NOT EXISTS "poa_applications_status_idx" ON "poa_applications" ("status")`,
+  `CREATE INDEX IF NOT EXISTS "poa_applications_expires_idx" ON "poa_applications" ("expires_at")`,
+  `CREATE TABLE IF NOT EXISTS "poa_audit_events" (
+    "id" serial PRIMARY KEY NOT NULL,
+    "application_id" integer NOT NULL,
+    "event" text NOT NULL,
+    "ip" text,
+    "user_agent" text,
+    "meta" jsonb,
+    "created_at" timestamp with time zone DEFAULT now() NOT NULL
+  )`,
+  `CREATE INDEX IF NOT EXISTS "poa_audit_events_application_idx" ON "poa_audit_events" ("application_id")`,
+  `CREATE TABLE IF NOT EXISTS "manifest_redactions" (
+    "id" serial PRIMARY KEY NOT NULL,
+    "name_key" text NOT NULL,
+    "application_id" integer,
+    "reason" text,
+    "active" boolean DEFAULT true NOT NULL,
+    "created_at" timestamp with time zone DEFAULT now() NOT NULL
+  )`,
+  `CREATE UNIQUE INDEX IF NOT EXISTS "manifest_redactions_name_key_idx" ON "manifest_redactions" ("name_key")`,
 ];
 
 export async function ensureSelfHealTables(): Promise<void> {
