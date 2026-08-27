@@ -98,21 +98,67 @@ export function recordLiveSearch(req: Request): void {
 }
 
 // ── 2. DETAIL-OPEN quota (reusable gate for the Phase-2 profile page) ────────
+/** Valid ImportYeti slug charset (matches sanitizeSlug in importerProfile). */
+const QUOTA_SLUG_RX = /^[a-z0-9][a-z0-9-]{0,80}$/;
+
+/**
+ * Parsed detail-quota cookie. Two on-the-wire formats are supported:
+ *   • Legacy / no-slug:  a bare integer ("3") — the used-count only.
+ *   • Slug-aware:        "s:<count>:<slug1>,<slug2>,…" — the used-count PLUS the
+ *     set of distinct company slugs already opened, so re-opening a company the
+ *     visitor already viewed never consumes another free profile.
+ */
+export interface DetailCookie {
+  used: number;
+  slugs: string[];
+}
+
+/** Read the raw cookie string (cookie-parser value, else the header). */
+function rawDetailCookie(req: Request): string | undefined {
+  const parsed = (req as Request & { cookies?: Record<string, unknown> }).cookies;
+  if (parsed && typeof parsed[DETAIL_COOKIE] === 'string') return parsed[DETAIL_COOKIE] as string;
+  const header = req.headers?.cookie;
+  if (typeof header === 'string') {
+    const m = header.match(new RegExp('(?:^|;\\s*)' + DETAIL_COOKIE + '=([^;]*)'));
+    if (m) return decodeURIComponent(m[1]);
+  }
+  return undefined;
+}
+
+/** Parse the detail-quota cookie into { used, distinct-slugs }. */
+export function parseDetailCookie(req: Request): DetailCookie {
+  const raw = rawDetailCookie(req);
+  if (!raw) return { used: 0, slugs: [] };
+  if (raw.startsWith('s:')) {
+    const rest = raw.slice(2);
+    const sep = rest.indexOf(':');
+    const countPart = sep >= 0 ? rest.slice(0, sep) : rest;
+    const slugPart = sep >= 0 ? rest.slice(sep + 1) : '';
+    const slugs = Array.from(
+      new Set(
+        slugPart
+          .split(',')
+          .map((s) => s.trim().toLowerCase())
+          .filter((s) => QUOTA_SLUG_RX.test(s)),
+      ),
+    );
+    const cnt = Number(countPart);
+    const used = Number.isFinite(cnt) && cnt > 0 ? Math.floor(cnt) : 0;
+    // used is authoritative but can never be under the number of tracked slugs.
+    return { used: Math.max(used, slugs.length), slugs };
+  }
+  const n = Number(raw);
+  return { used: Number.isFinite(n) && n > 0 ? Math.floor(n) : 0, slugs: [] };
+}
+
+/** Format the slug-aware cookie value. */
+function formatDetailCookie(used: number, slugs: string[]): string {
+  return `s:${used}:${slugs.join(',')}`;
+}
+
 /** Parse the used-detail-count from the request cookie (no cookie-parser dep). */
 export function readDetailUsed(req: Request): number {
-  const parsed = (req as Request & { cookies?: Record<string, unknown> }).cookies;
-  let raw: string | undefined;
-  if (parsed && typeof parsed[DETAIL_COOKIE] === 'string') {
-    raw = parsed[DETAIL_COOKIE] as string;
-  } else {
-    const header = req.headers?.cookie;
-    if (typeof header === 'string') {
-      const m = header.match(new RegExp('(?:^|;\\s*)' + DETAIL_COOKIE + '=([^;]*)'));
-      if (m) raw = decodeURIComponent(m[1]);
-    }
-  }
-  const n = raw != null ? Number(raw) : NaN;
-  return Number.isFinite(n) && n > 0 ? Math.floor(n) : 0;
+  return parseDetailCookie(req).used;
 }
 
 /**
@@ -120,12 +166,15 @@ export function readDetailUsed(req: Request): number {
  * DETAILED importer profile and how many free opens remain. Pure read — never
  * mutates (recording an open is the caller's explicit recordDetailOpen()).
  */
-export function checkDetailQuota(req: Request): QuotaState {
-  const cookieUsed = readDetailUsed(req);
-  const cookieRemaining = Math.max(0, FREE_DETAIL_QUOTA - cookieUsed);
+export function checkDetailQuota(req: Request, slug?: string): QuotaState {
+  const { used, slugs } = parseDetailCookie(req);
+  // Re-opening a company the visitor ALREADY opened never counts — it is served
+  // from cache (no credit) — so it is allowed even past the free quota.
+  const reopen = !!slug && slugs.includes(slug.toLowerCase());
+  const cookieRemaining = Math.max(0, FREE_DETAIL_QUOTA - used);
   const ipRemaining = Math.max(0, IP_DAILY_DETAIL_CAP - ipUsedToday(detailIpDaily, clientIp(req)));
   const remaining = Math.min(cookieRemaining, ipRemaining);
-  return { allowed: remaining > 0, remaining, used: cookieUsed, limit: FREE_DETAIL_QUOTA };
+  return { allowed: reopen || remaining > 0, remaining, used, limit: FREE_DETAIL_QUOTA };
 }
 
 /**
@@ -133,10 +182,35 @@ export function checkDetailQuota(req: Request): QuotaState {
  * backstop. Call this only once a profile has actually been served. Returns the
  * post-increment quota state.
  */
-export function recordDetailOpen(req: Request, res: Response): QuotaState {
-  const nextUsed = readDetailUsed(req) + 1;
+export function recordDetailOpen(req: Request, res: Response, slug?: string): QuotaState {
+  const { used, slugs } = parseDetailCookie(req);
+  const key = slug ? slug.toLowerCase() : '';
+
+  // Re-open of an already-opened company → DEDUP: don't consume a free profile
+  // and don't bump the per-IP backstop (it costs nothing — served from cache).
+  if (key && slugs.includes(key)) {
+    try {
+      res.cookie(DETAIL_COOKIE, formatDetailCookie(used, slugs), {
+        maxAge: COOKIE_MAX_AGE_MS,
+        httpOnly: true,
+        sameSite: 'lax',
+        path: '/',
+      });
+    } catch {
+      /* res.cookie unavailable — returned state still holds */
+    }
+    const cookieRemaining0 = Math.max(0, FREE_DETAIL_QUOTA - used);
+    const ipRemaining0 = Math.max(0, IP_DAILY_DETAIL_CAP - ipUsedToday(detailIpDaily, clientIp(req)));
+    return { allowed: true, remaining: Math.min(cookieRemaining0, ipRemaining0), used, limit: FREE_DETAIL_QUOTA };
+  }
+
+  // A NEW distinct company → count it. Track the slug (when known) so a later
+  // re-open is free. Without a slug, keep the legacy bare-count cookie format.
+  const nextUsed = used + 1;
+  const nextSlugs = key ? [...slugs, key] : slugs;
+  const cookieVal = key ? formatDetailCookie(nextUsed, nextSlugs) : String(nextUsed);
   try {
-    res.cookie(DETAIL_COOKIE, String(nextUsed), {
+    res.cookie(DETAIL_COOKIE, cookieVal, {
       maxAge: COOKIE_MAX_AGE_MS,
       httpOnly: true,
       sameSite: 'lax',

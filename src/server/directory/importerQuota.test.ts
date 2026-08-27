@@ -97,4 +97,41 @@ describe('detail-open quota (the free quota is on PROFILES)', () => {
     for (let i = 0; i < IP_DAILY_DETAIL_CAP; i++) recordDetailOpen(req(ip), res());
     expect(checkDetailQuota(req(ip)).allowed).toBe(false);
   });
+
+  it('re-opening the SAME company does not consume another free profile (slug dedup)', () => {
+    const ip = '10.10.10.10';
+    const r1 = res();
+    const a1 = recordDetailOpen(req(ip), r1, 'valbruna-stainless');
+    expect(a1.used).toBe(1);
+    // Replay the cookie the server just set back into a fresh request.
+    const cookie = r1._cookies[DETAIL_COOKIE];
+    const reqWith = { ip, headers: { cookie: `${DETAIL_COOKIE}=${cookie}` } } as unknown as Request;
+    // A re-open of the same slug is still allowed and records NO extra usage.
+    expect(checkDetailQuota(reqWith, 'valbruna-stainless').allowed).toBe(true);
+    const a2 = recordDetailOpen(reqWith, res(), 'valbruna-stainless');
+    expect(a2.used).toBe(1); // unchanged — dedup by slug
+  });
+
+  it('three DISTINCT companies exhaust the quota, then a re-open is still allowed', () => {
+    const ip = '11.11.11.11';
+    let cookie: string | undefined;
+    const build = () =>
+      ({ ip, headers: cookie ? { cookie: `${DETAIL_COOKIE}=${cookie}` } : {} }) as unknown as Request;
+    for (const slug of ['aaa', 'bbb', 'ccc']) {
+      const r = res();
+      expect(checkDetailQuota(build(), slug).allowed).toBe(true);
+      recordDetailOpen(build(), r, slug);
+      cookie = r._cookies[DETAIL_COOKIE];
+    }
+    // Quota is now exhausted for a NEW company…
+    expect(checkDetailQuota(build(), 'ddd').allowed).toBe(false);
+    // …but re-opening one of the three already opened is still allowed.
+    expect(checkDetailQuota(build(), 'aaa').allowed).toBe(true);
+  });
+
+  it('legacy numeric cookie still parses as a used-count', () => {
+    const q = checkDetailQuota(req('12.12.12.12', FREE_DETAIL_QUOTA));
+    expect(q.used).toBe(FREE_DETAIL_QUOTA);
+    expect(q.allowed).toBe(false);
+  });
 });

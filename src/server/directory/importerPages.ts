@@ -307,6 +307,10 @@ a.imp-co-link:hover{text-decoration:underline}
 
 @media(max-width:900px){
   .imp-layout{grid-template-columns:1fr}
+  /* B3-mobile: the desktop :has(.imp-side.on) rule (232px 1fr) out-specifies the
+     single-column default, so once a search runs the grid never collapsed on
+     phones and results squeezed to ~230px + scrolled sideways. Collapse it here. */
+  .imp-layout:has(.imp-side.on){grid-template-columns:1fr}
   .imp-side{position:static;order:-1}
   .imp-results.compact{grid-template-columns:1fr}
 }
@@ -766,8 +770,10 @@ const CLIENT_JS = `
     var added=0;
     leads.forEach(function(l){ var key=(l.company||'').toLowerCase(); if(key&&!seenCos[key]){ seenCos[key]=true; allLeads.push(l); added++; } });
     if(typeof res.recordsScanned==='number') totalScanned+=res.recordsScanned;
-    // more pages likely if this page came back full (before client dedup)
-    var full=leads.length>=PAGE_SIZE;
+    // Show "Load more" only if this page came back full AND actually added at
+    // least one NEW importer. A page that is all duplicates (added===0) would
+    // spend an ImportYeti pull for zero gain, so hide the button then.
+    var full=leads.length>=PAGE_SIZE && added>0;
     moreWrap.classList.toggle('on', full);
     return added;
   }
@@ -789,9 +795,22 @@ const CLIENT_JS = `
         toolbar.classList.add('on');
         if(!allLeads.length){
           side.classList.remove('on'); results.innerHTML='';
-          var e=T('div','imp-empty'); e.appendChild(T('h3',null,'No matches'));
-          e.appendChild(T('p',null,'Try a busier port, drop the state filter, or broaden the commodity.')); results.appendChild(e);
-          setStatus('No importers matched those filters \\u2014 widen your lane or commodity.',false);
+          // Commodity / HS-code searches need an entry geography to scope the
+          // customs pull — a bare commodity with no port/state/company reliably
+          // returns nothing, so guide the user to add a port instead of a dead end.
+          var commodityOnly = curPayload && (curPayload.hsCode||curPayload.product) &&
+            !curPayload.entryPort && !curPayload.state && !curPayload.supplierCountry && !curPayload.company;
+          var e=T('div','imp-empty');
+          if(commodityOnly){
+            e.appendChild(T('h3',null,'Add a port to search by commodity'));
+            e.appendChild(T('p',null,'Commodity and HS-code searches need an entry port (or state) to scope the customs data. Pick a US port above and search again.'));
+            setStatus('Add an entry port or state to search by commodity.',false);
+          } else {
+            e.appendChild(T('h3',null,'No matches'));
+            e.appendChild(T('p',null,'Try a busier port, drop the state filter, or broaden the commodity.'));
+            setStatus('No importers matched those filters \\u2014 widen your lane or commodity.',false);
+          }
+          results.appendChild(e);
           if(recordLine&&j.recordsScanned){ recordLine.textContent=Number(totalScanned).toLocaleString('en-US')+' customs records scanned'; }
           return;
         }

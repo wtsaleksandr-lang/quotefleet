@@ -35,6 +35,7 @@
 import type { Express, Request, Response } from 'express';
 import { layout, esc } from './pages.js';
 import { ISO_COUNTRIES } from './isoCountries.js';
+import { US_STATES } from './usStates.js';
 import { pullImportBols, type BolRow } from './importerLeads.js';
 import {
   dbBolCacheStore,
@@ -102,6 +103,21 @@ function flag(cc: string | null | undefined): string {
   const k = str(cc).toUpperCase();
   if (!/^[A-Z]{2}$/.test(k)) return '';
   return String.fromCodePoint(...[...k].map((c) => 127397 + c.charCodeAt(0)));
+}
+
+/** Every valid 2-letter US-state + ISO-country code (uppercase). */
+const CODE_TOKENS = new Set<string>([
+  ...US_STATES.map((s) => s.code.toUpperCase()),
+  ...ISO_COUNTRIES.map((c) => c.code.toUpperCase()),
+]);
+/**
+ * ImportYeti returns title-cased addresses, which lower-cases 2-letter state /
+ * country codes ("Lakewood Ny 14750 Us", "Newark, Nj"). Re-upper-case ONLY those
+ * standalone 2-letter tokens that are real state/country codes, leaving ordinary
+ * words untouched. Used for the displayed address + entry-port strings.
+ */
+function fixCodeCasing(s: string): string {
+  return str(s).replace(/\b[A-Za-z]{2}\b/g, (m) => (CODE_TOKENS.has(m.toUpperCase()) ? m.toUpperCase() : m));
 }
 
 /** Common HS-chapter labels (2-digit) so the product breakdown reads like the
@@ -288,7 +304,7 @@ export function aggregateProfile(rawRows: readonly BolRow[], slug: string): Prof
       if (cur) cur.n += 1;
       else notifyMap.set(np.toLowerCase(), { name: np, n: 1 });
     }
-    if (!entryPort && str(r.entry_port)) entryPort = str(r.entry_port);
+    if (!entryPort && str(r.entry_port)) entryPort = fixCodeCasing(str(r.entry_port));
   }
 
   const months = [...monthMap.values()].sort((a, b) => a.sort - b.sort).slice(-18).map((m) => ({ key: m.key, label: m.label, count: m.count }));
@@ -318,7 +334,7 @@ export function aggregateProfile(rawRows: readonly BolRow[], slug: string): Prof
   return {
     slug,
     company,
-    address: str(first.company_address) || null,
+    address: fixCodeCasing(str(first.company_address)) || null,
     phoneMasked: maskPhone(str(first.company_main_phone_number)),
     website: str(first.company_website) || null,
     countryCode: str(first.company_country_code).toUpperCase() || 'US',
@@ -717,7 +733,7 @@ export function renderImporterProfilePage(p: ProfileData, quota: QuotaState): st
     <div class="impp-lockcard">
       <span class="ico" aria-hidden="true" style="font-size:22px">\u{1F512}</span>
       <div class="lk">
-        <div class="lt"><span class="blur">Jennifer&nbsp;Harmon</span> · Logistics Director</div>
+        <div class="lt"><span class="blur">Logistics decision-maker</span> · hidden until unlocked</div>
         <div class="ls">Verified decision-maker email + an AI-drafted opener on this exact lane, hidden until unlocked.</div>
       </div>
       <a class="btn btn-primary" href="/signup">Unlock contact <span class="arr">&rarr;</span></a>
@@ -941,7 +957,7 @@ export async function handleImporterProfile(
     return;
   }
   const bolCache = deps.bolCache ?? dbBolCacheStore;
-  const quota = checkDetailQuota(req);
+  const quota = checkDetailQuota(req, slug);
 
   try {
     // Over quota → NEVER spend a credit. Use a cached teaser if we already have
@@ -961,7 +977,8 @@ export async function handleImporterProfile(
     }
     const profile = aggregateProfile(fetched.rows, slug);
     // Count this detailed open (bumps the visitor cookie + per-IP backstop).
-    const after = recordDetailOpen(req, res);
+    // Passing the slug dedups re-opens of the SAME company (no double-charge).
+    const after = recordDetailOpen(req, res, slug);
     res.type('html').send(renderImporterProfilePage(profile, after));
   } catch (err) {
     const msg = (err as Error)?.message || 'unknown error';
