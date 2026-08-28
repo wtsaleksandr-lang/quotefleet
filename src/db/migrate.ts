@@ -680,6 +680,21 @@ export const SELF_HEAL_TABLE_STATEMENTS: readonly string[] = [
   )`,
   `CREATE UNIQUE INDEX IF NOT EXISTS "importer_saved_user_slug_idx" ON "importer_saved" ("user_id","slug")`,
   `CREATE INDEX IF NOT EXISTS "importer_saved_user_idx" ON "importer_saved" ("user_id")`,
+  // 0065_sitemap_cache.sql — the PRECOMPUTED sitemap documents (index + cities +
+  // carriers-N chunks) that let /sitemap*.xml enumerate all ~334k carrier
+  // profiles for SEO discovery WITHOUT re-scanning carrier_directory on the
+  // request path (the same scan-stampede class as directory_aggregate_cache).
+  // Healed HERE (Replit skips db:migrate + its publish tool can drop tables):
+  // this CREATE TABLE IF NOT EXISTS runs on every boot and no-ops on a healthy
+  // DB. A phantom-drop loses ONLY a derived cache the next ingest/cron/boot
+  // recomputes — never any real carrier data. MUST stay byte-for-byte equivalent
+  // to drizzle/0065_sitemap_cache.sql + schema.ts `sitemapCache`.
+  `CREATE TABLE IF NOT EXISTS "sitemap_cache" (
+    "key" text PRIMARY KEY NOT NULL,
+    "xml" text NOT NULL,
+    "url_count" integer DEFAULT 0 NOT NULL,
+    "computed_at" timestamp DEFAULT now() NOT NULL
+  )`,
 ];
 
 export async function ensureSelfHealTables(): Promise<void> {

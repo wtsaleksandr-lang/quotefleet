@@ -33,6 +33,7 @@
 import { runCronSafely } from './cronSafety.js';
 import { forceReingestCarrierDirectory } from './directory/autoHeal.js';
 import { ensureFreshDirectoryAggregates } from './directory/queries.js';
+import { ensureFreshSitemap } from './directory/sitemapCache.js';
 
 const TICK_MS = 60 * 60 * 1000; // hourly
 const STARTUP_DELAY_MS = 2 * 60 * 1000; // 2 min after boot before the first tick
@@ -92,6 +93,19 @@ async function maybeRun(reason: string): Promise<void> {
     }
   });
 
+  // SAFETY NET (every hourly tick): keep the MATERIALIZED sitemap documents
+  // (sitemap_cache) fresh so /sitemap*.xml always serves the discovery layer for
+  // all ~334k carrier profiles from an O(1) PK lookup and NEVER falls back to a
+  // live 334k-row scan on the crawler's request. ensureFreshSitemap only
+  // recomputes when the 'index' row is missing or older than its max-age (a cheap
+  // PK read otherwise) and never throws, so it is safe to call on every tick.
+  await runCronSafely('directory-sitemap-refresh', async () => {
+    const outcome = await ensureFreshSitemap();
+    if (outcome === 'recomputed') {
+      console.log('[directoryRefresh.cron] sitemap documents recomputed + persisted (safety net)');
+    }
+  });
+
   const now = new Date();
   if (!shouldRunWeeklyRefresh(now, lastRunMs)) return;
   // Record BEFORE the run so the cooldown guard holds even if the tick re-enters
@@ -101,5 +115,11 @@ async function maybeRun(reason: string): Promise<void> {
     console.log(`[directoryRefresh.cron] weekly FMCSA re-ingest starting (${reason})`);
     const outcome = await forceReingestCarrierDirectory();
     console.log(`[directoryRefresh.cron] weekly FMCSA re-ingest kicked — outcome=${outcome}`);
+    // NOTE: no sitemap rebuild here on purpose. forceReingestCarrierDirectory
+    // returns as soon as the ingest is KICKED — the ingest itself runs in the
+    // background — so a rebuild here would materialize the PRE-ingest carrier set
+    // and would run its scan concurrently with the ingest's own writes. The
+    // sitemap instead picks the new carriers up on a later hourly tick, via the
+    // carrier-count drift check in ensureFreshSitemap() above.
   });
 }

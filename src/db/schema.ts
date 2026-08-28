@@ -1942,6 +1942,38 @@ export const directoryAggregateCache = pgTable('directory_aggregate_cache', {
 export type DirectoryAggregateCacheRow = typeof directoryAggregateCache.$inferSelect;
 
 /**
+ * PRECOMPUTED sitemap documents — the discovery layer for programmatic SEO over
+ * the ~334k-row carrier_directory.
+ *
+ * WHY THIS EXISTS: the public XML sitemap must enumerate EVERY carrier profile
+ * (+ every real city hub) so Google can discover and index them — the single
+ * highest-ROI SEO fix. But rendering those chunks per request would re-scan the
+ * 334k-row carrier_directory on the hot path (the exact scan-stampede that took
+ * all QuoteFleet domains down — see directory_aggregate_cache above). So we
+ * MATERIALIZE each fully-rendered sitemap document into one row here OFF the
+ * request path (the hourly directoryRefreshCron, plus a background rebuild on a
+ * cold miss), and the /sitemap*.xml routes serve them with a single-row PK lookup — O(1), never a
+ * scan. Keyed by document name: 'index', 'cities', and 'carriers-1'…'carriers-N'
+ * (≤50,000 <loc> per carrier chunk → ~7 chunks for 334k).
+ *
+ * Self-healed on every boot via ensureSelfHealTables() (Replit skips db:migrate),
+ * so a phantom-drop just loses a derived cache the next refresh/boot recomputes —
+ * never any real carrier data. See src/server/directory/sitemapCache.ts.
+ */
+export const sitemapCache = pgTable('sitemap_cache', {
+  /** Document key: 'index' | 'cities' | 'carriers-<n>'. There is one row per doc. */
+  key: text('key').primaryKey(),
+  /** The fully-rendered sitemap/sitemapindex XML for this document. */
+  xml: text('xml').notNull(),
+  /** How many <loc>/<sitemap> entries the doc holds (diagnostics / tests). */
+  urlCount: integer('url_count').notNull().default(0),
+  /** When this document was last recomputed (staleness clock for the boot check). */
+  computedAt: timestamp('computed_at', { mode: 'date' }).notNull().defaultNow(),
+});
+
+export type SitemapCacheRow = typeof sitemapCache.$inferSelect;
+
+/**
  * Persistent cache of ImportYeti bill-of-lading result sets for the Importer
  * Search feature (/importers). ImportYeti's ToS permits storing AND reselling
  * the purchased data, so this is a deliberate, licensed strategic asset — and a
