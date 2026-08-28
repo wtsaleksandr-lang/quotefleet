@@ -21,7 +21,7 @@ import { db } from '../db/client.js';
 import { platformSettings, type Tenant } from '../db/schema.js';
 import { AUTO_FSC_DEFAULTS } from '../calc/defaults.js';
 import { autoFscPerMile } from '../calc/fuelSurcharge.js';
-import { releaseBody } from '../http/responseBody.js';
+import { releaseBody, exchangeTimeoutSignal } from '../http/responseBody.js';
 
 const CACHE_KEY = 'eia_diesel_weekly';
 const EIA_SERIES = 'EMD_EPD2D_PTE_NUS_DPG';
@@ -49,14 +49,15 @@ interface CachedShape {
   source: 'eia' | 'usda';
 }
 
-async function withTimeout(url: string, init?: RequestInit): Promise<Response> {
-  const ctrl = new AbortController();
-  const t = setTimeout(() => ctrl.abort(), FETCH_TIMEOUT_MS);
-  try {
-    return await fetch(url, { ...init, signal: ctrl.signal });
-  } finally {
-    clearTimeout(t);
-  }
+/** Timeout that covers the WHOLE exchange — headers AND the body read.
+ *  (Was a manual AbortController cleared in `finally`, which disarmed the abort
+ *  the instant headers landed and left `await res.json()` unbounded — a stalled
+ *  EIA/USDA body then pinned a socket per call. See exchangeTimeoutSignal.) */
+function withTimeout(url: string, init?: RequestInit): Promise<Response> {
+  return fetch(url, {
+    ...init,
+    signal: exchangeTimeoutSignal(FETCH_TIMEOUT_MS, init?.signal),
+  });
 }
 
 /** Primary: EIA API v2. Returns null on any failure (caller falls back). */

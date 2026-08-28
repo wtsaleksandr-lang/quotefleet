@@ -29,24 +29,24 @@ import { loadEnv } from '../../config.js';
 import { publicAutocompleteLimiter } from '../rateLimits.js';
 import { LruCache } from '../lruCache.js';
 import { enforceTenantAccess } from '../access.js';
-import { releaseBody } from '../../http/responseBody.js';
+import { releaseBody, exchangeTimeoutSignal } from '../../http/responseBody.js';
 
 /** Abort a provider autocomplete request that hangs, so a stalled upstream can
  *  never pin a socket indefinitely (FD-leak guard). Generous vs. the ~sub-second
  *  typical latency; the caller degrades to empty suggestions on abort. */
 const AUTOCOMPLETE_TIMEOUT_MS = 6000;
 
-/** fetch() with a guaranteed-cleared abort timeout. The timer is always cleared
- *  in `finally` so it can never leak, and a timed-out request aborts (freeing its
- *  socket) instead of hanging. */
-async function fetchWithTimeout(input: URL | string) {
-  const controller = new AbortController();
-  const timer = setTimeout(() => controller.abort(), AUTOCOMPLETE_TIMEOUT_MS);
-  try {
-    return await fetch(input, { signal: controller.signal });
-  } finally {
-    clearTimeout(timer);
-  }
+/** fetch() whose timeout covers the WHOLE exchange — headers AND the body read.
+ *
+ *  This used to build a manual AbortController and `clearTimeout` it in a
+ *  `finally`. Because the helper RETURNS the Response and `fetch()` resolves on
+ *  HEADERS, that `finally` disarmed the abort before a single body byte was
+ *  read — so the `await r.json()` at the call sites below ran with no deadline
+ *  and a throttled Google/Mapbox that stalled its body pinned one socket per
+ *  request, forever (GC can't reclaim it: the suspended await holds the
+ *  Response). `AbortSignal.timeout` stays armed through body consumption. */
+function fetchWithTimeout(input: URL | string) {
+  return fetch(input, { signal: exchangeTimeoutSignal(AUTOCOMPLETE_TIMEOUT_MS) });
 }
 
 // Cache provider results for 1 hour. 2,000 distinct queries fit

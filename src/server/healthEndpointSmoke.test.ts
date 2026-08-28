@@ -142,7 +142,13 @@ describe('production health endpoint', () => {
 
   it('opens the compiled production listener before post-listen jobs', async () => {
     const index = await read('src/server/index.ts');
-    const listenerPosition = index.search(/^[ \t]*app\.listen\(env\.PORT, env\.HOST,/m);
+    // The listener's return value is now captured (`const server = app.listen(...)`)
+    // so the inbound socket timeouts / maxConnections backstop can be set on it;
+    // allow that optional assignment prefix. The ordering assertion below — the
+    // actual point of this test — is unchanged.
+    const listenerPosition = index.search(
+      /^[ \t]*(?:const \w+ = )?app\.listen\(env\.PORT, env\.HOST,/m,
+    );
     const postListenJobsPosition = index.search(/^[ \t]*void runPostListenJobs\(\);/m);
     const postListenJobs = index.slice(
       index.indexOf('async function runPostListenJobs'),

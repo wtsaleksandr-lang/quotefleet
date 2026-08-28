@@ -23,7 +23,7 @@ import { db } from '../../db/client.js';
 import { tenants, leads, routeMapCache, brandConfigs } from '../../db/schema.js';
 import { loadEnv } from '../../config.js';
 import { quoteMapLimiter } from '../rateLimits.js';
-import { releaseBody } from '../../http/responseBody.js';
+import { releaseBody, exchangeTimeoutSignal } from '../../http/responseBody.js';
 import { getRouteMap, laneCacheKey, normalizeTheme, resolveMapStyle, type LatLng, type MapStyle, type MapTheme } from '../routeMap.js';
 
 // Browsers/proxies may cache the rendered snapshot for a week — the lane
@@ -192,7 +192,11 @@ export function registerQuoteMapRoutes(app: Express): void {
 
     let png: Buffer;
     try {
-      const upstream = await fetch(route.url);
+      // Same whole-exchange timeout as resolveRouteMapPng above — without it a
+      // Static Maps host that stalls mid-body pins this socket indefinitely.
+      const upstream = await fetch(route.url, {
+        signal: exchangeTimeoutSignal(MAP_FETCH_TIMEOUT_MS),
+      });
       if (!upstream.ok) {
         releaseBody(upstream); // free the socket — bytes are never read on the error path
         console.warn(`[quote-map] upstream ${upstream.status} for ${refId} (${theme})`);

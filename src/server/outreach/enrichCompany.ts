@@ -32,6 +32,7 @@
  *     10,000") are reconciled: prefer the most-repeated / most-specific, and
  *     flag the uncertainty in `fetchNotes`.
  */
+import { releaseBody } from '../../http/responseBody.js';
 import { complete } from '../../ai/client.js';
 
 // ─── Types ──────────────────────────────────────────────────────────────
@@ -371,8 +372,11 @@ interface FetchResult {
 async function safeFetch(fetchFn: typeof fetch, url: string, timeoutMs: number): Promise<FetchResult> {
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), timeoutMs);
+  // Hoisted so the catch below can release a body whose read failed part-way
+  // (a mid-stream reject leaves the socket pinned otherwise).
+  let res: Response | undefined;
   try {
-    const res = await fetchFn(url, {
+    res = await fetchFn(url, {
       redirect: 'follow',
       signal: controller.signal,
       headers: { 'User-Agent': FETCH_UA, Accept: 'text/html,application/xhtml+xml' },
@@ -390,6 +394,7 @@ async function safeFetch(fetchFn: typeof fetch, url: string, timeoutMs: number):
     }
     return { url, ok: true, status: res.status, html, note: null };
   } catch (err) {
+    releaseBody(res); // body read failed part-way — free the socket
     const aborted = err instanceof Error && err.name === 'AbortError';
     return {
       url,
