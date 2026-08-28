@@ -47,7 +47,7 @@ export const LEADS_PRO_PRICE_USD = envInt('LEADS_PRO_PRICE_USD', 49);
 /** Short marketing feature bullets (honest-claims safe). */
 export const LEADS_PRO_FEATURES: readonly string[] = [
   `${LEADS_PRO_MONTHLY_ALLOWANCE} decision-maker contact reveals every month`,
-  'Verified email + role / phone tier on each importer, with an AI-drafted opener',
+  'The best real tier on each importer — verified decision-maker email, role-based inbox or full phone — with an AI-drafted opener',
   'Unlimited importer profile opens (no 3-profile cap)',
   'Re-reveal any importer you already unlocked — free, forever',
 ];

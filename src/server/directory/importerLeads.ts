@@ -55,6 +55,56 @@ export type BolRow = Record<string, unknown>;
  *  record). */
 export type ContactConfidence = 'verified' | 'role_based' | 'phone_only';
 
+/** What one reveal tier is allowed to SAY about itself.
+ *
+ *  HONEST-CLAIMS SINGLE SOURCE OF TRUTH. Every surface that names a tier — the
+ *  search-result footer chip, the profile reveal card, the revealed-contact
+ *  badge — reads its wording from here, so the pitch can never drift away from
+ *  what `resolveContactTiered` actually hands back.
+ *
+ *  The street address is deliberately absent from every tier. It renders FREE on
+ *  the importer profile (the identity header AND the Organization JSON-LD), so
+ *  selling it would be selling something already given away. `delivers` is the
+ *  machine-checkable list of `TieredContact` fields the tier may claim; a unit
+ *  test asserts the prose never names a field outside it. */
+export interface ContactTierCopy {
+  /** Badge / chip label. Short enough for a search-result card footer. */
+  badge: string;
+  /** One plain sentence: exactly what a reveal at this tier hands over. */
+  blurb: string;
+  /** `TieredContact` field names this tier is allowed to promise. */
+  delivers: readonly (keyof TieredContact)[];
+}
+
+/** The tiers, best-first — the order every surface lists them in. */
+export const TIER_ORDER: readonly ContactConfidence[] = Object.freeze([
+  'verified',
+  'role_based',
+  'phone_only',
+] as const);
+
+export const CONTACT_TIER_COPY: Readonly<Record<ContactConfidence, ContactTierCopy>> =
+  Object.freeze({
+    verified: {
+      badge: 'Verified decision-maker',
+      blurb:
+        "A named decision-maker with their title and a verified work email — plus their direct phone when the record carries one.",
+      delivers: ['contact_name', 'title', 'email', 'email_confidence', 'phone'],
+    },
+    role_based: {
+      badge: 'Role-based company email',
+      blurb:
+        "A role-based inbox on the company's own domain (purchasing@, logistics@, sales@, info@) — a real monitored inbox, not a named person.",
+      delivers: ['domain', 'role_emails'],
+    },
+    phone_only: {
+      badge: 'Company phone number',
+      blurb:
+        'The importer’s full switchboard number from the customs record — the profile shows only the last four digits until it is revealed.',
+      delivers: ['phone'],
+    },
+  });
+
 export interface ImporterFilters {
   entryPort?: string;
   product?: string;
@@ -121,7 +171,9 @@ export interface ImporterLead {
 }
 
 /** A resolved contact in one of the three confidence tiers. Always non-empty:
- *  the phone_only tier falls back to the ImportYeti phone + address. */
+ *  the phone_only tier falls back to the ImportYeti phone + address. `address`
+ *  is carried for convenience only — it is free page data, never a paid claim
+ *  (see CONTACT_TIER_COPY). */
 export interface TieredContact {
   contact_confidence: ContactConfidence;
   domain: string | null;
@@ -448,8 +500,12 @@ export async function enrichContact(companyName: string): Promise<EnrichedContac
  *   1. verified   — a named decision-maker email (Hunter, DM title match)
  *   2. role_based — domain resolved but no named person → purchasing@/logistics@
  *                   /sales@/info@ + domain, clearly UNVERIFIED
- *   3. phone_only — no domain → ImportYeti phone + physical address (always on
- *                   the record, so the user can still call / mail them)
+ *   3. phone_only — no domain → the ImportYeti phone, unmasked. The `address`
+ *                   travels with it for convenience but is NOT what this tier
+ *                   sells: the profile already prints the street address for
+ *                   free, so only the full phone number (masked to its last four
+ *                   digits on the free page) is genuinely gated here. See
+ *                   CONTACT_TIER_COPY.
  * Never throws — any Hunter failure (incl. a missing key) degrades to
  * phone_only, so the reveal is always answerable. */
 export async function resolveContactTiered(

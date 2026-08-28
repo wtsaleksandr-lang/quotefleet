@@ -16,7 +16,7 @@
  */
 import { describe, it, expect } from 'vitest';
 import { renderImporterSearchPage, SORTS } from './importerPages.js';
-import { aggregateProfile, renderImporterProfilePage, anonRevealState } from './importerProfile.js';
+import { aggregateProfile, renderImporterProfilePage, anonRevealState, BAR_MIN_PCT } from './importerProfile.js';
 import { FIXTURE_PROFILE_ROWS, FIXTURE_PROFILE_SLUG } from './importerFixture.js';
 
 const search = renderImporterSearchPage();
@@ -263,8 +263,8 @@ describe('R3-9 · bar rows print the share their caption promises', () => {
   });
 
   it('computes the share against the sample TOTAL, not the largest row', () => {
-    // The bar LENGTH is relative to the max; the printed figure must not be, or
-    // the biggest row would always read 100% of the sample.
+    // Both the printed figure and the bar length are shares of the sample total,
+    // so no row may read 100% unless it truly is the whole sample.
     expect(profileHtml).not.toContain('<span class="bp">100%</span>');
     const hs = longProfile.hsBreakdown;
     const total = hs.reduce((s, h) => s + h.n, 0);
@@ -281,5 +281,81 @@ describe('R3-9 · bar rows print the share their caption promises', () => {
     const wide = aggregateProfile(syntheticMonths(many), FIXTURE_PROFILE_SLUG);
     const html = renderImporterProfilePage(wide, quota, anonRevealState());
     expect(html).not.toContain('<span class="bp">0%</span>');
+  });
+});
+
+/* Bar LENGTH used to scale to the largest row, so the top row rendered a
+ * full-width bar while its own label said e.g. "38%" — length contradicted the
+ * printed number. Length is now the true share of the sample, floored at
+ * BAR_MIN_PCT so a sub-1% slice stays visible. */
+describe('bar LENGTH encodes the true share of the sample', () => {
+  /** {rendered width %, printed share} for every bar row in a profile. */
+  const rows = (html: string): Array<{ width: number; share: string }> =>
+    [...html.matchAll(/<div class="impp-brow"[\s\S]*?<\/div>/g)].map((m) => ({
+      width: Number(/width:(\d+)%/.exec(m[0])?.[1] ?? NaN),
+      share: /<span class="bp">(.*?)<\/span>/.exec(m[0])?.[1] ?? '',
+    }));
+
+  it('renders a bar for every row it prints a share for', () => {
+    expect(rows(profileHtml).length).toBeGreaterThanOrEqual(4);
+  });
+
+  it('sets each bar width to exactly the share printed beside it', () => {
+    for (const r of rows(profileHtml)) {
+      if (!r.share || r.share === '<1%') continue;
+      expect(r.width).toBe(Number(r.share.replace('%', '')));
+    }
+  });
+
+  it('never renders a full-width bar for a partial slice', () => {
+    // The regression: the biggest row always painted 100% of the track.
+    for (const r of rows(profileHtml)) {
+      if (r.share && r.share !== '100%') expect(r.width).toBeLessThan(100);
+    }
+  });
+
+  /** One dominant HS code plus a long tail of single-bill codes, so the top-6
+   *  list genuinely contains sub-1% slices AND is genuinely truncated. */
+  const longTail = () => {
+    const base = FIXTURE_PROFILE_ROWS[0];
+    const out: (typeof FIXTURE_PROFILE_ROWS)[number][] = [];
+    for (let i = 0; i < 400; i++) out.push({ ...base, hs_code: '999999', bol_number: `DOM${i}` });
+    for (let i = 0; i < 60; i++) out.push({ ...base, hs_code: `1000${String(i).padStart(2, '0')}`, bol_number: `TAIL${i}` });
+    return out;
+  };
+
+  it('floors a sub-1% slice at BAR_MIN_PCT instead of hiding it', () => {
+    const wide = aggregateProfile(longTail(), FIXTURE_PROFILE_SLUG);
+    const html = renderImporterProfilePage(wide, quota, anonRevealState());
+    const tiny = rows(html).filter((r) => r.share === '<1%');
+    expect(tiny.length).toBeGreaterThan(0);
+    for (const r of tiny) expect(r.width).toBe(BAR_MIN_PCT);
+    // …and the floor is genuinely small: it must never inflate a tiny slice into
+    // something that reads as a real share.
+    expect(BAR_MIN_PCT).toBeLessThanOrEqual(3);
+  });
+
+  it('measures the share against the SAMPLE, not the visible top-N rows', () => {
+    const wide = aggregateProfile(longTail(), FIXTURE_PROFILE_SLUG);
+    // 6 of 61 codes are drawn; their shares must NOT renormalise to 100%.
+    expect(wide.hsBreakdown.length).toBe(6);
+    expect(wide.hsCodeCount).toBe(61);
+    expect(wide.hsTotal).toBe(460);
+    const html = renderImporterProfilePage(wide, quota, anonRevealState());
+    // Scope to the Product-breakdown section — the origins section is a separate
+    // population with its own denominator.
+    const products = /id="sec-products"[\s\S]*?id="sec-origins"/.exec(html)?.[0] ?? '';
+    const drawn = rows(products).filter((r) => r.share);
+    const sum = drawn.reduce((s, r) => s + (r.share === '<1%' ? 0 : Number(r.share.replace('%', ''))), 0);
+    expect(sum).toBeLessThan(100);
+    // the dominant code is 400/460 ≈ 87%, never a full-width bar
+    expect(drawn.some((r) => r.share === '87%' && r.width === 87)).toBe(true);
+    // and a truncated list says so in its section header
+    expect(html).toContain('6 of 61 HS codes');
+  });
+
+  it('captions both bar sections with what the length means', () => {
+    expect(profileHtml).toContain('bar length = share of the sampled shipments');
+    expect((profileHtml.match(/bar length = share of the sampled shipments/g) ?? []).length).toBe(2);
   });
 });
