@@ -23,6 +23,8 @@ process.env.NODE_ENV = 'test';
 delete process.env.EXTERNAL_PULLS_ENABLED;
 delete process.env.IMPORTYETI_LIVE_PULLS;
 delete process.env.HUNTER_LIVE;
+delete process.env.PROSPEO_LIVE;
+delete process.env.APOLLO_LIVE;
 delete process.env.IMPORTER_DRAFTS_LIVE;
 
 // 2. Network sentinel. Test files capture `globalThis.fetch` at import time and
@@ -30,7 +32,8 @@ delete process.env.IMPORTER_DRAFTS_LIVE;
 //    LOOPBACK IS ALLOWED: several suites boot a real Express app on 127.0.0.1 and
 //    drive it over HTTP, which costs nothing. Everything OFF-BOX throws.
 const LOOPBACK = /^https?:\/\/(localhost|127\.0\.0\.1|0\.0\.0\.0|\[::1\])(:|\/|$)/i;
-const PAID_PROVIDER = /(importyeti|hunter\.io|api\.anthropic\.com)/i;
+const PAID_PROVIDER =
+  /(importyeti|hunter\.io|prospeo\.io|apollo\.io|api\.anthropic\.com)/i;
 
 const realFetch = globalThis.fetch;
 

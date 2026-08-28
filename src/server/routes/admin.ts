@@ -32,6 +32,12 @@ import { requireAuth, requireSuperAdmin } from '../middleware.js';
 import { creditMeter } from '../directory/importerQuota.js';
 import { externalCallMeter, guardStatus } from '../directory/externalPullGuard.js';
 import { externalSpendSummary } from '../directory/externalSpend.js';
+import {
+  providerOrder,
+  providerQuotas,
+  ENRICHMENT_PROVIDERS,
+  PROVIDER_ORDER_ENV,
+} from '../directory/enrichmentProviders.js';
 import { companyKey } from '../directory/importerCache.js';
 import { loadEnv } from '../../config.js';
 import Stripe from 'stripe';
@@ -1303,11 +1309,21 @@ export function registerAdminRoutes(app: Express) {
         externalSpendSummary(),
       ]);
       res.json({
-        // In-process meter (resets on deploy) — ImportYeti + Hunter.
+        // In-process meter (resets on deploy) — ImportYeti + the enrichment chain.
         meter: creditMeter(),
         callMeter: externalCallMeter(),
         // WHY spend is (or is not) possible right now, per provider.
         guard: guardStatus(),
+        // The enrichment chain as this process will actually walk it. Which
+        // provider is tried first is the lever that decides which free quota
+        // drains, so it belongs next to the spend it explains.
+        chain: {
+          order: providerOrder(),
+          configured: providerOrder().filter(
+            (n) => !!process.env[ENRICHMENT_PROVIDERS[n].keyEnv],
+          ),
+          envVar: PROVIDER_ORDER_ENV,
+        },
         // Durable ledger: one row per call that actually left the process.
         spend,
         cache: { bolRows: bolCount[0]?.n ?? 0, contactRows: contactCount[0]?.n ?? 0 },
@@ -1315,6 +1331,26 @@ export function registerAdminRoutes(app: Express) {
     } catch (err) {
       console.error('[admin] importer usage failed:', err);
       res.status(500).json({ error: 'Failed to load importer usage' });
+    }
+  });
+
+  /**
+   * Live free-quota readout for the enrichment chain.
+   *
+   * DELIBERATELY ITS OWN ENDPOINT rather than a field on /usage: it makes real
+   * outbound calls, so folding it into the page load would put two provider
+   * round-trips in front of every admin visit. On demand, behind a button.
+   *
+   * Costs nothing — these are the providers' own free account endpoints, ledgered
+   * at 0 credits — but they still go through the cost guard, so outside real
+   * production this answers `unavailable: 'blocked'` rather than opening a socket.
+   */
+  app.get('/api/admin/importers/quota', requireAuth, requireSuperAdmin, async (_req, res) => {
+    try {
+      res.json({ providers: await providerQuotas() });
+    } catch (err) {
+      console.error('[admin] importer quota failed:', err);
+      res.status(500).json({ error: 'Failed to load provider quota' });
     }
   });
 

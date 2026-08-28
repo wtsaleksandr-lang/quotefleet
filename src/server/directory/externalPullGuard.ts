@@ -16,7 +16,9 @@
  *
  *   EXTERNAL_PULLS_ENABLED=1   opt in for all providers  ← set in Doppler `prd`
  *   IMPORTYETI_LIVE_PULLS=1    ImportYeti only
- *   HUNTER_LIVE=1              Hunter only
+ *   HUNTER_LIVE=1              Hunter enrichment only
+ *   PROSPEO_LIVE=1             Prospeo enrichment only
+ *   APOLLO_LIVE=1              Apollo enrichment only
  *   IMPORTER_DRAFTS_LIVE=1     importer AI draft only
  * Setting any of them to 0/false force-DISABLES that provider even in prod, so
  * the kill switch works in both directions (prod incident → flip to 0, redeploy).
@@ -51,8 +53,25 @@
 
 import { exchangeTimeoutSignal } from '../../http/responseBody.js';
 
-/** Paid providers behind the guard. */
-export type ExternalProvider = 'importyeti' | 'hunter' | 'anthropic';
+/** Paid providers behind the guard.
+ *
+ *  `prospeo` and `hunter` are the CONTACT-ENRICHMENT providers behind the
+ *  reveal's provider chain (see enrichmentProviders.ts). Each carries its own
+ *  quota and its own kill switch, so one exhausted free tier degrades to the
+ *  next instead of ending the feature.
+ *
+ *  `apollo` is REGISTERED BUT NOT WIRED. Its kill switch and ledger slot exist
+ *  so that enabling it later is a config change plus an adapter, but it has no
+ *  adapter today and nothing calls it: Apollo's People Search is plan-gated, and
+ *  answers HTTP 403 `API_INACCESSIBLE` — "not accessible, even with a master
+ *  key" — on the Free plan (verified 2026-08-28), so there is no free path to a
+ *  work email there. Its `guardStatus()` row reading "blocked" is accurate. */
+export type ExternalProvider =
+  | 'importyeti'
+  | 'hunter'
+  | 'prospeo'
+  | 'apollo'
+  | 'anthropic';
 
 /** Per-external-call timeout in ms — covers headers AND the body read. */
 export const EXTERNAL_TIMEOUT_MS = 12_000;
@@ -61,6 +80,8 @@ export const EXTERNAL_TIMEOUT_MS = 12_000;
 const OVERRIDE_ENV: Record<ExternalProvider, string> = {
   importyeti: 'IMPORTYETI_LIVE_PULLS',
   hunter: 'HUNTER_LIVE',
+  prospeo: 'PROSPEO_LIVE',
+  apollo: 'APOLLO_LIVE',
   anthropic: 'IMPORTER_DRAFTS_LIVE',
 };
 
@@ -76,13 +97,23 @@ export const MASTER_ENV = 'EXTERNAL_PULLS_ENABLED';
 const EST_CREDITS: Record<ExternalProvider, number> = {
   importyeti: 5,
   hunter: 1,
+  prospeo: 1,
+  apollo: 1,
   anthropic: 0,
 };
 
-/** Rough USD cents per credit, for the admin spend view (labelled "est."). */
+/** Rough USD cents per credit, for the admin spend view (labelled "est.").
+ *
+ *  The enrichment providers all sit on FREE monthly quotas today, so their real
+ *  marginal cash cost is $0 — the number that matters for them is the QUOTA they
+ *  burn (`credits` + the provider-reported `creditsRemaining`), not the dollars.
+ *  These are the cheapest-paid-plan rates, kept so the column stays meaningful
+ *  the moment a plan is upgraded; the admin view labels the whole column "est.". */
 const EST_CENTS_PER_CREDIT: Record<ExternalProvider, number> = {
   importyeti: 9,
   hunter: 4,
+  prospeo: 4,
+  apollo: 4,
   anthropic: 0,
 };
 
@@ -184,7 +215,13 @@ export interface ProviderMeter {
   lastLiveAt: string | null;
 }
 
-const PROVIDERS: ExternalProvider[] = ['importyeti', 'hunter', 'anthropic'];
+const PROVIDERS: ExternalProvider[] = [
+  'importyeti',
+  'hunter',
+  'prospeo',
+  'apollo',
+  'anthropic',
+];
 
 function emptyMeter(): ProviderMeter {
   return { liveCalls: 0, blockedCalls: 0, credits: 0, lastCreditsRemaining: null, lastLiveAt: null };
@@ -315,6 +352,12 @@ export function fetchWithTimeout(
  *
  * @param provider which paid provider is being billed
  * @param context  short, log-safe description ("search page=1", "profile:acme")
+ * @param opts.credits  override the estimated credit cost of THIS call. Pass 0
+ *        for a provider's own FREE metadata endpoint (e.g. Prospeo's
+ *        `account-information`, Hunter's `/v2/account`): the call is still
+ *        guarded, still metered and still ledgered — so a quota check can never
+ *        happen invisibly — but it is recorded as costing nothing, because it
+ *        does not consume a search credit.
  */
 export async function guardedFetch(
   provider: ExternalProvider,
@@ -322,6 +365,7 @@ export async function guardedFetch(
   url: string,
   init: RequestInit = {},
   timeoutMs = EXTERNAL_TIMEOUT_MS,
+  opts: { credits?: number } = {},
 ): Promise<Response | null> {
   const decision = livePullsAllowed(provider);
   if (!decision.allowed) {
@@ -331,16 +375,20 @@ export async function guardedFetch(
     );
     return null;
   }
+  const credits =
+    opts.credits != null && Number.isFinite(opts.credits)
+      ? Math.max(0, opts.credits)
+      : EST_CREDITS[provider];
   const m = meterFor(provider);
   m.liveCalls += 1;
-  m.credits += EST_CREDITS[provider];
+  m.credits += credits;
   m.lastLiveAt = new Date().toISOString();
   persistSpend({
     provider,
     context,
-    credits: EST_CREDITS[provider],
+    credits,
     creditsRemaining: null,
-    estUsdCents: EST_CREDITS[provider] * EST_CENTS_PER_CREDIT[provider],
+    estUsdCents: credits * EST_CENTS_PER_CREDIT[provider],
   });
   return fetchWithTimeout(url, init, timeoutMs);
 }

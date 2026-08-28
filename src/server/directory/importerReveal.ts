@@ -3,7 +3,7 @@
  *
  *   POST /api/importers/company/:slug/reveal   (auth required)
  *
- * Activates the dormant Hunter enrichment behind a real, gated reveal:
+ * Activates the dormant contact enrichment behind a real, gated reveal:
  *
  *   • FREE accounts get a small taste allowance (FREE_REVEAL_TASTE reveals,
  *     all-time), then a "Upgrade to Leads Pro" wall.
@@ -20,7 +20,7 @@
  *
  * COST SAFETY (four levers):
  *   • CACHE-FIRST — a company already resolved (importer_contact_cache, 14-day
- *     TTL, licensed) is served from cache and spends ZERO Hunter credit.
+ *     TTL, licensed) is served from cache and spends ZERO provider credit.
  *   • RE-REVEAL DEDUP — an importer the account already revealed re-opens free
  *     and never decrements the allowance.
  *   • NOTHING-TO-SELL — a reveal that resolves no email (or that the cost guard
@@ -80,7 +80,7 @@ export interface RevealedContactView {
   address: string | null;
   /** Why this reveal returned nothing beyond what the profile already shows free.
    *  BOTH values mean NOTHING WAS CHARGED (`charged: false` on the result):
-   *    'cache-only' — the HARD COST GUARD refused the live Hunter call and
+   *    'cache-only' — the HARD COST GUARD refused every enrichment provider and
    *                   nothing was cached: honest "we did not look".
    *    'no-email'   — we DID look and no work email exists for this importer.
    *                   The phone and street address on the card are free page
@@ -107,13 +107,27 @@ export interface ImporterRevealDeps {
   contactCache?: ContactCacheStore;
   bolCache?: BolCacheStore;
   meter?: LeadsRevealMeter;
-  /** Contact resolver seam — defaults to the real (Hunter) resolveContactTiered.
-   *  Tests inject a stub so no live Hunter call is made. */
+  /** Contact resolver seam — defaults to the real `resolveContactTiered`, which
+   *  walks the enrichment PROVIDER CHAIN. Tests inject a stub so no live provider
+   *  call is ever made. */
   resolveContact?: (
     company: string,
-    opts: { phone?: string | null; address?: string | null },
+    opts: { phone?: string | null; address?: string | null; website?: string | null },
   ) => Promise<TieredContact>;
   now?: () => Date;
+}
+
+/** The importer's identity as held in the warm profile cache — company name,
+ *  switchboard, street address, and the company website. */
+interface CompanyIdentity {
+  company: string;
+  phone: string | null;
+  address: string | null;
+  /** ImportYeti's `company_website`. FREE data we already hold, and the single
+   *  cheapest input to the enrichment chain: handed forward as a domain hint it
+   *  lets a domain-only provider (Prospeo) answer directly, instead of spending
+   *  a scarcer provider's credit just to turn the name into a domain. */
+  website: string | null;
 }
 
 /** The importer's display identity from the warm profile cache (no credit spent).
@@ -121,7 +135,7 @@ export interface ImporterRevealDeps {
 async function loadCompanyIdentity(
   slug: string,
   deps: ImporterRevealDeps,
-): Promise<{ company: string; phone: string | null; address: string | null }> {
+): Promise<CompanyIdentity> {
   try {
     const bolCache = deps.bolCache ?? dbBolCacheStore;
     // allowLivePull:false — a reveal must never trigger an ImportYeti pull; the
@@ -135,12 +149,13 @@ async function loadCompanyIdentity(
         company,
         phone: str(first.company_main_phone_number) || null,
         address: str(first.company_address) || null,
+        website: str(first.company_website) || null,
       };
     }
   } catch {
     /* fall through to slug-derived identity */
   }
-  return { company: titleFromSlug(slug), phone: null, address: null };
+  return { company: titleFromSlug(slug), phone: null, address: null, website: null };
 }
 
 function viewFromTiered(t: TieredContact): RevealedContactView {
@@ -158,12 +173,12 @@ function viewFromTiered(t: TieredContact): RevealedContactView {
 }
 
 /**
- * CACHE-FIRST contact resolution. A fresh cached row spends ZERO Hunter credit.
+ * CACHE-FIRST contact resolution. A fresh cached row spends ZERO provider credit.
  * Only a miss calls the (real) resolver; the result — including a negative /
  * phone_only result — is cached so it's never re-resolved. Never throws.
  */
 async function resolveCacheFirst(
-  info: { company: string; phone: string | null; address: string | null },
+  info: CompanyIdentity,
   deps: ImporterRevealDeps,
 ): Promise<{ view: RevealedContactView; hitCache: boolean; blocked: boolean }> {
   const cache = deps.contactCache ?? dbContactCacheStore;
@@ -195,13 +210,18 @@ async function resolveCacheFirst(
   }
 
   const resolver = deps.resolveContact ?? resolveContactTiered;
-  const tiered = await resolver(info.company, { phone: info.phone, address: info.address });
+  const tiered = await resolver(info.company, {
+    phone: info.phone,
+    address: info.address,
+    website: info.website,
+  });
   const view = viewFromTiered(tiered);
-  // HARD COST GUARD refused the live Hunter call: this is NOT a real negative
-  // result. Do NOT cache it (that would poison the licensed 14-day contact cache
-  // with a fake "nothing found") and let the caller skip the allowance charge.
+  // HARD COST GUARD refused every enrichment provider: this is NOT a real
+  // negative result. Do NOT cache it (that would poison the licensed 14-day
+  // contact cache with a fake "nothing found") and let the caller skip the
+  // allowance charge.
   if (tiered.live_blocked) {
-    console.warn('[importers] reveal served cache-only (cost guard) — no Hunter call made');
+    console.warn('[importers] reveal served cache-only (cost guard) — no provider was called');
     return { view: { ...view, unavailable: 'cache-only' }, hitCache: false, blocked: true };
   }
   try {
@@ -264,7 +284,7 @@ export async function revealWithIdentity(
   // Both reuse the ONE no-charge exit the cost guard path already established:
   // flag the view via `unavailable`, return the UNCHANGED remaining count, and
   // skip meter.record entirely — which also leaves the slug unrecorded, so a later
-  // retry (once Hunter does have the company) is still a first, chargeable reveal.
+  // retry (once a provider does have the company) is still a first, chargeable reveal.
   if (blocked || !isChargeableContact(view.confidence, view)) {
     const flagged: RevealedContactView = blocked ? view : { ...view, unavailable: 'no-email' };
     return { ok: true, contact: flagged, remaining: Math.max(0, cap - used), tier, reused: false, charged: false };
