@@ -29,6 +29,7 @@ import {
   uniqueIndex,
   index,
 } from 'drizzle-orm/pg-core';
+import { sql } from 'drizzle-orm';
 import type { LtlConfig } from '../calc/freightClass.js';
 // Type-only imports (erased at runtime — no module cycle) so the precomputed
 // directory_aggregate_cache JSONB columns stay in lock-step with the shapes the
@@ -1904,6 +1905,64 @@ export const carrierDirectory = pgTable(
     uniqueIndex('carrier_directory_slug_idx').on(t.publicSlug),
     index('carrier_directory_state_idx').on(t.state),
     index('carrier_directory_port_idx').on(t.nearestPortCode),
+    // ── /directory query indexes (0066_directory_query_indexes.sql) ─────────
+    // The two single-column indexes above narrow to a state/port but leave the
+    // SORT keys (intermodal, power_units) and the ~20 cargo booleans in the heap,
+    // so a filtered page had to bitmap-fetch 4.6k–12k of the table's ~12k heap
+    // pages and top-N sort them — fine warm, but past the 8s statement_timeout on
+    // a cold Neon page cache, which made listCarriers degrade to an empty list.
+    // These carry the ORDER BY + the facet predicates so the LIMIT terminates in
+    // the index. Mirrored byte-for-byte in db/migrate.ts SELF_HEAL_TABLE_STATEMENTS
+    // (the mechanism that actually creates them — Replit skips db:migrate).
+    // Deliberately LEAN: no legal_name/id tail — measured identical plans for
+    // ~2.2x the index size, since the tie-break finishes as an Incremental Sort.
+    index('carrier_directory_state_featured_idx').on(
+      t.state,
+      t.intermodal.desc(),
+      t.powerUnits.desc().nullsLast(),
+    ),
+    index('carrier_directory_port_featured_idx').on(
+      t.nearestPortCode,
+      t.intermodal.desc(),
+      t.powerUnits.desc().nullsLast(),
+    ),
+    index('carrier_directory_featured_idx').on(t.intermodal.desc(), t.powerUnits.desc().nullsLast()),
+    index('carrier_directory_state_fleet_idx').on(t.state, t.powerUnits.desc().nullsLast()),
+    index('carrier_directory_port_fleet_idx').on(t.nearestPortCode, t.powerUnits.desc().nullsLast()),
+    // One PARTIAL index per cargo/equipment facet column, keyed on the default
+    // (`featured`) sort prefix. `dry_van` is excluded on purpose — it is true for
+    // 78.6% of prod rows, so the planner would never pick it. See migrate.ts
+    // DIRECTORY_FLAG_INDEX_COLUMNS for the full rationale.
+    // The predicate is written with sql.raw so the emitted DDL is an unqualified
+    // `WHERE "col"` — an index predicate cannot carry a table qualifier, and it
+    // has to match db/migrate.ts's self-heal statement byte-for-byte.
+    ...(
+      [
+        'intermodal',
+        'hazmat',
+        'reefer',
+        'tanker',
+        'flatbed',
+        'dry_bulk',
+        'household_goods',
+        'beverages',
+        'produce',
+        'motor_vehicles',
+        'livestock',
+        'grain_feed',
+        'oilfield',
+        'meat',
+        'paper',
+        'construction',
+        'farm_supplies',
+        'coal_coke',
+        'building_materials',
+      ] as const
+    ).map((name) =>
+      index(`carrier_directory_flag_${name}_idx`)
+        .on(t.intermodal.desc(), t.powerUnits.desc().nullsLast())
+        .where(sql.raw(`"${name}"`)),
+    ),
   ]
 );
 
