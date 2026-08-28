@@ -405,3 +405,112 @@ describe('drawn signature is OPTIONAL (importer-audit M1 — a11y)', () => {
     expect(apply).toContain('Type your full name as your signature.');
   });
 });
+
+/**
+ * VALUE-PROPOSITION FRAMING — Alex, 2026-08.
+ *
+ * The plans page led with the honest-claims disclaimer, so it read as "we hide
+ * you on QuoteFleet, and something about CBP" — which undersold the product and
+ * left buyers thinking the redaction was limited to our own directory. The CBP
+ * filing is what they are buying; the QuoteFleet redaction is the secondary,
+ * immediate benefit. These pin the corrected EMPHASIS without letting any of the
+ * honest-claims guardrails above be softened to get it.
+ */
+describe('value proposition — the CBP suppression leads, QuoteFleet redaction is secondary', () => {
+  const landing = renderPrivacyLanding();
+  const apply = renderPrivacyApply({ app: null, prefill: {} });
+  const account = renderPrivacyAccount({
+    email: 'jane@acme.com',
+    identity: identity({ isSubscriber: true, tier: 'basic', status: 'active' }),
+    applications: [poa()],
+  });
+
+  it('says the CBP filing suppresses the company on PUBLIC customs manifest records', () => {
+    for (const [name, html] of [['landing', landing], ['apply', apply]] as const) {
+      const t = lower(html);
+      expect(t, `${name}: must name the suppression`).toContain('suppress');
+      expect(t, `${name}: must say the records are public`).toContain('public manifest records');
+    }
+    // The landing names the trade-data sites the records feed, so "public" is
+    // concrete rather than abstract.
+    expect(landing).toContain('ImportYeti');
+    expect(landing).toContain('Panjiva');
+    expect(lower(landing)).toContain('19 cfr 103.31(d)');
+  });
+
+  it('scopes the suppression to FUTURE shipments, never to the whole history', () => {
+    for (const [name, html] of [['landing', landing], ['apply', apply]] as const) {
+      expect(lower(html), `${name}: must scope to future shipments`).toContain('future shipments');
+    }
+  });
+
+  it('states plainly that it is NOT retroactive — on every paid-decision surface', () => {
+    // Landing + plan cards are pre-payment; the flow's plan step is the checkout
+    // moment. A buyer must not be able to pay without having been told.
+    expect(lower(landing)).toContain('not retroactive');
+    expect(lower(landing)).toContain('already published');
+    expect(lower(apply)).toContain('not retroactive');
+    for (const t of MANIFEST_TIERS) {
+      expect(
+        t.features.some((f) => lower(f).includes('not retroactive')),
+        `tier ${t.tier} must carry the not-retroactive limit on its card`,
+      ).toBe(true);
+    }
+    // And it survives to the post-purchase status surface.
+    expect(lower(account)).toContain('not retroactive');
+  });
+
+  it('leads each tier card with the CBP filing, not with the QuoteFleet redaction', () => {
+    for (const t of MANIFEST_TIERS) {
+      const first = lower(t.features[0] ?? '');
+      expect(first, `tier ${t.tier} first bullet must lead with the CBP filing`).toContain('cbp');
+    }
+  });
+
+  it('keeps the QuoteFleet redaction present but framed as the immediate, lesser half', () => {
+    // Still stated (it is a real benefit and the honest-claims rule needs it)…
+    expect(lower(landing)).toContain('hidden on quotefleet');
+    // …and still explicitly distinguished from the CBP feed.
+    expect(lower(landing)).toContain('not the same as removal from cbp');
+  });
+
+  it('does NOT weaken any honest-claims guardrail to achieve the new emphasis', () => {
+    for (const [name, html] of [
+      ['landing', landing],
+      ['apply', apply],
+      ['account', account],
+    ] as const) {
+      const t = lower(html);
+      // No automated CBP connection claim.
+      expect(t, `${name}`).not.toContain('cbp api');
+      expect(t, `${name}`).not.toContain('automatically file');
+      expect(t, `${name}`).not.toContain('directly with cbp’s system');
+      // A human files it, on the customer's behalf.
+      expect(t, `${name}`).toContain('on your behalf');
+      // Never brokerage. The ONLY permitted occurrence is the disclosure's
+      // express DISCLAIMER ("QuoteFleet does not act as your customs broker") —
+      // a positive brokerage claim would break the non-broker legal posture.
+      const brokerHits = (t.match(/customs broker/g) ?? []).length;
+      const disclaimed = (t.match(/does not act as your customs broker/g) ?? []).length;
+      expect(brokerHits, `${name}: only the non-broker disclaimer may say "customs broker"`).toBe(
+        disclaimed,
+      );
+      // Uploaded docs are never "verified" — and nothing claims a guarantee.
+      expect(t, `${name}`).not.toContain('guaranteed');
+    }
+    // "Remove/delete your existing shipments" is the exact overclaim this fix
+    // must not introduce while making the benefit louder.
+    for (const html of [landing, apply, account]) {
+      expect(lower(html)).not.toContain('delete your shipment');
+      expect(lower(html)).not.toContain('remove your existing');
+      expect(lower(html)).not.toContain('erase your history');
+    }
+  });
+
+  it('the importer-facing nav descriptor points at CBP records, not "our directory"', async () => {
+    const { SITE_NAV_HTML } = await import('../siteChrome.js');
+    expect(SITE_NAV_HTML).toContain('U.S. Customs public records');
+    // The old wording read as if only the QuoteFleet directory was affected.
+    expect(SITE_NAV_HTML).not.toContain('public customs directory');
+  });
+});

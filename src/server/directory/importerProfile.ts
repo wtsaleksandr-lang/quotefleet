@@ -1195,14 +1195,15 @@ function identityHeader(p: ProfileData, opts: { showActions: boolean }): string 
   </div>`;
 }
 
-/** "Is this your company?" → Manifest Privacy onboarding CTA. Honest copy: we
- *  hide them on QuoteFleet and prepare/submit their CBP confidentiality request —
- *  no "remove from CBP" or "verified" claim. */
+/** "Is this your company?" → Manifest Privacy onboarding CTA. Honest copy: the
+ *  CBP filing leads (it is the product), the QuoteFleet redaction is the
+ *  secondary immediate benefit, and the not-retroactive limit is stated up front
+ *  — no "remove from CBP", no retroactive takedown, no "verified" claim. */
 function privacyCta(p: ProfileData): string {
   const href = `/privacy/apply?slug=${encodeURIComponent(p.slug)}&name=${encodeURIComponent(p.company)}`;
   return `<div class="impp-privacy">
     <span class="impp-privacy-t">Is this your company?</span>
-    <span class="impp-privacy-d">Hide your shipment data from competitors on QuoteFleet — we prepare &amp; submit your CBP confidentiality request on your behalf.</span>
+    <span class="impp-privacy-d">We prepare &amp; submit your CBP confidentiality request on your behalf, so your future shipments stop appearing in public U.S. Customs manifest records — shipments already published stay published. We hide you on QuoteFleet right away.</span>
     <a class="impp-privacy-cta" href="${href}">Hide my data <span class="arr">&rarr;</span></a>
   </div>`;
 }

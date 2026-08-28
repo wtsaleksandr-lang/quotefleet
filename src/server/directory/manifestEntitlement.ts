@@ -47,10 +47,11 @@ export const MANIFEST_TIERS: readonly ManifestTierMeta[] = [
     entityQuota: 1,
     priceEnvKey: 'STRIPE_PRICE_MANIFEST_BASIC',
     features: [
-      '1 business entity, unlimited name variations',
-      'We prepare & submit your CBP request on your behalf',
-      '2-year renewal tracking & refile reminders',
-      'Signed POA + audit trail retained',
+      'CBP confidentiality filing for 1 business entity',
+      'Suppresses your name & address on future manifest records',
+      'Not retroactive — already-published shipments stay published',
+      'Hidden on QuoteFleet immediately, while CBP processes',
+      '2-year renewal tracking, refiled before it lapses',
     ],
   },
   {
@@ -60,10 +61,11 @@ export const MANIFEST_TIERS: readonly ManifestTierMeta[] = [
     entityQuota: 5,
     priceEnvKey: 'STRIPE_PRICE_MANIFEST_PRO',
     features: [
-      'Multiple entities (up to 5)',
+      'CBP confidentiality filing for up to 5 business entities',
+      'Suppresses each entity on future manifest records',
+      'Not retroactive — already-published shipments stay published',
       'Document-based intake ("Documents on file")',
-      'Branded POA PDF & priority filing',
-      'Renewal reminders & status timeline',
+      'Branded POA PDF, priority filing & status timeline',
     ],
   },
   {
@@ -73,10 +75,11 @@ export const MANIFEST_TIERS: readonly ManifestTierMeta[] = [
     entityQuota: 100,
     priceEnvKey: 'STRIPE_PRICE_MANIFEST_ENT',
     features: [
-      'Bulk / multi-entity intake (CSV)',
-      'Optional automated KYB add-on',
-      'Dedicated account manager',
-      'Priority filing & renewals',
+      'CBP confidentiality filing across your whole entity portfolio',
+      'Suppresses every entity on future manifest records',
+      'Not retroactive — already-published shipments stay published',
+      'Bulk / multi-entity intake (CSV) + optional KYB add-on',
+      'Dedicated account manager, priority filing & renewals',
     ],
   },
 ];
