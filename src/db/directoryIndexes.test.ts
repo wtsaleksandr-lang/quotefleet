@@ -116,6 +116,104 @@ describe('carrier_directory /directory query indexes — self-heal DDL', () => {
   });
 });
 
+/**
+ * CITY indexes (0068_city_slug_indexes.sql).
+ *
+ * THE BUG: the same 57014 → empty list as 0066, one dimension later. 0066
+ * indexed state/port/power_units/cargo-flags but nothing indexed `city`, and
+ * 0065's sitemap started advertising thousands of city hubs + ~334k carrier
+ * profiles, so crawlers hit city-scoped queries in volume for the first time.
+ *
+ * THE TRAP these tests exist to pin: the route never compares the `city` COLUMN.
+ * cityCondition() matches the URL slug through an EXPRESSION, so a plain b-tree
+ * on (city) — or on (state, city) — can NEVER serve it; Postgres can only apply
+ * it as a post-heap-fetch Filter. The index therefore has to be on the
+ * expression, and it has to be the SAME expression byte-for-byte. If anyone
+ * edits cityCondition() without editing the index, the index silently stops
+ * being used and prod quietly returns to timing out. `matches cityCondition
+ * byte-for-byte` below is the test that catches that.
+ */
+const CITY_SLUG_EXPR = `btrim(regexp_replace(lower("city"), '[^a-z0-9]+', '-', 'g'), '-')`;
+const CITY_INDEXES: Array<[string, string]> = [
+  [
+    'carrier_directory_cityslug_state_featured_idx',
+    `CREATE INDEX IF NOT EXISTS "carrier_directory_cityslug_state_featured_idx" ON "carrier_directory" ((${CITY_SLUG_EXPR}), "state", "intermodal" DESC, "power_units" DESC NULLS LAST)`,
+  ],
+  [
+    'carrier_directory_state_city_power_idx',
+    `CREATE INDEX IF NOT EXISTS "carrier_directory_state_city_power_idx" ON "carrier_directory" ("state", "city", "power_units" DESC NULLS LAST)`,
+  ],
+];
+const cityMigrationSql = readFileSync(
+  fileURLToPath(new URL('../../drizzle/0068_city_slug_indexes.sql', import.meta.url)),
+  'utf8',
+);
+
+describe('carrier_directory CITY indexes — self-heal DDL', () => {
+  it.each(CITY_INDEXES)('creates %s idempotently on boot', (_name, stmt) => {
+    expect(SELF_HEAL_TABLE_STATEMENTS).toContain(stmt);
+  });
+
+  it.each(CITY_INDEXES)('drizzle/0068 declares %s with the same column list', (_name, stmt) => {
+    expect(cityMigrationSql).toContain(`${stmt};`);
+  });
+
+  it.each(CITY_INDEXES)('schema.ts declares %s', (name) => {
+    expect(schemaSrc).toContain(`index('${name}')`);
+  });
+
+  it('uses plain CREATE INDEX — CONCURRENTLY cannot run in the self-heal transaction', () => {
+    const ddl = cityMigrationSql
+      .split('\n')
+      .filter((l) => !l.trimStart().startsWith('--'))
+      .join('\n');
+    expect(ddl).not.toContain('CONCURRENTLY');
+  });
+
+  it('does NOT create a bare (city) index — the planner never picks one for the slug expression', () => {
+    expect(migrateSql).not.toContain(`"carrier_directory_city_idx"`);
+    const bareCity = SELF_HEAL_TABLE_STATEMENTS.filter((s) =>
+      /ON "carrier_directory" \("city"\)/.test(s),
+    );
+    expect(bareCity).toHaveLength(0);
+  });
+});
+
+describe('the city index matches the query it exists for', () => {
+  it('indexes the EXPRESSION, not the bare city column', () => {
+    const [, stmt] = CITY_INDEXES[0];
+    // The expression must be wrapped in its own parens (Postgres requires it)
+    // and must be the LEADING index column.
+    expect(stmt).toContain(`((${CITY_SLUG_EXPR}), "state"`);
+  });
+
+  it('matches cityCondition() byte-for-byte — the whole index depends on this', () => {
+    // Render the predicate the route actually emits and compare it to the
+    // expression the index is built on. Both are lowercased and stripped of the
+    // table qualifier / bind placeholder that only the query side carries.
+    const rendered = sqlTextAll(buildConditions(normalizeFilters({ state: 'AL', city: 'frisco-city' })));
+    const normalize = (s: string) => s.replace(/"carrier_directory"\./g, '').replace(/\s+/g, ' ');
+    expect(normalize(rendered)).toContain(normalize(CITY_SLUG_EXPR.toLowerCase()));
+  });
+
+  it('a state + city filter emits exactly the two predicates the index leads with', () => {
+    const conditions = buildConditions(normalizeFilters({ state: 'AL', city: 'frisco-city' }));
+    expect(conditions).toHaveLength(2);
+    const text = sqlTextAll(conditions);
+    expect(text).toContain('"state"');
+    expect(text).toContain('regexp_replace');
+  });
+
+  it('the sort prefix after the two equality columns is the `featured` sort', () => {
+    // (slug, state, intermodal DESC, power_units DESC NULLS LAST): with both
+    // leading columns pinned by equality the remaining two must be exactly the
+    // default ORDER BY's leading pair, or the LIMIT cannot terminate in-index.
+    const order = orderForSort(normalizeFilters({ state: 'AL', city: 'frisco-city' }).sort);
+    expect(sqlText(order[0])).toContain('"intermodal" desc');
+    expect(sqlText(order[1])).toContain('"power_units" desc nulls last');
+  });
+});
+
 describe('carrier_directory query indexes — schema.ts + drizzle SQL stay in sync', () => {
   it.each(COMPOSITES)('drizzle/0066 declares %s with the same column list', (name, stmt) => {
     expect(migrationSql).toContain(`${stmt};`);

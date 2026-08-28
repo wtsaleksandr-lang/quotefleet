@@ -1963,6 +1963,36 @@ export const carrierDirectory = pgTable(
         .on(t.intermodal.desc(), t.powerUnits.desc().nullsLast())
         .where(sql.raw(`"${name}"`)),
     ),
+    // ── city indexes (0068_city_slug_indexes.sql) ───────────────────────────
+    // City-filtered queries timed out on prod (57014 → empty list) because
+    // NOTHING indexed `city`. A b-tree on the city COLUMN cannot help: the route
+    // matches the URL slug through an EXPRESSION (queries.ts cityCondition) —
+    //   btrim(regexp_replace(lower(city), '[^a-z0-9]+', '-', 'g'), '-') = $slug
+    // — which Postgres can only apply as a post-heap-fetch Filter, so the city
+    // page bitmap heap-scanned every row in the state (4.3k AL / 31.7k TX) to
+    // return ~20. Hence an index on the EXPRESSION, then state, then the
+    // `featured` sort prefix. Verified on prod: cost 8,748 → 90.9 (AL),
+    // 13,167 → 590 (TX), and 1,889 → 28.7 for the same-city relatedCarriers leg
+    // that runs on every one of the ~334k crawlable carrier profiles.
+    // Slug-first (not state-first) so the stateless `?city=` facet is covered
+    // too. sql.raw keeps the emitted expression unqualified so it matches
+    // db/migrate.ts SELF_HEAL_TABLE_STATEMENTS byte-for-byte.
+    index('carrier_directory_cityslug_state_featured_idx').on(
+      sql.raw(`(btrim(regexp_replace(lower("city"), '[^a-z0-9]+', '-', 'g'), '-'))`),
+      t.state,
+      t.intermodal.desc(),
+      t.powerUnits.desc().nullsLast(),
+    ),
+    // (state, city) on the RAW column — citiesForState()'s GROUP BY city, the
+    // cityDisplayName() slug→display-case resolve, and the city page's filtered
+    // count(*) all become Index Only Scans on this. Shape carried as-deployed
+    // (added by hand on prod during the incident); only the (state, city) prefix
+    // is actually used.
+    index('carrier_directory_state_city_power_idx').on(
+      t.state,
+      t.city,
+      t.powerUnits.desc().nullsLast(),
+    ),
   ]
 );
 

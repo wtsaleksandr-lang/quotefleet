@@ -188,6 +188,34 @@ describe('robots.txt references the sitemap index', () => {
     expect(robots).not.toMatch(/Disallow:\s*\/directory/);
     expect(robots).not.toMatch(/Disallow:\s*\/$/m);
   });
+
+  /**
+   * The sitemap advertises every page worth indexing as a clean PATH, so the
+   * combinatorial query-string space behind /directory is pure crawl cost: each
+   * facet param multiplies the same rows into another indexable URL, `?page=`
+   * reaches OFFSET ~334k, and `?q=` is an unbounded ILIKE '%..%' scan. Blocking
+   * the params (never the paths) is what keeps a crawl bounded.
+   */
+  it('blocks the heavy facet/sort/pagination QUERY STRINGS, not the paths', () => {
+    const robots = readFileSync(resolve(process.cwd(), 'src/server/public/robots.txt'), 'utf8');
+    for (const p of [
+      'page',
+      'q',
+      'sort',
+      'dir',
+      'equipment',
+      'cargo',
+      'fleet',
+      'drivers',
+      'standing',
+      'authority',
+      'recent',
+    ]) {
+      expect(robots).toContain(`Disallow: /*?*${p}=`);
+    }
+    // Crawl-delay for the bots that honour it (Googlebot ignores it by design).
+    expect(robots).toMatch(/^Crawl-delay:\s*\d+/m);
+  });
 });
 
 describe('buildUrlset shape', () => {
