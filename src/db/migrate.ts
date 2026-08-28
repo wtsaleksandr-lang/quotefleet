@@ -906,17 +906,34 @@ export const SELF_HEAL_TABLE_STATEMENTS: readonly string[] = [
     "user_id" integer,
     "status" text DEFAULT 'draft' NOT NULL,
     "grantor_legal_name" text,
+    "dba_names" jsonb,
     "entity_type" text,
     "state_of_org" text,
+    "country_of_org" text,
+    "residency" text,
     "grantor_address" text,
+    "mailing_address" text,
     "ein_or_importer_no" text,
+    "ior_number" text,
+    "partner_names" jsonb,
     "name_variations" jsonb,
     "address_variations" jsonb,
     "importer_slug" text,
     "signer_name" text,
     "signer_title" text,
     "signer_email" text,
+    "signer_phone" text,
+    "signer_email_verify_token" text,
+    "signer_email_verified_at" timestamp with time zone,
+    "cert_signer_name" text,
+    "cert_signer_title" text,
+    "cert_signer_email" text,
+    "authority_docs_note" text,
+    "governing_law" text,
+    "term_years" integer,
     "consent_disclosure_version" text,
+    "consent_at" timestamp with time zone,
+    "retain_until" timestamp with time zone,
     "signature_typed" text,
     "signature_drawn_png" text,
     "signed_at" timestamp with time zone,
@@ -940,6 +957,35 @@ export const SELF_HEAL_TABLE_STATEMENTS: readonly string[] = [
   // CBP receipt/confirmation reference captured on confirm (admin renewal-ops).
   // Keep in sync with schema.ts `poaApplications`.
   `ALTER TABLE "poa_applications" ADD COLUMN IF NOT EXISTS "cbp_reference" text`,
+  // POA production-readiness columns — the CBP-required identity elements, the
+  // e-sign hardening set, and the retention floor. Keep in sync with schema.ts
+  // `poaApplications`.
+  //
+  // SAFETY: each of these is an ADD COLUMN IF NOT EXISTS, which takes an ACCESS
+  // EXCLUSIVE lock BEFORE it evaluates "IF NOT EXISTS" — an idempotent no-op is
+  // exactly as dangerous as a real migration (that is what took prod down on
+  // 2026-08-28). They are safe here ONLY because runSelfHealStatements runs each
+  // one behind the pg_attribute catalog pre-check (so a healed DB never touches
+  // the table lock at all) and under lock_timeout/statement_timeout. Do not add
+  // a DDL statement to this file that bypasses that runner, and do not give any
+  // of these a NOT NULL/DEFAULT that would force a table rewrite.
+  `ALTER TABLE "poa_applications" ADD COLUMN IF NOT EXISTS "dba_names" jsonb`,
+  `ALTER TABLE "poa_applications" ADD COLUMN IF NOT EXISTS "country_of_org" text`,
+  `ALTER TABLE "poa_applications" ADD COLUMN IF NOT EXISTS "residency" text`,
+  `ALTER TABLE "poa_applications" ADD COLUMN IF NOT EXISTS "mailing_address" text`,
+  `ALTER TABLE "poa_applications" ADD COLUMN IF NOT EXISTS "ior_number" text`,
+  `ALTER TABLE "poa_applications" ADD COLUMN IF NOT EXISTS "partner_names" jsonb`,
+  `ALTER TABLE "poa_applications" ADD COLUMN IF NOT EXISTS "signer_phone" text`,
+  `ALTER TABLE "poa_applications" ADD COLUMN IF NOT EXISTS "signer_email_verify_token" text`,
+  `ALTER TABLE "poa_applications" ADD COLUMN IF NOT EXISTS "signer_email_verified_at" timestamp with time zone`,
+  `ALTER TABLE "poa_applications" ADD COLUMN IF NOT EXISTS "cert_signer_name" text`,
+  `ALTER TABLE "poa_applications" ADD COLUMN IF NOT EXISTS "cert_signer_title" text`,
+  `ALTER TABLE "poa_applications" ADD COLUMN IF NOT EXISTS "cert_signer_email" text`,
+  `ALTER TABLE "poa_applications" ADD COLUMN IF NOT EXISTS "authority_docs_note" text`,
+  `ALTER TABLE "poa_applications" ADD COLUMN IF NOT EXISTS "governing_law" text`,
+  `ALTER TABLE "poa_applications" ADD COLUMN IF NOT EXISTS "term_years" integer`,
+  `ALTER TABLE "poa_applications" ADD COLUMN IF NOT EXISTS "consent_at" timestamp with time zone`,
+  `ALTER TABLE "poa_applications" ADD COLUMN IF NOT EXISTS "retain_until" timestamp with time zone`,
   `CREATE TABLE IF NOT EXISTS "poa_audit_events" (
     "id" serial PRIMARY KEY NOT NULL,
     "application_id" integer NOT NULL,

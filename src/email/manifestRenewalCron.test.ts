@@ -1,6 +1,6 @@
 /**
- * Manifest Privacy renewal cron — band selection, T-90/60/30/7 sends, and the
- * per-row double-send guard.
+ * Manifest Privacy renewal cron — band selection, T-180/90/60/30/7 sends, and
+ * the per-row double-send guard.
  */
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { poaApplications } from '../db/schema.js';
@@ -74,12 +74,18 @@ describe('bandFor', () => {
     expect(bandFor(20)).toBe(30);
     expect(bandFor(5)).toBe(7);
   });
-  it('is null outside the 90-day window / after expiry', () => {
-    expect(bandFor(120)).toBeNull();
+  it('reminds at ~18 months into the 2-year term (the T-180 band)', () => {
+    // CBP grants confidentiality for two years, never auto-renews, and sends no
+    // expiry notice — so the customer hears from us six months out.
+    expect(bandFor(170)).toBe(180);
+    expect(bandFor(120)).toBe(180);
+  });
+  it('is null outside the widest window / after expiry', () => {
+    expect(bandFor(200)).toBeNull();
     expect(bandFor(-1)).toBeNull();
   });
-  it('exposes the four bands', () => {
-    expect([...RENEWAL_BANDS]).toEqual([90, 60, 30, 7]);
+  it('exposes the five bands', () => {
+    expect([...RENEWAL_BANDS]).toEqual([180, 90, 60, 30, 7]);
   });
 });
 

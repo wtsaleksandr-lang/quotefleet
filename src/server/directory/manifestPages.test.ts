@@ -27,10 +27,12 @@ const {
   renderAdminPrivacyQueue,
   renderPrivacyAccount,
   renderPrivacyLogin,
+  renderPrivacyVerified,
   statusLabel,
   buildCbpCertText,
   DISCLOSURE_TEXT,
 } = await import('./manifestPages.js');
+const { validatePoaForFiling } = await import('../manifestPoaValidation.js');
 const { MANIFEST_TIERS } = await import('./manifestEntitlement.js');
 type ManifestIdentity = import('./manifestEntitlement.js').ManifestIdentity;
 type PoaApplication = import('../../db/schema.js').PoaApplication;
@@ -147,6 +149,181 @@ describe('admin queue renders without a "Verified" badge on docs', () => {
     const html = renderAdminPrivacyQueue([]);
     expect(html).toContain('CBP filing queue');
     expect(html).toContain('No applications yet.');
+  });
+});
+
+describe('production POA — the onboarding flow collects every CBP-required element', () => {
+  const apply = renderPrivacyApply({ app: null, prefill: {} });
+
+  it('has no DRAFT / attorney-review hedge left anywhere in the customer copy', () => {
+    for (const html of [apply, renderPrivacyLanding(), DISCLOSURE_TEXT]) {
+      expect(lower(html)).not.toContain('attorney review');
+      expect(lower(html)).not.toContain('pending attorney');
+      expect(lower(html)).not.toContain('is a draft');
+      expect(lower(html)).not.toContain('draft pending');
+    }
+  });
+
+  it('captures DBAs, entity type, jurisdiction, residency, physical address, EIN and IOR', () => {
+    for (const id of [
+      'f-legal',
+      'f-entity',
+      'f-state',
+      'f-country',
+      'f-residency',
+      'f-addr',
+      'f-mailaddr',
+      'f-ein',
+      'f-ior',
+    ]) {
+      expect(apply, `missing field ${id}`).toContain(`id="${id}"`);
+    }
+    expect(apply).toContain('data-chips="dba"');
+    expect(apply).toContain('data-chips="partner"');
+    // The physical-address rule is stated to the customer, not just enforced.
+    expect(lower(apply)).toContain('physical street address');
+    expect(lower(apply)).toContain('rejects po boxes');
+  });
+
+  it('captures the signer title, business email and phone, and the corporate certification', () => {
+    for (const id of ['f-signer', 'f-title', 'f-email', 'f-phone', 'f-certname', 'f-certtitle', 'f-certemail']) {
+      expect(apply, `missing field ${id}`).toContain(`id="${id}"`);
+    }
+    // The allowlist is embedded so the client can offer the accepted titles and
+    // reveal the certification block when the typed title is off-list.
+    expect(apply).toContain('"titleAllowlist"');
+    expect(apply).toContain('general partner');
+    expect(apply).toContain('Corporate certification (second officer)');
+  });
+
+  it('shows the partnership and nonresident-corporation conditional blocks', () => {
+    expect(apply).toContain('id="f-partners-wrap"');
+    expect(apply).toContain('19 CFR 141.39');
+    expect(apply).toContain('19 CFR 141.34');
+    expect(apply).toContain('id="f-nonres-note"');
+    expect(apply).toContain('19 CFR 141.37');
+    expect(apply).toContain('id="f-authdocs"');
+  });
+
+  it('states the e-sign hardening promises: audit trail, retention, governing law', () => {
+    expect(lower(apply)).toContain('sha-256');
+    expect(lower(apply)).toContain('audit trail');
+    expect(apply).toContain('at least 5 years');
+    expect(apply).toContain('State of Delaware');
+    // The email round-trip is disclosed as a blocking step, honestly.
+    expect(lower(apply)).toContain('confirmation link');
+    expect(apply).toContain('id="mcp-verify-note"');
+  });
+
+  it('the disclosure carries the express no-customs-business exclusion and the exact-match warning', () => {
+    expect(lower(DISCLOSURE_TEXT)).toContain('no authority to transact customs business');
+    expect(lower(DISCLOSURE_TEXT)).toContain('form 5106');
+    expect(lower(DISCLOSURE_TEXT)).toContain('does not act as your customs broker');
+    expect(lower(DISCLOSURE_TEXT)).toContain('exactly');
+    expect(lower(DISCLOSURE_TEXT)).not.toContain('cbp api');
+    // Never marketed as brokerage anywhere.
+    expect(lower(renderPrivacyLanding())).not.toContain('customs broker');
+  });
+});
+
+describe('admin queue — the pre-filing gate is rendered as a per-application checklist', () => {
+  const gateApp = poa({
+    entityType: 'Limited Liability Company (LLC)',
+    stateOfOrg: 'Delaware',
+    grantorAddress: 'PO Box 4120, Long Beach, CA',
+    einOrImporterNo: '12-3456789',
+    signerName: 'Jane Doe',
+    signerTitle: 'Manager',
+    signerEmail: 'jane@acme.test',
+    signerPhone: '+1 562 555 0142',
+    signerEmailVerifiedAt: null,
+  });
+
+  it('lists each check with pass/fail and a blocking count', () => {
+    const gate = validatePoaForFiling(gateApp);
+    const html = renderAdminPrivacyQueue([{ app: gateApp, events: [], gate }]);
+    expect(html).toContain('Pre-filing checks');
+    expect(html).toContain('blocking');
+    // The PO box and the unverified email are both surfaced by name.
+    expect(html).toContain('Physical address (no PO box)');
+    expect(html).toContain('Signer email round-trip verified');
+    expect(html).toContain('Legal name matches ACE exactly');
+    expect(html).toContain('Schedule A has at least one name variation');
+  });
+
+  it('says "Ready to file" only when every blocking check passes', () => {
+    const good = poa({
+      entityType: 'Limited Liability Company (LLC)',
+      stateOfOrg: 'Delaware',
+      grantorAddress: '123 Harbor Way, Long Beach, CA 90802',
+      einOrImporterNo: '12-3456789',
+      signerName: 'Jane Doe',
+      signerTitle: 'Manager',
+      signerEmail: 'jane@acme.test',
+      signerPhone: '+1 562 555 0142',
+      signerEmailVerifiedAt: new Date('2026-01-02'),
+    });
+    const html = renderAdminPrivacyQueue([{ app: good, events: [], gate: validatePoaForFiling(good) }]);
+    expect(html).toContain('Ready to file');
+  });
+
+  it('gives the operator view / print / download of the executed PDF and the CBP text', () => {
+    const html = renderAdminPrivacyQueue([{ app: gateApp, events: [], gate: validatePoaForFiling(gateApp) }]);
+    expect(html).toContain('/api/privacy/application/tok_abc/pdf');
+    expect(html).toContain('data-print="/api/privacy/application/tok_abc/pdf"');
+    expect(html).toContain('download="poa-tok_abc.pdf"');
+    expect(html).toContain('Copy CBP text');
+    expect(html).toContain('Record submission');
+  });
+
+  it('shows renewal timing — CBP does not auto-renew', () => {
+    const html = renderAdminPrivacyQueue([{ app: gateApp, events: [], gate: validatePoaForFiling(gateApp) }]);
+    expect(html).toContain('CBP does not auto-renew');
+    expect(html).toContain('60–90 days before expiry');
+  });
+});
+
+describe('buildCbpCertText — carries the full identity set the importer certifies', () => {
+  it('includes DBAs, jurisdiction, physical address, partners and the signer', () => {
+    const text = buildCbpCertText(
+      poa({
+        dbaNames: ['Acme Freight'],
+        entityType: 'Partnership',
+        stateOfOrg: 'Delaware',
+        countryOfOrg: 'United States',
+        residency: 'resident',
+        grantorAddress: '123 Harbor Way, Long Beach, CA 90802',
+        einOrImporterNo: '12-3456789',
+        iorNumber: 'IOR-99887',
+        partnerNames: ['Dana Vine', 'Marcus Harbor'],
+        signerName: 'Jane Doe',
+        signerTitle: 'General Partner',
+      }),
+    );
+    expect(text).toContain('Acme Freight');
+    expect(text).toContain('Delaware, United States');
+    expect(text).toContain('IOR-99887');
+    expect(text).toContain('Dana Vine; Marcus Harbor');
+    expect(text).toContain('Jane Doe, General Partner');
+    // The IMPORTER certifies; we transmit. That posture must survive in the text.
+    expect(text).toContain('The importer/consignee named above certifies');
+    expect(text).toContain('its authorized agent and attorney under 19 CFR 103.31(d)');
+    expect(lower(text)).not.toContain('cbp api');
+  });
+});
+
+describe('renderPrivacyVerified — the email round-trip landing page', () => {
+  it('confirms success and links back to the request', () => {
+    const html = renderPrivacyVerified({ ok: true, token: 'tok_abc', email: 'jane@acme.test' });
+    expect(html).toContain('Email confirmed');
+    expect(html).toContain('/privacy/apply/tok_abc');
+    expect(lower(html)).toContain('on your behalf');
+    expect(lower(html)).not.toContain('cbp api');
+  });
+  it('degrades honestly on an expired/used link — nothing is lost', () => {
+    const html = renderPrivacyVerified({ ok: false, token: null, email: null });
+    expect(html).toContain('This link has expired');
+    expect(lower(html)).toContain('nothing has been filed');
   });
 });
 

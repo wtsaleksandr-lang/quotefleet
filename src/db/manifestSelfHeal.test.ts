@@ -43,11 +43,68 @@ describe('ensureSelfHealTables — Manifest Privacy tables', () => {
     }
   });
 
+  it('the production-POA columns are healed both in CREATE TABLE and as ADD COLUMN', () => {
+    // Every CBP-required identity element, the e-sign hardening set, and the
+    // retention floor. Present in the CREATE (fresh DB / phantom-drop recreate)
+    // AND as an ADD COLUMN (an existing table healed in place).
+    const cols = [
+      'dba_names',
+      'country_of_org',
+      'residency',
+      'mailing_address',
+      'ior_number',
+      'partner_names',
+      'signer_phone',
+      'signer_email_verify_token',
+      'signer_email_verified_at',
+      'cert_signer_name',
+      'cert_signer_title',
+      'cert_signer_email',
+      'authority_docs_note',
+      'governing_law',
+      'term_years',
+      'consent_at',
+      'retain_until',
+    ];
+    for (const c of cols) {
+      expect(sql, `CREATE TABLE missing ${c}`).toContain(`"${c}"`);
+      expect(sql, `ADD COLUMN missing ${c}`).toContain(
+        `ALTER TABLE "poa_applications" ADD COLUMN IF NOT EXISTS "${c}"`,
+      );
+    }
+  });
+
+  it('no POA ADD COLUMN carries NOT NULL or DEFAULT (a table rewrite under ACCESS EXCLUSIVE)', () => {
+    // The 2026-08-28 outage: ADD COLUMN takes ACCESS EXCLUSIVE *before* it
+    // evaluates IF NOT EXISTS. runSelfHealStatements' catalog pre-check keeps a
+    // healed DB from touching the lock at all — but a first-run statement still
+    // takes it, so it must be an O(1) catalog-only change, never a rewrite.
+    const poaAlters = SELF_HEAL_TABLE_STATEMENTS.filter((s) =>
+      /^ALTER TABLE "poa_applications" ADD COLUMN/.test(s.trim()),
+    );
+    expect(poaAlters.length).toBeGreaterThanOrEqual(17);
+    for (const s of poaAlters) {
+      expect(s, s).not.toMatch(/NOT NULL/i);
+      expect(s, s).not.toMatch(/DEFAULT/i);
+    }
+  });
+
   it('every statement is idempotent (IF NOT EXISTS)', () => {
     const manifestStmts = SELF_HEAL_TABLE_STATEMENTS.filter(
       (s) => /manifest_|poa_/.test(s),
     );
     expect(manifestStmts.length).toBeGreaterThanOrEqual(11);
     for (const s of manifestStmts) expect(s).toMatch(/IF NOT EXISTS/);
+  });
+
+  it('every POA self-heal statement is recognized by the catalog pre-check (PR #442)', async () => {
+    // If selfHealTarget() returns null the statement runs WITHOUT the cheap
+    // pg_attribute probe — i.e. it grabs the table lock on every single boot.
+    // That is exactly the shape that caused the outage, so assert none of ours
+    // is unrecognized.
+    const { selfHealTarget } = await import('./migrate.js');
+    for (const s of SELF_HEAL_TABLE_STATEMENTS.filter((x) => /poa_applications/.test(x))) {
+      expect(selfHealTarget(s), s.slice(0, 80)).not.toBeNull();
+    }
   });
 });
