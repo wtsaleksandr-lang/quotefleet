@@ -16,7 +16,7 @@
  * server-side.
  */
 
-import { releaseBody } from '../../http/responseBody.js';
+import { releaseBody, exchangeTimeoutSignal } from '../../http/responseBody.js';
 
 const QC_BASE = 'https://mobile.fmcsa.dot.gov/qc/services/carriers';
 const DEFAULT_TIMEOUT_MS = 8_000;
@@ -57,19 +57,24 @@ const num = (v: unknown): number | null => {
 
 /** Timeout-bounded fetch that never throws; returns parsed JSON or null. */
 async function safeJson(fetchFn: typeof fetch, url: string, timeoutMs: number): Promise<unknown | null> {
-  const controller = new AbortController();
-  const timer = setTimeout(() => controller.abort(), timeoutMs);
+  // Hoisted so the catch can release a body whose read failed part-way.
+  let res: Response | undefined;
   try {
-    const res = await fetchFn(url, { redirect: 'follow', signal: controller.signal, headers: { Accept: 'application/json' } });
+    // exchangeTimeoutSignal stays armed through `res.json()` below — a manual
+    // controller cleared in `finally` would disarm the moment headers landed.
+    res = await fetchFn(url, {
+      redirect: 'follow',
+      signal: exchangeTimeoutSignal(timeoutMs),
+      headers: { Accept: 'application/json' },
+    });
     if (!res.ok) {
       releaseBody(res); // free the socket — body is never read on the error path
       return null;
     }
     return await res.json();
   } catch {
+    releaseBody(res); // malformed JSON / aborted mid-body — free the socket
     return null;
-  } finally {
-    clearTimeout(timer);
   }
 }
 

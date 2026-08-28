@@ -12,6 +12,10 @@
  */
 import { loadEnv } from '../config.js';
 import nodemailer from 'nodemailer';
+import { exchangeTimeoutSignal } from '../http/responseBody.js';
+
+/** Deadline for the Resend HTTP call — headers AND body. */
+const RESEND_TIMEOUT_MS = 20_000;
 
 let cachedTransport: ReturnType<typeof nodemailer.createTransport> | null = null;
 
@@ -264,6 +268,10 @@ export async function sendEmail(msg: EmailIn): Promise<EmailOut> {
               }
             : {}),
         }),
+        // Bounded end-to-end: sendEmail is called once per row inside the
+        // lifecycle / dunning / follow-up / digest cron loops, so an unbounded
+        // Resend call accumulates one pinned socket per attempt.
+        signal: exchangeTimeoutSignal(RESEND_TIMEOUT_MS),
       });
       if (!r.ok) {
         const body = await r.text();

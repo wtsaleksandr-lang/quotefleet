@@ -16,6 +16,7 @@
  * Smartlead API docs: https://api.smartlead.ai/reference/
  */
 import type { OutreachProspect } from '../db/schema.js';
+import { exchangeTimeoutSignal } from '../http/responseBody.js';
 
 export interface SmartleadConfig {
   /** API key from Smartlead → Settings → API. */
@@ -52,6 +53,9 @@ function smartleadConfigFromEnv(): SmartleadConfig | null {
   };
 }
 
+/** Per-Smartlead-call deadline, covering headers AND the body read. */
+const SMARTLEAD_TIMEOUT_MS = 20_000;
+
 async function smartleadFetch<T>(
   cfg: SmartleadConfig,
   path: string,
@@ -65,6 +69,9 @@ async function smartleadFetch<T>(
       'Content-Type': 'application/json',
       ...(init.headers ?? {}),
     },
+    // Whole-exchange deadline: getCampaignStats is documented as a ~10-minute
+    // cron caller, and a recurring unbounded call is the classic accumulator.
+    signal: exchangeTimeoutSignal(SMARTLEAD_TIMEOUT_MS, init.signal),
   });
   if (!res.ok) {
     const body = await res.text();

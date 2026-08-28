@@ -550,6 +550,11 @@ async function resolveApiKey(tenantId: number): Promise<string> {
   return env.ANTHROPIC_API_KEY;
 }
 
+/** Per-call timeout for rate-sheet ingest. The Anthropic SDK's default is 10
+ *  minutes; that is long enough for a hung upstream to hold an inbound handler
+ *  and its socket open indefinitely under repeated uploads. */
+const INGEST_TIMEOUT_MS = 120_000;
+
 export async function parseRateSheet(opts: {
   tenantId: number;
   filename: string;
@@ -559,7 +564,11 @@ export async function parseRateSheet(opts: {
   const mt = opts.mimeType.toLowerCase();
 
   const apiKey = await resolveApiKey(opts.tenantId);
-  const client = new Anthropic({ apiKey });
+  // Explicit timeout for the same reason ai/client.ts sets one: the SDK default
+  // is 10 MINUTES, and a hung request holds the inbound Express socket plus its
+  // outbound socket for that whole window. Rate-sheet parsing is a big document
+  // upload, so it gets a longer budget than the 30s chat path.
+  const client = new Anthropic({ apiKey, timeout: INGEST_TIMEOUT_MS });
 
   // Sonnet for ingest — extracting structured data from a busy rate
   // sheet wants more precision than Haiku.

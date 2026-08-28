@@ -57,7 +57,7 @@ import { resolveWidgetTheme, WIDGET_PRESETS } from '../widgetThemes.js';
 import { resolveQuoteDisclaimer } from '../quoteDisclaimer.js';
 import { loadCarrierProfile } from './carrierProfile.js';
 import { enforceTenantAccess } from '../access.js';
-import { releaseBody } from '../../http/responseBody.js';
+import { releaseBody, exchangeTimeoutSignal } from '../../http/responseBody.js';
 import { resolveFeatures, resolveBookingConfig, computeDeposit } from '../features.js';
 import {
   tenantCanCharge,
@@ -66,6 +66,11 @@ import {
   depositStripe,
   type DepositState,
 } from './depositCharge.js';
+
+/** How long the Static Maps image proxies wait on Google — headers AND body.
+ *  Matches the map fetch budget in quoteMap.ts; the map is a nicety, so a slow
+ *  upstream must degrade to a 502 rather than hold a socket open. */
+const MAP_PROXY_TIMEOUT_MS = 4500;
 
 /** Returns true if the request's Origin/Referer host matches the
  *  tenant's brand_configs.allowed_domains (CSV). Empty list = wide open
@@ -738,7 +743,12 @@ export function registerPublicRoutes(app: Express) {
     const key = loadEnv().GOOGLE_MAPS_API_KEY;
     if (!key) return res.status(404).end();
     try {
-      const img = await fetch(buildBaseMapUrl(key, theme, mapStyle, zoom, center, scale));
+      // Timeout covers headers AND the body read — a Static Maps host that
+      // answers headers then stalls its bytes would otherwise pin one socket
+      // per request on this public, unauthenticated endpoint.
+      const img = await fetch(buildBaseMapUrl(key, theme, mapStyle, zoom, center, scale), {
+        signal: exchangeTimeoutSignal(MAP_PROXY_TIMEOUT_MS),
+      });
       if (!img.ok) {
         releaseBody(img); // free the socket — bytes are never read on the error path
         return res.status(502).end();
@@ -770,7 +780,7 @@ export function registerPublicRoutes(app: Express) {
     const rm = peekRouteMap(`${lane}|${theme}|${mapStyle}`);
     if (!rm) return res.status(404).end();
     try {
-      const img = await fetch(rm.url);
+      const img = await fetch(rm.url, { signal: exchangeTimeoutSignal(MAP_PROXY_TIMEOUT_MS) });
       if (!img.ok) {
         releaseBody(img); // free the socket — bytes are never read on the error path
         return res.status(502).end();

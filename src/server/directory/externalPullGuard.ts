@@ -49,10 +49,12 @@
  * ledger) so spend is auditable in admin instead of invisible in console output.
  */
 
+import { exchangeTimeoutSignal } from '../../http/responseBody.js';
+
 /** Paid providers behind the guard. */
 export type ExternalProvider = 'importyeti' | 'hunter' | 'anthropic';
 
-/** Per-external-call timeout in ms (AbortController). */
+/** Per-external-call timeout in ms — covers headers AND the body read. */
 export const EXTERNAL_TIMEOUT_MS = 12_000;
 
 /** Per-provider explicit override env var. */
@@ -282,20 +284,26 @@ export function reportProviderCost(
 // ── the choke point ──────────────────────────────────────────────────────────
 /**
  * Timeout wrapper — every external call goes through here so a hung provider
- * trips an AbortError instead of holding the request open indefinitely.
+ * trips a TimeoutError instead of holding the request open indefinitely.
+ * (Callers treat any rejection alike; none branch on the error name.)
+ *
+ * The timeout MUST cover the body read, not just the headers. This wrapper
+ * returns the Response for the caller to consume (`await r.json()` /
+ * `await r.text()` in importerLeads.ts, including inside its 4-attempt retry
+ * loop), so a manual AbortController cleared in a `finally` here would be
+ * disarmed before a single body byte was read — and a provider that answers
+ * headers then stalls its body would pin one socket per call, unreclaimable by
+ * GC. `exchangeTimeoutSignal` stays armed for the whole exchange.
  */
-export async function fetchWithTimeout(
+export function fetchWithTimeout(
   url: string,
   init: RequestInit = {},
   timeoutMs = EXTERNAL_TIMEOUT_MS,
 ): Promise<Response> {
-  const ctrl = new AbortController();
-  const timer = setTimeout(() => ctrl.abort(), timeoutMs);
-  try {
-    return await fetch(url, { ...init, signal: ctrl.signal });
-  } finally {
-    clearTimeout(timer);
-  }
+  return fetch(url, {
+    ...init,
+    signal: exchangeTimeoutSignal(timeoutMs, init.signal),
+  });
 }
 
 /**

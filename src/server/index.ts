@@ -160,7 +160,7 @@ async function main() {
   // Bind the port before any optional database work so the service becomes
   // reachable as soon as Express is constructed.
   const app = createApp();
-  app.listen(env.PORT, env.HOST, () => {
+  const server = app.listen(env.PORT, env.HOST, () => {
     // The server is now serving traffic. Flip the boot-vs-serving gate BEFORE any
     // background work starts so that from here on an uncaughtException escaping a
     // background path is SURVIVED (see the process.on('uncaughtException') guard
@@ -175,6 +175,39 @@ async function main() {
     // listen; the guard above must swallow it and /healthz must stay 200.
     maybeScheduleCrashProofSelfTest();
   });
+
+  // ── INBOUND SOCKET BACKSTOP ────────────────────────────────────────────────
+  // The listener's return value used to be discarded, so none of these was ever
+  // set. Node's keepAlive default (5s) is already safe, but `requestTimeout`
+  // (5 min) and an unbounded `maxConnections` mean a slow-loris / stalled-body
+  // client can hold FDs for minutes with no ceiling. These are a BACKSTOP, not
+  // the leak fix (that is the whole-exchange fetch deadlines) — they cap how
+  // much damage any single inbound stall can do.
+  //
+  // headersTimeout MUST stay > keepAliveTimeout, else a keep-alive socket that
+  // is reused just as it expires races and drops a legitimate request.
+  server.keepAliveTimeout = 15_000;
+  server.headersTimeout = 20_000;
+  server.requestTimeout = 60_000;
+  // Well under a typical container's 1024-FD limit, leaving ample headroom for
+  // the DB pool + outbound sockets. Past the cap Node stops accepting (and the
+  // edge retries) instead of the process running out of descriptors entirely.
+  server.maxConnections = 512;
+
+  // Close the listener on a redeploy signal so in-flight requests drain and
+  // sockets are released cleanly rather than being severed by process exit.
+  for (const sig of ['SIGTERM', 'SIGINT'] as const) {
+    process.on(sig, () => {
+      console.log(`[server] ${sig} received — closing listener and draining.`);
+      server.close(() => process.exit(0));
+      // Idle keep-alive sockets have no request in flight, so hang them up at
+      // once — otherwise `close()` waits out keepAliveTimeout on every one and
+      // a routine redeploy stalls for no reason.
+      server.closeIdleConnections?.();
+      // Don't hang forever on a genuinely stuck request.
+      setTimeout(() => process.exit(0), 10_000).unref();
+    });
+  }
 }
 
 main().catch((err) => {

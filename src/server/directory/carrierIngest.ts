@@ -41,6 +41,7 @@ import { carrierDirectory, type CarrierDirectoryRow } from '../../db/schema.js';
 import { nearestPortForZip, nearestCaPortForProvince } from './containerPorts.js';
 import { US_STATE_CODES } from './usStates.js';
 import { CA_PROVINCE_CODES } from './caProvinces.js';
+import { exchangeTimeoutSignal } from '../../http/responseBody.js';
 
 // ─── Socrata sources ──────────────────────────────────────────────────────
 const SOCRATA_BASE = 'https://data.transportation.gov/resource';
@@ -573,10 +574,19 @@ export const dbCarrierStore: CarrierStore = {
 };
 
 // ─── Network (Socrata JSON API) ───────────────────────────────────────────
+/** Per-Socrata-call deadline, covering headers AND the body read. */
+const SOCRATA_TIMEOUT_MS = 60_000;
+
 async function socrataJson<T>(resource: string, params: Record<string, string>): Promise<T[]> {
   const qs = new URLSearchParams(params).toString();
   const url = `${SOCRATA_BASE}/${resource}.json?${qs}`;
-  const res = await fetch(url, { headers: { 'User-Agent': FETCH_UA, Accept: 'application/json' } });
+  // Whole-exchange deadline. This is the ONLY network primitive behind the
+  // ~1,700-call full-directory ingest loop; without it a hung Socrata pins one
+  // socket per call, permanently.
+  const res = await fetch(url, {
+    headers: { 'User-Agent': FETCH_UA, Accept: 'application/json' },
+    signal: exchangeTimeoutSignal(SOCRATA_TIMEOUT_MS),
+  });
   if (!res.ok) throw new Error(`Socrata ${resource} ${res.status}: ${await res.text().catch(() => '')}`);
   return (await res.json()) as T[];
 }

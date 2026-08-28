@@ -19,6 +19,7 @@
  * Everything external is injectable (the Places lookup fn, the freemail/aggregator
  * sets, the cache) so tests stay fully offline.
  */
+import { exchangeTimeoutSignal } from '../../http/responseBody.js';
 import { normalizeDomain } from './enrichCompany.js';
 
 export type DomainSource = 'email' | 'places' | 'none';
@@ -107,6 +108,11 @@ export function isAggregator(domain: string, aggregators: ReadonlySet<string> = 
   return aggregators.has(d) || aggregators.has(apexOf(d));
 }
 
+/** How long a Places call may take, headers AND body. These run per-lead in
+ *  enrichment batches; without a deadline a stalled Google response pins one
+ *  socket per call for the process's lifetime. */
+const PLACES_TIMEOUT_MS = 10_000;
+
 /** A syntactically-plausible apex (has a dot + a 2+ char TLD). */
 function looksLikeDomain(domain: string): boolean {
   return /^[a-z0-9.-]+\.[a-z]{2,}$/i.test(domain);
@@ -123,6 +129,7 @@ async function newPlacesSearch(query: string, apiKey: string, fetchFn: typeof fe
       'X-Goog-FieldMask': 'places.websiteUri,places.displayName,places.id',
     },
     body: JSON.stringify({ textQuery: query, maxResultCount: 1, regionCode: 'US' }),
+    signal: exchangeTimeoutSignal(PLACES_TIMEOUT_MS),
   });
   if (!res.ok) {
     const body = await res.text().catch(() => '');
@@ -147,7 +154,7 @@ async function legacyFindPlace(query: string, apiKey: string, fetchFn: typeof fe
   findUrl.searchParams.set('inputtype', 'textquery');
   findUrl.searchParams.set('fields', 'place_id');
   findUrl.searchParams.set('key', apiKey);
-  const findRes = await fetchFn(findUrl);
+  const findRes = await fetchFn(findUrl, { signal: exchangeTimeoutSignal(PLACES_TIMEOUT_MS) });
   if (!findRes.ok) throw new PlacesError(findRes.status, await findRes.text().catch(() => ''));
   const findData = (await findRes.json()) as {
     status: string;
@@ -164,7 +171,7 @@ async function legacyFindPlace(query: string, apiKey: string, fetchFn: typeof fe
   detUrl.searchParams.set('place_id', placeId);
   detUrl.searchParams.set('fields', 'website');
   detUrl.searchParams.set('key', apiKey);
-  const detRes = await fetchFn(detUrl);
+  const detRes = await fetchFn(detUrl, { signal: exchangeTimeoutSignal(PLACES_TIMEOUT_MS) });
   if (!detRes.ok) throw new PlacesError(detRes.status, await detRes.text().catch(() => ''));
   const detData = (await detRes.json()) as {
     status: string;
