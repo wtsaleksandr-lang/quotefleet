@@ -8,12 +8,27 @@
  *   GET /privacy/apply[...]  → renderPrivacyApply    (stepped onboarding flow)
  *   GET /admin/privacy       → renderAdminPrivacyQueue (super-admin filing queue)
  *
- * HONEST-CLAIMS enforced in copy throughout:
+ * EMPHASIS RULE (Alex, 2026-08 — this page starts SELLING on the next deploy):
+ * lead with what the customer is actually buying, which is the CBP filing. It
+ * suppresses their company name and address from U.S. Customs' PUBLIC
+ * vessel-manifest records — the records ImportYeti / Panjiva / ImportGenius are
+ * built from — for all FUTURE shipments. The QuoteFleet redaction is the
+ * secondary, immediate benefit while CBP processes, NOT the product. The old
+ * copy led with the disclaimer and read as "we hide you on QuoteFleet, and
+ * something about CBP", which undersold the thing being sold. Every surface that
+ * describes this (landing, plan cards + tier bullets, onboarding steps, the
+ * Done/status screen, the importer-profile "Hide my data" CTA) states the CBP
+ * suppression first and the not-retroactive limit plainly — BEFORE payment.
+ *
+ * HONEST-CLAIMS enforced in copy throughout (load-bearing — never soften these,
+ * the emphasis fix above is about clarity, not accuracy):
  *   • "We prepare and submit your request to CBP on your behalf" — never an automated CBP API claim.
+ *   • NOT RETROACTIVE, said plainly: shipments already published stay published.
  *   • Status vocabulary Draft → Signed → Submitted → Confirmed → Active → Renewal
  *     due; never "Hidden/Protected" before CBP confirms.
  *   • Redaction described as "Hidden on QuoteFleet" (≠ removal from the CBP feed).
  *   • Uploaded docs are "on file" / "self-reported" — never "Verified".
+ *   • Never described as customs brokerage (protects the non-broker posture).
  */
 import { layout, esc } from './pages.js';
 import {
@@ -248,9 +263,10 @@ export function renderPrivacyLanding(): string {
   <style>${MCP_CSS}</style>
   <main class="mcp-wrap">
     <p class="mcp-eyebrow">Manifest Privacy</p>
-    <h1 class="mcp-h1">Hide your shipment data from competitors</h1>
-    <p class="mcp-sub">Your ocean imports are public in U.S. Customs vessel-manifest data — visible to competitors on trackers like ImportYeti and Panjiva. Manifest Privacy prepares and submits a confidentiality request to CBP on your behalf, and hides your company on QuoteFleet.</p>
-    <p class="mcp-sub">CBP protection lasts 2 years and CBP won’t remind you when it lapses — we watch the clock and refile before it expires, so your data never quietly goes public again.</p>
+    <h1 class="mcp-h1">Keep your future shipments out of public customs records</h1>
+    <p class="mcp-sub">Every ocean import you make is published in U.S. Customs vessel-manifest data — the public feed that ImportYeti, Panjiva, ImportGenius and the rest of the trade-data industry are built from. We prepare and submit a confidentiality request to CBP on your behalf under 19 CFR 103.31(d). Once it is on file, CBP suppresses your company name and address on those manifest records for all of your future shipments, so new shipments stop showing up on the sites your competitors search.</p>
+    <div class="mcp-note"><b>It is not retroactive — and you should know that before you pay, not after.</b> Shipments already published stay in the historical record. The filing suppresses records going forward; it does not delete the ones already out there.</div>
+    <p class="mcp-sub">We also hide your company on QuoteFleet the moment you subscribe, while CBP works through the filing. That part is immediate — but it only covers QuoteFleet. The CBP filing is what reaches everyone else. Protection then runs 2 years, and CBP sends no expiry reminder, so we track the clock and refile before it lapses.</p>
     <div class="mcp-actions">
       <a class="mcp-btn primary" href="/privacy/apply">Start my request <span class="arr">&rarr;</span></a>
       <a class="mcp-btn" href="/importers">Find my company first</a>
@@ -262,25 +278,25 @@ export function renderPrivacyLanding(): string {
       <ul class="mcp-timeline">
         <li class="mcp-tl done"><span class="dot"></span><div><div class="tl-t">1. Tell us who to protect</div><div class="tl-d">Your legal entity plus every name and address variation on your bills of lading.</div></div></li>
         <li class="mcp-tl done"><span class="dot"></span><div><div class="tl-t">2. E-sign a limited authorization</div><div class="tl-d">A scope-restricted Power of Attorney for the confidentiality filing only — signed online (ESIGN/UETA).</div></div></li>
-        <li class="mcp-tl done"><span class="dot"></span><div><div class="tl-t">3. We prepare &amp; submit to CBP on your behalf</div><div class="tl-d">A human specialist files your request through CBP’s official channels — we do the filing for you.</div></div></li>
-        <li class="mcp-tl done"><span class="dot"></span><div><div class="tl-t">4. Confirmed &amp; tracked for 2 years</div><div class="tl-d">Once CBP confirms, we hide you on QuoteFleet and track your 2-year renewal so protection never lapses.</div></div></li>
+        <li class="mcp-tl done"><span class="dot"></span><div><div class="tl-t">3. We prepare &amp; submit to CBP on your behalf</div><div class="tl-d">A human specialist files your request through CBP’s official channels — there is no automated connection to CBP, so we do the filing for you.</div></div></li>
+        <li class="mcp-tl done"><span class="dot"></span><div><div class="tl-t">4. Confirmed &amp; tracked for 2 years</div><div class="tl-d">Once CBP confirms, your future shipments stop appearing in the public manifest records the trade-data sites pull from. We hide you on QuoteFleet and track your 2-year renewal so protection never lapses.</div></div></li>
       </ul>
     </div>
 
     <div class="mcp-card">
       <h2>Plans</h2>
-      <p class="mcp-steplead">Annual — includes managed filing and 2-year renewal tracking.</p>
+      <p class="mcp-steplead">Annual. Every plan includes the CBP confidentiality filing prepared and submitted for you, immediate redaction on QuoteFleet, and 2-year renewal tracking.</p>
       <div class="mcp-plans">
         ${MANIFEST_TIERS.map((t) => planCard(t, 'landing')).join('')}
       </div>
     </div>
 
-    <p class="mcp-honest"><b>How we describe this, honestly:</b> We prepare and submit your request to CBP on your behalf — QuoteFleet is not CBP and has no automated filing connection to it. Being “Hidden on QuoteFleet” is not the same as removal from CBP’s feed; the CBP filing is what removes your future shipments from third-party trackers (it is not retroactive). Uploaded documents are kept on file and treated as self-reported, not as an independent verification.</p>
+    <p class="mcp-honest"><b>How we describe this, honestly:</b> The CBP filing is the product — it is what stops your future shipments appearing on third-party trade-data trackers, and it is not retroactive: shipments already published stay in the historical record. We prepare and submit that request to CBP on your behalf; QuoteFleet is not CBP and has no automated filing connection to it, so a person files it through CBP’s official channels. Being “Hidden on QuoteFleet” is the immediate part, and is not the same as removal from CBP’s feed. Uploaded documents are kept on file and treated as self-reported, not as an independent verification.</p>
   </main>`;
   return layout({
-    title: 'Manifest Privacy — Hide Your Shipment Data | QuoteFleet',
+    title: 'Manifest Privacy — Keep Shipments Out of Public Customs Records | QuoteFleet',
     description:
-      'Managed U.S. Customs vessel manifest confidentiality (19 CFR 103.31(d)). We prepare and submit your CBP confidentiality request on your behalf and hide your company on QuoteFleet. Annual plans from $79.',
+      'Managed U.S. Customs vessel manifest confidentiality (19 CFR 103.31(d)). We prepare and submit your CBP confidentiality request on your behalf, so your future shipments stop appearing in the public manifest records ImportYeti and Panjiva are built from. Not retroactive. Annual plans from $79.',
     canonicalPath: '/manifest-privacy',
     bodyHtml: body,
   });
@@ -340,7 +356,7 @@ export function renderPrivacyApply(opts: {
     <a class="mcp-back" href="/manifest-privacy">&larr; Manifest Privacy</a>
     <p class="mcp-eyebrow">Manifest Privacy</p>
     <h1 class="mcp-h1">Hide my shipment data</h1>
-    <p class="mcp-sub">Fully online. Build your request, sign it, and we prepare and submit it to U.S. Customs on your behalf.</p>
+    <p class="mcp-sub">Fully online. Build your request, sign it, and we prepare and submit it to U.S. Customs on your behalf — so CBP suppresses your company name and address on the public manifest records for your future shipments. It is not retroactive: shipments already published stay in the historical record. We hide you on QuoteFleet right away while CBP processes the filing.</p>
 
     <div class="mcp-steps" id="mcp-stepper">
       ${steps.map((s, i) => `<div class="mcp-step${i === 0 ? ' active' : ''}" data-step="${i}"><span class="n">${i + 1}</span>${esc(s)}</div>`).join('')}
@@ -453,7 +469,7 @@ export function renderPrivacyApply(opts: {
     <!-- Step 4 -->
     <section class="mcp-card" data-panel="3" hidden>
       <h2>Choose your plan</h2>
-      <p class="mcp-steplead">Managed filing plus 2-year renewal tracking. Your signed authorization is saved — pick a plan to have us submit it to CBP.</p>
+      <p class="mcp-steplead">Your signed authorization is saved. Pick a plan and we submit it to CBP, which suppresses your company on the public manifest records for your future shipments — not the ones already published — plus immediate redaction on QuoteFleet and 2-year renewal tracking.</p>
       <div class="mcp-plans">${MANIFEST_TIERS.map((t) => planCard(t, 'flow')).join('')}</div>
       <div class="mcp-actions"><button type="button" class="mcp-btn" data-prev="2">Back</button><button type="button" class="mcp-btn" data-next="4">I’ll decide later</button></div>
       <p class="mcp-msg" data-msg="3"></p>
@@ -470,7 +486,7 @@ export function renderPrivacyApply(opts: {
         <a class="mcp-btn" id="mcp-account-link" href="/privacy/account">View my account</a>
         <a class="mcp-btn" href="/manifest-privacy">Done</a>
       </div>
-      <p class="mcp-honest" id="mcp-done-next"><b>What happens next:</b> We prepare and submit your request to CBP on your behalf (a human files it through CBP’s official channels). Your status stays honest — you’ll see Submitted, then Confirmed, then Active. We’ll track your 2-year renewal and refile before it lapses.</p>
+      <p class="mcp-honest" id="mcp-done-next"><b>What happens next:</b> We prepare and submit your request to CBP on your behalf (a human files it through CBP’s official channels). Once CBP has it on file, your company name and address are suppressed on the public manifest records for your future shipments — not for shipments already published. Your status stays honest — you’ll see Submitted, then Confirmed, then Active. We’ll track your 2-year renewal and refile before it lapses.</p>
       <p class="mcp-msg" data-msg="4"></p>
     </section>
   </main>
@@ -679,16 +695,16 @@ const FLOW_JS = `
     var nx=$('#mcp-done-next');
     if(nx){
       if(S.isSubscriber){
-        nx.innerHTML='<b>What happens next:</b> We prepare and submit your request to CBP on your behalf (a human files it through CBP\\u2019s official channels). Your status stays honest \\u2014 you\\u2019ll see Submitted, then Confirmed, then Active. We\\u2019ll track your 2-year renewal and refile before it lapses.';
+        nx.innerHTML='<b>What happens next:</b> We prepare and submit your request to CBP on your behalf (a human files it through CBP\\u2019s official channels). Once CBP has it on file, your company name and address are suppressed on the public manifest records for your future shipments \\u2014 not for shipments already published. Your status stays honest \\u2014 you\\u2019ll see Submitted, then Confirmed, then Active. We\\u2019ll track your 2-year renewal and refile before it lapses.';
       }else{
-        nx.innerHTML='<b>What happens next:</b> Your authorization is saved. Choose a plan and we\\u2019ll file it with CBP on your behalf \\u2014 until then nothing is submitted to CBP. You can pick a plan any time from your account.';
+        nx.innerHTML='<b>What happens next:</b> Your authorization is saved. Choose a plan and we\\u2019ll file it with CBP on your behalf \\u2014 that filing is what suppresses your company on the public manifest records for your future shipments, and until then nothing is submitted to CBP. You can pick a plan any time from your account.';
       }
     }
     var order=['signed','submitted','confirmed','active'];
     var labels={signed:['Signed',(S.docSha256?('Tamper-evident SHA-256 recorded: '+S.docSha256.slice(0,16)+'…'):'Your authorization is signed and saved.')],
-      submitted:['Submitted to CBP','We prepare and submit your request to CBP on your behalf.'],
-      confirmed:['Confirmed by CBP','CBP acknowledges receipt of your confidentiality request.'],
-      active:['Active — hidden on QuoteFleet','You’re hidden on QuoteFleet and tracked for 2-year renewal.']};
+      submitted:['Submitted to CBP','We prepare and submit your request to CBP on your behalf — a human files it through CBP\\u2019s official channels.'],
+      confirmed:['Confirmed by CBP','CBP acknowledges receipt of your confidentiality request. Suppression applies to manifest records from here forward, not to shipments already published.'],
+      active:['Active — hidden on QuoteFleet','CBP is suppressing your company name and address on new manifest records, you\\u2019re hidden on QuoteFleet, and we track your 2-year renewal.']};
     var idx=order.indexOf(S.status);if(idx<0)idx=0;
     var tl=$('#mcp-done-timeline');if(!tl)return;tl.innerHTML='';
     order.forEach(function(k,i){var li=document.createElement('li');li.className='mcp-tl '+(i<idx?'done':(i===idx?'cur':'pending'));
@@ -1086,7 +1102,7 @@ export function renderPrivacyAccount(opts: {
 
     ${entityCards}
 
-    <p class="mcp-honest"><b>How this works, honestly:</b> We prepare and submit your request to CBP on your behalf — QuoteFleet is not CBP and has no automated filing connection to it. Being “Hidden on QuoteFleet” is not the same as removal from CBP’s feed; the CBP filing is what removes your future shipments from third-party trackers (it is not retroactive).</p>
+    <p class="mcp-honest"><b>How this works, honestly:</b> The CBP filing is what stops your future shipments appearing on third-party trade-data trackers, and it is not retroactive — shipments already published stay in the historical record. We prepare and submit that request to CBP on your behalf; QuoteFleet is not CBP and has no automated filing connection to it. Being “Hidden on QuoteFleet” is the immediate part, and is not the same as removal from CBP’s feed.</p>
   </main>
   <script>${ACCOUNT_JS}</script>`;
   return layout({
@@ -1131,7 +1147,7 @@ export function renderPrivacyVerified(opts: {
     <h1 class="mcp-h1">${ok ? 'Email confirmed' : 'This link has expired'}</h1>
     <p class="mcp-sub">${
       ok
-        ? `Thanks${email ? ` — ${esc(email)} is confirmed` : ''}. Your authorization can now go to CBP. We prepare and submit it on your behalf and you’ll see your status move from Signed to Submitted to Confirmed.`
+        ? `Thanks${email ? ` — ${esc(email)} is confirmed` : ''}. Your authorization can now go to CBP. We prepare and submit it on your behalf, and once CBP has it on file your company is suppressed on the public manifest records for your future shipments. You’ll see your status move from Signed to Submitted to Confirmed.`
         : 'This confirmation link has already been used or is no longer valid. Open your request and send yourself a fresh link — nothing has been filed, and nothing is lost.'
     }</p>
     <div class="mcp-card">
@@ -1140,7 +1156,7 @@ export function renderPrivacyVerified(opts: {
         <a class="mcp-btn" href="/privacy/account">View my account</a>
       </div>
     </div>
-    <p class="mcp-honest"><b>How this works, honestly:</b> We prepare and submit your request to CBP on your behalf — QuoteFleet is not CBP and has no automated filing connection to it. Being “Hidden on QuoteFleet” is not the same as removal from CBP’s feed; the CBP filing is what removes your future shipments from third-party trackers.</p>
+    <p class="mcp-honest"><b>How this works, honestly:</b> The CBP filing is what stops your future shipments appearing on third-party trade-data trackers, and it is not retroactive — shipments already published stay in the historical record. We prepare and submit that request to CBP on your behalf; QuoteFleet is not CBP and has no automated filing connection to it. Being “Hidden on QuoteFleet” is the immediate part, and is not the same as removal from CBP’s feed.</p>
   </main>`;
   return layout({
     title: `${ok ? 'Email confirmed' : 'Link expired'} — Manifest Privacy | QuoteFleet`,

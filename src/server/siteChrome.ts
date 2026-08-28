@@ -17,6 +17,26 @@
 // directory subsite header (src/server/directory/pages.ts) so crossing between
 // them is one coherent site. Styling: /nav-unify.css (+ landing-*.css on the
 // homepage). Keep these three constants in sync with landing.html.
+//
+// AUTH GATING IS CLIENT-SIDE, AND THAT IS NOT A STYLE CHOICE.
+// These constants take NO auth input and MUST NOT branch on one. The public
+// directory HTML is CDN-cached (`public, s-maxage=86400` — see
+// directory/httpCache.ts), so a server-rendered auth branch would let a shared
+// cache hand one visitor's nav to every other visitor. Instead:
+//
+//   • PERSONAL WORKSPACES (a "my …" surface that is empty BY DEFINITION for a
+//     logged-out visitor — Saved Importers) ship `data-nav-auth="user" hidden`
+//     and /nav-auth.js reveals them once /api/directory/auth/me confirms a
+//     session. A logged-out visitor never sees a link whose only destination is
+//     a sign-in wall.
+//   • CAPABILITIES (Importer Search, Rate Calculator, RFQ, Directory Pro,
+//     Manifest Privacy) stay VISIBLE for everyone — each already lands on a page
+//     that explains the value and carries its own upgrade path — and where a
+//     tier boundary exists it is stated in the group's `.nav-dd-sub` line rather
+//     than implied by a badge on a link that is in fact free.
+//
+// navAuthGating.test.ts pins both halves, including that the server HTML is
+// byte-identical for anonymous and authenticated requests.
 
 const NAV_CARET = `<svg class="nav-dd-caret" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polyline points="6 9 12 15 18 9"/></svg>`;
 
@@ -33,12 +53,12 @@ export const SITE_NAV_HTML = `<nav class="site-nav" aria-label="Main navigation"
   + `<button type="button" class="nav-dd-trigger" id="nav-carriers-trigger" aria-haspopup="true" aria-expanded="false" aria-controls="nav-carriers-menu">For Carriers &amp; Brokers${NAV_CARET}</button>`
   + `<div class="nav-dd-panel" id="nav-carriers-menu" hidden>`
   + `<div class="nav-dd-group"><p class="nav-dd-head">Quoting platform</p><a href="/tools">Rate Calculator</a><a href="/w/demo">See a Demo</a><a href="/compare">Why QuoteFleet</a><a href="/services">Carrier Services</a><a href="/signup">Claim Your Listing</a></div>`
-  + `<div class="nav-dd-group"><p class="nav-dd-head">Lead generation</p><a href="/importers">Importer Search</a><a href="/importers/saved">Saved Importers (Leads Pro)</a><a href="/for/brokers">For Freight Brokers</a><a href="/for/forwarders">For Freight Forwarders</a><a href="/for/ltl">For LTL</a></div>`
+  + `<div class="nav-dd-group"><p class="nav-dd-head">Lead generation</p><a href="/importers">Importer Search</a><a href="/importers/saved" data-nav-auth="user" hidden>Saved Importers</a><a href="/for/brokers">For Freight Brokers</a><a href="/for/forwarders">For Freight Forwarders</a><a href="/for/ltl">For LTL</a><span class="nav-dd-sub">Search, profiles and saving are free with an account. Decision-maker email reveals are Leads Pro.</span></div>`
   + `</div></div>`
   + `<div class="nav-dd" data-nav-dd>`
   + `<button type="button" class="nav-dd-trigger" id="nav-importers-trigger" aria-haspopup="true" aria-expanded="false" aria-controls="nav-importers-menu">For Importers${NAV_CARET}</button>`
   + `<div class="nav-dd-panel nav-dd-panel--end" id="nav-importers-menu" hidden>`
-  + `<div class="nav-dd-group"><p class="nav-dd-head">Protect your data</p><a href="/manifest-privacy">Manifest Privacy</a><span class="nav-dd-sub">Remove your shipments from the public customs directory.</span></div>`
+  + `<div class="nav-dd-group"><p class="nav-dd-head">Protect your data</p><a href="/manifest-privacy">Manifest Privacy</a><span class="nav-dd-sub">Stop future shipments appearing in U.S. Customs public records.</span></div>`
   + `</div></div>`
   + `<a href="/pricing">Pricing</a>`
   + `</nav>`;
@@ -49,7 +69,7 @@ export const SITE_MOBILE_MENU_HTML = `<div class="site-mobile-menu" id="site-mob
   + `<details class="mm-group" open><summary class="mm-head">For Shippers</summary>`
   + `<a href="/directory">Carrier Directory</a><a href="/compliance">Compliance Tools</a><a href="/directory/rfq">Get Freight Quotes (RFQ)</a><a href="/directory/join">Directory Pro</a><a href="/glossary">Freight Glossary</a></details>`
   + `<details class="mm-group"><summary class="mm-head">For Carriers &amp; Brokers</summary>`
-  + `<a href="/tools">Rate Calculator</a><a href="/w/demo">See a Demo</a><a href="/pricing">Pricing</a><a href="/compare">Why QuoteFleet</a><a href="/services">Carrier Services</a><a href="/signup">Claim Your Listing</a><a href="/importers">Importer Search</a><a href="/importers/saved">Saved Importers (Leads Pro)</a><a href="/for/brokers">For Freight Brokers</a><a href="/for/forwarders">For Freight Forwarders</a><a href="/for/ltl">For LTL</a></details>`
+  + `<a href="/tools">Rate Calculator</a><a href="/w/demo">See a Demo</a><a href="/pricing">Pricing</a><a href="/compare">Why QuoteFleet</a><a href="/services">Carrier Services</a><a href="/signup">Claim Your Listing</a><a href="/importers">Importer Search</a><a href="/importers/saved" data-nav-auth="user" hidden>Saved Importers</a><a href="/for/brokers">For Freight Brokers</a><a href="/for/forwarders">For Freight Forwarders</a><a href="/for/ltl">For LTL</a></details>`
   + `<details class="mm-group"><summary class="mm-head">For Importers</summary>`
   + `<a href="/manifest-privacy">Manifest Privacy</a></details>`
   + `<a class="mm-account" href="/login">Sign in</a>`
@@ -119,7 +139,8 @@ export const HEADER_SCRIPTS = `<script>
       function closeOthers(except) { controllers.forEach(function (c) { if (c.dd !== except) c.close(); }); }
     }
   })();
-</script>`;
+</script>
+<script src="/nav-auth.js" defer></script>`;
 
 /**
  * Replace a static page's stripped `.topnav` header + reduced `.site-footer`

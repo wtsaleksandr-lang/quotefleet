@@ -462,3 +462,18 @@ html[data-theme="light"] .nav-dd-panel {
   .qf-footer-trustbar { gap: 8px 16px; }
   .premium-footer .footer-bottom { display: grid; font-size: 11.5px; }
 }
+
+/* ── Auth-gated nav items (hydrated by /nav-auth.js) ────────────────────────
+   Personal-workspace links (data-nav-auth="user") ship `hidden` from the
+   server and are revealed client-side once /api/directory/auth/me confirms a
+   session. The server HTML stays byte-identical for anonymous and signed-in
+   visitors, which is what keeps the CDN-cached directory pages safe to share.
+
+   `[hidden]`'s UA rule is only `display:none` at element specificity, so an
+   author rule like `.nav-dd-panel a{display:block}` or
+   `.site-mobile-menu a{display:block}` silently beats it and the link stays on
+   screen for logged-out visitors. Make the attribute authoritative. */
+.site-nav [hidden],
+.site-actions [hidden],
+.nav-dd-panel a[hidden],
+.site-mobile-menu a[hidden] { display: none !important; }

@@ -83,3 +83,23 @@ body.landing-v2.qf-wft .site-actions .signin:focus-visible {
   text-decoration-line: underline;
   text-decoration-color: currentColor;
 }
+
+/* ── Auth-gated nav items on the HOMEPAGE (hydrated by /nav-auth.js) ────────
+   The homepage is a static file with its own stylesheet set — it does NOT load
+   /nav-unify.css, so the `[hidden]` authority rule that protects the injected
+   marketing chrome and the directory subsite does not reach here.
+
+   Without this, `body.qf-wft .site-mobile-menu a{display:block}`
+   (landing-home-fixes.css) and `body.landing-v2.qf-wft .site-mobile-menu a`
+   (above) both beat the UA's `[hidden]{display:none}` — author rules always
+   beat UA rules — and the logged-out visitor sees "Saved Importers", a link
+   whose only destination is a sign-in wall. Caught by the 375px pass; keep it.
+
+   `!important` is deliberate: it has to win against any later homepage rule
+   without another specificity arms race. */
+.site-nav [hidden],
+.site-actions [hidden],
+.site-mobile-menu [hidden],
+body.qf-wft .site-mobile-menu a[hidden],
+body.landing-v2.qf-wft .site-mobile-menu a[hidden],
+body.qf-wft .site-mobile-menu .mm-group > a[hidden] { display: none !important; }

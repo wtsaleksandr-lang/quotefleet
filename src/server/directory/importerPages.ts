@@ -518,6 +518,9 @@ a.imp-co-link:focus-visible{outline:2px solid var(--accent);outline-offset:3px}
    already carries: darkens in light, lightens in dark. */
 .imp-tier.ok{color:color-mix(in srgb,var(--success) 62%,var(--ink))}
 .imp-lock{display:inline-flex;align-items:center;gap:8px;font-size:12px;font-weight:600;color:var(--ink-soft);border:1px solid var(--border-strong);border-radius:8px;padding:9px 13px;background:var(--surface-2);text-decoration:none;min-height:44px;box-sizing:border-box;transition:border-color .14s,color .14s}
+/* display:inline-flex above beats the UA [hidden] rule (author > UA), which
+   would leave the auth-gated "Saved" link visible to logged-out visitors. */
+.imp-lock[hidden]{display:none !important}
 .imp-lock:hover{border-color:var(--accent);color:var(--ink)}
 .imp-lock:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
 .imp-lock .ico{opacity:.7}
@@ -898,7 +901,14 @@ export function renderImporterSearchPage(): string {
           <a class="imp-lock imp-export" id="imp-export" href="/importers/saved" title="Export exactly what you are looking at — the filtered, sorted rows currently on screen (free with an account)">
             <span class="ico" aria-hidden="true">&#11123;</span> Export CSV
           </a>
-          <a class="imp-lock" id="imp-saved-link" href="/importers/saved" title="Your saved importers">
+          ${/* PERSONAL WORKSPACE — a logged-out visitor's saved list is empty by
+                definition, so this ships `hidden` and /nav-auth.js reveals it once
+                /api/directory/auth/me confirms a session. Server-side gating is
+                forbidden here: this HTML is CDN-cached and must stay byte-identical
+                for every visitor. "Export CSV" above is deliberately NOT gated — it
+                is a capability whose page explains the value and the free account
+                that unlocks it. */ ''}
+          <a class="imp-lock" id="imp-saved-link" href="/importers/saved" title="Your saved importers" data-nav-auth="user" hidden>
             <span class="ico" aria-hidden="true">&#9733;</span> Saved
           </a>
           <details class="imp-more">
@@ -1002,7 +1012,7 @@ export function renderImporterSearchPage(): string {
       <div class="imp-privacy-banner">
         <div class="imp-privacy-copy">
           <span class="imp-privacy-h">Is your company listed here?</span>
-          <span class="imp-privacy-p">Manifest Privacy hides your shipment data from competitors on QuoteFleet &mdash; we prepare &amp; submit your U.S. Customs confidentiality request on your behalf.</span>
+          <span class="imp-privacy-p">We prepare &amp; submit your U.S. Customs confidentiality request on your behalf, so CBP suppresses your name and address on the public manifest records for your future shipments &mdash; not the ones already published. We hide you on QuoteFleet right away.</span>
         </div>
         <a class="imp-privacy-btn" href="/manifest-privacy">Hide my data <span class="arr">&rarr;</span></a>
       </div>
