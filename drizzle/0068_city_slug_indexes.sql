@@ -1,0 +1,102 @@
+-- carrier_directory CITY indexes.
+--
+-- THE BUG (prod, live): city-filtered directory queries hit the 8s
+-- statement_timeout and listCarriers degraded to an empty list —
+--   [directory] listCarriers failed; serving empty list ...
+--   canceling statement due to statement timeout (57014)
+--   params: ['AL','frisco-city',250,...]
+-- 0066 indexed state / nearest_port_code / power_units / the cargo flags, but
+-- NOTHING indexed `city`. The trigger was 0065's sitemap: it now advertises
+-- thousands of city hub pages plus ~334k carrier profiles, so crawlers began
+-- hitting city-scoped queries in volume for the first time.
+--
+-- WHY A PLAIN (city) INDEX DOES NOT WORK — this is the whole point of this file.
+-- The route never compares `city` directly. queries.ts `cityCondition()` matches
+-- the URL SLUG against the free-text FMCSA column through an expression:
+--
+--   btrim(regexp_replace(lower(city), '[^a-z0-9]+', '-', 'g'), '-') = $slug
+--
+-- A b-tree on the bare `city` column can never serve that predicate — Postgres
+-- can only apply it as a post-heap-fetch Filter. Verified on prod with EXPLAIN:
+-- the city list query ignored both bare-column city indexes and fell back to a
+-- Bitmap Heap Scan of EVERY row in the state, then an explicit Sort:
+--
+--   Limit  (cost=8748.13..8748.18 rows=22)
+--     ->  Sort  (Sort Key: intermodal DESC, power_units DESC NULLS LAST, ...)
+--           ->  Bitmap Heap Scan  (cost=48.79..8747.63 rows=22)
+--                 Recheck Cond: (state = 'AL')
+--                 Filter: (btrim(regexp_replace(lower(city), ...)) = 'frisco-city')
+--                 ->  Bitmap Index Scan on carrier_directory_state_fleet_idx
+--                       Index Cond: (state = 'AL')   <-- 4,315 heap rows for 22 hits
+--
+-- 4,315 heap rows for Alabama; 31,668 for Texas. Warm that is survivable; on a
+-- cold Neon page cache (post-deploy / scale-from-zero / crawler burst across
+-- thousands of distinct city slugs) those are remote page fetches and the query
+-- blows the 8s budget.
+--
+-- THE FIX: an EXPRESSION index on exactly the expression cityCondition() emits,
+-- followed by `state`, then the default `featured` sort prefix. All three of
+-- lower(text), regexp_replace(text,text,text,text) and btrim(text,text) are
+-- IMMUTABLE (checked pg_proc.provolatile = 'i' on prod), so the expression is
+-- indexable.
+--
+-- COLUMN ORDER — the expression LEADS, `state` follows. Both are equality
+-- predicates on the city page, so (slug, state, ...) and (state, slug, ...) are
+-- interchangeable there; leading with the slug additionally makes the index
+-- usable for the `?city=` facet when NO state is selected, which the
+-- state-leading shape cannot serve at all. Measured on prod (total cost, via
+-- EXPLAIN with each candidate built inside a rolled-back transaction):
+--
+--   query                              before    (state,slug,…)   (slug,state,…)
+--   city list, AL, LIMIT 250            8,748          90.9            90.9
+--   city list, TX (big state)          13,167         590.1           590.1
+--   relatedCarriers same-city leg       1,889          28.7            28.7
+--   ?city= with NO state                6,302        6,302  (no help)  4,662
+--   index size                             —        5,688 kB        5,680 kB
+--
+-- i.e. identical on every state-scoped path, strictly better on the stateless
+-- one, and one index instead of two. That last row matters under crawl load: a
+-- `?city=<slug-with-no-matches>` previously scanned the ENTIRE featured index
+-- (cost 41,192) before returning nothing; it is now a bounded bitmap lookup.
+--
+-- The relatedCarriers row is the one with the most traffic behind it: that
+-- same-city query runs on EVERY carrier profile page, and 0065's sitemap
+-- advertises ~334k of them.
+--
+-- LEAN, per 0066: (filter…, sort-prefix) only — no legal_name/id tail. The
+-- name/id tie-break finishes as a cheap Incremental Sort.
+--
+-- Plain CREATE INDEX, not CONCURRENTLY: the runtime path is
+-- ensureSelfHealTables() (Replit skips db:migrate), which sends DDL over the
+-- extended query protocol, and CONCURRENTLY cannot run inside the implicit
+-- transaction that creates. CREATE INDEX takes a SHARE lock — it blocks WRITES
+-- to carrier_directory (only the weekly FMCSA ingest writes here) but never
+-- READS. Measured build time on the 330k-row prod table: ~2.0s.
+
+-- The expression cityCondition() actually emits, + state, + the `featured` sort
+-- prefix. Serves the /directory/<state>/<city> hub list and its count(*), the
+-- same-city leg of relatedCarriers on every carrier profile, and the stateless
+-- ?city= facet.
+CREATE INDEX IF NOT EXISTS "carrier_directory_cityslug_state_featured_idx" ON "carrier_directory" ((btrim(regexp_replace(lower("city"), '[^a-z0-9]+', '-', 'g'), '-')), "state", "intermodal" DESC, "power_units" DESC NULLS LAST);
+
+-- (state, city) — the RAW column, for the three plans that group/scan by the
+-- stored city text rather than the slug. Verified on prod: all three become
+-- Index Only Scans on this index.
+--   * citiesForState()  — GROUP BY city WHERE state = $1  (the city hub INDEX
+--     page, one per state, listing every city + its carrier count)
+--   * cityDisplayName() — resolve a slug back to its display casing
+--   * the city page's filtered count(*)
+-- Already present on prod (applied by hand during the incident); this codifies
+-- it so a fresh DB and every boot converge on the same shape. The `power_units`
+-- tail is carried as-deployed — only the (state, city) prefix is used by those
+-- three plans, and re-shaping it would need a DROP, which this migration
+-- deliberately avoids.
+CREATE INDEX IF NOT EXISTS "carrier_directory_state_city_power_idx" ON "carrier_directory" ("state", "city", "power_units" DESC NULLS LAST);
+
+-- NOT CREATED, deliberately: a bare "carrier_directory_city_idx" ON (city).
+-- One was added by hand on prod during the incident. EXPLAIN shows the planner
+-- never chooses it for ANY directory query — every city lookup goes through the
+-- slug expression above, and nothing does equality on the raw `city` column. It
+-- is ~2.7 MB of dead weight that the weekly FMCSA ingest still has to maintain,
+-- and it is safe to DROP from prod. It is left out here rather than dropped so
+-- this migration stays purely additive.

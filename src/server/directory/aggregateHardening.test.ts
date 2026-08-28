@@ -193,4 +193,67 @@ describe('AggregateLimiter — bounded recompute concurrency', () => {
     await Promise.all(running);
     expect(peak).toBe(2); // ceiling never exceeded across the whole run
   });
+
+  /**
+   * THE BUG: REQUEST_AGG_BUDGET_MS is armed INSIDE withAggregateTimeout — i.e.
+   * AFTER a limiter slot is acquired — so it bounded the scans but never the
+   * wait for a slot, and acquire() had no timeout and no queue cap. Once the
+   * sitemap began advertising thousands of city hubs (each its own facet cache
+   * key against a 200-entry cache) a crawl cold-missed nearly every request, the
+   * 2-slot queue grew without limit, and requests PILED UP to the 60s server
+   * requestTimeout instead of degrading. These pin the bounded acquire.
+   */
+  it('rejects a queued waiter once maxWaitMs elapses instead of waiting forever', async () => {
+    const { AggregateLimiter } = await import('./queries.js');
+    const limiter = new AggregateLimiter(1);
+
+    let release!: () => void;
+    const held = limiter.run(() => new Promise<void>((resolve) => (release = resolve)));
+    await Promise.resolve();
+
+    // The slot is taken and never freed during this assertion.
+    await expect(limiter.run(async () => 'never runs', 20)).rejects.toThrow(/queue wait exceeded 20ms/);
+
+    release();
+    await held;
+  });
+
+  it('does NOT bound off-path callers that omit maxWaitMs', async () => {
+    const { AggregateLimiter } = await import('./queries.js');
+    const limiter = new AggregateLimiter(1);
+
+    let release!: () => void;
+    const held = limiter.run(() => new Promise<void>((resolve) => (release = resolve)));
+    await Promise.resolve();
+
+    let settled = false;
+    const queued = limiter.run(async () => 'ran').then((v) => ((settled = true), v));
+    await new Promise((r) => setTimeout(r, 40)); // well past any request-path bound
+    expect(settled).toBe(false); // still patiently queued
+
+    release();
+    await held;
+    await expect(queued).resolves.toBe('ran');
+  });
+
+  it('a timed-out waiter never steals a slot — the limiter keeps full capacity', async () => {
+    // REGRESSION GUARD: if a rejected waiter stayed in the queue, release()
+    // would hand the freed slot to a dead promise and the conserved active
+    // count would leak, permanently shrinking the limiter toward zero.
+    const { AggregateLimiter } = await import('./queries.js');
+    const limiter = new AggregateLimiter(1);
+
+    let release!: () => void;
+    const held = limiter.run(() => new Promise<void>((resolve) => (release = resolve)));
+    await Promise.resolve();
+    await expect(limiter.run(async () => 'x', 10)).rejects.toThrow();
+    release();
+    await held;
+
+    // Capacity must be fully restored: two sequential runs and one immediate
+    // acquire all succeed.
+    await expect(limiter.run(async () => 'a')).resolves.toBe('a');
+    await expect(limiter.run(async () => 'b')).resolves.toBe('b');
+    await expect(limiter.run(async () => 'c', 1)).resolves.toBe('c');
+  });
 });

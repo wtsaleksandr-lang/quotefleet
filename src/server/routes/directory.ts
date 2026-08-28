@@ -216,7 +216,11 @@ export function registerDirectoryRoutes(app: Express) {
   });
 
   // Carrier profile (registered BEFORE the :stateSlug route so it wins).
-  app.get('/directory/carrier/:slug', async (req: Request, res: Response, next) => {
+  // Limiter parity with the other public directory pages: this is the page type
+  // the sitemap advertises ~334k times, and each render fires four DB reads
+  // (carrierBySlug + relatedCarriers + cityCarrierCount + stateCarrierCount).
+  // It was the only one of them registered without publicAutocompleteLimiter.
+  app.get('/directory/carrier/:slug', publicAutocompleteLimiter, async (req: Request, res: Response, next) => {
     try {
       const carrier = await carrierBySlug(String(req.params.slug));
       if (!carrier) return res.status(404).type('html').send(renderCarrierNotFound());

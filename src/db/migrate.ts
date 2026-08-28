@@ -287,6 +287,51 @@ export const SELF_HEAL_TABLE_STATEMENTS: readonly string[] = [
     (col) =>
       `CREATE INDEX IF NOT EXISTS "carrier_directory_flag_${col}_idx" ON "carrier_directory" ("intermodal" DESC, "power_units" DESC NULLS LAST) WHERE "${col}"`,
   ),
+  // ── 0068_city_slug_indexes.sql ────────────────────────────────────────────
+  // Same failure as 0066, one dimension later: city-filtered queries hit the 8s
+  // statement_timeout on prod and listCarriers degraded to an empty list
+  // ("[directory] listCarriers failed ... 57014", params ['AL','frisco-city',250,…]).
+  // 0066 indexed state/port/power_units/cargo-flags but NOTHING indexed `city`.
+  // 0065's sitemap is what surfaced it: it advertises thousands of city hubs +
+  // ~334k carrier profiles, so crawlers hit city-scoped queries in volume.
+  //
+  // A plain b-tree on the `city` COLUMN cannot fix this. queries.ts
+  // cityCondition() never compares `city` directly — it matches the URL slug
+  // through an EXPRESSION:
+  //   btrim(regexp_replace(lower(city), '[^a-z0-9]+', '-', 'g'), '-') = $slug
+  // which Postgres can only apply as a post-heap-fetch Filter. Confirmed on prod
+  // via EXPLAIN: the city list ignored the bare-column city indexes and bitmap
+  // heap-scanned every row in the state (4,315 for AL / 31,668 for TX) to return
+  // 22, then sorted. So the index below is on the EXPRESSION itself. All three
+  // of lower/regexp_replace/btrim are IMMUTABLE (pg_proc.provolatile='i'), so it
+  // is indexable.
+  //
+  // The expression LEADS and `state` follows: both are equality predicates on
+  // the city page so the order is interchangeable there, but slug-first also
+  // serves the `?city=` facet with no state selected, which state-first cannot.
+  // Measured on prod (total cost, each candidate built in a rolled-back tx):
+  //   city list AL      8,748 → 90.9   | city list TX  13,167 → 590.1
+  //   relatedCarriers   1,889 → 28.7   | ?city= no state 6,302 → 4,662
+  // The relatedCarriers row carries the most traffic — that same-city query runs
+  // on every one of the ~334k carrier profile pages the sitemap advertises.
+  //
+  // LEAN per 0066: (filter…, sort-prefix) only, no legal_name/id tail.
+  // NOT CONCURRENTLY, for the same reason as 0066 (implicit tx). ~2.0s build.
+  // MUST stay byte-for-byte equivalent to drizzle/0068_city_slug_indexes.sql
+  // and src/db/schema.ts `carrierDirectory`.
+  `CREATE INDEX IF NOT EXISTS "carrier_directory_cityslug_state_featured_idx" ON "carrier_directory" ((btrim(regexp_replace(lower("city"), '[^a-z0-9]+', '-', 'g'), '-')), "state", "intermodal" DESC, "power_units" DESC NULLS LAST)`,
+  // (state, city) on the RAW column — for the plans that group/scan by the stored
+  // city text rather than the slug: citiesForState() (GROUP BY city WHERE state,
+  // i.e. the per-state city hub INDEX page), cityDisplayName(), and the city
+  // page's filtered count(*). Verified on prod: all three become Index Only
+  // Scans on this index. The `power_units` tail is carried as-deployed (this
+  // index was applied by hand during the incident) — only the (state, city)
+  // prefix is used, and re-shaping would need a DROP, which is not additive.
+  //
+  // Deliberately NOT here: a bare (city) index. One exists on prod from the
+  // incident; EXPLAIN shows the planner never picks it for any directory query,
+  // so it is ~2.7 MB the weekly ingest maintains for nothing and is safe to DROP.
+  `CREATE INDEX IF NOT EXISTS "carrier_directory_state_city_power_idx" ON "carrier_directory" ("state", "city", "power_units" DESC NULLS LAST)`,
   // 0048_carrier_overrides.sql — human-editable OVERRIDES that survive the FMCSA
   // re-ingest (the ingest touches carrier_directory ONLY, never this table).
   // Healed HERE (like carrier_directory) because the Replit deploy skips

@@ -326,6 +326,31 @@ const AGG_MAX_CONCURRENCY = 2;
 const REQUEST_AGG_BUDGET_MS = 8000;
 
 /**
+ * Max time a REQUEST-PATH facet recompute may spend QUEUEING for one of the
+ * AGG_MAX_CONCURRENCY limiter slots before it gives up and degrades to empty
+ * counts.
+ *
+ * WHY THIS EXISTS: REQUEST_AGG_BUDGET_MS is armed INSIDE withAggregateTimeout —
+ * i.e. AFTER the limiter slot has been acquired — so it bounds the scans but not
+ * the wait for a slot. acquire() had no timeout and the waiter queue had no cap,
+ * so queue time was entirely unbounded. That is survivable while cold misses are
+ * rare, but the sitemap now advertises thousands of city hubs and facetCacheKey
+ * includes citySlug, so EVERY city page is its own cache key against a
+ * 200-entry cache: a sitemap-driven crawl cold-misses nearly every request. With
+ * 2 slots the queue then grows without limit and each request hangs until the
+ * 60s server requestTimeout — requests pile up instead of degrading, which is
+ * the one failure mode the rest of this file is built to prevent.
+ *
+ * Bounding the ACQUIRE turns that back into graceful degradation: the rejection
+ * flows through getFacetCounts' existing catch → emptyFacetCounts(). Only the
+ * sidebar facet BADGES go blank; the page and its carrier list are unaffected,
+ * because listCarriers runs on its own connection and never enters this limiter.
+ * Sized well under REQUEST_AGG_BUDGET_MS: if two slots haven't freed in 2s, the
+ * compute could not have finished inside its own budget anyway.
+ */
+const AGG_ACQUIRE_WAIT_MS = 2000;
+
+/**
  * OFF-PATH (boot / cron / ingest-end) recompute budgets. The persisted-aggregate
  * recompute runs the full 330k-row scans behind the limiter, so historically it
  * passed NO budget at all — a starved recompute could then wait UNBOUNDED on a
@@ -394,30 +419,62 @@ type ArmTimeout = () => Promise<void>;
  */
 export class AggregateLimiter {
   private active = 0;
-  private readonly waiters: Array<() => void> = [];
+  private readonly waiters: Array<AggregateLimiterWaiter> = [];
   constructor(private readonly max: number) {}
-  async run<T>(fn: () => Promise<T>): Promise<T> {
-    await this.acquire();
+  /**
+   * `maxWaitMs` bounds the time spent QUEUEING for a slot (not the work itself).
+   * Omit it for off-path callers, which carry their own wall-clock budget and
+   * should wait as long as it takes. See AGG_ACQUIRE_WAIT_MS for why the
+   * request path must pass one.
+   */
+  async run<T>(fn: () => Promise<T>, maxWaitMs?: number): Promise<T> {
+    await this.acquire(maxWaitMs);
     try {
       return await fn();
     } finally {
       this.release();
     }
   }
-  private acquire(): Promise<void> {
+  private acquire(maxWaitMs?: number): Promise<void> {
     if (this.active < this.max) {
       this.active += 1;
       return Promise.resolve();
     }
-    return new Promise<void>((resolve) => this.waiters.push(resolve));
+    return new Promise<void>((resolve, reject) => {
+      const waiter: AggregateLimiterWaiter = { resolve, reject };
+      if (maxWaitMs != null) {
+        waiter.timer = setTimeout(() => {
+          // Drop ourselves from the queue FIRST, so release() can never hand a
+          // freed slot to an already-rejected waiter (which would leak the
+          // conserved active count and shrink the limiter permanently).
+          const i = this.waiters.indexOf(waiter);
+          if (i >= 0) this.waiters.splice(i, 1);
+          reject(new Error(`aggregate limiter queue wait exceeded ${maxWaitMs}ms`));
+        }, maxWaitMs);
+        // Never keep the process alive just to fail a queued waiter.
+        if (typeof (waiter.timer as { unref?: () => void }).unref === 'function') {
+          (waiter.timer as { unref: () => void }).unref();
+        }
+      }
+      this.waiters.push(waiter);
+    });
   }
   private release(): void {
     const next = this.waiters.shift();
     // Hand the just-freed slot straight to the next waiter (the active count is
     // conserved); only when nobody is waiting does the active count drop.
-    if (next) next();
-    else this.active -= 1;
+    if (next) {
+      if (next.timer) clearTimeout(next.timer);
+      next.resolve();
+    } else this.active -= 1;
   }
+}
+
+/** One queued acquire(). `timer` is present only for a bounded (request-path) wait. */
+interface AggregateLimiterWaiter {
+  resolve: () => void;
+  reject: (err: Error) => void;
+  timer?: ReturnType<typeof setTimeout>;
 }
 
 /** Shared limiter for ALL directory aggregate recomputes (summary + every facet
@@ -1477,7 +1534,13 @@ async function refreshFacetCounts(filters: DirectoryFilters, key: string): Promi
     // aggregate transactions at once (the stampede that pinned the pool). The
     // REQUEST_AGG_BUDGET_MS total budget bounds the whole ~9-scan filtered facet
     // compute so it can never pin a connection for the ~25s that hung the page.
-    const val = await aggregateLimiter.run(() => getFacetCountsUnsafe(filters, REQUEST_AGG_BUDGET_MS));
+    // Request path: bound the QUEUE wait too, not just the scans — see
+    // AGG_ACQUIRE_WAIT_MS. A rejection here is caught by getFacetCounts and
+    // degrades to empty counts instead of holding the request open.
+    const val = await aggregateLimiter.run(
+      () => getFacetCountsUnsafe(filters, REQUEST_AGG_BUDGET_MS),
+      AGG_ACQUIRE_WAIT_MS,
+    );
     // Cache only a successfully computed value; an error must NOT poison the cache.
     // Evict the oldest entry (insertion order) once over the cap.
     facetCountsCache.set(key, { at: Date.now(), val });

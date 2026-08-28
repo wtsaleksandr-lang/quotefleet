@@ -7,4 +7,30 @@ Disallow: /w/
 Disallow: /quote/
 Disallow: /chat/
 
+# Facet, sort and pagination QUERY STRINGS are deliberately not crawlable.
+# Every /directory PATH stays fully crawlable — only query strings are blocked.
+# The sitemap advertises every page worth indexing as a clean PATH — ~334k
+# /directory/carrier/{slug}, the city hubs, 54 states, 60 ports — so nothing
+# below is needed for discovery, and each of these params multiplies the same
+# rows into a combinatorial URL space backed by an unbounded scan:
+#   ?page=   deep OFFSET (the last-page link reaches OFFSET ~334k)
+#   ?q=      legal_name/dba_name ILIKE '%..%' — always a full scan
+#   the rest self-canonicalize, so every combination is otherwise indexable.
+Disallow: /*?*page=
+Disallow: /*?*q=
+Disallow: /*?*sort=
+Disallow: /*?*dir=
+Disallow: /*?*equipment=
+Disallow: /*?*cargo=
+Disallow: /*?*fleet=
+Disallow: /*?*drivers=
+Disallow: /*?*standing=
+Disallow: /*?*authority=
+Disallow: /*?*recent=
+
+# Honoured by Bing/Yandex/Ahrefs/Semrush. Googlebot IGNORES Crawl-delay — its
+# rate is set in Search Console, and the real origin-side guards are the query
+# indexes plus the bounded aggregate limiter.
+Crawl-delay: 2
+
 Sitemap: https://quotefleet.net/sitemap.xml
