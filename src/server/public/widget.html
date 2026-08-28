@@ -97,8 +97,16 @@
       </div>
       <div class="qf-addr-hint" id="qf-addr-hint">Type a city, ZIP, or address, then pick a suggestion — a ZIP or full address gives the most accurate rate.</div>
       <div class="qf-map-card" id="qf-map-card" hidden>
-        <button type="button" class="qf-map-canvas" id="qf-map-open" aria-label="Open full route map">
-          <img class="qf-map-img" id="qf-map-img" alt="Route from pickup to delivery">
+        <!-- The canvas is a DIRECT-MANIPULATION surface (grab/drag-pan, wheel +
+             pinch zoom — widget.js attachPanZoom), so it is a div, not a button:
+             a button would swallow the drag into a click and force a modal.
+             ACCESSIBILITY IS PRESERVED by the explicit .qf-map-expand button
+             below — it keeps id="qf-map-open", so it is still the focusable,
+             screen-reader-labelled path to the full zoomable map (where the
+             existing +/- keyboard zoom lives). The <img alt> continues to carry
+             the route description for AT. -->
+        <div class="qf-map-canvas" id="qf-map-canvas">
+          <img class="qf-map-img" id="qf-map-img" alt="Route from pickup to delivery" draggable="false">
           <span class="qf-map-addr">
             <span class="qf-ma-pt qf-ma-pt-a"><span class="qf-ma-dot qf-ma-a" aria-hidden="true"></span><span class="qf-ma-txt" id="qf-map-pickup">—</span></span>
             <span class="qf-ma-link" aria-hidden="true"><span class="qf-ma-truck"><svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor"><path d="M3 6a1 1 0 0 1 1-1h9a1 1 0 0 1 1 1v2h3.4a1 1 0 0 1 .8.4l2.6 3.5a1 1 0 0 1 .2.6V16a1 1 0 0 1-1 1h-1a2.5 2.5 0 0 1-5 0H9a2.5 2.5 0 0 1-5 0H4a1 1 0 0 1-1-1V6Zm11 3v4h6v-.9L17.9 9H14ZM6.5 15.5A1 1 0 1 0 6.5 17a1 1 0 0 0 0-1.5Zm9 0a1 1 0 1 0 0 1.5 1 1 0 0 0 0-1.5Z"/></svg></span></span>
@@ -111,8 +119,8 @@
             <span class="qf-map-ov-div" aria-hidden="true"></span>
             <span class="qf-map-ov-stat"><span class="qf-map-ov-val" id="qf-map-permile">—</span><span class="qf-map-ov-lbl">$/mi</span></span>
           </span>
-          <span class="qf-map-expand" aria-label="Expand map"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polyline points="15 3 21 3 21 9"></polyline><polyline points="9 21 3 21 3 15"></polyline><line x1="21" y1="3" x2="14" y2="10"></line><line x1="3" y1="21" x2="10" y2="14"></line></svg></span>
-        </button>
+          <button type="button" class="qf-map-expand" id="qf-map-open" aria-label="Open full route map"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polyline points="15 3 21 3 21 9"></polyline><polyline points="9 21 3 21 3 15"></polyline><line x1="21" y1="3" x2="14" y2="10"></line><line x1="3" y1="21" x2="10" y2="14"></line></svg></button>
+        </div>
       </div>
       <div class="qf-map-modal" id="qf-map-modal" hidden>
         <div class="qf-map-modal-backdrop" id="qf-map-modal-close" aria-hidden="true"></div>

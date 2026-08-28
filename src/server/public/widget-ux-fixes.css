@@ -1080,3 +1080,87 @@ html, body { overscroll-behavior: auto; }
 .qf-cs-opt .qf-cs-txt { font-size: 15px; }
 .qf-cs-btn .qf-cs-ico, .qf-cs-btn .qf-cs-ico svg { width: 20px; height: 20px; }
 .qf-cs-btn .qf-cs-txt { font-size: 12px; }
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   PREMIUM WIDGET INTERACTIONS (Alex, 2026-08) — appended at EOF so no
+   baselined line number in scripts/*-violations-baseline.txt shifts.
+   ═══════════════════════════════════════════════════════════════════════════ */
+
+/* ── 1. MODAL: square "ears" at the four corners ─────────────────────────────
+   .qf-modal-card carries a border-radius (20px, or 20px 20px 0 0 as a mobile
+   sheet) but never clipped its children, so the square-cornered grey
+   .qf-modal-head and the footer's blue Done button painted straight over the
+   rounded corners — the card read as a rectangle with a rounded outline.
+
+   MUST be `clip`, NOT `hidden`. .qf-modal-body scrolls (overflow-y:auto) and
+   this is an embedded widget: `overflow:hidden` on an ancestor silently makes
+   it a scroll container, which breaks position:sticky on the head/footer. That
+   has bitten this widget before. `overflow: clip` clips WITHOUT creating a
+   scroll container, so sticky keeps working. ── */
+.qf-modal-card { overflow: clip; }
+
+/* ── 3. INLINE MAP: a real, directly-manipulable map surface ─────────────────
+   The inline map used to be a <button> with `cursor: zoom-in` whose only trick
+   was opening a modal. It is now a div driven by widget.js attachPanZoom() —
+   the SAME grab-pan + pinch/wheel-zoom handler set the modal viewport uses — so
+   the cursor must advertise that affordance instead of "click to enlarge".
+
+   Specificity note: the base-mode rule earlier in this file
+   (.qf-map-card.qf-map-base .qf-map-canvas { cursor: zoom-in }) is 0-3-0, so it
+   is restated here rather than relying on source order alone. ── */
+.qf-map-card .qf-map-canvas,
+.qf-map-card.qf-map-base .qf-map-canvas {
+  cursor: grab;
+  /* TOUCH: single-finger vertical scroll still belongs to the PAGE (pan-y) —
+     the map only claims two-finger pinch and horizontal drags. This is the same
+     contract embedded maps use, and it is what keeps the #415 no-scroll-hijack
+     guarantee on phones. The modal viewport keeps `touch-action: none` (full
+     single-finger control) because nothing scrolls behind it. */
+  touch-action: pan-y;
+  /* Clip the CSS zoom/pan feedback transform to the card in BOTH modes (base
+     mode already clipped; route mode is now manipulable too). `clip` for the
+     same sticky-safety reason as the modal above. */
+  overflow: clip;
+  -webkit-user-select: none;
+  user-select: none;
+  /* A pan briefly outruns the static bitmap, so the area it uncovers must be a
+     muted map-toned surface — NOT the stark white void it showed before (the
+     card's own --w-bg reads white on most presets). This is the exact backdrop
+     the enlarge-modal already paints on .qf-map-viewport when it opens; the
+     inline surface needs it now that it is draggable too. Token-only, so it
+     stays correct in light and dark. */
+  background: color-mix(in srgb, var(--w-fg) 8%, var(--w-bg));
+}
+/* widget.js toggles .qf-map-grabbing for the duration of a pointer drag. :active
+   alone is not enough once the pointer is captured. */
+.qf-map-card .qf-map-canvas.qf-map-grabbing,
+.qf-map-card .qf-map-canvas:active { cursor: grabbing; }
+/* The route inline image now also receives the shared feedback transform, so it
+   needs the same transform-origin + compositor hint base mode already had. */
+.qf-map-card .qf-map-img { transform-origin: center center; }
+/* The expand ⤢ is now THE explicit keyboard / screen-reader path to the full
+   zoomable map (the canvas itself is no longer a button), so it gets a real
+   button box, a proper focus ring and a 32px tap target on the 8px ramp. */
+.qf-map-card .qf-map-expand {
+  appearance: none;
+  border: 0;
+  width: 32px;
+  height: 32px;
+  padding: 0;
+  cursor: pointer;
+  z-index: 2;
+}
+.qf-map-card .qf-map-expand:focus-visible {
+  outline: 2px solid var(--w-primary);
+  outline-offset: 2px;
+}
+
+/* ── 4. PHONE-PREVIEW SCREEN (demo shell, desktop page, device toggle = Mobile)
+   The framed widget now scrolls INSIDE a fixed 390x844-class device viewport
+   instead of stretching the bezel to its content height. A desktop scrollbar
+   gutter down the middle of a phone mock breaks the illusion, so hide it — iOS
+   and Android both use overlay scrollbars. The class is toggled on the framed
+   document's <body> by widget-demo-shell.html syncPhoneClass(); it is scoped to
+   that demo path only and never reaches a real tenant embed. ── */
+body.qfd-embed-phone { scrollbar-width: none; }
+body.qfd-embed-phone::-webkit-scrollbar { width: 0; height: 0; }
