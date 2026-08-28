@@ -1050,6 +1050,10 @@ export function deltaChip(months: readonly ProfileMonth[]): string {
   }</b> vs prior 6</span>`;
 }
 
+/** Floor for a rendered bar, in % of the track. Below this a real slice would
+ *  vanish; above it, length is exactly the printed share. */
+export const BAR_MIN_PCT = 2;
+
 /**
  * Horizontal bar list for the Product-breakdown and Origin-country sections.
  *
@@ -1071,10 +1075,6 @@ export function deltaChip(months: readonly ProfileMonth[]): string {
  * rows drawn: both callers cap their list to a top-N, so summing what is visible
  * would silently renormalise every share to 100%.
  */
-/** Floor for a rendered bar, in % of the track. Below this a real slice would
- *  vanish; above it, length is exactly the printed share. */
-export const BAR_MIN_PCT = 2;
-
 function barRows(
   items: Array<{ label: string; value: number; flag?: string }>,
   /** Sample population. Defaults to the visible rows, but callers whose list is
