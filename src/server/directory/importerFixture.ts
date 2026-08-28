@@ -90,9 +90,34 @@ const SEARCH_SPECS: RowSpec[] = [
   { name: 'Mahlo America Inc', slug: 'mahlo-america', addr: '575 Simuel Rd, Spartanburg, SC 29303', state: 'SC', ships12m: 29, total: 414, teu12m: 35, supplier: 'Mahlo GmbH & Co KG', sc: 'DE', product: 'Textile measuring equipment', hs: '903120', incumbent: 'Milliken & Company' },
 ];
 
-/** The SEARCH result set: six distinct real-shaped importers entering Savannah.
- *  None of them trips `isForwarder`, so all six survive dedup. */
-export const FIXTURE_SEARCH_ROWS: readonly BolRow[] = SEARCH_SPECS.map((s, i) => row(s, i));
+/**
+ * ALIAS variants — extra bills filed by importers already in SEARCH_SPECS under
+ * a different name spelling and/or a different address. They share
+ * `company_basename` with their parent, so `dedupImporters` collapses them and
+ * the importer COUNT is unchanged; what they add is the raw material for the
+ * "Also under N names · M addresses" card sub-line, which is derived from the
+ * pre-dedup rows (see `aliasCountsByCompany`).
+ *
+ * `ships12m` is kept BELOW the parent row's so dedup always keeps the parent as
+ * the displayed row — the card content stays byte-for-byte what it was.
+ */
+const ALIAS_SPECS: RowSpec[] = [
+  { name: 'Robert Bosch Tool Corporation', base: 'Robert Bosch Tool Corp', slug: 'robert-bosch-tool', addr: '2300 S Watney Way, Ste A, Lincolnton, NC 28092', state: 'NC', ships12m: 9800, total: 169818, teu12m: 18910, supplier: 'Scintilla AG', sc: 'DE', product: 'Saw blades & parts', hs: '820299', incumbent: 'Expeditors Intl' },
+  { name: 'Bosch Tool Corp', base: 'Robert Bosch Tool Corp', slug: 'robert-bosch-tool', addr: '1980 Indian Creek Rd, Lincolnton, NC 28092', state: 'NC', ships12m: 9100, total: 169818, teu12m: 18910, supplier: 'Robert Bosch GmbH', sc: 'DE', product: 'Drill bits', hs: '820750', incumbent: 'Expeditors Intl' },
+  { name: 'Premier Specialty Brands LLC', base: 'Premier Specialty Brands', slug: 'premier-specialty-brands', addr: '4110 Buford Hwy NE, Atlanta, GA 30345', state: 'GA', ships12m: 300, total: 3384, teu12m: 1235, supplier: 'Guangdong Canbo Electrical', sc: 'CN', product: 'Gas / charcoal grills', hs: '732111' },
+];
+
+/** The SEARCH result set: six distinct real-shaped importers entering Savannah,
+ *  plus a few alias bills for two of them. None trips `isForwarder`, so all six
+ *  importers survive dedup. */
+export const FIXTURE_SEARCH_ROWS: readonly BolRow[] = [
+  ...SEARCH_SPECS.map((s, i) => row(s, i)),
+  ...ALIAS_SPECS.map((s, i) => row(s, 50 + i)),
+];
+
+/** Distinct importers the search fixture collapses to (rows > importers now that
+ *  the fixture carries alias bills). Asserted by the cost-guard test. */
+export const FIXTURE_SEARCH_IMPORTERS = SEARCH_SPECS.length;
 
 // ── profile history for FIXTURE_PROFILE_SLUG ────────────────────────────────
 // Deliberately includes ImportYeti's signature alias variants (several name

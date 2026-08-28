@@ -21,7 +21,7 @@ import {
   __resetGuardMetersForTests,
 } from './externalPullGuard.js';
 import { pullImportBols, resolveContactTiered, enrichContact, findImporterLeads } from './importerLeads.js';
-import { FIXTURE_SEARCH_ROWS, fixtureBolCache } from './importerFixture.js';
+import { FIXTURE_SEARCH_ROWS, FIXTURE_SEARCH_IMPORTERS, fixtureBolCache } from './importerFixture.js';
 
 const ENV_KEYS = [
   'NODE_ENV',
@@ -220,7 +220,9 @@ describe('cache-only degradation still serves real data', () => {
     expect(spy).not.toHaveBeenCalled();
     expect(out.cached).toBe(true);
     expect(out.liveBlocked).toBe(false);
-    expect(out.leads.length).toBe(FIXTURE_SEARCH_ROWS.length);
+    // Leads are DEDUPED importers, not raw bills — the fixture carries alias
+    // rows (same company_basename, different spelling/address) on purpose.
+    expect(out.leads.length).toBe(FIXTURE_SEARCH_IMPORTERS);
     expect(out.leads[0].company).toBe('Robert Bosch Tool Corp');
   });
 });

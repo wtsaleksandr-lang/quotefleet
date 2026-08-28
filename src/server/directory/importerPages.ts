@@ -34,6 +34,7 @@
 import type { Express, Request, Response } from 'express';
 import { layout, esc } from './pages.js';
 import { CONTAINER_PORTS } from './containerPorts.js';
+import { EXTRA_STATE_ENTRY_PORTS, quoteLaneHref } from './entryPortFacets.js';
 import { US_STATES } from './usStates.js';
 import { ISO_COUNTRIES, MAJOR_SUPPLIER_CODES } from './isoCountries.js';
 import { suggestCommodity } from './hsCodes.js';
@@ -83,11 +84,15 @@ export interface PortItem {
   value: string;
   label: string;
   state: string;
+  /** UN/LOCODE from CONTAINER_PORTS — the `?port=` value the directory filters
+   *  on, so a result card can deep-link an RFQ at this gateway. */
+  code: string;
 }
 export const US_PORT_ITEMS: readonly PortItem[] = US_PORTS.map((p) => ({
   value: `${p.city}, ${p.state}`,
   label: `${p.name} — ${p.city}, ${p.state}`,
   state: p.state,
+  code: p.code,
 }));
 
 const PORT_VALUE_TO_STATE = new Map(US_PORT_ITEMS.map((p) => [p.value.toLowerCase(), p.state] as const));
@@ -101,23 +106,6 @@ export function portToStateCode(portValue: string | null | undefined): string | 
   if (!portValue) return null;
   return PORT_VALUE_TO_STATE.get(String(portValue).trim().toLowerCase()) ?? null;
 }
-
-/**
- * Curated supplement of additional real US entry ports that are NOT in the
- * container-gateway directory (CONTAINER_PORTS is container-only, so it lists
- * just one port for several states). `entry_port` on ImportYeti is a SUBSTRING
- * match on the city token (verified against the live API: `entry_port=Savannah`
- * and `entry_port=Savannah, GA` both match "Savannah, Ga." rows), so a
- * "City, ST" value here matches that city's bills regardless of the state
- * formatting upstream. Kept SEPARATE from CONTAINER_PORTS so the directory's
- * nearest-port derivation and port facets stay byte-for-byte unchanged.
- */
-const EXTRA_STATE_ENTRY_PORTS: Readonly<Record<string, readonly string[]>> = {
-  GA: ['Brunswick, GA'],
-  CA: ['Oakland, CA'],
-  WA: ['Tacoma, WA'],
-  NY: ['New York, NY'],
-};
 
 /** Cap the ports pulled for a single state-alone search (credit guard — each
  *  port is one cache-first ImportYeti pull on a miss). */
@@ -152,6 +140,22 @@ export function entryPortsForState(stateCode: string | null | undefined): string
   if (!st) return [];
   return (STATE_TO_PORT_VALUES.get(st) ?? []).slice(0, MAX_STATE_PORTS);
 }
+
+/**
+ * Audience seats for the results switcher. QuoteFleet's own idea (NOT
+ * ImportYeti's tab bar) and the one differentiator here: the same result set,
+ * re-weighted for who is reading it. Lines up with the audience-segmented
+ * navigation shipped in #428.
+ *
+ * Every seat renders the SAME projection — the switch is pure CSS/attribute, so
+ * it costs nothing, hits no endpoint and can never advertise data we don't have.
+ */
+export const AUDIENCES: ReadonlyArray<[string, string]> = [
+  ['trucker', 'Trucker'],
+  ['broker', 'Broker'],
+  ['forwarder', 'Forwarder'],
+  ['supplier', 'Supplier'],
+];
 
 /** Volume (12-mo shipments) bands for the narrow-results pane. */
 const FREQ_BANDS: ReadonlyArray<[string, string]> = [
@@ -255,6 +259,24 @@ const IMPORTERS_CSS = `
 /* selected = tinted + outlined, never a bright fill (hard UI rule) */
 .imp-density button[aria-pressed="true"]{background:color-mix(in srgb,var(--accent) 12%,transparent);color:var(--accent);box-shadow:inset 0 0 0 1px var(--accent)}
 
+/* ── audience switcher (Trucker / Broker / Forwarder / Supplier) ──
+   Same segmented-control idiom as .imp-density on purpose — ONE toggle pattern
+   per surface. Switching re-weights the SAME projection via [data-aud] rules
+   below: no re-query, no new data, no network. */
+.imp-aud{display:inline-flex;border:1px solid var(--border-strong);border-radius:8px;overflow:hidden;background:var(--surface-2)}
+.imp-aud button{font-family:var(--font-sans);font-size:12px;font-weight:600;color:var(--muted);background:none;border:0;padding:8px 12px;min-height:38px;cursor:pointer;transition:color .14s,background .14s}
+.imp-aud button+button{border-left:1px solid var(--border-strong)}
+.imp-aud button:hover{color:var(--ink)}
+.imp-aud button:focus-visible{outline:2px solid var(--accent);outline-offset:-2px}
+.imp-aud button[aria-pressed="true"]{background:color-mix(in srgb,var(--accent) 12%,transparent);color:var(--accent);box-shadow:inset 0 0 0 1px var(--accent)}
+/* One-line explanation of the seat being shown. Full-width row of the toolbar
+   (order:9 keeps it last however the controls wrap). Accent TINT, never an
+   accent fill under text. */
+.imp-audhint{order:9;width:100%;display:flex;gap:9px;align-items:flex-start;font-size:12px;line-height:1.5;
+  color:var(--ink-soft);background:color-mix(in srgb,var(--accent) 7%,transparent);
+  border:1px solid color-mix(in srgb,var(--accent) 24%,transparent);border-radius:8px;padding:8px 12px}
+.imp-audhint b{color:var(--accent);font-weight:700;flex:0 0 auto;white-space:nowrap}
+
 /* ── two-column layout: narrow-results sidebar + results ──
    B3: the sidebar (.imp-side) is display:none until a search runs. With a fixed
    232px first column the results wrapper auto-placed INTO that 232px strip on
@@ -316,6 +338,15 @@ a.imp-co-link:focus-visible{outline:2px solid var(--accent);outline-offset:3px}
 .imp-cell{min-width:0}
 .imp-cell .lbl{font-size:9.5px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.06em;line-height:14px;height:14px;margin-bottom:5px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .imp-cell .val{font-size:16px;font-weight:700;color:var(--ink);font-variant-numeric:tabular-nums;letter-spacing:-.01em;line-height:1.2;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+/* Alias sub-line ("Also under N names · M addresses"), under the LAST stat value.
+   Deliberately NOT nowrap — it clamps to two lines instead. The slot is rendered
+   on that cell of EVERY card, empty when there is nothing to say, so the stat
+   strip keeps a CONSTANT height: without it, cards with aliases would be taller
+   than the ones without and the results column would ratchet into random card
+   sizes. Two lines are reserved because at 4-across the cell is ~130px wide. */
+.imp-cell .sub-slot{min-height:30px;margin-top:4px}
+.imp-cell .sub-slot.sub{font-size:10.5px;line-height:1.35;color:var(--muted);
+  display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}
 /* Footer sits flush to the card edges as a tinted action bar (mockup-style). */
 .imp-foot{display:flex;align-items:center;gap:10px 14px;flex-wrap:wrap;margin:14px -20px 0;padding:11px 20px;border-top:1px solid var(--border);background:var(--surface-2);min-height:44px}
 .imp-incumb{font-size:11.5px;color:var(--warn);background:color-mix(in srgb,var(--warn) 13%,transparent);border:1px solid color-mix(in srgb,var(--warn) 30%,transparent);border-radius:999px;padding:3px 10px;max-width:100%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
@@ -326,12 +357,64 @@ a.imp-co-link:focus-visible{outline:2px solid var(--accent);outline-offset:3px}
 .imp-lock:hover{border-color:var(--accent);color:var(--ink)}
 .imp-lock:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
 .imp-lock .ico{opacity:.7}
+/* Primary card action — the ONLY filled control on a card. Mirrors
+   .imp-privacy-btn so the filled-accent treatment is identical page-wide;
+   accent fill + --bg text is the sanctioned pair and is theme-aware (no hex). */
+.imp-cta{display:inline-flex;align-items:center;gap:6px;white-space:nowrap;text-decoration:none;
+  font-size:12px;font-weight:700;border-radius:8px;padding:9px 14px;min-height:44px;box-sizing:border-box;
+  background:var(--accent);color:var(--bg);border:1px solid var(--accent);
+  transition:background .14s,border-color .14s}
+.imp-cta:hover{background:var(--accent-strong,var(--accent));border-color:var(--accent-strong,var(--accent))}
+.imp-cta:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+.imp-cta .arr{transition:transform .15s ease}
+.imp-cta:hover .arr{transform:translateX(3px)}
 /* compact card condenses the stat grid + angle */
 .imp-results.compact .imp-card{padding:14px 15px 0}
 .imp-results.compact .imp-angle{display:none}
 .imp-results.compact .imp-stats{grid-template-columns:repeat(2,minmax(0,1fr));gap:8px 12px}
 .imp-results.compact .imp-co{font-size:15px}
 .imp-results.compact .imp-foot{margin:12px -15px 0;padding:10px 15px}
+/* Compact = two cards per row, so the footer has roughly half the width. With
+   the tier sentence AND the reveal chip AND the CTA it overflows and drops the
+   CTA onto a line by itself — a textbook orphan. The tier sentence and the
+   reveal chip are the droppable ones (the company NAME already links to the
+   same profile), leaving exactly [☆ Save][Quote this lane →] on one line. */
+.imp-results.compact .imp-cta{padding:8px 11px;font-size:11.5px}
+.imp-results.compact .imp-tier{display:none}
+.imp-results.compact .imp-foot-r a.imp-soon{display:none}
+.imp-results.compact .imp-cell .sub-slot{display:none}
+/* Cards in a compact ROW are stretched to the tallest by the grid; pin the
+   action bar to the bottom so a shorter card ends in its footer instead of a
+   band of empty surface. */
+.imp-results.compact .imp-card{display:flex;flex-direction:column}
+.imp-results.compact .imp-stats{margin-bottom:auto}
+
+/* ── audience emphasis: pure CSS/attribute over the SAME rendered card ──
+   Every node these rules touch is already in the DOM for every audience; the
+   switch only changes ORDER and WEIGHT. Nothing here implies data we don't have. */
+/* Trucker — it's a drayage move: TEU sizes the job, and the lane reduces to the
+   gateway the container comes out of. */
+.imp-results[data-aud="trucker"] .imp-cell:nth-child(3){order:-1}
+.imp-results[data-aud="trucker"] .imp-lane .cc,
+.imp-results[data-aud="trucker"] .imp-lane .sup,
+.imp-results[data-aud="trucker"] .imp-lane .arw-o{display:none}
+.imp-results[data-aud="trucker"] .imp-lane .port{font-weight:700;color:var(--ink)}
+/* Broker — frequency is the qualifier and the commodity/HS is what gets matched
+   to a carrier network. */
+.imp-results[data-aud="broker"] .imp-cell:nth-child(2){order:-1}
+.imp-results[data-aud="broker"] .imp-lane .prod{color:var(--ink-soft);font-weight:600}
+/* Forwarder — the incumbent named on the bills is the whole pitch, so it moves
+   out of the footer onto its own line under the lane. */
+/* inline-BLOCK, not inline-flex: a flex container drops the whitespace-only text
+   node between "Displacing:" and the <b>, which ran the two words together. */
+.imp-results[data-aud="forwarder"] .imp-incumb-lead{display:inline-block}
+.imp-results[data-aud="forwarder"] .imp-foot .imp-incumb{display:none}
+/* Supplier — the overseas seller and its origin country lead. */
+.imp-results[data-aud="supplier"] .imp-lane .sup{font-weight:700;color:var(--ink)}
+.imp-results[data-aud="supplier"] .imp-lane .cc{background:color-mix(in srgb,var(--accent) 14%,transparent);color:var(--accent)}
+/* The under-lane incumbent chip exists on every card and is revealed only in the
+   forwarder seat (own line, so it can never orphan-wrap a badge row). */
+.imp-incumb-lead{display:none;margin:-6px 0 12px}
 
 /* "N free profiles left" chip (point-of-use quota surfacing) */
 .imp-profiles-left{display:none;align-items:center;gap:6px;font-size:12px;font-weight:600;color:var(--accent);background:color-mix(in srgb,var(--accent) 12%,transparent);border-radius:999px;padding:5px 12px}
@@ -382,7 +465,11 @@ a.imp-soon:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
 .imp-skel span.w3{width:88%}
 .imp-skel span.w4{width:52%}
 @keyframes imp-sheen{from{background-position:140% 0}to{background-position:-40% 0}}
-@media (prefers-reduced-motion: reduce){.imp-skel span{animation:none}}
+@media (prefers-reduced-motion: reduce){
+  .imp-skel span{animation:none}
+  .imp-cta,.imp-cta .arr,.imp-privacy-btn .arr{transition:none}
+  .imp-cta:hover .arr,.imp-privacy-btn:hover .arr{transform:none}
+}
 
 /* ── load more ── */
 .imp-more-wrap{display:none;justify-content:center;margin:20px 0 0}
@@ -432,6 +519,10 @@ a.imp-soon:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
   .imp-export{margin-left:0}
   .imp-toolbar-r{width:100%;margin-left:0}
   .imp-empty{padding:24px 20px;gap:14px}
+  /* Touch targets: both segmented controls reach 44px on phones. */
+  .imp-aud button,.imp-density button{min-height:44px}
+  .imp-aud{width:100%}
+  .imp-aud button{flex:1 1 0;padding:8px 6px}
 }
 @media(max-width:560px){
   /* No-orphan wrap: the four action buttons pair 2x2 instead of leaving
@@ -445,15 +536,32 @@ a.imp-soon:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
      flag + IMPORTER + winnability stay together instead of orphaning one pill. */
   .imp-card-h{gap:7px}
   .imp-card-h .imp-co{flex:1 1 100%}
+  /* No-orphan wrap: four audience buttons pair 2x2, never 3+1. */
+  .imp-aud{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));border-radius:8px}
+  .imp-aud button{border-left:0;border-top:1px solid var(--border-strong)}
+  .imp-aud button:nth-child(-n+2){border-top:0}
+  .imp-aud button:nth-child(2n){border-left:1px solid var(--border-strong)}
+  /* Density sits directly under it — match the full-width 2-up so the two
+     segmented controls read as one stacked pair, not a ragged edge. */
+  .imp-density{width:100%}
+  .imp-density button{flex:1 1 0}
 }
 @media(max-width:440px){
   .imp-more-grid{grid-template-columns:1fr}
   .imp-panel{padding:14px}
-  .imp-foot-r{justify-content:flex-start}
   .imp-card{padding:14px 15px 0}
   .imp-foot{margin:12px -15px 0;padding:10px 15px}
   .imp-empty{flex-direction:column;gap:12px}
   .imp-co{font-size:16px}
+  /* No-orphan wrap in the card footer. The action row would be three buttons in
+     a two-column grid — one always left alone. The reveal chip is the redundant
+     one (the company NAME above already links to the same profile), so it is
+     hidden here and the row is exactly [☆ Save][Quote this lane →]. Hidden, not
+     removed from the DOM, so nothing about the desktop markup changes. */
+  .imp-foot-r{width:100%;justify-content:flex-start;display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px}
+  .imp-foot-r a.imp-soon{display:none}
+  .imp-foot-r .imp-tier{grid-column:1 / -1;white-space:normal}
+  .imp-save,.imp-cta{width:100%;justify-content:center;padding-left:10px;padding-right:10px;font-size:11.5px}
 }
 `;
 
@@ -552,6 +660,12 @@ export function renderImporterSearchPage(): string {
 
       <div class="imp-toolbar" id="imp-toolbar">
         <span class="imp-count" id="imp-count"></span>
+        <div class="imp-aud" role="group" aria-label="Show results for">
+          ${AUDIENCES.map(
+            ([id, label]) =>
+              `<button type="button" id="imp-aud-${esc(id)}" data-aud="${esc(id)}" aria-pressed="false">${esc(label)}</button>`,
+          ).join('')}
+        </div>
         <div class="imp-toolbar-r">
           <span class="imp-profiles-left" id="imp-profiles-left" role="status" aria-live="polite"></span>
           <div class="imp-density" role="group" aria-label="Result density">
@@ -559,6 +673,7 @@ export function renderImporterSearchPage(): string {
             <button type="button" id="imp-den-comp" aria-pressed="false">Compact</button>
           </div>
         </div>
+        <p class="imp-audhint" id="imp-audhint"><b id="imp-audhint-l"></b><span id="imp-audhint-t"></span></p>
       </div>
 
       <div class="imp-layout">
@@ -845,6 +960,30 @@ const CLIENT_JS = `
   document.getElementById('imp-den-comp').addEventListener('click',function(){ density='compact'; ls('qf_imp_density','compact'); applyDensity(); });
   applyDensity();
 
+  // ── audience switcher ──
+  // Re-weights the SAME cards via a data-aud attribute + CSS. No re-render, no
+  // re-query, no network — flipping seats is instant and costs zero credits.
+  var AUD_HINT={
+    trucker:['Trucker view','TEU leads the card and the lane collapses to the gateway \\u2014 this is the drayage move you would run.'],
+    broker:['Broker view','Shipment frequency leads, with commodity and HS code promoted so you can match the lane to a carrier network.'],
+    forwarder:['Forwarder view','The incumbent named on the bills is promoted \\u2014 that is the account you would be displacing.'],
+    supplier:['Supplier view','The overseas seller and origin country lead. These are US buyers already active in your category.']
+  };
+  var audBtns=document.querySelectorAll('.imp-aud button');
+  var audHintL=document.getElementById('imp-audhint-l');
+  var audHintT=document.getElementById('imp-audhint-t');
+  var aud=ls('qf_imp_aud'); if(!AUD_HINT[aud]) aud='broker';
+  function applyAudience(){
+    results.setAttribute('data-aud',aud);
+    for(var i=0;i<audBtns.length;i++){ audBtns[i].setAttribute('aria-pressed', audBtns[i].getAttribute('data-aud')===aud?'true':'false'); }
+    audHintL.textContent=AUD_HINT[aud][0];
+    audHintT.textContent=AUD_HINT[aud][1];
+  }
+  for(var ai=0;ai<audBtns.length;ai++){
+    audBtns[ai].addEventListener('click',function(){ aud=this.getAttribute('data-aud'); ls('qf_imp_aud',aud); applyAudience(); });
+  }
+  applyAudience();
+
   function card(l){
     var c=T('div','imp-card');
     var h=T('div','imp-card-h');
@@ -868,21 +1007,41 @@ const CLIENT_JS = `
     if(l.state){ c.appendChild(T('div','imp-addr','United States \\u00b7 '+l.state)); }
     var lane=T('div','imp-lane');
     if(l.supplier_country) lane.appendChild(T('span','cc',String(l.supplier_country).toUpperCase()));
-    lane.appendChild(T('span',null,l.supplier||'Supplier'));
-    lane.appendChild(T('span','arw','\\u2192'));
-    lane.appendChild(T('span',null,l.entry_port||'US port'));
+    lane.appendChild(T('span','sup',l.supplier||'Supplier'));
+    lane.appendChild(T('span','arw arw-o','\\u2192'));
+    lane.appendChild(T('span','port',l.entry_port||'US port'));
     if(l.product){ lane.appendChild(T('span','arw','\\u00b7'));
       lane.appendChild(T('span','prod',l.product+(l.hs_code?(' \\u00b7 HS '+l.hs_code):''))); }
     lane.title=(l.supplier||'Supplier')+' \\u2192 '+(l.entry_port||'US port')+(l.product?(' \\u00b7 '+l.product):'');
     c.appendChild(lane);
+    // Forwarder seat promotes the incumbent out of the footer onto its own line.
+    // Same value as the footer chip; CSS shows exactly one of the two at a time.
+    if(l.incumbent_forwarder){
+      var incL=T('span','imp-incumb imp-incumb-lead'); incL.appendChild(document.createTextNode('Displacing: '));
+      var bL=document.createElement('b'); bL.textContent=l.incumbent_forwarder; incL.appendChild(bL);
+      incL.title='Incumbent forwarder named on the bills: '+l.incumbent_forwarder;
+      c.appendChild(incL);
+    }
     if(l.aiAngle){ var a=T('div','imp-angle'); a.appendChild(T('span','z','\\u26a1 AI angle'));
       a.appendChild(T('span',null,l.aiAngle)); c.appendChild(a); }
     var stats=T('div','imp-stats');
-    [['Total shipments',n(l.total_shipments)],['Shipments \\u00b7 12 mo',n(l.ships_12m)],
-     ['TEU \\u00b7 12 mo',n(l.teu_12m)],['Last shipment',l.last_shipment||'\\u2014']].forEach(function(p){
+    var subTxt=aliasSub(l);
+    var cells=[['Total shipments',n(l.total_shipments)],['Shipments \\u00b7 12 mo',n(l.ships_12m)],
+     ['TEU \\u00b7 12 mo',n(l.teu_12m)],['Last shipment',l.last_shipment||'\\u2014']];
+    cells.forEach(function(p,ci){
       var cell=T('div','imp-cell'); var lb=T('div','lbl',p[0]); lb.title=p[0];
       var vl=T('div','val',p[1]); vl.title=p[0]+': '+p[1];
-      cell.appendChild(lb); cell.appendChild(vl); stats.appendChild(cell);
+      cell.appendChild(lb); cell.appendChild(vl);
+      // The LAST cell always carries the slot — empty when there are no
+      // alternates. Always-present is what keeps the stat strip the same height
+      // on a card with aliases and one without; only this cell needs it, so the
+      // other three stay tight (on a phone they sit in the row above).
+      if(ci===cells.length-1){
+        var sb=T('div','sub-slot'+(subTxt?' sub':''), subTxt||'');
+        if(subTxt) sb.title=ALIAS_TIP;
+        cell.appendChild(sb);
+      }
+      stats.appendChild(cell);
     });
     c.appendChild(stats);
     var foot=T('div','imp-foot');
@@ -906,8 +1065,40 @@ const CLIENT_JS = `
       reveal.title='Open the importer profile to reveal the decision-maker contact.';
       right.appendChild(reveal);
     }
+    // Primary action: source drayage rates for this lane. Deep-links the metered
+    // RFQ flow pre-seeded with the lane. port/state are FACET keys, so the RFQ
+    // GET resolves a real carrier set; without one it would 302 back to
+    // /directory — so a lead with neither gets NO CTA rather than a dead link.
+    var cta=ctaFor(l);
+    if(cta) right.appendChild(cta);
     foot.appendChild(right); c.appendChild(foot);
     return c;
+  }
+
+  // "Also under N names \\u00b7 M addresses" — distinct company-name spellings and
+  // addresses this importer filed under IN THIS SEARCH SAMPLE. Gated on >1 so a
+  // single spelling never renders a line saying "1 name".
+  var ALIAS_TIP='Distinct company-name spellings and addresses seen on the bills in this search sample. Open the profile for the full alias list.';
+  function aliasSub(l){
+    var nm=Number(l.alias_names||0), ad=Number(l.alias_addresses||0);
+    if(nm<2 && ad<2) return '';
+    var parts=[];
+    if(nm>1) parts.push(nm+' name'+(nm===1?'':'s'));
+    if(ad>1) parts.push(ad+' address'+(ad===1?'':'es'));
+    return 'Also under '+parts.join(' \\u00b7 ');
+  }
+
+  // Build the "Quote this lane" CTA. The href is resolved SERVER-side (see
+  // quoteLaneHref) and arrives as l.quote_href; null means the entry port maps
+  // to no directory facet, and the card must then show no CTA at all rather
+  // than a link that 302s straight back to /directory.
+  function ctaFor(l){
+    if(!l.quote_href) return null;
+    var a=document.createElement('a'); a.className='imp-cta'; a.href=l.quote_href;
+    a.appendChild(document.createTextNode('Quote this lane '));
+    a.appendChild(T('span','arr','\\u2192'));
+    a.title='Request drayage rates from carriers at '+(l.entry_port||'this port');
+    return a;
   }
 
   // Build a ☆ Save button for a result card. Toggles the importer in the user's
@@ -1263,10 +1454,24 @@ function toPublicCard(l: ImporterLead, tier: ContactConfidence): Record<string, 
     product: l.product,
     hs_code: l.hs_code,
     entry_port: l.entry_port,
+    // The card's "Quote this lane" href, built server-side by the SAME helper
+    // the profile page uses so both surfaces mean the same thing. null when the
+    // entry port resolves to no directory facet — the card then renders no CTA
+    // at all rather than a link that 302s back to /directory.
+    quote_href: quoteLaneHref({
+      entryPort: l.entry_port,
+      destinationState: l.state,
+      product: l.product,
+      hsCode: l.hs_code,
+    }),
     ships_12m: l.ships_12m,
     total_shipments: l.total_shipments,
     teu_12m: l.teu_12m,
     last_shipment: l.last_shipment,
+    // Sample-scoped alias counts (see aliasCountsByCompany) — the card labels
+    // them as "in this search sample" and gates rendering on > 1.
+    alias_names: l.alias_names ?? null,
+    alias_addresses: l.alias_addresses ?? null,
     incumbent_forwarder: l.incumbent_forwarder,
     winnability: winnability(l),
     aiAngle: aiAngle(l),
