@@ -27,14 +27,30 @@
         radial-gradient(ellipse 70% 40% at 50% -8%, rgba(13,60,252,.12), transparent 64%),
         linear-gradient(180deg, #0a1018 0%, #0d1219 45%, #0b0f15 100%);
     }
-    /* Subtle dotted "canvas" grid — reinforces the software/tool feel. Kept
-       faint and masked so it fades out behind the calculator content. */
+    /* Dotted "canvas" grid — reinforces the software/tool feel.
+       PROMINENCE (Alex): the dots were nearly invisible at 0.20 alpha / 1px, so
+       they are stronger now — 0.34 alpha, a slightly fatter dot, and a mask that
+       holds full strength much further down the page before fading.
+
+       WITHOUT crossing content: this layer is z-index 0 and .qfd-wrap sits at
+       z-index 1 on an opaque device card, so it never paints over the calculator.
+       The one place it does sit behind copy is the top brand row, so the mask's
+       hot spot is pulled DOWN to 16% — the grid now reads strongest across the
+       open canvas around the device and stays calm behind the header text,
+       rather than being brightened uniformly. */
     .qfd-body::before {
       content: ''; position: fixed; inset: 0; z-index: 0; pointer-events: none;
-      background-image: radial-gradient(circle, rgba(168,182,204,0.20) 1px, transparent 1.6px);
+      background-image: radial-gradient(circle, rgba(168,182,204,0.34) 1.2px, transparent 1.9px);
       background-size: 22px 22px;
-      -webkit-mask-image: radial-gradient(ellipse 120% 80% at 50% 0%, #000 0%, rgba(0,0,0,.5) 52%, transparent 82%);
-              mask-image: radial-gradient(ellipse 120% 80% at 50% 0%, #000 0%, rgba(0,0,0,.5) 52%, transparent 82%);
+      -webkit-mask-image: radial-gradient(ellipse 130% 92% at 50% 16%, #000 0%, rgba(0,0,0,.66) 58%, transparent 92%);
+              mask-image: radial-gradient(ellipse 130% 92% at 50% 16%, #000 0%, rgba(0,0,0,.66) 58%, transparent 92%);
+    }
+    /* Keep the header copy clean: a short top fade so the strengthened dots never
+       compete with the brand lockup / tagline sitting directly over them. */
+    .qfd-body::after {
+      content: ''; position: fixed; inset: 0 0 auto 0; height: 96px; z-index: 0;
+      pointer-events: none;
+      background: linear-gradient(180deg, #0a1018 0%, rgba(10,16,24,.72) 46%, rgba(10,16,24,0) 100%);
     }
     .qfd-wrap { position: relative; z-index: 1; max-width: 1040px; margin: 0 auto; padding: 24px 20px 56px; }
 
@@ -94,6 +110,24 @@
       transition: background .16s ease, color .16s ease, box-shadow .16s ease;
     }
     .qfd-seg button svg { width: 11px; height: 11px; display: block; }
+    /* Native-app press feedback (Alex) — same asymmetric timing as the widget's
+       motion layer: snaps down in 90ms under the finger, springs back over
+       180ms on release. transform/opacity only. Reduced-motion block below. */
+    .qfd-seg button, .qfd-cta {
+      transition: background .16s ease, color .16s ease, box-shadow .16s ease,
+                  transform 180ms cubic-bezier(.22,1,.36,1);
+    }
+    .qfd-seg button:active { transition-duration: .16s, .16s, .16s, 90ms; transform: scale(.92); }
+    .qfd-cta:active { transition-duration: .16s, .16s, .16s, 90ms; transform: scale(.97); }
+    /* The device toggle changes the stage's whole silhouette — let the new
+       device settle in rather than hard-cutting. */
+    @keyframes qfd-device-in { from { opacity: 0; transform: scale(.985); } to { opacity: 1; transform: none; } }
+    .qfd-stage .qfd-device { animation: qfd-device-in .26s cubic-bezier(.22,1,.36,1); }
+    @media (prefers-reduced-motion: reduce) {
+      .qfd-seg button, .qfd-cta, .qfd-device { transition: none !important; }
+      .qfd-seg button:active, .qfd-cta:active { transform: none !important; }
+      .qfd-stage .qfd-device { animation: none !important; }
+    }
     .qfd-seg button[aria-pressed="true"] {
       background: rgba(255,255,255,.12);
       color: #f4f7fc;
@@ -140,21 +174,77 @@
     .qfd-frame { display: block; width: 100%; height: 560px; border: 0; background: transparent; }
 
     /* Mobile preview (device toggle → Mobile): a phone silhouette — narrow
-       360px body, dynamic-island + status bar in a top strip, deep rounded
-       bezel — but the height FOLLOWS the widget content (the iframe is auto-sized
-       to its scrollHeight in JS) instead of a fixed 9:19.5 lock. This matches the
-       real ≤768px phone path: the whole page scrolls as one surface, so ALL
-       widget content (map card + options + CTA) is reachable — nothing clipped,
-       no trapped inner scroll. */
-    .qfd-stage.is-mobile .qfd-device {
-      box-sizing: border-box;
-      max-width: 360px; height: auto;
-      position: relative;
-      padding-top: 28px;
-      border: 12px solid #0b0d12;
-      border-radius: 48px;
-      background: #0b0d12;
-      box-shadow: 0 40px 90px -44px rgba(0,0,0,.92), 0 0 0 1px rgba(148,163,184,.18), inset 0 1px 0 rgba(255,255,255,.06);
+       390px screen, dynamic-island + status bar in a top strip, deep rounded
+       bezel.
+
+       FIXED DEVICE VIEWPORT (Alex: the preview was a stretched sliver, not a
+       phone). The height used to FOLLOW the widget's content height, so the
+       "phone" grew to ~1200px and stopped reading as a device at all. It is now
+       a real iPhone-class viewport — 390 x 844 CSS px — and the widget SCROLLS
+       INSIDE the screen, exactly like it would on a handset. Short desktop
+       viewports scale the screen height down via the clamp() below rather than
+       overflowing the page (the bezel still reads as a phone at any height).
+
+       This block is deliberately scoped to >=769px: it is a DESKTOP-preview
+       affordance. On a real phone (<=768px) the page IS the device, so the
+       original auto-size behaviour is left completely untouched — see the
+       768px media query further down. */
+    @media (min-width: 769px) {
+      .qfd-stage.is-mobile {
+        /* iPhone 14/15-class logical viewport. */
+        --qfd-screen-w: 390px;
+        --qfd-screen-h: clamp(600px, calc(100vh - 200px), 844px);
+        --qfd-bezel: 12px;
+        --qfd-strip: 28px;   /* status bar / dynamic-island strip */
+        align-items: flex-start;
+      }
+      .qfd-stage.is-mobile .qfd-device {
+        box-sizing: border-box;
+        display: flex;
+        flex-direction: column;
+        width: calc(var(--qfd-screen-w) + var(--qfd-bezel) * 2);
+        max-width: none;
+        height: calc(var(--qfd-screen-h) + var(--qfd-bezel) * 2 + var(--qfd-strip));
+        position: relative;
+        padding-top: var(--qfd-strip);
+        border: var(--qfd-bezel) solid #0b0d12;
+        border-radius: 48px;
+        background: #0b0d12;
+        /* NOTE: no `overflow` here on purpose. Clipping on the device would eat
+           the ::before/::after side buttons (they sit outside the border box),
+           and `overflow:hidden` would additionally make the device a scroll
+           container and break position:sticky inside the framed widget. The
+           screen's own corners are rounded on the iframe instead (below). */
+        box-shadow: 0 40px 90px -44px rgba(0,0,0,.92), 0 0 0 1px rgba(148,163,184,.18), inset 0 1px 0 rgba(255,255,255,.06);
+      }
+      /* The screen: fills the remaining bezel height and scrolls INTERNALLY.
+         `height: auto !important` beats the inline px height the auto-size JS
+         writes for the desktop mockup — setH() also bails out in this mode, this
+         is the belt-and-suspenders so a stale inline height can never re-stretch
+         the phone. */
+      .qfd-stage.is-mobile .qfd-frame {
+        flex: 1 1 0%;
+        width: 100%;
+        height: auto !important;
+        min-height: 0;
+        /* Round the screen into the bezel. The top corners are covered by the
+           status strip, so only the bottom pair needs it (bezel 48 - 12 = 36). */
+        border-radius: 0 0 36px 36px;
+      }
+      /* Side buttons — volume pair + power, purely cosmetic device detail. */
+      .qfd-stage.is-mobile .qfd-device::before,
+      .qfd-stage.is-mobile .qfd-device::after {
+        content: ''; position: absolute; z-index: 7;
+        width: 3px; border-radius: 2px;
+      }
+      .qfd-stage.is-mobile .qfd-device::before {
+        left: -15px; top: 108px; height: 92px;
+        background: linear-gradient(180deg, #232b36, #141a23 46%, #232b36 52%, #141a23);
+      }
+      .qfd-stage.is-mobile .qfd-device::after {
+        right: -15px; top: 148px; height: 64px;
+        background: linear-gradient(180deg, #232b36, #141a23);
+      }
     }
     /* Dynamic island + status bar — only in the mobile bezel's top strip. */
     .qfd-island, .qfd-mstatus { display: none; }
@@ -168,9 +258,7 @@
       font: 700 11px/1 Inter, system-ui, sans-serif; color: #fff; z-index: 5; pointer-events: none;
     }
     .qfd-stage.is-mobile .qfd-mstatus svg { display: block; }
-    /* The iframe fills the bezel width and is height-sized to content in JS
-       (same as desktop) — no fixed-height clamp, no scrollbar-hiding overhang
-       hack, so the outer page scrolls as one surface through to the CTA. */
+    /* The browser chrome bar is a desktop-only mockup detail. */
     .qfd-stage.is-mobile .qfd-chrome { display: none; }
 
     /* On a REAL phone the desktop mockup is dropped — the widget shows directly
@@ -311,8 +399,16 @@
         wrap.classList.toggle('is-mobile', d === 'mobile');
         press('qfd-desktop', d === 'desktop');
         press('qfd-mobile', d === 'mobile');
+        syncPhoneClass();
+        // Restart the device settle animation so the NEW silhouette eases in
+        // rather than hard-cutting (the element itself is reused, so the
+        // animation has to be re-triggered explicitly).
+        var dev = stage.querySelector('.qfd-device');
+        if (dev) { dev.style.animation = 'none'; void dev.offsetWidth; dev.style.animation = ''; }
         // Iframe width just changed → widget reflows; re-size to new content
         // height on the next frame (and once more after reflow settles).
+        // In phone-preview mode remeasure()→setH() just clears the inline height,
+        // which is exactly what we want when coming back from the desktop mockup.
         if (typeof requestAnimationFrame === 'function') {
           requestAnimationFrame(function () { remeasure(); requestAnimationFrame(remeasure); });
         } else { remeasure(); }
@@ -345,11 +441,34 @@
       // direct widget, and hiding the device toggle — is handled in CSS via the
       // 768px media query, which is more reliable than a JS viewport check.)
       var MINH = 560;
+      // TRUE only for the desktop-page "Mobile" preview — a fixed 390x844-class
+      // device viewport whose screen scrolls internally. On a REAL phone (<=768px)
+      // this is false, so the original auto-size path is used unchanged: there the
+      // page IS the device and the whole thing scrolls as one surface.
+      function isPhonePreview() {
+        if (state.device !== 'mobile') return false;
+        try { return window.matchMedia('(min-width: 769px)').matches; } catch (e) { return true; }
+      }
       function setH(h) {
-        // Size the iframe to content in BOTH desktop and mobile mockups so the
-        // outer page scrolls as one surface (no clipped content, no trapped inner
-        // scroll). The mobile bezel's height follows this content height via CSS.
+        // Phone preview: the bezel owns the height (CSS), the widget scrolls
+        // INSIDE the screen. Sizing the iframe to content here is exactly what
+        // stretched the "phone" into a ~1200px sliver, so clear any inline height
+        // left over from the desktop mockup and bail.
+        if (isPhonePreview()) { frame.style.height = ''; return; }
+        // Desktop mockup (and real phones): size the iframe to content so the
+        // outer page scrolls as one surface — no clipped content, no trapped
+        // inner scroll.
         if (h && isFinite(h)) frame.style.height = Math.max(MINH, Math.ceil(h)) + 'px';
+      }
+      // Inside the phone bezel the widget scrolls internally, so its scrollbar
+      // would paint a desktop-looking gutter down the screen. Hide it (iOS uses
+      // overlay scrollbars) via a body class on the same-origin framed document —
+      // the rule itself lives in widget-ux-fixes.css.
+      function syncPhoneClass() {
+        try {
+          var d = frame.contentDocument;
+          if (d && d.body) d.body.classList.toggle('qfd-embed-phone', isPhonePreview());
+        } catch (e) { /* ignore */ }
       }
       // Re-measure after a device toggle: switching desktop⇄mobile changes the
       // iframe width, so the widget reflows to a different content height. The
@@ -395,6 +514,7 @@
           // Let the calculator fill the device frame edge-to-edge (removes the
           // ~34px dead side-gap from its default centered 620px cap). Demo-only.
           if (doc && doc.body) doc.body.classList.add('qfd-embed-fill');
+          syncPhoneClass();
           setH(measureRoot(doc));
           // Same-origin fallback: observe the widget's body so the iframe re-sizes
           // even if a QF_WIDGET_HEIGHT message is ever missed (belt-and-suspenders
@@ -415,6 +535,10 @@
         var d = e.data;
         if (d && d.type === 'QF_WIDGET_HEIGHT') setH(d.height);
       });
+      // Crossing the 769px boundary while the Mobile toggle is on flips between
+      // the fixed phone viewport and the real-phone auto-size path, so re-sync
+      // the framed document's class and re-measure.
+      window.addEventListener('resize', function () { syncPhoneClass(); remeasure(); });
     })();
   </script>
 </body>

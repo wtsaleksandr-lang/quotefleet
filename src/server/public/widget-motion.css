@@ -279,3 +279,223 @@ body.qf-app-calculator #qf-services button.active,
    than stranded in a second column. */
 .qf-result.qf-contact-open .qf-result-actions { grid-template-columns: 1fr; }
 .qf-result.qf-contact-open #qf-continue-btn { display: none; }
+
+/* ════════════════════════════════════════════════════════════════════════
+   8. NATIVE-APP PRESS FEEDBACK + STATE MOTION (Alex, 2026-08)
+   "It should feel like an android/apple iOS app — you should SEE the icons,
+   buttons and containers move after being clicked."
+
+   THE iOS FEEL IS ASYMMETRIC TIMING, not a bigger scale: the control snaps
+   DOWN fast (~90ms) under the finger and springs BACK slowly (~180ms) when
+   released. A symmetric transition reads as a web hover; this reads as a
+   physical button. It is expressed with ONE pattern —
+
+       .thing        { transition: transform 180ms spring; }   ← release
+       .thing:active { transition-duration: 90ms; transform: scale(...); }
+
+   — because while :active holds, the shorter duration governs the press, and
+   the instant it drops the base rule's longer duration governs the spring
+   back. No JS, no keyframes, no timers.
+
+   HARD RULES honoured here: transform/opacity ONLY (never width/height/top —
+   those thrash layout and read as cheap), spring easing (never linear),
+   150-250ms for micro-interactions, and a mandatory prefers-reduced-motion
+   block at the end of this section. Nothing here animates during wheel scroll:
+   the map's zoom/pan feedback is a deliberately UNtransitioned transform (see
+   widget-style.css) so a wheel notch snaps instantly.
+
+   Appended at EOF; widget-motion.css carries no guard-baseline entries and
+   this section declares only transition/transform/animation.
+   ════════════════════════════════════════════════════════════════════════ */
+:root {
+  /* Spring easing specified for this work — a touch more settle than
+     --qf-ease-out, used for every press/release and state change below. */
+  --qf-spring: cubic-bezier(.22, 1, .36, 1);
+  --qf-dur-press: 90ms;      /* finger down — snappy   */
+  --qf-dur-release: 180ms;   /* finger up  — springs back */
+  /* Large surfaces need less scale to read as the same amount of movement, so
+     CTAs compress less than icon buttons and chips. */
+  --qf-press-lg: .97;
+  --qf-press-sm: .94;
+}
+
+/* ── Every tappable control in the widget ──────────────────────────────────
+   Grouped rather than applied via a shared class so no markup has to change
+   and third-party/dynamically-rendered controls (suggestions, chips, custom
+   select options, hazmat rows) are covered automatically. ── */
+.qf-cta,
+#qf-services button,
+.qf-acc-chip,
+.qf-wt-unit button,
+.qf-modal-x,
+.qf-ltl-add,
+.qf-textlink,
+.qf-help,
+.qf-cs-btn,
+.qf-cs-opt,
+.qf-hz-trigger,
+.qf-hz-class,
+.qf-hz-clear,
+.qf-suggestion,
+.qf-options-summary,
+.qf-oog-toggle,
+.qf-map-expand,
+.qf-map-modal-x,
+.qf-map-zoom button {
+  transition:
+    transform var(--qf-dur-release) var(--qf-spring),
+    background-color var(--qf-dur-fast) var(--qf-ease),
+    border-color var(--qf-dur-fast) var(--qf-ease),
+    color var(--qf-dur-fast) var(--qf-ease),
+    box-shadow var(--qf-dur-fast) var(--qf-ease),
+    opacity var(--qf-dur-fast) var(--qf-ease);
+}
+
+/* ── THE CTA NEEDS ITS OWN HIGH-SPECIFICITY PRESS RULE ─────────────────────
+   A mouse press is ALWAYS also a hover, and the tenant CTA-hover system ships
+   THIRTEEN variants of
+
+       body[data-qf-cta-hover="<x>"] .qf-cta:not(.qf-secondary):hover
+           { transform: none | translateY(..) | scale(..) }        (0,4,1)
+
+   plus one that adds `!important` at (0,5,1):
+
+       body.qf-app-calculator[data-qf-cta-hover="sink"]
+           .qf-cta:not(.qf-secondary):hover { transform: none !important; }
+
+   …in public-calculator-no-gradients.css, which is JS-injected (see
+   public-calculator-conditional-options.js) and therefore lands AFTER this
+   stylesheet. So a plain `.qf-cta:active` (0,3,0) loses on specificity to all
+   of them and loses the tie-break to the injected sheet. MEASURED: while held,
+   the button matched :active and picked up the 90ms duration, but its computed
+   transform was still `none` — i.e. the press was completely invisible on most
+   tenant themes. That is precisely the "I don't see the button react" report.
+
+   Fixed at (0,6,1) + !important so it outranks every hover variant including
+   the important one. Deliberately narrow: it only ever sets a press transform,
+   and the reduced-motion block below repeats the SAME selector (so it wins on
+   source order) to switch it off. ── */
+body.qf-app-calculator .qf-cta:active:not(:disabled):not([hidden]):not([aria-hidden="true"]) {
+  transition-duration: var(--qf-dur-press) !important;
+  transform: scale(var(--qf-press-lg)) !important;
+}
+
+/* Press — big surfaces (fold headers + list rows span the full width). */
+.qf-cta:active:not(:disabled),
+.qf-options-summary:active,
+.qf-suggestion:active,
+.qf-cs-btn:active,
+.qf-cs-opt:active,
+.qf-hz-trigger:active {
+  transition-duration: var(--qf-dur-press);
+  transform: scale(var(--qf-press-lg));
+}
+
+/* Press — chips, icon buttons and small controls. */
+#qf-services button:active,
+.qf-wt-unit button:active,
+.qf-modal-x:active,
+.qf-ltl-add:active,
+.qf-textlink:active,
+.qf-help:active,
+.qf-hz-class:active,
+.qf-hz-clear:active,
+.qf-oog-toggle:active,
+.qf-map-expand:active,
+.qf-map-modal-x:active,
+.qf-map-zoom button:active {
+  transition-duration: var(--qf-dur-press);
+  transform: scale(var(--qf-press-sm));
+}
+/* Chips carry a hover lift; the press must SINK them past it, not fight it. */
+.qf-acc-chip:active {
+  transition-duration: var(--qf-dur-press);
+  transform: translateY(0) scale(var(--qf-press-sm));
+}
+
+/* ── SELECTION STATE — a selected chip pops instead of hard-cutting its
+   colours, so the eye catches which one just changed. ── */
+@keyframes qf-select-pop {
+  0%   { transform: scale(var(--qf-press-sm)); }
+  60%  { transform: scale(1.03); }
+  100% { transform: none; }
+}
+.qf-acc-chip.active { animation: qf-select-pop var(--qf-dur-slow) var(--qf-spring); }
+
+/* ── STEP / PANEL CHANGE — the widget's steps are display-toggled
+   (.qf-step.active { display:block }), which is a hard cut with no motion at
+   all. Section 4 above covers the conditional panels but never covered the
+   STEP containers, so this is where "see the container move" was missing. ── */
+.qf-step.active { animation: qf-panel-in var(--qf-dur) var(--qf-ease-out); }
+
+/* ── CONTAINER SIZE CONTINUITY — the eye follows content into its new box.
+   Height itself is NEVER transitioned (layout thrash); continuity comes from
+   the entering content rising into place while the container resizes, which
+   reads as one continuous movement. The result card, the options panel and the
+   map card are the three surfaces that change size mid-flow. ── */
+.qf-map-card:not([hidden]),
+.qf-options-panel:not([hidden]),
+.qf-total-box {
+  animation: qf-panel-in var(--qf-dur) var(--qf-ease-out);
+}
+
+/* ── REDUCED MOTION — mandatory, and authoritative over everything in this
+   section. Controls land instantly in their final state. ── */
+@media (prefers-reduced-motion: reduce) {
+  .qf-cta,
+  #qf-services button,
+  .qf-acc-chip,
+  .qf-wt-unit button,
+  .qf-modal-x,
+  .qf-ltl-add,
+  .qf-textlink,
+  .qf-help,
+  .qf-cs-btn,
+  .qf-cs-opt,
+  .qf-hz-trigger,
+  .qf-hz-class,
+  .qf-hz-clear,
+  .qf-suggestion,
+  .qf-options-summary,
+  .qf-oog-toggle,
+  .qf-map-expand,
+  .qf-map-modal-x,
+  .qf-map-zoom button {
+    transition: none !important;
+  }
+  .qf-cta:active:not(:disabled),
+  #qf-services button:active,
+  .qf-acc-chip:active,
+  .qf-wt-unit button:active,
+  .qf-modal-x:active,
+  .qf-ltl-add:active,
+  .qf-textlink:active,
+  .qf-help:active,
+  .qf-cs-btn:active,
+  .qf-cs-opt:active,
+  .qf-hz-trigger:active,
+  .qf-hz-class:active,
+  .qf-hz-clear:active,
+  .qf-suggestion:active,
+  .qf-options-summary:active,
+  .qf-oog-toggle:active,
+  .qf-map-expand:active,
+  .qf-map-modal-x:active,
+  .qf-map-zoom button:active {
+    transform: none !important;
+  }
+  /* Same selector as the high-specificity CTA press rule above, so it wins the
+     tie purely on source order — a lower-specificity override could not switch
+     off an !important declaration at (0,6,1). */
+  body.qf-app-calculator .qf-cta:active:not(:disabled):not([hidden]):not([aria-hidden="true"]) {
+    transition-duration: 0s !important;
+    transform: none !important;
+  }
+  .qf-acc-chip.active,
+  .qf-step.active,
+  .qf-map-card:not([hidden]),
+  .qf-options-panel:not([hidden]),
+  .qf-total-box {
+    animation: none !important;
+  }
+}

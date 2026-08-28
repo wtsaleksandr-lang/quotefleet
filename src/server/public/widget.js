@@ -2855,7 +2855,14 @@
     card.classList.remove('qf-map-base');
     var routeModal = $('qf-map-modal'); if (routeModal) routeModal.classList.remove('qf-map-base');
     var openBtn = $('qf-map-open'); if (openBtn) openBtn.setAttribute('aria-label', 'Open full route map');
-    var routeImg = $('qf-map-img'); if (routeImg) { routeImg.alt = 'Route from pickup to delivery'; routeImg.style.transform = 'none'; }
+    var routeImg = $('qf-map-img'); if (routeImg) { routeImg.alt = 'Route from pickup to delivery'; }
+    // A new lane must open fully-framed, so drop any zoom/pan the user left on the
+    // previous map. Route mode is now directly manipulable too (shared scale/tx/ty
+    // with the modal), so clearing the inline transform alone is no longer enough —
+    // reset the shared state through the same hook showBaseMap() uses, which also
+    // re-applies identity to BOTH surfaces. Falls back to the old direct clear if
+    // initRouteMapCard() has not run yet.
+    if (_resetBaseZoom) _resetBaseZoom(); else if (routeImg) routeImg.style.transform = 'none';
     var dEl = $('qf-map-distance'); if (dEl) dEl.textContent = (resp.miles != null) ? (Number(resp.miles).toLocaleString() + ' mi') : '—';
     var tEl = $('qf-map-transit'); if (tEl) tEl.textContent = (resp.transit && resp.transit.text) ? resp.transit.text : '—';
     var pu = $('qf-map-pickup'); if (pu) pu.textContent = mapPickupLabel();
@@ -2916,7 +2923,14 @@
     showBaseMap();
     if (!open || !modal) return;
     var vp = $('qf-map-viewport'), mimg = $('qf-map-modal-img'), iimg = $('qf-map-img');
-    var scale = 1, tx = 0, ty = 0, dragging = false, sx = 0, sy = 0;
+    var canvas = $('qf-map-canvas');
+    var scale = 1, tx = 0, ty = 0;
+    // Which <img> the user is actually manipulating right now. The modal, when
+    // open, sits over the inline card, so it owns the gesture; otherwise the
+    // inline preview does. Drag→center math (shiftedCenter) must measure THAT
+    // image's rendered width, or an inline drag would be scaled by the modal's
+    // (much wider) box and the map would fly off.
+    function activeImg() { return (modal && !modal.hidden) ? mimg : iimg; }
     function apply() {
       var t = 'translate(' + tx + 'px,' + ty + 'px) scale(' + scale + ')';
       if (mimg) mimg.style.transform = t;
@@ -2932,7 +2946,11 @@
       // scale/tx/ty to 0 then calls apply(), so this transient transform settles
       // cleanly to identity the instant the crisp bitmap swaps in — no stuck or
       // offset image, no double-transform.
-      if (iimg && isBase()) iimg.style.transform = (modal && !modal.hidden) ? '' : t;
+      // The inline surface is now directly manipulable in ROUTE mode too (drag /
+      // wheel / pinch on a CSS-transformed static route bitmap, exactly like the
+      // modal's route behaviour), so the old isBase() guard is gone. Route mode
+      // resets this transform through _resetBaseZoom() in renderRouteMap().
+      if (iimg) iimg.style.transform = (modal && !modal.hidden) ? '' : t;
     }
     function isBase() { return !!(card && card.classList.contains('qf-map-base')); }
 
@@ -2963,7 +2981,8 @@
     // zoom `zoom`, accounting for the current CSS feedback scale. The static map
     // is 640 logical px wide (see MAP_SIZE), displayed at mimg.clientWidth.
     function shiftedCenter(centerObj, zoom, dxCss, dyCss, curScale) {
-      var imgW = (mimg && mimg.clientWidth) || 640;
+      var act = activeImg();
+      var imgW = (act && act.clientWidth) || (mimg && mimg.clientWidth) || 640;
       var mapPxPerCss = (640 / imgW) / (curScale || 1);
       var world = Math.pow(2, zoom);
       var p = project(centerObj.lat, centerObj.lng);
@@ -3093,7 +3112,15 @@
       if (isBase() && mimg) mimg.src = baseUrl(loadedZoom, loadedCenter, '2');
       apply();
     });
-    function closeModal() { modal.hidden = true; if (baseFetchTimer) { clearTimeout(baseFetchTimer); baseFetchTimer = null; } }
+    function closeModal() {
+      modal.hidden = true;
+      if (baseFetchTimer) { clearTimeout(baseFetchTimer); baseFetchTimer = null; }
+      // While the modal was open apply() blanked the inline transform (the inline
+      // <img> sits hidden behind the modal). Now that the inline preview is the
+      // active surface again, re-apply the shared state so it picks up wherever
+      // the modal left off instead of staying stuck at the blanked identity.
+      apply();
+    }
     var x = $('qf-map-modal-x'), bd = $('qf-map-modal-close');
     if (x) x.addEventListener('click', closeModal);
     if (bd) bd.addEventListener('click', closeModal);
@@ -3101,21 +3128,35 @@
     // Route map = CSS zoom (existing behavior); base map = crisp Google-zoom step.
     if (zi) zi.addEventListener('click', function () { if (isBase()) { stepBaseZoom(1); } else { scale = Math.min(4, scale + 0.4); apply(); } });
     if (zo) zo.addEventListener('click', function () { if (isBase()) { stepBaseZoom(-1); } else { scale = Math.max(1, scale - 0.4); if (scale === 1) { tx = 0; ty = 0; } apply(); } });
-    if (vp) {
+    // ── Shared direct-manipulation (grab-pan + pinch-zoom) ──────────────────
+    // Alex: the INLINE map must behave like a real map — grab it and drag, wheel
+    // or pinch to zoom — not act as a button that only opens a modal. The modal
+    // viewport already had exactly this behaviour, so rather than forking a
+    // second implementation we hoist the one handler set into attachPanZoom()
+    // and mount it on BOTH surfaces. They share the same scale/tx/ty + base
+    // zoom/center state, so a pan inline and a pan in the modal are one
+    // continuous map, and every fix lands on both at once.
+    function attachPanZoom(surface) {
+      if (!surface) return;
       var pointers = {}, pinchStartDist = 0, pinchStartScale = 1, pinchStartZoom = BASE_MIN_Z, pinching = false;
+      var dragging = false, sx = 0, sy = 0;
       function pointerCount() { var n = 0; for (var k in pointers) if (pointers.hasOwnProperty(k)) n++; return n; }
       function pinchDist() {
         var ids = Object.keys(pointers); if (ids.length < 2) return 0;
         var a = pointers[ids[0]], b = pointers[ids[1]];
         return Math.sqrt((a.x - b.x) * (a.x - b.x) + (a.y - b.y) * (a.y - b.y));
       }
-      vp.addEventListener('pointerdown', function (e) {
-        // A press that starts on an interactive control INSIDE the viewport (the
-        // close ✕ is a child of vp) must NOT begin a drag or grab pointer-capture:
-        // capturing the pointer retargets the ensuing click to vp so the button's
-        // own handler never fires — that is why ✕ was unclickable in the modal.
+      surface.addEventListener('pointerdown', function (e) {
+        // A press that starts on an interactive control INSIDE the surface (the
+        // close ✕ is a child of vp; the expand ⤢ is a child of the inline canvas)
+        // must NOT begin a drag or grab pointer-capture: capturing the pointer
+        // retargets the ensuing click to the surface so the button's own handler
+        // never fires — that is why ✕ was unclickable in the modal, and it is what
+        // would otherwise break the inline map's keyboard/SR expand button.
         // (Buttons are also excluded from grab-scroll, so let them bubble.)
         if (e.target && e.target.closest && e.target.closest('button')) return;
+        // Secondary/middle buttons keep their native behaviour (context menu).
+        if (e.pointerType === 'mouse' && e.button !== 0) return;
         // The shared grab-scroll page-pan utility engages on any non-excluded
         // background drag, and its exclude list does NOT cover THIS modal
         // (.qf-map-modal). Left alone it re-captures the pointer to <body> mid-pan,
@@ -3123,6 +3164,8 @@
         // only refreshes on the next click). Keep the press from reaching its
         // document/surface handlers so the map owns its own drag end-to-end.
         e.stopPropagation();
+        // Suppress the browser's native image drag-ghost on the inline map.
+        if (e.cancelable) e.preventDefault();
         pointers[e.pointerId] = { x: e.clientX, y: e.clientY };
         if (pointerCount() === 2) {
           pinching = true; dragging = false;
@@ -3130,9 +3173,10 @@
         } else {
           dragging = true; sx = e.clientX - tx; sy = e.clientY - ty;
         }
-        if (vp.setPointerCapture) { try { vp.setPointerCapture(e.pointerId); } catch (err) {} }
+        surface.classList.add('qf-map-grabbing');
+        if (surface.setPointerCapture) { try { surface.setPointerCapture(e.pointerId); } catch (err) {} }
       });
-      vp.addEventListener('pointermove', function (e) {
+      surface.addEventListener('pointermove', function (e) {
         if (pointers[e.pointerId]) { pointers[e.pointerId].x = e.clientX; pointers[e.pointerId].y = e.clientY; }
         if (pinching && pointerCount() >= 2) {
           var d = pinchDist(); if (!pinchStartDist) return;
@@ -3146,6 +3190,12 @@
           return;
         }
         if (!dragging) return;
+        // ROUTE mode is a fixed static bitmap: there is nothing outside the frame
+        // to reveal until the user has zoomed in, so panning is gated on scale>1
+        // (otherwise a drag would just slide the whole route into empty space).
+        // BASE mode always pans — the drag commits a crisp re-fetch at the new
+        // center, so there is always more map to reveal.
+        if (!isBase() && scale <= 1) return;
         tx = e.clientX - sx; ty = e.clientY - sy; apply();
       });
       function endPointer(e) {
@@ -3154,6 +3204,7 @@
         if (pointerCount() < 2) pinching = false;
         if (pointerCount() === 0) {
           dragging = false;
+          surface.classList.remove('qf-map-grabbing');
           // Commit a base-map pan as a crisp re-fetch at the shifted center.
           if (wasDragging && isBase() && (tx !== 0 || ty !== 0)) {
             center = shiftedCenter(loadedCenter, loadedZoom, tx, ty, scale);
@@ -3161,31 +3212,35 @@
           }
         }
       }
-      vp.addEventListener('pointerup', endPointer);
-      vp.addEventListener('pointercancel', endPointer);
-      vp.addEventListener('wheel', function (e) {
+      surface.addEventListener('pointerup', endPointer);
+      surface.addEventListener('pointercancel', endPointer);
+      surface.addEventListener('wheel', function (e) {
+        // ESCAPE HATCH (inline surface, ROUTE mode only): a routed map is a fixed
+        // bitmap, so once it is fully zoomed OUT a further scroll-down has nothing
+        // left to do — releasing it there lets the host page scroll past the card
+        // instead of dead-zoning on it. Base mode (already shipped) and the modal
+        // always trap: base always has more map to fetch, and the modal is a
+        // dedicated surface with nothing behind it to scroll. This is what keeps
+        // #415's no-scroll-hijack guarantee intact now that route mode zooms too.
+        if (surface === canvas && !isBase() && scale <= 1 && e.deltaY > 0) return;
         e.preventDefault();
+        // Never let a trapped wheel chain out to the host page/embed (#415).
+        e.stopPropagation();
         if (isBase()) { stepBaseZoom(e.deltaY < 0 ? 1 : -1); return; }
         scale = Math.min(4, Math.max(1, scale + (e.deltaY < 0 ? 0.3 : -0.3))); if (scale === 1) { tx = 0; ty = 0; } apply();
       }, { passive: false });
+      // The native image drag-ghost would otherwise abort the pan mid-gesture.
+      surface.addEventListener('dragstart', function (e) { e.preventDefault(); });
     }
-    // ── Inline preview: wheel zooms ONLY over the actual base map ────────────
-    // The inline base map is a static <img>. Over the BASE map surface the wheel
-    // ZOOMS (crisp re-fetch) and we trap it so the host page never scroll-chains.
-    // EVERYWHERE ELSE — a routed map (no inline wheel-zoom) or any non-map area —
-    // we must NOT preventDefault/stopPropagation, or the wheel dead-zones and the
-    // calculator (and its Customize-panel preview) can't scroll. So bail early
-    // unless we're in base mode AND the pointer is over the map canvas itself.
-    if (card) {
-      card.addEventListener('wheel', function (e) {
-        if (!isBase()) return;
-        var t = e.target;
-        if (!(t && t.closest && t.closest('.qf-map-canvas'))) return;
-        e.preventDefault();
-        e.stopPropagation();
-        stepBaseZoom(e.deltaY < 0 ? 1 : -1);
-      }, { passive: false });
-    }
+    attachPanZoom(vp);
+    attachPanZoom(canvas);
+    // ── Inline preview wheel-zoom: now owned by attachPanZoom(canvas) ────────
+    // This used to be a card-level delegated listener that re-tested
+    // `closest('.qf-map-canvas')`. attachPanZoom is bound to the canvas ITSELF,
+    // so the containment is structural rather than a target test — a wheel over
+    // any non-map part of the card (or anywhere else in the calculator, incl. the
+    // Customize-panel preview) never reaches it and scrolls normally. Keeping the
+    // old card listener as well would double-step every notch.
     document.addEventListener('keydown', function (e) {
       if (!modal || modal.hidden) return;
       if (e.key === 'Escape') { closeModal(); return; }
