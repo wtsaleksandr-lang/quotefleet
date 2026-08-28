@@ -233,8 +233,13 @@ describe('R3-7 · chart keyboard access', () => {
 describe('R3-8 · chart x-axis density', () => {
   it('labels an 18-month series with six ticks, not three', () => {
     const axis = /<div class="impp-xaxis">(.*?)<\/div>/s.exec(profileHtml)?.[1] ?? '';
-    const ticks = axis.match(/<span>/g) ?? [];
-    expect(ticks.length).toBe(6);
+    // R5 changed the axis to one slot PER MONTH, labelled only at the ticks, so
+    // that a label is centred under its OWN bar (the old evenly-spread row put
+    // every label after the third under the wrong bar). The density this spec
+    // protects is the number of LABELLED slots, which is unchanged at six.
+    const labelled = axis.match(/<span>[^<]+<\/span>/g) ?? [];
+    expect(labelled.length).toBe(6);
+    expect((axis.match(/<span>/g) ?? []).length).toBe(18);
   });
 
   it('always anchors both ends of the series', () => {

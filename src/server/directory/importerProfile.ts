@@ -531,6 +531,14 @@ const PROFILE_CSS = `
 .impp-flag{font-size:20px;line-height:1}
 .impp-pill{font-size:9.5px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;padding:3px 7px;border-radius:4px;background:var(--surface-3,var(--surface-2));color:var(--ink-soft);border:1px solid var(--border-strong)}
 .impp-head-act{margin-left:auto;display:flex;gap:8px;flex-wrap:wrap;align-items:center}
+/* This page's body carries no qf-* class, so the shared .btn-primary fell back
+   to the ink-filled treatment — a near-white slab in dark theme, sitting on a
+   profile whose OTHER filled CTA (.impp-privacy-cta) is accent. Same override
+   the search page already applies to its primary, so "Quote this lane" reads as
+   the same control across both importer surfaces. */
+.impp-head-act .btn-primary{background:var(--accent-fill);border-color:var(--accent-fill);color:#fff;box-shadow:none}
+.impp-head-act .btn-primary .arr{color:#fff}
+.impp-head-act .btn-primary:hover{background:var(--accent-strong,var(--accent-fill));border-color:var(--accent-strong,var(--accent-fill))}
 .impp-save{display:inline-flex;align-items:center;gap:7px;font-family:var(--font-sans);font-size:13px;font-weight:600;color:var(--ink-soft);background:var(--surface-2);border:1px solid var(--border-strong);border-radius:8px;padding:9px 14px;min-height:44px;cursor:pointer}
 .impp-save:hover{border-color:var(--accent);color:var(--ink)}
 .impp-save .star{font-size:15px;line-height:1;color:var(--muted)}
@@ -617,7 +625,17 @@ const PROFILE_CSS = `
 /* the latest month is the one a broker acts on — call it out */
 .impp-chart rect.bar.last{fill:var(--accent)}
 .impp-chart .axis{stroke:var(--border-strong);stroke-width:1}
-.impp-xaxis{display:flex;justify-content:space-between;color:var(--muted);font-size:10.5px;font-weight:600;margin:8px 0 0 0;padding-left:34px}
+/* One slot per month, so a tick label is centred under its OWN bar (see the
+   xLabels comment in chartSvg). Empty slots let a label overflow its neighbours
+   rather than being clipped. */
+.impp-xaxis{display:flex;color:var(--muted);font-size:10.5px;font-weight:600;margin:8px 0 0 0;padding-left:34px}
+.impp-xaxis span{flex:1 1 0;min-width:0;text-align:center;white-space:nowrap}
+/* A short series stretched to full bleed produced ~280px slabs at 1440, which
+   said nothing about seasonality. Cap the PLOT (bars, gridlines and labels all
+   shrink together, so nothing drifts out of alignment); --impp-plot-cap is set
+   server-side only when the series is short. */
+.impp-plot,.impp-xaxis{max-width:var(--impp-plot-cap,none)}
+.impp-xaxis{max-width:calc(var(--impp-plot-cap,100%) + 34px)}
 .impp-chart-cap{display:flex;align-items:center;gap:8px 14px;flex-wrap:wrap;font-size:11.5px;color:var(--muted);margin-top:10px;padding-top:10px;border-top:1px solid var(--border)}
 .impp-chart-cap b{color:var(--ink);font-variant-numeric:tabular-nums}
 /* Trend chip — a tinted pill, not a filled one, so it reads as a caption fact
@@ -764,7 +782,13 @@ const PROFILE_CSS = `
    the expand/collapse control and must not draw a full-width rule with a lone
    button hanging off it. It becomes a real sticky nav strip only once the tabs
    appear (see the 1320px query below). */
-.impp-secbar{display:flex;align-items:center;gap:12px;margin:0 0 12px;padding:8px 0;background:var(--bg)}
+/* Sticky, so it must read as chrome that sits ABOVE the page rather than a hole
+   cut through it: painted with --bg it punched a page-coloured band straight
+   across the surface-coloured section cards it scrolled over. An elevated
+   surface + a blur behind it (and its existing border-bottom) reads as a bar. */
+.impp-secbar{display:flex;align-items:center;gap:12px;margin:0 0 12px;padding:8px 12px;
+  background:color-mix(in srgb,var(--surface) 86%,transparent);backdrop-filter:blur(10px);
+  -webkit-backdrop-filter:blur(10px);border-radius:10px}
 /* ── scroll affordance for the section strip (R4) ──
    Eleven sections do not fit a phone, and the strip's only cue that more
    existed was a tab clipped mid-word at the edge — which reads as a layout bug,
@@ -775,10 +799,16 @@ const PROFILE_CSS = `
    above it. Both keyed to the direction that can ACTUALLY scroll, so a strip that
    already fits shows neither. */
 .impp-tabswrap{display:none;position:relative;min-width:0;flex:1 1 auto}
+/* The chevrons sit ON the strip, and the edge mask only fades the tabs to ~0 by
+   42px — so at 375, where the strip is ~233px wide, a glyph landed on top of a
+   still-half-visible tab label. Backing each chevron with a small surface chip
+   makes it unambiguously chrome rather than a character mixed into the labels. */
 .impp-tabswrap::before,.impp-tabswrap::after{position:absolute;top:50%;transform:translateY(-50%);z-index:2;
-  pointer-events:none;font-size:19px;font-weight:700;line-height:1;color:var(--accent);opacity:0;transition:opacity .18s ease}
-.impp-tabswrap::before{content:'\\2039';left:2px}
-.impp-tabswrap::after{content:'\\203A';right:2px}
+  pointer-events:none;font-size:15px;font-weight:700;line-height:1;color:var(--accent);opacity:0;transition:opacity .18s ease;
+  width:22px;height:22px;display:flex;align-items:center;justify-content:center;border-radius:7px;
+  background:var(--surface-2);border:1px solid var(--border-strong);box-shadow:var(--shadow-sm)}
+.impp-tabswrap::before{content:'\\2039';left:0}
+.impp-tabswrap::after{content:'\\203A';right:0}
 .impp-tabswrap[data-scroll="left"]::before,.impp-tabswrap[data-scroll="both"]::before{opacity:1}
 .impp-tabswrap[data-scroll="right"]::after,.impp-tabswrap[data-scroll="both"]::after{opacity:1}
 /* Fade width is deliberately fixed and the scroller's padding is NOT touched per
@@ -811,8 +841,22 @@ const PROFILE_CSS = `
   .impp-tabs{scroll-snap-type:none}
   .impp-tabswrap::before,.impp-tabswrap::after{transition:none}
 }
+@media(max-width:620px){
+  /* "Expand all" was taking 132px of a 327px bar, crushing nine section tabs
+     into the remainder. Drop the second word — the control keeps its full
+     accessible name via aria-label. */
+  .impp-expand-x{display:none}
+  /* The action pair wraps onto its own line inside .impp-title, where the
+     header's margin-left:auto then shoved it to the right edge and left a ~55px
+     hole on the left of a left-aligned header. Give it the full row instead. */
+  .impp-head-act{margin-left:0;width:100%}
+  .impp-head-act>*{flex:1 1 0;min-width:0;justify-content:center}
+  /* Uppercase + letter-spacing widened these enough to wrap with an orphan
+     ("TEU · LAST 12 / MO", "AVG TEU / / SHIPMENT"). Sentence case fits on one. */
+  .impp-stat .sl{text-transform:none;letter-spacing:0;font-size:11px}
+}
 @media(max-width:560px){
-  .impp-secbar{gap:8px}
+  .impp-secbar{gap:8px;padding:8px 10px}
   .impp-expand{padding:8px 10px;min-height:44px}
   .impp-tabs a{min-height:44px}
 }
@@ -862,6 +906,13 @@ function chartSvg(months: ProfileMonth[]): string {
   if (!months.length) return '<p class="lead">No dated shipments in the sampled history yet.</p>';
   const W = 720, H = 180, padB = 4;
   const max = Math.max(...months.map((m) => m.count), 1);
+  // The gridlines are hard-locked to four bands (.impp-plot::before repeats at
+  // 25%), so the y-axis always prints five ticks. Scaling those against a raw
+  // peak of, say, 2 produced "2, 2, 1, 1, 0" — Math.round collapsing 1.5 and 0.5
+  // onto their neighbours. Rounding the DOMAIN up to a multiple of four instead
+  // makes every tick a distinct integer for any peak (2→4: 4,3,2,1,0;
+  // 31→32: 32,24,16,8,0) and keeps the bars honest against the printed axis.
+  const axisMax = Math.max(4, Math.ceil(max / 4) * 4);
   const n = months.length;
   const gap = n > 1 ? Math.max(2, Math.min(10, 320 / n)) : 4;
   const bw = (W - gap * (n - 1)) / n;
@@ -872,7 +923,7 @@ function chartSvg(months: ProfileMonth[]): string {
   // screen reader got a single "Monthly shipment counts" summary and nothing else.
   const bars = months
     .map((m, i) => {
-      const h = Math.max(2, Math.round((m.count / max) * (H - padB)));
+      const h = Math.max(2, Math.round((m.count / axisMax) * (H - padB)));
       const x = i * (bw + gap);
       const y = H - h;
       const lbl = `${m.label}: ${N(m.count)} shipment${m.count === 1 ? '' : 's'}`;
@@ -884,17 +935,22 @@ function chartSvg(months: ProfileMonth[]): string {
   // impossible to place any bar in time. Up to six evenly spaced ticks (always
   // including both ends) stay readable at 375px while actually locating a bar.
   const tickCount = Math.min(6, n);
-  const xLabels =
+  // R5: the labels used to be their own `justify-content:space-between` row, so
+  // they spread evenly across the plot regardless of WHICH months they named —
+  // with 7 months and 6 ticks the indices are 0,1,2,4,5,6, and every label after
+  // the third sat under the wrong bar. Emit one slot PER MONTH instead (empty
+  // unless it is a tick) so a label is always centred under its own bar, at any
+  // series length. A labelled slot may overflow into its empty neighbours; that
+  // is why only the ticks carry text.
+  const tickIdx = new Set(
     n === 1
-      ? [first]
-      : Array.from(new Set(
-          Array.from({ length: tickCount }, (_, t) =>
-            months[Math.round((t * (n - 1)) / (tickCount - 1))].label,
-          ),
-        ));
-  // y-axis ticks at 100 / 75 / 50 / 25 / 0 % of the peak, matching the gridlines
+      ? [0]
+      : Array.from({ length: tickCount }, (_, t) => Math.round((t * (n - 1)) / (tickCount - 1))),
+  );
+  const xLabels = months.map((m, i) => (tickIdx.has(i) ? m.label : ''));
+  // y-axis ticks at 100 / 75 / 50 / 25 / 0 % of the ROUNDED domain (see axisMax)
   const ticks = [1, 0.75, 0.5, 0.25, 0]
-    .map((f) => `<span>${N(Math.round(max * f))}</span>`)
+    .map((f) => `<span>${N(Math.round(axisMax * f))}</span>`)
     .join('');
   const total = months.reduce((s, m) => s + m.count, 0);
   const peak = months.reduce((b, m) => (m.count > b.count ? m : b), months[0]);
@@ -908,7 +964,7 @@ function chartSvg(months: ProfileMonth[]): string {
   // entirely rather than shown with a misleading number.
   const delta = deltaChip(months);
   return `
-  <div class="impp-chartwrap">
+  <div class="impp-chartwrap"${n < 13 ? ` style="--impp-plot-cap:${n * 54}px"` : ''}>
     <div class="impp-chart-grid">
       <div class="impp-yaxis" aria-hidden="true">${ticks}</div>
       <div class="impp-plot">
@@ -919,7 +975,7 @@ function chartSvg(months: ProfileMonth[]): string {
         </svg>
       </div>
     </div>
-    <div class="impp-xaxis">${xLabels.map((l) => `<span>${esc(l)}</span>`).join('')}</div>
+    <div class="impp-xaxis">${xLabels.map((l) => `<span>${l ? esc(l) : ''}</span>`).join('')}</div>
     ${n > 1 ? '<p class="impp-chart-hint">Hover or focus a bar for its month and count &mdash; arrow keys step through the series.</p>' : ''}
     <div class="impp-chart-cap">
       <span>Peak <b>${N(peak.count)}</b> in ${esc(peak.label)}</span>
@@ -1043,7 +1099,6 @@ function identityHeader(p: ProfileData, opts: { showActions: boolean }): string 
       ${opts.showActions ? `<div class="impp-head-act">${saveBtn}${laneBtn}</div>` : ''}
     </div>
     ${meta ? `<div class="impp-meta">${meta}</div>` : ''}
-    ${opts.showActions ? privacyCta(p) : ''}
   </div>`;
 }
 
@@ -1062,10 +1117,13 @@ function privacyCta(p: ProfileData): string {
 /** Full statistics strip (real headline aggregates). */
 function statStrip(p: ProfileData): string {
   return `<div class="impp-stats">
+    ${/* The non-breaking spaces are load-bearing: the label block is two fixed
+          lines, and without them these broke as "TEU · last 12 / mo" and
+          "Avg TEU / / shipment" — an orphaned word and a dangling slash. */ ''}
     ${statCard('Total sea shipments', N(p.totalShipments), undefined, '\u{1F4E6}')}
-    ${statCard('Shipments · last 12 mo', N(p.ships12m), undefined, '\u{1F4C8}')}
-    ${statCard('Avg TEU / shipment', p.avgTeu == null ? '—' : String(p.avgTeu), undefined, '\u{1F4CF}')}
-    ${statCard('TEU · last 12 mo', N(p.teu12m), undefined, '\u{1F6A2}')}
+    ${statCard('Shipments · last 12 mo', N(p.ships12m), undefined, '\u{1F4C8}')}
+    ${statCard('Avg TEU / shipment', p.avgTeu == null ? '—' : String(p.avgTeu), undefined, '\u{1F4CF}')}
+    ${statCard('TEU · last 12 mo', N(p.teu12m), undefined, '\u{1F6A2}')}
     ${statCard('Est. shipping spend', p.estSpend || '—', 'est. · 12 mo', '\u{1F4B5}')}
   </div>`;
 }
@@ -1318,7 +1376,7 @@ export function renderImporterProfilePage(p: ProfileData, quota: QuotaState, rev
         ${secs.map((s) => `<a href="#sec-${esc(s.id)}" data-dot="${esc(s.id)}">${esc(s.label)}</a>`).join('')}
       </nav>
     </div>
-    <button type="button" class="impp-expand" id="impp-expand" aria-pressed="false">Expand all</button>
+    <button type="button" class="impp-expand" id="impp-expand" aria-pressed="false" aria-label="Expand all sections">Expand<span class="impp-expand-x"> all</span></button>
   </div>`;
 
   const remainingNote =
@@ -1336,6 +1394,13 @@ export function renderImporterProfilePage(p: ProfileData, quota: QuotaState, rev
       ${remainingNote}
       ${secBar}
       ${secs.map((s, i) => section(s, s.open ?? i === 0)).join('')}
+      ${/* R5: this used to sit inside the identity header, where it spent ~70px
+            of the FIRST screen on a pitch aimed at the importer being profiled —
+            not at the freight seller who is actually visiting. A quarter of the
+            fold went to chrome before a single lead fact. It belongs after the
+            data, where the one visitor in a thousand who IS that importer will
+            still find it. */ ''}
+      ${privacyCta(p)}
     </div>
   </main>
   <script>${PROFILE_JS}</script>`;
@@ -1557,7 +1622,13 @@ const PROFILE_JS = `
     if(!expandBtn) return;
     var on = allOpen();
     expandBtn.setAttribute('aria-pressed', on ? 'true' : 'false');
-    expandBtn.textContent = on ? 'Collapse all' : 'Expand all';
+    expandBtn.setAttribute('aria-label', (on ? 'Collapse' : 'Expand') + ' all sections');
+    // Rewrite only the verb. Setting textContent here used to wipe the
+    // .impp-expand-x span, which is what CSS drops at <=620px to stop this
+    // control eating a third of the sticky section bar on a phone.
+    var verb = expandBtn.firstChild;
+    if(verb && verb.nodeType === 3) verb.nodeValue = on ? 'Collapse' : 'Expand';
+    else expandBtn.textContent = on ? 'Collapse all' : 'Expand all';
   }
   if(expandBtn){
     expandBtn.addEventListener('click', function(){
@@ -1640,8 +1711,13 @@ const PROFILE_JS = `
       // so map the bar's centre through the CURRENT rendered width.
       try {
         var r = wrap.getBoundingClientRect();
+        // A collapsed section renders the plot at zero width, where the clamp
+        // below (max 52, min width-52) resolves to 52 and translateX(-50%) then
+        // pushes the tooltip off the left edge. Nothing sensible to place
+        // against, so leave it where it is.
+        if(!r.width) return;
         var cx = (Number(b.getAttribute('x')) + Number(b.getAttribute('width'))/2) / 720;
-        var x = Math.max(52, Math.min(r.width-52, cx * r.width));
+        var x = Math.max(52, Math.min(Math.max(52, r.width-52), cx * r.width));
         tip.style.left = x + 'px';
       } catch(e){}
     }

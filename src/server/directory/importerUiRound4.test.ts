@@ -71,8 +71,11 @@ describe('R4-2 · a search is shareable and bookmarkable', () => {
   it('rehydrates from the URL WITHOUT going through submit — which would drop the facets', () => {
     // form.submit() resets facetState; restoring must call doSearch directly or a
     // shared link silently loses exactly the facets it was carrying.
+    // R5 added a 4th argument (cacheOnly) so the arrival runs as a cache PROBE
+    // and can never spend a credit — the direct-call requirement this spec exists
+    // to protect is unchanged, so the pattern allows the optional flag.
     expect(search).toContain('function restoreFromUrl()');
-    expect(search).toMatch(/curPayload=collectPayload\(\); curPage=1;\s*doSearch\(curPayload,1,false\);/);
+    expect(search).toMatch(/curPayload=collectPayload\(\); curPage=1;[\s\S]*?doSearch\(curPayload,1,false(,true)?\);/);
     expect(search).toContain('restoreFromUrl();');
   });
 
