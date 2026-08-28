@@ -624,6 +624,24 @@ export const SELF_HEAL_TABLE_STATEMENTS: readonly string[] = [
     "fetched_at" timestamp with time zone DEFAULT now() NOT NULL
   )`,
   `CREATE UNIQUE INDEX IF NOT EXISTS "importer_contact_cache_key_idx" ON "importer_contact_cache" ("company_key")`,
+  // 0067_external_api_spend.sql — audit ledger for PAID external provider calls
+  // (ImportYeti / Hunter / importer AI draft). One row per call that actually
+  // went out, written from the single choke point in externalPullGuard.ts, so
+  // spend is auditable in admin instead of invisible in console output. Healed
+  // HERE (same reasoning as the caches above): read only as a bounded indexed
+  // query; a phantom-drop loses audit history, never product data. MUST stay
+  // byte-for-byte equivalent to drizzle/0067_external_api_spend.sql + schema.ts
+  // `externalApiSpend`.
+  `CREATE TABLE IF NOT EXISTS "external_api_spend" (
+    "id" serial PRIMARY KEY NOT NULL,
+    "provider" text NOT NULL,
+    "context" text,
+    "credits" integer DEFAULT 0 NOT NULL,
+    "credits_remaining" integer,
+    "est_usd_cents" integer DEFAULT 0 NOT NULL,
+    "occurred_at" timestamp with time zone DEFAULT now() NOT NULL
+  )`,
+  `CREATE INDEX IF NOT EXISTS "external_api_spend_at_idx" ON "external_api_spend" ("occurred_at")`,
   // leads_subscriptions + leads_reveal_usage — the "Leads Pro" contact-reveal
   // subscription (per-USER, cloned from directory/manifest) and its per-account
   // reveal allowance meter. Healed HERE (same reasoning as the directory tables

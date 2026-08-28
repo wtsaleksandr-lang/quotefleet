@@ -37,6 +37,7 @@ import { layout, esc } from './pages.js';
 import { ISO_COUNTRIES } from './isoCountries.js';
 import { US_STATES } from './usStates.js';
 import { pullImportBols, type BolRow } from './importerLeads.js';
+import { CACHE_ONLY_NOTE } from './externalPullGuard.js';
 import {
   dbBolCacheStore,
   searchKey,
@@ -434,27 +435,38 @@ export function profileCacheKey(slug: string): string {
 }
 
 /** Live multi-page pull of ONE company's history, bounded by PROFILE_MAX_PAGES;
- *  stops early when a page returns fewer than a full page (end of history). */
-async function pullCompanyHistory(slug: string): Promise<{ rows: BolRow[]; creditsRemaining: number | null }> {
+ *  stops early when a page returns fewer than a full page (end of history).
+ *  `blocked` is TRUE when the HARD COST GUARD refused the call — no socket was
+ *  opened and no credit spent. */
+async function pullCompanyHistory(
+  slug: string,
+): Promise<{ rows: BolRow[]; creditsRemaining: number | null; blocked: boolean }> {
   const all: BolRow[] = [];
   let creditsRemaining: number | null = null;
   for (let page = 1; page <= PROFILE_MAX_PAGES; page++) {
     const pulled = await pullImportBols({}, { companySlug: slug, pageSize: PROFILE_PAGE_SIZE, page, bolType: 'H' });
+    // Guard refused on page 1 → nothing to serve. Refused mid-way is impossible
+    // (the decision is per-process, not per-call), but stop safely either way.
+    if (pulled.blocked) return { rows: all, creditsRemaining, blocked: all.length === 0 };
     const rows = pulled.rows || [];
     if (pulled.creditsRemaining != null) creditsRemaining = pulled.creditsRemaining;
     all.push(...rows);
     if (rows.length < PROFILE_PAGE_SIZE) break;
   }
-  return { rows: all, creditsRemaining };
+  return { rows: all, creditsRemaining, blocked: false };
 }
 
 export interface ProfileFetch {
   rows: BolRow[] | null;
   cached: boolean;
   pulledLive: boolean;
+  /** True when the cost guard refused the live pull on a cache MISS — the page
+   *  must render its designed "unavailable" state, never a fabricated profile. */
+  liveBlocked?: boolean;
 }
 /** Cache-first fetch. When `allowLivePull` is false a cache MISS returns rows:null
- *  (no credit spent) so a walled visitor never triggers a pull. */
+ *  (no credit spent) so a walled visitor never triggers a pull. The HARD COST
+ *  GUARD produces the same rows:null shape (plus `liveBlocked`) outside prod. */
 export async function getProfileRows(
   slug: string,
   opts: { bolCache?: BolCacheStore; allowLivePull: boolean },
@@ -469,6 +481,10 @@ export async function getProfileRows(
   }
   if (!opts.allowLivePull) return { rows: null, cached: false, pulledLive: false };
   const pulled = await pullCompanyHistory(slug);
+  // Blocked by the cost guard → cache MISS with nothing to show. Do NOT write the
+  // empty result back: that would poison the licensed 14-day cache with a fake
+  // "this company has no history".
+  if (pulled.blocked) return { rows: null, cached: false, pulledLive: false, liveBlocked: true };
   try {
     await bolCache.put(key, pulled.rows, pulled.creditsRemaining);
   } catch {
@@ -1143,19 +1159,42 @@ export function renderProfileWall(p: ProfileData, quota: QuotaState): string {
 }
 
 /** A clean "temporarily unavailable / not configured" page (never a 500). */
-function renderProfileUnavailable(slug: string, configured: boolean): string {
+type UnavailableReason = 'error' | 'not_configured' | 'cache_only';
+
+function renderProfileUnavailable(slug: string, reason: UnavailableReason): string {
   const name = titleFromSlug(slug);
-  const body = `
+  const ICON: Record<UnavailableReason, string> = {
+    error: '&#9888;',
+    not_configured: '&#128338;',
+    cache_only: '&#128274;',
+  };
+  const TITLE: Record<UnavailableReason, string> = {
+    error: 'Profile temporarily unavailable',
+    not_configured: 'Importer profiles are coming soon',
+    cache_only: 'Profile temporarily unavailable',
+  };
+  const COPY: Record<UnavailableReason, string> = {
+    error:
+      'We could not load this importer&rsquo;s customs history right now. Nothing was charged &mdash; please try again shortly.',
+    not_configured:
+      'Importer profiles are not switched on in this environment yet. Searching importers still works.',
+    // HONEST: this environment is cache-only by design (cost guard). We show
+    // nothing rather than pretending the company has no shipment history.
+    cache_only:
+      'This importer&rsquo;s customs history has not been pulled into this environment yet, so there is nothing cached to show. Nothing was charged.',
+  };
+  // Dev-visible only: a plain HTML comment naming the cost guard, so a developer
+  // or agent immediately understands WHY the page is empty. Never user-facing copy.
+  const devNote = reason === 'cache_only' ? `\n  <!-- ${CACHE_ONLY_NOTE} (cost guard) -->` : '';
+  const body = `${devNote}
   <style>${PROFILE_CSS}</style>
   <main class="impp-wrap"><div class="container-narrow">
     <a class="impp-back" href="/importers">&larr; Back to importer search</a>
     <div class="impp-head"><div class="impp-title"><h1>${esc(name)}</h1></div></div>
     <div class="impp-wall">
-      <div class="wico" aria-hidden="true">${configured ? '&#9888;' : '&#128338;'}</div>
-      <h2>${configured ? 'Profile temporarily unavailable' : 'Importer profiles are coming soon'}</h2>
-      <p>${configured
-        ? 'We could not load this importer&rsquo;s customs history right now. Nothing was charged &mdash; please try again shortly.'
-        : 'Importer profiles are not switched on in this environment yet. Searching importers still works.'}</p>
+      <div class="wico" aria-hidden="true">${ICON[reason]}</div>
+      <h2>${TITLE[reason]}</h2>
+      <p>${COPY[reason]}</p>
       <div class="impp-wall-actions"><a class="impp-btn-o" href="/importers">Back to importer search</a></div>
     </div>
   </div></main>`;
@@ -1324,6 +1363,7 @@ const PROFILE_JS = `
 
   // ── Decision-maker contact reveal (Leads Pro) ──────────────────────────────
   var revBtn = document.getElementById('impp-reveal-btn');
+  var revBtnLabel = revBtn ? revBtn.textContent : '';
   var upBtn = document.getElementById('impp-upgrade-btn');
   var revResult = document.getElementById('impp-reveal-result');
   var revLeft = document.getElementById('impp-rev-left');
@@ -1336,6 +1376,14 @@ const PROFILE_JS = `
   }
   function renderContact(c){
     if(!revResult||!c) return;
+    // Cost guard: no live Hunter lookup was made and nothing was cached. Say so
+    // honestly — never render this as "no contact found", and leave the reveal
+    // button usable (the user's allowance was not charged).
+    if(c.unavailable==='cache-only'){
+      showMsg('impp-rvc-none','Contact lookup is disabled in this environment \\u2014 nothing cached for this importer yet.');
+      if(revBtn){ revBtn.disabled=false; revBtn.textContent=revBtnLabel; }
+      return;
+    }
     var conf = c.confidence || 'phone_only';
     var badge = conf==='verified' ? 'Verified decision-maker' : (conf==='role_based' ? 'Role-based email (unverified)' : 'Phone & address on file');
     var out = ['<div class="impp-rvc">','<span class="impp-rvc-badge '+conf+'">'+e2(badge)+'</span>'];
@@ -1439,7 +1487,13 @@ export async function handleImporterProfile(
     // Allowed → serve the full detail (cache-first; live pull only on a miss).
     const fetched = await getProfileRows(slug, { bolCache, allowLivePull: true });
     if (!fetched.rows) {
-      res.status(503).type('html').send(renderProfileUnavailable(slug, false));
+      // Cache miss with no live pull. Either the cost guard blocked it (dev / CI)
+      // or the feature is not switched on here — both render the designed
+      // "unavailable" state, and NEITHER counts as a profile open.
+      res
+        .status(503)
+        .type('html')
+        .send(renderProfileUnavailable(slug, fetched.liveBlocked ? 'cache_only' : 'not_configured'));
       return;
     }
     const profile = aggregateProfile(fetched.rows, slug);
@@ -1452,7 +1506,10 @@ export async function handleImporterProfile(
     const msg = (err as Error)?.message || 'unknown error';
     const missingKey = /API_KEY not set/i.test(msg);
     console.warn('[importers.profile] failed:', msg);
-    res.status(missingKey ? 503 : 502).type('html').send(renderProfileUnavailable(slug, !missingKey));
+    res
+      .status(missingKey ? 503 : 502)
+      .type('html')
+      .send(renderProfileUnavailable(slug, missingKey ? 'not_configured' : 'error'));
   }
 }
 

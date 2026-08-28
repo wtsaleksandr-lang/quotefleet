@@ -30,6 +30,8 @@ import {
 } from '../../db/schema.js';
 import { requireAuth, requireSuperAdmin } from '../middleware.js';
 import { creditMeter } from '../directory/importerQuota.js';
+import { externalCallMeter, guardStatus } from '../directory/externalPullGuard.js';
+import { externalSpendSummary } from '../directory/externalSpend.js';
 import { companyKey } from '../directory/importerCache.js';
 import { loadEnv } from '../../config.js';
 import Stripe from 'stripe';
@@ -1295,12 +1297,19 @@ export function registerAdminRoutes(app: Express) {
   // ── IMPORTER SEARCH admin — credits/usage meter + cache purge. ──
   app.get('/api/admin/importers/usage', requireAuth, requireSuperAdmin, async (_req, res) => {
     try {
-      const [bolCount, contactCount] = await Promise.all([
+      const [bolCount, contactCount, spend] = await Promise.all([
         db().select({ n: sql<number>`count(*)::int` }).from(importerBolCache),
         db().select({ n: sql<number>`count(*)::int` }).from(importerContactCache),
+        externalSpendSummary(),
       ]);
       res.json({
+        // In-process meter (resets on deploy) — ImportYeti + Hunter.
         meter: creditMeter(),
+        callMeter: externalCallMeter(),
+        // WHY spend is (or is not) possible right now, per provider.
+        guard: guardStatus(),
+        // Durable ledger: one row per call that actually left the process.
+        spend,
         cache: { bolRows: bolCount[0]?.n ?? 0, contactRows: contactCount[0]?.n ?? 0 },
       });
     } catch (err) {

@@ -17,6 +17,13 @@
  *   • Leads-per-request is hard-capped at MAX_LEADS (25).
  *   • No DB work here at all — this module only talks to external APIs.
  *
+ * ── HARD COST GUARD (see externalPullGuard.ts) ──────────────────────────────
+ * EVERY paid call in this file goes through `guardedFetch`, which opens NO
+ * socket outside real production. Dev / CI / vitest / an agent's checkout are
+ * CACHE-ONLY: `pullImportBols` returns `{ blocked: true, rows: [] }` and the
+ * Hunter path returns `'blocked'`, so callers serve the licensed cache or render
+ * their designed empty state — they must never present a blocked pull as data.
+ *
  * Keys are read from process.env at call time. An unset key throws a clean
  * runtime Error the caller surfaces as a 503-style message — it is deliberately
  * NOT part of the config schema, so a missing key never crashes boot.
@@ -25,13 +32,20 @@
  */
 
 import { releaseBody } from '../../http/responseBody.js';
+import {
+  guardedFetch,
+  reportProviderCost,
+  fetchWithTimeout,
+  EXTERNAL_TIMEOUT_MS,
+} from './externalPullGuard.js';
+
+/** Re-exported from the cost guard so existing importers keep working. */
+export { fetchWithTimeout, EXTERNAL_TIMEOUT_MS };
 
 /** Hard cap on leads returned per request (cost + latency guard). */
 export const MAX_LEADS = 25;
 /** Max concurrent enrichment / draft calls (bounded fan-out). */
 export const ENRICH_CONCURRENCY = 3;
-/** Per-external-call timeout in ms. */
-export const EXTERNAL_TIMEOUT_MS = 12_000;
 
 /** A raw ImportYeti bill-of-lading row (loose — the upstream schema is wide). */
 export type BolRow = Record<string, unknown>;
@@ -114,6 +128,10 @@ export interface TieredContact {
   role_emails: string[];
   phone: string | null;
   address: string | null;
+  /** TRUE when the cost guard refused the live Hunter call. This is NOT a real
+   *  "no contact found" result — the caller must not cache it as one, must not
+   *  charge an allowance for it, and must say so honestly in the UI. */
+  live_blocked?: boolean;
 }
 
 /** Minimal structural view of the BOL cache store (real impl in importerCache.ts).
@@ -125,23 +143,6 @@ export interface BolCacheLike {
 
 /** Local-part prefixes for the role-based (unverified) contact tier. */
 export const ROLE_LOCALPARTS = ['purchasing', 'logistics', 'sales', 'info'] as const;
-
-/* ── timeout wrapper ─────────────────────────────────────────────────────────
- * Every external call goes through here so a hung provider trips an AbortError
- * at EXTERNAL_TIMEOUT_MS instead of holding the request open indefinitely. */
-export async function fetchWithTimeout(
-  url: string,
-  init: RequestInit = {},
-  timeoutMs = EXTERNAL_TIMEOUT_MS,
-): Promise<Response> {
-  const ctrl = new AbortController();
-  const timer = setTimeout(() => ctrl.abort(), timeoutMs);
-  try {
-    return await fetch(url, { ...init, signal: ctrl.signal });
-  } finally {
-    clearTimeout(timer);
-  }
-}
 
 /* ── bounded-concurrency map ─────────────────────────────────────────────────
  * Runs `fn` over `items` with at most `limit` in flight at once. Preserves
@@ -184,10 +185,23 @@ export function companySlugFromLink(link: unknown): string {
   return /^[a-z0-9][a-z0-9-]*$/.test(slug) ? slug : '';
 }
 
+/** Result of one ImportYeti pull. `blocked` is TRUE when the cost guard refused
+ *  the call (no socket opened, no credit spent) — the caller MUST then serve
+ *  cache or its designed empty state and must NEVER cache the empty rows. */
+export interface BolPull {
+  rows: BolRow[];
+  cost: number | null;
+  creditsRemaining: number | null;
+  blocked: boolean;
+}
+
 /* ── 1. ImportYeti: pull US-import bill-of-lading records ───────────────────
  * GET https://data.importyeti.com/v1.0/powerquery/us-import/bols (Bearer auth).
  * bol_type="H" = house bill = the REAL consignee (not the NVOCC master).
- * Response: { requestCost, creditsRemaining, data:{ data:[ <bol rows> ] } }. */
+ * Response: { requestCost, creditsRemaining, data:{ data:[ <bol rows> ] } }.
+ *
+ * COST GUARD: the call goes through `guardedFetch`, which returns null WITHOUT
+ * touching the network outside real production. */
 export async function pullImportBols(
   {
     entryPort,
@@ -203,7 +217,7 @@ export async function pullImportBols(
     page = 1,
     companySlug,
   }: { bolType?: string; pageSize?: number; page?: number; companySlug?: string } = {},
-): Promise<{ rows: BolRow[]; cost: number | null; creditsRemaining: number | null }> {
+): Promise<BolPull> {
   const key = process.env.IMPORTYETI_API_KEY;
   if (!key) throw new Error('IMPORTYETI_API_KEY not set');
   const qs = new URLSearchParams();
@@ -219,17 +233,23 @@ export async function pullImportBols(
   if (bolType) qs.set('bol_type', bolType);
   qs.set('page_size', String(pageSize));
   qs.set('page', String(page));
-  const r = await fetchWithTimeout(
+  const ctx = companySlug ? `profile:${companySlug} page=${page}` : `search page=${page}`;
+  const r = await guardedFetch(
+    'importyeti',
+    ctx,
     `https://data.importyeti.com/v1.0/powerquery/us-import/bols?${qs}`,
     { headers: { Authorization: `Bearer ${key}` } },
   );
+  // Cost guard refused — nothing left the process. Cache-only from here.
+  if (!r) return { rows: [], cost: null, creditsRemaining: null, blocked: true };
   if (!r.ok) throw new Error(`ImportYeti ${r.status}: ${(await r.text()).slice(0, 200)}`);
   const j = (await r.json()) as { requestCost?: number; creditsRemaining?: number; data?: { data?: BolRow[] } };
-  return {
-    rows: j.data?.data ?? [],
-    cost: j.requestCost ?? null,
-    creditsRemaining: j.creditsRemaining ?? null,
-  };
+  const cost = j.requestCost ?? null;
+  const creditsRemaining = j.creditsRemaining ?? null;
+  // Refine the ledger row guardedFetch just wrote with the numbers ImportYeti
+  // itself reported, so admin shows real credits, not an estimate.
+  reportProviderCost('importyeti', cost, creditsRemaining);
+  return { rows: j.data?.data ?? [], cost, creditsRemaining, blocked: false };
 }
 
 /* ── 2. Forwarder / NVOCC / broker filter ────────────────────────────────────
@@ -294,17 +314,27 @@ export function domainMatchesCompany(companyName: string, domain: string | null 
   for (const t of want) if (t.length >= 4 && joined.includes(t)) return true;
   return false;
 }
+/** Sentinel: the cost guard refused the Hunter call — no credit spent, and the
+ *  result is NOT a real negative, so it must never be cached as one. */
+export const HUNTER_BLOCKED = 'blocked' as const;
+export type HunterResolve =
+  | { domain: string; emails: Array<Record<string, unknown>> }
+  | null
+  | typeof HUNTER_BLOCKED;
+
 /** Low-level Hunter resolve: company → { domain, indexed emails }, precision-
  *  guarded. Throws only on an unset key; a Hunter error / drift / no-domain
- *  returns null. `limit` MUST be <= 10. */
-async function hunterDomainSearch(
-  companyName: string,
-): Promise<{ domain: string; emails: Array<Record<string, unknown>> } | null> {
+ *  returns null; the cost guard returns HUNTER_BLOCKED. `limit` MUST be <= 10. */
+async function hunterDomainSearch(companyName: string): Promise<HunterResolve> {
   const key = process.env.HUNTER_API_KEY;
   if (!key) throw new Error('HUNTER_API_KEY not set');
-  const r = await fetchWithTimeout(
+  const r = await guardedFetch(
+    'hunter',
+    `reveal:${companyName.slice(0, 60)}`,
     `https://api.hunter.io/v2/domain-search?company=${encodeURIComponent(companyName)}&api_key=${key}&limit=10`,
   );
+  // Cost guard refused — nothing left the process.
+  if (!r) return HUNTER_BLOCKED;
   if (!r.ok) {
     releaseBody(r); // free the socket — body is never read on the error path
     return null;
@@ -319,7 +349,7 @@ async function hunterDomainSearch(
 
 export async function enrichContact(companyName: string): Promise<EnrichedContact | null> {
   const res = await hunterDomainSearch(companyName);
-  if (!res || !res.emails.length) return null;
+  if (!res || res === HUNTER_BLOCKED || !res.emails.length) return null;
   const ranked = [...res.emails].sort((a, b) => num(b.confidence) - num(a.confidence));
   const dm = ranked.find((e) => TARGET_TITLE_RX.test(str(e.position))) || ranked[0];
   const name = [dm.first_name, dm.last_name].filter(Boolean).join(' ') || null;
@@ -357,12 +387,15 @@ export async function resolveContactTiered(
     phone,
     address,
   };
-  let res: { domain: string; emails: Array<Record<string, unknown>> } | null = null;
+  let res: HunterResolve = null;
   try {
     res = await hunterDomainSearch(companyName);
   } catch {
     res = null; // missing key / network → fall through to phone_only
   }
+  // Cost guard refused the live call — honest phone_only, flagged so the caller
+  // does NOT cache it as a real negative and does NOT charge an allowance.
+  if (res === HUNTER_BLOCKED) return { ...base, live_blocked: true };
   if (!res) return base;
 
   const ranked = [...res.emails].sort((a, b) => num(b.confidence) - num(a.confidence));
@@ -447,7 +480,7 @@ export async function draftEmail(
   // intermittent HTTP-200-but-empty-content case, with linear backoff.
   let last = '';
   for (let attempt = 0; attempt < 4; attempt++) {
-    const r = await fetchWithTimeout('https://api.anthropic.com/v1/messages', {
+    const r = await guardedFetch('anthropic', `draft:${lead.company.slice(0, 60)}`, 'https://api.anthropic.com/v1/messages', {
       method: 'POST',
       headers: {
         'x-api-key': key,
@@ -456,6 +489,8 @@ export async function draftEmail(
       },
       body,
     });
+    // Cost guard refused — no socket opened, no tokens billed.
+    if (!r) throw new Error('importer draft blocked by cost guard (live pulls disabled)');
     if (r.ok) {
       const j = (await r.json()) as { content?: Array<{ type: string; text?: string }>; stop_reason?: string };
       const text = (j.content || [])
@@ -557,6 +592,10 @@ export async function findImporterLeads({
   pulledLive: boolean;
   /** Raw BOL records scanned this pull (0 on a blocked miss). */
   recordsScanned: number;
+  /** True when the HARD COST GUARD refused a live pull on a cache MISS. The
+   *  result is cache-only: the caller must render its designed empty state and
+   *  never present this as "no importers matched". */
+  liveBlocked: boolean;
 }> {
   const cap = Math.max(1, Math.min(maxLeads, MAX_LEADS));
   const pg = Math.max(1, Math.floor(page) || 1);
@@ -580,14 +619,21 @@ export async function findImporterLeads({
     }
   }
 
+  let liveBlocked = false;
   if (rows == null) {
     // Cache miss. The quota gate can veto the live pull to protect credits — the
     // caller then shows the subscribe wall instead of us spending a credit.
     if (!allowLivePull) {
-      return { leads: [], creditsRemaining: null, cached: false, pulledLive: false, recordsScanned: 0 };
+      return { leads: [], creditsRemaining: null, cached: false, pulledLive: false, recordsScanned: 0, liveBlocked: false };
     }
     // Pull generously (dedup collapses many BOL rows per importer), then cap.
     const pulled = await pullImportBols(filters, { pageSize, page: pg });
+    // HARD COST GUARD refused the call (no socket opened). Return an honest
+    // cache-only miss and — critically — do NOT write the empty rows back, which
+    // would poison the licensed 14-day cache with a fake "no results".
+    if (pulled.blocked) {
+      return { leads: [], creditsRemaining: null, cached: false, pulledLive: false, recordsScanned: 0, liveBlocked: true };
+    }
     rows = pulled.rows;
     creditsRemaining = pulled.creditsRemaining;
     pulledLive = true;
@@ -607,7 +653,7 @@ export async function findImporterLeads({
   const base = applyPostFilters(importers.map((r) => toLead(r)), filters, redactKeys).slice(0, cap);
 
   if (!withEnrichment && !withEmails) {
-    return { leads: base, creditsRemaining, cached, pulledLive, recordsScanned };
+    return { leads: base, creditsRemaining, cached, pulledLive, recordsScanned, liveBlocked };
   }
 
   // Enrichment / drafting fan-out — bounded concurrency, never unbounded.
@@ -619,7 +665,7 @@ export async function findImporterLeads({
     if (withEmails) merged.draft_email = await draftEmail(merged).catch(() => null);
     return merged;
   });
-  return { leads, creditsRemaining, cached, pulledLive, recordsScanned };
+  return { leads, creditsRemaining, cached, pulledLive, recordsScanned, liveBlocked };
 }
 
 /* ── CSV export (LOCKED / paid feature) ─────────────────────────────────────*/

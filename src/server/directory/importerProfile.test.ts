@@ -2,7 +2,7 @@
  * Importer Company Profile page (Phase 2) — aggregation, the 3-free-profile
  * detail-quota gate, and the cache-hit ($0 on repeat) path.
  */
-import { describe, it, expect, vi, afterEach } from 'vitest';
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import type { Request, Response } from 'express';
 import {
   aggregateProfile,
@@ -13,9 +13,17 @@ import {
 } from './importerProfile.js';
 import { companySlugFromLink } from './importerLeads.js';
 import { FREE_DETAIL_QUOTA, DETAIL_COOKIE, __resetQuotaStateForTests } from './importerQuota.js';
+import { __setLivePullsForTests } from './externalPullGuard.js';
 
 const realFetch = globalThis.fetch;
+// These specs drive the profile's LIVE pull path against a MOCKED fetch, so they
+// opt in to the cost guard explicitly. The opt-in is in-code only (no env var can
+// do it) and can therefore never reach a real provider — see externalPullGuard.
+beforeEach(() => {
+  __setLivePullsForTests(true);
+});
 afterEach(() => {
+  __setLivePullsForTests(null); // back to the default: OFF
   globalThis.fetch = realFetch;
   vi.restoreAllMocks();
   delete process.env.IMPORTYETI_API_KEY;
