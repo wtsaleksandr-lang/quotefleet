@@ -42,12 +42,39 @@ const DRAIN_BUDGET_MS = 10_000;
 
 let server: Server;
 let port: number;
-/** Live connections the stalling upstream is still holding open. */
+/**
+ * EVERY connection the stalling upstream is still holding open, including the
+ * idle keep-alive connections undici keeps for its pool. Only used to tear the
+ * fixture down in `afterEach` — never to assert on. See `requestSockets`.
+ */
 const liveSockets = new Set<Socket>();
+/**
+ * The subset of `liveSockets` that actually carried an HTTP REQUEST — the only
+ * population this test is about, because a leaked FD is by definition a socket
+ * still pinned to a request nobody will ever finish reading.
+ *
+ * WHY THE DISTINCTION EXISTS (it is what made this suite red on Linux CI while
+ * green on Windows): undici does not just destroy the socket when a request is
+ * aborted — it then opens a FRESH connection into its pool. That replacement
+ * carries no request and is reaped on undici's own keep-alive schedule, which
+ * is version-dependent: ~3.00s on the undici bundled with Node 22 (what CI
+ * runs), but ~0ms on Node 24 (local Windows). Counting raw connections
+ * therefore reports a perfectly healthy abort as a "pinned socket" for three
+ * seconds on CI and not at all locally.
+ *
+ * That linger is ordinary connection reuse, not a leak: a plain request that is
+ * answered and fully consumed — no abort, no timeout signal anywhere near it —
+ * leaves an identical ~3s idle connection behind on both platforms. Keying the
+ * assertions off request-carrying sockets measures the leak itself instead of
+ * undici's pool, so the test means the same thing on every runtime.
+ */
+const requestSockets = new Set<Socket>();
 
 beforeEach(async () => {
   liveSockets.clear();
-  server = createServer((_req, res) => {
+  requestSockets.clear();
+  server = createServer((req, res) => {
+    requestSockets.add(req.socket);
     // Headers land (so `fetch()` RESOLVES), then the body never completes:
     // content-length promises far more than we ever write, so any reader waits
     // forever. This is what a throttled Google/EIA/Hunter endpoint looks like.
@@ -56,8 +83,12 @@ beforeEach(async () => {
   });
   server.on('connection', (socket: Socket) => {
     liveSockets.add(socket);
-    socket.on('close', () => liveSockets.delete(socket));
-    socket.on('error', () => liveSockets.delete(socket));
+    const forget = () => {
+      liveSockets.delete(socket);
+      requestSockets.delete(socket);
+    };
+    socket.on('close', forget);
+    socket.on('error', forget);
   });
   server.listen(0, '127.0.0.1');
   await once(server, 'listening');
@@ -73,6 +104,27 @@ afterEach(async () => {
 });
 
 const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
+
+/**
+ * Poll until every request-carrying socket has been released, then report what
+ * is still pinned.
+ *
+ * Polls to a bounded deadline instead of sampling once after a fixed sleep:
+ * under full-suite parallel load the abort timers fire late, and a fixed window
+ * reports a socket as "pinned" when it was merely slow to be reclaimed. A
+ * correctly aborted request reaches zero well inside this budget; a genuinely
+ * pinned one never drops at all, so the leak case pays the full wait exactly
+ * once and still returns a non-zero count. Callers keep asserting `toBe(0)` —
+ * polling costs the leak nothing in strictness, only time.
+ */
+async function drainPinnedSockets(): Promise<number> {
+  const deadline = Date.now() + DRAIN_BUDGET_MS;
+  while (Date.now() < deadline && requestSockets.size > 0) {
+    await sleep(100);
+    (globalThis as { gc?: () => void }).gc?.();
+  }
+  return requestSockets.size;
+}
 
 /**
  * Fire N body reads through `doFetch`, then report sockets still pinned.
@@ -91,25 +143,14 @@ async function pinnedAfter(doFetch: (url: string) => Promise<Response>): Promise
         // asserts is the fate of the socket, measured by the caller below.
       });
   }
-  // 1. Wait for every request to actually establish its socket. Without this the
+  // 1. Wait for every request to actually REACH the server. Without this the
   //    drain poll below would exit immediately on a still-empty set.
   const connectDeadline = Date.now() + DRAIN_BUDGET_MS;
-  while (Date.now() < connectDeadline && liveSockets.size < REQUESTS) await sleep(25);
-  expect(liveSockets.size).toBe(REQUESTS);
+  while (Date.now() < connectDeadline && requestSockets.size < REQUESTS) await sleep(25);
+  expect(requestSockets.size).toBe(REQUESTS);
 
-  // 2. Poll for the drain rather than sleeping a fixed interval: under
-  //    full-suite parallel load the abort timers fire late, and a fixed window
-  //    would report a socket as "pinned" when it was merely slow to be
-  //    reclaimed. A correctly-aborted request reaches zero well inside this
-  //    budget; a genuinely pinned one never drops, so the leak case pays the
-  //    full wait exactly once.
-  const drainDeadline = Date.now() + DRAIN_BUDGET_MS;
-  while (Date.now() < drainDeadline && liveSockets.size > 0) {
-    await sleep(100);
-    (globalThis as { gc?: () => void }).gc?.();
-  }
-  await sleep(250);
-  return liveSockets.size;
+  // 2. Then wait for them to drain.
+  return drainPinnedSockets();
 }
 
 describe('outbound fetch FD hygiene: the abort must cover the body read', () => {
@@ -146,9 +187,17 @@ describe('outbound fetch FD hygiene: the abort must cover the body read', () => 
 
     await sleep(150);
     caller.abort();
-    await expect(inflight).rejects.toThrow();
 
-    await sleep(250);
-    expect(liveSockets.size).toBe(0);
-  });
+    // The CALLER's abort must be what ends this. `AbortSignal.timeout` rejects
+    // with a `TimeoutError`, so pinning the name to `AbortError` proves the
+    // combine actually forwarded the caller's cancellation rather than the
+    // exchange dying of something else.
+    await expect(inflight).rejects.toMatchObject({ name: 'AbortError' });
+
+    // ...and the socket the stalled body was holding must come back. If the
+    // combine dropped the caller's signal, nothing else could end this exchange
+    // inside the budget — the 60s timeout is far beyond it — so the socket
+    // would stay pinned for the full poll and this assertion would fail.
+    expect(await drainPinnedSockets()).toBe(0);
+  }, 40_000);
 });
