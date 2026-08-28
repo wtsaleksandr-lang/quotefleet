@@ -321,6 +321,7 @@ export interface PoaValidatable {
   certSignerTitle?: string | null;
   certSignerEmail?: string | null;
   authorityDocsNote?: string | null;
+  consentDisclosureVersion?: string | null;
   signedAt?: Date | null;
   docSha256?: string | null;
 }
@@ -367,6 +368,13 @@ export function validatePoaForFiling(
      *  address blocks the filing instead of fabricating a fact. Omitted ⇒ not
      *  checked (the pure callers that don't read env, e.g. tests). */
     agentAddressConfigured?: boolean;
+    /** The consent/disclosure version currently in force. When supplied, a
+     *  record executed under an OLDER version fails a blocking check: the POA is
+     *  regenerated deterministically from the stored row, so a row signed
+     *  against a superseded template would re-render as a document its signer
+     *  never saw — and its retained SHA-256 would no longer reproduce. Those
+     *  must be re-signed, not filed. Omitted ⇒ not checked. */
+    currentConsentVersion?: string;
   },
 ): PoaGateResult {
   const checks: PoaCheck[] = [];
@@ -535,6 +543,18 @@ export function validatePoaForFiling(
       ? `Signed ${app.signedAt.toISOString().slice(0, 10)} · SHA-256 ${String(app.docSha256).slice(0, 16)}…`
       : 'Not yet executed.',
   );
+
+  if (opts?.currentConsentVersion && app.signedAt instanceof Date) {
+    const onCurrent = app.consentDisclosureVersion === opts.currentConsentVersion;
+    add(
+      'template_current',
+      'Executed under the current authorization text',
+      onCurrent,
+      onCurrent
+        ? String(app.consentDisclosureVersion)
+        : `Signed under ${app.consentDisclosureVersion || 'an unrecorded version'}, superseded by ${opts.currentConsentVersion}. The document regenerates from the current template, so this record no longer reproduces what was signed — have the customer re-sign before filing.`,
+    );
+  }
 
   if (opts?.agentAddressConfigured !== undefined) {
     add(

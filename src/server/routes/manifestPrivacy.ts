@@ -643,7 +643,22 @@ export function registerManifestPrivacyRoutes(app: Express): void {
       if (!existing || !existing.signedAt) {
         return res.status(404).type('text/plain').send('Not available.');
       }
-      const { buffer } = await buildPoaPdf(pdfInputFromApp(existing, existing.signedAt));
+      const { buffer, sha256 } = await buildPoaPdf(pdfInputFromApp(existing, existing.signedAt));
+      // TAMPER-EVIDENCE: the document is re-rendered deterministically from the
+      // retained row, so its hash MUST reproduce the one recorded at execution.
+      // A mismatch means this is not the instrument that was signed — almost
+      // always a record executed under a superseded template. Never fail the
+      // download (the customer still needs their copy), but say so loudly and
+      // mark the response; `validatePoaForFiling`'s `template_current` check is
+      // what actually stops such a record from being filed.
+      if (existing.docSha256 && sha256 !== existing.docSha256) {
+        console.error(
+          `[manifest.application.pdf] HASH MISMATCH for application ${existing.id} ` +
+            `(token ${existing.publicToken}): retained ${existing.docSha256}, re-rendered ${sha256}. ` +
+            `Consent version on record: ${existing.consentDisclosureVersion ?? 'none'}; current: ${CONSENT_DISCLOSURE_VERSION}.`,
+        );
+      }
+      res.setHeader('X-Poa-Hash-Reproduces', existing.docSha256 ? String(sha256 === existing.docSha256) : 'unknown');
       // `?download=1` (the admin queue's Download action) forces a save-to-disk;
       // the default stays inline so View/Print open the document in the viewer.
       const download = String((req.query as Record<string, unknown>)?.download ?? '') === '1';
@@ -820,7 +835,10 @@ export function registerManifestPrivacyRoutes(app: Express): void {
             app: a,
             events,
             sub: subFor(a.userId),
-            gate: validatePoaForFiling(a, { agentAddressConfigured: !!agentAddress() }),
+            gate: validatePoaForFiling(a, {
+              agentAddressConfigured: !!agentAddress(),
+              currentConsentVersion: CONSENT_DISCLOSURE_VERSION,
+            }),
           };
         }),
       );
@@ -846,7 +864,10 @@ export function registerManifestPrivacyRoutes(app: Express): void {
       // transmitted to CBP — a rejected filing costs the customer a re-signature.
       // An operator can override deliberately (`force`), and the override is
       // recorded in the audit trail with the exact checks that were failing.
-      const gate = validatePoaForFiling(existing, { agentAddressConfigured: !!agentAddress() });
+      const gate = validatePoaForFiling(existing, {
+        agentAddressConfigured: !!agentAddress(),
+        currentConsentVersion: CONSENT_DISCLOSURE_VERSION,
+      });
       const force = body.force === true;
       if (!gate.ok && !force) {
         return res.status(409).json({

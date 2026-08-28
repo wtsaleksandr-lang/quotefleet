@@ -350,6 +350,28 @@ describe('validatePoaForFiling — the pre-filing gate', () => {
     expect(certified.ok).toBe(true);
   });
 
+  it('blocks a record executed under a SUPERSEDED authorization text', () => {
+    // The PDF regenerates from the row, so a record signed against an older
+    // template would re-render as a document its signer never saw and its
+    // retained SHA-256 would stop reproducing. Those must be re-signed.
+    const old = validatePoaForFiling(filable({ consentDisclosureVersion: 'poa-consent-2026-08-v1' }), {
+      currentConsentVersion: 'poa-consent-2026-08-v2',
+    });
+    expect(old.ok).toBe(false);
+    expect(old.failures.map((f) => f.key)).toContain('template_current');
+    expect(
+      validatePoaForFiling(filable({ consentDisclosureVersion: 'poa-consent-2026-08-v2' }), {
+        currentConsentVersion: 'poa-consent-2026-08-v2',
+      }).ok,
+    ).toBe(true);
+    // Not yet executed ⇒ nothing to compare, so the check is not added.
+    expect(
+      validatePoaForFiling(filable({ signedAt: null, docSha256: null }), {
+        currentConsentVersion: 'poa-consent-2026-08-v2',
+      }).checks.map((c) => c.key),
+    ).not.toContain('template_current');
+  });
+
   it('blocks when the Agent’s own filing address is not configured', () => {
     // We refuse to print an unverified address on a legal instrument, so an
     // unset MANIFEST_AGENT_ADDRESS is a filing blocker, not a silent fallback.
