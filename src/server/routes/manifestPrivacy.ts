@@ -59,7 +59,6 @@ import {
   buildPoaPdf,
   decodeSignaturePng,
   CONSENT_DISCLOSURE_VERSION,
-  AGENT_DEFAULT_ADDRESS,
 } from '../manifestPoaPdf.js';
 import {
   POA_GOVERNING_LAW_STATE,
@@ -87,8 +86,22 @@ import {
 } from '../directory/manifestUsage.js';
 import { invalidateRedactionCache } from '../directory/manifestRedactions.js';
 
-/** QuoteFleet's legal filing entity named as Agent on the POA. */
-const AGENT_LEGAL_NAME = 'QuoteFleet, Inc.';
+/** QuoteFleet's legal filing entity named as Agent on the POA. Overridable so
+ *  the instrument always carries the real, current legal name. */
+function agentLegalName(): string {
+  return loadEnv().MANIFEST_AGENT_LEGAL_NAME || 'QuoteFleet, Inc.';
+}
+
+/**
+ * The Agent's physical address on the POA (19 CFR 141.32's model form names the
+ * agent AND its address). Deliberately NOT hardcoded — an unverified address on
+ * an executed legal instrument is a false statement. Unset ⇒ the document falls
+ * back to the Agent's email notice address and the pre-filing gate BLOCKS, so
+ * this surfaces as a config task rather than shipping a fabricated fact.
+ */
+function agentAddress(): string | null {
+  return loadEnv().MANIFEST_AGENT_ADDRESS ?? null;
+}
 /** CBP confidentiality is valid 2 years from receipt. */
 const TWO_YEARS_MS = 2 * 365 * 24 * 60 * 60 * 1000;
 
@@ -267,8 +280,8 @@ function pdfInputFromApp(app: PoaApplication, signedAt: Date) {
     consentAt: app.consentAt ?? null,
     emailVerifiedAt: verifiedBeforeSigning,
     signatureImage: decodeSignaturePng(app.signatureDrawnPng),
-    agentLegalName: AGENT_LEGAL_NAME,
-    agentAddress: AGENT_DEFAULT_ADDRESS,
+    agentLegalName: agentLegalName(),
+    agentAddress: agentAddress(),
     expiresAt: app.expiresAt ?? null,
   };
 }
@@ -803,7 +816,12 @@ export function registerManifestPrivacyRoutes(app: Express): void {
           // checklist (ACE name / EIN / address / title / Schedule A /
           // partnership / nonresident / email round-trip) instead of having to
           // remember 15 rejection causes.
-          return { app: a, events, sub: subFor(a.userId), gate: validatePoaForFiling(a) };
+          return {
+            app: a,
+            events,
+            sub: subFor(a.userId),
+            gate: validatePoaForFiling(a, { agentAddressConfigured: !!agentAddress() }),
+          };
         }),
       );
       res.type('html').send(renderAdminPrivacyQueue(withEvents, { filter }));
@@ -828,7 +846,7 @@ export function registerManifestPrivacyRoutes(app: Express): void {
       // transmitted to CBP — a rejected filing costs the customer a re-signature.
       // An operator can override deliberately (`force`), and the override is
       // recorded in the audit trail with the exact checks that were failing.
-      const gate = validatePoaForFiling(existing);
+      const gate = validatePoaForFiling(existing, { agentAddressConfigured: !!agentAddress() });
       const force = body.force === true;
       if (!gate.ok && !force) {
         return res.status(409).json({

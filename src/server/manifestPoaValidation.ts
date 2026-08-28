@@ -358,7 +358,17 @@ export function looksLikeEin(v: string | null | undefined): boolean {
  * pass. Checks marked non-blocking are operator judgement (an ACE exact-name
  * match, for instance, is a human lookup — we surface it, we do not claim it).
  */
-export function validatePoaForFiling(app: PoaValidatable): PoaGateResult {
+export function validatePoaForFiling(
+  app: PoaValidatable,
+  opts?: {
+    /** Whether the Agent's own physical address is configured
+     *  (MANIFEST_AGENT_ADDRESS). 19 CFR 141.32's model form names the agent AND
+     *  its address, and we refuse to print an unverified one — so an unset
+     *  address blocks the filing instead of fabricating a fact. Omitted ⇒ not
+     *  checked (the pure callers that don't read env, e.g. tests). */
+    agentAddressConfigured?: boolean;
+  },
+): PoaGateResult {
   const checks: PoaCheck[] = [];
   const add = (key: string, label: string, ok: boolean, detail: string, blocking = true) =>
     checks.push({ key, label, ok, detail, blocking });
@@ -525,6 +535,17 @@ export function validatePoaForFiling(app: PoaValidatable): PoaGateResult {
       ? `Signed ${app.signedAt.toISOString().slice(0, 10)} · SHA-256 ${String(app.docSha256).slice(0, 16)}…`
       : 'Not yet executed.',
   );
+
+  if (opts?.agentAddressConfigured !== undefined) {
+    add(
+      'agent_address',
+      'Agent’s own filing address configured',
+      opts.agentAddressConfigured,
+      opts.agentAddressConfigured
+        ? 'On the instrument.'
+        : 'Set MANIFEST_AGENT_ADDRESS. Until it is set the POA names the Agent by its email notice address only — we will not print an address nobody verified.',
+    );
+  }
 
   const failures = checks.filter((c) => c.blocking && !c.ok);
   return {

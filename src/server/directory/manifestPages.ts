@@ -36,6 +36,12 @@ const SITE = 'https://quotefleet.net';
 
 // ── shared scoped CSS (QF tokens only — no raw colors) ───────────────────────
 const MCP_CSS = `
+/* The conditional blocks in the flow are toggled with the [hidden] attribute,
+   whose UA rule is only \`display:none\` at element specificity — a class rule
+   like .mcp-field{display:flex} silently beats it and the block stays visible.
+   That shipped the nonresident-corporation prompt to partnership grantors, so
+   the attribute is made authoritative here for everything in this stylesheet. */
+[hidden]{display:none !important}
 .mcp-wrap{max-width:920px;margin:0 auto;padding:28px 20px 64px}
 .mcp-wrap.mcp-narrow{max-width:760px}
 .mcp-back{display:inline-block;color:var(--muted);text-decoration:none;font-size:13px;margin:0 0 14px}
@@ -116,8 +122,14 @@ const MCP_CSS = `
 .mcp-tbl th,.mcp-tbl td{text-align:left;padding:10px 12px;border-bottom:1px solid var(--border);vertical-align:top;white-space:nowrap}
 .mcp-tbl th{font-size:11px;text-transform:uppercase;letter-spacing:.04em;color:var(--muted);background:var(--surface)}
 .mcp-tbl tr:last-child td{border-bottom:0}
-.mcp-mono{font-family:var(--font-mono,'JetBrains Mono',monospace);font-size:11px;color:var(--muted);word-break:break-all;white-space:normal;max-width:220px}
-.mcp-varlist{white-space:normal;max-width:260px;font-size:12px;color:var(--ink-soft)}
+/* Break at word boundaries first — word-break:break-all snapped names in half
+   ("Manag/er") in the applicant cell. Only the SHA-256 wants a hard break. */
+.mcp-mono{font-family:var(--font-mono,'JetBrains Mono',monospace);font-size:11px;color:var(--muted);overflow-wrap:anywhere;word-break:normal;white-space:normal;max-width:220px}
+.mcp-mono.hash{word-break:break-all;font-size:10.5px}
+/* min-width, not just max-width: with table-layout:auto a max-width alone lets
+   the column collapse narrower than its content, which spilled the variations
+   list over the pre-filing checklist beside it. */
+.mcp-varlist{white-space:normal;min-width:190px;max-width:260px;font-size:12px;color:var(--ink-soft);overflow-wrap:anywhere}
 .mcp-badge.unpaid{background:#fdecec;color:#b42318;border-color:#f3b4ae}
 .mcp-exp{display:inline-block;font-size:11px;font-weight:600;color:var(--muted);margin-top:2px}
 .mcp-exp.soon{color:#b54708}
@@ -137,17 +149,35 @@ const MCP_CSS = `
 .mcp-note.warn{border-left-color:var(--accent)}
 /* section subhead inside a step card */
 .mcp-sub2{font-size:11px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;color:var(--muted);margin:18px 0 8px;text-align:left}
-/* admin pre-filing gate checklist */
-.mcp-gate{list-style:none;padding:0;margin:0;display:flex;flex-direction:column;gap:3px;min-width:230px;max-width:300px;white-space:normal}
+/* Admin pre-filing gate checklist. Only the BLOCKING failures are listed inline
+   (usually none) — the full 13-check list lives behind a <details>, so a clean
+   row stays two lines tall instead of leaving a 500px void beside its neighbours. */
+.mcp-gatecell{white-space:normal;min-width:240px;max-width:320px}
+.mcp-gate{list-style:none;padding:0;margin:0;display:flex;flex-direction:column;gap:4px;white-space:normal}
 .mcp-gate li{display:flex;gap:7px;align-items:flex-start;font-size:11.5px;line-height:1.35;color:var(--ink-soft)}
-.mcp-gate .gk{flex:0 0 auto;font-weight:700;width:12px;color:var(--muted)}
+.mcp-gate .gk{flex:0 0 auto;font-weight:700;width:11px;color:var(--muted)}
 .mcp-gate li.fail .gk{color:var(--danger,#b42318)}
 .mcp-gate li.pass .gk{color:var(--accent)}
 .mcp-gate li.soft{color:var(--muted)}
 .mcp-gate .gd{display:block;color:var(--muted);font-size:11px}
-.mcp-gatehead{font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.04em;margin:0 0 5px;color:var(--muted)}
+.mcp-gatehead{font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.04em;margin:0 0 6px;color:var(--muted)}
 .mcp-gatehead.ok{color:var(--accent)}
 .mcp-gatehead.no{color:var(--danger,#b42318)}
+/* Inside the admin table the action buttons set the ROW height — four full-size
+   46px buttons stacked in a narrow cell left a ~250px void beside every short
+   cell. Compact them from tablet up; mobile keeps the 44px tap target. */
+.mcp-tbl .mcp-actions{gap:6px;margin:8px 0 0}
+@media (min-width:761px){
+  .mcp-tbl .mcp-btn{min-height:34px;padding:7px 11px;font-size:12.5px;border-radius:7px}
+  .mcp-tbl td{padding:9px 12px}
+}
+/* Nine columns never fit 375px, so the wrapper scrolls — say so, otherwise the
+   most important columns (checks, PDF, actions) look like they are missing. */
+.mcp-scrollhint{display:none;font-size:12px;color:var(--muted);line-height:1.45;margin:10px 0 0}
+@media (max-width:760px){.mcp-scrollhint{display:block}}
+.mcp-gatemore{margin:8px 0 0}
+.mcp-gatemore summary{font-size:11.5px;font-weight:600;color:var(--accent);cursor:pointer;list-style:revert}
+.mcp-gatemore[open] summary{margin-bottom:6px}
 @media print{.mcp-tabs,.mcp-actions,.mcp-back{display:none}}
 `;
 
@@ -711,19 +741,26 @@ export function renderAdminPrivacyQueue(
 
           // PRE-FILING GATE — the 15 documented CBP rejection causes rendered as
           // a per-application checklist so nothing has to be remembered.
+          // Inline = label only (one line each), so a blocked row stays compact;
+          // the "why" rides along as a title tooltip and in the expanded list.
+          const checkLi = (c: PoaGateResult['checks'][number], withDetail = true) =>
+            `<li class="${c.ok ? 'pass' : c.blocking ? 'fail' : 'soft'}" title="${esc(c.detail)}"><span class="gk">${c.ok ? '&#10003;' : c.blocking ? '&#10007;' : '&#8226;'}</span><span>${esc(c.label)}${withDetail ? `<span class="gd">${esc(c.detail)}</span>` : ''}</span></li>`;
           let gateHtml = '<span class="mcp-mono">—</span>';
           if (gate) {
             const head = gate.ok
               ? `<p class="mcp-gatehead ok">Ready to file · ${gate.passed}/${gate.total}</p>`
               : `<p class="mcp-gatehead no">${gate.failures.length} blocking · ${gate.passed}/${gate.total}</p>`;
+            // Blocking failures inline (what the operator must act on); the full
+            // list one click away, so a passing row does not tower over the table.
+            const inline = gate.failures.length
+              ? `<ul class="mcp-gate">${gate.failures.map((c) => checkLi(c, false)).join('')}</ul>`
+              : '';
             gateHtml =
               head +
-              `<ul class="mcp-gate">${gate.checks
-                .map(
-                  (c) =>
-                    `<li class="${c.ok ? 'pass' : c.blocking ? 'fail' : 'soft'}"><span class="gk">${c.ok ? '&#10003;' : c.blocking ? '&#10007;' : '&#8226;'}</span><span>${esc(c.label)}<span class="gd">${esc(c.detail)}</span></span></li>`,
-                )
-                .join('')}</ul>`;
+              inline +
+              `<details class="mcp-gatemore"><summary>All ${gate.total} checks</summary><ul class="mcp-gate">${gate.checks
+                .map((c) => checkLi(c))
+                .join('')}</ul></details>`;
           }
 
           // Renewal timing — CBP does NOT auto-renew and sends no notice, so the
@@ -759,9 +796,9 @@ export function renderAdminPrivacyQueue(
       <td>${paidHtml}</td>
       <td>${expiryHtml}</td>
       <td class="mcp-varlist">${esc(names)}</td>
-      <td>${gateHtml}</td>
+      <td class="mcp-gatecell">${gateHtml}</td>
       <td>
-        ${app.docSha256 ? `<div class="mcp-mono">${esc(app.docSha256)}</div>` : '<span class="mcp-mono">unsigned</span>'}
+        ${app.docSha256 ? `<div class="mcp-mono hash">${esc(app.docSha256)}</div>` : '<span class="mcp-mono">unsigned</span>'}
         ${
           app.docSha256
             ? `<div class="mcp-actions" style="margin-top:6px">
@@ -807,6 +844,7 @@ export function renderAdminPrivacyQueue(
         <tbody>${rowsHtml}</tbody>
       </table>
     </div>
+    <p class="mcp-scrollhint">Swipe the table sideways for the pre-filing checklist, the executed PDF, and the filing actions.</p>
     <p class="mcp-msg" id="mcp-admin-msg"></p>
   </main>
   <script>${ADMIN_JS}</script>`;

@@ -164,6 +164,15 @@ describe('buildPoaPdf — the required sections of the executed instrument', () 
     expect(docHas(buffer, 'is not a customs broker')).toBe(true);
   });
 
+  it('never prints an unverified Agent address — falls back to the email notice address', async () => {
+    // An address nobody verified would be a false statement on an executed legal
+    // instrument, so the drawer omits it entirely until it is configured.
+    const { buffer } = await buildPoaPdf(input());
+    expect(docHas(buffer, 'whose address for notices under this instrument is legal@quotefleet.net')).toBe(true);
+    const configured = await buildPoaPdf(input({ agentAddress: '500 Ocean Blvd, Suite 4, Long Beach, CA 90802' }));
+    expect(docHas(configured.buffer, 'of 500 Ocean Blvd, Suite 4, Long Beach, CA 90802')).toBe(true);
+  });
+
   it('states the signer-authority warranty, retention, ESIGN consent and governing law', async () => {
     const { buffer } = await buildPoaPdf(input());
     expect(docHas(buffer, 'duly authorized to execute this instrument and to bind the Principal')).toBe(true);

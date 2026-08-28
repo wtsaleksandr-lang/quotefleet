@@ -56,6 +56,14 @@ export interface Env {
   STRIPE_PRICE_MANIFEST_BASIC?: string;
   STRIPE_PRICE_MANIFEST_PRO?: string;
   STRIPE_PRICE_MANIFEST_ENT?: string;
+  /** The Agent's LEGAL NAME and PHYSICAL NOTICE ADDRESS as they appear on the
+   *  Manifest Privacy Limited Power of Attorney (19 CFR 141.32's model form
+   *  names the agent and its address). These are FACTS about the business, so
+   *  they are configuration, never a hardcoded guess: when the address is unset
+   *  the POA falls back to the Agent's email notice address and the pre-filing
+   *  gate BLOCKS, rather than printing an address nobody verified. */
+  MANIFEST_AGENT_LEGAL_NAME?: string;
+  MANIFEST_AGENT_ADDRESS?: string;
   /** Stripe Price id for the "Leads Pro" ($49/mo suggested) shipper subscription
    *  behind the Importer Search decision-maker CONTACT REVEAL — a per-USER access
    *  entitlement with a monthly reveal allowance, fully separate from the tenant
@@ -178,6 +186,8 @@ export function loadEnv(): Env {
     STRIPE_PRICE_MANIFEST_BASIC: opt('STRIPE_PRICE_MANIFEST_BASIC'),
     STRIPE_PRICE_MANIFEST_PRO: opt('STRIPE_PRICE_MANIFEST_PRO'),
     STRIPE_PRICE_MANIFEST_ENT: opt('STRIPE_PRICE_MANIFEST_ENT'),
+    MANIFEST_AGENT_LEGAL_NAME: opt('MANIFEST_AGENT_LEGAL_NAME'),
+    MANIFEST_AGENT_ADDRESS: opt('MANIFEST_AGENT_ADDRESS'),
     STRIPE_PRICE_LEADS_PRO: opt('STRIPE_PRICE_LEADS_PRO'),
     PLATFORM_FEE_PCT: opt('PLATFORM_FEE_PCT'),
     RESEND_API_KEY: opt('RESEND_API_KEY'),

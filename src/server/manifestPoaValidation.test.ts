@@ -350,6 +350,17 @@ describe('validatePoaForFiling — the pre-filing gate', () => {
     expect(certified.ok).toBe(true);
   });
 
+  it('blocks when the Agent’s own filing address is not configured', () => {
+    // We refuse to print an unverified address on a legal instrument, so an
+    // unset MANIFEST_AGENT_ADDRESS is a filing blocker, not a silent fallback.
+    const unset = validatePoaForFiling(filable(), { agentAddressConfigured: false });
+    expect(unset.ok).toBe(false);
+    expect(unset.failures.map((f) => f.key)).toContain('agent_address');
+    expect(validatePoaForFiling(filable(), { agentAddressConfigured: true }).ok).toBe(true);
+    // Callers that don't read env simply don't get the check.
+    expect(validatePoaForFiling(filable()).checks.map((c) => c.key)).not.toContain('agent_address');
+  });
+
   it('blocks an application that was never executed', () => {
     const gate = validatePoaForFiling(filable({ signedAt: null, docSha256: null }));
     expect(gate.failures.map((f) => f.key)).toContain('executed');

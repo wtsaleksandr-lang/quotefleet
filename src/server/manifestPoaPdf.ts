@@ -116,8 +116,17 @@ const MUTED = '#5b6472';
 const HAIRLINE = '#dfe4ec';
 const PANEL = '#f4f6fa';
 
-/** QuoteFleet's filing address as it appears on the instrument. */
-export const AGENT_DEFAULT_ADDRESS = '1111B South Governors Avenue, Dover, DE 19904, United States';
+/**
+ * The Agent's notice address used when MANIFEST_AGENT_ADDRESS is not configured.
+ *
+ * NEVER hardcode a street address here. 19 CFR 141.32's model form names the
+ * agent AND its address, so the address is a FACT about the business — printing
+ * an unverified one on an executed legal instrument would be a false statement
+ * and would fail on any CBP look-through. Until the real address is configured
+ * the document states the Agent's email notice address (which is true), and
+ * `validatePoaForFiling` BLOCKS the filing on `agentAddressConfigured`.
+ */
+export const AGENT_EMAIL_NOTICE_ADDRESS = 'legal@quotefleet.net';
 
 function fmtUtc(d: Date | null | undefined): string {
   if (!(d instanceof Date) || Number.isNaN(d.getTime())) return '—';
@@ -266,7 +275,10 @@ export function buildPoaPdf(input: PoaPdfInput): Promise<PoaPdfResult> {
   const partners = list(input.partnerNames);
   const nameVars = list(input.nameVariations);
   const addrVars = list(input.addressVariations);
-  const agentAddress = input.agentAddress || AGENT_DEFAULT_ADDRESS;
+  const agentAddress = String(input.agentAddress ?? '').trim();
+  const agentWhere = agentAddress
+    ? `of ${agentAddress}`
+    : `whose address for notices under this instrument is ${AGENT_EMAIL_NOTICE_ADDRESS}`;
   const residencyLabel =
     String(input.residency ?? '') === 'nonresident'
       ? 'a NONRESIDENT of the United States'
@@ -337,7 +349,7 @@ export function buildPoaPdf(input: PoaPdfInput): Promise<PoaPdfResult> {
   // ── 2. APPOINTMENT OF AGENT ─────────────────────────────────────────────────
   section(2, 'APPOINTMENT OF AGENT');
   para(
-    `The Principal hereby constitutes and appoints ${input.agentLegalName}, of ${agentAddress} (the ` +
+    `The Principal hereby constitutes and appoints ${input.agentLegalName}, ${agentWhere} (the ` +
       `"Agent"), as its true and lawful AGENT AND ATTORNEY-IN-FACT, and expressly as an ` +
       `"authorized agent and attorney" of the Principal within the meaning of 19 CFR 103.31(d), ` +
       `to act for and on behalf of the Principal solely as set out in Section 3 below. The Agent is ` +
