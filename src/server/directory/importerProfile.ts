@@ -560,7 +560,7 @@ const PROFILE_CSS = `
 .impp-brief li b{color:var(--ink)}
 
 /* section fold/unfold */
-.impp-sec{border:1px solid var(--border);border-radius:var(--radius-lg);background:var(--surface);margin:12px 0;box-shadow:var(--shadow-sm);overflow:hidden;scroll-margin-top:16px;transition:border-color .16s ease}
+.impp-sec{border:1px solid var(--border);border-radius:var(--radius-lg);background:var(--surface);margin:12px 0;box-shadow:var(--shadow-sm);overflow:hidden;scroll-margin-top:72px;transition:border-color .16s ease}
 .impp-sec:hover{border-color:color-mix(in srgb,var(--accent) 30%,var(--border))}
 .impp-sech{width:100%;display:flex;align-items:center;gap:10px;background:none;border:0;cursor:pointer;padding:15px 18px;text-align:left;font-family:var(--font-sans);color:var(--ink);min-height:54px;transition:background .14s}
 .impp-sech:hover{background:var(--surface-2)}
@@ -589,6 +589,12 @@ const PROFILE_CSS = `
 .impp-chart{display:block;width:100%;height:200px;overflow:visible;position:relative}
 .impp-chart rect.bar{fill:color-mix(in srgb,var(--accent) 68%,transparent);transition:fill .12s}
 .impp-chart rect.bar:hover,.impp-chart rect.bar.on{fill:var(--accent)}
+/* The SVG is preserveAspectRatio="none", so a stroked outline would be scaled
+   unevenly with the bar. Focus is shown by filling the bar and ringing it in
+   the page background colour instead, which stays true at any width. */
+.impp-chart rect.bar:focus{outline:none}
+.impp-chart rect.bar:focus-visible{fill:var(--accent);stroke:var(--bg);stroke-width:2;paint-order:stroke}
+.impp-chart-hint{font-size:11px;color:var(--muted);margin:6px 0 0;padding-left:34px}
 /* the latest month is the one a broker acts on — call it out */
 .impp-chart rect.bar.last{fill:var(--accent)}
 .impp-chart .axis{stroke:var(--border-strong);stroke-width:1}
@@ -636,6 +642,9 @@ const PROFILE_CSS = `
 .impp-brow .bt i{display:block;height:100%;background:var(--accent);border-radius:999px;min-width:3px}
 .impp-brow:first-child .bt i{background:var(--accent)}
 .impp-brow .bv{text-align:right;font-size:12.5px;font-weight:700;color:var(--ink);font-variant-numeric:tabular-nums}
+/* The share sits under the count so the row keeps ONE numeric column instead of
+   widening into two — the count stays the primary figure. */
+.impp-brow .bv .bp{display:block;font-size:11px;font-weight:600;color:var(--muted);line-height:1.35}
 @media(max-width:640px){.impp-brow{grid-template-columns:132px minmax(0,1fr) 56px;gap:10px}}
 
 /* two-column lists */
@@ -698,6 +707,42 @@ const PROFILE_CSS = `
 .impp-dots a.active .impp-dotl{color:var(--ink);font-weight:700}
 @media(max-width:1320px){.impp-dots{display:none}}
 
+/* ── section bar: horizontal jump nav + expand-all (R3) ──
+   Sticky, so the section list stays reachable anywhere down the page. The links
+   are the same set the dot rail uses and share its click handler + scroll-spy
+   (the JS keys off [data-dot], not the rail's class), so exactly one of the two
+   navs is on screen at any width. */
+/* Above 1320px the dot rail already handles navigation, so the bar carries only
+   the expand/collapse control and must not draw a full-width rule with a lone
+   button hanging off it. It becomes a real sticky nav strip only once the tabs
+   appear (see the 1320px query below). */
+.impp-secbar{display:flex;align-items:center;gap:12px;margin:0 0 12px;padding:8px 0;background:var(--bg)}
+.impp-tabs{display:none;align-items:center;gap:4px;min-width:0;overflow-x:auto;scrollbar-width:thin;-webkit-overflow-scrolling:touch}
+.impp-tabs a{flex:0 0 auto;font-size:12.5px;font-weight:600;color:var(--muted);text-decoration:none;
+  padding:7px 10px;min-height:36px;display:inline-flex;align-items:center;border-radius:8px;white-space:nowrap;
+  transition:color .14s,background .14s}
+.impp-tabs a:hover{color:var(--ink);background:var(--surface-2)}
+.impp-tabs a:focus-visible{outline:2px solid var(--accent);outline-offset:-2px}
+/* active = tinted + outlined, never a bright fill */
+.impp-tabs a.active{color:var(--accent);background:color-mix(in srgb,var(--accent) 12%,transparent);
+  box-shadow:inset 0 0 0 1px color-mix(in srgb,var(--accent) 45%,transparent)}
+.impp-expand{flex:0 0 auto;margin-left:auto;font-family:var(--font-sans);font-size:12px;font-weight:600;
+  color:var(--muted);background:var(--surface-2);border:1px solid var(--border-strong);border-radius:8px;
+  padding:8px 12px;min-height:36px;cursor:pointer;transition:color .14s,border-color .14s}
+.impp-expand:hover{color:var(--ink);border-color:var(--accent)}
+.impp-expand:focus-visible{outline:2px solid var(--accent);outline-offset:1px}
+.impp-expand[aria-pressed="true"]{color:var(--accent);border-color:var(--accent);
+  background:color-mix(in srgb,var(--accent) 12%,transparent)}
+@media(max-width:1320px){
+  .impp-tabs{display:flex}
+  .impp-secbar{position:sticky;top:0;z-index:20;border-bottom:1px solid var(--border)}
+}
+@media(max-width:560px){
+  .impp-secbar{gap:8px}
+  .impp-expand{padding:8px 10px;min-height:44px}
+  .impp-tabs a{min-height:44px}
+}
+
 /* subscribe / unavailable wall — a designed state, since the quota + credit
    paths are the ones visitors actually land on most. */
 .impp-wall{position:relative;border:1px solid color-mix(in srgb,var(--accent) 32%,transparent);border-radius:var(--radius-lg);background:color-mix(in srgb,var(--accent) 7%,transparent);padding:30px 26px;margin:20px 0;text-align:center}
@@ -746,16 +791,33 @@ function chartSvg(months: ProfileMonth[]): string {
   const n = months.length;
   const gap = n > 1 ? Math.max(2, Math.min(10, 320 / n)) : 4;
   const bw = (W - gap * (n - 1)) / n;
+  // R3: bars are keyboard-reachable. A roving tabindex (only one bar in the tab
+  // order; arrows walk the series) keeps an 18-month chart from costing 18 tab
+  // stops to pass. Each bar carries its own aria-label so focusing it announces
+  // the month and the count — previously the series was mouse-only and a
+  // screen reader got a single "Monthly shipment counts" summary and nothing else.
   const bars = months
     .map((m, i) => {
       const h = Math.max(2, Math.round((m.count / max) * (H - padB)));
       const x = i * (bw + gap);
       const y = H - h;
-      return `<rect class="bar${i === n - 1 ? ' last' : ''}" data-bar data-label="${esc(m.label)}" data-count="${m.count}" x="${x.toFixed(1)}" y="${y}" width="${bw.toFixed(1)}" height="${h}"><title>${esc(m.label)}: ${N(m.count)}</title></rect>`;
+      const lbl = `${m.label}: ${N(m.count)} shipment${m.count === 1 ? '' : 's'}`;
+      return `<rect class="bar${i === n - 1 ? ' last' : ''}" data-bar data-idx="${i}" data-label="${esc(m.label)}" data-count="${m.count}" tabindex="${i === 0 ? '0' : '-1'}" role="img" aria-label="${esc(lbl)}" x="${x.toFixed(1)}" y="${y}" width="${bw.toFixed(1)}" height="${h}"><title>${esc(m.label)}: ${N(m.count)}</title></rect>`;
     })
     .join('');
   const first = months[0].label, last = months[n - 1].label;
-  const mid = n > 2 ? months[Math.floor((n - 1) / 2)].label : '';
+  // R3: an 18-month series labelled with only first / middle / last made it
+  // impossible to place any bar in time. Up to six evenly spaced ticks (always
+  // including both ends) stay readable at 375px while actually locating a bar.
+  const tickCount = Math.min(6, n);
+  const xLabels =
+    n === 1
+      ? [first]
+      : Array.from(new Set(
+          Array.from({ length: tickCount }, (_, t) =>
+            months[Math.round((t * (n - 1)) / (tickCount - 1))].label,
+          ),
+        ));
   // y-axis ticks at 100 / 75 / 50 / 25 / 0 % of the peak, matching the gridlines
   const ticks = [1, 0.75, 0.5, 0.25, 0]
     .map((f) => `<span>${N(Math.round(max * f))}</span>`)
@@ -777,13 +839,14 @@ function chartSvg(months: ProfileMonth[]): string {
       <div class="impp-yaxis" aria-hidden="true">${ticks}</div>
       <div class="impp-plot">
         <div class="impp-tip" id="impp-chart-tip" hidden><span class="tv"></span><span class="tc"></span></div>
-        <svg class="impp-chart" id="impp-chart" viewBox="0 0 ${W} ${H}" preserveAspectRatio="none" role="img" aria-label="Monthly shipment counts, ${esc(first)} to ${esc(last)}">
+        <svg class="impp-chart" id="impp-chart" viewBox="0 0 ${W} ${H}" preserveAspectRatio="none" role="group" aria-label="Monthly shipment counts, ${esc(first)} to ${esc(last)}. Use the arrow keys to step through the months.">
           <line class="axis" x1="0" y1="${H}" x2="${W}" y2="${H}"/>
           ${bars}
         </svg>
       </div>
     </div>
-    <div class="impp-xaxis"><span>${esc(first)}</span>${mid ? `<span>${esc(mid)}</span>` : ''}<span>${esc(last)}</span></div>
+    <div class="impp-xaxis">${xLabels.map((l) => `<span>${esc(l)}</span>`).join('')}</div>
+    ${n > 1 ? '<p class="impp-chart-hint">Hover or focus a bar for its month and count &mdash; arrow keys step through the series.</p>' : ''}
     <div class="impp-chart-cap">
       <span>Peak <b>${N(peak.count)}</b> in ${esc(peak.label)}</span>
       <span>Average <b>${N(avg)}</b> / month</span>
@@ -820,12 +883,36 @@ export function deltaChip(months: readonly ProfileMonth[]): string {
   }</b> vs prior 6</span>`;
 }
 
+/**
+ * Horizontal bar list for the Product-breakdown and Origin-country sections.
+ *
+ * R3 — both sections are captioned "share of the sampled shipments", but the
+ * row printed only an absolute count while the bar length encoded share of the
+ * BIGGEST row. So the widest bar always read as 100% no matter how small a
+ * slice of the sample it actually was, and the number beside it answered a
+ * different question than the caption asked. The share is now computed against
+ * the sample TOTAL and printed next to the count, so the caption, the bar and
+ * the figures all describe the same quantity.
+ *
+ * Bar length stays relative to `max` — that is what makes the rows comparable
+ * to each other at a glance — but it is no longer the only thing on the row
+ * claiming to be a share.
+ */
 function barRows(items: Array<{ label: string; value: number; flag?: string }>): string {
   const max = Math.max(...items.map((i) => i.value), 1);
+  const total = items.reduce((sum, i) => sum + (i.value || 0), 0);
+  const pct = (v: number): string => {
+    if (total <= 0) return '';
+    const share = (v / total) * 100;
+    // Never round a present slice down to "0%" — sub-1% reads as "<1%".
+    return share > 0 && share < 1 ? '<1%' : `${Math.round(share)}%`;
+  };
   return `<div class="impp-bars">${items
-    .map(
-      (i) => `<div class="impp-brow" title="${esc(i.label)}: ${N(i.value)}"><span class="bl">${i.flag ? i.flag + ' ' : ''}<span>${esc(i.label)}</span></span><span class="bt"><i style="width:${Math.round((i.value / max) * 100)}%"></i></span><span class="bv impp-num">${N(i.value)}</span></div>`,
-    )
+    .map((i) => {
+      const share = pct(i.value);
+      const tip = `${esc(i.label)}: ${N(i.value)} of ${N(total)} sampled shipments${share ? ` (${share})` : ''}`;
+      return `<div class="impp-brow" title="${tip}"><span class="bl">${i.flag ? i.flag + ' ' : ''}<span>${esc(i.label)}</span></span><span class="bt"><i style="width:${Math.round((i.value / max) * 100)}%"></i></span><span class="bv impp-num">${N(i.value)}${share ? `<span class="bp">${share}</span>` : ''}</span></div>`;
+    })
     .join('')}</div>`;
 }
 
@@ -1143,6 +1230,21 @@ export function renderImporterProfilePage(p: ProfileData, quota: QuotaState, rev
       .join('')}</ul>
   </nav>`;
 
+  // R3: the dot rail is fixed to the viewport gutter and disappears below
+  // 1320px, which left every laptop, tablet and phone with NO way to move
+  // around a ~3,400px page except scrolling. This bar carries the same section
+  // list horizontally and takes over exactly where the rail drops out. The
+  // expand/collapse control rides in it at ALL widths — five of the eleven
+  // sections load folded, and there was previously no way to open them in one
+  // go.
+  const secBar = `
+  <div class="impp-secbar">
+    <nav class="impp-tabs" aria-label="Jump to section">
+      ${secs.map((s) => `<a href="#sec-${esc(s.id)}" data-dot="${esc(s.id)}">${esc(s.label)}</a>`).join('')}
+    </nav>
+    <button type="button" class="impp-expand" id="impp-expand" aria-pressed="false">Expand all</button>
+  </div>`;
+
   const remainingNote =
     quota.remaining > 0
       ? `<p class="impp-samplenote">You have <b>${quota.remaining}</b> free importer profile${quota.remaining === 1 ? '' : 's'} left. <a href="/signup">Subscribe</a> for unlimited opens.</p>`
@@ -1156,6 +1258,7 @@ export function renderImporterProfilePage(p: ProfileData, quota: QuotaState, rev
       <a class="impp-back" href="/importers">&larr; Back to importer search</a>
       ${identityHeader(p, { showActions: true })}
       ${remainingNote}
+      ${secBar}
       ${secs.map((s, i) => section(s, s.open ?? i === 0)).join('')}
     </div>
   </main>
@@ -1301,7 +1404,8 @@ const PROFILE_JS = `
   var reduce = false;
   try { reduce = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches; } catch(e){}
 
-  // (4) fold / unfold — only the first section is open on load.
+  // (4) fold / unfold — six sections render open, five folded (see the secs
+  // array in renderImporterProfilePage).
   function toggleSection(sec, open){
     var want = (open===undefined) ? !sec.classList.contains('open') : open;
     sec.classList.toggle('open', want);
@@ -1312,13 +1416,15 @@ const PROFILE_JS = `
   var sechs = document.querySelectorAll('.impp-sech');
   for(var i=0;i<sechs.length;i++){
     (function(btn){
-      btn.addEventListener('click', function(){ toggleSection(btn.parentNode); });
+      btn.addEventListener('click', function(){ toggleSection(btn.parentNode); syncExpand(); });
     })(sechs[i]);
   }
 
-  // (3) left dot pane — scroll-spy + click-to-open.
+  // (3) section navs — scroll-spy + click-to-open. Keyed off [data-dot] so the
+  // fixed dot rail (>1320px) and the horizontal section bar (<=1320px) share
+  // one handler; only one of the two is ever visible.
   var secs = [].slice.call(document.querySelectorAll('.impp-sec'));
-  var dots = [].slice.call(document.querySelectorAll('.impp-dots a'));
+  var dots = [].slice.call(document.querySelectorAll('[data-dot]'));
   function setActive(id){ for(var j=0;j<dots.length;j++){ dots[j].classList.toggle('active', dots[j].getAttribute('data-dot')===id); } }
 
   for(var d=0; d<dots.length; d++){
@@ -1329,11 +1435,46 @@ const PROFILE_JS = `
         var sec = document.getElementById('sec-'+id);
         if(!sec) return;
         toggleSection(sec, true);            // auto-unfold the target section
+        syncExpand();
         setActive(id);
         try { sec.scrollIntoView({behavior: reduce ? 'auto' : 'smooth', block:'start'}); }
         catch(e){ sec.scrollIntoView(); }
       });
     })(dots[d]);
+  }
+
+  // Keep the active tab in view on the horizontal bar — the scroll-spy is
+  // useless if the highlighted tab has scrolled out of the strip.
+  var tabsEl = document.querySelector('.impp-tabs');
+  function revealActiveTab(){
+    if(!tabsEl || !tabsEl.offsetParent) return;
+    var a = tabsEl.querySelector('a.active');
+    if(!a) return;
+    var lo = a.offsetLeft, hi = lo + a.offsetWidth;
+    if(lo < tabsEl.scrollLeft) tabsEl.scrollLeft = lo - 8;
+    else if(hi > tabsEl.scrollLeft + tabsEl.clientWidth) tabsEl.scrollLeft = hi - tabsEl.clientWidth + 8;
+  }
+
+  // (3b) expand all / collapse all. Five sections load folded; opening them one
+  // by one to scan the whole record was the only option before.
+  var expandBtn = document.getElementById('impp-expand');
+  function allOpen(){
+    for(var q=0;q<secs.length;q++){ if(!secs[q].classList.contains('open')) return false; }
+    return secs.length > 0;
+  }
+  function syncExpand(){
+    if(!expandBtn) return;
+    var on = allOpen();
+    expandBtn.setAttribute('aria-pressed', on ? 'true' : 'false');
+    expandBtn.textContent = on ? 'Collapse all' : 'Expand all';
+  }
+  if(expandBtn){
+    expandBtn.addEventListener('click', function(){
+      var open = !allOpen();
+      for(var q=0;q<secs.length;q++) toggleSection(secs[q], open);
+      syncExpand();
+    });
+    syncExpand();
   }
 
   if('IntersectionObserver' in window && secs.length){
@@ -1344,7 +1485,7 @@ const PROFILE_JS = `
       }
       var best=null, bestV=-1;
       for(var s=0;s<secs.length;s++){ var v=vis[secs[s].id]||0; if(v>bestV){ bestV=v; best=secs[s]; } }
-      if(best && bestV>0) setActive(best.getAttribute('data-sec'));
+      if(best && bestV>0){ setActive(best.getAttribute('data-sec')); revealActiveTab(); }
     }, {threshold:[0,0.15,0.4,0.75,1], rootMargin:'-8% 0px -55% 0px'});
     for(var o=0;o<secs.length;o++) io.observe(secs[o]);
     if(secs[0]) setActive(secs[0].getAttribute('data-sec'));
@@ -1391,6 +1532,50 @@ const PROFILE_JS = `
       if(b){ tip.hidden = true; lightBar(null); }
     });
     chart.addEventListener('mouseleave', function(){ tip.hidden = true; lightBar(null); });
+
+    // ── keyboard: arrows walk the series (R3) ────────────────────────────────
+    // Roving tabindex — exactly one bar sits in the tab order, so an 18-month
+    // chart costs one tab stop to reach and one to leave. Focus shows the same
+    // tooltip the mouse does; each bar's aria-label announces month + count.
+    var barList = [].slice.call(chart.querySelectorAll('[data-bar]'));
+    function showFor(b){
+      if(!b) return;
+      var c = Number(b.getAttribute('data-count')||0);
+      if(tv) tv.textContent = b.getAttribute('data-label');
+      if(tc) tc.textContent = c.toLocaleString('en-US') + (c===1?' shipment':' shipments');
+      lightBar(b);
+      tip.hidden = false;
+      // Bars are laid out on a 0..720 viewBox that stretches to the box width,
+      // so map the bar's centre through the CURRENT rendered width.
+      try {
+        var r = wrap.getBoundingClientRect();
+        var cx = (Number(b.getAttribute('x')) + Number(b.getAttribute('width'))/2) / 720;
+        var x = Math.max(52, Math.min(r.width-52, cx * r.width));
+        tip.style.left = x + 'px';
+      } catch(e){}
+    }
+    function focusBar(idx){
+      if(idx < 0 || idx >= barList.length) return;
+      for(var z=0; z<barList.length; z++) barList[z].setAttribute('tabindex', z===idx ? '0' : '-1');
+      barList[idx].focus();
+    }
+    for(var bi=0; bi<barList.length; bi++){
+      (function(b, idx){
+        b.addEventListener('focus', function(){ showFor(b); });
+        b.addEventListener('blur', function(){ tip.hidden = true; lightBar(null); });
+        b.addEventListener('keydown', function(ev){
+          var k = ev.key, to = -1;
+          if(k==='ArrowRight' || k==='ArrowDown') to = Math.min(barList.length-1, idx+1);
+          else if(k==='ArrowLeft' || k==='ArrowUp') to = Math.max(0, idx-1);
+          else if(k==='Home') to = 0;
+          else if(k==='End') to = barList.length-1;
+          else if(k==='Escape'){ tip.hidden = true; lightBar(null); return; }
+          else return;
+          ev.preventDefault();
+          focusBar(to);
+        });
+      })(barList[bi], bi);
+    }
   }
 
   // ── ☆ Save this importer (free, logged-in). Reflects saved state on load. ──

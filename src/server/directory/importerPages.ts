@@ -150,6 +150,24 @@ export function entryPortsForState(stateCode: string | null | undefined): string
  * Every seat renders the SAME projection — the switch is pure CSS/attribute, so
  * it costs nothing, hits no endpoint and can never advertise data we don't have.
  */
+/**
+ * Result sort orders (R3).
+ *
+ * Sorting is CLIENT-side over the set already fetched, so changing it costs no
+ * ImportYeti credits and issues no request. `ships` is first because it is the
+ * order the server already returns (runSearch re-ranks by 12-mo shipments), so
+ * the default selection tells the truth about what you are looking at instead
+ * of implying an ordering the list does not have.
+ */
+export const SORTS: ReadonlyArray<[string, string]> = [
+  ['ships', 'Shipments · 12 mo'],
+  ['total', 'Total shipments'],
+  ['teu', 'TEU · 12 mo'],
+  ['recent', 'Most recent shipment'],
+  ['win', 'Winnability'],
+  ['company', 'Company A–Z'],
+];
+
 export const AUDIENCES: ReadonlyArray<[string, string]> = [
   ['trucker', 'Trucker'],
   ['broker', 'Broker'],
@@ -191,6 +209,20 @@ const IMPORTERS_CSS = `
 .imp-field label{font-size:12px;font-weight:600;color:var(--muted);text-transform:uppercase;letter-spacing:.03em}
 .imp-field input,.imp-field select{width:100%;box-sizing:border-box;font-family:var(--font-sans);font-size:14px;color:var(--ink);background:var(--surface-2);border:1px solid var(--border-strong);border-radius:8px;padding:10px 12px;min-height:44px;appearance:none;-webkit-appearance:none}
 .imp-field input::placeholder{color:var(--muted)}
+/* ── title-in-field (hard input rule) ──
+   R3: the three primary filters previously carried their name ONLY in the
+   placeholder + aria-label, so the moment a value was typed the field went
+   anonymous — you could not tell "Savannah, GA" was the ENTRY PORT and not the
+   state. The caption now sits inside the field box, top-left, and never
+   disappears; the value renders under it. Applied to the secondary select
+   fields too so one panel speaks one language. */
+.imp-capfield{position:relative}
+.imp-cap{position:absolute;top:6px;left:13px;z-index:1;font-size:10px;font-weight:700;letter-spacing:.05em;text-transform:uppercase;color:var(--muted);pointer-events:none;line-height:1;max-width:calc(100% - 26px);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.imp-capfield input,.imp-capfield select{padding:21px 12px 7px;min-height:52px}
+.imp-capfield:focus-within .imp-cap{color:var(--accent)}
+/* The stacked <label> above the secondary fields is replaced by the in-field
+   caption; it stays in the DOM for the accessible name only. */
+.imp-field.imp-capfield>label{position:absolute;width:1px;height:1px;padding:0;margin:-1px;overflow:hidden;clip:rect(0 0 0 0);white-space:nowrap;border:0}
 .imp-field input:hover,.imp-field select:hover{border-color:var(--accent)}
 .imp-field input:focus-visible,.imp-field select:focus-visible{outline:2px solid var(--accent);outline-offset:1px;border-color:var(--accent)}
 .imp-field input:disabled{opacity:.72;cursor:not-allowed;background:var(--surface)}
@@ -251,6 +283,43 @@ const IMPORTERS_CSS = `
 .imp-count{font-size:13px;color:var(--muted);font-variant-numeric:tabular-nums}
 .imp-count b{color:var(--ink);font-weight:700}
 .imp-toolbar-r{display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin-left:auto}
+/* Sort control (R3). Client-side reorder of the already-fetched set — no
+   request, no credits. Sized down to sit level with the density segmented
+   control rather than towering over it. */
+.imp-sortwrap{flex:0 0 auto;width:auto;min-width:186px}
+.imp-sortwrap select{min-height:38px;padding:17px 26px 4px 11px;font-size:12px;font-weight:600;border-radius:8px;
+  background-image:linear-gradient(45deg,transparent 50%,var(--muted) 50%),linear-gradient(135deg,var(--muted) 50%,transparent 50%);
+  background-position:calc(100% - 14px) calc(50% + 3px),calc(100% - 9px) calc(50% + 3px);
+  background-size:5px 5px,5px 5px;background-repeat:no-repeat}
+.imp-sortwrap .imp-cap{top:5px;left:12px;font-size:9.5px}
+
+/* ── applied-filter chips (R3) ──
+   The facet rail said WHAT was available but never what was APPLIED — the only
+   feedback was a number on the rail header, itself hidden except when folded on
+   a phone. Each chip names one active facet and removes exactly that one. */
+.imp-chips{display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin:0 0 14px;padding:10px 12px;
+  border:1px solid var(--border);border-radius:10px;background:var(--surface-2)}
+.imp-chips[hidden]{display:none}
+.imp-chips-cap{font-size:10.5px;font-weight:700;letter-spacing:.05em;text-transform:uppercase;color:var(--muted);flex:0 0 auto}
+.imp-chips-list{display:contents}
+.imp-chip{display:inline-flex;align-items:center;gap:7px;font-family:var(--font-sans);font-size:12px;font-weight:600;
+  color:var(--accent);background:color-mix(in srgb,var(--accent) 11%,transparent);
+  border:1px solid color-mix(in srgb,var(--accent) 34%,transparent);border-radius:999px;
+  padding:5px 9px 5px 11px;min-height:30px;cursor:pointer;max-width:100%;transition:background .14s,border-color .14s}
+.imp-chip:hover{background:color-mix(in srgb,var(--accent) 20%,transparent);border-color:var(--accent)}
+.imp-chip:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+.imp-chip .lb{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.imp-chip .x{display:inline-flex;align-items:center;justify-content:center;width:15px;height:15px;border-radius:50%;
+  font-size:13px;line-height:1;background:color-mix(in srgb,var(--accent) 22%,transparent);flex:0 0 auto}
+.imp-chips-clear{margin-left:auto;font-family:var(--font-sans);font-size:12px;font-weight:600;color:var(--muted);
+  background:none;border:0;padding:6px 2px;min-height:30px;cursor:pointer;text-decoration:underline;text-underline-offset:2px}
+.imp-chips-clear:hover{color:var(--ink)}
+.imp-chips-clear:focus-visible{outline:2px solid var(--accent);outline-offset:2px;border-radius:4px}
+/* The results region takes programmatic focus after a search (see CLIENT_JS).
+   It is a scroll/landing target, not an interactive control, so it must not
+   paint a ring when focused that way. */
+.imp-results:focus{outline:none}
+.imp-results:focus-visible{outline:2px solid var(--accent);outline-offset:4px;border-radius:var(--radius-lg)}
 .imp-density{display:inline-flex;border:1px solid var(--border-strong);border-radius:8px;overflow:hidden;background:var(--surface-2)}
 .imp-density button{font-family:var(--font-sans);font-size:12px;font-weight:600;color:var(--muted);background:none;border:0;padding:8px 13px;min-height:38px;cursor:pointer;transition:color .14s,background .14s}
 .imp-density button+button{border-left:1px solid var(--border-strong)}
@@ -348,10 +417,23 @@ a.imp-co-link:focus-visible{outline:2px solid var(--accent);outline-offset:3px}
 .imp-cell .sub-slot.sub{font-size:10.5px;line-height:1.35;color:var(--muted);
   display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}
 /* Footer sits flush to the card edges as a tinted action bar (mockup-style). */
-.imp-foot{display:flex;align-items:center;gap:10px 14px;flex-wrap:wrap;margin:14px -20px 0;padding:11px 20px;border-top:1px solid var(--border);background:var(--surface-2);min-height:44px}
+/* ── card footer: three FIXED zones (R3) ──
+   It used to be a wrapping flex row where the whole right-hand group was pushed
+   over with margin-left:auto and the contact-tier note rode INSIDE that group.
+   The note therefore started at a different x on every card, because its
+   position depended on how many buttons followed it (a lane with no mappable
+   port has no "Quote this lane", a lead with no slug has no Save). Scanning a
+   column of cards meant re-finding the note each row.
+   Explicit grid columns pin each zone: incumbent chip | tier note | actions.
+   Columns are addressed by number, so an absent chip leaves column 1 empty
+   instead of shifting the note left. */
+.imp-foot{display:grid;grid-template-columns:auto minmax(0,1fr) auto;align-items:center;gap:10px 14px;margin:14px -20px 0;padding:11px 20px;border-top:1px solid var(--border);background:var(--surface-2);min-height:44px}
+.imp-foot>.imp-incumb{grid-column:1}
+.imp-foot>.imp-tier{grid-column:2;justify-self:start}
+.imp-foot>.imp-foot-r{grid-column:3}
 .imp-incumb{font-size:11.5px;color:var(--warn);background:color-mix(in srgb,var(--warn) 13%,transparent);border:1px solid color-mix(in srgb,var(--warn) 30%,transparent);border-radius:999px;padding:3px 10px;max-width:100%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
-.imp-foot-r{display:flex;align-items:center;gap:10px;flex-wrap:wrap;justify-content:flex-end;margin-left:auto}
-.imp-tier{font-size:11.5px;color:var(--muted);white-space:nowrap}
+.imp-foot-r{display:flex;align-items:center;gap:10px;flex-wrap:wrap;justify-content:flex-end}
+.imp-tier{font-size:11.5px;color:var(--muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:100%}
 .imp-tier.ok{color:var(--success)}
 .imp-lock{display:inline-flex;align-items:center;gap:8px;font-size:12px;font-weight:600;color:var(--ink-soft);border:1px solid var(--border-strong);border-radius:8px;padding:9px 13px;background:var(--surface-2);text-decoration:none;min-height:44px;box-sizing:border-box;transition:border-color .14s,color .14s}
 .imp-lock:hover{border-color:var(--accent);color:var(--ink)}
@@ -519,8 +601,15 @@ a.imp-soon:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
   .imp-export{margin-left:0}
   .imp-toolbar-r{width:100%;margin-left:0}
   .imp-empty{padding:24px 20px;gap:14px}
+  /* Narrow screens have no room for three side-by-side zones, so the footer
+     falls back to the wrapping row it always was. The explicit grid-column
+     assignments simply stop applying. */
+  .imp-foot{display:flex;flex-wrap:wrap}
+  .imp-foot>.imp-foot-r{margin-left:auto}
+  .imp-sortwrap{flex:1 1 100%;min-width:0}
   /* Touch targets: both segmented controls reach 44px on phones. */
   .imp-aud button,.imp-density button{min-height:44px}
+  .imp-sortwrap select{min-height:44px;padding-top:20px;padding-bottom:6px}
   .imp-aud{width:100%}
   .imp-aud button{flex:1 1 0;padding:8px 6px}
 }
@@ -558,9 +647,13 @@ a.imp-soon:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
      one (the company NAME above already links to the same profile), so it is
      hidden here and the row is exactly [☆ Save][Quote this lane →]. Hidden, not
      removed from the DOM, so nothing about the desktop markup changes. */
-  .imp-foot-r{width:100%;justify-content:flex-start;display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px}
+  /* auto-fit, not a fixed 2-up: a lead whose entry port maps to no facet has no
+     "Quote this lane", which in a hard two-column grid left ☆ Save stranded at
+     half width beside an empty cell. auto-fit collapses the empty track so a
+     single remaining action stretches the full row (no-orphan rule). */
+  .imp-foot-r{width:100%;justify-content:flex-start;display:grid;grid-template-columns:repeat(auto-fit,minmax(130px,1fr));gap:8px;margin-left:0}
   .imp-foot-r a.imp-soon{display:none}
-  .imp-foot-r .imp-tier{grid-column:1 / -1;white-space:normal}
+  .imp-foot>.imp-tier{width:100%;white-space:normal}
   .imp-save,.imp-cta{width:100%;justify-content:center;padding-left:10px;padding-right:10px;font-size:11.5px}
 }
 `;
@@ -575,15 +668,20 @@ function comboField(opts: {
   lockable?: boolean;
 }): string {
   const { id, name, label, placeholder, source, lockable } = opts;
-  // Directory-portal style: the input is a compact filter chip with the label as
-  // its placeholder (title-in-field per the hard input rule). No uppercase label
-  // block above it; `aria-label` carries the accessible name. The lock pill sits
-  // beside the chip and appears only when a port pre-locks the state.
+  // TITLE-IN-FIELD (hard input rule): the field's name is a caption rendered
+  // INSIDE the bordered box, top-left, above the value. Previously the label
+  // lived only in the placeholder + aria-label, which meant a filled field lost
+  // its identity entirely — "Savannah, GA" read the same in the port slot as in
+  // the state slot. The caption is aria-hidden because `aria-label` already
+  // carries the accessible name; it exists for sighted users.
+  // The lock pill sits beside the chip and appears only when a port pre-locks
+  // the state.
   return `
     <div class="imp-field imp-combo" data-field="${esc(id)}" data-source="${esc(source)}" data-has-value="0"${
       lockable ? ' data-lockable="1"' : ''
     }>
-      <div class="imp-combo-ctrl">
+      <div class="imp-combo-ctrl imp-capfield">
+        <span class="imp-cap" aria-hidden="true">${esc(label)}</span>
         <input id="${esc(id)}" type="text" role="combobox" aria-autocomplete="list" aria-expanded="false"
                aria-controls="${esc(id)}-list" aria-label="${esc(label)}" autocomplete="off" placeholder="${esc(placeholder)}" maxlength="80">
         <button type="button" class="imp-combo-clear" aria-label="Clear ${esc(label)}" tabindex="-1">&times;</button>
@@ -633,17 +731,20 @@ export function renderImporterSearchPage(): string {
             <summary>More filters</summary>
             <div class="imp-more-grid">
               ${comboField({ id: 'imp-supplier', name: 'supplierCountry', label: 'Supplier country', placeholder: 'Any origin', source: 'inline' })}
-              <div class="imp-field">
+              <div class="imp-field imp-capfield">
+                <span class="imp-cap" aria-hidden="true">Frequency</span>
                 <label for="imp-freq">Frequency</label>
                 <select id="imp-freq" name="minShipments12m">${FREQ_BANDS.map(([v, l]) => `<option value="${esc(v)}">${esc(l)}</option>`).join('')}</select>
               </div>
-              <div class="imp-field">
+              <div class="imp-field imp-capfield">
+                <span class="imp-cap" aria-hidden="true">TEU band</span>
                 <label for="imp-teu">TEU band</label>
                 <select id="imp-teu" name="minTeu12m">${TEU_BANDS.map(([v, l]) => `<option value="${esc(v)}">${esc(l)}</option>`).join('')}</select>
               </div>
             </div>
             <div class="imp-more-name">
-              <div class="imp-field">
+              <div class="imp-field imp-capfield">
+                <span class="imp-cap" aria-hidden="true">Company name</span>
                 <label for="imp-company">Or search by company name</label>
                 <input id="imp-company" name="company" type="text" placeholder="Importer name (optional)" autocomplete="off" maxlength="80">
               </div>
@@ -660,14 +761,19 @@ export function renderImporterSearchPage(): string {
 
       <div class="imp-toolbar" id="imp-toolbar">
         <span class="imp-count" id="imp-count"></span>
-        <div class="imp-aud" role="group" aria-label="Show results for">
-          ${AUDIENCES.map(
-            ([id, label]) =>
-              `<button type="button" id="imp-aud-${esc(id)}" data-aud="${esc(id)}" aria-pressed="false">${esc(label)}</button>`,
-          ).join('')}
-        </div>
         <div class="imp-toolbar-r">
+          <div class="imp-aud" role="group" aria-label="Show results for">
+            ${AUDIENCES.map(
+              ([id, label]) =>
+                `<button type="button" id="imp-aud-${esc(id)}" data-aud="${esc(id)}" aria-pressed="false">${esc(label)}</button>`,
+            ).join('')}
+          </div>
           <span class="imp-profiles-left" id="imp-profiles-left" role="status" aria-live="polite"></span>
+          <div class="imp-field imp-capfield imp-sortwrap">
+            <span class="imp-cap" aria-hidden="true">Sort by</span>
+            <label for="imp-sort">Sort results by</label>
+            <select id="imp-sort">${SORTS.map(([v, l]) => `<option value="${esc(v)}">${esc(l)}</option>`).join('')}</select>
+          </div>
           <div class="imp-density" role="group" aria-label="Result density">
             <button type="button" id="imp-den-comf" aria-pressed="true">Comfortable</button>
             <button type="button" id="imp-den-comp" aria-pressed="false">Compact</button>
@@ -687,7 +793,12 @@ export function renderImporterSearchPage(): string {
           <button type="button" class="imp-side-reset" id="imp-side-reset">Reset filters</button>
         </aside>
         <div>
-          <div class="imp-results" id="imp-results">
+          <div class="imp-chips" id="imp-chips" hidden>
+            <span class="imp-chips-cap">Filtered by</span>
+            <span class="imp-chips-list" id="imp-chips-list"></span>
+            <button type="button" class="imp-chips-clear" id="imp-chips-clear">Clear all</button>
+          </div>
+          <div class="imp-results" id="imp-results" tabindex="-1" aria-label="Importer results">
             <div class="imp-empty" id="imp-empty">
               <span class="imp-empty-ico" aria-hidden="true">&#128506;</span>
               <div class="imp-empty-b">
@@ -1049,10 +1160,14 @@ const CLIENT_JS = `
       var b=document.createElement('b'); b.textContent=l.incumbent_forwarder; inc.appendChild(b);
       inc.title='Incumbent forwarder named on the bills: '+l.incumbent_forwarder;
       foot.appendChild(inc); }
-    var right=T('div','imp-foot-r');
+    // The contact-tier note is its OWN footer zone (grid column 2), not a member
+    // of the action group — otherwise its x-position drifts card to card with
+    // however many buttons happen to follow it.
     var tierTxt={verified:'\\u2713 Verified decision-maker on file',role_based:'Role-based email available (unverified)',phone_only:'Phone & address on file'};
     var tierEl=T('span','imp-tier'+(l.contact_confidence==='verified'?' ok':''),tierTxt[l.contact_confidence]||tierTxt.phone_only);
-    right.appendChild(tierEl);
+    tierEl.title='What we hold for this importer\\u2019s decision-maker. Reveal it on the profile.';
+    foot.appendChild(tierEl);
+    var right=T('div','imp-foot-r');
     // ☆ Save (free, logged-in). Only when we have a slug to key the save on.
     if(l.slug){ right.appendChild(saveButton(l)); }
     // The decision-maker reveal is LIVE and lives on the importer profile (the
@@ -1060,9 +1175,11 @@ const CLIENT_JS = `
     // revealing inline — honest, no fabricated contact on the card itself.
     if(l.slug){
       var reveal=document.createElement('a'); reveal.className='imp-soon'; reveal.href='/importers/company/'+encodeURIComponent(l.slug);
-      reveal.appendChild(document.createTextNode('Reveal contact '));
-      reveal.appendChild(T('span','tag','on profile \\u2192'));
-      reveal.title='Open the importer profile to reveal the decision-maker contact.';
+      // ONE label, not a label plus a nested pill — "Reveal contact [on profile]"
+      // read as two separate controls sitting inside each other.
+      reveal.appendChild(document.createTextNode('Reveal on profile '));
+      reveal.appendChild(T('span','tag','\\u2192'));
+      reveal.title='Open '+(l.company||'this importer')+'\\u2019s profile to reveal the decision-maker contact.';
       right.appendChild(reveal);
     }
     // Primary action: source drayage rates for this lane. Deep-links the metered
@@ -1183,6 +1300,88 @@ const CLIENT_JS = `
     facetState={ country:{}, chapter:{}, minShip:'', minTeu:'', verifiedOnly:false }; buildFacets(); renderList();
   });
 
+  // ── sort (R3) ──────────────────────────────────────────────────────────────
+  // Reorders the set ALREADY in memory. No refetch, no ImportYeti credits. The
+  // default is 'ships' because that is the order the server hands back, so a
+  // freshly loaded list is labelled with the order it actually has.
+  var sortEl=document.getElementById('imp-sort');
+  var sortBy=ls('qf_imp_sort')||'ships';
+  function sortLabel(){
+    if(!sortEl)return 'shipments \\u00b7 12 mo';
+    for(var i=0;i<sortEl.options.length;i++){ if(sortEl.options[i].value===sortBy) return sortEl.options[i].text; }
+    return sortEl.options.length?sortEl.options[0].text:'';
+  }
+  // Dates arrive as MM/DD/YYYY. Parsed to a comparable number; anything
+  // unparseable sorts last rather than jumping to the top as NaN.
+  function recencyOf(l){
+    var m=/^(\\d{1,2})\\/(\\d{1,2})\\/(\\d{4})$/.exec(String(l.last_shipment||''));
+    if(!m)return -1;
+    return Number(m[3])*10000+Number(m[1])*100+Number(m[2]);
+  }
+  function sortLeads(rows){
+    var out=rows.slice();
+    var num=function(k){ return function(a,b){ return (Number(b[k])||0)-(Number(a[k])||0); }; };
+    if(sortBy==='total') out.sort(num('total_shipments'));
+    else if(sortBy==='teu') out.sort(num('teu_12m'));
+    else if(sortBy==='recent') out.sort(function(a,b){ return recencyOf(b)-recencyOf(a); });
+    else if(sortBy==='win') out.sort(function(a,b){ return ((b.winnability&&b.winnability.score)||0)-((a.winnability&&a.winnability.score)||0); });
+    else if(sortBy==='company') out.sort(function(a,b){ return String(a.company||'').localeCompare(String(b.company||'')); });
+    else out.sort(num('ships_12m'));
+    return out;
+  }
+  if(sortEl){
+    sortEl.value=sortBy;
+    // A select whose stored value is no longer an option falls back to the first.
+    if(sortEl.selectedIndex<0){ sortEl.selectedIndex=0; sortBy=sortEl.value; }
+    sortEl.addEventListener('change',function(){
+      sortBy=sortEl.value; ls('qf_imp_sort',sortBy); renderList();
+      setStatus('Sorted by '+sortLabel()+'.',false);
+    });
+  }
+
+  // ── applied-filter chips (R3) ──────────────────────────────────────────────
+  // One chip per ACTIVE facet, each removing only itself. The facet rail shows
+  // what is available; this shows what is in force, at the top of the results
+  // where the effect is visible.
+  var chipsEl=document.getElementById('imp-chips');
+  var chipsListEl=document.getElementById('imp-chips-list');
+  var chipsClearEl=document.getElementById('imp-chips-clear');
+  var SHIP_LBL={'50':'50+','200':'200+','800':'800+'};
+  var TEU_LBL={'100':'100+','500':'500+','2000':'2,000+'};
+  function addChip(label,onRemove){
+    var b=document.createElement('button'); b.type='button'; b.className='imp-chip';
+    b.appendChild(T('span','lb',label));
+    var x=T('span','x','\\u00d7'); x.setAttribute('aria-hidden','true'); b.appendChild(x);
+    b.setAttribute('aria-label','Remove filter: '+label);
+    b.title='Remove filter: '+label;
+    b.addEventListener('click',function(){ onRemove(); buildFacets(); renderList(); });
+    chipsListEl.appendChild(b);
+  }
+  function renderChips(){
+    if(!chipsEl||!chipsListEl)return;
+    chipsListEl.innerHTML='';
+    Object.keys(facetState.country).forEach(function(k){
+      if(!facetState.country[k])return;
+      addChip('Origin '+k,function(){ facetState.country[k]=false; });
+    });
+    Object.keys(facetState.chapter).forEach(function(k){
+      if(!facetState.chapter[k])return;
+      addChip('HS '+k,function(){ facetState.chapter[k]=false; });
+    });
+    if(facetState.minShip) addChip((SHIP_LBL[facetState.minShip]||facetState.minShip)+' shipments / 12 mo',function(){ facetState.minShip=''; });
+    if(facetState.minTeu) addChip((TEU_LBL[facetState.minTeu]||facetState.minTeu)+' TEU / 12 mo',function(){ facetState.minTeu=''; });
+    if(facetState.verifiedOnly) addChip('Has verified contact',function(){ facetState.verifiedOnly=false; });
+    if(chipsListEl.children.length) chipsEl.removeAttribute('hidden');
+    else chipsEl.setAttribute('hidden','');
+  }
+  if(chipsClearEl){
+    chipsClearEl.addEventListener('click',function(){
+      facetState={ country:{}, chapter:{}, minShip:'', minTeu:'', verifiedOnly:false };
+      buildFacets(); renderList();
+      setStatus('Filters cleared.',false);
+    });
+  }
+
   // Composed empty / error state: glyph + headline + reason + next-step chips.
   function emptyState(icon,title,body,tips,warn){
     var e=T('div','imp-empty'+(warn?' warn':''));
@@ -1198,6 +1397,7 @@ const CLIENT_JS = `
   // Skeleton rows while a search is in flight — a designed loading state instead
   // of an empty column with a one-line status.
   function showSkeleton(){
+    results.setAttribute('aria-busy','true');
     results.innerHTML='';
     for(var i=0;i<3;i++){
       var s=T('div','imp-skel');
@@ -1208,7 +1408,8 @@ const CLIENT_JS = `
   }
 
   function renderList(){
-    var rows=visibleLeads();
+    var rows=sortLeads(visibleLeads());
+    results.removeAttribute('aria-busy');
     results.innerHTML='';
     if(!rows.length){
       results.appendChild(emptyState('\\u2298','No matches in this set',
@@ -1216,11 +1417,19 @@ const CLIENT_JS = `
         ['Clear the country filter','Drop the TEU band','Reset filters']));
     }
     else { rows.forEach(function(l){ results.appendChild(card(l)); }); }
+    renderChips();
     var shown=rows.length, total=allLeads.length;
-    countEl.innerHTML=''; var b1=document.createElement('b'); b1.textContent=String(total);
-    countEl.appendChild(b1);
-    countEl.appendChild(document.createTextNode(' importer'+(total===1?'':'s')+(shown!==total?(' \\u00b7 '+shown+' shown'):'')+
-      (totalScanned?(' \\u00b7 '+totalScanned.toLocaleString('en-US')+' records scanned'):'')));
+    // A full sentence, not a fragment: how many you are looking at, out of how
+    // many were pulled, how many raw customs records that came from, and the
+    // order they are in. The old line ("6 importers · 177,457 records scanned")
+    // never said whether a filter was hiding anything or what the order was.
+    countEl.innerHTML='';
+    function frag(txt){ countEl.appendChild(document.createTextNode(txt)); }
+    function strong(txt){ var b=document.createElement('b'); b.textContent=txt; countEl.appendChild(b); }
+    if(shown===total){ frag('Showing all '); strong(String(total)); frag(' importer'+(total===1?'':'s')); }
+    else { frag('Showing '); strong(String(shown)); frag(' of '); strong(String(total)); frag(' importers'); }
+    if(totalScanned){ frag(' \\u00b7 built from '); strong(totalScanned.toLocaleString('en-US')); frag(' customs records'); }
+    frag(' \\u00b7 sorted by '); strong(sortLabel());
     // Active-filter count on the pane header (visible when it is folded on mobile).
     if(sideN){
       var active=Object.keys(facetState.country).filter(function(k){return facetState.country[k];}).length
@@ -1337,6 +1546,13 @@ const CLIENT_JS = `
         // The toolbar already carries the count — this line adds only provenance.
         setStatus(j.cached?'Served from cache \\u2014 free.':'Built from a live customs pull.',false);
         if(recordLine){ recordLine.textContent=Number(totalScanned).toLocaleString('en-US')+' customs records scanned'; }
+        // Land the caret on the results after a FRESH search, so keyboard and
+        // screen-reader users are not left at the top of the form with the page
+        // silently rewritten below them. "Load more" appends, so it must not
+        // yank focus back to the top of the list.
+        if(!append){
+          try{ results.focus({preventScroll:true}); }catch(e){ results.focus(); }
+        }
       })
       .catch(function(){ btn.disabled=false; loadMoreBtn.disabled=false;
         setStatus('Network error \\u2014 please try again.',false);
