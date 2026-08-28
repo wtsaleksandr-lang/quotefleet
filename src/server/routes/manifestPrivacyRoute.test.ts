@@ -110,22 +110,38 @@ beforeEach(() => {
   store.nextId = 1;
 });
 
+/** Everything the production execution gate requires on the Grantor block. */
+const GRANTOR = {
+  grantorLegalName: 'Acme Imports LLC',
+  entityType: 'Limited Liability Company (LLC)',
+  stateOfOrg: 'Delaware',
+  countryOfOrg: 'United States',
+  residency: 'resident',
+  grantorAddress: '123 Harbor Way, Long Beach, CA 90802',
+  einOrImporterNo: '12-3456789',
+  nameVariations: ['Acme Imports LLC', 'Acme Imports'],
+};
+/** …and on the signer block. */
+const SIGNER = {
+  signerName: 'Jane Doe',
+  signerTitle: 'Manager',
+  signerEmail: 'jane@acme.test',
+  signerPhone: '+1 562 555 0142',
+};
+
 describe('e-sign flow — draft → consent → sign (HTTP)', () => {
   it('signs a draft: returns status "signed" + a 64-hex SHA-256 and streams the PDF', async () => {
     const { base, close } = await startServer();
     try {
       // 1) create draft
-      const created = await jpost(base, '/api/privacy/application', {
-        grantorLegalName: 'Acme Imports LLC',
-        nameVariations: ['Acme Imports LLC', 'Acme Imports'],
-      });
+      const created = await jpost(base, '/api/privacy/application', GRANTOR);
       expect(created.status).toBe(200);
       const token = created.body.token as string;
       expect(token).toBeTruthy();
 
       // 2) autosave (PATCH) more fields
       const patched = await jpost(base, `/api/privacy/application/${token}`, {
-        grantorLegalName: 'Acme Imports LLC',
+        ...GRANTOR,
         einOrImporterNo: '12-3456789',
       });
       expect(patched.status).toBe(200);
@@ -138,14 +154,14 @@ describe('e-sign flow — draft → consent → sign (HTTP)', () => {
       // 4) sign — generates PDF, records SHA-256 + audit trail. (The drawn-PNG is
       // optional server-side; omitted here so the test doesn't pay PDFKit's slow
       // in-test PNG-deflate cost — production embeds it fine.)
-      const signed = await jpost(base, `/api/privacy/application/${token}/sign`, {
-        signerName: 'Jane Doe',
-        signerTitle: 'CFO',
-        signerEmail: 'jane@acme.test',
-      });
+      const signed = await jpost(base, `/api/privacy/application/${token}/sign`, SIGNER);
       expect(signed.status).toBe(200);
       expect(signed.body.status).toBe('signed');
       expect(String(signed.body.docSha256)).toMatch(/^[0-9a-f]{64}$/);
+      // The POA's own term is 2 years from execution, and the email round-trip
+      // is still outstanding (a BLOCKING pre-filing check).
+      expect(String(signed.body.termExpiresAt)).toMatch(/^20\d\d-/);
+      expect(signed.body.emailVerificationPending).toBe(true);
 
       // The audit trail (created→consent→signed→pdf_generated) is written
       // server-side; we observe its OUTCOME here (signed status + tamper-evident
@@ -166,10 +182,99 @@ describe('e-sign flow — draft → consent → sign (HTTP)', () => {
   it('rejects signing without a signer name', async () => {
     const { base, close } = await startServer();
     try {
-      const created = await jpost(base, '/api/privacy/application', { grantorLegalName: 'Acme LLC' });
+      const created = await jpost(base, '/api/privacy/application', GRANTOR);
       const token = created.body.token as string;
       const bad = await jpost(base, `/api/privacy/application/${token}/sign`, { signatureDrawnPng: SIG_PNG });
       expect(bad.status).toBe(400);
+      expect(String(bad.body.error)).toMatch(/full name/i);
+    } finally {
+      close();
+    }
+  });
+});
+
+describe('execution gate — the server is the authority, not the browser', () => {
+  async function signWith(
+    base: string,
+    grantor: Record<string, unknown>,
+    signer: Record<string, unknown> = SIGNER,
+  ) {
+    const created = await jpost(base, '/api/privacy/application', grantor);
+    const token = created.body.token as string;
+    return jpost(base, `/api/privacy/application/${token}/sign`, signer);
+  }
+
+  it('rejects a PO-box physical address (CBP requires a physical address)', async () => {
+    const { base, close } = await startServer();
+    try {
+      const r = await signWith(base, { ...GRANTOR, grantorAddress: 'PO Box 4120, Long Beach, CA 90802' });
+      expect(r.status).toBe(400);
+      expect(String(r.body.error)).toMatch(/physical street address/i);
+    } finally {
+      close();
+    }
+  });
+
+  it('rejects an empty Schedule A — CBP suppresses only exact matches', async () => {
+    const { base, close } = await startServer();
+    try {
+      const r = await signWith(base, { ...GRANTOR, nameVariations: [] });
+      expect(r.status).toBe(400);
+      expect(String(r.body.error)).toMatch(/name variation/i);
+    } finally {
+      close();
+    }
+  });
+
+  it('rejects a partnership that has not named every partner (19 CFR 141.39)', async () => {
+    const { base, close } = await startServer();
+    try {
+      const r = await signWith(
+        base,
+        { ...GRANTOR, entityType: 'Partnership', partnerNames: [] },
+        { ...SIGNER, signerTitle: 'General Partner' },
+      );
+      expect(r.status).toBe(400);
+      expect(String(r.body.error)).toMatch(/every partner/i);
+    } finally {
+      close();
+    }
+  });
+
+  it('rejects an off-allowlist signer title with no corporate certification, and accepts it with one', async () => {
+    const { base, close } = await startServer();
+    try {
+      const blocked = await signWith(
+        base,
+        { ...GRANTOR, entityType: 'Corporation' },
+        { ...SIGNER, signerTitle: 'Controller' },
+      );
+      expect(blocked.status).toBe(400);
+      expect(String(blocked.body.error)).toMatch(/second officer/i);
+    } finally {
+      close();
+    }
+
+    const second = await startServer();
+    try {
+      const ok = await signWith(
+        second.base,
+        { ...GRANTOR, entityType: 'Corporation' },
+        { ...SIGNER, signerTitle: 'Controller', certSignerName: 'Robert Chen', certSignerTitle: 'Secretary' },
+      );
+      expect(ok.status).toBe(200);
+      expect(ok.body.status).toBe('signed');
+    } finally {
+      second.close();
+    }
+  });
+
+  it('rejects a missing business phone (part of the retained ESIGN attribution)', async () => {
+    const { base, close } = await startServer();
+    try {
+      const r = await signWith(base, GRANTOR, { ...SIGNER, signerPhone: '' });
+      expect(r.status).toBe(400);
+      expect(String(r.body.error)).toMatch(/phone/i);
     } finally {
       close();
     }

@@ -889,6 +889,16 @@ const AdminCachePurgeBody = z
  * next open re-resolves fresh; optionally also deletes ONE BOL result set by its
  * exact search key. Both are UNIQUE-index deletes — never a table scan (the
  * importer cache MUST never reintroduce the unbounded-scan outages).
+ *
+ * RETENTION BOUNDARY — this is the ONLY data-purge path in the app, and it
+ * touches DERIVED CACHES only (importer_contact_cache / importer_bol_cache).
+ * It must never be widened to Manifest Privacy data. An executed POA
+ * (poa_applications), its append-only poa_audit_events, and its signature
+ * material are RETAINED FOR AT LEAST 5 YEARS after the later of execution and
+ * the last submission — ESIGN 15 U.S.C. 7001(d) requires an accurate,
+ * reproducible record and CBP may demand production of the POA under
+ * 19 CFR 141.46. `poa_applications.retain_until` carries that floor; any future
+ * cleanup job MUST skip rows whose retain_until is still in the future.
  */
 export async function purgeImporterCacheAdmin(opts: {
   body: unknown;

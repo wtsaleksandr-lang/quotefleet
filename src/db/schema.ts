@@ -3065,10 +3065,26 @@ export const poaApplications = pgTable(
     /** draft | signed | submitted | confirmed | active | renewal_due | expired | revoked */
     status: text('status').notNull().default('draft'),
     grantorLegalName: text('grantor_legal_name'),
+    /** DBA / trade names the grantor also ships under (CBP rejection cause E5 —
+     *  a DBA missing from the POA breaks the match). string[]. */
+    dbaNames: jsonb('dba_names').$type<string[]>(),
     entityType: text('entity_type'),
     stateOfOrg: text('state_of_org'),
+    /** Country of organization when it is not a U.S. state. */
+    countryOfOrg: text('country_of_org'),
+    /** 'resident' | 'nonresident' (of the U.S.). A nonresident CORPORATION may be
+     *  asked for evidence of the signer's authority — 19 CFR 141.37. */
+    residency: text('residency'),
+    /** The PHYSICAL address. PO boxes are rejected at execution (19 CFR requires
+     *  a physical address; a mail drop is a documented rejection cause). */
     grantorAddress: text('grantor_address'),
+    /** Optional mailing address when it differs from the physical address. */
+    mailingAddress: text('mailing_address'),
     einOrImporterNo: text('ein_or_importer_no'),
+    /** Importer of record number when it differs from the EIN. */
+    iorNumber: text('ior_number'),
+    /** EVERY partner, when entity_type is a partnership — 19 CFR 141.39. */
+    partnerNames: jsonb('partner_names').$type<string[]>(),
     /** The name variations to protect — the product differentiator; captured
      *  liberally. string[]. */
     nameVariations: jsonb('name_variations').$type<string[]>(),
@@ -3078,8 +3094,31 @@ export const poaApplications = pgTable(
     signerName: text('signer_name'),
     signerTitle: text('signer_title'),
     signerEmail: text('signer_email'),
+    /** Signer's business phone — part of the retained ESIGN attribution set. */
+    signerPhone: text('signer_phone'),
+    /** Email round-trip verification: the one-time token we email, and when the
+     *  signer clicked it. A filing is gated on a non-null verified timestamp. */
+    signerEmailVerifyToken: text('signer_email_verify_token'),
+    signerEmailVerifiedAt: timestamp('signer_email_verified_at', { withTimezone: true, mode: 'date' }),
+    /** Optional corporate certification — a SECOND officer attesting the signer's
+     *  authority. Required when the signer's title is off the CBP-accepted list
+     *  for the entity form (rejection cause E1). */
+    certSignerName: text('cert_signer_name'),
+    certSignerTitle: text('cert_signer_title'),
+    certSignerEmail: text('cert_signer_email'),
+    /** What supporting authority documentation is on file for a nonresident
+     *  corporation (19 CFR 141.37). Self-reported, never "verified". */
+    authorityDocsNote: text('authority_docs_note'),
+    /** The governing-law state fixed INSIDE the signed text. Never the grantor's
+     *  domicile — some states restrict e-signatures on agency instruments. */
+    governingLaw: text('governing_law'),
+    /** The POA's own term in years. Partnerships are hard-capped at 2 by
+     *  19 CFR 141.34 (enforced in manifestPoaValidation.ts). */
+    termYears: integer('term_years'),
     /** Version tag of the consent + ESIGN disclosure the signer accepted. */
     consentDisclosureVersion: text('consent_disclosure_version'),
+    /** When the ESIGN consent box was accepted — frozen into the PDF audit block. */
+    consentAt: timestamp('consent_at', { withTimezone: true, mode: 'date' }),
     /** Typed legal name entered as the e-signature. */
     signatureTyped: text('signature_typed'),
     /** Drawn-signature canvas as a data: PNG (base64). */
@@ -3102,6 +3141,20 @@ export const poaApplications = pgTable(
     expiresAt: timestamp('expires_at', { withTimezone: true, mode: 'date' }),
     /** Last renewal reminder sent — the cron double-send guard. */
     lastReminderAt: timestamp('last_reminder_at', { withTimezone: true, mode: 'date' }),
+    /**
+     * RETENTION FLOOR — the earliest date this row, its poa_audit_events, and its
+     * signature material may be destroyed: execution + POA_RETENTION_YEARS (5),
+     * rolled forward on each new submission. ESIGN 15 U.S.C. 7001(d) requires an
+     * accurate, reproducible record, and CBP may demand production of the POA
+     * (19 CFR 141.46) long after the filing.
+     *
+     * NOTHING in this codebase may delete a poa_applications row. There is no
+     * cleanup/purge job for these tables and none may be added — if one is ever
+     * written it MUST skip rows whose retain_until is in the future. (The only
+     * existing purge in the app is the importer CACHE purge in routes/admin.ts,
+     * which touches derived caches only.)
+     */
+    retainUntil: timestamp('retain_until', { withTimezone: true, mode: 'date' }),
     /** Uploaded supporting docs, "on file"/"self-reported" only — NEVER verified. */
     docs: jsonb('docs').$type<Record<string, unknown>>(),
     createdAt: timestamp('created_at', { withTimezone: true, mode: 'date' }).notNull().defaultNow(),

@@ -8,11 +8,14 @@
  * poa_applications.lastReminderAt (a short cooldown) makes the pass idempotent
  * across the hour the slot is open and across restarts.
  *
- * Reminder bands: T-90 / 60 / 30 / 7 days before expiry. An active application
- * that enters the 90-day window is moved to `renewal_due`, emailed a "expires
- * [date] — we’ll refile" note with a one-click renew link, and logged
- * (renewal_reminded). Re-filing resets expires_at (+2 years) — handled by the
- * admin confirm flow on the fresh filing.
+ * Reminder bands: T-180 / 90 / 60 / 30 / 7 days before expiry. The T-180 band is
+ * the "18 months into the 2-year term" nudge — CBP grants confidentiality for
+ * two years, sends NO expiry notice, and never auto-renews, so the customer gets
+ * a heads-up a full six months out and the replacement is filed inside the
+ * 60–90 day window. An active application that enters the window is moved to
+ * `renewal_due`, emailed a "expires [date] — we’ll refile" note with a one-click
+ * renew link, and logged (renewal_reminded). Re-filing resets expires_at
+ * (+2 years) — handled by the admin confirm flow on the fresh filing.
  *
  * Kill-switch: MANIFEST_RENEWAL_DISABLED=1 disables the cron entirely (tests,
  * second instance). Single-instance assumption (Reserved VM) — same as the other
@@ -31,8 +34,10 @@ const DAY_MS = 24 * 60 * 60 * 1000;
 
 /** Daily send slot: 15:00 UTC. */
 const SEND_HOUR = 15;
-/** Reminder bands (days before expiry). */
-export const RENEWAL_BANDS = [90, 60, 30, 7] as const;
+/** Reminder bands (days before expiry). 180 ≈ 18 months into a 2-year term. */
+export const RENEWAL_BANDS = [180, 90, 60, 30, 7] as const;
+/** The widest band — how far out the scan looks. */
+export const RENEWAL_WINDOW_DAYS = Math.max(...RENEWAL_BANDS);
 /** Don't re-send within this window — the per-row double-send guard. Shorter
  *  than the gap between bands so each band fires once, but long enough that
  *  consecutive hourly/daily ticks never double-send. */
@@ -59,8 +64,8 @@ async function maybeRun(reason: string): Promise<void> {
   await runManifestRenewalOnce(reason, now);
 }
 
-/** The largest band an application currently qualifies for, or null (outside the
- *  90-day window / already expired). daysLeft ≤ band. */
+/** The tightest band an application currently qualifies for, or null (outside
+ *  the widest window / already expired). daysLeft ≤ band. */
 export function bandFor(daysLeft: number): number | null {
   if (daysLeft < 0) return null;
   let hit: number | null = null;
@@ -80,7 +85,7 @@ export async function runManifestRenewalOnce(reason: string, now: Date = new Dat
   const t0 = Date.now();
   let sent = 0;
   try {
-    const windowEnd = new Date(now.getTime() + 90 * DAY_MS);
+    const windowEnd = new Date(now.getTime() + RENEWAL_WINDOW_DAYS * DAY_MS);
     const rows = await db()
       .select()
       .from(poaApplications)
