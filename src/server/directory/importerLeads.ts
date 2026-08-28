@@ -50,9 +50,13 @@ export const ENRICH_CONCURRENCY = 3;
 /** A raw ImportYeti bill-of-lading row (loose — the upstream schema is wide). */
 export type BolRow = Record<string, unknown>;
 
-/** Contact fallback tiers, highest confidence first. A lead is NEVER empty:
- *  phone_only is always available (ImportYeti gives phone + address on every
- *  record). */
+/** Contact resolution tiers, highest confidence first.
+ *
+ *  `verified` and `role_based` are the two PAID tiers, and both are EMAIL tiers.
+ *  `phone_only` is the FREE FLOOR — the name is kept because it is the value
+ *  persisted in `importer_contact_cache.confidence`, but it no longer sells
+ *  anything: it means "no work email resolved". The switchboard number and the
+ *  street address that travel with it both render free on the profile. */
 export type ContactConfidence = 'verified' | 'role_based' | 'phone_only';
 
 /** What one reveal tier is allowed to SAY about itself.
@@ -62,48 +66,81 @@ export type ContactConfidence = 'verified' | 'role_based' | 'phone_only';
  *  badge — reads its wording from here, so the pitch can never drift away from
  *  what `resolveContactTiered` actually hands back.
  *
- *  The street address is deliberately absent from every tier. It renders FREE on
- *  the importer profile (the identity header AND the Organization JSON-LD), so
- *  selling it would be selling something already given away. `delivers` is the
- *  machine-checkable list of `TieredContact` fields the tier may claim; a unit
- *  test asserts the prose never names a field outside it. */
+ *  DON'T SELL WHAT ISN'T SCARCE. The street address renders FREE on the importer
+ *  profile (identity header AND Organization JSON-LD) and the company switchboard
+ *  renders FREE next to it — both are published on the importer's own website, so
+ *  neither is scarce and neither may appear in a PAID tier's `delivers`. What is
+ *  genuinely hard to get is an EMAIL you can send to, so that — and only that —
+ *  is what a reveal sells. `delivers` is the machine-checkable list of
+ *  `TieredContact` fields a tier may claim; unit tests assert the prose never
+ *  names a field outside it and that no paid tier claims the phone or address. */
 export interface ContactTierCopy {
   /** Badge / chip label. Short enough for a search-result card footer. */
   badge: string;
   /** One plain sentence: exactly what a reveal at this tier hands over. */
   blurb: string;
-  /** `TieredContact` field names this tier is allowed to promise. */
+  /** `TieredContact` field names this tier is allowed to promise. Empty for the
+   *  free floor, which promises nothing the page does not already show. */
   delivers: readonly (keyof TieredContact)[];
+  /** TRUE only for a tier a reveal may charge an allowance for. */
+  paid: boolean;
 }
 
-/** The tiers, best-first — the order every surface lists them in. */
+/** Every tier, best-first — the order every surface lists them in. */
 export const TIER_ORDER: readonly ContactConfidence[] = Object.freeze([
   'verified',
   'role_based',
   'phone_only',
 ] as const);
 
+/** The PAID tiers, best-first. This — not TIER_ORDER — is what the reveal pitch
+ *  lists, because it is the complete set of outcomes worth an allowance. */
+export const PAID_TIER_ORDER: readonly ContactConfidence[] = Object.freeze([
+  'verified',
+  'role_based',
+] as const);
+
 export const CONTACT_TIER_COPY: Readonly<Record<ContactConfidence, ContactTierCopy>> =
   Object.freeze({
     verified: {
-      badge: 'Verified decision-maker',
+      badge: 'Verified decision-maker email',
       blurb:
-        "A named decision-maker with their title and a verified work email — plus their direct phone when the record carries one.",
-      delivers: ['contact_name', 'title', 'email', 'email_confidence', 'phone'],
+        'A named decision-maker with their title and a verified work email — the person who actually books the freight.',
+      delivers: ['contact_name', 'title', 'email', 'email_confidence'],
+      paid: true,
     },
     role_based: {
       badge: 'Role-based company email',
       blurb:
-        "A role-based inbox on the company's own domain (purchasing@, logistics@, sales@, info@) — a real monitored inbox, not a named person.",
+        "A monitored role inbox on the company's own domain (purchasing@, logistics@, sales@, info@) — a real working inbox, not a named person.",
       delivers: ['domain', 'role_emails'],
+      paid: true,
     },
     phone_only: {
-      badge: 'Company phone number',
+      badge: 'No email on file',
       blurb:
-        'The importer’s full switchboard number from the customs record — the profile shows only the last four digits until it is revealed.',
-      delivers: ['phone'],
+        'No work email has been resolved for this importer. Everything else we hold on it already renders free on its profile, so a reveal that lands here is never charged.',
+      delivers: [],
+      paid: false,
     },
   });
+
+/** Does this resolved contact carry anything a reveal may CHARGE for?
+ *
+ *  The one gate behind "never consume an allowance for nothing". A reveal is
+ *  chargeable only when it lands on a PAID tier *and* actually hands back an
+ *  email address — a work email or at least one role inbox. Anything else
+ *  (`phone_only`, or a paid tier that somehow resolved no address) returns only
+ *  what the free profile already prints, so the caller must skip the decrement
+ *  and say so plainly. Structural on purpose: it reads the same `delivers`/`paid`
+ *  metadata the UI copy reads, so the pitch and the meter can never disagree. */
+export function isChargeableContact(
+  tier: ContactConfidence,
+  contact: { email?: string | null; role_emails?: readonly string[] | null },
+): boolean {
+  if (!CONTACT_TIER_COPY[tier]?.paid) return false;
+  return !!(contact.email && contact.email.trim()) || (contact.role_emails?.length ?? 0) > 0;
+}
 
 export interface ImporterFilters {
   entryPort?: string;
@@ -171,9 +208,10 @@ export interface ImporterLead {
 }
 
 /** A resolved contact in one of the three confidence tiers. Always non-empty:
- *  the phone_only tier falls back to the ImportYeti phone + address. `address`
- *  is carried for convenience only — it is free page data, never a paid claim
- *  (see CONTACT_TIER_COPY). */
+ *  the phone_only floor still carries the ImportYeti phone + address. Both of
+ *  those ride along for convenience ONLY — they are free page data, never a paid
+ *  claim, and neither appears in any paid tier's `delivers` (see
+ *  CONTACT_TIER_COPY). */
 export interface TieredContact {
   contact_confidence: ContactConfidence;
   domain: string | null;
@@ -497,15 +535,14 @@ export async function enrichContact(companyName: string): Promise<EnrichedContac
 
 /* ── Tiered contact resolution (the paid REVEAL path) ────────────────────────
  * A lead is NEVER empty. Returns the best available tier:
- *   1. verified   — a named decision-maker email (Hunter, DM title match)
+ *   1. verified   — a named decision-maker email (Hunter, DM title match)  [PAID]
  *   2. role_based — domain resolved but no named person → purchasing@/logistics@
- *                   /sales@/info@ + domain, clearly UNVERIFIED
- *   3. phone_only — no domain → the ImportYeti phone, unmasked. The `address`
- *                   travels with it for convenience but is NOT what this tier
- *                   sells: the profile already prints the street address for
- *                   free, so only the full phone number (masked to its last four
- *                   digits on the free page) is genuinely gated here. See
- *                   CONTACT_TIER_COPY.
+ *                   /sales@/info@ + domain, clearly UNVERIFIED              [PAID]
+ *   3. phone_only — no domain, so no email: the FREE FLOOR. The phone and
+ *                   address travel with it for convenience but are NOT sold —
+ *                   the profile already prints both for free. A reveal that
+ *                   lands here must not charge an allowance (see
+ *                   isChargeableContact + CONTACT_TIER_COPY).
  * Never throws — any Hunter failure (incl. a missing key) degrades to
  * phone_only, so the reveal is always answerable. */
 export async function resolveContactTiered(

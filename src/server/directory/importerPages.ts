@@ -25,8 +25,9 @@
  *
  * The GET page is a light server-rendered shell (no external calls on load).
  * Results — importer, lane, volumes, incumbent, Winnability chip, AI angle — are
- * ALL FREE to view. The decision-maker CONTACT, the AI-drafted email, and CSV
- * export are LOCKED behind a sign-up CTA (placeholder unlock; no payment wired).
+ * ALL FREE to view — as are the company phone number and street address on each
+ * importer's profile. The one LOCKED thing is the decision-maker EMAIL (plus the
+ * AI-drafted outreach and CSV export), behind the metered profile reveal.
  *
  * Styles are inlined in this TS module (like DIRECTORY_CSS), so the public-dir
  * CSS/color/spacing guards — which only scan src/server/public — never touch them.
@@ -48,6 +49,10 @@ import {
   type ImporterLead,
   type ContactConfidence,
 } from './importerLeads.js';
+// The free-taste / Leads Pro allowance numbers the lock-note quotes. Read from
+// the entitlement module rather than retyped, so the marketing line on the search
+// page can never drift from the counts the reveal endpoint actually enforces.
+import { FREE_REVEAL_TASTE, LEADS_PRO_MONTHLY_ALLOWANCE } from './leadsEntitlement.js';
 import {
   dbBolCacheStore,
   dbContactCacheStore,
@@ -992,7 +997,7 @@ export function renderImporterSearchPage(): string {
         </div>
       </div>
 
-      <p class="imp-locknote"><b>Free to view:</b> importer, lane, volumes, incumbent forwarder, winnability &amp; the AI angle. <b>Free with an account:</b> save importers to your lead list, export the results to CSV, and 2 free decision-maker contact reveals to start. <b>Leads Pro:</b> 50 decision-maker reveals every month — open any importer profile to reveal.</p>
+      <p class="imp-locknote"><b>Free to view:</b> importer, lane, volumes, incumbent forwarder, winnability &amp; the AI angle &mdash; plus the company phone number and street address on every profile. <b>Free with an account:</b> save importers to your lead list, export the results to CSV, and ${FREE_REVEAL_TASTE} free decision-maker email reveals to start. <b>Leads Pro:</b> ${LEADS_PRO_MONTHLY_ALLOWANCE} email reveals every month &mdash; and a reveal that finds no email is never charged.</p>
 
       <div class="imp-privacy-banner">
         <div class="imp-privacy-copy">
@@ -1368,11 +1373,13 @@ const CLIENT_JS = `
     // of the action group — otherwise its x-position drifts card to card with
     // however many buttons happen to follow it.
     // Chip label + its tooltip both read from the server's CONTACT_TIER_COPY —
-    // one source of truth for what a tier is allowed to claim.
+    // one source of truth for what a tier is allowed to claim. A tier that is
+    // NOT paid promises nothing, so its tooltip says the reveal is free rather
+    // than pitching an unlock that would return only free page data.
     var TIER_COPY=${JSON.stringify(CONTACT_TIER_COPY)};
     var tc=TIER_COPY[l.contact_confidence]||TIER_COPY.phone_only;
     var tierEl=T('span','imp-tier'+(l.contact_confidence==='verified'?' ok':''),(l.contact_confidence==='verified'?'\\u2713 ':'')+tc.badge);
-    tierEl.title=tc.blurb+' Reveal it on the profile.';
+    tierEl.title=tc.blurb+(tc.paid?' Reveal it on the profile.':' A reveal that finds no email is never charged.');
     foot.appendChild(tierEl);
     var right=T('div','imp-foot-r');
     // ☆ Save (free, logged-in). Only when we have a slug to key the save on.
@@ -1384,9 +1391,9 @@ const CLIENT_JS = `
       var reveal=document.createElement('a'); reveal.className='imp-soon'; reveal.href='/importers/company/'+encodeURIComponent(l.slug);
       // ONE label, not a label plus a nested pill — "Reveal contact [on profile]"
       // read as two separate controls sitting inside each other.
-      reveal.appendChild(document.createTextNode('Reveal on profile '));
+      reveal.appendChild(document.createTextNode('Reveal email on profile '));
       reveal.appendChild(T('span','tag','\\u2192'));
-      reveal.title='Open '+(l.company||'this importer')+'\\u2019s profile to reveal the decision-maker contact.';
+      reveal.title='Open '+(l.company||'this importer')+'\\u2019s profile to reveal the decision-maker email. The company phone and address are free there.';
       right.appendChild(reveal);
     }
     // Primary action: source drayage rates for this lane. Deep-links the metered
@@ -2175,9 +2182,11 @@ function hasAnyFilter(f: ImporterFilters): boolean {
   return !!(f.entryPort || f.state || f.hsCode || f.product || f.supplierCountry || f.company);
 }
 
-/** FREE browse projection — never leak locked contact fields (phone / email /
- *  name / address) to the client; only the TIER LABEL (what the user would
- *  unlock) plus a boolean that a phone is on file. */
+/** FREE browse projection — never leak the LOCKED contact fields (the email, the
+ *  decision-maker's name/title) to the client; only the TIER LABEL, i.e. what a
+ *  reveal on the profile would actually unlock. The phone and address are free
+ *  page data but are still not repeated here: they belong on the profile, which
+ *  is where the card links. `hasPhone` is kept as a card-density signal only. */
 function toPublicCard(l: ImporterLead, tier: ContactConfidence): Record<string, unknown> {
   return {
     company: l.company,
@@ -2232,11 +2241,12 @@ function bolCacheKey(f: ImporterFilters, page: number): string {
   });
 }
 
-/** Cheap, guaranteed-non-empty contact tier for the free browse card. Every
- *  lead has AT LEAST phone_only (ImportYeti phone + address on every record). A
- *  prior paid reveal cached in importer_contact_cache upgrades the label for
- *  free — via a single indexed IN() lookup (never a scan). Degrades to
- *  phone_only on any cache failure. */
+/** Cheap contact tier for the free browse card. Everyone starts on the
+ *  `phone_only` FLOOR, which now means "no email resolved (yet)" — it promises
+ *  nothing and is never charged. A prior paid reveal cached in
+ *  importer_contact_cache upgrades the label to a real email tier for free — via
+ *  a single indexed IN() lookup (never a scan). Degrades to the floor on any
+ *  cache failure, which is honest: an unknown company has no email on file here. */
 async function browseTiers(
   leads: readonly ImporterLead[],
   cache: ContactCacheStore,

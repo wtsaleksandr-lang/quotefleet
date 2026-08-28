@@ -40,7 +40,7 @@ import {
   pullImportBols,
   normalizePortName,
   CONTACT_TIER_COPY,
-  TIER_ORDER,
+  PAID_TIER_ORDER,
   type BolRow,
 } from './importerLeads.js';
 import { quoteLaneHref } from './entryPortFacets.js';
@@ -158,11 +158,35 @@ const chapterLabel = (hs: string): string => {
   return `${ch} · ${HS_CHAPTERS[ch] || 'Chapter ' + ch}`;
 };
 
-/** Mask a phone to a contact-unlock teaser: "***-***-6693". */
-function maskPhone(raw: string | null | undefined): string | null {
-  const digits = str(raw).replace(/\D/g, '');
-  if (digits.length < 4) return null;
-  return `***-***-${digits.slice(-4)}`;
+/**
+ * The importer's switchboard number, FREE and in full.
+ *
+ * This used to render masked ("***-***-6693") as a teaser for the paid reveal.
+ * That sold six digits of a company switchboard which is published on the
+ * importer's own website — not scarce, and it cost a whole reveal out of a 2-free
+ * / 50-per-month allowance. Same call as the street address next to it: don't
+ * gate what isn't scarce. The reveal now sells the one genuinely hard thing, a
+ * decision-maker EMAIL (see CONTACT_TIER_COPY).
+ *
+ * A US 10-digit number is formatted for readability; anything else (an extension,
+ * an international number) is passed through trimmed rather than mangled.
+ */
+export function formatPhone(raw: string | null | undefined): string | null {
+  const s = str(raw);
+  if (!s) return null;
+  const digits = s.replace(/\D/g, '');
+  if (digits.length === 10) return `(${digits.slice(0, 3)}) ${digits.slice(3, 6)}-${digits.slice(6)}`;
+  if (digits.length === 11 && digits.startsWith('1')) {
+    return `(${digits.slice(1, 4)}) ${digits.slice(4, 7)}-${digits.slice(7)}`;
+  }
+  return digits.length >= 4 ? s : null;
+}
+
+/** `tel:` target for a displayed phone — digits only, so a formatted number and
+ *  an extension both dial. */
+export function telHref(raw: string | null | undefined): string {
+  const digits = str(raw).replace(/[^\d+]/g, '');
+  return `tel:${digits}`;
 }
 
 /** Rough est. 12-mo ocean+port spend from TEU (deliberately labelled "est."). */
@@ -184,7 +208,9 @@ export interface ProfileData {
   slug: string;
   company: string;
   address: string | null;
-  phoneMasked: string | null;
+  /** The company switchboard, FULL and FREE (see formatPhone). Never masked —
+   *  it is public on the importer's own site, so it is not what a reveal sells. */
+  phone: string | null;
   website: string | null;
   countryCode: string | null;
   entryPort: string | null;
@@ -433,7 +459,7 @@ export function aggregateProfile(rawRows: readonly BolRow[], slug: string): Prof
     slug,
     company,
     address: fixCodeCasing(str(first.company_address)) || null,
-    phoneMasked: maskPhone(str(first.company_main_phone_number)),
+    phone: formatPhone(str(first.company_main_phone_number)),
     website: str(first.company_website) || null,
     countryCode: str(first.company_country_code).toUpperCase() || 'US',
     entryPort,
@@ -469,7 +495,7 @@ export function aggregateProfile(rawRows: readonly BolRow[], slug: string): Prof
  *  a walled visitor). */
 export function minimalTeaser(slug: string): ProfileData {
   return {
-    slug, company: titleFromSlug(slug), address: null, phoneMasked: null, website: null,
+    slug, company: titleFromSlug(slug), address: null, phone: null, website: null,
     countryCode: 'US', entryPort: null, incumbent: null, aliasesCount: 0, otherNames: [], otherAddresses: [],
     totalShipments: null, ships12m: null, teu12m: null, avgTeu: null, estSpend: null,
     firstShipment: null, months: [], suppliers: [], hsBreakdown: [], origins: [],
@@ -581,6 +607,8 @@ const PROFILE_CSS = `
 .impp-soon .tag{font-size:10px;font-weight:700;letter-spacing:.04em;text-transform:uppercase;color:var(--muted);background:var(--surface);border:1px solid var(--border);border-radius:4px;padding:2px 7px}
 .impp-meta{display:flex;gap:6px 8px;flex-wrap:wrap;color:var(--muted);font-size:12.5px;margin:14px 0 2px}
 .impp-meta .mi{display:inline-flex;align-items:center;gap:7px;background:var(--surface-2);border:1px solid var(--border);border-radius:999px;padding:5px 12px;max-width:100%;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.impp-meta .mi-tel{color:inherit;text-decoration:none;border-bottom:1px solid var(--border)}
+.impp-meta .mi-tel:hover,.impp-meta .mi-tel:focus-visible{color:var(--ink);border-bottom-color:var(--accent)}
 .impp-privacy{display:flex;align-items:center;gap:8px 14px;flex-wrap:wrap;margin:14px 0 2px;padding:12px 14px;border:1px solid var(--border);border-radius:10px;background:var(--surface)}
 .impp-privacy-t{font-size:13px;font-weight:700;color:var(--ink)}
 .impp-privacy-d{font-size:12.5px;color:var(--muted);flex:1 1 260px;min-width:0}
@@ -1118,7 +1146,11 @@ function statCard(label: string, value: string, sub?: string, icon = '\u{1F4E6}'
 function identityHeader(p: ProfileData, opts: { showActions: boolean }): string {
   const meta = [
     p.address ? `<span class="mi">\u{1F4CD} ${esc(p.address)}</span>` : '',
-    p.phoneMasked ? `<span class="mi">\u{1F4DE} ${esc(p.phoneMasked)}</span>` : '',
+    // FULL switchboard number, free and dialable. It is on the company's own
+    // website — gating it sold nothing scarce and burned a whole reveal.
+    p.phone
+      ? `<span class="mi">\u{1F4DE} <a class="mi-tel" href="${esc(telHref(p.phone))}">${esc(p.phone)}</a></span>`
+      : '',
     p.entryPort ? `<span class="mi">\u{1F6A2} Enters via ${esc(p.entryPort)}</span>` : '',
     p.firstShipment ? `<span class="mi">\u{1F4C5} Importing since ${esc(p.firstShipment)}</span>` : '',
     p.aliasesCount > 1 ? `<span class="mi">\u{1F3F7}\u{FE0F} ${N(p.aliasesCount)} names on file</span>` : '',
@@ -1341,38 +1373,43 @@ export function renderImporterProfilePage(p: ProfileData, quota: QuotaState, rev
       }</span>`
     : '';
 
+  // Every CTA names the EMAIL, not "contact info" generally — that is the one
+  // thing a reveal actually unlocks now that the phone and address are free.
   let revealAction: string;
   if (!reveal.loggedIn) {
-    revealAction = `<a class="btn btn-primary" href="/login?next=${encodeURIComponent('/importers/company/' + p.slug)}">Sign in to reveal contact <span class="arr">&rarr;</span></a>`;
+    revealAction = `<a class="btn btn-primary" href="/login?next=${encodeURIComponent('/importers/company/' + p.slug)}">Sign in to reveal the email <span class="arr">&rarr;</span></a>`;
   } else if (reveal.remaining > 0) {
     const label = reveal.isSubscriber
-      ? `Reveal contact (${reveal.remaining} left)`
-      : `Reveal contact (${reveal.remaining} free)`;
+      ? `Reveal the email (${reveal.remaining} left)`
+      : `Reveal the email (${reveal.remaining} free)`;
     revealAction = `<button type="button" class="btn btn-primary" id="impp-reveal-btn" data-slug="${esc(p.slug)}">${esc(label)}</button>`;
   } else if (reveal.comingSoon) {
     revealAction = `<span class="impp-soon"><span class="ico" aria-hidden="true">\u{1F552}</span> Leads Pro <span class="tag">coming soon</span></span>`;
   } else {
-    revealAction = `<button type="button" class="btn btn-primary" id="impp-upgrade-btn">Upgrade to Leads Pro to reveal contacts <span class="arr">&rarr;</span></button>`;
+    revealAction = `<button type="button" class="btn btn-primary" id="impp-upgrade-btn">Upgrade to Leads Pro for decision-maker emails <span class="arr">&rarr;</span></button>`;
   }
 
   const revealLead = reveal.isSubscriber
-    ? `Reveal the decision-maker on this lane — included with Leads Pro. <b>${reveal.remaining}</b> of ${reveal.cap} reveals left this month.`
+    ? `Get the email that actually books this freight — included with Leads Pro. <b>${reveal.remaining}</b> of ${reveal.cap} reveals left this month.`
     : reveal.remaining > 0
-      ? `Reveal the decision-maker on this lane — a named contact with a verified work email, a role-based company inbox, or the importer's full phone number. You have <b>${reveal.remaining}</b> free reveal${reveal.remaining === 1 ? '' : 's'} to start; Leads Pro includes ${LEADS_PRO_MONTHLY_ALLOWANCE} reveals every month.`
-      : `You've used your ${FREE_REVEAL_TASTE} free contact reveals. Leads Pro includes <b>${LEADS_PRO_MONTHLY_ALLOWANCE}</b> decision-maker reveals every month${reveal.comingSoon ? ' — coming soon.' : ` for $${LEADS_PRO_PRICE_USD}/mo.`}`;
+      ? `Get the email that actually books this freight — a named decision-maker with a verified work address, or a monitored role inbox on the company domain. You have <b>${reveal.remaining}</b> free reveal${reveal.remaining === 1 ? '' : 's'} to start; Leads Pro includes ${LEADS_PRO_MONTHLY_ALLOWANCE} every month.`
+      : `You've used your ${FREE_REVEAL_TASTE} free email reveals. Leads Pro includes <b>${LEADS_PRO_MONTHLY_ALLOWANCE}</b> decision-maker email reveals every month${reveal.comingSoon ? ' — coming soon.' : ` for $${LEADS_PRO_PRICE_USD}/mo.`}`;
 
-  // The pitch is assembled from CONTACT_TIER_COPY so the card can never promise
-  // something a tier does not hand over. The street address is called out as
-  // FREE on purpose: it renders in the identity header and the Organization
-  // JSON-LD above, so selling it back would be selling what we already gave.
-  const tierPitch = TIER_ORDER.map((t) => CONTACT_TIER_COPY[t].badge.toLowerCase());
+  // The pitch is assembled from CONTACT_TIER_COPY, and from PAID_TIER_ORDER
+  // specifically, so the card can only ever list outcomes that are worth an
+  // allowance. The phone and street address are called out as FREE on purpose:
+  // both render in the identity header above (and the address in the
+  // Organization JSON-LD), so selling either back would be selling what we
+  // already gave. The no-charge promise is stated here because it is a real
+  // guarantee in the endpoint, not a softener — see isChargeableContact.
+  const tierPitch = PAID_TIER_ORDER.map((t) => CONTACT_TIER_COPY[t].badge.toLowerCase());
   const contactBody = `
     <p class="lead">${revealLead}</p>
     <div class="impp-lockcard" id="impp-reveal-card">
-      <span class="ico" aria-hidden="true">\u{1F513}</span>
+      <span class="ico" aria-hidden="true">\u{2709}\u{FE0F}</span>
       <div class="lk">
-        <div class="lt">Decision-maker contact ${revealChip}</div>
-        <div class="ls">We resolve the best available tier — ${esc(tierPitch.slice(0, -1).join(', '))} or ${esc(tierPitch[tierPitch.length - 1])}. The company&rsquo;s street address stays free on this page either way, and we never show a fabricated contact.</div>
+        <div class="lt">Decision-maker email ${revealChip}</div>
+        <div class="ls">We resolve the best available tier &mdash; ${esc(tierPitch.join(' or '))}. The company&rsquo;s phone number and street address stay free on this page either way, we never show a fabricated contact, and a reveal that turns up no email costs you nothing.</div>
       </div>
       <div class="impp-reveal-act">${revealAction}</div>
     </div>
@@ -1436,7 +1473,7 @@ export function renderImporterProfilePage(p: ProfileData, quota: QuotaState, rev
     { id: 'carriers', label: 'Carriers & containers', sub: `${p.carriers.length} carriers`, body: carrierBody },
     { id: 'ports', label: 'Ports & notify parties', sub: `${p.portsFrom.length} ports`, body: portsBody },
     { id: 'recent', label: 'Most recent sea shipments', sub: `${N(p.recent.length)} bills`, body: recentBody },
-    { id: 'contact', label: 'Decision-maker contacts', sub: 'paid unlock', body: contactBody, open: true },
+    { id: 'contact', label: 'Decision-maker email', sub: 'paid unlock', body: contactBody, open: true },
   ];
 
   const dots = `
@@ -1884,6 +1921,15 @@ const PROFILE_JS = `
       if(revBtn){ revBtn.disabled=false; revBtn.textContent=revBtnLabel; }
       return;
     }
+    // We looked and there is no work email for this importer. Everything we do
+    // hold — the switchboard number, the street address — is already printed
+    // free above, so there was nothing to sell and NOTHING WAS CHARGED. Say that
+    // plainly and leave the button live so the count on it is visibly unchanged.
+    if(c.unavailable==='no-email'){
+      showMsg('impp-rvc-none','No decision-maker email found for this company \\u2014 nothing was charged. Its phone number and address are already listed free above.');
+      if(revBtn){ revBtn.disabled=false; revBtn.textContent=revBtnLabel; }
+      return;
+    }
     var conf = c.confidence || 'phone_only';
     // Badge + one-line "what this actually is" both come from the server's
     // CONTACT_TIER_COPY, so the revealed card can never over-claim its tier.
@@ -1904,13 +1950,13 @@ const PROFILE_JS = `
     if(c.role_emails && c.role_emails.length){
       out.push('<div class="impp-rvc-row">Role inboxes: '+c.role_emails.map(function(x){return '<a href="mailto:'+e2(x)+'">'+e2(x)+'</a>';}).join(' &middot; ')+cbtn('all role inboxes',true)+'</div>');
     }
-    if(c.phone){ out.push('<div class="impp-rvc-row">Phone: <a href="tel:'+e2(c.phone)+'">'+e2(c.phone)+'</a>'+cbtn('phone number')+'</div>'); }
-    // The address is FREE page data (identity header + JSON-LD). It rides along
-    // here as a convenience, so it is marked free — a paid card must never imply
-    // the address was part of what the reveal unlocked.
+    // Phone AND address are FREE page data (identity header + JSON-LD). They ride
+    // along here as a convenience, so both are marked free — a paid card must
+    // never imply either was part of what the reveal unlocked.
+    if(c.phone){ out.push('<div class="impp-rvc-row">Phone: <a href="tel:'+e2(c.phone)+'">'+e2(c.phone)+'</a>'+cbtn('phone number')+' <span class="impp-rvc-conf">free on this page</span></div>'); }
     if(c.address){ out.push('<div class="impp-rvc-row">Address: <span>'+e2(c.address)+'</span>'+cbtn('address')+' <span class="impp-rvc-conf">free on this page</span></div>'); }
-    if(!c.email && (!c.role_emails||!c.role_emails.length) && !c.phone){
-      out.push('<div class="impp-rvc-none">No verified contact found for this importer — no email or phone resolved. Their supplier lanes above are still your strongest outreach angle.</div>');
+    if(!c.email && (!c.role_emails||!c.role_emails.length)){
+      out.push('<div class="impp-rvc-none">No decision-maker email found for this company \\u2014 nothing was charged. Their supplier lanes above are still your strongest outreach angle.</div>');
     }
     out.push('</div>');
     revResult.innerHTML = out.join('');

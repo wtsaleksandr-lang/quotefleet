@@ -9,16 +9,22 @@
  *     all-time), then a "Upgrade to Leads Pro" wall.
  *   • Leads Pro subscribers get a monthly reveal allowance.
  *
- * HONEST CLAIMS: we NEVER fabricate a contact. `resolveContactTiered` returns the
- * best real tier — a verified decision-maker email (Hunter), a role-based email
- * (domain resolved, unverified), or phone_only (the ImportYeti phone + address on
- * the bill). When enrichment turns up nothing, the response says so plainly.
+ * WHAT A REVEAL SELLS: an EMAIL, and only an email — a named decision-maker with
+ * a verified work address (`verified`) or a monitored role inbox on the company
+ * domain (`role_based`). The switchboard number and the street address render
+ * FREE on the profile, so they are never what an allowance buys.
  *
- * COST SAFETY (three levers):
+ * HONEST CLAIMS: we NEVER fabricate a contact. `resolveContactTiered` returns the
+ * best real tier, and when it turns up no email the response says so plainly AND
+ * costs the user nothing.
+ *
+ * COST SAFETY (four levers):
  *   • CACHE-FIRST — a company already resolved (importer_contact_cache, 14-day
  *     TTL, licensed) is served from cache and spends ZERO Hunter credit.
  *   • RE-REVEAL DEDUP — an importer the account already revealed re-opens free
  *     and never decrements the allowance.
+ *   • NOTHING-TO-SELL — a reveal that resolves no email (or that the cost guard
+ *     blocked) returns `charged: false` and does not decrement either allowance.
  *   • ALLOWANCE — the per-account monthly / free-taste count caps total spend.
  *
  * HARD RULE: the reveal never 500s. Any resolve / DB failure degrades to an
@@ -26,7 +32,12 @@
  */
 import type { Express, Request, Response } from 'express';
 import { requireAuth } from '../middleware.js';
-import { resolveContactTiered, type TieredContact, type ContactConfidence } from './importerLeads.js';
+import {
+  resolveContactTiered,
+  isChargeableContact,
+  type TieredContact,
+  type ContactConfidence,
+} from './importerLeads.js';
 import {
   dbContactCacheStore,
   companyKey,
@@ -67,14 +78,29 @@ export interface RevealedContactView {
   role_emails: string[];
   phone: string | null;
   address: string | null;
-  /** Set when the HARD COST GUARD refused the live Hunter call and nothing was
-   *  cached: honest "we did not look", NOT "we looked and found nothing". */
-  unavailable?: 'cache-only';
+  /** Why this reveal returned nothing beyond what the profile already shows free.
+   *  BOTH values mean NOTHING WAS CHARGED (`charged: false` on the result):
+   *    'cache-only' — the HARD COST GUARD refused the live Hunter call and
+   *                   nothing was cached: honest "we did not look".
+   *    'no-email'   — we DID look and no work email exists for this importer.
+   *                   The phone and street address on the card are free page
+   *                   data, so there was nothing to sell. */
+  unavailable?: 'cache-only' | 'no-email';
 }
 
 /** Reveal outcome for the route to serialize. Never a fabricated contact. */
 export type RevealResult =
-  | { ok: true; contact: RevealedContactView; remaining: number; tier: 'free' | 'pro'; reused: boolean }
+  | {
+      ok: true;
+      contact: RevealedContactView;
+      remaining: number;
+      tier: 'free' | 'pro';
+      reused: boolean;
+      /** TRUE only when this call actually decremented an allowance. FALSE for a
+       *  re-reveal, a cost-guard block, and — the pricing rule — any reveal that
+       *  produced no email (nothing beyond the free page). */
+      charged: boolean;
+    }
   | { ok: false; reason: 'auth' | 'bad_request' | 'upgrade' | 'allowance_exhausted'; remaining: number; comingSoon?: boolean };
 
 export interface ImporterRevealDeps {
@@ -216,7 +242,7 @@ export async function revealWithIdentity(
   if (await meter.hasRevealed(accountKey, slug)) {
     const { view } = await resolveCacheFirst(info, deps);
     const used = await meter.getReveals(accountKey, bucket);
-    return { ok: true, contact: view, remaining: Math.max(0, cap - used), tier, reused: true };
+    return { ok: true, contact: view, remaining: Math.max(0, cap - used), tier, reused: true, charged: false };
   }
 
   // A NEW reveal → gate on the allowance BEFORE resolving anything.
@@ -227,13 +253,24 @@ export async function revealWithIdentity(
   }
 
   const { view, blocked } = await resolveCacheFirst(info, deps);
-  // The cost guard blocked the live lookup and nothing was cached — we did not
-  // actually reveal anything, so we must NOT burn one of the user's reveals.
-  if (blocked) {
-    return { ok: true, contact: view, remaining: Math.max(0, cap - used), tier, reused: false };
+  // NEVER CONSUME AN ALLOWANCE FOR NOTHING. Two ways a reveal can come back with
+  // nothing the free profile did not already show, and neither may be charged:
+  //   • `blocked`  — the cost guard refused the live lookup and nothing was
+  //                  cached, so we did not actually reveal anything;
+  //   • no email   — we looked and the importer resolved to no work email and no
+  //                  role inbox. What is left (the switchboard number, the street
+  //                  address) already renders free on this page, so charging a
+  //                  reveal for it would be selling the user their own page back.
+  // Both reuse the ONE no-charge exit the cost guard path already established:
+  // flag the view via `unavailable`, return the UNCHANGED remaining count, and
+  // skip meter.record entirely — which also leaves the slug unrecorded, so a later
+  // retry (once Hunter does have the company) is still a first, chargeable reveal.
+  if (blocked || !isChargeableContact(view.confidence, view)) {
+    const flagged: RevealedContactView = blocked ? view : { ...view, unavailable: 'no-email' };
+    return { ok: true, contact: flagged, remaining: Math.max(0, cap - used), tier, reused: false, charged: false };
   }
   const newUsed = await meter.record(accountKey, bucket, slug);
-  return { ok: true, contact: view, remaining: Math.max(0, cap - newUsed), tier, reused: false };
+  return { ok: true, contact: view, remaining: Math.max(0, cap - newUsed), tier, reused: false, charged: true };
 }
 
 /** Testable Express handler — inject seams; no app needed. */
@@ -269,10 +306,12 @@ export async function handleImporterReveal(
     res.status(200).json({
       ok: true,
       reused: false,
+      charged: false,
       tier: 'free',
       remaining: 0,
       contact: {
         confidence: 'phone_only',
+        unavailable: 'no-email',
         domain: null,
         contact_name: null,
         title: null,
