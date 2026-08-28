@@ -158,6 +158,17 @@ const PUBLIC_PATHS: [label: string, path: string][] = [
   ['city hub', '/directory/texas/houston'],
   ['carrier profile', `/directory/carrier/${CARRIER.publicSlug}`],
   ['compliance tools', '/compliance'],
+  // Static-content surfaces. /glossary and /services shipped with NO
+  // Cache-Control at all, so Cloudflare treated them as DYNAMIC and every
+  // crawler hit reached the origin — and the /services handler runs a
+  // listCarriers query per request. They are byte-identical for every visitor,
+  // so they belong on the same shared-cache policy as the directory hubs.
+  ['glossary index', '/glossary'],
+  ['glossary term', '/glossary/drayage'],
+  ['services hub', '/services'],
+  ['service category', '/services/hazmat-drayage'],
+  ['drayage rates hub', '/drayage-rates'],
+  ['drayage rates port', '/drayage-rates/savannah'],
 ];
 
 describe('public directory HTML — the header that actually reaches the wire', () => {

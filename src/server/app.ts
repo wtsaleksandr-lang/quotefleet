@@ -36,6 +36,7 @@ import { registerSavedListsRoutes } from './routes/savedLists.js';
 import { registerRfqRoutes } from './routes/rfq.js';
 import { registerServiceRoutes } from './directory/servicePages.js';
 import { registerGlossaryRoutes } from './directory/glossary.js';
+import { registerDrayageRateRoutes } from './directory/drayageRatePages.js';
 import { renderSiteNotFound } from './directory/pages.js';
 import { setNoStore } from './directory/httpCache.js';
 import { registerImporterRoutes } from './directory/importerPages.js';
@@ -191,6 +192,7 @@ export function createApp(): express.Express {
   registerDirectoryRevealRoutes(app);
   registerServiceRoutes(app);
   registerGlossaryRoutes(app);
+  registerDrayageRateRoutes(app);
   // Importer Search (/importers page + POST /api/importers/search). Registered
   // next to the other directory surfaces; its paths don't collide with the
   // /directory/:stateSlug catch-alls.

@@ -35,6 +35,7 @@ import { US_STATES } from './usStates.js';
 import { PORT_GROUPS } from './containerPorts.js';
 import { GLOSSARY_TERMS } from './glossary.js';
 import { SERVICES } from './servicePages.js';
+import { DRAYAGE_RATE_SLUGS } from './drayageRatePages.js';
 import { citySlugify, getDirectorySummary, withWallClockDeadline } from './queries.js';
 
 export const SITE = 'https://quotefleet.net';
@@ -193,6 +194,7 @@ const MARKETING_ROUTES: Array<{ path: string; changefreq: string; priority: stri
   { path: '/manifest-privacy', changefreq: 'monthly', priority: '0.7' },
   { path: '/partners', changefreq: 'monthly', priority: '0.5' },
   { path: '/partners/terms', changefreq: 'yearly', priority: '0.3' },
+  { path: '/drayage-rates', changefreq: 'monthly', priority: '0.8' },
 ];
 
 /** Build the 'pages' child <urlset>: marketing + directory landing + every state
@@ -222,6 +224,9 @@ export function buildPagesXml(now = new Date()): string {
   for (const s of SERVICES) {
     entries.push({ loc: `${SITE}/services/${xmlEscape(s.slug)}`, lastmod, changefreq: 'monthly', priority: '0.6' });
   }
+  for (const slug of DRAYAGE_RATE_SLUGS) {
+    entries.push({ loc: `${SITE}/drayage-rates/${xmlEscape(slug)}`, lastmod, changefreq: 'monthly', priority: '0.7' });
+  }
   return buildUrlset(entries);
 }
 
@@ -233,7 +238,8 @@ export function pagesUrlCount(): number {
     PORT_GROUPS.length +
     US_STATES.length +
     GLOSSARY_TERMS.length +
-    SERVICES.length
+    SERVICES.length +
+    DRAYAGE_RATE_SLUGS.length
   );
 }
 
