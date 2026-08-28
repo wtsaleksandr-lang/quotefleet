@@ -67,6 +67,28 @@ export const PUBLIC_DIRECTORY_CACHE_CONTROL =
  *  caches; `no-store` keeps it off disk. */
 export const NO_STORE_CACHE_CONTROL = 'private, no-store';
 
+/**
+ * The request methods whose responses a shared cache may store.
+ *
+ * HEAD IS NOT OPTIONAL HERE — leaving it out is what made this whole module a
+ * no-op in production. `curl -I`, uptime monitors, link checkers, CDN warm-up
+ * jobs and several crawlers fetch with HEAD, and Express dispatches HEAD to the
+ * SAME `app.get()` handler, so `req.method` arrives as `'HEAD'`. A `GET`-only
+ * test therefore rejected every one of those requests and answered
+ * `private, no-store` on pages a GET correctly marked public.
+ *
+ * It is also a spec violation: HEAD is safe AND cacheable, and RFC 9110 §9.3.2
+ * requires the server to send the same header fields it would have sent for a
+ * GET. Since the handler is literally the same code path, the response is
+ * byte-identical minus the body — every safety argument that makes the GET
+ * shareable applies unchanged. No safety is traded away: the personalization
+ * checks below run for HEAD exactly as they do for GET.
+ *
+ * Everything else (POST/PUT/PATCH/DELETE — mutations and per-user submissions)
+ * stays out.
+ */
+const SHAREABLE_METHODS: ReadonlySet<string> = new Set(['GET', 'HEAD']);
+
 /** True when this request carries a session cookie (i.e. may be personalized). */
 function hasSessionCookie(req: Request): boolean {
   const jar = (req as Request & { cookies?: Record<string, unknown> }).cookies;
@@ -86,7 +108,7 @@ function hasStagedCookie(res: Response): boolean {
  * fail-closed conditions without driving Express.
  */
 export function isSharedCacheable(req: Request, res: Response): boolean {
-  if ((req.method ?? 'GET') !== 'GET') return false;
+  if (!SHAREABLE_METHODS.has(req.method ?? 'GET')) return false;
   // partners.ts's `?ref=` capture drops a 90-day attribution cookie on ANY GET.
   // It is fire-and-forget, so the Set-Cookie may land after we set headers —
   // never mark a ?ref= response public, regardless of what is staged yet.

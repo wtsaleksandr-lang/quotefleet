@@ -187,6 +187,29 @@ describe('httpCache — the fail-closed shareability predicate', () => {
 
   it('a non-GET is never shareable', () => {
     expect(isSharedCacheable(mkReq({ method: 'POST' }) as never, new MockRes() as never)).toBe(false);
+    for (const method of ['PUT', 'PATCH', 'DELETE', 'OPTIONS']) {
+      expect(isSharedCacheable(mkReq({ method }) as never, new MockRes() as never)).toBe(false);
+    }
+  });
+
+  it('a HEAD IS shareable — Express routes it to the same GET handler', () => {
+    // This one assertion is the whole bug 0068 shipped: HEAD was lumped in with
+    // the mutating methods, so `curl -I`, monitors and crawlers all saw
+    // `private, no-store` on pages a GET marked public. HEAD is safe AND
+    // cacheable, and RFC 9110 §9.3.2 requires the same headers as the GET.
+    expect(isSharedCacheable(mkReq({ method: 'HEAD' }) as never, new MockRes() as never)).toBe(true);
+  });
+
+  it('a HEAD is still refused when the request proves it is personalized', () => {
+    // Widening to HEAD must not widen anything else: every fail-closed rule
+    // applies to HEAD exactly as it does to GET.
+    const withSession = mkReq({ method: 'HEAD', cookies: { qf_sess: 'abc123' } });
+    expect(isSharedCacheable(withSession as never, new MockRes() as never)).toBe(false);
+    const withRef = mkReq({ method: 'HEAD', query: { ref: 'PARTNER7' } });
+    expect(isSharedCacheable(withRef as never, new MockRes() as never)).toBe(false);
+    const staged = new MockRes();
+    staged.setHeader('Set-Cookie', ['qf_ref=X; Path=/']);
+    expect(isSharedCacheable(mkReq({ method: 'HEAD' }) as never, staged as never)).toBe(false);
   });
 
   it('the shared TTL stays bounded well inside the weekly FMCSA re-ingest', () => {
