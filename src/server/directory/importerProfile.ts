@@ -480,15 +480,20 @@ export async function getProfileRows(
 // ── CSS (inline, guard-safe) ─────────────────────────────────────────────────
 const PROFILE_CSS = `
 .impp-wrap{padding:24px 0 64px;position:relative}
-.impp-back{display:inline-flex;align-items:center;gap:6px;color:var(--muted);font-size:13px;margin:8px 0 4px;text-decoration:none}
+/* A dense customs-data profile needs a wider canvas than the shared 780px
+   narrow container: tables, the chart and the 5-up stat strip all fight for
+   room otherwise. */
+.impp-wrap .container-narrow{max-width:1120px}
+.impp-back{display:inline-flex;align-items:center;gap:6px;color:var(--muted);font-size:13px;margin:8px 0 4px;text-decoration:none;border-radius:4px}
 .impp-back:hover{color:var(--accent)}
+.impp-back:focus-visible{outline:2px solid var(--accent);outline-offset:3px}
 
 /* identity header */
 .impp-head{padding:10px 0 4px}
-.impp-title{display:flex;align-items:center;gap:12px;flex-wrap:wrap}
-.impp-title h1{font-size:28px;line-height:1.15;margin:0;color:var(--ink);letter-spacing:-.015em}
-.impp-flag{font-size:22px;line-height:1}
-.impp-pill{font-size:10px;font-weight:700;letter-spacing:.04em;text-transform:uppercase;padding:4px 8px;border-radius:4px;background:var(--accent);color:var(--bg)}
+.impp-title{display:flex;align-items:center;gap:10px;flex-wrap:wrap}
+.impp-title h1{font-size:30px;line-height:1.12;margin:0;color:var(--ink);letter-spacing:-.02em}
+.impp-flag{font-size:20px;line-height:1}
+.impp-pill{font-size:9.5px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;padding:3px 7px;border-radius:4px;background:var(--surface-3,var(--surface-2));color:var(--ink-soft);border:1px solid var(--border-strong)}
 .impp-head-act{margin-left:auto;display:flex;gap:8px;flex-wrap:wrap;align-items:center}
 .impp-save{display:inline-flex;align-items:center;gap:7px;font-family:var(--font-sans);font-size:13px;font-weight:600;color:var(--ink-soft);background:var(--surface-2);border:1px solid var(--border-strong);border-radius:8px;padding:9px 14px;min-height:44px;cursor:pointer}
 .impp-save:hover{border-color:var(--accent);color:var(--ink)}
@@ -500,8 +505,8 @@ const PROFILE_CSS = `
 .impp-soon{display:inline-flex;align-items:center;gap:8px;font-size:13px;font-weight:600;color:var(--ink-soft);border:1px dashed var(--border-strong);border-radius:8px;padding:9px 14px;background:var(--surface-2)}
 .impp-soon .ico{opacity:.7}
 .impp-soon .tag{font-size:10px;font-weight:700;letter-spacing:.04em;text-transform:uppercase;color:var(--muted);background:var(--surface);border:1px solid var(--border);border-radius:4px;padding:2px 7px}
-.impp-meta{display:flex;gap:8px 20px;flex-wrap:wrap;color:var(--muted);font-size:13px;margin:12px 0 2px}
-.impp-meta .mi{display:inline-flex;align-items:center;gap:6px}
+.impp-meta{display:flex;gap:6px 8px;flex-wrap:wrap;color:var(--muted);font-size:12.5px;margin:14px 0 2px}
+.impp-meta .mi{display:inline-flex;align-items:center;gap:7px;background:var(--surface-2);border:1px solid var(--border);border-radius:999px;padding:5px 12px;max-width:100%;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .impp-privacy{display:flex;align-items:center;gap:8px 14px;flex-wrap:wrap;margin:14px 0 2px;padding:12px 14px;border:1px solid var(--border);border-radius:10px;background:var(--surface)}
 .impp-privacy-t{font-size:13px;font-weight:700;color:var(--ink)}
 .impp-privacy-d{font-size:12.5px;color:var(--muted);flex:1 1 260px;min-width:0}
@@ -511,14 +516,22 @@ const PROFILE_CSS = `
 .impp-samplenote{color:var(--muted);font-size:12px;margin:10px 0 0}
 .impp-samplenote b{color:var(--ink-soft)}
 
-/* stat strip */
-.impp-stats{display:grid;grid-template-columns:repeat(5,1fr);gap:12px;margin:18px 0 6px}
-.impp-stat{border:1px solid var(--border);border-radius:var(--radius-lg);background:var(--surface);padding:14px 15px;box-shadow:var(--shadow-sm)}
-.impp-stat .sl{font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:.03em;line-height:1.25}
-.impp-stat .sv{font-size:20px;font-weight:800;color:var(--ink);font-variant-numeric:tabular-nums;margin-top:6px;letter-spacing:-.01em}
-.impp-stat .sx{font-size:11px;color:var(--muted);margin-top:2px}
-@media(max-width:860px){.impp-stats{grid-template-columns:repeat(3,1fr)}}
-@media(max-width:520px){.impp-stats{grid-template-columns:repeat(2,1fr)}}
+/* stat strip — icon-left tiles. The label block is a fixed two-line height so
+   every value sits on the SAME baseline across the strip (labels of different
+   lengths used to shove the numbers up and down). */
+.impp-stats{display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:12px;margin:20px 0 6px}
+.impp-stat{display:flex;gap:11px;align-items:flex-start;border:1px solid var(--border);border-radius:var(--radius-lg);background:var(--surface);padding:14px 15px;box-shadow:var(--shadow-sm);min-width:0}
+.impp-stat .si{flex:0 0 auto;width:30px;height:30px;display:flex;align-items:center;justify-content:center;border-radius:9px;font-size:14px;line-height:1;background:color-mix(in srgb,var(--accent) 10%,transparent);border:1px solid color-mix(in srgb,var(--accent) 22%,transparent)}
+.impp-stat .sb{min-width:0;flex:1 1 auto}
+.impp-stat .sl{font-size:10px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.05em;line-height:13px;height:26px;overflow:hidden}
+.impp-stat .sv{font-size:21px;font-weight:800;color:var(--ink);font-variant-numeric:tabular-nums;margin-top:4px;letter-spacing:-.018em;line-height:1.15;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.impp-stat .sx{font-size:10.5px;color:var(--muted);margin-top:3px}
+@media(max-width:1000px){.impp-stats{grid-template-columns:repeat(3,minmax(0,1fr))}}
+@media(max-width:620px){.impp-stats{grid-template-columns:repeat(2,minmax(0,1fr));gap:10px}
+  .impp-stat{padding:12px 13px;gap:9px}.impp-stat .si{width:26px;height:26px;font-size:12px}.impp-stat .sv{font-size:18px}
+  /* 5 tiles in a 2-up grid leaves the last one orphaned at half width — where
+     "~$49.2M" also got clipped. Let it span the row instead. */
+  .impp-stat:last-child{grid-column:1 / -1}}
 
 /* AI opportunity brief */
 .impp-brief{border:1px solid color-mix(in srgb,var(--accent) 34%,transparent);border-radius:var(--radius-lg);background:color-mix(in srgb,var(--accent) 7%,transparent);padding:18px 20px;margin:18px 0 6px}
@@ -530,53 +543,83 @@ const PROFILE_CSS = `
 .impp-brief li b{color:var(--ink)}
 
 /* section fold/unfold */
-.impp-sec{border:1px solid var(--border);border-radius:var(--radius-lg);background:var(--surface);margin:14px 0;box-shadow:var(--shadow-sm);overflow:hidden;scroll-margin-top:16px}
-.impp-sech{width:100%;display:flex;align-items:center;gap:12px;background:none;border:0;cursor:pointer;padding:16px 18px;text-align:left;font-family:var(--font-sans);color:var(--ink);min-height:56px}
+.impp-sec{border:1px solid var(--border);border-radius:var(--radius-lg);background:var(--surface);margin:12px 0;box-shadow:var(--shadow-sm);overflow:hidden;scroll-margin-top:16px;transition:border-color .16s ease}
+.impp-sec:hover{border-color:color-mix(in srgb,var(--accent) 30%,var(--border))}
+.impp-sech{width:100%;display:flex;align-items:center;gap:10px;background:none;border:0;cursor:pointer;padding:15px 18px;text-align:left;font-family:var(--font-sans);color:var(--ink);min-height:54px;transition:background .14s}
 .impp-sech:hover{background:var(--surface-2)}
-.impp-sech .impp-sect{font-size:16px;font-weight:700;color:var(--ink)}
-.impp-sech .impp-secs{font-size:12px;color:var(--muted);margin-left:2px}
+.impp-sech:focus-visible{outline:2px solid var(--accent);outline-offset:-2px}
+.impp-sech .impp-sect{font-size:15.5px;font-weight:700;color:var(--ink);letter-spacing:-.012em}
+.impp-sech .impp-secs{font-size:11.5px;font-weight:600;color:var(--muted);background:var(--surface-2);border:1px solid var(--border);border-radius:999px;padding:2px 9px;font-variant-numeric:tabular-nums}
+.impp-sech:hover .impp-secs{border-color:var(--border-strong)}
 .impp-caret{margin-left:auto;flex:0 0 auto;width:16px;height:16px;color:var(--muted);transition:transform .18s ease}
 .impp-sec.open .impp-caret{transform:rotate(180deg)}
+.impp-sec.open .impp-sech{border-bottom:1px solid var(--border)}
 .impp-secb{padding:0 18px 18px;display:none}
-.impp-sec.open .impp-secb{display:block}
-.impp-secb .lead{color:var(--muted);font-size:12.5px;margin:0 0 14px}
+.impp-sec.open .impp-secb{display:block;padding-top:16px}
+.impp-secb .lead{color:var(--muted);font-size:12.5px;margin:0 0 14px;line-height:1.55}
 
-/* chart */
-.impp-chartwrap{position:relative;border:1px solid var(--border);border-radius:12px;background:var(--surface-2);padding:16px 16px 8px}
-.impp-chart{display:block;width:100%;height:200px;overflow:visible}
-.impp-chart rect.bar{fill:var(--accent);transition:opacity .12s}
-.impp-chart rect.bar:hover{opacity:.7}
+/* chart — gridlines + a real y-axis live in HTML (the SVG is stretched with
+   preserveAspectRatio:none for full-bleed bars, which would distort any text or
+   stroke drawn inside it). */
+.impp-chartwrap{position:relative;border:1px solid var(--border);border-radius:12px;background:var(--surface);padding:16px 18px 10px}
+.impp-chart-grid{position:relative;display:grid;grid-template-columns:auto minmax(0,1fr);gap:0 10px;align-items:stretch}
+.impp-yaxis{display:flex;flex-direction:column;justify-content:space-between;font-size:10px;font-weight:600;color:var(--muted);font-variant-numeric:tabular-nums;text-align:right;height:200px;padding:0;line-height:1}
+.impp-yaxis span{transform:translateY(-.35em)}
+.impp-yaxis span:last-child{transform:translateY(.1em)}
+.impp-plot{position:relative;height:200px}
+/* horizontal gridlines at 0 / 25 / 50 / 75 / 100% of the max */
+.impp-plot::before{content:'';position:absolute;inset:0;pointer-events:none;background-image:repeating-linear-gradient(to bottom,var(--border) 0 1px,transparent 1px 25%)}
+.impp-chart{display:block;width:100%;height:200px;overflow:visible;position:relative}
+.impp-chart rect.bar{fill:color-mix(in srgb,var(--accent) 68%,transparent);transition:fill .12s}
+.impp-chart rect.bar:hover,.impp-chart rect.bar.on{fill:var(--accent)}
+/* the latest month is the one a broker acts on — call it out */
+.impp-chart rect.bar.last{fill:var(--accent)}
 .impp-chart .axis{stroke:var(--border-strong);stroke-width:1}
-.impp-xaxis{display:flex;justify-content:space-between;color:var(--muted);font-size:11px;margin-top:8px}
-.impp-tip{position:absolute;top:8px;left:0;transform:translateX(-50%);background:var(--ink);color:var(--bg);font-size:12px;font-weight:600;padding:6px 10px;border-radius:7px;pointer-events:none;white-space:nowrap;box-shadow:0 6px 18px rgba(0,0,0,.25);z-index:5}
+.impp-xaxis{display:flex;justify-content:space-between;color:var(--muted);font-size:10.5px;font-weight:600;margin:8px 0 0 0;padding-left:34px}
+.impp-chart-cap{display:flex;align-items:center;gap:8px 14px;flex-wrap:wrap;font-size:11.5px;color:var(--muted);margin-top:10px;padding-top:10px;border-top:1px solid var(--border)}
+.impp-chart-cap b{color:var(--ink);font-variant-numeric:tabular-nums}
+.impp-tip{position:absolute;top:6px;left:0;transform:translateX(-50%);background:var(--ink);color:var(--bg);font-size:12px;font-weight:700;padding:7px 11px;border-radius:8px;pointer-events:none;white-space:nowrap;box-shadow:var(--shadow-md);z-index:5;line-height:1.35;text-align:center}
 .impp-tip[hidden]{display:none}
-.impp-tip .tc{opacity:.8;font-weight:500}
+.impp-tip .tv{display:block;font-size:10.5px;font-weight:600;opacity:.72;letter-spacing:.03em;text-transform:uppercase}
+.impp-tip .tc{display:block;font-size:14px;font-weight:800;font-variant-numeric:tabular-nums}
+@media(max-width:560px){.impp-chartwrap{padding:12px 12px 8px}.impp-yaxis,.impp-plot,.impp-chart{height:160px}.impp-xaxis{padding-left:28px}}
 
-/* tables */
-.impp-tbl-wrap{overflow-x:auto;border:1px solid var(--border);border-radius:12px}
-.impp-tbl{border-collapse:collapse;width:100%;min-width:560px;font-size:13px}
-.impp-tbl thead th{background:var(--surface-2);text-align:left;padding:10px 14px;font-size:10.5px;font-weight:700;letter-spacing:.04em;text-transform:uppercase;color:var(--muted);border-bottom:1px solid var(--border)}
-.impp-tbl tbody td{padding:11px 14px;border-bottom:1px solid var(--border);vertical-align:middle;color:var(--ink-soft)}
+/* tables — scannable rows: subtle zebra, hover highlight, right-aligned
+   tabular numerics, and a sticky header inside the horizontal scroll box. */
+.impp-tbl-wrap{overflow-x:auto;overflow-y:auto;max-height:520px;border:1px solid var(--border);border-radius:12px;-webkit-overflow-scrolling:touch}
+/* Scroll affordance: a wide table cut by the viewport needs to say so. */
+.impp-scrollnote{display:none;font-size:11.5px;color:var(--muted);margin:8px 0 0}
+@media(max-width:760px){.impp-scrollnote{display:block}}
+.impp-tbl{border-collapse:separate;border-spacing:0;width:100%;min-width:560px;font-size:13px}
+.impp-tbl thead th{position:sticky;top:0;z-index:2;background:var(--surface-2);text-align:left;padding:10px 14px;font-size:10px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;color:var(--muted);border-bottom:1px solid var(--border-strong);white-space:nowrap}
+.impp-tbl thead th.impp-num,.impp-tbl tbody td.impp-num{text-align:right}
+.impp-tbl tbody td{padding:10px 14px;border-bottom:1px solid var(--border);vertical-align:middle;color:var(--ink-soft);max-width:340px;overflow:hidden;text-overflow:ellipsis}
+.impp-tbl tbody tr:nth-child(even) td{background:color-mix(in srgb,var(--surface-2) 45%,transparent)}
+.impp-tbl tbody tr:hover td{background:color-mix(in srgb,var(--accent) 7%,transparent)}
 .impp-tbl tbody tr:last-child td{border-bottom:0}
 .impp-supn{font-weight:700;color:var(--ink)}
-.impp-hschip{font-family:var(--font-mono);font-size:11px;color:var(--accent);background:color-mix(in srgb,var(--accent) 12%,transparent);border-radius:4px;padding:1px 6px;display:inline-block}
+.impp-hschip{font-family:var(--font-mono);font-size:11px;color:var(--accent);background:color-mix(in srgb,var(--accent) 12%,transparent);border-radius:4px;padding:1px 6px;display:inline-block;white-space:nowrap}
 .impp-num{font-variant-numeric:tabular-nums}
 
 /* bars (volume / origin) */
-.impp-bars{display:flex;flex-direction:column;gap:10px}
-.impp-brow{display:grid;grid-template-columns:180px 1fr 70px;align-items:center;gap:12px}
+.impp-bars{display:flex;flex-direction:column;gap:4px}
+.impp-brow{display:grid;grid-template-columns:220px minmax(0,1fr) 76px;align-items:center;gap:14px;padding:6px 8px;margin:0 -8px;border-radius:8px;transition:background .12s}
+.impp-brow:hover{background:var(--surface-2)}
 .impp-brow .bl{display:flex;align-items:center;gap:8px;font-weight:600;color:var(--ink);font-size:13px;min-width:0}
 .impp-brow .bl span{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
-.impp-brow .bt{height:14px;background:var(--surface-2);border-radius:4px;overflow:hidden}
-.impp-brow .bt i{display:block;height:100%;background:var(--accent);border-radius:4px}
-.impp-brow .bv{text-align:right;font-size:12.5px;color:var(--muted);font-variant-numeric:tabular-nums}
-@media(max-width:560px){.impp-brow{grid-template-columns:120px 1fr 56px}}
+.impp-brow .bt{height:10px;background:var(--surface-2);border-radius:999px;overflow:hidden;box-shadow:inset 0 0 0 1px var(--border)}
+.impp-brow .bt i{display:block;height:100%;background:var(--accent);border-radius:999px;min-width:3px}
+.impp-brow:first-child .bt i{background:var(--accent)}
+.impp-brow .bv{text-align:right;font-size:12.5px;font-weight:700;color:var(--ink);font-variant-numeric:tabular-nums}
+@media(max-width:640px){.impp-brow{grid-template-columns:132px minmax(0,1fr) 56px;gap:10px}}
 
 /* two-column lists */
-.impp-two{display:grid;grid-template-columns:1fr 1fr;gap:16px}
+.impp-two{display:grid;grid-template-columns:1fr 1fr;gap:16px 24px}
 @media(max-width:700px){.impp-two{grid-template-columns:1fr}}
-.impp-list h4{font-size:13px;font-weight:700;color:var(--ink);margin:0 0 10px}
-.impp-lrow{display:grid;grid-template-columns:1fr auto;gap:10px;align-items:center;padding:7px 0;border-bottom:1px solid var(--border);font-size:13px;color:var(--ink-soft)}
+.impp-list h4{font-size:11px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.06em;margin:0 0 6px;padding-bottom:8px;border-bottom:1px solid var(--border-strong)}
+.impp-lrow{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:10px;align-items:center;padding:8px;margin:0 -8px;border-bottom:1px solid var(--border);font-size:13px;color:var(--ink-soft);border-radius:7px;transition:background .12s}
+.impp-lrow:hover{background:var(--surface-2)}
+.impp-lrow>span:first-child{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .impp-lrow:last-child{border-bottom:0}
 .impp-lrow .lc{font-weight:700;color:var(--ink);font-variant-numeric:tabular-nums}
 
@@ -588,12 +631,14 @@ const PROFILE_CSS = `
 .impp-relc .rd{font-size:12px;color:var(--muted);margin-top:5px}
 
 /* contact lock */
-.impp-lockcard{border:1px dashed var(--border-strong);border-radius:12px;background:var(--surface-2);padding:18px;display:flex;gap:14px;align-items:center;flex-wrap:wrap}
+.impp-lockcard{border:1px dashed var(--border-strong);border-radius:12px;background:var(--surface-2);padding:18px;display:flex;gap:16px;align-items:center;flex-wrap:wrap}
+.impp-lockcard>.ico{flex:0 0 auto;width:42px;height:42px;display:flex;align-items:center;justify-content:center;border-radius:12px;background:color-mix(in srgb,var(--accent) 10%,transparent);border:1px solid color-mix(in srgb,var(--accent) 24%,transparent)}
 .impp-lockcard .blur{filter:blur(5px);user-select:none;font-weight:700;color:var(--ink)}
 .impp-lockcard .lk{flex:1 1 240px;min-width:0}
 .impp-lockcard .lk .lt{font-weight:700;color:var(--ink);font-size:14px}
-.impp-lockcard .lk .ls{font-size:12.5px;color:var(--muted);margin-top:4px}
+.impp-lockcard .lk .ls{font-size:12.5px;color:var(--muted);margin-top:5px;line-height:1.55}
 .impp-reveal-act{margin-left:auto;display:flex;align-items:center}
+@media(max-width:560px){.impp-reveal-act{margin-left:0;width:100%}.impp-reveal-act>*{width:100%;justify-content:center}}
 .impp-revchip{display:inline-flex;align-items:center;gap:5px;font-size:11px;font-weight:700;letter-spacing:.02em;color:var(--accent);background:color-mix(in srgb,var(--accent) 12%,transparent);border-radius:999px;padding:2px 9px;margin-left:8px;vertical-align:middle}
 .impp-revchip.out{color:var(--warn);background:color-mix(in srgb,var(--warn) 16%,transparent)}
 /* revealed-contact result */
@@ -613,26 +658,34 @@ const PROFILE_CSS = `
 .impp-rvc-none{font-size:13px;color:var(--muted)}
 .impp-rvc-err{font-size:13px;color:var(--warn)}
 
-/* left dot shortcut pane */
-.impp-dots{position:fixed;left:14px;top:50%;transform:translateY(-50%);z-index:30}
-.impp-dots ul{list-style:none;margin:0;padding:8px;display:flex;flex-direction:column;gap:4px;border:1px solid transparent;border-radius:14px;transition:background .16s,box-shadow .16s,border-color .16s}
-.impp-dots a{display:flex;align-items:center;gap:11px;text-decoration:none;padding:5px 6px;border-radius:9px}
-.impp-dot{width:9px;height:9px;border-radius:50%;background:var(--border-strong);flex:0 0 auto;transition:background .16s,transform .16s}
+/* left dot shortcut pane — a hover-expanding scroll-spy rail */
+.impp-dots{position:fixed;left:18px;top:50%;transform:translateY(-50%);z-index:30}
+.impp-dots ul{list-style:none;margin:0;padding:10px 8px;display:flex;flex-direction:column;gap:2px;border:1px solid transparent;border-radius:14px;transition:background .16s,box-shadow .16s,border-color .16s,padding .16s}
+.impp-dots a{display:flex;align-items:center;gap:12px;text-decoration:none;padding:6px;border-radius:9px}
+.impp-dots a:focus-visible{outline:2px solid var(--accent);outline-offset:1px}
+.impp-dot{width:8px;height:8px;border-radius:50%;background:var(--border-strong);flex:0 0 auto;transition:background .16s,transform .16s;box-shadow:0 0 0 0 color-mix(in srgb,var(--accent) 30%,transparent)}
 .impp-dotl{font-size:12.5px;color:var(--muted);white-space:nowrap;opacity:0;max-width:0;overflow:hidden;transition:opacity .16s,max-width .16s}
-.impp-dots:hover ul,.impp-dots:focus-within ul{background:var(--surface);box-shadow:var(--shadow-lg,0 12px 32px rgba(0,0,0,.2));border-color:var(--border)}
+.impp-dots:hover ul,.impp-dots:focus-within ul{background:var(--surface);box-shadow:var(--shadow-lg);border-color:var(--border);padding:10px 14px 10px 10px}
 .impp-dots:hover .impp-dotl,.impp-dots:focus-within .impp-dotl{opacity:1;max-width:230px}
 .impp-dots a:hover .impp-dot{background:var(--accent)}
-.impp-dots a.active .impp-dot{background:var(--accent);transform:scale(1.4)}
+.impp-dots a:hover .impp-dotl{color:var(--ink)}
+.impp-dots a.active .impp-dot{background:var(--accent);transform:scale(1.45);box-shadow:0 0 0 4px color-mix(in srgb,var(--accent) 22%,transparent)}
 .impp-dots a.active .impp-dotl{color:var(--ink);font-weight:700}
-@media(max-width:1180px){.impp-dots{display:none}}
+@media(max-width:1320px){.impp-dots{display:none}}
 
-/* subscribe wall */
-.impp-wall{border:1px solid color-mix(in srgb,var(--accent) 34%,transparent);border-radius:var(--radius-lg);background:color-mix(in srgb,var(--accent) 8%,transparent);padding:28px 24px;margin:20px 0;text-align:center}
-.impp-wall h2{font-size:20px;color:var(--ink);margin:0 0 8px}
-.impp-wall p{color:var(--ink-soft);font-size:14px;margin:0 auto 16px;max-width:520px}
-.impp-wall .sub{color:var(--muted);font-size:12.5px;margin-top:14px}
+/* subscribe / unavailable wall — a designed state, since the quota + credit
+   paths are the ones visitors actually land on most. */
+.impp-wall{position:relative;border:1px solid color-mix(in srgb,var(--accent) 32%,transparent);border-radius:var(--radius-lg);background:color-mix(in srgb,var(--accent) 7%,transparent);padding:30px 26px;margin:20px 0;text-align:center}
+.impp-wall .wico{width:52px;height:52px;margin:0 auto 14px;display:flex;align-items:center;justify-content:center;border-radius:15px;font-size:24px;line-height:1;background:var(--surface);border:1px solid color-mix(in srgb,var(--accent) 28%,transparent);box-shadow:var(--shadow-sm)}
+.impp-wall h2{font-size:21px;color:var(--ink);margin:0 0 8px;letter-spacing:-.018em}
+.impp-wall p{color:var(--ink-soft);font-size:14px;margin:0 auto 18px;max-width:520px;line-height:1.6}
+.impp-wall .sub{color:var(--muted);font-size:12.5px;margin:16px auto 0}
 .impp-wall-actions{display:flex;gap:12px;justify-content:center;flex-wrap:wrap}
+/* what's behind the wall, listed honestly */
+.impp-wall-list{display:flex;gap:8px;flex-wrap:wrap;justify-content:center;list-style:none;margin:0 0 18px;padding:0}
+.impp-wall-list li{font-size:12px;font-weight:600;color:var(--ink-soft);background:var(--surface);border:1px solid var(--border);border-radius:999px;padding:5px 12px}
 .impp-teaserstats{filter:blur(4px);pointer-events:none;user-select:none}
+@media(max-width:520px){.impp-wall{padding:24px 18px}.impp-wall-actions>*{width:100%;justify-content:center}}
 
 /* buttons reuse .btn/.btn-primary from style.css; add an outline variant */
 .impp-btn-o{display:inline-flex;align-items:center;gap:6px;border:1px solid var(--border-strong);background:var(--surface);color:var(--ink-soft);border-radius:8px;padding:9px 14px;font-size:13px;font-weight:600;cursor:pointer;text-decoration:none;min-height:44px;box-sizing:border-box}
@@ -646,7 +699,7 @@ const PROFILE_CSS = `
 // ── render helpers ───────────────────────────────────────────────────────────
 const CARET = '<svg class="impp-caret" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m6 9 6 6 6-6"/></svg>';
 
-interface SecDef { id: string; label: string; sub?: string; body: string; }
+interface SecDef { id: string; label: string; sub?: string; body: string; open?: boolean; }
 
 function section(def: SecDef, open: boolean): string {
   return `
@@ -673,18 +726,36 @@ function chartSvg(months: ProfileMonth[]): string {
       const h = Math.max(2, Math.round((m.count / max) * (H - padB)));
       const x = i * (bw + gap);
       const y = H - h;
-      return `<rect class="bar" data-bar data-label="${esc(m.label)}" data-count="${m.count}" x="${x.toFixed(1)}" y="${y}" width="${bw.toFixed(1)}" height="${h}" rx="1.5"><title>${esc(m.label)}: ${N(m.count)}</title></rect>`;
+      return `<rect class="bar${i === n - 1 ? ' last' : ''}" data-bar data-label="${esc(m.label)}" data-count="${m.count}" x="${x.toFixed(1)}" y="${y}" width="${bw.toFixed(1)}" height="${h}"><title>${esc(m.label)}: ${N(m.count)}</title></rect>`;
     })
     .join('');
   const first = months[0].label, last = months[n - 1].label;
+  const mid = n > 2 ? months[Math.floor((n - 1) / 2)].label : '';
+  // y-axis ticks at 100 / 75 / 50 / 25 / 0 % of the peak, matching the gridlines
+  const ticks = [1, 0.75, 0.5, 0.25, 0]
+    .map((f) => `<span>${N(Math.round(max * f))}</span>`)
+    .join('');
+  const total = months.reduce((s, m) => s + m.count, 0);
+  const peak = months.reduce((b, m) => (m.count > b.count ? m : b), months[0]);
+  const avg = Math.round(total / n);
   return `
   <div class="impp-chartwrap">
-    <div class="impp-tip" id="impp-chart-tip" hidden><span class="tv"></span> <span class="tc"></span></div>
-    <svg class="impp-chart" id="impp-chart" viewBox="0 0 ${W} ${H}" preserveAspectRatio="none" role="img" aria-label="Monthly shipment counts">
-      <line class="axis" x1="0" y1="${H}" x2="${W}" y2="${H}"/>
-      ${bars}
-    </svg>
-    <div class="impp-xaxis"><span>${esc(first)}</span><span>${esc(last)}</span></div>
+    <div class="impp-chart-grid">
+      <div class="impp-yaxis" aria-hidden="true">${ticks}</div>
+      <div class="impp-plot">
+        <div class="impp-tip" id="impp-chart-tip" hidden><span class="tv"></span><span class="tc"></span></div>
+        <svg class="impp-chart" id="impp-chart" viewBox="0 0 ${W} ${H}" preserveAspectRatio="none" role="img" aria-label="Monthly shipment counts, ${esc(first)} to ${esc(last)}">
+          <line class="axis" x1="0" y1="${H}" x2="${W}" y2="${H}"/>
+          ${bars}
+        </svg>
+      </div>
+    </div>
+    <div class="impp-xaxis"><span>${esc(first)}</span>${mid ? `<span>${esc(mid)}</span>` : ''}<span>${esc(last)}</span></div>
+    <div class="impp-chart-cap">
+      <span>Peak <b>${N(peak.count)}</b> in ${esc(peak.label)}</span>
+      <span>Average <b>${N(avg)}</b> / month</span>
+      <span>${N(n)} month${n === 1 ? '' : 's'} on file</span>
+    </div>
   </div>`;
 }
 
@@ -692,7 +763,7 @@ function barRows(items: Array<{ label: string; value: number; flag?: string }>):
   const max = Math.max(...items.map((i) => i.value), 1);
   return `<div class="impp-bars">${items
     .map(
-      (i) => `<div class="impp-brow"><span class="bl">${i.flag ? i.flag + ' ' : ''}<span>${esc(i.label)}</span></span><span class="bt"><i style="width:${Math.round((i.value / max) * 100)}%"></i></span><span class="bv impp-num">${N(i.value)}</span></div>`,
+      (i) => `<div class="impp-brow" title="${esc(i.label)}: ${N(i.value)}"><span class="bl">${i.flag ? i.flag + ' ' : ''}<span>${esc(i.label)}</span></span><span class="bt"><i style="width:${Math.round((i.value / max) * 100)}%"></i></span><span class="bv impp-num">${N(i.value)}</span></div>`,
     )
     .join('')}</div>`;
 }
@@ -700,12 +771,12 @@ function barRows(items: Array<{ label: string; value: number; flag?: string }>):
 function listBlock(title: string, rows: Array<{ label: string; n: number }>): string {
   if (!rows.length) return `<div class="impp-list"><h4>${esc(title)}</h4><p class="lead">No data in the sample.</p></div>`;
   return `<div class="impp-list"><h4>${esc(title)}</h4>${rows
-    .map((r) => `<div class="impp-lrow"><span>${esc(r.label)}</span><span class="lc">${N(r.n)}</span></div>`)
+    .map((r) => `<div class="impp-lrow" title="${esc(r.label)}"><span>${esc(r.label)}</span><span class="lc">${N(r.n)}</span></div>`)
     .join('')}</div>`;
 }
 
-function statCard(label: string, value: string, sub?: string): string {
-  return `<div class="impp-stat"><div class="sl">${esc(label)}</div><div class="sv">${esc(value)}</div>${sub ? `<div class="sx">${esc(sub)}</div>` : ''}</div>`;
+function statCard(label: string, value: string, sub?: string, icon = '\u{1F4E6}'): string {
+  return `<div class="impp-stat"><span class="si" aria-hidden="true">${icon}</span><div class="sb"><div class="sl" title="${esc(label)}">${esc(label)}</div><div class="sv" title="${esc(value)}">${esc(value)}</div>${sub ? `<div class="sx">${esc(sub)}</div>` : ''}</div></div>`;
 }
 
 /** The identity header (shared by the full page and the wall). */
@@ -750,11 +821,11 @@ function privacyCta(p: ProfileData): string {
 /** Full statistics strip (real headline aggregates). */
 function statStrip(p: ProfileData): string {
   return `<div class="impp-stats">
-    ${statCard('Total sea shipments', N(p.totalShipments))}
-    ${statCard('Shipments · last 12 mo', N(p.ships12m))}
-    ${statCard('Avg TEU / shipment', p.avgTeu == null ? '—' : String(p.avgTeu))}
-    ${statCard('TEU · last 12 mo', N(p.teu12m))}
-    ${statCard('Est. shipping spend', p.estSpend || '—', 'est. · 12 mo')}
+    ${statCard('Total sea shipments', N(p.totalShipments), undefined, '\u{1F4E6}')}
+    ${statCard('Shipments · last 12 mo', N(p.ships12m), undefined, '\u{1F4C8}')}
+    ${statCard('Avg TEU / shipment', p.avgTeu == null ? '—' : String(p.avgTeu), undefined, '\u{1F4CF}')}
+    ${statCard('TEU · last 12 mo', N(p.teu12m), undefined, '\u{1F6A2}')}
+    ${statCard('Est. shipping spend', p.estSpend || '—', 'est. · 12 mo', '\u{1F4B5}')}
   </div>`;
 }
 
@@ -837,12 +908,12 @@ export function renderImporterProfilePage(p: ProfileData, quota: QuotaState, rev
   const supBody = p.suppliers.length
     ? `<p class="lead">Who this importer buys from · top ${p.suppliers.length} in the sample</p>
     <div class="impp-tbl-wrap"><table class="impp-tbl">
-      <thead><tr><th>Supplier</th><th>Shipments (sample)</th><th>Product &amp; HS</th></tr></thead>
+      <thead><tr><th>Supplier</th><th class="impp-num">Shipments (sample)</th><th>Product &amp; HS</th></tr></thead>
       <tbody>${p.suppliers
         .map(
-          (s) => `<tr><td><span class="impp-supn">${flag(s.country)} ${esc(s.name)}</span><div class="lead" style="margin:2px 0 0">${esc(countryName(s.country))}</div></td><td class="impp-num">${N(s.ships)}</td><td>${esc(s.product || '—')}${s.hs ? ` <span class="impp-hschip">${esc(s.hs)}</span>` : ''}</td></tr>`,
+          (s) => `<tr><td title="${esc(s.name)}"><span class="impp-supn">${flag(s.country)} ${esc(s.name)}</span><div class="lead" style="margin:2px 0 0">${esc(countryName(s.country))}</div></td><td class="impp-num">${N(s.ships)}</td><td title="${esc(s.product || '')}">${esc(s.product || '—')}${s.hs ? ` <span class="impp-hschip">${esc(s.hs)}</span>` : ''}</td></tr>`,
         )
-        .join('')}</tbody></table></div>`
+        .join('')}</tbody></table></div><p class="impp-scrollnote">Swipe the table sideways to see every column.</p>`
     : '<p class="lead">No suppliers resolved in the sampled history.</p>';
 
   // HS breakdown as bars
@@ -883,12 +954,12 @@ export function renderImporterProfilePage(p: ProfileData, quota: QuotaState, rev
   // recent shipments
   const recentBody = p.recent.length
     ? `<div class="impp-tbl-wrap"><table class="impp-tbl">
-      <thead><tr><th>Date</th><th>Bill of lading</th><th>Supplier</th><th>Weight</th><th>Qty</th><th>Cntrs</th><th>Description</th></tr></thead>
+      <thead><tr><th>Date</th><th>Bill of lading</th><th>Supplier</th><th class="impp-num">Weight</th><th class="impp-num">Qty</th><th class="impp-num">Cntrs</th><th>Description</th></tr></thead>
       <tbody>${p.recent
         .map(
-          (r) => `<tr><td class="impp-num">${esc(r.date)}</td><td><span class="impp-hschip">${esc(r.bol)}</span></td><td><span class="impp-supn">${flag(r.country)} ${esc(r.supplier)}</span></td><td class="impp-num">${r.weight == null ? '—' : N(r.weight) + ' kg'}</td><td class="impp-num">${r.qty == null ? '—' : N(r.qty) + (r.unit ? ' ' + esc(r.unit) : '')}</td><td class="impp-num">${r.containers == null ? '—' : N(r.containers)}</td><td>${esc(r.product || '—')}</td></tr>`,
+          (r) => `<tr><td>${esc(r.date)}</td><td><span class="impp-hschip">${esc(r.bol)}</span></td><td title="${esc(r.supplier)}"><span class="impp-supn">${flag(r.country)} ${esc(r.supplier)}</span></td><td class="impp-num">${r.weight == null ? '—' : N(r.weight) + ' kg'}</td><td class="impp-num">${r.qty == null ? '—' : N(r.qty) + (r.unit ? ' ' + esc(r.unit) : '')}</td><td class="impp-num">${r.containers == null ? '—' : N(r.containers)}</td><td title="${esc(r.product || '')}">${esc(r.product || '—')}</td></tr>`,
         )
-        .join('')}</tbody></table></div>`
+        .join('')}</tbody></table></div><p class="impp-scrollnote">Swipe the table sideways to see every column.</p>`
     : '<p class="lead">No recent shipments in the sample.</p>';
 
   // Contact reveal — the REAL gated reveal (Leads Pro). The CTA adapts to the
@@ -929,7 +1000,7 @@ export function renderImporterProfilePage(p: ProfileData, quota: QuotaState, rev
   const contactBody = `
     <p class="lead">${revealLead}</p>
     <div class="impp-lockcard" id="impp-reveal-card">
-      <span class="ico" aria-hidden="true" style="font-size:22px">\u{1F513}</span>
+      <span class="ico" aria-hidden="true">\u{1F513}</span>
       <div class="lk">
         <div class="lt">Decision-maker contact ${revealChip}</div>
         <div class="ls">We resolve the best available tier — a verified decision-maker email, a role-based email, or the phone &amp; address on file. We never show a fabricated contact.</div>
@@ -958,23 +1029,31 @@ export function renderImporterProfilePage(p: ProfileData, quota: QuotaState, rev
     }</p>
     <div class="impp-two">${otherNamesHtml}${otherAddrHtml}</div>`;
 
+  // Every collapsed header carries a count so a folded row still tells you what
+  // is behind it (ImportYeti's headers do the same).
   const secs: Array<SecDef> = [
-    { id: 'overview', label: 'Overview', sub: 'headline stats + AI brief', body: statStrip(p) + brief + sampleNote },
+    { id: 'overview', label: 'Overview', sub: 'headline stats + AI brief', body: statStrip(p) + brief + sampleNote, open: true },
     {
       id: 'aliases',
       label: 'Also known as / other addresses',
-      sub: p.aliasesCount > 1 ? `${p.aliasesCount} names · ${p.otherAddresses.length + 1} addresses` : undefined,
+      sub: p.aliasesCount > 1 ? `${p.aliasesCount} names · ${p.otherAddresses.length + 1} addresses` : '1 name on file',
       body: aliasesBody,
     },
-    { id: 'chart', label: 'Shipments over time', sub: 'monthly bill-of-lading count', body: chartSvg(p.months) },
-    { id: 'suppliers', label: 'Suppliers', body: supBody },
-    { id: 'products', label: 'Product breakdown', body: hsBody },
-    { id: 'origins', label: 'Imports by origin country', body: originBody },
-    { id: 'relationships', label: 'Top supplier relationships', body: relBody },
-    { id: 'carriers', label: 'Carriers & containers', body: carrierBody },
-    { id: 'ports', label: 'Ports & notify parties', body: portsBody },
-    { id: 'recent', label: 'Most recent sea shipments', body: recentBody },
-    { id: 'contact', label: 'Decision-maker contacts', sub: 'paid unlock', body: contactBody },
+    {
+      id: 'chart',
+      label: 'Shipments over time',
+      sub: p.months.length ? `${p.months.length} months` : 'no dated bills',
+      body: chartSvg(p.months),
+      open: true,
+    },
+    { id: 'suppliers', label: 'Suppliers', sub: `${p.suppliers.length} in sample`, body: supBody, open: true },
+    { id: 'products', label: 'Product breakdown', sub: `${p.hsBreakdown.length} HS codes`, body: hsBody, open: true },
+    { id: 'origins', label: 'Imports by origin country', sub: `${p.origins.length} countries`, body: originBody, open: true },
+    { id: 'relationships', label: 'Top supplier relationships', sub: `${Math.min(p.suppliers.length, 4)} look-alike lanes`, body: relBody },
+    { id: 'carriers', label: 'Carriers & containers', sub: `${p.carriers.length} carriers`, body: carrierBody },
+    { id: 'ports', label: 'Ports & notify parties', sub: `${p.portsFrom.length} ports`, body: portsBody },
+    { id: 'recent', label: 'Most recent sea shipments', sub: `${N(p.recent.length)} bills`, body: recentBody },
+    { id: 'contact', label: 'Decision-maker contacts', sub: 'paid unlock', body: contactBody, open: true },
   ];
 
   const dots = `
@@ -997,7 +1076,7 @@ export function renderImporterProfilePage(p: ProfileData, quota: QuotaState, rev
       <a class="impp-back" href="/importers">&larr; Back to importer search</a>
       ${identityHeader(p, { showActions: true })}
       ${remainingNote}
-      ${secs.map((s, i) => section(s, i === 0)).join('')}
+      ${secs.map((s, i) => section(s, s.open ?? i === 0)).join('')}
     </div>
   </main>
   <script>${PROFILE_JS}</script>`;
@@ -1041,8 +1120,12 @@ export function renderProfileWall(p: ProfileData, quota: QuotaState): string {
       ${identityHeader(p, { showActions: false })}
       ${teaser}
       <div class="impp-wall">
+        <div class="wico" aria-hidden="true">&#128274;</div>
         <h2>Subscribe to open more importer profiles</h2>
         <p>${esc(DETAIL_WALL_MESSAGE)}</p>
+        <ul class="impp-wall-list">
+          <li>Full supplier table</li><li>Monthly shipment history</li><li>HS &amp; origin breakdown</li><li>Carriers &amp; notify parties</li><li>Recent bills of lading</li>
+        </ul>
         <div class="impp-wall-actions">
           <a class="btn btn-primary" href="/signup">Subscribe to unlock <span class="arr">&rarr;</span></a>
           <a class="impp-btn-o" href="/importers">Keep searching — free</a>
@@ -1068,9 +1151,10 @@ function renderProfileUnavailable(slug: string, configured: boolean): string {
     <a class="impp-back" href="/importers">&larr; Back to importer search</a>
     <div class="impp-head"><div class="impp-title"><h1>${esc(name)}</h1></div></div>
     <div class="impp-wall">
+      <div class="wico" aria-hidden="true">${configured ? '&#9888;' : '&#128338;'}</div>
       <h2>${configured ? 'Profile temporarily unavailable' : 'Importer profiles are coming soon'}</h2>
       <p>${configured
-        ? 'We could not load this importer&rsquo;s customs history right now. Please try again shortly.'
+        ? 'We could not load this importer&rsquo;s customs history right now. Nothing was charged &mdash; please try again shortly.'
         : 'Importer profiles are not switched on in this environment yet. Searching importers still works.'}</p>
       <div class="impp-wall-actions"><a class="impp-btn-o" href="/importers">Back to importer search</a></div>
     </div>
@@ -1165,21 +1249,33 @@ const PROFILE_JS = `
 
   // (2) shipments-over-time hover tooltip.
   var chart = document.getElementById('impp-chart');
-  var wrap = chart && chart.closest('.impp-chartwrap');
+  // The tip is positioned inside .impp-plot (the bars' own box), so measure that
+  // — not the outer card — or it drifts by the y-axis gutter width.
+  var wrap = chart && chart.closest('.impp-plot');
   var tip = document.getElementById('impp-chart-tip');
   if(chart && wrap && tip){
     var tv = tip.querySelector('.tv'), tc = tip.querySelector('.tc');
+    var lit = null;
     function place(clientX){
       var r = wrap.getBoundingClientRect();
       var x = clientX - r.left;
-      x = Math.max(46, Math.min(r.width-46, x));
+      x = Math.max(52, Math.min(r.width-52, x));
       tip.style.left = x + 'px';
+    }
+    function lightBar(b){
+      if(lit === b) return;
+      if(lit) lit.classList.remove('on');
+      lit = b;
+      if(lit) lit.classList.add('on');
     }
     chart.addEventListener('mouseover', function(ev){
       var b = ev.target && ev.target.closest ? ev.target.closest('[data-bar]') : null;
       if(!b) return;
-      if(tv) tv.textContent = b.getAttribute('data-count');
-      if(tc) tc.textContent = b.getAttribute('data-label');
+      // .tv = the month caption, .tc = the emphasised shipment count.
+      var c = Number(b.getAttribute('data-count')||0);
+      if(tv) tv.textContent = b.getAttribute('data-label');
+      if(tc) tc.textContent = c.toLocaleString('en-US') + (c===1?' shipment':' shipments');
+      lightBar(b);
       tip.hidden = false;
     });
     chart.addEventListener('mousemove', function(ev){
@@ -1189,8 +1285,9 @@ const PROFILE_JS = `
     });
     chart.addEventListener('mouseout', function(ev){
       var b = ev.target && ev.target.closest ? ev.target.closest('[data-bar]') : null;
-      if(b) tip.hidden = true;
+      if(b){ tip.hidden = true; lightBar(null); }
     });
+    chart.addEventListener('mouseleave', function(){ tip.hidden = true; lightBar(null); });
   }
 
   // ── ☆ Save this importer (free, logged-in). Reflects saved state on load. ──

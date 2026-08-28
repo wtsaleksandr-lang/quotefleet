@@ -170,15 +170,18 @@ const IMPORTERS_CSS = `
 .imp-sr-only{position:absolute;width:1px;height:1px;padding:0;margin:-1px;overflow:hidden;clip:rect(0,0,0,0);white-space:nowrap;border:0}
 /* One-line trust / record strip (replaces the big floating datastat pill) —
    carries the 700M+ figure inline, mockup-style. */
-.imp-datastat{color:var(--muted);font-size:13px;line-height:1.5;margin:14px 0 4px}
+.imp-datastat{color:var(--muted);font-size:13px;line-height:1.5;margin:0}
 .imp-datastat .num{font-weight:800;color:var(--ink);font-variant-numeric:tabular-nums}
 .imp-datastat #imp-recordline{color:var(--ink-soft);font-weight:600}
-.imp-shell{padding:24px 0 48px}
+.imp-shell{padding:24px 0 56px}
+/* A search/results workspace needs room: the shared 780px narrow container made
+   the sidebar + cards fight for ~490px. Widen to a data-table-grade canvas. */
+.imp-shell .container-narrow{max-width:1200px}
 
-/* ── search bar (slim + unboxed — a directory filter row, not a card) ── */
-.imp-panel{margin:0 0 12px}
-.imp-grid{display:flex;flex-wrap:wrap;gap:10px;align-items:center}
-.imp-combo{flex:1 1 210px}
+/* ── search bar — a grouped filter rail, not a loose row of inputs ── */
+.imp-panel{margin:0;padding:16px;border:1px solid var(--border);border-radius:var(--radius-lg);background:var(--surface);box-shadow:var(--shadow-sm)}
+.imp-grid{display:flex;flex-wrap:wrap;gap:8px;align-items:center}
+.imp-combo{flex:1 1 220px}
 .imp-field{display:flex;flex-direction:column;gap:8px;min-width:0}
 .imp-field label{font-size:12px;font-weight:600;color:var(--muted);text-transform:uppercase;letter-spacing:.03em}
 .imp-field input,.imp-field select{width:100%;box-sizing:border-box;font-family:var(--font-sans);font-size:14px;color:var(--ink);background:var(--surface-2);border:1px solid var(--border-strong);border-radius:8px;padding:10px 12px;min-height:44px;appearance:none;-webkit-appearance:none}
@@ -194,7 +197,9 @@ const IMPORTERS_CSS = `
 .imp-combo-clear:hover{color:var(--ink)}
 .imp-combo[data-has-value="1"] .imp-combo-clear{display:flex}
 .imp-combo[data-has-value="1"] .imp-combo-ctrl input{padding-right:40px}
-.imp-lockpill{display:none;align-items:center;gap:6px;font-size:11px;font-weight:700;color:var(--accent);background:color-mix(in srgb,var(--accent) 12%,transparent);border-radius:5px;padding:2px 8px;text-transform:none;letter-spacing:0}
+/* The lock caption sizes to its text — as a stretched flex child it rendered as
+   a full-width bar under the field. */
+.imp-lockpill{display:none;align-self:flex-start;align-items:center;gap:6px;font-size:10.5px;font-weight:700;color:var(--accent);background:color-mix(in srgb,var(--accent) 12%,transparent);border-radius:999px;padding:2px 9px;margin-top:-2px;text-transform:none;letter-spacing:0}
 .imp-combo[data-locked="1"] .imp-lockpill{display:inline-flex}
 .imp-suggest{position:absolute;top:calc(100% + 4px);left:0;right:0;z-index:40;margin:0;padding:6px;list-style:none;max-height:280px;overflow-y:auto;background:var(--surface);border:1px solid var(--border-strong);border-radius:10px;box-shadow:var(--shadow-lg,0 12px 32px rgba(0,0,0,.18))}
 .imp-suggest[hidden]{display:none}
@@ -228,18 +233,26 @@ const IMPORTERS_CSS = `
 .imp-actions .btn-primary .arr{color:#fff}
 .imp-actions .btn-primary:hover{background:var(--accent-strong,var(--accent-fill));border-color:var(--accent-strong,var(--accent-fill))}
 
-.imp-status{color:var(--muted);font-size:13px;margin:22px 0 8px}
+.imp-status{color:var(--muted);font-size:13px;margin:0}
 .imp-status b{color:var(--ink)}
+/* Trust strip: the 700M+ record line + the live search status share one calm
+   band under the filter rail instead of stacking two loose paragraphs. */
+.imp-trust{display:flex;align-items:center;gap:8px 16px;flex-wrap:wrap;margin:12px 0 0;padding:10px 14px;border:1px solid var(--border);border-radius:10px;background:var(--surface-2)}
+.imp-trust .imp-status:not([hidden])::before{content:'';display:inline-block;width:5px;height:5px;border-radius:50%;background:var(--accent);margin-right:8px;vertical-align:middle}
 
 /* ── results toolbar (count + density toggle) ── */
-.imp-toolbar{display:none;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap;margin:8px 0 4px}
+.imp-toolbar{display:none;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap;margin:20px 0 12px;padding-bottom:12px;border-bottom:1px solid var(--border)}
 .imp-toolbar.on{display:flex}
-.imp-count{font-size:13px;color:var(--muted)}
-.imp-count b{color:var(--ink)}
-.imp-density{display:inline-flex;border:1px solid var(--border-strong);border-radius:8px;overflow:hidden}
-.imp-density button{font-family:var(--font-sans);font-size:12px;font-weight:600;color:var(--muted);background:var(--surface-2);border:0;padding:8px 12px;min-height:40px;cursor:pointer}
+.imp-count{font-size:13px;color:var(--muted);font-variant-numeric:tabular-nums}
+.imp-count b{color:var(--ink);font-weight:700}
+.imp-toolbar-r{display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin-left:auto}
+.imp-density{display:inline-flex;border:1px solid var(--border-strong);border-radius:8px;overflow:hidden;background:var(--surface-2)}
+.imp-density button{font-family:var(--font-sans);font-size:12px;font-weight:600;color:var(--muted);background:none;border:0;padding:8px 13px;min-height:38px;cursor:pointer;transition:color .14s,background .14s}
 .imp-density button+button{border-left:1px solid var(--border-strong)}
-.imp-density button[aria-pressed="true"]{background:color-mix(in srgb,var(--accent) 16%,transparent);color:var(--accent)}
+.imp-density button:hover{color:var(--ink)}
+.imp-density button:focus-visible{outline:2px solid var(--accent);outline-offset:-2px}
+/* selected = tinted + outlined, never a bright fill (hard UI rule) */
+.imp-density button[aria-pressed="true"]{background:color-mix(in srgb,var(--accent) 12%,transparent);color:var(--accent);box-shadow:inset 0 0 0 1px var(--accent)}
 
 /* ── two-column layout: narrow-results sidebar + results ──
    B3: the sidebar (.imp-side) is display:none until a search runs. With a fixed
@@ -247,54 +260,77 @@ const IMPORTERS_CSS = `
    first load. Default to a single column and only introduce the sidebar column
    once .imp-side.on is present, so the empty-state + results always render
    full-width-aligned. */
-.imp-layout{display:grid;grid-template-columns:1fr;gap:20px;align-items:start}
-.imp-layout:has(.imp-side.on){grid-template-columns:232px 1fr}
-.imp-side{display:none;position:sticky;top:16px;border:1px solid var(--border);border-radius:var(--radius-lg);background:var(--surface);padding:16px;box-shadow:var(--shadow-sm)}
+.imp-layout{display:grid;grid-template-columns:1fr;gap:24px;align-items:start}
+.imp-layout:has(.imp-side.on){grid-template-columns:248px minmax(0,1fr)}
+.imp-side{display:none;position:sticky;top:16px;border:1px solid var(--border);border-radius:var(--radius-lg);background:var(--surface);padding:4px 16px 16px;box-shadow:var(--shadow-sm)}
 .imp-side.on{display:block}
-.imp-side h3{font-size:12px;text-transform:uppercase;letter-spacing:.04em;color:var(--muted);margin:0 0 12px}
-.imp-facet{border-top:1px solid var(--border);padding:12px 0 4px}
-.imp-facet:first-of-type{border-top:0;padding-top:0}
-.imp-facet .ft{font-size:12px;font-weight:700;color:var(--ink-soft);margin:0 0 8px}
-.imp-facet label{display:flex;align-items:center;gap:8px;font-size:13px;color:var(--ink-soft);padding:4px 0;cursor:pointer;font-weight:400;text-transform:none;letter-spacing:0}
-.imp-facet label .ct{margin-left:auto;font-size:11px;color:var(--muted);font-variant-numeric:tabular-nums}
-.imp-facet input[type=checkbox],.imp-facet input[type=radio]{width:auto;min-height:0;margin:0;accent-color:var(--accent)}
-.imp-side-reset{margin-top:12px;font-size:12px;font-weight:600;color:var(--accent);background:none;border:0;padding:6px 0;cursor:pointer}
+/* The pane header doubles as the mobile expand/collapse control. */
+.imp-side-h{display:flex;align-items:center;gap:8px;width:100%;background:none;border:0;padding:14px 0 12px;margin:0;cursor:default;font-family:var(--font-sans);text-align:left;color:var(--muted);font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.05em}
+.imp-side-h .imp-side-caret{margin-left:auto;display:none;font-size:10px;color:var(--muted);transition:transform .18s ease}
+.imp-side-h .imp-side-n{display:none;font-size:11px;font-weight:700;color:var(--accent);background:color-mix(in srgb,var(--accent) 12%,transparent);border-radius:999px;padding:2px 8px;letter-spacing:0}
+.imp-side-h .imp-side-n.on{display:inline-flex}
+.imp-facet{border-top:1px solid var(--border);padding:14px 0 6px}
+.imp-facet:first-of-type{border-top:0;padding-top:2px}
+.imp-facet .ft{font-size:12px;font-weight:700;color:var(--ink);margin:0 0 8px;letter-spacing:.005em}
+.imp-facet label{display:flex;align-items:center;gap:9px;font-size:13px;color:var(--ink-soft);padding:6px 8px;margin:0 -8px;border-radius:7px;cursor:pointer;font-weight:400;text-transform:none;letter-spacing:0;transition:background .12s,color .12s}
+.imp-facet label:hover{background:var(--surface-2);color:var(--ink)}
+.imp-facet label:has(input:checked){color:var(--ink);font-weight:600}
+.imp-facet label:focus-within{outline:2px solid var(--accent);outline-offset:-2px}
+.imp-facet label .ct{margin-left:auto;font-size:11px;font-weight:600;color:var(--muted);font-variant-numeric:tabular-nums;background:var(--surface-2);border-radius:999px;padding:1px 7px}
+.imp-facet label:hover .ct{background:var(--surface-3,var(--surface))}
+.imp-facet input[type=checkbox],.imp-facet input[type=radio]{width:auto;min-height:0;margin:0;accent-color:var(--accent);flex:0 0 auto}
+.imp-side-reset{margin-top:14px;font-size:12px;font-weight:600;color:var(--accent);background:none;border:0;padding:8px 0;cursor:pointer}
 .imp-side-reset:hover{text-decoration:underline}
+.imp-side-reset:focus-visible{outline:2px solid var(--accent);outline-offset:2px;border-radius:4px}
 
 /* ── result cards (approved ImportYeti-style prototype) ── */
-.imp-results{display:grid;gap:16px}
+.imp-results{display:grid;gap:14px}
 .imp-results.compact{grid-template-columns:repeat(2,minmax(0,1fr))}
-.imp-card{border:1px solid var(--border);border-left:3px solid var(--accent);border-radius:var(--radius-lg);background:var(--surface);padding:18px 20px;box-shadow:var(--shadow-sm)}
-.imp-card-h{display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin-bottom:4px}
-.imp-co{font-size:17px;font-weight:700;color:var(--ink)}
-a.imp-co-link{color:var(--accent);text-decoration:none}
-a.imp-co-link:hover{text-decoration:underline}
-.imp-flag{font-size:16px;line-height:1}
-.imp-pill{font-size:10px;font-weight:700;letter-spacing:.04em;text-transform:uppercase;padding:4px 8px;border-radius:4px;background:var(--accent);color:var(--bg)}
-.imp-win{font-size:11px;font-weight:700;padding:4px 9px;border-radius:5px;white-space:nowrap}
-.imp-win.hi{background:color-mix(in srgb,var(--accent) 16%,transparent);color:var(--accent)}
-.imp-win.md{background:color-mix(in srgb,var(--warn) 18%,transparent);color:var(--warn)}
-.imp-addr{color:var(--muted);font-size:12px;margin-bottom:12px}
-.imp-lane{display:flex;align-items:center;gap:8px;flex-wrap:wrap;font-size:13px;color:var(--ink-soft);margin-bottom:12px}
-.imp-lane .arw{color:var(--muted)}
+.imp-card{position:relative;border:1px solid var(--border);border-radius:var(--radius-lg);background:var(--surface);padding:16px 20px 0;box-shadow:var(--shadow-sm);overflow:hidden;transition:border-color .16s ease,box-shadow .16s ease}
+/* accent rail drawn as a pseudo-element so the card's corner radius stays clean */
+.imp-card::before{content:'';position:absolute;left:0;top:0;bottom:0;width:3px;background:var(--accent)}
+.imp-card:hover{border-color:color-mix(in srgb,var(--accent) 45%,var(--border));box-shadow:var(--shadow-md)}
+.imp-card:focus-within{border-color:var(--accent)}
+.imp-card-h{display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-bottom:5px}
+.imp-co{font-size:17px;font-weight:700;color:var(--ink);letter-spacing:-.012em;line-height:1.25}
+a.imp-co-link{color:var(--accent);text-decoration:none;border-radius:4px}
+a.imp-co-link:hover{text-decoration:underline;text-underline-offset:3px}
+a.imp-co-link:focus-visible{outline:2px solid var(--accent);outline-offset:3px}
+.imp-flag{font-size:15px;line-height:1}
+/* Category badge reads as a quiet label, not a second brand-blue CTA. */
+.imp-pill{font-size:9.5px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;padding:3px 7px;border-radius:4px;background:var(--surface-3,var(--surface-2));color:var(--ink-soft);border:1px solid var(--border-strong)}
+.imp-win{font-size:11px;font-weight:700;padding:3px 9px;border-radius:999px;white-space:nowrap;font-variant-numeric:tabular-nums}
+.imp-win.hi{background:color-mix(in srgb,var(--success) 15%,transparent);color:var(--success);border:1px solid color-mix(in srgb,var(--success) 34%,transparent)}
+.imp-win.md{background:color-mix(in srgb,var(--warn) 15%,transparent);color:var(--warn);border:1px solid color-mix(in srgb,var(--warn) 34%,transparent)}
+.imp-addr{color:var(--muted);font-size:12px;margin-bottom:9px;line-height:1.45}
+.imp-lane{display:flex;align-items:center;gap:7px;flex-wrap:wrap;font-size:13px;color:var(--ink-soft);margin-bottom:12px;line-height:1.5}
+.imp-lane .arw{color:var(--muted-soft,var(--muted))}
 .imp-lane .prod{color:var(--muted)}
-.imp-angle{display:flex;gap:8px;align-items:flex-start;font-size:13px;color:var(--ink-soft);background:color-mix(in srgb,var(--accent) 8%,transparent);border:1px solid color-mix(in srgb,var(--accent) 28%,transparent);border-radius:8px;padding:10px 12px;margin-bottom:14px}
-.imp-angle .z{color:var(--accent);font-weight:800;flex:0 0 auto;white-space:nowrap}
-.imp-stats{display:grid;grid-template-columns:repeat(4,1fr);gap:12px;padding-top:14px;border-top:1px solid var(--border)}
-.imp-cell .lbl{font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:.03em;margin-bottom:4px}
-.imp-cell .val{font-size:15px;font-weight:700;color:var(--ink);font-variant-numeric:tabular-nums}
-.imp-foot{display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap;margin-top:14px;padding-top:14px;border-top:1px solid var(--border)}
-.imp-incumb{font-size:12px;color:var(--warn);background:color-mix(in srgb,var(--warn) 14%,transparent);border-radius:5px;padding:4px 9px}
-.imp-foot-r{display:flex;align-items:center;gap:12px;flex-wrap:wrap;justify-content:flex-end}
-.imp-tier{font-size:12px;color:var(--muted)}
-.imp-lock{display:inline-flex;align-items:center;gap:8px;font-size:12px;font-weight:600;color:var(--ink-soft);border:1px solid var(--border-strong);border-radius:8px;padding:9px 13px;background:var(--surface-2);text-decoration:none;min-height:44px;box-sizing:border-box}
+.imp-lane .cc{font-size:10px;font-weight:700;letter-spacing:.05em;color:var(--muted);background:var(--surface-2);border-radius:3px;padding:2px 5px}
+.imp-angle{display:flex;gap:9px;align-items:flex-start;font-size:12.5px;line-height:1.55;color:var(--ink-soft);background:color-mix(in srgb,var(--accent) 7%,transparent);border:1px solid color-mix(in srgb,var(--accent) 24%,transparent);border-radius:8px;padding:9px 12px;margin-bottom:14px}
+.imp-angle .z{color:var(--accent);font-weight:700;flex:0 0 auto;white-space:nowrap}
+/* Stat strip: labels are locked to one line at a fixed block height so every
+   value sits on the same baseline across all four columns (and across cards). */
+.imp-stats{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:12px;padding-top:13px;border-top:1px solid var(--border)}
+.imp-cell{min-width:0}
+.imp-cell .lbl{font-size:9.5px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.06em;line-height:14px;height:14px;margin-bottom:5px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.imp-cell .val{font-size:16px;font-weight:700;color:var(--ink);font-variant-numeric:tabular-nums;letter-spacing:-.01em;line-height:1.2;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+/* Footer sits flush to the card edges as a tinted action bar (mockup-style). */
+.imp-foot{display:flex;align-items:center;gap:10px 14px;flex-wrap:wrap;margin:14px -20px 0;padding:11px 20px;border-top:1px solid var(--border);background:var(--surface-2);min-height:44px}
+.imp-incumb{font-size:11.5px;color:var(--warn);background:color-mix(in srgb,var(--warn) 13%,transparent);border:1px solid color-mix(in srgb,var(--warn) 30%,transparent);border-radius:999px;padding:3px 10px;max-width:100%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.imp-foot-r{display:flex;align-items:center;gap:10px;flex-wrap:wrap;justify-content:flex-end;margin-left:auto}
+.imp-tier{font-size:11.5px;color:var(--muted);white-space:nowrap}
+.imp-tier.ok{color:var(--success)}
+.imp-lock{display:inline-flex;align-items:center;gap:8px;font-size:12px;font-weight:600;color:var(--ink-soft);border:1px solid var(--border-strong);border-radius:8px;padding:9px 13px;background:var(--surface-2);text-decoration:none;min-height:44px;box-sizing:border-box;transition:border-color .14s,color .14s}
 .imp-lock:hover{border-color:var(--accent);color:var(--ink)}
+.imp-lock:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
 .imp-lock .ico{opacity:.7}
 /* compact card condenses the stat grid + angle */
-.imp-results.compact .imp-card{padding:16px}
+.imp-results.compact .imp-card{padding:14px 15px 0}
 .imp-results.compact .imp-angle{display:none}
-.imp-results.compact .imp-stats{grid-template-columns:repeat(2,1fr);gap:8px}
+.imp-results.compact .imp-stats{grid-template-columns:repeat(2,minmax(0,1fr));gap:8px 12px}
 .imp-results.compact .imp-co{font-size:15px}
+.imp-results.compact .imp-foot{margin:12px -15px 0;padding:10px 15px}
 
 /* "N free profiles left" chip (point-of-use quota surfacing) */
 .imp-profiles-left{display:none;align-items:center;gap:6px;font-size:12px;font-weight:600;color:var(--accent);background:color-mix(in srgb,var(--accent) 12%,transparent);border-radius:999px;padding:5px 12px}
@@ -302,30 +338,62 @@ a.imp-co-link:hover{text-decoration:underline}
 .imp-profiles-left.out{color:var(--warn);background:color-mix(in srgb,var(--warn) 16%,transparent)}
 .imp-profiles-left a{color:inherit;text-decoration:underline}
 
-/* ☆ Save button on a result card */
-.imp-save{display:inline-flex;align-items:center;gap:6px;font-family:var(--font-sans);font-size:12px;font-weight:600;color:var(--ink-soft);background:var(--surface-2);border:1px solid var(--border-strong);border-radius:8px;padding:7px 11px;min-height:40px;cursor:pointer;margin-left:auto}
+/* ☆ Save button — lives in the card footer action row, not floating on its own
+   line above the content (that left a dead band under the title). */
+.imp-save{display:inline-flex;align-items:center;gap:6px;font-family:var(--font-sans);font-size:12px;font-weight:600;color:var(--ink-soft);background:var(--surface);border:1px solid var(--border-strong);border-radius:8px;padding:9px 12px;min-height:44px;box-sizing:border-box;cursor:pointer;transition:border-color .14s,color .14s}
 .imp-save:hover{border-color:var(--accent);color:var(--ink)}
+.imp-save:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
 .imp-save .star{font-size:14px;line-height:1;color:var(--muted)}
+/* saved = outline + tint, never a bright fill */
 .imp-save.saved{border-color:var(--accent);color:var(--accent);background:color-mix(in srgb,var(--accent) 10%,transparent)}
 .imp-save.saved .star{color:var(--accent)}
 .imp-save[disabled]{opacity:.6;cursor:default}
 
 /* honest "contact reveal — coming soon" chip (no fulfillment wired) */
-.imp-soon{display:inline-flex;align-items:center;gap:8px;font-size:12px;font-weight:600;color:var(--ink-soft);border:1px dashed var(--border-strong);border-radius:8px;padding:9px 12px;background:var(--surface-2)}
-.imp-soon .tag{font-size:9px;font-weight:700;letter-spacing:.04em;text-transform:uppercase;color:var(--muted);background:var(--surface);border:1px solid var(--border);border-radius:4px;padding:2px 6px}
+.imp-soon{display:inline-flex;align-items:center;gap:8px;font-size:12px;font-weight:600;color:var(--ink-soft);border:1px dashed var(--border-strong);border-radius:8px;padding:9px 12px;background:var(--surface);text-decoration:none;min-height:44px;box-sizing:border-box;transition:border-color .14s,color .14s}
+/* The card's reveal chip is a real link, so it gets a solid border — a dashed
+   one reads "unavailable". The dashed variant stays for the honest coming-soon
+   chip that is genuinely not actionable. */
+a.imp-soon{border-style:solid}
+a.imp-soon:hover{border-color:var(--accent);color:var(--ink)}
+a.imp-soon:hover .tag{border-color:color-mix(in srgb,var(--accent) 40%,transparent);color:var(--accent)}
+a.imp-soon:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+.imp-soon .tag{font-size:9px;font-weight:700;letter-spacing:.04em;text-transform:uppercase;color:var(--muted);background:var(--surface-2);border:1px solid var(--border);border-radius:4px;padding:2px 6px}
 
-.imp-empty{border:1px dashed var(--border-strong);border-radius:var(--radius-lg);padding:48px 24px;text-align:left;color:var(--muted);background:var(--surface)}
-.imp-empty h3{color:var(--ink);margin:0 0 8px}
+/* ── designed empty / error states ───────────────────────────────────────────
+   The credit-exhausted and no-result paths are the ones users hit most, so they
+   get a real composed state: a glyph, a headline, a reason, and next steps. */
+.imp-empty{display:flex;gap:16px;align-items:flex-start;border:1px dashed var(--border-strong);border-radius:var(--radius-lg);padding:32px 28px;text-align:left;color:var(--muted);background:var(--surface)}
+.imp-empty .imp-empty-ico{flex:0 0 auto;width:44px;height:44px;display:flex;align-items:center;justify-content:center;border-radius:12px;font-size:20px;line-height:1;background:color-mix(in srgb,var(--accent) 10%,transparent);border:1px solid color-mix(in srgb,var(--accent) 26%,transparent)}
+.imp-empty.warn .imp-empty-ico{background:color-mix(in srgb,var(--warn) 12%,transparent);border-color:color-mix(in srgb,var(--warn) 30%,transparent)}
+.imp-empty .imp-empty-b{min-width:0;flex:1 1 auto}
+.imp-empty h3{color:var(--ink);margin:0 0 6px;font-size:17px;letter-spacing:-.012em}
+.imp-empty p{margin:0;font-size:13.5px;line-height:1.6;max-width:58ch}
+.imp-empty-tips{display:flex;gap:8px;flex-wrap:wrap;margin-top:14px;padding:0;list-style:none}
+.imp-empty-tips li{font-size:12px;font-weight:600;color:var(--ink-soft);background:var(--surface-2);border:1px solid var(--border);border-radius:999px;padding:5px 12px}
+
+/* skeleton rows while a search is in flight */
+.imp-skel{border:1px solid var(--border);border-radius:var(--radius-lg);background:var(--surface);padding:16px 18px;overflow:hidden}
+.imp-skel span{display:block;height:11px;border-radius:5px;background:linear-gradient(90deg,var(--surface-2) 25%,var(--surface-3,var(--border)) 50%,var(--surface-2) 75%);background-size:280% 100%;animation:imp-sheen 1.25s linear infinite}
+.imp-skel span+span{margin-top:11px}
+.imp-skel span.w1{width:38%;height:15px}
+.imp-skel span.w2{width:64%}
+.imp-skel span.w3{width:88%}
+.imp-skel span.w4{width:52%}
+@keyframes imp-sheen{from{background-position:140% 0}to{background-position:-40% 0}}
+@media (prefers-reduced-motion: reduce){.imp-skel span{animation:none}}
 
 /* ── load more ── */
 .imp-more-wrap{display:none;justify-content:center;margin:20px 0 0}
 .imp-more-wrap.on{display:flex}
-.imp-loadmore{font-family:var(--font-sans);font-size:14px;font-weight:600;color:var(--ink);background:var(--surface-2);border:1px solid var(--border-strong);border-radius:10px;padding:12px 22px;min-height:44px;cursor:pointer}
+.imp-loadmore{font-family:var(--font-sans);font-size:14px;font-weight:600;color:var(--ink);background:var(--surface-2);border:1px solid var(--border-strong);border-radius:10px;padding:12px 22px;min-height:44px;cursor:pointer;transition:border-color .14s}
 .imp-loadmore:hover{border-color:var(--accent)}
+.imp-loadmore:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
 .imp-loadmore:disabled{opacity:.6;cursor:not-allowed}
 
-.imp-locknote{font-size:12px;color:var(--muted);margin:20px 0 0;line-height:1.5}
-.imp-privacy-banner{display:flex;align-items:center;gap:12px 18px;flex-wrap:wrap;margin:20px 0 0;padding:16px 18px;border:1px solid var(--border);border-radius:var(--radius-lg);background:var(--surface)}
+.imp-locknote{font-size:12px;color:var(--muted);margin:28px 0 0;line-height:1.6;padding-top:16px;border-top:1px solid var(--border)}
+.imp-locknote b{color:var(--ink-soft)}
+.imp-privacy-banner{display:flex;align-items:center;gap:12px 18px;flex-wrap:wrap;margin:16px 0 0;padding:16px 18px;border:1px solid var(--border);border-radius:var(--radius-lg);background:var(--surface)}
 .imp-privacy-copy{display:flex;flex-direction:column;gap:4px;flex:1 1 300px;min-width:0}
 .imp-privacy-h{font-size:14px;font-weight:700;color:var(--ink)}
 .imp-privacy-p{font-size:12.5px;color:var(--muted);line-height:1.5}
@@ -334,25 +402,57 @@ a.imp-co-link:hover{text-decoration:underline}
 .imp-privacy-btn:hover .arr{transform:translateX(3px)}
 .imp-locknote b{color:var(--ink-soft)}
 
+@media(max-width:1080px){
+  .imp-layout:has(.imp-side.on){grid-template-columns:224px minmax(0,1fr)}
+  .imp-results.compact{grid-template-columns:1fr}
+}
 @media(max-width:900px){
   .imp-layout{grid-template-columns:1fr}
-  /* B3-mobile: the desktop :has(.imp-side.on) rule (232px 1fr) out-specifies the
-     single-column default, so once a search runs the grid never collapsed on
-     phones and results squeezed to ~230px + scrolled sideways. Collapse it here. */
+  /* B3-mobile: the desktop :has(.imp-side.on) rule out-specifies the single-column
+     default, so once a search runs the grid never collapsed on phones and results
+     squeezed sideways. Collapse it here. */
   .imp-layout:has(.imp-side.on){grid-template-columns:1fr}
-  .imp-side{position:static;order:-1}
+  .imp-side{position:static;order:-1;padding:0 14px 0}
+  /* On phones the facet pane became a wall of checkboxes ABOVE the results —
+     several screens of scrolling before the first importer. Collapse it behind
+     its own header; results come first. */
+  .imp-side-h{cursor:pointer;min-height:48px;padding:14px 0}
+  .imp-side-h .imp-side-caret{display:inline-block}
+  .imp-side-h:focus-visible{outline:2px solid var(--accent);outline-offset:-2px;border-radius:8px}
+  .imp-side.folded #imp-facets,.imp-side.folded .imp-side-reset{display:none}
+  .imp-side:not(.folded){padding-bottom:14px}
+  .imp-side:not(.folded) .imp-side-caret{transform:rotate(180deg)}
   .imp-results.compact{grid-template-columns:1fr}
 }
 @media(max-width:760px){
   .imp-grid{grid-template-columns:1fr}
   .imp-more-grid{grid-template-columns:1fr 1fr}
-  .imp-stats{grid-template-columns:1fr 1fr}
+  .imp-stats{grid-template-columns:repeat(2,minmax(0,1fr));gap:10px 12px}
   .imp-export{margin-left:0}
+  .imp-toolbar-r{width:100%;margin-left:0}
+  .imp-empty{padding:24px 20px;gap:14px}
+}
+@media(max-width:560px){
+  /* No-orphan wrap: the four action buttons pair 2x2 instead of leaving
+     "More filters" alone on its own line. */
+  .imp-actions{display:grid;grid-template-columns:1fr 1fr;gap:10px;align-items:stretch}
+  .imp-actions>*{width:100%;justify-content:center;margin-left:0;white-space:nowrap;padding-left:10px;padding-right:10px;gap:6px}
+  .imp-more{grid-column:auto}
+  .imp-more[open]{grid-column:1 / -1}
+  .imp-more>summary{justify-content:center}
+  /* Same rule for the card's badge group: the company name takes its own line so
+     flag + IMPORTER + winnability stay together instead of orphaning one pill. */
+  .imp-card-h{gap:7px}
+  .imp-card-h .imp-co{flex:1 1 100%}
 }
 @media(max-width:440px){
   .imp-more-grid{grid-template-columns:1fr}
-  .imp-panel{padding:16px}
+  .imp-panel{padding:14px}
   .imp-foot-r{justify-content:flex-start}
+  .imp-card{padding:14px 15px 0}
+  .imp-foot{margin:12px -15px 0;padding:10px 15px}
+  .imp-empty{flex-direction:column;gap:12px}
+  .imp-co{font-size:16px}
 }
 `;
 
@@ -444,30 +544,43 @@ export function renderImporterSearchPage(): string {
         </div>
       </form>
 
-      <p class="imp-datastat" id="imp-recordline-wrap"><b class="num">${esc(DATASET_RECORDS_LABEL)}</b> US import records, updated daily &mdash; <span id="imp-recordline">pick a port, lane or commodity to start</span>.</p>
-
-      <p class="imp-status" id="imp-status" role="status" aria-live="polite" hidden></p>
+      <div class="imp-trust">
+        <p class="imp-datastat" id="imp-recordline-wrap"><b class="num">${esc(DATASET_RECORDS_LABEL)}</b> US import records, updated daily &mdash; <span id="imp-recordline">pick a port, lane or commodity to start</span>.</p>
+        <p class="imp-status" id="imp-status" role="status" aria-live="polite" hidden></p>
+      </div>
 
       <div class="imp-toolbar" id="imp-toolbar">
         <span class="imp-count" id="imp-count"></span>
-        <span class="imp-profiles-left" id="imp-profiles-left" role="status" aria-live="polite"></span>
-        <div class="imp-density" role="group" aria-label="Result density">
-          <button type="button" id="imp-den-comf" aria-pressed="true">Comfortable</button>
-          <button type="button" id="imp-den-comp" aria-pressed="false">Compact</button>
+        <div class="imp-toolbar-r">
+          <span class="imp-profiles-left" id="imp-profiles-left" role="status" aria-live="polite"></span>
+          <div class="imp-density" role="group" aria-label="Result density">
+            <button type="button" id="imp-den-comf" aria-pressed="true">Comfortable</button>
+            <button type="button" id="imp-den-comp" aria-pressed="false">Compact</button>
+          </div>
         </div>
       </div>
 
       <div class="imp-layout">
         <aside class="imp-side" id="imp-side" aria-label="Narrow your results">
-          <h3>Narrow your results</h3>
+          <button type="button" class="imp-side-h" id="imp-side-h" aria-expanded="true" aria-controls="imp-facets">
+            Narrow your results
+            <span class="imp-side-n" id="imp-side-n" aria-hidden="true"></span>
+            <span class="imp-side-caret" aria-hidden="true">&#9662;</span>
+          </button>
           <div id="imp-facets"></div>
           <button type="button" class="imp-side-reset" id="imp-side-reset">Reset filters</button>
         </aside>
         <div>
           <div class="imp-results" id="imp-results">
             <div class="imp-empty" id="imp-empty">
-              <h3>Start with your lane</h3>
-              <p>Pick an entry port, state or commodity above and hit Search to build importer profiles from live customs data.</p>
+              <span class="imp-empty-ico" aria-hidden="true">&#128506;</span>
+              <div class="imp-empty-b">
+                <h3>Start with your lane</h3>
+                <p>Pick an entry port, state or commodity above and hit Search to build importer profiles from live customs data.</p>
+                <ul class="imp-empty-tips">
+                  <li>Port of Savannah</li><li>Port of Long Beach</li><li>HS 8202 &mdash; saw blades</li><li>Furniture</li>
+                </ul>
+              </div>
             </div>
           </div>
           <div class="imp-more-wrap" id="imp-more-wrap">
@@ -543,7 +656,25 @@ const CLIENT_JS = `
   var loadMoreBtn=document.getElementById('imp-loadmore');
   var profilesLeftEl=document.getElementById('imp-profiles-left');
   var exportBtn=document.getElementById('imp-export');
+  var sideH=document.getElementById('imp-side-h');
+  var sideN=document.getElementById('imp-side-n');
   if(!form||!results)return;
+
+  // Mobile: the facet pane folds so results are the first thing on screen.
+  // Desktop CSS ignores the folded class, so this is phone-only behaviour.
+  function isNarrow(){ return window.matchMedia&&window.matchMedia('(max-width:900px)').matches; }
+  if(sideH){
+    sideH.addEventListener('click',function(){
+      if(!isNarrow())return;
+      var folded=side.classList.toggle('folded');
+      sideH.setAttribute('aria-expanded',folded?'false':'true');
+    });
+  }
+  function syncSideFold(){
+    if(!sideH)return;
+    if(isNarrow()){ side.classList.add('folded'); sideH.setAttribute('aria-expanded','false'); }
+    else { side.classList.remove('folded'); sideH.setAttribute('aria-expanded','true'); }
+  }
 
   var PAGE_SIZE=window.__IMP_PAGE_SIZE||25;
 
@@ -727,36 +858,43 @@ const CLIENT_JS = `
     }
     if(l.supplier_country){ h.appendChild(T('span','imp-flag',flag(l.supplier_country))); }
     h.appendChild(T('span','imp-pill','Importer'));
-    var w=l.winnability||{}; var win=T('span','imp-win '+(w.label==='High'?'hi':'md'),'Winnability '+(w.score||'')+' \\u00b7 '+(w.label||''));
+    var w=l.winnability||{};
+    var winTxt='Winnability'+(w.score?(' '+w.score):'')+(w.label?(' \\u00b7 '+w.label):'');
+    var win=T('span','imp-win '+(w.label==='High'?'hi':'md'),winTxt);
     win.title='How switchable this account looks (volume + named incumbent + contact on file)';
     h.appendChild(win);
-    // ☆ Save (free, logged-in). Only when we have a slug to key the save on.
-    if(l.slug){ h.appendChild(saveButton(l)); }
     c.appendChild(h);
     if(l.state){ c.appendChild(T('div','imp-addr','United States \\u00b7 '+l.state)); }
     var lane=T('div','imp-lane');
-    if(l.supplier_country) lane.appendChild(T('span','imp-flag',flag(l.supplier_country)));
+    if(l.supplier_country) lane.appendChild(T('span','cc',String(l.supplier_country).toUpperCase()));
     lane.appendChild(T('span',null,l.supplier||'Supplier'));
     lane.appendChild(T('span','arw','\\u2192'));
     lane.appendChild(T('span',null,l.entry_port||'US port'));
     if(l.product){ lane.appendChild(T('span','arw','\\u00b7'));
       lane.appendChild(T('span','prod',l.product+(l.hs_code?(' \\u00b7 HS '+l.hs_code):''))); }
+    lane.title=(l.supplier||'Supplier')+' \\u2192 '+(l.entry_port||'US port')+(l.product?(' \\u00b7 '+l.product):'');
     c.appendChild(lane);
     if(l.aiAngle){ var a=T('div','imp-angle'); a.appendChild(T('span','z','\\u26a1 AI angle'));
       a.appendChild(T('span',null,l.aiAngle)); c.appendChild(a); }
     var stats=T('div','imp-stats');
     [['Total shipments',n(l.total_shipments)],['Shipments \\u00b7 12 mo',n(l.ships_12m)],
      ['TEU \\u00b7 12 mo',n(l.teu_12m)],['Last shipment',l.last_shipment||'\\u2014']].forEach(function(p){
-      var cell=T('div','imp-cell'); cell.appendChild(T('div','lbl',p[0])); cell.appendChild(T('div','val',p[1])); stats.appendChild(cell);
+      var cell=T('div','imp-cell'); var lb=T('div','lbl',p[0]); lb.title=p[0];
+      var vl=T('div','val',p[1]); vl.title=p[0]+': '+p[1];
+      cell.appendChild(lb); cell.appendChild(vl); stats.appendChild(cell);
     });
     c.appendChild(stats);
     var foot=T('div','imp-foot');
     if(l.incumbent_forwarder){ var inc=T('span','imp-incumb'); inc.appendChild(document.createTextNode('Displacing: '));
-      var b=document.createElement('b'); b.textContent=l.incumbent_forwarder; inc.appendChild(b); foot.appendChild(inc); }
-    else { foot.appendChild(T('span',null,'')); }
+      var b=document.createElement('b'); b.textContent=l.incumbent_forwarder; inc.appendChild(b);
+      inc.title='Incumbent forwarder named on the bills: '+l.incumbent_forwarder;
+      foot.appendChild(inc); }
     var right=T('div','imp-foot-r');
     var tierTxt={verified:'\\u2713 Verified decision-maker on file',role_based:'Role-based email available (unverified)',phone_only:'Phone & address on file'};
-    right.appendChild(T('span','imp-tier',tierTxt[l.contact_confidence]||tierTxt.phone_only));
+    var tierEl=T('span','imp-tier'+(l.contact_confidence==='verified'?' ok':''),tierTxt[l.contact_confidence]||tierTxt.phone_only);
+    right.appendChild(tierEl);
+    // ☆ Save (free, logged-in). Only when we have a slug to key the save on.
+    if(l.slug){ right.appendChild(saveButton(l)); }
     // The decision-maker reveal is LIVE and lives on the importer profile (the
     // gated, allowance-metered point of use). The card links there rather than
     // revealing inline — honest, no fabricated contact on the card itself.
@@ -828,6 +966,7 @@ const CLIENT_JS = `
   function buildFacets(){
     facetsEl.innerHTML='';
     if(allLeads.length<2){ side.classList.remove('on'); return; }
+    syncSideFold();
     // supplier country counts
     var cc={}, ch={}; var hasVerified=false;
     allLeads.forEach(function(l){ if(l.supplier_country){ cc[l.supplier_country]=(cc[l.supplier_country]||0)+1; }
@@ -852,17 +991,52 @@ const CLIENT_JS = `
     facetState={ country:{}, chapter:{}, minShip:'', minTeu:'', verifiedOnly:false }; buildFacets(); renderList();
   });
 
+  // Composed empty / error state: glyph + headline + reason + next-step chips.
+  function emptyState(icon,title,body,tips,warn){
+    var e=T('div','imp-empty'+(warn?' warn':''));
+    var ic=T('span','imp-empty-ico',icon); ic.setAttribute('aria-hidden','true');
+    var bx=T('div','imp-empty-b');
+    bx.appendChild(T('h3',null,title));
+    bx.appendChild(T('p',null,body));
+    if(tips&&tips.length){ var ul=T('ul','imp-empty-tips');
+      tips.forEach(function(t){ ul.appendChild(T('li',null,t)); }); bx.appendChild(ul); }
+    e.appendChild(ic); e.appendChild(bx);
+    return e;
+  }
+  // Skeleton rows while a search is in flight — a designed loading state instead
+  // of an empty column with a one-line status.
+  function showSkeleton(){
+    results.innerHTML='';
+    for(var i=0;i<3;i++){
+      var s=T('div','imp-skel');
+      ['w1','w2','w3','w4'].forEach(function(cl){ s.appendChild(T('span',cl)); });
+      results.appendChild(s);
+    }
+    moreWrap.classList.remove('on');
+  }
+
   function renderList(){
     var rows=visibleLeads();
     results.innerHTML='';
-    if(!rows.length){ var e=T('div','imp-empty'); e.appendChild(T('h3',null,'No matches in this set'));
-      e.appendChild(T('p',null,'Loosen the filters on the left, or widen your lane / commodity and search again.')); results.appendChild(e); }
+    if(!rows.length){
+      results.appendChild(emptyState('\\u2298','No matches in this set',
+        'Every importer we pulled was filtered out. Loosen the filters in "Narrow your results", or widen your lane / commodity and search again.',
+        ['Clear the country filter','Drop the TEU band','Reset filters']));
+    }
     else { rows.forEach(function(l){ results.appendChild(card(l)); }); }
     var shown=rows.length, total=allLeads.length;
     countEl.innerHTML=''; var b1=document.createElement('b'); b1.textContent=String(total);
     countEl.appendChild(b1);
     countEl.appendChild(document.createTextNode(' importer'+(total===1?'':'s')+(shown!==total?(' \\u00b7 '+shown+' shown'):'')+
       (totalScanned?(' \\u00b7 '+totalScanned.toLocaleString('en-US')+' records scanned'):'')));
+    // Active-filter count on the pane header (visible when it is folded on mobile).
+    if(sideN){
+      var active=Object.keys(facetState.country).filter(function(k){return facetState.country[k];}).length
+        +Object.keys(facetState.chapter).filter(function(k){return facetState.chapter[k];}).length
+        +(facetState.minShip?1:0)+(facetState.minTeu?1:0)+(facetState.verifiedOnly?1:0);
+      sideN.textContent=active?String(active):'';
+      sideN.className='imp-side-n'+(active?' on':'');
+    }
   }
 
   function ingest(res){
@@ -895,6 +1069,7 @@ const CLIENT_JS = `
 
   function doSearch(payload,page,append){
     setStatus('Searching live customs records\\u2026',true);
+    if(!append) showSkeleton();
     loadMoreBtn.disabled=true;
     var body={}; for(var k in payload)body[k]=payload[k]; body.page=page;
     return fetch('/api/importers/search',{method:'POST',headers:{'Content-Type':'application/json','Accept':'application/json'},body:JSON.stringify(body)})
@@ -902,9 +1077,31 @@ const CLIENT_JS = `
       .then(function(out){
         btn.disabled=false; loadMoreBtn.disabled=false;
         var j=out.j||{};
-        if(out.status===429){ setStatus((j&&j.message)||'Too many searches. Slow down and try again in a minute.',false); return; }
-        if(j.searchLimited){ setStatus((j&&j.message)||'Live-search limit reached for today — cached searches stay free.',false); moreWrap.classList.remove('on'); return; }
-        if(!out.ok||j.error){ setStatus((j&&j.message)||'Importer search is temporarily unavailable. Try again shortly.',false); return; }
+        if(out.status===429){
+          setStatus((j&&j.message)||'Too many searches. Slow down and try again in a minute.',false);
+          if(!append){ results.innerHTML=''; results.appendChild(emptyState('\\u23F1','Slow down a moment',
+            (j&&j.message)||'You have run a lot of searches in a short window. Repeat and cached searches stay free — try again in a minute.',
+            ['Wait ~60 seconds','Re-run a cached lane'],true)); }
+          return;
+        }
+        if(j.searchLimited){
+          setStatus((j&&j.message)||'Live-search limit reached for today — cached searches stay free.',false);
+          moreWrap.classList.remove('on');
+          if(!append){ results.innerHTML=''; results.appendChild(emptyState('\\u26A1','Daily live-pull limit reached',
+            (j&&j.message)||'Live-search limit reached for today — repeat and cached searches are still free. Try again later or narrow your lane.',
+            ['Try a port you searched before','Narrow the lane','Come back tomorrow'],true)); }
+          return;
+        }
+        if(!out.ok||j.error){
+          setStatus((j&&j.message)||'Importer search is temporarily unavailable. Try again shortly.',false);
+          if(!append){ results.innerHTML=''; results.appendChild(emptyState('\\u26A0',
+            j.error==='not_configured'?'Importer search is not switched on yet':'Importer search is temporarily unavailable',
+            j.error==='not_configured'
+              ? 'The customs-data provider is not configured in this environment yet. Everything else on QuoteFleet still works.'
+              : 'The customs-data provider did not answer. Nothing was charged \\u2014 your filters are still set, so hit Search importers to retry.',
+            j.error==='not_configured'?['Check back soon']:['Try again','Pick a different port'],true)); }
+          return;
+        }
         if(!append){ allLeads=[]; seenCos={}; totalScanned=0; }
         var added=ingest(j);
         toolbar.classList.add('on');
@@ -916,14 +1113,16 @@ const CLIENT_JS = `
           // returns nothing, so guide the user to add a port instead of a dead end.
           var commodityOnly = curPayload && (curPayload.hsCode||curPayload.product) &&
             !curPayload.entryPort && !curPayload.state && !curPayload.supplierCountry && !curPayload.company;
-          var e=T('div','imp-empty');
+          var e;
           if(commodityOnly){
-            e.appendChild(T('h3',null,'Add a port to search by commodity'));
-            e.appendChild(T('p',null,'Commodity and HS-code searches need an entry port (or state) to scope the customs data. Pick a US port above and search again.'));
+            e=emptyState('\\u2693','Add a port to search by commodity',
+              'Commodity and HS-code searches need an entry port (or state) to scope the customs data. Pick a US port above and search again.',
+              ['Port of Savannah','Port of Long Beach','Port of Newark']);
             setStatus('Add an entry port or state to search by commodity.',false);
           } else {
-            e.appendChild(T('h3',null,'No matches'));
-            e.appendChild(T('p',null,'Try a busier port, drop the state filter, or broaden the commodity.'));
+            e=emptyState('\\u2298','No importers on this lane',
+              'Nothing in the customs records matched that combination. Try a busier port, drop the state filter, or broaden the commodity.',
+              ['Try a busier port','Drop the state filter','Broaden the commodity']);
             setStatus('No importers matched those filters \\u2014 widen your lane or commodity.',false);
           }
           results.appendChild(e);
@@ -931,11 +1130,16 @@ const CLIENT_JS = `
           return;
         }
         buildFacets(); renderList();
-        var srcTxt=j.cached?' (from cache \\u2014 free)':'';
-        setStatus('Showing '+allLeads.length+' importer'+(allLeads.length===1?'':'s')+' built from customs data'+srcTxt+'.',false);
+        // The toolbar already carries the count — this line adds only provenance.
+        setStatus(j.cached?'Served from cache \\u2014 free.':'Built from a live customs pull.',false);
         if(recordLine){ recordLine.textContent=Number(totalScanned).toLocaleString('en-US')+' customs records scanned'; }
       })
-      .catch(function(){ btn.disabled=false; loadMoreBtn.disabled=false; setStatus('Network error \\u2014 please try again.',false); });
+      .catch(function(){ btn.disabled=false; loadMoreBtn.disabled=false;
+        setStatus('Network error \\u2014 please try again.',false);
+        results.innerHTML='';
+        results.appendChild(emptyState('\\u26A0','Could not reach the search service',
+          'The request did not complete. Your filters are still set \\u2014 hit Search importers to retry.',
+          ['Retry the search','Check your connection'],true)); });
   }
 
   function collectPayload(){
