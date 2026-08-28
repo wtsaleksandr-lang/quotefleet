@@ -61,6 +61,7 @@ import {
   logCreditSpend,
   checkDetailQuota,
 } from './importerQuota.js';
+import { CACHE_ONLY_NOTE } from './externalPullGuard.js';
 import { importerSearchLimiter, publicAutocompleteLimiter } from '../rateLimits.js';
 import { registerImporterProfileRoutes } from './importerProfile.js';
 import { activeRedactionKeys } from './manifestRedactions.js';
@@ -1092,6 +1093,18 @@ const CLIENT_JS = `
             ['Try a port you searched before','Narrow the lane','Come back tomorrow'],true)); }
           return;
         }
+        // Cost guard: this environment is cache-only and nothing is cached for
+        // this lane. Render the designed no-data state — never "No matches",
+        // which would claim we searched and found nothing.
+        if(j.cacheOnly){
+          if(!append){ allLeads=[]; seenCos={}; totalScanned=0; }
+          side.classList.remove('on'); moreWrap.classList.remove('on');
+          setStatus((j&&j.message)||'Live customs pulls are disabled in this environment.',false);
+          results.innerHTML=''; results.appendChild(emptyState('\\u{1F512}','Live customs pulls are off here',
+            'This environment only serves lanes that are already cached, so there is nothing to show for these filters. Nothing was charged.',
+            ['Try a lane that has been searched before','Live pulls run in production only'],true));
+          return;
+        }
         if(!out.ok||j.error){
           setStatus((j&&j.message)||'Importer search is temporarily unavailable. Try again shortly.',false);
           if(!append){ results.innerHTML=''; results.appendChild(emptyState('\\u26A0',
@@ -1329,6 +1342,7 @@ async function runSearch(
   cached: boolean;
   pulledLive: boolean;
   recordsScanned: number;
+  liveBlocked: boolean;
 }> {
   // Resolve the active Manifest Privacy redaction set once (cached) so every
   // per-port pull in the state-expansion loop shares it — a CBP-confirmed
@@ -1361,7 +1375,7 @@ async function runSearch(
     // Nothing left to pull (an unmappable state with no other filter) → empty,
     // spending zero credits rather than an unrelated broad pull.
     if (!hasAnyFilter(f)) {
-      return { leads: [], creditsRemaining: null, cached: false, pulledLive: false, recordsScanned: 0 };
+      return { leads: [], creditsRemaining: null, cached: false, pulledLive: false, recordsScanned: 0, liveBlocked: false };
     }
     return findImporterLeads({ ...common, filters: f, cacheKey: bolCacheKey(f, page) });
   }
@@ -1374,6 +1388,7 @@ async function runSearch(
   let recordsScanned = 0;
   let anyLive = false;
   let allCached = true;
+  let anyBlocked = false;
   for (const portValue of ports) {
     if (merged.length >= MAX_LEADS) break; // enough unique importers → stop (credits)
     const pf: ImporterFilters = { ...rest, entryPort: portValue };
@@ -1381,6 +1396,7 @@ async function runSearch(
     recordsScanned += r.recordsScanned;
     if (r.creditsRemaining != null) creditsRemaining = r.creditsRemaining;
     if (r.pulledLive) anyLive = true;
+    if (r.liveBlocked) anyBlocked = true;
     if (!r.cached) allCached = false;
     for (const l of r.leads) {
       const k = l.company.toLowerCase();
@@ -1400,6 +1416,8 @@ async function runSearch(
     cached: merged.length > 0 && allCached,
     pulledLive: anyLive,
     recordsScanned,
+    // Cache-only ONLY when the guard blocked pulls AND nothing came back cached.
+    liveBlocked: anyBlocked && merged.length === 0,
   };
 }
 
@@ -1444,6 +1462,24 @@ export async function handleImporterSearch(
       return;
     }
 
+    // HARD COST GUARD: the live pull was refused (dev / CI / agent checkout) and
+    // nothing was cached for this lane. Answer honestly — cache-only, no data —
+    // instead of returning an empty set the UI would read as "no matches".
+    if (result.liveBlocked && result.leads.length === 0) {
+      res.json({
+        leads: [],
+        count: 0,
+        cached: false,
+        pulledLive: false,
+        source: 'cache-only',
+        cacheOnly: true,
+        message:
+          'Live customs pulls are disabled in this environment — only lanes already cached can be searched here.',
+        note: CACHE_ONLY_NOTE,
+      });
+      return;
+    }
+
     // A live pull actually happened → count it for anti-abuse + meter the credit.
     if (result.pulledLive) {
       recordLiveSearch(req);
@@ -1481,6 +1517,7 @@ export async function handleImporterSearch(
       creditsRemaining: result.creditsRemaining,
       cached: result.cached,
       pulledLive: result.pulledLive,
+      source: result.cached ? 'cache' : 'live',
       profilesRemaining,
       profilesLimit,
     });

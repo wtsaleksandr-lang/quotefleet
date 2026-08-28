@@ -1,8 +1,9 @@
 /**
  * Importer Search page + search API — render + freemium-gate + safety tests.
  */
-import { describe, it, expect, vi, afterEach } from 'vitest';
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import type { Request, Response } from 'express';
+import { __setLivePullsForTests } from './externalPullGuard.js';
 import {
   renderImporterSearchPage,
   handleImporterSearch,
@@ -20,7 +21,14 @@ import {
 } from './importerQuota.js';
 
 const realFetch = globalThis.fetch;
+// These specs drive the search LIVE pull path against a MOCKED fetch, so they opt
+// in to the cost guard explicitly. The opt-in is in-code only (no env var can do
+// it under a test runner) and can therefore never reach a real provider.
+beforeEach(() => {
+  __setLivePullsForTests(true);
+});
 afterEach(() => {
+  __setLivePullsForTests(null); // back to the default: OFF
   globalThis.fetch = realFetch;
   vi.restoreAllMocks();
   delete process.env.IMPORTYETI_API_KEY;

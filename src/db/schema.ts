@@ -2092,6 +2092,43 @@ export const importerContactCache = pgTable(
 export type ImporterContactCacheRow = typeof importerContactCache.$inferSelect;
 
 /**
+ * external_api_spend — the audit ledger for PAID external provider calls
+ * (ImportYeti / Hunter / the importer AI draft).
+ *
+ * One row per call that ACTUALLY went out over the network. Written from the
+ * single choke point in `directory/externalPullGuard.ts`, so a live pull that is
+ * not in this table cannot exist. This is what makes spend visible in admin
+ * (/api/admin/importers/usage) instead of invisible in console output — a $20
+ * two-day burn was only discovered from the provider's own dashboard.
+ *
+ * Read ONLY as a bounded, indexed query (ORDER BY occurred_at DESC LIMIT n) plus
+ * small aggregates — never an unbounded scan. A phantom-drop loses only audit
+ * history, never product data; self-healed on every boot (Replit skips
+ * db:migrate).
+ */
+export const externalApiSpend = pgTable(
+  'external_api_spend',
+  {
+    id: serial('id').primaryKey(),
+    /** 'importyeti' | 'hunter' | 'anthropic'. */
+    provider: text('provider').notNull(),
+    /** Short, log-safe call context ("search page=1", "profile:acme"). */
+    context: text('context'),
+    /** Credits attributed to this call (provider-reported when known, else est.). */
+    credits: integer('credits').default(0).notNull(),
+    /** Provider-reported remaining balance after the call, when reported. */
+    creditsRemaining: integer('credits_remaining'),
+    /** Estimated USD cost of this call, in cents (labelled "est." in admin). */
+    estUsdCents: integer('est_usd_cents').default(0).notNull(),
+    occurredAt: timestamp('occurred_at', { withTimezone: true, mode: 'date' }).notNull().defaultNow(),
+  },
+  (t) => ({
+    occurredAtIdx: index('external_api_spend_at_idx').on(t.occurredAt),
+  }),
+);
+export type ExternalApiSpendRow = typeof externalApiSpend.$inferSelect;
+
+/**
  * leads_subscriptions — the "Leads Pro" per-USER subscription behind the
  * Importer Search decision-maker CONTACT REVEAL. Cloned from directory/manifest
  * subscriptions: a subscriber is a SHIPPER (`users` row, tenant_id=null),

@@ -27,9 +27,18 @@ import {
   ROLE_LOCALPARTS,
   type BolRow,
 } from './importerLeads.js';
+import { __setLivePullsForTests } from './externalPullGuard.js';
 
 const realFetch = globalThis.fetch;
+// The specs below drive the LIVE provider paths against a MOCKED fetch, so they
+// opt in to the cost guard explicitly. The opt-in is in-code only (no env var can
+// do it under a test runner), so it can never reach a real provider. The guard's
+// own default-OFF / zero-fetch contract is covered in externalPullGuard.test.ts.
+beforeEach(() => {
+  __setLivePullsForTests(true);
+});
 afterEach(() => {
+  __setLivePullsForTests(null); // back to the default: OFF
   globalThis.fetch = realFetch;
   vi.restoreAllMocks();
   delete process.env.IMPORTYETI_API_KEY;

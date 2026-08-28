@@ -9,5 +9,9 @@ export default defineConfig({
     environment: 'node',
     globals: false,
     pool: 'forks',
+    // HARD COST GUARD: forces NODE_ENV=test, strips every live-pull override and
+    // installs a fetch sentinel, so the suite can NEVER spend an ImportYeti /
+    // Hunter credit. Runs in every worker before any test module is imported.
+    setupFiles: ['./src/test/setupNoExternalSpend.ts'],
   },
 });

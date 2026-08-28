@@ -24,6 +24,7 @@
  * acceptable — the goal is conversion + a spend ceiling, not perfect DRM).
  */
 import type { Request, Response } from 'express';
+import { externalCallMeter, __resetGuardMetersForTests } from './externalPullGuard.js';
 
 /** Read a positive integer from the environment, else fall back. */
 const envInt = (name: string, fallback: number): number => {
@@ -268,21 +269,39 @@ export function recordDetailOpen(req: Request, res: Response, slug?: string, use
 }
 
 // ── credit-spend meter (observability) ──────────────────────────────────────
-let creditsSpentSession = 0;
-let lastCreditsRemaining: number | null = null;
-
-/** Record a live pull's reported credit balance so spend is watchable in logs. */
+// The COUNTS come from the cost guard, which is the only place a paid call can
+// be made (externalPullGuard.guardedFetch) — so this meter can no longer drift
+// from reality, and a durable per-call ledger backs it in `external_api_spend`.
+/**
+ * Log a live pull's reported credit balance. The count itself is maintained by
+ * the cost-guard choke point; this only records the provider-reported balance
+ * and writes the human-readable line.
+ */
 export function logCreditSpend(creditsRemaining: number | null, ctx: string): void {
-  creditsSpentSession += 1;
-  lastCreditsRemaining = creditsRemaining;
+  const m = externalCallMeter().importyeti;
   console.info(
-    `[importers.credits] live pull (${ctx}) — session_live_pulls=${creditsSpentSession} credits_remaining=${creditsRemaining ?? 'unknown'}`,
+    `[importers.credits] live pull (${ctx}) — session_live_pulls=${m.liveCalls} credits_remaining=${creditsRemaining ?? m.lastCreditsRemaining ?? 'unknown'}`,
   );
 }
 
-/** Snapshot of the in-process credit meter (for a future admin/health view). */
-export function creditMeter(): { sessionLivePulls: number; lastCreditsRemaining: number | null } {
-  return { sessionLivePulls: creditsSpentSession, lastCreditsRemaining };
+/**
+ * Snapshot of the in-process credit meter (admin/health view). `sessionLivePulls`
+ * is now the guard's ImportYeti live-call count — one per call that actually left
+ * the process, not one per HTTP search (a state expansion can pull several).
+ */
+export function creditMeter(): {
+  sessionLivePulls: number;
+  lastCreditsRemaining: number | null;
+  blockedPulls: number;
+  hunter: { liveCalls: number; blockedCalls: number };
+} {
+  const m = externalCallMeter();
+  return {
+    sessionLivePulls: m.importyeti.liveCalls,
+    lastCreditsRemaining: m.importyeti.lastCreditsRemaining,
+    blockedPulls: m.importyeti.blockedCalls,
+    hunter: { liveCalls: m.hunter.liveCalls, blockedCalls: m.hunter.blockedCalls },
+  };
 }
 
 /** Test-only reset of the in-memory counters + meter. */
@@ -290,6 +309,5 @@ export function __resetQuotaStateForTests(): void {
   searchIpDaily.clear();
   detailIpDaily.clear();
   detailByUser.clear();
-  creditsSpentSession = 0;
-  lastCreditsRemaining = null;
+  __resetGuardMetersForTests();
 }

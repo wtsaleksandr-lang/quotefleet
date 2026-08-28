@@ -67,6 +67,9 @@ export interface RevealedContactView {
   role_emails: string[];
   phone: string | null;
   address: string | null;
+  /** Set when the HARD COST GUARD refused the live Hunter call and nothing was
+   *  cached: honest "we did not look", NOT "we looked and found nothing". */
+  unavailable?: 'cache-only';
 }
 
 /** Reveal outcome for the route to serialize. Never a fabricated contact. */
@@ -136,7 +139,7 @@ function viewFromTiered(t: TieredContact): RevealedContactView {
 async function resolveCacheFirst(
   info: { company: string; phone: string | null; address: string | null },
   deps: ImporterRevealDeps,
-): Promise<{ view: RevealedContactView; hitCache: boolean }> {
+): Promise<{ view: RevealedContactView; hitCache: boolean; blocked: boolean }> {
   const cache = deps.contactCache ?? dbContactCacheStore;
   const key = companyKey(info.company);
   try {
@@ -147,6 +150,7 @@ async function resolveCacheFirst(
       // record so phone_only stays answerable even if the cached payload was thin.
       return {
         hitCache: true,
+        blocked: false,
         view: {
           confidence: hit.confidence,
           domain: hit.domain ?? c.domain ?? null,
@@ -167,6 +171,13 @@ async function resolveCacheFirst(
   const resolver = deps.resolveContact ?? resolveContactTiered;
   const tiered = await resolver(info.company, { phone: info.phone, address: info.address });
   const view = viewFromTiered(tiered);
+  // HARD COST GUARD refused the live Hunter call: this is NOT a real negative
+  // result. Do NOT cache it (that would poison the licensed 14-day contact cache
+  // with a fake "nothing found") and let the caller skip the allowance charge.
+  if (tiered.live_blocked) {
+    console.warn('[importers] reveal served cache-only (cost guard) — no Hunter call made');
+    return { view: { ...view, unavailable: 'cache-only' }, hitCache: false, blocked: true };
+  }
   try {
     await cache.put({
       companyKey: key,
@@ -177,7 +188,7 @@ async function resolveCacheFirst(
   } catch {
     /* never break the reveal on a cache-write failure */
   }
-  return { view, hitCache: false };
+  return { view, hitCache: false, blocked: false };
 }
 
 /**
@@ -215,7 +226,12 @@ export async function revealWithIdentity(
     return { ok: false, reason: 'upgrade', remaining: 0, comingSoon: !leadsProPurchasable() };
   }
 
-  const { view } = await resolveCacheFirst(info, deps);
+  const { view, blocked } = await resolveCacheFirst(info, deps);
+  // The cost guard blocked the live lookup and nothing was cached — we did not
+  // actually reveal anything, so we must NOT burn one of the user's reveals.
+  if (blocked) {
+    return { ok: true, contact: view, remaining: Math.max(0, cap - used), tier, reused: false };
+  }
   const newUsed = await meter.record(accountKey, bucket, slug);
   return { ok: true, contact: view, remaining: Math.max(0, cap - newUsed), tier, reused: false };
 }
