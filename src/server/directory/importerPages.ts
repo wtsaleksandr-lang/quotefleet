@@ -555,6 +555,13 @@ a.imp-soon:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
 .imp-empty p{margin:0;font-size:13.5px;line-height:1.6;max-width:58ch}
 .imp-empty-tips{display:flex;gap:8px;flex-wrap:wrap;margin-top:14px;padding:0;list-style:none}
 .imp-empty-tips li{font-size:12px;font-weight:600;color:var(--ink-soft);background:var(--surface-2);border:1px solid var(--border);border-radius:999px;padding:5px 12px}
+/* Action row inside an empty state — the shared-link "Run search" affordance.
+   The page body carries no qf-* class, so .btn-primary needs the same explicit
+   accent fill the search button gets (see .imp-actions .btn-primary above). */
+.imp-empty-act{display:flex;align-items:center;gap:12px;flex-wrap:wrap;margin-top:16px}
+.imp-empty-act .imp-empty-run{background:var(--accent-fill);border-color:var(--accent-fill);color:#fff;box-shadow:none;flex:0 0 auto}
+.imp-empty-act .imp-empty-run:hover{background:var(--accent-strong,var(--accent-fill));border-color:var(--accent-strong,var(--accent-fill))}
+.imp-empty-act .imp-empty-hint{font-size:12px;font-weight:600;color:var(--muted)}
 
 /* skeleton rows while a search is in flight */
 .imp-skel{border:1px solid var(--border);border-radius:var(--radius-lg);background:var(--surface);padding:16px 18px;overflow:hidden}
@@ -664,6 +671,10 @@ a.imp-soon:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
   .imp-card{padding:14px 15px 0}
   .imp-foot{margin:12px -15px 0;padding:10px 15px}
   .imp-empty{flex-direction:column;gap:12px}
+  /* Full-width so the button and its hint stack as two clean rows instead of a
+     narrow button orphaned beside a wrapped fragment of hint text. */
+  .imp-empty-act{gap:8px}
+  .imp-empty-act .imp-empty-run{flex:1 1 100%;justify-content:center}
   .imp-co{font-size:16px}
   /* No-orphan wrap in the card footer. The action row would be three buttons in
      a two-column grid — one always left alone. The reveal chip is the redundant
@@ -1528,7 +1539,10 @@ const CLIENT_JS = `
     (q.hs?String(q.hs).split(','):[]).forEach(function(k){ if(k) facetState.chapter[k]=true; });
     curQs=formQs();
     curPayload=collectPayload(); curPage=1;
-    doSearch(curPayload,1,false);
+    // CACHE PROBE, never a live pull. A shared link that is already cached opens
+    // straight into its results for $0; one that is not stops at a "Run search"
+    // button. See parseCacheOnly() on the server for why.
+    doSearch(curPayload,1,false,true);
     return true;
   }
 
@@ -1560,12 +1574,24 @@ const CLIENT_JS = `
   }
 
   // Composed empty / error state: glyph + headline + reason + next-step chips.
-  function emptyState(icon,title,body,tips,warn){
+  // The optional 6th arg, action = {label,hint,onClick}, adds a real button —
+  // used by the shared-link state, where the whole point is that the user must
+  // press something before a paid pull happens.
+  function emptyState(icon,title,body,tips,warn,action){
     var e=T('div','imp-empty'+(warn?' warn':''));
     var ic=T('span','imp-empty-ico',icon); ic.setAttribute('aria-hidden','true');
     var bx=T('div','imp-empty-b');
     bx.appendChild(T('h3',null,title));
     bx.appendChild(T('p',null,body));
+    if(action){
+      var row=T('div','imp-empty-act');
+      var b=document.createElement('button');
+      b.type='button'; b.className='btn btn-primary imp-empty-run'; b.textContent=action.label;
+      b.addEventListener('click',action.onClick);
+      row.appendChild(b);
+      if(action.hint) row.appendChild(T('span','imp-empty-hint',action.hint));
+      bx.appendChild(row);
+    }
     if(tips&&tips.length){ var ul=T('ul','imp-empty-tips');
       tips.forEach(function(t){ ul.appendChild(T('li',null,t)); }); bx.appendChild(ul); }
     e.appendChild(ic); e.appendChild(bx);
@@ -1647,11 +1673,17 @@ const CLIENT_JS = `
     }
   }
 
-  function doSearch(payload,page,append){
-    setStatus('Searching live customs records\\u2026',true);
+  // The cacheOnly arg runs the search as a CACHE PROBE — see parseCacheOnly() on
+  // the server. Used for a deep-linked (shared) arrival so following a link can
+  // never spend an ImportYeti credit; the status copy stays honest about which
+  // of the two it is doing.
+  function doSearch(payload,page,append,cacheOnly){
+    setStatus(cacheOnly?'Opening a shared search \\u2014 checking the cache\\u2026'
+                       :'Searching live customs records\\u2026',true);
     if(!append) showSkeleton();
     loadMoreBtn.disabled=true;
     var body={}; for(var k in payload)body[k]=payload[k]; body.page=page;
+    if(cacheOnly) body.cacheOnly=true;
     return fetch('/api/importers/search',{method:'POST',headers:{'Content-Type':'application/json','Accept':'application/json'},body:JSON.stringify(body)})
       .then(function(r){ return r.json().then(function(j){ return {ok:r.ok,status:r.status,j:j}; }); })
       .then(function(out){
@@ -1682,6 +1714,25 @@ const CLIENT_JS = `
           results.innerHTML=''; results.appendChild(emptyState('\\u{1F512}','Live customs pulls are off here',
             'This environment only serves lanes that are already cached, so there is nothing to show for these filters. Nothing was charged.',
             ['Try a lane that has been searched before','Live pulls run in production only'],true));
+          return;
+        }
+        // ── Shared link, not cached: STOP and ask (R5 cost safety) ────────────
+        // The probe proved this lane would need a PAID live pull, so we render
+        // the restored search rather than running it. The link still behaves
+        // like a shared search — every filter, facet and sort is already in
+        // place — it just makes the spend a deliberate click.
+        if(j.needsLivePull){
+          if(!append){ allLeads=[]; seenCos={}; totalScanned=0; }
+          side.classList.remove('on'); moreWrap.classList.remove('on');
+          toolbar.classList.remove('on');
+          setStatus('Shared search restored \\u2014 nothing charged. Press Run search to pull it.',false);
+          results.innerHTML='';
+          results.appendChild(emptyState('\\u{1F517}','This shared search is ready to run',
+            'Its filters are restored above, but this lane is not in our cache yet, so building it needs a live customs pull. We do not run one automatically just because a link was opened \\u2014 nothing has been charged.',
+            ['Filters, sort and facets are already set','A cached lane would have opened instantly'],false,
+            { label:'Run search', hint:'Pulls live customs records',
+              onClick:function(){ doSearch(payload,page,false); } }));
+          try{ results.focus({preventScroll:true}); }catch(e){ results.focus(); }
           return;
         }
         if(!out.ok||j.error){
@@ -1807,10 +1858,11 @@ const CLIENT_JS = `
 
   // Hydrate saved-importer state so card stars reflect the account on load.
   hydrateSaved();
-  // A link that carries a search runs it. Same cost as the user pressing Search
-  // (cache-first, and the daily live-pull quota still governs), and it is the
-  // whole point of a shareable URL — a link that only pre-fills the form and
-  // waits is not a shared search.
+  // A link that carries a search opens it — but it can NEVER spend a credit on
+  // its own (R5). The arrival runs as a cache probe: a cached lane renders its
+  // results instantly and for free, exactly like the shared search it is; an
+  // uncached lane stops at a restored form with a "Run search" button, because
+  // "someone opened a link" is not a decision to buy customs data.
   restoreFromUrl();
 })();
 `.trim();
@@ -1838,6 +1890,32 @@ function parseFilters(body: unknown): ImporterFilters {
     minShipments12m: posInt(b.minShipments12m),
     minTeu12m: posInt(b.minTeu12m),
   };
+}
+
+/**
+ * COST SAFETY (R5) — `cacheOnly` turns the search into a CACHE PROBE.
+ *
+ * Round 4 made a search shareable, and opening the link auto-ran it. That is
+ * good UX and a real cost hole: a link circulated in a Slack channel, a
+ * bookmark opened by a crawler, or a colleague re-opening it a week later each
+ * triggered a PAID ImportYeti pull for any lane not already cached. Credits are
+ * only ever to be spent DELIBERATELY, for a real user who asked.
+ *
+ * So a deep-linked arrival sends `cacheOnly: true`. The search then runs with
+ * live pulls forced OFF: an already-cached lane is served in full for $0 (the
+ * shared link works exactly as before), and an uncached lane answers
+ * `needsLivePull` WITHOUT opening a socket — the client renders the restored
+ * form plus an explicit "Run search" button, so the spend becomes a click the
+ * user made rather than a side effect of following a link.
+ *
+ * This costs NO extra request: the auto-run POST *is* the probe. The cache read
+ * it performs is the same indexed `importer_bol_cache` lookup a normal search
+ * does first anyway.
+ */
+function parseCacheOnly(body: unknown): boolean {
+  const b = (body && typeof body === 'object' ? body : {}) as Record<string, unknown>;
+  const v = b.cacheOnly;
+  return v === true || v === 1 || v === '1' || v === 'true';
 }
 
 /** Parse the 1-based page (pagination / "Load more"), clamped to a sane ceiling. */
@@ -2054,6 +2132,7 @@ export async function handleImporterSearch(
       return;
     }
     const page = parsePage(req.body);
+    const cacheProbe = parseCacheOnly(req.body);
     const bolCache = deps.bolCache ?? dbBolCacheStore;
     const contactCache = deps.contactCache ?? dbContactCacheStore;
 
@@ -2062,9 +2141,44 @@ export async function handleImporterSearch(
     // The only search guard is a GENEROUS per-IP/day soft cap on LIVE (uncached)
     // pulls as pure anti-abuse — it vetoes the live pull, it is NOT a paywall.
     // (The FREE quota lives on opening detailed PROFILES — see importerQuota.ts.)
-    const searchGate = checkLiveSearchAllowed(req);
+    // A cache PROBE never reaches the live path, so the anti-abuse counter is not
+    // even read for it — following a shared link is not "a search you ran".
+    const searchGate = cacheProbe
+      ? { allowed: false, remaining: 0 }
+      : checkLiveSearchAllowed(req);
 
-    const result = await runSearch(filters, page, { bolCache, allowLivePull: searchGate.allowed });
+    const result = await runSearch(filters, page, {
+      bolCache,
+      allowLivePull: !cacheProbe && searchGate.allowed,
+    });
+
+    // ── COST SAFETY: the probe found no complete cached copy of this search ───
+    // Answer "not cached" instead of pulling. NOTHING was charged and no socket
+    // was opened — `allowLivePull:false` returns before `pullImportBols`. The
+    // client restores the form and shows an explicit "Run search" button, so the
+    // credit is spent only when a human asks for it.
+    //
+    // Note `result.cached` is the FULL-COVERAGE flag: a state-only search fans
+    // out over several entry ports, and it is true only when EVERY contributing
+    // port was a hit. A partially cached fan-out therefore reports needsLivePull
+    // rather than quietly serving a subset the user would read as the whole
+    // answer — running it then still costs only the ports that were missing.
+    if (cacheProbe && !result.cached) {
+      res.json({
+        leads: [],
+        count: 0,
+        page,
+        pageSize: MAX_LEADS,
+        cached: false,
+        pulledLive: false,
+        source: 'cache-probe',
+        cacheProbe: true,
+        needsLivePull: true,
+        message:
+          'This shared search is not cached yet — running it pulls live customs records. Nothing has been charged.',
+      });
+      return;
+    }
 
     // Cache miss vetoed by the generous anti-abuse cap → a soft "try later" note,
     // NOT a subscribe wall. Cached searches stay free.
