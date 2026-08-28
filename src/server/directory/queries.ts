@@ -1102,6 +1102,45 @@ export function citySlugify(s: string): string {
 }
 
 /**
+ * Hard ceiling on `?page=`.
+ *
+ * The list query's only OFFSET is `(page - 1) * perPage`, so an unbounded page
+ * number is an unbounded OFFSET — and 0065's sitemap made that reachable at
+ * scale, because numberedPager() links straight to the LAST page of every hub.
+ * Measured on prod with EXPLAIN (featured sort, perPage 24):
+ *
+ *   page 13,905  (OFFSET 333,696)  →  total cost 57,014.96
+ *   page 100     (OFFSET   2,376)  →  total cost    500.57
+ *
+ * 100 pages is 2,400 rows deep — far past where anyone paginates (Google itself
+ * truncates result sets long before that), and discovery is unaffected: the
+ * sitemap advertises every carrier profile as its own clean PATH, and robots.txt
+ * already Disallows `?page=` outright. Callers that want more depth narrow with
+ * a city hub or a facet, which is also the cheap query.
+ */
+export const MAX_PAGE = 100;
+
+/**
+ * Parse a `?page=` value into a clamped page number plus whether the request
+ * asked for something outside the servable range. PURE — unit-tested.
+ *
+ * `outOfRange` lets a route answer 404 for `?page=13917` instead of silently
+ * serving page 100 under a different URL, which would mint unlimited duplicate
+ * (and self-canonicalizing) URLs for crawlers to chew through.
+ */
+export function parsePageParam(raw: unknown): { page: number; outOfRange: boolean } {
+  const text = String(raw ?? '').trim();
+  if (text === '') return { page: 1, outOfRange: false };
+  const n = parseInt(text, 10);
+  // Non-numeric junk (?page=abc) keeps the historical "fall back to 1" behaviour
+  // rather than 404-ing a link someone mistyped.
+  if (!Number.isFinite(n) || n === 0) return { page: 1, outOfRange: false };
+  if (n < 1) return { page: 1, outOfRange: true };
+  if (n > MAX_PAGE) return { page: MAX_PAGE, outOfRange: true };
+  return { page: n, outOfRange: false };
+}
+
+/**
  * Normalize loosely-typed query values (e.g. req.query) into DirectoryFilters.
  * Pure + total: any unknown value collapses to the safe default. `overrides`
  * lets a scoped route lock a dimension (state/port/city) regardless of input.
@@ -1149,7 +1188,10 @@ export function normalizeFilters(
     q: normalizeNameQuery(raw.q),
     sort,
     dir,
-    page: Math.max(1, parseInt(str(raw.page), 10) || 1),
+    // Clamped to MAX_PAGE here as the LAST line of defence, so no caller can
+    // reach a deep OFFSET even if it forgets parsePageParam. Routes should use
+    // parsePageParam and 404 instead of silently serving the capped page.
+    page: parsePageParam(raw.page).page,
     perPage: DEFAULT_PER_PAGE,
   };
 }
@@ -1377,7 +1419,10 @@ export async function listCarriers(opts: ListCarriersOpts): Promise<CarrierListR
       },
     );
   const perPage = Math.min(MAX_PER_PAGE, Math.max(5, Math.floor(opts.perPage ?? filters.perPage) || DEFAULT_PER_PAGE));
-  const page = Math.max(1, Math.floor(filters.page) || 1);
+  // MAX_PAGE bound applied here too: listCarriers is reachable from the JSON API
+  // and from callers that build DirectoryFilters by hand, not only through
+  // normalizeFilters. The OFFSET must be bounded on EVERY path into it.
+  const page = Math.min(MAX_PAGE, Math.max(1, Math.floor(filters.page) || 1));
 
   try {
     return await listCarriersUnsafe({ ...filters, perPage, page });
@@ -1435,10 +1480,18 @@ async function listCarriersUnsafe(filters: DirectoryFilters): Promise<CarrierLis
 
   return {
     carriers: rows.map(visibleCarrier),
+    // `total` stays the TRUE match count — it is the "31,668 carriers" headline,
+    // the meta description and the ItemList JSON-LD numberOfItems, and capping it
+    // would make those copy lines wrong.
     total,
     page,
     perPage,
-    totalPages: Math.max(1, Math.ceil(total / perPage)),
+    // totalPages, by contrast, is consumed ONLY by the two pagination renderers
+    // (numberedPager + paginationRelLinks) and by the JSON API. Capping it here —
+    // at the single point that derives it — is what stops the "last page" link
+    // and the rel=next chain from advertising OFFSET ~334k URLs to crawlers, and
+    // keeps it honest with the 404 that ?page=101 now returns.
+    totalPages: Math.min(MAX_PAGE, Math.max(1, Math.ceil(total / perPage))),
     filters,
   };
 }
@@ -1975,9 +2028,25 @@ export function heroCarrierConditions(): SQL[] {
   ];
 }
 
-/** ORDER BY for the hero set — random, so the featured carriers vary each load. */
+/**
+ * ORDER BY for the hero POOL fetch — the primary key, so Postgres walks
+ * carrier_directory_pkey and stops at LIMIT.
+ *
+ * This deliberately replaced `ORDER BY random()`. That sorted the ENTIRE
+ * qualifying set to take 8 rows, on EVERY homepage load (hero-carriers.js
+ * fetches /api/directory/hero-carriers on DOMContentLoaded, and the route sets
+ * `no-store`). Measured on prod with EXPLAIN:
+ *
+ *   ORDER BY random() LIMIT 8      Seq Scan 314,554 rows + Sort → cost 24,727.62
+ *   id >= $rand ORDER BY id LIMIT 240   Index Scan, no sort     → cost    146.09
+ *
+ * The "varied" feel is preserved WITHOUT the sort, in two layers: the pool
+ * starts at a RANDOM id offset (so the window moves), and getHeroCarriers
+ * shuffles n cards out of the pool per call (so two loads inside one TTL still
+ * differ). See getHeroCarriers.
+ */
 export function heroCarrierOrder(): SQL[] {
-  return [sql`random()`];
+  return [asc(carrierDirectory.id)];
 }
 
 /** Equipment/standing badges for a hero card, derived from the FMCSA flags. */
@@ -2031,30 +2100,123 @@ export function heroCarrierCard(r: typeof carrierDirectory.$inferSelect): HeroCa
   };
 }
 
+/** How many rows one pool fetch pulls. Big enough that shuffling n=8 out of it
+ *  looks different every load, small enough that the fetch stays an index walk. */
+export const HERO_POOL_SIZE = 240;
+
+/** How long one pool is reused. The pool re-fetches from a NEW random id offset
+ *  after this, so the visible set drifts across the whole table over time. */
+export const HERO_POOL_TTL_MS = 5 * 60_000;
+
+/** max(id) is an index-only scan (cost 0.47) but there is no reason to pay it
+ *  per pool refresh — ids only grow, and a slightly stale ceiling just biases
+ *  the random offset a hair low, which is harmless. */
+const HERO_MAX_ID_TTL_MS = 60 * 60_000;
+
+let heroPoolCache: { cards: HeroCarrierCard[]; at: number } | null = null;
+let heroPoolInFlight: Promise<HeroCarrierCard[]> | null = null;
+let heroMaxIdCache: { value: number; at: number } | null = null;
+
+/** Drop the memoized hero pool + id ceiling. Test seam only. */
+export function resetHeroCarrierCache(): void {
+  heroPoolCache = null;
+  heroPoolInFlight = null;
+  heroMaxIdCache = null;
+}
+
 /**
- * Random set of display-worthy real carriers for the homepage hero preview.
- * Re-randomized on every call (variation-per-load is the whole point), so the
- * caller should serve it uncached. Degrades to an empty array on any read
- * failure — the client keeps the static fallback cards, never a broken hero.
+ * Pick `n` distinct items uniformly at random. Partial Fisher–Yates on a COPY,
+ * so it is O(n) and never mutates the cached pool. PURE — unit-tested.
+ */
+export function sampleCards<T>(pool: readonly T[], n: number): T[] {
+  const take = Math.min(n, pool.length);
+  const copy = pool.slice();
+  for (let i = 0; i < take; i++) {
+    const j = i + Math.floor(Math.random() * (copy.length - i));
+    [copy[i], copy[j]] = [copy[j], copy[i]];
+  }
+  return copy.slice(0, take);
+}
+
+/** Largest carrier_directory id, memoized. `max(id)` on the PK is an Index Only
+ *  Scan Backward (prod cost 0.47), never a scan. 0 when the table is empty. */
+async function heroMaxId(): Promise<number> {
+  const now = Date.now();
+  if (heroMaxIdCache && now - heroMaxIdCache.at < HERO_MAX_ID_TTL_MS) return heroMaxIdCache.value;
+  const row = await db().select({ n: sql<number | null>`max(${carrierDirectory.id})` }).from(carrierDirectory);
+  const value = Math.max(0, Number(row[0]?.n ?? 0) || 0);
+  heroMaxIdCache = { value, at: now };
+  return value;
+}
+
+/** One pool fetch: an index walk from a random id offset. */
+async function heroPoolFrom(fromId: number): Promise<HeroCarrierCard[]> {
+  const rows = await db()
+    .select()
+    .from(carrierDirectory)
+    .leftJoin(carrierOverrides, eq(carrierOverrides.usdot, carrierDirectory.usdot))
+    .where(
+      and(
+        ...heroCarrierConditions(),
+        // Honor an admin "hidden" override (kept out even though the hero shows
+        // no contact) — surviving-the-ingest hide flag on carrier_overrides.
+        or(isNull(carrierOverrides.hidden), ne(carrierOverrides.hidden, true)) as SQL,
+        gte(carrierDirectory.id, fromId),
+      ),
+    )
+    .orderBy(...heroCarrierOrder())
+    .limit(HERO_POOL_SIZE);
+  return rows.map((row) => heroCarrierCard(row.carrier_directory));
+}
+
+/** Fetch a fresh pool, wrapping to the start of the table when the random
+ *  offset landed too close to the end to fill it. `serial` ids are NOT dense
+ *  (the ingest upserts on usdot, so conflicts burn sequence values), which is
+ *  exactly why this samples a WINDOW rather than probing for a single id. */
+async function fetchHeroPool(): Promise<HeroCarrierCard[]> {
+  const maxId = await heroMaxId();
+  const fromId = maxId > 0 ? Math.floor(Math.random() * maxId) : 0;
+  const cards = await heroPoolFrom(fromId);
+  if (cards.length >= HERO_POOL_SIZE || fromId === 0) return cards;
+  return heroPoolFrom(0);
+}
+
+/**
+ * Varied set of display-worthy real carriers for the homepage hero preview.
+ *
+ * Served from a memoized POOL (single-flighted, so a homepage traffic burst on a
+ * cold cache makes ONE DB round-trip, not N) and shuffled per call, so the cards
+ * still change between loads without the old full-table `ORDER BY random()` sort
+ * on the hot path. Degrades to an empty array on any read failure — the client
+ * keeps its static fallback cards, never a broken hero.
  */
 export async function getHeroCarriers(limit = HERO_CARRIER_LIMIT): Promise<HeroCarrierCard[]> {
   const n = Math.min(12, Math.max(1, Math.floor(limit) || HERO_CARRIER_LIMIT));
   try {
-    const rows = await db()
-      .select()
-      .from(carrierDirectory)
-      .leftJoin(carrierOverrides, eq(carrierOverrides.usdot, carrierDirectory.usdot))
-      .where(
-        and(
-          ...heroCarrierConditions(),
-          // Honor an admin "hidden" override (kept out even though the hero shows
-          // no contact) — surviving-the-ingest hide flag on carrier_overrides.
-          or(isNull(carrierOverrides.hidden), ne(carrierOverrides.hidden, true)) as SQL,
-        ),
-      )
-      .orderBy(...heroCarrierOrder())
-      .limit(n);
-    return rows.map((row) => heroCarrierCard(row.carrier_directory));
+    const now = Date.now();
+    if (!heroPoolCache || now - heroPoolCache.at >= HERO_POOL_TTL_MS) {
+      if (!heroPoolInFlight) {
+        // The catch lives INSIDE the shared promise: a background refresh that
+        // nobody awaits must never surface as an unhandled rejection (that is a
+        // process-killer on this server — see crashProofBoot).
+        heroPoolInFlight = fetchHeroPool()
+          .then((cards) => {
+            heroPoolCache = { cards, at: Date.now() };
+            return cards;
+          })
+          .catch((err) => {
+            console.warn('[directory] hero pool refresh failed; keeping previous pool:', err);
+            return heroPoolCache?.cards ?? [];
+          })
+          .finally(() => {
+            heroPoolInFlight = null;
+          });
+      }
+      // A stale pool is better than a stalled homepage: only WAIT on the refetch
+      // when there is nothing at all to serve.
+      if (!heroPoolCache) await heroPoolInFlight;
+    }
+    return sampleCards(heroPoolCache?.cards ?? [], n);
   } catch (err) {
     console.warn('[directory] getHeroCarriers failed; serving none:', err);
     return [];

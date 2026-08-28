@@ -175,12 +175,13 @@ describe('renderCarrierProfile — NO new gating (public FMCSA data stays free)'
       carrier: carrier({ meat: true, updatedAt: new Date('2026-08-21T12:00:00Z') }),
     });
     // The only gated block is the single "More dispatch contacts" affordance —
-    // count the rendered DIV (the `.cp-gated` class token also appears in CSS).
-    expect((html.match(/<div class="cp-gated">/g) || []).length).toBe(1);
+    // count the rendered DIV (the `.cp-gated` class token also appears in CSS,
+    // and now in the client-side Pro hydrator too, so match the real element).
+    expect((html.match(/<div class="cp-gated" data-cp-gated/g) || []).length).toBe(1);
     // Newly-surfaced data renders without any "registered users" / account wall.
     const meatIdx = html.indexOf('>Meat</span>');
     const asOfIdx = html.indexOf('FMCSA data as of');
-    const gatedIdx = html.indexOf('<div class="cp-gated">');
+    const gatedIdx = html.indexOf('<div class="cp-gated" data-cp-gated');
     expect(meatIdx).toBeGreaterThan(-1);
     expect(asOfIdx).toBeGreaterThan(-1);
     expect(meatIdx).not.toBe(gatedIdx);

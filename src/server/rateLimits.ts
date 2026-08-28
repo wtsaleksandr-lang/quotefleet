@@ -113,6 +113,41 @@ export const publicAutocompleteLimiter: RateLimitRequestHandler = rateLimit({
   message: { error: 'Too many autocomplete requests. Slow down.' },
 });
 
+/**
+ * The public directory's `?q=` free-text carrier-name search — the single most
+ * expensive thing an anonymous caller can ask this app to do.
+ *
+ * `q` compiles to `legal_name ILIKE '%term%' OR dba_name ILIKE '%term%'` (see
+ * nameSearchCondition). A LEADING wildcard can never use a b-tree, and there is
+ * no trigram index, so EVERY `?q=` is a parallel seq scan of all ~330k rows —
+ * prod EXPLAIN puts one such scan at cost ~15,325. Worse, `q` is not excluded
+ * from any facet dimension, so a single `/directory?q=xx` fans out to roughly
+ * ELEVEN of those scans (the list, its count, and ~9 facet counts), and because
+ * facetCacheKey includes `q`, every distinct term is a guaranteed cold miss that
+ * also evicts a legitimate entry from the 200-entry facet cache.
+ *
+ * A single request is already bounded — 8s pool-wide statement_timeout, the
+ * 8s REQUEST_AGG_BUDGET_MS transaction budget, the 2-slot aggregate semaphore
+ * with a bounded queue wait (0068), and NAME_SEARCH_MIN/MAX on the term itself.
+ * What was NOT bounded is VOLUME: publicAutocompleteLimiter let one IP drive 120
+ * of them a minute. This limiter caps the search path specifically, an order of
+ * magnitude tighter, while leaving ordinary facet browsing on the 120/min lane.
+ *
+ * `skip` means it only ever engages on requests that actually carry a `q`, so a
+ * human clicking through cities is completely unaffected by it.
+ */
+export const directorySearchLimiter: RateLimitRequestHandler = rateLimit({
+  windowMs: minutes(1),
+  limit: envInt('DIRECTORY_SEARCH_BURST_LIMIT', 12),
+  standardHeaders: 'draft-7',
+  legacyHeaders: false,
+  skip: (req: Request) => {
+    const q = (req.query as Record<string, unknown> | undefined)?.q;
+    return !(typeof q === 'string' && q.trim() !== '');
+  },
+  message: { error: 'Too many directory searches. Slow down and try again in a minute.' },
+});
+
 /** /api/tenant/quote-doc/send/:refId — authed owner action that sends the
  *  carrier-branded quote email to the lead's stored customer address. Real use
  *  is a click or two per lead, so a tight per-tenant+refId cap plus the

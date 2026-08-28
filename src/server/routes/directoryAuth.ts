@@ -23,6 +23,7 @@
  */
 import type { Express, Request, Response } from 'express';
 import { eq } from 'drizzle-orm';
+import { setNoStore } from '../directory/httpCache.js';
 import { nanoid } from 'nanoid';
 import { z } from 'zod';
 import { db } from '../../db/client.js';
@@ -111,6 +112,12 @@ export function registerDirectoryAuthRoutes(app: Express) {
   // SOFT auth: current shipper + entitlement. Never 401 — an anonymous caller
   // just gets { user: null, directoryPro: null }.
   app.get('/api/directory/auth/me', async (req: Request, res: Response) => {
+    // The identity source for every client-side hydrator on the directory (the
+    // nav slot, the carrier-profile Pro block). It returns THIS caller's email
+    // and entitlement, so it must never be storable — especially now that the
+    // pages around it ARE publicly cacheable and a broad "cache everything" rule
+    // would otherwise be tempting to point at /api/directory/*.
+    setNoStore(res);
     const id = await directoryIdentity(req);
     if (id.userId == null) {
       return res.json({ user: null, directoryPro: null });

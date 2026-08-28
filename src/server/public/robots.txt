@@ -13,8 +13,13 @@ Disallow: /chat/
 # /directory/carrier/{slug}, the city hubs, 54 states, 60 ports — so nothing
 # below is needed for discovery, and each of these params multiplies the same
 # rows into a combinatorial URL space backed by an unbounded scan:
-#   ?page=   deep OFFSET (the last-page link reaches OFFSET ~334k)
-#   ?q=      legal_name/dba_name ILIKE '%..%' — always a full scan
+#   ?page=   pagination duplicates. 0069 caps this at MAX_PAGE (page 101+ now
+#            404s, and the pager/rel=next no longer link past the cap), so the
+#            OFFSET is bounded at the origin too — this line just keeps the
+#            duplicate URL space out of the index.
+#   ?q=      legal_name/dba_name ILIKE '%..%' — always a full scan, and one
+#            request fans out to ~11 of them. 0069 puts it on its own tighter
+#            rate-limit lane (DIRECTORY_SEARCH_BURST_LIMIT).
 #   the rest self-canonicalize, so every combination is otherwise indexable.
 Disallow: /*?*page=
 Disallow: /*?*q=
