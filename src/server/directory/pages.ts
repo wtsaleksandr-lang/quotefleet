@@ -1325,9 +1325,13 @@ interface LayoutOpts {
    *  understands the state/city/port/master listing is a single series. */
   relPrev?: string;
   relNext?: string;
+  /** <meta name="robots"> value. Omit for the default (indexable). Set to
+   *  'noindex, follow' on pages that must stay out of the index but whose links
+   *  should still be crawled — the site-wide 404 body, gated/personal surfaces. */
+  robots?: string;
 }
 
-export function layout({ title, description, canonicalPath, bodyHtml, jsonLd, relPrev, relNext }: LayoutOpts): string {
+export function layout({ title, description, canonicalPath, bodyHtml, jsonLd, relPrev, relNext, robots }: LayoutOpts): string {
   const ld = (jsonLd ?? [])
     .filter(Boolean)
     .map((j) => `<script type="application/ld+json">${j}</script>`)
@@ -1341,6 +1345,7 @@ export function layout({ title, description, canonicalPath, bodyHtml, jsonLd, re
   <title>${esc(title)}</title>
   <meta name="description" content="${esc(description)}">
   <link rel="canonical" href="${SITE}${esc(canonicalPath)}">
+  ${robots ? `<meta name="robots" content="${esc(robots)}">` : ''}
   ${relPrev ? `<link rel="prev" href="${esc(relPrev)}">` : ''}
   ${relNext ? `<link rel="next" href="${esc(relNext)}">` : ''}
   <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -1373,7 +1378,7 @@ export function layout({ title, description, canonicalPath, bodyHtml, jsonLd, re
   </header>
   ${bodyHtml}
   <footer class="site-footer">
-    © <span id="year"></span> QuoteFleet · <a href="/directory">Directory</a> · <a href="/importers">Importer Search</a> · <a href="/manifest-privacy">Manifest Privacy</a> · <a href="/compliance">Compliance</a> · <a href="/glossary">Glossary</a> · <a href="/services">Services</a> · <a href="/terms">Terms</a> · <a href="/privacy">Privacy</a> · <a href="/">Home</a>
+    © <span id="year"></span> QuoteFleet · <a href="/directory">Directory</a> · <a href="/importers">Importer Search</a> · <a href="/manifest-privacy">Manifest Privacy</a> · <a href="/compliance">Compliance</a> · <a href="/glossary">Glossary</a> · <a href="/drayage-rates">Drayage Rates</a> · <a href="/services">Services</a> · <a href="/terms">Terms</a> · <a href="/privacy">Privacy</a> · <a href="/">Home</a>
   </footer>
   ${HEADER_SCRIPTS}
   <script src="/marketing-chat.js" defer></script>
@@ -3360,6 +3365,44 @@ export function renderCarrierProfile(opts: {
     canonicalPath: `/directory/carrier/${encodeURIComponent(c.slug)}`,
     bodyHtml: body,
     jsonLd: [jsonLdBreadcrumb(crumbs), jsonLdCarrier(c)],
+  });
+}
+
+/**
+ * The SITE-WIDE 404 body, for any path no route claimed.
+ *
+ * The global catch-all used to answer every unknown URL with a bare
+ * `{"error":"Not found"}` JSON payload — correct status, but a dead end for a
+ * person who mistyped a URL or followed a stale link, and a page with no route
+ * back into the site for a crawler that found one. This renders a real branded
+ * page with the full site chrome and hand-picked links into the highest-value
+ * hubs, so a 404 recirculates instead of terminating.
+ *
+ * Deliberately `noindex, follow`: the status code already keeps it out of the
+ * index, and `follow` lets a crawler that lands here use the links out.
+ */
+export function renderSiteNotFound(): string {
+  const links: Array<[string, string]> = [
+    ['/directory', 'Carrier directory'],
+    ['/services', 'Drayage services'],
+    ['/glossary', 'Freight glossary'],
+    ['/compliance', 'Compliance lookup'],
+    ['/tools', 'Free tools'],
+    ['/pricing', 'Pricing'],
+  ];
+  const body = `<main class="dir-shell"><div class="dir-card" style="margin-top: 40px; padding: 40px;">
+    <h1 style="font-size: 24px;">That page isn't here</h1>
+    <p class="muted">The link may be out of date, or the address may have a typo. Here's where most people are headed:</p>
+    <div class="dir-chips" style="margin-top: 16px;">${links
+      .map(([href, label]) => `<a class="dir-chip" href="${esc(href)}">${esc(label)}</a>`)
+      .join('')}</div>
+  </div></main>`;
+  return layout({
+    title: 'Page not found | QuoteFleet',
+    description: 'This QuoteFleet page could not be found.',
+    canonicalPath: '/',
+    bodyHtml: body,
+    robots: 'noindex, follow',
   });
 }
 

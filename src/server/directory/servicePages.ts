@@ -30,6 +30,7 @@ import type { Express, Request, Response } from 'express';
 import { listCarriers, type VisibleCarrier } from './queries.js';
 import { CONTAINER_PORTS, portByCode } from './containerPorts.js';
 import { layout, carrierCard, esc } from './pages.js';
+import { setPublicDirectoryCache } from './httpCache.js';
 
 const SITE = 'https://quotefleet.net';
 
@@ -466,9 +467,13 @@ function renderServicePage(s: ServiceDef, sample: VisibleCarrier[], drayTotal: n
 // ─── Route registration ────────────────────────────────────────────────────
 export function registerServiceRoutes(app: Express) {
   // Hub.
-  app.get(['/services', '/services/'], async (_req: Request, res: Response, next) => {
+  app.get(['/services', '/services/'], async (req: Request, res: Response, next) => {
     try {
       const dray = await listCarriers({ intermodal: true, perPage: 1 });
+      // Byte-identical for every visitor (the only dynamic value is a global
+      // carrier count), so it belongs on the shared CDN cache like the directory
+      // hubs. Without this every crawler hit ran the listCarriers query.
+      setPublicDirectoryCache(req, res);
       res.type('html').send(renderServicesHub(dray.total));
     } catch (err) {
       next(err);
@@ -482,6 +487,7 @@ export function registerServiceRoutes(app: Express) {
       if (!svc) return res.redirect(302, '/services');
       // Real, honest sample: the FMCSA drayage / intermodal slice (~18 rows).
       const list = await listCarriers({ intermodal: true, perPage: 18, page: 1 });
+      setPublicDirectoryCache(req, res);
       res.type('html').send(renderServicePage(svc, list.carriers, list.total));
     } catch (err) {
       next(err);
