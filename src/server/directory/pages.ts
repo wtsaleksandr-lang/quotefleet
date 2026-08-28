@@ -1730,11 +1730,23 @@ function hrefWith(scope: FacetScope, f: DirectoryFilters, change: FacetChange, o
   return qs ? `${scope.basePath}?${qs}` : scope.basePath;
 }
 
-function facetOptionRow(active: boolean, href: string, label: string, count: number): string {
+/**
+ * One facet row. `count === null` means the count could not be computed for this
+ * request (see FacetCounts.unavailable) — the badge is then OMITTED rather than
+ * printed as "0". Rendering a fabricated 0 next to a facet that really has
+ * thousands of matches is the page asserting something false; an absent badge is
+ * simply an absent measurement, and the facet stays clickable either way.
+ */
+function facetOptionRow(active: boolean, href: string, label: string, count: number | null): string {
   return `<a class="facet-opt ${active ? 'active' : ''}" href="${href}">
     <span class="lbl"><span class="facet-check"></span>${esc(label)}</span>
-    <span class="cb">${fmtNum(count)}</span>
+    ${count == null ? '' : `<span class="cb">${fmtNum(count)}</span>`}
   </a>`;
+}
+
+/** Read one facet count, or null when this request's counts are unavailable. */
+function facetCount(counts: FacetCounts, value: number | undefined): number | null {
+  return counts.unavailable ? null : value ?? 0;
 }
 
 function disabledFacetRow(label: string): string {
@@ -1777,7 +1789,7 @@ function portPickerRow(scope: FacetScope, f: DirectoryFilters, counts: FacetCoun
   const search = `${g.label} ${g.city} ${g.state}`.toLowerCase();
   return `<a class="facet-opt${active ? ' active' : ''}" href="${href}" data-pk="${esc(search)}">
     <span class="lbl"><span class="facet-check"></span>${esc(g.label)}</span>
-    <span class="cb">${fmtNum(counts.ports[g.code] ?? 0)}</span>
+    ${counts.unavailable ? '' : `<span class="cb">${fmtNum(counts.ports[g.code] ?? 0)}</span>`}
   </a>`;
 }
 
@@ -1895,7 +1907,7 @@ function renderSidebar(scope: FacetScope, f: DirectoryFilters, counts: FacetCoun
       f.equipment.includes(o.id),
       hrefWith(scope, f, { equipment: toggleMulti(eqOrder, f.equipment, o.id) }),
       o.label,
-      counts.equipment[o.id],
+      facetCount(counts, counts.equipment[o.id]),
     ),
   ).join('\n');
 
@@ -1909,14 +1921,14 @@ function renderSidebar(scope: FacetScope, f: DirectoryFilters, counts: FacetCoun
       f.cargo.includes(o.id),
       hrefWith(scope, f, { cargo: toggleMulti(cargoOrder, f.cargo, o.id) }),
       o.label,
-      counts.cargo[o.id],
+      facetCount(counts, counts.cargo[o.id]),
     ),
   );
   const cargo = foldableRows(cargoRows, 6, 'fold-cargo');
 
   // Tier 1 — Fleet size (trucks / power units).
   const fleet = FLEET_BUCKETS.map((b) =>
-    facetOptionRow(f.fleet === b.id, hrefWith(scope, f, { fleet: f.fleet === b.id ? null : b.id }), b.label, counts.fleet[b.id]),
+    facetOptionRow(f.fleet === b.id, hrefWith(scope, f, { fleet: f.fleet === b.id ? null : b.id }), b.label, facetCount(counts, counts.fleet[b.id])),
   ).join('\n');
 
   // Tier 1 — Drivers count.
@@ -1925,7 +1937,7 @@ function renderSidebar(scope: FacetScope, f: DirectoryFilters, counts: FacetCoun
       f.drivers === b.id,
       hrefWith(scope, f, { drivers: f.drivers === b.id ? null : b.id }),
       b.label,
-      counts.drivers[b.id],
+      facetCount(counts, counts.drivers[b.id]),
     ),
   ).join('\n');
 
@@ -1936,7 +1948,7 @@ function renderSidebar(scope: FacetScope, f: DirectoryFilters, counts: FacetCoun
     f.goodStandingOnly,
     hrefWith(scope, f, { standing: f.goodStandingOnly ? null : 'good' }),
     'Good standing only',
-    counts.goodStanding,
+    facetCount(counts, counts.goodStanding),
   );
 
   // Tier 1/2 — Active authority + recently-updated (status/activity).
@@ -1944,13 +1956,13 @@ function renderSidebar(scope: FacetScope, f: DirectoryFilters, counts: FacetCoun
     f.authorityActive,
     hrefWith(scope, f, { authority: f.authorityActive ? null : 'active' }),
     'Active authority only',
-    counts.authorityActive,
+    facetCount(counts, counts.authorityActive),
   );
   const recent = facetOptionRow(
     f.recent,
     hrefWith(scope, f, { recent: f.recent ? null : '1' }),
     'Updated in last 12 mo',
-    counts.recent,
+    facetCount(counts, counts.recent),
   );
 
   // 'all' scope only — quick state refine (links to canonical state pages / scope).

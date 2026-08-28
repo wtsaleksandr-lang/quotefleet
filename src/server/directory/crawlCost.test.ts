@@ -446,3 +446,105 @@ describe('?q= runs on its own tighter rate-limit lane', () => {
     expect(normalizeNameQuery('x'.repeat(500))!.length).toBeLessThanOrEqual(100);
   });
 });
+
+// ═══════════════════════════════════════════════════════════════════════════
+// 5. HONEST DEGRADATION when the facet counts cannot be computed
+//    (prod was logging "aggregate limiter queue wait exceeded 2000ms" under
+//     sitemap-driven crawler load and rendering a fabricated "0")
+// ═══════════════════════════════════════════════════════════════════════════
+
+describe('facet counts degrade HONESTLY — never a fabricated 0', () => {
+  /** A zeroed FacetCounts, shaped like the real one. */
+  const zeroCounts = async () => {
+    const { PORT_GROUPS } = await import('./containerPorts.js');
+    return {
+      fleet: { '1-25': 0, '26-100': 0, '101-500': 0, '500+': 0 },
+      drivers: { '1-10': 0, '11-50': 0, '51-250': 0, '250+': 0 },
+      equipment: { drayage: 0, dryvan: 0, reefer: 0, hazmat: 0, tanker: 0, flatbed: 0, drybulk: 0 },
+      cargo: {
+        household: 0, beverages: 0, produce: 0, motorvehicles: 0, livestock: 0, grainfeed: 0,
+        oilfield: 0, meat: 0, paper: 0, construction: 0, farmsupplies: 0, coalcoke: 0, buildingmaterials: 0,
+      },
+      goodStanding: 0,
+      ports: Object.fromEntries(PORT_GROUPS.map((g) => [g.code, 0])),
+      authorityActive: 0,
+      intermodal: 0,
+      recent: 0,
+    } as Record<string, unknown>;
+  };
+
+  const statePage = async (counts: Record<string, unknown>) => {
+    const q = await vi.importActual<typeof import('./queries.js')>('./queries.js');
+    const { renderStatePage } = await import('./pages.js');
+    const filters = q.normalizeFilters({ state: 'TX' });
+    return renderStatePage({
+      state: { code: 'TX', slug: 'texas', name: 'Texas' } as never,
+      list: { carriers: [], total: 0, page: 1, perPage: 24, totalPages: 1, filters } as never,
+      counts: counts as never,
+      filters,
+      cities: [],
+    });
+  };
+
+  it('the degraded value is FLAGGED, not zeroed', async () => {
+    const src = await readFile(resolve(process.cwd(), 'src/server/directory/queries.ts'), 'utf8');
+    // The catch must not hand back plain emptyFacetCounts() any more.
+    expect(src).toContain('return { ...emptyFacetCounts(), unavailable: true };');
+    expect(src).not.toContain('serving zero counts');
+  });
+
+  it('the renderer OMITS the count badge when the counts are unavailable', async () => {
+    const html = await statePage({ ...(await zeroCounts()), unavailable: true });
+    // The facet rows still render — the filters stay fully usable …
+    expect(html).toContain('class="facet-opt');
+    // … but carry NO NUMERIC badge, because we genuinely do not have the number.
+    // (The static "claim" badge on the carrier-declared capability rows is not a
+    // count and is unaffected.)
+    expect(html).not.toMatch(/<span class="cb">\d/);
+  });
+
+  it('the renderer SHOWS the badge when the counts are real', async () => {
+    const counts = await zeroCounts();
+    counts.goodStanding = 4321;
+    const html = await statePage(counts);
+    expect(html).toContain('<span class="cb">');
+    expect(html).toContain('4,321');
+  });
+
+  it('a real 0 still renders as 0 — only UNKNOWN is omitted', async () => {
+    const html = await statePage(await zeroCounts());
+    expect(html).toContain('<span class="cb">0</span>');
+  });
+});
+
+describe('facet cache contention — the source of the limiter saturation', () => {
+  it('the cache key ignores sort/dir/page/perPage, which cannot change a count', async () => {
+    const q = await vi.importActual<typeof import('./queries.js')>('./queries.js');
+    const base = q.normalizeFilters({ state: 'TX' });
+    // Three URLs a crawler WILL hit; identical counts, so they must share one
+    // entry instead of cold-missing (and evicting) three times.
+    expect(q.facetCacheKey(q.normalizeFilters({ state: 'TX', page: '2' }))).toBe(q.facetCacheKey(base));
+    expect(q.facetCacheKey(q.normalizeFilters({ state: 'TX', sort: 'fleet' }))).toBe(q.facetCacheKey(base));
+    expect(q.facetCacheKey(q.normalizeFilters({ state: 'TX', dir: 'asc' }))).toBe(q.facetCacheKey(base));
+    // A real condition change still gets its own key.
+    expect(q.facetCacheKey(q.normalizeFilters({ state: 'TX', fleet: '1-25' }))).not.toBe(q.facetCacheKey(base));
+    expect(q.facetCacheKey(q.normalizeFilters({ state: 'TX', city: 'houston' }))).not.toBe(q.facetCacheKey(base));
+  });
+
+  it('the cache is large enough to hold the hubs the sitemap advertises', async () => {
+    const src = await readFile(resolve(process.cwd(), 'src/server/directory/queries.ts'), 'utf8');
+    const cap = Number(/FACET_COUNTS_CACHE_MAX = (\d+)/.exec(src)?.[1]);
+    // 54 states + ~60 ports + the busiest cities. At 200 a crawl pass evicted
+    // its own entries before they could ever be reused.
+    expect(cap).toBeGreaterThanOrEqual(1000);
+  });
+
+  it('the aggregate limiter has more than the 2 slots that were saturating', async () => {
+    const src = await readFile(resolve(process.cwd(), 'src/server/directory/queries.ts'), 'utf8');
+    const slots = Number(/AGG_MAX_CONCURRENCY = (\d+)/.exec(src)?.[1]);
+    expect(slots).toBeGreaterThan(2);
+    // …but still well inside the 10-connection pool, since listCarriers runs
+    // OUTSIDE this limiter on its own connection.
+    expect(slots).toBeLessThanOrEqual(5);
+  });
+});

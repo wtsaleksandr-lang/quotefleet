@@ -306,8 +306,25 @@ const DIRECTORY_AGG_TTL_MS = 5 * 60_000;
 
 /** Per-statement server-side timeout (ms) for the directory aggregate scans. */
 const AGG_STATEMENT_TIMEOUT_MS = 8000;
-/** Max directory aggregate recomputes allowed to touch the DB concurrently. */
-const AGG_MAX_CONCURRENCY = 2;
+/**
+ * Max directory aggregate recomputes allowed to touch the DB concurrently.
+ *
+ * Raised from 2. That number was sized when a city-scoped facet compute meant
+ * ~9 full-table bitmap scans — 0068 measured ONE of them at cost 8,748, so a
+ * whole compute was on the order of 79,000 and holding two of those at once was
+ * already generous. 0068's city-slug EXPRESSION index changed that: the same
+ * scans are now index scans, measured on prod at cost 40–585 each, ~4,000 for
+ * the compute — roughly a 20x drop, and the remaining wall-clock is dominated by
+ * per-statement ROUND TRIPS to Neon rather than by work on the server.
+ *
+ * At 2 slots that latency is the throughput ceiling, and prod duly started
+ * logging "aggregate limiter queue wait exceeded 2000ms" once the sitemap put
+ * ~350k URLs in front of crawlers: the bound was doing its job, but it was
+ * shedding work that the database could now comfortably absorb. 4 slots doubles
+ * throughput while still leaving 6 of the 10-connection pool for everything
+ * else (listCarriers runs outside this limiter, on its own connection).
+ */
+const AGG_MAX_CONCURRENCY = 4;
 
 /**
  * TOTAL wall-clock budget (ms) for a REQUEST-PATH multi-scan aggregate (the
@@ -1511,6 +1528,19 @@ export interface FacetCounts {
   authorityActive: number;
   intermodal: number;
   recent: number;
+  /**
+   * Set when the counts COULD NOT BE COMPUTED for this request (limiter queue
+   * timeout, statement timeout, DB read failure) — the numeric fields are then
+   * placeholders, NOT measurements.
+   *
+   * The degraded path used to return all-zero counts, which rendered a literal
+   * "0" beside facets whose true count is non-zero — the UI asserting something
+   * false. Serving the precomputed BASE counts instead would be wrong in the
+   * other direction (they are the unfiltered global totals, far larger than a
+   * city's). So consumers MUST omit the number entirely when this is set. See
+   * facetOptionRow / portPickerRow in pages.ts.
+   */
+  unavailable?: true;
 }
 
 function emptyFacetCounts(): FacetCounts {
@@ -1549,14 +1579,52 @@ const facetCountsCache = new Map<string, { at: number; val: FacetCounts }>();
  *  ONE recompute per key runs at a time; entries are always removed in a
  *  `finally` so nothing leaks. */
 const facetCountsInflight = new Map<string, Promise<FacetCounts>>();
-const FACET_COUNTS_CACHE_MAX = 200;
 
-/** Stable JSON key for a filter set — top-level keys sorted so key ordering can't
- *  produce distinct strings for equivalent filters. DirectoryFilters is a flat
- *  object whose only nested values (equipment, cargo) are order-canonical arrays,
- *  which JSON.stringify serializes in place. */
-function facetCacheKey(filters: DirectoryFilters): string {
-  return JSON.stringify(filters, Object.keys(filters).sort());
+/**
+ * Cache capacity, in distinct filter combinations.
+ *
+ * Raised from 200. The directory has ~54 state hubs, ~60 port hubs and a few
+ * thousand real city hubs, all of which the sitemap advertises — so at 200 a
+ * crawl pass evicted its own entries before they could ever be reused, and
+ * nearly every request became a cold miss that had to take a limiter slot. That
+ * cold-miss rate is what saturated the 2-slot semaphore in prod and produced the
+ * "aggregate limiter queue wait exceeded 2000ms" degradations.
+ *
+ * A FacetCounts is ~110 small numbers in a handful of plain objects (the keys
+ * are shared literals), so an entry costs single-digit KB; 1,500 entries is on
+ * the order of 10 MB, which comfortably covers every state, every port and the
+ * ~1,400 busiest cities. Eviction is unchanged (oldest insertion first).
+ */
+const FACET_COUNTS_CACHE_MAX = 1500;
+
+/**
+ * Stable key for a filter set — sorted keys so ordering can't produce distinct
+ * strings for equivalent filters.
+ *
+ * Keyed on the CONDITION-CONTRIBUTING fields only. `sort`, `dir`, `page` and
+ * `perPage` never add a WHERE condition (that is exactly what isUnfilteredFacets
+ * relies on), so they cannot change a single count — yet including them in the
+ * key made /directory/texas, ?page=2 and ?sort=fleet three separate entries with
+ * identical values, tripling the cold-miss rate and the eviction pressure for
+ * nothing. `equipment`/`cargo` are order-canonical arrays, so JSON.stringify
+ * serializes them deterministically in place.
+ */
+export function facetCacheKey(filters: DirectoryFilters): string {
+  const k: Omit<DirectoryFilters, 'sort' | 'dir' | 'page' | 'perPage'> = {
+    state: filters.state,
+    port: filters.port,
+    citySlug: filters.citySlug,
+    fleet: filters.fleet,
+    drivers: filters.drivers,
+    goodStandingOnly: filters.goodStandingOnly,
+    authorityActive: filters.authorityActive,
+    intermodal: filters.intermodal,
+    equipment: filters.equipment,
+    cargo: filters.cargo,
+    recent: filters.recent,
+    q: filters.q,
+  };
+  return JSON.stringify(k, Object.keys(k).sort());
 }
 
 /**
@@ -1652,10 +1720,16 @@ export async function getFacetCounts(filters: DirectoryFilters): Promise<FacetCo
   try {
     return await inflight;
   } catch (err) {
-    // Read failure ⇒ serve zero counts, never a 500. The in-flight slot was
-    // already cleared in refreshFacetCounts's finally, so a later request retries.
-    console.warn('[directory] getFacetCounts failed; serving zero counts:', err);
-    return emptyFacetCounts();
+    // Read failure ⇒ degrade, never a 500. The in-flight slot was already cleared
+    // in refreshFacetCounts's finally, so a later request retries.
+    //
+    // HONEST DEGRADATION: this returns counts FLAGGED `unavailable`, not zeros.
+    // Zeros rendered as "0" next to facets whose real count is non-zero — the
+    // page stating a falsehood. Flagged counts make the renderers omit the badge,
+    // so the facet is still clickable and the filter still works; only the number
+    // (which we genuinely do not have) is missing.
+    console.warn('[directory] getFacetCounts failed; omitting counts (facets still usable):', err);
+    return { ...emptyFacetCounts(), unavailable: true };
   }
 }
 

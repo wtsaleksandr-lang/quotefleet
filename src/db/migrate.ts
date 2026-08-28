@@ -86,21 +86,173 @@ export const SELF_HEAL_COLUMN_STATEMENTS: readonly string[] = [
   `ALTER TABLE "brand_configs" ADD COLUMN IF NOT EXISTS "tagline_style" text DEFAULT 'solid' NOT NULL`,
 ];
 
-export async function ensureSelfHealColumns(): Promise<void> {
+/**
+ * ═══════════════════════════════════════════════════════════════════════════
+ * SELF-HEAL DDL SAFETY — why every statement below runs under a lock timeout
+ * and behind a catalog pre-check.
+ * ═══════════════════════════════════════════════════════════════════════════
+ *
+ * On 2026-08-28 a publish took prod fully down for ~15 minutes. `pg_stat_activity`
+ * showed ONE statement running 15+ minutes:
+ *
+ *   ALTER TABLE "carrier_directory" ADD COLUMN IF NOT EXISTS "country" ...
+ *
+ * with 14/14 connections active and every city/facet/count query blocked behind
+ * it. The site recovered the instant that backend was cancelled.
+ *
+ * THE TRAP — and it is NOT obvious:
+ *
+ *   1. `ADD COLUMN IF NOT EXISTS` still takes an ACCESS EXCLUSIVE lock. The lock
+ *      is acquired BEFORE the existence check, so an idempotent no-op is exactly
+ *      as dangerous as a real migration.
+ *   2. A DDL WAITING for ACCESS EXCLUSIVE queues ahead of everything that arrives
+ *      after it — including plain SELECTs. So one blocked no-op does not merely
+ *      wait; it takes the whole table offline for as long as it waits.
+ *   3. Nothing bounded that wait. The self-heal connection had no `lock_timeout`
+ *      and no `statement_timeout`, so it waited indefinitely.
+ *
+ * This was always latent. What changed is traffic: 0065's sitemap put ~350k
+ * carrier_directory URLs in front of crawlers, so the table now has continuous
+ * open read transactions and the lock is rarely free at boot. Every deploy was a
+ * coin flip.
+ *
+ * THE FIX, in layers:
+ *   • A catalog pre-check, so the overwhelming common case (already healed) takes
+ *     NO lock on the target table at all — it reads pg_class/pg_attribute instead.
+ *   • `lock_timeout` so a statement that must wait fails in seconds, not forever.
+ *   • `statement_timeout` so a genuine index build cannot run unbounded either.
+ *   • Lock/timeout failures are SKIPPED, not fatal: the statements are idempotent
+ *     and post-listen, so retrying next boot is free. A skipped heal is harmless;
+ *     a queued one is an outage.
+ */
+
+/** How long a self-heal statement may WAIT for its lock before giving up. Short
+ *  on purpose — if the table is busy we would rather retry on the next boot. */
+export const SELF_HEAL_LOCK_TIMEOUT_MS = 3000;
+
+/** Ceiling on the EXECUTION of one self-heal statement once it holds its lock.
+ *  Generous enough for a real CREATE INDEX on the 330k-row carrier_directory
+ *  (measured ~1s each), finite so nothing can run away. */
+export const SELF_HEAL_STATEMENT_TIMEOUT_MS = 120_000;
+
+/** Postgres SQLSTATEs that mean "could not get in / took too long" — retryable,
+ *  never a code defect: 55P03 lock_not_available, 57014 query_canceled. */
+const SELF_HEAL_RETRYABLE_SQLSTATES = new Set(['55P03', '57014']);
+
+/** A catalog existence probe that makes a self-heal statement a guaranteed no-op. */
+export type SelfHealTarget =
+  | { kind: 'column'; relation: string; column: string }
+  | { kind: 'relation'; relation: string };
+
+/**
+ * Derive the cheap catalog check for a self-heal statement, or null when the
+ * shape is unrecognized (then we just run it and rely on the timeouts).
+ *
+ * PURE — unit-tested. Every statement in this file is one of three shapes:
+ *   ALTER TABLE "t" ADD COLUMN IF NOT EXISTS "c" ...
+ *   CREATE TABLE IF NOT EXISTS "t" (...)
+ *   CREATE [UNIQUE] INDEX IF NOT EXISTS "i" ON "t" (...)
+ * An index shares the relation namespace with tables, so both CREATE forms
+ * reduce to the same `to_regclass` probe on the object being created.
+ */
+export function selfHealTarget(statement: string): SelfHealTarget | null {
+  const s = statement.trim();
+  const alter = /^ALTER TABLE\s+"([^"]+)"\s+ADD COLUMN IF NOT EXISTS\s+"([^"]+)"/i.exec(s);
+  if (alter) return { kind: 'column', relation: alter[1], column: alter[2] };
+  const createTable = /^CREATE TABLE IF NOT EXISTS\s+"([^"]+)"/i.exec(s);
+  if (createTable) return { kind: 'relation', relation: createTable[1] };
+  const createIndex = /^CREATE\s+(?:UNIQUE\s+)?INDEX IF NOT EXISTS\s+"([^"]+)"/i.exec(s);
+  if (createIndex) return { kind: 'relation', relation: createIndex[1] };
+  return null;
+}
+
+type SelfHealSql = ReturnType<typeof postgres>;
+
+/** True when the object the statement would create already exists. Reads only
+ *  the system catalogs, so it never touches the target table's lock. */
+async function selfHealTargetExists(sql: SelfHealSql, target: SelfHealTarget): Promise<boolean> {
+  if (target.kind === 'relation') {
+    const rows = await sql<{ ok: boolean }[]>`SELECT to_regclass(${target.relation}) IS NOT NULL AS ok`;
+    return rows[0]?.ok === true;
+  }
+  const rows = await sql<{ ok: boolean }[]>`
+    SELECT true AS ok
+      FROM pg_attribute
+     WHERE attrelid = to_regclass(${target.relation})
+       AND attname = ${target.column}
+       AND attnum > 0
+       AND NOT attisdropped
+     LIMIT 1`;
+  return rows[0]?.ok === true;
+}
+
+/** SQLSTATE of a postgres.js error, when it carries one. */
+function sqlState(err: unknown): string {
+  return String((err as { code?: unknown } | null)?.code ?? '');
+}
+
+/**
+ * Run a list of idempotent self-heal DDL statements safely.
+ *
+ * Shared by ensureSelfHealColumns and ensureSelfHealTables so the outage guard
+ * can never be present in one and missing from the other.
+ *
+ * Contract:
+ *   • Already-satisfied statements are skipped via the catalog — no table lock.
+ *   • lock_timeout / statement_timeout are set on the session before anything.
+ *   • A lock/timeout failure logs and CONTINUES (retried next boot).
+ *   • Any other error still throws — a bad DDL must not fail silently.
+ */
+export async function runSelfHealStatements(label: string, statements: readonly string[]): Promise<void> {
   const env = loadEnv();
   // Dedicated one-shot connection (same pattern as runMigrations); `max: 1`,
   // closed in `finally` so the app's own pool (src/db/client.ts) is untouched.
   const sql = postgres(env.DATABASE_URL, { max: 1 });
+  let applied = 0;
+  let present = 0;
+  const deferred: string[] = [];
   try {
-    for (const statement of SELF_HEAL_COLUMN_STATEMENTS) {
-      // IF NOT EXISTS ⇒ a no-op when the column already exists; never an error.
-      // Any OTHER failure (bad DDL, connection loss) throws and fails boot loud.
-      await sql.unsafe(statement);
+    // Session-scoped, so EVERY statement below inherits them. This is the single
+    // line that turns "one no-op DDL takes the site down for 15 minutes" into
+    // "one no-op DDL gives up after 3 seconds".
+    await sql.unsafe(`SET lock_timeout = ${SELF_HEAL_LOCK_TIMEOUT_MS}`);
+    await sql.unsafe(`SET statement_timeout = ${SELF_HEAL_STATEMENT_TIMEOUT_MS}`);
+    for (const statement of statements) {
+      const target = selfHealTarget(statement);
+      try {
+        // Cheap catalog probe FIRST: on a healthy DB this is the whole loop, and
+        // it takes no lock on the target table. `ADD COLUMN IF NOT EXISTS` grabs
+        // ACCESS EXCLUSIVE before it checks existence, so "idempotent" is not the
+        // same as "free" — this is what makes it free.
+        if (target && (await selfHealTargetExists(sql, target))) {
+          present++;
+          continue;
+        }
+        await sql.unsafe(statement);
+        applied++;
+      } catch (err) {
+        if (SELF_HEAL_RETRYABLE_SQLSTATES.has(sqlState(err))) {
+          // Idempotent + post-listen ⇒ skipping costs nothing and the next boot
+          // retries. Blocking the table to wait for the lock costs everything.
+          deferred.push(statement);
+          console.warn(
+            `[self-heal] skipped (${sqlState(err)}) — lock not available or statement timed out, will retry next boot: ${statement.slice(0, 120)}`,
+          );
+          continue;
+        }
+        throw err;
+      }
     }
-    console.log('[server] brand_configs self-heal columns ensured');
+    console.log(
+      `[self-heal] ${label}: ${present} already present, ${applied} applied, ${deferred.length} deferred`,
+    );
   } finally {
     await sql.end();
   }
+}
+
+export async function ensureSelfHealColumns(): Promise<void> {
+  await runSelfHealStatements('brand_configs columns', SELF_HEAL_COLUMN_STATEMENTS);
 }
 
 /**
@@ -844,19 +996,11 @@ export const SELF_HEAL_TABLE_STATEMENTS: readonly string[] = [
 ];
 
 export async function ensureSelfHealTables(): Promise<void> {
-  const env = loadEnv();
-  // Dedicated one-shot connection (same pattern as runMigrations); `max: 1`,
-  // closed in `finally` so the app's own pool (src/db/client.ts) is untouched.
-  const sql = postgres(env.DATABASE_URL, { max: 1 });
-  try {
-    for (const statement of SELF_HEAL_TABLE_STATEMENTS) {
-      // IF NOT EXISTS ⇒ a no-op when the table/index already exists; never an
-      // error. Any OTHER failure (bad DDL, connection loss) throws and fails
-      // boot loud — same fail-fast contract as ensureSelfHealColumns.
-      await sql.unsafe(statement);
-    }
-    console.log('[server] carrier_directory self-heal table ensured');
-  } finally {
-    await sql.end();
-  }
+  // Runs through the shared guard: catalog pre-check, lock_timeout,
+  // statement_timeout, skip-and-retry on a lock/timeout failure. This is the
+  // list that contains the carrier_directory statements — the ones that took
+  // prod down on 2026-08-28 by queueing for an ACCESS EXCLUSIVE lock behind
+  // sitemap-driven crawler reads. See the block comment above
+  // runSelfHealStatements.
+  await runSelfHealStatements('directory tables + indexes', SELF_HEAL_TABLE_STATEMENTS);
 }
