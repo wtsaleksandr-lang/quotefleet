@@ -18,6 +18,7 @@
  * entry and it appears on the index (under its category) and gets its own page.
  */
 import type { Express, Request, Response } from 'express';
+import { setPublicDirectoryCache } from './httpCache.js';
 
 const SITE = 'https://quotefleet.net';
 
@@ -663,9 +664,13 @@ export function renderGlossaryTerm(term: GlossaryTerm): string {
 
 // ─── Route registration ────────────────────────────────────────────────────
 export function registerGlossaryRoutes(app: Express) {
-  // Index.
-  app.get(['/glossary', '/glossary/'], (_req: Request, res: Response, next) => {
+  // Index. The glossary is rendered from a static array — byte-identical for
+  // every visitor, no DB read, no per-user branching — so it is the single most
+  // CDN-friendly page type we serve. It previously set NO Cache-Control at all,
+  // so Cloudflare treated it as DYNAMIC and every crawler hit reached the origin.
+  app.get(['/glossary', '/glossary/'], (req: Request, res: Response, next) => {
     try {
+      setPublicDirectoryCache(req, res);
       res.type('html').send(renderGlossaryIndex());
     } catch (err) {
       next(err);
@@ -677,6 +682,7 @@ export function registerGlossaryRoutes(app: Express) {
     try {
       const term = glossaryTermBySlug(String(req.params.slug).toLowerCase());
       if (!term) return res.redirect(302, '/glossary');
+      setPublicDirectoryCache(req, res);
       res.type('html').send(renderGlossaryTerm(term));
     } catch (err) {
       next(err);

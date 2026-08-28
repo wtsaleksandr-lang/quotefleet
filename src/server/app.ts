@@ -36,6 +36,8 @@ import { registerSavedListsRoutes } from './routes/savedLists.js';
 import { registerRfqRoutes } from './routes/rfq.js';
 import { registerServiceRoutes } from './directory/servicePages.js';
 import { registerGlossaryRoutes } from './directory/glossary.js';
+import { renderSiteNotFound } from './directory/pages.js';
+import { setNoStore } from './directory/httpCache.js';
 import { registerImporterRoutes } from './directory/importerPages.js';
 import { registerImporterRevealRoutes } from './directory/importerReveal.js';
 import { registerLeadsBillingRoutes } from './routes/leadsBilling.js';
@@ -497,7 +499,22 @@ export function createApp(): express.Express {
   // /for/brokers, /for/ltl, /for/forwarders are served with the full site header
   // + premium footer earlier (see fullHeaderPages, before the static handler).
 
-  app.use((_req, res) => res.status(404).json({ error: 'Not found' }));
+  // Site-wide 404. API clients (and anything under /api/) keep the JSON body they
+  // have always received; a browser asking for HTML gets a real branded page with
+  // links back into the site instead of a bare `{"error":"Not found"}` payload.
+  // Never shared-cached: a 404 body must not be served from the CDN to the next
+  // visitor of a DIFFERENT missing URL.
+  app.use((req, res) => {
+    setNoStore(res);
+    const wantsHtml =
+      !req.path.startsWith('/api/') && req.accepts(['html', 'json']) === 'html';
+    if (!wantsHtml) return res.status(404).json({ error: 'Not found' });
+    try {
+      return res.status(404).type('html').send(renderSiteNotFound());
+    } catch {
+      return res.status(404).json({ error: 'Not found' });
+    }
+  });
   app.use((err: unknown, req: express.Request, res: express.Response, _next: express.NextFunction) => {
     const reqId = (req as unknown as { id?: string }).id ?? '-';
     console.error(`[err] ${req.method} ${req.path} reqId=${reqId}:`, err);
