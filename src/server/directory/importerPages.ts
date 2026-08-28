@@ -280,8 +280,26 @@ const IMPORTERS_CSS = `
 /* ── results toolbar (count + density toggle) ── */
 .imp-toolbar{display:none;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap;margin:20px 0 12px;padding-bottom:12px;border-bottom:1px solid var(--border)}
 .imp-toolbar.on{display:flex}
+.imp-countwrap{display:flex;flex-direction:column;gap:5px;min-width:0;flex:1 1 420px}
 .imp-count{font-size:13px;color:var(--muted);font-variant-numeric:tabular-nums}
 .imp-count b{color:var(--ink);font-weight:700}
+/* ── sample-scope disclosure (R4) ──
+   Sort and the "Narrow your results" facets operate over the set ALREADY
+   PULLED, not over the whole customs corpus — "Sort by TEU" ranks the loaded
+   importers, not every importer on the lane. Nothing on the page said so, and a
+   user reasonably reads a sort control as ranking everything. This line states
+   the scope in the same place the count is read, and names "Load more" as the
+   way to widen it. Same honest-claims discipline as the rest of the codebase. */
+.imp-scope{display:flex;align-items:baseline;gap:6px 10px;flex-wrap:wrap;font-size:11.5px;line-height:1.5;color:var(--muted)}
+.imp-scope .ico{flex:0 0 auto;font-size:11px;color:var(--accent);font-weight:700}
+.imp-scope .txt{min-width:0}
+/* Share the CURRENT search — the URL already carries the filters + sort (R4),
+   but a silently-rewritten address bar is an invisible feature. */
+.imp-copylink{flex:0 0 auto;font-family:var(--font-sans);font-size:11.5px;font-weight:600;color:var(--accent);
+  background:none;border:0;padding:2px 0;cursor:pointer;text-decoration:none}
+.imp-copylink:hover{color:var(--ink);text-decoration:underline;text-underline-offset:2px}
+.imp-copylink:focus-visible{outline:2px solid var(--accent);outline-offset:2px;border-radius:4px}
+.imp-copylink.done{color:var(--success);text-decoration:none}
 .imp-toolbar-r{display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin-left:auto}
 /* Sort control (R3). Client-side reorder of the already-fetched set — no
    request, no credits. Sized down to sit level with the density segmented
@@ -620,6 +638,11 @@ a.imp-soon:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
   .imp-actions>*{width:100%;justify-content:center;margin-left:0;white-space:nowrap;padding-left:10px;padding-right:10px;gap:6px}
   .imp-more{grid-column:auto}
   .imp-more[open]{grid-column:1 / -1}
+  /* No-orphan wrap, open state (R4): with "More filters" expanded it spans the
+     full row, leaving Search + Export + Saved — three chips in a two-column
+     grid, so "Saved" sat alone on its own line. Promoting the PRIMARY action to
+     the full row leaves exactly two secondary chips paired beside each other. */
+  .imp-actions:has(.imp-more[open]) #imp-search{grid-column:1 / -1}
   .imp-more>summary{justify-content:center}
   /* Same rule for the card's badge group: the company name takes its own line so
      flag + IMPORTER + winnability stay together instead of orphaning one pill. */
@@ -721,7 +744,7 @@ export function renderImporterSearchPage(): string {
 
         <div class="imp-actions">
           <button type="submit" class="btn btn-primary" id="imp-search">Search importers <span class="arr">&rarr;</span></button>
-          <a class="imp-lock imp-export" id="imp-export" href="/importers/saved" title="Export the current results as CSV (free with an account)">
+          <a class="imp-lock imp-export" id="imp-export" href="/importers/saved" title="Export exactly what you are looking at — the filtered, sorted rows currently on screen (free with an account)">
             <span class="ico" aria-hidden="true">&#11123;</span> Export CSV
           </a>
           <a class="imp-lock" id="imp-saved-link" href="/importers/saved" title="Your saved importers">
@@ -760,7 +783,14 @@ export function renderImporterSearchPage(): string {
       </div>
 
       <div class="imp-toolbar" id="imp-toolbar">
-        <span class="imp-count" id="imp-count"></span>
+        <div class="imp-countwrap">
+          <span class="imp-count" id="imp-count"></span>
+          <span class="imp-scope">
+            <span class="ico" aria-hidden="true">&#9432;</span>
+            <span class="txt" id="imp-scope-t"></span>
+            <button type="button" class="imp-copylink" id="imp-copylink" title="Copy a link to this search — the URL carries your filters, facets and sort order">Copy link</button>
+          </span>
+        </div>
         <div class="imp-toolbar-r">
           <div class="imp-aud" role="group" aria-label="Show results for">
             ${AUDIENCES.map(
@@ -772,7 +802,7 @@ export function renderImporterSearchPage(): string {
           <div class="imp-field imp-capfield imp-sortwrap">
             <span class="imp-cap" aria-hidden="true">Sort by</span>
             <label for="imp-sort">Sort results by</label>
-            <select id="imp-sort">${SORTS.map(([v, l]) => `<option value="${esc(v)}">${esc(l)}</option>`).join('')}</select>
+            <select id="imp-sort" title="Reorders the importers already loaded — it does not re-rank the whole customs corpus. Load more to widen the set.">${SORTS.map(([v, l]) => `<option value="${esc(v)}">${esc(l)}</option>`).join('')}</select>
           </div>
           <div class="imp-density" role="group" aria-label="Result density">
             <button type="button" id="imp-den-comf" aria-pressed="true">Comfortable</button>
@@ -794,7 +824,7 @@ export function renderImporterSearchPage(): string {
         </aside>
         <div>
           <div class="imp-chips" id="imp-chips" hidden>
-            <span class="imp-chips-cap">Filtered by</span>
+            <span class="imp-chips-cap" title="These filters narrow the importers already loaded. Load more to widen the set they run over.">Filtered by</span>
             <span class="imp-chips-list" id="imp-chips-list"></span>
             <button type="button" class="imp-chips-clear" id="imp-chips-clear">Clear all</button>
           </div>
@@ -811,7 +841,7 @@ export function renderImporterSearchPage(): string {
             </div>
           </div>
           <div class="imp-more-wrap" id="imp-more-wrap">
-            <button type="button" class="imp-loadmore" id="imp-loadmore">Load more importers</button>
+            <button type="button" class="imp-loadmore" id="imp-loadmore" title="Pulls the next page of importers on this lane and widens the set that sort and filters run over.">Load more importers</button>
           </div>
         </div>
       </div>
@@ -1382,6 +1412,153 @@ const CLIENT_JS = `
     });
   }
 
+  // ── sample-scope disclosure (R4) ────────────────────────────────────────────
+  // Sort and the facets run over the ACCUMULATED set — the importers pulled so
+  // far — not over the whole customs corpus. A sort control with no scope note
+  // implies it is ranking everything on the lane, which it is not. State it once,
+  // plainly, right under the count, and name the control that widens the set.
+  //
+  // The wording splits on whether there is genuinely more to load: when the last
+  // page came back short there is nothing further on this lane, so the set IS
+  // complete for these filters and hedging would be false modesty.
+  var scopeEl=document.getElementById('imp-scope-t');
+  function renderScope(total){
+    if(!scopeEl)return;
+    var more=moreWrap&&moreWrap.classList.contains('on');
+    var noun=' importer'+(total===1?'':'s');
+    scopeEl.textContent = more
+      ? 'Sort and filters run over the '+total+noun+' loaded so far \\u2014 "Load more" widens the set.'
+      : 'Sort and filters run over all '+total+noun+' this search returned.';
+  }
+
+  // ── shareable / bookmarkable search state (R4) ──────────────────────────────
+  // A search was entirely ephemeral: no way to bookmark it, send it to a
+  // colleague, or come back to it from an importer profile. The filters, the
+  // sort and the active facets now live in the URL, so the address bar IS the
+  // search. replaceState (not push) keeps one history entry per page rather than
+  // one per facet click, and the stored copy lets a profile page offer a real
+  // "back to your results".
+  var curQs='';   // the form's raw pairs, snapshotted when the search RAN
+  function formQs(){
+    var qs=[]; var fd=new FormData(form);
+    fd.forEach(function(v,k){ v=String(v).trim(); if(v) qs.push(encodeURIComponent(k)+'='+encodeURIComponent(v)); });
+    return qs.join('&');
+  }
+  function writeUrl(){
+    if(!curPayload)return;
+    // Built from the SNAPSHOT, never from the live form: editing a field without
+    // re-searching must not rewrite the URL to describe results it did not produce.
+    var qs=curQs?curQs.split('&'):[];
+    function add(k,v){ qs.push(encodeURIComponent(k)+'='+encodeURIComponent(v)); }
+    if(sortBy&&sortBy!=='ships') add('sort',sortBy);
+    var oc=Object.keys(facetState.country).filter(function(k){return facetState.country[k];});
+    if(oc.length) add('oc',oc.join(','));
+    var hs=Object.keys(facetState.chapter).filter(function(k){return facetState.chapter[k];});
+    if(hs.length) add('hs',hs.join(','));
+    if(facetState.minShip) add('ms',facetState.minShip);
+    if(facetState.minTeu) add('mt',facetState.minTeu);
+    if(facetState.verifiedOnly) add('vo','1');
+    var url=location.pathname+(qs.length?('?'+qs.join('&')):'');
+    try{ history.replaceState(null,'',url); }catch(e){}
+    try{ sessionStorage.setItem('qf_imp_back',url); }catch(e){}
+  }
+  function readUrl(){
+    var q=location.search.replace(/^\\?/,'');
+    if(!q)return null;
+    var out={}; var parts=q.split('&');
+    for(var i=0;i<parts.length;i++){
+      if(!parts[i])continue;
+      var eq=parts[i].indexOf('=');
+      var rk=eq<0?parts[i]:parts[i].slice(0,eq);
+      var rv=eq<0?'':parts[i].slice(eq+1);
+      try{ out[decodeURIComponent(rk.replace(/\\+/g,'%20'))]=decodeURIComponent(rv.replace(/\\+/g,'%20')); }
+      catch(e){ /* malformed pair — ignore it rather than losing the whole URL */ }
+    }
+    return out;
+  }
+  function labelFor(list,val){
+    var arr=list||[];
+    for(var i=0;i<arr.length;i++){ if(String(arr[i].value)===String(val)) return arr[i].label; }
+    return String(val);
+  }
+  // Rehydrate the form + sort + facets from the URL and run the search directly.
+  // Deliberately NOT via form.submit(): the submit handler clears facetState,
+  // which would drop exactly the facets the link was carrying.
+  function restoreFromUrl(){
+    var q=readUrl(); if(!q)return false;
+    var any=false;
+    function setCombo(id,val,list){
+      if(!val)return;
+      var c=combos[id]; if(!c)return;
+      c.hidden.value=val;
+      c.input.value=list?labelFor(list,val):val;
+      c.root.setAttribute('data-has-value','1');
+      any=true;
+    }
+    setCombo('imp-port',q.entryPort,window.__IMP_PORTS);
+    setCombo('imp-commodity',q.commodity,null);
+    setCombo('imp-supplier',q.supplierCountry,window.__IMP_COUNTRIES);
+    // Port implies its state and LOCKS the field — mirror the live pairing so a
+    // restored search looks exactly like one the user just built by hand.
+    if(q.entryPort){
+      var st=String(q.entryPort).split(',').pop().trim().toUpperCase();
+      var sc=combos['imp-state'];
+      if(sc&&st) sc.setLocked(labelFor(window.__IMP_STATES,st),st);
+    } else { setCombo('imp-state',q.state,window.__IMP_STATES); }
+    var freq=document.getElementById('imp-freq');
+    var teuSel=document.getElementById('imp-teu');
+    var coEl=document.getElementById('imp-company');
+    var secondary=false;
+    if(freq&&q.minShipments12m){ freq.value=q.minShipments12m; if(freq.value===q.minShipments12m){secondary=true;any=true;} }
+    if(teuSel&&q.minTeu12m){ teuSel.value=q.minTeu12m; if(teuSel.value===q.minTeu12m){secondary=true;any=true;} }
+    if(coEl&&q.company){ coEl.value=q.company; secondary=true; any=true; }
+    if(q.supplierCountry) secondary=true;
+    // Open "More filters" when the link carries any of them — a filter in force
+    // behind a closed disclosure is an invisible filter.
+    var moreEl=document.querySelector('.imp-more');
+    if(secondary&&moreEl) moreEl.setAttribute('open','');
+    if(!any)return false;
+    if(q.sort&&sortEl){
+      for(var s=0;s<sortEl.options.length;s++){
+        if(sortEl.options[s].value===q.sort){ sortBy=q.sort; sortEl.value=sortBy; break; }
+      }
+    }
+    facetState={ country:{}, chapter:{}, minShip:q.ms||'', minTeu:q.mt||'', verifiedOnly:q.vo==='1' };
+    (q.oc?String(q.oc).split(','):[]).forEach(function(k){ if(k) facetState.country[k]=true; });
+    (q.hs?String(q.hs).split(','):[]).forEach(function(k){ if(k) facetState.chapter[k]=true; });
+    curQs=formQs();
+    curPayload=collectPayload(); curPage=1;
+    doSearch(curPayload,1,false);
+    return true;
+  }
+
+  // Copy the current search URL. The address bar already carries the state; this
+  // makes that discoverable instead of a secret.
+  var copyLinkEl=document.getElementById('imp-copylink');
+  if(copyLinkEl){
+    copyLinkEl.addEventListener('click',function(){
+      var url=location.href;
+      function done(){
+        copyLinkEl.textContent='\\u2713 Copied'; copyLinkEl.classList.add('done');
+        setTimeout(function(){ copyLinkEl.textContent='Copy link'; copyLinkEl.classList.remove('done'); },1800);
+      }
+      if(navigator.clipboard&&navigator.clipboard.writeText){
+        navigator.clipboard.writeText(url).then(done).catch(function(){ legacyCopy(url,done); });
+      } else { legacyCopy(url,done); }
+    });
+  }
+  function legacyCopy(text,ok){
+    try{
+      var ta=document.createElement('textarea'); ta.value=text;
+      ta.setAttribute('readonly',''); ta.style.position='fixed'; ta.style.opacity='0';
+      document.body.appendChild(ta); ta.select();
+      var good=document.execCommand&&document.execCommand('copy');
+      document.body.removeChild(ta);
+      if(good){ ok(); return; }
+    }catch(e){ /* fall through to the honest failure below */ }
+    setStatus('Could not copy automatically \\u2014 the address bar holds this search.',false);
+  }
+
   // Composed empty / error state: glyph + headline + reason + next-step chips.
   function emptyState(icon,title,body,tips,warn){
     var e=T('div','imp-empty'+(warn?' warn':''));
@@ -1430,6 +1607,8 @@ const CLIENT_JS = `
     else { frag('Showing '); strong(String(shown)); frag(' of '); strong(String(total)); frag(' importers'); }
     if(totalScanned){ frag(' \\u00b7 built from '); strong(totalScanned.toLocaleString('en-US')); frag(' customs records'); }
     frag(' \\u00b7 sorted by '); strong(sortLabel());
+    renderScope(total);
+    writeUrl();
     // Active-filter count on the pane header (visible when it is folded on mobile).
     if(sideN){
       var active=Object.keys(facetState.country).filter(function(k){return facetState.country[k];}).length
@@ -1521,6 +1700,12 @@ const CLIENT_JS = `
         updateProfilesLeft(j);
         if(!allLeads.length){
           side.classList.remove('on'); results.innerHTML='';
+          // The toolbar is already visible at this point, so a previous search's
+          // "Showing all 6 importers…" sentence would sit above an empty state
+          // and describe results that are no longer on screen. Say the truth.
+          countEl.textContent='No importers matched this search.';
+          if(scopeEl) scopeEl.textContent='';
+          renderChips(); writeUrl();
           // Commodity / HS-code searches need an entry geography to scope the
           // customs pull — a bare commodity with no port/state/company reliably
           // returns nothing, so guide the user to add a port instead of a dead end.
@@ -1576,6 +1761,7 @@ const CLIENT_JS = `
       setStatus('Pick a port, state or commodity (or enter a company name) to search.',false); return;
     }
     curPayload=payload; curPage=1;
+    curQs=formQs();
     facetState={ country:{}, chapter:{}, minShip:'', minTeu:'', verifiedOnly:false };
     doSearch(payload,1,false);
   });
@@ -1591,10 +1777,16 @@ const CLIENT_JS = `
     exportBtn.addEventListener('click',function(ev){
       ev.preventDefault();
       if(!allLeads.length){ setStatus('Run a search first, then export the results to CSV.',false); return; }
+      // Export exactly WHAT IS ON SCREEN (R4). It used to post the whole
+      // accumulated set, so a user who filtered to 4 German suppliers and sorted
+      // by TEU got a 25-row file in the server's order — a file that did not
+      // match the screen it was exported from.
+      var rows=sortLeads(visibleLeads());
+      if(!rows.length){ setStatus('Every importer is filtered out \\u2014 loosen the filters, then export.',false); return; }
       exportBtn.setAttribute('aria-busy','true');
       fetch('/api/importers/export.csv',{method:'POST',
         headers:{'Content-Type':'application/json','Accept':'text/csv'},
-        body:JSON.stringify({leads:allLeads})})
+        body:JSON.stringify({leads:rows})})
         .then(function(r){
           exportBtn.removeAttribute('aria-busy');
           if(r.status===401){ window.location.href='/login?next='+encodeURIComponent('/importers'); return null; }
@@ -1615,6 +1807,11 @@ const CLIENT_JS = `
 
   // Hydrate saved-importer state so card stars reflect the account on load.
   hydrateSaved();
+  // A link that carries a search runs it. Same cost as the user pressing Search
+  // (cache-first, and the daily live-pull quota still governs), and it is the
+  // whole point of a shareable URL — a link that only pre-fills the form and
+  // waits is not a shared search.
+  restoreFromUrl();
 })();
 `.trim();
 

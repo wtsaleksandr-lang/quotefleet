@@ -230,6 +230,25 @@ function monthOf(raw: string): { ym: string; label: string; sort: number } | nul
   return { ym: `${y}-${String(m).padStart(2, '0')}`, label: `${MO[m - 1]} ${y}`, sort: y * 12 + m };
 }
 
+/**
+ * Numeric day key (YYYYMMDD) for an ImportYeti MM/DD/YYYY (or ISO) date, used as
+ * the `data-v` sort value on the recent-shipments Date column. Returns '' for an
+ * unparseable date so the client sinks that row instead of ranking it as 0 —
+ * "no date" is missing data, not the oldest shipment.
+ */
+export function dayKey(raw: string): string {
+  const s = str(raw);
+  if (!s) return '';
+  const us = s.match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})$/);
+  const iso = s.match(/^(\d{4})-(\d{1,2})-(\d{1,2})/);
+  let y: number, m: number, d: number;
+  if (us) { m = Number(us[1]); d = Number(us[2]); y = Number(us[3]); }
+  else if (iso) { y = Number(iso[1]); m = Number(iso[2]); d = Number(iso[3]); }
+  else return '';
+  if (!(m >= 1 && m <= 12) || !(d >= 1 && d <= 31) || !(y >= 1990 && y <= 2100)) return '';
+  return String(y * 10000 + m * 100 + d);
+}
+
 function topBy<T>(map: Map<string, T>, count: (t: T) => number, limit: number): Array<[string, T]> {
   return [...map.entries()].sort((a, b) => count(b[1]) - count(a[1])).slice(0, limit);
 }
@@ -628,6 +647,35 @@ const PROFILE_CSS = `
 .impp-tbl tbody tr:nth-child(even) td{background:color-mix(in srgb,var(--surface-2) 45%,transparent)}
 .impp-tbl tbody tr:hover td{background:color-mix(in srgb,var(--accent) 7%,transparent)}
 .impp-tbl tbody tr:last-child td{border-bottom:0}
+/* ── sortable columns (R4) ──
+   The two real tables (suppliers, recent bills) arrived in ONE fixed order and
+   could not be re-read any other way — you could not ask "which of these bills
+   was the heaviest" without reading all twelve. A real <button> inside the <th>
+   keeps the header keyboard-reachable and announced as a control; aria-sort on
+   the <th> carries the state for assistive tech. The arrow is its own span so
+   the label never shifts when the direction flips. */
+.impp-tbl thead th[data-sort]{padding:0}
+.impp-sortbtn{display:flex;align-items:center;gap:5px;width:100%;
+  font-family:var(--font-sans);font-size:10px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;
+  color:var(--muted);background:none;border:0;padding:10px 14px;min-height:38px;cursor:pointer;text-align:left;
+  white-space:nowrap;transition:color .14s,background .14s}
+.impp-tbl thead th.impp-num .impp-sortbtn{justify-content:flex-end}
+.impp-sortbtn:hover{color:var(--ink);background:color-mix(in srgb,var(--accent) 8%,transparent)}
+.impp-sortbtn:focus-visible{outline:2px solid var(--accent);outline-offset:-2px}
+.impp-sortar{font-size:8px;line-height:1;opacity:.35;flex:0 0 auto}
+.impp-tbl thead th[aria-sort="ascending"] .impp-sortbtn,
+.impp-tbl thead th[aria-sort="descending"] .impp-sortbtn{color:var(--accent)}
+.impp-tbl thead th[aria-sort="ascending"] .impp-sortar,
+.impp-tbl thead th[aria-sort="descending"] .impp-sortar{opacity:1}
+/* Copy on the revealed contact (R4). The reveal is the paid payoff and copying
+   the address is the literal next action — select-and-drag across a
+   word-break:break-all email is a poor substitute. */
+.impp-copy{font-family:var(--font-sans);font-size:10px;font-weight:700;letter-spacing:.04em;text-transform:uppercase;
+  color:var(--muted);background:var(--surface);border:1px solid var(--border-strong);border-radius:5px;
+  padding:3px 7px;cursor:pointer;flex:0 0 auto;transition:color .14s,border-color .14s}
+.impp-copy:hover{color:var(--accent);border-color:var(--accent)}
+.impp-copy:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+.impp-copy.done{color:var(--success);border-color:var(--success)}
 .impp-supn{font-weight:700;color:var(--ink)}
 .impp-hschip{font-family:var(--font-mono);font-size:11px;color:var(--accent);background:color-mix(in srgb,var(--accent) 12%,transparent);border-radius:4px;padding:1px 6px;display:inline-block;white-space:nowrap}
 .impp-num{font-variant-numeric:tabular-nums}
@@ -717,10 +765,32 @@ const PROFILE_CSS = `
    button hanging off it. It becomes a real sticky nav strip only once the tabs
    appear (see the 1320px query below). */
 .impp-secbar{display:flex;align-items:center;gap:12px;margin:0 0 12px;padding:8px 0;background:var(--bg)}
-.impp-tabs{display:none;align-items:center;gap:4px;min-width:0;overflow-x:auto;scrollbar-width:thin;-webkit-overflow-scrolling:touch}
+/* ── scroll affordance for the section strip (R4) ──
+   Eleven sections do not fit a phone, and the strip's only cue that more
+   existed was a tab clipped mid-word at the edge — which reads as a layout bug,
+   not as "scroll me". The fade is a MASK on the scroller rather than a gradient
+   overlay: a mask needs no knowledge of what is behind the strip, so it works in
+   both themes and over the sticky bar's background without the grey banding a
+   fade-to-transparent gradient produces. The chevron pips sit on the wrapper
+   above it. Both keyed to the direction that can ACTUALLY scroll, so a strip that
+   already fits shows neither. */
+.impp-tabswrap{display:none;position:relative;min-width:0;flex:1 1 auto}
+.impp-tabswrap::before,.impp-tabswrap::after{position:absolute;top:50%;transform:translateY(-50%);z-index:2;
+  pointer-events:none;font-size:19px;font-weight:700;line-height:1;color:var(--accent);opacity:0;transition:opacity .18s ease}
+.impp-tabswrap::before{content:'\\2039';left:2px}
+.impp-tabswrap::after{content:'\\203A';right:2px}
+.impp-tabswrap[data-scroll="left"]::before,.impp-tabswrap[data-scroll="both"]::before{opacity:1}
+.impp-tabswrap[data-scroll="right"]::after,.impp-tabswrap[data-scroll="both"]::after{opacity:1}
+/* Fade width is deliberately fixed and the scroller's padding is NOT touched per
+   state: changing padding on a scroll-driven state would resize scrollWidth
+   mid-gesture and make the strip jump under the finger. */
+.impp-tabswrap[data-scroll="right"] .impp-tabs{-webkit-mask-image:linear-gradient(90deg,#000 calc(100% - 42px),transparent);mask-image:linear-gradient(90deg,#000 calc(100% - 42px),transparent)}
+.impp-tabswrap[data-scroll="left"] .impp-tabs{-webkit-mask-image:linear-gradient(90deg,transparent,#000 42px);mask-image:linear-gradient(90deg,transparent,#000 42px)}
+.impp-tabswrap[data-scroll="both"] .impp-tabs{-webkit-mask-image:linear-gradient(90deg,transparent,#000 42px,#000 calc(100% - 42px),transparent);mask-image:linear-gradient(90deg,transparent,#000 42px,#000 calc(100% - 42px),transparent)}
+.impp-tabs{display:flex;align-items:center;gap:4px;min-width:0;overflow-x:auto;scrollbar-width:thin;-webkit-overflow-scrolling:touch;scroll-snap-type:x proximity}
 .impp-tabs a{flex:0 0 auto;font-size:12.5px;font-weight:600;color:var(--muted);text-decoration:none;
   padding:7px 10px;min-height:36px;display:inline-flex;align-items:center;border-radius:8px;white-space:nowrap;
-  transition:color .14s,background .14s}
+  scroll-snap-align:start;transition:color .14s,background .14s}
 .impp-tabs a:hover{color:var(--ink);background:var(--surface-2)}
 .impp-tabs a:focus-visible{outline:2px solid var(--accent);outline-offset:-2px}
 /* active = tinted + outlined, never a bright fill */
@@ -734,8 +804,12 @@ const PROFILE_CSS = `
 .impp-expand[aria-pressed="true"]{color:var(--accent);border-color:var(--accent);
   background:color-mix(in srgb,var(--accent) 12%,transparent)}
 @media(max-width:1320px){
-  .impp-tabs{display:flex}
+  .impp-tabswrap{display:block}
   .impp-secbar{position:sticky;top:0;z-index:20;border-bottom:1px solid var(--border)}
+}
+@media (prefers-reduced-motion: reduce){
+  .impp-tabs{scroll-snap-type:none}
+  .impp-tabswrap::before,.impp-tabswrap::after{transition:none}
 }
 @media(max-width:560px){
   .impp-secbar{gap:8px}
@@ -1075,12 +1149,12 @@ export function renderImporterProfilePage(p: ProfileData, quota: QuotaState, rev
   const supBody = p.suppliers.length
     ? `<p class="lead">Who this importer buys from · top ${p.suppliers.length} in the sample</p>
     <div class="impp-tbl-wrap"><table class="impp-tbl">
-      <thead><tr><th>Supplier</th><th class="impp-num">Shipments (sample)</th><th>Product &amp; HS</th></tr></thead>
+      <thead><tr><th data-sort="t">Supplier</th><th class="impp-num" data-sort="n">Shipments (sample)</th><th data-sort="t">Product &amp; HS</th></tr></thead>
       <tbody>${p.suppliers
         .map(
-          (s) => `<tr><td title="${esc(s.name)}"><span class="impp-supn">${flag(s.country)} ${esc(s.name)}</span><div class="lead" style="margin:2px 0 0">${esc(countryName(s.country))}</div></td><td class="impp-num">${N(s.ships)}</td><td title="${esc(s.product || '')}">${esc(s.product || '—')}${s.hs ? ` <span class="impp-hschip">${esc(s.hs)}</span>` : ''}</td></tr>`,
+          (s) => `<tr><td data-v="${esc(s.name)}" title="${esc(s.name)}"><span class="impp-supn">${flag(s.country)} ${esc(s.name)}</span><div class="lead" style="margin:2px 0 0">${esc(countryName(s.country))}</div></td><td class="impp-num" data-v="${s.ships}">${N(s.ships)}</td><td data-v="${esc(s.product || '')}" title="${esc(s.product || '')}">${esc(s.product || '—')}${s.hs ? ` <span class="impp-hschip">${esc(s.hs)}</span>` : ''}</td></tr>`,
         )
-        .join('')}</tbody></table></div><p class="impp-scrollnote">Swipe the table sideways to see every column.</p>`
+        .join('')}</tbody></table></div><p class="impp-scrollnote">Swipe the table sideways to see every column &middot; click a column heading to sort.</p>`
     : '<p class="lead">No suppliers resolved in the sampled history.</p>';
 
   // HS breakdown as bars
@@ -1121,12 +1195,12 @@ export function renderImporterProfilePage(p: ProfileData, quota: QuotaState, rev
   // recent shipments
   const recentBody = p.recent.length
     ? `<div class="impp-tbl-wrap"><table class="impp-tbl">
-      <thead><tr><th>Date</th><th>Bill of lading</th><th>Supplier</th><th class="impp-num">Weight</th><th class="impp-num">Qty</th><th class="impp-num">Cntrs</th><th>Description</th></tr></thead>
+      <thead><tr><th data-sort="n">Date</th><th data-sort="t">Bill of lading</th><th data-sort="t">Supplier</th><th class="impp-num" data-sort="n">Weight</th><th class="impp-num" data-sort="n">Qty</th><th class="impp-num" data-sort="n">Cntrs</th><th data-sort="t">Description</th></tr></thead>
       <tbody>${p.recent
         .map(
-          (r) => `<tr><td>${esc(r.date)}</td><td><span class="impp-hschip">${esc(r.bol)}</span></td><td title="${esc(r.supplier)}"><span class="impp-supn">${flag(r.country)} ${esc(r.supplier)}</span></td><td class="impp-num">${r.weight == null ? '—' : N(r.weight) + ' kg'}</td><td class="impp-num">${r.qty == null ? '—' : N(r.qty) + (r.unit ? ' ' + esc(r.unit) : '')}</td><td class="impp-num">${r.containers == null ? '—' : N(r.containers)}</td><td title="${esc(r.product || '')}">${esc(r.product || '—')}</td></tr>`,
+          (r) => `<tr><td data-v="${dayKey(r.date)}">${esc(r.date)}</td><td data-v="${esc(r.bol)}"><span class="impp-hschip">${esc(r.bol)}</span></td><td data-v="${esc(r.supplier)}" title="${esc(r.supplier)}"><span class="impp-supn">${flag(r.country)} ${esc(r.supplier)}</span></td><td class="impp-num" data-v="${r.weight == null ? '' : r.weight}">${r.weight == null ? '—' : N(r.weight) + ' kg'}</td><td class="impp-num" data-v="${r.qty == null ? '' : r.qty}">${r.qty == null ? '—' : N(r.qty) + (r.unit ? ' ' + esc(r.unit) : '')}</td><td class="impp-num" data-v="${r.containers == null ? '' : r.containers}">${r.containers == null ? '—' : N(r.containers)}</td><td data-v="${esc(r.product || '')}" title="${esc(r.product || '')}">${esc(r.product || '—')}</td></tr>`,
         )
-        .join('')}</tbody></table></div><p class="impp-scrollnote">Swipe the table sideways to see every column.</p>`
+        .join('')}</tbody></table></div><p class="impp-scrollnote">Swipe the table sideways to see every column &middot; click a column heading to sort.</p>`
     : '<p class="lead">No recent shipments in the sample.</p>';
 
   // Contact reveal — the REAL gated reveal (Leads Pro). The CTA adapts to the
@@ -1239,9 +1313,11 @@ export function renderImporterProfilePage(p: ProfileData, quota: QuotaState, rev
   // go.
   const secBar = `
   <div class="impp-secbar">
-    <nav class="impp-tabs" aria-label="Jump to section">
-      ${secs.map((s) => `<a href="#sec-${esc(s.id)}" data-dot="${esc(s.id)}">${esc(s.label)}</a>`).join('')}
-    </nav>
+    <div class="impp-tabswrap" id="impp-tabswrap" data-scroll="none">
+      <nav class="impp-tabs" aria-label="Jump to section">
+        ${secs.map((s) => `<a href="#sec-${esc(s.id)}" data-dot="${esc(s.id)}">${esc(s.label)}</a>`).join('')}
+      </nav>
+    </div>
     <button type="button" class="impp-expand" id="impp-expand" aria-pressed="false">Expand all</button>
   </div>`;
 
@@ -1446,14 +1522,29 @@ const PROFILE_JS = `
   // Keep the active tab in view on the horizontal bar — the scroll-spy is
   // useless if the highlighted tab has scrolled out of the strip.
   var tabsEl = document.querySelector('.impp-tabs');
+  var tabsWrap = document.getElementById('impp-tabswrap');
   function revealActiveTab(){
-    if(!tabsEl || !tabsEl.offsetParent) return;
+    if(!tabsEl || !tabsWrap || !tabsWrap.offsetParent) return;
     var a = tabsEl.querySelector('a.active');
     if(!a) return;
     var lo = a.offsetLeft, hi = lo + a.offsetWidth;
     if(lo < tabsEl.scrollLeft) tabsEl.scrollLeft = lo - 8;
     else if(hi > tabsEl.scrollLeft + tabsEl.clientWidth) tabsEl.scrollLeft = hi - tabsEl.clientWidth + 8;
+    syncTabScroll();
   }
+  // (3a) Which way can the strip still scroll? Drives the edge fade + chevrons.
+  // "none" when it already fits, so a short strip carries no false cue.
+  function syncTabScroll(){
+    if(!tabsEl || !tabsWrap) return;
+    if(!tabsWrap.offsetParent){ tabsWrap.setAttribute('data-scroll','none'); return; }
+    var max = tabsEl.scrollWidth - tabsEl.clientWidth;
+    if(max <= 2){ tabsWrap.setAttribute('data-scroll','none'); return; }
+    var canL = tabsEl.scrollLeft > 2, canR = tabsEl.scrollLeft < max - 2;
+    tabsWrap.setAttribute('data-scroll', canL && canR ? 'both' : (canL ? 'left' : 'right'));
+  }
+  if(tabsEl){ tabsEl.addEventListener('scroll', syncTabScroll, {passive:true}); }
+  window.addEventListener('resize', syncTabScroll);
+  syncTabScroll();
 
   // (3b) expand all / collapse all. Five sections load folded; opening them one
   // by one to scan the whole record was the only option before.
@@ -1638,15 +1729,20 @@ const PROFILE_JS = `
     var out = ['<div class="impp-rvc">','<span class="impp-rvc-badge '+conf+'">'+e2(badge)+'</span>'];
     if(c.contact_name){ out.push('<div class="impp-rvc-name">'+e2(c.contact_name)+'</div>'); }
     if(c.title){ out.push('<div class="impp-rvc-title">'+e2(c.title)+'</div>'); }
+    // Copy buttons carry NO value in an attribute: e2() escapes markup but not
+    // quotes, and these strings come from an external provider. The handler reads
+    // the rendered text instead, so nothing provider-supplied is ever parsed as
+    // an attribute value.
+    function cbtn(label,all){ return '<button type="button" class="impp-copy"'+(all?' data-all="1"':'')+' aria-label="Copy '+label+'">Copy</button>'; }
     if(c.email){
       var cf = (c.email_confidence!=null) ? ' <span class="impp-rvc-conf">('+e2(c.email_confidence)+'% confidence)</span>' : '';
-      out.push('<div class="impp-rvc-row">Email: <a href="mailto:'+e2(c.email)+'">'+e2(c.email)+'</a>'+cf+'</div>');
+      out.push('<div class="impp-rvc-row">Email: <a href="mailto:'+e2(c.email)+'">'+e2(c.email)+'</a>'+cbtn('email address')+cf+'</div>');
     }
     if(c.role_emails && c.role_emails.length){
-      out.push('<div class="impp-rvc-row">Role inboxes: '+c.role_emails.map(function(x){return '<a href="mailto:'+e2(x)+'">'+e2(x)+'</a>';}).join(' &middot; ')+'</div>');
+      out.push('<div class="impp-rvc-row">Role inboxes: '+c.role_emails.map(function(x){return '<a href="mailto:'+e2(x)+'">'+e2(x)+'</a>';}).join(' &middot; ')+cbtn('all role inboxes',true)+'</div>');
     }
-    if(c.phone){ out.push('<div class="impp-rvc-row">Phone: <a href="tel:'+e2(c.phone)+'">'+e2(c.phone)+'</a></div>'); }
-    if(c.address){ out.push('<div class="impp-rvc-row">Address: '+e2(c.address)+'</div>'); }
+    if(c.phone){ out.push('<div class="impp-rvc-row">Phone: <a href="tel:'+e2(c.phone)+'">'+e2(c.phone)+'</a>'+cbtn('phone number')+'</div>'); }
+    if(c.address){ out.push('<div class="impp-rvc-row">Address: <span>'+e2(c.address)+'</span>'+cbtn('address')+'</div>'); }
     if(!c.email && (!c.role_emails||!c.role_emails.length) && !c.phone){
       out.push('<div class="impp-rvc-none">No verified contact found for this importer — no email or phone resolved. Their supplier lanes above are still your strongest outreach angle.</div>');
     }
@@ -1685,6 +1781,130 @@ const PROFILE_JS = `
         }).catch(function(){ revBtn.disabled=false; revBtn.textContent=orig; showMsg('impp-rvc-err','Could not reveal the contact. Try again.'); });
     });
   }
+
+  // ── copy the revealed contact (R4) ─────────────────────────────────────────
+  // Delegated, because the reveal markup does not exist until the reveal lands.
+  // Values are read from the RENDERED text, never from an attribute.
+  function copyText(text, btn){
+    function done(){
+      var orig2 = btn.textContent;
+      btn.textContent = 'Copied'; btn.classList.add('done');
+      setTimeout(function(){ btn.textContent = orig2; btn.classList.remove('done'); }, 1600);
+    }
+    if(navigator.clipboard && navigator.clipboard.writeText){
+      navigator.clipboard.writeText(text).then(done).catch(function(){ legacyCopy(text, done); });
+    } else { legacyCopy(text, done); }
+  }
+  function legacyCopy(text, ok){
+    try{
+      var ta = document.createElement('textarea'); ta.value = text;
+      ta.setAttribute('readonly',''); ta.style.position='fixed'; ta.style.opacity='0';
+      document.body.appendChild(ta); ta.select();
+      var good = document.execCommand && document.execCommand('copy');
+      document.body.removeChild(ta);
+      if(good) ok();
+    }catch(e){ /* clipboard unavailable — the value stays selectable on screen */ }
+  }
+  if(revResult){
+    revResult.addEventListener('click', function(ev){
+      var btn = ev.target && ev.target.closest ? ev.target.closest('.impp-copy') : null;
+      if(!btn) return;
+      var text = '';
+      if(btn.getAttribute('data-all')){
+        var as = btn.parentNode.querySelectorAll('a');
+        var vals = [];
+        for(var i=0;i<as.length;i++) vals.push(as[i].textContent.trim());
+        text = vals.join(', ');
+      } else if(btn.previousElementSibling){
+        text = btn.previousElementSibling.textContent.trim();
+      }
+      if(text) copyText(text, btn);
+    });
+  }
+
+  // ── sortable table columns (R4) ────────────────────────────────────────────
+  // Client-side reorder of rows already on the page — no request, no credits.
+  // Sort values come from each cell's data-v (the raw number / name), so
+  // "1,240 kg" and "03/14/2026" sort as a number rather than as a string. A cell
+  // with an EMPTY data-v is missing data, not zero, so it always sinks to the
+  // bottom whichever direction is active.
+  var tables = document.querySelectorAll('table.impp-tbl');
+  for(var t=0; t<tables.length; t++){
+    (function(table){
+      var head = table.querySelector('thead tr');
+      var body = table.querySelector('tbody');
+      if(!head || !body) return;
+      var ths = [].slice.call(head.querySelectorAll('th'));
+      var sortable = [];
+      for(var c=0;c<ths.length;c++){ if(ths[c].getAttribute('data-sort')) sortable.push(c); }
+      if(!sortable.length) return;
+
+      function apply(col, dir){
+        var numeric = ths[col].getAttribute('data-sort')==='n';
+        var rows = [].slice.call(body.querySelectorAll('tr'));
+        rows.sort(function(a,b){
+          var ca=a.children[col], cb=b.children[col];
+          var va=ca?(ca.getAttribute('data-v')!=null?ca.getAttribute('data-v'):ca.textContent):'';
+          var vb=cb?(cb.getAttribute('data-v')!=null?cb.getAttribute('data-v'):cb.textContent):'';
+          va=String(va).trim(); vb=String(vb).trim();
+          if(!va && !vb) return 0;
+          if(!va) return 1;          // missing data sinks, both directions
+          if(!vb) return -1;
+          if(numeric){ var d=(Number(va)||0)-(Number(vb)||0); return dir==='asc'?d:-d; }
+          var s=String(va).toLowerCase().localeCompare(String(vb).toLowerCase());
+          return dir==='asc'?s:-s;
+        });
+        for(var r=0;r<rows.length;r++) body.appendChild(rows[r]);
+        for(var k=0;k<ths.length;k++){
+          if(!ths[k].getAttribute('data-sort')) continue;
+          ths[k].setAttribute('aria-sort', k===col ? (dir==='asc'?'ascending':'descending') : 'none');
+          var ar=ths[k].querySelector('.impp-sortar');
+          if(ar) ar.textContent = k===col ? (dir==='asc'?'\\u25B2':'\\u25BC') : '\\u25BC';
+        }
+      }
+
+      sortable.forEach(function(col){
+        var th=ths[col];
+        var label=th.textContent.trim();
+        var numeric=th.getAttribute('data-sort')==='n';
+        th.setAttribute('aria-sort','none');
+        th.innerHTML='';
+        var b=document.createElement('button');
+        b.type='button'; b.className='impp-sortbtn';
+        b.title='Sort by '+label;
+        b.appendChild(document.createTextNode(label));
+        var ar=document.createElement('span');
+        ar.className='impp-sortar'; ar.setAttribute('aria-hidden','true'); ar.textContent='\\u25BC';
+        b.appendChild(ar);
+        th.appendChild(b);
+        // First click on a MEASURE sorts biggest-first (the question is always
+        // "which is the largest"); on a NAME it sorts A-Z.
+        var dir = numeric ? 'desc' : 'asc';
+        var armed = false;
+        b.addEventListener('click', function(){
+          if(armed) dir = dir==='asc' ? 'desc' : 'asc';
+          armed = true;
+          apply(col, dir);
+        });
+      });
+    })(tables[t]);
+  }
+
+  // ── back to YOUR results (R4) ──────────────────────────────────────────────
+  // The search page now keeps its filters + sort in the URL and stores that URL,
+  // so this link can return to the exact result set the visitor came from
+  // instead of an empty search form. Same-origin relative paths under
+  // /importers only — never a value that could redirect off-site.
+  try{
+    var back = sessionStorage.getItem('qf_imp_back');
+    if(back && back.indexOf('/importers')===0 && back.charAt(1)!=='/' && back.indexOf('?')>0){
+      var backs = document.querySelectorAll('.impp-back');
+      for(var bi=0; bi<backs.length; bi++){
+        backs[bi].setAttribute('href', back);
+        backs[bi].textContent = '\\u2190 Back to your results';
+      }
+    }
+  }catch(e){ /* no sessionStorage — the plain link still works */ }
 })();
 `.trim();
 

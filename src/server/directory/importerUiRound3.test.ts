@@ -84,7 +84,8 @@ describe('R3-2 · sort control', () => {
   });
 
   it('renders the select with every order as an option', () => {
-    expect(search).toContain('<select id="imp-sort">');
+    // R4 added a scope title to the control; assert the control, not its attributes.
+    expect(search).toMatch(/<select id="imp-sort"[^>]*>/);
     for (const [value, label] of SORTS) {
       expect(search).toContain(`<option value="${value}">`);
       expect(search).toContain(label);
@@ -110,7 +111,8 @@ describe('R3-2 · sort control', () => {
 describe('R3-3 · applied-filter chips', () => {
   it('renders a results-level filter bar, hidden until something is applied', () => {
     expect(search).toContain('<div class="imp-chips" id="imp-chips" hidden>');
-    expect(search).toContain('<span class="imp-chips-cap">Filtered by</span>');
+    // R4 added a scope title to the caption; assert the caption, not its attributes.
+    expect(search).toMatch(/<span class="imp-chips-cap"[^>]*>Filtered by<\/span>/);
   });
 
   it('offers a clear-all alongside the per-chip removal', () => {
@@ -176,7 +178,9 @@ describe('R3-6 · profile section bar', () => {
 
   it('takes over exactly where the fixed dot rail drops out', () => {
     expect(profileHtml).toContain('@media(max-width:1320px){.impp-dots{display:none}}');
-    expect(profileHtml).toMatch(/@media\(max-width:1320px\)\{\s*\.impp-tabs\{display:flex\}/);
+    // R4 moved the reveal onto the scroll wrapper (which hosts the edge fade +
+    // chevrons); the strip still takes over at exactly the width the rail drops.
+    expect(profileHtml).toMatch(/@media\(max-width:1320px\)\{\s*\.impp-tabswrap\{display:block\}/);
   });
 
   it('shares one click handler and scroll-spy between both navs', () => {
