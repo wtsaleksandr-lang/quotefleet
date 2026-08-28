@@ -37,6 +37,7 @@ import { layout, esc } from './pages.js';
 import { ISO_COUNTRIES } from './isoCountries.js';
 import { US_STATES } from './usStates.js';
 import { pullImportBols, type BolRow } from './importerLeads.js';
+import { quoteLaneHref } from './entryPortFacets.js';
 import { CACHE_ONLY_NOTE } from './externalPullGuard.js';
 import {
   dbBolCacheStore,
@@ -594,6 +595,14 @@ const PROFILE_CSS = `
 .impp-xaxis{display:flex;justify-content:space-between;color:var(--muted);font-size:10.5px;font-weight:600;margin:8px 0 0 0;padding-left:34px}
 .impp-chart-cap{display:flex;align-items:center;gap:8px 14px;flex-wrap:wrap;font-size:11.5px;color:var(--muted);margin-top:10px;padding-top:10px;border-top:1px solid var(--border)}
 .impp-chart-cap b{color:var(--ink);font-variant-numeric:tabular-nums}
+/* Trend chip — a tinted pill, not a filled one, so it reads as a caption fact
+   rather than a fourth action. Token colours only; both pass AA in both themes. */
+.impp-delta{display:inline-flex;align-items:center;gap:5px;border-radius:999px;padding:2px 9px;
+  border:1px solid color-mix(in srgb,var(--muted) 34%,transparent);background:var(--surface-2)}
+.impp-delta b{font-weight:700;color:inherit}
+.impp-delta.up{color:var(--success);border-color:color-mix(in srgb,var(--success) 34%,transparent);background:color-mix(in srgb,var(--success) 12%,transparent)}
+.impp-delta.down{color:var(--warn);border-color:color-mix(in srgb,var(--warn) 34%,transparent);background:color-mix(in srgb,var(--warn) 12%,transparent)}
+.impp-delta.flat{color:var(--muted)}
 .impp-tip{position:absolute;top:6px;left:0;transform:translateX(-50%);background:var(--ink);color:var(--bg);font-size:12px;font-weight:700;padding:7px 11px;border-radius:8px;pointer-events:none;white-space:nowrap;box-shadow:var(--shadow-md);z-index:5;line-height:1.35;text-align:center}
 .impp-tip[hidden]{display:none}
 .impp-tip .tv{display:block;font-size:10.5px;font-weight:600;opacity:.72;letter-spacing:.03em;text-transform:uppercase}
@@ -754,6 +763,14 @@ function chartSvg(months: ProfileMonth[]): string {
   const total = months.reduce((s, m) => s + m.count, 0);
   const peak = months.reduce((b, m) => (m.count > b.count ? m : b), months[0]);
   const avg = Math.round(total / n);
+  // Direction — the one thing the caption lacked, and free from `months`.
+  // 6+6, deliberately NOT 12+12: the window is capped at 18 months and the
+  // underlying sample at ~100 bills, so the OLDEST months are themselves
+  // sample-truncated. Two equally-truncated halves are the only fair read; a
+  // 12+12 split would compare a full window against a truncated one. Below 12
+  // months there is nothing honest to compare, so the chip is suppressed
+  // entirely rather than shown with a misleading number.
+  const delta = deltaChip(months);
   return `
   <div class="impp-chartwrap">
     <div class="impp-chart-grid">
@@ -771,8 +788,36 @@ function chartSvg(months: ProfileMonth[]): string {
       <span>Peak <b>${N(peak.count)}</b> in ${esc(peak.label)}</span>
       <span>Average <b>${N(avg)}</b> / month</span>
       <span>${N(n)} month${n === 1 ? '' : 's'} on file</span>
+      ${delta}
     </div>
   </div>`;
+}
+
+/**
+ * "Last 6 mo ▲ 14% vs prior 6" — trend direction for the shipment chart.
+ * Exported for unit tests: the SIGN has to be provably right on a rising and a
+ * falling series, since a wrong arrow would misread an account's momentum.
+ *
+ * Returns '' when there are fewer than 12 months (nothing fair to compare) or
+ * when the prior half is empty (a percentage against zero is meaningless).
+ */
+export function deltaChip(months: readonly ProfileMonth[]): string {
+  if (months.length < 12) return '';
+  const sum = (a: readonly ProfileMonth[]) => a.reduce((s, m) => s + m.count, 0);
+  const recent = sum(months.slice(-6));
+  const prior = sum(months.slice(-12, -6));
+  if (prior <= 0) return '';
+  const pct = Math.round(((recent - prior) / prior) * 100);
+  // Token colours only, and both pass AA on --surface in either theme.
+  const cls = pct > 0 ? 'up' : pct < 0 ? 'down' : 'flat';
+  const arrow = pct > 0 ? '&#9650;' : pct < 0 ? '&#9660;' : '&#8212;';
+  const word = pct > 0 ? 'up' : pct < 0 ? 'down' : 'level';
+  const tip = `${N(recent)} shipments in the last 6 months vs ${N(prior)} in the 6 before that — ${word}${
+    pct === 0 ? '' : ` ${Math.abs(pct)}%`
+  }. Both halves come from the same sampled bill history.`;
+  return `<span class="impp-delta ${cls}" title="${esc(tip)}">Last 6 mo <b>${arrow}${
+    pct === 0 ? '' : ` ${Math.abs(pct)}%`
+  }</b> vs prior 6</span>`;
 }
 
 function barRows(items: Array<{ label: string; value: number; flag?: string }>): string {
@@ -809,13 +854,32 @@ function identityHeader(p: ProfileData, opts: { showActions: boolean }): string 
   // "☆ Save" is a real, free logged-in action (see importerSaved routes); the
   // client wires it (PROFILE_JS) — a signed-out click routes to /login.
   const saveBtn = `<button type="button" class="impp-save" id="impp-save" data-slug="${esc(p.slug)}" data-company="${esc(p.company)}" aria-pressed="false"><span class="star" aria-hidden="true">☆</span> <span class="lbl">Save</span></button>`;
+  // "Quote this lane" must mean the SAME thing here as on a search result card:
+  // a /directory/rfq deep link seeded with this importer's drayage leg. It used
+  // to point at /tools, a generic landing page — same words, dead end. When the
+  // entry port resolves to no directory facet the button is dropped entirely
+  // rather than rendered as a link that 302s back to /directory.
+  const laneHref = quoteLaneHref({
+    entryPort: p.entryPort,
+    // Delivery state parsed from the displayed address (the street address
+    // itself stays behind the metered reveal, so only the state is seeded).
+    destinationState: (String(p.address ?? '').match(/,\s*([A-Z]{2})[\s,]/) ?? [])[1] ?? null,
+    // The importer's biggest commodity — same field the lane chip already shows.
+    product: p.hsBreakdown[0]?.desc ?? p.suppliers[0]?.product ?? null,
+    hsCode: p.hsBreakdown[0]?.hs ?? null,
+  });
+  const laneBtn = laneHref
+    ? `<a class="btn btn-primary" href="${esc(laneHref)}" title="Request drayage rates from carriers at ${esc(
+        p.entryPort ?? 'this port',
+      )}">Quote this lane <span class="arr">&rarr;</span></a>`
+    : '';
   return `
   <div class="impp-head">
     <div class="impp-title">
       <h1>${esc(p.company)}</h1>
       <span class="impp-flag" aria-hidden="true">${flag(p.countryCode)}</span>
       <span class="impp-pill">Importer</span>
-      ${opts.showActions ? `<div class="impp-head-act">${saveBtn}<a class="btn btn-primary" href="/tools">Quote this lane <span class="arr">&rarr;</span></a></div>` : ''}
+      ${opts.showActions ? `<div class="impp-head-act">${saveBtn}${laneBtn}</div>` : ''}
     </div>
     ${meta ? `<div class="impp-meta">${meta}</div>` : ''}
     ${opts.showActions ? privacyCta(p) : ''}

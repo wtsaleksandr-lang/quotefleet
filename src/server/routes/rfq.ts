@@ -215,6 +215,31 @@ function serializeFacetQuery(raw: Record<string, unknown>): string {
   return p.toString();
 }
 
+/**
+ * Lane fields a GET may pre-seed on the form. Strictly a rendering convenience:
+ * these are echoed into the SAME `prefill` the bounced-back POST already uses,
+ * so nothing here touches the gate, the recipient cap, or metering. Values are
+ * length-clamped and HTML-escaped downstream by `field()`.
+ *
+ * Used by the Importer Search result cards' "Quote this lane" deep link.
+ */
+const PREFILLABLE_QUERY_FIELDS = [
+  'origin', 'destination', 'equipment', 'container_type',
+  'commodity', 'weight', 'ready_date', 'target_rate', 'notes',
+] as const;
+
+/** Read lane prefill from a GET query. Empty object when nothing is supplied. */
+function prefillFromQuery(raw: Record<string, unknown>): Record<string, string> | undefined {
+  const out: Record<string, string> = {};
+  for (const k of PREFILLABLE_QUERY_FIELDS) {
+    const v = raw[k];
+    if (v == null) continue;
+    const s = String(v).trim().slice(0, 500);
+    if (s) out[k] = s;
+  }
+  return Object.keys(out).length ? out : undefined;
+}
+
 /** True when a facet querystring carries at least one real filter. */
 function hasAnyFacet(query: string): boolean {
   if (!query) return false;
@@ -302,6 +327,11 @@ export function registerRfqRoutes(app: Express, deps: RfqRouteDeps = {}) {
           filterQuery: filterQuery || undefined,
           gate: gateView(g),
           identity: identityView(g),
+          // Additive: a deep link (e.g. an Importer Search "Quote this lane"
+          // card CTA) can seed the shipment fields. `prefill` is the same slot a
+          // bounced-back POST uses, and the contact fields still resolve from
+          // the gated identity — a query can never override those.
+          prefill: prefillFromQuery(req.query as Record<string, unknown>),
         }),
       );
     } catch (err) {

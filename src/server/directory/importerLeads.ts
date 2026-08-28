@@ -113,6 +113,11 @@ export interface ImporterLead {
   /** Which contact fallback tier is available for this lead (never empty). */
   contact_confidence?: ContactConfidence | null;
   draft_email?: string | null;
+  /** Distinct company-name spellings for this importer in THIS pull's sample.
+   *  SAMPLE-SCOPED (see aliasCountsByCompany) — a floor, never the full list. */
+  alias_names?: number | null;
+  /** Distinct company addresses for this importer in THIS pull's sample. */
+  alias_addresses?: number | null;
 }
 
 /** A resolved contact in one of the three confidence tiers. Always non-empty:
@@ -281,6 +286,59 @@ export function dedupImporters(rows: readonly BolRow[]): BolRow[] {
   return [...byCo.values()].sort(
     (a, b) => num(b.company_shipments_12m) - num(a.company_shipments_12m),
   );
+}
+
+/** Alias key normalisation — byte-for-byte what `aggregateProfile` uses for its
+ *  name/address maps, so the profile page and a search card mean exactly the
+ *  same thing by "distinct". (The profile also runs `fixCodeCasing` on the
+ *  address first; that only changes CASE, which this lowercases away, so the
+ *  resulting keys are identical.) */
+function aliasKey(raw: string): string {
+  return raw.toLowerCase().replace(/\s+/g, ' ').trim();
+}
+
+/**
+ * Distinct company-name spellings + distinct addresses per importer, derived
+ * from the RAW BOL rows — ImportYeti's signature "also files under N names /
+ * M addresses" de-dup signal.
+ *
+ * Grouped on the SAME key as `dedupImporters` (company_basename || company_name)
+ * and filtered by the same forwarder/confidentiality rules, so every collapsed
+ * importer row has a matching entry.
+ *
+ * ⚠ SAMPLE-SCOPED, and the UI must say so. A search pull is ~100 bills spread
+ * across 25+ importers (~2-4 rows each); a PROFILE pull is ~100 bills for ONE
+ * importer. The count here is therefore a FLOOR and will be materially lower
+ * than the profile's `aliasesCount` for the same company — never present it as a
+ * complete alias list.
+ *
+ * Cost: $0. These are rows already in memory (and already in the 14-day licensed
+ * cache); no extra pull, no extra DB read, no change to `requestCost`.
+ *
+ * Deliberately a SIBLING of `dedupImporters` rather than a change to it —
+ * dedupImporters has direct unit-test coverage and widening its return type
+ * would ripple through every caller.
+ */
+export function aliasCountsByCompany(
+  rows: readonly BolRow[],
+): Map<string, { names: number; addresses: number }> {
+  const acc = new Map<string, { names: Set<string>; addresses: Set<string> }>();
+  for (const r of rows) {
+    const name = str(r.company_name);
+    if (!name || r.company_manifest_confidentiality || isForwarder(name)) continue;
+    const key = str(r.company_basename) || name;
+    let e = acc.get(key);
+    if (!e) {
+      e = { names: new Set<string>(), addresses: new Set<string>() };
+      acc.set(key, e);
+    }
+    e.names.add(aliasKey(name));
+    const addr = str(r.company_address);
+    if (addr) e.addresses.add(aliasKey(addr));
+  }
+  const out = new Map<string, { names: number; addresses: number }>();
+  for (const [k, v] of acc) out.set(k, { names: v.names.size, addresses: v.addresses.size });
+  return out;
 }
 
 /* ── 3. Enrich: domain + decision-maker + email (Hunter) ────────────────────
@@ -649,8 +707,25 @@ export async function findImporterLeads({
   }
   const recordsScanned = rows.length;
   const importers = dedupImporters(rows);
+  // Alias counts must come from the RAW rows, BEFORE dedup collapses them — this
+  // is the only point where the alternate name/address spellings still exist.
+  // Same group key as dedupImporters, so every importer row finds its entry. $0.
+  const aliases = aliasCountsByCompany(rows);
+  const aliasFor = (r: BolRow) => aliases.get(str(r.company_basename) || str(r.company_name));
   // Base leads (no enrichment) — cheap, so build all then post-filter, then cap.
-  const base = applyPostFilters(importers.map((r) => toLead(r)), filters, redactKeys).slice(0, cap);
+  const base = applyPostFilters(
+    importers.map((r) => {
+      const lead = toLead(r);
+      const a = aliasFor(r);
+      if (a) {
+        lead.alias_names = a.names;
+        lead.alias_addresses = a.addresses;
+      }
+      return lead;
+    }),
+    filters,
+    redactKeys,
+  ).slice(0, cap);
 
   if (!withEnrichment && !withEmails) {
     return { leads: base, creditsRemaining, cached, pulledLive, recordsScanned, liveBlocked };
@@ -662,6 +737,10 @@ export async function findImporterLeads({
     const row = rowByCompany.get(lead.company);
     const contact = withEnrichment ? await enrichContact(lead.company).catch(() => null) : null;
     const merged = row ? toLead(row, contact) : { ...lead, ...(contact ?? {}) };
+    // toLead() rebuilds from the raw row and knows nothing about aliases — carry
+    // the counts computed above so enriched leads keep the sub-line.
+    merged.alias_names = lead.alias_names;
+    merged.alias_addresses = lead.alias_addresses;
     if (withEmails) merged.draft_email = await draftEmail(merged).catch(() => null);
     return merged;
   });
