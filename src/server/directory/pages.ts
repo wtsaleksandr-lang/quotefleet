@@ -1272,9 +1272,14 @@ interface LayoutOpts {
   bodyHtml: string;
   /** JSON-LD blocks (already stringified objects) to inject into <head>. */
   jsonLd?: string[];
+  /** Paginated-series crawl hints — absolute URLs for the previous/next page in a
+   *  paginated listing. Emitted as <link rel="prev">/<link rel="next"> so Google
+   *  understands the state/city/port/master listing is a single series. */
+  relPrev?: string;
+  relNext?: string;
 }
 
-export function layout({ title, description, canonicalPath, bodyHtml, jsonLd }: LayoutOpts): string {
+export function layout({ title, description, canonicalPath, bodyHtml, jsonLd, relPrev, relNext }: LayoutOpts): string {
   const ld = (jsonLd ?? [])
     .filter(Boolean)
     .map((j) => `<script type="application/ld+json">${j}</script>`)
@@ -1288,6 +1293,8 @@ export function layout({ title, description, canonicalPath, bodyHtml, jsonLd }: 
   <title>${esc(title)}</title>
   <meta name="description" content="${esc(description)}">
   <link rel="canonical" href="${SITE}${esc(canonicalPath)}">
+  ${relPrev ? `<link rel="prev" href="${esc(relPrev)}">` : ''}
+  ${relNext ? `<link rel="next" href="${esc(relNext)}">` : ''}
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
@@ -2229,13 +2236,37 @@ function renderFacetedResults(cfg: FacetedCfg): string {
     <p class="muted-small" style="margin: 24px 0 0; max-width: 760px;">Carrier information is sourced from public FMCSA records and shown so shippers can contact carriers directly. Carriers: email us to update or hide your details.</p>
   </main>`;
 
+  const { relPrev, relNext } = paginationRelLinks(scope, filters, list);
   return layout({
     title: cfg.title,
     description: cfg.description,
     canonicalPath: cfg.canonicalPath,
     bodyHtml: body,
     jsonLd: cfg.jsonLd,
+    relPrev,
+    relNext,
   });
+}
+
+/** Absolute prev/next URLs for the paginated series (rel=prev/rel=next crawl
+ *  hints), built with the SAME hrefWith used by the visible pager so they always
+ *  agree. Empty when there is no prev/next page. Page-1 prev drops the `page`
+ *  param (→ the canonical base URL), matching the numbered pager. */
+function paginationRelLinks(
+  scope: FacetScope,
+  f: DirectoryFilters,
+  list: CarrierListResult,
+): { relPrev?: string; relNext?: string } {
+  const out: { relPrev?: string; relNext?: string } = {};
+  if (list.totalPages <= 1) return out;
+  if (list.page > 1) {
+    const prev = list.page - 1;
+    out.relPrev = `${SITE}${hrefWith(scope, f, { page: prev > 1 ? String(prev) : null }, { keepPage: false })}`;
+  }
+  if (list.page < list.totalPages) {
+    out.relNext = `${SITE}${hrefWith(scope, f, { page: String(list.page + 1) }, { keepPage: false })}`;
+  }
+  return out;
 }
 
 /** Canonical query suffix for a faceted URL (stable key order, no page dup). */

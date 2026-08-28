@@ -54,6 +54,7 @@ import {
 } from '../directory/pages.js';
 import { publicAutocompleteLimiter, publicCalcLimiter } from '../rateLimits.js';
 import { hasDirectoryPro, directoryIdentity } from '../directory/entitlement.js';
+import { serveSitemapIndex, serveSitemapChild, carrierChunkKey } from '../directory/sitemapCache.js';
 
 const isIntermodal = (v: unknown): boolean => ['1', 'true', 'yes'].includes(String(v ?? '').toLowerCase());
 const pageNum = (v: unknown): number => Math.max(1, parseInt(String(v ?? '1'), 10) || 1);
@@ -70,7 +71,57 @@ const prettifySlug = (slug: string): string =>
     .map((w) => w.charAt(0).toUpperCase() + w.slice(1))
     .join(' ');
 
+/** Send a sitemap XML document with the right content-type + a modest CDN cache.
+ *  The bodies are materialized (sitemap_cache) so this is always an O(1) send. */
+function sendSitemapXml(res: Response, xml: string): void {
+  res.type('application/xml');
+  // Sitemaps change only on the weekly ingest; an hour of CDN/browser cache is
+  // safe and shields the (already O(1)) PK lookup from crawler bursts.
+  res.setHeader('Cache-Control', 'public, max-age=3600');
+  res.send(xml);
+}
+
 export function registerDirectoryRoutes(app: Express) {
+  // ── SEO sitemap (materialized — never a live 334k-row scan) ──────────────
+  // The dynamic index REPLACES the old static ~50-URL public/sitemap.xml: it
+  // references the marketing/state/port pages, the real city hubs, and the
+  // chunked carrier children so all ~334k carrier profiles are discoverable.
+  // Registered before express.static so it wins over any residual static file.
+  app.get('/sitemap.xml', async (_req: Request, res: Response, next) => {
+    try {
+      sendSitemapXml(res, (await serveSitemapIndex()).xml);
+    } catch (err) {
+      next(err);
+    }
+  });
+
+  // Chunked carrier children: /sitemap-carriers-1.xml … -N.xml (≤50k <loc> each).
+  app.get('/sitemap-carriers-:n.xml', async (req: Request, res: Response, next) => {
+    try {
+      const key = carrierChunkKey(String(req.params.n));
+      if (!key) return res.status(404).type('text/plain').send('Not found');
+      sendSitemapXml(res, (await serveSitemapChild(key)).xml);
+    } catch (err) {
+      next(err);
+    }
+  });
+
+  // City hubs + the marketing/state/port pages child.
+  app.get('/sitemap-cities.xml', async (_req: Request, res: Response, next) => {
+    try {
+      sendSitemapXml(res, (await serveSitemapChild('cities')).xml);
+    } catch (err) {
+      next(err);
+    }
+  });
+  app.get('/sitemap-pages.xml', async (_req: Request, res: Response, next) => {
+    try {
+      sendSitemapXml(res, (await serveSitemapChild('pages')).xml);
+    } catch (err) {
+      next(err);
+    }
+  });
+
   // ── JSON API ───────────────────────────────────────────────────────────
   app.get('/api/public/directory', publicAutocompleteLimiter, async (req: Request, res: Response) => {
     const result = await listCarriers({
