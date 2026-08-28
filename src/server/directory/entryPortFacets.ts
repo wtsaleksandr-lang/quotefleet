@@ -103,7 +103,9 @@ export function portStateForEntryPort(entryPort: string | null | undefined): str
  */
 export function quoteLaneHref(lane: {
   entryPort: string | null | undefined;
-  /** Importer's delivery state. The street address stays behind the paid reveal. */
+  /** Importer's delivery state — a region, never the street address. Drayage is
+   *  priced to a delivery area, and this href is shareable, so the narrower
+   *  field is both the correct input and the one that leaks nothing. */
   destinationState?: string | null;
   product?: string | null;
   hsCode?: string | null;
