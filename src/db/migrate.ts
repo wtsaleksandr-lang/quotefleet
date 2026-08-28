@@ -104,6 +104,39 @@ export async function ensureSelfHealColumns(): Promise<void> {
 }
 
 /**
+ * FMCSA cargo/equipment BOOLEAN facet columns that get a PARTIAL index
+ * (0066_directory_query_indexes.sql). One entry per user-selectable
+ * equipment/cargo option in the /directory sidebar.
+ *
+ * `dry_van` is deliberately EXCLUDED: it is true for 78.6% of the 330k prod rows,
+ * so a partial index over it would cover most of the table and the planner would
+ * never choose it over a sequential scan — it would be pure write cost on the
+ * weekly FMCSA re-ingest. Every other flag is true for ≤ 17.5% of rows (meat is
+ * 0.13%), which is exactly the range where a partial index pays for itself.
+ */
+export const DIRECTORY_FLAG_INDEX_COLUMNS: readonly string[] = [
+  'intermodal',
+  'hazmat',
+  'reefer',
+  'tanker',
+  'flatbed',
+  'dry_bulk',
+  'household_goods',
+  'beverages',
+  'produce',
+  'motor_vehicles',
+  'livestock',
+  'grain_feed',
+  'oilfield',
+  'meat',
+  'paper',
+  'construction',
+  'farm_supplies',
+  'coal_coke',
+  'building_materials',
+];
+
+/**
  * Raw, journal-INDEPENDENT ensure step for at-risk TABLES.
  *
  * WHY THIS EXISTS (separate from ensureSelfHealColumns above, which only heals
@@ -204,6 +237,56 @@ export const SELF_HEAL_TABLE_STATEMENTS: readonly string[] = [
   `CREATE UNIQUE INDEX IF NOT EXISTS "carrier_directory_slug_idx" ON "carrier_directory" ("public_slug")`,
   `CREATE INDEX IF NOT EXISTS "carrier_directory_state_idx" ON "carrier_directory" ("state")`,
   `CREATE INDEX IF NOT EXISTS "carrier_directory_port_idx" ON "carrier_directory" ("nearest_port_code")`,
+  // ── 0066_directory_query_indexes.sql ──────────────────────────────────────
+  // The /directory list + filtered-count path (listCarriers → listCarriersUnsafe)
+  // was hitting the 8s statement_timeout on prod and degrading to an empty list
+  // ("[directory] listCarriers failed; serving empty list ... 57014"). The two
+  // single-column indexes above narrow to a state/port, but the SORT keys
+  // (power_units, intermodal) and the ~20 cargo BOOLEANs live only in the heap,
+  // so every filtered page had to bitmap-fetch 4.6k–12k heap pages out of the
+  // 94 MB / 330k-row table and then top-N sort them. Warm that costs ~10–100 ms;
+  // on a cold Neon page cache (post-deploy / scale-from-zero / crawler burst on
+  // many distinct facet combos) those page fetches are remote and blow the
+  // budget. These indexes put the ORDER BY and the facet predicates INTO the
+  // index so the LIMIT terminates early and the heap is touched ~24 times.
+  //
+  // Composites are deliberately LEAN — (filter, sort-prefix) only, no
+  // legal_name/id tail. Measured on a 330k-row replica of prod, adding the tail
+  // made the indexes ~2.2x larger for an identical plan (Postgres finishes the
+  // name/id tie-break with a cheap Incremental Sort), and a smaller index is
+  // strictly better on Neon where index pages compete for the local file cache.
+  //
+  // NOT `CREATE INDEX CONCURRENTLY`: postgres.js sends these over the extended
+  // query protocol, which wraps each statement in an implicit transaction, and
+  // CONCURRENTLY cannot run inside a transaction block. A plain CREATE INDEX
+  // takes a SHARE lock — it blocks WRITES to carrier_directory (only the weekly
+  // FMCSA ingest writes here) but never READS, and each build measured ~1s on a
+  // 330k-row table. IF NOT EXISTS makes every subsequent boot a no-op.
+  //
+  // MUST stay byte-for-byte equivalent to drizzle/0066_directory_query_indexes.sql
+  // and src/db/schema.ts `carrierDirectory`.
+  //
+  // (state|port|∅, intermodal DESC, power_units DESC NULLS LAST) — the DEFAULT
+  // `featured` sort (orderForSort's 'featured' branch), which is what every
+  // /directory, /directory?state=, /directory?port= and city page uses.
+  `CREATE INDEX IF NOT EXISTS "carrier_directory_state_featured_idx" ON "carrier_directory" ("state", "intermodal" DESC, "power_units" DESC NULLS LAST)`,
+  `CREATE INDEX IF NOT EXISTS "carrier_directory_port_featured_idx" ON "carrier_directory" ("nearest_port_code", "intermodal" DESC, "power_units" DESC NULLS LAST)`,
+  `CREATE INDEX IF NOT EXISTS "carrier_directory_featured_idx" ON "carrier_directory" ("intermodal" DESC, "power_units" DESC NULLS LAST)`,
+  // (state|port, power_units DESC NULLS LAST) — the `fleet` sort AND the
+  // fleet-bucket range predicate (`power_units BETWEEN a AND b`), which the
+  // featured indexes above cannot serve as a range because `intermodal` sits
+  // between the equality column and power_units.
+  `CREATE INDEX IF NOT EXISTS "carrier_directory_state_fleet_idx" ON "carrier_directory" ("state", "power_units" DESC NULLS LAST)`,
+  `CREATE INDEX IF NOT EXISTS "carrier_directory_port_fleet_idx" ON "carrier_directory" ("nearest_port_code", "power_units" DESC NULLS LAST)`,
+  // One PARTIAL index per cargo/equipment facet, keyed on the default sort
+  // prefix. Small (a few hundred KB each — they only index the rows where the
+  // flag is true) and they serve three shapes: an index-only `count(*)` for the
+  // facet badge, a BitmapAnd/BitmapOr leg when the facet is combined with
+  // others, and an ordered scan for a cargo-only list page.
+  ...DIRECTORY_FLAG_INDEX_COLUMNS.map(
+    (col) =>
+      `CREATE INDEX IF NOT EXISTS "carrier_directory_flag_${col}_idx" ON "carrier_directory" ("intermodal" DESC, "power_units" DESC NULLS LAST) WHERE "${col}"`,
+  ),
   // 0048_carrier_overrides.sql — human-editable OVERRIDES that survive the FMCSA
   // re-ingest (the ingest touches carrier_directory ONLY, never this table).
   // Healed HERE (like carrier_directory) because the Replit deploy skips

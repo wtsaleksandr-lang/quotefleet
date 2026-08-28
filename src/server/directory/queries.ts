@@ -1336,6 +1336,22 @@ async function listCarriersUnsafe(filters: DirectoryFilters): Promise<CarrierLis
   const conditions = buildConditions(filters);
   const where = conditions.length ? and(...conditions) : undefined;
 
+  // PERSISTED-FIRST for the UNFILTERED total — the same short-circuit
+  // getFacetCounts already applies to the unfiltered base facets. With no active
+  // facet the total is `count(*)` over the whole table: identical for every
+  // visitor, only changing on the weekly FMCSA ingest, and (measured on prod) a
+  // 12,090-buffer parallel seq scan of the 330k-row heap on EVERY /directory,
+  // ?sort=, and ?page= request — i.e. the highest-traffic path paying the most.
+  // The precomputed singleton already carries that number as summary.total, so
+  // serve it from the memory-shielded PK lookup instead. This also makes the list
+  // total and the sidebar counts come from the SAME snapshot (today they can
+  // disagree: the facets are persisted while the total was live). No persisted
+  // row (cold DB / never populated) ⇒ null ⇒ the live count below still runs, so
+  // the graceful degradation is unchanged. Awaited OUTSIDE the transaction so it
+  // never holds a pooled connection. `conditions.length === 0` IS
+  // isUnfilteredFacets(filters) — same definition, without rebuilding them.
+  const persistedTotal = conditions.length === 0 ? (await loadPersistedAggregates())?.summary.total ?? null : null;
+
   // Both the filtered count and the ordered page run in ONE transaction under a
   // shared wall-clock budget (re-armed before each), so the list path — like the
   // facet path — can never pin a connection past REQUEST_AGG_BUDGET_MS. Running
@@ -1343,8 +1359,12 @@ async function listCarriersUnsafe(filters: DirectoryFilters): Promise<CarrierLis
   // request's pool footprint under crawler/state-click bursts. On a budget/scan
   // failure the transaction rejects and listCarriers' catch serves an empty list.
   const { total, rows } = await withAggregateTimeout(async (tx, arm) => {
-    await arm();
-    const totalRow = await tx.select({ n: sql<number>`count(*)::int` }).from(carrierDirectory).where(where);
+    let count = persistedTotal;
+    if (count == null) {
+      await arm();
+      const totalRow = await tx.select({ n: sql<number>`count(*)::int` }).from(carrierDirectory).where(where);
+      count = totalRow[0]?.n ?? 0;
+    }
     await arm();
     const rows = await tx
       .select()
@@ -1353,7 +1373,7 @@ async function listCarriersUnsafe(filters: DirectoryFilters): Promise<CarrierLis
       .orderBy(...orderForSort(filters.sort, filters.dir))
       .limit(perPage)
       .offset((page - 1) * perPage);
-    return { total: totalRow[0]?.n ?? 0, rows };
+    return { total: count, rows };
   }, REQUEST_AGG_BUDGET_MS);
 
   return {
