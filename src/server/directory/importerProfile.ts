@@ -1421,14 +1421,14 @@ export function renderImporterProfilePage(p: ProfileData, quota: QuotaState, rev
       label: 'Product breakdown',
       // A capped list says so, so a folded header never implies the sample only
       // held the codes we happen to draw.
-      sub: p.hsCodeCount > p.hsBreakdown.length ? `top ${p.hsBreakdown.length} of ${p.hsCodeCount} HS codes` : `${p.hsBreakdown.length} HS codes`,
+      sub: p.hsCodeCount > p.hsBreakdown.length ? `${p.hsBreakdown.length} of ${p.hsCodeCount} HS codes` : `${p.hsBreakdown.length} HS codes`,
       body: hsBody,
       open: true,
     },
     {
       id: 'origins',
       label: 'Imports by origin country',
-      sub: p.originCount > p.origins.length ? `top ${p.origins.length} of ${p.originCount} countries` : `${p.origins.length} countries`,
+      sub: p.originCount > p.origins.length ? `${p.origins.length} of ${p.originCount} countries` : `${p.origins.length} countries`,
       body: originBody,
       open: true,
     },
@@ -1905,7 +1905,10 @@ const PROFILE_JS = `
       out.push('<div class="impp-rvc-row">Role inboxes: '+c.role_emails.map(function(x){return '<a href="mailto:'+e2(x)+'">'+e2(x)+'</a>';}).join(' &middot; ')+cbtn('all role inboxes',true)+'</div>');
     }
     if(c.phone){ out.push('<div class="impp-rvc-row">Phone: <a href="tel:'+e2(c.phone)+'">'+e2(c.phone)+'</a>'+cbtn('phone number')+'</div>'); }
-    if(c.address){ out.push('<div class="impp-rvc-row">Address: <span>'+e2(c.address)+'</span>'+cbtn('address')+'</div>'); }
+    // The address is FREE page data (identity header + JSON-LD). It rides along
+    // here as a convenience, so it is marked free — a paid card must never imply
+    // the address was part of what the reveal unlocked.
+    if(c.address){ out.push('<div class="impp-rvc-row">Address: <span>'+e2(c.address)+'</span>'+cbtn('address')+' <span class="impp-rvc-conf">free on this page</span></div>'); }
     if(!c.email && (!c.role_emails||!c.role_emails.length) && !c.phone){
       out.push('<div class="impp-rvc-none">No verified contact found for this importer — no email or phone resolved. Their supplier lanes above are still your strongest outreach angle.</div>');
     }

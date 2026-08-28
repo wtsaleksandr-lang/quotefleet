@@ -351,7 +351,7 @@ describe('bar LENGTH encodes the true share of the sample', () => {
     // the dominant code is 400/460 ≈ 87%, never a full-width bar
     expect(drawn.some((r) => r.share === '87%' && r.width === 87)).toBe(true);
     // and a truncated list says so in its section header
-    expect(html).toContain('top 6 of 61 HS codes');
+    expect(html).toContain('6 of 61 HS codes');
   });
 
   it('captions both bar sections with what the length means', () => {
