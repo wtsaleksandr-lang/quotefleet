@@ -61,6 +61,22 @@ function tiered(email = 'dm@bosch.com'): TieredContact {
   };
 }
 
+/** The FREE FLOOR: Hunter resolved no email at all. The phone and address that
+ *  ride along are free page data, so this outcome sells nothing. */
+function nothingFound(): TieredContact {
+  return {
+    contact_confidence: 'phone_only',
+    domain: null,
+    contact_name: null,
+    title: null,
+    email: null,
+    email_confidence: null,
+    role_emails: [],
+    phone: '912-555-0100',
+    address: '1 Main St, Newberry, SC 29108',
+  };
+}
+
 /** BOL cache that always MISSES → loadCompanyIdentity falls back to the slug
  *  name (distinct per slug), so each slug maps to a distinct company/cache key. */
 function missBolCache(): BolCacheStore {
@@ -241,22 +257,102 @@ describe('cache-first — no double charge', () => {
 
 describe('honest claims', () => {
   it('returns the real resolved tier verbatim — never a fabricated contact', async () => {
-    const resolveContact = vi.fn(async () => ({
-      contact_confidence: 'phone_only' as const,
-      domain: null,
-      contact_name: null,
-      title: null,
-      email: null,
-      email_confidence: null,
-      role_emails: [],
-      phone: null,
-      address: null,
-    }));
-    const d = deps({ resolveContact });
+    const d = deps({ resolveContact: vi.fn(async () => nothingFound()) });
     const r = res();
     await handleImporterReveal(req('unknown-co'), r, d);
     expect(r.body.ok).toBe(true);
     expect(r.body.contact.confidence).toBe('phone_only');
     expect(r.body.contact.email).toBeNull();
+  });
+});
+
+/* ── NEVER CONSUME AN ALLOWANCE FOR NOTHING ─────────────────────────────────
+ * The phone and street address render FREE on the importer profile. A reveal that
+ * resolves no email has therefore handed the user nothing they did not already
+ * have, and charging a reveal for it — out of a 2-free / 50-per-month allowance —
+ * would be selling them their own page back. It must cost nothing and say so.
+ *
+ * This reuses the ONE no-charge exit the cost-guard path already established
+ * (flag the view via `unavailable`, return the count unchanged, skip
+ * meter.record) rather than adding a second refund mechanism. */
+describe('a reveal that finds nothing beyond the free page is never charged', () => {
+  it('does not decrement the FREE taste allowance, and says why', async () => {
+    const d = deps({ resolveContact: vi.fn(async () => nothingFound()) });
+
+    // Three reveals of three different companies, all resolving to no email.
+    for (const slug of ['unknown-a', 'unknown-b', 'unknown-c']) {
+      const r = res();
+      await handleImporterReveal(req(slug), r, d);
+      expect(r.body.ok).toBe(true);
+      expect(r.body.charged).toBe(false);
+      // The FULL free taste is still intact after every one of them.
+      expect(r.body.remaining).toBe(2);
+      expect(r.body.contact.unavailable).toBe('no-email');
+    }
+    // …and a real, chargeable reveal afterwards still has its whole allowance.
+    const good = deps({ meter: (d as { meter: LeadsRevealMeter }).meter });
+    const r = res();
+    await handleImporterReveal(req('bosch-tool'), r, good);
+    expect(r.body.charged).toBe(true);
+    expect(r.body.remaining).toBe(1);
+  });
+
+  it('does not decrement the Leads Pro monthly allowance either', async () => {
+    vi.mocked(leadsIdentity).mockResolvedValue({
+      userId: 7,
+      email: 'pro@co.com',
+      isSubscriber: true,
+      status: 'active',
+      currentPeriodEnd: null,
+      revealAllowance: 3,
+    });
+    const d = deps({ resolveContact: vi.fn(async () => nothingFound()) });
+    for (const slug of ['unknown-a', 'unknown-b', 'unknown-c', 'unknown-d']) {
+      const r = res();
+      await handleImporterReveal(req(slug, 7), r, d);
+      expect(r.body.charged).toBe(false);
+      expect(r.body.tier).toBe('pro');
+      expect(r.body.remaining).toBe(3); // never moves
+    }
+  });
+
+  it('leaves the company un-recorded, so a later retry is still a first reveal', async () => {
+    // The importer may simply not be in Hunter today. Recording an uncharged
+    // reveal would silently spend the user's retry: the next attempt would come
+    // back `reused` from a cached negative instead of resolving fresh.
+    const resolveContact = vi.fn(async () => nothingFound());
+    const d = deps({ resolveContact });
+    let r = res();
+    await handleImporterReveal(req('unknown-a'), r, d);
+    expect(r.body.reused).toBe(false);
+
+    r = res();
+    await handleImporterReveal(req('unknown-a'), r, d);
+    expect(r.body.reused).toBe(false); // NOT a "you already revealed this"
+    expect(r.body.charged).toBe(false);
+    expect(r.body.remaining).toBe(2);
+  });
+
+  it('charges a role-based reveal — a role inbox is a real, sellable email', async () => {
+    const resolveContact = vi.fn(async () => ({
+      ...nothingFound(),
+      contact_confidence: 'role_based' as const,
+      domain: 'bosch.com',
+      role_emails: ['purchasing@bosch.com', 'logistics@bosch.com'],
+    }));
+    const d = deps({ resolveContact });
+    const r = res();
+    await handleImporterReveal(req('bosch-tool'), r, d);
+    expect(r.body.charged).toBe(true);
+    expect(r.body.remaining).toBe(1);
+  });
+
+  it('a normal verified reveal still charges exactly one', async () => {
+    const d = deps();
+    const r = res();
+    await handleImporterReveal(req('bosch-tool'), r, d);
+    expect(r.body.charged).toBe(true);
+    expect(r.body.contact.unavailable).toBeUndefined();
+    expect(r.body.remaining).toBe(1);
   });
 });

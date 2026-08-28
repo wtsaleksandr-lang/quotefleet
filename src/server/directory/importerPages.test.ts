@@ -19,6 +19,7 @@ import {
   recordLiveSearch,
   __resetQuotaStateForTests,
 } from './importerQuota.js';
+import { FREE_REVEAL_TASTE, LEADS_PRO_MONTHLY_ALLOWANCE } from './leadsEntitlement.js';
 
 const realFetch = globalThis.fetch;
 // These specs drive the search LIVE pull path against a MOCKED fetch, so they opt
@@ -110,12 +111,22 @@ describe('renderImporterSearchPage', () => {
     // CSV export + saved-importers surfaces are present (free with an account).
     expect(html).toContain('Export CSV');
     expect(html).toContain('/importers/saved');
-    // The decision-maker reveal is now REAL + gated: the free-taste + Leads Pro
-    // model is stated honestly, and the card routes to the profile to reveal
-    // (NOT a fabricated inline contact).
-    expect(html).toContain('free decision-maker contact reveals');
+    // The reveal is REAL + gated, and what it sells is now ONE clear thing: the
+    // decision-maker EMAIL. The card routes to the profile to reveal it (NOT a
+    // fabricated inline contact).
+    expect(html).toContain('free decision-maker email reveals');
     expect(html).toContain('Leads Pro');
-    expect(html).toContain('Reveal contact ');
+    expect(html).toContain('Reveal email on profile ');
+  });
+
+  it('lists the phone and address as FREE, and promises no charge for a dud reveal', () => {
+    // Don't sell what isn't scarce: both render free on every importer profile,
+    // so the lock-note says so instead of implying they are behind the paywall.
+    expect(html).toMatch(/company phone number and street address on every profile/i);
+    expect(html).toMatch(/a reveal that finds no email is never charged/i);
+    // Allowance numbers come from the entitlement module, never retyped here.
+    expect(html).toContain(`${FREE_REVEAL_TASTE} free decision-maker email reveals`);
+    expect(html).toContain(`${LEADS_PRO_MONTHLY_ALLOWANCE} email reveals every month`);
   });
   it('carries the nav Importer link (discovery wiring)', () => {
     expect(html).toContain('href="/importers"');

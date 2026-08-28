@@ -164,7 +164,7 @@ describe('R3-5 · card footer zones', () => {
   });
 
   it('reads the reveal action as one control rather than a nested pill', () => {
-    expect(search).toContain("'Reveal on profile '");
+    expect(search).toContain("'Reveal email on profile '");
   });
 });
 

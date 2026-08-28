@@ -27,6 +27,8 @@ import {
   ROLE_LOCALPARTS,
   CONTACT_TIER_COPY,
   TIER_ORDER,
+  PAID_TIER_ORDER,
+  isChargeableContact,
   type BolRow,
   type ContactConfidence,
   type TieredContact,
@@ -236,7 +238,14 @@ describe('resolveContactTiered (never-empty fallback tiers)', () => {
  * "the phone & address on file" while the street address renders FREE on the
  * importer profile (identity header + Organization JSON-LD). The address is not
  * scarce — it is on the company's own website — so the decision was to keep it
- * free and stop claiming it. These specs are the regression fence. */
+ * free and stop claiming it.
+ *
+ * The follow-up applied the SAME principle to the phone: a company switchboard is
+ * published on that company's own site, so unmasking it on the free profile costs
+ * nothing real, and selling six digits of it for a whole reveal out of a 2-free /
+ * 50-per-month allowance was the thinnest thing in the product. The paid tiers are
+ * now strictly EMAIL tiers, and a reveal that lands on the free floor charges
+ * nothing at all. These specs are the regression fence for both decisions. */
 describe('CONTACT_TIER_COPY — every tier claims only what it delivers', () => {
   /** Street address, but NOT the "address" inside "email address". */
   const STREET_ADDRESS = /(?<!e-?mail\s)\baddress(es)?\b/i;
@@ -267,6 +276,13 @@ describe('CONTACT_TIER_COPY — every tier claims only what it delivers', () => 
     expect(Object.keys(CONTACT_TIER_COPY).sort()).toEqual([...TIER_ORDER].sort());
   });
 
+  it('the PAID tiers are exactly the two email tiers, best-first', () => {
+    expect([...PAID_TIER_ORDER]).toEqual(['verified', 'role_based']);
+    // PAID_TIER_ORDER must stay derivable from the copy itself — one source of
+    // truth, so a tier can never be listed as paid in one place and free in another.
+    expect(TIER_ORDER.filter((t) => CONTACT_TIER_COPY[t].paid)).toEqual([...PAID_TIER_ORDER]);
+  });
+
   it.each([...TIER_ORDER])('%s actually delivers every field it promises', async (tier) => {
     const c = await resolveTier(tier);
     expect(c.contact_confidence).toBe(tier);
@@ -277,9 +293,23 @@ describe('CONTACT_TIER_COPY — every tier claims only what it delivers', () => 
     }
   });
 
-  it.each([...TIER_ORDER])('%s never sells the street address (it is free on the profile)', (tier) => {
-    expect(CONTACT_TIER_COPY[tier].delivers).not.toContain('address');
-    expect(prose(tier)).not.toMatch(STREET_ADDRESS);
+  it.each([...PAID_TIER_ORDER])(
+    '%s sells neither the street address nor the phone — both render free',
+    (tier) => {
+      const { delivers } = CONTACT_TIER_COPY[tier];
+      expect(delivers).not.toContain('address');
+      expect(delivers).not.toContain('phone');
+      // …and the prose may not imply either, in any wording.
+      expect(prose(tier)).not.toMatch(STREET_ADDRESS);
+      expect(prose(tier)).not.toMatch(/\bphone\b|\bswitchboard\b|\bnumber\b|\bcall\b/i);
+    },
+  );
+
+  it.each([...PAID_TIER_ORDER])('%s is an EMAIL tier — that is the whole paid promise', (tier) => {
+    const { delivers } = CONTACT_TIER_COPY[tier];
+    const sellsAnEmail = delivers.includes('email') || delivers.includes('role_emails');
+    expect(sellsAnEmail, `${tier} is paid but delivers no email field`).toBe(true);
+    expect(prose(tier)).toMatch(/\bemail\b|\binbox\b/i);
   });
 
   it('verified promises a named person, a title and a verified email', () => {
@@ -295,16 +325,44 @@ describe('CONTACT_TIER_COPY — every tier claims only what it delivers', () => 
     expect(delivers).not.toContain('contact_name');
     expect(delivers).not.toContain('email');
     expect(delivers).toEqual(expect.arrayContaining(['role_emails']));
-    expect(`${badge} ${blurb}`).toMatch(/role-based/i);
+    expect(`${badge} ${blurb}`).toMatch(/role-based|role inbox/i);
     expect(blurb).toMatch(/not a named person/i);
   });
 
-  it('phone_only claims the phone and nothing else', () => {
-    const { badge, blurb, delivers } = CONTACT_TIER_COPY.phone_only;
-    expect([...delivers]).toEqual(['phone']);
-    expect(`${badge} ${blurb}`).toMatch(/phone|number/i);
-    // No email of any kind is delivered at this tier, so none may be implied.
-    expect(`${badge} ${blurb}`).not.toMatch(/\bemail\b|\binbox\b/i);
+  it('phone_only is the FREE floor: it promises nothing and sells nothing', () => {
+    const { badge, blurb, delivers, paid } = CONTACT_TIER_COPY.phone_only;
+    expect(paid).toBe(false);
+    // Nothing at all — the phone and address it carries are free page data.
+    expect([...delivers]).toEqual([]);
+    // It must say out loud that it found no email AND that it costs nothing.
+    expect(`${badge} ${blurb}`).toMatch(/no .*email|email .*(not|no)/i);
+    expect(blurb).toMatch(/free/i);
+    expect(blurb).toMatch(/never charged|not charged|nothing was charged|no charge/i);
+  });
+});
+
+/* ── NEVER CONSUME AN ALLOWANCE FOR NOTHING ─────────────────────────────────
+ * The structural gate the reveal endpoint uses to decide whether a resolved
+ * contact is worth a decrement. It reads the same `paid` / `delivers` metadata
+ * the UI copy reads, so the pitch and the meter cannot drift apart. */
+describe('isChargeableContact', () => {
+  it('charges for a verified decision-maker email', () => {
+    expect(isChargeableContact('verified', { email: 'j@bosch.com', role_emails: [] })).toBe(true);
+  });
+
+  it('charges for role inboxes on the company domain', () => {
+    expect(isChargeableContact('role_based', { email: null, role_emails: ['purchasing@bosch.com'] })).toBe(true);
+  });
+
+  it('NEVER charges on the free floor, even with a phone and address in hand', () => {
+    // This is the whole point: phone + address are free page data, so a reveal
+    // that returns only them has sold the user their own page back.
+    expect(isChargeableContact('phone_only', { email: null, role_emails: [] })).toBe(false);
+  });
+
+  it('does not charge a paid tier that resolved no address at all', () => {
+    expect(isChargeableContact('verified', { email: '  ', role_emails: [] })).toBe(false);
+    expect(isChargeableContact('role_based', {})).toBe(false);
   });
 });
 

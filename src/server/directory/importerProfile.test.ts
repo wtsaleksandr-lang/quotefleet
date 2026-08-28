@@ -12,8 +12,10 @@ import {
   handleImporterProfile,
   renderImporterProfilePage,
   anonRevealState,
+  formatPhone,
+  telHref,
 } from './importerProfile.js';
-import { companySlugFromLink, CONTACT_TIER_COPY, TIER_ORDER } from './importerLeads.js';
+import { companySlugFromLink, CONTACT_TIER_COPY, PAID_TIER_ORDER } from './importerLeads.js';
 import { FIXTURE_PROFILE_ROWS, FIXTURE_PROFILE_SLUG } from './importerFixture.js';
 import { FREE_DETAIL_QUOTA, DETAIL_COOKIE, __resetQuotaStateForTests } from './importerQuota.js';
 import { __setLivePullsForTests } from './externalPullGuard.js';
@@ -183,8 +185,27 @@ describe('aggregateProfile', () => {
     expect(p.incumbent).toBe('Expeditors Intl');
     expect(p.notifyParties.some((n) => /valbruna/i.test(n.name))).toBe(false);
   });
-  it('masks the phone to a contact-unlock teaser', () => {
-    expect(p.phoneMasked).toBe('***-***-2910');
+  it('carries the FULL company phone — it is public, so it is not gated', () => {
+    // Was "***-***-2910". A company switchboard is on that company's own website;
+    // masking it sold nothing scarce and cost a whole reveal to unmask.
+    expect(p.phone).toBe('(260) 434-2910');
+    expect(p.phone).not.toMatch(/\*/);
+  });
+});
+
+describe('formatPhone', () => {
+  it('formats a US 10-digit number and an 11-digit +1 number', () => {
+    expect(formatPhone('8036622910')).toBe('(803) 662-2910');
+    expect(formatPhone('1-803-662-2910')).toBe('(803) 662-2910');
+  });
+  it('passes anything else through rather than mangling it', () => {
+    expect(formatPhone('+49 711 400 40990')).toBe('+49 711 400 40990');
+    expect(formatPhone('x22')).toBeNull();
+    expect(formatPhone('')).toBeNull();
+    expect(formatPhone(null)).toBeNull();
+  });
+  it('dials on the digits, whatever the display formatting', () => {
+    expect(telHref('(803) 662-2910')).toBe('tel:8036622910');
   });
 });
 
@@ -208,11 +229,18 @@ describe('handleImporterProfile', () => {
     expect(String(res._html)).toContain('Shipments over time');
     // the detailed open was counted → slug-aware cookie records the opened slug
     expect(res._cookies[DETAIL_COOKIE]).toBe('s:1:valbruna-stainless');
-    // real contact data is NEVER rendered on load — only the gated reveal CTA;
-    // the decision-maker contact is resolved server-side only on an explicit,
+    // The EMAIL is never rendered on load — only the gated reveal CTA; the
+    // decision-maker contact is resolved server-side only on an explicit,
     // allowance-metered POST to the reveal endpoint.
-    expect(String(res._html)).toContain('Reveal the decision-maker');
-    expect(String(res._html)).not.toContain('2604342910'); // raw phone never leaks
+    expect(String(res._html)).toContain('Decision-maker email');
+    // The revealed-contact block ships EMPTY + hidden — the contact section holds
+    // the lock card, and rows are only ever built client-side from the POST's
+    // response. (The rvc-row markup does appear in PROFILE_JS, as source.)
+    expect(String(res._html)).toContain('<div class="impp-reveal-result" id="impp-reveal-result" hidden></div>');
+    expect(String(res._html)).toContain('<div class="impp-lockcard" id="impp-reveal-card">');
+    // The company PHONE, by contrast, is free page data and renders in full —
+    // it is published on the importer's own site, so gating it sold nothing.
+    expect(String(res._html)).toContain('(260) 434-2910');
   });
 
   it('shows the subscribe WALL once the free quota is spent (no credit spent)', async () => {
@@ -267,13 +295,16 @@ describe('handleImporterProfile', () => {
 });
 
 /* ── the reveal card must not sell what the page gives away ──────────────────
- * The street address renders FREE in the identity header AND in the page's
- * Organization JSON-LD. The paid reveal therefore may not claim it. These specs
- * pin the rendered page, not just the copy constants. */
+ * The street address AND the company switchboard both render FREE in the identity
+ * header (the address also in the page's Organization JSON-LD). The paid reveal
+ * therefore may not claim either — it sells the decision-maker EMAIL and nothing
+ * else. These specs pin the rendered page, not just the copy constants. */
 describe('reveal card claims match the tiers it can deliver', () => {
   const profile = aggregateProfile([...FIXTURE_PROFILE_ROWS], FIXTURE_PROFILE_SLUG);
   const quota = { allowed: true, used: 1, remaining: 2, limit: 3, signedIn: false } as const;
   const html = renderImporterProfilePage(profile, quota, anonRevealState());
+  const lockCard =
+    /<div class="impp-lockcard"[\s\S]*?<\/div>\s*<div class="impp-reveal-result"/.exec(html)?.[0] ?? '';
 
   it('still shows the street address for free (header + JSON-LD)', () => {
     expect(profile.address).toBeTruthy();
@@ -281,24 +312,47 @@ describe('reveal card claims match the tiers it can deliver', () => {
     expect(html).toMatch(/"@type":\s*"Organization"[\s\S]*?"address"/);
   });
 
-  it('never offers the address as part of the paid reveal', () => {
-    const card = /<div class="impp-lockcard"[\s\S]*?<\/div>\s*<div class="impp-reveal-result"/.exec(html)?.[0] ?? '';
-    // The card may mention the address only to say it is FREE. Drop that clause,
-    // and no mention of an address may survive anywhere in the pitch.
-    const pitch = card.replace(/The company&rsquo;s street address stays free on this page either way,?/i, '');
-    expect(pitch).not.toMatch(/\baddress(es)?\b/i);
-    // The old copy sold "the phone & address on file" — never again.
-    expect(card).not.toMatch(/address on file/i);
-    // …and it says the free/paid line out loud.
-    expect(card).toMatch(/street address stays free/i);
+  it('shows the FULL company phone for free, as a dial link', () => {
+    expect(profile.phone).toBeTruthy();
+    expect(profile.phone).not.toMatch(/\*/);
+    // In the identity header, next to the free address — and dialable.
+    expect(html).toContain(`<a class="mi-tel" href="${telHref(profile.phone)}">${profile.phone}</a>`);
   });
 
-  it('lists exactly the three real tiers, best-first', () => {
-    const card = /<div class="ls">([\s\S]*?)<\/div>/.exec(html)?.[1] ?? '';
-    for (const t of TIER_ORDER) expect(card.toLowerCase()).toContain(CONTACT_TIER_COPY[t].badge.toLowerCase());
-    expect(card.indexOf(CONTACT_TIER_COPY.verified.badge.toLowerCase())).toBeLessThan(
-      card.indexOf(CONTACT_TIER_COPY.phone_only.badge.toLowerCase()),
+  it('never offers the address or the phone as part of the paid reveal', () => {
+    // The card may mention either ONLY to say it is free. Drop that clause, and
+    // no mention of an address or a phone may survive anywhere in the pitch.
+    const pitch = lockCard.replace(
+      /The company&rsquo;s phone number and street address stay free on this page either way,?/i,
+      '',
     );
+    expect(pitch).not.toMatch(/\baddress(es)?\b/i);
+    expect(pitch).not.toMatch(/\bphone\b|\bswitchboard\b/i);
+    // The old copy sold "the phone & address on file" — never again.
+    expect(lockCard).not.toMatch(/address on file/i);
+    // …and it says the free/paid line out loud, for BOTH.
+    expect(lockCard).toMatch(/phone number and street address stay free/i);
+  });
+
+  it('lists exactly the two PAID email tiers, best-first — and not the free floor', () => {
+    const card = /<div class="ls">([\s\S]*?)<\/div>/.exec(html)?.[1] ?? '';
+    for (const t of PAID_TIER_ORDER) expect(card.toLowerCase()).toContain(CONTACT_TIER_COPY[t].badge.toLowerCase());
+    expect(card.indexOf(CONTACT_TIER_COPY.verified.badge.toLowerCase())).toBeLessThan(
+      card.indexOf(CONTACT_TIER_COPY.role_based.badge.toLowerCase()),
+    );
+    // The free floor promises nothing, so pitching it would be pitching nothing.
+    expect(card.toLowerCase()).not.toContain(CONTACT_TIER_COPY.phone_only.badge.toLowerCase());
+  });
+
+  it('promises up front that a reveal finding no email costs nothing', () => {
+    expect(lockCard).toMatch(/no email costs you nothing/i);
+  });
+
+  it('sells the EMAIL in every CTA, not "contact info" generally', () => {
+    // Signed-out state → the sign-in CTA. It must name what is actually unlocked.
+    expect(lockCard).toMatch(/Sign in to reveal the email/i);
+    expect(lockCard).not.toMatch(/reveal contact\b/i);
+    expect(html).toMatch(/<div class="lt">Decision-maker email/);
   });
 
   it('ships the tier copy to the client so the revealed badge cannot drift', () => {
@@ -306,5 +360,17 @@ describe('reveal card claims match the tiers it can deliver', () => {
     // blurb from it rather than a second hand-written map.
     expect(html).toContain(JSON.stringify(CONTACT_TIER_COPY.phone_only.badge));
     expect(html).toContain(JSON.stringify(CONTACT_TIER_COPY.role_based.blurb));
+  });
+
+  it('marks the phone AND the address as free page data on the revealed card', () => {
+    // Both ride along on the revealed contact for convenience; neither may read
+    // as something the reveal unlocked.
+    const rows = /if\(c\.phone\)\{[\s\S]*?if\(c\.address\)\{[\s\S]*?\}/.exec(html)?.[0] ?? '';
+    expect((rows.match(/free on this page/g) || []).length).toBe(2);
+  });
+
+  it('renders the no-email outcome as an explicit "nothing was charged"', () => {
+    expect(html).toContain("c.unavailable==='no-email'");
+    expect(html).toMatch(/No decision-maker email found for this company[\s\S]{0,40}nothing was charged/);
   });
 });
