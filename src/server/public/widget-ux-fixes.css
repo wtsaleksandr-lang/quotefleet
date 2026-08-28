@@ -400,7 +400,10 @@ body.qf-modal-open { overflow: hidden; }
   margin: 0 4px;
   padding: var(--space-0-5);
   border-radius: 8px;
-  background: color-mix(in srgb, var(--w-fg) 8%, transparent);
+  /* --w-text, not --w-fg: applyTheme() remaps --w-text but leaves --w-fg at its
+     static light default (#0c1424), so an 8% tint of it is invisible on a dark
+     shell — the lbs/kg track disappeared and the active pill floated free. */
+  background: color-mix(in srgb, var(--w-text, var(--w-fg)) 8%, transparent);
   vertical-align: middle;
 }
 .qf-wt-unit button {
@@ -441,7 +444,9 @@ body.qf-modal-open { overflow: hidden; }
   border-radius: 10px;
   padding: var(--space-1);
   margin-top: var(--space-1);
-  background: color-mix(in srgb, var(--w-fg) 3%, transparent);
+  /* Same legacy-token trap as .qf-wt-unit: a 3% tint of the static light --w-fg
+     leaves the item card with no surface at all on the dark default preset. */
+  background: color-mix(in srgb, var(--w-text, var(--w-fg)) 3%, transparent);
 }
 /* Compact, light field chrome — override the base 44px glossy .qf-input so the
    item grid reads as a thin, dense form (thinner border, no gloss shadow,
@@ -1164,3 +1169,298 @@ html, body { overscroll-behavior: auto; }
    that demo path only and never reaches a real tenant embed. ── */
 body.qfd-embed-phone { scrollbar-width: none; }
 body.qfd-embed-phone::-webkit-scrollbar { width: 0; height: 0; }
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   CRITICAL-REVIEW PASS — measured defects, root-cause fixes.
+   Every item below was MEASURED in a real browser at 1440 and 375 in both the
+   light (cupertino) and dark (midnight — the shipped DEFAULT_PRESET_ID, so
+   these are what a new customer sees out of the box) presets. Appended at EOF
+   so the line-based guard baselines never renumber.
+   Deliberately does NOT touch PR #448's territory: press/transition motion, the
+   map's direct-manipulation pan/zoom, or `overflow: clip` on .qf-modal-card.
+   ═════════════════════════════════════════════════════════════════════════ */
+
+/* ── 1. Service tabs: fill the bar, and never orphan one tab ────────────────
+   The app-calculator skin pinned the tab bar to FIVE equal columns while every
+   real tenant has 1-4 services, so a 3-service widget left 40.7% of the bar
+   (138.8px of 341px at 375) as dead space with the tabs bunched left. That file
+   now uses grid-auto-flow: column, so the track count follows the tab count.
+   For the wide sets it still has to wrap, pick a row width that cannot leave a
+   single tab alone: 5-6 services break 3+2 / 3+3, and 7-8 break 4+3 / 4+4.
+   (7 is the ceiling of the canonical mode set in outreach/prospectDemo.ts.) */
+body.qf-app-calculator .qf-tabs:has(> button:nth-child(5)) {
+  grid-auto-flow: row !important;
+  grid-template-columns: repeat(3, minmax(0, 1fr)) !important;
+}
+body.qf-app-calculator .qf-tabs:has(> button:nth-child(7)) {
+  grid-template-columns: repeat(4, minmax(0, 1fr)) !important;
+}
+
+/* ── 2. --w-bg is a LEGACY token the theme engine never remaps ──────────────
+   widget-style.css:461-467 already documents the trap for the booking panel:
+   applyTheme() rewrites --w-text / --w-surface / --w-input-bg at runtime but
+   leaves --w-fg / --w-bg at their static light defaults, so `var(--w-bg)`
+   paints #ffffff on EVERY preset including the dark default. Two surfaces were
+   still reading it and rendering white-on-dark:
+     - .qf-modal-card — the whole options dialog came up WHITE in midnight, with
+       the dark-glass head/foot compositing over it as grey bars and
+       .qf-opt-group-label measuring 1.79:1 (#b1c5ce on #ffffff).
+     - .qf-ltl-remove — a white remove-disc on the dark LTL item card.
+   Re-point both to the runtime surface with --w-bg kept as the pre-applyTheme
+   fallback, exactly like .qf-book-panel already does. */
+.qf-modal-card { background: var(--w-surface, var(--w-bg)); }
+.qf-ltl-remove { background: var(--w-surface, var(--w-bg)); }
+
+/* ── 3. The inline contact form sits on the CREAM result card, not the shell ─
+   In midnight the result card is --w-input-bg (#E6E3E0 cream) while the field
+   labels/hints inherit shell tokens tuned for the charcoal surface, so the
+   whole "Almost done" form was unreadable: six labels at 1.4:1 (#b1c5ce on
+   #e6e3e0), the heading at 1.28:1 (#ffffff on #e6e3e0), and the "Ask about this
+   quote" link at 2.35:1. The engine already computes AA-guaranteed on-card
+   foregrounds against --w-input-bg (widgetThemes.ts:1134-1140) and
+   #qf-disclaimer-toggle already uses one — they were simply never applied here.
+   --w-oncard-muted measures 4.69:1 on midnight's cream.
+   Selectors are ID-anchored deliberately: the repaint comes from
+   `body.qf-app-calculator .qf-field label { color: var(--qf-color-muted)
+   !important }` (quotefleet-color-system.css:284-286) at (0,2,2), and that
+   sheet is injected AFTER this one, so a class-only rule of equal specificity
+   would lose on source order. #qf-result lifts these to (1,1,1). */
+#qf-result .qf-field > label,
+#qf-result .qf-field-hint,
+#qf-result .qf-title-muted,
+#qf-result .qf-contact-head .qf-tagline {
+  color: var(--w-oncard-muted, var(--w-muted)) !important;
+}
+#qf-result .qf-section-title {
+  color: var(--w-oncard-text, var(--w-text, var(--w-fg))) !important;
+}
+/* Two sibling result links were rendering at different contrast because the
+   on-card accent was applied to .qf-edit-link only — "Ask about this quote"
+   fell through to the on-DARK accent and measured 2.35:1 next to its sibling's
+   4.65:1. One rule for every text link on the card. */
+#qf-result .qf-textlink {
+  color: var(--w-oncard-accent, var(--w-accent-on-surface, var(--w-primary))) !important;
+}
+
+/* ── 4. No-orphan in the options modal ─────────────────────────────────────
+   .qf-flags / .qf-accessorials are `display: contents`, so their chips are
+   direct items of the modal's 2-column grid at <=560px. Three shipment
+   conditions therefore broke 2 + 1, leaving "Temp-control" alone on its own
+   row — the exact pattern the no-orphan rule forbids. An odd final chip now
+   spans the full row, which reads as a deliberate wide cell rather than a
+   stranded one. Same guard for an odd accessorial count. */
+@media (max-width: 560px) {
+  #qf-options-modal .qf-flags > *:last-child:nth-child(odd),
+  #qf-options-modal .qf-accessorials > .qf-acc-chip:last-child:nth-child(odd) {
+    grid-column: 1 / -1;
+  }
+}
+
+/* ── 5. Lock the PAGE, not just <body>, behind the modal ───────────────────
+   body.qf-modal-open { overflow: hidden } does not stop the document scrolling
+   — measured: with the dialog open, window.scrollTo(0, 2000) still moved the
+   page 125px behind it at 375. The scroller here is documentElement, so lock it
+   too. Done with :has() rather than a JS change so the existing single
+   classList toggle in widget.js stays the only piece of state. */
+html:has(> body.qf-modal-open) { overflow: hidden; }
+
+/* ── 6. Errors have to LOOK like errors ────────────────────────────────────
+   The app-calculator skin repaints .qf-error to --w-error-bg (#F3EDDF, a warm
+   beige) with near-black text, which is almost indistinguishable from
+   .qf-success (#E4EDF1) sitting in the same slot — a failed calculate read as a
+   neutral notice. Add the one signal the palette was missing: a rule down the
+   leading edge plus a warning glyph. Colour comes from --w-error, which already
+   exists; no new literal. widget.js also scrolls it into view now — the
+   junk-ZIP error was rendering at y~1730 of a 2028px page, off-screen. */
+.qf-error {
+  position: relative;
+  border-left: 3px solid var(--w-error, #b91c1c);
+  padding-left: var(--space-4);
+}
+.qf-error::before {
+  content: "!";
+  position: absolute;
+  left: var(--space-1-5);
+  top: 50%;
+  width: 14px;
+  height: 14px;
+  /* translateY rather than a -7px margin: the spacing guard's ramp is the whole
+     point of the token system, and half-of-14 is not on it. */
+  transform: translateY(-50%);
+  border: 1.5px solid var(--w-error, #b91c1c);
+  border-radius: 999px;
+  color: var(--w-error, #b91c1c);
+  font-size: 10px;
+  font-weight: 800;
+  line-height: 11px;
+  text-align: center;
+}
+
+/* ── 7. LTL remove control was sitting on top of the fragility select ──────
+   It is absolutely positioned at the item card's top-right while
+   .qf-ltl-row-a's second column runs to the same edge — measured ~20 x 20px of
+   overlap on the select's corner, so the top-right of a real control was
+   un-tappable. Reserve the gutter instead of moving the control. */
+.qf-ltl-row-a { padding-right: var(--space-4); }
+
+/* ── 8. Drayage left half the row empty at 375 ─────────────────────────────
+   In drayage the widget moves #qf-default-delivery INTO #qf-drayage-row, so
+   that row is a 2-column grid holding [Pickup port + Terminal] | [Delivery].
+   Terminal therefore sits under Pickup port with ~165 x 48px of nothing beside
+   it, and at 375 both port and delivery inputs are squeezed to ~167px — the
+   port placeholder truncated mid-word ("Type a port — Los Angel…").
+   One column on phones fixes both: no orphaned half-row, and each field gets
+   the full width its content needs. Scoped to the drayage row so the FTL / LTL
+   / hotshot address rows are untouched.
+   .qf-addr-row is FLEX, not grid (widget-style.css:326) — a grid-template rule
+   here would be silently inert. */
+@media (max-width: 560px) {
+  #qf-drayage-row { flex-direction: column; }
+  #qf-drayage-row > .qf-addr-col { width: 100%; }
+}
+
+/* ── 8b. "Booking details" fold was invisible on the dark default ──────────
+   .qf-options-summary hardcodes the legacy --w-fg (near-black) for its label,
+   which is correct on the light options bar but not on .qf-booking-summary:
+   that one is frosted glass, and the glass follows the theme — white at 62% on
+   light presets, charcoal at 62% on dark. Measured on midnight: #111827 label
+   on a #1e2528 bar = 1.14:1, i.e. the words "Booking details" were simply not
+   there. The label has to follow the glass, so use --w-text (which applyTheme
+   DOES remap) rather than --w-fg (which it does not). */
+.qf-booking-summary,
+.qf-booking-summary > span,
+body.qf-app-calculator .qf-booking-summary,
+body.qf-app-calculator .qf-booking-summary > span {
+  color: var(--w-text, var(--w-fg)) !important;
+}
+.qf-booking-summary .qf-title-muted {
+  color: var(--w-muted) !important;
+}
+
+/* ── 9. Map overlay micro-type ─────────────────────────────────────────────
+   DISTANCE / EST. TRANSIT / $/MI dropped to 8px at <=640px, below the 9px floor
+   and barely legible on a phone. 9px with the existing tracking still fits the
+   three stats plus dividers across a 375 card. */
+@media (max-width: 640px) {
+  .qf-map-ov-lbl { font-size: 9px; }
+}
+
+/* ── 10. Restore copy the app-calculator skin was deleting ─────────────────
+   `body.qf-app-calculator .qf-tagline { display: none !important }` was written
+   to drop the HEADER tagline, but .qf-tagline is also the class on the options
+   modal's empty state ("No optional add-ons for this service."), the contact
+   form's intro, and the thanks-step detail line — so an "Optional add-ons"
+   heading rendered above nothing, and "Almost done" rendered with no
+   explanation. That selector is now scoped to #qf-tagline; these rules restore
+   the three survivors explicitly so a future re-broadening cannot silently
+   delete product copy again. */
+#qf-options-modal .qf-accessorials .qf-tagline,
+.qf-inline-contact .qf-tagline,
+#qf-thanks-detail { display: block !important; }
+
+/* ── 11. Sub-24px touch targets on the quiet text links ────────────────────
+   --tap-min is 24px, and the borderless links fell well under even that:
+   "Show more" on the disclaimer measured 60.2 x 15.4 and the powered-by link
+   14px tall. Rather than pad them (which would open gaps in a deliberately
+   tight result card), grow the HIT AREA with a centred overlay on coarse
+   pointers only — layout is untouched, and ::before/::after are outside the
+   spacing guard's tap-target rule by design. */
+@media (pointer: coarse) {
+  .qf-widget .qf-textlink,
+  .qf-widget #qf-disclaimer-toggle,
+  .qf-widget #qf-powered a { position: relative; }
+  .qf-widget .qf-textlink::after,
+  .qf-widget #qf-disclaimer-toggle::after,
+  .qf-widget #qf-powered a::after {
+    content: "";
+    position: absolute;
+    left: 50%;
+    top: 50%;
+    width: 100%;
+    height: 100%;
+    min-width: 44px;
+    min-height: 44px;
+    transform: translate(-50%, -50%);
+  }
+  /* The map/modal icon buttons have room around them, so grow them for real. */
+  .qf-map-zoom button,
+  .qf-map-modal-x,
+  .qf-modal-x,
+  .qf-map-expand { min-width: 44px; min-height: 44px; }
+}
+
+/* ── 12. The route-map modal was trapped inside the widget card ────────────
+   .qf-map-modal is position:fixed, but it lived inside #qf-step-quote → #qf-root,
+   and on the frosted presets #qf-root carries `backdrop-filter: blur(30px)`
+   (public-calculator-no-gradients.css:629-635) — which makes it the containing
+   block for fixed descendants. Measured on cupertino at 1440x1200: the panel
+   rendered 618 x 348.5 at top 716.8 (centred would be 425.8) and was only 26px
+   wider than the inline map it was supposed to enlarge. On midnight, where
+   #qf-root is opaque and has no filter, the same markup centred perfectly —
+   that split is the proof. #qf-map-modal is now a <body> child beside
+   #qf-options-modal, which always centred correctly for exactly this reason.
+   With the containing block fixed, give the panel a real full-map size. */
+.qf-map-modal-panel { width: min(92vw, 1100px); max-height: 86vh; }
+
+/* ── 13. One primary action per screen ────────────────────────────────────
+   After a quote the result screen showed TWO full-width filled blue CTAs —
+   "Recalculate" (594 x 52) directly above "Get the rate confirmed" (552 x 52),
+   near-identical hue and weight — so the actual next step had no visual
+   priority. widget.js now marks the calculate button .qf-recalc once it has
+   relabelled it, and that state borrows the existing .qf-secondary treatment.
+   The class is dropped again by resetCalcCta().
+   Specificity note: the app-calculator skin pins EVERY .qf-cta to the primary
+   fill with an on-fill label, both !important, at (0,2,0) from a
+   later-injected sheet — so a plain `.qf-cta.qf-recalc` ties and loses on
+   source order. (0,3,0) + !important is what it takes. */
+.qf-widget .qf-cta.qf-recalc,
+body.qf-app-calculator .qf-cta.qf-recalc {
+  background: transparent !important;
+  background-image: none !important;
+  color: var(--w-accent-on-surface, var(--w-primary)) !important;
+  border: 1px solid var(--w-border) !important;
+  box-shadow: none !important;
+}
+.qf-widget .qf-cta.qf-recalc:hover,
+body.qf-app-calculator .qf-cta.qf-recalc:hover {
+  background: color-mix(in srgb, var(--w-text, var(--w-fg)) 6%, transparent) !important;
+  border-color: var(--w-accent-on-surface, var(--w-primary)) !important;
+}
+
+/* ── 14. Surfaces that ignored the theme entirely ──────────────────────────
+   .qf-customer-note (a legal disclaimer) painted a hardcoded white-to-ice
+   gradient with a bright accent border in BOTH themes, so on the dark default
+   it was a glowing white slab sitting directly above the CTA — both wrong for
+   a disclaimer's hierarchy and wrong for the theme. Route it through theme
+   tokens for any layout that still renders it. (In the app-calculator skin the
+   note is now correctly hidden: `body.qf-app-calculator #qf-step-quote >
+   .qf-customer-note { display: none !important }` at
+   public-calculator-app-style.css:147 was written for it but never matched,
+   because the stray </div> put the note OUTSIDE #qf-step-quote. Fixing the
+   nesting made someone's deliberate rule start working.)
+   NOT changed here: the contact form's white "Back" button. It looks heavy,
+   but the surface comes from `var(--w-accent-surface)` — a real per-preset
+   theme token (midnight resolves it to #FFFFFF, light presets to an accent
+   tint) — so it is a deliberate design decision, not a legacy-token bug. */
+.qf-customer-note {
+  background: color-mix(in srgb, var(--w-text, var(--w-fg)) 4%, transparent) !important;
+  background-image: none !important;
+  border-color: var(--w-border) !important;
+  color: var(--w-muted) !important;
+}
+#qf-result .qf-customer-note,
+.qf-result .qf-customer-note { color: var(--w-oncard-muted, var(--w-muted)) !important; }
+
+/* ── 15. "N selected" count pill was a hairline AA fail ────────────────────
+   11px/800 accent text needs 4.5:1; it measured 4.29:1 on the cream result
+   surface. --w-oncard-accent is the engine-guaranteed accent for exactly that
+   background. */
+#qf-result .qf-options-count,
+.qf-result .qf-options-count { color: var(--w-oncard-accent, var(--w-primary)); }
+
+/* ── 16. Bigger, better-centred map dialog on desktop ──────────────────────
+   Pair the containing-block fix above with a viewport-proportional height so
+   "Open full route map" is meaningfully larger than the inline card. */
+@media (min-width: 900px) {
+  .qf-map-viewport { min-height: 60vh; }
+}
