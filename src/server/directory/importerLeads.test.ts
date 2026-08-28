@@ -49,6 +49,10 @@ afterEach(() => {
   vi.restoreAllMocks();
   delete process.env.IMPORTYETI_API_KEY;
   delete process.env.HUNTER_API_KEY;
+  // Enrichment is a CHAIN now: leaving any provider's key (or a custom order)
+  // set would silently change which provider a later spec exercises.
+  delete process.env.PROSPEO_API_KEY;
+  delete process.env.ENRICHMENT_PROVIDER_ORDER;
   delete process.env.ANTHROPIC_API_KEY;
 });
 
@@ -179,8 +183,12 @@ describe('pullImportBols / enrichContact key guards', () => {
   it('pullImportBols throws a clean error when the key is unset', async () => {
     await expect(pullImportBols({ entryPort: 'Savannah, GA' })).rejects.toThrow(/IMPORTYETI_API_KEY not set/);
   });
-  it('enrichContact throws a clean error when the key is unset', async () => {
-    await expect(enrichContact('Bosch')).rejects.toThrow(/HUNTER_API_KEY not set/);
+  it('enrichContact throws a clean error when NO provider in the chain has a key', async () => {
+    // A chain with one of two keys is valid; a chain with none is a deployment
+    // error, and the message must name every key that would fix it.
+    await expect(enrichContact('Bosch')).rejects.toThrow(/no enrichment provider configured/);
+    await expect(enrichContact('Bosch')).rejects.toThrow(/PROSPEO_API_KEY/);
+    await expect(enrichContact('Bosch')).rejects.toThrow(/HUNTER_API_KEY/);
   });
   it('enrichContact requests Hunter with limit=10 and applies the precision guard', async () => {
     process.env.HUNTER_API_KEY = 'test';

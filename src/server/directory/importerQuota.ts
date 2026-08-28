@@ -288,19 +288,27 @@ export function logCreditSpend(creditsRemaining: number | null, ctx: string): vo
  * Snapshot of the in-process credit meter (admin/health view). `sessionLivePulls`
  * is now the guard's ImportYeti live-call count — one per call that actually left
  * the process, not one per HTTP search (a state expansion can pull several).
+ *
+ * `enrichment` is the CHAIN total, not one provider's: contact enrichment is
+ * served by whichever provider answers first, so a per-provider number here would
+ * describe part of the work and read as all of it. The per-provider split lives in
+ * the admin view's own table, off `externalCallMeter()` + the spend ledger.
  */
 export function creditMeter(): {
   sessionLivePulls: number;
   lastCreditsRemaining: number | null;
   blockedPulls: number;
-  hunter: { liveCalls: number; blockedCalls: number };
+  enrichment: { liveCalls: number; blockedCalls: number };
 } {
   const m = externalCallMeter();
   return {
     sessionLivePulls: m.importyeti.liveCalls,
     lastCreditsRemaining: m.importyeti.lastCreditsRemaining,
     blockedPulls: m.importyeti.blockedCalls,
-    hunter: { liveCalls: m.hunter.liveCalls, blockedCalls: m.hunter.blockedCalls },
+    enrichment: {
+      liveCalls: m.hunter.liveCalls + m.prospeo.liveCalls,
+      blockedCalls: m.hunter.blockedCalls + m.prospeo.blockedCalls,
+    },
   };
 }
 

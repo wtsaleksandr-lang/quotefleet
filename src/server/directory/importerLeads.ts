@@ -2,12 +2,13 @@
  * Importer-Leads engine (QuoteFleet port of the validated `engine.mjs`).
  *
  * Pipeline:  ImportYeti pull → drop forwarders/NVOCCs → dedup to real importers
- *            → (optional) Hunter decision-maker enrichment → (optional) AI-draft
- *            personalised outreach.
+ *            → (optional) decision-maker enrichment via the PROVIDER CHAIN
+ *            → (optional) AI-draft personalised outreach.
  *
  * Powers the public "Importer Search" feature (/importers). Browsing is FREE and
- * calls ONLY ImportYeti — enrichment (Hunter) and the AI draft (Anthropic) are
- * the LOCKED / paid reveal and are never run on the free browse path.
+ * calls ONLY ImportYeti — enrichment (the provider chain) and the AI draft
+ * (Anthropic) are the LOCKED / paid reveal and are never run on the free browse
+ * path.
  *
  * ── Outage-safety invariants (QuoteFleet had repeated total outages from
  *    unbounded work — do NOT reintroduce it) ──────────────────────────────────
@@ -21,23 +22,33 @@
  * EVERY paid call in this file goes through `guardedFetch`, which opens NO
  * socket outside real production. Dev / CI / vitest / an agent's checkout are
  * CACHE-ONLY: `pullImportBols` returns `{ blocked: true, rows: [] }` and the
- * Hunter path returns `'blocked'`, so callers serve the licensed cache or render
- * their designed empty state — they must never present a blocked pull as data.
+ * enrichment chain reports `allBlocked`, so callers serve the licensed cache or
+ * render their designed empty state — they must never present a blocked pull as
+ * data.
  *
  * Keys are read from process.env at call time. An unset key throws a clean
  * runtime Error the caller surfaces as a 503-style message — it is deliberately
  * NOT part of the config schema, so a missing key never crashes boot.
  *
- * Env: IMPORTYETI_API_KEY, HUNTER_API_KEY, ANTHROPIC_API_KEY
+ * Env: IMPORTYETI_API_KEY, ANTHROPIC_API_KEY, and the enrichment chain's own
+ *      keys / order (PROSPEO_API_KEY, HUNTER_API_KEY,
+ *      ENRICHMENT_PROVIDER_ORDER — see enrichmentProviders.ts).
  */
 
-import { releaseBody } from '../../http/responseBody.js';
 import {
   guardedFetch,
   reportProviderCost,
   fetchWithTimeout,
   EXTERNAL_TIMEOUT_MS,
 } from './externalPullGuard.js';
+import {
+  resolveViaChain,
+  providerOrder,
+  ENRICHMENT_PROVIDERS,
+  TARGET_TITLE_RX,
+  type ProviderPerson,
+  type ChainResult,
+} from './enrichmentProviders.js';
 
 /** Re-exported from the cost guard so existing importers keep working. */
 export { fetchWithTimeout, EXTERNAL_TIMEOUT_MS };
@@ -453,89 +464,100 @@ export function aliasCountsByCompany(
   return out;
 }
 
-/* ── 3. Enrich: domain + decision-maker + email (Hunter) ────────────────────
- * ONE call: Hunter domain-search?company=NAME resolves the company to its
- * DOMAIN and returns indexed employees with titles + confidence. `limit` MUST
- * be <= 10. Precision guard: reject any resolved domain whose host shares no
- * distinctive token with the input company (a fuzzy match can drift, e.g.
- * "Bosch Tool" → motopaja.fi). Hunter's echoed `organization` field is
- * deliberately IGNORED — it always "matches" and cannot catch the drift. */
-const TARGET_TITLE_RX = /logistic|supply|import|procure|operation|purchas|owner|president|founder|ceo|coo|director|vp|head/i;
-const STOP_TOKENS = new Set([
-  'inc', 'llc', 'corp', 'co', 'ltd', 'america', 'american', 'usa', 'us', 'the', 'company', 'group',
-  'north', 'corporation', 'ab', 'gmbh', 'international', 'intl', 'holdings', 'industries', 'na',
-]);
-function nameTokens(s = ''): Set<string> {
-  return new Set(
-    String(s).toLowerCase().replace(/[^a-z0-9 ]/g, ' ').split(/\s+/)
-      .filter((t) => t.length > 2 && !STOP_TOKENS.has(t)),
-  );
-}
-/** True if the resolved DOMAIN plausibly IS the input company (host shares a
- *  distinctive token, or a solid substring hit). Strict host-token match trades
- *  recall for precision — the right call for a lead product where a wrong email
- *  burns sender reputation. */
-export function domainMatchesCompany(companyName: string, domain: string | null | undefined): boolean {
-  const want = nameTokens(companyName);
-  if (!want.size) return true; // nothing distinctive to check → don't block
-  const host = new Set(nameTokens((domain || '').split('.').slice(0, -1).join(' ')));
-  for (const t of want) if (host.has(t)) return true;
-  const joined = (domain || '').split('.')[0].toLowerCase().replace(/[^a-z0-9]/g, '');
-  for (const t of want) if (t.length >= 4 && joined.includes(t)) return true;
-  return false;
-}
-/** Sentinel: the cost guard refused the Hunter call — no credit spent, and the
- *  result is NOT a real negative, so it must never be cached as one. */
-export const HUNTER_BLOCKED = 'blocked' as const;
-export type HunterResolve =
-  | { domain: string; emails: Array<Record<string, unknown>> }
-  | null
-  | typeof HUNTER_BLOCKED;
+/* ── 3. Enrich: domain + decision-maker + email (PROVIDER CHAIN) ────────────
+ * The provider adapters, the chain walk and the precision guard now live in
+ * enrichmentProviders.ts. This file keeps what it always owned: turning a
+ * normalised provider hit into the PRICED tiers the reveal sells.
+ *
+ * WHY A CHAIN. Enrichment used to be Hunter and only Hunter, on Hunter's Free
+ * plan (~25 searches/month) — which made one provider's free tier the hard
+ * ceiling on how many reveals Leads Pro could sell. The chain tries several
+ * independent free quotas in a configurable order (ENRICHMENT_PROVIDER_ORDER),
+ * stopping at the first that answers, so an exhausted provider degrades to the
+ * next instead of ending the feature for the month.
+ *
+ * Re-exported below because the precision guard is part of this module's public
+ * contract and has direct test coverage against it. */
+export {
+  domainMatchesCompany,
+  normalizeDomain,
+  resolveViaChain,
+  providerOrder,
+  DEFAULT_PROVIDER_ORDER,
+  ENRICHMENT_PROVIDERS,
+  TARGET_TITLE_RX,
+} from './enrichmentProviders.js';
+export type {
+  EnrichmentProviderName,
+  ProviderHit,
+  ProviderPerson,
+  ChainResult,
+} from './enrichmentProviders.js';
 
-/** Low-level Hunter resolve: company → { domain, indexed emails }, precision-
- *  guarded. Throws only on an unset key; a Hunter error / drift / no-domain
- *  returns null; the cost guard returns HUNTER_BLOCKED. `limit` MUST be <= 10. */
-async function hunterDomainSearch(companyName: string): Promise<HunterResolve> {
-  const key = process.env.HUNTER_API_KEY;
-  if (!key) throw new Error('HUNTER_API_KEY not set');
-  const r = await guardedFetch(
-    'hunter',
-    `reveal:${companyName.slice(0, 60)}`,
-    `https://api.hunter.io/v2/domain-search?company=${encodeURIComponent(companyName)}&api_key=${key}&limit=10`,
-  );
-  // Cost guard refused — nothing left the process.
-  if (!r) return HUNTER_BLOCKED;
-  if (!r.ok) {
-    releaseBody(r); // free the socket — body is never read on the error path
-    return null;
-  }
-  const j = (await r.json()) as { data?: { domain?: string; emails?: Array<Record<string, unknown>> } };
-  const d = j.data || {};
-  const domain = d.domain || null;
-  if (!domain) return null;
-  if (!domainMatchesCompany(companyName, domain)) return null; // fuzzy-drift guard
-  return { domain, emails: d.emails || [] };
+/** Thrown by `enrichContact` when NO provider in the chain has a key. A chain
+ *  with one of two keys is perfectly valid; a chain with none is a deployment
+ *  error the caller should see. */
+export const NO_ENRICHMENT_PROVIDER =
+  'no enrichment provider configured (set PROSPEO_API_KEY and/or HUNTER_API_KEY)';
+
+/** TRUE when at least one provider in the configured chain has an API key. */
+function enrichmentConfigured(): boolean {
+  return providerOrder().some((n) => !!process.env[ENRICHMENT_PROVIDERS[n].keyEnv]);
 }
 
-export async function enrichContact(companyName: string): Promise<EnrichedContact | null> {
-  const res = await hunterDomainSearch(companyName);
-  if (!res || res === HUNTER_BLOCKED || !res.emails.length) return null;
-  const ranked = [...res.emails].sort((a, b) => num(b.confidence) - num(a.confidence));
-  const dm = ranked.find((e) => TARGET_TITLE_RX.test(str(e.position))) || ranked[0];
-  const name = [dm.first_name, dm.last_name].filter(Boolean).join(' ') || null;
+/** Rank provider candidates the way the reveal cares about: a named
+ *  decision-maker with an address first, then whoever the provider scored
+ *  highest. Shared by `enrichContact` and `resolveContactTiered` so both pick
+ *  the same person out of the same hit. */
+function pickDecisionMaker(people: readonly ProviderPerson[]): {
+  dm: ProviderPerson | undefined;
+  any: ProviderPerson | undefined;
+} {
+  const ranked = [...people].sort((a, b) => (b.confidence ?? 0) - (a.confidence ?? 0));
   return {
-    domain: res.domain,
-    contact_name: name,
-    title: (dm.position as string) || null,
-    email: (dm.value as string) || null,
-    email_confidence: dm.confidence == null ? null : num(dm.confidence),
-    linkedin: (dm.linkedin as string) || null,
+    dm: ranked.find((p) => p.email && TARGET_TITLE_RX.test(str(p.position))),
+    any: ranked[0],
+  };
+}
+
+const fullName = (p: ProviderPerson | undefined): string | null =>
+  p ? [p.first_name, p.last_name].filter(Boolean).join(' ') || null : null;
+
+/**
+ * Best-effort enrichment for the batch/CSV path: company → domain + one
+ * decision-maker, or null when the chain turns up nothing.
+ *
+ * Throws ONLY when the chain is entirely unconfigured, because that is a
+ * deployment error rather than a "this importer has no contact" result.
+ * `resolveContactTiered` — the paid reveal path — deliberately does NOT throw;
+ * it degrades to the free floor so a reveal is always answerable.
+ *
+ * `website` is the FREE domain hint from the ImportYeti row; passing it lets the
+ * chain start at a domain-only provider instead of paying to resolve the domain.
+ */
+export async function enrichContact(
+  companyName: string,
+  website?: string | null,
+): Promise<EnrichedContact | null> {
+  if (!enrichmentConfigured()) throw new Error(NO_ENRICHMENT_PROVIDER);
+  const { hit } = await resolveViaChain(companyName, { domainHint: website ?? null });
+  if (!hit || !hit.people.length) return null;
+  const { dm, any } = pickDecisionMaker(hit.people);
+  const best = dm || any;
+  if (!best) return null;
+  return {
+    domain: hit.domain,
+    contact_name: fullName(best),
+    title: best.position,
+    email: best.email,
+    email_confidence: best.confidence,
+    linkedin: best.linkedin,
   };
 }
 
 /* ── Tiered contact resolution (the paid REVEAL path) ────────────────────────
  * A lead is NEVER empty. Returns the best available tier:
- *   1. verified   — a named decision-maker email (Hunter, DM title match)  [PAID]
+ *   1. verified   — a named decision-maker email (DM title match)           [PAID]
  *   2. role_based — domain resolved but no named person → purchasing@/logistics@
  *                   /sales@/info@ + domain, clearly UNVERIFIED              [PAID]
  *   3. phone_only — no domain, so no email: the FREE FLOOR. The phone and
@@ -543,11 +565,30 @@ export async function enrichContact(companyName: string): Promise<EnrichedContac
  *                   the profile already prints both for free. A reveal that
  *                   lands here must not charge an allowance (see
  *                   isChargeableContact + CONTACT_TIER_COPY).
- * Never throws — any Hunter failure (incl. a missing key) degrades to
+ *
+ * THE SEAM. This is the one function the reveal calls, and its contract is
+ * unchanged by the move to a provider chain: same three tiers, same never-empty
+ * guarantee, same `live_blocked` flag. Which provider answered is an
+ * implementation detail recorded in the `external_api_spend` ledger, not
+ * something the pricing logic above it can see — so adding or re-ranking
+ * providers can never move a reveal between a charged and an uncharged outcome.
+ *
+ * Never throws — any provider failure (including no keys at all) degrades to
  * phone_only, so the reveal is always answerable. */
 export async function resolveContactTiered(
   companyName: string,
-  { phone = null, address = null }: { phone?: string | null; address?: string | null } = {},
+  {
+    phone = null,
+    address = null,
+    website = null,
+  }: {
+    phone?: string | null;
+    address?: string | null;
+    /** FREE domain hint from the ImportYeti row (`company_website`). Lets the
+     *  chain start at a domain-only provider instead of paying a name→domain
+     *  resolve. Ignored when it does not look like this company's domain. */
+    website?: string | null;
+  } = {},
 ): Promise<TieredContact> {
   const base: TieredContact = {
     contact_confidence: 'phone_only',
@@ -560,41 +601,41 @@ export async function resolveContactTiered(
     phone,
     address,
   };
-  let res: HunterResolve = null;
+  let chain: ChainResult;
   try {
-    res = await hunterDomainSearch(companyName);
+    chain = await resolveViaChain(companyName, { domainHint: website });
   } catch {
-    res = null; // missing key / network → fall through to phone_only
+    return base; // an unexpected failure must never take the reveal down
   }
-  // Cost guard refused the live call — honest phone_only, flagged so the caller
-  // does NOT cache it as a real negative and does NOT charge an allowance.
-  if (res === HUNTER_BLOCKED) return { ...base, live_blocked: true };
-  if (!res) return base;
+  // The cost guard refused every provider that could have answered — honest
+  // phone_only, flagged so the caller neither caches it as a real negative nor
+  // charges an allowance for it.
+  if (chain.allBlocked) return { ...base, live_blocked: true };
+  const hit = chain.hit;
+  if (!hit) return base;
 
-  const ranked = [...res.emails].sort((a, b) => num(b.confidence) - num(a.confidence));
-  const dm = ranked.find((e) => TARGET_TITLE_RX.test(str(e.position)) && e.value);
+  const { dm, any } = pickDecisionMaker(hit.people);
   if (dm) {
     return {
       ...base,
       contact_confidence: 'verified',
-      domain: res.domain,
-      contact_name: [dm.first_name, dm.last_name].filter(Boolean).join(' ') || null,
-      title: str(dm.position) || null,
-      email: str(dm.value) || null,
-      email_confidence: dm.confidence == null ? null : num(dm.confidence),
+      domain: hit.domain,
+      contact_name: fullName(dm),
+      title: dm.position,
+      email: dm.email,
+      email_confidence: dm.confidence,
     };
   }
   // Domain resolved but no named decision-maker → role-based (unverified).
-  const any = ranked[0];
   return {
     ...base,
     contact_confidence: 'role_based',
-    domain: res.domain,
-    contact_name: any ? [any.first_name, any.last_name].filter(Boolean).join(' ') || null : null,
-    title: any ? str(any.position) || null : null,
-    email: any ? str(any.value) || null : null,
-    email_confidence: any && any.confidence != null ? num(any.confidence) : null,
-    role_emails: ROLE_LOCALPARTS.map((lp) => `${lp}@${res!.domain}`),
+    domain: hit.domain,
+    contact_name: fullName(any),
+    title: any?.position ?? null,
+    email: any?.email ?? null,
+    email_confidence: any?.confidence ?? null,
+    role_emails: ROLE_LOCALPARTS.map((lp) => `${lp}@${hit.domain}`),
   };
 }
 
@@ -850,7 +891,11 @@ export async function findImporterLeads({
   const rowByCompany = new Map(importers.map((r) => [str(r.company_name), r]));
   const leads = await mapLimit(base, concurrency, async (lead) => {
     const row = rowByCompany.get(lead.company);
-    const contact = withEnrichment ? await enrichContact(lead.company).catch(() => null) : null;
+    // `lead.website` is ImportYeti's own `company_website` — a FREE domain hint
+    // that lets the chain skip paying a provider to resolve the domain.
+    const contact = withEnrichment
+      ? await enrichContact(lead.company, lead.website).catch(() => null)
+      : null;
     const merged = row ? toLead(row, contact) : { ...lead, ...(contact ?? {}) };
     // toLead() rebuilds from the raw row and knows nothing about aliases — carry
     // the counts computed above so enriched leads keep the sub-line.

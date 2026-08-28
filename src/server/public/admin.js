@@ -664,17 +664,96 @@
       card.appendChild(el('div', { style: { fontSize: '28px', fontWeight: '800', letterSpacing: '-0.02em' }, text: String(value) }));
       grid.appendChild(card);
     }
+    // Per-provider spend + the enrichment chain. Enrichment is a CHAIN of
+    // independent free quotas now, so a single "credits remaining" number can no
+    // longer describe it — which provider served a reveal, and how much of each
+    // free tier is left, is the whole operating picture.
+    var chainCard = el('div', { class: 'card', style: { margin: '0 0 24px 0' } });
+    chainCard.appendChild(el('div', { class: 'card-title', text: 'External providers' }));
+    var chainSub = el('p', { class: 'muted-small' });
+    chainCard.appendChild(chainSub);
+    var provTable = el('div');
+    chainCard.appendChild(provTable);
+    c.appendChild(chainCard);
+
+    function cell(text, opts) {
+      return el('div', Object.assign({ text: String(text) }, opts || {}));
+    }
+    function providerRows(rows, headers) {
+      var t = el('div', { style: { display: 'grid', gridTemplateColumns: 'repeat(' + headers.length + ', minmax(0,1fr))', gap: '2px 12px', alignItems: 'center' } });
+      headers.forEach(function (h) { t.appendChild(el('div', { class: 'muted-small', text: h })); });
+      rows.forEach(function (r) { r.forEach(function (v) { t.appendChild(cell(v)); }); });
+      return t;
+    }
+
     api('/api/admin/importers/usage').then(function (d) {
       var m = d.meter || {}; var cache = d.cache || {};
+      var spend = d.spend || {}; var totals = spend.totals || [];
+      var guard = (d.guard || {}).providers || {};
+      var chain = d.chain || {};
       stat('Live pulls (session)', m.sessionLivePulls != null ? m.sessionLivePulls : '—');
-      stat('Credits remaining', m.lastCreditsRemaining != null ? m.lastCreditsRemaining : 'unknown');
+      stat('ImportYeti credits left', m.lastCreditsRemaining != null ? m.lastCreditsRemaining : 'unknown');
       stat('BOL cache rows', cache.bolRows != null ? cache.bolRows : '—');
       stat('Contact cache rows', cache.contactRows != null ? cache.contactRows : '—');
+
+      var order = chain.order || [];
+      chainSub.textContent =
+        'Enrichment chain (first that answers wins): ' + (order.length ? order.join(' → ') : 'none') +
+        '. Keys present: ' + ((chain.configured || []).join(', ') || 'none') +
+        '. Re-rank with ' + (chain.envVar || 'ENRICHMENT_PROVIDER_ORDER') + ' — no deploy needed.';
+
+      // One row per provider the ledger has ever seen, plus every provider the
+      // guard knows about, so a provider with zero calls is visibly at zero
+      // rather than silently absent.
+      var names = Object.keys(guard);
+      totals.forEach(function (t) { if (names.indexOf(t.provider) < 0) names.push(t.provider); });
+      var byProvider = {};
+      totals.forEach(function (t) { byProvider[t.provider] = t; });
+      var rows = names.map(function (n) {
+        var t = byProvider[n] || {};
+        var g = guard[n] || {};
+        return [
+          n,
+          t.calls != null ? t.calls : 0,
+          t.credits != null ? t.credits : 0,
+          '$' + (((t.estUsdCents || 0) / 100).toFixed(2)),
+          g.allowed ? 'live' : 'blocked',
+        ];
+      });
+      provTable.innerHTML = '';
+      provTable.appendChild(providerRows(rows, ['Provider', 'Calls', 'Credits', 'Est. spend', 'Guard']));
     }).catch(function (e) { grid.appendChild(el('div', { class: 'notice error', text: e.message })); });
+
+    // Live free-quota check — its own button because it makes real (free)
+    // outbound calls to each provider's account endpoint.
+    var qBtn = el('button', { class: 'btn btn-secondary', type: 'button', text: 'Check free quota' });
+    var qOut = el('div', { class: 'muted', style: { marginTop: '10px' } });
+    chainCard.appendChild(qBtn);
+    chainCard.appendChild(qOut);
+    qBtn.addEventListener('click', function () {
+      qBtn.disabled = true; qOut.innerHTML = '';
+      qOut.appendChild(el('div', { class: 'muted', text: 'Checking…' }));
+      api('/api/admin/importers/quota').then(function (r) {
+        qOut.innerHTML = '';
+        var rows = (r.providers || []).map(function (p) {
+          return [
+            p.provider,
+            p.plan || '—',
+            p.remaining != null ? p.remaining : (p.unavailable || '—'),
+            p.used != null ? p.used : '—',
+            p.renewsInDays != null ? p.renewsInDays + 'd' : '—',
+          ];
+        });
+        qOut.appendChild(providerRows(rows, ['Provider', 'Plan', 'Remaining', 'Used', 'Renews in']));
+      }).catch(function (e) {
+        qOut.innerHTML = '';
+        qOut.appendChild(el('div', { class: 'notice error', text: e.message }));
+      }).finally(function () { qBtn.disabled = false; });
+    });
 
     var card = el('div', { class: 'card' });
     card.appendChild(el('div', { class: 'card-title', text: 'Purge cache by company' }));
-    card.appendChild(el('p', { class: 'muted-small', text: 'Deletes the resolved-contact cache for a company (forces a fresh Hunter resolve on next open). Optionally purge one BOL result set by its exact search key.' }));
+    card.appendChild(el('p', { class: 'muted-small', text: 'Deletes the resolved-contact cache for a company (forces a fresh provider-chain resolve on next open, spending a credit). Optionally purge one BOL result set by its exact search key.' }));
     function fld(label, node) { var f = el('div', { class: 'field', style: { marginBottom: '10px' } }); f.appendChild(el('label', { class: 'field-label', text: label })); f.appendChild(node); return f; }
     var coInput = el('input', { class: 'input', type: 'text', placeholder: 'Company name', autocomplete: 'off' });
     var skInput = el('input', { class: 'input', type: 'text', placeholder: 'BOL search key (optional)', autocomplete: 'off' });

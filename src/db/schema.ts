@@ -2140,7 +2140,9 @@ export const externalApiSpend = pgTable(
   'external_api_spend',
   {
     id: serial('id').primaryKey(),
-    /** 'importyeti' | 'hunter' | 'anthropic'. */
+    /** 'importyeti' | 'hunter' | 'prospeo' | 'apollo' | 'anthropic'. Free text on
+     *  purpose: adding a provider to the enrichment chain must never need a
+     *  migration. */
     provider: text('provider').notNull(),
     /** Short, log-safe call context ("search page=1", "profile:acme"). */
     context: text('context'),
