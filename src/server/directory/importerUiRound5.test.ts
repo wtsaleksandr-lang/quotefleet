@@ -1,5 +1,6 @@
 /**
- * Importer Search round 5 — COST SAFETY for the shareable search link.
+ * Importer Search round 5 — COST SAFETY for the shareable search link, plus the
+ * holistic polish pass over the surfaces a real user hits first.
  *
  * Round 4 made a search deep-linkable and had the arrival AUTO-RUN it. That is
  * the right UX and the wrong economics: a link pasted into a channel, kept in a
@@ -23,11 +24,22 @@
  *   R5-4  probe is side-effect-free on the anti-abuse live-search counter
  *   R5-5  client wiring          → the deep-link arrival probes, a typed search does not
  *   R5-6  the "Run search" gate  → a real button, honest copy, and it re-runs for real
+ *   R5-7  first-hit surfaces    → visible h1, card-shaped skeleton, honest busy state
+ *   R5-8  the first card        → no contradictory flag, AA badges, readable facets
+ *   R5-9  layout defects        → lock-pill shove, 2px rhythm, toolbar, rings, typeahead
+ *   R5-10 the profile page      → port spelling, y/x axes, plot width, the fold
  */
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import type { Request, Response } from 'express';
 import { __setLivePullsForTests } from './externalPullGuard.js';
 import { renderImporterSearchPage, handleImporterSearch } from './importerPages.js';
+import { normalizePortName } from './importerLeads.js';
+import {
+  aggregateProfile,
+  renderImporterProfilePage,
+  anonRevealState,
+} from './importerProfile.js';
+import { FIXTURE_PROFILE_ROWS, FIXTURE_PROFILE_SLUG } from './importerFixture.js';
 import { __resetQuotaStateForTests } from './importerQuota.js';
 
 const realFetch = globalThis.fetch;
@@ -283,6 +295,12 @@ describe('R5-4 · the probe is invisible to the anti-abuse live-search counter',
 
 // ── client wiring (the rendered page's inline script) ────────────────────────
 const html = renderImporterSearchPage();
+const pQuota = { allowed: true, used: 2, remaining: 3, limit: 5, signedIn: false } as const;
+const profileHtml5 = renderImporterProfilePage(
+  aggregateProfile([...FIXTURE_PROFILE_ROWS], FIXTURE_PROFILE_SLUG),
+  pQuota,
+  anonRevealState(),
+);
 
 describe('R5-5 · the client only probes on a deep-linked arrival', () => {
   it('doSearch takes a cacheOnly arg and puts it on the request body', () => {
@@ -340,5 +358,188 @@ describe('R5-6 · the un-cached shared link renders a deliberate "Run search" ga
 
   it('clears the stale results toolbar so no old count describes an empty view', () => {
     expect(html).toContain("toolbar.classList.remove('on');");
+  });
+});
+
+// ── R5-7 · the round-5 polish pass ──────────────────────────────────────────
+describe('R5-7 · the surfaces a user hits FIRST', () => {
+  it('the initial state has a real, visible, left-aligned page header', () => {
+    // It was sr-only, so the most-visited surface on the page opened on a bare
+    // filter panel with no title and no statement of what the tool does.
+    expect(html).toContain('<header class="imp-head">');
+    expect(html).toContain('<h1>Find US importers to pitch</h1>');
+    expect(html).toContain('.imp-head{text-align:left');
+    expect(html).not.toContain('<h1 class="imp-sr-only"');
+  });
+
+  it('the loading skeleton is built from the CARD\'S OWN layout, so it reserves the real height', () => {
+    // 4 plain bars (115px) standing in for a 327px card made the results column
+    // jump ~1,650px the instant the response landed.
+    expect(html).toContain('function skelCard()');
+    expect(html).toContain(".imp-card,.imp-skel{position:relative");
+    expect(html).toContain("var c=T('div','imp-skel');");
+    // …and NOT .imp-card, which is the results-only selector.
+    expect(html).not.toContain("T('div','imp-card imp-skel')");
+    // the footer stands in button-shaped blocks at the real 44px control height
+    expect(html).toContain('.imp-skel .sk-btn{width:112px;height:44px');
+  });
+
+  it('the skeleton is mixed against --ink so it is visible in DARK too', () => {
+    // On the raw surface tokens it measured 1.13:1 in dark — an invisible
+    // loading state that read as an empty card.
+    expect(html).toContain('color-mix(in srgb,var(--ink) 16%,var(--surface-2)) 50%');
+  });
+
+  it('the busy button says what it is doing instead of just greying out', () => {
+    expect(html).toContain('id="imp-search-l"');
+    expect(html).toContain("btnLabel.textContent = busy ? 'Searching\\u2026' : 'Search importers'");
+    expect(html).toContain('.imp-actions .btn-primary[disabled]{opacity:1');
+  });
+
+  it('the record strip stops telling the user to do what they just did', () => {
+    expect(html).toContain("recordLine.textContent=cacheOnly?'checking the cache for this lane':'searching this lane now'");
+  });
+
+  it('a phone scrolls to the results, which otherwise start ~1,080px down', () => {
+    expect(html).toContain('if(window.innerWidth<=900){');
+    expect(html).toContain("results.scrollIntoView({block:'start',behavior:'smooth'})");
+  });
+});
+
+describe('R5-8 · the first result card tells the truth', () => {
+  it('carries no supplier flag beside the US importer\'s name', () => {
+    // It rendered flag(supplier_country) directly above "United States · NC",
+    // and degraded to the literal letters "DE" wherever flag glyphs are absent.
+    expect(html).not.toContain("T('span','imp-flag',flag(l.supplier_country))");
+  });
+
+  it('the winnability badge and incumbent chip are mixed toward --ink for AA', () => {
+    expect(html).toContain('.imp-win.hi{background:color-mix(in srgb,var(--success) 15%,transparent);color:color-mix(in srgb,var(--success) 62%,var(--ink))');
+    expect(html).toContain('color:color-mix(in srgb,var(--warn) 72%,var(--ink))');
+  });
+
+  it('facet rows are readable — no doubled country code, and named HS chapters', () => {
+    // The label was `code + flag(code)`, which renders "DE de" wherever the flag
+    // falls back to letterforms.
+    expect(html).not.toContain("label:k+' '+flag(k)");
+    expect(html).toContain('function countryLabel(code)');
+    expect(html).toContain('function chapterName(c)');
+  });
+});
+
+describe('R5-9 · layout defects that misdirected the eye', () => {
+  it('the filter row top-aligns, so the lock pill cannot shove its neighbours', () => {
+    expect(html).toContain('.imp-grid{display:flex;flex-wrap:wrap;gap:8px;align-items:start}');
+  });
+
+  it('stacked input clusters use the 2px rhythm', () => {
+    expect(html).toContain('.imp-grid{gap:2px 8px}');
+    expect(html).toContain('.imp-more-grid{gap:2px 12px}');
+    expect(html).toContain('.imp-more-name{margin-top:2px}');
+  });
+
+  it('the toolbar declares its two rows and starts both at the left edge', () => {
+    expect(html).toContain('.imp-countwrap{display:flex;flex-direction:column;gap:5px;min-width:0;flex:1 1 100%}');
+    expect(html).toContain('flex:1 1 100%;margin-left:0}');
+  });
+
+  it('the quota chip is a status, not a look-alike of a selected control', () => {
+    expect(html).toContain('.imp-profiles-left{display:none;align-items:center;gap:6px;font-size:12px;font-weight:600;color:var(--ink-soft);background:var(--surface-2)');
+  });
+
+  it('the selected audience ring is not overpainted by the sibling divider', () => {
+    expect(html).toContain('.imp-aud button[aria-pressed="true"],.imp-aud button[aria-pressed="true"]+button{border-left-color:transparent}');
+    // …and in the 2x2 mobile grid, where the grey edge can land on top instead.
+    expect(html).toContain('{border-left-color:transparent;border-top-color:transparent}');
+  });
+
+  it('the suggestion list closes before it can swallow a click on Search', () => {
+    expect(html).toContain("document.addEventListener('pointerdown'");
+  });
+});
+
+// ── R5-10 · the profile surface ─────────────────────────────────────────────
+describe('R5-10 · the profile page above the fold and its chart', () => {
+  it('normalizePortName fixes the provider spelling once, at the boundary', () => {
+    // "Savannah, Ga." rendered on every card, in its title attribute AND inside
+    // the origin= parameter of the RFQ deep link, so the quote request carried a
+    // differently-spelled port from the one the user picked.
+    expect(normalizePortName('Savannah, Ga.')).toBe('Savannah, GA');
+    expect(normalizePortName('Long Beach, Ca')).toBe('Long Beach, CA');
+    expect(normalizePortName('  Newark, nj.  ')).toBe('Newark, NJ');
+    // Anything that is not a trailing 2-letter state token is left alone.
+    expect(normalizePortName('Rotterdam, Netherlands')).toBe('Rotterdam, Netherlands');
+    expect(normalizePortName('Yantian')).toBe('Yantian');
+    expect(normalizePortName('')).toBeNull();
+    expect(normalizePortName(null)).toBeNull();
+  });
+
+  it('the y-axis prints five DISTINCT ticks even when the peak is tiny', () => {
+    // The gridlines are locked to four bands, so a peak of 2 used to print
+    // "2, 2, 1, 1, 0" — Math.round collapsing 1.5 and 0.5 onto their neighbours.
+    const small = aggregateProfile(
+      [...FIXTURE_PROFILE_ROWS].slice(0, 3),
+      FIXTURE_PROFILE_SLUG,
+    );
+    const h = renderImporterProfilePage(small, pQuota, anonRevealState());
+    const yaxis = /<div class="impp-yaxis"[^>]*>(.*?)<\/div>/s.exec(h)?.[1] ?? '';
+    const ticks = [...yaxis.matchAll(/<span>([^<]*)<\/span>/g)].map((m) => m[1]);
+    expect(ticks).toHaveLength(5);
+    expect(new Set(ticks).size).toBe(5);
+    expect(ticks[ticks.length - 1]).toBe('0');
+  });
+
+  it('a short series does not stretch into full-bleed slabs', () => {
+    expect(profileHtml5).toMatch(/class="impp-chartwrap" style="--impp-plot-cap:\d+px"/);
+    expect(profileHtml5).toContain('.impp-plot,.impp-xaxis{max-width:var(--impp-plot-cap,none)}');
+  });
+
+  it('every x-axis slot is a month, so a label sits under its OWN bar', () => {
+    expect(profileHtml5).toContain('.impp-xaxis span{flex:1 1 0;min-width:0;text-align:center;white-space:nowrap}');
+    expect(profileHtml5).not.toContain('.impp-xaxis{display:flex;justify-content:space-between');
+  });
+
+  it('the CBP privacy pitch no longer spends a quarter of the first screen', () => {
+    // It is aimed at the importer being profiled, not the freight seller who is
+    // actually visiting — so it sits after the data, not above it.
+    const headEnd = profileHtml5.indexOf('impp-secbar');
+    const privacyAt = profileHtml5.indexOf('impp-privacy"');
+    expect(privacyAt).toBeGreaterThan(headEnd);
+  });
+
+  it('the header actions take the full row on a phone instead of hugging the right', () => {
+    expect(profileHtml5).toContain('.impp-head-act{margin-left:0;width:100%}');
+    expect(profileHtml5).toContain('.impp-head-act>*{flex:1 1 0;min-width:0;justify-content:center}');
+  });
+
+  it('"Quote this lane" is accent-filled, matching the search page\'s primary', () => {
+    expect(profileHtml5).toContain('.impp-head-act .btn-primary{background:var(--accent-fill)');
+  });
+
+  it('the sticky section bar reads as chrome, not a hole cut through the cards', () => {
+    expect(profileHtml5).toContain('backdrop-filter:blur(10px)');
+    expect(profileHtml5).not.toContain('padding:8px 0;background:var(--bg)}');
+  });
+
+  it('"Expand all" sheds its second word on a phone, and the JS keeps the span', () => {
+    expect(profileHtml5).toContain('<span class="impp-expand-x"> all</span>');
+    expect(profileHtml5).toContain('.impp-expand-x{display:none}');
+    // The old syncExpand set textContent, which destroyed the span on first run.
+    expect(profileHtml5).toContain("if(verb && verb.nodeType === 3) verb.nodeValue");
+  });
+
+  it('the scroll chevrons are backed chips, so they cannot sit inside a label', () => {
+    expect(profileHtml5).toContain('background:var(--surface-2);border:1px solid var(--border-strong);box-shadow:var(--shadow-sm)}');
+  });
+
+  it('KPI labels are sentence case on a phone and cannot orphan a word', () => {
+    expect(profileHtml5).toContain('.impp-stat .sl{text-transform:none;letter-spacing:0;font-size:11px}');
+    // Non-breaking spaces hold "12 mo" and "TEU / shipment" together.
+    expect(profileHtml5).toContain('last 12 mo');
+    expect(profileHtml5).toContain('Avg TEU / shipment');
+  });
+
+  it('the chart tooltip bails instead of clipping when the plot has no width', () => {
+    expect(profileHtml5).toContain('if(!r.width) return;');
   });
 });

@@ -176,6 +176,28 @@ const num = (v: unknown): number => {
 };
 const str = (v: unknown): string => (v == null ? '' : String(v));
 
+/**
+ * ImportYeti files entry ports title-cased with an abbreviating period —
+ * "Savannah, Ga." — which then rendered on every card, in the card's title
+ * attribute AND inside the `origin=` parameter of the RFQ deep link, so the
+ * quote request carried a differently-spelled port from the one the user picked
+ * ("Savannah, GA"). Normalise ONCE here, at the boundary where the provider's
+ * row becomes our lead, rather than at each of the three render sites.
+ *
+ * Only a trailing 2-letter state token is touched; anything else (a foreign
+ * port, a name with no state suffix) is returned unchanged apart from trimming.
+ */
+export function normalizePortName(v: unknown): string | null {
+  const s = str(v).trim();
+  if (!s) return null;
+  const i = s.lastIndexOf(',');
+  if (i < 0) return s;
+  const head = s.slice(0, i).trim();
+  const tail = s.slice(i + 1).trim().replace(/\.$/, '');
+  if (!head || !/^[A-Za-z]{2}$/.test(tail)) return s;
+  return `${head}, ${tail.toUpperCase()}`;
+}
+
 /** ImportYeti company slug from its `company_link` ("/company/valbruna-stainless"
  *  → "valbruna-stainless"). This slug — NOT the basename — is the only value the
  *  bols endpoint's `company` param actually filters on (verified against the live
@@ -496,7 +518,7 @@ export function toLead(r: BolRow, contact?: EnrichedContact | null): ImporterLea
     supplier_country: (r.supplier_country_code as string) || null,
     product: (r.product_description as string) || (r.hs_code_description as string) || null,
     hs_code: (r.hs_code as string) || null,
-    entry_port: (r.entry_port as string) || null,
+    entry_port: normalizePortName(r.entry_port),
     ships_12m: r.company_shipments_12m == null ? null : num(r.company_shipments_12m),
     total_shipments: r.company_total_shipments == null ? null : num(r.company_total_shipments),
     teu_12m:

@@ -191,6 +191,12 @@ const IMPORTERS_CSS = `
    marketing hero), so the visible title is dropped and kept only for crawlers
    and assistive tech. */
 .imp-sr-only{position:absolute;width:1px;height:1px;padding:0;margin:-1px;overflow:hidden;clip:rect(0,0,0,0);white-space:nowrap;border:0}
+/* Visible page header. Left-aligned, never centred (house rule) — the shared
+   .hero centres, which is why this page gets its own. */
+.imp-head{text-align:left;margin:0 0 16px}
+.imp-head h1{font-size:30px;line-height:1.14;letter-spacing:-.02em;color:var(--ink);margin:0}
+.imp-head .imp-sub{font-size:14px;line-height:1.6;color:var(--muted);margin:8px 0 0;max-width:70ch}
+@media(max-width:620px){.imp-head{margin-bottom:12px}.imp-head h1{font-size:24px}.imp-head .imp-sub{font-size:13.5px}}
 /* One-line trust / record strip (replaces the big floating datastat pill) —
    carries the 700M+ figure inline, mockup-style. */
 .imp-datastat{color:var(--muted);font-size:13px;line-height:1.5;margin:0}
@@ -203,7 +209,12 @@ const IMPORTERS_CSS = `
 
 /* ── search bar — a grouped filter rail, not a loose row of inputs ── */
 .imp-panel{margin:0;padding:16px;border:1px solid var(--border);border-radius:var(--radius-lg);background:var(--surface);box-shadow:var(--shadow-sm)}
-.imp-grid{display:flex;flex-wrap:wrap;gap:8px;align-items:center}
+/* align-items:START, not center. The Entry-port field grows downward when the
+   "set by port" lock pill appears under it; centring then re-centred that taller
+   field, so picking a port pushed Port and Commodity 13px BELOW Entry state and
+   the pill drifted into the button row's band. Top-aligning pins all three
+   boxes to the same baseline and lets the pill simply extend its own field. */
+.imp-grid{display:flex;flex-wrap:wrap;gap:8px;align-items:start}
 .imp-combo{flex:1 1 220px}
 .imp-field{display:flex;flex-direction:column;gap:8px;min-width:0}
 .imp-field label{font-size:12px;font-weight:600;color:var(--muted);text-transform:uppercase;letter-spacing:.03em}
@@ -267,6 +278,14 @@ const IMPORTERS_CSS = `
    guard-scanned, so #fff on the blue fill is fine here. */
 .imp-actions{display:flex;flex-wrap:wrap;gap:12px;align-items:center;margin-top:12px}
 .imp-actions .btn-primary{background:var(--accent-fill);border-color:var(--accent-fill);color:#fff;box-shadow:none}
+/* Busy, not broken. The blanket opacity:.5 the shared button applies while
+   disabled composited to ~2.2-3.0:1 in both themes — it read as an error state,
+   and the label never changed, so nothing said the search was running. Keep the
+   fill, dim it deliberately, and let the label swap to "Searching…". */
+.imp-actions .btn-primary[disabled]{opacity:1;cursor:progress;
+  background:color-mix(in srgb,var(--accent-fill) 62%,var(--surface-2));
+  border-color:color-mix(in srgb,var(--accent-fill) 62%,var(--surface-2));color:#fff}
+.imp-actions .btn-primary[disabled] .arr{opacity:.75}
 .imp-actions .btn-primary .arr{color:#fff}
 .imp-actions .btn-primary:hover{background:var(--accent-strong,var(--accent-fill));border-color:var(--accent-strong,var(--accent-fill))}
 
@@ -278,9 +297,14 @@ const IMPORTERS_CSS = `
 .imp-trust .imp-status:not([hidden])::before{content:'';display:inline-block;width:5px;height:5px;border-radius:50%;background:var(--accent);margin-right:8px;vertical-align:middle}
 
 /* ── results toolbar (count + density toggle) ── */
-.imp-toolbar{display:none;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap;margin:20px 0 12px;padding-bottom:12px;border-bottom:1px solid var(--border)}
+/* Two DECLARED rows, both left-aligned. It used to be one wrapping row where
+   .imp-countwrap took a flex-basis of 420px — enough to claim the whole first line at
+   1440 — after which margin-left:auto shoved the entire control cluster to the
+   far right of line two, leaving ~480px of dead space exactly where the eye
+   starts scanning. Making the split explicit removes the accident. */
+.imp-toolbar{display:none;align-items:center;gap:10px 12px;flex-wrap:wrap;margin:20px 0 12px;padding-bottom:12px;border-bottom:1px solid var(--border)}
 .imp-toolbar.on{display:flex}
-.imp-countwrap{display:flex;flex-direction:column;gap:5px;min-width:0;flex:1 1 420px}
+.imp-countwrap{display:flex;flex-direction:column;gap:5px;min-width:0;flex:1 1 100%}
 .imp-count{font-size:13px;color:var(--muted);font-variant-numeric:tabular-nums}
 .imp-count b{color:var(--ink);font-weight:700}
 /* ── sample-scope disclosure (R4) ──
@@ -300,7 +324,11 @@ const IMPORTERS_CSS = `
 .imp-copylink:hover{color:var(--ink);text-decoration:underline;text-underline-offset:2px}
 .imp-copylink:focus-visible{outline:2px solid var(--accent);outline-offset:2px;border-radius:4px}
 .imp-copylink.done{color:var(--success);text-decoration:none}
-.imp-toolbar-r{display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin-left:auto}
+/* Controls row: starts at the left edge (see .imp-toolbar), and every control in
+   it stands 40px tall — they were 40 / 29 / 42, a ragged band. */
+.imp-toolbar-r{display:flex;align-items:center;gap:10px;flex-wrap:wrap;flex:1 1 100%;margin-left:0}
+.imp-toolbar-r .imp-aud button,.imp-toolbar-r .imp-density button,.imp-toolbar-r .imp-sortwrap select{min-height:40px}
+.imp-toolbar-r .imp-profiles-left{min-height:40px;box-sizing:border-box}
 /* Sort control (R3). Client-side reorder of the already-fetched set — no
    request, no credits. Sized down to sit level with the density segmented
    control rather than towering over it. */
@@ -356,6 +384,10 @@ const IMPORTERS_CSS = `
 .imp-aud button:hover{color:var(--ink)}
 .imp-aud button:focus-visible{outline:2px solid var(--accent);outline-offset:-2px}
 .imp-aud button[aria-pressed="true"]{background:color-mix(in srgb,var(--accent) 12%,transparent);color:var(--accent);box-shadow:inset 0 0 0 1px var(--accent)}
+/* The 1px divider between siblings painted straight over the pressed button's
+   inset ring, so the selected outline was accent on three edges and grey on the
+   fourth. Drop the divider on the pressed button and on the one after it. */
+.imp-aud button[aria-pressed="true"],.imp-aud button[aria-pressed="true"]+button{border-left-color:transparent}
 /* One-line explanation of the seat being shown. Full-width row of the toolbar
    (order:9 keeps it last however the controls wrap). Accent TINT, never an
    accent fill under text. */
@@ -396,9 +428,12 @@ const IMPORTERS_CSS = `
 /* ── result cards (approved ImportYeti-style prototype) ── */
 .imp-results{display:grid;gap:14px}
 .imp-results.compact{grid-template-columns:repeat(2,minmax(0,1fr))}
-.imp-card{position:relative;border:1px solid var(--border);border-radius:var(--radius-lg);background:var(--surface);padding:16px 20px 0;box-shadow:var(--shadow-sm);overflow:hidden;transition:border-color .16s ease,box-shadow .16s ease}
+/* The skeleton shares the card's BOX so their heights agree by construction —
+   but deliberately NOT the .imp-card class itself, which is the results-only
+   selector everything else (counts, tests, hover, density rules) keys off. */
+.imp-card,.imp-skel{position:relative;border:1px solid var(--border);border-radius:var(--radius-lg);background:var(--surface);padding:16px 20px 0;box-shadow:var(--shadow-sm);overflow:hidden;transition:border-color .16s ease,box-shadow .16s ease}
 /* accent rail drawn as a pseudo-element so the card's corner radius stays clean */
-.imp-card::before{content:'';position:absolute;left:0;top:0;bottom:0;width:3px;background:var(--accent)}
+.imp-card::before,.imp-skel::before{content:'';position:absolute;left:0;top:0;bottom:0;width:3px;background:var(--accent)}
 .imp-card:hover{border-color:color-mix(in srgb,var(--accent) 45%,var(--border));box-shadow:var(--shadow-md)}
 .imp-card:focus-within{border-color:var(--accent)}
 .imp-card-h{display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-bottom:5px}
@@ -410,12 +445,17 @@ a.imp-co-link:focus-visible{outline:2px solid var(--accent);outline-offset:3px}
 /* Category badge reads as a quiet label, not a second brand-blue CTA. */
 .imp-pill{font-size:9.5px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;padding:3px 7px;border-radius:4px;background:var(--surface-3,var(--surface-2));color:var(--ink-soft);border:1px solid var(--border-strong)}
 .imp-win{font-size:11px;font-weight:700;padding:3px 9px;border-radius:999px;white-space:nowrap;font-variant-numeric:tabular-nums}
-.imp-win.hi{background:color-mix(in srgb,var(--success) 15%,transparent);color:var(--success);border:1px solid color-mix(in srgb,var(--success) 34%,transparent)}
-.imp-win.md{background:color-mix(in srgb,var(--warn) 15%,transparent);color:var(--warn);border:1px solid color-mix(in srgb,var(--warn) 34%,transparent)}
+/* The text is mixed toward --ink rather than used raw. On the 15% tint the raw
+   tokens measured 3.14:1 (success) and 4.2:1 (warn) in LIGHT theme — both below
+   AA on the flagship badge of every card. Mixing toward the foreground darkens
+   in light and lightens in dark, so it gains contrast in both directions. */
+.imp-win.hi{background:color-mix(in srgb,var(--success) 15%,transparent);color:color-mix(in srgb,var(--success) 62%,var(--ink));border:1px solid color-mix(in srgb,var(--success) 34%,transparent)}
+.imp-win.md{background:color-mix(in srgb,var(--warn) 15%,transparent);color:color-mix(in srgb,var(--warn) 66%,var(--ink));border:1px solid color-mix(in srgb,var(--warn) 34%,transparent)}
 .imp-addr{color:var(--muted);font-size:12px;margin-bottom:9px;line-height:1.45}
 .imp-lane{display:flex;align-items:center;gap:7px;flex-wrap:wrap;font-size:13px;color:var(--ink-soft);margin-bottom:12px;line-height:1.5}
 .imp-lane .arw{color:var(--muted-soft,var(--muted))}
 .imp-lane .prod{color:var(--muted)}
+.imp-lane .prodwrap{display:inline-flex;align-items:center;gap:7px;min-width:0}
 .imp-lane .cc{font-size:10px;font-weight:700;letter-spacing:.05em;color:var(--muted);background:var(--surface-2);border-radius:3px;padding:2px 5px}
 .imp-angle{display:flex;gap:9px;align-items:flex-start;font-size:12.5px;line-height:1.55;color:var(--ink-soft);background:color-mix(in srgb,var(--accent) 7%,transparent);border:1px solid color-mix(in srgb,var(--accent) 24%,transparent);border-radius:8px;padding:9px 12px;margin-bottom:14px}
 .imp-angle .z{color:var(--accent);font-weight:700;flex:0 0 auto;white-space:nowrap}
@@ -449,7 +489,8 @@ a.imp-co-link:focus-visible{outline:2px solid var(--accent);outline-offset:3px}
 .imp-foot>.imp-incumb{grid-column:1}
 .imp-foot>.imp-tier{grid-column:2;justify-self:start}
 .imp-foot>.imp-foot-r{grid-column:3}
-.imp-incumb{font-size:11.5px;color:var(--warn);background:color-mix(in srgb,var(--warn) 13%,transparent);border:1px solid color-mix(in srgb,var(--warn) 30%,transparent);border-radius:999px;padding:3px 10px;max-width:100%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+/* Same AA correction as .imp-win — raw --warn on its own tint was 4.2:1. */
+.imp-incumb{font-size:11.5px;color:color-mix(in srgb,var(--warn) 72%,var(--ink));background:color-mix(in srgb,var(--warn) 13%,transparent);border:1px solid color-mix(in srgb,var(--warn) 30%,transparent);border-radius:999px;padding:3px 10px;max-width:100%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .imp-foot-r{display:flex;align-items:center;gap:10px;flex-wrap:wrap;justify-content:flex-end}
 .imp-tier{font-size:11.5px;color:var(--muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:100%}
 .imp-tier.ok{color:var(--success)}
@@ -469,7 +510,7 @@ a.imp-co-link:focus-visible{outline:2px solid var(--accent);outline-offset:3px}
 .imp-cta .arr{transition:transform .15s ease}
 .imp-cta:hover .arr{transform:translateX(3px)}
 /* compact card condenses the stat grid + angle */
-.imp-results.compact .imp-card{padding:14px 15px 0}
+.imp-results.compact .imp-card,.imp-results.compact .imp-skel{padding:14px 15px 0}
 .imp-results.compact .imp-angle{display:none}
 .imp-results.compact .imp-stats{grid-template-columns:repeat(2,minmax(0,1fr));gap:8px 12px}
 .imp-results.compact .imp-co{font-size:15px}
@@ -517,7 +558,11 @@ a.imp-co-link:focus-visible{outline:2px solid var(--accent);outline-offset:3px}
 .imp-incumb-lead{display:none;margin:-6px 0 12px}
 
 /* "N free profiles left" chip (point-of-use quota surfacing) */
-.imp-profiles-left{display:none;align-items:center;gap:6px;font-size:12px;font-weight:600;color:var(--accent);background:color-mix(in srgb,var(--accent) 12%,transparent);border-radius:999px;padding:5px 12px}
+/* Neutral, deliberately. It carried the accent tint + accent text — byte for
+   byte the pressed state of the audience buttons it sits beside — so a pure
+   STATUS read as a selected control and invited a click that does nothing. */
+.imp-profiles-left{display:none;align-items:center;gap:6px;font-size:12px;font-weight:600;color:var(--ink-soft);background:var(--surface-2);border:1px solid var(--border);border-radius:999px;padding:5px 12px}
+.imp-profiles-left a{color:var(--accent)}
 .imp-profiles-left.on{display:inline-flex}
 .imp-profiles-left.out{color:var(--warn);background:color-mix(in srgb,var(--warn) 16%,transparent)}
 .imp-profiles-left a{color:inherit;text-decoration:underline}
@@ -563,17 +608,40 @@ a.imp-soon:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
 .imp-empty-act .imp-empty-run:hover{background:var(--accent-strong,var(--accent-fill));border-color:var(--accent-strong,var(--accent-fill))}
 .imp-empty-act .imp-empty-hint{font-size:12px;font-weight:600;color:var(--muted)}
 
-/* skeleton rows while a search is in flight */
-.imp-skel{border:1px solid var(--border);border-radius:var(--radius-lg);background:var(--surface);padding:16px 18px;overflow:hidden}
-.imp-skel span{display:block;height:11px;border-radius:5px;background:linear-gradient(90deg,var(--surface-2) 25%,var(--surface-3,var(--border)) 50%,var(--surface-2) 75%);background-size:280% 100%;animation:imp-sheen 1.25s linear infinite}
-.imp-skel span+span{margin-top:11px}
-.imp-skel span.w1{width:38%;height:15px}
-.imp-skel span.w2{width:64%}
-.imp-skel span.w3{width:88%}
-.imp-skel span.w4{width:52%}
+/* Skeleton card while a search is in flight.
+   It reuses .imp-card / .imp-card-h / .imp-stats / .imp-cell / .imp-foot, so its
+   height is the real card's height by construction rather than by a guessed
+   number — the loading→loaded swap lands in place instead of jumping the column.
+   Only the shimmer blocks are defined here. */
+.imp-skel{pointer-events:none;box-shadow:none}
+.imp-skel:hover{border-color:var(--border);box-shadow:none}
+.imp-skel::before{opacity:.35}
+/* Mixed against --ink, not left on the raw surface tokens: in dark theme
+   --surface-2 over --surface measured 1.13:1, so the skeleton was effectively
+   invisible and the loading state looked like an empty card. Mixing toward the
+   foreground lifts it in BOTH themes (dark ink is light, light ink is dark). */
+.imp-skel .sk{display:block;border-radius:5px;background-size:280% 100%;animation:imp-sheen 1.25s linear infinite;
+  background-image:linear-gradient(90deg,
+    color-mix(in srgb,var(--ink) 7%,var(--surface-2)) 25%,
+    color-mix(in srgb,var(--ink) 16%,var(--surface-2)) 50%,
+    color-mix(in srgb,var(--ink) 7%,var(--surface-2)) 75%)}
+/* Each block matches the line box it stands in for (see .imp-co, .imp-pill,
+   .imp-win, .imp-addr, .imp-lane, .imp-angle, .imp-cell .lbl/.val). */
+.imp-skel .sk-co{width:38%;height:25px;border-radius:6px}
+.imp-skel .sk-pill{width:62px;height:17px;border-radius:4px}
+.imp-skel .sk-win{width:104px;height:19px;border-radius:999px}
+.imp-skel .sk-addr{width:26%;height:17px;margin-bottom:9px}
+.imp-skel .sk-lane{width:72%;height:20px;margin-bottom:12px}
+.imp-skel .sk-angle{height:39px;border-radius:8px;margin-bottom:14px}
+.imp-skel .sk-lbl{width:74%;height:14px;margin-bottom:5px}
+.imp-skel .sk-val{width:56%;height:19px}
+.imp-skel .sk-tier{width:150px;height:14px}
+/* Button-shaped, at the real controls' 44px minimum — see skelCard(). */
+.imp-skel .sk-btn{width:112px;height:44px;border-radius:8px}
+.imp-skel .sk-btn-w{width:150px}
 @keyframes imp-sheen{from{background-position:140% 0}to{background-position:-40% 0}}
 @media (prefers-reduced-motion: reduce){
-  .imp-skel span{animation:none}
+  .imp-skel .sk{animation:none}
   .imp-cta,.imp-cta .arr,.imp-privacy-btn .arr{transition:none}
   .imp-cta:hover .arr,.imp-privacy-btn:hover .arr{transform:none}
 }
@@ -622,6 +690,12 @@ a.imp-soon:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
 @media(max-width:760px){
   .imp-grid{grid-template-columns:1fr}
   .imp-more-grid{grid-template-columns:1fr 1fr}
+  /* Stacked input clusters use the 2px rhythm (hard input rule). The 8px /16px
+     gaps are HORIZONTAL spacing that survived the collapse to one column, where
+     they read as loose, unrelated boxes rather than one control group. */
+  .imp-grid{gap:2px 8px}
+  .imp-more-grid{gap:2px 12px}
+  .imp-more-name{margin-top:2px}
   .imp-stats{grid-template-columns:repeat(2,minmax(0,1fr));gap:10px 12px}
   .imp-export{margin-left:0}
   .imp-toolbar-r{width:100%;margin-left:0}
@@ -660,6 +734,12 @@ a.imp-soon:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
   .imp-aud button{border-left:0;border-top:1px solid var(--border-strong)}
   .imp-aud button:nth-child(-n+2){border-top:0}
   .imp-aud button:nth-child(2n){border-left:1px solid var(--border-strong)}
+  /* Same divider-vs-selected-ring conflict as the desktop row, but in a 2x2 the
+     grey edge can land on the TOP as well as the left. Declared after the
+     divider rules above so it wins on equal specificity. */
+  .imp-aud button[aria-pressed="true"],
+  .imp-aud button[aria-pressed="true"]+button,
+  .imp-aud button[aria-pressed="true"]+button+button{border-left-color:transparent;border-top-color:transparent}
   /* Density sits directly under it — match the full-width 2-up so the two
      segmented controls read as one stacked pair, not a ragged edge. */
   .imp-density{width:100%}
@@ -745,7 +825,15 @@ export function renderImporterSearchPage(): string {
   <style>${IMPORTERS_CSS}</style>
   <main class="imp-shell">
     <div class="container-narrow">
-      <h1 class="imp-sr-only">Find US importers to pitch by port, lane and commodity</h1>
+      ${/* R5: the h1 used to be sr-only, so the most important surface on the
+            page — the state a first-time visitor lands in — opened on a bare
+            filter panel with no title, no promise and nothing saying what the
+            tool does. A left-aligned heading and one line of orientation cost
+            ~64px and are the difference between a product and a form. */ ''}
+      <header class="imp-head">
+        <h1>Find US importers to pitch</h1>
+        <p class="imp-sub">Search live US customs records by entry port, lane or commodity &mdash; then see who moves their freight today, and what it would take to win them.</p>
+      </header>
       <form class="imp-panel" id="imp-form" novalidate>
         <div class="imp-grid">
           ${comboField({ id: 'imp-port', name: 'entryPort', label: 'Entry port', placeholder: 'Any US port', source: 'inline' })}
@@ -754,7 +842,7 @@ export function renderImporterSearchPage(): string {
         </div>
 
         <div class="imp-actions">
-          <button type="submit" class="btn btn-primary" id="imp-search">Search importers <span class="arr">&rarr;</span></button>
+          <button type="submit" class="btn btn-primary" id="imp-search"><span id="imp-search-l">Search importers</span> <span class="arr">&rarr;</span></button>
           <a class="imp-lock imp-export" id="imp-export" href="/importers/saved" title="Export exactly what you are looking at — the filtered, sorted rows currently on screen (free with an account)">
             <span class="ico" aria-hidden="true">&#11123;</span> Export CSV
           </a>
@@ -1059,6 +1147,17 @@ const CLIENT_JS = `
       else if(ev.key==='Escape'){ close(); }
     });
     input.addEventListener('blur',function(){ setTimeout(close,120); });
+    // The suggestion list is absolutely positioned and overhangs the button row,
+    // so at desktop widths it covered "Search importers" — a user who typed a
+    // port and reached for Search hit a suggestion instead. Blur alone was not
+    // enough (a pointerdown on the button lands before blur fires), so close on
+    // any pointerdown outside this combobox, BEFORE the click resolves.
+    document.addEventListener('pointerdown',function(ev){
+      if(listEl.hasAttribute('hidden'))return;
+      var t=ev.target;
+      if(t&&(root.contains(t)||listEl.contains(t)))return;
+      close();
+    },true);
     function syncActive(){
       var opts=listEl.querySelectorAll('li[role=option]');
       for(var i=0;i<opts.length;i++){ opts[i].setAttribute('aria-selected', i===active?'true':'false'); }
@@ -1104,7 +1203,15 @@ const CLIENT_JS = `
   var density=(ls('qf_imp_density')==='compact')?'compact':'comfortable';
   var facetState={ country:{}, chapter:{}, minShip:'', minTeu:'', verifiedOnly:false };
 
-  function setStatus(msg,busy){ statusEl.hidden=false; statusEl.innerHTML=''; statusEl.appendChild(document.createTextNode(msg)); btn.disabled=!!busy; }
+  var btnLabel=document.getElementById('imp-search-l');
+  function setStatus(msg,busy){
+    statusEl.hidden=false; statusEl.innerHTML=''; statusEl.appendChild(document.createTextNode(msg));
+    btn.disabled=!!busy;
+    // Say what it is DOING. A greyed-out button whose label still reads "Search
+    // importers" is indistinguishable from a broken one.
+    if(busy) btn.setAttribute('aria-busy','true'); else btn.removeAttribute('aria-busy');
+    if(btnLabel) btnLabel.textContent = busy ? 'Searching\\u2026' : 'Search importers';
+  }
   function applyDensity(){ results.className='imp-results'+(density==='compact'?' compact':'');
     document.getElementById('imp-den-comf').setAttribute('aria-pressed', density==='comfortable'?'true':'false');
     document.getElementById('imp-den-comp').setAttribute('aria-pressed', density==='compact'?'true':'false'); }
@@ -1148,7 +1255,12 @@ const CLIENT_JS = `
     } else {
       h.appendChild(T('span','imp-co',l.company));
     }
-    if(l.supplier_country){ h.appendChild(T('span','imp-flag',flag(l.supplier_country))); }
+    // NO flag here. It used to render flag(l.supplier_country) — the SUPPLIER's
+    // country — immediately after a US importer's name, directly above a line
+    // reading "United States · NC", so the card said two contradictory things
+    // about who this company is. It was also redundant (the lane's .cc chip
+    // already carries the origin) and, on any platform without regional-indicator
+    // glyphs, degraded to the literal letters "DE" beside the company name.
     h.appendChild(T('span','imp-pill','Importer'));
     var w=l.winnability||{};
     var winTxt='Winnability'+(w.score?(' '+w.score):'')+(w.label?(' \\u00b7 '+w.label):'');
@@ -1162,8 +1274,12 @@ const CLIENT_JS = `
     lane.appendChild(T('span','sup',l.supplier||'Supplier'));
     lane.appendChild(T('span','arw arw-o','\\u2192'));
     lane.appendChild(T('span','port',l.entry_port||'US port'));
-    if(l.product){ lane.appendChild(T('span','arw','\\u00b7'));
-      lane.appendChild(T('span','prod',l.product+(l.hs_code?(' \\u00b7 HS '+l.hs_code):''))); }
+    // Separator and product travel together. As loose siblings the interpunct
+    // could end a line on its own once .prod wrapped — a dangling "·" at 375.
+    if(l.product){ var pw=T('span','prodwrap');
+      pw.appendChild(T('span','arw','\\u00b7'));
+      pw.appendChild(T('span','prod',l.product+(l.hs_code?(' \\u00b7 HS '+l.hs_code):'')));
+      lane.appendChild(pw); }
     lane.title=(l.supplier||'Supplier')+' \\u2192 '+(l.entry_port||'US port')+(l.product?(' \\u00b7 '+l.product):'');
     c.appendChild(lane);
     // Forwarder seat promotes the incumbent out of the footer onto its own line.
@@ -1318,13 +1434,36 @@ const CLIENT_JS = `
     if(allLeads.length<2){ side.classList.remove('on'); return; }
     syncSideFold();
     // supplier country counts
-    var cc={}, ch={}; var hasVerified=false;
+    var cc={}, ch={}, chProd={}; var hasVerified=false;
     allLeads.forEach(function(l){ if(l.supplier_country){ cc[l.supplier_country]=(cc[l.supplier_country]||0)+1; }
-      var c=chapterOf(l); if(c){ ch[c]=(ch[c]||0)+1; } if(l.contact_confidence==='verified')hasVerified=true; });
+      var c=chapterOf(l);
+      if(c){ ch[c]=(ch[c]||0)+1;
+        // Name the chapter from the goods ACTUALLY in this result set — accurate
+        // by construction, and no HTS chapter table to ship or keep correct.
+        if(!chProd[c]) chProd[c]={};
+        if(l.product){ chProd[c][l.product]=(chProd[c][l.product]||0)+1; } }
+      if(l.contact_confidence==='verified')hasVerified=true; });
+    function countryLabel(code){
+      var arr=window.__IMP_COUNTRIES||[];
+      for(var i=0;i<arr.length;i++){ if(String(arr[i].value)===String(code)) return arr[i].label; }
+      return String(code);
+    }
+    function chapterName(c){
+      var m=chProd[c]||{}; var best='', bn=0;
+      for(var k in m){ if(m[k]>bn){ bn=m[k]; best=k; } }
+      if(!best) return '';
+      return best.length>26?(best.slice(0,25)+'\\u2026'):best;
+    }
+    // The label was code + flag ("DE " + flag('DE')). On any platform without
+    // regional-indicator glyphs — Windows Chromium, i.e. most desktop users —
+    // the flag degrades to the letters "DE", so the row read "DE de". The code
+    // alone is unambiguous and renders identically everywhere.
     var countryRows=Object.keys(cc).sort(function(a,b){return cc[b]-cc[a];}).slice(0,8)
-      .map(function(k){ return {value:k,label:k+' '+flag(k),ct:cc[k]}; });
+      .map(function(k){ return {value:k,label:countryLabel(k),ct:cc[k]}; });
+    // Bare chapter numbers ("HS 82") mean nothing without the reference open;
+    // chapterName() carries the same curated table the commodity box uses.
     var chapRows=Object.keys(ch).sort(function(a,b){return ch[b]-ch[a];}).slice(0,8)
-      .map(function(k){ return {value:k,label:'HS '+k,ct:ch[k]}; });
+      .map(function(k){ var d=chapterName(k); return {value:k,label:d?(k+' \\u00b7 '+d):('HS '+k),ct:ch[k]}; });
     if(countryRows.length>1) facetsEl.appendChild(facetGroup('Supplier country',countryRows,'checkbox','country'));
     if(chapRows.length>1) facetsEl.appendChild(facetGroup('HS chapter',chapRows,'checkbox','chapter'));
     facetsEl.appendChild(facetGroup('Shipments / 12 mo',[{value:'',label:'Any'},{value:'50',label:'50+'},{value:'200',label:'200+'},{value:'800',label:'800+'}],'radio','minShip'));
@@ -1597,16 +1736,60 @@ const CLIENT_JS = `
     e.appendChild(ic); e.appendChild(bx);
     return e;
   }
-  // Skeleton rows while a search is in flight — a designed loading state instead
-  // of an empty column with a one-line status.
+  // Skeleton cards while a search is in flight.
+  //
+  // A skeleton exists to RESERVE the space the content will take. The first
+  // version was four generic bars in a small box: 115px tall against a real card
+  // of ~327px, so the results column snapped from 373px to 2029px the instant
+  // the response landed — a 1,656px jump that threw away whatever the user was
+  // looking at. So the skeleton is now built from the CARD'S OWN layout classes
+  // (.imp-card / .imp-card-h / .imp-stats / .imp-cell / .imp-foot) with shimmer
+  // blocks where the text goes: it inherits every padding, gap and min-height
+  // the real card has, which is what makes the heights agree — and keeps them
+  // agreeing if the card is restyled later.
+  //
+  // It also mirrors the density mode, so the compact (2-up) grid does not load
+  // through a comfortable-width skeleton and then re-flow.
+  function skelCard(){
+    // NOT .imp-card — that class is the results-only selector the counts, the
+    // density rules and the tests all key off. The box geometry is shared in CSS
+    // instead (see the ".imp-card,.imp-skel" rules).
+    var c=T('div','imp-skel');
+    c.setAttribute('aria-hidden','true');
+    var h=T('div','imp-card-h');
+    ['sk-co','sk-pill','sk-win'].forEach(function(cl){ h.appendChild(T('span','sk '+cl)); });
+    c.appendChild(h);
+    c.appendChild(T('div','sk sk-addr'));
+    c.appendChild(T('div','sk sk-lane'));
+    c.appendChild(T('div','sk sk-angle'));
+    var st=T('div','imp-stats');
+    for(var k=0;k<4;k++){
+      var cell=T('div','imp-cell');
+      cell.appendChild(T('div','sk sk-lbl'));
+      cell.appendChild(T('div','sk sk-val'));
+      cell.appendChild(T('div','sub-slot'));
+      st.appendChild(cell);
+    }
+    c.appendChild(st);
+    // The footer is where the height used to run away: .imp-foot's min-height is
+    // border-box (44px), but a REAL footer is taller because its controls are
+    // themselves min-height:44. So the skeleton stands in button-shaped blocks,
+    // which both matches the height and tells the user actions are coming.
+    var f=T('div','imp-foot');
+    f.appendChild(T('span','sk sk-tier'));
+    var fr=T('div','imp-foot-r');
+    fr.appendChild(T('span','sk sk-btn'));
+    fr.appendChild(T('span','sk sk-btn sk-btn-w'));
+    f.appendChild(fr);
+    c.appendChild(f);
+    return c;
+  }
   function showSkeleton(){
     results.setAttribute('aria-busy','true');
     results.innerHTML='';
-    for(var i=0;i<3;i++){
-      var s=T('div','imp-skel');
-      ['w1','w2','w3','w4'].forEach(function(cl){ s.appendChild(T('span',cl)); });
-      results.appendChild(s);
-    }
+    // Compact packs two per row, so it needs four to cover the same vertical run.
+    var n=results.classList.contains('compact')?4:3;
+    for(var i=0;i<n;i++) results.appendChild(skelCard());
     moreWrap.classList.remove('on');
   }
 
@@ -1682,6 +1865,10 @@ const CLIENT_JS = `
                        :'Searching live customs records\\u2026',true);
     if(!append) showSkeleton();
     loadMoreBtn.disabled=true;
+    // The record strip only ever updated on SUCCESS, so while a search ran it
+    // still told the user to "pick a port, lane or commodity to start" — which
+    // they had just done — directly beside "Searching…".
+    if(recordLine&&!append) recordLine.textContent=cacheOnly?'checking the cache for this lane':'searching this lane now';
     var body={}; for(var k in payload)body[k]=payload[k]; body.page=page;
     if(cacheOnly) body.cacheOnly=true;
     return fetch('/api/importers/search',{method:'POST',headers:{'Content-Type':'application/json','Accept':'application/json'},body:JSON.stringify(body)})
@@ -1788,6 +1975,14 @@ const CLIENT_JS = `
         // yank focus back to the top of the list.
         if(!append){
           try{ results.focus({preventScroll:true}); }catch(e){ results.focus(); }
+          // On a phone the form panel + toolbar stand ~1,080px tall, so a
+          // successful search left ZERO results on screen — the user pressed
+          // Search and saw only chrome. Desktop keeps preventScroll (results are
+          // already in view there and yanking the page would be worse).
+          if(window.innerWidth<=900){
+            try{ results.scrollIntoView({block:'start',behavior:'smooth'}); }
+            catch(e){ try{ results.scrollIntoView(); }catch(e2){} }
+          }
         }
       })
       .catch(function(){ btn.disabled=false; loadMoreBtn.disabled=false;
