@@ -75,8 +75,26 @@ const fmtNum = (n: number | null | undefined): string =>
  * error states. With JS disabled the form still POSTs and the endpoint returns
  * the same fragment as a standalone response, so the feature degrades cleanly.
  */
+/**
+ * ONE shared, memoized `/api/directory/auth/me` request per page.
+ *
+ * Every directory page hydrates its identity-dependent bits client-side so the
+ * server HTML can stay byte-identical (and therefore shared-cacheable — see
+ * directory/httpCache.ts). Two of those hydrators run on a carrier profile (the
+ * nav slot and the Pro contacts block), and they must not become two network
+ * round-trips. `window.__qfDirMe` is created by whichever script runs first and
+ * awaited by the other, so it is always exactly one request. Resolves to null on
+ * any failure, so a consumer's `.then` never has to care.
+ */
+const DIRECTORY_ME_PROMISE_JS =
+  "(window.__qfDirMe=window.__qfDirMe||fetch('/api/directory/auth/me',{headers:{'Accept':'application/json'},credentials:'same-origin'}).then(function(r){return r.ok?r.json():null;}).catch(function(){return null;}))";
+
+/** True when the /me payload describes a live Directory Pro subscriber. */
+const DIRECTORY_IS_PRO_JS =
+  "function(d){var s=d&&d.directoryPro&&d.directoryPro.status;return s==='active'||s==='trialing';}";
+
 const REVEAL_ENHANCE_SCRIPT = `
-(function(){
+window.__qfBindReveal=function(){
   var forms = document.querySelectorAll('form[data-reveal-form]');
   Array.prototype.forEach.call(forms, function(f){
     if (f.__revealBound) return; f.__revealBound = true;
@@ -94,6 +112,36 @@ const REVEAL_ENHANCE_SCRIPT = `
         .then(function(){ if (btn) { btn.disabled = false; btn.textContent = label; } });
     });
   });
+};
+window.__qfBindReveal();
+`.trim();
+
+/**
+ * Hydrates the carrier profile's "More dispatch contacts" block for a Directory
+ * Pro subscriber. The server always renders the FREE variant so every one of the
+ * ~334k profile URLs is byte-identical and cacheable; this swaps in the live
+ * reveal form afterwards for a caller whose session says Pro. Anonymous and free
+ * visitors keep exactly what the server sent. Degrades silently on any error —
+ * and the reveal endpoint enforces the entitlement itself regardless, so the
+ * worst case of a failed hydrate is a Pro user seeing the upgrade CTA, never a
+ * free user gaining access.
+ */
+const CARRIER_PRO_HYDRATE_SCRIPT = `
+(function(){
+  var slot=document.querySelector('[data-cp-gated]'); if(!slot) return;
+  var action=slot.getAttribute('data-reveal-action')||''; if(!action) return;
+  var isPro=${DIRECTORY_IS_PRO_JS};
+  ${DIRECTORY_ME_PROMISE_JS}.then(function(d){
+    if(!d||!d.user||!isPro(d)) return;
+    slot.className='cp-gated cp-gated--pro';
+    slot.innerHTML='<h3>Additional contacts</h3>'
+      +'<p>Direct dispatch and decision-maker contacts beyond the public FMCSA record \\u2014 part of your Directory Pro plan.</p>'
+      +'<form class="cp-reveal-form" method="post" action="'+action+'" data-reveal-form>'
+      +'<button type="submit" class="btn btn-primary cp-reveal-btn">Reveal additional contacts</button>'
+      +'</form>'
+      +'<div class="cp-reveal-result" data-reveal-result aria-live="polite"></div>';
+    if(typeof window.__qfBindReveal==='function') window.__qfBindReveal();
+  }).catch(function(){});
 })();
 `.trim();
 
@@ -1346,12 +1394,11 @@ export function layout({ title, description, canonicalPath, bodyHtml, jsonLd, re
 const NAV_SHIPPER_SCRIPT = `
 (function(){
   var slot=document.getElementById('nav-shipper'); if(!slot) return;
-  fetch('/api/directory/auth/me',{headers:{'Accept':'application/json'},credentials:'same-origin'})
-    .then(function(r){return r.ok?r.json():null;})
+  var isPro=${DIRECTORY_IS_PRO_JS};
+  ${DIRECTORY_ME_PROMISE_JS}
     .then(function(d){
       if(!d||!d.user) return;
-      var s=d.directoryPro&&d.directoryPro.status;
-      var pro=s==='active'||s==='trialing';
+      var pro=isPro(d);
       var email=String(d.user.email||'').replace(/[<>&"']/g,'');
       var parts='<span class="nav-email" title="'+email+'">'+email+'</span>';
       if(pro){ parts+='<span class="nav-pro-chip">Directory Pro \\u2713</span><a class="nav-link nav-manage" href="#" data-nav-portal>Manage</a>'; }
@@ -1683,11 +1730,23 @@ function hrefWith(scope: FacetScope, f: DirectoryFilters, change: FacetChange, o
   return qs ? `${scope.basePath}?${qs}` : scope.basePath;
 }
 
-function facetOptionRow(active: boolean, href: string, label: string, count: number): string {
+/**
+ * One facet row. `count === null` means the count could not be computed for this
+ * request (see FacetCounts.unavailable) — the badge is then OMITTED rather than
+ * printed as "0". Rendering a fabricated 0 next to a facet that really has
+ * thousands of matches is the page asserting something false; an absent badge is
+ * simply an absent measurement, and the facet stays clickable either way.
+ */
+function facetOptionRow(active: boolean, href: string, label: string, count: number | null): string {
   return `<a class="facet-opt ${active ? 'active' : ''}" href="${href}">
     <span class="lbl"><span class="facet-check"></span>${esc(label)}</span>
-    <span class="cb">${fmtNum(count)}</span>
+    ${count == null ? '' : `<span class="cb">${fmtNum(count)}</span>`}
   </a>`;
+}
+
+/** Read one facet count, or null when this request's counts are unavailable. */
+function facetCount(counts: FacetCounts, value: number | undefined): number | null {
+  return counts.unavailable ? null : value ?? 0;
 }
 
 function disabledFacetRow(label: string): string {
@@ -1730,7 +1789,7 @@ function portPickerRow(scope: FacetScope, f: DirectoryFilters, counts: FacetCoun
   const search = `${g.label} ${g.city} ${g.state}`.toLowerCase();
   return `<a class="facet-opt${active ? ' active' : ''}" href="${href}" data-pk="${esc(search)}">
     <span class="lbl"><span class="facet-check"></span>${esc(g.label)}</span>
-    <span class="cb">${fmtNum(counts.ports[g.code] ?? 0)}</span>
+    ${counts.unavailable ? '' : `<span class="cb">${fmtNum(counts.ports[g.code] ?? 0)}</span>`}
   </a>`;
 }
 
@@ -1848,7 +1907,7 @@ function renderSidebar(scope: FacetScope, f: DirectoryFilters, counts: FacetCoun
       f.equipment.includes(o.id),
       hrefWith(scope, f, { equipment: toggleMulti(eqOrder, f.equipment, o.id) }),
       o.label,
-      counts.equipment[o.id],
+      facetCount(counts, counts.equipment[o.id]),
     ),
   ).join('\n');
 
@@ -1862,14 +1921,14 @@ function renderSidebar(scope: FacetScope, f: DirectoryFilters, counts: FacetCoun
       f.cargo.includes(o.id),
       hrefWith(scope, f, { cargo: toggleMulti(cargoOrder, f.cargo, o.id) }),
       o.label,
-      counts.cargo[o.id],
+      facetCount(counts, counts.cargo[o.id]),
     ),
   );
   const cargo = foldableRows(cargoRows, 6, 'fold-cargo');
 
   // Tier 1 — Fleet size (trucks / power units).
   const fleet = FLEET_BUCKETS.map((b) =>
-    facetOptionRow(f.fleet === b.id, hrefWith(scope, f, { fleet: f.fleet === b.id ? null : b.id }), b.label, counts.fleet[b.id]),
+    facetOptionRow(f.fleet === b.id, hrefWith(scope, f, { fleet: f.fleet === b.id ? null : b.id }), b.label, facetCount(counts, counts.fleet[b.id])),
   ).join('\n');
 
   // Tier 1 — Drivers count.
@@ -1878,7 +1937,7 @@ function renderSidebar(scope: FacetScope, f: DirectoryFilters, counts: FacetCoun
       f.drivers === b.id,
       hrefWith(scope, f, { drivers: f.drivers === b.id ? null : b.id }),
       b.label,
-      counts.drivers[b.id],
+      facetCount(counts, counts.drivers[b.id]),
     ),
   ).join('\n');
 
@@ -1889,7 +1948,7 @@ function renderSidebar(scope: FacetScope, f: DirectoryFilters, counts: FacetCoun
     f.goodStandingOnly,
     hrefWith(scope, f, { standing: f.goodStandingOnly ? null : 'good' }),
     'Good standing only',
-    counts.goodStanding,
+    facetCount(counts, counts.goodStanding),
   );
 
   // Tier 1/2 — Active authority + recently-updated (status/activity).
@@ -1897,13 +1956,13 @@ function renderSidebar(scope: FacetScope, f: DirectoryFilters, counts: FacetCoun
     f.authorityActive,
     hrefWith(scope, f, { authority: f.authorityActive ? null : 'active' }),
     'Active authority only',
-    counts.authorityActive,
+    facetCount(counts, counts.authorityActive),
   );
   const recent = facetOptionRow(
     f.recent,
     hrefWith(scope, f, { recent: f.recent ? null : '1' }),
     'Updated in last 12 mo',
-    counts.recent,
+    facetCount(counts, counts.recent),
   );
 
   // 'all' scope only — quick state refine (links to canonical state pages / scope).
@@ -2848,10 +2907,10 @@ export function renderCarrierProfile(opts: {
   related?: VisibleCarrier[];
   cityCount?: number;
   stateCount?: number;
-  /** True when the caller holds a live Directory Pro entitlement — unlocks the
-   *  additional-contacts affordance. Defaults to false (free/anonymous). The
-   *  public FMCSA phone/email block is unaffected either way. */
-  isPro?: boolean;
+  // NOTE: there is deliberately NO `isPro` option. Entitlement must never reach
+  // this renderer — the output has to be byte-identical for every visitor so the
+  // ~334k profile URLs stay shared-cacheable. The Pro affordance is hydrated
+  // client-side by CARRIER_PRO_HYDRATE_SCRIPT.
 }): string {
   const c = opts.carrier;
   const related = opts.related ?? [];
@@ -3056,19 +3115,22 @@ export function renderCarrierProfile(opts: {
   //     the reveal endpoint (built in PR C; the button is wired + ready now).
   // The enriched data + the reveal endpoint itself are PR C — this renders the
   // gate surface only, never real enriched contacts.
-  const isPro = opts.isPro === true;
+  //
+  // ENTITLEMENT IS HYDRATED CLIENT-SIDE, NOT BRANCHED SERVER-SIDE.
+  // This block used to be an `opts.isPro ? pro : free` ternary. That made the
+  // server HTML differ per visitor on the page type the sitemap advertises ~334k
+  // times, which meant NONE of those URLs could ever be stored in a shared cache
+  // (see directory/httpCache.ts). The server now always emits the FREE variant —
+  // identical bytes for every visitor — and CARRIER_PRO_HYDRATE_SCRIPT swaps in
+  // the Pro variant after /api/directory/auth/me answers, mirroring how the nav's
+  // "For shippers" slot already works.
+  //
+  // Safe because the free variant contains NO withheld data to protect: the
+  // teaser is hardcoded bullet characters, and real enriched contacts only ever
+  // arrive from POST /api/directory/carrier/:usdot/reveal, which re-checks the
+  // entitlement itself and 403s a non-Pro caller (routes/directoryReveal.ts).
   const revealAction = `/api/directory/carrier/${encodeURIComponent(c.usdot)}/reveal`;
-  const gatedContact = isPro
-    ? `<div class="cp-gated cp-gated--pro">
-        <h3>Additional contacts</h3>
-        <p>Direct dispatch and decision-maker contacts beyond the public FMCSA record — part of your Directory Pro plan.</p>
-        <form class="cp-reveal-form" method="post" action="${revealAction}" data-reveal-form>
-          <button type="submit" class="btn btn-primary cp-reveal-btn">Reveal additional contacts</button>
-        </form>
-        <div class="cp-reveal-result" data-reveal-result aria-live="polite"></div>
-      </div>
-      <script>${REVEAL_ENHANCE_SCRIPT}</script>`
-    : `<div class="cp-gated">
+  const gatedContact = `<div class="cp-gated" data-cp-gated data-reveal-action="${esc(revealAction)}">
         <h3>More dispatch contacts</h3>
         <p>Direct dispatch and decision-maker contacts beyond the public FMCSA phone and email are part of Directory Pro.</p>
         <div class="cp-gated-teaser" aria-hidden="true">
@@ -3077,7 +3139,9 @@ export function renderCarrierProfile(opts: {
         </div>
         <a class="btn btn-primary cp-unlock-btn" href="/directory/join?intent=subscribe">Unlock with Directory Pro — $19/mo</a>
         <button type="button" class="btn btn-secondary cp-reveal-btn" disabled aria-disabled="true" title="Available on Directory Pro">Reveal contacts</button>
-      </div>`;
+      </div>
+      <script>${CARRIER_PRO_HYDRATE_SCRIPT}</script>
+      <script>${REVEAL_ENHANCE_SCRIPT}</script>`;
 
   // Count-bearing cross-links (city + state).
   const crossLinks: string[] = [];
@@ -3309,6 +3373,25 @@ export function renderCarrierNotFound(): string {
     title: 'Carrier not found | QuoteFleet',
     description: 'This carrier is not in the QuoteFleet directory.',
     canonicalPath: '/directory',
+    bodyHtml: body,
+  });
+}
+
+/**
+ * 404 body for a `?page=` past MAX_PAGE. Deliberately a real page (not a bare
+ * text 404) so a person who followed a stale deep link lands somewhere useful,
+ * and canonicals to the un-paginated hub so nothing points back at the OFFSET.
+ */
+export function renderDirectoryPageOutOfRange(maxPage: number, backPath = '/directory'): string {
+  const body = `<main class="dir-shell"><div class="dir-card" style="margin-top: 40px; text-align: center; padding: 40px;">
+    <h1 style="font-size: 24px;">Page not found</h1>
+    <p class="muted">This listing stops at page ${maxPage}. Narrow the results with a city, state or filter to find what you're after.</p>
+    <a class="btn btn-secondary" href="${esc(backPath)}">Back to the listing</a>
+  </div></main>`;
+  return layout({
+    title: 'Page not found | QuoteFleet',
+    description: 'This directory page is outside the available range.',
+    canonicalPath: backPath,
     bodyHtml: body,
   });
 }

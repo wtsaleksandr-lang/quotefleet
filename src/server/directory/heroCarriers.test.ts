@@ -3,8 +3,9 @@
  *
  * Covers the homepage hero social-proof feed: the WHERE predicates keep only
  * display-worthy carriers (good standing, not opted-out, real location + fleet),
- * the ORDER BY is random (so the featured set varies per load), and the card
- * projection emits ONLY contact-free public fields.
+ * the ORDER BY walks the primary key (a random POOL WINDOW plus a per-call
+ * shuffle now supply the variation that `ORDER BY random()` used to buy with a
+ * full-table sort), and the card projection emits ONLY contact-free public fields.
  */
 import { describe, it, expect } from 'vitest';
 import { PgDialect } from 'drizzle-orm/pg-core';
@@ -12,6 +13,7 @@ import {
   heroCarrierConditions,
   heroCarrierOrder,
   heroCarrierCard,
+  sampleCards,
   HERO_CARRIER_LIMIT,
 } from './queries.js';
 import type { carrierDirectory } from '../../db/schema.js';
@@ -94,9 +96,42 @@ describe('heroCarrierConditions — WHERE shape', () => {
   });
 });
 
-describe('heroCarrierOrder — variation per load', () => {
-  it('orders randomly so the featured set rotates each request', () => {
-    expect(heroCarrierOrder().map(sqlText).join(' ')).toContain('random()');
+describe('heroCarrierOrder — variation WITHOUT a full-table sort', () => {
+  /**
+   * This ORDER BY used to be `random()`. That is a full sort of every qualifying
+   * row to take 8, and it ran on EVERY homepage load (hero-carriers.js fetches
+   * the endpoint on DOMContentLoaded and the route is `no-store`). Prod EXPLAIN:
+   * cost 24,727.62 (Seq Scan 314,554 + Sort) vs 146.09 for the id-ordered window.
+   *
+   * If anyone reinstates `random()` here, that regression comes straight back —
+   * so this test asserts its ABSENCE, not just the presence of the new order.
+   */
+  it('walks the primary key so Postgres can stop at LIMIT (never a full sort)', () => {
+    const text = heroCarrierOrder().map(sqlText).join(' ');
+    expect(text).toContain('"id"');
+    expect(text).toContain('asc');
+    expect(text).not.toContain('random()');
+  });
+
+  it('still varies the visible set: a random pool window, then a per-call shuffle', () => {
+    // Variation now comes from two cheap layers instead of the sort. Pin them so
+    // a future "simplification" cannot quietly make the hero static.
+    const pool = Array.from({ length: 40 }, (_, i) => i);
+    const a = sampleCards(pool, 8);
+    const b = sampleCards(pool, 8);
+    expect(a).toHaveLength(8);
+    expect(new Set(a).size).toBe(8); // distinct — no card shown twice
+    for (const v of a) expect(pool).toContain(v);
+    // Two draws of 8 from 40 collide identically with probability ~1/7.7e10.
+    expect(a.join(',')).not.toBe(b.join(','));
+  });
+
+  it('sampleCards never mutates the cached pool and degrades when it is short', () => {
+    const pool = [1, 2, 3];
+    const snapshot = pool.slice();
+    expect(sampleCards(pool, 8)).toHaveLength(3);
+    expect(pool).toEqual(snapshot);
+    expect(sampleCards([], 8)).toEqual([]);
   });
 });
 

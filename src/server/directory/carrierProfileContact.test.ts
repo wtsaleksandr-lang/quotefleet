@@ -124,38 +124,49 @@ describe('renderCarrierProfile — contact display', () => {
   });
 });
 
+/**
+ * The Pro contacts gate used to be a SERVER-SIDE `isPro ? pro : free` branch.
+ * It is now always rendered free + hydrated client-side, so the ~334k profile
+ * URLs are byte-identical for every visitor and can be cached by a shared cache
+ * (see directory/httpCache.ts). These tests pin BOTH halves of that contract.
+ */
 describe('renderCarrierProfile — Directory Pro contacts gate', () => {
-  it('free / anonymous: renders the teaser + "Unlock with Directory Pro — $19/mo" CTA + disabled reveal', () => {
-    const html = renderCarrierProfile({ carrier: carrier() }); // isPro defaults to false
-    expect(html).toContain('<div class="cp-gated">');
+  it('always server-renders the FREE variant: teaser + "$19/mo" CTA + disabled reveal', () => {
+    const html = renderCarrierProfile({ carrier: carrier() });
     expect(html).toContain('Unlock with Directory Pro — $19/mo');
     expect(html).toContain('href="/directory/join?intent=subscribe"');
-    // A disabled "Reveal contacts" affordance (the real reveal is Pro-only, PR C).
-    expect(html).toContain('Reveal contacts');
     expect(html).toMatch(/<button[^>]*disabled[^>]*>Reveal contacts<\/button>/);
-    // NOT the live Pro reveal button/endpoint.
-    expect(html).not.toContain('Reveal additional contacts');
-    expect(html).not.toContain('/reveal"');
+    // The gate ELEMENT served to everyone is the free one. (The Pro markup does
+    // appear in the page — as a STRING inside the hydrate script — so assert on
+    // the rendered element, not on raw substring absence.)
+    expect(html).toContain('<div class="cp-gated" data-cp-gated');
+    expect(html).not.toMatch(/<div class="cp-gated cp-gated--pro"/);
   });
 
-  it('Pro: renders a live "Reveal additional contacts" button posting to the reveal endpoint, no upgrade CTA', () => {
-    const html = renderCarrierProfile({ carrier: carrier(), isPro: true });
+  it('carries no server-side entitlement input at all — the render is identity-free', () => {
+    // renderCarrierProfile has no `isPro` parameter to pass (a compile-time
+    // guarantee), so two renders of the same carrier are byte-identical. That
+    // IS the caching contract: a shared cache may hand one visitor's copy to
+    // any other visitor.
+    expect(renderCarrierProfile({ carrier: carrier() })).toBe(renderCarrierProfile({ carrier: carrier() }));
+  });
+
+  it('ships the Pro variant in a client-side hydrator keyed on the real reveal endpoint', () => {
+    const html = renderCarrierProfile({ carrier: carrier() });
+    // The endpoint travels as a data-attribute the hydrator reads, so the free
+    // markup stays inert while the Pro form can still POST to the right URL.
+    expect(html).toContain('data-reveal-action="/api/directory/carrier/107080/reveal"');
     expect(html).toContain('cp-gated--pro');
     expect(html).toContain('Reveal additional contacts');
-    expect(html).toContain('action="/api/directory/carrier/107080/reveal"');
-    // No upgrade wall for a paying subscriber. (The shared nav script carries a
-    // generic /directory/join?intent=subscribe link on every page, and the
-    // .cp-unlock-btn CLASS lives in the inlined stylesheet, so assert the absence
-    // of the profile's OWN rendered upsell ELEMENT instead.)
-    expect(html).not.toContain('Unlock with Directory Pro');
-    expect(html).not.toContain('class="btn btn-primary cp-unlock-btn"');
+    // Hydration must gate on a LIVE subscription, never merely on being signed in.
+    expect(html).toContain("s==='active'||s==='trialing'");
+    // And it must reuse the single shared /me request, not open a second one.
+    expect(html).toContain('window.__qfDirMe');
   });
 
-  it('the gate NEVER hides the public FMCSA phone/email (free data stays free) in either state', () => {
-    for (const isPro of [false, true]) {
-      const html = renderCarrierProfile({ carrier: carrier(), isPro });
-      expect(html).toContain('href="tel:9125550921"');
-      expect(html).toContain('href="mailto:dispatch%40acme.com"');
-    }
+  it('the gate NEVER hides the public FMCSA phone/email (free data stays free)', () => {
+    const html = renderCarrierProfile({ carrier: carrier() });
+    expect(html).toContain('href="tel:9125550921"');
+    expect(html).toContain('href="mailto:dispatch%40acme.com"');
   });
 });
