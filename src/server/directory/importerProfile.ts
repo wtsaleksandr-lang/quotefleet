@@ -36,7 +36,13 @@ import type { Express, Request, Response } from 'express';
 import { layout, esc } from './pages.js';
 import { ISO_COUNTRIES } from './isoCountries.js';
 import { US_STATES } from './usStates.js';
-import { pullImportBols, normalizePortName, type BolRow } from './importerLeads.js';
+import {
+  pullImportBols,
+  normalizePortName,
+  CONTACT_TIER_COPY,
+  TIER_ORDER,
+  type BolRow,
+} from './importerLeads.js';
 import { quoteLaneHref } from './entryPortFacets.js';
 import { CACHE_ONLY_NOTE } from './externalPullGuard.js';
 import {
@@ -203,6 +209,15 @@ export interface ProfileData {
   suppliers: Array<{ name: string; country: string | null; ships: number; product: string | null; hs: string | null }>;
   hsBreakdown: Array<{ hs: string; chapter: string; desc: string; n: number }>;
   origins: Array<{ cc: string; name: string; ships: number }>;
+  /** Sampled bills carrying ANY hs_code / supplier country — the denominator the
+   *  bar sections are captioned with. `hsBreakdown` / `origins` are capped to the
+   *  top few, so summing the visible rows would understate the sample and
+   *  overstate every share. */
+  hsTotal: number;
+  originsTotal: number;
+  /** Distinct HS codes / origin countries seen, before the top-N display cap. */
+  hsCodeCount: number;
+  originCount: number;
   carriers: Array<{ scac: string; n: number }>;
   containers: Array<{ type: string; n: number }>;
   portsFrom: Array<{ port: string; cc: string | null; n: number }>;
@@ -375,6 +390,10 @@ export function aggregateProfile(rawRows: readonly BolRow[], slug: string): Prof
   const suppliers = topBy(supMap, (s) => s.ships, 10).map(([, s]) => s);
   const hsBreakdown = topBy(hsMap, (h) => h.n, 6).map(([, h]) => h);
   const origins = topBy(originMap, (o) => o.ships, 8).map(([, o]) => o);
+  // Denominators for the bar sections: every sampled bill that carried the field,
+  // NOT just the top-N rows that survive the display cap.
+  const hsTotal = [...hsMap.values()].reduce((s, h) => s + h.n, 0);
+  const originsTotal = [...originMap.values()].reduce((s, o) => s + o.ships, 0);
   const carriers = topBy(scacMap, (s) => s.n, 6).map(([, s]) => s);
   const containers = topBy(contMap, (c) => c.n, 6).map(([, c]) => c);
   const portsFrom = topBy(portFromMap, (p) => p.n, 6).map(([, p]) => p);
@@ -432,6 +451,10 @@ export function aggregateProfile(rawRows: readonly BolRow[], slug: string): Prof
     suppliers,
     hsBreakdown,
     origins,
+    hsTotal,
+    originsTotal,
+    hsCodeCount: hsMap.size,
+    originCount: originMap.size,
     carriers,
     containers,
     portsFrom,
@@ -450,6 +473,7 @@ export function minimalTeaser(slug: string): ProfileData {
     countryCode: 'US', entryPort: null, incumbent: null, aliasesCount: 0, otherNames: [], otherAddresses: [],
     totalShipments: null, ships12m: null, teu12m: null, avgTeu: null, estSpend: null,
     firstShipment: null, months: [], suppliers: [], hsBreakdown: [], origins: [],
+    hsTotal: 0, originsTotal: 0, hsCodeCount: 0, originCount: 0,
     carriers: [], containers: [], portsFrom: [], notifyParties: [], recent: [], sampleSize: 0,
   };
 }
@@ -761,6 +785,9 @@ const PROFILE_CSS = `
 .impp-rvc-badge.phone_only{background:var(--surface-2);color:var(--muted);border:1px solid var(--border)}
 .impp-rvc-name{font-size:15px;font-weight:800;color:var(--ink)}
 .impp-rvc-title{font-size:12.5px;color:var(--muted);margin-top:2px}
+/* One plain line saying what the tier above actually hands over — the badge on
+   its own reads as a grade, not a promise. Kept left-aligned with the badge. */
+.impp-rvc-what{font-size:12.5px;line-height:1.5;color:var(--muted);margin:2px 0 10px;text-align:left}
 .impp-rvc-row{display:flex;align-items:center;gap:8px;flex-wrap:wrap;font-size:13px;color:var(--ink-soft);margin-top:8px}
 .impp-rvc-row a{color:var(--accent);text-decoration:none;font-weight:600;word-break:break-all}
 .impp-rvc-row a:hover{text-decoration:underline}
@@ -1026,21 +1053,39 @@ export function deltaChip(months: readonly ProfileMonth[]): string {
 /**
  * Horizontal bar list for the Product-breakdown and Origin-country sections.
  *
- * R3 — both sections are captioned "share of the sampled shipments", but the
- * row printed only an absolute count while the bar length encoded share of the
- * BIGGEST row. So the widest bar always read as 100% no matter how small a
- * slice of the sample it actually was, and the number beside it answered a
- * different question than the caption asked. The share is now computed against
- * the sample TOTAL and printed next to the count, so the caption, the bar and
- * the figures all describe the same quantity.
+ * Both sections are captioned "share of the sampled shipments", so BOTH the
+ * printed figure and the bar LENGTH encode share of the sample TOTAL. Length,
+ * label and caption therefore always answer the same question.
  *
- * Bar length stays relative to `max` — that is what makes the rows comparable
- * to each other at a glance — but it is no longer the only thing on the row
- * claiming to be a share.
+ * They used to disagree: the figure was a share of the total while the bar was
+ * scaled to the BIGGEST row, so the top bar rendered full-width while its own
+ * label said e.g. "38%". Scaling to the max made rows easy to rank against each
+ * other but made every chart look like it had one dominant slice. Real share
+ * scaling means a fragmented supply base renders as a row of short bars — that
+ * is the finding, not a rendering defect.
+ *
+ * BAR_MIN_PCT keeps a tiny-but-present slice visible (and hoverable) instead of
+ * collapsing it to a hairline; it is the only place length may exceed share.
+ *
+ * The denominator is the SAMPLE population (`sampleTotal`), not the sum of the
+ * rows drawn: both callers cap their list to a top-N, so summing what is visible
+ * would silently renormalise every share to 100%.
  */
-function barRows(items: Array<{ label: string; value: number; flag?: string }>): string {
-  const max = Math.max(...items.map((i) => i.value), 1);
-  const total = items.reduce((sum, i) => sum + (i.value || 0), 0);
+/** Floor for a rendered bar, in % of the track. Below this a real slice would
+ *  vanish; above it, length is exactly the printed share. */
+export const BAR_MIN_PCT = 2;
+
+function barRows(
+  items: Array<{ label: string; value: number; flag?: string }>,
+  /** Sample population. Defaults to the visible rows, but callers whose list is
+   *  capped to a top-N MUST pass the real total — otherwise every share is
+   *  measured against a denominator the caption does not describe. */
+  sampleTotal?: number,
+): string {
+  const visible = items.reduce((sum, i) => sum + (i.value || 0), 0);
+  const total = sampleTotal != null && sampleTotal >= visible ? sampleTotal : visible;
+  /** Whole-percent share of the sample total — the number printed on the row. */
+  const sharePct = (v: number): number => (total <= 0 ? 0 : Math.round((v / total) * 100));
   const pct = (v: number): string => {
     if (total <= 0) return '';
     const share = (v / total) * 100;
@@ -1050,8 +1095,10 @@ function barRows(items: Array<{ label: string; value: number; flag?: string }>):
   return `<div class="impp-bars">${items
     .map((i) => {
       const share = pct(i.value);
+      // Length == the printed share, floored so a "<1%" row is still a bar.
+      const width = Math.max(BAR_MIN_PCT, sharePct(i.value));
       const tip = `${esc(i.label)}: ${N(i.value)} of ${N(total)} sampled shipments${share ? ` (${share})` : ''}`;
-      return `<div class="impp-brow" title="${tip}"><span class="bl">${i.flag ? i.flag + ' ' : ''}<span>${esc(i.label)}</span></span><span class="bt"><i style="width:${Math.round((i.value / max) * 100)}%"></i></span><span class="bv impp-num">${N(i.value)}${share ? `<span class="bp">${share}</span>` : ''}</span></div>`;
+      return `<div class="impp-brow" title="${tip}"><span class="bl">${i.flag ? i.flag + ' ' : ''}<span>${esc(i.label)}</span></span><span class="bt"><i style="width:${width}%"></i></span><span class="bv impp-num">${N(i.value)}${share ? `<span class="bp">${share}</span>` : ''}</span></div>`;
     })
     .join('')}</div>`;
 }
@@ -1211,7 +1258,7 @@ export function renderImporterProfilePage(p: ProfileData, quota: QuotaState, rev
       <li><b>Steady, sticky volume —</b> ${N(p.ships12m)} shipments (${N(p.teu12m)} TEU) in the last 12 months${p.entryPort ? ' into ' + esc(p.entryPort) : ''}; a consistent lane worth pursuing.</li>
       ${p.incumbent ? `<li><b>Displaceable incumbent —</b> notify party <b>${esc(p.incumbent)}</b> shows on the bills; a named target to undercut${originName ? ' on the ' + esc(originName) + '→' + esc(port) + ' lane' : ''}.</li>` : '<li><b>No forwarder named —</b> the bills show no dominant notify party; an open lane to win with a sharper rate.</li>'}
       <li><b>Best timing —</b> pitch ahead of their busiest months (see the shipments chart) to land the next booking cycle.</li>
-      <li><b>Who to reach —</b> reveal the decision-maker contact (verified email, role or phone tier) below — ${reveal.isSubscriber ? 'included with your Leads Pro plan' : `${reveal.remaining} free reveal${reveal.remaining === 1 ? '' : 's'} to start`}.</li>
+      <li><b>Who to reach —</b> reveal the decision-maker contact (verified work email, role-based inbox or the full phone number) below — ${reveal.isSubscriber ? 'included with your Leads Pro plan' : `${reveal.remaining} free reveal${reveal.remaining === 1 ? '' : 's'} to start`}.</li>
     </ul>
   </div>`;
 
@@ -1231,14 +1278,18 @@ export function renderImporterProfilePage(p: ProfileData, quota: QuotaState, rev
 
   // HS breakdown as bars
   const hsBody = p.hsBreakdown.length
-    ? `<p class="lead">By HS code · share of the sampled shipments</p>${barRows(
+    ? `<p class="lead">By HS code · bar length = share of the sampled shipments</p>${barRows(
         p.hsBreakdown.map((h) => ({ label: `${h.hs} · ${h.chapter}`, value: h.n })),
+        p.hsTotal,
       )}`
     : '<p class="lead">No HS codes on the sampled bills.</p>';
 
   // origins
   const originBody = p.origins.length
-    ? barRows(p.origins.map((o) => ({ label: o.name, value: o.ships, flag: flag(o.cc) })))
+    ? `<p class="lead">By origin country · bar length = share of the sampled shipments</p>${barRows(
+        p.origins.map((o) => ({ label: o.name, value: o.ships, flag: flag(o.cc) })),
+        p.originsTotal,
+      )}`
     : '<p class="lead">No origin countries in the sample.</p>';
 
   // relationships
@@ -1307,16 +1358,21 @@ export function renderImporterProfilePage(p: ProfileData, quota: QuotaState, rev
   const revealLead = reveal.isSubscriber
     ? `Reveal the decision-maker on this lane — included with Leads Pro. <b>${reveal.remaining}</b> of ${reveal.cap} reveals left this month.`
     : reveal.remaining > 0
-      ? `Reveal the decision-maker on this lane — a verified email, a role-based email, or the phone &amp; address on file. You have <b>${reveal.remaining}</b> free reveal${reveal.remaining === 1 ? '' : 's'} to start; Leads Pro includes ${LEADS_PRO_MONTHLY_ALLOWANCE} reveals every month.`
+      ? `Reveal the decision-maker on this lane — a named contact with a verified work email, a role-based company inbox, or the importer's full phone number. You have <b>${reveal.remaining}</b> free reveal${reveal.remaining === 1 ? '' : 's'} to start; Leads Pro includes ${LEADS_PRO_MONTHLY_ALLOWANCE} reveals every month.`
       : `You've used your ${FREE_REVEAL_TASTE} free contact reveals. Leads Pro includes <b>${LEADS_PRO_MONTHLY_ALLOWANCE}</b> decision-maker reveals every month${reveal.comingSoon ? ' — coming soon.' : ` for $${LEADS_PRO_PRICE_USD}/mo.`}`;
 
+  // The pitch is assembled from CONTACT_TIER_COPY so the card can never promise
+  // something a tier does not hand over. The street address is called out as
+  // FREE on purpose: it renders in the identity header and the Organization
+  // JSON-LD above, so selling it back would be selling what we already gave.
+  const tierPitch = TIER_ORDER.map((t) => CONTACT_TIER_COPY[t].badge.toLowerCase());
   const contactBody = `
     <p class="lead">${revealLead}</p>
     <div class="impp-lockcard" id="impp-reveal-card">
       <span class="ico" aria-hidden="true">\u{1F513}</span>
       <div class="lk">
         <div class="lt">Decision-maker contact ${revealChip}</div>
-        <div class="ls">We resolve the best available tier — a verified decision-maker email, a role-based email, or the phone &amp; address on file. We never show a fabricated contact.</div>
+        <div class="ls">We resolve the best available tier — ${esc(tierPitch.slice(0, -1).join(', '))} or ${esc(tierPitch[tierPitch.length - 1])}. The company&rsquo;s street address stays free on this page either way, and we never show a fabricated contact.</div>
       </div>
       <div class="impp-reveal-act">${revealAction}</div>
     </div>
@@ -1360,8 +1416,22 @@ export function renderImporterProfilePage(p: ProfileData, quota: QuotaState, rev
       open: true,
     },
     { id: 'suppliers', label: 'Suppliers', sub: `${p.suppliers.length} in sample`, body: supBody, open: true },
-    { id: 'products', label: 'Product breakdown', sub: `${p.hsBreakdown.length} HS codes`, body: hsBody, open: true },
-    { id: 'origins', label: 'Imports by origin country', sub: `${p.origins.length} countries`, body: originBody, open: true },
+    {
+      id: 'products',
+      label: 'Product breakdown',
+      // A capped list says so, so a folded header never implies the sample only
+      // held the codes we happen to draw.
+      sub: p.hsCodeCount > p.hsBreakdown.length ? `top ${p.hsBreakdown.length} of ${p.hsCodeCount} HS codes` : `${p.hsBreakdown.length} HS codes`,
+      body: hsBody,
+      open: true,
+    },
+    {
+      id: 'origins',
+      label: 'Imports by origin country',
+      sub: p.originCount > p.origins.length ? `top ${p.origins.length} of ${p.originCount} countries` : `${p.origins.length} countries`,
+      body: originBody,
+      open: true,
+    },
     { id: 'relationships', label: 'Top supplier relationships', sub: `${Math.min(p.suppliers.length, 4)} look-alike lanes`, body: relBody },
     { id: 'carriers', label: 'Carriers & containers', sub: `${p.carriers.length} carriers`, body: carrierBody },
     { id: 'ports', label: 'Ports & notify parties', sub: `${p.portsFrom.length} ports`, body: portsBody },
@@ -1815,8 +1885,11 @@ const PROFILE_JS = `
       return;
     }
     var conf = c.confidence || 'phone_only';
-    var badge = conf==='verified' ? 'Verified decision-maker' : (conf==='role_based' ? 'Role-based email (unverified)' : 'Phone & address on file');
-    var out = ['<div class="impp-rvc">','<span class="impp-rvc-badge '+conf+'">'+e2(badge)+'</span>'];
+    // Badge + one-line "what this actually is" both come from the server's
+    // CONTACT_TIER_COPY, so the revealed card can never over-claim its tier.
+    var TIER_COPY = ${JSON.stringify(CONTACT_TIER_COPY)};
+    var tc = TIER_COPY[conf] || TIER_COPY.phone_only;
+    var out = ['<div class="impp-rvc">','<span class="impp-rvc-badge '+conf+'">'+e2(tc.badge)+'</span>','<div class="impp-rvc-what">'+e2(tc.blurb)+'</div>'];
     if(c.contact_name){ out.push('<div class="impp-rvc-name">'+e2(c.contact_name)+'</div>'); }
     if(c.title){ out.push('<div class="impp-rvc-title">'+e2(c.title)+'</div>'); }
     // Copy buttons carry NO value in an attribute: e2() escapes markup but not

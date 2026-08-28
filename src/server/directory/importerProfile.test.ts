@@ -10,8 +10,11 @@ import {
   titleFromSlug,
   profileCacheKey,
   handleImporterProfile,
+  renderImporterProfilePage,
+  anonRevealState,
 } from './importerProfile.js';
-import { companySlugFromLink } from './importerLeads.js';
+import { companySlugFromLink, CONTACT_TIER_COPY, TIER_ORDER } from './importerLeads.js';
+import { FIXTURE_PROFILE_ROWS, FIXTURE_PROFILE_SLUG } from './importerFixture.js';
 import { FREE_DETAIL_QUOTA, DETAIL_COOKIE, __resetQuotaStateForTests } from './importerQuota.js';
 import { __setLivePullsForTests } from './externalPullGuard.js';
 
@@ -260,5 +263,48 @@ describe('handleImporterProfile', () => {
     });
     expect(res._status).toBe(503);
     expect(String(res._html)).toContain('coming soon');
+  });
+});
+
+/* ── the reveal card must not sell what the page gives away ──────────────────
+ * The street address renders FREE in the identity header AND in the page's
+ * Organization JSON-LD. The paid reveal therefore may not claim it. These specs
+ * pin the rendered page, not just the copy constants. */
+describe('reveal card claims match the tiers it can deliver', () => {
+  const profile = aggregateProfile([...FIXTURE_PROFILE_ROWS], FIXTURE_PROFILE_SLUG);
+  const quota = { allowed: true, used: 1, remaining: 2, limit: 3, signedIn: false } as const;
+  const html = renderImporterProfilePage(profile, quota, anonRevealState());
+
+  it('still shows the street address for free (header + JSON-LD)', () => {
+    expect(profile.address).toBeTruthy();
+    expect(html).toContain(profile.address as string);
+    expect(html).toMatch(/"@type":\s*"Organization"[\s\S]*?"address"/);
+  });
+
+  it('never offers the address as part of the paid reveal', () => {
+    const card = /<div class="impp-lockcard"[\s\S]*?<\/div>\s*<div class="impp-reveal-result"/.exec(html)?.[0] ?? '';
+    // The card may mention the address only to say it is FREE. Drop that clause,
+    // and no mention of an address may survive anywhere in the pitch.
+    const pitch = card.replace(/The company&rsquo;s street address stays free on this page either way,?/i, '');
+    expect(pitch).not.toMatch(/\baddress(es)?\b/i);
+    // The old copy sold "the phone & address on file" — never again.
+    expect(card).not.toMatch(/address on file/i);
+    // …and it says the free/paid line out loud.
+    expect(card).toMatch(/street address stays free/i);
+  });
+
+  it('lists exactly the three real tiers, best-first', () => {
+    const card = /<div class="ls">([\s\S]*?)<\/div>/.exec(html)?.[1] ?? '';
+    for (const t of TIER_ORDER) expect(card.toLowerCase()).toContain(CONTACT_TIER_COPY[t].badge.toLowerCase());
+    expect(card.indexOf(CONTACT_TIER_COPY.verified.badge.toLowerCase())).toBeLessThan(
+      card.indexOf(CONTACT_TIER_COPY.phone_only.badge.toLowerCase()),
+    );
+  });
+
+  it('ships the tier copy to the client so the revealed badge cannot drift', () => {
+    // PROFILE_JS inlines CONTACT_TIER_COPY; the revealed card reads its badge and
+    // blurb from it rather than a second hand-written map.
+    expect(html).toContain(JSON.stringify(CONTACT_TIER_COPY.phone_only.badge));
+    expect(html).toContain(JSON.stringify(CONTACT_TIER_COPY.role_based.blurb));
   });
 });

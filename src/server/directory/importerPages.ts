@@ -43,6 +43,7 @@ import {
   winnability,
   aiAngle,
   MAX_LEADS,
+  CONTACT_TIER_COPY,
   type ImporterFilters,
   type ImporterLead,
   type ContactConfidence,
@@ -1366,9 +1367,12 @@ const CLIENT_JS = `
     // The contact-tier note is its OWN footer zone (grid column 2), not a member
     // of the action group — otherwise its x-position drifts card to card with
     // however many buttons happen to follow it.
-    var tierTxt={verified:'\\u2713 Verified decision-maker on file',role_based:'Role-based email available (unverified)',phone_only:'Phone & address on file'};
-    var tierEl=T('span','imp-tier'+(l.contact_confidence==='verified'?' ok':''),tierTxt[l.contact_confidence]||tierTxt.phone_only);
-    tierEl.title='What we hold for this importer\\u2019s decision-maker. Reveal it on the profile.';
+    // Chip label + its tooltip both read from the server's CONTACT_TIER_COPY —
+    // one source of truth for what a tier is allowed to claim.
+    var TIER_COPY=${JSON.stringify(CONTACT_TIER_COPY)};
+    var tc=TIER_COPY[l.contact_confidence]||TIER_COPY.phone_only;
+    var tierEl=T('span','imp-tier'+(l.contact_confidence==='verified'?' ok':''),(l.contact_confidence==='verified'?'\\u2713 ':'')+tc.badge);
+    tierEl.title=tc.blurb+' Reveal it on the profile.';
     foot.appendChild(tierEl);
     var right=T('div','imp-foot-r');
     // ☆ Save (free, logged-in). Only when we have a slug to key the save on.

@@ -25,7 +25,11 @@ import {
   findImporterLeads,
   MAX_LEADS,
   ROLE_LOCALPARTS,
+  CONTACT_TIER_COPY,
+  TIER_ORDER,
   type BolRow,
+  type ContactConfidence,
+  type TieredContact,
 } from './importerLeads.js';
 import { __setLivePullsForTests } from './externalPullGuard.js';
 
@@ -224,6 +228,83 @@ describe('resolveContactTiered (never-empty fallback tiers)', () => {
     expect(c.contact_confidence).toBe('phone_only');
     expect(c.phone).toBe('555-123');
     expect(c.address).toBe('1 Main St');
+  });
+});
+
+/* ── HONEST CLAIMS: what a tier SAYS must equal what it HANDS OVER ───────────
+ * The audit that produced this suite found the paid `phone_only` tier selling
+ * "the phone & address on file" while the street address renders FREE on the
+ * importer profile (identity header + Organization JSON-LD). The address is not
+ * scarce — it is on the company's own website — so the decision was to keep it
+ * free and stop claiming it. These specs are the regression fence. */
+describe('CONTACT_TIER_COPY — every tier claims only what it delivers', () => {
+  /** Street address, but NOT the "address" inside "email address". */
+  const STREET_ADDRESS = /(?<!e-?mail\s)\baddress(es)?\b/i;
+  const prose = (t: ContactConfidence): string =>
+    `${CONTACT_TIER_COPY[t].badge} ${CONTACT_TIER_COPY[t].blurb}`;
+
+  /** Resolve a real TieredContact for each tier through the real code path, so
+   *  `delivers` is checked against actual output rather than a second opinion. */
+  async function resolveTier(tier: ContactConfidence): Promise<TieredContact> {
+    if (tier === 'phone_only') {
+      delete process.env.HUNTER_API_KEY; // no key → honest degrade
+      return resolveContactTiered('Some Importer', { phone: '555-123', address: '1 Main St' });
+    }
+    process.env.HUNTER_API_KEY = 'test';
+    const emails =
+      tier === 'verified'
+        ? [{ value: 'j.smith@bosch.com', first_name: 'J', last_name: 'Smith', position: 'Head of Logistics', confidence: 95 }]
+        : [];
+    globalThis.fetch = vi.fn(async () => ({
+      ok: true,
+      json: async () => ({ data: { domain: 'bosch.com', emails } }),
+    })) as unknown as typeof fetch;
+    return resolveContactTiered('Robert Bosch Tool Corp', { phone: '555', address: '1 Main St' });
+  }
+
+  it('covers every tier exactly once, best-first', () => {
+    expect([...TIER_ORDER]).toEqual(['verified', 'role_based', 'phone_only']);
+    expect(Object.keys(CONTACT_TIER_COPY).sort()).toEqual([...TIER_ORDER].sort());
+  });
+
+  it.each([...TIER_ORDER])('%s actually delivers every field it promises', async (tier) => {
+    const c = await resolveTier(tier);
+    expect(c.contact_confidence).toBe(tier);
+    for (const field of CONTACT_TIER_COPY[tier].delivers) {
+      const v = c[field];
+      const present = Array.isArray(v) ? v.length > 0 : v != null && v !== '';
+      expect(present, `${tier} promises "${String(field)}" but resolved ${JSON.stringify(v)}`).toBe(true);
+    }
+  });
+
+  it.each([...TIER_ORDER])('%s never sells the street address (it is free on the profile)', (tier) => {
+    expect(CONTACT_TIER_COPY[tier].delivers).not.toContain('address');
+    expect(prose(tier)).not.toMatch(STREET_ADDRESS);
+  });
+
+  it('verified promises a named person, a title and a verified email', () => {
+    const { blurb, delivers } = CONTACT_TIER_COPY.verified;
+    expect(delivers).toEqual(expect.arrayContaining(['contact_name', 'title', 'email']));
+    expect(blurb).toMatch(/named/i);
+    expect(blurb).toMatch(/title/i);
+    expect(blurb).toMatch(/verified[^.]*email/i);
+  });
+
+  it('role_based says plainly that it is a role inbox, not a named person', () => {
+    const { badge, blurb, delivers } = CONTACT_TIER_COPY.role_based;
+    expect(delivers).not.toContain('contact_name');
+    expect(delivers).not.toContain('email');
+    expect(delivers).toEqual(expect.arrayContaining(['role_emails']));
+    expect(`${badge} ${blurb}`).toMatch(/role-based/i);
+    expect(blurb).toMatch(/not a named person/i);
+  });
+
+  it('phone_only claims the phone and nothing else', () => {
+    const { badge, blurb, delivers } = CONTACT_TIER_COPY.phone_only;
+    expect([...delivers]).toEqual(['phone']);
+    expect(`${badge} ${blurb}`).toMatch(/phone|number/i);
+    // No email of any kind is delivered at this tier, so none may be implied.
+    expect(`${badge} ${blurb}`).not.toMatch(/\bemail\b|\binbox\b/i);
   });
 });
 
