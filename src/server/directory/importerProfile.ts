@@ -36,7 +36,7 @@ import type { Express, Request, Response } from 'express';
 import { layout, esc } from './pages.js';
 import { ISO_COUNTRIES } from './isoCountries.js';
 import { US_STATES } from './usStates.js';
-import { pullImportBols, type BolRow } from './importerLeads.js';
+import { pullImportBols, normalizePortName, type BolRow } from './importerLeads.js';
 import { quoteLaneHref } from './entryPortFacets.js';
 import { CACHE_ONLY_NOTE } from './externalPullGuard.js';
 import {
@@ -362,7 +362,13 @@ export function aggregateProfile(rawRows: readonly BolRow[], slug: string): Prof
       if (cur) cur.n += 1;
       else notifyMap.set(np.toLowerCase(), { name: np, n: 1 });
     }
-    if (!entryPort && str(r.entry_port)) entryPort = fixCodeCasing(str(r.entry_port));
+    // Round 5 normalised the port at the LEADS boundary so the search card's
+    // RFQ deep link stopped carrying "Savannah, Ga."; the profile aggregates
+    // raw rows on its own path and never got the same treatment, so its
+    // identically-labelled "Quote this lane" still emitted origin=Savannah,+GA.
+    // fixCodeCasing only re-upper-cases the code — it leaves the abbreviating
+    // period on — so normalize after it, not instead of it.
+    if (!entryPort && str(r.entry_port)) entryPort = normalizePortName(fixCodeCasing(str(r.entry_port)));
   }
 
   const months = [...monthMap.values()].sort((a, b) => a.sort - b.sort).slice(-18).map((m) => ({ key: m.key, label: m.label, count: m.count }));
@@ -643,7 +649,10 @@ const PROFILE_CSS = `
 .impp-delta{display:inline-flex;align-items:center;gap:5px;border-radius:999px;padding:2px 9px;
   border:1px solid color-mix(in srgb,var(--muted) 34%,transparent);background:var(--surface-2)}
 .impp-delta b{font-weight:700;color:inherit}
-.impp-delta.up{color:var(--success);border-color:color-mix(in srgb,var(--success) 34%,transparent);background:color-mix(in srgb,var(--success) 12%,transparent)}
+/* Raw --success as text is 3.77:1 on white in LIGHT theme — below AA before the
+   12% tint is even applied. Mixed toward --ink, the same correction .imp-win
+   carries. --warn already clears AA raw (5.02:1), so it is left alone. */
+.impp-delta.up{color:color-mix(in srgb,var(--success) 62%,var(--ink));border-color:color-mix(in srgb,var(--success) 34%,transparent);background:color-mix(in srgb,var(--success) 12%,transparent)}
 .impp-delta.down{color:var(--warn);border-color:color-mix(in srgb,var(--warn) 34%,transparent);background:color-mix(in srgb,var(--warn) 12%,transparent)}
 .impp-delta.flat{color:var(--muted)}
 .impp-tip{position:absolute;top:6px;left:0;transform:translateX(-50%);background:var(--ink);color:var(--bg);font-size:12px;font-weight:700;padding:7px 11px;border-radius:8px;pointer-events:none;white-space:nowrap;box-shadow:var(--shadow-md);z-index:5;line-height:1.35;text-align:center}
@@ -693,9 +702,10 @@ const PROFILE_CSS = `
   padding:3px 7px;cursor:pointer;flex:0 0 auto;transition:color .14s,border-color .14s}
 .impp-copy:hover{color:var(--accent);border-color:var(--accent)}
 .impp-copy:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
-.impp-copy.done{color:var(--success);border-color:var(--success)}
+.impp-copy.done{color:color-mix(in srgb,var(--success) 62%,var(--ink));border-color:var(--success)}
 .impp-supn{font-weight:700;color:var(--ink)}
-.impp-hschip{font-family:var(--font-mono);font-size:11px;color:var(--accent);background:color-mix(in srgb,var(--accent) 12%,transparent);border-radius:4px;padding:1px 6px;display:inline-block;white-space:nowrap}
+/* Accent on its own 12% tint is 4.38:1 in DARK — mixed toward --ink like .imp-chip. */
+.impp-hschip{font-family:var(--font-mono);font-size:11px;color:color-mix(in srgb,var(--accent) 82%,var(--ink));background:color-mix(in srgb,var(--accent) 12%,transparent);border-radius:4px;padding:1px 6px;display:inline-block;white-space:nowrap}
 .impp-num{font-variant-numeric:tabular-nums}
 
 /* bars (volume / origin) */
@@ -1078,9 +1088,13 @@ function identityHeader(p: ProfileData, opts: { showActions: boolean }): string 
   // rather than rendered as a link that 302s back to /directory.
   const laneHref = quoteLaneHref({
     entryPort: p.entryPort,
-    // Delivery state parsed from the displayed address (the street address
-    // itself stays behind the metered reveal, so only the state is seeded).
-    destinationState: (String(p.address ?? '').match(/,\s*([A-Z]{2})[\s,]/) ?? [])[1] ?? null,
+    // Delivery state parsed from the displayed address. Only the STATE is
+    // seeded into the RFQ — the recipients price a drayage leg to a region, and
+    // a street address in a shareable query string is neither needed nor wanted.
+    // The trailing [\s,] used to require a character AFTER the code, so an
+    // address ending exactly in ", NC" (no ZIP) silently produced
+    // destination= and a half-filled RFQ. A lookahead matches end-of-string too.
+    destinationState: (String(p.address ?? '').match(/,\s*([A-Z]{2})(?=[\s,]|$)/) ?? [])[1] ?? null,
     // The importer's biggest commodity — same field the lane chip already shows.
     product: p.hsBreakdown[0]?.desc ?? p.suppliers[0]?.product ?? null,
     hsCode: p.hsBreakdown[0]?.hs ?? null,

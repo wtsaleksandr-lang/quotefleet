@@ -287,7 +287,13 @@ const IMPORTERS_CSS = `
   border-color:color-mix(in srgb,var(--accent-fill) 62%,var(--surface-2));color:#fff}
 .imp-actions .btn-primary[disabled] .arr{opacity:.75}
 .imp-actions .btn-primary .arr{color:#fff}
-.imp-actions .btn-primary:hover{background:var(--accent-strong,var(--accent-fill));border-color:var(--accent-strong,var(--accent-fill))}
+/* --accent-strong DARKENS in light (#0A30CC, 9.1:1 under #fff) but BRIGHTENS in
+   dark (#93A9FF), where the same #fff label drops to 2.24:1 — the page's primary
+   action, in the default theme. Deepening the fill instead of jumping straight
+   to the strong token keeps a visible hover in both directions and clears AA:
+   5.38:1 dark / 7.34:1 light. Light keeps the crisper token below. */
+.imp-actions .btn-primary:hover{background:color-mix(in srgb,var(--accent-strong,var(--accent-fill)) 25%,var(--accent-fill));border-color:color-mix(in srgb,var(--accent-strong,var(--accent-fill)) 25%,var(--accent-fill))}
+html[data-theme="light"] .imp-actions .btn-primary:hover{background:var(--accent-strong,var(--accent-fill));border-color:var(--accent-strong,var(--accent-fill))}
 
 .imp-status{color:var(--muted);font-size:13px;margin:0}
 .imp-status b{color:var(--ink)}
@@ -323,7 +329,7 @@ const IMPORTERS_CSS = `
   background:none;border:0;padding:2px 0;cursor:pointer;text-decoration:none}
 .imp-copylink:hover{color:var(--ink);text-decoration:underline;text-underline-offset:2px}
 .imp-copylink:focus-visible{outline:2px solid var(--accent);outline-offset:2px;border-radius:4px}
-.imp-copylink.done{color:var(--success);text-decoration:none}
+.imp-copylink.done{color:color-mix(in srgb,var(--success) 62%,var(--ink));text-decoration:none}
 /* Controls row: starts at the left edge (see .imp-toolbar), and every control in
    it stands 40px tall — they were 40 / 29 / 42, a ragged band. */
 .imp-toolbar-r{display:flex;align-items:center;gap:10px;flex-wrap:wrap;flex:1 1 100%;margin-left:0}
@@ -349,7 +355,11 @@ const IMPORTERS_CSS = `
 .imp-chips-cap{font-size:10.5px;font-weight:700;letter-spacing:.05em;text-transform:uppercase;color:var(--muted);flex:0 0 auto}
 .imp-chips-list{display:contents}
 .imp-chip{display:inline-flex;align-items:center;gap:7px;font-family:var(--font-sans);font-size:12px;font-weight:600;
-  color:var(--accent);background:color-mix(in srgb,var(--accent) 11%,transparent);
+  /* Raw --accent on its own 11% tint measures 4.14:1 in DARK — the tint lifts the
+     background while the text stays put. Mixed toward --ink it clears AA in both
+     directions (ink is light in dark, dark in light), the same correction
+     .imp-win carries. */
+  color:color-mix(in srgb,var(--accent) 82%,var(--ink));background:color-mix(in srgb,var(--accent) 11%,transparent);
   border:1px solid color-mix(in srgb,var(--accent) 34%,transparent);border-radius:999px;
   padding:5px 9px 5px 11px;min-height:30px;cursor:pointer;max-width:100%;transition:background .14s,border-color .14s}
 .imp-chip:hover{background:color-mix(in srgb,var(--accent) 20%,transparent);border-color:var(--accent)}
@@ -372,7 +382,8 @@ const IMPORTERS_CSS = `
 .imp-density button:hover{color:var(--ink)}
 .imp-density button:focus-visible{outline:2px solid var(--accent);outline-offset:-2px}
 /* selected = tinted + outlined, never a bright fill (hard UI rule) */
-.imp-density button[aria-pressed="true"]{background:color-mix(in srgb,var(--accent) 12%,transparent);color:var(--accent);box-shadow:inset 0 0 0 1px var(--accent)}
+/* Same accent-on-accent-tint trap as .imp-chip: 4.05:1 in DARK. */
+.imp-density button[aria-pressed="true"]{background:color-mix(in srgb,var(--accent) 12%,transparent);color:color-mix(in srgb,var(--accent) 82%,var(--ink));box-shadow:inset 0 0 0 1px var(--accent)}
 
 /* ── audience switcher (Trucker / Broker / Forwarder / Supplier) ──
    Same segmented-control idiom as .imp-density on purpose — ONE toggle pattern
@@ -383,7 +394,7 @@ const IMPORTERS_CSS = `
 .imp-aud button+button{border-left:1px solid var(--border-strong)}
 .imp-aud button:hover{color:var(--ink)}
 .imp-aud button:focus-visible{outline:2px solid var(--accent);outline-offset:-2px}
-.imp-aud button[aria-pressed="true"]{background:color-mix(in srgb,var(--accent) 12%,transparent);color:var(--accent);box-shadow:inset 0 0 0 1px var(--accent)}
+.imp-aud button[aria-pressed="true"]{background:color-mix(in srgb,var(--accent) 12%,transparent);color:color-mix(in srgb,var(--accent) 82%,var(--ink));box-shadow:inset 0 0 0 1px var(--accent)}
 /* The 1px divider between siblings painted straight over the pressed button's
    inset ring, so the selected outline was accent on three edges and grey on the
    fourth. Drop the divider on the pressed button and on the one after it. */
@@ -441,7 +452,6 @@ const IMPORTERS_CSS = `
 a.imp-co-link{color:var(--accent);text-decoration:none;border-radius:4px}
 a.imp-co-link:hover{text-decoration:underline;text-underline-offset:3px}
 a.imp-co-link:focus-visible{outline:2px solid var(--accent);outline-offset:3px}
-.imp-flag{font-size:15px;line-height:1}
 /* Category badge reads as a quiet label, not a second brand-blue CTA. */
 .imp-pill{font-size:9.5px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;padding:3px 7px;border-radius:4px;background:var(--surface-3,var(--surface-2));color:var(--ink-soft);border:1px solid var(--border-strong)}
 .imp-win{font-size:11px;font-weight:700;padding:3px 9px;border-radius:999px;white-space:nowrap;font-variant-numeric:tabular-nums}
@@ -453,7 +463,11 @@ a.imp-co-link:focus-visible{outline:2px solid var(--accent);outline-offset:3px}
 .imp-win.md{background:color-mix(in srgb,var(--warn) 15%,transparent);color:color-mix(in srgb,var(--warn) 66%,var(--ink));border:1px solid color-mix(in srgb,var(--warn) 34%,transparent)}
 .imp-addr{color:var(--muted);font-size:12px;margin-bottom:9px;line-height:1.45}
 .imp-lane{display:flex;align-items:center;gap:7px;flex-wrap:wrap;font-size:13px;color:var(--ink-soft);margin-bottom:12px;line-height:1.5}
-.imp-lane .arw{color:var(--muted-soft,var(--muted))}
+/* --muted-soft measured 3.63:1 (dark) / 3.02:1 (light) — below AA. The arrow is
+   not decoration: it is what says supplier -> gateway, and the middot is what
+   separates the lane from the commodity. --muted clears AA in both themes and
+   is already the colour of .prod sitting beside it. */
+.imp-lane .arw{color:var(--muted)}
 .imp-lane .prod{color:var(--muted)}
 .imp-lane .prodwrap{display:inline-flex;align-items:center;gap:7px;min-width:0}
 .imp-lane .cc{font-size:10px;font-weight:700;letter-spacing:.05em;color:var(--muted);background:var(--surface-2);border-radius:3px;padding:2px 5px}
@@ -493,7 +507,10 @@ a.imp-co-link:focus-visible{outline:2px solid var(--accent);outline-offset:3px}
 .imp-incumb{font-size:11.5px;color:color-mix(in srgb,var(--warn) 72%,var(--ink));background:color-mix(in srgb,var(--warn) 13%,transparent);border:1px solid color-mix(in srgb,var(--warn) 30%,transparent);border-radius:999px;padding:3px 10px;max-width:100%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .imp-foot-r{display:flex;align-items:center;gap:10px;flex-wrap:wrap;justify-content:flex-end}
 .imp-tier{font-size:11.5px;color:var(--muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:100%}
-.imp-tier.ok{color:var(--success)}
+/* Raw --success as text measures 3.77:1 on white in LIGHT theme — below AA
+   before any tint is involved. Same mix-toward---ink correction .imp-win
+   already carries: darkens in light, lightens in dark. */
+.imp-tier.ok{color:color-mix(in srgb,var(--success) 62%,var(--ink))}
 .imp-lock{display:inline-flex;align-items:center;gap:8px;font-size:12px;font-weight:600;color:var(--ink-soft);border:1px solid var(--border-strong);border-radius:8px;padding:9px 13px;background:var(--surface-2);text-decoration:none;min-height:44px;box-sizing:border-box;transition:border-color .14s,color .14s}
 .imp-lock:hover{border-color:var(--accent);color:var(--ink)}
 .imp-lock:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
@@ -511,7 +528,18 @@ a.imp-co-link:focus-visible{outline:2px solid var(--accent);outline-offset:3px}
 .imp-cta:hover .arr{transform:translateX(3px)}
 /* compact card condenses the stat grid + angle */
 .imp-results.compact .imp-card,.imp-results.compact .imp-skel{padding:14px 15px 0}
-.imp-results.compact .imp-angle{display:none}
+/* The skeleton's stand-in must be hidden with it. It was not, so a compact
+   search reserved a 39px block + 14px margin the real card never draws:
+   measured 332px of skeleton against a 305.8px card (26.2px per card, x4
+   skeletons in a 2-col grid), i.e. the very column-jump the card-shaped
+   skeleton exists to prevent. */
+.imp-results.compact .imp-angle,.imp-results.compact .sk-angle{display:none}
+/* The other half of the same mismatch, in the opposite direction: a compact card
+   is HALF width, so .imp-lane wraps to two rows (19.5 + 7 gap + 19.5 = 46px)
+   while .sk-lane stayed at its one-row 20px. Compact only means two-up above
+   1080px — below that it is a full-width single column and the lane fits on one
+   row again, so this is undone in that breakpoint. */
+.imp-results.compact .sk-lane{height:46px}
 .imp-results.compact .imp-stats{grid-template-columns:repeat(2,minmax(0,1fr));gap:8px 12px}
 .imp-results.compact .imp-co{font-size:15px}
 .imp-results.compact .imp-foot{margin:12px -15px 0;padding:10px 15px}
@@ -605,7 +633,9 @@ a.imp-soon:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
    accent fill the search button gets (see .imp-actions .btn-primary above). */
 .imp-empty-act{display:flex;align-items:center;gap:12px;flex-wrap:wrap;margin-top:16px}
 .imp-empty-act .imp-empty-run{background:var(--accent-fill);border-color:var(--accent-fill);color:#fff;box-shadow:none;flex:0 0 auto}
-.imp-empty-act .imp-empty-run:hover{background:var(--accent-strong,var(--accent-fill));border-color:var(--accent-strong,var(--accent-fill))}
+/* Same #fff-on-brightening-accent trap as .imp-actions .btn-primary:hover. */
+.imp-empty-act .imp-empty-run:hover{background:color-mix(in srgb,var(--accent-strong,var(--accent-fill)) 25%,var(--accent-fill));border-color:color-mix(in srgb,var(--accent-strong,var(--accent-fill)) 25%,var(--accent-fill))}
+html[data-theme="light"] .imp-empty-act .imp-empty-run:hover{background:var(--accent-strong,var(--accent-fill));border-color:var(--accent-strong,var(--accent-fill))}
 .imp-empty-act .imp-empty-hint{font-size:12px;font-weight:600;color:var(--muted)}
 
 /* Skeleton card while a search is in flight.
@@ -668,6 +698,9 @@ a.imp-soon:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
 @media(max-width:1080px){
   .imp-layout:has(.imp-side.on){grid-template-columns:224px minmax(0,1fr)}
   .imp-results.compact{grid-template-columns:1fr}
+  /* Compact is a single full-width column from here down, so the lane stops
+     wrapping and the skeleton's stand-in goes back to one row. */
+  .imp-results.compact .sk-lane{height:20px}
 }
 @media(max-width:900px){
   .imp-layout{grid-template-columns:1fr}
@@ -726,9 +759,19 @@ a.imp-soon:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
   .imp-actions:has(.imp-more[open]) #imp-search{grid-column:1 / -1}
   .imp-more>summary{justify-content:center}
   /* Same rule for the card's badge group: the company name takes its own line so
-     flag + IMPORTER + winnability stay together instead of orphaning one pill. */
+     IMPORTER + winnability stay together instead of orphaning one pill. (The
+     supplier flag that used to lead this group was removed in round 5 — it was
+     the SUPPLIER's country sitting above the importer's own "United States".) */
   .imp-card-h{gap:7px}
   .imp-card-h .imp-co{flex:1 1 100%}
+  /* The skeleton mirrors the card's LAYOUT classes, so every breakpoint rule
+     that changes the card's shape needs its stand-in paired with it — the same
+     omission as the compact .sk-angle/.sk-lane pair above. Unpaired, the phone
+     skeleton kept a one-row header and a one-row lane while the real card takes
+     two of each, so it under-reserved 53px per card on the viewport where a
+     column jump is most expensive. */
+  .imp-skel .sk-co{flex:1 1 100%}
+  .imp-skel .sk-lane{height:46px}
   /* No-orphan wrap: four audience buttons pair 2x2, never 3+1. */
   .imp-aud{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));border-radius:8px}
   .imp-aud button{border-left:0;border-top:1px solid var(--border-strong)}
@@ -748,7 +791,10 @@ a.imp-soon:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
 @media(max-width:440px){
   .imp-more-grid{grid-template-columns:1fr}
   .imp-panel{padding:14px}
-  .imp-card{padding:14px 15px 0}
+  /* Paired with .imp-skel, like the compact rule above. Unpaired, the phone
+     skeleton kept 16px/20px padding against the card's 14px/15px and stopped
+     reserving the right height on the viewport that needs it most. */
+  .imp-card,.imp-skel{padding:14px 15px 0}
   .imp-foot{margin:12px -15px 0;padding:10px 15px}
   .imp-empty{flex-direction:column;gap:12px}
   /* Full-width so the button and its hint stack as two clean rows instead of a

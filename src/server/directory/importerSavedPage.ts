@@ -49,26 +49,41 @@ a.imps-co-link:focus-visible{outline:2px solid var(--accent);outline-offset:3px}
 /* current stage, read at a glance without opening the select */
 .imps-chip{display:inline-flex;align-items:center;gap:6px;font-size:10.5px;font-weight:700;letter-spacing:.05em;text-transform:uppercase;border-radius:999px;padding:3px 10px;color:var(--muted);background:var(--surface-2);border:1px solid var(--border-strong)}
 .imps-chip[data-k="new"]{color:var(--accent);background:color-mix(in srgb,var(--accent) 12%,transparent);border-color:color-mix(in srgb,var(--accent) 32%,transparent)}
-.imps-chip[data-k="contacted"]{color:var(--warn);background:color-mix(in srgb,var(--warn) 13%,transparent);border-color:color-mix(in srgb,var(--warn) 32%,transparent)}
+.imps-chip[data-k="contacted"]{color:color-mix(in srgb,var(--warn) 78%,var(--ink));background:color-mix(in srgb,var(--warn) 13%,transparent);border-color:color-mix(in srgb,var(--warn) 32%,transparent)}
 .imps-chip[data-k="quoted"]{color:var(--accent-strong,var(--accent));background:color-mix(in srgb,var(--accent) 10%,transparent);border-color:color-mix(in srgb,var(--accent) 28%,transparent)}
-.imps-chip[data-k="won"]{color:var(--success);background:color-mix(in srgb,var(--success) 13%,transparent);border-color:color-mix(in srgb,var(--success) 32%,transparent)}
+/* Raw --success measures 3.77:1 as text in LIGHT theme (3.2:1 on its own 13%
+   tint) — below AA. Mixed toward --ink, the same correction .imp-win carries on
+   the search card. --warn/--accent already clear AA raw, so they stay. */
+.imps-chip[data-k="won"]{color:color-mix(in srgb,var(--success) 62%,var(--ink));background:color-mix(in srgb,var(--success) 13%,transparent);border-color:color-mix(in srgb,var(--success) 32%,transparent)}
 .imps-since{color:var(--muted);font-size:12px;margin-left:auto;font-variant-numeric:tabular-nums;white-space:nowrap}
 /* stretch, not start: the note grows to the height of the status + actions
    column so the card never ends with a band of dead space under one side. */
 .imps-row{display:grid;grid-template-columns:minmax(0,1fr) 224px;gap:12px 16px;align-items:stretch}
-.imps-note{min-width:0;display:flex;flex-direction:column;gap:6px}
+.imps-note{min-width:0;display:flex;flex-direction:column;gap:2px}
+/* The caption wrapper is the flex item now, so it — not the textarea — has to
+   be the one that grows to the height of the status + actions column. */
+.imps-note .imps-capfield{flex:1 1 auto;display:flex;min-height:0}
 .imps-note textarea{flex:1 1 auto}
 .imps-side{display:flex;flex-direction:column;gap:8px;min-width:0}
 .imps-side .imps-actions{margin-top:auto}
-/* Title-in-field: the field's own label is its placeholder, help sits top-left. */
-.imps-field .imps-hint{font-size:11.5px;color:var(--muted);display:block;margin:0 0 6px}
-.imps-note textarea{width:100%;box-sizing:border-box;font-family:var(--font-sans);font-size:14px;color:var(--ink);background:var(--surface-2);border:1px solid var(--border-strong);border-radius:8px;padding:10px 12px;min-height:76px;resize:vertical;line-height:1.55}
+/* ── title-in-field (hard input rule) ──
+   This page claimed title-in-field in a comment but did the opposite: the note
+   carried its name ONLY in the placeholder, so the moment a note was typed the
+   field went anonymous, and the status select put its TITLE in the top-left
+   help slot — the inversion of the rule. Same mechanism as .imp-capfield on
+   /importers, so both importer surfaces speak one language: caption inside the
+   box (never disappears), help above it, value under the caption. */
+.imps-capfield{position:relative}
+.imps-cap{position:absolute;top:6px;left:13px;z-index:1;font-size:10px;font-weight:700;letter-spacing:.05em;text-transform:uppercase;color:var(--muted);pointer-events:none;line-height:1;max-width:calc(100% - 26px);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.imps-capfield:focus-within .imps-cap{color:var(--accent)}
+.imps-field .imps-hint{font-size:11.5px;color:var(--muted);display:block;margin:0 0 2px}
+.imps-note textarea{width:100%;box-sizing:border-box;font-family:var(--font-sans);font-size:14px;color:var(--ink);background:var(--surface-2);border:1px solid var(--border-strong);border-radius:8px;padding:21px 12px 7px;min-height:76px;resize:vertical;line-height:1.55}
 .imps-note textarea::placeholder{color:var(--muted)}
 .imps-note textarea:hover{border-color:var(--accent)}
 .imps-note textarea:focus-visible{outline:2px solid var(--accent);outline-offset:1px;border-color:var(--accent)}
-.imps-status-sel{width:100%;box-sizing:border-box;font-family:var(--font-sans);font-size:14px;color:var(--ink);background:var(--surface-2);border:1px solid var(--border-strong);border-radius:8px;padding:10px 12px;min-height:44px;appearance:none;-webkit-appearance:none;cursor:pointer;
+.imps-status-sel{width:100%;box-sizing:border-box;font-family:var(--font-sans);font-size:14px;color:var(--ink);background:var(--surface-2);border:1px solid var(--border-strong);border-radius:8px;padding:21px 12px 7px;min-height:52px;appearance:none;-webkit-appearance:none;cursor:pointer;
   background-image:linear-gradient(45deg,transparent 50%,currentColor 50%),linear-gradient(135deg,currentColor 50%,transparent 50%);
-  background-position:calc(100% - 16px) calc(50% + 1px),calc(100% - 11px) calc(50% + 1px);background-size:5px 5px,5px 5px;background-repeat:no-repeat;padding-right:34px}
+  background-position:calc(100% - 16px) calc(50% + 3px),calc(100% - 11px) calc(50% + 3px);background-size:5px 5px,5px 5px;background-repeat:no-repeat;padding-right:34px}
 .imps-status-sel:hover{border-color:var(--accent)}
 .imps-status-sel:focus-visible{outline:2px solid var(--accent);outline-offset:1px;border-color:var(--accent)}
 .imps-actions{display:flex;gap:8px;align-items:center;flex-wrap:wrap}
@@ -80,7 +95,7 @@ a.imps-co-link:focus-visible{outline:2px solid var(--accent);outline-offset:3px}
 .imps-remove:hover{border-color:var(--warn);color:var(--warn)}
 .imps-remove:focus-visible{outline:2px solid var(--warn);outline-offset:2px}
 .imps-saved-note{font-size:11.5px;color:var(--muted);min-height:15px;line-height:15px}
-.imps-saved-note.ok{color:var(--success)}
+.imps-saved-note.ok{color:color-mix(in srgb,var(--success) 62%,var(--ink))}
 
 .imps-empty{display:flex;gap:16px;align-items:flex-start;border:1px dashed var(--border-strong);border-radius:var(--radius-lg);padding:32px 28px;text-align:left;color:var(--muted);background:var(--surface);max-width:720px;margin-top:20px}
 .imps-empty-ico{flex:0 0 auto;width:44px;height:44px;display:flex;align-items:center;justify-content:center;border-radius:12px;font-size:20px;line-height:1;background:color-mix(in srgb,var(--accent) 10%,transparent);border:1px solid color-mix(in srgb,var(--accent) 26%,transparent)}
@@ -94,9 +109,14 @@ a.imps-co-link:focus-visible{outline:2px solid var(--accent);outline-offset:3px}
 .imps-cta.secondary:hover{border-color:var(--accent)}
 @media(max-width:720px){.imps-row{grid-template-columns:1fr}}
 @media(max-width:560px){
-  /* No-orphan wrap: four stage pills pair 2x2 rather than leaving one alone. */
-  .imps-pipe{display:grid;grid-template-columns:1fr 1fr;gap:8px}
-  .imps-pipe li{justify-content:center}
+  /* No-orphan wrap. The fixed 2-column grid solved the FOUR-pill case (2x2) and
+     created the THREE-pill one: at 375 three stages rendered 2 + "1 Won" alone,
+     even though all three measure ~226px together inside a 327px row. Letting
+     the pills size to content and grow into the row keeps them on one line when
+     they fit, and wraps them in pairs rather than by a fixed column count when
+     they don't — which is what the rule actually asks for. */
+  .imps-pipe{gap:8px}
+  .imps-pipe li{flex:1 1 auto;justify-content:center;padding:6px 10px}
   .imps-empty-act>*{flex:1 1 100%;justify-content:center}
 }
 @media(max-width:440px){.imps-empty{flex-direction:column;padding:24px 20px}.imps-since{margin-left:0;width:100%}}
@@ -127,12 +147,15 @@ function savedCard(s: SavedImporter): string {
     <div class="imps-row">
       <div class="imps-note imps-field">
         <span class="imps-hint" id="notehint-${esc(s.slug)}">Saves as you type</span>
-        <textarea id="note-${esc(s.slug)}" data-note aria-label="Note for ${esc(s.company)}" aria-describedby="notehint-${esc(s.slug)}" placeholder="Note — incumbent, target rate, who you spoke to…">${esc(s.note ?? '')}</textarea>
+        <span class="imps-capfield">
+          <span class="imps-cap" aria-hidden="true">Note</span>
+          <textarea id="note-${esc(s.slug)}" data-note aria-label="Note for ${esc(s.company)}" aria-describedby="notehint-${esc(s.slug)}" placeholder="Incumbent, target rate, who you spoke to…">${esc(s.note ?? '')}</textarea>
+        </span>
         <span class="imps-saved-note" data-savenote aria-live="polite"></span>
       </div>
       <div class="imps-side">
-        <div class="imps-field">
-          <span class="imps-hint">Pipeline status</span>
+        <div class="imps-field imps-capfield">
+          <span class="imps-cap" aria-hidden="true">Pipeline status</span>
           <select id="status-${esc(s.slug)}" class="imps-status-sel" data-status aria-label="Pipeline status for ${esc(s.company)}">${statusOptions(s.status)}</select>
         </div>
         <div class="imps-actions">
