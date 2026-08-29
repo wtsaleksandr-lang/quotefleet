@@ -1362,3 +1362,34 @@ body[data-qf-map-blend="on"] .qf-map-overlay,
 body[data-qf-map-blend="on"] .qf-map-expand {
   z-index: 2;
 }
+
+/* --- Cupertino: the map ADDRESS pills went white-on-white -------------------
+   The comment on the frosted-overlay fix above (~line 930) reasons that the TOP
+   address pills can keep their white text because ".qf-map-addr" paints a dark
+   gradient underneath them. That was true when it was written and is not true
+   now: line ~651 in this same file gives .qf-ma-pt its own
+   `background: rgba(255,255,255,0.7)` frost, which replaces that gradient with
+   light glass. So the pickup/delivery text (widget-style.css:398,
+   `color: rgba(255,255,255,0.96)`) sits on white frost — measured 1:1 computed
+   and confirmed visually at 375 and 1440: the route endpoints are invisible on
+   every cupertino/light-preset map.
+
+   Fix is the one already applied to the sibling bottom badge: re-point the pill
+   text (and its dot markers, which have the same problem) to the same dark
+   Apple slate. Scoped to body[data-qf-preset="cupertino"] so no other preset
+   shifts, and appended at EOF so the line-based guard baselines never renumber.
+   Contrast after: rgba(28,28,30,.92) on the white frost, ~15:1. */
+body[data-qf-preset="cupertino"] .qf-ma-txt {
+  color: rgba(28, 28, 30, 0.92) !important;
+  text-shadow: none !important;
+}
+body[data-qf-preset="cupertino"] .qf-ma-truck {
+  color: rgba(28, 28, 30, 0.7) !important;
+}
+
+/* Bottom-badge label was 4.49:1 — just under the 4.5 AA floor at the 9px size
+   it renders on a phone. A small alpha bump clears it without changing the
+   frosted look. */
+body[data-qf-preset="cupertino"] .qf-map-ov-lbl {
+  color: rgba(28, 28, 30, 0.72) !important;
+}

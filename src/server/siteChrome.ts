@@ -89,9 +89,75 @@ export const FULL_SITE_HEADER = `<header class="site-header">
     ${SITE_MOBILE_MENU_HTML}
   </header>`;
 
+/**
+ * VERY-BOTTOM footer strip — accepted-payment marks + commercial trust badges.
+ *
+ * TRUTHFULNESS IS THE WHOLE POINT OF THIS BLOCK. Everything here was verified
+ * against the LIVE Stripe account and this codebase before it shipped; nothing
+ * is aspirational, and nothing implies a certification we do not hold.
+ *
+ * PAYMENT MARKS — what a customer can genuinely pay with, not what the account
+ * merely *could* do. All five Checkout Session sites (routes/billing.ts,
+ * directoryBilling.ts, manifestBilling.ts, leadsBilling.ts, depositCharge.ts)
+ * omit `payment_method_types` entirely, so Stripe expands the account's default
+ * Payment Method Configuration against `mode` + `currency`. Every real live
+ * Checkout Session on the account resolved to exactly ["card","link"] — the
+ * account's other active capabilities (klarna, bancontact, blik, eps, mb_way,
+ * pix, satispay) are EUR/PLN/BRL or non-recurring and are filtered out for our
+ * USD subscriptions. So:
+ *   • Visa / Mastercard / American Express — the `card` method on a Stripe CA
+ *     account. (Discover is also supported but unconfirmable from the API and
+ *     unproven by any charge, so it is deliberately OFF this conservative set.)
+ *   • Apple Pay — PMC `apple_pay: available=true, value=on`. It rides `card`,
+ *     which is why it never appears in `payment_method_types`. Checkout is
+ *     Stripe-HOSTED (no Stripe.js/Elements anywhere in this repo), so it needs
+ *     no Apple Pay domain registration.
+ *   • Link — present in `payment_method_types` on every real session.
+ * DELIBERATELY ABSENT: Google Pay (PMC available=false — it would not render)
+ * and PayPal (PMC off; there is no PayPal integration in this codebase at all).
+ *
+ * STYLING — monochrome by design: the marks inherit `currentColor` from
+ * `--ink`, which is near-white on the dark theme and deep navy on light, so
+ * they invert with the theme from ONE token. No brand colours, no hardcoded
+ * hexes, no external image requests.
+ *
+ * TRUST BADGES — each is checkable in this repo:
+ *   • "Card details never touch our servers" — zero `js.stripe.com`, `loadStripe`,
+ *     Elements or PaymentElement usage; every billing route returns `session.url`
+ *     and redirects to Stripe-hosted Checkout.
+ *   • "No credit card to start" — routes/auth.ts creates NO Checkout session at
+ *     signup (`const checkoutUrl: string | null = null`); a card is collected
+ *     only at upgrade.
+ *   • "Cancel anytime — no contracts" — public/refund.html, "no cancellation
+ *     fees and no long-term contracts".
+ * Nothing here claims SOC 2 / ISO / PCI-DSS certification, per the standing
+ * honest-claims bar (see public/security.html: "We don't claim certifications
+ * we don't yet hold").
+ *
+ * Shared VERBATIM by PREMIUM_FOOTER, landing.html and the directory subsite
+ * footer; footerPayRow.test.ts pins those copies byte-identical.
+ */
+const APPLE_MARK = `M17.05 12.04c-.03-2.72 2.22-4.03 2.32-4.09-1.27-1.85-3.24-2.1-3.94-2.13-1.68-.17-3.28.99-4.13.99-.85 0-2.16-.97-3.55-.94-1.83.03-3.51 1.06-4.45 2.7-1.9 3.29-.48 8.16 1.36 10.83.9 1.31 1.97 2.77 3.38 2.72 1.36-.06 1.87-.88 3.51-.88 1.64 0 2.1.88 3.53.85 1.46-.02 2.38-1.33 3.27-2.64 1.03-1.51 1.46-2.98 1.48-3.06-.03-.01-2.84-1.09-2.87-4.33zM14.32 4.15c.75-.91 1.25-2.17 1.11-3.43-1.08.04-2.38.72-3.15 1.62-.69.8-1.3 2.08-1.14 3.31 1.2.09 2.43-.61 3.18-1.5z`;
+
+export const FOOTER_PAY_ROW = `<div class="qf-footer-payrow">`
+  + `<div class="qf-payrow-methods"><span class="qf-payrow-label">Accepted payments</span>`
+  + `<ul class="qf-paymarks" role="list">`
+  + `<li class="qf-paymark"><svg class="qf-pm" viewBox="0 0 32 16" role="img" aria-label="Visa"><text x="16" y="12.4" text-anchor="middle" font-size="11.5" font-weight="800" font-style="italic" letter-spacing=".2">VISA</text></svg></li>`
+  + `<li class="qf-paymark"><svg class="qf-pm" viewBox="0 0 32 16" role="img" aria-label="Mastercard"><circle cx="12.8" cy="8" r="6.2" fill-opacity=".85"/><circle cx="19.2" cy="8" r="6.2" fill-opacity=".85"/></svg></li>`
+  + `<li class="qf-paymark"><svg class="qf-pm" viewBox="0 0 32 16" role="img" aria-label="American Express"><text x="16" y="11.8" text-anchor="middle" font-size="9" font-weight="800" letter-spacing=".1">AMEX</text></svg></li>`
+  + `<li class="qf-paymark"><svg class="qf-pm" viewBox="0 0 32 16" role="img" aria-label="Apple Pay"><path transform="translate(1.7 3.2) scale(.4)" d="${APPLE_MARK}"/><text x="12.5" y="11.7" font-size="9.5" font-weight="600" letter-spacing="-.1">Pay</text></svg></li>`
+  + `<li class="qf-paymark"><svg class="qf-pm" viewBox="0 0 32 16" role="img" aria-label="Link"><text x="16" y="12" text-anchor="middle" font-size="11" font-weight="700" letter-spacing="-.2">link</text></svg></li>`
+  + `</ul></div>`
+  + `<ul class="qf-payrow-trust" role="list">`
+  + `<li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 3 4.5 6v6c0 4.4 3.2 7.4 7.5 8.9 4.3-1.5 7.5-4.5 7.5-8.9V6z"/><rect x="9.2" y="10.6" width="5.6" height="4.6" rx="1"/><path d="M10.4 10.6V9.5a1.6 1.6 0 0 1 3.2 0v1.1"/></svg>Card details never touch our servers</li>`
+  + `<li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="2.5" y="5" width="19" height="14" rx="2.5"/><path d="M2.5 9.5h19"/><line x1="4" y1="20" x2="20" y2="4"/></svg>No credit card to start</li>`
+  + `<li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polyline points="2.5 5 2.5 10.5 8 10.5"/><path d="M4.6 15.3a8.5 8.5 0 1 0 1.5-8.4L2.5 10.5"/></svg>Cancel anytime — no contracts</li>`
+  + `</ul></div>`;
+
 // Premium footer — the shared marketing footer. Carries the site-wide "Partners"
-// link (affiliate + referral program) in the Product column.
-export const PREMIUM_FOOTER = `<footer class="premium-footer"><div class="premium-footer-inner"><div class="footer-brand"><a href="/" class="qf-footer-brand" aria-label="QuoteFleet home"><img class="qf-footer-logo" src="/brand/logo-full-ondark.png" alt="QuoteFleet — freight rate calculator" width="168" height="113" decoding="async"></a><div class="qf-footer-brandtext"><a href="/" class="qf-footer-wordmark">QuoteFleet</a><p class="qf-footer-tagline">Branded rate calculator pages, PDF quotes, and optional AI chat for trucking service providers.</p></div></div><div class="footer-col"><h4>Product</h4><a href="/w/demo">Demo</a><a href="/pricing">Pricing</a><a href="/compare">Why QuoteFleet</a><a href="/partners">Partners</a><a href="/signup">Start free</a></div><div class="footer-col"><h4>Solutions</h4><a href="/tools">Free rate calculator</a><a href="/drayage-rates">Port drayage rates</a><a href="/for/brokers">For freight brokers</a><a href="/for/forwarders">For freight forwarders</a><a href="/for/ltl">For LTL</a><a href="/directory">Carrier directory</a><a href="/services">Carrier services</a><a href="/compliance">Compliance tools</a><a href="/importers">Importer search</a><a href="/manifest-privacy">Manifest privacy</a><a href="/glossary">Freight glossary</a></div><div class="footer-col"><h4>Company</h4><a href="mailto:hello@quotefleet.net">Contact</a><a href="/support">Support</a><a href="/partners">Affiliate program</a><a href="/login">Sign in</a><a href="/security">Security</a></div><div class="footer-col"><h4>Legal</h4><a href="/terms">Terms of Service</a><a href="/privacy">Privacy Policy</a><a href="/refund">Refund &amp; Cancellation</a><a href="/dpa">Data Processing (DPA)</a><a href="/cookie">Cookie Policy</a><a href="/.well-known/security.txt">security.txt</a></div></div><ul class="qf-footer-trustbar" role="list"><li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="11" width="18" height="10" rx="2"/><path d="M7 11V7.5a5 5 0 0 1 10 0V11"/></svg>Payments secured by Stripe</li><li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 3 4.5 6v6c0 4.4 3.2 7.4 7.5 8.9 4.3-1.5 7.5-4.5 7.5-8.9V6z"/><path d="m9 12 2 2 4-4"/></svg>SSL/TLS encrypted</li><li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 2.5 4 5.5v6c0 4.6 3.3 7.7 8 9.5 4.7-1.8 8-4.9 8-9.5v-6z"/><circle cx="12" cy="11" r="2.4"/><path d="M12 13.4V16"/></svg>GDPR &amp; CCPA-ready</li><li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="4" y="4" width="16" height="16" rx="2"/><path d="M4 10h16M10 4v16"/></svg>Per-tenant data isolation</li></ul><div class="footer-bottom"><span>© <span id="year"></span> QuoteFleet. All rights reserved.</span><span class="qf-foot-operator">QuoteFleet is a product of MR Holdings &amp; Trade LLC.</span></div></footer>`;
+// link (affiliate + referral program) in the Product column, and closes with the
+// FOOTER_PAY_ROW accepted-payment + trust strip as its very last child.
+export const PREMIUM_FOOTER = `<footer class="premium-footer"><div class="premium-footer-inner"><div class="footer-brand"><a href="/" class="qf-footer-brand" aria-label="QuoteFleet home"><img class="qf-footer-logo" src="/brand/logo-full-ondark.png" alt="QuoteFleet — freight rate calculator" width="168" height="113" decoding="async"></a><div class="qf-footer-brandtext"><a href="/" class="qf-footer-wordmark">QuoteFleet</a><p class="qf-footer-tagline">Branded rate calculator pages, PDF quotes, and optional AI chat for trucking service providers.</p></div></div><div class="footer-col"><h4>Product</h4><a href="/w/demo">Demo</a><a href="/pricing">Pricing</a><a href="/compare">Why QuoteFleet</a><a href="/partners">Partners</a><a href="/signup">Start free</a></div><div class="footer-col"><h4>Solutions</h4><a href="/tools">Free rate calculator</a><a href="/drayage-rates">Port drayage rates</a><a href="/for/brokers">For freight brokers</a><a href="/for/forwarders">For freight forwarders</a><a href="/for/ltl">For LTL</a><a href="/directory">Carrier directory</a><a href="/services">Carrier services</a><a href="/compliance">Compliance tools</a><a href="/importers">Importer search</a><a href="/manifest-privacy">Manifest privacy</a><a href="/glossary">Freight glossary</a></div><div class="footer-col"><h4>Company</h4><a href="mailto:hello@quotefleet.net">Contact</a><a href="/support">Support</a><a href="/partners">Affiliate program</a><a href="/login">Sign in</a><a href="/security">Security</a></div><div class="footer-col"><h4>Legal</h4><a href="/terms">Terms of Service</a><a href="/privacy">Privacy Policy</a><a href="/refund">Refund &amp; Cancellation</a><a href="/dpa">Data Processing (DPA)</a><a href="/cookie">Cookie Policy</a><a href="/.well-known/security.txt">security.txt</a></div></div><ul class="qf-footer-trustbar" role="list"><li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="11" width="18" height="10" rx="2"/><path d="M7 11V7.5a5 5 0 0 1 10 0V11"/></svg>Payments secured by Stripe</li><li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 3 4.5 6v6c0 4.4 3.2 7.4 7.5 8.9 4.3-1.5 7.5-4.5 7.5-8.9V6z"/><path d="m9 12 2 2 4-4"/></svg>SSL/TLS encrypted</li><li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 2.5 4 5.5v6c0 4.6 3.3 7.7 8 9.5 4.7-1.8 8-4.9 8-9.5v-6z"/><circle cx="12" cy="11" r="2.4"/><path d="M12 13.4V16"/></svg>GDPR &amp; CCPA-ready</li><li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="4" y="4" width="16" height="16" rx="2"/><path d="M4 10h16M10 4v16"/></svg>Per-tenant data isolation</li></ul><div class="footer-bottom"><span>© <span id="year"></span> QuoteFleet. All rights reserved.</span><span class="qf-foot-operator">QuoteFleet is a product of MR Holdings &amp; Trade LLC.</span></div>${FOOTER_PAY_ROW}</footer>`;
 
 // Burger + Solutions-dropdown behaviour, mirrored from landing.html so the
 // injected header is interactive. Idempotent #year setter included.

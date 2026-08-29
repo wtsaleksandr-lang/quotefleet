@@ -50,6 +50,7 @@ import {
   THEME_TOGGLE_BTN,
   SITE_BURGER_BTN,
   HEADER_SCRIPTS,
+  FOOTER_PAY_ROW,
 } from '../siteChrome.js';
 
 const SITE = 'https://quotefleet.net';
@@ -1379,6 +1380,7 @@ export function layout({ title, description, canonicalPath, bodyHtml, jsonLd, re
   ${bodyHtml}
   <footer class="site-footer">
     © <span id="year"></span> QuoteFleet · <a href="/directory">Directory</a> · <a href="/importers">Importer Search</a> · <a href="/manifest-privacy">Manifest Privacy</a> · <a href="/compliance">Compliance</a> · <a href="/glossary">Glossary</a> · <a href="/drayage-rates">Drayage Rates</a> · <a href="/services">Services</a> · <a href="/terms">Terms</a> · <a href="/privacy">Privacy</a> · <a href="/">Home</a>
+    ${FOOTER_PAY_ROW}
   </footer>
   ${HEADER_SCRIPTS}
   <script src="/marketing-chat.js" defer></script>

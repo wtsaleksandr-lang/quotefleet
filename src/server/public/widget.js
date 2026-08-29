@@ -1622,13 +1622,13 @@
     fetch(withGrant('/api/public/callback/' + encodeURIComponent(state.refId)), { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ customerName: name, customerPhone: phone, customerEmail: email || undefined, customerCompany: company || undefined, preferredTime: (timeEl && timeEl.value || '').trim() || undefined, topic: (topicEl && topicEl.value || '').trim() || undefined, triggerSource: 'visitor_button' }) })
       .then(function (r) { return r.json(); })
       .then(function (resp) {
-        if (btn) { btn.disabled = false; btn.textContent = oldText; }
+        if (btn) { btn.disabled = false; btn.removeAttribute('aria-busy'); btn.textContent = oldText; }
         if (resp.error) { showCallbackError(resp.error); return; }
         var success = $('qf-cb-success'); if (success) { success.textContent = '✓ Got it. We\'ll call ' + phone + ' soon.'; success.style.display = 'block'; }
         ['qf-cb-phone', 'qf-cb-time', 'qf-cb-topic'].forEach(function (id) { var el = $(id); if (el) el.disabled = true; });
         if (btn) btn.style.display = 'none'; var cancel = $('qf-cb-cancel-btn'); if (cancel) cancel.style.display = 'none'; autoResize();
       })
-      .catch(function () { if (btn) { btn.disabled = false; btn.textContent = oldText; } showCallbackError('Connection error. Try again in a moment.'); });
+      .catch(function () { if (btn) { btn.disabled = false; btn.removeAttribute('aria-busy'); btn.textContent = oldText; } showCallbackError('Connection error. Try again in a moment.'); });
   }
 
   function renderTerminals() {
@@ -1802,7 +1802,26 @@
       drawer.style.maxHeight = ''; drawer.style.opacity = ''; drawer.style.overflow = '';
     }
   }
-  function showError(id, msg) { var e = $(id); if (msg) { e.textContent = msg; e.style.display = 'block'; } else { e.style.display = 'none'; } }
+  // An error the user cannot see is an error they cannot fix. The junk-ZIP
+  // message rendered at y~1730 of a 2028px page on a phone — below the fold,
+  // under a Calculate button that just appeared to do nothing. Bring it into
+  // view. The markup carries role="alert" so screen readers get it either way;
+  // this is purely for sighted users on a long form. Guarded because
+  // scrollIntoView options are unsupported in some embedded webviews.
+  function showError(id, msg) {
+    var e = $(id);
+    if (!e) return;
+    if (msg) {
+      e.textContent = msg;
+      e.style.display = 'block';
+      try {
+        var reduce = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+        e.scrollIntoView({ behavior: reduce ? 'auto' : 'smooth', block: 'center' });
+      } catch (_e) { /* older webview — the message is still rendered */ }
+    } else {
+      e.style.display = 'none';
+    }
+  }
 
   function gatherQuoteRequest() {
     var isDrayage = state.service === 'drayage';
@@ -1910,13 +1929,15 @@
     // click always ends in either a price or a real (hard) error, never a
     // silent no-op.
     state.calcPending = true;
-    if (btn) { btn.disabled = true; btn.innerHTML = '<span class="qf-spinner"></span> &nbsp; Calculating…'; }
+    // aria-busy so assistive tech announces the wait — the visible spinner +
+    // "Calculating…" label said nothing to a screen reader before.
+    if (btn) { btn.disabled = true; btn.setAttribute('aria-busy', 'true'); btn.innerHTML = '<span class="qf-spinner"></span> &nbsp; Calculating…'; }
     // Any early return (hard validation failure) must restore the button —
     // fail() is the single exit path that does that, so every guard below
     // routes through it instead of a bare showError()+return.
     function fail(msg) {
       state.calcPending = false;
-      if (btn) { btn.disabled = false; btn.textContent = oldText; }
+      if (btn) { btn.disabled = false; btn.removeAttribute('aria-busy'); btn.textContent = oldText; }
       showError('qf-error', msg);
     }
     var req = gatherQuoteRequest();
@@ -1976,8 +1997,8 @@
     if (notices.length) showError('qf-error', notices.join(' '));
     fetch(withGrant('/api/public/quote/' + slug), { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(req) })
       .then(function (r) { return r.json(); })
-      .then(function (resp) { state.calcPending = false; if (btn) { btn.disabled = false; btn.textContent = oldText; } if (resp.error) { showError('qf-error', resp.error); return; } if (resp.result && resp.result.unsupported) { showError('qf-error', resp.result.unsupported.reason); return; } state.quote = resp; renderResult(resp); })
-      .catch(function (err) { state.calcPending = false; if (btn) { btn.disabled = false; btn.textContent = oldText; } showError('qf-error', 'Network error — please try again.'); console.error(err); });
+      .then(function (resp) { state.calcPending = false; if (btn) { btn.disabled = false; btn.removeAttribute('aria-busy'); btn.textContent = oldText; } if (resp.error) { showError('qf-error', resp.error); return; } if (resp.result && resp.result.unsupported) { showError('qf-error', resp.result.unsupported.reason); return; } state.quote = resp; renderResult(resp); })
+      .catch(function (err) { state.calcPending = false; if (btn) { btn.disabled = false; btn.removeAttribute('aria-busy'); btn.textContent = oldText; } showError('qf-error', 'Network error — please try again.'); console.error(err); });
   }
 
   var SERVICE_LABELS = { drayage: 'Drayage', ftl: 'FTL', ltl: 'LTL', expedited: 'Expedite', hotshot: 'Hotshot' };
@@ -2020,7 +2041,7 @@
 
   // Revert the primary CTA to its original label (used when the result is
   // cleared or the mode changes, so it no longer reads "Recalculate").
-  function resetCalcCta() { var b = $('qf-calc-btn'); if (b && b.dataset.calcLabel) b.textContent = b.dataset.calcLabel; }
+  function resetCalcCta() { var b = $('qf-calc-btn'); if (b && b.dataset.calcLabel) { b.textContent = b.dataset.calcLabel; b.classList.remove('qf-recalc'); } }
   function renderResult(resp) {
     var r = resp.result;
     // Guard the degenerate $0 / empty result. A total that isn't a positive
@@ -2080,7 +2101,15 @@
     // A quote is now on screen — demote the primary CTA from "Get instant quote"
     // to "Recalculate" so it no longer reads as if nothing has happened yet.
     var cbtn = $('qf-calc-btn');
-    if (cbtn) { if (!cbtn.dataset.calcLabel) cbtn.dataset.calcLabel = cbtn.textContent; cbtn.textContent = 'Recalculate'; }
+    // ...and DEMOTE it visually too. Two full-width filled blue CTAs stacked on
+    // the result screen ("Recalculate" directly above "Get the rate confirmed")
+    // gave the actual next step no priority; .qf-recalc borrows the secondary
+    // outline treatment. resetCalcCta() drops it again.
+    if (cbtn) {
+      if (!cbtn.dataset.calcLabel) cbtn.dataset.calcLabel = cbtn.textContent;
+      cbtn.textContent = 'Recalculate';
+      cbtn.classList.add('qf-recalc');
+    }
     // Fresh quote → fresh chat (history references the prior numbers otherwise).
     resetQuoteChat();
     // Fade + slide the card in on every calculate (re-trigger the CSS animation).

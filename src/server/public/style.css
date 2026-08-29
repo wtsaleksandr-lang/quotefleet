@@ -1502,3 +1502,139 @@ html[data-theme="light"] .site-footer strong { color: var(--ink); }
 .table .select.aff-tier {
   min-width: 96px;
 }
+
+/* ══ Footer accepted-payment + trust strip (FOOTER_PAY_ROW) ═══════════════════
+   The very-bottom strip in siteChrome.ts's PREMIUM_FOOTER, landing.html and the
+   directory subsite footer. ONE rule set for all three: style.css is the only
+   sheet every one of those surfaces loads.
+
+   MONOCHROME BY TOKEN, not by two hardcoded colours. The payment marks inherit
+   `currentColor` from `--ink` — near-white (#F9F9F9) on the dark theme, deep
+   navy (#0A2540) under html[data-theme="light"] — so they invert with the theme
+   from a single declaration. Marks are inline SVG: no external request, nothing
+   for the CSP to block, and they stay crisp at any DPR.
+
+   Appended at EOF so the LINE-NUMBER-keyed spacing/colour guard baselines don't
+   renumber (same convention as landing-footer-polish.css). All spacing uses the
+   --space-* ramp, so check-spacing.mjs skips it as token usage. */
+.qf-footer-payrow {
+  max-width: 1120px;
+  margin: var(--space-3) auto 0;
+  padding: var(--space-2) 0 0;
+  border-top: 1px solid var(--border);
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-1-5) var(--space-3);
+}
+.qf-payrow-methods {
+  display: flex;
+  align-items: center;
+  gap: var(--space-1-5);
+  /* Never let the label+marks group be the thing that forces a scrollbar. */
+  min-width: 0;
+}
+.qf-payrow-label {
+  font-size: 11.5px;
+  letter-spacing: .02em;
+  text-transform: uppercase;
+  color: var(--muted);
+  white-space: nowrap;
+}
+.qf-paymarks {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  align-items: center;
+  /* NO WRAP: five marks at 40px + 8px gaps = 232px, which fits inside the
+     narrowest supported viewport (375 - 36 padding = 339). Keeping the row
+     unwrapped is what guarantees a mark is never orphaned onto its own line. */
+  flex-wrap: nowrap;
+  gap: var(--space-1);
+}
+.qf-paymark {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 40px;
+  height: 26px;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+}
+/* The mark itself: white on dark, black-navy on light — ONE token, both themes.
+   MEASURED, not assumed. The marks are <li>s, and the public-pages skin ships
+   TWO blanket !important rules that every <li> on an injected marketing page
+   matches, which were repainting them muted grey instead of the ink/paper
+   monochrome this strip is specified as:
+     • `body.qf-public-wft li { color: var(--qf-color-muted) !important }`  (0,1,2)
+       → #B1C5CE on dark
+     • `html[data-theme="light"] body.qf-public-wft li { color: var(--muted)
+       !important }`                                                        (0,2,3)
+       → #5A6B7B on light
+   An !important can only be beaten by a MORE SPECIFIC !important, so this rule
+   carries one and reaches (0,3,0) — three classes outrank both. Verified by
+   CDP getMatchedStylesForNode on /pricing and the marketing shell in both
+   themes, not by eyeballing. The trust row below needs only (0,2,0): the light
+   override there resolves to var(--muted), which is the tone it wants anyway.
+   The existing .qf-footer-trustbar deliberately keeps the muted tone — untouched. */
+.qf-footer-payrow .qf-paymarks .qf-paymark { color: var(--ink) !important; }
+.qf-paymark .qf-pm {
+  width: 32px;
+  height: 16px;
+  display: block;
+  /* FULL ink, no opacity hold-back: the spec for this strip is a true monochrome
+     mark — white on dark, black on light — and any opacity here would grey the
+     marks against the crisp footer type sitting beside them. */
+  fill: currentColor;
+}
+.qf-payrow-trust {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-1) var(--space-3);
+}
+.qf-payrow-trust li {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-1);
+  font-size: 12px;
+  line-height: 1.5;
+}
+/* Same blanket-!important story as the marks — pin the badges to the footer's
+   own muted tone so they read identically on the homepage and on the injected
+   marketing pages instead of drifting to the skin's --qf-color-muted. */
+.qf-footer-payrow .qf-payrow-trust li { color: var(--muted) !important; }
+.qf-payrow-trust svg {
+  width: 15px;
+  height: 15px;
+  flex: 0 0 auto;
+  opacity: .85;
+}
+/* Directory subsite: its .site-footer is a single centred link row, so the strip
+   needs its own left-aligned gutter there rather than inheriting the premium
+   footer's grid. */
+.site-footer .qf-footer-payrow {
+  margin-top: var(--space-2);
+  text-align: left;
+}
+@media (max-width: 720px) {
+  /* Stack label above marks so the 5-mark row keeps its full width and stays on
+     ONE line — the label is what would otherwise push a mark down alone. */
+  .qf-payrow-methods {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: var(--space-1);
+  }
+  .qf-footer-payrow { gap: var(--space-2); }
+  /* One badge per line is a deliberate stack, not an orphaned wrap. */
+  .qf-payrow-trust {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: var(--space-1);
+  }
+}
