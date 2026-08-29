@@ -1088,6 +1088,27 @@ export const SELF_HEAL_TABLE_STATEMENTS: readonly string[] = [
     "updated_at" timestamp DEFAULT now() NOT NULL,
     "updated_by" integer
   )`,
+
+  // ── 0070_indexnow_submissions.sql — the IndexNow "already announced" ledger ─
+  // The IndexNow protocol treats resubmission of UNCHANGED URLs as abuse and
+  // punishes it SILENTLY (the key stops being honoured, with no error), and it
+  // offers no server-side "did I already send this?" query. This table is the
+  // local memory that makes the never-resubmit rule enforceable. Healed HERE for
+  // the usual reason (Replit skips db:migrate and its publish tool can propose
+  // dropping tables it does not know about).
+  //
+  // A phantom-drop here loses ONLY the announcement memory — never carrier or
+  // editorial data. The blast radius is one duplicate announcement per URL,
+  // bounded by the per-run 10,000-URL cap, after which the ledger is rebuilt.
+  // MUST stay byte-for-byte equivalent to drizzle/0070_indexnow_submissions.sql
+  // + schema.ts `indexnowSubmissions`.
+  `CREATE TABLE IF NOT EXISTS "indexnow_submissions" (
+    "kind" text NOT NULL,
+    "ref" text NOT NULL,
+    "change_key" text NOT NULL,
+    "submitted_at" timestamp DEFAULT now() NOT NULL,
+    CONSTRAINT "indexnow_submissions_kind_ref_pk" PRIMARY KEY("kind","ref")
+  )`,
 ];
 
 export async function ensureSelfHealTables(): Promise<void> {
