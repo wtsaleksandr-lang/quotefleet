@@ -33,6 +33,9 @@ import { db } from '../../db/client.js';
 import { carrierDirectory, sitemapCache } from '../../db/schema.js';
 import { US_STATES } from './usStates.js';
 import { PORT_GROUPS } from './containerPorts.js';
+import { GLOSSARY_TERMS } from './glossary.js';
+import { SERVICES } from './servicePages.js';
+import { DRAYAGE_RATE_SLUGS } from './drayageRatePages.js';
 import { citySlugify, getDirectorySummary, withWallClockDeadline } from './queries.js';
 
 export const SITE = 'https://quotefleet.net';
@@ -179,6 +182,19 @@ const MARKETING_ROUTES: Array<{ path: string; changefreq: string; priority: stri
   { path: '/dpa', changefreq: 'yearly', priority: '0.4' },
   { path: '/directory', changefreq: 'weekly', priority: '0.8' },
   { path: '/compliance', changefreq: 'monthly', priority: '0.7' },
+  // ── Content surfaces that were LIVE but never advertised ──────────────────
+  // Each of these returns 200 with a unique title/description/canonical and its
+  // own JSON-LD, but none of them appeared in any sitemap document, so Google
+  // could only find them by crawling a nav link. They are our informational and
+  // commercial-intent pages — exactly the ones worth discovering.
+  { path: '/compare', changefreq: 'monthly', priority: '0.7' },
+  { path: '/glossary', changefreq: 'monthly', priority: '0.7' },
+  { path: '/services', changefreq: 'monthly', priority: '0.7' },
+  { path: '/importers', changefreq: 'weekly', priority: '0.7' },
+  { path: '/manifest-privacy', changefreq: 'monthly', priority: '0.7' },
+  { path: '/partners', changefreq: 'monthly', priority: '0.5' },
+  { path: '/partners/terms', changefreq: 'yearly', priority: '0.3' },
+  { path: '/drayage-rates', changefreq: 'monthly', priority: '0.8' },
 ];
 
 /** Build the 'pages' child <urlset>: marketing + directory landing + every state
@@ -198,7 +214,33 @@ export function buildPagesXml(now = new Date()): string {
   for (const s of US_STATES) {
     entries.push({ loc: `${SITE}/directory/${xmlEscape(s.slug)}`, lastmod, changefreq: 'weekly', priority: '0.6' });
   }
+  // Every glossary term and service category has its OWN page (/glossary/:slug,
+  // /services/:slug) with a unique title, canonical and DefinedTerm/FAQPage
+  // JSON-LD. They are enumerated from the same static arrays the routes serve,
+  // so the sitemap can never advertise a slug that would 302 back to the hub.
+  for (const t of GLOSSARY_TERMS) {
+    entries.push({ loc: `${SITE}/glossary/${xmlEscape(t.slug)}`, lastmod, changefreq: 'monthly', priority: '0.5' });
+  }
+  for (const s of SERVICES) {
+    entries.push({ loc: `${SITE}/services/${xmlEscape(s.slug)}`, lastmod, changefreq: 'monthly', priority: '0.6' });
+  }
+  for (const slug of DRAYAGE_RATE_SLUGS) {
+    entries.push({ loc: `${SITE}/drayage-rates/${xmlEscape(slug)}`, lastmod, changefreq: 'monthly', priority: '0.7' });
+  }
   return buildUrlset(entries);
+}
+
+/** Total <url> count of the 'pages' document — kept next to buildPagesXml so the
+ *  two can never drift (the recompute persists this as url_count). */
+export function pagesUrlCount(): number {
+  return (
+    MARKETING_ROUTES.length +
+    PORT_GROUPS.length +
+    US_STATES.length +
+    GLOSSARY_TERMS.length +
+    SERVICES.length +
+    DRAYAGE_RATE_SLUGS.length
+  );
 }
 
 /** Build the <sitemapindex> from the set of child document keys that exist. */
@@ -305,7 +347,7 @@ async function recomputeAndPersistSitemapInner(): Promise<{ childKeys: string[];
   const docs: SitemapDoc[] = [];
 
   // 'pages' + 'cities' children.
-  docs.push({ key: 'pages', xml: buildPagesXml(now), urlCount: MARKETING_ROUTES.length + PORT_GROUPS.length + US_STATES.length });
+  docs.push({ key: 'pages', xml: buildPagesXml(now), urlCount: pagesUrlCount() });
   docs.push({ key: 'cities', xml: buildCitiesXml(cityHubs, now), urlCount: cityHubs.length });
 
   // Carrier children — carriers-1..N (1-indexed so /sitemap-carriers-1.xml reads

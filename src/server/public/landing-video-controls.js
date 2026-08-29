@@ -22,8 +22,12 @@
   var PLAY_SVG = '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M8 5.14v13.72c0 .8.87 1.28 1.54.85l10.5-6.86a1 1 0 0 0 0-1.7L9.54 4.29A1 1 0 0 0 8 5.14z"/></svg>';
   var PAUSE_SVG = '<svg viewBox="0 0 24 24" aria-hidden="true"><rect x="6" y="5" width="4" height="14" rx="1"/><rect x="14" y="5" width="4" height="14" rx="1"/></svg>';
 
+  // The two hero clips still carry `autoplay`; the below-the-fold clips are now
+  // started on scroll by landing-lazy-video.js and are marked `data-lazy-video`
+  // instead (they must NOT autoplay — that would defeat the lazy download). Both
+  // families get the same click/tap play-pause treatment.
   var videos = Array.prototype.slice.call(
-    document.querySelectorAll('main video[autoplay]')
+    document.querySelectorAll('main video[autoplay], main video[data-lazy-video]')
   );
   if (!videos.length) return;
 
@@ -68,11 +72,19 @@
         // One shared choreography drives both hero videos.
         nowPlaying = window.qfHeroSwap.toggle();
       } else if (video.paused) {
+        // A lazy clip the user taps before it has scrolled into view still needs
+        // its source fetched, and the scroll observer must stop treating it as
+        // user-paused.
+        if (video.preload === 'none') video.preload = 'metadata';
+        video.dataset.userPaused = '0';
         var p = video.play();
         if (p && p.catch) p.catch(function () {});
         nowPlaying = true;
       } else {
         video.pause();
+        // Pin the pause so landing-lazy-video.js's observer does not resume it
+        // on the next scroll into view.
+        video.dataset.userPaused = '1';
         nowPlaying = false;
       }
       host.setAttribute('aria-label', nowPlaying ? 'Pause video' : 'Play video');

@@ -27,8 +27,13 @@ import {
   buildPagesXml,
   childDocFilename,
   carrierChunkKey,
+  pagesUrlCount,
   SITE,
 } from './sitemapCache.js';
+import { GLOSSARY_TERMS } from './glossary.js';
+import { SERVICES } from './servicePages.js';
+import { DRAYAGE_RATE_PORTS, DRAYAGE_RATE_SLUGS } from './drayageRatePages.js';
+import { portGroupByCode } from './containerPorts.js';
 
 describe('sitemap chunk boundary (50k cap)', () => {
   it('SITEMAP_MAX_URLS is the sitemaps.org 50,000-URL cap', () => {
@@ -164,6 +169,83 @@ describe('cities + pages children', () => {
     expect(xml).toMatch(/<loc>https:\/\/quotefleet\.net\/directory\/port\/US[A-Z]+<\/loc>/);
     // Far more than the old static ~50-URL file's marketing-only set.
     expect((xml.match(/<url>/g) || []).length).toBeGreaterThan(60);
+  });
+
+  // ── THE GAP THIS SECTION WAS WRITTEN FOR ────────────────────────────────
+  // These pages were all LIVE, all returning 200 with a unique title, canonical
+  // and JSON-LD — and all missing from every sitemap document, so the only way
+  // Google could reach them was by crawling a nav link. A page worth rendering
+  // is a page worth advertising.
+  it('buildPagesXml advertises the content surfaces, not just the directory', () => {
+    const xml = buildPagesXml(new Date('2026-08-20T00:00:00Z'));
+    for (const path of [
+      '/compare',
+      '/glossary',
+      '/services',
+      '/importers',
+      '/manifest-privacy',
+      '/drayage-rates',
+    ]) {
+      expect(xml).toContain(`<loc>https://quotefleet.net${path}</loc>`);
+    }
+  });
+
+  it('buildPagesXml enumerates every glossary term, service and drayage-rate page', () => {
+    const xml = buildPagesXml(new Date('2026-08-20T00:00:00Z'));
+    // Enumerated from the same static arrays the routes serve, so the sitemap
+    // can never advertise a slug that would 302 back to its hub.
+    for (const t of GLOSSARY_TERMS) {
+      expect(xml).toContain(`<loc>https://quotefleet.net/glossary/${t.slug}</loc>`);
+    }
+    for (const s of SERVICES) {
+      expect(xml).toContain(`<loc>https://quotefleet.net/services/${s.slug}</loc>`);
+    }
+    for (const slug of DRAYAGE_RATE_SLUGS) {
+      expect(xml).toContain(`<loc>https://quotefleet.net/drayage-rates/${slug}</loc>`);
+    }
+  });
+
+  it('pagesUrlCount matches the document it describes', () => {
+    const xml = buildPagesXml(new Date('2026-08-20T00:00:00Z'));
+    // The recompute persists this number as url_count; if the two drift, the
+    // cache row lies about the document it holds.
+    expect((xml.match(/<url>/g) || []).length).toBe(pagesUrlCount());
+  });
+});
+
+describe('drayage rate pages — the published set stays honest', () => {
+  it('only publishes gateways that have BOTH a real tariff and real editorial', () => {
+    expect(DRAYAGE_RATE_PORTS.length).toBeGreaterThan(0);
+    for (const p of DRAYAGE_RATE_PORTS) {
+      // A real port group to cross-link to.
+      expect(portGroupByCode(p.groupCode)).not.toBeNull();
+      // Three real price rings, strictly increasing with distance.
+      expect(p.rings.length).toBe(3);
+      for (let i = 1; i < p.rings.length; i += 1) {
+        expect(p.rings[i].radius).toBeGreaterThan(p.rings[i - 1].radius);
+        expect(p.rings[i].price).toBeGreaterThan(p.rings[i - 1].price);
+      }
+      // Real editorial — this is the gate that stops a gateway slipping in on
+      // tariff data alone and becoming a templated doorway page.
+      expect(p.intro.length).toBeGreaterThan(200);
+      expect(p.faqs.length).toBeGreaterThanOrEqual(3);
+      for (const f of p.faqs) expect(f.a.length).toBeGreaterThan(60);
+    }
+  });
+
+  it('every slug is unique and URL-safe', () => {
+    const slugs = DRAYAGE_RATE_PORTS.map((p) => p.slug);
+    expect(new Set(slugs).size).toBe(slugs.length);
+    for (const s of slugs) expect(s).toMatch(/^[a-z0-9-]+$/);
+  });
+
+  it('merged gateways collapse to one page (LA/Long Beach, Seattle/Tacoma)', () => {
+    const groups = DRAYAGE_RATE_PORTS.map((p) => p.groupCode);
+    expect(new Set(groups).size).toBe(groups.length);
+    expect(groups).toContain('USLALB');
+    expect(groups).not.toContain('USLAX');
+    expect(groups).not.toContain('USLGB');
+    expect(groups).not.toContain('USTIW');
   });
 });
 

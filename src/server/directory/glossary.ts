@@ -18,6 +18,7 @@
  * entry and it appears on the index (under its category) and gets its own page.
  */
 import type { Express, Request, Response } from 'express';
+import { setPublicDirectoryCache } from './httpCache.js';
 
 const SITE = 'https://quotefleet.net';
 
@@ -488,7 +489,7 @@ function layout({ title, description, canonicalPath, bodyHtml, jsonLd }: LayoutO
   </header>
   ${bodyHtml}
   <footer class="site-footer">
-    © <span id="year"></span> QuoteFleet · <a href="/directory">Directory</a> · <a href="/importers">Importer Search</a> · <a href="/compliance">Compliance</a> · <a href="/glossary">Glossary</a> · <a href="/services">Services</a> · <a href="/marketplace/">Marketplace</a> · <a href="/terms">Terms</a> · <a href="/privacy">Privacy</a> · <a href="/">Home</a>
+    © <span id="year"></span> QuoteFleet · <a href="/directory">Directory</a> · <a href="/importers">Importer Search</a> · <a href="/compliance">Compliance</a> · <a href="/glossary">Glossary</a> · <a href="/drayage-rates">Drayage Rates</a> · <a href="/services">Services</a> · <a href="/marketplace/">Marketplace</a> · <a href="/terms">Terms</a> · <a href="/privacy">Privacy</a> · <a href="/">Home</a>
   </footer>
   <script>document.getElementById('year').textContent = new Date().getFullYear();</script>
   <script>(function(){var b=document.querySelector('.topnav-burger'),m=document.getElementById('topnav-mobile-menu');if(!b||!m)return;function set(o){b.setAttribute('aria-expanded',o?'true':'false');b.setAttribute('aria-label',o?'Close menu':'Open menu');if(o)m.removeAttribute('hidden');else m.setAttribute('hidden','');}b.addEventListener('click',function(e){e.stopPropagation();set(b.getAttribute('aria-expanded')!=='true');});document.addEventListener('click',function(e){if(b.getAttribute('aria-expanded')==='true'&&!m.contains(e.target)&&!b.contains(e.target))set(false);});document.addEventListener('keydown',function(e){if(e.key==='Escape')set(false);});})();</script>
@@ -663,9 +664,13 @@ export function renderGlossaryTerm(term: GlossaryTerm): string {
 
 // ─── Route registration ────────────────────────────────────────────────────
 export function registerGlossaryRoutes(app: Express) {
-  // Index.
-  app.get(['/glossary', '/glossary/'], (_req: Request, res: Response, next) => {
+  // Index. The glossary is rendered from a static array — byte-identical for
+  // every visitor, no DB read, no per-user branching — so it is the single most
+  // CDN-friendly page type we serve. It previously set NO Cache-Control at all,
+  // so Cloudflare treated it as DYNAMIC and every crawler hit reached the origin.
+  app.get(['/glossary', '/glossary/'], (req: Request, res: Response, next) => {
     try {
+      setPublicDirectoryCache(req, res);
       res.type('html').send(renderGlossaryIndex());
     } catch (err) {
       next(err);
@@ -677,6 +682,7 @@ export function registerGlossaryRoutes(app: Express) {
     try {
       const term = glossaryTermBySlug(String(req.params.slug).toLowerCase());
       if (!term) return res.redirect(302, '/glossary');
+      setPublicDirectoryCache(req, res);
       res.type('html').send(renderGlossaryTerm(term));
     } catch (err) {
       next(err);
