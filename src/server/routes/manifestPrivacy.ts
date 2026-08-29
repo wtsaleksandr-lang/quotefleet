@@ -86,10 +86,38 @@ import {
 } from '../directory/manifestUsage.js';
 import { invalidateRedactionCache } from '../directory/manifestRedactions.js';
 
-/** QuoteFleet's legal filing entity named as Agent on the POA. Overridable so
- *  the instrument always carries the real, current legal name. */
-function agentLegalName(): string {
-  return loadEnv().MANIFEST_AGENT_LEGAL_NAME || 'QuoteFleet, Inc.';
+/**
+ * The legal filing entity named as Agent on the POA.
+ *
+ * Deliberately has NO default. This previously fell back to `'QuoteFleet, Inc.'`
+ * — a company that does not exist. The operating entity is a Wyoming LLC; there
+ * is no "QuoteFleet, Inc." registered anywhere, so any POA produced under that
+ * fallback would have appointed a fictitious attorney-in-fact. CBP rejects a POA
+ * whose agent cannot be identified, and an executed instrument naming a
+ * non-existent grantee is defective on its face.
+ *
+ * Unset ⇒ we refuse to build the document at all (see `pdfInputFromApp`). That
+ * mirrors how MANIFEST_AGENT_ADDRESS already behaves: never fabricate a fact on
+ * a legal instrument, surface it as a config task instead. The address can at
+ * least degrade to an email notice address; a missing agent NAME has no safe
+ * fallback, so this one fails harder.
+ */
+function agentLegalName(): string | null {
+  const configured = loadEnv().MANIFEST_AGENT_LEGAL_NAME?.trim();
+  return configured ? configured : null;
+}
+
+/** Thrown when the Agent identity is unconfigured. Surfaces as a 503 config
+ *  error rather than a silently defective POA. */
+export class AgentIdentityUnconfiguredError extends Error {
+  constructor() {
+    super(
+      'MANIFEST_AGENT_LEGAL_NAME is not set. The POA cannot name its ' +
+        'attorney-in-fact, so no document will be generated. Set it to the ' +
+        'exact registered legal name of the filing entity.',
+    );
+    this.name = 'AgentIdentityUnconfiguredError';
+  }
 }
 
 /**
@@ -101,6 +129,14 @@ function agentLegalName(): string {
  */
 function agentAddress(): string | null {
   return loadEnv().MANIFEST_AGENT_ADDRESS ?? null;
+}
+
+/** The Agent's legal name, or throw. Every POA-producing path goes through here
+ *  so there is exactly one place a missing identity can be caught. */
+function requireAgentLegalName(): string {
+  const name = agentLegalName();
+  if (!name) throw new AgentIdentityUnconfiguredError();
+  return name;
 }
 /** CBP confidentiality is valid 2 years from receipt. */
 const TWO_YEARS_MS = 2 * 365 * 24 * 60 * 60 * 1000;
@@ -280,7 +316,7 @@ function pdfInputFromApp(app: PoaApplication, signedAt: Date) {
     consentAt: app.consentAt ?? null,
     emailVerifiedAt: verifiedBeforeSigning,
     signatureImage: decodeSignaturePng(app.signatureDrawnPng),
-    agentLegalName: agentLegalName(),
+    agentLegalName: requireAgentLegalName(),
     agentAddress: agentAddress(),
     expiresAt: app.expiresAt ?? null,
   };
@@ -549,6 +585,18 @@ export function registerManifestPrivacyRoutes(app: Express): void {
       // 19 CFR 141.34. Retention floor: execution + 5 years (ESIGN 7001(d)).
       const termYears = poaTermYears(withSigner.entityType);
       const retainUntil = poaRetainUntil(signedAt);
+
+      // Config error, not a signer error: without an Agent identity we cannot
+      // produce a valid instrument, so refuse BEFORE writing any signed state.
+      // 503 (not 500) — it is a fixable deployment condition, and the draft is
+      // left intact so the customer can complete signing once it is set.
+      if (!agentLegalName()) {
+        return res.status(503).json({
+          error:
+            'Signing is temporarily unavailable: our filing agent identity is not configured. ' +
+            'Your application has been saved — please try again shortly.',
+        });
+      }
 
       const { buffer, sha256 } = await buildPoaPdf(pdfInputFromApp(withSigner, signedAt));
 
@@ -837,12 +885,15 @@ export function registerManifestPrivacyRoutes(app: Express): void {
             sub: subFor(a.userId),
             gate: validatePoaForFiling(a, {
               agentAddressConfigured: !!agentAddress(),
+              agentLegalNameConfigured: !!agentLegalName(),
               currentConsentVersion: CONSENT_DISCLOSURE_VERSION,
             }),
           };
         }),
       );
-      res.type('html').send(renderAdminPrivacyQueue(withEvents, { filter }));
+      res
+        .type('html')
+        .send(renderAdminPrivacyQueue(withEvents, { filter, agentLegalName: agentLegalName() }));
     },
   );
 
@@ -866,6 +917,7 @@ export function registerManifestPrivacyRoutes(app: Express): void {
       // recorded in the audit trail with the exact checks that were failing.
       const gate = validatePoaForFiling(existing, {
         agentAddressConfigured: !!agentAddress(),
+        agentLegalNameConfigured: !!agentLegalName(),
         currentConsentVersion: CONSENT_DISCLOSURE_VERSION,
       });
       const force = body.force === true;

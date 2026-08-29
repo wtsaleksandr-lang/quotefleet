@@ -136,7 +136,7 @@ describe('buildCbpCertText — the human-filing certification', () => {
       grantorAddress: '123 Harbor Way',
       docSha256: 'abc123',
     } as unknown as Parameters<typeof buildCbpCertText>[0];
-    const text = buildCbpCertText(app);
+    const text = buildCbpCertText(app, 'MR Holdings & Trade LLC');
     expect(text).toContain('103.31(d)');
     expect(text).toContain('12-3456789');
     expect(text).toContain('Acme Imports');
@@ -299,6 +299,7 @@ describe('buildCbpCertText — carries the full identity set the importer certif
         signerName: 'Jane Doe',
         signerTitle: 'General Partner',
       }),
+      'MR Holdings & Trade LLC',
     );
     expect(text).toContain('Acme Freight');
     expect(text).toContain('Delaware, United States');
@@ -309,6 +310,23 @@ describe('buildCbpCertText — carries the full identity set the importer certif
     expect(text).toContain('The importer/consignee named above certifies');
     expect(text).toContain('its authorized agent and attorney under 19 CFR 103.31(d)');
     expect(lower(text)).not.toContain('cbp api');
+  });
+
+  it('names the agent passed in, and never a hardcoded entity', () => {
+    // Regression guard. This text once hardcoded 'QuoteFleet, Inc.' — a company
+    // that does not exist — so the certification submitted to CBP named a
+    // fictitious agent while the executed POA named the real filing entity. CBP
+    // matches the submitter against the POA on file; a mismatch is a rejection.
+    const text = buildCbpCertText(poa({}), 'MR Holdings & Trade LLC');
+    expect(text).toContain('MR Holdings & Trade LLC');
+    expect(text).not.toContain('QuoteFleet, Inc');
+
+    // A different agent must actually change the output — proving it is threaded
+    // through rather than ignored in favour of a constant.
+    expect(buildCbpCertText(poa({}), 'Other Filing Co LLC')).toContain('Other Filing Co LLC');
+
+    // And it refuses to build nameless rather than emitting a dangling agent.
+    expect(() => buildCbpCertText(poa({}), '   ')).toThrow(/registered legal name/i);
   });
 });
 

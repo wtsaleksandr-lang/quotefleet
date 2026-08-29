@@ -21,7 +21,13 @@ const store = vi.hoisted((): Store => {
 });
 
 vi.mock('../../config.js', () => ({
-  loadEnv: () => ({ PUBLIC_BASE_URL: 'http://localhost:5000' }),
+  loadEnv: () => ({
+    PUBLIC_BASE_URL: 'http://localhost:5000',
+    // The Agent identity is REQUIRED to produce a POA — there is no default
+    // (a missing name once fell back to a non-existent company). Signing
+    // refuses with 503 without it, so the happy-path tests must configure it.
+    MANIFEST_AGENT_LEGAL_NAME: 'MR Holdings & Trade LLC',
+  }),
 }));
 
 // Anonymous caller — no session (drafts are allowed anonymously).
