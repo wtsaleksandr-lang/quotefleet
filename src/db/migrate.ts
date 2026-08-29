@@ -1039,6 +1039,55 @@ export const SELF_HEAL_TABLE_STATEMENTS: readonly string[] = [
     "url_count" integer DEFAULT 0 NOT NULL,
     "computed_at" timestamp DEFAULT now() NOT NULL
   )`,
+
+  // ── 0069_seo_content_engine.sql — the /guides editorial surface ──────────
+  // Backs the SEO content engine: data-backed guides generated from the FMCSA
+  // carrier census, each one human-approved before it goes live. Healed HERE
+  // for the usual reason (Replit skips db:migrate and its publish tool can
+  // propose dropping tables it does not know about). A phantom-drop here loses
+  // editorial content only, never carrier data — and because the approvals
+  // table is append-only, the audit trail is what makes a restore accountable.
+  // MUST stay byte-for-byte equivalent to drizzle/0069_seo_content_engine.sql
+  // + schema.ts `seoContentPages` / `seoContentApprovals` / `seoEngineSettings`.
+  `CREATE TABLE IF NOT EXISTS "seo_content_pages" (
+    "id" serial PRIMARY KEY NOT NULL,
+    "slug" text NOT NULL,
+    "title" text NOT NULL,
+    "meta_description" text,
+    "excerpt" text,
+    "content" text NOT NULL,
+    "status" text DEFAULT 'draft' NOT NULL,
+    "jsonld_type" text DEFAULT 'Article' NOT NULL,
+    "author_entity" text DEFAULT 'QuoteFleet Research' NOT NULL,
+    "canonical" text,
+    "original_data" jsonb,
+    "unique_data_score" integer,
+    "surface" text DEFAULT 'qf_seo' NOT NULL,
+    "published_at" timestamp,
+    "created_at" timestamp DEFAULT now() NOT NULL,
+    "updated_at" timestamp DEFAULT now() NOT NULL
+  )`,
+  `CREATE UNIQUE INDEX IF NOT EXISTS "seo_content_pages_slug_idx" ON "seo_content_pages" ("slug")`,
+  `CREATE INDEX IF NOT EXISTS "seo_content_pages_status_surface_idx" ON "seo_content_pages" ("status", "surface")`,
+
+  `CREATE TABLE IF NOT EXISTS "seo_content_approvals" (
+    "id" serial PRIMARY KEY NOT NULL,
+    "page_id" integer NOT NULL,
+    "actor_type" text NOT NULL,
+    "actor_id" integer,
+    "action" text NOT NULL,
+    "notes" text,
+    "metadata" jsonb,
+    "created_at" timestamp DEFAULT now() NOT NULL
+  )`,
+  `CREATE INDEX IF NOT EXISTS "seo_content_approvals_page_idx" ON "seo_content_approvals" ("page_id", "created_at")`,
+
+  `CREATE TABLE IF NOT EXISTS "seo_engine_settings" (
+    "id" integer PRIMARY KEY NOT NULL,
+    "kill_switch" boolean DEFAULT false NOT NULL,
+    "updated_at" timestamp DEFAULT now() NOT NULL,
+    "updated_by" integer
+  )`,
 ];
 
 export async function ensureSelfHealTables(): Promise<void> {

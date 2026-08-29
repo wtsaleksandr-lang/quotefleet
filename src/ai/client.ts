@@ -64,7 +64,13 @@ async function resolveApiKey(tenantId: number | null): Promise<string> {
 
 /** Per-call timeout. SDK default is 10 minutes — way too long; a hung
  *  request would hold an Express handler indefinitely. 30s covers
- *  even slow Sonnet runs with a comfortable margin. */
+ *  even slow Sonnet runs with a comfortable margin.
+ *
+ *  Callers that are NOT on a request path may raise it via `timeoutMs` — a
+ *  long-form generation (a 2,400-token article) reliably exceeds 30s on the
+ *  escalate model, and there is no Express handler to protect when the work is
+ *  an admin-triggered batch job. The default is unchanged, so every existing
+ *  caller keeps the 30s ceiling. */
 const ANTHROPIC_TIMEOUT_MS = 30_000;
 
 export async function complete(opts: {
@@ -77,9 +83,12 @@ export async function complete(opts: {
   /** Mark the system prompt for ephemeral prompt caching (5-minute TTL).
    *  Use when the system prompt is mostly static and >1024 tokens. */
   cacheSystem?: boolean;
+  /** Override the per-call timeout. ONLY for off-request-path work (batch
+   *  generation); a request handler must keep the 30s default. */
+  timeoutMs?: number;
 }): Promise<ChatCompletion> {
   const apiKey = await resolveApiKey(opts.tenantId);
-  const client = new Anthropic({ apiKey, timeout: ANTHROPIC_TIMEOUT_MS });
+  const client = new Anthropic({ apiKey, timeout: opts.timeoutMs ?? ANTHROPIC_TIMEOUT_MS });
 
   const model = opts.model ?? DEFAULT_MODEL;
   // System block: optionally wrapped in a cache_control structure.

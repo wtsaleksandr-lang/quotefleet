@@ -71,7 +71,8 @@ export type ExternalProvider =
   | 'hunter'
   | 'prospeo'
   | 'apollo'
-  | 'anthropic';
+  | 'anthropic'
+  | 'anthropic_seo';
 
 /** Per-external-call timeout in ms — covers headers AND the body read. */
 export const EXTERNAL_TIMEOUT_MS = 12_000;
@@ -83,6 +84,11 @@ const OVERRIDE_ENV: Record<ExternalProvider, string> = {
   prospeo: 'PROSPEO_LIVE',
   apollo: 'APOLLO_LIVE',
   anthropic: 'IMPORTER_DRAFTS_LIVE',
+  // The /guides SEO engine's article generation. Deliberately a SEPARATE slot
+  // from `anthropic` (importer drafts): the two features must be switchable
+  // independently, so turning importer drafts on can never silently unlock SEO
+  // article spend. Default-deny still applies — an unset flag means no spend.
+  anthropic_seo: 'SEO_ENGINE_LIVE_LLM',
 };
 
 /** Master override env var (all providers). */
@@ -100,6 +106,7 @@ const EST_CREDITS: Record<ExternalProvider, number> = {
   prospeo: 1,
   apollo: 1,
   anthropic: 0,
+  anthropic_seo: 1,
 };
 
 /** Rough USD cents per credit, for the admin spend view (labelled "est.").
@@ -115,6 +122,9 @@ const EST_CENTS_PER_CREDIT: Record<ExternalProvider, number> = {
   prospeo: 4,
   apollo: 4,
   anthropic: 0,
+  // One guide article is ~2.2k output tokens on the escalate model — well under
+  // a cent of real spend, but the ledger row is what makes it auditable.
+  anthropic_seo: 1,
 };
 
 const TRUEY = /^(1|true|yes|on)$/i;
@@ -221,6 +231,7 @@ const PROVIDERS: ExternalProvider[] = [
   'prospeo',
   'apollo',
   'anthropic',
+  'anthropic_seo',
 ];
 
 function emptyMeter(): ProviderMeter {
