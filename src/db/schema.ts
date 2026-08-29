@@ -28,6 +28,7 @@ import {
   timestamp,
   uniqueIndex,
   index,
+  primaryKey,
 } from 'drizzle-orm/pg-core';
 import { sql } from 'drizzle-orm';
 import type { LtlConfig } from '../calc/freightClass.js';
@@ -2061,6 +2062,51 @@ export const sitemapCache = pgTable('sitemap_cache', {
 });
 
 export type SitemapCacheRow = typeof sitemapCache.$inferSelect;
+
+/**
+ * INDEXNOW SUBMISSION LEDGER — what we have already announced to Bing / Yandex /
+ * Seznam, and the content state it was in when we announced it.
+ *
+ * WHY THIS EXISTS: the IndexNow protocol's one unforgivable sin is resubmitting
+ * URLs that have not changed — it is treated as spam and the penalty is SILENT
+ * (the key stops being honoured, with no error to tell you). There is no
+ * server-side "have I sent this already?" query, so the only way to obey the
+ * rule is to remember locally. This table is that memory: a row appears ONLY
+ * after a 2xx from the endpoint, so a failed submission stays a candidate for
+ * the next run instead of being silently dropped.
+ *
+ * SHAPE: keyed by (kind, ref) rather than the full URL. `ref` is the
+ * family-relative identity — a carrier's `public_slug`, a guide slug, a
+ * `state/city` hub pair, or a static path — so the ~330k-row carrier anti-join
+ * (`fetchCarrierCandidates`) joins straight onto `carrier_directory.public_slug`
+ * through this composite PK instead of matching a concatenated URL string.
+ *
+ * `change_key` is an opaque token that advances IFF the page's content genuinely
+ * changed: a formatted `updated_at` for carriers, the real last-edit timestamp
+ * for guides, and a deliberately-bumped version constant for the static families
+ * (which have no change timestamp — see indexNow.ts STATIC_CHANGE_KEY).
+ *
+ * Self-healed on every boot (Replit skips db:migrate). A phantom-drop of this
+ * table loses only the "already announced" memory — never carrier or editorial
+ * data. The blast radius is one duplicate announcement per URL, which is why the
+ * per-run cap exists. See src/server/directory/indexNow.ts.
+ */
+export const indexnowSubmissions = pgTable(
+  'indexnow_submissions',
+  {
+    /** URL family: 'page' | 'city' | 'guide' | 'carrier'. */
+    kind: text('kind').notNull(),
+    /** Family-relative identity (carrier/guide slug, 'state/city', or a path). */
+    ref: text('ref').notNull(),
+    /** Content state at announcement time. Unchanged ⇒ never resubmitted. */
+    changeKey: text('change_key').notNull(),
+    /** When this URL was last successfully announced. */
+    submittedAt: timestamp('submitted_at', { mode: 'date' }).notNull().defaultNow(),
+  },
+  (t) => [primaryKey({ columns: [t.kind, t.ref] })],
+);
+
+export type IndexnowSubmissionRow = typeof indexnowSubmissions.$inferSelect;
 
 /**
  * Persistent cache of ImportYeti bill-of-lading result sets for the Importer

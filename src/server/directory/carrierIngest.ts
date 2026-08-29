@@ -505,6 +505,98 @@ export interface CarrierStore {
 export const UPSERT_BATCH = 500;
 
 /**
+ * Every column the re-ingest overwrites, as its DATABASE name, in the order the
+ * SET below lists them. This is the tuple compared to decide whether a carrier
+ * ACTUALLY changed (see CARRIER_CHANGED_SQL) — `updated_at` is excluded because
+ * it is the thing being decided, and `contact_hidden` because the ingest never
+ * touches it.
+ *
+ * Derived by hand rather than from the drizzle table so a NEW column cannot be
+ * silently omitted: `cargoClasses.test.ts` asserts this list and the SET map
+ * cover exactly the same columns, so adding one to either without the other
+ * fails CI.
+ */
+export const CARRIER_MUTABLE_COLUMNS: readonly string[] = [
+  'mc_number',
+  'legal_name',
+  'dba_name',
+  'city',
+  'state',
+  'country',
+  'zip',
+  'phone',
+  'email',
+  'power_units',
+  'drivers',
+  'safety_rating',
+  'authority_type',
+  'intermodal',
+  'hazmat',
+  'dry_van',
+  'reefer',
+  'tanker',
+  'flatbed',
+  'dry_bulk',
+  'household_goods',
+  'beverages',
+  'produce',
+  'motor_vehicles',
+  'livestock',
+  'grain_feed',
+  'oilfield',
+  'meat',
+  'paper',
+  'construction',
+  'farm_supplies',
+  'coal_coke',
+  'building_materials',
+  'nearest_port_code',
+  'public_slug',
+];
+
+/**
+ * TRUTHFUL `updated_at`: advance it ONLY when the incoming census row actually
+ * differs from the stored one.
+ *
+ * WHY THIS MATTERS (measured on prod 2026-08-29): the weekly re-ingest rewrites
+ * all ~330k rows and used to stamp `updated_at = now()` on every one of them,
+ * changed or not. `updated_at` is what the sitemap publishes as `<lastmod>` — so
+ * every Sunday we were telling every crawler that all 330,218 carrier pages had
+ * just changed, when in reality almost none had. That is fake freshness, and it
+ * is actively harmful: a crawler that refetches on a `<lastmod>` promise, finds
+ * a byte-identical page, and repeats that 330k times learns to STOP TRUSTING our
+ * lastmod entirely — which is the opposite of what a site fighting for crawl
+ * budget needs. (The measurement: min(updated_at) 2026-08-20, max 2026-08-23,
+ * spread across 3 calendar days — a stamp of when the ingest ran, carrying zero
+ * information about the carrier.)
+ *
+ * It is also what makes IndexNow possible at all: with a per-row change signal,
+ * `indexnow_submissions` can announce a carrier exactly once and then only when
+ * it genuinely changes. Without it, every weekly ingest would look like 330k
+ * changed URLs — the unchanged-resubmission the protocol punishes.
+ *
+ * A ROW-WISE `IS DISTINCT FROM` (not `<>`) so a NULL→NULL column reads as "same"
+ * instead of poisoning the comparison to NULL.
+ *
+ * DELIBERATELY CONSERVATIVE: only the TIMESTAMP is made conditional. Every data
+ * column is still written unconditionally, exactly as before. `ON CONFLICT …
+ * WHERE` would additionally skip the write for unchanged rows (fewer dead
+ * tuples, less WAL) — but then a column accidentally missing from the comparison
+ * tuple would mean REAL DATA silently failing to update. With the CASE, the
+ * worst case of an omission is a slightly stale `lastmod`. That asymmetry is
+ * worth the dead tuples on a weekly job.
+ */
+export const CARRIER_CHANGED_SQL = `(${CARRIER_MUTABLE_COLUMNS.map(
+  (c) => `"carrier_directory"."${c}"`,
+).join(', ')}) IS DISTINCT FROM (${CARRIER_MUTABLE_COLUMNS.map((c) => `excluded."${c}"`).join(', ')})`;
+
+/** The conditional `updated_at` assignment itself. Exported as TEXT (rather than
+ *  only as the drizzle `sql` object below) so a unit test can assert the ELSE
+ *  branch really does preserve the stored timestamp — a bare
+ *  `excluded.updated_at` is what produced the fake weekly freshness. */
+export const CARRIER_UPDATED_AT_SQL = `CASE WHEN ${CARRIER_CHANGED_SQL} THEN excluded."updated_at" ELSE "carrier_directory"."updated_at" END`;
+
+/**
  * The ON CONFLICT (usdot) DO UPDATE SET map — every MUTABLE column refreshed
  * from the incoming (EXCLUDED) row on a re-ingest.
  *
@@ -513,6 +605,8 @@ export const UPSERT_BATCH = 500;
  * default false applies), so a carrier who emailed us to hide their contact
  * STAYS hidden across every future re-ingest. Exported so a unit test can assert
  * the opt-out is never in this SET.
+ *
+ * `updated_at` is the one CONDITIONAL entry — see CARRIER_CHANGED_SQL above.
  */
 export const CARRIER_UPSERT_SET = {
   mcNumber: sql`excluded.mc_number`,
@@ -550,7 +644,9 @@ export const CARRIER_UPSERT_SET = {
   buildingMaterials: sql`excluded.building_materials`,
   nearestPortCode: sql`excluded.nearest_port_code`,
   publicSlug: sql`excluded.public_slug`,
-  updatedAt: sql`excluded.updated_at`,
+  // Advances ONLY on a real field change, so <lastmod> stays truthful and the
+  // IndexNow change feed stays honest. See CARRIER_CHANGED_SQL.
+  updatedAt: sql.raw(CARRIER_UPDATED_AT_SQL),
 } as const;
 
 export const dbCarrierStore: CarrierStore = {

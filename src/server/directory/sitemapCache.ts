@@ -41,6 +41,8 @@ import { GLOSSARY_TERMS } from './glossary.js';
 import { SERVICES } from './servicePages.js';
 import { DRAYAGE_RATE_SLUGS } from './drayageRatePages.js';
 import { citySlugify, getDirectorySummary, withWallClockDeadline } from './queries.js';
+import { carrierChangefreq, carrierPriority, richnessScoreSql } from './carrierRichness.js';
+import { runIndexNowSubmission, type IndexNowSmallFamilies } from './indexNow.js';
 
 export const SITE = 'https://quotefleet.net';
 
@@ -60,6 +62,10 @@ const OFFPATH_SCAN_BUDGET_MS = 30_000;
 /** TOTAL wall-clock cap over the whole recompute (both scans + all upserts) so a
  *  starved run settles well before the 15-min cron slow-run watchdog. */
 const OFFPATH_RECOMPUTE_BUDGET_MS = 120_000;
+/** TOTAL wall-clock cap for the IndexNow announcement that follows a rebuild —
+ *  its own budget, so a slow push to Bing cannot eat into (or fail) the sitemap
+ *  materialization that has already succeeded. */
+const INDEXNOW_RUN_BUDGET_MS = 90_000;
 
 /** In-memory SWR shield in FRONT of the single-row PK lookups so a warm crawler
  *  hit serves from memory (zero DB round-trips) and a cold/stale one does a single
@@ -143,15 +149,71 @@ export function carrierChunkCount(total: number): number {
   return Math.max(0, Math.ceil(Math.max(0, total) / SITEMAP_MAX_URLS));
 }
 
-/** Build one carrier child <urlset> from a slice of carrier rows. */
-export function buildCarrierChunkXml(rows: Array<{ slug: string; updatedAt: Date | null }>, now = new Date()): string {
+/** One carrier as the sitemap sees it: its URL slug, its REAL last-change
+ *  timestamp, and its data-richness score (see carrierRichness.ts). */
+export interface CarrierSitemapRow {
+  slug: string;
+  updatedAt: Date | null;
+  /** 0..100. Absent is treated as 0 (the sparse tier) — never as "rich". */
+  score?: number;
+  /** Fleet size, carried ONLY as the tie-break below. */
+  powerUnits?: number | null;
+}
+
+/**
+ * Build one carrier child <urlset> from a slice of carrier rows.
+ *
+ * `<priority>` and `<changefreq>` are derived PER ROW from the richness score
+ * rather than stamped flat, so the document itself says which profiles carry
+ * real data — a crawler that reads priority gets the signal even if it ignores
+ * document order. `<lastmod>` is the row's own `updated_at`, which since the
+ * truthful-timestamp change in carrierIngest.ts advances only on a genuine
+ * field change; it is never `now()`.
+ */
+export function buildCarrierChunkXml(rows: CarrierSitemapRow[], now = new Date()): string {
   return buildUrlset(
-    rows.map((r) => ({
-      loc: carrierLoc(r.slug),
-      lastmod: fmtLastmod(r.updatedAt, now),
-      changefreq: 'monthly',
-      priority: '0.5',
-    })),
+    rows.map((r) => {
+      const score = r.score ?? 0;
+      return {
+        loc: carrierLoc(r.slug),
+        lastmod: fmtLastmod(r.updatedAt, now),
+        changefreq: carrierChangefreq(score),
+        priority: carrierPriority(score),
+      };
+    }),
+  );
+}
+
+/**
+ * Order carriers RICHEST FIRST so the earliest chunks — the ones a crawler on a
+ * tight budget actually samples — hold our most substantive profiles.
+ *
+ * Sorted in JS, not SQL, deliberately: the rebuild already pulls every row into
+ * memory to chunk it, and a 330k-row `ORDER BY` in Postgres would risk an
+ * external merge sort inside the off-path scan's statement_timeout for no gain.
+ * The SCORE is still computed server-side (one int per row) so the result set
+ * stays small — see richnessScoreSql().
+ *
+ * TIE-BREAKS, in order: score, then FLEET SIZE, then slug. Fleet size is there
+ * because the score saturates at its 100-point ceiling — 176 prod carriers score
+ * exactly 100, and among them power_units ranges from 100 to 1,628. Breaking
+ * that tie alphabetically would put "2951291 CANADA INC." ahead of a
+ * 1,628-truck carrier for no reason; breaking it on fleet size orders the very
+ * top of the sitemap by something that actually means something. Slug is the
+ * final tie-break so the output is DETERMINISTIC across recomputes.
+ *
+ * Note that chunk boundaries are no longer stable the way `ORDER BY id` made
+ * them: when a carrier's data changes, its score can move it to a different
+ * chunk. That is fine — the index's <lastmod> changes on every rebuild anyway,
+ * so a crawler refetches the children as a set, and no URL is ever dropped, only
+ * reordered.
+ */
+export function sortCarriersByRichness(rows: CarrierSitemapRow[]): CarrierSitemapRow[] {
+  return rows.sort(
+    (a, b) =>
+      (b.score ?? 0) - (a.score ?? 0) ||
+      (b.powerUnits ?? 0) - (a.powerUnits ?? 0) ||
+      a.slug.localeCompare(b.slug),
   );
 }
 
@@ -163,7 +225,10 @@ export function buildCitiesXml(hubs: Array<{ stateSlug: string; citySlug: string
       loc: `${SITE}/directory/${xmlEscape(h.stateSlug)}/${xmlEscape(h.citySlug)}`,
       lastmod,
       changefreq: 'weekly',
-      priority: '0.5',
+      // A city hub outranks every carrier profile beneath it (max 0.5): it is
+      // the page that aggregates them, and the one with a real head-term query
+      // behind it ("drayage carriers in Long Beach"). See carrierPriority().
+      priority: '0.6',
     })),
   );
 }
@@ -223,50 +288,62 @@ const MARKETING_ROUTES: Array<{ path: string; changefreq: string; priority: stri
   { path: '/guides', changefreq: 'weekly', priority: '0.7' },
 ];
 
-/** Build the 'pages' child <urlset>: marketing + directory landing + every state
- *  hub + every port hub. NO carrier scan — states come from US_STATES, ports from
- *  PORT_GROUPS. lastmod is the recompute time. */
-export function buildPagesXml(now = new Date()): string {
-  const lastmod = fmtLastmod(now, now);
-  const entries: UrlEntry[] = MARKETING_ROUTES.map((r) => ({
-    loc: `${SITE}${r.path}`,
-    lastmod,
-    changefreq: r.changefreq,
-    priority: r.priority,
-  }));
+/**
+ * EVERY path in the 'pages' document, with its crawl hints. Built from static
+ * arrays only — no carrier scan.
+ *
+ * Extracted as a single list so `buildPagesXml`, `pagesUrlCount` and the
+ * IndexNow submission all read the SAME source. Previously the count was a
+ * hand-maintained sum of six `.length`s that had to be kept in step with the
+ * builder by eye; now it cannot drift.
+ *
+ * PRIORITY LADDER — hub pages sit strictly ABOVE every carrier profile (which
+ * tops out at 0.5, see carrierPriority()), because a hub aggregates hundreds of
+ * profiles and answers a real head-term query. State and port hubs are 0.7 for
+ * exactly that reason.
+ */
+export function staticPageEntries(): Array<{ path: string; changefreq: string; priority: string }> {
+  const out: Array<{ path: string; changefreq: string; priority: string }> = [...MARKETING_ROUTES];
   for (const g of PORT_GROUPS) {
-    entries.push({ loc: `${SITE}/directory/port/${xmlEscape(g.code)}`, lastmod, changefreq: 'weekly', priority: '0.6' });
+    out.push({ path: `/directory/port/${g.code}`, changefreq: 'weekly', priority: '0.7' });
   }
   for (const s of US_STATES) {
-    entries.push({ loc: `${SITE}/directory/${xmlEscape(s.slug)}`, lastmod, changefreq: 'weekly', priority: '0.6' });
+    out.push({ path: `/directory/${s.slug}`, changefreq: 'weekly', priority: '0.7' });
   }
   // Every glossary term and service category has its OWN page (/glossary/:slug,
   // /services/:slug) with a unique title, canonical and DefinedTerm/FAQPage
   // JSON-LD. They are enumerated from the same static arrays the routes serve,
   // so the sitemap can never advertise a slug that would 302 back to the hub.
   for (const t of GLOSSARY_TERMS) {
-    entries.push({ loc: `${SITE}/glossary/${xmlEscape(t.slug)}`, lastmod, changefreq: 'monthly', priority: '0.5' });
+    out.push({ path: `/glossary/${t.slug}`, changefreq: 'monthly', priority: '0.5' });
   }
   for (const s of SERVICES) {
-    entries.push({ loc: `${SITE}/services/${xmlEscape(s.slug)}`, lastmod, changefreq: 'monthly', priority: '0.6' });
+    out.push({ path: `/services/${s.slug}`, changefreq: 'monthly', priority: '0.6' });
   }
   for (const slug of DRAYAGE_RATE_SLUGS) {
-    entries.push({ loc: `${SITE}/drayage-rates/${xmlEscape(slug)}`, lastmod, changefreq: 'monthly', priority: '0.7' });
+    out.push({ path: `/drayage-rates/${slug}`, changefreq: 'monthly', priority: '0.7' });
   }
-  return buildUrlset(entries);
+  return out;
 }
 
-/** Total <url> count of the 'pages' document — kept next to buildPagesXml so the
- *  two can never drift (the recompute persists this as url_count). */
-export function pagesUrlCount(): number {
-  return (
-    MARKETING_ROUTES.length +
-    PORT_GROUPS.length +
-    US_STATES.length +
-    GLOSSARY_TERMS.length +
-    SERVICES.length +
-    DRAYAGE_RATE_SLUGS.length
+/** Build the 'pages' child <urlset>: marketing + directory landing + every state
+ *  hub + every port hub. NO carrier scan. lastmod is the recompute time. */
+export function buildPagesXml(now = new Date()): string {
+  const lastmod = fmtLastmod(now, now);
+  return buildUrlset(
+    staticPageEntries().map((r) => ({
+      loc: `${SITE}${xmlEscape(r.path)}`,
+      lastmod,
+      changefreq: r.changefreq,
+      priority: r.priority,
+    })),
   );
+}
+
+/** Total <url> count of the 'pages' document — read from the same list the
+ *  builder uses, so the two can never drift (persisted as url_count). */
+export function pagesUrlCount(): number {
+  return staticPageEntries().length;
 }
 
 /** Build the <sitemapindex> from the set of child document keys that exist. */
@@ -293,15 +370,37 @@ async function boundedScan<T>(budgetMs: number, fn: (tx: Parameters<Parameters<R
   });
 }
 
-/** ALL carrier (slug, updatedAt) rows, ordered by id so chunk boundaries are
- *  stable across recomputes. OFF-PATH only (behind the statement timeout). */
-async function fetchAllCarrierRows(): Promise<Array<{ slug: string; updatedAt: Date | null }>> {
+/**
+ * ALL carrier (slug, updatedAt, richness score) rows. OFF-PATH only (behind the
+ * statement timeout).
+ *
+ * NO `ORDER BY`. The old query ordered by `id` purely to keep chunk boundaries
+ * stable; the ordering that matters now is by richness, and that happens in JS
+ * (`sortCarriersByRichness`) so Postgres never has to sort 330k rows. Dropping
+ * the ORDER BY makes this a plain sequential scan — strictly cheaper than the
+ * ordered scan it replaces.
+ *
+ * The SCORE is computed server-side so the wire payload stays three small
+ * columns instead of the ~13 the scorer reads. A full scan is unavoidable here
+ * by definition: the sitemap must enumerate every carrier. It is bounded by
+ * `SET LOCAL statement_timeout` and runs only from the off-path rebuild.
+ */
+async function fetchAllCarrierRows(): Promise<CarrierSitemapRow[]> {
   return boundedScan(OFFPATH_SCAN_BUDGET_MS, async (tx) => {
     const rows = await tx
-      .select({ slug: carrierDirectory.publicSlug, updatedAt: carrierDirectory.updatedAt })
-      .from(carrierDirectory)
-      .orderBy(carrierDirectory.id);
-    return rows.map((r) => ({ slug: r.slug, updatedAt: r.updatedAt }));
+      .select({
+        slug: carrierDirectory.publicSlug,
+        updatedAt: carrierDirectory.updatedAt,
+        score: sql<number>`${sql.raw(richnessScoreSql())}`.as('score'),
+        powerUnits: carrierDirectory.powerUnits,
+      })
+      .from(carrierDirectory);
+    return rows.map((r) => ({
+      slug: r.slug,
+      updatedAt: r.updatedAt,
+      score: Number(r.score) || 0,
+      powerUnits: r.powerUnits,
+    }));
   });
 }
 
@@ -361,12 +460,51 @@ async function persistDoc(doc: SitemapDoc, computedAt: Date): Promise<void> {
  * child-key set + carrier count for logging/tests.
  */
 export async function recomputeAndPersistSitemap(): Promise<{ childKeys: string[]; carriers: number; cities: number }> {
-  return withWallClockDeadline(recomputeAndPersistSitemapInner(), OFFPATH_RECOMPUTE_BUDGET_MS, 'sitemap recompute');
+  const result = await withWallClockDeadline(
+    recomputeAndPersistSitemapInner(),
+    OFFPATH_RECOMPUTE_BUDGET_MS,
+    'sitemap recompute',
+  );
+  // ── IndexNow: announce what CHANGED, after the rebuild has already succeeded.
+  // Deliberately OUTSIDE the rebuild's wall-clock budget: the sitemap is the
+  // load-bearing artefact and must never fail because a best-effort push to
+  // Bing was slow. `runIndexNowSubmission` is itself default-deny (inert
+  // without INDEXNOW_ENABLED + INDEXNOW_KEY) and never throws.
+  //
+  // THIS IS THE TRIGGER POINT for every real change event: the weekly FMCSA
+  // ingest reaches it via ensureFreshSitemap()'s carrier-count drift rebuild,
+  // a new city hub reaches it the same way, and a /guides approval reaches it
+  // because the approve route calls recomputeAndPersistSitemap() directly.
+  await maybeAnnounceViaIndexNow(result.families);
+  return { childKeys: result.childKeys, carriers: result.carriers, cities: result.cities };
 }
 
-async function recomputeAndPersistSitemapInner(): Promise<{ childKeys: string[]; carriers: number; cities: number }> {
+/** Fire one IndexNow run against its own bounded transaction. Never throws —
+ *  the sitemap rebuild that called it has already committed. */
+async function maybeAnnounceViaIndexNow(families: IndexNowSmallFamilies): Promise<void> {
+  try {
+    await withWallClockDeadline(
+      boundedScan(OFFPATH_SCAN_BUDGET_MS, (tx) => runIndexNowSubmission(SITE, families, tx)),
+      INDEXNOW_RUN_BUDGET_MS,
+      'indexnow submission',
+    );
+  } catch (err) {
+    console.warn('[sitemap] IndexNow submission skipped (non-fatal):', (err as Error)?.message);
+  }
+}
+
+interface SitemapRecomputeResult {
+  childKeys: string[];
+  carriers: number;
+  cities: number;
+  /** The non-carrier URL families, handed to IndexNow so it does not have to
+   *  re-derive (or re-query) what the rebuild just computed. */
+  families: IndexNowSmallFamilies;
+}
+
+async function recomputeAndPersistSitemapInner(): Promise<SitemapRecomputeResult> {
   const now = new Date();
-  const carriers = await fetchAllCarrierRows();
+  const carriers = sortCarriersByRichness(await fetchAllCarrierRows());
   const cityHubs = await fetchAllCityHubs();
   // Published guides only — the store helper applies the status filter, so this
   // caller cannot accidentally advertise a draft.
@@ -411,7 +549,16 @@ async function recomputeAndPersistSitemapInner(): Promise<{ childKeys: string[];
   }
 
   invalidateSitemapMemCache();
-  return { childKeys, carriers: carriers.length, cities: cityHubs.length };
+  return {
+    childKeys,
+    carriers: carriers.length,
+    cities: cityHubs.length,
+    families: {
+      pagePaths: staticPageEntries().map((e) => e.path),
+      cityHubs,
+      guides,
+    },
+  };
 }
 
 /** How many carrier <loc>s the CURRENTLY-materialized chunks hold, summed over the

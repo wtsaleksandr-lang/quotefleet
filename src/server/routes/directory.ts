@@ -58,6 +58,7 @@ import {
 import { publicAutocompleteLimiter, publicCalcLimiter, directorySearchLimiter } from '../rateLimits.js';
 import { directoryIdentity } from '../directory/entitlement.js';
 import { serveSitemapIndex, serveSitemapChild, carrierChunkKey } from '../directory/sitemapCache.js';
+import { INDEXNOW_KEY_ROUTE, indexNowKeyFileHandler } from '../directory/indexNow.js';
 import { setPublicDirectoryCache, setNoStore } from '../directory/httpCache.js';
 
 const isIntermodal = (v: unknown): boolean => ['1', 'true', 'yes'].includes(String(v ?? '').toLowerCase());
@@ -105,6 +106,16 @@ function sendSitemapXml(res: Response, xml: string): void {
 }
 
 export function registerDirectoryRoutes(app: Express) {
+  // ── IndexNow ownership proof: /<key>.txt ─────────────────────────────────
+  // The protocol requires a text file at the site root whose ENTIRE body is the
+  // key; without it every submission is rejected 403. The handler + its route
+  // pattern live in directory/indexNow.ts next to the rest of the protocol
+  // (and are unit-tested over real HTTP there). Registered here, before
+  // express.static, so it cannot be shadowed by a file of the same name — and
+  // it calls next() for anything that is not exactly our key, so it cannot
+  // shadow anything else either.
+  app.get(INDEXNOW_KEY_ROUTE, indexNowKeyFileHandler);
+
   // ── SEO sitemap (materialized — never a live 334k-row scan) ──────────────
   // The dynamic index REPLACES the old static ~50-URL public/sitemap.xml: it
   // references the marketing/state/port pages, the real city hubs, and the
