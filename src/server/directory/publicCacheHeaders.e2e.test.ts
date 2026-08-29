@@ -169,6 +169,11 @@ const PUBLIC_PATHS: [label: string, path: string][] = [
   ['service category', '/services/hazmat-drayage'],
   ['drayage rates hub', '/drayage-rates'],
   ['drayage rates port', '/drayage-rates/savannah'],
+  // The editorial hub. It renders from a published-only DB read and is
+  // byte-identical for every visitor, so it must be on the shared-cache policy
+  // like every other content surface. (An individual /guides/:slug needs a
+  // published row this fixture does not seed; the hub covers the route wiring.)
+  ['guides hub', '/guides'],
 ];
 
 describe('public directory HTML — the header that actually reaches the wire', () => {

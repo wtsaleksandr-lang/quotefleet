@@ -144,6 +144,16 @@ export function registerDirectoryRoutes(app: Express) {
       next(err);
     }
   });
+  // Published /guides articles. Cold miss serves a valid empty urlset (the
+  // engine ships dark, so an empty document is the CORRECT answer until a human
+  // has approved the first draft) and kicks a background recompute.
+  app.get('/sitemap-guides.xml', async (_req: Request, res: Response, next) => {
+    try {
+      sendSitemapXml(res, (await serveSitemapChild('guides')).xml);
+    } catch (err) {
+      next(err);
+    }
+  });
 
   // ── JSON API ───────────────────────────────────────────────────────────
   app.get('/api/public/directory', publicAutocompleteLimiter, async (req: Request, res: Response) => {

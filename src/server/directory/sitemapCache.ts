@@ -27,6 +27,10 @@
  *                    hubs + all port hubs (a small fixed set, no carrier scan).
  *   'cities'       → <urlset> of every REAL city hub (/directory/{state}/{city}).
  *   'carriers-<n>' → <urlset> of ≤SITEMAP_MAX_URLS carrier profiles (~7 for 334k).
+ *   'guides'       → <urlset> of every PUBLISHED /guides article. Its own child
+ *                    (not folded into 'pages') because it is the one DB-backed
+ *                    set here whose membership changes on a human approve —
+ *                    'pages' is built from static arrays and stays synchronous.
  */
 import { sql } from 'drizzle-orm';
 import { db } from '../../db/client.js';
@@ -164,6 +168,25 @@ export function buildCitiesXml(hubs: Array<{ stateSlug: string; citySlug: string
   );
 }
 
+/** The 'guides' child <urlset> — one entry per PUBLISHED editorial article.
+ *  lastmod is the row's real updated_at (never now()), so a crawler is told the
+ *  truth about when the analysis last changed. Rows are supplied by the caller,
+ *  which reads them through the published-only store helper — a draft can never
+ *  reach this function. */
+export function buildGuidesXml(
+  guides: Array<{ slug: string; lastmod: Date | null }>,
+  now = new Date(),
+): string {
+  return buildUrlset(
+    guides.map((g) => ({
+      loc: `${SITE}/guides/${xmlEscape(g.slug)}`,
+      lastmod: fmtLastmod(g.lastmod, now),
+      changefreq: 'monthly',
+      priority: '0.7',
+    })),
+  );
+}
+
 /** Marketing / legal / product routes that are NOT carrier or city pages. These
  *  mirror the retired static sitemap.xml so nothing already-indexed drops out. */
 const MARKETING_ROUTES: Array<{ path: string; changefreq: string; priority: string }> = [
@@ -195,6 +218,9 @@ const MARKETING_ROUTES: Array<{ path: string; changefreq: string; priority: stri
   { path: '/partners', changefreq: 'monthly', priority: '0.5' },
   { path: '/partners/terms', changefreq: 'yearly', priority: '0.3' },
   { path: '/drayage-rates', changefreq: 'monthly', priority: '0.8' },
+  // The editorial hub. Individual articles live in the 'guides' child document
+  // (below) because they are DB-backed and this list is static.
+  { path: '/guides', changefreq: 'weekly', priority: '0.7' },
 ];
 
 /** Build the 'pages' child <urlset>: marketing + directory landing + every state
@@ -342,6 +368,13 @@ async function recomputeAndPersistSitemapInner(): Promise<{ childKeys: string[];
   const now = new Date();
   const carriers = await fetchAllCarrierRows();
   const cityHubs = await fetchAllCityHubs();
+  // Published guides only — the store helper applies the status filter, so this
+  // caller cannot accidentally advertise a draft.
+  const { listPublishedGuides } = await import('../seo/store.js');
+  const guides = (await listPublishedGuides()).map((g) => ({
+    slug: g.slug,
+    lastmod: g.updatedAt ?? g.publishedAt,
+  }));
 
   const carrierChunks = chunkArray(carriers, SITEMAP_MAX_URLS);
   const docs: SitemapDoc[] = [];
@@ -349,6 +382,7 @@ async function recomputeAndPersistSitemapInner(): Promise<{ childKeys: string[];
   // 'pages' + 'cities' children.
   docs.push({ key: 'pages', xml: buildPagesXml(now), urlCount: pagesUrlCount() });
   docs.push({ key: 'cities', xml: buildCitiesXml(cityHubs, now), urlCount: cityHubs.length });
+  docs.push({ key: 'guides', xml: buildGuidesXml(guides, now), urlCount: guides.length });
 
   // Carrier children — carriers-1..N (1-indexed so /sitemap-carriers-1.xml reads
   // naturally). An empty directory still emits carriers-1 as a valid empty urlset.
@@ -361,7 +395,7 @@ async function recomputeAndPersistSitemapInner(): Promise<{ childKeys: string[];
   });
 
   // Index references pages + cities + every carrier chunk.
-  const childKeys = ['pages', 'cities', ...chunkKeys];
+  const childKeys = ['pages', 'cities', 'guides', ...chunkKeys];
   docs.push({ key: 'index', xml: buildIndexXml(childKeys, now), urlCount: childKeys.length });
 
   for (const doc of docs) await persistDoc(doc, now);
@@ -539,7 +573,7 @@ export async function serveSitemapIndex(): Promise<ServeResult> {
   }
   const chunkCount = Math.max(1, carrierChunkCount(total));
   const chunkKeys = Array.from({ length: chunkCount }, (_v, i) => `carriers-${i + 1}`);
-  return { xml: buildIndexXml(['pages', 'cities', ...chunkKeys]), source: 'fallback' };
+  return { xml: buildIndexXml(['pages', 'cities', 'guides', ...chunkKeys]), source: 'fallback' };
 }
 
 /** A child <urlset> by key ('pages' | 'cities' | 'carriers-N'). Cold miss → a valid

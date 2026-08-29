@@ -3224,3 +3224,99 @@ export const manifestRedactions = pgTable(
 
 export type ManifestRedaction = typeof manifestRedactions.$inferSelect;
 export type NewManifestRedaction = typeof manifestRedactions.$inferInsert;
+
+/* ════════════════════════════════════════════════════════════════════════
+   OWNED-DOMAIN SEO CONTENT ENGINE — editorial surface (/guides).
+
+   QuoteFleet has ~334k programmatic carrier pages and zero editorial
+   surface. Programmatic pages don't earn links; data-backed guides do. This
+   is the durable store for guides generated from the FMCSA carrier census
+   (carrier_directory) — the corpus is PUBLIC federal data, so unlike the
+   WeFixTrades engine this port has no k-anonymity obligation. The
+   minimum-sample floor survives anyway, doing its OTHER job: anti-thin
+   content. A cut below CARRIER_MIN_SAMPLE never becomes a page.
+
+   The engine is INERT by default: gated behind SEO_ENGINE_ENABLED (env) AND
+   the seo_engine_settings.kill_switch row, failing CLOSED. Nothing generates
+   until the flag is on; nothing renders until a human approves a draft.
+   ════════════════════════════════════════════════════════════════════════ */
+
+/** draft → in_review → published → archived. Only 'published' renders + feeds
+ *  the sitemap; everything else 404s and is excluded from discovery. */
+export const SEO_PAGE_STATUSES = ['draft', 'in_review', 'published', 'archived'] as const;
+export type SeoPageStatus = (typeof SEO_PAGE_STATUSES)[number];
+
+/** The durable, indexable record of what is (or was) live at /guides/:slug. */
+export const seoContentPages = pgTable(
+  'seo_content_pages',
+  {
+    id: serial('id').primaryKey(),
+    slug: text('slug').notNull(),
+    title: text('title').notNull(),
+    metaDescription: text('meta_description'),
+    excerpt: text('excerpt'),
+    /** Article body, markdown. */
+    content: text('content').notNull(),
+    /** 'draft' | 'in_review' | 'published' | 'archived'. */
+    status: text('status').notNull().default('draft'),
+    /** schema.org @type for the primary JSON-LD block. */
+    jsonldType: text('jsonld_type').notNull().default('Article'),
+    /** Real author entity (E-E-A-T) — what makes the content attributable. */
+    authorEntity: text('author_entity').notNull().default('QuoteFleet Research'),
+    /** Self-canonical by default; may point at a collapse target for near-dupes. */
+    canonical: text('canonical'),
+    /** The carrier-census aggregate snapshot the article cites, frozen at
+     *  generation. This is the moat + the provenance a reviewer audits. */
+    originalData: jsonb('original_data'),
+    /** Anti-thin audit value: count of page-specific real data points cited. */
+    uniqueDataScore: integer('unique_data_score'),
+    /** Always 'qf_seo' — keeps the sitemap query trivial and unambiguous. */
+    surface: text('surface').notNull().default('qf_seo'),
+    publishedAt: timestamp('published_at', { mode: 'date' }),
+    createdAt: timestamp('created_at', { mode: 'date' }).notNull().defaultNow(),
+    updatedAt: timestamp('updated_at', { mode: 'date' }).notNull().defaultNow(),
+  },
+  (t) => [
+    uniqueIndex('seo_content_pages_slug_idx').on(t.slug),
+    index('seo_content_pages_status_surface_idx').on(t.status, t.surface),
+  ]
+);
+
+export type SeoContentPage = typeof seoContentPages.$inferSelect;
+export type NewSeoContentPage = typeof seoContentPages.$inferInsert;
+
+/** Append-only human-review audit. Every status mutation writes one immutable
+ *  row, so "who published this and when" is always answerable. */
+export const SEO_APPROVAL_ACTIONS = ['submitted', 'approved', 'edited', 'rejected'] as const;
+export type SeoApprovalAction = (typeof SEO_APPROVAL_ACTIONS)[number];
+
+export const seoContentApprovals = pgTable(
+  'seo_content_approvals',
+  {
+    id: serial('id').primaryKey(),
+    pageId: integer('page_id').notNull(),
+    /** 'admin' (a reviewer) | 'system' (the generator submitting for review). */
+    actorType: text('actor_type').notNull(),
+    actorId: integer('actor_id'),
+    /** 'submitted' | 'approved' | 'edited' | 'rejected'. */
+    action: text('action').notNull(),
+    notes: text('notes'),
+    metadata: jsonb('metadata'),
+    createdAt: timestamp('created_at', { mode: 'date' }).notNull().defaultNow(),
+  },
+  (t) => [index('seo_content_approvals_page_idx').on(t.pageId, t.createdAt)]
+);
+
+export type SeoContentApproval = typeof seoContentApprovals.$inferSelect;
+export type NewSeoContentApproval = typeof seoContentApprovals.$inferInsert;
+
+/** Singleton (id=1) DB kill switch. With kill_switch ON the whole engine is
+ *  halted regardless of the SEO_ENGINE_ENABLED env flag. */
+export const seoEngineSettings = pgTable('seo_engine_settings', {
+  id: integer('id').primaryKey(),
+  killSwitch: boolean('kill_switch').notNull().default(false),
+  updatedAt: timestamp('updated_at', { mode: 'date' }).notNull().defaultNow(),
+  updatedBy: integer('updated_by'),
+});
+
+export type SeoEngineSettingsRow = typeof seoEngineSettings.$inferSelect;

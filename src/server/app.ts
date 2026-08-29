@@ -37,6 +37,8 @@ import { registerRfqRoutes } from './routes/rfq.js';
 import { registerServiceRoutes } from './directory/servicePages.js';
 import { registerGlossaryRoutes } from './directory/glossary.js';
 import { registerDrayageRateRoutes } from './directory/drayageRatePages.js';
+import { registerGuidesRoutes } from './seo/guidesPages.js';
+import { registerAdminGuidesRoutes } from './seo/adminGuidesRoutes.js';
 import { renderSiteNotFound } from './directory/pages.js';
 import { setNoStore } from './directory/httpCache.js';
 import { registerImporterRoutes } from './directory/importerPages.js';
@@ -193,6 +195,13 @@ export function createApp(): express.Express {
   registerServiceRoutes(app);
   registerGlossaryRoutes(app);
   registerDrayageRateRoutes(app);
+  // /guides + /guides/:slug — the editorial surface. No collision with the
+  // /directory/:stateSlug catch-alls, and its own paths are unique.
+  registerGuidesRoutes(app);
+  // /admin/guides (the review queue) + its JSON mutations. MUST be registered
+  // before the `/admin/*splat` SPA catch-all further down this file, or the
+  // server-rendered page would be shadowed by admin.html.
+  registerAdminGuidesRoutes(app);
   // Importer Search (/importers page + POST /api/importers/search). Registered
   // next to the other directory surfaces; its paths don't collide with the
   // /directory/:stateSlug catch-alls.
