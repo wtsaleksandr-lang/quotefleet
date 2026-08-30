@@ -9,14 +9,28 @@ Disallow: /chat/
 
 # Facet, sort and pagination QUERY STRINGS are deliberately not crawlable.
 # Every /directory PATH stays fully crawlable — only query strings are blocked.
-# The sitemap advertises every page worth indexing as a clean PATH — ~334k
-# /directory/carrier/{slug}, the city hubs, 54 states, 60 ports — so nothing
-# below is needed for discovery, and each of these params multiplies the same
-# rows into a combinatorial URL space backed by an unbounded scan:
-#   ?page=   pagination duplicates. 0069 caps this at MAX_PAGE (page 101+ now
-#            404s, and the pager/rel=next no longer link past the cap), so the
-#            OFFSET is bounded at the origin too — this line just keeps the
-#            duplicate URL space out of the index.
+# The sitemap advertises every page worth indexing as a clean PATH — ~330k
+# /directory/carrier/{slug}, the city hubs, 54 states + their A–Z city indexes,
+# 60 ports — so nothing below is needed for discovery, and each of these params
+# multiplies the same rows into a combinatorial URL space backed by an unbounded
+# scan:
+#   ?page=   pagination duplicates. Bounded at the origin by MAX_PAGE (past the
+#            cap now 404s, and the pager/rel=next never link past it), so this
+#            line just keeps the duplicate URL space out of the index.
+#
+#            IMPORTANT: pagination itself is NOT blocked — only this query form
+#            is. Every hub also pages over a clean PATH, `{hub}/page/N`, which is
+#            allowed above and is what the pager, rel=prev/next and the canonical
+#            all point at on an unfiltered hub.
+#
+#            That distinction is the whole fix. While `?page=` was the ONLY pager,
+#            this line made hub pagination invisible to Googlebot and froze every
+#            hub at its first 24 carriers — and 66.77% of carriers (220,479 of
+#            330,218) live in cities with more than 24. Combined with only the
+#            top-24 cities per state being linked at all, the transitive closure
+#            of the link graph from `/` reached ~32,600 of 330,218 carrier
+#            profiles (9.2%); Search Console reported the rest as "Discovered –
+#            currently not indexed", lastCrawl NEVER.
 #   ?q=      legal_name/dba_name ILIKE '%..%' — always a full scan, and one
 #            request fans out to ~11 of them. 0069 puts it on its own tighter
 #            rate-limit lane (DIRECTORY_SEARCH_BURST_LIMIT).

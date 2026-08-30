@@ -309,6 +309,21 @@ export function staticPageEntries(): Array<{ path: string; changefreq: string; p
   }
   for (const s of US_STATES) {
     out.push({ path: `/directory/${s.slug}`, changefreq: 'weekly', priority: '0.7' });
+    // The COMPLETE A–Z city index for the state. 54 URLs that between them link
+    // to all 24,728 city hubs.
+    //
+    // WHY THESE 54 URLS EARN THEIR PLACE IN A CRAWL-BUDGET-CONSTRAINED SITEMAP:
+    // sitemap-cities.xml already advertised every city hub, but only the top-24
+    // cards on each state page ever LINKED to one — 1,296 linked, ~23,400
+    // orphaned — and a city hub is the only route to the 24 carriers on its
+    // first page. That orphaning is why the link graph from `/` reached just
+    // ~32,600 of 330,218 carrier profiles (9.2%) while the rest sat at
+    // "Discovered – currently not indexed", lastCrawl NEVER. These index pages
+    // are the link surface that fixes it, so they are worth discovering early.
+    //
+    // Only page 1 of each index is listed: pages 2..N are reachable from the
+    // numbered pager on page 1, which links every page of the series directly.
+    out.push({ path: `/directory/${s.slug}/cities`, changefreq: 'weekly', priority: '0.6' });
   }
   // Every glossary term and service category has its OWN page (/glossary/:slug,
   // /services/:slug) with a unique title, canonical and DefinedTerm/FAQPage
