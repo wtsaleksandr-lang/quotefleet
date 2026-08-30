@@ -52,6 +52,7 @@ import {
   SITE_BURGER_BTN,
   HEADER_SCRIPTS,
   FOOTER_PAY_ROW,
+  DIRECTORY_DATA_SOURCES,
 } from '../siteChrome.js';
 
 const SITE = 'https://quotefleet.net';
@@ -369,6 +370,16 @@ export const DIRECTORY_CSS = `
   .dir-section-h h2 { font-size: 22px; margin: 0; }
   .dir-section-h .muted-small { white-space: nowrap; }
   .dir-grid { display: grid; gap: 14px; grid-template-columns: repeat(auto-fill, minmax(240px, 1fr)); }
+  /* BROWSE grids (top ports / browse by state / cities in state) — the short
+     navigation cards, as opposed to the carrier-RESULT grids, which override
+     grid-template-columns inline and are unaffected by anything below.
+     grid-auto-rows:1fr is what makes every card the SAME SIZE: all rows are
+     implicit here, so 1fr resolves each to the tallest row's height and a short
+     name ("Guam") can no longer produce a shorter card than a wrapping one
+     ("U.S. Virgin Islands"). Column count is handled per-breakpoint below. */
+  .dir-grid--browse { grid-auto-rows: 1fr; }
+  .dir-grid--browse > .dir-card { display: flex; flex-direction: column; }
+  .dir-grid--browse > .dir-card .cnt { margin-top: auto; padding-top: 12px; }
   .dir-card { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius-lg); padding: 18px 20px; text-decoration: none; color: inherit; display: block; transition: border-color 0.15s ease, transform 0.15s ease; }
   .dir-card:hover { border-color: var(--border-strong); transform: translateY(-2px); }
   .dir-card h3 { margin: 0 0 4px; font-size: 17px; }
@@ -596,6 +607,19 @@ export const DIRECTORY_CSS = `
     .dir-hero .container-narrow { padding-left: 18px; padding-right: 18px; }
     .dir-grid { grid-template-columns: 1fr 1fr; gap: 10px; }
     .carrier-facts { gap: 14px; }
+    /* Two EQUAL columns for the browse cards all the way down to 320px.
+       minmax(0,1fr) — not the default minmax(auto,1fr) — is the part that
+       stops a long territory name's min-content width from widening its track
+       and pushing the page into horizontal scroll. Tighter padding + a stacked
+       count keeps a ~137px card readable at 320px. */
+    .dir-grid--browse { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+    .dir-grid--browse > .dir-card { padding: 14px 14px; min-width: 0; }
+    .dir-grid--browse > .dir-card h3 { font-size: 15px; line-height: 1.25; overflow-wrap: anywhere; }
+    .dir-grid--browse > .dir-card .cnt { font-size: 19px; padding-top: 10px; }
+    .dir-grid--browse > .dir-card .cnt small { display: block; margin-left: 0; margin-top: 2px; }
+    /* Odd count: the final card fills the row rather than sitting alone beside
+       an empty half — see browseGrid(). Every row is full at two columns. */
+    .dir-grid--browse[data-odd="1"] > .dir-card:last-child { grid-column: 1 / -1; }
     /* Sort bar: count on its own row, then the full sort control (label + select
        + direction toggle) together on the next — never stacks mid-control, never
        leaves the toggle orphaned. */
@@ -606,7 +630,11 @@ export const DIRECTORY_CSS = `
     .sort-dir { flex: 0 0 auto; }
   }
   @media (max-width: 420px) {
-    .dir-grid { grid-template-columns: 1fr; }
+    /* Result/detail grids still collapse to one column on the narrowest phones.
+       The BROWSE grids deliberately do NOT: a full-width card holding one short
+       state name and a count wasted the whole right half of the screen, which
+       is the defect this excludes them from. */
+    .dir-grid:not(.dir-grid--browse) { grid-template-columns: 1fr; }
   }
   /* Sub-375px phones (360/320): a single long browse-chip label (e.g. a full
      port-group name) has a nowrap min-content wider than the results column,
@@ -1391,6 +1419,24 @@ const SAVE_SELECTED_SCRIPT = `(function(){
   saveBtn.addEventListener('click',function(e){ e.preventDefault(); var dots=selected(); if(!dots.length){ renderEmpty(); } else { renderPicker(dots); } openModal(); });
 })();`;
 
+/**
+ * Which of the surfaces sharing this shell actually render FMCSA-sourced carrier
+ * data — so the data-source attribution strip appears exactly where it is TRUE
+ * and nowhere else. layout() is shared by the carrier directory, /compliance,
+ * /drayage-rates, /services and /guides (all FMCSA-backed) AND by /importers and
+ * /manifest-privacy, whose data comes from a licensed CBP-manifest provider on a
+ * different code path entirely. Naming FMCSA under an importer page would be the
+ * same padding-with-untrue-sources mistake the badges exist to avoid, so the
+ * strip is gated on the canonical path rather than bolted to the shell.
+ */
+function rendersCarrierData(canonicalPath: string): boolean {
+  return /^\/(directory|compliance|drayage-rates|services|guides)(\/|\?|$)/.test(canonicalPath);
+}
+
+/** Test seam for the gate above — footerPayRow.test.ts pins which surfaces may
+ *  claim FMCSA as a source and which must not. */
+export const rendersCarrierDataForTest = rendersCarrierData;
+
 interface LayoutOpts {
   title: string;
   description: string;
@@ -1457,6 +1503,7 @@ export function layout({ title, description, canonicalPath, bodyHtml, jsonLd, re
   ${bodyHtml}
   <footer class="site-footer">
     © <span id="year"></span> QuoteFleet · <a href="/directory">Directory</a> · <a href="/importers">Importer Search</a> · <a href="/manifest-privacy">Manifest Privacy</a> · <a href="/compliance">Compliance</a> · <a href="/glossary">Glossary</a> · <a href="/guides">Guides</a> · <a href="/drayage-rates">Drayage Rates</a> · <a href="/services">Services</a> · <a href="/terms">Terms</a> · <a href="/privacy">Privacy</a> · <a href="/">Home</a>
+    ${rendersCarrierData(canonicalPath) ? DIRECTORY_DATA_SOURCES : ''}
     ${FOOTER_PAY_ROW}
   </footer>
   ${HEADER_SCRIPTS}
@@ -2760,13 +2807,13 @@ export function renderDirectoryLanding(
       <h2>Top US ports</h2>
       <a class="muted-small" href="/compliance">Compliance tools →</a>
     </div>
-    <div class="dir-grid">${portCards}</div>
+    ${browseGrid(portCards, summary.byPort.length)}
 
     <div class="dir-section-h">
       <h2>Browse by state</h2>
       <span class="muted-small">${fmtNum(usStateRows.length)} states</span>
     </div>
-    <div class="dir-grid">${stateCards}</div>
+    ${browseGrid(stateCards, usStateRows.length)}
   </main>`;
 
   return layout({
@@ -2853,8 +2900,23 @@ function citiesModule(state: UsState, cities: CityCount[]): string {
     )
     .join('\n');
   return `<div class="dir-section-h"><h2 style="font-size: 18px;">Cities in ${esc(state.name)}</h2><span class="muted-small">top ${cities.length} by carrier count</span></div>
-    <div class="dir-grid">${cards}</div>
+    ${browseGrid(cards, cities.length)}
     <div class="dir-chips" style="margin-top: 14px;"><a class="dir-chip" href="/directory/${state.slug}/cities">All ${esc(state.name)} cities A–Z <span class="arr">→</span></a></div>`;
+}
+
+/**
+ * Wrapper for the BROWSE card grids (top ports / browse by state / cities in a
+ * state), as distinct from the carrier-RESULT grids.
+ *
+ * `data-odd` exists for the no-orphan rule. At phone widths these grids are two
+ * equal columns, so an ODD number of cards would leave the final one alone
+ * beside an empty half-row — which is the exact "wasted right half" this whole
+ * layout change was raised to fix, just moved to the bottom of the list. When
+ * the count is odd the CSS spans that last card across both columns, so every
+ * row is full. Even counts need no special case.
+ */
+function browseGrid(cards: string, count: number): string {
+  return `<div class="dir-grid dir-grid--browse"${count % 2 === 1 ? ' data-odd="1"' : ''}>${cards}</div>`;
 }
 
 /** "Browse by state" chip row (all US states except an optional current one). */
