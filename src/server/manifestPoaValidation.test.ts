@@ -383,6 +383,22 @@ describe('validatePoaForFiling — the pre-filing gate', () => {
     expect(validatePoaForFiling(filable()).checks.map((c) => c.key)).not.toContain('agent_address');
   });
 
+  it('blocks when the Agent’s registered legal name is not configured', () => {
+    // Regression guard. MANIFEST_AGENT_LEGAL_NAME once defaulted to
+    // 'QuoteFleet, Inc.' — an entity that does not exist — so an unconfigured
+    // deployment would have executed POAs appointing a fictitious
+    // attorney-in-fact. There is no safe fallback for an agent's NAME (unlike
+    // its address, which can degrade to an email notice address), so this must
+    // stay a hard blocker.
+    const unset = validatePoaForFiling(filable(), { agentLegalNameConfigured: false });
+    expect(unset.ok).toBe(false);
+    expect(unset.failures.map((f) => f.key)).toContain('agent_legal_name');
+    expect(validatePoaForFiling(filable(), { agentLegalNameConfigured: true }).ok).toBe(true);
+    expect(validatePoaForFiling(filable()).checks.map((c) => c.key)).not.toContain(
+      'agent_legal_name',
+    );
+  });
+
   it('blocks an application that was never executed', () => {
     const gate = validatePoaForFiling(filable({ signedAt: null, docSha256: null }));
     expect(gate.failures.map((f) => f.key)).toContain('executed');

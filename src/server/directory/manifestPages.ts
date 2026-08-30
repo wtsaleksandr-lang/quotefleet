@@ -737,9 +737,13 @@ export function renderAdminPrivacyQueue(
     sub?: { tier: string | null; paid: boolean };
     gate?: PoaGateResult;
   }>,
-  opts?: { filter?: 'all' | 'renewals' },
+  opts?: { filter?: 'all' | 'renewals'; agentLegalName?: string | null },
 ): string {
   const filter = opts?.filter === 'renewals' ? 'renewals' : 'all';
+  // Must match the name on the executed POA — see buildCbpCertText. When it is
+  // unconfigured we render the blocker instead of a certification naming nobody;
+  // the pre-filing gate's `agent_legal_name` check explains it in the same row.
+  const agentLegalName = opts?.agentLegalName?.trim() || null;
   const fmt = (d: Date | null | undefined) =>
     d ? new Date(d).toISOString().slice(0, 16).replace('T', ' ') : '—';
   const fmtDay = (d: Date | null | undefined) =>
@@ -753,7 +757,9 @@ export function renderAdminPrivacyQueue(
             .slice(0, 8)
             .map((e) => `${esc(e.event)} @ ${fmt(e.createdAt)}`)
             .join('<br>');
-          const certText = buildCbpCertText(app);
+          const certText = agentLegalName
+            ? buildCbpCertText(app, agentLegalName)
+            : 'MANIFEST_AGENT_LEGAL_NAME is not configured. The CBP certification cannot name its filing agent, so it is withheld rather than submitted naming an entity that does not exist. Set the variable to the filing entity’s exact registered legal name — it must match the executed POA.';
 
           // PRE-FILING GATE — the 15 documented CBP rejection causes rendered as
           // a per-application checklist so nothing has to be remembered.
@@ -874,7 +880,22 @@ export function renderAdminPrivacyQueue(
 
 /** The plain-text certification an admin pastes into CBP's online application /
  *  mailbox. No automated filing API — this is the human filing step. */
-export function buildCbpCertText(app: PoaApplication): string {
+/**
+ * The certification text an operator sends to CBP.
+ *
+ * `agentLegalName` is REQUIRED and has no default. It used to hardcode
+ * 'QuoteFleet, Inc.' — an entity that does not exist — which meant the text
+ * submitted to CBP named a fictitious agent while the executed POA named the
+ * real filing entity. The two instruments must identify the SAME agent: CBP
+ * matches the submitter against the POA on file, and a mismatch is a rejection.
+ * Pass the same value the POA was generated with.
+ */
+export function buildCbpCertText(app: PoaApplication, agentLegalName: string): string {
+  if (!agentLegalName?.trim()) {
+    throw new Error(
+      'buildCbpCertText requires the Agent’s registered legal name — it must match the executed POA exactly.',
+    );
+  }
   const names = (app.nameVariations ?? []).length
     ? (app.nameVariations ?? []).join('; ')
     : app.grantorLegalName || '';
@@ -896,7 +917,7 @@ export function buildCbpCertText(app: PoaApplication): string {
     `Address(es): ${addrs}`,
     (app.partnerNames ?? []).length ? `Partners: ${(app.partnerNames ?? []).join('; ')}` : '',
     'The importer/consignee named above certifies that it requests confidential treatment of the above names and addresses appearing in vessel manifest data pursuant to 19 CFR 103.31(d), and that the information supplied is true and correct to the best of its knowledge and belief.',
-    `Submitted by its authorized agent and attorney under 19 CFR 103.31(d): QuoteFleet, Inc. A limited power of attorney restricted to this confidentiality request is on file and will be produced on request.`,
+    `Submitted by its authorized agent and attorney under 19 CFR 103.31(d): ${agentLegalName}. A limited power of attorney restricted to this confidentiality request is on file and will be produced on request.`,
     `Signed by: ${app.signerName || ''}${app.signerTitle ? `, ${app.signerTitle}` : ''}${app.signerEmail ? ` (${app.signerEmail})` : ''}`,
     `Authorization executed: ${app.signedAt ? new Date(app.signedAt).toISOString().slice(0, 10) : 'n/a'}; document SHA-256: ${app.docSha256 || 'n/a'}.`,
   ];

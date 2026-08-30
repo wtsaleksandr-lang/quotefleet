@@ -368,6 +368,12 @@ export function validatePoaForFiling(
      *  address blocks the filing instead of fabricating a fact. Omitted ⇒ not
      *  checked (the pure callers that don't read env, e.g. tests). */
     agentAddressConfigured?: boolean;
+    /** Whether the Agent's registered legal name is configured
+     *  (MANIFEST_AGENT_LEGAL_NAME). Unlike the address — which can degrade to an
+     *  email notice address — a missing agent NAME has no safe fallback, so
+     *  document generation refuses outright. Surfaced here so the admin queue
+     *  explains WHY nothing generated. Omitted ⇒ not checked. */
+    agentLegalNameConfigured?: boolean;
     /** The consent/disclosure version currently in force. When supplied, a
      *  record executed under an OLDER version fails a blocking check: the POA is
      *  regenerated deterministically from the stored row, so a row signed
@@ -564,6 +570,17 @@ export function validatePoaForFiling(
       opts.agentAddressConfigured
         ? 'On the instrument.'
         : 'Set MANIFEST_AGENT_ADDRESS. Until it is set the POA names the Agent by its email notice address only — we will not print an address nobody verified.',
+    );
+  }
+
+  if (opts?.agentLegalNameConfigured !== undefined) {
+    add(
+      'agent_legal_name',
+      'Agent’s registered legal name configured',
+      opts.agentLegalNameConfigured,
+      opts.agentLegalNameConfigured
+        ? 'On the instrument.'
+        : 'Set MANIFEST_AGENT_LEGAL_NAME to the filing entity’s exact registered name. Unset, no POA is generated at all — an instrument that cannot name its attorney-in-fact is defective on its face and CBP will reject it.',
     );
   }
 
