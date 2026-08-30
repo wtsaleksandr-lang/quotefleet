@@ -1141,8 +1141,13 @@ html, body { overscroll-behavior: auto; }
 .qf-map-card .qf-map-canvas.qf-map-grabbing,
 .qf-map-card .qf-map-canvas:active { cursor: grabbing; }
 /* The route inline image now also receives the shared feedback transform, so it
-   needs the same transform-origin + compositor hint base mode already had. */
-.qf-map-card .qf-map-img { transform-origin: center center; }
+   needs the same transform-origin + compositor hint base mode already had.
+   `will-change: transform` gets the bitmap onto its own compositor layer BEFORE
+   the first pointermove, so a drag/pinch never pays for a mid-gesture layer
+   promotion (base mode and the modal image already carried this hint; route mode
+   was left out even after it became directly manipulable). One small, static
+   image per card — not a blanket promotion. */
+.qf-map-card .qf-map-img { transform-origin: center center; will-change: transform; }
 /* The expand ⤢ is now THE explicit keyboard / screen-reader path to the full
    zoomable map (the canvas itself is no longer a button), so it gets a real
    button box, a proper focus ring and a 32px tap target on the 8px ramp. */

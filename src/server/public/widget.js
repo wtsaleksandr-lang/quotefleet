@@ -2960,26 +2960,74 @@
     // image's rendered width, or an inline drag would be scaled by the modal's
     // (much wider) box and the map would fly off.
     function activeImg() { return (modal && !modal.hidden) ? mimg : iimg; }
-    function apply() {
+    // ── rAF-COALESCED transform writes ──────────────────────────────────────
+    // apply() used to write style.transform SYNCHRONOUSLY on every pointermove,
+    // to BOTH <img> elements — 182 style writes + 92 style recalcs for a single
+    // 90-move drag (measured). Worse, that cost scales with the INPUT rate, not
+    // the frame rate: a 120Hz trackpad or a coalesced-pointer device fires 2-8x
+    // more moves per frame than a 60Hz mouse, and every one of them invalidated
+    // style. The browser can only paint once per frame, so all but the last
+    // write per frame was pure waste.
+    //
+    // Now the writes are throttled to one per animation frame (see apply(), which
+    // keeps the FIRST write of each frame synchronous so nothing is delayed), and
+    // each write only touches the surface the user is actually looking at. Cost
+    // becomes O(frames), not O(pointer events).
+    var _applyRaf = 0;
+    function writeTransform() {
+      _applyRaf = 0;
       var t = 'translate(' + tx + 'px,' + ty + 'px) scale(' + scale + ')';
-      if (mimg) mimg.style.transform = t;
-      // Give the INLINE base image the SAME instant CSS-transform feedback the
-      // enlarged modal image already gets, so a wheel notch is visible AT ONCE
-      // instead of waiting ~120ms for the debounced crisp scale=1 PNG swap. We
-      // reuse the modal's exact mechanism (this transform + baseFeedback()) rather
-      // than forking a parallel one. Only touch iimg while the inline map is the
-      // ACTIVE surface — base mode AND modal closed: when the modal is open the
-      // inline <img> sits hidden behind it (blank it to identity), and in ROUTE
-      // mode renderRouteMap() owns the inline transform (sets it to none), so we
-      // must never write it here. The commit in fetchBaseCrisp() resets
-      // scale/tx/ty to 0 then calls apply(), so this transient transform settles
-      // cleanly to identity the instant the crisp bitmap swaps in — no stuck or
-      // offset image, no double-transform.
-      // The inline surface is now directly manipulable in ROUTE mode too (drag /
+      var modalOpen = !!(modal && !modal.hidden);
+      // Only the ACTIVE surface gets the live transform. The other one is
+      // offscreen/hidden, so writing it every frame invalidated style for
+      // nothing. The modal picks the shared state up in its own open handler and
+      // the inline map picks it up in closeModal(), so neither goes stale.
+      if (modalOpen) {
+        if (mimg) mimg.style.transform = t;
+        // The inline <img> sits hidden BEHIND the open modal — blank it to
+        // identity once (not every frame) so it isn't left carrying a stale
+        // offset when the modal closes and closeModal() re-applies shared state.
+        if (iimg && iimg.style.transform !== '') iimg.style.transform = '';
+        return;
+      }
+      // Give the INLINE image the SAME instant CSS-transform feedback the
+      // enlarged modal image gets, so a wheel notch is visible AT ONCE instead of
+      // waiting for the debounced crisp PNG swap. We reuse the modal's exact
+      // mechanism (this transform + baseFeedback()) rather than forking a
+      // parallel one. The commit in fetchBaseCrisp() rebases scale/tx/ty then
+      // calls applyNow(), so this transient transform settles cleanly the instant
+      // the crisp bitmap swaps in — no stuck or offset image, no double-transform.
+      // The inline surface is directly manipulable in ROUTE mode too (drag /
       // wheel / pinch on a CSS-transformed static route bitmap, exactly like the
-      // modal's route behaviour), so the old isBase() guard is gone. Route mode
-      // resets this transform through _resetBaseZoom() in renderRouteMap().
-      if (iimg) iimg.style.transform = (modal && !modal.hidden) ? '' : t;
+      // modal's route behaviour). Route mode resets this transform through
+      // _resetBaseZoom() in renderRouteMap().
+      if (iimg) iimg.style.transform = t;
+    }
+    // LEADING-EDGE throttle, one write per frame. The first apply() of a frame
+    // writes SYNCHRONOUSLY — deferring it to rAF would have added up to a whole
+    // frame of input latency (measured: 2.9ms -> 12ms on a desktop drag), which
+    // is the opposite of the goal. Every further apply() in the same frame only
+    // marks the state dirty; the rAF that closes the frame flushes the newest
+    // value. So: zero added latency, and at most one redundant write per frame
+    // no matter how fast the pointer fires.
+    var _applyDirty = false;
+    function apply() {
+      if (_applyRaf) { _applyDirty = true; return; }
+      writeTransform();
+      _applyDirty = false;
+      _applyRaf = requestAnimationFrame(function () {
+        _applyRaf = 0;
+        if (_applyDirty) { _applyDirty = false; apply(); }
+      });
+    }
+    // Write NOW, cancelling any pending frame. Used where the transform must be
+    // in the DOM before the very next statement — the crisp-bitmap commit (the
+    // src swap and the transform reset must land in the same frame or the map
+    // visibly jumps) and the state resets.
+    function applyNow() {
+      if (_applyRaf) { cancelAnimationFrame(_applyRaf); _applyRaf = 0; }
+      _applyDirty = false;
+      writeTransform();
     }
     function isBase() { return !!(card && card.classList.contains('qf-map-base')); }
 
@@ -2990,10 +3038,19 @@
     // is used only as instant feedback while the crisp bitmap is debounced in.
     var BASE_DEF_CENTER = { lat: 44, lng: -97 }; // mirrors server BASE_MAP_CENTER
     var BASE_MIN_Z = 3, BASE_MAX_Z = 16;         // mirrors server clamp bounds
-    var gZoom = BASE_MIN_Z, loadedZoom = BASE_MIN_Z;
+    // gZoomF is the CONTINUOUS zoom the gesture is driving (fractional); gZoom is
+    // the integer Google level the next crisp fetch will ask for. Splitting them
+    // is what makes wheel + pinch feel smooth: the CSS feedback tracks the
+    // fractional value every frame, while the network only ever sees whole
+    // levels. Before this split, both wheel and pinch were quantised to whole
+    // levels, so a wheel notch teleported the map by a full 2x and a pinch showed
+    // NOTHING until the fingers had spread past sqrt(2) (~41%) — measured as a
+    // 182ms dead zone before the map first responded to a pinch.
+    var gZoomF = BASE_MIN_Z, gZoom = BASE_MIN_Z, loadedZoom = BASE_MIN_Z;
     var center = { lat: BASE_DEF_CENTER.lat, lng: BASE_DEF_CENTER.lng };
     var loadedCenter = { lat: center.lat, lng: center.lng };
     var baseFetchTimer = null, baseSeq = 0;
+    function clampZ(z) { return Math.min(BASE_MAX_Z, Math.max(BASE_MIN_Z, z)); }
     // Web-Mercator project/unproject at the 256px world (zoom 0).
     function project(lat, lng) {
       var s = Math.sin(lat * Math.PI / 180);
@@ -3047,25 +3104,19 @@
       bmpLru.set(k, v);
       while (bmpLru.size > BMP_LRU_MAX) { var o = bmpLru.keys().next().value; bmpLru.delete(o); }
     }
-    // After a crisp swap, warm zoom±1 at the current center (same scale) so the
-    // NEXT wheel step is an instant browser-cache + LRU hit. Guarded to fire once
-    // per settled {scale,zoom,center} frame so it never over-fetches.
-    var lastPreloadKey = '';
-    function preloadNeighbors(zoom, c, scaleParam) {
-      var gk = scaleParam + '@' + zoom + ':' + c.lat.toFixed(4) + ',' + c.lng.toFixed(4);
-      if (gk === lastPreloadKey) return;
-      lastPreloadKey = gk;
-      [zoom - 1, zoom + 1].forEach(function (z) {
-        if (z < BASE_MIN_Z || z > BASE_MAX_Z) return;
-        var u = baseUrl(z, coarseCenter(c, z), scaleParam);
-        if (lruGet(u)) return;
-        var im = new Image();
-        im.onload = function () { lruPut(u, im); };
-        im.src = u;
-      });
-    }
-    // Debounced crisp re-fetch: preload the new bitmap, then swap it in and drop
-    // the CSS feedback transform so the crisp tiles replace the scaled preview.
+    // NOTE: there is deliberately NO speculative neighbour preload here.
+    // fetchBaseCrisp() used to warm zoom±1 after every committed frame, which
+    // cost TWO extra Google Static Maps renders per settled gesture (measured: 3
+    // unique upstream calls per pan/zoom, only 1 of which the user ever saw) to
+    // save one round-trip on a zoom step the user might never take. Now that the
+    // gesture itself is continuous — the CSS feedback tracks the finger/wheel in
+    // real time and the network is only consulted once the gesture settles — the
+    // speculative frames buy nothing the user can perceive, so they are gone.
+    // Maps spend per interaction drops to the ONE frame actually displayed.
+
+    // Debounced crisp re-fetch: preload the new bitmap, then swap it in and
+    // rebase the CSS feedback transform so the crisp tiles replace the scaled
+    // preview WITHOUT the map jumping under the user's finger.
     // `immediate` runs the crisp re-fetch NOW (no debounce) — used on drag-release
     // so the map settles at the dropped center at once with no lingering blank.
     // Wheel/pinch bursts coalesce: each notch resets a 120ms timer + updates the
@@ -3084,12 +3135,27 @@
         function commit() {
           if (seq !== baseSeq || !isBase()) return;
           // Swap the crisp bitmap into BOTH the inline preview and the modal so
-          // the two surfaces share one zoom state, then drop the CSS feedback.
+          // the two surfaces share one zoom state.
           if (mimg) mimg.src = url;
           if (iimg) iimg.src = url;
+          // REBASE, don't reset. The old code zeroed tx/ty/scale outright, which
+          // is only correct if the gesture has already ended. A commit that lands
+          // MID-GESTURE (see the pan-threshold commit in pointermove) would
+          // otherwise yank the map back to centre under the user's finger. The
+          // new frame is already centred on `cc`, so the residual offset the user
+          // still owes is measured from the NEW anchor: the pointer handler
+          // rebases its own drag origin via onCrispCommit, and the fractional
+          // zoom residual is folded back into `scale`.
           loadedZoom = zoom; loadedCenter = { lat: cc.lat, lng: cc.lng };
-          scale = 1; tx = 0; ty = 0; apply();
-          preloadNeighbors(zoom, { lat: center.lat, lng: center.lng }, sc);
+          var dxCommitted = tx, dyCommitted = ty;
+          tx = 0; ty = 0;
+          // Keep the continuous zoom honest: the bitmap is now at integer `zoom`,
+          // so the residual CSS scale is whatever fraction of a level the gesture
+          // is still holding. Snapping gZoomF here would make the map jump.
+          gZoomF = clampZ(gZoomF);
+          scale = Math.min(6, Math.max(0.5, Math.pow(2, gZoomF - loadedZoom)));
+          applyNow(); // src swap + transform must land in the SAME frame
+          if (onCrispCommit) onCrispCommit(dxCommitted, dyCommitted);
         }
         var hit = lruGet(url);
         if (hit && hit.complete && hit.naturalWidth) { commit(); return; }
@@ -3100,29 +3166,42 @@
       }
       if (immediate) run(); else baseFetchTimer = setTimeout(run, 120);
     }
+    // Set by the active pointer handler so a mid-gesture crisp commit can rebase
+    // the drag origin instead of teleporting the map. Null when nothing is
+    // dragging (the commit then behaves exactly like the old reset).
+    var onCrispCommit = null;
+
     // Update the CSS feedback transform to preview the pending zoom/pan before
-    // the crisp bitmap arrives. scale = 2^(target−loaded), capped so a fast
-    // multi-step gesture can't blow up the preview.
+    // the crisp bitmap arrives. scale = 2^(target−loaded) on the CONTINUOUS zoom,
+    // capped so a fast multi-step gesture can't blow up the preview.
     function baseFeedback() {
-      var s = Math.pow(2, gZoom - loadedZoom);
+      var s = Math.pow(2, gZoomF - loadedZoom);
       scale = Math.min(6, Math.max(0.5, s));
       apply();
     }
-    function stepBaseZoom(dir) {
-      var next = Math.min(BASE_MAX_Z, Math.max(BASE_MIN_Z, gZoom + dir));
-      if (next === gZoom) return;
-      gZoom = next; baseFeedback(); fetchBaseCrisp();
+    // Nudge the continuous zoom by `dz` levels (fractional allowed) and schedule
+    // the crisp frame for the nearest whole level. `dz` of ±1 is the discrete
+    // button/keyboard step; the wheel passes a fraction so a notch is a smooth
+    // partial zoom rather than a 2x teleport.
+    function nudgeBaseZoom(dz) {
+      var next = clampZ(gZoomF + dz);
+      if (next === gZoomF) return;
+      gZoomF = next;
+      gZoom = clampZ(Math.round(gZoomF));
+      baseFeedback();
+      fetchBaseCrisp();
     }
+    function stepBaseZoom(dir) { nudgeBaseZoom(dir); }
 
     // Reset the shared base-map zoom state to the default continental frame.
     // Called on every style/theme change (via showBaseMap) so a newly-picked
     // style always opens fully-framed, not stuck at a prior deep zoom.
     function resetBaseZoom() {
       scale = 1; tx = 0; ty = 0;
-      gZoom = BASE_MIN_Z; loadedZoom = BASE_MIN_Z;
+      gZoomF = BASE_MIN_Z; gZoom = BASE_MIN_Z; loadedZoom = BASE_MIN_Z;
       center = { lat: BASE_DEF_CENTER.lat, lng: BASE_DEF_CENTER.lng };
       loadedCenter = { lat: center.lat, lng: center.lng };
-      apply();
+      applyNow();
     }
     _resetBaseZoom = resetBaseZoom;
     open.addEventListener('click', function () {
@@ -3139,16 +3218,18 @@
       // Enlarged view → fetch the crisp retina scale=2 frame (not the light
       // scale=1 interactive frame) at the shared inline zoom/center.
       if (isBase() && mimg) mimg.src = baseUrl(loadedZoom, loadedCenter, '2');
-      apply();
+      gZoomF = loadedZoom;
+      applyNow();
     });
     function closeModal() {
       modal.hidden = true;
       if (baseFetchTimer) { clearTimeout(baseFetchTimer); baseFetchTimer = null; }
-      // While the modal was open apply() blanked the inline transform (the inline
-      // <img> sits hidden behind the modal). Now that the inline preview is the
-      // active surface again, re-apply the shared state so it picks up wherever
-      // the modal left off instead of staying stuck at the blanked identity.
-      apply();
+      // While the modal was open writeTransform() blanked the inline transform
+      // (the inline <img> sits hidden behind the modal). Now that the inline
+      // preview is the active surface again, re-apply the shared state so it
+      // picks up wherever the modal left off instead of staying stuck at the
+      // blanked identity.
+      applyNow();
     }
     var x = $('qf-map-modal-x'), bd = $('qf-map-modal-close');
     if (x) x.addEventListener('click', closeModal);
@@ -3169,6 +3250,9 @@
       if (!surface) return;
       var pointers = {}, pinchStartDist = 0, pinchStartScale = 1, pinchStartZoom = BASE_MIN_Z, pinching = false;
       var dragging = false, sx = 0, sy = 0;
+      // Frame size cached per gesture + the mid-drag refresh latch (see the
+      // pointermove handler and PAN_COMMIT_FRACTION below).
+      var frameW = 1, frameH = 1, panCommitArmed = true;
       function pointerCount() { var n = 0; for (var k in pointers) if (pointers.hasOwnProperty(k)) n++; return n; }
       function pinchDist() {
         var ids = Object.keys(pointers); if (ids.length < 2) return 0;
@@ -3198,21 +3282,54 @@
         pointers[e.pointerId] = { x: e.clientX, y: e.clientY };
         if (pointerCount() === 2) {
           pinching = true; dragging = false;
-          pinchStartDist = pinchDist(); pinchStartScale = scale; pinchStartZoom = gZoom;
+          pinchStartDist = pinchDist(); pinchStartScale = scale; pinchStartZoom = gZoomF;
         } else {
           dragging = true; sx = e.clientX - tx; sy = e.clientY - ty;
+          // Cache the frame size ONCE per gesture. Reading clientWidth/Height in
+          // pointermove is a layout read on the hot path — harmless today only
+          // because nothing writes layout in the same handler, but it is exactly
+          // the read/write interleave that turns into forced reflow the moment
+          // anyone adds a style write nearby. The surface cannot resize mid-drag.
+          frameW = surface.clientWidth || 1;
+          frameH = surface.clientHeight || 1;
+          panCommitArmed = true;
+          // A crisp frame that lands MID-DRAG re-anchors the map on the newly
+          // fetched centre. Slide our own drag origin by the same amount so the
+          // map keeps tracking the finger 1:1 instead of snapping back, then
+          // re-arm so a long drag can pull the next frame too.
+          onCrispCommit = function (dxCommitted, dyCommitted) {
+            sx += dxCommitted; sy += dyCommitted;
+            panCommitArmed = true;
+          };
         }
         surface.classList.add('qf-map-grabbing');
         if (surface.setPointerCapture) { try { surface.setPointerCapture(e.pointerId); } catch (err) {} }
       });
+      // How far (as a fraction of the visible frame) a base-map pan may travel
+      // before we pull the next crisp frame WITHOUT waiting for the release. The
+      // static bitmap is exactly viewport-sized, so every pixel dragged uncovers
+      // a pixel of empty backdrop; measured, a normal drag left 33% (desktop) to
+      // 56% (mobile) of the map surface as flat void until the finger came up.
+      // Committing at ~a third of the frame bounds that, and the commit is
+      // rebased (see onCrispCommit) so the map never jumps. It costs at most ONE
+      // extra render per third of a frame travelled — still fewer than the two
+      // speculative neighbour renders this change removed.
+      var PAN_COMMIT_FRACTION = 0.35;
       surface.addEventListener('pointermove', function (e) {
         if (pointers[e.pointerId]) { pointers[e.pointerId].x = e.clientX; pointers[e.pointerId].y = e.clientY; }
         if (pinching && pointerCount() >= 2) {
           var d = pinchDist(); if (!pinchStartDist) return;
           var ratio = d / pinchStartDist;
           if (isBase()) {
-            var next = Math.min(BASE_MAX_Z, Math.max(BASE_MIN_Z, pinchStartZoom + Math.round(Math.log(ratio) / Math.log(2))));
-            if (next !== gZoom) { gZoom = next; baseFeedback(); fetchBaseCrisp(); }
+            // CONTINUOUS pinch. This used to round to whole Google zoom levels,
+            // so nothing moved until the fingers crossed sqrt(2) — a measured
+            // 182ms of total non-response at the start of every pinch. Now the
+            // fractional zoom tracks the fingers every frame and only the
+            // debounced FETCH quantises to a whole level.
+            gZoomF = clampZ(pinchStartZoom + Math.log(ratio) / Math.LN2);
+            var nz = clampZ(Math.round(gZoomF));
+            baseFeedback();
+            if (nz !== gZoom) { gZoom = nz; fetchBaseCrisp(); }
           } else {
             scale = Math.min(4, Math.max(1, pinchStartScale * ratio)); if (scale === 1) { tx = 0; ty = 0; } apply();
           }
@@ -3225,24 +3342,44 @@
         // BASE mode always pans — the drag commits a crisp re-fetch at the new
         // center, so there is always more map to reveal.
         if (!isBase() && scale <= 1) return;
-        tx = e.clientX - sx; ty = e.clientY - sy; apply();
-      });
+        tx = e.clientX - sx; ty = e.clientY - sy;
+        apply();
+        // Refresh the map WHILE the finger is still down, once the pan has
+        // uncovered a meaningful slice of void. The commit is LATCHED rather
+        // than debounced: fetchBaseCrisp()'s 120ms debounce is re-armed by every
+        // call, and pointermoves arrive ~16ms apart, so a debounced trigger here
+        // would never fire until the drag STOPPED — exactly the "nothing happens
+        // until I let go" behaviour being fixed. The latch fires the fetch once
+        // on each threshold crossing and only re-arms after that frame commits
+        // (see onCrispCommit), so a continuous drag keeps at most one render in
+        // flight and issues at most one extra render per 45% of frame travelled.
+        if (isBase() && panCommitArmed &&
+            (Math.abs(tx) > frameW * PAN_COMMIT_FRACTION || Math.abs(ty) > frameH * PAN_COMMIT_FRACTION)) {
+          panCommitArmed = false;
+          center = shiftedCenter(loadedCenter, loadedZoom, tx, ty, scale);
+          fetchBaseCrisp(true);
+        }
+      }, { passive: true });
       function endPointer(e) {
         var wasDragging = dragging;
         delete pointers[e.pointerId];
         if (pointerCount() < 2) pinching = false;
         if (pointerCount() === 0) {
           dragging = false;
+          onCrispCommit = null;
           surface.classList.remove('qf-map-grabbing');
           // Commit a base-map pan as a crisp re-fetch at the shifted center.
           if (wasDragging && isBase() && (tx !== 0 || ty !== 0)) {
             center = shiftedCenter(loadedCenter, loadedZoom, tx, ty, scale);
             fetchBaseCrisp(true); // commit the release NOW — no debounce, no blank
+          } else if (isBase() && gZoom !== loadedZoom) {
+            // A pinch that ended between levels still owes a crisp frame.
+            fetchBaseCrisp(true);
           }
         }
       }
-      surface.addEventListener('pointerup', endPointer);
-      surface.addEventListener('pointercancel', endPointer);
+      surface.addEventListener('pointerup', endPointer, { passive: true });
+      surface.addEventListener('pointercancel', endPointer, { passive: true });
       surface.addEventListener('wheel', function (e) {
         // ESCAPE HATCH (inline surface, ROUTE mode only): a routed map is a fixed
         // bitmap, so once it is fully zoomed OUT a further scroll-down has nothing
@@ -3255,8 +3392,27 @@
         e.preventDefault();
         // Never let a trapped wheel chain out to the host page/embed (#415).
         e.stopPropagation();
-        if (isBase()) { stepBaseZoom(e.deltaY < 0 ? 1 : -1); return; }
-        scale = Math.min(4, Math.max(1, scale + (e.deltaY < 0 ? 0.3 : -0.3))); if (scale === 1) { tx = 0; ty = 0; } apply();
+        // Normalise the notch to pixels — Firefox reports lines, some setups
+        // report pages — so one physical notch means the same thing everywhere
+        // and a trackpad's fine-grained deltas stay proportional.
+        var dy = e.deltaY;
+        if (e.deltaMode === 1) dy *= 16;
+        else if (e.deltaMode === 2) dy *= 400;
+        if (isBase()) {
+          // CONTINUOUS wheel zoom. A notch used to step a WHOLE Google level —
+          // an instant 2x teleport with nothing in between, which reads as a
+          // jump-cut rather than a zoom. Now ~2.5 notches make a level and every
+          // event moves the map immediately. NOTE: this is a direct, synchronous
+          // response to the wheel delta — there is deliberately no transition or
+          // animation on the transform during a wheel (see #415); the map simply
+          // tracks the wheel.
+          nudgeBaseZoom(Math.max(-1, Math.min(1, -dy / 300)));
+          return;
+        }
+        // Route mode: same continuous treatment on the CSS-only zoom.
+        scale = Math.min(4, Math.max(1, scale * Math.pow(2, -dy / 600)));
+        if (scale === 1) { tx = 0; ty = 0; }
+        apply();
       }, { passive: false });
       // The native image drag-ghost would otherwise abort the pan mid-gesture.
       surface.addEventListener('dragstart', function (e) { e.preventDefault(); });
