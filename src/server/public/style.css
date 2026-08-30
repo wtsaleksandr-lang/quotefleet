@@ -1638,3 +1638,19 @@ html[data-theme="light"] .site-footer strong { color: var(--ink); }
     gap: var(--space-1);
   }
 }
+
+/* ══ Payment PROCESSOR attribution ═══════════════════════════════════════════
+   "Powered by Stripe", sitting under the accepted-payment marks. Every mark in
+   that row IS Stripe (Link is Stripe's own wallet), so without this line the
+   processor is invisible and a reader reasonably asks where Stripe went. Plain
+   text in the strip's own monochrome treatment — no wordmark, no brand colour,
+   no external asset — and the same --muted tone as the trust badges beside it.
+   Carries the same specificity-3 !important as its neighbours because the
+   public-pages skin ships blanket overrides on this subtree. */
+.qf-footer-payrow .qf-payrow-methods .qf-payrow-proc {
+  font-size: 11.5px;
+  line-height: 1.5;
+  letter-spacing: .02em;
+  color: var(--muted) !important;
+  white-space: nowrap;
+}
