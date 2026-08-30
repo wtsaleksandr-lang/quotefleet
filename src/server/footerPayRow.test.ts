@@ -21,7 +21,7 @@
 import { readFile } from 'node:fs/promises';
 import { resolve } from 'node:path';
 import { describe, expect, it } from 'vitest';
-import { FOOTER_PAY_ROW, PREMIUM_FOOTER } from './siteChrome.js';
+import { DIRECTORY_DATA_SOURCES, FOOTER_PAY_ROW, PREMIUM_FOOTER } from './siteChrome.js';
 
 const publicDir = resolve(process.cwd(), 'src/server/public');
 const srcDir = resolve(process.cwd(), 'src/server');
@@ -89,5 +89,110 @@ describe('footer accepted-payment + trust strip', () => {
     expect(css).toMatch(/\.qf-paymark \.qf-pm\s*\{[^}]*fill:\s*currentColor/);
     // The marks must never wrap — a wrapped 5-up row orphans one mark alone.
     expect(css).toMatch(/\.qf-paymarks\s*\{[^}]*flex-wrap:\s*nowrap/);
+  });
+
+  it('names Stripe as the processor, since every mark shown IS Stripe', async () => {
+    // Visa/MC/Amex ride `card`, Apple Pay rides `card` via the PMC, and Link is
+    // Stripe's own wallet — without this line the processor is invisible and the
+    // row reads as if Stripe were a missing option rather than the whole row.
+    expect(FOOTER_PAY_ROW).toContain('Powered by Stripe');
+    expect(FOOTER_PAY_ROW).toContain('class="qf-payrow-proc"');
+    // Text only — a Stripe wordmark/logo would be a brand asset, and the strip
+    // is specified as monochrome inline markup with no external requests.
+    expect(FOOTER_PAY_ROW).not.toMatch(/<img/);
+    const landing = await readFile(resolve(publicDir, 'landing.html'), 'utf8');
+    expect(landing).toContain('Powered by Stripe');
+  });
+});
+
+/**
+ * DATA-SOURCE ATTRIBUTION strip (siteChrome.ts#DIRECTORY_DATA_SOURCES).
+ *
+ * This is an honest-claims surface twice over: it must not imply a federal
+ * endorsement (no seals, an explicit non-affiliation line), and it must not name
+ * an organisation whose data we do not actually ingest. Every source asserted
+ * below was traced to ingest code; every name asserted ABSENT was traced to
+ * either "outbound link only" or "different product surface".
+ */
+describe('directory data-source attribution strip', () => {
+  it('names only sources the directory ingest code actually reads', async () => {
+    for (const src of [
+      'FMCSA Company Census (MCS-150)', // Socrata az4n-8mr2, carrierIngest.ts
+      'FMCSA Licensing &amp; Insurance (L&amp;I)', // Socrata 6eyk-hxee, carrierIngest.ts
+      'FMCSA QCMobile', // mobile.fmcsa.dot.gov, fmcsaLookup.ts
+      'USDOT Open Data Portal (data.transportation.gov)',
+      'U.S. Census Bureau 2020 Gazetteer', // zip5Centroids.ts → containerPorts.ts
+    ]) {
+      expect(DIRECTORY_DATA_SOURCES).toContain(src);
+    }
+    // The ingest is real: these resource ids must still be the ones we page.
+    const ingest = await readFile(resolve(srcDir, 'directory/carrierIngest.ts'), 'utf8');
+    expect(ingest).toContain('az4n-8mr2');
+    expect(ingest).toContain('6eyk-hxee');
+    expect(ingest).toContain('https://data.transportation.gov/resource');
+    const lookup = await readFile(resolve(srcDir, 'directory/fmcsaLookup.ts'), 'utf8');
+    expect(lookup).toContain('https://mobile.fmcsa.dot.gov/qc/services/carriers');
+  });
+
+  it('never names an organisation we do not ingest for the directory', () => {
+    for (const absent of [
+      'SAFER', // linked out for users; never read as a feed
+      'SMS', // FMCSA BASIC scores — outbound link card only
+      'UIIA', // carrier SELF-DECLARED badge, not a source
+      'TWIC',
+      'TSA',
+      'MCDOT', // no state-DOT integration exists anywhere in this repo
+      'Caltrans',
+      'CBP', // ImportYeti manifest data — /importers only, never /directory
+      'Customs',
+      'ImportYeti',
+      'Hunter',
+      'Apollo',
+      'Google',
+    ]) {
+      expect(DIRECTORY_DATA_SOURCES).not.toContain(absent);
+    }
+  });
+
+  it('reads as attribution, not as accreditation', () => {
+    expect(DIRECTORY_DATA_SOURCES).toContain('Directory data sources');
+    expect(DIRECTORY_DATA_SOURCES).toContain('not affiliated with, endorsed by, or certified by');
+    for (const forbidden of [
+      'Approved', 'Accredited', 'Official', 'Partner', 'Verified by', 'Authorized',
+    ]) {
+      expect(DIRECTORY_DATA_SOURCES).not.toContain(forbidden);
+    }
+  });
+
+  it('uses no agency seal, no brand colour and no external asset', async () => {
+    // A federal seal implies endorsement, which is exactly what we must not
+    // claim — so every glyph is a generic monochrome shape on currentColor.
+    expect(DIRECTORY_DATA_SOURCES).not.toMatch(/<img/);
+    expect(DIRECTORY_DATA_SOURCES).not.toMatch(/https?:\/\//);
+    expect(DIRECTORY_DATA_SOURCES).not.toMatch(/#[0-9a-fA-F]{3,8}\b/);
+    expect(DIRECTORY_DATA_SOURCES).not.toMatch(/(?:fill|stroke)="(?!currentColor|none)[^"]+"/);
+    expect(DIRECTORY_DATA_SOURCES).not.toMatch(/\bseal\b|\blogo\b/i);
+
+    const css = await readFile(resolve(publicDir, 'style.css'), 'utf8');
+    // FIVE badges: the column counts must be explicit, never auto-fit, or a
+    // 4-track row would strand the fifth alone (the no-orphan rule).
+    expect(css).toMatch(/\.qf-ds-list\s*\{[^}]*grid-template-columns:\s*repeat\(5,/);
+    expect(css).not.toMatch(/\.qf-ds-list\s*\{[^}]*auto-fit/);
+  });
+
+  it('renders on FMCSA-backed surfaces and NOT on the importer/manifest ones', async () => {
+    // Gated in directory/pages.ts#rendersCarrierData — /importers is served by
+    // the same shell but its data comes from a licensed CBP-manifest provider,
+    // so an FMCSA attribution there would be false.
+    const dir = await readFile(resolve(srcDir, 'directory/pages.ts'), 'utf8');
+    expect(dir).toContain('rendersCarrierData');
+    expect(dir).toContain('DIRECTORY_DATA_SOURCES');
+    const { rendersCarrierDataForTest } = await import('./directory/pages.js');
+    for (const p of ['/directory', '/directory/california', '/compliance', '/drayage-rates', '/services/reefer', '/guides']) {
+      expect(rendersCarrierDataForTest(p)).toBe(true);
+    }
+    for (const p of ['/importers', '/importers/saved', '/manifest-privacy', '/glossary']) {
+      expect(rendersCarrierDataForTest(p)).toBe(false);
+    }
   });
 });
