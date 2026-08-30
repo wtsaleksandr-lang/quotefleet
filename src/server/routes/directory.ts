@@ -27,6 +27,7 @@ import {
   carrierBySlug,
   carriersByCity,
   citiesForState,
+  allCitiesForState,
   cityDisplayName,
   cityCarrierCount,
   stateCarrierCount,
@@ -54,6 +55,12 @@ import {
   renderDirectoryPageOutOfRange,
   renderCompliancePage,
   renderDirectoryJoin,
+  renderStateCityIndex,
+  cityIndexPageCount,
+  cityIndexPath,
+  CITY_INDEX_PER_PAGE,
+  DIRECTORY_CSS,
+  DIRECTORY_CSS_HREF,
 } from '../directory/pages.js';
 import { publicAutocompleteLimiter, publicCalcLimiter, directorySearchLimiter } from '../rateLimits.js';
 import { directoryIdentity } from '../directory/entitlement.js';
@@ -83,6 +90,49 @@ function rejectOutOfRangePage(req: Request, res: Response, backPath = '/director
   return true;
 }
 
+/**
+ * Merge a clean-path `/page/N` segment into the query bag the filter parser reads.
+ *
+ * The hub listings are now reachable at BOTH `{hub}?page=N` (unchanged, for
+ * humans and back-compat) and `{hub}/page/N` (new, crawlable). Everything
+ * downstream — normalizeFilters, listCarriers, the pager — still speaks
+ * `query.page`, so the path form is normalised here and nothing else changes.
+ *
+ * WHY THE PATH FORM EXISTS: robots.txt line 24 disallows `/*?*page=`, so the
+ * query pager was invisible to Googlebot and every hub was frozen at its first
+ * 24 carriers. 66.77% of carriers (220,479 of 330,218) sit in cities with more
+ * than 24 carriers, i.e. past page 1 with no crawlable route to them.
+ */
+function withPathPage(req: Request): Record<string, unknown> {
+  const q = { ...(req.query as Record<string, unknown>) };
+  if (req.params.page != null) q.page = String(req.params.page);
+  return q;
+}
+
+/**
+ * Guard the clean `/page/N` form. Returns true when it has already answered.
+ *
+ * `/page/1` and any non-numeric or out-of-range N are duplicates or dead URLs,
+ * so they 301 to the bare hub (one canonical page-1 URL) or 404 rather than
+ * silently render another address for content that already has one.
+ */
+function rejectBadPathPage(req: Request, res: Response, hubPath: string): boolean {
+  const raw = req.params.page;
+  if (raw == null) return false;
+  const text = String(raw);
+  if (!/^[1-9][0-9]*$/.test(text) || text === '1') {
+    res.redirect(301, hubPath);
+    return true;
+  }
+  if (parseInt(text, 10) > MAX_PAGE) {
+    setNoStore(res);
+    res.setHeader('X-Robots-Tag', 'noindex');
+    res.status(404).type('html').send(renderDirectoryPageOutOfRange(MAX_PAGE, hubPath));
+    return true;
+  }
+  return false;
+}
+
 /** True when /directory carries any facet param (→ render results, not landing). */
 const hasFacetParams = (q: Record<string, unknown>): boolean =>
   FACET_QUERY_KEYS.some((k) => q[k] != null && String(q[k]).trim() !== '');
@@ -106,6 +156,24 @@ function sendSitemapXml(res: Response, xml: string): void {
 }
 
 export function registerDirectoryRoutes(app: Express) {
+  // ── Directory stylesheet, content-hashed + immutable ─────────────────────
+  // Was a 68,058-byte <style> block inlined into every one of the ~355k
+  // directory URLs — byte-identical on all of them, and 59% of a carrier
+  // profile's ~115 KB. Inline CSS cannot be cached across URLs, so Googlebot
+  // re-downloaded it 330k times (~22 GB of the ~37 GB needed to crawl the
+  // carrier set). Crawl budget is spent in bytes, and crawl rate is this
+  // site's binding constraint, so serving it ONCE is the single biggest
+  // crawl-throughput win available. See pages.ts DIRECTORY_CSS_HREF.
+  //
+  // Registered before express.static so no file can shadow it. The filename
+  // carries the content hash, so `immutable` is safe: changed CSS = changed
+  // URL, and no visitor can be pinned to a stale bundle.
+  app.get(DIRECTORY_CSS_HREF, (_req: Request, res: Response) => {
+    res.type('text/css');
+    res.setHeader('Cache-Control', 'public, max-age=31536000, immutable');
+    res.send(DIRECTORY_CSS);
+  });
+
   // ── IndexNow ownership proof: /<key>.txt ─────────────────────────────────
   // The protocol requires a text file at the site root whose ENTIRE body is the
   // key; without it every submission is rejected 403. The handler + its route
@@ -267,7 +335,7 @@ export function registerDirectoryRoutes(app: Express) {
   // ports are ONE display hub: a request for a member slug (or any non-canonical
   // code) 301-redirects to the group's canonical slug so there's no link rot.
   app.get(
-    '/directory/port/:port',
+    ['/directory/port/:port', '/directory/port/:port/page/:page'],
     publicAutocompleteLimiter,
     directorySearchLimiter,
     async (req: Request, res: Response, next) => {
@@ -277,11 +345,17 @@ export function registerDirectoryRoutes(app: Express) {
         if (!group) return res.redirect(302, '/directory');
         if (code !== group.code) {
           const qs = req.originalUrl.includes('?') ? req.originalUrl.slice(req.originalUrl.indexOf('?')) : '';
-          return res.redirect(301, `/directory/port/${group.code}${qs}`);
+          // Carry the /page/N segment through the canonicalising redirect. Without
+          // it, `/directory/port/USLAX/page/2` landed on page 1 of the LA/LB hub —
+          // a redirect that silently drops the deep page is exactly the kind of
+          // severed crawl path this work exists to remove.
+          const pageSeg = req.params.page != null ? `/page/${encodeURIComponent(String(req.params.page))}` : '';
+          return res.redirect(301, `/directory/port/${group.code}${pageSeg}${qs}`);
         }
+        if (rejectBadPathPage(req, res, `/directory/port/${group.code}`)) return;
         if (rejectOutOfRangePage(req, res, `/directory/port/${group.code}`)) return;
         const port = portGroupAsPort(group);
-        const filters = normalizeFilters(req.query as Record<string, unknown>, { port: group.code, state: null, citySlug: null });
+        const filters = normalizeFilters(withPathPage(req), { port: group.code, state: null, citySlug: null });
         const [list, counts] = await Promise.all([listCarriers({ filters }), getFacetCounts(filters)]);
         setPublicDirectoryCache(req, res);
         res.type('html').send(renderPortPage({ port, list, counts, filters }));
@@ -326,9 +400,55 @@ export function registerDirectoryRoutes(app: Express) {
     }
   });
 
+  // ── Complete city index: /directory/{state}/cities[/page/N] ──────────────
+  // Registered BEFORE /directory/:stateSlug/:citySlug so "cities" is never
+  // mistaken for a city slug.
+  //
+  // WHY IT EXISTS (measured 2026-08-29): sitemap-cities.xml advertises all
+  // 24,728 US city hubs, but the ONLY internal links to city hubs came from the
+  // top-24 cards on the state and city pages — 1,296 hubs linked, ~23,400
+  // orphaned. Since a city hub is the only route to the 24 carriers on its first
+  // page, that orphaning cascaded: the transitive closure of the link graph from
+  // `/` reached ~32,600 of 330,218 carrier profiles (9.2%), and Google answered
+  // the other 91% with "Discovered – currently not indexed", lastCrawl NEVER.
+  // This index makes every city hub reachable in 3 clicks from the homepage.
+  app.get(
+    ['/directory/:stateSlug/cities', '/directory/:stateSlug/cities/page/:page'],
+    publicAutocompleteLimiter,
+    directorySearchLimiter,
+    async (req: Request, res: Response, next) => {
+      try {
+        const state = stateBySlug(String(req.params.stateSlug));
+        if (!state) return res.redirect(302, '/directory');
+        const all = await allCitiesForState(state.code);
+        const totalPages = cityIndexPageCount(all.length);
+        // `/page/1` is a duplicate of the bare path — 301 rather than serve it,
+        // so the series has exactly one URL per page of content.
+        const raw = req.params.page;
+        if (raw != null && !/^[1-9][0-9]*$/.test(String(raw))) {
+          return res.redirect(301, cityIndexPath(state.slug, 1));
+        }
+        const page = raw == null ? 1 : parseInt(String(raw), 10);
+        if (page === 1 && raw != null) return res.redirect(301, cityIndexPath(state.slug, 1));
+        // Past the end of the series is a genuine 404, not a silently-clamped
+        // duplicate — the same rule the ?page= guard already applies.
+        if (page > totalPages) {
+          setNoStore(res);
+          res.setHeader('X-Robots-Tag', 'noindex');
+          return res.status(404).type('html').send(renderDirectoryPageOutOfRange(totalPages, cityIndexPath(state.slug, 1)));
+        }
+        const slice = all.slice((page - 1) * CITY_INDEX_PER_PAGE, page * CITY_INDEX_PER_PAGE);
+        setPublicDirectoryCache(req, res);
+        res.type('html').send(renderStateCityIndex({ state, cities: slice, page, totalCities: all.length }));
+      } catch (err) {
+        next(err);
+      }
+    },
+  );
+
   // City tier (registered BEFORE :stateSlug; port/carrier already win above).
   app.get(
-    '/directory/:stateSlug/:citySlug',
+    ['/directory/:stateSlug/:citySlug', '/directory/:stateSlug/:citySlug/page/:page'],
     publicAutocompleteLimiter,
     directorySearchLimiter,
     async (req: Request, res: Response, next) => {
@@ -337,8 +457,9 @@ export function registerDirectoryRoutes(app: Express) {
       if (!state) return res.redirect(302, '/directory');
       const citySlug = citySlugify(String(req.params.citySlug));
       if (!citySlug) return res.redirect(302, `/directory/${state.slug}`);
+      if (rejectBadPathPage(req, res, `/directory/${state.slug}/${citySlug}`)) return;
       if (rejectOutOfRangePage(req, res, `/directory/${state.slug}/${citySlug}`)) return;
-      const filters = normalizeFilters(req.query as Record<string, unknown>, {
+      const filters = normalizeFilters(withPathPage(req), {
         state: state.code,
         citySlug,
         port: null,
@@ -373,15 +494,16 @@ export function registerDirectoryRoutes(app: Express) {
 
   // State page.
   app.get(
-    '/directory/:stateSlug',
+    ['/directory/:stateSlug', '/directory/:stateSlug/page/:page'],
     publicAutocompleteLimiter,
     directorySearchLimiter,
     async (req: Request, res: Response, next) => {
       try {
         const state = stateBySlug(String(req.params.stateSlug));
         if (!state) return res.redirect(302, '/directory');
+        if (rejectBadPathPage(req, res, `/directory/${state.slug}`)) return;
         if (rejectOutOfRangePage(req, res, `/directory/${state.slug}`)) return;
-        const filters = normalizeFilters(req.query as Record<string, unknown>, {
+        const filters = normalizeFilters(withPathPage(req), {
           state: state.code,
           port: null,
           citySlug: null,

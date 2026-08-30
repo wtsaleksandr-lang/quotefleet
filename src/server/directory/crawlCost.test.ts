@@ -339,7 +339,10 @@ describe('parsePageParam — the OFFSET bound', () => {
   });
 
   it('flags anything past the cap and clamps it', () => {
-    for (const v of ['101', '13917', '5000000', '99999999999999999999']) {
+    // Derived from MAX_PAGE, not hardcoded: the cap moved 100 -> 200 when hub
+    // pagination gained a crawlable path form and had to clear the largest city
+    // group in prod (Houston TX, 3,501 carriers = 146 pages). See MAX_PAGE.
+    for (const v of [String(MAX_PAGE + 1), '13917', '5000000', '99999999999999999999']) {
       const got = parsePageParam(v);
       expect(got.outOfRange).toBe(true);
       expect(got.page).toBe(MAX_PAGE);
@@ -353,7 +356,18 @@ describe('parsePageParam — the OFFSET bound', () => {
   it('caps the OFFSET a request can reach to a bounded number of rows', () => {
     // (MAX_PAGE - 1) * MAX_PER_PAGE. Prod EXPLAIN: OFFSET 333,696 cost 57,014.96
     // vs OFFSET 2,376 cost 500.57 — this is the whole point of the cap.
-    expect((MAX_PAGE - 1) * 50).toBeLessThanOrEqual(5000);
+    //
+    // The ceiling is 10,000 rows rather than 5,000 because MAX_PAGE moved
+    // 100 -> 200: the pager now has a crawlable PATH form (robots.txt disallows
+    // ?page=, so the old pager was invisible to Google and froze every hub at 24
+    // carriers), and city hubs are the surface that must enumerate the whole
+    // directory. Measured on prod: a cap of 100 stranded 1,793 carriers past
+    // rank 2,400 in just two cities; a cap of 200 strands zero, with ~37%
+    // headroom. Cost scales linearly, so this is ~1,000 — still 57x below the
+    // unbounded case that motivated the cap.
+    expect((MAX_PAGE - 1) * 50).toBeLessThanOrEqual(10_000);
+    // …and the cap must stay FAR below the unbounded end of the table.
+    expect((MAX_PAGE - 1) * 50).toBeLessThan(330_218 / 10);
   });
 });
 

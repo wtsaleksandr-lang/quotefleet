@@ -40,6 +40,7 @@ import {
   citySlugify,
   titleCaseCity,
 } from './queries.js';
+import { createHash } from 'node:crypto';
 import { US_STATES, stateByCode, type UsState } from './usStates.js';
 import { CONTAINER_PORTS, portByCode, PORT_GROUPS, portGroupForMemberCode, type ContainerPort } from './containerPorts.js';
 import { CA_PROVINCE_CODES } from './caProvinces.js';
@@ -343,7 +344,10 @@ function fmtDataAsOf(d?: Date | null): string {
 }
 
 // ─── Shared page shell ────────────────────────────────────────────────────
-const DIRECTORY_CSS = `
+/** Exported so routes/directory.ts can serve it as ONE cacheable, content-hashed
+ *  file instead of inlining 68 KB into all ~355k directory pages. See
+ *  DIRECTORY_CSS_HREF below for the measurement that motivated this. */
+export const DIRECTORY_CSS = `
   .dir-shell { max-width: 1100px; margin: 0 auto; padding: 28px; }
   /* Left-align the hero — the shared marketing .hero centers text; directory
      pages must read as a left-aligned page/company card, never centered. */
@@ -1178,7 +1182,80 @@ const DIRECTORY_CSS = `
        bar): auto width, no bottom margin, squared to match the sort control. */
     .rt-main .rail-toggle { display: inline-flex; width: auto; margin: 0; }
   }
+
+  /* Complete city index (/directory/{state}/cities) — a dense A-Z link list.
+     Appended at the END of DIRECTORY_CSS on purpose: the spacing/colour guards
+     are line-based, so inserting mid-file renumbers every later baseline. */
+  .ci-grp { margin: 0 0 18px; }
+  .ci-grp:last-child { margin-bottom: 0; }
+  .ci-ltr {
+    font-family: var(--font-mono);
+    font-size: 13px;
+    font-weight: 600;
+    color: var(--muted);
+    margin: 0 0 8px;
+    padding-bottom: 6px;
+    border-bottom: 1px solid var(--border);
+  }
+  .ci-grp .dir-chip { font-size: 13px; }
+  .ci-grp .dir-chip .muted-small { margin-left: 6px; opacity: 0.7; }
+
+  /* Decade jump links under the numbered pager on long hub series. Keeps every
+     page of a 146-page city hub within two hops of page 1. */
+  .dir-pagejumps {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+    margin: 10px 0 8px;
+  }
+  .dir-pagejumps a {
+    font-family: var(--font-mono);
+    font-size: 12px;
+    color: var(--muted);
+    text-decoration: none;
+    padding: 2px 6px;
+    border-radius: 6px;
+  }
+  .dir-pagejumps a:hover { color: var(--text); background: var(--surface-2); }
 `;
+
+/**
+ * DIRECTORY_CSS AS AN EXTERNAL, CONTENT-HASHED, IMMUTABLE STYLESHEET.
+ *
+ * MEASURED PROBLEM (Search Console + live fetches, 2026-08-29): every directory
+ * page inlined this block in a <style> tag. It is 68,058 bytes and BYTE-IDENTICAL
+ * on every page (verified: same SHA-256 across three sampled carrier profiles), so
+ * it was 59% of a ~115 KB carrier profile — and ~95% of each page was boilerplate
+ * CSS + JS with only ~5 KB of per-carrier markup.
+ *
+ * Inline CSS cannot be cached across URLs. Googlebot therefore re-downloaded the
+ * same 68 KB on every one of the ~330k carrier profiles: ~22 GB of the ~37 GB
+ * needed to crawl the carrier set. Crawl budget is spent in BYTES and TIME as much
+ * as in requests, and this site's binding constraint is crawl rate (URL Inspection
+ * on 5 unindexed carriers: "Discovered – currently not indexed", lastCrawl NEVER,
+ * while discovery is 100% solved). Serving it once as a cacheable file cuts crawl
+ * bytes for the whole directory by ~60%.
+ *
+ * WHY CONTENT-HASHED + `immutable` RATHER THAN THE express.static DEFAULT: the
+ * static mount deliberately sets `Cache-Control: no-cache` on .css because those
+ * filenames are NOT content-hashed, so a positive TTL would pin visitors to a
+ * stale bundle after a deploy (see app.ts). That reasoning does not apply here —
+ * the hash IS the filename, so a changed stylesheet is a changed URL and can be
+ * cached for a year with no staleness risk. A crawler fetches it once for the
+ * entire directory instead of revalidating 330k times.
+ *
+ * USER-FACING EFFECT IS A NET WIN, NOT A TRADE: the HTML each visitor downloads
+ * drops ~68 KB (115 KB → ~47 KB), and the stylesheet is fetched once and reused
+ * across every subsequent directory page. The page already loads /style.css and
+ * /nav-unify.css from the same origin, so this adds no NEW connection and is
+ * multiplexed alongside them.
+ */
+export const DIRECTORY_CSS_HASH = createHash('sha256').update(DIRECTORY_CSS).digest('hex').slice(0, 16);
+
+/** The immutable href for DIRECTORY_CSS. Changes only when the CSS changes. */
+export const DIRECTORY_CSS_HREF = `/assets/directory-${DIRECTORY_CSS_HASH}.css`;
 
 /**
  * Progressive-enhancement for the results action bar. No-JS renders links that
@@ -1354,7 +1431,7 @@ export function layout({ title, description, canonicalPath, bodyHtml, jsonLd, re
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="/style.css">
   <link rel="stylesheet" href="/nav-unify.css">
-  <style>${DIRECTORY_CSS}</style>
+  <link rel="stylesheet" href="${DIRECTORY_CSS_HREF}">
   <link rel="icon" href="/favicon.ico" sizes="any">
   <link rel="icon" type="image/png" sizes="32x32" href="/brand/favicon-32.png">
   <link rel="icon" type="image/png" sizes="16x16" href="/brand/favicon-16.png">
@@ -1656,6 +1733,46 @@ interface FacetScope {
   state?: UsState;
   port?: ContainerPort;
   city?: { name: string; slug: string };
+  /**
+   * True when this scope has a crawlable PATH form of pagination
+   * (`{basePath}/page/N`) in addition to `?page=N`.
+   *
+   * MEASURED REASON THIS EXISTS: robots.txt line 24 is `Disallow: /*?*page=`,
+   * so every `?page=2` link the pager emitted was invisible to Googlebot. Each
+   * hub was therefore frozen at its first 24 carriers (DEFAULT_PER_PAGE), and
+   * 66.77% of carriers (220,479 of 330,218) live in a city with MORE than 24 —
+   * i.e. past page 1, with no crawlable route to them at all. Combined with the
+   * city-hub orphaning this left ~91% of carrier profiles unreachable from `/`,
+   * which is exactly the "Discovered – currently not indexed / lastCrawl NEVER"
+   * state Search Console reports.
+   *
+   * The path form is offered ONLY for the unfiltered hub series. A FACETED view
+   * keeps the query pager: those combinations are a ~1.9e11 URL space that
+   * robots.txt blocks on purpose, and minting clean paths for them would undo
+   * that. Pagination of a clean hub is a legitimate, bounded, non-duplicate
+   * series; faceted pagination is not.
+   */
+  pagePaths?: boolean;
+}
+
+/** True when no facet is active in this scope — i.e. the plain hub listing, the
+ *  one series we want crawled. Sort/page are not facets for this purpose: `page`
+ *  is handled separately and a non-default `sort` DOES count as a facet. */
+function isUnfilteredHub(f: DirectoryFilters, locked: Set<string>): boolean {
+  return Object.keys(currentParams(f, locked)).length === 0;
+}
+
+/** The clean, crawlable path for page N of an unfiltered hub series. Page 1 is
+ *  the bare hub path so the series never has a `/page/1` duplicate. */
+export function hubPagePath(basePath: string, page: number): string {
+  return page > 1 ? `${basePath}/page/${page}` : basePath;
+}
+
+/** Href for page N in this scope: the crawlable path when the hub is unfiltered
+ *  and supports it, otherwise the (robots-blocked) query form. */
+function pageHref(scope: FacetScope, f: DirectoryFilters, page: number): string {
+  if (scope.pagePaths && isUnfilteredHub(f, scope.locked)) return hubPagePath(scope.basePath, page);
+  return hrefWith(scope, f, { page: page > 1 ? String(page) : null }, { keepPage: false });
 }
 
 /** Active facet dims serialized as query params (respecting path-locked dims). */
@@ -2133,7 +2250,7 @@ function numberedPager(scope: FacetScope, f: DirectoryFilters, list: CarrierList
   const cur = list.page;
   const last = list.totalPages;
   const link = (p: number, label?: string, cls = '') =>
-    `<a class="${cls}" href="${hrefWith(scope, f, { page: p > 1 ? String(p) : null }, { keepPage: false })}">${esc(label ?? String(p))}</a>`;
+    `<a class="${cls}" href="${esc(pageHref(scope, f, p))}">${esc(label ?? String(p))}</a>`;
   const nums: Array<number | '…'> = [];
   const push = (p: number) => nums.push(p);
   push(1);
@@ -2146,11 +2263,40 @@ function numberedPager(scope: FacetScope, f: DirectoryFilters, list: CarrierList
   const body = nums
     .map((n) => (n === '…' ? '<span class="gap">…</span>' : n === cur ? `<span class="cur">${n}</span>` : link(n)))
     .join('\n');
+
+  /**
+   * DEPTH JUMPS — every 10th page, on long UNFILTERED hub series only.
+   *
+   * The window above is ±2 pages, so on Houston's 146-page city hub, page 73 sat
+   * ~18 link hops from page 1. Crawlers discount pages by depth, and a 146-page
+   * chain is exactly the shape that never gets walked to the end — the same
+   * class of defect as the orphaned city hubs this work exists to fix.
+   *
+   * Linking every 10th page bounds the whole series at TWO hops from page 1
+   * (page 1 → nearest decade anchor → any page within 5 of it), for ~15 extra
+   * links on the largest hub in prod. Restricted to the path-paginated
+   * unfiltered series so this never mints jump links into the robots-blocked
+   * facet space.
+   */
+  const jumps =
+    scope.pagePaths && isUnfilteredHub(f, scope.locked) && last > 12
+      ? (() => {
+          const decades: number[] = [];
+          for (let p = 10; p < last; p += 10) if (Math.abs(p - cur) > 2) decades.push(p);
+          return decades.length
+            ? `<nav class="dir-pagejumps" aria-label="Jump to page">
+                <span class="muted-small">Jump to</span>
+                ${decades.map((p) => link(p)).join('\n')}
+              </nav>`
+            : '';
+        })()
+      : '';
+
   return `<nav class="dir-pagenums" aria-label="Pagination">
     ${cur > 1 ? link(cur - 1, '← Prev') : ''}
     ${body}
     ${cur < last ? link(cur + 1, 'Next →') : ''}
-  </nav>`;
+  </nav>${jumps}`;
 }
 
 function crumbsHtml(crumbs: Crumb[]): string {
@@ -2315,9 +2461,10 @@ function renderFacetedResults(cfg: FacetedCfg): string {
 }
 
 /** Absolute prev/next URLs for the paginated series (rel=prev/rel=next crawl
- *  hints), built with the SAME hrefWith used by the visible pager so they always
- *  agree. Empty when there is no prev/next page. Page-1 prev drops the `page`
- *  param (→ the canonical base URL), matching the numbered pager. */
+ *  hints), built with the SAME pageHref used by the visible pager so they always
+ *  agree — including the clean `/page/N` path form on an unfiltered hub, where
+ *  the old `?page=N` target was one robots.txt disallowed and could never fetch.
+ *  Empty when there is no prev/next page. */
 function paginationRelLinks(
   scope: FacetScope,
   f: DirectoryFilters,
@@ -2325,13 +2472,8 @@ function paginationRelLinks(
 ): { relPrev?: string; relNext?: string } {
   const out: { relPrev?: string; relNext?: string } = {};
   if (list.totalPages <= 1) return out;
-  if (list.page > 1) {
-    const prev = list.page - 1;
-    out.relPrev = `${SITE}${hrefWith(scope, f, { page: prev > 1 ? String(prev) : null }, { keepPage: false })}`;
-  }
-  if (list.page < list.totalPages) {
-    out.relNext = `${SITE}${hrefWith(scope, f, { page: String(list.page + 1) }, { keepPage: false })}`;
-  }
+  if (list.page > 1) out.relPrev = `${SITE}${pageHref(scope, f, list.page - 1)}`;
+  if (list.page < list.totalPages) out.relNext = `${SITE}${pageHref(scope, f, list.page + 1)}`;
   return out;
 }
 
@@ -2341,6 +2483,22 @@ function canonicalSuffix(f: DirectoryFilters, locked: Set<string>): string {
   if (f.page > 1) p.page = String(f.page);
   const qs = new URLSearchParams(p).toString();
   return qs ? `?${qs}` : '';
+}
+
+/**
+ * The canonical URL path for a hub listing.
+ *
+ * On an UNFILTERED hub that has the crawlable path pager, page N canonicalises
+ * to `{basePath}/page/N` — the URL the pager, rel=prev/next and the sitemap all
+ * point at. Emitting the `?page=N` form here instead would have every crawlable
+ * page of the series declare a robots.txt-disallowed URL as its canonical, which
+ * is a page asking not to be indexed under the only address Google can reach it
+ * by. Everything else (any facet active) keeps the existing query-string
+ * canonical, unchanged.
+ */
+function hubCanonicalPath(scope: FacetScope, f: DirectoryFilters): string {
+  if (scope.pagePaths && isUnfilteredHub(f, scope.locked)) return hubPagePath(scope.basePath, f.page);
+  return `${scope.basePath}${canonicalSuffix(f, scope.locked)}`;
 }
 
 // ─── 1. Directory landing ─────────────────────────────────────────────────
@@ -2674,7 +2832,16 @@ function shipperCarrierBand(summary: DirectorySummary): string {
 }
 
 // ─── Shared cross-link modules ────────────────────────────────────────────
-/** "Cities in {state}" module — links to the city-tier pages with counts. */
+/**
+ * "Cities in {state}" module — links to the city-tier pages with counts.
+ *
+ * The card grid shows the TOP cities by carrier count (good for a person), and
+ * the trailing link goes to the COMPLETE index at /directory/{state}/cities.
+ * That link is the fix for a measured orphaning defect: only these top-24 cards
+ * ever linked to a city hub, so 54 x 24 = 1,296 of 24,728 city hubs had any
+ * internal inbound link at all and the other ~95% were reachable only from
+ * sitemap-cities.xml. See allCitiesForState() in queries.ts for the numbers.
+ */
 function citiesModule(state: UsState, cities: CityCount[]): string {
   if (!cities.length) return '';
   const cards = cities
@@ -2685,8 +2852,9 @@ function citiesModule(state: UsState, cities: CityCount[]): string {
       </a>`,
     )
     .join('\n');
-  return `<div class="dir-section-h"><h2 style="font-size: 18px;">Cities in ${esc(state.name)}</h2><span class="muted-small">${cities.length} cities</span></div>
-    <div class="dir-grid">${cards}</div>`;
+  return `<div class="dir-section-h"><h2 style="font-size: 18px;">Cities in ${esc(state.name)}</h2><span class="muted-small">top ${cities.length} by carrier count</span></div>
+    <div class="dir-grid">${cards}</div>
+    <div class="dir-chips" style="margin-top: 14px;"><a class="dir-chip" href="/directory/${state.slug}/cities">All ${esc(state.name)} cities A–Z <span class="arr">→</span></a></div>`;
 }
 
 /** "Browse by state" chip row (all US states except an optional current one). */
@@ -2751,8 +2919,9 @@ export function renderStatePage(opts: {
     basePath: `/directory/${state.slug}`,
     locked: new Set(['state']),
     state,
+    pagePaths: true,
   };
-  const canonicalPath = `${scope.basePath}${canonicalSuffix(filters, scope.locked)}`;
+  const canonicalPath = hubCanonicalPath(scope, filters);
   return renderFacetedResults({
     scope,
     list,
@@ -2778,6 +2947,124 @@ export function renderStatePage(opts: {
   });
 }
 
+// ─── 2a. Complete city index (/directory/{state}/cities) ──────────────────
+
+/** Cities per index page. Chosen so the largest states need only a handful of
+ *  pages while a page stays a reasonable size (~500 chips ≈ 35 KB of markup). */
+export const CITY_INDEX_PER_PAGE = 500;
+
+/** How many index pages a given city count needs (always ≥ 1). */
+export function cityIndexPageCount(total: number): number {
+  return Math.max(1, Math.ceil(total / CITY_INDEX_PER_PAGE));
+}
+
+/** Path for one page of a state's city index. Page 1 is the bare path so the
+ *  index has exactly ONE canonical URL rather than a `/page/1` duplicate. */
+export function cityIndexPath(stateSlug: string, page: number): string {
+  return page > 1 ? `/directory/${stateSlug}/cities/page/${page}` : `/directory/${stateSlug}/cities`;
+}
+
+/**
+ * The COMPLETE, alphabetical index of every city hub in one state.
+ *
+ * THE POINT: this page exists to carry link equity into ~24,728 city hubs that
+ * previously had none, which in turn are the only route to the 24 carriers on
+ * each hub's first page. It is deliberately a dense, plain list of links — that
+ * is what an index is for, and a crawler reads it in one fetch.
+ *
+ * Paginated by clean PATH (`/cities/page/2`), never `?page=`, because robots.txt
+ * disallows `/*?*page=` outright — a query-string pager is invisible to Google,
+ * which is precisely how the directory ended up with an unreachable long tail.
+ */
+export function renderStateCityIndex(opts: {
+  state: UsState;
+  cities: CityCount[];
+  page: number;
+  totalCities: number;
+}): string {
+  const { state, cities, page, totalCities } = opts;
+  const totalPages = cityIndexPageCount(totalCities);
+  const path = cityIndexPath(state.slug, page);
+
+  // Group into A–Z sections so a person can actually navigate a few thousand
+  // entries. Anything not starting with a letter lands in '#'.
+  const groups = new Map<string, CityCount[]>();
+  for (const c of cities) {
+    const first = c.city.charAt(0).toUpperCase();
+    const key = first >= 'A' && first <= 'Z' ? first : '#';
+    const bucket = groups.get(key);
+    if (bucket) bucket.push(c);
+    else groups.set(key, [c]);
+  }
+  const sections = [...groups.entries()]
+    .sort((a, b) => (a[0] === '#' ? 1 : b[0] === '#' ? -1 : a[0].localeCompare(b[0])))
+    .map(
+      ([letter, items]) => `<section class="ci-grp">
+        <h2 class="ci-ltr">${esc(letter)}</h2>
+        <div class="dir-chips">${items
+          .map(
+            (c) =>
+              `<a class="dir-chip" href="/directory/${state.slug}/${encodeURIComponent(c.slug)}">${esc(c.city)} <span class="muted-small">${fmtNum(
+                c.count,
+              )}</span></a>`,
+          )
+          .join('')}</div>
+      </section>`,
+    )
+    .join('\n');
+
+  // Numbered pager over clean paths. Every page of the series is reachable from
+  // every other page, so a crawler never has to walk the series one hop at a time.
+  const pager =
+    totalPages > 1
+      ? `<nav class="dir-pagenums" aria-label="City index pagination">${Array.from({ length: totalPages }, (_, i) => i + 1)
+          .map((p) =>
+            p === page
+              ? `<span class="cur">${p}</span>`
+              : `<a href="${esc(cityIndexPath(state.slug, p))}">${p}</a>`,
+          )
+          .join('\n')}</nav>`
+      : '';
+
+  const body = `<main class="dir-shell">
+    ${crumbsHtml([
+      { name: 'Directory', path: '/directory' },
+      { name: state.name, path: `/directory/${state.slug}` },
+      { name: 'All cities' },
+    ])}
+    <section class="hero dir-hero">
+      <h1>Carriers by city in ${esc(state.name)}</h1>
+      <p class="muted">Every city in ${esc(state.name)} with FMCSA-registered motor carriers — ${fmtNum(
+        totalCities,
+      )} in total${totalPages > 1 ? `, page ${page} of ${totalPages}` : ''}. Pick a city for its carrier list, or browse <a href="/directory/${
+        state.slug
+      }">all ${esc(state.name)} carriers</a>.</p>
+    </section>
+    <div class="dir-card" style="padding: 24px;">${sections || '<p class="muted">No cities found for this state.</p>'}</div>
+    ${pager}
+  </main>`;
+
+  return layout({
+    title: `Carriers by City in ${state.name} — ${totalCities.toLocaleString('en-US')} Cities${
+      totalPages > 1 ? ` (Page ${page} of ${totalPages})` : ''
+    } | QuoteFleet`,
+    description: `Complete A–Z index of every ${state.name} city with FMCSA-registered freight and drayage carriers. ${totalCities.toLocaleString(
+      'en-US',
+    )} cities, free to browse.`,
+    canonicalPath: path,
+    bodyHtml: body,
+    relPrev: page > 1 ? `${SITE}${cityIndexPath(state.slug, page - 1)}` : undefined,
+    relNext: page < totalPages ? `${SITE}${cityIndexPath(state.slug, page + 1)}` : undefined,
+    jsonLd: [
+      jsonLdBreadcrumb([
+        { name: 'Directory', path: '/directory' },
+        { name: state.name, path: `/directory/${state.slug}` },
+        { name: 'All cities', path: cityIndexPath(state.slug, 1) },
+      ]),
+    ],
+  });
+}
+
 // ─── 2b. City page (faceted) ──────────────────────────────────────────────
 export function renderCityPage(opts: {
   state: UsState;
@@ -2794,8 +3081,9 @@ export function renderCityPage(opts: {
     locked: new Set(['state', 'city']),
     state,
     city,
+    pagePaths: true,
   };
-  const canonicalPath = `${scope.basePath}${canonicalSuffix(filters, scope.locked)}`;
+  const canonicalPath = hubCanonicalPath(scope, filters);
   const otherCities = cities.filter((c) => c.slug !== city.slug).slice(0, 23);
   return renderFacetedResults({
     scope,
@@ -2866,8 +3154,9 @@ export function renderPortPage(opts: {
     basePath: `/directory/port/${port.code}`,
     locked: new Set(['port']),
     port,
+    pagePaths: true,
   };
-  const canonicalPath = `${scope.basePath}${canonicalSuffix(filters, scope.locked)}`;
+  const canonicalPath = hubCanonicalPath(scope, filters);
   const faqs = portFaqs(port);
   // Other US gateways as their DISPLAY groups (co-located ports as one "/" hub),
   // linking to the canonical group slug so no chip lands on a redirect.

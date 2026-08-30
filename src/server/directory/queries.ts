@@ -19,7 +19,7 @@ import {
   type CarrierOperatingLocation,
   type CarrierOverrideRow,
 } from '../../db/schema.js';
-import { CONTAINER_PORTS, PORT_GROUPS, portFilterCodes, portGroupForMemberCode } from './containerPorts.js';
+import { CONTAINER_PORTS, PORT_GROUPS, portFilterCodes, portGroupForMemberCode, isKnownPortCode } from './containerPorts.js';
 
 export type { CarrierCapabilities, CarrierOperatingLocation } from '../../db/schema.js';
 
@@ -1129,13 +1129,32 @@ export function citySlugify(s: string): string {
  *   page 13,905  (OFFSET 333,696)  →  total cost 57,014.96
  *   page 100     (OFFSET   2,376)  →  total cost    500.57
  *
- * 100 pages is 2,400 rows deep — far past where anyone paginates (Google itself
- * truncates result sets long before that), and discovery is unaffected: the
- * sitemap advertises every carrier profile as its own clean PATH, and robots.txt
- * already Disallows `?page=` outright. Callers that want more depth narrow with
- * a city hub or a facet, which is also the cheap query.
+ * The cost is LINEAR in the OFFSET, so the cap is a straight trade between query
+ * cost and how much of the directory a crawler can walk to.
+ *
+ * WHY 200 AND NOT 100 (measured on prod, 2026-08-29): the cap is no longer only
+ * an abuse ceiling. Hub pagination now has a crawlable PATH form
+ * (`{hub}/page/N`, see routes/directory.ts withPathPage), because robots.txt
+ * disallows `/*?*page=` and the query pager was therefore invisible to Google —
+ * which froze every hub at its first 24 carriers and left ~91% of carrier
+ * profiles unreachable from `/`. City hubs are the surface that has to enumerate
+ * the whole directory, so the cap has to clear the largest city:
+ *
+ *   carriers past rank 2,400 in their own city (cap 100)  →   1,793  (0.54%)
+ *   carriers past rank 4,800 in their own city (cap 200)  →       0  (0.00%)
+ *
+ * Only TWO city groups in 26,229 exceed 2,400 rows — Houston TX (3,501 carriers,
+ * 146 pages) and Fresno CA (3,092, 129 pages) — so a cap of 100 stranded exactly
+ * those 1,793 carriers and nothing else. 200 covers every city group in prod with
+ * ~37% headroom for ingest growth, at an EXPLAIN cost of roughly 1,000 (double
+ * the 500.57 above, still two orders of magnitude below the unbounded case).
+ * Anything larger buys nothing: 500 and 1,000 strand the same zero carriers.
+ *
+ * STATE hubs deliberately still truncate — the largest is CA at 44,137 carriers
+ * (1,840 pages) and sizing the cap for that would be pointless, because every
+ * carrier is also in a city hub, and the city hub is the cheap query.
  */
-export const MAX_PAGE = 100;
+export const MAX_PAGE = 200;
 
 /**
  * Parse a `?page=` value into a clamped page number plus whether the request
@@ -1168,7 +1187,16 @@ export function normalizeFilters(
 ): DirectoryFilters {
   const str = (v: unknown): string => (v == null ? '' : String(v)).trim();
   const stateRaw = str(raw.state).toUpperCase();
-  const portRaw = str(raw.port).toUpperCase().slice(0, 8);
+  // `?port=` is WHITELISTED against the real port codes. Without this any string
+  // (`?port=ZZZZZZZZ`) rendered a real 200 page with zero results that
+  // self-canonicalised — i.e. an unbounded supply of thin, indexable URLs that a
+  // single inbound link could mint permanently, competing for the same crawl
+  // budget as the 330,218 carrier profiles. The /directory/port/:port PATH route
+  // has always validated (routes/directory.ts); only the query facet did not.
+  // An unknown code collapses to null = the unfiltered hub, matching how every
+  // other unrecognised facet value already degrades.
+  const portRawUnchecked = str(raw.port).toUpperCase().slice(0, 8);
+  const portRaw = portRawUnchecked && isKnownPortCode(portRawUnchecked) ? portRawUnchecked : '';
   const fleetRaw = str(raw.fleet) as FleetBucketId;
   const driversRaw = str(raw.drivers) as DriversBucketId;
   const sortRaw = str(raw.sort).toLowerCase() as SortId;
@@ -1946,6 +1974,58 @@ export async function citiesForState(stateCode: string, limit = 30): Promise<Cit
     return [...bySlug.values()].sort((a, b) => b.count - a.count).slice(0, limit);
   } catch (err) {
     console.warn('[directory] citiesForState failed; serving no cities:', err);
+    return [];
+  }
+}
+
+/**
+ * EVERY city hub in a state, alphabetical — the data behind /directory/{state}/cities.
+ *
+ * WHY THIS EXISTS (measured, 2026-08-29): sitemap-cities.xml advertises all
+ * 24,728 US city hubs, but the only internal links to city hubs came from
+ * `citiesForState(state, 24)` on the state and city pages. That is 54 x 24 =
+ * 1,296 linked hubs — so ~23,400 city hubs (95%) had ZERO internal inbound links
+ * and existed only in an XML file. Because a city hub is the ONLY path to the 24
+ * carriers on its first page, orphaning the hub orphaned its carriers too: the
+ * transitive closure of the link graph from `/` reached just ~32,600 of 330,218
+ * carrier profiles (9.2%). Google's answer was exactly what you would expect —
+ * "Discovered – currently not indexed", lastCrawl NEVER, on the other 91%.
+ *
+ * `citiesForState` cannot serve this: it hard-caps at 200 rows, and it orders by
+ * carrier count (right for a "top cities" module, wrong for a complete index).
+ *
+ * COST: one GROUP BY over a single state, served by the (state, city) prefix of
+ * carrier_directory_state_city_power_idx as an index-only scan — the same access
+ * path citiesForState already uses, without the LIMIT. The largest state returns
+ * a few thousand short rows, and the route caches like every other public
+ * directory page.
+ */
+export async function allCitiesForState(stateCode: string): Promise<CityCount[]> {
+  const code = String(stateCode).toUpperCase().slice(0, 2);
+  try {
+    const rows = await db()
+      .select({ city: carrierDirectory.city, n: sql<number>`count(*)::int` })
+      .from(carrierDirectory)
+      .where(and(eq(carrierDirectory.state, code), isNotNull(carrierDirectory.city), ne(carrierDirectory.city, '')))
+      .groupBy(carrierDirectory.city);
+    // Collapse case/spacing variants of the same city onto one slug, exactly as
+    // citiesForState does — the slug is what the hub URL is keyed on, so two
+    // spellings of one city must not become two index entries.
+    const bySlug = new Map<string, CityCount>();
+    for (const r of rows) {
+      const name = (r.city ?? '').trim();
+      if (!name) continue;
+      const slug = citySlugify(name);
+      if (!slug) continue;
+      const cur = bySlug.get(slug);
+      if (cur) cur.count += r.n;
+      else bySlug.set(slug, { city: titleCaseCity(name), slug, count: r.n });
+    }
+    // Alphabetical: an INDEX is for enumeration, so a stable A→Z order is what
+    // makes it usable by a person and predictable for a crawler paging through it.
+    return [...bySlug.values()].sort((a, b) => a.city.localeCompare(b.city));
+  } catch (err) {
+    console.warn('[directory] allCitiesForState failed; serving no cities:', err);
     return [];
   }
 }

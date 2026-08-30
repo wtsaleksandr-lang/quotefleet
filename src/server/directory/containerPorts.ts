@@ -214,6 +214,22 @@ export function portGroupForMemberCode(code: string | null | undefined): PortGro
 }
 
 /**
+ * Is this a port code the site actually knows — a display-group code or a stored
+ * member code?
+ *
+ * Used to WHITELIST the `?port=` query facet. The /directory/port/:port path
+ * route has always validated, but the query facet accepted any 8-character
+ * string, so `?port=ZZZZZZZZ` rendered a real 200 page with zero results that
+ * self-canonicalised — an unbounded supply of thin, indexable URLs competing for
+ * crawl budget with the 330,218 carrier profiles that actually need it.
+ */
+export function isKnownPortCode(code: string | null | undefined): boolean {
+  if (!code) return false;
+  const up = String(code).toUpperCase();
+  return PORT_GROUP_BY_CODE.has(up) || PORT_GROUP_BY_MEMBER.has(up);
+}
+
+/**
  * Resolve a port facet/URL value to the member codes it should filter on.
  * Accepts a group code (→ its members) or a bare member code (→ its group's
  * members, so a legacy `?port=USLAX` deep-link consolidates like the hub). An
