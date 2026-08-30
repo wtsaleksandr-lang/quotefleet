@@ -95,12 +95,19 @@ describe('safety record — present', () => {
     expect(html).toContain('381 of 2,658');
   });
 
-  it('shows the crash total and its severity split', () => {
+  it('shows the crash total with its severity split as a sub-line breakdown', () => {
     expect(html).toContain('Reported crashes');
     expect(html).toContain('200');
-    expect(html).toMatch(/Fatal/);
-    expect(html).toMatch(/With injuries/);
-    expect(html).toMatch(/Towed away/);
+    expect(html).toContain('7 fatal · 67 with injuries · 192 towed away');
+  });
+
+  it('keeps the grid at four items, so no line strands a single figure', () => {
+    // 4 stats → clean 2×2 on desktop, 4 stacked at 375px. A 5th would leave an
+    // orphan on the last row (the global no-orphan rule).
+    const block = html.slice(html.indexOf('Roadside inspection'));
+    const grid = block.slice(block.indexOf('cp-datagrid'), block.indexOf('</div>', block.indexOf('cp-datagrid')));
+    expect((block.match(/class="cp-dt"/g) ?? []).length).toBe(4);
+    expect(grid).toBeTruthy();
   });
 
   it('puts the national average beside each rate, as neutral arithmetic', () => {
@@ -179,7 +186,8 @@ describe('safety record — partial coverage', () => {
       safetyDataAsOf: AS_OF,
     });
     const block = html.slice(html.indexOf('Roadside inspection'));
-    expect(block).not.toMatch(/Towed away/);
+    expect(block).not.toMatch(/towed away/i);
+    expect(block).not.toMatch(/fatal/i);
   });
 
   it('SUPPRESSES the rate on a tiny sample but still shows the counts', () => {

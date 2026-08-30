@@ -340,20 +340,22 @@ function safetyRecordBlock(safety: CarrierSafety | null | undefined): string {
 
   const crashRows: string[] = [];
   if (safety.crashesTotal != null) {
-    crashRows.push(
-      `<div class="cp-dt"><span class="k">Reported crashes</span><span class="v">${fmtNum(safety.crashesTotal)}</span></div>`,
-    );
-    // Severity split only adds signal when there was at least one crash.
+    // Severity is a BREAKDOWN of the total, so it renders as a sub-line under
+    // the count (same treatment as the out-of-service rate context) rather than
+    // as three more peer stats. That keeps the grid at exactly FOUR items — a
+    // clean 2×2 on desktop and 4 stacked at 375px, with no line left holding a
+    // single orphaned figure — and reads as "200 crashes, of which…" instead of
+    // implying "fatal" is a metric on par with "inspections".
+    const sev: string[] = [];
     if (safety.crashesTotal > 0) {
-      const parts: Array<[string, number | null]> = [
-        ['Fatal', safety.crashesFatal],
-        ['With injuries', safety.crashesInjury],
-        ['Towed away', safety.crashesTow],
-      ];
-      for (const [k, v] of parts)
-        if (v != null)
-          crashRows.push(`<div class="cp-dt"><span class="k">${esc(k)}</span><span class="v">${fmtNum(v)}</span></div>`);
+      if (safety.crashesFatal != null) sev.push(`${fmtNum(safety.crashesFatal)} fatal`);
+      if (safety.crashesInjury != null) sev.push(`${fmtNum(safety.crashesInjury)} with injuries`);
+      if (safety.crashesTow != null) sev.push(`${fmtNum(safety.crashesTow)} towed away`);
     }
+    const sevLine = sev.length ? `<span class="cp-safety-ctx">${esc(sev.join(' · '))}</span>` : '';
+    crashRows.push(
+      `<div class="cp-dt"><span class="k">Reported crashes</span><span class="v">${fmtNum(safety.crashesTotal)}${sevLine}</span></div>`,
+    );
   }
 
   const all = [...rows, ...crashRows];
