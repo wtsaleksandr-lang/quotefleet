@@ -611,14 +611,72 @@ export function renderOptOutConfirmation(ctx: { carrierName?: string }): string 
   return page('Opted out · QuoteFleet', 'You have opted out of rate requests.', '/directory/rfq', body);
 }
 
-// ─── 7. Not found ───────────────────────────────────────────────────────────
-export function renderRfqNotFound(): string {
+// ─── 7. Expired / unknown token ─────────────────────────────────────────────
+/**
+ * Which link the visitor followed. The page is otherwise identical, but the two
+ * carrier-facing entry points deserve different words and different exits:
+ *
+ *   'quote'   — a carrier clicked "Submit your quote" on a rate request that has
+ *               since expired or been filled. Tell them that (it is by far the
+ *               likeliest cause of a dead quote token — the token is real, the
+ *               request simply closed), and hand them the two things a trucking
+ *               company can still use today: the directory and the calculator.
+ *   'optout'  — a carrier clicked the OPT-OUT link and it did not resolve. This
+ *               is compliance-sensitive: never leave them with no way out. The
+ *               page must carry a working alternative route to opt out.
+ *   'shipper' — a shipper's own view/review link. Generic wording.
+ *
+ * All three still answer 404 (the resource genuinely is not there) — the fix is
+ * the BODY, not the status code.
+ */
+export type RfqNotFoundContext = 'quote' | 'optout' | 'shipper';
+
+export function renderRfqNotFound(context: RfqNotFoundContext = 'shipper'): string {
+  if (context === 'optout') {
+    const body = `
+  <main class="rfq-wrap">
+    <p class="rfq-eyebrow">Opt-out link expired</p>
+    <h1>We couldn't read that opt-out link</h1>
+    <p class="rfq-lede">The link has expired or was cut short by your email client — so we could not match it to a carrier. <strong>You can still opt out.</strong> Email us from the address that received the rate request and we'll suppress it the same day, or use the opt-out link in any newer rate request you've received.</p>
+    <div class="rfq-actions">
+      <a class="rfq-btn" href="/support">Contact us to opt out <span aria-hidden="true">→</span></a>
+      <a class="rfq-btn rfq-btn--ghost" href="/directory">Back to directory</a>
+    </div>
+  </main>`;
+    return page(
+      'Opt-out link expired · QuoteFleet',
+      "This opt-out link has expired — here's how to still opt out.",
+      '/directory/rfq',
+      body,
+    );
+  }
+
+  if (context === 'quote') {
+    const body = `
+  <main class="rfq-wrap">
+    <p class="rfq-eyebrow">Rate request closed</p>
+    <h1>This rate request is no longer open</h1>
+    <p class="rfq-lede">The request has expired or the shipper has already booked the lane, so quotes are closed. Nothing went wrong on your end — quote links stay live only while the request is open. If you reached this from an email, it's also worth checking the full link wasn't cut in half by your mail client.</p>
+    <div class="rfq-actions">
+      <a class="rfq-btn" href="/directory">Browse the carrier directory <span aria-hidden="true">→</span></a>
+      <a class="rfq-btn rfq-btn--ghost" href="/tools">Free rate calculator</a>
+    </div>
+  </main>`;
+    return page(
+      'Rate request closed · QuoteFleet',
+      'This rate request has expired or has already been filled.',
+      '/directory/rfq',
+      body,
+    );
+  }
+
   const body = `
   <main class="rfq-wrap">
     <p class="rfq-eyebrow">Not found</p>
     <h1>This link isn't valid</h1>
-    <p class="rfq-lede">The rate-request link you followed is expired or incorrect. If you reached this from an email, check that you copied the full link.</p>
+    <p class="rfq-lede">The rate-request link you followed has expired or is incorrect. If you reached this from an email, check that the full link was copied — mail clients sometimes break long links across two lines.</p>
     <div class="rfq-actions">
+      <a class="rfq-btn" href="/directory/rfq?sort=featured">Start a new rate request <span aria-hidden="true">→</span></a>
       <a class="rfq-btn rfq-btn--ghost" href="/directory">Back to directory</a>
     </div>
   </main>`;

@@ -7,9 +7,17 @@
  *     when live sending is on. Checked before anything hits the wire.
  *   - HONEST From via brandedFrom(SENDER_NAME) — reuses the platform's verified
  *     sending address so SPF/DKIM stay intact.
- *   - PHYSICAL mailing address (SENDER_ADDRESS) in the footer.
+ *   - PHYSICAL mailing address (SENDER_ADDRESS) in the footer. It is the
+ *     registered office of the operating entity — NEVER a personal residence
+ *     (`check:no-home-address` fails the build if a home address reappears).
  *   - ONE-CLICK UNSUBSCRIBE (RFC 8058) = the carrier's opt-out link, passed as
  *     listUnsubscribeUrl so sendEmail attaches List-Unsubscribe + -Post headers.
+ *
+ * FOOTER (shared by both builders — see `footerHtml`): the opt-out line, one
+ * quiet "also from QuoteFleet" line, and a single line carrying the legal links
+ * plus the postal address. The address is ANCHOR-WRAPPED so mail clients cannot
+ * auto-linkify it into a big blue Maps link; the reasoning is on `footerHtml`.
+ * Everything is inline-styled — no external CSS, no web fonts, no <style> block.
  *
  * LIVE-SEND GATE (`RFQ_LIVE_SEND`, DEFAULT OFF):
  *   - OFF (dry-run): render the full email, LOG it, and report 'sent' WITHOUT
@@ -46,6 +54,126 @@ export function optOutUrl(baseUrl: string, quoteToken: string): string {
 /** A concise one-line lane summary for the subject + body. */
 export function laneSummary(request: Pick<RfqRequest, 'origin' | 'destination'>): string {
   return `${request.origin} → ${request.destination}`;
+}
+
+/**
+ * Public site links carried in the email footer. Paths ONLY — each is joined to
+ * the caller's baseUrl so a preview/staging send never points at prod.
+ *
+ * Every path here is a real registered route (verified 200 on the live site);
+ * inventing one would put a 404 in front of a carrier. Keep this list and the
+ * footer in lockstep — `email.test.ts` asserts each path is reachable in the
+ * rendered HTML and that no path outside this set appears.
+ */
+export const FOOTER_LINKS = {
+  /** Free public rate calculator — the single most useful thing we have for a
+   *  trucking service provider, and our best top-of-funnel surface. */
+  tools: '/tools',
+  /** US importer database — carriers use it to find shippers to pitch. */
+  importers: '/importers',
+  terms: '/terms',
+  privacy: '/privacy',
+  support: '/support',
+} as const;
+
+/** Footer palette — muted greys that stay legible after Gmail's dark-mode
+ *  inversion (the footer is deliberately quieter than the body, not invisible).
+ *  11px is the floor: below it Outlook/Gmail start bumping sizes back up. */
+const F_MUTED = '#8a919e';
+const F_LINK = '#5b6472';
+const F_SIZE = '11px';
+
+/**
+ * The compliance + navigation footer shared by BOTH email builders (static
+ * template and AI-drafted letter), so the two can never drift apart on the
+ * guarantees that matter: physical postal address, one-click opt-out.
+ *
+ * ── WHY THE ADDRESS IS WRAPPED IN AN ANCHOR ──────────────────────────────────
+ * Gmail (and Apple Mail's data detectors, and Outlook) run an auto-linkifier
+ * over rendered message text and turn anything shaped like a postal address
+ * into a big blue "open in Maps" link. That is what made the footer address the
+ * loudest thing on the email instead of the quietest.
+ *
+ * A `<meta name="format-detection">` hint alone does NOT fix this — it is an
+ * Apple/iOS convention that Gmail ignores. The reliable, client-agnostic fix is
+ * structural: put the address inside an anchor we control. No linkifier will
+ * ever create a nested `<a>` (that is invalid HTML and every implementation
+ * skips text already inside an anchor), so the address keeps OUR inline colour
+ * and OUR font-size instead of the client's link styling. We send it to /terms,
+ * which is where the operating entity and this same registered office are
+ * published — so the link is honest rather than a decoy `href="#"`.
+ *
+ * Both belts are worn: the meta hint (Apple Mail / iOS) in `emailHead()`, and
+ * the anchor wrap (Gmail, Outlook, everything else).
+ */
+function footerHtml(baseUrl: string, optOutHref: string): string {
+  const b = stripSlash(baseUrl);
+  const url = (p: string) => esc(`${b}${p}`);
+  const a = (p: string, label: string, nowrap = false) =>
+    `<a href="${url(p)}" style="color:${F_LINK};text-decoration:underline;${
+      nowrap ? 'white-space:nowrap;' : ''
+    }">${label}</a>`;
+  return (
+    `<hr style="border:none;border-top:1px solid #e3e6ea;margin:24px 0 12px;">` +
+    // Opt-out — REDUCED to 11px, but still the first thing in the footer and
+    // still one click. RFC 8058 List-Unsubscribe rides the same URL.
+    `<p style="margin:0 0 6px;color:${F_MUTED};font-size:${F_SIZE};line-height:1.55;">` +
+    `You received this because your carrier is listed in the public FMCSA-sourced ${esc(SENDER_NAME)} directory. ` +
+    `<a href="${esc(optOutHref)}" style="color:${F_LINK};text-decoration:underline;">Opt out in one click</a>.` +
+    `</p>` +
+    // Promotional, but useful-first and one quiet line — never a banner.
+    // The two labels are nowrap so a 375px line breaks at the "·" separator
+    // instead of orphaning a single word ("US importer / directory"). Each
+    // label is ~120px at 11px, well inside the 343px mobile content box.
+    `<p style="margin:0 0 6px;color:${F_MUTED};font-size:${F_SIZE};line-height:1.55;">` +
+    `Also from ${esc(SENDER_NAME)}, free to use: ` +
+    `${a(FOOTER_LINKS.tools, 'freight rate calculator', true)} &middot; ` +
+    `${a(FOOTER_LINKS.importers, 'US importer directory', true)}` +
+    `</p>` +
+    // Legal links + the physical address, all on ONE quiet line so the address
+    // sits among peers instead of standing alone as the only thing there.
+    `<p style="margin:0;color:${F_MUTED};font-size:${F_SIZE};line-height:1.55;">` +
+    `${a(FOOTER_LINKS.terms, 'Terms')} &middot; ` +
+    `${a(FOOTER_LINKS.privacy, 'Privacy')} &middot; ` +
+    `${a(FOOTER_LINKS.support, 'Support')} &middot; ` +
+    `<a href="${url(FOOTER_LINKS.terms)}" style="color:${F_MUTED};text-decoration:none;">` +
+    `${esc(SENDER_NAME)} &middot; ${esc(SENDER_ADDRESS)}</a>` +
+    `</p>`
+  );
+}
+
+/** Plaintext mirror of `footerHtml` — same links, same order, same guarantees. */
+function footerText(baseUrl: string, optOutHref: string): string[] {
+  const b = stripSlash(baseUrl);
+  return [
+    '',
+    `If you'd rather not receive rate requests, opt out here:`,
+    optOutHref,
+    '',
+    `Also from ${SENDER_NAME}, free to use:`,
+    `  Freight rate calculator: ${b}${FOOTER_LINKS.tools}`,
+    `  US importer directory:   ${b}${FOOTER_LINKS.importers}`,
+    '',
+    `Terms: ${b}${FOOTER_LINKS.terms} · Privacy: ${b}${FOOTER_LINKS.privacy} · Support: ${b}${FOOTER_LINKS.support}`,
+    `${SENDER_NAME} · ${SENDER_ADDRESS}`,
+  ];
+}
+
+/**
+ * Shared `<head>`. `format-detection` asks Apple Mail / iOS not to run its data
+ * detectors over the message (the address + phone-shaped strings); Gmail ignores
+ * it, which is why the address is ALSO anchor-wrapped — see `footerHtml`.
+ * No external CSS and no web fonts: everything downstream is inline.
+ */
+function emailHead(title: string): string {
+  return (
+    `<head>` +
+    `<meta charset="utf-8">` +
+    `<meta name="viewport" content="width=device-width,initial-scale=1">` +
+    `<meta name="format-detection" content="telephone=no,date=no,address=no,email=no">` +
+    `<title>${esc(title)}</title>` +
+    `</head>`
+  );
 }
 
 export interface BuiltEmail {
@@ -99,11 +227,7 @@ export function buildCarrierRfqEmail(
     qUrl,
     '',
     `Requested by: ${shipper}`,
-    '',
-    `If you'd rather not receive rate requests, opt out here:`,
-    oUrl,
-    '',
-    `${SENDER_NAME} · ${SENDER_ADDRESS}`,
+    ...footerText(baseUrl, oUrl),
   );
   const text = textLines.join('\n');
 
@@ -122,7 +246,7 @@ export function buildCarrierRfqEmail(
       )}</p>`
     : '';
   const html = `<!doctype html>
-<html><body style="margin:0;padding:0;background:#f4f5f7;">
+<html lang="en">${emailHead(subject)}<body style="margin:0;padding:0;background:#f4f5f7;">
   <div style="max-width:560px;margin:0 auto;padding:24px 16px;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Arial,sans-serif;color:#0b0f15;">
     <p style="margin:0 0 4px;font-size:12px;letter-spacing:.08em;text-transform:uppercase;color:#5b6472;">Rate request</p>
     <h1 style="margin:0 0 16px;font-size:20px;line-height:1.25;color:#0b0f15;">${esc(laneSummary(request))}</h1>
@@ -135,13 +259,7 @@ export function buildCarrierRfqEmail(
       <a href="${esc(qUrl)}" style="display:inline-block;background:#0b0f15;color:#ffffff;text-decoration:none;font-size:15px;font-weight:600;padding:12px 22px;border-radius:4px;">Submit your quote →</a>
     </div>
     <p style="margin:0 0 4px;color:#5b6472;font-size:13px;">Requested by ${esc(shipper)}.</p>
-    <hr style="border:none;border-top:1px solid #e3e6ea;margin:24px 0 12px;">
-    <p style="margin:0 0 6px;color:#8a919e;font-size:12px;line-height:1.5;">You received this because your carrier is listed in the public FMCSA-sourced ${esc(
-      SENDER_NAME,
-    )} directory. Don't want rate requests? <a href="${esc(
-      oUrl,
-    )}" style="color:#5b6472;">Opt out in one click</a>.</p>
-    <p style="margin:0;color:#8a919e;font-size:12px;">${esc(SENDER_NAME)} · ${esc(SENDER_ADDRESS)}</p>
+    ${footerHtml(baseUrl, oUrl)}
   </div>
 </body></html>`;
 
@@ -173,11 +291,7 @@ export function buildDraftedRfqEmail(
     '',
     'Submit your quote here:',
     qUrl,
-    '',
-    `If you'd rather not receive rate requests, opt out here:`,
-    oUrl,
-    '',
-    `${SENDER_NAME} · ${SENDER_ADDRESS}`,
+    ...footerText(baseUrl, oUrl),
   ].join('\n');
 
   // ── HTML — the letter as paragraphs, then the CTA + compliance footer. ─────
@@ -193,7 +307,7 @@ export function buildDraftedRfqEmail(
     )
     .join('');
   const html = `<!doctype html>
-<html><body style="margin:0;padding:0;background:#f4f5f7;">
+<html lang="en">${emailHead(subject)}<body style="margin:0;padding:0;background:#f4f5f7;">
   <div style="max-width:560px;margin:0 auto;padding:24px 16px;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Arial,sans-serif;color:#0b0f15;">
     <p style="margin:0 0 4px;font-size:12px;letter-spacing:.08em;text-transform:uppercase;color:#5b6472;">Rate request</p>
     <h1 style="margin:0 0 16px;font-size:20px;line-height:1.25;color:#0b0f15;">${esc(laneSummary(request))}</h1>
@@ -201,13 +315,7 @@ export function buildDraftedRfqEmail(
     <div style="margin:24px 0;">
       <a href="${esc(qUrl)}" style="display:inline-block;background:#0b0f15;color:#ffffff;text-decoration:none;font-size:15px;font-weight:600;padding:12px 22px;border-radius:4px;">Submit your quote →</a>
     </div>
-    <hr style="border:none;border-top:1px solid #e3e6ea;margin:24px 0 12px;">
-    <p style="margin:0 0 6px;color:#8a919e;font-size:12px;line-height:1.5;">You received this because your carrier is listed in the public FMCSA-sourced ${esc(
-      SENDER_NAME,
-    )} directory. Don't want rate requests? <a href="${esc(
-      oUrl,
-    )}" style="color:#5b6472;">Opt out in one click</a>.</p>
-    <p style="margin:0;color:#8a919e;font-size:12px;">${esc(SENDER_NAME)} · ${esc(SENDER_ADDRESS)}</p>
+    ${footerHtml(baseUrl, oUrl)}
   </div>
 </body></html>`;
 

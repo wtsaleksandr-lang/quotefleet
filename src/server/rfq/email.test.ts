@@ -4,8 +4,16 @@
  * the network sender, live send does, and suppression short-circuits both.
  */
 import { describe, it, expect, vi } from 'vitest';
-import { buildCarrierRfqEmail, buildDraftedRfqEmail, sendRfqToCarrier, quoteUrl, optOutUrl } from './email.js';
+import {
+  buildCarrierRfqEmail,
+  buildDraftedRfqEmail,
+  sendRfqToCarrier,
+  quoteUrl,
+  optOutUrl,
+  FOOTER_LINKS,
+} from './email.js';
 import { SENDER_ADDRESS } from '../outreach/draftEmail.js';
+import { esc } from '../directory/pages.js';
 import type { EmailOut } from '../../email/send.js';
 import type { RfqRequest, RfqRecipient } from '../../db/schema.js';
 
@@ -75,6 +83,97 @@ describe('buildCarrierRfqEmail', () => {
     const built = buildCarrierRfqEmail(request({ commodity: null, weight: null, notes: null }), recipient(), BASE);
     expect(built.text).not.toContain('Commodity:');
     expect(built.text).not.toContain('Notes:');
+  });
+});
+
+/**
+ * The footer is the compliance surface AND the thing a carrier reads last, so it
+ * is pinned here on BOTH builders — the static template and the AI-drafted
+ * letter must never drift apart on any of it.
+ */
+describe.each([
+  ['buildCarrierRfqEmail', () => buildCarrierRfqEmail(request(), recipient(), BASE)],
+  [
+    'buildDraftedRfqEmail',
+    () => buildDraftedRfqEmail(request(), recipient(), BASE, { subject: 'S', body: 'Dear Acme,\n\nhi' }),
+  ],
+] as const)('%s footer', (_name, build) => {
+  it('suppresses address auto-linkification: the address appears ONLY inside an anchor', () => {
+    const { html } = build();
+    // THE INVARIANT. Gmail/Outlook/Apple Mail linkifiers all skip text that is
+    // already inside an <a> (a nested anchor is invalid HTML), so an
+    // anchor-enclosed address can never be repainted as a blue Maps link. If a
+    // future edit moves the address out of its anchor, this fails.
+    // The address is HTML-escaped on the way in ("&" → "&amp;"), so match the
+    // escaped form — the same transform the renderer applies.
+    const addr = esc(SENDER_ADDRESS);
+    const idx = html.indexOf(addr);
+    expect(idx).toBeGreaterThan(-1);
+    // Every occurrence must sit between an <a ...> and the next </a>.
+    for (let i = idx; i !== -1; i = html.indexOf(addr, i + 1)) {
+      const before = html.slice(0, i);
+      const openA = before.lastIndexOf('<a ');
+      const closeA = before.lastIndexOf('</a>');
+      expect(openA).toBeGreaterThan(closeA); // inside an open anchor
+      expect(html.indexOf('</a>', i)).toBeGreaterThan(i); // and it closes after
+    }
+    // Belt two, for Apple Mail / iOS data detectors, which honour the hint.
+    expect(html).toContain('name="format-detection"');
+    expect(html).toContain('address=no');
+    // The address anchor must NOT be painted like a link (no blue, no underline).
+    expect(html).toMatch(/<a href="[^"]*\/terms" style="color:#8a919e;text-decoration:none;">/);
+  });
+
+  it('keeps the address small and muted rather than loud', () => {
+    const { html } = build();
+    // 11px is the floor — smaller and mail clients bump it back up anyway.
+    expect(html).toContain('font-size:11px');
+    // The old 12px footer treatment is gone from the footer block.
+    expect(html).not.toContain('color:#8a919e;font-size:12px');
+  });
+
+  it('carries the legal + promotional links, all as absolute URLs', () => {
+    const { html, text } = build();
+    for (const path of Object.values(FOOTER_LINKS)) {
+      expect(html).toContain(`href="${BASE}${path}"`);
+      expect(text).toContain(`${BASE}${path}`);
+    }
+    expect(html).toContain('freight rate calculator');
+    expect(html).toContain('US importer directory');
+  });
+
+  it('never regresses the one-click opt-out or the physical address', () => {
+    const { html, text } = build();
+    expect(html).toContain(optOutUrl(BASE, 'quote-token-xyz'));
+    expect(html).toContain('Opt out in one click');
+    expect(text).toContain(optOutUrl(BASE, 'quote-token-xyz'));
+    expect(html).toContain(esc(SENDER_ADDRESS));
+    expect(text).toContain(SENDER_ADDRESS);
+  });
+
+  it('survives real mail clients: no external CSS, no web fonts, no <style>', () => {
+    const { html } = build();
+    expect(html).not.toMatch(/<link\b/i);
+    expect(html).not.toMatch(/<style\b/i);
+    expect(html).not.toMatch(/fonts\.(googleapis|gstatic)\.com/);
+    expect(html).not.toMatch(/@import/);
+    // Every http(s) URL in the email points at our own base — no trackers, no
+    // remote images (a remote image would also be a privacy/blocking problem).
+    for (const m of html.matchAll(/https?:\/\/[^"'\s>]+/g)) {
+      expect(m[0].startsWith(BASE)).toBe(true);
+    }
+    expect(html).not.toMatch(/<img\b/i);
+  });
+
+  it('links only to routes that exist — no invented paths', () => {
+    const { html } = build();
+    const paths = [...html.matchAll(new RegExp(`href="${BASE}([^"]*)"`, 'g'))].map((m) => m[1]);
+    const allowed = new Set<string>([
+      ...Object.values(FOOTER_LINKS),
+      `/directory/rfq/quote/quote-token-xyz`,
+      `/directory/rfq/optout/quote-token-xyz`,
+    ]);
+    for (const p of paths) expect(allowed.has(p)).toBe(true);
   });
 });
 

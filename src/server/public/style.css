@@ -1548,9 +1548,11 @@ html[data-theme="light"] .site-footer strong { color: var(--ink); }
   padding: 0;
   display: flex;
   align-items: center;
-  /* NO WRAP: five marks at 40px + 8px gaps = 232px, which fits inside the
+  /* NO WRAP: six marks at 40px + five 8px gaps = 280px, which fits inside the
      narrowest supported viewport (375 - 36 padding = 339). Keeping the row
-     unwrapped is what guarantees a mark is never orphaned onto its own line. */
+     unwrapped is what guarantees a mark is never orphaned onto its own line.
+     Adding a SEVENTH mark would be 328px — still under 339, but with no slack
+     left, so re-measure before ever adding one. */
   flex-wrap: nowrap;
   gap: var(--space-1);
 }

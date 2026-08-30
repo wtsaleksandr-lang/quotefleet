@@ -112,9 +112,17 @@ export const FULL_SITE_HEADER = `<header class="site-header">
  *     which is why it never appears in `payment_method_types`. Checkout is
  *     Stripe-HOSTED (no Stripe.js/Elements anywhere in this repo), so it needs
  *     no Apple Pay domain registration.
+ *   • Google Pay — PMC `google_pay: available=true, value=on` (ENABLED on the
+ *     live account 2026-08; this mark was previously absent because the
+ *     capability read available=false and would not have rendered). Like Apple
+ *     Pay it rides `card`, so it never appears in `payment_method_types`, and
+ *     Stripe-HOSTED Checkout needs no domain registration for it.
  *   • Link — present in `payment_method_types` on every real session.
- * DELIBERATELY ABSENT: Google Pay (PMC available=false — it would not render)
- * and PayPal (PMC off; there is no PayPal integration in this codebase at all).
+ * DELIBERATELY ABSENT: PayPal. The `paypal_payments` capability does not exist
+ * AT ALL on this Canadian Stripe account — it is not merely switched off, it is
+ * unavailable — so PayPal genuinely cannot be offered, and there is no PayPal
+ * integration in this codebase either. Discover stays off for the separate
+ * reason above (supported but unconfirmable from the API).
  *
  * PROCESSOR ATTRIBUTION — "Powered by Stripe" sits directly under the marks
  * because every mark above IS Stripe (Link is Stripe's own wallet), and without
@@ -153,6 +161,7 @@ export const FOOTER_PAY_ROW = `<div class="qf-footer-payrow">`
   + `<li class="qf-paymark"><svg class="qf-pm" viewBox="0 0 32 16" role="img" aria-label="Mastercard"><circle cx="12.8" cy="8" r="6.2" fill-opacity=".85"/><circle cx="19.2" cy="8" r="6.2" fill-opacity=".85"/></svg></li>`
   + `<li class="qf-paymark"><svg class="qf-pm" viewBox="0 0 32 16" role="img" aria-label="American Express"><text x="16" y="11.8" text-anchor="middle" font-size="9" font-weight="800" letter-spacing=".1">AMEX</text></svg></li>`
   + `<li class="qf-paymark"><svg class="qf-pm" viewBox="0 0 32 16" role="img" aria-label="Apple Pay"><path transform="translate(1.7 3.2) scale(.4)" d="${APPLE_MARK}"/><text x="12.5" y="11.7" font-size="9.5" font-weight="600" letter-spacing="-.1">Pay</text></svg></li>`
+  + `<li class="qf-paymark"><svg class="qf-pm" viewBox="0 0 32 16" role="img" aria-label="Google Pay"><text x="7" y="12.2" text-anchor="middle" font-size="12.5" font-weight="700">G</text><text x="12.5" y="11.7" font-size="9.5" font-weight="600" letter-spacing="-.1">Pay</text></svg></li>`
   + `<li class="qf-paymark"><svg class="qf-pm" viewBox="0 0 32 16" role="img" aria-label="Link"><text x="16" y="12" text-anchor="middle" font-size="11" font-weight="700" letter-spacing="-.2">link</text></svg></li>`
   + `</ul>`
   + `<span class="qf-payrow-proc">Powered by Stripe</span>`

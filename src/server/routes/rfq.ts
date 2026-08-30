@@ -505,9 +505,9 @@ export function registerRfqRoutes(app: Express, deps: RfqRouteDeps = {}) {
   app.get('/directory/rfq/quote/:token', async (req: Request, res: Response, next) => {
     try {
       const token = String(req.params.token);
-      if (!isValidRfqToken(token)) return res.status(404).type('html').send(renderRfqNotFound());
+      if (!isValidRfqToken(token)) return res.status(404).type('html').send(renderRfqNotFound('quote'));
       const ctx = await store.getByQuoteToken(token);
-      if (!ctx) return res.status(404).type('html').send(renderRfqNotFound());
+      if (!ctx) return res.status(404).type('html').send(renderRfqNotFound('quote'));
       if (ctx.recipient.status === 'opted_out') {
         return res.type('html').send(renderOptOutConfirmation({ carrierName: ctx.recipient.carrierName }));
       }
@@ -521,9 +521,9 @@ export function registerRfqRoutes(app: Express, deps: RfqRouteDeps = {}) {
   app.post('/directory/rfq/quote/:token', rfqQuoteLimiter, async (req: Request, res: Response, next) => {
     try {
       const token = String(req.params.token);
-      if (!isValidRfqToken(token)) return res.status(404).type('html').send(renderRfqNotFound());
+      if (!isValidRfqToken(token)) return res.status(404).type('html').send(renderRfqNotFound('quote'));
       const ctx = await store.getByQuoteToken(token);
-      if (!ctx) return res.status(404).type('html').send(renderRfqNotFound());
+      if (!ctx) return res.status(404).type('html').send(renderRfqNotFound('quote'));
       if (ctx.recipient.status === 'opted_out') {
         return res.type('html').send(renderOptOutConfirmation({ carrierName: ctx.recipient.carrierName }));
       }
@@ -558,9 +558,11 @@ export function registerRfqRoutes(app: Express, deps: RfqRouteDeps = {}) {
   app.get('/directory/rfq/optout/:token', async (req: Request, res: Response, next) => {
     try {
       const token = String(req.params.token);
-      if (!isValidRfqToken(token)) return res.status(404).type('html').send(renderRfqNotFound());
+      // Compliance-sensitive: a dead opt-out link must never be a dead end, so
+      // the 'optout' page carries a working alternative route to opt out.
+      if (!isValidRfqToken(token)) return res.status(404).type('html').send(renderRfqNotFound('optout'));
       const result = await store.optOutByQuoteToken(token);
-      if (!result.ok) return res.status(404).type('html').send(renderRfqNotFound());
+      if (!result.ok) return res.status(404).type('html').send(renderRfqNotFound('optout'));
       res.type('html').send(renderOptOutConfirmation({ carrierName: result.carrierName }));
     } catch (err) {
       next(err);

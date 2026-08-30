@@ -13,10 +13,13 @@
  *
  *  2. AN UNTRUTHFUL PAYMENT MARK. The marks are a claim about what a customer
  *     can actually pay with, verified against the live Stripe account: every
- *     real Checkout Session resolves to ["card","link"], and Apple Pay rides
- *     `card` via the account's Payment Method Configuration. Google Pay
- *     (available=false) and PayPal (off, and not integrated at all) would both
- *     be false — so they are asserted ABSENT, here and in the homepage copy.
+ *     real Checkout Session resolves to ["card","link"], and Apple Pay AND
+ *     Google Pay both ride `card` via the account's Payment Method
+ *     Configuration (`apple_pay` and `google_pay` each read available=true,
+ *     value=on — Google Pay was switched on 2026-08 and the mark added then).
+ *     PayPal remains FALSE and asserted ABSENT: the `paypal_payments`
+ *     capability does not exist at all on this Canadian account, so it cannot
+ *     be offered even in principle, and nothing in this codebase integrates it.
  */
 import { readFile } from 'node:fs/promises';
 import { resolve } from 'node:path';
@@ -48,14 +51,19 @@ describe('footer accepted-payment + trust strip', () => {
     expect(dir).toContain('${FOOTER_PAY_ROW}');
   });
 
-  it('shows exactly the five payment methods a customer can genuinely use', () => {
+  it('shows exactly the six payment methods a customer can genuinely use', () => {
     const labels = [...FOOTER_PAY_ROW.matchAll(/aria-label="([^"]+)"/g)].map((m) => m[1]);
-    expect(labels).toEqual(['Visa', 'Mastercard', 'American Express', 'Apple Pay', 'Link']);
+    expect(labels).toEqual([
+      'Visa', 'Mastercard', 'American Express', 'Apple Pay', 'Google Pay', 'Link',
+    ]);
   });
 
   it('never shows a payment method we do not actually accept', async () => {
     const landing = await readFile(resolve(publicDir, 'landing.html'), 'utf8');
-    for (const absent of ['PayPal', 'Google Pay', 'Klarna', 'Afterpay', 'Discover']) {
+    // PayPal: `paypal_payments` does not exist on this Canadian account at all.
+    // Klarna/Afterpay: EUR/PLN/BRL or non-recurring, filtered out of our USD
+    // subscription sessions. Discover: supported but unproven by any charge.
+    for (const absent of ['PayPal', 'Klarna', 'Afterpay', 'Discover']) {
       expect(FOOTER_PAY_ROW).not.toContain(absent);
     }
     // The homepage used to advertise "Integrated with Stripe & PayPal" in a hero
