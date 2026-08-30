@@ -345,7 +345,12 @@ export function registerDirectoryRoutes(app: Express) {
         if (!group) return res.redirect(302, '/directory');
         if (code !== group.code) {
           const qs = req.originalUrl.includes('?') ? req.originalUrl.slice(req.originalUrl.indexOf('?')) : '';
-          return res.redirect(301, `/directory/port/${group.code}${qs}`);
+          // Carry the /page/N segment through the canonicalising redirect. Without
+          // it, `/directory/port/USLAX/page/2` landed on page 1 of the LA/LB hub —
+          // a redirect that silently drops the deep page is exactly the kind of
+          // severed crawl path this work exists to remove.
+          const pageSeg = req.params.page != null ? `/page/${encodeURIComponent(String(req.params.page))}` : '';
+          return res.redirect(301, `/directory/port/${group.code}${pageSeg}${qs}`);
         }
         if (rejectBadPathPage(req, res, `/directory/port/${group.code}`)) return;
         if (rejectOutOfRangePage(req, res, `/directory/port/${group.code}`)) return;

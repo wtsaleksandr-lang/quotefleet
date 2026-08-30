@@ -232,6 +232,16 @@ describe('route registration for the crawlable paths', () => {
     );
   });
 
+  it('the port-code canonicalising redirect carries the /page/N segment', async () => {
+    // /directory/port/USLAX/page/2 301s to the LA/LB group code. Dropping the
+    // page segment there would land the crawler on page 1 — a severed deep path.
+    const src = await import('node:fs/promises').then((fs) =>
+      fs.readFile(new URL('../routes/directory.ts', import.meta.url), 'utf8'),
+    );
+    expect(src).toContain('const pageSeg = req.params.page != null');
+    expect(src).toContain('`/directory/port/${group.code}${pageSeg}${qs}`');
+  });
+
   it('the port hub is registered BEFORE the city hub — both are 5 segments with /page/N', async () => {
     // /directory/port/USLAX/page/2 would otherwise match
     // /directory/:stateSlug/:citySlug/page/:page as state="port", city="USLAX".
