@@ -2070,48 +2070,230 @@ export async function carriersByCity(
   return listCarriers({ filters: scoped, perPage: filters.perPage });
 }
 
-// ─── Related carriers (profile cross-links) ───────────────────────────────
+// ─── Related carriers — the RING MESH (profile cross-links) ───────────────
+//
+// WHAT THIS REPLACED, and why it had to change (measured on prod 2026-08-30).
+//
+// The previous implementation took the same deterministic `featured` TOP-6 of
+// the carrier's city for every carrier in that city, topped up with the state's
+// top-6. That is a STAR, not a mesh: the link target set does not depend on who
+// is linking, so every one of Houston's 3,511 profiles linked to the same six
+// carriers. Census over all 330,452 rows:
+//
+//   distinct carriers receiving ANY profile→profile link      97,287  (29.4%)
+//   carriers receiving NONE                                  241,428  (73.1%)
+//   most inbound links to a single carrier                     3,510
+//   p99 / p99.9 inbound                                        89 / 467
+//
+// #455 already fixed REACHABILITY (a crawler can now walk to ~100% of carriers
+// through /directory/{state}/cities + {hub}/page/N). This fixes EQUITY: 73% of
+// profiles were terminal leaves that no other profile pointed at, so the link
+// value the hubs pass down pooled on a 29% subset and never circulated.
+//
+// THE MESH. Put every carrier on a RING and hand each one the K carriers that
+// follow it. Define one total order over the table:
+//
+//   intermodal DESC, coalesce(power_units, 0) DESC, usdot DESC
+//
+// and, for the carrier at ring position p, link to positions p+1 … p+K, wrapping
+// past the end back to the start. Out-degree K, in-degree K, for EVERY member:
+// the set that links to p is exactly p-1 … p-K. Nothing pools, because the
+// window is a function of the linker, not a fixed top-N.
+//
+// WHY THAT ORDER IS ALSO GOOD FOR A HUMAN (the SEO value follows from this, not
+// the other way round). Ring neighbours are near-identical on the two things a
+// shipper compares carriers by: drayage capability (intermodal leads, so the
+// 18,977 drayage carriers cluster and cross-link to each other) and fleet size
+// (`power_units` is the second key). So "other carriers in Houston, TX" is a
+// list of directly comparable alternatives at your scale, not the six biggest
+// fleets in the city that a small shipper has no use for. `usdot` is only the
+// tie-break that makes the order total; it is a public, already-rendered field,
+// which is why it is used instead of the internal `id` (VisibleCarrier
+// deliberately drops internal ids).
+//
+// TWO RINGS, NOT ONE. A city ring alone leaves the 8,251 carriers that are the
+// ONLY carrier in their city with nobody to link to or be linked from, so every
+// profile also joins a CORRIDOR ring — its `nearest_port_code` group (57 groups,
+// covering 319,878 of 330,452 carriers), or, for the 10,574 with no port, the
+// no-port carriers of its own state. Every member of a ring queries that ring,
+// so both are DENSE: minimum in-degree is 2 (a node's two immediate predecessors
+// always reach it, because the smallest window any carrier emits is 2).
+// The corridor ring is also what keeps the profile graph from decomposing into
+// 26,231 disconnected city cycles — it is the cross-city shortcut, and "carriers
+// near the Port of Houston" is a real thing a drayage shipper searches for.
+//
+// MEASURED AFTER, modelled over the same 330,452 rows:
+//
+//   distinct carriers receiving a profile→profile link      330,451 (100.00%)
+//   carriers receiving none                                       1  (the only
+//     carrier in Guam — its city, its state and its no-port group each hold
+//     exactly one row, so there is nothing for it to link to; irreducible)
+//   most inbound links to a single carrier                         9  (was 3,510)
+//   p50 / p99 / p99.9 inbound                                  6 / 7 / 8
+//   out-degree exactly 6                                    330,447 of 330,452
+//   share of rendered links that are same-city                  47.7%
+//
+// COST. The link COUNT is unchanged at 6, and #455's ~60% cut in directory crawl
+// bytes is not given back: rendered through renderCarrierProfile over 120 real
+// carriers, 44,826 bytes/page before → 44,713 after, i.e. -114 bytes (-0.25%).
+// The extra section heading is more than paid for by the cards themselves — the
+// star always pointed at the largest fleets in the city, which carry the longest
+// names and the most equipment pills, while ring neighbours are same-scale peers.
+// Raising the count would buy no coverage anyway: in a ring in-degree EQUALS
+// out-degree, so 6 already reaches every carrier and more would only be bytes on
+// ~330k crawled pages. Both ring queries are pure index seeks on the 0071
+// indexes, and the city seek is CHEAPER than the star query it replaces (total
+// cost 8.44 vs 32.39, 7 buffers vs 20 — see drizzle/0071_carrier_ring_indexes.sql).
+// One round trip (2 statements) for 82.3% of profiles and two (4 statements) for
+// the 17.7% that sit at the tail of a ring or in a city smaller than its slot
+// count; the star was 1-2 statements over the same 14.9%/85.1% split.
+
+/** Profile slots filled from the carrier's own city ring.
+ *  3 + 3 is a LAYOUT constraint as much as a graph one: the related grid resolves
+ *  to three columns at desktop width, so each section renders as one full row and
+ *  never strands a single card alone on a line (a 4 + 2 split wraps 3 + 1). It is
+ *  also the same visual density as the single six-card grid this replaced. */
+export const RELATED_CITY_SLOTS = 3;
+/** Profile slots filled from the corridor (nearest-port, else no-port state) ring. */
+export const RELATED_NEARBY_SLOTS = 3;
+/** Related links rendered per profile. Unchanged from the pre-mesh star: in a
+ *  ring, in-degree = out-degree, so every carrier is already covered at 6 and a
+ *  higher count would only add bytes to ~330k crawled pages. */
+export const RELATED_LIMIT = RELATED_CITY_SLOTS + RELATED_NEARBY_SLOTS;
+
+/** The carrier's own position on the ring — the seek key, nothing more. */
+interface RingAnchor {
+  intermodal: boolean;
+  powerUnits: number;
+  usdot: string;
+}
+
 /**
- * Other carriers to surface on a profile: same city first, topped up with
- * same-state, self excluded. Ordered featured-first. Never throws.
+ * The ring's total order. MUST stay identical to the trailing key columns of the
+ * 0071 `*_ring_idx` indexes (`"intermodal" DESC, (COALESCE("power_units", 0))
+ * DESC, "usdot" DESC`) or every ring query silently degrades to a full scan of
+ * its group + a sort — the exact failure 0068 documents for the city slug.
  */
-export async function relatedCarriers(carrier: VisibleCarrier, limit = 6): Promise<VisibleCarrier[]> {
-  if (!carrier.state) return [];
+export function ringOrder(): SQL[] {
+  return [
+    sql`${carrierDirectory.intermodal} desc`,
+    sql`coalesce(${carrierDirectory.powerUnits}, 0) desc`,
+    sql`${carrierDirectory.usdot} desc`,
+  ];
+}
+
+/**
+ * "Strictly after `anchor` on the ring", as a ROW-WISE comparison.
+ *
+ * Row-wise (rather than the equivalent OR-chain) is deliberate: Postgres turns
+ * `ROW(a,b,c) < ROW(x,y,z)` into a single multi-column btree Index Cond, so the
+ * whole window is one seek. Verified on a byte-identical 330,452-row copy of
+ * prod — `Index Cond: (... AND (ROW(intermodal, COALESCE(power_units, 0), usdot)
+ * < ROW(...)))`, no Filter, no Sort.
+ *
+ * Every key is NULL-free by construction (`intermodal` and `usdot` are NOT NULL;
+ * `power_units` is coalesced), which is what makes the row comparison total —
+ * a NULL operand would make it return NULL and drop the row from the ring.
+ */
+function ringAfter(anchor: RingAnchor): SQL {
+  return sql`(${carrierDirectory.intermodal}, coalesce(${carrierDirectory.powerUnits}, 0), ${carrierDirectory.usdot}) < (${anchor.intermodal}, ${anchor.powerUnits}, ${anchor.usdot})`;
+}
+
+/** The K carriers following `anchor` inside `scope`. */
+function ringWindow(scope: SQL, anchor: RingAnchor, n: number) {
+  return db()
+    .select()
+    .from(carrierDirectory)
+    .where(and(scope, ringAfter(anchor)))
+    .orderBy(...ringOrder())
+    .limit(n);
+}
+
+/** The head of `scope`'s ring — what the window wraps around to. */
+function ringHead(scope: SQL, n: number) {
+  return db().select().from(carrierDirectory).where(scope).orderBy(...ringOrder()).limit(n);
+}
+
+/**
+ * Other carriers to surface on a profile — the city ring first, then the
+ * corridor ring. Self excluded, deduped, deterministic (so the ~330k profile
+ * pages stay byte-identical per URL and shared-cacheable). Never throws.
+ */
+export async function relatedCarriers(carrier: VisibleCarrier, limit = RELATED_LIMIT): Promise<VisibleCarrier[]> {
+  if (!carrier.state || limit < 1) return [];
   const state = carrier.state.toUpperCase().slice(0, 2);
-  try {
-    const out: VisibleCarrier[] = [];
+  const citySlug = carrier.city ? citySlugify(carrier.city) : '';
+  const anchor: RingAnchor = {
+    intermodal: carrier.intermodal,
+    powerUnits: carrier.powerUnits ?? 0,
+    usdot: carrier.usdot,
+  };
+  // The city ring: same state + same city slug. Null when the FMCSA row has no
+  // usable city, in which case the corridor ring takes every slot.
+  const cityScope: SQL | null = citySlug
+    ? (and(eq(carrierDirectory.state, state), cityCondition(citySlug)) as SQL)
+    : null;
+  // The corridor ring: the nearest-port group, or — for the carriers FMCSA
+  // places nowhere near a port — the no-port carriers of the same state. The
+  // `IS NULL` arm is a scope, not a fallback filter: it makes the ring's members
+  // exactly the carriers that QUERY it, which is what keeps it dense.
+  const nearbyScope: SQL = carrier.nearestPortCode
+    ? (eq(carrierDirectory.nearestPortCode, carrier.nearestPortCode) as SQL)
+    : (and(eq(carrierDirectory.state, state), isNull(carrierDirectory.nearestPortCode)) as SQL);
+
+  const citySlots = Math.min(RELATED_CITY_SLOTS, limit);
+
+  type Row = typeof carrierDirectory.$inferSelect;
+  /**
+   * Deterministically pick the profile's list from whatever ring rows we hold.
+   * Pure, and re-run from scratch after the wrap fetch so the result never
+   * depends on how many round trips it took to get the rows.
+   */
+  const assemble = (cityPool: Row[], nearbyPool: Row[]) => {
     const seen = new Set<string>([carrier.slug]);
-    const push = (rows: (typeof carrierDirectory.$inferSelect)[]) => {
+    const city: VisibleCarrier[] = [];
+    const nearby: VisibleCarrier[] = [];
+    const fill = (into: VisibleCarrier[], rows: Row[], want: number) => {
       for (const r of rows) {
+        if (into.length >= want) break;
         if (seen.has(r.publicSlug)) continue;
         seen.add(r.publicSlug);
-        out.push(visibleCarrier(r));
-        if (out.length >= limit) break;
+        into.push(visibleCarrier(r));
       }
     };
+    fill(city, cityPool, citySlots);
+    fill(nearby, nearbyPool, limit - city.length);
+    // A corridor ring too small to fill its slots hands them back to the city,
+    // so a profile is never rendered with fewer links than the data allows.
+    fill(city, cityPool, limit - nearby.length);
+    return { city, nearby };
+  };
 
-    if (carrier.city) {
-      const citySlug = citySlugify(carrier.city);
-      if (citySlug) {
-        const cityRows = await db()
-          .select()
-          .from(carrierDirectory)
-          .where(and(eq(carrierDirectory.state, state), cityCondition(citySlug), ne(carrierDirectory.publicSlug, carrier.slug)))
-          .orderBy(...orderForSort('featured'))
-          .limit(limit + 1);
-        push(cityRows);
-      }
+  try {
+    // ONE round trip for the common case. Both legs over-fetch to `limit + 1` —
+    // the same index seek either way — so whichever ring is short (a one-carrier
+    // city, a state with no other no-port carriers) the other can cover the
+    // whole profile instead of leaving a stub.
+    const [cityFwd, nearbyFwd] = await Promise.all([
+      cityScope ? ringWindow(cityScope, anchor, limit + 1) : Promise.resolve([] as Row[]),
+      ringWindow(nearbyScope, anchor, limit + 1),
+    ]);
+    let picked = assemble(cityFwd, nearbyFwd);
+
+    // Second round trip ONLY for the 17.7% of profiles sitting at the tail of a
+    // ring (or in a city smaller than its slot count): wrap past the end back to
+    // the head. The wrap is what makes in-degree equal out-degree — without it,
+    // the carriers at the HEAD of each ring would receive nothing.
+    const cityShort = cityScope != null && picked.city.length < citySlots;
+    const nearbyShort = picked.city.length + picked.nearby.length < limit;
+    if (cityShort || nearbyShort) {
+      const [cityWrap, nearbyWrap] = await Promise.all([
+        cityShort && cityScope ? ringHead(cityScope, limit + 1) : Promise.resolve([] as Row[]),
+        nearbyShort ? ringHead(nearbyScope, limit + 1) : Promise.resolve([] as Row[]),
+      ]);
+      picked = assemble([...cityFwd, ...cityWrap], [...nearbyFwd, ...nearbyWrap]);
     }
-    if (out.length < limit) {
-      const stateRows = await db()
-        .select()
-        .from(carrierDirectory)
-        .where(and(eq(carrierDirectory.state, state), ne(carrierDirectory.publicSlug, carrier.slug)))
-        .orderBy(...orderForSort('featured'))
-        .limit(limit + out.length + 1);
-      push(stateRows);
-    }
-    return out.slice(0, limit);
+    return [...picked.city, ...picked.nearby].slice(0, limit);
   } catch (err) {
     console.warn('[directory] relatedCarriers failed; serving none:', err);
     return [];

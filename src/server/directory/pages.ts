@@ -3451,11 +3451,37 @@ export function renderCarrierProfile(opts: {
   }
   if (port) crossLinks.push(`<a class="dir-chip" href="/directory/port/${port.code}">Near ${esc(port.name)}</a>`);
 
+  // Related carriers arrive as ONE ordered list from the ring mesh (queries.ts
+  // relatedCarriers): the carrier's own city ring first, then its corridor ring
+  // (nearest port, else the no-port carriers of its state). Split them here so
+  // each group gets an honest heading — a card only says "City, ST" in its meta
+  // line, so a single "Other carriers in Houston" heading over a mixed list
+  // would be a lie. Nothing is dropped or reordered; this is a partition.
+  const sameCity = (r: VisibleCarrier): boolean =>
+    !!r.city && !!r.state && !!citySlug && r.state === c.state && citySlugify(r.city) === citySlug;
+  const relatedCity = related.filter(sameCity);
+  const relatedNearby = related.filter((r) => !sameCity(r));
+  const relatedGrid = (list: VisibleCarrier[]): string =>
+    `<div class="dir-grid" style="grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));">${list
+      .map(carrierCard)
+      .join('\n')}</div>`;
+  // Corridor heading names the actual scope the ring used, so the reason those
+  // carriers are on the page is legible: the port group, or failing that the
+  // state. Never "the area" when we can name it.
+  const nearbyHeading = port ? `More carriers near ${esc(port.name)}` : st ? `More carriers in ${esc(st.name)}` : 'More carriers nearby';
   const relatedModule = related.length
-    ? `<div class="dir-section-h"><h2 style="font-size: 18px;">Other carriers in ${esc(cityName || st?.name || 'the area')}</h2></div>
-       <div class="dir-grid" style="grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));">${related
-         .map(carrierCard)
-         .join('\n')}</div>`
+    ? [
+        relatedCity.length
+          ? `<div class="dir-section-h"><h2 style="font-size: 18px;">Other carriers in ${esc(cityName || st?.name || 'the area')}</h2></div>
+       ${relatedGrid(relatedCity)}`
+          : '',
+        relatedNearby.length
+          ? `<div class="dir-section-h"><h2 style="font-size: 18px;">${nearbyHeading}</h2></div>
+       ${relatedGrid(relatedNearby)}`
+          : '',
+      ]
+        .filter(Boolean)
+        .join('\n')
     : '';
 
   // Location line — NEW: append ZIP (stored, never shown before) after City, State.

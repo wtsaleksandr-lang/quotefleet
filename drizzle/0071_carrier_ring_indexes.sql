@@ -1,0 +1,121 @@
+-- carrier_directory RING indexes — the internal-link MESH.
+--
+-- THE PROBLEM (measured on prod, 2026-08-30, census over all 330,452 rows).
+-- #455 fixed carrier REACHABILITY: a crawler can now walk from `/` to ~100% of
+-- carriers via /directory/{state}/cities and the {hub}/page/N path pager. What
+-- it explicitly deferred was link EQUITY, and the numbers are stark:
+--
+--   distinct carriers receiving ANY profile→profile link      97,287  (29.4%)
+--   carriers receiving NONE                                  241,428  (73.1%)
+--   most inbound links to a single carrier                     3,510
+--   p99 / p99.9 inbound links                                  89 / 467
+--   profile→profile edges                                  1,826,618
+--
+-- The cause is that relatedCarriers() asked for the same thing on every page:
+--
+--   SELECT … WHERE city_slug = $1 AND state = $2 AND public_slug <> $me
+--   ORDER BY intermodal DESC, power_units DESC NULLS LAST, legal_name, id
+--   LIMIT 7
+--
+-- The target set does not depend on WHO is asking, so all 3,511 Houston profiles
+-- pointed at the same six carriers. That is a STAR. Link value handed down by
+-- the city hubs pooled on a 29% subset and never circulated; 73% of profiles
+-- were terminal leaves.
+--
+-- THE FIX: a RING. Define one total order over the table —
+--
+--   intermodal DESC, COALESCE(power_units, 0) DESC, usdot DESC
+--
+-- — and give the carrier at ring position p the carriers at p+1 … p+K, wrapping
+-- past the end back to the head. Out-degree K and in-degree K for EVERY member,
+-- because the set pointing at p is exactly p-1 … p-K. Nothing can pool: the
+-- window is a function of the linker.
+--
+-- The order is also the useful one for a reader, which is the point — a shipper
+-- comparing carriers cares about drayage capability and fleet size, and ring
+-- neighbours match on both (intermodal leads, power_units is next). So "other
+-- carriers in Houston, TX" reads as directly comparable alternatives at your own
+-- scale instead of the six largest fleets in the city. `usdot` is only the
+-- tie-break that makes the order total; it is used instead of `id` because it is
+-- unique, NOT NULL, already rendered on every card, and VisibleCarrier
+-- deliberately carries no internal id.
+--
+-- WHY THESE INDEXES AND NOT THE 0068 ONE. 0068's
+-- carrier_directory_cityslug_state_featured_idx ends in
+-- `"intermodal" DESC, "power_units" DESC NULLS LAST` and has no unique tail. It
+-- cannot serve the ring for two independent reasons:
+--
+--   1. NO UNIQUE TAIL. Ties on (intermodal, power_units) are enormous — most of
+--      Houston's 3,511 carriers report power_units = 1 — so a seek that stops at
+--      power_units skips the whole tie group at once and every tied carrier
+--      lands on the same next target. The star, rebuilt.
+--   2. NULLS LAST vs COALESCE. The seek is written as a row-wise comparison,
+--      ROW(intermodal, COALESCE(power_units,0), usdot) < ROW($1,$2,$3), because
+--      Postgres folds that into ONE multi-column Index Cond. Row comparison has
+--      no NULLS LAST spelling, and a NULL operand makes it return NULL — which
+--      would silently drop the 449 NULL-power_units carriers off the ring. So
+--      the key is COALESCE'd, and the INDEX has to be on that same expression or
+--      the planner cannot match it. This is the 0068 trap one dimension further
+--      in: an index on the column does not serve a predicate on an expression.
+--
+-- MEASURED (EXPLAIN ANALYZE of the exact drizzle-generated SQL, with real bound
+-- parameters, on a 330,452-row byte-identical copy of prod carrying all 31 of
+-- its existing indexes; Houston TX anchor at ring position ~1,500):
+--
+--   query                          before (0068 only)      after (this file)
+--   city ring forward seek     1,063.52  Bitmap Heap Scan       8.44  Index Scan
+--                              2,764 buffers, 6.26 ms        7 buffers, 0.16 ms
+--                              ROW(...) applied as Filter    ROW(...) in Index Cond
+--   city ring head (wrap)              —                     28.37  Index Scan
+--   port ring forward seek             —                      8.44  Index Scan
+--   no-port state ring seek            —                      8.30  Index Scan
+--   no-port state ring head            —                     27.18  Index Scan
+--
+-- For reference the STAR query these replace cost 32.39 / 20 buffers on the same
+-- copy, so the mesh's hot path is CHEAPER than the concentrated graph it fixes.
+--
+-- Index sizes on the 330,452-row copy: cityslug ring 15 MB, port ring 13 MB,
+-- no-port state ring 344 kB — ~28 MB against a table whose indexes already total
+-- ~120 MB. No index is dropped; this migration is purely additive.
+--
+-- PLAIN CREATE INDEX, NOT CONCURRENTLY. Three reasons, and the third is the one
+-- specific to this file:
+--   * The runtime path is ensureSelfHealTables() (the Replit deploy skips
+--     db:migrate), which sends DDL over the extended query protocol, and
+--     CONCURRENTLY cannot run inside the implicit transaction that creates.
+--   * CREATE INDEX takes a SHARE lock: it blocks WRITES to carrier_directory
+--     (only the weekly FMCSA ingest writes here) and never READS. It is not the
+--     ACCESS EXCLUSIVE ADD COLUMN that took prod down on 2026-08-28, and
+--     runSelfHealStatements still runs it behind a to_regclass catalog pre-check
+--     with lock_timeout = 3s and statement_timeout = 120s, so a busy table
+--     defers the build to the next boot instead of queueing on the lock.
+--   * A CONCURRENTLY build that FAILS leaves an INVALID index behind. The
+--     runner's to_regclass pre-check would then report the index as already
+--     present and never rebuild it — and an invalid index is never chosen by the
+--     planner, so every carrier profile would quietly go back to scanning its
+--     entire city. A plain build either exists and works or does not exist.
+-- Measured build on the 330,452-row copy: ~1.5 s each.
+
+-- CITY ring — the primary relatedness scope ("other carriers in <city>"), and
+-- the one that has to carry 26,231 city groups. Leading expression is byte-for-
+-- byte the one queries.ts cityCondition() emits (see 0068); `state` follows
+-- because a city slug is only unique within a state.
+CREATE INDEX IF NOT EXISTS "carrier_directory_cityslug_ring_idx" ON "carrier_directory" ((btrim(regexp_replace(lower("city"), '[^a-z0-9]+', '-', 'g'), '-')), "state", "intermodal" DESC, (COALESCE("power_units", 0)) DESC, "usdot" DESC);
+
+-- CORRIDOR ring — the nearest-port group (57 groups covering 319,878 of 330,452
+-- carriers). Every profile joins one in addition to its city ring, for two
+-- reasons: it is what gives the 8,251 carriers that are the ONLY carrier in
+-- their city somebody to link to and be linked from, and it is the cross-city
+-- shortcut that stops the profile graph decomposing into 26,231 disconnected
+-- city cycles. It is also a real search intent for a drayage directory —
+-- "carriers near the Port of Houston".
+CREATE INDEX IF NOT EXISTS "carrier_directory_port_ring_idx" ON "carrier_directory" ("nearest_port_code", "intermodal" DESC, (COALESCE("power_units", 0)) DESC, "usdot" DESC);
+
+-- CORRIDOR ring for the 10,574 carriers FMCSA places near no port (TX 1,751,
+-- ND 1,429, ID 1,373, MT 1,329, …). PARTIAL on `nearest_port_code IS NULL` on
+-- purpose: a ring only distributes evenly when its members are exactly the rows
+-- that QUERY it. A full (state, ring…) index would put 330k carriers on a ring
+-- that only 10,574 of them walk, so each seek would step over port-having
+-- carriers and the no-port members would receive almost nothing — the
+-- concentration bug in miniature. 344 kB.
+CREATE INDEX IF NOT EXISTS "carrier_directory_state_noport_ring_idx" ON "carrier_directory" ("state", "intermodal" DESC, (COALESCE("power_units", 0)) DESC, "usdot" DESC) WHERE "nearest_port_code" IS NULL;

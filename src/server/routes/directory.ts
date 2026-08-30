@@ -32,6 +32,7 @@ import {
   cityCarrierCount,
   stateCarrierCount,
   relatedCarriers,
+  RELATED_LIMIT,
   getFacetCounts,
   getHeroCarriers,
   normalizeFilters,
@@ -389,7 +390,9 @@ export function registerDirectoryRoutes(app: Express) {
       }
       const citySlug = carrier.city ? citySlugify(carrier.city) : '';
       const [related, cityCount, stateCount] = await Promise.all([
-        relatedCarriers(carrier, 6),
+        // Count comes from queries.ts, not a literal here: the mesh's slot split
+        // (city ring + corridor ring) has to add up to whatever this asks for.
+        relatedCarriers(carrier, RELATED_LIMIT),
         carrier.state && citySlug ? cityCarrierCount(carrier.state, citySlug) : Promise.resolve(0),
         carrier.state ? stateCarrierCount(carrier.state) : Promise.resolve(0),
       ]);
