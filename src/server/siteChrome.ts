@@ -116,13 +116,6 @@ export const FULL_SITE_HEADER = `<header class="site-header">
  * DELIBERATELY ABSENT: Google Pay (PMC available=false — it would not render)
  * and PayPal (PMC off; there is no PayPal integration in this codebase at all).
  *
- * PROCESSOR ATTRIBUTION — "Powered by Stripe" sits directly under the marks
- * because every mark above IS Stripe (Link is Stripe's own wallet), and without
- * the line a reader reasonably asks where Stripe is. It is a statement of fact
- * about who processes the payment — checkout is Stripe-HOSTED — not a badge of
- * partnership or certification, and it is plain text in the same monochrome
- * treatment: no Stripe wordmark, no brand colour, no external asset.
- *
  * STYLING — monochrome by design: the marks inherit `currentColor` from
  * `--ink`, which is near-white on the dark theme and deep navy on light, so
  * they invert with the theme from ONE token. No brand colours, no hardcoded
@@ -154,71 +147,12 @@ export const FOOTER_PAY_ROW = `<div class="qf-footer-payrow">`
   + `<li class="qf-paymark"><svg class="qf-pm" viewBox="0 0 32 16" role="img" aria-label="American Express"><text x="16" y="11.8" text-anchor="middle" font-size="9" font-weight="800" letter-spacing=".1">AMEX</text></svg></li>`
   + `<li class="qf-paymark"><svg class="qf-pm" viewBox="0 0 32 16" role="img" aria-label="Apple Pay"><path transform="translate(1.7 3.2) scale(.4)" d="${APPLE_MARK}"/><text x="12.5" y="11.7" font-size="9.5" font-weight="600" letter-spacing="-.1">Pay</text></svg></li>`
   + `<li class="qf-paymark"><svg class="qf-pm" viewBox="0 0 32 16" role="img" aria-label="Link"><text x="16" y="12" text-anchor="middle" font-size="11" font-weight="700" letter-spacing="-.2">link</text></svg></li>`
-  + `</ul>`
-  + `<span class="qf-payrow-proc">Powered by Stripe</span>`
-  + `</div>`
+  + `</ul></div>`
   + `<ul class="qf-payrow-trust" role="list">`
   + `<li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 3 4.5 6v6c0 4.4 3.2 7.4 7.5 8.9 4.3-1.5 7.5-4.5 7.5-8.9V6z"/><rect x="9.2" y="10.6" width="5.6" height="4.6" rx="1"/><path d="M10.4 10.6V9.5a1.6 1.6 0 0 1 3.2 0v1.1"/></svg>Card details never touch our servers</li>`
   + `<li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="2.5" y="5" width="19" height="14" rx="2.5"/><path d="M2.5 9.5h19"/><line x1="4" y1="20" x2="20" y2="4"/></svg>No credit card to start</li>`
   + `<li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polyline points="2.5 5 2.5 10.5 8 10.5"/><path d="M4.6 15.3a8.5 8.5 0 1 0 1.5-8.4L2.5 10.5"/></svg>Cancel anytime — no contracts</li>`
   + `</ul></div>`;
-
-/**
- * DATA-SOURCE ATTRIBUTION strip for the carrier-directory surfaces.
- *
- * ATTRIBUTION, NOT ACCREDITATION. Federal agencies restrict use of their seals
- * precisely because a seal reads as endorsement or certification, and we hold
- * neither. So: NO FMCSA/USDOT seal, no agency logo, no external image — plain
- * wordmark text plus a generic monochrome glyph, under a label that says these
- * are where the data comes FROM, closed by an explicit non-affiliation line.
- *
- * EVERY SOURCE NAMED HERE WAS TRACED TO INGEST CODE BEFORE IT SHIPPED. Padding
- * the row with impressive-sounding organisations we do not touch is the exact
- * failure this comment exists to prevent:
- *   • FMCSA Company Census (MCS-150) — data.transportation.gov Socrata resource
- *     `az4n-8mr2`, fetched in directory/carrierIngest.ts. Supplies fleet size,
- *     drivers, safety rating, hazmat flag, the crgo_* cargo-class flags and the
- *     public phone/email on every profile.
- *   • FMCSA Licensing & Insurance (L&I) Carrier file — Socrata `6eyk-hxee`,
- *     same ingester. Supplies MC/docket number and operating-authority status,
- *     and its (common_stat='A' OR contract_stat='A') filter is what defines the
- *     directory's "active US motor carrier" set.
- *   • FMCSA QCMobile — https://mobile.fmcsa.dot.gov/qc/services/carriers, called
- *     live by directory/fmcsaLookup.ts behind the carrier-profile and
- *     /compliance lookup buttons. Called "live carrier lookup", NOT "SAFER":
- *     safer.fmcsa.dot.gov appears in this codebase only as an outbound link a
- *     user clicks, never as a feed we read.
- *   • USDOT Open Data Portal — data.transportation.gov, the portal that
- *     publishes both Socrata datasets above.
- *   • U.S. Census Bureau 2020 Gazetteer — the ZCTA5 centroid table vendored at
- *     src/calc/zip5Centroids.ts, used by directory/containerPorts.ts to derive
- *     each carrier's nearest port, i.e. every /directory/port/* page.
- *
- * DELIBERATELY NOT NAMED, because we do not ingest them for the directory: any
- * state DOT (no such integration exists anywhere in this repo), FMCSA SAFER as
- * a feed, FMCSA SMS/BASIC scores, UIIA, TSA/TWIC (all outbound link cards or
- * carrier-self-declared badges), and CBP / bill-of-lading manifest data, which
- * belongs to the separate /importers surface and never renders on /directory.
- *
- * STYLING — monochrome from `--ink`/`--muted` exactly like FOOTER_PAY_ROW: no
- * brand colours, no hardcoded hexes, no external image requests.
- */
-const DS_ICON_DATASET = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><ellipse cx="12" cy="6" rx="7.5" ry="3"/><path d="M4.5 6v12c0 1.7 3.4 3 7.5 3s7.5-1.3 7.5-3V6"/><path d="M4.5 12c0 1.7 3.4 3 7.5 3s7.5-1.3 7.5-3"/></svg>`;
-const DS_ICON_LIVE = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="2.4"/><path d="M7.8 16.2a6 6 0 0 1 0-8.4"/><path d="M16.2 7.8a6 6 0 0 1 0 8.4"/><path d="M5 19a10 10 0 0 1 0-14"/><path d="M19 5a10 10 0 0 1 0 14"/></svg>`;
-const DS_ICON_PORTAL = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 3 3 7.5l9 4.5 9-4.5z"/><path d="m3 12.5 9 4.5 9-4.5"/><path d="m3 17 9 4.5 9-4.5"/></svg>`;
-const DS_ICON_GEO = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 21s7-5.4 7-11a7 7 0 1 0-14 0c0 5.6 7 11 7 11z"/><circle cx="12" cy="10" r="2.6"/></svg>`;
-
-export const DIRECTORY_DATA_SOURCES = `<div class="qf-datasources">`
-  + `<span class="qf-ds-label">Directory data sources</span>`
-  + `<ul class="qf-ds-list" role="list">`
-  + `<li>${DS_ICON_DATASET}FMCSA Company Census (MCS-150)</li>`
-  + `<li>${DS_ICON_DATASET}FMCSA Licensing &amp; Insurance (L&amp;I)</li>`
-  + `<li>${DS_ICON_LIVE}FMCSA QCMobile — live carrier lookup</li>`
-  + `<li>${DS_ICON_PORTAL}USDOT Open Data Portal (data.transportation.gov)</li>`
-  + `<li>${DS_ICON_GEO}U.S. Census Bureau 2020 Gazetteer</li>`
-  + `</ul>`
-  + `<p class="qf-ds-note">Public records, used as sources and credited as such. QuoteFleet is not affiliated with, endorsed by, or certified by the FMCSA, USDOT, or any other agency. Carrier-supplied details on a claimed listing are labelled self-declared.</p>`
-  + `</div>`;
 
 // Premium footer — the shared marketing footer. Carries the site-wide "Partners"
 // link (affiliate + referral program) in the Product column, and closes with the
