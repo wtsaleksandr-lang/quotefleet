@@ -15,6 +15,7 @@ import { resolve } from 'node:path';
 import type { AddressInfo } from 'node:net';
 import type { Server } from 'node:http';
 import type { CompanyProfile } from '../outreach/enrichCompany.js';
+import { SENDER_ADDRESS } from '../outreach/draftEmail.js';
 import type { ProspectDemoStore, UpsertProspectDemoInput } from '../outreach/prospectDemoStore.js';
 import type { OutreachEmailStore, SaveOutreachEmailInput } from '../outreach/outreachEmailStore.js';
 import { draftOutreachEmail } from '../outreach/draftEmail.js';
@@ -181,8 +182,16 @@ describe('POST /api/admin/outreach/draft-email', () => {
     expect(typeof r.json.subject).toBe('string');
     expect(String(r.json.subject)).toContain('Acme Drayage');
     // Mailing address + visible unsubscribe are intentionally NOT in the body.
-    expect(String(r.json.bodyHtml)).not.toContain('30 Angus Road, Hamilton, ON L8K 6L1, Canada');
-    expect(String(r.json.bodyText)).not.toContain('30 Angus Road, Hamilton, ON L8K 6L1, Canada');
+    // Asserted against SENDER_ADDRESS rather than a literal, so this keeps
+    // holding if the address changes — and so no address is hardcoded here.
+    expect(String(r.json.bodyHtml)).not.toContain(SENDER_ADDRESS);
+    expect(String(r.json.bodyText)).not.toContain(SENDER_ADDRESS);
+    // Belt and braces: a founder's home address must never reach a recipient,
+    // whatever SENDER_ADDRESS happens to be set to.
+    for (const body of [String(r.json.bodyHtml), String(r.json.bodyText)]) {
+      expect(body).not.toMatch(/angus\s*(road|rd)/i);
+      expect(body).not.toMatch(/L8K\s*6L1/i);
+    }
     expect(String(r.json.bodyHtml)).not.toContain('/outreach/unsubscribe/');
     expect(String(r.json.demoUrl)).toMatch(/\/demo\/tok_/);
     expect(String(r.json.bodyText)).toContain(String(r.json.demoUrl));

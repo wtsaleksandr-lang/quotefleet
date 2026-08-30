@@ -282,8 +282,15 @@ describe('draftOutreachEmail — cold-compliant footer (CAN-SPAM)', () => {
       coldCompliantFooter: true,
     });
     const unsubPath = '/outreach/unsubscribe/unsub-token-abcdef1234';
+    // The HTML body escapes the address (the entity name contains an "&", which
+    // renders as "&amp;"), so compare each document against its own encoding
+    // rather than the raw constant — the address IS present in both.
+    const htmlAddress = SENDER_ADDRESS.replace(/&/g, '&amp;')
+      .replace(/</g, '&lt;')
+      .replace(/>/g, '&gt;');
+    expect(draft.bodyHtml).toContain(htmlAddress);
+    expect(draft.bodyText).toContain(SENDER_ADDRESS);
     for (const doc of [draft.bodyHtml, draft.bodyText]) {
-      expect(doc).toContain(SENDER_ADDRESS);
       expect(doc).toContain(unsubPath);
     }
     // The HTML link is real + labelled "Unsubscribe".

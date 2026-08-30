@@ -15,7 +15,7 @@
     "test:watch": "vitest",
     "check:spacing": "node scripts/check-spacing.mjs",
     "check:hardcoded-colors": "node scripts/check-hardcoded-colors.mjs",
-    "check:guards": "pnpm check:spacing && pnpm check:hardcoded-colors",
+    "check:guards": "pnpm check:spacing && pnpm check:hardcoded-colors && pnpm check:no-home-address",
     "test:e2e": "playwright test",
     "test:e2e:ui": "playwright test --ui",
     "db:push": "drizzle-kit push",
@@ -27,7 +27,8 @@
     "rates:import": "tsx scripts/import-rates.ts",
     "quotes:recent": "tsx scripts/list-recent-quotes.ts",
     "prod:check": "tsx scripts/check-production-readiness.ts",
-    "deploy:replit": "pnpm install && pnpm db:migrate && pnpm db:seed && pnpm start"
+    "deploy:replit": "pnpm install && pnpm db:migrate && pnpm db:seed && pnpm start",
+    "check:no-home-address": "node scripts/check-no-home-address.mjs"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.90.0",
