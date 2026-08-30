@@ -33,8 +33,28 @@ import type { CompanyProfile } from './enrichCompany.js';
 // ─── Compliance constants (CASL / CAN-SPAM) ──────────────────────────────
 /** Sender identity shown in every footer. */
 export const SENDER_NAME = 'QuoteFleet';
-/** Physical mailing address — a hard CAN-SPAM / CASL requirement. */
-export const SENDER_ADDRESS = '30 Angus Road, Hamilton, ON L8K 6L1, Canada';
+/**
+ * Physical mailing address — a hard CAN-SPAM / CASL requirement.
+ *
+ * This MUST be the registered office of the operating entity, never a
+ * personal residence. It previously carried the founder's home address, which
+ * meant every outreach and RFQ email published it to a stranger; those are the
+ * two highest-volume outbound surfaces we have. A home address cannot be
+ * un-sent once it is in someone's inbox.
+ *
+ * The value below is the registered office of MR Holdings & Trade LLC (the
+ * entity that operates QuoteFleet), is already published in our own public
+ * Terms of Service, and satisfies the "valid physical postal address"
+ * requirement in both CAN-SPAM §7704(a)(5) and CASL. Overridable via
+ * SENDER_ADDRESS so the entity can move without a code change — but it falls
+ * back to the registered office, never to a person's home.
+ *
+ * `check:no-home-address` fails the build if the redacted address reappears
+ * anywhere in the tree.
+ */
+export const SENDER_ADDRESS =
+  process.env.SENDER_ADDRESS?.trim() ||
+  'MR Holdings & Trade LLC, 30 N Gould St, Ste R, Sheridan, WY 82801, United States';
 /** Named founder signature — a real person lifts cold-email trust + reply rate. */
 export const SENDER_PERSON = 'Aleksandr';
 /** Signature title shown under the name. */
