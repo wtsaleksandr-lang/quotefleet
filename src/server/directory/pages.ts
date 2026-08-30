@@ -275,6 +275,18 @@ function safetyLabel(code: string | null): { text: string; tone: 'good' | 'warn'
  *     arithmetic about a rate. No grades, no stars, no "unsafe", no "poor".
  *   • ALWAYS DATED. Stale safety data presented as current is misleading, so the
  *     as-of date is part of the block, not a footnote we might drop.
+ *
+ * The rate context (`.cp-safety-ctx`) sits on its OWN line under the count so a
+ * long phrase can never force horizontal overflow at 375px, and is deliberately
+ * muted and non-tabular — it qualifies the count, it does not out-shout it. It
+ * is never colour-coded: a green or red rate would be precisely the verdict we
+ * refuse to hand down. (This rationale lives here rather than in the CSS string
+ * because that string is inlined into all ~330k pages — comments in it are
+ * crawl budget, per PR #455.)
+ *
+ * Likewise the "no record" branch is intentionally ONE short sentence: it must
+ * reassure a reader that nothing is being hidden without spending the byte
+ * budget of a full data block on the large slice of carriers that have no data.
  */
 function safetyRecordBlock(safety: CarrierSafety | null | undefined): string {
   const asOf = safety?.safetyDataAsOf;
@@ -817,11 +829,7 @@ export const DIRECTORY_CSS = `
   .cp-chip.muted { opacity: 0.6; }
   .cp-chip .tag { font-size: 9px; text-transform: uppercase; letter-spacing: 0.05em; color: var(--muted); border: 1px solid var(--border); border-radius: 4px; padding: 2px 6px; }
   .cp-note { margin: 16px 0 0; font-size: 12px; color: var(--muted); line-height: 1.5; }
-  /* Safety-record context ("5.4% · below the national average of 5.4%"). Its own
-     line under the count so a long phrase never forces horizontal overflow at
-     375px, and deliberately MUTED + non-tabular: it is context, not a verdict,
-     and must never out-shout the count it qualifies. No colour coding — a green
-     or red rate would be exactly the editorialising we refuse to do. */
+  /* Safety-record rate context — muted, own line, never colour-coded. */
   .cp-safety-ctx { display: block; margin-top: 2px; font-size: 12px; font-family: var(--font-sans, inherit); font-variant-numeric: normal; color: var(--muted); line-height: 1.4; }
   .cp-safety-lede { margin-top: 0; margin-bottom: 16px; }
   .cp-loc { margin: 0 0 8px; line-height: 1.6; color: var(--ink-soft); font-size: 14px; }
@@ -3785,12 +3793,6 @@ export function renderCarrierProfile(opts: {
             <div class="cp-dt"><span class="k">Authority status</span><span class="v">${isActive ? 'Active' : 'On file'}</span></div>
             <div class="cp-dt"><span class="k">Hazmat registration</span><span class="v">${c.hazmat ? 'Registered' : 'Not registered'}</span></div>
           </div>
-          <!-- A safety rating has precise regulatory meaning, and "Not rated" is
-               the MOST COMMON value by far — FMCSA only rates a carrier after a
-               compliance review, and it has never reviewed most of the ~330k
-               authorised carriers. Spelling that out is the difference between
-               informing a shipper and quietly implying a real company failed
-               something it was never assessed on. -->
           <p class="cp-note">${esc(safetyRatingExplainer(c.safetyRating))}</p>
           <div class="cp-actions">
             <a class="btn btn-secondary" href="${saferUrl}" target="_blank" rel="noopener nofollow">Verify on FMCSA SAFER ↗</a>
