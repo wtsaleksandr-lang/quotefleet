@@ -20,6 +20,7 @@ import {
   type CarrierOverrideRow,
 } from '../../db/schema.js';
 import { CONTAINER_PORTS, PORT_GROUPS, portFilterCodes, portGroupForMemberCode, isKnownPortCode } from './containerPorts.js';
+import type { CarrierSafety } from './safetyData.js';
 
 export type { CarrierCapabilities, CarrierOperatingLocation } from '../../db/schema.js';
 
@@ -102,6 +103,17 @@ export interface VisibleCarrier {
    */
   updatedAt?: Date | null;
   /**
+   * FMCSA safety record — roadside inspections, out-of-service orders and
+   * crashes over FMCSA's rolling 24-month window.
+   *
+   * OPTIONAL, so the many hand-built `VisibleCarrier` fixtures stay valid, and
+   * every field inside is nullable: `null` means "FMCSA published no record",
+   * NEVER "zero". The profile renders the safety block only when
+   * `safety.safetyDataAsOf` is set, so an unenriched carrier shows nothing
+   * rather than a fabricated clean record. See ./safetyData.ts.
+   */
+  safety?: CarrierSafety | null;
+  /**
    * Admin/carrier "About" override, applied ONLY on the profile (carrierBySlug).
    * `null` on list/card rows and whenever no override exists → the profile falls
    * back to the FMCSA-derived prose (carrierAbout).
@@ -165,6 +177,18 @@ export function visibleCarrier(r: typeof carrierDirectory.$inferSelect): Visible
     buildingMaterials: r.buildingMaterials,
     nearestPortCode: r.nearestPortCode,
     updatedAt: r.updatedAt,
+    safety: {
+      inspTotal: r.inspTotal,
+      driverInspTotal: r.driverInspTotal,
+      driverOosTotal: r.driverOosTotal,
+      vehicleInspTotal: r.vehicleInspTotal,
+      vehicleOosTotal: r.vehicleOosTotal,
+      crashesTotal: r.crashesTotal,
+      crashesFatal: r.crashesFatal,
+      crashesInjury: r.crashesInjury,
+      crashesTow: r.crashesTow,
+      safetyDataAsOf: r.safetyDataAsOf,
+    },
     // FMCSA-only base shape: no override applied. The profile read
     // (carrierBySlug) merges carrier_overrides on top via mergeCarrierOverride;
     // list/card rows keep these FMCSA defaults so those surfaces are unchanged.
