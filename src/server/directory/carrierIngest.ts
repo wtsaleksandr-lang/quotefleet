@@ -42,6 +42,16 @@ import { nearestPortForZip, nearestCaPortForProvince } from './containerPorts.js
 import { US_STATE_CODES } from './usStates.js';
 import { CA_PROVINCE_CODES } from './caProvinces.js';
 import { exchangeTimeoutSignal } from '../../http/responseBody.js';
+import {
+  CRASH_ID,
+  EMPTY_SAFETY,
+  SMS_AB_ID,
+  buildCarrierSafety,
+  crashWindowStart,
+  type CarrierSafety,
+  type CrashAggRow,
+  type SmsSafetyRow,
+} from './safetyData.js';
 
 // ─── Socrata sources ──────────────────────────────────────────────────────
 const SOCRATA_BASE = 'https://data.transportation.gov/resource';
@@ -204,6 +214,32 @@ export interface CarrierRecord {
   buildingMaterials: boolean;
   nearestPortCode: string | null;
   publicSlug: string;
+  /**
+   * FMCSA safety record (roadside inspections / out-of-service orders / crashes)
+   * over FMCSA's rolling 24-month window. Every field nullable — `null` means
+   * "FMCSA published no record", never "zero". See ./safetyData.ts for the
+   * sources, the rejected ones, and the honesty contract.
+   */
+  safety: CarrierSafety;
+}
+
+/**
+ * Per-page safety lookups handed to the pure normalizer. Kept as ONE object so
+ * adding safety didn't turn `normalizeCarrier` into a seven-positional-argument
+ * function (and so every existing call site + fixture stays valid — the param is
+ * optional and defaults to "no safety data").
+ */
+export interface SafetyLookup {
+  /** SMS AB PassProperty rows, keyed by NORMALIZED dot number. */
+  sms: Map<string, SmsSafetyRow>;
+  /** Crash-file aggregates for the window, keyed by NORMALIZED dot number. */
+  crashes: Map<string, CrashAggRow>;
+  /** One consistent as-of stamp for the whole run. Null ⇒ no safety data. */
+  asOf: Date | null;
+  /** True only when the crash query actually SUCCEEDED for this page — which is
+   *  what makes "absent from the group-by result" mean a real zero crashes
+   *  rather than an unknown. */
+  crashQueried: boolean;
 }
 
 // ─── Pure normalize / filter helpers (unit-tested) ────────────────────────
@@ -412,6 +448,7 @@ export function normalizeCarrier(
   li: LiCarrierRow,
   census: CensusRow | undefined,
   includeCanada = false,
+  safety: CarrierSafety = EMPTY_SAFETY,
 ): CarrierRecord | null {
   if (!isActivePropertyCarrier(li)) return null;
   if (!censusAllowsOperate(census)) return null;
@@ -467,6 +504,7 @@ export function normalizeCarrier(
     // Shared with the re-derivation backfill via deriveNearestPortCode().
     nearestPortCode: deriveNearestPortCode(country, state, zip),
     publicSlug: makeSlug(legalName, usdot),
+    safety,
   };
 }
 
@@ -479,13 +517,22 @@ export function filterAndNormalizeCarriers(
   liRows: LiCarrierRow[],
   censusByDot: Map<string, CensusRow>,
   includeCanada = false,
+  safetyLookup?: SafetyLookup,
 ): CarrierRecord[] {
   const out: CarrierRecord[] = [];
   const seen = new Set<string>();
   for (const li of liRows) {
     const dot = normalizeDot(li.dot_number);
     const census = dot ? censusByDot.get(dot) : undefined;
-    const rec = normalizeCarrier(li, census, includeCanada);
+    const safety = safetyLookup
+      ? buildCarrierSafety(
+          dot ? safetyLookup.sms.get(dot) : undefined,
+          dot ? safetyLookup.crashes.get(dot) : undefined,
+          safetyLookup.asOf,
+          safetyLookup.crashQueried,
+        )
+      : EMPTY_SAFETY;
+    const rec = normalizeCarrier(li, census, includeCanada, safety);
     if (rec && !seen.has(rec.usdot)) {
       seen.add(rec.usdot);
       out.push(rec);
@@ -552,7 +599,64 @@ export const CARRIER_MUTABLE_COLUMNS: readonly string[] = [
   'building_materials',
   'nearest_port_code',
   'public_slug',
+  // ── FMCSA safety block. Listed here so the change-detection tuple (and the
+  //    parity test in carrierRichness.test.ts) covers them, but written through
+  //    the CONDITIONAL expression below rather than a bare `excluded.` — see
+  //    CARRIER_SAFETY_COLUMNS.
+  ...['insp_total',
+    'driver_insp_total',
+    'driver_oos_total',
+    'vehicle_insp_total',
+    'vehicle_oos_total',
+    'crashes_total',
+    'crashes_fatal',
+    'crashes_injury',
+    'crashes_tow',
+    'safety_data_as_of'],
 ];
+
+/**
+ * The safety columns, which are the ONE exception to "every data column is
+ * written unconditionally".
+ *
+ * WHY: the safety block comes from two extra Socrata calls per page. If one of
+ * them fails (timeout, 5xx, portal maintenance) the page still ingests — we do
+ * not want a flaky safety feed to stall the whole 330k-carrier directory
+ * refresh. But a bare `excluded.insp_total` would then write NULL over a
+ * perfectly good stored safety record, and the profile would silently lose its
+ * safety block until the next weekly run got lucky.
+ *
+ * So the whole block is written ATOMICALLY, gated on the incoming as-of stamp:
+ *   - incoming `safety_data_as_of` IS NOT NULL  → the fetch succeeded; take ALL
+ *     incoming values, INCLUDING nulls (a null there is meaningful: it means
+ *     FMCSA has no SMS row for this carrier).
+ *   - incoming `safety_data_as_of` IS NULL      → the fetch did not happen or
+ *     failed; KEEP the stored block untouched.
+ *
+ * Because the same expression feeds CARRIER_CHANGED_SQL, a failed fetch also
+ * compares equal to what is stored — so it does NOT bump `updated_at`, does NOT
+ * produce a fake `<lastmod>`, and does NOT enqueue a pointless IndexNow ping.
+ */
+export const CARRIER_SAFETY_COLUMNS: readonly string[] = [
+  'insp_total',
+  'driver_insp_total',
+  'driver_oos_total',
+  'vehicle_insp_total',
+  'vehicle_oos_total',
+  'crashes_total',
+  'crashes_fatal',
+  'crashes_injury',
+  'crashes_tow',
+  'safety_data_as_of',
+];
+
+/** The atomic keep-or-replace expression for one safety column. */
+export function safetyColumnSql(col: string): string {
+  return `CASE WHEN excluded."safety_data_as_of" IS NOT NULL THEN excluded."${col}" ELSE "carrier_directory"."${col}" END`;
+}
+
+/** True for a column governed by the conditional safety expression above. */
+const isSafetyColumn = (c: string): boolean => CARRIER_SAFETY_COLUMNS.includes(c);
 
 /**
  * TRUTHFUL `updated_at`: advance it ONLY when the incoming census row actually
@@ -588,7 +692,13 @@ export const CARRIER_MUTABLE_COLUMNS: readonly string[] = [
  */
 export const CARRIER_CHANGED_SQL = `(${CARRIER_MUTABLE_COLUMNS.map(
   (c) => `"carrier_directory"."${c}"`,
-).join(', ')}) IS DISTINCT FROM (${CARRIER_MUTABLE_COLUMNS.map((c) => `excluded."${c}"`).join(', ')})`;
+).join(', ')}) IS DISTINCT FROM (${CARRIER_MUTABLE_COLUMNS.map((c) =>
+  // Safety columns compare their EFFECTIVE (post-CASE) value, not the raw
+  // incoming one — otherwise a failed safety fetch would read as "everything
+  // went null", mark all 330k rows changed, and reintroduce exactly the fake
+  // weekly freshness this comparison exists to prevent.
+  isSafetyColumn(c) ? safetyColumnSql(c) : `excluded."${c}"`,
+).join(', ')})`;
 
 /** The conditional `updated_at` assignment itself. Exported as TEXT (rather than
  *  only as the drizzle `sql` object below) so a unit test can assert the ELSE
@@ -644,6 +754,19 @@ export const CARRIER_UPSERT_SET = {
   buildingMaterials: sql`excluded.building_materials`,
   nearestPortCode: sql`excluded.nearest_port_code`,
   publicSlug: sql`excluded.public_slug`,
+  // FMCSA safety block — atomic keep-or-replace, gated on the incoming as-of
+  // stamp so a failed safety fetch preserves the stored record instead of
+  // nulling it. See CARRIER_SAFETY_COLUMNS.
+  inspTotal: sql.raw(safetyColumnSql('insp_total')),
+  driverInspTotal: sql.raw(safetyColumnSql('driver_insp_total')),
+  driverOosTotal: sql.raw(safetyColumnSql('driver_oos_total')),
+  vehicleInspTotal: sql.raw(safetyColumnSql('vehicle_insp_total')),
+  vehicleOosTotal: sql.raw(safetyColumnSql('vehicle_oos_total')),
+  crashesTotal: sql.raw(safetyColumnSql('crashes_total')),
+  crashesFatal: sql.raw(safetyColumnSql('crashes_fatal')),
+  crashesInjury: sql.raw(safetyColumnSql('crashes_injury')),
+  crashesTow: sql.raw(safetyColumnSql('crashes_tow')),
+  safetyDataAsOf: sql.raw(safetyColumnSql('safety_data_as_of')),
   // Advances ONLY on a real field change, so <lastmod> stays truthful and the
   // IndexNow change feed stays honest. See CARRIER_CHANGED_SQL.
   updatedAt: sql.raw(CARRIER_UPDATED_AT_SQL),
@@ -653,9 +776,13 @@ export const dbCarrierStore: CarrierStore = {
   async upsertMany(records) {
     if (records.length === 0) return;
     for (let i = 0; i < records.length; i += UPSERT_BATCH) {
-      const chunk = records
-        .slice(i, i + UPSERT_BATCH)
-        .map((r) => ({ ...r, updatedAt: new Date() }));
+      const chunk = records.slice(i, i + UPSERT_BATCH).map(({ safety, ...r }) => ({
+        ...r,
+        // Flatten the nested safety block onto the row — the drizzle table has
+        // one column per field, and a nested object would be dropped silently.
+        ...safety,
+        updatedAt: new Date(),
+      }));
       // Multi-row INSERT with ON CONFLICT (usdot) DO UPDATE — idempotent re-run
       // refreshes every mutable column from the incoming (EXCLUDED) row. The
       // page is already de-duped by USDOT so no row is affected twice in one
@@ -733,6 +860,80 @@ export async function fetchCensusByDots(dots: string[]): Promise<Map<string, Cen
   return map;
 }
 
+/**
+ * Dots per safety request. 1000 (a whole L&I page in ONE call) — measured
+ * against the live portal: a 1000-item `IN` list is a ~15KB URL and both
+ * resources answer it in ~0.5s. That keeps the safety enrichment at +2 calls
+ * per 1000-carrier page instead of the +10 the census's 200-dot chunking would
+ * have cost, which is what keeps the full ingest inside its existing runtime
+ * envelope rather than adding hours.
+ */
+export const SAFETY_CHUNK = 1000;
+
+/**
+ * SMS AB PassProperty rows for a batch of NORMALIZED dot numbers → Map keyed by
+ * normalized dot. One row per carrier, already aggregated by FMCSA over its
+ * rolling 24-month measurement period.
+ */
+export async function fetchSafetyByDots(dots: string[]): Promise<Map<string, SmsSafetyRow>> {
+  const map = new Map<string, SmsSafetyRow>();
+  const unique = [...new Set(dots.filter(Boolean))];
+  if (unique.length === 0) return map;
+  for (let i = 0; i < unique.length; i += SAFETY_CHUNK) {
+    const chunk = unique.slice(i, i + SAFETY_CHUNK);
+    const inList = chunk.map((d) => `'${d}'`).join(',');
+    const rows = await socrataJson<SmsSafetyRow>(SMS_AB_ID, {
+      $select:
+        'dot_number,insp_total,driver_insp_total,driver_oos_insp_total,vehicle_insp_total,vehicle_oos_insp_total',
+      $where: `dot_number in (${inList})`,
+      $limit: String(chunk.length),
+    });
+    for (const r of rows) {
+      const dot = normalizeDot(r.dot_number);
+      if (dot) map.set(dot, r);
+    }
+  }
+  return map;
+}
+
+/**
+ * Crash counts for a batch of NORMALIZED dot numbers over the rolling window →
+ * Map keyed by normalized dot.
+ *
+ * The Crash File is 4.98M rows (one per vehicle per state-reported crash), so
+ * this AGGREGATES SERVER-SIDE with SoQL `$group=dot_number`: we transfer at most
+ * one row per carrier instead of every crash report. Note every numeric column
+ * on that resource is TEXT — `sum(fatalities)` is a hard type-mismatch error, so
+ * the `::number` casts below are load-bearing, not decoration.
+ *
+ * A carrier ABSENT from the result had zero crashes in the window (a real zero,
+ * which is why the caller passes crashQueried=true only when this SUCCEEDED).
+ */
+export async function fetchCrashesByDots(
+  dots: string[],
+  windowStart: string = crashWindowStart(),
+): Promise<Map<string, CrashAggRow>> {
+  const map = new Map<string, CrashAggRow>();
+  const unique = [...new Set(dots.filter(Boolean))];
+  if (unique.length === 0) return map;
+  for (let i = 0; i < unique.length; i += SAFETY_CHUNK) {
+    const chunk = unique.slice(i, i + SAFETY_CHUNK);
+    const inList = chunk.map((d) => `'${d}'`).join(',');
+    const rows = await socrataJson<CrashAggRow>(CRASH_ID, {
+      $select:
+        "dot_number,count(*) as crashes,sum(fatalities::number) as fatalities,sum(injuries::number) as injuries,sum(case(tow_away='Y',1,true,0)) as tow_aways",
+      $where: `report_date>'${windowStart}' AND dot_number in (${inList})`,
+      $group: 'dot_number',
+      $limit: String(chunk.length),
+    });
+    for (const r of rows) {
+      const dot = normalizeDot(r.dot_number);
+      if (dot) map.set(dot, r);
+    }
+  }
+  return map;
+}
+
 // ─── Ingest orchestrator ──────────────────────────────────────────────────
 export interface IngestOptions {
   limit: number; // 0 = no cap
@@ -764,12 +965,23 @@ export async function runIngest(
   deps: {
     fetchCarriers?: typeof fetchCarrierPage;
     fetchCensus?: typeof fetchCensusByDots;
+    fetchSafety?: typeof fetchSafetyByDots;
+    fetchCrashes?: typeof fetchCrashesByDots;
+    now?: () => Date;
     log?: (msg: string) => void;
   } = {},
 ): Promise<IngestSummary> {
   const fetchCarriers = deps.fetchCarriers ?? fetchCarrierPage;
   const fetchCensus = deps.fetchCensus ?? fetchCensusByDots;
+  const fetchSafety = deps.fetchSafety ?? fetchSafetyByDots;
+  const fetchCrashes = deps.fetchCrashes ?? fetchCrashesByDots;
+  const now = deps.now ?? (() => new Date());
   const log = deps.log ?? ((m: string) => console.log(m));
+  // ONE as-of stamp + ONE crash window for the whole run, so every carrier in a
+  // single ingest reports the same "safety data as of" date and the crash
+  // windows can't drift across a multi-hour job.
+  const runAsOf = now();
+  const windowStart = crashWindowStart(runAsOf);
   // Effective Canada gate: explicit option wins; otherwise DEFAULT ON so the
   // ingest produces the full North-America set. INGEST_INCLUDE_CANADA=0 forces
   // the legacy US-only ingest.
@@ -790,7 +1002,39 @@ export async function runIngest(
 
     const dots = liRows.map((r) => normalizeDot(r.dot_number)).filter((d): d is string => !!d);
     const censusByDot = await fetchCensus(dots);
-    let records = filterAndNormalizeCarriers(liRows, censusByDot, includeCanada);
+
+    // ── FMCSA safety enrichment (2 extra calls per page). DELIBERATELY
+    //    NON-FATAL and independently isolated: the directory's core value is the
+    //    carrier list, so a flaky or down safety feed must degrade to "no safety
+    //    block on this page" rather than abort a 330k-row refresh. When a fetch
+    //    fails, asOf/crashQueried stay off for that half and the conditional
+    //    upsert (CARRIER_SAFETY_COLUMNS) PRESERVES whatever is already stored.
+    let smsByDot = new Map<string, SmsSafetyRow>();
+    let smsOk = false;
+    try {
+      smsByDot = await fetchSafety(dots);
+      smsOk = true;
+    } catch (err) {
+      log(`  …WARN: safety (SMS) fetch failed at offset ${offset} (non-fatal): ${String(err)}`);
+    }
+    let crashByDot = new Map<string, CrashAggRow>();
+    let crashOk = false;
+    try {
+      crashByDot = await fetchCrashes(dots, windowStart);
+      crashOk = true;
+    } catch (err) {
+      log(`  …WARN: safety (crash) fetch failed at offset ${offset} (non-fatal): ${String(err)}`);
+    }
+    const safetyLookup: SafetyLookup = {
+      sms: smsByDot,
+      crashes: crashByDot,
+      // Only stamp an as-of when at least ONE half genuinely succeeded —
+      // otherwise the row would claim a safety reading it never took.
+      asOf: smsOk || crashOk ? runAsOf : null,
+      crashQueried: crashOk,
+    };
+
+    let records = filterAndNormalizeCarriers(liRows, censusByDot, includeCanada, safetyLookup);
 
     // Honor --limit at the page boundary: trim this page's records so the total
     // never exceeds the cap, then bulk-upsert the (trimmed) page in one go.

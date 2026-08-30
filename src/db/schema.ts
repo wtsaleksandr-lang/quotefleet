@@ -1894,6 +1894,33 @@ export const carrierDirectory = pgTable(
     coalCoke: boolean('coal_coke').notNull().default(false),
     /** crgo_bldgmat === 'X' — building materials. */
     buildingMaterials: boolean('building_materials').notNull().default(false),
+    // ── FMCSA SAFETY record (0072_carrier_safety_data.sql) ─────────────────
+    //    Roadside inspections + out-of-service orders from the SMS AB
+    //    PassProperty file (4y6x-dmck, one pre-aggregated 24-month row per
+    //    carrier), and crashes aggregated server-side off the Crash File
+    //    (aayw-vxb3) over the SAME 24-month window.
+    //
+    //    EVERY COLUMN IS NULLABLE ON PURPOSE. `null` means "FMCSA published no
+    //    record", never "zero" — only ~74% of directory carriers appear in the
+    //    SMS file, and rendering a missing record as a clean 0 would invent a
+    //    spotless safety history for a real company. Self-healed in migrate.ts.
+    /** Total roadside inspections in FMCSA's 24-month measurement period. */
+    inspTotal: integer('insp_total'),
+    /** Driver inspections, and how many had >=1 driver out-of-service violation. */
+    driverInspTotal: integer('driver_insp_total'),
+    driverOosTotal: integer('driver_oos_total'),
+    /** Vehicle inspections, and how many had >=1 vehicle out-of-service violation. */
+    vehicleInspTotal: integer('vehicle_insp_total'),
+    vehicleOosTotal: integer('vehicle_oos_total'),
+    /** State-reported crashes in the same 24-month window, and severity split. */
+    crashesTotal: integer('crashes_total'),
+    crashesFatal: integer('crashes_fatal'),
+    crashesInjury: integer('crashes_injury'),
+    crashesTow: integer('crashes_tow'),
+    /** When the FMCSA safety extract was read. Null ⇒ no safety data at all;
+     *  the profile shows the safety block ONLY when this is set, so we never
+     *  present stale or absent safety data as current. */
+    safetyDataAsOf: timestamp('safety_data_as_of', { mode: 'date' }),
     /** Derived: nearest major container/rail hub UN/LOCODE (ZIP centroid). */
     nearestPortCode: text('nearest_port_code'),
     /** Unique URL slug for the public carrier page (slug(name)-usdot). */

@@ -385,6 +385,25 @@ export const SELF_HEAL_TABLE_STATEMENTS: readonly string[] = [
   `ALTER TABLE "carrier_directory" ADD COLUMN IF NOT EXISTS "farm_supplies" boolean NOT NULL DEFAULT false`,
   `ALTER TABLE "carrier_directory" ADD COLUMN IF NOT EXISTS "coal_coke" boolean NOT NULL DEFAULT false`,
   `ALTER TABLE "carrier_directory" ADD COLUMN IF NOT EXISTS "building_materials" boolean NOT NULL DEFAULT false`,
+  // 0072_carrier_safety_data.sql — FMCSA roadside-inspection / out-of-service /
+  // crash record. All NULLABLE with NO DEFAULT, which is both the honest
+  // encoding (null = "FMCSA published no record", never "zero") AND the cheap
+  // DDL: adding a nullable column with no default is a catalog-only change in
+  // Postgres, so these ten ALTERs do not rewrite the 330k-row table. They still
+  // go through runSelfHealStatements, which sets lock_timeout +
+  // statement_timeout FIRST — an ADD COLUMN takes ACCESS EXCLUSIVE before it
+  // checks IF NOT EXISTS, and an unbounded wait behind it is what took the
+  // directory down before.
+  `ALTER TABLE "carrier_directory" ADD COLUMN IF NOT EXISTS "insp_total" integer`,
+  `ALTER TABLE "carrier_directory" ADD COLUMN IF NOT EXISTS "driver_insp_total" integer`,
+  `ALTER TABLE "carrier_directory" ADD COLUMN IF NOT EXISTS "driver_oos_total" integer`,
+  `ALTER TABLE "carrier_directory" ADD COLUMN IF NOT EXISTS "vehicle_insp_total" integer`,
+  `ALTER TABLE "carrier_directory" ADD COLUMN IF NOT EXISTS "vehicle_oos_total" integer`,
+  `ALTER TABLE "carrier_directory" ADD COLUMN IF NOT EXISTS "crashes_total" integer`,
+  `ALTER TABLE "carrier_directory" ADD COLUMN IF NOT EXISTS "crashes_fatal" integer`,
+  `ALTER TABLE "carrier_directory" ADD COLUMN IF NOT EXISTS "crashes_injury" integer`,
+  `ALTER TABLE "carrier_directory" ADD COLUMN IF NOT EXISTS "crashes_tow" integer`,
+  `ALTER TABLE "carrier_directory" ADD COLUMN IF NOT EXISTS "safety_data_as_of" timestamp`,
   `CREATE UNIQUE INDEX IF NOT EXISTS "carrier_directory_usdot_idx" ON "carrier_directory" ("usdot")`,
   `CREATE UNIQUE INDEX IF NOT EXISTS "carrier_directory_slug_idx" ON "carrier_directory" ("public_slug")`,
   `CREATE INDEX IF NOT EXISTS "carrier_directory_state_idx" ON "carrier_directory" ("state")`,

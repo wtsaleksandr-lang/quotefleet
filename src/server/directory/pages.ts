@@ -44,6 +44,18 @@ import { createHash } from 'node:crypto';
 import { US_STATES, stateByCode, type UsState } from './usStates.js';
 import { CONTAINER_PORTS, portByCode, PORT_GROUPS, portGroupForMemberCode, type ContainerPort } from './containerPorts.js';
 import { CA_PROVINCE_CODES } from './caProvinces.js';
+import {
+  NATIONAL_DRIVER_OOS_RATE,
+  NATIONAL_VEHICLE_OOS_RATE,
+  SAFETY_WINDOW_MONTHS,
+  compareToNational,
+  comparisonPhrase,
+  formatAsOf,
+  formatRate,
+  oosRate,
+  safetyRatingExplainer,
+  type CarrierSafety,
+} from './safetyData.js';
 import type { DirectoryIdentity } from './entitlement.js';
 import {
   SITE_NAV_HTML,
@@ -242,6 +254,110 @@ function safetyLabel(code: string | null): { text: string; tone: 'good' | 'warn'
     default:
       return { text: 'Not rated', tone: 'none' };
   }
+}
+
+/**
+ * The FMCSA roadside-inspection / out-of-service / crash record for the profile's
+ * "Safety & compliance" panel.
+ *
+ * HONESTY RULES BAKED IN HERE (see src/server/directory/safetyData.ts for the
+ * full contract — this is a real company's reputation on an indexable page):
+ *
+ *   • NO DATA ⇒ SAY SO. If FMCSA published no record we render one plain
+ *     sentence saying that. We never fall back to zeros: "0 crashes" for a
+ *     carrier we simply have no data on would invent a spotless history.
+ *   • COUNTS ALWAYS, RATES ONLY WHEN MEANINGFUL. A percentage off fewer than
+ *     MIN_INSPECTIONS_FOR_RATE inspections is suppressed — 1 of 1 is not a
+ *     "100% out-of-service rate", it is noise, and publishing it would smear a
+ *     real business.
+ *   • NEUTRAL COMPARISON, NEVER A VERDICT. Where a rate is shown we put the
+ *     published national average beside it and say "below"/"above"/"about" —
+ *     arithmetic about a rate. No grades, no stars, no "unsafe", no "poor".
+ *   • ALWAYS DATED. Stale safety data presented as current is misleading, so the
+ *     as-of date is part of the block, not a footnote we might drop.
+ */
+function safetyRecordBlock(safety: CarrierSafety | null | undefined): string {
+  const asOf = safety?.safetyDataAsOf;
+  if (!safety || !asOf) {
+    return `<section class="cp-card">
+          <h2 class="cp-h">Roadside inspection &amp; crash record</h2>
+          <p class="cp-note">FMCSA has not published a roadside inspection or crash record for this carrier. That is common — it does not indicate a problem. Use the live FMCSA check above for the current official record.</p>
+        </section>`;
+  }
+
+  // ── Rows. Counts are facts and always render; the rate + national comparison
+  //    is appended only when the sample is big enough to mean anything.
+  const rows: string[] = [];
+  const oosRow = (
+    label: string,
+    oos: number | null,
+    insp: number | null,
+    national: number,
+  ): void => {
+    if (insp == null) return;
+    const rate = oosRate(oos, insp);
+    const countTxt = `${fmtNum(oos)} of ${fmtNum(insp)}`;
+    const ctx =
+      rate == null
+        ? // Too few inspections for a percentage to carry information.
+          `<span class="cp-safety-ctx">too few inspections to compute a rate</span>`
+        : `<span class="cp-safety-ctx">${esc(formatRate(rate))} · ${esc(
+            comparisonPhrase(compareToNational(rate, national)),
+          )} of ${esc(formatRate(national))}</span>`;
+    rows.push(
+      `<div class="cp-dt"><span class="k">${esc(label)}</span><span class="v">${esc(countTxt)} ${ctx}</span></div>`,
+    );
+  };
+
+  if (safety.inspTotal != null)
+    rows.push(
+      `<div class="cp-dt"><span class="k">Inspections</span><span class="v">${fmtNum(safety.inspTotal)}</span></div>`,
+    );
+  oosRow(
+    'Driver out-of-service',
+    safety.driverOosTotal,
+    safety.driverInspTotal,
+    NATIONAL_DRIVER_OOS_RATE,
+  );
+  oosRow(
+    'Vehicle out-of-service',
+    safety.vehicleOosTotal,
+    safety.vehicleInspTotal,
+    NATIONAL_VEHICLE_OOS_RATE,
+  );
+
+  const crashRows: string[] = [];
+  if (safety.crashesTotal != null) {
+    crashRows.push(
+      `<div class="cp-dt"><span class="k">Reported crashes</span><span class="v">${fmtNum(safety.crashesTotal)}</span></div>`,
+    );
+    // Severity split only adds signal when there was at least one crash.
+    if (safety.crashesTotal > 0) {
+      const parts: Array<[string, number | null]> = [
+        ['Fatal', safety.crashesFatal],
+        ['With injuries', safety.crashesInjury],
+        ['Towed away', safety.crashesTow],
+      ];
+      for (const [k, v] of parts)
+        if (v != null)
+          crashRows.push(`<div class="cp-dt"><span class="k">${esc(k)}</span><span class="v">${fmtNum(v)}</span></div>`);
+    }
+  }
+
+  const all = [...rows, ...crashRows];
+  if (!all.length) {
+    return `<section class="cp-card">
+          <h2 class="cp-h">Roadside inspection &amp; crash record</h2>
+          <p class="cp-note">FMCSA has not published a roadside inspection or crash record for this carrier. That is common — it does not indicate a problem. Use the live FMCSA check above for the current official record.</p>
+        </section>`;
+  }
+
+  return `<section class="cp-card">
+          <h2 class="cp-h">Roadside inspection &amp; crash record</h2>
+          <p class="cp-note cp-safety-lede">Counts published by FMCSA over its rolling ${SAFETY_WINDOW_MONTHS}-month measurement period. QuoteFleet reports these figures as published and does not rate, certify or endorse any carrier.</p>
+          <div class="cp-datagrid">${all.join('')}</div>
+          <p class="cp-note">FMCSA safety data as of ${esc(formatAsOf(asOf))}. Crash counts are state-reported and are not adjusted for fault or for how many miles the carrier runs.</p>
+        </section>`;
 }
 
 function authorityLabel(type: string | null): string {
@@ -701,6 +817,13 @@ export const DIRECTORY_CSS = `
   .cp-chip.muted { opacity: 0.6; }
   .cp-chip .tag { font-size: 9px; text-transform: uppercase; letter-spacing: 0.05em; color: var(--muted); border: 1px solid var(--border); border-radius: 4px; padding: 2px 6px; }
   .cp-note { margin: 16px 0 0; font-size: 12px; color: var(--muted); line-height: 1.5; }
+  /* Safety-record context ("5.4% · below the national average of 5.4%"). Its own
+     line under the count so a long phrase never forces horizontal overflow at
+     375px, and deliberately MUTED + non-tabular: it is context, not a verdict,
+     and must never out-shout the count it qualifies. No colour coding — a green
+     or red rate would be exactly the editorialising we refuse to do. */
+  .cp-safety-ctx { display: block; margin-top: 2px; font-size: 12px; font-family: var(--font-sans, inherit); font-variant-numeric: normal; color: var(--muted); line-height: 1.4; }
+  .cp-safety-lede { margin-top: 0; margin-bottom: 16px; }
   .cp-loc { margin: 0 0 8px; line-height: 1.6; color: var(--ink-soft); font-size: 14px; }
   .cp-loc:last-child { margin-bottom: 0; }
   .cp-loc .lk { color: var(--muted); font-family: var(--font-mono); font-size: 12px; }
@@ -3662,6 +3785,13 @@ export function renderCarrierProfile(opts: {
             <div class="cp-dt"><span class="k">Authority status</span><span class="v">${isActive ? 'Active' : 'On file'}</span></div>
             <div class="cp-dt"><span class="k">Hazmat registration</span><span class="v">${c.hazmat ? 'Registered' : 'Not registered'}</span></div>
           </div>
+          <!-- A safety rating has precise regulatory meaning, and "Not rated" is
+               the MOST COMMON value by far — FMCSA only rates a carrier after a
+               compliance review, and it has never reviewed most of the ~330k
+               authorised carriers. Spelling that out is the difference between
+               informing a shipper and quietly implying a real company failed
+               something it was never assessed on. -->
+          <p class="cp-note">${esc(safetyRatingExplainer(c.safetyRating))}</p>
           <div class="cp-actions">
             <a class="btn btn-secondary" href="${saferUrl}" target="_blank" rel="noopener nofollow">Verify on FMCSA SAFER ↗</a>
             <button class="btn btn-primary" id="live-verify" data-usdot="${esc(c.usdot)}">Verify live now</button>
@@ -3669,6 +3799,8 @@ export function renderCarrierProfile(opts: {
           <div id="live-result" class="lookup-result" style="margin-top: 8px;"></div>
           <p class="cp-note">Insurance on file and out-of-service status are pulled from the live FMCSA QCMobile check above.</p>
         </section>
+
+        ${safetyRecordBlock(c.safety)}
       </div>
 
       <div class="cp-panel cp-panel--contact">
