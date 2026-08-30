@@ -484,6 +484,42 @@ export const SELF_HEAL_TABLE_STATEMENTS: readonly string[] = [
   // incident; EXPLAIN shows the planner never picks it for any directory query,
   // so it is ~2.7 MB the weekly ingest maintains for nothing and is safe to DROP.
   `CREATE INDEX IF NOT EXISTS "carrier_directory_state_city_power_idx" ON "carrier_directory" ("state", "city", "power_units" DESC NULLS LAST)`,
+  // ── 0071_carrier_ring_indexes.sql ────────────────────────────────────────
+  // The RING MESH indexes. #455 made ~100% of carriers REACHABLE; these make
+  // them LINKED. Census over all 330,452 prod rows before this change:
+  //   distinct carriers receiving a profile→profile link   97,287  (29.4%)
+  //   carriers receiving none                             241,428  (73.1%)
+  //   most inbound links to one carrier                      3,510
+  // …because relatedCarriers() handed every carrier in a city the SAME
+  // `featured` top 6. queries.ts now walks a RING instead — each carrier links
+  // to the K carriers FOLLOWING it in one total order — so in-degree equals
+  // out-degree for every member and nothing pools.
+  //
+  // The seek is a row-wise comparison, `ROW("intermodal", COALESCE("power_units",
+  // 0), "usdot") < ROW($1,$2,$3)`, and these indexes are the ONLY reason it is a
+  // bounded index range instead of a post-heap-fetch Filter over the whole city
+  // (measured on a 330,452-row byte-identical copy of prod: total cost 8.44 vs
+  // 1,063.52, 7 buffers vs 2,764). The trailing key columns MUST stay
+  // byte-identical to queries.ts ringOrder()/ringAfter() — this is the same trap
+  // 0068 documents for the city slug expression, one dimension further in:
+  // `COALESCE("power_units", 0) DESC` is NOT interchangeable with 0068's
+  // `"power_units" DESC NULLS LAST`, and the 0068 index cannot serve the ring.
+  //
+  // NOT CONCURRENTLY, for the same reason as 0066/0068 plus one more: a failed
+  // CONCURRENTLY build leaves an INVALID index behind, which the runner's
+  // to_regclass pre-check would read as "already present" — so the ring would
+  // silently never get its index and every profile would fall back to scanning
+  // its whole city. Plain CREATE INDEX takes a SHARE lock: it blocks WRITES to
+  // carrier_directory (only the weekly FMCSA ingest writes) and never READS, and
+  // runSelfHealStatements caps the wait at lock_timeout and the build at
+  // statement_timeout. Measured build on 330,452 rows: ~1.5s each.
+  // MUST stay byte-for-byte equivalent to drizzle/0071_carrier_ring_indexes.sql
+  // and src/db/schema.ts `carrierDirectory`.
+  `CREATE INDEX IF NOT EXISTS "carrier_directory_cityslug_ring_idx" ON "carrier_directory" ((btrim(regexp_replace(lower("city"), '[^a-z0-9]+', '-', 'g'), '-')), "state", "intermodal" DESC, (COALESCE("power_units", 0)) DESC, "usdot" DESC)`,
+  `CREATE INDEX IF NOT EXISTS "carrier_directory_port_ring_idx" ON "carrier_directory" ("nearest_port_code", "intermodal" DESC, (COALESCE("power_units", 0)) DESC, "usdot" DESC)`,
+  // PARTIAL on purpose: the no-port ring's members must be exactly the carriers
+  // that query it, or its members receive almost no inbound links.
+  `CREATE INDEX IF NOT EXISTS "carrier_directory_state_noport_ring_idx" ON "carrier_directory" ("state", "intermodal" DESC, (COALESCE("power_units", 0)) DESC, "usdot" DESC) WHERE "nearest_port_code" IS NULL`,
   // 0048_carrier_overrides.sql — human-editable OVERRIDES that survive the FMCSA
   // re-ingest (the ingest touches carrier_directory ONLY, never this table).
   // Healed HERE (like carrier_directory) because the Replit deploy skips

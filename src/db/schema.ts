@@ -1994,6 +1994,56 @@ export const carrierDirectory = pgTable(
       t.city,
       t.powerUnits.desc().nullsLast(),
     ),
+    // ── ring indexes (0071_carrier_ring_indexes.sql) ────────────────────────
+    // These serve relatedCarriers()'s RING MESH — the fix for a link graph in
+    // which 241,428 of 330,452 carrier profiles (73.1%) received no inbound link
+    // from any other profile, because the old "same-city featured top 6" handed
+    // every carrier in a city the SAME six targets. The ring instead gives each
+    // carrier the K carriers that FOLLOW it in one total order, so out-degree and
+    // in-degree are both K for every member. See queries.ts `relatedCarriers`.
+    //
+    // The trailing three key columns ARE that total order and must stay
+    // byte-identical to queries.ts `ringOrder()` / `ringAfter()`:
+    //   "intermodal" DESC, (COALESCE("power_units", 0)) DESC, "usdot" DESC
+    // COALESCE (not `power_units DESC NULLS LAST`, which the 0068 index uses) is
+    // load-bearing twice over: it removes the 449 NULL power_units rows from the
+    // ordering, which is what lets the seek be written as the row-wise
+    // comparison `ROW(...) < ROW(...)` — a NULL operand would make that return
+    // NULL and silently drop the row off the ring — and it is what Postgres
+    // matches to fold that comparison into a single Index Cond. Verified on a
+    // 330,452-row byte-identical copy of prod: Index Scan, no Filter, no Sort,
+    // total cost 8.44 (vs 1,063.52 with only the 0068 indexes present).
+    // `usdot` (unique, NOT NULL, already public) is the tie-break rather than
+    // `id`, because VisibleCarrier deliberately carries no internal id.
+    index('carrier_directory_cityslug_ring_idx').on(
+      sql.raw(`(btrim(regexp_replace(lower("city"), '[^a-z0-9]+', '-', 'g'), '-'))`),
+      t.state,
+      t.intermodal.desc(),
+      sql.raw(`(COALESCE("power_units", 0)) DESC`),
+      t.usdot.desc(),
+    ),
+    // The CORRIDOR ring: the nearest-port group (57 groups, 319,878 carriers).
+    // Every profile joins one, which is what keeps the profile graph from
+    // decomposing into 26,231 disconnected city cycles.
+    index('carrier_directory_port_ring_idx').on(
+      t.nearestPortCode,
+      t.intermodal.desc(),
+      sql.raw(`(COALESCE("power_units", 0)) DESC`),
+      t.usdot.desc(),
+    ),
+    // The corridor ring for the 10,574 carriers FMCSA places near no port.
+    // PARTIAL on `nearest_port_code IS NULL` on purpose: it makes the ring's
+    // members exactly the carriers that QUERY it. A full (state, ring) index
+    // would be a ring whose members mostly never link, so its no-port members
+    // would receive almost nothing — the concentration bug in miniature.
+    index('carrier_directory_state_noport_ring_idx')
+      .on(
+        t.state,
+        t.intermodal.desc(),
+        sql.raw(`(COALESCE("power_units", 0)) DESC`),
+        t.usdot.desc(),
+      )
+      .where(sql.raw(`"nearest_port_code" IS NULL`)),
   ]
 );
 
