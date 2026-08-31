@@ -17,6 +17,9 @@ import {
   truncateDetail,
   DETAIL_MAX_CHARS,
   JOB_RUNS_SELF_HEAL_STATEMENTS,
+  FailureStreakTracker,
+  FAILURE_ALERT_THRESHOLD,
+  SUSTAINED_FAILURE_ALERT_MS,
   type JobRunRow,
   type TickResult,
   type TrackedJobDeps,
@@ -120,8 +123,10 @@ describe('outcomeFromTick — the anti-canned-success rule', () => {
   });
 });
 
-describe('runTrackedJob — ledger + de-duped alert', () => {
-  function deps(over: Partial<TrackedJobDeps> = {}): TrackedJobDeps {
+describe('runTrackedJob — ledger + alert threshold + de-dupe', () => {
+  type Armed = { fn: () => void; ms: number };
+  function deps(over: Partial<TrackedJobDeps> = {}): TrackedJobDeps & { timers: Armed[] } {
+    const timers: Armed[] = [];
     return {
       record: vi.fn(async (_job, fn) => fn()),
       sendAlert: vi.fn(async () => {}),
@@ -129,6 +134,11 @@ describe('runTrackedJob — ledger + de-duped alert', () => {
       cooldownMs: 6 * 60 * 60 * 1000,
       now: () => 0,
       log: vi.fn(),
+      streaks: new FailureStreakTracker(),
+      alertAfterFailures: FAILURE_ALERT_THRESHOLD,
+      sustainedMs: SUSTAINED_FAILURE_ALERT_MS,
+      schedule: (fn, ms) => void timers.push({ fn, ms }),
+      timers,
       ...over,
     };
   }
@@ -140,13 +150,69 @@ describe('runTrackedJob — ledger + de-duped alert', () => {
     expect(d.sendAlert).not.toHaveBeenCalled();
   });
 
-  it('alerts on failure, naming the job and carrying the detail', async () => {
+  // THE REGRESSION THIS THRESHOLD EXISTS FOR. 2026-08-22 lifecycle-email hit a
+  // single Neon connection blip at 15:48:57 and succeeded again at 15:50:55.
+  // Nothing was broken and an alert email went out anyway.
+  it('does NOT alert on one transient failure the next tick heals', async () => {
+    let clock = 0;
+    const d = deps({ now: () => clock });
+    await runTrackedJob('lifecycle-email', () => jobFailure('write CONNECT_TIMEOUT'), d);
+    expect(d.sendAlert).not.toHaveBeenCalled();
+    // ...and the ledger row was still written, so the blip is not invisible.
+    expect(d.record).toHaveBeenCalledTimes(1);
+
+    clock = 2 * 60 * 1000; // the next tick, two minutes later
+    await runTrackedJob('lifecycle-email', () => jobSuccess(1), d);
+
+    // The sustained-window re-check fires later and must find a healed job.
+    clock = SUSTAINED_FAILURE_ALERT_MS + 1;
+    d.timers.forEach((t) => t.fn());
+    expect(d.sendAlert).not.toHaveBeenCalled();
+  });
+
+  it('alerts once the failure repeats, naming the job and carrying the detail', async () => {
     const d = deps();
+    await runTrackedJob('fuel-surcharge', () => jobFailure('EIA fetch failed'), d);
+    expect(d.sendAlert).not.toHaveBeenCalled();
     await runTrackedJob('fuel-surcharge', () => jobFailure('EIA fetch failed'), d);
     expect(d.sendAlert).toHaveBeenCalledTimes(1);
     const [subject, body] = vi.mocked(d.sendAlert).mock.calls[0];
     expect(subject).toContain('fuel-surcharge');
     expect(body).toContain('EIA fetch failed');
+    expect(body).toContain('Consecutive failures: 2');
+  });
+
+  // A slot job (weekly-digest, ops-digest) or a user-triggered one (rfq-blast)
+  // may never tick a second time. Waiting for failure #2 would mean "alert me
+  // tomorrow", so the streak clock alerts on its own.
+  it('alerts on the sustained window when a second failure never comes', async () => {
+    let clock = 0;
+    const d = deps({ now: () => clock });
+    await runTrackedJob('rfq-blast', () => jobFailure('smtp refused'), d);
+    expect(d.sendAlert).not.toHaveBeenCalled();
+    expect(d.timers).toHaveLength(1);
+    expect(d.timers[0].ms).toBe(SUSTAINED_FAILURE_ALERT_MS);
+
+    clock = SUSTAINED_FAILURE_ALERT_MS;
+    d.timers[0].fn();
+    await Promise.resolve();
+    expect(d.sendAlert).toHaveBeenCalledTimes(1);
+    expect(vi.mocked(d.sendAlert).mock.calls[0][1]).toContain('smtp refused');
+  });
+
+  it('ignores a stale sustained-window timer left over from a healed streak', async () => {
+    let clock = 0;
+    const d = deps({ now: () => clock });
+    await runTrackedJob('j', () => jobFailure('blip one'), d); // arms for t=0
+    clock = 60 * 1000;
+    await runTrackedJob('j', () => jobSuccess(1), d); // healed — streak closed
+    clock = 120 * 1000;
+    await runTrackedJob('j', () => jobFailure('blip two'), d); // a NEW streak
+
+    clock = SUSTAINED_FAILURE_ALERT_MS;
+    d.timers[0].fn(); // the stale timer: its streak no longer exists
+    await Promise.resolve();
+    expect(d.sendAlert).not.toHaveBeenCalled();
   });
 
   it('de-dupes repeat failures within the cooldown, then alerts again after it', async () => {
@@ -163,7 +229,22 @@ describe('runTrackedJob — ledger + de-duped alert', () => {
     const d = deps();
     await runTrackedJob('a', () => jobFailure('x'), d);
     await runTrackedJob('b', () => jobFailure('y'), d);
+    await runTrackedJob('a', () => jobFailure('x'), d);
+    await runTrackedJob('b', () => jobFailure('y'), d);
     expect(d.sendAlert).toHaveBeenCalledTimes(2);
+  });
+
+  it('counts the streak per job — one job failing cannot trip another', async () => {
+    const d = deps();
+    await runTrackedJob('a', () => jobFailure('x'), d);
+    await runTrackedJob('b', () => jobFailure('y'), d);
+    expect(d.sendAlert).not.toHaveBeenCalled();
+  });
+
+  it('honours a per-call threshold of 1 (alert on the first failure)', async () => {
+    const d = deps({ alertAfterFailures: 1 });
+    await runTrackedJob('j', () => jobFailure('x'), d);
+    expect(d.sendAlert).toHaveBeenCalledTimes(1);
   });
 
   it('never throws when the alert send itself fails', async () => {
@@ -171,10 +252,28 @@ describe('runTrackedJob — ledger + de-duped alert', () => {
       sendAlert: vi.fn(async () => {
         throw new Error('smtp down');
       }),
+      alertAfterFailures: 1,
     });
     await expect(runTrackedJob('j', () => jobFailure('x'), d)).resolves.toMatchObject({
       status: 'failure',
     });
+  });
+});
+
+describe('FailureStreakTracker', () => {
+  it('counts consecutive failures and keeps the streak start fixed', () => {
+    const t = new FailureStreakTracker();
+    expect(t.peek('j')).toBeNull();
+    expect(t.onFailure('j', 1_000)).toEqual({ count: 1, firstFailedAtMs: 1_000 });
+    expect(t.onFailure('j', 9_000)).toEqual({ count: 2, firstFailedAtMs: 1_000 });
+  });
+
+  it('a healthy run clears the streak, so the next failure starts over', () => {
+    const t = new FailureStreakTracker();
+    t.onFailure('j', 1_000);
+    t.onHealthy('j');
+    expect(t.peek('j')).toBeNull();
+    expect(t.onFailure('j', 5_000)).toEqual({ count: 1, firstFailedAtMs: 5_000 });
   });
 });
 

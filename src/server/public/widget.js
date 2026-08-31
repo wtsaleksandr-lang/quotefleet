@@ -192,6 +192,71 @@
     }
   }
 
+  // ── Service tabs live on ONE line and scroll INSIDE their own bar ──────────
+  // Alex: "the truck modes selection must fit into 1 single line and implement
+  // horizontal scroll if necessary." The layout is CSS (widget-ux-fixes.css);
+  // two behaviours have to be JS:
+  //   1. syncTabScroll  — writes data-scroll (none/left/right/both) so the
+  //      stylesheet can fade the edge that has more modes behind it. Without a
+  //      visible affordance the off-screen modes are simply invisible.
+  //   2. revealActiveTab — scrolls the SELECTED mode into view, on first paint
+  //      and on every switch, so the current choice is never off-edge.
+  // Both no-op when everything fits, which is the common case (most tenants
+  // run 2-4 modes) — the bar then looks exactly as it always has.
+  function syncTabScroll() {
+    var wrap = $('qf-services');
+    if (!wrap) return;
+    var max = wrap.scrollWidth - wrap.clientWidth;
+    var x = wrap.scrollLeft;
+    var state = max <= 1 ? 'none' : (x <= 1 ? 'right' : (x >= max - 1 ? 'left' : 'both'));
+    wrap.setAttribute('data-scroll', state);
+  }
+
+  function revealActiveTab(animate) {
+    var wrap = $('qf-services');
+    if (!wrap) return;
+    var active = wrap.querySelector('button.active');
+    if (!active || wrap.scrollWidth <= wrap.clientWidth + 1) { syncTabScroll(); return; }
+    var pad = 12;
+    var left = active.offsetLeft - pad;
+    var right = active.offsetLeft + active.offsetWidth + pad;
+    var target = wrap.scrollLeft;
+    if (left < target) target = left;
+    else if (right > target + wrap.clientWidth) target = right - wrap.clientWidth;
+    target = Math.max(0, Math.min(target, wrap.scrollWidth - wrap.clientWidth));
+    if (Math.abs(target - wrap.scrollLeft) > 1) {
+      if (animate && !prefersReduce() && typeof wrap.scrollTo === 'function') {
+        wrap.scrollTo({ left: target, behavior: 'smooth' });
+      } else {
+        wrap.scrollLeft = target;
+      }
+    }
+    syncTabScroll();
+  }
+
+  var tabScrollBound = false;
+  var tabResizeObserver = null;
+  function bindTabScroll() {
+    var wrap = $('qf-services');
+    if (!wrap) return;
+    if (!tabScrollBound) {
+      tabScrollBound = true;
+      wrap.addEventListener('scroll', syncTabScroll, { passive: true });
+      window.addEventListener('resize', function () { revealActiveTab(false); }, { passive: true });
+    }
+    // The bar is measured BEFORE the conditional-options stylesheets land and
+    // before webfonts swap, so a first-paint reading can say "scrollable" for a
+    // bar that ends up fitting — leaving a permanent fade on a row with nothing
+    // behind it. Re-measure whenever the bar or any tab actually changes size.
+    if (!window.ResizeObserver) return;
+    if (tabResizeObserver) tabResizeObserver.disconnect();
+    tabResizeObserver = new ResizeObserver(function () { revealActiveTab(false); });
+    tabResizeObserver.observe(wrap);
+    Array.prototype.forEach.call(wrap.querySelectorAll('button'), function (b) {
+      tabResizeObserver.observe(b);
+    });
+  }
+
   function titleizeWord(s) {
     return String(s || '').replace(/[_-]+/g, ' ').replace(/\b\w/g, function (c) { return c.toUpperCase(); }).trim();
   }
@@ -1013,9 +1078,42 @@
       else { var h = $('qf-header'); if (h && h.parentNode) h.parentNode.insertBefore(box, h.nextSibling); }
     }
     box.innerHTML = '';
-    if (address) box.appendChild(el('div', { class: 'qf-cred-line qf-cred-address', text: address }));
-    if (authParts.length) box.appendChild(el('div', { class: 'qf-cred-line', text: credLineText(authParts) }));
-    if (reachParts.length) box.appendChild(el('div', { class: 'qf-cred-line', text: credLineText(reachParts) }));
+    // ONE FLOWING RUN of inline items, not one row per fact. Every datum is
+    // still here — dropping a carrier's address / authority / contact would be a
+    // downgrade, it is their regulatory identity — but the block now wraps to
+    // fill the width (2-3 lines) instead of reserving a full-weight row each.
+    // Alex, from a 390px screenshot: "the company card with contacts must be
+    // subtle, not bold, and fit in 2-3 lines."
+    // Phone + email become REAL tel:/mailto: links (they were dead text here
+    // before, clickable only in the credentials-off fallback block) and carry a
+    // >=44px tap box — see .qf-cred-link in public-calculator-ux.css.
+    function sep() {
+      return el('span', { class: 'qf-cred-sep', 'aria-hidden': 'true', text: String.fromCharCode(160) + '· ' });
+    }
+    var items = [];
+    if (address) items.push(el('span', { class: 'qf-cred-item qf-cred-address', text: address }));
+    if (authParts.length) items.push(el('span', { class: 'qf-cred-item qf-cred-auth', text: credLineText(authParts) }));
+    if (reachParts.length) {
+      // Phone + email are wrapped in ONE unbreakable inline-block. Their 44px
+      // tap boxes come from vertical padding on an inline box, which paints and
+      // hit-tests OUTSIDE the line box — so if the two links ever landed on
+      // DIFFERENT lines their boxes would overlap and the lower one would steal
+      // the upper one's taps (measured at 320px). Binding them to a single line
+      // makes them side-by-side neighbours instead, which cannot overlap.
+      var reach = el('span', { class: 'qf-cred-item qf-cred-reach' });
+      if (phone) reach.appendChild(el('a', { class: 'qf-cred-link', href: 'tel:' + phone.replace(/[^+0-9]/g, ''), text: phone }));
+      if (phone && email) reach.appendChild(sep());
+      if (email) reach.appendChild(el('a', { class: 'qf-cred-link', href: 'mailto:' + email, text: email }));
+      items.push(reach);
+    }
+    items.forEach(function (node, i) {
+      // The separator LEADS with an NBSP so it glues to the PRECEDING item: a
+      // wrap can only break before the next fact, never orphan a lone "·" at a
+      // line start (global no-orphan rule). Decorative, so hidden from AT —
+      // each fact is still its own element.
+      if (i) box.appendChild(sep());
+      box.appendChild(node);
+    });
     box.style.display = '';
   }
 
@@ -1368,7 +1466,11 @@
     var single = services.length <= 1;
     wrap.style.display = single ? 'none' : '';
     var root = $('qf-root'); if (root) root.classList.toggle('qf-single-service', single);
+    bindTabScroll();
     selectService(services[0]);
+    // After first paint the bar has real widths — settle the edge fade and pull
+    // the preselected mode into view if the set is wider than the strip.
+    requestAnimationFrame(function () { revealActiveTab(false); });
   }
 
   // Set by initOptionsPanel() so selectService() can refresh the "N selected"
@@ -1400,6 +1502,9 @@
     // Slide the active-tab indicator to the new tab (snap on the very first
     // selection so it doesn't animate in from the left on load).
     positionTabIndicator(!firstSelect);
+    // Keep the chosen mode on screen when the bar is scrolled (keyboard/arrow
+    // selection can land on a tab that is currently off-edge).
+    revealActiveTab(!firstSelect);
     var equip = state.config.equipmentByService[service] || [];
     if (service === 'drayage') equip = withDrayageEquipmentDefaults(equip);
     var sel = $('qf-equipment');
