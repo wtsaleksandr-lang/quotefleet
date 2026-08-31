@@ -28,6 +28,10 @@ const RFQ_CSS = `
   .rfq-card { background: var(--surface); border: 1px solid var(--border); border-radius: 4px; padding: 24px; margin: 0 0 16px; }
   .rfq-note { background: var(--accent-soft); border: 1px solid var(--border); border-radius: 4px; padding: 12px 16px; color: var(--ink-soft); font-size: 14px; margin: 0 0 24px; }
   .rfq-note strong { color: var(--ink); }
+  /* Delivery failures: same shape as a note, warning palette. Both tokens are
+     theme-aware (see .rfq-status--no_email), so this reads in light and dark. */
+  .rfq-note-warn { background: var(--warn-bg); border-color: var(--warn); }
+  .rfq-note-warn strong { color: var(--ink); }
   .rfq-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
   .rfq-field { display: flex; flex-direction: column; gap: 2px; margin: 0 0 16px; }
   .rfq-field.rfq-col2 { grid-column: 1 / -1; }
@@ -404,17 +408,32 @@ export interface RfqConfirmationOpts {
   sent: number;
   noEmail: number;
   optedOut: number;
+  /** Hard delivery failures. Omitted → 0, for callers predating the counter. */
+  failed?: number;
   cappedOut: number;
   total: number;
   dryRun: boolean;
 }
 
 export function renderRfqConfirmation(opts: RfqConfirmationOpts): string {
+  const failed = opts.failed ?? 0;
   const dryRunNote = opts.dryRun
     ? `<div class="rfq-note"><strong>Preview mode.</strong> Live sending is off, so no carrier emails actually went out — the flow is fully wired and ready to enable.</div>`
     : '';
+  // A blast where deliveries failed used to render as an unqualified success:
+  // `failed` was never counted, so "0 Requests sent" was the only hint that
+  // nothing arrived. Say it plainly, above the fold, and say who is on it.
+  const failureNote =
+    failed > 0
+      ? `<div class="rfq-note rfq-note-warn"><strong>${esc(String(failed))} ${
+          failed === 1 ? "request couldn't be delivered." : "requests couldn't be delivered."
+        }</strong> ${
+          failed === 1 ? 'That carrier was' : 'Those carriers were'
+        } not reached. QuoteFleet has been alerted automatically — you don't need to report it.</div>`
+      : '';
   const counts = [
     { n: opts.sent, label: opts.dryRun ? 'Prepared' : 'Requests sent' },
+    ...(failed > 0 ? [{ n: failed, label: 'Not delivered' }] : []),
     { n: opts.noEmail, label: 'No email on file' },
     { n: opts.optedOut, label: 'Opted out' },
     ...(opts.cappedOut > 0 ? [{ n: opts.cappedOut, label: 'Over the cap' }] : []),
@@ -423,7 +442,14 @@ export function renderRfqConfirmation(opts: RfqConfirmationOpts): string {
   <main class="rfq-wrap">
     <p class="rfq-eyebrow">Rate request sent</p>
     <h1>Your request is on its way</h1>
-    <p class="rfq-lede">We've notified the carriers with a public email on file. Bookmark your responses link below — quotes will appear there as carriers reply.</p>
+    <p class="rfq-lede">${
+      // Don't claim every carrier was notified when some were not — the note
+      // below would then be correcting the sentence directly above it.
+      failed > 0
+        ? `We've notified the carriers we could reach. Bookmark your responses link below — quotes will appear there as carriers reply.`
+        : `We've notified the carriers with a public email on file. Bookmark your responses link below — quotes will appear there as carriers reply.`
+    }</p>
+    ${failureNote}
     ${dryRunNote}
     <div class="rfq-card">
       <div class="rfq-section-title">Your responses link</div>

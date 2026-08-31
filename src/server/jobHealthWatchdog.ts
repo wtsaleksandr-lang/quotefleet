@@ -144,11 +144,37 @@ export const JOB_REGISTRY: readonly JobExpectation[] = [
     impact: 'The daily admin action queue stops arriving — CBP filings awaiting submission, LAPSED filings, and past-due tenants go back to being things someone has to remember to look for.',
   },
   {
+    job: 'card-expiry-sweep',
+    maxIntervalMs: 3 * HOUR, // hourly tick, daily 12:00 UTC sweep slot
+    disabledEnv: 'CARD_EXPIRY_DISABLED',
+    impact:
+      "Expiring cards stop being detected. There is no Stripe webhook for an expiring PaymentMethod, so this sweep is the ONLY warning before a renewal fails — without it every card expiry becomes a past-due tenant first, and dunning is the fallback instead of the safety net.",
+  },
+  {
+    job: 'rfq-response-digest',
+    maxIntervalMs: 3 * HOUR, // hourly tick
+    disabledEnv: 'RFQ_RESPONSE_DISABLED',
+    impact:
+      'Shippers stop being told that carriers replied to their rate request — a time-sensitive quote sits unseen behind a link nobody re-opens. Blasts that got zero replies also stop being flagged, so a broken carrier set looks like a quiet week.',
+  },
+  {
     job: 'job-health-watchdog',
     maxIntervalMs: 3 * HOUR, // hourly tick — this module itself
     impact: 'The staleness watchdog itself is dead, so no other job failure will be reported. Check the process is alive.',
   },
 ];
+
+/**
+ * Jobs that record to the ledger but are deliberately ABSENT from the registry
+ * above, with the reason. Kept as a list so "why isn't rfq-blast checked?" has
+ * an answer in the code rather than in a reviewer's memory.
+ *
+ * `rfq-blast` is user-triggered: it runs when a shipper sends a rate request and
+ * at no other time, so "no run in three hours" is a quiet Tuesday, not a fault.
+ * The watchdog checks CADENCE, and this job has none. Its FAILURES still alert —
+ * runTrackedJob owns that — and every run is still in the ledger.
+ */
+export const UNSCHEDULED_LEDGER_JOBS: readonly string[] = ['rfq-blast'];
 
 // ─────────────────────────────────────────────────────────────────────────────
 // 2. THE STALENESS DECISION (pure)

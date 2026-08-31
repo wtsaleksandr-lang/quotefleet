@@ -41,6 +41,7 @@ import { runReferralFulfillmentForInvoice } from '../affiliate/fulfillment.js';
 import { isDirectorySubscription, applyDirectorySubscription } from '../directory/subscription.js';
 import { isManifestSubscription, applyManifestSubscription } from '../directory/manifestSubscription.js';
 import { isLeadsSubscription, applyLeadsSubscription } from '../directory/leadsSubscription.js';
+import { isBillingRiskEvent, handleBillingRiskEvent } from './billingRisk.js';
 
 let stripeClient: Stripe | null = null;
 function stripe(): Stripe {
@@ -447,7 +448,39 @@ async function routeSubscription(sub: Stripe.Subscription): Promise<void> {
   await applySubscription(sub);
 }
 
+/**
+ * Best-effort charge → customer id, for attributing a dispute to a tenant.
+ *
+ * A dispute object carries the CHARGE but not the customer, so naming who
+ * disputed needs one read. It is a free Stripe API call and it is wrapped: a
+ * failure costs the alert its "who" line and nothing else. Never let it throw —
+ * losing the dispute record over a name lookup would invert the priorities.
+ */
+async function customerForCharge(chargeId: string): Promise<string | null> {
+  try {
+    const charge = await stripe().charges.retrieve(chargeId);
+    const c = (charge as { customer?: unknown }).customer;
+    if (typeof c === 'string') return c || null;
+    if (c && typeof c === 'object' && typeof (c as { id?: unknown }).id === 'string') {
+      return (c as { id: string }).id;
+    }
+    return null;
+  } catch (err) {
+    console.warn('[billing.webhook] dispute charge lookup failed (non-fatal):', err);
+    return null;
+  }
+}
+
 export async function handleEvent(event: Stripe.Event): Promise<void> {
+  // RISK EVENTS FIRST — disputes and payment-method problems (see billingRisk.ts).
+  // These used to fall through `default:` and get a silent 200: a dispute has a
+  // hard evidence deadline, so an acked-and-forgotten one is money lost by
+  // default. A throw in here is deliberate — it 500s the webhook so Stripe
+  // redelivers, rather than acking an event we failed to record.
+  if (isBillingRiskEvent(event.type)) {
+    await handleBillingRiskEvent(event, { customerForCharge });
+    return;
+  }
   switch (event.type) {
     case 'invoice.payment_failed': {
       // A renewal (or first) charge failed. Stripe will keep retrying per the

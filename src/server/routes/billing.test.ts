@@ -30,6 +30,8 @@ const state = vi.hoisted(() => ({
   // Subscription the mocked Stripe client returns from subscriptions.retrieve —
   // used by the invoice.paid recovery path (handleEvent retrieves the live sub).
   retrieveSub: null as Stripe.Subscription | null,
+  // Raw-SQL writes (the ops_alerts ledger behind dispute / card-problem events).
+  executes: 0,
 }));
 
 // Stripe client mock — only subscriptions.retrieve is exercised (invoice.paid
@@ -80,6 +82,11 @@ vi.mock('../../db/client.js', () => ({
         return Promise.resolve();
       },
     }),
+    // The ops_alerts ledger (risk events) writes through raw SQL, not the ORM.
+    execute: () => {
+      state.executes++;
+      return Promise.resolve([]);
+    },
   }),
 }));
 
@@ -114,6 +121,54 @@ beforeEach(() => {
   state.updates = [];
   state.inserts = [];
   state.retrieveSub = null;
+  state.executes = 0;
+});
+
+describe('handleEvent — risk events are ROUTED, not silently acked', () => {
+  // Before this, charge.dispute.* fell through `default:` and got a 200. A
+  // dispute is the only Stripe event with a hard deadline attached, so an
+  // acked-and-discarded one is money lost by default. The dispute HANDLER is
+  // unit-tested in billingRisk.test.ts; what is asserted here is only that the
+  // webhook actually reaches it.
+  function disputeEvent(status = 'needs_response'): Stripe.Event {
+    return {
+      type: 'charge.dispute.created',
+      livemode: false,
+      data: {
+        object: {
+          id: 'dp_1',
+          amount: 5000,
+          currency: 'usd',
+          charge: 'ch_1',
+          reason: 'fraudulent',
+          status,
+          evidence_details: { due_by: 1893456000 },
+        },
+      },
+    } as unknown as Stripe.Event;
+  }
+
+  it('charge.dispute.created reaches the ops_alerts ledger', async () => {
+    await handleEvent(disputeEvent());
+    expect(state.executes).toBeGreaterThan(0);
+  });
+
+  it('a card event reaches it too, and neither touches the tenant row', async () => {
+    await handleEvent({
+      type: 'customer.source.expiring',
+      livemode: false,
+      data: { object: { customer: 'cus_123' } },
+    } as unknown as Stripe.Event);
+    expect(state.executes).toBeGreaterThan(0);
+    // A risk event must never rewrite plan / subscription state as a side effect.
+    expect(state.updates).toHaveLength(0);
+  });
+
+  it('an unrelated event type still falls through to the default no-op', async () => {
+    await handleEvent({ type: 'ping', data: { object: {} } } as unknown as Stripe.Event);
+    expect(state.executes).toBe(0);
+    expect(state.updates).toHaveLength(0);
+  });
 });
 
 describe('deriveSubscriptionState — status → plan mapping', () => {
