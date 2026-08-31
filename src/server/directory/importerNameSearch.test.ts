@@ -32,6 +32,7 @@ import {
   invalidateNameIndexCache,
   NAME_INDEX_KEY,
   NAME_INDEX_MAX_COMPANIES,
+  NAME_INDEX_REFRESH_MS,
 } from './importerNameIndex.js';
 import { companyKey } from './importerCache.js';
 import { FIXTURE_SEARCH_ROWS, FIXTURE_ENTRY_PORT } from './importerFixture.js';
@@ -124,6 +125,21 @@ describe('companyNameMatchRank — punctuation and word order never decide a mat
   });
 });
 
+describe('companyMatchKey is pinned to companyKey — Manifest Privacy depends on it', () => {
+  it('normalizes identically to importerCache.companyKey', () => {
+    // Redactions are STORED under companyKey() (importerCache, DB-aware) and
+    // TESTED against companyMatchKey() (importerLeads, deliberately DB-free).
+    // The duplication is intentional; the drift would be silent, and it would
+    // un-hide paying Manifest Privacy customers. So it is pinned here.
+    for (const n of [
+      'Premier Specialty Brands', 'Robert Bosch Tool Corp.', "O'Neil & Sons, LLC",
+      '  ACME   TRADING  ', 'Bosch (USA), Inc.', '3M Company', 'Ünïcode Çø', '',
+    ]) {
+      expect(companyMatchKey(n)).toBe(companyKey(n));
+    }
+  });
+});
+
 describe('slugFromCompanyKey / companySearchRowToLead', () => {
   it('strips the company/ prefix and rejects anything outside the slug charset', () => {
     expect(slugFromCompanyKey('company/robert-bosch-tool')).toBe('robert-bosch-tool');
@@ -166,6 +182,20 @@ describe('N-2 · the local index is free to fill and free to search', () => {
     const hit = await searchNameIndex(store, 'bosch');
     expect(hit.leads.map((l) => l.company)).toEqual(['Robert Bosch Tool Corp']);
     expect(hit.total).toBe(2);
+  });
+
+  it('does not rewrite the row when nothing changed (it is ONE ~600KB row)', async () => {
+    const store = memBolStore();
+    const put = vi.spyOn(store, 'put');
+    const batch = [lead('Robert Bosch Tool Corp'), lead('Komatsu America Corp')];
+    expect(await indexLeads(store, batch)).toBe(2);
+    expect(put).toHaveBeenCalledTimes(1);
+    // The very next lane search sees the same companies — no write, no DB touch.
+    expect(await indexLeads(store, batch)).toBe(0);
+    expect(put).toHaveBeenCalledTimes(1);
+    // A day later the projection is stale, so it IS refreshed.
+    await indexLeads(store, batch, Date.now() + NAME_INDEX_REFRESH_MS + 1);
+    expect(put).toHaveBeenCalledTimes(2);
   });
 
   it('stays bounded — the row can never grow without limit', async () => {

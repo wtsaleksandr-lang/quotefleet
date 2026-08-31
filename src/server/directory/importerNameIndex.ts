@@ -173,12 +173,19 @@ export async function loadNameIndex(store: BolCacheStore): Promise<IndexedCompan
  * these rows are already in memory and already paid for.
  *
  * Best-effort and never throws: indexing is a side benefit of a search, so a
- * failure here must never affect the search's own response. Writes only when
- * something actually changed, so the common case (a repeat search over already
- * indexed companies) touches the DB zero times.
+ * failure here must never affect the search's own response.
+ *
+ * WRITE DISCIPLINE. The index is one row, and rewriting it on every lane search
+ * would push up to ~600 KB of jsonb per search for no gain. It is written only
+ * when the row would actually change in a way worth persisting: a company we did
+ * not have, or a stored projection older than NAME_INDEX_REFRESH_MS. A repeat
+ * search over already-indexed companies therefore touches the DB zero times —
+ * the memo answers it and nothing is written.
  *
  * Returns the number of NEW companies added (0 when nothing was written).
  */
+export const NAME_INDEX_REFRESH_MS = 24 * 60 * 60 * 1000;
+
 export async function indexLeads(
   store: BolCacheStore,
   leads: readonly ImporterLead[],
@@ -195,12 +202,13 @@ export async function indexLeads(
       const k = companyMatchKey(lead.company);
       const prev = byKey.get(k);
       if (!prev) added++;
-      // Always refresh the stored projection: the newest pull is the freshest
-      // volume/lane data we have for this importer.
+      // Refresh a stale projection — the newest pull is the freshest volume/lane
+      // data we hold — but leave a recent one alone so this stays a no-op write.
+      else if (now - prev.t < NAME_INDEX_REFRESH_MS) continue;
       byKey.set(k, { k, t: now, lead });
       touched = true;
     }
-    if (!touched) return 0;
+    if (!touched) return added;
     // Least-recently-seen eviction keeps the row bounded and keeps the companies
     // people actually search for.
     const next = [...byKey.values()]
