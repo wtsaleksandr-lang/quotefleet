@@ -1978,7 +1978,11 @@ const CLIENT_JS = `
     // The record strip only ever updated on SUCCESS, so while a search ran it
     // still told the user to "pick a port, lane or commodity to start" — which
     // they had just done — directly beside "Searching…".
-    if(recordLine&&!append) recordLine.textContent=cacheOnly?'checking the cache for this lane':'searching this lane now';
+    // A name search reaches no lane, so the lane wording would be wrong from the
+    // first frame — say what is actually happening.
+    if(recordLine&&!append) recordLine.textContent = payload&&payload.company&&!payload.entryPort&&!payload.state&&!payload.hsCode&&!payload.product&&!payload.supplierCountry
+      ? 'looking that company up'
+      : (cacheOnly?'checking the cache for this lane':'searching this lane now');
     var body={}; for(var k in payload)body[k]=payload[k]; body.page=page;
     if(cacheOnly) body.cacheOnly=true;
     return fetch('/api/importers/search',{method:'POST',headers:{'Content-Type':'application/json','Accept':'application/json'},body:JSON.stringify(body)})
@@ -2082,7 +2086,14 @@ const CLIENT_JS = `
             setStatus('No importers matched those filters \\u2014 widen your lane or commodity.',false);
           }
           results.appendChild(e);
-          if(recordLine&&j.recordsScanned){ recordLine.textContent=Number(totalScanned).toLocaleString('en-US')+' customs records scanned'; }
+          // Retire the in-flight wording even when nothing matched — otherwise a
+          // finished search still reads "searching this lane now" beside its own
+          // empty state. A name miss scanned no bills, so it says so.
+          if(recordLine){
+            recordLine.textContent = j.recordsScanned
+              ? Number(totalScanned).toLocaleString('en-US')+' customs records scanned'
+              : (j.nameSearch ? 'no importer matched that name' : 'no records matched \\u2014 widen the lane');
+          }
           return;
         }
         buildFacets(); renderList();

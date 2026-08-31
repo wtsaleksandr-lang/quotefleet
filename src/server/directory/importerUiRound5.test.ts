@@ -397,7 +397,13 @@ describe('R5-7 · the surfaces a user hits FIRST', () => {
   });
 
   it('the record strip stops telling the user to do what they just did', () => {
-    expect(html).toContain("recordLine.textContent=cacheOnly?'checking the cache for this lane':'searching this lane now'");
+    // Still the lane wording while a LANE search runs — but a name search reaches
+    // no lane, so it gets its own in-flight line rather than the wrong one.
+    expect(html).toContain("(cacheOnly?'checking the cache for this lane':'searching this lane now')");
+    expect(html).toContain("'looking that company up'");
+    // ...and both are retired on completion, including when nothing matched.
+    expect(html).toContain("'no importer matched that name'");
+    expect(html).toContain("'no records matched \\u2014 widen the lane'");
   });
 
   it('a phone scrolls to the results, which otherwise start ~1,080px down', () => {
