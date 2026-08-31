@@ -168,7 +168,50 @@ describe('customize panel — tagline on/off toggle + regrouped header block', (
     // Authority + reach lines still follow (the USDOT label glues its number
     // with an internal NBSP, so match up to the opening quote only).
     expect(cred).toContain("authParts.push('USDOT");
-    expect(cred).toContain('credLineText(reachParts)');
+    // Reach (phone + email) is emitted as REAL links, not dead text, and the
+    // two travel in one unbreakable run so their 44px tap boxes stay
+    // side-by-side neighbours instead of overlapping across a wrap.
+    expect(cred).toContain("'tel:'");
+    expect(cred).toContain("'mailto:'");
+    expect(cred).toContain('qf-cred-reach');
+  });
+
+  it('renders the credential block as ONE flowing run, sized to recede', async () => {
+    const css = await pub('public-calculator-ux.css');
+    const block = css.slice(css.indexOf('Credential block: ONE quiet'));
+    // Alex: "subtle, not bold, and fit in 2-3 lines" — the fixed one-row-per-
+    // fact stack becomes a single flowing block at a smaller, lighter size.
+    expect(block).toContain('display: block');
+    expect(block).toContain('font-size: 11px');
+    expect(block).toContain('font-weight: 500');
+    // Contrast is NOT traded away for subtlety: the colour stays on the muted
+    // theme token, which applyTheme sets for both light and dark presets.
+    expect(block).toContain('color: var(--w-muted)');
+    // The tap target survives the shrink: 16px block padding on an inline link
+    // expands the hit box past 44px without growing the line box.
+    expect(block).toContain('.qf-cred-link');
+    expect(block).toContain('padding: 16px 0');
+  });
+
+  it('lays the service tabs on ONE horizontally scrolling line', async () => {
+    const css = await pub('widget-ux-fixes.css');
+    // Alex: "the truck modes selection must fit into 1 single line and
+    // implement horizontal scroll if necessary." The old rule wrapped 5+ modes
+    // into a 3+2 grid at EVERY width — it must not come back.
+    expect(css).not.toContain('grid-auto-flow: row !important');
+    const bar = css.slice(css.indexOf('body.qf-app-calculator #qf-services.qf-tabs {'));
+    expect(bar).toContain('flex-wrap: nowrap !important');
+    expect(bar).toContain('overflow-x: auto !important');
+    // The strip is the scroll port, so the PAGE never gains horizontal scroll.
+    expect(bar).toContain('overscroll-behavior-x: contain');
+    // Off-edge modes must be discoverable — the fade is driven by data-scroll.
+    expect(bar).toContain('[data-scroll="right"]');
+    expect(bar).toContain('[data-scroll="left"]');
+
+    const js = await pub('widget.js');
+    expect(js).toContain('function syncTabScroll');
+    expect(js).toContain('function revealActiveTab');
+    expect(js).toContain("setAttribute('data-scroll'");
   });
 });
 

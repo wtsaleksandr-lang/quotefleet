@@ -1185,20 +1185,71 @@ body.qfd-embed-phone::-webkit-scrollbar { width: 0; height: 0; }
    map's direct-manipulation pan/zoom, or `overflow: clip` on .qf-modal-card.
    ═════════════════════════════════════════════════════════════════════════ */
 
-/* ── 1. Service tabs: fill the bar, and never orphan one tab ────────────────
-   The app-calculator skin pinned the tab bar to FIVE equal columns while every
-   real tenant has 1-4 services, so a 3-service widget left 40.7% of the bar
-   (138.8px of 341px at 375) as dead space with the tabs bunched left. That file
-   now uses grid-auto-flow: column, so the track count follows the tab count.
-   For the wide sets it still has to wrap, pick a row width that cannot leave a
-   single tab alone: 5-6 services break 3+2 / 3+3, and 7-8 break 4+3 / 4+4.
-   (7 is the ceiling of the canonical mode set in outreach/prospectDemo.ts.) */
-body.qf-app-calculator .qf-tabs:has(> button:nth-child(5)) {
-  grid-auto-flow: row !important;
-  grid-template-columns: repeat(3, minmax(0, 1fr)) !important;
+/* ── 1. Service tabs: ONE line that scrolls INSIDE its own bar ──────────────
+   Alex, from a real 390px screenshot: "the truck modes selection must fit into
+   1 single line and implement horizontal scroll if necessary."
+
+   This block used to do the opposite. To avoid orphaning a lone tab it wrapped
+   5-6 modes to 3+2 / 3+3 and 7-8 to 4+3 / 4+4 — measured at EVERY viewport, not
+   just narrow ones, so the demo's five modes rendered as two rows at 320 THROUGH
+   1440. The no-orphan rule it was serving only exists for rows that wrap; a
+   single scrolling line cannot orphan anything, so the rule is satisfied by
+   construction and the wrap is gone.
+
+   The row now scrolls INSIDE ITSELF. The container is the scroll port, so
+   document.documentElement.scrollWidth stays === innerWidth at every width —
+   the widget never gains page-level horizontal scroll. `flex: 1 0 auto` keeps
+   the familiar look for the common 2-4 mode tenant (tabs grow to fill the bar,
+   nothing to scroll, data-scroll="none" so no fade); only a set genuinely wider
+   than the strip starts scrolling.
+
+   The id raises specificity above public-calculator-app-style.css's
+   `display: grid !important` / `overflow: visible !important`, which is INJECTED
+   (public-calculator-conditional-options.js) and therefore cascades AFTER this
+   file — an equal-specificity !important rule here would lose the tie.
+
+   Scroll behaviour: native momentum on touch (-webkit-overflow-scrolling), no
+   scrollbar chrome on any platform, and overscroll-behavior-x: contain so
+   reaching the end never chains out to the page/host document. Keyboard is
+   untouched — every tab is still a focusable <button> in DOM order, the browser
+   scrolls a focused tab into view on its own, and widget.js's revealActiveTab()
+   does the same on selection. outline-offset keeps the focus ring inside the
+   scroll port, where overflow would otherwise clip it. */
+body.qf-app-calculator #qf-services.qf-tabs {
+  display: flex !important;
+  flex-wrap: nowrap !important;
+  align-items: stretch;
+  overflow-x: auto !important;
+  overflow-y: hidden !important;
+  -webkit-overflow-scrolling: touch;
+  overscroll-behavior-x: contain;
+  scrollbar-width: none;
 }
-body.qf-app-calculator .qf-tabs:has(> button:nth-child(7)) {
-  grid-template-columns: repeat(4, minmax(0, 1fr)) !important;
+body.qf-app-calculator #qf-services.qf-tabs::-webkit-scrollbar { display: none; }
+body.qf-app-calculator #qf-services.qf-tabs > button {
+  flex: 1 0 auto !important;
+  width: auto !important;
+  min-width: max-content !important;
+  white-space: nowrap;
+  outline-offset: -2px;
+}
+
+/* Edge fade — the affordance that off-edge modes exist at all. widget.js
+   syncTabScroll() writes data-scroll (none|left|right|both) on scroll/resize;
+   without it the extra modes are simply invisible and unfindable. The mask is
+   painted in the element's own box, so it stays pinned to the edges while the
+   content scrolls under it. Nothing is drawn when everything fits. */
+body.qf-app-calculator #qf-services.qf-tabs[data-scroll="right"] {
+  -webkit-mask-image: linear-gradient(90deg, #000 calc(100% - 24px), transparent);
+  mask-image: linear-gradient(90deg, #000 calc(100% - 24px), transparent);
+}
+body.qf-app-calculator #qf-services.qf-tabs[data-scroll="left"] {
+  -webkit-mask-image: linear-gradient(90deg, transparent, #000 24px);
+  mask-image: linear-gradient(90deg, transparent, #000 24px);
+}
+body.qf-app-calculator #qf-services.qf-tabs[data-scroll="both"] {
+  -webkit-mask-image: linear-gradient(90deg, transparent, #000 24px, #000 calc(100% - 24px), transparent);
+  mask-image: linear-gradient(90deg, transparent, #000 24px, #000 calc(100% - 24px), transparent);
 }
 
 /* ── 2. --w-bg is a LEGACY token the theme engine never remaps ──────────────

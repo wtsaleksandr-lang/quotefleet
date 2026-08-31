@@ -279,6 +279,87 @@ export async function recordJobRun(
  *  job failing every 10 minutes cannot send 144 emails a day. */
 export const jobFailureDeduper = new AlertDeduper();
 
+// ─────────────────────────────────────────────────────────────────────────────
+// 3b. THE ALERT THRESHOLD — one self-healing blip is not an outage
+// ─────────────────────────────────────────────────────────────────────────────
+//
+// Shipped as "alert on the first failure", which is correct for a job that
+// stays broken and wrong for the far more common case: a single transient
+// dependency blip (a Neon connection reset) that the very next tick heals.
+// 2026-08-22, `lifecycle-email` failed once at 15:48:57 and succeeded at
+// 15:50:55 — nothing was broken, and an email went out anyway. Alert fatigue is
+// how a good signal stops being read, so a failure now has to CLEAR A BAR
+// before it pages anyone.
+//
+// The bar is "whichever comes first":
+//   (a) FAILURE_ALERT_THRESHOLD consecutive failures with no healthy run in
+//       between — a job that retries fast proves itself broken by failing
+//       twice; or
+//   (b) the streak has stayed unhealthy for SUSTAINED_FAILURE_ALERT_MS — the
+//       clause that covers every job whose next retry is NOT imminent (the
+//       weekly `fuel-surcharge`, the once-a-day slot jobs like `weekly-digest`
+//       / `ops-digest` / `card-expiry-sweep`, and the user-triggered
+//       `rfq-blast`, which may never tick a second time). Without it, "two
+//       consecutive failures" would silently mean "alert me in 24 hours".
+//
+// (b) is enforced by a real timer rather than only on the next failure event,
+// precisely so a job that never ticks again still surfaces. The window is
+// therefore also the WORST-CASE silence for a genuinely broken job: 30 minutes,
+// and only ~1 tick (10 min) for the fast crons. Everything else about the
+// signal is unchanged and deliberately still first-failure-immediate:
+//   - the ledger row is written on the FIRST failure (so /api/admin/job-health
+//     and the ops digest's `lastStatus === 'failure'` line show it at once);
+//   - the staleness watchdog still keys on the last HEALTHY run, so a job stuck
+//     failing every tick goes stale on its own schedule regardless of this;
+//   - the 6 h de-dupe cooldown still caps the volume once an alert does fire.
+//
+// The streak lives in process memory, like AlertDeduper — a restart resets it.
+// That is acceptable because the watchdog is the durable backstop: a job that
+// never records a healthy run goes stale and alerts on `maxIntervalMs` no
+// matter how many times the process bounced.
+
+/** Consecutive failures (no healthy run between) that trip an alert. */
+export const FAILURE_ALERT_THRESHOLD = 2;
+
+/** How long one unbroken failure streak may last before it alerts regardless of
+ *  how few ticks it managed — the upper bound on silence. */
+export const SUSTAINED_FAILURE_ALERT_MS = 30 * 60 * 1000;
+
+export interface FailureStreak {
+  /** Consecutive failures, healthy runs reset it to 0 (so this is >= 1). */
+  count: number;
+  /** When the CURRENT streak started — the sustained-window clock. */
+  firstFailedAtMs: number;
+}
+
+/** Per-job consecutive-failure streaks. A healthy outcome clears the job's
+ *  entry; that is what makes a self-healed blip a non-event. */
+export class FailureStreakTracker {
+  private readonly streaks = new Map<string, FailureStreak>();
+
+  /** Record a failure and return the resulting (always open) streak. */
+  onFailure(job: string, nowMs: number): FailureStreak {
+    const prev = this.streaks.get(job);
+    const next: FailureStreak = prev
+      ? { count: prev.count + 1, firstFailedAtMs: prev.firstFailedAtMs }
+      : { count: 1, firstFailedAtMs: nowMs };
+    this.streaks.set(job, next);
+    return next;
+  }
+
+  /** A success/skipped run ends the streak — the job healed itself. */
+  onHealthy(job: string): void {
+    this.streaks.delete(job);
+  }
+
+  /** The open streak, or null when the job is currently healthy. */
+  peek(job: string): FailureStreak | null {
+    return this.streaks.get(job) ?? null;
+  }
+}
+
+export const jobFailureStreaks = new FailureStreakTracker();
+
 export interface TrackedJobDeps {
   record: (job: string, fn: () => Promise<JobOutcome> | JobOutcome) => Promise<JobOutcome>;
   sendAlert: (subject: string, body: string) => Promise<void>;
@@ -286,6 +367,13 @@ export interface TrackedJobDeps {
   cooldownMs: number;
   now: () => number;
   log: (msg: string) => void;
+  /** Consecutive-failure bar — see FAILURE_ALERT_THRESHOLD. */
+  streaks: FailureStreakTracker;
+  alertAfterFailures: number;
+  sustainedMs: number;
+  /** Arms the sustained-window re-check. Injected so tests drive it without
+   *  timers; the default unrefs so it can never hold the process open. */
+  schedule: (fn: () => void, ms: number) => void;
 }
 
 function defaultTrackedDeps(): TrackedJobDeps {
@@ -296,6 +384,14 @@ function defaultTrackedDeps(): TrackedJobDeps {
     cooldownMs: CRON_ALERT_COOLDOWN_MS,
     now: () => Date.now(),
     log: (msg) => console.log(msg),
+    streaks: jobFailureStreaks,
+    alertAfterFailures: FAILURE_ALERT_THRESHOLD,
+    sustainedMs: SUSTAINED_FAILURE_ALERT_MS,
+    schedule: (fn, ms) => {
+      const t = setTimeout(fn, ms);
+      // Never keep the event loop (or a test runner) alive for an alert re-check.
+      if (typeof (t as { unref?: () => void }).unref === 'function') (t as { unref: () => void }).unref();
+    },
   };
 }
 
@@ -312,8 +408,9 @@ function defaultTrackedDeps(): TrackedJobDeps {
  *                producing any signal at all)
  *
  * Never throws — the surrounding setInterval must keep ticking. A `failure`
- * outcome (returned OR thrown by `fn`) triggers the alert; `success` and
- * `skipped` do not.
+ * outcome (returned OR thrown by `fn`) is ALWAYS recorded to the ledger, but it
+ * only emails once the streak clears the threshold in section 3b — a single
+ * transient blip that the next tick heals is a ledger row, not a page.
  */
 export async function runTrackedJob(
   job: string,
@@ -322,18 +419,63 @@ export async function runTrackedJob(
 ): Promise<JobOutcome> {
   const deps: TrackedJobDeps = { ...defaultTrackedDeps(), ...overrides };
   const outcome = await deps.record(job, fn);
-  if (outcome.status !== 'failure') return outcome;
+  if (outcome.status !== 'failure') {
+    // Healthy run — the job proved itself, so any open streak is over.
+    deps.streaks.onHealthy(job);
+    return outcome;
+  }
 
   const detail = outcome.detail ?? 'no detail recorded';
   deps.log(`[job-health] job "${job}" FAILED: ${detail}`);
-  if (!deps.deduper.shouldAlert(`job-failure:${job}`, deps.now(), deps.cooldownMs)) {
-    deps.log(`[job-health] alert for "${job}" suppressed — within cooldown`);
+  const streak = deps.streaks.onFailure(job, deps.now());
+  const threshold = Math.max(1, deps.alertAfterFailures);
+  const unhealthyForMs = deps.now() - streak.firstFailedAtMs;
+
+  if (streak.count < threshold && unhealthyForMs < deps.sustainedMs) {
+    deps.log(
+      `[job-health] alert for "${job}" held — failure ${streak.count}/${threshold}, ` +
+        `unhealthy ${Math.round(unhealthyForMs / 1000)}s of ${Math.round(deps.sustainedMs / 1000)}s`,
+    );
+    // Arm the sustained-window re-check ONCE per streak, so a job whose next
+    // retry is hours away (or never — rfq-blast) still surfaces on the clock
+    // instead of waiting for a second failure event that may not come.
+    if (streak.count === 1) {
+      const armedFor = streak.firstFailedAtMs;
+      deps.schedule(() => {
+        const open = deps.streaks.peek(job);
+        // Recovered, or this is a stale timer from an already-closed streak.
+        if (!open || open.firstFailedAtMs !== armedFor) return;
+        void emitJobFailureAlert(job, detail, open, deps);
+      }, deps.sustainedMs);
+    }
     return outcome;
   }
+
+  await emitJobFailureAlert(job, detail, streak, deps);
+  return outcome;
+}
+
+/** Send the de-duped failure email for an alerting streak. Never throws. */
+async function emitJobFailureAlert(
+  job: string,
+  detail: string,
+  streak: FailureStreak,
+  deps: TrackedJobDeps,
+): Promise<void> {
+  if (!deps.deduper.shouldAlert(`job-failure:${job}`, deps.now(), deps.cooldownMs)) {
+    deps.log(`[job-health] alert for "${job}" suppressed — within cooldown`);
+    return;
+  }
+  const unhealthyMin = Math.max(0, Math.round((deps.now() - streak.firstFailedAtMs) / 60000));
   const body =
     `Scheduled job "${job}" could not complete its work.\n\n` +
     `${detail}\n\n` +
+    `Consecutive failures: ${streak.count} (no healthy run for ${unhealthyMin} min).\n` +
+    `First failure in this streak (UTC): ${new Date(streak.firstFailedAtMs).toISOString()}\n` +
     `Time (UTC): ${new Date(deps.now()).toISOString()}\n\n` +
+    `A single self-healing failure does NOT send this email — it alerts on ` +
+    `${Math.max(1, deps.alertAfterFailures)} consecutive failures or ` +
+    `${Math.round(deps.sustainedMs / 60000)} min unhealthy, whichever is first.\n` +
     `Further alerts for this job are suppressed for ` +
     `${Math.round(deps.cooldownMs / 60000)} min to avoid spam.\n` +
     `Full run history: GET /api/admin/job-health (super-admin).`;
@@ -343,5 +485,4 @@ export async function runTrackedJob(
     // Alerting must never break the job it is observing.
     deps.log(`[job-health] failure alert for "${job}" threw (swallowed): ${String(err)}`);
   }
-  return outcome;
 }

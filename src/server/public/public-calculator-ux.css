@@ -774,3 +774,89 @@ body.qf-app-calculator .qf-header .brand-name[data-tagline-style="plain"]::after
   color: var(--w-accent, #0D3CFC) !important;
   padding: 4px 0 !important;
 }
+
+/* ── Credential block: ONE quiet, flowing 2-3 line unit ─────────────────────
+   Appended at EOF so the line-based guard baselines never renumber, and so it
+   out-cascades the two earlier .qf-cred-meta blocks (base + Maersk regroup).
+
+   Alex, from a real 390px screenshot: "the company card with contacts must be
+   subtle, not bold, and fit in 2-3 lines." It shipped as five stacked rows of
+   12.5px/600 text — a wrapped two-line address, then USDOT · MC, then
+   phone · email — all at full weight, visually competing with the form beneath
+   it, which is the thing the customer actually came to use.
+
+   Nothing is REMOVED. Address, USDOT, MC, phone and email are a carrier's
+   regulatory identity; dropping any of them would be a downgrade. Only the
+   PRESENTATION is compressed: renderCredMeta (widget.js) now emits one flowing
+   run of inline items joined by NBSP-glued middots, so the text wraps to fill
+   the width instead of reserving a row per fact — 3 lines at 320px, 2 from
+   768px up. Size 12.5 -> 11px and weight 600 -> 500 make it recede to
+   supporting information; the COLOUR stays on the --w-muted token (identical in
+   both themes) so subtlety is never bought with contrast. */
+.qf-cred-meta {
+  display: block;
+  margin: 4px 0 16px;
+  color: var(--w-muted);
+  font-size: 11px;
+  font-weight: 500;
+  line-height: 1.5;
+  letter-spacing: 0.01em;
+  /* Prefer breaking at the separators; only a single unbreakable token (a very
+     long email on a 320px phone) may break inside itself. */
+  overflow-wrap: break-word;
+}
+.qf-cred-sep { opacity: 0.55; }
+
+/* Phone + email travel together as ONE unbreakable inline-block, so the two
+   expanded tap boxes are always side-by-side neighbours on a single line and
+   can never overlap each other vertically (see renderCredMeta). */
+.qf-cred-reach {
+  display: inline-block;
+  white-space: nowrap;
+}
+/* Below 360px the pair (phone + " · " + email) is a few px wider than the card,
+   and an unbreakable inline-block that does not fit would overflow. One small
+   step down keeps the whole block at three lines on a 320px phone — the only
+   width where it is needed; 360px and up stay at 11px. */
+@media (max-width: 359px) {
+  .qf-cred-meta { font-size: 10.5px; }
+}
+
+/* Phone + email are real tel:/mailto: links here now. They read quieter than
+   before (same muted colour as the rest of the block, no accent fill) but the
+   affordance is never colour-only: a hairline underline carries it.
+   The 16px BLOCK padding IS the tap target. Vertical padding on a non-replaced
+   INLINE box expands the hit + paint box without growing the line box, so each
+   link measures >=44px tall to a finger while the card stays 2-3 compact lines.
+   Inline padding is 0 so the middot rhythm is untouched. */
+.qf-cred-link {
+  color: inherit;
+  padding: 16px 0;
+  /* The padded hit box reaches above/below its own line, so it has to sit ABOVE
+     the neighbouring line's text in paint order — otherwise that text (a plain,
+     non-interactive span) swallows the top row of the tap target. Measured at
+     320px, where the pair wraps onto its own line directly under USDOT · MC. */
+  position: relative;
+  z-index: 1;
+  /* A phone number contains spaces, so without this the run wraps mid-number
+     ("+1 (562)" / "555-0184") and the link becomes two disjoint fragments — an
+     unreadable number AND a broken tap target. Each link stays one unbroken
+     box; the block wraps at the separators around it instead. */
+  white-space: nowrap;
+  text-decoration: underline;
+  text-decoration-color: color-mix(in srgb, currentColor 40%, transparent);
+  text-underline-offset: 2px;
+}
+/* --w-text, NOT --w-fg: applyTheme() rewrites --w-text per preset but leaves
+   the legacy --w-fg at its static LIGHT default, so --w-fg would paint dark
+   ink on the dark preset (the trap documented in widget-ux-fixes.css). */
+.qf-cred-link:hover,
+.qf-cred-link:focus-visible {
+  color: var(--w-text, var(--w-fg));
+  text-decoration-color: currentColor;
+}
+.qf-cred-link:focus-visible {
+  outline: 2px solid var(--w-primary);
+  outline-offset: 2px;
+  border-radius: 4px;
+}
