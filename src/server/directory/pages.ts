@@ -56,6 +56,14 @@ import {
   safetyRatingExplainer,
   type CarrierSafety,
 } from './safetyData.js';
+import {
+  LI_EXTRACT_DATE,
+  formatCoverage,
+  formatCredentialDate,
+  hasInsuranceFilings,
+  registeredSinceLabel,
+  type CarrierCredentials,
+} from './carrierCredentials.js';
 import type { DirectoryIdentity } from './entitlement.js';
 import {
   SITE_NAV_HTML,
@@ -371,6 +379,67 @@ function safetyRecordBlock(safety: CarrierSafety | null | undefined): string {
           <p class="cp-note cp-safety-lede">Counts published by FMCSA over its rolling ${SAFETY_WINDOW_MONTHS}-month measurement period. QuoteFleet reports these figures as published and does not rate, certify or endorse any carrier.</p>
           <div class="cp-datagrid">${all.join('')}</div>
           <p class="cp-note">FMCSA safety data as of ${esc(formatAsOf(asOf))}. Crash counts are state-reported and are not adjusted for fault or for how many miles the carrier runs.</p>
+        </section>`;
+}
+
+/**
+ * The FMCSA INSURANCE FILINGS panel.
+ *
+ * Verifying insurance is the first thing a shipper does before tendering a load,
+ * and until now the profile could not answer it at all — the page just pointed
+ * at the live QCMobile check. The filings were sitting unread in the same L&I
+ * row the ingest already downloads for operating authority.
+ *
+ * HONESTY RULES BAKED IN HERE (full contract in ./carrierCredentials.ts):
+ *
+ *   • A FILING IS NOT COVERAGE. L&I records that an insurer filed a form with
+ *     FMCSA. It is not proof a policy is in force today, so the wording is
+ *     "filing on record" and the note tells the reader to get a certificate
+ *     before tendering. We never write "insured" or "verified".
+ *   • THE FILE IS FROZEN. FMCSA stopped refreshing L&I on 14 May 2026, so every
+ *     figure here is a snapshot of that date and says so. An undated figure off
+ *     a closed file would be a claim we cannot stand behind.
+ *   • THE FEDERAL MINIMUM SITS BESIDE THE AMOUNT, so $750,000 reads as "the
+ *     legal floor" rather than as an achievement — the same neutral-context
+ *     device the out-of-service rates use with the national average.
+ *   • ABSENCE IS NOT A NEGATIVE. Cargo insurance and a surety bond are not
+ *     required of most property carriers (measured: 3.8% and 1.4% have one), so
+ *     their rows appear only when the filing EXISTS. A "Not on file" line would
+ *     read as a black mark for the ~96% who were never required to have one.
+ *     If there is no filing of any kind the whole card is omitted rather than
+ *     rendered empty.
+ *
+ * The grid takes `cp-datagrid--auto` because the row count is 1–3: the odd-count
+ * rule spans the first item full-width so the last line never strands a single
+ * figure (the global no-orphan rule).
+ *
+ * The L&I provenance + freeze date live on the "Safety & compliance" card
+ * IMMEDIATELY ABOVE this one in the same panel, which is where the authority
+ * rows that share the same source and the same staleness also sit — stating it
+ * once for both costs ~120 fewer bytes on every one of ~330k pages than
+ * repeating it here. Keep the two together if either ever moves.
+ */
+function insuranceBlock(cred: CarrierCredentials | null | undefined): string {
+  if (!hasInsuranceFilings(cred) || !cred) return '';
+  const rows: string[] = [];
+  if (cred.bipdOnFile != null) {
+    const floor =
+      cred.bipdRequired != null
+        ? `<span class="cp-safety-ctx">federal minimum for this authority ${esc(formatCoverage(cred.bipdRequired))}</span>`
+        : '';
+    rows.push(
+      `<div class="cp-dt"><span class="k">Liability (BIPD)</span><span class="v">${esc(formatCoverage(cred.bipdOnFile))}${floor}</span></div>`,
+    );
+  }
+  if (cred.cargoInsuranceOnFile)
+    rows.push('<div class="cp-dt"><span class="k">Cargo insurance</span><span class="v">Filing on record</span></div>');
+  if (cred.bondOnFile)
+    rows.push('<div class="cp-dt"><span class="k">Surety bond</span><span class="v">Filing on record</span></div>');
+  if (!rows.length) return '';
+  return `<section class="cp-card">
+          <h2 class="cp-h">Insurance filings on record</h2>
+          <div class="cp-datagrid cp-datagrid--auto">${rows.join('')}</div>
+          <p class="cp-note">A filing on record is not proof of current coverage — ask the carrier for a certificate of insurance before tendering.</p>
         </section>`;
 }
 
@@ -1083,8 +1152,16 @@ export const DIRECTORY_CSS = `
   #cp-tab-contact:checked ~ .cp-panel--contact { display: flex; flex-direction: column; gap: 16px; }
   /* Cargo-class specialties: a neutral chip group (variable length → the same
      flex-wrap chip row the full-enumeration list already uses). */
-  .cp-badge--cargo { background: var(--surface-2); color: var(--ink-soft); border-color: var(--border); text-transform: none; letter-spacing: 0.02em; }
+  .cp-badge--cargo, .cp-badge--fact { background: var(--surface-2); color: var(--ink-soft); border-color: var(--border); text-transform: none; letter-spacing: 0.02em; }
+  /* Credential FACTS carry figures, so tabular digits; outline-and-tint, never a
+     fill — a measured credential should not out-shout the category badges. */
+  .cp-badge--fact { font-variant-numeric: tabular-nums; cursor: default; }
   .cp-cargorow { margin-top: 2px; }
+  .cp-factrow { margin-top: 8px; }
+  /* Variable-length data grids (1–3 insurance rows): odd count ⇒ the first item
+     spans both columns, so the last line never strands a single figure. Same
+     structural no-orphan rule the chip rows use. */
+  .cp-datagrid--auto > :first-child:nth-last-child(odd) { grid-column: 1 / -1; }
   .cp-asof { margin-top: 14px; }
   @media (max-width: 640px) {
     .cp-tabs { margin-top: 16px; }
@@ -1881,7 +1958,10 @@ function jsonLdFaq(faqs: Array<{ q: string; a: string }>): string {
 function jsonLdCarrier(c: VisibleCarrier): string {
   const addr = {
     '@type': 'PostalAddress',
-    addressCountry: 'US',
+    // The STORED domicile country, not an assumption. This was hardcoded 'US',
+    // which published a wrong country in structured data for every
+    // Canada-domiciled carrier the ingest deliberately keeps.
+    addressCountry: c.country === 'CA' ? 'CA' : 'US',
     ...(c.city ? { addressLocality: c.city } : {}),
     ...(c.state ? { addressRegion: c.state } : {}),
     ...(c.zip ? { postalCode: c.zip } : {}),
@@ -3562,6 +3642,35 @@ export function renderCarrierProfile(opts: {
   const credentialGroup = credentialBadges.length
     ? `<div class="cp-badgegroup" data-n="${credentialBadges.length}">${credentialBadges.join('')}</div>`
     : '';
+  // ── FMCSA CREDENTIAL FACTS — the measurable ones, as neutral outline chips.
+  //
+  // Deliberately NOT more solid colour badges. The solid badges above say what a
+  // carrier IS (a category: has authority, hauls hazmat); these say HOW MUCH (a
+  // quantity: insured for $1m, registered 14 years). Different kind of fact,
+  // different weight — and a positive credential is an outline-and-tint chip,
+  // never a bright fill, so eight saturated badges never shout at once.
+  //
+  // Variable length, so this is a `.cp-chiprow` and inherits the STRUCTURAL
+  // no-orphan rule (odd count ⇒ first chip spans both columns) rather than the
+  // fixed `data-n` map, which only covers 1..6.
+  //
+  // Fleet size and the inspection count are NOT repeated here on purpose. Fleet
+  // is already two inches below in the FMCSA snapshot grid on this same tab, and
+  // the inspection count belongs with the out-of-service rates and the national
+  // average that make it mean anything — a bare "5,043 inspections" chip would
+  // strip exactly the context that keeps it honest.
+  const factChips: string[] = [];
+  const tenureLabel = registeredSinceLabel(c.credentials?.fmcsaRegisteredSince ?? null);
+  if (tenureLabel) factChips.push(tenureLabel);
+  if (c.credentials?.bipdOnFile != null)
+    factChips.push(`${formatCoverage(c.credentials.bipdOnFile)} liability on file`);
+  if (c.credentials?.cargoInsuranceOnFile) factChips.push('Cargo insurance on file');
+  if (c.credentials?.bondOnFile) factChips.push('Surety bond on file');
+  const factGroup = factChips.length
+    ? `<div class="cp-chiprow cp-factrow">${factChips
+        .map((t) => `<span class="cp-badge cp-badge--fact">${esc(t)}</span>`)
+        .join('')}</div>`
+    : '';
   const equipmentGroup = equipmentBadges.length
     ? `<div class="cp-eqwrap"><span class="cp-eqlabel">Equipment</span><div class="cp-badgegroup cp-badgegroup--equip" data-n="${equipmentBadges.length}">${equipmentBadges.join('')}</div></div>`
     : '';
@@ -3576,6 +3685,16 @@ export function renderCarrierProfile(opts: {
     : '';
   // NEW — FMCSA record freshness (updatedAt threaded onto VisibleCarrier). '' when absent.
   const dataAsOf = fmtDataAsOf(c.updatedAt);
+  // WHEN the rating was assigned, as a sub-line under it. A rating without its
+  // date is misleading — FMCSA only rates after a compliance review, most of the
+  // ratings in this directory are many years old, and "Satisfactory" earned in
+  // 2004 is a different claim from one earned last year. Renders only for a real
+  // rating: an unrated carrier has no date and must not gain a second line
+  // implying something is missing.
+  const ratingDateLine =
+    sr.tone !== 'none' && c.credentials?.safetyRatingDate
+      ? `<span class="cp-safety-ctx">assigned ${esc(formatCredentialDate(c.credentials.safetyRatingDate))}</span>`
+      : '';
 
   // ── §6 Contact — TIERED. Public block = FMCSA-sourced phone/email (encoded
   // href, escaped text), respecting the contactHidden opt-out. Gated block is
@@ -3758,18 +3877,19 @@ export function renderCarrierProfile(opts: {
           <p class="cp-about">${esc(c.aboutOverride ?? carrierAbout(c))}</p>
         </section>
 
+        ${credentialGroup || factGroup ? `<section class="cp-card">
+          <h2 class="cp-h">Credentials</h2>
+          ${credentialGroup}
+          ${factGroup}
+          <p class="cp-note">Read from FMCSA public records — hover any badge for its meaning and source. Insurance is a filing on record, not proof of current coverage.</p>
+        </section>` : ''}
+
         <section class="cp-card">
           <h2 class="cp-h">FMCSA snapshot</h2>
           <div class="cp-datagrid">${dataGrid}</div>
           ${dataAsOf ? `<p class="cp-note cp-asof">FMCSA data as of ${esc(dataAsOf)}.</p>` : ''}
           <a class="cp-verify-link" href="${saferUrl}" target="_blank" rel="noopener nofollow">Verify on FMCSA SAFER ↗</a>
         </section>
-
-        ${credentialGroup ? `<section class="cp-card">
-          <h2 class="cp-h">Credentials</h2>
-          ${credentialGroup}
-          <p class="cp-note">Solid-colour badges are confirmed from FMCSA public data — hover any badge for what it means and its source.</p>
-        </section>` : ''}
       </div>
 
       <div class="cp-panel cp-panel--services">
@@ -3790,7 +3910,7 @@ export function renderCarrierProfile(opts: {
         <section class="cp-card">
           <h2 class="cp-h">Safety &amp; compliance</h2>
           <div class="cp-datagrid">
-            <div class="cp-dt"><span class="k">Safety rating</span><span class="v">${esc(sr.text)}</span></div>
+            <div class="cp-dt"><span class="k">Safety rating</span><span class="v">${esc(sr.text)}${ratingDateLine}</span></div>
             <div class="cp-dt"><span class="k">Operating authority</span><span class="v">${esc(authorityLabel(c.authorityType))}</span></div>
             <div class="cp-dt"><span class="k">Authority status</span><span class="v">${isActive ? 'Active' : 'On file'}</span></div>
             <div class="cp-dt"><span class="k">Hazmat registration</span><span class="v">${c.hazmat ? 'Registered' : 'Not registered'}</span></div>
@@ -3801,8 +3921,10 @@ export function renderCarrierProfile(opts: {
             <button class="btn btn-primary" id="live-verify" data-usdot="${esc(c.usdot)}">Verify live now</button>
           </div>
           <div id="live-result" class="lookup-result" style="margin-top: 8px;"></div>
-          <p class="cp-note">Insurance on file and out-of-service status are pulled from the live FMCSA QCMobile check above.</p>
+          <p class="cp-note">Authority and insurance come from FMCSA's Licensing &amp; Insurance file, last refreshed ${esc(LI_EXTRACT_DATE)}; out-of-service status is from the live check above.</p>
         </section>
+
+        ${insuranceBlock(c.credentials)}
 
         ${safetyRecordBlock(c.safety)}
       </div>

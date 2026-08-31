@@ -21,6 +21,7 @@ import {
 } from '../../db/schema.js';
 import { CONTAINER_PORTS, PORT_GROUPS, portFilterCodes, portGroupForMemberCode, isKnownPortCode } from './containerPorts.js';
 import type { CarrierSafety } from './safetyData.js';
+import type { CarrierCredentials } from './carrierCredentials.js';
 
 export type { CarrierCapabilities, CarrierOperatingLocation } from '../../db/schema.js';
 
@@ -114,6 +115,25 @@ export interface VisibleCarrier {
    */
   safety?: CarrierSafety | null;
   /**
+   * FMCSA credentials — the insurance filings (L&I) plus the registration date
+   * and the safety-rating date (census).
+   *
+   * OPTIONAL for the same fixture-compatibility reason as `safety`. The amounts
+   * and dates inside are nullable and `null` means "FMCSA has no such filing /
+   * date on record", never zero — 5.0% of carriers have no liability filing and
+   * 97.6% have no rating at all. The profile renders each fact only when it is
+   * present, so absence costs the reader nothing and never reads as a warning.
+   * See ./carrierCredentials.ts.
+   */
+  credentials?: CarrierCredentials | null;
+  /**
+   * Domicile country ('US' | 'CA'), as stored. Surfaced so structured data can
+   * state the real country instead of assuming US — the profile previously
+   * hardcoded `addressCountry: 'US'`, which was simply wrong on the
+   * Canada-domiciled carriers the ingest deliberately includes.
+   */
+  country?: string | null;
+  /**
    * Admin/carrier "About" override, applied ONLY on the profile (carrierBySlug).
    * `null` on list/card rows and whenever no override exists → the profile falls
    * back to the FMCSA-derived prose (carrierAbout).
@@ -189,6 +209,15 @@ export function visibleCarrier(r: typeof carrierDirectory.$inferSelect): Visible
       crashesTow: r.crashesTow,
       safetyDataAsOf: r.safetyDataAsOf,
     },
+    credentials: {
+      bipdOnFile: r.bipdOnFile,
+      bipdRequired: r.bipdRequired,
+      cargoInsuranceOnFile: r.cargoInsuranceOnFile,
+      bondOnFile: r.bondOnFile,
+      fmcsaRegisteredSince: r.fmcsaRegisteredSince,
+      safetyRatingDate: r.safetyRatingDate,
+    },
+    country: r.country,
     // FMCSA-only base shape: no override applied. The profile read
     // (carrierBySlug) merges carrier_overrides on top via mergeCarrierOverride;
     // list/card rows keep these FMCSA defaults so those surfaces are unchanged.

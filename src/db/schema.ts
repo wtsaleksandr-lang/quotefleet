@@ -1921,6 +1921,32 @@ export const carrierDirectory = pgTable(
      *  the profile shows the safety block ONLY when this is set, so we never
      *  present stale or absent safety data as current. */
     safetyDataAsOf: timestamp('safety_data_as_of', { mode: 'date' }),
+    // ── FMCSA CREDENTIALS (0073_carrier_credentials.sql) ───────────────────
+    //    Insurance filings off the L&I row the ingest already reads for
+    //    authority, plus two dates off the census row it already reads for
+    //    fleet/cargo. No extra Socrata request.
+    //
+    //    AMOUNTS ARE IN DOLLARS. L&I encodes zero-padded THOUSANDS ("00750");
+    //    the ingest multiplies by 1,000 so the unit is unambiguous at rest.
+    //    Amounts + dates are NULLABLE: null means "FMCSA has no such filing /
+    //    date on record", never zero — 5.0% of carriers have no liability
+    //    filing and 97.6% have no safety rating. Self-healed in migrate.ts.
+    /** BIPD liability ON FILE, dollars. Null ⇒ no liability filing on record. */
+    bipdOnFile: integer('bipd_on_file'),
+    /** Minimum BIPD this authority REQUIRES, dollars. Printed beside the
+     *  on-file amount so a reader can see the federal floor, not just a number. */
+    bipdRequired: integer('bipd_required'),
+    /** A cargo-insurance filing is on record (L&I cargo_file = 'Y'; 3.8%). */
+    cargoInsuranceOnFile: boolean('cargo_insurance_on_file').notNull().default(false),
+    /** A surety-bond filing is on record (L&I bond_file = 'Y'; 1.4%). */
+    bondOnFile: boolean('bond_on_file').notNull().default(false),
+    /** Census add_date — when FMCSA registered the carrier. A FLOOR on tenure,
+     *  NOT a founding date, and never rendered as "in business since". The
+     *  19740601 bulk-load sentinel (0.58% of carriers) is stored as null. */
+    fmcsaRegisteredSince: timestamp('fmcsa_registered_since', { mode: 'date' }),
+    /** Census safety_rating_date — when the published rating was assigned. Most
+     *  published ratings are years old, so the rating is never shown without it. */
+    safetyRatingDate: timestamp('safety_rating_date', { mode: 'date' }),
     /** Derived: nearest major container/rail hub UN/LOCODE (ZIP centroid). */
     nearestPortCode: text('nearest_port_code'),
     /** Unique URL slug for the public carrier page (slug(name)-usdot). */

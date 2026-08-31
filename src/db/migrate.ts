@@ -404,6 +404,24 @@ export const SELF_HEAL_TABLE_STATEMENTS: readonly string[] = [
   `ALTER TABLE "carrier_directory" ADD COLUMN IF NOT EXISTS "crashes_injury" integer`,
   `ALTER TABLE "carrier_directory" ADD COLUMN IF NOT EXISTS "crashes_tow" integer`,
   `ALTER TABLE "carrier_directory" ADD COLUMN IF NOT EXISTS "safety_data_as_of" timestamp`,
+  // 0073_carrier_credentials.sql — FMCSA insurance filings (L&I) + the
+  // registration and safety-rating dates (census). Both source rows were already
+  // being fetched, so this adds no Socrata request. Amounts are stored in
+  // DOLLARS (L&I encodes thousands; the ingest multiplies on the way in).
+  // Amounts + dates NULLABLE with NO DEFAULT — null means "no such filing on
+  // record", never zero, and it is also the cheap catalog-only DDL. The two Y/N
+  // flags take NOT NULL DEFAULT false (still catalog-only on PG 11+, same shape
+  // as the cargo wave above) because the L&I row that defines a carrier's
+  // presence here always carries them. All six go through
+  // runSelfHealStatements, which sets lock_timeout + statement_timeout FIRST —
+  // ADD COLUMN takes ACCESS EXCLUSIVE before it checks IF NOT EXISTS, and an
+  // unbounded wait behind it is what took the directory down before.
+  `ALTER TABLE "carrier_directory" ADD COLUMN IF NOT EXISTS "bipd_on_file" integer`,
+  `ALTER TABLE "carrier_directory" ADD COLUMN IF NOT EXISTS "bipd_required" integer`,
+  `ALTER TABLE "carrier_directory" ADD COLUMN IF NOT EXISTS "cargo_insurance_on_file" boolean NOT NULL DEFAULT false`,
+  `ALTER TABLE "carrier_directory" ADD COLUMN IF NOT EXISTS "bond_on_file" boolean NOT NULL DEFAULT false`,
+  `ALTER TABLE "carrier_directory" ADD COLUMN IF NOT EXISTS "fmcsa_registered_since" timestamp`,
+  `ALTER TABLE "carrier_directory" ADD COLUMN IF NOT EXISTS "safety_rating_date" timestamp`,
   `CREATE UNIQUE INDEX IF NOT EXISTS "carrier_directory_usdot_idx" ON "carrier_directory" ("usdot")`,
   `CREATE UNIQUE INDEX IF NOT EXISTS "carrier_directory_slug_idx" ON "carrier_directory" ("public_slug")`,
   `CREATE INDEX IF NOT EXISTS "carrier_directory_state_idx" ON "carrier_directory" ("state")`,
