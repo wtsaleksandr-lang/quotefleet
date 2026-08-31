@@ -46,6 +46,15 @@ import { portByCode, portGroupByCode, portGroupForMemberCode, portGroupAsPort } 
 import { stateBySlug } from '../directory/usStates.js';
 import { lookupCarrierCompliance } from '../directory/fmcsaLookup.js';
 import {
+  mayRevalidate,
+  isCrawlerUserAgent,
+  readAuthorityCache,
+  resolveAuthority,
+  defaultRevalidationDeps,
+  snapshotAuthorityAnswer,
+  type AuthorityRequestHeaders,
+} from '../directory/authorityRevalidation.js';
+import {
   renderDirectoryLanding,
   renderDirectoryResults,
   renderStatePage,
@@ -278,6 +287,60 @@ export function registerDirectoryRoutes(app: Express) {
       : await lookupCarrierCompliance('mc', mc);
     return res.json(snap);
   });
+
+  // ── Live authority revalidation for ONE carrier profile ─────────────────
+  //
+  // The profile page asserts "Active" operating authority from FMCSA's
+  // Licensing & Insurance file, which FMCSA FROZE on 14 May 2026 (and its
+  // AuthHist sibling with it — both measured dead, see authorityRevalidation.ts).
+  // This endpoint re-checks that ONE carrier against the live QCMobile API and
+  // the profile hydrates the answer in, so the loudest claim on the page carries
+  // a current date instead of an ageing one.
+  //
+  // WHY IT IS A SEPARATE ENDPOINT AND NOT PART OF THE RENDER: the profile HTML
+  // must stay byte-identical for every visitor to keep its shared-cache
+  // eligibility (see directory/httpCache.ts), and it currently serves from an
+  // index scan in ~0.08 ms. A third-party call on that path would be orders of
+  // magnitude worse than the staleness it fixes. So the page renders the
+  // snapshot at full speed and this arrives afterwards — the same
+  // render-then-hydrate split CARRIER_PRO_HYDRATE_SCRIPT already uses here.
+  //
+  // THE BOT GATE IS THE FIRST THING THAT RUNS. Googlebot renders JavaScript, and
+  // the link mesh made ~100% of 330,452 carriers reachable, so a crawler reaching
+  // this would mean hundreds of thousands of requests to a government API. A
+  // request that is not positively a first-party fetch from a real browser is
+  // answered from the snapshot with ZERO DB queries and ZERO outbound calls —
+  // it never even reaches the carrier lookup below.
+  //
+  // `no-store`, because the answer is per-carrier-per-moment and must never be
+  // pinned into a shared cache object the way the page HTML deliberately is.
+  app.get(
+    '/api/directory/carrier/:usdot/authority',
+    publicCalcLimiter,
+    async (req: Request, res: Response) => {
+      setNoStore(res);
+      const usdot = String(req.params.usdot ?? '').replace(/\D/g, '');
+      if (!usdot) return res.status(400).json(snapshotAuthorityAnswer('not-first-party'));
+
+      // GATE FIRST — cheapest possible path for a crawler: no I/O whatsoever.
+      if (!mayRevalidate(req.headers as AuthorityRequestHeaders)) {
+        return res.json(snapshotAuthorityAnswer(isCrawlerUserAgent(req.headers['user-agent']) ? 'crawler' : 'not-first-party'));
+      }
+
+      // ONE indexed read, reused as the cache read below so the whole request is
+      // a single query on the (overwhelmingly common) cache-hit path. A USDOT we
+      // do not carry is 404 — this must never become an open FMCSA proxy someone
+      // can enumerate the national registry through.
+      const row = await readAuthorityCache(usdot).catch(() => null);
+      if (!row) return res.status(404).json(snapshotAuthorityAnswer('lookup-failed'));
+
+      const answer = await resolveAuthority(usdot, req.headers as AuthorityRequestHeaders, {
+        ...defaultRevalidationDeps(),
+        readCache: async () => row,
+      });
+      return res.json(answer);
+    },
+  );
 
   // ── Server-rendered pages ──────────────────────────────────────────────
   // Landing (no facet params) OR faceted master search (any facet param).
