@@ -30,7 +30,7 @@
  * The tick is routed through runCronSafely so a throw/hang raises an admin alert
  * instead of silently dying.
  */
-import { runCronSafely } from './cronSafety.js';
+import { runTrackedJob, jobSuccess, jobSkipped, jobFailure } from './jobHealth.js';
 import { forceReingestCarrierDirectory } from './directory/autoHeal.js';
 import { ensureFreshDirectoryAggregates } from './directory/queries.js';
 import { ensureFreshSitemap } from './directory/sitemapCache.js';
@@ -86,11 +86,24 @@ async function maybeRun(reason: string): Promise<void> {
   // all-domains-down outage. ensureFreshDirectoryAggregates only recomputes when
   // the row is missing or older than its max-age (a cheap PK read otherwise) and
   // never throws, so it is safe to call on every tick.
-  await runCronSafely('directory-aggregate-refresh', async () => {
+  // ensureFreshDirectoryAggregates NEVER THROWS — it catches internally and
+  // returns the string 'error'. That sentinel used to be discarded here, so a
+  // permanently-broken recompute (the missing directory_aggregate_cache table
+  // that caused the all-domains-down outage) returned 'error' every hour while
+  // runCronSafely reported success and sent nothing. Read the sentinel.
+  await runTrackedJob('directory-aggregate-refresh', async () => {
     const outcome = await ensureFreshDirectoryAggregates();
+    if (outcome === 'error') {
+      return jobFailure(
+        'ensureFreshDirectoryAggregates returned "error" — the precomputed directory aggregate ' +
+          'cache could not be refreshed. /directory falls back to a live 330k-row scan.',
+      );
+    }
     if (outcome === 'recomputed') {
       console.log('[directoryRefresh.cron] directory aggregates recomputed + persisted (safety net)');
+      return jobSuccess(1, 'aggregates recomputed + persisted');
     }
+    return jobSkipped(`aggregates already fresh (${outcome})`);
   });
 
   // SAFETY NET (every hourly tick): keep the MATERIALIZED sitemap documents
@@ -99,27 +112,65 @@ async function maybeRun(reason: string): Promise<void> {
   // live 334k-row scan on the crawler's request. ensureFreshSitemap only
   // recomputes when the 'index' row is missing or older than its max-age (a cheap
   // PK read otherwise) and never throws, so it is safe to call on every tick.
-  await runCronSafely('directory-sitemap-refresh', async () => {
+  // Same unread-sentinel defect as the aggregates above. This one is worse in
+  // its consequences: on a read failure the serving path degrades to a VALID but
+  // EMPTY <urlset>, which is indistinguishable to a crawler from "this site has
+  // no pages". A silently-failing rebuild is therefore an SEO outage that looks
+  // like a healthy 200.
+  await runTrackedJob('directory-sitemap-refresh', async () => {
     const outcome = await ensureFreshSitemap();
+    if (outcome === 'error') {
+      return jobFailure(
+        'ensureFreshSitemap returned "error" — the materialized sitemap documents could not be ' +
+          'rebuilt. /sitemap*.xml may serve a stale or empty urlset to crawlers.',
+      );
+    }
     if (outcome === 'recomputed') {
       console.log('[directoryRefresh.cron] sitemap documents recomputed + persisted (safety net)');
+      return jobSuccess(1, 'sitemap documents recomputed + persisted');
     }
+    return jobSkipped(`sitemap already fresh (${outcome})`);
   });
 
   const now = new Date();
-  if (!shouldRunWeeklyRefresh(now, lastRunMs)) return;
+  if (!shouldRunWeeklyRefresh(now, lastRunMs)) {
+    // HEARTBEAT. The re-ingest only does work one hour a week, but the tick runs
+    // hourly. Recording the no-op tick as `skipped` is what lets the staleness
+    // watchdog hold this job to a 3-hour interval instead of a 7-day one — the
+    // difference between noticing a dead scheduler in an afternoon and noticing
+    // it next month. See jobHealthWatchdog.ts, "WHY skipped COUNTS AS HEALTHY".
+    await runTrackedJob('directory-reingest', () =>
+      jobSkipped('outside the weekly Sun 09:00 UTC re-ingest slot'),
+    );
+    return;
+  }
   // Record BEFORE the run so the cooldown guard holds even if the tick re-enters
   // within the same open hour (the ingest itself is single-flighted anyway).
   lastRunMs = now.getTime();
-  await runCronSafely('directory-refresh', async () => {
+  await runTrackedJob('directory-reingest', async () => {
     console.log(`[directoryRefresh.cron] weekly FMCSA re-ingest starting (${reason})`);
     const outcome = await forceReingestCarrierDirectory();
     console.log(`[directoryRefresh.cron] weekly FMCSA re-ingest kicked — outcome=${outcome}`);
+    // This records only that the ingest was KICKED. The ~30-minute run itself is
+    // detached, so its TERMINAL result is reported separately against this same
+    // job name from autoHeal.ts's reportIngestOutcome — that is where a failed or
+    // zero-row ingest becomes a `failure` row and an admin email. Reporting
+    // 'started' as a plain success here (the old behaviour) was the lie: the
+    // cron went green minutes before the ingest had done anything at all.
+    if (outcome === 'disabled') {
+      return jobSkipped('re-ingest kick skipped — auto-heal is disabled (CARRIER_AUTOHEAL_DISABLED)');
+    }
+    if (outcome === 'lock-held') {
+      // NOTE: forceReingestCarrierDirectory also returns 'lock-held' when the
+      // lock CHECK itself threw, so this is not purely benign contention.
+      return jobSkipped('re-ingest not kicked — advisory lock held (an ingest is already running, or the lock check failed)');
+    }
     // NOTE: no sitemap rebuild here on purpose. forceReingestCarrierDirectory
     // returns as soon as the ingest is KICKED — the ingest itself runs in the
     // background — so a rebuild here would materialize the PRE-ingest carrier set
     // and would run its scan concurrently with the ingest's own writes. The
     // sitemap instead picks the new carriers up on a later hourly tick, via the
     // carrier-count drift check in ensureFreshSitemap() above.
+    return jobSuccess(0, 'weekly FMCSA re-ingest kicked; terminal outcome reported by the detached run');
   });
 }

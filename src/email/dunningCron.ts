@@ -35,6 +35,7 @@
  */
 import { eq, isNotNull } from 'drizzle-orm';
 import { db } from '../db/client.js';
+import { runTrackedJob, outcomeFromTick, type TickResult } from '../server/jobHealth.js';
 import { tenants, type Tenant } from '../db/schema.js';
 import { sendEmail } from './send.js';
 import { billingDunningEmail } from './templates.js';
@@ -54,8 +55,15 @@ export function startDunningEmailCron(): void {
     return;
   }
   started = true;
-  setTimeout(() => void runOnce('startup'), STARTUP_DELAY_MS);
-  setInterval(() => void runOnce('tick'), TICK_MS);
+  setTimeout(() => void trackedRunOnce('startup'), STARTUP_DELAY_MS);
+  setInterval(() => void trackedRunOnce('tick'), TICK_MS);
+}
+
+/** Scheduling site: records every tick to the job ledger and alerts on failure. */
+async function trackedRunOnce(reason: string): Promise<void> {
+  await runTrackedJob('dunning-email', async () =>
+    outcomeFromTick(await runOnce(reason), 'no tenant is past due'),
+  );
   console.log(
     `[dunning.cron] scheduled — first run in ${STARTUP_DELAY_MS / 1000}s, then every ${TICK_MS / 60_000} min`
   );
@@ -68,7 +76,7 @@ function publicBaseUrl(): string {
 /** One cron tick — scan tenants and send any due dunning stage / reset any
  *  recovered sequence. Exported for tests (the cron drives it on a timer).
  *  `now` is injectable for deterministic tests. */
-export async function runOnce(reason: string, now: number = Date.now()): Promise<void> {
+export async function runOnce(reason: string, now: number = Date.now()): Promise<TickResult> {
   const t0 = Date.now();
   let sent = 0;
   let reset = 0;
@@ -98,12 +106,19 @@ export async function runOnce(reason: string, now: number = Date.now()): Promise
     }
   } catch (err) {
     console.warn(`[dunning.cron] tick failed (${reason}):`, err);
-    return;
+    // Was a bare `return`. Dunning failing silently is a direct revenue leak:
+    // past-due tenants stop being asked to fix their card and simply churn.
+    return { ok: false, processed: 0, detail: err instanceof Error ? err.message : String(err) };
   }
   const ms = Date.now() - t0;
   if (sent > 0 || reset > 0) {
     console.log(`[dunning.cron] tick=${reason} sent=${sent} reset=${reset} elapsed=${ms}ms`);
   }
+  return {
+    ok: true,
+    processed: sent + reset,
+    detail: sent + reset > 0 ? `sent ${sent} dunning email(s), reset ${reset} sequence(s)` : undefined,
+  };
 }
 
 /** Send one dunning stage to the tenant, then record it under the stage's key

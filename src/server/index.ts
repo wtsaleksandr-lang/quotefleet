@@ -21,6 +21,9 @@ import { startManifestRenewalCron } from '../email/manifestRenewalCron.js';
 import { startFuelSurchargeCron } from '../eia/dieselPrice.js';
 import { startDirectoryRefreshCron } from './directoryRefreshCron.js';
 import { runCronSafely } from './cronSafety.js';
+import { ensureJobRunsTable } from './jobHealth.js';
+import { startJobHealthWatchdogCron } from './jobHealthWatchdogCron.js';
+import { startOpsDigestCron } from './opsDigestCron.js';
 import {
   decideUncaughtExceptionAction,
   isServerListening,
@@ -138,6 +141,14 @@ async function runPostListenJobs(): Promise<void> {
     void ensureSelfHealColumns().catch((err) => {
       console.error('[server] brand_configs column self-heal failed (non-fatal):', err);
     });
+    // job_runs ledger — a brand-new table touched by nothing else, so it is
+    // fired independently of the carrier_directory chain above (no shared lock).
+    // Crons begin writing 30s–2min from now and the watchdog first reads at
+    // +5min, so this CREATE TABLE IF NOT EXISTS wins the race comfortably; a
+    // ledger write that loses it is swallowed and the next tick records fine.
+    void ensureJobRunsTable().catch((err) => {
+      console.error('[server] job_runs ledger self-heal failed (non-fatal):', err);
+    });
     // Register every scheduled cron through runCronSafely. This wrapper (a) catches
     // a throw at registration so one cron failing to register can NEVER stop the
     // siblings below it from registering, and (b) sends a de-duped admin alert +
@@ -160,6 +171,15 @@ async function runPostListenJobs(): Promise<void> {
     // stale — see src/server/directoryRefreshCron.ts). Its own tick is wrapped in
     // runCronSafely internally, so a re-ingest throw/hang alerts the admin too.
     await runCronSafely('directory-refresh-cron', () => startDirectoryRefreshCron());
+    // NEW: job staleness watchdog. Registered LAST so the jobs it watches have
+    // already been scheduled. Every cron above now records each tick to the
+    // `job_runs` ledger; this is the piece that notices when one of them STOPS
+    // recording — the failure mode no try/catch can see. See jobHealthWatchdog.ts.
+    await runCronSafely('job-health-watchdog-cron', () => startJobHealthWatchdogCron());
+    // NEW: daily ops digest — pushes the work that must stay human (CBP filings
+    // awaiting submission, LAPSED filings, past-due tenants) to the admin instead
+    // of requiring someone to remember to open a page. See opsDigestCron.ts.
+    await runCronSafely('ops-digest-cron', () => startOpsDigestCron());
     console.log('[server] post-listen jobs registered');
   } catch (err) {
     console.error('[server] post-listen setup failed (non-fatal):', err);

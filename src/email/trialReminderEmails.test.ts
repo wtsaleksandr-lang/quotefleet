@@ -205,7 +205,10 @@ describe('trial-end card reminders — runOnce (idempotency + graceful)', () => 
     sendMock.mockResolvedValue({ ok: true, logged: true, provider: 'stdout' });
     rowsRef.current = [tenant({ id: 9, trialEndsAt: new Date(Date.now() + 3 * DAY) })];
     const { runOnce } = await import('./lifecycleCron.js');
-    await expect(runOnce('test')).resolves.toBeUndefined();
+    // runOnce now reports a TickResult instead of void, so the scheduling site
+    // can tell a clean tick from a swallowed exception (see server/jobHealth.ts).
+    // The assertion here is unchanged in spirit: it must RESOLVE, not throw.
+    await expect(runOnce('test')).resolves.toMatchObject({ ok: true });
     expect(sendMock).toHaveBeenCalledTimes(1);
   });
 });

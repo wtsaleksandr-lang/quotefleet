@@ -41,6 +41,7 @@ import {
 } from './templates.js';
 import { unsubscribeUrl } from './unsubscribe.js';
 import { loadEnv } from '../config.js';
+import { runTrackedJob, outcomeFromTick, type TickResult } from '../server/jobHealth.js';
 
 const TICK_MS = 10 * 60 * 1000; // 10 min
 const STARTUP_DELAY_MS = 60 * 1000;
@@ -54,17 +55,26 @@ export function startLifecycleEmailCron(): void {
     return;
   }
   started = true;
-  setTimeout(() => void runOnce('startup'), STARTUP_DELAY_MS);
-  setInterval(() => void runOnce('tick'), TICK_MS);
+  setTimeout(() => void trackedRunOnce('startup'), STARTUP_DELAY_MS);
+  setInterval(() => void trackedRunOnce('tick'), TICK_MS);
   console.log(
     `[email.cron] scheduled — first run in ${STARTUP_DELAY_MS / 1000}s, then every ${TICK_MS / 60_000} min`
+  );
+}
+
+/** Scheduling site: records every tick to the job ledger and alerts on failure.
+ *  The pass itself (runOnce) keeps its own logging and stays ledger-free so its
+ *  unit tests need no DB. */
+async function trackedRunOnce(reason: string): Promise<void> {
+  await runTrackedJob('lifecycle-email', async () =>
+    outcomeFromTick(await runOnce(reason), 'no trialing tenant was due an email'),
   );
 }
 
 /** One cron tick — scan trialing tenants and send any due lifecycle email,
  *  skipping tenants who opted out of marketing. Exported for tests (the cron
  *  itself drives it on a timer via startLifecycleEmailCron). */
-export async function runOnce(reason: string): Promise<void> {
+export async function runOnce(reason: string): Promise<TickResult> {
   const t0 = Date.now();
   let sent = 0;
   try {
@@ -87,10 +97,12 @@ export async function runOnce(reason: string): Promise<void> {
     }
   } catch (err) {
     console.warn(`[email.cron] tick failed (${reason}):`, err);
-    return;
+    // Was a bare `return` — indistinguishable from a clean tick to the caller.
+    return { ok: false, processed: 0, detail: err instanceof Error ? err.message : String(err) };
   }
   const ms = Date.now() - t0;
   if (sent > 0) console.log(`[email.cron] tick=${reason} sent=${sent} elapsed=${ms}ms`);
+  return { ok: true, processed: sent, detail: sent > 0 ? `sent ${sent} lifecycle email(s)` : undefined };
 }
 
 interface LifecycleEmail {

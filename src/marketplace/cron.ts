@@ -12,6 +12,7 @@
  *   - Honors AGGREGATES_CRON_DISABLED=1 in env (useful for tests / 2nd instance).
  */
 import { recomputeMarketplaceAggregates } from './sync.js';
+import { runTrackedJob, outcomeFromTick, type TickResult } from '../server/jobHealth.js';
 
 const HOUR_MS = 60 * 60 * 1000;
 const STARTUP_DELAY_MS = 30 * 1000;
@@ -26,22 +27,34 @@ export function startMarketplaceCron(): void {
   }
   started = true;
 
-  setTimeout(() => void runOnce('startup'), STARTUP_DELAY_MS);
-  setInterval(() => void runOnce('hourly'), HOUR_MS);
+  setTimeout(() => void trackedRunOnce('startup'), STARTUP_DELAY_MS);
+  setInterval(() => void trackedRunOnce('hourly'), HOUR_MS);
 
   console.log(
     `[marketplace.cron] scheduled — first run in ${STARTUP_DELAY_MS / 1000}s, then every ${HOUR_MS / 60_000} min`
   );
 }
 
-async function runOnce(reason: string): Promise<void> {
+/** Scheduling site: records every tick to the job ledger and alerts on failure.
+ *  The pass itself (runOnce) keeps its own logging and stays ledger-free. */
+async function trackedRunOnce(reason: string): Promise<void> {
+  await runTrackedJob('marketplace-aggregates', async () =>
+    outcomeFromTick(await runOnce(reason), 'aggregates recomputed'),
+  );
+}
+
+async function runOnce(reason: string): Promise<TickResult> {
   const t0 = Date.now();
   try {
     await recomputeMarketplaceAggregates();
     const ms = Date.now() - t0;
     console.log(`[marketplace.cron] aggregates recomputed (${reason}) in ${ms}ms`);
+    return { ok: true, processed: 1, detail: `aggregates recomputed in ${ms}ms` };
   } catch (err) {
     console.warn(`[marketplace.cron] recompute failed (${reason}):`, err);
+    // Was a bare swallow: the caller could not distinguish this from a clean
+    // tick, so a permanently-failing recompute looked identical to success.
+    return { ok: false, processed: 0, detail: err instanceof Error ? err.message : String(err) };
   }
 }
 

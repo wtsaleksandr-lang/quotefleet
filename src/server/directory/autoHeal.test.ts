@@ -35,6 +35,8 @@ function mockDeps(over: Partial<AutoHealDeps> = {}): AutoHealDeps {
     runFullIngest: vi.fn(async () => emptySummary),
     isDisabled: vi.fn(() => false),
     log: vi.fn(),
+    // Mocked so the detached ingest's ledger report never touches the DB here.
+    reportIngestOutcome: vi.fn(async () => {}),
     ...over,
   };
 }

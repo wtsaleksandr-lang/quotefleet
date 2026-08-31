@@ -32,6 +32,7 @@ import { unsubscribeUrl } from './unsubscribe.js';
 import { computeWeeklyStats, type WeeklyDigestStats } from './weeklyDigest.js';
 import { hasCoreAccess, isTrialing } from '../server/plans.js';
 import { loadEnv } from '../config.js';
+import { runTrackedJob, outcomeFromTick, jobSkipped, type TickResult } from '../server/jobHealth.js';
 
 const TICK_MS = 60 * 60 * 1000; // hourly
 const STARTUP_DELAY_MS = 90 * 1000;
@@ -76,14 +77,19 @@ export function startWeeklyDigestCron(): void {
 /** Gate the hourly tick to a send slot, then run the pass. Monday fires for all
  *  audiences; Thursday (when enabled) fires the trial-only second slot. */
 async function maybeRun(reason: string): Promise<void> {
-  const now = new Date();
-  if (now.getUTCHours() !== SEND_HOUR) return;
-  const dow = now.getUTCDay();
-  if (dow === PRIMARY_DOW) {
-    await runWeeklyDigestOnce(reason, now);
-  } else if (dow === TRIAL_DOW && trialExtraEnabled()) {
-    await runWeeklyDigestOnce(reason, now);
-  }
+  // Every hourly tick records to the ledger, including the 23 hours a day that
+  // are outside the send slot. Those are `skipped` — healthy — and they are what
+  // give this job an hourly heartbeat instead of a weekly one, so a dead
+  // scheduler is caught in hours rather than a week. See jobHealthWatchdog.ts.
+  await runTrackedJob('weekly-digest', async () => {
+    const now = new Date();
+    if (now.getUTCHours() !== SEND_HOUR) return jobSkipped('outside the 14:00 UTC send hour');
+    const dow = now.getUTCDay();
+    if (dow === PRIMARY_DOW || (dow === TRIAL_DOW && trialExtraEnabled())) {
+      return outcomeFromTick(await runWeeklyDigestOnce(reason, now), 'no tenant was due a digest');
+    }
+    return jobSkipped('not a digest send day');
+  });
 }
 
 /**
@@ -92,7 +98,7 @@ async function maybeRun(reason: string): Promise<void> {
  * compute the week's stats and send the digest. Exported for tests (the cron
  * gates WHEN via maybeRun; this does the actual work). `now` is injectable.
  */
-export async function runWeeklyDigestOnce(reason: string, now: Date = new Date()): Promise<void> {
+export async function runWeeklyDigestOnce(reason: string, now: Date = new Date()): Promise<TickResult> {
   const t0 = Date.now();
   let sent = 0;
   let skippedEmpty = 0;
@@ -104,7 +110,9 @@ export async function runWeeklyDigestOnce(reason: string, now: Date = new Date()
     // When the trial-extra cadence is disabled there is nothing to send on the
     // Thursday slot (it exists ONLY for trials), so bail before the tenant scan.
     const isTrialSlot = now.getUTCDay() === TRIAL_DOW;
-    if (isTrialSlot && !trialExtraEnabled()) return;
+    if (isTrialSlot && !trialExtraEnabled()) {
+      return { ok: true, processed: 0, detail: 'Thursday trial slot is disabled' };
+    }
 
     const rows = await db().select().from(tenants).where(eq(tenants.status, 'active'));
 
@@ -139,7 +147,8 @@ export async function runWeeklyDigestOnce(reason: string, now: Date = new Date()
     }
   } catch (err) {
     console.warn(`[weeklyDigest.cron] pass failed (${reason}):`, err);
-    return;
+    // Was a bare `return` — indistinguishable from a clean pass to the caller.
+    return { ok: false, processed: 0, detail: err instanceof Error ? err.message : String(err) };
   }
   const ms = Date.now() - t0;
   if (sent > 0 || skippedEmpty > 0) {
@@ -147,6 +156,11 @@ export async function runWeeklyDigestOnce(reason: string, now: Date = new Date()
       `[weeklyDigest.cron] pass=${reason} sent=${sent} skippedEmpty=${skippedEmpty} elapsed=${ms}ms`
     );
   }
+  return {
+    ok: true,
+    processed: sent,
+    detail: sent > 0 ? `sent ${sent} digest(s), skipped ${skippedEmpty} empty account(s)` : undefined,
+  };
 }
 
 function publicBaseUrl(): string {

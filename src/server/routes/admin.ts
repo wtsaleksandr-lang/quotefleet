@@ -42,6 +42,7 @@ import { companyKey } from '../directory/importerCache.js';
 import { loadEnv } from '../../config.js';
 import Stripe from 'stripe';
 import { runAggregatesNow } from '../../marketplace/cron.js';
+import { classifyJobs, readJobHealth, JOB_REGISTRY } from '../jobHealthWatchdog.js';
 import { normalizeDot } from '../directory/carrierIngest.js';
 import {
   PLAN_IDS,
@@ -1200,6 +1201,41 @@ export function registerAdminRoutes(app: Express) {
     });
     if (!result.ok) return res.status(500).json(result);
     return res.json(result);
+  });
+
+  // Background-job health. The ONE place that answers "did the crons actually
+  // run?" — before this, nothing in the app could (no ledger, no status route,
+  // no UI). Read-only; the staleness alert emails link here for the detail.
+  app.get('/api/admin/job-health', requireAuth, requireSuperAdmin, async (_req, res) => {
+    try {
+      const now = new Date();
+      const health = await readJobHealth();
+      const reports = classifyJobs(
+        JOB_REGISTRY,
+        health,
+        now,
+        now,
+        process.env as Record<string, string | undefined>,
+      );
+      return res.json({
+        ok: true,
+        checkedAt: now.toISOString(),
+        jobs: reports.map((r) => ({
+          job: r.job,
+          verdict: r.verdict,
+          lastHealthyAt: r.lastHealthyAt ? r.lastHealthyAt.toISOString() : null,
+          lastStatus: r.lastStatus,
+          lastDetail: r.lastDetail,
+          maxIntervalMs: r.maxIntervalMs,
+          impact: r.impact,
+        })),
+      });
+    } catch (err) {
+      // A read failure here must NOT render as an empty, healthy-looking list.
+      return res
+        .status(500)
+        .json({ ok: false, error: err instanceof Error ? err.message : String(err) });
+    }
   });
 
   // ── SUBSCRIPTIONS — visibility over the two per-shipper revenue tables. ──
