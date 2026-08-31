@@ -22,6 +22,7 @@ import { platformSettings, type Tenant } from '../db/schema.js';
 import { AUTO_FSC_DEFAULTS } from '../calc/defaults.js';
 import { autoFscPerMile } from '../calc/fuelSurcharge.js';
 import { releaseBody, exchangeTimeoutSignal } from '../http/responseBody.js';
+import { runTrackedJob, jobSuccess, jobFailure } from '../server/jobHealth.js';
 
 const CACHE_KEY = 'eia_diesel_weekly';
 const EIA_SERIES = 'EMD_EPD2D_PTE_NUS_DPG';
@@ -268,10 +269,28 @@ export function startFuelSurchargeCron(): void {
 }
 
 async function refreshOnce(reason: string): Promise<void> {
-  try {
+  // runTrackedJob catches a throw and records it as a failure, so no try/catch
+  // here — a swallowed throw would be invisible to the watchdog.
+  await runTrackedJob('fuel-surcharge', async () => {
     const p = await getDieselPrice({ forceRefresh: true });
-    console.log(`[fsc.cron] diesel refreshed (${reason}): $${p.usdPerGal}/gal as of ${p.asOf || 'n/a'} (${p.source})`);
-  } catch (err) {
-    console.warn(`[fsc.cron] refresh failed (${reason}):`, err);
-  }
+    // `getDieselPrice` NEVER THROWS by contract — on a failed fetch it quietly
+    // falls back to the stale cache, or to a hardcoded constant, and sets
+    // `stale: true`. This cron used to log "diesel refreshed" for that case,
+    // which is precisely the canned-success lie the ledger exists to kill: with
+    // EIA_API_KEY blank (how .env.example ships it) and USDA down, every
+    // auto-FSC tenant quotes off a frozen number and the log says it refreshed.
+    // `stale` is the fetch-failed signal, so it must be recorded as a FAILURE.
+    if (p.stale) {
+      const detail =
+        p.source === 'default'
+          ? `EIA/USDA diesel fetch failed and there is no cache — serving the HARDCODED default $${p.usdPerGal}/gal. Every auto-FSC tenant is quoting off a constant. Check EIA_API_KEY.`
+          : `EIA/USDA diesel fetch failed — serving stale cached $${p.usdPerGal}/gal from ${p.asOf || 'an unknown date'}.`;
+      console.warn(`[fsc.cron] refresh FAILED (${reason}): ${detail}`);
+      return jobFailure(detail);
+    }
+    console.log(
+      `[fsc.cron] diesel refreshed (${reason}): $${p.usdPerGal}/gal as of ${p.asOf || 'n/a'} (${p.source})`
+    );
+    return jobSuccess(1, `$${p.usdPerGal}/gal as of ${p.asOf || 'n/a'} (${p.source})`);
+  });
 }

@@ -26,6 +26,7 @@ import { sql } from 'drizzle-orm';
 import { db } from '../../db/client.js';
 import { carrierDirectory } from '../../db/schema.js';
 import { runIngest, type IngestSummary } from './carrierIngest.js';
+import { runTrackedJob, jobSuccess, jobFailure, type JobOutcome } from '../jobHealth.js';
 
 /**
  * Postgres advisory-lock key for the carrier-directory auto-ingest. Constant,
@@ -64,6 +65,19 @@ export interface AutoHealDeps {
   /** True when auto-heal is gated off entirely. */
   isDisabled: () => boolean;
   log: (msg: string) => void;
+  /**
+   * Report the TERMINAL outcome of the DETACHED ingest to the job ledger.
+   *
+   * This exists because the ingest is deliberately fire-and-forget: the caller
+   * gets 'started' back within milliseconds and the real ~330k-row run finishes
+   * many minutes later. Before this seam the only record of how that run ACTUALLY
+   * ended was a console.log in the `.then`/`.catch` below, while the cron that
+   * kicked it had already logged a successful "outcome=started". A total FMCSA
+   * outage therefore produced a green cron and one line on an unwatched stdout.
+   *
+   * Injected so tests never touch the DB or send email. Must never throw.
+   */
+  reportIngestOutcome: (outcome: JobOutcome) => Promise<void>;
 }
 
 // ─── Default deps wired to the real db() client + ingest ──────────────────
@@ -100,6 +114,11 @@ function defaultDeps(): AutoHealDeps {
     runFullIngest: defaultRunFullIngest,
     isDisabled: defaultIsDisabled,
     log: (msg) => console.log(msg),
+    // runTrackedJob writes the ledger row AND sends the de-duped admin email;
+    // it never throws, so this is safe inside the detached promise chain.
+    reportIngestOutcome: async (outcome) => {
+      await runTrackedJob('directory-reingest', () => outcome);
+    },
   };
 }
 
@@ -145,11 +164,25 @@ export async function maybeAutoHealCarrierDirectory(
     // every error so nothing rejects unhandled or leaks into boot.
     void deps
       .runFullIngest()
-      .then((summary) => {
+      .then(async (summary) => {
         deps.log(`[autoheal] carrier_directory auto-ingest complete — ${summary.ingested} carriers`);
+        // This path only runs when the table was EMPTY (a phantom drop). If the
+        // recovery ingest writes nothing, the public directory stays empty and
+        // NOBODY finds out — the worst version of a silent failure. Report it.
+        await deps.reportIngestOutcome(
+          summary.ingested > 0
+            ? jobSuccess(summary.ingested, `auto-heal recovered ${summary.ingested} carriers into an empty table`)
+            : jobFailure(
+                `carrier_directory auto-heal ran on an EMPTY table but wrote 0 carriers ` +
+                  `(saw ${summary.carriersSeen}). The public directory is still empty.`,
+              ),
+        );
       })
-      .catch((err) => {
+      .catch(async (err) => {
         deps.log(`[autoheal] carrier_directory auto-ingest FAILED: ${String(err)}`);
+        await deps.reportIngestOutcome(
+          jobFailure(`carrier_directory auto-heal ingest threw — the directory is still empty: ${String(err)}`),
+        );
       })
       .finally(() => {
         void deps.advisoryUnlock().catch((err) => {
@@ -203,11 +236,23 @@ export async function forceReingestCarrierDirectory(
 
     void deps
       .runFullIngest()
-      .then((summary) => {
+      .then(async (summary) => {
         deps.log(`[autoheal] force re-ingest complete — ${summary.ingested} carriers`);
+        // A run that finished but wrote NOTHING is a failed fetch, not an empty
+        // world — FMCSA always has ~330k carriers. Recording it as a zero-result
+        // success is exactly the lie the ledger exists to prevent.
+        await deps.reportIngestOutcome(
+          summary.ingested > 0
+            ? jobSuccess(summary.ingested, `re-ingested ${summary.ingested} of ${summary.carriersSeen} carriers seen`)
+            : jobFailure(
+                `FMCSA re-ingest completed but wrote 0 carriers (saw ${summary.carriersSeen}). ` +
+                  `Treat as a failed/empty upstream fetch, not an empty directory.`,
+              ),
+        );
       })
-      .catch((err) => {
+      .catch(async (err) => {
         deps.log(`[autoheal] force re-ingest FAILED: ${String(err)}`);
+        await deps.reportIngestOutcome(jobFailure(`FMCSA re-ingest threw: ${String(err)}`));
       })
       .finally(() => {
         void deps.advisoryUnlock().catch((err) => {

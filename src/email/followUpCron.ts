@@ -25,6 +25,7 @@
  */
 import { and, eq, isNotNull, inArray } from 'drizzle-orm';
 import { db } from '../db/client.js';
+import { runTrackedJob, outcomeFromTick, type TickResult } from '../server/jobHealth.js';
 import { brandConfigs, leads, tenants, type Tenant } from '../db/schema.js';
 import { sendEmail, brandedFrom } from './send.js';
 import { leadUnsubscribeUrl } from './unsubscribe.js';
@@ -51,8 +52,15 @@ export function startFollowUpEmailCron(): void {
     return;
   }
   started = true;
-  setTimeout(() => void runOnce('startup'), STARTUP_DELAY_MS);
-  setInterval(() => void runOnce('tick'), TICK_MS);
+  setTimeout(() => void trackedRunOnce('startup'), STARTUP_DELAY_MS);
+  setInterval(() => void trackedRunOnce('tick'), TICK_MS);
+}
+
+/** Scheduling site: records every tick to the job ledger and alerts on failure. */
+async function trackedRunOnce(reason: string): Promise<void> {
+  await runTrackedJob('followup-email', async () =>
+    outcomeFromTick(await runOnce(reason), 'no lead was due a follow-up'),
+  );
   console.log(
     `[followup.cron] scheduled — first run in ${STARTUP_DELAY_MS / 1000}s, then every ${TICK_MS / 60_000} min`
   );
@@ -65,7 +73,7 @@ function publicBaseUrl(): string {
 /** One cron tick — scan every follow-up-enabled tenant's open leads and send
  *  any due touch. Exported for tests (the cron drives it on a timer). `now` is
  *  injectable for deterministic tests. */
-export async function runOnce(reason: string, now: number = Date.now()): Promise<void> {
+export async function runOnce(reason: string, now: number = Date.now()): Promise<TickResult> {
   const t0 = Date.now();
   let sent = 0;
   try {
@@ -82,7 +90,9 @@ export async function runOnce(reason: string, now: number = Date.now()): Promise
       const cfg = resolveFollowUpConfig(b);
       if (cfg.enabled) cfgByTenant.set(b.tenantId, cfg);
     }
-    if (cfgByTenant.size === 0) return;
+    // No tenant has follow-up enabled. A legitimate idle tick, not a failure —
+    // but it must still report, so the scheduler's heartbeat is recorded.
+    if (cfgByTenant.size === 0) return { ok: true, processed: 0, detail: 'no tenant has follow-up enabled' };
 
     // 2. Load those tenants (name + plan for gating + brand fallback).
     const tenantRows = await db()
@@ -136,10 +146,12 @@ export async function runOnce(reason: string, now: number = Date.now()): Promise
     }
   } catch (err) {
     console.warn(`[followup.cron] tick failed (${reason}):`, err);
-    return;
+    // Was a bare `return` — indistinguishable from a clean tick to the caller.
+    return { ok: false, processed: 0, detail: err instanceof Error ? err.message : String(err) };
   }
   const ms = Date.now() - t0;
   if (sent > 0) console.log(`[followup.cron] tick=${reason} sent=${sent} elapsed=${ms}ms`);
+  return { ok: true, processed: sent, detail: sent > 0 ? `sent ${sent} follow-up touch(es)` : undefined };
 }
 
 /** Render + send a single touch to the lead, then record it in

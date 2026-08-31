@@ -27,6 +27,7 @@ import { db } from '../db/client.js';
 import { poaApplications, poaAuditEvents, type PoaApplication } from '../db/schema.js';
 import { sendEmail } from './send.js';
 import { loadEnv } from '../config.js';
+import { runTrackedJob, outcomeFromTick, jobSkipped, type TickResult } from '../server/jobHealth.js';
 
 const TICK_MS = 60 * 60 * 1000; // hourly
 const STARTUP_DELAY_MS = 120 * 1000;
@@ -59,9 +60,17 @@ export function startManifestRenewalCron(): void {
 
 /** Gate the hourly tick to the daily send slot, then run the pass. */
 async function maybeRun(reason: string): Promise<void> {
-  const now = new Date();
-  if (now.getUTCHours() !== SEND_HOUR) return;
-  await runManifestRenewalOnce(reason, now);
+  // Every hourly tick records, including the 23 hours a day outside the send
+  // slot. Those are `skipped` — healthy — and they give this job an hourly
+  // heartbeat rather than a daily one. See jobHealthWatchdog.ts.
+  await runTrackedJob('manifest-renewal', async () => {
+    const now = new Date();
+    if (now.getUTCHours() !== SEND_HOUR) return jobSkipped(`outside the ${SEND_HOUR}:00 UTC send hour`);
+    return outcomeFromTick(
+      await runManifestRenewalOnce(reason, now),
+      'no filing is inside a renewal reminder band',
+    );
+  });
 }
 
 /** The tightest band an application currently qualifies for, or null (outside
@@ -81,7 +90,7 @@ export function bandFor(daysLeft: number): number | null {
  * the reminder, move it to `renewal_due`, stamp lastReminderAt, and log the
  * event. Exported for tests; `now` is injectable.
  */
-export async function runManifestRenewalOnce(reason: string, now: Date = new Date()): Promise<void> {
+export async function runManifestRenewalOnce(reason: string, now: Date = new Date()): Promise<TickResult> {
   const t0 = Date.now();
   let sent = 0;
   try {
@@ -111,12 +120,16 @@ export async function runManifestRenewalOnce(reason: string, now: Date = new Dat
     }
   } catch (err) {
     console.warn(`[manifestRenewal.cron] pass failed (${reason}):`, err);
-    return;
+    // Was a bare `return`. This is the highest-consequence silent failure in
+    // the product: a missed renewal band means a CBP confidentiality filing
+    // lapses and a paying customer's shipment data is re-exposed.
+    return { ok: false, processed: 0, detail: err instanceof Error ? err.message : String(err) };
   }
   const ms = Date.now() - t0;
   if (sent > 0) {
     console.log(`[manifestRenewal.cron] pass=${reason} sent=${sent} elapsed=${ms}ms`);
   }
+  return { ok: true, processed: sent, detail: sent > 0 ? `sent ${sent} renewal reminder(s)` : undefined };
 }
 
 function publicBaseUrl(): string {
