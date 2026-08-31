@@ -204,10 +204,20 @@ describe('R4-6 · the revealed contact is copyable — safely', () => {
 });
 
 describe('R4-7 · the 560px actions row never orphans a chip', () => {
-  it('spans the primary action when "More filters" is open', () => {
-    // Open, "More filters" takes the full row; without this the remaining
-    // Search + Export + Saved are three chips in a two-column grid.
-    expect(search).toContain('.imp-actions:has(.imp-more[open]) #imp-search{grid-column:1 / -1}');
+  it('spans the primary action in BOTH odd-chip cases, not just the open one', () => {
+    // Half-width chips are Search, Export, Saved (signed in only) and More
+    // (closed only — open it spans the row). An ODD count strands one:
+    //   signed out + closed → 3   ·   signed in + open → 3
+    // The original rule keyed on the open state alone, which fixed the signed-IN
+    // case and broke the signed-OUT one — and signed out is the default state
+    // every first-time visitor lands in, since Saved ships hidden until
+    // /nav-auth.js confirms a session.
+    expect(search).toContain(
+      '.imp-actions:has(#imp-saved-link[hidden]):has(.imp-more:not([open])) #imp-search,',
+    );
+    expect(search).toContain(
+      '.imp-actions:not(:has(#imp-saved-link[hidden])):has(.imp-more[open]) #imp-search{grid-column:1 / -1}',
+    );
   });
 });
 

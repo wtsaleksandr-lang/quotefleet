@@ -785,11 +785,24 @@ html[data-theme="light"] .imp-empty-act .imp-empty-run:hover{background:var(--ac
   .imp-actions>*{width:100%;justify-content:center;margin-left:0;white-space:nowrap;padding-left:10px;padding-right:10px;gap:6px}
   .imp-more{grid-column:auto}
   .imp-more[open]{grid-column:1 / -1}
-  /* No-orphan wrap, open state (R4): with "More filters" expanded it spans the
-     full row, leaving Search + Export + Saved — three chips in a two-column
-     grid, so "Saved" sat alone on its own line. Promoting the PRIMARY action to
-     the full row leaves exactly two secondary chips paired beside each other. */
-  .imp-actions:has(.imp-more[open]) #imp-search{grid-column:1 / -1}
+  /* No-orphan wrap in the action row — it depends on TWO things, not one.
+     Half-width chips are Search, Export, Saved (only when signed in) and More
+     (only while closed; open it spans the full row). An ODD count strands one:
+
+       signed out, closed  Search Export More        3 → orphan
+       signed out, open    Search Export            2 → ok
+       signed in,  closed  Search Export Saved More 4 → ok
+       signed in,  open    Search Export Saved      3 → orphan
+
+     The previous rule keyed on the open state alone. That fixed the signed-IN
+     open case and actively broke the signed-OUT one — and signed out is the
+     default every first-time visitor lands in, because "Saved" ships with the
+     hidden attribute until /nav-auth.js confirms a session. NOTE this sheet is a
+     TS template literal — no backticks in these comments, they end the string.
+     Promote the primary to a full row in
+     exactly the two odd cases, so the remaining chips always pair. */
+  .imp-actions:has(#imp-saved-link[hidden]):has(.imp-more:not([open])) #imp-search,
+  .imp-actions:not(:has(#imp-saved-link[hidden])):has(.imp-more[open]) #imp-search{grid-column:1 / -1}
   .imp-more>summary{justify-content:center}
   /* Same rule for the card's badge group: the company name takes its own line so
      IMPORTER + winnability stay together instead of orphaning one pill. (The
