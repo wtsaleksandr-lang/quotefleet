@@ -42,6 +42,7 @@ import { loadEnv } from '../config.js';
 import { sendEmail } from '../email/send.js';
 import { runTrackedJob, jobSkipped, jobSuccess, jobFailure, type JobOutcome } from './jobHealth.js';
 import { classifyJobs, readJobHealth, JOB_REGISTRY } from './jobHealthWatchdog.js';
+import { listOpenOpsAlerts, opsAlertLine, isOpsAlertUrgent, type OpsAlertRow } from './opsAlerts.js';
 import { BILLING_PAST_DUE_KEY } from './trialGating.js';
 
 const TICK_MS = 60 * 60 * 1000; // hourly tick
@@ -181,7 +182,40 @@ export async function collectActionItems(now: Date): Promise<ActionItem[]> {
     });
   }
 
+  // 4. The ops-alert ledger: Stripe disputes (deadline-bearing), expiring cards,
+  //    and rate-request blasts that reached carriers and got no reply. These
+  //    happen OUTSIDE any cron of ours, which is exactly why they need pulling
+  //    into the one place a human already looks. Grouped by kind so a run of
+  //    expiring cards is one heading rather than five.
+  const alerts = await listOpenOpsAlerts();
+  for (const [kind, rows] of groupAlertsByKind(alerts)) {
+    items.push({
+      kind: `${rows.length} ${OPS_ALERT_HEADINGS[kind] ?? kind}`,
+      lines: rows.map((r) => opsAlertLine(r, now)),
+      urgent: rows.some((r) => isOpsAlertUrgent(r, now)),
+    });
+  }
+
   return items;
+}
+
+/** Plural heading per alert kind. A dispute says what stays manual right in the
+ *  heading — the digest should never imply the system will handle it. */
+const OPS_ALERT_HEADINGS: Record<string, string> = {
+  stripe_dispute: 'OPEN STRIPE DISPUTE(S) — evidence submission is MANUAL and deadline-bound',
+  card_problem: 'customer card problem(s) — reach out before the renewal fails',
+  rfq_no_replies: 'rate request(s) delivered with no carrier replies',
+};
+
+/** Stable grouping in registry order, so the digest reads the same every day. */
+export function groupAlertsByKind(rows: readonly OpsAlertRow[]): Map<string, OpsAlertRow[]> {
+  const out = new Map<string, OpsAlertRow[]>();
+  for (const r of rows) {
+    const list = out.get(r.kind);
+    if (list) list.push(r);
+    else out.set(r.kind, [r]);
+  }
+  return out;
 }
 
 /** Stale / failing background jobs, as digest lines. Never throws — job health

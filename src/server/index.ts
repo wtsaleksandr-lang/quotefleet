@@ -22,8 +22,11 @@ import { startFuelSurchargeCron } from '../eia/dieselPrice.js';
 import { startDirectoryRefreshCron } from './directoryRefreshCron.js';
 import { runCronSafely } from './cronSafety.js';
 import { ensureJobRunsTable } from './jobHealth.js';
+import { ensureOpsAlertsTable } from './opsAlerts.js';
 import { startJobHealthWatchdogCron } from './jobHealthWatchdogCron.js';
 import { startOpsDigestCron } from './opsDigestCron.js';
+import { startCardExpiryCron } from './cardExpiryCron.js';
+import { startRfqResponseCron } from './rfq/responseCron.js';
 import {
   decideUncaughtExceptionAction,
   isServerListening,
@@ -149,6 +152,12 @@ async function runPostListenJobs(): Promise<void> {
     void ensureJobRunsTable().catch((err) => {
       console.error('[server] job_runs ledger self-heal failed (non-fatal):', err);
     });
+    // ops_alerts ledger — same reasoning as job_runs: a brand-new table nothing
+    // else touches, so no shared lock. The Stripe webhook can write to it as
+    // soon as the port is open, which is why it heals here rather than lazily.
+    void ensureOpsAlertsTable().catch((err) => {
+      console.error('[server] ops_alerts ledger self-heal failed (non-fatal):', err);
+    });
     // Register every scheduled cron through runCronSafely. This wrapper (a) catches
     // a throw at registration so one cron failing to register can NEVER stop the
     // siblings below it from registering, and (b) sends a de-duped admin alert +
@@ -180,6 +189,13 @@ async function runPostListenJobs(): Promise<void> {
     // awaiting submission, LAPSED filings, past-due tenants) to the admin instead
     // of requiring someone to remember to open a page. See opsDigestCron.ts.
     await runCronSafely('ops-digest-cron', () => startOpsDigestCron());
+    // NEW: expiring-card sweep. Stripe emits NO webhook when a PaymentMethod is
+    // about to expire, so looking once a day is the only way to see it coming —
+    // otherwise every expiry becomes a failed renewal first. See cardExpiryCron.ts.
+    await runCronSafely('card-expiry-cron', () => startCardExpiryCron());
+    // NEW: RFQ response watcher — tells the shipper when carriers reply, and
+    // flags blasts that were delivered and got nothing back. See rfq/responseCron.ts.
+    await runCronSafely('rfq-response-cron', () => startRfqResponseCron());
     console.log('[server] post-listen jobs registered');
   } catch (err) {
     console.error('[server] post-listen setup failed (non-fatal):', err);

@@ -28,7 +28,12 @@
  * all injectable so tests run with no network and can assert the dry-run path
  * never calls the sender.
  */
-import { sendEmail as realSendEmail, brandedFrom, type EmailOut } from '../../email/send.js';
+import {
+  sendEmail as realSendEmail,
+  brandedFrom,
+  wasSentByAProvider,
+  type EmailOut,
+} from '../../email/send.js';
 import { SENDER_NAME, SENDER_ADDRESS } from '../outreach/draftEmail.js';
 import { esc } from '../directory/pages.js';
 import type { RfqRequest, RfqRecipient } from '../../db/schema.js';
@@ -322,6 +327,122 @@ export function buildDraftedRfqEmail(
   return { subject, text, html };
 }
 
+/**
+ * "Your rate request got N quotes" — the reply notification the shipper never
+ * received.
+ *
+ * Before this, a carrier's quote landed in the database and NOTHING told the
+ * shipper. Discovering it required remembering the private responses link and
+ * re-opening it on the off chance, which for a time-sensitive rate quote is the
+ * same as not being told. This is the other half of "did the blast work?": the
+ * blast's delivery outcome is now on the ops side, and the RESPONSE is here.
+ *
+ * TRANSACTIONAL, not marketing: the shipper explicitly asked these carriers for
+ * a price, so this carries no opt-out footer and is not gated on any marketing
+ * preference — the same treatment as the magic-link and dunning emails.
+ */
+export function buildShipperQuotesEmail(opts: {
+  request: Pick<RfqRequest, 'origin' | 'destination' | 'shipperName' | 'equipment'>;
+  /** Quotes that arrived since the last notification. Always ≥ 1. */
+  newQuotes: number;
+  /** Quotes on the request in total, including the new ones. */
+  totalQuotes: number;
+  viewUrl: string;
+}): BuiltEmail {
+  const { request, newQuotes, totalQuotes, viewUrl } = opts;
+  const lane = laneSummary(request);
+  const noun = newQuotes === 1 ? 'quote' : 'quotes';
+  const subject = `${newQuotes} new ${noun} on ${lane}`;
+  const totalLine =
+    totalQuotes > newQuotes ? `You now have ${totalQuotes} quotes on this lane in total.` : '';
+
+  const text = [
+    `Hi ${request.shipperName},`,
+    '',
+    `${newQuotes} carrier${newQuotes === 1 ? ' has' : 's have'} responded to your rate request for ${lane}.`,
+    ...(totalLine ? ['', totalLine] : []),
+    '',
+    'Compare them side by side here:',
+    viewUrl,
+    '',
+    'Quotes are listed newest first, with transit time and validity where the carrier supplied them.',
+  ].join('\n');
+
+  const html = `<!doctype html>
+<html lang="en">${emailHead(subject)}<body style="margin:0;padding:0;background:#f4f5f7;">
+  <div style="max-width:560px;margin:0 auto;padding:24px 16px;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Arial,sans-serif;color:#0b0f15;">
+    <p style="margin:0 0 4px;font-size:12px;letter-spacing:.08em;text-transform:uppercase;color:#5b6472;">New ${esc(noun)}</p>
+    <h1 style="margin:0 0 16px;font-size:20px;line-height:1.25;color:#0b0f15;">${esc(lane)}</h1>
+    <p style="margin:0 0 16px;color:#3a4250;font-size:14px;line-height:1.5;">Hi ${esc(
+      request.shipperName,
+    )}, ${esc(String(newQuotes))} carrier${newQuotes === 1 ? ' has' : 's have'} responded to your rate request.${
+      totalLine ? ` ${esc(totalLine)}` : ''
+    }</p>
+    <div style="margin:24px 0;">
+      <a href="${esc(viewUrl)}" style="display:inline-block;background:#0b0f15;color:#ffffff;text-decoration:none;font-size:15px;font-weight:600;padding:12px 22px;border-radius:4px;">Compare quotes →</a>
+    </div>
+    <p style="margin:0;color:#5b6472;font-size:13px;line-height:1.5;">Quotes are listed newest first, with transit time and validity where the carrier supplied them.</p>
+  </div>
+</body></html>`;
+
+  return { subject, text, html };
+}
+
+/**
+ * "No replies yet" — the honest 48-hour follow-up.
+ *
+ * A rate request that reached carriers and got nothing back is a dead end the
+ * shipper cannot see: the responses page just stays empty, indistinguishable
+ * from a page they opened too early. This says so once, with the one thing that
+ * actually helps (a wider carrier set), and never again for that request.
+ */
+export function buildShipperNoRepliesEmail(opts: {
+  request: Pick<RfqRequest, 'origin' | 'destination' | 'shipperName'>;
+  delivered: number;
+  viewUrl: string;
+  directoryUrl: string;
+}): BuiltEmail {
+  const { request, delivered, viewUrl, directoryUrl } = opts;
+  const lane = laneSummary(request);
+  const subject = `No quotes yet on ${lane}`;
+
+  const text = [
+    `Hi ${request.shipperName},`,
+    '',
+    `Your rate request for ${lane} reached ${delivered} carrier${delivered === 1 ? '' : 's'}, and none has quoted yet.`,
+    '',
+    'That usually means the lane needs a wider net rather than more waiting. Sending the same',
+    'request to a broader carrier set is the fastest fix:',
+    directoryUrl,
+    '',
+    'Your responses page stays live if a late quote arrives:',
+    viewUrl,
+    '',
+    "This is the only reminder we'll send for this request.",
+  ].join('\n');
+
+  const html = `<!doctype html>
+<html lang="en">${emailHead(subject)}<body style="margin:0;padding:0;background:#f4f5f7;">
+  <div style="max-width:560px;margin:0 auto;padding:24px 16px;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Arial,sans-serif;color:#0b0f15;">
+    <p style="margin:0 0 4px;font-size:12px;letter-spacing:.08em;text-transform:uppercase;color:#5b6472;">No quotes yet</p>
+    <h1 style="margin:0 0 16px;font-size:20px;line-height:1.25;color:#0b0f15;">${esc(lane)}</h1>
+    <p style="margin:0 0 16px;color:#3a4250;font-size:14px;line-height:1.5;">Hi ${esc(
+      request.shipperName,
+    )}, your request reached ${esc(String(delivered))} carrier${
+      delivered === 1 ? '' : 's'
+    } and none has quoted yet. That usually means the lane needs a wider net rather than more waiting.</p>
+    <div style="margin:24px 0;">
+      <a href="${esc(directoryUrl)}" style="display:inline-block;background:#0b0f15;color:#ffffff;text-decoration:none;font-size:15px;font-weight:600;padding:12px 22px;border-radius:4px;">Find more carriers →</a>
+    </div>
+    <p style="margin:0 0 4px;color:#5b6472;font-size:13px;line-height:1.5;">Your <a href="${esc(
+      viewUrl,
+    )}" style="color:#5b6472;">responses page</a> stays live if a late quote arrives. This is the only reminder we'll send for this request.</p>
+  </div>
+</body></html>`;
+
+  return { subject, text, html };
+}
+
 export type RfqSendStatus = 'sent' | 'failed' | 'opted_out';
 
 export interface RfqSendResult {
@@ -396,12 +517,20 @@ export async function sendRfqToCarrier(
       from: brandedFrom(SENDER_NAME),
       listUnsubscribeUrl: optOutUrl(baseUrl, recipient.quoteToken),
     });
-    if (out.logged || out.provider === 'stdout') {
-      // No real provider configured — treat as a failed live send (not a false
-      // 'sent'), so the recipient row reflects that nothing left the building.
-      return { status: 'failed', dryRun: false, error: 'no email provider configured' };
-    }
     if (!out.ok) return { status: 'failed', dryRun: false, error: out.error ?? 'send failed' };
+    // `ok: true` is NOT "the carrier received it". sendEmail also returns ok for
+    // a stdout-only fallback (no provider configured) and for a reserved/
+    // undeliverable domain. Treating either as 'sent' would mark the recipient
+    // row delivered for a message that never left the building — the same class
+    // of bug #465 fixed in the lifecycle/dunning crons. wasSentByAProvider() is
+    // the one shared answer to "did a real provider accept this?".
+    if (!wasSentByAProvider(out)) {
+      return {
+        status: 'failed',
+        dryRun: false,
+        error: 'no email provider accepted the message (logged only — nothing was sent)',
+      };
+    }
     return { status: 'sent', dryRun: false, providerId: out.id };
   } catch (err) {
     return { status: 'failed', dryRun: false, error: err instanceof Error ? err.message : String(err) };

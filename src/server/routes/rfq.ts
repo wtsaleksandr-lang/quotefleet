@@ -39,7 +39,9 @@ import {
   parseDots,
   type ResolveDeps,
 } from '../rfq/resolve.js';
-import { sendRfqToCarrier, rfqLiveSendEnabled, type SendRfqDeps } from '../rfq/email.js';
+import { rfqLiveSendEnabled, type SendRfqDeps } from '../rfq/email.js';
+import { runTrackedRfqBlast } from '../rfq/blast.js';
+import type { runTrackedJob } from '../jobHealth.js';
 import { draftRfqEmail, type RfqCarrierFacts } from '../rfq/draftEmail.js';
 import type { complete } from '../../ai/client.js';
 import { isValidRfqToken } from '../rfq/tokens.js';
@@ -61,7 +63,7 @@ import {
 } from '../directory/backfillNearestPort.js';
 import { directoryIdentity } from '../directory/entitlement.js';
 import { dbRfqUsageStore, currentRfqPeriod, type RfqUsageStore } from '../directory/rfqUsage.js';
-import type { RfqFilterSnapshot, RfqRecipientStatus } from '../../db/schema.js';
+import type { RfqFilterSnapshot } from '../../db/schema.js';
 
 /** Positive-int env reader with a fallback (shared by the RFQ cap/quota knobs). */
 function envPosInt(name: string, fallback: number): number {
@@ -198,6 +200,10 @@ export interface RfqRouteDeps {
   gate?: RfqGate;
   /** Monthly send meter (defaults to dbRfqUsageStore). */
   usage?: RfqUsageStore;
+  /** Job-ledger recorder for the blast (defaults to the real runTrackedJob).
+   *  Injected in tests so the fan-out's recorded outcome can be asserted with
+   *  no DB and no alert email. */
+  track?: typeof runTrackedJob;
 }
 
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
@@ -614,47 +620,39 @@ export function registerRfqRoutes(app: Express, deps: RfqRouteDeps = {}) {
       const throttleMs = deps.throttleMs ?? rfqThrottleMs();
       const baseUrl = baseUrlOf(deps, req);
 
-      const finalStatus = new Map<number, RfqRecipientStatus>();
-      for (const rec of view.recipients) finalStatus.set(rec.id, rec.status as RfqRecipientStatus);
-
-      // Skip anything already terminal for THIS send (only pending rows are sent).
-      // Re-sending a request whose recipients are already 'sent' is a no-op.
-      for (const rec of view.recipients) {
-        if (rec.status !== 'pending') continue;
-
-        // Persist the shipper's edit (falls back to the stored draft when the
-        // form omitted the field). The edited value is what actually gets sent.
-        const editedSubject = body[`subject_${rec.id}`] !== undefined ? str(body[`subject_${rec.id}`]) : rec.draftSubject ?? '';
-        const editedBody = body[`body_${rec.id}`] !== undefined ? str(body[`body_${rec.id}`]) : rec.draftBody ?? '';
-        if (editedSubject !== (rec.draftSubject ?? '') || editedBody !== (rec.draftBody ?? '')) {
-          await store.updateRecipientDraft(rec.id, editedSubject, editedBody);
-        }
-
-        const result = await sendRfqToCarrier(
-          request,
-          {
-            carrierName: rec.carrierName,
-            carrierEmail: rec.carrierEmail,
-            quoteToken: rec.quoteToken,
-            draftSubject: editedSubject || null,
-            draftBody: editedBody || null,
-          },
-          { send: deps.send, isEmailSuppressed, liveSend, baseUrl },
-        );
-        const nextStatus: RfqRecipientStatus =
-          result.status === 'sent' ? 'sent' : result.status === 'opted_out' ? 'opted_out' : 'failed';
-        await store.markRecipientStatus(rec.id, nextStatus, nextStatus === 'sent' ? new Date() : null);
-        finalStatus.set(rec.id, nextStatus);
-        if (liveSend && throttleMs > 0) await sleep(throttleMs);
-      }
+      // The fan-out now runs through the #464 job ledger: one durable row per
+      // blast carrying attempted/sent/suppressed/failed, and a de-duped admin
+      // alert when any delivery hard-fails. Before this, a blast in which every
+      // send failed was recorded nowhere and rendered as a success page.
+      const blast = await runTrackedRfqBlast(
+        request,
+        view.recipients,
+        {
+          store,
+          edited: (rec) => ({
+            // Persist the shipper's edit (falls back to the stored draft when
+            // the form omitted the field) — the edited value is what is sent.
+            subject:
+              body[`subject_${rec.id}`] !== undefined ? str(body[`subject_${rec.id}`]) : rec.draftSubject ?? '',
+            body: body[`body_${rec.id}`] !== undefined ? str(body[`body_${rec.id}`]) : rec.draftBody ?? '',
+          }),
+          sendDeps: { send: deps.send, isEmailSuppressed, liveSend, baseUrl },
+          liveSend,
+          throttleMs,
+          sleep,
+        },
+        deps.track,
+      );
 
       let sent = 0;
       let noEmail = 0;
       let optedOut = 0;
-      for (const s of finalStatus.values()) {
+      let failed = 0;
+      for (const s of blast.finalStatus.values()) {
         if (s === 'sent') sent++;
         else if (s === 'no_email') noEmail++;
         else if (s === 'opted_out') optedOut++;
+        else if (s === 'failed') failed++;
       }
 
       const viewUrl = `${baseUrl.replace(/\/$/, '')}/directory/rfq/${request.viewToken}`;
@@ -664,6 +662,7 @@ export function registerRfqRoutes(app: Express, deps: RfqRouteDeps = {}) {
           sent,
           noEmail,
           optedOut,
+          failed,
           cappedOut: 0,
           total: view.recipients.length,
           dryRun: !liveSend,

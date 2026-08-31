@@ -14,7 +14,12 @@
  *   • anonymous (no identity) → empty contact inputs, no "Sending as" note.
  */
 import { describe, it, expect } from 'vitest';
-import { renderRfqForm, type RfqFormOpts } from './pages.js';
+import {
+  renderRfqForm,
+  renderRfqConfirmation,
+  type RfqFormOpts,
+  type RfqConfirmationOpts,
+} from './pages.js';
 
 const base: RfqFormOpts = {
   recipientCount: 3,
@@ -81,5 +86,57 @@ describe('renderRfqForm — signed-in shipper prefill (H3)', () => {
     expect(html).not.toContain('Sending as <strong>');
     // The default contact helper still renders.
     expect(html).toContain("So carriers know who's requesting");
+  });
+});
+
+/**
+ * Confirmation page — the delivery-failure surface.
+ *
+ * Before this, `failed` was not a field: a blast where every send hard-failed
+ * rendered "0 Requests sent" and nothing else. The shipper was shown a success
+ * page for a total failure.
+ */
+describe('renderRfqConfirmation — failed deliveries are visible', () => {
+  const base: RfqConfirmationOpts = {
+    viewUrl: 'https://quotefleet.net/directory/rfq/tok',
+    sent: 10,
+    noEmail: 1,
+    optedOut: 2,
+    cappedOut: 0,
+    total: 13,
+    dryRun: false,
+  };
+
+  it('says nothing about failures when there are none', () => {
+    const html = renderRfqConfirmation(base);
+    expect(html).not.toContain("couldn't be delivered");
+    expect(html).not.toContain('Not delivered');
+  });
+
+  it('states the failure count in prose AND as a count tile', () => {
+    const html = renderRfqConfirmation({ ...base, sent: 8, failed: 2 });
+    expect(html).toContain("2 requests couldn't be delivered.");
+    expect(html).toContain('Not delivered');
+    expect(html).toContain('rfq-note-warn');
+  });
+
+  it('reads correctly for a single failure', () => {
+    const html = renderRfqConfirmation({ ...base, sent: 9, failed: 1 });
+    expect(html).toContain("1 request couldn't be delivered.");
+    expect(html).toContain('That carrier was');
+  });
+
+  it('tells the shipper it is already reported — they have no action to take', () => {
+    const html = renderRfqConfirmation({ ...base, failed: 1 });
+    expect(html).toContain("you don't need to report it");
+  });
+
+  it('keeps the count tiles to an even number so mobile never orphans one', () => {
+    // .rfq-count is flex 1 1 120px: at 375px two fit per row, so an odd tile
+    // count would leave a lone stretched tile on the last row.
+    const html = renderRfqConfirmation({ ...base, failed: 2 });
+    const tiles = html.match(/class="rfq-count"/g) ?? [];
+    expect(tiles).toHaveLength(4);
+    expect(tiles.length % 2).toBe(0);
   });
 });

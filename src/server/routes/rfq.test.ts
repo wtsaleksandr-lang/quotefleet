@@ -33,6 +33,7 @@ import type {
 import type { RfqRequest, RfqRecipient, RfqQuote, RfqRecipientStatus } from '../../db/schema.js';
 import type { ResolveDeps, CarrierLite } from '../rfq/resolve.js';
 import type { EmailOut } from '../../email/send.js';
+import type { JobOutcome } from '../jobHealth.js';
 
 // The live-send path calls brandedFrom() → loadEnv(), which requires
 // DATABASE_URL; satisfy it with a dummy so the live send test doesn't throw.
@@ -205,6 +206,8 @@ interface Harness {
   usage: MemUsage;
   send: ReturnType<typeof vi.fn>;
   forceReingest: ReturnType<typeof vi.fn>;
+  /** Every blast the route recorded to the job ledger, in order. */
+  recorded: Array<{ job: string; outcome: JobOutcome }>;
 }
 
 async function boot(over: Partial<RfqRouteDeps> = {}): Promise<Harness> {
@@ -215,7 +218,16 @@ async function boot(over: Partial<RfqRouteDeps> = {}): Promise<Harness> {
   const usage = new MemUsage();
   const send = vi.fn(async (): Promise<EmailOut> => ({ ok: true, provider: 'resend', id: 'msg_1' }));
   const forceReingest = vi.fn(async () => 'started' as const);
+  // Capture the blast's ledger outcome instead of writing to a real job_runs
+  // table (and never send the failure alert email from a test).
+  const recorded: Array<{ job: string; outcome: JobOutcome }> = [];
+  const track = (async (job: string, fn: () => Promise<JobOutcome> | JobOutcome) => {
+    const outcome = await fn();
+    recorded.push({ job, outcome });
+    return outcome;
+  }) as unknown as NonNullable<RfqRouteDeps['track']>;
   registerRfqRoutes(app, {
+    track,
     store,
     resolveDeps: fixedResolveDeps([carrier({ usdot: '1', email: 'a@x.example' }), carrier({ usdot: '2', email: 'b@x.example' }), carrier({ usdot: '3', email: null })]),
     isEmailSuppressed: async () => false,
@@ -236,7 +248,7 @@ async function boot(over: Partial<RfqRouteDeps> = {}): Promise<Harness> {
     const s = app.listen(0, () => resolve(s));
   });
   const { port } = server.address() as AddressInfo;
-  return { server, baseUrl: `http://127.0.0.1:${port}`, store, usage, send, forceReingest };
+  return { server, baseUrl: `http://127.0.0.1:${port}`, store, usage, send, forceReingest, recorded };
 }
 
 const form = (fields: Record<string, string>) =>
@@ -350,6 +362,59 @@ describe('RFQ routes', () => {
     expect(hh.send).not.toHaveBeenCalled();
     const statuses = hh.store.recipients.map((x) => x.status).sort();
     expect(statuses).toEqual(['no_email', 'sent', 'sent']);
+    hh.server.close();
+  });
+
+  it('PHASE 2: a HALF-FAILED blast says so on the page and records a ledger FAILURE', async () => {
+    // The bug: `failed` was never counted, so a blast where deliveries failed
+    // rendered an unqualified success page and was recorded nowhere at all.
+    const hh = await boot({
+      liveSend: true,
+      send: vi.fn(async (msg: { to: string }) =>
+        msg.to === 'a@x.example'
+          ? ({ ok: false, error: 'mailbox unavailable' } as EmailOut)
+          : ({ ok: true, provider: 'resend', id: 'm' } as EmailOut),
+      ) as unknown as RfqRouteDeps['send'],
+    });
+    await postForm(hh.baseUrl, '/directory/rfq', { ...validShipper, dots: '1,2,3' });
+    const viewToken = hh.store.requests.at(-1)!.viewToken;
+    const r = await postForm(hh.baseUrl, `/directory/rfq/${viewToken}/send`, {});
+    expect(r.status).toBe(200);
+    const html = await r.text();
+
+    // Visible to the shipper, above the fold, not buried in a count tile alone.
+    expect(html).toContain("couldn't be delivered");
+    expect(html).toContain('Not delivered');
+
+    // …and loud on the ops side: a failure row, with the reason.
+    expect(hh.recorded).toHaveLength(1);
+    expect(hh.recorded[0].job).toBe('rfq-blast');
+    expect(hh.recorded[0].outcome.status).toBe('failure');
+    expect(hh.recorded[0].outcome.detail).toContain('mailbox unavailable');
+    expect(hh.store.recipients.filter((x) => x.status === 'failed')).toHaveLength(1);
+    hh.server.close();
+  });
+
+  it('PHASE 2: a clean blast shows no failure note and records a ledger success', async () => {
+    const hh = await boot({ liveSend: true });
+    await postForm(hh.baseUrl, '/directory/rfq', { ...validShipper, dots: '1,2,3' });
+    const viewToken = hh.store.requests.at(-1)!.viewToken;
+    const html = await (await postForm(hh.baseUrl, `/directory/rfq/${viewToken}/send`, {})).text();
+    expect(html).not.toContain("couldn't be delivered");
+    expect(hh.recorded[0].outcome.status).toBe('success');
+    expect(hh.recorded[0].outcome.processed).toBe(2);
+    hh.server.close();
+  });
+
+  it('PHASE 2: a DRY RUN records `skipped`, never a success (nothing was sent)', async () => {
+    // Recording 25 "delivered" rate requests on a day nothing left the building
+    // is the same lie #465 fixed in the lifecycle crons.
+    const hh = await boot();
+    await postForm(hh.baseUrl, '/directory/rfq', { ...validShipper, dots: '1,2,3' });
+    const viewToken = hh.store.requests.at(-1)!.viewToken;
+    await postForm(hh.baseUrl, `/directory/rfq/${viewToken}/send`, {});
+    expect(hh.recorded[0].outcome.status).toBe('skipped');
+    expect(hh.recorded[0].outcome.detail).toContain('RFQ_LIVE_SEND is off');
     hh.server.close();
   });
 
