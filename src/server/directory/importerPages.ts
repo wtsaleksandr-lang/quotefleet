@@ -43,6 +43,9 @@ import {
   findImporterLeads,
   winnability,
   aiAngle,
+  isForwarder,
+  searchCompaniesByName,
+  companySearchRowToLead,
   MAX_LEADS,
   CONTACT_TIER_COPY,
   type ImporterFilters,
@@ -69,6 +72,13 @@ import {
   checkDetailQuota,
 } from './importerQuota.js';
 import { CACHE_ONLY_NOTE } from './externalPullGuard.js';
+import {
+  indexLeads,
+  searchNameIndex,
+  suggestCompanies,
+  isLeadRedacted,
+  NAME_INDEX_MAX_RESULTS,
+} from './importerNameIndex.js';
 import { importerSearchLimiter, publicAutocompleteLimiter } from '../rateLimits.js';
 import { registerImporterProfileRoutes } from './importerProfile.js';
 import { activeRedactionKeys } from './manifestRedactions.js';
@@ -218,10 +228,14 @@ const IMPORTERS_CSS = `
 /* align-items:START, not center. The Entry-port field grows downward when the
    "set by port" lock pill appears under it; centring then re-centred that taller
    field, so picking a port pushed Port and Commodity 13px BELOW Entry state and
-   the pill drifted into the button row's band. Top-aligning pins all three
-   boxes to the same baseline and lets the pill simply extend its own field. */
-.imp-grid{display:flex;flex-wrap:wrap;gap:8px;align-items:start}
-.imp-combo{flex:1 1 220px}
+   the pill drifted into the button row's band. Top-aligning pins every box in
+   the row to the same baseline and lets the pill simply extend its own field. */
+/* FOUR filters now (Entry port · Entry state · Commodity/HS · Company name), so
+   the rail is an explicit grid rather than a wrapping flex row. Flex-wrap would
+   have dropped ONE control onto a line of its own at any width between three and
+   four columns — the orphan-wrap the house rule forbids. Declared column counts
+   step 4 → 2 → 1 and never pass through 3. */
+.imp-grid{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:8px;align-items:start}
 .imp-field{display:flex;flex-direction:column;gap:8px;min-width:0}
 .imp-field label{font-size:12px;font-weight:600;color:var(--muted);text-transform:uppercase;letter-spacing:.03em}
 .imp-field input,.imp-field select{width:100%;box-sizing:border-box;font-family:var(--font-sans);font-size:14px;color:var(--ink);background:var(--surface-2);border:1px solid var(--border-strong);border-radius:8px;padding:10px 12px;min-height:44px;appearance:none;-webkit-appearance:none}
@@ -273,9 +287,14 @@ const IMPORTERS_CSS = `
 .imp-more>summary::-webkit-details-marker{display:none}
 .imp-more>summary::after{content:'▾';font-size:10px}
 .imp-more[open]>summary::after{content:'▴'}
-.imp-more-grid{display:grid;grid-template-columns:repeat(2,1fr);gap:16px;margin-top:4px}
-.imp-more-name{margin-top:16px}
-.imp-more-name .hint{display:block;font-size:12px;color:var(--muted);margin-top:8px}
+/* Three secondary filters (supplier country, frequency, TEU) — three columns, so
+   all three sit on one line. A two-column grid left the third alone underneath,
+   the same orphan the primary rail above now avoids by construction. */
+.imp-more-grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:16px;margin-top:4px}
+/* Coverage note under the company-name field: what a name search actually
+   searches. Top-left under its own field, never a floating aside. */
+.imp-namehint{grid-column:1 / -1;font-size:12px;line-height:1.5;color:var(--muted);margin:2px 0 0}
+.imp-namehint b{color:var(--ink-soft);font-weight:600}
 
 /* Search + Export grouped adjacent (no margin-left:auto gap, I8); "More filters"
    disclosure follows inline. B4: force the primary a proper brand-blue fill (the
@@ -712,6 +731,11 @@ html[data-theme="light"] .imp-empty-act .imp-empty-run:hover{background:var(--ac
   .imp-results.compact .sk-lane{height:20px}
 }
 @media(max-width:900px){
+  /* Four filter boxes across a ~870px rail leave ~200px each, at which the
+     Commodity placeholder and the in-field captions start clipping. Step to a
+     2x2 here — the pair-preserving step, never 3+1. */
+  .imp-grid{grid-template-columns:repeat(2,minmax(0,1fr))}
+  .imp-more-grid{grid-template-columns:1fr}
   .imp-layout{grid-template-columns:1fr}
   /* B3-mobile: the desktop :has(.imp-side.on) rule out-specifies the single-column
      default, so once a search runs the grid never collapsed on phones and results
@@ -730,14 +754,11 @@ html[data-theme="light"] .imp-empty-act .imp-empty-run:hover{background:var(--ac
   .imp-results.compact{grid-template-columns:1fr}
 }
 @media(max-width:760px){
-  .imp-grid{grid-template-columns:1fr}
-  .imp-more-grid{grid-template-columns:1fr 1fr}
   /* Stacked input clusters use the 2px rhythm (hard input rule). The 8px /16px
-     gaps are HORIZONTAL spacing that survived the collapse to one column, where
-     they read as loose, unrelated boxes rather than one control group. */
+     gaps are HORIZONTAL spacing that survived the collapse to fewer columns,
+     where they read as loose, unrelated boxes rather than one control group. */
   .imp-grid{gap:2px 8px}
   .imp-more-grid{gap:2px 12px}
-  .imp-more-name{margin-top:2px}
   .imp-stats{grid-template-columns:repeat(2,minmax(0,1fr));gap:10px 12px}
   .imp-export{margin-left:0}
   .imp-toolbar-r{width:100%;margin-left:0}
@@ -755,17 +776,33 @@ html[data-theme="light"] .imp-empty-act .imp-empty-run:hover{background:var(--ac
   .imp-aud button{flex:1 1 0;padding:8px 6px}
 }
 @media(max-width:560px){
+  /* Phones: one filter per line. Two columns below this leaves ~200px per box —
+     narrower than the in-field caption plus its value. */
+  .imp-grid{grid-template-columns:1fr}
   /* No-orphan wrap: the four action buttons pair 2x2 instead of leaving
      "More filters" alone on its own line. */
   .imp-actions{display:grid;grid-template-columns:1fr 1fr;gap:10px;align-items:stretch}
   .imp-actions>*{width:100%;justify-content:center;margin-left:0;white-space:nowrap;padding-left:10px;padding-right:10px;gap:6px}
   .imp-more{grid-column:auto}
   .imp-more[open]{grid-column:1 / -1}
-  /* No-orphan wrap, open state (R4): with "More filters" expanded it spans the
-     full row, leaving Search + Export + Saved — three chips in a two-column
-     grid, so "Saved" sat alone on its own line. Promoting the PRIMARY action to
-     the full row leaves exactly two secondary chips paired beside each other. */
-  .imp-actions:has(.imp-more[open]) #imp-search{grid-column:1 / -1}
+  /* No-orphan wrap in the action row — it depends on TWO things, not one.
+     Half-width chips are Search, Export, Saved (only when signed in) and More
+     (only while closed; open it spans the full row). An ODD count strands one:
+
+       signed out, closed  Search Export More        3 → orphan
+       signed out, open    Search Export            2 → ok
+       signed in,  closed  Search Export Saved More 4 → ok
+       signed in,  open    Search Export Saved      3 → orphan
+
+     The previous rule keyed on the open state alone. That fixed the signed-IN
+     open case and actively broke the signed-OUT one — and signed out is the
+     default every first-time visitor lands in, because "Saved" ships with the
+     hidden attribute until /nav-auth.js confirms a session. NOTE this sheet is a
+     TS template literal — no backticks in these comments, they end the string.
+     Promote the primary to a full row in
+     exactly the two odd cases, so the remaining chips always pair. */
+  .imp-actions:has(#imp-saved-link[hidden]):has(.imp-more:not([open])) #imp-search,
+  .imp-actions:not(:has(#imp-saved-link[hidden])):has(.imp-more[open]) #imp-search{grid-column:1 / -1}
   .imp-more>summary{justify-content:center}
   /* Same rule for the card's badge group: the company name takes its own line so
      IMPORTER + winnability stay together instead of orphaning one pill. (The
@@ -835,8 +872,11 @@ function comboField(opts: {
   placeholder: string;
   source: 'inline' | 'remote';
   lockable?: boolean;
+  /** `field=` value for a remote combobox's /api/importers/suggest call.
+   *  Defaults to `commodity`, which is what the HS box has always sent. */
+  remoteField?: string;
 }): string {
-  const { id, name, label, placeholder, source, lockable } = opts;
+  const { id, name, label, placeholder, source, lockable, remoteField } = opts;
   // TITLE-IN-FIELD (hard input rule): the field's name is a caption rendered
   // INSIDE the bordered box, top-left, above the value. Previously the label
   // lived only in the placeholder + aria-label, which meant a filled field lost
@@ -847,8 +887,8 @@ function comboField(opts: {
   // the state.
   return `
     <div class="imp-field imp-combo" data-field="${esc(id)}" data-source="${esc(source)}" data-has-value="0"${
-      lockable ? ' data-lockable="1"' : ''
-    }>
+      source === 'remote' ? ` data-remote-field="${esc(remoteField ?? 'commodity')}"` : ''
+    }${lockable ? ' data-lockable="1"' : ''}>
       <div class="imp-combo-ctrl imp-capfield">
         <span class="imp-cap" aria-hidden="true">${esc(label)}</span>
         <input id="${esc(id)}" type="text" role="combobox" aria-autocomplete="list" aria-expanded="false"
@@ -886,14 +926,28 @@ export function renderImporterSearchPage(): string {
             tool does. A left-aligned heading and one line of orientation cost
             ~64px and are the difference between a product and a form. */ ''}
       <header class="imp-head">
-        <h1>Find US importers to pitch</h1>
-        <p class="imp-sub">Search live US customs records by entry port, lane or commodity &mdash; then see who moves their freight today, and what it would take to win them.</p>
+        <h1>US Importers Directory</h1>
+        <p class="imp-sub">Search live US customs records by company name, entry port, lane or commodity &mdash; then see who moves their freight today, and what it would take to win them.</p>
       </header>
       <form class="imp-panel" id="imp-form" novalidate>
         <div class="imp-grid">
           ${comboField({ id: 'imp-port', name: 'entryPort', label: 'Entry port', placeholder: 'Any US port', source: 'inline' })}
           ${comboField({ id: 'imp-state', name: 'state', label: 'Entry state', placeholder: 'Any entry state', source: 'inline', lockable: true })}
           ${comboField({ id: 'imp-commodity', name: 'commodity', label: 'Commodity / HS code', placeholder: 'e.g. saw blades, or 8202', source: 'remote' })}
+          ${/* PROMOTED from behind "More filters" (Alex): someone who already knows
+                the importer they want must be able to type it, not hunt for it
+                behind a disclosure. Suggestions come from /api/importers/suggest
+                ?field=company — the local index — which never costs a credit and
+                shows exactly which names are findable. */ ''}
+          ${comboField({ id: 'imp-company', name: 'company', label: 'Company name', placeholder: 'e.g. Robert Bosch Tool', source: 'remote', remoteField: 'company' })}
+          ${/* HONEST COVERAGE. The 700M+ figure above is the BILL-OF-LADING corpus
+                a port/lane/commodity search runs over. A name on its own is
+                answered by ImportYeti's company directory plus the importers we
+                have already pulled — company identity, not the whole bill
+                history — so it is stated separately instead of being allowed to
+                inherit the headline number. The live status line refines this to
+                what actually happened on each search. */ ''}
+          <p class="imp-namehint" id="imp-namehint"><b>Searching by name?</b> A name on its own looks the company up in the US importer directory and in the importers QuoteFleet has already pulled &mdash; open its profile for the full bill-of-lading history. Add a port, state or commodity to search the customs records themselves.</p>
         </div>
 
         <div class="imp-actions">
@@ -926,20 +980,12 @@ export function renderImporterSearchPage(): string {
                 <select id="imp-teu" name="minTeu12m">${TEU_BANDS.map(([v, l]) => `<option value="${esc(v)}">${esc(l)}</option>`).join('')}</select>
               </div>
             </div>
-            <div class="imp-more-name">
-              <div class="imp-field imp-capfield">
-                <span class="imp-cap" aria-hidden="true">Company name</span>
-                <label for="imp-company">Or search by company name</label>
-                <input id="imp-company" name="company" type="text" placeholder="Importer name (optional)" autocomplete="off" maxlength="80">
-              </div>
-              <span class="hint">Secondary &mdash; most users start from a port, lane or commodity above.</span>
-            </div>
           </details>
         </div>
       </form>
 
       <div class="imp-trust">
-        <p class="imp-datastat" id="imp-recordline-wrap"><b class="num">${esc(DATASET_RECORDS_LABEL)}</b> US import records, updated daily &mdash; <span id="imp-recordline">pick a port, lane or commodity to start</span>.</p>
+        <p class="imp-datastat" id="imp-recordline-wrap"><b class="num">${esc(DATASET_RECORDS_LABEL)}</b> US import records, updated daily &mdash; <span id="imp-recordline">search a company name, or pick a port, lane or commodity</span>.</p>
         <p class="imp-status" id="imp-status" role="status" aria-live="polite" hidden></p>
       </div>
 
@@ -993,10 +1039,10 @@ export function renderImporterSearchPage(): string {
             <div class="imp-empty" id="imp-empty">
               <span class="imp-empty-ico" aria-hidden="true">&#128506;</span>
               <div class="imp-empty-b">
-                <h3>Start with your lane</h3>
-                <p>Pick an entry port, state or commodity above and hit Search to build importer profiles from live customs data.</p>
+                <h3>Start with a company or a lane</h3>
+                <p>Know the importer? Type its name. Don&rsquo;t? Pick an entry port, state or commodity and hit Search to build importer profiles from live customs data.</p>
                 <ul class="imp-empty-tips">
-                  <li>Port of Savannah</li><li>Port of Long Beach</li><li>HS 8202 &mdash; saw blades</li><li>Furniture</li>
+                  <li>Robert Bosch Tool</li><li>Port of Savannah</li><li>HS 8202 &mdash; saw blades</li><li>Furniture</li>
                 </ul>
               </div>
             </div>
@@ -1028,20 +1074,24 @@ export function renderImporterSearchPage(): string {
   <script>${CLIENT_JS}</script>`;
 
   return layout({
-    title: 'US Importer Database — Find & Contact Importers | QuoteFleet',
+    // Keeps the "US importer database/directory" keyword head the page already
+    // ranked for, and adds the search axes — including the company NAME axis the
+    // page now supports, which is what most name-intent queries actually look
+    // like ("<company> importer records").
+    title: 'US Importers Directory — Search by Company Name, Port & Commodity | QuoteFleet',
     description:
-      'Search real US customs bill-of-lading records to find importers by port, lane and commodity — their suppliers, volumes, incumbent forwarder, a winnability score and an AI pitch angle. Free to browse.',
+      'Search real US customs bill-of-lading records to find importers by company name, port, lane and commodity — their suppliers, volumes, incumbent forwarder, a winnability score and an AI angle. Free to browse.',
     canonicalPath: '/importers',
     bodyHtml: body,
     jsonLd: [
       JSON.stringify({
         '@context': 'https://schema.org',
         '@type': 'WebApplication',
-        name: 'QuoteFleet Importer Search',
+        name: 'QuoteFleet US Importers Directory',
         applicationCategory: 'BusinessApplication',
         url: `${SITE}/importers`,
         description:
-          'Find US importers to pitch from customs bill-of-lading data, searchable by port, lane and commodity.',
+          'A directory of US importers built from customs bill-of-lading data, searchable by company name, port, lane and commodity.',
         offers: { '@type': 'Offer', price: '0', priceCurrency: 'USD' },
       }),
       JSON.stringify({
@@ -1049,7 +1099,7 @@ export function renderImporterSearchPage(): string {
         '@type': 'BreadcrumbList',
         itemListElement: [
           { '@type': 'ListItem', position: 1, name: 'Home', item: `${SITE}/` },
-          { '@type': 'ListItem', position: 2, name: 'Importer Search', item: `${SITE}/importers` },
+          { '@type': 'ListItem', position: 2, name: 'US Importers Directory', item: `${SITE}/importers` },
         ],
       }),
     ],
@@ -1134,6 +1184,7 @@ const CLIENT_JS = `
     var listEl=root.querySelector('.imp-suggest');
     var clearBtn=root.querySelector('.imp-combo-clear');
     var source=root.getAttribute('data-source');
+    var remoteField=root.getAttribute('data-remote-field')||'commodity';
     var fieldId=input.id;
     var items=[]; var active=-1; var debounce=null; var lastQ=null;
 
@@ -1172,12 +1223,14 @@ const CLIENT_JS = `
     }
     function open(q){
       if(source==='inline'){ items=filterStatic(q); active=-1; render(); return; }
-      // remote (commodity) — debounced fetch
+      // remote (commodity / company name) — debounced fetch. Both are served
+      // from local data (the HS reference, the company index): a suggestion has
+      // never cost, and must never cost, an ImportYeti credit.
       if(debounce)clearTimeout(debounce);
       debounce=setTimeout(function(){
         if(q===lastQ)return; lastQ=q;
         if(!q){ items=[]; render(); return; }
-        fetch('/api/importers/suggest?field=commodity&q='+encodeURIComponent(q),{headers:{'Accept':'application/json'}})
+        fetch('/api/importers/suggest?field='+encodeURIComponent(remoteField)+'&q='+encodeURIComponent(q),{headers:{'Accept':'application/json'}})
           .then(function(r){return r.json();})
           .then(function(j){ items=(j&&j.items)||[]; active=-1; render(); })
           .catch(function(){ items=[]; render(); });
@@ -1714,6 +1767,9 @@ const CLIENT_JS = `
     }
     setCombo('imp-port',q.entryPort,window.__IMP_PORTS);
     setCombo('imp-commodity',q.commodity,null);
+    // Company name is a PRIMARY combobox now, so it restores like the others —
+    // it is no longer one of the "More filters" that force the disclosure open.
+    setCombo('imp-company',q.company,null);
     setCombo('imp-supplier',q.supplierCountry,window.__IMP_COUNTRIES);
     // Port implies its state and LOCKS the field — mirror the live pairing so a
     // restored search looks exactly like one the user just built by hand.
@@ -1724,11 +1780,9 @@ const CLIENT_JS = `
     } else { setCombo('imp-state',q.state,window.__IMP_STATES); }
     var freq=document.getElementById('imp-freq');
     var teuSel=document.getElementById('imp-teu');
-    var coEl=document.getElementById('imp-company');
     var secondary=false;
     if(freq&&q.minShipments12m){ freq.value=q.minShipments12m; if(freq.value===q.minShipments12m){secondary=true;any=true;} }
     if(teuSel&&q.minTeu12m){ teuSel.value=q.minTeu12m; if(teuSel.value===q.minTeu12m){secondary=true;any=true;} }
-    if(coEl&&q.company){ coEl.value=q.company; secondary=true; any=true; }
     if(q.supplierCountry) secondary=true;
     // Open "More filters" when the link carries any of them — a filter in force
     // behind a closed disclosure is an invisible filter.
@@ -1903,7 +1957,9 @@ const CLIENT_JS = `
     // Show "Load more" only if this page came back full AND actually added at
     // least one NEW importer. A page that is all duplicates (added===0) would
     // spend an ImportYeti pull for zero gain, so hide the button then.
-    var full=leads.length>=PAGE_SIZE && added>0;
+    // A NAME search has no pages at all — both of its layers return their whole
+    // match set in one go — so the button would promise more that does not exist.
+    var full=!res.nameSearch && leads.length>=PAGE_SIZE && added>0;
     moreWrap.classList.toggle('on', full);
     return added;
   }
@@ -1935,7 +1991,11 @@ const CLIENT_JS = `
     // The record strip only ever updated on SUCCESS, so while a search ran it
     // still told the user to "pick a port, lane or commodity to start" — which
     // they had just done — directly beside "Searching…".
-    if(recordLine&&!append) recordLine.textContent=cacheOnly?'checking the cache for this lane':'searching this lane now';
+    // A name search reaches no lane, so the lane wording would be wrong from the
+    // first frame — say what is actually happening.
+    if(recordLine&&!append) recordLine.textContent = payload&&payload.company&&!payload.entryPort&&!payload.state&&!payload.hsCode&&!payload.product&&!payload.supplierCountry
+      ? 'looking that company up'
+      : (cacheOnly?'checking the cache for this lane':'searching this lane now');
     var body={}; for(var k in payload)body[k]=payload[k]; body.page=page;
     if(cacheOnly) body.cacheOnly=true;
     return fetch('/api/importers/search',{method:'POST',headers:{'Content-Type':'application/json','Accept':'application/json'},body:JSON.stringify(body)})
@@ -2017,7 +2077,17 @@ const CLIENT_JS = `
           var commodityOnly = curPayload && (curPayload.hsCode||curPayload.product) &&
             !curPayload.entryPort && !curPayload.state && !curPayload.supplierCountry && !curPayload.company;
           var e;
-          if(commodityOnly){
+          if(j.nameSearch){
+            // A name that matched nothing is NOT "this importer does not import".
+            // Say exactly what was searched, and offer the lane path that can
+            // pull records this search deliberately did not buy.
+            var nameScope=j.nameLiveSearched
+              ? 'No US importer on file matches that name. Check the spelling, try the legal entity name (Corp / LLC / Inc), or search by port and commodity instead.'
+              : 'That name is not among the '+Number(j.nameIndexTotal||0).toLocaleString('en-US')+' importers QuoteFleet has already pulled, and the live company directory is unavailable right now. Search by entry port or commodity to pull the lane, then the name will be searchable.';
+            e=emptyState('\\uD83D\\uDD0D','No importer found by that name',nameScope,
+              ['Try the legal entity name','Search by entry port','Search by commodity']);
+            setStatus('No importer matched that name.',false);
+          } else if(commodityOnly){
             e=emptyState('\\u2693','Add a port to search by commodity',
               'Commodity and HS-code searches need an entry port (or state) to scope the customs data. Pick a US port above and search again.',
               ['Port of Savannah','Port of Long Beach','Port of Newark']);
@@ -2029,13 +2099,37 @@ const CLIENT_JS = `
             setStatus('No importers matched those filters \\u2014 widen your lane or commodity.',false);
           }
           results.appendChild(e);
-          if(recordLine&&j.recordsScanned){ recordLine.textContent=Number(totalScanned).toLocaleString('en-US')+' customs records scanned'; }
+          // Retire the in-flight wording even when nothing matched — otherwise a
+          // finished search still reads "searching this lane now" beside its own
+          // empty state. A name miss scanned no bills, so it says so.
+          if(recordLine){
+            recordLine.textContent = j.recordsScanned
+              ? Number(totalScanned).toLocaleString('en-US')+' customs records scanned'
+              : (j.nameSearch ? 'no importer matched that name' : 'no records matched \\u2014 widen the lane');
+          }
           return;
         }
         buildFacets(); renderList();
         // The toolbar already carries the count — this line adds only provenance.
-        setStatus(j.cached?'Served from cache \\u2014 free.':'Built from a live customs pull.',false);
-        if(recordLine){ recordLine.textContent=Number(totalScanned).toLocaleString('en-US')+' customs records scanned'; }
+        // A NAME search says what it searched, because it did not search the
+        // 700M+ bill corpus the headline figure refers to: it matched company
+        // records. Overstating that would be the one dishonest thing this page
+        // could say about itself.
+        if(j.nameSearch){
+          setStatus(j.nameLiveSearched
+            ? 'Matched against the US importer directory \\u2014 free. Open a profile for its bill-of-lading history.'
+            : 'Matched against the '+Number(j.nameIndexTotal||0).toLocaleString('en-US')+' importers QuoteFleet has already pulled \\u2014 free.',false);
+        } else {
+          setStatus(j.cached?'Served from cache \\u2014 free.':'Built from a live customs pull.',false);
+        }
+        // A name search scans no bills, so "0 customs records scanned" would be a
+        // true number attached to a false impression. Say what it matched instead.
+        if(recordLine){
+          recordLine.textContent = totalScanned
+            ? Number(totalScanned).toLocaleString('en-US')+' customs records scanned'
+            : (j.nameSearch ? 'matched by company name \\u2014 no customs records pulled'
+                            : 'pick a port, lane or commodity to start');
+        }
         // Land the caret on the results after a FRESH search, so keyboard and
         // screen-reader users are not left at the top of the form with the page
         // silently rewritten below them. "Load more" appends, so it must not
@@ -2071,7 +2165,7 @@ const CLIENT_JS = `
     ev.preventDefault();
     var payload=collectPayload();
     if(!payload.entryPort&&!payload.state&&!payload.hsCode&&!payload.product&&!payload.supplierCountry&&!payload.company){
-      setStatus('Pick a port, state or commodity (or enter a company name) to search.',false); return;
+      setStatus('Enter a company name, or pick a port, state or commodity, to search.',false); return;
     }
     curPayload=payload; curPage=1;
     curQs=formQs();
@@ -2192,6 +2286,23 @@ function hasAnyFilter(f: ImporterFilters): boolean {
   return !!(f.entryPort || f.state || f.hsCode || f.product || f.supplierCountry || f.company);
 }
 
+/**
+ * TRUE when the only thing the user gave us is a company NAME (volume/TEU bands
+ * are post-filters, not pull parameters, so they do not count as a lane).
+ *
+ * This is the COST fork. ImportYeti's BILLS route has no consignee-name
+ * parameter — its `company` param takes a slug and returns one company — so
+ * there is nothing a name can be pulled BY there. The old behaviour pulled an
+ * untargeted page of bills and name-filtered it locally: a real credit spent on
+ * an arbitrary slice of the corpus, which then matched nothing.
+ *
+ * A name-only search is answered by `searchByName` instead — the local index
+ * plus ImportYeti's ZERO-credit `company/search` directory. Zero credits, always.
+ */
+function isNameOnly(f: ImporterFilters): boolean {
+  return !!f.company && !f.entryPort && !f.state && !f.hsCode && !f.product && !f.supplierCountry;
+}
+
 /** FREE browse projection — never leak the LOCKED contact fields (the email, the
  *  decision-maker's name/title) to the client; only the TIER LABEL, i.e. what a
  *  reveal on the profile would actually unlock. The phone and address are free
@@ -2279,15 +2390,115 @@ async function browseTiers(
 }
 
 /**
+ * Company-NAME search. Two layers, BOTH free — no bill-of-lading pull happens on
+ * this path at all, so it can never spend an ImportYeti credit.
+ *
+ *   1. THE LOCAL INDEX (importerNameIndex.ts). Importers a paid pull already
+ *      surfaced. Rich: full lane, volumes, incumbent, winnability. Works
+ *      everywhere, including dev/CI where live calls are structurally off.
+ *   2. IMPORTYETI'S FREE COMPANY DIRECTORY (`company/search`, documented at 0
+ *      credits — see searchCompaniesByName). Covers every US importer on file,
+ *      not just ours, but returns identity + headline volume only. Merged in for
+ *      companies layer 1 does not already hold, so a richer local card is never
+ *      replaced by a sparser remote one.
+ *
+ * Layer 2 degrades silently to nothing when the cost guard is off (dev, CI, an
+ * agent's checkout), when the API key is unset, when ImportYeti errors, or when
+ * the cost breaker has latched. The caller is told which layers actually ran
+ * (`nameLiveSearched`) so the page can describe the coverage truthfully instead
+ * of implying the whole corpus was searched when only the index was.
+ *
+ * REDACTIONS APPLY TO BOTH LAYERS, after the merge — a Manifest Privacy customer
+ * must not be findable by typing their name, whichever layer knows about them.
+ *
+ * ── Why a cache PROBE still runs layer 2 ────────────────────────────────────
+ * `cacheOnly` exists to stop a shared link BUYING customs data (see
+ * parseCacheOnly). Layer 2 buys nothing, so suppressing it would only make a
+ * shared name-search link render a worse answer than the search it links to,
+ * while protecting nothing. Request VOLUME is a separate concern and is already
+ * bounded by `importerSearchLimiter` on the route.
+ */
+async function searchByName(
+  filters: ImporterFilters,
+  opts: { bolCache: BolCacheStore; redactKeys: Set<string> },
+): Promise<{
+  leads: ImporterLead[];
+  creditsRemaining: number | null;
+  cached: boolean;
+  pulledLive: boolean;
+  recordsScanned: number;
+  liveBlocked: boolean;
+  nameIndexTotal: number;
+  nameLiveSearched: boolean;
+}> {
+  const query = filters.company ?? '';
+  const limit = Math.min(MAX_LEADS, NAME_INDEX_MAX_RESULTS);
+  const local = await searchNameIndex(opts.bolCache, query, {
+    redactKeys: opts.redactKeys,
+    limit,
+    minShipments12m: filters.minShipments12m,
+    minTeu12m: filters.minTeu12m,
+  });
+
+  // Copied, not aliased: `local.leads` is the index layer's own result array and
+  // the merge below appends to this one.
+  const leads = [...local.leads];
+  let nameLiveSearched = false;
+  if (leads.length < limit) {
+    try {
+      const remote = await searchCompaniesByName(query, { pageSize: limit });
+      if (!remote.blocked) {
+        nameLiveSearched = true;
+        const seen = new Set(leads.map((l) => companyKey(l.company)));
+        for (const row of remote.companies) {
+          if (leads.length >= limit) break;
+          const lead = companySearchRowToLead(row);
+          if (!lead) continue;
+          const k = companyKey(lead.company);
+          // Redaction + de-dup against layer 1, and drop forwarders/NVOCCs for
+          // the same reason the lane path does: their contact is another
+          // forwarder's, not the buyer's.
+          if (!k || seen.has(k) || isLeadRedacted(opts.redactKeys, lead) || isForwarder(lead.company)) continue;
+          if (filters.minShipments12m && (lead.total_shipments ?? 0) < filters.minShipments12m) continue;
+          seen.add(k);
+          leads.push(lead);
+        }
+      }
+    } catch (err) {
+      // A name lookup must never take the page down, and must never fall through
+      // to a paid path. Log and serve whatever layer 1 found.
+      console.warn('[importers.nameSearch] free company lookup failed:', (err as Error)?.message);
+    }
+  }
+  // Best name match first is already layer 1's order; keep remote hits after it.
+  return {
+    leads: leads.slice(0, limit),
+    creditsRemaining: null,
+    // Nothing was bought: report it as a free result, never as a live pull.
+    cached: true,
+    pulledLive: false,
+    recordsScanned: 0,
+    liveBlocked: false,
+    nameIndexTotal: local.total,
+    nameLiveSearched,
+  };
+}
+
+/**
  * One search → one result set, resolving the State ⇄ Port ENTRY-geography pair:
  *
+ *  • Company NAME alone → `searchByName`: the local index + ImportYeti's free
+ *    company directory. No bills pull, no credit, ever (see isNameOnly).
  *  • Port selected (with or without the auto-locked State) → a single pull
  *    filtered by that PORT. The locked State is display-only and is NOT used to
  *    HQ-filter (that wrongly excluded importers HQ'd elsewhere).
  *  • State only (no Port) → expand the State to its entry ports
  *    (entryPortsForState) and pull each, deduping importers across them. This
  *    returns everyone ENTERING through the state, whatever their HQ state.
- *  • Neither (commodity / company only) → a single pull as before.
+ *  • Commodity only → a single pull as before.
+ *
+ * A company name combined with a lane is unchanged: the lane is pulled and the
+ * name narrows that pulled set (applyPostFilters), which costs nothing extra.
  *
  * Credit-bounded: cache-first per port, the port list is capped
  * (MAX_STATE_PORTS), and expansion stops once MAX_LEADS unique importers are in
@@ -2304,11 +2515,30 @@ async function runSearch(
   pulledLive: boolean;
   recordsScanned: number;
   liveBlocked: boolean;
+  /** Set only on the name path: how many importers the LOCAL index holds (the
+   *  honest coverage number the UI quotes when the live layer is unavailable).
+   *  Undefined on every lane path. */
+  nameIndexTotal?: number;
+  /** Set only on the name path: TRUE when ImportYeti's free company directory
+   *  was actually reachable for this query, i.e. the search covered every US
+   *  importer on file rather than only the ones we have already pulled. */
+  nameLiveSearched?: boolean;
 }> {
   // Resolve the active Manifest Privacy redaction set once (cached) so every
   // per-port pull in the state-expansion loop shares it — a CBP-confirmed
   // confidentiality customer is dropped from the search results.
   const redactKeys = await activeRedactionKeys();
+
+  // ── Name-only: two FREE layers, never a bills pull ────────────────────────
+  // Page 2+ of a name search would be a second slice of the same match list;
+  // both layers return their whole match set at once, so later pages are empty
+  // by construction rather than by another lookup.
+  if (isNameOnly(filters)) {
+    if (page > 1) {
+      return { leads: [], creditsRemaining: null, cached: true, pulledLive: false, recordsScanned: 0, liveBlocked: false, nameIndexTotal: 0, nameLiveSearched: false };
+    }
+    return searchByName(filters, { bolCache: opts.bolCache, redactKeys });
+  }
   const common = {
     maxLeads: MAX_LEADS,
     page,
@@ -2392,7 +2622,7 @@ export async function handleImporterSearch(
     if (!hasAnyFilter(filters)) {
       res.status(400).json({
         error: 'no_filter',
-        message: 'Pick a port, state or commodity (or enter a company name) to search.',
+        message: 'Enter a company name, or pick a port, state or commodity, to search.',
       });
       return;
     }
@@ -2400,6 +2630,9 @@ export async function handleImporterSearch(
     const cacheProbe = parseCacheOnly(req.body);
     const bolCache = deps.bolCache ?? dbBolCacheStore;
     const contactCache = deps.contactCache ?? dbContactCacheStore;
+    // A name-only search never reaches ImportYeti (see isNameOnly / runSearch),
+    // so none of the credit machinery below applies to it.
+    const nameSearch = isNameOnly(filters);
 
     // ── Credit guardrail #7 — searching is FREE + generous ────────────────────
     // Cache-first: a cache HIT costs nothing and is ALWAYS served (never counts).
@@ -2483,6 +2716,13 @@ export async function handleImporterSearch(
       logCreditSpend(result.creditsRemaining, `page=${page}`);
     }
 
+    // Fold whatever this LANE search surfaced into the company-name index, so a
+    // later name lookup can find it for $0. These leads are already in memory and
+    // already paid for, so indexing costs nothing external and — because it runs
+    // AFTER the redaction filter in runSearch — can never index a hidden importer.
+    // Best-effort by contract: it cannot throw, and never blocks the answer.
+    if (!nameSearch) await indexLeads(bolCache, result.leads);
+
     const tiers = await browseTiers(result.leads, contactCache);
 
     // Surface the FREE-PROFILE quota at point-of-use: `profilesRemaining` powers
@@ -2514,7 +2754,14 @@ export async function handleImporterSearch(
       creditsRemaining: result.creditsRemaining,
       cached: result.cached,
       pulledLive: result.pulledLive,
-      source: result.cached ? 'cache' : 'live',
+      // HONEST SCOPE. A name-only search ran over the local index, not the 700M+
+      // customs corpus, so it is labelled as its own source and carries the real
+      // size of what it searched. The client states both, verbatim, rather than
+      // letting a name result inherit the page's dataset headline.
+      source: nameSearch ? 'name' : result.cached ? 'cache' : 'live',
+      nameSearch,
+      nameIndexTotal: result.nameIndexTotal ?? null,
+      nameLiveSearched: result.nameLiveSearched ?? false,
       profilesRemaining,
       profilesLimit,
     });
@@ -2533,16 +2780,37 @@ export async function handleImporterSearch(
   }
 }
 
-/** GET /api/importers/suggest — autosuggest for the commodity / HS combobox.
- *  Serves ONLY from the curated in-memory HS reference — ImportYeti is NEVER
- *  called for suggestions. Port / state / country suggestions are inlined into
- *  the page, so this endpoint currently answers `field=commodity` (aliases: hs,
- *  product); an unknown field returns an empty list. */
-export function handleImporterSuggest(req: Request, res: Response): void {
+/** GET /api/importers/suggest — autosuggest for the commodity/HS and the
+ *  company-name comboboxes.
+ *
+ *  ImportYeti is NEVER called for suggestions, in either branch:
+ *   • `field=commodity` (aliases: hs, product) is served from the curated
+ *     in-memory HS reference.
+ *   • `field=company` is served from the LOCAL company-name index — companies a
+ *     paid pull already surfaced (see importerNameIndex.ts). That is deliberate
+ *     as well as free: the suggestions ARE the honest coverage statement, since
+ *     they show exactly which names this search can find.
+ *  An unknown field returns an empty list. */
+export async function handleImporterSuggest(
+  req: Request,
+  res: Response,
+  deps: { bolCache?: BolCacheStore } = {},
+): Promise<void> {
   const field = String((req.query.field ?? 'commodity') || 'commodity').toLowerCase();
   const q = String(req.query.q ?? '').slice(0, 80);
   if (field === 'commodity' || field === 'hs' || field === 'product') {
     res.json({ items: suggestCommodity(q, 10) });
+    return;
+  }
+  if (field === 'company') {
+    try {
+      // Redactions apply to autosuggest exactly as they do to results — a hidden
+      // importer must not be discoverable by typing the first letters of its name.
+      const redactKeys = await activeRedactionKeys();
+      res.json({ items: await suggestCompanies(deps.bolCache ?? dbBolCacheStore, q, { redactKeys }) });
+    } catch {
+      res.json({ items: [] });
+    }
     return;
   }
   res.json({ items: [] });

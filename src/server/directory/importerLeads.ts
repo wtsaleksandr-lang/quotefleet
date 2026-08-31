@@ -167,7 +167,11 @@ export interface ImporterFilters {
    *  valid importers whose HQ sits in a different state than the port they enter
    *  through (e.g. a New-York-HQ'd company clearing freight at Newark, NJ). */
   state?: string;
-  /** Post-pull filter (ImportYeti has no server-side param for this). */
+  /** Company-NAME query. ALWAYS a post-pull / post-cache filter: ImportYeti has
+   *  no server-side consignee-name parameter. Its `company` param takes the
+   *  company SLUG and returns exactly one company (see pullImportBols), so it
+   *  cannot answer "find importers whose name looks like X". Matching is done
+   *  locally by `companyNameMatchRank`. */
   company?: string;
   /** Minimum 12-month shipment count (frequency band). */
   minShipments12m?: number;
@@ -378,6 +382,161 @@ export async function pullImportBols(
   // itself reported, so admin shows real credits, not an estimate.
   reportProviderCost('importyeti', cost, creditsRemaining);
   return { rows: j.data?.data ?? [], cost, creditsRemaining, blocked: false };
+}
+
+/* ── 1b. ImportYeti company/search — the FREE company-NAME lookup ───────────
+ * GET https://data.importyeti.com/v1.0/company/search?name=<free text>
+ *
+ * WHY A SEPARATE ENDPOINT. The bills route (`powerquery/us-import/bols`) has NO
+ * consignee-name parameter: its `company` param takes a SLUG and returns exactly
+ * one company. Name resolution is a different, documented endpoint — "Search US
+ * companies by name, phone, or website" — and ImportYeti's published credit
+ * table prices it at ZERO credits, alongside `supplier/search` and
+ * `database-updated`. That is the whole reason a name search is affordable at
+ * all: the free hop resolves a name to a slug, and only OPENING the resulting
+ * profile (already metered by checkDetailQuota) ever buys bills.
+ *
+ * Response shape differs from powerquery: records are a PLAIN ARRAY at `data`,
+ * not `data.data`, with no total count. Each row carries `key` ("company/walmart")
+ * — the slug, which is the value every later call must use, never the display
+ * name.
+ *
+ * ── COST BREAKER ────────────────────────────────────────────────────────────
+ * "Free" is read from ImportYeti's documentation, not from our own invoice, so
+ * it is trusted but VERIFIED: the call is booked through `guardedFetch` with
+ * `credits: 0` (still guarded, still metered, still ledgered — a free call is
+ * never an invisible call), and if a response ever reports a non-zero
+ * `requestCost`, `companySearchBilled` latches and this process stops using the
+ * endpoint for good. Worst case if the docs are wrong is a single call, once per
+ * process, surfaced loudly in the ledger — after which name search falls back to
+ * the local index. Cheaper than trusting a doc page.
+ */
+
+/** One row from `company/search`. Loose — only the fields we consume are typed. */
+export interface CompanySearchRow {
+  title?: string;
+  key?: string;
+  address?: string;
+  countryCode?: string;
+  type?: string;
+  totalShipments?: number;
+  mostRecentShipment?: string;
+  topSuppliers?: unknown;
+}
+
+/** Latches TRUE the first time ImportYeti bills us for a "free" company search.
+ *  Process-local and one-way: the endpoint is never used again after that. */
+let companySearchBilled = false;
+
+/** TRUE once the free company-name lookup has been disabled by the cost breaker. */
+export function companySearchDisabled(): boolean {
+  return companySearchBilled;
+}
+
+/** TEST-ONLY: reset the cost breaker between cases. */
+export function __resetCompanySearchBreakerForTests(): void {
+  companySearchBilled = false;
+}
+
+/** Result of a free company-name lookup. `blocked` is TRUE when the cost guard
+ *  refused the call OR the breaker has latched — the caller must then serve the
+ *  local index alone and must NOT present the empty list as "no such importer". */
+export interface CompanySearchResult {
+  companies: CompanySearchRow[];
+  blocked: boolean;
+}
+
+/** Strip ImportYeti's `company/<slug>` key down to the bare slug. */
+export function slugFromCompanyKey(key: unknown): string {
+  const s = str(key).trim().toLowerCase().replace(/^company\//, '');
+  return /^[a-z0-9][a-z0-9-]*$/.test(s) ? s : '';
+}
+
+export async function searchCompaniesByName(
+  name: string,
+  { pageSize = 10 }: { pageSize?: number } = {},
+): Promise<CompanySearchResult> {
+  const q = str(name).trim();
+  if (!q || companySearchBilled) return { companies: [], blocked: true };
+  // Unlike `pullImportBols`, a missing key is NOT thrown here. This layer is
+  // strictly optional — the local index answers without it — so "no key" is the
+  // same honest outcome as "guard off": unavailable, not broken. Throwing would
+  // log a warning on every name search in any environment without the key.
+  const key = process.env.IMPORTYETI_API_KEY;
+  if (!key) return { companies: [], blocked: true };
+  const qs = new URLSearchParams({ name: q, page_size: String(Math.max(1, Math.min(pageSize, 25))) });
+  const r = await guardedFetch(
+    'importyeti',
+    `company-search:${q.slice(0, 40)}`,
+    `https://data.importyeti.com/v1.0/company/search?${qs}`,
+    { headers: { Authorization: `Bearer ${key}` } },
+    EXTERNAL_TIMEOUT_MS,
+    // Documented as costing 0 credits. Booked at 0 so admin shows the call
+    // without inventing spend — and the breaker below catches it if that is wrong.
+    { credits: 0 },
+  );
+  if (!r) return { companies: [], blocked: true };
+  if (!r.ok) throw new Error(`ImportYeti company/search ${r.status}: ${(await r.text()).slice(0, 200)}`);
+  const j = (await r.json()) as {
+    requestCost?: number;
+    creditsRemaining?: number;
+    data?: CompanySearchRow[];
+  };
+  const cost = j.requestCost ?? null;
+  reportProviderCost('importyeti', cost, j.creditsRemaining ?? null);
+  if (cost != null && Number.isFinite(cost) && cost > 0) {
+    companySearchBilled = true;
+    console.warn(
+      `[importers] ImportYeti company/search reported requestCost=${cost} — documented as FREE. ` +
+        'Cost breaker latched: name lookups now serve the local index only.',
+    );
+  }
+  return { companies: Array.isArray(j.data) ? j.data : [], blocked: false };
+}
+
+/** Turn a free company/search row into the same lead shape a card renders.
+ *
+ *  DELIBERATELY SPARSE. company/search returns identity + headline volume only —
+ *  no 12-month counts, no TEU, no entry port, no HS code, no phone, no notify
+ *  party. Those fields stay NULL rather than being guessed at, so the card shows
+ *  an honest em-dash and the profile (where the bills are actually pulled) is
+ *  where the lane detail comes from. */
+export function companySearchRowToLead(r: CompanySearchRow): ImporterLead | null {
+  const company = str(r.title).trim();
+  if (!company) return null;
+  const addr = str(r.address).trim();
+  const derivedState = (addr.match(/,\s*([A-Z]{2})(?:\s|,|$)/) || [])[1] || null;
+  const suppliers = Array.isArray(r.topSuppliers) ? r.topSuppliers : [];
+  const firstSupplier = suppliers.length
+    ? str(
+        typeof suppliers[0] === 'string'
+          ? suppliers[0]
+          : (suppliers[0] as { title?: unknown; name?: unknown })?.title ??
+              (suppliers[0] as { name?: unknown })?.name,
+      ).trim() || null
+    : null;
+  return {
+    company,
+    slug: slugFromCompanyKey(r.key) || null,
+    state: derivedState,
+    address: addr || null,
+    supplier: firstSupplier,
+    supplier_country: null,
+    product: null,
+    hs_code: null,
+    entry_port: null,
+    ships_12m: null,
+    total_shipments: r.totalShipments == null ? null : num(r.totalShipments),
+    teu_12m: null,
+    last_shipment: str(r.mostRecentShipment).trim() || null,
+    phone: null,
+    website: null,
+    incumbent_forwarder: null,
+    contact_name: null,
+    title: null,
+    email: null,
+    email_confidence: null,
+  };
 }
 
 /* ── 2. Forwarder / NVOCC / broker filter ────────────────────────────────────
@@ -729,15 +888,18 @@ export async function draftEmail(
  * importers whose company address differs from the port's state. State is
  * realized upstream by pulling each of the state's entry ports (see
  * importerPages.runSearch). */
-function applyPostFilters(
+export function applyPostFilters(
   leads: ImporterLead[],
   f: ImporterFilters,
   redactKeys?: Set<string>,
 ): ImporterLead[] {
   let out = leads;
   if (f.company) {
-    const q = f.company.trim().toLowerCase();
-    if (q) out = out.filter((l) => l.company.toLowerCase().includes(q));
+    // Normalized, token-aware name matching (see companyNameMatchRank) rather
+    // than a raw substring test: an importer files as "Robert Bosch Tool Corp."
+    // and a user types "bosch tool corp", which a raw `includes` misses on the
+    // period alone.
+    out = out.filter((l) => companyNameMatchRank(l.company, f.company!) != null);
   }
   if (f.minShipments12m) out = out.filter((l) => (l.ships_12m ?? 0) >= f.minShipments12m!);
   if (f.minTeu12m) out = out.filter((l) => (l.teu_12m ?? 0) >= f.minTeu12m!);
@@ -751,15 +913,60 @@ function applyPostFilters(
   return out;
 }
 
-/** Normalize a company name to the redaction key. MUST match companyKey() in
- *  importerCache.ts byte-for-byte (this module is deliberately import-free, so
- *  the logic is replicated rather than imported). */
-function redactionKey(name: string): string {
+/**
+ * Normalize a company name (or a name QUERY) to its canonical key: lowercase,
+ * every run of non-alphanumerics collapsed to one space, trimmed.
+ *
+ * MUST match companyKey() in importerCache.ts byte-for-byte — it is the key the
+ * Manifest Privacy redactions and the contact cache are stored under. This
+ * module is deliberately import-free (no DB layer), so the logic is replicated
+ * rather than imported; `importerCache.companyKey` and this function are pinned
+ * to each other by a unit test.
+ */
+export function companyMatchKey(name: string): string {
   return String(name || '')
     .toLowerCase()
     .replace(/[^a-z0-9]+/g, ' ')
     .trim()
     .replace(/\s+/g, ' ');
+}
+
+/** Redaction-set lookup key. Alias of companyMatchKey — same normalization, and
+ *  naming it separately keeps the choke-point call site readable. */
+const redactionKey = companyMatchKey;
+
+/**
+ * Rank how well an importer's filed name answers a company-name QUERY, or null
+ * when it does not match at all. Lower rank = better match; the caller sorts on
+ * it so an exact name outranks a fragment.
+ *
+ *   0  exact            "robert bosch tool corp"  ← "Robert Bosch Tool Corp."
+ *   1  prefix           "robert bosch"            ← "Robert Bosch Tool Corp"
+ *   2  contiguous       "bosch tool"              ← "Robert Bosch Tool Corp"
+ *   3  all tokens       "bosch corp"              ← "Robert Bosch Tool Corp"
+ *
+ * Both sides are normalized with `companyMatchKey`, so punctuation, casing and
+ * spacing never decide a match ("Bosch Tool Corp." vs "bosch tool corp").
+ *
+ * A query shorter than MIN_NAME_QUERY normalized characters never matches: a
+ * one-character query is a substring of nearly every company on file, which is
+ * not a search result, it is the whole table.
+ */
+export const MIN_NAME_QUERY = 2;
+
+export function companyNameMatchRank(name: string, query: string): number | null {
+  const n = companyMatchKey(name);
+  const q = companyMatchKey(query);
+  if (!n || q.replace(/ /g, '').length < MIN_NAME_QUERY) return null;
+  if (n === q) return 0;
+  if (n.startsWith(`${q} `)) return 1;
+  if (n.includes(q)) return 2;
+  // Every meaningful token must appear somewhere in the name (so "bosch corp"
+  // finds "Robert Bosch Tool Corporation"). One-character tokens are dropped —
+  // they match everything and would turn an AND into an OR.
+  const toks = q.split(' ').filter((t) => t.length >= MIN_NAME_QUERY);
+  if (!toks.length) return null;
+  return toks.every((t) => n.includes(t)) ? 3 : null;
 }
 
 /* ── Orchestration: one request → leads (+ optional enrichment / drafts) ────
@@ -942,5 +1149,5 @@ export function aiAngle(lead: ImporterLead): string {
   const incumbent = lead.incumbent_forwarder
     ? `routed via ${lead.incumbent_forwarder} — a switchable incumbent`
     : 'no forwarder named on the bill';
-  return `${country}${volTxt}, ${incumbent}. Pitch a sharper ${port} rate this quarter.`;
+  return `${country}${volTxt}, ${incumbent}. Win it with a sharper ${port} rate this quarter.`;
 }

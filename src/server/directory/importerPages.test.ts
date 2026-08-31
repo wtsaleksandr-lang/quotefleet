@@ -94,18 +94,48 @@ const memDeps = () => ({ bolCache: memBolStore(), contactCache: memContactStore(
 describe('renderImporterSearchPage', () => {
   const html = renderImporterSearchPage();
   it('renders a server-rendered page with the right SEO + canonical', () => {
-    expect(html).toContain('<title>US Importer Database');
+    expect(html).toContain('<title>US Importers Directory');
     expect(html).toContain('href="https://quotefleet.net/importers"');
-    // directory-portal redesign: visible eyebrow removed; SEO h1 is now sr-only
-    expect(html).toContain('Find US importers to pitch');
+    expect(html).toContain('US Importers Directory');
   });
-  it('leads with the provider-first pickers (port / state / commodity)', () => {
+  it('never calls itself a place to "pitch" importers — the page is a directory', () => {
+    // Owner-flagged wording. The visible copy, the <title>, the meta description
+    // and the structured data must all say the same neutral thing; one surface
+    // keeping the old framing is how it creeps back in.
+    // Inline <style>/<script> are stripped first: they carry this module's own
+    // source comments, which are not copy anybody reads.
+    const visible = html
+      .replace(/<style\b[\s\S]*?<\/style>/gi, '')
+      .replace(/<script(?![^>]*ld\+json)\b[\s\S]*?<\/script>/gi, '');
+    expect(visible).not.toMatch(/pitch/i);
+    expect(html).toContain('<h1>US Importers Directory</h1>');
+    expect(html).toContain('<title>US Importers Directory');
+    // Structured data survives the strip above and is checked with it.
+    expect(visible).toContain('QuoteFleet US Importers Directory');
+    expect(visible).toContain('"name":"US Importers Directory"');
+  });
+  it('leads with FOUR first-class filters — company name among them', () => {
     expect(html).toContain('id="imp-port"');
     expect(html).toContain('id="imp-state"');
     expect(html).toContain('id="imp-commodity"');
-    // company-name box is present but secondary.
+    // Company name was buried behind the "More filters" disclosure, so a user who
+    // knew the importer they wanted could not look it up. It is now a primary
+    // control in the same rail, with autosuggest off the local index.
     expect(html).toContain('id="imp-company"');
-    expect(html).toContain('Or search by company name');
+    expect(html).toContain('data-remote-field="company"');
+    expect(html).not.toContain('Or search by company name');
+    // ...and the rail steps 4 → 2 → 1 columns, never through 3 (no orphan wrap).
+    expect(html).toContain('.imp-grid{display:grid;grid-template-columns:repeat(4,minmax(0,1fr))');
+    expect(html).toContain('.imp-grid{grid-template-columns:repeat(2,minmax(0,1fr))}');
+    expect(html).not.toMatch(/\.imp-grid\{grid-template-columns:repeat\(3/);
+  });
+  it('states the name-search coverage honestly, separate from the 700M+ figure', () => {
+    // The headline dataset number describes the BILL corpus a lane search runs
+    // over. A name search matches company records, so the page must not let the
+    // name path inherit that claim.
+    expect(html).toContain('id="imp-namehint"');
+    expect(html).toContain('A name on its own looks the company up in the US importer directory');
+    expect(html).toContain('Add a port, state or commodity to search the customs records themselves.');
   });
   it('shows the honest freemium state (CSV export + save free, real gated contact reveal)', () => {
     // CSV export + saved-importers surfaces are present (free with an account).
