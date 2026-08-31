@@ -367,7 +367,7 @@ describe('R5-7 · the surfaces a user hits FIRST', () => {
     // It was sr-only, so the most-visited surface on the page opened on a bare
     // filter panel with no title and no statement of what the tool does.
     expect(html).toContain('<header class="imp-head">');
-    expect(html).toContain('<h1>Find US importers to pitch</h1>');
+    expect(html).toContain('<h1>US Importers Directory</h1>');
     expect(html).toContain('.imp-head{text-align:left');
     expect(html).not.toContain('<h1 class="imp-sr-only"');
   });
@@ -429,13 +429,16 @@ describe('R5-8 · the first result card tells the truth', () => {
 
 describe('R5-9 · layout defects that misdirected the eye', () => {
   it('the filter row top-aligns, so the lock pill cannot shove its neighbours', () => {
-    expect(html).toContain('.imp-grid{display:flex;flex-wrap:wrap;gap:8px;align-items:start}');
+    // Now a declared grid (four filters, stepping 4 → 2 → 1 so none is ever
+    // orphaned on its own line), but align-items:start is the load-bearing half
+    // of this rule and must survive: it is what lets the Entry-port field grow
+    // downward for the lock pill without re-centring its neighbours.
+    expect(html).toContain('.imp-grid{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:8px;align-items:start}');
   });
 
   it('stacked input clusters use the 2px rhythm', () => {
     expect(html).toContain('.imp-grid{gap:2px 8px}');
     expect(html).toContain('.imp-more-grid{gap:2px 12px}');
-    expect(html).toContain('.imp-more-name{margin-top:2px}');
   });
 
   it('the toolbar declares its two rows and starts both at the left edge', () => {

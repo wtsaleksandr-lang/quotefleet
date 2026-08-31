@@ -228,7 +228,7 @@ export function renderSavedImportersPage(opts: { loggedIn: boolean; saved: Saved
 
   return layout({
     title: 'Saved importers | QuoteFleet',
-    description: 'Your saved importer leads on QuoteFleet — notes and pipeline status for importers you plan to pitch.',
+    description: 'Your saved importer leads on QuoteFleet — notes and pipeline status for the importers on your list.',
     canonicalPath: '/importers/saved',
     bodyHtml: body,
   });

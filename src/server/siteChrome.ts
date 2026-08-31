@@ -53,7 +53,7 @@ export const SITE_NAV_HTML = `<nav class="site-nav" aria-label="Main navigation"
   + `<button type="button" class="nav-dd-trigger" id="nav-carriers-trigger" aria-haspopup="true" aria-expanded="false" aria-controls="nav-carriers-menu">For Carriers &amp; Brokers${NAV_CARET}</button>`
   + `<div class="nav-dd-panel" id="nav-carriers-menu" hidden>`
   + `<div class="nav-dd-group"><p class="nav-dd-head">Quoting platform</p><a href="/tools">Rate Calculator</a><a href="/w/demo">See a Demo</a><a href="/compare">Why QuoteFleet</a><a href="/services">Carrier Services</a><a href="/signup">Claim Your Listing</a></div>`
-  + `<div class="nav-dd-group"><p class="nav-dd-head">Lead generation</p><a href="/importers">Importer Search</a><a href="/importers/saved" data-nav-auth="user" hidden>Saved Importers</a><a href="/for/brokers">For Freight Brokers</a><a href="/for/forwarders">For Freight Forwarders</a><a href="/for/ltl">For LTL</a><span class="nav-dd-sub">Search, profiles and saving are free with an account. Decision-maker email reveals are Leads Pro.</span></div>`
+  + `<div class="nav-dd-group"><p class="nav-dd-head">Lead generation</p><a href="/importers">Importers Directory</a><a href="/importers/saved" data-nav-auth="user" hidden>Saved Importers</a><a href="/for/brokers">For Freight Brokers</a><a href="/for/forwarders">For Freight Forwarders</a><a href="/for/ltl">For LTL</a><span class="nav-dd-sub">Search, profiles and saving are free with an account. Decision-maker email reveals are Leads Pro.</span></div>`
   + `</div></div>`
   + `<div class="nav-dd" data-nav-dd>`
   + `<button type="button" class="nav-dd-trigger" id="nav-importers-trigger" aria-haspopup="true" aria-expanded="false" aria-controls="nav-importers-menu">For Importers${NAV_CARET}</button>`
@@ -69,7 +69,7 @@ export const SITE_MOBILE_MENU_HTML = `<div class="site-mobile-menu" id="site-mob
   + `<details class="mm-group" open><summary class="mm-head">For Shippers</summary>`
   + `<a href="/directory">Carrier Directory</a><a href="/compliance">Compliance Tools</a><a href="/directory/rfq">Get Freight Quotes (RFQ)</a><a href="/drayage-rates">Port Drayage Rates</a><a href="/directory/join">Directory Pro</a><a href="/glossary">Freight Glossary</a></details>`
   + `<details class="mm-group"><summary class="mm-head">For Carriers &amp; Brokers</summary>`
-  + `<a href="/tools">Rate Calculator</a><a href="/w/demo">See a Demo</a><a href="/pricing">Pricing</a><a href="/compare">Why QuoteFleet</a><a href="/services">Carrier Services</a><a href="/signup">Claim Your Listing</a><a href="/importers">Importer Search</a><a href="/importers/saved" data-nav-auth="user" hidden>Saved Importers</a><a href="/for/brokers">For Freight Brokers</a><a href="/for/forwarders">For Freight Forwarders</a><a href="/for/ltl">For LTL</a></details>`
+  + `<a href="/tools">Rate Calculator</a><a href="/w/demo">See a Demo</a><a href="/pricing">Pricing</a><a href="/compare">Why QuoteFleet</a><a href="/services">Carrier Services</a><a href="/signup">Claim Your Listing</a><a href="/importers">Importers Directory</a><a href="/importers/saved" data-nav-auth="user" hidden>Saved Importers</a><a href="/for/brokers">For Freight Brokers</a><a href="/for/forwarders">For Freight Forwarders</a><a href="/for/ltl">For LTL</a></details>`
   + `<details class="mm-group"><summary class="mm-head">For Importers</summary>`
   + `<a href="/manifest-privacy">Manifest Privacy</a></details>`
   + `<a class="mm-account" href="/login">Sign in</a>`

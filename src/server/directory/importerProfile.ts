@@ -1290,7 +1290,7 @@ export function renderImporterProfilePage(p: ProfileData, quota: QuotaState, rev
     <ul>
       <li><b>Steady, sticky volume —</b> ${N(p.ships12m)} shipments (${N(p.teu12m)} TEU) in the last 12 months${p.entryPort ? ' into ' + esc(p.entryPort) : ''}; a consistent lane worth pursuing.</li>
       ${p.incumbent ? `<li><b>Displaceable incumbent —</b> notify party <b>${esc(p.incumbent)}</b> shows on the bills; a named target to undercut${originName ? ' on the ' + esc(originName) + '→' + esc(port) + ' lane' : ''}.</li>` : '<li><b>No forwarder named —</b> the bills show no dominant notify party; an open lane to win with a sharper rate.</li>'}
-      <li><b>Best timing —</b> pitch ahead of their busiest months (see the shipments chart) to land the next booking cycle.</li>
+      <li><b>Best timing —</b> reach out ahead of their busiest months (see the shipments chart) to land the next booking cycle.</li>
       <li><b>Who to reach —</b> reveal the decision-maker contact (verified work email, role-based inbox or the full phone number) below — ${reveal.isSubscriber ? 'included with your Leads Pro plan' : `${reveal.remaining} free reveal${reveal.remaining === 1 ? '' : 's'} to start`}.</li>
     </ul>
   </div>`;
@@ -1327,7 +1327,7 @@ export function renderImporterProfilePage(p: ProfileData, quota: QuotaState, rev
 
   // relationships
   const relBody = p.suppliers.length
-    ? `<p class="lead">Every shared supplier is a look-alike lead — importers you can pitch the same route.</p>
+    ? `<p class="lead">Every shared supplier is a look-alike lead — importers you can win on the same route.</p>
        <div class="impp-rel">${p.suppliers
          .slice(0, 4)
          .map(
@@ -1545,7 +1545,7 @@ export function renderImporterProfilePage(p: ProfileData, quota: QuotaState, rev
         '@type': 'BreadcrumbList',
         itemListElement: [
           { '@type': 'ListItem', position: 1, name: 'Home', item: `${SITE}/` },
-          { '@type': 'ListItem', position: 2, name: 'Importer Search', item: `${SITE}/importers` },
+          { '@type': 'ListItem', position: 2, name: 'US Importers Directory', item: `${SITE}/importers` },
           { '@type': 'ListItem', position: 3, name: p.company, item: `${SITE}/importers/company/${p.slug}` },
         ],
       }),

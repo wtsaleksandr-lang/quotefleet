@@ -1797,7 +1797,7 @@ export function layout({ title, description, canonicalPath, bodyHtml, jsonLd, re
   </header>
   ${bodyHtml}
   <footer class="site-footer">
-    © <span id="year"></span> QuoteFleet · <a href="/directory">Directory</a> · <a href="/importers">Importer Search</a> · <a href="/manifest-privacy">Manifest Privacy</a> · <a href="/compliance">Compliance</a> · <a href="/glossary">Glossary</a> · <a href="/guides">Guides</a> · <a href="/drayage-rates">Drayage Rates</a> · <a href="/services">Services</a> · <a href="/terms">Terms</a> · <a href="/privacy">Privacy</a> · <a href="/">Home</a>
+    © <span id="year"></span> QuoteFleet · <a href="/directory">Directory</a> · <a href="/importers">Importers Directory</a> · <a href="/manifest-privacy">Manifest Privacy</a> · <a href="/compliance">Compliance</a> · <a href="/glossary">Glossary</a> · <a href="/guides">Guides</a> · <a href="/drayage-rates">Drayage Rates</a> · <a href="/services">Services</a> · <a href="/terms">Terms</a> · <a href="/privacy">Privacy</a> · <a href="/">Home</a>
     ${rendersCarrierData(canonicalPath) ? DIRECTORY_DATA_SOURCES : ''}
     ${FOOTER_PAY_ROW}
   </footer>
