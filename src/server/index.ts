@@ -6,6 +6,7 @@
 import './bootstrapDoppler.js';
 import { loadEnv } from '../config.js';
 import { ensureSelfHealTables, ensureSelfHealColumns } from '../db/migrate.js';
+import { ensureAuthorityRevalidationColumns } from './directory/authorityRevalidation.js';
 import { maybeAutoHealCarrierDirectory } from './directory/autoHeal.js';
 import { maybeBackfillNearestPortCodes } from './directory/backfillNearestPort.js';
 import { ensureFreshDirectoryAggregates } from './directory/queries.js';
@@ -113,7 +114,17 @@ async function runPostListenJobs(): Promise<void> {
     // precompute so directory_aggregate_cache exists before the precompute writes
     // its singleton row; the precompute itself is limiter+timeout bounded and
     // never throws into boot, and the weekly cron keeps the row fresh thereafter.
+    //
+    // The live-authority cache columns are chained onto this SAME promise rather
+    // than fired beside it: they ALTER carrier_directory, which the table heal has
+    // just finished touching, and two concurrent ACCESS EXCLUSIVE requests on one
+    // table are precisely the lock pile-up that took prod down on 2026-08-28. They
+    // run BEFORE the aggregate precompute (a plain read/write that does not need
+    // them) so the DDL window closes as early as possible. Their absence is a plain
+    // cache miss to the endpoint that reads them, so a deferred heal degrades to
+    // the stored snapshot rather than erroring.
     void ensureSelfHealTables()
+      .then(() => ensureAuthorityRevalidationColumns())
       .then(() => ensureFreshDirectoryAggregates())
       .catch((err) => {
         console.error(

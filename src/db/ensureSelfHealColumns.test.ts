@@ -131,7 +131,38 @@ describe('src/server/index.ts — self-heal is wired into boot, post-listen + no
     expect(healIdx).toBeLessThan(mainIdx);
   });
 
+  /**
+   * The INVARIANT is the ordering, not the exact number of links: the aggregate
+   * precompute writes a singleton row into directory_aggregate_cache, so the
+   * table heal that creates that table has to have finished first.
+   *
+   * Asserted positionally rather than as one literal `.then()` pattern, because
+   * the chain legitimately grows — the live-authority column heal was added
+   * between the two, and pinning the exact shape failed a change that preserved
+   * the property perfectly. What must stay true is that both hang off the SAME
+   * `void ensureSelfHealTables()` chain, in that order.
+   */
   it('chains the aggregate precompute AFTER the table heal (table exists before the singleton write)', () => {
-    expect(src).toMatch(/ensureSelfHealTables\(\)\s*\n?\s*\.then\(\(\)\s*=>\s*ensureFreshDirectoryAggregates\(\)\)/);
+    const chain = src.slice(src.indexOf('void ensureSelfHealTables()'));
+    const end = chain.indexOf('.catch(');
+    const links = chain.slice(0, end);
+    expect(links).toContain('.then(');
+    expect(links).toContain('ensureFreshDirectoryAggregates()');
+    expect(links.indexOf('ensureSelfHealTables()')).toBeLessThan(
+      links.indexOf('ensureFreshDirectoryAggregates()'),
+    );
+  });
+
+  /**
+   * The live-authority cache columns ALTER carrier_directory, the same table the
+   * table heal has just touched. Two concurrent ACCESS EXCLUSIVE requests on one
+   * table are the lock pile-up that took prod down on 2026-08-28, so this heal
+   * must be a LINK IN THE SAME CHAIN — never a second `void` fired beside it.
+   */
+  it('chains the authority-column heal into the same serialised chain, not beside it', () => {
+    const chain = src.slice(src.indexOf('void ensureSelfHealTables()'));
+    const links = chain.slice(0, chain.indexOf('.catch('));
+    expect(links).toContain('ensureAuthorityRevalidationColumns()');
+    expect(src.match(/void\s+ensureSelfHealTables\(\)/g) ?? []).toHaveLength(1);
   });
 });

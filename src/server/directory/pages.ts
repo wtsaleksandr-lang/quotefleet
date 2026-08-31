@@ -149,6 +149,79 @@ window.__qfBindReveal();
  * worst case of a failed hydrate is a Pro user seeing the upgrade CTA, never a
  * free user gaining access.
  */
+/**
+ * LIVE AUTHORITY REVALIDATION — the client half.
+ *
+ * The server rendered this carrier's operating authority from FMCSA's Licensing
+ * & Insurance file, which FMCSA froze on 14 May 2026 and will never publish
+ * again (see server/directory/authorityRevalidation.ts — its AuthHist sibling is
+ * dead too, measured, so there is no bulk feed left). This asks the server to
+ * re-check THIS carrier against the live QCMobile API and corrects the page if
+ * the answer moved.
+ *
+ * WHY IT IS CLIENT-SIDE: the profile HTML must stay byte-identical for every
+ * visitor to keep its shared-cache eligibility (see directory/httpCache.ts), and
+ * it serves from an index scan in ~0.08 ms. Putting a third-party call on that
+ * path would trade a stale label for a slow page. Same render-then-hydrate split
+ * CARRIER_PRO_HYDRATE_SCRIPT uses, for the same reason.
+ *
+ * FOUR PROPERTIES, ALL DELIBERATE:
+ *   • IT NEVER RUNS EAGERLY. requestIdleCallback (setTimeout fallback) keeps it
+ *     off the critical path entirely — it cannot touch LCP or block paint.
+ *   • IT IS SILENT ON FAILURE. Every non-live answer, every network error, every
+ *     malformed payload is a no-op: the dated snapshot the server already
+ *     rendered stays exactly as it is. A visitor must never see an error, a
+ *     spinner or an empty state because FMCSA was slow.
+ *   • THE LIVE ANSWER WINS AND CARRIES ITS OWN DATE. When FMCSA's current record
+ *     disagrees with the snapshot the stale value is REPLACED, not shown beside
+ *     it, and the new line says when it was read. Never the word "verified" —
+ *     this is what FMCSA's record said and when, not our judgement.
+ *   • THE BOT GATE IS NOT HERE. Googlebot renders JavaScript, so a client-side
+ *     check would be no gate at all. `X-QF-Authority-Check: 1` is only the
+ *     first-party SIGNAL; the enforcement is server-side on the endpoint.
+ */
+const AUTHORITY_REVALIDATE_SCRIPT = `
+(function(){
+  var root=document.querySelector('[data-auth-root]'); if(!root) return;
+  var dot=root.getAttribute('data-auth-root'); if(!dot) return;
+  function paint(d){
+    if(!d||d.live!==true||!d.checkedLabel) return;
+    var active=d.status==='active';
+    if(!active&&d.status!=='inactive') return;
+    var badge=document.querySelector('[data-auth-badge]');
+    if(badge){ badge.hidden=!active; }
+    var word=active?'Active':'Not active';
+    var nodes=document.querySelectorAll('[data-auth-status]');
+    for(var i=0;i<nodes.length;i++){ nodes[i].textContent=word; }
+    var line=document.querySelector('[data-auth-line]');
+    if(line){
+      line.textContent=(active
+        ?'FMCSA\\u2019s current record shows active operating authority'
+        :'FMCSA\\u2019s current record shows no active operating authority')
+        +' \\u2014 checked '+d.checkedLabel+'.';
+      line.hidden=false;
+    }
+    // Re-attribute the provenance note: the authority above is no longer the
+    // frozen 14 May 2026 file, so the sentence must stop saying it is. Insurance
+    // still is, so that half stays.
+    var src=document.querySelector('[data-auth-source]');
+    if(src){
+      src.textContent='Insurance filings come from FMCSA\\u2019s Licensing & Insurance file, last refreshed ${LI_EXTRACT_DATE}; the operating-authority status above is from FMCSA\\u2019s live record.';
+    }
+  }
+  function go(){
+    try{
+      fetch('/api/directory/carrier/'+encodeURIComponent(dot)+'/authority',{
+        credentials:'same-origin',
+        headers:{'Accept':'application/json','X-QF-Authority-Check':'1'}
+      }).then(function(r){ return r.ok?r.json():null; }).then(paint).catch(function(){});
+    }catch(e){}
+  }
+  if(window.requestIdleCallback){ window.requestIdleCallback(go,{timeout:3000}); }
+  else { setTimeout(go,1200); }
+})();
+`.trim();
+
 const CARRIER_PRO_HYDRATE_SCRIPT = `
 (function(){
   var slot=document.querySelector('[data-cp-gated]'); if(!slot) return;
@@ -877,6 +950,18 @@ export const DIRECTORY_CSS = `
   }
   .cp-badge-active { font-size: 10px; font-family: var(--font-mono); letter-spacing: 0.06em; text-transform: uppercase; padding: 5px 9px; border-radius: var(--radius-chip); background: var(--success-bg); color: var(--success); border: 1px solid var(--success); display: inline-flex; align-items: center; gap: 6px; }
   .cp-badge-active::before { content: ''; width: 6px; height: 6px; border-radius: 50%; background: var(--success); display: inline-block; }
+  /* The badge is now ALWAYS in the markup and toggled by the live-authority
+     hydration, so the server HTML stays byte-identical while the client can
+     still add or remove it. An author display rule BEATS the UA stylesheet's
+     [hidden] rule, so without this line the hidden attribute would be inert and
+     every carrier would render "Active" — including the ones that are not. */
+  .cp-badge-active[hidden] { display: none; }
+  /* Live-authority line: the current FMCSA reading with its own date, rendered
+     only when a live check actually returned. Deliberately styled as a plain
+     muted note, not a success/alert colour — it is a dated fact, not a verdict,
+     and colouring it would editorialise about a real business. */
+  .cp-authlive { margin-top: 12px; }
+  .cp-authlive[hidden] { display: none; }
   .cp-claimline { margin: 14px 0 0; font-size: 13px; color: var(--muted); }
   .cp-claimline a { color: var(--accent); text-decoration: none; }
   .cp-claimline a:hover { text-decoration: underline; }
@@ -3513,7 +3598,11 @@ export function renderCarrierProfile(opts: {
     ['Drivers', fmtNum(c.drivers)],
     ['Authority', esc(authorityLabel(c.authorityType))],
     ['Safety rating', esc(sr.text)],
-    ['Status', isActive ? 'Active' : 'On file'],
+    // `data-auth-status` marks the two places the authority status is asserted so
+    // AUTHORITY_REVALIDATE_SCRIPT can correct BOTH from one live read. The value
+    // slot is raw HTML by design (every other entry pre-escapes itself), so the
+    // marker span costs nothing and changes no rendered text.
+    ['Status', `<span data-auth-status>${isActive ? 'Active' : 'On file'}</span>`],
   ];
   // Data-as-of date is not carried on VisibleCarrier today — omit rather than fake.
   const dataGrid = dataItems
@@ -3843,7 +3932,7 @@ export function renderCarrierProfile(opts: {
           <div class="cp-idtext">
             <div class="cp-nameline">
               <h1>${esc(carrierName(c))}</h1>
-              ${isActive ? '<span class="cp-badge-active">Active</span>' : ''}
+              <span class="cp-badge-active" data-auth-badge${isActive ? '' : ' hidden'}>Active</span>
               <span class="cp-fmcsa cp-tip" tabindex="0" role="note" aria-label="FMCSA — Profile built from FMCSA public records." data-tip="Profile built from FMCSA public records.">FMCSA</span>
             </div>
             <p class="lead cp-subtitle">${headerSubtitle}</p>
@@ -3860,7 +3949,7 @@ export function renderCarrierProfile(opts: {
       </div>
     </div>
   </section>
-  <main class="dir-shell dir-shell--cp">
+  <main class="dir-shell dir-shell--cp" data-auth-root="${esc(c.usdot)}">
     <div class="cp-tabs" role="group" aria-label="Carrier profile sections">
       <input type="radio" name="cp-tab" id="cp-tab-overview" class="cp-tab-input" checked>
       <label class="cp-tab" for="cp-tab-overview"><span class="cp-tab-lg">Overview</span><span class="cp-tab-sm">Overview</span></label>
@@ -3912,7 +4001,7 @@ export function renderCarrierProfile(opts: {
           <div class="cp-datagrid">
             <div class="cp-dt"><span class="k">Safety rating</span><span class="v">${esc(sr.text)}${ratingDateLine}</span></div>
             <div class="cp-dt"><span class="k">Operating authority</span><span class="v">${esc(authorityLabel(c.authorityType))}</span></div>
-            <div class="cp-dt"><span class="k">Authority status</span><span class="v">${isActive ? 'Active' : 'On file'}</span></div>
+            <div class="cp-dt"><span class="k">Authority status</span><span class="v" data-auth-status>${isActive ? 'Active' : 'On file'}</span></div>
             <div class="cp-dt"><span class="k">Hazmat registration</span><span class="v">${c.hazmat ? 'Registered' : 'Not registered'}</span></div>
           </div>
           <p class="cp-note">${esc(safetyRatingExplainer(c.safetyRating))}</p>
@@ -3921,7 +4010,14 @@ export function renderCarrierProfile(opts: {
             <button class="btn btn-primary" id="live-verify" data-usdot="${esc(c.usdot)}">Verify live now</button>
           </div>
           <div id="live-result" class="lookup-result" style="margin-top: 8px;"></div>
-          <p class="cp-note">Authority and insurance come from FMCSA's Licensing &amp; Insurance file, last refreshed ${esc(LI_EXTRACT_DATE)}; out-of-service status is from the live check above.</p>
+          <p class="cp-note cp-authlive" data-auth-line hidden></p>
+          <!-- The provenance line. It is REWRITTEN by AUTHORITY_REVALIDATE_SCRIPT
+               when a live authority check lands: once the status above comes from
+               the live record, saying "Authority ... comes from the L&I file, last
+               refreshed 14 May 2026" would misattribute the fact the reader is
+               looking at. Insurance still does come from the frozen file, so that
+               half of the sentence survives. -->
+          <p class="cp-note" data-auth-source>Authority and insurance come from FMCSA's Licensing &amp; Insurance file, last refreshed ${esc(LI_EXTRACT_DATE)}; out-of-service status is from the live check above.</p>
         </section>
 
         ${insuranceBlock(c.credentials)}
@@ -3992,7 +4088,8 @@ export function renderCarrierProfile(opts: {
       }
     })();
   </script>
-  <script>${SAVE_WIDGET_SCRIPT}</script>`;
+  <script>${SAVE_WIDGET_SCRIPT}</script>
+  <script>${AUTHORITY_REVALIDATE_SCRIPT}</script>`;
 
   return layout({
     title: `${carrierName(c)} — USDOT ${c.usdot} Carrier Profile | QuoteFleet`,
