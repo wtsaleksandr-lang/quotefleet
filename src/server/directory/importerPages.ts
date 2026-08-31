@@ -2386,6 +2386,13 @@ async function browseTiers(
  *
  * REDACTIONS APPLY TO BOTH LAYERS, after the merge — a Manifest Privacy customer
  * must not be findable by typing their name, whichever layer knows about them.
+ *
+ * ── Why a cache PROBE still runs layer 2 ────────────────────────────────────
+ * `cacheOnly` exists to stop a shared link BUYING customs data (see
+ * parseCacheOnly). Layer 2 buys nothing, so suppressing it would only make a
+ * shared name-search link render a worse answer than the search it links to,
+ * while protecting nothing. Request VOLUME is a separate concern and is already
+ * bounded by `importerSearchLimiter` on the route.
  */
 async function searchByName(
   filters: ImporterFilters,
