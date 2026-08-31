@@ -19,7 +19,10 @@ const { sendMock, tableRows, updateMock } = vi.hoisted(() => ({
   updateMock: vi.fn(),
 }));
 
-vi.mock('./send.js', () => ({
+// Only `sendEmail` is stubbed. `wasSentByAProvider` stays REAL so the test
+// exercises the actual "ok is not sent" predicate rather than a copy of it.
+vi.mock('./send.js', async (orig) => ({
+  ...((await orig()) as Record<string, unknown>),
   sendEmail: sendMock,
   // brandedFrom is called by the cron; keep the real-ish shape without env.
   brandedFrom: (name: string) => `${name} <hello@quotefleet.net>`,

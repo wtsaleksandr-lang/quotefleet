@@ -26,7 +26,11 @@ const { sendMock, rowsRef } = vi.hoisted(() => ({
   rowsRef: { current: [] as Record<string, unknown>[] },
 }));
 
-vi.mock('./send.js', () => ({ sendEmail: sendMock }));
+// Only `sendEmail` is stubbed — `wasSentByAProvider` stays REAL.
+vi.mock('./send.js', async (orig) => ({
+  ...((await orig()) as Record<string, unknown>),
+  sendEmail: sendMock,
+}));
 
 vi.mock('../db/client.js', () => ({
   db: () => ({

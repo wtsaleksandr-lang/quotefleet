@@ -332,7 +332,20 @@ export function authorityType(li: LiCarrierRow): string | null {
   return parts.length ? parts.join(',') : null;
 }
 
-/** Census status 'I' means not allowed to operate; missing census = keep. */
+/**
+ * Census status 'I' means not allowed to operate; missing census = keep.
+ *
+ * The `keep` is CORRECT and stays: ~0.1% of carriers holding active L&I
+ * authority have no census row, and dropping them would silently shrink the
+ * directory. But it is only correct for a GENUINE absence. Read against a
+ * fabricated one — Socrata answering 200 with an empty body — this same line
+ * keeps every carrier on the page and lets the upsert null its census columns.
+ *
+ * That is why the payload is validated BEFORE it reaches here, at the two
+ * altitudes a bad payload can enter: `SocrataPayloadError` for a wrong-shaped
+ * or zero-matching response, and `censusPayloadPlausible` for a collapsed one.
+ * This function may therefore assume its `undefined` is real.
+ */
 export function censusAllowsOperate(census: CensusRow | undefined): boolean {
   if (!census) return true;
   return census.status_code !== 'I';
@@ -654,6 +667,16 @@ export const CARRIER_MUTABLE_COLUMNS: readonly string[] = [
   //    state to protect against — the conditional keep-or-replace expression
   //    would be dead code here.
   //
+  //    THAT INVARIANT IS LOAD-BEARING, AND IT IS ENFORCED, NOT ASSUMED. It
+  //    holds for a HARD census failure because that throws. It did NOT hold for
+  //    a SOFT one — a 200 with an empty body parses cleanly and arrives as
+  //    "FMCSA has no record of any of these carriers", nulling every column
+  //    below (and every census column above) across ~330k rows. See
+  //    CENSUS_MIN_MATCH_RATE / SocrataPayloadError: an implausible payload is
+  //    now RAISED as a failure, which is what puts this comment back in the
+  //    right tense. Anything added to this unconditional list inherits that
+  //    protection; anything sourced from a NEW upstream must bring its own.
+  //
   //    They are also all STABLE facts (a filed coverage amount, a registration
   //    date, a rating date), never a per-run timestamp. That is what keeps them
   //    out of the fake-freshness trap: an unchanged carrier compares equal in
@@ -861,9 +884,119 @@ export const dbCarrierStore: CarrierStore = {
 /** Per-Socrata-call deadline, covering headers AND the body read. */
 const SOCRATA_TIMEOUT_MS = 60_000;
 
-async function socrataJson<T>(resource: string, params: Record<string, string>): Promise<T[]> {
-  const qs = new URLSearchParams(params).toString();
-  const url = `${SOCRATA_BASE}/${resource}.json?${qs}`;
+/**
+ * A Socrata answer that was not a usable payload.
+ *
+ * THE POINT OF THIS CLASS: "the request did not throw" is NOT "we received
+ * data". A 200 carrying `{}`, `null`, an error envelope, or a truncated body
+ * parses cleanly and then flows downstream as authoritative emptiness — which,
+ * for the census join, means "FMCSA has no record of this carrier" for every
+ * carrier at once. Every non-payload therefore becomes an EXCEPTION here, so it
+ * takes the same abort path a 5xx already takes instead of quietly poisoning
+ * the upsert. See CENSUS_MIN_MATCH_RATE for the second, statistical layer.
+ */
+export class SocrataPayloadError extends Error {
+  readonly retryable = true;
+  constructor(resource: string, detail: string) {
+    super(`Socrata ${resource} returned an unusable payload: ${detail}`);
+    this.name = 'SocrataPayloadError';
+  }
+}
+
+/** A non-2xx from Socrata, carrying the status so the retry policy can read it. */
+export class SocrataHttpError extends Error {
+  constructor(
+    resource: string,
+    readonly status: number,
+    body: string,
+  ) {
+    super(`Socrata ${resource} ${status}: ${body}`);
+    this.name = 'SocrataHttpError';
+  }
+  get retryable(): boolean {
+    return isRetryableSocrataStatus(this.status);
+  }
+}
+
+/**
+ * Worth retrying: the portal is busy or broken, not us. A 4xx other than
+ * 408/429 means OUR SoQL is malformed — retrying that just hammers a free
+ * public service to get the same error four times.
+ */
+export function isRetryableSocrataStatus(status: number): boolean {
+  return status === 408 || status === 429 || status >= 500;
+}
+
+/** Retry budget for one Socrata call: the initial try plus 3 more. */
+export const SOCRATA_MAX_ATTEMPTS = 4;
+const SOCRATA_BACKOFF_BASE_MS = 500;
+const SOCRATA_BACKOFF_MAX_MS = 8_000;
+
+/**
+ * FULL-JITTER exponential backoff (`random(0, min(base·2^n, cap))`).
+ *
+ * Jitter is not decoration here: the ingest issues ~1,700 sequential calls, and
+ * the safety/crash/census fetches for one page fire back-to-back. A fixed
+ * schedule would retry a rate-limited portal in lockstep on every page for
+ * hours. Pure + exported so the schedule is unit-tested without ever sleeping.
+ */
+export function socrataBackoffMs(attempt: number, rand: () => number = Math.random): number {
+  const ceiling = Math.min(SOCRATA_BACKOFF_BASE_MS * 2 ** Math.max(0, attempt - 1), SOCRATA_BACKOFF_MAX_MS);
+  return Math.round(ceiling * rand());
+}
+
+/** True for anything the retry policy should try again. Transport-level throws
+ *  (DNS, reset socket, the exchange timeout aborting) carry no status and are
+ *  ALWAYS transient by nature, so they retry. */
+export function isRetryableSocrataError(err: unknown): boolean {
+  if (err instanceof SocrataHttpError) return err.retryable;
+  if (err instanceof SocrataPayloadError) return err.retryable;
+  return err instanceof Error;
+}
+
+export interface SocrataRetryDeps {
+  sleep?: (ms: number) => Promise<void>;
+  random?: () => number;
+  log?: (msg: string) => void;
+  maxAttempts?: number;
+}
+
+/**
+ * Run one Socrata call with bounded retry + backoff. Exported so the POLICY is
+ * testable in isolation (inject `sleep`) without a network or a real delay.
+ *
+ * Exhausting the budget RETHROWS the last error — a retry that gives up must
+ * still fail the run, never degrade to an empty result. That is the whole
+ * lesson of the soft-failure hole this module guards against.
+ */
+export async function withSocrataRetry<T>(
+  label: string,
+  attemptFn: () => Promise<T>,
+  deps: SocrataRetryDeps = {},
+): Promise<T> {
+  const sleep = deps.sleep ?? ((ms: number) => new Promise<void>((r) => setTimeout(r, ms)));
+  const random = deps.random ?? Math.random;
+  const log = deps.log ?? ((m: string) => console.warn(m));
+  const maxAttempts = deps.maxAttempts ?? SOCRATA_MAX_ATTEMPTS;
+
+  let lastErr: unknown;
+  for (let attempt = 1; attempt <= maxAttempts; attempt += 1) {
+    try {
+      return await attemptFn();
+    } catch (err) {
+      lastErr = err;
+      if (attempt >= maxAttempts || !isRetryableSocrataError(err)) throw err;
+      const wait = socrataBackoffMs(attempt, random);
+      log(`  …Socrata ${label} attempt ${attempt}/${maxAttempts} failed (${String(err)}) — retrying in ${wait}ms`);
+      await sleep(wait);
+    }
+  }
+  throw lastErr;
+}
+
+/** ONE Socrata attempt, no retry. Exported so the payload checks can be
+ *  unit-tested against a stubbed `fetch` without walking the backoff schedule. */
+export async function socrataFetchOnce<T>(resource: string, url: string): Promise<T[]> {
   // Whole-exchange deadline. This is the ONLY network primitive behind the
   // ~1,700-call full-directory ingest loop; without it a hung Socrata pins one
   // socket per call, permanently.
@@ -871,8 +1004,26 @@ async function socrataJson<T>(resource: string, params: Record<string, string>):
     headers: { 'User-Agent': FETCH_UA, Accept: 'application/json' },
     signal: exchangeTimeoutSignal(SOCRATA_TIMEOUT_MS),
   });
-  if (!res.ok) throw new Error(`Socrata ${resource} ${res.status}: ${await res.text().catch(() => '')}`);
-  return (await res.json()) as T[];
+  if (!res.ok) throw new SocrataHttpError(resource, res.status, await res.text().catch(() => ''));
+
+  // A 200 is only the START of the checks. `res.json()` itself throws on a
+  // truncated/HTML body; what it does NOT catch is a well-formed body of the
+  // wrong SHAPE — Socrata's `{"error":true,...}` envelope, a `null`, an object.
+  // Those must fail, not decay into "no rows".
+  const body: unknown = await res.json();
+  if (!Array.isArray(body)) {
+    throw new SocrataPayloadError(
+      resource,
+      `expected a JSON array, got ${body === null ? 'null' : typeof body}`,
+    );
+  }
+  return body as T[];
+}
+
+async function socrataJson<T>(resource: string, params: Record<string, string>): Promise<T[]> {
+  const qs = new URLSearchParams(params).toString();
+  const url = `${SOCRATA_BASE}/${resource}.json?${qs}`;
+  return withSocrataRetry(resource, () => socrataFetchOnce<T>(resource, url));
 }
 
 /** Build the L&I $where, optionally restricted to physical state(s). */
@@ -898,6 +1049,66 @@ export async function fetchCarrierPage(
   });
 }
 
+/**
+ * ─── THE CENSUS PLAUSIBILITY FLOOR ────────────────────────────────────────
+ *
+ * WHY THIS EXISTS. CARRIER_MUTABLE_COLUMNS writes the census-derived columns
+ * with a bare `excluded.` — no keep-or-replace CASE like the safety block — and
+ * says why: "a failed census fetch aborts the run, so there is no partial
+ * success state to protect against". That is true of a HARD failure. It is NOT
+ * true of a SOFT one. Socrata answering `200 OK` with `[]` does not throw: the
+ * lookup comes back empty, every carrier on the page normalizes with
+ * `census === undefined`, `censusAllowsOperate(undefined)` KEEPS the row, and
+ * the upsert writes null over fleet size, drivers, safety rating, registration
+ * date and 13 cargo-class flags — on ~330k rows. Worse, the nulls flip
+ * `IS DISTINCT FROM` in CARRIER_CHANGED_SQL, so `updated_at` — the sitemap's
+ * `<lastmod>` — jumps on all 330k carrier URLs at once, announcing a
+ * site-wide change that is really a site-wide data loss.
+ *
+ * So: an implausibly empty payload is a FAILURE, and is raised as one, which
+ * routes it into the abort path the unconditional writes already assume.
+ *
+ * WHERE THE NUMBER COMES FROM. Measured on prod 2026-08-31 over all 330,498
+ * rows: `power_units` (census-only) is non-null on 99.86% of them, so the true
+ * census match rate is ~99.9% and a page's expected miss count is ~1 in 700.
+ * The floor is set at 50% — a ~350x margin over observed reality — precisely so
+ * it can NEVER fire on normal coverage variance, only on a collapse. It is a
+ * smoke alarm, not a quality metric.
+ */
+export const CENSUS_MIN_MATCH_RATE = 0.5;
+
+/** Below this many requested dots there is no sample to judge — a state-filtered
+ *  run's last page can legitimately be a handful of carriers, and calling that a
+ *  failure would abort good runs. Small batches are trusted. */
+export const CENSUS_MIN_SAMPLE = 50;
+
+/**
+ * Did we ACTUALLY receive census data, as distinct from "the request did not
+ * throw"? Pure, so the policy is unit-tested without a network or a database.
+ */
+export function censusPayloadPlausible(requested: number, received: number): boolean {
+  if (requested < CENSUS_MIN_SAMPLE) return true;
+  return received / requested >= CENSUS_MIN_MATCH_RATE;
+}
+
+/** Raised when a census payload parsed fine but cannot be believed. Distinct
+ *  type so callers (autoHeal's ledger, the CLI) can report it precisely. */
+export class CensusSoftFailureError extends Error {
+  constructor(
+    readonly requested: number,
+    readonly received: number,
+    readonly offset: number,
+  ) {
+    super(
+      `FMCSA census returned ${received} rows for ${requested} requested USDOTs at offset ${offset} ` +
+        `(${((100 * received) / Math.max(1, requested)).toFixed(1)}%, floor ${(100 * CENSUS_MIN_MATCH_RATE).toFixed(0)}%). ` +
+        `Treating this as a FAILED fetch, not an empty census: writing it would null the census columns ` +
+        `on every carrier in the page and bump their <lastmod>. Re-run with --offset ${offset} once the portal recovers.`,
+    );
+    this.name = 'CensusSoftFailureError';
+  }
+}
+
 /** Census rows for a batch of NORMALIZED dot numbers → Map keyed by normalized dot. */
 export async function fetchCensusByDots(dots: string[]): Promise<Map<string, CensusRow>> {
   const map = new Map<string, CensusRow>();
@@ -916,6 +1127,19 @@ export async function fetchCensusByDots(dots: string[]): Promise<Map<string, Cen
     for (const r of rows) {
       const dot = normalizeDot(r.dot_number);
       if (dot) map.set(dot, r);
+    }
+    // PER-CHUNK zero check, independent of the page-level floor below. A chunk
+    // of 200 contiguous USDOTs matching NOTHING is not a data condition at a
+    // 99.9% coverage rate — it is a truncated or empty response. Catching it
+    // here matters because the page-level rate would DILUTE one dead chunk
+    // (200 of 1000 lost = 80%, comfortably over the floor) and let a fifth of
+    // the page get nulled. Read off the PAYLOAD (`rows`) rather than the map's
+    // growth, so it reports what Socrata actually sent.
+    if (chunk.length >= CENSUS_MIN_SAMPLE && rows.length === 0) {
+      throw new SocrataPayloadError(
+        CENSUS_ID,
+        `0 of ${chunk.length} requested USDOTs matched — an empty or truncated body, not an empty census`,
+      );
     }
   }
   return map;
@@ -1063,6 +1287,27 @@ export async function runIngest(
 
     const dots = liRows.map((r) => normalizeDot(r.dot_number)).filter((d): d is string => !!d);
     const censusByDot = await fetchCensus(dots);
+
+    // ── SOFT FAILURE = FAILURE. Deliberately checked HERE, on the Map the
+    //    census fetch actually returned, rather than inside fetchCensusByDots:
+    //    at this altitude the guard covers EVERY implementation of the fetch —
+    //    the live one, the auto-heal's, a future cached or bulk-file loader —
+    //    so no future census source can quietly reintroduce the hole.
+    //
+    //    THROWING (rather than skipping the page, or preserving prior values
+    //    with a CASE like the safety block) is the deliberate choice:
+    //      · It RESTORES the invariant the unconditional `excluded.` writes
+    //        already document — "a failed census fetch aborts the run" — instead
+    //        of adding a second, weaker semantic beside it.
+    //      · Census is not optional enrichment like safety. It carries
+    //        `status_code`, the out-of-service gate: preserving stale values
+    //        would keep publishing a carrier FMCSA has since deactivated.
+    //      · Nothing is written, so nothing is nulled and no `updated_at` moves.
+    //    The run is resumable (`--offset`), and autoHeal already catches a
+    //    thrown ingest and records it as a job failure with an admin alert.
+    if (!censusPayloadPlausible(dots.length, censusByDot.size)) {
+      throw new CensusSoftFailureError(dots.length, censusByDot.size, offset);
+    }
 
     // ── FMCSA safety enrichment (2 extra calls per page). DELIBERATELY
     //    NON-FATAL and independently isolated: the directory's core value is the

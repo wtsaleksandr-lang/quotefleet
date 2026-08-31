@@ -37,7 +37,7 @@ import { eq, isNotNull } from 'drizzle-orm';
 import { db } from '../db/client.js';
 import { runTrackedJob, outcomeFromTick, type TickResult } from '../server/jobHealth.js';
 import { tenants, type Tenant } from '../db/schema.js';
-import { sendEmail } from './send.js';
+import { sendEmail, wasSentByAProvider } from './send.js';
 import { billingDunningEmail } from './templates.js';
 import { BILLING_PAST_DUE_KEY } from '../server/trialGating.js';
 import { nextDunningAction, DUNNING_STAGE_KEYS, type DunningStage } from './dunning.js';
@@ -150,6 +150,17 @@ async function sendStage(t: Tenant, stage: DunningStage, now: number): Promise<b
     if (!out.ok) {
       console.error(
         `[dunning] stage ${stage.id} send FAILED (tenant ${t.id}): ${out.error ?? 'unknown error'}`
+      );
+      return false;
+    }
+    // `ok` is not `sent`. A logged-only result (no provider configured, or a
+    // reserved recipient) never reached the wire, and the stamp below is a
+    // PERMANENT "already sent" marker — writing it on a logged-only send loses
+    // this dunning notice forever, on the one email sequence whose whole job is
+    // to stop a subscription lapsing. See wasSentByAProvider.
+    if (!wasSentByAProvider(out)) {
+      console.warn(
+        `[dunning] stage ${stage.id} was LOGGED ONLY (provider=${out.provider ?? 'none'}, tenant ${t.id}) — not marking it sent`
       );
       return false;
     }

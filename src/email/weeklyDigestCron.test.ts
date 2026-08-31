@@ -19,7 +19,11 @@ const { sendMock, rowsRef, updateMock, statsMock } = vi.hoisted(() => ({
   statsMock: vi.fn(),
 }));
 
-vi.mock('./send.js', () => ({ sendEmail: sendMock }));
+// Only `sendEmail` is stubbed — `wasSentByAProvider` stays REAL.
+vi.mock('./send.js', async (orig) => ({
+  ...((await orig()) as Record<string, unknown>),
+  sendEmail: sendMock,
+}));
 vi.mock('./weeklyDigest.js', async (orig) => {
   const actual = (await orig()) as Record<string, unknown>;
   return { ...actual, computeWeeklyStats: statsMock };
@@ -115,6 +119,20 @@ describe('weekly digest cron audience + compliance', () => {
     // lastWeeklyDigestAt stamped for the double-send guard.
     expect(updateMock).toHaveBeenCalledTimes(1);
     expect((updateMock.mock.calls[0][0] as { lastWeeklyDigestAt?: Date }).lastWeeklyDigestAt).toEqual(NOW);
+  });
+
+  it('does NOT stamp the cooldown when the send was LOGGED ONLY', async () => {
+    // `sendEmail` returns ok:true for the stdout fallback (no provider
+    // configured) — nothing reached the wire. Stamping lastWeeklyDigestAt on
+    // that would consume the tenant's week for a mail nobody received, and the
+    // cooldown means it is never retried. "ok" is not "sent".
+    sendMock.mockResolvedValue({ ok: true, logged: true, provider: 'stdout' });
+    rowsRef.current = [tenant({ id: 51 })];
+    const { runWeeklyDigestOnce } = await import('./weeklyDigestCron.js');
+    await runWeeklyDigestOnce('test', NOW);
+
+    expect(sendMock).toHaveBeenCalledTimes(1);
+    expect(updateMock).not.toHaveBeenCalled();
   });
 
   it('skips a marketing opt-out tenant', async () => {

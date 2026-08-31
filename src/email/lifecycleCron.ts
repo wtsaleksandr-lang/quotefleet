@@ -31,7 +31,7 @@
 import { eq, isNotNull, and } from 'drizzle-orm';
 import { db } from '../db/client.js';
 import { tenants, type Tenant } from '../db/schema.js';
-import { sendEmail } from './send.js';
+import { sendEmail, wasSentByAProvider } from './send.js';
 import {
   lifecycleWelcomeEmail,
   lifecycleDay7Email,
@@ -273,6 +273,15 @@ async function sendOne(t: Tenant, email: LifecycleEmail): Promise<boolean> {
     });
     if (!out.ok) {
       console.error(`[email] lifecycle ${email.key} send FAILED (tenant ${t.id}): ${out.error ?? 'unknown error'}`);
+      return false;
+    }
+    // `ok` is not `sent` — a logged-only result never reached the wire, and the
+    // stamp below permanently marks this lifecycle step done, so the tenant
+    // would never receive it. See wasSentByAProvider.
+    if (!wasSentByAProvider(out)) {
+      console.warn(
+        `[email] lifecycle ${email.key} was LOGGED ONLY (provider=${out.provider ?? 'none'}, tenant ${t.id}) — not marking it sent`,
+      );
       return false;
     }
     const updated = { ...(t.lifecycleEmailsJson ?? {}), [email.key]: new Date().toISOString() };

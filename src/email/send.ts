@@ -189,6 +189,31 @@ export function isUndeliverableReservedRecipient(to: string): boolean {
   return /(^|\.)example\.(com|net|org)$/.test(domain);
 }
 
+/**
+ * Did a REAL provider accept this message — as distinct from `ok: true`?
+ *
+ * `sendEmail` returns `{ ok: true, logged: true, provider: 'stdout' }` in two
+ * cases that did not put a message on the wire: a reserved/undeliverable
+ * recipient, and the dev fallback when no provider is configured. Both are
+ * correct as "this call did not fail", and both are WRONG as "the recipient
+ * received it".
+ *
+ * The difference matters wherever a caller writes an IDEMPOTENCY MARKER on the
+ * strength of the result — the lifecycle / dunning / follow-up / digest crons
+ * all stamp "already sent" and never look at that message again. Treating a
+ * logged-only result as sent PERMANENTLY LOSES the message: it is marked
+ * delivered and never retried. That is the same class of bug as an ingest
+ * reading an empty upstream payload as authoritative emptiness — "the call did
+ * not throw" is not "the work happened".
+ *
+ * `sendOutreach` and the RFQ mailer already made this distinction inline
+ * (surfacing it as an `unconfigured` status); this gives it one name so every
+ * caller can ask the same question the same way.
+ */
+export function wasSentByAProvider(out: EmailOut): boolean {
+  return out.ok && !out.logged && out.provider !== 'stdout';
+}
+
 export async function sendEmail(msg: EmailIn): Promise<EmailOut> {
   const env = loadEnv();
 
