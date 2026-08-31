@@ -19,13 +19,17 @@
  *       (common_stat='A' OR contract_stat='A') AND property_chk='Y' — i.e. it
  *       holds active common and/or contract carrier authority for property
  *       (general freight), excluding passenger / HHG-only. Supplies
- *       docket_number (MC), dot_number, legal/dba name, address, phone.
+ *       docket_number (MC), dot_number, legal/dba name, address, phone, AND the
+ *       INSURANCE FILINGS (bipd_file / min_cov_amount / cargo_file / bond_file).
+ *       NOTE: FMCSA froze this file on 14 May 2026 — see ./carrierCredentials.ts.
  *   - Company Census file                        — resource az4n-8mr2
- *       Supplies power_units, total_drivers, safety_rating, the physical
- *       address, a live status_code (A/I), and the cargo-classification flags —
- *       notably crgo_intermodal='X', which marks container / drayage carriers.
+ *       Supplies power_units, total_drivers, safety_rating + safety_rating_date,
+ *       add_date (when FMCSA registered the carrier), the physical address, a
+ *       live status_code (A/I), and the cargo-classification flags — notably
+ *       crgo_intermodal='X', which marks container / drayage carriers.
  *       Keyed by dot_number (L&I dot_number is zero-padded; strip leading zeros
- *       to join).
+ *       to join — which also drops L&I's `00000000` sentinel, ~278 rows inside
+ *       our filter, that would otherwise collapse into one bogus carrier).
  *
  * Server-side $where filter (streaming, batched, resumable, dependency-free) —
  * we pull ONLY active property carriers rather than downloading the multi-
@@ -52,6 +56,7 @@ import {
   type CrashAggRow,
   type SmsSafetyRow,
 } from './safetyData.js';
+import { buildCarrierCredentials, type CarrierCredentials } from './carrierCredentials.js';
 
 // ─── Socrata sources ──────────────────────────────────────────────────────
 const SOCRATA_BASE = 'https://data.transportation.gov/resource';
@@ -78,6 +83,16 @@ export interface LiCarrierRow {
   bus_state_code?: string;
   bus_zip_code?: string;
   bus_telno?: string;
+  // ── Insurance filings. Same row, previously unread. Amounts are zero-padded
+  //    THOUSANDS of dollars ("00750" = $750,000); see ./carrierCredentials.ts.
+  /** BIPD liability ON FILE, thousands. "00000" ⇒ no filing on record. */
+  bipd_file?: string;
+  /** Minimum BIPD this authority REQUIRES, thousands. */
+  min_cov_amount?: string;
+  /** Cargo-insurance filing on record — 'Y'/'N'. */
+  cargo_file?: string;
+  /** Surety-bond filing on record — 'Y'/'N'. */
+  bond_file?: string;
 }
 
 export interface CensusRow {
@@ -88,6 +103,13 @@ export interface CensusRow {
   power_units?: string;
   total_drivers?: string;
   safety_rating?: string;
+  /** YYYYMMDD the rating was assigned. Present on 100% of rated carriers, and
+   *  most published ratings are years old — so it always travels with the
+   *  rating. See ./carrierCredentials.ts. */
+  safety_rating_date?: string;
+  /** YYYYMMDD FMCSA created the USDOT record. A FLOOR on tenure, not a founding
+   *  date. 100% coverage; the 19740601 bulk-load sentinel is parsed to null. */
+  add_date?: string;
   status_code?: string;
   crgo_intermodal?: string;
   /** Census hazmat indicator: 'Y' when FMCSA-registered to haul hazardous
@@ -221,6 +243,15 @@ export interface CarrierRecord {
    * sources, the rejected ones, and the honesty contract.
    */
   safety: CarrierSafety;
+  /**
+   * FMCSA insurance filings (L&I) + the registration and safety-rating dates
+   * (census). Both source rows were already being fetched, so this costs no
+   * extra request. Amounts are in DOLLARS; `null` means "no such filing on
+   * record", never zero. See ./carrierCredentials.ts — in particular that a
+   * filing is NOT proof of current coverage, and that FMCSA froze the L&I file
+   * on 14 May 2026.
+   */
+  credentials: CarrierCredentials;
 }
 
 /**
@@ -505,6 +536,9 @@ export function normalizeCarrier(
     nearestPortCode: deriveNearestPortCode(country, state, zip),
     publicSlug: makeSlug(legalName, usdot),
     safety,
+    // Insurance filings off the SAME L&I row, dates off the SAME census row —
+    // both already in hand here, so this is free.
+    credentials: buildCarrierCredentials(li, census),
   };
 }
 
@@ -613,6 +647,24 @@ export const CARRIER_MUTABLE_COLUMNS: readonly string[] = [
     'crashes_injury',
     'crashes_tow',
     'safety_data_as_of'],
+  // ── FMCSA credentials. Ordinary UNCONDITIONAL columns, unlike the safety
+  //    block above, and deliberately so: they ride the two fetches the ingest
+  //    cannot proceed without (a failed L&I page throws out of the loop, a
+  //    failed census fetch aborts the run), so there is no "partial success"
+  //    state to protect against — the conditional keep-or-replace expression
+  //    would be dead code here.
+  //
+  //    They are also all STABLE facts (a filed coverage amount, a registration
+  //    date, a rating date), never a per-run timestamp. That is what keeps them
+  //    out of the fake-freshness trap: an unchanged carrier compares equal in
+  //    CARRIER_CHANGED_SQL week after week, so `updated_at` does not move and
+  //    the sitemap's <lastmod> stays truthful across all ~330k rows.
+  'bipd_on_file',
+  'bipd_required',
+  'cargo_insurance_on_file',
+  'bond_on_file',
+  'fmcsa_registered_since',
+  'safety_rating_date',
 ];
 
 /**
@@ -767,6 +819,13 @@ export const CARRIER_UPSERT_SET = {
   crashesInjury: sql.raw(safetyColumnSql('crashes_injury')),
   crashesTow: sql.raw(safetyColumnSql('crashes_tow')),
   safetyDataAsOf: sql.raw(safetyColumnSql('safety_data_as_of')),
+  // FMCSA credentials — plain unconditional refresh (see CARRIER_MUTABLE_COLUMNS).
+  bipdOnFile: sql`excluded.bipd_on_file`,
+  bipdRequired: sql`excluded.bipd_required`,
+  cargoInsuranceOnFile: sql`excluded.cargo_insurance_on_file`,
+  bondOnFile: sql`excluded.bond_on_file`,
+  fmcsaRegisteredSince: sql`excluded.fmcsa_registered_since`,
+  safetyRatingDate: sql`excluded.safety_rating_date`,
   // Advances ONLY on a real field change, so <lastmod> stays truthful and the
   // IndexNow change feed stays honest. See CARRIER_CHANGED_SQL.
   updatedAt: sql.raw(CARRIER_UPDATED_AT_SQL),
@@ -776,11 +835,13 @@ export const dbCarrierStore: CarrierStore = {
   async upsertMany(records) {
     if (records.length === 0) return;
     for (let i = 0; i < records.length; i += UPSERT_BATCH) {
-      const chunk = records.slice(i, i + UPSERT_BATCH).map(({ safety, ...r }) => ({
+      const chunk = records.slice(i, i + UPSERT_BATCH).map(({ safety, credentials, ...r }) => ({
         ...r,
-        // Flatten the nested safety block onto the row — the drizzle table has
-        // one column per field, and a nested object would be dropped silently.
+        // Flatten the nested safety + credential blocks onto the row — the
+        // drizzle table has one column per field, and a nested object would be
+        // dropped silently.
         ...safety,
+        ...credentials,
         updatedAt: new Date(),
       }));
       // Multi-row INSERT with ON CONFLICT (usdot) DO UPDATE — idempotent re-run
@@ -829,7 +890,7 @@ export async function fetchCarrierPage(
 ): Promise<LiCarrierRow[]> {
   return socrataJson<LiCarrierRow>(LI_CARRIER_ID, {
     $select:
-      'docket_number,dot_number,common_stat,contract_stat,broker_stat,property_chk,passenger_chk,hhg_chk,legal_name,dba_name,bus_street_po,bus_city,bus_state_code,bus_zip_code,bus_telno',
+      'docket_number,dot_number,common_stat,contract_stat,broker_stat,property_chk,passenger_chk,hhg_chk,legal_name,dba_name,bus_street_po,bus_city,bus_state_code,bus_zip_code,bus_telno,bipd_file,min_cov_amount,cargo_file,bond_file',
     $where: buildCarrierWhere(states),
     $order: 'dot_number',
     $limit: String(limit),
@@ -848,7 +909,7 @@ export async function fetchCensusByDots(dots: string[]): Promise<Map<string, Cen
     const inList = chunk.map((d) => `'${d}'`).join(',');
     const rows = await socrataJson<CensusRow>(CENSUS_ID, {
       $select:
-        'dot_number,legal_name,dba_name,email_address,power_units,total_drivers,safety_rating,status_code,crgo_intermodal,hm_ind,crgo_genfreight,crgo_coldfood,crgo_liqgas,crgo_chem,crgo_metalsheet,crgo_machlrg,crgo_logpole,crgo_drybulk,crgo_household,crgo_beverages,crgo_produce,crgo_motoveh,crgo_livestock,crgo_grainfeed,crgo_oilfield,crgo_meat,crgo_paperprod,crgo_construct,crgo_farmsupp,crgo_coalcoke,crgo_bldgmat,phone,phy_street,phy_city,phy_state,phy_zip',
+        'dot_number,legal_name,dba_name,email_address,power_units,total_drivers,safety_rating,safety_rating_date,add_date,status_code,crgo_intermodal,hm_ind,crgo_genfreight,crgo_coldfood,crgo_liqgas,crgo_chem,crgo_metalsheet,crgo_machlrg,crgo_logpole,crgo_drybulk,crgo_household,crgo_beverages,crgo_produce,crgo_motoveh,crgo_livestock,crgo_grainfeed,crgo_oilfield,crgo_meat,crgo_paperprod,crgo_construct,crgo_farmsupp,crgo_coalcoke,crgo_bldgmat,phone,phy_street,phy_city,phy_state,phy_zip',
       $where: `dot_number in (${inList})`,
       $limit: String(chunk.length),
     });
