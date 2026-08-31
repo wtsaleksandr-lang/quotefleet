@@ -42,9 +42,9 @@ import { billingDunningEmail } from './templates.js';
 import { BILLING_PAST_DUE_KEY } from '../server/trialGating.js';
 import { nextDunningAction, DUNNING_STAGE_KEYS, type DunningStage } from './dunning.js';
 import { loadEnv } from '../config.js';
+import { startCronSchedule } from '../server/cronSchedule.js';
 
 const TICK_MS = 60 * 60 * 1000; // 1 hour
-const STARTUP_DELAY_MS = 120 * 1000;
 
 let started = false;
 
@@ -55,17 +55,13 @@ export function startDunningEmailCron(): void {
     return;
   }
   started = true;
-  setTimeout(() => void trackedRunOnce('startup'), STARTUP_DELAY_MS);
-  setInterval(() => void trackedRunOnce('tick'), TICK_MS);
+  startCronSchedule({ cron: 'dunning-email', tickMs: TICK_MS, run: trackedRunOnce });
 }
 
 /** Scheduling site: records every tick to the job ledger and alerts on failure. */
 async function trackedRunOnce(reason: string): Promise<void> {
   await runTrackedJob('dunning-email', async () =>
     outcomeFromTick(await runOnce(reason), 'no tenant is past due'),
-  );
-  console.log(
-    `[dunning.cron] scheduled — first run in ${STARTUP_DELAY_MS / 1000}s, then every ${TICK_MS / 60_000} min`
   );
 }
 

@@ -8,6 +8,20 @@ import { randomBytes } from 'node:crypto';
 
 export interface Env {
   DATABASE_URL: string;
+  /**
+   * OPTIONAL pooled (PgBouncer) endpoint used by the APP'S CONNECTION POOL ONLY.
+   *
+   * On Neon this is the `-pooler` host. When set, src/db/client.ts uses it and
+   * turns prepared statements OFF, because PgBouncer in transaction pooling
+   * mode hands each statement a different backend and named prepared statements
+   * do not survive that. Migrations and self-heal DDL deliberately keep using
+   * DATABASE_URL (the direct endpoint) — they take session-scoped advisory and
+   * table locks, which transaction pooling also breaks.
+   *
+   * Leave unset to keep everything on the direct endpoint. It is a Doppler
+   * value precisely so it can be applied and reverted without a deploy.
+   */
+  DATABASE_POOLED_URL?: string;
   ANTHROPIC_API_KEY: string;
   PUBLIC_BASE_URL: string;
   SESSION_SECRET: string;
@@ -164,6 +178,7 @@ export function loadEnv(): Env {
 
   cached = {
     DATABASE_URL: need('DATABASE_URL'),
+    DATABASE_POOLED_URL: opt('DATABASE_POOLED_URL'),
     ANTHROPIC_API_KEY: opt('ANTHROPIC_API_KEY') ?? '',
     PUBLIC_BASE_URL: opt('PUBLIC_BASE_URL') ?? 'http://localhost:5000',
     SESSION_SECRET: sessionSecret,

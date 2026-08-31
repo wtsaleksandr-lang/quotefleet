@@ -57,9 +57,9 @@ import {
   type OpsAlertRow,
 } from '../opsAlerts.js';
 import { buildShipperQuotesEmail, buildShipperNoRepliesEmail } from './email.js';
+import { startCronSchedule } from '../cronSchedule.js';
 
 const TICK_MS = 60 * 60 * 1000; // hourly
-const STARTUP_DELAY_MS = 90 * 1000;
 
 /** How long after delivery a silent request counts as "no replies". Two days
  *  covers a weekend-adjacent send without crying wolf on a Monday morning. */
@@ -84,9 +84,7 @@ export function startRfqResponseCron(): void {
     return;
   }
   started = true;
-  setTimeout(() => void tick('startup'), STARTUP_DELAY_MS);
-  setInterval(() => void tick('tick'), TICK_MS);
-  console.log('[rfqResponse.cron] scheduled — hourly');
+  startCronSchedule({ cron: 'rfq-response', tickMs: TICK_MS, run: tick });
 }
 
 async function tick(reason: string): Promise<void> {

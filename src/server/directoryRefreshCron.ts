@@ -34,9 +34,9 @@ import { runTrackedJob, jobSuccess, jobSkipped, jobFailure } from './jobHealth.j
 import { forceReingestCarrierDirectory } from './directory/autoHeal.js';
 import { ensureFreshDirectoryAggregates } from './directory/queries.js';
 import { ensureFreshSitemap } from './directory/sitemapCache.js';
+import { startCronSchedule } from './cronSchedule.js';
 
 const TICK_MS = 60 * 60 * 1000; // hourly
-const STARTUP_DELAY_MS = 2 * 60 * 1000; // 2 min after boot before the first tick
 
 /** Weekly slot: Sunday (UTC day 0), 09:00 UTC — off-peak for freight ops. */
 export const REFRESH_DOW = 0;
@@ -70,11 +70,8 @@ export function startDirectoryRefreshCron(): void {
     return;
   }
   started = true;
-  setTimeout(() => void maybeRun('startup'), STARTUP_DELAY_MS);
-  setInterval(() => void maybeRun('tick'), TICK_MS);
-  console.log(
-    `[directoryRefresh.cron] scheduled — hourly tick; re-ingest slot Sun ${REFRESH_HOUR}:00 UTC`,
-  );
+  startCronSchedule({ cron: 'directory-refresh', tickMs: TICK_MS, run: maybeRun });
+  console.log(`[directoryRefresh.cron] re-ingest slot Sun ${REFRESH_HOUR}:00 UTC`);
 }
 
 /** Gate the hourly tick to the weekly slot, then kick the re-ingest (safely). */

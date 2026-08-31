@@ -39,9 +39,10 @@ import {
   type FollowUpTouch,
 } from './followUp.js';
 import { loadEnv } from '../config.js';
+import { startCronSchedule } from '../server/cronSchedule.js';
+import { describeDbError, withDbRetry } from '../db/retry.js';
 
 const TICK_MS = 60 * 60 * 1000; // 1 hour
-const STARTUP_DELAY_MS = 90 * 1000;
 
 let started = false;
 
@@ -52,17 +53,13 @@ export function startFollowUpEmailCron(): void {
     return;
   }
   started = true;
-  setTimeout(() => void trackedRunOnce('startup'), STARTUP_DELAY_MS);
-  setInterval(() => void trackedRunOnce('tick'), TICK_MS);
+  startCronSchedule({ cron: 'followup-email', tickMs: TICK_MS, run: trackedRunOnce });
 }
 
 /** Scheduling site: records every tick to the job ledger and alerts on failure. */
 async function trackedRunOnce(reason: string): Promise<void> {
   await runTrackedJob('followup-email', async () =>
     outcomeFromTick(await runOnce(reason), 'no lead was due a follow-up'),
-  );
-  console.log(
-    `[followup.cron] scheduled — first run in ${STARTUP_DELAY_MS / 1000}s, then every ${TICK_MS / 60_000} min`
   );
 }
 
@@ -80,10 +77,18 @@ export async function runOnce(reason: string, now: number = Date.now()): Promise
     // 1. Which tenants have follow-up ENABLED? The config lives in
     //    brand_configs.featuresJson.followUp; resolve every brand row and keep
     //    the enabled ones. (Tenant count is small — one cheap scan.)
-    const brands = await db()
-      .select({ tenantId: brandConfigs.tenantId, featuresJson: brandConfigs.featuresJson })
-      .from(brandConfigs)
-      .where(isNotNull(brandConfigs.featuresJson));
+    //    Retried on transient connection/wake failures only — a pure read, so
+    //    running it twice costs nothing. The retry stops here on purpose: the
+    //    per-tenant loop below sends email, and re-running that after a
+    //    mid-pass drop would re-send what it had already delivered.
+    const brands = await withDbRetry(
+      () =>
+        db()
+          .select({ tenantId: brandConfigs.tenantId, featuresJson: brandConfigs.featuresJson })
+          .from(brandConfigs)
+          .where(isNotNull(brandConfigs.featuresJson)),
+      { label: 'followup-email brand scan' },
+    );
 
     const cfgByTenant = new Map<number, FollowUpConfig>();
     for (const b of brands) {
@@ -147,7 +152,8 @@ export async function runOnce(reason: string, now: number = Date.now()): Promise
   } catch (err) {
     console.warn(`[followup.cron] tick failed (${reason}):`, err);
     // Was a bare `return` — indistinguishable from a clean tick to the caller.
-    return { ok: false, processed: 0, detail: err instanceof Error ? err.message : String(err) };
+    // describeDbError unwraps drizzle's `Failed query: <SQL>` to the real cause.
+    return { ok: false, processed: 0, detail: describeDbError(err) };
   }
   const ms = Date.now() - t0;
   if (sent > 0) console.log(`[followup.cron] tick=${reason} sent=${sent} elapsed=${ms}ms`);

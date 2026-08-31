@@ -59,6 +59,7 @@
 import { sql } from 'drizzle-orm';
 import { db } from '../db/client.js';
 import { runSelfHealStatements } from '../db/migrate.js';
+import { describeDbError, withDbRetry } from '../db/retry.js';
 import { AlertDeduper, sendCronAlertEmail, CRON_ALERT_COOLDOWN_MS } from './cronSafety.js';
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -187,6 +188,10 @@ export interface JobLedgerDeps {
   /** Persist one finished run. Must never throw back into the caller. */
   write: (row: JobRunRow) => Promise<void>;
   log: (msg: string) => void;
+  /** Holds rows the DB refused, for replay once it is back. See section 3a. */
+  outbox: LedgerOutbox;
+  /** The DB-independent record of an unpersisted run — stderr by default. */
+  logUnrecorded: (line: string) => void;
 }
 
 export interface JobRunRow {
@@ -200,21 +205,160 @@ export interface JobRunRow {
 }
 
 /**
- * Persist a finished run. Best-effort by contract: a ledger write failure must
- * never break the job it is observing, so this swallows and logs.
+ * Persist a finished run.
  *
- * Note the deliberate asymmetry — if the DB is down this write fails silently,
- * which is exactly the case the WATCHDOG then catches as staleness. The ledger
- * degrades to silence; the watchdog turns silence into an alert.
+ * Retried on transient connection/wake failures only — an append of an
+ * already-computed row is idempotent enough that a duplicate ledger line is
+ * vastly preferable to a missing one. Anything the classifier does not
+ * recognise as transient (a dropped table, a quota rejection) throws straight
+ * out on the first attempt, into the outbox path below.
  */
 export async function writeJobRun(row: JobRunRow): Promise<void> {
-  await db().execute(sql`
-    insert into "job_runs" ("job", "status", "started_at", "finished_at", "duration_ms", "processed", "detail")
-    values (
-      ${row.job}, ${row.status}, ${row.startedAt.toISOString()}, ${row.finishedAt.toISOString()},
-      ${row.durationMs}, ${row.processed}, ${row.detail}
-    )
-  `);
+  await withDbRetry(
+    () =>
+      db().execute(sql`
+        insert into "job_runs" ("job", "status", "started_at", "finished_at", "duration_ms", "processed", "detail")
+        values (
+          ${row.job}, ${row.status}, ${row.startedAt.toISOString()}, ${row.finishedAt.toISOString()},
+          ${row.durationMs}, ${row.processed}, ${row.detail}
+        )
+      `),
+    { label: `job_runs insert (${row.job})` },
+  );
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// 3a. THE OUTBOX — how "the database was down" becomes recordable
+// ─────────────────────────────────────────────────────────────────────────────
+//
+// THE CONTRADICTION THIS RESOLVES
+// ───────────────────────────────
+// The ledger's original contract said a write failure "degrades to silence; the
+// watchdog turns silence into an alert". That is true for a job that stops
+// ticking. It is NOT true for the case that actually happened, because the
+// ledger writes to the very database the jobs read from:
+//
+//   the DB is unreachable
+//     → every DB-first cron's opening SELECT throws        → outcome = failure
+//     → the ledger's INSERT hits the same dead DB           → swallowed, no row
+//     → the alert email needs no Postgres                   → email SENT
+//
+// So the failure emails and the ledger disagreed by construction: the emails
+// said four jobs had failed and the ledger showed an unbroken run of `skipped`
+// and `success`, with not one `failure` row in its entire history. Every
+// signal that a DB outage exists was routed through the DB. Worse, the next
+// tick after recovery writes a healthy row, so the gap closes and the outage
+// leaves no trace at all — you cannot even tell afterwards that it happened.
+//
+// THE FIX, IN TWO PARTS, NEITHER OF WHICH NEEDS POSTGRES
+// ─────────────────────────────────────────────────────
+//   1. A structured line on stderr, immediately. Replit retains deploy logs, so
+//      this is the record that survives even if the process then dies.
+//   2. A bounded in-memory outbox. The row is kept and replayed on the next
+//      successful write, WITH ITS ORIGINAL TIMESTAMPS — so once the database
+//      comes back the ledger contains the failures that happened while it was
+//      gone, in their true positions, rather than a silent gap.
+//
+// The outbox is memory-only on purpose. It must not depend on the database (the
+// whole point), and writing to the container filesystem would trade one
+// unreliable store for another — Replit's disk is ephemeral across deploys and
+// a full disk is its own outage. A process restart therefore loses whatever is
+// pending, which is acceptable precisely because it is not the only signal:
+// part 1 has already put the record in the logs, the failure email has already
+// been sent, and the staleness watchdog still keys on the last HEALTHY run, so
+// a job that never recovers goes stale and alerts regardless.
+
+/** Cap on retained rows. ~12 jobs × a few hours of ticks; far past this the
+ *  outage is long over and the oldest rows are the least interesting. */
+export const LEDGER_OUTBOX_MAX = 250;
+
+/** Rows the ledger could not persist, kept for replay. Bounded and oldest-first. */
+export class LedgerOutbox {
+  private rows: JobRunRow[] = [];
+  private droppedCount = 0;
+  private lastError: string | null = null;
+  private lastErrorAtMs: number | null = null;
+
+  /** Retain a row the DB refused. Drops the OLDEST first when full — during an
+   *  outage the newest rows are the ones that still describe the situation. */
+  add(row: JobRunRow, error: string, nowMs: number): void {
+    if (this.rows.length >= LEDGER_OUTBOX_MAX) {
+      this.rows.shift();
+      this.droppedCount++;
+    }
+    this.rows.push(row);
+    this.lastError = error;
+    this.lastErrorAtMs = nowMs;
+  }
+
+  /** Take everything pending for a replay attempt. */
+  drain(): JobRunRow[] {
+    const out = this.rows;
+    this.rows = [];
+    return out;
+  }
+
+  /** Put back rows a replay could not write, ahead of anything newer. */
+  requeue(rows: JobRunRow[]): void {
+    this.rows = [...rows, ...this.rows].slice(-LEDGER_OUTBOX_MAX);
+  }
+
+  size(): number {
+    return this.rows.length;
+  }
+
+  dropped(): number {
+    return this.droppedCount;
+  }
+
+  /** Why the last write failed — the diagnosis the alert email should carry. */
+  lastFailure(): { error: string; atMs: number } | null {
+    return this.lastError !== null && this.lastErrorAtMs !== null
+      ? { error: this.lastError, atMs: this.lastErrorAtMs }
+      : null;
+  }
+
+  /** A successful write means the DB is back; the failure note is stale. */
+  clearFailure(): void {
+    this.lastError = null;
+    this.lastErrorAtMs = null;
+  }
+
+  /** Test helper. */
+  reset(): void {
+    this.rows = [];
+    this.droppedCount = 0;
+    this.clearFailure();
+  }
+}
+
+/** Process-wide outbox, read by the alert path and /api/admin/job-health. */
+export const jobLedgerOutbox = new LedgerOutbox();
+
+/**
+ * Replay retained rows. Stops at the first failure and puts the remainder back,
+ * so a still-sick database is retried on the next healthy write rather than
+ * hammered here. Never throws.
+ */
+export async function flushLedgerOutbox(deps: JobLedgerDeps): Promise<number> {
+  const pending = deps.outbox.drain();
+  if (pending.length === 0) return 0;
+  let written = 0;
+  for (let i = 0; i < pending.length; i++) {
+    try {
+      await deps.write(pending[i]!);
+      written++;
+    } catch (err) {
+      deps.outbox.requeue(pending.slice(i));
+      deps.log(
+        `[job-health] ledger replay stopped after ${written}/${pending.length} rows — ` +
+          `${describeDbError(err)}`,
+      );
+      return written;
+    }
+  }
+  deps.log(`[job-health] ledger replay wrote ${written} row(s) held during a DB outage`);
+  return written;
 }
 
 function defaultLedgerDeps(): JobLedgerDeps {
@@ -222,6 +366,8 @@ function defaultLedgerDeps(): JobLedgerDeps {
     now: () => Date.now(),
     write: writeJobRun,
     log: (msg) => console.log(msg),
+    outbox: jobLedgerOutbox,
+    logUnrecorded: (line) => console.error(line),
   };
 }
 
@@ -250,23 +396,47 @@ export async function recordJobRun(
   try {
     outcome = await fn();
   } catch (err) {
-    const message = err instanceof Error ? err.message : String(err);
-    outcome = jobFailure(`threw: ${message}`);
+    // describeDbError, not err.message: drizzle wraps every driver error in a
+    // DrizzleQueryError whose message is `Failed query: <the whole SELECT>` and
+    // keeps the real diagnosis on `.cause`. Reporting the raw message is why
+    // the 2026-08-31 alerts were a page of column names with no cause in them,
+    // and why a dev-branch quota rejection read as a production outage.
+    outcome = jobFailure(`threw: ${describeDbError(err)}`);
   }
   const finishedMs = deps.now();
+  const row: JobRunRow = {
+    job,
+    status: outcome.status,
+    startedAt: new Date(startedMs),
+    finishedAt: new Date(finishedMs),
+    durationMs: Math.max(0, finishedMs - startedMs),
+    processed: typeof outcome.processed === 'number' ? outcome.processed : null,
+    detail: truncateDetail(outcome.detail),
+  };
   try {
-    await deps.write({
-      job,
-      status: outcome.status,
-      startedAt: new Date(startedMs),
-      finishedAt: new Date(finishedMs),
-      durationMs: Math.max(0, finishedMs - startedMs),
-      processed: typeof outcome.processed === 'number' ? outcome.processed : null,
-      detail: truncateDetail(outcome.detail),
-    });
+    await deps.write(row);
+    // The DB answered, so anything held during an earlier outage can land now.
+    deps.outbox.clearFailure();
+    await flushLedgerOutbox(deps);
   } catch (err) {
-    // The observer must never break the observed.
-    deps.log(`[job-health] ledger write failed for "${job}" (swallowed): ${String(err)}`);
+    // The observer must never break the observed — but it must not vanish
+    // either. Record it somewhere that does not need Postgres (stderr), and
+    // keep the row for replay. See section 3a.
+    const diagnosis = describeDbError(err);
+    deps.outbox.add(row, diagnosis, deps.now());
+    deps.logUnrecorded(
+      `[job-health] LEDGER UNAVAILABLE — run not persisted: ` +
+        JSON.stringify({
+          job: row.job,
+          status: row.status,
+          startedAt: row.startedAt.toISOString(),
+          durationMs: row.durationMs,
+          processed: row.processed,
+          detail: row.detail,
+          ledgerError: diagnosis,
+          heldForReplay: deps.outbox.size(),
+        }),
+    );
   }
   return outcome;
 }
@@ -371,6 +541,8 @@ export interface TrackedJobDeps {
   streaks: FailureStreakTracker;
   alertAfterFailures: number;
   sustainedMs: number;
+  /** Read (not written) here, so the alert can say whether the ledger is down too. */
+  outbox: LedgerOutbox;
   /** Arms the sustained-window re-check. Injected so tests drive it without
    *  timers; the default unrefs so it can never hold the process open. */
   schedule: (fn: () => void, ms: number) => void;
@@ -387,6 +559,7 @@ function defaultTrackedDeps(): TrackedJobDeps {
     streaks: jobFailureStreaks,
     alertAfterFailures: FAILURE_ALERT_THRESHOLD,
     sustainedMs: SUSTAINED_FAILURE_ALERT_MS,
+    outbox: jobLedgerOutbox,
     schedule: (fn, ms) => {
       const t = setTimeout(fn, ms);
       // Never keep the event loop (or a test runner) alive for an alert re-check.
@@ -467,9 +640,23 @@ async function emitJobFailureAlert(
     return;
   }
   const unhealthyMin = Math.max(0, Math.round((deps.now() - streak.firstFailedAtMs) / 60000));
+  // If the ledger is ALSO down, say so in the email. Without this line the two
+  // signals silently contradict each other: the alert reports a failure and
+  // /api/admin/job-health shows an unbroken run of healthy rows, because the
+  // failure row could not be written to the database that was the problem.
+  const ledgerFailure = deps.outbox.lastFailure();
+  const ledgerNote = ledgerFailure
+    ? `\nLEDGER ALSO UNAVAILABLE — this run is NOT in job_runs.\n` +
+      `  Ledger write failed with: ${ledgerFailure.error}\n` +
+      `  ${deps.outbox.size()} run(s) are held in memory and will be written when the ` +
+      `database is reachable again${deps.outbox.dropped() > 0 ? ` (${deps.outbox.dropped()} older row(s) dropped)` : ''}.\n` +
+      `  So /api/admin/job-health will look healthy for this window. It is not — the ` +
+      `database itself is the failure.\n`
+    : '';
   const body =
     `Scheduled job "${job}" could not complete its work.\n\n` +
-    `${detail}\n\n` +
+    `${detail}\n` +
+    `${ledgerNote}\n` +
     `Consecutive failures: ${streak.count} (no healthy run for ${unhealthyMin} min).\n` +
     `First failure in this streak (UTC): ${new Date(streak.firstFailedAtMs).toISOString()}\n` +
     `Time (UTC): ${new Date(deps.now()).toISOString()}\n\n` +

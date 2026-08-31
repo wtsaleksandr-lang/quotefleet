@@ -62,21 +62,104 @@ export class AlertDeduper {
 /** Process-wide de-dupe shared by every runCronSafely call (default deps). */
 export const defaultDeduper = new AlertDeduper();
 
+// ─────────────────────────────────────────────────────────────────────────────
+// WHICH ENVIRONMENT IS PAGING? — the thing these emails never said
+// ─────────────────────────────────────────────────────────────────────────────
+//
+// On 2026-08-31 ten "QuoteFleet job failed" emails arrived in ninety minutes
+// while production was completely healthy — its job ledger recorded 46 runs in
+// that window, every one `success` or `skipped`, and not one `failure` in the
+// table's entire history. The alerts were real; they were simply not from
+// production. They came from a process running the **dev** Doppler config,
+// whose Neon branch answers every query with SQLSTATE 53000 ("Your project has
+// exceeded the active time quota"). Their timestamps line up with that
+// process's restarts, not with production's tick schedule.
+//
+// Three things conspired, and each is fixed here or nearby:
+//
+//   1. `SUPER_ADMIN_EMAIL` is set in the `dev` Doppler config and NOT in `prd`.
+//      Only non-production could send these emails at all. (See the warning
+//      below — production alerting is currently inert, which is its own bug and
+//      needs the secret added to `prd`.)
+//   2. `.replit` sets `NODE_ENV = "production"` for the workspace as well as the
+//      deployment, so NODE_ENV cannot tell the two apart. `DOPPLER_CONFIG` can,
+//      and does.
+//   3. Nothing in the subject or body identified the sender's environment, so a
+//      dev container's quota problem was indistinguishable from a production
+//      outage — and got treated as one for hours.
+//
+// A development container must not page anyone. Non-production alerts are
+// therefore dropped by default, with an explicit opt-in for the case where
+// someone genuinely wants to watch a staging box.
+
+/** Env var that re-enables alert emails from a non-production config. */
+export const NON_PROD_ALERT_OPT_IN = 'CRON_ALERTS_FROM_NON_PROD';
+
+/**
+ * The deploy environment, from Doppler's injected config name.
+ *
+ * NOT from NODE_ENV: `.replit` pins that to "production" in the workspace too,
+ * so it is the one variable guaranteed to be useless for this question.
+ */
+export function deployEnvironment(env: NodeJS.ProcessEnv = process.env): string {
+  const raw = env.DOPPLER_CONFIG || env.DOPPLER_ENVIRONMENT || '';
+  return raw.trim().toLowerCase() || 'unknown';
+}
+
+/** Config names (and Doppler branch-config prefixes) that are not production. */
+const NON_PRODUCTION_NAMES = ['dev', 'stg', 'staging', 'ci', 'test', 'local', 'preview'];
+
+/**
+ * True only when the environment is POSITIVELY known to be non-production.
+ *
+ * Deliberately fail-open: an unrecognised or absent config name counts as
+ * production and still alerts. Silence is the worse failure — a real outage
+ * must never be suppressed because an env var was missing.
+ */
+export function isNonProductionEnvironment(name: string): boolean {
+  if (!name || name === 'unknown') return false;
+  return NON_PRODUCTION_NAMES.some((n) => name === n || name.startsWith(`${n}_`));
+}
+
 /**
  * Send an admin alert email for a failed/slow cron. Best-effort: if no
  * SUPER_ADMIN_EMAIL is configured, or the send fails, it only logs — an alert
  * must NEVER throw back into the scheduler. Not exported as the primary API;
  * callers use runCronSafely, but it is injectable for tests.
+ *
+ * Suppressed entirely on a non-production config unless CRON_ALERTS_FROM_NON_PROD=1.
  */
 export async function sendCronAlertEmail(subject: string, body: string): Promise<void> {
   try {
     const env = loadEnv();
-    const to = env.SUPER_ADMIN_EMAIL;
-    if (!to) {
-      console.warn('[cron-safety] cron alert not sent — no SUPER_ADMIN_EMAIL configured');
+    const envName = deployEnvironment();
+    const optedIn = process.env[NON_PROD_ALERT_OPT_IN] === '1';
+
+    if (isNonProductionEnvironment(envName) && !optedIn) {
+      console.warn(
+        `[cron-safety] alert SUPPRESSED — this process runs the "${envName}" config, not production. ` +
+          `Subject would have been: ${subject}. ` +
+          `Set ${NON_PROD_ALERT_OPT_IN}=1 to receive alerts from this environment.`,
+      );
       return;
     }
-    const out = await sendEmail({ to, subject, text: body });
+
+    const to = env.SUPER_ADMIN_EMAIL;
+    if (!to) {
+      console.warn(
+        `[cron-safety] cron alert NOT SENT — no SUPER_ADMIN_EMAIL in the "${envName}" config. ` +
+          `Nothing will ever be alerted from this environment until it is set.`,
+      );
+      return;
+    }
+
+    // Always name the environment. Tag the subject only when it is not
+    // production, so production's subject lines (and any filters on them) are
+    // unchanged while an opted-in dev/staging alert is impossible to mistake.
+    const taggedSubject = isNonProductionEnvironment(envName) ? `[${envName}] ${subject}` : subject;
+    const stamped = `Environment: ${envName}\n\n${body}`;
+
+    const out = await sendEmail({ to, subject: taggedSubject, text: stamped });
     if (!out.ok) {
       console.error(`[cron-safety] cron alert email failed: ${out.error ?? 'unknown error'}`);
     }
