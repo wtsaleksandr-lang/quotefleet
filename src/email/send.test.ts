@@ -436,3 +436,41 @@ describe('isUndeliverableReservedRecipient — RFC 2606/6761 guard', () => {
     expect(mockSendMail).not.toHaveBeenCalled(); // SMTP fallback never attempted
   });
 });
+
+/**
+ * `ok` is not `sent`. Callers that write a PERMANENT idempotency marker on the
+ * strength of the result (the lifecycle / dunning / follow-up / digest crons all
+ * stamp "already sent" and never revisit the row) must ask the narrower
+ * question, or a logged-only result loses the message forever.
+ */
+describe('wasSentByAProvider — "the call did not fail" is not "it was delivered"', () => {
+  it('is true only when a real provider accepted the message', async () => {
+    const { wasSentByAProvider } = await import('./send.js');
+    expect(wasSentByAProvider({ ok: true, provider: 'resend', id: 'abc' })).toBe(true);
+    expect(wasSentByAProvider({ ok: true, provider: 'smtp' })).toBe(true);
+  });
+
+  it('is FALSE for the dev stdout fallback, which returns ok:true', async () => {
+    const { wasSentByAProvider } = await import('./send.js');
+    // No provider configured — nothing reached the wire.
+    expect(wasSentByAProvider({ ok: true, logged: true, provider: 'stdout' })).toBe(false);
+  });
+
+  it('is FALSE for the reserved-recipient no-op, which also returns ok:true', async () => {
+    const { wasSentByAProvider } = await import('./send.js');
+    expect(wasSentByAProvider({ ok: true, logged: true, provider: 'stdout' })).toBe(false);
+  });
+
+  it('is FALSE for an outright provider failure', async () => {
+    const { wasSentByAProvider } = await import('./send.js');
+    expect(wasSentByAProvider({ ok: false, error: 'resend HTTP 401' })).toBe(false);
+  });
+
+  it('agrees with the real sendEmail on a reserved recipient', async () => {
+    // End-to-end: the ONE shape a caller is most likely to mistake for success.
+    const { sendEmail, wasSentByAProvider } = await import('./send.js');
+    const out = await sendEmail({ to: 'nobody@example.com', subject: 'x', text: 'y' });
+    expect(out.ok).toBe(true);
+    expect(wasSentByAProvider(out)).toBe(false);
+  });
+});

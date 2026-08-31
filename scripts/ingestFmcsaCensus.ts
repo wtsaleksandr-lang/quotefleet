@@ -33,6 +33,18 @@
  *     pnpm exec tsx scripts/ingestFmcsaCensus.ts --limit 0
  */
 import { dbLeadStore, type LeadStore, type UpsertLeadInput } from '../src/server/outreach/leadStore.js';
+// SHARED Socrata transport policy. This script and the carrier-directory ingest
+// pull the SAME two FMCSA resources, so they must treat a soft failure the same
+// way — a second, subtly different copy of the rules is how one of them silently
+// keeps the hole. See carrierIngest.ts for the full reasoning.
+import {
+  CENSUS_MIN_SAMPLE,
+  CensusSoftFailureError,
+  SocrataHttpError,
+  SocrataPayloadError,
+  censusPayloadPlausible,
+  withSocrataRetry,
+} from '../src/server/directory/carrierIngest.js';
 
 // ─── Socrata sources ──────────────────────────────────────────────────────
 const SOCRATA_BASE = 'https://data.transportation.gov/resource';
@@ -180,9 +192,19 @@ export function filterAndNormalizeBrokers(
 async function socrataJson<T>(resource: string, params: Record<string, string>): Promise<T[]> {
   const qs = new URLSearchParams(params).toString();
   const url = `${SOCRATA_BASE}/${resource}.json?${qs}`;
-  const res = await fetch(url, { headers: { 'User-Agent': FETCH_UA, Accept: 'application/json' } });
-  if (!res.ok) throw new Error(`Socrata ${resource} ${res.status}: ${await res.text().catch(() => '')}`);
-  return (await res.json()) as T[];
+  return withSocrataRetry(resource, async () => {
+    const res = await fetch(url, { headers: { 'User-Agent': FETCH_UA, Accept: 'application/json' } });
+    if (!res.ok) throw new SocrataHttpError(resource, res.status, await res.text().catch(() => ''));
+    // A 200 is not a payload. Socrata's `{"error":true,…}` envelope parses fine
+    // and would flow on as "no rows" — which, for the census join, reads as
+    // "FMCSA has never heard of any of these brokers" and nulls their columns
+    // through dbLeadStore.upsert's unconditional `.set({...values})`.
+    const body: unknown = await res.json();
+    if (!Array.isArray(body)) {
+      throw new SocrataPayloadError(resource, `expected a JSON array, got ${body === null ? 'null' : typeof body}`);
+    }
+    return body as T[];
+  });
 }
 
 /** One page of active property brokers, ordered by docket_number for stable paging. */
@@ -214,6 +236,15 @@ export async function fetchCensusByDots(dots: string[]): Promise<Map<string, Cen
     for (const r of rows) {
       const dot = normalizeDot(r.dot_number);
       if (dot) map.set(dot, r);
+    }
+    // A chunk of 200 contiguous USDOTs matching NOTHING is a truncated or empty
+    // body, not an empty census. Caught per chunk so the page-level floor below
+    // cannot dilute one dead chunk into an acceptable average.
+    if (chunk.length >= CENSUS_MIN_SAMPLE && rows.length === 0) {
+      throw new SocrataPayloadError(
+        CENSUS_ID,
+        `0 of ${chunk.length} requested USDOTs matched — an empty or truncated body, not an empty census`,
+      );
     }
   }
   return map;
@@ -261,6 +292,14 @@ export async function runIngest(
 
     const dots = liRows.map((r) => normalizeDot(r.dot_number)).filter((d): d is string => !!d);
     const censusByDot = await fetchCensus(dots);
+    // SOFT FAILURE = FAILURE. `dbLeadStore.upsert` overwrites an existing broker
+    // with `.set({ ...values })` — unconditionally — so a census payload that
+    // collapsed would blank censusEmail / powerUnits / the physical address on
+    // every broker in the page. Checked here, on the Map the fetch returned, so
+    // the guard covers any future census implementation. See carrierIngest.ts.
+    if (!censusPayloadPlausible(dots.length, censusByDot.size)) {
+      throw new CensusSoftFailureError(dots.length, censusByDot.size, offset);
+    }
     const leads = filterAndNormalizeBrokers(liRows, censusByDot);
 
     for (const lead of leads) {

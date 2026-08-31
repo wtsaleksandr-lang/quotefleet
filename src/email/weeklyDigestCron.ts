@@ -26,7 +26,7 @@
 import { eq } from 'drizzle-orm';
 import { db } from '../db/client.js';
 import { tenants, type Tenant } from '../db/schema.js';
-import { sendEmail } from './send.js';
+import { sendEmail, wasSentByAProvider } from './send.js';
 import { weeklyDigestEmail } from './templates.js';
 import { unsubscribeUrl } from './unsubscribe.js';
 import { computeWeeklyStats, type WeeklyDigestStats } from './weeklyDigest.js';
@@ -234,6 +234,15 @@ async function sendOne(t: Tenant, stats: WeeklyDigestStats, now: Date): Promise<
     });
     if (!out.ok) {
       console.error(`[weeklyDigest] send FAILED (tenant ${t.id}): ${out.error ?? 'unknown error'}`);
+      return false;
+    }
+    // `ok` is not `sent` — a logged-only result never reached the wire, and
+    // stamping lastWeeklyDigestAt would skip this tenant's week entirely.
+    // See wasSentByAProvider.
+    if (!wasSentByAProvider(out)) {
+      console.warn(
+        `[weeklyDigest] LOGGED ONLY (provider=${out.provider ?? 'none'}, tenant ${t.id}) — not stamping lastWeeklyDigestAt`,
+      );
       return false;
     }
     await db()

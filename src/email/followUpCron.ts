@@ -27,7 +27,7 @@ import { and, eq, isNotNull, inArray } from 'drizzle-orm';
 import { db } from '../db/client.js';
 import { runTrackedJob, outcomeFromTick, type TickResult } from '../server/jobHealth.js';
 import { brandConfigs, leads, tenants, type Tenant } from '../db/schema.js';
-import { sendEmail, brandedFrom } from './send.js';
+import { sendEmail, brandedFrom, wasSentByAProvider } from './send.js';
 import { leadUnsubscribeUrl } from './unsubscribe.js';
 import { resolveFollowUpConfig, type FollowUpConfig } from '../server/features.js';
 import { canUseProFeature } from '../server/plans.js';
@@ -196,6 +196,14 @@ async function sendTouch(
     if (!out.ok) {
       console.error(
         `[followup] ${touch} send FAILED (lead ${lead.refId}): ${out.error ?? 'unknown error'}`
+      );
+      return false;
+    }
+    // `ok` is not `sent` — a logged-only result never reached the wire, and the
+    // stamp below permanently marks this touch done. See wasSentByAProvider.
+    if (!wasSentByAProvider(out)) {
+      console.warn(
+        `[followup] ${touch} was LOGGED ONLY (provider=${out.provider ?? 'none'}, lead ${lead.refId}) — not marking it sent`
       );
       return false;
     }
