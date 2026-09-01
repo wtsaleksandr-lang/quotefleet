@@ -15,7 +15,7 @@ import type { Express, Request, Response, NextFunction, RequestHandler } from 'e
 import { readFile } from 'node:fs/promises';
 import { resolve } from 'node:path';
 import { z } from 'zod';
-import { currencyForCountry, customerFacingLines, MAX_QUOTABLE_WEIGHT_LBS, type CalcRequest } from '../../calc/engine.js';
+import { currencyForCountry, customerFacingLines, maxQuotableWeightLbs, type CalcRequest } from '../../calc/engine.js';
 import { distanceBetween } from '../../calc/distance.js';
 import { estimateTransit } from '../../calc/transit.js';
 import { loadEnv } from '../../config.js';
@@ -112,7 +112,10 @@ export function registerProspectDemoRoutes(app: Express, deps: ProspectDemoRoute
       const parse = QuoteSchema.safeParse(req.body);
       if (!parse.success) return res.status(400).json({ error: 'Invalid input', details: parse.error.flatten() });
       const body = parse.data;
-      if (typeof body.weightLbs === 'number' && body.weightLbs > MAX_QUOTABLE_WEIGHT_LBS) {
+      // Per-lane ceiling — see maxQuotableWeightLbs. Unchanged (80,000 lb)
+      // for any lane without OS/OW permit coverage.
+      const weightCeiling = maxQuotableWeightLbs(body.pickup.state, body.delivery.state);
+      if (typeof body.weightLbs === 'number' && body.weightLbs > weightCeiling) {
         return res.status(400).json({ error: 'That load is over the legal highway weight limit.' });
       }
       const pickup = resolveDemoLocation(body.pickup);

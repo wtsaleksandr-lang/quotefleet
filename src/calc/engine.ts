@@ -40,14 +40,47 @@ import {
   type MatrixCellInput,
   type ZoneDefInput,
 } from './rateMatrix.js';
+import { maxQuotableWeightLbs as osowMaxQuotableWeightLbs } from './osow/engine.js';
 
 /**
- * Absolute upper bound (pounds) for an automated instant quote. Anything above
- * this is over-legal / oversize and must route to a human ("please contact us")
- * rather than silently pricing an impossible load. Shared by the client widget
- * (mirrored as a literal) and the server quote routes.
+ * Federal legal gross weight on the Interstate system (23 U.S.C. 127). Above
+ * this a load is over-legal and needs an oversize/overweight permit — it is a
+ * PERMITTING threshold, not a quoting one.
+ */
+export const FEDERAL_LEGAL_GROSS_WEIGHT_LBS = 80000;
+
+/**
+ * Default upper bound (pounds) for an automated instant quote, used wherever
+ * we have no OS/OW permit coverage for the lane. Anything above it routes to
+ * a human ("please contact us") rather than silently pricing a load whose
+ * permit cost we cannot compute. Mirrored as a literal in the client widget.
+ *
+ * This used to be the whole story, and it conflated "over the legal limit"
+ * with "unquotable". They are different: a 100,000 lb load inside Texas is
+ * over-legal AND fully priceable, because `src/calc/osow` can compute its
+ * permit from published TxDMV figures. Use `maxQuotableWeightLbs()` to get
+ * the real ceiling for a lane; this constant remains the floor it falls back
+ * to, so every existing caller keeps its current behaviour unchanged.
  */
 export const MAX_QUOTABLE_WEIGHT_LBS = 80000;
+
+/**
+ * The heaviest quotable load for a specific lane. Returns
+ * `MAX_QUOTABLE_WEIGHT_LBS` unless both ends sit in one jurisdiction whose
+ * OS/OW rules we hold, in which case it returns that jurisdiction's superload
+ * threshold. See the implementation for why the same-state condition is
+ * required rather than merely conservative.
+ */
+export function maxQuotableWeightLbs(
+  pickupState?: string | null,
+  deliveryState?: string | null,
+): number {
+  return osowMaxQuotableWeightLbs(
+    pickupState,
+    deliveryState,
+    MAX_QUOTABLE_WEIGHT_LBS,
+  );
+}
 
 /**
  * Quote-validity window, in calendar days. SINGLE SOURCE OF TRUTH for how long

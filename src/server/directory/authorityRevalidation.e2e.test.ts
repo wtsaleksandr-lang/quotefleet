@@ -246,7 +246,11 @@ describe('/api/directory/carrier/:usdot/authority — the bot gate on the wire',
     expect(status).toBe(200);
     expect(spies.lookup).toHaveBeenCalledTimes(1);
     expect(body).toMatchObject({ status: 'active', live: true, reason: 'fresh' });
-    expect(body.checkedLabel).toMatch(/^\d{1,2} \w{3} \d{4}$/);
+    // `\w{3,4}`, not `\w{3}`: en-GB abbreviates September to the four-letter
+    // "Sept", so this assertion started failing on 1 September 2026 for every
+    // PR in the repo. The formatter is right — the regex was wrong to assume
+    // every short month name is exactly three letters.
+    expect(body.checkedLabel).toMatch(/^\d{1,2} \w{3,4} \d{4}$/);
   });
 
   it('serves a cached result without calling FMCSA', async () => {
