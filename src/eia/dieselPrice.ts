@@ -23,6 +23,7 @@ import { AUTO_FSC_DEFAULTS } from '../calc/defaults.js';
 import { autoFscPerMile } from '../calc/fuelSurcharge.js';
 import { releaseBody, exchangeTimeoutSignal } from '../http/responseBody.js';
 import { runTrackedJob, jobSuccess, jobFailure } from '../server/jobHealth.js';
+import { startCronSchedule } from '../server/cronSchedule.js';
 
 const CACHE_KEY = 'eia_diesel_weekly';
 const EIA_SERIES = 'EMD_EPD2D_PTE_NUS_DPG';
@@ -251,7 +252,6 @@ export async function resolveFscForTenant(tenant: Pick<Tenant, 'fscMode'>): Prom
 // FUEL_CRON_DISABLED=1 (tests / second instance).
 // ────────────────────────────────────────────────────────────────────
 const WEEK_MS = 7 * DAY_MS;
-const STARTUP_DELAY_MS = 45 * 1000;
 let cronStarted = false;
 
 export function startFuelSurchargeCron(): void {
@@ -261,11 +261,11 @@ export function startFuelSurchargeCron(): void {
     return;
   }
   cronStarted = true;
-  setTimeout(() => void refreshOnce('startup'), STARTUP_DELAY_MS);
-  setInterval(() => void refreshOnce('weekly'), WEEK_MS);
-  console.log(
-    `[fsc.cron] scheduled — first run in ${STARTUP_DELAY_MS / 1000}s, then every ${WEEK_MS / DAY_MS} days`
-  );
+  startCronSchedule({
+    cron: 'fuel-surcharge',
+    tickMs: WEEK_MS,
+    run: (reason) => refreshOnce(reason === 'startup' ? 'startup' : 'weekly'),
+  });
 }
 
 async function refreshOnce(reason: string): Promise<void> {

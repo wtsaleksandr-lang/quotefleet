@@ -20,6 +20,7 @@ import {
   FailureStreakTracker,
   FAILURE_ALERT_THRESHOLD,
   SUSTAINED_FAILURE_ALERT_MS,
+  LedgerOutbox,
   type JobRunRow,
   type TickResult,
   type TrackedJobDeps,
@@ -75,16 +76,31 @@ describe('recordJobRun — outcome recording', () => {
     expect(l.rows[0].durationMs).toBe(3_500);
   });
 
-  it('a ledger write failure is swallowed — the observer never breaks the observed', async () => {
+  it('a ledger write failure never breaks the job — and the run is NOT lost', async () => {
+    // The observer must not break the observed. But "swallowed" was the old,
+    // weaker contract: it made a DB outage invisible, which is exactly why 10
+    // failure emails arrived while job_runs showed zero failures — the job
+    // failed AND its ledger row failed, because both need the same Postgres.
+    // Now the row is held for replay and reported somewhere that does not need
+    // the database, so the outage is recordable.
     const log = vi.fn();
+    const logUnrecorded = vi.fn();
+    const outbox = new LedgerOutbox();
     const out = await recordJobRun('j', () => jobSuccess(1), {
       write: async () => {
         throw new Error('db down');
       },
       log,
+      logUnrecorded,
+      outbox,
     });
-    expect(out.status).toBe('success');
-    expect(log).toHaveBeenCalledWith(expect.stringContaining('ledger write failed'));
+    expect(out.status).toBe('success'); // the job itself is unaffected
+    expect(outbox.size()).toBe(1); // held for replay, not discarded
+    expect(logUnrecorded).toHaveBeenCalledWith(expect.stringContaining('LEDGER UNAVAILABLE'));
+    // and the DB-independent record carries enough to reconstruct the run
+    const line = String(logUnrecorded.mock.calls[0]?.[0] ?? '');
+    expect(line).toContain('"job":"j"');
+    expect(line).toContain('"status":"success"');
   });
 
   it('truncates an oversized detail rather than storing an essay', () => {
@@ -137,6 +153,7 @@ describe('runTrackedJob — ledger + alert threshold + de-dupe', () => {
       streaks: new FailureStreakTracker(),
       alertAfterFailures: FAILURE_ALERT_THRESHOLD,
       sustainedMs: SUSTAINED_FAILURE_ALERT_MS,
+      outbox: new LedgerOutbox(),
       schedule: (fn, ms) => void timers.push({ fn, ms }),
       timers,
       ...over,

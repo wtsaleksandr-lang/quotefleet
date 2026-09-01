@@ -13,9 +13,10 @@
  */
 import { recomputeMarketplaceAggregates } from './sync.js';
 import { runTrackedJob, outcomeFromTick, type TickResult } from '../server/jobHealth.js';
+import { startCronSchedule } from '../server/cronSchedule.js';
+import { describeDbError } from '../db/retry.js';
 
 const HOUR_MS = 60 * 60 * 1000;
-const STARTUP_DELAY_MS = 30 * 1000;
 
 let started = false;
 
@@ -27,12 +28,13 @@ export function startMarketplaceCron(): void {
   }
   started = true;
 
-  setTimeout(() => void trackedRunOnce('startup'), STARTUP_DELAY_MS);
-  setInterval(() => void trackedRunOnce('hourly'), HOUR_MS);
-
-  console.log(
-    `[marketplace.cron] scheduled — first run in ${STARTUP_DELAY_MS / 1000}s, then every ${HOUR_MS / 60_000} min`
-  );
+  // Staggered so this does not share an instant with the other eleven crons —
+  // the interval's phase now inherits the offset. See server/cronSchedule.ts.
+  startCronSchedule({
+    cron: 'marketplace-aggregates',
+    tickMs: HOUR_MS,
+    run: (reason) => trackedRunOnce(reason === 'startup' ? 'startup' : 'hourly'),
+  });
 }
 
 /** Scheduling site: records every tick to the job ledger and alerts on failure.
@@ -54,7 +56,10 @@ async function runOnce(reason: string): Promise<TickResult> {
     console.warn(`[marketplace.cron] recompute failed (${reason}):`, err);
     // Was a bare swallow: the caller could not distinguish this from a clean
     // tick, so a permanently-failing recompute looked identical to success.
-    return { ok: false, processed: 0, detail: err instanceof Error ? err.message : String(err) };
+    // describeDbError unwraps drizzle's `Failed query: <entire SQL>` wrapper to
+    // the actual cause — otherwise the alert email is pages of SQL and no
+    // diagnosis, which is exactly how the 2026-08-31 alerts read.
+    return { ok: false, processed: 0, detail: describeDbError(err) };
   }
 }
 

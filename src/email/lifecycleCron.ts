@@ -42,9 +42,10 @@ import {
 import { unsubscribeUrl } from './unsubscribe.js';
 import { loadEnv } from '../config.js';
 import { runTrackedJob, outcomeFromTick, type TickResult } from '../server/jobHealth.js';
+import { startCronSchedule } from '../server/cronSchedule.js';
+import { describeDbError, withDbRetry } from '../db/retry.js';
 
 const TICK_MS = 10 * 60 * 1000; // 10 min
-const STARTUP_DELAY_MS = 60 * 1000;
 
 let started = false;
 
@@ -55,11 +56,7 @@ export function startLifecycleEmailCron(): void {
     return;
   }
   started = true;
-  setTimeout(() => void trackedRunOnce('startup'), STARTUP_DELAY_MS);
-  setInterval(() => void trackedRunOnce('tick'), TICK_MS);
-  console.log(
-    `[email.cron] scheduled — first run in ${STARTUP_DELAY_MS / 1000}s, then every ${TICK_MS / 60_000} min`
-  );
+  startCronSchedule({ cron: 'lifecycle-email', tickMs: TICK_MS, run: trackedRunOnce });
 }
 
 /** Scheduling site: records every tick to the job ledger and alerts on failure.
@@ -80,10 +77,20 @@ export async function runOnce(reason: string): Promise<TickResult> {
   try {
     // Fetch all free-plan tenants — only ones who could need a
     // lifecycle email. Paid tenants don't get trial emails.
-    const rows = await db()
-      .select()
-      .from(tenants)
-      .where(and(eq(tenants.plan, 'free'), isNotNull(tenants.trialEndsAt)));
+    //
+    // Retried on transient connection/wake failures ONLY, and only here: this
+    // is a pure read with no side effects, so running it twice is free. The
+    // retry deliberately does NOT wrap the send loop below — re-running that
+    // after a mid-pass connection drop would re-send every email it had
+    // already delivered.
+    const rows = await withDbRetry(
+      () =>
+        db()
+          .select()
+          .from(tenants)
+          .where(and(eq(tenants.plan, 'free'), isNotNull(tenants.trialEndsAt))),
+      { label: 'lifecycle-email tenant scan' },
+    );
 
     for (const t of rows) {
       // CAN-SPAM / CASL: a tenant who unsubscribed from product updates gets
@@ -98,7 +105,9 @@ export async function runOnce(reason: string): Promise<TickResult> {
   } catch (err) {
     console.warn(`[email.cron] tick failed (${reason}):`, err);
     // Was a bare `return` — indistinguishable from a clean tick to the caller.
-    return { ok: false, processed: 0, detail: err instanceof Error ? err.message : String(err) };
+    // describeDbError unwraps drizzle's `Failed query: <entire SQL>` so the
+    // alert names the cause instead of quoting the tenants column list.
+    return { ok: false, processed: 0, detail: describeDbError(err) };
   }
   const ms = Date.now() - t0;
   if (sent > 0) console.log(`[email.cron] tick=${reason} sent=${sent} elapsed=${ms}ms`);

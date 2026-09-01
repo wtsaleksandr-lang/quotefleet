@@ -28,9 +28,9 @@ import { poaApplications, poaAuditEvents, type PoaApplication } from '../db/sche
 import { sendEmail } from './send.js';
 import { loadEnv } from '../config.js';
 import { runTrackedJob, outcomeFromTick, jobSkipped, type TickResult } from '../server/jobHealth.js';
+import { startCronSchedule } from '../server/cronSchedule.js';
 
 const TICK_MS = 60 * 60 * 1000; // hourly
-const STARTUP_DELAY_MS = 120 * 1000;
 const DAY_MS = 24 * 60 * 60 * 1000;
 
 /** Daily send slot: 15:00 UTC. */
@@ -53,9 +53,8 @@ export function startManifestRenewalCron(): void {
     return;
   }
   started = true;
-  setTimeout(() => void maybeRun('startup'), STARTUP_DELAY_MS);
-  setInterval(() => void maybeRun('tick'), TICK_MS);
-  console.log(`[manifestRenewal.cron] scheduled — hourly tick; daily slot ${SEND_HOUR}:00 UTC`);
+  startCronSchedule({ cron: 'manifest-renewal', tickMs: TICK_MS, run: maybeRun });
+  console.log(`[manifestRenewal.cron] daily slot ${SEND_HOUR}:00 UTC`);
 }
 
 /** Gate the hourly tick to the daily send slot, then run the pass. */

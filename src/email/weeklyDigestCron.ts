@@ -33,9 +33,9 @@ import { computeWeeklyStats, type WeeklyDigestStats } from './weeklyDigest.js';
 import { hasCoreAccess, isTrialing } from '../server/plans.js';
 import { loadEnv } from '../config.js';
 import { runTrackedJob, outcomeFromTick, jobSkipped, type TickResult } from '../server/jobHealth.js';
+import { startCronSchedule } from '../server/cronSchedule.js';
 
 const TICK_MS = 60 * 60 * 1000; // hourly
-const STARTUP_DELAY_MS = 90 * 1000;
 const DAY_MS = 24 * 60 * 60 * 1000;
 
 /** Primary send slot: Monday (UTC day 1), 14:00 UTC — ALL audiences. */
@@ -66,10 +66,9 @@ export function startWeeklyDigestCron(): void {
     return;
   }
   started = true;
-  setTimeout(() => void maybeRun('startup'), STARTUP_DELAY_MS);
-  setInterval(() => void maybeRun('tick'), TICK_MS);
+  startCronSchedule({ cron: 'weekly-digest', tickMs: TICK_MS, run: maybeRun });
   console.log(
-    `[weeklyDigest.cron] scheduled — hourly tick; slots Mon ${SEND_HOUR}:00 UTC (all)` +
+    `[weeklyDigest.cron] slots Mon ${SEND_HOUR}:00 UTC (all)` +
       (trialExtraEnabled() ? ` + Thu ${SEND_HOUR}:00 UTC (trial only)` : '')
   );
 }

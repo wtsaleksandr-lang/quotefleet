@@ -16,12 +16,9 @@
  */
 import { runTrackedJob } from './jobHealth.js';
 import { runJobHealthWatchdogOnce } from './jobHealthWatchdog.js';
+import { startCronSchedule } from './cronSchedule.js';
 
 const TICK_MS = 60 * 60 * 1000; // hourly
-/** Longer than any other cron's startup delay (max is 2 min) so the first check
- *  runs after the jobs it watches have had a chance to record their first tick,
- *  rather than racing them and seeing an empty ledger. */
-const STARTUP_DELAY_MS = 5 * 60 * 1000;
 
 let started = false;
 
@@ -32,11 +29,11 @@ export function startJobHealthWatchdogCron(): void {
     return;
   }
   started = true;
-  setTimeout(() => void tick('startup'), STARTUP_DELAY_MS);
-  setInterval(() => void tick('tick'), TICK_MS);
-  console.log(
-    `[job-health.cron] scheduled — first check in ${STARTUP_DELAY_MS / 60_000} min, then hourly`,
-  );
+  // Its offset in CRON_STAGGER_MS is deliberately the LAST one, so the first
+  // check runs after every job it watches has had a chance to record a first
+  // tick instead of racing them and reading an empty ledger. A unit test pins
+  // that ordering so a future offset change cannot silently break it.
+  startCronSchedule({ cron: 'job-health-watchdog', tickMs: TICK_MS, run: tick });
 }
 
 async function tick(reason: string): Promise<void> {

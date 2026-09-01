@@ -44,9 +44,9 @@ import { runTrackedJob, jobSkipped, jobSuccess, jobFailure, type JobOutcome } fr
 import { classifyJobs, readJobHealth, JOB_REGISTRY } from './jobHealthWatchdog.js';
 import { listOpenOpsAlerts, opsAlertLine, isOpsAlertUrgent, type OpsAlertRow } from './opsAlerts.js';
 import { BILLING_PAST_DUE_KEY } from './trialGating.js';
+import { startCronSchedule } from './cronSchedule.js';
 
 const TICK_MS = 60 * 60 * 1000; // hourly tick
-const STARTUP_DELAY_MS = 3 * 60 * 1000;
 /** One digest a day, at 13:00 UTC (morning in North America). */
 const SEND_HOUR = 13;
 const DAY_MS = 24 * 60 * 60 * 1000;
@@ -67,9 +67,8 @@ export function startOpsDigestCron(): void {
     return;
   }
   started = true;
-  setTimeout(() => void maybeRun('startup'), STARTUP_DELAY_MS);
-  setInterval(() => void maybeRun('tick'), TICK_MS);
-  console.log(`[opsDigest.cron] scheduled — hourly tick; daily digest at ${SEND_HOUR}:00 UTC`);
+  startCronSchedule({ cron: 'ops-digest', tickMs: TICK_MS, run: maybeRun });
+  console.log(`[opsDigest.cron] daily digest at ${SEND_HOUR}:00 UTC`);
 }
 
 /** Hourly tick; the 23 non-slot hours record as `skipped` so this job has an
