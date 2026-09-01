@@ -1255,6 +1255,21 @@
   // Over-legal ceiling for an automated instant quote — mirrors the server's
   // MAX_QUOTABLE_WEIGHT_LBS (src/calc/engine.ts). Above this we route to a human.
   var MAX_QUOTABLE_WEIGHT_LBS = 80000;
+  // Superload thresholds for the jurisdictions whose OS/OW permit rules we
+  // hold, mirroring src/calc/osow/jurisdictions/*.ts. A lane with BOTH ends in
+  // one covered state can be quoted past the 80,000 lb federal legal limit,
+  // because the server can price that state's permit from published figures.
+  // Any other lane keeps the 80,000 lb ceiling — we know the endpoints, not
+  // the states in between, so a cross-state heavy load still goes to a human.
+  // Pinned against the server-side data by src/calc/osow/widgetMirror.test.ts.
+  var OSOW_SUPERLOAD_LBS = { TX: 254300 };
+  function maxQuotableWeightLbs(pickup, delivery) {
+    var from = String((pickup && pickup.state) || '').trim().toUpperCase();
+    var to = String((delivery && delivery.state) || '').trim().toUpperCase();
+    if (!from || !to || from !== to) return MAX_QUOTABLE_WEIGHT_LBS;
+    var ceiling = OSOW_SUPERLOAD_LBS[from];
+    return ceiling ? Math.max(MAX_QUOTABLE_WEIGHT_LBS, ceiling) : MAX_QUOTABLE_WEIGHT_LBS;
+  }
   // Sanity ceiling for a single LTL piece dimension (inches). A 53' trailer is
   // ~636"; anything beyond is a typo / not real LTL freight.
   var MAX_LTL_DIM_IN = 636;
@@ -2074,7 +2089,7 @@
       if (lt.validItems < 1) { fail('Add at least one item with its weight and length / width / height so we can determine the freight class.'); return; }
     }
     if (!(req.weightLbs > 0)) { fail(req.service === 'ltl' ? 'Enter the shipment weight — LTL is priced by weight and size.' : 'Enter the load weight (lbs).'); return; }
-    if (req.weightLbs > MAX_QUOTABLE_WEIGHT_LBS) { fail('That weight is over the legal limit for a standard instant quote. For over-legal / oversize loads, please contact us for a custom quote.'); return; }
+    if (req.weightLbs > maxQuotableWeightLbs(req.pickup, req.delivery)) { fail('That weight is over the legal limit for a standard instant quote. For over-legal / oversize loads, please contact us for a custom quote.'); return; }
     if (req.service === 'ltl') {
       if (!(req.lengthIn > 0 && req.widthIn > 0 && req.heightIn > 0)) { fail('Enter length, width, and height for each item so we can determine the freight class.'); return; }
       if (req.lengthIn > MAX_LTL_DIM_IN || req.widthIn > MAX_LTL_DIM_IN || req.heightIn > MAX_LTL_DIM_IN) { fail('Those dimensions look too large for LTL freight. Please double-check length / width / height, or contact us for oversize / full-truckload freight.'); return; }

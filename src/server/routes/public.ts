@@ -30,7 +30,7 @@ import {
   callbackRequests,
 } from '../../db/schema.js';
 import express from 'express';
-import { calculate, currencyForCountry, customerFacingLines, MAX_QUOTABLE_WEIGHT_LBS, type CalcRequest, type FscOptions } from '../../calc/engine.js';
+import { calculate, currencyForCountry, customerFacingLines, maxQuotableWeightLbs, type CalcRequest, type FscOptions } from '../../calc/engine.js';
 import type { MatrixCellInput, ZoneDefInput } from '../../calc/rateMatrix.js';
 import { resolveFscForTenant, asOfLabel } from '../../eia/dieselPrice.js';
 import { estimateTransit } from '../../calc/transit.js';
@@ -575,7 +575,12 @@ export function registerPublicRoutes(app: Express) {
       return res.status(400).json({ error: 'Invalid input', details: parse.error.flatten() });
     }
     const body = parse.data;
-    if (typeof body.weightLbs === 'number' && body.weightLbs > MAX_QUOTABLE_WEIGHT_LBS) {
+    // Ceiling is per-lane: a load inside a jurisdiction whose OS/OW permit
+    // rules we hold can be priced well past the 80,000 lb federal legal limit
+    // (see maxQuotableWeightLbs). Everywhere else this is still 80,000 and the
+    // contact-us path below is unchanged.
+    const weightCeiling = maxQuotableWeightLbs(body.pickup.state, body.delivery.state);
+    if (typeof body.weightLbs === 'number' && body.weightLbs > weightCeiling) {
       return res.status(400).json({ error: OVER_LEGAL_WEIGHT_MESSAGE });
     }
     const { cards, accs, zones, terms, matrices, matrixZones } = await loadConfig(tenant.id);
@@ -818,7 +823,12 @@ export function registerPublicRoutes(app: Express) {
       return res.status(400).json({ error: 'Invalid input', details: parse.error.flatten() });
     }
     const body = parse.data;
-    if (typeof body.weightLbs === 'number' && body.weightLbs > MAX_QUOTABLE_WEIGHT_LBS) {
+    // Ceiling is per-lane: a load inside a jurisdiction whose OS/OW permit
+    // rules we hold can be priced well past the 80,000 lb federal legal limit
+    // (see maxQuotableWeightLbs). Everywhere else this is still 80,000 and the
+    // contact-us path below is unchanged.
+    const weightCeiling = maxQuotableWeightLbs(body.pickup.state, body.delivery.state);
+    if (typeof body.weightLbs === 'number' && body.weightLbs > weightCeiling) {
       return res.status(400).json({ error: OVER_LEGAL_WEIGHT_MESSAGE });
     }
     // Optional customer attachments (work order / delivery order). Validated from
