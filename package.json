@@ -15,7 +15,7 @@
     "test:watch": "vitest",
     "check:spacing": "node scripts/check-spacing.mjs",
     "check:hardcoded-colors": "node scripts/check-hardcoded-colors.mjs",
-    "check:guards": "pnpm check:spacing && pnpm check:hardcoded-colors && pnpm check:no-home-address",
+    "check:guards": "pnpm check:spacing && pnpm check:hardcoded-colors && pnpm check:no-home-address && pnpm check:osow-data",
     "test:e2e": "playwright test",
     "test:e2e:ui": "playwright test --ui",
     "db:push": "drizzle-kit push",
@@ -28,7 +28,8 @@
     "quotes:recent": "tsx scripts/list-recent-quotes.ts",
     "prod:check": "tsx scripts/check-production-readiness.ts",
     "deploy:replit": "pnpm install && pnpm db:migrate && pnpm db:seed && pnpm start",
-    "check:no-home-address": "node scripts/check-no-home-address.mjs"
+    "check:no-home-address": "node scripts/check-no-home-address.mjs",
+    "check:osow-data": "node --import tsx scripts/check-osow-data.ts"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.90.0",
