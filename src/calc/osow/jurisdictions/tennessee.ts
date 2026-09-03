@@ -432,13 +432,7 @@ function fromDated<T>(
  * because a year cannot window a row. Arkansas's and Louisiana's rule.
  */
 function fromStatute<T>(value: T, source: SourceDoc, note?: string): Sourced<T> {
-  return {
-    value,
-    source,
-    effectiveFrom: RETRIEVED,
-    effectiveTo: null,
-    ...(note === undefined ? {} : { note }),
-  };
+  return fromDated(value, source, RETRIEVED, note);
 }
 
 function escortRule(
