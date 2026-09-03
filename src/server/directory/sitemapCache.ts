@@ -261,6 +261,7 @@ const MARKETING_ROUTES: Array<{ path: string; changefreq: string; priority: stri
   { path: '/for/ltl', changefreq: 'monthly', priority: '0.8' },
   { path: '/for/forwarders', changefreq: 'monthly', priority: '0.8' },
   { path: '/tools', changefreq: 'monthly', priority: '0.7' },
+  { path: '/tools/oversize-permits', changefreq: 'monthly', priority: '0.7' },
   { path: '/support', changefreq: 'monthly', priority: '0.6' },
   { path: '/security', changefreq: 'yearly', priority: '0.5' },
   { path: '/terms', changefreq: 'yearly', priority: '0.4' },
