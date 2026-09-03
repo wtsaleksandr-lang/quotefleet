@@ -1255,14 +1255,28 @@
   // Over-legal ceiling for an automated instant quote — mirrors the server's
   // MAX_QUOTABLE_WEIGHT_LBS (src/calc/engine.ts). Above this we route to a human.
   var MAX_QUOTABLE_WEIGHT_LBS = 80000;
-  // Superload thresholds for the jurisdictions whose OS/OW permit rules we
-  // hold, mirroring src/calc/osow/jurisdictions/*.ts. A lane with BOTH ends in
-  // one covered state can be quoted past the 80,000 lb federal legal limit,
-  // because the server can price that state's permit from published figures.
-  // Any other lane keeps the 80,000 lb ceiling — we know the endpoints, not
-  // the states in between, so a cross-state heavy load still goes to a human.
+  // Heaviest gross weight that is NOT yet a superload, for the jurisdictions
+  // whose OS/OW permit rules we hold — mirroring src/calc/osow/jurisdictions/*.ts.
+  // A lane with BOTH ends in one covered state can be quoted past the 80,000 lb
+  // federal legal limit, because the server can price that state's permit from
+  // published figures. Any other lane keeps the 80,000 lb ceiling — we know the
+  // endpoints, not the states in between, so a cross-state heavy load still
+  // goes to a human.
+  //
+  // These are QUOTABLE CEILINGS, not the published thresholds, and the two
+  // differ by a pound where a state's rule is inclusive: New York's superload
+  // definition reads "200,000 pounds or greater", so 199,999 is the heaviest
+  // ordinary permit. Mirroring the raw 200,000 would let the widget wave
+  // through the exact load the server then rejects.
+  //
+  // Two covered states are deliberately ABSENT. Illinois publishes no numeric
+  // gross-weight superload threshold at all, and Indiana's own agencies publish
+  // three that disagree (108,000 / 120,000 / 200,000 lb) — in neither case is
+  // there a defensible ceiling above the federal one, so both keep the 80,000 lb
+  // contact-us path.
+  //
   // Pinned against the server-side data by src/calc/osow/widgetMirror.test.ts.
-  var OSOW_SUPERLOAD_LBS = { TX: 254300 };
+  var OSOW_SUPERLOAD_LBS = { TX: 254300, OH: 120000, PA: 201000, NY: 199999 };
   function maxQuotableWeightLbs(pickup, delivery) {
     var from = String((pickup && pickup.state) || '').trim().toUpperCase();
     var to = String((delivery && delivery.state) || '').trim().toUpperCase();

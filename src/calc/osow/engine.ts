@@ -31,6 +31,7 @@
  * prevent.
  */
 import {
+  isInEffect,
   resolveSourced,
   spreadOf,
   citeOf,
@@ -38,6 +39,7 @@ import {
   type IsoDate,
   type Resolution,
   type SourceDoc,
+  type Sourced,
 } from './provenance.js';
 import {
   evaluateEscortRules,
@@ -53,17 +55,30 @@ import {
 } from './bridgeFormula.js';
 import {
   applyTransactionFee,
+  combinedFeeRulesEqual,
   exceeds,
+  oversizeBandApplies,
+  oversizeFeeBandsEqual,
+  perMileAmount,
+  perMileRatesEqual,
+  overweightPricingEqual,
+  additionalAuthoritiesEqual,
   thresholdsEqual,
   weightBandsEqual,
   conditionalFeesEqual,
   transactionFeesEqual,
   MILEAGE_SPLIT_NOTE,
+  type AdditionalAuthority,
+  type CombinedFeeRule,
   type JurisdictionOsowRules,
+  type OversizeBandInput,
+  type OversizeFeeBand,
+  type OverweightPricing,
+  type PerMileRate,
   type Threshold,
   type WeightBand,
 } from './types.js';
-import { osowRulesFor } from './jurisdictions/texas.js';
+import { osowRulesFor } from './jurisdictions/index.js';
 
 export interface OsowLoad {
   grossWeightLbs?: number;
@@ -145,6 +160,30 @@ function sourcesOf(r: Resolution<unknown>): SourceDoc[] {
 }
 
 /**
+ * Resolve a field that a jurisdiction may legitimately not have.
+ *
+ * `resolveSourced` treats an empty candidate list as a GAP — "we hold no data
+ * for this field" — and forces manual review, which is right for a fee every
+ * state charges. It is wrong for a rule only some states have: Kentucky's
+ * combined permit has no separate overweight step, and warning that its
+ * overweight band is missing would report a data gap where the correct
+ * statement is "this state does not charge one".
+ *
+ * `null` here means "not applicable in this jurisdiction". A field that IS
+ * applicable but unsourced must be given an empty array explicitly and go
+ * through `resolveSourced`, so the gap is still loud.
+ */
+function resolveIfPresent<T>(
+  field: string,
+  candidates: Sourced<T>[] | undefined,
+  asOf: IsoDate,
+  equals?: (a: T, b: T) => boolean,
+): Resolution<T> | null {
+  if (candidates === undefined || candidates.length === 0) return null;
+  return resolveSourced(field, candidates, asOf, equals);
+}
+
+/**
  * Does a measurement exceed a resolved legal limit? Returns `null` when
  * either the measurement or the limit is unknown — the caller must not read
  * that as "within limits".
@@ -155,6 +194,34 @@ function overLimit(
 ): boolean | null {
   if (measurement === undefined || limit.value === null) return null;
   return measurement > limit.value;
+}
+
+/**
+ * Show the per-mile arithmetic on the line item. A distance-priced fee that
+ * appears as a bare dollar amount is impossible to check; spelling out the
+ * rate, the increments and the miles lets a dispatcher verify it against the
+ * state's own schedule without opening the code.
+ */
+function describePerMile(
+  rate: PerMileRate,
+  grossWeightLbs: number,
+  miles: number,
+  jurisdictionName: string,
+): string {
+  const parts = [`${miles} mi in ${jurisdictionName}`];
+  if (rate.perIncrementLbs !== null && rate.perIncrementLbs > 0) {
+    const excess = Math.max(0, grossWeightLbs - (rate.excessBaseLbs ?? 0));
+    const exact = excess / rate.perIncrementLbs;
+    const units = rate.roundIncrementUp ? Math.ceil(exact) : Math.floor(exact);
+    parts.push(
+      `× $${rate.ratePerMileUsd} per mile per ${rate.perIncrementLbs.toLocaleString()} lb over ${(rate.excessBaseLbs ?? 0).toLocaleString()} lb × ${units} increment${units === 1 ? '' : 's'}${rate.roundIncrementUp && exact !== units ? ' (part increment charged in full)' : ''}`,
+    );
+  } else {
+    parts.push(`× $${rate.ratePerMileUsd} per mile`);
+  }
+  if (rate.minimumUsd !== null) parts.push(`minimum $${rate.minimumUsd.toFixed(2)}`);
+  if (rate.maximumUsd !== null) parts.push(`capped at $${rate.maximumUsd.toFixed(2)}`);
+  return parts.join(', ');
 }
 
 /** Pick the weight band containing `weightLbs`. */
@@ -185,24 +252,48 @@ export function calculateOsowForJurisdiction(
   let requiresManualReview = false;
 
   // ── 1. Legal limits: is a permit needed at all? ────────────────────────
-  const widthLimit = resolveSourced('Texas legal width', rules.legalLimits.widthIn, asOf);
-  const heightLimit = resolveSourced('Texas legal height', rules.legalLimits.heightIn, asOf);
-  const lengthLimit = resolveSourced('Texas legal trailer length', rules.legalLimits.trailerLengthIn, asOf);
-  const frontOverhangLimit = resolveSourced('Texas legal front overhang', rules.legalLimits.frontOverhangIn, asOf);
-  const rearOverhangLimit = resolveSourced('Texas legal rear overhang', rules.legalLimits.rearOverhangIn, asOf);
-  const grossLimit = resolveSourced('Texas legal gross weight', rules.legalLimits.grossWeightLbs, asOf);
+  const widthLimit = resolveSourced(`${rules.name} legal width`, rules.legalLimits.widthIn, asOf);
+  const heightLimit = resolveSourced(`${rules.name} legal height`, rules.legalLimits.heightIn, asOf);
+  const lengthLimit = resolveSourced(`${rules.name} legal trailer length`, rules.legalLimits.trailerLengthIn, asOf);
+  /**
+   * Overhang limits are OPTIONAL for the same reason overall length is: Ohio,
+   * Pennsylvania and Indiana publish none, regulating overhang through flagging
+   * and escort rules instead. Running `resolveSourced` on an absent list would
+   * warn — on every quote in three states — about a limit those states do not
+   * impose. Their real overhang rules are in `escortRules` and still fire.
+   */
+  const frontOverhangLimit = resolveIfPresent(`${rules.name} legal front overhang`, rules.legalLimits.frontOverhangIn, asOf);
+  const rearOverhangLimit = resolveIfPresent(`${rules.name} legal rear overhang`, rules.legalLimits.rearOverhangIn, asOf);
+  const grossLimit = resolveSourced(`${rules.name} legal gross weight`, rules.legalLimits.grossWeightLbs, asOf);
+  /**
+   * Overall combination length is OPTIONAL, and its absence must stay silent.
+   * Texas's general permit turns on the semitrailer length, so Phase 1 holds
+   * no overall-length row for it — and `resolveSourced` on an empty list
+   * correctly reports "nothing on file" and forces review. Running that on
+   * every Texas quote would flag a limit Texas does not impose. So an absent
+   * list means "this jurisdiction does not cap overall combination length in
+   * the data we hold", which is a different claim from "we looked and found
+   * nothing", and only the latter deserves a warning.
+   */
+  const overallLengthLimit = resolveIfPresent(
+    `${rules.name} legal overall combination length`,
+    rules.legalLimits.overallLengthIn,
+    asOf,
+  );
 
-  for (const r of [widthLimit, heightLimit, lengthLimit, frontOverhangLimit, rearOverhangLimit, grossLimit]) {
+  for (const r of [widthLimit, heightLimit, lengthLimit, frontOverhangLimit, rearOverhangLimit, grossLimit, overallLengthLimit]) {
+    if (r === null) continue;
     pushSources(sources, r);
     warnings.push(...r.warnings);
     if (r.requiresManualReview) requiresManualReview = true;
   }
 
   const details: string[] = [];
-  const checks: Array<[keyof Omit<OverDimension, 'details'>, number | undefined, Resolution<number>, string, 'in' | 'lb']> = [
+  const checks: Array<[keyof Omit<OverDimension, 'details'>, number | undefined, Resolution<number> | null, string, 'in' | 'lb']> = [
     ['width', load.widthIn, widthLimit, 'Width', 'in'],
     ['height', load.heightIn, heightLimit, 'Height', 'in'],
     ['length', load.trailerLengthIn, lengthLimit, 'Trailer length', 'in'],
+    ['length', load.overallLengthIn, overallLengthLimit, 'Overall combination length', 'in'],
     ['frontOverhang', load.frontOverhangIn, frontOverhangLimit, 'Front overhang', 'in'],
     ['rearOverhang', load.rearOverhangIn, rearOverhangLimit, 'Rear overhang', 'in'],
     ['weight', load.grossWeightLbs, grossLimit, 'Gross weight', 'lb'],
@@ -215,6 +306,7 @@ export function calculateOsowForJurisdiction(
   };
 
   for (const [key, measurement, limit, label, unit] of checks) {
+    if (limit === null) continue;
     const over = overLimit(measurement, limit);
     if (over === true) {
       overDimension[key] = true;
@@ -246,22 +338,121 @@ export function calculateOsowForJurisdiction(
   }
 
   // ── 3. Superload triggers — checked BEFORE pricing anything ───────────
-  const superloadWeight = resolveSourced<Threshold>(
-    `${rules.code} superload gross-weight threshold`,
-    rules.superload.grossWeight,
-    asOf,
-    thresholdsEqual,
-  );
-  pushSources(sources, superloadWeight);
-  warnings.push(...superloadWeight.warnings);
-  if (superloadWeight.requiresManualReview) requiresManualReview = true;
+  /**
+   * An ABSENT `grossWeight` list is a positive finding — "this state publishes
+   * no gross-weight superload threshold" — not a gap. Illinois is the case; see
+   * `SuperloadTriggers`. An EMPTY list still runs through the resolver and
+   * still says loudly that we hold nothing.
+   */
+  const superloadWeight =
+    rules.superload.grossWeight === undefined
+      ? null
+      : resolveSourced<Threshold>(
+          `${rules.code} superload gross-weight threshold`,
+          rules.superload.grossWeight,
+          asOf,
+          thresholdsEqual,
+        );
 
   let superload = false;
-  if (load.grossWeightLbs !== undefined && superloadWeight.value !== null) {
-    if (exceeds(load.grossWeightLbs, superloadWeight.value)) {
+  if (superloadWeight !== null) {
+    pushSources(sources, superloadWeight);
+    const gross = load.grossWeightLbs;
+
+    if (superloadWeight.conflict) {
+      /**
+       * Indiana's own agencies publish three different superload weights —
+       * ISP says over 108,000 lb, the DOR FAQ says 120,000 lb, the July 2026
+       * DOR fee sheet says 200,000 lb — and 105 IAC 10-1.5-3 states none at
+       * all. That disagreement only bites BETWEEN the lowest and highest
+       * candidate. Raising it on a 90,000 lb load, which every candidate agrees
+       * is not a superload, would be noise on a settled question — and noise on
+       * every quote trains people to ignore the warning that matters. Same
+       * treatment, for the same reason, as the route-inspection conflict below.
+       */
+      const values = superloadWeight.candidates.map((c) => c.value.value);
+      const lo = Math.min(...values);
+      const hi = Math.max(...values);
+      if (gross !== undefined && gross > hi) {
+        // Above every candidate: a superload on any reading of the sources.
+        superload = true;
+        warnings.push(
+          `This load is a superload in ${rules.name}: ${gross.toLocaleString()} lb is over every published threshold on file (${lo.toLocaleString()}–${hi.toLocaleString()} lb, sources disagree). A superload has no over-the-counter fee — the agency prices it after review.`,
+        );
+        requiresManualReview = true;
+      } else if (gross === undefined || gross >= lo) {
+        warnings.push(...superloadWeight.warnings);
+        warnings.push(
+          gross === undefined
+            ? `Official sources disagree on ${rules.name}'s superload weight threshold and no gross weight was supplied, so whether this move is a superload cannot be determined.`
+            : `This load's gross weight (${gross.toLocaleString()} lb) falls inside the band where ${rules.name}'s own sources disagree about the superload threshold (${lo.toLocaleString()}–${hi.toLocaleString()} lb), so whether it is issued as an ordinary permit or a superload cannot be determined from the published rules.`,
+        );
+        requiresManualReview = true;
+      }
+    } else {
+      warnings.push(...superloadWeight.warnings);
+      if (superloadWeight.requiresManualReview) requiresManualReview = true;
+      if (gross !== undefined && superloadWeight.value !== null) {
+        if (exceeds(gross, superloadWeight.value)) {
+          superload = true;
+          warnings.push(
+            `This load is a superload in ${rules.name}: ${gross.toLocaleString()} lb exceeds the ${superloadWeight.value.value.toLocaleString()} lb threshold. Superheavy permits have no published fee — the agency prices them after an engineering review of the route, and applications must be filed roughly three to four weeks ahead. Source: ${citeOf(superloadWeight.chosen?.source ?? superloadWeight.candidates[0]?.source ?? rules.escortRules[0]?.source as SourceDoc)}.`,
+          );
+          requiresManualReview = true;
+        }
+      }
+    }
+  }
+
+  // Dimensional superload triggers — size alone, regardless of weight.
+  const dimensionalSuperloadChecks: Array<[string, number | undefined, Sourced<Threshold>[] | undefined]> = [
+    ['width', load.widthIn, rules.superload.widthIn],
+    ['height', load.heightIn, rules.superload.heightIn],
+    ['overall length', load.overallLengthIn, rules.superload.overallLengthIn],
+  ];
+  for (const [label, measurement, candidates] of dimensionalSuperloadChecks) {
+    const res = resolveIfPresent<Threshold>(
+      `${rules.code} superload ${label} threshold`,
+      candidates,
+      asOf,
+      thresholdsEqual,
+    );
+    if (res === null) continue;
+    pushSources(sources, res);
+    if (res.conflict) {
+      /**
+       * Same banding as the gross-weight conflict above. New York is the live
+       * case: its superloads page says a load "greater than 160 feet in length"
+       * is a superload while the PERM 12S form it links to says "at or greater
+       * than 160 feet". They differ for exactly one load — one measuring 160 ft
+       * 0 in — and nowhere else, so only that load hears about it.
+       */
+      if (measurement === undefined) continue;
+      const values = res.candidates.map((c) => c.value.value);
+      const lo = Math.min(...values);
+      const hi = Math.max(...values);
+      if (measurement > hi) {
+        superload = true;
+        warnings.push(
+          `This load is a superload in ${rules.name} on ${label} alone: ${formatFtIn(measurement)} is over every published threshold on file. A superload is not issued over the counter — the agency prices it after review.`,
+        );
+        requiresManualReview = true;
+      } else if (measurement >= lo) {
+        warnings.push(...res.warnings);
+        warnings.push(
+          `This load's ${label} (${formatFtIn(measurement)}) sits exactly where ${rules.name}'s own sources disagree about the superload threshold, so whether it is issued over the counter cannot be determined from the published rules.`,
+        );
+        requiresManualReview = true;
+      }
+      continue;
+    }
+    warnings.push(...res.warnings);
+    if (res.requiresManualReview) requiresManualReview = true;
+    if (res.value === null || measurement === undefined) continue;
+    if (exceeds(measurement, res.value)) {
       superload = true;
       warnings.push(
-        `This load is a superload in ${rules.name}: ${load.grossWeightLbs.toLocaleString()} lb exceeds the ${superloadWeight.value.value.toLocaleString()} lb threshold. Superheavy permits have no published fee — the agency prices them after an engineering review of the route, and applications must be filed roughly three to four weeks ahead. Source: ${citeOf(superloadWeight.chosen?.source ?? superloadWeight.candidates[0]?.source ?? rules.escortRules[0]?.source as SourceDoc)}.`,
+        `This load is a superload in ${rules.name} on ${label} alone: ${formatFtIn(measurement)} against a ${formatFtIn(res.value.value)} threshold. A superload is not issued over the counter — the agency prices it after review. Source: ${citeOf((res.chosen ?? res.candidates[0] as Sourced<Threshold>).source)}.`,
       );
       requiresManualReview = true;
     }
@@ -372,54 +563,341 @@ export function calculateOsowForJurisdiction(
     warnings.push(...base.warnings);
     if (base.requiresManualReview) requiresManualReview = true;
     const baseSpread = spreadOf(base);
-    lines.push({
-      code: 'osow_permit_base',
-      name: `${rules.name} single-trip permit`,
-      amountUsd: base.value,
-      ...(base.conflict ? { lowUsd: baseSpread.low ?? undefined, highUsd: baseSpread.high ?? undefined } : {}),
-      sources: sourcesOf(base),
-    });
-
-    // Weight step.
-    if (overDimension.weight && load.grossWeightLbs !== undefined) {
-      const bandRes = resolveSourced<WeightBand>(
-        `${rules.code} overweight fee band`,
-        rules.overweightBands.filter((b) => {
-          const v = b.value;
-          return (
-            (load.grossWeightLbs as number) >= v.minLbs &&
-            (v.maxLbs === null || (load.grossWeightLbs as number) <= v.maxLbs)
-          );
-        }),
-        asOf,
-        weightBandsEqual,
-      );
-      pushSources(sources, bandRes);
-      warnings.push(...bandRes.warnings);
-      if (bandRes.requiresManualReview) requiresManualReview = true;
-      const spread = { low: null as number | null, high: null as number | null };
-      if (bandRes.conflict) {
-        const fees = bandRes.candidates.map((c) => c.value.feeUsd);
-        spread.low = Math.min(...fees);
-        spread.high = Math.max(...fees);
-      }
-      const band = bandRes.value;
+    /**
+     * A SOURCED ZERO base beside a dimension-banded schedule is not a fee; it
+     * is the recorded fact that the state charges nothing on top of the band
+     * (Pennsylvania, Indiana, Illinois). Printing "$0.00" as its own line would
+     * invite the reader to wonder what was missed, so the line is suppressed
+     * while the row stays on file and in the citations. Ohio's $20 basic
+     * processing charge IS a real separate fee and still prints.
+     */
+    const baseIsAbsorbedByBands =
+      rules.oversizeFeeBands !== undefined && base.value === 0 && !base.conflict;
+    if (!baseIsAbsorbedByBands) {
       lines.push({
-        code: 'osow_overweight',
-        name: 'Highway maintenance fee (overweight)',
-        amountUsd: band === null ? null : band.feeUsd,
-        ...(bandRes.conflict ? { lowUsd: spread.low ?? undefined, highUsd: spread.high ?? undefined } : {}),
-        note: band === null
-          ? undefined
-          : `${band.minLbs.toLocaleString()}–${band.maxLbs === null ? 'over' : band.maxLbs.toLocaleString()} lb band`,
-        sources: sourcesOf(bandRes),
+        code: 'osow_permit_base',
+        name: `${rules.name} single-trip permit`,
+        amountUsd: base.value,
+        ...(base.conflict ? { lowUsd: baseSpread.low ?? undefined, highUsd: baseSpread.high ?? undefined } : {}),
+        sources: sourcesOf(base),
       });
-      if (band === null && bandRes.candidates.length === 0) {
+    }
+
+    // ── The dimension-banded oversize charge ──────────────────────────
+    // Held back rather than pushed, because two states say in writing that it
+    // does not simply add to the overweight charge. See `combinedFeeRule`.
+    let oversizeLine: OsowFeeLine | null = null;
+    /**
+     * Only an OVERSIZE load pays an oversize band. An overweight-but-legal-size
+     * load matches no dimensional band by construction, and reading that as
+     * "the schedule does not price this" would send every legal-size overweight
+     * permit to review over a fee it never owed.
+     */
+    const isOversize =
+      overDimension.width ||
+      overDimension.height ||
+      overDimension.length ||
+      overDimension.frontOverhang ||
+      overDimension.rearOverhang;
+    if (rules.oversizeFeeBands !== undefined && isOversize) {
+      const bandInput: OversizeBandInput = {
+        ...(load.widthIn === undefined ? {} : { widthIn: load.widthIn }),
+        ...(load.heightIn === undefined ? {} : { heightIn: load.heightIn }),
+        ...(load.overallLengthIn === undefined ? {} : { overallLengthIn: load.overallLengthIn }),
+        ...(load.milesInJurisdiction === undefined
+          ? {}
+          : { milesInJurisdiction: load.milesInJurisdiction }),
+      };
+      const inEffect = rules.oversizeFeeBands.filter((b) => isInEffect(b, asOf));
+      const matched: Sourced<OversizeFeeBand>[] = [];
+      const undecided = new Set<string>();
+      for (const row of inEffect) {
+        const verdict = oversizeBandApplies(row.value, bandInput);
+        if (verdict.applies === true) matched.push(row);
+        else if (verdict.applies === null) {
+          for (const m of verdict.missing) undecided.add(m);
+        }
+      }
+
+      for (const row of inEffect) {
+        if (!sources.some((s) => s.id === row.source.id)) sources.push(row.source);
+      }
+
+      if (undecided.size > 0) {
+        // A band was bounded on something we were never told. Picking any band
+        // would be choosing a fee by an absence.
+        oversizeLine = {
+          code: 'osow_oversize',
+          name: `${rules.name} oversize permit fee`,
+          amountUsd: null,
+          note: `${rules.name} sets the oversize fee by band, and the band cannot be selected without the ${[...undecided].join(' and ')}.`,
+          sources: inEffect.map((r) => r.source),
+        };
         warnings.push(
-          `No overweight fee band on file covers ${load.grossWeightLbs.toLocaleString()} lb in ${rules.name}. The permit fee cannot be computed.`,
+          `${rules.name} steps the oversize permit fee by ${[...undecided].join(' and ')}, which ${[...undecided].length === 1 ? 'was' : 'were'} not supplied. The fee band cannot be selected, so no oversize amount is quoted for this state.`,
         );
         requiresManualReview = true;
+      } else if (matched.length === 0) {
+        /**
+         * The published schedule does not price this load. Pennsylvania's is
+         * the case that forced the mutually-exclusive band design: its fee PDF
+         * prints "$46 (If < 14' wide)" and "$97 (If > 14' wide)" and assigns a
+         * load of exactly 14 ft 0 in to neither.
+         */
+        oversizeLine = {
+          code: 'osow_oversize',
+          name: `${rules.name} oversize permit fee`,
+          amountUsd: null,
+          note: `No published ${rules.name} fee band covers this load's dimensions.`,
+          sources: inEffect.map((r) => r.source),
+        };
+        warnings.push(
+          `${rules.name}'s published oversize fee bands do not cover this load's dimensions — the schedule states a fee below one boundary and above it, and says nothing about a load sitting exactly on it. The oversize fee must be confirmed with the issuing agency.`,
+        );
+        requiresManualReview = true;
+      } else {
+        const bandRes = resolveSourced<OversizeFeeBand>(
+          `${rules.code} oversize fee band`,
+          matched,
+          asOf,
+          oversizeFeeBandsEqual,
+        );
+        warnings.push(...bandRes.warnings);
+        if (bandRes.requiresManualReview) requiresManualReview = true;
+        const fees = bandRes.candidates.map((c) => c.value.feeUsd);
+        oversizeLine = {
+          code: 'osow_oversize',
+          name: `${rules.name} oversize permit fee`,
+          amountUsd: bandRes.value === null ? null : bandRes.value.feeUsd,
+          ...(bandRes.conflict && fees.length > 0
+            ? { lowUsd: Math.min(...fees), highUsd: Math.max(...fees) }
+            : {}),
+          ...(bandRes.value === null ? {} : { note: bandRes.value.label }),
+          sources: sourcesOf(bandRes),
+        };
       }
+    }
+
+    // ── The overweight component ──────────────────────────────────────
+    // How a state prices this is itself sourced data, not something inferred
+    // from which array happens to be populated. See `OverweightPricing`.
+    let overweightLine: OsowFeeLine | null = null;
+    if (overDimension.weight && load.grossWeightLbs !== undefined) {
+      const gross = load.grossWeightLbs;
+      const modelRes = resolveSourced<OverweightPricing>(
+        `${rules.code} overweight pricing model`,
+        rules.overweightPricing,
+        asOf,
+        overweightPricingEqual,
+      );
+      pushSources(sources, modelRes);
+      warnings.push(...modelRes.warnings);
+      if (modelRes.requiresManualReview) requiresManualReview = true;
+
+      switch (modelRes.value?.kind) {
+        case 'includedInBaseFee': {
+          // A genuine $0, not a gap: the base fee above already covers it.
+          overweightLine = {
+            code: 'osow_overweight',
+            name: 'Overweight component',
+            amountUsd: 0,
+            note: `No separate overweight charge — ${modelRes.value.explanation}`,
+            sources: sourcesOf(modelRes),
+          };
+          break;
+        }
+
+        case 'bands': {
+          const bandRes = resolveSourced<WeightBand>(
+            `${rules.code} overweight fee band`,
+            rules.overweightBands.filter((b) => {
+              const v = b.value;
+              return gross >= v.minLbs && (v.maxLbs === null || gross <= v.maxLbs);
+            }),
+            asOf,
+            weightBandsEqual,
+          );
+          pushSources(sources, bandRes);
+          warnings.push(...bandRes.warnings);
+          if (bandRes.requiresManualReview) requiresManualReview = true;
+          const spread = { low: null as number | null, high: null as number | null };
+          if (bandRes.conflict) {
+            const fees = bandRes.candidates.map((c) => c.value.feeUsd);
+            spread.low = Math.min(...fees);
+            spread.high = Math.max(...fees);
+          }
+          const band = bandRes.value;
+          overweightLine = {
+            code: 'osow_overweight',
+            name: 'Overweight permit charge',
+            amountUsd: band === null ? null : band.feeUsd,
+            ...(bandRes.conflict ? { lowUsd: spread.low ?? undefined, highUsd: spread.high ?? undefined } : {}),
+            note: band === null
+              ? undefined
+              : `${band.minLbs.toLocaleString()}–${band.maxLbs === null ? 'over' : band.maxLbs.toLocaleString()} lb band`,
+            sources: sourcesOf(bandRes),
+          };
+          if (band === null && bandRes.candidates.length === 0) {
+            // The pricing MODEL resolved, so we know how the state charges; we
+            // simply hold no band covering this weight. Ohio is the live case:
+            // its banded surcharge stops at 120,000 lb and a ton-mile formula
+            // takes over above it. Saying only "no band on file" would read as
+            // a research gap, so the model's own explanation goes with it.
+            warnings.push(
+              `No overweight fee band on file covers ${gross.toLocaleString()} lb in ${rules.name}. ${modelRes.value.explanation} The permit fee cannot be computed and must be confirmed with the issuing agency.`,
+            );
+            requiresManualReview = true;
+          }
+          break;
+        }
+
+        case 'perMile': {
+          const miles = load.milesInJurisdiction;
+          if (miles === undefined) {
+            // Billing the whole lane's miles to one state would be the single
+            // easiest way to produce a large, confident, wrong number here.
+            overweightLine = {
+              code: 'osow_overweight',
+              name: 'Overweight permit (distance-priced)',
+              amountUsd: null,
+              note: `${rules.name} charges by the mile travelled inside the state, and those miles are not known.`,
+              sources: sourcesOf(modelRes),
+            };
+            warnings.push(
+              `${rules.name} prices the overweight permit per mile travelled inside the state. ${MILEAGE_SPLIT_NOTE}`,
+            );
+            requiresManualReview = true;
+            break;
+          }
+          const rateRes = resolveSourced<PerMileRate>(
+            `${rules.code} overweight per-mile rate`,
+            rules.overweightPerMile.filter((r) => {
+              const v = r.value;
+              return gross >= v.minLbs && (v.maxLbs === null || gross <= v.maxLbs);
+            }),
+            asOf,
+            perMileRatesEqual,
+          );
+          pushSources(sources, rateRes);
+          warnings.push(...rateRes.warnings);
+          if (rateRes.requiresManualReview) requiresManualReview = true;
+          const amounts = rateRes.candidates.map((c) =>
+            perMileAmount(c.value, gross, miles),
+          );
+          const rate = rateRes.value;
+          overweightLine = {
+            code: 'osow_overweight',
+            name: 'Overweight permit (distance-priced)',
+            amountUsd: rate === null ? null : perMileAmount(rate, gross, miles),
+            ...(rateRes.conflict && amounts.length > 0
+              ? { lowUsd: Math.min(...amounts), highUsd: Math.max(...amounts) }
+              : {}),
+            note:
+              rate === null
+                ? undefined
+                : describePerMile(rate, gross, miles, rules.name),
+            sources: sourcesOf(rateRes),
+          };
+          if (rate === null && rateRes.candidates.length === 0) {
+            warnings.push(
+              `No per-mile overweight rate on file covers ${gross.toLocaleString()} lb in ${rules.name}. The permit fee cannot be computed.`,
+            );
+            requiresManualReview = true;
+          }
+          break;
+        }
+
+        case 'notPriceable': {
+          overweightLine = {
+            code: 'osow_overweight',
+            name: 'Overweight permit',
+            amountUsd: null,
+            note: modelRes.value.explanation,
+            sources: sourcesOf(modelRes),
+          };
+          warnings.push(
+            `${rules.name} charges an overweight permit fee that we cannot compute from published sources: ${modelRes.value.explanation} This leg must be priced by the issuing agency.`,
+          );
+          requiresManualReview = true;
+          break;
+        }
+
+        default: {
+          // The model itself did not resolve — either nothing on file, or two
+          // sources disagreeing about how the state prices overweight at all.
+          overweightLine = {
+            code: 'osow_overweight',
+            name: 'Overweight permit',
+            amountUsd: null,
+            note: `How ${rules.name} prices the overweight component could not be determined from the sources on file.`,
+            sources: sourcesOf(modelRes),
+          };
+          requiresManualReview = true;
+          break;
+        }
+      }
+    }
+
+    // ── How the two components combine ────────────────────────────────
+    /**
+     * Phase 1 added them because Texas does. Ohio replaces and Indiana takes
+     * the greater, both in writing, and adding in either state would over-quote
+     * every combined permit it issues. The rule is sourced data; absent means
+     * cumulative. See `CombinedFeeRule`.
+     */
+    const combineRes = resolveIfPresent<CombinedFeeRule>(
+      `${rules.code} combined oversize/overweight fee rule`,
+      rules.combinedFeeRule,
+      asOf,
+      combinedFeeRulesEqual,
+    );
+    if (combineRes !== null) {
+      pushSources(sources, combineRes);
+      warnings.push(...combineRes.warnings);
+      if (combineRes.requiresManualReview) requiresManualReview = true;
+    }
+    const combineKind = combineRes?.value?.kind ?? 'cumulative';
+
+    if (oversizeLine !== null && overweightLine !== null && combineKind !== 'cumulative') {
+      if (combineKind === 'overweightOnly') {
+        // Ohio: "only one basic processing fee ... and the applicable
+        // overweight surcharge ... will be charged." The oversize surcharge is
+        // not billed at all, so it is not printed as a $0 line either.
+        lines.push({
+          ...overweightLine,
+          note: `${overweightLine.note === undefined ? '' : `${overweightLine.note}. `}${combineRes?.value?.explanation ?? ''}`.trim(),
+        });
+      } else {
+        // Indiana: "Whichever of the calculated oversize or overweight fees is
+        // greater." Undecidable the moment either side is unpriced — and
+        // guessing which is larger is exactly the confident-wrong-number this
+        // engine exists to refuse.
+        const a = oversizeLine.amountUsd;
+        const b = overweightLine.amountUsd;
+        if (a === null || b === null) {
+          lines.push({
+            code: 'osow_permit_greater_of',
+            name: `${rules.name} permit fee (greater of oversize or overweight)`,
+            amountUsd: null,
+            note: `${combineRes?.value?.explanation ?? ''} One of the two amounts could not be computed, so which is greater cannot be determined.`.trim(),
+            sources: [...oversizeLine.sources, ...overweightLine.sources],
+          });
+          warnings.push(
+            `${rules.name} charges whichever of the oversize and overweight fees is greater, and one of them could not be priced from the sources on file. No ${rules.name} permit amount is quoted.`,
+          );
+          requiresManualReview = true;
+        } else {
+          const winner = a >= b ? oversizeLine : overweightLine;
+          const loser = a >= b ? overweightLine : oversizeLine;
+          lines.push({
+            ...winner,
+            note: `${winner.note === undefined ? '' : `${winner.note}. `}Charged instead of the ${loser.code === 'osow_oversize' ? 'oversize' : 'overweight'} fee of $${(loser.amountUsd ?? 0).toFixed(2)} — ${combineRes?.value?.explanation ?? ''}`.trim(),
+          });
+        }
+      }
+    } else {
+      if (oversizeLine !== null) lines.push(oversizeLine);
+      if (overweightLine !== null) lines.push(overweightLine);
     }
 
     // Conditional fees (Texas's Vehicle Supervision Fee).
@@ -487,12 +965,34 @@ export function calculateOsowForJurisdiction(
     }
   }
 
-  // ── 7. Distance-dependent jurisdictions (Phase 2) ─────────────────────
+  // ── 7. Distance-dependent jurisdictions ───────────────────────────────
   if (rules.feesDependOnDistance && load.milesInJurisdiction === undefined) {
     warnings.push(
       `${rules.name} prices this permit on distance travelled inside the state, and per-jurisdiction mileage is not yet computed. ${MILEAGE_SPLIT_NOTE}`,
     );
     requiresManualReview = true;
+  }
+
+  // ── 7b. A second permit issuer inside the same state ──────────────────
+  // A complete-looking state subtotal that is missing an entire permit is
+  // worse than an obviously incomplete one, because nothing on the quote says
+  // to go looking. So an unpriceable second authority sets review outright.
+  if (permitRequired && rules.additionalAuthorities !== undefined) {
+    const authRes = resolveIfPresent<AdditionalAuthority>(
+      `${rules.code} additional permitting authorities`,
+      rules.additionalAuthorities,
+      asOf,
+      additionalAuthoritiesEqual,
+    );
+    for (const cand of authRes?.candidates ?? []) {
+      const a = cand.value;
+      if (!sources.some((s) => s.id === cand.source.id)) sources.push(cand.source);
+      if (a.priceable) continue;
+      warnings.push(
+        `${rules.name} is not a single-issuer state. ${a.appliesWhen} A ${a.name} permit is a SEPARATE permit with its own fee, which is not included in the ${rules.name} subtotal above. Source: ${citeOf(cand.source)}.`,
+      );
+      requiresManualReview = true;
+    }
   }
 
   // ── 8. Escort cost is the caller's, not the state's ───────────────────
@@ -601,6 +1101,10 @@ export function maxQuotableWeightLbs(
 
   const rules = osowRulesFor(from);
   if (rules === null) return fallbackLbs;
+  // No published threshold (Illinois), or sources that disagree about it
+  // (Indiana) — either way there is no defensible ceiling above the federal
+  // one, so the existing contact-us path stands.
+  if (rules.superload.grossWeight === undefined) return fallbackLbs;
 
   const threshold = resolveSourced<Threshold>(
     `${rules.code} superload gross-weight threshold`,
@@ -609,11 +1113,43 @@ export function maxQuotableWeightLbs(
     thresholdsEqual,
   );
   if (threshold.value === null) return fallbackLbs;
-  return Math.max(fallbackLbs, threshold.value.value);
+  return Math.max(fallbackLbs, quotableCeilingFor(threshold.value));
+}
+
+/**
+ * The heaviest gross weight that is NOT yet a superload under a threshold.
+ *
+ * Phase 1 returned the threshold value itself, which is right for Texas —
+ * "over 254,300 lb" means 254,300 lb is still an ordinary permit. It is off by
+ * a pound for New York, whose rule reads "200,000 pounds or greater", where a
+ * load at exactly 200,000 lb IS a superload and must not be quoted. The
+ * `inclusive` flag was recorded from the start precisely so this could be got
+ * right; this is where it gets used.
+ */
+export function quotableCeilingFor(t: Threshold): number {
+  return t.inclusive ? t.value - 1 : t.value;
+}
+
+/**
+ * One state on a route. A bare code keeps every existing caller working; the
+ * object form carries that state's own mileage.
+ *
+ * Per-state miles have to travel WITH the state, not on the load: a corridor
+ * crosses seven states with seven different distances, and a single
+ * `load.milesInJurisdiction` would silently bill each state for the same
+ * number — most likely the whole lane — which is precisely the over-quote the
+ * distance guard exists to prevent.
+ */
+export type OsowLeg = string | { code: string; milesInJurisdiction?: number };
+
+function legCode(leg: OsowLeg): string {
+  return String((typeof leg === 'string' ? leg : leg.code) ?? '')
+    .trim()
+    .toUpperCase();
 }
 
 export function calculateOsow(
-  stateCodes: string[],
+  legs: OsowLeg[],
   load: OsowLoad,
   asOf: IsoDate = todayIso(),
 ): OsowQuote {
@@ -623,10 +1159,15 @@ export function calculateOsow(
   let requiresManualReview = false;
 
   const seen = new Set<string>();
-  for (const raw of stateCodes) {
-    const code = String(raw ?? '').trim().toUpperCase();
+  for (const leg of legs) {
+    const code = legCode(leg);
     if (code === '' || seen.has(code)) continue;
     seen.add(code);
+
+    const legMiles =
+      typeof leg === 'string' ? undefined : leg.milesInJurisdiction;
+    const legLoad: OsowLoad =
+      legMiles === undefined ? load : { ...load, milesInJurisdiction: legMiles };
 
     const rules = osowRulesFor(code);
     if (rules === null) {
@@ -638,7 +1179,7 @@ export function calculateOsow(
       continue;
     }
 
-    const result = calculateOsowForJurisdiction(rules, load, asOf);
+    const result = calculateOsowForJurisdiction(rules, legLoad, asOf);
     jurisdictions.push(result);
     warnings.push(...result.warnings);
     if (result.requiresManualReview) requiresManualReview = true;

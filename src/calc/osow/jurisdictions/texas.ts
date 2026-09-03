@@ -36,6 +36,7 @@ import { ftIn, type EscortRule } from '../escortRules.js';
 import type {
   JurisdictionOsowRules,
   ConditionalFee,
+  OverweightPricing,
   Threshold,
   TransactionFee,
   WeightBand,
@@ -447,7 +448,34 @@ export const TEXAS_OSOW_RULES: JurisdictionOsowRules = {
     fromUndatedPage(60, GENERAL_SINGLE_TRIP),
   ],
 
+  /**
+   * Texas steps the overweight charge by gross weight and charges nothing per
+   * mile. Recorded explicitly rather than inferred from a populated
+   * `overweightBands`, so that a state with an EMPTY band list is unambiguous:
+   * it either folds overweight into one fee or we have not sourced it, and
+   * only the model row can tell those apart.
+   */
+  overweightPricing: [
+    fromDated<OverweightPricing>(
+      {
+        kind: 'bands',
+        explanation:
+          'Transp. Code §623.077 sets a highway maintenance fee in four flat gross-weight steps. The general single-trip permit has no mileage component.',
+      },
+      TRANSP_623_077,
+      '2013-09-01',
+    ),
+    fromFeePdf<OverweightPricing>({
+      kind: 'bands',
+      explanation:
+        'The TxDMV fee table prints one flat total per weight band, with no per-mile column.',
+    }),
+  ],
+
   overweightBands,
+
+  /** Texas's general single-trip permit has no distance-priced component. */
+  overweightPerMile: [],
 
   /**
    * Vehicle Supervision Fee — $35 on loads over 200,000 lb. This is what
@@ -588,20 +616,7 @@ export const TEXAS_OSOW_RULES: JurisdictionOsowRules = {
 };
 
 /**
- * Jurisdictions this engine can price. Phase 1 ships exactly one.
- *
- * Adding a state means adding a `JurisdictionOsowRules` object and one entry
- * here. Nothing in `engine.ts`, `escortRules.ts`, or `provenance.ts` changes.
+ * The registry that used to live here moved to `./index.ts` when Phase 2 added
+ * six more states. Adding a jurisdiction is still exactly two steps: write a
+ * data file like this one, and add one line to that registry.
  */
-export const OSOW_JURISDICTIONS: Record<string, JurisdictionOsowRules> = {
-  TX: TEXAS_OSOW_RULES,
-};
-
-/** Is there OS/OW coverage for this state/province code? */
-export function hasOsowCoverage(code: string): boolean {
-  return Object.hasOwn(OSOW_JURISDICTIONS, String(code ?? '').trim().toUpperCase());
-}
-
-export function osowRulesFor(code: string): JurisdictionOsowRules | null {
-  return OSOW_JURISDICTIONS[String(code ?? '').trim().toUpperCase()] ?? null;
-}
