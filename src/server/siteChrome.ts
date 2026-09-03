@@ -16,18 +16,33 @@
 //   For Carriers & Brokers
 //                — the people who SELL freight (carriers, brokers, forwarders).
 //                  QuoteFleet's paying product plus their lead-generation tools.
-//                  THE LABEL NAMES BROKERS EXPLICITLY, on purpose: this menu's
-//                  own third column is "By business type → Freight Brokers /
-//                  Freight Forwarders / LTL Carriers" and the homepage eyebrow
-//                  under it reads "FOR CARRIERS, BROKERS & FORWARDERS", yet the
-//                  menu said only "For Carriers". A freight broker — a core
-//                  paying customer — scanning "For Carriers / For Shippers" saw
-//                  himself in neither and had no entry point.
+//                  THE LABEL NAMES BROKERS EXPLICITLY, and — contrary to what
+//                  this comment used to claim — it ALREADY DID before the
+//                  rebuild: `git show <pre-rebuild main>:src/server/siteChrome.ts`
+//                  renders the same "For Carriers &amp; Brokers" trigger, so no
+//                  broker was ever left without an entry point. Two things
+//                  actually changed on this menu, and both are worth keeping
+//                  straight:
+//                    • ORDER. It ran SECOND, behind For Shippers. The sell side
+//                      is the side that pays for the product, so it leads now.
+//                    • THE LABEL WAS BRIEFLY LOST AND RESTORED *inside* the
+//                      rebuild — shortened to "For Carriers" mid-PR, then put
+//                      back. That momentary regression, not any shipped state,
+//                      is why the tests pin the full label character for
+//                      character. This menu's own third column is "By business
+//                      type → Freight Brokers / Freight Forwarders / LTL
+//                      Carriers" and the homepage eyebrow under it reads "FOR
+//                      CARRIERS, BROKERS & FORWARDERS"; dropping "& Brokers"
+//                      would contradict both.
 //   For Shippers — the people who BUY freight (shippers and importers). Finding
 //                  and vetting carriers, getting rates, protecting manifest data.
-//   Free Tools   — the ungated UTILITIES: the rate calculator and the glossary
-//                  lookup. Things you *operate*, not things you *read* — which
-//                  is why /guides moved out of it (see below).
+//   Free Tools   — NEW in the rebuild, and it is what replaced the third menu
+//                  slot: that slot used to be "For Importers", a dropdown
+//                  holding exactly one link (/manifest-privacy, now filed under
+//                  For Shippers). Free Tools holds the ungated UTILITIES: the
+//                  rate calculator and the glossary lookup. Things you
+//                  *operate*, not things you *read* — which is why /guides did
+//                  not stay in it (see below).
 //   Pricing      — a top-level one-click link (accessibility rule).
 //
 // TWO RULES KEEP IT LEGIBLE, and both were broken before this structure landed:
@@ -48,7 +63,8 @@
 //      visitor came to do. That is what moved /services (browse carriers by
 //      capability — a SHIPPER task) out of the carrier menu, and /tools (the
 //      free calculator, useful to both) out of it into Free Tools.
-//   3. A MENU IS NAMED FOR WHAT IS IN IT. "Free Tools" held /guides — the
+//   3. A MENU IS NAMED FOR WHAT IS IN IT. As first drafted, this rebuild's new
+//      "Free Tools" menu held /guides — the
 //      editorial market guides ("Trucking Companies in Houston, TX"), which are
 //      reference ARTICLES, not tools, and whose own module comment says they
 //      "deep-link into the directory pages [they] describe". The reader who
@@ -318,10 +334,23 @@ export const DIRECTORY_DATA_SOURCES = `<div class="qf-datasources">`
  * navInformationArchitecture.test.ts now pins landing.html to contain this
  * string verbatim, the same way footerPayRow.test.ts pins FOOTER_PAY_ROW.
  *
+ * THE ONE IN-PAGE ANCHOR, AND WHY IT IS ABSOLUTE. The homepage used to run a
+ * bespoke footer whose single unique destination was `#faq` — the "Simple
+ * answers before you start" block that still carries `id="faq"` in
+ * landing.html. Replacing that footer with this shared one gained six
+ * destinations and dropped that one, leaving the FAQ reachable only by
+ * scrolling. It is restored HERE rather than only on the homepage, because a
+ * footer that is byte-identical everywhere cannot carry a bare `#faq`: on
+ * /pricing or a carrier profile that fragment resolves against a page with no
+ * such element and the click does nothing. `/#faq` is ROOT-RELATIVE, so it
+ * scrolls in place on `/` (same path, fragment only) and navigates home to the
+ * right section from every other page. Filed under Company beside Support,
+ * which is the other "answer my question" destination.
+ *
  * Closes with the FOOTER_PAY_ROW accepted-payment + trust strip as its very
  * last child.
  */
-export const PREMIUM_FOOTER = `<footer class="premium-footer"><div class="premium-footer-inner"><div class="footer-brand"><a href="/" class="qf-footer-brand" aria-label="QuoteFleet home"><img class="qf-footer-logo" src="/brand/logo-full-ondark.png" alt="QuoteFleet — freight rate calculator" width="168" height="113" decoding="async"></a><div class="qf-footer-brandtext"><a href="/" class="qf-footer-wordmark">QuoteFleet</a><p class="qf-footer-tagline">Branded rate calculator pages, PDF quotes, and optional AI chat for trucking service providers.</p></div></div><div class="footer-col"><h4>For Carriers &amp; Brokers</h4><a href="/w/demo">See a live demo</a><a href="/compare">Why QuoteFleet</a><a href="/pricing">Pricing</a><a href="/signup">Start free</a><a href="/importers">Importers directory</a><a href="/for/brokers">Freight brokers</a><a href="/for/forwarders">Freight forwarders</a><a href="/for/ltl">LTL carriers</a></div><div class="footer-col"><h4>For Shippers</h4><a href="/directory">Carrier directory</a><a href="/guides">Carrier market guides</a><a href="/compliance">Compliance tools</a><a href="/services">Carriers by capability</a><a href="/directory/join">Directory Pro</a><a href="${RFQ_HREF}">Request freight quotes</a><a href="/drayage-rates">Port drayage rates</a><a href="/manifest-privacy">Manifest privacy</a></div><div class="footer-col"><h4>Free Tools</h4><a href="/tools">Freight rate calculator</a><a href="/glossary">Freight glossary</a></div><div class="footer-col"><h4>Company</h4><a href="mailto:hello@quotefleet.net">Contact</a><a href="/support">Support</a><a href="/partners">Partners &amp; affiliates</a><a href="/security">Security</a><a href="/login">Sign in</a></div><div class="footer-col"><h4>Legal</h4><a href="/terms">Terms of Service</a><a href="/privacy">Privacy Policy</a><a href="/refund">Refund &amp; Cancellation</a><a href="/dpa">Data Processing (DPA)</a><a href="/cookie">Cookie Policy</a><a href="/.well-known/security.txt">security.txt</a></div></div><ul class="qf-footer-trustbar" role="list"><li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="11" width="18" height="10" rx="2"/><path d="M7 11V7.5a5 5 0 0 1 10 0V11"/></svg>Payments secured by Stripe</li><li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 3 4.5 6v6c0 4.4 3.2 7.4 7.5 8.9 4.3-1.5 7.5-4.5 7.5-8.9V6z"/><path d="m9 12 2 2 4-4"/></svg>SSL/TLS encrypted</li><li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 2.5 4 5.5v6c0 4.6 3.3 7.7 8 9.5 4.7-1.8 8-4.9 8-9.5v-6z"/><circle cx="12" cy="11" r="2.4"/><path d="M12 13.4V16"/></svg>GDPR &amp; CCPA-ready</li><li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="4" y="4" width="16" height="16" rx="2"/><path d="M4 10h16M10 4v16"/></svg>Per-tenant data isolation</li></ul><div class="footer-bottom"><span>© <span id="year"></span> QuoteFleet. All rights reserved.</span><span class="qf-foot-operator">QuoteFleet is a product of MR Holdings &amp; Trade LLC.</span></div>${FOOTER_PAY_ROW}</footer>`;
+export const PREMIUM_FOOTER = `<footer class="premium-footer"><div class="premium-footer-inner"><div class="footer-brand"><a href="/" class="qf-footer-brand" aria-label="QuoteFleet home"><img class="qf-footer-logo" src="/brand/logo-full-ondark.png" alt="QuoteFleet — freight rate calculator" width="168" height="113" decoding="async"></a><div class="qf-footer-brandtext"><a href="/" class="qf-footer-wordmark">QuoteFleet</a><p class="qf-footer-tagline">Branded rate calculator pages, PDF quotes, and optional AI chat for trucking service providers.</p></div></div><div class="footer-col"><h4>For Carriers &amp; Brokers</h4><a href="/w/demo">See a live demo</a><a href="/compare">Why QuoteFleet</a><a href="/pricing">Pricing</a><a href="/signup">Start free</a><a href="/importers">Importers directory</a><a href="/for/brokers">Freight brokers</a><a href="/for/forwarders">Freight forwarders</a><a href="/for/ltl">LTL carriers</a></div><div class="footer-col"><h4>For Shippers</h4><a href="/directory">Carrier directory</a><a href="/guides">Carrier market guides</a><a href="/compliance">Compliance tools</a><a href="/services">Carriers by capability</a><a href="/directory/join">Directory Pro</a><a href="${RFQ_HREF}">Request freight quotes</a><a href="/drayage-rates">Port drayage rates</a><a href="/manifest-privacy">Manifest privacy</a></div><div class="footer-col"><h4>Free Tools</h4><a href="/tools">Freight rate calculator</a><a href="/glossary">Freight glossary</a></div><div class="footer-col"><h4>Company</h4><a href="mailto:hello@quotefleet.net">Contact</a><a href="/support">Support</a><a href="/#faq">FAQ</a><a href="/partners">Partners &amp; affiliates</a><a href="/security">Security</a><a href="/login">Sign in</a></div><div class="footer-col"><h4>Legal</h4><a href="/terms">Terms of Service</a><a href="/privacy">Privacy Policy</a><a href="/refund">Refund &amp; Cancellation</a><a href="/dpa">Data Processing (DPA)</a><a href="/cookie">Cookie Policy</a><a href="/.well-known/security.txt">security.txt</a></div></div><ul class="qf-footer-trustbar" role="list"><li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="11" width="18" height="10" rx="2"/><path d="M7 11V7.5a5 5 0 0 1 10 0V11"/></svg>Payments secured by Stripe</li><li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 3 4.5 6v6c0 4.4 3.2 7.4 7.5 8.9 4.3-1.5 7.5-4.5 7.5-8.9V6z"/><path d="m9 12 2 2 4-4"/></svg>SSL/TLS encrypted</li><li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 2.5 4 5.5v6c0 4.6 3.3 7.7 8 9.5 4.7-1.8 8-4.9 8-9.5v-6z"/><circle cx="12" cy="11" r="2.4"/><path d="M12 13.4V16"/></svg>GDPR &amp; CCPA-ready</li><li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="4" y="4" width="16" height="16" rx="2"/><path d="M4 10h16M10 4v16"/></svg>Per-tenant data isolation</li></ul><div class="footer-bottom"><span>© <span id="year"></span> QuoteFleet. All rights reserved.</span><span class="qf-foot-operator">QuoteFleet is a product of MR Holdings &amp; Trade LLC.</span></div>${FOOTER_PAY_ROW}</footer>`;
 
 // Burger + Solutions-dropdown behaviour, mirrored from landing.html so the
 // injected header is interactive. Idempotent #year setter included.

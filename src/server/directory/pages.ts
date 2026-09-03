@@ -1256,11 +1256,75 @@ export const DIRECTORY_CSS = `
   }
 
   /* ── Shipper nav state + Directory Pro join/checkout surface ───────────── */
+  /* THE SIGNED-IN HEADER IS AN ACCOUNT MENU, NOT AN INLINE ROW, AND THAT IS
+     ARITHMETIC. Every earlier measurement of this header was taken logged OUT,
+     where it fits with ~9px to spare. Hydrated, the slot laid out the email
+     (capped at 200px), the "Directory Pro ✓" chip (125px) and Manage (53px)
+     INLINE — 403px where the anonymous "Sign in" it replaces is 52px. The
+     header card's content box is 938px at the 1024px collapse point and never
+     exceeds 1134px (max-width 1180 less padding), so the demand was:
+
+       brand 132 + nav 491 + [theme 40 + slot 403 + CTA 216] = 1310px
+
+     …which overflows the card by 234px at 1024px and still by 68px at 1600px —
+     the "Claim your listing — free" CTA pushed outside the card and the theme
+     toggle clipped, on all ~334k directory pages. Measured: 0px anonymous,
+     131px peak for a free shipper (1024–1132), 264px peak for a Pro shipper
+     (1024 all the way to 1600). Dropping the email or shortening the chip does
+     not close it — chip + Manage alone is 190px against a ~94px budget — so
+     the identity folds into ONE compact control (~58px, i.e. the width the
+     anonymous "Sign in" already spent) and the email, plan and billing action
+     move into its panel.
+
+     <details> because it needs no wiring: the drawer's groups already use it,
+     and the slot is injected AFTER HEADER_SCRIPTS has bound [data-nav-dd], so
+     a nav-dd panel here would never open. Open state is a 1px accent OUTLINE,
+     never a fill (DESIGN-SYSTEM.md §4). Tokens only, both themes. */
   .nav-shipper { display: inline-flex; align-items: center; }
   .nav-shipper--auth { gap: 12px; }
   .nav-email { font-size: 13px; color: var(--ink-soft); max-width: 200px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
   .nav-pro-chip { font-size: 11px; font-family: var(--font-mono); letter-spacing: 0.04em; text-transform: uppercase; padding: 4px 8px; border-radius: var(--radius-chip); background: var(--success-bg); color: var(--success); border: 1px solid var(--success); white-space: nowrap; }
   .nav-upgrade, .nav-manage { white-space: nowrap; }
+
+  .nav-acct { position: relative; }
+  .nav-acct > summary {
+    display: inline-flex; align-items: center; gap: 4px;
+    min-height: 40px; padding: 4px 8px;
+    list-style: none; cursor: pointer;
+    background: transparent; color: var(--ink);
+    border: 1px solid var(--border-strong); border-radius: 10px;
+    transition: border-color 0.16s ease, color 0.16s ease;
+  }
+  .nav-acct > summary::-webkit-details-marker { display: none; }
+  .nav-acct > summary:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+  .nav-acct > summary:hover, .nav-acct[open] > summary { border-color: var(--accent); color: var(--accent); }
+  .nav-acct-ini {
+    display: inline-flex; align-items: center; justify-content: center;
+    width: 24px; height: 24px; border-radius: 50%;
+    font-size: 12px; font-weight: 700; line-height: 1;
+    background: var(--accent-soft); color: var(--accent); border: 1px solid var(--accent);
+  }
+  .nav-acct--pro .nav-acct-ini { background: var(--success-bg); color: var(--success); border-color: var(--success); }
+  .nav-acct-caret { width: 12px; height: 12px; transition: transform 0.18s ease; }
+  .nav-acct[open] .nav-acct-caret { transform: rotate(180deg); }
+  .nav-acct-panel {
+    position: absolute; top: calc(100% + 8px); right: 0; z-index: 80;
+    display: flex; flex-direction: column; align-items: flex-start; gap: 8px;
+    min-width: 240px; max-width: 320px; padding: 16px;
+    background: var(--surface); border: 1px solid var(--border);
+    border-radius: var(--radius-lg); box-shadow: 0 18px 42px rgba(0, 0, 0, 0.42);
+  }
+  html[data-theme="light"] .nav-acct-panel { box-shadow: 0 18px 42px rgba(10, 37, 64, 0.14); }
+  .nav-acct-head { margin: 0; font-family: var(--font-mono); font-size: 10px; letter-spacing: 0.12em; text-transform: uppercase; font-weight: 700; color: var(--muted); }
+  /* The panel is where the address is finally allowed its full length — the
+     200px ellipsis cap above exists only for the retired inline layout. */
+  .nav-acct-panel .nav-email { max-width: none; overflow: visible; white-space: normal; overflow-wrap: anywhere; color: var(--ink); }
+  .nav-acct-plan { font-size: 12px; color: var(--muted); }
+  .nav-acct-panel a { font-size: 13px; font-weight: 600; color: var(--accent); text-decoration: none; }
+  .nav-acct-panel a:hover { text-decoration: underline; text-underline-offset: 3px; }
+  @media (prefers-reduced-motion: reduce) {
+    .nav-acct > summary, .nav-acct-caret { transition: none; }
+  }
 
   .join-shell { max-width: 720px; }
   .join-panel { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius-card, 16px); padding: 24px; }
@@ -1871,7 +1935,7 @@ export function layout({ title, description, canonicalPath, bodyHtml, jsonLd, re
       <div class="dirfoot-col"><h2 class="dirfoot-head">For Carriers &amp; Brokers</h2><a href="/w/demo">See a Live Demo</a><a href="/compare">Why QuoteFleet</a><a href="/pricing">Pricing</a><a href="/signup">Start Free</a><a href="/importers">Importers Directory</a></div>
       <div class="dirfoot-col"><h2 class="dirfoot-head">For Shippers</h2><a href="/directory">Carrier Directory</a><a href="/guides">Carrier Market Guides</a><a href="/compliance">Compliance Tools</a><a href="/services">Carriers by Capability</a><a href="/directory/join">Directory Pro</a><a href="/directory/rfq?sort=featured">Request Freight Quotes</a><a href="/drayage-rates">Port Drayage Rates</a><a href="/manifest-privacy">Manifest Privacy</a></div>
       <div class="dirfoot-col"><h2 class="dirfoot-head">Free Tools</h2><a href="/tools">Freight Rate Calculator</a><a href="/glossary">Freight Glossary</a></div>
-      <div class="dirfoot-col"><h2 class="dirfoot-head">Company</h2><a href="/partners">Partners &amp; Affiliates</a><a href="/support">Support</a><a href="/security">Security</a><a href="/login">Sign In</a></div>
+      <div class="dirfoot-col"><h2 class="dirfoot-head">Company</h2><a href="/partners">Partners &amp; Affiliates</a><a href="/support">Support</a><a href="/#faq">FAQ</a><a href="/security">Security</a><a href="/login">Sign In</a></div>
     </nav>
     <p class="dirfoot-legal">© <span id="year"></span> QuoteFleet · <a href="/">Home</a> · <a href="/terms">Terms</a> · <a href="/privacy">Privacy</a></p>
     ${rendersCarrierData(canonicalPath) ? DIRECTORY_DATA_SOURCES : ''}
@@ -1889,27 +1953,50 @@ export function layout({ title, description, canonicalPath, bodyHtml, jsonLd, re
 /**
  * Hydrates the SHIPPER ACCOUNT slot from GET /api/directory/auth/me (soft auth —
  * never 401). Anonymous shows NOTHING (the slot ships empty + hidden, so the
- * header no longer says "For shippers" beside the For Shippers menu); a signed-in
- * free shipper gets their email + an Upgrade link; a Directory Pro shipper gets
- * their email + a "Directory Pro ✓" chip + a "Manage" link that opens the Stripe
- * billing portal. The slot is unhidden only once real content lands in it.
- * Degrades silently on any error (nav stays as server-rendered = anonymous).
+ * header no longer says "For shippers" beside the For Shippers menu); a
+ * signed-in shipper gets ONE compact account control whose panel carries their
+ * email, their plan, and the matching action — "Upgrade to Directory Pro" for a
+ * free account, "Manage billing" (Stripe billing portal) for Directory Pro. The
+ * slot is unhidden only once real content lands in it, and degrades silently on
+ * any error (the nav stays as server-rendered, i.e. anonymous).
+ *
+ * WHY A MENU AND NOT THE INLINE ROW IT REPLACES: the inline email + chip + link
+ * measured 403px against the ~94px this cluster can afford, overflowing the
+ * header card by up to 264px on every directory page for a signed-in Pro
+ * shipper. The full arithmetic is in the `.nav-acct` block of DIRECTORY_CSS.
+ *
+ * <details> carries the disclosure, so there is nothing to bind for open/close:
+ * this script runs from a promise, long after HEADER_SCRIPTS bound its
+ * [data-nav-dd] triggers, so a nav-dd panel injected here would never open. The
+ * only listeners added are the ones <details> does not give for free —
+ * click-outside and Escape — mirroring HEADER_SCRIPTS' dropdown behaviour.
  */
-const NAV_SHIPPER_SCRIPT = `
+export const NAV_SHIPPER_SCRIPT = `
 (function(){
   var slot=document.getElementById('nav-shipper'); if(!slot) return;
   var isPro=${DIRECTORY_IS_PRO_JS};
+  var CARET='<svg class="nav-acct-caret" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polyline points="6 9 12 15 18 9"/></svg>';
   ${DIRECTORY_ME_PROMISE_JS}
     .then(function(d){
       if(!d||!d.user) return;
       var pro=isPro(d);
       var email=String(d.user.email||'').replace(/[<>&"']/g,'');
-      var parts='<span class="nav-email" title="'+email+'">'+email+'</span>';
-      if(pro){ parts+='<span class="nav-pro-chip">Directory Pro \\u2713</span><a class="nav-link nav-manage" href="#" data-nav-portal>Manage</a>'; }
-      else { parts+='<a class="nav-link nav-upgrade" href="/directory/join?intent=subscribe">Upgrade</a>'; }
+      var initial=(email.charAt(0)||'?').toUpperCase();
+      var plan=pro
+        ? '<span class="nav-pro-chip">Directory Pro \\u2713</span><a class="nav-link nav-manage" href="#" data-nav-portal>Manage billing</a>'
+        : '<span class="nav-acct-plan">Free account</span><a class="nav-link nav-upgrade" href="/directory/join?intent=subscribe">Upgrade to Directory Pro</a>';
       slot.classList.add('nav-shipper--auth');
-      slot.innerHTML=parts;
+      slot.innerHTML='<details class="nav-acct'+(pro?' nav-acct--pro':'')+'">'
+        +'<summary aria-label="Account menu" title="'+email+'">'
+        +'<span class="nav-acct-ini" aria-hidden="true">'+initial+'</span>'+CARET
+        +'</summary>'
+        +'<div class="nav-acct-panel">'
+        +'<p class="nav-acct-head">Signed in as</p>'
+        +'<span class="nav-email">'+email+'</span>'
+        +plan
+        +'</div></details>';
       slot.removeAttribute('hidden');
+      var det=slot.querySelector('details');
       var p=slot.querySelector('[data-nav-portal]');
       if(p){ p.addEventListener('click',function(e){
         e.preventDefault();
@@ -1918,6 +2005,10 @@ const NAV_SHIPPER_SCRIPT = `
           .then(function(j){ if(j&&j.url) window.location.href=j.url; })
           .catch(function(){});
       }); }
+      if(det){
+        document.addEventListener('click',function(e){ if(det.open&&!det.contains(e.target)) det.open=false; });
+        document.addEventListener('keydown',function(e){ if(e.key==='Escape'&&det.open){ det.open=false; var s=det.querySelector('summary'); if(s) s.focus(); } });
+      }
     })
     .catch(function(){});
 })();

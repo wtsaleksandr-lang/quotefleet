@@ -253,3 +253,37 @@ html body.qf-wft .premium-footer .footer-brand .qf-footer-tagline {
   html body.qf-wft .premium-footer .footer-brand { gap: 12px; }
   html body.qf-wft .premium-footer .footer-brand .qf-footer-logo { height: 48px; }
 }
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   NAV POLISH — the homepage half. nav-unify.css carries the same two fixes for
+   every other page; the homepage does not load it, so they are restated here at
+   `html body.qf-wft` specificity (this sheet is injected LAST by
+   landing-motion.js, so it wins the cascade without !important on layout).
+
+   1. NO BUTTON WRAPS ITS OWN LABEL. The homepage broke "For Carriers &/Brokers"
+      across two lines at 1024–1032px — a narrower band than the directory
+      pages' 1024–1100px only because its action cluster is "View demo →"
+      rather than "Claim your listing — free →". Same flex-shrink cause, same
+      fix, and the same rule that nowrap may not buy itself header overflow:
+      the compaction below ships with it and both are measured together.
+   2. THE FOUR-ITEM TRUST BAR GOES 2×2, NEVER 3+1 — the homepage is where the
+      459–673px orphan band was measured. Full arithmetic in nav-unify.css.
+   ═══════════════════════════════════════════════════════════════════════════ */
+html body.qf-wft .site-nav .nav-dd-trigger,
+html body.qf-wft .site-nav > a,
+html body.qf-wft .site-actions .signin { white-space: nowrap; }
+
+@media (min-width: 1024px) and (max-width: 1140px) {
+  html body.qf-wft .site-header-inner { gap: 16px; }
+  html body.qf-wft .site-nav { gap: 0; }
+  html body.qf-wft .site-nav > a,
+  html body.qf-wft .site-nav .nav-dd-trigger { padding-left: 8px; padding-right: 8px; font-size: 13px; }
+  html body.qf-wft .site-actions { gap: 8px; }
+}
+
+@media (max-width: 720px) {
+  html body.qf-wft .qf-footer-trustbar {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}

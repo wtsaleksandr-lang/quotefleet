@@ -136,6 +136,38 @@
       .qf-public-wft .btn-primary:active,
       .qf-public-wft .btn-secondary:active { transform: none; }
     }
+
+    /* PAGE HEADERS ARE LEFT-ALIGNED, NEVER CENTRED (standing rule). The shared
+       `.hero` in style.css sets `text-align: center`, which every other hero on
+       the site overrides — `.dir-hero`, `.gl-hero` and the compliance/profile
+       heroes all restate `text-align: left`. This one never did, so the H1 sat
+       dead-centre in its column (measured gapL 106 / gapR 106 at 1440px).
+
+       Overriding the SECTION, not just the H1: `.hero p.lead` centres itself
+       with `margin: 0 auto`, and `.hero-cta` / `.hero-meta` centre themselves
+       with `justify-content: center`, so aligning the heading alone would leave
+       the sub-line and any future CTA row centred under a left-aligned title.
+       The hero COLUMN stays centred on the page — `.container-narrow` keeps its
+       `margin: 0 auto` — so only the text alignment inside it changes, exactly
+       as /glossary does it. */
+    .qf-public-wft .hero { text-align: left; padding-left: 0; padding-right: 0; }
+    .qf-public-wft .hero p.lead { margin-left: 0; margin-right: 0; }
+    .qf-public-wft .hero .hero-cta,
+    .qf-public-wft .hero .hero-meta { justify-content: flex-start; }
+    /* …and the left edge it aligns TO is the plan grid's, not an arbitrary one.
+       Two separate offsets had to go for the heading and the cards to share one
+       edge at EVERY width, which is the whole point of aligning left:
+         • WIDE — the cards are a 760px box centred in `.container`, while
+           `.container-narrow` is 780px with 24px of padding, so the heading
+           started 14px to their right. 808 − 2×24 = 760 and both boxes are
+           centred, so the two content columns now coincide exactly.
+         • NARROW — `.hero` carries its own 28px (22px under 720px) side padding
+           ON TOP of the container's 24px, which put the heading at 46–52px
+           against the cards' 24px. The section keeps only its VERTICAL padding
+           and lets the container own the gutter — the same split `.dir-hero`
+           already uses, and the reason the gradient still spans edge-to-edge
+           (it is painted by `.hero::before`, which is inset:0 on the section). */
+    .qf-public-wft .hero .container-narrow { max-width: 808px; }
   </style>
   <link rel="icon" href="/favicon.ico" sizes="any">
   <link rel="icon" type="image/png" sizes="32x32" href="/brand/favicon-32.png">
