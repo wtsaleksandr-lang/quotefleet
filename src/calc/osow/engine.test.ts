@@ -10,7 +10,11 @@ import {
   hasOsowCoverage,
   osowRulesFor,
 } from './jurisdictions/index.js';
-import { applyTransactionFee, oversizeBandApplies } from './types.js';
+import {
+  applyTransactionFee,
+  oversizeBandApplies,
+  weightBandAmount,
+} from './types.js';
 import { ftIn } from './escortRules.js';
 import { resolveSourced, spreadOf } from './provenance.js';
 import {
@@ -42,6 +46,14 @@ import {
   COLORADO_LVC_OWD_ANNUAL_FEE_USD,
   COLORADO_OSOW_RULES,
 } from './jurisdictions/colorado.js';
+import {
+  ARKANSAS_251_MILE_GAP,
+  ARKANSAS_EXCESS_BASE_INFERENCE_LBS,
+  ARKANSAS_MANUFACTURED_HOME_ESCORT_WIDTH_IN,
+  ARKANSAS_MOBILE_CONSTRUCTION_FEE_SCHEDULE,
+  ARKANSAS_OSOW_RULES,
+  ARKANSAS_SUPERLOAD_SUPPLEMENTAL_FEE_CEILING_USD,
+} from './jurisdictions/arkansas.js';
 
 /**
  * Texas figures asserted here come from TxDMV and the Texas Transportation
@@ -2319,11 +2331,367 @@ describe('Colorado — a permit priced by the axle', () => {
   });
 });
 
-describe('the registry after Phase 5', () => {
-  it('covers exactly the eighteen states whose datasets exist', () => {
+/**
+ * PHASE 6 — one state, and the first permit in the dataset priced BY THE TON.
+ *
+ * Arkansas charges "$17 per permit, plus, for each ton or major fraction
+ * thereof to be hauled in excess of the lawful weight", at a rate that steps by
+ * the mileage travelled inside the state. Every subtotal below is checked
+ * against arithmetic taken straight off ARDOT's Appendix 3 chart, and the two
+ * cases that are NOT priced — a 251-mile move and a fractional mileage — are
+ * checked to fail in the way the published documents fail.
+ */
+const ASOF6 = '2026-09-03';
+
+function priceIn6(
+  code: string,
+  partial: Parameters<typeof calculateOsowForJurisdiction>[1],
+) {
+  const rules = osowRulesFor(code);
+  expect(rules, `${code} must be a covered jurisdiction`).not.toBeNull();
+  return calculateOsowForJurisdiction(
+    rules as NonNullable<typeof rules>,
+    partial,
+    ASOF6,
+  );
+}
+
+describe('Arkansas — a permit priced by the ton', () => {
+  /** Legal on every Arkansas limit, so only the overweight side moves. */
+  const legalSize = {
+    widthIn: 102,
+    heightIn: ftIn(13, 6),
+    overallLengthIn: ftIn(70),
+    trailerLengthIn: ftIn(48),
+    routeClass: 'divided' as const,
+  };
+
+  it('reproduces the fee chart’s own per-ton rate in every mileage band', () => {
+    // ARDOT Appendix 3: $8.00 / $10.00 / $12.00 / $14.00 / $16.00 a ton.
+    // 100,000 lb is 20,000 lb over the 80,000 lb lawful weight — ten tons flat,
+    // so the whole subtotal is $17 + 10 × the band rate.
+    const cells: Array<[number, number]> = [
+      [50, 8],
+      [120, 10],
+      [175, 12],
+      [225, 14],
+      [300, 16],
+    ];
+    for (const [miles, perTon] of cells) {
+      const r = priceIn6('AR', {
+        ...legalSize,
+        grossWeightLbs: 100000,
+        milesInJurisdiction: miles,
+      });
+      expect(r.subtotalUsd, `${miles} mi`).toBe(17 + 10 * perTon);
+      expect(r.requiresManualReview, `${miles} mi`).toBe(false);
+      expect(
+        r.lines.find((l) => l.code === 'osow_overweight')?.amountUsd,
+        `${miles} mi`,
+      ).toBe(10 * perTon);
+    }
+  });
+
+  /**
+   * THE INFERENCE, DRIVEN FROM BOTH SIDES. "Or major fraction thereof" is
+   * verbatim; reading it as "more than half a ton" is ours. These four cases are
+   * what that reading actually costs, and they are the reason it is not encoded
+   * as `roundIncrementUp` — a round-any-fraction rule would charge $25 for the
+   * first load below instead of $17.
+   */
+  it('charges a ton only for a MAJOR fraction, and drops exactly half', () => {
+    const at = (grossWeightLbs: number) =>
+      priceIn6('AR', { ...legalSize, grossWeightLbs, milesInJurisdiction: 50 })
+        .subtotalUsd;
+    expect(at(81000)).toBe(17); // exactly 1,000 lb over — half a ton, dropped
+    expect(at(81001)).toBe(25); // 1,001 lb — a major fraction, one ton at $8
+    expect(at(82999)).toBe(25); // one ton + 999 lb — the part ton is dropped
+    expect(at(83001)).toBe(33); // one ton + 1,001 lb — two tons
+    // The base fee alone when the excess rounds away to nothing, never $0.
+    expect(at(80001)).toBe(17);
+  });
+
+  /**
+   * THE 251-MILE GAP. Ark. Code §27-35-210(e)(2) bands "201 miles to 250 miles,
+   * inclusive" and then "Over 251 miles"; ARDOT's Appendix 3 and the codified 27
+   * CAR Part 111 Appendix both read "251 miles or more". Only the range all
+   * three name is priced, so a move of exactly 251 miles falls through — the
+   * same answer the statute's own table gives.
+   */
+  it('prices 250 and 252 miles and refuses the 251 the statute skips', () => {
+    const at = (milesInJurisdiction: number) =>
+      priceIn6('AR', {
+        ...legalSize,
+        grossWeightLbs: 100000,
+        milesInJurisdiction,
+      });
+    expect(at(250).subtotalUsd).toBe(157); // $17 + 10 × $14
+    expect(at(252).subtotalUsd).toBe(177); // $17 + 10 × $16
+
+    const gap = at(251);
+    expect(gap.subtotalUsd).toBeNull();
+    expect(gap.requiresManualReview).toBe(true);
+    expect(gap.lines.find((l) => l.code === 'osow_overweight')?.amountUsd).toBeNull();
+    expect(gap.warnings.join(' ')).toContain(
+      'No overweight fee band on file covers 100,000 lb in Arkansas',
+    );
+    // A HOLE, not a disagreement: nothing is on file that prices 251 miles, so
+    // the resolver has no two candidates to weigh and reports no conflict.
+    expect(gap.warnings.join(' ')).not.toContain('Official sources disagree');
+    expect(ARKANSAS_251_MILE_GAP.unpricedMiles).toBe(251);
+    expect(ARKANSAS_251_MILE_GAP.pricedFromMiles).toBe(252);
+    expect(ARKANSAS_251_MILE_GAP.statuteTopBand).toBe('Over 251 miles');
+    expect(ARKANSAS_251_MILE_GAP.ruleTopBand).toBe('251 miles or more');
+  });
+
+  /**
+   * The bands are printed in whole miles — "100 Miles or Less", then "101 to
+   * 150" — so 100.4 miles is named by neither. Louisiana's distance columns
+   * have exactly this shape and are left exactly this way: nothing is rounded
+   * into a band Arkansas did not put it in.
+   */
+  it('will not round a fractional mileage into a band the chart does not name', () => {
+    const r = priceIn6('AR', {
+      ...legalSize,
+      grossWeightLbs: 100000,
+      milesInJurisdiction: 100.4,
+    });
+    expect(r.subtotalUsd).toBeNull();
+    expect(r.requiresManualReview).toBe(true);
+  });
+
+  it('will not pick a rate it was not given the mileage for', () => {
+    const r = priceIn6('AR', { ...legalSize, grossWeightLbs: 100000 });
+    expect(r.subtotalUsd).toBeNull();
+    expect(r.requiresManualReview).toBe(true);
+    expect(r.warnings.join(' ')).toContain(
+      'steps the overweight permit charge by miles travelled inside the state',
+    );
+  });
+
+  it('charges the flat $17 for an oversize load and nothing per dimension', () => {
+    // Arkansas has no dimensional fee ladder at all — 13 ft wide and 20 ft wide
+    // pay the same issuance fee, and only the escort count moves.
+    const narrow = priceIn6('AR', {
+      ...legalSize,
+      widthIn: ftIn(13),
+      grossWeightLbs: 70000,
+      milesInJurisdiction: 80,
+      routeClass: 'two-lane' as const,
+    });
+    expect(narrow.subtotalUsd).toBe(17);
+    expect(narrow.requiresManualReview).toBe(false);
+    expect(narrow.escorts.front).toBe(1);
+    expect(narrow.escorts.rear).toBe(0);
+    expect(ARKANSAS_OSOW_RULES.oversizeFeeBands).toBeUndefined();
+  });
+
+  it('counts two escorts off a divided highway and one on it', () => {
+    const off = priceIn6('AR', {
+      ...legalSize,
+      widthIn: ftIn(15),
+      grossWeightLbs: 70000,
+      milesInJurisdiction: 80,
+      routeClass: 'two-lane' as const,
+    });
+    expect(off.escortsRequired).toBe(2);
+    expect(off.escorts.front).toBe(1);
+    expect(off.escorts.rear).toBe(1);
+
+    const on = priceIn6('AR', {
+      ...legalSize,
+      widthIn: ftIn(15),
+      grossWeightLbs: 70000,
+      milesInJurisdiction: 80,
+      routeClass: 'divided' as const,
+    });
+    expect(on.escortsRequired).toBe(1);
+    expect(on.escorts.rear).toBe(1);
+    expect(on.escorts.front).toBe(0);
+  });
+
+  /**
+   * Arkansas's second road category is RESIDUAL — "all highways that are not
+   * controlled access or divided highways with four or more lanes" — so it is
+   * written as a negation and an urban arterial lands in it, as the state's own
+   * wording puts it. A quote with NO road type is the genuinely undecided case,
+   * because the escort COUNT moves with the road here.
+   */
+  it('reads an urban arterial as “all other highways”, and no road type as undecided', () => {
+    const urban = priceIn6('AR', {
+      ...legalSize,
+      widthIn: ftIn(15),
+      grossWeightLbs: 70000,
+      milesInJurisdiction: 80,
+      routeClass: 'urban' as const,
+    });
+    expect(urban.escortsRequired).toBe(2);
+
+    const { routeClass: _dropped, ...noRoad } = legalSize;
+    const unknownRoad = priceIn6('AR', {
+      ...noRoad,
+      widthIn: ftIn(15),
+      grossWeightLbs: 70000,
+      milesInJurisdiction: 80,
+    });
+    expect(unknownRoad.escorts.undecided.map((u) => u.ruleId)).toContain(
+      'ar-width-over-14-divided',
+    );
+    expect(unknownRoad.requiresManualReview).toBe(true);
+    // The permit fee is still priced — an undecided ESCORT is a gap in what we
+    // were told, not a quarrel between two documents, so it does not poison the
+    // fee lines.
+    expect(
+      unknownRoad.lines.find((l) => l.code === 'osow_permit_base')?.amountUsd,
+    ).toBe(17);
+  });
+
+  it('requires a clearance bar over 15 ft, which Arkansas mandates rather than recommends', () => {
+    const r = priceIn6('AR', {
+      ...legalSize,
+      heightIn: ftIn(15, 3),
+      grossWeightLbs: 70000,
+      milesInJurisdiction: 80,
+    });
+    expect(r.escorts.heightPole).toBe(true);
+    expect(r.escorts.front).toBe(1);
+  });
+
+  /**
+   * 180,000 lb is a real superload CLASS under 27 CAR §111-110(a), not merely
+   * the trigger for §27-35-210(e)(3)'s supplemental fee — which is why Arkansas
+   * belongs in the widget's ceiling mirror where Florida's 300,000 lb does not.
+   * The pound below it still prices cleanly, so the client can never wave
+   * through a load the server then refuses.
+   */
+  it('prices the heaviest ordinary permit and refuses the pound above it', () => {
+    const heaviest = priceIn6('AR', {
+      ...legalSize,
+      grossWeightLbs: 179999,
+      milesInJurisdiction: 90,
+    });
+    // 99,999 lb over = 49 tons + 1,999 lb, a major fraction → 50 tons at $8.
+    expect(heaviest.subtotalUsd).toBe(17 + 50 * 8);
+    expect(heaviest.superload).toBe(false);
+    expect(heaviest.requiresManualReview).toBe(false);
+
+    const superload = priceIn6('AR', {
+      ...legalSize,
+      grossWeightLbs: 180000,
+      milesInJurisdiction: 90,
+    });
+    expect(superload.superload).toBe(true);
+    expect(superload.subtotalUsd).toBeNull();
+    // The $500 supplement is a CEILING, so it is never quoted as an amount —
+    // and its trigger is the superload threshold itself, so no line exists to
+    // put it on.
+    expect(ARKANSAS_SUPERLOAD_SUPPLEMENTAL_FEE_CEILING_USD).toBe(500);
+    expect(ARKANSAS_OSOW_RULES.conditionalFees).toEqual([]);
+  });
+
+  /**
+   * ARKANSAS IS THE FIRST STATE THAT CAN BE A SUPERLOAD WHILE NEEDING NO PERMIT
+   * ON ANY LIMIT IT PUBLISHES: §111-110(a) escalates at 100 ft overall, and
+   * Rule 3.G.1 imposes no overall-length restriction at all on a combination
+   * whose trailer is within 53'6". The subtotal must be `null`, never the $0.00
+   * an empty fee list sums to.
+   */
+  it('never totals $0 for a superload that is legal on every published limit', () => {
+    const r = priceIn6('AR', {
+      ...legalSize,
+      overallLengthIn: ftIn(100),
+      grossWeightLbs: 70000,
+      milesInJurisdiction: 80,
+    });
+    expect(r.superload).toBe(true);
+    expect(r.permitRequired).toBe(false);
+    expect(r.subtotalUsd).toBeNull();
+    expect(r.requiresManualReview).toBe(true);
+    expect(ARKANSAS_OSOW_RULES.legalLimits.overallLengthIn).toBeUndefined();
+  });
+
+  /**
+   * THE CONFLICT THE RESEARCH SUMMARY REPORTED AS ZERO. The codified 27 CAR
+   * §111-505(c) says 14 ft 6 in; Ark. Code §27-35-306 and ARDOT's own 2023
+   * booklet say 14 ft 9 in. Held open rather than settled, exactly like
+   * Louisiana's four administrative-versus-statutory disagreements.
+   */
+  it('holds the manufactured-home escort width open at 14\'6" against 14\'9"', () => {
+    const r = resolveSourced(
+      'AR manufactured-home escort width',
+      ARKANSAS_MANUFACTURED_HOME_ESCORT_WIDTH_IN,
+      ASOF6,
+    );
+    expect(r.conflict).toBe(true);
+    expect(r.value).toBeNull();
+    expect(r.requiresManualReview).toBe(true);
+    expect(spreadOf(r)).toEqual({ low: ftIn(14, 6), high: ftIn(14, 9) });
+    // The 2025 redline is on file as EVIDENCE OF THE CODIFIED TEXT and must
+    // never be dated as though the amendment were in force.
+    const draft = ARKANSAS_MANUFACTURED_HOME_ESCORT_WIDTH_IN.find(
+      (row) => row.source.id === 'ar-car-111-proposed-2025-draft',
+    );
+    expect(draft?.value).toBe(ftIn(14, 6));
+    expect(draft?.source.revisedOn).toBe('2025-08-04');
+    expect(draft?.source.title).toContain('NOT IN FORCE');
+  });
+
+  it('keeps the mobile-construction schedule on file without pricing from it', () => {
+    // §27-35-210(i) is progressive — first five tons, next five, then the rest —
+    // and nothing on a load says it is a Vehicle of Special Design, so the
+    // general chart applies. Every rate here is BELOW the general rate for the
+    // same mileage, so applying the general chart over-quotes rather than under.
+    expect(ARKANSAS_MOBILE_CONSTRUCTION_FEE_SCHEDULE).toHaveLength(5);
+    const bands = [8, 10, 12, 14, 16];
+    ARKANSAS_MOBILE_CONSTRUCTION_FEE_SCHEDULE.forEach((row, i) => {
+      expect(row.additionalTonsUsd).toBeLessThan(bands[i] as number);
+      expect(row.firstFiveTonsUsd).toBeLessThan(row.nextFiveTonsUsd);
+      expect(row.nextFiveTonsUsd).toBeLessThan(row.additionalTonsUsd);
+    });
+    // The top row carries the same 251-mile hole, from the same two documents.
+    expect(ARKANSAS_MOBILE_CONSTRUCTION_FEE_SCHEDULE.at(-1)?.minMiles).toBe(252);
+  });
+
+  it('counts the per-ton excess above a base it names as an inference', () => {
+    expect(ARKANSAS_EXCESS_BASE_INFERENCE_LBS).toBe(80000);
+    for (const row of ARKANSAS_OSOW_RULES.overweightBands) {
+      expect(row.value.incrementLbs).toBe(2000);
+      expect(row.value.incrementBaseLbs).toBe(ARKANSAS_EXCESS_BASE_INFERENCE_LBS);
+      expect(row.value.incrementRounding).toBe('majorFraction');
+      // The $17 lives in `permitBaseFeeUsd`, never doubled into a band.
+      expect(row.value.feeUsd).toBe(0);
+    }
+  });
+
+  /**
+   * THE DEFERRAL IS LIVE FOR ARKANSAS, and it has to be: a per-ton rate turns a
+   * small published disagreement into a large one on a heavy load. A synthetic
+   * two-cent-a-ton quarrel is immaterial on a ten-ton overload and material on a
+   * fifty-ton one only if the comparison happens AFTER the fee is computed for
+   * this load — which is what `priceSourced` and `weightBandAmount` do together.
+   */
+  it('measures a per-ton disagreement on the computed total, not the published rate', () => {
+    const band = ARKANSAS_OSOW_RULES.overweightBands[0]?.value;
+    expect(band).toBeDefined();
+    const cheap = { ...(band as NonNullable<typeof band>), perIncrementUsd: 8 };
+    const dear = { ...(band as NonNullable<typeof band>), perIncrementUsd: 9 };
+    // One dollar a ton is $10 apart on a ten-ton overload…
+    expect(weightBandAmount(dear, undefined, 100000)).toBe(90);
+    expect(weightBandAmount(cheap, undefined, 100000)).toBe(80);
+    // …and $50 apart on a fifty-ton one. The threshold sees two different
+    // questions because it is handed two different numbers.
+    expect(weightBandAmount(dear, undefined, 180000)).toBe(450);
+    expect(weightBandAmount(cheap, undefined, 180000)).toBe(400);
+    // Rule 4: a band that cannot be costed is not the cheap one.
+    expect(weightBandAmount(cheap, undefined, undefined)).toBeNull();
+  });
+});
+
+describe('the registry after Phase 6', () => {
+  it('covers exactly the nineteen states whose datasets exist', () => {
     expect(Object.keys(OSOW_JURISDICTIONS).sort()).toEqual(
       [
-        'AL', 'CA', 'CO', 'FL', 'GA', 'IL', 'IN', 'LA', 'MO',
+        'AL', 'AR', 'CA', 'CO', 'FL', 'GA', 'IL', 'IN', 'LA', 'MO',
         'NC', 'NJ', 'NY', 'OH', 'OK', 'PA', 'TX', 'VA', 'WA',
       ].sort(),
     );
@@ -2334,6 +2702,6 @@ describe('the registry after Phase 5', () => {
     // The registry must never name a jurisdiction ahead of its dataset, and the
     // count is asserted separately so a stray import cannot pass by matching a
     // list someone updated in the same edit.
-    expect(Object.keys(OSOW_JURISDICTIONS)).toHaveLength(18);
+    expect(Object.keys(OSOW_JURISDICTIONS)).toHaveLength(19);
   });
 });

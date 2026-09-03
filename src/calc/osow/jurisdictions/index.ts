@@ -36,13 +36,28 @@
  * the three prices exactly as it did in Phase 1, and no `if (state === ...)` has
  * ever been added anywhere.
  *
+ * PHASE 6 MOVED ONE, AND ONLY INSIDE `WeightBand` AGAIN. ARKANSAS prices the
+ * overweight permit BY THE TON — "$17 per permit, plus, for each ton or major
+ * fraction thereof to be hauled in excess of the lawful weight", at a rate that
+ * steps by mileage — so a band grew four optional fields: `perIncrementUsd`,
+ * `incrementLbs`, `incrementBaseLbs` and `incrementRounding`. The mileage is
+ * named by the `minMiles`/`maxMiles` Louisiana already added. `RouteClass` did
+ * NOT grow: Arkansas splits on "controlled access, divided highway with four or
+ * more lanes" against everything else, which `interstate` and `divided` already
+ * say, and inventing `ar-` members for a distinction the general vocabulary
+ * covers would be the opposite of what the prefix is for. Same terms as every
+ * phase before: no evaluator changed, no condition kind was added, a band that
+ * declares none of the new fields prices exactly as it did in Phase 1, and no
+ * `if (state === ...)` has ever been added anywhere.
+ *
  * WHAT IS HERE IS EXACTLY WHAT EXISTS. An earlier draft of this file imported
  * Arkansas, Tennessee and Kentucky, whose data files were never written; the
- * build failed on three missing modules. The registry must never name a
+ * build failed on three missing modules. Arkansas now has one; Tennessee and
+ * Kentucky still do not, and are still absent. The registry must never name a
  * jurisdiction ahead of its dataset — `calculateOsow` refuses loudly for any
  * state that is not here, and that refusal is the honest answer for a state we
- * have not sourced. Eighteen are covered: TX, OH, PA, NY, IL, IN, CA, GA, NC,
- * NJ, VA, WA, AL, FL, MO, OK, LA, CO.
+ * have not sourced. Nineteen are covered: TX, OH, PA, NY, IL, IN, CA, GA, NC,
+ * NJ, VA, WA, AL, FL, MO, OK, LA, CO, AR.
  */
 import type { JurisdictionOsowRules } from '../types.js';
 import { TEXAS_OSOW_RULES } from './texas.js';
@@ -63,6 +78,7 @@ import { MISSOURI_OSOW_RULES } from './missouri.js';
 import { OKLAHOMA_OSOW_RULES } from './oklahoma.js';
 import { LOUISIANA_OSOW_RULES } from './louisiana.js';
 import { COLORADO_OSOW_RULES } from './colorado.js';
+import { ARKANSAS_OSOW_RULES } from './arkansas.js';
 
 export const OSOW_JURISDICTIONS: Record<string, JurisdictionOsowRules> = {
   TX: TEXAS_OSOW_RULES,
@@ -83,6 +99,7 @@ export const OSOW_JURISDICTIONS: Record<string, JurisdictionOsowRules> = {
   OK: OKLAHOMA_OSOW_RULES,
   LA: LOUISIANA_OSOW_RULES,
   CO: COLORADO_OSOW_RULES,
+  AR: ARKANSAS_OSOW_RULES,
 };
 
 /** Is there OS/OW coverage for this state/province code? */
@@ -116,4 +133,5 @@ export {
   OKLAHOMA_OSOW_RULES,
   LOUISIANA_OSOW_RULES,
   COLORADO_OSOW_RULES,
+  ARKANSAS_OSOW_RULES,
 };

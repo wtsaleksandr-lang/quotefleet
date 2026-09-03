@@ -47,6 +47,9 @@ function mirroredThresholds(): Record<string, number> {
  * mirror test running on the day before would find the server refusing a ceiling
  * the widget publishes, which is the exact drift these tests exist to catch. The
  * date is a retrieval date, not a convenience.
+ *
+ * Phase 6 did NOT have to move it again: Arkansas was collected on the same day,
+ * and its 180,000 lb threshold rows carry the same retrieval date.
  */
 const ASOF = '2026-09-03';
 
@@ -92,6 +95,14 @@ describe('widget mirror of the OS/OW weight ceiling', () => {
     // worst case of all, because the server's Florida per-mile schedule stops at
     // 162,000 lb and would refuse a load the widget had already accepted.
     // All four are covered jurisdictions and all four keep the federal ceiling.
+    //
+    // ARKANSAS IS THE CONTRAST, and it is why the Florida reasoning is about
+    // more than the presence of a number. 27 CAR §111-110(a) is a real superload
+    // CLASS at 180,000 lb — a permit issued at the Department's discretion, only
+    // for a move "essential to public health, welfare, safety, or defense" — and
+    // Arkansas's per-ton chart has no upper weight bound, so the server prices
+    // every pound below it. That is what earns a mirrored ceiling; publishing a
+    // number does not.
     const mirrored = mirroredThresholds();
     for (const code of ['IL', 'IN', 'OK', 'FL']) {
       expect(OSOW_JURISDICTIONS[code], `${code} must still be covered`).toBeDefined();
