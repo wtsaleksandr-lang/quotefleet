@@ -39,13 +39,16 @@ function mirroredThresholds(): Record<string, number> {
 }
 
 /**
- * Phase 4 moved this a day forward. Alabama's superload memorandum carries NO
- * revision date, so its threshold row is effective only from the date we read it
- * (2026-09-02) — and a mirror test running on the day before would have found
- * the server refusing a ceiling the widget publishes, which is the exact drift
- * these tests exist to catch. The date is the retrieval date, not a convenience.
+ * Phase 4 moved this a day forward and Phase 5 moved it one more, for the same
+ * reason both times. Alabama's superload memorandum carries NO revision date, so
+ * its threshold row is effective only from the date we read it; Louisiana's
+ * statutes state a bare year and Colorado's CDOT fee page states nothing, so
+ * both of their threshold rows start on THEIR retrieval date (2026-09-03). A
+ * mirror test running on the day before would find the server refusing a ceiling
+ * the widget publishes, which is the exact drift these tests exist to catch. The
+ * date is a retrieval date, not a convenience.
  */
-const ASOF = '2026-09-02';
+const ASOF = '2026-09-03';
 
 /**
  * The ceiling the SERVER would allow for a same-state lane, or `null` where the

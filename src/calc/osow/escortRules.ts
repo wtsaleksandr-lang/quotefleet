@@ -144,6 +144,34 @@ export type Measure =
  * really a general road type must stay general, or every state ends up with its
  * own private synonym for "two-lane" and a caller cannot pass a road type
  * without first knowing which state it is in.
+ *
+ * PHASE 5 ADDED TEN, AND ONLY BECAUSE COLORADO PUBLISHES A TWO-AXIS LEGEND.
+ * ------------------------------------------------------------------------
+ * Colorado is California's problem with a second dimension bolted on. 2 CCR
+ * 601-4 §408.2 colours every state-highway segment red, blue, yellow, green or
+ * white on the official Pilot Escort and Oversize Restriction Map, and each
+ * colour carries its own width ladder — a 12 ft load needs a Chapter 6 Special
+ * permit on red, one front pilot car on blue, one on yellow, and nothing at all
+ * on green or white. That is the California case exactly, and it is prefixed
+ * `co-` for the California reason: it is Colorado's map legend, not a road
+ * taxonomy.
+ *
+ * The second axis is LANE COUNT, and it cannot be folded into the colour or
+ * dropped. §408.2.4 splits GREEN by it (over 13 ft is one front car on a
+ * two-lane green segment and a rear car or a rear amber light on a four-lane
+ * one), §410 sets the length trigger from it on EVERY colour (110 ft two-lane,
+ * 115 ft four-lane), and §408.3.2 sets the night-time position from it (front on
+ * two-lane, rear on four-lane). A caller passes ONE route class, so colour and
+ * lane count have to travel together or one of the two rules is permanently
+ * undecidable — which is why there are ten members and not five.
+ *
+ * TERRAIN IS THE THIRD AXIS AND IS DELIBERATELY *NOT* IN THIS UNION. §410.1
+ * drops the two-lane length trigger from 110 ft to 85 ft on "Mountainous"
+ * highways, which would have doubled the list to twenty. It is asked instead as
+ * a `subjective` condition — mountainous-ness is a published property of the
+ * segment that a dispatcher can answer and the engine cannot derive, which is
+ * exactly what `subjective` is for, and an unanswered one reads `unknown`
+ * rather than flat country.
  */
 export type RouteClass =
   | 'interstate'
@@ -165,7 +193,20 @@ export type RouteClass =
   /** Caltrans: two-lane with 11 ft or 10 ft lanes. */
   | 'ca-brown'
   /** Caltrans: restricted route — movement governed by the Red Route Summary Table. */
-  | 'ca-red';
+  | 'ca-red'
+  /** CDOT map: RED segment, two lanes. Anything over 8'6" needs a Chapter 6 Special. */
+  | 'co-red-two-lane'
+  | 'co-red-four-lane'
+  /** CDOT map: BLUE segment — the tightest colour that still takes a pilot car. */
+  | 'co-blue-two-lane'
+  | 'co-blue-four-lane'
+  | 'co-yellow-two-lane'
+  | 'co-yellow-four-lane'
+  | 'co-green-two-lane'
+  | 'co-green-four-lane'
+  /** CDOT map: WHITE segment — the most permissive, no escort until 15 ft. */
+  | 'co-white-two-lane'
+  | 'co-white-four-lane';
 
 export type EscortCondition =
   /** measure > value */
