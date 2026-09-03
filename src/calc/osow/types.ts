@@ -38,15 +38,143 @@ export function exceeds(measurement: number, t: Threshold): boolean {
   return t.inclusive ? measurement >= t.value : measurement > t.value;
 }
 
-/** One band of a weight-stepped permit fee. `maxLbs: null` = open-ended top. */
+/**
+ * One band of a weight-stepped permit fee. `maxLbs: null` = open-ended top.
+ *
+ * PHASE 5 ADDED THREE OPTIONAL FIELDS, FOR TWO STATES AND NO NEW ENGINE BRANCH.
+ * ---------------------------------------------------------------------------
+ * Phase 1–4 states all step the overweight charge on WEIGHT ALONE, so a band
+ * was three numbers. Two of the states added in Phase 5 do not:
+ *
+ *   - LOUISIANA publishes a TWO-DIMENSIONAL table. R.S. 32:387(H)(2)(c) prints
+ *     ten gross-weight rows against five distance columns — "80,001-100,000 |
+ *     $45.00 $67.50 $97.50 $120.00 $150.00" — and the cell, not the row, is the
+ *     fee. Weight alone selects five different amounts at once, which the
+ *     resolver would read as one source disagreeing with itself and refuse to
+ *     price. `minMiles`/`maxMiles` name the column, exactly as
+ *     `OversizeFeeBand.minMiles` already names Illinois's distance step on the
+ *     oversize side. They are OPTIONAL and absent everywhere else, so every
+ *     Phase 1–4 band selects exactly as it did before.
+ *   - COLORADO charges PER AXLE. C.R.S. §42-4-510(11)(a)(III)(B) sets the
+ *     single-trip overweight fee at "fifteen dollars plus five dollars per
+ *     axle", doubled by the FASTER surcharge to $30 plus $10 per axle, and CDOT
+ *     publishes its own worked example: "a six-axle semi-truck/trailer with a
+ *     load exceeding 80,000 pounds would cost $45". There is no weight
+ *     increment at all — the fee is flat in pounds and linear in axles — so
+ *     without `perAxleUsd` the only honest encoding was `notPriceable`, and a
+ *     state whose fee schedule is published in full would have been unquotable
+ *     over a multiplication.
+ *
+ * Both are DATA-MODEL extensions in the Phase 3/4 sense: no evaluator changed,
+ * no condition kind was added, and no `if (state === ...)` exists anywhere. A
+ * band that declares none of the three behaves identically to a Phase 1 band.
+ */
 export interface WeightBand {
   minLbs: number;
   maxLbs: number | null;
   feeUsd: number;
+  /**
+   * Miles travelled INSIDE this jurisdiction, where the state's own fee table
+   * is banded by distance as well as weight. OPTIONAL; absent means the band
+   * applies at any distance, which is what every Phase 1–4 state publishes.
+   *
+   * A state that uses these MUST also set `feesDependOnDistance`, or the engine
+   * would silently price its shortest column on a lane whose mileage it does
+   * not know.
+   */
+  minMiles?: number;
+  maxMiles?: number | null;
+  /**
+   * USD per axle, ADDED to `feeUsd`. OPTIONAL, and absent everywhere but
+   * Colorado. A band that sets this cannot be priced without the axle count,
+   * and `weightBandApplies` answers `null` rather than `false` when the count
+   * is missing — the same three-valued contract as `oversizeBandApplies` and
+   * `escortRules.ts`, for the same reason: a fee chosen by an absence is a
+   * confident wrong number.
+   */
+  perAxleUsd?: number;
 }
 
 export function weightBandsEqual(a: WeightBand, b: WeightBand): boolean {
-  return a.minLbs === b.minLbs && a.maxLbs === b.maxLbs && a.feeUsd === b.feeUsd;
+  return (
+    a.minLbs === b.minLbs &&
+    a.maxLbs === b.maxLbs &&
+    a.feeUsd === b.feeUsd &&
+    a.minMiles === b.minMiles &&
+    a.maxMiles === b.maxMiles &&
+    a.perAxleUsd === b.perAxleUsd
+  );
+}
+
+/** Measurements a weight band is tested against. */
+export interface WeightBandInput {
+  grossWeightLbs: number;
+  milesInJurisdiction?: number;
+  /** Axles on the combination, including the steering axle. */
+  axleCount?: number;
+}
+
+/**
+ * Does a band apply to this load?
+ *
+ * Three-valued, exactly like `oversizeBandApplies`. A band bounded on distance
+ * or priced per axle is not "does not apply" when the mileage or the axle count
+ * was never supplied — it is "cannot tell", and answering `false` would select
+ * a different column, or drop a real charge, on the strength of a blank field.
+ * A definite MISS on weight is still a real answer, because the band is out
+ * whatever the other inputs turn out to be.
+ */
+export function weightBandApplies(
+  band: WeightBand,
+  load: WeightBandInput,
+): { applies: boolean | null; missing: string[] } {
+  if (load.grossWeightLbs < band.minLbs) return { applies: false, missing: [] };
+  if (band.maxLbs !== null && load.grossWeightLbs > band.maxLbs) {
+    return { applies: false, missing: [] };
+  }
+
+  const missing: string[] = [];
+
+  if (band.minMiles !== undefined || band.maxMiles !== undefined) {
+    const miles = load.milesInJurisdiction;
+    if (miles === undefined) missing.push('miles travelled inside the state');
+    else {
+      if (band.minMiles !== undefined && miles < band.minMiles) {
+        return { applies: false, missing: [] };
+      }
+      if (
+        band.maxMiles !== undefined &&
+        band.maxMiles !== null &&
+        miles > band.maxMiles
+      ) {
+        return { applies: false, missing: [] };
+      }
+    }
+  }
+
+  if (band.perAxleUsd !== undefined && load.axleCount === undefined) {
+    missing.push('number of axles');
+  }
+
+  if (missing.length > 0) return { applies: null, missing };
+  return { applies: true, missing: [] };
+}
+
+/**
+ * What a band charges. The per-axle component is ADDED to the flat amount, not
+ * substituted for it: Colorado's single-trip OSOW permit is "$30 plus $10 per
+ * axle", and dropping either half misprices every permit the state issues.
+ *
+ * Returns `null` when the band is priced per axle and no axle count was given —
+ * `0` would read as "this band is free".
+ */
+export function weightBandAmount(
+  band: WeightBand,
+  axleCount: number | undefined,
+): number | null {
+  if (band.perAxleUsd === undefined) return band.feeUsd;
+  if (axleCount === undefined) return null;
+  return Math.round((band.feeUsd + band.perAxleUsd * axleCount) * 100) / 100;
 }
 
 /**

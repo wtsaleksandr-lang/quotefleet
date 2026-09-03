@@ -1289,8 +1289,17 @@
   // resolve would let this widget wave through a load the server then sends to
   // a human.
   //
+  // COLORADO'S CEILING IS 200,000 AND NOT THE 500,000 COLORADO ITSELF CALLS A
+  // SUPER LOAD. CDOT's single-trip OSOW permit stops at 200,000 lb GVW; between
+  // 200,001 and 500,000 the move is a Chapter 6 Special with a bond or escrow
+  // for the actual cost of Department staff and State Patrol, which the server
+  // cannot turn into a total. Mirroring 499,999 here would be the Florida
+  // mistake in a different state — a client that accepts a 400,000 lb load the
+  // server then refuses. The server's own threshold is 200,000 for exactly this
+  // reason, and this line follows it rather than the statute's vocabulary.
+  //
   // Pinned against the server-side data by src/calc/osow/widgetMirror.test.ts.
-  var OSOW_SUPERLOAD_LBS = { TX: 254300, OH: 120000, PA: 201000, NY: 199999, GA: 180000, NC: 132000, WA: 200000, AL: 300000, MO: 160000 };
+  var OSOW_SUPERLOAD_LBS = { TX: 254300, OH: 120000, PA: 201000, NY: 199999, GA: 180000, NC: 132000, WA: 200000, AL: 300000, MO: 160000, LA: 254000, CO: 200000 };
   function maxQuotableWeightLbs(pickup, delivery) {
     var from = String((pickup && pickup.state) || '').trim().toUpperCase();
     var to = String((delivery && delivery.state) || '').trim().toUpperCase();

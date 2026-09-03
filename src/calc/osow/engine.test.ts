@@ -1,5 +1,9 @@
 import { describe, it, expect } from 'vitest';
-import { calculateOsow, calculateOsowForJurisdiction } from './engine.js';
+import {
+  calculateOsow,
+  calculateOsowForJurisdiction,
+  type OsowLoad,
+} from './engine.js';
 import {
   OSOW_JURISDICTIONS,
   TEXAS_OSOW_RULES,
@@ -24,6 +28,20 @@ import {
   VIRGINIA_OSOW_RULES,
 } from './jurisdictions/virginia.js';
 import { CALIFORNIA_OSOW_RULES } from './jurisdictions/california.js';
+import {
+  LOUISIANA_CLASS_II_OCEAN_CONTAINER_FEE_USD,
+  LOUISIANA_OVERWEIGHT_SCHEDULE_A,
+  LOUISIANA_OVERWEIGHT_SCHEDULE_B,
+  LOUISIANA_PLEASURE_CRAFT_FEE_USD,
+  LOUISIANA_REAR_OVERHANG_FLAG_THRESHOLD_IN,
+  LOUISIANA_STRUCTURAL_EVALUATION_FEES,
+} from './jurisdictions/louisiana.js';
+import {
+  COLORADO_FLEET_PER_VEHICLE_FEE_USD,
+  COLORADO_INTERSTATE_GROSS_WEIGHT_LBS,
+  COLORADO_LVC_OWD_ANNUAL_FEE_USD,
+  COLORADO_OSOW_RULES,
+} from './jurisdictions/colorado.js';
 
 /**
  * Texas figures asserted here come from TxDMV and the Texas Transportation
@@ -1836,12 +1854,449 @@ describe('Phase 4 conflicts that live outside the priced lines', () => {
   });
 });
 
-describe('the registry after Phase 4', () => {
-  it('covers exactly the sixteen states whose datasets exist', () => {
+/**
+ * PHASE 5 — two states that each broke a different assumption in the fee model.
+ *
+ * Louisiana prices from a TWO-DIMENSIONAL table (weight rows × distance
+ * columns), and Colorado prices PER AXLE with no weight increment at all. Every
+ * subtotal below is compared against a figure printed in a state document: a
+ * cell of R.S. 32:387(H)(2)(c), or CDOT's own six-axle worked example.
+ */
+const ASOF5 = '2026-09-03';
+
+function priceIn5(
+  code: string,
+  partial: Parameters<typeof calculateOsowForJurisdiction>[1],
+) {
+  const rules = osowRulesFor(code);
+  expect(rules, `${code} must be a covered jurisdiction`).not.toBeNull();
+  return calculateOsowForJurisdiction(
+    rules as NonNullable<typeof rules>,
+    partial,
+    ASOF5,
+  );
+}
+
+describe('Louisiana — a fee table with two dimensions', () => {
+  const legalSize = {
+    widthIn: 102,
+    heightIn: ftIn(13),
+    overallLengthIn: ftIn(70),
+    trailerLengthIn: ftIn(48),
+    routeClass: 'divided' as const,
+  };
+
+  it('reproduces the statute’s own cells across the distance columns', () => {
+    // R.S. 32:387(H)(2)(c)(i), row "108,001-120,000":
+    //   0-50 $105.00 · 51-100 $195.00 · 101-150 $285.00 · 151-200 $375.00 · over 200 $465.00
+    const cells: Array<[number, number]> = [
+      [40, 105],
+      [100, 195],
+      [130, 285],
+      [180, 375],
+      [210, 465],
+    ];
+    for (const [miles, fee] of cells) {
+      const r = priceIn5('LA', {
+        ...legalSize,
+        grossWeightLbs: 120000,
+        milesInJurisdiction: miles,
+      });
+      expect(r.subtotalUsd, `${miles} mi`).toBe(fee);
+      // A legal-size overweight move is a clean, priced Louisiana answer.
+      expect(r.requiresManualReview, `${miles} mi`).toBe(false);
+    }
+  });
+
+  it('reads the weight rows as well as the columns', () => {
+    // Bottom-left and top-right corners of the printed schedule.
+    expect(
+      priceIn5('LA', { ...legalSize, grossWeightLbs: 85000, milesInJurisdiction: 30 })
+        .subtotalUsd,
+    ).toBe(45);
+    expect(
+      priceIn5('LA', { ...legalSize, grossWeightLbs: 250000, milesInJurisdiction: 300 })
+        .subtotalUsd,
+    ).toBe(2130);
+  });
+
+  it('will not pick a distance column it was not given', () => {
+    const r = priceIn5('LA', { ...legalSize, grossWeightLbs: 120000 });
+    expect(r.subtotalUsd).toBeNull();
+    expect(r.requiresManualReview).toBe(true);
+    expect(r.warnings.join(' ')).toContain(
+      'steps the overweight permit charge by miles travelled inside the state',
+    );
+  });
+
+  it('absorbs the oversize fee into the overweight schedule, as the statute says', () => {
+    const both = priceIn5('LA', {
+      ...legalSize,
+      widthIn: ftIn(13),
+      grossWeightLbs: 120000,
+      milesInJurisdiction: 100,
+    });
+    // $195 and not $195 + $8/$10: R.S. 32:387(H)(3) waives the oversize fee.
+    expect(both.subtotalUsd).toBe(195);
+    expect(both.lines.some((l) => l.code === 'osow_oversize')).toBe(false);
+  });
+
+  it('refuses to pick between the administrative code’s $8 and the statute’s $10', () => {
+    const oversizeOnly = priceIn5('LA', {
+      ...legalSize,
+      widthIn: ftIn(13),
+      grossWeightLbs: 70000,
+      milesInJurisdiction: 100,
+    });
+    const line = oversizeOnly.lines.find((l) => l.code === 'osow_oversize');
+    expect(line?.amountUsd).toBeNull();
+    expect(line?.lowUsd).toBe(8);
+    expect(line?.highUsd).toBe(10);
+    expect(oversizeOnly.subtotalUsd).toBeNull();
+    expect(oversizeOnly.subtotalLowUsd).toBe(8);
+    expect(oversizeOnly.subtotalHighUsd).toBe(10);
+    expect(oversizeOnly.requiresManualReview).toBe(true);
+    // The researcher's supersession argument is recorded and NOT applied.
+    expect(oversizeOnly.warnings.join(' ')).toContain('Official sources disagree');
+  });
+
+  it('swaps the pilot car for a trooper past 16 feet, rather than adding one', () => {
+    const wide = priceIn5('LA', {
+      ...legalSize,
+      widthIn: ftIn(17),
+      grossWeightLbs: 70000,
+      milesInJurisdiction: 100,
+      routeClass: 'two-lane',
+    });
+    expect(wide.escortsRequired).toBe(0); // no civilian pilot car at all
+    expect(wide.escorts.policeFront).toBe(1);
+    expect(wide.warnings.join(' ')).toContain('$75.00 per hour with a two-hour minimum');
+    // At 13 ft it is a private escort and no trooper.
+    const narrow = priceIn5('LA', {
+      ...legalSize,
+      widthIn: ftIn(13),
+      grossWeightLbs: 70000,
+      milesInJurisdiction: 100,
+      routeClass: 'two-lane',
+    });
+    expect(narrow.escortsRequired).toBe(1);
+    expect(narrow.escorts.policeFront).toBe(0);
+  });
+
+  it('flags the two ceilings that bite below the 254,000 lb superload line', () => {
+    const heavy = priceIn5('LA', {
+      ...legalSize,
+      grossWeightLbs: 240000,
+      milesInJurisdiction: 100,
+    });
+    const fired = heavy.escorts.applied.map((a) => a.ruleId);
+    expect(fired).toContain('la-over-232000-approved-routes-and-structural-evaluation');
+    expect(fired).toContain('la-over-238000-rail-or-water');
+    expect(heavy.requiresManualReview).toBe(true);
+    // Still inside the printed table, so it is a superload only past 254,000.
+    expect(heavy.superload).toBe(false);
+    expect(
+      priceIn5('LA', { ...legalSize, grossWeightLbs: 260000, milesInJurisdiction: 100 })
+        .superload,
+    ).toBe(true);
+  });
+
+  it('never sets a height pole, because Louisiana only recommends one', () => {
+    const tall = priceIn5('LA', {
+      ...legalSize,
+      heightIn: ftIn(16),
+      grossWeightLbs: 70000,
+      milesInJurisdiction: 100,
+    });
+    expect(tall.escorts.heightPole).toBe(false);
+    expect(tall.warnings.join(' ')).toContain('strongly recommended');
+  });
+
+  it('holds the three conflicts a single-trip quote cannot show as a fee', () => {
+    for (const [field, rows, low, high] of [
+      ['LA Class II ocean container fee', LOUISIANA_CLASS_II_OCEAN_CONTAINER_FEE_USD, 375, 500],
+      ['LA pleasure craft fee', LOUISIANA_PLEASURE_CRAFT_FEE_USD, 5, 10],
+      [
+        'LA rear overhang flag threshold',
+        LOUISIANA_REAR_OVERHANG_FLAG_THRESHOLD_IN,
+        ftIn(4),
+        ftIn(8),
+      ],
+    ] as const) {
+      const r = resolveSourced(field, rows, ASOF5);
+      expect(r.conflict, field).toBe(true);
+      expect(r.value, field).toBeNull();
+      expect(r.requiresManualReview, field).toBe(true);
+      expect(spreadOf(r), field).toEqual({ low, high });
+      expect(new Set(r.candidates.map((c) => c.source.id)).size, field).toBe(2);
+    }
+  });
+
+  it('lets the amending act’s date, not a hand-picked winner, decide what is in force', () => {
+    // Acts 2019 No. 301 took effect 2020-01-01, so the statutory $375 is on file
+    // from that day. The administrative $500 starts only on OUR retrieval date,
+    // because a bare "current through June 2025" is not evidence of what the LAC
+    // said in 2021. Priced as of 2021 there is therefore exactly one candidate
+    // and no conflict — the dates did the work.
+    const midway = resolveSourced(
+      'LA Class II ocean container fee',
+      LOUISIANA_CLASS_II_OCEAN_CONTAINER_FEE_USD,
+      '2021-06-01',
+    );
+    expect(midway.conflict).toBe(false);
+    expect(midway.value).toBe(375);
+    // Before the act there is nothing on file at all, which is the honest answer
+    // rather than back-dating either figure into a year we cannot evidence.
+    const before = resolveSourced(
+      'LA Class II ocean container fee',
+      LOUISIANA_CLASS_II_OCEAN_CONTAINER_FEE_USD,
+      '2019-06-01',
+    );
+    expect(before.value).toBeNull();
+    expect(before.conflict).toBe(false);
+    expect(before.requiresManualReview).toBe(true);
+  });
+
+  it('keeps schedules (a) and (b) on file without pricing from them', () => {
+    // Schedule (b)'s overlapping band is what `la-four-axle-schedule-b` quotes.
+    const fourAxle = LOUISIANA_OVERWEIGHT_SCHEDULE_B.find(
+      (r) => r.minGrossLbs === 80001,
+    );
+    expect(fourAxle?.feesByDistanceUsd[0]).toBe(67.5);
+    expect(fourAxle?.feesByDistanceUsd[4]).toBe(262.5);
+    // Schedule (a)'s top row is a formula, not a fee — recorded as null.
+    const overSixty = LOUISIANA_OVERWEIGHT_SCHEDULE_A.at(-1);
+    expect(overSixty?.minExcessLbs).toBe(60001);
+    expect(overSixty?.feesByDistanceUsd).toBeNull();
+    // Three per-structure evaluation fees and no structure count.
+    expect(LOUISIANA_STRUCTURAL_EVALUATION_FEES.map((f) => f.feeUsd)).toEqual([
+      187.5, 1275, 750,
+    ]);
+  });
+});
+
+describe('Colorado — a permit priced by the axle', () => {
+  const legalSize = {
+    widthIn: 102,
+    heightIn: ftIn(13),
+    overallLengthIn: ftIn(70),
+    trailerLengthIn: ftIn(48),
+    routeClass: 'co-white-four-lane' as const,
+  };
+
+  it('reproduces CDOT’s own six-axle worked example, doubled and carded', () => {
+    // "a six-axle semi-truck/trailer with a load exceeding 80,000 pounds would
+    // cost $45" — the statutory base. The FASTER surcharge doubles it to $90,
+    // and the $4 card charge makes $94.
+    const r = priceIn5('CO', { ...legalSize, grossWeightLbs: 100000, axleCount: 6 });
+    expect(r.lines.find((l) => l.code === 'osow_permit_base')?.amountUsd).toBe(30);
+    expect(r.lines.find((l) => l.code === 'osow_overweight')?.amountUsd).toBe(60);
+    expect(r.subtotalUsd).toBe(94);
+    expect(15 + 6 * 5).toBe(45);
+    expect((15 + 6 * 5) * 2).toBe(90);
+    expect(r.requiresManualReview).toBe(false);
+  });
+
+  it('charges an oversize-only load $30 and the card fee, and nothing per axle', () => {
+    const r = priceIn5('CO', {
+      ...legalSize,
+      widthIn: ftIn(11),
+      grossWeightLbs: 70000,
+    });
+    expect(r.subtotalUsd).toBe(34);
+    expect(r.lines.some((l) => l.code === 'osow_overweight')).toBe(false);
+    expect(r.requiresManualReview).toBe(false);
+  });
+
+  it('is flat in pounds and linear in axles, which is the whole fee shape', () => {
+    const at = (grossWeightLbs: number, axleCount: number) =>
+      priceIn5('CO', { ...legalSize, grossWeightLbs, axleCount }).subtotalUsd;
+    // 119,000 lb of extra cargo costs nothing; one more axle costs $10.
+    expect(at(81000, 6)).toBe(94);
+    expect(at(199000, 6)).toBe(94);
+    expect(at(199000, 7)).toBe(104);
+  });
+
+  it('will not price the axle component from an absence', () => {
+    const r = priceIn5('CO', { ...legalSize, grossWeightLbs: 100000 });
+    expect(r.lines.find((l) => l.code === 'osow_overweight')?.amountUsd).toBeNull();
+    expect(r.subtotalUsd).toBeNull();
+    expect(r.requiresManualReview).toBe(true);
+    expect(r.warnings.join(' ')).toContain(
+      'steps the overweight permit charge by number of axles',
+    );
+  });
+
+  it('takes the axle count from a supplied axle layout when no count is given', () => {
+    const axles = [0, 12, 16, 40, 44, 48].map((positionFt) => ({
+      positionFt,
+      weightLbs: 16000,
+    }));
+    const r = priceIn5('CO', { ...legalSize, grossWeightLbs: 96000, axles });
+    expect(r.lines.find((l) => l.code === 'osow_overweight')?.amountUsd).toBe(60);
+  });
+
+  it('surfaces the 80,000/85,000 statutory quarrel only inside the disputed band', () => {
+    const inBand = priceIn5('CO', { ...legalSize, grossWeightLbs: 82000, axleCount: 5 });
+    expect(inBand.escorts.applied.map((a) => a.ruleId)).toContain(
+      'co-interstate-gross-80000-to-85000-conflict',
+    );
+    expect(inBand.requiresManualReview).toBe(true);
+    // And it is still PRICED — the conflict does not disable the weight check.
+    expect(inBand.subtotalUsd).toBe(84);
+    // Below 80,000 both readings agree the load is legal; above 85,000 both
+    // agree it needs a permit. Neither hears about the disagreement.
+    for (const gross of [79000, 100000]) {
+      expect(
+        priceIn5('CO', { ...legalSize, grossWeightLbs: gross, axleCount: 5 })
+          .escorts.applied.map((a) => a.ruleId),
+        `${gross} lb`,
+      ).not.toContain('co-interstate-gross-80000-to-85000-conflict');
+    }
+    // The conflict itself is held with both candidates and no adopted value.
+    const held = resolveSourced(
+      'CO interstate legal gross weight',
+      COLORADO_INTERSTATE_GROSS_WEIGHT_LBS,
+      ASOF5,
+    );
+    expect(held.conflict).toBe(true);
+    expect(held.value).toBeNull();
+    expect(spreadOf(held)).toEqual({ low: 80000, high: 85000 });
+    // …and it is NOT what the engine uses for the legal limit, which is exactly
+    // why the over-dimension check above still works.
+    expect(
+      resolveSourced(
+        'CO legal gross weight',
+        COLORADO_OSOW_RULES.legalLimits.grossWeightLbs,
+        ASOF5,
+      ).value,
+    ).toBe(80000);
+  });
+
+  it('gives the same 12-foot load a different answer on each map colour', () => {
+    const at = (routeClass: OsowLoad['routeClass']) =>
+      priceIn5('CO', {
+        ...legalSize,
+        widthIn: ftIn(12),
+        grossWeightLbs: 70000,
+        ...(routeClass === undefined ? {} : { routeClass }),
+      });
+    expect(at('co-blue-two-lane').escortsRequired).toBe(2); // front and rear
+    expect(at('co-yellow-two-lane').escortsRequired).toBe(1); // front only
+    expect(at('co-green-two-lane').escortsRequired).toBe(0); // green starts at 13 ft
+    expect(at('co-white-four-lane').escortsRequired).toBe(0); // white starts at 15 ft
+    // Red admits no ordinary oversize movement at any width over legal.
+    expect(at('co-red-two-lane').escorts.applied.map((a) => a.ruleId)).toContain(
+      'co-red-over-legal-width',
+    );
+    expect(at('co-red-two-lane').requiresManualReview).toBe(true);
+    // Without a colour the ladder cannot be read at all, which is the point of
+    // carrying Colorado's own legend instead of flattening it.
+    const noColour = priceIn5('CO', {
+      ...legalSize,
+      widthIn: ftIn(12),
+      grossWeightLbs: 70000,
+      routeClass: undefined,
+    });
+    expect(noColour.requiresManualReview).toBe(true);
+    expect(noColour.escorts.undecided.length).toBeGreaterThan(0);
+  });
+
+  it('splits GREEN by lane count, which no other colour does', () => {
+    const wide = { ...legalSize, widthIn: ftIn(14), grossWeightLbs: 70000 };
+    // Two-lane green wants a front pilot car; four-lane green accepts a light.
+    expect(priceIn5('CO', { ...wide, routeClass: 'co-green-two-lane' }).escorts.front).toBe(1);
+    const fourLane = priceIn5('CO', { ...wide, routeClass: 'co-green-four-lane' });
+    expect(fourLane.escortsRequired).toBe(0);
+    expect(fourLane.warnings.join(' ')).toContain('one Flashing Yellow Light in the rear');
+  });
+
+  it('asks about terrain rather than guessing flat country', () => {
+    const long = {
+      ...legalSize,
+      overallLengthIn: ftIn(95),
+      grossWeightLbs: 70000,
+      routeClass: 'co-white-two-lane' as const,
+    };
+    const unanswered = priceIn5('CO', long);
+    expect(unanswered.escorts.undecided.map((u) => u.ruleId)).toContain(
+      'co-length-over-85-mountainous-two-lane',
+    );
+    expect(unanswered.requiresManualReview).toBe(true);
+    const answered = priceIn5('CO', {
+      ...long,
+      subjectiveAnswers: { coMountainousHighway: true },
+    });
+    expect(answered.escorts.front).toBe(1);
+    expect(answered.requiresManualReview).toBe(false);
+    // Past 110 ft the flat-country rule requires the same car, so the terrain
+    // question can no longer change the answer and is not asked.
+    const veryLong = priceIn5('CO', { ...long, overallLengthIn: ftIn(120) });
+    expect(veryLong.escorts.front).toBe(1);
+    expect(veryLong.escorts.undecided.map((u) => u.ruleId)).not.toContain(
+      'co-length-over-85-mountainous-two-lane',
+    );
+  });
+
+  it('runs a height pole without inventing an escort to carry it', () => {
+    const tall = priceIn5('CO', {
+      ...legalSize,
+      heightIn: ftIn(17, 6),
+      grossWeightLbs: 70000,
+    });
+    expect(tall.escorts.heightPole).toBe(true);
+    // Colorado triggers no escort on height at all.
+    expect(tall.escortsRequired).toBe(0);
+    expect(tall.warnings.join(' ')).toContain('licensed signal contractor');
+    // Exactly 17 ft 6 in does not yet trigger the route survey — "exceed".
+    expect(tall.escorts.routeSurvey).toBe(false);
+    expect(
+      priceIn5('CO', { ...legalSize, heightIn: ftIn(18), grossWeightLbs: 70000 })
+        .escorts.routeSurvey,
+    ).toBe(true);
+  });
+
+  it('stops issuing the ordinary permit at 17 feet and at 200,000 pounds', () => {
+    const wide = priceIn5('CO', {
+      ...legalSize,
+      widthIn: ftIn(18),
+      grossWeightLbs: 70000,
+      routeClass: 'co-green-four-lane',
+    });
+    expect(wide.superload).toBe(true);
+    expect(wide.subtotalUsd).toBeNull();
+    const heavy = priceIn5('CO', {
+      ...legalSize,
+      grossWeightLbs: 210000,
+      axleCount: 9,
+    });
+    expect(heavy.superload).toBe(true);
+    expect(heavy.subtotalUsd).toBeNull();
+    // A Chapter 6 Special carries a front and a rear car whatever it measures.
+    expect(heavy.escorts.front).toBe(1);
+    expect(heavy.escorts.rear).toBe(1);
+  });
+
+  it('holds the two CDOT fee conflicts open rather than reading one as a typo', () => {
+    for (const [field, rows, low, high] of [
+      ['CO annual LVC OWD permit fee', COLORADO_LVC_OWD_ANNUAL_FEE_USD, 400, 1500],
+      ['CO annual fleet per-vehicle fee', COLORADO_FLEET_PER_VEHICLE_FEE_USD, 15, 25],
+    ] as const) {
+      const r = resolveSourced(field, rows, ASOF5);
+      expect(r.conflict, field).toBe(true);
+      expect(r.value, field).toBeNull();
+      expect(r.requiresManualReview, field).toBe(true);
+      expect(spreadOf(r), field).toEqual({ low, high });
+    }
+  });
+});
+
+describe('the registry after Phase 5', () => {
+  it('covers exactly the eighteen states whose datasets exist', () => {
     expect(Object.keys(OSOW_JURISDICTIONS).sort()).toEqual(
       [
-        'AL', 'CA', 'FL', 'GA', 'IL', 'IN', 'MO', 'NC',
-        'NJ', 'NY', 'OH', 'OK', 'PA', 'TX', 'VA', 'WA',
+        'AL', 'CA', 'CO', 'FL', 'GA', 'IL', 'IN', 'LA', 'MO',
+        'NC', 'NJ', 'NY', 'OH', 'OK', 'PA', 'TX', 'VA', 'WA',
       ].sort(),
     );
     for (const code of Object.keys(OSOW_JURISDICTIONS)) {
@@ -1851,6 +2306,6 @@ describe('the registry after Phase 4', () => {
     // The registry must never name a jurisdiction ahead of its dataset, and the
     // count is asserted separately so a stray import cannot pass by matching a
     // list someone updated in the same edit.
-    expect(Object.keys(OSOW_JURISDICTIONS)).toHaveLength(16);
+    expect(Object.keys(OSOW_JURISDICTIONS)).toHaveLength(18);
   });
 });

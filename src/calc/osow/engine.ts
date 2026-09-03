@@ -65,6 +65,8 @@ import {
   additionalAuthoritiesEqual,
   thresholdsEqual,
   weightBandsEqual,
+  weightBandApplies,
+  weightBandAmount,
   conditionalFeesEqual,
   transactionFeesEqual,
   MILEAGE_SPLIT_NOTE,
@@ -100,6 +102,16 @@ export interface OsowLoad {
   /** Outer-to-outer axle spacing in feet — needed for Texas's short-spacing
    *  superload trigger even when the full layout is unknown. */
   axleSpacingFt?: number;
+  /**
+   * Axles on the combination INCLUDING the steering axle, when the full layout
+   * in `axles` is not known. OPTIONAL, and it exists because Colorado prices the
+   * overweight permit per axle — "$30 plus $10 per axle" — while a quote that
+   * can state a count often cannot state each axle's position and weight, which
+   * is all `axles` is for. Falls back to `axles.length` when only that is given;
+   * a caller supplying neither leaves a per-axle band UNDECIDED rather than
+   * unpriced-at-zero. See `WeightBand.perAxleUsd`.
+   */
+  axleCount?: number;
   routeClass?: RouteClass;
   subjectiveAnswers?: Record<string, boolean>;
   /** Miles inside this jurisdiction. Phase 2 — see MILEAGE_SPLIT_NOTE. */
@@ -257,6 +269,12 @@ export function calculateOsowForJurisdiction(
   const sources: SourceDoc[] = [];
   const lines: OsowFeeLine[] = [];
   let requiresManualReview = false;
+  /**
+   * An explicit count wins over the layout, and the layout answers when only it
+   * is given. `undefined` stays `undefined` — never 0 — so a per-axle band is
+   * undecided rather than free. See `OsowLoad.axleCount`.
+   */
+  const axleCount = load.axleCount ?? load.axles?.length;
 
   // ── 1. Legal limits: is a permit needed at all? ────────────────────────
   const widthLimit = resolveSourced(`${rules.name} legal width`, rules.legalLimits.widthIn, asOf);
@@ -767,12 +785,56 @@ export function calculateOsowForJurisdiction(
         }
 
         case 'bands': {
+          /**
+           * Band selection is three-valued for the same reason the oversize
+           * side is. A Louisiana band names a DISTANCE COLUMN as well as a
+           * weight row, and a Colorado band is priced per axle — so a band can
+           * be undecidable rather than in or out, and choosing one anyway would
+           * pick a fee out of a blank field. See `weightBandApplies`.
+           */
+          const bandInEffect = rules.overweightBands.filter((b) =>
+            isInEffect(b, asOf),
+          );
+          const bandMatched: Sourced<WeightBand>[] = [];
+          const bandUndecided = new Set<string>();
+          for (const row of bandInEffect) {
+            const verdict = weightBandApplies(row.value, {
+              grossWeightLbs: gross,
+              ...(load.milesInJurisdiction === undefined
+                ? {}
+                : { milesInJurisdiction: load.milesInJurisdiction }),
+              ...(axleCount === undefined ? {} : { axleCount }),
+            });
+            if (verdict.applies === true) bandMatched.push(row);
+            else if (verdict.applies === null) {
+              for (const m of verdict.missing) bandUndecided.add(m);
+            }
+          }
+
+          if (bandUndecided.size > 0) {
+            for (const row of bandInEffect) {
+              if (!sources.some((s) => s.id === row.source.id)) {
+                sources.push(row.source);
+              }
+            }
+            const needed = [...bandUndecided].join(' and ');
+            overweightLine = {
+              code: 'osow_overweight',
+              name: 'Overweight permit charge',
+              amountUsd: null,
+              note: `${rules.name} sets the overweight charge by band, and the band cannot be priced without the ${needed}.`,
+              sources: bandInEffect.map((r) => r.source),
+            };
+            warnings.push(
+              `${rules.name} steps the overweight permit charge by ${needed}, which ${bandUndecided.size === 1 ? 'was' : 'were'} not supplied. No overweight amount is quoted for this state.`,
+            );
+            requiresManualReview = true;
+            break;
+          }
+
           const bandRes = resolveSourced<WeightBand>(
             `${rules.code} overweight fee band`,
-            rules.overweightBands.filter((b) => {
-              const v = b.value;
-              return gross >= v.minLbs && (v.maxLbs === null || gross <= v.maxLbs);
-            }),
+            bandMatched,
             asOf,
             weightBandsEqual,
           );
@@ -781,19 +843,23 @@ export function calculateOsowForJurisdiction(
           if (bandRes.requiresManualReview) requiresManualReview = true;
           const spread = { low: null as number | null, high: null as number | null };
           if (bandRes.conflict) {
-            const fees = bandRes.candidates.map((c) => c.value.feeUsd);
-            spread.low = Math.min(...fees);
-            spread.high = Math.max(...fees);
+            const fees = bandRes.candidates
+              .map((c) => weightBandAmount(c.value, axleCount))
+              .filter((f): f is number => f !== null);
+            if (fees.length > 0) {
+              spread.low = Math.min(...fees);
+              spread.high = Math.max(...fees);
+            }
           }
           const band = bandRes.value;
           overweightLine = {
             code: 'osow_overweight',
             name: 'Overweight permit charge',
-            amountUsd: band === null ? null : band.feeUsd,
+            amountUsd: band === null ? null : weightBandAmount(band, axleCount),
             ...(bandRes.conflict ? { lowUsd: spread.low ?? undefined, highUsd: spread.high ?? undefined } : {}),
             note: band === null
               ? undefined
-              : `${band.minLbs.toLocaleString()}–${band.maxLbs === null ? 'over' : band.maxLbs.toLocaleString()} lb band`,
+              : `${band.minLbs.toLocaleString()}–${band.maxLbs === null ? 'over' : band.maxLbs.toLocaleString()} lb band${band.perAxleUsd === undefined ? '' : `, $${band.perAxleUsd.toFixed(2)} per axle × ${axleCount ?? 0} axles`}`,
             sources: sourcesOf(bandRes),
           };
           if (band === null && bandRes.candidates.length === 0) {
