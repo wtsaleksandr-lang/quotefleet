@@ -81,6 +81,38 @@ export interface PerMileRate {
   roundIncrementUp: boolean;
   minimumUsd: number | null;
   maximumUsd: number | null;
+  /**
+   * Miles are rounded UP to a multiple of this before pricing. OPTIONAL and
+   * absent everywhere but Florida, whose fee rule reads "Permit fees shall be
+   * based on 25 mile increments" and whose own worked example bills a 67.5-mile
+   * move as 75 miles. Pricing the true mileage would under-bill every Florida
+   * overweight permit that is not an exact multiple of 25.
+   */
+  roundMilesUpTo?: number;
+  /**
+   * A flat amount added AFTER the per-mile computation and BEFORE any rounding
+   * to whole dollars. OPTIONAL. Florida's $3.33 "administrative cost of
+   * issuance" for weights over 80,000 lb is inside the rounding, not outside
+   * it: the rule's example is "(75 miles X $0.32) plus $3.33 = $27.33 rounded
+   * up to $28.00", and adding the $3.33 after the rounding would give $27.00 +
+   * $3.33 = $30.33 — a different, wrong number.
+   */
+  addAfterUsd?: number;
+  /**
+   * Rounding to whole dollars, where the STATE says so. OPTIONAL; absent means
+   * cents, which is what every Phase 1–3 state does.
+   *
+   *   - `'nearest'` — Washington. RCW 46.44.0941(c): overweight fees "that
+   *     result in an amount less than even dollars ... shall be carried to the
+   *     next full dollar if 50 cents or over and shall be reduced to the next
+   *     full dollar if 49 cents or under". A 293-mile move at $0.07 per mile is
+   *     $20.51 raw and $21.00 as the state computes it.
+   *   - `'up'` — Florida. "rounded up to the nearest dollar".
+   *
+   * Applied to the amount rounded to cents first, so a value already on a whole
+   * dollar is not pushed up a dollar by binary floating-point dust.
+   */
+  roundDollars?: 'nearest' | 'up';
 }
 
 export function perMileRatesEqual(a: PerMileRate, b: PerMileRate): boolean {
@@ -92,11 +124,28 @@ export function perMileRatesEqual(a: PerMileRate, b: PerMileRate): boolean {
     a.excessBaseLbs === b.excessBaseLbs &&
     a.roundIncrementUp === b.roundIncrementUp &&
     a.minimumUsd === b.minimumUsd &&
-    a.maximumUsd === b.maximumUsd
+    a.maximumUsd === b.maximumUsd &&
+    a.roundMilesUpTo === b.roundMilesUpTo &&
+    a.addAfterUsd === b.addAfterUsd &&
+    a.roundDollars === b.roundDollars
   );
 }
 
-/** Distance-priced overweight amount, rounded to cents. */
+/** Round to cents. Binary floating point makes this necessary before, not
+ *  only after, a rounding step that reads whole dollars. */
+function toCents(value: number): number {
+  return Math.round(value * 100) / 100;
+}
+
+/**
+ * Distance-priced overweight amount, rounded to cents.
+ *
+ * ORDER OF OPERATIONS IS THE STATE'S, NOT OURS, and Florida's rule publishes
+ * its own worked example so it can be checked: 112,000 lb over 67.5 miles is
+ * "(75 miles X $0.32) plus $3.33 = $27.33 rounded up to $28.00". Miles round up
+ * to the increment first, the flat administrative amount goes in before the
+ * dollar rounding, and only then do the minimum and maximum apply.
+ */
 export function perMileAmount(
   rate: PerMileRate,
   grossWeightLbs: number,
@@ -109,11 +158,19 @@ export function perMileAmount(
     const exact = excess / rate.perIncrementLbs;
     units = rate.roundIncrementUp ? Math.ceil(exact) : Math.floor(exact);
   }
-  const raw = rate.ratePerMileUsd * miles * units;
+  const billedMiles =
+    rate.roundMilesUpTo !== undefined && rate.roundMilesUpTo > 0
+      ? Math.ceil(miles / rate.roundMilesUpTo) * rate.roundMilesUpTo
+      : miles;
+  let raw = toCents(
+    rate.ratePerMileUsd * billedMiles * units + (rate.addAfterUsd ?? 0),
+  );
+  if (rate.roundDollars === 'nearest') raw = Math.round(raw);
+  else if (rate.roundDollars === 'up') raw = Math.ceil(raw);
   const floored = rate.minimumUsd === null ? raw : Math.max(raw, rate.minimumUsd);
   const capped =
     rate.maximumUsd === null ? floored : Math.min(floored, rate.maximumUsd);
-  return Math.round(capped * 100) / 100;
+  return toCents(capped);
 }
 
 /**

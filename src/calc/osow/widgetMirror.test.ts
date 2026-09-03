@@ -38,7 +38,14 @@ function mirroredThresholds(): Record<string, number> {
   return out;
 }
 
-const ASOF = '2026-09-01';
+/**
+ * Phase 4 moved this a day forward. Alabama's superload memorandum carries NO
+ * revision date, so its threshold row is effective only from the date we read it
+ * (2026-09-02) — and a mirror test running on the day before would have found
+ * the server refusing a ceiling the widget publishes, which is the exact drift
+ * these tests exist to catch. The date is the retrieval date, not a convenience.
+ */
+const ASOF = '2026-09-02';
 
 /**
  * The ceiling the SERVER would allow for a same-state lane, or `null` where the
@@ -75,10 +82,15 @@ describe('widget mirror of the OS/OW weight ceiling', () => {
   });
 
   it('omits a covered state whose superload threshold does not resolve', () => {
-    // Illinois publishes none; Indiana publishes three that disagree. Both are
-    // covered jurisdictions, and both must keep the federal ceiling.
+    // Illinois publishes none; Indiana publishes three that disagree. Oklahoma
+    // defines a superload against Standard Drawing OL-1, a configuration rather
+    // than a weight. Florida has no superload class at all — and mirroring the
+    // 300,000 lb structural-evaluation trigger it DOES publish would be the
+    // worst case of all, because the server's Florida per-mile schedule stops at
+    // 162,000 lb and would refuse a load the widget had already accepted.
+    // All four are covered jurisdictions and all four keep the federal ceiling.
     const mirrored = mirroredThresholds();
-    for (const code of ['IL', 'IN']) {
+    for (const code of ['IL', 'IN', 'OK', 'FL']) {
       expect(OSOW_JURISDICTIONS[code], `${code} must still be covered`).toBeDefined();
       expect(serverCeilingFor(code), `${code} must not resolve a ceiling`).toBeNull();
       expect(mirrored[code]).toBeUndefined();
