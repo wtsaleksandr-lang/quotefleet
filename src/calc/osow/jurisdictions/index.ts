@@ -1,18 +1,27 @@
 /**
  * The jurisdiction registry.
  *
- * Phase 1 kept this in `texas.ts` because there was one state. Phase 2 adds
- * five more and the registry moves here, so that adding a state is: write the
- * data file, add one line below. Nothing in `engine.ts`, `escortRules.ts`,
- * `provenance.ts` or `types.ts` changes to add a jurisdiction — that has been
- * the design constraint since Phase 1 and it still holds.
+ * Phase 1 kept this in `texas.ts` because there was one state. Phase 2 added
+ * five more and the registry moved here, so that adding a state is: write the
+ * data file, add one line below. Nothing in `engine.ts`, `provenance.ts` or
+ * `types.ts` changes to add a jurisdiction — that has been the design
+ * constraint since Phase 1 and it still holds.
+ *
+ * PHASE 3 MOVED ONE THING, ONCE, AND ONLY IN `escortRules.ts`: the `RouteClass`
+ * union grew five members for California's pilot-car map colours. That is a
+ * vocabulary extension rather than a new branch — no evaluator, no engine path
+ * and no existing rule changed — and it was preferred to flattening yellow,
+ * green, blue, brown and red onto "divided" and "two-lane", which would have
+ * erased two feet of width and thirty-five feet of length between route classes
+ * that California prices differently. See `RouteClass` for the reasoning.
  *
  * WHAT IS HERE IS EXACTLY WHAT EXISTS. An earlier draft of this file imported
  * Arkansas, Tennessee and Kentucky, whose data files were never written; the
  * build failed on three missing modules. The registry must never name a
  * jurisdiction ahead of its dataset — `calculateOsow` refuses loudly for any
  * state that is not here, and that refusal is the honest answer for a state we
- * have not sourced. Six are covered: TX, OH, PA, NY, IL, IN.
+ * have not sourced. Eleven are covered: TX, OH, PA, NY, IL, IN, CA, GA, NC, NJ,
+ * VA.
  */
 import type { JurisdictionOsowRules } from '../types.js';
 import { TEXAS_OSOW_RULES } from './texas.js';
@@ -21,6 +30,11 @@ import { PENNSYLVANIA_OSOW_RULES } from './pennsylvania.js';
 import { NEW_YORK_OSOW_RULES } from './newYork.js';
 import { ILLINOIS_OSOW_RULES } from './illinois.js';
 import { INDIANA_OSOW_RULES } from './indiana.js';
+import { CALIFORNIA_OSOW_RULES } from './california.js';
+import { GEORGIA_OSOW_RULES } from './georgia.js';
+import { NORTH_CAROLINA_OSOW_RULES } from './northCarolina.js';
+import { NEW_JERSEY_OSOW_RULES } from './newJersey.js';
+import { VIRGINIA_OSOW_RULES } from './virginia.js';
 
 export const OSOW_JURISDICTIONS: Record<string, JurisdictionOsowRules> = {
   TX: TEXAS_OSOW_RULES,
@@ -29,6 +43,11 @@ export const OSOW_JURISDICTIONS: Record<string, JurisdictionOsowRules> = {
   NY: NEW_YORK_OSOW_RULES,
   IL: ILLINOIS_OSOW_RULES,
   IN: INDIANA_OSOW_RULES,
+  CA: CALIFORNIA_OSOW_RULES,
+  GA: GEORGIA_OSOW_RULES,
+  NC: NORTH_CAROLINA_OSOW_RULES,
+  NJ: NEW_JERSEY_OSOW_RULES,
+  VA: VIRGINIA_OSOW_RULES,
 };
 
 /** Is there OS/OW coverage for this state/province code? */
@@ -50,4 +69,9 @@ export {
   NEW_YORK_OSOW_RULES,
   ILLINOIS_OSOW_RULES,
   INDIANA_OSOW_RULES,
+  CALIFORNIA_OSOW_RULES,
+  GEORGIA_OSOW_RULES,
+  NORTH_CAROLINA_OSOW_RULES,
+  NEW_JERSEY_OSOW_RULES,
+  VIRGINIA_OSOW_RULES,
 };
