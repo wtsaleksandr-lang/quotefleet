@@ -135,8 +135,20 @@ describe('renderDirectoryLanding — shipper discoverability (H1)', () => {
     expect(html).toContain('href="/directory/join"');
     expect(html).toContain('Directory Pro — $19/mo');
   });
-  it('carries a "For shippers" nav link reaching /directory/join', () => {
-    expect(html).toContain('href="/directory/join">For shippers');
+  it('reaches /directory/join from the For Shippers menu, without saying it twice', () => {
+    // This used to assert a `href="/directory/join">For shippers` link in the
+    // action cluster. That link sat directly beside the "For Shippers" dropdown,
+    // so the header printed the same words twice — the duplicate Alex flagged in
+    // the nav/IA rebuild. Directory Pro now lives inside the For Shippers menu,
+    // under the job it belongs to ("Find & vet carriers"), and the action slot
+    // ships empty.
+    expect(html).toContain('>For Shippers<');
+    expect(html).toContain('<a href="/directory/join">Directory Pro</a>');
+    expect(html).not.toMatch(/href="\/directory\/join">For shippers/i);
+    const header = html.match(/<header class="site-header">[\s\S]*?<div class="site-mobile-menu"/)?.[0] ?? '';
+    expect(header, 'header must be extractable').toContain('site-actions');
+    // Exactly ONE "For Shippers" in the desktop header: the menu trigger.
+    expect((header.match(/>For shippers</gi) ?? []).length).toBe(1);
   });
   it('coexists with the carrier "Claim your listing — free" path', () => {
     // Both audiences framed; the carrier claim path is not buried.

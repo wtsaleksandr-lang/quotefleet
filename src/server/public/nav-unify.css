@@ -217,8 +217,8 @@ html[data-theme="light"] .nav-dd-panel {
 .site-burger { display: none; }
 .site-mobile-menu { display: none; }
 
-/* ───────────────────── Mobile (≤ 640px) ───────────────────── */
-@media (max-width: 640px) {
+/* ────────────── Collapsed nav (≤ 1023px) — see EOF note ────────────── */
+@media (max-width: 1023px) {
   .site-header {
     padding: 0;
   }
@@ -349,7 +349,7 @@ html[data-theme="light"] .nav-dd-panel {
   max-width: 1120px;
   margin: 0 auto;
   display: grid;
-  grid-template-columns: 1.4fr repeat(4, 1fr);
+  grid-template-columns: repeat(5, minmax(0, 1fr));
   gap: 32px;
 }
 .premium-footer .footer-brand {
@@ -451,7 +451,7 @@ html[data-theme="light"] .nav-dd-panel {
 }
 
 @media (max-width: 980px) {
-  .premium-footer-inner { grid-template-columns: 1fr 1fr; }
+  .premium-footer-inner { grid-template-columns: repeat(3, minmax(0, 1fr)); }
   .premium-footer .footer-brand { grid-column: 1 / -1; }
 }
 @media (max-width: 640px) {
@@ -477,3 +477,127 @@ html[data-theme="light"] .nav-dd-panel {
 .site-actions [hidden],
 .nav-dd-panel a[hidden],
 .site-mobile-menu a[hidden] { display: none !important; }
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   NAV / IA REBUILD — appended at EOF on purpose.
+
+   The spacing + color guards baseline by FILE:LINE, so an edit in the middle of
+   this file renumbers 14 tolerated entries and turns a green run red. Everything
+   below is therefore additive and appended; the only in-place edit was widening
+   one existing media query's max-width (same line count, no renumbering).
+
+   ── THE BREAKPOINT BUG ──────────────────────────────────────────────────────
+   The header used to collapse to the burger only at ≤640px, but the full bar
+   (brand + three mega-menus + Pricing + theme + Sign in + CTA) needs ~1000px.
+   Between 641 and ~960px `.site-actions` therefore ran off the end of
+   `.site-header-inner` — measured at +288px on /directory@660 and +170px on
+   /pricing@660, still +2px at 960. There is now ONE collapse point: the bar is
+   inline at ≥1024px and a burger below it, so the overflow band cannot exist.
+   ═══════════════════════════════════════════════════════════════════════════ */
+
+/* Tablet (641–1023px): the nav is a burger here, but there is still plenty of
+   room for the floating card header and the primary CTA — only the phone
+   layout goes full-bleed. Restores what the ≤1023px block turns off. */
+@media (min-width: 641px) and (max-width: 1023px) {
+  .site-header { padding: 12px 24px 0; }
+  .site-header-inner {
+    max-width: 1180px;
+    margin: 0 auto;
+    padding: 12px 24px;
+    gap: 16px;
+    justify-content: flex-start;
+    border: 1px solid var(--border);
+    border-radius: 14px;
+    background: var(--surface-2);
+    box-shadow: 0 6px 20px rgba(0, 0, 0, 0.18);
+  }
+  html[data-theme="light"] .site-header-inner {
+    background: var(--surface-2);
+    box-shadow: 0 1px 0 var(--border), 0 6px 20px rgba(10, 37, 64, 0.06);
+  }
+  /* Push the action cluster to the trailing edge now that .site-nav (which
+     carried `margin-left:auto`) is hidden. */
+  .site-actions { margin-left: auto; }
+  .site-actions .btn-secondary { display: inline-flex; }
+  .site-mobile-menu:not([hidden]) { margin: 8px 24px 0; }
+}
+
+/* ── Mega-menu panel: column count is declared by the panel, not guessed ──
+   The base rule hard-codes two `max-content` tracks, so a panel with three
+   groups silently wrapped its third column onto a second row. Each panel now
+   states how many columns it has. */
+.nav-dd-panel--cols1 { grid-template-columns: max-content; }
+.nav-dd-panel--cols3 { grid-template-columns: repeat(3, max-content); }
+
+/* ── Mobile drawer sub-headings ──────────────────────────────────────────
+   The drawer used to be a flat 11-link list under one heading. Each desktop
+   panel column is now a `.mm-sub` inside its <details>, so the phone menu has
+   the same structure as the desktop one. */
+.site-mobile-menu .mm-sub {
+  margin: 8px 0 0;
+  padding: 8px 16px 4px;
+  font-family: var(--font-mono);
+  font-size: 10px;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  font-weight: 700;
+  color: var(--muted);
+}
+.site-mobile-menu .mm-group > .mm-sub:first-of-type { margin-top: 0; }
+.site-mobile-menu .mm-flat {
+  border-top: 1px solid var(--border);
+  font-weight: 600;
+}
+
+/* ── Footer: five columns that mirror the three header menus + Company/Legal.
+   The brand block takes its own full-width row so each link column keeps a
+   readable measure instead of being squeezed into a sixth track.
+
+   ── THE TRACK LADDER IS ARITHMETIC, NOT TASTE ───────────────────────────────
+   Standing rule: a group never wraps so that ONE item sits alone on a line
+   (DESIGN-SYSTEM.md §8). For a footer that means: with N link columns laid out
+   in T tracks, the last row holds `N mod T` columns, so any T where
+   `N mod T === 1` strands a column on a row of its own. N is 5 here, so:
+
+       T=5 → 5            ✓ one full row
+       T=4 → 4 + 1        ✗ orphan
+       T=3 → 3 + 2        ✓ (a 5-group wrapping 3+2 is explicitly allowed)
+       T=2 → 2 + 2 + 1    ✗ orphan  ← what shipped: LEGAL alone at ≤760px,
+                                       stranded next to ~620px of dead space
+       T=1 → 1 + 1 + …    ✓ a deliberate full stack, not a wrap remainder
+
+   So the ladder steps 5 → 3 → 1 and SKIPS 4 and 2 entirely. Three tracks is
+   held all the way down to 641px (≈165px per column at the low end — the links
+   wrap a word, nothing overflows) rather than dropping to two, because two is
+   the arithmetic that produces the orphan. Below 641px every column goes
+   full-bleed, which is a stack rather than a wrap and leaves no dead track.
+
+   Deriving T from N is why this is stated once, here, instead of being
+   re-guessed per breakpoint: change the column count and the only question to
+   re-answer is which T values still satisfy `N mod T !== 1`.
+
+   These rules sit AFTER the older `@media (max-width: 980px)` block above, so
+   at equal specificity they win for every width — that block's `1fr 1fr` is
+   the two-track layout this ladder deliberately replaces.
+   navInformationArchitecture.test.ts measures the rendered result at every
+   width from 320 to 1600 and fails on any row holding exactly one column. */
+.premium-footer-inner { grid-template-columns: repeat(5, minmax(0, 1fr)); }
+.premium-footer .footer-brand { grid-column: 1 / -1; }
+@media (max-width: 1100px) {
+  .premium-footer-inner { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+}
+@media (max-width: 640px) {
+  .premium-footer-inner { grid-template-columns: minmax(0, 1fr); }
+}
+
+/* ── Wide mega-panels anchor to the HEADER CARD, not to their trigger ─────
+   A three-column panel hung off its own trigger ran past the right edge of the
+   viewport — measured +100px at 1024px and +70px at 1280px on the For Shippers
+   menu. Making the wrapper `static` promotes `.site-header-inner` to the
+   containing block, so `left:0` / `right:0` pin the panel inside the header card
+   at every desktop width (card ≥982px at the 1024px collapse point; the widest
+   panel is ~745px). The panel stays a DOM child of `[data-nav-dd]`, so the
+   hover/focus/Escape handlers in HEADER_SCRIPTS are untouched. */
+.site-header-inner { position: relative; }
+.nav-dd--wide { position: static; }
+.nav-dd--wide > .nav-dd-panel { top: calc(100% + 8px); }

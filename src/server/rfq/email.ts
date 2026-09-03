@@ -74,7 +74,9 @@ export const FOOTER_LINKS = {
   /** Free public rate calculator — the single most useful thing we have for a
    *  trucking service provider, and our best top-of-funnel surface. */
   tools: '/tools',
-  /** US importer database — carriers use it to find shippers to pitch. */
+  /** US importer database — carriers use it to find shippers to sell to.
+   *  Never call this "pitching" in copy or in a comment that copy is written
+   *  from: Alex rejected the word outright — the surface is a DIRECTORY. */
   importers: '/importers',
   terms: '/terms',
   privacy: '/privacy',

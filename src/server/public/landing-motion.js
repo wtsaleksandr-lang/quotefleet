@@ -20,6 +20,12 @@
      and applies the glass card/toggle treatment). See landing-glass.css. */
   loadStylesheet('/landing-glass.css');
 
+  /* Navigation / information-architecture rebuild — injected AFTER the glass
+     sheet so the homepage's single nav collapse point, the drawer's group
+     structure and the audience-toggle alignment win the cascade without
+     needing !important on every layout declaration. See nav-ia.css. */
+  loadStylesheet('/nav-ia.css');
+
   const reduceMotion = window.matchMedia?.('(prefers-reduced-motion: reduce)').matches;
   const items = document.querySelectorAll('[data-reveal]');
   if (!items.length) return;

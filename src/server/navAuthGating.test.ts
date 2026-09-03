@@ -50,7 +50,9 @@ const CAPABILITIES = [
   '/directory',
   '/compliance',
   '/glossary',
-  '/directory/rfq',
+  '/guides',
+  // Deep-linked on purpose: a bare /directory/rfq 302s back to /directory.
+  '/directory/rfq?sort=featured',
   '/directory/join',
   '/tools',
   '/w/demo',

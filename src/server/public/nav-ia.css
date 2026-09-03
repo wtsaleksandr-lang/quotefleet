@@ -1,0 +1,255 @@
+/* ═══════════════════════════════════════════════════════════════════════════
+   nav-ia.css — HOMEPAGE half of the navigation / information-architecture
+   rebuild. Injected LAST by landing-motion.js (after landing-glass.css, which
+   is itself injected after every static <link>), so these rules win the cascade
+   without needing !important on layout.
+
+   The non-homepage chrome is handled in nav-unify.css; the homepage carries its
+   own header markup styled by the landing-*.css bundle, so the same three fixes
+   have to be re-expressed here against `body.qf-wft`.
+
+   WHAT IT FIXES, all three measured with Playwright before and after:
+
+   1. A DEAD BAND WITH NO NAVIGATION AT ALL. landing-conversion.css hides
+      `.site-nav` at ≤720px, but landing-home-fixes.css only shows `.site-burger`
+      at ≤640px. Between 641 and 720px the homepage rendered no menu and no
+      burger — the site was unnavigable. One collapse point now: inline bar at
+      ≥1024px, burger below it.
+
+   2. `.site-actions` OVERFLOWING THE HEADER between ~640 and 900px (measured
+      +98px at 768, +46px at 820, +6px at 860). Same root cause as (1): the full
+      bar needs ~1000px and was being asked to fit in 700.
+
+   3. THE AUDIENCE TOGGLE CLIPPED AT THE VIEWPORT EDGE. `.qf-aud-toggle` sat at
+      x=0 at every width while the hero copy started at 12–130px, so the pill's
+      rounded end was cut off and it collided with the header card's border. It
+      now rides a `.hero-grid` row (see landing.html) and inherits the hero's
+      inset; these rules only stop the grid from stretching it.
+
+   Tokens only, both themes, spacing on the 8px ramp.
+   ═══════════════════════════════════════════════════════════════════════════ */
+
+/* ── 1 + 2 — ONE collapse point for the homepage header ─────────────────── */
+@media (max-width: 1023px) {
+  html body.qf-wft .site-nav { display: none !important; }
+  html body.qf-wft .site-actions .signin { display: none !important; }
+  html body.qf-wft .site-actions { margin-left: auto; }
+  html body.qf-wft .site-burger {
+    display: inline-flex !important;
+    align-items: center;
+    justify-content: center;
+    width: 40px;
+    height: 40px;
+    padding: 0;
+    background: transparent;
+    border: 1px solid var(--border-strong);
+    border-radius: 12px;
+    color: var(--ink);
+    cursor: pointer;
+    flex: none;
+  }
+  html body.qf-wft .site-burger svg { width: 24px; height: 24px; display: block; }
+  html body.qf-wft .site-burger .ico-close { display: none; }
+  html body.qf-wft .site-burger[aria-expanded="true"] .ico-open { display: none; }
+  html body.qf-wft .site-burger[aria-expanded="true"] .ico-close { display: block; }
+}
+
+/* Tablet band (641–1023px): the drawer's own styling only existed inside the
+   old ≤640px block, so it has to be restated for the widths that now use it. */
+@media (min-width: 641px) and (max-width: 1023px) {
+  html body.qf-wft .site-mobile-menu:not([hidden]) {
+    display: flex !important;
+    flex-direction: column;
+    gap: 4px;
+    margin: 8px 0 0;
+    padding: 8px;
+    border-radius: 16px;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    box-shadow: 0 12px 28px rgba(0, 0, 0, 0.32);
+  }
+  html[data-theme="light"] body.qf-wft .site-mobile-menu:not([hidden]) {
+    box-shadow: 0 12px 28px rgba(10, 37, 64, 0.14);
+  }
+  html body.qf-wft .site-mobile-menu a {
+    display: block;
+    font-size: 14px;
+    font-weight: 500;
+    color: var(--ink-soft);
+    text-decoration: none;
+    padding: 12px 16px;
+    border-radius: 12px;
+  }
+  html body.qf-wft .site-mobile-menu a:hover,
+  html body.qf-wft .site-mobile-menu a:focus-visible {
+    color: var(--accent);
+    background: var(--surface-2);
+  }
+  /* The drawer opens under a floating card header, so match its side inset. */
+  html body.qf-wft .site-header .site-mobile-menu:not([hidden]) { margin: 8px 24px 0; }
+}
+
+/* ── Mobile drawer structure — group heads + sub-heads ───────────────────
+   The homepage sheets style `.site-mobile-menu a` but knew nothing about the
+   <details> groups' sub-headings, which are new. */
+html body.qf-wft .site-mobile-menu .mm-group { border-top: 1px solid var(--border); }
+html body.qf-wft .site-mobile-menu .mm-group:first-child { border-top: 0; }
+html body.qf-wft .site-mobile-menu .mm-sub {
+  margin: 8px 0 0;
+  padding: 8px 16px 4px;
+  font-family: var(--font-mono);
+  font-size: 10px;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  font-weight: 700;
+  color: var(--muted);
+}
+html body.qf-wft .site-mobile-menu .mm-group > .mm-sub:first-of-type { margin-top: 0; }
+html body.qf-wft .site-mobile-menu .mm-flat {
+  border-top: 1px solid var(--border);
+  font-weight: 600;
+}
+/* `hidden` must stay authoritative against the display rules above. */
+html body.qf-wft .site-mobile-menu a[hidden],
+html body.qf-wft .site-mobile-menu .mm-group > a[hidden],
+html body.qf-wft .site-actions [hidden],
+html body.qf-wft .site-nav [hidden] { display: none !important; }
+
+/* ── Mega-menu panels: declared column counts ───────────────────────────── */
+html body.qf-wft .nav-dd-panel--cols1 { grid-template-columns: max-content !important; }
+html body.qf-wft .nav-dd-panel--cols3 { grid-template-columns: repeat(3, max-content) !important; }
+
+/* Wide panels anchor to the header card so they cannot run off the viewport —
+   the For Shippers panel overflowed the right edge by 100px at 1024px. Same
+   rules as nav-unify.css; restated because the homepage does not load it. */
+html body.qf-wft .site-header-inner { position: relative; }
+html body.qf-wft .nav-dd--wide { position: static; }
+html body.qf-wft .nav-dd--wide > .nav-dd-panel { top: calc(100% + 8px); }
+
+/* READABILITY OVER MATERIAL. landing-glass.css paints the dropdown with
+   `--glass-ultra-bg` (0.58–0.60 alpha). On an interior page that sits over a
+   calm wash and reads fine; on the HOMEPAGE the panel opens directly over the
+   hero headline and the device mockups, and the menu's own link text competed
+   with the artwork showing through. The glass system's own hard rule is that
+   glass never sits behind body text, so the nav panel keeps the frosted blur but
+   takes the most opaque SOLID token (`--glass-card-solid`, 0.98) the glass
+   system already defines. At 0.94 the H1 still ghosted through the panel behind
+   the link column; 0.98 keeps the frosted edge and shadow with no ghost.
+   Both themes, tokens only. */
+html body.qf-wft .nav-dd-panel,
+html[data-theme="light"] body.qf-wft .nav-dd-panel,
+html:not([data-theme="light"]) body.qf-wft .nav-dd-panel {
+  background: var(--glass-card-solid) !important;
+}
+
+/* ── 3 — Audience toggle rides the hero column ──────────────────────────── */
+html body.qf-wft .qf-aud-togglerow {
+  margin-bottom: 0;
+  align-items: start;
+}
+html body.qf-wft .qf-aud-togglerow > .qf-aud-toggle {
+  justify-self: start;
+  align-self: start;
+  max-width: 100%;
+}
+/* At phone widths the segmented control is deliberately full-width; the
+   .hero-grid row now supplies the side gutter it never had. */
+@media (max-width: 640px) {
+  html body.qf-wft .qf-aud-togglerow > .qf-aud-toggle { width: 100%; }
+}
+
+/* ── Footer: five columns mirroring the three header menus + Company/Legal ─
+   THE HOMEPAGE SHIPS THE SAME FOOTER MARKUP AS EVERY OTHER PAGE. It did not:
+   landing.html is a static file that never passes through applyFullSiteHeader,
+   so it carried its own hardcoded four-column PRODUCT / SOLUTIONS / COMPANY /
+   LEGAL footer while the shared PREMIUM_FOOTER moved to five. The five-track
+   grid below was applied to it regardless, so `/` rendered four columns in five
+   tracks — a permanently empty 203–230px trailing track from 981px to 1600px —
+   and linked to none of Importers Directory, Manifest Privacy, Carrier Market
+   Guides, Directory Pro, Request Freight Quotes or Partners. landing.html now
+   embeds PREMIUM_FOOTER verbatim (pinned by navInformationArchitecture.test.ts),
+   so the markup and the grid finally describe the same footer.
+
+   TRACK LADDER — 5 → 3 → 1, skipping 4 and 2. The full arithmetic lives in the
+   matching block at the foot of nav-unify.css: with N=5 link columns, any track
+   count T where `N mod T === 1` strands one column alone on the last row, which
+   rules out T=4 and T=2. The homepage does not load nav-unify.css, so the same
+   ladder is restated here at `html body.qf-wft` specificity to beat
+   landing-conversion.css's own `.premium-footer-inner` rules (1.4fr + 3 tracks
+   at base, `1fr 1fr` at ≤980px, `1fr` at ≤720px) at EVERY width — hence no
+   `min-width` floor on the base rule. */
+/* THE HOMEPAGE FOOTER HAD NO SIDE OR BOTTOM INSET AT ALL — measured
+   `54px 0 0 0` against `54px 24px 34px 24px` on every other page. Cause:
+   landing-wefixtrades.css applies `all: unset` to `body.qf-wft .premium-footer`,
+   which wipes landing-conversion.css's padding, and the cleanup sheet restores
+   only `padding-top`. Harmless while the inner grid was capped at 1120px and the
+   viewport was wider — but from 641px to 1120px the grid runs the full viewport
+   width, so every column heading and link sat flush against the screen edge, and
+   the payment strip sat flush against the bottom of the document.
+
+   `display: block` is half the fix and the non-obvious half: `all: unset` also
+   drops <footer> back to `display: inline`, and horizontal padding on an inline
+   box does not indent a block-level child — the grid escaped the padding and
+   measured the full 900px of a 900px viewport even once the padding was
+   restored. Restoring the element's own default display is what makes the inset
+   real. Left deliberately NOT `!important`, so landing-home-fixes.css's phone
+   treatment (footer padding 0, 16px on the inner instead) still wins below
+   641px. */
+html body.qf-wft .premium-footer {
+  display: block;
+  padding-left: 24px;
+  padding-right: 24px;
+  padding-bottom: 32px;
+}
+
+html body.qf-wft .premium-footer .premium-footer-inner {
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+  column-gap: 32px;
+}
+html body.qf-wft .premium-footer .footer-brand { grid-column: 1 / -1; }
+@media (max-width: 1100px) {
+  html body.qf-wft .premium-footer .premium-footer-inner {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+}
+@media (max-width: 640px) {
+  html body.qf-wft .premium-footer .premium-footer-inner {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+
+/* The brand block owns a full-width row, so give the homepage the same compact
+   HORIZONTAL lockup the rest of the site gets from nav-unify.css. Without this
+   it inherits landing-conversion.css's stacked treatment (168px logo above the
+   wordmark), which on a full-width row is ~110px of vertical dead space. */
+html body.qf-wft .premium-footer .footer-brand {
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  gap: 16px;
+}
+html body.qf-wft .premium-footer .footer-brand .qf-footer-brand {
+  flex: 0 0 auto;
+  margin: 0;
+}
+html body.qf-wft .premium-footer .footer-brand .qf-footer-logo {
+  width: auto;
+  height: 60px;
+  max-width: 100%;
+}
+html body.qf-wft .premium-footer .qf-footer-brandtext {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  min-width: 0;
+}
+html body.qf-wft .premium-footer .footer-brand .qf-footer-tagline {
+  margin: 0;
+  max-width: 340px;
+  font-size: 13px;
+  line-height: 1.55;
+}
+@media (max-width: 640px) {
+  html body.qf-wft .premium-footer .footer-brand { gap: 12px; }
+  html body.qf-wft .premium-footer .footer-brand .qf-footer-logo { height: 48px; }
+}

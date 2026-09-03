@@ -4,8 +4,8 @@
  * A self-contained, server-rendered glossary that lives alongside the carrier
  * directory. Every definition here is ORIGINAL copy written for QuoteFleet —
  * no third-party text is copied. Pages reuse the QuoteFleet marketing shell
- * (style.css, topnav, footer, favicons) and the directory's design tokens so
- * they're visually consistent with /directory and /compliance.
+ * (style.css, the canonical site header/footer, favicons) and the directory's
+ * design tokens so they are visually consistent with /directory and /compliance.
  *
  * Routes (registered via registerGlossaryRoutes in src/server/app.ts):
  *   GET /glossary          → index, terms grouped by category.
@@ -19,6 +19,7 @@
  */
 import type { Express, Request, Response } from 'express';
 import { setPublicDirectoryCache } from './httpCache.js';
+import { FULL_SITE_HEADER, PREMIUM_FOOTER, HEADER_SCRIPTS } from '../siteChrome.js';
 
 const SITE = 'https://quotefleet.net';
 
@@ -371,7 +372,17 @@ const GLOSSARY_CSS = `
   .gl-shell { max-width: 900px; margin: 0 auto; padding: 28px; }
   /* Left-align the hero (shared .hero centers text; glossary must read left-aligned). */
   .gl-hero { padding: 40px 28px 22px; text-align: left; }
-  .gl-hero .container-narrow { max-width: 900px; margin: 0; }
+  /* LEFT-ALIGNED, NOT LEFT-FLUSHED. "margin: 0" pinned the hero's 900px box to
+     the viewport edge, so the eyebrow and H1 rendered at x=52 at 1440px — 78px
+     LEFT of the floating header card above them (x=130) and 246px left of the
+     page's own body column (.gl-shell content, x=298). /glossary was the only
+     page on the site whose content overhung its header card. Centring the same
+     column the body uses fixes both: the text stays left-ALIGNED, it now starts
+     on the body's left edge, and it can no longer escape the card.
+     844 = .gl-shell's 900px box minus its 2 × 28px padding, i.e. the hero's
+     inner column and the body's inner column are the same width and the same
+     centre, so their left edges land on the same pixel at every width. */
+  .gl-hero .container-narrow { max-width: 844px; margin: 0 auto; padding: 0; }
   .gl-hero h1 { font-size: 40px; line-height: 1.1; margin: 0 0 10px; }
   .gl-hero p.lead { max-width: 640px; margin-left: 0; margin-right: 0; }
   .gl-hero .hero-cta { justify-content: flex-start; }
@@ -421,9 +432,16 @@ interface LayoutOpts {
 }
 
 /**
- * Page shell — replicates the directory/marketing shell (style.css + topnav +
- * footer + favicons) so the glossary is visually identical to /directory and
- * /compliance, plus an optional JSON-LD block.
+ * Page shell — the CANONICAL site chrome (FULL_SITE_HEADER + the shared mobile
+ * drawer + PREMIUM_FOOTER from siteChrome.ts), plus an optional JSON-LD block.
+ *
+ * This page used to hand-roll a THIRD navigation: a flat `.topnav` reading
+ * "Directory · Importers · Compliance · Glossary" with its own burger menu, its
+ * own link list and its own footer. A visitor arriving here from search saw a
+ * different site map than the one every other page shows — the single worst
+ * kind of IA inconsistency, because it makes the whole site feel like two sites.
+ * It now renders exactly the same header, drawer and footer as /pricing,
+ * /directory and the homepage. /nav-unify.css carries their styling.
  */
 function layout({ title, description, canonicalPath, bodyHtml, jsonLd }: LayoutOpts): string {
   const jsonLdTags = (jsonLd ?? [])
@@ -442,6 +460,7 @@ function layout({ title, description, canonicalPath, bodyHtml, jsonLd }: LayoutO
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="/style.css">
+  <link rel="stylesheet" href="/nav-unify.css">
   <style>${GLOSSARY_CSS}</style>
   <link rel="icon" href="/favicon.ico" sizes="any">
   <link rel="icon" type="image/png" sizes="32x32" href="/brand/favicon-32.png">
@@ -457,42 +476,10 @@ function layout({ title, description, canonicalPath, bodyHtml, jsonLd }: LayoutO
   ${jsonLdTags}
 </head>
 <body>
-  <header class="topnav topnav--mobile-menu">
-    <div class="topnav-inner">
-      <a href="/" class="brand-mark">
-        <span class="logo"><img class="qf-brand-mark" src="/brand/mark-keys-ondark.png" alt="QuoteFleet" width="28" height="30" decoding="async"></span>
-        QuoteFleet
-      </a>
-      <span class="topnav-spacer"></span>
-      <a class="nav-link" href="/directory">Directory</a>
-      <a class="nav-link" href="/importers">Importers</a>
-      <a class="nav-link" href="/compliance">Compliance</a>
-      <a class="nav-link" href="/glossary">Glossary</a>
-      <a class="btn btn-primary always-show" href="/signup">Claim your listing <span class="arr">→</span></a>
-      <button type="button" class="qf-theme-btn" aria-label="Toggle light/dark theme" aria-pressed="false" title="Toggle theme"><svg class="qf-ico-sun" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M2 12h2M20 12h2M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4"/></svg><svg class="qf-ico-moon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 12.8A9 9 0 1 1 11.2 3a7 7 0 0 0 9.8 9.8z"/></svg></button>
-      <button type="button" class="topnav-burger" aria-label="Open menu" aria-expanded="false" aria-controls="topnav-mobile-menu">
-        <svg class="ico-open" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><line x1="4" y1="7" x2="20" y2="7"/><line x1="4" y1="12" x2="20" y2="12"/><line x1="4" y1="17" x2="20" y2="17"/></svg>
-        <svg class="ico-close" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><line x1="6" y1="6" x2="18" y2="18"/><line x1="18" y1="6" x2="6" y2="18"/></svg>
-      </button>
-    </div>
-    <nav class="topnav-mobile" id="topnav-mobile-menu" hidden aria-label="Site navigation">
-      <a href="/directory">Directory</a>
-      <a href="/importers">Importers Directory</a>
-      <a href="/compliance">Compliance</a>
-      <a href="/glossary">Glossary</a>
-      <a href="/services">Services</a>
-      <a href="/tools">Rate calculator</a>
-      <a href="/pricing">Pricing</a>
-      <a href="/">Home</a>
-      <a class="tn-cta" href="/signup">Claim your listing →</a>
-    </nav>
-  </header>
+  ${FULL_SITE_HEADER}
   ${bodyHtml}
-  <footer class="site-footer">
-    © <span id="year"></span> QuoteFleet · <a href="/directory">Directory</a> · <a href="/importers">Importers Directory</a> · <a href="/compliance">Compliance</a> · <a href="/glossary">Glossary</a> · <a href="/drayage-rates">Drayage Rates</a> · <a href="/services">Services</a> · <a href="/marketplace/">Marketplace</a> · <a href="/terms">Terms</a> · <a href="/privacy">Privacy</a> · <a href="/">Home</a>
-  </footer>
-  <script>document.getElementById('year').textContent = new Date().getFullYear();</script>
-  <script>(function(){var b=document.querySelector('.topnav-burger'),m=document.getElementById('topnav-mobile-menu');if(!b||!m)return;function set(o){b.setAttribute('aria-expanded',o?'true':'false');b.setAttribute('aria-label',o?'Close menu':'Open menu');if(o)m.removeAttribute('hidden');else m.setAttribute('hidden','');}b.addEventListener('click',function(e){e.stopPropagation();set(b.getAttribute('aria-expanded')!=='true');});document.addEventListener('click',function(e){if(b.getAttribute('aria-expanded')==='true'&&!m.contains(e.target)&&!b.contains(e.target))set(false);});document.addEventListener('keydown',function(e){if(e.key==='Escape')set(false);});})();</script>
+  ${PREMIUM_FOOTER}
+  ${HEADER_SCRIPTS}
   <script src="/marketing-chat.js" defer></script>
   <script src="/theme-toggle.js" defer></script>
 </body>

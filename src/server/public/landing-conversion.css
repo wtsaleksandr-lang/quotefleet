@@ -511,7 +511,7 @@
   max-width: 1120px;
   margin: 0 auto;
   display: grid;
-  grid-template-columns: 1.4fr repeat(3, 1fr);
+  grid-template-columns: repeat(5, minmax(0, 1fr));
   gap: 32px;
 }
 .footer-brand p,
@@ -546,7 +546,7 @@
   .visual-flow { max-width: 680px; width: 100%; margin: 0 auto; }
   .simple-steps { grid-template-columns: 1fr 1fr; }
   .use-grid { grid-template-columns: 1fr; }
-  .premium-footer-inner { grid-template-columns: 1fr 1fr; }
+  .premium-footer-inner { grid-template-columns: repeat(3, minmax(0, 1fr)); }
   .footer-brand { grid-column: 1 / -1; }
 }
 @media (max-width: 720px) {
