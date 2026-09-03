@@ -1577,6 +1577,9 @@ export const DIRECTORY_CSS = `
     padding-top: 16px;
     border-top: 1px solid var(--border);
     text-align: center;
+    /* Five separator-joined links wrapped 4+1 at 375px, stranding "Support" on
+       a line of its own. Balance splits them evenly instead. */
+    text-wrap: balance;
   }
   @media (max-width: 720px) {
     .site-footer .dirfoot { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 24px; }
