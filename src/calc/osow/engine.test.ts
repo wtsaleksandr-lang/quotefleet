@@ -3551,14 +3551,35 @@ describe('Tennessee — a permit priced by the ton-mile', () => {
 
     // "two-lane" answers the lane count and not the pavement width. One pilot car
     // over a long Tennessee leg is not a distinction to guess at.
-    const halfAnswered = at('two-lane');
-    expect(halfAnswered.requiresManualReview).toBe(true);
-    expect(halfAnswered.escorts.applied.map((a) => a.ruleId)).toContain(
-      'tn-width-over-10-to-12-6-pavement-unknown',
-    );
-    expect(halfAnswered.warnings.join(' ')).toContain(
-      'Tennessee splits this escort requirement on a measurement this quote does not have',
-    );
+    //
+    // "urban" answers NEITHER, and it is the case a `two-lane`-only test would
+    // have let fall through both rules and read as "no escort required" — a pilot
+    // car dropped by an absence. The rule is written as a negation of the answered
+    // list for exactly that reason; Arkansas solved the same problem the same way.
+    for (const routeClass of ['two-lane', 'urban']) {
+      const halfAnswered = at(routeClass);
+      expect(halfAnswered.requiresManualReview, routeClass).toBe(true);
+      expect(halfAnswered.escortsRequired, routeClass).toBe(0);
+      expect(halfAnswered.escorts.applied.map((a) => a.ruleId), routeClass).toContain(
+        'tn-width-over-10-to-12-6-pavement-unknown',
+      );
+      expect(halfAnswered.warnings.join(' '), routeClass).toContain(
+        'Tennessee splits this escort requirement on a measurement this quote does not have',
+      );
+    }
+    // A class that DOES answer .06(2) hears nothing about it.
+    for (const routeClass of [
+      'interstate',
+      'divided',
+      'multilane-undivided',
+      'tn-two-lane-under-24ft-pavement',
+      'tn-two-lane-24ft-pavement-or-more',
+    ]) {
+      expect(
+        at(routeClass).escorts.applied.map((a) => a.ruleId),
+        routeClass,
+      ).not.toContain('tn-width-over-10-to-12-6-pavement-unknown');
+    }
     // No road type at all leaves the rule undecided rather than false.
     const { routeClass: _dropped, ...noRoad } = legalSize;
     const unknownRoad = priceIn8('TN', {

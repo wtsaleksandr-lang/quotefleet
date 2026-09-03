@@ -492,9 +492,6 @@ function escortRule(
 const TN_TWO_LANE_NARROW: RouteClass = 'tn-two-lane-under-24ft-pavement';
 const TN_TWO_LANE_WIDE: RouteClass = 'tn-two-lane-24ft-pavement-or-more';
 
-/** Every two-lane member, for the rules that do not split on pavement width. */
-const TWO_LANE: RouteClass[] = ['two-lane', TN_TWO_LANE_NARROW, TN_TWO_LANE_WIDE];
-
 /**
  * ".06(2)(a) exempts the interstate highway system and highways with four or more
  * lanes." Four-or-more-lanes covers a divided highway and an undivided one alike,
@@ -502,6 +499,25 @@ const TWO_LANE: RouteClass[] = ['two-lane', TN_TWO_LANE_NARROW, TN_TWO_LANE_WIDE
  * rule text draws no median distinction anywhere.
  */
 const FOUR_LANE: RouteClass[] = ['interstate', 'divided', 'multilane-undivided'];
+
+/**
+ * EVERY ROUTE CLASS THAT ACTUALLY ANSWERS .06(2), and it is written as a positive
+ * list so that the "cannot tell" rule can be its NEGATION.
+ *
+ * The list is exhaustive on purpose. A route described as `urban` has not said
+ * whether it is a two-lane street or a four-lane arterial, and neither has one
+ * described by another state's map legend; testing only for `two-lane` would have
+ * let every one of those fall through both rules and read as "no escort
+ * required" — a pilot car dropped by an absence, which is exactly what the
+ * three-valued contract exists to prevent. Arkansas met the same problem and
+ * solved it the same way, by writing its residual category as a negation so an
+ * urban arterial lands in it rather than nowhere.
+ */
+const PAVEMENT_ANSWERED: RouteClass[] = [
+  ...FOUR_LANE,
+  TN_TWO_LANE_NARROW,
+  TN_TWO_LANE_WIDE,
+];
 
 // ── The findings and inferences, named so they can be audited ─────────────
 
@@ -853,19 +869,26 @@ export const TENNESSEE_ESCORT_RULES: EscortRule[] = [
     },
   ),
   /**
-   * THE HONEST GAP IN THE MIDDLE. A caller who says "two-lane" has answered the
-   * lane count and not the pavement width, and one pilot car over a long
-   * Tennessee leg is not a distinction to guess at. This is `manualReview` rather
-   * than an advisory for the reason `materiality.ts` rule 1 gives: an escort
-   * count is a requirement and is never a rounding question.
+   * THE HONEST GAP IN THE MIDDLE, WRITTEN AS A NEGATION SO NOTHING FALLS THROUGH
+   * IT.
+   *
+   * A caller who says "two-lane" has answered the lane count and not the pavement
+   * width; one who says "urban" has answered neither. Both are the same question
+   * — .06(2) cannot be evaluated — and one pilot car over a long Tennessee leg is
+   * not a distinction to guess at, so the rule fires on ANY route class that is
+   * not on the answered list rather than on `two-lane` alone. A route class that
+   * IS on the list has its answer already and hears nothing.
+   *
+   * `manualReview` rather than an advisory, for the reason `materiality.ts` rule 1
+   * gives: an escort count is a requirement and is never a rounding question.
    */
   escortRule(
     'tn-width-over-10-to-12-6-pavement-unknown',
-    'Over 10 ft up to 12 ft 6 in wide on a two-lane road whose pavement width was not stated — Tennessee decides the escort on that measurement',
+    'Over 10 ft up to 12 ft 6 in wide on a road whose pavement width was not stated — Tennessee decides the escort on that measurement',
     {
       kind: 'all',
       of: [
-        { kind: 'routeClass', anyOf: ['two-lane'] },
+        { kind: 'not', of: { kind: 'routeClass', anyOf: PAVEMENT_ANSWERED } },
         {
           kind: 'between',
           measure: 'widthIn',
@@ -877,7 +900,7 @@ export const TENNESSEE_ESCORT_RULES: EscortRule[] = [
     },
     {
       manualReview:
-        'Tennessee splits this escort requirement on a measurement this quote does not have. 1680-07-01-.06(2) requires no escort at this width "on two-lane highways with a minimum pavement width (excluding paved shoulders) of twenty-four feet (24\')" and one front escort "where the minimum pavement width (excluding paved shoulders) is less than twenty-four feet (24\')". The route was described as two-lane without that pavement width, so whether this move needs a pilot car cannot be determined. Supply the segment as tn-two-lane-under-24ft-pavement or tn-two-lane-24ft-pavement-or-more, or confirm with the TDOT Permit Office.',
+        'Tennessee splits this escort requirement on a measurement this quote does not have. 1680-07-01-.06(2) requires no escort at this width "on the interstate highway system, on highways with four or more lanes, or on two-lane highways with a minimum pavement width (excluding paved shoulders) of twenty-four feet (24\')", and one front escort "where the minimum pavement width (excluding paved shoulders) is less than twenty-four feet (24\')". This route was described in terms that answer neither — a two-lane road with no pavement width, or a class such as "urban" that does not even settle the lane count — so whether this move needs a pilot car cannot be determined. Supply the segment as tn-two-lane-under-24ft-pavement or tn-two-lane-24ft-pavement-or-more, or confirm with the TDOT Permit Office.',
     },
   ),
 
