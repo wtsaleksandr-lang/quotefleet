@@ -8,6 +8,17 @@ import {
 } from './jurisdictions/index.js';
 import { applyTransactionFee, oversizeBandApplies } from './types.js';
 import { ftIn } from './escortRules.js';
+import { resolveSourced, spreadOf } from './provenance.js';
+import {
+  RCW_0941_FULL_FEE_TABLE,
+  WASHINGTON_999_POUND_GAP,
+  WASHINGTON_MANUFACTURED_HOME_ANNUAL_FEE_USD,
+  WASHINGTON_MANUFACTURED_HOME_ANNUAL_WIDTH_IN,
+} from './jurisdictions/washington.js';
+import {
+  ALABAMA_DOUBLES_TRAILER_LENGTH_IN,
+  ALABAMA_STINGER_STEERED_LENGTH_IN,
+} from './jurisdictions/alabama.js';
 
 /**
  * Texas figures asserted here come from TxDMV and the Texas Transportation
@@ -399,18 +410,27 @@ describe('multi-jurisdiction lanes', () => {
     expect(q.requiresManualReview).toBe(false);
   });
 
+  /**
+   * WYOMING IS THE UNCOVERED STATE HERE BECAUSE OKLAHOMA STOPPED BEING ONE.
+   * Phase 1 wrote these three cases against 'OK' and Phase 4 shipped Oklahoma's
+   * dataset, which turned "the engine refuses a state it has no data for" into
+   * "the engine prices Oklahoma" — a passing behaviour asserted as a failure.
+   * The uncovered-state cases must always name a state the registry genuinely
+   * does not hold, and must be moved again the day that state is added.
+   */
   it('refuses to price a lane that leaves Texas — and names the gap', () => {
-    const q = calculateOsow(['TX', 'OK'], load({ grossWeightLbs: 100000, widthIn: ftIn(12), heightIn: ftIn(13) }), ASOF);
-    expect(q.uncoveredJurisdictions).toEqual(['OK']);
+    const q = calculateOsow(['TX', 'WY'], load({ grossWeightLbs: 100000, widthIn: ftIn(12), heightIn: ftIn(13) }), ASOF);
+    expect(hasOsowCoverage('WY'), 'WY must still be an uncovered state').toBe(false);
+    expect(q.uncoveredJurisdictions).toEqual(['WY']);
     expect(q.totalPermitUsd).toBeNull();
     expect(q.requiresManualReview).toBe(true);
-    expect(q.warnings.join(' ')).toContain('No oversize/overweight permit data is on file for OK');
+    expect(q.warnings.join(' ')).toContain('No oversize/overweight permit data is on file for WY');
     // Texas is still fully priced — the gap is isolated to the leg we lack.
     expect(q.jurisdictions[0]?.subtotalUsd).toBe(214.98);
   });
 
   it('never infers one state’s fees from a neighbour', () => {
-    const q = calculateOsow(['OK'], load({ grossWeightLbs: 100000 }), ASOF);
+    const q = calculateOsow(['WY'], load({ grossWeightLbs: 100000 }), ASOF);
     expect(q.jurisdictions).toEqual([]);
     expect(q.totalPermitUsd).toBeNull();
     expect(q.warnings.join(' ')).toContain('cannot be inferred from a neighbouring one');
@@ -429,12 +449,15 @@ describe('multi-jurisdiction lanes', () => {
 });
 
 describe('coverage helpers', () => {
-  it('knows Texas is covered and Oklahoma is not', () => {
+  it('knows Texas is covered and Wyoming is not', () => {
     expect(hasOsowCoverage('TX')).toBe(true);
     expect(hasOsowCoverage('tx')).toBe(true);
-    expect(hasOsowCoverage('OK')).toBe(false);
-    expect(osowRulesFor('OK')).toBeNull();
+    expect(hasOsowCoverage('WY')).toBe(false);
+    expect(osowRulesFor('WY')).toBeNull();
     expect(osowRulesFor('TX')?.name).toBe('Texas');
+    // Oklahoma stood here from Phase 1 until its dataset shipped in Phase 4.
+    expect(hasOsowCoverage('OK')).toBe(true);
+    expect(osowRulesFor('OK')?.name).toBe('Oklahoma');
   });
 });
 
@@ -912,14 +935,666 @@ describe('Virginia — $20 plus thirty cents a mile, and the steepest escort lad
   });
 });
 
-describe('the registry after Phase 3', () => {
-  it('covers exactly the eleven states whose datasets exist', () => {
+/**
+ * PHASE 4 — five more states, and the three ways a source can fail a quote.
+ *
+ * Phase 3 exercised five fee ARCHITECTURES. These five exercise five failure
+ * modes instead: a per-mile schedule with a statutory rounding rule, a fee sheet
+ * that contradicts its own administrative code twelve times over, a rule that
+ * publishes its own worked example, a state running a pilot programme against
+ * its codified thresholds, and a table whose totals have to be decomposed before
+ * they can be recombined.
+ *
+ * As with Phase 3, none of these is a restatement of the inputs. Every subtotal
+ * below is compared against a number that appears in a state document — and in
+ * Alabama's case against all five cells of two published columns at once.
+ */
+const ASOF4 = '2026-09-02';
+
+function priceIn4(
+  code: string,
+  partial: Parameters<typeof calculateOsowForJurisdiction>[1],
+) {
+  const rules = osowRulesFor(code);
+  expect(rules, `${code} must be a covered jurisdiction`).not.toBeNull();
+  return calculateOsowForJurisdiction(
+    rules as NonNullable<typeof rules>,
+    partial,
+    ASOF4,
+  );
+}
+
+describe('Washington — a per-mile schedule with the state’s own rounding rule', () => {
+  const legalSize = {
+    widthIn: 102,
+    heightIn: ftIn(13),
+    overallLengthIn: ftIn(70),
+    trailerLengthIn: ftIn(48),
+    routeClass: 'divided' as const,
+  };
+
+  it('bills 100 miles at the statute’s $0.49 rate for 32,000 lb of excess', () => {
+    const r = priceIn4('WA', {
+      ...legalSize,
+      grossWeightLbs: 112000,
+      milesInJurisdiction: 100,
+    });
+    // RCW 46.44.0941: "30,000-34,999 pounds . . . . $ .49" of excess over legal
+    // capacity, and Washington charges nothing to issue the permit.
+    expect(r.subtotalUsd).toBe(49);
+    expect(r.lines.find((l) => l.code === 'osow_service_fee')?.amountUsd).toBe(0);
+  });
+
+  it('rounds to the nearest whole dollar, which no earlier state required', () => {
+    // 293 mi × $0.07 = $20.51 raw. RCW 46.44.0941(c) carries it to the next full
+    // dollar at 50 cents, so Washington's own answer is $21.00.
+    const r = priceIn4('WA', {
+      ...legalSize,
+      grossWeightLbs: 85000,
+      milesInJurisdiction: 293,
+    });
+    expect(r.subtotalUsd).toBe(21);
+    // …and the $14.00 statutory minimum floors a short crossing.
+    const short = priceIn4('WA', {
+      ...legalSize,
+      grossWeightLbs: 85000,
+      milesInJurisdiction: 20,
+    });
+    expect(short.subtotalUsd).toBe(14);
+  });
+
+  it('charges the $10 dimensional fee alone, and never alongside the mileage fee', () => {
+    const oversizeOnly = priceIn4('WA', {
+      ...legalSize,
+      widthIn: ftIn(13),
+      grossWeightLbs: 70000,
+      routeClass: 'two-lane',
+      milesInJurisdiction: 100,
+    });
+    expect(oversizeOnly.subtotalUsd).toBe(10);
+    // RCW 46.44.096: an overweight AND oversize load pays the overweight fee
+    // "without additional fees being assessed for the oversize features".
+    const both = priceIn4('WA', {
+      ...legalSize,
+      widthIn: ftIn(13),
+      grossWeightLbs: 112000,
+      routeClass: 'divided',
+      milesInJurisdiction: 100,
+    });
+    expect(both.subtotalUsd).toBe(49);
+    expect(both.lines.some((l) => l.code === 'osow_oversize')).toBe(false);
+  });
+
+  it('refuses to price the 999 pounds WSDOT’s schedule does not cover', () => {
+    const r = priceIn4('WA', {
+      ...legalSize,
+      grossWeightLbs: 179500,
+      milesInJurisdiction: 100,
+    });
+    expect(r.subtotalUsd).toBeNull();
+    expect(r.escorts.applied.map((a) => a.ruleId)).toContain('wa-999-pound-fee-gap');
+    expect(r.warnings.join(' ')).toContain('defines no fee whatever');
+    // A pound either side of the gap is unambiguous and prices cleanly.
+    expect(
+      priceIn4('WA', { ...legalSize, grossWeightLbs: 179000, milesInJurisdiction: 100 })
+        .subtotalUsd,
+    ).toBe(387);
+    expect(
+      priceIn4('WA', { ...legalSize, grossWeightLbs: 180000, milesInJurisdiction: 100 })
+        .subtotalUsd,
+    ).toBe(425);
+  });
+
+  it('adds a rear escort at 12 ft only because a height escort is already leading', () => {
+    const base = {
+      ...legalSize,
+      widthIn: ftIn(13),
+      grossWeightLbs: 70000,
+      milesInJurisdiction: 100,
+    };
+    // 13 ft wide on a multilane road is under the 14 ft rear-escort trigger, so
+    // at legal height nothing fires.
+    expect(priceIn4('WA', base).escortsRequired).toBe(0);
+    // Raise the load over 14 ft 6 in and WAC 468-38-100(1)(i) reaches down to
+    // 12 ft: the pole car leads and a second car is required behind it.
+    const tall = priceIn4('WA', { ...base, heightIn: ftIn(15) });
+    expect(tall.escorts.applied.map((a) => a.ruleId)).toContain(
+      'wa-width-over-12-multilane-with-height-escort',
+    );
+    expect(tall.escorts.front).toBe(1);
+    expect(tall.escorts.rear).toBe(1);
+    expect(tall.escorts.heightPole).toBe(true);
+  });
+
+  it('cannot decide the mirror-visibility rule, and never turns it into an escort', () => {
+    const r = priceIn4('WA', {
+      ...legalSize,
+      grossWeightLbs: 70000,
+      widthIn: ftIn(13),
+      routeClass: 'two-lane',
+      milesInJurisdiction: 100,
+    });
+    expect(r.escorts.undecided.map((u) => u.ruleId)).toContain(
+      'wa-mirror-visibility-under-200ft',
+    );
+    expect(r.requiresManualReview).toBe(true);
+    // Answered by a dispatcher, the rule resolves — and STILL adds no escort,
+    // because a judgement call must not become a billable pilot car.
+    const answered = priceIn4('WA', {
+      ...legalSize,
+      grossWeightLbs: 70000,
+      widthIn: ftIn(13),
+      routeClass: 'two-lane',
+      milesInJurisdiction: 100,
+      subjectiveAnswers: { 'wa-cannot-see-200ft-in-mirrors': true },
+    });
+    expect(answered.escorts.undecided.map((u) => u.ruleId)).not.toContain(
+      'wa-mirror-visibility-under-200ft',
+    );
+    expect(answered.escorts.rear).toBe(1); // from the 11 ft two-lane rule alone
+  });
+
+  it('uses the overhang RATIO rule rather than any fixed number of feet', () => {
+    const base = {
+      widthIn: 102,
+      heightIn: ftIn(13),
+      overallLengthIn: ftIn(70),
+      grossWeightLbs: 70000,
+      routeClass: 'two-lane' as const,
+      milesInJurisdiction: 100,
+      rearOverhangIn: ftIn(14),
+    };
+    // 14 ft of overhang is over one-third of a 40 ft trailer and under one-third
+    // of a 53 ft trailer. The SAME overhang, two different answers — which is
+    // exactly what a fixed threshold in feet could not express.
+    const short = priceIn4('WA', { ...base, trailerLengthIn: ftIn(40) });
+    expect(short.escorts.applied.map((a) => a.ruleId)).toContain(
+      'wa-trailer-over-105-or-overhang-ratio-two-lane',
+    );
+    const long = priceIn4('WA', { ...base, trailerLengthIn: ftIn(53) });
+    expect(long.escorts.applied.map((a) => a.ruleId)).not.toContain(
+      'wa-trailer-over-105-or-overhang-ratio-two-lane',
+    );
+    // Without the trailer length the ratio is UNKNOWN, never "no escort".
+    const noTrailer = priceIn4('WA', {
+      widthIn: 102,
+      heightIn: ftIn(13),
+      overallLengthIn: ftIn(70),
+      grossWeightLbs: 70000,
+      routeClass: 'two-lane',
+      milesInJurisdiction: 100,
+      rearOverhangIn: ftIn(14),
+    });
+    expect(noTrailer.escorts.undecided.map((u) => u.ruleId)).toContain(
+      'wa-trailer-over-105-or-overhang-ratio-two-lane',
+    );
+  });
+});
+
+describe('Alabama — two published columns, decomposed and put back together', () => {
+  const base = {
+    heightIn: ftIn(13),
+    overallLengthIn: ftIn(70),
+    trailerLengthIn: ftIn(48),
+    routeClass: 'divided' as const,
+  };
+  /** The $4 card charge ALDOT adds to every credit-card transaction. */
+  const CARD = 4;
+
+  it('reproduces every cell of ALDOT’s Weight Only and General W/H/L columns', () => {
+    const oversizeOnly = priceIn4('AL', {
+      ...base,
+      widthIn: ftIn(12, 6),
+      grossWeightLbs: 75000,
+    });
+    expect(oversizeOnly.subtotalUsd).toBe(20 + CARD); // "W/H/L: up to 100,000 lbs. $20"
+
+    const cases: Array<[number, number, number]> = [
+      // gross lb, Weight Only total, General W/H/L total
+      [90000, 10, 20],
+      [110000, 30, 40],
+      [140000, 60, 70],
+      [160000, 100, 110],
+    ];
+    for (const [gross, weightOnly, general] of cases) {
+      const legalSize = priceIn4('AL', { ...base, widthIn: 102, grossWeightLbs: gross });
+      expect(legalSize.subtotalUsd, `Weight Only at ${gross} lb`).toBe(weightOnly + CARD);
+      const overDimension = priceIn4('AL', {
+        ...base,
+        widthIn: ftIn(12, 6),
+        grossWeightLbs: gross,
+      });
+      expect(overDimension.subtotalUsd, `General W/H/L at ${gross} lb`).toBe(general + CARD);
+      // The whole point of the decomposition: General is Weight Only plus the
+      // administrative code's flat $10 dimensional charge, in every row.
+      expect(general - weightOnly).toBe(10);
+    }
+  });
+
+  it('refuses the three pounds its own fee documents assign to two bands', () => {
+    for (const gross of [80000, 100000, 125000]) {
+      const r = priceIn4('AL', { ...base, widthIn: ftIn(12, 6), grossWeightLbs: gross });
+      expect(r.requiresManualReview, `${gross} lb must go to review`).toBe(true);
+    }
+    const fired = priceIn4('AL', {
+      ...base,
+      widthIn: ftIn(12, 6),
+      grossWeightLbs: 100000,
+    }).escorts.applied.map((a) => a.ruleId);
+    expect(fired).toContain('al-general-table-overlap-100000');
+  });
+
+  it('surfaces the width conflict only in the 8 ft to 8 ft 6 in band', () => {
+    const inBand = priceIn4('AL', { ...base, widthIn: 100, grossWeightLbs: 70000 });
+    expect(inBand.escorts.applied.map((a) => a.ruleId)).toContain('al-legal-width-conflict');
+    // At 8 ft flat both sources agree the load is legal; at 12 ft both agree it
+    // is over. Neither hears about a disagreement that cannot affect it.
+    const below = priceIn4('AL', { ...base, widthIn: 96, grossWeightLbs: 70000 });
+    expect(below.escorts.applied.map((a) => a.ruleId)).not.toContain('al-legal-width-conflict');
+    const above = priceIn4('AL', { ...base, widthIn: ftIn(12), grossWeightLbs: 70000 });
+    expect(above.escorts.applied.map((a) => a.ruleId)).not.toContain('al-legal-width-conflict');
+  });
+
+  it('flags the overhang ambiguity when the two readings can actually differ', () => {
+    // Four feet at each end: legal under the rule's five-feet-per-end reading,
+    // over the limit under the statute's five-feet-in-total one.
+    const bothEnds = priceIn4('AL', {
+      ...base,
+      widthIn: 102,
+      grossWeightLbs: 70000,
+      frontOverhangIn: ftIn(4),
+      rearOverhangIn: ftIn(4),
+    });
+    expect(bothEnds.escorts.applied.map((a) => a.ruleId)).toContain(
+      'al-overhang-total-vs-each-end-conflict',
+    );
+    // Overhang at one end only: both readings agree, and nothing is said.
+    const oneEnd = priceIn4('AL', {
+      ...base,
+      widthIn: 102,
+      grossWeightLbs: 70000,
+      rearOverhangIn: ftIn(4),
+    });
+    expect(oneEnd.escorts.applied.map((a) => a.ruleId)).not.toContain(
+      'al-overhang-total-vs-each-end-conflict',
+    );
+  });
+
+  it('quotes ALEA’s published trooper rate without putting it in any total', () => {
+    // Alabama's law-enforcement length trigger and its superload length trigger
+    // are the SAME 150 feet, so every load that needs troopers is also a load
+    // ALDOT prices after review. The escort requirement is stated in full, with
+    // the rate; the permit fee is not quoted at all.
+    const r = priceIn4('AL', {
+      ...base,
+      widthIn: ftIn(12, 6),
+      overallLengthIn: ftIn(160),
+      grossWeightLbs: 75000,
+    });
+    expect(r.escorts.policeFront).toBe(1);
+    expect(r.escorts.policeRear).toBe(1);
+    expect(r.warnings.join(' ')).toContain('$100.00 per hour per arresting officer');
+    expect(r.superload).toBe(true);
+    expect(r.subtotalUsd).toBeNull();
+    // Ten feet shorter it is an ordinary permit again, and the price is the
+    // General W/H/L row plus the card charge — with no trooper on it.
+    const under = priceIn4('AL', {
+      ...base,
+      widthIn: ftIn(12, 6),
+      overallLengthIn: ftIn(140),
+      grossWeightLbs: 75000,
+    });
+    expect(under.escorts.policeFront).toBe(0);
+    expect(under.subtotalUsd).toBe(20 + CARD);
+  });
+});
+
+describe('Florida — a fee rule that publishes its own arithmetic', () => {
+  const legalSize = {
+    widthIn: 102,
+    heightIn: ftIn(13),
+    overallLengthIn: ftIn(70),
+    trailerLengthIn: ftIn(48),
+    routeClass: 'divided' as const,
+  };
+
+  it('reproduces FDOT’s own worked example to the dollar', () => {
+    // "A 112,000 pound load traveling 67.5 miles would cost (75 miles X $0.32)
+    // plus $3.33 = $27.33 rounded up to $28.00 in addition to the $5.00
+    // transmission fee when applicable."
+    const r = priceIn4('FL', {
+      ...legalSize,
+      grossWeightLbs: 112000,
+      milesInJurisdiction: 67.5,
+    });
+    expect(r.lines.find((l) => l.code === 'osow_overweight')?.amountUsd).toBe(28);
+    expect(r.lines.find((l) => l.code === 'osow_service_fee')?.amountUsd).toBe(5);
+    expect(r.subtotalUsd).toBe(33);
+  });
+
+  it('charges Table 1A’s $5 bottom row for an ordinary oversize load', () => {
+    const r = priceIn4('FL', {
+      ...legalSize,
+      widthIn: ftIn(11),
+      grossWeightLbs: 70000,
+      milesInJurisdiction: 100,
+    });
+    expect(r.lines.find((l) => l.code === 'osow_oversize')?.amountUsd).toBe(5);
+    expect(r.subtotalUsd).toBe(10); // $5 band + $5 transmission fee
+  });
+
+  it('will not compute a rate whose own rule does not say which pounds it multiplies', () => {
+    const r = priceIn4('FL', {
+      ...legalSize,
+      grossWeightLbs: 170000,
+      milesInJurisdiction: 100,
+    });
+    expect(r.subtotalUsd).toBeNull();
+    expect(r.escorts.applied.map((a) => a.ruleId)).toContain('fl-over-162000-rate-basis-unknown');
+    // A pound under the line prices cleanly from row (g).
+    expect(
+      priceIn4('FL', { ...legalSize, grossWeightLbs: 162000, milesInJurisdiction: 100 })
+        .lines.find((l) => l.code === 'osow_overweight')?.amountUsd,
+    ).toBe(51); // 100 mi × $0.47 = $47.00 + $3.33 = $50.33, rounded UP
+  });
+
+  it('holds the semitrailer-length conflict open rather than picking six inches', () => {
+    const r = priceIn4('FL', {
+      ...legalSize,
+      grossWeightLbs: 70000,
+      milesInJurisdiction: 100,
+    });
+    expect(r.requiresManualReview).toBe(true);
+    expect(r.warnings.join(' ')).toContain('Official sources disagree');
+    expect(r.warnings.join(' ')).toContain('legal trailer length');
+  });
+
+  it('changes the escort COUNT on a limited access facility, not just the position', () => {
+    const long = {
+      ...legalSize,
+      overallLengthIn: ftIn(160),
+      grossWeightLbs: 70000,
+      milesInJurisdiction: 100,
+    };
+    expect(priceIn4('FL', { ...long, routeClass: 'divided' }).escortsRequired).toBe(2);
+    expect(priceIn4('FL', { ...long, routeClass: 'fl-limited-access' }).escortsRequired).toBe(1);
+  });
+});
+
+describe('Missouri — a pilot programme running against its own codified rule', () => {
+  const base = {
+    heightIn: ftIn(13),
+    overallLengthIn: ftIn(70),
+    trailerLengthIn: ftIn(48),
+  };
+
+  it('charges $15 plus $20 for each 10,000 lb, and MoDOT’s card fee on top', () => {
+    const r = priceIn4('MO', {
+      ...base,
+      widthIn: ftIn(12),
+      grossWeightLbs: 100000,
+      routeClass: 'divided',
+    });
+    // $15 base + two 10,000 lb increments at $20 = $55, the regulation's own
+    // arithmetic, then 2% plus 25 cents.
+    expect(r.lines.find((l) => l.code === 'osow_permit_base')?.amountUsd).toBe(15);
+    expect(r.lines.find((l) => l.code === 'osow_overweight')?.amountUsd).toBe(40);
+    expect(r.subtotalUsd).toBe(56.36);
+  });
+
+  it('prices a plain oversize permit cleanly, with no review flag at all', () => {
+    const r = priceIn4('MO', {
+      ...base,
+      widthIn: ftIn(13),
+      grossWeightLbs: 70000,
+      routeClass: 'two-lane',
+    });
+    expect(r.subtotalUsd).toBe(15.55);
+    expect(r.requiresManualReview).toBe(false);
+    expect(r.escortsRequired).toBe(1);
+    expect(r.escorts.front).toBe(1);
+  });
+
+  it('gives a multilane undivided road the divided answer at 13 ft and the two-lane answer at 15 ft', () => {
+    const at13 = { ...base, widthIn: ftIn(13), grossWeightLbs: 70000 };
+    expect(priceIn4('MO', { ...at13, routeClass: 'divided' }).escortsRequired).toBe(1);
+    expect(priceIn4('MO', { ...at13, routeClass: 'multilane-undivided' }).escortsRequired).toBe(1);
+    expect(priceIn4('MO', { ...at13, routeClass: 'two-lane' }).escortsRequired).toBe(1);
+
+    const at15 = { ...base, widthIn: ftIn(15), grossWeightLbs: 70000 };
+    expect(priceIn4('MO', { ...at15, routeClass: 'divided' }).escortsRequired).toBe(1);
+    // …and now undivided sides with two-lane instead. Folding it onto either
+    // neighbour would have lost a pilot car in one band or the other.
+    expect(priceIn4('MO', { ...at15, routeClass: 'multilane-undivided' }).escortsRequired).toBe(2);
+    expect(priceIn4('MO', { ...at15, routeClass: 'two-lane' }).escortsRequired).toBe(2);
+  });
+
+  it('sends the three pilot-versus-rule bands to review and leaves the rest alone', () => {
+    const at17 = priceIn4('MO', {
+      ...base,
+      widthIn: ftIn(17),
+      grossWeightLbs: 70000,
+      routeClass: 'two-lane',
+    });
+    expect(at17.escorts.applied.map((a) => a.ruleId)).toContain('mo-le-width-threshold-conflict');
+    const at19 = priceIn4('MO', {
+      ...base,
+      widthIn: ftIn(19),
+      grossWeightLbs: 70000,
+      routeClass: 'two-lane',
+    });
+    // Above 18 ft both readings agree a trooper is required, so there is no
+    // disagreement left to report — only the requirement itself.
+    expect(at19.escorts.applied.map((a) => a.ruleId)).not.toContain(
+      'mo-le-width-threshold-conflict',
+    );
+    expect(at19.escorts.policeFront).toBe(1);
+  });
+
+  it('fires the weight escort only when another dimensional rule already has', () => {
+    const heavy = { ...base, grossWeightLbs: 200000, routeClass: 'two-lane' as const };
+    const plain = priceIn4('MO', { ...heavy, widthIn: 102 });
+    expect(plain.escorts.applied.map((a) => a.ruleId)).not.toContain(
+      'mo-weight-160001-to-220000-two-lane-with-other-escort',
+    );
+    const wide = priceIn4('MO', { ...heavy, widthIn: ftIn(13) });
+    expect(wide.escorts.applied.map((a) => a.ruleId)).toContain(
+      'mo-weight-160001-to-220000-two-lane-with-other-escort',
+    );
+    // Both are superloads over 160,000 lb, so neither carries a priced line.
+    expect(wide.superload).toBe(true);
+    expect(wide.subtotalUsd).toBeNull();
+  });
+});
+
+describe('Oklahoma — two permits priced as though issued separately', () => {
+  const base = {
+    heightIn: ftIn(13),
+    overallLengthIn: ftIn(70),
+    trailerLengthIn: ftIn(48),
+  };
+
+  it('reproduces the whole published chain: $80 + $20, then $2, then 4%', () => {
+    const r = priceIn4('OK', {
+      ...base,
+      widthIn: ftIn(13),
+      grossWeightLbs: 82000,
+      routeClass: 'two-lane',
+    });
+    expect(r.lines.find((l) => l.code === 'osow_oversize')?.amountUsd).toBe(40);
+    expect(r.lines.find((l) => l.code === 'osow_overweight')?.amountUsd).toBe(60);
+    // "3. Oversize & Overweight $80.00 (Plus $10 for each 1,000 lb...)" = $100,
+    // then the $2.00 Fax/ETF fee, then 4% of the total card charge.
+    expect(r.subtotalUsd).toBe(106.08);
+    expect(Math.round((100 + 2) * 1.04 * 100) / 100).toBe(106.08);
+  });
+
+  it('prices each permit alone at the figure ODOT publishes for it', () => {
+    const oversizeOnly = priceIn4('OK', {
+      ...base,
+      widthIn: ftIn(13),
+      grossWeightLbs: 70000,
+      routeClass: 'two-lane',
+    });
+    expect(oversizeOnly.subtotalUsd).toBe(43.68); // ($40 + $2) × 1.04
+    const overweightOnly = priceIn4('OK', {
+      ...base,
+      widthIn: 102,
+      grossWeightLbs: 82000,
+      routeClass: 'divided',
+    });
+    expect(overweightOnly.subtotalUsd).toBe(64.48); // ($40 + $20 + $2) × 1.04
+  });
+
+  it('splits an 80-foot escort on Oklahoma’s own "super two-lane" class', () => {
+    const long = {
+      ...base,
+      widthIn: 102,
+      overallLengthIn: ftIn(90),
+      grossWeightLbs: 70000,
+    };
+    const superTwo = priceIn4('OK', { ...long, routeClass: 'ok-super-two-lane' });
+    expect(superTwo.escorts.applied.map((a) => a.ruleId)).toContain(
+      'ok-super-two-lane-length-ambiguity',
+    );
+    // On a plain two-lane road both provisions agree, so there is nothing to
+    // report — and on a multi-lane road Oklahoma publishes no length trigger at
+    // all, so no escort is asserted.
+    const twoLane = priceIn4('OK', { ...long, routeClass: 'two-lane' });
+    expect(twoLane.escorts.applied.map((a) => a.ruleId)).not.toContain(
+      'ok-super-two-lane-length-ambiguity',
+    );
+    expect(twoLane.escorts.front).toBe(1);
+    expect(priceIn4('OK', { ...long, routeClass: 'divided' }).escortsRequired).toBe(0);
+  });
+
+  it('surfaces the FAQ’s quarrel with the statute in the disputed six inches', () => {
+    const inBand = priceIn4('OK', {
+      ...base,
+      widthIn: 102,
+      heightIn: ftIn(13, 9),
+      grossWeightLbs: 70000,
+      routeClass: 'divided',
+    });
+    expect(inBand.escorts.applied.map((a) => a.ruleId)).toContain('ok-height-13-6-to-14-conflict');
+    // At 15 ft both sources agree a permit is required.
+    const above = priceIn4('OK', {
+      ...base,
+      widthIn: 102,
+      heightIn: ftIn(15),
+      grossWeightLbs: 70000,
+      routeClass: 'divided',
+    });
+    expect(above.escorts.applied.map((a) => a.ruleId)).not.toContain(
+      'ok-height-13-6-to-14-conflict',
+    );
+  });
+
+  it('takes the height trigger INCLUSIVELY, unlike every other Oklahoma threshold', () => {
+    const at = priceIn4('OK', {
+      ...base,
+      widthIn: 102,
+      heightIn: ftIn(15, 9),
+      grossWeightLbs: 70000,
+      routeClass: 'divided',
+    });
+    // "fifteen (15) feet and nine (9) inches OR MORE" — exactly 15'9" fires.
+    expect(at.escorts.applied.map((a) => a.ruleId)).toContain('ok-height-15-9-or-more');
+    expect(at.escorts.heightPole).toBe(true);
+    const justUnder = priceIn4('OK', {
+      ...base,
+      widthIn: 102,
+      heightIn: ftIn(15, 8),
+      grossWeightLbs: 70000,
+      routeClass: 'divided',
+    });
+    expect(justUnder.escorts.applied.map((a) => a.ruleId)).not.toContain('ok-height-15-9-or-more');
+  });
+});
+
+describe('Phase 4 conflicts that live outside the priced lines', () => {
+  /**
+   * Three of Phase 4's conflicts are about products this engine does not price —
+   * an annual manufactured-home permit, a doubles trailer, a stinger-steered car
+   * hauler — so they cannot surface as a null fee. They still have to be held by
+   * the CONFLICT MECHANISM rather than settled in a comment, which is what these
+   * cases prove: both candidates on file, no value adopted, review forced, and
+   * an honest spread the quote can show.
+   */
+  it('refuses to adopt either Washington manufactured-home annual permit', () => {
+    const fee = resolveSourced(
+      'WA annual manufactured-home permit fee',
+      WASHINGTON_MANUFACTURED_HOME_ANNUAL_FEE_USD,
+      ASOF4,
+    );
+    expect(fee.conflict).toBe(true);
+    expect(fee.value).toBeNull();
+    expect(fee.requiresManualReview).toBe(true);
+    expect(fee.candidates).toHaveLength(2);
+    expect(spreadOf(fee)).toEqual({ low: 150, high: 360 });
+
+    // The same conflict's dimensional half — the statute covers a home up to
+    // 14 ft wide and WSDOT's schedule up to 15 ft, so a 14 ft 6 in home is
+    // inside one entitlement and outside the other.
+    const width = resolveSourced(
+      'WA annual manufactured-home permit width',
+      WASHINGTON_MANUFACTURED_HOME_ANNUAL_WIDTH_IN,
+      ASOF4,
+    );
+    expect(width.conflict).toBe(true);
+    expect(spreadOf(width)).toEqual({ low: ftIn(14), high: ftIn(15) });
+  });
+
+  it('refuses to adopt either Alabama length figure the 2025 statute left behind', () => {
+    for (const [field, rows, low, high] of [
+      ['AL doubles trailer length', ALABAMA_DOUBLES_TRAILER_LENGTH_IN, ftIn(28), ftIn(28, 6)],
+      ['AL stinger-steered length', ALABAMA_STINGER_STEERED_LENGTH_IN, ftIn(75), ftIn(80)],
+    ] as const) {
+      const r = resolveSourced(field, rows, ASOF4);
+      expect(r.conflict, field).toBe(true);
+      expect(r.value, field).toBeNull();
+      expect(r.requiresManualReview, field).toBe(true);
+      expect(spreadOf(r), field).toEqual({ low, high });
+      // Both sources must still be citable — a conflict that loses one of its
+      // candidates is just a missing value with extra steps.
+      expect(new Set(r.candidates.map((c) => c.source.id)).size, field).toBe(2);
+    }
+  });
+
+  it('keeps the RCW 46.44.0941 table whole, with only one row a single trip', () => {
+    // Fifteen rows, and fourteen of them are 30-day, quarterly or annual permits.
+    // Reading any of them as a trip fee would put a $150 tow-truck annual, or a
+    // $300 milk-tanker annual, on a single move.
+    expect(RCW_0941_FULL_FEE_TABLE).toHaveLength(16);
+    const singleTrip = RCW_0941_FULL_FEE_TABLE.filter((r) => r.term === 'single-trip');
+    expect(singleTrip).toHaveLength(1);
+    expect(singleTrip[0]?.feeUsd).toBe(10);
+    // The statute's own line breaks are preserved, not re-flowed into prose.
+    expect(singleTrip[0]?.verbatim).toContain('\n\n');
+    expect(singleTrip[0]?.verbatim).toContain('All overlegal loads, except overweight, single');
+
+    // And the 999-pound hole is recorded as a range, not as a rate.
+    expect(WASHINGTON_999_POUND_GAP.minGrossLbs).toBe(179001);
+    expect(WASHINGTON_999_POUND_GAP.maxGrossLbs).toBe(179999);
+    expect(WASHINGTON_999_POUND_GAP.maxGrossLbs - WASHINGTON_999_POUND_GAP.minGrossLbs + 1).toBe(999);
+  });
+});
+
+describe('the registry after Phase 4', () => {
+  it('covers exactly the sixteen states whose datasets exist', () => {
     expect(Object.keys(OSOW_JURISDICTIONS).sort()).toEqual(
-      ['CA', 'GA', 'IL', 'IN', 'NC', 'NJ', 'NY', 'OH', 'PA', 'TX', 'VA'].sort(),
+      [
+        'AL', 'CA', 'FL', 'GA', 'IL', 'IN', 'MO', 'NC',
+        'NJ', 'NY', 'OH', 'OK', 'PA', 'TX', 'VA', 'WA',
+      ].sort(),
     );
     for (const code of Object.keys(OSOW_JURISDICTIONS)) {
       expect(hasOsowCoverage(code)).toBe(true);
       expect(osowRulesFor(code)?.code).toBe(code);
     }
+    // The registry must never name a jurisdiction ahead of its dataset, and the
+    // count is asserted separately so a stray import cannot pass by matching a
+    // list someone updated in the same edit.
+    expect(Object.keys(OSOW_JURISDICTIONS)).toHaveLength(16);
   });
 });

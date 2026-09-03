@@ -83,12 +83,53 @@ export type Measure =
  * A California quote that does not know the segment colour evaluates the width
  * rules to `unknown`, which is correct: without the colour, Caltrans's own
  * table cannot say how many pilot cars the move needs.
+ *
+ * PHASE 4 ADDED THREE MORE, AND ONLY THREE, FOR A DIFFERENT REASON.
+ * ----------------------------------------------------------------
+ * Washington, Missouri, Oklahoma, Alabama and Florida all classify by lane
+ * count and median, which the four original members mostly cover. Three gaps
+ * were real:
+ *
+ *   - `multilane-undivided` is GENERIC, not prefixed, because it is an ordinary
+ *     road taxonomy term that three of the five states use in exactly the same
+ *     sense: two or more lanes each way with NO physical median divider.
+ *     `divided` cannot stand in for it — Washington requires two pilot cars
+ *     over 20 ft wide on a multilane UNDIVIDED highway and none on a divided
+ *     one at the same width, and RCW 46.44.092 caps a permit at 20 ft on a
+ *     divided multilane and 32 ft on an undivided one. Missouri splits the same
+ *     way and disagrees with itself about which side undivided falls on: over
+ *     12 ft 6 in it behaves like a divided highway (one rear escort) and over
+ *     14 ft it behaves like a two-lane one (front and rear). Folding undivided
+ *     onto either neighbour would have thrown away a whole pilot car.
+ *   - `ok-super-two-lane` IS prefixed, because "super two-lane highway" is
+ *     Oklahoma's own term of art in OAC 730:50-5-18 and not a general road
+ *     type. It matters: the >80 ft front-escort rule for a truck-tractor/
+ *     semitrailer names only "two-lane highways", while the identical rule for
+ *     any other combination names "two-lane highways OR super two-lane
+ *     highways". One escort turns on that distinction.
+ *   - `fl-limited-access` IS prefixed, because "limited access facility" is a
+ *     Florida-defined class in FAC 14-26 that is wider than `interstate` — it
+ *     includes Florida's Turnpike — and Florida prices on it hard: over 16 ft
+ *     wide it is two QUALIFIED escorts on a limited-access facility by day and
+ *     two LAW ENFORCEMENT escorts at all times on any other state road.
+ *
+ * Everything else in the five Phase 4 states fits the existing members, which
+ * is the point of checking rather than reflexively prefixing: a member that is
+ * really a general road type must stay general, or every state ends up with its
+ * own private synonym for "two-lane" and a caller cannot pass a road type
+ * without first knowing which state it is in.
  */
 export type RouteClass =
   | 'interstate'
   | 'divided'
   | 'two-lane'
   | 'urban'
+  /** Two or more lanes each way with NO physical median divider. */
+  | 'multilane-undivided'
+  /** OAC 730:50-5-18's own class: a two-lane highway with paved shoulders. */
+  | 'ok-super-two-lane'
+  /** FAC 14-26's "limited access facility" — wider than `interstate`. */
+  | 'fl-limited-access'
   /** Caltrans pilot-car map: multilane freeways and expressways. */
   | 'ca-yellow'
   /** Caltrans pilot-car map: two-lane, 12 ft lanes with a 4 ft or wider shoulder. */
@@ -141,8 +182,26 @@ export type EscortCondition =
   /** True when another rule fires — lets a rule be conditioned on an escort
    *  already being required for a different reason. */
   | { kind: 'ruleApplies'; ruleId: string }
-  /** True when another rule does NOT fire. The Washington case: a width rule
-   *  that only applies if no height escort is already on the move. */
+  /**
+   * True when another rule does NOT fire.
+   *
+   * PHASE 1 ANTICIPATED WASHINGTON HERE AND GOT THE POLARITY BACKWARDS. The
+   * comment this replaces predicted "a width rule that only applies if no
+   * height escort is already on the move". WAC 468-38-100(1)(i) as published
+   * says the opposite: "The vehicle(s) or load exceeds 12 feet in width on a
+   * multilane highway AND HAS A HEIGHT THAT REQUIRES A FRONT PILOT/ESCORT
+   * VEHICLE: One rear pilot/escort vehicle is required." The width rule bites
+   * BECAUSE a height escort is already leading — the lead car is watching
+   * overhead clearance rather than the load's width, so the state wants a
+   * second car behind. That is `ruleApplies`, and Washington is encoded with
+   * `ruleApplies` for exactly that reason.
+   *
+   * The negative form is kept because it is cheap, because the evaluator
+   * already implements it correctly, and because a rule of the predicted shape
+   * is a normal thing for a state to write. It is currently unused by any
+   * dataset, and it must not be reached for by inventing a condition a state
+   * did not publish just to exercise it.
+   */
   | { kind: 'ruleDoesNotApply'; ruleId: string }
   /**
    * Inherently a judgement call — mirror visibility, "if the load obscures

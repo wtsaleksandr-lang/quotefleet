@@ -1269,7 +1269,7 @@
   // ordinary permit. Mirroring the raw 200,000 would let the widget wave
   // through the exact load the server then rejects.
   //
-  // FIVE covered states are deliberately ABSENT, each for a reason the server
+  // SEVEN covered states are deliberately ABSENT, each for a reason the server
   // can defend. Illinois publishes no numeric gross-weight superload threshold
   // at all. Indiana's own agencies publish three that disagree (108,000 /
   // 120,000 / 200,000 lb). California defines a weight superload by hauling
@@ -1277,13 +1277,20 @@
   // pound figure. New Jersey has no superload classification of any kind;
   // "SUPERLOAD" is the name of its permitting system. Virginia publishes its
   // gross ceiling as a procedure ("based on total number of axles ... and total
-  // amount of spacing"), not a number. In none of the five is there a
-  // defensible ceiling above the federal one, so all five keep the 80,000 lb
-  // contact-us path — and mirroring a threshold the server refuses to resolve
-  // would let this widget wave through a load the server then sends to a human.
+  // amount of spacing"), not a number. Oklahoma defines a superload against
+  // Standard Drawing OL-1, a configuration comparison rather than a weight.
+  // Florida has no superload class at all — its rules distinguish only routine
+  // from non-routine permits, and the 300,000 lb figure it does publish is a
+  // documentation trigger for a bridge review, not a permit ceiling; mirroring
+  // it would wave through a 250,000 lb Florida load the server refuses to price
+  // because its per-mile schedule stops at 162,000 lb. In none of the seven is
+  // there a defensible ceiling above the federal one, so all seven keep the
+  // 80,000 lb contact-us path — and mirroring a threshold the server refuses to
+  // resolve would let this widget wave through a load the server then sends to
+  // a human.
   //
   // Pinned against the server-side data by src/calc/osow/widgetMirror.test.ts.
-  var OSOW_SUPERLOAD_LBS = { TX: 254300, OH: 120000, PA: 201000, NY: 199999, GA: 180000, NC: 132000 };
+  var OSOW_SUPERLOAD_LBS = { TX: 254300, OH: 120000, PA: 201000, NY: 199999, GA: 180000, NC: 132000, WA: 200000, AL: 300000, MO: 160000 };
   function maxQuotableWeightLbs(pickup, delivery) {
     var from = String((pickup && pickup.state) || '').trim().toUpperCase();
     var to = String((delivery && delivery.state) || '').trim().toUpperCase();

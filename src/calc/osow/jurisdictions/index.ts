@@ -15,13 +15,21 @@
  * erased two feet of width and thirty-five feet of length between route classes
  * that California prices differently. See `RouteClass` for the reasoning.
  *
+ * PHASE 4 MOVED TWO, ON THE SAME TERMS. `RouteClass` grew three more members —
+ * a generic `multilane-undivided` and two prefixed ones, `ok-super-two-lane` and
+ * `fl-limited-access` — and `PerMileRate` grew three optional fields for the
+ * rounding rules Washington and Florida publish in their own fee statutes.
+ * Both are data-model extensions with no new engine branch and no change to any
+ * existing jurisdiction's behaviour. No `if (state === ...)` has ever been
+ * added, which is still the design constraint.
+ *
  * WHAT IS HERE IS EXACTLY WHAT EXISTS. An earlier draft of this file imported
  * Arkansas, Tennessee and Kentucky, whose data files were never written; the
  * build failed on three missing modules. The registry must never name a
  * jurisdiction ahead of its dataset — `calculateOsow` refuses loudly for any
  * state that is not here, and that refusal is the honest answer for a state we
- * have not sourced. Eleven are covered: TX, OH, PA, NY, IL, IN, CA, GA, NC, NJ,
- * VA.
+ * have not sourced. Sixteen are covered: TX, OH, PA, NY, IL, IN, CA, GA, NC, NJ,
+ * VA, WA, AL, FL, MO, OK.
  */
 import type { JurisdictionOsowRules } from '../types.js';
 import { TEXAS_OSOW_RULES } from './texas.js';
@@ -35,6 +43,11 @@ import { GEORGIA_OSOW_RULES } from './georgia.js';
 import { NORTH_CAROLINA_OSOW_RULES } from './northCarolina.js';
 import { NEW_JERSEY_OSOW_RULES } from './newJersey.js';
 import { VIRGINIA_OSOW_RULES } from './virginia.js';
+import { WASHINGTON_OSOW_RULES } from './washington.js';
+import { ALABAMA_OSOW_RULES } from './alabama.js';
+import { FLORIDA_OSOW_RULES } from './florida.js';
+import { MISSOURI_OSOW_RULES } from './missouri.js';
+import { OKLAHOMA_OSOW_RULES } from './oklahoma.js';
 
 export const OSOW_JURISDICTIONS: Record<string, JurisdictionOsowRules> = {
   TX: TEXAS_OSOW_RULES,
@@ -48,6 +61,11 @@ export const OSOW_JURISDICTIONS: Record<string, JurisdictionOsowRules> = {
   NC: NORTH_CAROLINA_OSOW_RULES,
   NJ: NEW_JERSEY_OSOW_RULES,
   VA: VIRGINIA_OSOW_RULES,
+  WA: WASHINGTON_OSOW_RULES,
+  AL: ALABAMA_OSOW_RULES,
+  FL: FLORIDA_OSOW_RULES,
+  MO: MISSOURI_OSOW_RULES,
+  OK: OKLAHOMA_OSOW_RULES,
 };
 
 /** Is there OS/OW coverage for this state/province code? */
@@ -74,4 +92,9 @@ export {
   NORTH_CAROLINA_OSOW_RULES,
   NEW_JERSEY_OSOW_RULES,
   VIRGINIA_OSOW_RULES,
+  WASHINGTON_OSOW_RULES,
+  ALABAMA_OSOW_RULES,
+  FLORIDA_OSOW_RULES,
+  MISSOURI_OSOW_RULES,
+  OKLAHOMA_OSOW_RULES,
 };
