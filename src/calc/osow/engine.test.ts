@@ -545,6 +545,19 @@ describe('data-model invariants that must hold for every jurisdiction added', ()
     const lengths = [600, 840, 900, 1020, 1140, 1200, 1320, 1400, 1440, 1800];
     const mileages = [45, 135, 225, 400];
 
+    /**
+     * Findings are COLLECTED and asserted once at the end rather than asserted
+     * inside the innermost loop. The grid is ~5,000 dimension combinations and
+     * the dataset now carries several hundred bands — New Jersey alone
+     * enumerates a per-foot formula as sixteen width steps from two sources —
+     * so an `expect()` per combination per source ran tens of thousands of
+     * times and pushed the whole test past the default timeout once the
+     * suite was running in parallel. The coverage is identical; only the
+     * assertion count changed.
+     */
+    const violations: string[] = [];
+    let combinationsChecked = 0;
+
     for (const j of all) {
       const bands = j.oversizeFeeBands;
       if (bands === undefined) continue;
@@ -552,7 +565,8 @@ describe('data-model invariants that must hold for every jurisdiction added', ()
         for (const heightIn of heights) {
           for (const overallLengthIn of lengths) {
             for (const milesInJurisdiction of mileages) {
-              const bySource = new Map<string, Set<number>>();
+              combinationsChecked += 1;
+              const feeBySource: Record<string, number> = {};
               for (const row of bands) {
                 const verdict = oversizeBandApplies(row.value, {
                   widthIn,
@@ -561,21 +575,24 @@ describe('data-model invariants that must hold for every jurisdiction added', ()
                   milesInJurisdiction,
                 });
                 if (verdict.applies !== true) continue;
-                const seen = bySource.get(row.source.id) ?? new Set<number>();
-                seen.add(row.value.feeUsd);
-                bySource.set(row.source.id, seen);
-              }
-              for (const [sourceId, fees] of bySource) {
-                expect(
-                  [...fees],
-                  `${j.code} ${sourceId} gives ${fees.size} different fees for ${widthIn}in x ${heightIn}in x ${overallLengthIn}in over ${milesInJurisdiction} mi`,
-                ).toHaveLength(1);
+                const seen = feeBySource[row.source.id];
+                if (seen === undefined) {
+                  feeBySource[row.source.id] = row.value.feeUsd;
+                } else if (seen !== row.value.feeUsd) {
+                  violations.push(
+                    `${j.code} ${row.source.id} gives both $${seen} and $${row.value.feeUsd} for ${widthIn}in x ${heightIn}in x ${overallLengthIn}in over ${milesInJurisdiction} mi`,
+                  );
+                }
               }
             }
           }
         }
       }
     }
+
+    // A grid that silently stopped matching anything would pass vacuously.
+    expect(combinationsChecked).toBeGreaterThan(1000);
+    expect(violations).toEqual([]);
   });
 
   it('the Texas fee PDF is recorded with its real February 2021 revision date', () => {
@@ -586,5 +603,323 @@ describe('data-model invariants that must hold for every jurisdiction added', ()
     expect(pdfRows[0]?.source.revisedOn).toBe('2021-02-01');
     // Not backfilled with the retrieval date, which is the whole point.
     expect(pdfRows[0]?.source.revisedOn).not.toBe(pdfRows[0]?.source.retrievedOn);
+  });
+});
+
+/**
+ * PHASE 3 — five states with five different fee architectures, each driven end
+ * to end and checked against the figure its own agency publishes.
+ *
+ * These are not restatements of the inputs. Each case runs the whole engine —
+ * legal limits, superload triggers, band selection, the combination rule and
+ * the transaction-fee arithmetic — and compares the subtotal to a number that
+ * appears in a state document. Between them they exercise a flat fee, a
+ * per-dimension fee, a per-2,000-lb formula, flat bands taken as the greater of
+ * two components, and a per-mile rate.
+ *
+ * The as-of date is later than the rest of this file's because several of these
+ * sources are undated pages, and an undated page's row is only effective from
+ * the day we can prove it said what it says.
+ */
+const ASOF3 = '2026-09-02';
+
+function priceIn(
+  code: string,
+  partial: Parameters<typeof calculateOsowForJurisdiction>[1],
+) {
+  const rules = osowRulesFor(code);
+  expect(rules, `${code} must be a covered jurisdiction`).not.toBeNull();
+  return calculateOsowForJurisdiction(
+    rules as NonNullable<typeof rules>,
+    partial,
+    ASOF3,
+  );
+}
+
+describe('California — a flat $16, priced by route COLOUR rather than road type', () => {
+  const wide13 = {
+    widthIn: ftIn(13),
+    heightIn: ftIn(13),
+    overallLengthIn: ftIn(90),
+    grossWeightLbs: 90000,
+  };
+
+  it('charges $16 plus the 2.3% card surcharge, whatever the load weighs', () => {
+    const r = priceIn('CA', { ...wide13, routeClass: 'ca-yellow' });
+    expect(r.subtotalUsd).toBe(16.37);
+    // The overweight component is a SOURCED zero, not a missing one.
+    const ow = r.lines.find((l) => l.code === 'osow_overweight');
+    expect(ow?.amountUsd).toBe(0);
+  });
+
+  it('gives the SAME load a different escort count on a different colour', () => {
+    // At 13 ft, yellow, green and blue all want one pilot car and brown wants
+    // two — brown is a two-lane road with 10 or 11 ft lanes, and its two-car
+    // step starts at 12 ft where the others start at 13, 14 and 15.
+    expect(priceIn('CA', { ...wide13, routeClass: 'ca-yellow' }).escortsRequired).toBe(1);
+    expect(priceIn('CA', { ...wide13, routeClass: 'ca-green' }).escortsRequired).toBe(1);
+    expect(priceIn('CA', { ...wide13, routeClass: 'ca-blue' }).escortsRequired).toBe(1);
+    expect(priceIn('CA', { ...wide13, routeClass: 'ca-brown' }).escortsRequired).toBe(2);
+
+    // Six inches wider and blue joins brown at two, while yellow and green are
+    // still on one. Same load, same $16 fee, three different escort bills —
+    // which is exactly why the colours could not be flattened onto "divided"
+    // and "two-lane". Green, blue and brown are ALL two-lane roads.
+    const wide13h = { ...wide13, widthIn: ftIn(13, 6) };
+    expect(priceIn('CA', { ...wide13h, routeClass: 'ca-yellow' }).escortsRequired).toBe(1);
+    expect(priceIn('CA', { ...wide13h, routeClass: 'ca-green' }).escortsRequired).toBe(1);
+    expect(priceIn('CA', { ...wide13h, routeClass: 'ca-blue' }).escortsRequired).toBe(2);
+    expect(priceIn('CA', { ...wide13h, routeClass: 'ca-brown' }).escortsRequired).toBe(2);
+  });
+
+  it('cannot count pilot cars at all without the route colour', () => {
+    const r = priceIn('CA', wide13);
+    expect(r.requiresManualReview).toBe(true);
+    expect(r.escorts.undecided.map((u) => u.ruleId)).toContain('ca-yellow-width-over-12-to-15');
+  });
+
+  it('never asks for a height pole, and says so on an overheight load', () => {
+    const r = priceIn('CA', {
+      widthIn: ftIn(9),
+      heightIn: ftIn(16),
+      overallLengthIn: ftIn(70),
+      grossWeightLbs: 70000,
+      routeClass: 'ca-yellow',
+    });
+    expect(r.escorts.heightPole).toBe(false);
+    expect(r.warnings.join(' ')).toContain('Height poles will not be a Caltrans requirement');
+  });
+
+  it('refuses to total a load over 14 ft wide, because of the $50/hour charge', () => {
+    const r = priceIn('CA', {
+      ...wide13,
+      widthIn: ftIn(14, 6),
+      routeClass: 'ca-yellow',
+    });
+    expect(r.requiresManualReview).toBe(true);
+    expect(r.warnings.join(' ')).toContain('$50.00 for each hour');
+  });
+
+  it('surfaces the legend’s self-contradiction only on the colours it affects', () => {
+    const at14ft6 = { ...wide13, widthIn: ftIn(14, 6) };
+    const green = priceIn('CA', { ...at14ft6, routeClass: 'ca-green' });
+    expect(green.escorts.applied.map((a) => a.ruleId)).toContain('ca-note1-conflicts-with-table');
+    // Yellow's two-pilot cell starts above 15 ft, where Note 1 no longer bites.
+    const yellow = priceIn('CA', { ...at14ft6, routeClass: 'ca-yellow' });
+    expect(yellow.escorts.applied.map((a) => a.ruleId)).not.toContain(
+      'ca-note1-conflicts-with-table',
+    );
+  });
+});
+
+describe('North Carolina — $12 per over-legal dimension, and a height its own documents dispute', () => {
+  const base = {
+    overallLengthIn: ftIn(70),
+    trailerLengthIn: ftIn(48),
+    routeClass: 'divided' as const,
+  };
+
+  it('charges $12 for width plus $12 for weight, inside the published $12–$48 range', () => {
+    const r = priceIn('NC', {
+      ...base,
+      widthIn: ftIn(12),
+      heightIn: ftIn(13),
+      grossWeightLbs: 100000,
+    });
+    expect(r.subtotalUsd).toBe(24);
+    expect(r.subtotalUsd).toBeGreaterThanOrEqual(12);
+    expect(r.subtotalUsd).toBeLessThanOrEqual(48);
+  });
+
+  it('reports a RANGE, not a number, for a load in the 13 ft 6 in – 14 ft gap', () => {
+    const r = priceIn('NC', {
+      ...base,
+      widthIn: ftIn(11),
+      heightIn: ftIn(13, 9),
+      grossWeightLbs: 90000,
+    });
+    const os = r.lines.find((l) => l.code === 'osow_oversize');
+    expect(os?.amountUsd).toBeNull();
+    expect(os?.lowUsd).toBe(12);
+    expect(os?.highUsd).toBe(24);
+    expect(r.subtotalUsd).toBeNull();
+    expect(r.requiresManualReview).toBe(true);
+  });
+
+  it('has a WEIGHT-based escort trigger, which almost no other state does', () => {
+    const heavy = {
+      ...base,
+      widthIn: ftIn(11),
+      heightIn: ftIn(13),
+      grossWeightLbs: 150000,
+    };
+    const r = priceIn('NC', heavy);
+    expect(r.escorts.applied.map((a) => a.ruleId)).toContain('nc-weight-over-149999');
+    expect(r.escorts.front).toBe(1);
+    // Exactly at the published figure the rule does NOT fire: "in excess of
+    // 149,999 pounds" leaves 149,999 itself clear.
+    const at = priceIn('NC', { ...heavy, grossWeightLbs: 149999 });
+    expect(at.escorts.applied.map((a) => a.ruleId)).not.toContain('nc-weight-over-149999');
+  });
+
+  it('keeps a 38,000 lb tandem limit rather than borrowing the federal 34,000', () => {
+    const rules = osowRulesFor('NC');
+    expect(rules?.legalLimits.tandemAxleLbs.map((r) => r.value)).toEqual([38000]);
+  });
+});
+
+describe('New Jersey — a per-2,000-lb formula whose 5% applies AFTER the $12', () => {
+  const base = {
+    heightIn: ftIn(13),
+    overallLengthIn: ftIn(60),
+    trailerLengthIn: ftIn(48),
+    routeClass: 'divided' as const,
+  };
+
+  it('reproduces NJDOT’s order of operations on an oversize-and-overweight load', () => {
+    const r = priceIn('NJ', { ...base, widthIn: ftIn(15), grossWeightLbs: 90000 });
+    // $10 oversize base + $1 width excess + $10 overweight base + $25 weight
+    // excess = $46, which is the $20 combined base the regulation prints plus
+    // the two excess formulas. Then ($46 + $12) × 1.05.
+    expect(r.subtotalUsd).toBe(60.9);
+    expect(Math.round((46 + 12) * 1.05 * 100) / 100).toBe(60.9);
+  });
+
+  it('reaches the $10 base and NJDOT’s own $12.60 arithmetic on a bare oversize permit', () => {
+    const r = priceIn('NJ', { ...base, widthIn: ftIn(12), grossWeightLbs: 70000 });
+    expect(r.subtotalUsd).toBe(23.1);
+    expect(Math.round((10 + 12) * 1.05 * 100) / 100).toBe(23.1);
+  });
+
+  it('sends both of New Jersey’s fee-basis conflicts to review', () => {
+    const r = priceIn('NJ', {
+      ...base,
+      widthIn: ftIn(15),
+      overallLengthIn: ftIn(70),
+      grossWeightLbs: 90000,
+    });
+    const fired = r.escorts.applied.map((a) => a.ruleId);
+    expect(fired).toContain('nj-length-fee-basis-conflict');
+    expect(fired).toContain('nj-overweight-fee-basis-conflict');
+    expect(r.requiresManualReview).toBe(true);
+  });
+});
+
+describe('Georgia — one flat fee per permit type, taken as the greater of the two components', () => {
+  const base = {
+    heightIn: ftIn(13),
+    overallLengthIn: ftIn(70),
+    trailerLengthIn: ftIn(48),
+    routeClass: 'divided' as const,
+  };
+
+  it('prices a Standard Single at $30 plus the $7 card charge', () => {
+    const r = priceIn('GA', { ...base, widthIn: ftIn(12), grossWeightLbs: 100000 });
+    expect(r.subtotalUsd).toBe(37);
+  });
+
+  it('charges ONE Superload Single, not an oversize fee plus an overweight fee', () => {
+    const r = priceIn('GA', { ...base, widthIn: ftIn(17), grossWeightLbs: 100000 });
+    expect(r.subtotalUsd).toBe(132); // $125 + $7, not $125 + $30 + $7
+    expect(r.lines.find((l) => l.code === 'osow_oversize')?.note).toContain(
+      'Charged instead of the overweight fee',
+    );
+  });
+
+  it('refuses to price the one pound its own sources disagree about', () => {
+    const at = priceIn('GA', { ...base, widthIn: ftIn(12), grossWeightLbs: 150001 });
+    expect(at.subtotalUsd).toBeNull();
+    expect(at.requiresManualReview).toBe(true);
+    // A pound either side is unambiguous and is priced.
+    expect(priceIn('GA', { ...base, widthIn: ftIn(12), grossWeightLbs: 150000 }).subtotalUsd).toBe(37);
+    expect(priceIn('GA', { ...base, widthIn: ftIn(12), grossWeightLbs: 150002 }).subtotalUsd).toBe(132);
+  });
+
+  it('cannot count escorts without the road class, because Georgia’s counts differ by it', () => {
+    const wide = { ...base, widthIn: ftIn(13), grossWeightLbs: 79000 };
+    expect(priceIn('GA', { ...wide, routeClass: 'two-lane' }).escortsRequired).toBe(2);
+    expect(priceIn('GA', { ...wide, routeClass: 'divided' }).escortsRequired).toBe(1);
+  });
+});
+
+describe('Virginia — $20 plus thirty cents a mile, and the steepest escort ladder here', () => {
+  const base = {
+    heightIn: ftIn(13),
+    overallLengthIn: ftIn(70),
+    trailerLengthIn: ftIn(48),
+  };
+
+  it('prices a 200-mile overweight run as $20 + $60, with nothing else in the way', () => {
+    const r = priceIn('VA', {
+      ...base,
+      widthIn: ftIn(12),
+      grossWeightLbs: 100000,
+      routeClass: 'interstate',
+      milesInJurisdiction: 200,
+    });
+    expect(r.subtotalUsd).toBe(80);
+    // A clean quote: no conflict, no missing input, no unpriced line.
+    expect(r.requiresManualReview).toBe(false);
+  });
+
+  it('refuses to bill a corridor’s whole mileage to Virginia', () => {
+    const r = priceIn('VA', {
+      ...base,
+      widthIn: ftIn(12),
+      grossWeightLbs: 100000,
+      routeClass: 'interstate',
+    });
+    expect(r.subtotalUsd).toBeNull();
+    expect(r.requiresManualReview).toBe(true);
+  });
+
+  it('asks for FOUR pilot cars over 16 ft wide off the interstate', () => {
+    const r = priceIn('VA', {
+      ...base,
+      widthIn: ftIn(17),
+      grossWeightLbs: 79000,
+      routeClass: 'two-lane',
+      milesInJurisdiction: 120,
+    });
+    expect(r.escortsRequired).toBe(4);
+    expect(r.escorts.front).toBe(2);
+    expect(r.escorts.rear).toBe(2);
+    // …and three on the interstate, for the same load.
+    const inter = priceIn('VA', {
+      ...base,
+      widthIn: ftIn(17),
+      grossWeightLbs: 79000,
+      routeClass: 'interstate',
+      milesInJurisdiction: 120,
+    });
+    expect(inter.escortsRequired).toBe(3);
+  });
+
+  it('does not price a load past the 250,000 lb travel-plan parameter', () => {
+    const r = priceIn('VA', {
+      ...base,
+      widthIn: ftIn(12),
+      grossWeightLbs: 260000,
+      routeClass: 'interstate',
+      milesInJurisdiction: 120,
+    });
+    // Virginia publishes no numeric gross-weight superload threshold, so
+    // without this rule the load would have been quoted as an ordinary permit.
+    expect(r.requiresManualReview).toBe(true);
+    expect(r.escorts.applied.map((a) => a.ruleId)).toContain(
+      'va-extreme-parameters-travel-plan',
+    );
+  });
+});
+
+describe('the registry after Phase 3', () => {
+  it('covers exactly the eleven states whose datasets exist', () => {
+    expect(Object.keys(OSOW_JURISDICTIONS).sort()).toEqual(
+      ['CA', 'GA', 'IL', 'IN', 'NC', 'NJ', 'NY', 'OH', 'PA', 'TX', 'VA'].sort(),
+    );
+    for (const code of Object.keys(OSOW_JURISDICTIONS)) {
+      expect(hasOsowCoverage(code)).toBe(true);
+      expect(osowRulesFor(code)?.code).toBe(code);
+    }
   });
 });

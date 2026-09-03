@@ -57,8 +57,48 @@ export type Measure =
  * Road type, for states that escalate escorts on undivided roads. Present in
  * the grammar from day one because retrofitting a route-conditioned rule into
  * a dimension-only evaluator means touching every rule already written.
+ *
+ * CALIFORNIA IS WHY THIS UNION IS NOT CLOSED AT FOUR VALUES.
+ * ---------------------------------------------------------
+ * Every other jurisdiction here conditions escorts on a property of the ROAD
+ * that a dispatcher can name from the road itself — interstate, divided,
+ * two-lane, urban. California does not. Caltrans classifies every state
+ * highway SEGMENT by COLOUR on its Single Trip Pilot Car Maps — yellow, green,
+ * blue, brown, red — and each colour carries its own width thresholds, its own
+ * length threshold, and its own CHP trigger. A load 13 ft wide needs no pilot
+ * car on a yellow segment, one on a green or blue segment, and two on a brown
+ * one. The colour is a published property of the segment, read off the map or
+ * off the permit face (item 36); it is not derivable from lane count, and the
+ * 1990 definitions that tie the colours to lane and shoulder widths are the
+ * only ones Caltrans has ever published.
+ *
+ * Flattening the five colours onto `divided`/`two-lane` would have destroyed
+ * the distinction the state actually prices on — green, blue and brown are all
+ * two-lane and they disagree with each other by two feet of width and 35 feet
+ * of length. So the union is EXTENDED rather than reinterpreted. The colours
+ * carry a `ca-` prefix because they are California's map legend and not a
+ * general road taxonomy; a future state with its own scheme adds its own
+ * prefixed members the same way, and no existing rule changes.
+ *
+ * A California quote that does not know the segment colour evaluates the width
+ * rules to `unknown`, which is correct: without the colour, Caltrans's own
+ * table cannot say how many pilot cars the move needs.
  */
-export type RouteClass = 'interstate' | 'divided' | 'two-lane' | 'urban';
+export type RouteClass =
+  | 'interstate'
+  | 'divided'
+  | 'two-lane'
+  | 'urban'
+  /** Caltrans pilot-car map: multilane freeways and expressways. */
+  | 'ca-yellow'
+  /** Caltrans pilot-car map: two-lane, 12 ft lanes with a 4 ft or wider shoulder. */
+  | 'ca-green'
+  /** Caltrans: two-lane, 12 ft lanes with a 0–4 ft shoulder, or multilane with substandard lanes. */
+  | 'ca-blue'
+  /** Caltrans: two-lane with 11 ft or 10 ft lanes. */
+  | 'ca-brown'
+  /** Caltrans: restricted route — movement governed by the Red Route Summary Table. */
+  | 'ca-red';
 
 export type EscortCondition =
   /** measure > value */
