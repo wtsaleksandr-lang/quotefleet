@@ -50,6 +50,11 @@ function mirroredThresholds(): Record<string, number> {
  *
  * Phase 6 did NOT have to move it again: Arkansas was collected on the same day,
  * and its 180,000 lb threshold rows carry the same retrieval date.
+ *
+ * Nor did Phase 7. Kentucky was collected a day earlier (2026-09-02) and its
+ * 160,000 lb ceiling comes from 601 KAR 1:018 §7(2)(h), a dated regulation
+ * effective 2017-07-07, so the row is in effect on any as-of date this file
+ * would use.
  */
 const ASOF = '2026-09-03';
 
@@ -103,6 +108,14 @@ describe('widget mirror of the OS/OW weight ceiling', () => {
     // Arkansas's per-ton chart has no upper weight bound, so the server prices
     // every pound below it. That is what earns a mirrored ceiling; publishing a
     // number does not.
+    //
+    // KENTUCKY IS THE SAME TEST PASSED FROM THE OTHER DIRECTION. 601 KAR 1:018
+    // §7(2)(h) is the top of a CLOSED list of what a single-trip permit may
+    // authorise — "Seven (7) axle combination units not exceeding 160,000 pounds
+    // gross weight" — so it is a permit ceiling and not a fee trigger, and
+    // Kentucky's fee is one flat $60 with no upper weight bound at all. The
+    // Florida failure (a client accepting a load the server's schedule cannot
+    // reach) is structurally impossible there.
     const mirrored = mirroredThresholds();
     for (const code of ['IL', 'IN', 'OK', 'FL']) {
       expect(OSOW_JURISDICTIONS[code], `${code} must still be covered`).toBeDefined();

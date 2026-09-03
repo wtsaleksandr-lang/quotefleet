@@ -172,6 +172,29 @@ export type Measure =
  * segment that a dispatcher can answer and the engine cannot derive, which is
  * exactly what `subjective` is for, and an unanswered one reads `unknown`
  * rather than flat country.
+ *
+ * PHASE 7 ADDED THREE, FOR A CLASSIFICATION THAT CARRIES A WEIGHT RATHER THAN
+ * AN ESCORT COUNT.
+ * -------------------------------------------------------------------------
+ * Kentucky is the first state here whose LEGAL GROSS WEIGHT is a property of
+ * the road segment. 603 KAR 5:066 §1(1) classifies every state-maintained
+ * highway as Class "AAA", "AA" or "A" and gives each its own maximum — 80,000,
+ * 62,000 and 44,000 lb. A 70,000 lb five-axle combination is legal on the
+ * first, needs an overweight permit on the second, and is far over the third.
+ * The classification is published by the Cabinet and read off the segment; it
+ * is not derivable from lane count, pavement or anything on the load, which is
+ * the California test exactly, so the members are prefixed `ky-`.
+ *
+ * WHAT THEY DO NOT CARRY IS LANE COUNT, and unlike Colorado that is deliberate
+ * rather than a compromise. Colorado crossed colour with lane count into ten
+ * members because NEITHER axis existed in the general vocabulary. Kentucky's
+ * escort table (601 KAR 1:018 §14) splits on "two (2) lane routes of travel"
+ * against "four (4) lane routes of travel", which `two-lane`, `divided`,
+ * `interstate` and `multilane-undivided` already say — so crossing would have
+ * produced six members to restate four. The cost is that a caller passes one
+ * route class and can answer only one of Kentucky's two axes at a time; the
+ * unanswered side goes `unknown` and to review, never to a guess. See
+ * `kentucky.ts` for the full note.
  */
 export type RouteClass =
   | 'interstate'
@@ -206,7 +229,13 @@ export type RouteClass =
   | 'co-green-four-lane'
   /** CDOT map: WHITE segment — the most permissive, no escort until 15 ft. */
   | 'co-white-two-lane'
-  | 'co-white-four-lane';
+  | 'co-white-four-lane'
+  /** 603 KAR 5:066 classification: Class "AAA" — 80,000 lb, and the interstates. */
+  | 'ky-class-aaa'
+  /** 603 KAR 5:066 classification: Class "AA" — 62,000 lb. */
+  | 'ky-class-aa'
+  /** 603 KAR 5:066 classification: Class "A" — 44,000 lb, barely half of AAA. */
+  | 'ky-class-a';
 
 export type EscortCondition =
   /** measure > value */

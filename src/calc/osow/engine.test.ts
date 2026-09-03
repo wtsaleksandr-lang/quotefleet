@@ -13,8 +13,13 @@ import {
 import {
   applyTransactionFee,
   oversizeBandApplies,
+  thresholdsEqual,
   weightBandAmount,
 } from './types.js';
+import {
+  IMMATERIAL_CONFLICT_THRESHOLD_USD,
+  priceSourced,
+} from './materiality.js';
 import { ftIn } from './escortRules.js';
 import { resolveSourced, spreadOf } from './provenance.js';
 import {
@@ -54,6 +59,14 @@ import {
   ARKANSAS_OSOW_RULES,
   ARKANSAS_SUPERLOAD_SUPPLEMENTAL_FEE_CEILING_USD,
 } from './jurisdictions/arkansas.js';
+import {
+  KENTUCKY_HEIGHT_POLE_TRIGGER_IN,
+  KENTUCKY_NON_DESIGNATED_VS_STATE_SYSTEM,
+  KENTUCKY_OSOW_RULES,
+  KENTUCKY_PROPOSED_2026_FEES,
+  KENTUCKY_PROPOSED_AMENDMENT_NOT_IN_FORCE,
+  KENTUCKY_PROPOSED_AMENDMENT_SOURCE,
+} from './jurisdictions/kentucky.js';
 
 /**
  * Texas figures asserted here come from TxDMV and the Texas Transportation
@@ -2687,12 +2700,548 @@ describe('Arkansas — a permit priced by the ton', () => {
   });
 });
 
-describe('the registry after Phase 6', () => {
-  it('covers exactly the nineteen states whose datasets exist', () => {
+/**
+ * PHASE 7 — one state, and the first in the dataset whose LEGAL GROSS WEIGHT is
+ * a property of the road segment.
+ *
+ * Kentucky's fee side is the simplest here — one flat $60 for a single-trip
+ * permit, oversize, overweight or both — so almost everything worth testing is
+ * on the requirements side: three road classes that disagree by 36,000 lb, a
+ * height-pole trigger two Kentucky sources state one inch apart, a statutory
+ * baseline that governs a different road network from the regulations, and a
+ * proposed fee amendment that would double the schedule and supplies no value
+ * because nothing dates it into force.
+ */
+const ASOF7 = '2026-09-03';
+
+function priceIn7(
+  code: string,
+  partial: Parameters<typeof calculateOsowForJurisdiction>[1],
+) {
+  const rules = osowRulesFor(code);
+  expect(rules, `${code} must be a covered jurisdiction`).not.toBeNull();
+  return calculateOsowForJurisdiction(
+    rules as NonNullable<typeof rules>,
+    partial,
+    ASOF7,
+  );
+}
+
+describe('Kentucky — a legal weight that depends on the road', () => {
+  /** Legal on every Kentucky limit recorded, on a Class AAA highway. */
+  const legalSize = {
+    widthIn: 102,
+    heightIn: ftIn(13, 6),
+    overallLengthIn: ftIn(70),
+    trailerLengthIn: ftIn(53),
+    routeClass: 'ky-class-aaa' as const,
+  };
+
+  it('prices one flat $60 plus the 4% card surcharge, whatever the load is over', () => {
+    // 601 KAR 1:018 §17(2)(b) "a payment of sixty (60) dollars" and the KYTC
+    // FAQ's "applicable service fee of 4%": $60 × 1.04 = $62.40. The same total
+    // for an oversize-only, an overweight-only and a combined move is the whole
+    // point of `includedInBaseFee` — Kentucky charges once, not per component.
+    const oversizeOnly = priceIn7('KY', {
+      ...legalSize,
+      widthIn: ftIn(14),
+      grossWeightLbs: 79000,
+      routeClass: 'divided',
+    });
+    const overweightOnly = priceIn7('KY', { ...legalSize, grossWeightLbs: 100000 });
+    const both = priceIn7('KY', {
+      ...legalSize,
+      widthIn: ftIn(14),
+      heightIn: ftIn(15),
+      overallLengthIn: ftIn(100),
+      grossWeightLbs: 120000,
+      routeClass: 'two-lane',
+    });
+
+    for (const [label, r] of [
+      ['oversize only', oversizeOnly],
+      ['overweight only', overweightOnly],
+      ['both', both],
+    ] as const) {
+      expect(r.permitRequired, label).toBe(true);
+      expect(r.subtotalUsd, label).toBe(62.4);
+      expect(r.requiresManualReview, label).toBe(false);
+      expect(
+        r.lines.find((l) => l.code === 'osow_permit_base')?.amountUsd,
+        label,
+      ).toBe(60);
+      expect(
+        r.lines.find((l) => l.code === 'osow_service_fee')?.amountUsd,
+        label,
+      ).toBe(2.4);
+    }
+
+    // The overweight component is a SOURCED ZERO, not a missing line: the base
+    // fee already covers it and the engine says so rather than staying silent.
+    const ow = overweightOnly.lines.find((l) => l.code === 'osow_overweight');
+    expect(ow?.amountUsd).toBe(0);
+    expect(ow?.note).toContain('No separate overweight charge');
+    // An oversize-only move never reaches the overweight side at all.
+    expect(oversizeOnly.lines.some((l) => l.code === 'osow_overweight')).toBe(false);
+  });
+
+  /**
+   * THE THREE CLASSES, DRIVEN. 603 KAR 5:066 gives Class AAA 80,000 lb, Class AA
+   * 62,000 lb and Class A 44,000 lb, and the same 70,000 lb truck gets three
+   * different answers. The fourth case is the one that matters most: with no
+   * class supplied both rules go UNDECIDED rather than falling back to AAA.
+   */
+  it('answers a 70,000 lb load differently on each road class, and refuses to guess', () => {
+    // `routeClass` is spread in only when it is given, so the last case really
+    // carries no road type at all — spreading `legalSize` wholesale would have
+    // left its Class AAA behind and quietly tested the wrong thing.
+    const { routeClass: _classFromLegalSize, ...classless } = legalSize;
+    const at = (routeClass?: OsowLoad['routeClass']) =>
+      priceIn7('KY', {
+        ...classless,
+        grossWeightLbs: 70000,
+        ...(routeClass === undefined ? {} : { routeClass }),
+      });
+
+    const aaa = at('ky-class-aaa');
+    expect(aaa.escorts.applied.map((a) => a.ruleId)).not.toContain(
+      'ky-class-aa-gross-over-62000',
+    );
+    expect(aaa.escorts.undecided.map((u) => u.ruleId)).not.toContain(
+      'ky-class-a-gross-over-44000',
+    );
+    expect(aaa.permitRequired).toBe(false);
+
+    const aa = at('ky-class-aa');
+    expect(aa.escorts.applied.map((a) => a.ruleId)).toContain(
+      'ky-class-aa-gross-over-62000',
+    );
+    expect(aa.requiresManualReview).toBe(true);
+
+    const a = at('ky-class-a');
+    expect(a.escorts.applied.map((a2) => a2.ruleId)).toContain(
+      'ky-class-a-gross-over-44000',
+    );
+    expect(a.requiresManualReview).toBe(true);
+
+    // NO CLASS: `routeClass` is unknown, which propagates through `all` and
+    // leaves both class rules undecided. Nothing assumes the permissive class.
+    const unknown = at(undefined);
+    const undecided = unknown.escorts.undecided.map((u) => u.ruleId);
+    expect(undecided).toContain('ky-class-aa-gross-over-62000');
+    expect(undecided).toContain('ky-class-a-gross-over-44000');
+    expect(unknown.requiresManualReview).toBe(true);
+    expect(unknown.escorts.applied.map((x) => x.ruleId)).not.toContain(
+      'ky-class-aa-gross-over-62000',
+    );
+  });
+
+  it('says nothing about the road class for a load legal on every one of them', () => {
+    // 40,000 lb is under Class A's 44,000 lb, so the weight condition is
+    // definitely false and `triAll` answers false even with the class unknown.
+    // A settled question must not produce a warning.
+    const r = priceIn7('KY', { ...legalSize, grossWeightLbs: 40000, routeClass: undefined });
+    const touched = [
+      ...r.escorts.applied.map((x) => x.ruleId),
+      ...r.escorts.undecided.map((x) => x.ruleId),
+    ];
+    expect(touched).not.toContain('ky-class-a-gross-over-44000');
+    expect(touched).not.toContain('ky-class-aa-gross-over-62000');
+  });
+
+  /**
+   * THE HEIGHT-POLE INCH. 601 KAR 1:018 §13(1)(d) says "in excess of fourteen
+   * (14) feet eleven (11) inches" and drive.ky.gov says "fifteen (15) feet or
+   * greater". They agree everywhere except strictly between the two.
+   */
+  it('fires the height-pole conflict in the disputed inch and nowhere else', () => {
+    const at = (heightIn: number) =>
+      priceIn7('KY', { ...legalSize, heightIn, grossWeightLbs: 79000 });
+
+    // Exactly 14'11" — the regulation's "in excess of" excludes it, and the
+    // portal's "15 ft or greater" excludes it too. Both agree: no pole.
+    const at1411 = at(ftIn(14, 11));
+    expect(at1411.escorts.applied.map((a) => a.ruleId)).not.toContain(
+      'ky-height-pole-14-11-to-15-conflict',
+    );
+    expect(at1411.escorts.heightPole).toBe(false);
+
+    // Inside the inch: the regulation requires a pole and the portal does not.
+    const inBand = at(ftIn(14, 11.5));
+    expect(inBand.escorts.applied.map((a) => a.ruleId)).toContain(
+      'ky-height-pole-14-11-to-15-conflict',
+    );
+    // The stricter reading is applied while a human confirms — an under-poled
+    // load hits the wire, so this is not left to the permissive source.
+    expect(inBand.escorts.heightPole).toBe(true);
+    expect(inBand.requiresManualReview).toBe(true);
+
+    // At 15 ft both sources require the pole, so there is nothing left to
+    // disagree about and the conflict rule stays quiet.
+    const at15 = at(ftIn(15));
+    expect(at15.escorts.heightPole).toBe(true);
+    expect(at15.escorts.applied.map((a) => a.ruleId)).not.toContain(
+      'ky-height-pole-14-11-to-15-conflict',
+    );
+    expect(at15.escorts.applied.map((a) => a.ruleId)).toContain('ky-height-pole-over-15');
+  });
+
+  it('keeps both height-pole readings on file and adopts neither', () => {
+    const r = resolveSourced(
+      'KY height pole trigger',
+      KENTUCKY_HEIGHT_POLE_TRIGGER_IN,
+      ASOF7,
+      thresholdsEqual,
+    );
+    expect(r.conflict).toBe(true);
+    expect(r.value).toBeNull();
+    expect(r.requiresManualReview).toBe(true);
+    expect(r.candidates.map((c) => c.value.value).sort((x, y) => x - y)).toEqual([
+      ftIn(14, 11),
+      ftIn(15),
+    ]);
+    // The inclusivity is the whole disagreement and must not be smoothed.
+    expect(
+      r.candidates.find((c) => c.value.value === ftIn(14, 11))?.value.inclusive,
+    ).toBe(false);
+    expect(r.candidates.find((c) => c.value.value === ftIn(15))?.value.inclusive).toBe(
+      true,
+    );
+  });
+
+  /**
+   * KENTUCKY TRIGGERS NO ESCORT ON HEIGHT AT ALL — its §14 table runs on width,
+   * length, overhang and speed — so a tall but narrow load gets a height pole
+   * requirement and no pilot car. Inventing one to carry the pole would bill a
+   * vehicle the state has not asked for; the exclusion is stated instead.
+   */
+  it('requires a height pole without inventing an escort to carry it', () => {
+    const r = priceIn7('KY', {
+      ...legalSize,
+      heightIn: ftIn(16),
+      grossWeightLbs: 79000,
+    });
+    expect(r.escorts.heightPole).toBe(true);
+    expect(r.escorts.totalEscorts).toBe(0);
+    expect(r.warnings.some((w) => w.includes('NO pilot car is added to the count'))).toBe(
+      true,
+    );
+    // Over 15 ft 6 in Kentucky requires a driven route survey (§6(4)).
+    expect(r.routeInspectionRequired).toBe(true);
+    expect(r.escorts.routeSurvey).toBe(true);
+  });
+
+  /**
+   * THE ESCORT LADDERS, WHICH DIVERGE BY A WHOLE PILOT CAR ON THE SAME LOAD.
+   * 601 KAR 1:018 §14 and drive.ky.gov: a 13 ft load takes a front AND a rear
+   * escort on a two-lane route and a rear escort alone on a four-lane one.
+   */
+  it('reproduces the two-lane and four-lane escort counts the state publishes', () => {
+    const escortsFor = (
+      routeClass: 'two-lane' | 'divided',
+      over: Partial<OsowLoad>,
+    ) => {
+      const r = priceIn7('KY', {
+        ...legalSize,
+        grossWeightLbs: 79000,
+        routeClass,
+        ...over,
+      });
+      return { total: r.escorts.totalEscorts, front: r.escorts.front, rear: r.escorts.rear };
+    };
+
+    // Width, two-lane: over 12 ft is one front and one rear; over 16 ft is two
+    // and two.
+    expect(escortsFor('two-lane', { widthIn: ftIn(13) })).toEqual({ total: 2, front: 1, rear: 1 });
+    expect(escortsFor('two-lane', { widthIn: ftIn(17) })).toEqual({ total: 4, front: 2, rear: 2 });
+    // Width, four-lane: over 12 ft is a rear escort ALONE, and the front car
+    // only appears over 14 ft.
+    expect(escortsFor('divided', { widthIn: ftIn(13) })).toEqual({ total: 1, front: 0, rear: 1 });
+    expect(escortsFor('divided', { widthIn: ftIn(15) })).toEqual({ total: 2, front: 1, rear: 1 });
+    expect(escortsFor('divided', { widthIn: ftIn(17) })).toEqual({ total: 4, front: 2, rear: 2 });
+
+    // Length: a two-lane route wants a front car from 75 ft; a four-lane route
+    // wants nothing until 110 ft. Thirty-five feet of difference.
+    expect(escortsFor('two-lane', { overallLengthIn: ftIn(80) })).toEqual({ total: 1, front: 1, rear: 0 });
+    expect(escortsFor('divided', { overallLengthIn: ftIn(80) })).toEqual({ total: 0, front: 0, rear: 0 });
+    expect(escortsFor('two-lane', { overallLengthIn: ftIn(90) })).toEqual({ total: 2, front: 1, rear: 1 });
+    expect(escortsFor('divided', { overallLengthIn: ftIn(115) })).toEqual({ total: 1, front: 0, rear: 1 });
+    // Over 120 ft both columns agree on one front and two rear, so the rule is
+    // route-agnostic and a quote without a road type is not sent to review.
+    expect(escortsFor('two-lane', { overallLengthIn: ftIn(125) })).toEqual({ total: 3, front: 1, rear: 2 });
+    expect(escortsFor('divided', { overallLengthIn: ftIn(125) })).toEqual({ total: 3, front: 1, rear: 2 });
+
+    // Rear overhang over 10 ft — a rear escort on any road.
+    expect(escortsFor('divided', { rearOverhangIn: ftIn(11) })).toEqual({ total: 1, front: 0, rear: 1 });
+  });
+
+  /**
+   * THE STATUTORY BASELINE. It fires inside the bands where KRS 189.221 and the
+   * 603 KAR regulations give different answers, and is silent above them — a
+   * 20 ft wide load needs a permit on any reading, so there is nothing to say.
+   */
+  it('states the KRS 189.221 baseline only where the two texts disagree', () => {
+    const inBand = priceIn7('KY', { ...legalSize, grossWeightLbs: 70000 });
+    expect(inBand.escorts.applied.map((a) => a.ruleId)).toContain(
+      'ky-krs-189-221-baseline-conflict',
+    );
+    // An ADVISORY, not a review flag: the band is every loaded truck in the
+    // Commonwealth and the price is a flat $60 on either reading. See the rule.
+    expect(
+      inBand.escorts.applied.find(
+        (a) => a.ruleId === 'ky-krs-189-221-baseline-conflict',
+      )?.outcome.manualReview,
+    ).toBeUndefined();
+
+    const aboveEveryBand = priceIn7('KY', {
+      widthIn: ftIn(20),
+      heightIn: ftIn(16),
+      overallLengthIn: ftIn(140),
+      trailerLengthIn: ftIn(53),
+      grossWeightLbs: 150000,
+      routeClass: 'ky-class-aaa',
+    });
+    expect(aboveEveryBand.escorts.applied.map((a) => a.ruleId)).not.toContain(
+      'ky-krs-189-221-baseline-conflict',
+    );
+  });
+
+  it('holds the statutory-versus-regulatory limits open and adopts neither', () => {
+    for (const [field, rows, low, high] of [
+      ['KY width', KENTUCKY_NON_DESIGNATED_VS_STATE_SYSTEM.widthIn, 96, 102],
+      ['KY height', KENTUCKY_NON_DESIGNATED_VS_STATE_SYSTEM.heightIn, ftIn(11, 6), ftIn(13, 6)],
+      ['KY single unit', KENTUCKY_NON_DESIGNATED_VS_STATE_SYSTEM.singleUnitLengthIn, ftIn(26, 6), ftIn(45)],
+      ['KY overall length', KENTUCKY_NON_DESIGNATED_VS_STATE_SYSTEM.overallLengthIn, ftIn(30), ftIn(65)],
+      ['KY gross weight', KENTUCKY_NON_DESIGNATED_VS_STATE_SYSTEM.grossWeightLbs, 36000, 80000],
+    ] as const) {
+      const r = resolveSourced(field, rows, ASOF7);
+      expect(r.conflict, field).toBe(true);
+      expect(r.value, field).toBeNull();
+      expect(r.requiresManualReview, field).toBe(true);
+      expect(spreadOf(r), field).toEqual({ low, high });
+    }
+
+    /**
+     * AND THE LIMITS THEMSELVES STAY ALIVE, which is the whole reason the
+     * conflict is held out here. `colorado.ts`'s lesson: a null legal gross
+     * weight disables the over-dimension check and drops the permit entirely.
+     */
+    const heavy = priceIn7('KY', { ...legalSize, grossWeightLbs: 120000 });
+    expect(heavy.overDimension.weight).toBe(true);
+    expect(heavy.subtotalUsd).toBe(62.4);
+    const wide = priceIn7('KY', { ...legalSize, widthIn: ftIn(14), grossWeightLbs: 79000 });
+    expect(wide.overDimension.width).toBe(true);
+  });
+
+  /**
+   * THE PROPOSED AMENDMENT SUPPLIES NO VALUE, AND THE TEST IS THAT NOTHING IN
+   * THE DATASET CITES IT. It carries a filing date and an implementing statute —
+   * the shape that CAN displace older text — but SB 107 sets no fee and the
+   * amendment states no effective date, so neither half alone can move one.
+   */
+  it('cites the proposed 2026 amendment for no value anywhere in the dataset', () => {
+    const rows = [
+      ...Object.values(KENTUCKY_OSOW_RULES.legalLimits).flat(),
+      ...KENTUCKY_OSOW_RULES.permitBaseFeeUsd,
+      ...KENTUCKY_OSOW_RULES.overweightBands,
+      ...KENTUCKY_OSOW_RULES.overweightPerMile,
+      ...KENTUCKY_OSOW_RULES.conditionalFees,
+      ...KENTUCKY_OSOW_RULES.transactionFee,
+      ...KENTUCKY_OSOW_RULES.routeAnalysisFeeUsd,
+      ...KENTUCKY_OSOW_RULES.noBridgeRouteFeeUsd,
+      ...KENTUCKY_OSOW_RULES.overweightPricing,
+      ...(KENTUCKY_OSOW_RULES.superload.grossWeight ?? []),
+      ...KENTUCKY_OSOW_RULES.superload.shortSpacing,
+      ...KENTUCKY_OSOW_RULES.routeInspection.widthIn,
+      ...KENTUCKY_OSOW_RULES.routeInspection.heightIn,
+      ...KENTUCKY_OSOW_RULES.routeInspection.lengthIn,
+    ];
+    expect(rows.length).toBeGreaterThan(0);
+    for (const row of rows) {
+      expect(row.source.id).not.toBe('ky-601-kar-1-018-proposed-2026');
+    }
+    for (const rule of KENTUCKY_OSOW_RULES.escortRules) {
+      expect(rule.source.id).not.toBe('ky-601-kar-1-018-proposed-2026');
+    }
+    // The document is still on file, and its title says what it is.
+    expect(KENTUCKY_PROPOSED_AMENDMENT_SOURCE.title).toContain('NOT IN FORCE');
+    expect(KENTUCKY_PROPOSED_AMENDMENT_SOURCE.revisedOn).toBe('2026-05-05');
+    expect(KENTUCKY_PROPOSED_AMENDMENT_NOT_IN_FORCE).toContain('SB 107');
+  });
+
+  it('preserves the amendment’s own drafting typo instead of correcting it', () => {
+    const a01 = KENTUCKY_PROPOSED_2026_FEES.find((f) => f.section.endsWith('§3(3)'));
+    const a02 = KENTUCKY_PROPOSED_2026_FEES.find((f) => f.section.endsWith('§3(4)'));
+    // §3(4) is the A02 permit, which drive.ky.gov describes as "14 ft. to 16 ft.
+    // wide" — and the proposal repeats §3(3)'s width band verbatim. Quoted as
+    // written: a typo in a fee table is evidence about the document.
+    expect(a01?.quote).toContain('less than fourteen (14) feet wide');
+    expect(a02?.quote).toContain('less than fourteen (14) feet wide');
+    expect(a02?.item).toContain('14 ft to 16 ft');
+    expect(a02?.proposedUsd).toBe(1500);
+
+    // The superload bridge analysis has NO codified counterpart, and that is
+    // recorded as an absence rather than as a published zero.
+    const bridge = KENTUCKY_PROPOSED_2026_FEES.find((f) =>
+      f.item.includes('Superload bridge analysis'),
+    );
+    expect(bridge?.codifiedUsd).toBeNull();
+    expect(bridge?.proposedUsd).toBe(500);
+    expect(KENTUCKY_OSOW_RULES.routeAnalysisFeeUsd).toEqual([]);
+    expect(KENTUCKY_OSOW_RULES.noBridgeRouteFeeUsd).toEqual([]);
+  });
+
+  /**
+   * AND IF IT IS EVER ADOPTED, IT MUST FORCE REVIEW RATHER THAN ABSORB. $60
+   * against $120 is a $60 spread on every permit Kentucky issues, well over the
+   * $50 materiality threshold — so `priceSourced` escalates and publishes the
+   * range instead of quietly quoting the higher figure. Constructed here rather
+   * than dated into the dataset, because inventing the effective date is the one
+   * thing this file refuses to do.
+   */
+  it('would escalate the $60-versus-$120 fee rather than absorb it', () => {
+    const doubling = priceSourced(
+      {
+        field: 'KY single-trip permit base fee',
+        value: null,
+        chosen: null,
+        candidates: [
+          {
+            value: 60,
+            source: KENTUCKY_PROPOSED_AMENDMENT_SOURCE,
+            effectiveFrom: '2017-07-07',
+            effectiveTo: null,
+          },
+          {
+            value: 120,
+            source: KENTUCKY_PROPOSED_AMENDMENT_SOURCE,
+            effectiveFrom: '2017-07-07',
+            effectiveTo: null,
+          },
+        ],
+        conflict: true,
+        warnings: [],
+        requiresManualReview: true,
+      },
+      (v) => v,
+      { absorb: true },
+    );
+    expect(120 - 60).toBeGreaterThan(IMMATERIAL_CONFLICT_THRESHOLD_USD);
+    expect(doubling.absorbed).toBeNull();
+    expect(doubling.amountUsd).toBeNull();
+    expect(doubling.requiresManualReview).toBe(true);
+    expect(doubling.lowUsd).toBe(60);
+    expect(doubling.highUsd).toBe(120);
+  });
+
+  /**
+   * 160,000 LB IS A REAL PERMIT CEILING, NOT A FEE TRIGGER — the distinction
+   * Florida's 300,000 lb failed. 601 KAR 1:018 §7(2)(h) is the top of a closed
+   * list of what a single-trip permit may authorise, and Kentucky's flat fee has
+   * no upper weight bound, so the server prices every pound below it.
+   */
+  it('prices to the permit ceiling and refuses above it', () => {
+    const atCeiling = priceIn7('KY', { ...legalSize, grossWeightLbs: 160000 });
+    expect(atCeiling.superload).toBe(false);
+    expect(atCeiling.subtotalUsd).toBe(62.4);
+
+    const over = priceIn7('KY', { ...legalSize, grossWeightLbs: 160001 });
+    expect(over.superload).toBe(true);
+    expect(over.requiresManualReview).toBe(true);
+    // A superload gets no priced lines at all — no $60 with a confident face.
+    expect(over.lines).toEqual([]);
+    expect(over.subtotalUsd).toBeNull();
+  });
+
+  it('states the per-configuration axle caps the weight ceiling cannot see', () => {
+    // §7(2) caps five axles at 96,000 lb and six at 120,000 lb; 160,000 is the
+    // SEVEN-axle figure. Nothing on a load lets a rule test the axle count, so
+    // the caps are stated for any load past the five-axle figure.
+    const r = priceIn7('KY', { ...legalSize, grossWeightLbs: 150000 });
+    expect(r.escorts.applied.map((a) => a.ruleId)).toContain(
+      'ky-permitted-axle-configuration-caps',
+    );
+    expect(r.warnings.some((w) => w.includes('Five (5) axle combination units'))).toBe(true);
+    // An advisory: the price stands and the exclusion is stated.
+    expect(r.requiresManualReview).toBe(false);
+  });
+
+  /**
+   * THE FOUR UNKNOWNS, ALL ADVISORY. Every one of them is a real exclusion that
+   * does not invalidate the price, so none may force review — the Texas
+   * police-escort contract. Two of them are POSITIVE findings rather than gaps:
+   * Kentucky's police-escort rules set no threshold by construction, and it runs
+   * no pilot-car certification programme where several neighbours do.
+   */
+  it('carries all four unknowns as advisories and none of them stops the quote', () => {
+    const r = priceIn7('KY', {
+      ...legalSize,
+      widthIn: ftIn(13),
+      heightIn: ftIn(14),
+      overallLengthIn: ftIn(90),
+      grossWeightLbs: 100000,
+      routeClass: 'two-lane',
+    });
+    const fired = r.escorts.applied;
+    for (const id of [
+      'ky-police-escort-no-threshold',
+      'ky-police-escort-no-rate-schedule',
+      'ky-bucket-truck-no-codified-trigger',
+      'ky-no-pilot-car-certification',
+    ]) {
+      const rule = fired.find((a) => a.ruleId === id);
+      expect(rule, `${id} must fire`).toBeDefined();
+      expect(rule?.outcome.advisory, `${id} must be advisory`).toBeDefined();
+      expect(rule?.outcome.manualReview, `${id} must not stop the quote`).toBeUndefined();
+    }
+    expect(r.requiresManualReview).toBe(false);
+    expect(r.subtotalUsd).toBe(62.4);
+    // The police-escort absence is STRUCTURAL and is phrased as one — there is
+    // no threshold to have found, rather than one that was not found.
+    expect(
+      r.warnings.some((w) =>
+        w.includes('that is how the rules are built rather than a gap in what was searched'),
+      ),
+    ).toBe(true);
+    // Certification is recorded POSITIVELY: Kentucky issues none and takes none.
+    expect(
+      r.warnings.some((w) =>
+        w.includes('does not license, certify or require any state or third-party certification'),
+      ),
+    ).toBe(true);
+  });
+
+  it('records no superload trigger it cannot quote, and one route-survey trigger', () => {
+    // The research summarised width over 16 ft and height over 15 ft 6 in as
+    // superload triggers. Neither is quoted in that sense — 16 ft is an ANNUAL
+    // permit's maximum width and a step in the escort table, and 15 ft 6 in is
+    // the route-survey trigger, which is recorded where it belongs.
+    expect(KENTUCKY_OSOW_RULES.superload.widthIn).toBeUndefined();
+    expect(KENTUCKY_OSOW_RULES.superload.heightIn).toBeUndefined();
+    expect(KENTUCKY_OSOW_RULES.superload.overallLengthIn).toBeUndefined();
+    expect(KENTUCKY_OSOW_RULES.superload.shortSpacing).toEqual([]);
+    expect(KENTUCKY_OSOW_RULES.routeInspection.widthIn).toEqual([]);
+    expect(KENTUCKY_OSOW_RULES.routeInspection.lengthIn).toEqual([]);
+    expect(KENTUCKY_OSOW_RULES.routeInspection.heightIn).toHaveLength(1);
+    expect(KENTUCKY_OSOW_RULES.routeInspection.heightIn[0]?.value).toEqual({
+      value: ftIn(15, 6),
+      inclusive: false,
+    });
+    // No mileage anywhere in the schedule, so a Kentucky quote never needs
+    // in-state miles to price.
+    expect(KENTUCKY_OSOW_RULES.feesDependOnDistance).toBe(false);
+    expect(KENTUCKY_OSOW_RULES.overweightBands).toEqual([]);
+    expect(KENTUCKY_OSOW_RULES.overweightPerMile).toEqual([]);
+    expect(KENTUCKY_OSOW_RULES.overweightPricing[0]?.value.kind).toBe('includedInBaseFee');
+  });
+});
+
+describe('the registry after Phase 7', () => {
+  it('covers exactly the twenty states whose datasets exist', () => {
     expect(Object.keys(OSOW_JURISDICTIONS).sort()).toEqual(
       [
-        'AL', 'AR', 'CA', 'CO', 'FL', 'GA', 'IL', 'IN', 'LA', 'MO',
-        'NC', 'NJ', 'NY', 'OH', 'OK', 'PA', 'TX', 'VA', 'WA',
+        'AL', 'AR', 'CA', 'CO', 'FL', 'GA', 'IL', 'IN', 'KY', 'LA',
+        'MO', 'NC', 'NJ', 'NY', 'OH', 'OK', 'PA', 'TX', 'VA', 'WA',
       ].sort(),
     );
     for (const code of Object.keys(OSOW_JURISDICTIONS)) {
@@ -2702,6 +3251,6 @@ describe('the registry after Phase 6', () => {
     // The registry must never name a jurisdiction ahead of its dataset, and the
     // count is asserted separately so a stray import cannot pass by matching a
     // list someone updated in the same edit.
-    expect(Object.keys(OSOW_JURISDICTIONS)).toHaveLength(19);
+    expect(Object.keys(OSOW_JURISDICTIONS)).toHaveLength(20);
   });
 });

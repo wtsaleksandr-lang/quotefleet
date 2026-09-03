@@ -50,14 +50,27 @@
  * declares none of the new fields prices exactly as it did in Phase 1, and no
  * `if (state === ...)` has ever been added anywhere.
  *
+ * PHASE 7 MOVED ONE, AND ONLY INSIDE `RouteClass` AGAIN. KENTUCKY is the first
+ * state whose LEGAL GROSS WEIGHT is a property of the road segment: 603 KAR
+ * 5:066 classifies every state-maintained highway as Class "AAA" (80,000 lb),
+ * "AA" (62,000 lb) or "A" (44,000 lb), which is California's map-colour case in
+ * a different currency, so three `ky-` members were added. `WeightBand` did NOT
+ * grow, and could not have: Kentucky charges one flat $60 for a single-trip
+ * permit whether the load is oversize, overweight or both, which is the
+ * `includedInBaseFee` case the model already had — and which
+ * `OverweightPricing` has cited Kentucky by name for since Phase 2. Same terms
+ * as every phase before: no evaluator changed, no condition kind was added, and
+ * no `if (state === ...)` has ever been added anywhere.
+ *
  * WHAT IS HERE IS EXACTLY WHAT EXISTS. An earlier draft of this file imported
  * Arkansas, Tennessee and Kentucky, whose data files were never written; the
- * build failed on three missing modules. Arkansas now has one; Tennessee and
- * Kentucky still do not, and are still absent. The registry must never name a
- * jurisdiction ahead of its dataset — `calculateOsow` refuses loudly for any
- * state that is not here, and that refusal is the honest answer for a state we
- * have not sourced. Nineteen are covered: TX, OH, PA, NY, IL, IN, CA, GA, NC,
- * NJ, VA, WA, AL, FL, MO, OK, LA, CO, AR.
+ * build failed on three missing modules. Arkansas got one in Phase 6 and
+ * Kentucky has one now; Tennessee still does not, and is still absent. The
+ * registry must never name a jurisdiction ahead of its dataset —
+ * `calculateOsow` refuses loudly for any state that is not here, and that
+ * refusal is the honest answer for a state we have not sourced. Twenty are
+ * covered: TX, OH, PA, NY, IL, IN, CA, GA, NC, NJ, VA, WA, AL, FL, MO, OK, LA,
+ * CO, AR, KY.
  */
 import type { JurisdictionOsowRules } from '../types.js';
 import { TEXAS_OSOW_RULES } from './texas.js';
@@ -79,6 +92,7 @@ import { OKLAHOMA_OSOW_RULES } from './oklahoma.js';
 import { LOUISIANA_OSOW_RULES } from './louisiana.js';
 import { COLORADO_OSOW_RULES } from './colorado.js';
 import { ARKANSAS_OSOW_RULES } from './arkansas.js';
+import { KENTUCKY_OSOW_RULES } from './kentucky.js';
 
 export const OSOW_JURISDICTIONS: Record<string, JurisdictionOsowRules> = {
   TX: TEXAS_OSOW_RULES,
@@ -100,6 +114,7 @@ export const OSOW_JURISDICTIONS: Record<string, JurisdictionOsowRules> = {
   LA: LOUISIANA_OSOW_RULES,
   CO: COLORADO_OSOW_RULES,
   AR: ARKANSAS_OSOW_RULES,
+  KY: KENTUCKY_OSOW_RULES,
 };
 
 /** Is there OS/OW coverage for this state/province code? */
@@ -134,4 +149,5 @@ export {
   LOUISIANA_OSOW_RULES,
   COLORADO_OSOW_RULES,
   ARKANSAS_OSOW_RULES,
+  KENTUCKY_OSOW_RULES,
 };
