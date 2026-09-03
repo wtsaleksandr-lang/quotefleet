@@ -54,6 +54,7 @@ import {
 } from './bridgeFormula.js';
 import {
   applyTransactionFee,
+  chargedIncrements,
   combinedFeeRulesEqual,
   exceeds,
   oversizeBandApplies,
@@ -1012,8 +1013,12 @@ export function calculateOsowForJurisdiction(
            * DEFERRED: the amount, not the published row, is what gets compared.
            * A Colorado band is "$30 plus $10 per axle", so two sources one
            * dollar apart per axle are $6 apart on a six-axle rig and $11 apart
-           * on an eleven-axle one. `weightBandAmount` answers `null` without an
-           * axle count, which `priceSourced` treats as "no higher figure to
+           * on an eleven-axle one. An Arkansas band is "$8.00 for each ton or
+           * major fraction thereof over the lawful weight", so a two-dollar
+           * disagreement about the rate is $2 on a one-ton overload and $100 on
+           * a fifty-ton one — which is exactly why the threshold has to see the
+           * COMPUTED figure. `weightBandAmount` answers `null` without the input
+           * a band needs, which `priceSourced` treats as "no higher figure to
            * take" and escalates rather than absorbs.
            */
           const bandRes = priceOf(
@@ -1023,7 +1028,7 @@ export function calculateOsowForJurisdiction(
               asOf,
               weightBandsEqual,
             ),
-            (b) => weightBandAmount(b, axleCount),
+            (b) => weightBandAmount(b, axleCount, gross),
           );
           pushSources(sources, bandRes);
           warnings.push(...bandRes.warnings);
@@ -1036,7 +1041,11 @@ export function calculateOsowForJurisdiction(
             ...rangeOf(bandRes),
             note: band === null
               ? undefined
-              : `${band.minLbs.toLocaleString()}–${band.maxLbs === null ? 'over' : band.maxLbs.toLocaleString()} lb band${band.perAxleUsd === undefined ? '' : `, $${band.perAxleUsd.toFixed(2)} per axle × ${axleCount ?? 0} axles`}`,
+              : `${band.minLbs.toLocaleString()}–${band.maxLbs === null ? 'over' : band.maxLbs.toLocaleString()} lb band${band.perAxleUsd === undefined ? '' : `, $${band.perAxleUsd.toFixed(2)} per axle × ${axleCount ?? 0} axles`}${
+                  band.perIncrementUsd === undefined
+                    ? ''
+                    : `, $${band.perIncrementUsd.toFixed(2)} × ${chargedIncrements(band, gross) ?? 0} increments of ${(band.incrementLbs ?? 0).toLocaleString()} lb over ${(band.incrementBaseLbs ?? 0).toLocaleString()} lb`
+                }`,
             sources: sourcesOf(bandRes),
           };
           if (band === null && bandRes.candidates.length === 0) {
@@ -1323,7 +1332,21 @@ export function calculateOsowForJurisdiction(
   // an empty list to $0 would turn "we cannot price this" into "this is free",
   // which is the single worst answer this engine could give.
   const anyUnpriced = lines.some((l) => l.amountUsd === null);
-  const pricingRefused = permitRequired && lines.length === 0;
+  /**
+   * `|| superload` IS NOT REDUNDANT, AND ARKANSAS IS WHY.
+   *
+   * Every state before it triggered a superload only on a dimension it also
+   * publishes a legal limit for, so `permitRequired` was always true by the time
+   * `superload` was — and the two clauses could not be told apart. Arkansas
+   * breaks that: 27 CAR §111-110(a) makes a load of 100 ft or more overall a
+   * super load, while Rule 3.G.1 says a combination whose trailer is within
+   * 53'6" has "no overall length restriction" at all. A load can therefore be
+   * legal on every Arkansas limit on file AND a super load at the same time, and
+   * without this clause it left the fee block with no lines, summed to $0.00,
+   * and printed "this move is free" beside "the agency prices it after review" —
+   * the exact confusion the paragraph above exists to prevent.
+   */
+  const pricingRefused = (permitRequired || superload) && lines.length === 0;
   const subtotalUsd =
     anyUnpriced || pricingRefused
       ? null

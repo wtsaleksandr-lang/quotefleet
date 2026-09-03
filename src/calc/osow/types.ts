@@ -68,6 +68,25 @@ export function exceeds(measurement: number, t: Threshold): boolean {
  * Both are DATA-MODEL extensions in the Phase 3/4 sense: no evaluator changed,
  * no condition kind was added, and no `if (state === ...)` exists anywhere. A
  * band that declares none of the three behaves identically to a Phase 1 band.
+ *
+ * PHASE 6 ADDED FOUR MORE, FOR A STATE THAT CHARGES BY THE TON.
+ * ------------------------------------------------------------
+ * ARKANSAS prices the overweight permit as "$17 per permit, plus, for each ton
+ * or major fraction thereof to be hauled in excess of the lawful weight, a
+ * charge that steps by MILEAGE" — $8.00 a ton up to 100 miles, rising to $16.00
+ * a ton past 251. Neither existing shape fits: `feeUsd` is flat in weight, and
+ * `PerMileRate` multiplies by the miles, which Arkansas does not do — the
+ * mileage picks the RATE and then disappears from the arithmetic. So a band
+ * grew an optional per-increment component, exactly parallel to Colorado's
+ * `perAxleUsd`, and the mileage is named by the `minMiles`/`maxMiles` Louisiana
+ * already added.
+ *
+ * `incrementRounding` is the field that matters most, and it exists because
+ * "or major fraction thereof" is NOT "or fraction thereof". At 80,500 lb gross
+ * a round-any-fraction-up rule charges a full ton and a major-fraction rule
+ * charges nothing, and the two readings differ by $8–$16 on every partial-ton
+ * load in the state. `PerMileRate.roundIncrementUp` is a boolean and cannot say
+ * the difference, so this is a three-way named mode rather than a second flag.
  */
 export interface WeightBand {
   minLbs: number;
@@ -93,6 +112,30 @@ export interface WeightBand {
    * confident wrong number.
    */
   perAxleUsd?: number;
+  /**
+   * USD per INCREMENT of weight above `incrementBaseLbs`, ADDED to `feeUsd`.
+   * OPTIONAL, and absent everywhere but Arkansas. A band that sets this cannot
+   * be priced without the gross weight, and `weightBandAmount` answers `null`
+   * rather than `0` when it is not supplied — the same contract as `perAxleUsd`.
+   */
+  perIncrementUsd?: number;
+  /** Pounds per charged increment — 2,000 for a ton. Required alongside `perIncrementUsd`. */
+  incrementLbs?: number;
+  /** Weight the increments are counted ABOVE; absent = from zero. */
+  incrementBaseLbs?: number;
+  /**
+   * How a PART increment is charged. Defaults to `'up'`, the statutory norm
+   * ("or fraction thereof"), which is also what `PerMileRate.roundIncrementUp`
+   * means.
+   *
+   *   - `'up'` — any part increment is charged in full.
+   *   - `'majorFraction'` — Arkansas. Ark. Code §27-35-210(e)(2) charges "for
+   *     each ton or major fraction thereof", so a part ton is charged only when
+   *     it is MORE THAN HALF the increment. Neither the statute nor the rules
+   *     define "major fraction"; reading it as "more than half" is stated as an
+   *     inference in `arkansas.ts` rather than presented as the state's words.
+   */
+  incrementRounding?: 'up' | 'majorFraction';
 }
 
 export function weightBandsEqual(a: WeightBand, b: WeightBand): boolean {
@@ -102,7 +145,11 @@ export function weightBandsEqual(a: WeightBand, b: WeightBand): boolean {
     a.feeUsd === b.feeUsd &&
     a.minMiles === b.minMiles &&
     a.maxMiles === b.maxMiles &&
-    a.perAxleUsd === b.perAxleUsd
+    a.perAxleUsd === b.perAxleUsd &&
+    a.perIncrementUsd === b.perIncrementUsd &&
+    a.incrementLbs === b.incrementLbs &&
+    a.incrementBaseLbs === b.incrementBaseLbs &&
+    a.incrementRounding === b.incrementRounding
   );
 }
 
@@ -161,20 +208,60 @@ export function weightBandApplies(
 }
 
 /**
- * What a band charges. The per-axle component is ADDED to the flat amount, not
- * substituted for it: Colorado's single-trip OSOW permit is "$30 plus $10 per
- * axle", and dropping either half misprices every permit the state issues.
+ * How many increments this band charges for a gross weight — Arkansas's "each
+ * ton or major fraction thereof". `null` when the band declares a per-increment
+ * price without an increment size, which is unpriceable rather than free.
  *
- * Returns `null` when the band is priced per axle and no axle count was given —
- * `0` would read as "this band is free".
+ * The major-fraction test is done in INTEGER POUNDS (`remainder * 2 > size`)
+ * rather than on a ratio, so that a load sitting exactly on the half-ton line —
+ * 81,000 lb against an 80,000 lb base — is decided by the statute's words and
+ * not by binary floating-point dust.
+ */
+export function chargedIncrements(
+  band: WeightBand,
+  grossWeightLbs: number,
+): number | null {
+  const size = band.incrementLbs;
+  if (size === undefined || size <= 0) return null;
+  const excess = grossWeightLbs - (band.incrementBaseLbs ?? 0);
+  if (excess <= 0) return 0;
+  const whole = Math.floor(excess / size);
+  const remainder = excess - whole * size;
+  if (remainder === 0) return whole;
+  if (band.incrementRounding === 'majorFraction') {
+    return remainder * 2 > size ? whole + 1 : whole;
+  }
+  return whole + 1;
+}
+
+/**
+ * What a band charges. Both optional components are ADDED to the flat amount,
+ * never substituted for it: Colorado's single-trip OSOW permit is "$30 plus $10
+ * per axle" and Arkansas's is "$17 per permit plus $8.00 a ton", and dropping
+ * either half misprices every permit those states issue.
+ *
+ * Returns `null` when the band needs an input it was not given — an axle count
+ * for a per-axle band, a gross weight for a per-ton one. `0` would read as
+ * "this band is free", and `materiality.ts` rule 4 depends on the distinction:
+ * a candidate that cannot be costed must not be treated as the cheap one.
  */
 export function weightBandAmount(
   band: WeightBand,
   axleCount: number | undefined,
+  grossWeightLbs?: number,
 ): number | null {
-  if (band.perAxleUsd === undefined) return band.feeUsd;
-  if (axleCount === undefined) return null;
-  return Math.round((band.feeUsd + band.perAxleUsd * axleCount) * 100) / 100;
+  let total = band.feeUsd;
+  if (band.perIncrementUsd !== undefined) {
+    if (grossWeightLbs === undefined) return null;
+    const increments = chargedIncrements(band, grossWeightLbs);
+    if (increments === null) return null;
+    total += band.perIncrementUsd * increments;
+  }
+  if (band.perAxleUsd !== undefined) {
+    if (axleCount === undefined) return null;
+    total += band.perAxleUsd * axleCount;
+  }
+  return Math.round(total * 100) / 100;
 }
 
 /**
