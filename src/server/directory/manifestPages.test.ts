@@ -69,6 +69,19 @@ const poa = (over: Partial<PoaApplication> = {}): PoaApplication =>
 
 const lower = (s: string) => s.toLowerCase();
 
+/**
+ * The page's own markup, with the shared chrome's <script> blocks removed.
+ *
+ * These pages render through directory `layout()`, which ships the header's
+ * client-side hydrators inline — including the shipper account menu, whose
+ * Directory Pro branch also builds a "Manage billing" link (both open the same
+ * Stripe billing portal, so the label is deliberately the same on both
+ * surfaces). A negative assertion about what THIS page offers therefore has to
+ * look at the page, not at chrome source that only ever runs for a Directory
+ * Pro subscriber.
+ */
+const pageOnly = (html: string) => html.replace(/<script[\s\S]*?<\/script>/g, '');
+
 describe('honest-claims — landing + onboarding copy', () => {
   const landing = renderPrivacyLanding();
   const apply = renderPrivacyApply({ app: null, prefill: { slug: 'acme-imports', name: 'Acme Imports LLC' } });
@@ -375,7 +388,7 @@ describe('customer account portal — renderPrivacyAccount', () => {
     expect(html).toContain('No entities yet');
     // No plan → prompts to choose one rather than a billing-portal button.
     expect(html).toContain('Choose a plan');
-    expect(html).not.toContain('Manage billing');
+    expect(pageOnly(html)).not.toContain('Manage billing');
   });
 
   it('marks a still-draft entity with a "Finish & sign" resume link', () => {

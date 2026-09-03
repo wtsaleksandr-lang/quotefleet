@@ -47,10 +47,16 @@
 import { describe, it, expect } from 'vitest';
 import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
+import { runInNewContext } from 'node:vm';
 import { SITE_NAV_HTML, SITE_MOBILE_MENU_HTML, PREMIUM_FOOTER, FULL_SITE_HEADER } from './siteChrome.js';
+import { NAV_SHIPPER_SCRIPT } from './directory/pages.js';
 
 const read = (p: string) => readFileSync(resolve(process.cwd(), p), 'utf8');
 const LANDING_HTML = read('src/server/public/landing.html');
+const SITE_CHROME_TS = read('src/server/siteChrome.ts');
+const SELF_TS = read('src/server/navInformationArchitecture.test.ts');
+const PRICING_HTML = read('src/server/public/pricing.html');
+const STYLE_CSS = read('src/server/public/style.css');
 const DIRECTORY_PAGES_TS = read('src/server/directory/pages.ts');
 const GLOSSARY_TS = read('src/server/directory/glossary.ts');
 const NAV_UNIFY_CSS = read('src/server/public/nav-unify.css');
@@ -73,13 +79,24 @@ function labels(html: string): string[] {
 
 describe('the primary nav has exactly three audience menus + Pricing', () => {
   it('names the three menus, and names BROKERS in the sell-side one', () => {
-    // "For Carriers" excluded the audience the menu's own third column is built
-    // for — Freight Brokers / Freight Forwarders / LTL Carriers — and which the
-    // homepage eyebrow directly under it already calls out as "FOR CARRIERS,
-    // BROKERS & FORWARDERS". A broker scanning "For Carriers / For Shippers" saw
-    // himself in neither. The longer label is measured for header overflow at
-    // every width 320–1600 (0px at all of them; the bar still collapses to the
-    // burger at exactly one point, 1024px).
+    // WHAT THIS ACTUALLY GUARDS — corrected, because the version of this comment
+    // that shipped with the rebuild described a history that never happened. It
+    // claimed the sell-side menu was labelled without "& Brokers", and that a
+    // broker therefore had nowhere to click;
+    // `git show <pre-rebuild main>:src/server/siteChrome.ts`
+    // renders "For Carriers &amp; Brokers", so the label was already correct and
+    // no broker was ever without an entry. What the rebuild changed was the
+    // ORDER (this menu ran second, behind For Shippers) and the third menu
+    // ("For Importers", a one-link dropdown → "Free Tools").
+    //
+    // The label is pinned anyway, and for a real reason: it was momentarily
+    // shortened to "For Carriers" INSIDE the rebuild and restored before merge.
+    // Losing "& Brokers" would contradict the menu's own third column (Freight
+    // Brokers / Freight Forwarders / LTL Carriers) and the homepage eyebrow
+    // under it ("FOR CARRIERS, BROKERS & FORWARDERS"). The longer label is
+    // measured for header overflow at every width 320–1600 (0px at all of them,
+    // anonymous AND signed in; the bar still collapses to the burger at exactly
+    // one point, 1024px).
     for (const [name, html] of [['SITE_NAV_HTML', SITE_NAV_HTML], ['landing.html', LANDING_HTML]] as const) {
       expect(html, name).toContain('>For Carriers &amp; Brokers<');
       expect(html, name).not.toMatch(/>For Carriers</);
@@ -292,6 +309,8 @@ interface GridDecl {
   sheet: string;
   order: number;
   selector: string;
+  /** The declaration's raw value — meaningful for any property, not just grids. */
+  value: string;
   tracks: number;
   important: boolean;
   minWidth: number;
@@ -309,11 +328,14 @@ function specificity(sel: string): number {
 }
 
 /**
- * Pull every `grid-template-columns` declaration whose selector matches, with
- * the media bounds it sits under. A brace scanner rather than a regex, so a
- * media block's own braces cannot swallow the rules inside it.
+ * Pull every declaration of `prop` whose selector matches, with the media bounds
+ * it sits under. A brace scanner rather than a regex, so a media block's own
+ * braces cannot swallow the rules inside it. `prop` defaults to
+ * `grid-template-columns` (the footer track ladder above); the nav tests below
+ * pass `white-space`, which is the same cascade question about a different
+ * property.
  */
-function gridDecls(css: string, sheet: string, match: RegExp, seed = { n: 0 }): GridDecl[] {
+function gridDecls(css: string, sheet: string, match: RegExp, seed = { n: 0 }, prop = 'grid-template-columns'): GridDecl[] {
   const src = css.replace(/\/\*[\s\S]*?\*\//g, '');
   const out: GridDecl[] = [];
   const walk = (text: string, minWidth: number, maxWidth: number): void => {
@@ -337,12 +359,13 @@ function gridDecls(css: string, sheet: string, match: RegExp, seed = { n: 0 }): 
       } else if (prelude.startsWith('@')) {
         /* @supports / @keyframes etc. — not a media context, skip. */
       } else if (match.test(prelude)) {
-        const d = body.match(/(?:^|;)\s*grid-template-columns\s*:([^;}]+)/);
+        const d = body.match(new RegExp(`(?:^|;)\\s*${prop}\\s*:([^;}]+)`));
         if (d) {
           out.push({
             sheet,
             order: seed.n++,
             selector: prelude.replace(/\s+/g, ' '),
+            value: d[1].trim(),
             tracks: trackCount(d[1]),
             important: /!important/.test(d[1]),
             minWidth,
@@ -392,9 +415,9 @@ const PREMIUM_SHEETS_HOMEPAGE: Array<[string, string]> = [
 const PREMIUM_SHEETS_SHARED: Array<[string, string]> = [['nav-unify.css', NAV_UNIFY_CSS]];
 const DIRFOOT_SHEETS: Array<[string, string]> = [['directory/pages.ts DIRECTORY_CSS', DIRECTORY_CSS]];
 
-function collect(sheets: Array<[string, string]>, match: RegExp): GridDecl[] {
+function collect(sheets: Array<[string, string]>, match: RegExp, prop?: string): GridDecl[] {
   const seed = { n: 0 };
-  return sheets.flatMap(([name, css]) => gridDecls(css, name, match, seed));
+  return sheets.flatMap(([name, css]) => gridDecls(css, name, match, seed, prop));
 }
 
 const FOOTER_SURFACES = [
@@ -593,5 +616,335 @@ describe('/glossary content sits inside its own header card', () => {
     // 844 = the .gl-shell 900px box minus its 2 × 28px padding.
     expect(GLOSSARY_TS).toMatch(/\.gl-hero \.container-narrow \{[^}]*max-width: 844px/);
     expect(GLOSSARY_TS).toMatch(/\.gl-hero \{[^}]*text-align: left/);
+  });
+});
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   THE SIGNED-IN HEADER — the case that had no coverage at all.
+
+   Every assertion above, and every measurement taken during the rebuild, was
+   made against the ANONYMOUS header, where the bar fits with ~9px to spare. It
+   is not the header most directory traffic sees once a shipper has an account:
+   `#nav-shipper` hydrates client-side on all ~334k directory pages, and what it
+   used to inject was an INLINE row — the email (capped at 200px), a "Directory
+   Pro ✓" chip (125px) and a Manage link (53px) — 403px of new content replacing
+   the 52px "Sign in" it hides. The header card's content box is 938px at the
+   1024px collapse point and never exceeds 1134px, so the cluster ran past the
+   card's right edge: measured 0px anonymous, 131px for a free shipper
+   (1024–1132px) and 264px for a Pro shipper, from 1024px all the way out to
+   1600px, pushing the "Claim your listing — free" CTA outside the card and
+   clipping the theme toggle.
+
+   The fix folds identity, plan and billing action into ONE ~58px control's
+   panel. These tests execute the REAL hydration script against a minimal DOM
+   stub (there is no jsdom in this suite — `node:vm` plus a few stub objects,
+   built-ins only), so they assert the markup that actually ships rather than a
+   regex over its source, for all three viewer states.
+   ═══════════════════════════════════════════════════════════════════════════ */
+
+interface SlotState { html: string; hidden: boolean; classes: string[] }
+
+/** Run NAV_SHIPPER_SCRIPT against a stub DOM and report what it wrote. */
+async function hydrateAccountSlot(me: unknown): Promise<SlotState> {
+  const state: SlotState = { html: '', hidden: true, classes: [] };
+  const slot = {
+    set innerHTML(v: string) { state.html = v; },
+    get innerHTML() { return state.html; },
+    classList: { add: (c: string) => { state.classes.push(c); } },
+    removeAttribute: (a: string) => { if (a === 'hidden') state.hidden = false; },
+    querySelector: () => null,
+  };
+  const sandbox = {
+    window: {} as Record<string, unknown>,
+    document: {
+      getElementById: (id: string) => (id === 'nav-shipper' ? slot : null),
+      addEventListener: () => {},
+    },
+    fetch: () => Promise.resolve({ ok: true, json: () => Promise.resolve(me) }),
+  };
+  runInNewContext(NAV_SHIPPER_SCRIPT, sandbox);
+  // One macrotask drains every microtask both realms queued.
+  await new Promise((r) => setTimeout(r, 0));
+  return state;
+}
+
+/** The content between <summary> and </summary> — i.e. what shows in the bar. */
+const summaryOf = (html: string) => html.match(/<summary[^>]*>([\s\S]*?)<\/summary>/)?.[1] ?? '';
+/** Everything from the panel open tag on — i.e. what is hidden until clicked. */
+const panelOf = (html: string) => html.slice(html.indexOf('<div class="nav-acct-panel">'));
+
+describe('THE SIGNED-IN HEADER — identity folds into one control, not an inline row', () => {
+  it('renders NOTHING for an anonymous visitor, and leaves the slot hidden', async () => {
+    for (const me of [{ user: null }, null]) {
+      const s = await hydrateAccountSlot(me);
+      expect(s.html, JSON.stringify(me)).toBe('');
+      expect(s.hidden, 'an empty slot must stay hidden').toBe(true);
+    }
+  });
+
+  it('gives a free shipper ONE control, with plan + action inside its panel', async () => {
+    const s = await hydrateAccountSlot({ user: { email: 'dispatch@harborlink.example' }, directoryPro: null });
+    expect(s.hidden).toBe(false);
+    expect((s.html.match(/<details/g) ?? []).length, 'exactly one control').toBe(1);
+    expect(s.html).toMatch(/^<details class="nav-acct">/);
+    expect(s.html).not.toContain('nav-acct--pro');
+    const panel = panelOf(s.html);
+    expect(panel).toContain('dispatch@harborlink.example');
+    expect(panel).toContain('Free account');
+    expect(panel).toContain('/directory/join?intent=subscribe');
+  });
+
+  it('gives a Pro shipper the chip and the billing portal — also inside the panel', async () => {
+    const s = await hydrateAccountSlot({
+      user: { email: 'ops@transglobal-logistics.example' },
+      directoryPro: { status: 'active' },
+    });
+    expect(s.html).toMatch(/^<details class="nav-acct nav-acct--pro">/);
+    const panel = panelOf(s.html);
+    expect(panel).toContain('Directory Pro ✓');
+    expect(panel).toContain('data-nav-portal');
+    expect(panel).toContain('Manage billing');
+    // 'trialing' is a live subscriber too (DIRECTORY_IS_PRO_JS).
+    const trial = await hydrateAccountSlot({ user: { email: 'a@b.example' }, directoryPro: { status: 'trialing' } });
+    expect(trial.html).toContain('nav-acct--pro');
+  });
+
+  it('puts NOTHING wide in the header bar itself — that is the whole fix', async () => {
+    // The overflow was 403px of email + chip + link sitting in `.site-actions`.
+    // Whatever the panel holds, the BAR may only ever carry the avatar and the
+    // caret; anything else here re-opens the defect at some width.
+    for (const me of [
+      { user: { email: 'ops@transglobal-logistics.example' }, directoryPro: { status: 'active' } },
+      { user: { email: 'dispatch@harborlink.example' }, directoryPro: null },
+    ]) {
+      const html = (await hydrateAccountSlot(me)).html;
+      const bar = summaryOf(html);
+      expect(bar, 'no address in the bar').not.toMatch(/@/);
+      expect(bar).not.toContain('nav-pro-chip');
+      expect(bar).not.toContain('nav-manage');
+      expect(bar).not.toContain('nav-upgrade');
+      expect(bar).not.toContain('nav-email');
+      expect(bar).toContain('nav-acct-ini');
+      expect(bar).toContain('nav-acct-caret');
+      // The full address is still one hover away.
+      expect(html).toMatch(/<summary [^>]*title="[^"]+@/);
+    }
+  });
+
+  it('still escapes the address it echoes', async () => {
+    const s = await hydrateAccountSlot({ user: { email: 'a<script>@"x.example' }, directoryPro: null });
+    expect(s.html).not.toContain('<script>');
+    expect(s.html).toContain('ascript@x.example');
+  });
+
+  it('styles the control with an OUTLINE when open, never a fill', () => {
+    // DESIGN-SYSTEM.md §4 — the recurring "selected state is a bright fill" bug.
+    expect(DIRECTORY_PAGES_TS).toMatch(/\.nav-acct\[open\] > summary \{[^}]*border-color: var\(--accent\)/);
+    expect(DIRECTORY_PAGES_TS).toMatch(/\.nav-acct-panel \{[\s\S]*?position: absolute/);
+    // Out of flow, so the panel can never widen the header cluster.
+    expect(DIRECTORY_PAGES_TS).toMatch(/\.nav-acct-panel \{[\s\S]*?right: 0/);
+    // The 200px ellipsis cap was for the retired inline row; the panel lifts it.
+    expect(DIRECTORY_PAGES_TS).toMatch(/\.nav-acct-panel \.nav-email \{[^}]*max-width: none/);
+  });
+
+  it('keeps the slot off the collapsed header, and the server HTML auth-invariant', () => {
+    // Both were already true and must stay true: below the single 1024px
+    // collapse point the bar is brand + theme + CTA + burger, and the
+    // CDN-cached HTML still ships the same empty slot to everyone.
+    expect(DIRECTORY_PAGES_TS).toMatch(/@media \(max-width: 1023px\)[\s\S]{0,200}\.nav-shipper \{ display: none; \}/);
+    expect(DIRECTORY_PAGES_TS).toContain('<span class="nav-shipper" id="nav-shipper" hidden></span>');
+    expect(NAV_SHIPPER_SCRIPT).not.toMatch(/@[\w.-]+\.(com|net|org)/);
+  });
+});
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   A CONTROL NEVER WRAPS ITS OWN LABEL — and never buys it with overflow.
+   ═══════════════════════════════════════════════════════════════════════════ */
+
+const NAV_SHEETS: Array<[string, string]> = [
+  ['nav-unify.css', NAV_UNIFY_CSS],
+  ['nav-ia.css', NAV_IA_CSS],
+];
+
+describe('no nav control breaks its label across two lines', () => {
+  it('resolves to white-space: nowrap on the triggers at every desktop width', () => {
+    // Measured before the fix: "For Carriers &/Brokers", "For/Shippers",
+    // "Free/Tools" and "Sign/in" all broke in two on /directory, /carrier/*,
+    // /city/* and /compliance across 1024–1100px (77 widths), and on the
+    // homepage across 1024–1032px. /pricing, /glossary, /partners and /support
+    // were clean, because their action cluster is 88px narrower.
+    for (const [name, css] of NAV_SHEETS) {
+      const decls = gridDecls(css, name, /nav-dd-trigger/, { n: 0 }, 'white-space');
+      expect(decls.length, `${name}: no white-space rule on the trigger`).toBeGreaterThan(0);
+      for (const w of [1024, 1032, 1060, 1100, 1140, 1280, 1600]) {
+        expect(winnerAt(decls, w)?.value, `${name} @${w}px`).toBe('nowrap');
+      }
+    }
+  });
+
+  it('NEVER ships that nowrap without the compaction that pays for it', () => {
+    // A nowrap flex item's automatic minimum size is its full label width, so
+    // nowrap ALONE stops the controls shrinking and overflows the header card
+    // instead — trading a wrap for the exact defect the 1024px collapse point
+    // exists to prevent. The 1024–1140px band takes the nav from 491px to
+    // ~420px and the action cluster from 337px to ~312px, against a 938px card
+    // at the low end. The two halves are one fix and must stay together.
+    for (const [name, css] of NAV_SHEETS) {
+      const band = css.slice(css.indexOf('@media (min-width: 1024px) and (max-width: 1140px)'));
+      expect(css.includes('@media (min-width: 1024px) and (max-width: 1140px)'), `${name}: the compaction band is gone`).toBe(true);
+      expect(band, name).toContain('.site-nav { gap: 0; }');
+      expect(band, name).toMatch(/padding-left: 8px; padding-right: 8px; font-size: 13px/);
+      expect(band, name).toContain('.site-actions { gap: 8px; }');
+    }
+    // The collapse point itself is untouched: still exactly one, still 1024px.
+    expect(NAV_UNIFY_CSS).toContain('@media (max-width: 1023px)');
+    expect(NAV_IA_CSS).toContain('@media (max-width: 1023px)');
+  });
+});
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   THE FOUR-ITEM TRUST BAR — 2×2, never 3+1.
+   ═══════════════════════════════════════════════════════════════════════════ */
+
+describe('.qf-footer-trustbar never strands its fourth claim on a line alone', () => {
+  const TRUSTBAR_SURFACES: Array<[string, Array<[string, string]>]> = [
+    ['shared marketing chrome', PREMIUM_SHEETS_SHARED],
+    ['homepage', PREMIUM_SHEETS_HOMEPAGE],
+  ];
+
+  it('has exactly four claims — the count the ladder is derived from', () => {
+    const bar = PREMIUM_FOOTER.match(/<ul class="qf-footer-trustbar"[\s\S]*?<\/ul>/)?.[0] ?? '';
+    expect((bar.match(/<li>/g) ?? []).length).toBe(4);
+  });
+
+  it.each(TRUSTBAR_SURFACES)('%s: two tracks below 720px, one row above', (_name, sheets) => {
+    // N=4 in T tracks strands `4 mod T` on the last row, so T=3 is the single
+    // forbidden count and the ladder is 4 → 2. Measured before the fix: the
+    // fourth claim sat alone from 459–673px on the homepage and 495–697px on
+    // every PREMIUM_FOOTER page.
+    const decls = collect(sheets, /qf-footer-trustbar/, 'grid-template-columns');
+    for (const w of [320, 375, 459, 500, 640, 673, 697, 720]) {
+      const win = winnerAt(decls, w);
+      expect(win, `no trust-bar rule applies at ${w}px`).toBeDefined();
+      expect(win.tracks, `${w}px`).toBe(2);
+    }
+    // Above 720px all four fit on one flex line on both surfaces (they need
+    // <=650px of the >=673px available), so there is deliberately no grid rule.
+    for (const w of [721, 900, 1120, 1600]) {
+      expect(winnerAt(decls, w), `${w}px should stay a plain flex row`).toBeUndefined();
+    }
+  });
+
+  it('leaves .qf-payrow-trust alone — its one-per-line stack is deliberate', () => {
+    // style.css: "One badge per line is a deliberate stack, not an orphaned
+    // wrap." Three items going fully vertical is a stack; it is not the 3+1
+    // remainder this rule is about, and it must not be "fixed".
+    expect(STYLE_CSS).toContain('One badge per line is a deliberate stack, not an orphaned wrap.');
+    expect(STYLE_CSS).toMatch(/\.qf-payrow-trust \{\s*flex-direction: column/);
+    // The nav sheets may NAME it in a comment (they explain why it is exempt);
+    // what they must not do is open a rule block for it.
+    for (const [name, css] of NAV_SHEETS) {
+      const rules = css.replace(/\/\*[\s\S]*?\*\//g, '');
+      expect(rules, name).not.toContain('.qf-payrow-trust');
+    }
+  });
+});
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   THE HOMEPAGE FAQ, AND THE PAGE HEADER THAT WAS CENTRED.
+   ═══════════════════════════════════════════════════════════════════════════ */
+
+describe('the FAQ is reachable from the footer again', () => {
+  it('is filed in the SHARED footer, as a root-relative anchor', () => {
+    // Replacing the homepage's bespoke footer with the shared one gained six
+    // destinations and dropped the one in-page shortcut the old footer uniquely
+    // had, leaving `id="faq"` reachable only by scrolling.
+    //
+    // ROOT-RELATIVE is what makes an in-page anchor legal in a footer that is
+    // byte-identical on every page: a bare "#faq" resolves against /pricing or
+    // a carrier profile, where no such element exists, and does nothing.
+    for (const [name, html] of [
+      ['PREMIUM_FOOTER', PREMIUM_FOOTER],
+      ['landing.html', LANDING_HTML],
+      ['.dirfoot', DIRECTORY_PAGES_TS],
+    ] as const) {
+      expect(html, name).toContain('<a href="/#faq">FAQ</a>');
+      expect(html, name).not.toMatch(/href="#faq"/);
+    }
+  });
+
+  it('still has a target to reach, and one filing decision for it', () => {
+    expect(LANDING_HTML).toMatch(/<section[^>]*id="faq"/);
+    const columnOf = (html: string, cls: string, tag: string) => {
+      const col = [...html.matchAll(new RegExp(`<div class="${cls}">[\\s\\S]*?</div>`, 'g'))]
+        .map((m) => m[0]).find((c) => c.includes('href="/#faq"')) ?? '';
+      return col.match(new RegExp(`<${tag}[^>]*>([^<]+)</${tag}>`))?.[1] ?? null;
+    };
+    expect(columnOf(PREMIUM_FOOTER, 'footer-col', 'h4')).toBe('Company');
+    expect(columnOf(DIRECTORY_PAGES_TS, 'dirfoot-col', 'h2')).toBe('Company');
+  });
+
+  it('does not break the shared-footer-verbatim invariant', () => {
+    expect(LANDING_HTML).toContain(PREMIUM_FOOTER);
+  });
+});
+
+describe('/pricing gets the standing left-aligned page header', () => {
+  it('overrides the shared .hero centring, for the whole hero', () => {
+    // `.hero` in style.css sets `text-align: center`; every other hero on the
+    // site overrides it (.dir-hero, .gl-hero, the compliance/profile heroes).
+    // /pricing never did — measured `text-align: center`, gapL 106 / gapR 106
+    // at 1440px. The sub-line and CTA row centre themselves independently
+    // (`margin: 0 auto`, `justify-content: center`), so overriding the heading
+    // alone would leave them centred under a left-aligned title.
+    expect(STYLE_CSS).toMatch(/\.hero \{[\s\S]*?text-align: center/);
+    expect(PRICING_HTML).toMatch(/\.qf-public-wft \.hero \{[^}]*text-align: left/);
+    expect(PRICING_HTML).toMatch(/\.qf-public-wft \.hero p\.lead \{[^}]*margin-left: 0/);
+    expect(PRICING_HTML).toMatch(/\.hero-cta,\s*\.qf-public-wft \.hero \.hero-meta \{[^}]*justify-content: flex-start/);
+  });
+
+  it('aligns the heading to the plan grid, not to an arbitrary edge', () => {
+    // 808 - 2x24 = the 760px the `.pricing` box occupies, and both are centred,
+    // so the two content columns coincide at every width (measured delta 0px at
+    // 320/375/480/760/900/1100/1440/1600). Dropping the section's own side
+    // padding is the narrow half of that: it was stacking 28px (22px under
+    // 720px) on top of the container's 24px.
+    expect(PRICING_HTML).toMatch(/\.qf-public-wft \.hero \.container-narrow \{[^}]*max-width: 808px/);
+    expect(PRICING_HTML).toMatch(/\.qf-public-wft \.hero \{[^}]*padding-left: 0; padding-right: 0/);
+  });
+
+  it('has no eyebrow to mis-place', () => {
+    // Rule 4 governs an eyebrow above a heading; this hero is H1 + lead only,
+    // so there is nothing to align. Pinned so that adding one later fails here
+    // and gets placed top-left deliberately.
+    const hero = PRICING_HTML.match(/<section class="hero"[\s\S]*?<\/section>/)?.[0] ?? '';
+    expect(hero, 'the pricing hero must be extractable').toContain('<h1');
+    expect(hero).not.toMatch(/class="[^"]*\b(tag|eyebrow|section-kicker)\b/);
+  });
+});
+
+describe('the comments in this repo describe what actually happened', () => {
+  it('no longer claims the sell-side menu shipped without "& Brokers"', () => {
+    // The rebuild's own comment asserted a pre-rebuild state that never
+    // existed. The repo tests its comments, so an inaccurate one is a defect.
+    //
+    // The two retired phrases are ASSEMBLED, not written out: this file is one
+    // of the two sources being scanned, so a literal pattern would match its
+    // own test and fail forever.
+    const retired = [['menu', 'said', 'only'], ['had', 'no', 'entry', 'point']]
+      .map((words) => new RegExp(words.join('\\s+')));
+    for (const [name, src] of [
+      ['siteChrome.ts', SITE_CHROME_TS],
+      ['navInformationArchitecture.test.ts', SELF_TS],
+    ] as const) {
+      for (const re of retired) expect(src, `${name} still carries "${re.source}"`).not.toMatch(re);
+    }
+  });
+
+  it('states the change that DID happen — order, and the third menu', () => {
+    expect(SITE_CHROME_TS).toContain('It ran SECOND, behind For Shippers');
+    expect(SITE_CHROME_TS).toContain('that slot used to be "For Importers"');
+    expect(SITE_CHROME_TS).toMatch(/shortened to "For Carriers" mid-PR, then put/);
+    expect(SITE_CHROME_TS).toMatch(/it ALREADY DID before the/);
   });
 });

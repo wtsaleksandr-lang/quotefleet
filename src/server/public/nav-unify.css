@@ -601,3 +601,72 @@ html[data-theme="light"] .nav-dd-panel {
 .site-header-inner { position: relative; }
 .nav-dd--wide { position: static; }
 .nav-dd--wide > .nav-dd-panel { top: calc(100% + 8px); }
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   NAV POLISH — appended at EOF for the same reason as the block above: the
+   spacing + colour guards baseline by FILE:LINE, so an in-place edit here
+   renumbers 14 tolerated entries and turns a green run red. Everything below
+   is additive.
+
+   ── 1. A BUTTON NEVER WRAPS ITS OWN LABEL ───────────────────────────────────
+   Between 1024 and 1100px the four nav controls broke their own labels across
+   two lines — "For Carriers &/Brokers", "For/Shippers", "Free/Tools",
+   "Sign/in" — on /directory, /carrier/*, /city/* and /compliance (77 widths),
+   and 1024–1032px on the homepage. It is a flex-shrink artefact, not a copy
+   problem: `.site-nav` is a flex item that shrinks, and each control shrinks
+   with it until the label has to wrap.
+
+   `white-space: nowrap` alone would only trade one defect for a worse one. A
+   nowrap flex item's automatic minimum size is its FULL label width, so the
+   controls stop shrinking and the header card overflows instead — which is
+   exactly the defect the 1024px collapse point was introduced to remove. So
+   nowrap ships WITH the compaction below, and both halves are measured
+   together: zero header overflow at every width 1024–1600, anonymous and
+   signed in, or neither ships.
+
+   ── 2. THE COMPACTION IS SIZED FROM THE ARITHMETIC ──────────────────────────
+   At the 1024px collapse point the header card's content box is 938px, and it
+   has to hold brand (132) + nav + actions. The nav's natural width is 491px
+   and the directory's action cluster is 337px — 960px of demand against 938,
+   which is the 22px shortfall the labels were absorbing by wrapping. Stepping
+   the inter-item gaps to 8/16px, the control padding to 8px and the label to
+   13px takes the nav to ~420px and the cluster to ~312px, i.e. ~884px against
+   938 — the labels fit on one line with room to spare, and nothing overflows.
+   The band ends at 1140px, above which the natural sizes fit unaided.
+   ═══════════════════════════════════════════════════════════════════════════ */
+.site-nav .nav-dd-trigger,
+.site-nav > a,
+.site-actions .signin { white-space: nowrap; }
+
+@media (min-width: 1024px) and (max-width: 1140px) {
+  .site-header-inner { gap: 16px; }
+  .site-nav { gap: 0; }
+  .site-nav > a,
+  .site-nav .nav-dd-trigger { padding-left: 8px; padding-right: 8px; font-size: 13px; }
+  .site-actions { gap: 8px; }
+  .site-actions .btn-secondary { padding-left: 12px; padding-right: 12px; }
+}
+
+/* ── 3. THE FOUR-ITEM TRUST BAR GOES 2×2, NEVER 3+1 ────────────────────────
+   `.qf-footer-trustbar` holds exactly FOUR claims in a wrapping flex row, so
+   between 459 and 673px (homepage) / 495 and 697px (every PREMIUM_FOOTER page)
+   the fourth wrapped onto a line of its own — the orphan the standing rule
+   forbids (DESIGN-SYSTEM.md §8: an even count wraps 2×2, never 3+1).
+
+   Four items in T tracks strand `4 mod T` on the last row, so T=3 is the one
+   forbidden count; the ladder is 4 → 2, skipping 3. Above 720px all four fit
+   on one line on both surfaces (they need ≤650px of the ≥673px available), so
+   flex-wrap can only ever produce the single full row it already does. At and
+   below 720px an explicit two-track grid makes the wrap 2×2 by construction
+   instead of by luck — including at 375px, where the flex row happened to land
+   on 2+2 already.
+
+   NOT TOUCHED, deliberately: `.qf-payrow-trust`, whose one-per-line stack at
+   ≤720px is documented as intentional at style.css:1638. Three items stacking
+   fully is a stack, not a wrap remainder. */
+@media (max-width: 720px) {
+  .qf-footer-trustbar {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
