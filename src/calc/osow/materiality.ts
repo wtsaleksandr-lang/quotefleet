@@ -177,7 +177,7 @@ function usd(n: number): string {
  * row costs THIS load. A flat fee ignores its arguments; a per-mile rate
  * multiplies by the miles; a per-axle band multiplies by the axle count and
  * answers `null` when the count is unknown. That is what makes the same
- * one-cent-per-mile disagreement immaterial over 200 miles and material over
+ * 1.2-cent-per-mile disagreement immaterial over 1,000 miles and material over
  * 5,000 — see rule 3 in the module header.
  *
  * `absorb: false` reproduces the pre-materiality behaviour exactly, and the
