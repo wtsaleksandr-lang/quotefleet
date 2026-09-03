@@ -67,6 +67,20 @@ import {
   KENTUCKY_PROPOSED_AMENDMENT_NOT_IN_FORCE,
   KENTUCKY_PROPOSED_AMENDMENT_SOURCE,
 } from './jurisdictions/kentucky.js';
+import {
+  TENNESSEE_BRIDGE_EVALUATION_FEES,
+  TENNESSEE_ESCORT_BOUNDARY_GAPS,
+  TENNESSEE_EXCESS_BASE_INFERENCE_LBS,
+  TENNESSEE_HEAVY_DUTY_TOWING_TON_MILE,
+  TENNESSEE_HOUSEBOAT_CONFLICT_ANALYSIS,
+  TENNESSEE_HOUSEBOAT_SINGLE_TRIP_FEE_USD,
+  TENNESSEE_OSOW_RULES,
+  TENNESSEE_PARTIAL_INCREMENT_UNKNOWN,
+  TENNESSEE_SEED_COTTON_ANNUAL_FEE_USD,
+  TENNESSEE_SINGLE_BASE_FEE_READING,
+  TENNESSEE_TON_MILE_MODEL_NOTE,
+  TENNESSEE_WIDTH_BAND_GAP,
+} from './jurisdictions/tennessee.js';
 
 /**
  * Texas figures asserted here come from TxDMV and the Texas Transportation
@@ -3236,12 +3250,605 @@ describe('Kentucky — a legal weight that depends on the road', () => {
   });
 });
 
-describe('the registry after Phase 7', () => {
-  it('covers exactly the twenty states whose datasets exist', () => {
+/**
+ * PHASE 8 — TENNESSEE, the first fee in this directory that is a PRODUCT of
+ * weight and distance rather than a step by either.
+ *
+ * The cases below drive the whole engine across a weight × distance grid and
+ * check that the arithmetic reproduces "$20.00 plus six cents (6¢) per ton-mile"
+ * exactly — at four weights, at four distances, at a partial ton and at a partial
+ * mile. They also pin the two holes the stepped boundaries leave, the
+ * route-survey conflict that fires in six inches and nowhere else, and the
+ * pavement-width axis that decides one pilot car.
+ */
+const ASOF8 = '2026-09-03';
+
+function priceIn8(
+  code: string,
+  partial: Parameters<typeof calculateOsowForJurisdiction>[1],
+) {
+  const rules = osowRulesFor(code);
+  expect(rules, `${code} must be a covered jurisdiction`).not.toBeNull();
+  return calculateOsowForJurisdiction(
+    rules as NonNullable<typeof rules>,
+    partial,
+    ASOF8,
+  );
+}
+
+describe('Tennessee — a permit priced by the ton-mile', () => {
+  /** Legal on every Tennessee limit recorded, so only the overweight side moves. */
+  const legalSize = {
+    widthIn: 102,
+    heightIn: ftIn(13, 6),
+    overallLengthIn: ftIn(70),
+    trailerLengthIn: ftIn(48),
+    routeClass: 'divided' as const,
+  };
+
+  /** $20 base + $0.06 × tons over 80,000 lb (rounded up) × miles. */
+  const expected = (grossWeightLbs: number, miles: number): number => {
+    const tons = Math.ceil((grossWeightLbs - 80000) / 2000);
+    return Math.round((20 + 0.06 * tons * miles) * 100) / 100;
+  };
+
+  /**
+   * THE WHOLE POINT OF THE STATE, DRIVEN BOTH WAYS. Doubling the distance doubles
+   * the charge and doubling the excess weight doubles it again — which is what
+   * makes this a product and not a band. A `WeightBand` encoding would have
+   * returned the same number for all four distances.
+   */
+  it('reproduces $20 plus six cents a ton-mile across weight AND distance', () => {
+    const grid: Array<[number, number]> = [
+      [90000, 50],
+      [100000, 100],
+      [100000, 250],
+      [100000, 500],
+      [120000, 100],
+      [120000, 500],
+      [150000, 500],
+      [165000, 300],
+    ];
+    for (const [lbs, miles] of grid) {
+      const r = priceIn8('TN', {
+        ...legalSize,
+        grossWeightLbs: lbs,
+        milesInJurisdiction: miles,
+      });
+      expect(r.subtotalUsd, `${lbs} lb / ${miles} mi`).toBe(expected(lbs, miles));
+      expect(
+        r.lines.find((l) => l.code === 'osow_permit_base')?.amountUsd,
+        `${lbs} lb / ${miles} mi base`,
+      ).toBe(20);
+      expect(
+        r.lines.find((l) => l.code === 'osow_overweight')?.amountUsd,
+        `${lbs} lb / ${miles} mi ton-mile`,
+      ).toBe(expected(lbs, miles) - 20);
+    }
+
+    // The published figures, spelled out. 100,000 lb is ten tons over the lawful
+    // weight, so 100 miles is 1,000 ton-miles at six cents = $60 plus the $20.
+    expect(
+      priceIn8('TN', { ...legalSize, grossWeightLbs: 100000, milesInJurisdiction: 100 })
+        .subtotalUsd,
+    ).toBe(80);
+    // Five times the distance, five times the ton-mile charge — the base does not
+    // scale, which is why it is a base fee and not part of the rate.
+    expect(
+      priceIn8('TN', { ...legalSize, grossWeightLbs: 100000, milesInJurisdiction: 500 })
+        .subtotalUsd,
+    ).toBe(320);
+    // Twice the excess weight over the same 500 miles: $300 becomes $600.
+    expect(
+      priceIn8('TN', { ...legalSize, grossWeightLbs: 120000, milesInJurisdiction: 500 })
+        .subtotalUsd,
+    ).toBe(620);
+  });
+
+  /**
+   * THE UNKNOWN THAT MATTERS MOST, DRIVEN FROM BOTH SIDES. Neither § 55-7-205(h)(3)
+   * nor 1680-07-01-.24 says how a part ton is billed. A half ton left unrounded
+   * over 500 miles is $15; this quote charges it, says so, and sends the move to
+   * a human — which is the difference from Virginia, where the same silence about
+   * a part MILE is bounded at thirty cents and only earns an advisory.
+   */
+  it('charges a part ton in full, bills a part mile pro rata, and says both', () => {
+    // 101,000 lb is ten and a half tons over. Rounded up: 11 × 500 × $0.06 = $330.
+    const halfTon = priceIn8('TN', {
+      ...legalSize,
+      grossWeightLbs: 101000,
+      milesInJurisdiction: 500,
+    });
+    expect(halfTon.subtotalUsd).toBe(350);
+    // Pro rata would have been $315 and a floor $300 — a $30 spread on one load.
+    expect(halfTon.subtotalUsd).not.toBe(335);
+
+    // Miles are NOT rounded: 100.5 mi × 10 tons × $0.06 = $60.30.
+    const partMile = priceIn8('TN', {
+      ...legalSize,
+      grossWeightLbs: 100000,
+      milesInJurisdiction: 100.5,
+    });
+    expect(partMile.subtotalUsd).toBe(80.3);
+
+    // Priced AND flagged. A refusal that produced no number would be less useful
+    // than a number with its assumption written beside it.
+    expect(halfTon.requiresManualReview).toBe(true);
+    expect(halfTon.escorts.applied.map((a) => a.ruleId)).toContain(
+      'tn-ton-mile-partial-increment-unknown',
+    );
+    expect(halfTon.warnings.join(' ')).toContain(
+      'CHARGES A PART TON IN FULL AND BILLS THE TRUE MILEAGE PRO RATA',
+    );
+    expect(TENNESSEE_PARTIAL_INCREMENT_UNKNOWN.assumedTonRounding).toBe('up');
+    expect(TENNESSEE_PARTIAL_INCREMENT_UNKNOWN.assumedMileRounding).toBe('pro-rata');
+    // A legal-weight load never hears about it.
+    const light = priceIn8('TN', {
+      ...legalSize,
+      widthIn: ftIn(11),
+      grossWeightLbs: 79000,
+      milesInJurisdiction: 500,
+      routeClass: 'interstate',
+    });
+    expect(light.escorts.applied.map((a) => a.ruleId)).not.toContain(
+      'tn-ton-mile-partial-increment-unknown',
+    );
+    expect(light.requiresManualReview).toBe(false);
+  });
+
+  it('refuses to bill a ton-mile charge without the in-state miles', () => {
+    const r = priceIn8('TN', { ...legalSize, grossWeightLbs: 100000 });
+    expect(r.subtotalUsd).toBeNull();
+    expect(r.requiresManualReview).toBe(true);
+    expect(r.lines.find((l) => l.code === 'osow_overweight')?.amountUsd).toBeNull();
+    expect(TENNESSEE_OSOW_RULES.feesDependOnDistance).toBe(true);
+    // The base fee still resolves — an unknown mileage is a gap in what we were
+    // told, not a quarrel between documents, so it does not poison the other line.
+    expect(r.lines.find((l) => l.code === 'osow_permit_base')?.amountUsd).toBe(20);
+  });
+
+  /**
+   * THE MODEL DECISION, PINNED. A ton-mile is `rate × miles × increments`, which
+   * `PerMileRate` has computed since Phase 2 — so no new rate type exists, and
+   * `WeightBand`, which is flat in miles, is deliberately empty.
+   */
+  it('is encoded as a per-mile rate with a 2,000 lb increment and no new type', () => {
+    expect(TENNESSEE_OSOW_RULES.overweightPricing[0]?.value.kind).toBe('perMile');
+    expect(TENNESSEE_OSOW_RULES.overweightBands).toEqual([]);
+    for (const row of TENNESSEE_OSOW_RULES.overweightPerMile) {
+      expect(row.value.ratePerMileUsd).toBe(0.06);
+      expect(row.value.perIncrementLbs).toBe(2000);
+      expect(row.value.excessBaseLbs).toBe(TENNESSEE_EXCESS_BASE_INFERENCE_LBS);
+      expect(row.value.roundIncrementUp).toBe(true);
+      // Absent, not 1 — Virginia's rule. A ceil here would add a whole ton-mile
+      // per ton to every quote on the authority of nothing.
+      expect(row.value.roundMilesUpTo).toBeUndefined();
+      // The $20 lives in `permitBaseFeeUsd`, reachable by a legal-size overweight
+      // permit; duplicating it here would double-charge every combined move.
+      expect(row.value.addAfterUsd).toBeUndefined();
+      // § 55-7-205(h)(3) states no upper weight bound; the superload class does.
+      expect(row.value.maxLbs).toBeNull();
+    }
+    expect(TENNESSEE_TON_MILE_MODEL_NOTE).toContain('PerMileRate');
+  });
+
+  /**
+   * THE WIDTH LADDER AS AN INCREMENT — Indiana's decomposition. The published $20
+   * and $30 are reproduced from a base plus a band, and the base survives on a
+   * legal-size overweight permit that matches no band at all.
+   */
+  it('reproduces the published $20 and $30 width steps, and the $20 for height alone', () => {
+    const at = (widthIn: number) =>
+      priceIn8('TN', {
+        ...legalSize,
+        widthIn,
+        grossWeightLbs: 79000,
+        milesInJurisdiction: 200,
+      });
+    expect(at(ftIn(10)).subtotalUsd).toBe(20); // "8'6" up to 14' $20.00"
+    expect(at(ftIn(14)).subtotalUsd).toBe(20); // inclusive at exactly 14 ft
+    expect(at(ftIn(14, 1)).subtotalUsd).toBe(30); // "14'1" up to 16' $30.00"
+    expect(at(ftIn(16)).subtotalUsd).toBe(30); // inclusive at exactly 16 ft
+
+    // "Excess Height $20.00" — the bands bound width only, so an over-height load
+    // within 14 ft picks up the base and no increment.
+    const tall = priceIn8('TN', {
+      ...legalSize,
+      heightIn: ftIn(14),
+      grossWeightLbs: 79000,
+      milesInJurisdiction: 200,
+    });
+    expect(tall.subtotalUsd).toBe(20);
+    expect(tall.requiresManualReview).toBe(false);
+  });
+
+  /**
+   * THE FEE-SIDE HOLE. § 55-7-205(h)(1)(B) opens its $30 band immediately above
+   * 14 ft 0 in; TDOT's fee table opens it at 14 ft 1 in. Only the range both
+   * documents name is priced, so the fraction between them falls through — the
+   * Arkansas 251-mile answer in a dimension.
+   */
+  it('prices 14 ft and 14 ft 1 in and refuses the fraction between them', () => {
+    const gap = priceIn8('TN', {
+      ...legalSize,
+      widthIn: ftIn(14) + 0.5,
+      grossWeightLbs: 79000,
+      milesInJurisdiction: 200,
+    });
+    expect(gap.subtotalUsd).toBeNull();
+    expect(gap.requiresManualReview).toBe(true);
+    expect(gap.lines.find((l) => l.code === 'osow_oversize')?.amountUsd).toBeNull();
+    expect(gap.warnings.join(' ')).toContain(
+      "published oversize fee bands do not cover this load's dimensions",
+    );
+    // A HOLE, not a disagreement: no two candidates match, so nothing is weighed.
+    expect(gap.warnings.join(' ')).not.toContain('Official sources disagree on TN oversize');
+    expect(TENNESSEE_WIDTH_BAND_GAP.pricedToIn).toBe(ftIn(14));
+    expect(TENNESSEE_WIDTH_BAND_GAP.pricedFromIn).toBe(ftIn(14, 1));
+  });
+
+  /**
+   * THE ESCORT-SIDE HOLE, WHICH IS THE SAME DEFECT AND CANNOT BE ABSORBED AT ANY
+   * DOLLAR VALUE. Inside the fractional inch the regulation requires a pilot car
+   * and the FAQ does not, so no count is adopted and the move goes to a human.
+   */
+  it('sends the fractional inches between TDOT’s escort steps to review', () => {
+    for (const g of TENNESSEE_ESCORT_BOUNDARY_GAPS) {
+      const r = priceIn8('TN', {
+        ...legalSize,
+        widthIn: g.fromIn + 0.5,
+        grossWeightLbs: 79000,
+        milesInJurisdiction: 100,
+        routeClass: 'tn-two-lane-24ft-pavement-or-more',
+      });
+      expect(r.requiresManualReview, `${g.fromIn}in + 0.5`).toBe(true);
+      expect(
+        r.escorts.applied.map((a) => a.ruleId),
+        `${g.fromIn}in + 0.5`,
+      ).toContain('tn-escort-boundary-step-gap');
+      // The fee is unaffected — a width in the gap is still inside the $20 band,
+      // and it is the REQUIREMENT that could not be determined.
+      expect(r.subtotalUsd, `${g.fromIn}in + 0.5`).toBe(20);
+    }
+    // On the steps themselves the two documents agree and nobody hears about it.
+    const onStep = priceIn8('TN', {
+      ...legalSize,
+      widthIn: ftIn(11),
+      grossWeightLbs: 79000,
+      milesInJurisdiction: 100,
+      routeClass: 'tn-two-lane-24ft-pavement-or-more',
+    });
+    expect(onStep.escorts.applied.map((a) => a.ruleId)).not.toContain(
+      'tn-escort-boundary-step-gap',
+    );
+    expect(onStep.requiresManualReview).toBe(false);
+    // Two of the three holes are the research's finding; the third is ours and is
+    // labelled as ours rather than presented as the source's analysis.
+    expect(TENNESSEE_ESCORT_BOUNDARY_GAPS.filter((g) => g.namedByResearch)).toHaveLength(2);
+  });
+
+  /**
+   * PAVEMENT WIDTH — the axis `RouteClass` grew for. Same load, same lane count,
+   * one pilot car apart, and a caller who says only "two-lane" is told what is
+   * missing instead of being given either answer.
+   */
+  it('counts one escort on narrow pavement, none on wide, and refuses to guess', () => {
+    const at = (routeClass: string) =>
+      priceIn8('TN', {
+        ...legalSize,
+        widthIn: ftIn(11),
+        grossWeightLbs: 79000,
+        milesInJurisdiction: 100,
+        routeClass: routeClass as never,
+      });
+
+    expect(at('tn-two-lane-under-24ft-pavement').escortsRequired).toBe(1);
+    expect(at('tn-two-lane-under-24ft-pavement').escorts.front).toBe(1);
+    expect(at('tn-two-lane-24ft-pavement-or-more').escortsRequired).toBe(0);
+    expect(at('interstate').escortsRequired).toBe(0);
+    expect(at('divided').escortsRequired).toBe(0);
+    expect(at('multilane-undivided').escortsRequired).toBe(0);
+
+    // "two-lane" answers the lane count and not the pavement width. One pilot car
+    // over a long Tennessee leg is not a distinction to guess at.
+    const halfAnswered = at('two-lane');
+    expect(halfAnswered.requiresManualReview).toBe(true);
+    expect(halfAnswered.escorts.applied.map((a) => a.ruleId)).toContain(
+      'tn-width-over-10-to-12-6-pavement-unknown',
+    );
+    expect(halfAnswered.warnings.join(' ')).toContain(
+      'Tennessee splits this escort requirement on a measurement this quote does not have',
+    );
+    // No road type at all leaves the rule undecided rather than false.
+    const { routeClass: _dropped, ...noRoad } = legalSize;
+    const unknownRoad = priceIn8('TN', {
+      ...noRoad,
+      widthIn: ftIn(11),
+      grossWeightLbs: 79000,
+      milesInJurisdiction: 100,
+    });
+    expect(unknownRoad.escorts.undecided.map((u) => u.ruleId)).toContain(
+      'tn-width-over-10-to-12-6-narrow-two-lane',
+    );
+    expect(unknownRoad.requiresManualReview).toBe(true);
+    // The permit is still priced: an undecided escort is a gap in what we were
+    // told, not a disagreement between documents.
+    expect(unknownRoad.lines.find((l) => l.code === 'osow_permit_base')?.amountUsd).toBe(20);
+  });
+
+  /**
+   * THE ESCORT LADDER ABOVE 12 FT 6 IN. The middle band is a BARE COUNT because
+   * Tennessee puts the same one car in front on a two-lane road and behind on a
+   * four-lane one — the Texas pattern, so a quote without a road type is not sent
+   * to review over a distinction that cannot move the price.
+   */
+  it('counts one escort at 13 ft on any road and two above 13 ft 6 in', () => {
+    const { routeClass: _dropped, ...noRoad } = legalSize;
+    const mid = priceIn8('TN', {
+      ...noRoad,
+      widthIn: ftIn(13),
+      grossWeightLbs: 79000,
+      milesInJurisdiction: 100,
+    });
+    expect(mid.escortsRequired).toBe(1);
+    expect(mid.escorts.applied.map((a) => a.ruleId)).toContain('tn-width-over-12-6-to-13-6');
+
+    const wide = priceIn8('TN', {
+      ...legalSize,
+      widthIn: ftIn(14),
+      grossWeightLbs: 79000,
+      milesInJurisdiction: 100,
+    });
+    expect(wide.escortsRequired).toBe(2);
+    expect(wide.escorts.front).toBe(1);
+    expect(wide.escorts.rear).toBe(1);
+
+    // Length: nothing to 90 ft, one rear to 120 ft, front and rear above it.
+    const at = (overallLengthIn: number) =>
+      priceIn8('TN', {
+        ...legalSize,
+        overallLengthIn,
+        grossWeightLbs: 79000,
+        milesInJurisdiction: 100,
+      }).escorts;
+    expect(at(ftIn(90)).rear).toBe(0);
+    expect(at(ftIn(100)).rear).toBe(1);
+    expect(at(ftIn(100)).front).toBe(0);
+    expect(at(ftIn(130)).front).toBe(1);
+    expect(at(ftIn(130)).rear).toBe(1);
+  });
+
+  /**
+   * THE HEIGHT POLE, AND WHY TENNESSEE ASSERTS A COUNT WHERE KENTUCKY DOES NOT.
+   * 1680-07-01-.10(1)(d) makes the front escort the INSTRUMENT of the requirement
+   * — "shall determine all vertical clearances by use of a front escort vehicle" —
+   * rather than presupposing one the way "the escorted load" does.
+   */
+  it('adds a front escort with a height pole over 15 ft, unlike Kentucky', () => {
+    const tall = priceIn8('TN', {
+      ...legalSize,
+      heightIn: ftIn(15, 3),
+      grossWeightLbs: 79000,
+      milesInJurisdiction: 100,
+    });
+    expect(tall.escorts.heightPole).toBe(true);
+    expect(tall.escorts.front).toBe(1);
+    expect(tall.escortsRequired).toBe(1);
+
+    // Kentucky reads its own text the other way and asserts no count for height.
+    const ky = priceIn7('KY', {
+      widthIn: 102,
+      heightIn: ftIn(15, 3),
+      overallLengthIn: ftIn(70),
+      trailerLengthIn: ftIn(53),
+      grossWeightLbs: 79000,
+      routeClass: 'ky-class-aaa',
+    });
+    expect(ky.escorts.heightPole).toBe(true);
+    expect(ky.escorts.front).toBe(0);
+  });
+
+  /**
+   * THE ROUTE-SURVEY CONFLICT, HELD OPEN. The research says the statute overrules
+   * the rule; both are still recorded, and the disagreement surfaces only for a
+   * load in the six inches where the two texts give different answers.
+   */
+  it('surfaces the 15 ft versus 15 ft 6 in survey conflict only inside those six inches', () => {
+    const inBand = priceIn8('TN', {
+      ...legalSize,
+      heightIn: ftIn(15, 3),
+      grossWeightLbs: 79000,
+      milesInJurisdiction: 100,
+    });
+    expect(inBand.requiresManualReview).toBe(true);
+    expect(inBand.warnings.join(' ')).toContain(
+      'whether a route inspection is required cannot be determined',
+    );
+
+    // A 12 ft load does not care that two sources disagree about 15 ft.
+    const below = priceIn8('TN', {
+      ...legalSize,
+      heightIn: ftIn(14),
+      grossWeightLbs: 79000,
+      milesInJurisdiction: 100,
+    });
+    expect(below.warnings.join(' ')).not.toContain('route inspection');
+    expect(below.requiresManualReview).toBe(false);
+
+    // Both candidates are on file and neither has been adopted.
+    const res = resolveSourced(
+      'TN route survey height',
+      TENNESSEE_OSOW_RULES.routeInspection.heightIn,
+      ASOF8,
+      thresholdsEqual,
+    );
+    expect(res.value).toBeNull();
+    expect(res.conflict).toBe(true);
+    expect(res.candidates.map((c) => c.value.value).sort((a, b) => a - b)).toEqual([
+      ftIn(15),
+      ftIn(15, 6),
+    ]);
+    // Tennessee publishes no length trigger, so that list is empty rather than
+    // borrowed from the escort table.
+    expect(TENNESSEE_OSOW_RULES.routeInspection.lengthIn).toEqual([]);
+  });
+
+  /**
+   * THE HOUSEBOAT AND THE SEED COTTON MODULE. Both are live disagreements, both
+   * are about products no field on a load identifies, and neither is priced —
+   * Arkansas's manufactured-home treatment twice over.
+   */
+  it('holds the houseboat and seed-cotton conflicts open without pricing either', () => {
+    const houseboat = resolveSourced(
+      'TN houseboat single-trip fee',
+      [
+        ...TENNESSEE_HOUSEBOAT_SINGLE_TRIP_FEE_USD.statuteAndAgency,
+        ...TENNESSEE_HOUSEBOAT_SINGLE_TRIP_FEE_USD.administrativeRule,
+      ],
+      ASOF8,
+    );
+    expect(houseboat.value).toBeNull();
+    expect(houseboat.conflict).toBe(true);
+    expect(houseboat.requiresManualReview).toBe(true);
+    // $750 against $6,100 at 20 ft — a factor of eight on the same boat.
+    const spread = spreadOf(houseboat);
+    expect(spread.low).toBe(1000);
+    expect(spread.high).toBe(6100);
+    expect(TENNESSEE_HOUSEBOAT_SINGLE_TRIP_FEE_USD.atWidthIn).toBe(ftIn(20));
+    // The reassembled analysis, split across the PDF's two columns in the source.
+    expect(TENNESSEE_HOUSEBOAT_CONFLICT_ANALYSIS).toContain('whereas the older administrative code');
+
+    const seedCotton = resolveSourced(
+      'TN seed cotton annual fee',
+      TENNESSEE_SEED_COTTON_ANNUAL_FEE_USD,
+      ASOF8,
+    );
+    expect(seedCotton.value).toBeNull();
+    expect(seedCotton.conflict).toBe(true);
+    expect(spreadOf(seedCotton)).toEqual({ low: 100, high: 500 });
+    // $400 is eight times the materiality threshold: it could never be absorbed.
+    expect(500 - 100).toBeGreaterThan(IMMATERIAL_CONFLICT_THRESHOLD_USD);
+
+    // Neither reaches a quote. A 17-ft-wide load is priced by the general
+    // schedule (and is a superload), and the houseboat disagreement is stated.
+    const wide = priceIn8('TN', {
+      ...legalSize,
+      widthIn: ftIn(17),
+      grossWeightLbs: 79000,
+      milesInJurisdiction: 100,
+    });
+    expect(wide.escorts.applied.map((a) => a.ruleId)).toContain('tn-houseboat-fee-conflict');
+    expect(wide.warnings.join(' ')).toContain(
+      'Tennessee publishes two incompatible houseboat schedules',
+    );
+    expect(wide.warnings.join(' ')).toContain("$6,100 against the statute's $750");
+    // Stated, and still not priced: the general width schedule is what ran.
+    expect(wide.warnings.join(' ')).toContain('NEITHER IS IN THE TOTAL ABOVE');
+  });
+
+  /**
+   * ABOVE 165,000 LB NOTHING IS PRICED, AND THE THINGS THAT LIVE UP THERE ARE
+   * RECORDED RATHER THAN ENCODED — the bridge evaluation bands, their own
+   * 250,000/251,000 hole, and the heavy-duty towing rate that is not the general
+   * rate at all.
+   */
+  it('treats 165,000 lb as a superload class and prices every pound below it', () => {
+    const atCeiling = priceIn8('TN', {
+      ...legalSize,
+      grossWeightLbs: 165000,
+      milesInJurisdiction: 300,
+    });
+    // Exclusive: exactly 165,000 lb is still an ordinary permit, and 42.5 tons of
+    // excess rounds to 43. 43 × 300 × $0.06 = $774, plus the $20 base.
+    expect(atCeiling.subtotalUsd).toBe(794);
+
+    const over = priceIn8('TN', {
+      ...legalSize,
+      grossWeightLbs: 165001,
+      milesInJurisdiction: 300,
+    });
+    expect(over.subtotalUsd).toBeNull();
+    expect(over.lines).toHaveLength(0);
+    expect(over.requiresManualReview).toBe(true);
+    expect(over.warnings.join(' ')).toContain('This load is a superload in Tennessee');
+
+    // The dimensional triggers escalate on size alone, whatever the weight.
+    const wide = priceIn8('TN', {
+      ...legalSize,
+      widthIn: ftIn(16, 1),
+      grossWeightLbs: 79000,
+      milesInJurisdiction: 100,
+    });
+    expect(wide.subtotalUsd).toBeNull();
+    expect(wide.escorts.routeSurvey).toBe(true);
+
+    // The $0.12 tier belongs to a tow, not to general freight above 165,000 lb.
+    expect(TENNESSEE_HEAVY_DUTY_TOWING_TON_MILE.usdPerTonMile).toBe(0.12);
+    expect(TENNESSEE_HEAVY_DUTY_TOWING_TON_MILE.detail).toContain('HEAVY-DUTY TOWING');
+    // The top bridge band is "actual cost" — not a number, and never a zero.
+    expect(TENNESSEE_BRIDGE_EVALUATION_FEES.map((b) => b.feeUsd)).toEqual([100, 300, null]);
+    expect(TENNESSEE_OSOW_RULES.conditionalFees).toEqual([]);
+  });
+
+  /**
+   * THE TRANSACTION SURCHARGE THAT EXISTS AND HAS NO PUBLISHED RATE — an EMPTY
+   * list, never a sourced zero, because "nobody publishes the rate" and "the rate
+   * is nought" are different claims and only one of them is true here.
+   */
+  it('holds no transaction fee, no route-analysis fee, and prints neither as zero', () => {
+    expect(TENNESSEE_OSOW_RULES.transactionFee).toEqual([]);
+    expect(TENNESSEE_OSOW_RULES.routeAnalysisFeeUsd).toEqual([]);
+    expect(TENNESSEE_OSOW_RULES.noBridgeRouteFeeUsd).toEqual([]);
+
+    const r = priceIn8('TN', {
+      ...legalSize,
+      grossWeightLbs: 100000,
+      milesInJurisdiction: 200,
+    });
+    // No service-fee line at all — not a $0.00 one.
+    expect(r.lines.some((l) => l.code === 'osow_service_fee')).toBe(false);
+    expect(r.subtotalUsd).toBe(140);
+    expect(r.warnings.join(' ')).toContain('No TN permit transaction fee is on file');
+    expect(r.warnings.join(' ')).toContain('subject to a transaction surcharge');
+  });
+
+  /**
+   * THE READINGS THIS FILE MAKES, STATED ON THE QUOTE RATHER THAN BURIED. Which
+   * network sets the legal width, and whether a movement over in two dimensions
+   * pays one base fee or two.
+   */
+  it('states the 8 ft baseline and the single-base-fee reading as inferences', () => {
+    const r = priceIn8('TN', {
+      ...legalSize,
+      widthIn: ftIn(12),
+      grossWeightLbs: 100000,
+      milesInJurisdiction: 200,
+      routeClass: 'interstate',
+    });
+    const said = r.warnings.join(' ');
+    expect(said).toContain('OUR READING of which network a quoted lane uses');
+    expect(said).toContain('This quote charges ONE base fee per movement');
+    expect(said).toContain("OUR READING, not the state's words");
+    expect(TENNESSEE_SINGLE_BASE_FEE_READING).toContain('OUR READING');
+    // 102 in is recorded, not the statute's 8 ft — an over-width permit on every
+    // ordinary trailer in the state is the failure this avoids.
+    expect(
+      resolveSourced('TN width', TENNESSEE_OSOW_RULES.legalLimits.widthIn, ASOF8).value,
+    ).toBe(102);
+    // Overall length and overhang are ABSENT, not empty: Tennessee regulates the
+    // tractor-semitrailer by the towed vehicle and publishes no overhang limit.
+    expect(TENNESSEE_OSOW_RULES.legalLimits.overallLengthIn).toBeUndefined();
+    expect(TENNESSEE_OSOW_RULES.legalLimits.frontOverhangIn).toBeUndefined();
+    expect(TENNESSEE_OSOW_RULES.legalLimits.rearOverhangIn).toBeUndefined();
+  });
+});
+
+describe('the registry after Phase 8', () => {
+  it('covers exactly the twenty-one states whose datasets exist', () => {
     expect(Object.keys(OSOW_JURISDICTIONS).sort()).toEqual(
       [
         'AL', 'AR', 'CA', 'CO', 'FL', 'GA', 'IL', 'IN', 'KY', 'LA',
-        'MO', 'NC', 'NJ', 'NY', 'OH', 'OK', 'PA', 'TX', 'VA', 'WA',
+        'MO', 'NC', 'NJ', 'NY', 'OH', 'OK', 'PA', 'TN', 'TX', 'VA', 'WA',
       ].sort(),
     );
     for (const code of Object.keys(OSOW_JURISDICTIONS)) {
@@ -3251,6 +3858,6 @@ describe('the registry after Phase 7', () => {
     // The registry must never name a jurisdiction ahead of its dataset, and the
     // count is asserted separately so a stray import cannot pass by matching a
     // list someone updated in the same edit.
-    expect(Object.keys(OSOW_JURISDICTIONS)).toHaveLength(20);
+    expect(Object.keys(OSOW_JURISDICTIONS)).toHaveLength(21);
   });
 });

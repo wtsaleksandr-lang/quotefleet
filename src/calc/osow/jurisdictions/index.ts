@@ -62,15 +62,35 @@
  * as every phase before: no evaluator changed, no condition kind was added, and
  * no `if (state === ...)` has ever been added anywhere.
  *
+ * PHASE 8 MOVED ONE, INSIDE `RouteClass` FOR THE THIRD TIME — AND THE HEADLINE
+ * IS WHAT IT DID *NOT* HAVE TO MOVE. TENNESSEE charges "$20.00 plus six cents
+ * (6¢) per ton-mile", the first fee in this directory that is a genuine PRODUCT
+ * of weight and distance rather than a step by one of them. It needed no new rate
+ * type: `PerMileRate` has computed `rate × miles × weight increments` since Phase
+ * 2 — its own documentation names "a rate per mile per increment of weight OVER
+ * the legal limit" as one of the three shapes it was built for — and a ton-mile
+ * is that shape with the increment set to 2,000 lb. Pennsylvania's "4¢ per mile
+ * per ton" is the same fee in different words. What `WeightBand` could NOT have
+ * done is the point: Arkansas's `perIncrementUsd` is flat in miles, so encoding
+ * Tennessee there would have priced a 500-mile move as a 1-mile one.
+ *
+ * The two new `RouteClass` members are `tn-two-lane-under-24ft-pavement` and
+ * `tn-two-lane-24ft-pavement-or-more`, because 1680-07-01-.06(2) decides one
+ * pilot car on the segment's PAVEMENT WIDTH — a published property of the road
+ * that nothing on the load implies, which is the California test. They are
+ * cheaper than Colorado's ten because they cross nothing: the split lives inside
+ * `two-lane` and never reaches a four-lane road. Same terms as every phase
+ * before: no evaluator changed, no condition kind was added, and no
+ * `if (state === ...)` has ever been added anywhere.
+ *
  * WHAT IS HERE IS EXACTLY WHAT EXISTS. An earlier draft of this file imported
  * Arkansas, Tennessee and Kentucky, whose data files were never written; the
- * build failed on three missing modules. Arkansas got one in Phase 6 and
- * Kentucky has one now; Tennessee still does not, and is still absent. The
- * registry must never name a jurisdiction ahead of its dataset —
- * `calculateOsow` refuses loudly for any state that is not here, and that
- * refusal is the honest answer for a state we have not sourced. Twenty are
- * covered: TX, OH, PA, NY, IL, IN, CA, GA, NC, NJ, VA, WA, AL, FL, MO, OK, LA,
- * CO, AR, KY.
+ * build failed on three missing modules. Arkansas got one in Phase 6, Kentucky in
+ * Phase 7, and Tennessee now has one too — the last of the three, and the
+ * registry named none of them before its dataset existed. `calculateOsow`
+ * refuses loudly for any state that is not here, and that refusal is the honest
+ * answer for a state we have not sourced. Twenty-one are covered: TX, OH, PA, NY,
+ * IL, IN, CA, GA, NC, NJ, VA, WA, AL, FL, MO, OK, LA, CO, AR, KY, TN.
  */
 import type { JurisdictionOsowRules } from '../types.js';
 import { TEXAS_OSOW_RULES } from './texas.js';
@@ -93,6 +113,7 @@ import { LOUISIANA_OSOW_RULES } from './louisiana.js';
 import { COLORADO_OSOW_RULES } from './colorado.js';
 import { ARKANSAS_OSOW_RULES } from './arkansas.js';
 import { KENTUCKY_OSOW_RULES } from './kentucky.js';
+import { TENNESSEE_OSOW_RULES } from './tennessee.js';
 
 export const OSOW_JURISDICTIONS: Record<string, JurisdictionOsowRules> = {
   TX: TEXAS_OSOW_RULES,
@@ -115,6 +136,7 @@ export const OSOW_JURISDICTIONS: Record<string, JurisdictionOsowRules> = {
   CO: COLORADO_OSOW_RULES,
   AR: ARKANSAS_OSOW_RULES,
   KY: KENTUCKY_OSOW_RULES,
+  TN: TENNESSEE_OSOW_RULES,
 };
 
 /** Is there OS/OW coverage for this state/province code? */
@@ -150,4 +172,5 @@ export {
   COLORADO_OSOW_RULES,
   ARKANSAS_OSOW_RULES,
   KENTUCKY_OSOW_RULES,
+  TENNESSEE_OSOW_RULES,
 };
