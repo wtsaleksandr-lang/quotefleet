@@ -195,6 +195,32 @@ export type Measure =
  * route class and can answer only one of Kentucky's two axes at a time; the
  * unanswered side goes `unknown` and to review, never to a guess. See
  * `kentucky.ts` for the full note.
+ *
+ * PHASE 8 ADDED TWO, AND THEY SIT *INSIDE* AN EXISTING MEMBER RATHER THAN BESIDE
+ * IT.
+ * -------------------------------------------------------------------------
+ * Tennessee decides one pilot car on a measurement no other state here uses:
+ * PAVEMENT WIDTH. Tenn. Comp. R. & Regs. 1680-07-01-.06(2) requires no escort for
+ * a load over 10 ft wide "on two-lane highways with a minimum pavement width
+ * (excluding paved shoulders) of twenty-four feet (24')" and one front escort
+ * "where the minimum pavement width (excluding paved shoulders) is less than
+ * twenty-four feet (24')". Two roads with the same lane count, the same median
+ * and the same load, one pilot car apart — decided by a figure TDOT holds for the
+ * segment and derivable from nothing on the load. That is California's map-colour
+ * test, so the members are prefixed `tn-`.
+ *
+ * WHAT MAKES THEM CHEAPER THAN COLORADO'S TEN IS THAT THEY DO NOT CROSS ANYTHING.
+ * Colorado had to multiply colour by lane count because neither axis existed in
+ * the general vocabulary. Tennessee's pavement-width split is a SUB-CLASSIFICATION
+ * OF `two-lane` and never reaches any other road type — .06(2)(a) exempts the
+ * interstate system and every four-or-more-lane highway outright, whatever their
+ * pavement — so the two facts travel in one value and two members suffice.
+ *
+ * A CALLER THAT PASSES PLAIN `two-lane` HAS ANSWERED HALF THE QUESTION, and is
+ * told so rather than defaulted: `tn-width-over-10-to-12-6-pavement-unknown`
+ * fires and sends the move to review naming the missing measurement. Reading
+ * plain `two-lane` as the wide variant would drop a real pilot car; reading it as
+ * the narrow one would invent one. See `tennessee.ts`.
  */
 export type RouteClass =
   | 'interstate'
@@ -235,7 +261,14 @@ export type RouteClass =
   /** 603 KAR 5:066 classification: Class "AA" — 62,000 lb. */
   | 'ky-class-aa'
   /** 603 KAR 5:066 classification: Class "A" — 44,000 lb, barely half of AAA. */
-  | 'ky-class-a';
+  | 'ky-class-a'
+  /**
+   * 1680-07-01-.06(2): a Tennessee two-lane highway whose minimum pavement width
+   * EXCLUDING paved shoulders is under 24 ft. One front escort over 10 ft wide.
+   */
+  | 'tn-two-lane-under-24ft-pavement'
+  /** The same road with 24 ft or more of pavement — no escort until 12 ft 6 in. */
+  | 'tn-two-lane-24ft-pavement-or-more';
 
 export type EscortCondition =
   /** measure > value */
