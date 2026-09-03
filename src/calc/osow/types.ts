@@ -428,6 +428,35 @@ export interface LegalLimits {
    */
   overallLengthIn?: Sourced<number>[];
   /**
+   * Legal KINGPIN-TO-REARMOST-AXLE distance, where the state publishes one —
+   * OPTIONAL, and absent for a state that regulates the semitrailer by length
+   * alone.
+   *
+   * WHY IT IS A SEPARATE FIELD AND NOT A SECOND `trailerLengthIn` ROW.
+   * -----------------------------------------------------------------
+   * KPRA and trailer length are different measurements of the same trailer, and
+   * a state can cap one, the other, both, or neither. Recording California's
+   * 40 ft KPRA in `trailerLengthIn` would have said "a California semitrailer
+   * may not exceed 40 ft", which is false and would have flagged every ordinary
+   * 53 ft trailer in the state as over-length. Recording Virginia's 41 ft there
+   * would have contradicted the 53 ft the same statute allows. They are two
+   * fields because they are two rules.
+   *
+   * WHAT ABSENT MEANS. "This jurisdiction states no KPRA limit in the sources on
+   * file", and the engine stays silent — the same contract as `overallLengthIn`.
+   * An EMPTY array still means "we looked and hold nothing", and still goes
+   * loudly to review, so a state with a KPRA limit we have not sourced must use
+   * that.
+   *
+   * WHAT IT UNLOCKS. A state that regulates the semitrailer ONLY by KPRA holds
+   * an empty `trailerLengthIn` — there is genuinely no length to record — plus a
+   * KPRA row. When a caller supplies KPRA, the gap the empty length list reports
+   * is answered by the measurement the state actually regulates on, and the
+   * engine withdraws the length-gap warning. Without KPRA the warning stands,
+   * unchanged. See `calculateOsowForJurisdiction`.
+   */
+  kingpinToRearAxleIn?: Sourced<number>[];
+  /**
    * Legal overhang, where the state publishes one — OPTIONAL, and absent for
    * most of the corridor. Ohio, Pennsylvania and Indiana regulate overhang
    * only through flagging and escort rules (Ohio's OS-1A flags a rear overhang

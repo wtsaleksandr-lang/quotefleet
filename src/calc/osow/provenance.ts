@@ -48,6 +48,21 @@ export interface SourceDoc {
    * instance, carries a February 2021 footer — "we downloaded it today" tells
    * you nothing about whether the numbers are current, and conflating the two
    * is how a five-year-old fee ends up presented as this morning's price.
+   *
+   * A PARTIAL DATE IS ALLOWED HERE, AND ONLY HERE. Some documents state a year
+   * and nothing else. The Virginia Law Portal's history lines are the case:
+   * §46.2-1124 and §46.2-1127 — the statutes that set Virginia's axle and gross
+   * weight limits — show "1989" with no month and no day. Writing `1989-01-01`
+   * would invent a precision the source does not have, and writing `null` would
+   * throw away the single most useful thing the line says, which is that
+   * Virginia's weight law has not been touched in thirty-seven years. So
+   * `YYYY` and `YYYY-MM` are both accepted for `revisedOn`, they sort correctly
+   * against full dates under the lexicographic comparison the resolver uses
+   * (`'1989' < '2023-03-01'`), and a bare year ranks as the OLDER evidence
+   * against any full date inside the same year — the conservative reading.
+   *
+   * `effectiveFrom`, `effectiveTo` and `retrievedOn` stay strict `YYYY-MM-DD`.
+   * They feed `isInEffect`, where a partial date would silently mis-window a row.
    */
   revisedOn: IsoDate | null;
   /** When WE fetched and read it. Always known. */
