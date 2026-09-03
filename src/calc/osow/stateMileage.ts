@@ -686,7 +686,24 @@ function mergeBboxes(boxes: readonly BBox[]): BBox {
   ];
 }
 
-function prepareRing(points: GeoPosition[]): PreparedRing {
+function prepareRing(ring: GeoPosition[]): PreparedRing {
+  /**
+   * CLOSED EXPLICITLY, so the two point-in-ring implementations in this file
+   * cannot disagree. `pointInRing` walks the wrap-around edge (last → first)
+   * and the chunked `pointInPreparedRing` walks only edges (i, i+1); on a
+   * closed ring the wrap-around edge is degenerate and the two are identical,
+   * which is the case for every TIGER/Line ring by shapefile spec. On an
+   * UNCLOSED ring they would silently return different answers — one used to
+   * assign holes to shells, the other to price mileage — so the assumption is
+   * enforced here rather than trusted.
+   */
+  const first = ring[0];
+  const last = ring[ring.length - 1];
+  const points =
+    first !== undefined && last !== undefined && (first[0] !== last[0] || first[1] !== last[1])
+      ? [...ring, first]
+      : ring;
+
   const chunks: RingChunk[] = [];
   for (let start = 0; start + 1 < points.length; start += RING_CHUNK_EDGES) {
     const end = Math.min(start + RING_CHUNK_EDGES, points.length - 1);
