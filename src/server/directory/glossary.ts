@@ -372,7 +372,17 @@ const GLOSSARY_CSS = `
   .gl-shell { max-width: 900px; margin: 0 auto; padding: 28px; }
   /* Left-align the hero (shared .hero centers text; glossary must read left-aligned). */
   .gl-hero { padding: 40px 28px 22px; text-align: left; }
-  .gl-hero .container-narrow { max-width: 900px; margin: 0; }
+  /* LEFT-ALIGNED, NOT LEFT-FLUSHED. "margin: 0" pinned the hero's 900px box to
+     the viewport edge, so the eyebrow and H1 rendered at x=52 at 1440px — 78px
+     LEFT of the floating header card above them (x=130) and 246px left of the
+     page's own body column (.gl-shell content, x=298). /glossary was the only
+     page on the site whose content overhung its header card. Centring the same
+     column the body uses fixes both: the text stays left-ALIGNED, it now starts
+     on the body's left edge, and it can no longer escape the card.
+     844 = .gl-shell's 900px box minus its 2 × 28px padding, i.e. the hero's
+     inner column and the body's inner column are the same width and the same
+     centre, so their left edges land on the same pixel at every width. */
+  .gl-hero .container-narrow { max-width: 844px; margin: 0 auto; padding: 0; }
   .gl-hero h1 { font-size: 40px; line-height: 1.1; margin: 0 0 10px; }
   .gl-hero p.lead { max-width: 640px; margin-left: 0; margin-right: 0; }
   .gl-hero .hero-cta { justify-content: flex-start; }

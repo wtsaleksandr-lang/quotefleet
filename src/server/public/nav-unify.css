@@ -349,7 +349,7 @@ html[data-theme="light"] .nav-dd-panel {
   max-width: 1120px;
   margin: 0 auto;
   display: grid;
-  grid-template-columns: 1.4fr repeat(4, 1fr);
+  grid-template-columns: repeat(5, minmax(0, 1fr));
   gap: 32px;
 }
 .premium-footer .footer-brand {
@@ -451,7 +451,7 @@ html[data-theme="light"] .nav-dd-panel {
 }
 
 @media (max-width: 980px) {
-  .premium-footer-inner { grid-template-columns: 1fr 1fr; }
+  .premium-footer-inner { grid-template-columns: repeat(3, minmax(0, 1fr)); }
   .premium-footer .footer-brand { grid-column: 1 / -1; }
 }
 @media (max-width: 640px) {
@@ -551,14 +551,43 @@ html[data-theme="light"] .nav-dd-panel {
 
 /* ── Footer: five columns that mirror the three header menus + Company/Legal.
    The brand block takes its own full-width row so each link column keeps a
-   readable measure instead of being squeezed into a sixth track. */
+   readable measure instead of being squeezed into a sixth track.
+
+   ── THE TRACK LADDER IS ARITHMETIC, NOT TASTE ───────────────────────────────
+   Standing rule: a group never wraps so that ONE item sits alone on a line
+   (DESIGN-SYSTEM.md §8). For a footer that means: with N link columns laid out
+   in T tracks, the last row holds `N mod T` columns, so any T where
+   `N mod T === 1` strands a column on a row of its own. N is 5 here, so:
+
+       T=5 → 5            ✓ one full row
+       T=4 → 4 + 1        ✗ orphan
+       T=3 → 3 + 2        ✓ (a 5-group wrapping 3+2 is explicitly allowed)
+       T=2 → 2 + 2 + 1    ✗ orphan  ← what shipped: LEGAL alone at ≤760px,
+                                       stranded next to ~620px of dead space
+       T=1 → 1 + 1 + …    ✓ a deliberate full stack, not a wrap remainder
+
+   So the ladder steps 5 → 3 → 1 and SKIPS 4 and 2 entirely. Three tracks is
+   held all the way down to 641px (≈165px per column at the low end — the links
+   wrap a word, nothing overflows) rather than dropping to two, because two is
+   the arithmetic that produces the orphan. Below 641px every column goes
+   full-bleed, which is a stack rather than a wrap and leaves no dead track.
+
+   Deriving T from N is why this is stated once, here, instead of being
+   re-guessed per breakpoint: change the column count and the only question to
+   re-answer is which T values still satisfy `N mod T !== 1`.
+
+   These rules sit AFTER the older `@media (max-width: 980px)` block above, so
+   at equal specificity they win for every width — that block's `1fr 1fr` is
+   the two-track layout this ladder deliberately replaces.
+   navInformationArchitecture.test.ts measures the rendered result at every
+   width from 320 to 1600 and fails on any row holding exactly one column. */
 .premium-footer-inner { grid-template-columns: repeat(5, minmax(0, 1fr)); }
 .premium-footer .footer-brand { grid-column: 1 / -1; }
 @media (max-width: 1100px) {
   .premium-footer-inner { grid-template-columns: repeat(3, minmax(0, 1fr)); }
 }
-@media (max-width: 760px) {
-  .premium-footer-inner { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+@media (max-width: 640px) {
+  .premium-footer-inner { grid-template-columns: minmax(0, 1fr); }
 }
 
 /* ── Wide mega-panels anchor to the HEADER CARD, not to their trigger ─────

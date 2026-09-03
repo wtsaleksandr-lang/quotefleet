@@ -121,19 +121,26 @@ body.qf-wft .premium-footer .qf-footer-wordmark:hover {
 }
 
 /* ── Footer grid alignment fix. The base rule (landing-conversion.css) declared
-   only four tracks — `grid-template-columns: 1.4fr repeat(3, 1fr)` — but the
-   row holds FIVE children: the brand lockup plus four link columns (Product /
-   Solutions / Company / Legal). With one track short, the last column (Legal)
-   wrapped onto a second implicit row under the brand block, reading as a
-   misaligned/offset column. Add the fifth track so the brand block and all four
-   columns sit in one clean, balanced row. Scoped to ≥981px so the tablet
-   (≤980px → 2-col) and mobile (≤640px → 2-col, ≤720px → 1-col) stacked grids
-   defined elsewhere are left untouched. (The exact track sizing is finalized in
-   the balanced-grid block appended at the end of this file — kept in sync here.)
+   only four tracks — `grid-template-columns: 1.4fr repeat(3, 1fr)` — for a row
+   that held five children, so the last column wrapped onto an implicit second
+   row and read as a misaligned/offset column.
+
+   REWRITTEN FOR THE FIVE-COLUMN FOOTER. The homepage no longer carries its own
+   four-column PRODUCT / SOLUTIONS / COMPANY / LEGAL footer: it embeds the shared
+   PREMIUM_FOOTER verbatim, which is FIVE link columns (the three header menus +
+   Company + Legal) with the brand lockup on its own full-width row above them.
+   So the desktop grid is five equal tracks and the brand spans all of them —
+   `1.5fr repeat(4, …)` reserved a track for a brand block that is no longer in
+   the row, which is what left a 203–230px permanently empty trailing track.
+   nav-ia.css owns the responsive ladder (5 → 3 → 1); this block agrees with its
+   desktop step so no sheet contradicts the shipped markup.
    ── */
 @media (min-width: 981px) {
   body.qf-wft .premium-footer .premium-footer-inner {
-    grid-template-columns: 1.5fr repeat(4, minmax(0, 1fr));
+    grid-template-columns: repeat(5, minmax(0, 1fr));
+  }
+  body.qf-wft .premium-footer .footer-brand {
+    grid-column: 1 / -1;
   }
 }
 
@@ -298,27 +305,31 @@ body.qf-wft .premium-footer .qf-footer-wordmark:hover {
    and PRODUCT and reading as "columns not aligned" — they lined up with nothing
    in the full-width trust strip or © row below.
 
-   Fix: go back to a real proportional grid — one brand track plus four EQUAL
-   `minmax(0, 1fr)` link tracks — with the grid left at its default `stretch`
-   justification so the five tracks span the whole 1120px container edge-to-edge.
-   `minmax(0, 1fr)` keeps the four link tracks exactly equal (and lets them shrink
-   without overflowing near the 981px boundary); the link labels (widest ≈137px)
-   sit comfortably inside each ~150px+ track, so nothing wraps. Result: evenly
-   distributed columns whose left edges form a clean grid, the brand pinned to the
-   container's left edge (over the © line) and LEGAL near the right edge (over the
-   operator line) — the columns, trust strip, and legal row now share the same
-   left/right container edges.
+   Fix: go back to a real proportional grid of EQUAL `minmax(0, 1fr)` tracks with
+   the grid left at its default `stretch` justification, so the tracks span the
+   whole 1120px container edge-to-edge. `minmax(0, 1fr)` keeps the link tracks
+   exactly equal (and lets them shrink without overflowing near the 981px
+   boundary). Result: evenly distributed columns whose left edges form a clean
+   grid, and columns, trust strip and © row sharing the same container edges.
 
-   Scoped ≥981px so the ≤980px 2-col and ≤720px 1-col stacked grids defined in
-   landing-conversion.css stay intact. Spacing on the 8px ramp (32px gaps).
+   NOW FIVE LINK TRACKS, NOT "brand + four". The footer grew a fifth link column
+   when it was regrouped to mirror the header menus, and the brand lockup moved
+   to its own full-width row above the columns (so each column keeps a readable
+   measure). A brand track reserved in the column row is therefore exactly the
+   empty trailing track this file set out to remove — see the matching block
+   ~line 134 and the ladder in nav-ia.css.
+
+   Scoped ≥981px; nav-ia.css owns the ≤1100px (3-track) and ≤640px (stack) steps.
+   Spacing on the 8px ramp (32px gaps).
    ───────────────────────────────────────────────────────────────────────── */
 @media (min-width: 981px) {
   body.qf-wft .premium-footer .premium-footer-inner {
-    grid-template-columns: 1.5fr repeat(4, minmax(0, 1fr));
+    grid-template-columns: repeat(5, minmax(0, 1fr));
     column-gap: 32px;
     align-items: start;
   }
   body.qf-wft .premium-footer .footer-brand {
+    grid-column: 1 / -1;
     align-items: flex-start;
   }
 }

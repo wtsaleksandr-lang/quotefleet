@@ -1547,15 +1547,33 @@ export const DIRECTORY_CSS = `
   /* ── Directory subsite footer — grouped, not a flat link soup ────────────
      It used to be ONE centred inline row of 11 unlabelled links, which told the
      visitor nothing about which of them were for them. It now mirrors the three
-     header menus in the same order with the same labels, so header and footer
-     teach the same site map. Column headings are LEFT-aligned (the base
-     .site-footer centres its text — headings never centre, per the standing
-     rule), and the legal line keeps the centred utility treatment. */
+     header menus IN THE HEADER'S OWN ORDER — For Carriers & Brokers, then For
+     Shippers, then Free Tools — and closes with Company, exactly like the
+     marketing PREMIUM_FOOTER. (The comment used to claim header order while the
+     markup ran For Shippers first; code and comment now agree, and the order is
+     asserted in navInformationArchitecture.test.ts.) Column headings are
+     LEFT-aligned (the base .site-footer centres its text — headings never
+     centre, per the standing rule), and the legal line keeps the centred
+     utility treatment.
+
+     THE COMPANY COLUMN IS ALSO HOW /partners BECAME REACHABLE. Partners &
+     affiliates is a revenue surface that existed in exactly one place on the
+     whole site — the Company column of PREMIUM_FOOTER — so the ~334k-page
+     directory subsite, which uses this footer and not that one, linked to it
+     from nowhere at all.
+
+     TRACK LADDER — 4 → 2 → 1, and the fourth column is what makes that legal.
+     With N columns in T tracks the last row holds "N mod T" columns, so any T
+     where "N mod T === 1" strands one column alone (DESIGN-SYSTEM.md §8). At
+     N=3 the only orphan-free ladder was 3 → 1, and the "repeat(2, …)" rule that
+     shipped here produced exactly the forbidden 2+1 — FREE TOOLS alone beside
+     207–344px of dead space from 421 to 720px. At N=4 both 4 and 2 divide
+     cleanly, so the mid band is a true 2×2 and only the ≤640px stack remains. */
   .site-footer .dirfoot {
     max-width: 1120px;
     margin: 0 auto;
     display: grid;
-    grid-template-columns: repeat(3, minmax(0, 1fr));
+    grid-template-columns: repeat(4, minmax(0, 1fr));
     gap: 24px 32px;
     text-align: left;
   }
@@ -1577,14 +1595,21 @@ export const DIRECTORY_CSS = `
     padding-top: 16px;
     border-top: 1px solid var(--border);
     text-align: center;
-    /* Five separator-joined links wrapped 4+1 at 375px, stranding "Support" on
-       a line of its own. Balance splits them evenly instead. */
+    /* Separator-joined links wrapped 4+1 at 375px, stranding the last one on a
+       line of its own. Balance splits them evenly instead. Support moved up
+       into the Company column, so this line is now © + three links.
+
+       NO mailto: IN THE DIRECTORY CHROME. The Company column reaches us via
+       /support rather than a mailto — carrierProfileContact.test.ts asserts a
+       contact-hidden carrier profile contains NO "mailto:" anywhere in the
+       page, and a site-wide address in the footer would defeat that check on
+       every one of the ~334k profiles. */
     text-wrap: balance;
   }
-  @media (max-width: 720px) {
+  @media (max-width: 980px) {
     .site-footer .dirfoot { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 24px; }
   }
-  @media (max-width: 420px) {
+  @media (max-width: 640px) {
     .site-footer .dirfoot { grid-template-columns: minmax(0, 1fr); }
   }
 `;
@@ -1843,11 +1868,12 @@ export function layout({ title, description, canonicalPath, bodyHtml, jsonLd, re
   ${bodyHtml}
   <footer class="site-footer">
     <nav class="dirfoot" aria-label="Footer">
-      <div class="dirfoot-col"><h2 class="dirfoot-head">For Shippers</h2><a href="/directory">Carrier Directory</a><a href="/compliance">Compliance Tools</a><a href="/services">Carriers by Capability</a><a href="/directory/join">Directory Pro</a><a href="/directory/rfq?sort=featured">Request Freight Quotes</a><a href="/drayage-rates">Port Drayage Rates</a><a href="/manifest-privacy">Manifest Privacy</a></div>
-      <div class="dirfoot-col"><h2 class="dirfoot-head">For Carriers</h2><a href="/w/demo">See a Live Demo</a><a href="/compare">Why QuoteFleet</a><a href="/signup">Start Free</a><a href="/importers">Importers Directory</a><a href="/pricing">Pricing</a></div>
-      <div class="dirfoot-col"><h2 class="dirfoot-head">Free Tools</h2><a href="/tools">Freight Rate Calculator</a><a href="/glossary">Freight Glossary</a><a href="/guides">Carrier Market Guides</a></div>
+      <div class="dirfoot-col"><h2 class="dirfoot-head">For Carriers &amp; Brokers</h2><a href="/w/demo">See a Live Demo</a><a href="/compare">Why QuoteFleet</a><a href="/pricing">Pricing</a><a href="/signup">Start Free</a><a href="/importers">Importers Directory</a></div>
+      <div class="dirfoot-col"><h2 class="dirfoot-head">For Shippers</h2><a href="/directory">Carrier Directory</a><a href="/guides">Carrier Market Guides</a><a href="/compliance">Compliance Tools</a><a href="/services">Carriers by Capability</a><a href="/directory/join">Directory Pro</a><a href="/directory/rfq?sort=featured">Request Freight Quotes</a><a href="/drayage-rates">Port Drayage Rates</a><a href="/manifest-privacy">Manifest Privacy</a></div>
+      <div class="dirfoot-col"><h2 class="dirfoot-head">Free Tools</h2><a href="/tools">Freight Rate Calculator</a><a href="/glossary">Freight Glossary</a></div>
+      <div class="dirfoot-col"><h2 class="dirfoot-head">Company</h2><a href="/partners">Partners &amp; Affiliates</a><a href="/support">Support</a><a href="/security">Security</a><a href="/login">Sign In</a></div>
     </nav>
-    <p class="dirfoot-legal">© <span id="year"></span> QuoteFleet · <a href="/">Home</a> · <a href="/terms">Terms</a> · <a href="/privacy">Privacy</a> · <a href="/support">Support</a></p>
+    <p class="dirfoot-legal">© <span id="year"></span> QuoteFleet · <a href="/">Home</a> · <a href="/terms">Terms</a> · <a href="/privacy">Privacy</a></p>
     ${rendersCarrierData(canonicalPath) ? DIRECTORY_DATA_SOURCES : ''}
     ${FOOTER_PAY_ROW}
   </footer>
