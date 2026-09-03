@@ -86,6 +86,13 @@ export interface OsowLoad {
   heightIn?: number;
   overallLengthIn?: number;
   trailerLengthIn?: number;
+  /**
+   * Kingpin to the rearmost axle (or the rear tandem's midpoint), in inches.
+   * OPTIONAL. Omitting it leaves every result exactly as it was before this
+   * field existed; supplying it is what lets a KPRA-regulated state price. See
+   * `LegalLimits.kingpinToRearAxleIn` and `Measure` in `escortRules.ts`.
+   */
+  kingpinToRearAxleIn?: number;
   frontOverhangIn?: number;
   rearOverhangIn?: number;
   /** Full axle layout, when known. Enables bridge-formula checking. */
@@ -254,7 +261,41 @@ export function calculateOsowForJurisdiction(
   // ── 1. Legal limits: is a permit needed at all? ────────────────────────
   const widthLimit = resolveSourced(`${rules.name} legal width`, rules.legalLimits.widthIn, asOf);
   const heightLimit = resolveSourced(`${rules.name} legal height`, rules.legalLimits.heightIn, asOf);
-  const lengthLimit = resolveSourced(`${rules.name} legal trailer length`, rules.legalLimits.trailerLengthIn, asOf);
+  /**
+   * KPRA is OPTIONAL and silent when absent, exactly like overhang and overall
+   * length: a state that publishes no kingpin limit holds no row and is not
+   * warned about a rule it does not have.
+   */
+  const kpraLimit = resolveIfPresent(
+    `${rules.name} legal kingpin-to-rearmost-axle distance`,
+    rules.legalLimits.kingpinToRearAxleIn,
+    asOf,
+  );
+  /**
+   * A STATE THAT REGULATES THE SEMITRAILER BY KPRA RATHER THAN BY LENGTH.
+   *
+   * California is the case. CVC §35400(b)(4) publishes no semitrailer length
+   * limit at all — it exempts the semitrailer from the 40 ft single-vehicle cap
+   * whenever KPRA is within limits — so `trailerLengthIn` is legitimately EMPTY
+   * and `resolveSourced` correctly reports a gap and forces review. That gap is
+   * real right up until the caller supplies the measurement the state actually
+   * regulates on. Once KPRA is on the load, the question the empty list was
+   * asking has been answered, and continuing to demand a trailer length the
+   * state does not publish would send a fully-specified move to a human for
+   * nothing.
+   *
+   * Deliberately conditioned on DATA, not on a state code: it takes an empty
+   * length list AND a KPRA row AND a supplied KPRA. Every jurisdiction that
+   * publishes a trailer length keeps its length check untouched, and a state
+   * with neither is unaffected.
+   */
+  const trailerLengthAnsweredByKpra =
+    rules.legalLimits.trailerLengthIn.length === 0 &&
+    kpraLimit !== null &&
+    load.kingpinToRearAxleIn !== undefined;
+  const lengthLimit = trailerLengthAnsweredByKpra
+    ? null
+    : resolveSourced(`${rules.name} legal trailer length`, rules.legalLimits.trailerLengthIn, asOf);
   /**
    * Overhang limits are OPTIONAL for the same reason overall length is: Ohio,
    * Pennsylvania and Indiana publish none, regulating overhang through flagging
@@ -281,7 +322,7 @@ export function calculateOsowForJurisdiction(
     asOf,
   );
 
-  for (const r of [widthLimit, heightLimit, lengthLimit, frontOverhangLimit, rearOverhangLimit, grossLimit, overallLengthLimit]) {
+  for (const r of [widthLimit, heightLimit, lengthLimit, kpraLimit, frontOverhangLimit, rearOverhangLimit, grossLimit, overallLengthLimit]) {
     if (r === null) continue;
     pushSources(sources, r);
     warnings.push(...r.warnings);
@@ -293,6 +334,14 @@ export function calculateOsowForJurisdiction(
     ['width', load.widthIn, widthLimit, 'Width', 'in'],
     ['height', load.heightIn, heightLimit, 'Height', 'in'],
     ['length', load.trailerLengthIn, lengthLimit, 'Trailer length', 'in'],
+    /**
+     * Counted as a LENGTH over-dimension, because that is what it is: a
+     * semitrailer past the state's kingpin limit needs a length permit, and the
+     * quote's oversize side is keyed on `overDimension.length`. Silent unless
+     * BOTH the state publishes a KPRA limit and the caller supplied a KPRA —
+     * `overLimit` returns null on a missing measurement, never `false`.
+     */
+    ['length', load.kingpinToRearAxleIn, kpraLimit, 'Kingpin-to-rearmost-axle distance', 'in'],
     ['length', load.overallLengthIn, overallLengthLimit, 'Overall combination length', 'in'],
     ['frontOverhang', load.frontOverhangIn, frontOverhangLimit, 'Front overhang', 'in'],
     ['rearOverhang', load.rearOverhangIn, rearOverhangLimit, 'Rear overhang', 'in'],
@@ -530,6 +579,16 @@ export function calculateOsowForJurisdiction(
     ...(load.heightIn === undefined ? {} : { heightIn: load.heightIn }),
     ...(load.overallLengthIn === undefined ? {} : { overallLengthIn: load.overallLengthIn }),
     ...(load.trailerLengthIn === undefined ? {} : { trailerLengthIn: load.trailerLengthIn }),
+    /**
+     * KPRA is spread the same way as every other real measurement — absent
+     * means absent, so a KPRA condition reads `unknown` rather than zero. It
+     * must NOT take the overhang treatment below: an unstated overhang is
+     * genuinely none, while an unstated KPRA is simply unknown. Defaulting it
+     * to 0 would make every load look like it comfortably clears the limit.
+     */
+    ...(load.kingpinToRearAxleIn === undefined
+      ? {}
+      : { kingpinToRearAxleIn: load.kingpinToRearAxleIn }),
     /**
      * Overhang defaults to ZERO when unstated, unlike every other
      * measurement here, and the asymmetry is deliberate. Width, height and

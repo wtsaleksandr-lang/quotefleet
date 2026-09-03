@@ -46,6 +46,21 @@
  *    wide). A load 14 ft 6 in wide is an ordinary permit that still carries an
  *    open-ended hourly charge.
  *
+ * 5. THE SEMITRAILER IS REGULATED BY KINGPIN, NOT BY LENGTH — and that is why
+ *    California used to send EVERY quote to a human. CVC §35400(b)(4) publishes
+ *    no semitrailer length limit at all; it exempts the semitrailer from the
+ *    40 ft single-vehicle cap whenever its kingpin-to-rearmost-axle distance is
+ *    within limits. With nowhere to record a kingpin distance, `trailerLengthIn`
+ *    was an empty list, the engine correctly reported a gap, and the gap fired
+ *    on every California load however completely it was specified.
+ *
+ *    `kingpinToRearAxleIn` now carries the real limit — 40 ft, from the statute
+ *    and from Caltrans's own page — and a load that supplies a KPRA is checked
+ *    against the rule California actually writes instead of being asked for a
+ *    number the state does not publish. A load that does NOT supply one is
+ *    treated exactly as before: the length gap stands and the quote goes to
+ *    review. The measurement is optional and only ever buys a better answer.
+ *
  * WHERE FEE FACTS LIVE IN THE ESCORT LIST. Items 2 and 4 above, and several of
  * California's recorded unknowns, are conditioned on the load's dimensions but
  * are not escort counts. `EscortRule` is the only dimension-conditioned
@@ -141,7 +156,35 @@ const CALTRANS_LENGTHS: SourceDoc = {
   publisher: 'California Department of Transportation',
   revisedOn: null,
   retrievedOn: RETRIEVED,
+  cite: '§35400(b)(4) KPRA 40 ft / 38 ft; §35401.5(a)(1) STAA semitrailer 48 ft in exclusive combination and 53 ft with the KPRA condition; §35401(e)–(f) and §35401.1 on local restriction of KPRA to no less than 38 ft',
 };
+
+/**
+ * THE STATUTE THAT REGULATES A CALIFORNIA SEMITRAILER — BY KINGPIN, NOT LENGTH.
+ *
+ * leginfo.legislature.ca.gov blocks automated fetching (see the module header),
+ * so the text comes from Public.Law, the same secondary publisher already used
+ * for §35550. FindLaw's reproduction of (b)(4) was checked against it and is
+ * word-for-word identical, which is the closest thing to verification available
+ * without the official host.
+ *
+ * NO AMENDMENT HISTORY LINE IS PRINTED on either reproduction, so `revisedOn`
+ * is null rather than backfilled. What the section DOES date is the figure
+ * itself: §35400(c) says the Legislature increased "the maximum permissible
+ * kingpin to rearmost axle distance to 40 feet effective January 1, 1987", and
+ * that operative date is what `effectiveFrom` carries.
+ */
+const CVC_35400: SourceDoc = {
+  id: 'ca-cvc-35400',
+  title: 'Cal. Veh. Code §35400 (via Public.Law — SECONDARY source)',
+  url: 'https://california.public.law/codes/vehicle_code_section_35400',
+  publisher: 'Public.Law, reproducing the California Vehicle Code',
+  revisedOn: null,
+  retrievedOn: RETRIEVED,
+  cite: '§35400(a) 40 ft single-vehicle cap; §35400(b)(4) the kingpin-to-rearmost-axle exemption; §35400(c) "effective January 1, 1987"',
+};
+/** §35400(c)'s own stated operative date for the 40 ft KPRA figure. */
+const EFF_KPRA = '1987-01-01';
 
 const CALTRANS_WEIGHT: SourceDoc = {
   id: 'caltrans-legal-weight',
@@ -666,14 +709,39 @@ export const CALIFORNIA_ESCORT_RULES: EscortRule[] = [
   ),
   escortRule(
     'ca-kpra-dashed-routes',
-    'A pilot car is also required on dashed routes when the kingpin-to-rear-axle distance exceeds 38 ft, which a quote does not collect',
+    'A pilot car is also required on dashed routes when the kingpin-to-rear-axle distance exceeds 38 ft, and which segments are dashed is a property of the district map',
     { kind: 'gt', measure: 'widthIn', value: 102 },
     {
       advisory:
-        'The June 2021 legend adds a pilot car on DASHED routes whenever the kingpin-to-rear-axle distance exceeds 38 ft 0 in. KPRA is not collected on a quote and the dashed segments are a property of the district map, so this requirement can neither be applied nor ruled out here. California also has no pilot-car operator certification programme — CVC §§28100–28103 regulate escort equipment only — so no certification cost arises, and any pilot-car price is the operator\'s market rate rather than a state fee.',
+        'The June 2021 legend adds a pilot car on DASHED routes whenever the kingpin-to-rear-axle distance exceeds 38 ft 0 in. KPRA can now be supplied on a quote and is checked against California\'s 40 ft statutory limit, but the dashed segments are a property of the district map and are not held here, so this extra pilot car can neither be applied nor ruled out even when the KPRA is known. California also has no pilot-car operator certification programme — CVC §§28100–28103 regulate escort equipment only — so no certification cost arises, and any pilot-car price is the operator\'s market rate rather than a state fee.',
     },
     PCMAP_LEGEND,
     EFF_LEGEND,
+  ),
+
+  /**
+   * THE TWO WAYS CALIFORNIA'S 40 FT KPRA IS REALLY 38 FT.
+   *
+   * Stated as an advisory rather than modelled, because both turn on facts a
+   * quote does not carry — the trailer's axle count, and whether a particular
+   * city or county has exercised its power to restrict. Conditioning a rule on
+   * the KPRA measure itself would read `unknown` on every quote that does not
+   * supply one and would put a warning and an undecided rule on loads that were
+   * clean before this measure existed, which is precisely the regression the
+   * optional-measure design exists to avoid. The trigger is therefore the same
+   * over-width condition its sibling rule uses, and the outcome is an advisory:
+   * the price stands and the exclusion is stated.
+   */
+  escortRule(
+    'ca-kpra-38-ft-cases',
+    'California’s 40 ft kingpin limit drops to 38 ft for a single-axle semitrailer, and a city or county may restrict it to 38 ft on its own highways',
+    { kind: 'gt', measure: 'widthIn', value: 102 },
+    {
+      advisory:
+        'The 40 ft kingpin-to-rearmost-axle limit used here is CVC §35400(b)(4)\'s figure for a semitrailer "having two or more axles". A SINGLE-AXLE semitrailer is limited to 38 feet, and a quote does not collect the trailer\'s axle count, so a single-axle trailer between 38 ft and 40 ft of KPRA is over the limit and will not be detected here. Separately, the 40 ft figure is a state maximum that local authorities may cut: CVC §35401(e) lets "Any city or county ... restrict the kingpin to rearmost axle distance to 38 feet, but not less" on highways under its jurisdiction, §35401(f) lets Caltrans recommend the same restriction on certain highways, and §35401.1 provides that a combination with a KPRA of 38 to 40 feet "may be operated on local highways only where it is deemed to be safe". None of those local restrictions is held here, so a KPRA between 38 ft and 40 ft is quoted as legal on the state highway system and must be checked against the actual route.',
+    },
+    CALTRANS_LENGTHS,
+    RETRIEVED,
   ),
 ];
 
@@ -696,23 +764,65 @@ export const CALIFORNIA_OSOW_RULES: JurisdictionOsowRules = {
       ),
     ],
     /**
-     * EMPTY ON PURPOSE, AND IT COSTS US A REVIEW FLAG ON EVERY CALIFORNIA
-     * QUOTE. California publishes no semitrailer LENGTH limit. CVC §35400(a)
-     * caps a vehicle at 40 ft, and §35400(b)(4) then EXCLUDES a semitrailer in
-     * a tractor-semitrailer combination from that cap whenever its
-     * kingpin-to-rear-axle distance is 40 ft or less (two or more axles) or
-     * 38 ft or less (one axle). California regulates the trailer by KPRA, which
-     * is exactly why a California-legal 53 ft trailer exists and is ordinary.
+     * STILL EMPTY, AND STILL ON PURPOSE. California publishes no semitrailer
+     * LENGTH limit. CVC §35400(a) caps a vehicle at 40 ft, and §35400(b)(4)
+     * then EXCLUDES a semitrailer in a tractor-semitrailer combination from
+     * that cap whenever its kingpin-to-rearmost-axle distance is within limits.
+     * California regulates the trailer by KPRA, which is exactly why a
+     * California-legal 53 ft trailer exists and is ordinary.
      *
      * Recording the 40 ft figure here would flag every standard 53 ft trailer
      * in the state as over-length and attach a permit and a fee to a legal
      * load — a confident wrong number. Recording 53 ft would be inventing a
-     * limit no source states. KPRA is not a `Measure` and is not collected on a
-     * quote. So the honest answer is that we hold no California semitrailer
-     * length limit, and the engine says so and asks for review rather than
-     * choosing between two wrong numbers.
+     * limit for the network the load is not necessarily on: 53 ft is the
+     * §35401.5(a)(1) cap for STAA vehicles on the National Network and Terminal
+     * Access routes, and 23 CFR 658.13 preempts a state overall-length cap
+     * there, while a California Legal (non-STAA) route has no semitrailer
+     * length cap at all — the binding constraint off the network is the 65 ft
+     * combination limit in §35401(a). A quote does not know which network the
+     * route uses.
+     *
+     * WHAT CHANGED IS THE OTHER HALF. The gap this empty list reports is real
+     * until the caller supplies the measurement California actually regulates
+     * on. `kingpinToRearAxleIn` below now carries that limit, and when a KPRA
+     * is on the load the engine withdraws this warning instead of demanding a
+     * trailer length the state does not publish. With no KPRA, nothing here
+     * changes: the gap stands and the quote still goes to review.
      */
     trailerLengthIn: [],
+    /**
+     * 40 FEET, AND IT IS THE ONLY SEMITRAILER NUMBER CALIFORNIA PUBLISHES.
+     *
+     * Two independent sources, one statutory and one the agency's own, and they
+     * agree — so they corroborate rather than conflict and the resolver returns
+     * a clean 40 ft.
+     *
+     * BOUNDARY: "does not exceed 40 feet" is INCLUSIVE of 40 ft 0 in. A KPRA of
+     * exactly 480 in is legal; 481 in is not. `overLimit` compares with `>`,
+     * which is that reading.
+     *
+     * THE 38 FT CASE IS NOT RECORDED AS A SECOND ROW, and that is deliberate.
+     * §35400(b)(4)'s 38 ft figure is for a SINGLE-AXLE semitrailer, not a
+     * competing limit on the same vehicle — putting it in this list would read
+     * as two sources disagreeing about one number and would refuse to price a
+     * load that is unambiguously fine. A quote does not collect the trailer's
+     * axle count, so the ordinary two-or-more-axle figure is used and the
+     * single-axle case is stated in `ca-kpra-38-ft-cases` below. Same treatment,
+     * for the same reason, as §35551.5's alternate axle table.
+     */
+    kingpinToRearAxleIn: [
+      fromDated(
+        ftIn(40),
+        CVC_35400,
+        EFF_KPRA,
+        'CVC §35400(b)(4): "A semitrailer while being towed by a motortruck or truck tractor, if the distance from the kingpin to the rearmost axle of the semitrailer does not exceed 40 feet for semitrailers having two or more axles, or 38 feet for semitrailers having one axle." The 40 ft figure is the two-or-more-axle case, which is the ordinary tractor-semitrailer. §35400(c) records the date: the Legislature increased "the maximum permissible kingpin to rearmost axle distance to 40 feet effective January 1, 1987" and added that it "does not intend this action to be considered a precedent for any future increases in truck size and length limitations".',
+      ),
+      fromUndatedPage(
+        ftIn(40),
+        CALTRANS_LENGTHS,
+        'Caltrans states the same 40 ft figure for BOTH networks, which is why this is one row and not two: on California Legal routes "the kingpin-to-rearmost-axle (KPRA) distance of the semitrailer does not exceed 40 feet for semitrailers having two or more axles, or 38 feet for semitrailers having one axle", and on STAA routes (National Network and Terminal Access) §35401.5(a)(1) reads "The semitrailer is not more than 53 feet in length, with two or more rear axles and a maximum 40\' KPRA, or with a single axle and a maximum 38-foot KPRA." The KPRA threshold does not vary by network; the semitrailer LENGTH cap does, which is why `trailerLengthIn` stays empty.',
+      ),
+    ],
     /**
      * `overallLengthIn` is ABSENT rather than empty. CVC §35401(a) caps a
      * combination at 65 ft and §35401(b)(1) at 75 ft for a tractor and two

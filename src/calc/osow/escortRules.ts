@@ -43,12 +43,38 @@ export type Tri = true | false | 'unknown';
 /**
  * A measurement an escort rule can test. Units are baked into the name so a
  * rule can never silently compare inches to pounds.
+ *
+ * `kingpinToRearAxleIn` IS THE ONE MEASURE NO PERMIT APPLICATION ASKS FOR, AND
+ * IT IS HERE BECAUSE SEVEN STATES REGULATE ON IT.
+ * ------------------------------------------------------------------------
+ * Kingpin-to-rearmost-axle distance — KPRA — is the distance from the fifth
+ * wheel's kingpin back to the centre of the rearmost axle or the midpoint of
+ * the rear tandem. It is not the trailer's length, it is not the combination's
+ * length, and it cannot be derived from either: two 53 ft trailers with their
+ * tandems slid to different positions have different KPRA and the same length.
+ *
+ * California is the state that forced it. CVC §35400(b)(4) does not cap a
+ * semitrailer's LENGTH at all — it exempts the semitrailer from the 40 ft
+ * single-vehicle cap whenever KPRA is within limits, which is exactly why a
+ * California-legal 53 ft trailer exists and is ordinary. With no KPRA measure
+ * there was no honest number to record for California's semitrailer, and every
+ * California quote went to review over it. Florida, Illinois, New Jersey, New
+ * York, Pennsylvania and Virginia all publish a KPRA limit too, and all of them
+ * currently carry it as prose in a note because the engine had nowhere to put it.
+ *
+ * IT IS OPTIONAL, AND THAT IS THE POINT. A caller that does not supply KPRA
+ * gets exactly the behaviour it got before this measure existed: a KPRA
+ * condition evaluates to `unknown`, never to `false`, and a jurisdiction that
+ * publishes no KPRA limit holds no row and is silent. Supplying KPRA is what
+ * buys a cleaner answer; not supplying it never makes one worse.
  */
 export type Measure =
   | 'widthIn'
   | 'heightIn'
   | 'overallLengthIn'
   | 'trailerLengthIn'
+  /** Kingpin to the rearmost axle (or the rear tandem's midpoint), in inches. */
+  | 'kingpinToRearAxleIn'
   | 'frontOverhangIn'
   | 'rearOverhangIn'
   | 'grossWeightLbs';
@@ -269,6 +295,11 @@ export interface EscortContext {
   heightIn?: number;
   overallLengthIn?: number;
   trailerLengthIn?: number;
+  /**
+   * OPTIONAL, and it must stay optional. Absent means "we were not told", which
+   * makes every KPRA condition `unknown` — never `false`. See `Measure`.
+   */
+  kingpinToRearAxleIn?: number;
   frontOverhangIn?: number;
   rearOverhangIn?: number;
   grossWeightLbs?: number;
@@ -323,6 +354,7 @@ const MEASURE_LABEL: Record<Measure, string> = {
   heightIn: 'height',
   overallLengthIn: 'overall length',
   trailerLengthIn: 'trailer length',
+  kingpinToRearAxleIn: 'kingpin-to-rearmost-axle distance',
   frontOverhangIn: 'front overhang',
   rearOverhangIn: 'rear overhang',
   grossWeightLbs: 'gross weight',

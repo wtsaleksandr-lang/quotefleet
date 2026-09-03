@@ -19,6 +19,11 @@ import {
   ALABAMA_DOUBLES_TRAILER_LENGTH_IN,
   ALABAMA_STINGER_STEERED_LENGTH_IN,
 } from './jurisdictions/alabama.js';
+import {
+  VIRGINIA_ESCORT_RECIPROCITY_SOURCES,
+  VIRGINIA_OSOW_RULES,
+} from './jurisdictions/virginia.js';
+import { CALIFORNIA_OSOW_RULES } from './jurisdictions/california.js';
 
 /**
  * Texas figures asserted here come from TxDMV and the Texas Transportation
@@ -502,8 +507,15 @@ describe('data-model invariants that must hold for every jurisdiction added', ()
         expect(row.source.retrievedOn).toMatch(/^\d{4}-\d{2}-\d{2}$/);
         expect(row.effectiveFrom).toMatch(/^\d{4}-\d{2}-\d{2}$/);
         // `revisedOn` may legitimately be null — an undated document is a
-        // recorded fact. But the field must be present, never undefined.
-        expect(row.source.revisedOn === null || /^\d{4}-\d{2}-\d{2}$/.test(row.source.revisedOn)).toBe(true);
+        // recorded fact. But the field must be present, never undefined. A
+        // PARTIAL date is allowed here and nowhere else: the Virginia Law
+        // Portal states "1989" for §46.2-1124 with no month or day, and both
+        // inventing 1989-01-01 and discarding the year would be worse than
+        // recording what the document actually says. See `SourceDoc.revisedOn`.
+        expect(
+          row.source.revisedOn === null ||
+            /^\d{4}(-\d{2}(-\d{2})?)?$/.test(row.source.revisedOn),
+        ).toBe(true);
       }
     }
   });
@@ -733,6 +745,118 @@ describe('California — a flat $16, priced by route COLOUR rather than road typ
       'ca-note1-conflicts-with-table',
     );
   });
+
+  /**
+   * KPRA — THE OPTIONAL MEASUREMENT THAT UNLOCKS THE STATE.
+   *
+   * California publishes no semitrailer LENGTH limit, so `trailerLengthIn` is
+   * an empty list and the engine has always reported that gap and sent every
+   * California quote to a human. These two tests are a matched pair and both
+   * halves matter: the first pins that a caller who supplies no kingpin
+   * distance gets exactly what it got before, and the second that supplying one
+   * is what buys a clean answer. A change that made California price without
+   * KPRA would fail the first; a change that failed to unlock it would fail the
+   * second.
+   *
+   * The subjective CHP answers are supplied in both, because they are a
+   * separate, unrelated reason California asks for a human and they would mask
+   * the thing under test.
+   */
+  const chpAnswered = {
+    subjectiveAnswers: {
+      'ca-uses-opposing-lanes': false,
+      'ca-slows-crossing-structure': false,
+    },
+  };
+  const fullySpecified = { ...wide13, routeClass: 'ca-yellow' as const, ...chpAnswered };
+
+  it('WITHOUT a kingpin distance, still asks for a human — exactly as before', () => {
+    const r = priceIn('CA', fullySpecified);
+    expect(r.requiresManualReview).toBe(true);
+    expect(r.warnings.join(' ')).toContain(
+      'No California legal trailer length is on file',
+    );
+    // The price itself was never the problem, and has not moved.
+    expect(r.subtotalUsd).toBe(16.37);
+  });
+
+  it('WITH a kingpin distance, prices cleanly and drops the trailer-length gap', () => {
+    const r = priceIn('CA', { ...fullySpecified, kingpinToRearAxleIn: ftIn(38) });
+    expect(r.requiresManualReview).toBe(false);
+    expect(r.warnings.join(' ')).not.toContain(
+      'No California legal trailer length is on file',
+    );
+    expect(r.subtotalUsd).toBe(16.37);
+    expect(r.escorts.undecided).toEqual([]);
+  });
+
+  it('checks the supplied kingpin distance against CVC §35400(b)(4)’s 40 ft', () => {
+    // "does not exceed 40 feet" — inclusive, so 40 ft 0 in is legal.
+    const at40 = priceIn('CA', { ...fullySpecified, kingpinToRearAxleIn: ftIn(40) });
+    expect(at40.overDimension.details.join(' ')).not.toContain('Kingpin');
+    const over40 = priceIn('CA', { ...fullySpecified, kingpinToRearAxleIn: ftIn(40, 6) });
+    expect(over40.overDimension.length).toBe(true);
+    expect(over40.overDimension.details.join(' ')).toContain(
+      'Kingpin-to-rearmost-axle distance 40\'6" exceeds the 40\' legal limit',
+    );
+  });
+
+  it('leaves a legal-size load legal — a kingpin distance never invents a permit', () => {
+    const r = priceIn('CA', {
+      widthIn: 102,
+      heightIn: ftIn(13, 6),
+      overallLengthIn: ftIn(70),
+      grossWeightLbs: 40000,
+      kingpinToRearAxleIn: ftIn(38),
+      routeClass: 'ca-yellow',
+      ...chpAnswered,
+    });
+    expect(r.permitRequired).toBe(false);
+    expect(r.subtotalUsd).toBe(0);
+    expect(r.requiresManualReview).toBe(false);
+  });
+
+  it('records the 40 ft limit from the statute AND from Caltrans, and neither guesses', () => {
+    const rows = CALIFORNIA_OSOW_RULES.legalLimits.kingpinToRearAxleIn ?? [];
+    expect(rows).toHaveLength(2);
+    expect(rows.map((r) => r.value)).toEqual([ftIn(40), ftIn(40)]);
+    // Two publishers agreeing is corroboration, and the resolver must read it
+    // that way rather than as a conflict.
+    const resolved = resolveSourced('CA KPRA', rows, ASOF3);
+    expect(resolved.conflict).toBe(false);
+    expect(resolved.value).toBe(ftIn(40));
+    // The statute dates the figure itself: §35400(c) says the 40 ft KPRA took
+    // effect on 1 January 1987, and that is not backfilled with today's date.
+    const statute = rows.find((r) => r.source.id === 'ca-cvc-35400');
+    expect(statute?.effectiveFrom).toBe('1987-01-01');
+    expect(statute?.source.revisedOn).toBeNull();
+    // The 38 ft single-axle figure is NOT a second row — it is a different
+    // configuration, and recording it here would read as a conflict.
+    expect(rows.some((r) => r.value === ftIn(38))).toBe(false);
+    expect(
+      priceIn('CA', fullySpecified).warnings.join(' '),
+    ).toContain('A SINGLE-AXLE semitrailer is limited to 38 feet');
+  });
+
+  /**
+   * The trailer-length gap must be answered by KPRA only where the state
+   * genuinely regulates that way. Every other jurisdiction publishes a trailer
+   * length, and supplying a kingpin distance must not switch its length check
+   * off.
+   */
+  it('does not let a kingpin distance suppress a state’s real trailer-length check', () => {
+    const over = priceIn('TX', {
+      widthIn: 102,
+      heightIn: ftIn(13),
+      overallLengthIn: ftIn(70),
+      trailerLengthIn: ftIn(70),
+      grossWeightLbs: 79000,
+      kingpinToRearAxleIn: ftIn(38),
+      routeClass: 'divided',
+    });
+    expect(over.overDimension.length).toBe(true);
+    expect(over.overDimension.details.join(' ')).toContain('Trailer length');
+  });
 });
 
 describe('North Carolina — $12 per over-legal dimension, and a height its own documents dispute', () => {
@@ -931,6 +1055,138 @@ describe('Virginia — $20 plus thirty cents a mile, and the steepest escort lad
     expect(r.requiresManualReview).toBe(true);
     expect(r.escorts.applied.map((a) => a.ruleId)).toContain(
       'va-extreme-parameters-travel-plan',
+    );
+  });
+
+  /**
+   * THE UPGRADE FROM A SECOND, MUCH RICHER RESEARCH PASS. Each of these pins a
+   * claim the first pass either did not hold at all or held too weakly.
+   */
+  const overweight200 = {
+    ...base,
+    widthIn: ftIn(12),
+    grossWeightLbs: 100000,
+    routeClass: 'interstate' as const,
+    milesInJurisdiction: 200,
+  };
+
+  // Both of the escort-side advisories below fire ABOVE 12 ft, not at it —
+  // 24VAC20-82-130's ladder starts when the load "exceeds 12 feet in width".
+  const wide13Overweight = { ...overweight200, widthIn: ftIn(13) };
+
+  it('says there is NO state police rate, not that one was not found', () => {
+    const r = priceIn('VA', wide13Overweight);
+    const text = r.warnings.join(' ');
+    expect(text).toContain('Virginia does not have a state police escort rate');
+    expect(text).toContain(
+      'Written authorization from local law-enforcement personnel',
+    );
+    // The old, weaker claim must be gone: "we looked and did not find it"
+    // invites the reader to assume a rate exists somewhere.
+    expect(text).not.toContain('was found in any official source');
+    // A statement about the sources, not a price — the quote still stands.
+    expect(r.requiresManualReview).toBe(false);
+  });
+
+  it('states the unpublished partial-mile rule instead of rounding silently', () => {
+    const r = priceIn('VA', overweight200);
+    expect(r.warnings.join(' ')).toContain(
+      'whether a PART mile is rounded up, rounded down, or billed pro rata',
+    );
+    // Pro rata, to the cent, on a mileage that is not a whole number. A
+    // `Math.ceil` would bill 181 miles here and quietly add 30 cents.
+    const partMile = priceIn('VA', { ...overweight200, milesInJurisdiction: 180.4 });
+    expect(partMile.lines.find((l) => l.code === 'osow_overweight')?.amountUsd).toBe(54.12);
+    expect(partMile.subtotalUsd).toBe(74.12);
+  });
+
+  it('quotes no superload total at all, and names the $30 base and the unpublished damage fee', () => {
+    const r = priceIn('VA', {
+      ...base,
+      widthIn: ftIn(16),
+      grossWeightLbs: 100000,
+      routeClass: 'interstate',
+      milesInJurisdiction: 200,
+    });
+    expect(r.superload).toBe(true);
+    expect(r.subtotalUsd).toBeNull();
+    expect(r.lines).toEqual([]);
+    const text = r.warnings.join(' ');
+    expect(text).toContain('The base fee is $30, not the $20 single-trip figure');
+    expect(text).toContain(
+      'An additional damage fee is added based on the gross weight of the vehicle configuration',
+    );
+    expect(r.escorts.applied.map((a) => a.ruleId)).toContain('va-superload-fee-not-quotable');
+  });
+
+  it('carries the real ages of the statutes behind the weight limits', () => {
+    // §46.2-1124, §46.2-1125 and §46.2-1127 were last amended in 1989 and
+    // §46.2-1126 in 1994. A bare year is what the Virginia Law Portal states,
+    // and it is recorded as a year rather than invented into a full date.
+    const rows = [
+      ...VIRGINIA_OSOW_RULES.legalLimits.singleAxleLbs,
+      ...VIRGINIA_OSOW_RULES.legalLimits.tandemAxleLbs,
+      ...VIRGINIA_OSOW_RULES.legalLimits.grossWeightLbs,
+    ];
+    const statutes = rows.filter((r) => r.source.id.startsWith('va-code-'));
+    expect(statutes).toHaveLength(3);
+    for (const row of statutes) {
+      expect(row.source.revisedOn).toBe('1989');
+      expect(row.effectiveFrom).toBe('1989-07-01');
+    }
+    // The statute rows CORROBORATE the DMV manual rather than conflicting with
+    // it — same numbers, two independent publishers — so nothing goes to review.
+    expect(priceIn('VA', overweight200).requiresManualReview).toBe(false);
+  });
+
+  it('checks the 41 ft kingpin limit only when a kingpin distance is supplied', () => {
+    // §46.2-1112 buys the 53 ft trailer allowance with "not more than 41 feet"
+    // of kingpin distance. Silent when the measurement is absent…
+    const noKpra = priceIn('VA', { ...overweight200, trailerLengthIn: ftIn(53) });
+    expect(noKpra.overDimension.details.join(' ')).not.toContain('Kingpin');
+    expect(noKpra.subtotalUsd).toBe(80);
+    // …and inclusive at exactly 41 ft ("not more than 41 feet").
+    const at41 = priceIn('VA', {
+      ...overweight200,
+      trailerLengthIn: ftIn(53),
+      kingpinToRearAxleIn: ftIn(41),
+    });
+    expect(at41.overDimension.details.join(' ')).not.toContain('Kingpin');
+    const over41 = priceIn('VA', {
+      ...overweight200,
+      trailerLengthIn: ftIn(53),
+      kingpinToRearAxleIn: ftIn(41, 1),
+    });
+    expect(over41.overDimension.length).toBe(true);
+    expect(over41.overDimension.details.join(' ')).toContain(
+      'Kingpin-to-rearmost-axle distance',
+    );
+    // Purely additive: the kingpin check adds a finding, never a review flag or
+    // a different price.
+    expect(over41.subtotalUsd).toBe(80);
+    expect(over41.requiresManualReview).toBe(false);
+  });
+
+  it('records the seven-state escort reciprocity, and that a second DMV page says one', () => {
+    const text = priceIn('VA', wide13Overweight).warnings.join(' ');
+    expect(text).toContain(
+      'Florida Georgia Minnesota North Carolina Oklahoma Utah Washington',
+    );
+    // Both undated pages stay on file; neither is discarded.
+    expect(text).toContain('Currently, we have an agreement with North Carolina.');
+    expect(VIRGINIA_ESCORT_RECIPROCITY_SOURCES.map((s) => s.revisedOn)).toEqual([null, null]);
+  });
+
+  it('requires the utility companies to lift the wires on an extreme move', () => {
+    const r = priceIn('VA', {
+      ...base,
+      widthIn: ftIn(19),
+      grossWeightLbs: 100000,
+      routeClass: 'interstate',
+      milesInJurisdiction: 200,
+    });
+    expect(r.warnings.join(' ')).toContain(
+      'agreeing to accompany the overdimensional configuration to lift overhead wires',
     );
   });
 });
