@@ -1,7 +1,12 @@
 import { describe, it, expect } from 'vitest';
 import { calculateOsow, calculateOsowForJurisdiction } from './engine.js';
-import { TEXAS_OSOW_RULES, hasOsowCoverage, osowRulesFor } from './jurisdictions/texas.js';
-import { applyTransactionFee } from './types.js';
+import {
+  OSOW_JURISDICTIONS,
+  TEXAS_OSOW_RULES,
+  hasOsowCoverage,
+  osowRulesFor,
+} from './jurisdictions/index.js';
+import { applyTransactionFee, oversizeBandApplies } from './types.js';
 import { ftIn } from './escortRules.js';
 
 /**
@@ -434,7 +439,13 @@ describe('coverage helpers', () => {
 });
 
 describe('data-model invariants that must hold for every jurisdiction added', () => {
-  const all = [TEXAS_OSOW_RULES];
+  /**
+   * Read from the registry, not a hand-written list. A new jurisdiction is one
+   * line in `jurisdictions/index.ts`, and these invariants must catch it there
+   * — a separate list here would silently stop covering the newest state, which
+   * is exactly the one most likely to be wrong.
+   */
+  const all = Object.values(OSOW_JURISDICTIONS);
 
   it('every sourced value carries a URL, a retrieval date, and an effective-from', () => {
     for (const j of all) {
@@ -446,8 +457,18 @@ describe('data-model invariants that must hold for every jurisdiction added', ()
         ...j.transactionFee,
         ...j.routeAnalysisFeeUsd,
         ...j.noBridgeRouteFeeUsd,
-        ...j.superload.grossWeight,
+        // OPTIONAL by design: an absent `grossWeight` is Illinois saying it
+        // publishes no numeric superload weight, which is a finding, not a gap.
+        ...(j.superload.grossWeight ?? []),
         ...j.superload.shortSpacing,
+        ...(j.superload.widthIn ?? []),
+        ...(j.superload.heightIn ?? []),
+        ...(j.superload.overallLengthIn ?? []),
+        ...(j.oversizeFeeBands ?? []),
+        ...(j.combinedFeeRule ?? []),
+        ...j.overweightPricing,
+        ...j.overweightPerMile,
+        ...(j.additionalAuthorities ?? []),
         ...j.routeInspection.widthIn,
         ...j.routeInspection.heightIn,
         ...j.routeInspection.lengthIn,
@@ -476,6 +497,7 @@ describe('data-model invariants that must hold for every jurisdiction added', ()
   });
 
   it('no escort rule references a rule id that does not exist', () => {
+    let totalRefs = 0;
     for (const j of all) {
       const ids = new Set(j.escortRules.map((r) => r.id));
       const refs: string[] = [];
@@ -489,8 +511,70 @@ describe('data-model invariants that must hold for every jurisdiction added', ()
         else if (node.of) walk(node.of);
       };
       j.escortRules.forEach((r) => walk(r.when));
-      expect(refs.length).toBeGreaterThan(0);
-      for (const ref of refs) expect(ids.has(ref)).toBe(true);
+      totalRefs += refs.length;
+      for (const ref of refs) {
+        expect(ids.has(ref), `${j.code} references missing rule "${ref}"`).toBe(true);
+      }
+    }
+    // Not every state needs a cross-rule reference — Pennsylvania, New York and
+    // Indiana state their escort rules as independent thresholds. But at least
+    // one must, or the `ruleApplies` grammar is dead code the dataset never
+    // exercises and a regression in it would go unnoticed.
+    expect(totalRefs).toBeGreaterThan(0);
+  });
+
+  /**
+   * THE INVARIANT THE WHOLE OVERSIZE SCHEDULE RESTS ON.
+   *
+   * `OversizeFeeBand` bands must be mutually exclusive WITHIN one published
+   * schedule, or the resolver reads two band amounts as two sources disagreeing
+   * about one fee and refuses to price a load that is unambiguously in one
+   * band. Grouping by source id is what preserves the disagreements that ARE
+   * real: Pennsylvania deliberately holds an overlapping statutory schedule
+   * ($35/$71) against PennDOT's current one ($46/$97), and that cross-schedule
+   * overlap is the conflict the engine exists to surface.
+   *
+   * Distances are sampled strictly INSIDE Illinois's mileage steps. The statute
+   * writes "For the first 90 miles" and then "From 90 miles to 180 miles", so a
+   * leg of exactly 90 miles is named by both steps and correctly resolves as a
+   * range — an ambiguity in the source, not a defect in the encoding.
+   */
+  it('oversize fee bands from one source never overlap with different fees', () => {
+    const widths = [96, 102, 120, 144, 150, 162, 168, 174, 180, 192, 200, 204, 216, 240];
+    const heights = [162, 168, 174, 176, 180, 186, 192, 200, 216];
+    const lengths = [600, 840, 900, 1020, 1140, 1200, 1320, 1400, 1440, 1800];
+    const mileages = [45, 135, 225, 400];
+
+    for (const j of all) {
+      const bands = j.oversizeFeeBands;
+      if (bands === undefined) continue;
+      for (const widthIn of widths) {
+        for (const heightIn of heights) {
+          for (const overallLengthIn of lengths) {
+            for (const milesInJurisdiction of mileages) {
+              const bySource = new Map<string, Set<number>>();
+              for (const row of bands) {
+                const verdict = oversizeBandApplies(row.value, {
+                  widthIn,
+                  heightIn,
+                  overallLengthIn,
+                  milesInJurisdiction,
+                });
+                if (verdict.applies !== true) continue;
+                const seen = bySource.get(row.source.id) ?? new Set<number>();
+                seen.add(row.value.feeUsd);
+                bySource.set(row.source.id, seen);
+              }
+              for (const [sourceId, fees] of bySource) {
+                expect(
+                  [...fees],
+                  `${j.code} ${sourceId} gives ${fees.size} different fees for ${widthIn}in x ${heightIn}in x ${overallLengthIn}in over ${milesInJurisdiction} mi`,
+                ).toHaveLength(1);
+              }
+            }
+          }
+        }
+      }
     }
   });
 
