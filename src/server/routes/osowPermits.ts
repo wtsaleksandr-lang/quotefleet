@@ -71,6 +71,7 @@ import { OSOW_JURISDICTIONS, hasOsowCoverage } from '../../calc/osow/jurisdictio
 import { todayIso } from '../../calc/osow/provenance.js';
 import { US_STATES, US_STATE_CODES, stateByCode } from '../directory/usStates.js';
 import { publicCalcLimiter } from '../rateLimits.js';
+import { setPublicDirectoryCache } from '../directory/httpCache.js';
 import { FULL_SITE_HEADER, PREMIUM_FOOTER, HEADER_SCRIPTS } from '../siteChrome.js';
 
 const SITE = 'https://quotefleet.net';
@@ -697,8 +698,15 @@ export function renderOsowToolPage(): string {
 // ── Routes ─────────────────────────────────────────────────────────────────
 
 export function registerOsowPermitRoutes(app: Express) {
-  app.get([OSOW_TOOL_PATH, `${OSOW_TOOL_PATH}/`], (_req: Request, res: Response, next) => {
+  /**
+   * The page is byte-identical for every visitor — a static form over compiled
+   * jurisdiction data, no DB read and no per-user branch — so it is exactly the
+   * CDN-cacheable shape `setPublicDirectoryCache` exists for. Without it
+   * Cloudflare treats the route as dynamic and every crawler hit reaches origin.
+   */
+  app.get([OSOW_TOOL_PATH, `${OSOW_TOOL_PATH}/`], (req: Request, res: Response, next) => {
     try {
+      setPublicDirectoryCache(req, res);
       res.type('html').send(renderOsowToolPage());
     } catch (err) {
       next(err);
