@@ -33,7 +33,6 @@
 import {
   isInEffect,
   resolveSourced,
-  spreadOf,
   citeOf,
   todayIso,
   type IsoDate,
@@ -80,7 +79,23 @@ import {
   type Threshold,
   type WeightBand,
 } from './types.js';
+import {
+  absorbedTotalUsd,
+  aggregateExceedsThreshold,
+  aggregateReviewWarning,
+  priceSourced,
+  type AbsorbedFeeConflict,
+} from './materiality.js';
 import { osowRulesFor } from './jurisdictions/index.js';
+
+/**
+ * Re-exported so a caller pricing an OS/OW move never has to reach past the
+ * engine for the number the engine used, or for the shape of what it absorbed.
+ */
+export {
+  IMMATERIAL_CONFLICT_THRESHOLD_USD,
+  type AbsorbedFeeConflict,
+} from './materiality.js';
 
 export interface OsowLoad {
   grossWeightLbs?: number;
@@ -162,20 +177,58 @@ export interface OsowJurisdictionResult {
   routeInspectionRequired: boolean | null;
   warnings: string[];
   requiresManualReview: boolean;
+  /**
+   * THE DATA-QUALITY CHANNEL — internal, not customer copy.
+   *
+   * `requiresManualReview` used to carry two different claims at once: "we
+   * cannot give you a reliable number" and "our sources disagree". Only the
+   * first is a reason to stop a quote. Splitting them lets an immaterial fee
+   * disagreement resolve to the higher figure and price cleanly, WITHOUT the
+   * finding being lost — every absorbed conflict lands here with its candidates,
+   * its documents and its dollar spread, exactly as an escort `advisory` states
+   * a real exclusion in `warnings[]` without invalidating the price.
+   */
+  dataQuality: string[];
+  /** Fee conflicts quoted at the higher figure instead of escalated. */
+  absorbedConflicts: AbsorbedFeeConflict[];
+  /** Money those decisions moved in this jurisdiction. See the aggregate cap. */
+  absorbedConflictTotalUsd: number;
   sources: SourceDoc[];
   asOf: IsoDate;
 }
 
-function pushSources(into: SourceDoc[], from: Resolution<unknown>): void {
+/**
+ * Structural, so a `Resolution<T>` and a `PricedResolution<T>` are both
+ * acceptable — the citation list only ever needs the candidate rows.
+ */
+interface HasCandidates {
+  candidates: ReadonlyArray<{ source: SourceDoc }>;
+}
+
+function pushSources(into: SourceDoc[], from: HasCandidates): void {
   for (const c of from.candidates) {
     if (!into.some((s) => s.id === c.source.id)) into.push(c.source);
   }
 }
 
-function sourcesOf(r: Resolution<unknown>): SourceDoc[] {
+function sourcesOf(r: HasCandidates): SourceDoc[] {
   const out: SourceDoc[] = [];
   pushSources(out, r);
   return out;
+}
+
+/**
+ * The honest RANGE fields on a fee line — present only when a disagreement was
+ * escalated. An ABSORBED conflict deliberately shows no range: it resolved to
+ * the higher figure and prices like any settled line, and printing "$8–$10"
+ * beside a $10 amount would re-raise the very question the threshold settled.
+ */
+function rangeOf(priced: { lowUsd: number | null; highUsd: number | null }): {
+  lowUsd?: number;
+  highUsd?: number;
+} {
+  if (priced.lowUsd === null || priced.highUsd === null) return {};
+  return { lowUsd: priced.lowUsd, highUsd: priced.highUsd };
 }
 
 /**
@@ -266,9 +319,37 @@ export function calculateOsowForJurisdiction(
   asOf: IsoDate = todayIso(),
 ): OsowJurisdictionResult {
   const warnings: string[] = [];
+  const dataQuality: string[] = [];
+  const absorbedConflicts: AbsorbedFeeConflict[] = [];
   const sources: SourceDoc[] = [];
   const lines: OsowFeeLine[] = [];
   let requiresManualReview = false;
+  /**
+   * A LIVE DISAGREEMENT ABOUT A REQUIREMENT SWITCHES FEE ABSORPTION OFF FOR THE
+   * WHOLE JURISDICTION.
+   *
+   * `materiality.ts` may only ever settle money. This flag is the fence around
+   * that: when this state's own sources disagree about a legal limit, a
+   * permit-vs-no-permit threshold, an escort trigger, a superload trigger, how
+   * the state prices at all, how the two components combine, or whether a second
+   * agency also issues, then EVERY fee conflict here is escalated exactly as it
+   * was before this feature existed — at any dollar value.
+   *
+   * The reason it is jurisdiction-wide rather than per-field is that these
+   * disagreements are not independent of the fee. North Carolina is the case:
+   * its statute says the legal height is 14 ft and the EVO Handbook says
+   * 13 ft 6 in, and the $12-per-over-legal-dimension schedule therefore prints
+   * $12 or $24 for the same load. The $12 gap is small; what is actually in
+   * dispute is whether the load is over height at all, which is not a rounding
+   * question. Absorbing the fee would put a confident $24 beside "we cannot tell
+   * whether this needs a height permit".
+   *
+   * "LIVE" is doing real work. A dormant disagreement — Indiana's three
+   * superload weights, on a load far below all three — does not gate anything,
+   * for the same reason the engine already declines to warn about it: noise on a
+   * settled question trains people to ignore the warning that matters.
+   */
+  let requirementConflict = false;
   /**
    * An explicit count wins over the layout, and the layout answers when only it
    * is given. `undefined` stays `undefined` — never 0 — so a per-axle band is
@@ -345,6 +426,9 @@ export function calculateOsowForJurisdiction(
     pushSources(sources, r);
     warnings.push(...r.warnings);
     if (r.requiresManualReview) requiresManualReview = true;
+    // A legal limit is the permit-vs-no-permit threshold itself. Two sources
+    // disagreeing about it is never a rounding question.
+    if (r.conflict) requirementConflict = true;
   }
 
   const details: string[] = [];
@@ -443,6 +527,7 @@ export function calculateOsowForJurisdiction(
       if (gross !== undefined && gross > hi) {
         // Above every candidate: a superload on any reading of the sources.
         superload = true;
+        requirementConflict = true;
         warnings.push(
           `This load is a superload in ${rules.name}: ${gross.toLocaleString()} lb is over every published threshold on file (${lo.toLocaleString()}–${hi.toLocaleString()} lb, sources disagree). A superload has no over-the-counter fee — the agency prices it after review.`,
         );
@@ -455,6 +540,7 @@ export function calculateOsowForJurisdiction(
             : `This load's gross weight (${gross.toLocaleString()} lb) falls inside the band where ${rules.name}'s own sources disagree about the superload threshold (${lo.toLocaleString()}–${hi.toLocaleString()} lb), so whether it is issued as an ordinary permit or a superload cannot be determined from the published rules.`,
         );
         requiresManualReview = true;
+        requirementConflict = true;
       }
     } else {
       warnings.push(...superloadWeight.warnings);
@@ -500,6 +586,7 @@ export function calculateOsowForJurisdiction(
       const hi = Math.max(...values);
       if (measurement > hi) {
         superload = true;
+        requirementConflict = true;
         warnings.push(
           `This load is a superload in ${rules.name} on ${label} alone: ${formatFtIn(measurement)} is over every published threshold on file. A superload is not issued over the counter — the agency prices it after review.`,
         );
@@ -510,6 +597,7 @@ export function calculateOsowForJurisdiction(
           `This load's ${label} (${formatFtIn(measurement)}) sits exactly where ${rules.name}'s own sources disagree about the superload threshold, so whether it is issued over the counter cannot be determined from the published rules.`,
         );
         requiresManualReview = true;
+        requirementConflict = true;
       }
       continue;
     }
@@ -577,6 +665,7 @@ export function calculateOsowForJurisdiction(
           `This load's ${label} (${formatFtIn(measurement)}) falls exactly in the band where the two sources disagree, so whether a route inspection is required cannot be determined from the published rules.`,
         );
         requiresManualReview = true;
+        requirementConflict = true;
         routeInspectionRequired = null;
       } else if (measurement !== undefined && measurement > hi) {
         routeInspectionRequired = true;
@@ -629,17 +718,99 @@ export function calculateOsowForJurisdiction(
   for (const r of rules.escortRules) {
     if (!sources.some((s) => s.id === r.source.id)) sources.push(r.source);
   }
+  /**
+   * Escort trigger boundaries are carried as rules that FIRE with a
+   * `manualReview` reason — Alabama at exactly 12 ft wide, North Carolina's
+   * front-and-rear at exactly 150 ft, Georgia's two-lane width band, Colorado's
+   * 80,000-vs-85,000 interstate gross. One extra or missing pilot car on a
+   * 1,200-mile run is $2,400–3,600 and an under-escorted load gets stopped, so
+   * none of these is a rounding question at any dollar value.
+   *
+   * A rule that fired and said "this cannot be turned into a number" is a
+   * live requirement disagreement and gates absorption. `undecided` rules are
+   * NOT: a missing measurement or an unanswered subjective question is a gap in
+   * what we were told, not a quarrel between two documents, and it is already
+   * reported on its own terms.
+   */
+  if (escorts.applied.some((a) => a.outcome.manualReview !== undefined)) {
+    requirementConflict = true;
+  }
+
+  /**
+   * HOISTED, RESOLUTION ONLY. These three describe REQUIREMENTS — how the state
+   * prices at all, how the two components combine, and whether a second agency
+   * also issues — so the absorption gate has to know about them before the fee
+   * block runs. Resolving is pure; the warnings, the source citations and the
+   * review flags are all still raised at their original places below, unchanged
+   * and under their original conditions.
+   */
+  const overweightModelRes = resolveSourced<OverweightPricing>(
+    `${rules.code} overweight pricing model`,
+    rules.overweightPricing,
+    asOf,
+    overweightPricingEqual,
+  );
+  const combineRes = resolveIfPresent<CombinedFeeRule>(
+    `${rules.code} combined oversize/overweight fee rule`,
+    rules.combinedFeeRule,
+    asOf,
+    combinedFeeRulesEqual,
+  );
+  const authRes = resolveIfPresent<AdditionalAuthority>(
+    `${rules.code} additional permitting authorities`,
+    rules.additionalAuthorities,
+    asOf,
+    additionalAuthoritiesEqual,
+  );
+  /**
+   * `authRes.conflict` is deliberately NOT consulted. `additionalAuthorities`
+   * is a LIST of distinct issuers, not competing candidates for one value —
+   * New York holds three (the Thruway Authority, the Bridge Authority and New
+   * York City) — so the resolver reports them as "disagreeing" when nothing is
+   * in dispute at all. The engine already ignores `authRes.value` and iterates
+   * the candidates for exactly that reason, and an unpriceable second permit
+   * still sets `requiresManualReview` on its own terms below. Gating on that
+   * false positive would have blocked every absorption in New York over a
+   * disagreement that does not exist.
+   */
+  if (
+    (overDimension.weight && overweightModelRes.conflict) ||
+    combineRes?.conflict === true
+  ) {
+    requirementConflict = true;
+  }
+
+  /** Fee conflicts may only settle themselves when no requirement is in dispute. */
+  const absorb = !requirementConflict;
+  const priceOf = <T>(
+    resolution: Resolution<T>,
+    amountOf: (value: T) => number | null,
+  ) => {
+    const priced = priceSourced(resolution, amountOf, { absorb });
+    if (priced.absorbed !== null) absorbedConflicts.push(priced.absorbed);
+    dataQuality.push(...priced.dataQuality);
+    return priced;
+  };
 
   // ── 6. Fees ───────────────────────────────────────────────────────────
   // A superload has no published fee schedule. Emitting the general permit's
   // $60 + $375 here would be a confident number the sources do not support,
   // so the priced lines are skipped entirely and the review flag carries it.
   if (permitRequired && !superload) {
-    const base = resolveSourced(`${rules.code} single-trip permit base fee`, rules.permitBaseFeeUsd, asOf);
+    /**
+     * New York is the live case for absorption here: NYSDOT's own fee page and
+     * the Highway Law print $40 and $60 for the same single-trip permit. Twenty
+     * dollars on a permit that rides a five-figure move is not a decision worth
+     * a human, so the higher figure prices and the finding goes to
+     * `dataQuality`. See `materiality.ts`.
+     */
+    const base = priceOf(
+      resolveSourced(`${rules.code} single-trip permit base fee`, rules.permitBaseFeeUsd, asOf),
+      (v) => v,
+    );
     pushSources(sources, base);
     warnings.push(...base.warnings);
     if (base.requiresManualReview) requiresManualReview = true;
-    const baseSpread = spreadOf(base);
     /**
      * A SOURCED ZERO base beside a dimension-banded schedule is not a fee; it
      * is the recorded fact that the state charges nothing on top of the band
@@ -654,8 +825,8 @@ export function calculateOsowForJurisdiction(
       lines.push({
         code: 'osow_permit_base',
         name: `${rules.name} single-trip permit`,
-        amountUsd: base.value,
-        ...(base.conflict ? { lowUsd: baseSpread.low ?? undefined, highUsd: baseSpread.high ?? undefined } : {}),
+        amountUsd: base.amountUsd,
+        ...rangeOf(base),
         sources: sourcesOf(base),
       });
     }
@@ -733,22 +904,30 @@ export function calculateOsowForJurisdiction(
         );
         requiresManualReview = true;
       } else {
-        const bandRes = resolveSourced<OversizeFeeBand>(
-          `${rules.code} oversize fee band`,
-          matched,
-          asOf,
-          oversizeFeeBandsEqual,
+        /**
+         * Louisiana's LAC $8 against the statute's $10, and Pennsylvania's
+         * §1942 $35/$71 against PennDOT's CPI-adjusted $46/$97, both land here.
+         * The band's fee IS the amount for this load, so the deferral is a
+         * no-op arithmetically — but it goes through the same path as the
+         * per-mile and per-axle cases so there is one rule, not a flat-fee
+         * special case. See `materiality.ts`, rule 3.
+         */
+        const bandRes = priceOf(
+          resolveSourced<OversizeFeeBand>(
+            `${rules.code} oversize fee band`,
+            matched,
+            asOf,
+            oversizeFeeBandsEqual,
+          ),
+          (b) => b.feeUsd,
         );
         warnings.push(...bandRes.warnings);
         if (bandRes.requiresManualReview) requiresManualReview = true;
-        const fees = bandRes.candidates.map((c) => c.value.feeUsd);
         oversizeLine = {
           code: 'osow_oversize',
           name: `${rules.name} oversize permit fee`,
-          amountUsd: bandRes.value === null ? null : bandRes.value.feeUsd,
-          ...(bandRes.conflict && fees.length > 0
-            ? { lowUsd: Math.min(...fees), highUsd: Math.max(...fees) }
-            : {}),
+          amountUsd: bandRes.amountUsd,
+          ...rangeOf(bandRes),
           ...(bandRes.value === null ? {} : { note: bandRes.value.label }),
           sources: sourcesOf(bandRes),
         };
@@ -761,12 +940,9 @@ export function calculateOsowForJurisdiction(
     let overweightLine: OsowFeeLine | null = null;
     if (overDimension.weight && load.grossWeightLbs !== undefined) {
       const gross = load.grossWeightLbs;
-      const modelRes = resolveSourced<OverweightPricing>(
-        `${rules.code} overweight pricing model`,
-        rules.overweightPricing,
-        asOf,
-        overweightPricingEqual,
-      );
+      // Resolved above so the absorption gate could see it; cited and warned
+      // about here, exactly where it always was.
+      const modelRes = overweightModelRes;
       pushSources(sources, modelRes);
       warnings.push(...modelRes.warnings);
       if (modelRes.requiresManualReview) requiresManualReview = true;
@@ -832,31 +1008,32 @@ export function calculateOsowForJurisdiction(
             break;
           }
 
-          const bandRes = resolveSourced<WeightBand>(
-            `${rules.code} overweight fee band`,
-            bandMatched,
-            asOf,
-            weightBandsEqual,
+          /**
+           * DEFERRED: the amount, not the published row, is what gets compared.
+           * A Colorado band is "$30 plus $10 per axle", so two sources one
+           * dollar apart per axle are $6 apart on a six-axle rig and $11 apart
+           * on an eleven-axle one. `weightBandAmount` answers `null` without an
+           * axle count, which `priceSourced` treats as "no higher figure to
+           * take" and escalates rather than absorbs.
+           */
+          const bandRes = priceOf(
+            resolveSourced<WeightBand>(
+              `${rules.code} overweight fee band`,
+              bandMatched,
+              asOf,
+              weightBandsEqual,
+            ),
+            (b) => weightBandAmount(b, axleCount),
           );
           pushSources(sources, bandRes);
           warnings.push(...bandRes.warnings);
           if (bandRes.requiresManualReview) requiresManualReview = true;
-          const spread = { low: null as number | null, high: null as number | null };
-          if (bandRes.conflict) {
-            const fees = bandRes.candidates
-              .map((c) => weightBandAmount(c.value, axleCount))
-              .filter((f): f is number => f !== null);
-            if (fees.length > 0) {
-              spread.low = Math.min(...fees);
-              spread.high = Math.max(...fees);
-            }
-          }
           const band = bandRes.value;
           overweightLine = {
             code: 'osow_overweight',
             name: 'Overweight permit charge',
-            amountUsd: band === null ? null : weightBandAmount(band, axleCount),
-            ...(bandRes.conflict ? { lowUsd: spread.low ?? undefined, highUsd: spread.high ?? undefined } : {}),
+            amountUsd: bandRes.amountUsd,
+            ...rangeOf(bandRes),
             note: band === null
               ? undefined
               : `${band.minLbs.toLocaleString()}–${band.maxLbs === null ? 'over' : band.maxLbs.toLocaleString()} lb band${band.perAxleUsd === undefined ? '' : `, $${band.perAxleUsd.toFixed(2)} per axle × ${axleCount ?? 0} axles`}`,
@@ -894,29 +1071,36 @@ export function calculateOsowForJurisdiction(
             requiresManualReview = true;
             break;
           }
-          const rateRes = resolveSourced<PerMileRate>(
-            `${rules.code} overweight per-mile rate`,
-            rules.overweightPerMile.filter((r) => {
-              const v = r.value;
-              return gross >= v.minLbs && (v.maxLbs === null || gross <= v.maxLbs);
-            }),
-            asOf,
-            perMileRatesEqual,
+          /**
+           * THE CASE THAT FORCED DEFERRAL. Virginia charges $0.30 a mile and
+           * New Jersey $5.00 per 2,000 lb, so a disagreement that reads as a
+           * fraction of a cent in the statute is multiplied by the distance and
+           * the weight of THIS move before it means anything. A 1.2-cent
+           * per-mile quarrel is $12 over 1,000 miles and $60 over 5,000, and the
+           * threshold has to see those as two different questions — which it
+           * only can if the rate is priced first and compared second.
+           */
+          const rateRes = priceOf(
+            resolveSourced<PerMileRate>(
+              `${rules.code} overweight per-mile rate`,
+              rules.overweightPerMile.filter((r) => {
+                const v = r.value;
+                return gross >= v.minLbs && (v.maxLbs === null || gross <= v.maxLbs);
+              }),
+              asOf,
+              perMileRatesEqual,
+            ),
+            (r) => perMileAmount(r, gross, miles),
           );
           pushSources(sources, rateRes);
           warnings.push(...rateRes.warnings);
           if (rateRes.requiresManualReview) requiresManualReview = true;
-          const amounts = rateRes.candidates.map((c) =>
-            perMileAmount(c.value, gross, miles),
-          );
           const rate = rateRes.value;
           overweightLine = {
             code: 'osow_overweight',
             name: 'Overweight permit (distance-priced)',
-            amountUsd: rate === null ? null : perMileAmount(rate, gross, miles),
-            ...(rateRes.conflict && amounts.length > 0
-              ? { lowUsd: Math.min(...amounts), highUsd: Math.max(...amounts) }
-              : {}),
+            amountUsd: rateRes.amountUsd,
+            ...rangeOf(rateRes),
             note:
               rate === null
                 ? undefined
@@ -970,12 +1154,6 @@ export function calculateOsowForJurisdiction(
      * every combined permit it issues. The rule is sourced data; absent means
      * cumulative. See `CombinedFeeRule`.
      */
-    const combineRes = resolveIfPresent<CombinedFeeRule>(
-      `${rules.code} combined oversize/overweight fee rule`,
-      rules.combinedFeeRule,
-      asOf,
-      combinedFeeRulesEqual,
-    );
     if (combineRes !== null) {
       pushSources(sources, combineRes);
       warnings.push(...combineRes.warnings);
@@ -1027,11 +1205,14 @@ export function calculateOsowForJurisdiction(
 
     // Conditional fees (Texas's Vehicle Supervision Fee).
     for (const cf of rules.conditionalFees) {
-      const res = resolveSourced(
-        `${rules.code} conditional fee`,
-        rules.conditionalFees.filter((x) => conditionalFeesEqual(x.value, cf.value)),
-        asOf,
-        conditionalFeesEqual,
+      const res = priceOf(
+        resolveSourced(
+          `${rules.code} conditional fee`,
+          rules.conditionalFees.filter((x) => conditionalFeesEqual(x.value, cf.value)),
+          asOf,
+          conditionalFeesEqual,
+        ),
+        (c) => c.feeUsd,
       );
       if (res.value === null) continue;
       if (load.grossWeightLbs === undefined) continue;
@@ -1041,7 +1222,8 @@ export function calculateOsowForJurisdiction(
       lines.push({
         code: 'osow_supervision',
         name: 'Vehicle supervision fee',
-        amountUsd: res.value.feeUsd,
+        amountUsd: res.amountUsd,
+        ...rangeOf(res),
         note: `Applies over ${res.value.appliesAbove.value.toLocaleString()} lb`,
         sources: sourcesOf(res),
       });
@@ -1049,22 +1231,35 @@ export function calculateOsowForJurisdiction(
 
     // Payment processing — a percentage of everything above, so it is
     // computed last and only when every preceding line resolved.
-    const txRes = resolveSourced<import('./types.js').TransactionFee>(
-      `${rules.code} permit transaction fee`,
-      rules.transactionFee,
-      asOf,
-      transactionFeesEqual,
-    );
-    pushSources(sources, txRes);
-    warnings.push(...txRes.warnings);
     const pricedSoFar = lines.every((l) => l.amountUsd !== null)
       ? lines.reduce((s, l) => s + (l.amountUsd ?? 0), 0)
       : null;
+    /**
+     * The percentage surcharge is the one fee that is inherently computed on
+     * the finished subtotal, so its own conflict — two sources quoting
+     * different card percentages — is measured in the dollars it produces for
+     * THIS permit. 2.25% against 2.30% is three cents on a $60 permit and ten
+     * dollars on a $20,000 one. Where the subtotal is not yet known the
+     * surcharge cannot be costed at all, and a conflict about it escalates.
+     */
+    const txRes = priceOf(
+      resolveSourced<import('./types.js').TransactionFee>(
+        `${rules.code} permit transaction fee`,
+        rules.transactionFee,
+        asOf,
+        transactionFeesEqual,
+      ),
+      (t) => (pricedSoFar === null ? null : applyTransactionFee(pricedSoFar, t)),
+    );
+    pushSources(sources, txRes);
+    warnings.push(...txRes.warnings);
+    if (txRes.requiresManualReview && txRes.conflict) requiresManualReview = true;
     if (txRes.value !== null && pricedSoFar !== null) {
       lines.push({
         code: 'osow_service_fee',
         name: 'Permit service fee',
-        amountUsd: applyTransactionFee(pricedSoFar, txRes.value),
+        amountUsd: txRes.amountUsd,
+        ...rangeOf(txRes),
         note: `$${txRes.value.perPermitUsd.toFixed(2)} per permit plus ${txRes.value.percentOfTotal}% of the permit total`,
         sources: sourcesOf(txRes),
       });
@@ -1103,12 +1298,6 @@ export function calculateOsowForJurisdiction(
   // worse than an obviously incomplete one, because nothing on the quote says
   // to go looking. So an unpriceable second authority sets review outright.
   if (permitRequired && rules.additionalAuthorities !== undefined) {
-    const authRes = resolveIfPresent<AdditionalAuthority>(
-      `${rules.code} additional permitting authorities`,
-      rules.additionalAuthorities,
-      asOf,
-      additionalAuthoritiesEqual,
-    );
     for (const cand of authRes?.candidates ?? []) {
       const a = cand.value;
       if (!sources.some((s) => s.id === cand.source.id)) sources.push(cand.source);
@@ -1149,6 +1338,25 @@ export function calculateOsowForJurisdiction(
     ? Math.round(lines.reduce((s, l) => s + (l.highUsd ?? l.amountUsd ?? 0), 0) * 100) / 100
     : subtotalUsd;
 
+  /**
+   * THE AGGREGATE CAP, at the jurisdiction level. Several small absorptions in
+   * one state can add up past the point where "immaterial" is still true, so
+   * the same threshold is applied to their sum. The adopted prices STAY — they
+   * are the higher, conservative reading of each source and nothing about them
+   * became less true — but the quote is surfaced for a human.
+   */
+  const jurisdictionAbsorbedUsd = absorbedTotalUsd(absorbedConflicts);
+  if (aggregateExceedsThreshold(jurisdictionAbsorbedUsd)) {
+    requiresManualReview = true;
+    warnings.push(
+      aggregateReviewWarning(
+        jurisdictionAbsorbedUsd,
+        absorbedConflicts.length,
+        rules.name,
+      ),
+    );
+  }
+
   return {
     jurisdiction: rules.code,
     jurisdictionName: rules.name,
@@ -1165,6 +1373,9 @@ export function calculateOsowForJurisdiction(
     routeInspectionRequired,
     warnings,
     requiresManualReview,
+    dataQuality,
+    absorbedConflicts,
+    absorbedConflictTotalUsd: jurisdictionAbsorbedUsd,
     sources,
     asOf,
   };
@@ -1187,6 +1398,17 @@ export interface OsowQuote {
   totalEscortsRequired: number;
   warnings: string[];
   requiresManualReview: boolean;
+  /** Internal data-quality notes across every jurisdiction on the lane. */
+  dataQuality: string[];
+  /** Every fee conflict quoted at the higher figure instead of escalated. */
+  absorbedConflicts: AbsorbedFeeConflict[];
+  /**
+   * Money those decisions moved across the WHOLE quote. Five states each
+   * papering over $40 is $200, and the cap is applied here as well as
+   * per-jurisdiction so that spreading a material amount thinly across a
+   * corridor cannot slip past it.
+   */
+  absorbedConflictTotalUsd: number;
   asOf: IsoDate;
 }
 
@@ -1326,6 +1548,29 @@ export function calculateOsow(
     ? null
     : Math.round(jurisdictions.reduce((s, j) => s + (j.subtotalUsd ?? 0), 0) * 100) / 100;
 
+  /**
+   * THE AGGREGATE CAP, at the quote level. Each jurisdiction has already
+   * checked its own total; this catches the case the per-state check cannot see,
+   * where several states each absorb an amount that is immaterial alone and
+   * material together. The prices stand and the quote goes to a human.
+   */
+  const absorbedConflicts = jurisdictions.flatMap((j) => j.absorbedConflicts);
+  const quoteAbsorbedUsd = absorbedTotalUsd(absorbedConflicts);
+  if (aggregateExceedsThreshold(quoteAbsorbedUsd) && !jurisdictions.some(
+    (j) => aggregateExceedsThreshold(j.absorbedConflictTotalUsd),
+  )) {
+    // Only when no single state already said it — otherwise the same finding
+    // would be printed twice on one quote.
+    warnings.push(
+      aggregateReviewWarning(
+        quoteAbsorbedUsd,
+        absorbedConflicts.length,
+        'this lane',
+      ),
+    );
+  }
+  if (aggregateExceedsThreshold(quoteAbsorbedUsd)) requiresManualReview = true;
+
   return {
     jurisdictions,
     uncoveredJurisdictions: uncovered,
@@ -1336,6 +1581,9 @@ export function calculateOsow(
     ),
     warnings,
     requiresManualReview,
+    dataQuality: jurisdictions.flatMap((j) => j.dataQuality),
+    absorbedConflicts,
+    absorbedConflictTotalUsd: quoteAbsorbedUsd,
     asOf,
   };
 }

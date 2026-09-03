@@ -1941,7 +1941,15 @@ describe('Louisiana — a fee table with two dimensions', () => {
     expect(both.lines.some((l) => l.code === 'osow_oversize')).toBe(false);
   });
 
-  it('refuses to pick between the administrative code’s $8 and the statute’s $10', () => {
+  /**
+   * WAS: "refuses to pick between the administrative code's $8 and the
+   * statute's $10". The refusal was correct in principle and wrong in practice —
+   * it sent a $2 disagreement to a human on a move worth thousands. See
+   * `materiality.ts` for Alex's direction and the reasoning. The candidates,
+   * their documents and the spread are all still on file; what changed is that
+   * $2 is quoted at $10 instead of being escalated.
+   */
+  it('quotes the statute’s $10 over the administrative code’s $8, and does not ask a human about $2', () => {
     const oversizeOnly = priceIn5('LA', {
       ...legalSize,
       widthIn: ftIn(13),
@@ -1949,15 +1957,35 @@ describe('Louisiana — a fee table with two dimensions', () => {
       milesInJurisdiction: 100,
     });
     const line = oversizeOnly.lines.find((l) => l.code === 'osow_oversize');
-    expect(line?.amountUsd).toBeNull();
-    expect(line?.lowUsd).toBe(8);
-    expect(line?.highUsd).toBe(10);
-    expect(oversizeOnly.subtotalUsd).toBeNull();
-    expect(oversizeOnly.subtotalLowUsd).toBe(8);
-    expect(oversizeOnly.subtotalHighUsd).toBe(10);
-    expect(oversizeOnly.requiresManualReview).toBe(true);
-    // The researcher's supersession argument is recorded and NOT applied.
-    expect(oversizeOnly.warnings.join(' ')).toContain('Official sources disagree');
+    // The HIGHER figure, never the lower — the customer is not under-quoted.
+    expect(line?.amountUsd).toBe(10);
+    // …and the line's EXPLANATION is the winning row's, not the loser's. A $10
+    // amount captioned "administrative code: $8" would be a quote that
+    // contradicts itself in the same sentence.
+    expect(line?.note).toContain('statute: $10');
+    expect(line?.note).not.toContain('administrative code');
+    // No range: an absorbed conflict prices like any settled line.
+    expect(line?.lowUsd).toBeUndefined();
+    expect(line?.highUsd).toBeUndefined();
+    expect(oversizeOnly.subtotalUsd).toBe(10);
+    expect(oversizeOnly.requiresManualReview).toBe(false);
+    expect(oversizeOnly.warnings.join(' ')).not.toContain('Official sources disagree');
+    // …and the finding is not lost. It moves to the internal channel with both
+    // candidates, both documents and the dollar spread.
+    expect(oversizeOnly.absorbedConflicts).toHaveLength(1);
+    const absorbed = oversizeOnly.absorbedConflicts[0];
+    expect(absorbed?.lowUsd).toBe(8);
+    expect(absorbed?.highUsd).toBe(10);
+    expect(absorbed?.spreadUsd).toBe(2);
+    expect(absorbed?.adoptedUsd).toBe(10);
+    expect(oversizeOnly.absorbedConflictTotalUsd).toBe(2);
+    expect(absorbed?.candidates.map((c) => c.source.id).sort()).toEqual(
+      ['la-lac-73-i-303', 'la-rs-32-387'].sort(),
+    );
+    expect(oversizeOnly.dataQuality.join(' ')).toContain('LA oversize fee band');
+    // The researcher's supersession argument is still not what decided it: the
+    // threshold did, and it took the larger figure rather than the argued one.
+    expect(oversizeOnly.dataQuality.join(' ')).toContain('materiality threshold');
   });
 
   it('swaps the pilot car for a trooper past 16 feet, rather than adding one', () => {
