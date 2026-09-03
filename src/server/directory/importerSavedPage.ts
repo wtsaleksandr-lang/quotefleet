@@ -189,7 +189,7 @@ export function renderSavedImportersPage(opts: { loggedIn: boolean; saved: Saved
       <span class="imps-empty-ico" aria-hidden="true">&#128274;</span>
       <div class="imps-empty-b">
         <h2>Sign in to see your saved importers</h2>
-        <p>Save importers from the <a href="/importers">importer search</a> or any company profile to build a lead list with notes and a pipeline status you can revisit anytime.</p>
+        <p>Save importers from the <a href="/importers">Importers Directory</a> or any company profile to build a lead list with notes and a pipeline status you can revisit anytime.</p>
         <div class="imps-empty-act">
           <a class="imps-cta" href="/login">Sign in</a>
           <a class="imps-cta secondary" href="/signup">Create a free account</a>
@@ -216,7 +216,7 @@ export function renderSavedImportersPage(opts: { loggedIn: boolean; saved: Saved
   <style>${SAVED_CSS}</style>
   <main class="imps-shell">
     <div class="container-narrow">
-      <a class="imps-back" href="/importers">&larr; Back to importer search</a>
+      <a class="imps-back" href="/importers">&larr; Back to Importers Directory</a>
       <div class="imps-head">
         <h1>Saved importers</h1>
         <p class="imps-lead">${loggedIn ? `${N(saved.length)} saved importer${saved.length === 1 ? '' : 's'} — add a note and a pipeline status to work your leads.` : 'Your saved importer lead list.'}</p>

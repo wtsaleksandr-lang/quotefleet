@@ -1511,7 +1511,7 @@ export function renderImporterProfilePage(p: ProfileData, quota: QuotaState, rev
   ${dots}
   <main class="impp-wrap">
     <div class="container-narrow">
-      <a class="impp-back" href="/importers">&larr; Back to importer search</a>
+      <a class="impp-back" href="/importers">&larr; Back to Importers Directory</a>
       ${identityHeader(p, { showActions: true })}
       ${remainingNote}
       ${secBar}
@@ -1562,7 +1562,7 @@ export function renderProfileWall(p: ProfileData, quota: QuotaState): string {
   <style>${PROFILE_CSS}</style>
   <main class="impp-wrap">
     <div class="container-narrow">
-      <a class="impp-back" href="/importers">&larr; Back to importer search</a>
+      <a class="impp-back" href="/importers">&larr; Back to Importers Directory</a>
       ${identityHeader(p, { showActions: false })}
       ${teaser}
       <div class="impp-wall">
@@ -1619,13 +1619,13 @@ function renderProfileUnavailable(slug: string, reason: UnavailableReason): stri
   const body = `${devNote}
   <style>${PROFILE_CSS}</style>
   <main class="impp-wrap"><div class="container-narrow">
-    <a class="impp-back" href="/importers">&larr; Back to importer search</a>
+    <a class="impp-back" href="/importers">&larr; Back to Importers Directory</a>
     <div class="impp-head"><div class="impp-title"><h1>${esc(name)}</h1></div></div>
     <div class="impp-wall">
       <div class="wico" aria-hidden="true">${ICON[reason]}</div>
       <h2>${TITLE[reason]}</h2>
       <p>${COPY[reason]}</p>
-      <div class="impp-wall-actions"><a class="impp-btn-o" href="/importers">Back to importer search</a></div>
+      <div class="impp-wall-actions"><a class="impp-btn-o" href="/importers">Back to Importers Directory</a></div>
     </div>
   </div></main>`;
   return layout({
@@ -1646,11 +1646,11 @@ function renderProfileRedacted(): string {
   const body = `
   <style>${PROFILE_CSS}</style>
   <main class="impp-wrap"><div class="container-narrow">
-    <a class="impp-back" href="/importers">&larr; Back to importer search</a>
+    <a class="impp-back" href="/importers">&larr; Back to Importers Directory</a>
     <div class="impp-wall">
       <h2>This importer profile isn&rsquo;t available</h2>
       <p>This company&rsquo;s profile can&rsquo;t be shown on QuoteFleet. Searching importers still works.</p>
-      <div class="impp-wall-actions"><a class="impp-btn-o" href="/importers">Back to importer search</a></div>
+      <div class="impp-wall-actions"><a class="impp-btn-o" href="/importers">Back to Importers Directory</a></div>
     </div>
   </div></main>`;
   return layout({

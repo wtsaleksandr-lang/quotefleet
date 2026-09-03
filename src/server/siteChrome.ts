@@ -10,13 +10,41 @@
  */
 
 // ── Audience-segmented navigation — ONE canonical structure ─────────────────
-// The site serves three distinct audiences; the nav groups every surface under
-// the audience it belongs to, so a shipper never trips over a broker tool and an
-// importer finds the privacy product immediately. Shared VERBATIM by the
-// homepage header (landing.html), this injected marketing/legal chrome, and the
-// directory subsite header (src/server/directory/pages.ts) so crossing between
-// them is one coherent site. Styling: /nav-unify.css (+ landing-*.css on the
-// homepage). Keep these three constants in sync with landing.html.
+// The site serves two buying audiences plus a set of free, ungated surfaces, so
+// the nav has exactly three menus and one direct link:
+//
+//   For Carriers — the people who SELL freight (carriers, brokers, forwarders).
+//                  QuoteFleet's paying product plus their lead-generation tools.
+//   For Shippers — the people who BUY freight (shippers and importers). Finding
+//                  and vetting carriers, getting rates, protecting manifest data.
+//   Free Tools   — everything usable with no account, so a first-time visitor
+//                  can answer "what can I do here right now?" in one hover.
+//   Pricing      — a top-level one-click link (accessibility rule).
+//
+// TWO RULES KEEP IT LEGIBLE, and both were broken before this structure landed:
+//
+//   1. ONE DESTINATION, ONE HOME. Every href appears exactly ONCE inside
+//      `.site-nav`, and no label is ever visible twice in the header. A link that
+//      shows up under two audiences teaches the visitor that the grouping means
+//      nothing. Cross-linking belongs on the pages and in the footer, not in the
+//      menu. (The header previously rendered "For Shippers" twice on directory
+//      pages — once as this menu, once as an action-cluster link — which is the
+//      defect this rule exists to prevent.) The one deliberate exception is the
+//      primary CTA button in `.site-actions`: it may point at a destination the
+//      menu also lists (/w/demo on marketing pages, /signup on the directory),
+//      because a button is a different affordance from a menu row — but its
+//      LABEL must differ, which is why the menu says "Start Free" while the
+//      directory's button says "Claim your listing — free".
+//   2. GROUPED BY JOB, NOT BY TEAM. Each panel column is headed by the job the
+//      visitor came to do. That is what moved /services (browse carriers by
+//      capability — a SHIPPER task) out of the carrier menu, and /tools (the
+//      free calculator, useful to both) out of it into Free Tools.
+//
+// Shared VERBATIM by the homepage header (landing.html), this injected
+// marketing/legal chrome, and the directory subsite header
+// (src/server/directory/pages.ts) so crossing between them is one coherent site.
+// Styling: /nav-unify.css (+ landing-*.css and /nav-ia.css on the homepage).
+// Keep these three constants in sync with landing.html.
 //
 // AUTH GATING IS CLIENT-SIDE, AND THAT IS NOT A STYLE CHOICE.
 // These constants take NO auth input and MUST NOT branch on one. The public
@@ -40,38 +68,53 @@
 
 const NAV_CARET = `<svg class="nav-dd-caret" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polyline points="6 9 12 15 18 9"/></svg>`;
 
-/** The three-audience primary nav (desktop). Three hover/click dropdowns +
- *  a top-level Pricing link (kept one-click per the accessibility rule). */
+/** RFQ deep link. A BARE `/directory/rfq` 302s straight back to `/directory`
+ *  (see directory/entryPortFacets.ts — the form needs a facet key to resolve a
+ *  carrier set), so linking it unqualified put a dead end in the menu. `sort` is
+ *  in FACET_QUERY_KEYS, so this is the same href the homepage RFQ CTA uses. */
+const RFQ_HREF = '/directory/rfq?sort=featured';
+
+/** The primary nav (desktop): three job-grouped dropdowns + a top-level Pricing
+ *  link (kept one-click per the accessibility rule). */
 export const SITE_NAV_HTML = `<nav class="site-nav" aria-label="Main navigation">`
-  + `<div class="nav-dd" data-nav-dd>`
+  + `<div class="nav-dd nav-dd--wide" data-nav-dd>`
+  + `<button type="button" class="nav-dd-trigger" id="nav-carriers-trigger" aria-haspopup="true" aria-expanded="false" aria-controls="nav-carriers-menu">For Carriers${NAV_CARET}</button>`
+  + `<div class="nav-dd-panel nav-dd-panel--cols3" id="nav-carriers-menu" hidden>`
+  + `<div class="nav-dd-group"><p class="nav-dd-head">Your quote tool</p><a href="/w/demo">See a Live Demo</a><a href="/compare">Why QuoteFleet</a><a href="/signup">Start Free</a></div>`
+  + `<div class="nav-dd-group"><p class="nav-dd-head">Find new customers</p><a href="/importers">Importers Directory</a><a href="/importers/saved" data-nav-auth="user" hidden>Saved Importers</a><span class="nav-dd-sub">Search, profiles and saving are free with an account. Decision-maker email reveals are Leads Pro.</span></div>`
+  + `<div class="nav-dd-group"><p class="nav-dd-head">By business type</p><a href="/for/brokers">Freight Brokers</a><a href="/for/forwarders">Freight Forwarders</a><a href="/for/ltl">LTL Carriers</a></div>`
+  + `</div></div>`
+  + `<div class="nav-dd nav-dd--wide" data-nav-dd>`
   + `<button type="button" class="nav-dd-trigger" id="nav-shippers-trigger" aria-haspopup="true" aria-expanded="false" aria-controls="nav-shippers-menu">For Shippers${NAV_CARET}</button>`
-  + `<div class="nav-dd-panel" id="nav-shippers-menu" hidden>`
-  + `<div class="nav-dd-group"><p class="nav-dd-head">Find &amp; vet carriers</p><a href="/directory">Carrier Directory</a><a href="/compliance">Compliance Tools</a><a href="/glossary">Freight Glossary</a></div>`
-  + `<div class="nav-dd-group"><p class="nav-dd-head">Get freight quotes</p><a href="/directory/rfq">Get Freight Quotes (RFQ)</a><a href="/drayage-rates">Port Drayage Rates</a><a href="/directory/join">Directory Pro</a></div>`
+  + `<div class="nav-dd-panel nav-dd-panel--cols3 nav-dd-panel--end" id="nav-shippers-menu" hidden>`
+  + `<div class="nav-dd-group"><p class="nav-dd-head">Find &amp; vet carriers</p><a href="/directory">Carrier Directory</a><a href="/compliance">Compliance Tools</a><a href="/services">Carriers by Capability</a><a href="/directory/join">Directory Pro</a><span class="nav-dd-sub">Browsing carriers is free. Directory Pro adds contact reveals and CSV export.</span></div>`
+  + `<div class="nav-dd-group"><p class="nav-dd-head">Get rates &amp; quotes</p><a href="${RFQ_HREF}">Request Freight Quotes</a><a href="/drayage-rates">Port Drayage Rates</a></div>`
+  + `<div class="nav-dd-group"><p class="nav-dd-head">Protect your shipment data</p><a href="/manifest-privacy">Manifest Privacy</a><span class="nav-dd-sub">Stop future shipments appearing in U.S. Customs public records.</span></div>`
   + `</div></div>`
   + `<div class="nav-dd" data-nav-dd>`
-  + `<button type="button" class="nav-dd-trigger" id="nav-carriers-trigger" aria-haspopup="true" aria-expanded="false" aria-controls="nav-carriers-menu">For Carriers &amp; Brokers${NAV_CARET}</button>`
-  + `<div class="nav-dd-panel" id="nav-carriers-menu" hidden>`
-  + `<div class="nav-dd-group"><p class="nav-dd-head">Quoting platform</p><a href="/tools">Rate Calculator</a><a href="/w/demo">See a Demo</a><a href="/compare">Why QuoteFleet</a><a href="/services">Carrier Services</a><a href="/signup">Claim Your Listing</a></div>`
-  + `<div class="nav-dd-group"><p class="nav-dd-head">Lead generation</p><a href="/importers">Importers Directory</a><a href="/importers/saved" data-nav-auth="user" hidden>Saved Importers</a><a href="/for/brokers">For Freight Brokers</a><a href="/for/forwarders">For Freight Forwarders</a><a href="/for/ltl">For LTL</a><span class="nav-dd-sub">Search, profiles and saving are free with an account. Decision-maker email reveals are Leads Pro.</span></div>`
-  + `</div></div>`
-  + `<div class="nav-dd" data-nav-dd>`
-  + `<button type="button" class="nav-dd-trigger" id="nav-importers-trigger" aria-haspopup="true" aria-expanded="false" aria-controls="nav-importers-menu">For Importers${NAV_CARET}</button>`
-  + `<div class="nav-dd-panel nav-dd-panel--end" id="nav-importers-menu" hidden>`
-  + `<div class="nav-dd-group"><p class="nav-dd-head">Protect your data</p><a href="/manifest-privacy">Manifest Privacy</a><span class="nav-dd-sub">Stop future shipments appearing in U.S. Customs public records.</span></div>`
+  + `<button type="button" class="nav-dd-trigger" id="nav-free-trigger" aria-haspopup="true" aria-expanded="false" aria-controls="nav-free-menu">Free Tools${NAV_CARET}</button>`
+  + `<div class="nav-dd-panel nav-dd-panel--end nav-dd-panel--cols1" id="nav-free-menu" hidden>`
+  + `<div class="nav-dd-group"><p class="nav-dd-head">No account needed</p><a href="/tools">Freight Rate Calculator</a><a href="/glossary">Freight Glossary</a><a href="/guides">Carrier Market Guides</a></div>`
   + `</div></div>`
   + `<a href="/pricing">Pricing</a>`
   + `</nav>`;
 
-/** The same three-audience structure as a collapsible mobile drawer. Each group
- *  is a <details> so it collapses cleanly at 375px. */
+/** The same structure as a collapsible mobile drawer. Each menu is a <details>
+ *  so it collapses cleanly at 375px, and each panel column becomes a `.mm-sub`
+ *  sub-heading — the drawer used to be a flat 11-link dump under Carriers with
+ *  no grouping at all, which is what made it unscannable on a phone. */
 export const SITE_MOBILE_MENU_HTML = `<div class="site-mobile-menu" id="site-mobile-menu" hidden>`
-  + `<details class="mm-group" open><summary class="mm-head">For Shippers</summary>`
-  + `<a href="/directory">Carrier Directory</a><a href="/compliance">Compliance Tools</a><a href="/directory/rfq">Get Freight Quotes (RFQ)</a><a href="/drayage-rates">Port Drayage Rates</a><a href="/directory/join">Directory Pro</a><a href="/glossary">Freight Glossary</a></details>`
-  + `<details class="mm-group"><summary class="mm-head">For Carriers &amp; Brokers</summary>`
-  + `<a href="/tools">Rate Calculator</a><a href="/w/demo">See a Demo</a><a href="/pricing">Pricing</a><a href="/compare">Why QuoteFleet</a><a href="/services">Carrier Services</a><a href="/signup">Claim Your Listing</a><a href="/importers">Importers Directory</a><a href="/importers/saved" data-nav-auth="user" hidden>Saved Importers</a><a href="/for/brokers">For Freight Brokers</a><a href="/for/forwarders">For Freight Forwarders</a><a href="/for/ltl">For LTL</a></details>`
-  + `<details class="mm-group"><summary class="mm-head">For Importers</summary>`
-  + `<a href="/manifest-privacy">Manifest Privacy</a></details>`
+  + `<details class="mm-group" open><summary class="mm-head">For Carriers</summary>`
+  + `<p class="mm-sub">Your quote tool</p><a href="/w/demo">See a Live Demo</a><a href="/compare">Why QuoteFleet</a><a href="/signup">Start Free</a>`
+  + `<p class="mm-sub">Find new customers</p><a href="/importers">Importers Directory</a><a href="/importers/saved" data-nav-auth="user" hidden>Saved Importers</a>`
+  + `<p class="mm-sub">By business type</p><a href="/for/brokers">Freight Brokers</a><a href="/for/forwarders">Freight Forwarders</a><a href="/for/ltl">LTL Carriers</a></details>`
+  + `<details class="mm-group"><summary class="mm-head">For Shippers</summary>`
+  + `<p class="mm-sub">Find &amp; vet carriers</p><a href="/directory">Carrier Directory</a><a href="/compliance">Compliance Tools</a><a href="/services">Carriers by Capability</a><a href="/directory/join">Directory Pro</a>`
+  + `<p class="mm-sub">Get rates &amp; quotes</p><a href="${RFQ_HREF}">Request Freight Quotes</a><a href="/drayage-rates">Port Drayage Rates</a>`
+  + `<p class="mm-sub">Protect your shipment data</p><a href="/manifest-privacy">Manifest Privacy</a></details>`
+  + `<details class="mm-group"><summary class="mm-head">Free Tools</summary>`
+  + `<p class="mm-sub">No account needed</p><a href="/tools">Freight Rate Calculator</a><a href="/glossary">Freight Glossary</a><a href="/guides">Carrier Market Guides</a></details>`
+  + `<a class="mm-flat" href="/pricing">Pricing</a>`
   + `<a class="mm-account" href="/login">Sign in</a>`
   + `</div>`;
 
@@ -229,10 +272,23 @@ export const DIRECTORY_DATA_SOURCES = `<div class="qf-datasources">`
   + `<p class="qf-ds-note">Public records, used as sources and credited as such. QuoteFleet is not affiliated with, endorsed by, or certified by the FMCSA, USDOT, or any other agency. Carrier-supplied details on a claimed listing are labelled self-declared.</p>`
   + `</div>`;
 
-// Premium footer — the shared marketing footer. Carries the site-wide "Partners"
-// link (affiliate + referral program) in the Product column, and closes with the
-// FOOTER_PAY_ROW accepted-payment + trust strip as its very last child.
-export const PREMIUM_FOOTER = `<footer class="premium-footer"><div class="premium-footer-inner"><div class="footer-brand"><a href="/" class="qf-footer-brand" aria-label="QuoteFleet home"><img class="qf-footer-logo" src="/brand/logo-full-ondark.png" alt="QuoteFleet — freight rate calculator" width="168" height="113" decoding="async"></a><div class="qf-footer-brandtext"><a href="/" class="qf-footer-wordmark">QuoteFleet</a><p class="qf-footer-tagline">Branded rate calculator pages, PDF quotes, and optional AI chat for trucking service providers.</p></div></div><div class="footer-col"><h4>Product</h4><a href="/w/demo">Demo</a><a href="/pricing">Pricing</a><a href="/compare">Why QuoteFleet</a><a href="/partners">Partners</a><a href="/signup">Start free</a></div><div class="footer-col"><h4>Solutions</h4><a href="/tools">Free rate calculator</a><a href="/drayage-rates">Port drayage rates</a><a href="/for/brokers">For freight brokers</a><a href="/for/forwarders">For freight forwarders</a><a href="/for/ltl">For LTL</a><a href="/directory">Carrier directory</a><a href="/services">Carrier services</a><a href="/compliance">Compliance tools</a><a href="/importers">Importer search</a><a href="/manifest-privacy">Manifest privacy</a><a href="/glossary">Freight glossary</a><a href="/guides">Carrier market guides</a></div><div class="footer-col"><h4>Company</h4><a href="mailto:hello@quotefleet.net">Contact</a><a href="/support">Support</a><a href="/partners">Affiliate program</a><a href="/login">Sign in</a><a href="/security">Security</a></div><div class="footer-col"><h4>Legal</h4><a href="/terms">Terms of Service</a><a href="/privacy">Privacy Policy</a><a href="/refund">Refund &amp; Cancellation</a><a href="/dpa">Data Processing (DPA)</a><a href="/cookie">Cookie Policy</a><a href="/.well-known/security.txt">security.txt</a></div></div><ul class="qf-footer-trustbar" role="list"><li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="11" width="18" height="10" rx="2"/><path d="M7 11V7.5a5 5 0 0 1 10 0V11"/></svg>Payments secured by Stripe</li><li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 3 4.5 6v6c0 4.4 3.2 7.4 7.5 8.9 4.3-1.5 7.5-4.5 7.5-8.9V6z"/><path d="m9 12 2 2 4-4"/></svg>SSL/TLS encrypted</li><li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 2.5 4 5.5v6c0 4.6 3.3 7.7 8 9.5 4.7-1.8 8-4.9 8-9.5v-6z"/><circle cx="12" cy="11" r="2.4"/><path d="M12 13.4V16"/></svg>GDPR &amp; CCPA-ready</li><li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="4" y="4" width="16" height="16" rx="2"/><path d="M4 10h16M10 4v16"/></svg>Per-tenant data isolation</li></ul><div class="footer-bottom"><span>© <span id="year"></span> QuoteFleet. All rights reserved.</span><span class="qf-foot-operator">QuoteFleet is a product of MR Holdings &amp; Trade LLC.</span></div>${FOOTER_PAY_ROW}</footer>`;
+/**
+ * Premium footer — the shared marketing footer.
+ *
+ * COLUMNS MIRROR THE HEADER MENUS, on purpose. The footer used to run a
+ * "Product" column and a 12-link flat "Solutions" column that mixed shipper
+ * tools, carrier tools, the importer product and SEO content in one alphabet
+ * soup, so it taught the visitor a different site map than the nav did. Now the
+ * first three columns are the three header menus (For Carriers / For Shippers /
+ * Free Tools) in the same order with the same labels, and Company + Legal close
+ * it. Two straight duplicates went with the regroup: /partners appeared twice
+ * ("Partners" and "Affiliate program") and /signup appeared twice ("Start free"
+ * and "Claim your listing").
+ *
+ * Closes with the FOOTER_PAY_ROW accepted-payment + trust strip as its very
+ * last child.
+ */
+export const PREMIUM_FOOTER = `<footer class="premium-footer"><div class="premium-footer-inner"><div class="footer-brand"><a href="/" class="qf-footer-brand" aria-label="QuoteFleet home"><img class="qf-footer-logo" src="/brand/logo-full-ondark.png" alt="QuoteFleet — freight rate calculator" width="168" height="113" decoding="async"></a><div class="qf-footer-brandtext"><a href="/" class="qf-footer-wordmark">QuoteFleet</a><p class="qf-footer-tagline">Branded rate calculator pages, PDF quotes, and optional AI chat for trucking service providers.</p></div></div><div class="footer-col"><h4>For Carriers</h4><a href="/w/demo">See a live demo</a><a href="/compare">Why QuoteFleet</a><a href="/signup">Start free</a><a href="/importers">Importers directory</a><a href="/for/brokers">Freight brokers</a><a href="/for/forwarders">Freight forwarders</a><a href="/for/ltl">LTL carriers</a></div><div class="footer-col"><h4>For Shippers</h4><a href="/directory">Carrier directory</a><a href="/compliance">Compliance tools</a><a href="/services">Carriers by capability</a><a href="/directory/join">Directory Pro</a><a href="${RFQ_HREF}">Request freight quotes</a><a href="/drayage-rates">Port drayage rates</a><a href="/manifest-privacy">Manifest privacy</a></div><div class="footer-col"><h4>Free Tools</h4><a href="/tools">Freight rate calculator</a><a href="/glossary">Freight glossary</a><a href="/guides">Carrier market guides</a><a href="/pricing">Pricing</a></div><div class="footer-col"><h4>Company</h4><a href="mailto:hello@quotefleet.net">Contact</a><a href="/support">Support</a><a href="/partners">Partners &amp; affiliates</a><a href="/security">Security</a><a href="/login">Sign in</a></div><div class="footer-col"><h4>Legal</h4><a href="/terms">Terms of Service</a><a href="/privacy">Privacy Policy</a><a href="/refund">Refund &amp; Cancellation</a><a href="/dpa">Data Processing (DPA)</a><a href="/cookie">Cookie Policy</a><a href="/.well-known/security.txt">security.txt</a></div></div><ul class="qf-footer-trustbar" role="list"><li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="11" width="18" height="10" rx="2"/><path d="M7 11V7.5a5 5 0 0 1 10 0V11"/></svg>Payments secured by Stripe</li><li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 3 4.5 6v6c0 4.4 3.2 7.4 7.5 8.9 4.3-1.5 7.5-4.5 7.5-8.9V6z"/><path d="m9 12 2 2 4-4"/></svg>SSL/TLS encrypted</li><li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 2.5 4 5.5v6c0 4.6 3.3 7.7 8 9.5 4.7-1.8 8-4.9 8-9.5v-6z"/><circle cx="12" cy="11" r="2.4"/><path d="M12 13.4V16"/></svg>GDPR &amp; CCPA-ready</li><li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="4" y="4" width="16" height="16" rx="2"/><path d="M4 10h16M10 4v16"/></svg>Per-tenant data isolation</li></ul><div class="footer-bottom"><span>© <span id="year"></span> QuoteFleet. All rights reserved.</span><span class="qf-foot-operator">QuoteFleet is a product of MR Holdings &amp; Trade LLC.</span></div>${FOOTER_PAY_ROW}</footer>`;
 
 // Burger + Solutions-dropdown behaviour, mirrored from landing.html so the
 // injected header is interactive. Idempotent #year setter included.

@@ -1328,10 +1328,11 @@ export const DIRECTORY_CSS = `
   .dir-upgrade-banner--ok { background: var(--success-bg); border-color: var(--success); }
   .dir-upgrade-banner--info { background: var(--accent-soft); border-color: var(--accent); }
 
-  /* The mobile burger menu carries its own "For shippers" link, so the desktop
-     shipper nav slot (incl. the hydrated email / Pro chip / Manage) is hidden
-     on mobile to avoid crowding + horizontal overflow in the top bar. */
-  @media (max-width: 720px) {
+  /* Below the nav's collapse point the header is brand + theme + CTA + burger,
+     so the hydrated shipper account slot (email / Pro chip / Manage) is hidden
+     to avoid crowding + horizontal overflow in the top bar. Matches the single
+     canonical breakpoint in nav-unify.css (the header collapses at ≤1023px). */
+  @media (max-width: 1023px) {
     .nav-shipper { display: none; }
   }
   @media (max-width: 640px) {
@@ -1542,6 +1543,47 @@ export const DIRECTORY_CSS = `
     border-radius: 6px;
   }
   .dir-pagejumps a:hover { color: var(--text); background: var(--surface-2); }
+
+  /* ── Directory subsite footer — grouped, not a flat link soup ────────────
+     It used to be ONE centred inline row of 11 unlabelled links, which told the
+     visitor nothing about which of them were for them. It now mirrors the three
+     header menus in the same order with the same labels, so header and footer
+     teach the same site map. Column headings are LEFT-aligned (the base
+     .site-footer centres its text — headings never centre, per the standing
+     rule), and the legal line keeps the centred utility treatment. */
+  .site-footer .dirfoot {
+    max-width: 1120px;
+    margin: 0 auto;
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 24px 32px;
+    text-align: left;
+  }
+  .site-footer .dirfoot-col { display: flex; flex-direction: column; align-items: flex-start; }
+  .site-footer .dirfoot-head {
+    margin: 0 0 8px;
+    text-align: left;
+    font-family: var(--font-mono);
+    font-size: 11px;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    font-weight: 700;
+    color: var(--ink);
+  }
+  .site-footer .dirfoot-col a { display: block; margin: 0; padding: 4px 0; font-size: 13px; }
+  .site-footer .dirfoot-legal {
+    max-width: 1120px;
+    margin: 24px auto 0;
+    padding-top: 16px;
+    border-top: 1px solid var(--border);
+    text-align: center;
+  }
+  @media (max-width: 720px) {
+    .site-footer .dirfoot { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 24px; }
+  }
+  @media (max-width: 420px) {
+    .site-footer .dirfoot { grid-template-columns: minmax(0, 1fr); }
+  }
 `;
 
 /**
@@ -1791,13 +1833,18 @@ export function layout({ title, description, canonicalPath, bodyHtml, jsonLd, re
     <div class="site-header-inner">
       <a href="/" class="site-brand" aria-label="QuoteFleet home"><span class="site-logo" aria-hidden="true"><img class="qf-brand-mark" src="/brand/mark-keys-ondark.png" alt="QuoteFleet" width="28" height="30" decoding="async"></span>QuoteFleet</a>
       ${SITE_NAV_HTML}
-      <div class="site-actions"><span class="nav-shipper" id="nav-shipper"><a class="signin" href="/directory/join">For shippers</a></span>${THEME_TOGGLE_BTN}<a class="btn btn-secondary" href="/signup">Claim your listing<span class="tn-free"> — free</span> <span class="arr">→</span></a>${SITE_BURGER_BTN}</div>
+      <div class="site-actions"><span class="nav-shipper" id="nav-shipper" hidden></span>${THEME_TOGGLE_BTN}<a class="signin" href="/login" data-nav-auth="anon">Sign in</a><a class="btn btn-secondary" href="/signup">Claim your listing<span class="tn-free"> — free</span> <span class="arr">→</span></a>${SITE_BURGER_BTN}</div>
     </div>
     ${SITE_MOBILE_MENU_HTML}
   </header>
   ${bodyHtml}
   <footer class="site-footer">
-    © <span id="year"></span> QuoteFleet · <a href="/directory">Directory</a> · <a href="/importers">Importers Directory</a> · <a href="/manifest-privacy">Manifest Privacy</a> · <a href="/compliance">Compliance</a> · <a href="/glossary">Glossary</a> · <a href="/guides">Guides</a> · <a href="/drayage-rates">Drayage Rates</a> · <a href="/services">Services</a> · <a href="/terms">Terms</a> · <a href="/privacy">Privacy</a> · <a href="/">Home</a>
+    <nav class="dirfoot" aria-label="Footer">
+      <div class="dirfoot-col"><h2 class="dirfoot-head">For Shippers</h2><a href="/directory">Carrier Directory</a><a href="/compliance">Compliance Tools</a><a href="/services">Carriers by Capability</a><a href="/directory/join">Directory Pro</a><a href="/directory/rfq?sort=featured">Request Freight Quotes</a><a href="/drayage-rates">Port Drayage Rates</a><a href="/manifest-privacy">Manifest Privacy</a></div>
+      <div class="dirfoot-col"><h2 class="dirfoot-head">For Carriers</h2><a href="/w/demo">See a Live Demo</a><a href="/compare">Why QuoteFleet</a><a href="/signup">Start Free</a><a href="/importers">Importers Directory</a><a href="/pricing">Pricing</a></div>
+      <div class="dirfoot-col"><h2 class="dirfoot-head">Free Tools</h2><a href="/tools">Freight Rate Calculator</a><a href="/glossary">Freight Glossary</a><a href="/guides">Carrier Market Guides</a></div>
+    </nav>
+    <p class="dirfoot-legal">© <span id="year"></span> QuoteFleet · <a href="/">Home</a> · <a href="/terms">Terms</a> · <a href="/privacy">Privacy</a> · <a href="/support">Support</a></p>
     ${rendersCarrierData(canonicalPath) ? DIRECTORY_DATA_SOURCES : ''}
     ${FOOTER_PAY_ROW}
   </footer>
@@ -1811,11 +1858,13 @@ export function layout({ title, description, canonicalPath, bodyHtml, jsonLd, re
 }
 
 /**
- * Hydrates the "For shippers" nav slot from GET /api/directory/auth/me (soft
- * auth — never 401). Anonymous keeps the static "For shippers" link; a signed-in
+ * Hydrates the SHIPPER ACCOUNT slot from GET /api/directory/auth/me (soft auth —
+ * never 401). Anonymous shows NOTHING (the slot ships empty + hidden, so the
+ * header no longer says "For shippers" beside the For Shippers menu); a signed-in
  * free shipper gets their email + an Upgrade link; a Directory Pro shipper gets
  * their email + a "Directory Pro ✓" chip + a "Manage" link that opens the Stripe
- * billing portal. Degrades silently on any error (nav stays as server-rendered).
+ * billing portal. The slot is unhidden only once real content lands in it.
+ * Degrades silently on any error (nav stays as server-rendered = anonymous).
  */
 const NAV_SHIPPER_SCRIPT = `
 (function(){
@@ -1831,6 +1880,7 @@ const NAV_SHIPPER_SCRIPT = `
       else { parts+='<a class="nav-link nav-upgrade" href="/directory/join?intent=subscribe">Upgrade</a>'; }
       slot.classList.add('nav-shipper--auth');
       slot.innerHTML=parts;
+      slot.removeAttribute('hidden');
       var p=slot.querySelector('[data-nav-portal]');
       if(p){ p.addEventListener('click',function(e){
         e.preventDefault();
