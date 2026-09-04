@@ -96,13 +96,22 @@ export const QUOTE_VALIDITY_DAYS = 30;
 
 /**
  * Rate-confidence label, derived from MATCH QUALITY (which pricing tier actually
- * resolved the lane), never shown as a scary "low":
+ * resolved the lane):
  *   - 'high'   : an exact rate-matrix cell priced the lane AND at least one end
  *                carried a precise ZIP.
  *   - 'medium' : a zone / flat tariff, a per-mile or LTL rate card, or a matrix
  *                cell that only had coarse (city/state, no ZIP) inputs to match.
+ *   - 'low'    : a composed quote with a component it could not price at all.
+ *
+ * `confidenceAndRange` BELOW STILL NEVER RETURNS 'low', and the widget's
+ * behaviour is unchanged: a tenant rate-card quote has a rate source for every
+ * line by construction, so "low" would have been a scary label with no fact
+ * behind it. The member exists for `src/calc/heavyHaul`, where a lane genuinely
+ * can come back with its permits unpriced and its line haul excluded, and where
+ * saying so plainly is the entire product. See
+ * `src/calc/heavyHaul/confidence.ts` for how a score maps onto these three.
  */
-export type QuoteConfidence = 'high' | 'medium';
+export type QuoteConfidence = 'high' | 'medium' | 'low';
 
 /**
  * Currency the carrier prices in.
@@ -211,10 +220,32 @@ export interface CalcRequest {
   };
 }
 
+/**
+ * One row of a price breakdown.
+ *
+ * `'permit'` and `'escort'` are additions for the heavy-haul quote tool
+ * (`src/calc/heavyHaul`), where a delivered cost is composed from a state
+ * permit engine and an escort estimator alongside the line haul and fuel this
+ * engine already produces. They are ADDED to the existing vocabulary rather
+ * than described in a parallel one, so a breakdown from either source can be
+ * rendered by the same code. Nothing in the tenant quote path emits them:
+ * `customerFacingLines` and `stripNonReconcilingDescriptor` both key on the
+ * kinds they always did, and pass anything else through untouched.
+ */
 export interface CalcLine {
   name: string;
   amount: number; // USD, can be 0 for explanatory rows
-  kind: 'linehaul' | 'minimum' | 'accessorial' | 'fuel' | 'margin' | 'note';
+  kind:
+    | 'linehaul'
+    | 'minimum'
+    | 'accessorial'
+    | 'fuel'
+    | 'margin'
+    | 'note'
+    /** A state OS/OW permit fee. Cited to a statute or published schedule. */
+    | 'permit'
+    /** Pilot-car or law-enforcement escort money. Never inside a permit fee. */
+    | 'escort';
   note?: string;
   code?: string;
 }
