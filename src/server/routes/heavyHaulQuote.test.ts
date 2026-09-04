@@ -364,9 +364,13 @@ describe('the coverage endpoint', () => {
       expect(body.coveredStates.length).toBe(21);
       expect(body.mileageTiers.filed?.mayPriceStates).toBe(true);
       expect(body.mileageTiers.scalar?.mayPriceStates).toBe(false);
-      // Declared and NOT reachable — the type says what is missing rather than
-      // pretending the ladder has two rungs.
-      expect(body.mileageTiers.routed?.available).toBe(false);
+      // Tier 1 is now REACHABLE: routed in process over the federal
+      // primary-road network, and allowed to price a distance-priced state.
+      expect(body.mileageTiers.routedPrimaryNetwork?.available).toBe(true);
+      expect(body.mileageTiers.routedPrimaryNetwork?.mayPriceStates).toBe(true);
+      // Still declared and NOT reachable — a straight line intersected with
+      // state polygons measured per-state error from -100% to +780%, and the
+      // type says so rather than leaving a silent gap.
       expect(body.mileageTiers.geodesicSplit?.available).toBe(false);
       expect(body.confidence.bands.high).toBe(0.04);
       expect(body.confidence.bands.medium).toBe(0.08);

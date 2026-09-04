@@ -35,6 +35,7 @@ import {
   type DieselReading,
   type LaneEndpoint,
 } from './quote.js';
+import type { RoutedMileageResult } from './routedMileage.js';
 import { hasOsowCoverage } from '../osow/jurisdictions/index.js';
 
 /**
@@ -823,5 +824,193 @@ describe('the fuel surcharge model', () => {
     const out = lane({ linehaulUsdPerMile: 4.85, fuelPegUsdPerGal: 19 });
     expect(out.fuel.perMileUsd).toBe(0);
     expect(out.subtotalDerivedUsd).toBe(0);
+  });
+});
+
+// ──────────────────────────────────────────────────────────────────────────
+// TIER 1 — the routed mileage, injected
+// ──────────────────────────────────────────────────────────────────────────
+
+/**
+ * A tier-1 measurement as a FIXTURE, not a real one.
+ *
+ * `priceHeavyHaulLane` is pure and must stay that way, so the routed split is
+ * passed in rather than measured here — which also means these tests never
+ * touch the 14 MB of routing assets. The measurement itself is exercised
+ * against the real graph in `routedMileage.test.ts`.
+ */
+function routedFixture(
+  legs: ReadonlyArray<{ stateCode: string; stateName: string; miles: number }>,
+  extra: { unpricedStates?: string[] } = {},
+): RoutedMileageResult {
+  const stateCodes = legs.map((l) => l.stateCode);
+  const unpricedStates = extra.unpricedStates ?? [];
+  const totalMiles = legs.reduce((sum, l) => sum + l.miles, 0);
+  return {
+    ok: true,
+    best: {
+      label: 'via I-40 · I-81',
+      totalMiles,
+      legs: legs.map((l) => ({ ...l })),
+      stateCodes,
+      divergentStates: [],
+      unassignedMiles: 0,
+    },
+    alternates:
+      unpricedStates.length > 0
+        ? [
+            {
+              label: 'via I-30 · I-55',
+              totalMiles: totalMiles * 1.05,
+              legs: [],
+              stateCodes: [...stateCodes, ...unpricedStates],
+              divergentStates: unpricedStates,
+              unassignedMiles: 0,
+            },
+          ]
+        : [],
+    permitStates: [...stateCodes, ...unpricedStates],
+    unpricedStates,
+    corridorsAgree: unpricedStates.length === 0,
+    scanOnlyStates: [],
+    split: {
+      legs: legs.map((l) => ({ ...l })),
+      basis: 'routedPolyline',
+      totalMiles,
+      unassignedMiles: 0,
+      approximate: true,
+      warnings: [],
+      requiresManualReview: false,
+    },
+    coverage: {
+      ok: true,
+      requiresManualReview: false,
+      originHopMiles: 0.4,
+      destinationHopMiles: 0.6,
+      warnings: [],
+    },
+    warnings: [],
+    requiresManualReview: unpricedStates.length > 0,
+  };
+}
+
+describe('tier 1 — routed mileage in the quote', () => {
+  it('PRICES PERMITS from a routed split, which tier 4 refuses to do', () => {
+    const out = priceHeavyHaulLane({
+      cargo: REFERENCE_CARGO,
+      lane: { origin: HOUSTON, destination: BUFFALO },
+      routedMileage: routedFixture(REFERENCE_LEGS),
+      diesel: DIESEL,
+      asOf: ASOF,
+    });
+    expect(out.mileage.tier).toBe('routedPrimaryNetwork');
+    expect(out.mileage.mayPriceStates).toBe(true);
+    // The same seven legs the permits-only tool prices at $1,223.18. Measured
+    // miles must reach the permit engine EXACTLY as filed miles do.
+    expect(out.permits?.totalPermitUsd).toBe(1223.18);
+  });
+
+  it('LETS TIER 0 WIN OUTRIGHT when both are present', () => {
+    // Filed miles are what the permit application carries and what the state
+    // bills. A routed measurement alongside them is a weaker claim about the
+    // same thing, not a second opinion worth blending.
+    const out = priceHeavyHaulLane({
+      cargo: REFERENCE_CARGO,
+      lane: { origin: HOUSTON, destination: BUFFALO },
+      filedLegs: REFERENCE_LEGS,
+      routedMileage: routedFixture([
+        { stateCode: 'LA', stateName: 'Louisiana', miles: 999 },
+      ]),
+      diesel: DIESEL,
+      asOf: ASOF,
+    });
+    expect(out.mileage.tier).toBe('filed');
+    expect(out.mileage.totalPlusMinusMiles).toBe(0);
+    expect(out.routedCorridors).toBeNull();
+    // The routed fixture's invented Louisiana must not reach the engine.
+    expect(out.permits?.jurisdictions.some((j) => j.jurisdiction === 'LA')).toBe(false);
+    expect(out.permits?.totalPermitUsd).toBe(1223.18);
+  });
+
+  it('LISTS a union-only state and REFUSES TO PRICE IT', () => {
+    const out = priceHeavyHaulLane({
+      cargo: REFERENCE_CARGO,
+      lane: { origin: HOUSTON, destination: BUFFALO },
+      routedMileage: routedFixture(REFERENCE_LEGS, { unpricedStates: ['LA'] }),
+      diesel: DIESEL,
+      stateNames: { LA: 'Louisiana' },
+      asOf: ASOF,
+    });
+    const louisiana = out.lines.find((l) => l.code === 'permit_LA');
+    expect(louisiana).toBeDefined();
+    // `null`, never 0 — a state we cannot price is not a state that is free.
+    expect(louisiana?.amountUsd).toBeNull();
+    expect(louisiana?.note).toMatch(/alternate corridor/i);
+    expect(out.routedCorridors?.unpricedStates).toEqual(['LA']);
+    // Louisiana's real permit on this load is $285-$465. Listing it costs a
+    // phone call; omitting it costs an illegal load.
+    expect(out.permits?.totalPermitUsd).toBe(1223.18);
+  });
+
+  it('exposes the corridors so a dispatcher can pick one', () => {
+    const out = priceHeavyHaulLane({
+      cargo: REFERENCE_CARGO,
+      lane: { origin: HOUSTON, destination: BUFFALO },
+      routedMileage: routedFixture(REFERENCE_LEGS, { unpricedStates: ['LA'] }),
+      diesel: DIESEL,
+      asOf: ASOF,
+    });
+    expect(out.routedCorridors?.best.label).toContain('I-40');
+    expect(out.routedCorridors?.alternates[0]?.divergentStates).toEqual(['LA']);
+    expect(out.routedCorridors?.corridorsAgree).toBe(false);
+  });
+
+  it('FALLS BACK TO THE OLD BEHAVIOUR when the guards refuse, never to a worse number', () => {
+    const out = priceHeavyHaulLane({
+      cargo: REFERENCE_CARGO,
+      lane: { origin: HOUSTON, destination: BUFFALO },
+      routedMileage: {
+        ok: false,
+        reason: 'outsideCoverage',
+        coverage: null,
+        warnings: ['the pickup is 121 mi from the nearest mapped primary road'],
+      },
+      diesel: DIESEL,
+      asOf: ASOF,
+    });
+    // Tier 4: a lane total, no per-state figure, no permit priced, and the
+    // corridor list asks for filed miles — exactly what shipped before.
+    expect(out.mileage.tier).toBe('scalar');
+    expect(out.mileage.mayPriceStates).toBe(false);
+    expect(out.routedCorridors).toBeNull();
+    expect(out.corridor).not.toBeNull();
+    expect(out.lines.find((l) => l.code === 'permit_all')?.amountUsd).toBeNull();
+    // And it must SAY the road measurement was refused, not stay silent.
+    expect(out.lines.find((l) => l.code === 'permit_all')?.note).toMatch(/121 mi/);
+  });
+
+  it('carries the tier band into the confidence score, grounded as measured', () => {
+    const routedOut = priceHeavyHaulLane({
+      cargo: REFERENCE_CARGO,
+      lane: { origin: HOUSTON, destination: BUFFALO },
+      routedMileage: routedFixture(REFERENCE_LEGS),
+      diesel: DIESEL,
+      asOf: ASOF,
+    });
+    const filedOut = priceHeavyHaulLane({
+      cargo: REFERENCE_CARGO,
+      lane: { origin: HOUSTON, destination: BUFFALO },
+      filedLegs: REFERENCE_LEGS,
+      diesel: DIESEL,
+      asOf: ASOF,
+    });
+    // A measurement is worth less than the filed figure and must score lower.
+    expect(routedOut.confidence.score).toBeLessThan(filedOut.confidence.score);
+    const deduction = routedOut.confidence.findings.find(
+      (f) => f.code === 'mileage_estimated',
+    );
+    // 10 points, because the band is 10% — the p95 measured over 80 lanes.
+    expect(deduction?.grounding).toBe('measured');
+    expect(deduction?.points).toBe(10);
   });
 });

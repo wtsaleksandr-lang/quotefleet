@@ -24,3 +24,7 @@ _rec/
 
 # Scratchpad — throwaway agent artifacts, never commit
 scratchpad/
+
+# TIGER source archives are fetched on demand by scripts/tiger-net/build.mjs.
+# Only the built artefact (assets/tiger/usnet.bin.gz) is committed.
+assets/tiger/.cache/

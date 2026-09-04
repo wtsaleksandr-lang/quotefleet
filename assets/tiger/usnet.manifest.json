@@ -1,0 +1,15 @@
+{
+  "format": "USNET2",
+  "tigerVintage": "2025",
+  "sourceUrl": "https://www2.census.gov/geo/tiger/TIGER2025/PRIMARYROADS/tl_2025_us_primaryroads.zip",
+  "licence": "US Census Bureau TIGER/Line — work of the US federal government, public domain (17 U.S.C. § 105).",
+  "builtBy": "scripts/tiger-net/build.mjs",
+  "simplifyMeters": 15,
+  "snapMeters": 25,
+  "nodeCount": 24642,
+  "edgeCount": 57146,
+  "coordCount": 402993,
+  "uncompressedBytes": 4716651,
+  "gzipBytes": 3554275,
+  "sha256": "df3b4953b583badac96da8bd96590160e91785ca003f2e192ebc2d7388d5a36a"
+}

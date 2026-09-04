@@ -28,7 +28,9 @@
     "quotes:recent": "tsx scripts/list-recent-quotes.ts",
     "prod:check": "tsx scripts/check-production-readiness.ts",
     "deploy:replit": "pnpm install && pnpm db:migrate && pnpm db:seed && pnpm start",
-    "check:no-home-address": "node scripts/check-no-home-address.mjs"
+    "check:no-home-address": "node scripts/check-no-home-address.mjs",
+    "tiger:build": "node scripts/tiger-net/build.mjs",
+    "tiger:validate": "tsx scripts/tiger-net/validate.ts"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.90.0",
