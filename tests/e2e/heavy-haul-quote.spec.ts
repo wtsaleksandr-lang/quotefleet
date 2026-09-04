@@ -482,13 +482,23 @@ for (const theme of ['dark', 'light'] as const) {
     test.slow();
     await openTool(page, theme);
     const ratios = await page.evaluate(() => {
+      // getComputedStyle returns TWO notations here. A plain colour comes back
+      // as `rgb(r, g, b)` with 0-255 channels; anything resolved through
+      // color-mix() comes back as `color(srgb 0.02 0.47 0.37)` with 0-1
+      // channels. Reading the second as though it were the first makes a dark
+      // green look like near-black and reports a wildly passing ratio, which
+      // is exactly how the first version of this test passed on a colour it
+      // had not actually measured.
       const lum = (c: string) => {
-        const [r, g, b] = c.match(/\d+(\.\d+)?/g)!.slice(0, 3).map(Number);
+        const nums = c.match(/[\d.]+/g)!.map(Number);
+        const chans = c.startsWith('color(')
+          ? nums.slice(0, 3).map((v) => v * 255)
+          : nums.slice(0, 3);
         const f = (v: number) => {
           const x = v / 255;
           return x <= 0.03928 ? x / 12.92 : Math.pow((x + 0.055) / 1.055, 2.4);
         };
-        return 0.2126 * f(r) + 0.7152 * f(g) + 0.0722 * f(b);
+        return 0.2126 * f(chans[0]) + 0.7152 * f(chans[1]) + 0.0722 * f(chans[2]);
       };
       const surface = getComputedStyle(document.body).backgroundColor;
       const probe = document.createElement('span');
