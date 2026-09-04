@@ -94,7 +94,11 @@ const FORMAT_LABEL: Record<string, string> = {
 // `data-theme` block of our own and no raw hex anywhere.
 
 const SEASONAL_CSS = `
-  .sr-shell { max-width: 1080px; margin: 0 auto; padding: 24px; }
+  /* The shared hero already carries its own bottom padding, so the shell's top
+     pad is deliberately small: stacking 24px here on a 28px section margin on
+     top of the hero opened a ~90px band of nothing between the honesty banner
+     and the first heading. */
+  .sr-shell { max-width: 1080px; margin: 0 auto; padding: 8px 24px 24px; }
   /* Shared .hero centres its text. Left-align it and centre the same column the
      body uses, so the H1 starts on the body's left edge. */
   .sr-hero { padding: 48px 24px 16px; text-align: left; }
@@ -109,7 +113,8 @@ const SEASONAL_CSS = `
   .sr-truth p { margin: 0; color: var(--ink-soft); font-size: 14px; line-height: 1.55; }
   .sr-truth strong { color: var(--ink); }
 
-  .sr-sec { margin: 32px 0 0; }
+  .sr-sec { margin: 28px 0 0; }
+  .sr-sec:first-child { margin-top: 8px; }
   .sr-sec h2 { font-size: 20px; margin: 0 0 4px; color: var(--ink); text-align: left; }
   .sr-sec p.sr-sub { margin: 0 0 12px; color: var(--muted); font-size: 14px; line-height: 1.55; max-width: 780px; }
 
@@ -151,7 +156,7 @@ const SEASONAL_CSS = `
   @media (max-width: 760px) {
     .sr-hero h1 { font-size: 28px; }
     .sr-hero { padding: 32px 16px 12px; }
-    .sr-shell { padding: 16px; }
+    .sr-shell { padding: 8px 16px 16px; }
     .sr-cards { grid-template-columns: minmax(0, 1fr); }
     .sr-dl { grid-template-columns: minmax(0, 1fr); gap: 2px; }
     .sr-dl dd { margin: 0 0 8px; }
@@ -175,11 +180,19 @@ function statusPill(spec: SeasonalSourceSpec, snap: StateSeasonalSnapshot | unde
   return '<span class="sr-pill is-unknown">Status unknown — check the state</span>';
 }
 
+/**
+ * Format+readability travel in ONE pill and the cadence in a second, so a card
+ * never carries three pills that wrap 2 + 1. A group that leaves a single pill
+ * alone on its own line is the recurring layout defect this codebase keeps
+ * fixing; two pills either sit together or stack evenly, and neither reads as
+ * broken. The two facts also belong together — "GeoJSON feed" and
+ * "machine-readable" are one statement about the source, not two.
+ */
 function capabilityPills(spec: SeasonalSourceSpec, now: Date): string {
   const cadence = cadenceFor(spec, now);
+  const source = `${FORMAT_LABEL[spec.format] ?? spec.format} · ${READABILITY_LABEL[spec.machineReadable] ?? spec.machineReadable}`;
   const pills: string[] = [
-    `<span class="sr-pill">${esc(FORMAT_LABEL[spec.format] ?? spec.format)}</span>`,
-    `<span class="sr-pill${spec.machineReadable === 'full' ? ' is-machine' : ''}">${esc(READABILITY_LABEL[spec.machineReadable] ?? spec.machineReadable)}</span>`,
+    `<span class="sr-pill${spec.machineReadable === 'full' ? ' is-machine' : ''}">${esc(source)}</span>`,
   ];
   if (spec.ingestion !== 'none') {
     pills.push(
