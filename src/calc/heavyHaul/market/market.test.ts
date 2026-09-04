@@ -60,6 +60,7 @@ import {
   permitServiceLine,
   priceLoading,
   routeSurveyLine,
+  securementLine,
   tarpingUsd,
 } from './index.js';
 
@@ -697,6 +698,17 @@ describe('the rest of the invoice', () => {
       ((survey?.lowUsd ?? 0) + (survey?.highUsd ?? 0)) / 2,
       2,
     );
+  });
+
+  it('treats securement as an ALLOWANCE anchored at the bottom of its band', () => {
+    // A CONDITIONAL component: the headline is the low end, not the 65th
+    // percentile, because biasing a may-not-apply item upward would inflate
+    // every quote on the site. It is also off by default in the composer,
+    // because securement is normally inside the heavy-haul rate already priced.
+    const sec = securementLine();
+    expect(sec.headlineUsd).toBe(sec.lowUsd);
+    expect(sec.accuracy.tier).toBe('benchmark');
+    expect(sec.accuracy.hover).toMatch(/ALLOWANCE, not a price/);
   });
 
   it('turns cargo value into arithmetic instead of a guess', () => {

@@ -202,7 +202,7 @@ export interface MarketOptions {
   highPoleEscort?: boolean;
   /** Cargo value. Turns the largest blindside on the invoice into arithmetic. */
   declaredValueUsd?: number;
-  /** Suppress the securement allowance when the carrier's rate already covers it. */
+  /** Cribbing / dunnage allowance for a load needing a built cradle. Off by default: securement is normally inside the heavy-haul rate already priced above. */
   securementAllowance?: boolean;
 }
 
@@ -952,7 +952,13 @@ export function priceHeavyHaulLane(input: HeavyHaulRequest): HeavyHaulQuote {
         tarpingLine(input.cargo.widthIn, input.cargo.heightIn),
       );
     }
-    if (input.market?.securementAllowance !== false) accessorials.push(securementLine());
+    // OFF BY DEFAULT, and that is a correction rather than caution: the same
+    // research that prices this says securement is NORMALLY INSIDE the
+    // heavy-haul rate when the carrier supplies the trailer — and the line haul
+    // above IS that rate. Adding $150 to every quote for something already in
+    // the number beside it would be double-counting. Ask for it when the load
+    // needs a built cradle.
+    if (input.market?.securementAllowance === true) accessorials.push(securementLine());
 
     // The permit AGENT's fee, on top of the state fee already cited above. It is
     // never inside `totalPermitUsd` and never can be — it is 'market' money.
