@@ -317,8 +317,17 @@ export const OSOW_NOT_INCLUDED: ReadonlyArray<{ item: string; why: string }> = [
     why: 'This is a permit-fee calculator, not a freight rate. Nothing here prices moving the load.',
   },
   {
+    /**
+     * REWORDED WHEN THE PAGE GAINED A RATE INPUT. The old sentence — "we hold no
+     * pilot-car rates, so the cost is yours to add" — described a page that could
+     * not do arithmetic on an escort. It can now, from the operator's OWN rate,
+     * so the honest claim changed shape: we still hold no pilot-car rates and
+     * still never invent one, and no escort money has ever been inside
+     * `totalPermitUsd`. What is new is that a rate you supply is applied for you,
+     * beside the permit total and never inside it.
+     */
     item: 'Pilot car / escort cost',
-    why: 'We can tell you how many escorts a state requires. We hold no pilot-car rates, so the cost is yours to add — on a long lane one escort can cost more than every permit on this page combined.',
+    why: 'No escort money is ever inside the permit total. We hold no pilot-car rates of our own and will not invent one — enter YOUR pilot-car rate on this page and we apply it to the escort counts each state requires, as its own separate figure. On a long lane one escort can cost more than every permit on this page combined.',
   },
   {
     item: 'Police escorts, route surveys and bridge analysis',
@@ -519,7 +528,14 @@ export function priceOsowLane(input: OsowRequest): OsowApiResponse {
         required: j.escortsRequired,
       })),
       costIncluded: false,
-      note: 'Escort COST is not included anywhere in this total. States set the requirement; pilot cars are private vendors on a market rate we do not hold. Price them from your own vendor rate.',
+      /**
+       * REWORDED ALONGSIDE `OSOW_NOT_INCLUDED`. "Price them from your own vendor
+       * rate" was an instruction to go and do the sum somewhere else, which went
+       * stale the moment `pilotCarRate` existed. `costIncluded: false` above is
+       * NOT stale and never will be: it means no escort money is inside
+       * `quote.totalPermitUsd`, which stays true however this section is priced.
+       */
+      note: 'Escort COST is never inside the permit total, however it is priced. States set the requirement; pilot cars are private vendors and we hold no rates of our own — supply yours and it is applied to these counts as its own separate figure. Where a state publishes a LAW-ENFORCEMENT escort rate, that figure is cited and shown apart from anything derived from your rate.',
     },
     escortEstimate: {
       included: includeEscortEstimate,
@@ -675,18 +691,120 @@ const OSOW_CSS = `
   .ow-empty { color: var(--muted); font-size: 14px; line-height: 1.6; margin: 0; }
   .ow-busy { color: var(--muted); font-size: 14px; margin: 0; }
 
+  /* ── THE ALL-STATES SUMMARY — every state on one screen. ──────────────────
+     The single structural idea taken from the competitive review: a reader who
+     wants to know what the lane costs per state should not have to scroll seven
+     detail blocks to assemble it. The detail stays below, in full; this is a
+     second view of the same numbers, not a replacement for them.
+
+     It SCROLLS INSIDE ITS OWN BOX at narrow widths (.ow-sumwrap) and carries a
+     min-width, because seven money columns cannot compress to 375px without
+     becoming unreadable. The wrapper is what scrolls; document.scrollWidth
+     never moves, which the e2e suite asserts rather than eyeballs. */
+  .ow-summary { background: var(--surface); border: 1px solid var(--border-strong); border-radius: var(--radius-lg); padding: 16px; margin-top: 16px; }
+  .ow-summary > h3 { font-size: 15px; margin: 0 0 4px; color: var(--ink); }
+  .ow-summary > .ow-hint { margin: 0 0 8px; }
+  .ow-sumwrap { overflow-x: auto; }
+  /* 520px is the width at which seven columns are still readable, and it is
+     under the ~556px the results column gets at 1080px — so the table fits with
+     no inner scroll on desktop and scrolls inside its own box on a phone. The
+     two text columns wrap; only the money columns are nowrap, because a
+     mid-figure line break is a misread waiting to happen. */
+  .ow-sum { width: 100%; min-width: 520px; border-collapse: collapse; font-size: 13px; }
+  /* 4px of column gutter, not 8: seven columns of 8 cost 28px, and 28px was the
+     difference between the table fitting the 554px results column and cutting
+     the Status column off behind an inner scrollbar on a 1440px desktop. */
+  .ow-sum th, .ow-sum td { text-align: left; padding: 8px 4px 8px 0; border-bottom: 1px solid var(--border); color: var(--ink-soft); white-space: normal; vertical-align: middle; }
+  .ow-sum th { font-size: 11px; font-family: var(--font-mono); letter-spacing: 0.06em; text-transform: uppercase; color: var(--muted); font-weight: 500; }
+  .ow-sum td.num, .ow-sum th.num { text-align: right; font-family: var(--font-mono); color: var(--ink); white-space: nowrap; }
+  .ow-sum td.nil { color: var(--muted); }
+  /* The state name stays put while the money columns scroll under it at phone
+     width — a row of figures with no state against it is unreadable. Sticky in
+     the scroll axis of .ow-sumwrap, which is overflow-x: auto, never hidden. */
+  .ow-sum th:first-child, .ow-sum td:first-child { position: sticky; left: 0; background: var(--surface); }
+  .ow-sum .ow-sumtot td:first-child { background: var(--surface); }
+  .ow-sum tbody tr:last-child td { border-bottom: none; }
+  /* The totals row is the reason the table exists. Rule above it, never a fill. */
+  .ow-sum .ow-sumtot td { font-weight: 700; color: var(--ink); border-top: 2px solid var(--border-strong); border-bottom: none; padding-top: 12px; }
+  /* A PILL MUST NEVER WRAP. Broken across two lines an outlined chip reads as a
+     rendering fault, so the chip is nowrap and the cell around it is what
+     absorbs a narrow column. */
+  .ow-sum .ow-st { display: inline-block; white-space: nowrap; font-size: 11px; font-family: var(--font-mono); letter-spacing: 0.04em; text-transform: uppercase; padding: 4px 8px; border-radius: var(--radius-pill); border: 1px solid var(--border-strong); color: var(--muted); }
+  .ow-sum .ow-st--review { border-color: var(--warn); color: var(--warn); }
+  .ow-sum .ow-st--none { border-color: var(--error); color: var(--error); }
+  .ow-sum .ow-st--np { border-color: var(--warn); color: var(--warn); }
+  /* USER-SOURCED money inside a table of cited money. Never the same treatment. */
+  .ow-sum td.mine { font-style: italic; }
+
+  /* ── FOLDED PROSE. Every note and every citation is still here, one click
+     away, and the count is on the summary so nothing looks smaller than it is. */
+  .ow-fold { margin-top: 12px; }
+  .ow-fold > summary { font-size: 12px; font-family: var(--font-mono); letter-spacing: 0.04em; color: var(--muted); cursor: pointer; }
+  .ow-fold > summary:hover, .ow-fold > summary:focus-visible { color: var(--accent); }
+  .ow-fold ol, .ow-fold ul { margin: 8px 0 0; padding-left: 20px; display: grid; gap: 8px; }
+  .ow-fold li { font-size: 13px; line-height: 1.55; color: var(--ink-soft); overflow-wrap: anywhere; }
+  /* The reason that stays VISIBLE next to the MANUAL REVIEW badge.
+     CLAMPED TO THREE LINES, and the clamp is what makes it a one-line reason
+     rather than a second essay: Tennessee's most state-specific unsettled note
+     is 1,782 characters, which is worth showing and is not worth 400px above a
+     disclosure that holds it verbatim. The ellipsis is the affordance and the
+     fold directly beneath is the answer. overflow: clip, never hidden. */
+  .ow-reason { margin: 8px 0 0; padding: 0 0 0 12px; border-left: 2px solid var(--warn); font-size: 13px; line-height: 1.55; color: var(--ink-soft); overflow-wrap: anywhere; display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 3; overflow: clip; }
+
+  /* ── A PARTIAL FIGURE, drawn so it can never read as a lane total. ──────── */
+  .ow-total--partial { border-color: var(--warn); }
+  .ow-total .ow-tpart { font-size: 12px; font-family: var(--font-mono); letter-spacing: 0.04em; text-transform: uppercase; color: var(--warn); margin: 4px 0 0; }
+
+  /* ── ESCORT MONEY. Two channels, drawn differently on purpose. ────────────
+     A SOURCED police figure sits on a normal surface with its citations, like
+     any permit fee. A figure derived from the USER'S OWN rate gets a dashed
+     outline, no surface of its own and a literal YOUR RATE tag — it is their
+     arithmetic, we did not source it, and the page must never let the two
+     read as the same kind of claim. */
+  .ow-yours { border: 1px dashed var(--accent); border-radius: var(--radius); background: transparent; padding: 12px; margin-top: 12px; }
+  .ow-yourtag { display: inline-block; font-size: 11px; font-family: var(--font-mono); letter-spacing: 0.06em; text-transform: uppercase; color: var(--accent); border: 1px dashed var(--accent); border-radius: var(--radius-pill); padding: 4px 8px; margin: 0 0 8px; }
+  .ow-yourv { font-size: 24px; font-weight: 700; line-height: 1.2; color: var(--ink); font-family: var(--font-mono); margin: 0; }
+  .ow-yours p { font-size: 13px; line-height: 1.55; color: var(--ink-soft); margin: 4px 0 0; overflow-wrap: anywhere; }
+  .ow-yours ul { margin: 8px 0 0; padding-left: 20px; display: grid; gap: 4px; }
+  .ow-yours li { font-size: 13px; line-height: 1.55; color: var(--ink-soft); }
+
+  /* ── EMPTY STATE. One disclaimer, and a lane you can actually load. ─────── */
+  .ow-eg { margin-top: 12px; }
+  .ow-eg .btn { width: 100%; min-height: 48px; display: inline-flex; align-items: center; justify-content: center; }
+  .ow-eglist { margin: 8px 0 0; padding-left: 20px; display: grid; gap: 4px; }
+  .ow-eglist li { font-size: 13px; line-height: 1.55; color: var(--ink-soft); }
+
+  /* ── OPTIONAL RATE CARD. Ours is the only page on the site that asks for a
+     rate it will not supply a default for, so the copy says why, top-left. ── */
+  .ow-rate-empty { font-size: 12px; color: var(--muted); margin: 8px 0 0; line-height: 1.5; }
+
+  @media (min-width: 961px) {
+    /* THE EMPTY RIGHT COLUMN used to stop around y=800 while the form ran on to
+       y=1300, leaving 500px of nothing beside a live form. Sticking it keeps the
+       worked example and the exclusions beside whatever the user is filling in.
+       Dropped the moment a real result renders — a 3,500px result must scroll. */
+    .ow-results.is-empty { position: sticky; top: 88px; }
+  }
   @media (max-width: 960px) {
     .ow-grid { grid-template-columns: minmax(0, 1fr); }
   }
   @media (max-width: 640px) {
     .ow-hero h1 { font-size: 28px; }
     .ow-hero { padding: 32px 16px 12px; }
-    .ow-shell { padding: 16px; }
+    /* 80px of bottom clearance so the last line of the page never ends up under
+       the fixed chat launcher, which sits bottom-right at phone widths. */
+    .ow-shell { padding: 16px 16px 80px; }
     .ow-total .ow-tv { font-size: 32px; }
-    .ow-flags { grid-template-columns: repeat(2, minmax(0, 1fr)); }
     .ow-row3 { grid-template-columns: repeat(3, minmax(0, 1fr)); }
     .ow-leg { grid-template-columns: minmax(0, 1fr) minmax(0, 92px) 44px; }
     .ow-field input, .ow-field select { font-size: 16px; }
+  }
+  @media (max-width: 520px) {
+    /* ONE COLUMN, NOT A 2x2. Side by side at 375px the four tiles stretched to
+       the tallest of the row, which left ~180px of dead space inside STATES
+       PRICED and put the four values on four different baselines. Stacked, each
+       tile is its own content height and the values line up by construction. */
+    .ow-flags { grid-template-columns: minmax(0, 1fr); }
   }
 `;
 
@@ -744,9 +862,16 @@ export function renderOsowToolPage(): string {
       <p class="ow-eyebrow">Free tool · no account needed</p>
       <h1>Oversize &amp; Overweight State Permit Calculator</h1>
       <p class="lead">Add the states your load crosses and the miles inside each one, and get the single-trip OS/OW permit fee each state charges — every line traced to the statute or fee schedule it came from.</p>
+      <!-- ONE STATEMENT OF THE CLAIM, NOT THREE. The heading made it, the
+           paragraph repeated it verbatim through OSOW_HEADLINE_DISCLAIMER, and
+           the results column restated it a third time in an always-open
+           exclusions list. The heading keeps the sentence; the paragraph now
+           only lists what is left out; the exclusions list is a disclosure. The
+           disclaimer that matters most — the one 4px under the number — is
+           unchanged and still renders beside every total this page prints. -->
       <div class="ow-truth">
         <h2>This prices state permit fees. It is not a freight quote.</h2>
-        <p><strong>${esc(OSOW_HEADLINE_DISCLAIMER)}</strong> It also excludes the cost of any pilot car a state requires — we can tell you how many escorts you need, not what they charge, and on a long lane one escort can cost more than every permit below combined.</p>
+        <p><strong>STATE PERMIT FEES ONLY: no line haul, no fuel, no margin.</strong> It also excludes the cost of any pilot car a state requires — we hold no pilot-car rates, so enter your own and we apply it as a separate figure, never inside the permit total. On a long lane one escort can cost more than every permit below combined.</p>
       </div>
     </div>
   </section>
@@ -785,6 +910,22 @@ export function renderOsowToolPage(): string {
         </div>
 
         <div class="ow-card">
+          <div class="ow-sec">${cue('cue-pilot')}<h2>Your pilot-car rate (optional)</h2></div>
+          ${cueBody('cue-pilot', 'We hold no pilot-car rates and will not invent one — no state publishes a rate, and your negotiated figure beats any range we could make up. Enter YOUR rate and we apply it to the escort counts each state’s own rules require, as a separate line. It is never added to the permit total. A day rate needs a day count: a rate without one is not a price, and one day is not a safe default. Leave this blank and the escorts come back as a count with the cost stated as unknown, which is the true answer.')}
+          <div class="ow-stack">
+            <div class="ow-row2">
+              ${field('ow-pc-mile', 'Pilot car $ / mile')}
+              ${field('ow-pc-day', 'Pilot car $ / day')}
+            </div>
+            <div class="ow-row2">
+              ${field('ow-pc-days', 'Days per state', { step: '1' })}
+              ${field('ow-pc-min', 'Your minimum per state ($)')}
+            </div>
+          </div>
+          <p class="ow-rate-empty">Blank is a valid answer. Police-escort rates are different — six states publish one, and those are cited for you either way.</p>
+        </div>
+
+        <div class="ow-card">
           <div class="ow-sec">${cue('cue-miles')}<h2>States and miles inside each</h2></div>
           ${cueBody('cue-miles', 'These are YOUR miles, not ours. We do not route the lane. Type the per-state mileage your PC*Miler or ProMiles run produced — the same figures that go on the permit application, which is why they are the miles the state will bill. Tennessee charges 6¢ per ton-mile, so fifty miles out on one leg is real money.')}
           <div class="ow-legs" id="ow-legs"></div>
@@ -799,14 +940,35 @@ export function renderOsowToolPage(): string {
         </div>
       </form>
 
-      <section class="ow-results" id="ow-results" aria-live="polite">
+      <section class="ow-results is-empty" id="ow-results" aria-live="polite">
         <div class="ow-card">
           <p class="ow-empty">Fill in the load and at least one state, then press <strong>Calculate permits</strong>. Nothing is stored and no account is needed.</p>
+          <div class="ow-eg">
+            <button type="button" class="btn btn-secondary" id="ow-example">See a worked example — Houston to Buffalo</button>
+          </div>
+          <ul class="ow-eglist">
+            <li>120,000 lb · 12'6" wide · 14'6" high · 85 ft · 8 axles, interstate.</li>
+            <li>Seven states — TX, AR, TN, KY, OH, PA, NY — with the miles inside each.</li>
+            <li>Fills the form and prices it, so you can see the output before typing anything.</li>
+          </ul>
+          <!-- WHAT THE RESULT ACTUALLY CONTAINS. The empty right column used to
+               stop around y=740 beside a form running to y=1600, which read as a
+               broken layout. This is the description of the output rather than
+               filler, and the column is sticky on desktop so it stays beside
+               whatever part of the form is being filled in. -->
+          <div class="ow-sec">${cue('cue-output')}<h2>What comes back</h2></div>
+          ${cueBody('cue-output', 'Every fee line is resolved from a statute or a published fee schedule as of today’s date, and each state’s sources are listed with their revision dates. Where two official sources disagree by more than the immaterial threshold, the state is flagged for manual review instead of a figure being picked; where they disagree by less, the higher figure is quoted and the disagreement is shown.')}
+          <ul class="ow-eglist">
+            <li><strong>One table with every state on the lane</strong> — oversize, overweight, base and fees, escorts, subtotal and status, with a totals row.</li>
+            <li><strong>The statute behind each line</strong>, effective-dated, per state.</li>
+            <li><strong>Named gaps.</strong> A state we hold no schedule for comes back named and unpriced, never as $0, and the lane total refuses rather than quietly excluding it.</li>
+            <li><strong>Escort counts</strong> each state requires — priced from your own pilot-car rate if you give one, and never added to the permit total.</li>
+          </ul>
         </div>
-        <div class="ow-note">
-          <h3>What this total never includes</h3>
+        <details class="ow-note ow-notincluded ow-fold">
+          <summary>What this total never includes (${OSOW_NOT_INCLUDED.length})</summary>
           <ul>${notIncludedHtml}</ul>
-        </div>
+        </details>
       </section>
     </div>
   </main>`;
