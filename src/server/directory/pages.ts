@@ -70,6 +70,8 @@ import {
   SITE_MOBILE_MENU_HTML,
   THEME_TOGGLE_BTN,
   SITE_BURGER_BTN,
+  HEADER_OOG_CTA,
+  FOOTER_OOG_CTA,
   HEADER_SCRIPTS,
   FOOTER_PAY_ROW,
   DIRECTORY_DATA_SOURCES,
@@ -1925,7 +1927,7 @@ export function layout({ title, description, canonicalPath, bodyHtml, jsonLd, re
     <div class="site-header-inner">
       <a href="/" class="site-brand" aria-label="QuoteFleet home"><span class="site-logo" aria-hidden="true"><img class="qf-brand-mark" src="/brand/mark-keys-ondark.png" alt="QuoteFleet" width="28" height="30" decoding="async"></span>QuoteFleet</a>
       ${SITE_NAV_HTML}
-      <div class="site-actions"><span class="nav-shipper" id="nav-shipper" hidden></span>${THEME_TOGGLE_BTN}<a class="signin" href="/login" data-nav-auth="anon">Sign in</a><a class="btn btn-secondary" href="/signup">Claim your listing<span class="tn-free"> — free</span> <span class="arr">→</span></a>${SITE_BURGER_BTN}</div>
+      <div class="site-actions"><span class="nav-shipper" id="nav-shipper" hidden></span>${HEADER_OOG_CTA}${THEME_TOGGLE_BTN}<a class="signin" href="/login" data-nav-auth="anon">Sign in</a><a class="btn btn-secondary" href="/signup">Claim your listing<span class="tn-free"> — free</span> <span class="arr">→</span></a>${SITE_BURGER_BTN}</div>
     </div>
     ${SITE_MOBILE_MENU_HTML}
   </header>
@@ -1938,6 +1940,7 @@ export function layout({ title, description, canonicalPath, bodyHtml, jsonLd, re
       <div class="dirfoot-col"><h2 class="dirfoot-head">Company</h2><a href="/partners">Partners &amp; Affiliates</a><a href="/support">Support</a><a href="/#faq">FAQ</a><a href="/security">Security</a><a href="/login">Sign In</a></div>
     </nav>
     <p class="dirfoot-legal">© <span id="year"></span> QuoteFleet · <a href="/">Home</a> · <a href="/terms">Terms</a> · <a href="/privacy">Privacy</a></p>
+    <p class="dirfoot-oog">${FOOTER_OOG_CTA}</p>
     ${rendersCarrierData(canonicalPath) ? DIRECTORY_DATA_SOURCES : ''}
     ${FOOTER_PAY_ROW}
   </footer>

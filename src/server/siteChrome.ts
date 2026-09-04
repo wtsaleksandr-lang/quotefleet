@@ -101,6 +101,38 @@
 // navAuthGating.test.ts pins both halves, including that the server HTML is
 // byte-identical for anonymous and authenticated requests.
 
+/**
+ * THE OOG (OUT-OF-GAUGE) CTA — one subtle affordance, in the header bar and in
+ * the footer bar, pointing at the free heavy-haul delivered-cost estimator.
+ *
+ * SUBTLE MEANS SUBTLE. It is a quiet text link in the house style — the same
+ * weight and colour as `.signin` in the header, and a muted line beside the
+ * copyright in the footer. It is deliberately NOT a coloured banner, not a
+ * second primary button, and not a badge: the header already carries one
+ * primary CTA per surface (View demo / Claim your listing) and a second bright
+ * one would compete with it.
+ *
+ * WHY IT IS NOT IN `SITE_NAV_HTML` OR `SITE_MOBILE_MENU_HTML`. Both of those
+ * already list `/tools/heavy-haul-quote` once, under Free Tools, and the
+ * "one destination, one home" rule (navInformationArchitecture.test.ts) forbids
+ * a second copy of an href inside either. The action cluster is a different
+ * surface — the same exception the primary button already relies on — so the
+ * CTA lives there, with a label no menu row uses.
+ *
+ * WHY THE HEADER COPY HIDES BELOW 1141px, WHICH IS MEASURED RATHER THAN
+ * CAUTIOUS. Below 1024px the bar is already brand + theme + burger — `.signin`
+ * and the primary button are both gone — so there is nowhere to put it. And
+ * #476/#477 left the 1024–1140px band running on roughly 50px of slack, while
+ * this link is ~70px: measured at 1024px it put the homepage header 39px past
+ * its content box and the directory header 25px past, which is precisely the
+ * defect those PRs removed. So the header copy starts at 1141px (where the
+ * compaction step in nav-unify.css was extended to cover it), and the FOOTER
+ * copy carries every width, phones included.
+ */
+export const OOG_QUOTE_HREF = '/tools/heavy-haul-quote';
+export const HEADER_OOG_CTA = `<a class="site-oog" href="${OOG_QUOTE_HREF}">OOG quote</a>`;
+export const FOOTER_OOG_CTA = `<a class="qf-foot-oog" href="${OOG_QUOTE_HREF}">Oversize or out-of-gauge load? Get an OOG trucking quote <span class="arr" aria-hidden="true">→</span></a>`;
+
 const NAV_CARET = `<svg class="nav-dd-caret" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polyline points="6 9 12 15 18 9"/></svg>`;
 
 /** RFQ deep link. A BARE `/directory/rfq` 302s straight back to `/directory`
@@ -162,7 +194,7 @@ export const FULL_SITE_HEADER = `<header class="site-header">
     <div class="site-header-inner">
       <a href="/" class="site-brand" aria-label="QuoteFleet home"><span class="site-logo" aria-hidden="true"><img class="qf-brand-mark" src="/brand/mark-keys-ondark.png" alt="QuoteFleet" width="28" height="30" decoding="async"></span>QuoteFleet</a>
       ${SITE_NAV_HTML}
-      <div class="site-actions">${THEME_TOGGLE_BTN}<a class="signin" href="/login">Sign in</a><a class="btn btn-secondary" href="/w/demo">View demo <span class="arr">→</span></a>${SITE_BURGER_BTN}</div>
+      <div class="site-actions">${HEADER_OOG_CTA}${THEME_TOGGLE_BTN}<a class="signin" href="/login">Sign in</a><a class="btn btn-secondary" href="/w/demo">View demo <span class="arr">→</span></a>${SITE_BURGER_BTN}</div>
     </div>
     ${SITE_MOBILE_MENU_HTML}
   </header>`;
@@ -350,7 +382,7 @@ export const DIRECTORY_DATA_SOURCES = `<div class="qf-datasources">`
  * Closes with the FOOTER_PAY_ROW accepted-payment + trust strip as its very
  * last child.
  */
-export const PREMIUM_FOOTER = `<footer class="premium-footer"><div class="premium-footer-inner"><div class="footer-brand"><a href="/" class="qf-footer-brand" aria-label="QuoteFleet home"><img class="qf-footer-logo" src="/brand/logo-full-ondark.png" alt="QuoteFleet — freight rate calculator" width="168" height="113" decoding="async"></a><div class="qf-footer-brandtext"><a href="/" class="qf-footer-wordmark">QuoteFleet</a><p class="qf-footer-tagline">Branded rate calculator pages, PDF quotes, and optional AI chat for trucking service providers.</p></div></div><div class="footer-col"><h4>For Carriers &amp; Brokers</h4><a href="/w/demo">See a live demo</a><a href="/compare">Why QuoteFleet</a><a href="/pricing">Pricing</a><a href="/signup">Start free</a><a href="/importers">Importers directory</a><a href="/for/brokers">Freight brokers</a><a href="/for/forwarders">Freight forwarders</a><a href="/for/ltl">LTL carriers</a></div><div class="footer-col"><h4>For Shippers</h4><a href="/directory">Carrier directory</a><a href="/guides">Carrier market guides</a><a href="/compliance">Compliance tools</a><a href="/services">Carriers by capability</a><a href="/directory/join">Directory Pro</a><a href="${RFQ_HREF}">Request freight quotes</a><a href="/drayage-rates">Port drayage rates</a><a href="/manifest-privacy">Manifest privacy</a></div><div class="footer-col"><h4>Free Tools</h4><a href="/tools">Freight rate calculator</a><a href="/tools/oversize-permits">Oversize permit calculator</a><a href="/tools/heavy-haul-quote">Heavy-haul quote tool</a><a href="/tools/seasonal-weight-restrictions">Frost law restrictions</a><a href="/pilot-cars">Pilot car &amp; escort directory</a><a href="/glossary">Freight glossary</a></div><div class="footer-col"><h4>Company</h4><a href="mailto:hello@quotefleet.net">Contact</a><a href="/support">Support</a><a href="/#faq">FAQ</a><a href="/partners">Partners &amp; affiliates</a><a href="/security">Security</a><a href="/login">Sign in</a></div><div class="footer-col"><h4>Legal</h4><a href="/terms">Terms of Service</a><a href="/privacy">Privacy Policy</a><a href="/refund">Refund &amp; Cancellation</a><a href="/dpa">Data Processing (DPA)</a><a href="/cookie">Cookie Policy</a><a href="/.well-known/security.txt">security.txt</a></div></div><ul class="qf-footer-trustbar" role="list"><li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="11" width="18" height="10" rx="2"/><path d="M7 11V7.5a5 5 0 0 1 10 0V11"/></svg>Payments secured by Stripe</li><li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 3 4.5 6v6c0 4.4 3.2 7.4 7.5 8.9 4.3-1.5 7.5-4.5 7.5-8.9V6z"/><path d="m9 12 2 2 4-4"/></svg>SSL/TLS encrypted</li><li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 2.5 4 5.5v6c0 4.6 3.3 7.7 8 9.5 4.7-1.8 8-4.9 8-9.5v-6z"/><circle cx="12" cy="11" r="2.4"/><path d="M12 13.4V16"/></svg>GDPR &amp; CCPA-ready</li><li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="4" y="4" width="16" height="16" rx="2"/><path d="M4 10h16M10 4v16"/></svg>Per-tenant data isolation</li></ul><div class="footer-bottom"><span>© <span id="year"></span> QuoteFleet. All rights reserved.</span><span class="qf-foot-operator">QuoteFleet is a product of MR Holdings &amp; Trade LLC.</span></div>${FOOTER_PAY_ROW}</footer>`;
+export const PREMIUM_FOOTER = `<footer class="premium-footer"><div class="premium-footer-inner"><div class="footer-brand"><a href="/" class="qf-footer-brand" aria-label="QuoteFleet home"><img class="qf-footer-logo" src="/brand/logo-full-ondark.png" alt="QuoteFleet — freight rate calculator" width="168" height="113" decoding="async"></a><div class="qf-footer-brandtext"><a href="/" class="qf-footer-wordmark">QuoteFleet</a><p class="qf-footer-tagline">Branded rate calculator pages, PDF quotes, and optional AI chat for trucking service providers.</p></div></div><div class="footer-col"><h4>For Carriers &amp; Brokers</h4><a href="/w/demo">See a live demo</a><a href="/compare">Why QuoteFleet</a><a href="/pricing">Pricing</a><a href="/signup">Start free</a><a href="/importers">Importers directory</a><a href="/for/brokers">Freight brokers</a><a href="/for/forwarders">Freight forwarders</a><a href="/for/ltl">LTL carriers</a></div><div class="footer-col"><h4>For Shippers</h4><a href="/directory">Carrier directory</a><a href="/guides">Carrier market guides</a><a href="/compliance">Compliance tools</a><a href="/services">Carriers by capability</a><a href="/directory/join">Directory Pro</a><a href="${RFQ_HREF}">Request freight quotes</a><a href="/drayage-rates">Port drayage rates</a><a href="/manifest-privacy">Manifest privacy</a></div><div class="footer-col"><h4>Free Tools</h4><a href="/tools">Freight rate calculator</a><a href="/tools/oversize-permits">Oversize permit calculator</a><a href="/tools/heavy-haul-quote">Heavy-haul quote tool</a><a href="/tools/seasonal-weight-restrictions">Frost law restrictions</a><a href="/pilot-cars">Pilot car &amp; escort directory</a><a href="/glossary">Freight glossary</a></div><div class="footer-col"><h4>Company</h4><a href="mailto:hello@quotefleet.net">Contact</a><a href="/support">Support</a><a href="/#faq">FAQ</a><a href="/partners">Partners &amp; affiliates</a><a href="/security">Security</a><a href="/login">Sign in</a></div><div class="footer-col"><h4>Legal</h4><a href="/terms">Terms of Service</a><a href="/privacy">Privacy Policy</a><a href="/refund">Refund &amp; Cancellation</a><a href="/dpa">Data Processing (DPA)</a><a href="/cookie">Cookie Policy</a><a href="/.well-known/security.txt">security.txt</a></div></div><ul class="qf-footer-trustbar" role="list"><li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="11" width="18" height="10" rx="2"/><path d="M7 11V7.5a5 5 0 0 1 10 0V11"/></svg>Payments secured by Stripe</li><li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 3 4.5 6v6c0 4.4 3.2 7.4 7.5 8.9 4.3-1.5 7.5-4.5 7.5-8.9V6z"/><path d="m9 12 2 2 4-4"/></svg>SSL/TLS encrypted</li><li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 2.5 4 5.5v6c0 4.6 3.3 7.7 8 9.5 4.7-1.8 8-4.9 8-9.5v-6z"/><circle cx="12" cy="11" r="2.4"/><path d="M12 13.4V16"/></svg>GDPR &amp; CCPA-ready</li><li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="4" y="4" width="16" height="16" rx="2"/><path d="M4 10h16M10 4v16"/></svg>Per-tenant data isolation</li></ul><div class="footer-bottom"><span>© <span id="year"></span> QuoteFleet. All rights reserved.</span><span class="qf-foot-operator">QuoteFleet is a product of MR Holdings &amp; Trade LLC.</span>${FOOTER_OOG_CTA}</div>${FOOTER_PAY_ROW}</footer>`;
 
 // Burger + Solutions-dropdown behaviour, mirrored from landing.html so the
 // injected header is interactive. Idempotent #year setter included.

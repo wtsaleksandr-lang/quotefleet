@@ -600,11 +600,17 @@ const HH_CSS = `
   .hh-tile.is-yours { border-style: dashed; border-color: var(--accent); }
   .hh-tile .k { font-size: 11px; font-family: var(--font-mono); letter-spacing: 0.06em; text-transform: uppercase; color: var(--muted); display: block; margin-bottom: 4px; }
   .hh-tile .v { font-size: 18px; font-weight: 600; color: var(--ink); font-family: var(--font-mono); }
-  .hh-tile .n { font-size: 12px; color: var(--muted); line-height: 1.5; display: block; margin-top: 4px; }
+  /* CLAMPED TO TWO LINES. Four captions at four lines each is 200px of prose
+     above the breakdown, and every one of these claims is repeated on the
+     rows beneath with its own rating and its own hover card. */
+  .hh-tile .n { font-size: 12px; color: var(--muted); line-height: 1.5; display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 2; overflow: clip; margin-top: 4px; }
 
   .hh-note { border-radius: var(--radius-lg); padding: 16px; margin-top: 12px; border: 1px solid var(--border); background: var(--surface); }
   .hh-note h3 { font-size: 15px; margin: 0 0 8px; color: var(--ink); }
   .hh-note p, .hh-note li { font-size: 13px; line-height: 1.55; color: var(--ink-soft); overflow-wrap: anywhere; }
+  /* The routing engine's own notes run to six lines at 375px. Clamped to
+     three; the tier label above them already says which measurement this is. */
+  .hh-note p.hh-clamp { display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 3; overflow: clip; }
   .hh-note ul { margin: 0; padding-left: 20px; display: grid; gap: 4px; }
   .hh-note--warn { border-color: var(--warn); background: var(--warn-bg); }
   .hh-note--error { border-color: var(--error); background: var(--error-bg); }
@@ -612,24 +618,15 @@ const HH_CSS = `
   /* ── The breakdown. One table, every line, basis stated per row. ───────── */
   .hh-linesbox { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius-lg); padding: 16px; margin-top: 12px; }
   .hh-linesbox > h3 { font-size: 15px; margin: 0 0 4px; color: var(--ink); }
-  /* The safety net, not the plan. TWO columns fit 375px natively — unlike the
-     permits page's seven money columns, which genuinely need an inner scroll —
-     so the table carries NO min-width and nothing here ever scrolls sideways.
-     The wrapper stays because a future column would otherwise push the document
-     itself sideways, and that is the one failure this page must not have. */
+  /* The safety net, not the plan. The breakdown itself is a two-track GRID and
+     fits 375px natively, so nothing here scrolls sideways. The wrapper stays
+     for the folded per-state detail, whose citation URLs are unbreakable
+     strings: it lets THAT box scroll rather than the document, which is the
+     one failure this page must not have. */
   .hh-tablewrap { overflow-x: auto; }
-  .hh-lines { width: 100%; border-collapse: collapse; font-size: 13px; table-layout: fixed; }
-  .hh-lines td:first-child, .hh-lines th:first-child { width: auto; }
-  .hh-lines td.num, .hh-lines th.num { width: 88px; }
-  .hh-lines th, .hh-lines td { text-align: left; padding: 8px 8px 8px 0; border-bottom: 1px solid var(--border); vertical-align: top; color: var(--ink-soft); }
-  .hh-lines th { font-size: 11px; font-family: var(--font-mono); letter-spacing: 0.06em; text-transform: uppercase; color: var(--muted); font-weight: 500; }
-  .hh-lines td.num, .hh-lines th.num { text-align: right; padding-right: 0; font-family: var(--font-mono); color: var(--ink); white-space: nowrap; }
-  /* USER-SOURCED money inside a table that also holds cited money. Never the
-     same treatment — italic amount plus a dashed YOUR RATE pill on the name. */
-  .hh-lines td.mine { font-style: italic; }
-  .hh-lines td.nil { color: var(--warn); font-style: normal; }
-  .hh-lines tbody tr:last-child td { border-bottom: none; }
-  .hh-lines .hh-tot td { font-weight: 700; color: var(--ink); border-top: 2px solid var(--border-strong); border-bottom: none; padding-top: 12px; }
+  /* THE DELIVERED TOTAL, as the last row of the breakdown. */
+  .hh-line.hh-tot { border-top: 2px solid var(--border-strong); border-bottom: none; padding-top: 12px; }
+  .hh-line.hh-tot .hh-lname, .hh-line.hh-tot .hh-lamt { font-weight: 700; color: var(--ink); }
   /* THE LINE NOTE, CLAMPED TO THREE LINES — the same treatment .ow-reason gets
      on the permits page, and for the same reason. The fuel line's model note
      runs to six lines at 375px and the seven permit rows each carry their own
@@ -637,7 +634,7 @@ const HH_CSS = `
      Nothing is lost: every note is repeated VERBATIM and in full in the
      per-state disclosure directly beneath, whose summary carries the count.
      overflow: clip, never hidden — hidden breaks position: sticky. */
-  .hh-ln { display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 3; overflow: clip; font-size: 12px; color: var(--muted); line-height: 1.5; margin-top: 4px; overflow-wrap: anywhere; }
+  .hh-ln { display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 2; overflow: clip; font-size: 12px; color: var(--muted); line-height: 1.5; margin-top: 4px; overflow-wrap: anywhere; }
   /* THE BASIS PILL LIVES ON THE ROW NAME, NOT IN THE NOTE, and that placement
      is load-bearing: the note beneath is clamped to three lines, and the claim
      "this is your number, not one we sourced" is the one sentence on the row
@@ -677,6 +674,120 @@ const HH_CSS = `
   .hh-eg { margin-top: 12px; }
   .hh-eg .btn { width: 100%; min-height: 48px; display: inline-flex; align-items: center; justify-content: center; }
 
+  /* -- THE SHIPPER FORM --------------------------------------------------
+     Three questions and a disclosure. Everything a shipper cannot answer --
+     axle count, trailer class, route class, per-state mileage -- is derived by
+     the engine from the cargo and the two addresses, and everything a
+     forwarder with his own book MIGHT want to override lives behind one
+     collapsed summary rather than in front of everybody who has neither. */
+
+  /* The two addresses sit SIDE BY SIDE on one line, per the brief -- cards
+     next to each other, not stacked. They collapse to one column at 640px,
+     where two 160px address boxes would be unusable. */
+  .hh-row2--addr { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+
+  /* UNITS. Two options, so the group is a two-track grid and can never leave
+     one pill alone on a row. Selected = OUTLINE + tint, never a bright fill. */
+  .hh-units { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 2px; margin: 0 0 8px; }
+
+  /* LOADING AT EACH END. Two checkmarks, two tracks -- the same no-orphan rule.
+     Both default CHECKED, i.e. "provided", because most shippers do have a
+     forklift or a crane on site and defaulting the crane ON would inflate
+     every quote on the page. Unticking one is what buys the machine. */
+  .hh-checks { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 2px; }
+  .hh-check { display: flex; align-items: flex-start; gap: 8px; min-height: 48px; padding: 12px; box-sizing: border-box; border: 1px solid var(--border); border-radius: var(--radius); background: var(--bg); font-size: 13px; line-height: 1.5; color: var(--ink-soft); cursor: pointer; }
+  .hh-check input { width: 20px; height: 20px; min-width: 20px; margin: 0; flex: none; accent-color: var(--accent); }
+  .hh-check:hover { border-color: var(--border-strong); }
+  .hh-check:has(input:checked) { border-color: var(--accent); color: var(--ink); }
+  .hh-check:focus-within { border-color: var(--accent); box-shadow: 0 0 0 1px var(--accent); }
+
+  /* THE OVERRIDE DISCLOSURE. Collapsed by default and deliberately quiet: a
+     shipper never opens it, and a forwarder with a negotiated rate finds it
+     without being asked a carrier question first. */
+  .hh-adv { margin-top: 16px; border: 1px solid var(--border); border-radius: var(--radius-lg); background: var(--surface); padding: 16px; }
+  .hh-adv > summary { font-size: 13px; color: var(--muted); cursor: pointer; list-style: none; display: flex; align-items: center; gap: 8px; min-height: 24px; }
+  .hh-adv > summary::-webkit-details-marker { display: none; }
+  .hh-adv > summary::before { content: "+"; font-family: var(--font-mono); font-size: 14px; line-height: 1; color: var(--muted); }
+  .hh-adv[open] > summary::before { content: "−"; }
+  .hh-adv > summary:hover, .hh-adv > summary:focus-visible { color: var(--accent); }
+  .hh-advbody { margin-top: 12px; display: grid; gap: 12px; }
+  .hh-advsec > h3 { font-size: 13px; margin: 0 0 4px; color: var(--ink); }
+
+  /* -- THE BREAKDOWN. A GRID, NOT A TABLE -- because every charge carries a
+     hover card, and a hover card inside an overflow-x:auto box is a clipped hover
+     card. Two tracks: the claim on the left, the money on the right. */
+  .hh-lines { list-style: none; margin: 8px 0 0; padding: 0; display: grid; }
+  .hh-line { display: grid; grid-template-columns: minmax(0, 1fr) max-content; column-gap: 12px; padding: 12px 0; border-bottom: 1px solid var(--border); position: relative; }
+  .hh-lines > .hh-line:last-child { border-bottom: none; }
+  .hh-lname { grid-column: 1; font-size: 13px; color: var(--ink); line-height: 1.5; overflow-wrap: anywhere; }
+  .hh-lamt { grid-column: 2; grid-row: 1; text-align: right; font-family: var(--font-mono); font-size: 13px; color: var(--ink); white-space: nowrap; }
+  .hh-lamt.is-mine { font-style: italic; }
+  .hh-lamt.is-nil { color: var(--warn); }
+  /* A BENCHMARK NEVER RENDERS AS A POINT. The range is the figure; the single
+     number beneath it is only what the delivered total actually summed. */
+  .hh-lamt .rng { display: block; }
+  .hh-lamt .mid { display: block; font-size: 11px; color: var(--muted); margin-top: 4px; }
+  .hh-lmeta { grid-column: 1 / -1; display: flex; flex-wrap: wrap; align-items: center; gap: 4px; margin-top: 4px; }
+
+  /* THE ACCURACY RATING. One pill per charge, and the pill is the button that
+     opens its card. Four tiers, four borders, and CITED never carries a band. */
+  .hh-tierwrap { position: relative; display: inline-flex; }
+  .hh-tier { font-size: 10px; font-family: var(--font-mono); letter-spacing: 0.04em; text-transform: uppercase; padding: 4px 8px; min-height: 24px; border-radius: var(--radius-pill); border: 1px solid var(--border-strong); background: transparent; color: var(--muted); cursor: pointer; white-space: nowrap; }
+  /* 10px text: WCAG AA has no large-text relief here, so every tier colour is
+     mixed toward var(--ink) rather than used raw. That darkens it on light and
+     lightens it on dark from ONE declaration, with no theme block and no raw
+     hex -- the same fix .hh-kpilabel--high already carries. */
+  .hh-tier--cited { border-color: var(--success); color: color-mix(in srgb, var(--success) 70%, var(--ink)); }
+  .hh-tier--indexed { border-color: var(--accent); color: color-mix(in srgb, var(--accent) 70%, var(--ink)); }
+  .hh-tier--benchmark { border-color: var(--border-strong); color: var(--ink-soft); }
+  .hh-tier--refused { border-color: var(--warn); color: color-mix(in srgb, var(--warn) 80%, var(--ink)); }
+  .hh-tier:hover, .hh-tier:focus-visible { border-color: var(--accent); }
+  /* A GROUP HEADER'S PILL IS A LABEL, NOT A BUTTON. It says what kind of
+     claim every member makes and stops there: the band and the evidence
+     are per component and live on the member rows. */
+  .hh-tier.is-static { cursor: default; }
+
+  /* THE HOVER CARD. Brief in the card, the argument behind "read more" -- the
+     engine already splits a short hover from a long detail and renders them
+     way. Anchored to the pill and constrained to the row, so it can never push
+     the document sideways. Opens on hover where there IS a hover, and on click
+     everywhere, because a tooltip a phone cannot open is not a tooltip. */
+  .hh-hover { display: none; position: absolute; z-index: 6; top: calc(100% + 4px); left: 0; width: 320px; max-width: 100%; box-sizing: border-box; padding: 12px; border: 1px solid var(--border-strong); border-radius: var(--radius); background: var(--surface-2); box-shadow: 0 8px 24px rgba(0, 0, 0, 0.18); }
+  .hh-hover.is-open { display: block; }
+  @media (hover: hover) { .hh-tierwrap:hover > .hh-hover, .hh-tierwrap:focus-within > .hh-hover { display: block; } }
+  .hh-hbrief { margin: 0; font-size: 12px; line-height: 1.5; color: var(--ink-soft); }
+  .hh-hmeta { margin: 4px 0 0; font-size: 11px; line-height: 1.5; color: var(--muted); }
+  .hh-more { margin-top: 8px; min-height: 24px; padding: 4px 8px; font-size: 11px; font-family: var(--font-mono); letter-spacing: 0.04em; background: transparent; border: 1px solid var(--border-strong); border-radius: var(--radius-pill); color: var(--muted); cursor: pointer; }
+  .hh-more:hover, .hh-more:focus-visible { border-color: var(--accent); color: var(--accent); }
+  .hh-hdetail { margin-top: 8px; font-size: 12px; line-height: 1.5; color: var(--ink-soft); max-height: 240px; overflow-y: auto; overflow-x: clip; overscroll-behavior: contain; }
+  .hh-hdetail p { margin: 0; overflow-wrap: anywhere; }
+  .hh-hdetail a { color: var(--accent); overflow-wrap: anywhere; }
+
+  /* GROUPED LINES. Seven permit rows are one claim, so they render as one row
+     with the states one click inside it. This is the whole reason the result
+     block did not grow when the accuracy rating was added to every charge. */
+  .hh-sub { grid-column: 1 / -1; margin-top: 4px; }
+  .hh-sub > summary { font-size: 11px; font-family: var(--font-mono); letter-spacing: 0.04em; color: var(--muted); cursor: pointer; min-height: 24px; }
+  .hh-sub > summary:hover, .hh-sub > summary:focus-visible { color: var(--accent); }
+  .hh-sub .hh-lines { margin-top: 4px; padding-left: 12px; border-left: 1px solid var(--border); }
+  .hh-sub .hh-line { padding: 8px 0; }
+  .hh-nil { font-size: 11px; font-family: var(--font-mono); color: var(--warn); }
+
+  /* DISCLOSED, NOT ADDED. Detention at 13 axles is $605/hr and a shipper
+     expects $50-100. It belongs on the page and NOT in the total. */
+  .hh-risk { border: 1px solid var(--warn); background: var(--warn-bg); border-radius: var(--radius-lg); padding: 16px; margin-top: 12px; }
+  .hh-risk h3 { font-size: 15px; margin: 0 0 4px; color: var(--ink); }
+  .hh-risk > p { font-size: 13px; line-height: 1.55; color: var(--ink-soft); margin: 0; }
+  .hh-risk .hh-lines { margin-top: 8px; }
+  .hh-risk .hh-line { border-bottom-color: var(--border); }
+
+  .hh-legend { margin-top: 12px; }
+  .hh-legend > summary { font-size: 11px; font-family: var(--font-mono); letter-spacing: 0.04em; color: var(--muted); cursor: pointer; min-height: 24px; }
+  .hh-legend > summary:hover, .hh-legend > summary:focus-visible { color: var(--accent); }
+  .hh-legend dl { margin: 8px 0 0; display: grid; gap: 8px; }
+  .hh-legend dt { font-size: 10px; font-family: var(--font-mono); letter-spacing: 0.04em; text-transform: uppercase; color: var(--muted); }
+  .hh-legend dd { margin: 0; font-size: 12px; line-height: 1.5; color: var(--ink-soft); }
+
   @media (min-width: 961px) {
     /* Keep the worked example beside whatever part of the form is being filled
        in. Dropped the moment a real result renders — a result must scroll. */
@@ -700,6 +811,18 @@ const HH_CSS = `
     .hh-leg { grid-template-columns: minmax(0, 1fr) minmax(0, 92px) 44px; }
     .hh-field input, .hh-field select { font-size: 16px; }
     .hh-chips { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+    /* Two 160px address boxes are unusable. ONE COLUMN, which is the only
+       other count that cannot orphan. */
+    .hh-row2--addr { grid-template-columns: minmax(0, 1fr); }
+    .hh-checks { grid-template-columns: minmax(0, 1fr); }
+    /* In flow, not floating: a 320px popover anchored inside a 343px column is
+       the whole column, so it may as well push the rows below it down rather
+       than cover them. */
+    .hh-hover { position: static; width: auto; box-shadow: none; margin-top: 8px; }
+  }
+  @media (max-width: 640px) and (hover: hover) {
+    .hh-tierwrap:hover > .hh-hover, .hh-tierwrap:focus-within > .hh-hover { display: none; }
+    .hh-hover.is-open { display: block; }
   }
 `;
 
@@ -708,9 +831,18 @@ const HH_CSS = `
 function field(
   id: string,
   label: string,
-  opts: { step?: string; type?: string } = {},
+  opts: { step?: string; type?: string; imperial?: string; metric?: string; unit?: 'weight' | 'length' } = {},
 ): string {
-  return `<label class="hh-field"><input id="${esc(id)}" type="${esc(opts.type ?? 'number')}" ${opts.type === 'text' ? '' : `inputmode="decimal" step="${esc(opts.step ?? 'any')}" min="0"`} placeholder=" " autocomplete="off"><span class="hh-lab">${esc(label)}</span></label>`;
+  /**
+   * THE UNIT-AWARE FIELD. `imperial`/`metric` carry the two titles and `unit`
+   * says which conversion applies, so the client swaps the TITLE and the VALUE
+   * from data on the element rather than from a table it keeps in step by hand.
+   * The title stays INSIDE the field either way — see `.hh-field .hh-lab`.
+   */
+  const unitAttrs = opts.unit
+    ? ` data-unit="${esc(opts.unit)}" data-imperial="${esc(opts.imperial ?? label)}" data-metric="${esc(opts.metric ?? label)}"`
+    : '';
+  return `<label class="hh-field"><input id="${esc(id)}" type="${esc(opts.type ?? 'number')}" ${opts.type === 'text' ? '' : `inputmode="decimal" step="${esc(opts.step ?? 'any')}" min="0"`} placeholder=" " autocomplete="off"${unitAttrs}><span class="hh-lab">${esc(label)}</span></label>`;
 }
 
 /** The help cue. ALWAYS top-left of the section header, exactly one per section. */
@@ -744,15 +876,22 @@ export function renderHeavyHaulToolPage(): string {
     (n) => `<li><strong>${esc(n.item)}.</strong> ${esc(n.why)}</li>`,
   ).join('');
 
+  const tierLegend = (['cited', 'indexed', 'benchmark', 'refused'] as const)
+    .map(
+      (t) =>
+        `<dt>${esc(TIER_LABELS[t])}</dt><dd>${esc(TIER_MEANINGS[t])}</dd>`,
+    )
+    .join('');
+
   const body = `
   <section class="hero hh-hero">
     <div class="container-narrow">
-      <p class="hh-eyebrow">Free tool · no account needed</p>
-      <h1>Heavy-Haul Delivered-Cost Estimator</h1>
-      <p class="lead">Enter the cargo, an address at each end, and your own line-haul rate. You get a delivered-cost estimate, a line-by-line breakdown that says where every number came from, and a confidence score you can take apart.</p>
+      <p class="hh-eyebrow">Free tool &middot; no account needed</p>
+      <h1>Heavy-Haul &amp; OOG Delivered-Cost Estimator</h1>
+      <p class="lead">Two addresses and your cargo. That is the whole form. Axle count, trailer class and route class are worked out from the load rather than asked for, and every charge that comes back says what kind of evidence stands behind it.</p>
       <div class="hh-truth">
-        <h2>Every line says whose number it is.</h2>
-        <p><strong>State permit fees are cited to the statute or fee schedule they came from. Line haul and pilot cars are computed from the rates YOU enter — we hold no market rates and will not invent one. Fuel comes from the EIA weekly diesel index through a surcharge model whose peg and fuel economy are our assumptions.</strong> No margin is added, ever. A component we cannot price is named and left out, never counted as $0.</p>
+        <h2>Every line says what kind of number it is.</h2>
+        <p><strong>State permit fees are cited to the statute or fee schedule they came from, and carry no range. Fuel is indexed to the EIA weekly diesel price. Line haul, pilot cars and accessorials are a benchmark band from published market data, always shown as a range, and replaced outright by any rates YOU enter.</strong> No margin is added, ever. A component we cannot price is named and left out, never counted as $0.</p>
       </div>
     </div>
   </section>
@@ -761,75 +900,93 @@ export function renderHeavyHaulToolPage(): string {
     <div class="hh-grid">
       <form class="hh-form" id="hh-form" novalidate>
         <div class="hh-card">
+          <div class="hh-sec">${cue('cue-lane')}<h2>Pickup and delivery</h2></div>
+          ${cueBody('cue-lane', 'Full US street addresses — number, street, city, state and ZIP. They are resolved by the US Census geocoder, which is free, keyless and public domain, and which refuses an address it cannot place rather than matching a different town. Two addresses are enough: we route the lane over the federal primary-road network (US Census TIGER/Line, public domain) and split it against state lines, so permits are priced per state. LOADING IS THE ONE QUESTION ONLY YOU CAN ANSWER. A filed heavy-haul tariff says cranes, hoists and winches "shall be supplied by the Consignor or Consignee" together with the people to run them — so if nobody at your pickup or your delivery has the machine, it is a real cost that nobody in your quote chain has priced. Untick the end that has none and we price it.')}
+          <div class="hh-stack">
+            <div class="hh-row2 hh-row2--addr">
+              ${field('hh-origin', 'Pickup address', { type: 'text' })}
+              ${field('hh-destination', 'Delivery address', { type: 'text' })}
+            </div>
+            <div class="hh-checks">
+              <label class="hh-check"><input type="checkbox" id="hh-load-origin" checked><span>Loading provided at pickup</span></label>
+              <label class="hh-check"><input type="checkbox" id="hh-load-destination" checked><span>Unloading provided at delivery</span></label>
+            </div>
+          </div>
+        </div>
+
+        <div class="hh-card">
           <div class="hh-sec">${cue('cue-cargo')}<h2>The cargo</h2></div>
-          ${cueBody('cue-cargo', 'Gross weight is what every state prices the overweight permit from. Width, height and overall length decide the oversize fee band and the escort rules — leave one blank and the states that need it will say so instead of guessing.')}
-          <div class="hh-stack">
-            ${field('hh-weight', 'Gross weight (lb)', { step: '1' })}
-            <div class="hh-row2">
-              ${field('hh-width-ft', 'Width (ft)', { step: '1' })}
-              ${field('hh-width-in', 'Width (in)', { step: '1' })}
-            </div>
-            <div class="hh-row2">
-              ${field('hh-height-ft', 'Height (ft)', { step: '1' })}
-              ${field('hh-height-in', 'Height (in)', { step: '1' })}
-            </div>
-            <div class="hh-row2">
-              ${field('hh-length-ft', 'Overall length (ft)', { step: '1' })}
-              ${field('hh-axles', 'Axles (incl. steer)', { step: '1' })}
-            </div>
+          ${cueBody('cue-cargo', 'Weight and the three dimensions of the piece, in whichever system you work in — switching converts what you have already typed and never clears it. Decimals are fine: 12 ft 6 in is 12.5. Weight is what every state prices the overweight permit from, and it is also what tells us the trailer and the axle count; width, height and length decide the oversize fee band and the escort rules. Leave one blank and the states that need it say so instead of guessing.')}
+          <div class="hh-units" id="hh-units" role="group" aria-label="Units">
+            <button type="button" class="hh-pill" data-units="imperial" aria-pressed="true">Imperial &mdash; ft &middot; lb</button>
+            <button type="button" class="hh-pill" data-units="metric" aria-pressed="false">Metric &mdash; m &middot; kg</button>
           </div>
-        </div>
-
-        <div class="hh-card">
-          <div class="hh-sec">${cue('cue-lane')}<h2>Point A to point B</h2></div>
-          ${cueBody('cue-lane', 'Full US street addresses — number, street, city, state and ZIP. They are resolved by the US Census geocoder, which is free, keyless and public domain, and which refuses an address it cannot place rather than matching a different town. We show you what it matched so you can check it. Two addresses are enough to MEASURE the lane: we route it over the federal primary-road network (US Census TIGER/Line, public domain) and split it against state lines, so permits are priced per state. Where that measurement cannot be trusted — an address far from any mapped highway, or a lane whose real road is not in that dataset — the tool says so and asks you for the miles instead of guessing.')}
-          <div class="hh-stack">
-            ${field('hh-origin', 'Pickup address', { type: 'text' })}
-            ${field('hh-destination', 'Delivery address', { type: 'text' })}
-          </div>
-        </div>
-
-        <div class="hh-card">
-          <div class="hh-sec">${cue('cue-route')}<h2>Road type</h2></div>
-          ${cueBody('cue-route', 'Escort rules are written per road class. Pick the class most of the move runs on. States that classify their own highways will leave those rules unresolved and say so in their notes rather than assume an answer.')}
-          <div class="hh-pills" id="hh-routeclass">${pills}</div>
-        </div>
-
-        <div class="hh-card">
-          <div class="hh-sec">${cue('cue-rates')}<h2>Your rates</h2></div>
-          ${cueBody('cue-rates', 'Your line-haul rate is the one number this tool cannot supply. The engine that prices line haul reads a carrier rate card and needs an account, so a public tool has no honest way to produce a market rate — and a made-up per-mile figure sitting beside cited statute numbers would be the one dishonest line on the page. Same for pilot cars: no state publishes a rate, and your negotiated figure beats any range we could invent. A day rate needs a day count — a rate without one is not a price, and one day is not a safe default.')}
           <div class="hh-stack">
             <div class="hh-row2">
-              ${field('hh-linehaul', 'Line haul $ / mile')}
-              ${field('hh-linehaul-min', 'Your minimum charge ($)')}
+              ${field('hh-weight', 'Gross weight (lb)', { unit: 'weight', imperial: 'Gross weight (lb)', metric: 'Gross weight (kg)' })}
+              ${field('hh-length', 'Overall length (ft)', { unit: 'length', imperial: 'Overall length (ft)', metric: 'Overall length (m)' })}
             </div>
             <div class="hh-row2">
-              ${field('hh-pc-mile', 'Pilot car $ / mile')}
-              ${field('hh-pc-day', 'Pilot car $ / day')}
-            </div>
-            <div class="hh-row2">
-              ${field('hh-pc-days', 'Days per state', { step: '1' })}
-              ${field('hh-pc-min', 'Pilot car minimum per state ($)')}
-            </div>
-            <div class="hh-row2">
-              ${field('hh-fuel-peg', 'Your FSC peg $ / gal')}
-              ${field('hh-fuel-mpg', 'Your fuel economy (mpg)')}
+              ${field('hh-width', 'Width (ft)', { unit: 'length', imperial: 'Width (ft)', metric: 'Width (m)' })}
+              ${field('hh-height', 'Height (ft)', { unit: 'length', imperial: 'Height (ft)', metric: 'Height (m)' })}
             </div>
           </div>
-          <p class="hh-hint">Blank is a valid answer. Anything left blank comes back named and excluded, and costs the confidence score points — never quietly $0. Leave the peg and mpg blank and we use the standard OOIDA figures ($1.25/gal, 6 mpg) and label them as ours; fill them in and the fuel line becomes your model on our sourced diesel price.</p>
         </div>
 
-        <div class="hh-card">
-          <div class="hh-sec">${cue('cue-miles')}<h2>Filed per-state miles — unlocks permits</h2></div>
-          ${cueBody('cue-miles', 'These are YOUR miles and they BEAT OURS. We do route the lane now, but a routed path is a measurement of a road, while these are the figures on the permit application — which is what each state actually bills. Type the per-state mileage your PC*Miler or ProMiles run produced and it replaces our measurement outright, for every covered state, priced from a cited fee schedule.')}
-          <div class="hh-legs" id="hh-legs"></div>
-          <div class="hh-actions">
-            <button type="button" class="btn btn-secondary" id="hh-add">Add a state</button>
-            <button type="button" class="btn btn-secondary" id="hh-clear-legs">Clear states</button>
+        <details class="hh-adv" id="hh-adv">
+          <summary id="hh-adv-summary">I have my own rates, my own filed miles, or an extra to add</summary>
+          <div class="hh-advbody">
+            <p class="hh-hint">Nothing here is needed for an estimate. It is here because a forwarder with a negotiated rate should be able to use it: anything you enter REPLACES our band outright, and the line then says the basis is yours rather than ours.</p>
+
+            <div class="hh-advsec">
+              <h3>Your own rates</h3>
+              <div class="hh-stack">
+                <div class="hh-row2">
+                  ${field('hh-linehaul', 'Line haul $ / mile')}
+                  ${field('hh-linehaul-min', 'Your minimum charge ($)')}
+                </div>
+                <div class="hh-row2">
+                  ${field('hh-pc-mile', 'Pilot car $ / mile')}
+                  ${field('hh-pc-day', 'Pilot car $ / day')}
+                </div>
+                <div class="hh-row2">
+                  ${field('hh-pc-days', 'Days per state', { step: '1' })}
+                  ${field('hh-pc-min', 'Pilot car minimum per state ($)')}
+                </div>
+                <div class="hh-row2">
+                  ${field('hh-fuel-peg', 'Your FSC peg $ / gal')}
+                  ${field('hh-fuel-mpg', 'Your fuel economy (mpg)')}
+                </div>
+              </div>
+            </div>
+
+            <div class="hh-advsec">
+              <h3>The rig, if you already know it</h3>
+              <div class="hh-stack">
+                <div class="hh-row2">
+                  ${field('hh-axles', 'Axles (incl. steer)', { step: '1' })}
+                  ${field('hh-value', 'Declared cargo value ($)')}
+                </div>
+                <div class="hh-pills" id="hh-routeclass">${pills}</div>
+                <div class="hh-checks">
+                  <label class="hh-check"><input type="checkbox" id="hh-tarping"><span>Tarping requested</span></label>
+                  <label class="hh-check"><input type="checkbox" id="hh-securement"><span>Cribbing / built cradle needed</span></label>
+                </div>
+              </div>
+            </div>
+
+            <div class="hh-advsec">
+              <h3>Filed per-state miles &mdash; your figures beat ours</h3>
+              <div class="hh-legs" id="hh-legs"></div>
+              <div class="hh-actions">
+                <button type="button" class="btn btn-secondary" id="hh-add">Add a state</button>
+                <button type="button" class="btn btn-secondary" id="hh-clear-legs">Clear states</button>
+              </div>
+              <p class="hh-hint" id="hh-cap" hidden>${OSOW_MAX_LEGS} states is the most one lane can carry here. Remove a state to add another.</p>
+              <p class="hh-hint">We hold a cited fee schedule for these ${covered.length} states: ${esc(covered.map((s) => s.code).join(' '))}. Any other state can still be added &mdash; it comes back named and unpriced, never as $0.</p>
+            </div>
           </div>
-          <p class="hh-hint" id="hh-cap" hidden>${OSOW_MAX_LEGS} states is the most one lane can carry here. Remove a state to add another.</p>
-          <p class="hh-hint">We hold a cited fee schedule for these ${covered.length} states: ${esc(covered.map((s) => s.code).join(' '))}. Any other state can still be added — it comes back named and unpriced, never as $0.</p>
-        </div>
+        </details>
 
         <div class="hh-go">
           <button type="submit" class="btn btn-primary" id="hh-go">Get the delivered estimate</button>
@@ -838,22 +995,22 @@ export function renderHeavyHaulToolPage(): string {
 
       <section class="hh-results is-empty" id="hh-results" aria-live="polite">
         <div class="hh-card">
-          <p class="hh-empty">Fill in the cargo and both addresses, then press <strong>Get the delivered estimate</strong>. Nothing is stored and no account is needed.</p>
+          <p class="hh-empty">Enter both addresses and the cargo, then press <strong>Get the delivered estimate</strong>. Nothing is stored and no account is needed.</p>
           <div class="hh-eg">
-            <button type="button" class="btn btn-secondary" id="hh-example">See a worked example — Houston to Buffalo</button>
+            <button type="button" class="btn btn-secondary" id="hh-example">See a worked example &mdash; Houston to Buffalo</button>
           </div>
           <ul class="hh-eglist">
-            <li>120,000 lb · 12'6" wide · 14'6" high · 85 ft · 8 axles, interstate.</li>
-            <li>Houston, TX to Buffalo, NY, with the filed miles inside all seven states.</li>
-            <li>A $4.85/mi line-haul rate and a $1.95/mi pilot-car rate — both entered as yours.</li>
+            <li>120,000 lb &middot; 12.5 ft wide &middot; 14.5 ft high &middot; 85 ft long, loading provided at both ends.</li>
+            <li>Houston, TX to Buffalo, NY &mdash; two addresses, nothing else.</li>
+            <li>Eight axles, a multi-axle trailer and an interstate route class, all worked out from that.</li>
           </ul>
           <div class="hh-sec">${cue('cue-output')}<h2>What comes back</h2></div>
-          ${cueBody('cue-output', 'A delivered figure with a range around it, the three subtotals kept apart (money we sourced, money from your rates, money derived from an index), a line for every component including the ones we could not price, and a confidence score itemised into the specific facts that took points off it.')}
+          ${cueBody('cue-output', 'A delivered figure with a range around it, a rating on EVERY charge saying what kind of evidence stands behind it, a line for every component including the ones we refuse to price, and a confidence score itemised into the specific facts that took points off it.')}
           <ul class="hh-eglist">
-            <li><strong>Money we SOURCED, money from YOUR rates, and money DERIVED</strong> — three subtotals, never blended into one.</li>
-            <li><strong>A confidence score you can take apart</strong> — every deduction names the engine field it keys on and whether its weight is measured or our judgement.</li>
-            <li><strong>Named gaps.</strong> An uncovered state, a superload, a missing rate — each appears as its own line with no dollar figure, never as $0.</li>
-            <li><strong>The statute behind each permit line</strong>, effective-dated, per state.</li>
+            <li><strong>An accuracy rating on every charge.</strong> Cited, indexed, benchmark or not priced &mdash; with the evidence one hover away and the full argument behind &ldquo;read more&rdquo;.</li>
+            <li><strong>A cited fee carries no range</strong>, because a statute states it. <strong>A benchmark always carries one</strong>, because the market does not have a point value.</li>
+            <li><strong>Detention and layover are disclosed and NOT added</strong>, because the hours are set by whoever keeps the truck waiting.</li>
+            <li><strong>Named refusals.</strong> A superload line haul, a lift above 160,000 lb, a tarp above 14 ft wide &mdash; each says what to do instead, and none of them carries a number.</li>
           </ul>
         </div>
         <details class="hh-fold">
@@ -927,6 +1084,7 @@ export function renderHeavyHaulToolPage(): string {
   ${body}
   ${PREMIUM_FOOTER}
   ${HEADER_SCRIPTS}
+  <template id="hh-tier-legend"><details class="hh-legend"><summary>What the four ratings mean</summary><dl>${tierLegend}</dl></details></template>
   <template id="hh-leg-tpl"><div class="hh-leg">
     <label class="hh-field"><select class="hh-leg-state">${stateOptionsHtml}</select><span class="hh-lab">State</span></label>
     <label class="hh-field"><input class="hh-leg-miles" type="number" inputmode="decimal" step="any" min="0" placeholder=" " autocomplete="off"><span class="hh-lab">Miles in state</span></label>

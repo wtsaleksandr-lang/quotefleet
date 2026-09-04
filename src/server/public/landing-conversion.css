@@ -621,3 +621,47 @@ body.qf-wft .footer-brand .qf-footer-brand {
 @media (max-width: 720px) {
   .footer-brand .qf-footer-logo { width: 148px; }
 }
+
+/* ── THE OOG CTA (homepage copy) ────────────────────────────────────────────
+   landing.html does not load /nav-unify.css, so the two rules that sheet adds
+   for the header and footer CTA are mirrored here. Appended at EOF: the
+   spacing and colour guards baseline this file by FILE:LINE. */
+.site-actions .site-oog {
+  display: inline-flex;
+  align-items: center;
+  min-height: 24px;
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--muted);
+  text-decoration: none;
+  white-space: nowrap;
+  transition: color 0.16s ease;
+}
+.site-actions .site-oog:hover,
+.site-actions .site-oog:focus-visible {
+  color: var(--ink);
+  text-decoration: underline;
+}
+/* HIDDEN BELOW 1141px, AND THAT IS MEASURED RATHER THAN CAUTIOUS.
+   #476/#477 removed a 641-960px band where the action cluster ran off the end
+   of the header card, and left the 1024-1140px band running with about 50px of
+   slack. This link is ~70px. Measured at 1024px it put the homepage header
+   39px over its content box and the directory header 25px over -- exactly the
+   defect those PRs fixed -- so it does not ship into that band. Below 1024px
+   the bar is brand + theme + burger and `.signin` and the primary button are
+   already gone, so nothing changes there either. The FOOTER copy carries every
+   width, phones included. */
+@media (max-width: 1140px) {
+  .site-actions .site-oog { display: none; }
+}
+.premium-footer .footer-bottom .qf-foot-oog {
+  color: var(--muted);
+  text-decoration: none;
+  font-weight: 500;
+}
+.premium-footer .footer-bottom .qf-foot-oog:hover,
+.premium-footer .footer-bottom .qf-foot-oog:focus-visible {
+  color: var(--ink);
+  text-decoration: underline;
+}
+.premium-footer .footer-bottom .qf-foot-oog .arr { color: currentColor; }
