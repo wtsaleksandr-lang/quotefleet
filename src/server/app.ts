@@ -47,6 +47,7 @@ import { registerLeadsBillingRoutes } from './routes/leadsBilling.js';
 import { registerToolsRoutes } from './routes/tools.js';
 import { registerOsowPermitRoutes } from './routes/osowPermits.js';
 import { registerHeavyHaulQuoteRoutes } from './routes/heavyHaulQuote.js';
+import { registerSeasonalRestrictionRoutes } from './routes/seasonalRestrictions.js';
 import { registerBillingRoutes, registerStripeWebhook } from './routes/billing.js';
 import { registerDirectoryAuthRoutes } from './routes/directoryAuth.js';
 import { registerDirectoryBillingRoutes } from './routes/directoryBilling.js';
@@ -218,6 +219,7 @@ export function createApp(): express.Express {
   registerToolsRoutes(app);
   registerOsowPermitRoutes(app);
   registerHeavyHaulQuoteRoutes(app);
+  registerSeasonalRestrictionRoutes(app);
   registerBillingRoutes(app);
   registerDirectoryBillingRoutes(app);
   registerConnectRoutes(app);

@@ -55,7 +55,7 @@
  * on, its permanent phase within its own tick period.
  *
  * Spaced `MIN_CRON_SPACING_MS` apart in registration order. The widest is under
- * ten minutes, so even the hourly jobs keep their existing hour-slot behaviour
+ * eleven minutes, so even the hourly jobs keep their existing hour-slot behaviour
  * (a job that only acts during the 13:00 UTC hour still gets its tick inside
  * that hour); the fastest cron's period is 10 minutes, and no offset is allowed
  * to approach it (see the test).
@@ -78,6 +78,7 @@ export const CRON_STAGGER_MS: Readonly<Record<string, number>> = {
   'ops-digest': 435_000,
   'card-expiry': 480_000,
   'job-health-watchdog': 525_000,
+  'seasonal-restrictions': 570_000,
 };
 
 /** Minimum gap the offset table must keep between any two crons. Job runs are
@@ -88,7 +89,7 @@ export const MIN_CRON_SPACING_MS = 45_000;
 /** Fallback for a cron missing from the table — deliberately late and loud, so
  *  a new cron still runs but the omission is visible in the boot log rather
  *  than silently colliding with an existing offset. */
-export const UNREGISTERED_CRON_OFFSET_MS = 570_000;
+export const UNREGISTERED_CRON_OFFSET_MS = 615_000;
 
 export function cronStaggerMs(cron: string, log: (msg: string) => void = console.warn): number {
   const offset = CRON_STAGGER_MS[cron];

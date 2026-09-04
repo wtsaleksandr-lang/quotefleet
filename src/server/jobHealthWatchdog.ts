@@ -158,6 +158,13 @@ export const JOB_REGISTRY: readonly JobExpectation[] = [
       'Shippers stop being told that carriers replied to their rate request — a time-sensitive quote sits unseen behind a link nobody re-opens. Blasts that got zero replies also stop being flagged, so a broken carrier set looks like a quiet week.',
   },
   {
+    job: 'seasonal-restrictions',
+    maxIntervalMs: 3 * HOUR, // 30-minute tick; an idle tick records `skipped`, which is healthy
+    disabledEnv: 'SEASONAL_RESTRICTIONS_DISABLED',
+    impact:
+      'Spring-thaw (frost law) weight restrictions stop being refreshed from the state DOTs. The stored snapshots age, and every OS/OW quote through a restricting state falls back to a staleness warning instead of a current one. Dangerous specifically in February-May, when a missed posting is a load quoted as legal on a road that is posted.',
+  },
+  {
     job: 'job-health-watchdog',
     maxIntervalMs: 3 * HOUR, // hourly tick — this module itself
     impact: 'The staleness watchdog itself is dead, so no other job failure will be reported. Check the process is alive.',

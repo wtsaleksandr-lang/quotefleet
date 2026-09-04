@@ -18,6 +18,7 @@
  * logs rather than silently serving a schema-mismatched app that 500s.
  */
 import postgres from 'postgres';
+import { SEASONAL_RESTRICTIONS_DDL } from './seasonalRestrictionsDdl.js';
 import { drizzle } from 'drizzle-orm/postgres-js';
 import { migrate } from 'drizzle-orm/postgres-js/migrator';
 import { loadEnv } from '../config.js';
@@ -1182,6 +1183,13 @@ export const SELF_HEAL_TABLE_STATEMENTS: readonly string[] = [
     "submitted_at" timestamp DEFAULT now() NOT NULL,
     CONSTRAINT "indexnow_submissions_kind_ref_pk" PRIMARY KEY("kind","ref")
   )`,
+
+  // SEASONAL (SPRING THAW) WEIGHT RESTRICTIONS — one row per state, holding the
+  // snapshot last read from that state's own DOT publication. Defined in
+  // src/db/seasonalRestrictionsDdl.ts so that migrate.ts and the module that
+  // owns the table read the SAME strings; server/seasonal/store.ts imports
+  // runSelfHealStatements from here, so it cannot be imported back.
+  ...SEASONAL_RESTRICTIONS_DDL,
 ];
 
 export async function ensureSelfHealTables(): Promise<void> {

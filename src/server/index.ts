@@ -27,6 +27,8 @@ import { startJobHealthWatchdogCron } from './jobHealthWatchdogCron.js';
 import { startOpsDigestCron } from './opsDigestCron.js';
 import { startCardExpiryCron } from './cardExpiryCron.js';
 import { startRfqResponseCron } from './rfq/responseCron.js';
+import { ensureSeasonalRestrictionsTable } from './seasonal/store.js';
+import { startSeasonalRestrictionsCron } from './seasonalRestrictionsCron.js';
 import {
   decideUncaughtExceptionAction,
   isServerListening,
@@ -158,6 +160,15 @@ async function runPostListenJobs(): Promise<void> {
     void ensureOpsAlertsTable().catch((err) => {
       console.error('[server] ops_alerts ledger self-heal failed (non-fatal):', err);
     });
+    // seasonal_restrictions — a brand-new table nothing else touches, so it
+    // takes no shared lock and cannot queue behind the carrier_directory chain.
+    // Non-blocking and non-fatal for the same reason as the two above: an
+    // OS/OW quote and the reference page both answer correctly with the table
+    // absent (they degrade to "we hold no current data" with the state's own
+    // link), so a failed heal must never delay a healthz probe or stop boot.
+    void ensureSeasonalRestrictionsTable().catch((err) => {
+      console.error('[server] seasonal_restrictions self-heal failed (non-fatal):', err);
+    });
     // Register every scheduled cron through runCronSafely. This wrapper (a) catches
     // a throw at registration so one cron failing to register can NEVER stop the
     // siblings below it from registering, and (b) sends a de-duped admin alert +
@@ -196,6 +207,12 @@ async function runPostListenJobs(): Promise<void> {
     // NEW: RFQ response watcher — tells the shipper when carriers reply, and
     // flags blasts that were delivered and got nothing back. See rfq/responseCron.ts.
     await runCronSafely('rfq-response-cron', () => startRfqResponseCron());
+    // NEW: seasonal (spring-thaw / frost law) restriction ingest. Ticks every 30
+    // min and polls each state DOT on its OWN cadence -- 3h inside that state's
+    // posting window, 12h in the shoulder, weekly otherwise. Most ticks do
+    // nothing and record `skipped`, which is the off-season heartbeat the
+    // staleness watchdog needs. See seasonalRestrictionsCron.ts.
+    await runCronSafely('seasonal-restrictions-cron', () => startSeasonalRestrictionsCron());
     console.log('[server] post-listen jobs registered');
   } catch (err) {
     console.error('[server] post-listen setup failed (non-fatal):', err);
