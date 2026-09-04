@@ -33,6 +33,7 @@
  *                    'pages' is built from static arrays and stays synchronous.
  */
 import { sql } from 'drizzle-orm';
+import { SEASONAL_SOURCES } from '../../calc/osow/seasonal/sources.js';
 import { db } from '../../db/client.js';
 import { carrierDirectory, sitemapCache } from '../../db/schema.js';
 import { US_STATES } from './usStates.js';
@@ -263,6 +264,11 @@ const MARKETING_ROUTES: Array<{ path: string; changefreq: string; priority: stri
   { path: '/tools', changefreq: 'monthly', priority: '0.7' },
   { path: '/tools/oversize-permits', changefreq: 'monthly', priority: '0.7' },
   { path: '/tools/heavy-haul-quote', changefreq: 'monthly', priority: '0.7' },
+  // Seasonal (spring thaw) restrictions. `weekly` on the index because its
+  // status pills genuinely change through the season; the per-state pages are
+  // appended below from the registry so adding a state adds its URL here too,
+  // with no second list to forget.
+  { path: '/tools/seasonal-weight-restrictions', changefreq: 'weekly', priority: '0.7' },
   { path: '/support', changefreq: 'monthly', priority: '0.6' },
   { path: '/security', changefreq: 'yearly', priority: '0.5' },
   { path: '/terms', changefreq: 'yearly', priority: '0.4' },
@@ -306,6 +312,18 @@ const MARKETING_ROUTES: Array<{ path: string; changefreq: string; priority: stri
  */
 export function staticPageEntries(): Array<{ path: string; changefreq: string; priority: string }> {
   const out: Array<{ path: string; changefreq: string; priority: string }> = [...MARKETING_ROUTES];
+  // One page per state in the seasonal-restriction registry, generated FROM the
+  // registry rather than listed by hand: adding a state to `sources.ts` adds its
+  // URL here, and there is no second list to fall out of step.
+  for (const spec of SEASONAL_SOURCES) {
+    out.push({
+      path: `/tools/seasonal-weight-restrictions/${spec.name.toLowerCase().replace(/\s+/g, '-')}`,
+      // The states that actually restrict change through the season; the ones
+      // that do not are a stable reference answer.
+      changefreq: spec.programme === 'statewide' ? 'weekly' : 'monthly',
+      priority: '0.6',
+    });
+  }
   for (const g of PORT_GROUPS) {
     out.push({ path: `/directory/port/${g.code}`, changefreq: 'weekly', priority: '0.7' });
   }

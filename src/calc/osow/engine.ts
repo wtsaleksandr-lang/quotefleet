@@ -89,6 +89,8 @@ import {
   type AbsorbedFeeConflict,
 } from './materiality.js';
 import { osowRulesFor } from './jurisdictions/index.js';
+import { seasonalAdvisoryFor, type SeasonalAdvisory } from './seasonal/advisory.js';
+import type { SeasonalContext } from './seasonal/types.js';
 
 /**
  * Re-exported so a caller pricing an OS/OW move never has to reach past the
@@ -98,6 +100,11 @@ export {
   IMMATERIAL_CONFLICT_THRESHOLD_USD,
   type AbsorbedFeeConflict,
 } from './materiality.js';
+
+/** Seasonal (spring-thaw) surfacing travels with the quote, so a caller never
+ *  has to reach into `seasonal/` for the shape of a warning the engine emitted. */
+export type { SeasonalAdvisory } from './seasonal/advisory.js';
+export type { SeasonalContext, StateSeasonalSnapshot } from './seasonal/types.js';
 
 export interface OsowLoad {
   grossWeightLbs?: number;
@@ -197,6 +204,17 @@ export interface OsowJurisdictionResult {
   absorbedConflictTotalUsd: number;
   sources: SourceDoc[];
   asOf: IsoDate;
+  /**
+   * SEASONAL (SPRING THAW) SURFACING for this state, when the caller supplied a
+   * `SeasonalContext`. OPTIONAL: omitted entirely when no seasonal data was
+   * passed, so every existing caller's result is byte-identical to before.
+   *
+   * It NEVER changes a fee or a limit — see `seasonal/advisory.ts` for the
+   * three reasons a restriction is flagged rather than applied. Its warnings
+   * are merged into `warnings[]` and its notes into `dataQuality[]` so a
+   * consumer that only reads those two arrays needs no change at all.
+   */
+  seasonal?: SeasonalAdvisory;
 }
 
 /**
@@ -1594,6 +1612,17 @@ export function calculateOsow(
   legs: OsowLeg[],
   load: OsowLoad,
   asOf: IsoDate = todayIso(),
+  /**
+   * SEASONAL RESTRICTIONS, already loaded by the caller.
+   *
+   * Optional and pure: the engine does no I/O, exactly as it does none for fee
+   * data. Omit it and every field of the result is what it was before this
+   * parameter existed. Supply it and each covered state gains a cited warning
+   * when a spring-thaw restriction is in force — and NOTHING is repriced;
+   * `seasonal/advisory.ts` sets out why applying one would be a confident wrong
+   * number rather than a better one.
+   */
+  seasonal?: SeasonalContext,
 ): OsowQuote {
   const jurisdictions: OsowJurisdictionResult[] = [];
   const uncovered: string[] = [];
@@ -1622,6 +1651,24 @@ export function calculateOsow(
     }
 
     const result = calculateOsowForJurisdiction(rules, legLoad, asOf);
+
+    // Seasonal surfacing is applied HERE rather than inside
+    // calculateOsowForJurisdiction because it is not a property of the
+    // jurisdiction's RULES — it is a property of what the state posted this
+    // week. Keeping it out of the per-jurisdiction pricer means the fee
+    // arithmetic is unchanged and unchangeable by it, which is the whole
+    // flag-don't-reprice contract expressed in the call graph.
+    if (seasonal !== undefined) {
+      const advisory = seasonalAdvisoryFor(code, seasonal, asOf, {
+        permitRequired: result.permitRequired,
+        overweight: result.overDimension.weight,
+      });
+      result.seasonal = advisory;
+      result.warnings.push(...advisory.warnings);
+      result.dataQuality.push(...advisory.dataQuality);
+      if (advisory.requiresManualReview) result.requiresManualReview = true;
+    }
+
     jurisdictions.push(result);
     warnings.push(...result.warnings);
     if (result.requiresManualReview) requiresManualReview = true;
