@@ -723,3 +723,96 @@ describe('the public API and the form agree on what is askable', () => {
     expect(client).toContain('data.asOf');
   });
 });
+
+/**
+ * THE ESCORT SECTION.
+ *
+ * The reference lane is the whole argument for building this at all: seven
+ * states of cited permit fees total $1,223.18, and the two pilot cars the same
+ * seven states require are worth more than that on any rate a carrier would
+ * recognise. What is pinned here is that the second number never contaminates
+ * the first, and that we still refuse to invent it.
+ */
+describe('the escort section', () => {
+  const REFERENCE_PERMIT_TOTAL = 1223.18;
+
+  it('sits beside the permit total, never inside it', () => {
+    const out = priceOsowLane({
+      ...REFERENCE_LANE,
+      pilotCarRate: { usdPerMile: 2.25 },
+    });
+    expect(out.quote.totalPermitUsd).toBe(REFERENCE_PERMIT_TOTAL);
+    expect(out.escortEstimate.included).toBe(true);
+    // Kentucky 62.4 mi + New York 60 mi, one pilot car each, at $2.25/mi.
+    expect(out.escortEstimate.estimate?.pilotCarsRequired).toBe(2);
+    expect(out.escortEstimate.estimate?.pilotCarUsd).toBe(275.4);
+    // The permit total is untouched by the escort figure existing at all.
+    expect(out.quote.totalPermitUsd).toBe(REFERENCE_PERMIT_TOTAL);
+    expect(out.escorts.costIncluded).toBe(false);
+  });
+
+  it('leaves the permit subtotals BYTE-IDENTICAL with the estimate on and off', () => {
+    const withEstimate = priceOsowLane({
+      ...REFERENCE_LANE,
+      includeEscortEstimate: true,
+      pilotCarRate: { usdPerMile: 2.25, usdPerDay: 500, daysPerJurisdiction: 2 },
+    });
+    const without = priceOsowLane({ ...REFERENCE_LANE, includeEscortEstimate: false });
+
+    expect(JSON.stringify(withEstimate.quote)).toBe(JSON.stringify(without.quote));
+    expect(without.escortEstimate.included).toBe(false);
+    expect(without.escortEstimate.estimate).toBeNull();
+    expect(without.quote.totalPermitUsd).toBe(REFERENCE_PERMIT_TOTAL);
+  });
+
+  it('defaults to "we hold no pilot-car rates" rather than a synthesised range', () => {
+    const out = priceOsowLane(REFERENCE_LANE);
+    const est = out.escortEstimate.estimate;
+    expect(est?.pilotCarBasis).toBe('none');
+    expect(est?.pilotCarUsd).toBeNull();
+    expect(est?.pilotCarLowUsd).toBeNull();
+    expect(est?.internalBand).toBeNull();
+    expect(est?.disclaimer).toMatch(/We hold no pilot-car rates/);
+  });
+
+  it('carries the sourced police floor as its own figure, cited', () => {
+    // 19 ft wide trips Tennessee's THP trigger; TDOT publishes the rate.
+    const out = priceOsowLane({
+      load: { ...REFERENCE_LANE.load, widthIn: 19 * 12 },
+      legs: [{ state: 'TN', miles: 250 }],
+      asOf: ASOF,
+    });
+    const est = out.escortEstimate.estimate;
+    expect(est?.policeStatesRequiring).toEqual(['TN']);
+    expect(est?.policeFloorUsd).toBe(520);
+    expect(est?.policeSources.every((s) => /^https?:\/\//.test(s.url))).toBe(true);
+    // And it is still nowhere near the permit total.
+    expect(out.quote.jurisdictions[0]?.subtotalUsd).not.toBe(520);
+  });
+
+  it('accepts the caller’s rate over HTTP and rejects a nonsense one', async () => {
+    const { base, close } = await startServer();
+    try {
+      const ok = await post(base, { ...REFERENCE_LANE, pilotCarRate: { usdPerMile: 2.25 } });
+      expect(ok.status).toBe(200);
+      const body = ok.body as unknown as ReturnType<typeof priceOsowLane>;
+      expect(body.quote.totalPermitUsd).toBe(REFERENCE_PERMIT_TOTAL);
+      expect(body.escortEstimate.estimate?.pilotCarBasis).toBe('userSupplied');
+      expect(body.escortEstimate.estimate?.pilotCarUsd).toBe(275.4);
+
+      const bad = await post(base, { ...REFERENCE_LANE, pilotCarRate: { usdPerMile: -4 } });
+      expect(bad.status).toBe(400);
+    } finally {
+      close();
+    }
+  });
+
+  it('leaves the public page untouched — its escort copy is still the old copy', () => {
+    const html = renderOsowToolPage();
+    // Nothing about the new section reaches the rendered page in this change.
+    expect(html).not.toMatch(/escortEstimate/);
+    expect(html).not.toMatch(/pilotCarRate/);
+    // The page's own "not included" copy is unchanged, verbatim.
+    expect(html).toContain('We hold no pilot-car rates, so the cost is yours to add');
+  });
+});

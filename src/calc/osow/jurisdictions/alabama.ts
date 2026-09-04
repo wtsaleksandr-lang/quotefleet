@@ -1013,3 +1013,11 @@ export const ALABAMA_OSOW_RULES: JurisdictionOsowRules = {
   /** Flat weight bands. Nothing in Alabama's permit fee depends on distance. */
   feesDependOnDistance: false,
 };
+
+/**
+ * Cited for ALEA's published law-enforcement escort charges — the $200.00
+ * administrative fee, the $100.00 hourly officer rate and the four-hour minimum.
+ * Alabama is one of only six jurisdictions in this corpus that publishes a
+ * trooper rate at all; see `escortCost.ts`.
+ */
+export const ALABAMA_POLICE_ESCORT_RATE_SOURCE = ALEA_760_X_2_05;

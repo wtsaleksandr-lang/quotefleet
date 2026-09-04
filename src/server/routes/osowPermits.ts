@@ -67,6 +67,10 @@ import {
   operatorSuppliedStateMileage,
   priceOsowWithStateMileage,
 } from '../../calc/osow/stateMileage.js';
+import {
+  estimateLaneEscortCost,
+  type LaneEscortEstimate,
+} from '../../calc/osow/escortCost.js';
 import { OSOW_JURISDICTIONS, hasOsowCoverage } from '../../calc/osow/jurisdictions/index.js';
 import { todayIso } from '../../calc/osow/provenance.js';
 import { US_STATES, US_STATE_CODES, stateByCode } from '../directory/usStates.js';
@@ -226,6 +230,47 @@ const OsowRequestSchema = z.object({
    * today — a future date would be a schedule nobody has published.
    */
   asOf: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).optional(),
+  /**
+   * Whether to compute the ESCORT section. Defaults to on.
+   *
+   * The flag exists so the separation can be PROVEN rather than asserted: the
+   * tests price the reference lane with it on and off and compare the `quote`
+   * object byte for byte. It changes nothing about the permit arithmetic — the
+   * estimator is a post-processor that reads a finished `OsowQuote` and cannot
+   * write to one — and the flag is the cheapest way to keep saying so.
+   *
+   * The public page never sends it. See `escortEstimate` on the response.
+   */
+  includeEscortEstimate: z.boolean().optional(),
+  /**
+   * THE CALLER'S OWN PILOT-CAR RATE — the primary way an escort line gets a
+   * number here, and the reason this tool does not synthesise one.
+   *
+   * A dispatcher already knows what their pilot cars cost; it is a rate they
+   * negotiate. Their figure beats any band we could invent, and every other
+   * number on this page traces to a statute with a revision date — spending that
+   * for a made-up market rate would be a bad trade. With nothing supplied the
+   * answer stays "we hold no pilot-car rates", which is true and useful.
+   *
+   * `days` has NO DEFAULT alongside `usdPerDay`: a day rate without a day count
+   * is not a price, and defaulting to one would bill a five-day crossing as one
+   * day. The bounds are typo guards, not opinions about the market.
+   */
+  pilotCarRate: z
+    .object({
+      usdPerMile: z.number().finite().positive().max(1_000).optional(),
+      usdPerDay: z.number().finite().positive().max(100_000).optional(),
+      daysPerJurisdiction: z.number().finite().positive().max(60).optional(),
+      minimumUsdPerJurisdiction: z.number().finite().positive().max(1_000_000).optional(),
+    })
+    .optional(),
+  /**
+   * Opt in to QuoteFleet's own fallback pilot-car band. OFF BY DEFAULT and
+   * ignored whenever `pilotCarRate` is supplied. It is our estimate, not a
+   * published figure, and it is mileage-only — see
+   * `QUOTEFLEET_INTERNAL_PILOT_CAR_BAND`.
+   */
+  useInternalPilotCarBand: z.boolean().optional(),
 });
 
 export type OsowRequest = z.infer<typeof OsowRequestSchema>;
@@ -349,9 +394,32 @@ export interface OsowApiResponse {
     /** Most any single state on the lane requires — the engine's own aggregate. */
     maxRequiredOnAnyState: number;
     byState: Array<{ code: string; name: string; required: number }>;
-    /** Always false. `escortCost.ts` holds no rates; see the module header. */
+    /**
+     * ALWAYS FALSE, AND IT STAYS FALSE NOW THAT AN ESTIMATE EXISTS. It means
+     * "no escort money is inside `quote.totalPermitUsd`", which is still true:
+     * `escortEstimate` is a parallel section computed after the quote and never
+     * added to it.
+     */
     costIncluded: false;
     note: string;
+  };
+  /**
+   * THE ESCORT SECTION — deliberately its own top-level key, never folded into
+   * `quote`.
+   *
+   * It carries figures that are never added together: a CIVILIAN pilot-car
+   * amount, computed from the rate the CALLER supplied and labelled as theirs,
+   * and a LAW-ENFORCEMENT floor, which is cited, effective-dated and resolved
+   * through the same conflict machinery as a permit fee. With no rate supplied
+   * the civilian side stays empty and says we hold no pilot-car rates, which is
+   * the true answer rather than a failure. A consumer that wants permits only
+   * reads `quote.totalPermitUsd` and is unaffected by anything here.
+   */
+  escortEstimate: {
+    /** False when the caller passed `includeEscortEstimate: false`. */
+    included: boolean;
+    note: string;
+    estimate: LaneEscortEstimate | null;
   };
   absorbedConflicts: {
     thresholdUsd: number;
@@ -403,6 +471,27 @@ export function priceOsowLane(input: OsowRequest): OsowApiResponse {
     name: stateByCode(code)?.name ?? code,
   }));
 
+  /**
+   * COMPUTED AFTER THE QUOTE, FROM THE QUOTE. `estimateLaneEscortCost` takes a
+   * finished `OsowQuote` and returns a new object; the quote above is already
+   * final and is not passed by reference into anything that could write to it.
+   * That is why turning this off cannot move a permit fee by a cent.
+   */
+  const includeEscortEstimate = input.includeEscortEstimate ?? true;
+  const escortEstimate = includeEscortEstimate
+    ? estimateLaneEscortCost(
+        quote,
+        Object.fromEntries(input.legs.map((l) => [l.state.toUpperCase(), l.miles])),
+        {
+          asOf,
+          ...(input.pilotCarRate === undefined ? {} : { pilotCarRate: input.pilotCarRate }),
+          ...(input.useInternalPilotCarBand === undefined
+            ? {}
+            : { useInternalBand: input.useInternalPilotCarBand }),
+        },
+      )
+    : null;
+
   return {
     asOf,
     quote,
@@ -431,6 +520,13 @@ export function priceOsowLane(input: OsowRequest): OsowApiResponse {
       })),
       costIncluded: false,
       note: 'Escort COST is not included anywhere in this total. States set the requirement; pilot cars are private vendors on a market rate we do not hold. Price them from your own vendor rate.',
+    },
+    escortEstimate: {
+      included: includeEscortEstimate,
+      note: includeEscortEstimate
+        ? 'Escort cost, in figures that are never added together. PILOT CARS are priced from the rate YOU supply in `pilotCarRate` — we hold no pilot-car rates, because no state publishes one and your negotiated rate beats any range we could invent. The LAW-ENFORCEMENT floor is cited and effective-dated, and it is the published minimum only, never a total: the hours are set by the agency on the day. Nothing here is inside the permit total above.'
+        : 'Not computed for this request. The permit total is identical either way — the estimator reads the finished quote and cannot change it.',
+      estimate: escortEstimate,
     },
     absorbedConflicts: {
       thresholdUsd: IMMATERIAL_CONFLICT_THRESHOLD_USD,

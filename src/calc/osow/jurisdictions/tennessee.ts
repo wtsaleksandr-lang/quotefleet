@@ -1799,3 +1799,6 @@ export const TENNESSEE_HOUSE_MOVE_SOURCE = RULE_14;
 
 /** Cited for the holiday restrictions and emergency declarations portal. */
 export const TENNESSEE_NEWS_AND_MEMOS_SOURCE = TDOT_NEWS;
+
+/** Cited for the Tennessee Highway Patrol escort rate, its four-hour minimum and its two-officer minimum. */
+export const TENNESSEE_POLICE_ESCORT_RATE_SOURCE = TDOT_FAQ;
