@@ -28,6 +28,7 @@ import { startOpsDigestCron } from './opsDigestCron.js';
 import { startCardExpiryCron } from './cardExpiryCron.js';
 import { startRfqResponseCron } from './rfq/responseCron.js';
 import { ensureSeasonalRestrictionsTable } from './seasonal/store.js';
+import { ensurePilotCarTable } from './pilotCars/store.js';
 import { startSeasonalRestrictionsCron } from './seasonalRestrictionsCron.js';
 import {
   decideUncaughtExceptionAction,
@@ -168,6 +169,15 @@ async function runPostListenJobs(): Promise<void> {
     // link), so a failed heal must never delay a healthz probe or stop boot.
     void ensureSeasonalRestrictionsTable().catch((err) => {
       console.error('[server] seasonal_restrictions self-heal failed (non-fatal):', err);
+    });
+    // pilot_car_operators — same shape again: a brand-new table nothing else
+    // touches, so no shared lock and no place in the carrier_directory queue.
+    // Non-blocking and non-fatal because every pilot-car page renders with the
+    // table absent — the store returns `unavailable: true` and the page says
+    // "we cannot reach the directory right now", which is the honest output and
+    // is emphatically not "no operators found".
+    void ensurePilotCarTable().catch((err) => {
+      console.error('[server] pilot_car_operators self-heal failed (non-fatal):', err);
     });
     // Register every scheduled cron through runCronSafely. This wrapper (a) catches
     // a throw at registration so one cron failing to register can NEVER stop the

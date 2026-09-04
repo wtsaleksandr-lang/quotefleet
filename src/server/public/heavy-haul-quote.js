@@ -502,6 +502,25 @@
     );
   }
 
+  /**
+   * WHERE TO GET THE PILOT CAR. The quote can say a state requires one; it
+   * cannot say who can legally run it, and that is the sentence a dispatcher
+   * actually has to finish. The href is built SERVER-side and pre-filtered to
+   * the states that require an escort and to the ones that issue a certificate
+   * — filtering on a certificate a state does not issue returns nothing.
+   * Renders nothing at all when no escort is required.
+   */
+  function renderEscortDirectory(res) {
+    if (!res.escortDirectoryHref) return '';
+    return (
+      '<div class="hh-note"><h3>Finding the pilot cars this lane needs</h3><p>' +
+      '<a href="' +
+      esc(res.escortDirectoryHref) +
+      '">Escort operators who cover these states, filtered to the ones that require a certificate</a>. ' +
+      'Records there are opt-in and self-reported unless the listing says we checked something, and each one says which.</p></div>'
+    );
+  }
+
   function renderLane(res) {
     return (
       '<div class="hh-note"><h3>The lane we measured</h3><p>Pickup matched to <strong>' +
@@ -520,6 +539,7 @@
       renderCorridor(res) +
       renderLines(q) +
       renderMileage(q) +
+      renderEscortDirectory(res) +
       renderLane(res) +
       renderPermitDetail(q) +
       renderNotIncluded(q);

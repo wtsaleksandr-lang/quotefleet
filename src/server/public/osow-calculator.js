@@ -739,6 +739,19 @@
           }).join('') + '</ul>'
         : '<p>No state on this lane requires a pilot car for the dimensions you entered. Several states can still impose one at the permitting office’s discretion.</p>');
 
+    // ── WHERE TO GET ONE. The requirement is only half a sentence: a dispatcher
+    // told "Kentucky requires 1 certified escort" still has to find somebody who
+    // can legally run it. The href comes from the SERVER, pre-filtered to the
+    // states that require an escort and — separately — to the states that
+    // actually issue a certificate, because filtering on a certificate a state
+    // does not issue returns nothing forever.
+    var find = '';
+    if (data.escorts.directoryHref) {
+      find = '<p class="ow-find"><a href="' + esc(data.escorts.directoryHref) + '">' +
+        'Find escort operators who cover these states — filtered to the ones that need a certificate</a>. ' +
+        'Every record there is the operator’s own statement unless the listing says we checked it, and it says which.</p>';
+    }
+
     // ── The caller's own pilot-car arithmetic, marked as theirs.
     var yours = '';
     if (est && est.pilotCarsRequired > 0) {
@@ -812,7 +825,7 @@
     return note(
       data.escorts.maxRequiredOnAnyState > 0 ? 'warn' : '',
       'Pilot cars / escorts',
-      head + yours + notes,
+      head + find + yours + notes,
     ) + police;
   }
 
