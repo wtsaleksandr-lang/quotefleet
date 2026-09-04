@@ -308,16 +308,28 @@
       });
       return total === 0 && unpriced ? 'Not priced' : usd(total);
     }
+    // The MARKET tile only appears when there is market money to show. It is a
+    // fourth column rather than a re-labelling of an existing one because a
+    // market band and a cited statute fee are different claims, and the whole
+    // design of this page is that two different claims never read the same.
+    var marketTile =
+      q.subtotalMarketUsd > 0 || q.lines.some(function (l) { return l.basis === 'market'; })
+        ? '<div class="hh-tile"><span class="k">Market estimate</span><span class="v">' +
+          esc(amountFor(q.subtotalMarketUsd, 'market')) +
+          '</span><span class="n">Line haul, pilot cars and accessorials from published market data. A band, never a quote — your own rates replace it.</span></div>'
+        : '';
     return (
       '<div class="hh-split"><div class="hh-tile"><span class="k">Sourced</span><span class="v">' +
       esc(amountFor(q.subtotalSourcedUsd, 'sourced')) +
-      '</span><span class="n">State permit fees and published police-escort floors, each cited to a statute or fee schedule.</span></div>' +
+      '</span><span class="n">State permit fees, published police-escort floors and filed tariff charges, each cited to a statute or fee schedule.</span></div>' +
       '<div class="hh-tile is-yours"><span class="k">Your rates</span><span class="v">' +
       esc(amountFor(q.subtotalYourRatesUsd, 'yours')) +
       '</span><span class="n">Line haul and pilot cars, computed from rates you entered. Not figures we source.</span></div>' +
       '<div class="hh-tile"><span class="k">Index-derived</span><span class="v">' +
       esc(amountFor(q.subtotalDerivedUsd, 'derived')) +
-      '</span><span class="n">Fuel surcharge: EIA diesel price through a model whose peg and mpg are our assumptions.</span></div></div>'
+      '</span><span class="n">Fuel surcharge: EIA diesel price through a model whose peg and mpg are our assumptions.</span></div>' +
+      marketTile +
+      '</div>'
     );
   }
 

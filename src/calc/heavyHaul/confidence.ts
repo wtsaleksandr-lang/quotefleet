@@ -146,8 +146,32 @@ export const FLAT_WEIGHTS = {
   superload: 20,
   /** The line haul is excluded because no $/mile was supplied. */
   linehaulExcluded: 20,
+  /**
+   * The line haul was priced from OUR MARKET BAND rather than from a rate the
+   * caller supplied.
+   *
+   * Eight, against twenty for excluding it outright. The reasoning is a ratio
+   * rather than a feeling: excluding the largest line on a heavy-haul quote
+   * leaves the delivered figure meaningless, while pricing it from a published
+   * anchor leaves it usable but banded. The band itself is ±25% for flatbed and
+   * ±40% for RGN and multi-axle work, where the equipment multiplier — five
+   * broker rate guides, no free index — is the load-bearing term. Eight points
+   * is enough that a quote resting on the band cannot score 'high' on the back
+   * of it alone, and small enough that it does not read as a failure.
+   */
+  linehaulMarketBand: 8,
   /** Escorts are required and no pilot-car rate was supplied to price them. */
   escortsUnpriced: 10,
+  /**
+   * Escorts priced from our market band rather than the caller's own rate.
+   *
+   * Four, half the line-haul figure, because the escort band is better evidenced
+   * than the line-haul equipment multiplier — its tiered floor appears in all
+   * five regions of a dated industry rate card and in three independent vendor
+   * sheets, and its per-mile component agrees to within a dollar with a
+   * competitor's independently-built model on a 1,115-mile two-car move.
+   */
+  escortsMarketBand: 4,
   /** A trooper is required in a state that publishes no rate we could floor. */
   policeFloorIncomplete: 4,
   /** The supplied per-state mileage itself needs a human look. */
@@ -192,6 +216,10 @@ export interface ConfidenceInput {
   mileageTier: { label: string; totalBandPct: number; mayPriceStates: boolean };
   /** True when at least one state permit fee actually resolved to a number. */
   permitsPriced: boolean;
+  /** True when the line haul came from OUR market band, not the caller's rate. */
+  linehaulFromMarketBand?: boolean;
+  /** True when the pilot cars came from OUR market band, not the caller's rate. */
+  escortsFromMarketBand?: boolean;
   /** States on the lane the caller named or the corridor scan asked about. */
   statesOnLane: number;
   /** `quote.uncoveredJurisdictions` — states we hold no schedule for. */
@@ -395,22 +423,41 @@ export function scoreHeavyHaulConfidence(input: ConfidenceInput): HeavyHaulConfi
       code: 'linehaul_excluded',
       headline: 'line haul not included',
       detail:
-        'No line haul is in this total. Moving the load is normally the largest single number on a heavy-haul quote, and we will not invent a market rate for it — the rate-card engine that prices line haul needs a carrier account, and a made-up per-mile figure beside cited statute numbers would be the one dishonest line on the page. Enter your own $/mile and it is added, labelled as yours.',
+        'No line haul is in this total. Moving the load is normally the largest single number on a heavy-haul quote. Enter your own $/mile and it is added, labelled as yours.',
       points: FLAT_WEIGHTS.linehaulExcluded,
       grounding: 'judgement',
       source: 'no linehaulUsdPerMile supplied on the request',
     });
+  } else if (input.linehaulFromMarketBand) {
+    add({
+      code: 'linehaul_market_band',
+      headline: 'line haul is a market band',
+      detail:
+        'The line haul is OUR MARKET ESTIMATE, not a rate you supplied. It is anchored on a national flatbed line-haul rate published weekly and on a distance curve measured from about 6,100 real lane observations, both of which are strong — but the trailer multiplier that turns a flatbed rate into a heavy-haul rate rests on five industry rate guides rather than on an index, because no free heavy-haul index exists. Enter your own $/mile and this deduction goes away, because your negotiated rate is a real price and this is a band.',
+      points: FLAT_WEIGHTS.linehaulMarketBand,
+      grounding: 'judgement',
+      source: 'HeavyHaulLine.basis === "market" on the linehaul row (src/calc/heavyHaul/market/linehaul.ts)',
+    });
   }
 
   // ── Escorts ────────────────────────────────────────────────────────────
-  if (input.escortsRequired > 0 && !input.escortsPriced) {
+  if (input.escortsRequired > 0 && !input.escortsPriced && !input.escortsFromMarketBand) {
     add({
       code: 'escorts_unpriced',
       headline: 'escort cost excluded',
-      detail: `This move needs ${input.escortsRequired} certified escort${input.escortsRequired === 1 ? '' : 's'} and none of them is priced here. Pilot cars are private vendors; states set the requirement, not the price, and we hold no pilot-car rates. On a long lane one escort can cost more than every permit on this quote combined. Enter your own pilot-car rate and it is applied to these counts.`,
+      detail: `This move needs ${input.escortsRequired} certified escort${input.escortsRequired === 1 ? '' : 's'} and none of them is priced here. Pilot cars are private vendors; states set the requirement, not the price. On a long lane one escort can cost more than every permit on this quote combined. Enter your own pilot-car rate and it is applied to these counts.`,
       points: FLAT_WEIGHTS.escortsUnpriced,
       grounding: 'judgement',
       source: 'LaneEscortEstimate.pilotCarBasis === "none" (src/calc/osow/escortCost.ts)',
+    });
+  } else if (input.escortsRequired > 0 && !input.escortsPriced && input.escortsFromMarketBand) {
+    add({
+      code: 'escorts_market_band',
+      headline: 'escorts are a market band',
+      detail: `The ${input.escortsRequired} required escort${input.escortsRequired === 1 ? ' is' : 's are'} priced from OUR MARKET BAND — about a dozen published operator rate sheets and one industry rate posting dated January 2025 — not from a rate you supplied. The structure is well evidenced (below roughly 250 miles an operator bills a day rate rather than the miles, which every source that segments confirms); the deadhead component is genuinely $0–$350 a vehicle and is the line most likely to make a real invoice exceed this. Your own operator rate replaces it outright.`,
+      points: FLAT_WEIGHTS.escortsMarketBand,
+      grounding: 'judgement',
+      source: 'estimateEscortMarketCost (src/calc/heavyHaul/market/escorts.ts)',
     });
   }
 

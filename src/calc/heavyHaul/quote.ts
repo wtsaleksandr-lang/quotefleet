@@ -63,6 +63,28 @@ import {
   confidenceRange,
   type HeavyHaulConfidence,
 } from './confidence.js';
+import {
+  assertAccuracyBasisInvariant,
+  deriveLoad,
+  detentionRiskLine,
+  estimateEscortMarketCost,
+  excessValueLine,
+  layoverRiskLine,
+  permitServiceLine,
+  priceLoading,
+  priceMarketLinehaul,
+  routeSurveyLine,
+  securementLine,
+  tarpingLine,
+  mpgForEquipment,
+  rate,
+  ROUTE_CLASS_UNDERIVABLE,
+  type AccessorialLine,
+  type AccuracyRating,
+  type DerivedLoad,
+  type EquipmentClass,
+  type MarketRegion,
+} from './market/index.js';
 
 /**
  * WHAT KIND OF CLAIM A LINE IS. The page must never let two of these read the
@@ -74,7 +96,24 @@ export type LineBasis =
   /** Computed from a rate the CALLER supplied. Their arithmetic, not our figure. */
   | 'yours'
   /** A sourced input run through a model whose assumptions are ours. Fuel only. */
-  | 'derived';
+  | 'derived'
+  /**
+   * A MARKET BAND — real observed prices from published rate sheets, indexes
+   * and filed tariffs, run through a model of ours.
+   *
+   * THE FOURTH CHANNEL EXISTS SO THE OTHER THREE STAY HONEST. A market band is
+   * not 'sourced': it is not a statute and it must never be summed into the
+   * cited column. It is not 'derived' either, because 'derived' means one
+   * sourced input through a formula — the fuel surcharge is an EIA price
+   * through a DOE-index model — and a spread across a dozen vendor rate cards
+   * has no single sourced input to derive from. Putting it in the same subtotal
+   * as fuel would make that subtotal mean two different things at once.
+   *
+   * See `market/accuracy.ts`: `BASIS_FOR_TIER` maps the BENCHMARK accuracy tier
+   * to this basis and nothing else, and `assertAccuracyBasisInvariant` fails the
+   * quote rather than letting a benchmark figure reach a cited subtotal.
+   */
+  | 'market';
 
 export interface HeavyHaulLine {
   /** Shares `CalcLine['kind']` — the same vocabulary, not a parallel one. */
@@ -90,6 +129,16 @@ export interface HeavyHaulLine {
   code?: string;
   /** Only on `basis: 'sourced'` lines. The documents behind the number. */
   sources?: SourceDoc[];
+  /**
+   * WHAT KIND OF EVIDENCE STANDS BEHIND THE NUMBER — cited, indexed, benchmark
+   * or refused — with its own measured band, a short hover and a longer detail.
+   *
+   * Orthogonal to `basis`, which says which subtotal the money lands in. The one
+   * relation between them is `BASIS_FOR_TIER`, and it is enforced rather than
+   * documented. Absent on lines computed from the CALLER's own rate: that is
+   * their number, not our claim about the market.
+   */
+  accuracy?: AccuracyRating;
 }
 
 /** The caller's own rates. Nothing here is ever supplied by us. */
@@ -117,6 +166,44 @@ export interface DieselReading {
   asOf: string;
   source: 'eia' | 'usda' | 'cache' | 'default' | 'none';
   stale: boolean;
+}
+
+/**
+ * THE MARKET ENGINE'S SWITCHES.
+ *
+ * DEFAULT-ON FOR THE FALLBACKS, OPT-IN FOR THE CONDITIONALS. The line-haul and
+ * escort bands only ever fire when the caller supplied no rate of their own —
+ * a dispatcher's negotiated number still beats any band here and the code still
+ * says so. The always-applicable accessorials (the permit agent's fee, the
+ * securement allowance, a route survey where a state flags a superload) fire on
+ * their own. The conditional ones do not fire until asked, because biasing a
+ * may-not-apply item into every quote is how a tool gets a reputation for
+ * quoting high.
+ */
+export interface MarketOptions {
+  /** Set false to get the old behaviour: refuse rather than estimate. */
+  enabled?: boolean;
+  /**
+   * Regional line-haul adjustment. OFF unless named, and it should stay off:
+   * the two free proxies for it contradict each other by 72%.
+   */
+  region?: MarketRegion;
+  /** Overrides the derived class. A carrier who knows the trailer wins. */
+  equipmentClass?: EquipmentClass;
+  /** The weight of the PIECE, when it is not the permit gross less a tractor. */
+  cargoWeightLbs?: number;
+  /** True when the SHIPPER is not providing a crane at pickup. */
+  loadingAtOrigin?: boolean;
+  /** True when the CONSIGNEE is not providing a crane at delivery. */
+  loadingAtDestination?: boolean;
+  /** Off by default — most oversize machinery ships untarped. */
+  tarping?: boolean;
+  /** One escort must carry a height pole. A premium on that car, not a car. */
+  highPoleEscort?: boolean;
+  /** Cargo value. Turns the largest blindside on the invoice into arithmetic. */
+  declaredValueUsd?: number;
+  /** Suppress the securement allowance when the carrier's rate already covers it. */
+  securementAllowance?: boolean;
 }
 
 export interface HeavyHaulCargo {
@@ -166,6 +253,8 @@ export interface HeavyHaulRequest {
    */
   routedMileage?: RoutedMileageResult;
   rates?: HeavyHaulRates;
+  /** The market engine. Absent means default-on with every conditional off. */
+  market?: MarketOptions;
   diesel: DieselReading;
   asOf?: IsoDate;
   /**
@@ -185,6 +274,11 @@ export interface HeavyHaulQuote {
   subtotalYourRatesUsd: number;
   /** Money from a sourced index through a model of ours. */
   subtotalDerivedUsd: number;
+  /**
+   * Money from a MARKET BAND. Structurally incapable of reaching
+   * `subtotalSourcedUsd` — see `LineBasis` and `market/accuracy.ts`.
+   */
+  subtotalMarketUsd: number;
   /**
    * The delivered figure. `null` when NOTHING priced. When `partial` is true it
    * is a real sum of what DID price and is explicitly not a lane total.
@@ -263,6 +357,23 @@ export interface HeavyHaulQuote {
     /** Said out loud: the peg and the mpg are OUR assumptions, not EIA's. */
     modelNote: string;
   };
+  /**
+   * WHAT THE ENGINE WORKED OUT RATHER THAN ASKED FOR — axle count, trailer
+   * class, the piece weight and the route class — each labelled with the fact it
+   * was derived from. `null` when the market engine is switched off.
+   *
+   * These are the questions a shipper cannot answer and a carrier can. Asking a
+   * freight forwarder how many axles his carrier will run is asking him to do
+   * the carrier's job; the weight implies it, so the engine says so.
+   */
+  derived: DerivedLoad | null;
+  /**
+   * REAL COSTS THAT ARE DISCLOSED AND NOT ADDED. Detention and layover are
+   * genuine, published and unpredictable — the hours are set by whoever keeps
+   * the truck waiting. Adding a guess at them would inflate every quote; hiding
+   * them is how a shipper gets a $2,400 surprise from four hours at a receiver.
+   */
+  riskLines: AccessorialLine[];
   notIncluded: ReadonlyArray<{ item: string; why: string }>;
   disclaimer: string;
 }
@@ -272,7 +383,7 @@ function round2(n: number): number {
 }
 
 export const HEAVY_HAUL_DISCLAIMER =
-  'A delivered-cost ESTIMATE, not a contract rate. State permit fees are cited to the statute or fee schedule they came from; line haul and pilot cars are computed from the rates YOU entered and are never figures we source; fuel comes from the EIA weekly diesel index through a surcharge model whose peg and fuel economy are our assumptions.';
+  'A delivered-cost ESTIMATE, not a contract rate. Every charge says what it rests on. State permit fees are CITED to the statute or fee schedule they came from. Fuel is INDEXED to the EIA weekly diesel price through a surcharge model whose peg and fuel economy are our assumptions. Line haul, pilot cars and accessorials are a BENCHMARK — a band from published market data, shown as a range, never added into a cited subtotal, and replaced outright by any rate you enter yourself. Where the evidence stops we say so and price nothing.';
 
 /**
  * Everything the delivered figure leaves out, stated once and reused by the
@@ -284,24 +395,32 @@ export const HEAVY_HAUL_NOT_INCLUDED: ReadonlyArray<{ item: string; why: string 
     why: 'Quoting your margin for you is not our business, and there is no code path in this tool that adds one. Every number here is a cost.',
   },
   {
-    item: 'A market line-haul rate',
-    why: 'The rate-card engine that prices line haul needs a carrier account, so a public no-account tool cannot price it. Rather than invent a market rate beside cited statute figures, we take yours and label it as yours.',
+    item: 'A binding rate of any kind',
+    why: 'The line haul, pilot cars and accessorials here are a market BAND assembled from published indexes, filed tariffs and operator rate sheets. It is a defensible starting number with a stated basis, not a price anybody has offered you. A rate you enter yourself replaces it, because your negotiated number is real and a band is not.',
+  },
+  {
+    item: 'Superload line haul, cranes over 160,000 lb, and drive-the-route surveys',
+    why: 'Each of these is refused rather than estimated, and for the same reason: the published evidence stops there. Superloads are priced job by job after an engineering review, a crane above that weight travels disassembled and needs a lift plan, and no published rate for a physical route survey exists anywhere. A refusal that names the floor and the next step beats a number we cannot defend.',
+  },
+  {
+    item: 'Detention, layover, escort wait time and cancellation',
+    why: 'All four are real, all four are published, and none of them is in the total — the HOURS cannot be predicted. They are disclosed as risk lines instead, with the published rate on each, because four hours at a slow receiver on a 13-axle rig is $2,420 and that belongs on the page rather than in a footnote.',
   },
   {
     item: 'Permits from a second issuing authority',
     why: 'A toll road, a bridge authority or a city can require its own permit inside a state we do price. Where we know of one, that state’s notes name it.',
   },
   {
-    item: 'Route surveys, bridge analysis and superload engineering',
-    why: 'Several states impose these at the permitting office’s discretion, with no published price, and a superload has no over-the-counter fee at all.',
+    item: 'A per-state superload trigger table',
+    why: 'Two state fee ARCHITECTURES were sourced — Texas charges a flat $500 for its engineering review, Illinois bills $40 an hour — but not the thresholds and fees for the other nineteen states that can impose one. The route-survey line therefore fires only on the states our own permit engine already flags as a superload.',
   },
   {
-    item: 'Tolls, escorts beyond your own stated rate, and permit-service brokerage',
-    why: 'Tolls vary by the routing the state assigns. A law-enforcement escort is cited where the state publishes a rate and left unpriced where it does not.',
+    item: 'Tolls',
+    why: 'Tolls vary by the routing the state assigns, and the routing is not settled until the permit is issued.',
   },
   {
-    item: 'Insurance, tarps, dunnage, detention and layover',
-    why: 'All are real heavy-haul costs and all are yours to add — none of them has a published figure this tool could cite.',
+    item: 'Tarping unless you ask for it',
+    why: 'Most oversize machinery, structural steel and vessels ship untarped — tarping an oversize load is frequently impossible and aerodynamically dangerous — and the filed tariff we price it from makes it shipper-requested. Ask for it and it is priced by width and height, up to the 14 ft / 12 ft point where that tariff itself stops quoting.',
   },
 ];
 
@@ -312,20 +431,6 @@ export function priceHeavyHaulLane(input: HeavyHaulRequest): HeavyHaulQuote {
   const asOf = input.asOf ?? todayIso();
   const lines: HeavyHaulLine[] = [];
   const partialBecause: string[] = [];
-
-  const load: OsowLoad = {
-    grossWeightLbs: input.cargo.grossWeightLbs,
-    ...(input.cargo.widthIn !== undefined ? { widthIn: input.cargo.widthIn } : {}),
-    ...(input.cargo.heightIn !== undefined ? { heightIn: input.cargo.heightIn } : {}),
-    ...(input.cargo.overallLengthIn !== undefined
-      ? { overallLengthIn: input.cargo.overallLengthIn }
-      : {}),
-    ...(input.cargo.trailerLengthIn !== undefined
-      ? { trailerLengthIn: input.cargo.trailerLengthIn }
-      : {}),
-    ...(input.cargo.axleCount !== undefined ? { axleCount: input.cargo.axleCount } : {}),
-    ...(input.cargo.routeClass !== undefined ? { routeClass: input.cargo.routeClass } : {}),
-  };
 
   // ── 1. Mileage ──────────────────────────────────────────────────────────
   const filedLegs = input.filedLegs ?? [];
@@ -392,6 +497,59 @@ export function priceHeavyHaulLane(input: HeavyHaulRequest): HeavyHaulQuote {
       disagrees: Math.abs(differencePct) > 25,
     };
   }
+
+  // ── 1b. Derivation — stop asking the shipper carrier questions ────────
+  //
+  // A forwarder knows the cargo and the two addresses. Axle count, trailer
+  // class and route class are all IMPLIED by that and all three change the
+  // price, so the engine works them out and LABELS each one as derived, with
+  // the fact it was derived from. Anything the caller supplied wins outright.
+  //
+  // The derived AXLE COUNT feeds the permit engine, because that is the whole
+  // point of deriving it — the bridge formula is a function of axle count and
+  // spacing, and a shipper cannot answer it. The derived ROUTE CLASS feeds it
+  // too, but only when the routed corridor's principal road is an Interstate;
+  // a US route may be divided or two-lane and the network does not say which,
+  // so that case refuses rather than guesses.
+  const marketEnabled = input.market?.enabled !== false;
+  const derived: DerivedLoad | null = marketEnabled
+    ? deriveLoad({
+        grossWeightLbs: input.cargo.grossWeightLbs,
+        ...(input.market?.cargoWeightLbs === undefined
+          ? {}
+          : { cargoWeightLbs: input.market.cargoWeightLbs }),
+        ...(input.cargo.heightIn === undefined ? {} : { heightIn: input.cargo.heightIn }),
+        ...(input.cargo.widthIn === undefined ? {} : { widthIn: input.cargo.widthIn }),
+        ...(input.cargo.axleCount === undefined ? {} : { axleCount: input.cargo.axleCount }),
+        ...(input.market?.equipmentClass === undefined
+          ? {}
+          : { equipmentClass: input.market.equipmentClass }),
+        ...(input.cargo.routeClass === undefined ? {} : { routeClass: input.cargo.routeClass }),
+        corridorLabel: routed?.best.label ?? null,
+      })
+    : null;
+
+  const load: OsowLoad = {
+    grossWeightLbs: input.cargo.grossWeightLbs,
+    ...(input.cargo.widthIn !== undefined ? { widthIn: input.cargo.widthIn } : {}),
+    ...(input.cargo.heightIn !== undefined ? { heightIn: input.cargo.heightIn } : {}),
+    ...(input.cargo.overallLengthIn !== undefined
+      ? { overallLengthIn: input.cargo.overallLengthIn }
+      : {}),
+    ...(input.cargo.trailerLengthIn !== undefined
+      ? { trailerLengthIn: input.cargo.trailerLengthIn }
+      : {}),
+    ...(input.cargo.axleCount !== undefined
+      ? { axleCount: input.cargo.axleCount }
+      : derived
+        ? { axleCount: derived.axleCount.value }
+        : {}),
+    ...(input.cargo.routeClass !== undefined
+      ? { routeClass: input.cargo.routeClass }
+      : derived?.routeClass
+        ? { routeClass: derived.routeClass.value }
+        : {}),
+  };
 
   // ── 2. Permits — priced ONLY from filed per-state miles ─────────────────
   //
@@ -517,13 +675,20 @@ export function priceHeavyHaulLane(input: HeavyHaulRequest): HeavyHaulQuote {
     );
   }
 
-  // ── 3. Line haul — the caller's own $/mile, labelled as theirs ──────────
+  // ── 3. Line haul — the caller's rate first, the market band second ─────
+  //
+  // ORDER OF PRECEDENCE, AND IT DOES NOT CHANGE: a rate the caller supplied is
+  // their real price and always wins. The market band below is the fallback for
+  // somebody who has none, which is who this tool is for.
+  let linehaulUsd: number | null = null;
+  let marketLinehaulBelowFloor = false;
   const perMile = input.rates?.linehaulUsdPerMile;
   const linehaulPriced = typeof perMile === 'number' && perMile > 0 && distance.totalMiles > 0;
   if (linehaulPriced) {
     const computed = perMile * distance.totalMiles;
     const minimum = input.rates?.linehaulMinimumUsd ?? 0;
     const floored = minimum > 0 && computed < minimum;
+    linehaulUsd = round2(floored ? minimum : computed);
     lines.push({
       kind: floored ? 'minimum' : 'linehaul',
       code: 'linehaul',
@@ -540,6 +705,54 @@ export function priceHeavyHaulLane(input: HeavyHaulRequest): HeavyHaulQuote {
               : `Multiplied by an ESTIMATED lane distance (±${tierSpec.totalBandPct}%), so this line carries that band even though your rate is exact.`
           }`,
     });
+  } else if (marketEnabled && derived && distance.totalMiles > 0) {
+    // ── THE REVERSAL ───────────────────────────────────────────
+    //
+    // This branch used to refuse. Refusing was right for a carrier's dispatcher
+    // and wrong for the people actually using the tool — a freight forwarder
+    // has no rates of his own for any of this, and telling him to supply one is
+    // telling him to go and get a quote, which is the thing he came here to
+    // avoid. The honest version is not refusing to estimate; it is estimating
+    // from real market data and showing exactly what the number rests on.
+    const market = priceMarketLinehaul({
+      miles: distance.totalMiles,
+      equipment: derived.equipmentClass.value,
+      ...(input.market?.region === undefined ? {} : { region: input.market.region }),
+    });
+    if (market.ok) {
+      linehaulUsd = market.totalUsd;
+      lines.push({
+        kind: market.minimumBinds ? 'minimum' : 'linehaul',
+        code: 'linehaul',
+        name: market.minimumBinds
+          ? `Line haul — market minimum charge (${market.equipment === 'flatbed' ? 'flatbed' : market.equipment === 'stepDeck' ? 'step deck' : market.equipment === 'rgn' ? 'RGN' : 'multi-axle'})`
+          : `Line haul (${Math.round(distance.totalMiles).toLocaleString()} mi × $${market.realisedUsdPerMile.toFixed(2)}/mi market rate)`,
+        amountUsd: market.totalUsd,
+        basis: 'market',
+        note: [
+          market.minimumBinds
+            ? `A MARKET BAND, not your rate and not a cited figure. ${market.notes[0] ?? ''}`
+            : `A MARKET BAND, not your rate and not a cited figure: $${market.baseUsdPerMile.toFixed(2)}/mi national flatbed line-haul × ${market.distanceMultiplier} (${market.distanceBandLabel}) × ${market.equipmentMultiplier} (${market.equipment}) = $${market.effectiveUsdPerMile.toFixed(2)}/mi. Excludes fuel, which is added separately from the EIA index.`,
+          ...market.notes.slice(market.minimumBinds ? 1 : 0),
+          'Enter your own $/mile and it replaces this outright — your negotiated rate beats any band we can build.',
+        ].join(' '),
+        accuracy: market.accuracy,
+      });
+      marketLinehaulBelowFloor = market.belowCostFloor;
+    } else {
+      lines.push({
+        kind: 'linehaul',
+        code: 'linehaul',
+        name: 'Line haul — superload',
+        amountUsd: null,
+        basis: 'market',
+        note: market.message,
+        accuracy: market.accuracy,
+      });
+      partialBecause.push(
+        'line haul is not included — this is a superload, which every rate source prices individually after a route survey',
+      );
+    }
   } else {
     lines.push({
       kind: 'linehaul',
@@ -547,14 +760,35 @@ export function priceHeavyHaulLane(input: HeavyHaulRequest): HeavyHaulQuote {
       name: 'Line haul',
       amountUsd: null,
       basis: 'yours',
-      note: 'Not included. Moving the load is normally the largest number on a heavy-haul quote, and we will not invent a market rate for it — the engine that prices line haul needs a carrier account. Enter your own $/mile and it is added, labelled as yours.',
+      note: 'Not included. Moving the load is normally the largest number on a heavy-haul quote. Enter your own $/mile and it is added, labelled as yours.',
     });
     partialBecause.push('line haul is not included — no $/mile was supplied');
   }
 
   // ── 4. Fuel — EIA index, our model, and it says which is which ──────────
   const pegUsdPerGal = input.rates?.fuelPegUsdPerGal ?? AUTO_FSC_DEFAULTS.pegUsdPerGal;
-  const fuelMpg = input.rates?.fuelMpg ?? AUTO_FSC_DEFAULTS.mpg;
+  /**
+   * FLATBED FUEL ECONOMY IS 5.0 MPG, NOT 6.0 — A CORRECTION, NOT A TWEAK.
+   *
+   * `AUTO_FSC_DEFAULTS.mpg` is 6.0. That is the classic van figure, it is right
+   * for a van, and it is wrong for every single piece of equipment this tool
+   * quotes. The evidence is unusually good: DAT publishes an all-in and a
+   * line-haul rate weekly and the difference is its fuel surcharge, and the
+   * formula (diesel − $1.25) ÷ mpg with 6.0 van / 5.5 reefer / 5.0 FLATBED
+   * reproduces DAT's published surcharge nine times out of nine, within a cent,
+   * across three independent weeks — one of which states the surcharges outright,
+   * so it is a reproduction of a published figure rather than a curve fit.
+   *
+   * At $5.454/gal that is $0.700/mi on 6.0 against $0.841/mi on 5.0: on a
+   * 1,500-mile flatbed lane the old default understated fuel by $210.
+   *
+   * The heavy-haul extensions — RGN 4.0, multi-axle 3.5 — are OURS and are not
+   * validated by anything; they are extrapolations on physical grounds and the
+   * note below says so. The caller's own mpg still replaces all of it.
+   */
+  const derivedMpg =
+    marketEnabled && derived ? mpgForEquipment(derived.equipmentClass.value) : null;
+  const fuelMpg = input.rates?.fuelMpg ?? derivedMpg ?? AUTO_FSC_DEFAULTS.mpg;
   const fuelModelIsCallers =
     input.rates?.fuelPegUsdPerGal !== undefined || input.rates?.fuelMpg !== undefined;
   const fscPerMile = autoFscPerMile({
@@ -570,7 +804,12 @@ export function priceHeavyHaulLane(input: HeavyHaulRequest): HeavyHaulQuote {
    * cited figure from an assumption of ours. The arithmetic closes it, so a
    * reader can check the number against the column beside it.
    */
-  const fuelModelNote = `The DIESEL PRICE is sourced: the EIA weekly national on-highway No. 2 retail price${input.diesel.asOf ? `, week of ${input.diesel.asOf}` : ''} — US Government, public domain. The PEG ($${pegUsdPerGal.toFixed(2)}/gal) and the FUEL ECONOMY (${fuelMpg} mpg) are ${fuelModelIsCallers ? 'YOURS — you entered them, so this line is your model on our sourced price' : 'OUR assumptions — the standard OOIDA figures, and your own FSC table may peg elsewhere. Enter your own peg and mpg and this line becomes yours'}. DOE-index model: ($${input.diesel.usdPerGal.toFixed(2)} − $${pegUsdPerGal.toFixed(2)}) ÷ ${fuelMpg} = $${fscPerMile.toFixed(3)}/mi.`;
+  const mpgProvenance = fuelModelIsCallers
+    ? 'YOURS — you entered them, so this line is your model on our sourced price'
+    : derivedMpg !== null
+      ? `OURS. The ${fuelMpg} mpg is the figure for ${derived?.equipmentClass.value === 'flatbed' ? 'a flatbed' : derived?.equipmentClass.value === 'stepDeck' ? 'a step deck' : derived?.equipmentClass.value === 'rgn' ? 'an RGN' : 'a multi-axle rig'}, not the 6.0 mpg van default this product used to apply to everything${derivedMpg === 5 ? ' — (diesel − $1.25) ÷ 5.0 reproduces DAT’s published flatbed surcharge to the cent across three weeks' : ' — an extrapolation of ours from the validated flatbed figure, not a validated number'}. Enter your own peg and mpg and this line becomes yours`
+      : 'OUR assumptions — the standard OOIDA figures, and your own FSC table may peg elsewhere. Enter your own peg and mpg and this line becomes yours';
+  const fuelModelNote = `The DIESEL PRICE is sourced: the EIA weekly national on-highway No. 2 retail price${input.diesel.asOf ? `, week of ${input.diesel.asOf}` : ''} — US Government, public domain. The PEG ($${pegUsdPerGal.toFixed(2)}/gal) and the FUEL ECONOMY (${fuelMpg} mpg) are ${mpgProvenance}. DOE-index model: ($${input.diesel.usdPerGal.toFixed(2)} − $${pegUsdPerGal.toFixed(2)}) ÷ ${fuelMpg} = $${fscPerMile.toFixed(3)}/mi.`;
   const fuelUsd = distance.totalMiles > 0 ? round2(fscPerMile * distance.totalMiles) : 0;
   if (distance.totalMiles > 0) {
     lines.push({
@@ -580,11 +819,19 @@ export function priceHeavyHaulLane(input: HeavyHaulRequest): HeavyHaulQuote {
       amountUsd: fuelUsd,
       basis: 'derived',
       note: fuelModelNote,
+      accuracy: rate({
+        tier: 'indexed',
+        bandPct: 5,
+        asOf: input.diesel.asOf || null,
+        hover: `From the EIA weekly national on-highway diesel price${input.diesel.asOf ? `, week of ${input.diesel.asOf}` : ''}, through the industry-standard (diesel − peg) ÷ mpg surcharge formula.`,
+        detail: fuelModelNote,
+      }),
     });
   }
 
   // ── 5. Escorts — two channels that are never added together ─────────────
   let escorts: LaneEscortEstimate | null = null;
+  let escortMarket: ReturnType<typeof estimateEscortMarketCost> = null;
   if (permits !== null) {
     escorts = estimateLaneEscortCost(
       permits,
@@ -604,10 +851,41 @@ export function priceHeavyHaulLane(input: HeavyHaulRequest): HeavyHaulQuote {
         basis: 'yours',
         note:
           escorts.pilotCarUsd === null
-            ? 'Not priced. States set the escort REQUIREMENT; pilot cars are private vendors and we hold no rates of our own — no state publishes one, and your negotiated rate beats any range we could invent. Enter yours and it is applied to these counts.'
+            ? 'Not priced from YOUR rates — none was supplied. The market band below prices these counts instead.'
             : 'YOUR rate applied to the escort counts each state’s own rules require. Never inside a permit fee.',
       });
-      if (escorts.pilotCarUsd === null) {
+
+      // ── THE CIVILIAN MARKET BAND, BESIDE THE CITED POLICE RATES ────────
+      //
+      // `escortCost.ts` is untouched by this: it still owns the six states'
+      // SOURCED law-enforcement rates and the caller's own rate path, and this
+      // consumes only the escort COUNTS the state rules produce. The band is
+      // 'market' money and cannot reach the cited column.
+      //
+      // The structure is the finding, not the level. Below about 250 miles an
+      // operator bills a day rate or a minimum rather than the miles, and that
+      // floor is published in all five regions of the one dated industry rate
+      // card and in three independent vendor sheets. A per-mile-only escort
+      // line is simply wrong there.
+      if (escorts.pilotCarUsd === null && marketEnabled && distance.totalMiles > 0) {
+        const band = estimateEscortMarketCost({
+          vehicles: escorts.pilotCarsRequired,
+          miles: distance.totalMiles,
+          ...(input.market?.highPoleEscort ? { highPole: true } : {}),
+        });
+        if (band) {
+          escortMarket = band;
+          lines.push({
+            kind: 'escort',
+            code: 'pilot_cars_market',
+            name: `Pilot cars — market band (${band.vehicles} vehicle${band.vehicles === 1 ? '' : 's'}, ${band.tier === 'mileage' ? 'mileage' : band.tier === 'dayRate' ? 'day rate' : 'minimum charge'})`,
+            amountUsd: round2(band.centralUsd),
+            basis: 'market',
+            note: `${band.components.map((c) => `${c.name}: $${Math.round(c.lowUsd).toLocaleString()}–$${Math.round(c.highUsd).toLocaleString()}`).join(' · ')}. Range $${Math.round(band.lowUsd).toLocaleString()}–$${Math.round(band.highUsd).toLocaleString()}. Your own operator rate replaces this outright.`,
+            accuracy: band.accuracy,
+          });
+        }
+      } else if (escorts.pilotCarUsd === null) {
         partialBecause.push(
           `${escorts.pilotCarsRequired} pilot car${escorts.pilotCarsRequired === 1 ? ' is' : 's are'} required and no pilot-car rate was supplied to price them`,
         );
@@ -635,6 +913,90 @@ export function priceHeavyHaulLane(input: HeavyHaulRequest): HeavyHaulQuote {
     }
   }
 
+  // ── 5b. Accessorials — what turns a line haul into a delivered price ───
+  //
+  // LOADING IS THE HEADLINE AND IT IS NOT THE CARRIER'S COST. A filed heavy-haul
+  // tariff says so outright: cranes, hoists and winches "shall be supplied by
+  // the Consignor or Consignee" together with the personnel to operate them. So
+  // a shipper who ticks "no loading provided" is buying a machine nobody in his
+  // quote chain has priced — on the worked example, 73% of the accessorial
+  // stack. It is opt-in because most shippers DO have a forklift or a crane on
+  // site, and defaulting it on would inflate every quote on the page.
+  const riskLines: AccessorialLine[] = [];
+  const accessorials: AccessorialLine[] = [];
+  if (marketEnabled && derived) {
+    const cargoLbs = derived.cargoWeightLbs.value;
+    const cargoDerived = derived.cargoWeightLbs.origin === 'derived';
+    if (input.market?.loadingAtOrigin) {
+      accessorials.push(
+        ...priceLoading({
+          cargoWeightLbs: cargoLbs,
+          end: 'origin',
+          stateCode: input.lane?.origin.state ?? null,
+          cargoWeightDerived: cargoDerived,
+        }),
+      );
+    }
+    if (input.market?.loadingAtDestination) {
+      accessorials.push(
+        ...priceLoading({
+          cargoWeightLbs: cargoLbs,
+          end: 'destination',
+          stateCode: input.lane?.destination.state ?? null,
+          cargoWeightDerived: cargoDerived,
+        }),
+      );
+    }
+    if (input.market?.tarping) {
+      accessorials.push(
+        tarpingLine(input.cargo.widthIn, input.cargo.heightIn),
+      );
+    }
+    if (input.market?.securementAllowance !== false) accessorials.push(securementLine());
+
+    // The permit AGENT's fee, on top of the state fee already cited above. It is
+    // never inside `totalPermitUsd` and never can be — it is 'market' money.
+    const pricedPermitCount = (permits?.jurisdictions ?? []).filter(
+      (j) => j.subtotalUsd !== null,
+    ).length;
+    const svc = permitServiceLine(pricedPermitCount);
+    if (svc) accessorials.push(svc);
+
+    const survey = routeSurveyLine(
+      (permits?.jurisdictions ?? []).filter((j) => j.superload).map((j) => j.jurisdiction),
+    );
+    if (survey) accessorials.push(survey);
+
+    const cover = excessValueLine(input.market?.declaredValueUsd);
+    if (cover) accessorials.push(cover);
+
+    // DISCLOSED, NEVER ADDED. The rates are published and the hours are not
+    // predictable, and four hours at a slow receiver on a 13-axle rig is $2,420
+    // — more than every other accessorial on a typical quote combined.
+    riskLines.push(detentionRiskLine(derived.axleCount.value));
+    riskLines.push(layoverRiskLine());
+  }
+
+  for (const a of accessorials) {
+    lines.push({
+      kind: 'accessorial',
+      code: a.code,
+      name: a.name,
+      amountUsd: a.headlineUsd,
+      basis: a.accuracy.tier === 'cited' ? 'sourced' : 'market',
+      note:
+        a.headlineUsd === null
+          ? a.accuracy.detail
+          : `${a.accuracy.hover} Range $${Math.round(a.lowUsd ?? 0).toLocaleString()}–$${Math.round(a.highUsd ?? 0).toLocaleString()}.`,
+      accuracy: a.accuracy,
+    });
+  }
+
+  // THE INVARIANT, ENFORCED RATHER THAN DOCUMENTED. A BENCHMARK figure that
+  // found its way into the cited column fails the quote here, at the seam,
+  // rather than showing a shipper a vendor rate card labelled as a statute.
+  assertAccuracyBasisInvariant(lines);
+
   // ── 6. Totals, kept apart by basis ──────────────────────────────────────
   const sumBy = (basis: LineBasis) =>
     round2(
@@ -645,9 +1007,12 @@ export function priceHeavyHaulLane(input: HeavyHaulRequest): HeavyHaulQuote {
   const subtotalSourcedUsd = sumBy('sourced');
   const subtotalYourRatesUsd = sumBy('yours');
   const subtotalDerivedUsd = sumBy('derived');
+  const subtotalMarketUsd = sumBy('market');
   const anyPriced = lines.some((l) => l.amountUsd !== null && l.amountUsd > 0);
   const deliveredUsd = anyPriced
-    ? round2(subtotalSourcedUsd + subtotalYourRatesUsd + subtotalDerivedUsd)
+    ? round2(
+        subtotalSourcedUsd + subtotalYourRatesUsd + subtotalDerivedUsd + subtotalMarketUsd,
+      )
     : null;
   /**
    * Endpoint states the filing omits.
@@ -736,9 +1101,13 @@ export function priceHeavyHaulLane(input: HeavyHaulRequest): HeavyHaulQuote {
       ? { differencePct: crossCheck.differencePct, disagrees: crossCheck.disagrees }
       : null,
     filedMissingEndpointStates,
-    linehaulPriced,
+    linehaulPriced: linehaulUsd !== null,
+    linehaulFromMarketBand:
+      linehaulUsd !== null &&
+      lines.find((l) => l.code === 'linehaul')?.basis === 'market',
     escortsRequired: escorts?.pilotCarsRequired ?? 0,
     escortsPriced: escorts?.pilotCarUsd !== null && escorts?.pilotCarUsd !== undefined,
+    escortsFromMarketBand: escortMarket !== null,
     policeFloorIncomplete: escorts?.policeFloorIncomplete ?? false,
     fuelSource: input.diesel.source,
     fuelStale: input.diesel.stale,
@@ -762,6 +1131,7 @@ export function priceHeavyHaulLane(input: HeavyHaulRequest): HeavyHaulQuote {
     subtotalSourcedUsd,
     subtotalYourRatesUsd,
     subtotalDerivedUsd,
+    subtotalMarketUsd,
     deliveredUsd,
     partial,
     partialBecause,
@@ -806,6 +1176,8 @@ export function priceHeavyHaulLane(input: HeavyHaulRequest): HeavyHaulQuote {
       perMileUsd: fscPerMile,
       modelNote: fuelModelNote,
     },
+    derived,
+    riskLines,
     notIncluded: HEAVY_HAUL_NOT_INCLUDED,
     disclaimer: HEAVY_HAUL_DISCLAIMER,
   };

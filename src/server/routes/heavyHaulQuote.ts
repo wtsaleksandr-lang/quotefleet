@@ -50,6 +50,12 @@ import {
 } from '../../calc/heavyHaul/quote.js';
 import { MILEAGE_TIERS } from '../../calc/heavyHaul/corridor.js';
 import {
+  MARKET_SOURCES,
+  TIER_DEFAULT_BAND_PCT,
+  TIER_LABELS,
+  TIER_MEANINGS,
+} from '../../calc/heavyHaul/market/index.js';
+import {
   CONFIDENCE_HIGH_MIN,
   CONFIDENCE_MEDIUM_MIN,
   CONFIDENCE_BANDS,
@@ -211,6 +217,34 @@ const HeavyHaulRequestSchema = z.object({
        */
       fuelPegUsdPerGal: z.number().finite().nonnegative().max(20).optional(),
       fuelMpg: z.number().finite().positive().min(1).max(20).optional(),
+    })
+    .optional(),
+  /**
+   * THE MARKET ENGINE'S SWITCHES. Every field optional, and the whole object
+   * optional, so the form as it stands today keeps working unchanged — a
+   * request that omits this gets the fallbacks on and every conditional off,
+   * which is the behaviour the page already renders.
+   *
+   * `enabled: false` restores the old refuse-rather-than-estimate behaviour in
+   * full, which is what the regression tests use to prove the reversal is a
+   * switch rather than a rewrite.
+   */
+  market: z
+    .object({
+      enabled: z.boolean().optional(),
+      region: z
+        .enum(['midwest', 'mountainPlains', 'west', 'southCentral', 'southeast', 'northeast'])
+        .optional(),
+      equipmentClass: z
+        .enum(['flatbed', 'stepDeck', 'rgn', 'multiAxle', 'superload'])
+        .optional(),
+      cargoWeightLbs: z.number().finite().positive().max(MAX_WEIGHT_LBS).optional(),
+      loadingAtOrigin: z.boolean().optional(),
+      loadingAtDestination: z.boolean().optional(),
+      tarping: z.boolean().optional(),
+      highPoleEscort: z.boolean().optional(),
+      declaredValueUsd: z.number().finite().positive().max(500_000_000).optional(),
+      securementAllowance: z.boolean().optional(),
     })
     .optional(),
   asOf: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).optional(),
@@ -395,6 +429,7 @@ export function priceResolvedHeavyHaulLane(
         : { fuelPegUsdPerGal: input.rates.fuelPegUsdPerGal }),
       ...(input.rates?.fuelMpg === undefined ? {} : { fuelMpg: input.rates.fuelMpg }),
     },
+    ...(input.market === undefined ? {} : { market: input.market }),
     diesel,
     asOf,
     stateNames: STATE_NAMES,
@@ -936,6 +971,22 @@ export function registerHeavyHaulQuoteRoutes(app: Express) {
         bands: CONFIDENCE_BANDS,
       },
       notIncluded: HEAVY_HAUL_NOT_INCLUDED,
+      /**
+       * THE ACCURACY LEGEND AND THE SOURCE REGISTER, served alongside the
+       * coverage list so the page can render the tier pills and a "where these
+       * numbers come from" panel without hardcoding either.
+       *
+       * `sources` deliberately carries `refetch` on every row: it is the field
+       * that says whether a figure can be put on a cron or whether it ages
+       * silently until somebody re-reads a PDF, and that is worth showing.
+       */
+      accuracyTiers: (['cited', 'indexed', 'benchmark', 'refused'] as const).map((t) => ({
+        tier: t,
+        label: TIER_LABELS[t],
+        meaning: TIER_MEANINGS[t],
+        defaultBandPct: TIER_DEFAULT_BAND_PCT[t],
+      })),
+      sources: MARKET_SOURCES,
       permitsOnlyTool: OSOW_TOOL_PATH,
       disclaimer: HEAVY_HAUL_DISCLAIMER,
     });
