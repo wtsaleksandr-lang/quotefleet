@@ -164,6 +164,26 @@ export const FLAT_WEIGHTS = {
   dataQualityNotes: 2,
   /** Filed miles and the free straight-line estimate disagree by over a quarter. */
   mileageCrossCheckFailed: 6,
+  /**
+   * A state the lane provably touches is absent from the filed mileage rows.
+   *
+   * These two are the only gap weights on the board, and they key on ENDPOINT
+   * states alone — never on the wider corridor. The corridor scan is
+   * deliberately over-inclusive (bounding boxes, not polygons: it names
+   * Louisiana on a Houston-to-Buffalo lane the truck never enters), so
+   * deducting for a corridor state a filing omits would punish the honest
+   * filing that correctly left it out. An endpoint is different in kind: the
+   * load demonstrably starts in one state and ends in the other, both were
+   * geocoded from the addresses on this page, and no real filing can omit
+   * them. That makes it evidence rather than a question, and it is why these
+   * are the heaviest flat weights here.
+   *
+   * Sized so that any filing missing an endpoint scores below a complete
+   * filing of the same lane — the property that stops the score rewarding
+   * under-reporting. See the test that asserts that inequality directly.
+   */
+  filedMissingOneEndpoint: 45,
+  filedMissingBothEndpoints: 60,
 } as const;
 
 /** Everything the score reads. All of it is recorded by an existing engine. */
@@ -193,6 +213,12 @@ export interface ConfidenceInput {
    * there was nothing to compare. See `mileage.crossCheck`.
    */
   mileageCrossCheck: { differencePct: number; disagrees: boolean } | null;
+  /**
+   * Endpoint states (origin/destination, as geocoded) that do NOT appear in the
+   * filed mileage rows. Empty when the lane was not geocoded, when nothing was
+   * filed, or when the filing covers both ends.
+   */
+  filedMissingEndpointStates: string[];
   /** True when the caller gave a $/mile and line haul is therefore in the total. */
   linehaulPriced: boolean;
   /** Escorts required across the lane, and whether a rate existed to price them. */
@@ -334,6 +360,20 @@ export function scoreHeavyHaulConfidence(input: ConfidenceInput): HeavyHaulConfi
       points: FLAT_WEIGHTS.mileageSplitReview,
       grounding: 'judgement',
       source: 'StateMileageSplit.requiresManualReview (src/calc/osow/stateMileage.ts)',
+    });
+  }
+
+  if (input.filedMissingEndpointStates.length > 0) {
+    const missing = input.filedMissingEndpointStates;
+    const both = missing.length > 1;
+    add({
+      code: 'filed_missing_endpoint_state',
+      headline: `${missing.join(' and ')} ${both ? 'are' : 'is'} not in your filed miles`,
+      detail:
+        `The addresses on this page place this load in ${missing.join(' and ')}, but ${both ? 'neither state has' : 'that state has'} a mileage row, so ${both ? 'no' : 'its'} permit was priced and ${both ? 'none' : 'it'} is in the total. A load provably crosses the states it starts and ends in, so this is a gap in the filing rather than a routing question. Add ${both ? 'those rows' : 'that row'} and the permit is priced and cited like the others.`,
+      points: both ? FLAT_WEIGHTS.filedMissingBothEndpoints : FLAT_WEIGHTS.filedMissingOneEndpoint,
+      grounding: 'judgement',
+      source: 'geocoded endpoint states vs filedLegs (src/calc/heavyHaul/quote.ts)',
     });
   }
 

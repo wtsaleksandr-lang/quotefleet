@@ -313,6 +313,7 @@ const CLEAN: ConfidenceInput = {
   dataQualityNotes: 0,
   mileageSplitReview: false,
   mileageCrossCheck: null,
+  filedMissingEndpointStates: [],
   linehaulPriced: true,
   escortsRequired: 0,
   escortsPriced: true,
@@ -515,7 +516,13 @@ describe('the reference lane, composed', () => {
   });
 
   it('offers no corridor prompt, because the states are already known', () => {
+    // The corridor is still COMPUTED at tier 0 — it is what the endpoint check
+    // reads — but it is only exposed when it is genuinely a prompt. A complete
+    // filing needs no prompt; an incomplete one does.
     expect(out.corridor).toBeNull();
+    expect(out.confidence.findings.map((f) => f.code)).not.toContain(
+      'filed_missing_endpoint_state',
+    );
   });
 
   it('exports its priced rows in the engine’s own CalcLine vocabulary', () => {
@@ -678,5 +685,87 @@ describe('the exclusions list', () => {
     const margin = HEAVY_HAUL_NOT_INCLUDED.find((n) => /margin/i.test(n.item));
     expect(margin).toBeDefined();
     expect(margin?.why).toMatch(/no code path in this tool that adds one/);
+  });
+});
+
+/**
+ * THE SCORE MUST NOT REWARD UNDER-REPORTING.
+ *
+ * An independent review found that filing ONE state's mileage for a
+ * seven-state lane scored 100% HIGH with no PARTIAL badge and no deductions —
+ * while the complete, correct filing of the same lane scored 87%. Fewer states
+ * filed meant higher confidence AND a smaller bill, which is exactly backwards
+ * and made the headline claim ("every component priced from a cited figure or
+ * a rate you supplied") false rather than merely optimistic.
+ *
+ * The property pinned here is the one that matters, and it is an inequality
+ * rather than a magic number: a complete filing of a lane must score strictly
+ * higher than any filing of the same lane that omits a state the load
+ * provably touches. Every variant below is one the review reached by hand.
+ */
+describe('a truncated filing cannot out-score a complete one', () => {
+  const honest = priceHeavyHaulLane({
+    cargo: REFERENCE_CARGO,
+    lane: { origin: HOUSTON, destination: BUFFALO },
+    filedLegs: REFERENCE_LEGS,
+    rates: { linehaulUsdPerMile: 4.85, pilotCar: { usdPerMile: 2.25 } },
+    diesel: DIESEL,
+    asOf: ASOF,
+  });
+
+  const truncated = (legs: Array<{ stateCode: string; miles: number }>) =>
+    priceHeavyHaulLane({
+      cargo: REFERENCE_CARGO,
+      lane: { origin: HOUSTON, destination: BUFFALO },
+      filedLegs: legs,
+      rates: { linehaulUsdPerMile: 4.85, pilotCar: { usdPerMile: 2.25 } },
+      diesel: DIESEL,
+      asOf: ASOF,
+    });
+
+  const VARIANTS: Array<[string, Array<{ stateCode: string; miles: number }>]> = [
+    ['TX only', [{ stateCode: 'TX', miles: 1500 }]],
+    ['TX + AR', [{ stateCode: 'TX', miles: 800 }, { stateCode: 'AR', miles: 700 }]],
+    ['OH only', [{ stateCode: 'OH', miles: 1500 }]],
+    ['PA only', [{ stateCode: 'PA', miles: 1500 }]],
+    ['CA + WA', [{ stateCode: 'CA', miles: 760 }, { stateCode: 'WA', miles: 760 }]],
+  ];
+
+  for (const [name, legs] of VARIANTS) {
+    it(`${name} scores strictly below the complete filing`, () => {
+      const out = truncated(legs);
+      expect(out.confidence.score).toBeLessThan(honest.confidence.score);
+    });
+
+    it(`${name} names the omitted endpoint state and marks the quote partial`, () => {
+      const out = truncated(legs);
+      expect(out.confidence.findings.map((f) => f.code)).toContain(
+        'filed_missing_endpoint_state',
+      );
+      expect(out.partial).toBe(true);
+      // A prompt appears precisely because it is now useful.
+      expect(out.corridor).not.toBeNull();
+    });
+  }
+
+  it('never labels a filing that omits an endpoint state as HIGH confidence', () => {
+    for (const [, legs] of VARIANTS) {
+      expect(truncated(legs).confidence.label).not.toBe('high');
+    }
+  });
+
+  it('leaves a genuine single-state lane alone — the check is endpoints, not count', () => {
+    // Both endpoints in Texas: one filed row is the complete and correct filing.
+    const intrastate = priceHeavyHaulLane({
+      cargo: REFERENCE_CARGO,
+      lane: { origin: HOUSTON, destination: { ...HOUSTON, state: 'TX' } },
+      filedLegs: [{ stateCode: 'TX', miles: 240 }],
+      rates: { linehaulUsdPerMile: 4.85 },
+      diesel: DIESEL,
+      asOf: ASOF,
+    });
+    expect(intrastate.confidence.findings.map((f) => f.code)).not.toContain(
+      'filed_missing_endpoint_state',
+    );
   });
 });

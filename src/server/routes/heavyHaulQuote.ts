@@ -456,7 +456,16 @@ const HH_CSS = `
   .hh-kpihead { display: flex; align-items: baseline; justify-content: space-between; gap: 12px; }
   .hh-kpiscore { font-size: 28px; font-weight: 700; line-height: 1.1; color: var(--ink); font-family: var(--font-mono); }
   .hh-kpilabel { font-size: 11px; font-family: var(--font-mono); letter-spacing: 0.06em; text-transform: uppercase; padding: 4px 8px; border-radius: var(--radius-pill); border: 1px solid var(--border-strong); color: var(--muted); white-space: nowrap; }
-  .hh-kpilabel--high { border-color: var(--success); color: var(--success); }
+  /* The BORDER may be the raw success token; the 11px TEXT may not. Bare
+     var(--success) renders 3.54:1 on this page's light surface — under WCAG
+     AA's 4.5:1, which has no large-text relief below 18.66px. Mixing it toward
+     var(--ink) darkens it on light and lightens it on dark, so one declaration
+     clears AA in both themes without a theme block, and it stays token-only:
+     a hardcoded hex here would (rightly) fail the page's no-raw-hex guard. */
+  .hh-kpilabel--high {
+    border-color: var(--success);
+    color: color-mix(in srgb, var(--success) 75%, var(--ink));
+  }
   .hh-kpilabel--medium { border-color: var(--warn); color: var(--warn); }
   .hh-kpilabel--low { border-color: var(--error); color: var(--error); }
   .hh-bar { height: 6px; border-radius: var(--radius-pill); background: var(--surface-3); margin: 8px 0; overflow: clip; }

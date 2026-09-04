@@ -127,7 +127,7 @@ test.describe('the reference lane, through the form', () => {
     await fillLane(page);
     await fillLegs(page, REFERENCE_LEGS);
     await page.fill('#hh-linehaul', '4.85');
-    await page.fill('#hh-pc-mile', '2.25');
+    await page.fill('#hh-pc-mile', '1.95');
     await submit(page);
   });
 
@@ -400,7 +400,7 @@ for (const theme of ['dark', 'light'] as const) {
     await fillLane(page);
     await fillLegs(page, REFERENCE_LEGS);
     await page.fill('#hh-linehaul', '4.85');
-    await page.fill('#hh-pc-mile', '2.25');
+    await page.fill('#hh-pc-mile', '1.95');
     await submit(page);
 
     await assertNoHorizontalOverflow(page, `375px ${theme}`);
@@ -470,6 +470,47 @@ for (const theme of ['dark', 'light'] as const) {
     expect(painted.bg).not.toBe('rgba(0, 0, 0, 0)');
     expect(painted.heroInk).not.toBe('rgba(0, 0, 0, 0)');
     expect(painted.heroInk).not.toBe(painted.bg);
+  });
+
+  /**
+   * The KPI label specifically. The test above samples the body against the
+   * hero heading and never touched the confidence pill — which is how a 3.54:1
+   * "HIGH CONFIDENCE" label shipped past it. This measures a real ratio on the
+   * element that actually renders, in both themes, for every variant.
+   */
+  test(`the confidence label clears WCAG AA in the ${theme} theme`, async ({ page }) => {
+    test.slow();
+    await openTool(page, theme);
+    const ratios = await page.evaluate(() => {
+      const lum = (c: string) => {
+        const [r, g, b] = c.match(/\d+(\.\d+)?/g)!.slice(0, 3).map(Number);
+        const f = (v: number) => {
+          const x = v / 255;
+          return x <= 0.03928 ? x / 12.92 : Math.pow((x + 0.055) / 1.055, 2.4);
+        };
+        return 0.2126 * f(r) + 0.7152 * f(g) + 0.0722 * f(b);
+      };
+      const surface = getComputedStyle(document.body).backgroundColor;
+      const probe = document.createElement('span');
+      probe.style.display = 'none';
+      document.body.appendChild(probe);
+      const out: Record<string, number> = {};
+      for (const variant of ['high', 'medium', 'low']) {
+        probe.className = 'hh-kpilabel hh-kpilabel--' + variant;
+        probe.style.display = '';
+        const ink = getComputedStyle(probe).color;
+        const a = lum(ink);
+        const b = lum(surface);
+        out[variant] = (Math.max(a, b) + 0.05) / (Math.min(a, b) + 0.05);
+        probe.style.display = 'none';
+      }
+      probe.remove();
+      return out;
+    });
+    // 11px text — AA large-text relief does not apply below 18.66px.
+    for (const variant of ['high', 'medium', 'low']) {
+      expect(ratios[variant], `${variant} label contrast`).toBeGreaterThanOrEqual(4.5);
+    }
   });
 }
 

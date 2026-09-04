@@ -292,15 +292,25 @@
   }
 
   function renderSplit(q) {
+    // A subtotal of 0 that has an UNPRICED line of the same basis is not zero
+    // money — it is money we could not price. Printing "$0.00" under a caption
+    // describing what sourced money is, is the one place this page would break
+    // its own null-is-not-zero rule, and it is the part a dispatcher screenshots.
+    function amountFor(total, basis) {
+      var unpriced = q.lines.some(function (l) {
+        return l.basis === basis && l.amountUsd === null;
+      });
+      return total === 0 && unpriced ? 'Not priced' : usd(total);
+    }
     return (
       '<div class="hh-split"><div class="hh-tile"><span class="k">Sourced</span><span class="v">' +
-      esc(usd(q.subtotalSourcedUsd)) +
+      esc(amountFor(q.subtotalSourcedUsd, 'sourced')) +
       '</span><span class="n">State permit fees and published police-escort floors, each cited to a statute or fee schedule.</span></div>' +
       '<div class="hh-tile is-yours"><span class="k">Your rates</span><span class="v">' +
-      esc(usd(q.subtotalYourRatesUsd)) +
+      esc(amountFor(q.subtotalYourRatesUsd, 'yours')) +
       '</span><span class="n">Line haul and pilot cars, computed from rates you entered. Not figures we source.</span></div>' +
       '<div class="hh-tile"><span class="k">Index-derived</span><span class="v">' +
-      esc(usd(q.subtotalDerivedUsd)) +
+      esc(amountFor(q.subtotalDerivedUsd, 'derived')) +
       '</span><span class="n">Fuel surcharge: EIA diesel price through a model whose peg and mpg are our assumptions.</span></div></div>'
     );
   }

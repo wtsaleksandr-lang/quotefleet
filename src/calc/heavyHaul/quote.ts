@@ -541,6 +541,32 @@ export function priceHeavyHaulLane(input: HeavyHaulRequest): HeavyHaulQuote {
   const deliveredUsd = anyPriced
     ? round2(subtotalSourcedUsd + subtotalYourRatesUsd + subtotalDerivedUsd)
     : null;
+  /**
+   * Endpoint states the filing omits.
+   *
+   * Only the two ENDPOINTS are checked, never the wider corridor: the corridor
+   * scan is deliberately over-inclusive, so a corridor state missing from a
+   * filing is a question, whereas an endpoint state missing is evidence — the
+   * load starts and ends there and both were geocoded from the addresses the
+   * user typed. Checking the corridor here would penalise the correct filing
+   * for leaving out a state the truck never enters.
+   */
+  const filedStateCodes = new Set(filedLegs.map((l) => l.stateCode.toUpperCase()));
+  const filedMissingEndpointStates =
+    hasFiled && input.lane
+      ? [input.lane.origin.state, input.lane.destination.state]
+          .filter((c): c is string => typeof c === 'string' && c.length === 2)
+          .map((c) => c.toUpperCase())
+          .filter((c, i, arr) => arr.indexOf(c) === i)
+          .filter((c) => !filedStateCodes.has(c))
+      : [];
+
+  if (filedMissingEndpointStates.length > 0) {
+    partialBecause.push(
+      `${filedMissingEndpointStates.join(' and ')} ${filedMissingEndpointStates.length > 1 ? 'are' : 'is'} on this lane but ${filedMissingEndpointStates.length > 1 ? 'have' : 'has'} no filed mileage, so ${filedMissingEndpointStates.length > 1 ? 'those permits are' : 'that permit is'} not priced`,
+    );
+  }
+
   const partial = partialBecause.length > 0;
 
   // ── 7. The KPI ──────────────────────────────────────────────────────────
@@ -551,20 +577,32 @@ export function priceHeavyHaulLane(input: HeavyHaulRequest): HeavyHaulQuote {
     .filter((j) => j.superload)
     .map((j) => j.jurisdiction);
 
-  const corridor =
-    !tierSpec.mayPriceStates && input.lane
-      ? {
-          states: corridorStates(input.lane.origin, input.lane.destination, hasOsowCoverage, {
-            originState: input.lane.origin.state,
-            destinationState: input.lane.destination.state,
-          }),
-          disclaimer: CORRIDOR_DISCLAIMER,
-        }
-      : null;
+  // The corridor is computed whenever we have a geocoded lane — not only when
+  // the tier cannot price states. At tier 0 it is what lets us check the filed
+  // rows against the lane the addresses describe; without it a filing naming
+  // one state scored a clean 100% on a seven-state move.
+  const corridorAll = input.lane
+    ? corridorStates(input.lane.origin, input.lane.destination, hasOsowCoverage, {
+        originState: input.lane.origin.state,
+        destinationState: input.lane.destination.state,
+      })
+    : null;
 
   const statesOnLane = hasFiled
     ? filedLegs.length
-    : Math.max(1, corridor?.states.length ?? 1);
+    : Math.max(1, corridorAll?.length ?? 1);
+
+  /**
+   * The corridor is exposed to the page only when it is genuinely a PROMPT:
+   * when the tier cannot price states at all, or when a filing has left out a
+   * state the lane provably touches. On a complete tier-0 filing the states are
+   * already known and asking for them again would be noise — the data is still
+   * computed above, because that is what the endpoint check reads.
+   */
+  const corridor =
+    corridorAll && (!tierSpec.mayPriceStates || filedMissingEndpointStates.length > 0)
+      ? { states: corridorAll, disclaimer: CORRIDOR_DISCLAIMER }
+      : null;
 
   const confidence = scoreHeavyHaulConfidence({
     mileageTier: {
@@ -584,6 +622,7 @@ export function priceHeavyHaulLane(input: HeavyHaulRequest): HeavyHaulQuote {
     mileageCrossCheck: crossCheck
       ? { differencePct: crossCheck.differencePct, disagrees: crossCheck.disagrees }
       : null,
+    filedMissingEndpointStates,
     linehaulPriced,
     escortsRequired: escorts?.pilotCarsRequired ?? 0,
     escortsPriced: escorts?.pilotCarUsd !== null && escorts?.pilotCarUsd !== undefined,
