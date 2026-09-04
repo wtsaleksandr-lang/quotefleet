@@ -898,3 +898,13 @@ export const ILLINOIS_AXLE_FEE_SOURCE = ILCS_15_306;
 
 /** Cited for the rounding rules on weight and distance. */
 export const ILLINOIS_ROUNDING_SOURCE = ILCS_15_302;
+
+/** Cited for the statutory IDOT and Illinois State Police escort charges. */
+export const ILLINOIS_POLICE_ESCORT_RATE_SOURCE = ILCS_15_312;
+
+/**
+ * Cited for the STILL-PUBLISHED administrative rule that charges per State
+ * Police District crossed instead of per hour — the other half of Illinois's
+ * live disagreement about what a trooper escort costs.
+ */
+export const ILLINOIS_POLICE_ESCORT_RULE_SOURCE = IAC_554_2012;

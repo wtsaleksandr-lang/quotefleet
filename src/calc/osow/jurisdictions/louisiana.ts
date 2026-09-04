@@ -1083,3 +1083,6 @@ export const LOUISIANA_PERMIT_VALIDITY_SOURCE = DOTD_SINGLE_TRIP;
 
 /** Cited for the state police vehicle-use fee scale, which is separate from the officer's hourly rate. */
 export const LOUISIANA_POLICE_VEHICLE_FEE_SOURCE = LAC_55_1101;
+
+/** Cited for the off-duty trooper hourly rate and its two-hour minimum. */
+export const LOUISIANA_POLICE_ESCORT_RATE_SOURCE = LSP_1107;

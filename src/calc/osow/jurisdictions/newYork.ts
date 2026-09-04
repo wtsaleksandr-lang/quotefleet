@@ -701,3 +701,6 @@ export const NEW_YORK_TRAFFIC_CONTROL_PLAN_SOURCE = NY_TCP;
 
 /** Cited for escort-driver certification costs — the operator's, never the state's. */
 export const NEW_YORK_ESCORT_CERTIFICATION_SOURCE = NY_DMV_ESCORT;
+
+/** Cited for the New York State Police hourly, overtime, mileage and minimum-hours escort rates. */
+export const NEW_YORK_POLICE_ESCORT_RATE_SOURCE = NYSP_COMMERCIAL;
