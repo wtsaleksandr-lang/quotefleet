@@ -18,9 +18,20 @@
  *      hidden behind a toggle.
  *   5. `totalPermitUsd === null` is NOT $0. It means something on the lane
  *      cannot be priced, and it renders as a refusal with the cause named.
+ *   6. COVERED IS NOT PRICED. A state can be covered — we hold its schedule —
+ *      and still come back unpriceable for this load, and the summary tile must
+ *      not report the second as the first. See `renderFlags`.
  */
 (function () {
   'use strict';
+
+  /**
+   * The API's own ceiling, mirrored. `legs` is `z.array(...).max(20)` server
+   * side, and an Add button with no limit let the user build a 39-row form
+   * whose only feedback was a 400. The state is prevented rather than
+   * explained: the button stops at the cap and says why.
+   */
+  var MAX_LEGS = 20;
 
   var form = document.getElementById('ow-form');
   var legsEl = document.getElementById('ow-legs');
@@ -69,7 +80,28 @@
 
   // ── leg rows ─────────────────────────────────────────────────────────────
 
+  var addBtn = document.getElementById('ow-add');
+  var capHint = document.getElementById('ow-cap');
+
+  function legRows() { return legsEl.querySelectorAll('.ow-leg'); }
+
+  /** Keep the Add control and the cap notice in step with the row count. */
+  function syncCap() {
+    var full = legRows().length >= MAX_LEGS;
+    if (addBtn) {
+      addBtn.disabled = full;
+      addBtn.setAttribute('aria-disabled', full ? 'true' : 'false');
+      // SHORT. `.btn` is an inline-flex box at a fixed width, so a longer label
+      // overflows its own button at 320-375px instead of wrapping — measured at
+      // 147px of text in a 121px box. The sentence lives in `#ow-cap`, which is
+      // revealed at the same moment.
+      addBtn.textContent = full ? 'Limit: ' + MAX_LEGS + ' states' : 'Add a state';
+    }
+    if (capHint) capHint.hidden = !full;
+  }
+
   function addLeg(stateCode, miles) {
+    if (legRows().length >= MAX_LEGS) { syncCap(); return; }
     var node = tpl.content.firstElementChild.cloneNode(true);
     var sel = node.querySelector('.ow-leg-state');
     var mi = node.querySelector('.ow-leg-miles');
@@ -80,12 +112,13 @@
       drop.addEventListener('click', function () {
         node.remove();
         if (!legsEl.querySelector('.ow-leg')) addLeg();
+        syncCap();
       });
     }
     legsEl.appendChild(node);
+    syncCap();
   }
 
-  var addBtn = document.getElementById('ow-add');
   if (addBtn) addBtn.addEventListener('click', function () { addLeg(); });
   addLeg();
   addLeg();
@@ -130,9 +163,28 @@
     return '<div class="ow-note' + cls + '"><h3>' + esc(title) + '</h3>' + inner + '</div>';
   }
 
+  /**
+   * States that came back with an actual figure.
+   *
+   * NOT `jurisdictions.length`. A jurisdiction is in that list because we HOLD
+   * the state's fee schedule, which is a different fact from having priced this
+   * load with it: Florida returns a covered jurisdiction with a null subtotal
+   * whenever the oversize band cannot be selected, and Illinois and Arkansas do
+   * the same on other inputs. Counting the list rendered "2 of 2 — every state
+   * on this lane is covered" directly above a block reading "Not priceable",
+   * which invites a dispatcher to read the missing total as a display glitch.
+   */
+  function pricedCount(q) {
+    var n = 0;
+    for (var i = 0; i < q.jurisdictions.length; i++) {
+      if (q.jurisdictions[i].subtotalUsd !== null) n++;
+    }
+    return n;
+  }
+
   function renderTotal(data) {
     var q = data.quote;
-    var priced = q.jurisdictions.length;
+    var priced = pricedCount(q);
     var value = usd(q.totalPermitUsd);
 
     var head;
@@ -159,16 +211,43 @@
     var q = data.quote;
     var esc1 = data.escorts.maxRequiredOnAnyState;
     var absorbed = data.absorbedConflicts.items.length;
+
+    // PRICED, COVERED AND ON THE LANE ARE THREE DIFFERENT COUNTS. The tile
+    // reports the first and names the other two, because "covered" is the fact
+    // a reader will otherwise assume from a priced total.
+    var priced = pricedCount(q);
+    var onLane = q.jurisdictions.length + data.uncovered.length;
+    var unpriced = q.jurisdictions.length - priced;
+    var gaps = [];
+    if (unpriced > 0) {
+      gaps.push(unpriced + ' covered but not priceable for this load');
+    }
+    if (data.uncovered.length) {
+      gaps.push(data.uncovered.length + ' not covered at all');
+    }
+
+    var escortStates = data.escorts.byState.filter(function (s) { return s.required > 0; }).length;
+
     var tiles = [
       {
         k: 'States priced',
-        v: q.jurisdictions.length + ' of ' + (q.jurisdictions.length + data.uncovered.length),
-        n: data.uncovered.length ? data.uncovered.length + ' state(s) not covered — see below' : 'Every state on this lane is covered',
+        v: priced + ' of ' + onLane,
+        n: gaps.length
+          ? gaps.join(', ') + ' — each named below'
+          : 'Every state on this lane returned a priced permit fee',
       },
       {
-        k: 'Escorts required',
-        v: esc1 === 0 ? 'None' : esc1 + ' pilot car' + (esc1 === 1 ? '' : 's'),
-        n: 'Cost NOT included — states set the requirement, not the price',
+        // A PER-STATE MAXIMUM, NOT A LANE TOTAL. `maxRequiredOnAnyState` is a
+        // Math.max across the states, so a lane where Florida and Georgia each
+        // require one escort reports 1 — which reads as one pilot car for the
+        // whole move when it is two, one per state. The list below is right;
+        // the tile has to say which number it is showing.
+        k: 'Escorts, per state',
+        v: esc1 === 0 ? 'None' : 'Up to ' + esc1 + ' per state',
+        n: esc1 === 0
+          ? 'Cost NOT included — states set the requirement, not the price'
+          : 'The most any ONE state requires, not a lane total — ' + escortStates + ' state' +
+            (escortStates === 1 ? '' : 's') + ' below each require their own. Cost NOT included.',
       },
       {
         k: 'Manual review',
@@ -372,8 +451,12 @@
         return;
       }
       var milesVal = Number(rawMiles);
-      if (!isFinite(milesVal) || milesVal < 0) {
-        showMessage('error', 'Miles for ' + code + ' are not a usable distance', 'Enter the in-state mileage as a positive number.');
+      // ZERO IS NOT A POSITIVE NUMBER, and the copy right here already said so.
+      // A 0-mile leg used to price: Pennsylvania returned its base fee with a
+      // $0.00 distance charge and reported the lane as priced, which understates
+      // a per-mile state without saying anything is missing.
+      if (!isFinite(milesVal) || milesVal <= 0) {
+        showMessage('error', 'Miles for ' + code + ' are not a usable distance', 'Enter the in-state mileage as a positive number. Zero miles is an empty row, not a state the load crosses for free — remove the row if the load does not enter ' + code + '.');
         return;
       }
       legs.push({ state: code, miles: milesVal });
@@ -381,6 +464,11 @@
 
     if (!legs.length) {
       showMessage('error', 'Add at least one state', 'Pick the states the load crosses and the miles it runs inside each one.');
+      return;
+    }
+
+    if (legs.length > MAX_LEGS) {
+      showMessage('error', 'Too many states on one lane', 'This calculator prices at most ' + MAX_LEGS + ' states in a single lane. Remove a state and try again.');
       return;
     }
 

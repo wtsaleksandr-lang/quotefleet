@@ -93,6 +93,28 @@ export function osowCoveredStates(): Array<{ code: string; name: string }> {
 }
 
 /**
+ * Territories in `US_STATES` that this tool does not offer.
+ *
+ * `US_STATE_CODES` is the directory's membership set and includes them, so
+ * validating a leg against it let the API accept a state the FORM cannot
+ * produce — a public endpoint answering for Puerto Rico while the page it
+ * belongs to has no such option. They are excluded here for the same reason
+ * they are excluded from the form: none is reachable by road from the mainland,
+ * so an in-state mileage leg for one is not a lane this calculator describes.
+ * `OSOW_SELECTABLE_STATE_CODES` is now the single list both surfaces read.
+ */
+const OSOW_TERRITORY_CODES: ReadonlySet<string> = new Set(['PR', 'VI', 'GU']);
+
+const OSOW_SELECTABLE_STATES = US_STATES.filter(
+  (s) => s.code.length === 2 && !OSOW_TERRITORY_CODES.has(s.code),
+);
+
+/** Exactly the codes the form offers — and the API's own membership set. */
+export const OSOW_SELECTABLE_STATE_CODES: ReadonlySet<string> = new Set(
+  OSOW_SELECTABLE_STATES.map((s) => s.code),
+);
+
+/**
  * Every US state, flagged for coverage — the form's own state list.
  *
  * An uncovered state is deliberately SELECTABLE. Hiding the other 29 would make
@@ -102,9 +124,11 @@ export function osowCoveredStates(): Array<{ code: string; name: string }> {
  * "not covered" result instead.
  */
 export function osowStateOptions(): Array<{ code: string; name: string; covered: boolean }> {
-  return US_STATES.filter((s) => s.code.length === 2 && !['PR', 'VI', 'GU'].includes(s.code))
-    .map((s) => ({ code: s.code, name: s.name, covered: hasOsowCoverage(s.code) }))
-    .sort((a, b) => a.name.localeCompare(b.name));
+  return OSOW_SELECTABLE_STATES.map((s) => ({
+    code: s.code,
+    name: s.name,
+    covered: hasOsowCoverage(s.code),
+  })).sort((a, b) => a.name.localeCompare(b.name));
 }
 
 /**
@@ -142,13 +166,28 @@ const ROUTE_CLASS_VALUES = OSOW_ROUTE_CLASSES.map((r) => r.value) as [string, ..
 const MAX_WEIGHT_LBS = 2_000_000;
 const MAX_DIMENSION_IN = 12 * 400; // 400 ft
 const MAX_MILES_PER_STATE = 3_000;
-const MAX_LEGS = 20;
+export const OSOW_MAX_LEGS = 20;
 
 const positive = (max: number) => z.number().finite().positive().max(max);
 
+/**
+ * MILES MUST BE GREATER THAN ZERO, and this is a correctness bound rather than
+ * a tidiness one.
+ *
+ * The form's own error copy already says "enter the in-state mileage as a
+ * positive number", and zero is not one. Accepting it produced a confident
+ * understatement in every per-mile state: Pennsylvania at 0 mi prices its base
+ * fee and a $0.00 distance charge, and reports the lane as priced. A leg with
+ * no miles is a leg that was not filled in, not a state the load crosses for
+ * free — so it is refused with the same words the page uses.
+ */
 const LegSchema = z.object({
   state: z.string().trim().min(2).max(2),
-  miles: z.number().finite().min(0).max(MAX_MILES_PER_STATE),
+  miles: z
+    .number()
+    .finite()
+    .positive('In-state miles must be a positive number — a leg of 0 mi is not a state the load crosses.')
+    .max(MAX_MILES_PER_STATE),
 });
 
 const OsowRequestSchema = z.object({
@@ -164,12 +203,62 @@ const OsowRequestSchema = z.object({
     axleCount: z.number().int().min(2).max(40).optional(),
     routeClass: z.enum(ROUTE_CLASS_VALUES).optional(),
   }),
-  legs: z.array(LegSchema).min(1).max(MAX_LEGS),
-  /** Which fee schedule to read. Defaults to today; used by tests to pin a date. */
+  legs: z
+    .array(LegSchema)
+    .min(1)
+    .max(
+      OSOW_MAX_LEGS,
+      `A lane can carry at most ${OSOW_MAX_LEGS} states here. Remove a state before adding another.`,
+    ),
+  /**
+   * Which fee schedule to read. Defaults to today.
+   *
+   * BOUNDED, BECAUSE IT IS AN UNAUTHENTICATED LEVER ON THE ANSWER. Every fee
+   * row in the corpus is effective-dated, so `asOf=1800-01-01` puts all of them
+   * out of effect and the engine correctly reports "no permit required, $0" —
+   * a true statement about 1800 that renders on this page as "this move is
+   * free". That is the one place the "$0 is not null" discipline inverts, and
+   * the page never sends the parameter at all.
+   *
+   * The window is the range the corpus can actually answer for: from
+   * `OSOW_ASOF_MIN`, the day the newest schedule on file took effect and so the
+   * first day on which every recorded row is simultaneously in force, through
+   * today — a future date would be a schedule nobody has published.
+   */
   asOf: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).optional(),
 });
 
 export type OsowRequest = z.infer<typeof OsowRequestSchema>;
+
+/**
+ * The earliest date the recorded fee schedules can be read for: the latest
+ * `effectiveFrom` in the whole corpus.
+ *
+ * Computed rather than hardcoded so it cannot go stale when a state's schedule
+ * is re-sourced — the alternative is a constant that silently starts admitting
+ * dates on which part of the corpus is out of effect, which is the exact bug
+ * the bound exists to close. One pass over the compiled data at module load.
+ */
+export const OSOW_ASOF_MIN: string = (() => {
+  let latest = '1900-01-01';
+  const seen = new Set<unknown>();
+  const walk = (node: unknown, depth: number): void => {
+    if (node === null || typeof node !== 'object' || depth > 8) return;
+    if (seen.has(node)) return;
+    seen.add(node);
+    if (Array.isArray(node)) {
+      for (const item of node) walk(item, depth + 1);
+      return;
+    }
+    const row = node as { effectiveFrom?: unknown };
+    if (typeof row.effectiveFrom === 'string' && row.effectiveFrom > latest) {
+      latest = row.effectiveFrom;
+    }
+    for (const value of Object.values(node)) walk(value, depth + 1);
+  };
+  walk(OSOW_JURISDICTIONS, 0);
+  return latest;
+})();
 
 // ── The honest "not included" list ─────────────────────────────────────────
 
@@ -417,7 +506,12 @@ const OSOW_CSS = `
 
   .ow-actions { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; margin-top: 12px; }
   .ow-actions .btn { width: 100%; min-height: 48px; display: inline-flex; align-items: center; justify-content: center; }
+  /* The Add button STOPS at the cap the API enforces, rather than letting the
+     user build a 21st row and meet a 400. A disabled control still has to read
+     as disabled in both themes. */
+  .ow-actions .btn:disabled { opacity: 0.5; cursor: not-allowed; }
   .ow-hint { font-size: 12px; color: var(--muted); margin: 8px 0 0; line-height: 1.5; }
+  .ow-hint[hidden] { display: none; }
 
   /* ── Results ── */
   .ow-results { scroll-margin-top: 96px; }
@@ -602,6 +696,7 @@ export function renderOsowToolPage(): string {
             <button type="button" class="btn btn-secondary" id="ow-add">Add a state</button>
             <button type="submit" class="btn btn-primary" id="ow-go">Calculate permits</button>
           </div>
+          <p class="ow-hint" id="ow-cap" hidden>${OSOW_MAX_LEGS} states is the most one lane can carry here. Remove a state to add another.</p>
           <p class="ow-hint">Covered states — the engine holds a cited fee schedule for these ${covered.length}:</p>
           <div class="ow-cov">${coveredPills}</div>
           <p class="ow-hint">Any other state can still be added. It will come back named and unpriced, never as $0.</p>
@@ -727,9 +822,25 @@ export function registerOsowPermitRoutes(app: Express) {
   app.post('/api/tools/osow-permits', publicCalcLimiter, (req: Request, res: Response) => {
     const parsed = OsowRequestSchema.safeParse(req.body);
     if (!parsed.success) {
+      // The zod message travels. A bare "Invalid input" for a 21-leg lane told
+      // the user nothing about the cap they had just crossed, and the page has
+      // no other way to name it.
+      const first = parsed.error.issues[0];
       return res.status(400).json({
-        error: 'Invalid input',
+        error: first ? `Invalid input: ${first.message}` : 'Invalid input',
         details: parsed.error.flatten(),
+      });
+    }
+
+    // The corpus is a snapshot of the schedules currently on file, so it can
+    // only answer for the window in which all of them are in force. Outside it
+    // the engine reports a truthful "$0, no permit required" about a year whose
+    // fee schedules we do not hold — the one place a null would be the honest
+    // answer and a zero comes out instead. See `OSOW_ASOF_MIN`.
+    const asOf = parsed.data.asOf;
+    if (asOf !== undefined && (asOf < OSOW_ASOF_MIN || asOf > todayIso())) {
+      return res.status(400).json({
+        error: `asOf must fall between ${OSOW_ASOF_MIN} and ${todayIso()} — the range the fee schedules on file are effective for. Outside it whole schedules are out of effect and the answer would be $0 for a date we hold no data for.`,
       });
     }
 
@@ -744,9 +855,18 @@ export function registerOsowPermitRoutes(app: Express) {
     // page still renders, so it can never report an unknown one. The membership
     // set is the real check — without it "ZZ" would sail through and come back
     // as a confident "not covered" state that does not exist.
-    const unknown = codes.find((c) => !US_STATE_CODES.has(c));
+    //
+    // The set is the FORM'S list, not `US_STATE_CODES`: the wider directory set
+    // carries PR, VI and GU, which this tool does not offer, and an API that
+    // accepts a leg its own page cannot produce is two surfaces disagreeing
+    // about what the product covers.
+    const unknown = codes.find((c) => !OSOW_SELECTABLE_STATE_CODES.has(c));
     if (unknown) {
-      return res.status(400).json({ error: `"${unknown}" is not a US state code.` });
+      return res.status(400).json({
+        error: US_STATE_CODES.has(unknown)
+          ? `"${unknown}" is a US territory, not one of the 50 states or DC this calculator covers. It is not reachable by road from the mainland, so it is not offered on the form either.`
+          : `"${unknown}" is not a US state code.`,
+      });
     }
 
     // Pure calculation over compiled jurisdiction data — no database, so this

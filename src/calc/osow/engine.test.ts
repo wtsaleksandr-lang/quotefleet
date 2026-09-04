@@ -21,7 +21,7 @@ import {
   priceSourced,
 } from './materiality.js';
 import { ftIn } from './escortRules.js';
-import { resolveSourced, spreadOf } from './provenance.js';
+import { resolveSourced, spreadOf, todayIso } from './provenance.js';
 import {
   RCW_0941_FULL_FEE_TABLE,
   WASHINGTON_999_POUND_GAP,
@@ -2459,8 +2459,21 @@ describe('Arkansas — a permit priced by the ton', () => {
     expect(gap.subtotalUsd).toBeNull();
     expect(gap.requiresManualReview).toBe(true);
     expect(gap.lines.find((l) => l.code === 'osow_overweight')?.amountUsd).toBeNull();
+    // THE HEADLINE MUST BLAME THE MILEAGE. 100,000 lb prices fine at 250 and at
+    // 252, so "no band covers 100,000 lb in Arkansas" is a true sentence about
+    // the wrong variable — it reads as a weight the state cannot take.
     expect(gap.warnings.join(' ')).toContain(
+      'No overweight fee band on file covers a 251-mile move in Arkansas',
+    );
+    expect(gap.warnings.join(' ')).toContain('it is the MILEAGE that falls in the gap, not the weight');
+    expect(gap.warnings.join(' ')).toContain('201–250 mi');
+    expect(gap.warnings.join(' ')).toContain('252 mi and over');
+    expect(gap.warnings.join(' ')).not.toContain(
       'No overweight fee band on file covers 100,000 lb in Arkansas',
+    );
+    // The blank fee line carries the cause too, not just the notes below it.
+    expect(gap.lines.find((l) => l.code === 'osow_overweight')?.note).toContain(
+      'price no move of exactly 251 mi',
     );
     // A HOLE, not a disagreement: nothing is on file that prices 251 miles, so
     // the resolver has no two candidates to weigh and reports no conflict.
@@ -3880,5 +3893,203 @@ describe('the registry after Phase 8', () => {
     // count is asserted separately so a stray import cannot pass by matching a
     // list someone updated in the same edit.
     expect(Object.keys(OSOW_JURISDICTIONS)).toHaveLength(21);
+  });
+});
+
+/**
+ * A PER-MILE FEE NOTE MUST PRODUCE ITS OWN AMOUNT.
+ *
+ * The public calculator prints `line.note` directly beside `line.amountUsd`
+ * under the promise that every line traces to the statute or fee schedule it
+ * came from. A note that does not reconcile is not a cosmetic defect: it is a
+ * false statement about a real fee, on the surface whose entire claim is that
+ * the arithmetic is checkable.
+ *
+ * It got there because `describePerMile` re-read `PerMileRate` instead of
+ * rendering the steps `perMileAmount` had taken, so the three modifiers only
+ * Florida uses — `roundMilesUpTo: 25`, `addAfterUsd: 3.33` and round-up-to-whole
+ * dollars — were priced and never described. A 26-mile Florida move printed
+ * "26 mi in Florida, × $0.36 per mile", which reads as $9.36, beside its correct
+ * $22.00; $12.64 of a genuine fee had no stated cause. Pennsylvania and
+ * Washington reconciled only because they use none of the three.
+ *
+ * This test re-derives the amount FROM THE SENTENCE — parsing the miles, the
+ * billed miles, the rate, the increments, the flat charge, the rounding mode,
+ * the minimum and the cap out of the printed text and evaluating them — for
+ * every state that holds a per-mile rate, across a weight x mileage sweep. A
+ * modifier added to the model and to the arithmetic but not to the explanation
+ * fails here rather than shipping.
+ */
+describe('every per-mile fee note reconciles to its own amount', () => {
+  const ASOF_NOTES = todayIso();
+
+  /** Derived from the data, so a new per-mile state is covered automatically. */
+  const PER_MILE_STATES = Object.entries(OSOW_JURISDICTIONS)
+    .filter(([, rules]) => rules.overweightPerMile.length > 0)
+    .map(([code]) => code)
+    .sort();
+
+  const WEIGHTS = [70_000, 82_000, 90_000, 100_000, 112_000, 120_000, 132_000, 150_000, 160_000];
+  const MILES = [1, 26, 46, 67.5, 100, 250, 260, 293, 300, 500];
+
+  const round2 = (n: number) => Math.round(n * 100) / 100;
+
+  /** The figure the note closes on. */
+  function statedAmount(note: string): number {
+    const m = note.match(/ = \$([\d,]+\.\d{2})/);
+    if (!m) throw new Error(`note states no amount: ${note}`);
+    return Number((m[1] as string).replace(/,/g, ''));
+  }
+
+  /**
+   * Evaluate the note's own arithmetic, using nothing but the note. The order
+   * of operations is the one the sentence describes: miles round to the
+   * increment, the rate and the weight increments multiply, the flat charge
+   * goes in, the dollar rounding applies, and only then the minimum and cap.
+   */
+  function amountFromNote(note: string): number {
+    const head = (note.split(' = $')[0] as string) ?? '';
+    if (/no distance charge arises/.test(head)) return 0;
+
+    const milesM = head.match(/^([\d,.]+) mi in /);
+    const rateM = head.match(/× \$([\d.]+) per mile/);
+    if (!milesM || !rateM) throw new Error(`note is not readable as arithmetic: ${note}`);
+    const miles = Number((milesM[1] as string).replace(/,/g, ''));
+    const rate = Number(rateM[1] as string);
+
+    const billedM = head.match(/billed as ([\d,.]+) mi \(fees are set in ([\d,.]+) mi increments/);
+    const billed = billedM ? Number((billedM[1] as string).replace(/,/g, '')) : miles;
+    if (billedM) {
+      // The clause must be internally true as well: the billed figure IS the
+      // supplied mileage rounded up to the increment the same clause names.
+      const increment = Number((billedM[2] as string).replace(/,/g, ''));
+      expect(billed, `billed miles in: ${note}`).toBe(Math.ceil(miles / increment) * increment);
+    }
+
+    const unitsM = head.match(/per ([\d,]+) lb over ([\d,]+) lb × ([\d,]+) increments?/);
+    const units = unitsM ? Number((unitsM[3] as string).replace(/,/g, '')) : 1;
+
+    const addM = head.match(/plus a \$([\d.]+) flat charge inside the rounding/);
+    const addAfter = addM ? Number(addM[1] as string) : 0;
+
+    let amount = round2(rate * billed * units + addAfter);
+    if (/rounded up to the whole dollar/.test(head)) amount = Math.ceil(amount);
+    else if (/rounded to the nearest whole dollar/.test(head)) amount = Math.round(amount);
+
+    const minM = head.match(/minimum \$([\d.]+)/);
+    if (minM) amount = Math.max(amount, Number(minM[1] as string));
+    const maxM = head.match(/capped at \$([\d.]+)/);
+    if (maxM) amount = Math.min(amount, Number(maxM[1] as string));
+    return round2(amount);
+  }
+
+  interface NoteSample {
+    code: string;
+    grossWeightLbs: number;
+    miles: number;
+    amountUsd: number;
+    note: string;
+  }
+
+  function sweep(): NoteSample[] {
+    const out: NoteSample[] = [];
+    for (const code of PER_MILE_STATES) {
+      const rules = OSOW_JURISDICTIONS[code];
+      if (!rules) continue;
+      for (const grossWeightLbs of WEIGHTS) {
+        for (const milesInJurisdiction of MILES) {
+          const load: OsowLoad = {
+            grossWeightLbs,
+            widthIn: 150,
+            heightIn: 174,
+            overallLengthIn: 1020,
+            axleCount: 8,
+            routeClass: 'interstate',
+            milesInJurisdiction,
+          };
+          const priced = calculateOsowForJurisdiction(rules, load, ASOF_NOTES);
+          for (const line of priced.lines) {
+            if (line.code !== 'osow_overweight') continue;
+            if (typeof line.note !== 'string' || !/ mi in /.test(line.note)) continue;
+            if (line.amountUsd === null) continue;
+            out.push({
+              code,
+              grossWeightLbs,
+              miles: milesInJurisdiction,
+              amountUsd: line.amountUsd,
+              note: line.note,
+            });
+          }
+        }
+      }
+    }
+    return out;
+  }
+
+  it('exercises every state that holds a per-mile rate', () => {
+    // Six as of Phase 8: PA, IN, VA, WA, FL, TN. Asserted from the data rather
+    // than a list, so the sweep cannot silently stop covering one.
+    expect(PER_MILE_STATES.length).toBeGreaterThanOrEqual(6);
+    const covered = new Set(sweep().map((s) => s.code));
+    expect([...covered].sort()).toEqual(PER_MILE_STATES);
+  });
+
+  it('prints an explanation that computes the amount charged, in every state', () => {
+    const samples = sweep();
+    expect(samples.length).toBeGreaterThan(100);
+    const mismatches = samples
+      .filter((s) => statedAmount(s.note) !== s.amountUsd || amountFromNote(s.note) !== s.amountUsd)
+      .map(
+        (s) =>
+          `${s.code} ${s.grossWeightLbs.toLocaleString()} lb / ${s.miles} mi — charged $${s.amountUsd}, note states $${statedAmount(s.note)}, note computes $${amountFromNote(s.note)} :: ${s.note}`,
+      );
+    expect(mismatches, mismatches.join('\n')).toEqual([]);
+  });
+
+  it('names the three Florida modifiers that used to be priced but not described', () => {
+    // The exact rows from the review: the note used to imply $9.36, $93.60 and
+    // $108.00 against charges of $22, $103 and $112.
+    const florida = OSOW_JURISDICTIONS.FL;
+    if (!florida) throw new Error('Florida is missing from the registry');
+    const at = (miles: number) => {
+      const priced = calculateOsowForJurisdiction(
+        florida,
+        {
+          grossWeightLbs: 120_000,
+          widthIn: 150,
+          heightIn: 174,
+          overallLengthIn: 1020,
+          axleCount: 8,
+          routeClass: 'interstate',
+          milesInJurisdiction: miles,
+        },
+        ASOF_NOTES,
+      );
+      const line = priced.lines.find((l) => l.code === 'osow_overweight');
+      return { amountUsd: line?.amountUsd ?? null, note: line?.note ?? '' };
+    };
+
+    for (const [miles, billed, amount] of [
+      [26, 50, 22],
+      [260, 275, 103],
+      [300, 300, 112],
+    ] as const) {
+      const line = at(miles);
+      expect(line.amountUsd, `FL at ${miles} mi`).toBe(amount);
+      expect(line.note).toContain(`${miles} mi in Florida`);
+      expect(line.note).toContain(`billed as ${billed} mi`);
+      expect(line.note).toContain('fees are set in 25 mi increments');
+      expect(line.note).toContain('plus a $3.33 flat charge inside the rounding');
+      expect(line.note).toContain('rounded up to the whole dollar');
+      expect(statedAmount(line.note)).toBe(amount);
+      expect(amountFromNote(line.note)).toBe(amount);
+    }
+
+    // The rule's OWN worked example is the only external check available:
+    // "(75 miles X $0.32) plus $3.33 = $27.33 rounded up to $28.00". 67.5 miles
+    // must bill as 75 whatever the weight band.
+    const worked = at(67.5);
+    expect(worked.note).toContain('billed as 75 mi');
+    expect(worked.note).toContain('× $0.36 per mile');
   });
 });

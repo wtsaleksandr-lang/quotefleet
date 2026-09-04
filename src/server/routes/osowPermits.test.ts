@@ -26,7 +26,10 @@ import {
   priceOsowLane,
   osowCoveredStates,
   osowStateOptions,
+  OSOW_ASOF_MIN,
+  OSOW_MAX_LEGS,
   OSOW_ROUTE_CLASSES,
+  OSOW_SELECTABLE_STATE_CODES,
   OSOW_TOOL_PATH,
 } from './osowPermits.js';
 import { SITE_NAV_HTML, SITE_MOBILE_MENU_HTML, PREMIUM_FOOTER } from '../siteChrome.js';
@@ -456,5 +459,267 @@ describe('the Free Tools group carries the new tool on every surface', () => {
     expect(LANDING).toContain(SITE_NAV_HTML);
     expect(LANDING).toContain(SITE_MOBILE_MENU_HTML);
     expect(LANDING).toContain(PREMIUM_FOOTER);
+  });
+});
+
+/**
+ * THE SCREEN MUST NOT CONTRADICT ITSELF.
+ *
+ * Every case below is one a dispatcher can reach from the form in under a
+ * minute, and each used to produce a page that asserted two incompatible things
+ * at once — a summary saying every state was priced above a block saying one was
+ * not, a fee explanation that did not produce its fee, a refusal that blamed the
+ * wrong input. They are honesty defects rather than bugs: the arithmetic was
+ * right and the sentence beside it was wrong.
+ */
+describe('covered is not the same fact as priced', () => {
+  /**
+   * Florida returns a COVERED jurisdiction with a null subtotal on this load —
+   * its oversize band cannot be selected without an overall length — while
+   * Georgia prices normally. Counting `jurisdictions.length` as "priced" made
+   * the summary read "2 of 2 — every state on this lane is covered" directly
+   * above a Florida block reading "Not priceable".
+   */
+  const out = priceOsowLane({
+    load: {
+      grossWeightLbs: 120_000,
+      widthIn: 12 * 12 + 6,
+      heightIn: 14 * 12 + 6,
+      axleCount: 8,
+      routeClass: 'interstate' as const,
+    },
+    legs: [
+      { state: 'FL', miles: 300 },
+      { state: 'GA', miles: 120 },
+    ],
+    asOf: ASOF,
+  });
+
+  it('returns a covered state with no subtotal, which is the shape the tile got wrong', () => {
+    const fl = out.quote.jurisdictions.find((j) => j.jurisdiction === 'FL');
+    const ga = out.quote.jurisdictions.find((j) => j.jurisdiction === 'GA');
+    expect(fl).toBeDefined();
+    expect(fl?.subtotalUsd).toBeNull();
+    expect(ga?.subtotalUsd).not.toBeNull();
+    // Not an uncovered state — Florida's schedule is on file. The two facts are
+    // reported separately and must stay separate.
+    expect(out.uncovered).toEqual([]);
+    expect(out.quote.totalPermitUsd).toBeNull();
+  });
+
+  it('counts priced states by subtotal, so 2 of 2 can never sit above a refusal', () => {
+    const priced = out.quote.jurisdictions.filter((j) => j.subtotalUsd !== null).length;
+    const onLane = out.quote.jurisdictions.length + out.uncovered.length;
+    expect(priced).toBe(1);
+    expect(onLane).toBe(2);
+    // The page renders `priced of onLane`. The old count would have said 2 of 2.
+    expect(out.quote.jurisdictions.length).toBe(2);
+
+    // The client owns the arithmetic, so assert the client says so too.
+    const client = readFileSync(
+      resolve(process.cwd(), 'src/server/public/osow-calculator.js'),
+      'utf8',
+    );
+    expect(client).toContain('function pricedCount(');
+    expect(client).toContain('subtotalUsd !== null');
+    expect(client).toContain('covered but not priceable for this load');
+    // The old wording asserted coverage where the count meant pricing.
+    expect(client).not.toContain('Every state on this lane is covered');
+  });
+
+  it('states the escort count as a per-state maximum, not a lane total', () => {
+    // Florida and Georgia each require one pilot car on this load: two cars on
+    // the move, and `maxRequiredOnAnyState` is 1 by construction.
+    const needing = out.escorts.byState.filter((s) => s.required > 0).map((s) => s.code);
+    expect(needing.sort()).toEqual(['FL', 'GA']);
+    expect(out.escorts.maxRequiredOnAnyState).toBe(1);
+
+    const client = readFileSync(
+      resolve(process.cwd(), 'src/server/public/osow-calculator.js'),
+      'utf8',
+    );
+    expect(client).toContain('Escorts, per state');
+    expect(client).toContain('The most any ONE state requires, not a lane total');
+    // The exclusion still has to be spelled out on the tile itself.
+    expect(client).toContain('Cost NOT included');
+  });
+});
+
+describe('a refusal names the input that actually failed', () => {
+  const load = {
+    grossWeightLbs: 120_000,
+    widthIn: 12 * 12 + 6,
+    heightIn: 14 * 12 + 6,
+    overallLengthIn: 85 * 12,
+    axleCount: 8,
+    routeClass: 'interstate' as const,
+  };
+  const at = (miles: number) =>
+    priceOsowLane({ load, legs: [{ state: 'AR', miles }], asOf: ASOF });
+
+  it('prices Arkansas either side of the 251-mile hole', () => {
+    expect(at(250).quote.totalPermitUsd).toBe(297);
+    expect(at(252).quote.totalPermitUsd).toBe(337);
+  });
+
+  it('blames the mileage, not a weight that prices fine one mile either side', () => {
+    const gap = at(251);
+    expect(gap.quote.totalPermitUsd).toBeNull();
+    const notes = (gap.review.byState.find((s) => s.code === 'AR')?.notes ?? []).join(' ');
+    expect(notes).toContain('No overweight fee band on file covers a 251-mile move in Arkansas');
+    expect(notes).toContain('it is the MILEAGE that falls in the gap, not the weight');
+    expect(notes).toContain('201–250 mi');
+    expect(notes).not.toContain('No overweight fee band on file covers 120,000 lb in Arkansas');
+    // The blank fee LINE says why it is blank too, so the cause sits beside the
+    // "Not priceable" cell rather than only in the notes block below it.
+    const ar = gap.quote.jurisdictions.find((j) => j.jurisdiction === 'AR');
+    const line = ar?.lines.find((l) => l.code === 'osow_overweight');
+    expect(line?.amountUsd).toBeNull();
+    expect(line?.note).toContain('price no move of exactly 251 mi');
+    // It is ranked with the UNSETTLED notes, not after the advisory ones, so a
+    // reader meets it inside the expanded reasons block.
+    const ordered = gap.review.byState.find((s) => s.code === 'AR')?.notes ?? [];
+    const gapIndex = ordered.findIndex((n) => n.includes('251-mile move'));
+    const advisoryIndex = ordered.findIndex((n) => n.includes('Per-state mileage'));
+    expect(gapIndex).toBeGreaterThanOrEqual(0);
+    if (advisoryIndex >= 0) expect(gapIndex).toBeLessThan(advisoryIndex);
+  });
+});
+
+describe('the public API and the form agree on what is askable', () => {
+  it('refuses a 0-mile leg, which the page’s own copy already called invalid', async () => {
+    const { base, close } = await startServer();
+    try {
+      const zero = await post(base, {
+        load: { grossWeightLbs: 120_000 },
+        legs: [{ state: 'PA', miles: 0 }],
+      });
+      expect(zero.status).toBe(400);
+      expect(String(zero.body.error)).toMatch(/positive number/i);
+    } finally {
+      close();
+    }
+  });
+
+  it('refuses the territories the form does not offer', async () => {
+    const { base, close } = await startServer();
+    try {
+      for (const code of ['PR', 'VI', 'GU']) {
+        const r = await post(base, {
+          load: { grossWeightLbs: 120_000 },
+          legs: [{ state: code, miles: 100 }],
+        });
+        expect(r.status, code).toBe(400);
+        expect(String(r.body.error)).toMatch(/US territory/);
+      }
+      // A code that is not a state at all still gets the original answer.
+      const zz = await post(base, {
+        load: { grossWeightLbs: 120_000 },
+        legs: [{ state: 'ZZ', miles: 100 }],
+      });
+      expect(zz.status).toBe(400);
+      expect(String(zz.body.error)).toMatch(/not a US state code/);
+      const lower = await post(base, {
+        load: { grossWeightLbs: 120_000 },
+        legs: [{ state: 'zz', miles: 100 }],
+      });
+      expect(lower.status).toBe(400);
+    } finally {
+      close();
+    }
+  });
+
+  it('offers exactly the codes the API accepts', () => {
+    const offered = osowStateOptions().map((s) => s.code).sort();
+    expect([...OSOW_SELECTABLE_STATE_CODES].sort()).toEqual(offered);
+    expect(OSOW_SELECTABLE_STATE_CODES.has('PR')).toBe(false);
+    expect(OSOW_SELECTABLE_STATE_CODES.size).toBe(51);
+  });
+
+  it('names the leg cap instead of answering a 21-leg lane with “Invalid input”', async () => {
+    const { base, close } = await startServer();
+    try {
+      const codes = osowStateOptions().slice(0, OSOW_MAX_LEGS + 1).map((s) => s.code);
+      expect(codes.length).toBe(OSOW_MAX_LEGS + 1);
+      const tooMany = await post(base, {
+        load: { grossWeightLbs: 120_000 },
+        legs: codes.map((state) => ({ state, miles: 10 })),
+      });
+      expect(tooMany.status).toBe(400);
+      expect(String(tooMany.body.error)).toMatch(
+        new RegExp(`at most ${OSOW_MAX_LEGS} states`),
+      );
+
+      // Exactly at the cap still prices.
+      const atCap = await post(base, {
+        load: { grossWeightLbs: 120_000 },
+        legs: codes.slice(0, OSOW_MAX_LEGS).map((state) => ({ state, miles: 10 })),
+      });
+      expect(atCap.status).toBe(200);
+    } finally {
+      close();
+    }
+  });
+
+  it('stops the Add button at the cap rather than letting the user build a 21st row', () => {
+    const client = readFileSync(
+      resolve(process.cwd(), 'src/server/public/osow-calculator.js'),
+      'utf8',
+    );
+    expect(client).toMatch(new RegExp(`var MAX_LEGS = ${OSOW_MAX_LEGS};`));
+    expect(client).toContain('if (legRows().length >= MAX_LEGS)');
+    expect(client).toContain('addBtn.disabled = full');
+    // And the page carries the sentence that explains the disabled control.
+    const html = renderOsowToolPage();
+    expect(html).toContain('id="ow-cap"');
+    expect(html).toContain(`${OSOW_MAX_LEGS} states is the most one lane can carry here`);
+  });
+
+  it('bounds asOf, the one public lever that could turn a refusal into $0', async () => {
+    const { base, close } = await startServer();
+    try {
+      // 1800-01-01 puts every effective-dated fee row out of effect. It used to
+      // return 200 with totalPermitUsd: 0 and permitRequired: false — a $0 that
+      // means "we hold no schedule for that year", rendered as "this is free".
+      const ancient = await post(base, {
+        load: { grossWeightLbs: 120_000 },
+        legs: [{ state: 'FL', miles: 300 }],
+        asOf: '1800-01-01',
+      });
+      expect(ancient.status).toBe(400);
+      expect(String(ancient.body.error)).toMatch(/asOf must fall between/);
+
+      const future = await post(base, {
+        load: { grossWeightLbs: 120_000 },
+        legs: [{ state: 'FL', miles: 300 }],
+        asOf: '2999-01-01',
+      });
+      expect(future.status).toBe(400);
+
+      // The floor is the day the newest schedule on file took effect, so the
+      // whole corpus is in force from it — and it must be a date, not a guess.
+      expect(OSOW_ASOF_MIN).toMatch(/^\d{4}-\d{2}-\d{2}$/);
+      const atFloor = await post(base, {
+        load: { grossWeightLbs: 120_000 },
+        legs: [{ state: 'FL', miles: 300 }],
+        asOf: OSOW_ASOF_MIN,
+      });
+      expect(atFloor.status).toBe(200);
+    } finally {
+      close();
+    }
+  });
+
+  it('never sends asOf from the page — it only ever reads the one it got back', () => {
+    const client = readFileSync(
+      resolve(process.cwd(), 'src/server/public/osow-calculator.js'),
+      'utf8',
+    );
+    // Nothing puts it on the request body.
+    expect(client).not.toMatch(/asOf\s*[:=]/);
+    expect(client).not.toMatch(/payload\.asOf/);
+    // It is only ever rendered from the response.
+    expect(client).toContain('j.asOf');
+    expect(client).toContain('data.asOf');
   });
 });
