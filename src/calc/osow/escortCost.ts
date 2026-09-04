@@ -889,18 +889,31 @@ function resolvePoliceRate(
     policeEscortRatesEqual,
   );
 
-  // Reuse the range machinery rather than a second min/max written here: the
-  // candidates are re-expressed as their computed floors and handed to
-  // `spreadOf`, which is the same function a conflicted permit fee uses.
-  const costed = resolution.candidates
-    .map((c) => ({ ...c, value: policeEscortFloorUsd(c.value, officers) }))
-    .filter((c): c is Sourced<number> => c.value !== null);
-  const spread = spreadOf({
-    ...resolution,
+  // Reuse the range machinery rather than writing a second min/max here: each
+  // candidate is re-expressed as the floor IT would produce for this officer
+  // count, and the resulting `Resolution<number>` goes to `spreadOf` — the same
+  // function a conflicted permit fee's honest range comes from.
+  //
+  // Candidates that cannot be costed are dropped rather than read as zero, for
+  // `materiality.ts` rule 4's reason: a schedule that will not state its own
+  // rate is not a schedule that charges nothing. Illinois's administrative rule
+  // is the live case, and dropping it means Illinois shows one costable
+  // candidate and no range across the two — which is the true picture.
+  const costedFloors: Sourced<number>[] = [];
+  for (const candidate of resolution.candidates) {
+    const floor = policeEscortFloorUsd(candidate.value, officers);
+    if (floor !== null) costedFloors.push({ ...candidate, value: floor });
+  }
+  const floorResolution: Resolution<number> = {
+    field: `${code} law-enforcement escort floor`,
     value: null,
     chosen: null,
-    candidates: costed,
-  } as unknown as Resolution<number>);
+    candidates: costedFloors,
+    conflict: resolution.conflict,
+    warnings: [],
+    requiresManualReview: resolution.requiresManualReview,
+  };
+  const spread = spreadOf(floorResolution);
 
   return {
     resolution,
