@@ -46,6 +46,7 @@ import { registerImporterRevealRoutes } from './directory/importerReveal.js';
 import { registerLeadsBillingRoutes } from './routes/leadsBilling.js';
 import { registerToolsRoutes } from './routes/tools.js';
 import { registerOsowPermitRoutes } from './routes/osowPermits.js';
+import { registerHeavyHaulQuoteRoutes } from './routes/heavyHaulQuote.js';
 import { registerBillingRoutes, registerStripeWebhook } from './routes/billing.js';
 import { registerDirectoryAuthRoutes } from './routes/directoryAuth.js';
 import { registerDirectoryBillingRoutes } from './routes/directoryBilling.js';
@@ -216,6 +217,7 @@ export function createApp(): express.Express {
   registerManifestBillingRoutes(app);
   registerToolsRoutes(app);
   registerOsowPermitRoutes(app);
+  registerHeavyHaulQuoteRoutes(app);
   registerBillingRoutes(app);
   registerDirectoryBillingRoutes(app);
   registerConnectRoutes(app);
