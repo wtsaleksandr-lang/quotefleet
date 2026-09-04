@@ -82,15 +82,14 @@ export function haversineMiles(a: LatLng, b: LatLng): number {
  * WHERE THE MILES CAME FROM, and therefore what may be priced from them.
  *
  * The ranks match the evaluation's tier numbering so the two can be read
- * against each other. Tiers 1–3 are DECLARED AND NOT REACHABLE from this build:
- * naming them here is how the type says what is missing rather than pretending
- * the ladder has two rungs.
+ * against each other. Tier 3 is DECLARED AND NOT REACHABLE: naming it here is
+ * how the type says what was rejected rather than leaving a silent gap.
  */
 export type MileageTier =
   /** 0 — the dispatcher's filed PC*Miler / ProMiles figures. Authoritative. */
   | 'filed'
-  /** 1 — a real routed path from a router we run. Not built; needs a router. */
-  | 'routed'
+  /** 1 — a routed path over the federal primary-road network, in process. */
+  | 'routedPrimaryNetwork'
   /** 3 — straight line intersected with state polygons. Never a price. */
   | 'geodesicSplit'
   /** 4 — straight line × circuity. A lane total only; no per-state figure exists. */
@@ -123,16 +122,16 @@ export const MILEAGE_TIERS: Readonly<Record<MileageTier, MileageTierSpec>> = {
     basis:
       'The per-state mileage from the routing software the permit application is filled in from (PC*Miler, ProMiles). These are not an estimate of the billed miles — they ARE the billed miles, because the state prices the route on the application. Zero band by definition; the remaining risk is transcription, not measurement.',
   },
-  routed: {
-    tier: 'routed',
+  routedPrimaryNetwork: {
+    tier: 'routedPrimaryNetwork',
     rank: 1,
-    label: 'Routed road path',
-    totalBandPct: 5,
-    stateBandPct: 8,
+    label: 'Routed over the federal primary-road network',
+    totalBandPct: 10,
+    stateBandPct: 15,
     mayPriceStates: true,
-    available: false,
+    available: true,
     basis:
-      'A real road route over OSM from a router we run ourselves, intersected with full-resolution TIGER/Line polygons. Measured at +0.31% against the published length of I-40 through Tennessee. NOT AVAILABLE: every free hosted router is demo-only or non-commercial-only, and self-hosting is a standing monthly cost that is a business decision, not a code one.',
+      'A road route computed in this process over TIGER/Line PRIMARYROADS (US Census Bureau, public domain), intersected with full-resolution TIGER/Line state polygons. Against published route logs it measures a state to +0.11% (I-40 through Tennessee) and +0.42% (I-81 through Virginia). MEASURED OVER 80 REAL LANES against a reference router, on the 66 that pass the guards: lane totals mean 2.1%, p90 6.1%, p95 8.9%, worst 13.1% — against 4.8% mean for the straight-line scalar and 12.2% for a bare geodesic. Per-state legs of 25 mi or more, where the corridors agree: mean 2.7%, p90 9.3%, p95 14.4%, worst 57.6%. THE BANDS ABOVE ARE THOSE p95 FIGURES ROUNDED UP, not a hoped-for number. Legs UNDER 25 miles are much worse (worst measured 646%) and are named in the quote rather than covered by this band. 14 lanes in 80 were REFUSED by the guards rather than answered.',
   },
   geodesicSplit: {
     tier: 'geodesicSplit',
@@ -201,6 +200,43 @@ export function filedLaneDistance(
     notes: [
       `Lane distance is the sum of the per-state miles YOU supplied (${Math.round(totalMiles).toLocaleString()} mi across ${legs.length} state${legs.length === 1 ? '' : 's'}). They are treated as the filed figures, so every distance-priced permit is computed directly from them and they must match the route you file with each state.`,
     ],
+  };
+}
+
+/**
+ * Lane total from a routed path over the primary-road network — tier 1.
+ *
+ * The miles come from `routedStateMileage` in `routedMileage.ts`, which owns
+ * the graph, the corridors and the guards. This function only dresses them as a
+ * `LaneDistance` so the rest of the quote cannot tell one tier from another
+ * except through `tier` and the band — which is the point of the ladder.
+ */
+export function routedLaneDistance(
+  totalMiles: number,
+  options: { corridorLabel: string; alternateCount: number; unpricedStates: readonly string[] },
+): LaneDistance {
+  const spec = MILEAGE_TIERS.routedPrimaryNetwork;
+  const rounded = Math.round(totalMiles * 10) / 10;
+  const notes = [
+    `Lane distance was MEASURED on a road route ${options.corridorLabel} — ${Math.round(rounded).toLocaleString()} mi (±${spec.totalBandPct}%) over the federal primary-road network (US Census TIGER/Line, public domain). It is a measurement of a road, not the figure on your permit application: if you hold PC*Miler or ProMiles per-state miles, enter them and they replace this entirely, because those are the miles each state actually bills.`,
+  ];
+  if (options.alternateCount > 0) {
+    notes.push(
+      `${options.alternateCount} other plausible corridor${options.alternateCount === 1 ? '' : 's'} were routed for this lane. The permit list is the UNION of every state any of them crosses, so it errs toward naming a permit you do not need rather than omitting one you do; the MILES above are from the best corridor only.`,
+    );
+  }
+  if (options.unpricedStates.length > 0) {
+    notes.push(
+      `${options.unpricedStates.join(', ')} appear only on an alternate corridor, so no mileage was measured there and no permit is priced for ${options.unpricedStates.length === 1 ? 'it' : 'them'}. ${options.unpricedStates.length === 1 ? 'It is' : 'They are'} listed rather than dropped — confirm which way you are running, or enter the in-state miles.`,
+    );
+  }
+  return {
+    tier: 'routedPrimaryNetwork',
+    totalMiles: rounded,
+    straightLineMiles: null,
+    totalPlusMinusMiles: Math.round((rounded * spec.totalBandPct) / 100),
+    mayPriceStates: true,
+    notes,
   };
 }
 

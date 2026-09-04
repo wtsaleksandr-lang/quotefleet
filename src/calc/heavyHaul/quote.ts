@@ -52,10 +52,12 @@ import {
   filedLaneDistance,
   scalarLaneDistance,
   MILEAGE_TIERS,
+  routedLaneDistance,
   CORRIDOR_DISCLAIMER,
   type CorridorState,
   type LaneDistance,
 } from './corridor.js';
+import type { RoutedMileageResult } from './routedMileage.js';
 import {
   scoreHeavyHaulConfidence,
   confidenceRange,
@@ -149,6 +151,20 @@ export interface HeavyHaulRequest {
    * at tier 4: a lane total only, no per-state figure, and no permit priced.
    */
   filedLegs?: ReadonlyArray<{ stateCode: string; stateName?: string; miles: number }>;
+  /**
+   * TIER 1 — a routed measurement of this lane, if one was taken.
+   *
+   * PASSED IN, NOT COMPUTED HERE, and that is deliberate: this module is pure,
+   * and `routedStateMileage` reads a 4.5 MB graph and a 10 MB boundary archive
+   * off disk. Injecting it keeps the arithmetic testable with a fixture and
+   * keeps the I/O in the route handler that already owns the geocoder.
+   *
+   * IT NEVER OUTRANKS `filedLegs`. When both are present the filed figures win
+   * outright, because those are the miles the state bills. A refusal
+   * (`ok: false`) is not a failure to handle — it means the lane falls back to
+   * the tier-4 behaviour of naming the corridor states and asking.
+   */
+  routedMileage?: RoutedMileageResult;
   rates?: HeavyHaulRates;
   diesel: DieselReading;
   asOf?: IsoDate;
@@ -204,6 +220,36 @@ export interface HeavyHaulQuote {
   corridor: {
     states: CorridorState[];
     disclaimer: string;
+  } | null;
+  /**
+   * The routed corridors, when this lane was measured at tier 1.
+   *
+   * THE CORRIDOR PICKER IS THE PRODUCT SURFACE FOR THE ONE ERROR THIS METHOD
+   * CANNOT SOLVE. Corridor choice is a decision a dispatcher makes and a router
+   * guesses: measured over 66 lanes, the routed corridors crossed identical
+   * states on 85% of them and the best corridor matched a reference router's on
+   * 85%. Presenting the alternates by name turns the remaining 15% from a
+   * hidden error into a question the person who knows the answer can settle —
+   * and their answer is a tier-0 figure, which is worth more than any of this.
+   */
+  routedCorridors: {
+    /** The corridor the miles came from. */
+    best: { label: string; totalMiles: number; stateCodes: string[] };
+    /** Other ways to run it, each with the states it would add. */
+    alternates: Array<{
+      label: string;
+      totalMiles: number;
+      stateCodes: string[];
+      divergentStates: string[];
+    }>;
+    /** Union across every corridor — the permit list. */
+    permitStates: string[];
+    /** On the list, not on the priced corridor. Named, never priced. */
+    unpricedStates: string[];
+    /** True when every routed corridor crossed the same states. */
+    corridorsAgree: boolean;
+    /** Advisory: a straight-line scan touches these and no corridor does. */
+    scanOnlyStates: string[];
   } | null;
   /** The permit engine's verbatim output. `null` when no permits were priced. */
   permits: OsowQuote | null;
@@ -284,18 +330,35 @@ export function priceHeavyHaulLane(input: HeavyHaulRequest): HeavyHaulQuote {
   // ── 1. Mileage ──────────────────────────────────────────────────────────
   const filedLegs = input.filedLegs ?? [];
   const hasFiled = filedLegs.length > 0;
+
+  /**
+   * The routed measurement, but only where it is allowed to speak.
+   *
+   * TIER 0 WINS OUTRIGHT. Filed miles are what the permit application carries
+   * and what the state bills, so a routed measurement alongside them is not a
+   * second opinion worth blending — it is a weaker claim about the same thing.
+   */
+  const routed =
+    !hasFiled && input.routedMileage?.ok === true ? input.routedMileage : null;
+
   const distance: LaneDistance = hasFiled
     ? filedLaneDistance(filedLegs.map((l) => ({ stateCode: l.stateCode, miles: l.miles })))
-    : input.lane
-      ? scalarLaneDistance(input.lane.origin, input.lane.destination)
-      : {
-          tier: 'scalar',
-          totalMiles: 0,
-          straightLineMiles: null,
-          totalPlusMinusMiles: 0,
-          mayPriceStates: false,
-          notes: ['No lane distance could be established: neither two addresses nor filed per-state miles were supplied.'],
-        };
+    : routed
+      ? routedLaneDistance(routed.best.totalMiles, {
+          corridorLabel: routed.best.label,
+          alternateCount: routed.alternates.length,
+          unpricedStates: routed.unpricedStates,
+        })
+      : input.lane
+        ? scalarLaneDistance(input.lane.origin, input.lane.destination)
+        : {
+            tier: 'scalar',
+            totalMiles: 0,
+            straightLineMiles: null,
+            totalPlusMinusMiles: 0,
+            mayPriceStates: false,
+            notes: ['No lane distance could be established: neither two addresses nor filed per-state miles were supplied.'],
+          };
   const tierSpec = MILEAGE_TIERS[distance.tier];
 
   /**
@@ -338,19 +401,27 @@ export function priceHeavyHaulLane(input: HeavyHaulRequest): HeavyHaulQuote {
   // A straight line through Houston→Buffalo also invents Louisiana outright,
   // which is $285 of permit for a state the truck never enters. So no permit is
   // priced without filed figures, and the corridor list below asks for them.
+  //
+  // TIER 1 CHANGES THE FIRST SENTENCE, NOT THE RULE. A routed split is a real
+  // per-state mileage and may price a permit; a straight line still may not,
+  // and neither may a lane total. What survives unchanged is that nothing is
+  // priced from mileage nobody measured.
   let permits: OsowQuote | null = null;
   let splitRequiresReview = false;
-  if (hasFiled) {
-    const split = operatorSuppliedStateMileage(
-      filedLegs.map((l) => ({
-        stateCode: l.stateCode,
-        ...(l.stateName === undefined ? {} : { stateName: l.stateName }),
-        miles: l.miles,
-      })),
-    );
-    splitRequiresReview = split.requiresManualReview;
+  const split = hasFiled
+    ? operatorSuppliedStateMileage(
+        filedLegs.map((l) => ({
+          stateCode: l.stateCode,
+          ...(l.stateName === undefined ? {} : { stateName: l.stateName }),
+          miles: l.miles,
+        })),
+      )
+    : (routed?.split ?? null);
+
+  if (split) {
+    splitRequiresReview = split.requiresManualReview || (routed?.requiresManualReview ?? false);
     // The ONLY sanctioned entry point for pricing off a split — it carries the
-    // "these miles are yours, not ours" warnings into the quote. Calling
+    // "where these miles came from" warnings into the quote. Calling
     // `calculateOsow(osowLegsFrom(split), …)` is arithmetically identical and
     // silently drops every one of them.
     permits = priceOsowWithStateMileage(split, load, asOf);
@@ -385,6 +456,25 @@ export function priceHeavyHaulLane(input: HeavyHaulRequest): HeavyHaulQuote {
         note: `We hold no fee schedule for ${name} and will not infer one from a neighbouring state. It is named and unpriced, never counted as $0.`,
       });
     }
+
+    // THE UNION, made visible as money that is NOT in the total.
+    //
+    // These states sit on an alternate corridor and not on the one the miles
+    // came from. Pricing them at the alternate's mileage would invent a permit
+    // for a road we have no reason to think the truck takes; dropping them
+    // would be the one error this whole design exists to avoid. So they are
+    // named, unpriced, and the corridor picker is how the dispatcher settles it.
+    for (const code of routed?.unpricedStates ?? []) {
+      const name = input.stateNames?.[code] ?? code;
+      lines.push({
+        kind: 'permit',
+        code: `permit_${code}`,
+        name: `${name} single-trip OS/OW permit`,
+        amountUsd: null,
+        basis: 'sourced',
+        note: `${name} is on an alternate corridor for this lane but not on the one these miles were measured from, so there is no in-state mileage to price it from. It is listed rather than dropped: a permit left off a quote is an illegal load, while one you turn out not to need is a phone call. Pick your corridor, or enter the ${name} miles.`,
+      });
+    }
   } else {
     lines.push({
       kind: 'permit',
@@ -392,7 +482,11 @@ export function priceHeavyHaulLane(input: HeavyHaulRequest): HeavyHaulQuote {
       name: 'State OS/OW permits',
       amountUsd: null,
       basis: 'sourced',
-      note: `Not priced. ${tierSpec.label} produces a lane total and no per-state mileage, and several states price the overweight permit on miles travelled inside that state. Add your filed per-state miles below and every covered state is computed and added.`,
+      note: `Not priced. ${tierSpec.label} produces a lane total and no per-state mileage, and several states price the overweight permit on miles travelled inside that state. Add your filed per-state miles below and every covered state is computed and added.${
+        input.routedMileage && input.routedMileage.ok === false
+          ? ` This lane was NOT measured on the road network either — ${input.routedMileage.warnings[0] ?? 'the routing guards refused it'}`
+          : ''
+      }`,
     });
   }
 
@@ -402,7 +496,9 @@ export function priceHeavyHaulLane(input: HeavyHaulRequest): HeavyHaulQuote {
     partialBecause.push(
       hasFiled
         ? 'no state on this lane produced a permit figure'
-        : 'state permit fees are not included — this lane was not routed, so there is no in-state mileage to price them from',
+        : routed
+          ? 'no state on this lane produced a permit figure from the routed mileage'
+          : 'state permit fees are not included — this lane was not routed, so there is no in-state mileage to price them from',
     );
   }
 
@@ -602,7 +698,12 @@ export function priceHeavyHaulLane(input: HeavyHaulRequest): HeavyHaulQuote {
 
   const statesOnLane = hasFiled
     ? filedLegs.length
-    : Math.max(1, corridorAll?.length ?? 1);
+    : routed
+      // The routed union, not the bounding-box scan: the scan is deliberately
+      // generous and using it here would dilute every per-state deduction in
+      // the confidence score with states no corridor crosses.
+      ? Math.max(1, routed.permitStates.length)
+      : Math.max(1, corridorAll?.length ?? 1);
 
   /**
    * The corridor is exposed to the page only when it is genuinely a PROMPT:
@@ -676,6 +777,25 @@ export function priceHeavyHaulLane(input: HeavyHaulRequest): HeavyHaulQuote {
       crossCheck,
     },
     corridor,
+    routedCorridors: routed
+      ? {
+          best: {
+            label: routed.best.label,
+            totalMiles: routed.best.totalMiles,
+            stateCodes: routed.best.stateCodes,
+          },
+          alternates: routed.alternates.map((c) => ({
+            label: c.label,
+            totalMiles: c.totalMiles,
+            stateCodes: c.stateCodes,
+            divergentStates: c.divergentStates,
+          })),
+          permitStates: routed.permitStates,
+          unpricedStates: routed.unpricedStates,
+          corridorsAgree: routed.corridorsAgree,
+          scanOnlyStates: routed.scanOnlyStates,
+        }
+      : null,
     permits,
     escorts,
     fuel: {

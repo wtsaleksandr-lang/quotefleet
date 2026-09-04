@@ -59,6 +59,10 @@ import {
   seedGeocodeCache,
   type GeocodeResult,
 } from '../../calc/heavyHaul/geocode.js';
+import {
+  routedStateMileage,
+  type RoutedMileageResult,
+} from '../../calc/heavyHaul/routedMileage.js';
 import { AUTO_FSC_DEFAULTS } from '../../calc/defaults.js';
 import { todayIso } from '../../calc/osow/provenance.js';
 import { getDieselPrice } from '../../eia/dieselPrice.js';
@@ -305,6 +309,36 @@ const STATE_NAMES: Readonly<Record<string, string>> = Object.fromEntries(
 );
 
 /**
+ * Measure the lane on the primary-road network, or return `undefined`.
+ *
+ * ── WHY THIS NEVER THROWS ─────────────────────────────────────────────────
+ * This is the only place in the request path that touches the routing assets,
+ * and a quote must not stop working because one of them is missing from a
+ * deploy. Every failure — a missing 4.5 MB graph, an unreadable boundary
+ * archive, an endpoint outside coverage — degrades to `undefined`, and the
+ * quote then behaves exactly as it did before this tier existed: it names the
+ * corridor states and asks for filed miles. That is a WORSE ANSWER, not a wrong
+ * one, and it is the only acceptable direction to fall.
+ *
+ * The first call pays ~250 ms and about 130 MB to load the graph and the
+ * full-resolution state polygons; every call after it is free, because both are
+ * held in module singletons for the life of the process.
+ */
+function measureLaneMileage(lane: {
+  origin: LaneEndpoint;
+  destination: LaneEndpoint;
+}): RoutedMileageResult | undefined {
+  try {
+    return routedStateMileage(
+      { latitude: lane.origin.latitude, longitude: lane.origin.longitude },
+      { latitude: lane.destination.latitude, longitude: lane.destination.longitude },
+    );
+  } catch {
+    return undefined;
+  }
+}
+
+/**
  * Price a request whose addresses are already resolved. Pure — exported so the
  * tests exercise exactly the path the route does, with no network at all.
  */
@@ -312,6 +346,13 @@ export function priceResolvedHeavyHaulLane(
   input: HeavyHaulApiRequest,
   lane: { origin: LaneEndpoint; destination: LaneEndpoint },
   diesel: DieselReading,
+  /**
+   * The tier-1 routed measurement, PASSED IN so this function stays pure.
+   *
+   * `measureLaneMileage` below does the disk I/O; the tests call this function
+   * without it, or with a fixture, and never touch the 14 MB of assets.
+   */
+  routedMileage?: RoutedMileageResult,
 ): HeavyHaulApiResponse {
   const asOf = input.asOf ?? todayIso();
   const pilotCar = {
@@ -332,6 +373,7 @@ export function priceResolvedHeavyHaulLane(
   const quote = priceHeavyHaulLane({
     cargo: input.cargo as Parameters<typeof priceHeavyHaulLane>[0]['cargo'],
     lane,
+    ...(routedMileage ? { routedMileage } : {}),
     ...(input.legs && input.legs.length > 0
       ? {
           filedLegs: input.legs.map((l) => {
@@ -705,7 +747,7 @@ export function renderHeavyHaulToolPage(): string {
 
         <div class="hh-card">
           <div class="hh-sec">${cue('cue-lane')}<h2>Point A to point B</h2></div>
-          ${cueBody('cue-lane', 'Full US street addresses — number, street, city, state and ZIP. They are resolved by the US Census geocoder, which is free, keyless and public domain, and which refuses an address it cannot place rather than matching a different town. We show you what it matched so you can check it. Two addresses give a LANE TOTAL and no per-state mileage, which is enough to price line haul and not enough to price a permit.')}
+          ${cueBody('cue-lane', 'Full US street addresses — number, street, city, state and ZIP. They are resolved by the US Census geocoder, which is free, keyless and public domain, and which refuses an address it cannot place rather than matching a different town. We show you what it matched so you can check it. Two addresses are enough to MEASURE the lane: we route it over the federal primary-road network (US Census TIGER/Line, public domain) and split it against state lines, so permits are priced per state. Where that measurement cannot be trusted — an address far from any mapped highway, or a lane whose real road is not in that dataset — the tool says so and asks you for the miles instead of guessing.')}
           <div class="hh-stack">
             ${field('hh-origin', 'Pickup address', { type: 'text' })}
             ${field('hh-destination', 'Delivery address', { type: 'text' })}
@@ -744,7 +786,7 @@ export function renderHeavyHaulToolPage(): string {
 
         <div class="hh-card">
           <div class="hh-sec">${cue('cue-miles')}<h2>Filed per-state miles — unlocks permits</h2></div>
-          ${cueBody('cue-miles', 'These are YOUR miles, not ours. We do not route the lane. Type the per-state mileage your PC*Miler or ProMiles run produced — the same figures that go on the permit application, which is why they are the miles the state will bill. Leave this empty and the quote comes back with no permit money in it and says so; fill it in and every covered state is priced from a cited fee schedule.')}
+          ${cueBody('cue-miles', 'These are YOUR miles and they BEAT OURS. We do route the lane now, but a routed path is a measurement of a road, while these are the figures on the permit application — which is what each state actually bills. Type the per-state mileage your PC*Miler or ProMiles run produced and it replaces our measurement outright, for every covered state, priced from a cited fee schedule.')}
           <div class="hh-legs" id="hh-legs"></div>
           <div class="hh-actions">
             <button type="button" class="btn btn-secondary" id="hh-add">Add a state</button>
@@ -964,12 +1006,9 @@ export function registerHeavyHaulQuoteRoutes(app: Express) {
         }
 
         const diesel = await resolveDieselReading();
+        const lane = { origin: originPoint, destination: destinationPoint };
         return res.json(
-          priceResolvedHeavyHaulLane(
-            parsed.data,
-            { origin: originPoint, destination: destinationPoint },
-            diesel,
-          ),
+          priceResolvedHeavyHaulLane(parsed.data, lane, diesel, measureLaneMileage(lane)),
         );
       } catch (err) {
         next(err);
