@@ -95,6 +95,30 @@ const REFERENCE_LEGS = [
   { stateCode: 'NY', stateName: 'New York', miles: 60 },
 ];
 
+/**
+ * THE SAME LANE AT A REALISTIC DISTANCE.
+ *
+ * `REFERENCE_LEGS` sums to 1,115 mi. The real Houston→Buffalo lane is 1,484 mi
+ * routed over TIGER-NET and 1,517 mi by the scalar estimate — the reference
+ * legs were reverse-derived to reproduce a $1,223.18 permit total, not to be a
+ * route, and the composer's own cross-check says so out loud on every run.
+ *
+ * The parity fixture stays exactly as it is, because $1,223.18 is what pins the
+ * permits-only tool to this one. This lane exists BESIDE it so that nothing new
+ * — the line-haul band, the escort floor, the fuel divisor, all of which are
+ * multiplied by distance — is ever calibrated against a lane 26% short.
+ */
+const REALISTIC_LEGS = [
+  { stateCode: 'TX', stateName: 'Texas', miles: 286 },
+  { stateCode: 'AR', stateName: 'Arkansas', miles: 448 },
+  { stateCode: 'TN', stateName: 'Tennessee', miles: 333 },
+  { stateCode: 'KY', stateName: 'Kentucky', miles: 83 },
+  { stateCode: 'OH', stateName: 'Ohio', miles: 193 },
+  { stateCode: 'PA', stateName: 'Pennsylvania', miles: 61 },
+  { stateCode: 'NY', stateName: 'New York', miles: 80 },
+];
+const REALISTIC_TOTAL_MILES = 1484;
+
 // ──────────────────────────────────────────────────────────────────────────
 // Geocoding — the provider that fails closed
 // ──────────────────────────────────────────────────────────────────────────
@@ -476,9 +500,12 @@ describe('the reference lane, composed', () => {
   });
 
   it('derives fuel from the EIA index and says which half of the model is ours', () => {
-    expect(out.fuel.perMileUsd).toBeCloseTo((3.9 - 1.25) / 6, 3);
+    // 3.5 mpg, not 6.0: the reference load is 120,000 lb gross, which the engine
+    // derives as a multi-axle permitted configuration. The old 6.0 default was
+    // the VAN figure and understated fuel on every quote this tool produces.
+    expect(out.fuel.perMileUsd).toBeCloseTo((3.9 - 1.25) / 3.5, 3);
     expect(out.subtotalDerivedUsd).toBeCloseTo(out.fuel.perMileUsd * 1115.38, 1);
-    expect(out.fuel.modelNote).toMatch(/are OUR assumptions/);
+    expect(out.fuel.modelNote).toMatch(/not the 6\.0 mpg van default/);
     expect(out.fuel.modelNote).toMatch(/EIA weekly national on-highway/);
     // The provenance sentence must LEAD, because the page clamps the note to
     // three lines and this is the sentence that must never be the clipped one.
@@ -487,12 +514,86 @@ describe('the reference lane, composed', () => {
     );
   });
 
-  it('the delivered figure is the three subtotals and nothing else — no margin', () => {
+  it('the delivered figure is the four subtotals and nothing else — no margin', () => {
     expect(out.deliveredUsd).toBeCloseTo(
-      out.subtotalSourcedUsd + out.subtotalYourRatesUsd + out.subtotalDerivedUsd,
+      out.subtotalSourcedUsd +
+        out.subtotalYourRatesUsd +
+        out.subtotalDerivedUsd +
+        out.subtotalMarketUsd,
       2,
     );
     expect(out.lines.some((l) => l.kind === 'margin')).toBe(false);
+  });
+
+  it('EVERY CITED ROW ON THE QUOTE CARRIES NO BAND, and they are all state fees', () => {
+    // After the tariff-backed rows were retiered, the only CITED money left on a
+    // quote is what a state's own schedule sets — a fee that binds whoever
+    // hauls the load. Each such row's low and high ARE the figure, because we
+    // know it. Any row needing a range is a BENCHMARK, whatever published it.
+    const cited = out.lines.filter((l) => l.accuracy?.tier === 'cited');
+    expect(cited.length).toBeGreaterThan(0);
+    for (const l of cited) {
+      expect(l.basis).toBe('sourced');
+      expect(l.accuracy?.bandPct).toBe(0);
+      expect(l.accuracy?.lowUsd).toBe(l.amountUsd);
+      expect(l.accuracy?.highUsd).toBe(l.amountUsd);
+      expect(l.kind === 'permit' || l.kind === 'escort').toBe(true);
+    }
+    // And the cited column is those fees exactly — nothing else reached it.
+    expect(out.subtotalSourcedUsd).toBe(1223.18);
+    expect(out.subtotalSourcedUsd).toBe(out.permits?.totalPermitUsd);
+  });
+
+  it('A FILED CARRIER TARIFF NEVER REACHES THE CITED COLUMN', () => {
+    // Tarping is priced from a carrier's filed tariff. That tariff binds the
+    // carrier that filed it, not the one this shipper has yet to choose, so the
+    // money lands in the market column and the permit parity is untouched.
+    const tarped = priceHeavyHaulLane({
+      cargo: REFERENCE_CARGO,
+      lane: { origin: HOUSTON, destination: BUFFALO },
+      filedLegs: REFERENCE_LEGS,
+      rates: { linehaulUsdPerMile: 4.85, pilotCar: { usdPerMile: 2.25 } },
+      market: { tarping: true },
+      diesel: DIESEL,
+      asOf: ASOF,
+    });
+    // This load is 14 ft 6 in high, past the 12 ft where the tariff itself
+    // prints SPOT BID — so on THIS lane the honest answer is a refusal, and a
+    // refusal carries no money into any column.
+    const tarping = tarped.lines.find((l) => l.code === 'tarping');
+    expect(tarping?.accuracy?.tier).toBe('refused');
+    expect(tarping?.amountUsd).toBeNull();
+    expect(tarped.subtotalSourcedUsd).toBe(1223.18);
+
+    // A load inside the tariff's table DOES price — into the market column.
+    const inTable = priceHeavyHaulLane({
+      cargo: { grossWeightLbs: 70_000, widthIn: 120, heightIn: 96 },
+      lane: { origin: HOUSTON, destination: BUFFALO },
+      filedLegs: REFERENCE_LEGS,
+      market: { tarping: true },
+      diesel: DIESEL,
+      asOf: ASOF,
+    });
+    const priced = inTable.lines.find((l) => l.code === 'tarping');
+    expect(priced?.amountUsd).toBe(225);
+    expect(priced?.basis).toBe('market');
+    expect(priced?.accuracy?.tier).toBe('benchmark');
+    expect(priced?.accuracy?.hover).toMatch(/not a statute/);
+    // $225 of tariff money, and not one cent of it in the cited column.
+    const citedRows = inTable.lines.filter((l) => l.accuracy?.tier === 'cited');
+    expect(citedRows.every((l) => l.kind === 'permit' || l.kind === 'escort')).toBe(true);
+    expect(inTable.subtotalSourcedUsd).toBe(inTable.permits?.totalPermitUsd);
+  });
+
+  it('MARKET MONEY EXISTS AND IS IN ITS OWN COLUMN, never the cited one', () => {
+    // The permit agent's fee and the securement allowance are market figures.
+    // They are real money on the delivered total and they are structurally
+    // incapable of reaching the column that holds statute-cited permit fees.
+    expect(out.subtotalMarketUsd).toBeGreaterThan(0);
+    expect(out.subtotalSourcedUsd).toBe(1223.18);
+    const benchmarkLines = out.lines.filter((l) => l.accuracy?.tier === 'benchmark');
+    expect(benchmarkLines.length).toBeGreaterThan(0);
+    for (const l of benchmarkLines) expect(l.basis).toBe('market');
   });
 
   it('is not partial, and scores in the top band', () => {
@@ -535,6 +636,71 @@ describe('the reference lane, composed', () => {
     }
     expect(calcLines.some((l) => l.kind === 'permit')).toBe(true);
     expect(calcLines.some((l) => l.kind === 'escort')).toBe(true);
+  });
+});
+
+describe('the realistic-mileage lane, beside the parity fixture', () => {
+  const out = priceHeavyHaulLane({
+    cargo: REFERENCE_CARGO,
+    lane: { origin: HOUSTON, destination: BUFFALO },
+    filedLegs: REALISTIC_LEGS,
+    market: { cargoWeightLbs: 120_000, loadingAtOrigin: true, loadingAtDestination: true },
+    diesel: DIESEL,
+    asOf: ASOF,
+  });
+
+  it('measures 1,484 mi and AGREES with the map, unlike the parity fixture', () => {
+    expect(out.mileage.totalMiles).toBe(REALISTIC_TOTAL_MILES);
+    // The parity lane's cross-check fails by design (its legs are 26% short).
+    // This one passes, which is the whole reason it exists.
+    expect(out.mileage.crossCheck?.disagrees).toBe(false);
+    expect(out.confidence.findings.map((f) => f.code)).not.toContain('mileage_crosscheck');
+  });
+
+  it('prices distance-multiplied lines off the REAL distance, not the short one', () => {
+    const short = priceHeavyHaulLane({
+      cargo: REFERENCE_CARGO,
+      lane: { origin: HOUSTON, destination: BUFFALO },
+      filedLegs: REFERENCE_LEGS,
+      diesel: DIESEL,
+      asOf: ASOF,
+    });
+    const shortLinehaul = short.lines.find((l) => l.code === 'linehaul')?.amountUsd ?? 0;
+    const realLinehaul = out.lines.find((l) => l.code === 'linehaul')?.amountUsd ?? 0;
+    expect(realLinehaul).toBeGreaterThan(shortLinehaul);
+    // 1,484 mi on the 1,000–1,500 band: $2.67 × 0.87 × 2.40 × 1,484.
+    expect(realLinehaul).toBeCloseTo(2.67 * 0.87 * 2.4 * REALISTIC_TOTAL_MILES, 1);
+    expect(out.fuel.perMileUsd * REALISTIC_TOTAL_MILES).toBeCloseTo(
+      out.subtotalDerivedUsd,
+      1,
+    );
+  });
+
+  it('prices loading at both ends, with the crane sized on the piece weight', () => {
+    const codes = out.lines.map((l) => l.code);
+    expect(codes).toContain('loading_crane_origin');
+    expect(codes).toContain('loading_crane_destination');
+    // 120,000 lb at 2–3× is a 120–180 t machine, on the published curve.
+    const crane = out.lines.find((l) => l.code === 'loading_crane_origin');
+    expect(crane?.name).toMatch(/120–180 t class/);
+    expect(crane?.basis).toBe('market');
+    // The Buffalo end carries the Northeast metro uplift and costs more.
+    const far = out.lines.find((l) => l.code === 'loading_crane_destination');
+    expect(far?.amountUsd ?? 0).toBeGreaterThan(crane?.amountUsd ?? 0);
+  });
+
+  it('never moves a cited permit fee by a dollar, whatever the market engine does', () => {
+    // Different mileage means different distance-priced permits, which is
+    // correct — but every one of them is still a SOURCED figure, and no market
+    // money reached that column.
+    // A sourced row is either a CITED state fee or a REFUSED one we could not
+    // price. It is never a BENCHMARK: nothing with a band reaches this column.
+    const sourcedLines = out.lines.filter((l) => l.basis === 'sourced');
+    for (const l of sourcedLines) {
+      expect(['cited', 'refused', undefined]).toContain(l.accuracy?.tier);
+      if (l.accuracy?.tier === 'refused') expect(l.amountUsd).toBeNull();
+    }
+    expect(out.subtotalSourcedUsd).toBeCloseTo(out.permits?.totalPermitUsd ?? 0, 2);
   });
 });
 
@@ -648,21 +814,52 @@ describe('a quote with no line-haul rate', () => {
     asOf: ASOF,
   });
 
-  it('excludes line haul by name rather than inventing a market rate', () => {
+  it('PRICES LINE HAUL FROM THE MARKET BAND — this is the reversal', () => {
+    // It used to refuse here. Refusing was right for a carrier's dispatcher and
+    // wrong for a freight forwarder, who has no rates of his own for any of it.
     const linehaul = out.lines.find((l) => l.code === 'linehaul');
-    expect(linehaul?.amountUsd).toBeNull();
-    expect(linehaul?.note).toMatch(/will not invent a market rate/);
+    expect(linehaul?.amountUsd).not.toBeNull();
+    expect(linehaul?.basis).toBe('market');
+    expect(linehaul?.accuracy?.tier).toBe('benchmark');
+    // A BENCHMARK renders as a range, never a point.
+    expect(linehaul?.accuracy?.lowUsd).not.toBeNull();
+    expect(linehaul?.accuracy?.highUsd).not.toBeNull();
+    // And it is NOT in the caller's column, because the caller supplied nothing.
     expect(out.subtotalYourRatesUsd).toBe(0);
   });
 
-  it('still prices every permit exactly as before — the exclusion moves nothing', () => {
-    expect(out.permits?.totalPermitUsd).toBe(1223.18);
+  it('says what the market band rests on, and that your own rate replaces it', () => {
+    const linehaul = out.lines.find((l) => l.code === 'linehaul');
+    expect(linehaul?.note).toMatch(/MARKET BAND/);
+    expect(linehaul?.note).toMatch(/replaces this outright/);
+    expect(linehaul?.accuracy?.marketSources.map((m) => m.id)).toContain(
+      'dat_flatbed_linehaul_2026w35',
+    );
   });
 
-  it('is partial, and says line haul is what is missing', () => {
-    expect(out.partial).toBe(true);
-    expect(out.partialBecause.join(' ')).toMatch(/line haul/i);
-    expect(out.confidence.findings.map((f) => f.code)).toContain('linehaul_excluded');
+  it('still prices every permit exactly as before — the market band moves nothing', () => {
+    expect(out.permits?.totalPermitUsd).toBe(1223.18);
+    expect(out.subtotalSourcedUsd).toBe(1223.18);
+  });
+
+  it('is no longer partial for want of a line-haul rate', () => {
+    expect(out.partialBecause.join(' ')).not.toMatch(/no \$\/mile was supplied/);
+    expect(out.confidence.findings.map((f) => f.code)).not.toContain('linehaul_excluded');
+  });
+
+  it('STILL REFUSES when the market engine is switched off', () => {
+    const off = priceHeavyHaulLane({
+      cargo: REFERENCE_CARGO,
+      lane: { origin: HOUSTON, destination: BUFFALO },
+      filedLegs: REFERENCE_LEGS,
+      market: { enabled: false },
+      diesel: DIESEL,
+      asOf: ASOF,
+    });
+    expect(off.lines.find((l) => l.code === 'linehaul')?.amountUsd).toBeNull();
+    expect(off.partial).toBe(true);
+    expect(off.subtotalMarketUsd).toBe(0);
+    expect(off.derived).toBeNull();
   });
 });
 
@@ -790,16 +987,30 @@ describe('the fuel surcharge model', () => {
       asOf: ASOF,
     });
 
-  it('defaults to the OOIDA figures and says they are OURS', () => {
+  it('defaults to the EQUIPMENT’S fuel economy and says the figure is OURS', () => {
     const out = lane({ linehaulUsdPerMile: 4.85 });
+    expect(out.fuel.perMileUsd).toBeCloseTo((DIESEL.usdPerGal - 1.25) / 3.5, 3);
+    expect(out.fuel.modelNote).toMatch(/OURS/);
+    expect(out.fuel.modelNote).toMatch(/Enter your own peg and mpg/);
+  });
+
+  it('FALLS BACK TO 6.0 ONLY WITH THE MARKET ENGINE OFF — the old behaviour', () => {
+    const out = priceHeavyHaulLane({
+      cargo: REFERENCE_CARGO,
+      lane: { origin: HOUSTON, destination: BUFFALO },
+      filedLegs: REFERENCE_LEGS,
+      rates: { linehaulUsdPerMile: 4.85 },
+      market: { enabled: false },
+      diesel: DIESEL,
+      asOf: ASOF,
+    });
     expect(out.fuel.perMileUsd).toBeCloseTo((DIESEL.usdPerGal - 1.25) / 6, 3);
     expect(out.fuel.modelNote).toMatch(/OUR assumptions/);
-    expect(out.fuel.modelNote).toMatch(/Enter your own peg and mpg/);
   });
 
   it('uses the caller’s peg when supplied, and relabels the line as theirs', () => {
     const out = lane({ linehaulUsdPerMile: 4.85, fuelPegUsdPerGal: 2.5 });
-    expect(out.fuel.perMileUsd).toBeCloseTo((DIESEL.usdPerGal - 2.5) / 6, 3);
+    expect(out.fuel.perMileUsd).toBeCloseTo((DIESEL.usdPerGal - 2.5) / 3.5, 3);
     expect(out.fuel.modelNote).toMatch(/YOURS/);
     expect(out.fuel.modelNote).not.toMatch(/OUR assumptions/);
   });

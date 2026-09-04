@@ -210,9 +210,39 @@ describe('the composed reference lane', () => {
     expect(out.quote.deliveredUsd).toBeCloseTo(
       out.quote.subtotalSourcedUsd +
         out.quote.subtotalYourRatesUsd +
-        out.quote.subtotalDerivedUsd,
+        out.quote.subtotalDerivedUsd +
+        out.quote.subtotalMarketUsd,
       2,
     );
+  });
+
+  it('derives what the shipper cannot answer, and LABELS every one as derived', () => {
+    // The reference request supplies an axle count and a route class, so those
+    // come back as 'supplied'. Nothing else does, and the trailer class and the
+    // piece weight are worked out from the weight the shipper does know.
+    const d = out.quote.derived;
+    expect(d).not.toBeNull();
+    expect(d?.equipmentClass.value).toBe('multiAxle');
+    expect(d?.equipmentClass.origin).toBe('derived');
+    expect(d?.equipmentClass.from).toMatch(/120,000 lb gross/);
+    expect(d?.axleCount.origin).toBe('supplied');
+    expect(d?.cargoWeightLbs.origin).toBe('derived');
+    expect(d?.cargoWeightLbs.from).toMatch(/less 45,000 lb of tractor and trailer/);
+  });
+
+  it('discloses detention and layover without adding either to the total', () => {
+    const codes = out.quote.riskLines.map((r) => r.code);
+    expect(codes).toContain('risk_detention');
+    expect(codes).toContain('risk_layover');
+    for (const r of out.quote.riskLines) expect(r.inTotal).toBe(false);
+    // 8 axles: $150 + 8 x $25 = $350/hr after two free hours at each end.
+    const detention = out.quote.riskLines.find((r) => r.code === 'risk_detention');
+    expect(detention?.headlineUsd).toBe(350);
+    // BENCHMARK, not CITED: it comes from a filed carrier tariff, which binds
+    // the carrier that filed it and not the one this shipper has yet to pick.
+    // The band it carries is the tell -- a cited figure would not need one.
+    expect(detention?.accuracy.tier).toBe('benchmark');
+    expect(detention?.accuracy.hover).toMatch(/not a statute/);
   });
 
   it('echoes back the address the geocoder actually matched, not the one typed', () => {
