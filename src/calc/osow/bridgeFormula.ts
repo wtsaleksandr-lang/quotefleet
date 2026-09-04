@@ -118,37 +118,145 @@ export function roundToNearest500TiesDown(lbs: number): number {
 }
 
 /**
- * Max weight allowed on a group of two or more consecutive axles — the value
- * FHWA's published Bridge Formula table prints for (L, N).
+ * FHWA prints ONE flat row for spans "over 8 but less than 9 feet", and this
+ * is its upper bound. Below it the table does not interpolate; see
+ * `tableSpanFt`.
+ */
+export const TABLE_FLAT_INTERVAL_UPPER_FT = 9;
+
+/**
+ * The span at which FHWA's table is entered for a given real span.
  *
- * The table is NOT the bare formula. Three caps are baked into it, and
- * omitting any one of them over-permits real loads:
+ * The table prints whole-foot rows plus exactly one interval row: "over 8 but
+ * less than 9 feet", which reads 38,000 lb at N=2 and 42,000 lb at N=3. Those
+ * are precisely the formula's values AT L=8 (500 × (16 + 24 + 36) and
+ * 500 × (12 + 36 + 36)) — so across that whole open interval FHWA holds the
+ * 8-ft value flat rather than letting the formula climb.
+ *
+ * Interpolating there over-permits. At L=8.99/N=2 the bare formula gives
+ * 38,990 → 39,000, a full 1,000 lb more than the 38,000 FHWA prints for that
+ * exact span. Over-permitting is the dangerous direction — it is the direction
+ * that puts an illegal truck on a bridge — so the published flat value wins.
+ *
+ * This is NOT generalised to every fractional span. Between 8 and 9 ft FHWA
+ * publishes a value that contradicts interpolation, so we have a fact. Nowhere
+ * else does the table say anything about fractional feet, and the statute
+ * defines W as a continuous function of L, so interpolating elsewhere is the
+ * honest reading rather than an unpublished guess in either direction.
+ */
+export function tableSpanFt(spanFt: number): number {
+  return spanFt > TANDEM_MAX_SPACING_FT &&
+    spanFt < TABLE_FLAT_INTERVAL_UPPER_FT
+    ? TANDEM_MAX_SPACING_FT
+    : spanFt;
+}
+
+/**
+ * Cells where FHWA's PUBLISHED TABLE disagrees with FHWA's OWN FORMULA, and we
+ * deliberately follow the formula.
+ *
+ * 23 U.S.C. 127(a) defines W by the formula, "to the nearest 500 pounds". The
+ * printed table is a reader's aid derived from it, and in five cells the
+ * derivation is simply wrong — each prints exactly 500 lb below the nearest-500
+ * value, while every neighbouring cell in the same column is correct:
+ *
+ *     L    N   raw formula     nearest 500   FHWA prints
+ *     39   5      72,375.00        72,500        72,000
+ *     53   9     101,812.50       102,000       101,500
+ *     54   9     102,375.00       102,500       102,000
+ *     55   9     102,937.50       103,000       102,500
+ *     56   9     103,500.00       103,500       103,000
+ *
+ * L=56/N=9 is the one that settles it: 500 × (63 + 108 + 36) is 103,500 on the
+ * nose, an exact multiple of 500 with no rounding decision to make at all, and
+ * the table still prints 103,000. No rounding rule produces that. None of the
+ * five is an exact 500-lb tie either, so ties-down does not explain them — and
+ * L=52/N=9 IS an exact tie (101,250) and FHWA prints 101,000, ties-down,
+ * correctly. They are typos in a table, not a rule we have failed to find.
+ *
+ * Recorded here so that a future cross-check against the published table does
+ * not "fix" us into matching the error. `bridgeFormula.test.ts` walks all 265
+ * published cells and expects exactly these five to differ, by exactly +500 —
+ * so if FHWA ever reprints the table, the test says which way it moved.
+ */
+export const FHWA_TABLE_ERRATA: ReadonlyArray<{
+  spanFt: number;
+  axleCount: number;
+  publishedLbs: number;
+  ourLbs: number;
+}> = [
+  { spanFt: 39, axleCount: 5, publishedLbs: 72000, ourLbs: 72500 },
+  { spanFt: 53, axleCount: 9, publishedLbs: 101500, ourLbs: 102000 },
+  { spanFt: 54, axleCount: 9, publishedLbs: 102000, ourLbs: 102500 },
+  { spanFt: 55, axleCount: 9, publishedLbs: 102500, ourLbs: 103000 },
+  { spanFt: 56, axleCount: 9, publishedLbs: 103000, ourLbs: 103500 },
+];
+
+/**
+ * Max weight allowed on a group of two or more consecutive axles: the value
+ * FHWA's published Bridge Formula table prints for (L, N) — save for the five
+ * cells in `FHWA_TABLE_ERRATA`, where the table contradicts the statutory
+ * formula and the formula wins — capped by what the vehicle actually weighs.
+ *
+ * The table is NOT the bare formula. Three caps are layered on it, and omitting
+ * any one of them over-permits real loads:
  *
  *   1. 20,000 lb × N — no group may exceed its axles' individual limits. This
  *      is why the N=2 column flattens at 40,000: the raw formula at L=11/N=2
  *      gives 41,000, but two axles can never legally carry more than 40,000.
  *      The N=3 column flattens at 60,000 for the same reason.
- *   2. 80,000 lb — no group may exceed the vehicle's gross limit.
- *   3. 34,000 lb for any group spanning 8 ft or less, which is the statutory
+ *   2. 34,000 lb for any group spanning 8 ft or less, which is the statutory
  *      tandem limit. The published table shows 34,000 for both the N=2 and
  *      N=3 columns at L ≤ 8, so this is applied by span, not by axle count.
+ *   3. `vehicleGrossWeightLbs` — a group is a SUBSET of the vehicle's axles, so
+ *      it cannot carry more than the whole vehicle carries. Arithmetic, not
+ *      statute, which is exactly why it is safe at every weight.
+ *
+ * CAP 3 WAS A HARD-CODED 80,000 AND THAT WAS THE BUG. The principle it stated —
+ * "no group may exceed the vehicle's gross limit" — is right; 80,000 lb is that
+ * limit only for an UNPERMITTED vehicle (23 U.S.C. 127(a)). On a permitted
+ * 105,500 lb nine-axle load the gross is 105,500, and clamping every group's
+ * allowance to 80,000 fabricated bridge-formula overages of up to 25,500 lb on
+ * axle groups that were in fact compliant — on precisely the OS/OW loads this
+ * engine exists to price. Measured against all 265 published table cells, the
+ * clamp cost 110 of them.
+ *
+ * The federal 80,000 lb gross limit is still enforced, once, where it belongs:
+ * step 3 of `checkBridgeFormula`. It is a limit on the VEHICLE, not on a group.
+ *
+ * `vehicleGrossWeightLbs` is REQUIRED and deliberately has no default. A
+ * default would be the old bug wearing a parameter: every caller that forgot it
+ * would silently clamp at 80,000 again, and the forgetting would be invisible.
+ * `checkBridgeFormula` already sums the axles, so the caller that matters has
+ * the real number to hand.
  *
  * The 34-34-at-36-ft exception is deliberately NOT applied here — it is a
  * geometry-dependent floor, not a table value, and lives in
  * `checkBridgeFormula` where the actual axle layout is known.
  */
-export function groupMaxWeightLbs(spanFt: number, axleCount: number): number {
+export function groupMaxWeightLbs(
+  spanFt: number,
+  axleCount: number,
+  vehicleGrossWeightLbs: number,
+): number {
   if (axleCount < 2) return FEDERAL_SINGLE_AXLE_LIMIT_LBS;
 
-  if (spanFt <= TANDEM_MAX_SPACING_FT) return FEDERAL_TANDEM_AXLE_LIMIT_LBS;
+  // Cap 3 applies to the tandem branch too. Not because 34,000 lb is ever the
+  // wrong statutory number, but because "a group's allowance is never more than
+  // the vehicle carries" should hold on every path out of this function — an
+  // unexplained exemption on one branch is how the next version of this bug
+  // gets in. It changes no verdict: a group cannot outweigh its own vehicle.
+  if (spanFt <= TANDEM_MAX_SPACING_FT) {
+    return Math.min(FEDERAL_TANDEM_AXLE_LIMIT_LBS, vehicleGrossWeightLbs);
+  }
 
   const rounded = roundToNearest500TiesDown(
-    bridgeFormulaRawLbs(spanFt, axleCount),
+    bridgeFormulaRawLbs(tableSpanFt(spanFt), axleCount),
   );
   return Math.min(
     rounded,
     FEDERAL_SINGLE_AXLE_LIMIT_LBS * axleCount,
-    FEDERAL_GROSS_WEIGHT_LIMIT_LBS,
+    vehicleGrossWeightLbs,
   );
 }
 
@@ -255,7 +363,15 @@ export function checkBridgeFormula(axles: Axle[]): BridgeFormulaResult {
         (group[axleCount - 1] as Axle).positionFt - (group[0] as Axle).positionFt;
       const actual = group.reduce((s, a) => s + a.weightLbs, 0);
 
-      let allowed = groupMaxWeightLbs(spanFt, axleCount);
+      /**
+       * `gross` — not 80,000 — is the third cap. A group cannot carry more
+       * than the whole vehicle does, so this term can never MANUFACTURE a
+       * violation; it can only stop one group's allowance being quoted above
+       * the vehicle's own weight. Passing the federal limit here instead was
+       * the bug: over 80,000 lb it invented overages on compliant permitted
+       * loads. See `groupMaxWeightLbs`.
+       */
+      let allowed = groupMaxWeightLbs(spanFt, axleCount, gross);
       let rule: BridgeViolation['rule'] =
         spanFt <= TANDEM_MAX_SPACING_FT ? 'tandem-axle' : 'bridge-formula';
 
