@@ -74,6 +74,7 @@ import {
 import { US_STATE_CODES, stateByCode, US_STATES } from '../directory/usStates.js';
 import { publicCalcLimiter } from '../rateLimits.js';
 import { setPublicDirectoryCache } from '../directory/httpCache.js';
+import { escortDirectoryHref } from '../pilotCars/model.js';
 import { FULL_SITE_HEADER, PREMIUM_FOOTER, HEADER_SCRIPTS } from '../siteChrome.js';
 
 const SITE = 'https://quotefleet.net';
@@ -277,6 +278,16 @@ export interface HeavyHaulApiResponse {
   quote: HeavyHaulQuote;
   /** Names for the corridor prompt, so the page holds no state list of its own. */
   corridorNames: Record<string, string>;
+  /**
+   * A DEEP LINK INTO THE ESCORT DIRECTORY, pre-filtered to this lane.
+   *
+   * Built server-side from the states whose own escort rules fired on THIS load
+   * and, separately, from the cited certification registry, so the `certin`
+   * half never asks for a certificate the state does not issue. `null` when no
+   * state on the lane requires a pilot car — there is nothing to go and find,
+   * and a link offering to find it anyway would be an advert.
+   */
+  escortDirectoryHref: string | null;
   disclaimer: string;
 }
 
@@ -355,6 +366,12 @@ export function priceResolvedHeavyHaulLane(
     },
     quote,
     corridorNames,
+    escortDirectoryHref: (() => {
+      const states = (quote.permits?.jurisdictions ?? [])
+        .filter((j) => j.escortsRequired > 0)
+        .map((j) => j.jurisdiction);
+      return states.length > 0 ? escortDirectoryHref(states) : null;
+    })(),
     disclaimer: HEAVY_HAUL_DISCLAIMER,
   };
 }

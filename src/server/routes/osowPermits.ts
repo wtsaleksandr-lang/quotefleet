@@ -74,6 +74,7 @@ import {
 import { OSOW_JURISDICTIONS, hasOsowCoverage } from '../../calc/osow/jurisdictions/index.js';
 import { todayIso } from '../../calc/osow/provenance.js';
 import { US_STATES, US_STATE_CODES, stateByCode } from '../directory/usStates.js';
+import { escortDirectoryHref } from '../pilotCars/model.js';
 import { publicCalcLimiter } from '../rateLimits.js';
 import { setPublicDirectoryCache } from '../directory/httpCache.js';
 import { FULL_SITE_HEADER, PREMIUM_FOOTER, HEADER_SCRIPTS } from '../siteChrome.js';
@@ -411,6 +412,17 @@ export interface OsowApiResponse {
      */
     costIncluded: false;
     note: string;
+    /**
+     * A DEEP LINK INTO THE ESCORT DIRECTORY, pre-filtered to this lane.
+     *
+     * The page cannot build this itself and must not try: "certified in KY" is
+     * a filter for a certificate Kentucky does not issue, and it would return
+     * zero operators forever. `escortDirectoryHref` intersects the lane with
+     * the cited certification registry, so the `certin` half names only the
+     * states that actually certify. `null` when no state on the lane requires
+     * an escort — there is nothing to go and find.
+     */
+    directoryHref: string | null;
   };
   /**
    * THE ESCORT SECTION — deliberately its own top-level key, never folded into
@@ -536,6 +548,15 @@ export function priceOsowLane(input: OsowRequest): OsowApiResponse {
        * `quote.totalPermitUsd`, which stays true however this section is priced.
        */
       note: 'Escort COST is never inside the permit total, however it is priced. States set the requirement; pilot cars are private vendors and we hold no rates of our own — supply yours and it is applied to these counts as its own separate figure. Where a state publishes a LAW-ENFORCEMENT escort rate, that figure is cited and shown apart from anything derived from your rate.',
+      // Built from the states that ACTUALLY require an escort on this load, not
+      // from every state on the lane: a link that pre-filters on a state needing
+      // no escort narrows the list for no reason.
+      directoryHref:
+        quote.jurisdictions.some((j) => j.escortsRequired > 0)
+          ? escortDirectoryHref(
+              quote.jurisdictions.filter((j) => j.escortsRequired > 0).map((j) => j.jurisdiction),
+            )
+          : null,
     },
     escortEstimate: {
       included: includeEscortEstimate,
@@ -735,6 +756,12 @@ const OSOW_CSS = `
   .ow-sum .ow-st--np { border-color: var(--warn); color: var(--warn); }
   /* USER-SOURCED money inside a table of cited money. Never the same treatment. */
   .ow-sum td.mine { font-style: italic; }
+
+  /* THE "NOW FIND ONE" LINE. It sits inside the escort note rather than in a
+     card of its own, because it is the second half of that note's sentence and
+     a separate CTA block would read as an advert beside cited data. */
+  .ow-find { margin: 8px 0 0; font-size: 13px; line-height: 1.55; }
+  .ow-find a { color: var(--accent); }
 
   /* ── FOLDED PROSE. Every note and every citation is still here, one click
      away, and the count is on the summary so nothing looks smaller than it is. */

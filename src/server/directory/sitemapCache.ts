@@ -269,6 +269,13 @@ const MARKETING_ROUTES: Array<{ path: string; changefreq: string; priority: stri
   // appended below from the registry so adding a state adds its URL here too,
   // with no second list to forget.
   { path: '/tools/seasonal-weight-restrictions', changefreq: 'weekly', priority: '0.7' },
+  // Pilot car / escort operator directory. The INDEX and the JOIN page only:
+  // individual operator profiles are DB-backed and opt-in, so they belong in a
+  // generated child document rather than in this static list — and listing a
+  // profile URL that a moderator has not published yet would advertise a page
+  // that 404s. `weekly` because the listed set changes as records are approved.
+  { path: '/pilot-cars', changefreq: 'weekly', priority: '0.7' },
+  { path: '/pilot-cars/join', changefreq: 'monthly', priority: '0.5' },
   { path: '/support', changefreq: 'monthly', priority: '0.6' },
   { path: '/security', changefreq: 'yearly', priority: '0.5' },
   { path: '/terms', changefreq: 'yearly', priority: '0.4' },

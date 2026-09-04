@@ -19,6 +19,7 @@
  */
 import postgres from 'postgres';
 import { SEASONAL_RESTRICTIONS_DDL } from './seasonalRestrictionsDdl.js';
+import { PILOT_CAR_DIRECTORY_DDL } from './pilotCarDirectoryDdl.js';
 import { drizzle } from 'drizzle-orm/postgres-js';
 import { migrate } from 'drizzle-orm/postgres-js/migrator';
 import { loadEnv } from '../config.js';
@@ -1190,6 +1191,13 @@ export const SELF_HEAL_TABLE_STATEMENTS: readonly string[] = [
   // owns the table read the SAME strings; server/seasonal/store.ts imports
   // runSelfHealStatements from here, so it cannot be imported back.
   ...SEASONAL_RESTRICTIONS_DDL,
+
+  // PILOT CAR / ESCORT OPERATOR DIRECTORY — opt-in operator records, every
+  // legality-deciding attribute as a filterable column. Defined in
+  // src/db/pilotCarDirectoryDdl.ts for the same reason the seasonal block above
+  // is: server/pilotCars/store.ts imports runSelfHealStatements from here, so
+  // the DDL lives in a leaf both sides can read and neither can fork.
+  ...PILOT_CAR_DIRECTORY_DDL,
 ];
 
 export async function ensureSelfHealTables(): Promise<void> {
