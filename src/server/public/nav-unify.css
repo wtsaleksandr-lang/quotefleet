@@ -670,3 +670,89 @@ html[data-theme="light"] .nav-dd-panel {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 }
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   THE OOG CTA — appended at EOF, like everything else here, because the
+   spacing and colour guards baseline by FILE:LINE and a mid-file insert
+   renumbers every tolerated entry below it.
+
+   ONE AFFORDANCE, TWO BARS. `.site-oog` is a quiet text link in the header's
+   action cluster; `.qf-foot-oog` is the same claim as a muted line in the
+   footer bar. Neither is a coloured banner and neither is a second primary
+   button — the header already carries exactly one of those per surface.
+
+   THE HEADER COPY HIDES AT ≤1023px, alongside `.signin` and the primary
+   button, because 1024px is the single collapse point and below it the bar is
+   brand + theme + burger. Between 1024 and 1140px the bar is measured tight
+   (nav ~420px + cluster ~312px against a 938px content box), so the CTA joins
+   the existing compaction step rather than adding width the band has not got.
+   ═══════════════════════════════════════════════════════════════════════════ */
+.site-actions .site-oog {
+  display: inline-flex;
+  align-items: center;
+  min-height: 24px;
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--muted);
+  text-decoration: none;
+  white-space: nowrap;
+  transition: color 0.16s ease;
+}
+.site-actions .site-oog:hover,
+.site-actions .site-oog:focus-visible {
+  color: var(--ink);
+  text-decoration: underline;
+}
+/* HIDDEN BELOW 1141px, AND THAT IS MEASURED RATHER THAN CAUTIOUS.
+   #476/#477 removed a 641-960px band where the action cluster ran off the end
+   of the header card, and left the 1024-1140px band running with about 50px of
+   slack. This link is ~70px. Measured at 1024px it put the homepage header
+   39px over its content box and the directory header 25px over -- exactly the
+   defect those PRs fixed -- so it does not ship into that band. Below 1024px
+   the bar is brand + theme + burger and `.signin` and the primary button are
+   already gone, so nothing changes there either. The FOOTER copy carries every
+   width, phones included. */
+@media (max-width: 1140px) {
+  .site-actions .site-oog { display: none; }
+}
+
+/* The footer bar copy. Always present, phones included — it is the only copy a
+   phone gets, and the row it sits in already wraps to its own line there. */
+.premium-footer .footer-bottom .qf-foot-oog,
+.dirfoot-oog .qf-foot-oog {
+  color: var(--muted);
+  text-decoration: none;
+  font-weight: 500;
+}
+.premium-footer .footer-bottom .qf-foot-oog:hover,
+.premium-footer .footer-bottom .qf-foot-oog:focus-visible,
+.dirfoot-oog .qf-foot-oog:hover,
+.dirfoot-oog .qf-foot-oog:focus-visible {
+  color: var(--ink);
+  text-decoration: underline;
+}
+.premium-footer .footer-bottom .qf-foot-oog .arr,
+.dirfoot-oog .qf-foot-oog .arr { color: currentColor; }
+.dirfoot-oog {
+  margin: 8px 0 0;
+  text-align: center;
+  font-size: 12px;
+  line-height: 1.5;
+}
+
+/* THE COMPACTION STEP, EXTENDED TO COVER THE WIDTH THE CTA FIRST APPEARS AT.
+   #476/#477 sized a 1024-1140px step from the arithmetic of the widest header
+   (brand 132 + nav 491 + cluster 337 against a 938px content box). The
+   directory's cluster is the widest on the site — "Claim your listing — free"
+   — and at 1141px, the first width the OOG link renders at, it ran 18px past
+   its content box. The same declarations that fixed the band below it fix
+   this: they return about 76px, which is four times the shortfall. Above
+   1199px the natural sizes fit unaided and nothing here applies. */
+@media (min-width: 1141px) and (max-width: 1199px) {
+  .site-header-inner { gap: 16px; }
+  .site-nav { gap: 0; }
+  .site-nav > a,
+  .site-nav .nav-dd-trigger { padding-left: 8px; padding-right: 8px; font-size: 13px; }
+  .site-actions { gap: 8px; }
+  .site-actions .btn-secondary { padding-left: 12px; padding-right: 12px; }
+}

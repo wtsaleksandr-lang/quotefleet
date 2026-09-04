@@ -31,7 +31,15 @@ import {
 } from './heavyHaulQuote.js';
 import { clearGeocodeCache } from '../../calc/heavyHaul/geocode.js';
 import type { DieselReading, LaneEndpoint } from '../../calc/heavyHaul/quote.js';
-import { SITE_NAV_HTML, SITE_MOBILE_MENU_HTML, PREMIUM_FOOTER } from '../siteChrome.js';
+import {
+  SITE_NAV_HTML,
+  SITE_MOBILE_MENU_HTML,
+  PREMIUM_FOOTER,
+  FULL_SITE_HEADER,
+  HEADER_OOG_CTA,
+  FOOTER_OOG_CTA,
+  OOG_QUOTE_HREF,
+} from '../siteChrome.js';
 
 const ASOF = '2026-09-03';
 
@@ -453,6 +461,108 @@ describe('the page', () => {
     expect(html).toMatch(/\.hh-pill\[aria-pressed="true"\] \{[^}]*background: var\(--accent-soft\)/);
   });
 
+  // ── THE SHIPPER FORM ─────────────────────────────────────────────────
+
+  it('asks for the two addresses SIDE BY SIDE, not stacked', () => {
+    expect(html).toContain('hh-row2 hh-row2--addr');
+    expect(html).toMatch(/\.hh-row2--addr \{ grid-template-columns: repeat\(2, minmax\(0, 1fr\)\)/);
+    // One column at 640px, which is the only other count that cannot orphan.
+    expect(html).toMatch(/\.hh-row2--addr \{ grid-template-columns: minmax\(0, 1fr\)/);
+    const form = html.slice(html.indexOf('<form class="hh-form"'), html.indexOf('</form>'));
+    expect(form.indexOf('hh-origin')).toBeLessThan(form.indexOf('hh-destination'));
+  });
+
+  it('asks whether loading is PROVIDED at each end, as two checkmarks', () => {
+    expect(html).toContain('id="hh-load-origin"');
+    expect(html).toContain('id="hh-load-destination"');
+    // Ticked by default: most shippers do have a forklift or a crane on site,
+    // and defaulting the crane ON would inflate every quote on the page.
+    expect(html).toMatch(/id="hh-load-origin" checked/);
+    expect(html).toMatch(/id="hh-load-destination" checked/);
+    // Two boxes in two tracks — a group of two can never orphan one.
+    expect(html).toMatch(/\.hh-checks \{[^}]*repeat\(2, minmax\(0, 1fr\)\)/);
+  });
+
+  it('offers metric AND imperial, with the unit in the field title', () => {
+    expect(html).toContain('data-units="imperial"');
+    expect(html).toContain('data-units="metric"');
+    for (const id of ['hh-weight', 'hh-length', 'hh-width', 'hh-height']) {
+      const field = html.slice(html.indexOf(`id="${id}"`), html.indexOf(`id="${id}"`) + 400);
+      expect(field, `${id} must carry both unit titles`).toMatch(/data-imperial="/);
+      expect(field, `${id} must carry both unit titles`).toMatch(/data-metric="/);
+    }
+    expect(html).toContain('data-metric="Gross weight (kg)"');
+    expect(html).toContain('data-metric="Width (m)"');
+  });
+
+  it('STOPS ASKING THE SHIPPER CARRIER QUESTIONS on the default surface', () => {
+    const form = html.slice(html.indexOf('<form class="hh-form"'), html.indexOf('</form>'));
+    const disclosure = form.slice(form.indexOf('<details class="hh-adv"'));
+    const surface = form.slice(0, form.indexOf('<details class="hh-adv"'));
+    // Every one of these is DERIVED from the cargo and the two addresses, and
+    // asking a forwarder for them is asking him to do the carrier's job.
+    for (const carrierField of [
+      'hh-axles',
+      'hh-routeclass',
+      'hh-linehaul',
+      'hh-pc-mile',
+      'hh-fuel-peg',
+      'hh-fuel-mpg',
+      'hh-legs',
+    ]) {
+      expect(surface, `${carrierField} must not be on the default surface`).not.toContain(
+        carrierField,
+      );
+      expect(disclosure, `${carrierField} must stay REACHABLE in the disclosure`).toContain(
+        carrierField,
+      );
+    }
+    // And the disclosure ships closed.
+    expect(form).not.toMatch(/<details class="hh-adv"[^>]*\sopen/);
+  });
+
+  // ── THE OOG CTA ──────────────────────────────────────────────────────
+
+  it('carries a SUBTLE OOG CTA in the header bar and the footer bar', () => {
+    expect(html).toContain(HEADER_OOG_CTA);
+    expect(html).toContain(FOOTER_OOG_CTA);
+    expect(HEADER_OOG_CTA).toContain(OOG_QUOTE_HREF);
+    expect(FOOTER_OOG_CTA).toContain(OOG_QUOTE_HREF);
+    // SUBTLE: a text link, not a button and not a coloured banner. The header
+    // already carries exactly one primary CTA per surface.
+    expect(HEADER_OOG_CTA).not.toMatch(/class="[^"]*\bbtn\b/);
+    expect(FOOTER_OOG_CTA).not.toMatch(/class="[^"]*\bbtn\b/);
+    // In the ACTION CLUSTER, never inside .site-nav or the drawer — both of
+    // those already list this href once under Free Tools, and listing it twice
+    // breaks the one-destination-one-home rule.
+    expect(FULL_SITE_HEADER).toContain(`<div class="site-actions">${HEADER_OOG_CTA}`);
+    expect(SITE_NAV_HTML).not.toContain(HEADER_OOG_CTA);
+    expect(SITE_MOBILE_MENU_HTML).not.toContain(HEADER_OOG_CTA);
+    expect(PREMIUM_FOOTER).toContain(FOOTER_OOG_CTA);
+  });
+
+  it('ships the CTA on every chrome surface, with one styling rule each', () => {
+    const read = (f: string) => readFileSync(resolve(process.cwd(), f), 'utf8');
+    const landing = read('src/server/public/landing.html');
+    const directory = read('src/server/directory/pages.ts');
+    // landing.html inlines its own copy of the chrome; the directory subsite
+    // imports the constants. Both must carry the link or the site drifts.
+    expect(landing).toContain('class="site-oog"');
+    expect(landing).toContain('class="qf-foot-oog"');
+    expect(directory).toContain('HEADER_OOG_CTA');
+    expect(directory).toContain('FOOTER_OOG_CTA');
+    // Styling: nav-unify for every chrome page, landing-conversion for the
+    // homepage, which does not load nav-unify.
+    for (const sheet of ['src/server/public/nav-unify.css', 'src/server/public/landing-conversion.css']) {
+      const css = read(sheet);
+      expect(css, sheet).toContain('.site-actions .site-oog');
+      // HIDDEN BELOW 1141px — measured, not cautious. At 1024px the link put
+      // the homepage header 39px over its content box, which is the #476/#477
+      // defect. The footer copy carries every width instead.
+      expect(css, sheet).toMatch(/@media \(max-width: 1140px\) \{\s*\.site-actions \.site-oog \{ display: none; \}/);
+    }
+  });
+
   it('uses fixed even column counts so a group can never orphan one item', () => {
     // 4 route-class pills in a 2-column grid, 3 subtotal tiles in a 3-column
     // grid that collapses to 1, corridor chips in a padded 4-column grid.
@@ -499,12 +609,74 @@ describe('the client script', () => {
     expect(client).toMatch(/basis === 'yours'/);
   });
 
-  it('puts the basis pill on the ROW NAME, above the clamped note', () => {
-    // The note is clamped to three lines, so "whose number is this" has to live
-    // somewhere a clamp cannot reach.
+  it('puts the basis pill in the row META, above the clamped note', () => {
+    // The note is clamped, so "whose number is this" has to live somewhere a
+    // clamp cannot reach: the meta strip, beside the accuracy pill.
     expect(client).toMatch(/basis === 'derived'/);
     expect(client).toContain('EIA index');
-    expect(client).toMatch(/esc\(l\.name\) \+\s*\n?\s*tag/);
+    expect(client).toMatch(/hh-lmeta[\s\S]{0,120}tierChip\(line\.accuracy\)[\s\S]{0,40}basisTag\(line\)/);
+  });
+
+  // ── THE ACCURACY RATING, WHICH IS THE PRODUCT ──────────────────────────
+
+  it('renders a CITED figure with NO range and a BENCHMARK as a range', () => {
+    // The structural invariant, on the render side. `citedCarriesNoBand` in
+    // market/accuracy.ts enforces it in the engine; this is the half that stops
+    // a cited fee being PAINTED as a band of width zero, which is what a naive
+    // "has a low and a high" test produced over the seven reference permits.
+    expect(client).toMatch(/acc\.tier === 'benchmark'[\s\S]{0,120}acc\.lowUsd !== null/);
+    expect(client).toMatch(/l\.accuracy\.tier === 'benchmark'/);
+    // A cited pill carries no band either.
+    expect(client).toMatch(/acc\.tier === 'cited' \|\| acc\.tier === 'refused' \? '' : ' ±'/);
+  });
+
+  it('shows the brief hover and hides the argument behind READ MORE', () => {
+    expect(client).toContain('hh-hbrief');
+    expect(client).toContain('Read more');
+    expect(client).toMatch(/acc\.hover/);
+    expect(client).toMatch(/acc\.detail/);
+    // The long form ships hidden, so the card opens brief.
+    expect(client).toMatch(/hh-hdetail" hidden/);
+  });
+
+  it('discloses detention and layover WITHOUT adding them', () => {
+    expect(client).toMatch(/q\.riskLines/);
+    expect(client).toContain('Disclosed, and NOT in the total');
+    // They are rendered from riskLines, which the composer keeps out of every
+    // subtotal — nothing here ever adds a risk line into a total.
+    expect(client).not.toMatch(/deliveredUsd \+[\s\S]{0,40}riskLines/);
+  });
+
+  it('GROUPS related lines instead of stacking a row per state', () => {
+    expect(client).toMatch(/function renderGroup/);
+    expect(client).toMatch(/State OS\/OW permits/);
+    // A group pill is a LABEL, never one member's card borrowed for five rows.
+    expect(client).toContain('hh-tier is-static');
+  });
+
+  it('converts metric and imperial by MEMORY so the round trip is exact', () => {
+    // Converting 120,000 lb to kg and back through the factor returns
+    // 120,000.04, because the displayed figure was rounded for a human. The
+    // field therefore remembers the exact characters it held in the other
+    // system, and an edit drops the memo.
+    expect(client).toContain('0.45359237');
+    expect(client).toContain('0.3048');
+    expect(client).toMatch(/dataset\.altFor === next/);
+    expect(client).toMatch(/delete el\.dataset\.alt;/);
+    // Switching never clears a field.
+    expect(client).not.toMatch(/setUnits[\s\S]{0,600}el\.value = '';[\s\S]{0,40}\n\s*\}\s*else/);
+  });
+
+  it('sends the LOADING checkboxes as the engine flags they invert to', () => {
+    expect(client).toMatch(/loadingAtOrigin: !checked\('hh-load-origin'\)/);
+    expect(client).toMatch(/loadingAtDestination: !checked\('hh-load-destination'\)/);
+  });
+
+  it('never asks the SHIPPER for an axle count on the default surface', () => {
+    // It is still sent when the disclosure is filled in — a carrier who knows
+    // the configuration beats our inference — but nothing outside the
+    // disclosure reads it.
+    expect(client).toMatch(/cargo\.axleCount = axles/);
   });
 
   it('never shows the score without the reasons behind it', () => {
@@ -519,5 +691,13 @@ describe('the client script', () => {
   it('loads the worked example from the pre-resolved endpoints', () => {
     expect(client).toContain(HEAVY_HAUL_EXAMPLE.originAddress);
     expect(client).toContain(HEAVY_HAUL_EXAMPLE.destinationAddress);
+  });
+
+  it('the worked example is a SHIPPER’S lane — cargo and two addresses only', () => {
+    const example = client.slice(client.indexOf("getElementById('hh-example')"));
+    for (const carrierField of ['hh-axles', 'hh-linehaul', 'hh-pc-mile', 'data-route']) {
+      expect(example, `the example must not pre-fill ${carrierField}`).not.toContain(carrierField);
+    }
+    expect(example).toContain("getElementById('hh-weight').value = '120000'");
   });
 });
