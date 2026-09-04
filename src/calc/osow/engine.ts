@@ -60,6 +60,7 @@ import {
   oversizeBandApplies,
   oversizeFeeBandsEqual,
   perMileAmount,
+  perMileAmountBreakdown,
   perMileRatesEqual,
   overweightPricingEqual,
   additionalAuthoritiesEqual,
@@ -274,6 +275,19 @@ function overLimit(
  * appears as a bare dollar amount is impossible to check; spelling out the
  * rate, the increments and the miles lets a dispatcher verify it against the
  * state's own schedule without opening the code.
+ *
+ * EVERY MODIFIER THAT MOVED THE AMOUNT IS NAMED, and that is not decoration.
+ * The public calculator publishes this string directly beneath the number it
+ * describes, under a promise that every line traces to the statute or fee
+ * schedule it came from. When the note listed only the rate and the miles, a
+ * 26-mile Florida move printed "26 mi in Florida, × $0.36 per mile" — an
+ * explanation that produces $9.36 — next to its correct $22.00, leaving $12.64
+ * of a real fee with no stated cause. Florida was the outlier only because it
+ * is the one state using `roundMilesUpTo`, `addAfterUsd` and `roundDollars`.
+ *
+ * It renders `perMileAmountBreakdown` rather than re-deriving the arithmetic,
+ * so the explanation is built from the same steps that produced the figure and
+ * a future modifier cannot be priced without also being described.
  */
 function describePerMile(
   rate: PerMileRate,
@@ -281,20 +295,35 @@ function describePerMile(
   miles: number,
   jurisdictionName: string,
 ): string {
+  const step = perMileAmountBreakdown(rate, grossWeightLbs, miles);
+  if (step.belowExcessBase) {
+    return `${miles} mi in ${jurisdictionName}, but ${grossWeightLbs.toLocaleString()} lb is at or under the ${(rate.excessBaseLbs ?? 0).toLocaleString()} lb this rate is charged above, so no distance charge arises = $0.00`;
+  }
   const parts = [`${miles} mi in ${jurisdictionName}`];
-  if (rate.perIncrementLbs !== null && rate.perIncrementLbs > 0) {
-    const excess = Math.max(0, grossWeightLbs - (rate.excessBaseLbs ?? 0));
-    const exact = excess / rate.perIncrementLbs;
-    const units = rate.roundIncrementUp ? Math.ceil(exact) : Math.floor(exact);
+  if (step.milesIncrement !== null) {
     parts.push(
-      `× $${rate.ratePerMileUsd} per mile per ${rate.perIncrementLbs.toLocaleString()} lb over ${(rate.excessBaseLbs ?? 0).toLocaleString()} lb × ${units} increment${units === 1 ? '' : 's'}${rate.roundIncrementUp && exact !== units ? ' (part increment charged in full)' : ''}`,
+      `billed as ${step.billedMiles} mi (fees are set in ${step.milesIncrement} mi increments, a part increment charged in full)`,
+    );
+  }
+  if (rate.perIncrementLbs !== null && rate.perIncrementLbs > 0) {
+    const exact =
+      (grossWeightLbs - (rate.excessBaseLbs ?? 0)) / rate.perIncrementLbs;
+    parts.push(
+      `× $${rate.ratePerMileUsd} per mile per ${rate.perIncrementLbs.toLocaleString()} lb over ${(rate.excessBaseLbs ?? 0).toLocaleString()} lb × ${step.units} increment${step.units === 1 ? '' : 's'}${rate.roundIncrementUp && exact !== step.units ? ' (part increment charged in full)' : ''}`,
     );
   } else {
     parts.push(`× $${rate.ratePerMileUsd} per mile`);
   }
+  if (step.addAfterUsd > 0) {
+    parts.push(`plus a $${step.addAfterUsd.toFixed(2)} flat charge inside the rounding`);
+  }
+  if (rate.roundDollars === 'up') parts.push('rounded up to the whole dollar');
+  else if (rate.roundDollars === 'nearest') parts.push('rounded to the nearest whole dollar');
   if (rate.minimumUsd !== null) parts.push(`minimum $${rate.minimumUsd.toFixed(2)}`);
   if (rate.maximumUsd !== null) parts.push(`capped at $${rate.maximumUsd.toFixed(2)}`);
-  return parts.join(', ');
+  // The note closes on its own result, so a reader can check the sentence
+  // against the column beside it without doing the arithmetic in their head.
+  return `${parts.join(', ')} = $${step.amountUsd.toFixed(2)}`;
 }
 
 /** Pick the weight band containing `weightLbs`. */
@@ -1050,13 +1079,56 @@ export function calculateOsowForJurisdiction(
           };
           if (band === null && bandRes.candidates.length === 0) {
             // The pricing MODEL resolved, so we know how the state charges; we
-            // simply hold no band covering this weight. Ohio is the live case:
-            // its banded surcharge stops at 120,000 lb and a ton-mile formula
-            // takes over above it. Saying only "no band on file" would read as
-            // a research gap, so the model's own explanation goes with it.
-            warnings.push(
-              `No overweight fee band on file covers ${gross.toLocaleString()} lb in ${rules.name}. ${modelRes.value.explanation} The permit fee cannot be computed and must be confirmed with the issuing agency.`,
-            );
+            // simply hold no band covering this load. Ohio is the live case on
+            // WEIGHT: its banded surcharge stops at 120,000 lb and a ton-mile
+            // formula takes over above it. Saying only "no band on file" would
+            // read as a research gap, so the model's own explanation goes with
+            // it.
+            //
+            // NAME THE INPUT THAT ACTUALLY FELL IN THE GAP. Arkansas is the
+            // live case on MILEAGE: §27-35-210(e)(2) bands "201 to 250" and
+            // then "Over 251", so a 251-mile move matches nothing while the
+            // same weight prices at 250 and at 252. Blaming the weight there is
+            // a true sentence about the wrong variable — a dispatcher reads
+            // "no band covers 120,000 lb in Arkansas", concludes the state
+            // cannot take the load at all, and re-plans a lane that only needed
+            // a mile either side.
+            const milesBandedForThisWeight = bandInEffect.filter((row) => {
+              const b = row.value;
+              if (gross < b.minLbs) return false;
+              if (b.maxLbs !== null && gross > b.maxLbs) return false;
+              return b.minMiles !== undefined || b.maxMiles !== undefined;
+            });
+            const milesHere = load.milesInJurisdiction;
+            if (milesBandedForThisWeight.length > 0 && milesHere !== undefined) {
+              const ranges = [
+                ...new Set(
+                  milesBandedForThisWeight.map((row) => {
+                    const b = row.value;
+                    const lo = (b.minMiles ?? 0).toLocaleString();
+                    return b.maxMiles === null || b.maxMiles === undefined
+                      ? `${lo} mi and over`
+                      : `${lo}–${b.maxMiles.toLocaleString()} mi`;
+                  }),
+                ),
+              ].join(', ');
+              warnings.push(
+                `No overweight fee band on file covers a ${milesHere.toLocaleString()}-mile move in ${rules.name} — it is the MILEAGE that falls in the gap, not the weight. ${gross.toLocaleString()} lb is priced at other in-state distances: the published bands run ${ranges}, and ${milesHere.toLocaleString()} mi sits between two of them. ${modelRes.value.explanation} The permit fee cannot be computed and must be confirmed with the issuing agency.`,
+              );
+            } else {
+              warnings.push(
+                `No overweight fee band on file covers ${gross.toLocaleString()} lb in ${rules.name}. ${modelRes.value.explanation} The permit fee cannot be computed and must be confirmed with the issuing agency.`,
+              );
+            }
+            // The fee line itself says why it is blank, rather than rendering a
+            // bare "Not priceable" whose cause is only in the notes below it.
+            overweightLine = {
+              ...overweightLine,
+              note:
+                milesBandedForThisWeight.length > 0 && milesHere !== undefined
+                  ? `${rules.name}'s published bands price no move of exactly ${milesHere.toLocaleString()} mi at this weight.`
+                  : `${rules.name}'s published bands price no load of ${gross.toLocaleString()} lb.`,
+            };
             requiresManualReview = true;
           }
           break;

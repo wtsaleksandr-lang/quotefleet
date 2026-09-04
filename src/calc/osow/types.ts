@@ -353,7 +353,45 @@ function toCents(value: number): number {
 }
 
 /**
- * Distance-priced overweight amount, rounded to cents.
+ * Every step a distance-priced amount passed through, in the order the state
+ * applies them.
+ *
+ * THIS EXISTS SO THE PRICE AND ITS PRINTED EXPLANATION CANNOT DIVERGE. The fee
+ * line the public calculator renders carries a `note` beside the amount under a
+ * promise that every line is traceable to the schedule it came from, and that
+ * note used to be written by a SECOND reading of `PerMileRate` that knew about
+ * the rate, the increments and the miles but not about `roundMilesUpTo`,
+ * `addAfterUsd` or `roundDollars`. A 26-mile Florida move therefore printed
+ * "26 mi in Florida, × $0.36 per mile" — which reads as $9.36 — beside its
+ * correct $22.00, and $12.64 of a real fee had no stated cause.
+ *
+ * With the steps returned as data, `perMileAmount` sums them and
+ * `describePerMile` renders them, so a modifier added to the model and to the
+ * arithmetic reaches the explanation with it.
+ */
+export interface PerMileBreakdown {
+  /** Miles as supplied by the caller. */
+  miles: number;
+  /** Miles actually charged, after `roundMilesUpTo`. Equals `miles` when unset. */
+  billedMiles: number;
+  /** The mileage increment that was applied, or `null` when the state has none. */
+  milesIncrement: number | null;
+  /** Charged weight increments; 1 when the rate is flat per mile, 0 when nothing is charged. */
+  units: number;
+  /** True when the load is at or under `excessBaseLbs`, so no distance charge arises at all. */
+  belowExcessBase: boolean;
+  /** rate × billedMiles × units, to cents, BEFORE `addAfterUsd`. Display only. */
+  distanceUsd: number;
+  /** `addAfterUsd`, which goes INSIDE the dollar rounding. 0 when unset. */
+  addAfterUsd: number;
+  /** After `roundDollars`, before the minimum and maximum. */
+  roundedUsd: number;
+  /** The figure that is charged. */
+  amountUsd: number;
+}
+
+/**
+ * Distance-priced overweight amount, decomposed and rounded to cents.
  *
  * ORDER OF OPERATIONS IS THE STATE'S, NOT OURS, and Florida's rule publishes
  * its own worked example so it can be checked: 112,000 lb over 67.5 miles is
@@ -361,22 +399,42 @@ function toCents(value: number): number {
  * to the increment first, the flat administrative amount goes in before the
  * dollar rounding, and only then do the minimum and maximum apply.
  */
-export function perMileAmount(
+export function perMileAmountBreakdown(
   rate: PerMileRate,
   grossWeightLbs: number,
   miles: number,
-): number {
+): PerMileBreakdown {
+  const milesIncrement =
+    rate.roundMilesUpTo !== undefined && rate.roundMilesUpTo > 0
+      ? rate.roundMilesUpTo
+      : null;
+  const billedMiles =
+    milesIncrement === null
+      ? miles
+      : Math.ceil(miles / milesIncrement) * milesIncrement;
+
   let units = 1;
   if (rate.perIncrementLbs !== null && rate.perIncrementLbs > 0) {
     const excess = grossWeightLbs - (rate.excessBaseLbs ?? 0);
-    if (excess <= 0) return 0;
+    if (excess <= 0) {
+      // Nothing is over the weight the rate counts above, so no distance charge
+      // arises — and the minimum does not create one out of a fee that was
+      // never triggered.
+      return {
+        miles,
+        billedMiles,
+        milesIncrement,
+        units: 0,
+        belowExcessBase: true,
+        distanceUsd: 0,
+        addAfterUsd: 0,
+        roundedUsd: 0,
+        amountUsd: 0,
+      };
+    }
     const exact = excess / rate.perIncrementLbs;
     units = rate.roundIncrementUp ? Math.ceil(exact) : Math.floor(exact);
   }
-  const billedMiles =
-    rate.roundMilesUpTo !== undefined && rate.roundMilesUpTo > 0
-      ? Math.ceil(miles / rate.roundMilesUpTo) * rate.roundMilesUpTo
-      : miles;
   let raw = toCents(
     rate.ratePerMileUsd * billedMiles * units + (rate.addAfterUsd ?? 0),
   );
@@ -385,7 +443,26 @@ export function perMileAmount(
   const floored = rate.minimumUsd === null ? raw : Math.max(raw, rate.minimumUsd);
   const capped =
     rate.maximumUsd === null ? floored : Math.min(floored, rate.maximumUsd);
-  return toCents(capped);
+  return {
+    miles,
+    billedMiles,
+    milesIncrement,
+    units,
+    belowExcessBase: false,
+    distanceUsd: toCents(rate.ratePerMileUsd * billedMiles * units),
+    addAfterUsd: rate.addAfterUsd ?? 0,
+    roundedUsd: raw,
+    amountUsd: toCents(capped),
+  };
+}
+
+/** The charged figure alone. See `perMileAmountBreakdown` for the steps. */
+export function perMileAmount(
+  rate: PerMileRate,
+  grossWeightLbs: number,
+  miles: number,
+): number {
+  return perMileAmountBreakdown(rate, grossWeightLbs, miles).amountUsd;
 }
 
 /**
