@@ -769,3 +769,59 @@ describe('a truncated filing cannot out-score a complete one', () => {
     );
   });
 });
+
+/**
+ * THE FUEL MODEL'S TWO ASSUMPTIONS ARE THE CALLER'S TO SET.
+ *
+ * The diesel PRICE is sourced from the EIA index and stays sourced. The peg and
+ * the fuel economy are the only assumptions inside the surcharge, and every
+ * carrier's FSC table pegs somewhere — so leaving them hardcoded meant the page
+ * told the reader they were our assumptions while giving no way to replace them.
+ */
+describe('the fuel surcharge model', () => {
+  const lane = (rates: Record<string, unknown>) =>
+    priceHeavyHaulLane({
+      cargo: REFERENCE_CARGO,
+      lane: { origin: HOUSTON, destination: BUFFALO },
+      filedLegs: REFERENCE_LEGS,
+      rates: rates as never,
+      diesel: DIESEL,
+      asOf: ASOF,
+    });
+
+  it('defaults to the OOIDA figures and says they are OURS', () => {
+    const out = lane({ linehaulUsdPerMile: 4.85 });
+    expect(out.fuel.perMileUsd).toBeCloseTo((DIESEL.usdPerGal - 1.25) / 6, 3);
+    expect(out.fuel.modelNote).toMatch(/OUR assumptions/);
+    expect(out.fuel.modelNote).toMatch(/Enter your own peg and mpg/);
+  });
+
+  it('uses the caller’s peg when supplied, and relabels the line as theirs', () => {
+    const out = lane({ linehaulUsdPerMile: 4.85, fuelPegUsdPerGal: 2.5 });
+    expect(out.fuel.perMileUsd).toBeCloseTo((DIESEL.usdPerGal - 2.5) / 6, 3);
+    expect(out.fuel.modelNote).toMatch(/YOURS/);
+    expect(out.fuel.modelNote).not.toMatch(/OUR assumptions/);
+  });
+
+  it('uses the caller’s fuel economy when supplied', () => {
+    const out = lane({ linehaulUsdPerMile: 4.85, fuelMpg: 5 });
+    expect(out.fuel.perMileUsd).toBeCloseTo((DIESEL.usdPerGal - 1.25) / 5, 3);
+    expect(out.fuel.modelNote).toMatch(/5 mpg/);
+  });
+
+  it('never lets the caller’s model touch the SOURCED column', () => {
+    // The peg is theirs; the permit fees are not. A change to one must not move
+    // the other -- the whole point of keeping the three subtotals apart.
+    const a = lane({ linehaulUsdPerMile: 4.85 });
+    const b = lane({ linehaulUsdPerMile: 4.85, fuelPegUsdPerGal: 3.75, fuelMpg: 4 });
+    expect(b.subtotalSourcedUsd).toBe(a.subtotalSourcedUsd);
+    expect(b.permits?.totalPermitUsd).toBe(1223.18);
+    expect(b.subtotalDerivedUsd).not.toBe(a.subtotalDerivedUsd);
+  });
+
+  it('a peg above the pump price yields no surcharge, not a negative one', () => {
+    const out = lane({ linehaulUsdPerMile: 4.85, fuelPegUsdPerGal: 19 });
+    expect(out.fuel.perMileUsd).toBe(0);
+    expect(out.subtotalDerivedUsd).toBe(0);
+  });
+});

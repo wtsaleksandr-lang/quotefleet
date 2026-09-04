@@ -179,12 +179,18 @@
     var pcDay = num('hh-pc-day');
     var pcDays = num('hh-pc-days');
     var pcMin = num('hh-pc-min');
+    var fuelPeg = num('hh-fuel-peg');
+    var fuelMpg = num('hh-fuel-mpg');
     if (lh !== undefined) rates.linehaulUsdPerMile = lh;
     if (lhMin !== undefined) rates.linehaulMinimumUsd = lhMin;
     if (pcMile !== undefined) rates.pilotCarUsdPerMile = pcMile;
     if (pcDay !== undefined) rates.pilotCarUsdPerDay = pcDay;
     if (pcDays !== undefined) rates.pilotCarDaysPerState = pcDays;
     if (pcMin !== undefined) rates.pilotCarMinimumPerState = pcMin;
+    // The diesel PRICE stays sourced either way; these two are the assumptions
+    // inside the surcharge, and the note says whose they are.
+    if (fuelPeg !== undefined) rates.fuelPegUsdPerGal = fuelPeg;
+    if (fuelMpg !== undefined) rates.fuelMpg = fuelMpg;
 
     var body = { cargo: cargo, originAddress: origin, destinationAddress: destination };
     if (parsedLegs.legs.length > 0) body.legs = parsedLegs.legs;

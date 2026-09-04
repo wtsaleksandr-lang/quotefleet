@@ -98,6 +98,14 @@ export interface HeavyHaulRates {
   linehaulMinimumUsd?: number;
   /** The caller's pilot-car rate. See `UserPilotCarRate`. */
   pilotCar?: UserPilotCarRate;
+  /**
+   * The caller's OWN fuel-surcharge model. The diesel PRICE is always sourced
+   * from the EIA index; the peg and the fuel economy are the two assumptions in
+   * it, and every carrier's FSC table pegs somewhere. Supplying either makes
+   * this line theirs rather than ours, and the note says which.
+   */
+  fuelPegUsdPerGal?: number;
+  fuelMpg?: number;
 }
 
 /** The diesel reading, passed in so this module stays pure and DB-free. */
@@ -449,10 +457,14 @@ export function priceHeavyHaulLane(input: HeavyHaulRequest): HeavyHaulQuote {
   }
 
   // ── 4. Fuel — EIA index, our model, and it says which is which ──────────
+  const pegUsdPerGal = input.rates?.fuelPegUsdPerGal ?? AUTO_FSC_DEFAULTS.pegUsdPerGal;
+  const fuelMpg = input.rates?.fuelMpg ?? AUTO_FSC_DEFAULTS.mpg;
+  const fuelModelIsCallers =
+    input.rates?.fuelPegUsdPerGal !== undefined || input.rates?.fuelMpg !== undefined;
   const fscPerMile = autoFscPerMile({
     dieselUsdPerGal: input.diesel.usdPerGal,
-    pegUsdPerGal: AUTO_FSC_DEFAULTS.pegUsdPerGal,
-    mpg: AUTO_FSC_DEFAULTS.mpg,
+    pegUsdPerGal,
+    mpg: fuelMpg,
   });
   /**
    * HALF SOURCED, HALF OURS, AND IT SAYS SO IN THAT ORDER.
@@ -462,7 +474,7 @@ export function priceHeavyHaulLane(input: HeavyHaulRequest): HeavyHaulQuote {
    * cited figure from an assumption of ours. The arithmetic closes it, so a
    * reader can check the number against the column beside it.
    */
-  const fuelModelNote = `The DIESEL PRICE is sourced: the EIA weekly national on-highway No. 2 retail price${input.diesel.asOf ? `, week of ${input.diesel.asOf}` : ''} — US Government, public domain. The PEG ($${AUTO_FSC_DEFAULTS.pegUsdPerGal.toFixed(2)}/gal) and the FUEL ECONOMY (${AUTO_FSC_DEFAULTS.mpg} mpg) are OUR assumptions — the standard OOIDA figures, and your own FSC table may peg elsewhere. DOE-index model: ($${input.diesel.usdPerGal.toFixed(2)} − $${AUTO_FSC_DEFAULTS.pegUsdPerGal.toFixed(2)}) ÷ ${AUTO_FSC_DEFAULTS.mpg} = $${fscPerMile.toFixed(3)}/mi.`;
+  const fuelModelNote = `The DIESEL PRICE is sourced: the EIA weekly national on-highway No. 2 retail price${input.diesel.asOf ? `, week of ${input.diesel.asOf}` : ''} — US Government, public domain. The PEG ($${pegUsdPerGal.toFixed(2)}/gal) and the FUEL ECONOMY (${fuelMpg} mpg) are ${fuelModelIsCallers ? 'YOURS — you entered them, so this line is your model on our sourced price' : 'OUR assumptions — the standard OOIDA figures, and your own FSC table may peg elsewhere. Enter your own peg and mpg and this line becomes yours'}. DOE-index model: ($${input.diesel.usdPerGal.toFixed(2)} − $${pegUsdPerGal.toFixed(2)}) ÷ ${fuelMpg} = $${fscPerMile.toFixed(3)}/mi.`;
   const fuelUsd = distance.totalMiles > 0 ? round2(fscPerMile * distance.totalMiles) : 0;
   if (distance.totalMiles > 0) {
     lines.push({

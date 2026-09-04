@@ -198,6 +198,15 @@ const HeavyHaulRequestSchema = z.object({
       pilotCarUsdPerDay: z.number().finite().positive().max(100_000).optional(),
       pilotCarDaysPerState: z.number().finite().positive().max(60).optional(),
       pilotCarMinimumPerState: z.number().finite().positive().max(1_000_000).optional(),
+      /**
+       * The caller's own FSC model. The diesel PRICE stays sourced from the EIA
+       * index either way; these are the two assumptions inside the surcharge,
+       * and every carrier's table pegs somewhere. Bounds are sanity rails, not
+       * opinions: a peg above the current pump price yields $0 surcharge, which
+       * is a legitimate answer, and 1 mpg is absurd but not our call to refuse.
+       */
+      fuelPegUsdPerGal: z.number().finite().nonnegative().max(20).optional(),
+      fuelMpg: z.number().finite().positive().min(1).max(20).optional(),
     })
     .optional(),
   asOf: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).optional(),
@@ -339,6 +348,10 @@ export function priceResolvedHeavyHaulLane(
         ? {}
         : { linehaulMinimumUsd: input.rates.linehaulMinimumUsd }),
       ...(Object.keys(pilotCar).length === 0 ? {} : { pilotCar }),
+      ...(input.rates?.fuelPegUsdPerGal === undefined
+        ? {}
+        : { fuelPegUsdPerGal: input.rates.fuelPegUsdPerGal }),
+      ...(input.rates?.fuelMpg === undefined ? {} : { fuelMpg: input.rates.fuelMpg }),
     },
     diesel,
     asOf,
@@ -721,8 +734,12 @@ export function renderHeavyHaulToolPage(): string {
               ${field('hh-pc-days', 'Days per state', { step: '1' })}
               ${field('hh-pc-min', 'Pilot car minimum per state ($)')}
             </div>
+            <div class="hh-row2">
+              ${field('hh-fuel-peg', 'Your FSC peg $ / gal')}
+              ${field('hh-fuel-mpg', 'Your fuel economy (mpg)')}
+            </div>
           </div>
-          <p class="hh-hint">Blank is a valid answer. Anything left blank comes back named and excluded, and costs the confidence score points — never quietly $0.</p>
+          <p class="hh-hint">Blank is a valid answer. Anything left blank comes back named and excluded, and costs the confidence score points — never quietly $0. Leave the peg and mpg blank and we use the standard OOIDA figures ($1.25/gal, 6 mpg) and label them as ours; fill them in and the fuel line becomes your model on our sourced diesel price.</p>
         </div>
 
         <div class="hh-card">
