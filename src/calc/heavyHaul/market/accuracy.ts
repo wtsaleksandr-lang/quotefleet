@@ -5,9 +5,17 @@
  * rests on. Four tiers, and the difference between them is the difference
  * between a statute and a broker's rate card:
  *
- *   CITED     — a statute or a published fee schedule. Tennessee's
- *               `$20 + $0.06/ton-mile` is Tenn. Code Ann. § 55-7-205. It is not
- *               an estimate and it does not carry a band.
+ *   CITED     — a figure that BINDS EVERY CARRIER, from a statute or a public
+ *               agency's fee schedule. Tennessee's `$20 + $0.06/ton-mile` is
+ *               Tenn. Code Ann. § 55-7-205: it is what the shipper will pay in
+ *               Tennessee, from whoever hauls it. It is not an estimate and IT
+ *               CARRIES NO BAND — see `citedCarriesNoBand` below, which is the
+ *               whole test and is enforced rather than argued.
+ *
+ *               A FILED CARRIER TARIFF IS NOT THIS. Ace Doran's tariff binds Ace
+ *               Doran; a different carrier tarps at a different price, and the
+ *               shipper has not chosen a carrier yet. It is excellent evidence
+ *               and it is a BENCHMARK, whose hover says so in as many words.
  *   INDEXED   — a live published index, with the date of the reading. The EIA
  *               weekly on-highway diesel price; the DAT national flatbed
  *               line-haul rate. Exact on its date; the band is drift since.
@@ -79,7 +87,10 @@ export function basisForTier(tier: AccuracyTier): BasisForTier {
 /**
  * The DEFAULT ± band per tier, as a percentage. Every component overrides it.
  *
- *   cited      0 — a statute states the number. There is no spread to report.
+ *   cited      0 — a statute states the number. There is no spread to report,
+                  and a CITED row carrying one is rejected outright: if a figure
+                  needs a band, it is not cited. That is the cheapest available
+                  test for the category and it is the one this file enforces.
  *   indexed    5 — the reading is exact on its date. The band is how far the
  *                  index can move between the reading and the move: DAT's
  *                  national flatbed line-haul moved $2.79 → $2.67 in three
@@ -112,7 +123,7 @@ export const TIER_LABELS: Readonly<Record<AccuracyTier, string>> = {
 /** What each tier means, in one sentence, for the legend the UI pass renders. */
 export const TIER_MEANINGS: Readonly<Record<AccuracyTier, string>> = {
   cited:
-    'A statute or a published fee schedule. The figure is the law’s or the agency’s own, quoted, not estimated.',
+    'A figure that binds every carrier — a statute or a public agency’s fee schedule. It is what you will pay, from whoever hauls it, and it carries no range because there is nothing to estimate.',
   indexed:
     'A live published index, with the date of the reading. Exact on that date; the band is how far the index can move before you move the load.',
   benchmark:
@@ -189,16 +200,49 @@ export interface AccuracyCheckable {
 }
 
 /**
+ * A CITED FIGURE CARRIES NO BAND — the structural test for the category.
+ *
+ * This exists because the judgement call it replaces is genuinely easy to get
+ * wrong. "A published fee schedule" reads as though a filed carrier tariff
+ * qualifies, and it does not: a statute binds every carrier in the state, a
+ * tariff binds the one carrier that filed it, and the shipper has not chosen a
+ * carrier yet. Reasoning that out correctly every time is not something to rely
+ * on, so the rule is expressed as arithmetic instead.
+ *
+ * If a figure needs a range, we do not know it, and if we do not know it, it is
+ * not cited. Tennessee's $320 has no range. A tarping charge quoted from one
+ * carrier's tariff has a ±20% one, and that band is the tell.
+ *
+ * Both forms of "no band" are accepted: no low/high at all, or a low and high
+ * that both equal the amount exactly. Anything else is a violation.
+ */
+export function citedCarriesNoBand(line: AccuracyCheckable): string | null {
+  const acc = line.accuracy;
+  if (!acc || acc.tier !== 'cited') return null;
+  const id = line.code ?? line.name;
+  if (acc.bandPct !== 0) {
+    return `${id}: tier CITED with a ±${acc.bandPct}% band. A cited figure carries no band — if it needs one it is a BENCHMARK, whatever published it.`;
+  }
+  const hasRange = acc.lowUsd !== null || acc.highUsd !== null;
+  if (hasRange && (acc.lowUsd !== line.amountUsd || acc.highUsd !== line.amountUsd)) {
+    return `${id}: tier CITED but its low ($${acc.lowUsd}) and high ($${acc.highUsd}) do not both equal the figure ($${line.amountUsd}). A cited figure carries no band.`;
+  }
+  return null;
+}
+
+/**
  * THE INVARIANT, CHECKED RATHER THAN ASSERTED IN PROSE.
  *
  * Returns every violation it finds, so a caller can throw, log or test on it.
- * Three rules:
+ * Four rules:
  *
  *  1. A line's `basis` must be the one `BASIS_FOR_TIER` allows for its tier.
  *     This is what stops a market band being summed into the cited column.
  *  2. A BENCHMARK line must carry a low and a high. A benchmark rendered as a
  *     point is the exact dishonesty this whole rating exists to prevent.
- *  3. A REFUSED line must carry no money.
+ *  3. A CITED line must carry NO band. The mirror of rule 2, and the one that
+ *     settles what may call itself cited without anybody re-arguing it.
+ *  4. A REFUSED line must carry no money.
  */
 export function accuracyBasisViolations(
   lines: ReadonlyArray<AccuracyCheckable>,
@@ -225,6 +269,8 @@ export function accuracyBasisViolations(
         `${id}: a BENCHMARK figure must render as a range and this one has no low/high.`,
       );
     }
+    const banded = citedCarriesNoBand(line);
+    if (banded) problems.push(banded);
     if (acc.hover.length > MAX_HOVER_CHARS) {
       problems.push(
         `${id}: hover text is ${acc.hover.length} characters, over the ${MAX_HOVER_CHARS} the card holds. Move the argument into detail.`,

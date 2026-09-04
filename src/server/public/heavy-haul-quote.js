@@ -321,7 +321,7 @@
     return (
       '<div class="hh-split"><div class="hh-tile"><span class="k">Sourced</span><span class="v">' +
       esc(amountFor(q.subtotalSourcedUsd, 'sourced')) +
-      '</span><span class="n">State permit fees, published police-escort floors and filed tariff charges, each cited to a statute or fee schedule.</span></div>' +
+      '</span><span class="n">State permit fees and published police-escort floors, each cited to a statute or fee schedule. A fee here binds whoever hauls the load, and carries no range.</span></div>' +
       '<div class="hh-tile is-yours"><span class="k">Your rates</span><span class="v">' +
       esc(amountFor(q.subtotalYourRatesUsd, 'yours')) +
       '</span><span class="n">Line haul and pilot cars, computed from rates you entered. Not figures we source.</span></div>' +

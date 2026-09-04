@@ -525,6 +525,66 @@ describe('the reference lane, composed', () => {
     expect(out.lines.some((l) => l.kind === 'margin')).toBe(false);
   });
 
+  it('EVERY CITED ROW ON THE QUOTE CARRIES NO BAND, and they are all state fees', () => {
+    // After the tariff-backed rows were retiered, the only CITED money left on a
+    // quote is what a state's own schedule sets — a fee that binds whoever
+    // hauls the load. Each such row's low and high ARE the figure, because we
+    // know it. Any row needing a range is a BENCHMARK, whatever published it.
+    const cited = out.lines.filter((l) => l.accuracy?.tier === 'cited');
+    expect(cited.length).toBeGreaterThan(0);
+    for (const l of cited) {
+      expect(l.basis).toBe('sourced');
+      expect(l.accuracy?.bandPct).toBe(0);
+      expect(l.accuracy?.lowUsd).toBe(l.amountUsd);
+      expect(l.accuracy?.highUsd).toBe(l.amountUsd);
+      expect(l.kind === 'permit' || l.kind === 'escort').toBe(true);
+    }
+    // And the cited column is those fees exactly — nothing else reached it.
+    expect(out.subtotalSourcedUsd).toBe(1223.18);
+    expect(out.subtotalSourcedUsd).toBe(out.permits?.totalPermitUsd);
+  });
+
+  it('A FILED CARRIER TARIFF NEVER REACHES THE CITED COLUMN', () => {
+    // Tarping is priced from a carrier's filed tariff. That tariff binds the
+    // carrier that filed it, not the one this shipper has yet to choose, so the
+    // money lands in the market column and the permit parity is untouched.
+    const tarped = priceHeavyHaulLane({
+      cargo: REFERENCE_CARGO,
+      lane: { origin: HOUSTON, destination: BUFFALO },
+      filedLegs: REFERENCE_LEGS,
+      rates: { linehaulUsdPerMile: 4.85, pilotCar: { usdPerMile: 2.25 } },
+      market: { tarping: true },
+      diesel: DIESEL,
+      asOf: ASOF,
+    });
+    // This load is 14 ft 6 in high, past the 12 ft where the tariff itself
+    // prints SPOT BID — so on THIS lane the honest answer is a refusal, and a
+    // refusal carries no money into any column.
+    const tarping = tarped.lines.find((l) => l.code === 'tarping');
+    expect(tarping?.accuracy?.tier).toBe('refused');
+    expect(tarping?.amountUsd).toBeNull();
+    expect(tarped.subtotalSourcedUsd).toBe(1223.18);
+
+    // A load inside the tariff's table DOES price — into the market column.
+    const inTable = priceHeavyHaulLane({
+      cargo: { grossWeightLbs: 70_000, widthIn: 120, heightIn: 96 },
+      lane: { origin: HOUSTON, destination: BUFFALO },
+      filedLegs: REFERENCE_LEGS,
+      market: { tarping: true },
+      diesel: DIESEL,
+      asOf: ASOF,
+    });
+    const priced = inTable.lines.find((l) => l.code === 'tarping');
+    expect(priced?.amountUsd).toBe(225);
+    expect(priced?.basis).toBe('market');
+    expect(priced?.accuracy?.tier).toBe('benchmark');
+    expect(priced?.accuracy?.hover).toMatch(/not a statute/);
+    // $225 of tariff money, and not one cent of it in the cited column.
+    const citedRows = inTable.lines.filter((l) => l.accuracy?.tier === 'cited');
+    expect(citedRows.every((l) => l.kind === 'permit' || l.kind === 'escort')).toBe(true);
+    expect(inTable.subtotalSourcedUsd).toBe(inTable.permits?.totalPermitUsd);
+  });
+
   it('MARKET MONEY EXISTS AND IS IN ITS OWN COLUMN, never the cited one', () => {
     // The permit agent's fee and the securement allowance are market figures.
     // They are real money on the delivered total and they are structurally
@@ -633,9 +693,12 @@ describe('the realistic-mileage lane, beside the parity fixture', () => {
     // Different mileage means different distance-priced permits, which is
     // correct — but every one of them is still a SOURCED figure, and no market
     // money reached that column.
+    // A sourced row is either a CITED state fee or a REFUSED one we could not
+    // price. It is never a BENCHMARK: nothing with a band reaches this column.
     const sourcedLines = out.lines.filter((l) => l.basis === 'sourced');
     for (const l of sourcedLines) {
-      expect(l.accuracy === undefined || l.accuracy.tier === 'cited').toBe(true);
+      expect(['cited', 'refused', undefined]).toContain(l.accuracy?.tier);
+      if (l.accuracy?.tier === 'refused') expect(l.amountUsd).toBeNull();
     }
     expect(out.subtotalSourcedUsd).toBeCloseTo(out.permits?.totalPermitUsd ?? 0, 2);
   });

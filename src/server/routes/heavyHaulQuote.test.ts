@@ -238,7 +238,11 @@ describe('the composed reference lane', () => {
     // 8 axles: $150 + 8 x $25 = $350/hr after two free hours at each end.
     const detention = out.quote.riskLines.find((r) => r.code === 'risk_detention');
     expect(detention?.headlineUsd).toBe(350);
-    expect(detention?.accuracy.tier).toBe('cited');
+    // BENCHMARK, not CITED: it comes from a filed carrier tariff, which binds
+    // the carrier that filed it and not the one this shipper has yet to pick.
+    // The band it carries is the tell -- a cited figure would not need one.
+    expect(detention?.accuracy.tier).toBe('benchmark');
+    expect(detention?.accuracy.hover).toMatch(/not a statute/);
   });
 
   it('echoes back the address the geocoder actually matched, not the one typed', () => {

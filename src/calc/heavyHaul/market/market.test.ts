@@ -18,6 +18,7 @@ import {
   accuracyBasisViolations,
   assertAccuracyBasisInvariant,
   basisForTier,
+  citedCarriesNoBand,
   rate,
   MAX_HOVER_CHARS,
   // sources
@@ -54,13 +55,16 @@ import {
   // accessorials
   CRANE_REFUSAL_CARGO_LBS,
   craneRateUsdPerHour,
+  detentionRiskLine,
   detentionUsdPerHour,
   excessValueLine,
   headlineOf,
+  layoverRiskLine,
   permitServiceLine,
   priceLoading,
   routeSurveyLine,
   securementLine,
+  tarpingLine,
   tarpingUsd,
 } from './index.js';
 
@@ -136,13 +140,94 @@ describe('the accuracy rating', () => {
     expect(violations.join(' ')).toMatch(/refusal that quotes a number is not a refusal/);
   });
 
+  it('A CITED FIGURE CARRIES NO BAND — and that is the test for the category', () => {
+    // The rule exists because the judgement it replaces is easy to get wrong.
+    // "A published fee schedule" reads as though a filed carrier tariff counts,
+    // and it does not: a statute binds every carrier, a tariff binds the one
+    // that filed it, and the shipper has not picked a carrier yet. So the rule
+    // is arithmetic instead of prose -- if it needs a range, we do not know it.
+    const banded = {
+      code: 'tarping_pretending_to_be_a_statute',
+      name: 'A tariff charge wearing a statute’s label',
+      basis: 'sourced',
+      amountUsd: 225,
+      accuracy: rate({
+        tier: 'cited',
+        bandPct: 20,
+        lowUsd: 180,
+        highUsd: 270,
+        hover: 'x',
+        detail: 'y',
+      }),
+    };
+    expect(citedCarriesNoBand(banded)).toMatch(/carries no band/);
+    expect(accuracyBasisViolations([banded])).toHaveLength(1);
+    expect(() => assertAccuracyBasisInvariant([banded])).toThrow(/carries no band/);
+
+    // Both honest forms pass: no low/high at all, or low and high that ARE the
+    // figure. Tennessee's $320 is the second.
+    const noRange = {
+      code: 'permit_TN',
+      name: 'Tennessee single-trip OS/OW permit',
+      basis: 'sourced',
+      amountUsd: 320,
+      accuracy: rate({ tier: 'cited', bandPct: 0, hover: 'x', detail: 'y' }),
+    };
+    const pointRange = {
+      ...noRange,
+      accuracy: rate({
+        tier: 'cited',
+        bandPct: 0,
+        lowUsd: 320,
+        highUsd: 320,
+        hover: 'x',
+        detail: 'y',
+      }),
+    };
+    expect(citedCarriesNoBand(noRange)).toBeNull();
+    expect(citedCarriesNoBand(pointRange)).toBeNull();
+    expect(accuracyBasisViolations([noRange, pointRange])).toEqual([]);
+  });
+
+  it('leaves NOTHING in this engine claiming CITED — every figure here is a market one', () => {
+    // After the retier the only cited money on a quote is the state permit fees
+    // and the published police-escort floors, and neither is produced in this
+    // directory. A filed carrier tariff is excellent evidence and it is still
+    // one carrier's schedule.
+    const everyAccessorial = [
+      ...priceLoading({
+        cargoWeightLbs: 40_000,
+        end: 'origin',
+        stateCode: 'TX',
+        cargoWeightDerived: false,
+      }),
+      tarpingLine(120, 96),
+      securementLine(),
+      detentionRiskLine(13),
+      layoverRiskLine(),
+      permitServiceLine(3),
+      routeSurveyLine(['TX']),
+      excessValueLine(500_000),
+    ].filter((l): l is NonNullable<typeof l> => l !== null);
+    for (const l of everyAccessorial) {
+      expect(l.accuracy.tier).not.toBe('cited');
+    }
+  });
+
+  it('says a filed tariff is a filed tariff, in the hover, in as many words', () => {
+    // More useful to a shipper than either "cited" or a bare "market estimate".
+    expect(tarpingLine(120, 96).accuracy.hover).toMatch(/not a statute/);
+    expect(detentionRiskLine(13).accuracy.hover).toMatch(/not a statute/);
+    expect(layoverRiskLine().accuracy.hover).toMatch(/not a statute/);
+  });
+
   it('EACH TIER CARRIES ITS OWN BAND — there is no global ± number', () => {
     expect(TIER_DEFAULT_BAND_PCT.cited).toBe(0);
     expect(TIER_DEFAULT_BAND_PCT.indexed).toBeLessThan(TIER_DEFAULT_BAND_PCT.benchmark);
     // And a component's own measured spread overrides the tier default: the
     // research measured detention at ±15% and a route survey at ±70%.
-    const detention = detentionUsdPerHour(13);
-    expect(detention).toBe(605);
+    expect(detentionUsdPerHour(13)).toBe(605);
+    expect(detentionRiskLine(13).accuracy.bandPct).toBe(15);
     const survey = routeSurveyLine(['TX']);
     expect(survey?.accuracy.bandPct).toBe(70);
     const svc = permitServiceLine(7);
@@ -666,6 +751,14 @@ describe('the rest of the invoice', () => {
     expect(detentionUsdPerHour(16)).toBe(790);
     // Four times the van-freight expectation a shipper carries in their head.
     expect(detentionUsdPerHour(13) / 150).toBeGreaterThan(4);
+  });
+
+  it('tiers tarping as a BENCHMARK, because one carrier’s tariff is not a statute', () => {
+    const t = tarpingLine(120, 96);
+    expect(t.accuracy.tier).toBe('benchmark');
+    expect(t.accuracy.lowUsd).toBe(180);
+    expect(t.accuracy.highUsd).toBe(270);
+    expect(t.accuracy.detail).toMatch(/another carrier will quote another number/);
   });
 
   it('prices tarping by dimension and REFUSES above the tariff’s own threshold', () => {

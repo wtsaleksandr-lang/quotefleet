@@ -65,6 +65,7 @@ import {
 } from './confidence.js';
 import {
   assertAccuracyBasisInvariant,
+  basisForTier,
   deriveLoad,
   detentionRiskLine,
   estimateEscortMarketCost,
@@ -585,12 +586,45 @@ export function priceHeavyHaulLane(input: HeavyHaulRequest): HeavyHaulQuote {
     permits = priceOsowWithStateMileage(split, load, asOf);
 
     for (const j of permits.jurisdictions) {
+      /**
+       * THIS IS WHERE CITED ACTUALLY LIVES, and after the tariff-backed rows
+       * were retiered it is the only place it does — which is correct rather
+       * than awkward. A state permit fee binds whoever hauls the load: it is
+       * what the shipper WILL pay in that state, from any carrier. That is the
+       * distinction `subtotalSourcedUsd` exists to protect and the one thing
+       * this tool does that an uncited competitor cannot.
+       *
+       * A CITED ROW CARRIES NO BAND, so `low` and `high` are the figure itself.
+       * `citedCarriesNoBand` rejects anything else, which is what stops the
+       * next well-argued tariff figure drifting into this column.
+       *
+       * A state we could not price is REFUSED, never a cited $0.
+       */
+      const jurisdictionAccuracy: AccuracyRating =
+        j.subtotalUsd === null
+          ? rate({
+              tier: 'refused',
+              hover: j.superload
+                ? `${j.jurisdictionName} treats this as a superload. Above its threshold no published fee exists — the agency prices the move after an engineering review.`
+                : `${j.jurisdictionName}'s published schedule does not price this load. The reason is in that state's notes; it is not $0.`,
+              detail: `A state whose fee we cannot compute is left unpriced rather than counted as zero. Summing it as $0 would make the delivered figure look complete while a real permit is missing from it, and a permit left off a quote is an illegal load. ${j.superload ? 'A superload has no over-the-counter fee at all in any state: the routing and the price are settled together, after review.' : ''}`,
+            })
+          : rate({
+              tier: 'cited',
+              bandPct: 0,
+              lowUsd: j.subtotalUsd,
+              highUsd: j.subtotalUsd,
+              asOf: asOf,
+              hover: `${j.jurisdictionName}'s own published fee for this load, traced to the statute or fee schedule that sets it. Not an estimate, and it carries no range.`,
+              detail: `Computed from ${j.jurisdictionName}'s published permit fee schedule for the dimensions, weight and in-state mileage on this lane. A state fee binds whoever hauls the load — it is what you will pay in ${j.jurisdictionName} from any carrier — which is why it sits in the cited column and why it carries no band. ${j.sources.map((d) => d.title).join('; ')}`,
+            });
       lines.push({
         kind: 'permit',
         code: `permit_${j.jurisdiction}`,
         name: `${j.jurisdictionName} single-trip OS/OW permit`,
         amountUsd: j.subtotalUsd,
         basis: 'sourced',
+        accuracy: jurisdictionAccuracy,
         note:
           j.subtotalUsd === null
             ? j.superload
@@ -899,6 +933,26 @@ export function priceHeavyHaulLane(input: HeavyHaulRequest): HeavyHaulQuote {
         name: `Law-enforcement escort floor (${escorts.policeOfficersRequired} officer${escorts.policeOfficersRequired === 1 ? '' : 's'}, ${escorts.policeStatesRequiring.join(', ')})`,
         amountUsd: escorts.policeFloorUsd,
         basis: 'sourced',
+        accuracy:
+          escorts.policeFloorUsd === null
+            ? rate({
+                tier: 'refused',
+                hover:
+                  'A trooper is required and the state publishes no rate to floor it. Only six states publish one; elsewhere the permitting office sets it on the day.',
+                detail:
+                  'The escort is required by the state\'s own rules, so this is not an optional line — it is a real cost with no published figure behind it. Rather than estimate a law-enforcement rate, which is set by an agency and not by a market, the requirement is named and left unpriced and the quote is marked partial.',
+              })
+            : rate({
+                tier: 'cited',
+                bandPct: 0,
+                lowUsd: escorts.policeFloorUsd,
+                highUsd: escorts.policeFloorUsd,
+                asOf: asOf,
+                hover:
+                  'The least the published law-enforcement schedule can charge, cited and effective-dated. A floor, never a total — the agency sets the hours on the day.',
+                detail:
+                  'Six states publish a law-enforcement escort rate. This is the minimum that schedule can produce for the officer count the state\'s rules require, quoted from the schedule and carrying no band because the schedule states it. It is a FLOOR: the hours, and therefore the final charge, are set by the agency when the move happens. This is a statutory figure and is entirely separate from the civilian pilot-car band, which is a market estimate.',
+              }),
         note:
           escorts.policeFloorUsd === null
             ? 'Required, and no published rate exists to floor it. Only six states publish a law-enforcement escort rate; elsewhere the permitting office sets it on the day.'
@@ -989,7 +1043,11 @@ export function priceHeavyHaulLane(input: HeavyHaulRequest): HeavyHaulQuote {
       code: a.code,
       name: a.name,
       amountUsd: a.headlineUsd,
-      basis: a.accuracy.tier === 'cited' ? 'sourced' : 'market',
+      // THE ONE-WAY MAP DECIDES, not a ternary here. A tier can only ever land
+      // in the channel `BASIS_FOR_TIER` allows, so a retier moves the money
+      // automatically and the invariant below cannot be argued around. Refused
+      // rows carry no money at all, so their channel is immaterial.
+      basis: basisForTier(a.accuracy.tier) ?? 'market',
       note:
         a.headlineUsd === null
           ? a.accuracy.detail

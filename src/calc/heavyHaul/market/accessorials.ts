@@ -26,7 +26,17 @@
  *    may-not-apply item upward would inflate every quote on the site.
  * 2. ALWAYS SHOW THE RANGE AND LABEL ITS DRIVER. The width IS the content. A
  *    crane's real driver is site access, which we have not asked about.
- * 3. REFUSE ABOVE 160,000 LB. That is exactly where the evidence stops — see
+ * 3. A FILED CARRIER TARIFF IS EXCELLENT EVIDENCE AND IT IS NOT A STATUTE.
+ *    Several figures here come from tariffs actually filed by named carriers —
+ *    detention, tarping, layover, the assist-labour rates. They are dated,
+ *    pinpoint-citable and far better than a broker's marketing page. They are
+ *    still one carrier's published schedule: a statute binds every carrier in
+ *    the state and a tariff binds the carrier that filed it, and the shipper
+ *    using this tool has not chosen a carrier yet. So every one of them is a
+ *    BENCHMARK, it renders as a range, and its hover says in as many words
+ *    where the number came from — which is more useful to a shipper than either
+ *    "cited" or a bare "market estimate", and it is the truth.
+ * 4. REFUSE ABOVE 160,000 LB. That is exactly where the evidence stops — see
  *    `CRANE_REFUSAL_CARGO_LBS`. There is published precedent for refusing: Ace
  *    Doran quotes tarping by dimension and then prints SPOT BID above 14 ft
  *    wide. A carrier with a filed tariff and decades of lane data declines to
@@ -370,12 +380,13 @@ export function detentionRiskLine(axles: number): AccessorialLine {
     highUsd: round2(perHour * 1.15),
     inTotal: false,
     accuracy: rate({
-      tier: 'cited',
+      tier: 'benchmark',
       bandPct: 15,
       lowUsd: round2(perHour * 0.85),
       highUsd: round2(perHour * 1.15),
       asOf: '2024-12-02',
-      hover: `$${perHour.toFixed(0)}/hr after two free hours at each end. Detention scales by axle count on heavy haul — roughly four times what van freight conditions you to expect.`,
+      sample: 'Three independent carrier tariffs, one of them a US government trucking tariff; the axle scaling comes from a heavy-haul carrier’s filed schedule dated 2024-12-02',
+      hover: `About $${perHour.toFixed(0)}/hr after two free hours at each end, from a filed carrier tariff — one carrier’s published schedule, not a statute. Heavy-haul detention scales by axle count.`,
       detail: `A filed carrier tariff prices detention at $${DETENTION_BASE_USD_PER_HOUR}/hr flat up to five axles and then adds $25/hr per axle at 6–10 axles, $35 at 11–14 and $40 above 14. A ${axles}-axle rig is therefore $${perHour.toFixed(0)} an hour — against the $50–$100 a shipper carries in their head from van freight. Two hours free at each end is effectively an industry constant, confirmed in three independent tariffs; a government tariff sets $135/hr flat on a five-axle van basis and two other carrier tariffs give $150/hr and $220/hr. Free time excludes 17:00–06:00 and weekends unless the appointment falls in that window. NOT INCLUDED IN THE TOTAL, because the hours cannot be predicted — but four hours at a slow receiver is $${round2(perHour * 4).toLocaleString()}, which is usually more than every other accessorial on this quote combined.`,
       marketSources: [SRC_ACE_DORAN_TARIFF, SRC_FEMA_URT, SRC_GLEN_RAVEN_TARIFF],
     }),
@@ -406,7 +417,7 @@ export function layoverRiskLine(): AccessorialLine {
       asOf: '2016-07-10',
       sample: 'One carrier tariff naming the oversize trigger ($306/night) and one government tariff setting the ceiling ($550/day)',
       hover:
-        '$400–$550 a night for an ADDED night. Routine daylight-only oversize transit is already inside the line haul — this is for a night the shipper or a schedule break causes.',
+        '$400–$550 a night for an ADDED night, from filed carrier tariffs — published schedules, not a statute. Routine daylight-only oversize transit is already inside the line haul.',
       detail: `One carrier tariff names the cause directly: a layover applies where the carrier must lay over between sun-down and sun-up BECAUSE OF oversize or overweight shipments, at $130 per man plus $176 per vehicle per night, weekends and holidays included — $306. A US government trucking tariff caps layover at $550 per vehicle per day, which is the right upper bound. The carrier tariff is ten years old, so its low end understates 2026 and the band here starts at $400 instead of $306; that uplift is ours. DOUBLE-COUNTING HERE IS AN EASY AND EXPENSIVE MISTAKE: curfew-driven overnight stops on a normal oversize run are already priced inside the line haul, so this is only for ADDED nights.`,
       marketSources: [SRC_GLEN_RAVEN_TARIFF, SRC_FEMA_URT],
     }),
@@ -461,15 +472,16 @@ export function tarpingLine(
     highUsd: round2(amount * 1.2),
     inTotal: true,
     accuracy: rate({
-      tier: 'cited',
+      tier: 'benchmark',
       bandPct: 20,
       lowUsd: round2(amount * 0.8),
       highUsd: round2(amount * 1.2),
       asOf: '2024-12-02',
+      sample: 'One heavy-haul carrier’s filed tariff, dated 2024-12-02, priced across seven dimension steps',
       hover:
-        'Priced from a filed carrier tariff by width and height. Most oversize freight ships untarped, so this is off unless you ask for it.',
+        'From a filed carrier tariff — one carrier’s published schedule, not a statute, so another carrier tarps at another price. Most oversize freight ships untarped, so this is off unless you ask.',
       detail:
-        'A filed carrier tariff prices tarping by dimension: $150 at legal width or under 8 ft 4 in high, $225 at 8 ft 6 in – 11 ft 6 in wide or 8 ft 4 in – 10 ft 4 in high, $315 at 11 ft 6 in – 14 ft wide or 10 ft 4 in – 12 ft high, and SPOT BID above that. Untarping and retarping at a stop-off is 90% of the original charge each time. The same tariff makes tarping shipper-requested and disclaims weather-damage liability when no tarp is asked for — which is why this is opt-in rather than a default.',
+        'A BENCHMARK, not a cited fee, and the difference matters: a state permit fee binds whoever hauls your load, while this is what ONE carrier published in its filed tariff. It is strong evidence — dated, pinpoint-citable, and far better than a broker’s marketing page — but another carrier will quote another number, and you have not picked a carrier yet. That tariff prices tarping by dimension: $150 at legal width or under 8 ft 4 in high, $225 at 8 ft 6 in – 11 ft 6 in wide or 8 ft 4 in – 10 ft 4 in high, $315 at 11 ft 6 in – 14 ft wide or 10 ft 4 in – 12 ft high, and SPOT BID above that. Untarping and retarping at a stop-off is 90% of the original charge each time. The same tariff makes tarping shipper-requested and disclaims weather-damage liability when no tarp is asked for — which is why this is opt-in rather than a default.',
       marketSources: [SRC_ACE_DORAN_TARIFF],
     }),
   };
@@ -482,6 +494,20 @@ export function tarpingLine(
 export const SECUREMENT_LOW_USD = 150;
 export const SECUREMENT_HIGH_USD = 600;
 
+/**
+ * OFF BY DEFAULT IN THE COMPOSER, AND THAT IS NOT CAUTION.
+ *
+ * The research this is built from says securement is NORMALLY INSIDE the
+ * heavy-haul line haul when the carrier supplies the trailer — and the line haul
+ * this engine now quotes IS that rate. Adding $150 to every quote for something
+ * already inside the number on the row above is double-counting, the same
+ * mistake `layoverRiskLine` warns about for curfew nights.
+ *
+ * Recorded here rather than only in a pull request, because the research reads
+ * as though it wants this on and the reason it must not be is one step further
+ * along than anything the research says. Turn it on for a load that needs a
+ * built cradle; do not turn it on by default.
+ */
 export function securementLine(): AccessorialLine {
   // A CONDITIONAL component: likelihood-weighted, not 65th-percentile. Biasing a
   // may-not-apply item upward would inflate every quote on the site.
