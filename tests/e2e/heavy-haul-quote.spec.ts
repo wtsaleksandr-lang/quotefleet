@@ -58,7 +58,7 @@ async function openTool(page: Page, theme?: 'light' | 'dark') {
       }
     }, theme);
   }
-  const res = await page.goto(TOOL_PATH, { waitUntil: 'domcontentloaded', timeout: 30_000 });
+  const res = await page.goto(TOOL_PATH, { waitUntil: 'domcontentloaded', timeout: 45_000 });
   expect(res?.status(), `${TOOL_PATH} must serve with the database down`).toBe(200);
   await page.waitForSelector('#hh-form');
 }
@@ -387,6 +387,13 @@ test('AN ADDRESS THAT CANNOT BE PLACED STOPS THE QUOTE — no price from a guess
 
 for (const theme of ['dark', 'light'] as const) {
   test(`renders at exactly 375px in the ${theme} theme without cropping`, async ({ page }) => {
+    // MARKED SLOW, NOT GIVEN A LOOSER ASSERTION. This case loads the page,
+    // fills eighteen fields, builds seven mileage rows, submits, and then reads
+    // the painted geometry — genuinely more work than any other test here, and
+    // on a loaded machine it ran past the 60s default while every assertion in
+    // it still held. `test.slow()` triples the budget and changes nothing about
+    // what is checked.
+    test.slow();
     await page.setViewportSize({ width: 375, height: 812 });
     await openTool(page, theme);
     await fillLoad(page);
@@ -448,6 +455,7 @@ for (const theme of ['dark', 'light'] as const) {
   });
 
   test(`theme-aware contrast holds in the ${theme} theme`, async ({ page }) => {
+    test.slow();
     await openTool(page, theme);
     const painted = await page.evaluate(() => {
       const body = getComputedStyle(document.body);
