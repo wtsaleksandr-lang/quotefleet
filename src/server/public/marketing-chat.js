@@ -284,6 +284,19 @@
       }
     }
 
+    /* The OS/OW permit calculator is a single long column of body text at phone
+       width — over 5,000px of per-state fee lines, escort exclusions and notes.
+       The generic 84px lift above parked the launcher in the middle-right of
+       that column, on top of the pilot-cars paragraph, where it covered the one
+       sentence saying escort COST is not included. Return it to the corner here
+       (the tool's own CSS adds 80px of bottom padding so the last line still
+       clears it) — same fix, same reason, as the directory action bar above. */
+    @media (max-width: 480px) {
+      body:has(.ow-shell) .qf-mc-fab {
+        bottom: calc(12px + env(safe-area-inset-bottom, 0px));
+      }
+    }
+
     /* Pages that opt in with body.qf-mc-hide-sm (signup, pricing) hide the
        floating launcher on narrow phones (<=420px). On those two funnel
        surfaces the fixed bottom-right bubble overlapped real content — the

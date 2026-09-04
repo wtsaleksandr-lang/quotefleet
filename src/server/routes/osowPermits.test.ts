@@ -28,6 +28,7 @@ import {
   osowStateOptions,
   OSOW_ASOF_MIN,
   OSOW_MAX_LEGS,
+  OSOW_NOT_INCLUDED,
   OSOW_ROUTE_CLASSES,
   OSOW_SELECTABLE_STATE_CODES,
   OSOW_TOOL_PATH,
@@ -150,7 +151,9 @@ describe('the reference lane', () => {
 
   it('reports escorts as a requirement with the cost excluded', () => {
     expect(out.escorts.costIncluded).toBe(false);
-    expect(out.escorts.note).toMatch(/cost is not included/i);
+    // The note was reworded when the page gained a rate input; what it must
+    // still say is that escort money is never inside the permit total.
+    expect(out.escorts.note).toMatch(/never inside the permit total/i);
     // Kentucky and New York each require one certified escort on this load.
     const needing = out.escorts.byState.filter((s) => s.required > 0).map((s) => s.code);
     expect(needing.sort()).toEqual(['KY', 'NY']);
@@ -807,12 +810,55 @@ describe('the escort section', () => {
     }
   });
 
-  it('leaves the public page untouched — its escort copy is still the old copy', () => {
+  it('reworded the two sentences that went stale the moment a rate input existed', () => {
     const html = renderOsowToolPage();
-    // Nothing about the new section reaches the rendered page in this change.
-    expect(html).not.toMatch(/escortEstimate/);
-    expect(html).not.toMatch(/pilotCarRate/);
-    // The page's own "not included" copy is unchanged, verbatim.
-    expect(html).toContain('We hold no pilot-car rates, so the cost is yours to add');
+
+    // GONE. "We hold no pilot-car rates, so the cost is yours to add" described
+    // a page that could not do arithmetic on an escort. It can now, from the
+    // operator's own rate, so the sentence would be false where it stood.
+    expect(html).not.toContain('We hold no pilot-car rates, so the cost is yours to add');
+    const pilotEntry = OSOW_NOT_INCLUDED.find((n) => /Pilot car/.test(n.item));
+    expect(pilotEntry?.why).not.toMatch(/the cost is yours to add/);
+    expect(pilotEntry?.why).toMatch(/enter YOUR pilot-car rate on this page/);
+    // The claim that survives, and must: no escort money in the permit total.
+    expect(pilotEntry?.why).toMatch(/No escort money is ever inside the permit total/);
+
+    // The lane-level escort note is reworded in the same direction, and the two
+    // agree: we hold no rates, yours is applied, police rates are cited.
+    const out = priceOsowLane({ ...REFERENCE_LANE, asOf: ASOF });
+    expect(out.escorts.note).not.toMatch(/Price them from your own vendor rate/);
+    expect(out.escorts.note).toMatch(/never inside the permit total/);
+    expect(out.escorts.note).toMatch(/supply yours/i);
+    expect(out.escorts.note).toMatch(/LAW-ENFORCEMENT escort rate/);
+
+    // `costIncluded: false` is NOT stale and never will be. It is a statement
+    // about `quote.totalPermitUsd`, not about whether a figure exists.
+    expect(out.escorts.costIncluded).toBe(false);
+  });
+
+  it('asks for the operator’s own pilot-car rate and never offers our band', () => {
+    const html = renderOsowToolPage();
+    // The four inputs, each labelled INSIDE its own field.
+    for (const id of ['ow-pc-mile', 'ow-pc-day', 'ow-pc-days', 'ow-pc-min']) {
+      expect(html).toContain(`id="${id}"`);
+    }
+    expect(html).toMatch(/<label class="ow-field"><input id="ow-pc-mile"[^>]*><span class="ow-lab">/);
+    // Four fields -> two rows of two, so none can be orphaned on a line.
+    expect(html).toMatch(/ow-pc-mile[\s\S]{0,400}ow-pc-day[\s\S]{0,600}ow-pc-days[\s\S]{0,400}ow-pc-min/);
+    // Blank is a valid answer, and the page says so rather than pressing.
+    expect(html).toMatch(/Blank is a valid answer/);
+
+    // OUR FALLBACK BAND IS NEVER OFFERED. It is our estimate, not a published
+    // figure, and the page must not have a control that turns it on.
+    expect(html).not.toMatch(/useInternalPilotCarBand/);
+    const client = readFileSync(
+      resolve(process.cwd(), 'src/server/public/osow-calculator.js'),
+      'utf8',
+    );
+    // Named in a comment saying it is never sent; never assigned or serialised.
+    expect(client).not.toMatch(/useInternalPilotCarBand\s*[:=]/);
+    expect(client).not.toMatch(/payload\.useInternalPilotCarBand/);
+    // And the client sends the rate only when one was actually given.
+    expect(client).toContain('payload.pilotCarRate = rate;');
   });
 });
