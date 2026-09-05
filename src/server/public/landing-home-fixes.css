@@ -665,3 +665,25 @@ body.qf-wft .site-brand:focus-visible .qf-brand-mark {
   body.qf-wft .site-brand:hover .qf-brand-mark,
   body.qf-wft .site-brand:focus-visible .qf-brand-mark { transform: none; }
 }
+
+/* ── PHONE FOOTER — TWO COLUMNS. Overrides this sheet's own
+   `grid-template-columns: minmax(0, 1fr) !important` phone step above, which is
+   the declaration that actually wins on the homepage (nav-ia.css is injected by
+   landing-motion.js, so it is not there with scripting off). `!important` is
+   matched, not escalated — the rule it replaces already carries it.
+   Arithmetic and rationale: foot of nav-unify.css. */
+@media (max-width: 640px) {
+  body.qf-wft.landing-v2 .premium-footer-inner {
+    grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
+    column-gap: 16px !important;
+    row-gap: 24px !important;
+  }
+  body.qf-wft.landing-v2 .premium-footer-inner > .footer-col:last-child {
+    grid-column: 1 / -1 !important;
+    display: block !important;
+    columns: 2;
+    column-gap: 16px;
+  }
+  body.qf-wft.landing-v2 .premium-footer-inner > .footer-col:last-child h4 { column-span: all; }
+  body.qf-wft.landing-v2 .premium-footer-inner > .footer-col:last-child a { break-inside: avoid; }
+}

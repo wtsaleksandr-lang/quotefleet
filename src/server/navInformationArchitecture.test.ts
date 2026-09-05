@@ -420,6 +420,32 @@ function collect(sheets: Array<[string, string]>, match: RegExp, prop?: string):
   return sheets.flatMap(([name, css]) => gridDecls(css, name, match, seed, prop));
 }
 
+/**
+ * A LINK COLUMN THAT SPANS EVERY TRACK IS NOT PART OF THE WRAP.
+ *
+ * The phone footer went from one tall stack to two columns (Alex, 2026-09), and
+ * with N=5 that is only legal because the LAST link column spans `1 / -1` and
+ * paginates its own links into two CSS columns. A full-bleed row is the same
+ * deliberate case the rule already blesses at T=1 — it is a row that holds one
+ * column because it was told to, not a wrap that ran out of items. So the
+ * arithmetic is applied to the columns that actually wrap:
+ *
+ *     wrapping = N - (link columns pinned to `grid-column: 1 / -1`)
+ *     forbidden  ⟺  wrapping mod T === 1
+ *
+ * `.footer-brand` never counted (N counts `.footer-col` / `.dirfoot-col` only),
+ * so this only ever picks up a deliberately spanned LINK column.
+ */
+const SPAN_SEL = /footer-col:last-child|dirfoot-col:last-child/;
+const FULL_ROW = /^\s*1\s*\/\s*-1\s*(!important)?\s*$/;
+
+/** How many link columns are pinned full-bleed at `width`, per the cascade. */
+function spannedAt(sheets: Array<[string, string]>, width: number): number {
+  const decls = collect(sheets, SPAN_SEL, 'grid-column');
+  const win = winnerAt(decls, width);
+  return win !== undefined && FULL_ROW.test(win.value) ? 1 : 0;
+}
+
 const FOOTER_SURFACES = [
   { name: 'homepage (landing.html + nav-ia.css)', cols: () => PREMIUM_COLS, sheets: PREMIUM_SHEETS_HOMEPAGE, sel: /premium-footer-inner/ },
   { name: 'shared marketing chrome (nav-unify.css)', cols: () => PREMIUM_COLS, sheets: PREMIUM_SHEETS_SHARED, sel: /premium-footer-inner/ },
@@ -445,8 +471,11 @@ describe('NO FOOTER ROW EVER HOLDS ONE COLUMN — every variant, 320→1600px', 
         const win = winnerAt(decls, w);
         expect(win, `no rule applies at ${w}px`).toBeDefined();
         const t = win.tracks;
-        if (t > 1 && n % t === 1) {
-          offenders.push(`${w}px → ${t} tracks for ${n} columns (${n % t} alone on the last row) via ${win.sheet} "${win.selector}"`);
+        /* A link column pinned `1 / -1` owns a row of its own by instruction,
+           so it is not one of the columns the grid has to wrap. */
+        const wrapping = n - spannedAt(surface.sheets as unknown as Array<[string, string]>, w);
+        if (t > 1 && wrapping % t === 1) {
+          offenders.push(`${w}px → ${t} tracks for ${wrapping} wrapping columns (${wrapping % t} alone on the last row) via ${win.sheet} "${win.selector}"`);
         }
         if (t > n) offenders.push(`${w}px → ${t} tracks but only ${n} columns: ${t - n} track(s) can never be filled (${win.sheet})`);
       }
@@ -454,11 +483,16 @@ describe('NO FOOTER ROW EVER HOLDS ONE COLUMN — every variant, 320→1600px', 
     },
   );
 
-  it('is checked at 375px specifically — the reference phone width', () => {
+  /* THE OWNER'S ASK, PINNED. "I don't like that footer it is 1 long stacked
+     column in a mobile view. optimize it. make 2 columns." Every variant, at
+     the reference phone width, with the remainder still zero. */
+  it('is TWO columns at 375px — the reference phone width — with no orphaned row', () => {
     for (const surface of FOOTER_SURFACES) {
-      const decls = collect(surface.sheets as unknown as Array<[string, string]>, surface.sel);
-      const t = winnerAt(decls, 375).tracks;
-      expect(t, `${surface.name} at 375px`).toBe(1);
+      const sheets = surface.sheets as unknown as Array<[string, string]>;
+      const t = winnerAt(collect(sheets, surface.sel), 375).tracks;
+      expect(t, `${surface.name} at 375px`).toBe(2);
+      const wrapping = surface.cols() - spannedAt(sheets, 375);
+      expect(wrapping % t, `${surface.name}: ${wrapping} wrapping columns in ${t} tracks`).toBe(0);
     }
   });
 
@@ -470,33 +504,46 @@ describe('NO FOOTER ROW EVER HOLDS ONE COLUMN — every variant, 320→1600px', 
     const bad: string[] = [];
     for (const surface of FOOTER_SURFACES) {
       const n = surface.cols();
-      for (const d of collect(surface.sheets as unknown as Array<[string, string]>, surface.sel)) {
-        if (d.tracks > 1 && n % d.tracks === 1) bad.push(`${d.sheet} "${d.selector}" → ${d.tracks} tracks for ${n} columns`);
+      const sheets = surface.sheets as unknown as Array<[string, string]>;
+      for (const d of collect(sheets, surface.sel)) {
+        /* Judge each declaration in the media band it actually governs, so a
+           two-track rule is read alongside the span that makes it legal. */
+        const probe = Number.isFinite(d.maxWidth) ? d.maxWidth : Math.max(d.minWidth, 1600);
+        const wrapping = n - spannedAt(sheets, probe);
+        if (d.tracks > 1 && wrapping % d.tracks === 1) bad.push(`${d.sheet} "${d.selector}" → ${d.tracks} tracks for ${wrapping} wrapping columns`);
         if (d.tracks > n) bad.push(`${d.sheet} "${d.selector}" → ${d.tracks} tracks, only ${n} columns exist`);
       }
     }
     expect(bad).toEqual([]);
   });
 
-  it('steps the ladder 5 → 3 → 1 for the five-column footer, on BOTH surfaces', () => {
+  it('steps the ladder 5 → 3 → 2 for the five-column footer, on BOTH surfaces', () => {
     for (const surface of FOOTER_SURFACES.filter((s) => s.cols() === 5)) {
-      const decls = collect(surface.sheets as unknown as Array<[string, string]>, surface.sel);
+      const sheets = surface.sheets as unknown as Array<[string, string]>;
+      const decls = collect(sheets, surface.sel);
       const at = (w: number) => winnerAt(decls, w).tracks;
       expect([at(1600), at(1101)], `${surface.name} wide`).toEqual([5, 5]);
       expect([at(1100), at(641)], `${surface.name} mid`).toEqual([3, 3]);
-      expect([at(640), at(320)], `${surface.name} phone`).toEqual([1, 1]);
+      // The phone step is TWO, not the old full-bleed stack. It is only legal
+      // because the last link column is pinned `1 / -1` there, leaving four
+      // columns to wrap into two tracks with nothing left over.
+      expect([at(640), at(320)], `${surface.name} phone`).toEqual([2, 2]);
+      expect([spannedAt(sheets, 640), spannedAt(sheets, 320)], `${surface.name} spanned`).toEqual([1, 1]);
+      expect(spannedAt(sheets, 641), `${surface.name} does NOT span above the phone step`).toBe(0);
     }
   });
 
-  it('steps the ladder 4 → 2 → 1 for the directory footer', () => {
+  it('steps the ladder 4 → 2 for the directory footer', () => {
     const decls = collect(DIRFOOT_SHEETS, /\.dirfoot(?![-\w])/);
     const at = (w: number) => winnerAt(decls, w).tracks;
     expect([at(1600), at(981)]).toEqual([4, 4]);
     // 421–720px used to be `repeat(2, …)` against THREE columns — 2 + 1, with
     // FREE TOOLS alone beside 207–344px of dead space. Four columns make two
-    // tracks a true 2×2.
+    // tracks a true 2×2 — and because 4 mod 2 === 0, the same two tracks are
+    // orphan-free at 375px, so the phone step needs no span and no stack.
     expect([at(980), at(721), at(641)]).toEqual([2, 2, 2]);
-    expect([at(640), at(320)]).toEqual([1, 1]);
+    expect([at(640), at(320)]).toEqual([2, 2]);
+    expect(spannedAt(DIRFOOT_SHEETS, 375)).toBe(0);
   });
 });
 

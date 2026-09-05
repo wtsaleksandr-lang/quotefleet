@@ -756,3 +756,42 @@ html[data-theme="light"] .nav-dd-panel {
   .site-actions { gap: 8px; }
   .site-actions .btn-secondary { padding-left: 12px; padding-right: 12px; }
 }
+
+/* ── PHONE FOOTER — TWO COLUMNS, NOT ONE TALL STACK ────────────────────────
+   Alex, 2026-09: "I don't like that footer it is 1 long stacked column in a
+   mobile view. optimize it. make 2 columns."
+
+   THE ARITHMETIC IS THE WHOLE PROBLEM. PREMIUM_FOOTER has N=5 link columns and
+   the standing rule (DESIGN-SYSTEM.md §8, measured by
+   navInformationArchitecture.test.ts at every width 320→1600) is that no row
+   may hold exactly one column: with N columns in T tracks the last row holds
+   `N mod T`, so every T where `N mod T === 1` is forbidden. 5 mod 2 === 1, so a
+   plain two-track phone grid strands LEGAL alone — which is exactly why the
+   phone step shipped as a single full-bleed stack in the first place.
+
+   THE FIX IS TO TAKE ONE COLUMN OUT OF THE WRAP. The last link column spans
+   both tracks and lays its own links out in two CSS columns, so it is a
+   deliberate full-bleed row (the same case the rule already blesses at T=1),
+   not a wrap remainder. That leaves 4 columns wrapping into 2 tracks —
+   4 mod 2 === 0 — and every row of the footer holds two things.
+
+   Appended at EOF on purpose: the spacing guard's baseline is line-numbered,
+   so an in-place edit above would renumber ~6 tolerated entries in this file.
+   Later + equal specificity beats the `minmax(0, 1fr)` step above at ≤640px;
+   that older rule stays legal on its own terms (T=1 is always allowed). */
+@media (max-width: 640px) {
+  .premium-footer-inner {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    column-gap: 16px;
+    row-gap: 24px;
+  }
+  .premium-footer .footer-brand { grid-column: 1 / -1; }
+  .premium-footer-inner > .footer-col:last-child {
+    grid-column: 1 / -1;
+    display: block;
+    columns: 2;
+    column-gap: 16px;
+  }
+  .premium-footer-inner > .footer-col:last-child h4 { column-span: all; }
+  .premium-footer-inner > .footer-col:last-child a { break-inside: avoid; }
+}

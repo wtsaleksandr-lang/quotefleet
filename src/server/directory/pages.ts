@@ -1675,8 +1675,11 @@ export const DIRECTORY_CSS = `
   @media (max-width: 980px) {
     .site-footer .dirfoot { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 24px; }
   }
+  /* PHONE: TWO COLUMNS, NOT ONE TALL STACK (Alex, 2026-09). N=4 here, and
+     4 mod 2 === 0, so the two-track grid the 980px step already establishes is
+     orphan-free at 375px as well — the phone step only tightens the gutter. */
   @media (max-width: 640px) {
-    .site-footer .dirfoot { grid-template-columns: minmax(0, 1fr); }
+    .site-footer .dirfoot { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 24px 16px; }
   }
 `;
 

@@ -58,6 +58,10 @@ import type { FirstTrigger, HubState } from './hubData.js';
 import {
   citeLink,
   esc,
+  fold,
+  folds,
+  microLabel,
+  shortVersion,
   hubPage,
   jsonLdBreadcrumb,
   jsonLdCollection,
@@ -183,20 +187,24 @@ export const HUB_ENTRIES: readonly HubEntry[] = [
 
 // ── Small builders ─────────────────────────────────────────────────────────
 
-function sec(id: string, heading: string, inner: string): string {
-  return `<section class="qh-sec" id="${esc(id)}"><h2>${esc(heading)}</h2>${inner}</section>`;
+/**
+ * A section. The optional `eyebrow` is the mono micro-label that does the
+ * wayfinding — 11px uppercase at step 3 of the ink ladder, top-left of the
+ * heading block per the house rule, never centred and never inline with it.
+ */
+function sec(id: string, heading: string, inner: string, eyebrow?: string): string {
+  const label = eyebrow ?? id.replace(/-/g, ' ');
+  return `<section class="qh-sec" id="${esc(id)}">${microLabel(label)}<h2>${esc(heading)}</h2>${inner}</section>`;
 }
 
 function compareLink(path: string, label: string): string {
   return `<p class="qh-compare"><a href="${esc(path)}">${esc(label)} →</a></p>`;
 }
 
+/** ONE disclosure pattern per surface: the FAQ is the same compact fold. */
 function faqBlock(faqs: Array<{ q: string; a: string }>): string {
-  return `<div class="qh-faq">${faqs
-    .map(
-      (f) =>
-        `<details><summary>${esc(f.q)}</summary><p>${esc(f.a)}</p></details>`,
-    )
+  return `<div class="qh-faq" data-qh-folds>${faqs
+    .map((f) => fold({ label: f.q, bodyHtml: `<p>${esc(f.a)}</p>` }))
     .join('')}</div>`;
 }
 
@@ -1093,7 +1101,11 @@ export function renderSourceNotes(asOf: IsoDate): string {
             </div>`,
           )
           .join('')}</div>
-        <p>Both documents are in effect and both are official. Neither has been adopted: the engine returns no value for this field, and a quote that depends on it is sent to the issuing agency rather than being priced from whichever document was read first.</p>
+        ${fold({
+          label: 'What that means for a quote',
+          bodyHtml:
+            '<p>Both documents are in effect and both are official. Neither has been adopted: the engine returns no value for this field, and a quote that depends on it is sent to the issuing agency rather than being priced from whichever document was read first.</p>',
+        })}
       </article>`,
     )
     .join('');
@@ -1112,7 +1124,11 @@ export function renderSourceNotes(asOf: IsoDate): string {
             </div>`,
           )
           .join('')}</div>
-        <p>Two schedules band the same load the same way and price it differently. The difference reaches the applicant directly: a load that falls in this band is quoted as a spread, and the permit is sent to the agency to price.</p>
+        ${fold({
+          label: 'What that means for a quote',
+          bodyHtml:
+            '<p>Two schedules band the same load the same way and price it differently. The difference reaches the applicant directly: a load that falls in this band is quoted as a spread, and the permit is sent to the agency to price.</p>',
+        })}
       </article>`,
     )
     .join('');
@@ -1121,8 +1137,8 @@ export function renderSourceNotes(asOf: IsoDate): string {
     .map(
       (g) => `<article class="qh-entry">
         <h3><a href="${esc(hubStatePath(g.slug))}#conflicts">${esc(g.stateName)}</a> — ${esc(g.title)}</h3>
-        <p>${esc(g.detail)}</p>
         <p class="qh-meta"><code>${esc(g.constantName)}</code></p>
+        ${fold({ label: 'What the two schedules leave uncovered', bodyHtml: `<p>${esc(g.detail)}</p>` })}
       </article>`,
     )
     .join('');
@@ -1149,22 +1165,36 @@ export function renderSourceNotes(asOf: IsoDate): string {
       'conflicts',
       `${total} places two official documents disagree`,
       `<p>Each entry below is a field where two documents that are both in effect, both official and both published by the state give different answers. We hold both and adopt neither. Finding one of these required reading both documents, which is why they are not in anybody else's table.</p>
-       ${conflictHtml}${bandHtml}`,
+       <div data-qh-folds>${conflictHtml}${bandHtml}</div>`,
+      'The disagreements',
     ),
     sec(
       'gaps',
       `${gaps.length} gaps where nothing at all is priced`,
       `<p>A different failure, and a more surprising one: not two documents disagreeing about a value, but two documents that between them leave a range covered by neither. A move landing inside one of these bands matches no published fee at all.</p>
-       ${gapHtml}`,
+       <div data-qh-folds>${gapHtml}</div>`,
+      'The gaps',
     ),
     sec(
       'how',
       'How this page is made',
-      `<p>The engine stores every value as a list of candidates, each with its own source document, effective window and pinpoint cite. Resolving a field filters to the candidates in effect on the quote date and — when they disagree — returns no value, with both candidates attached and a warning. This page renders those refusals.</p>
-       <p>That has a consequence worth stating: <strong>the page stays current for free and grows as jurisdictions are added.</strong> It is not a document somebody maintains. ${compareLink(`${OSOW_HUB_PATH}/common-figures`, 'Figures in circulation that no primary document supports')}</p>`,
+      `<p><strong>The page stays current for free and grows as jurisdictions are added.</strong> It is not a document somebody maintains.</p>
+       ${folds([
+         {
+           label: 'The mechanism, in full',
+           bodyHtml:
+             '<p>The engine stores every value as a list of candidates, each with its own source document, effective window and pinpoint cite. Resolving a field filters to the candidates in effect on the quote date and — when they disagree — returns no value, with both candidates attached and a warning. This page renders those refusals.</p>',
+         },
+       ])}
+       ${compareLink(`${OSOW_HUB_PATH}/common-figures`, 'Figures in circulation that no primary document supports')}`,
+      'Method',
     ),
-    sec('faq', 'Questions', faqBlock(faqs)),
+    sec('faq', 'Questions', faqBlock(faqs), 'Common questions'),
   ].join('');
+
+  const shortHtml = shortVersion(
+    `across ${HUB_COVERED_STATES.length} covered states there are <strong>${total}</strong> fields where two in-effect official documents give different answers, and <strong>${gaps.length}</strong> ranges that no published schedule prices at all. Neither side of a disagreement is adopted: the engine returns no value and the permit goes to the issuing agency. Every entry below names both documents and the pinpoint cite in each, so the question to the permit office is "which of these two do you charge" rather than "how much is it".`,
+  );
 
   return hubPage({
     title: 'Where the Official OS/OW Sources Disagree | QuoteFleet',
@@ -1181,7 +1211,7 @@ export function renderSourceNotes(asOf: IsoDate): string {
       { id: 'how', label: 'How this is made' },
       { id: 'faq', label: 'Questions' },
     ],
-    bodyHtml: body,
+    bodyHtml: shortHtml + body,
     dateModified: prov.lastRetrieved,
     jsonLd: [
       jsonLdBreadcrumb([
@@ -1243,13 +1273,25 @@ export function renderStatePage(state: HubState, asOf: IsoDate): string {
       return `<tr><td class="qh-st">${esc(m.label)}</td><td>${fmt(t)}</td><td>${fmt(p)}</td></tr>`;
     }).join('')}</tbody></table></div>`;
 
-  const ruleList = rules.escortRules
-    .filter((r) => isInEffect(r, asOf))
+  const inEffectRules = rules.escortRules.filter((r) => isInEffect(r, asOf));
+  const ruleList = inEffectRules
     .map(
       (r) =>
         `<li>${esc(r.description)} — ${citeLink(r.source, r.source.cite ?? r.source.title)} <span class="qh-rev">${esc(revisionLine(r.source))}</span></li>`,
     )
     .join('');
+  /* The TRIGGER TABLE above answers "when"; this is the full prose of every
+     rule behind it. Folded with its count on the summary, so the page never
+     looks like it holds fewer rules than it does. */
+  const ruleFold = folds([
+    {
+      id: 'escort-rules',
+      label: 'Every escort rule on file, in full',
+      count: `${inEffectRules.length} ${inEffectRules.length === 1 ? 'rule' : 'rules'}`,
+      bodyHtml: `<ul>${ruleList}</ul>`,
+      capped: inEffectRules.length > 8,
+    },
+  ]);
 
   const feeCells = {
     base: cellFrom('single-trip base permit fee', rules.permitBaseFeeUsd, asOf, fmtUsd),
@@ -1324,7 +1366,17 @@ export function renderStatePage(state: HubState, asOf: IsoDate): string {
           police.floorOneOfficerUsd === null ? 'an amount the schedule does not let us compute' : fmtUsd(police.floorOneOfficerUsd),
         )} before mileage.</p>
          <p class="qh-meta">${citeLink(police.rate.source, police.rate.source.title)} — ${esc(revisionLine(police.rate.source))}</p>
-         <ul>${police.rate.value.unpriced.map((u) => `<li>${esc(u.description)}</li>`).join('')}</ul>`
+         ${
+           police.rate.value.unpriced.length === 0
+             ? ''
+             : folds([
+                 {
+                   label: 'What the schedule does not price',
+                   count: `${police.rate.value.unpriced.length} ${police.rate.value.unpriced.length === 1 ? 'item' : 'items'}`,
+                   bodyHtml: `<ul>${police.rate.value.unpriced.map((u) => `<li>${esc(u.description)}</li>`).join('')}</ul>`,
+                 },
+               ])
+         }`
       : police?.finding != null
         ? `<p><strong>${
             police.finding.kind === 'noScheduleExists'
@@ -1437,19 +1489,36 @@ export function renderStatePage(state: HubState, asOf: IsoDate): string {
     { id: 'faq', label: 'Questions' },
   ];
 
-  const body = [
+  /* THE ANSWER, ABOVE THE DOCUMENT. Three computed figures — the base fee, the
+     first width trigger, the superload line — so a reader who wants only "what
+     do I actually need" gets it before twelve sections of citation. Generated
+     from the same cells the tables below render; nothing here is typed prose
+     about a number, and each clause degrades to an honest "not published"
+     rather than to a guess. */
+  const short = shortVersion(
+    `a ${esc(state.name)} single-trip permit starts at `
+      + `${feeCells.base.text === null ? '<strong>a figure the documents on file do not resolve</strong>' : `<strong>${esc(feeCells.base.text)}</strong>`}`
+      + ' before bands, overweight and the transaction charge; an escort is first required at '
+      + `${triggers.widthIn === undefined ? '<strong>no width the state publishes</strong>' : `<strong>${esc(formatTrigger(triggers.widthIn, 'widthIn'))}</strong> wide`}`
+      + '; and the load becomes a superload at '
+      + `${superCells.gross.text === null ? '<strong>a gross weight the state does not publish</strong>' : `<strong>${esc(superCells.gross.text)}</strong>`}`
+      + `. Everything below carries the ${esc(state.name)} document it came from, that document's own revision date, and the date we read it.`,
+  );
+
+  const body = short + [
     sec(
       'legal-limits',
       `1. ${state.name} legal limits`,
       `<p>Anything over one of these needs a permit. Every value links to the document that sets it.</p>${limitTable}${compareLink(`${OSOW_HUB_PATH}/legal-limits`, 'Compare all states')}`,
+      'Legal limits',
     ),
     sec(
       'escorts',
       `2. When ${state.name} requires an escort`,
       `${triggerTable}
-       <h3>Every escort rule on file</h3>
-       <ul>${ruleList}</ul>
+       ${ruleFold}
        ${compareLink(`${OSOW_HUB_PATH}/escort-requirements`, 'Compare all states')}`,
+      'Escort requirements',
     ),
     sec(
       'fees',
@@ -1458,29 +1527,47 @@ export function renderStatePage(state: HubState, asOf: IsoDate): string {
        ${bandRows === '' ? '' : `<h3>Dimension bands</h3><div class="qh-tablewrap"><table class="qh-table"><thead><tr><th class="qh-st">Band</th><th>Fee</th></tr></thead><tbody>${bandRows}</tbody></table></div>`}
        ${additionalHtml}
        ${compareLink(`${OSOW_HUB_PATH}/permit-fees`, 'Compare all states')}`,
+      'Permit fees',
     ),
-    sec('overweight', `4. How ${state.name} prices overweight`, overweightHtml),
+    sec('overweight', `4. How ${state.name} prices overweight`, overweightHtml, 'Overweight'),
     sec(
       'superload',
       `5. ${state.name}'s superload threshold`,
       `<p>Above one of these, the state stops issuing over the counter and prices the move after an engineering review.</p>${superTable}${compareLink(`${OSOW_HUB_PATH}/superloads`, 'Compare all states')}`,
+      'Superload',
     ),
     sec(
       'survey',
       '6. Route survey and bridge review',
       `<p>The dimensions at which ${esc(state.name)} triggers a physical route inspection or an engineering review, and what the agency charges to review it.</p>${inspectionTable}`,
+      'Route survey',
     ),
-    sec('police', '7. Police escorts', policeHtml + compareLink(`${OSOW_HUB_PATH}/police-escorts`, 'Compare all states')),
+    sec('police', '7. Police escorts', policeHtml + compareLink(`${OSOW_HUB_PATH}/police-escorts`, 'Compare all states'), 'Police escorts'),
     sec(
       'timing',
       '8. When you can move it',
-      `<p>Holiday, curfew and night-travel windows are <strong>not yet encoded</strong> for ${esc(state.name)} and are not guessed at here. What we do publish is the seasonal weight-restriction picture, with the date we last read each state's own bulletin.</p>
-       <p><a href="${esc(SEASONAL_TOOL)}/${esc(state.slug)}">${esc(state.name)} spring thaw restrictions →</a></p>`,
+      `<p>Holiday, curfew and night-travel windows are <strong>not yet encoded</strong> for ${esc(state.name)}.</p>
+       <p><a href="${esc(SEASONAL_TOOL)}/${esc(state.slug)}">${esc(state.name)} spring thaw restrictions →</a></p>
+       ${folds([
+         {
+           label: 'Why those windows are absent rather than estimated',
+           bodyHtml: `<p>They are not guessed at here. What we do publish is the seasonal weight-restriction picture, with the date we last read each state's own bulletin — a curfew invented from a plausible pattern is worth less than an honest gap, because a reader cannot tell the two apart on the page.</p>`,
+         },
+       ])}`,
+      'Travel restrictions',
     ),
     sec(
       'office',
       '9. Permit office',
-      `<p>We are <strong>not</strong> publishing per-state permit-office phone numbers yet, and the reason is worth stating: the two seed lists available for them are both demonstrably stale — the federal one gives two different states the same phone number — and a wrong number on a page like this costs somebody a morning. The agency behind each figure above is linked from that figure, which is the part we can stand behind today.</p>`,
+      `<p>The agency behind each figure above is linked from that figure. We publish no per-state permit-office phone number.</p>
+       ${folds([
+         {
+           id: 'why-no-phone',
+           label: 'Why there is no phone number here',
+           bodyHtml: `<p>We are <strong>not</strong> publishing per-state permit-office phone numbers yet, and the reason is worth stating: the two seed lists available for them are both demonstrably stale — the federal one gives two different states the same phone number — and a wrong number on a page like this costs somebody a morning. The agency behind each figure above is linked from that figure, which is the part we can stand behind today.</p>`,
+         },
+       ])}`,
+      'Who issues it',
     ),
     ...(hasDisagreement
       ? [
@@ -1488,22 +1575,33 @@ export function renderStatePage(state: HubState, asOf: IsoDate): string {
             'conflicts',
             '10. Where the sources disagree',
             `<p>Two official documents, both in effect, giving different answers. Neither has been adopted.</p>${disagreementHtml}${compareLink(`${OSOW_HUB_PATH}/source-notes`, 'Every conflict across all states')}`,
+            'Source conflicts',
           ),
         ]
       : []),
     sec(
       'excluded',
       '11. What this does not include',
-      `<p>Named in dollars rather than gestured at, because each of these can exceed the permit itself.</p>
-       <ul>${NOT_INCLUDED.map((n) => `<li><strong>${esc(n.item)}.</strong> ${esc(n.why)}</li>`).join('')}</ul>
+      `<p>Named rather than gestured at, because each of these can exceed the permit itself. Every item is listed; open one for why it is excluded.</p>
+       ${folds(NOT_INCLUDED.map((n) => ({ label: n.item, bodyHtml: `<p>${esc(n.why)}</p>` })))}
        <p><a href="${esc(OSOW_TOOL)}">Price a lane through ${esc(state.name)} →</a></p>`,
+      'Scope',
     ),
     sec(
       'sources',
       `12. Every source behind this page (${prov.count})`,
-      sourceList(prov.sources),
+      folds([
+        {
+          id: 'source-list',
+          label: `Every document behind ${state.name}`,
+          count: `${prov.count} ${prov.count === 1 ? 'source' : 'sources'}`,
+          bodyHtml: sourceList(prov.sources),
+          capped: true,
+        },
+      ]),
+      'Provenance',
     ),
-    sec('faq', 'Questions', faqBlock(faqs)),
+    sec('faq', 'Questions', faqBlock(faqs), 'Common questions'),
   ].join('');
 
   return hubPage({
