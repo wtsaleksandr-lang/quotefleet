@@ -1269,7 +1269,7 @@
   // ordinary permit. Mirroring the raw 200,000 would let the widget wave
   // through the exact load the server then rejects.
   //
-  // SEVEN covered states are deliberately ABSENT, each for a reason the server
+  // NINE covered states are deliberately ABSENT, each for a reason the server
   // can defend. Illinois publishes no numeric gross-weight superload threshold
   // at all. Indiana's own agencies publish three that disagree (108,000 /
   // 120,000 / 200,000 lb). California defines a weight superload by hauling
@@ -1298,8 +1298,27 @@
   // server then refuses. The server's own threshold is 200,000 for exactly this
   // reason, and this line follows it rather than the statute's vocabulary.
   //
+  // MICHIGAN AND MISSISSIPPI ARE THE TWO NEWEST ABSENCES, AND FOR OPPOSITE
+  // REASONS. Michigan publishes NO gross-weight superload threshold at all: its
+  // superload list is dimensional only (over 16 ft wide, over 15 ft high, over
+  // 150 ft long), because Michigan's weight law is per-axle-and-spacing and a
+  // 164,000 lb move on eleven properly spaced axles is an ORDINARY $50
+  // single-trip permit. There is no number to mirror and inventing one would be
+  // the Florida mistake with the polarity reversed. Mississippi DOES publish a
+  // number and contradicts itself inside the sentence that prints it — "any
+  // vehicle that EXCEEDS any of the following limits: ... Gross Weight of
+  // 189,999 pounds OR GREATER" — so the server resolves no ceiling and neither
+  // does this table.
+  //
+  // SOUTH CAROLINA IS 130,000, WHICH IS ALSO ITS PERMIT CEILING ON SEVEN AXLES.
+  // Above it a load is a superload requiring additional routing analysis, a
+  // $100 non-refundable application, an engineering analysis and an impact fee
+  // whose basis the statute does not state — none of which the server prices.
+  // Below it every South Carolina permit is the flat $30 single trip, so the
+  // server can price every pound under the ceiling.
+  //
   // Pinned against the server-side data by src/calc/osow/widgetMirror.test.ts.
-  var OSOW_SUPERLOAD_LBS = { TX: 254300, OH: 120000, PA: 201000, NY: 199999, GA: 180000, NC: 132000, WA: 200000, AL: 300000, MO: 160000, LA: 254000, CO: 200000, AR: 179999, KY: 160000, TN: 165000 };
+  var OSOW_SUPERLOAD_LBS = { TX: 254300, OH: 120000, PA: 201000, NY: 199999, GA: 180000, NC: 132000, WA: 200000, AL: 300000, MO: 160000, LA: 254000, CO: 200000, AR: 179999, KY: 160000, TN: 165000, SC: 130000 };
   function maxQuotableWeightLbs(pickup, delivery) {
     var from = String((pickup && pickup.state) || '').trim().toUpperCase();
     var to = String((delivery && delivery.state) || '').trim().toUpperCase();

@@ -89,8 +89,48 @@
  * Phase 7, and Tennessee now has one too — the last of the three, and the
  * registry named none of them before its dataset existed. `calculateOsow`
  * refuses loudly for any state that is not here, and that refusal is the honest
- * answer for a state we have not sourced. Twenty-one are covered: TX, OH, PA, NY,
- * IL, IN, CA, GA, NC, NJ, VA, WA, AL, FL, MO, OK, LA, CO, AR, KY, TN.
+ * answer for a state we have not sourced.
+ *
+ * PHASE 9 MOVED THREE, AND ONE OF THEM IS THE FIRST STRUCTURAL ADDITION TO
+ * `JurisdictionOsowRules` SINCE THE MODEL WAS WRITTEN.
+ *
+ * MICHIGAN HAS NO GROSS-WEIGHT LIMIT TO RECORD. MCL 257.722(1) sets its axle
+ * maxima by the DISTANCE TO THE NEIGHBOURING AXLE — 18,000 / 13,000 / 9,000 lb —
+ * MCL 257.719(5)(b) caps the vehicle at eleven axles, and MDOT states in its own
+ * words that the famous 164,000 lb figure is the ARITHMETIC RESULT of those two
+ * and not a number the statute writes. No `Sourced<number>` can express that, so
+ * `axleSpacingWeightTables` was added: a spacing table evaluated per
+ * adjacent-axle gap, with the inclusivity of BOTH bounds recorded, because the
+ * statute leaves exactly 3 1/2 ft named by no subdivision and MDOT's own T-1
+ * closes the hole. Michigan also brought a NEW SELECTOR AXIS — its two tables
+ * are chosen by GROSS WEIGHT ("in excess of 80,000 pounds"), not by route, so
+ * the same truck on the same road is judged by a different table depending on
+ * how heavy it is — and two `RouteClass` members, `mi-designated` and
+ * `mi-non-designated`, which control a width, four lengths and a tandem weight.
+ *
+ * SOUTH CAROLINA BROUGHT THE SECOND: `stateBridgeTable`. § 56-5-4140 transcribes
+ * its OWN bridge table and the two-axle row at 8 ft reads 35,200 lb where FHWA
+ * reads 34,000, so falling through to `bridgeFormula.ts` would test a South
+ * Carolina load against another state's numbers. When the field is present the
+ * federal check is not run, and a group with no cell on file is reported
+ * undecided rather than judged by the wrong table.
+ *
+ * MISSISSIPPI NEEDED NOTHING NEW, AND THAT IS THE POINT OF CHECKING. Its
+ * overweight fee is unpriceable — ".05 cents per thousand lbs. times the miles
+ * traveled" is $0.0005 read literally and $0.05 as intended, a hundredfold,
+ * with no statutory backstop — which is the `notPriceable` case the model has
+ * had since Phase 2. Its two road classes are defined by lane count and map onto
+ * `two-lane`, `divided`, `multilane-undivided` and `interstate`, so no `ms-`
+ * member was minted; a private synonym for a definition the general vocabulary
+ * already expresses is a member a caller cannot know to pass.
+ *
+ * Same terms as every phase before: no evaluator changed its meaning for any
+ * existing state, no condition kind was added, a jurisdiction that declares
+ * neither new field behaves exactly as it did in Phase 8, and no
+ * `if (state === ...)` has ever been added anywhere.
+ *
+ * Twenty-four are covered: TX, OH, PA, NY, IL, IN, CA, GA, NC, NJ, VA, WA, AL,
+ * FL, MO, OK, LA, CO, AR, KY, TN, MI, MS, SC.
  */
 import type { JurisdictionOsowRules } from '../types.js';
 import { TEXAS_OSOW_RULES } from './texas.js';
@@ -114,6 +154,9 @@ import { COLORADO_OSOW_RULES } from './colorado.js';
 import { ARKANSAS_OSOW_RULES } from './arkansas.js';
 import { KENTUCKY_OSOW_RULES } from './kentucky.js';
 import { TENNESSEE_OSOW_RULES } from './tennessee.js';
+import { MICHIGAN_OSOW_RULES } from './michigan.js';
+import { MISSISSIPPI_OSOW_RULES } from './mississippi.js';
+import { SOUTH_CAROLINA_OSOW_RULES } from './southCarolina.js';
 
 export const OSOW_JURISDICTIONS: Record<string, JurisdictionOsowRules> = {
   TX: TEXAS_OSOW_RULES,
@@ -137,6 +180,9 @@ export const OSOW_JURISDICTIONS: Record<string, JurisdictionOsowRules> = {
   AR: ARKANSAS_OSOW_RULES,
   KY: KENTUCKY_OSOW_RULES,
   TN: TENNESSEE_OSOW_RULES,
+  MI: MICHIGAN_OSOW_RULES,
+  MS: MISSISSIPPI_OSOW_RULES,
+  SC: SOUTH_CAROLINA_OSOW_RULES,
 };
 
 /** Is there OS/OW coverage for this state/province code? */
@@ -173,4 +219,7 @@ export {
   ARKANSAS_OSOW_RULES,
   KENTUCKY_OSOW_RULES,
   TENNESSEE_OSOW_RULES,
+  MICHIGAN_OSOW_RULES,
+  MISSISSIPPI_OSOW_RULES,
+  SOUTH_CAROLINA_OSOW_RULES,
 };

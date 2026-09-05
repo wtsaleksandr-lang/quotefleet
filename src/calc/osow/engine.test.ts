@@ -2,8 +2,27 @@ import { describe, it, expect } from 'vitest';
 import {
   calculateOsow,
   calculateOsowForJurisdiction,
+  maxQuotableWeightLbs,
   type OsowLoad,
 } from './engine.js';
+import {
+  POLICE_ESCORT_RATES,
+  policeEscortFloorUsd,
+} from './escortCost.js';
+import { certificationFor } from './pilotCar/certification.js';
+import { MICHIGAN_164000_RECONSTRUCTION } from './jurisdictions/michigan.js';
+import {
+  MISSISSIPPI_BLANKET_ENVELOPE_CONFLICT,
+  MISSISSIPPI_OVERWEIGHT_RATE_UNIT_CONFLICT,
+  MISSISSIPPI_POLE_BLANKET_CONFLICT,
+  MISSISSIPPI_SPECIAL_HEAVY_HAUL_TABLE_CONFLICT,
+} from './jurisdictions/mississippi.js';
+import {
+  SOUTH_CAROLINA_EXCESSIVE_WIDTH_STEPS,
+  SOUTH_CAROLINA_MEGALOAD_IMPACT_FEE,
+  SOUTH_CAROLINA_OPEN_END_TRIP_FEE,
+  SOUTH_CAROLINA_SUPERLOAD_IMPACT_FEE_CONFLICT,
+} from './jurisdictions/southCarolina.js';
 import {
   OSOW_JURISDICTIONS,
   TEXAS_OSOW_RULES,
@@ -3877,12 +3896,13 @@ describe('Tennessee — a permit priced by the ton-mile', () => {
   });
 });
 
-describe('the registry after Phase 8', () => {
-  it('covers exactly the twenty-one states whose datasets exist', () => {
+describe('the registry after Phase 9', () => {
+  it('covers exactly the twenty-four states whose datasets exist', () => {
     expect(Object.keys(OSOW_JURISDICTIONS).sort()).toEqual(
       [
         'AL', 'AR', 'CA', 'CO', 'FL', 'GA', 'IL', 'IN', 'KY', 'LA',
-        'MO', 'NC', 'NJ', 'NY', 'OH', 'OK', 'PA', 'TN', 'TX', 'VA', 'WA',
+        'MI', 'MO', 'MS', 'NC', 'NJ', 'NY', 'OH', 'OK', 'PA', 'SC',
+        'TN', 'TX', 'VA', 'WA',
       ].sort(),
     );
     for (const code of Object.keys(OSOW_JURISDICTIONS)) {
@@ -3892,7 +3912,7 @@ describe('the registry after Phase 8', () => {
     // The registry must never name a jurisdiction ahead of its dataset, and the
     // count is asserted separately so a stray import cannot pass by matching a
     // list someone updated in the same edit.
-    expect(Object.keys(OSOW_JURISDICTIONS)).toHaveLength(21);
+    expect(Object.keys(OSOW_JURISDICTIONS)).toHaveLength(24);
   });
 });
 
@@ -4091,5 +4111,726 @@ describe('every per-mile fee note reconciles to its own amount', () => {
     const worked = at(67.5);
     expect(worked.note).toContain('billed as 75 mi');
     expect(worked.note).toContain('× $0.36 per mile');
+  });
+});
+
+/**
+ * PHASE 9 — MICHIGAN, MISSISSIPPI AND SOUTH CAROLINA.
+ *
+ * Three states that between them exercise the two structural additions the
+ * model has taken since it was written, and one that deliberately needed
+ * neither. What is asserted here is what the states PUBLISH: the flat $15/$50,
+ * the axle-spacing table, the 3 1/2 ft hole, the hundredfold unit problem, the
+ * 35,200 lb bridge row, and the two absences — Michigan's missing superload
+ * weight and South Carolina's missing weight escort trigger — that are findings
+ * rather than gaps.
+ */
+describe('Phase 9 — Michigan, the state with no gross-weight limit', () => {
+  const ASOF9 = '2026-09-06';
+  const MI = OSOW_JURISDICTIONS.MI!;
+  const priceMI = (load: OsowLoad) =>
+    calculateOsowForJurisdiction(MI, load, ASOF9);
+
+  /** A legal-size, legal-weight baseline to vary one field at a time from. */
+  const base: OsowLoad = {
+    grossWeightLbs: 60_000,
+    widthIn: 102,
+    heightIn: ftIn(13),
+    trailerLengthIn: ftIn(48),
+    routeClass: 'mi-designated',
+  };
+
+  it('charges a flat $15 for an over-dimension move of any size, with no base line beside it', () => {
+    const r = priceMI({ ...base, widthIn: ftIn(12) });
+    expect(r.subtotalUsd).toBe(15);
+    // The $15 IS the whole permit. `permitBaseFeeUsd` is a sourced zero and the
+    // engine suppresses the empty line rather than printing "$0.00" beside it.
+    expect(r.lines.map((l) => l.code)).toEqual(['osow_oversize']);
+    // A twenty-foot-wide load pays the same $15. Michigan does not band it.
+    expect(priceMI({ ...base, widthIn: ftIn(15, 11) }).subtotalUsd).toBe(15);
+  });
+
+  it('charges a flat $50 when the load is over on an axle, whatever it weighs', () => {
+    // Two axles four feet apart at 15,000 lb each: over the 13,000 lb the
+    // spacing table allows, and nowhere near any gross figure.
+    const r = priceMI({
+      ...base,
+      grossWeightLbs: 96_000,
+      axles: [
+        { positionFt: 0, weightLbs: 12_000 },
+        { positionFt: 14, weightLbs: 15_000 },
+        { positionFt: 18, weightLbs: 15_000 },
+        { positionFt: 40, weightLbs: 13_500 },
+        { positionFt: 49, weightLbs: 13_500 },
+        { positionFt: 58, weightLbs: 13_500 },
+        { positionFt: 67, weightLbs: 13_500 },
+      ],
+    });
+    expect(r.overDimension.weight).toBe(true);
+    expect(r.lines.map((l) => l.code)).toEqual(['osow_overweight']);
+    expect(r.subtotalUsd).toBe(50);
+  });
+
+  /**
+   * THE ARITHMETIC THE STATE PUBLISHES, AND THE ONE IT DOES NOT. MCL 257.725
+   * charges "$50.00 for a load that is over-dimension AND/OR over legal axle
+   * weight" — the $50 is the whole fee, not an addition to the $15.
+   */
+  it('never adds the $15 to the $50 on a load that is both', () => {
+    const r = priceMI({
+      ...base,
+      widthIn: ftIn(12),
+      heightIn: ftIn(15),
+      grossWeightLbs: 96_000,
+      axles: [
+        { positionFt: 0, weightLbs: 12_000 },
+        { positionFt: 14, weightLbs: 15_000 },
+        { positionFt: 18, weightLbs: 15_000 },
+        { positionFt: 40, weightLbs: 13_500 },
+        { positionFt: 49, weightLbs: 13_500 },
+        { positionFt: 58, weightLbs: 13_500 },
+        { positionFt: 67, weightLbs: 13_500 },
+      ],
+    });
+    expect(r.subtotalUsd).toBe(50);
+    expect(r.subtotalUsd).not.toBe(65);
+    expect(r.lines.map((l) => l.code)).toEqual(['osow_overweight']);
+  });
+
+  it('has no distance term and no partial-increment question at all', () => {
+    expect(MI.feesDependOnDistance).toBe(false);
+    expect(MI.overweightPerMile).toEqual([]);
+    // One band, flat from zero, with no increment, no per-axle and no mileage
+    // component — the only such row in the directory.
+    expect(MI.overweightBands.every((b) => b.value.perIncrementUsd === undefined)).toBe(true);
+    expect(MI.overweightBands.every((b) => b.value.perAxleUsd === undefined)).toBe(true);
+    expect(MI.overweightBands.every((b) => b.value.minMiles === undefined)).toBe(true);
+    // The same $50 at 300 miles as at 3.
+    const heavy = {
+      ...base,
+      grossWeightLbs: 170_000,
+      axles: [
+        { positionFt: 0, weightLbs: 20_000 },
+        { positionFt: 14, weightLbs: 15_000 },
+        { positionFt: 18, weightLbs: 15_000 },
+        { positionFt: 40, weightLbs: 20_000 },
+        { positionFt: 49, weightLbs: 20_000 },
+      ],
+    };
+    expect(priceMI({ ...heavy, milesInJurisdiction: 3 }).subtotalUsd).toBe(50);
+    expect(priceMI({ ...heavy, milesInJurisdiction: 300 }).subtotalUsd).toBe(50);
+  });
+
+  /**
+   * THE SURPRISING RESULT, AND IT IS RIGHT. Michigan's superload list is
+   * dimensional only, so a 164,000 lb move is an ordinary permit.
+   */
+  it('publishes no gross-weight superload threshold, so no weight makes a Michigan load a superload', () => {
+    expect(MI.superload.grossWeight).toBeUndefined();
+    const r = priceMI({ ...base, grossWeightLbs: 164_000, widthIn: ftIn(12) });
+    expect(r.superload).toBe(false);
+    // And it therefore mirrors no quotable ceiling to the widget.
+    expect(maxQuotableWeightLbs('MI', 'MI', 80_000, ASOF9)).toBe(80_000);
+    // The dimensional triggers ARE published and do fire.
+    expect(priceMI({ ...base, widthIn: ftIn(17) }).superload).toBe(true);
+    expect(priceMI({ ...base, heightIn: ftIn(15, 1) }).superload).toBe(true);
+    expect(priceMI({ ...base, overallLengthIn: ftIn(151) }).superload).toBe(true);
+  });
+
+  it('holds MDOT’s 164,000 lb as a published RESULT, with the note saying so', () => {
+    const gross = resolveSourced('MI gross', MI.legalLimits.grossWeightLbs, ASOF9);
+    expect(gross.value).toBe(164_000);
+    expect(gross.chosen?.note).toContain('ARITHMETIC RESULT, NOT A STATUTORY LIMIT');
+    // The reconstruction that reaches the figure is OURS and is flagged as ours.
+    expect(MICHIGAN_164000_RECONSTRUCTION).toContain('THAT ARITHMETIC IS OURS');
+    expect(MICHIGAN_164000_RECONSTRUCTION).toContain('encoded in no rule');
+    // And it is nowhere in the encoded data.
+    expect(JSON.stringify(MI.axleSpacingWeightTables)).not.toContain('164000');
+  });
+
+  /**
+   * REAR OVERHANG IS ABSENT, NOT EMPTY — the Georgia precedent. Michigan
+   * publishes no independent rear-overhang limit; it is consumed by the length.
+   */
+  it('records the absence of a rear-overhang limit as a finding, not a gap', () => {
+    expect(MI.legalLimits.rearOverhangIn).toBeUndefined();
+    expect(MI.legalLimits.overallLengthIn).toBeUndefined();
+    const r = priceMI({ ...base, rearOverhangIn: ftIn(12) });
+    expect(r.overDimension.rearOverhang).toBe(false);
+    expect(r.warnings.join(' ')).not.toContain('legal rear overhang');
+  });
+
+  it('selects its axle table by GROSS WEIGHT rather than by route', () => {
+    const light = priceMI({
+      ...base,
+      grossWeightLbs: 79_000,
+      axles: [
+        { positionFt: 0, weightLbs: 12_000 },
+        { positionFt: 14, weightLbs: 17_000 },
+        { positionFt: 18, weightLbs: 17_000 },
+        { positionFt: 40, weightLbs: 16_500 },
+        { positionFt: 44, weightLbs: 16_500 },
+      ],
+    });
+    // At or under 80,000 lb the FEDERAL table governs: 17,000 lb axles are fine.
+    expect(light.axleSpacingTables?.map((t) => t.result.tableName)).toEqual([
+      'the federal loading maximum, MCL 257.722(12)',
+    ]);
+    expect(light.overDimension.weight).toBe(false);
+
+    // The same axles one pound over 80,000 are judged by Michigan's own table,
+    // where an axle four feet from its neighbour may carry only 13,000 lb.
+    const heavy = priceMI({
+      ...base,
+      grossWeightLbs: 80_001,
+      axles: [
+        { positionFt: 0, weightLbs: 12_001 },
+        { positionFt: 14, weightLbs: 17_000 },
+        { positionFt: 18, weightLbs: 17_000 },
+        { positionFt: 40, weightLbs: 17_000 },
+        { positionFt: 44, weightLbs: 17_000 },
+      ],
+    });
+    expect(heavy.axleSpacingTables?.length).toBe(2);
+    expect(heavy.overDimension.weight).toBe(true);
+  });
+
+  /**
+   * CONFLICT 2 — a spacing of exactly 3 1/2 feet is named by no subdivision of
+   * the statute, and MDOT's own table closes the hole.
+   */
+  it('reproduces the 3 1/2 ft hole in the statute, and MDOT closing it', () => {
+    const r = priceMI({
+      ...base,
+      grossWeightLbs: 90_000,
+      axles: [
+        { positionFt: 0, weightLbs: 12_000 },
+        { positionFt: 14, weightLbs: 9_000 },
+        { positionFt: 17.5, weightLbs: 9_000 },
+        { positionFt: 40, weightLbs: 13_000 },
+        { positionFt: 49, weightLbs: 13_000 },
+        { positionFt: 58, weightLbs: 13_000 },
+        { positionFt: 67, weightLbs: 13_000 },
+      ],
+    });
+    const statute = r.axleSpacingTables!.find((t) =>
+      t.result.tableName.includes('as the statute writes it'),
+    )!;
+    const mdot = r.axleSpacingTables!.find((t) => t.result.tableName.includes('T-1'))!;
+    expect(statute.result.unnamedGapAxles).toEqual([2, 3]);
+    expect(mdot.result.unnamedGapAxles).toEqual([]);
+    expect(r.requiresManualReview).toBe(true);
+    expect(r.warnings.join(' ')).toContain('name no maximum for the spacing at axles 2, 3');
+    // Half a foot either side and both documents agree, so nothing is said.
+    const clear = priceMI({
+      ...base,
+      grossWeightLbs: 90_000,
+      axles: [
+        { positionFt: 0, weightLbs: 12_000 },
+        { positionFt: 14, weightLbs: 9_000 },
+        { positionFt: 18, weightLbs: 9_000 },
+        { positionFt: 40, weightLbs: 13_000 },
+        { positionFt: 49, weightLbs: 13_000 },
+        { positionFt: 58, weightLbs: 13_000 },
+        { positionFt: 67, weightLbs: 13_000 },
+      ],
+    });
+    expect(clear.warnings.join(' ')).not.toContain('name no maximum for the spacing');
+  });
+
+  /**
+   * CONFLICT 1 — the 16,000 lb tandem is route-conditioned in the statute and
+   * unconditioned in MDOT's T-1, and it is raised ONLY where it can decide.
+   */
+  it('raises the tandem-allowance disagreement only on an axle it can reach', () => {
+    const inBand = priceMI({
+      ...base,
+      grossWeightLbs: 96_000,
+      routeClass: 'mi-non-designated',
+      axles: [
+        { positionFt: 0, weightLbs: 12_000 },
+        { positionFt: 14, weightLbs: 15_000 },
+        { positionFt: 18, weightLbs: 15_000 },
+        { positionFt: 40, weightLbs: 13_000 },
+        { positionFt: 49, weightLbs: 13_000 },
+        { positionFt: 58, weightLbs: 13_000 },
+        { positionFt: 67, weightLbs: 13_000 },
+      ],
+    });
+    expect(inBand.warnings.join(' ')).toContain('special tandem allowance would permit');
+    expect(inBand.requiresManualReview).toBe(true);
+
+    // The same axles at 13,000 lb: both readings agree the load is legal, and
+    // nothing is said about a disagreement that cannot affect it.
+    const below = priceMI({
+      ...base,
+      grossWeightLbs: 90_000,
+      routeClass: 'mi-non-designated',
+      axles: [
+        { positionFt: 0, weightLbs: 12_000 },
+        { positionFt: 14, weightLbs: 13_000 },
+        { positionFt: 18, weightLbs: 13_000 },
+        { positionFt: 40, weightLbs: 13_000 },
+        { positionFt: 49, weightLbs: 13_000 },
+        { positionFt: 58, weightLbs: 13_000 },
+        { positionFt: 67, weightLbs: 13_000 },
+      ],
+    });
+    expect(below.warnings.join(' ')).not.toContain('special tandem allowance');
+
+    // And a 15,000 lb axle with another axle four feet away on BOTH sides is
+    // not in a tandem assembly at all, so the allowance could never help it.
+    const notATandem = priceMI({
+      ...base,
+      grossWeightLbs: 96_000,
+      routeClass: 'mi-non-designated',
+      axles: [
+        { positionFt: 0, weightLbs: 12_000 },
+        { positionFt: 40, weightLbs: 15_000 },
+        { positionFt: 44, weightLbs: 15_000 },
+        { positionFt: 48, weightLbs: 15_000 },
+        { positionFt: 52, weightLbs: 15_000 },
+      ],
+    });
+    expect(notATandem.overDimension.weight).toBe(true);
+    expect(notATandem.warnings.join(' ')).not.toContain('special tandem allowance');
+  });
+
+  it('refuses to call a heavy Michigan move legal without the axle layout', () => {
+    const r = priceMI({ ...base, grossWeightLbs: 120_000 });
+    expect(r.axleSpacingTables).toBeUndefined();
+    expect(r.requiresManualReview).toBe(true);
+    expect(r.warnings.join(' ')).toContain(
+      'An overweight permit may be required and is not included above',
+    );
+  });
+
+  /**
+   * THE POSITIVE FINDING THAT MATTERS MOST. Michigan publishes NO dimensional
+   * escort threshold, and the third-party figures are not adopted.
+   */
+  it('publishes no dimensional escort threshold and adopts none from elsewhere', () => {
+    const r = priceMI({ ...base, widthIn: ftIn(14), heightIn: ftIn(15, 1) });
+    expect(r.escortsRequired).toBe(0);
+    expect(r.escorts.front).toBe(0);
+    expect(r.escorts.rear).toBe(0);
+    expect(r.requiresManualReview).toBe(true);
+    const said = r.warnings.join(' ');
+    expect(said).toContain('assigned per permit inside MiTRIP');
+    expect(said).toContain('are third-party and are NOT adopted here');
+    // The only published number is the height pole, and it is an advisory
+    // BECAUSE the front escort it hangs off is not published either.
+    const tall = priceMI({ ...base, heightIn: ftIn(14, 7) });
+    expect(tall.escorts.heightPole).toBe(false);
+    expect(tall.warnings.join(' ')).toContain('fixed measuring device');
+    expect(
+      MI.escortRules.every((rule) => rule.then.heightPole === undefined),
+    ).toBe(true);
+  });
+
+  it('records the transaction fee and the route-analysis fee as unpublished, not as zero', () => {
+    expect(MI.transactionFee).toEqual([]);
+    expect(MI.routeAnalysisFeeUsd).toEqual([]);
+    expect(MI.noBridgeRouteFeeUsd).toEqual([]);
+    const r = priceMI({ ...base, widthIn: ftIn(12) });
+    expect(r.lines.some((l) => l.code === 'osow_service_fee')).toBe(false);
+  });
+
+  it('says a Michigan permit is not valid off the trunkline system', () => {
+    const r = priceMI({ ...base, widthIn: ftIn(12) });
+    expect(r.warnings.join(' ')).toContain('not a single-issuer state');
+    expect(r.requiresManualReview).toBe(true);
+  });
+
+  it('leaves every other jurisdiction without an axle-spacing table', () => {
+    const withTables = Object.entries(OSOW_JURISDICTIONS)
+      .filter(([, rules]) => rules.axleSpacingWeightTables !== undefined)
+      .map(([code]) => code);
+    expect(withTables).toEqual(['MI']);
+    const texas = calculateOsowForJurisdiction(
+      TEXAS_OSOW_RULES,
+      { grossWeightLbs: 100_000, widthIn: ftIn(12), heightIn: ftIn(13) },
+      ASOF9,
+    );
+    expect(texas.axleSpacingTables).toBeUndefined();
+    expect(texas.stateBridge).toBeUndefined();
+  });
+});
+
+describe('Phase 9 — Mississippi, whose overweight rate is printed in the wrong unit', () => {
+  const ASOF9 = '2026-09-06';
+  const MS = OSOW_JURISDICTIONS.MS!;
+  const priceMS = (load: OsowLoad) =>
+    calculateOsowForJurisdiction(MS, load, ASOF9);
+
+  const base: OsowLoad = {
+    grossWeightLbs: 55_000,
+    widthIn: 102,
+    heightIn: ftIn(13),
+    trailerLengthIn: ftIn(53),
+    overallLengthIn: ftIn(90),
+    milesInJurisdiction: 120,
+    routeClass: 'two-lane',
+  };
+
+  it('prices the $10 oversize permit and refuses to price any overweight amount', () => {
+    const r = priceMS({ ...base, widthIn: ftIn(12) });
+    expect(r.subtotalUsd).toBe(10);
+
+    const heavy = priceMS({ ...base, widthIn: ftIn(12), grossWeightLbs: 100_000 });
+    expect(heavy.requiresManualReview).toBe(true);
+    const said = heavy.warnings.join(' ');
+    expect(said).toContain('.05 cents');
+    expect(said).toContain('$0.0005');
+    expect(said).toContain('$0.05');
+    // The factor, stated rather than resolved.
+    // THE FACTOR IS DERIVED, NOT COPIED. The research brief this dataset was
+    // written from called the spread 200x while its own worked example gave
+    // $1.00 against $100.00; five cents divided by a hundredth of a cent is a
+    // hundred, and the encoded figure is the one the arithmetic supports.
+    expect(MISSISSIPPI_OVERWEIGHT_RATE_UNIT_CONFLICT.factor).toBe(100);
+    expect(
+      MISSISSIPPI_OVERWEIGHT_RATE_UNIT_CONFLICT.intendedUsdPerThousandLbPerMile /
+        MISSISSIPPI_OVERWEIGHT_RATE_UNIT_CONFLICT.literalUsdPerThousandLbPerMile,
+    ).toBeCloseTo(100, 9);
+  });
+
+  it('holds no per-mile rate at all, so no reading of the unit can be priced', () => {
+    expect(MS.overweightPerMile).toEqual([]);
+    expect(MS.overweightBands).toEqual([]);
+    const model = resolveSourced(
+      'MS overweight model',
+      MS.overweightPricing,
+      ASOF9,
+      (a, b) => a.kind === b.kind,
+    );
+    expect(model.value?.kind).toBe('notPriceable');
+    // And the fee IS distance-dependent, which is a different claim from
+    // "we can price it".
+    expect(MS.feesDependOnDistance).toBe(true);
+  });
+
+  /** CONFLICT 5 — 80,000 lb against 57,650 lb, and the resolver refuses. */
+  it('refuses to pick between the 80,000 lb designated table and the 57,650 lb one', () => {
+    const gross = resolveSourced('MS gross', MS.legalLimits.grossWeightLbs, ASOF9);
+    expect(gross.conflict).toBe(true);
+    expect(gross.value).toBeNull();
+    expect(spreadOf(gross)).toEqual({ low: 57_650, high: 80_000 });
+    const r = priceMS({ ...base, grossWeightLbs: 100_000 });
+    expect(r.requiresManualReview).toBe(true);
+    expect(r.warnings.join(' ')).toContain('Official sources disagree on Mississippi legal gross weight');
+  });
+
+  /** CONFLICT 6 — the superload boundary contradicts itself inside one sentence. */
+  it('resolves no superload weight, because one sentence says both things', () => {
+    const rows = MS.superload.grossWeight!;
+    expect(rows).toHaveLength(2);
+    expect(rows.map((r) => r.value.value)).toEqual([189_999, 189_999]);
+    expect(rows.map((r) => r.value.inclusive)).toEqual([false, true]);
+    const res = resolveSourced('MS superload', rows, ASOF9, thresholdsEqual);
+    expect(res.conflict).toBe(true);
+    expect(res.value).toBeNull();
+    // So Mississippi publishes no quotable ceiling to the widget either.
+    expect(maxQuotableWeightLbs('MS', 'MS', 80_000, ASOF9)).toBe(80_000);
+  });
+
+  /** The determinate width rules: one escort either way, position by road. */
+  it('puts the escort in front on a Two Lane Roadway and behind on a Divided Highway', () => {
+    const twoLane = priceMS({ ...base, widthIn: ftIn(13) });
+    expect(twoLane.escortsRequired).toBe(1);
+    expect(twoLane.escorts.front).toBe(1);
+    expect(twoLane.escorts.rear).toBe(0);
+
+    for (const routeClass of ['divided', 'multilane-undivided', 'interstate'] as const) {
+      const divided = priceMS({ ...base, widthIn: ftIn(13), routeClass });
+      expect(divided.escortsRequired, routeClass).toBe(1);
+      expect(divided.escorts.rear, routeClass).toBe(1);
+      expect(divided.escorts.front, routeClass).toBe(0);
+    }
+  });
+
+  it('sends a road that answers neither Mississippi definition to review', () => {
+    const urban = priceMS({ ...base, widthIn: ftIn(13), routeClass: 'urban' });
+    expect(urban.escortsRequired).toBe(0);
+    expect(urban.requiresManualReview).toBe(true);
+    expect(urban.escorts.applied.map((a) => a.ruleId)).toContain('ms-road-class-answers-neither');
+    expect(urban.warnings.join(' ')).toContain('answers neither');
+  });
+
+  /**
+   * MISSISSIPPI'S WEIGHT-BASED ESCORT TRIGGER EXISTS, and it is the only one of
+   * the three states added in this phase that has one.
+   */
+  it('requires two blue-light escorts at 300,000 lb, inclusive', () => {
+    const at = priceMS({ ...base, grossWeightLbs: 300_000 });
+    expect(at.escorts.policeFront).toBe(1);
+    expect(at.escorts.policeRear).toBe(1);
+    const below = priceMS({ ...base, grossWeightLbs: 299_999 });
+    expect(below.escorts.policeFront).toBe(0);
+    expect(below.escorts.policeRear).toBe(0);
+  });
+
+  /** CONFLICT 2 — 18 ft against 20 ft, raised only inside the band. */
+  it('raises the police-escort width conflict only between 18 ft and 20 ft', () => {
+    const inBand = priceMS({ ...base, widthIn: ftIn(19) });
+    expect(inBand.escorts.applied.map((a) => a.ruleId)).toContain(
+      'ms-police-escort-width-18-vs-20',
+    );
+    const above = priceMS({ ...base, widthIn: ftIn(21) });
+    expect(above.escorts.applied.map((a) => a.ruleId)).not.toContain(
+      'ms-police-escort-width-18-vs-20',
+    );
+    const below = priceMS({ ...base, widthIn: ftIn(17, 11) });
+    expect(below.escorts.applied.map((a) => a.ruleId)).not.toContain(
+      'ms-police-escort-width-18-vs-20',
+    );
+  });
+
+  /** CONFLICT 3 — the seven-inch utility band. */
+  it('raises the utility notification conflict only in the seven-inch band', () => {
+    const inBand = priceMS({ ...base, heightIn: ftIn(16, 3) });
+    expect(inBand.escorts.applied.map((a) => a.ruleId)).toContain(
+      'ms-utility-railroad-height-16-vs-16-7',
+    );
+    const above = priceMS({ ...base, heightIn: ftIn(17) });
+    expect(above.escorts.applied.map((a) => a.ruleId)).not.toContain(
+      'ms-utility-railroad-height-16-vs-16-7',
+    );
+  });
+
+  it('states the count for an over-length move as indeterminate rather than guessing', () => {
+    const r = priceMS({ ...base, overallLengthIn: ftIn(105) });
+    expect(r.requiresManualReview).toBe(true);
+    expect(r.warnings.join(' ')).toContain('"And/or" does not say whether that is one escort or two');
+    // No count was invented from an "and/or".
+    expect(r.escortsRequired).toBe(0);
+  });
+
+  it('keeps the four conflicts that do not reach a single-trip quote as named findings', () => {
+    expect(MISSISSIPPI_SPECIAL_HEAVY_HAUL_TABLE_CONFLICT.detail).toContain('120,000');
+    expect(MISSISSIPPI_SPECIAL_HEAVY_HAUL_TABLE_CONFLICT.detail).toContain('117,000');
+    expect(MISSISSIPPI_BLANKET_ENVELOPE_CONFLICT.detail).toContain('FOURTEEN (14) FEET IN HEIGHT');
+    expect(MISSISSIPPI_POLE_BLANKET_CONFLICT.detail).toContain('one (1) month');
+  });
+
+  it('needed no new route class and no new fee shape', () => {
+    expect(MS.axleSpacingWeightTables).toBeUndefined();
+    expect(MS.stateBridgeTable).toBeUndefined();
+    const classes = JSON.stringify(MS.escortRules);
+    expect(classes).not.toContain('ms-two-lane-roadway');
+    expect(classes).not.toContain('ms-divided-highway');
+  });
+});
+
+describe('Phase 9 — South Carolina, whose bridge table is not the federal one', () => {
+  const ASOF9 = '2026-09-06';
+  const SC = OSOW_JURISDICTIONS.SC!;
+  const priceSC = (load: OsowLoad) =>
+    calculateOsowForJurisdiction(SC, load, ASOF9);
+
+  const base: OsowLoad = {
+    grossWeightLbs: 70_000,
+    widthIn: 102,
+    heightIn: ftIn(13),
+    trailerLengthIn: ftIn(53),
+    kingpinToRearAxleIn: ftIn(40),
+    overallLengthIn: ftIn(95),
+    milesInJurisdiction: 120,
+    routeClass: 'interstate',
+  };
+
+  it('prices the flat $30 single-trip permit with the overweight component inside it', () => {
+    const r = priceSC({ ...base, widthIn: ftIn(13), grossWeightLbs: 100_000 });
+    expect(r.subtotalUsd).toBe(30);
+    expect(r.requiresManualReview).toBe(false);
+    const overweight = r.lines.find((l) => l.code === 'osow_overweight')!;
+    expect(overweight.amountUsd).toBe(0);
+    expect(overweight.note).toContain('No separate overweight charge');
+  });
+
+  it('caps the legal gross at 73,280 lb, not 80,000', () => {
+    const gross = resolveSourced('SC gross', SC.legalLimits.grossWeightLbs, ASOF9);
+    expect(gross.value).toBe(73_280);
+    const r = priceSC({ ...base, grossWeightLbs: 79_000 });
+    expect(r.overDimension.weight).toBe(true);
+    // And the interstate exception to 80,000 is stated where it can bite.
+    expect(r.escorts.applied.map((a) => a.ruleId)).toContain(
+      'sc-interstate-gross-73280-to-80000',
+    );
+    expect(priceSC({ ...base, grossWeightLbs: 73_280 }).overDimension.weight).toBe(false);
+  });
+
+  /**
+   * THE ROW THAT PROVES THE FEDERAL TABLE MUST NOT BE USED HERE: 35,200 lb at
+   * 8 ft where FHWA reads 34,000.
+   */
+  it('judges an axle group by South Carolina’s own table and never by the federal one', () => {
+    const axles = [
+      { positionFt: 0, weightLbs: 12_000 },
+      { positionFt: 16, weightLbs: 17_500 },
+      { positionFt: 20, weightLbs: 17_500 },
+      { positionFt: 52, weightLbs: 16_000 },
+      { positionFt: 56, weightLbs: 16_000 },
+    ];
+    const r = priceSC({ ...base, grossWeightLbs: 79_000, axles });
+    // The federal check did not run at all — that is what `stateBridgeTable` does.
+    expect(r.bridge).toBeNull();
+    expect(r.stateBridge).toBeDefined();
+    // A 35,000 lb tandem is legal on South Carolina's 35,200 lb row and would
+    // have been a violation on the federal 34,000 lb one.
+    expect(r.stateBridge!.violations.filter((v) => v.basis === 'tandem')).toEqual([]);
+    const overTandem = priceSC({
+      ...base,
+      grossWeightLbs: 79_600,
+      axles: [
+        { positionFt: 0, weightLbs: 12_000 },
+        { positionFt: 16, weightLbs: 17_800 },
+        { positionFt: 20, weightLbs: 17_800 },
+        { positionFt: 52, weightLbs: 16_000 },
+        { positionFt: 56, weightLbs: 16_000 },
+      ],
+    });
+    expect(
+      overTandem.stateBridge!.violations.some((v) => v.basis === 'tandem'),
+    ).toBe(true);
+  });
+
+  it('reports an axle group it holds no cell for rather than borrowing the federal value', () => {
+    const r = priceSC({
+      ...base,
+      grossWeightLbs: 79_000,
+      axles: [
+        { positionFt: 0, weightLbs: 12_000 },
+        { positionFt: 16, weightLbs: 17_500 },
+        { positionFt: 20, weightLbs: 17_500 },
+        { positionFt: 52, weightLbs: 16_000 },
+        { positionFt: 56, weightLbs: 16_000 },
+      ],
+    });
+    expect(r.stateBridge!.undecidedGroups).toBeGreaterThan(0);
+    expect(r.requiresManualReview).toBe(true);
+    expect(r.warnings.join(' ')).toContain('is NOT the federal one');
+    expect(r.warnings.join(' ')).toContain('35,200 lb where the federal table reads 34,000');
+  });
+
+  it('leaves every other jurisdiction on the federal bridge table', () => {
+    const withOwnTable = Object.entries(OSOW_JURISDICTIONS)
+      .filter(([, rules]) => rules.stateBridgeTable !== undefined)
+      .map(([code]) => code);
+    expect(withOwnTable).toEqual(['SC']);
+  });
+
+  /** STATED AFFIRMATIVELY: the seven-bullet escort table has no weight in it. */
+  it('publishes no weight-based escort trigger, so a heavy narrow load needs none', () => {
+    const heavyAndNarrow = priceSC({ ...base, grossWeightLbs: 129_000, widthIn: ftIn(10) });
+    expect(heavyAndNarrow.escortsRequired).toBe(0);
+    expect(heavyAndNarrow.escorts.policeFront).toBe(0);
+    expect(heavyAndNarrow.warnings.join(' ')).toContain('NO WEIGHT FIGURE APPEARS IN IT');
+  });
+
+  it('escorts by width in three clean bands with no hole between them', () => {
+    expect(priceSC({ ...base, widthIn: ftIn(13), routeClass: 'two-lane' }).escortsRequired).toBe(1);
+    // Off a two-lane road the same load needs none.
+    expect(priceSC({ ...base, widthIn: ftIn(13) }).escortsRequired).toBe(0);
+    expect(
+      priceSC({ ...base, widthIn: ftIn(14), routeClass: 'two-lane' }).escortsRequired,
+    ).toBe(1);
+    // One inch more and the road stops mattering: front AND rear on all roadways.
+    expect(priceSC({ ...base, widthIn: ftIn(14, 1) }).escortsRequired).toBe(2);
+    expect(priceSC({ ...base, widthIn: ftIn(16) }).escortsRequired).toBe(2);
+    const wide = priceSC({ ...base, widthIn: ftIn(16, 1) });
+    expect(wide.escortsRequired).toBe(2);
+    expect(wide.escorts.policeFront).toBe(1);
+    expect(wide.escorts.policeRear).toBe(1);
+  });
+
+  it('sends a load over the 16 ft permit ceiling to review rather than choosing a fee reading', () => {
+    const r = priceSC({ ...base, widthIn: ftIn(17) });
+    expect(r.requiresManualReview).toBe(true);
+    const said = r.warnings.join(' ');
+    expect(said).toContain('Frame Building or Other Load of Similar Size');
+    expect(said).toContain('$35 or $65 on a 17-ft-wide load');
+    expect(SOUTH_CAROLINA_EXCESSIVE_WIDTH_STEPS.map((b) => b.feeUsd)).toEqual([35, 40, 45, 50]);
+  });
+
+  /** CONFLICT 1 — the largest hole, and it is inside one statute. */
+  it('states the superload impact fee as a rate with no basis, and prices neither reading', () => {
+    const r = priceSC({ ...base, grossWeightLbs: 180_000 });
+    expect(r.superload).toBe(true);
+    expect(r.subtotalUsd).toBeNull();
+    const said = r.warnings.join(' ');
+    expect(said).toContain('$540');
+    expect(said).toContain('$150');
+    expect(SOUTH_CAROLINA_SUPERLOAD_IMPACT_FEE_CONFLICT.entireGvwAt180000Usd).toBe(540);
+    expect(SOUTH_CAROLINA_SUPERLOAD_IMPACT_FEE_CONFLICT.excessOnlyAt180000Usd).toBe(150);
+    // 180,000 lb is also where two paragraphs of one document disagree.
+    expect(r.escorts.applied.map((a) => a.ruleId)).toContain('sc-insurance-180000-boundary');
+  });
+
+  it('is distance-priced only above 500,000 lb, and holds that term dormant', () => {
+    expect(SC.feesDependOnDistance).toBe(true);
+    expect(SC.overweightPerMile).toEqual([]);
+    expect(SOUTH_CAROLINA_MEGALOAD_IMPACT_FEE.overLbs).toBe(500_000);
+    expect(SOUTH_CAROLINA_MEGALOAD_IMPACT_FEE.usdPerThousandLbsPerMile).toBe(0.05);
+    expect(SOUTH_CAROLINA_MEGALOAD_IMPACT_FEE.basis).toBe('entire gross vehicle weight');
+    expect(SOUTH_CAROLINA_OPEN_END_TRIP_FEE.usdPerTrip).toBe(10);
+    expect(SOUTH_CAROLINA_OPEN_END_TRIP_FEE.usdPerShortTrip).toBe(1);
+    expect(SOUTH_CAROLINA_OPEN_END_TRIP_FEE.shortTripUnderMiles).toBe(12);
+    // Without in-state mileage the engine refuses to treat the state as flat.
+    const noMiles = { ...base, widthIn: ftIn(13) };
+    delete (noMiles as { milesInJurisdiction?: number }).milesInJurisdiction;
+    expect(priceSC(noMiles).requiresManualReview).toBe(true);
+  });
+
+  it('publishes a police rate, and can only floor it because the commute is billable', () => {
+    const row = POLICE_ESCORT_RATES.find((r) => r.value.jurisdiction === 'SC')!;
+    expect(row.value.usdPerHourPerOfficer).toBe(50);
+    expect(row.value.minimumHoursPerOfficer).toBe(2);
+    expect(row.value.minimumOfficers).toBe(2);
+    expect(row.value.perMileUsd).toBe(0.76);
+    // Over 16 ft wide South Carolina requires two officers: 2 x 2 x $50.
+    expect(policeEscortFloorUsd(row.value, 2)).toBe(200);
+    // The mileage is deliberately NOT in the floor — it is the officer's
+    // commute plus the escort, and the commute is unknowable in advance.
+    expect(row.value.unpriced.map((u) => u.description).join(' ')).toContain(
+      'cannot be computed at quote time',
+    );
+    const wide = priceSC({ ...base, widthIn: ftIn(17) });
+    expect(wide.warnings.join(' ')).toContain('$200.00');
+  });
+
+  it('records the 130,000 lb superload threshold and mirrors it as the quotable ceiling', () => {
+    const res = resolveSourced('SC superload', SC.superload.grossWeight!, ASOF9, thresholdsEqual);
+    expect(res.value).toEqual({ value: 130_000, inclusive: false });
+    expect(maxQuotableWeightLbs('SC', 'SC', 80_000, ASOF9)).toBe(130_000);
+    expect(priceSC({ ...base, grossWeightLbs: 130_000 }).superload).toBe(false);
+    expect(priceSC({ ...base, grossWeightLbs: 130_001 }).superload).toBe(true);
+  });
+
+  it('records the absence of an overall length limit as an explicit negative', () => {
+    expect(SC.legalLimits.overallLengthIn).toBeUndefined();
+    const long = priceSC({ ...base, overallLengthIn: ftIn(140) });
+    expect(long.overDimension.length).toBe(false);
+    // The length escort bands still fire, because they are permit rules and not
+    // legal-limit ones.
+    expect(long.escortsRequired).toBe(1);
+    expect(long.escorts.rear).toBe(1);
+  });
+});
+
+describe('Phase 9 — none of the three certifies pilot-car operators', () => {
+  it('records the absence positively, in both directions, for MI, MS and SC', () => {
+    for (const code of ['MI', 'MS', 'SC']) {
+      const fact = certificationFor(code)!;
+      expect(fact.requirement, code).toBe('not-required');
+      expect(fact.sourceUrl, code).toContain('fhwa.dot.gov');
+      expect(fact.note, code).toContain('OUTBOUND');
+    }
+    // South Carolina's outbound half is the one that costs money: both its
+    // I-95 neighbours DO certify.
+    expect(certificationFor('SC')!.note).toContain('North Carolina and Georgia');
+    for (const neighbour of ['NC', 'GA']) {
+      expect(certificationFor(neighbour)!.requirement, neighbour).toBe('required');
+    }
   });
 });

@@ -42,7 +42,15 @@ import { hasOsowCoverage } from '../osow/jurisdictions/index.js';
  * The date the permit corpus is read as of, pinned so a schedule taking effect
  * tomorrow cannot silently move an assertion. Same value the permits suite uses.
  */
-const ASOF = '2026-09-03';
+/**
+ * THE AS-OF MUST BE INSIDE THE WINDOW `OSOW_ASOF_MIN` COMPUTES, and that window
+ * moves when a state is added. Phase 9's Michigan and Mississippi datasets
+ * include undated documents — MDOT's permit-conditions PDF, Mississippi's fee
+ * sheet and Commission Rule — whose rows are effective from the date we
+ * retrieved them, 2026-09-05, which is now the latest `effectiveFrom` in the
+ * corpus and so the earliest date on which every recorded row is in force.
+ */
+const ASOF = '2026-09-05';
 
 /** Real US Census results for the worked-example endpoints. */
 const HOUSTON: LaneEndpoint = {
@@ -796,31 +804,37 @@ describe('a lane touching an uncovered state', () => {
     lane: { origin: HOUSTON, destination: BUFFALO },
     filedLegs: [
       { stateCode: 'TX', miles: 200 },
-      { stateCode: 'MS', stateName: 'Mississippi', miles: 180 },
+      { stateCode: 'WV', stateName: 'West Virginia', miles: 180 },
       { stateCode: 'TN', miles: 250 },
     ],
     rates: { linehaulUsdPerMile: 4.85 },
     diesel: DIESEL,
     asOf: ASOF,
-    stateNames: { MS: 'Mississippi' },
+    stateNames: { WV: 'West Virginia' },
   });
 
+  /**
+   * West Virginia stands where Mississippi stood until Phase 9 sourced it. What
+   * is under test is the OUTCOME for a state with no dataset — named, unpriced,
+   * never inferred from a neighbour — not which state happens to be uncovered
+   * this month.
+   */
   it('NAMES IT AND LEAVES IT UNPRICED — never $0, never inferred from a neighbour', () => {
-    expect(out.permits?.uncoveredJurisdictions).toContain('MS');
-    const ms = out.lines.find((l) => l.code === 'permit_MS');
-    expect(ms?.amountUsd).toBeNull();
-    expect(ms?.name).toContain('Mississippi');
-    expect(ms?.note).toMatch(/will not infer one from a neighbouring state/);
+    expect(out.permits?.uncoveredJurisdictions).toContain('WV');
+    const wv = out.lines.find((l) => l.code === 'permit_WV');
+    expect(wv?.amountUsd).toBeNull();
+    expect(wv?.name).toContain('West Virginia');
+    expect(wv?.note).toMatch(/will not infer one from a neighbouring state/);
   });
 
   it('marks the delivered figure PARTIAL and names the missing state', () => {
     expect(out.partial).toBe(true);
-    expect(out.partialBecause.join(' ')).toContain('MS');
+    expect(out.partialBecause.join(' ')).toContain('WV');
   });
 
-  it('takes points off, and the finding names Mississippi', () => {
+  it('takes points off, and the finding names West Virginia', () => {
     const finding = out.confidence.findings.find((f) => f.code === 'states_uncovered');
-    expect(finding?.headline).toContain('MS');
+    expect(finding?.headline).toContain('WV');
     expect(finding?.grounding).toBe('ratio');
   });
 });

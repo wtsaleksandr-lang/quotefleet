@@ -35,7 +35,18 @@ import {
 } from './osowPermits.js';
 import { SITE_NAV_HTML, SITE_MOBILE_MENU_HTML, PREMIUM_FOOTER } from '../siteChrome.js';
 
-const ASOF = '2026-09-03';
+/**
+ * THE AS-OF MUST BE INSIDE THE WINDOW `OSOW_ASOF_MIN` COMPUTES, and that window
+ * moves when a state is added. Phase 9's Michigan and Mississippi sources
+ * include undated documents — MDOT's permit-conditions PDF, Mississippi's fee
+ * sheet and Commission Rule — whose rows are therefore effective from the date
+ * we retrieved them, 2026-09-05. That is now the latest `effectiveFrom` in the
+ * corpus and so the earliest date every recorded row is simultaneously in force.
+ * The route rejects anything earlier ON PURPOSE: outside the window whole
+ * schedules fall out of effect and the honest answer would be $0 for a date we
+ * hold no data for.
+ */
+const ASOF = '2026-09-05';
 
 function startServer(): Promise<{ base: string; close: () => void }> {
   const app = express();
@@ -190,17 +201,20 @@ describe('an uncovered state is a first-class outcome', () => {
     load: { ...REFERENCE_LANE.load },
     legs: [
       { state: 'TX', miles: 215 },
-      { state: 'MS', miles: 160 },
+      { state: 'WV', miles: 160 },
       { state: 'AL', miles: 90 },
     ],
     asOf: ASOF,
   });
 
   it('names the state instead of charging $0 for it', () => {
-    expect(out.uncovered).toEqual([{ code: 'MS', name: 'Mississippi' }]);
-    expect(out.quote.uncoveredJurisdictions).toEqual(['MS']);
+    // West Virginia stands in for the uncovered case that Mississippi used to
+    // hold before Phase 9 sourced it. The point of the test is the OUTCOME for a
+    // state with no dataset, not which state that is.
+    expect(out.uncovered).toEqual([{ code: 'WV', name: 'West Virginia' }]);
+    expect(out.quote.uncoveredJurisdictions).toEqual(['WV']);
     // It must not appear as a priced jurisdiction at any amount, least of all 0.
-    expect(out.quote.jurisdictions.some((j) => j.jurisdiction === 'MS')).toBe(false);
+    expect(out.quote.jurisdictions.some((j) => j.jurisdiction === 'WV')).toBe(false);
   });
 
   it('refuses a lane total rather than quietly excluding it', () => {
@@ -306,7 +320,7 @@ describe('POST /api/tools/osow-permits', () => {
       const r = await fetch(`${base}/api/tools/osow-permits/coverage`);
       expect(r.status).toBe(200);
       const body = (await r.json()) as { coveredStates: unknown[]; routeClasses: unknown[] };
-      expect(body.coveredStates.length).toBe(21);
+      expect(body.coveredStates.length).toBe(24);
       expect(body.routeClasses.length).toBe(4);
     } finally {
       close();
@@ -315,18 +329,21 @@ describe('POST /api/tools/osow-permits', () => {
 });
 
 describe('coverage lists', () => {
-  it('covers the 21 states the engine holds data for, and no more', () => {
+  it('covers the 24 states the engine holds data for, and no more', () => {
     const codes = osowCoveredStates().map((s) => s.code).sort();
     expect(codes).toEqual(
-      ['TX', 'OH', 'PA', 'NY', 'IL', 'IN', 'CA', 'GA', 'NC', 'NJ', 'VA', 'WA', 'AL', 'FL', 'MO', 'OK', 'LA', 'CO', 'AR', 'KY', 'TN'].sort(),
+      [
+        'TX', 'OH', 'PA', 'NY', 'IL', 'IN', 'CA', 'GA', 'NC', 'NJ', 'VA', 'WA',
+        'AL', 'FL', 'MO', 'OK', 'LA', 'CO', 'AR', 'KY', 'TN', 'MI', 'MS', 'SC',
+      ].sort(),
     );
   });
 
-  it('still OFFERS the 29 states it cannot price, so choosing one is explicit', () => {
+  it('still OFFERS the 27 states it cannot price, so choosing one is explicit', () => {
     const all = osowStateOptions();
     expect(all.length).toBe(51); // 50 states + DC
-    expect(all.filter((s) => s.covered).length).toBe(21);
-    expect(all.find((s) => s.code === 'MS')?.covered).toBe(false);
+    expect(all.filter((s) => s.covered).length).toBe(24);
+    expect(all.find((s) => s.code === 'WV')?.covered).toBe(false);
   });
 
   it('offers exactly four route classes — an even count wraps 2x2, never 3+1', () => {
@@ -386,10 +403,11 @@ describe('the page', () => {
     expect(html).toMatch(/\.ow-flags \{[^}]*grid-template-columns: repeat\(2, minmax\(0, 1fr\)\)/);
     // 1-4 status badges per state -> 2 content-sized columns, padded to even.
     expect(html).toMatch(/\.ow-badges \{[^}]*grid-template-columns: repeat\(2, minmax\(0, max-content\)\)/);
-    // The coverage chips are a FIXED 7 across because 21 states divide by 7 and
-    // by nothing else that a fluid grid would land on. Assert the arithmetic,
-    // not just the number, so adding a 22nd state fails here rather than
-    // shipping a chip alone on a row.
+    // The coverage chips are a FIXED grid whose column count must DIVIDE the
+    // covered-state count exactly, so no chip is ever left alone on a row. It
+    // was 7 across for 21 states and is 6 across for 24. Assert the arithmetic,
+    // not the number, so adding a 25th state fails here rather than shipping a
+    // short last row.
     const cols = Number(
       html.match(/\.ow-cov \{[^}]*grid-template-columns: repeat\((\d+), minmax\(0, 1fr\)\)/)?.[1],
     );

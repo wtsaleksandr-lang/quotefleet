@@ -27,9 +27,15 @@
  */
 import { OSOW_JURISDICTIONS, osowRulesFor } from '../../calc/osow/jurisdictions/index.js';
 import type {
+  AxleSpacingWeightTable,
   JurisdictionOsowRules,
   OverweightPricing,
+  StateBridgeTable,
   Threshold,
+} from '../../calc/osow/types.js';
+import {
+  axleSpacingWeightTablesEqual,
+  stateBridgeTablesEqual,
 } from '../../calc/osow/types.js';
 import type { IsoDate, Resolution, SourceDoc, Sourced } from '../../calc/osow/provenance.js';
 import { isInEffect, resolveSourced } from '../../calc/osow/provenance.js';
@@ -53,6 +59,23 @@ import {
   TENNESSEE_HOUSEBOAT_CONFLICT_ANALYSIS,
   TENNESSEE_WIDTH_BAND_GAP,
 } from '../../calc/osow/jurisdictions/tennessee.js';
+import {
+  MICHIGAN_164000_RECONSTRUCTION,
+  MICHIGAN_NAME_LETTER_PRORATION,
+  MICHIGAN_SUPERSEDED_EDITIONS,
+} from '../../calc/osow/jurisdictions/michigan.js';
+import {
+  MISSISSIPPI_BLANKET_ENVELOPE_CONFLICT,
+  MISSISSIPPI_OVERWEIGHT_RATE_UNIT_CONFLICT,
+  MISSISSIPPI_POLE_BLANKET_CONFLICT,
+  MISSISSIPPI_SPECIAL_HEAVY_HAUL_TABLE_CONFLICT,
+} from '../../calc/osow/jurisdictions/mississippi.js';
+import {
+  SOUTH_CAROLINA_EXCESSIVE_WIDTH_STEPS,
+  SOUTH_CAROLINA_SUPERLOAD_ENGINEERING_FEE_NOTE,
+  SOUTH_CAROLINA_SUPERLOAD_IMPACT_FEE_CONFLICT,
+  SOUTH_CAROLINA_SUPERSEDED_GUIDELINES,
+} from '../../calc/osow/jurisdictions/southCarolina.js';
 import { US_STATES } from '../directory/usStates.js';
 
 export const OSOW_HUB_PATH = '/oversize';
@@ -688,6 +711,44 @@ function conflictProbes(rules: JurisdictionOsowRules): ConflictProbe[] {
       format: thrIn,
       equals: thrEq,
     },
+    /**
+     * PHASE 9's two new `Sourced<T>[]` fields, probed here for the same reason
+     * every other field is: a conflict the engine surfaces on a quote must also
+     * be visible on the reference page, or the page quietly under-reports the
+     * state's own disagreements. Michigan is the live case — its statute and
+     * MDOT's T-1 print the same axle table with two different answers.
+     */
+    {
+      field: 'axle-load table by axle spacing',
+      rows: rules.axleSpacingWeightTables,
+      format: (v: unknown) => {
+        const t = v as AxleSpacingWeightTable;
+        const rows = t.rows
+          .map((r) => `${r.label} → ${fmtLbs(r.maxAxleLoadLbs)}`)
+          .join('; ');
+        const tandem =
+          t.tandemAllowance === null
+            ? ''
+            : ` — one tandem assembly at ${fmtLbs(t.tandemAllowance.perAxleLbs)} per axle${
+                t.tandemAllowance.routeClasses === null
+                  ? ', with NO route condition stated'
+                  : ` only on ${t.tandemAllowance.routeClasses.join(', ')} highways`
+              }`;
+        return `${t.name}: ${rows}${tandem}`;
+      },
+      equals: (a: unknown, b: unknown) =>
+        axleSpacingWeightTablesEqual(a as AxleSpacingWeightTable, b as AxleSpacingWeightTable),
+    },
+    {
+      field: "the state's own bridge table",
+      rows: rules.stateBridgeTable,
+      format: (v: unknown) => {
+        const t = v as StateBridgeTable;
+        return `${t.name}: single axle ${t.singleAxleLbs === null ? 'not stated' : fmtLbs(t.singleAxleLbs)}, tandem ${t.tandemAxleLbs === null ? 'not stated' : fmtLbs(t.tandemAxleLbs)}, gross ${t.grossLbs === null ? 'not stated' : fmtLbs(t.grossLbs)}`;
+      },
+      equals: (a: unknown, b: unknown) =>
+        stateBridgeTablesEqual(a as StateBridgeTable, b as StateBridgeTable),
+    },
     {
       field: 'route-inspection width trigger',
       rows: rules.routeInspection.widthIn,
@@ -803,6 +864,86 @@ export function namedGaps(): NamedGap[] {
       constantName: 'TENNESSEE_HOUSEBOAT_CONFLICT_ANALYSIS',
       title: 'A houseboat priced eight times apart by two official schedules',
       detail: TENNESSEE_HOUSEBOAT_CONFLICT_ANALYSIS,
+    },
+    {
+      code: 'MI',
+      ...at('MI'),
+      constantName: 'MICHIGAN_164000_RECONSTRUCTION',
+      title: 'The 164,000 lb figure is published without the configuration that reaches it',
+      detail: MICHIGAN_164000_RECONSTRUCTION,
+    },
+    {
+      code: 'MI',
+      ...at('MI'),
+      constantName: 'MICHIGAN_NAME_LETTER_PRORATION',
+      title: "An annual permit fee keyed to the first letter of the applicant's name",
+      detail: MICHIGAN_NAME_LETTER_PRORATION,
+    },
+    {
+      code: 'MI',
+      ...at('MI'),
+      constantName: 'MICHIGAN_SUPERSEDED_EDITIONS',
+      title: 'michigan.gov serves superseded editions of MDOT’s own operational documents',
+      detail: `Two official MDOT hosts serve different editions of the same two documents, and only one host is current. ${MICHIGAN_SUPERSEDED_EDITIONS.map(
+        (e) => `${e.source.title} at ${e.source.url} is superseded by ${e.supersededBy}.`,
+      ).join(' ')} These are different editions rather than reflows — the michigan.gov T-2 runs to eight pages against the permit host’s five. Every Michigan value on this site is taken from the permit host’s current copies, and no value is taken from the superseded ones, because their contents were not transcribed and writing down what they probably said would manufacture history.`,
+    },
+    {
+      code: 'MS',
+      ...at('MS'),
+      constantName: 'MISSISSIPPI_OVERWEIGHT_RATE_UNIT_CONFLICT',
+      title: 'An overweight rate printed in the wrong unit, 200 times apart',
+      detail: MISSISSIPPI_OVERWEIGHT_RATE_UNIT_CONFLICT.detail,
+    },
+    {
+      code: 'MS',
+      ...at('MS'),
+      constantName: 'MISSISSIPPI_SPECIAL_HEAVY_HAUL_TABLE_CONFLICT',
+      title: 'A heavy-haul axle table rewritten wholesale between two live documents',
+      detail: MISSISSIPPI_SPECIAL_HEAVY_HAUL_TABLE_CONFLICT.detail,
+    },
+    {
+      code: 'MS',
+      ...at('MS'),
+      constantName: 'MISSISSIPPI_BLANKET_ENVELOPE_CONFLICT',
+      title: 'An annual blanket envelope that gains a height limit in one document',
+      detail: MISSISSIPPI_BLANKET_ENVELOPE_CONFLICT.detail,
+    },
+    {
+      code: 'MS',
+      ...at('MS'),
+      constantName: 'MISSISSIPPI_POLE_BLANKET_CONFLICT',
+      title: 'The same $200 permit lasts a year in one document and a month in the other',
+      detail: MISSISSIPPI_POLE_BLANKET_CONFLICT.detail,
+    },
+    {
+      code: 'SC',
+      ...at('SC'),
+      constantName: 'SOUTH_CAROLINA_SUPERLOAD_IMPACT_FEE_CONFLICT',
+      title: 'A superload impact fee that states a rate and no basis',
+      detail: SOUTH_CAROLINA_SUPERLOAD_IMPACT_FEE_CONFLICT.detail,
+    },
+    {
+      code: 'SC',
+      ...at('SC'),
+      constantName: 'SOUTH_CAROLINA_EXCESSIVE_WIDTH_STEPS',
+      title: 'Four width fee steps, and no published order of operations',
+      detail: `§ 57-3-130(A) prints ${SOUTH_CAROLINA_EXCESSIVE_WIDTH_STEPS.map(
+        (b) => `${fmtUsd(b.feeUsd)} over ${b.overWidthFt} ft`,
+      ).join(', ')} as separate line items in the same table as the ${fmtUsd(
+        30,
+      )} single-trip permit, and neither the statute nor SCDOT’s Guidelines says whether a step REPLACES that fee or is ADDED to it — ${fmtUsd(
+        35,
+      )} or ${fmtUsd(
+        65,
+      )} on a 17-ft-wide load. Every band they could occupy also starts above South Carolina’s own 16 ft permit ceiling, where a load is no longer issued over the counter but goes through the Resident Maintenance Engineer as a frame building, capped at thirty miles with four escorts and per-county sign-off. Neither reading has been adopted and no width step is priced. ${SOUTH_CAROLINA_SUPERLOAD_ENGINEERING_FEE_NOTE}`,
+    },
+    {
+      code: 'SC',
+      ...at('SC'),
+      constantName: 'SOUTH_CAROLINA_SUPERSEDED_GUIDELINES',
+      title: 'A superseded copy of the Guidelines is still served by scdot.org',
+      detail: SOUTH_CAROLINA_SUPERSEDED_GUIDELINES.detail,
     },
   ];
 }

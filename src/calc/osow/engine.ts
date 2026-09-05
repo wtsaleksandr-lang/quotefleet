@@ -56,6 +56,12 @@ import {
   applyTransactionFee,
   chargedIncrements,
   combinedFeeRulesEqual,
+  evaluateAxleSpacingTable,
+  evaluateStateBridgeTable,
+  stateBridgeTablesEqual,
+  tableGovernsGross,
+  tandemAllowanceDecisiveAxles,
+  tandemAxleAllowancesEqual,
   exceeds,
   oversizeBandApplies,
   oversizeFeeBandsEqual,
@@ -72,8 +78,12 @@ import {
   transactionFeesEqual,
   MILEAGE_SPLIT_NOTE,
   type AdditionalAuthority,
+  type AxleSpacingTableResult,
+  type AxleSpacingWeightTable,
   type CombinedFeeRule,
   type JurisdictionOsowRules,
+  type StateBridgeTable,
+  type StateBridgeTableResult,
   type OversizeBandInput,
   type OversizeFeeBand,
   type OverweightPricing,
@@ -182,6 +192,24 @@ export interface OsowJurisdictionResult {
   /** Escort count the caller must price with its own pilot-car rate. */
   escortsRequired: number;
   bridge: BridgeFormulaResult | null;
+  /**
+   * A STATE'S OWN AXLE-SPACING WEIGHT TABLE, evaluated. OPTIONAL and omitted
+   * everywhere but Michigan, so every existing caller's result is byte-identical
+   * to before this field existed.
+   *
+   * One entry per in-effect published table that GOVERNS this load's gross
+   * weight. Michigan's statute and MDOT's T-1 disagree about two of the rows, so
+   * a Michigan load over 80,000 lb produces two entries and the engine reports
+   * the disagreement only when the two verdicts actually differ FOR THIS LOAD.
+   */
+  axleSpacingTables?: Array<{ source: SourceDoc; result: AxleSpacingTableResult }>;
+  /**
+   * A STATE'S OWN BRIDGE TABLE, evaluated. OPTIONAL and omitted everywhere but
+   * South Carolina. When it is present, `bridge` is `null` BY DESIGN: the
+   * federal table does not govern here and falling through to it would test the
+   * load against another state's numbers. See `StateBridgeTable`.
+   */
+  stateBridge?: StateBridgeTableResult;
   superload: boolean;
   routeInspectionRequired: boolean | null;
   warnings: string[];
@@ -514,13 +542,231 @@ export function calculateOsowForJurisdiction(
     }
   }
 
+  // ── 1b. A weight law expressed PER AXLE AND SPACING (Michigan) ────────
+  /**
+   * The block that makes `overDimension.weight` mean something in a state with
+   * no gross-weight limit.
+   *
+   * Michigan's legal weight is not a number, it is the outcome of MCL
+   * 257.722(1) evaluated over every adjacent-axle gap, and the table it is
+   * evaluated from is selected by the load's own GROSS WEIGHT rather than by the
+   * road. Everything below is driven from `rules.axleSpacingWeightTables`; there
+   * is no `if (state === 'MI')` here and there never has been an equivalent line
+   * for any state.
+   */
+  let axleSpacingTables:
+    | Array<{ source: SourceDoc; result: AxleSpacingTableResult }>
+    | undefined;
+  if (rules.axleSpacingWeightTables !== undefined) {
+    const tableRows = rules.axleSpacingWeightTables.filter((r) => isInEffect(r, asOf));
+    for (const r of tableRows) {
+      if (!sources.some((s) => s.id === r.source.id)) sources.push(r.source);
+    }
+    const gross = load.grossWeightLbs;
+    if (tableRows.length === 0) {
+      warnings.push(
+        `${rules.name} sets its weight maxima per axle and per axle spacing, and no such table is on file as effective on ${asOf}. Weight legality could not be determined.`,
+      );
+      requiresManualReview = true;
+    } else if (gross === undefined) {
+      warnings.push(
+        `${rules.name} selects between two axle-load tables on GROSS WEIGHT rather than on road type, and no gross weight was supplied. Which table governs this move could not be determined.`,
+      );
+      requiresManualReview = true;
+    } else {
+      const governing = tableRows.filter((r) => tableGovernsGross(r.value, gross));
+      if (governing.length === 0) {
+        warnings.push(
+          `No ${rules.name} axle-load table on file governs a gross weight of ${gross.toLocaleString()} lb. The tables select on gross weight and none of them names this one, so weight legality could not be determined.`,
+        );
+        requiresManualReview = true;
+      } else if (load.axles === undefined || load.axles.length === 0) {
+        // The honest degradation, and the same one the federal bridge check
+        // makes: we can say a table governs, we cannot say whether it is met.
+        /**
+         * REVIEW, NOT A SILENT WARNING, AND ONLY WHERE THE STATE'S OWN TABLE IS
+         * THE ONE THAT DECIDES.
+         *
+         * In a state whose weight law is a flat number, a missing axle layout
+         * costs only the bridge-formula check and the gross limit still answers
+         * the permit question. In Michigan there IS no gross limit to fall back
+         * on: MDOT's own FAQ says "Permitted loads are based on Michigan's legal
+         * allowable axle weights and not federal bridge weights", so without the
+         * layout the answer to "does this move need a $50 overweight permit?" is
+         * genuinely unknown. Warning and pricing on regardless would print a
+         * confident $15 oversize-only permit beside a load that may owe $50.
+         */
+        warnings.push(
+          `${rules.name} does not set a general gross-weight limit — ${(governing[0] as Sourced<AxleSpacingWeightTable>).value.explanation} Axle positions and per-axle weights were not supplied, so the axle table could not be evaluated and this quote cannot say whether the move is overweight in ${rules.name}. An overweight permit may be required and is not included above.`,
+        );
+        requiresManualReview = true;
+      } else {
+        const axles = load.axles;
+        const evaluated = governing.map((r) => ({
+          source: r.source,
+          table: r.value,
+          result: evaluateAxleSpacingTable(r.value, axles),
+        }));
+        axleSpacingTables = evaluated.map((e) => ({ source: e.source, result: e.result }));
+
+        const verdicts = new Set(evaluated.map((e) => e.result.overweight));
+        const first = evaluated[0] as (typeof evaluated)[number];
+
+        /**
+         * TWO PUBLISHED TABLES THAT DISAGREE ABOUT THIS LOAD. Surfaced only when
+         * the verdicts actually differ, on the same discipline the superload and
+         * route-inspection conflicts already use: a load every candidate agrees
+         * is legal hears nothing.
+         */
+        if (verdicts.size > 1) {
+          const detail = evaluated
+            .map(
+              (e) =>
+                `${e.result.overweight ? 'overweight' : 'legal'} per ${citeOf(e.source)}`,
+            )
+            .join(' — versus — ');
+          warnings.push(
+            `${rules.name}'s own sources disagree about whether this axle configuration is legal: ${detail}. Neither reading has been adopted. The permit below is priced on the stricter reading — a permit IS required — and the movement must be confirmed with the permitting office.`,
+          );
+          requiresManualReview = true;
+          requirementConflict = true;
+        }
+
+        if ([...verdicts].some((v) => v)) {
+          overDimension.weight = true;
+          const worst = evaluated
+            .flatMap((e) => e.result.violations)
+            .reduce<(typeof evaluated)[number]['result']['violations'][number] | null>(
+              (w, v) => (w === null || v.overageLbs > w.overageLbs ? v : w),
+              null,
+            );
+          if (worst !== null) {
+            details.push(
+              `Axle ${worst.axleNumber} carries ${worst.actualLbs.toLocaleString()} lb against the ${(worst.maxAxleLoadLbs ?? 0).toLocaleString()} lb ${rules.name} allows at ${worst.gapFt} ft of spacing to its nearest neighbouring axle`,
+            );
+          }
+        }
+
+        /**
+         * A SPACING NO SUBDIVISION NAMES. Michigan's statute allows 13,000 lb at
+         * MORE than 3.5 ft and 9,000 lb at LESS than 3.5 ft, so a pair of axles
+         * spaced at exactly 42.000 inches falls in a hole in the law, while
+         * MDOT's own table closes it. Rounding such a gap into the neighbouring
+         * band would resolve, in favour of one document, a defect that consists
+         * precisely of the two not meeting.
+         */
+        const holes = evaluated.filter((e) => e.result.unnamedGapAxles.length > 0);
+        if (holes.length > 0) {
+          const axleList = [
+            ...new Set(holes.flatMap((e) => e.result.unnamedGapAxles)),
+          ].sort((a, b) => a - b);
+          warnings.push(
+            `${rules.name}'s published axle-spacing bands name no maximum for the spacing at axle${axleList.length === 1 ? '' : 's'} ${axleList.join(', ')} — the bands stop above it and start again below it, and nothing is rounded into either. Source: ${citeOf((holes[0] as (typeof evaluated)[number]).source)}. The allowable axle load there must be confirmed with the permitting office.`,
+          );
+          requiresManualReview = true;
+          requirementConflict = true;
+        }
+
+        /**
+         * THE HEAVIER TANDEM ALLOWANCE, AND ONLY WHEN IT DECIDES THE ANSWER.
+         * Michigan's statute confines the 16,000 lb-per-axle assembly to
+         * DESIGNATED highways and MDOT's T-1 footnote reproduces it with no route
+         * condition at all — 6,000 lb of payload apart on a non-designated road.
+         * An axle inside the band the allowance covers is the only load the
+         * disagreement can reach, so it is the only one told about it.
+         */
+        const decisiveAxles = [
+          ...new Set(
+            evaluated.flatMap((e) =>
+              tandemAllowanceDecisiveAxles(e.table, axles, e.result),
+            ),
+          ),
+        ].sort((a, b) => a - b);
+        const allowanceDecides = decisiveAxles.length > 0;
+        const allowancesDisagree = evaluated.some(
+          (e) => !tandemAxleAllowancesEqual(e.table.tandemAllowance, first.table.tandemAllowance),
+        );
+        if (allowanceDecides && allowancesDisagree) {
+          const detail = evaluated
+            .map((e) => {
+              const allow = e.table.tandemAllowance;
+              const where =
+                allow === null
+                  ? 'no such allowance'
+                  : allow.routeClasses === null
+                    ? `${allow.perAxleLbs.toLocaleString()} lb per axle with NO route condition stated`
+                    : `${allow.perAxleLbs.toLocaleString()} lb per axle only on ${allow.routeClasses.join(', ')} highways`;
+              return `${where} per ${citeOf(e.source)}`;
+            })
+            .join(' — versus — ');
+          warnings.push(
+            `Axle${decisiveAxles.length === 1 ? '' : 's'} ${decisiveAxles.join(', ')} sit${decisiveAxles.length === 1 ? 's' : ''} in a tandem assembly heavier than the ordinary spacing row allows and no heavier than ${rules.name}'s special tandem allowance would permit — and the state's own sources disagree about when that allowance applies: ${detail}. Neither has been adopted. Whether this configuration needs an overweight permit turns on that disagreement.`,
+          );
+          requiresManualReview = true;
+          requirementConflict = true;
+        }
+
+        if (evaluated.some((e) => e.result.overMaxAxles === true)) {
+          const maxAxles = first.table.maxAxles ?? 0;
+          warnings.push(
+            `This combination has ${axles.length} axles against the ${maxAxles} ${rules.name} allows without a permit. ${rules.name} permits more than ${maxAxles} axles under a special permit, so this is not a refusal — but the axle count itself needs the permitting office's agreement and is not priced separately here.`,
+          );
+          requiresManualReview = true;
+        }
+      }
+    }
+  }
+
   const permitRequired = Object.entries(overDimension)
     .filter(([k]) => k !== 'details')
     .some(([, v]) => v === true);
 
-  // ── 2. Bridge formula — federal, applies regardless of jurisdiction ────
+  // ── 2. Bridge formula — federal, EXCEPT where the state prints its own ─
+  /**
+   * `stateBridgeTable` is the one thing that turns the federal check off, and
+   * it is data, not a state code. South Carolina transcribes its own table into
+   * § 56-5-4140 and its first row disagrees with FHWA's by 1,200 lb, so running
+   * the federal check there would report violations South Carolina does not have
+   * and clear ones it does. See `StateBridgeTable`.
+   */
+  let stateBridge: StateBridgeTableResult | undefined;
+  const stateBridgeRes = resolveIfPresent<StateBridgeTable>(
+    `${rules.name} state bridge table`,
+    rules.stateBridgeTable,
+    asOf,
+    stateBridgeTablesEqual,
+  );
+  if (stateBridgeRes !== null) {
+    pushSources(sources, stateBridgeRes);
+    warnings.push(...stateBridgeRes.warnings);
+    if (stateBridgeRes.requiresManualReview) requiresManualReview = true;
+    if (stateBridgeRes.conflict) requirementConflict = true;
+    const table = stateBridgeRes.value;
+    if (table !== null && load.axles !== undefined && load.axles.length >= 2) {
+      stateBridge = evaluateStateBridgeTable(table, load.axles);
+      for (const v of stateBridge.violations) {
+        warnings.push(
+          `${rules.name}'s own weight table: axles ${v.firstAxle}-${v.lastAxle} (${v.axleCount} over ${v.spanFt} ft) carry ${v.actualLbs.toLocaleString()} lb against the ${(v.allowedLbs ?? 0).toLocaleString()} lb ${table.name} allows.`,
+        );
+      }
+      if (stateBridge.overweight) overDimension.weight = true;
+      if (table.partial && stateBridge.undecidedGroups > 0) {
+        warnings.push(
+          `${stateBridge.undecidedGroups} of the ${stateBridge.groupsChecked} axle groups on this combination have no cell on file in ${table.name}, and ${rules.name}'s table is NOT the federal one — its two-axle row reads ${(table.tandemAxleLbs ?? 0).toLocaleString()} lb where the federal table reads 34,000 — so those groups have deliberately not been judged by the federal figures. ${table.explanation}`,
+        );
+        requiresManualReview = true;
+      }
+    } else if (table !== null && (load.axles === undefined || load.axles.length < 2)) {
+      warnings.push(
+        `${rules.name} publishes its own axle-group weight table rather than adopting the federal one, and axle positions and per-axle weights were not supplied, so it could not be checked. ${table.explanation}`,
+      );
+    }
+  }
+
   let bridge: BridgeFormulaResult | null = null;
-  if (load.axles && load.axles.length >= 2) {
+  if (stateBridgeRes !== null) {
+    // Deliberately no federal check here. See the comment above.
+  } else if (load.axles && load.axles.length >= 2) {
     bridge = checkBridgeFormula(load.axles);
     warnings.push(...bridge.warnings);
     if (bridge.requiresManualReview) requiresManualReview = true;
@@ -1482,6 +1728,10 @@ export function calculateOsowForJurisdiction(
     escorts,
     escortsRequired: escorts.totalEscorts,
     bridge,
+    // OPTIONAL, and omitted rather than set to a placeholder, so a result for
+    // any state that publishes neither is byte-identical to before Phase 9.
+    ...(axleSpacingTables === undefined ? {} : { axleSpacingTables }),
+    ...(stateBridge === undefined ? {} : { stateBridge }),
     superload,
     routeInspectionRequired,
     warnings,

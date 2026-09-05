@@ -41,7 +41,15 @@ import {
   OOG_QUOTE_HREF,
 } from '../siteChrome.js';
 
-const ASOF = '2026-09-03';
+/**
+ * THE AS-OF MUST BE INSIDE THE WINDOW `OSOW_ASOF_MIN` COMPUTES, and that window
+ * moves when a state is added. Phase 9's Michigan and Mississippi datasets
+ * include undated documents — MDOT's permit-conditions PDF, Mississippi's fee
+ * sheet and Commission Rule — whose rows are effective from the date we
+ * retrieved them, 2026-09-05, which is now the latest `effectiveFrom` in the
+ * corpus and so the earliest date on which every recorded row is in force.
+ */
+const ASOF = '2026-09-05';
 
 /**
  * REAL US Census geocoder responses, recorded once. The stub answers from this
@@ -399,7 +407,7 @@ describe('the coverage endpoint', () => {
         permitsOnlyTool: string;
         coveredStates: unknown[];
       };
-      expect(body.coveredStates.length).toBe(21);
+      expect(body.coveredStates.length).toBe(24);
       expect(body.mileageTiers.filed?.mayPriceStates).toBe(true);
       expect(body.mileageTiers.scalar?.mayPriceStates).toBe(false);
       // Tier 1 is now REACHABLE: routed in process over the federal
