@@ -706,7 +706,7 @@ const OSOW_CSS = `
   /* SEVEN COLUMNS BECAUSE THERE ARE 21 COVERED STATES, and 21 = 3 x 7 exactly.
      An auto-fill grid or a flex wrap lands on five columns at some width, where
      21 chips leave ONE alone on a fourth row. A fixed 7 cannot. */
-  .ow-cov { display: grid; grid-template-columns: repeat(7, minmax(0, 1fr)); gap: 4px; margin-top: 8px; }
+  .ow-cov { display: grid; grid-template-columns: repeat(6, minmax(0, 1fr)); gap: 4px; margin-top: 8px; }
   .ow-cov span { font-size: 11px; font-family: var(--font-mono); letter-spacing: 0.04em; padding: 4px; text-align: center; border-radius: var(--radius-pill); border: 1px solid var(--border); color: var(--muted); }
 
   .ow-empty { color: var(--muted); font-size: 14px; line-height: 1.6; margin: 0; }

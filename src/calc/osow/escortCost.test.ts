@@ -69,8 +69,8 @@ describe('the police-rate dataset', () => {
     const withoutRate = new Set(NO_PUBLISHED_POLICE_ESCORT_RATE.map((n) => n.jurisdiction));
     const covered = Object.keys(OSOW_JURISDICTIONS);
 
-    expect([...withRate].sort()).toEqual(['AL', 'IL', 'IN', 'LA', 'NY', 'TN']);
-    expect(withoutRate.size).toBe(15);
+    expect([...withRate].sort()).toEqual(['AL', 'IL', 'IN', 'LA', 'NY', 'SC', 'TN']);
+    expect(withoutRate.size).toBe(17);
     // No state may be in both lists, and between them they must be the whole
     // corpus — a state in neither would silently fall through to "no finding".
     const overlap = [...withRate].filter((c) => withoutRate.has(c));

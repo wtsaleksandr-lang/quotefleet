@@ -137,7 +137,7 @@ function unknownState(code: string, note: string): StateCertificationFacts {
 }
 
 /**
- * The 21 states the permit engine holds fee data for, plus every other state as
+ * The 24 states the permit engine holds fee data for, plus every other state as
  * an explicit `'unknown'`.
  *
  * The `'unknown'` rows are not filler. Omitting a state would let the directory
@@ -401,6 +401,60 @@ const FACTS: StateCertificationFacts[] = [
     sourceUrl: 'https://www.law.cornell.edu/regulations/tennessee/Tenn-Comp-R-Regs-1680-07-01-.21',
     sourceTitle: 'Tenn. Comp. R. & Regs. 1680-07-01-.21 — Escort vehicle requirements (via Cornell LII)',
     sourcePublisher: 'Cornell Legal Information Institute, reproducing the Tennessee Compilation Rules & Regulations',
+    sourceRevisedOn: null,
+  },
+  {
+    code: 'MI',
+    requirement: 'not-required',
+    acceptsCertificationFrom: [],
+    inboundPublished: false,
+    certificationAcceptedBy: [],
+    outboundPublished: false,
+    termYears: null,
+    minimumAge: null,
+    vehicleGvwrMaxLbs: null,
+    vehicleWeightMinLbs: null,
+    note:
+      'Michigan is not on FHWA’s list of certifying states, and independently MDOT’s own escort text specifies VEHICLE, LIGHTING AND SIGNAGE ONLY — a passenger vehicle, at least one roof-mounted flashing or rotating light visible 500 ft, and a 5 ft by 12 in OVERSIZE LOAD sign with 8-inch black letters on yellow — and imposes no operator qualification of any kind. Both directions follow from the one fact: INBOUND there is no Michigan certification to require, so an out-of-state card is neither demanded nor refused; OUTBOUND Michigan issues no card, so a Michigan escort must obtain the certification of any certifying state it enters. There is no reciprocity list because there is nothing to reciprocate.',
+    sourceUrl: 'https://ops.fhwa.dot.gov/publications/fhwahop16054/pevo_study_gde.htm',
+    sourceTitle: 'FHWA — Pilot/Escort Vehicle Operator (P/EVO) Best Practices Guide',
+    sourcePublisher: 'Federal Highway Administration',
+    sourceRevisedOn: null,
+  },
+  {
+    code: 'MS',
+    requirement: 'not-required',
+    acceptsCertificationFrom: [],
+    inboundPublished: false,
+    certificationAcceptedBy: [],
+    outboundPublished: false,
+    termYears: null,
+    minimumAge: null,
+    vehicleGvwrMaxLbs: null,
+    vehicleWeightMinLbs: null,
+    note:
+      'Mississippi is not on FHWA’s list, and MDOT’s own "Escort Vehicle" definition — identical in the 2024 Manual and the 2020 Commission Rule — specifies EQUIPMENT, SIGNAGE, LIGHTING AND RADIO ONLY: "a flashing or revolving amber light, two warning flags mounted on the vehicle, an Oversize Load or Wide Load sign mounted on top of the vehicle ... Two-way communication is required between escort/escorts and towing vehicle." No operator qualification, training or certification appears anywhere in either document. INBOUND no Mississippi certification exists to require; OUTBOUND Mississippi issues no card, so its escorts must obtain the certification of any certifying state they enter.',
+    sourceUrl: 'https://ops.fhwa.dot.gov/publications/fhwahop16054/pevo_study_gde.htm',
+    sourceTitle: 'FHWA — Pilot/Escort Vehicle Operator (P/EVO) Best Practices Guide',
+    sourcePublisher: 'Federal Highway Administration',
+    sourceRevisedOn: null,
+  },
+  {
+    code: 'SC',
+    requirement: 'not-required',
+    acceptsCertificationFrom: [],
+    inboundPublished: false,
+    certificationAcceptedBy: [],
+    outboundPublished: false,
+    termYears: null,
+    minimumAge: null,
+    vehicleGvwrMaxLbs: null,
+    vehicleWeightMinLbs: null,
+    note:
+      'South Carolina is not on FHWA’s list, and SCDOT’s escort section specifies VEHICLE, LIGHTING, SIGNAGE, SPACING AND RADIO ONLY — one roof-mounted amber light visible 500 ft at 360 degrees, a 12 in by 7 ft OVERSIZE LOAD or WIDE LOAD banner front and rear, a rear escort 3-4 seconds back, a front escort no more than half a mile ahead, and two-way radio — with no operator qualification. THE OUTBOUND HALF MATTERS MORE HERE THAN ANYWHERE ELSE IN THE CORPUS: both of South Carolina’s I-95 neighbours, North Carolina and Georgia, DO certify, so a South Carolina pilot car cannot lawfully cross either state line without first obtaining that state’s certification. INBOUND, no South Carolina certification exists to require.',
+    sourceUrl: 'https://ops.fhwa.dot.gov/publications/fhwahop16054/pevo_study_gde.htm',
+    sourceTitle: 'FHWA — Pilot/Escort Vehicle Operator (P/EVO) Best Practices Guide',
+    sourcePublisher: 'Federal Highway Administration',
     sourceRevisedOn: null,
   },
   {

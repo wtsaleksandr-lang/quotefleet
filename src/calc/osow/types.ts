@@ -886,6 +886,36 @@ export interface JurisdictionOsowRules {
   noBridgeRouteFeeUsd: Sourced<number>[];
   superload: SuperloadTriggers;
   routeInspection: RouteInspectionTriggers;
+  /**
+   * A weight law expressed PER AXLE AND SPACING rather than per gross —
+   * OPTIONAL, and absent for every jurisdiction but Michigan.
+   *
+   * ABSENT means "this state states its weight limits as flat numbers, which
+   * `legalLimits` already holds". An EMPTY array would mean "this state has a
+   * spacing table and we hold none of it", which is a gap and would go loudly to
+   * review, so a future spacing state we have not sourced must use that.
+   *
+   * A jurisdiction may hold MORE THAN ONE table and select between them with
+   * `AxleSpacingWeightTable.selector`. Michigan holds two — the federal one at
+   * or under 80,000 lb and its own above it — and two more rows besides, because
+   * the statute and MDOT's own T-1 do not agree about the 3.5 ft boundary or
+   * about whether the 16,000 lb tandem allowance is confined to designated
+   * highways. The resolver refuses to pick between those, exactly as it does for
+   * a fee. See the PHASE 9 section at the foot of this file.
+   */
+  axleSpacingWeightTables?: Sourced<AxleSpacingWeightTable>[];
+  /**
+   * The state's OWN bridge table, where it does not adopt FHWA's — OPTIONAL,
+   * and absent for every jurisdiction but South Carolina.
+   *
+   * ABSENT means the state adopts the federal table, which is what every other
+   * jurisdiction on file does and what `bridgeFormula.ts` implements. PRESENT
+   * means the engine must NOT fall through to the federal table for this state:
+   * South Carolina's own two-axle row at 8 ft reads 35,200 lb against FHWA's
+   * 34,000, and a group with no cell on file is reported undecided rather than
+   * judged by another state's number.
+   */
+  stateBridgeTable?: Sourced<StateBridgeTable>[];
   escortRules: EscortRule[];
   /**
    * Other agencies that issue their OWN permit for part of this state's
@@ -946,3 +976,589 @@ export function additionalAuthoritiesEqual(
  */
 export const MILEAGE_SPLIT_NOTE =
   'Per-jurisdiction mileage is not yet computed. Intended source: US Census TIGER/Line state boundaries (public domain), intersected with the cached route polyline.';
+
+// ═══════════════════════════════════════════════════════════════════════════
+// PHASE 9 — A WEIGHT LAW THAT IS PER-AXLE-AND-SPACING, NOT PER-GROSS.
+//
+// MICHIGAN IS THE STATE THAT DOES NOT FIT ANY FIELD ABOVE, and forcing it into
+// one would have been the largest single wrong number in the corpus.
+//
+// Every jurisdiction in Phases 1-8 states a gross-weight limit and the engine
+// asks one question of it: is this load over that number? Michigan states no
+// general gross-weight limit at all. MCL 257.722(1) sets a maximum PER AXLE
+// keyed to the DISTANCE TO THE NEIGHBOURING AXLE — 18,000 lb at 9 ft or more,
+// 13,000 lb between 3.5 and 9 ft, 9,000 lb under 3.5 ft — and MCL 257.719(5)(b)
+// caps the vehicle at eleven axles. MDOT's own explainer says in as many words
+// that the famous 164,000 lb figure is the ARITHMETIC RESULT of those two
+// constraints and not a number the statute writes: "Since 1967, the maximum
+// number of axles has been limited to eleven, and per-axle load restrictions
+// have resulted in a maximum gross vehicle weight of 164,000 pounds."
+//
+// So a `grossWeightLbs` threshold cannot express Michigan. Two 150,000 lb
+// eleven-axle trucks differing only in where the axles sit are one legal and
+// one not, and no single number separates them.
+//
+// ── THE SECOND THING, WHICH IS A NEW SELECTOR AXIS ────────────────────────
+// Michigan runs TWO parallel tables and picks between them on GROSS WEIGHT.
+// MCL 257.722(12) is the federal one (20,000 single / 34,000 tandem / bridge
+// formula / 80,000 gross); MCL 257.722(1)-(3) is Michigan's own, and it governs
+// "vehicles having a gross weight in excess of 80,000 pounds". THE SAME TRUCK
+// ON THE SAME ROAD IS JUDGED BY A DIFFERENT TABLE DEPENDING ON HOW HEAVY IT IS.
+// Every other jurisdiction here selects a table by ROUTE CLASS — Kentucky's
+// AAA/AA/A, Colorado's map colours, California's. `selector` is that new axis,
+// and it is recorded as data on the table rather than branched on in the engine,
+// which is the same contract every earlier phase kept.
+//
+// ── WHAT THIS DELIBERATELY DOES NOT DO ────────────────────────────────────
+// It does not compute a gross ceiling. `maxAxles` times the heaviest row is
+// 11 x 18,000 = 198,000 lb, which is not 164,000 and is not reachable: an
+// 18,000 lb axle needs 9 ft of clearance on both sides and eleven of them do not
+// fit in a legal combination. MDOT publishes the RESULT and not the arrangement,
+// and the only configuration that reaches 164,000 lb in this repository is
+// written down in `michigan.ts` as OUR arithmetic, flagged as ours, and encoded
+// nowhere.
+// ═══════════════════════════════════════════════════════════════════════════
+
+/**
+ * One spacing band of a per-axle weight table.
+ *
+ * BOTH BOUNDS CARRY THEIR OWN INCLUSIVITY, AND THAT IS THE POINT. MCL
+ * 257.722(1)(b) reads "less than 9 feet between 2 axles but MORE THAN 3-1/2
+ * feet" while (c) reads "less than 3-1/2 feet". A spacing of exactly 3 ft 6 in
+ * is therefore named by NO subdivision — (b) needs more than 3.5 and (c) needs
+ * less than 3.5 — and MDOT's own T-1 table closes the hole by printing "More
+ * than or equal to 3 1/2 feet but less than 9 feet".
+ *
+ * Storing a bare band would erase that. Storing the inclusivity reproduces the
+ * defect exactly: `axleSpacingRowFor` returns `null` at 42.000 inches under the
+ * statute's rows and a 13,000 lb row under MDOT's, which is the disagreement,
+ * not a bug in the encoding.
+ */
+export interface AxleSpacingWeightRow {
+  /** The subdivision's own words, e.g. '9 feet or more between axles'. */
+  label: string;
+  /** Lower bound on the gap to the neighbouring axle, FEET. `null` = no floor. */
+  minSpacingFt: number | null;
+  /** true = the row survives AT `minSpacingFt` ("3.5 feet or more"). */
+  minInclusive: boolean;
+  /** Upper bound on that gap, FEET. `null` = open-ended. */
+  maxSpacingFt: number | null;
+  /** true = the row survives AT `maxSpacingFt` ("9 feet or less"). */
+  maxInclusive: boolean;
+  maxAxleLoadLbs: number;
+  /**
+   * A condition the subdivision attaches, verbatim; `null` = none stated.
+   * Michigan's (a) and (b) are written "for vehicles equipped with high
+   * pressure pneumatic or balloon tires" and (c) is not, so a vehicle on other
+   * tires is not addressed by (a) at all. Recorded, never applied — tire type
+   * is not on an `OsowLoad`.
+   */
+  conditionedOn: string | null;
+}
+
+export function axleSpacingWeightRowsEqual(
+  a: AxleSpacingWeightRow,
+  b: AxleSpacingWeightRow,
+): boolean {
+  return (
+    a.minSpacingFt === b.minSpacingFt &&
+    a.minInclusive === b.minInclusive &&
+    a.maxSpacingFt === b.maxSpacingFt &&
+    a.maxInclusive === b.maxInclusive &&
+    a.maxAxleLoadLbs === b.maxAxleLoadLbs
+  );
+}
+
+/**
+ * The heavier allowance a state grants ONE tandem assembly.
+ *
+ * `routeClasses` IS THE WHOLE REASON THIS IS A TYPE. MCL 257.722(2) and (3)
+ * both grant the 16,000 lb-per-axle tandem "on designated highways"; MDOT's
+ * T-1 footnote reproduces the same allowance as "On any legal combination of
+ * vehicles" with no route condition at all. `null` means THE SOURCE STATES NO
+ * ROUTE CONDITION — it never means "we did not look" — and it is what makes the
+ * two rows compare unequal, so the resolver refuses to pick between them. On a
+ * non-designated road the disagreement is 3,000 lb per axle across two axles:
+ * 6,000 lb of payload.
+ */
+export interface TandemAxleAllowance {
+  perAxleLbs: number;
+  /** Route classes the source confines it to; `null` = no route condition stated. */
+  routeClasses: string[] | null;
+  /** No other axle may be within this many feet of any axle of the assembly. */
+  minClearanceFt: number;
+  /** Assemblies allowed at this weight on an ordinary combination. */
+  maxAssemblies: number;
+  /** Assemblies allowed on a truck tractor + semitrailer of five axles or fewer. */
+  maxAssembliesOnShortTractorSemitrailer: number;
+  /** The source's own words. */
+  quote: string;
+}
+
+export function tandemAxleAllowancesEqual(
+  a: TandemAxleAllowance | null,
+  b: TandemAxleAllowance | null,
+): boolean {
+  if (a === null || b === null) return a === b;
+  const routes = (r: string[] | null): string =>
+    r === null ? '<none stated>' : [...r].sort().join(',');
+  return (
+    a.perAxleLbs === b.perAxleLbs &&
+    routes(a.routeClasses) === routes(b.routeClasses) &&
+    a.minClearanceFt === b.minClearanceFt &&
+    a.maxAssemblies === b.maxAssemblies &&
+    a.maxAssembliesOnShortTractorSemitrailer ===
+      b.maxAssembliesOnShortTractorSemitrailer
+  );
+}
+
+/** How a table is selected. Michigan selects on WEIGHT; nothing else here does. */
+export interface AxleSpacingTableSelector {
+  kind: 'grossWeightAbove' | 'grossWeightAtOrUnder';
+  thresholdLbs: number;
+}
+
+export interface AxleSpacingWeightTable {
+  /** The jurisdiction's own name for the set — Michigan: "the normal loading maximum". */
+  name: string;
+  selector: AxleSpacingTableSelector;
+  rows: AxleSpacingWeightRow[];
+  /** Axles the jurisdiction allows without a further permit; `null` = none stated. */
+  maxAxles: number | null;
+  tandemAllowance: TandemAxleAllowance | null;
+  /** What the source actually says. Required — this is the audit trail. */
+  explanation: string;
+}
+
+export function axleSpacingWeightTablesEqual(
+  a: AxleSpacingWeightTable,
+  b: AxleSpacingWeightTable,
+): boolean {
+  if (a.selector.kind !== b.selector.kind) return false;
+  if (a.selector.thresholdLbs !== b.selector.thresholdLbs) return false;
+  if (a.maxAxles !== b.maxAxles) return false;
+  if (a.rows.length !== b.rows.length) return false;
+  for (let i = 0; i < a.rows.length; i += 1) {
+    const ar = a.rows[i] as AxleSpacingWeightRow;
+    const br = b.rows[i] as AxleSpacingWeightRow;
+    if (!axleSpacingWeightRowsEqual(ar, br)) return false;
+  }
+  return tandemAxleAllowancesEqual(a.tandemAllowance, b.tandemAllowance);
+}
+
+/** Does this table govern a load of this gross weight? */
+export function tableGovernsGross(
+  table: AxleSpacingWeightTable,
+  grossWeightLbs: number,
+): boolean {
+  return table.selector.kind === 'grossWeightAbove'
+    ? grossWeightLbs > table.selector.thresholdLbs
+    : grossWeightLbs <= table.selector.thresholdLbs;
+}
+
+/**
+ * The row that names a spacing, or `null` when NO row does.
+ *
+ * `null` is a real answer and the reason the inclusivity flags exist. See
+ * `AxleSpacingWeightRow` for Michigan's 3.5 ft hole.
+ */
+export function axleSpacingRowFor(
+  rows: ReadonlyArray<AxleSpacingWeightRow>,
+  gapFt: number,
+): AxleSpacingWeightRow | null {
+  for (const row of rows) {
+    if (row.minSpacingFt !== null) {
+      if (row.minInclusive ? gapFt < row.minSpacingFt : gapFt <= row.minSpacingFt) {
+        continue;
+      }
+    }
+    if (row.maxSpacingFt !== null) {
+      if (row.maxInclusive ? gapFt > row.maxSpacingFt : gapFt >= row.maxSpacingFt) {
+        continue;
+      }
+    }
+    return row;
+  }
+  return null;
+}
+
+/** One axle's verdict against a spacing table. */
+export interface AxleSpacingGapFinding {
+  /** 1-based axle number, front to rear. */
+  axleNumber: number;
+  /** The gap this axle is judged on — see `evaluateAxleSpacingTable`. */
+  gapFt: number;
+  /** `null` when no subdivision names this spacing. */
+  rowLabel: string | null;
+  maxAxleLoadLbs: number | null;
+  actualLbs: number;
+  /** 0 when compliant or undecidable. */
+  overageLbs: number;
+}
+
+export interface AxleSpacingTableResult {
+  tableName: string;
+  /** Axle numbers whose spacing no subdivision names. */
+  unnamedGapAxles: number[];
+  findings: AxleSpacingGapFinding[];
+  violations: AxleSpacingGapFinding[];
+  /** `null` when the table publishes no axle maximum. */
+  overMaxAxles: boolean | null;
+  /** True when any axle is over its row, i.e. the load needs a permit on weight. */
+  overweight: boolean;
+}
+
+/**
+ * Judge every axle against a spacing table.
+ *
+ * THE GOVERNING GAP IS THE SMALLER OF THE TWO NEIGHBOURING GAPS, AND THAT IS
+ * OUR READING, NOT MICHIGAN'S. MCL 257.722(1) says "if the axle spacing is 9
+ * feet or more between axles" without saying which of an interior axle's two
+ * neighbours it means, and MDOT does not say either. Taking the smaller gap is
+ * the conservative reading — it applies the tighter of the two allowances — and
+ * the alternative (the larger gap) would permit more weight than the state
+ * plausibly intends. `michigan.ts` states the reading on every quote it can
+ * affect rather than presenting it as the statute's words.
+ *
+ * The statute is also silent on HOW spacing is measured (centre to centre?) and
+ * on rounding — contrast the federal formula's "to the nearest 500 pounds" and
+ * Mississippi's "measured longitudinally to the nearest foot". At 8 ft 11.5 in
+ * versus 9 ft 0 in the difference is 5,000 lb on one axle. Nothing is rounded
+ * here; the caller's figure is used exactly as supplied.
+ */
+export function evaluateAxleSpacingTable(
+  table: AxleSpacingWeightTable,
+  axles: ReadonlyArray<{ positionFt: number; weightLbs: number }>,
+): AxleSpacingTableResult {
+  const findings: AxleSpacingGapFinding[] = [];
+  const unnamed: number[] = [];
+
+  for (let i = 0; i < axles.length; i += 1) {
+    const here = axles[i] as { positionFt: number; weightLbs: number };
+    const before = i > 0 ? (axles[i - 1] as { positionFt: number }) : null;
+    const after =
+      i < axles.length - 1 ? (axles[i + 1] as { positionFt: number }) : null;
+    const gaps: number[] = [];
+    if (before !== null) gaps.push(here.positionFt - before.positionFt);
+    if (after !== null) gaps.push(after.positionFt - here.positionFt);
+    // A lone axle has no spacing to be judged on. It is measured against the
+    // widest row rather than skipped, because that is what a lone axle
+    // unambiguously satisfies.
+    const gapFt = gaps.length === 0 ? Number.POSITIVE_INFINITY : Math.min(...gaps);
+    const row = axleSpacingRowFor(table.rows, gapFt);
+    if (row === null) {
+      unnamed.push(i + 1);
+      findings.push({
+        axleNumber: i + 1,
+        gapFt,
+        rowLabel: null,
+        maxAxleLoadLbs: null,
+        actualLbs: here.weightLbs,
+        overageLbs: 0,
+      });
+      continue;
+    }
+    findings.push({
+      axleNumber: i + 1,
+      gapFt,
+      rowLabel: row.label,
+      maxAxleLoadLbs: row.maxAxleLoadLbs,
+      actualLbs: here.weightLbs,
+      overageLbs: Math.max(0, here.weightLbs - row.maxAxleLoadLbs),
+    });
+  }
+
+  const violations = findings.filter((f) => f.overageLbs > 0);
+  return {
+    tableName: table.name,
+    unnamedGapAxles: unnamed,
+    findings,
+    violations,
+    overMaxAxles: table.maxAxles === null ? null : axles.length > table.maxAxles,
+    overweight: violations.length > 0,
+  };
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
+// PHASE 9 — A BRIDGE TABLE THAT IS NOT THE FEDERAL BRIDGE TABLE.
+//
+// SOUTH CAROLINA TRANSCRIBES ITS OWN, AND IT DISAGREES WITH FHWA'S IN THE
+// FIRST ROW. SC Code 56-5-4140 prints a table for W = 500(LN/N-1 + 12N + 36)
+// whose two-axle row at 8 ft and under reads 35,200 lb where the federal table
+// reads 34,000 — South Carolina's interstate tandem ceiling INCLUDING all
+// enforcement tolerances — and whose interstate gross ceiling is 75,185 lb
+// before the formula lifts it to 80,000. Falling through to `bridgeFormula.ts`
+// would test a South Carolina load against another state's numbers and report
+// violations the state does not have, or clear ones it does.
+//
+// WE HOLD PART OF THE TABLE, AND `partial` SAYS SO. The research transcribes the
+// caps and four cells; the rest of the printed table was not captured. A cell we
+// do not hold is NOT evaluated against the federal value — the entire reason
+// this type exists is that the two tables differ — so an unheld group comes back
+// undecided and says which group it was. An honest "we cannot check axles 2-5
+// against South Carolina's own table" beats a confident verdict from the wrong
+// table.
+// ═══════════════════════════════════════════════════════════════════════════
+
+/** One printed (L, N) cell of a state's own bridge table. */
+export interface StateBridgeCell {
+  /** Outer-to-outer span of the group, feet. */
+  spanFt: number;
+  axleCount: number;
+  maxWeightLbs: number;
+}
+
+export interface StateBridgeTable {
+  name: string;
+  /** Only the cells the source prints AND we have transcribed. */
+  cells: StateBridgeCell[];
+  /** Flat caps the same section publishes; `null` = none stated. */
+  singleAxleLbs: number | null;
+  tandemAxleLbs: number | null;
+  /** Span at or under which `tandemAxleLbs` governs a group. */
+  tandemMaxSpanFt: number | null;
+  grossLbs: number | null;
+  /** Two consecutive tandems at this span or more may carry `twinTandemLbs`. */
+  twinTandemSpanFt: number | null;
+  twinTandemLbs: number | null;
+  /**
+   * TRUE when the source prints more cells than we hold. A partial table never
+   * defers to the federal one — see the section header.
+   */
+  partial: boolean;
+  explanation: string;
+}
+
+export function stateBridgeTablesEqual(
+  a: StateBridgeTable,
+  b: StateBridgeTable,
+): boolean {
+  const key = (t: StateBridgeTable): string =>
+    JSON.stringify([
+      t.singleAxleLbs,
+      t.tandemAxleLbs,
+      t.tandemMaxSpanFt,
+      t.grossLbs,
+      t.twinTandemSpanFt,
+      t.twinTandemLbs,
+      [...t.cells].sort((x, y) => x.spanFt - y.spanFt || x.axleCount - y.axleCount),
+    ]);
+  return key(a) === key(b);
+}
+
+export interface StateBridgeGroupFinding {
+  firstAxle: number;
+  lastAxle: number;
+  axleCount: number;
+  spanFt: number;
+  actualLbs: number;
+  /** `null` when the state's own table holds no cell for this group. */
+  allowedLbs: number | null;
+  overageLbs: number;
+  /** Which published figure decided it. */
+  basis: 'cell' | 'tandem' | 'twin-tandem' | 'single-axle' | 'gross' | 'not-held';
+}
+
+export interface StateBridgeTableResult {
+  tableName: string;
+  grossWeightLbs: number;
+  overallLengthFt: number;
+  findings: StateBridgeGroupFinding[];
+  violations: StateBridgeGroupFinding[];
+  /** Groups the transcribed cells do not cover. */
+  undecidedGroups: number;
+  groupsChecked: number;
+  overweight: boolean;
+}
+
+/**
+ * Check an axle layout against a STATE's own bridge table.
+ *
+ * Deliberately never calls into `bridgeFormula.ts`: a group with no cell on file
+ * comes back `basis: 'not-held'` and `allowedLbs: null`, which the engine
+ * reports as undecided. Substituting the federal value there would be exactly
+ * the fall-through this type exists to prevent.
+ */
+export function evaluateStateBridgeTable(
+  table: StateBridgeTable,
+  axles: ReadonlyArray<{ positionFt: number; weightLbs: number }>,
+): StateBridgeTableResult {
+  const findings: StateBridgeGroupFinding[] = [];
+  const gross = axles.reduce((s, a) => s + a.weightLbs, 0);
+  const overallLengthFt =
+    axles.length === 0
+      ? 0
+      : (axles[axles.length - 1] as { positionFt: number }).positionFt -
+        (axles[0] as { positionFt: number }).positionFt;
+
+  if (table.singleAxleLbs !== null) {
+    const cap = table.singleAxleLbs;
+    axles.forEach((axle, idx) => {
+      findings.push({
+        firstAxle: idx + 1,
+        lastAxle: idx + 1,
+        axleCount: 1,
+        spanFt: 0,
+        actualLbs: axle.weightLbs,
+        allowedLbs: cap,
+        overageLbs: Math.max(0, axle.weightLbs - cap),
+        basis: 'single-axle',
+      });
+    });
+  }
+
+  let groupsChecked = 0;
+  for (let i = 0; i < axles.length; i += 1) {
+    for (let j = i + 1; j < axles.length; j += 1) {
+      groupsChecked += 1;
+      const group = axles.slice(i, j + 1);
+      const axleCount = group.length;
+      const spanFt =
+        (group[axleCount - 1] as { positionFt: number }).positionFt -
+        (group[0] as { positionFt: number }).positionFt;
+      const actual = group.reduce((s, a) => s + a.weightLbs, 0);
+
+      let allowed: number | null = null;
+      let basis: StateBridgeGroupFinding['basis'] = 'not-held';
+
+      if (
+        table.tandemAxleLbs !== null &&
+        table.tandemMaxSpanFt !== null &&
+        spanFt <= table.tandemMaxSpanFt
+      ) {
+        allowed = table.tandemAxleLbs;
+        basis = 'tandem';
+      } else {
+        const cell = table.cells.find(
+          (c) => c.axleCount === axleCount && c.spanFt === spanFt,
+        );
+        if (cell !== undefined) {
+          allowed = cell.maxWeightLbs;
+          basis = 'cell';
+        }
+      }
+
+      // The twin-tandem carve-out raises, never lowers, the allowance.
+      if (
+        table.twinTandemSpanFt !== null &&
+        table.twinTandemLbs !== null &&
+        axleCount === 4 &&
+        spanFt >= table.twinTandemSpanFt
+      ) {
+        const a0 = group[0] as { positionFt: number };
+        const a1 = group[1] as { positionFt: number };
+        const a2 = group[2] as { positionFt: number };
+        const a3 = group[3] as { positionFt: number };
+        if (a1.positionFt - a0.positionFt <= 8 && a3.positionFt - a2.positionFt <= 8) {
+          allowed = Math.max(allowed ?? 0, table.twinTandemLbs);
+          basis = 'twin-tandem';
+        }
+      }
+
+      findings.push({
+        firstAxle: i + 1,
+        lastAxle: j + 1,
+        axleCount,
+        spanFt,
+        actualLbs: actual,
+        allowedLbs: allowed,
+        overageLbs: allowed === null ? 0 : Math.max(0, actual - allowed),
+        basis,
+      });
+    }
+  }
+
+  if (table.grossLbs !== null) {
+    const cap = table.grossLbs;
+    findings.push({
+      firstAxle: 1,
+      lastAxle: axles.length,
+      axleCount: axles.length,
+      spanFt: overallLengthFt,
+      actualLbs: gross,
+      allowedLbs: cap,
+      overageLbs: Math.max(0, gross - cap),
+      basis: 'gross',
+    });
+  }
+
+  const violations = findings.filter((f) => f.overageLbs > 0);
+  return {
+    tableName: table.name,
+    grossWeightLbs: gross,
+    overallLengthFt,
+    findings,
+    violations,
+    undecidedGroups: findings.filter((f) => f.basis === 'not-held').length,
+    groupsChecked,
+    overweight: violations.length > 0,
+  };
+}
+
+/**
+ * The axles for which a jurisdiction's HEAVIER TANDEM ALLOWANCE actually decides
+ * the answer — and only those.
+ *
+ * Michigan's 16,000 lb-per-axle allowance is the case, and its two published
+ * readings differ only in whether it is confined to designated highways. That
+ * disagreement can reach an axle only when THREE things are true at once, and
+ * warning without checking all three is noise on a settled question:
+ *
+ *   1. the axle is part of a genuine TANDEM ASSEMBLY — a run of exactly two
+ *      axles closer together than the clearance the allowance names;
+ *   2. no other axle is within that clearance of either of them, which is what
+ *      "if there is no other axle within 9 feet of the assembly" requires and
+ *      which falls out of the run being maximal;
+ *   3. the axle is HEAVIER than its ordinary spacing row allows and no heavier
+ *      than the allowance would permit, so the allowance is the only thing that
+ *      could make it legal.
+ *
+ * A 15,000 lb axle in a four-axle group spaced at 4 ft is over its 13,000 lb row
+ * and the allowance cannot help it, because there are other axles within 9 ft.
+ * Returning it would put a live disagreement on a quote it cannot affect.
+ */
+export function tandemAllowanceDecisiveAxles(
+  table: AxleSpacingWeightTable,
+  axles: ReadonlyArray<{ positionFt: number; weightLbs: number }>,
+  result: AxleSpacingTableResult,
+): number[] {
+  const allowance = table.tandemAllowance;
+  if (allowance === null) return [];
+  const clearance = allowance.minClearanceFt;
+
+  // Maximal runs of consecutive axles each closer than `clearance` to the next.
+  const runs: number[][] = [];
+  let current: number[] = [];
+  for (let i = 0; i < axles.length; i += 1) {
+    if (current.length === 0) {
+      current = [i];
+      continue;
+    }
+    const prev = axles[i - 1] as { positionFt: number };
+    const here = axles[i] as { positionFt: number };
+    if (here.positionFt - prev.positionFt < clearance) current.push(i);
+    else {
+      runs.push(current);
+      current = [i];
+    }
+  }
+  if (current.length > 0) runs.push(current);
+
+  const out: number[] = [];
+  for (const run of runs) {
+    // Exactly two axles: an assembly the allowance names. A run of three or
+    // more is not a tandem assembly and a run of one has nothing to pair with.
+    if (run.length !== 2) continue;
+    for (const idx of run) {
+      const finding = result.findings.find((f) => f.axleNumber === idx + 1);
+      if (finding === undefined || finding.maxAxleLoadLbs === null) continue;
+      if (
+        finding.actualLbs > finding.maxAxleLoadLbs &&
+        finding.actualLbs <= allowance.perAxleLbs
+      ) {
+        out.push(idx + 1);
+      }
+    }
+  }
+  return out;
+}

@@ -30,6 +30,7 @@ import {
   allBandConflicts,
   allConflictEntries,
   collectSources,
+  conflictEntriesFor,
   corpusProvenance,
   escortRows,
   hubStateBySlug,
@@ -70,6 +71,60 @@ describe('hub coverage', () => {
     expect(HUB_COVERED_STATES.map((s) => s.code).sort()).toEqual(
       Object.keys(OSOW_JURISDICTIONS).sort(),
     );
+  });
+
+  /**
+   * PHASE 9. The hub walks `SourceDoc`s structurally, so a new jurisdiction is
+   * picked up for free — but "for free" is a claim, and this is the assertion
+   * that makes it one. All four cross-state tables must carry a real row for
+   * each of the three states added, and the two new structural fields must
+   * reach the conflicts page rather than being visible only inside a quote.
+   */
+  it('renders all twenty-four covered states in every cross-state table', () => {
+    expect(HUB_COVERED_STATES).toHaveLength(24);
+    for (const code of ['MI', 'MS', 'SC']) {
+      expect(HUB_COVERED_STATES.some((s) => s.code === code), code).toBe(true);
+      const limits = legalLimitRows(ASOF).find((r) => r.state.code === code)!;
+      expect(limits.width.text, `${code} width`).not.toBeNull();
+      expect(limits.height.text, `${code} height`).not.toBeNull();
+      const fees = permitFeeRows(ASOF).find((r) => r.state.code === code)!;
+      expect(fees.base.text, `${code} base fee`).not.toBeNull();
+      expect(fees.overweightMechanism.text, `${code} overweight mechanism`).not.toBeNull();
+      const escorts = escortRows(ASOF).find((r) => r.state.code === code)!;
+      expect(escorts.ruleCount, `${code} escort rules`).toBeGreaterThan(0);
+      expect(superloadRows(ASOF).some((r) => r.state.code === code), code).toBe(true);
+      // And the state page renders without throwing.
+      const page = renderStatePage(HUB_COVERED_STATES.find((s) => s.code === code)!, ASOF);
+      expect(page.length, code).toBeGreaterThan(2000);
+    }
+
+    // Michigan publishes no gross-weight superload threshold: the cell says
+    // "none published", which is a finding, not our gap.
+    const mi = superloadRows(ASOF).find((r) => r.state.code === 'MI')!;
+    expect(mi.gross.absence).toBe('not-published');
+      expect(mi.width.text).toBe("over 16'");
+    // Mississippi's contradicts itself, so the cell shows both readings.
+    const ms = superloadRows(ASOF).find((r) => r.state.code === 'MS')!;
+    expect(ms.gross.absence).toBe('conflict');
+    expect(ms.gross.conflict).toHaveLength(2);
+    // South Carolina resolves cleanly.
+    const sc = superloadRows(ASOF).find((r) => r.state.code === 'SC')!;
+    expect(sc.gross.text).toBe('over 130,000 lb');
+
+    // The two Phase 9 structural fields reach the conflicts page. Michigan's
+    // statute and MDOT's T-1 print the same axle table with two different
+    // answers, and that must be visible here as well as inside a quote.
+    const miConflicts = conflictEntriesFor(
+      HUB_COVERED_STATES.find((s) => s.code === 'MI')!,
+      ASOF,
+    ).map((c) => c.field);
+    expect(miConflicts).toContain('axle-load table by axle spacing');
+    // Mississippi's 80,000-vs-57,650 gross disagreement, likewise.
+    const msConflicts = conflictEntriesFor(
+      HUB_COVERED_STATES.find((s) => s.code === 'MS')!,
+      ASOF,
+    ).map((c) => c.field);
+    expect(msConflicts).toContain('legal gross weight');
   });
 
   it('lists the 50 states plus DC and no territories', () => {
@@ -134,9 +189,20 @@ describe('provenance', () => {
       expect(m).not.toBeNull();
       const stamp = m![1] as string;
       expect(stamp).toMatch(/^\d{4}-\d{2}-\d{2}$/);
-      // The corpus was retrieved before today; a stamp equal to today would be
-      // the deploy-time bug wearing a date.
-      expect(stamp < today).toBe(true);
+      // THE STAMP MUST BE A RETRIEVAL DATE THE CORPUS ACTUALLY HOLDS, and the
+      // way to assert that is to require it to BE one — not to require it to be
+      // in the past. Phase 9 broke the older `stamp < today` form on the day it
+      // landed: Michigan, Mississippi and South Carolina were retrieved on
+      // 2026-09-05 and the pages correctly stamped 2026-09-05, so a test that
+      // demanded yesterday would have been satisfied only by back-dating three
+      // datasets. Matching against the retrieval dates on file is the stronger
+      // check anyway — a deploy timestamp fails it on any day the corpus was
+      // not read, instead of only on days after the last research drop.
+      const retrievals = new Set(
+        [...collectSources(OSOW_JURISDICTIONS).values()].map((d) => d.retrievedOn),
+      );
+      expect(retrievals.has(stamp), `${stamp} is not a retrieval date on file`).toBe(true);
+      expect(stamp <= today).toBe(true);
     }
   });
 });

@@ -221,6 +221,33 @@ export type Measure =
  * fires and sends the move to review naming the missing measurement. Reading
  * plain `two-lane` as the wide variant would drop a real pilot car; reading it as
  * the narrow one would invent one. See `tennessee.ts`.
+ *
+ * PHASE 9 ADDED TWO, AND THEY DECIDE A WIDTH, FOUR LENGTHS AND A TANDEM WEIGHT
+ * RATHER THAN AN ESCORT.
+ * -------------------------------------------------------------------------
+ * Michigan splits its whole size-and-weight law on whether a highway has been
+ * DESIGNATED under MCL 257.717(7): 102 in wide against 96, a 53 ft semitrailer
+ * against 50, a 65 ft truck-and-trailer against 59, and the 16,000 lb-per-axle
+ * tandem assembly of MCL 257.722(2)-(3). Designation is an act of the state
+ * transportation department, a county road commission or a local authority and
+ * is published on MDOT's Truck Operators' Map in green and gold; it is not
+ * derivable from lane count, median or pavement, which is the California
+ * map-colour test exactly, so the members are prefixed `mi-`.
+ *
+ * THEY CROSS NOTHING, like Tennessee's and unlike Colorado's. Michigan's escort
+ * provisions publish no route condition at all — they publish no dimensional
+ * trigger at all, which is the finding recorded in `michigan.ts` — so there is
+ * no second axis to multiply against and two members suffice.
+ *
+ * MISSISSIPPI GOT NONE, AND THAT IS THE POINT OF CHECKING. Its Manual defines
+ * exactly two road classes for escorts: "Two Lane Roadway - one lane per
+ * direction of travel" and "Divided Highway - two (2) or more through lanes per
+ * direction of travel". The first IS `two-lane`; the second is defined by lane
+ * count and not by a median, so `divided`, `multilane-undivided` and
+ * `interstate` all satisfy it and the rules name all three. Minting
+ * `ms-divided-highway` would have created a private synonym a caller could not
+ * know to pass. An `urban` street answers NEITHER definition and correctly falls
+ * through to `unknown` rather than to "no escort" — see `mississippi.ts`.
  */
 export type RouteClass =
   | 'interstate'
@@ -268,7 +295,16 @@ export type RouteClass =
    */
   | 'tn-two-lane-under-24ft-pavement'
   /** The same road with 24 ft or more of pavement — no escort until 12 ft 6 in. */
-  | 'tn-two-lane-24ft-pavement-or-more';
+  | 'tn-two-lane-24ft-pavement-or-more'
+  /**
+   * MCL 257.717(7) / 257.719(3): a Michigan highway the state transportation
+   * department, a county road commission or a local authority HAS DESIGNATED.
+   * 102 in wide, a 53 ft semitrailer, 65 ft truck-and-trailer, and the 16,000 lb
+   * tandem allowance of MCL 257.722(2)-(3).
+   */
+  | 'mi-designated'
+  /** The same road undesignated: 96 in wide, a 50 ft semitrailer, 59 ft combination. */
+  | 'mi-non-designated';
 
 export type EscortCondition =
   /** measure > value */

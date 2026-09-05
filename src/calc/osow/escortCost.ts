@@ -6,12 +6,15 @@
  * it is cited. What they COST splits cleanly in two, and the whole point of this
  * module is that the two halves never touch:
  *
- *   1. LAW-ENFORCEMENT ESCORTS ARE SOMETIMES PUBLISHED. Six of the twenty-one
+ *   1. LAW-ENFORCEMENT ESCORTS ARE SOMETIMES PUBLISHED. Seven of the twenty-four
  *      jurisdictions print a trooper rate — Alabama, Illinois, Indiana,
- *      Louisiana, New York and Tennessee. Those are official figures with a URL
- *      and a date, so they are `Sourced<PoliceEscortRate>` rows and they go
- *      through `resolveSourced` like any permit fee: two schedules that disagree
- *      resolve to nothing and force review, exactly as Illinois's do.
+ *      Louisiana, New York, South Carolina and Tennessee. Those are official
+ *      figures with a URL and a date, so they are `Sourced<PoliceEscortRate>`
+ *      rows and they go through `resolveSourced` like any permit fee: two
+ *      schedules that disagree resolve to nothing and force review, exactly as
+ *      Illinois's do. SOUTH CAROLINA IS THE ONLY ONE WHOSE RATE IS PUBLISHED BY
+ *      THE POLICE RATHER THAN BY THE DOT, on the State Transport Police's own
+ *      contractor request form, which SCDOT links from its OS/OW page.
  *   2. CIVILIAN PILOT CARS ARE A MARKET RATE. No state publishes one — the
  *      research prompt behind all twenty-one datasets explicitly told
  *      researchers not to report them, because there is nothing official to
@@ -103,6 +106,7 @@ import {
 } from './jurisdictions/louisiana.js';
 import { NEW_YORK_POLICE_ESCORT_RATE_SOURCE } from './jurisdictions/newYork.js';
 import { TENNESSEE_POLICE_ESCORT_RATE_SOURCE } from './jurisdictions/tennessee.js';
+import { SOUTH_CAROLINA_POLICE_ESCORT_RATE_SOURCE } from './jurisdictions/southCarolina.js';
 
 function round2(n: number): number {
   return Math.round(n * 100) / 100;
@@ -231,7 +235,7 @@ function rate(
  * and each row cites the same `SourceDoc` object the jurisdiction file cites, so
  * a document can never be described two different ways in two places.
  *
- * The list is SIX STATES LONG and that is the finding, not a gap. Fifteen
+ * The list is SEVEN STATES LONG and that is the finding, not a gap. Seventeen
  * jurisdictions publish nothing, and `NO_PUBLISHED_POLICE_ESCORT_RATE` records
  * each of those as a positive result with the rule that carries its citation.
  */
@@ -473,6 +477,59 @@ export const POLICE_ESCORT_RATES: ReadonlyArray<Sourced<PoliceEscortRate>> = [
     '2026-09-03',
     'The TDOT FAQ states no revision date, so the date we retrieved it is used as the effective-from rather than inventing one.',
   ),
+
+  // ── South Carolina ─────────────────────────────────────────────────────
+  /**
+   * THE ONLY ONE OF THE SEVEN PUBLISHED BY THE POLICE RATHER THAN THE DOT, and
+   * the most completely specified rate card in the corpus: hourly, minimum
+   * hours, mileage, late-cancellation and post-dispatch cancellation are all
+   * printed on one form. SCDOT's own documents say nothing about cost at all.
+   *
+   * THE FLOOR IS A FLOOR AND THE FORM SAYS WHY. "Billed time shall include
+   * travel time to and from the officer's residence", and the mileage is
+   * "mileage driven by the officer to and from the officer's residence AND
+   * during the entire escort". The officer's origin is unknowable at quote time,
+   * so `perMileUsd` is recorded and — like every other per-mile police figure
+   * here — is deliberately excluded from `policeEscortFloorUsd`. Over 16 ft wide
+   * South Carolina requires ONE FRONT AND ONE REAR police escort, so the
+   * two-hour minimum applies to two officers and the computable floor is
+   * 2 x 2 x $50.00 = $200.00.
+   */
+  rate(
+    {
+      jurisdiction: 'SC',
+      agency: 'South Carolina State Transport Police',
+      usdPerHourPerOfficer: 50,
+      hourlyRateKind: 'flat',
+      minimumHoursPerOfficer: 2,
+      minimumChargeUsdPerOfficer: null,
+      minimumOfficers: 2,
+      administrativeUsd: null,
+      perMileUsd: 0.76,
+      unpriced: [
+        {
+          description:
+            'Billable time and billable mileage BOTH include the officer’s commute — "travel time to and from the officer’s residence" and "mileage driven by the officer to and from the officer’s residence and during the entire escort". The officer is assigned after the permit issues, so the commute cannot be computed at quote time and the figure below is a floor rather than a price.',
+        },
+        {
+          description:
+            'Late cancellation: "a minimum charge of $100.00 per officer" for notice inside 24 hours. A cancellation after officers are dispatched, or a delay of more than two hours from the stated origination time, "shall be deemed a cancellation and a minimum charge of four (4) hours per officer will be charged" — $200.00 per officer.',
+        },
+        {
+          description:
+            'The escorting agency may be "local, county, city, Highway Patrol or State Transport Police" and only the State Transport Police rate is published. A move escorted by a county or municipal agency is unpriced, and SCDOT expressly contemplates that.',
+        },
+        {
+          description:
+            'The request must be signed and emailed to State Transport Police 48 hours before the escort, excluding weekends and holidays — a lead time, not a charge, but it constrains when the move can be booked.',
+        },
+      ],
+      triggeringEscortRuleIds: ['sc-width-over-16'],
+    },
+    SOUTH_CAROLINA_POLICE_ESCORT_RATE_SOURCE,
+    '2026-07-01',
+    'The form states its own effective date of 1 July 2026 for the mileage rate only; the $50 hourly rate, the two-hour minimum and the cancellation terms carry no date of their own.',
+  ),
 ];
 
 /**
@@ -500,7 +557,7 @@ export interface NoPublishedPoliceRate {
   finding: string;
 }
 
-/** The fifteen jurisdictions that publish no law-enforcement escort rate. */
+/** The seventeen jurisdictions that publish no law-enforcement escort rate. */
 export const NO_PUBLISHED_POLICE_ESCORT_RATE: ReadonlyArray<NoPublishedPoliceRate> = [
   {
     jurisdiction: 'AR',
@@ -543,6 +600,20 @@ export const NO_PUBLISHED_POLICE_ESCORT_RATE: ReadonlyArray<NoPublishedPoliceRat
     escortRuleId: 'ky-police-escort-no-rate-schedule',
     finding:
       'Neither the Kentucky State Police (502 KAR, KRS Chapter 16) nor the Transportation Cabinet publishes an application fee, hourly officer rate, minimum hours, mileage charge or cancellation charge. The title index was opened and searched.',
+  },
+  {
+    jurisdiction: 'MI',
+    kind: 'notPublished',
+    escortRuleId: 'mi-police-supervision-no-threshold-no-rate',
+    finding:
+      'MDOT Special Provision 14 reads, in full, "Police supervision of traffic required on move." No width, height, length or weight triggers it, and neither the Michigan State Police nor MDOT publishes an hourly rate, minimum hours, officer minimum or mileage rate in michigan.gov/msp, T-1, either revision of T-2, the permit conditions, Form 2465 or the OS/OW FAQ. A required police escort also forces a motor-carrier-officer inspection before movement, for which no fee is published either.',
+  },
+  {
+    jurisdiction: 'MS',
+    kind: 'notPublished',
+    escortRuleId: 'ms-police-escort-width-over-20',
+    finding:
+      'Mississippi requires two blue-light escorts at 300,000 lb or more and contemplates a discretionary police escort by width, and neither MDOT nor the Mississippi Department of Public Safety publishes an hourly rate, minimum hours, officer minimum, mileage rate or cancellation charge. The Manual says only that "The Mississippi Department of Public Safety (DPS) is authorized to enforce Mississippi laws relating to commercial vehicles".',
   },
   {
     jurisdiction: 'MO',
