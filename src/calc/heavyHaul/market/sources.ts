@@ -5,8 +5,9 @@
  * schedules and eCFR sections. Its own doc comment says so: "State DOT / eCFR /
  * statute sites only". Nothing in this file is one of those. These are trade
  * press republications of a paid index, US Government open datasets, one dated
- * industry rate posting, a dozen operator rate cards and two filed carrier
- * tariffs.
+ * industry rate posting, two dozen operator rate cards, a county bid
+ * tabulation, federal and state wage determinations, state fee schedules and
+ * three filed carrier tariffs.
  *
  * Some of those are genuinely strong evidence. None of them is a statute, and
  * `MarketSource` is a DIFFERENT TYPE so that no future edit can put a pilot-car
@@ -287,7 +288,47 @@ export const SRC_NORTH_TEXAS_CRANE: MarketSource = {
   samplePoints: 14,
   refetch: 'manualDocument',
   gives:
-    'The full OPERATED hourly curve from 23 t to 275 t, plus minimums, the crane’s own road permit, rigger and standby rates, the 7% fuel surcharge and portal-to-portal billing. The spine of the crane model — and the single-source risk in it, since it is one Texas market.',
+    'The full OPERATED hourly curve from 23 t to 275 t, plus minimums, the crane’s own road permit, rigger and standby rates, the 7% fuel surcharge and portal-to-portal billing. The spine of the crane model — and it is NO LONGER A SINGLE SOURCE: seven further cards now pool around it and it sits 0–20% above their median in every capacity band.',
+};
+
+export const SRC_CRANE_OPERATOR_CARDS: MarketSource = {
+  id: 'crane_operator_rate_cards_pooled',
+  title: 'Seven further published operated crane rate cards, six US markets',
+  url: 'https://limehousesons.com/crane-equipment-rental/',
+  publisher:
+    'Limehouse & Sons (Charleston SC) · D&G Crane (Missoula MT) · HWC Crane (Chicago Ridge IL) · COI Crane (Richmond VA) · Dependable Crane (Sacramento CA) · B&M Crane (Michigan) · Liftoff Cranes (Chicago IL)',
+  dated: null,
+  retrievedOn: RETRIEVED,
+  samplePoints: 55,
+  refetch: 'manualDocument',
+  gives:
+    'The operated hourly curve as a DISTRIBUTION rather than one card — 12 t to 350 t across six markets — plus the published minimum-hours ladder (3/4/6/8/10 hr by capacity), a second fuel surcharge at 8%, riggers at $85–$95/hr, an oiler carried as a distinct crew member at 100 t and above, and the regional index that replaced a derived compass table. Most are undated pages: the only honest claim is that they were live on the retrieval date.',
+};
+
+export const SRC_ALLEGANY_CRANE_BID: MarketSource = {
+  id: 'allegany_county_ny_crane_bid_tab_2024',
+  title: 'Allegany County DPW — Crane Rental bid tabulation',
+  url: 'https://www.alleganyco.gov/wp-content/uploads/Bid-Tab-2024-Crane-Rental.pdf',
+  publisher: 'Allegany County, New York (public procurement)',
+  dated: '2024-02-16',
+  retrievedOn: RETRIEVED,
+  samplePoints: 2,
+  refetch: 'manualDocument',
+  gives:
+    'Two operators’ awarded operated-plus-rigger prices for 100 t, 150 t, 300 t and 400 t machines — a CEILING product, not a market rate, at 1.9–2.5× the commercial cards. And the finding that matters most: a complete bare column at four capacities and four durations drew "No Bid" from BOTH bidders on all sixteen lines while they bid the entire operated column.',
+};
+
+export const SRC_DAVIS_BACON_CRANE_WAGE: MarketSource = {
+  id: 'davis_bacon_co_crane_operator_2025',
+  title: 'Davis-Bacon highway wage determinations CO20250009 and CO20250014',
+  url: 'https://osa.colorado.gov/sites/osa/files/documents/Highway%20CO20250009%20Denver-Douglas%20Counties%20MOD%200.pdf',
+  publisher: 'US Department of Labor (public domain)',
+  dated: '2025-01-03',
+  retrievedOn: RETRIEVED,
+  samplePoints: 4,
+  refetch: 'manualDocument',
+  gives:
+    'The same crane-operator classification priced in a metro and a non-metro determination, in one state, on one date: Denver metro $50.98 fully burdened against non-metro Colorado $32.91 — 1.55×. The independent confirmation that the regional axis is METRO DENSITY and not compass. It also shows the wage is essentially flat across capacity ($50.98 at ≤50 t, $50.48 at 91–140 t): the machine, not the man, is what makes a big crane expensive.',
 };
 
 export const SRC_FEMA_EQUIPMENT_RATES: MarketSource = {
@@ -352,7 +393,86 @@ export const SRC_IL_ENGINEERING_REVIEW: MarketSource = {
   samplePoints: 1,
   refetch: 'manualDocument',
   gives:
-    'Engineering review and pavement analysis at $40/hr — the HOURLY architecture, against Texas’s flat fee. A single national constant would be wrong for one of the two.',
+    'Engineering review and pavement analysis at $40/hr — the HOURLY architecture, one of six now sourced. A single national constant would be wrong in six different ways.',
+};
+
+export const SRC_MODOT_ANALYSIS_FEES: MarketSource = {
+  id: 'modot_bridge_roadway_analysis_2025',
+  title: 'MoDOT Fees 2025 and Superloads 2025, reproducing 7 CSR 10-25.020',
+  url: 'https://www.modot.org/sites/default/files/documents/Fees%202025_0.pdf',
+  publisher: 'Missouri Department of Transportation',
+  dated: '2025-03-31',
+  retrievedOn: RETRIEVED,
+  samplePoints: 5,
+  refetch: 'manualDocument',
+  gives:
+    'The only DISTANCE-TIERED state analysis fee found: $425 for 0–50 miles, $625 for 51–200, $925 over 200, above a 160,000 lb trigger — plus $425 for a re-analysis after a dimension change, $265 for a commercial-zone analysis, and a published reuse window (one fee on an identical reapplication inside 30 days above 300,000 lb, 60 days below it).',
+};
+
+export const SRC_STATE_ANALYSIS_FEE_SCHEDULES: MarketSource = {
+  id: 'state_bridge_analysis_fee_schedules',
+  title: 'Five further state engineering/bridge-analysis fee schedules, including one negative',
+  url: 'https://regs.maryland.gov/us/md/exec/comar/11.04.01.08',
+  publisher:
+    'COMAR 11.04.01.08 (Maryland) · SCDOT · WisDOT MV2600 · INDOT · WSDOT self-issue fee list',
+  dated: null,
+  retrievedOn: RETRIEVED,
+  samplePoints: 5,
+  refetch: 'manualDocument',
+  gives:
+    'Four more fee architectures — Maryland PER STRUCTURE ($8, $20 with a bridge engineer escorting, $12 on a repeat, plus $200/day monitoring, review valid six months), South Carolina WEIGHT-TIERED ($100/$200/$350 plus a $100 superload application fee), Indiana $10 PER BRIDGE, Wisconsin $10 PER DISTRICT review — and Washington, which publishes a complete permit fee list containing no analysis fee at all. That last one is NEGATIVE EVIDENCE and is the reason a state publishing nothing is shown as $0 rather than imputed.',
+};
+
+export const SRC_ROUTE_SURVEY_PRACTICES: MarketSource = {
+  id: 'osow_permitting_practices_review_phase2',
+  title: 'Oversize/Overweight Permitting Practices Review — Phase II (NJ-2013-001)',
+  url: 'https://rosap.ntl.bts.gov/view/dot/29330/dot_29330_DS1.pdf',
+  publisher: 'New Jersey DOT, via the National Transportation Library',
+  dated: '2013-01-01',
+  retrievedOn: RETRIEVED,
+  samplePoints: 7,
+  refetch: 'manualDocument',
+  gives:
+    'Who requires a physical route survey, at what HEIGHT, and who may perform it, across seven states — CT 14\'0", DE 14\'6", MD 14\'6", NY 13\'11" (a state-certified escort only), PA 14\'6" or superload, NJ never. The document that establishes the split: the applicant produces the survey and the state consumes it, so no state charges for one. Thirteen years old — the structure holds, the exact heights want re-verifying.',
+};
+
+export const SRC_UTILITY_CLEARANCE_TESTIMONY: MarketSource = {
+  id: 'perkins_stc_high_load_utility_costs',
+  title: 'The Costly Truths About Moving High Loads',
+  url: 'https://www.perkinsstc.com/oversize-news/2017/2/16/costly-truths-about-high-loads',
+  publisher: 'Perkins Specialized Transportation Contracting (heavy-haul operator)',
+  dated: '2017-02-16',
+  retrievedOn: RETRIEVED,
+  samplePoints: 2,
+  refetch: 'manualDocument',
+  gives:
+    'An operator describing his own utility invoices: non-refundable deposits merely to have a utility measure its own wires, charges to come out and WATCH a load pass under them, and unitemised flat rates with no man-hours shown — $90,000 of over-height assistance on a 100-mile project and $200,000 on a 1,000-mile move. The evidence behind a refusal, not behind a band.',
+};
+
+export const SRC_CFR_393_TIEDOWNS: MarketSource = {
+  id: 'cfr_49_393_106_110_tiedowns',
+  title: '49 CFR 393.106 and 393.110 — cargo securement',
+  url: 'https://www.law.cornell.edu/cfr/text/49/393.106',
+  publisher: 'US Code of Federal Regulations',
+  dated: null,
+  retrievedOn: RETRIEVED,
+  samplePoints: 2,
+  refetch: 'manualDocument',
+  gives:
+    'The aggregate working-load-limit rule (tiedowns ≥ 50% of cargo weight, an anchor-to-anchor tiedown counting HALF its WLL) and the minimum tiedown count by article length. Together they yield a chain COUNT that scales linearly with weight above ~33,000 lb — a quantity of gear, never a price.',
+};
+
+export const SRC_ODFL_TARIFF: MarketSource = {
+  id: 'odfl_705_rules_tariff',
+  title: 'Old Dominion Freight Line Tariff ODFL 705',
+  url: 'https://www.odfl.com/content/dam/odfl/us/en/documents/rates-and-tariffs/other-tariff-rules/ODFL_705_Rules.pdf',
+  publisher: 'Old Dominion Freight Line',
+  dated: null,
+  retrievedOn: RETRIEVED,
+  samplePoints: 1,
+  refetch: 'manualDocument',
+  gives:
+    'A FOURTH independent tariff assigning blocking and bracing to the consignor at the consignor’s expense and pricing none of it. The wording is standard NMFC-derived language, so this is one convention observed four times — decisive that securement is not billed as an accessorial, and silent on what the materials cost.',
 };
 
 export const SRC_CARGO_INSURANCE: MarketSource = {
@@ -385,18 +505,27 @@ export const MARKET_SOURCES: ReadonlyArray<MarketSource> = [
   SRC_GLEN_RAVEN_TARIFF,
   SRC_FEMA_URT,
   SRC_NORTH_TEXAS_CRANE,
+  SRC_CRANE_OPERATOR_CARDS,
+  SRC_ALLEGANY_CRANE_BID,
+  SRC_DAVIS_BACON_CRANE_WAGE,
   SRC_FEMA_EQUIPMENT_RATES,
   SRC_CA_PREVAILING_WAGE,
   SRC_PERMIT_SERVICE_FEES,
   SRC_TXDMV_SUPERHEAVY,
   SRC_IL_ENGINEERING_REVIEW,
+  SRC_MODOT_ANALYSIS_FEES,
+  SRC_STATE_ANALYSIS_FEE_SCHEDULES,
+  SRC_ROUTE_SURVEY_PRACTICES,
+  SRC_UTILITY_CLEARANCE_TESTIMONY,
+  SRC_CFR_393_TIEDOWNS,
+  SRC_ODFL_TARIFF,
   SRC_CARGO_INSURANCE,
 ];
 
 /**
  * The sources a cron could refresh on its own, with no key and no payment.
  *
- * Two of twenty-one, and naming them is the point: everything else in this engine
+ * Two of thirty, and naming them is the point: everything else in this engine
  * ages silently until somebody re-reads a PDF. The DAT weekly anchor is free but
  * 403s a plain fetch and its article slug changes every week, so it sits in
  * `headlessCapture` rather than here.

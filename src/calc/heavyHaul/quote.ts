@@ -72,11 +72,13 @@ import {
   excessValueLine,
   layoverRiskLine,
   permitServiceLine,
+  physicalRouteSurveyLine,
   priceLoading,
   priceMarketLinehaul,
-  routeSurveyLine,
   securementLine,
+  stateAnalysisFeeLine,
   tarpingLine,
+  utilityClearanceRiskLine,
   mpgForEquipment,
   rate,
   ROUTE_CLASS_UNDERIVABLE,
@@ -176,8 +178,8 @@ export interface DieselReading {
  * escort bands only ever fire when the caller supplied no rate of their own —
  * a dispatcher's negotiated number still beats any band here and the code still
  * says so. The always-applicable accessorials (the permit agent's fee, the
- * securement allowance, a route survey where a state flags a superload) fire on
- * their own. The conditional ones do not fire until asked, because biasing a
+ * state's own engineering analysis where a state flags a superload, and a
+ * physical route survey where the load's HEIGHT trips one) fire on their own. The conditional ones do not fire until asked, because biasing a
  * may-not-apply item into every quote is how a tool gets a reputation for
  * quoting high.
  */
@@ -400,8 +402,8 @@ export const HEAVY_HAUL_NOT_INCLUDED: ReadonlyArray<{ item: string; why: string 
     why: 'The line haul, pilot cars and accessorials here are a market BAND assembled from published indexes, filed tariffs and operator rate sheets. It is a defensible starting number with a stated basis, not a price anybody has offered you. A rate you enter yourself replaces it, because your negotiated number is real and a band is not.',
   },
   {
-    item: 'Superload line haul, cranes over 160,000 lb, and drive-the-route surveys',
-    why: 'Each of these is refused rather than estimated, and for the same reason: the published evidence stops there. Superloads are priced job by job after an engineering review, a crane above that weight travels disassembled and needs a lift plan, and no published rate for a physical route survey exists anywhere. A refusal that names the floor and the next step beats a number we cannot defend.',
+    item: 'Superload line haul, cranes over 200,000 lb, and utility line lifts',
+    why: 'Each of these is refused rather than estimated, and for the same reason: the published evidence stops there. Superloads are priced job by job after an engineering review. The crane refusal MOVED OUT from 160,000 lb once seven further operator rate cards put the operated hour in print to 350 tons — between 160,000 and 200,000 lb we now quote the machine and crew as a floor and say plainly that assembly and multi-trailer mobilisation are not in it, because that half is still published by nobody after a three-angle search. Utility clearance is refused outright: an operator documents $90,000 of over-height assistance on a 100-mile project and $200,000 on a 1,000-mile move, billed unitemised, and no utility publishes a rate. A refusal that names the floor and the next step beats a number we cannot defend.',
   },
   {
     item: 'Detention, layover, escort wait time and cancellation',
@@ -412,8 +414,12 @@ export const HEAVY_HAUL_NOT_INCLUDED: ReadonlyArray<{ item: string; why: string 
     why: 'A toll road, a bridge authority or a city can require its own permit inside a state we do price. Where we know of one, that state’s notes name it.',
   },
   {
-    item: 'A per-state superload trigger table',
-    why: 'Two state fee ARCHITECTURES were sourced — Texas charges a flat $500 for its engineering review, Illinois bills $40 an hour — but not the thresholds and fees for the other nineteen states that can impose one. The route-survey line therefore fires only on the states our own permit engine already flags as a superload.',
+    item: 'The engineering-analysis fee in thirteen of the twenty-one encoded states',
+    why: 'Eight states are now priced from their own published schedules, in SIX different architectures — Missouri by trip distance ($425 / $625 / $925), Texas flat ($500, or $100 with no bridges on the route), South Carolina by weight ($100 / $200 / $350), Maryland per structure ($8–$20), Indiana $10 a bridge, Wisconsin $10 per district review, Illinois $40 an hour, and Washington, whose complete published fee list contains none at all. The remaining thirteen keep the original wide band until their schedules are read, and the widest state on your lane governs the line — so a narrow band is never claimed on the strength of the states we did read.',
+  },
+  {
+    item: 'Which crane your SITE needs, as opposed to which your weight implies',
+    why: 'A crane is not rated to the load’s weight: capacity is quoted at a radius and falls off steeply as the boom reaches out, the rigging is part of the load, and picks are planned at 75–85% of chart capacity. The 2–3× weight-to-capacity rule this tool sizes on is OURS — eight operator rate cards, a county bid tabulation and four government schedules later, no association, manufacturer or agency publishes one. It is now the largest single uncertainty in the loading line, and three questions collapse it faster than any further rate research: how far the crane can set up from the item, whether the ground is paved or soft, and whether anything is overhead.',
   },
   {
     item: 'Tolls',
@@ -1012,19 +1018,60 @@ export function priceHeavyHaulLane(input: HeavyHaulRequest): HeavyHaulQuote {
     // above IS that rate. Adding $150 to every quote for something already in
     // the number beside it would be double-counting. Ask for it when the load
     // needs a built cradle.
-    if (input.market?.securementAllowance === true) accessorials.push(securementLine());
+    if (input.market?.securementAllowance === true) {
+      accessorials.push(securementLine(cargoLbs, input.cargo.overallLengthIn));
+    }
 
     // The permit AGENT's fee, on top of the state fee already cited above. It is
     // never inside `totalPermitUsd` and never can be — it is 'market' money.
-    const pricedPermitCount = (permits?.jurisdictions ?? []).filter(
+    // The state-side portal surcharges (NJ $12 + 5%, TX $0.25 + 2.25%) are NOT
+    // added here: the permits engine already carries both as `transactionFee`
+    // inside the cited total, and billing them again would charge twice.
+    const pricedJurisdictions = (permits?.jurisdictions ?? []).filter(
       (j) => j.subtotalUsd !== null,
-    ).length;
-    const svc = permitServiceLine(pricedPermitCount);
+    );
+    const svc = permitServiceLine(pricedJurisdictions.length, {
+      superloadPermitCount: pricedJurisdictions.filter((j) => j.superload).length,
+    });
     if (svc) accessorials.push(svc);
 
-    const survey = routeSurveyLine(
+    // TWO PRODUCTS, TWO LINES. The state's own engineers analysing the route is
+    // a published fee in eight states and six architectures; a drive-the-route
+    // survey is a document the APPLICANT produces, which no state performs and
+    // none charges for. They used to share one ±70% line, and that width was
+    // mostly the averaging.
+    const analysis = stateAnalysisFeeLine(
       (permits?.jurisdictions ?? []).filter((j) => j.superload).map((j) => j.jurisdiction),
+      {
+        routeMiles: distance.totalMiles,
+        grossWeightLbs: input.cargo.grossWeightLbs,
+      },
     );
+    if (analysis) accessorials.push(analysis);
+
+    const laneStateCodes = (permits?.jurisdictions ?? []).map((j) => j.jurisdiction);
+    // KEYED PER STATE, NOT ON HEIGHT ALONE. Five states require a survey at
+    // 13'11"-14'6"; a lane that crosses none of them needs no survey however
+    // tall the load is, and New Jersey requires none at any height.
+    const survey = physicalRouteSurveyLine({
+      ...(input.cargo.heightIn === undefined ? {} : { heightIn: input.cargo.heightIn }),
+      ...(input.cargo.widthIn === undefined ? {} : { widthIn: input.cargo.widthIn }),
+      ...(input.cargo.overallLengthIn === undefined
+        ? {}
+        : { lengthIn: input.cargo.overallLengthIn }),
+      routeMiles: distance.totalMiles,
+      // Only when we actually know the lane. With no per-state filing we fall
+      // back to the national height trigger rather than silently concluding
+      // that no state on an unknown route requires a survey.
+      ...(laneStateCodes.length > 0 ? { stateCodes: laneStateCodes } : {}),
+      // And priced over the miles that need a survey, not the whole lane: a
+      // permit binds the state that issued it, and so does the survey it asks
+      // for. Billing 1,484 miles because 80 of them are in New York would be
+      // the same error as quoting a permit in a state the load never enters.
+      ...(filedLegs.length > 0
+        ? { stateMiles: filedLegs.map((l) => ({ stateCode: l.stateCode, miles: l.miles })) }
+        : {}),
+    });
     if (survey) accessorials.push(survey);
 
     const cover = excessValueLine(input.market?.declaredValueUsd);
@@ -1035,6 +1082,13 @@ export function priceHeavyHaulLane(input: HeavyHaulRequest): HeavyHaulQuote {
     // — more than every other accessorial on a typical quote combined.
     riskLines.push(detentionRiskLine(derived.axleCount.value));
     riskLines.push(layoverRiskLine());
+    // PULLED OUT OF THE ROUTE-SURVEY BAND ON PURPOSE. An operator documents
+    // $90,000 of over-height utility assistance on a 100-mile project and
+    // $200,000 on a 1,000-mile move, billed unitemised, with no schedule
+    // published anywhere. Averaging a six-figure exposure into a ±35% estimate
+    // would be the most dangerous thing in this model, so it is disclosed.
+    const utility = utilityClearanceRiskLine(input.cargo.heightIn);
+    if (utility) riskLines.push(utility);
   }
 
   for (const a of accessorials) {

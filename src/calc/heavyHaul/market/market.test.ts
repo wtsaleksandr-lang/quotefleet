@@ -61,19 +61,31 @@ import {
   estimateEscortMarketCost,
   overnightsNeeded,
   // accessorials
+  CRANE_BAND_PCT_MOB_EXCLUDED,
+  CRANE_BAND_PCT_NORMAL,
+  CRANE_BAND_PCT_REGION_KNOWN,
+  CRANE_BAND_PCT_WIDE,
+  CRANE_MOB_EXCLUDED_CARGO_LBS,
   CRANE_REFUSAL_CARGO_LBS,
+  CRANE_REGION_MULTIPLIERS,
+  craneMinHours,
   craneRateUsdPerHour,
+  craneRegionForState,
   detentionRiskLine,
   detentionUsdPerHour,
   excessValueLine,
   headlineOf,
   layoverRiskLine,
   permitServiceLine,
+  physicalRouteSurveyLine,
   priceLoading,
-  routeSurveyLine,
+  securementChainCount,
   securementLine,
+  stateAnalysisFee,
+  stateAnalysisFeeLine,
   tarpingLine,
   tarpingUsd,
+  utilityClearanceRiskLine,
 } from './index.js';
 
 // ══════════════════════════════════════════════════════════════════════════
@@ -210,11 +222,12 @@ describe('the accuracy rating', () => {
         cargoWeightDerived: false,
       }),
       tarpingLine(120, 96),
-      securementLine(),
+      securementLine(40_000, 240),
       detentionRiskLine(13),
       layoverRiskLine(),
       permitServiceLine(3),
-      routeSurveyLine(['TX']),
+      stateAnalysisFeeLine(['TX']),
+      physicalRouteSurveyLine({ heightIn: 180, routeMiles: 1_484 }),
       excessValueLine(500_000),
     ].filter((l): l is NonNullable<typeof l> => l !== null);
     for (const l of everyAccessorial) {
@@ -236,10 +249,15 @@ describe('the accuracy rating', () => {
     // research measured detention at ±15% and a route survey at ±70%.
     expect(detentionUsdPerHour(13)).toBe(605);
     expect(detentionRiskLine(13).accuracy.bandPct).toBe(15);
-    const survey = routeSurveyLine(['TX']);
-    expect(survey?.accuracy.bandPct).toBe(70);
+    // The route-survey line used to be ±70% because ONE line was carrying two
+    // products. Split, the state's own analysis fee in Texas is a statutory
+    // $500 (±10%) and the private drive-the-route survey is ±35%.
+    const analysis = stateAnalysisFeeLine(['TX']);
+    expect(analysis?.accuracy.bandPct).toBe(10);
+    const survey = physicalRouteSurveyLine({ heightIn: 180, routeMiles: 1_484 });
+    expect(survey?.accuracy.bandPct).toBe(35);
     const svc = permitServiceLine(7);
-    expect(svc?.accuracy.bandPct).toBe(45);
+    expect(svc?.accuracy.bandPct).toBe(20);
     expect(svc?.accuracy.bandPct).not.toBe(survey?.accuracy.bandPct);
   });
 
@@ -252,7 +270,10 @@ describe('the accuracy rating', () => {
         cargoWeightDerived: false,
       }),
       permitServiceLine(3),
-      routeSurveyLine(['TX']),
+      stateAnalysisFeeLine(['TX']),
+      physicalRouteSurveyLine({ heightIn: 180, routeMiles: 1_484 }),
+      utilityClearanceRiskLine(180),
+      securementLine(120_000, 600),
       excessValueLine(500_000),
     ].filter((l): l is NonNullable<typeof l> => l !== null);
     for (const l of lines) {
@@ -907,6 +928,54 @@ describe('loading — the headline', () => {
     expect(craneRateUsdPerHour(10)).toBe(155); // below the smallest published
   });
 
+  it('HOLDS FLAT above the published curve rather than extrapolating its slope', () => {
+    // The curve flattens hard up there: $440 to $595 from 165 t to 350 t is
+    // +35% of price for +112% of capacity, and a second card prices a 350 t
+    // machine at $575 — BELOW this card's 275 t figure. Continuing the sub-100 t
+    // slope would invent a rise the market does not charge.
+    expect(craneRateUsdPerHour(275)).toBe(595);
+    expect(craneRateUsdPerHour(350)).toBe(595);
+    expect(craneRateUsdPerHour(500)).toBe(595);
+    const slopeBelow = craneRateUsdPerHour(120) - craneRateUsdPerHour(60);
+    const slopeAbove = craneRateUsdPerHour(275) - craneRateUsdPerHour(215);
+    expect(slopeAbove).toBeLessThan(slopeBelow);
+  });
+
+  it('climbs the PUBLISHED minimum-hours ladder, which is the real floor', () => {
+    // Five cards publish 3 / 4 / 6 / 8 / 10 hr by capacity. The old flat
+    // "3 up to 30 t else 4" under-billed the 100–120 t floor by roughly 2x.
+    expect(craneMinHours(25)).toBe(3);
+    expect(craneMinHours(30)).toBe(3);
+    expect(craneMinHours(40)).toBe(4);
+    expect(craneMinHours(80)).toBe(4);
+    expect(craneMinHours(100)).toBe(6);
+    expect(craneMinHours(120)).toBe(8);
+    expect(craneMinHours(250)).toBe(8);
+    expect(craneMinHours(350)).toBe(10);
+  });
+
+  it('indexes the region on METRO DENSITY, not compass — two old rows had the wrong sign', () => {
+    // Charleston SC measured 0.91x and Missoula MT 0.91x against the Dallas
+    // spine. The old table put the Southeast at 1.00x and the Mountain states
+    // ABOVE Texas at 1.05-1.15x. Both were backwards.
+    expect(craneRegionForState('SC')).toBe('southeast');
+    expect(craneRegionForState('MT')).toBe('mountainPlains');
+    expect(CRANE_REGION_MULTIPLIERS.southeast).toBeLessThan(
+      CRANE_REGION_MULTIPLIERS.texasSouthCentral,
+    );
+    expect(CRANE_REGION_MULTIPLIERS.mountainPlains).toBeLessThan(
+      CRANE_REGION_MULTIPLIERS.texasSouthCentral,
+    );
+    // Chicago metro and the West Coast are above it, and California is confirmed.
+    expect(CRANE_REGION_MULTIPLIERS.midwestMetro).toBe(1.15);
+    expect(CRANE_REGION_MULTIPLIERS.westCoastMetro).toBe(1.22);
+    expect(craneRegionForState('CA')).toBe('westCoastMetro');
+    expect(craneRegionForState('IL')).toBe('midwestMetro');
+    // With no state we do NOT guess a middle row and quietly apply an uplift
+    // nobody evidenced. We fall back to the spine's own market and widen.
+    expect(craneRegionForState(null)).toBe('texasSouthCentral');
+  });
+
   it('anchors the headline at the 65th percentile, NOT the midpoint', () => {
     expect(headlineOf(1000, 2000)).toBe(1650);
     const lines = priceLoading({
@@ -921,10 +990,13 @@ describe('loading — the headline', () => {
     expect(crane?.headlineUsd).toBeGreaterThan(midpoint);
   });
 
-  it('reproduces the research’s Houston worked example to the dollar', () => {
+  it('reproduces the Houston worked example on the PUBLISHED minimum-hours ladder', () => {
     // 120,000 lb piece, 120-180 t class, $440-$530/hr on the published curve,
-    // Texas 1.00x. Crane $1,883-$4,537 headline $3,608; rigger $380-$1,520
-    // headline $1,121; crane road permit $125-$275 headline $223.
+    // Texas 1.00x. The floor is the ladder's 8 hr at this capacity, not the old
+    // flat 4 hr: crane $3,766-$4,537 headline $4,267, which is where the ~2x
+    // under-billing of the 100-120 t floor gets corrected. And at 120 t the crew
+    // is a rigger AND an oiler, so the rigging line doubles at the minimum:
+    // $760-$2,280 headline $1,748. The crane road permit is unchanged.
     const lines = priceLoading({
       cargoWeightLbs: 120_000,
       end: 'origin',
@@ -932,17 +1004,42 @@ describe('loading — the headline', () => {
       cargoWeightDerived: false,
     });
     const crane = lines.find((l) => l.code === 'loading_crane_origin');
-    expect(crane?.lowUsd).toBeCloseTo(1883.2, 1);
+    expect(crane?.lowUsd).toBeCloseTo(3766.4, 1);
     expect(crane?.highUsd).toBeCloseTo(4536.8, 1);
-    expect(Math.round(crane?.headlineUsd ?? 0)).toBe(3608);
+    expect(Math.round(crane?.headlineUsd ?? 0)).toBe(4267);
+    // The old model billed this floor at 4 hr. Exactly twice as much time now.
+    expect((crane?.lowUsd ?? 0) / (440 * 4 * 1.07)).toBeCloseTo(2, 5);
     const rigger = lines.find((l) => l.code === 'loading_rigging_origin');
-    expect(rigger?.lowUsd).toBe(380);
-    expect(rigger?.highUsd).toBe(1520);
-    expect(Math.round(rigger?.headlineUsd ?? 0)).toBe(1121);
+    expect(rigger?.name).toMatch(/rigger \+ oiler/i);
+    expect(rigger?.lowUsd).toBe(760);
+    expect(rigger?.highUsd).toBe(2280);
+    expect(Math.round(rigger?.headlineUsd ?? 0)).toBe(1748);
     const permit = lines.find((l) => l.code === 'loading_crane_permit_origin');
     expect(permit?.lowUsd).toBe(125);
     expect(permit?.highUsd).toBe(275);
     expect(Math.round(permit?.headlineUsd ?? 0)).toBe(223);
+  });
+
+  it('carries an OILER as a second wage unit at 100 t and above, and not below', () => {
+    // One card prices its 100 t and 175 t machines "full dress with oiler" and
+    // itemises him; the smaller machines on the same card carry none. A quote
+    // that adds a single rigger to a 100 t pick is a body short.
+    const small = priceLoading({
+      cargoWeightLbs: 40_000, // 40-60 t class
+      end: 'origin',
+      stateCode: 'TX',
+      cargoWeightDerived: false,
+    }).find((l) => l.code === 'loading_rigging_origin');
+    expect(small?.name).not.toMatch(/oiler/i);
+    expect(small?.lowUsd).toBe(380); // one rigger at the 4 hr minimum
+    const big = priceLoading({
+      cargoWeightLbs: 100_000, // 100-150 t class
+      end: 'origin',
+      stateCode: 'TX',
+      cargoWeightDerived: false,
+    }).find((l) => l.code === 'loading_rigging_origin');
+    expect(big?.name).toMatch(/oiler/i);
+    expect(big?.lowUsd).toBe(760); // two bodies at the 4 hr minimum
   });
 
   it('applies the Northeast metro uplift at the Buffalo end', () => {
@@ -953,17 +1050,21 @@ describe('loading — the headline', () => {
       cargoWeightDerived: false,
     });
     const crane = lines.find((l) => l.code === 'loading_crane_destination');
-    expect(crane?.lowUsd).toBeCloseTo(2259.8, 0);
-    expect(crane?.highUsd).toBeCloseTo(5444.2, 0);
+    expect(crane?.lowUsd).toBeCloseTo(4595.01, 1);
+    expect(crane?.highUsd).toBeCloseTo(5534.9, 1);
+    // The Northeast row is the ONE cell with no commercial card behind it, and
+    // the line says so rather than passing it off as measured.
+    expect(crane?.accuracy.detail).toMatch(/is DERIVED/);
   });
 
-  it('REFUSES ABOVE 160,000 LB — exactly where the evidence stops', () => {
+  it('REFUSES ABOVE 200,000 LB — the wall moved, and only half of it did', () => {
     const lines = priceLoading({
       cargoWeightLbs: CRANE_REFUSAL_CARGO_LBS + 1,
       end: 'origin',
       stateCode: 'TX',
       cargoWeightDerived: false,
     });
+    expect(CRANE_REFUSAL_CARGO_LBS).toBe(200_000);
     expect(lines).toHaveLength(1);
     expect(lines[0].headlineUsd).toBeNull();
     expect(lines[0].lowUsd).toBeNull();
@@ -971,7 +1072,9 @@ describe('loading — the headline', () => {
     // A refusal that hands the shipper their next action is not a dead end.
     expect(lines[0].accuracy.detail).toMatch(/site survey/i);
     expect(lines[0].accuracy.hover).toMatch(/From about \$/);
-    // 160,000 lb exactly still prices.
+    // The honest sentence: we can quote the crane, not getting it there.
+    expect(lines[0].accuracy.detail).toMatch(/cannot quote getting it there/i);
+    // 200,000 lb exactly still prices.
     const ok = priceLoading({
       cargoWeightLbs: CRANE_REFUSAL_CARGO_LBS,
       end: 'origin',
@@ -981,21 +1084,72 @@ describe('loading — the headline', () => {
     expect(ok.length).toBe(3);
   });
 
-  it('widens the band above 80,000 lb, where access swings the price more than weight', () => {
-    const small = priceLoading({
+  it('quotes 160k-200k lb as a FLOOR with mobilisation excluded, and says so', () => {
+    // The operated hour is published to 350 t by three cards and is flat across
+    // the band. Assembly and multi-trailer mobilisation are still published by
+    // nobody, so they come out of the number and into the sentence.
+    const lines = priceLoading({
+      cargoWeightLbs: CRANE_MOB_EXCLUDED_CARGO_LBS + 1,
+      end: 'origin',
+      stateCode: 'TX',
+      cargoWeightDerived: false,
+    });
+    expect(lines).toHaveLength(3);
+    const crane = lines[0];
+    expect(crane.headlineUsd).not.toBeNull();
+    expect(crane.accuracy.bandPct).toBe(CRANE_BAND_PCT_MOB_EXCLUDED);
+    expect(crane.accuracy.hover).toMatch(/mobilisation are NOT included/);
+    expect(crane.accuracy.detail).toMatch(/ARE NOT IN THIS FIGURE/);
+    expect(crane.accuracy.detail).toMatch(/a floor, not a total/);
+  });
+
+  it('NEVER implies bare hire is a cheaper option — both bidders refused to quote one', () => {
+    for (const cargo of [40_000, 120_000, 180_000, 260_000]) {
+      const lines = priceLoading({
+        cargoWeightLbs: cargo,
+        end: 'origin',
+        stateCode: 'TX',
+        cargoWeightDerived: false,
+      });
+      expect(lines[0].accuracy.detail).toMatch(/no cheaper bare option/);
+      expect(lines[0].accuracy.detail).toMatch(/declined all sixteen lines/);
+    }
+  });
+
+  it('narrows the band ONLY where the region is known, never nationally', () => {
+    const known = priceLoading({
       cargoWeightLbs: 40_000,
       end: 'origin',
       stateCode: 'TX',
       cargoWeightDerived: false,
     })[0];
+    const unknown = priceLoading({
+      cargoWeightLbs: 40_000,
+      end: 'origin',
+      stateCode: null,
+      cargoWeightDerived: false,
+    })[0];
+    // Regional variance is now MODELLED instead of absorbed into the band, so a
+    // job whose market we know carries the interquartile spread plus site risk.
+    expect(known.accuracy.bandPct).toBe(CRANE_BAND_PCT_REGION_KNOWN);
+    expect(known.accuracy.bandPct).toBe(25);
+    // Without the region you are still exposed to the full 0.85x-1.30x spread.
+    expect(unknown.accuracy.bandPct).toBe(CRANE_BAND_PCT_NORMAL);
+    expect(unknown.accuracy.bandPct).toBe(35);
+    expect(unknown.accuracy.detail).toMatch(/No state was given/);
+  });
+
+  it('tightens 80,000-160,000 lb from ±55% to ±40%, and says why', () => {
     const large = priceLoading({
       cargoWeightLbs: 120_000,
       end: 'origin',
       stateCode: 'TX',
       cargoWeightDerived: false,
     })[0];
-    expect(small.accuracy.bandPct).toBe(35);
-    expect(large.accuracy.bandPct).toBe(55);
+    expect(large.accuracy.bandPct).toBe(CRANE_BAND_PCT_WIDE);
+    expect(large.accuracy.bandPct).toBe(40);
+    // What is left at this size is SITE risk, not price risk.
+    expect(large.accuracy.detail).toMatch(/how far the crane can set up/);
   });
 
   it('says when the piece weight is itself a derivation', () => {
@@ -1036,27 +1190,159 @@ describe('the rest of the invoice', () => {
     expect(tarpingUsd(96, 12 * 12 + 1)).toBeNull();
   });
 
-  it('prices the permit AGENT’S fee as a band, never a point', () => {
+  it('prices the permit AGENT’S fee as TWO TIERS, which is what the old ±45% was', () => {
     const svc = permitServiceLine(7);
-    expect(svc?.lowUsd).toBe(210);
-    expect(svc?.highUsd).toBe(595);
+    // The published edges are $27 and $82, not the old $30 and $85.
+    expect(svc?.lowUsd).toBe(189);
+    expect(svc?.highUsd).toBe(574);
     expect(svc?.headlineUsd).toBe(385);
     expect(svc?.accuracy.tier).toBe('benchmark');
+    expect(svc?.accuracy.bandPct).toBe(20);
     expect(svc?.accuracy.detail).toMatch(/never added to the permit total/);
     expect(permitServiceLine(0)).toBeNull();
   });
 
-  it('fires a route survey only where a state flags a superload', () => {
-    expect(routeSurveyLine([])).toBeNull();
-    const survey = routeSurveyLine(['TX', 'OH']);
-    expect(survey?.lowUsd).toBe(200);
-    expect(survey?.name).toMatch(/TX, OH/);
+  it('tightens to ±11% when the service tier is declared — each tier is internally tight', () => {
+    const budget = permitServiceLine(7, { tier: 'budget' });
+    expect(budget?.lowUsd).toBe(168); // 7 x $24
+    expect(budget?.highUsd).toBe(210); // 7 x $30
+    expect(budget?.accuracy.bandPct).toBe(11);
+    const full = permitServiceLine(7, { tier: 'fullService' });
+    expect(full?.lowUsd).toBe(507.5); // 7 x $72.50
+    expect(full?.highUsd).toBe(633.5); // 7 x $90.50
+    expect(full?.accuracy.bandPct).toBe(11);
+    // The 3x spread is BETWEEN the tiers, not inside either of them.
+    expect((full?.headlineUsd ?? 0) / (budget?.headlineUsd ?? 1)).toBeGreaterThan(2.5);
+  });
+
+  it('keeps the superload uplift SMALL, because the state fee is what costs money', () => {
+    const plain = permitServiceLine(2);
+    const withSuper = permitServiceLine(2, { superloadPermitCount: 1 });
+    expect(withSuper?.headlineUsd ?? 0).toBeGreaterThan(plain?.headlineUsd ?? 0);
+    // $60-$90.50 published against $27-$82 standard: more, but not a lot more.
+    expect((withSuper?.headlineUsd ?? 0) / (plain?.headlineUsd ?? 1)).toBeLessThan(1.5);
+    expect(withSuper?.name).toMatch(/1 at the superload rate/);
+    expect(withSuper?.accuracy.detail).toMatch(/SUPERLOAD UPLIFT IS SMALL/);
+  });
+
+  it('does NOT bill the NJ and TX portal surcharges twice — the permits engine has them', () => {
+    // Both are real, both are published, and both are already `transactionFee`
+    // inside the CITED permit total. Adding them here would charge the shipper
+    // twice for the same statutory add-on.
+    const svc = permitServiceLine(7);
+    expect(svc?.accuracy.detail).toMatch(/already inside the cited permit total/);
+  });
+
+  it('splits the state ANALYSIS fee from the private ROUTE SURVEY', () => {
+    expect(stateAnalysisFeeLine([])).toBeNull();
+    // The state's own engineers: Texas is a statutory $500, or $100 with no
+    // bridges on the route. Ohio's schedule has not been read, so it keeps the
+    // original width — and the widest state on the lane governs the line.
+    const analysis = stateAnalysisFeeLine(['TX', 'OH']);
+    expect(analysis?.lowUsd).toBe(200);
+    expect(analysis?.highUsd).toBe(1000);
+    expect(analysis?.name).toMatch(/TX, OH/);
+    expect(analysis?.accuracy.bandPct).toBe(70);
+    expect(stateAnalysisFeeLine(['TX'])?.accuracy.bandPct).toBe(10);
+    // And the reframe that made the split possible.
+    expect(analysis?.accuracy.detail).toMatch(/no state charges for one/);
+  });
+
+  it('drives Missouri off ROUTE MILES, which is the only distance-tiered schedule found', () => {
+    expect(stateAnalysisFee('MO', { routeMiles: 40 }).headlineUsd).toBe(425);
+    expect(stateAnalysisFee('MO', { routeMiles: 150 }).headlineUsd).toBe(625);
+    expect(stateAnalysisFee('MO', { routeMiles: 900 }).headlineUsd).toBe(925);
+    // A long Missouri superload is $925, not a flat mid-four-hundreds figure.
+    expect(stateAnalysisFee('MO', { routeMiles: 900 }).bandPct).toBe(10);
+  });
+
+  it('shows $0 for a state whose COMPLETE published fee list contains none', () => {
+    // Negative evidence, not a gap. Imputing a national average to Washington
+    // would invent a fee the state does not charge.
+    const wa = stateAnalysisFee('WA', {});
+    expect(wa.headlineUsd).toBe(0);
+    expect(wa.architecture).toBe('nonePublished');
+    expect(wa.note).toMatch(/negative evidence/);
+  });
+
+  it('prices per-unit states on an exact RATE and an unknown COUNT', () => {
+    expect(stateAnalysisFee('MD', {}).architecture).toBe('perStructure');
+    expect(stateAnalysisFee('MD', {}).bandPct).toBe(40);
+    expect(stateAnalysisFee('IN', {}).lowUsd).toBe(10);
+    expect(stateAnalysisFee('WI', {}).architecture).toBe('perReview');
+    expect(stateAnalysisFee('IL', {}).lowUsd).toBe(160); // $40/hr x 4 hr
+    expect(stateAnalysisFee('IL', {}).highUsd).toBe(480); // $40/hr x 12 hr
+    // South Carolina steps on GROSS WEIGHT and adds its $100 application fee.
+    expect(stateAnalysisFee('SC', { grossWeightLbs: 150_000 }).headlineUsd).toBe(200);
+    expect(stateAnalysisFee('SC', { grossWeightLbs: 320_000 }).headlineUsd).toBe(450);
+    expect(stateAnalysisFee('SC', { grossWeightLbs: 100_000 }).headlineUsd).toBe(0);
+  });
+
+  it('fires the physical route survey on HEIGHT, not weight — five states key it there', () => {
+    // 13 ft 11 in to 14 ft 6 in across CT, DE, MD, NY and PA.
+    expect(physicalRouteSurveyLine({ heightIn: 160, routeMiles: 500 })).toBeNull();
+    const survey = physicalRouteSurveyLine({ heightIn: 174, routeMiles: 500 });
+    expect(survey).not.toBeNull();
+    expect(survey?.name).toMatch(/triggered by 14 ft 6 in of height/);
+    // $1.90-$2.50 a mile on the published high-pole escort rate, one pass.
+    expect(survey?.lowUsd).toBe(950);
+    expect(survey?.highUsd).toBe(1250);
+    expect(survey?.accuracy.bandPct).toBe(35);
     // CONDITIONAL: headline is likelihood-weighted at the midpoint, not the
     // 65th percentile, so a may-not-apply item does not inflate every quote.
     expect(survey?.headlineUsd).toBeCloseTo(
       ((survey?.lowUsd ?? 0) + (survey?.highUsd ?? 0)) / 2,
       2,
     );
+    // A short local survey is billed below a full escort day: the floor binds.
+    expect(physicalRouteSurveyLine({ heightIn: 174, routeMiles: 100 })?.lowUsd).toBe(350);
+    // Superload width is the secondary trigger, with no height given.
+    expect(physicalRouteSurveyLine({ widthIn: 200, routeMiles: 500 })).not.toBeNull();
+  });
+
+  it('surveys the miles that NEED a survey, not the whole lane', () => {
+    // A permit binds the state that issued it and so does the survey it asks
+    // for. Billing 1,484 miles because 80 of them are in New York would be the
+    // same error as quoting a permit in a state the load never enters.
+    const scoped = physicalRouteSurveyLine({
+      heightIn: 14 * 12 + 6,
+      routeMiles: 1_484,
+      stateCodes: ['TX', 'AR', 'TN', 'KY', 'OH', 'PA', 'NY'],
+      stateMiles: [
+        { stateCode: 'TX', miles: 286 },
+        { stateCode: 'AR', miles: 448 },
+        { stateCode: 'TN', miles: 333 },
+        { stateCode: 'KY', miles: 83 },
+        { stateCode: 'OH', miles: 193 },
+        { stateCode: 'PA', miles: 61 },
+        { stateCode: 'NY', miles: 80 },
+      ],
+    });
+    // 14 ft 6 in trips New York (13 ft 11 in) and NOT Pennsylvania, Maryland or
+    // Delaware, whose threshold is 14 ft 6 in exactly. So 80 miles, not 1,484.
+    expect(scoped?.name).toMatch(/^Physical route survey \(80 mi/);
+    expect(scoped?.lowUsd).toBe(350); // the short-route floor binds
+    expect(scoped?.accuracy.detail).toMatch(/rather than the whole 1,484-mile lane/);
+    // With no per-state mileage the whole lane is the only figure there is.
+    const unscoped = physicalRouteSurveyLine({
+      heightIn: 14 * 12 + 6,
+      routeMiles: 1_484,
+      stateCodes: ['TX', 'NY'],
+    });
+    expect(unscoped?.lowUsd).toBe(2819.6);
+  });
+
+  it('REFUSES to band utility clearance, and warns instead', () => {
+    expect(utilityClearanceRiskLine(160)).toBeNull();
+    const util = utilityClearanceRiskLine(180);
+    expect(util?.accuracy.tier).toBe('refused');
+    expect(util?.headlineUsd).toBeNull();
+    expect(util?.inTotal).toBe(false);
+    // $90,000 on a 100-mile project and $200,000 on a 1,000-mile move, billed
+    // unitemised. Averaging that into a ±35% survey line would be the single
+    // most dangerous thing available in this model.
+    expect(util?.accuracy.detail).toMatch(/\$90,000/);
+    expect(util?.accuracy.detail).toMatch(/\$200,000/);
   });
 
   it('treats securement as an ALLOWANCE anchored at the bottom of its band', () => {
@@ -1064,10 +1350,34 @@ describe('the rest of the invoice', () => {
     // percentile, because biasing a may-not-apply item upward would inflate
     // every quote on the site. It is also off by default in the composer,
     // because securement is normally inside the heavy-haul rate already priced.
-    const sec = securementLine();
+    const sec = securementLine(45_000, 360);
     expect(sec.headlineUsd).toBe(sec.lowUsd);
     expect(sec.accuracy.tier).toBe('benchmark');
     expect(sec.accuracy.hover).toMatch(/ALLOWANCE, not a price/);
+    // The band did NOT narrow, and that is now a result rather than a shrug:
+    // four carrier tariffs and one binding government tariff price it at zero.
+    expect(sec.accuracy.bandPct).toBe(60);
+  });
+
+  it('drives the securement allowance off CARGO WEIGHT via the federal chain count', () => {
+    // 49 CFR 393.106(d) with 393.110, on 3/8in Grade 70 chain at a 6,600 lb WLL.
+    expect(securementChainCount(20_000, 240)).toBe(4);
+    expect(securementChainCount(45_000, 360)).toBe(7);
+    expect(securementChainCount(80_000, 480)).toBe(13);
+    expect(securementChainCount(120_000, 600)).toBe(19);
+    // Above ~33,000 lb the WEIGHT rule always governs and the count is linear.
+    expect(securementChainCount(120_000, 120)).toBe(19);
+    // Below it, length governs.
+    expect(securementChainCount(5_000, 480)).toBe(5);
+    // And the allowance moves with the load instead of sitting flat.
+    const light = securementLine(20_000, 240);
+    const heavy = securementLine(120_000, 600);
+    expect(light.lowUsd).toBe(100);
+    expect(light.highUsd).toBe(240);
+    expect(heavy.lowUsd).toBe(475);
+    expect(heavy.highUsd).toBe(1140);
+    // The gear value is NOT converted into a price, and the line says why.
+    expect(heavy.accuracy.detail).toMatch(/QUANTITY OF GEAR, NOT A CHARGE/);
   });
 
   it('turns cargo value into arithmetic instead of a guess', () => {

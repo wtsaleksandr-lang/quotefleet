@@ -15,7 +15,9 @@
  *                     ladder pinned to the ~250-mile day-rate crossover
  *   escorts.ts      — the civilian pilot-car tiered floor
  *   accessorials.ts — loading (the headline), detention, layover, tarping,
- *                     securement, permit service margin, route survey, insurance
+ *                     securement, permit service margin, the state's own
+ *                     engineering analysis, the private drive-the-route survey,
+ *                     utility clearance (refused) and insurance
  *   derive.ts       — axle count, equipment class, route class, from the cargo
  *   accuracy.ts     — the four-tier rating every charge carries
  *   sources.ts      — the register, deliberately NOT `SourceDoc`

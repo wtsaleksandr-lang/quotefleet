@@ -680,13 +680,56 @@ describe('the realistic-mileage lane, beside the parity fixture', () => {
     const codes = out.lines.map((l) => l.code);
     expect(codes).toContain('loading_crane_origin');
     expect(codes).toContain('loading_crane_destination');
-    // 120,000 lb at 2–3× is a 120–180 t machine, on the published curve.
+    // 120,000 lb at 2-3x is a 120-180 t machine, on the published curve, and at
+    // that capacity the published minimum is EIGHT hours, not four.
     const crane = out.lines.find((l) => l.code === 'loading_crane_origin');
     expect(crane?.name).toMatch(/120–180 t class/);
+    expect(crane?.name).toMatch(/8 h portal to portal/);
     expect(crane?.basis).toBe('market');
     // The Buffalo end carries the Northeast metro uplift and costs more.
     const far = out.lines.find((l) => l.code === 'loading_crane_destination');
     expect(far?.amountUsd ?? 0).toBeGreaterThan(crane?.amountUsd ?? 0);
+    // Houston is Texas, the spine's own market, so no factor is applied there.
+    expect(crane?.accuracy?.detail).toMatch(/the spine card is this market/);
+  });
+
+  it('fires the physical route survey on the NEW YORK height rule, not on weight', () => {
+    // The reference cargo is 14 ft 6 in high. New York requires a survey above
+    // 13 ft 11 in and the lane crosses it, so the line fires and names it.
+    const survey = out.lines.find((l) => l.code === 'physical_route_survey');
+    expect(survey).toBeDefined();
+    expect(survey?.name).toMatch(/in NY/);
+    expect(survey?.basis).toBe('market');
+    // A short load on the same lane needs no survey at all.
+    const low = priceHeavyHaulLane({
+      cargo: { ...REFERENCE_CARGO, heightIn: 12 * 12 },
+      lane: { origin: HOUSTON, destination: BUFFALO },
+      filedLegs: REALISTIC_LEGS,
+      market: { cargoWeightLbs: 120_000 },
+      diesel: DIESEL,
+      asOf: ASOF,
+    });
+    expect(low.lines.map((l) => l.code)).not.toContain('physical_route_survey');
+  });
+
+  it('separates the STATE analysis fee from the private survey, and neither is cited', () => {
+    for (const code of ['physical_route_survey', 'route_survey']) {
+      const line = out.lines.find((l) => l.code === code);
+      if (line) {
+        expect(line.basis).toBe('market');
+        expect(line.accuracy?.tier).toBe('benchmark');
+      }
+    }
+    // The cited permit column is untouched by any of it.
+    expect(out.subtotalSourcedUsd).toBe(out.permits?.totalPermitUsd);
+  });
+
+  it('discloses utility clearance as a REFUSAL rather than banding it', () => {
+    const util = out.riskLines.find((l) => l.code === 'risk_utility_clearance');
+    expect(util).toBeDefined();
+    expect(util?.accuracy.tier).toBe('refused');
+    expect(util?.headlineUsd).toBeNull();
+    expect(util?.inTotal).toBe(false);
   });
 
   it('never moves a cited permit fee by a dollar, whatever the market engine does', () => {
