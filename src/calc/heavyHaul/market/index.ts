@@ -11,7 +11,8 @@
  * market data and showing exactly what each number rests on. That is what this
  * directory does:
  *
- *   linehaul.ts     — DAT-anchored line haul, USDA distance curve, USDA minimum
+ *   linehaul.ts     — DAT-anchored line haul, USDA distance curve, and a minimum
+ *                     ladder pinned to the ~250-mile day-rate crossover
  *   escorts.ts      — the civilian pilot-car tiered floor
  *   accessorials.ts — loading (the headline), detention, layover, tarping,
  *                     securement, permit service margin, route survey, insurance

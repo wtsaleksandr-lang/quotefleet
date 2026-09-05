@@ -40,6 +40,14 @@ import {
   FLATBED_MPG,
   LINEHAUL_BAND_PCT,
   REGION_MULTIPLIERS,
+  REGIONS_WITH_PUBLISHED_FLATBED_RATE,
+  MINIMUM_CROSSOVER_MILES,
+  PROCUREMENT_CROSSOVER_MILES,
+  OBSERVED_FLATBED_MEDIAN_USD_PER_MILE,
+  OBSERVED_CURVE_ANCHOR_MILES,
+  atsAxleFormulaUsd,
+  observedCurveUsdPerMile,
+  observedCurveMultiplier,
   distanceMultiplier,
   mpgForEquipment,
   notionalCrossoverMiles,
@@ -359,8 +367,37 @@ describe('the line-haul model', () => {
     expect(out.totalUsd).toBeCloseTo(2.67 * 750, 2);
   });
 
-  it('publishes the distance multipliers exactly as observed', () => {
-    expect(distanceMultiplier(120)).toBe(1.9);
+  it('HOLDS THE ANCHOR AT $2.67 against 2,636 observed flatbed postings', () => {
+    // The observed median is $2.84/mi (p25 $2.16, p75 $3.49), and DAT's own
+    // June-2026 flatbed line-haul was $2.94. $2.67 therefore sits near the 40th
+    // percentile of what open-deck freight actually posts at: conservative, not
+    // wrong, and it is not raised because the anchor's value is that it is a
+    // dated published figure rather than an unpublished observed median.
+    expect(OBSERVED_FLATBED_MEDIAN_USD_PER_MILE).toBe(2.84);
+    expect(BASE_FLATBED_LINEHAUL_USD_PER_MILE).toBeLessThan(
+      OBSERVED_FLATBED_MEDIAN_USD_PER_MILE,
+    );
+    // Inside the observed p25-p75, and within 7% of the observed median.
+    expect(BASE_FLATBED_LINEHAUL_USD_PER_MILE).toBeGreaterThan(2.16);
+    expect(
+      Math.abs(BASE_FLATBED_LINEHAUL_USD_PER_MILE / OBSERVED_FLATBED_MEDIAN_USD_PER_MILE - 1),
+    ).toBeLessThan(0.07);
+  });
+
+  it('CORRECTS THE SHORT-HAUL RUNG from a reefer-produce 1.90 to 1.28', () => {
+    // 1.90 came from USDA REEFER PRODUCE lanes: real data, wrong market. Two
+    // independent angles agree on the replacement -- published rate structures
+    // give 1.22-1.30 (median 1.25) and observed postings give $3.73/mi at
+    // 150-300 mi against $2.87/mi at 800-1,200 mi, a ratio of 1.30. 1.28 is the
+    // midpoint of those two central estimates.
+    expect(distanceMultiplier(120)).toBe(1.28);
+    expect(1.28).toBeGreaterThanOrEqual(1.25);
+    expect(1.28).toBeLessThanOrEqual(1.3);
+    expect(3.73 / 2.87).toBeCloseTo(1.3, 2);
+    // And the cliff is gone: 1.90 -> 1.25 was a 34% step at 250 miles; 1.28 ->
+    // 1.25 is 2.4%, so the curve degrades smoothly into the next band.
+    const step = distanceMultiplier(249) / distanceMultiplier(251) - 1;
+    expect(step).toBeLessThan(0.03);
     expect(distanceMultiplier(300)).toBe(1.25);
     expect(distanceMultiplier(750)).toBe(1.0);
     expect(distanceMultiplier(1200)).toBe(0.87);
@@ -368,35 +405,76 @@ describe('the line-haul model', () => {
     expect(DISTANCE_BANDS).toHaveLength(5);
   });
 
-  it('THE MINIMUM GOVERNS THE ENTIRE SUB-250-MILE BAND', () => {
-    // The single best-evidenced number in the model. USDA's 0-100 mile lanes:
-    // p10 $1,300, median $1,400, p75 $1,500 -- a minimum, not a rate.
-    for (const miles of [1, 25, 60, 100, 185, 249, 250]) {
+  it('THE MINIMUM GOVERNS EVERY LANE BELOW THE ~250-MILE CROSSOVER', () => {
+    // The crossover, not the level, is what two unrelated methods agree on:
+    // USDA's flat sub-100-mile totals put it at 256 miles, and an interagency
+    // lowboy schedule that pays "the guarantee OR the mileage, whichever is
+    // greater" crosses its own rates at 244-261. So every rung of the ladder is
+    // the price of a 250-mile lane for its class.
+    for (const miles of [1, 25, 60, 100, 185, 240]) {
       const out = priceMarketLinehaul({ miles, equipment: 'flatbed' });
       expect(out.ok).toBe(true);
       if (!out.ok) return;
       expect(out.minimumBinds).toBe(true);
-      expect(out.totalUsd).toBe(1300);
+      expect(out.totalUsd).toBe(850);
     }
-    // The notional crossover -- where the sub-250 rate path would overtake the
-    // floor -- sits at 256 miles, outside the band, which is why it governs it.
-    expect(notionalCrossoverMiles('flatbed')).toBeCloseTo(256.3, 1);
-    // Every class scales identically, so every class crosses in the same place.
-    expect(notionalCrossoverMiles('rgn')).toBeCloseTo(notionalCrossoverMiles('flatbed'), 1);
-    expect(notionalCrossoverMiles('multiAxle')).toBeCloseTo(notionalCrossoverMiles('flatbed'), 1);
+    // EVERY class crosses inside the range the interagency schedule measures.
+    for (const equipment of ['flatbed', 'stepDeck', 'rgn', 'multiAxle'] as const) {
+      const crossover = notionalCrossoverMiles(equipment);
+      expect(crossover).toBeGreaterThanOrEqual(PROCUREMENT_CROSSOVER_MILES.low);
+      expect(crossover).toBeLessThanOrEqual(PROCUREMENT_CROSSOVER_MILES.high);
+      // And each rung really is the price of a 250-mile lane, to the rounding.
+      const exact =
+        BASE_FLATBED_LINEHAUL_USD_PER_MILE *
+        DISTANCE_BANDS[0].multiplier *
+        EQUIPMENT[equipment].multiplier *
+        MINIMUM_CROSSOVER_MILES;
+      expect(Math.abs(EQUIPMENT[equipment].minimumUsd - exact)).toBeLessThanOrEqual(5);
+    }
+    // Rounding to the nearest $10 is the only reason they are not identical,
+    // and it leaves under two miles of spread across the four classes.
+    const crossings = (['flatbed', 'stepDeck', 'rgn', 'multiAxle'] as const).map((e) =>
+      notionalCrossoverMiles(e),
+    );
+    expect(Math.max(...crossings) - Math.min(...crossings)).toBeLessThan(2);
+  });
+
+  it('LOWERS THE FLATBED RUNG from a reefer-produce $1,300 to a published $850', () => {
+    // Every published open-deck minimum is below $1,300, most by 2-4x: a
+    // $600-$1,400 day rate, $300-$800 for a local legal move, ~$500 flat fees.
+    // $1,300 was USDA REFRIGERATED PRODUCE, where the reefer unit and produce
+    // urgency support a floor open-deck local work does not.
+    expect(EQUIPMENT.flatbed.minimumUsd).toBe(850);
+    expect(EQUIPMENT.flatbed.minimumUsd).toBeGreaterThanOrEqual(600);
+    expect(EQUIPMENT.flatbed.minimumUsd).toBeLessThanOrEqual(1400);
+    // The heavy rungs stay well above it, because the procurement figures that
+    // support THEM are for a different product: fully-operated heavy haul.
+    expect(EQUIPMENT.rgn.minimumUsd).toBe(1370);
+    expect(EQUIPMENT.rgn.minimumUsd).toBeGreaterThanOrEqual(1100);
+    expect(EQUIPMENT.rgn.minimumUsd).toBeLessThanOrEqual(1500);
+    expect(EQUIPMENT.multiAxle.minimumUsd).toBe(1750);
+    expect(EQUIPMENT.multiAxle.minimumUsd).toBeGreaterThanOrEqual(800);
+    expect(EQUIPMENT.multiAxle.minimumUsd).toBeLessThanOrEqual(2500);
+    // The ladder keeps its shape: each rung is its class multiplier times the
+    // flatbed rung, to the rounding.
+    for (const equipment of ['stepDeck', 'rgn', 'multiAxle'] as const) {
+      const ratio = EQUIPMENT[equipment].minimumUsd / EQUIPMENT.flatbed.minimumUsd;
+      expect(ratio).toBeCloseTo(EQUIPMENT[equipment].multiplier, 1);
+    }
   });
 
   it('is 35% higher than a pure per-mile model on the 185-mile step-deck lane', () => {
     const out = priceMarketLinehaul({ miles: 185, equipment: 'stepDeck' });
     expect(out.ok).toBe(true);
     if (!out.ok) return;
-    expect(out.totalUsd).toBe(1400);
-    // A pure per-mile model with no floor returns $1,014 on this lane with the
-    // regional adjustment off (the research quotes $912 with a Midwest 0.90x
-    // applied; we ship regional off, so the comparison is against $1,014).
-    const naive = 2.67 * 1.9 * 1.08 * 185;
-    expect(naive).toBeCloseTo(1013.59, 1);
-    expect(out.totalUsd / naive).toBeGreaterThan(1.35);
+    expect(out.totalUsd).toBe(870);
+    // A pure per-mile model with no floor returns $645 on this lane. The floor
+    // is smaller than it used to be AND the short-haul multiplier is smaller,
+    // so the gap between the two is almost exactly what it was: the two
+    // corrections were of the same double-count, from opposite ends.
+    const naive = 2.67 * 1.28 * 1.02 * 185;
+    expect(naive).toBeCloseTo(644.9, 1);
+    expect(out.totalUsd / naive).toBeGreaterThan(1.34);
   });
 
   it('NEVER PRICES A LONGER LANE BELOW A SHORTER ONE', () => {
@@ -414,16 +492,16 @@ describe('the line-haul model', () => {
   });
 
   it('QUOTES THE RATE THE LANE ACTUALLY WORKS OUT AT, not the band multiplier', () => {
-    // At 1,115 mi the 1,000-1,500 band multiplier is 0.87, giving $5.58/mi --
-    // but the 500-1,000 band's ceiling price ($6,408) is higher and acts as this
-    // lane's floor. A row reading "1,115 mi x $5.58/mi" beside a $6,408 total is
-    // arithmetic a reader can check and find wrong, so the row quotes $5.75.
+    // At 1,115 mi the 1,000-1,500 band multiplier is 0.87, giving $4.76/mi --
+    // but the 500-1,000 band's ceiling price ($5,473) is higher and acts as this
+    // lane's floor. A row reading "1,115 mi x $4.76/mi" beside a $5,473 total is
+    // arithmetic a reader can check and find wrong, so the row quotes $4.91.
     const out = priceMarketLinehaul({ miles: 1115.38, equipment: 'multiAxle' });
     expect(out.ok).toBe(true);
     if (!out.ok) return;
-    expect(out.effectiveUsdPerMile).toBeCloseTo(2.67 * 0.87 * 2.4, 3);
+    expect(out.effectiveUsdPerMile).toBeCloseTo(2.67 * 0.87 * 2.05, 3);
     expect(out.bandCeilingGoverns).toBe(true);
-    expect(out.totalUsd).toBeCloseTo(2.67 * 1.0 * 2.4 * 1000, 2);
+    expect(out.totalUsd).toBeCloseTo(2.67 * 1.0 * 2.05 * 1000, 2);
     expect(out.realisedUsdPerMile * out.miles).toBeCloseTo(out.totalUsd, 0);
     expect(out.notes.join(' ')).toMatch(/cannot price below what a 1,000-mile lane costs/);
 
@@ -432,16 +510,168 @@ describe('the line-haul model', () => {
     expect(longer.ok).toBe(true);
     if (!longer.ok) return;
     expect(longer.bandCeilingGoverns).toBe(false);
-    expect(longer.totalUsd).toBeCloseTo(2.67 * 0.87 * 2.4 * 1484, 2);
+    expect(longer.totalUsd).toBeCloseTo(2.67 * 0.87 * 2.05 * 1484, 2);
   });
 
-  it('carries the equipment multipliers and minimums the research settled on', () => {
+  it('carries the equipment multipliers and minimums the three angles settled on', () => {
     expect(EQUIPMENT.flatbed.multiplier).toBe(1.0);
-    expect(EQUIPMENT.stepDeck.multiplier).toBe(1.08);
+    expect(EQUIPMENT.stepDeck.multiplier).toBe(1.02);
     expect(EQUIPMENT.rgn.multiplier).toBe(1.6);
-    expect(EQUIPMENT.multiAxle.multiplier).toBe(2.4);
-    expect(EQUIPMENT.flatbed.minimumUsd).toBe(1300);
-    expect(EQUIPMENT.multiAxle.minimumUsd).toBe(3120);
+    expect(EQUIPMENT.multiAxle.multiplier).toBe(2.05);
+    expect(EQUIPMENT.flatbed.minimumUsd).toBe(850);
+    expect(EQUIPMENT.multiAxle.minimumUsd).toBe(1750);
+  });
+
+  it('MOVES STEP DECK TO 1.02 — the only multiplier that is actually measured', () => {
+    // 162 matched state-pair lanes carrying BOTH a flatbed and a step-deck row
+    // with >=5 observed loads each: median ratio 0.970, load-weighted mean
+    // 0.985, on 10,245 step-deck postings. Five publishers say 1.10. On a
+    // legal-weight equipment class, transaction volume wins -- so 1.02 sits just
+    // above parity rather than at the guides' figure, and BOTH are recorded.
+    expect(EQUIPMENT.stepDeck.multiplier).toBe(1.02);
+    expect(EQUIPMENT.stepDeck.multiplier).toBeGreaterThan(0.97);
+    expect(EQUIPMENT.stepDeck.multiplier).toBeLessThan(1.108);
+    expect(EQUIPMENT.stepDeck.basis).toMatch(/0\.970/);
+    expect(EQUIPMENT.stepDeck.basis).toMatch(/10,245/);
+    expect(EQUIPMENT.stepDeck.basis).toMatch(/1\.10/);
+  });
+
+  it('HOLDS RGN AT 1.60 BECAUSE TWO METHODS BRACKET IT, and says bracketed not confirmed', () => {
+    // Published: 10 publishers, median 1.523. Observed: 3 marketplace rate sets,
+    // 1.71 / 1.75 / 1.86. They straddle 1.60. When two independent methods
+    // bracket a value, the value is not the thing to change -- moving to either
+    // would be picking a side the evidence does not pick.
+    expect(EQUIPMENT.rgn.multiplier).toBe(1.6);
+    expect(1.523).toBeLessThan(EQUIPMENT.rgn.multiplier);
+    expect(1.75).toBeGreaterThan(EQUIPMENT.rgn.multiplier);
+    expect(EQUIPMENT.rgn.basis).toMatch(/BRACKETED, not confirmed/);
+    const out = priceMarketLinehaul({ miles: 900, equipment: 'rgn' });
+    expect(out.ok).toBe(true);
+    if (!out.ok) return;
+    expect(out.accuracy.hover).toMatch(/bracketed/i);
+    expect(out.accuracy.detail).toMatch(/BRACKETED, NOT CONFIRMED/);
+    // Bracketed is not confirmed, so the band does not narrow.
+    expect(LINEHAUL_BAND_PCT.rgn).toBe(40);
+  });
+
+  it('MOVES MULTI-AXLE 2.40 -> 2.05 because 2.40 DOUBLE-COUNTED permits and escorts', () => {
+    // 2.40 came from PERMITTED-BAND rates, and three publishers state those
+    // bands are all-in -- "linehaul plus permits, escorts, and fuel", "the total
+    // cost to the shipper". This engine prices permits and escorts as separate
+    // lines, so 2.40 charged for them twice. That is a category error, not a
+    // calibration error, and it is the reason the higher figure was rejected.
+    expect(EQUIPMENT.multiAxle.multiplier).toBe(2.05);
+    // Two independent angles converge once the accessorials come back out:
+    // three decomposed published quotes give 1.79-2.12 (median 2.07), and a
+    // government lowboy schedule whose rate is explicitly ex-escort gives
+    // 1.85-2.00. 2.05 is inside both.
+    expect(EQUIPMENT.multiAxle.multiplier).toBeGreaterThanOrEqual(1.85);
+    expect(EQUIPMENT.multiAxle.multiplier).toBeLessThanOrEqual(2.12);
+    expect(EQUIPMENT.multiAxle.basis).toMatch(/2\.40 was rejected/);
+    expect(EQUIPMENT.multiAxle.basis).toMatch(/all-in/);
+  });
+
+  it('SAYS CORROBORATED, NOT MEASURED — a recalibration is not a promotion', () => {
+    // The heavy end has almost no public transaction record: two lowboy
+    // postings in a 4,087-load board, and nothing above 47,000 lb in the whole
+    // weight sample. So multi-axle moved from ONE inference to TWO AGREEING
+    // inferences -- better, and still not an observation.
+    const out = priceMarketLinehaul({ miles: 900, equipment: 'multiAxle' });
+    expect(out.ok).toBe(true);
+    if (!out.ok) return;
+    expect(out.accuracy.hover).toMatch(/corroborated, not measured/);
+    expect((out.accuracy.hover ?? '').length).toBeLessThanOrEqual(MAX_HOVER_CHARS);
+    expect(out.accuracy.detail).toMatch(/CORROBORATED, NOT MEASURED/);
+    expect(out.accuracy.detail).toMatch(/47,000 lb/);
+    expect(out.accuracy.sample).toMatch(/no observed transaction/);
+    // AND THE BAND DOES NOT NARROW. This is the one dishonest move available in
+    // this recalibration and the test exists to stop it being made later.
+    expect(LINEHAUL_BAND_PCT.multiAxle).toBe(40);
+  });
+
+  it('CROSS-CHECKS THE MULTI-AXLE RATE AGAINST A REAL CARRIER’S PUBLISHED FORMULA', () => {
+    // Anderson Trucking Service -- an asset-based specialized carrier, not a
+    // broker guide -- publishes $1 x axles x miles up to 100,000 lb, with a
+    // worked example: 70,000 lb boiler, New Orleans->Indianapolis, 819 mi,
+    // 7 axles, $5,733. Reproduce it exactly first.
+    expect(atsAxleFormulaUsd(7, 819)).toBe(5733);
+
+    // That figure is ALL-IN by the carrier's own policy. Strip fuel at our own
+    // multi-axle divisor and what is left STILL contains light permits, so our
+    // permits-excluded line-haul must sit AT OR BELOW it.
+    const fuelPerMile = (5.454 - 1.25) / mpgForEquipment('multiAxle');
+    const atsExFuelPerMile = atsAxleFormulaUsd(7, 819) / 819 - fuelPerMile;
+    expect(atsExFuelPerMile).toBeCloseTo(5.8, 1);
+
+    const ours = priceMarketLinehaul({ miles: 819, equipment: 'multiAxle' });
+    expect(ours.ok).toBe(true);
+    if (!ours.ok) return;
+    expect(ours.effectiveUsdPerMile).toBeLessThanOrEqual(atsExFuelPerMile);
+    // And not absurdly below it either -- a real carrier's published number is
+    // the sanity rail in both directions.
+    expect(ours.effectiveUsdPerMile).toBeGreaterThan(atsExFuelPerMile * 0.75);
+
+    // THIS TEST HAS TEETH: the old 2.40 multiplier fails the upper bound.
+    expect(BASE_FLATBED_LINEHAUL_USD_PER_MILE * 2.4).toBeGreaterThan(atsExFuelPerMile);
+    // It is evaluated at the shipping anchor. If the anchor is refetched much
+    // higher and this fires, that is a real calibration alarm, not flake.
+    expect(BASE_FLATBED_LINEHAUL_USD_PER_MILE).toBe(2.67);
+  });
+
+  it('TESTED THE FITTED DISTANCE CURVE AS A REPLACEMENT, AND KEPT THE BANDS', () => {
+    // 626 lanes / 12,881 observed open-deck loads fit $/mi = 8.34 x mi^-0.168.
+    // The three conditions a replacement had to meet, all three of which it
+    // MEETS -- so the reason it is not adopted has to be stated, not implied.
+
+    // 1. Monotone-decreasing in $/mile.
+    let previousRate = Infinity;
+    for (let miles = 50; miles <= 3000; miles += 25) {
+      const r = observedCurveUsdPerMile(miles);
+      expect(r).toBeLessThan(previousRate);
+      previousRate = r;
+    }
+    // 2. Total dollars never fall as miles rise.
+    let previousTotal = 0;
+    for (let miles = 50; miles <= 3000; miles += 25) {
+      const total = observedCurveUsdPerMile(miles) * miles;
+      expect(total).toBeGreaterThan(previousTotal);
+      previousTotal = total;
+    }
+    // 3. Reproduces every observed band median inside that band's own p25-p75.
+    const observedBands: ReadonlyArray<[number, number, number, number]> = [
+      // [geometric midpoint, p25, median, p75]
+      [Math.sqrt(150 * 300), 3.21, 3.73, 4.01],
+      [Math.sqrt(300 * 500), 2.26, 2.83, 3.42],
+      [Math.sqrt(500 * 800), 2.25, 3.04, 3.59],
+      [Math.sqrt(800 * 1200), 2.33, 2.87, 3.4],
+      [Math.sqrt(1200 * 2000), 2.03, 2.27, 2.51],
+      [2500, 1.8, 1.98, 2.3],
+    ];
+    for (const [mid, p25, , p75] of observedBands) {
+      const fitted = observedCurveUsdPerMile(mid);
+      expect(fitted).toBeGreaterThanOrEqual(p25);
+      expect(fitted).toBeLessThanOrEqual(p75);
+    }
+
+    // AND IT IS STILL NOT ADOPTED. The curve is an ABSOLUTE $/mi; this model
+    // needs a RELATIVE multiplier on DAT's published flatbed line-haul, and DAT
+    // publishes no lane length for its own figure. Normalising it means
+    // inventing that constant and then making it load-bearing on every quote.
+    // The bands need no such constant: USDA's observation is already relative.
+    expect(OBSERVED_CURVE_ANCHOR_MILES).toBeCloseTo(707.1, 1);
+    expect(observedCurveMultiplier(OBSERVED_CURVE_ANCHOR_MILES)).toBeCloseTo(1, 6);
+
+    // And the gain is small where the model operates: beyond 600 miles the two
+    // agree to about 6%, well inside the +/-25-40% the model already declares.
+    for (let miles = 600; miles <= 3000; miles += 50) {
+      const banded = distanceMultiplier(miles);
+      const fitted = observedCurveMultiplier(miles);
+      expect(Math.abs(banded / fitted - 1)).toBeLessThan(0.09);
+    }
+    // They diverge more inside the 250-500 band -- and that divergence is about
+    // that rung's level, the last USDA-reefer-derived multiplier in the table,
+    // not about step-versus-curve.
+    expect(distanceMultiplier(499) / observedCurveMultiplier(499) - 1).toBeGreaterThan(0.15);
   });
 
   it('REFUSES A SUPERLOAD and routes it to a carrier quote', () => {
@@ -453,18 +683,46 @@ describe('the line-haul model', () => {
     expect(out.message).toMatch(/carrier for a lane quote/);
   });
 
-  it('SHIPS REGIONAL MULTIPLIERS OFF, because the two proxies contradict each other', () => {
+  it('SHIPS REGIONAL MULTIPLIERS OFF — and the sign is no longer reversed', () => {
     const off = priceMarketLinehaul({ miles: 1000, equipment: 'flatbed' });
     expect(off.ok).toBe(true);
     if (!off.ok) return;
     expect(off.regionMultiplier).toBe(1);
     expect(off.notes.join(' ')).toMatch(/Regional adjustment is OFF/);
     // The table exists and is opt-in, and it does move the number when asked.
-    const on = priceMarketLinehaul({ miles: 1000, equipment: 'flatbed', region: 'northeast' });
+    const on = priceMarketLinehaul({ miles: 1000, equipment: 'flatbed', region: 'midwest' });
     expect(on.ok).toBe(true);
     if (!on.ok) return;
-    expect(on.regionMultiplier).toBe(REGION_MULTIPLIERS.northeast);
+    expect(on.regionMultiplier).toBe(REGION_MULTIPLIERS.midwest);
     expect(on.totalUsd).toBeGreaterThan(off.totalUsd);
+  });
+
+  it('CORRECTS A REVERSED REGIONAL SIGN that was waiting behind the flag', () => {
+    // DAT's March 2026 regional FLATBED spot rates: national $2.95, MIDWEST
+    // HIGHEST at $3.14 (1.064x), WEST LOWEST at $2.39 (0.810x). The old table
+    // read Midwest 0.90 and West 1.00 -- both backwards -- and put the Northeast
+    // at 1.15, above the published maximum. Nothing was ever mispriced, because
+    // the table ships off; but the first person to switch it on would have been
+    // handed the exact opposite of the market.
+    expect(REGION_MULTIPLIERS.midwest).toBe(1.06);
+    expect(REGION_MULTIPLIERS.west).toBe(0.81);
+    expect(REGION_MULTIPLIERS.midwest).toBeGreaterThan(REGION_MULTIPLIERS.west);
+    expect(3.14 / 2.95).toBeCloseTo(REGION_MULTIPLIERS.midwest, 2);
+    expect(2.39 / 2.95).toBeCloseTo(REGION_MULTIPLIERS.west, 2);
+    // Midwest is the published maximum and West the published minimum, so no
+    // region may sit outside them.
+    for (const m of Object.values(REGION_MULTIPLIERS)) {
+      expect(m).toBeLessThanOrEqual(REGION_MULTIPLIERS.midwest);
+      expect(m).toBeGreaterThanOrEqual(REGION_MULTIPLIERS.west);
+    }
+    // Exactly two regions have a published flatbed figure. The other four sit
+    // at 1.00 rather than carrying a produce or heavy-equipment proxy dressed
+    // up as a flatbed rate.
+    expect([...REGIONS_WITH_PUBLISHED_FLATBED_RATE].sort()).toEqual(['midwest', 'west']);
+    for (const [region, m] of Object.entries(REGION_MULTIPLIERS)) {
+      if (REGIONS_WITH_PUBLISHED_FLATBED_RATE.includes(region as never)) continue;
+      expect(m).toBe(1.0);
+    }
   });
 
   it('APPLIES NO SEASONAL CURVE — seasonality is already inside the live anchor', () => {
@@ -497,16 +755,24 @@ describe('the line-haul model', () => {
     expect(out.totalUsd).toBeCloseTo(2.0 * 0.85 * REGION_MULTIPLIERS.midwest * 2500, 0);
   });
 
-  it('renders as a range whose width reflects which joint is weak', () => {
+  it('renders as a range whose width reflects which joint is weak — AND NONE OF THEM MOVED', () => {
+    // The declared bands are unchanged by the recalibration, deliberately.
     expect(LINEHAUL_BAND_PCT.flatbed).toBe(25);
+    expect(LINEHAUL_BAND_PCT.stepDeck).toBe(25);
+    expect(LINEHAUL_BAND_PCT.rgn).toBe(40);
     expect(LINEHAUL_BAND_PCT.multiAxle).toBe(40);
+    // +/-25% is now a MEASUREMENT rather than an argument: 2,636 observed
+    // flatbed postings run p25 $2.16 / median $2.84 / p75 $3.49, which is
+    // -24% / +23%.
+    expect(1 - 2.16 / OBSERVED_FLATBED_MEDIAN_USD_PER_MILE).toBeCloseTo(0.24, 2);
+    expect(3.49 / OBSERVED_FLATBED_MEDIAN_USD_PER_MILE - 1).toBeCloseTo(0.23, 2);
     const rgn = priceMarketLinehaul({ miles: 900, equipment: 'rgn' });
     expect(rgn.ok).toBe(true);
     if (!rgn.ok) return;
     expect(rgn.accuracy.tier).toBe('benchmark');
     expect(rgn.accuracy.lowUsd).toBeLessThan(rgn.totalUsd);
     expect(rgn.accuracy.highUsd).toBeGreaterThan(rgn.totalUsd);
-    expect(rgn.accuracy.detail).toMatch(/weakest joint/);
+    expect(rgn.accuracy.detail).toMatch(/BRACKETED, NOT CONFIRMED/);
   });
 });
 

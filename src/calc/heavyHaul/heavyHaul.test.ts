@@ -668,8 +668,8 @@ describe('the realistic-mileage lane, beside the parity fixture', () => {
     const shortLinehaul = short.lines.find((l) => l.code === 'linehaul')?.amountUsd ?? 0;
     const realLinehaul = out.lines.find((l) => l.code === 'linehaul')?.amountUsd ?? 0;
     expect(realLinehaul).toBeGreaterThan(shortLinehaul);
-    // 1,484 mi on the 1,000–1,500 band: $2.67 × 0.87 × 2.40 × 1,484.
-    expect(realLinehaul).toBeCloseTo(2.67 * 0.87 * 2.4 * REALISTIC_TOTAL_MILES, 1);
+    // 1,484 mi on the 1,000–1,500 band: $2.67 × 0.87 × 2.05 × 1,484.
+    expect(realLinehaul).toBeCloseTo(2.67 * 0.87 * 2.05 * REALISTIC_TOTAL_MILES, 1);
     expect(out.fuel.perMileUsd * REALISTIC_TOTAL_MILES).toBeCloseTo(
       out.subtotalDerivedUsd,
       1,

@@ -113,16 +113,86 @@ export const SRC_ATRI_COSTS: MarketSource = {
 };
 
 export const SRC_EQUIPMENT_GUIDES: MarketSource = {
-  id: 'heavy_haul_equipment_rate_guides',
-  title: 'Five independent heavy-haul rate guides (RGN / step deck multipliers)',
-  url: 'https://usatruckerchoice.com/guides/flatbed-trailer-types-explained/',
-  publisher: 'usatruckerchoice · heavydutyyard · freightsidekick · otrucking · a1autotransport',
+  id: 'heavy_haul_published_rate_guides',
+  title: 'Ten independent published heavy-haul rate guides, two of them operating carriers',
+  url: 'https://atsinc.com/blog/open-deck-shipping-price-information',
+  publisher:
+    'Anderson Trucking Service · Freight Sidekick · O Trucking · Logi Transports · Truck Dispatch Experts · Nexus · usatruckerchoice · FF Dispatch · Heavy Haulers · heavydutyyard',
   dated: null,
   retrievedOn: RETRIEVED,
-  samplePoints: 5,
+  samplePoints: 10,
   refetch: 'manualDocument',
   gives:
-    'RGN-to-flatbed ratios clustering at 1.4–1.8× and a step-deck delta of +$0.15–0.30/mi. All five are broker or carrier marketing — this is the weakest joint in the line-haul model and the one that turns a flatbed rate into a heavy-haul rate.',
+    'RGN-to-flatbed ratios with a median of 1.523 across ten publishers (±22%, not the ±40% five guides gave), a step-deck delta of +$0.23–0.50/mi, published open-deck minimums of $300–$1,400, and — the correction that matters — three DECOMPOSED worked examples where the publisher itemises base hauling separately from permits, escorts and fuel. Those three are the only published figures that are line-haul rather than all-in.',
+};
+
+/**
+ * THE ONLY ANGLE WITH TRANSACTION VOLUME — and it stops at legal weight.
+ *
+ * 21,851 real broker postings behind a lane × equipment rate table, plus one
+ * heavy-haul marketplace's own published average of itself. It measures the
+ * flatbed level and the step-deck ratio outright. It measures NOTHING above
+ * 47,000 lb: a 4,087-load live board carried exactly two lowboy postings, and
+ * the entire permitted/multi-axle domain has no public transaction record at
+ * all. That asymmetry is why the multi-axle band stays wide.
+ *
+ * NOT `keylessApi` DELIBERATELY. The board's terms forbid scraping at scale, so
+ * the figures came from a handful of ordinary page views and this source must
+ * never end up on a cron.
+ */
+export const SRC_OBSERVED_POSTINGS: MarketSource = {
+  id: 'observed_load_board_postings_2026',
+  title: 'Observed open-deck load postings and marketplace line-haul averages',
+  url: 'https://www.trulos.com/',
+  publisher: 'Trulos free load board (Freight Rate Intelligence) · FR8Star (Sandhills Global)',
+  dated: '2026-09-04',
+  retrievedOn: RETRIEVED,
+  samplePoints: 21_851,
+  refetch: 'manualDocument',
+  gives:
+    'Flatbed line-haul median $2.84/mi (p25 $2.16 · p75 $3.49, n=2,636 postings); a matched-lane step-deck-to-flatbed ratio of 0.970 across 162 lanes carrying both with ≥5 loads each; an RGN-to-flatbed ratio of 1.75 from a heavy-haul marketplace’s own three published rate sets; and a fitted distance decay of $/mi = 8.34 × miles^(−0.168) over 626 lanes and 12,881 loads.',
+};
+
+/**
+ * A GOVERNMENT-SET $/MILE SCHEDULE KEYED TO LOAD WEIGHT IN POUNDS.
+ *
+ * The only one found anywhere, free or paid: a binding interagency rate for
+ * lowboy transport at $4.50 / $5.50 / $5.75 per mile by load rating, with a
+ * daily guarantee paid whenever it beats the mileage. Escorts are reimbursed
+ * separately on the invoice, so those figures are EX-ESCORT — which is the same
+ * decomposition this engine uses, and the reason they are comparable at all.
+ */
+export const SRC_NRCG_TRANSPORT_RATES: MarketSource = {
+  id: 'nrcg_chapter20_transport_lowboy_2025',
+  title: 'NR Supplement to the NWCG Standards for Interagency Incident Business Management, Chapter 20',
+  url: 'https://gacc.nifc.gov/nrcc/nrcg/committees/business/nr%20supplements/NR_Chapter20.pdf',
+  publisher: 'Northern Rockies Coordinating Group (US interagency, public domain)',
+  dated: '2025-05-01',
+  retrievedOn: RETRIEVED,
+  samplePoints: 3,
+  refetch: 'manualDocument',
+  gives:
+    'TRANSPORT, LOWBOY at $4.50/$5.50/$5.75 per mile by load rating (≤35,000 / 35,001–69,999 / ≥70,000 lb), fully operated and ex-escort, each with a minimum daily guarantee of $1,100/$1,400/$1,500 paid whenever it beats the mileage — which puts the day-rate crossover at 244–261 miles.',
+};
+
+/**
+ * A REAL ASSET-BASED CARRIER'S PUBLISHED HEAVY-HAUL FORMULA.
+ *
+ * Held as a CROSS-CHECK, never as a pricing path — see `atsAxleFormulaUsd` in
+ * `linehaul.ts`. It is all-in by the carrier's own policy, which is exactly why
+ * it can only bound our line-haul figure from above rather than replace it.
+ */
+export const SRC_ATS_AXLE_FORMULA: MarketSource = {
+  id: 'ats_heavy_haul_axle_formula',
+  title: 'Heavy haul trucking cost information — the $1 × axles × miles formula',
+  url: 'https://atsinc.com/blog/heavy-haul-trucking-cost-information',
+  publisher: 'Anderson Trucking Service (asset-based specialized carrier)',
+  dated: null,
+  retrievedOn: RETRIEVED,
+  samplePoints: 1,
+  refetch: 'manualDocument',
+  gives:
+    '$1.00 × axles × miles for heavy haul up to 100,000 lb, with a worked example — a 70,000 lb boiler, New Orleans→Indianapolis, 819 mi on 7 axles, $5,733. Declared invalid above 100,000 lb, 13\'6", 50 ft or 16 ft.',
 };
 
 // ── Escorts ───────────────────────────────────────────────────────────────
@@ -305,6 +375,9 @@ export const MARKET_SOURCES: ReadonlyArray<MarketSource> = [
   SRC_USDA_GRAIN_TRUCK,
   SRC_ATRI_COSTS,
   SRC_EQUIPMENT_GUIDES,
+  SRC_OBSERVED_POSTINGS,
+  SRC_NRCG_TRANSPORT_RATES,
+  SRC_ATS_AXLE_FORMULA,
   SRC_PILOTCAR101,
   SRC_ESCORT_OPERATOR_SHEETS,
   SRC_ESCORT_BUYER_SIDE,
@@ -323,7 +396,7 @@ export const MARKET_SOURCES: ReadonlyArray<MarketSource> = [
 /**
  * The sources a cron could refresh on its own, with no key and no payment.
  *
- * Two of eighteen, and naming them is the point: everything else in this engine
+ * Two of twenty-one, and naming them is the point: everything else in this engine
  * ages silently until somebody re-reads a PDF. The DAT weekly anchor is free but
  * 403s a plain fetch and its article slug changes every week, so it sits in
  * `headlessCapture` rather than here.
