@@ -278,6 +278,11 @@ const FOOTER_VARIANTS = [
 
 for (const v of FOOTER_VARIANTS) {
   test(`footer: ${v.name} is TWO columns at 375px with no orphaned row`, async ({ page }) => {
+    /* The homepage and the directory index are the two heaviest documents on
+       the site and both do database work before the first byte; a cold local
+       server can take most of the default budget just to answer. Tripled, so a
+       slow environment reads as slow rather than as a footer defect. */
+    test.slow();
     await page.setViewportSize(MOBILE);
     await page.goto(v.path, { waitUntil: 'domcontentloaded' });
     const measured = await page.evaluate(([innerSel, colSel]) => {
