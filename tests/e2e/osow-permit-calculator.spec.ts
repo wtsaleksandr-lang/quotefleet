@@ -419,7 +419,10 @@ test.describe('OS/OW calculator — refusals a user can reach', () => {
     await openTool(page);
     await calculate(page, REFERENCE_LOAD, [
       { state: 'TX', miles: 215 },
-      { state: 'MS', miles: 160 },
+      // West Virginia, not Mississippi: MS was this suite's canonical uncovered
+      // state until it was encoded, at which point this lane started pricing in
+      // full and the test was asserting a refusal that no longer happens.
+      { state: 'WV', miles: 160 },
       { state: 'AL', miles: 90 },
     ]);
 
@@ -875,7 +878,7 @@ test.describe('OS/OW calculator — layout the browser actually painted', () => 
     expect(size.scrollWidth, JSON.stringify(size)).toBeLessThanOrEqual(size.clientWidth);
   });
 
-  test('lays the coverage chips out 7 across and never orphans a badge', async ({ page }) => {
+  test('lays the coverage chips out with no orphaned row, and never orphans a badge', async ({ page }) => {
     await openTool(page);
     const chips = await page.evaluate(() => {
       const grid = document.querySelector('.ow-cov');
@@ -886,8 +889,15 @@ test.describe('OS/OW calculator — layout the browser actually painted', () => 
       };
     });
     expect(chips).not.toBeNull();
-    expect((chips as NonNullable<typeof chips>).columns).toBe(7);
-    expect((chips as NonNullable<typeof chips>).count % 7).toBe(0);
+    const { count, columns } = chips as NonNullable<typeof chips>;
+    // The COLUMN COUNT IS NOT PINNED, deliberately. It was 7 until the 24th
+    // state landed and 24 % 7 stranded three chips, so the grid moved to 6 --
+    // and this assertion, pinned to the literal, went stale without any unit
+    // test noticing. What actually matters is the no-orphan rule: whatever the
+    // track count, the last row must not hold a lone chip. Encoding the rule
+    // instead of one of its answers survives the 25th state.
+    expect(columns).toBeGreaterThan(1);
+    expect(count % columns, `${count} chips in ${columns} columns leaves an orphan`).not.toBe(1);
 
     await calculate(page, REFERENCE_LOAD, REFERENCE_LEGS);
     // renderState pads an odd badge count with the as-of badge, so no row can
