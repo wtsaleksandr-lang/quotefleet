@@ -2,8 +2,15 @@
  * PUBLIC drayage & freight GLOSSARY — no auth, SEO-first.
  *
  * A self-contained, server-rendered glossary that lives alongside the carrier
- * directory. Every definition here is ORIGINAL copy written for QuoteFleet —
- * no third-party text is copied. Pages reuse the QuoteFleet marketing shell
+ * directory. Every definition here is ORIGINAL copy written for QuoteFleet,
+ * with ONE deliberate and clearly-marked exception: the 'Oversize & overweight'
+ * category quotes FEDERAL definitions verbatim, in blockquotes, with the
+ * document and its date attached. Works of the United States Government are not
+ * subject to copyright (17 U.S.C. §105), and paraphrasing them here would make
+ * them weaker — the operative federal test for a non-divisible load is a
+ * threshold with a number in it, and any rewording of "more than 8 work hours
+ * to dismantle" loses the thing that makes it usable. No third-party COMMERCIAL
+ * text is copied anywhere in this file. Pages reuse the QuoteFleet marketing shell
  * (style.css, the canonical site header/footer, favicons) and the directory's
  * design tokens so they are visually consistent with /directory and /compliance.
  *
@@ -37,6 +44,7 @@ export const GLOSSARY_CATEGORIES = [
   'Costs',
   'Equipment',
   'Operations',
+  'Oversize & overweight',
   'Port fees',
   'Specialized',
 ] as const;
@@ -359,7 +367,165 @@ export const GLOSSARY_TERMS: GlossaryTerm[] = [
       <p>Reefer drayage carries tighter time pressure and higher stakes than dry drayage — a temperature excursion can ruin an entire load — so it commands specialized equipment (reefer-capable chassis and gensets) and carriers who can prioritize these moves. It is a distinct specialty within drayage, often overlapping with produce and cold-chain logistics.</p>`,
     related: ['chassis', 'hazmat-drayage', 'carb-compliance', 'drayage'],
   },
+  // ── Oversize & overweight ───────────────────────────────────────────────
+  //
+  // Federal definitions, quoted verbatim under 17 U.S.C. §105 with the document
+  // and its date attached. The surrounding explanation is ours; the quoted
+  // paragraph is the federal government's, unaltered.
+  {
+    slug: 'non-divisible-load',
+    term: 'Non-Divisible Load',
+    category: 'Oversize & overweight',
+    summary: 'A load that cannot be broken down without ruining it, destroying its value, or taking more than 8 work hours to dismantle — the federal test for whether an oversize or overweight permit is available at all.',
+    titleQuestion: 'What is a Non-Divisible Load?',
+    definitionHtml: `
+      <p>A non-divisible load is one that cannot practically be split into smaller legal loads. It is the question that comes before every other question in oversize and overweight work: if a load is divisible, the answer is not "what does the permit cost" — it is "split the load", because no permit is available for it on the federal test.</p>
+      <blockquote><p>"any load or vehicle exceeding applicable length or weight limits, which, if separated into smaller loads or vehicles, would: (1) Compromise the intended use of the vehicle …; (2) Destroy the value of the load or vehicle …; or (3) <strong>Require more than 8 work hours to dismantle using appropriate equipment.</strong> The applicant for a non-divisible load permit has the burden of proof regarding the number of work hours required to dismantle the load. A State may treat emergency response vehicles, casks designed for the transport of spent nuclear materials, and military vehicles transporting marked military equipment or materiel as non-divisible vehicles or loads."</p><cite>23 CFR §658.5, as published in the Glossary of Terms, <em>Compilation of Existing State Truck Size and Weight Limit Laws</em> — FHWA, May 2015. Public domain.</cite></blockquote>
+      <p>The 8-work-hour test is the part that settles most real arguments, because it is measurable rather than a matter of opinion — and the burden of substantiating it sits with the applicant, not with the permit office. <a href="/oversize/non-divisible">The full federal definition, in context →</a></p>`,
+    related: ['bridge-formula', 'superload', 'gvw', 'pilot-car'],
+  },
+  {
+    slug: 'bridge-formula',
+    term: 'Federal Bridge Formula',
+    category: 'Oversize & overweight',
+    summary: 'The federal calculation that caps the weight on any group of two or more consecutive axles, based on how far apart the outer axles of that group are.',
+    titleQuestion: 'What is the Federal Bridge Formula?',
+    definitionHtml: `
+      <p>The Federal Bridge Formula limits how much weight a group of axles may carry based on how far apart they are. It exists to stop a heavy load from concentrating its mass over a short span of bridge deck: spread 80,000 lb over 51 feet and the bridge is fine; bunch it into 20 feet and it is not.</p>
+      <blockquote><p>W = 500 × ( (L × N) / (N − 1) + 12N + 36 ) — where W is the maximum weight in pounds on a group of two or more axles to the nearest 500 pounds, L is the distance in feet between the outer axles of the group, and N is the number of axles being considered.</p><cite>23 U.S.C. §127(a) / 23 CFR Part 658, as published in <em>Bridge Formula Weights</em>, FHWA-HOP-19-028, August 2019. Public domain.</cite></blockquote>
+      <p>The part that is easy to get wrong is not the arithmetic — it is the scope. Compliance is not "check the steer axle, the drives and the trailer tandems". It is every group of two or more <em>consecutive</em> axles, all N(N−1)/2 of them; a five-axle tractor-semitrailer has ten such groups. The classic failure is a rig whose every named group passes and whose interior span across axles two through five does not.</p>
+      <p><a href="/tools/bridge-formula">Check an axle layout against the formula →</a></p>`,
+    related: ['axle-spacing', 'tandem-axle', 'gvw', 'non-divisible-load'],
+  },
+  {
+    slug: 'axle-spacing',
+    term: 'Axle Spacing',
+    category: 'Oversize & overweight',
+    summary: 'The distance between axles, measured centre to centre — the input the bridge formula runs on, and the reason two rigs at the same gross weight can differ on legality.',
+    titleQuestion: 'What is Axle Spacing?',
+    definitionHtml: `
+      <blockquote><p>"Method of computing distance between axles for bridge formula calculations. Typically measured from center of axle to center of axle between outermost wheel or wheel cluster."</p><cite>Glossary of Terms, <em>Compilation of Existing State Truck Size and Weight Limit Laws</em> — FHWA, May 2015. Public domain.</cite></blockquote>
+      <p>Axle spacing is why a gross-weight-only check cannot answer whether a rig is legal. A legal 80,000 lb five-axle van and an illegal 80,000 lb three-axle dump truck weigh exactly the same; the entire difference is in the spacing. It is also why a permit application asks for the layout rather than just the total, and why no calculator can honestly infer the spacing from a weight.</p>`,
+    related: ['bridge-formula', 'tandem-axle', 'kingpin-to-rear-axle', 'gvw'],
+  },
+  {
+    slug: 'tandem-axle',
+    term: 'Tandem Axle',
+    category: 'Oversize & overweight',
+    summary: 'Two axles spaced more than 40 and not more than 96 inches apart, limited to 34,000 lb between them on the Interstate System.',
+    titleQuestion: 'What is a Tandem Axle?',
+    definitionHtml: `
+      <blockquote><p>"In addition to Bridge Formula weight limits, Federal law states that single axles are limited to 20,000 pounds, and <strong>axles spaced more than 40 inches and not more than 96 inches apart (tandem axles)</strong> are limited to 34,000 pounds. Gross vehicle weight is limited to 80,000 pounds (23 U.S.C. 127)."</p><cite><em>Bridge Formula Weights</em>, FHWA-HOP-19-028, p. 2 — FHWA, August 2019. Public domain.</cite></blockquote>
+      <p>Note that a tandem is defined by a spacing <em>range</em>, not just a maximum: axles closer together than 40 inches are not a tandem under federal law. Note also the statutory carve-out that makes the standard 80,000 lb van legal at all — two consecutive sets of tandem axles may carry 34,000 lb each, 68,000 lb between them, provided the outer axles of the two tandems are at least 36 feet apart. The bare bridge formula at that geometry allows only 66,000 lb.</p>`,
+    related: ['bridge-formula', 'axle-spacing', 'gvw', 'lcv'],
+  },
+  {
+    slug: 'gvw',
+    term: 'GVW (Gross Vehicle Weight)',
+    category: 'Oversize & overweight',
+    summary: 'The total combined weight of the vehicle and its load — capped at 80,000 lb on the Interstate System, above which an overweight permit is needed.',
+    titleQuestion: 'What is GVW (Gross Vehicle Weight)?',
+    definitionHtml: `
+      <blockquote><p>"The total combined weight of the vehicle and load."</p><cite>Glossary of Terms, <em>Compilation of Existing State Truck Size and Weight Limit Laws</em> — FHWA, May 2015. Public domain.</cite></blockquote>
+      <p>On the Interstate System, federal law limits gross vehicle weight to 80,000 lb. Off the Interstate, states set their own standards — which is why a state statute can print a higher figure and both numbers be correct. It is also why 80,000 lb is <em>not</em> the superload line: above 80,000 you need an overweight permit, which is an ordinary product; a superload is a move the state will not issue over the counter at all.</p>
+      <p><a href="/oversize/legal-limits">What each state's own statute says →</a></p>`,
+    related: ['bridge-formula', 'tandem-axle', 'superload', 'non-divisible-load'],
+  },
+  {
+    slug: 'kingpin-to-rear-axle',
+    term: 'Kingpin to Rear Axle (KPRA)',
+    category: 'Oversize & overweight',
+    summary: 'The distance from the fifth-wheel kingpin to the centre of the rear axle group — a limit in its own right in several states, and not derivable from trailer length.',
+    titleQuestion: 'What is Kingpin to Rear Axle (KPRA)?',
+    definitionHtml: `
+      <blockquote><p>"A common vehicle dimension for governing the turning performance of tractor semitrailer combinations; typically the distance is measured from the kingpin to the center of the rear axle or rear axle group."</p><cite>Glossary of Terms, <em>Compilation of Existing State Truck Size and Weight Limit Laws</em> — FHWA, May 2015. Public domain.</cite></blockquote>
+      <p>KPRA is not the trailer's length and cannot be derived from it: two 53 ft trailers with their tandems slid to different positions have the same length and different KPRA. That matters because a state can cap the trailer, cap KPRA, cap both, or cap neither — and at least one state does not cap semitrailer length at all, exempting the trailer from its single-vehicle length rule whenever KPRA is within limits. Reading a KPRA figure as a length limit would flag every ordinary 53 ft trailer in that state as over-length.</p>`,
+    related: ['axle-spacing', 'fifth-wheel', 'bridge-formula'],
+  },
+  {
+    slug: 'fifth-wheel',
+    term: 'Fifth Wheel',
+    category: 'Oversize & overweight',
+    summary: 'The coupling that connects a semitrailer to the towing tractor, leading trailer, or dolly.',
+    titleQuestion: 'What is a Fifth Wheel?',
+    definitionHtml: `
+      <blockquote><p>"The fifth wheel coupling provides the link between a semitrailer and the towing truck, tractor unit, leading trailer, or dolly."</p><cite>Glossary of Terms, <em>Compilation of Existing State Truck Size and Weight Limit Laws</em> — FHWA, May 2015. Public domain.</cite></blockquote>
+      <p>The fifth wheel matters for permits because its kingpin is the origin of the KPRA measurement, and because sliding it changes both the weight distribution across the axle groups and the geometry the bridge formula is computed on. Repositioning the fifth wheel is one of the cheapest ways to bring a marginal axle group back inside its allowance.</p>`,
+    related: ['kingpin-to-rear-axle', 'axle-spacing', 'bridge-formula'],
+  },
+  {
+    slug: 'lcv',
+    term: 'LCV (Longer Combination Vehicle)',
+    category: 'Oversize & overweight',
+    summary: 'A tractor with two or more trailers running above 80,000 lb on the Interstate System — frozen in place by federal law since 1991.',
+    titleQuestion: 'What is an LCV (Longer Combination Vehicle)?',
+    definitionHtml: `
+      <blockquote><p>"Any combination of a truck tractor and two or more trailers or semitrailers that operate on the Interstate Highway System at a gross vehicle weight of greater than 80,000 pounds."</p><cite>Glossary of Terms, <em>Compilation of Existing State Truck Size and Weight Limit Laws</em> — FHWA, May 2015. Public domain.</cite></blockquote>
+      <p>LCV operation on the Interstate System was frozen by federal law in 1991: a state may continue what it allowed at the freeze date and may not expand it. That is why LCV rights vary sharply between neighbouring states, and why the question is always "was it allowed here in 1991", not "does it seem reasonable".</p>`,
+    related: ['gvw', 'tandem-axle', 'national-network'],
+  },
+  {
+    slug: 'national-network',
+    term: 'National Network (NN)',
+    category: 'Oversize & overweight',
+    summary: 'The federally-designated highway system on which states may not set truck width, or minimum trailer length, away from federal standards.',
+    titleQuestion: 'What is the National Network (NN)?',
+    definitionHtml: `
+      <p>The National Network is the federally-designated system on which certain federal truck size standards pre-empt state rules. Its width rule is unusual because it is a floor and a ceiling at once.</p>
+      <blockquote><p><strong>Width:</strong> "On the NN, no State may impose a width limit of more than or less than 102 inches. Safety devices (e.g., mirrors, handholds) necessary for the safe and efficient operation of motor vehicles may not be included in the calculation of width."<br><br><strong>Trailer length:</strong> "no State may impose a length limit of less than 48 feet … on a semitrailer … Similarly … no State may impose a length limit of less than 28 feet on a semitrailer or trailer operating in a truck tractor-semitrailer-trailer (twin-trailer) combination."<br><br><strong>Height:</strong> "No Federal vehicle height limit exists. State standards range from 13.6 feet to 14.6 feet."</p><cite>Exhibit 2, <em>Compilation of Existing State Truck Size and Weight Limit Laws</em> — FHWA, May 2015. Public domain.</cite></blockquote>
+      <p>That combination explains most of what a state legal-limit table looks like: width is 102 inches almost everywhere because federal law fixes it there, while height varies by a full foot across the country because federal law says nothing about it at all.</p>
+      <p><a href="/oversize/federal-limits">What federal law fixes, and what it leaves to the states →</a></p>`,
+    related: ['gvw', 'lcv', 'grandfather-rights'],
+  },
+  {
+    slug: 'grandfather-rights',
+    term: 'Grandfather Rights',
+    category: 'Oversize & overweight',
+    summary: 'A state allowance to keep truck weight limits that were lawful before the federal standards were adopted — held by 37 states and DC.',
+    titleQuestion: 'What are Grandfather Rights?',
+    definitionHtml: `
+      <p>When federal Interstate weight standards were adopted, states that already allowed heavier operation were not made to come down. Three separate grandfather clauses in the statute preserve those allowances.</p>
+      <blockquote><p>"When considered together, the successive grandfather provisions provided by Congress in 1956, 1974, and 1991 and other exceptions results in <strong>37 States and the District of Columbia</strong> having allowances to exceed Federal weight limits on their Interstate highways (in many States these exceptions are very limited)."</p><cite><em>Compilation of Existing State Truck Size and Weight Limit Laws</em>, pp. 15–16 — FHWA, May 2015. Public domain.</cite></blockquote>
+      <p>The trap sits right next to it: in at least eight states the weight limits printed in statute are <em>higher</em> than the federal Interstate limits without a grandfather right behind them, and a federal compliance clause pulls them back to the federal figures on the Interstate itself. Taking one of those statutory numbers onto an Interstate lane misprices the move.</p>`,
+    related: ['national-network', 'gvw', 'tandem-axle'],
+  },
+  {
+    slug: 'superload',
+    term: 'Superload',
+    category: 'Oversize & overweight',
+    summary: 'A move a state will not issue over the counter — priced only after an engineering and route review. It is not "anything over 80,000 lb".',
+    titleQuestion: 'What is a Superload?',
+    definitionHtml: `
+      <p>A superload is a move so large or heavy that the issuing state will not sell a permit for it at a published price. Instead the agency reviews the route, usually analyses the bridges on it, and prices the move afterwards — often attaching a route survey and escorts as conditions.</p>
+      <p>The most common error about superloads is the threshold. A figure of "over 80,000 lb" circulates widely; 80,000 lb is the federal <em>legal</em> gross limit, the point at which an ordinary overweight permit becomes necessary. Real published superload lines sit far higher, and several states escalate on width, height or length regardless of weight — so a wide but comparatively light load can be a superload while a much heavier legal-width one is not.</p>
+      <p><a href="/oversize/superloads">Published superload thresholds by state →</a></p>`,
+    related: ['gvw', 'non-divisible-load', 'pilot-car', 'route-survey'],
+  },
+  {
+    slug: 'pilot-car',
+    term: 'Pilot Car (Escort Vehicle)',
+    category: 'Oversize & overweight',
+    summary: 'A certified escort vehicle running ahead of or behind an oversize load — routinely the largest single line on an oversize move.',
+    titleQuestion: 'What is a Pilot Car?',
+    definitionHtml: `
+      <p>A pilot car, or escort vehicle, runs ahead of or behind an oversize load to warn traffic, watch overhead clearances (with a height pole where the load is tall), and in some states to stop traffic at pinch points. States set their own triggers, and the first trigger is usually a width — but many states lower it on a two-lane road, and some classify individual highway segments on a published map so the segment, not the lane count, decides.</p>
+      <p>Escorts are worth understanding as a <em>cost</em> and not as a detail. On a long lane a single pilot car above roughly seventy-seven cents a mile costs more than the entire state permit total for the move. They are also a feasibility gate before they are a price: an operator who is not certified in the next state cannot take the load at any rate, and certification reciprocity is a directed relationship rather than a mutual one — some states accept nobody at all.</p>
+      <p><a href="/oversize/escort-requirements">The first dimension that requires an escort, by state →</a></p>`,
+    related: ['superload', 'route-survey', 'non-divisible-load'],
+  },
+  {
+    slug: 'route-survey',
+    term: 'Route Survey',
+    category: 'Oversize & overweight',
+    summary: 'A physical or engineering check of the intended route before a permit is issued — triggered by dimension in most states, and priced separately from the permit.',
+    titleQuestion: 'What is a Route Survey?',
+    definitionHtml: `
+      <p>A route survey is a check of the actual route a load will take, before the state will issue the permit: overhead clearances, turning radii at every intersection, utility lines, pavement and shoulder width, and the bridges the load will cross. Most states trigger one by dimension — a stated width, height or length — and some also require a separate bridge analysis by an engineer.</p>
+      <p>Two costs sit here and only one of them is a state fee. The agency's charge to <em>review</em> the survey is published by most states and is quotable. The engineer's own fee for producing the analysis is a private cost with no published schedule, and any quote that omits it while implying completeness is understating the move.</p>`,
+    related: ['superload', 'pilot-car', 'non-divisible-load'],
+  },
 ];
+
 
 // ─── Lookups ───────────────────────────────────────────────────────────────
 const TERM_BY_SLUG = new Map(GLOSSARY_TERMS.map((t) => [t.slug, t]));

@@ -667,7 +667,13 @@ for (const theme of ['dark', 'light'] as const) {
       };
     });
     expect(results, `375px ${theme} results column ${results}px`).toBeLessThan(3200);
-    expect(doc, `375px ${theme} document ${doc}px`).toBeLessThan(7400);
+    // The RESULTS budget above is the one this page owns and it has not moved.
+    // The DOCUMENT budget includes the shared footer, which grew by three links
+    // when the OS/OW reference hub and its two calculators were added to the
+    // "Free Tools" column — ~150px of footer on every page on the site, and
+    // nothing to do with this tool's own output. Raised once, deliberately, so
+    // the number still catches a regression in the part this page controls.
+    expect(doc, `375px ${theme} document ${doc}px`).toBeLessThan(7600);
     // Two lines at 12px/1.5 is 36px. A taller note means the clamp stopped
     // working, which is how a compact result silently becomes a report again.
     expect(note, `375px ${theme} tallest line note ${note}px`).toBeLessThanOrEqual(40);
