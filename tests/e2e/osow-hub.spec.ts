@@ -376,11 +376,18 @@ test('expand-all opens every fold in its own group', async ({ page }) => {
   await expect(bar).toBeVisible();
   await bar.click();
   const state = await page.evaluate(() => {
-    const btn = document.querySelector('.qh-expand') as HTMLElement;
-    const group = btn.nextElementSibling as HTMLElement;
+    /* The control lives inside its own `.qh-foldbar`, and the BAR is what sits
+       next to the group — not the button. */
+    const bar = document.querySelector('.qh-foldbar') as HTMLElement;
+    const group = bar.nextElementSibling as HTMLElement;
     const items = group.querySelectorAll('details');
-    return { total: items.length, open: [...items].filter((d) => (d as HTMLDetailsElement).open).length };
+    return {
+      groupIsFoldGroup: group.hasAttribute('data-qh-folds'),
+      total: items.length,
+      open: [...items].filter((d) => (d as HTMLDetailsElement).open).length,
+    };
   });
+  expect(state.groupIsFoldGroup, 'the expand-all bar is not adjacent to its fold group').toBe(true);
   expect(state.total).toBeGreaterThan(2);
   expect(state.open).toBe(state.total);
 });
