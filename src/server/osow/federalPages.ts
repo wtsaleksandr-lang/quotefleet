@@ -118,7 +118,8 @@ function quote(text: string, cite: string): string {
     count: 'verbatim',
     bodyHtml: `<blockquote class="qh-quote"><p>${text}</p></blockquote>`,
     capped: true,
-  }).replace('class="qh-fold"', 'class="qh-fold qh-fold--quote"');
+    variant: 'qh-fold--quote',
+  });
 }
 
 /** A run of quotes, so the page can offer one expand-all over the lot. */

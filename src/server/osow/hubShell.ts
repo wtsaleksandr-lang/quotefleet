@@ -344,11 +344,13 @@ export interface Fold {
   open?: boolean;
   /** Cap the revealed block at 320px and let it scroll inside itself. */
   capped?: boolean;
+  /** An extra modifier class on the `<details>` — e.g. `qh-fold--quote`. */
+  variant?: string;
 }
 
 /** One compact disclosure. Native `<details>`; works with scripting disabled. */
 export function fold(f: Fold): string {
-  return `<details class="qh-fold"${f.id ? ` id="${esc(f.id)}"` : ''}${f.open ? ' open' : ''}>`
+  return `<details class="qh-fold${f.variant ? ` ${f.variant}` : ''}"${f.id ? ` id="${esc(f.id)}"` : ''}${f.open ? ' open' : ''}>`
     + `<summary><span>${esc(f.label)}</span>`
     + `${f.count ? `<span class="qh-n">${esc(f.count)}</span>` : '<span></span>'}`
     + `${CHEVRON}</summary>`
