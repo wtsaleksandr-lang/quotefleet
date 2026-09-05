@@ -56,8 +56,10 @@
  *
  * There is no global ± number here. The default band per tier is below, and
  * every component overrides it with its OWN measured spread — the research
- * measured detention at ±15% and a route survey at ±70%, and flattening those
- * to one figure would throw away the most useful thing either of them says.
+ * measured detention at ±15% and securement at ±60%, and flattening those to one
+ * figure would throw away the most useful thing either of them says. The width
+ * is CONTENT: a narrow band on a statutory analysis fee and a wide one on a
+ * securement allowance nobody publishes say two different, true things.
  */
 import type { MarketSource } from './sources.js';
 
@@ -97,12 +99,34 @@ export function basisForTier(tier: AccuracyTier): BasisForTier {
  *                  weeks (4.3%), and EIA diesel moved $5.257 → $5.454 in the
  *                  same window (3.7%). Five percent covers a weekly reading
  *                  read a fortnight later; it does not cover a frozen anchor.
- *   benchmark 30 — the MEDIAN of the per-component spreads the research
- *                  actually measured: detention ±15%, tarping ±20%, layover
- *                  ±25%, escorts ±25%, forklift ±30%, crane ≤80t ±35%, permit
- *                  service ±45%, insurance ±50%, crane 80–160t ±55%, route
- *                  survey ±70%. It is a fallback for a component that does not
- *                  state its own, and no shipped component uses it.
+ *   benchmark 30 — sits in the middle of the per-component spreads the research
+ *                  actually measured. After the second accessorial pass those
+ *                  are: state analysis fee where the rule is exact ±10%,
+ *                  permit service with a declared tier ±11%, detention ±15%,
+ *                  tarping ±20%, permit service with no declared tier ±20%,
+ *                  layover ±25%, escorts ±25%, crane with the region known
+ *                  ±25%, forklift ±30%, rigging crew ±30%, crane road permit
+ *                  ±40%, state analysis fee where the state publishes a
+ *                  per-unit rate but not the count ±40%, crane 80–160k lb
+ *                  ±40%, crane 160–200k lb ±45%, insurance ±50%, securement
+ *                  ±60%, crane with the region unknown ±35%, physical route
+ *                  survey ±35%, and a superload state whose own schedule has
+ *                  not been read ±70%. It is a fallback for a component that
+ *                  does not state its own, and no shipped component uses it.
+ *
+ *                  Three of those moved on evidence and one deliberately did
+ *                  not. The route-survey ±70% split into ±10/±40 for the
+ *                  state's own analysis and ±35% for the private survey,
+ *                  because one line had been carrying two products. Permit
+ *                  service went ±45% → ±20% because its 3× spread turned out
+ *                  to be two service tiers, each internally tight. The crane
+ *                  narrowed ONLY where the region is known, never nationally,
+ *                  because ±35% is almost exactly the observed full spread of
+ *                  published US operator prices at the same tonnage.
+ *                  SECUREMENT STAYED AT ±60% ON PURPOSE: four carrier tariffs
+ *                  and one binding government tariff price it at zero, so the
+ *                  width is evidence of absence rather than an unfinished
+ *                  search, and narrowing it would invent a market.
  *   refused    — no band, because there is no number.
  */
 export const TIER_DEFAULT_BAND_PCT: Readonly<Record<AccuracyTier, number>> = {
