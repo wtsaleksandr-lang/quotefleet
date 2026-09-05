@@ -559,6 +559,10 @@ export function perMileAmountBreakdown(
         addAfterUsd: 0,
         roundedUsd: 0,
         amountUsd: 0,
+        // The weight rounding still travelled, even though nothing is charged:
+        // "we rounded your pounds and you are still under the base" is the
+        // explanation, and dropping it here would leave the $0 unexplained.
+        ...(poundsBasis !== undefined ? { billedPoundsBasis: poundsBasis } : {}),
       };
     }
     const exact = excess / rate.perIncrementLbs;
