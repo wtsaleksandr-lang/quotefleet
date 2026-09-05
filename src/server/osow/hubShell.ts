@@ -305,8 +305,18 @@ export const HUB_CSS = `
     .qh-rail li { break-inside: avoid; margin: 0 0 4px; }
     .qh-rail a { border-left: none; padding: 4px 0; }
   }
+  /* TWO COLUMNS ALL THE WAY DOWN — deliberately NOT the reference system's
+     collapse-to-one at 560px. Its TOC entries are prose ("Rate limits and
+     quotas"); ours are numbered stubs of two or three words, and at 375px two
+     columns are still ~155px wide, which fits the longest of them ("4.
+     Overweight pricing") with room over. Collapsing would put thirteen items
+     in one 460px stack — the exact defect Alex raised about the footer, moved
+     to the top of the page. The gutter tightens instead, and the e2e suite
+     asserts the document still never scrolls sideways at 375px. */
   @media (max-width: 560px) {
-    .qh-rail ol { columns: 1; }
+    .qh-rail { padding: 12px; }
+    .qh-rail ol { column-gap: 16px; }
+    .qh-rail a { font-size: 12px; }
   }
   @media (max-width: 760px) {
     .qh-short { padding: 12px; }

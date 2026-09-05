@@ -459,11 +459,17 @@ test('the mono micro-labels clear AA in BOTH themes', async ({ page }) => {
   }
 });
 
-test('the collapsed rail is a two-column TOC box, not a tall single stack', async ({ page }) => {
-  await page.setViewportSize({ width: 820, height: 900 });
-  await page.goto('/oversize/texas', { waitUntil: 'domcontentloaded' });
-  const cols = await page.locator('.qh-rail ol').evaluate((el) => getComputedStyle(el).columnCount);
-  expect(cols, 'the on-page TOC is not in two columns below the desktop breakpoint').toBe('2');
+test('the collapsed rail is a two-column TOC box at EVERY width below the rail breakpoint', async ({ page }) => {
+  /* 375 included. A thirteen-item single-column contents list is the same
+     defect as the single-column footer, moved to the top of the page. */
+  for (const width of [820, 560, 375]) {
+    await page.setViewportSize({ width, height: 900 });
+    await page.goto('/oversize/texas', { waitUntil: 'domcontentloaded' });
+    const cols = await page.locator('.qh-rail ol').evaluate((el) => getComputedStyle(el).columnCount);
+    expect(cols, `the on-page TOC is not in two columns at ${width}px`).toBe('2');
+    /* Two columns are only an improvement if they still fit. */
+    await assertNoDocumentOverflow(page, `/oversize/texas TOC @${width}`);
+  }
 });
 
 test('folding removes nothing from the DOM — the prose is still indexable', async ({ page }) => {
