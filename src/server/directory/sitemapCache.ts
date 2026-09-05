@@ -34,6 +34,7 @@
  */
 import { sql } from 'drizzle-orm';
 import { SEASONAL_SOURCES } from '../../calc/osow/seasonal/sources.js';
+import { HUB_COVERED_STATES, OSOW_HUB_PATH } from '../osow/hubData.js';
 import { db } from '../../db/client.js';
 import { carrierDirectory, sitemapCache } from '../../db/schema.js';
 import { US_STATES } from './usStates.js';
@@ -274,6 +275,25 @@ const MARKETING_ROUTES: Array<{ path: string; changefreq: string; priority: stri
   // generated child document rather than in this static list — and listing a
   // profile URL that a moderator has not published yet would advertise a page
   // that 404s. `weekly` because the listed set changes as records are approved.
+  // The OS/OW reference hub. The fixed pages are listed here; the 21 state
+  // profiles are appended below FROM the jurisdiction registry, so adding a
+  // 22nd state adds its URL with no second list to keep in step. `monthly` on
+  // the reference pages because they change when a state amends a schedule,
+  // which is not on a weekly cadence.
+  { path: OSOW_HUB_PATH, changefreq: 'weekly', priority: '0.8' },
+  { path: `${OSOW_HUB_PATH}/legal-limits`, changefreq: 'monthly', priority: '0.8' },
+  { path: `${OSOW_HUB_PATH}/permit-fees`, changefreq: 'monthly', priority: '0.8' },
+  { path: `${OSOW_HUB_PATH}/escort-requirements`, changefreq: 'monthly', priority: '0.8' },
+  { path: `${OSOW_HUB_PATH}/superloads`, changefreq: 'monthly', priority: '0.7' },
+  { path: `${OSOW_HUB_PATH}/police-escorts`, changefreq: 'monthly', priority: '0.7' },
+  { path: `${OSOW_HUB_PATH}/source-notes`, changefreq: 'monthly', priority: '0.7' },
+  { path: `${OSOW_HUB_PATH}/common-figures`, changefreq: 'monthly', priority: '0.7' },
+  { path: `${OSOW_HUB_PATH}/federal-limits`, changefreq: 'yearly', priority: '0.7' },
+  { path: `${OSOW_HUB_PATH}/bridge-formula`, changefreq: 'yearly', priority: '0.7' },
+  { path: `${OSOW_HUB_PATH}/non-divisible`, changefreq: 'yearly', priority: '0.7' },
+  { path: `${OSOW_HUB_PATH}/coverage`, changefreq: 'monthly', priority: '0.6' },
+  { path: '/tools/bridge-formula', changefreq: 'monthly', priority: '0.7' },
+  { path: '/tools/axle-weights', changefreq: 'monthly', priority: '0.7' },
   { path: '/pilot-cars', changefreq: 'weekly', priority: '0.7' },
   { path: '/pilot-cars/join', changefreq: 'monthly', priority: '0.5' },
   { path: '/support', changefreq: 'monthly', priority: '0.6' },
@@ -330,6 +350,12 @@ export function staticPageEntries(): Array<{ path: string; changefreq: string; p
       changefreq: spec.programme === 'statewide' ? 'weekly' : 'monthly',
       priority: '0.6',
     });
+  }
+  // One page per state with an OS/OW jurisdiction file, generated FROM the
+  // registry. A state with no file behind it gets no page and no URL here —
+  // that rule is enforced in the route as well as in this list.
+  for (const s of HUB_COVERED_STATES) {
+    out.push({ path: `${OSOW_HUB_PATH}/${s.slug}`, changefreq: 'monthly', priority: '0.7' });
   }
   for (const g of PORT_GROUPS) {
     out.push({ path: `/directory/port/${g.code}`, changefreq: 'weekly', priority: '0.7' });
