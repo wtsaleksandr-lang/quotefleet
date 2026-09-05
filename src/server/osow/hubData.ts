@@ -40,6 +40,7 @@ import {
 import type { IsoDate, Resolution, SourceDoc, Sourced } from '../../calc/osow/provenance.js';
 import { isInEffect, resolveSourced } from '../../calc/osow/provenance.js';
 import type {
+  ContextCondition,
   EscortCondition,
   EscortOutcome,
   EscortRule,
@@ -366,6 +367,7 @@ export function legalLimitRows(asOf: IsoDate): LegalLimitRow[] {
 const OVERWEIGHT_MECHANISM: Record<OverweightPricing['kind'], string> = {
   bands: 'Stepped by weight',
   perMile: 'Per mile',
+  perMilePerAxleGroup: 'Per mile, per overweight axle group',
   includedInBaseFee: 'Included in the base fee',
   notPriceable: 'No published schedule',
 };
@@ -464,6 +466,20 @@ function conditionBounds(c: EscortCondition, out: Bound[] = []): Bound[] {
   return out;
 }
 
+/** True when a context condition turns on the road class, at any depth. */
+function contextMentionsRouteClass(c: ContextCondition): boolean {
+  switch (c.kind) {
+    case 'routeClassIn':
+      return true;
+    case 'allOf':
+    case 'anyOf':
+    case 'noneOf':
+      return c.of.some((sub) => contextMentionsRouteClass(sub));
+    default:
+      return false;
+  }
+}
+
 function mentionsRouteClass(c: EscortCondition): boolean {
   switch (c.kind) {
     case 'routeClass':
@@ -474,6 +490,12 @@ function mentionsRouteClass(c: EscortCondition): boolean {
       return c.of.some((sub) => mentionsRouteClass(sub));
     case 'not':
       return mentionsRouteClass(c.of);
+    // A rule written in a state's OWN road vocabulary reaches the grammar
+    // through the context leaf, and the hub's "route-dependent" column has to
+    // see through it — otherwise the first state to declare a `RouteVocabulary`
+    // would publish its escort trigger as though it applied on every road.
+    case 'context':
+      return contextMentionsRouteClass(c.of);
     default:
       return false;
   }

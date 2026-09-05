@@ -13,7 +13,13 @@
  * why it deliberately refuses to resolve when sources conflict.
  */
 import type { Sourced } from './provenance.js';
-import type { EscortRule } from './escortRules.js';
+import type { EscortCountCombination, EscortRule } from './escortRules.js';
+import type {
+  ContextCondition,
+  LiveSegmentTable,
+  NamedRouteSegment,
+  RouteVocabulary,
+} from './routeContext.js';
 
 /**
  * A threshold with its comparison baked in, because states really do differ
@@ -283,6 +289,68 @@ export function weightBandAmount(
  * increment in full ("or fraction thereof"), and rounding the other way
  * silently under-bills every load that is not an exact multiple.
  */
+/**
+ * A ROUNDING RULE A STATE PUBLISHES, WITH ITS DIRECTION AND ITS STEP.
+ *
+ * `PerMileRate` grew rounding one boolean at a time — `roundIncrementUp`, then
+ * `roundMilesUpTo`, then `roundDollars: 'nearest' | 'up'` — because each new
+ * state added exactly one. Utah applies THREE ROUNDING RULES TO ONE FEE and
+ * they do not all go the same way: Utah Code § 72-7-406(7)(c) rounds miles UP
+ * to the nearest 50, pounds UP to the nearest 25,000, and the dollar amount TO
+ * THE NEAREST $10. There is nowhere in the boolean shape to put "nearest ten
+ * dollars", and no field at all for rounding the pounds.
+ *
+ * So direction and step became one type. `'nearest'` is not a convenience —
+ * on a $180 fee, nearest-$10 and up-to-$10 differ by up to $9.99, and Utah's
+ * floor of $80 and cap of $540 mean the rounding is a real fraction of the
+ * whole charge on a short lane.
+ */
+export interface RoundingRule {
+  direction: 'up' | 'down' | 'nearest';
+  /** Round to a multiple of this. 50 miles, 25,000 lb, $10. */
+  toMultipleOf: number;
+  /**
+   * WHICH POUNDS, for a weight rounding — and it exists because Utah does not
+   * say. § 72-7-406(7)(c) reads "The pounds used to calculate the fee under
+   * this Subsection (7) shall be rounded up to the nearest 25,000 pound
+   * increment", and the fee is charged on the excess over 80,000 lb. At
+   * 126,000 lb over 300 miles the two readings are $180 and $252.
+   *
+   * Both readings are encodable, as two rows, so the resolver refuses to pick —
+   * which is the correct outcome for a genuine ambiguity worth $72. Absent
+   * means the rule does not round a weight.
+   */
+  appliesTo?: 'gross' | 'excessOverBase';
+  /** The source's own words. Required — this is the audit trail. */
+  quote: string;
+}
+
+export function roundingRulesEqual(a: RoundingRule, b: RoundingRule): boolean {
+  return (
+    a.direction === b.direction &&
+    a.toMultipleOf === b.toMultipleOf &&
+    a.appliesTo === b.appliesTo
+  );
+}
+
+/**
+ * Apply one rounding rule. Rounds to cents FIRST, so a value already sitting on
+ * a step is not pushed up one by binary floating-point dust — the same defence
+ * `perMileAmountBreakdown` already takes before reading whole dollars.
+ */
+export function applyRounding(value: number, rule: RoundingRule): number {
+  const step = rule.toMultipleOf;
+  if (!(step > 0)) return value;
+  const quotient = Math.round((value / step) * 1e9) / 1e9;
+  const stepped =
+    rule.direction === 'up'
+      ? Math.ceil(quotient)
+      : rule.direction === 'down'
+        ? Math.floor(quotient)
+        : Math.round(quotient);
+  return Math.round(stepped * step * 100) / 100;
+}
+
 export interface PerMileRate {
   minLbs: number;
   maxLbs: number | null;
@@ -328,6 +396,25 @@ export interface PerMileRate {
    * dollar is not pushed up a dollar by binary floating-point dust.
    */
   roundDollars?: 'nearest' | 'up';
+  /**
+   * Round the POUNDS before the increments are counted. OPTIONAL and absent
+   * everywhere today; Utah is the state that publishes one. See `RoundingRule`
+   * for why `appliesTo` is not a detail.
+   *
+   * Runs BEFORE `perIncrementLbs` divides, because that is the order Utah
+   * writes: the pounds "used to calculate the fee" are rounded, and then the
+   * fee is calculated from them.
+   */
+  roundPoundsTo?: RoundingRule;
+  /**
+   * Round the DOLLARS, to any step in any direction. OPTIONAL. It generalises
+   * `roundDollars`, which can only say whole dollars, up or nearest — and which
+   * stays because four states use it and none of them needs more.
+   *
+   * When both are present this one governs and `roundDollars` is ignored, so a
+   * state is never rounded twice.
+   */
+  roundDollarsTo?: RoundingRule;
 }
 
 export function perMileRatesEqual(a: PerMileRate, b: PerMileRate): boolean {
@@ -342,8 +429,15 @@ export function perMileRatesEqual(a: PerMileRate, b: PerMileRate): boolean {
     a.maximumUsd === b.maximumUsd &&
     a.roundMilesUpTo === b.roundMilesUpTo &&
     a.addAfterUsd === b.addAfterUsd &&
-    a.roundDollars === b.roundDollars
+    a.roundDollars === b.roundDollars &&
+    optionalRoundingEqual(a.roundPoundsTo, b.roundPoundsTo) &&
+    optionalRoundingEqual(a.roundDollarsTo, b.roundDollarsTo)
   );
+}
+
+function optionalRoundingEqual(a?: RoundingRule, b?: RoundingRule): boolean {
+  if (a === undefined || b === undefined) return a === b;
+  return roundingRulesEqual(a, b);
 }
 
 /** Round to cents. Binary floating point makes this necessary before, not
@@ -388,6 +482,15 @@ export interface PerMileBreakdown {
   roundedUsd: number;
   /** The figure that is charged. */
   amountUsd: number;
+  /**
+   * The pounds the increments were counted from, AFTER `roundPoundsTo`.
+   * OPTIONAL and present only when the state publishes a weight rounding, so a
+   * rate that declares none produces exactly the object it produced before this
+   * field existed.
+   */
+  billedPoundsBasis?: { rounded: number; raw: number; appliesTo: 'gross' | 'excessOverBase' };
+  /** The dollar rounding that was applied, when it came from `roundDollarsTo`. */
+  dollarRounding?: RoundingRule;
 }
 
 /**
@@ -413,9 +516,35 @@ export function perMileAmountBreakdown(
       ? miles
       : Math.ceil(miles / milesIncrement) * milesIncrement;
 
+  // POUND ROUNDING RUNS FIRST, because that is the order the state writes it:
+  // the pounds "used to calculate the fee" are rounded, and the fee is then
+  // calculated from them. Absent — everywhere on file — this block is skipped
+  // entirely and `excess` is derived exactly as before.
+  let poundsBasis: PerMileBreakdown['billedPoundsBasis'];
+  let effectiveGrossLbs = grossWeightLbs;
+  let roundedExcessLbs: number | null = null;
+  const poundRule = rate.roundPoundsTo;
+  if (poundRule !== undefined) {
+    if (poundRule.appliesTo === 'gross') {
+      effectiveGrossLbs = applyRounding(grossWeightLbs, poundRule);
+      poundsBasis = { rounded: effectiveGrossLbs, raw: grossWeightLbs, appliesTo: 'gross' };
+    } else {
+      const rawExcess = grossWeightLbs - (rate.excessBaseLbs ?? 0);
+      roundedExcessLbs = rawExcess <= 0 ? rawExcess : applyRounding(rawExcess, poundRule);
+      poundsBasis = {
+        rounded: roundedExcessLbs,
+        raw: rawExcess,
+        appliesTo: 'excessOverBase',
+      };
+    }
+  }
+
   let units = 1;
   if (rate.perIncrementLbs !== null && rate.perIncrementLbs > 0) {
-    const excess = grossWeightLbs - (rate.excessBaseLbs ?? 0);
+    const excess =
+      roundedExcessLbs !== null
+        ? roundedExcessLbs
+        : effectiveGrossLbs - (rate.excessBaseLbs ?? 0);
     if (excess <= 0) {
       // Nothing is over the weight the rate counts above, so no distance charge
       // arises — and the minimum does not create one out of a fee that was
@@ -438,7 +567,10 @@ export function perMileAmountBreakdown(
   let raw = toCents(
     rate.ratePerMileUsd * billedMiles * units + (rate.addAfterUsd ?? 0),
   );
-  if (rate.roundDollars === 'nearest') raw = Math.round(raw);
+  // The general rule wins where both are declared, so a state is never rounded
+  // twice — see `PerMileRate.roundDollarsTo`.
+  if (rate.roundDollarsTo !== undefined) raw = applyRounding(raw, rate.roundDollarsTo);
+  else if (rate.roundDollars === 'nearest') raw = Math.round(raw);
   else if (rate.roundDollars === 'up') raw = Math.ceil(raw);
   const floored = rate.minimumUsd === null ? raw : Math.max(raw, rate.minimumUsd);
   const capped =
@@ -453,6 +585,8 @@ export function perMileAmountBreakdown(
     addAfterUsd: rate.addAfterUsd ?? 0,
     roundedUsd: raw,
     amountUsd: toCents(capped),
+    ...(poundsBasis !== undefined ? { billedPoundsBasis: poundsBasis } : {}),
+    ...(rate.roundDollarsTo !== undefined ? { dollarRounding: rate.roundDollarsTo } : {}),
   };
 }
 
@@ -477,7 +611,13 @@ export function perMileAmount(
  * render as a $0 overweight line.
  */
 export interface OverweightPricing {
-  kind: 'bands' | 'perMile' | 'includedInBaseFee' | 'notPriceable';
+  /**
+   * `'perMilePerAxleGroup'` is Minnesota — see `PerMilePerAxleGroupRate`. It is
+   * a fourth priced shape rather than a variant of `perMile`, because the
+   * multiplicand is the axle CONFIGURATION rather than a weight, and a caller
+   * that reads `perMile` will look for `overweightPerMile` and find nothing.
+   */
+  kind: 'bands' | 'perMile' | 'perMilePerAxleGroup' | 'includedInBaseFee' | 'notPriceable';
   /** What the source actually says. Required — this is the audit trail. */
   explanation: string;
 }
@@ -684,14 +824,111 @@ export function oversizeBandApplies(
  * Illinois ("An additional fee ... shall be charged for each overdimension") do.
  */
 export interface CombinedFeeRule {
-  kind: 'cumulative' | 'overweightOnly' | 'greaterOf';
+  /**
+   * `'absorption'` IS THE GENERALISATION, AND WISCONSIN IS WHY IT WAS NEEDED.
+   *
+   * The three original kinds each describe ONE relationship between exactly two
+   * buckets, which is all Ohio, Indiana and Georgia have. Wis. Stat.
+   * § 348.25(8) has a two-level LATTICE and states it twice over:
+   * (c) the width/height fee absorbs the LENGTH fee, and (d) the WEIGHT fee
+   * absorbs every size fee. A load that is over-length, over-width, over-height
+   * AND overweight pays the weight fee ALONE.
+   *
+   * There is no way to say that with a single kind. `greaterOf` is not it —
+   * absorption is not a comparison, it is a statement about which charge exists
+   * at all, and a Wisconsin size fee that happened to exceed the weight fee is
+   * still not charged. `overweightOnly` is closer but drops (c) entirely, so a
+   * Wisconsin load that is over-length and over-width but LEGAL ON WEIGHT would
+   * be summed when the statute says the width fee stands alone.
+   *
+   * AND THE COST OF GETTING IT WRONG IS ONE-DIRECTIONAL: an engine that adds
+   * dimension fees OVERCHARGES every Wisconsin heavy-haul quote, on every
+   * single one, by the whole size ladder.
+   */
+  kind: 'cumulative' | 'overweightOnly' | 'greaterOf' | 'absorption';
+  /**
+   * Required when `kind === 'absorption'`, meaningless otherwise. Each entry
+   * says: when `absorber` is charged, none of `absorbs` is charged at all.
+   *
+   * Entries are applied TRANSITIVELY by `applyFeeAbsorption` — Wisconsin's
+   * weight fee absorbs width, which absorbs length, and a reader should not
+   * have to notice that (d) already lists length to get the right answer.
+   */
+  absorption?: FeeAbsorption[];
   /** What the source actually says. Required — this is the audit trail. */
   explanation: string;
 }
 
-/** Same reasoning as `overweightPricingEqual`: the MODEL is the claim. */
+/**
+ * The buckets a state's fee schedule can charge in.
+ *
+ * `oversize` is the aggregate that `oversizeFeeBands` produces, and it is
+ * separate from `width`/`height`/`length` because most states publish one
+ * dimensional charge and Wisconsin publishes three. A jurisdiction that only
+ * has the aggregate never names the three.
+ */
+export type FeeComponent =
+  | 'base'
+  | 'width'
+  | 'height'
+  | 'length'
+  | 'oversize'
+  | 'overweight';
+
+export interface FeeAbsorption {
+  absorber: FeeComponent;
+  absorbs: FeeComponent[];
+  /** The source's own words. Required — this is the audit trail. */
+  quote: string;
+}
+
+/**
+ * Which components survive, given the ones a load actually incurs.
+ *
+ * Pure and total: it takes the charged set and returns the subset that is still
+ * charged after absorption, applied to a fixed point so a chain of two
+ * absorptions resolves in one call. A component absorbs only when it is ITSELF
+ * charged — an absent weight fee absorbs nothing, which is the whole reason a
+ * legal-weight Wisconsin load still pays its width fee.
+ */
+export function applyFeeAbsorption(
+  charged: ReadonlyArray<FeeComponent>,
+  rule: CombinedFeeRule | null,
+): FeeComponent[] {
+  if (rule === null || rule.kind !== 'absorption' || rule.absorption === undefined) {
+    return [...charged];
+  }
+  let surviving = new Set<FeeComponent>(charged);
+  for (let pass = 0; pass < rule.absorption.length + 1; pass += 1) {
+    const before = surviving.size;
+    const next = new Set(surviving);
+    for (const entry of rule.absorption) {
+      if (!surviving.has(entry.absorber)) continue;
+      for (const victim of entry.absorbs) {
+        if (victim !== entry.absorber) next.delete(victim);
+      }
+    }
+    surviving = next;
+    if (surviving.size === before) break;
+  }
+  return [...charged].filter((c) => surviving.has(c));
+}
+
+/**
+ * Same reasoning as `overweightPricingEqual`: the MODEL is the claim — with one
+ * addition. Two `absorption` rules describing DIFFERENT lattices are a real
+ * disagreement about which fees are charged, not two wordings of one rule, so
+ * the lattice is part of the comparison.
+ */
 export function combinedFeeRulesEqual(a: CombinedFeeRule, b: CombinedFeeRule): boolean {
-  return a.kind === b.kind;
+  if (a.kind !== b.kind) return false;
+  const key = (r: CombinedFeeRule): string =>
+    JSON.stringify(
+      (r.absorption ?? [])
+        .map((e) => [e.absorber, [...e.absorbs].sort()])
+        .sort((x, y) => String(x[0]).localeCompare(String(y[0]))),
+    );
+  return key(a) === key(b);
 }
 
 /** A fee that only attaches above some weight (Texas's Vehicle Supervision Fee). */
@@ -934,11 +1171,81 @@ export interface JurisdictionOsowRules {
    * refuses to price such a state without in-state mileage rather than billing
    * total lane miles to one state. Per-state mileage splitting itself is still
    * to be built — see `MILEAGE_SPLIT_NOTE`.
+   *
+   * This is the jurisdiction-wide DEFAULT. Where a state answers differently
+   * per fee — Iowa is flat for a general single trip and per-mile for a
+   * building hauler — `feeDistanceDependence` overrides it component by
+   * component. See `FeeDistanceDependence`.
    */
   feesDependOnDistance: boolean;
+
+  // ── PHASE 10 ─────────────────────────────────────────────────────────────
+  // EVERY FIELD BELOW IS OPTIONAL AND EVERY ONE IS ABSENT ON ALL 24 ENCODED
+  // JURISDICTIONS. A state that declares none of them is priced by exactly the
+  // code path it was priced by before they existed, which
+  // `scripts/osow-behaviour-snapshot.ts` checks rather than assumes.
+
+  /**
+   * This jurisdiction's OWN road classification, in its own published names.
+   *
+   * Declaring one changes one thing and it is the important one: a route class
+   * the vocabulary does not list evaluates `unknown` instead of `false`, so a
+   * caller who passes the generic `two-lane` into a state whose rules are
+   * written against "four lanes or more" is told the question is unanswered
+   * rather than quietly given the cheaper reading. See `RouteVocabulary`.
+   */
+  routeVocabulary?: Sourced<RouteVocabulary>[];
+  /**
+   * Named stretches of road a rule can be confined to. Nevada's I-15 carve-out,
+   * Nebraska's route-locked 46,000 lb tandem corridors, Arizona's Table 4
+   * segments. See `NamedRouteSegment`.
+   */
+  routeSegments?: Sourced<NamedRouteSegment>[];
+  /**
+   * A segment table the AGENCY serves live and we therefore cannot hold.
+   * Arizona's Table 4 is the case; see `LiveSegmentTable` for why holding a
+   * transcription of it would be worse than holding none.
+   */
+  liveSegmentTables?: Sourced<LiveSegmentTable>[];
+  /** Hours and days a move may or may not travel. See `TravelWindow`. */
+  travelWindows?: Sourced<TravelWindow>[];
+  /**
+   * The dimensional ceiling above which the state will not issue this permit at
+   * all — which in Nevada moves with the clock, the day, the direction and the
+   * steering configuration. See `PermitEnvelope`.
+   */
+  permitEnvelopes?: Sourced<PermitEnvelope>[];
+  /**
+   * How this jurisdiction combines the escort counts of several firing rules.
+   * Absent means the Phase 1 reading (max per position, then add), which is
+   * what every jurisdiction on file uses. Utah takes "the most stringent
+   * requirement" instead — see `EscortCountCombination`.
+   */
+  escortCountCombination?: Sourced<EscortCountCombination>[];
+  /**
+   * A distance charge computed from the AXLE CONFIGURATION rather than from
+   * gross weight. Used when `overweightPricing.kind === 'perMilePerAxleGroup'`,
+   * which also requires in-state miles. See `PerMilePerAxleGroupRate`.
+   */
+  overweightPerMilePerAxleGroup?: Sourced<PerMilePerAxleGroupRate>[];
+  /** Per-component overrides of `feesDependOnDistance`. */
+  feeDistanceDependence?: Sourced<FeeDistanceDependence>[];
+  /**
+   * Permits this state issues at NO CHARGE. A $0 permit is not an absent
+   * permit, and the engine prints it as a line rather than suppressing it —
+   * see `ZeroFeePermit`.
+   */
+  zeroFeePermits?: Sourced<ZeroFeePermit>[];
+  /**
+   * Rules this jurisdiction was checked for and positively does NOT publish.
+   * Kansas and Nebraska publish no overhang limit at all, so no overhang escort
+   * trigger exists in either — a fact a quote should state rather than a
+   * default it should fall back to. See `PublishedAbsence`.
+   */
+  publishedAbsences?: Sourced<PublishedAbsence>[];
 }
 
-/** A second permit issuer inside one state. */
+/** A second permit issuer inside one state — or, now, a replacement one. */
 export interface AdditionalAuthority {
   name: string;
   /** When the load must have this permit as well. */
@@ -949,13 +1256,36 @@ export interface AdditionalAuthority {
    * permit is a hole in the quote, not a rounding error.
    */
   priceable: boolean;
+  /**
+   * TRUE when this authority permits INSTEAD OF the state, not in addition.
+   *
+   * This type was built for New York's Thruway, where the state permit and the
+   * Authority permit are BOTH needed. The Kansas Turnpike inverts it, in the
+   * Authority's own words: "Special permits from KDOT are not required to move
+   * oversized loads on the Kansas Turnpike." The Turnpike carries I-35, I-70
+   * between Topeka and Kansas City, I-335 and I-470, so this is not a corner
+   * case — it is much of the state's east-west heavy-haul mileage.
+   *
+   * Getting it backwards is wrong twice over: it charges a state fee that is
+   * not owed, and it applies the state's escort rule where the Authority
+   * publishes its own. Absent means the Phase 6 reading — an ADDITIONAL permit.
+   */
+  replacesStatePermit?: boolean;
+  /** Named segments this authority governs, by `NamedRouteSegment.id`. */
+  segmentIds?: string[];
+  /** The authority's own rules, where they differ from the state's. */
+  ownRules?: SubJurisdictionRules;
 }
 
 export function additionalAuthoritiesEqual(
   a: AdditionalAuthority,
   b: AdditionalAuthority,
 ): boolean {
-  return a.name === b.name && a.priceable === b.priceable;
+  return (
+    a.name === b.name &&
+    a.priceable === b.priceable &&
+    (a.replacesStatePermit ?? false) === (b.replacesStatePermit ?? false)
+  );
 }
 
 /**
@@ -1126,6 +1456,13 @@ export interface AxleSpacingWeightTable {
   /** Axles the jurisdiction allows without a further permit; `null` = none stated. */
   maxAxles: number | null;
   tandemAllowance: TandemAxleAllowance | null;
+  /**
+   * How a measured spacing is rounded before the rows are read. OPTIONAL, and
+   * absent means the caller's figure is used exactly as supplied — which is
+   * Michigan's case and is stated as a limitation there rather than papered
+   * over. See `AxleSpacingRounding` for Minnesota's anti-gaming carve-out.
+   */
+  spacingRounding?: AxleSpacingRounding;
   /** What the source actually says. Required — this is the audit trail. */
   explanation: string;
 }
@@ -1137,6 +1474,14 @@ export function axleSpacingWeightTablesEqual(
   if (a.selector.kind !== b.selector.kind) return false;
   if (a.selector.thresholdLbs !== b.selector.thresholdLbs) return false;
   if (a.maxAxles !== b.maxAxles) return false;
+  if ((a.spacingRounding === undefined) !== (b.spacingRounding === undefined)) return false;
+  if (
+    a.spacingRounding !== undefined &&
+    b.spacingRounding !== undefined &&
+    !axleSpacingRoundingsEqual(a.spacingRounding, b.spacingRounding)
+  ) {
+    return false;
+  }
   if (a.rows.length !== b.rows.length) return false;
   for (let i = 0; i < a.rows.length; i += 1) {
     const ar = a.rows[i] as AxleSpacingWeightRow;
@@ -1244,7 +1589,13 @@ export function evaluateAxleSpacingTable(
     // A lone axle has no spacing to be judged on. It is measured against the
     // widest row rather than skipped, because that is what a lone axle
     // unambiguously satisfies.
-    const gapFt = gaps.length === 0 ? Number.POSITIVE_INFINITY : Math.min(...gaps);
+    const measuredGapFt =
+      gaps.length === 0 ? Number.POSITIVE_INFINITY : Math.min(...gaps);
+    // The state's OWN rounding, where it publishes one. Absent — Michigan, and
+    // every table on file — this is the identity and the caller's figure stands.
+    const gapFt = Number.isFinite(measuredGapFt)
+      ? roundedSpacingFt(measuredGapFt, table.spacingRounding)
+      : measuredGapFt;
     const row = axleSpacingRowFor(table.rows, gapFt);
     if (row === null) {
       unnamed.push(i + 1);
@@ -1561,4 +1912,470 @@ export function tandemAllowanceDecisiveAxles(
     }
   }
   return out;
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
+// PHASE 10 — AN OVERWEIGHT FEE THAT IS A FUNCTION OF THE AXLE CONFIGURATION.
+//
+// MINNESOTA CANNOT BE PRICED FROM GROSS WEIGHT, AND EVERY SHAPE ABOVE CAN.
+//
+// `WeightBand` steps on gross weight. `PerMileRate` multiplies gross weight's
+// excess by distance. Both take ONE number off the load. Minn. Stat. § 169.86
+// subd. 5(e) takes the whole axle layout: "The additional cost is equal to the
+// product of the distance traveled times the sum of the overweight axle group
+// cost factors shown in the following chart." Each OVERWEIGHT GROUP contributes
+// a cents-per-mile factor chosen by its axle count, its spacing and how far
+// over it is; the factors are summed; the sum is multiplied by the miles.
+//
+// Two 140,000 lb Minnesota loads with the same gross and different axle
+// arrangements are DIFFERENT PRICES, and no banding of gross weight separates
+// them. Texas's bands and Wisconsin's percentage both fit the existing model;
+// this does not, and forcing it would have meant either quoting the wrong
+// number or marking a state whose fee chart is published in full `notPriceable`.
+// ═══════════════════════════════════════════════════════════════════════════
+
+/** One row of a per-axle-group cost chart. */
+export interface AxleGroupCostFactor {
+  /** The state's own label for the row, verbatim. */
+  label: string;
+  /** Axles in the group the row describes. */
+  axleCount: number;
+  /** Spacing bounds on the group, feet; `null` = unbounded that way. */
+  minSpacingFt: number | null;
+  maxSpacingFt: number | null;
+  /** Weight band on the GROUP, not on the vehicle. */
+  minLbs: number;
+  maxLbs: number | null;
+  /** Cost per mile this group contributes, USD. MnDOT publishes cents. */
+  costPerMileUsd: number;
+}
+
+export interface PerMilePerAxleGroupRate {
+  /** The state's own name for the chart. */
+  name: string;
+  factors: AxleGroupCostFactor[];
+  /**
+   * Round each factor to the nearest cent BEFORE summing, where the state says
+   * so. It is not a display concern: rounding after the sum and rounding before
+   * it differ by cents per mile, which over a 400-mile lane is dollars.
+   */
+  roundFactorToCents: boolean;
+  minimumUsd: number | null;
+  maximumUsd: number | null;
+  /** What the source actually says. Required — this is the audit trail. */
+  explanation: string;
+}
+
+export function perMilePerAxleGroupRatesEqual(
+  a: PerMilePerAxleGroupRate,
+  b: PerMilePerAxleGroupRate,
+): boolean {
+  const key = (r: PerMilePerAxleGroupRate): string =>
+    JSON.stringify([
+      r.roundFactorToCents,
+      r.minimumUsd,
+      r.maximumUsd,
+      [...r.factors]
+        .map((f) => [
+          f.axleCount,
+          f.minSpacingFt,
+          f.maxSpacingFt,
+          f.minLbs,
+          f.maxLbs,
+          f.costPerMileUsd,
+        ])
+        .sort((x, y) => JSON.stringify(x).localeCompare(JSON.stringify(y))),
+    ]);
+  return key(a) === key(b);
+}
+
+/** One overweight group, as the caller can state it. */
+export interface OverweightAxleGroup {
+  axleCount: number;
+  spanFt: number;
+  weightLbs: number;
+}
+
+export interface PerMilePerAxleGroupBreakdown {
+  miles: number;
+  /** One entry per group, with the row that priced it. `null` = no row matched. */
+  groups: Array<{
+    group: OverweightAxleGroup;
+    factorLabel: string | null;
+    costPerMileUsd: number | null;
+  }>;
+  /** Groups the published chart has no row for. */
+  unpricedGroups: number;
+  sumPerMileUsd: number;
+  amountUsd: number | null;
+}
+
+/**
+ * Price a per-axle-group distance charge.
+ *
+ * `amountUsd` is `null` — not 0 — when ANY group has no row in the chart. A
+ * chart that does not price a group is a chart that does not price the move,
+ * and summing the groups it does cover would under-bill by exactly the amount
+ * nobody noticed was missing. Same contract as `weightBandAmount`.
+ */
+export function perMilePerAxleGroupAmount(
+  rate: PerMilePerAxleGroupRate,
+  groups: ReadonlyArray<OverweightAxleGroup>,
+  miles: number,
+): PerMilePerAxleGroupBreakdown {
+  const rows: PerMilePerAxleGroupBreakdown['groups'] = [];
+  let sum = 0;
+  let unpriced = 0;
+  for (const group of groups) {
+    const factor = rate.factors.find(
+      (f) =>
+        f.axleCount === group.axleCount &&
+        (f.minSpacingFt === null || group.spanFt >= f.minSpacingFt) &&
+        (f.maxSpacingFt === null || group.spanFt <= f.maxSpacingFt) &&
+        group.weightLbs >= f.minLbs &&
+        (f.maxLbs === null || group.weightLbs <= f.maxLbs),
+    );
+    if (factor === undefined) {
+      unpriced += 1;
+      rows.push({ group, factorLabel: null, costPerMileUsd: null });
+      continue;
+    }
+    const per = rate.roundFactorToCents
+      ? Math.round(factor.costPerMileUsd * 100) / 100
+      : factor.costPerMileUsd;
+    sum += per;
+    rows.push({ group, factorLabel: factor.label, costPerMileUsd: per });
+  }
+  const sumPerMile = Math.round(sum * 1e6) / 1e6;
+  if (unpriced > 0) {
+    return {
+      miles,
+      groups: rows,
+      unpricedGroups: unpriced,
+      sumPerMileUsd: sumPerMile,
+      amountUsd: null,
+    };
+  }
+  let amount = Math.round(sumPerMile * miles * 100) / 100;
+  if (rate.minimumUsd !== null) amount = Math.max(amount, rate.minimumUsd);
+  if (rate.maximumUsd !== null) amount = Math.min(amount, rate.maximumUsd);
+  return {
+    miles,
+    groups: rows,
+    unpricedGroups: 0,
+    sumPerMileUsd: sumPerMile,
+    amountUsd: Math.round(amount * 100) / 100,
+  };
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
+// PHASE 10 — DISTANCE-DEPENDENCE IS A PROPERTY OF A FEE, NOT OF A STATE.
+// ═══════════════════════════════════════════════════════════════════════════
+
+/**
+ * Whether ONE fee component needs in-state mileage — and, where the state
+ * confines it, WHICH MOVES it applies to.
+ *
+ * `JurisdictionOsowRules.feesDependOnDistance` is a single boolean over the
+ * whole state, and Iowa cannot answer it. Iowa Code § 321E.14(1)(e) prices the
+ * general single-trip permit at a flat $35 with no mileage term at all, and
+ * § 321E.12(3) charges 5 cents per ton per mile — but "only to vehicles
+ * transporting buildings other than mobile homes and factory-built structures".
+ * The state is therefore `false` for one product and `true` for another, and
+ * the boolean has to pick one: saying `true` refuses to price the ordinary Iowa
+ * permit without mileage it does not need, and saying `false` prices a building
+ * haul off a rate that has nowhere to get its miles.
+ *
+ * The boolean STAYS as the jurisdiction-wide default, because it is right for
+ * all 24 states on file and changing its meaning would be a behaviour change
+ * for every one of them. These rows override it per component.
+ */
+export interface FeeDistanceDependence {
+  /** The component this is about. Free-form beyond `FeeComponent` for named products. */
+  component: FeeComponent | string;
+  dependsOnDistance: boolean;
+  /** The moves it applies to, where the state confines it. Absent = all moves. */
+  appliesWhen?: ContextCondition;
+  /** The source's own words. Required — this is the audit trail. */
+  quote: string;
+}
+
+export function feeDistanceDependenciesEqual(
+  a: FeeDistanceDependence,
+  b: FeeDistanceDependence,
+): boolean {
+  return a.component === b.component && a.dependsOnDistance === b.dependsOnDistance;
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
+// PHASE 10 — A PERMIT THAT IS REQUIRED AND COSTS NOTHING.
+// ═══════════════════════════════════════════════════════════════════════════
+
+/**
+ * A published $0 permit.
+ *
+ * `amountUsd: null` already means "this fee applies and cannot be priced", and
+ * the engine already suppresses a $0 line so that Pennsylvania's sourced zero
+ * does not print "$0.00" beside a real charge. Between them those two rules
+ * leave nowhere to say the third thing: THE PERMIT IS REQUIRED AND THE
+ * PUBLISHED FEE IS ZERO. Kansas issues government vehicles a permit at no
+ * charge; Nebraska's Highway 75 implement-of-husbandry permit is the same
+ * shape. Suppressing the line reads as "no permit needed", which is wrong in
+ * the direction that gets a truck stopped.
+ *
+ * So a zero-fee case is its own record and the engine emits a line at $0 with
+ * the state's words on it — visibly a permit, visibly free.
+ */
+export interface ZeroFeePermit {
+  /** The state's own name for the case: 'government vehicle', 'Highway 75 IOH permit'. */
+  name: string;
+  /** The source's own words. Required — this is the audit trail. */
+  quote: string;
+}
+
+export function zeroFeePermitsEqual(a: ZeroFeePermit, b: ZeroFeePermit): boolean {
+  return a.name === b.name;
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
+// PHASE 10 — AFFIRMATIVE ABSENCE: "THIS STATE PUBLISHES NO SUCH RULE."
+// ═══════════════════════════════════════════════════════════════════════════
+
+/** A rule a jurisdiction is checked for and positively does not publish. */
+export type PublishedAbsenceSubject =
+  | 'frontOverhangLimit'
+  | 'rearOverhangLimit'
+  | 'overhangEscortTrigger'
+  | 'weightEscortTrigger'
+  | 'heightEscortTrigger'
+  | 'dimensionalEscortThresholds'
+  | 'policeEscortTrigger'
+  | 'policeEscortRate'
+  | 'superloadDefinition'
+  | 'superloadFee'
+  | 'roadClassification'
+  | 'permitDimensionalEnvelope'
+  | 'partialIncrementRule';
+
+/**
+ * A CHECKED NEGATIVE, recorded as data.
+ *
+ * Absence has been carried by an ABSENT FIELD since Phase 2 —
+ * `LegalLimits.frontOverhangIn` omitted means "this state states no overhang
+ * limit" — and that works exactly as long as somebody reads the header comment.
+ * Two of the nine states make it worth writing down instead, because the
+ * consequence is a rule that must NOT be synthesised:
+ *
+ *   KANSAS AND NEBRASKA PUBLISH NO OVERHANG LIMIT AT ALL. Kansas regulates
+ *   overhang only through overall length; K.S.A. 8-1902/8-1904 and K.A.R.
+ *   36-1-36/36-1-37 set none. Nebraska is the same — sections 60-6,288 to
+ *   60-6,290 and 408 NAC 3 contain none, and NDOT's legal-sizes sheet lists
+ *   nine dimensions without one. THE DOWNSTREAM CONSEQUENCE IS THE POINT:
+ *   because there is no overhang limit, there is no overhang ESCORT trigger
+ *   either, and a quote must not port Utah's 10 ft and 20 ft overhang escorts
+ *   across a state line. Contrast Utah, which publishes 3 ft front / 6 ft rear.
+ *
+ * The difference between this and an absent field is that this one can be
+ * PRINTED — "Kansas publishes no overhang limit; the sources checked are ..." is
+ * an answer, where a missing field is only ever silence.
+ */
+export interface PublishedAbsence {
+  subject: PublishedAbsenceSubject;
+  /** What was checked and what it does — and does not — say. */
+  statement: string;
+  /** Downstream rules that therefore do not exist. */
+  consequence?: string;
+}
+
+export function publishedAbsencesEqual(a: PublishedAbsence, b: PublishedAbsence): boolean {
+  return a.subject === b.subject;
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
+// PHASE 10 — A PERMIT ENVELOPE THAT MOVES WITH THE CLOCK AND THE ROAD.
+// ═══════════════════════════════════════════════════════════════════════════
+
+/**
+ * The maximum a permit PRODUCT will be issued for.
+ *
+ * Not a legal limit (that is `LegalLimits`) and not an escort trigger. It is
+ * the ceiling above which the state will not sell you this permit at all, and
+ * Nevada made it a first-class record because ITS CEILING IS NOT CONSTANT:
+ *
+ *   - NAC 484D.655 caps the annual permit at 14 ft wide by day and 12 ft AT
+ *     NIGHT. A permit limit that changes with the time of day, which is not an
+ *     escort rule and has nowhere else to live.
+ *   - NAC 484D.655(1)(b)-(c) cuts the single-trip width from 14 ft to 12 ft for
+ *     FRIDAY-AFTERNOON NORTHBOUND and SUNDAY-AFTERNOON SOUTHBOUND travel on
+ *     I-15 between the California line and Las Vegas Exit 33. A 13 ft load that
+ *     is quotable on Thursday is not quotable at 3 p.m. on Friday on that
+ *     stretch.
+ *   - A combination with a MECHANICALLY STEERED REAR AXLE gets 120 ft where
+ *     others get 110.
+ *
+ * Each variant is one row with its own `Sourced.appliesWhen`, so the day
+ * ceiling and the night ceiling are two rows rather than one number with a
+ * caveat — and a quote that does not state the time leaves BOTH in effect,
+ * which resolves to a conflict and a review. That is the required behaviour:
+ * absent time must never read as "day".
+ */
+export interface PermitEnvelope {
+  /** The state's own name for the product: 'single trip', 'annual'. */
+  product: string;
+  widthIn?: number;
+  heightIn?: number;
+  overallLengthIn?: number;
+  grossWeightLbs?: number;
+  /** The source's own words. Required — this is the audit trail. */
+  quote: string;
+}
+
+export function permitEnvelopesEqual(a: PermitEnvelope, b: PermitEnvelope): boolean {
+  return (
+    a.product === b.product &&
+    a.widthIn === b.widthIn &&
+    a.heightIn === b.heightIn &&
+    a.overallLengthIn === b.overallLengthIn &&
+    a.grossWeightLbs === b.grossWeightLbs
+  );
+}
+
+/**
+ * A window in which a move may — or may not — travel.
+ *
+ * The Kansas Turnpike publishes Monday-to-Thursday 08:30-16:30 for loads over
+ * 14 ft, which does not match KDOT's own window on the state highway system —
+ * so a travel window belongs to an AUTHORITY, not only to a state, and
+ * `SubJurisdictionRules` carries its own list.
+ */
+export interface TravelWindow {
+  /** The window's own description, e.g. 'over 14 ft wide, Kansas Turnpike'. */
+  label: string;
+  /** 0 = Sunday ... 6 = Saturday; `null` = every day. */
+  daysOfWeek: number[] | null;
+  /** `'HH:MM'`; `null` = no clock bound on that side. */
+  fromHhmm: string | null;
+  toHhmm: string | null;
+  /** True when travel is FORBIDDEN in the window rather than confined to it. */
+  prohibits?: boolean;
+  /** Conditions that narrow it further — width, direction, segment. */
+  appliesWhen?: ContextCondition;
+  /** The source's own words. Required — this is the audit trail. */
+  quote: string;
+}
+
+export function travelWindowsEqual(a: TravelWindow, b: TravelWindow): boolean {
+  return (
+    a.label === b.label &&
+    JSON.stringify(a.daysOfWeek) === JSON.stringify(b.daysOfWeek) &&
+    a.fromHhmm === b.fromHhmm &&
+    a.toHhmm === b.toHhmm &&
+    (a.prohibits ?? false) === (b.prohibits ?? false)
+  );
+}
+
+/**
+ * The rules an authority INSIDE a state applies in place of the state's.
+ *
+ * `AdditionalAuthority` was built for New York's Thruway, where a second permit
+ * is needed AS WELL AS the state's. The Kansas Turnpike is the opposite shape
+ * and the difference is a whole permit fee: KTA's own page says "Special
+ * permits from KDOT are not required to move oversized loads on the Kansas
+ * Turnpike." The Turnpike carries I-35, I-70 between Topeka and Kansas City,
+ * I-335 and I-470 — a large share of the state's east-west heavy-haul mileage —
+ * and it publishes its own escort trigger and its own travel window, neither of
+ * which matches KDOT's.
+ *
+ * Quoting the state permit there charges $40 that is not owed AND applies the
+ * wrong escort rule. `replacesStatePermit` on `AdditionalAuthority` is what
+ * separates the two cases.
+ */
+export interface SubJurisdictionRules {
+  escortRules?: EscortRule[];
+  permitBaseFeeUsd?: Sourced<number>[];
+  travelWindows?: Sourced<TravelWindow>[];
+  /** The source's own words. Required — this is the audit trail. */
+  quote: string;
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
+// PHASE 10 — SPACING ROUNDING, INCLUDING AN ANTI-GAMING CARVE-OUT.
+// ═══════════════════════════════════════════════════════════════════════════
+
+/**
+ * How a measured axle spacing is rounded before a table is read.
+ *
+ * `evaluateAxleSpacingTable` uses the caller's figure exactly as supplied and
+ * says so, because Michigan's statute is silent on rounding and inventing one
+ * would have been our rule presented as the state's. MINNESOTA IS NOT SILENT.
+ * Minn. Stat. § 169.824 publishes the most explicit spacing-rounding rule in
+ * this corpus, and it includes a carve-out whose only purpose is to stop a
+ * carrier gaming the rounding: a distance measured at 3 ft 4 in to 3 ft 6 in is
+ * NOT rounded to the nearest foot like everything else.
+ *
+ * The carve-out is why this is a type rather than a direction and a step. A
+ * plain "nearest foot" rule rounds 3'4" down to 3 ft and 3'6" up to 4 ft, and
+ * the statute says neither — it names the band and states its own treatment.
+ * Encoding only the general rule would silently reintroduce exactly the
+ * behaviour the legislature wrote a sentence to prevent.
+ */
+export interface AxleSpacingRounding {
+  direction: 'up' | 'down' | 'nearest';
+  /** Round to a multiple of this many feet. 1 for "to the nearest foot". */
+  toMultipleOfFt: number;
+  /** Bands the source excludes from the general rule, with their own treatment. */
+  carveOuts: Array<{
+    /** Inclusive bounds of the band, feet. */
+    fromFt: number;
+    toFt: number;
+    /** The spacing the source says to use inside the band. */
+    treatAsFt: number;
+    /** The source's own words. Required — this is the audit trail. */
+    quote: string;
+  }>;
+  /** The source's own words for the general rule. Required — the audit trail. */
+  quote: string;
+}
+
+export function axleSpacingRoundingsEqual(
+  a: AxleSpacingRounding,
+  b: AxleSpacingRounding,
+): boolean {
+  const key = (r: AxleSpacingRounding): string =>
+    JSON.stringify([
+      r.direction,
+      r.toMultipleOfFt,
+      [...r.carveOuts]
+        .map((c) => [c.fromFt, c.toFt, c.treatAsFt])
+        .sort((x, y) => (x[0] as number) - (y[0] as number)),
+    ]);
+  return key(a) === key(b);
+}
+
+/**
+ * The spacing a table is actually read at.
+ *
+ * A CARVE-OUT WINS OVER THE GENERAL RULE, which is the only ordering that makes
+ * a carve-out mean anything. With no rule at all the measurement is returned
+ * untouched, which is what `evaluateAxleSpacingTable` has always done and what
+ * every table on file still gets.
+ */
+export function roundedSpacingFt(
+  gapFt: number,
+  rounding: AxleSpacingRounding | undefined,
+): number {
+  if (rounding === undefined) return gapFt;
+  for (const carve of rounding.carveOuts) {
+    if (gapFt >= carve.fromFt && gapFt <= carve.toFt) return carve.treatAsFt;
+  }
+  const step = rounding.toMultipleOfFt;
+  if (!(step > 0)) return gapFt;
+  const quotient = Math.round((gapFt / step) * 1e9) / 1e9;
+  const stepped =
+    rounding.direction === 'up'
+      ? Math.ceil(quotient)
+      : rounding.direction === 'down'
+        ? Math.floor(quotient)
+        : Math.round(quotient);
+  return Math.round(stepped * step * 1e6) / 1e6;
 }

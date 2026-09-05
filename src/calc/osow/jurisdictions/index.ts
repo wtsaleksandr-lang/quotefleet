@@ -129,6 +129,46 @@
  * neither new field behaves exactly as it did in Phase 8, and no
  * `if (state === ...)` has ever been added anywhere.
  *
+ * PHASE 10 IS THE FIRST THAT ADDS NO JURISDICTION AT ALL — IT ADDS THE ROOM FOR
+ * NINE.
+ * -------------------------------------------------------------------------
+ * Wisconsin, Minnesota, Iowa, Maryland, Arizona, Nevada, Kansas, Utah and
+ * Nebraska were researched to 792 primary-source data points and none of them
+ * can be encoded in the Phase 9 model without either flattening a real
+ * distinction or writing a per-state special case — and the whole value of this
+ * engine is that it has neither. So this phase changes the SCHEMA and leaves
+ * the registry below at twenty-four, deliberately: capability first, data
+ * second, with the boundary between them visible in the history.
+ *
+ * The one that could not be patched around is the road vocabulary. A four-lane
+ * undivided road is "undivided" in Nebraska and "four lanes or more" in Kansas
+ * — the same road, and the two states put the escort on opposite ends of the
+ * load. Nine phases of adding prefixed members to one shared union cannot hold
+ * that, because the problem is not naming; it is that a caller passes ONE route
+ * class and the two states ask different questions of it. So the vocabulary
+ * became per-jurisdiction data in `routeContext.ts`, the existing members stay
+ * exactly where they are as `SharedRouteClass`, and a class a state does not
+ * publish now evaluates `unknown` rather than false — the guarantee the shared
+ * union never made.
+ *
+ * Around it: a MAX/absorption combinator for fees and for escort counts
+ * (Wisconsin's weight fee absorbs every size fee; Utah takes "the most
+ * stringent requirement" where Texas is additive), named route segments and
+ * sub-jurisdictions that REPLACE the state permit rather than adding to it (the
+ * Kansas Turnpike), time-of-day and named-segment conditions (Arizona publishes
+ * escort thresholds only between 3 a.m. and half an hour before sunrise;
+ * Nevada's permit envelope itself shrinks 14 ft to 12 ft at night), an escort
+ * outcome that is a REVIEW rather than a count ("one or more properly equipped
+ * escorts"), a second width measurement (Minnesota measures at the bottom and
+ * the top of the load in one sentence), and a rounding rule with a direction
+ * and a step (Utah applies three different roundings to one fee).
+ *
+ * Same terms as every phase before, and checked rather than asserted: no
+ * evaluator changed its meaning for any existing state, no `if (state === ...)`
+ * exists anywhere, and every one of the twenty-four below produces byte-
+ * identical output across a matrix of loads, dates and route classes — see
+ * `scripts/osow-behaviour-snapshot.ts`.
+ *
  * Twenty-four are covered: TX, OH, PA, NY, IL, IN, CA, GA, NC, NJ, VA, WA, AL,
  * FL, MO, OK, LA, CO, AR, KY, TN, MI, MS, SC.
  */
