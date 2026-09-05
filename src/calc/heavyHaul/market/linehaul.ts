@@ -534,6 +534,10 @@ export const SUPERLOAD_REFUSAL_MESSAGE =
  * exactly `base × distanceMultiplier(miles) × equip × region × miles`, the
  * stated formula. Where it does not dominate, the shorter band's ceiling price
  * becomes a floor, which is conservative and never understates.
+ *
+ * A CONTINUOUS FITTED CURVE WOULD REMOVE THIS MAX ENTIRELY, and one exists — it
+ * was tested against the bands and rejected for a reason that has nothing to do
+ * with monotonicity. See `observedCurveMultiplier`.
  */
 function ratePathUsd(
   base: number,
