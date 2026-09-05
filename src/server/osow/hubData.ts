@@ -502,7 +502,17 @@ function mentionsRouteClass(c: EscortCondition): boolean {
 }
 
 function requiresCivilianEscort(t: EscortOutcome): boolean {
-  return (t.escorts ?? 0) > 0 || (t.front ?? 0) > 0 || (t.rear ?? 0) > 0;
+  // A rule whose outcome is a REVIEW rather than a count still requires
+  // escorts — Wisconsin's "one or more properly equipped escorts" is the only
+  // dimensional escort trigger that state publishes. Reading the absence of a
+  // number as the absence of a requirement would print "no published escort
+  // trigger" on the one page a dispatcher checks for exactly that.
+  return (
+    (t.escorts ?? 0) > 0 ||
+    (t.front ?? 0) > 0 ||
+    (t.rear ?? 0) > 0 ||
+    t.reviewRequired !== undefined
+  );
 }
 
 function requiresPoliceEscort(t: EscortOutcome): boolean {
