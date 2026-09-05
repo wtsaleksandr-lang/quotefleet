@@ -36,6 +36,32 @@ export function esc(s: unknown): string {
 // ── CSS ────────────────────────────────────────────────────────────────────
 
 export const HUB_CSS = `
+  /* ── ONE INK, FOUR STEPS ──────────────────────────────────────────────────
+     Hierarchy on these pages is a POSITION ON ONE LADDER, not a palette. Every
+     piece of text picks one of four steps and nothing else, which is what stops
+     a page of tables and citations reading as a page of competing colours.
+
+       1  headings, answers, figures            --ink
+       2  body copy                             --ink-soft
+       3  metadata, citations, column heads      --muted
+       4  absence placeholders ONLY              --muted-soft
+
+     THE LADDER STOPS AT FOUR ON PURPOSE. The reference system this is drawn
+     from runs to six (28% and 18% of the ink) and uses the bottom two for
+     10px metadata. Measured against this codebase's own grounds, --muted-soft
+     is already 3.86:1 on the dark canvas — under the 4.5:1 floor for text at
+     this size — so step 4 carries placeholder words a reader never has to read
+     ("Not yet covered") and NOTHING a reader has to act on. Steps 5 and 6 do
+     not exist here. Citations, revision dates and micro-labels stop at step 3.
+     ── */
+  :root {
+    --qh-ink-1: var(--ink);
+    --qh-ink-2: var(--ink-soft);
+    --qh-ink-3: var(--muted);
+    --qh-ink-4: var(--muted-soft);
+    --qh-ease: cubic-bezier(0.22, 1, 0.36, 1);
+  }
+
   .qh-shell { max-width: 1180px; margin: 0 auto; padding: 8px 24px 48px; }
   /* Shared .hero centres its text. Left-align it and centre the same column the
      body uses, so the H1 starts on the body's left edge. */
@@ -70,7 +96,13 @@ export const HUB_CSS = `
   .qh-rail a { display: block; font-size: 13px; line-height: 1.5; color: var(--ink-soft); text-decoration: none; padding: 4px 8px; border-left: 1px solid var(--border); }
   .qh-rail a:hover, .qh-rail a:focus-visible { color: var(--accent); border-left-color: var(--accent); }
 
-  .qh-sec { margin: 0 0 32px; scroll-margin-top: 96px; }
+  /* SECTIONS ARE SEPARATED BY A HAIRLINE, NOT BY WHITESPACE. A 32px gap
+     between twelve sections is 384px of nothing on a state page; a 1px rule
+     with 24px of lead-in says the same thing in a quarter of the height and
+     satisfies the house rule against whitespace-as-separator. First section
+     suppressed — a rule above the first heading has nothing to separate. */
+  .qh-sec { margin: 0 0 24px; scroll-margin-top: 96px; }
+  .qh-sec + .qh-sec { border-top: 1px solid var(--border); padding-top: 24px; }
   .qh-sec h2 { font-size: 22px; margin: 0 0 4px; color: var(--ink); text-align: left; text-wrap: balance; }
   .qh-sec h3 { font-size: 16px; margin: 16px 0 4px; color: var(--ink); text-align: left; }
   .qh-sec p { font-size: 14px; line-height: 1.55; color: var(--ink-soft); margin: 0 0 12px; max-width: 820px; }
@@ -95,8 +127,13 @@ export const HUB_CSS = `
   /* Sticky first column so a row stays identifiable while the table scrolls. */
   .qh-table th.qh-st, .qh-table td.qh-st { position: sticky; left: 0; z-index: 1; background: var(--surface); border-right: 1px solid var(--border); min-width: 132px; }
   .qh-table thead th.qh-st { z-index: 3; background: var(--surface-2); }
-  .qh-table tbody tr:nth-child(even) td { background: var(--surface-2); }
-  .qh-table tbody tr:nth-child(even) td.qh-st { background: var(--surface-2); }
+  /* NO ZEBRA. A full 1px grid at the hairline weight does the row-tracking job
+     that striping was doing, and it does it without a second surface colour
+     fighting the conflict tint (.is-conflict) and the sticky first column for
+     the same cell background. Vertical rules stop before the last column so the
+     table has no outer border of its own — .qh-tablewrap already draws one. */
+  .qh-table th, .qh-table td { border-right: 1px solid var(--border); }
+  .qh-table th:last-child, .qh-table td:last-child { border-right: none; }
   .qh-table td.qh-st a { color: var(--ink); text-decoration: none; font-weight: 600; }
   .qh-table td.qh-st a:hover, .qh-table td.qh-st a:focus-visible { color: var(--accent); text-decoration: underline; }
   /* The VALUE never wraps — "13'6"" broken across two lines is unreadable —
@@ -157,22 +194,124 @@ export const HUB_CSS = `
   .qh-sources a { color: var(--accent); overflow-wrap: anywhere; }
   .qh-sources .qh-pub { color: var(--ink-soft); }
 
-  /* FAQ. */
-  .qh-faq { display: grid; gap: 8px; }
-  .qh-faq details { border: 1px solid var(--border); border-radius: var(--radius); background: var(--surface); padding: 12px; }
-  .qh-faq summary { font-size: 14px; color: var(--ink); cursor: pointer; line-height: 1.5; }
-  .qh-faq p { margin: 8px 0 0; font-size: 13px; line-height: 1.55; color: var(--ink-soft); }
+  /* ── MONO MICRO-LABEL — the section eyebrow that does the wayfinding. ─────
+     Small, quiet, categorically loud: a reader scans the labels, not the prose.
+     POSITIVE tracking on tiny uppercase mono is the whole trick (0.12em at 11px
+     is ~1.3px). Held at step 3 of the ladder, never lower — step 4 would not
+     clear 4.5:1 at this size in either theme. Left-aligned, always: the house
+     rule puts an eyebrow top-left of the block it introduces, never centred. */
+  .qh-label { display: block; font-family: var(--font-mono); font-size: 11px; font-weight: 500; letter-spacing: 0.12em; text-transform: uppercase; color: var(--qh-ink-3); margin: 0 0 8px; text-align: left; }
+
+  /* ── "THE SHORT VERSION" — the answer, above the document. ────────────────
+     Accent tint + a 3px accent left edge, with the radius flattened on that
+     edge so the border reads as a tab rather than a stroke around a pill.
+     Solid tint, never glass: this is body text and the house readability rule
+     keeps glass off body text. */
+  .qh-short { background: var(--accent-soft); border-left: 3px solid var(--accent); border-radius: 0 var(--radius) var(--radius) 0; padding: 16px; margin: 0 0 24px; }
+  .qh-short p { margin: 0; font-size: 14px; line-height: 1.55; color: var(--qh-ink-1); max-width: 820px; }
+  .qh-short p + p { margin-top: 8px; }
+  .qh-short strong { color: var(--qh-ink-1); }
+  .qh-short a { color: var(--accent); }
+
+  /* ── THE FOLD ─────────────────────────────────────────────────────────────
+     Native <details>/<summary>. No JavaScript, no ARIA wiring, no height
+     measuring — the element exposes its own expanded state to assistive tech
+     and is keyboard-operable for free, which is the whole argument for not
+     hand-rolling an accordion here.
+
+     SUMMARY-FIRST IS THE RULE, not the styling. What folds is the EXPLANATION.
+     The number, the citation link, the revision dates and the accuracy tier
+     stay visible unconditionally — a reader must never have to open something
+     to find out whether it is relevant.
+
+     The panel carries no padding of its own; the summary owns 12px 16px so the
+     whole header row is the hit target, edge to edge, at a 44px floor. */
+  .qh-folds { display: grid; gap: 4px; margin: 0 0 12px; }
+  /* Standing on its own in a section a fold owns its bottom rhythm; inside a
+     group the group's 4px gap does it instead. */
+  .qh-fold { border: 1px solid var(--border); border-radius: var(--radius); background: var(--surface); padding: 0; margin: 0 0 12px; }
+  .qh-folds > .qh-fold, .qh-faq > .qh-fold { margin: 0; }
+  .qh-entry > .qh-fold:last-child { margin: 0; }
+  .qh-fold > summary { display: grid; grid-template-columns: 1fr auto auto; align-items: center; gap: 8px; padding: 12px 16px; min-height: 44px; box-sizing: border-box; font-size: 13px; font-weight: 500; line-height: 1.5; color: var(--qh-ink-1); cursor: pointer; list-style: none; }
+  .qh-fold > summary::-webkit-details-marker { display: none; }
+  .qh-fold > summary::marker { content: ''; }
+  .qh-fold > summary:hover { color: var(--accent); }
+  .qh-fold > summary:focus-visible { outline: 2px solid var(--accent); outline-offset: -2px; border-radius: var(--radius); }
+  /* The count. A fold that holds a list says how long the list is, so nothing
+     ever looks smaller closed than it is. */
+  .qh-fold .qh-n { font-family: var(--font-mono); font-size: 11px; letter-spacing: 0.08em; text-transform: uppercase; color: var(--qh-ink-3); white-space: nowrap; }
+  .qh-fold .chv { width: 16px; height: 16px; flex: 0 0 auto; color: var(--qh-ink-3); transition: transform 0.2s var(--qh-ease); }
+  .qh-fold[open] > summary .chv, .qh-fold:target > summary .chv { transform: rotate(180deg); }
+  /* Opened, the body reads as a DRAWER: a hairline separates it from the
+     header instead of the text simply appearing where there was none. */
+  .qh-fold-b { border-top: 1px solid var(--border); margin: 0 16px; padding: 12px 0 16px; min-height: 0; }
+  .qh-fold-b > :last-child { margin-bottom: 0; }
+  .qh-fold-b p { font-size: 13px; line-height: 1.55; color: var(--qh-ink-2); margin: 0 0 8px; max-width: 820px; }
+  .qh-fold-b ul, .qh-fold-b ol { margin: 0 0 8px; padding-left: 24px; display: grid; gap: 4px; }
+  .qh-fold-b li { font-size: 13px; line-height: 1.55; color: var(--qh-ink-2); }
+  .qh-fold-b a { color: var(--accent); }
+  /* A single expansion can never blow up the page's scroll length. */
+  .qh-fold-b--capped { max-height: 320px; overflow-y: auto; }
+
+  /* THE FOLD ANIMATION the reference system does not have. ::details-content
+     is the only handle on the closed subtree, so the house 0fr → 1fr grid fold
+     hangs off it; browsers without it drop the whole rule and the element
+     snaps, which is the correct degradation. content-visibility rides along
+     with allow-discrete so the body is still painted while it closes. */
+  .qh-fold::details-content { display: grid; grid-template-rows: 0fr; overflow: clip; }
+  .qh-fold[open]::details-content, .qh-fold:target::details-content { grid-template-rows: 1fr; content-visibility: visible; }
+  @media (prefers-reduced-motion: no-preference) {
+    .qh-fold::details-content { transition: grid-template-rows 0.2s var(--qh-ease), content-visibility 0.2s allow-discrete; }
+  }
+
+  /* DEEP LINKING WITH NO SCRIPT. /oversize/texas#tx-office opens that fold on
+     arrival even with JavaScript off; the script below additionally sets the
+     real open attribute so the next click toggles from the right state. */
+  .qh-fold:target { border-color: var(--accent); }
+  /* A verbatim public-domain passage keeps the accent edge it had as a
+     blockquote — the citation is the summary, the passage is what folds. */
+  .qh-fold--quote { border-left: 2px solid var(--accent); }
+  .qh-fold--quote > summary { color: var(--qh-ink-2); font-weight: 400; }
+  .qh-fold--quote .qh-fold-b p { color: var(--qh-ink-2); }
+  /* Inside a fold the drawer already IS the surface — the blockquote drops its
+     own border, fill and radius so the passage does not sit in a box in a box. */
+  .qh-fold-b .qh-quote { border: none; background: none; border-radius: 0; padding: 0; margin: 0; }
+
+  /* Expand-all. Ships hidden and is revealed by script, so a reader with no
+     JavaScript is never shown a control that cannot work. */
+  .qh-foldbar { display: flex; justify-content: flex-start; margin: 0 0 8px; }
+  .qh-expand { font-family: var(--font-mono); font-size: 11px; letter-spacing: 0.08em; text-transform: uppercase; color: var(--qh-ink-3); background: transparent; border: 1px solid var(--border); border-radius: var(--radius-pill); padding: 8px 16px; min-height: 44px; cursor: pointer; }
+  .qh-expand:hover, .qh-expand:focus-visible { border-color: var(--accent); color: var(--accent); }
+
+  /* FAQ — literally the same component, so a page has ONE disclosure pattern
+     rather than a question that opens one way and a note that opens another. */
+  .qh-faq { display: grid; gap: 4px; }
 
   @media (max-width: 980px) {
     .qh-body { grid-template-columns: minmax(0, 1fr); gap: 16px; }
-    .qh-rail { position: static; top: auto; }
-    /* ONE column, deliberately. A two-column rail leaves the last item alone
-       on its own row whenever the section count is odd — three sections on a
-       topic table, thirteen on a state page — which is the orphaned-group
-       defect this codebase keeps fixing. One column cannot orphan anything. */
-    .qh-rail ol { grid-template-columns: minmax(0, 1fr); }
+    /* ── THE RAIL BECOMES AN ON-PAGE TOC BOX. ─────────────────────────────
+       Un-sticky it and it is a bare list running the width of the page; give
+       it a border, a mono heading and TWO CSS COLUMNS and it is a contents
+       box that costs half the height.
+
+       CSS COLUMNS, NOT A GRID — and that distinction is the reason the old
+       comment here forbade two columns. A two-track GRID fills row by row, so
+       thirteen sections leave the thirteenth alone on a row of its own. CSS
+       multi-column BALANCES: thirteen items are 7 + 6, both columns full, and
+       there is no last row to orphan. break-inside: avoid keeps an item from
+       splitting across the gutter. */
+    .qh-rail { position: static; top: auto; border: 1px solid var(--border); border-radius: var(--radius-lg); background: var(--surface); padding: 16px; }
+    .qh-rail ol { display: block; columns: 2; column-gap: 32px; }
+    .qh-rail li { break-inside: avoid; margin: 0 0 4px; }
+    .qh-rail a { border-left: none; padding: 4px 0; }
+  }
+  @media (max-width: 560px) {
+    .qh-rail ol { columns: 1; }
   }
   @media (max-width: 760px) {
+    .qh-short { padding: 12px; }
+    .qh-fold > summary { padding: 12px; }
+    .qh-fold-b { margin: 0 12px; }
     .qh-hero h1 { font-size: 28px; }
     .qh-hero { padding: 32px 16px 12px; }
     .qh-shell { padding: 8px 16px 32px; }
@@ -185,6 +324,114 @@ export const HUB_CSS = `
     .qh-table th.qh-st, .qh-table td.qh-st { min-width: 108px; }
   }
 `;
+
+// ── Disclosure ─────────────────────────────────────────────────────────────
+
+/** The one chevron. `.chv` is the rotation hook, not a component. */
+export const CHEVRON =
+  '<svg class="chv" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M19 9l-7 7-7-7"/></svg>';
+
+export interface Fold {
+  /** Anchor id, so a link can open this exact fold (`#id`), with or without JS. */
+  id?: string;
+  /** The summary. ALWAYS VISIBLE — never the number, the cite or the tier. */
+  label: string;
+  /** A right-aligned mono count, where the fold holds a list. */
+  count?: string;
+  /** The explanation. This — and only this — is what folds. */
+  bodyHtml: string;
+  /** Ship this one open, so a page never opens as a stack of closed bars. */
+  open?: boolean;
+  /** Cap the revealed block at 320px and let it scroll inside itself. */
+  capped?: boolean;
+}
+
+/** One compact disclosure. Native `<details>`; works with scripting disabled. */
+export function fold(f: Fold): string {
+  return `<details class="qh-fold"${f.id ? ` id="${esc(f.id)}"` : ''}${f.open ? ' open' : ''}>`
+    + `<summary><span>${esc(f.label)}</span>`
+    + `${f.count ? `<span class="qh-n">${esc(f.count)}</span>` : '<span></span>'}`
+    + `${CHEVRON}</summary>`
+    + `<div class="qh-fold-b${f.capped ? ' qh-fold-b--capped' : ''}">${f.bodyHtml}</div>`
+    + '</details>';
+}
+
+/**
+ * A group of folds. `data-qh-folds` is what the expand-all script looks for;
+ * a group of one gets no control, because "expand all" over one row is noise.
+ */
+export function folds(items: Fold[]): string {
+  if (items.length === 0) return '';
+  return `<div class="qh-folds" data-qh-folds>${items.map(fold).join('')}</div>`;
+}
+
+/** The gist of a dense page, above the dense page. */
+export function shortVersion(html: string): string {
+  return `<div class="qh-short"><p><strong>The short version:</strong> ${html}</p></div>`;
+}
+
+/** A mono section eyebrow. Left-aligned, always. */
+export function microLabel(text: string): string {
+  return `<span class="qh-label">${esc(text)}</span>`;
+}
+
+/**
+ * PROGRESSIVE ENHANCEMENT ONLY. Every fold on these pages already opens,
+ * closes, focuses and announces itself with this script absent — it is native
+ * `<details>`. What the script adds is the two things the element has no
+ * built-in answer for: an expand-all control (rendered only once it exists, so
+ * a reader with no JavaScript is never offered a dead button) and setting the
+ * real `open` attribute on a hash-targeted fold, so the CSS `:target` reveal
+ * and the next click agree about the state.
+ */
+export const HUB_SCRIPTS = `<script>
+(function(){
+  var groups = document.querySelectorAll('[data-qh-folds]');
+  Array.prototype.forEach.call(groups, function(g){
+    var items = Array.prototype.filter.call(
+      g.querySelectorAll('details'),
+      function(d){ return d.closest('[data-qh-folds]') === g; }
+    );
+    if (items.length < 3) return;
+    var bar = document.createElement('div');
+    bar.className = 'qh-foldbar';
+    var btn = document.createElement('button');
+    btn.type = 'button';
+    btn.className = 'qh-expand';
+    var sync = function(){
+      var open = 0;
+      Array.prototype.forEach.call(items, function(d){ if (d.open) open++; });
+      var all = open === items.length;
+      btn.textContent = all ? 'Collapse all' : 'Expand all (' + items.length + ')';
+      btn.setAttribute('aria-expanded', all ? 'true' : 'false');
+    };
+    btn.addEventListener('click', function(){
+      var open = 0;
+      Array.prototype.forEach.call(items, function(d){ if (d.open) open++; });
+      var next = open !== items.length;
+      Array.prototype.forEach.call(items, function(d){ d.open = next; });
+      sync();
+    });
+    Array.prototype.forEach.call(items, function(d){ d.addEventListener('toggle', sync); });
+    sync();
+    bar.appendChild(btn);
+    g.parentNode.insertBefore(bar, g);
+  });
+
+  function openHash(){
+    var h = location.hash;
+    if (!h || h.length < 2) return;
+    var el;
+    try { el = document.querySelector(h); } catch (e) { return; }
+    while (el) {
+      if (el.tagName === 'DETAILS') el.open = true;
+      el = el.parentElement;
+    }
+  }
+  window.addEventListener('hashchange', openHash);
+  openHash();
+})();
+</script>`;
 
 // ── Cell + citation rendering ──────────────────────────────────────────────
 
@@ -464,6 +711,7 @@ export function hubPage(opts: HubPageOpts): string {
   ${HEADER_SCRIPTS}
   <script src="/marketing-chat.js" defer></script>
   <script src="/theme-toggle.js" defer></script>
+  ${HUB_SCRIPTS}
   ${opts.extraScripts ?? ''}
 </body>
 </html>`;

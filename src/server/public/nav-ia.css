@@ -287,3 +287,26 @@ html body.qf-wft .site-actions .signin { white-space: nowrap; }
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 }
+
+/* ── PHONE FOOTER — TWO COLUMNS (homepage copy of the shared ladder) ───────
+   Same arithmetic as the block at the foot of nav-unify.css: N=5 link columns,
+   `5 mod 2 === 1`, so the last column spans both tracks and paginates its own
+   links into two CSS columns. The four that remain wrap 2+2 with no remainder.
+   Restated here at `html body.qf-wft` specificity because the homepage does not
+   load nav-unify.css and landing-conversion.css / landing-home-fixes.css both
+   declare a one-track phone footer of their own. */
+@media (max-width: 640px) {
+  html body.qf-wft .premium-footer .premium-footer-inner {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    column-gap: 16px;
+    row-gap: 24px;
+  }
+  html body.qf-wft .premium-footer .premium-footer-inner > .footer-col:last-child {
+    grid-column: 1 / -1;
+    display: block;
+    columns: 2;
+    column-gap: 16px;
+  }
+  html body.qf-wft .premium-footer .premium-footer-inner > .footer-col:last-child h4 { column-span: all; }
+  html body.qf-wft .premium-footer .premium-footer-inner > .footer-col:last-child a { break-inside: avoid; }
+}

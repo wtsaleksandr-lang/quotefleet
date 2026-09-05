@@ -765,7 +765,19 @@ const OSOW_CSS = `
 
   /* ── FOLDED PROSE. Every note and every citation is still here, one click
      away, and the count is on the summary so nothing looks smaller than it is. */
+  /* ONE DISCLOSURE LANGUAGE ACROSS OS/OW (2026-09). The tool already folded the
+     right things — a clamped one-line reason visible, the full note and every
+     citation behind a summary that carries its own count — so this only gives
+     those summaries the same CHROME the /oversize pages now use: no native
+     marker, a chevron that rotates 180 deg on open, and a 44px hit row. The
+     chevron is drawn with ::after rather than an element so the markup the
+     calculator's client script emits does not have to change. */
   .ow-fold { margin-top: 12px; }
+  .ow-fold > summary, .ow-cites summary { display: flex; align-items: center; justify-content: space-between; gap: 8px; min-height: 44px; list-style: none; }
+  .ow-fold > summary::-webkit-details-marker, .ow-cites summary::-webkit-details-marker { display: none; }
+  .ow-fold > summary::marker, .ow-cites summary::marker { content: ''; }
+  .ow-fold > summary::after, .ow-cites summary::after { content: '⌄'; font-size: 14px; line-height: 1; color: var(--muted); transition: transform 0.2s cubic-bezier(0.22, 1, 0.36, 1); }
+  .ow-fold[open] > summary::after, .ow-cites[open] summary::after { transform: rotate(180deg); }
   .ow-fold > summary { font-size: 12px; font-family: var(--font-mono); letter-spacing: 0.04em; color: var(--muted); cursor: pointer; }
   .ow-fold > summary:hover, .ow-fold > summary:focus-visible { color: var(--accent); }
   .ow-fold ol, .ow-fold ul { margin: 8px 0 0; padding-left: 20px; display: grid; gap: 8px; }

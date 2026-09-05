@@ -62,6 +62,10 @@ import type { HubCell } from './hubData.js';
 import {
   citeLink,
   esc,
+  fold,
+  folds,
+  microLabel,
+  shortVersion,
   hubPage,
   jsonLdBreadcrumb,
   jsonLdDataset,
@@ -73,19 +77,53 @@ import {
 export const BRIDGE_TOOL_PATH = '/tools/bridge-formula';
 export const AXLE_TOOL_PATH = '/tools/axle-weights';
 
-function sec(id: string, heading: string, inner: string): string {
-  return `<section class="qh-sec" id="${esc(id)}"><h2>${esc(heading)}</h2>${inner}</section>`;
+/**
+ * A section, with a MONO MICRO-LABEL as its eyebrow.
+ *
+ * The label falls back to the section's own id ("compliance-clause" →
+ * "COMPLIANCE CLAUSE") rather than being typed twice: every section here
+ * already carries a semantic id because it is a rail anchor, so the eyebrow is
+ * free and can never drift out of step with the link that points at it. Pass
+ * `eyebrow` only where the id would read badly. Top-left of the heading block,
+ * per the house rule — never centred, never inline with the H2.
+ */
+function sec(id: string, heading: string, inner: string, eyebrow?: string): string {
+  const label = eyebrow ?? id.replace(/-/g, ' ');
+  return `<section class="qh-sec" id="${esc(id)}">${microLabel(label)}<h2>${esc(heading)}</h2>${inner}</section>`;
 }
 
+/** ONE disclosure pattern per surface: the FAQ is the same compact fold. */
 function faqBlock(faqs: Array<{ q: string; a: string }>): string {
-  return `<div class="qh-faq">${faqs
-    .map((f) => `<details><summary>${esc(f.q)}</summary><p>${esc(f.a)}</p></details>`)
+  return `<div class="qh-faq" data-qh-folds>${faqs
+    .map((f) => fold({ label: f.q, bodyHtml: `<p>${esc(f.a)}</p>` }))
     .join('')}</div>`;
 }
 
-/** A verbatim federal quote with its document and date attached. */
+/**
+ * A VERBATIM FEDERAL QUOTE, FOLDED — but folded the right way round.
+ *
+ * The passages on these pages run 300–900 characters each and there are five of
+ * them on `/oversize/federal-limits` alone, which is most of the page's height
+ * before a reader has met a single one of our own sentences. Summary-first says
+ * the CITATION is what must stay visible: a reader has to be able to see which
+ * document is being relied on, and how old it is, without opening anything.
+ * So the citation is the summary and the passage is what folds, with a mono
+ * VERBATIM tag saying what is inside. Nothing leaves the DOM, so the quote is
+ * still indexed and still findable with the browser's own find-in-page once
+ * expanded.
+ */
 function quote(text: string, cite: string): string {
-  return `<blockquote class="qh-quote"><p>${text}</p><cite>${esc(cite)}</cite></blockquote>`;
+  return fold({
+    label: cite,
+    count: 'verbatim',
+    bodyHtml: `<blockquote class="qh-quote"><p>${text}</p></blockquote>`,
+    capped: true,
+  }).replace('class="qh-fold"', 'class="qh-fold qh-fold--quote"');
+}
+
+/** A run of quotes, so the page can offer one expand-all over the lot. */
+function quotes(...items: string[]): string {
+  return `<div class="qh-folds" data-qh-folds>${items.join('')}</div>`;
 }
 
 // ── /oversize/federal-limits ───────────────────────────────────────────────
@@ -129,14 +167,14 @@ export function renderFederalLimits(): string {
     sec(
       'weights',
       'Federal weight limits on the Interstate System',
-      quote(
+      quotes(quote(
         `"Federal weight standards apply to commercial vehicle operations only on the Interstate Highway System, which consists of approximately 50,000 miles of limited access, divided highways that span the Nation. <strong>Off the Interstate Highway System, States may set their own commercial vehicle weight standards.</strong> Federal standards for commercial vehicle maximum weights on the Interstate Highway System are as follows: Single Axle – 20,000 lbs.; Tandem Axle – 34,000 lbs.; GVW – 80,000 lbs."`,
         'Compilation of Existing State Truck Size and Weight Limit Laws, Exhibit 2 — Federal Highway Administration, May 2015. Public domain (17 U.S.C. §105).',
       ) +
         quote(
           `"In addition to Bridge Formula weight limits, Federal law states that single axles are limited to 20,000 pounds, and <strong>axles spaced more than 40 inches and not more than 96 inches apart (tandem axles)</strong> are limited to 34,000 pounds. Gross vehicle weight is limited to 80,000 pounds (23 U.S.C. 127)."`,
           'Bridge Formula Weights, FHWA-HOP-19-028, p. 2 — Federal Highway Administration, August 2019. Public domain.',
-        ) +
+        )) +
         `<p><strong>Note the 40-inch lower bound.</strong> A tandem is defined by a spacing range, not just a maximum — axles closer together than 40 inches are not a tandem under federal law. Our own engine captures the 96-inch (${TANDEM_MAX_SPACING_FT} ft) upper bound and does not yet model the lower one; that is a real edge, it is stated here rather than hidden, and it affects only unusually tight axle groups.</p>`,
     ),
     sec(
@@ -187,7 +225,7 @@ export function renderFederalLimits(): string {
       ) +
         `<p>The 1956 → 1974 → 1982 sequence is why grandfather rights exist at all: states that were already lawfully running heavier were not made to come down.</p>`,
     ),
-    sec('faq', 'Questions', faqBlock(faqs)),
+    sec('faq', 'Questions', faqBlock(faqs), 'Common questions'),
   ].join('');
 
   return hubPage({
@@ -217,7 +255,10 @@ export function renderFederalLimits(): string {
       { id: 'history', label: 'How we got here' },
       { id: 'faq', label: 'Questions' },
     ],
-    bodyHtml: body,
+    bodyHtml:
+      shortVersion(
+        `federal weight limits — ${FEDERAL_SINGLE_AXLE_LIMIT_LBS.toLocaleString('en-US')} lb single axle, ${FEDERAL_TANDEM_AXLE_LIMIT_LBS.toLocaleString('en-US')} lb tandem, ${FEDERAL_GROSS_WEIGHT_LIMIT_LBS.toLocaleString('en-US')} lb gross — bind on the <strong>Interstate System</strong> and nowhere else; off it, a state sets its own. Width on the National Network is fixed at <strong>102 inches</strong>, a floor and a ceiling at once. There is <strong>no federal height limit</strong>. And ${ours.length === 0 ? 'several states' : `${ours.length} of the states we cover`} print statutory weights <em>above</em> the federal figures because of grandfather rights or a compliance clause — which is the trap this page exists for. Every passage below is quoted verbatim from FHWA and folded behind its own citation.`,
+      ) + body,
     dateModified: '2026-09-03',
     jsonLd: [
       jsonLdBreadcrumb([
@@ -346,7 +387,7 @@ export function renderBridgeFormulaExplainer(): string {
        <p>The 56 ft, 9-axle cell settles it: 500 × (63 + 108 + 36) is 103,500 on the nose, an exact multiple of 500 with no rounding decision to make at all, and the table still prints 103,000. No rounding rule produces that. None of the five is an exact tie either, so ties-down does not explain them — and the 52 ft, 9-axle cell <em>is</em> an exact tie, and the table rounds it down correctly. These are typos in a table, not a rule anyone has failed to find.</p>
        <p><strong>We follow the formula.</strong> The disagreement is recorded in our code as a named constant, and a test walks all 265 published cells and expects exactly these five to differ by exactly +500 — so if the table is ever reprinted, the test says which way it moved.</p>`,
     ),
-    sec('faq', 'Questions', faqBlock(faqs)),
+    sec('faq', 'Questions', faqBlock(faqs), 'Common questions'),
   ].join('');
 
   return hubPage({
@@ -376,7 +417,10 @@ export function renderBridgeFormulaExplainer(): string {
       { id: 'errata', label: 'Where the table is wrong' },
       { id: 'faq', label: 'Questions' },
     ],
-    bodyHtml: body,
+    bodyHtml:
+      shortVersion(
+        `the bridge formula is not the whole rule. Three caps sit on top of it — ${FEDERAL_SINGLE_AXLE_LIMIT_LBS.toLocaleString('en-US')} lb per axle, ${FEDERAL_TANDEM_AXLE_LIMIT_LBS.toLocaleString('en-US')} lb for any group spanning ${TANDEM_MAX_SPACING_FT} ft or less, and the vehicle's own gross weight — and omitting any one of them over-permits a real load. The published federal table also disagrees with the federal formula in ${FHWA_TABLE_ERRATA.length} cells; we follow the formula and record the disagreement. <a href="${BRIDGE_TOOL_PATH}">Run it on your own axle layout →</a>`,
+      ) + body,
     dateModified: '2026-09-03',
     jsonLd: [
       jsonLdBreadcrumb([
@@ -452,7 +496,7 @@ export function renderNonDivisible(): string {
          <li><a href="${OSOW_HUB_PATH}/escort-requirements">Does it need a pilot car?</a> — usually the larger number.</li>
        </ul>`,
     ),
-    sec('faq', 'Questions', faqBlock(faqs)),
+    sec('faq', 'Questions', faqBlock(faqs), 'Common questions'),
   ].join('');
 
   return hubPage({
@@ -480,7 +524,10 @@ export function renderNonDivisible(): string {
       { id: 'why', label: 'Why it decides the quote' },
       { id: 'faq', label: 'Questions' },
     ],
-    bodyHtml: body,
+    bodyHtml:
+      shortVersion(
+        `a load is non-divisible if splitting it would compromise the vehicle's intended use, destroy the value of the load or vehicle, or take <strong>more than 8 work hours</strong> to dismantle with appropriate equipment — any one of the three is enough, and the <em>applicant</em> carries the burden of proof on the hours. If the load is divisible, there is no permit to price: the answer is to split it. Both federal passages are quoted verbatim below, behind their own citations.`,
+      ) + body,
     dateModified: '2026-09-03',
     jsonLd: [
       jsonLdBreadcrumb([
@@ -659,10 +706,15 @@ export function renderCommonFigures(asOf: IsoDate): string {
     const link = c.seeAlso
       ? `<p class="qh-meta"><a href="${esc(c.seeAlso.path)}">${esc(c.seeAlso.label)} →</a></p>`
       : '';
+    /* SUMMARY-FIRST, LITERALLY. The circulating claim and the corrected figure
+       — with its citation and both dates — are unconditional. What folds is the
+       MECHANISM: the surcharge statute, the CPI cycle, the dropped supervision
+       fee. A reader who arrived with a wrong number gets the right one without
+       a click; a reader who wants to know why it went wrong opens one. */
     return `<article class="qh-entry" id="${esc(c.id)}">
       <h3>${esc(c.circulating)}</h3>
       ${answer}
-      <p>${esc(c.detail)}</p>
+      ${fold({ label: 'What the documents actually say, and why the figure moved', bodyHtml: `<p>${esc(c.detail)}</p>` })}
       ${link}
     </article>`;
   }).join('');
@@ -690,11 +742,23 @@ export function renderCommonFigures(asOf: IsoDate): string {
     sec(
       'intro',
       'How to read this page',
-      `<p>Each entry states a figure that is in circulation, then gives what the primary documents actually say — with the document, its own revision date, and the date we read it. Nothing here names or links to another site, and nothing here imputes intent: a number can circulate for years without anyone being at fault, and the useful thing is the statute, not the attribution.</p>
-       <p>Where a figure turns out to be a genuine disagreement between two <em>official</em> documents rather than an error, it is marked as such and shows both. That distinction is the difference between authority and embarrassment, and there are entries below on both sides of it.</p>`,
+      `<p>Each entry states a figure that is in circulation, then gives what the primary documents actually say — with the document, its own revision date, and the date we read it.</p>
+       ${folds([
+         {
+           label: 'Why nothing here is attributed',
+           bodyHtml:
+             '<p>Nothing here names or links to another site, and nothing here imputes intent: a number can circulate for years without anyone being at fault, and the useful thing is the statute, not the attribution.</p>',
+         },
+         {
+           label: 'Errors versus genuine disagreements',
+           bodyHtml:
+             '<p>Where a figure turns out to be a genuine disagreement between two <em>official</em> documents rather than an error, it is marked as such and shows both. That distinction is the difference between authority and embarrassment, and there are entries below on both sides of it.</p>',
+         },
+       ])}`,
+      'How to read this',
     ),
-    sec('entries', `${CORRECTIONS.length} figures, against the documents`, entries),
-    sec('faq', 'Questions', faqBlock(faqs)),
+    sec('entries', `${CORRECTIONS.length} figures, against the documents`, `<div data-qh-folds>${entries}</div>`, 'The figures'),
+    sec('faq', 'Questions', faqBlock(faqs), 'Common questions'),
   ].join('');
 
   return hubPage({
@@ -711,7 +775,10 @@ export function renderCommonFigures(asOf: IsoDate): string {
       { id: 'entries', label: 'The figures' },
       { id: 'faq', label: 'Questions' },
     ],
-    bodyHtml: body,
+    bodyHtml:
+      shortVersion(
+        `${CORRECTIONS.length} figures that circulate widely in oversize and overweight work are set against the primary document that governs them. Each entry shows the circulating claim, the figure the state's own document carries, and that document's revision date beside the date we read it — all of it visible without opening anything. The fold under each one holds the <em>mechanism</em>: the surcharge statute, the inflation cycle or the dropped line item that produced the gap.`,
+      ) + body,
     dateModified: prov.lastRetrieved,
     jsonLd: [
       jsonLdBreadcrumb([
