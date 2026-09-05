@@ -36,9 +36,33 @@
  */
 import type { IsoDate, SourceDoc } from './provenance.js';
 import { citeOf, isInEffect } from './provenance.js';
+import type {
+  ContextCondition,
+  ContextTrace,
+  MoveContext,
+  RouteClass,
+  RouteVocabulary,
+  Tri,
+} from './routeContext.js';
+import { evaluateContextCondition } from './routeContext.js';
 
-/** Three-valued truth. `'unknown'` is a first-class answer, not an error. */
-export type Tri = true | false | 'unknown';
+/**
+ * Three-valued truth, and the road-class vocabulary, now live in
+ * `routeContext.ts` and are re-exported here so every existing importer is
+ * untouched. They moved because `provenance.ts` needs them too — a single
+ * SOURCED ROW can now be confined to a road class or a time of day — and
+ * leaving them here would have made the two modules import each other.
+ */
+export type {
+  Tri,
+  RouteClass,
+  SharedRouteClass,
+  JurisdictionRouteClass,
+  RouteClassDefinition,
+  RouteVocabulary,
+  MoveContext,
+  ContextCondition,
+} from './routeContext.js';
 
 /**
  * A measurement an escort rule can test. Units are baked into the name so a
@@ -70,6 +94,22 @@ export type Tri = true | false | 'unknown';
  */
 export type Measure =
   | 'widthIn'
+  /**
+   * MINNESOTA MEASURES WIDTH TWICE, IN ONE SENTENCE, AND A SINGLE `widthIn`
+   * CANNOT HOLD IT.
+   *
+   * Minn. Stat. § 169.812 subd. 2 sets the escort threshold at 15 feet AT THE
+   * BOTTOM of the load and 16 feet AT THE TOP. A tank 14 ft across the deck and
+   * 17 ft across the shell needs escorts in Minnesota and reports none against
+   * one width — and picking either figure as "the" width is wrong in one
+   * direction for half the loads that care.
+   *
+   * BOTH ARE OPTIONAL AND NEITHER FALLS BACK TO `widthIn`. A load whose profile
+   * is not stated leaves these `unknown`, which is a review, where deriving them
+   * from the overall width would invent a measurement the shipper never gave.
+   */
+  | 'widthAtBottomIn'
+  | 'widthAtTopIn'
   | 'heightIn'
   | 'overallLengthIn'
   | 'trailerLengthIn'
@@ -249,62 +289,33 @@ export type Measure =
  * know to pass. An `urban` street answers NEITHER definition and correctly falls
  * through to `unknown` rather than to "no escort" — see `mississippi.ts`.
  */
-export type RouteClass =
-  | 'interstate'
-  | 'divided'
-  | 'two-lane'
-  | 'urban'
-  /** Two or more lanes each way with NO physical median divider. */
-  | 'multilane-undivided'
-  /** OAC 730:50-5-18's own class: a two-lane highway with paved shoulders. */
-  | 'ok-super-two-lane'
-  /** FAC 14-26's "limited access facility" — wider than `interstate`. */
-  | 'fl-limited-access'
-  /** Caltrans pilot-car map: multilane freeways and expressways. */
-  | 'ca-yellow'
-  /** Caltrans pilot-car map: two-lane, 12 ft lanes with a 4 ft or wider shoulder. */
-  | 'ca-green'
-  /** Caltrans: two-lane, 12 ft lanes with a 0–4 ft shoulder, or multilane with substandard lanes. */
-  | 'ca-blue'
-  /** Caltrans: two-lane with 11 ft or 10 ft lanes. */
-  | 'ca-brown'
-  /** Caltrans: restricted route — movement governed by the Red Route Summary Table. */
-  | 'ca-red'
-  /** CDOT map: RED segment, two lanes. Anything over 8'6" needs a Chapter 6 Special. */
-  | 'co-red-two-lane'
-  | 'co-red-four-lane'
-  /** CDOT map: BLUE segment — the tightest colour that still takes a pilot car. */
-  | 'co-blue-two-lane'
-  | 'co-blue-four-lane'
-  | 'co-yellow-two-lane'
-  | 'co-yellow-four-lane'
-  | 'co-green-two-lane'
-  | 'co-green-four-lane'
-  /** CDOT map: WHITE segment — the most permissive, no escort until 15 ft. */
-  | 'co-white-two-lane'
-  | 'co-white-four-lane'
-  /** 603 KAR 5:066 classification: Class "AAA" — 80,000 lb, and the interstates. */
-  | 'ky-class-aaa'
-  /** 603 KAR 5:066 classification: Class "AA" — 62,000 lb. */
-  | 'ky-class-aa'
-  /** 603 KAR 5:066 classification: Class "A" — 44,000 lb, barely half of AAA. */
-  | 'ky-class-a'
-  /**
-   * 1680-07-01-.06(2): a Tennessee two-lane highway whose minimum pavement width
-   * EXCLUDING paved shoulders is under 24 ft. One front escort over 10 ft wide.
-   */
-  | 'tn-two-lane-under-24ft-pavement'
-  /** The same road with 24 ft or more of pavement — no escort until 12 ft 6 in. */
-  | 'tn-two-lane-24ft-pavement-or-more'
-  /**
-   * MCL 257.717(7) / 257.719(3): a Michigan highway the state transportation
-   * department, a county road commission or a local authority HAS DESIGNATED.
-   * 102 in wide, a 53 ft semitrailer, 65 ft truck-and-trailer, and the 16,000 lb
-   * tandem allowance of MCL 257.722(2)-(3).
-   */
-  | 'mi-designated'
-  /** The same road undesignated: 96 in wide, a 50 ft semitrailer, 59 ft combination. */
-  | 'mi-non-designated';
+/*
+ * PHASE 10 STOPPED ADDING MEMBERS HERE, AND THAT IS THE CHANGE.
+ * -------------------------------------------------------------------------
+ * Every phase above widened ONE shared union, and it worked for nine of them
+ * because each new state's classification could be given a private prefix and
+ * dropped in beside everyone else's. The tenth broke it, and not at the margin:
+ *
+ *   A FOUR-LANE UNDIVIDED ROAD IS "UNDIVIDED" IN NEBRASKA AND "FOUR LANES OR
+ *   MORE" IN KANSAS. Same road. Kansas puts the escort in front, Nebraska puts
+ *   it behind. Both readings are published, both are correct, and no single
+ *   member of a shared union can be true for one and false for the other.
+ *
+ * A prefix cannot fix that, because the problem is not naming — it is that a
+ * caller passes ONE route class for a move and the two states ask different
+ * questions of it. So the vocabulary became per-jurisdiction DATA
+ * (`RouteVocabulary` in `routeContext.ts`): each state declares its own classes
+ * under its own published names with its own quotes, and a class the state does
+ * not publish evaluates `unknown` rather than false — which is the guarantee
+ * this union never made and could not make.
+ *
+ * THE MEMBERS THIS PHASE INHERITED STAY EXACTLY AS THEY WERE. `ca-green`, `ky-class-aa`,
+ * `co-blue-two-lane` and the rest are the same idea in an older spelling; they
+ * are passed today by callers, by stored quotes and by public pages, and
+ * renaming them would break all three to express nothing new. They are now
+ * `SharedRouteClass` in `routeContext.ts` and this name re-exports them.
+ */
+
 
 export type EscortCondition =
   /** measure > value */
@@ -373,7 +384,33 @@ export type EscortCondition =
    * the vehicle's lighting". Always `unknown` unless a dispatcher has
    * answered it via `EscortContext.subjectiveAnswers[key]`.
    */
-  | { kind: 'subjective'; key: string; question: string };
+  | { kind: 'subjective'; key: string; question: string }
+  /**
+   * A predicate over the MOVE rather than over the load — the road class in the
+   * jurisdiction's own vocabulary, a named route segment, the time of day, the
+   * day of the week, direction of travel, darkness, a holiday, the season, the
+   * vehicle's registered weight or its configuration. See `ContextCondition`.
+   *
+   * IT IS ONE LEAF RATHER THAN TEN NEW KINDS ON PURPOSE. The same language
+   * confines a single SOURCED ROW in `provenance.ts`, so it has to live in a
+   * module both files can import; folding its members into this union would
+   * have meant maintaining two copies of a grammar whose whole job is to be
+   * evaluated identically in both places. Every walker over `EscortCondition`
+   * that does not know this kind treats it as opaque and unchanged, which is
+   * what the pre-existing `default:` arms already do.
+   *
+   * ARIZONA IS THE STATE THAT MADE THIS NECESSARY, and its finding is a
+   * NEGATIVE one: A.A.C. R17-6-305, the section actually titled "Escort
+   * Vehicles", publishes NO numeric threshold at all. The only published
+   * numbers are in R17-6-402(D), which applies "from 3:00 a.m. until one-half
+   * hour before sunrise", and R17-6-404, which applies on eleven named
+   * metropolitan segments during weekday curfew hours. So a daytime 13 ft load
+   * on I-10 HAS NO PUBLISHED ESCORT REQUIREMENT IN ARIZONA. That is a finding
+   * to encode, not a gap to paper over with a width rule the state never wrote
+   * — and encoding it needs a time condition, or the choice collapses to
+   * inventing a requirement or dropping a real one.
+   */
+  | { kind: 'context'; of: ContextCondition };
 
 /** What a firing rule requires. Absent fields mean "this rule says nothing". */
 export interface EscortOutcome {
@@ -414,6 +451,95 @@ export interface EscortOutcome {
    * the exclusion stated.
    */
   advisory?: string;
+  /**
+   * THE RULE FIRES, THE REQUIREMENT IS REAL, AND THE SOURCE PUBLISHES NO
+   * NUMBER.
+   *
+   * This is a THIRD outcome, and it is not either of the two that already
+   * existed. It is not `unknown` — the condition resolved, the state does
+   * require escorts on this move, and saying "we cannot tell whether escorts
+   * are needed" would be false. It is not a count — inventing one would be
+   * worse. `manualReview` is about the RULE being unusable; this is about the
+   * rule being perfectly usable and its ANSWER not being a number.
+   *
+   * Three states publish outcomes of this shape and they are not marginal:
+   *
+   *   - WISCONSIN. Trans 254.16(2): "All loads exceeding 16 feet in width shall
+   *     have one or more properly equipped escorts." Not one. Not two. The
+   *     state's only published dimensional escort trigger, and it states a
+   *     floor and nothing else.
+   *   - KANSAS. K.A.R. 36-1-38(d)(9) stations an escort "at side road
+   *     intersections" for a large structure — a count set by the ROUTE, not by
+   *     the load, unbounded, and not derivable from any dimension.
+   *   - MISSISSIPPI. Three rules read "a front AND/OR rear escort", which
+   *     settles the count at one and leaves the position genuinely open.
+   *
+   * `atLeast` is a FLOOR THAT IS BILLED, not a guess: "one or more" is at least
+   * one escort's worth of money and quoting zero would be wrong in the
+   * expensive direction. The move still goes to review, so the floor is a lower
+   * bound on a number a human will finish.
+   */
+  reviewRequired?: EscortReviewRequired;
+}
+
+/** Why a firing rule's requirement cannot be reduced to a count. */
+export interface EscortReviewRequired {
+  /**
+   *   - `countNotPublished`  — the source requires escorts and states no number
+   *     ("one or more properly equipped escorts").
+   *   - `countDependsOnRoute` — the number is a function of the route, not the
+   *     load (an escort at each side-road intersection).
+   *   - `positionNotPublished` — the count is settled and front-versus-rear is
+   *     not ("a front and/or rear escort").
+   */
+  kind: 'countNotPublished' | 'countDependsOnRoute' | 'positionNotPublished';
+  /** A floor the source itself states. "One or more" is 1. Absent = none stated. */
+  atLeast?: number;
+  /** What decides the count, where the source says. 'side-road intersections'. */
+  countDependsOn?: string;
+  /** The source's own words. Required — this is the audit trail. */
+  quote: string;
+}
+
+/**
+ * HOW ONE JURISDICTION COMBINES THE ESCORT COUNTS OF SEVERAL FIRING RULES.
+ *
+ * Phase 1 chose max-per-position-then-sum and it is right for Texas: a load
+ * over-width (one escort) and over-height (one escort with a pole) needs one
+ * car carrying a pole, so counts MAX rather than SUM — but a rule demanding a
+ * front car and a rule demanding a rear car want two different vehicles, so
+ * positions ADD. That has been the global rule and it was never sourced,
+ * because with one state there was nothing to disagree with it.
+ *
+ * UTAH DISAGREES, IN WRITING. R909-2-14(1)(b) takes "the most stringent
+ * requirement" where more than one applies — the single heaviest published
+ * requirement governs, and the others are satisfied by it rather than added to
+ * it. On a load that trips two of Utah's rows the two readings differ by a
+ * whole pilot car, which at Utah distances is real money.
+ *
+ * So combination is a PROPERTY OF THE JURISDICTION, recorded from its own
+ * words, exactly like `CombinedFeeRule` on the fee side. Absent means
+ * `perPositionMax`, which is what every jurisdiction on file gets and what the
+ * engine has always done.
+ */
+export interface EscortCountCombination {
+  /**
+   *   - `perPositionMax` — front and rear each take the MAXIMUM any single rule
+   *     asks for, then add. The Phase 1 default.
+   *   - `mostStringent` — the single most demanding rule governs outright; no
+   *     rule's requirement is added to another's.
+   */
+  kind: 'perPositionMax' | 'mostStringent';
+  /** What the source actually says. Required — this is the audit trail. */
+  explanation: string;
+}
+
+/** Same reasoning as `combinedFeeRulesEqual`: the MODEL is the claim. */
+export function escortCountCombinationsEqual(
+  a: EscortCountCombination,
+  b: EscortCountCombination,
+): boolean {
+  return a.kind === b.kind;
 }
 
 export interface EscortRule {
@@ -429,8 +555,25 @@ export interface EscortRule {
   effectiveTo: IsoDate | null;
 }
 
-export interface EscortContext {
+/**
+ * What an escort rule is evaluated against.
+ *
+ * It EXTENDS `MoveContext`, so every field the new context language reads —
+ * road class, named segments, time of day, day of week, direction, darkness,
+ * holiday, season, registered weight, vehicle configuration, driver credential
+ * — arrives here without this interface restating any of them. `routeClass` and
+ * `subjectiveAnswers` moved to `MoveContext` for the same reason and are still
+ * spelled and passed exactly as before.
+ */
+export interface EscortContext extends MoveContext {
   widthIn?: number;
+  /**
+   * Width at the bottom and at the top of the load. See `Measure` — Minnesota
+   * sets two different escort thresholds against them in one sentence. Absent
+   * means absent; neither is derived from `widthIn`.
+   */
+  widthAtBottomIn?: number;
+  widthAtTopIn?: number;
   heightIn?: number;
   overallLengthIn?: number;
   trailerLengthIn?: number;
@@ -442,13 +585,14 @@ export interface EscortContext {
   frontOverhangIn?: number;
   rearOverhangIn?: number;
   grossWeightLbs?: number;
-  routeClass?: RouteClass;
   /**
-   * Dispatcher answers to `subjective` conditions, keyed by the condition's
-   * `key`. This is how a judgement call becomes decidable WITHOUT the engine
-   * pretending to make it: a human answers, we record it, the rule evaluates.
+   * The jurisdiction's own road vocabulary, when it declares one.
+   *
+   * This is what makes a `routeClass` the state does not publish resolve to
+   * `unknown` instead of `false`. Absent — which is every jurisdiction on file —
+   * means any class the caller names is taken at face value, exactly as before.
    */
-  subjectiveAnswers?: Record<string, boolean>;
+  routeVocabulary?: RouteVocabulary;
 }
 
 export interface AppliedRule {
@@ -479,6 +623,15 @@ export interface EscortEvaluation {
   applied: AppliedRule[];
   /** Rules whose condition could not be decided — the honesty channel. */
   undecided: UndecidedRule[];
+  /**
+   * Rules that DID fire and whose requirement is not a number. OPTIONAL and
+   * omitted entirely when there are none, so a result from a jurisdiction that
+   * publishes no such rule is byte-identical to one from before this existed.
+   *
+   * `totalEscorts` carries any floor these state, and `requiresManualReview` is
+   * set — the number is a lower bound a human finishes, never the answer.
+   */
+  reviewRequired?: Array<EscortReviewRequired & { ruleId: string; description: string }>;
   warnings: string[];
   requiresManualReview: boolean;
 }
@@ -490,6 +643,8 @@ function measureOf(ctx: EscortContext, m: Measure): number | undefined {
 /** Human name for a measure, for warning text. */
 const MEASURE_LABEL: Record<Measure, string> = {
   widthIn: 'width',
+  widthAtBottomIn: 'width at the bottom of the load',
+  widthAtTopIn: 'width at the top of the load',
   heightIn: 'height',
   overallLengthIn: 'overall length',
   trailerLengthIn: 'trailer length',
@@ -531,10 +686,14 @@ function triAtLeast(values: Tri[], count: number): Tri {
   return 'unknown';
 }
 
-/** Why a condition came back `unknown`, for the warning text. */
-interface EvalTrace {
-  missing: Set<string>;
-}
+/**
+ * Why a condition came back `unknown`, for the warning text.
+ *
+ * Structurally identical to `ContextTrace` on purpose — one rule's missing
+ * inputs are one list whether the fact it wanted was a dimension or the time of
+ * day, so the context evaluator writes into this same set.
+ */
+type EvalTrace = ContextTrace;
 
 function evaluateCondition(
   cond: EscortCondition,
@@ -605,6 +764,12 @@ function evaluateCondition(
       }
       return answer;
     }
+    case 'context':
+      // `EvalTrace` and `ContextTrace` are the same shape by construction — a
+      // set of the facts that were wanted — so the context evaluator writes
+      // straight into this rule's trace and its missing inputs are named in the
+      // same warning as a missing dimension would be.
+      return evaluateContextCondition(cond.of, ctx, ctx.routeVocabulary, trace);
     default: {
       // Exhaustiveness: a new condition kind must be handled explicitly, not
       // silently treated as false.
@@ -634,6 +799,7 @@ export function evaluateEscortRules(
   rules: EscortRule[],
   ctx: EscortContext,
   asOf: IsoDate,
+  options: { combination?: EscortCountCombination } = {},
 ): EscortEvaluation {
   const active = rules.filter((r) => isInEffect(r, asOf));
   const byId = new Map(active.map((r) => [r.id, r]));
@@ -674,8 +840,18 @@ export function evaluateEscortRules(
   const applied: AppliedRule[] = [];
   const undecided: UndecidedRule[] = [];
   const warnings: string[] = [];
+  const reviewRequired: Array<
+    EscortReviewRequired & { ruleId: string; description: string }
+  > = [];
 
   let bareEscorts = 0;
+  // The most stringent SINGLE rule, for a jurisdiction that combines that way.
+  // Tracked alongside the per-position maxima rather than instead of them, so
+  // the two readings are computed from the same pass and the choice between
+  // them is one line at the end.
+  let mostStringentTotal = 0;
+  let mostStringentFront = 0;
+  let mostStringentRear = 0;
 
   const out: EscortEvaluation = {
     totalEscorts: 0,
@@ -724,6 +900,12 @@ export function evaluateEscortRules(
     if (t.escorts !== undefined) bareEscorts = Math.max(bareEscorts, t.escorts);
     if (t.front !== undefined) out.front = Math.max(out.front, t.front);
     if (t.rear !== undefined) out.rear = Math.max(out.rear, t.rear);
+    const ruleTotal = Math.max(t.escorts ?? 0, (t.front ?? 0) + (t.rear ?? 0));
+    if (ruleTotal > mostStringentTotal) {
+      mostStringentTotal = ruleTotal;
+      mostStringentFront = t.front ?? 0;
+      mostStringentRear = t.rear ?? 0;
+    }
     if (t.policeFront !== undefined) {
       out.policeFront = Math.max(out.policeFront, t.policeFront);
     }
@@ -741,9 +923,37 @@ export function evaluateEscortRules(
     }
     // An advisory states a real exclusion WITHOUT invalidating the price.
     if (t.advisory !== undefined) warnings.push(t.advisory);
+    if (t.reviewRequired !== undefined) {
+      const rr = t.reviewRequired;
+      reviewRequired.push({ ...rr, ruleId: rule.id, description: rule.description });
+      out.requiresManualReview = true;
+      // The floor is BILLED. "One or more escorts" costs at least one escort,
+      // and a quote that shows zero beside a firing escort rule is wrong in the
+      // direction that costs the customer at the scale house.
+      if (rr.atLeast !== undefined) bareEscorts = Math.max(bareEscorts, rr.atLeast);
+      const detail =
+        rr.kind === 'countDependsOnRoute'
+          ? `the number of escorts is set by ${rr.countDependsOn ?? 'the route'} rather than by the load's dimensions, so it cannot be computed from a quote`
+          : rr.kind === 'positionNotPublished'
+            ? 'the source does not say whether the escort rides in front or behind, so the position is not quoted'
+            : 'the source requires escorts and publishes no count';
+      warnings.push(
+        `${rule.description}: ${detail} — "${rr.quote}"${rr.atLeast !== undefined ? ` A floor of ${rr.atLeast} is billed; the final count must be confirmed with the permitting office.` : ' The count must be confirmed with the permitting office.'} Source: ${citeOf(rule.source)}.`,
+      );
+    }
   }
 
-  out.totalEscorts = Math.max(bareEscorts, out.front + out.rear);
+  // THE COMBINATION RULE IS THE JURISDICTION'S, NOT OURS. Absent = the Phase 1
+  // reading, which every jurisdiction on file uses and which this expression is
+  // unchanged from.
+  if (options.combination?.kind === 'mostStringent') {
+    out.front = mostStringentFront;
+    out.rear = mostStringentRear;
+    out.totalEscorts = Math.max(bareEscorts, mostStringentTotal);
+  } else {
+    out.totalEscorts = Math.max(bareEscorts, out.front + out.rear);
+  }
+  if (reviewRequired.length > 0) out.reviewRequired = reviewRequired;
 
   for (const id of missingRefs) {
     warnings.push(

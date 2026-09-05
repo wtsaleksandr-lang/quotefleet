@@ -39,14 +39,18 @@ import {
   type Resolution,
   type SourceDoc,
   type Sourced,
+  type SourcedContext,
 } from './provenance.js';
 import {
   evaluateEscortRules,
   formatFtIn,
   type EscortContext,
   type EscortEvaluation,
+  type EscortCountCombination,
   type RouteClass,
 } from './escortRules.js';
+import type { MoveContext, RouteVocabulary } from './routeContext.js';
+import { escortCountCombinationsEqual } from './escortRules.js';
 import {
   checkBridgeFormula,
   type Axle,
@@ -90,6 +94,16 @@ import {
   type PerMileRate,
   type Threshold,
   type WeightBand,
+  perMilePerAxleGroupAmount,
+  perMilePerAxleGroupRatesEqual,
+  permitEnvelopesEqual,
+  publishedAbsencesEqual,
+  zeroFeePermitsEqual,
+  type OverweightAxleGroup,
+  type PerMilePerAxleGroupRate,
+  type PermitEnvelope,
+  type PublishedAbsence,
+  type ZeroFeePermit,
 } from './types.js';
 import {
   absorbedTotalUsd,
@@ -99,8 +113,15 @@ import {
   type AbsorbedFeeConflict,
 } from './materiality.js';
 import { osowRulesFor } from './jurisdictions/index.js';
-import { seasonalAdvisoryFor, type SeasonalAdvisory } from './seasonal/advisory.js';
+import {
+  activeRestrictions,
+  isStale,
+  seasonalAdvisoryFor,
+  type SeasonalAdvisory,
+} from './seasonal/advisory.js';
 import type { SeasonalContext } from './seasonal/types.js';
+import type { SeasonalRestrictionState } from './routeContext.js';
+import { evaluateContextCondition } from './routeContext.js';
 
 /**
  * Re-exported so a caller pricing an OS/OW move never has to reach past the
@@ -116,9 +137,33 @@ export {
 export type { SeasonalAdvisory } from './seasonal/advisory.js';
 export type { SeasonalContext, StateSeasonalSnapshot } from './seasonal/types.js';
 
-export interface OsowLoad {
+/**
+ * The load, plus the move.
+ *
+ * It EXTENDS `MoveContext`, so `routeClass` and `subjectiveAnswers` are spelled
+ * and passed exactly as they always were, and the facts a state can also
+ * condition on — named segments, time of day, day of week, direction of travel,
+ * darkness, holidays, the seasonal-restriction state, the vehicle's REGISTERED
+ * weight, its steering configuration, the driver's credential — arrive with
+ * them instead of being bolted on one at a time. Every one is optional, and an
+ * absent one is `unknown` rather than a permissive default. See
+ * `routeContext.ts`.
+ */
+export interface OsowLoad extends MoveContext {
   grossWeightLbs?: number;
   widthIn?: number;
+  /**
+   * Width at the BOTTOM and at the TOP of the load, where they differ.
+   *
+   * Minn. Stat. § 169.812 subd. 2 sets the escort threshold at 15 ft at the
+   * bottom and 16 ft at the top IN ONE SENTENCE. A tank 14 ft across the deck
+   * and 17 ft across the shell needs escorts in Minnesota and a single
+   * `widthIn` reports none. Neither is derived from `widthIn` — a load whose
+   * profile was not stated leaves them unknown, which is a review rather than a
+   * guess about the shape of somebody else's freight.
+   */
+  widthAtBottomIn?: number;
+  widthAtTopIn?: number;
   heightIn?: number;
   overallLengthIn?: number;
   trailerLengthIn?: number;
@@ -146,8 +191,16 @@ export interface OsowLoad {
    * unpriced-at-zero. See `WeightBand.perAxleUsd`.
    */
   axleCount?: number;
-  routeClass?: RouteClass;
-  subjectiveAnswers?: Record<string, boolean>;
+  /**
+   * Overweight axle GROUPS, where the caller can state them.
+   *
+   * Minnesota's overweight fee is the sum of a per-mile cost factor for each
+   * overweight group, times the distance — a function of the axle
+   * configuration, not of gross weight. `axles` can produce these when the full
+   * layout is known; this field lets a caller that knows its groups but not
+   * every axle's position state them directly. See `PerMilePerAxleGroupRate`.
+   */
+  overweightAxleGroups?: OverweightAxleGroup[];
   /** Miles inside this jurisdiction. Phase 2 — see MILEAGE_SPLIT_NOTE. */
   milesInJurisdiction?: number;
 }
@@ -433,15 +486,65 @@ export function calculateOsowForJurisdiction(
    */
   const axleCount = load.axleCount ?? load.axles?.length;
 
+  /**
+   * ── THE MOVE CONTEXT, RESOLVED ONCE ──────────────────────────────────────
+   *
+   * A jurisdiction may declare its own road vocabulary and may confine
+   * individual SOURCED ROWS to part of itself (a road class, a named segment, a
+   * time of day, a season, a registered weight, a steering configuration). Both
+   * are read here, once, and handed to every resolution below through `resolve`
+   * — so a conditioned row is filtered the same way whether it is a legal
+   * limit, a fee, a permit envelope or an escort rule.
+   *
+   * NOTHING ON FILE DECLARES EITHER. `vocabulary` is `undefined` and no row
+   * carries `appliesWhen` for all 24 encoded jurisdictions, so `resolveSourced`
+   * takes its fast path and every resolution is byte-identical to the one it
+   * produced before this block existed. `scripts/osow-behaviour-snapshot.ts`
+   * exists to check that rather than to assert it.
+   */
+  const vocabularyRes = resolveIfPresent<RouteVocabulary>(
+    `${rules.code} road classification`,
+    rules.routeVocabulary,
+    asOf,
+    (a, b) => a.name === b.name,
+  );
+  if (vocabularyRes !== null) {
+    pushSources(sources, vocabularyRes);
+    warnings.push(...vocabularyRes.warnings);
+    if (vocabularyRes.requiresManualReview) requiresManualReview = true;
+  }
+  const vocabulary = vocabularyRes?.value ?? undefined;
+  const sourcedContext: SourcedContext = {
+    move: load as MoveContext,
+    ...(vocabulary === undefined ? {} : { vocabulary }),
+  };
+  /** `resolveSourced`, with this move's context already applied. */
+  const resolve = <T>(
+    field: string,
+    candidates: Sourced<T>[],
+    at: IsoDate,
+    equals?: (a: T, b: T) => boolean,
+  ): Resolution<T> => resolveSourced(field, candidates, at, equals, sourcedContext);
+  /** `resolveIfPresent`, likewise. */
+  const resolveHere = <T>(
+    field: string,
+    candidates: Sourced<T>[] | undefined,
+    at: IsoDate,
+    equals?: (a: T, b: T) => boolean,
+  ): Resolution<T> | null =>
+    candidates === undefined || candidates.length === 0
+      ? null
+      : resolveSourced(field, candidates, at, equals, sourcedContext);
+
   // ── 1. Legal limits: is a permit needed at all? ────────────────────────
-  const widthLimit = resolveSourced(`${rules.name} legal width`, rules.legalLimits.widthIn, asOf);
-  const heightLimit = resolveSourced(`${rules.name} legal height`, rules.legalLimits.heightIn, asOf);
+  const widthLimit = resolve(`${rules.name} legal width`, rules.legalLimits.widthIn, asOf);
+  const heightLimit = resolve(`${rules.name} legal height`, rules.legalLimits.heightIn, asOf);
   /**
    * KPRA is OPTIONAL and silent when absent, exactly like overhang and overall
    * length: a state that publishes no kingpin limit holds no row and is not
    * warned about a rule it does not have.
    */
-  const kpraLimit = resolveIfPresent(
+  const kpraLimit = resolveHere(
     `${rules.name} legal kingpin-to-rearmost-axle distance`,
     rules.legalLimits.kingpinToRearAxleIn,
     asOf,
@@ -470,7 +573,7 @@ export function calculateOsowForJurisdiction(
     load.kingpinToRearAxleIn !== undefined;
   const lengthLimit = trailerLengthAnsweredByKpra
     ? null
-    : resolveSourced(`${rules.name} legal trailer length`, rules.legalLimits.trailerLengthIn, asOf);
+    : resolve(`${rules.name} legal trailer length`, rules.legalLimits.trailerLengthIn, asOf);
   /**
    * Overhang limits are OPTIONAL for the same reason overall length is: Ohio,
    * Pennsylvania and Indiana publish none, regulating overhang through flagging
@@ -478,9 +581,9 @@ export function calculateOsowForJurisdiction(
    * warn — on every quote in three states — about a limit those states do not
    * impose. Their real overhang rules are in `escortRules` and still fire.
    */
-  const frontOverhangLimit = resolveIfPresent(`${rules.name} legal front overhang`, rules.legalLimits.frontOverhangIn, asOf);
-  const rearOverhangLimit = resolveIfPresent(`${rules.name} legal rear overhang`, rules.legalLimits.rearOverhangIn, asOf);
-  const grossLimit = resolveSourced(`${rules.name} legal gross weight`, rules.legalLimits.grossWeightLbs, asOf);
+  const frontOverhangLimit = resolveHere(`${rules.name} legal front overhang`, rules.legalLimits.frontOverhangIn, asOf);
+  const rearOverhangLimit = resolveHere(`${rules.name} legal rear overhang`, rules.legalLimits.rearOverhangIn, asOf);
+  const grossLimit = resolve(`${rules.name} legal gross weight`, rules.legalLimits.grossWeightLbs, asOf);
   /**
    * Overall combination length is OPTIONAL, and its absence must stay silent.
    * Texas's general permit turns on the semitrailer length, so Phase 1 holds
@@ -491,7 +594,7 @@ export function calculateOsowForJurisdiction(
    * the data we hold", which is a different claim from "we looked and found
    * nothing", and only the latter deserves a warning.
    */
-  const overallLengthLimit = resolveIfPresent(
+  const overallLengthLimit = resolveHere(
     `${rules.name} legal overall combination length`,
     rules.legalLimits.overallLengthIn,
     asOf,
@@ -730,7 +833,7 @@ export function calculateOsowForJurisdiction(
    * and clear ones it does. See `StateBridgeTable`.
    */
   let stateBridge: StateBridgeTableResult | undefined;
-  const stateBridgeRes = resolveIfPresent<StateBridgeTable>(
+  const stateBridgeRes = resolveHere<StateBridgeTable>(
     `${rules.name} state bridge table`,
     rules.stateBridgeTable,
     asOf,
@@ -792,7 +895,7 @@ export function calculateOsowForJurisdiction(
   const superloadWeight =
     rules.superload.grossWeight === undefined
       ? null
-      : resolveSourced<Threshold>(
+      : resolve<Threshold>(
           `${rules.code} superload gross-weight threshold`,
           rules.superload.grossWeight,
           asOf,
@@ -858,7 +961,7 @@ export function calculateOsowForJurisdiction(
     ['overall length', load.overallLengthIn, rules.superload.overallLengthIn],
   ];
   for (const [label, measurement, candidates] of dimensionalSuperloadChecks) {
-    const res = resolveIfPresent<Threshold>(
+    const res = resolveHere<Threshold>(
       `${rules.code} superload ${label} threshold`,
       candidates,
       asOf,
@@ -908,7 +1011,7 @@ export function calculateOsowForJurisdiction(
   }
 
   // The trigger a gross-weight-only check misses: heavy load, short trailer.
-  const shortSpacing = resolveSourced(
+  const shortSpacing = resolve(
     `${rules.code} short-axle-spacing superload trigger`,
     rules.superload.shortSpacing,
     asOf,
@@ -939,9 +1042,9 @@ export function calculateOsowForJurisdiction(
   // ── 4. Route inspection triggers (incl. the unresolved height conflict) ─
   let routeInspectionRequired: boolean | null = false;
   const inspectionChecks: Array<[string, number | undefined, Resolution<Threshold>]> = [
-    ['width', load.widthIn, resolveSourced(`${rules.code} route-inspection width threshold`, rules.routeInspection.widthIn, asOf, thresholdsEqual)],
-    ['height', load.heightIn, resolveSourced(`${rules.code} route-inspection height threshold`, rules.routeInspection.heightIn, asOf, thresholdsEqual)],
-    ['length', load.overallLengthIn, resolveSourced(`${rules.code} route-inspection length threshold`, rules.routeInspection.lengthIn, asOf, thresholdsEqual)],
+    ['width', load.widthIn, resolve(`${rules.code} route-inspection width threshold`, rules.routeInspection.widthIn, asOf, thresholdsEqual)],
+    ['height', load.heightIn, resolve(`${rules.code} route-inspection height threshold`, rules.routeInspection.heightIn, asOf, thresholdsEqual)],
+    ['length', load.overallLengthIn, resolve(`${rules.code} route-inspection length threshold`, rules.routeInspection.lengthIn, asOf, thresholdsEqual)],
   ];
 
   for (const [label, measurement, res] of inspectionChecks) {
@@ -1003,10 +1106,71 @@ export function calculateOsowForJurisdiction(
     frontOverhangIn: load.frontOverhangIn ?? 0,
     rearOverhangIn: load.rearOverhangIn ?? 0,
     ...(load.grossWeightLbs === undefined ? {} : { grossWeightLbs: load.grossWeightLbs }),
+    /**
+     * The two Minnesota widths are spread like every other real measurement —
+     * absent means absent. Neither falls back to `widthIn`: a load whose
+     * profile was not stated leaves § 169.812 subd. 2 undecided, which is a
+     * review, where substituting the overall width would answer the state's
+     * question with a number the shipper never gave. See `Measure`.
+     */
+    ...(load.widthAtBottomIn === undefined ? {} : { widthAtBottomIn: load.widthAtBottomIn }),
+    ...(load.widthAtTopIn === undefined ? {} : { widthAtTopIn: load.widthAtTopIn }),
+    /**
+     * EVERY CONTEXT FACT TRAVELS WITH THE LOAD, and every one of them is
+     * spread conditionally for the same reason: an absent one must reach the
+     * evaluator as `undefined` so its condition reads `unknown`. Writing
+     * `timeOfDay: load.timeOfDay` would be identical today and would silently
+     * become a default the moment anything downstream coalesced it.
+     */
     ...(load.routeClass === undefined ? {} : { routeClass: load.routeClass }),
+    ...(load.routeSegments === undefined ? {} : { routeSegments: load.routeSegments }),
+    ...(load.travelDirection === undefined ? {} : { travelDirection: load.travelDirection }),
+    ...(load.timeOfDay === undefined ? {} : { timeOfDay: load.timeOfDay }),
+    ...(load.dayOfWeek === undefined ? {} : { dayOfWeek: load.dayOfWeek }),
+    ...(load.darkness === undefined ? {} : { darkness: load.darkness }),
+    ...(load.holiday === undefined ? {} : { holiday: load.holiday }),
+    ...(load.seasonalRestriction === undefined
+      ? {}
+      : { seasonalRestriction: load.seasonalRestriction }),
+    ...(load.registeredGrossWeightLbs === undefined
+      ? {}
+      : { registeredGrossWeightLbs: load.registeredGrossWeightLbs }),
+    ...(load.vehicleConfiguration === undefined
+      ? {}
+      : { vehicleConfiguration: load.vehicleConfiguration }),
+    ...(load.driverCredential === undefined ? {} : { driverCredential: load.driverCredential }),
+    ...(vocabulary === undefined ? {} : { routeVocabulary: vocabulary }),
     ...(load.subjectiveAnswers === undefined ? {} : { subjectiveAnswers: load.subjectiveAnswers }),
   };
-  const escorts = evaluateEscortRules(rules.escortRules, escortCtx, asOf);
+  /**
+   * HOW THIS STATE COMBINES THE COUNTS OF SEVERAL FIRING ESCORT RULES.
+   *
+   * Absent — every jurisdiction on file — leaves `evaluateEscortRules` on its
+   * Phase 1 reading: each position takes the maximum any one rule asks for, and
+   * the positions add. Utah publishes the other reading in R909-2-14(1)(b),
+   * "the most stringent requirement", where one rule governs outright and the
+   * others are satisfied by it rather than added to it. On a load that trips two
+   * of Utah's rows the two readings differ by a whole pilot car.
+   */
+  const escortCombinationRes = resolveHere<EscortCountCombination>(
+    `${rules.code} escort count combination rule`,
+    rules.escortCountCombination,
+    asOf,
+    escortCountCombinationsEqual,
+  );
+  if (escortCombinationRes !== null) {
+    pushSources(sources, escortCombinationRes);
+    warnings.push(...escortCombinationRes.warnings);
+    if (escortCombinationRes.requiresManualReview) requiresManualReview = true;
+  }
+  const escorts = evaluateEscortRules(
+    rules.escortRules,
+    escortCtx,
+    asOf,
+    escortCombinationRes?.value == null
+      ? {}
+      : { combination: escortCombinationRes.value },
+  );
   warnings.push(...escorts.warnings);
   if (escorts.requiresManualReview) requiresManualReview = true;
   for (const r of rules.escortRules) {
@@ -1038,19 +1202,19 @@ export function calculateOsowForJurisdiction(
    * review flags are all still raised at their original places below, unchanged
    * and under their original conditions.
    */
-  const overweightModelRes = resolveSourced<OverweightPricing>(
+  const overweightModelRes = resolve<OverweightPricing>(
     `${rules.code} overweight pricing model`,
     rules.overweightPricing,
     asOf,
     overweightPricingEqual,
   );
-  const combineRes = resolveIfPresent<CombinedFeeRule>(
+  const combineRes = resolveHere<CombinedFeeRule>(
     `${rules.code} combined oversize/overweight fee rule`,
     rules.combinedFeeRule,
     asOf,
     combinedFeeRulesEqual,
   );
-  const authRes = resolveIfPresent<AdditionalAuthority>(
+  const authRes = resolveHere<AdditionalAuthority>(
     `${rules.code} additional permitting authorities`,
     rules.additionalAuthorities,
     asOf,
@@ -1086,6 +1250,91 @@ export function calculateOsowForJurisdiction(
     return priced;
   };
 
+  // ── 5b. What this state positively does NOT publish ─────────────────
+  // A checked negative is an answer. Kansas and Nebraska publish no overhang
+  // limit at all, so no overhang escort trigger exists in either — which a
+  // quote should SAY rather than leave to a reader's assumption that a blank
+  // field means nobody looked. These are notes, never warnings: nothing is
+  // wrong, and putting them in `warnings` would dilute the channel that stops a
+  // quote. See `PublishedAbsence`.
+  if (rules.publishedAbsences !== undefined) {
+    for (const row of rules.publishedAbsences) {
+      if (!isInEffect(row, asOf)) continue;
+      if (!sources.some((x) => x.id === row.source.id)) sources.push(row.source);
+      dataQuality.push(
+        `${rules.name} publishes no ${row.value.subject.replace(/([A-Z])/g, ' $1').toLowerCase().trim()}: ${row.value.statement}${row.value.consequence === undefined ? '' : ` ${row.value.consequence}`} Source: ${citeOf(row.source)}.`,
+      );
+    }
+  }
+
+  // ── 5c. A segment table the agency serves live ─────────────────────
+  // Arizona's Table 4 governs ten other sections and is provided from ADOT's
+  // real-time permitting system, so there is no version of it that can be held
+  // and still be true. A move whose route we cannot place against the segments
+  // we DO hold is sent to review naming the table — which is a useful answer —
+  // rather than priced from a transcription that would go stale silently.
+  if (permitRequired && rules.liveSegmentTables !== undefined) {
+    for (const row of rules.liveSegmentTables) {
+      if (!isInEffect(row, asOf)) continue;
+      if (!sources.some((x) => x.id === row.source.id)) sources.push(row.source);
+      const held = row.value.heldSegments.map((seg) => seg.id);
+      const named = load.routeSegments ?? [];
+      if (named.length > 0 && named.every((id) => held.includes(id))) continue;
+      warnings.push(
+        `${rules.name} defers to ${row.value.name}, which is served live by the issuing agency rather than published as a fixed table (${row.value.url}). ${row.value.explanation} This move's route has not been resolved against it, so route-specific restrictions, escorts and allowances for this state must be confirmed with the agency.`,
+      );
+      requiresManualReview = true;
+    }
+  }
+
+  // ── 5d. The permit envelope ─────────────────────────────────
+  // The ceiling above which the state will not issue this permit at all —
+  // which in Nevada moves with the clock, the day, the direction and the
+  // steering configuration. A quote that does not state the time leaves the day
+  // row AND the night row in effect, which resolves to a conflict and a review:
+  // absent time must never read as "day". See `PermitEnvelope`.
+  const envelopeRes = resolveHere<PermitEnvelope>(
+    `${rules.code} permit dimensional envelope`,
+    rules.permitEnvelopes,
+    asOf,
+    permitEnvelopesEqual,
+  );
+  if (envelopeRes !== null) {
+    pushSources(sources, envelopeRes);
+    warnings.push(...envelopeRes.warnings);
+    if (envelopeRes.requiresManualReview) requiresManualReview = true;
+    const env = envelopeRes.value;
+    if (env !== null) {
+      const over: string[] = [];
+      if (env.widthIn !== undefined && load.widthIn !== undefined && load.widthIn > env.widthIn) {
+        over.push(`width ${formatFtIn(load.widthIn)} over the ${formatFtIn(env.widthIn)} this permit is issued to`);
+      }
+      if (env.heightIn !== undefined && load.heightIn !== undefined && load.heightIn > env.heightIn) {
+        over.push(`height ${formatFtIn(load.heightIn)} over ${formatFtIn(env.heightIn)}`);
+      }
+      if (
+        env.overallLengthIn !== undefined &&
+        load.overallLengthIn !== undefined &&
+        load.overallLengthIn > env.overallLengthIn
+      ) {
+        over.push(`overall length ${formatFtIn(load.overallLengthIn)} over ${formatFtIn(env.overallLengthIn)}`);
+      }
+      if (
+        env.grossWeightLbs !== undefined &&
+        load.grossWeightLbs !== undefined &&
+        load.grossWeightLbs > env.grossWeightLbs
+      ) {
+        over.push(`gross weight ${load.grossWeightLbs.toLocaleString()} lb over ${env.grossWeightLbs.toLocaleString()} lb`);
+      }
+      if (over.length > 0) {
+        warnings.push(
+          `${rules.name} will not issue its ${env.product} permit for this move — ${over.join('; ')}. "${env.quote}" A move above the published envelope is not a more expensive permit, it is a different process, and no fee is quoted for it here.`,
+        );
+        requiresManualReview = true;
+      }
+    }
+  }
+
   // ── 6. Fees ───────────────────────────────────────────────────────────
   // A superload has no published fee schedule. Emitting the general permit's
   // $60 + $375 here would be a confident number the sources do not support,
@@ -1099,7 +1348,7 @@ export function calculateOsowForJurisdiction(
      * `dataQuality`. See `materiality.ts`.
      */
     const base = priceOf(
-      resolveSourced(`${rules.code} single-trip permit base fee`, rules.permitBaseFeeUsd, asOf),
+      resolve(`${rules.code} single-trip permit base fee`, rules.permitBaseFeeUsd, asOf),
       (v) => v,
     );
     pushSources(sources, base);
@@ -1207,7 +1456,7 @@ export function calculateOsowForJurisdiction(
          * special case. See `materiality.ts`, rule 3.
          */
         const bandRes = priceOf(
-          resolveSourced<OversizeFeeBand>(
+          resolve<OversizeFeeBand>(
             `${rules.code} oversize fee band`,
             matched,
             asOf,
@@ -1315,7 +1564,7 @@ export function calculateOsowForJurisdiction(
            * take" and escalates rather than absorbs.
            */
           const bandRes = priceOf(
-            resolveSourced<WeightBand>(
+            resolve<WeightBand>(
               `${rules.code} overweight fee band`,
               bandMatched,
               asOf,
@@ -1426,7 +1675,7 @@ export function calculateOsowForJurisdiction(
            * only can if the rate is priced first and compared second.
            */
           const rateRes = priceOf(
-            resolveSourced<PerMileRate>(
+            resolve<PerMileRate>(
               `${rules.code} overweight per-mile rate`,
               rules.overweightPerMile.filter((r) => {
                 const v = r.value;
@@ -1455,6 +1704,68 @@ export function calculateOsowForJurisdiction(
           if (rate === null && rateRes.candidates.length === 0) {
             warnings.push(
               `No per-mile overweight rate on file covers ${gross.toLocaleString()} lb in ${rules.name}. The permit fee cannot be computed.`,
+            );
+            requiresManualReview = true;
+          }
+          break;
+        }
+
+        case 'perMilePerAxleGroup': {
+          /**
+           * MINNESOTA. The charge is the distance times the SUM of a per-mile
+           * cost factor for each overweight axle group — a function of the axle
+           * configuration, which no banding of gross weight can reproduce. Two
+           * things can stop it, and each is reported as itself rather than as a
+           * zero: unknown in-state miles, and a group the published chart has
+           * no row for. See `perMilePerAxleGroupAmount`.
+           */
+          const miles = load.milesInJurisdiction;
+          const groups = load.overweightAxleGroups;
+          const rateRes = resolve<PerMilePerAxleGroupRate>(
+            `${rules.code} overweight per-axle-group rate`,
+            rules.overweightPerMilePerAxleGroup ?? [],
+            asOf,
+            perMilePerAxleGroupRatesEqual,
+          );
+          pushSources(sources, rateRes);
+          warnings.push(...rateRes.warnings);
+          if (rateRes.requiresManualReview) requiresManualReview = true;
+          if (miles === undefined || groups === undefined || rateRes.value === null) {
+            const needed =
+              miles === undefined && groups === undefined
+                ? 'the miles travelled inside the state and the overweight axle groups'
+                : miles === undefined
+                  ? 'the miles travelled inside the state'
+                  : groups === undefined
+                    ? 'the overweight axle groups'
+                    : 'a resolved cost-factor chart';
+            overweightLine = {
+              code: 'osow_overweight',
+              name: 'Overweight permit (per axle group, per mile)',
+              amountUsd: null,
+              note: `${rules.name} charges a per-mile cost factor for each overweight axle group, and that cannot be computed without ${needed}.`,
+              sources: sourcesOf(rateRes),
+            };
+            warnings.push(
+              `${rules.name} prices the overweight permit as the distance travelled times the sum of a cost factor for each overweight axle group. ${needed.charAt(0).toUpperCase()}${needed.slice(1)} ${needed.includes(' and ') ? 'were' : 'was'} not supplied, so no overweight amount is quoted for this state.`,
+            );
+            requiresManualReview = true;
+            break;
+          }
+          const breakdown = perMilePerAxleGroupAmount(rateRes.value, groups, miles);
+          overweightLine = {
+            code: 'osow_overweight',
+            name: 'Overweight permit (per axle group, per mile)',
+            amountUsd: breakdown.amountUsd,
+            note:
+              breakdown.amountUsd === null
+                ? `${breakdown.unpricedGroups} of ${groups.length} overweight axle group(s) match no row in ${rateRes.value.name}, so the charge cannot be summed.`
+                : `${miles} mi in ${rules.name} × $${breakdown.sumPerMileUsd.toFixed(4)} per mile (the sum of ${breakdown.groups.length} axle-group cost factor${breakdown.groups.length === 1 ? '' : 's'}) = $${breakdown.amountUsd.toFixed(2)}`,
+            sources: sourcesOf(rateRes),
+          };
+          if (breakdown.amountUsd === null) {
+            warnings.push(
+              `${breakdown.unpricedGroups} overweight axle group(s) on this load match no row in ${rateRes.value.name}. Summing only the groups the chart does cover would under-bill by exactly the amount nobody noticed was missing, so no overweight amount is quoted for this state.`,
             );
             requiresManualReview = true;
           }
@@ -1551,7 +1862,7 @@ export function calculateOsowForJurisdiction(
     // Conditional fees (Texas's Vehicle Supervision Fee).
     for (const cf of rules.conditionalFees) {
       const res = priceOf(
-        resolveSourced(
+        resolve(
           `${rules.code} conditional fee`,
           rules.conditionalFees.filter((x) => conditionalFeesEqual(x.value, cf.value)),
           asOf,
@@ -1574,6 +1885,35 @@ export function calculateOsowForJurisdiction(
       });
     }
 
+    // ── A permit that is REQUIRED and costs nothing ───────────────────
+    // `$0` and `unpriced` are already distinguishable, and a sourced zero is
+    // already suppressed so Pennsylvania's does not print beside a real charge.
+    // Neither of those can say the third thing: the permit is required and the
+    // published fee is zero. Kansas issues government vehicles one; Nebraska's
+    // Highway 75 implement-of-husbandry permit is the same. Suppressing the
+    // line would read as "no permit needed", which is the reading that gets a
+    // truck stopped. See `ZeroFeePermit`.
+    const zeroFeeRes = resolveHere<ZeroFeePermit>(
+      `${rules.code} no-fee permit`,
+      rules.zeroFeePermits,
+      asOf,
+      zeroFeePermitsEqual,
+    );
+    if (zeroFeeRes !== null) {
+      pushSources(sources, zeroFeeRes);
+      warnings.push(...zeroFeeRes.warnings);
+      if (zeroFeeRes.requiresManualReview) requiresManualReview = true;
+      if (zeroFeeRes.value !== null) {
+        lines.push({
+          code: 'osow_permit_no_fee',
+          name: `${rules.name} ${zeroFeeRes.value.name} permit`,
+          amountUsd: 0,
+          note: `A permit IS required and the published fee is zero — "${zeroFeeRes.value.quote}"`,
+          sources: sourcesOf(zeroFeeRes),
+        });
+      }
+    }
+
     // Payment processing — a percentage of everything above, so it is
     // computed last and only when every preceding line resolved.
     const pricedSoFar = lines.every((l) => l.amountUsd !== null)
@@ -1588,7 +1928,7 @@ export function calculateOsowForJurisdiction(
      * surcharge cannot be costed at all, and a conflict about it escalates.
      */
     const txRes = priceOf(
-      resolveSourced<import('./types.js').TransactionFee>(
+      resolve<import('./types.js').TransactionFee>(
         `${rules.code} permit transaction fee`,
         rules.transactionFee,
         asOf,
@@ -1621,11 +1961,11 @@ export function calculateOsowForJurisdiction(
 
   // Route/bridge analysis review — superload path only.
   if (superload) {
-    const analysis = resolveSourced(`${rules.code} route analysis review fee`, rules.routeAnalysisFeeUsd, asOf);
+    const analysis = resolve(`${rules.code} route analysis review fee`, rules.routeAnalysisFeeUsd, asOf);
     pushSources(sources, analysis);
     if (analysis.value !== null) {
       warnings.push(
-        `A superheavy move in ${rules.name} also carries an agency charge of $${analysis.value.toFixed(2)} to review a state-approved engineer's route and bridge analysis (or $${(resolveSourced('no-bridge route fee', rules.noBridgeRouteFeeUsd, asOf).value ?? 0).toFixed(2)} where the approved route crosses no bridges). The engineer's own fee is separate and is not a state charge. Neither amount is included in the total, and no permit price is quoted for a superload.`,
+        `A superheavy move in ${rules.name} also carries an agency charge of $${analysis.value.toFixed(2)} to review a state-approved engineer's route and bridge analysis (or $${(resolve('no-bridge route fee', rules.noBridgeRouteFeeUsd, asOf).value ?? 0).toFixed(2)} where the approved route crosses no bridges). The engineer's own fee is separate and is not a state charge. Neither amount is included in the total, and no permit price is quoted for a superload.`,
       );
     }
   }
@@ -1637,6 +1977,43 @@ export function calculateOsowForJurisdiction(
     );
     requiresManualReview = true;
   }
+  /**
+   * PER-COMPONENT OVERRIDES OF THE JURISDICTION-WIDE BOOLEAN.
+   *
+   * Iowa cannot answer `feesDependOnDistance` with one value. Iowa Code
+   * § 321E.14(1)(e) prices the general single-trip permit flat, with no mileage
+   * term at all, and § 321E.12(3) charges 5 cents per ton per mile — but only
+   * for "vehicles transporting buildings other than mobile homes and
+   * factory-built structures". The boolean has to pick one, and either choice
+   * is wrong for half the state's traffic: `true` refuses to price the ordinary
+   * permit over miles it does not need, `false` prices a building haul off a
+   * rate with nowhere to get its miles.
+   *
+   * A row whose `appliesWhen` is undecidable does NOT quietly drop out — the
+   * resolver keeps it and says what would settle it, which is exactly the
+   * behaviour wanted when a quote has not said whether it is hauling a
+   * building. See `FeeDistanceDependence`.
+   */
+  if (rules.feeDistanceDependence !== undefined && load.milesInJurisdiction === undefined) {
+    for (const row of rules.feeDistanceDependence) {
+      if (!isInEffect(row, asOf)) continue;
+      if (!row.value.dependsOnDistance) continue;
+      let applies: boolean | 'unknown' = true;
+      if (row.value.appliesWhen !== undefined) {
+        applies = evaluateContextCondition(
+          row.value.appliesWhen,
+          load as MoveContext,
+          vocabulary,
+        );
+      }
+      if (applies === false) continue;
+      if (!sources.some((x) => x.id === row.source.id)) sources.push(row.source);
+      warnings.push(
+        `${rules.name}'s ${row.value.component} charge is priced on distance travelled inside the state${applies === 'unknown' ? ', and this quote has not said whether that charge applies to this move' : ''}. "${row.value.quote}" ${MILEAGE_SPLIT_NOTE}`,
+      );
+      requiresManualReview = true;
+    }
+  }
 
   // ── 7b. A second permit issuer inside the same state ──────────────────
   // A complete-looking state subtotal that is missing an entire permit is
@@ -1646,6 +2023,33 @@ export function calculateOsowForJurisdiction(
     for (const cand of authRes?.candidates ?? []) {
       const a = cand.value;
       if (!sources.some((s) => s.id === cand.source.id)) sources.push(cand.source);
+      /**
+       * AN AUTHORITY THAT REPLACES THE STATE'S PERMIT RATHER THAN ADDING TO IT.
+       *
+       * This block was written for New York's Thruway, where the state permit
+       * and the Authority permit are BOTH needed. The Kansas Turnpike is the
+       * inverse and says so itself: "Special permits from KDOT are not required
+       * to move oversized loads on the Kansas Turnpike." It carries I-35, I-70
+       * between Topeka and Kansas City, I-335 and I-470, so this is much of the
+       * state's east–west heavy-haul mileage rather than a corner case.
+       *
+       * Treating it as an ADDITIONAL permit is wrong twice: it charges a state
+       * fee that is not owed, and it applies the state's escort rule where the
+       * Authority publishes its own and a different travel window besides.
+       */
+      if (a.replacesStatePermit === true) {
+        const onIt =
+          a.segmentIds === undefined || load.routeSegments === undefined
+            ? 'unknown'
+            : a.segmentIds.some((id) => (load.routeSegments ?? []).includes(id));
+        warnings.push(
+          onIt === true
+            ? `This move runs on the ${a.name}, which issues its OWN permit in place of ${rules.name}'s — ${a.appliesWhen} The ${rules.name} permit fee quoted above is not owed on that roadway, and the ${a.name}'s escort and travel-window rules govern instead of the state's. Source: ${citeOf(cand.source)}.`
+            : `Part of ${rules.name}'s network is permitted by the ${a.name}, not by the state — ${a.appliesWhen} Where a move runs on it, the ${rules.name} fee above is not owed and the ${a.name}'s own escort and travel-window rules apply. This quote has not resolved the route against that roadway. Source: ${citeOf(cand.source)}.`,
+        );
+        requiresManualReview = true;
+        continue;
+      }
       if (a.priceable) continue;
       warnings.push(
         `${rules.name} is not a single-issuer state. ${a.appliesWhen} A ${a.name} permit is a SEPARATE permit with its own fee, which is not included in the ${rules.name} subtotal above. Source: ${citeOf(cand.source)}.`,
@@ -1850,6 +2254,33 @@ export function quotableCeilingFor(t: Threshold): number {
  * number — most likely the whole lane — which is precisely the over-quote the
  * distance guard exists to prevent.
  */
+/**
+ * The seasonal RESTRICTION STATE for one jurisdiction — the single bit a fee
+ * rule can be conditioned on, derived from the snapshot the caller loaded.
+ *
+ * `undefined` is returned in three cases and they are all the same claim: WE DO
+ * NOT KNOW. No snapshot for the state, an unreachable snapshot store, or a
+ * snapshot older than its own tier's staleness budget. Returning
+ * `'not-in-effect'` from any of them would be the FALSE CLEAR the seasonal
+ * module was built to avoid — the direction that under-prices and under-warns —
+ * so a fee row keyed to the season stays undecided instead.
+ *
+ * Reads the clock only to age the snapshot, and only when a seasonal context
+ * was supplied at all; a quote priced without one is fully deterministic.
+ */
+function seasonalStateFor(
+  ctx: SeasonalContext,
+  code: string,
+  asOf: IsoDate,
+  now: Date = new Date(),
+): SeasonalRestrictionState | undefined {
+  if (ctx.storeUnavailable === true) return undefined;
+  const snapshot = ctx.snapshots.get(String(code ?? '').trim().toUpperCase());
+  if (snapshot === undefined) return undefined;
+  if (isStale(snapshot, asOf, now)) return undefined;
+  return activeRestrictions(snapshot, asOf).length > 0 ? 'in-effect' : 'not-in-effect';
+}
+
 export type OsowLeg = string | { code: string; milesInJurisdiction?: number };
 
 function legCode(leg: OsowLeg): string {
@@ -1887,8 +2318,42 @@ export function calculateOsow(
 
     const legMiles =
       typeof leg === 'string' ? undefined : leg.milesInJurisdiction;
-    const legLoad: OsowLoad =
-      legMiles === undefined ? load : { ...load, milesInJurisdiction: legMiles };
+    /**
+     * ── THE FROST-LAW SEAM ────────────────────────────────────────────────
+     *
+     * Seasonal restrictions have been a LEGALITY signal since they were built:
+     * flagged, cited, never repriced. That is still the right default and the
+     * reasoning in `seasonal/advisory.ts` is unchanged. But it is not the whole
+     * truth, because two Minnesota rules make the frost calendar a PRICING
+     * input outright:
+     *
+     *   - Minn. Stat. § 169.86 subd. 5(g) adds $120 to a wide single-trip
+     *     permit "when the permit is issued while seasonal load restrictions
+     *     pursuant to section 169.87 are in effect". A single trip wider than
+     *     14 ft 6 in costs $135 instead of $15 during the thaw.
+     *   - MnDOT publishes allowable PERMIT axle weights as three columns keyed
+     *     to the restriction state, so what the permit even authorises moves
+     *     with the season.
+     *
+     * Neither can be priced from a warning attached after the fact. So the
+     * restriction STATE — not the restriction's terms — is derived here and
+     * handed to the pricer as one more context fact, exactly like the time of
+     * day. A caller that states it explicitly wins; a caller that supplies no
+     * seasonal context at all leaves it `undefined`, and a fee row conditioned
+     * on the season stays undecided rather than being priced as summer.
+     *
+     * WHAT THIS DELIBERATELY DOES NOT DO is let a restriction change a LIMIT.
+     * It supplies a fact; only a jurisdiction's own sourced rows can act on it.
+     */
+    const derivedSeasonal =
+      load.seasonalRestriction !== undefined || seasonal === undefined
+        ? undefined
+        : seasonalStateFor(seasonal, code, asOf);
+    const legLoad: OsowLoad = {
+      ...load,
+      ...(legMiles === undefined ? {} : { milesInJurisdiction: legMiles }),
+      ...(derivedSeasonal === undefined ? {} : { seasonalRestriction: derivedSeasonal }),
+    };
 
     const rules = osowRulesFor(code);
     if (rules === null) {
