@@ -658,6 +658,13 @@ export const NO_PUBLISHED_POLICE_ESCORT_RATE: ReadonlyArray<NoPublishedPoliceRat
       'The charge is "a fee covering the full cost to administer, plan, and carry out the escort within this state" and, although the statute directs DPS to adopt a schedule of fees, no hourly, mileage or fixed schedule is published.',
   },
   {
+    jurisdiction: 'DC',
+    kind: 'notPublished',
+    escortRuleId: 'dc-escort-width-conflict',
+    finding:
+      'The District is the only jurisdiction here where the TRIGGER is contradicted and the RATE is absent at the same time. DDOT publishes two police-escort tables in the same year that disagree on every threshold — OSOWFAQ_2023.pdf at 15 ft wide / 14 ft 6 in high / 150,000 lb and "may be required", overweight_vehicles.pdf at 12 ft wide / 75 ft long / 13 ft 6 in high / 120,000 lb and "Yes for" — and neither document, the DDOT site, nor the Metropolitan Police Department publishes an hourly rate, minimum hours, mileage, per diem or cancellation charge. The DDOT instruction is to email MPD at motorcarrier@dc.gov to find out whether an escort is needed at all. Both DDOT PDFs and DCMR Title 18 chapter 25 were read in full.',
+  },
+  {
     jurisdiction: 'PA',
     kind: 'notPublished',
     escortRuleId: 'pa-superload-police-conflict',
