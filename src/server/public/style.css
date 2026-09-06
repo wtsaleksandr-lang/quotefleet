@@ -226,6 +226,24 @@ html[data-theme="light"] .qf-theme-btn .qf-ico-moon { display: block; }
 
 /* ── Reset ─────────────────────────────────────────────────────── */
 * { box-sizing: border-box; }
+
+/* MEDIA NEVER SETS THE PAGE WIDTH.
+ *
+ * The landing page injects `landing-wefixtrades-cleanup.css` from JavaScript
+ * (landing-motion.js), so between DOMContentLoaded and that sheet arriving the
+ * `.qf-included-media` images have no width rule and lay out at their intrinsic
+ * 1280px — inside a 320px viewport. The document then scrolls sideways by
+ * ~1016px until the sheet lands. On a phone on a slow connection that is a
+ * visible sideways lurch on first paint, and it is the same class of bug for
+ * the 1100px `.qf-browser-vid` elements.
+ *
+ * This sheet is render-blocking on every surface, so the clamp is in effect
+ * before any content paints and no late stylesheet is needed to keep the page
+ * inside the viewport. It is `max-width`, not `width`, so every explicit sizing
+ * rule downstream still wins; it only ever removes overflow. Nothing in the
+ * codebase deliberately paints media wider than its container (no `100vw`
+ * media rule exists), so there is nothing for it to break. */
+img, video, svg, canvas, iframe { max-width: 100%; }
 html, body { height: 100%; }
 body {
   font-family: var(--font-sans);

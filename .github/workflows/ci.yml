@@ -42,3 +42,67 @@ jobs:
 
       - name: Unit tests
         run: pnpm test
+
+  # ──────────────────────────────────────────────────────────────────────────
+  # END-TO-END
+  #
+  # These specs existed for weeks and ran nowhere. 102 tests across five files
+  # -- the $1,223.18 reference lane, the footer column arithmetic, the 375px
+  # overflow sweeps, the cited-carries-no-band invariant -- all of which only
+  # protected us as far as somebody remembered to run them locally. A test that
+  # does not run on a pull request is documentation.
+  #
+  # Its own job rather than more steps on `typecheck-and-test`, for two
+  # reasons: a browser download must not slow the fast feedback loop that
+  # catches most mistakes, and a flaky render must not mask a real type error.
+  #
+  # --workers=1 is deliberate. The public calculator endpoints share a
+  # 30-request/minute rate limiter, and a fully parallel run trips it: three
+  # calculator-driving specs take a 429 and fail for a reason that has nothing
+  # to do with the change under test. Serial is slower and it is honest.
+  #
+  # DATABASE_URL points at a port nothing listens on. That is the intended
+  # configuration: every OS/OW surface is built to render with the database
+  # down, and running the suite this way proves it on every pull request
+  # instead of asserting it in a report.
+  # ──────────────────────────────────────────────────────────────────────────
+  e2e:
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    env:
+      SESSION_SECRET: testtesttesttesttesttesttesttesttesttesttesttesttesttesttesttest
+      DATABASE_URL: postgresql://user:pass@127.0.0.1:59999/quotefleet_e2e
+      ANTHROPIC_API_KEY: sk-test
+      PUBLIC_BASE_URL: http://localhost:5000
+      HOST_DOMAINS: quotefleet.net,localhost
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: 10.33.1
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Install Chromium
+        run: pnpm exec playwright install --with-deps chromium
+
+      - name: End-to-end tests
+        run: pnpm exec playwright test --workers=1 --reporter=line
+
+      - name: Upload report on failure
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: playwright-report
+          path: playwright-report/
+          retention-days: 7

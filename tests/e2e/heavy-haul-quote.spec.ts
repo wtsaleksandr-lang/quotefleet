@@ -31,6 +31,8 @@
  */
 import { test, expect, type Page } from '@playwright/test';
 
+import { anUncoveredState } from './_uncovered';
+
 const TOOL_PATH = '/tools/heavy-haul-quote';
 
 /** The lane whose two endpoints the server pre-resolves. */
@@ -438,24 +440,30 @@ test('loading provided at NEITHER end prices the machine nobody costed', async (
 // ──────────────────────────────────────────────────────────────────────────
 
 test('an uncovered state is NAMED and unpriced, never $0', async ({ page }) => {
+  // Asked of the engine rather than hardcoded — see ./_uncovered. This test
+  // named Mississippi until Mississippi was encoded, at which point the lane
+  // priced in full and the failure looked like a broken refusal instead of a
+  // stale fixture.
+  const uncoveredState = anUncoveredState();
+
   await openTool(page);
   await fillLoad(page);
   await fillLane(page);
   await fillLegs(page, [
     { state: 'TX', miles: 200 },
-    { state: 'MS', miles: 180 },
+    { state: uncoveredState.code, miles: 180 },
     { state: 'TN', miles: 250 },
   ]);
   await page.fill('#hh-linehaul', '4.85');
   await submit(page);
 
   await line(page, 'State OS/OW permits').locator('summary').click();
-  const row = subLine(page, 'Mississippi single-trip OS/OW permit');
+  const row = subLine(page, `${uncoveredState.name} single-trip OS/OW permit`);
   await expect(row).toBeVisible();
   await expect(row).toContainText('not priced');
   await expect(row).toContainText('will not infer one from a neighbouring state');
   await expect(page.locator('.hh-total')).toContainText('Partial');
-  await expect(page.locator('.hh-kpi')).toContainText('MS not covered');
+  await expect(page.locator('.hh-kpi')).toContainText(`${uncoveredState.code} not covered`);
 });
 
 test('a superload is refused a price, because no published fee exists', async ({ page }) => {
