@@ -166,6 +166,19 @@ export const HUB_CSS = `
   .qh-card h3 a:hover, .qh-card h3 a:focus-visible { text-decoration: underline; color: var(--accent); }
   .qh-card p { margin: 0; font-size: 13px; line-height: 1.55; color: var(--ink-soft); }
   .qh-card .qh-meta { color: var(--muted); font-size: 12px; font-family: var(--font-mono); margin: 0; }
+  /* THE CONSTANT NAMES HAVE NO BREAK OPPORTUNITIES, AND THEY ARE LONG.
+     Every named gap and conflict prints its own identifier —
+     MISSISSIPPI_SPECIAL_HEAVY_HAUL_TABLE_CONFLICT is 45 characters of
+     UPPER_SNAKE_CASE with nowhere for the browser to wrap. At 375px that is
+     already within a few pixels of the viewport, and it is only measured as
+     fitting because of how wide the local monospace font happens to be: on
+     Linux, where the mono fallback is wider, the same string renders 385px
+     against a 375px viewport and the whole document scrolls sideways.
+     "anywhere" is the correct value rather than "break-word" — these tokens
+     contain no spaces, so there is no soft break for "break-word" to prefer,
+     and it would leave the overflow exactly where it was. The identifiers get
+     longer as the corpus grows, so this is a floor, not a one-off. */
+  .qh-card .qh-meta code, .qh-entry .qh-meta code { overflow-wrap: anywhere; }
 
   /* Conflict / gap entries — outline + tint, never a fill. */
   .qh-entry { border: 1px solid var(--border); border-radius: var(--radius-lg); background: var(--surface); padding: 16px; margin: 0 0 12px; }
