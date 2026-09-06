@@ -69,13 +69,28 @@ describe('the police-rate dataset', () => {
     const withoutRate = new Set(NO_PUBLISHED_POLICE_ESCORT_RATE.map((n) => n.jurisdiction));
     const covered = Object.keys(OSOW_JURISDICTIONS);
 
+    // The states that publish a rate ARE named, because there are few of them
+    // and each is a real find worth noticing if it disappears.
     expect([...withRate].sort()).toEqual(['AL', 'IL', 'IN', 'LA', 'NY', 'SC', 'TN']);
-    expect(withoutRate.size).toBe(20);
-    // No state may be in both lists, and between them they must be the whole
-    // corpus — a state in neither would silently fall through to "no finding".
+
+    // The states that do NOT are counted, never listed, and the count is
+    // DERIVED. It used to be the literal 20, which meant every jurisdiction
+    // added to the corpus failed this test for the entirely expected reason
+    // that the corpus had grown by one.
+    //
+    // The invariant is unchanged and is actually stated more precisely this
+    // way: every covered jurisdiction sits in exactly one of the two buckets.
     const overlap = [...withRate].filter((c) => withoutRate.has(c));
     const missing = covered.filter((c) => !withRate.has(c) && !withoutRate.has(c));
     expect({ overlap, missing }).toEqual({ overlap: [], missing: [] });
+    expect(withoutRate.size).toBe(covered.length - withRate.size);
+
+    // And neither bucket may name a jurisdiction the engine does not cover —
+    // an absence recorded for a state with no dataset is a finding nothing can
+    // reach, and would quietly inflate the count above.
+    const corpus = new Set(covered);
+    expect([...withoutRate].filter((c) => !corpus.has(c))).toEqual([]);
+    expect([...withRate].filter((c) => !corpus.has(c))).toEqual([]);
   });
 
   it('cites a real document on every rate row and points at a real rule on every absence', () => {

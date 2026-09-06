@@ -398,22 +398,60 @@ export function permitFeeRows(asOf: IsoDate): PermitFeeRow[] {
       };
     }
     const bandCount = rules.oversizeFeeBands?.length ?? 0;
+    const base = cellFrom('single-trip base permit fee', rules.permitBaseFeeUsd, asOf, fmtUsd);
     return {
       state,
-      base: cellFrom('single-trip base permit fee', rules.permitBaseFeeUsd, asOf, fmtUsd),
+      base,
       oversizeMechanism: {
         text:
           bandCount > 0
             ? `${bandCount} dimension band${bandCount === 1 ? '' : 's'} above the base`
             : 'One flat charge, no dimension bands',
       },
-      overweightMechanism: cellFrom(
-        'overweight pricing mechanism',
-        rules.overweightPricing,
-        asOf,
-        (v) => OVERWEIGHT_MECHANISM[v.kind],
-        (a, b) => a.kind === b.kind,
-      ),
+      /**
+       * A JURISDICTION CAN PRICE OVERWEIGHT WITH NO MECHANISM AT ALL, and the
+       * cell has to say that rather than render blank.
+       *
+       * `cellFrom` yields a null text on an empty array, which is right when
+       * the data is missing and wrong when the state genuinely publishes no
+       * weight schedule. The District of Columbia is the case: DDOT charges a
+       * flat $30 single-trip fee whatever the load weighs — no bands, no
+       * per-pound rate, no formula — so every overweight input resolves to
+       * nothing and the public table printed an empty cell on a page whose
+       * whole claim is that a blank means "we do not know".
+       *
+       * The three overweight inputs being empty together IS the finding, and it
+       * is structural rather than inferred: a registered jurisdiction is a
+       * fully encoded one, so empty here means the state published nothing to
+       * encode. Said the same way `oversizeMechanism` already says it above.
+       */
+      overweightMechanism:
+        rules.overweightPricing.length === 0 &&
+        rules.overweightBands.length === 0 &&
+        rules.overweightPerMile.length === 0
+          ? // THE SOURCE IS THE BASE FEE'S OWN DOCUMENT, and that is a real
+            // citation rather than a convenient one: the sentence "one flat
+            // charge, no weight schedule" is a restatement of the very row
+            // that sets the flat charge, read from the same page. If the base
+            // fee itself did not resolve — unsourced or in conflict — there is
+            // nothing to restate, and the cell falls back to the ordinary
+            // empty-array path so it reports an absence instead of a claim.
+            base.source === undefined
+            ? cellFrom(
+                'overweight pricing mechanism',
+                rules.overweightPricing,
+                asOf,
+                (v) => OVERWEIGHT_MECHANISM[v.kind],
+                (a, b) => a.kind === b.kind,
+              )
+            : { text: 'One flat charge, no weight schedule', source: base.source }
+          : cellFrom(
+              'overweight pricing mechanism',
+              rules.overweightPricing,
+              asOf,
+              (v) => OVERWEIGHT_MECHANISM[v.kind],
+              (a, b) => a.kind === b.kind,
+            ),
       transaction: cellFrom(
         'transaction fee',
         rules.transactionFee,

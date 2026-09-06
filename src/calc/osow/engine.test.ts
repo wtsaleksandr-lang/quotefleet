@@ -3914,22 +3914,35 @@ describe('Tennessee — a permit priced by the ton-mile', () => {
 });
 
 describe('the registry after Phase 11', () => {
-  it('covers exactly the twenty-seven states whose datasets exist', () => {
-    expect(Object.keys(OSOW_JURISDICTIONS).sort()).toEqual(
-      [
-        'AL', 'AR', 'CA', 'CO', 'FL', 'GA', 'IL', 'IN', 'KY', 'LA',
-        'MI', 'MN', 'MO', 'MS', 'NC', 'NJ', 'NY', 'OH', 'OK', 'PA',
-        'SC', 'TN', 'TX', 'UT', 'VA', 'WA', 'WI',
-      ].sort(),
-    );
+  /**
+   * THE INVENTORY, IN ONE PLACE. Adding a jurisdiction means adding it here and
+   * nowhere else in this test: the count below is derived from this list rather
+   * than written out a second time, and the test name no longer spells the
+   * number. Both used to be literals, which meant every research wave failed
+   * this test three times over for a reason that was never a defect — and a
+   * test that cries wolf on every intended change stops being read.
+   *
+   * The guard it exists for is intact. A stray import that registers a
+   * jurisdiction whose dataset was never meant to ship still fails, because the
+   * registry's keys would not equal this list.
+   */
+  const REGISTERED = [
+    'AL', 'AR', 'CA', 'CO', 'DC', 'FL', 'GA', 'IL', 'IN', 'KY',
+    'LA', 'MI', 'MN', 'MO', 'MS', 'NC', 'NJ', 'NY', 'OH', 'OK',
+    'PA', 'SC', 'TN', 'TX', 'UT', 'VA', 'WA', 'WI',
+  ];
+
+  it('covers exactly the jurisdictions whose datasets exist', () => {
+    expect(Object.keys(OSOW_JURISDICTIONS).sort()).toEqual([...REGISTERED].sort());
     for (const code of Object.keys(OSOW_JURISDICTIONS)) {
       expect(hasOsowCoverage(code)).toBe(true);
       expect(osowRulesFor(code)?.code).toBe(code);
     }
-    // The registry must never name a jurisdiction ahead of its dataset, and the
-    // count is asserted separately so a stray import cannot pass by matching a
-    // list someone updated in the same edit.
-    expect(Object.keys(OSOW_JURISDICTIONS)).toHaveLength(27);
+    // The registry must never name a jurisdiction ahead of its dataset.
+    expect(Object.keys(OSOW_JURISDICTIONS)).toHaveLength(REGISTERED.length);
+    // And the inventory must not contain a duplicate, which `toEqual` on sorted
+    // arrays would otherwise let through only if the registry duplicated it too.
+    expect(new Set(REGISTERED).size).toBe(REGISTERED.length);
   });
 });
 

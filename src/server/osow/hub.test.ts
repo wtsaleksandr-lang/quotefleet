@@ -80,9 +80,15 @@ describe('hub coverage', () => {
    * each of the three states added, and the two new structural fields must
    * reach the conflicts page rather than being visible only inside a quote.
    */
-  it('renders all twenty-seven covered states in every cross-state table', () => {
-    expect(HUB_COVERED_STATES).toHaveLength(27);
-    for (const code of ['MI', 'MS', 'SC', 'WI', 'MN', 'UT']) {
+  it('renders every covered state in every cross-state table', () => {
+    // DERIVED, not pinned. This was `toHaveLength(27)` and failed on every
+    // jurisdiction added — always for the reason the number was supposed to
+    // celebrate. What it is actually asserting is that the hub renders the
+    // WHOLE registry and invents nobody, and that survives the corpus growing.
+    expect(HUB_COVERED_STATES.map((s) => s.code).sort()).toEqual(
+      Object.keys(OSOW_JURISDICTIONS).sort(),
+    );
+    for (const code of ['MI', 'MS', 'SC', 'WI', 'MN', 'UT', 'DC']) {
       expect(HUB_COVERED_STATES.some((s) => s.code === code), code).toBe(true);
       const limits = legalLimitRows(ASOF).find((r) => r.state.code === code)!;
       expect(limits.width.text, `${code} width`).not.toBeNull();
