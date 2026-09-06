@@ -672,6 +672,13 @@ export const NO_PUBLISHED_POLICE_ESCORT_RATE: ReadonlyArray<NoPublishedPoliceRat
       'Neither the South Dakota Highway Patrol nor the Department of Public Safety publishes an escort fee schedule, hourly rate, mileage rate, administrative fee, minimum hours or cancellation charge for commercial motor carrier escorts. The Motor Carrier Handbook says only that "some permit applications require review by the Department of Transportation or the Highway Patrol" — a review of the APPLICATION, not an escort of the load, and ARSD 70:03:01:20 requires no law-enforcement escort at any width, length, height or weight. The escorts South Dakota does require are civilian pilot cars.',
   },
   {
+    jurisdiction: 'NV',
+    kind: 'noScheduleExists',
+    escortRuleId: 'nv-discretionary-extra-escorts',
+    finding:
+      'Nevada has no police escort rate because it has no police escort requirement to price. No provision in NAC 484D or NRS 484D mandates a Nevada Highway Patrol escort at any dimension or any weight. NAC 484D.640(12) is the only law-enforcement hook in the chapter, and it is a discretion to "coordinate additional utilities escorts and traffic control with the appropriate law enforcement agencies" over 17 ft wide on two or three lanes, over 19 ft on four or more, or over 16 ft high — coordination, not an officer escort. NAC 484D.670(5)(c) does confirm the Highway Patrol runs its own amber-light permit on the pilot car under NRS 484D.185, and publishes no price for that either. NAC 484D.500-695 and the reachable NRS 484D sections were read in full; dot.nv.gov and leg.state.nv.us were both unreachable from the researching network. Claims that every superload requires an NHP escort appear only on commercial permit-service sites and are not adopted.',
+  },
+  {
     jurisdiction: 'PA',
     kind: 'notPublished',
     escortRuleId: 'pa-superload-police-conflict',
