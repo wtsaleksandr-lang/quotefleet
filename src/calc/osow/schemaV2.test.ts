@@ -865,9 +865,32 @@ describe('engine wiring — each capability is inert until a jurisdiction declar
   });
 });
 
+/**
+ * PHASE 11 ENCODED WISCONSIN, MINNESOTA AND UTAH, WHICH ARE THE FIRST
+ * JURISDICTIONS TO DECLARE ANY OF THE FIELDS THIS FILE ADDED. The claim these
+ * two tests make is unchanged and is still the important one: the TWENTY-FOUR
+ * that existed before Phase 10 declare none of them and carry no conditioned
+ * row, so every one of them takes exactly the code path it took before the
+ * schema grew. The list is written out rather than derived, so that adding a
+ * jurisdiction cannot quietly shrink what is being asserted.
+ */
+const PRE_PHASE_10_JURISDICTIONS = [
+  'AL', 'AR', 'CA', 'CO', 'FL', 'GA', 'IL', 'IN', 'KY', 'LA',
+  'MI', 'MO', 'MS', 'NC', 'NJ', 'NY', 'OH', 'OK', 'PA', 'SC',
+  'TN', 'TX', 'VA', 'WA',
+];
+
 describe('THE 24 ENCODED JURISDICTIONS ARE UNCHANGED', () => {
+  it('is still asserting all twenty-four of them', () => {
+    expect(PRE_PHASE_10_JURISDICTIONS).toHaveLength(24);
+    for (const code of PRE_PHASE_10_JURISDICTIONS) {
+      expect(OSOW_JURISDICTIONS[code], `${code} must still be covered`).toBeDefined();
+    }
+  });
+
   it('declares none of the Phase 10 fields, so every one takes the untouched path', () => {
-    for (const [code, rules] of Object.entries(OSOW_JURISDICTIONS)) {
+    for (const code of PRE_PHASE_10_JURISDICTIONS) {
+      const rules = OSOW_JURISDICTIONS[code];
       if (rules === undefined) continue;
       const declared = [
         rules.routeVocabulary,
@@ -897,7 +920,7 @@ describe('THE 24 ENCODED JURISDICTIONS ARE UNCHANGED', () => {
       if ('appliesWhen' in rec && 'effectiveFrom' in rec) conditioned.push(path);
       for (const [k, v] of Object.entries(rec)) walk(v, `${path}.${k}`);
     };
-    for (const [code, rules] of Object.entries(OSOW_JURISDICTIONS)) walk(rules, code);
+    for (const code of PRE_PHASE_10_JURISDICTIONS) walk(OSOW_JURISDICTIONS[code], code);
     expect(conditioned).toEqual([]);
   });
 });

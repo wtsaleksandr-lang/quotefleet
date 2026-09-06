@@ -18,6 +18,7 @@
 import { describe, it, expect } from 'vitest';
 import http from 'node:http';
 import express from 'express';
+import { OSOW_JURISDICTIONS } from '../../calc/osow/jurisdictions/index.js';
 import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import {
@@ -320,7 +321,7 @@ describe('POST /api/tools/osow-permits', () => {
       const r = await fetch(`${base}/api/tools/osow-permits/coverage`);
       expect(r.status).toBe(200);
       const body = (await r.json()) as { coveredStates: unknown[]; routeClasses: unknown[] };
-      expect(body.coveredStates.length).toBe(24);
+      expect(body.coveredStates.length).toBe(Object.keys(OSOW_JURISDICTIONS).length);
       expect(body.routeClasses.length).toBe(4);
     } finally {
       close();
@@ -329,20 +330,20 @@ describe('POST /api/tools/osow-permits', () => {
 });
 
 describe('coverage lists', () => {
-  it('covers the 24 states the engine holds data for, and no more', () => {
+  it('covers exactly the states the engine holds data for, and no more', () => {
+    // The expected set is the REGISTRY, not a transcription of it. The literal
+    // list this replaced had to be edited every time a state landed, and an
+    // edit that is purely mechanical is an edit nobody reads -- which is how a
+    // stale assertion survives. What is worth asserting is that the public
+    // coverage list and the engine's own registry cannot drift apart.
     const codes = osowCoveredStates().map((s) => s.code).sort();
-    expect(codes).toEqual(
-      [
-        'TX', 'OH', 'PA', 'NY', 'IL', 'IN', 'CA', 'GA', 'NC', 'NJ', 'VA', 'WA',
-        'AL', 'FL', 'MO', 'OK', 'LA', 'CO', 'AR', 'KY', 'TN', 'MI', 'MS', 'SC',
-      ].sort(),
-    );
+    expect(codes).toEqual(Object.keys(OSOW_JURISDICTIONS).sort());
   });
 
   it('still OFFERS the 27 states it cannot price, so choosing one is explicit', () => {
     const all = osowStateOptions();
     expect(all.length).toBe(51); // 50 states + DC
-    expect(all.filter((s) => s.covered).length).toBe(24);
+    expect(all.filter((s) => s.covered).length).toBe(Object.keys(OSOW_JURISDICTIONS).length);
     expect(all.find((s) => s.code === 'WV')?.covered).toBe(false);
   });
 
@@ -412,7 +413,16 @@ describe('the page', () => {
       html.match(/\.ow-cov \{[^}]*grid-template-columns: repeat\((\d+), minmax\(0, 1fr\)\)/)?.[1],
     );
     expect(cols).toBeGreaterThan(0);
-    expect(osowCoveredStates().length % cols).toBe(0);
+    // The rule is NO ORPHAN, not perfect division. A last row holding three of
+    // six is fine; a last row holding ONE is the defect. Requiring an exact
+    // multiple made the assertion fail the moment the 27th state landed --
+    // 27 % 6 = 3, which is a perfectly good final row -- and would have forced
+    // the grid to 3 or 9 columns to satisfy a stricter rule than the one the
+    // design system actually states.
+    expect(
+      osowCoveredStates().length % cols,
+      `${osowCoveredStates().length} chips in ${cols} columns strands one`,
+    ).not.toBe(1);
   });
 
   it('uses theme tokens only — no raw hex that would break one theme', () => {

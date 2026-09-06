@@ -686,12 +686,29 @@ describe('data-model invariants that must hold for every jurisdiction added', ()
                   milesInJurisdiction,
                 });
                 if (verdict.applies !== true) continue;
-                const seen = feeBySource[row.source.id];
+                /**
+                 * TWO ROWS FROM ONE DOCUMENT CONFINED TO DIFFERENT CONDITIONS
+                 * ARE NOT COMPETING, and Minnesota is why the key grew. Minn.
+                 * Stat. § 169.86 subd. 5(g) charges $120 above 14 ft 6 in of
+                 * width "when the permit is issued while seasonal load
+                 * restrictions ... are in effect" and nothing outside that
+                 * season, so the same subdivision states two amounts for one
+                 * set of DIMENSIONS and `resolveSourced` separates them on the
+                 * restriction state rather than on a measurement. This grid
+                 * applies no context, so grouping by source id alone would read
+                 * a season-conditioned pair as one schedule contradicting
+                 * itself. The invariant it exists to protect is unchanged:
+                 * within one document AND one condition the bands must still be
+                 * mutually exclusive, which is what keeps the resolver from
+                 * seeing two band amounts as a source conflict.
+                 */
+                const key = `${row.source.id}|${JSON.stringify(row.appliesWhen ?? null)}`;
+                const seen = feeBySource[key];
                 if (seen === undefined) {
-                  feeBySource[row.source.id] = row.value.feeUsd;
+                  feeBySource[key] = row.value.feeUsd;
                 } else if (seen !== row.value.feeUsd) {
                   violations.push(
-                    `${j.code} ${row.source.id} gives both $${seen} and $${row.value.feeUsd} for ${widthIn}in x ${heightIn}in x ${overallLengthIn}in over ${milesInJurisdiction} mi`,
+                    `${j.code} ${key} gives both $${seen} and $${row.value.feeUsd} for ${widthIn}in x ${heightIn}in x ${overallLengthIn}in over ${milesInJurisdiction} mi`,
                   );
                 }
               }
@@ -3896,13 +3913,13 @@ describe('Tennessee — a permit priced by the ton-mile', () => {
   });
 });
 
-describe('the registry after Phase 9', () => {
-  it('covers exactly the twenty-four states whose datasets exist', () => {
+describe('the registry after Phase 11', () => {
+  it('covers exactly the twenty-seven states whose datasets exist', () => {
     expect(Object.keys(OSOW_JURISDICTIONS).sort()).toEqual(
       [
         'AL', 'AR', 'CA', 'CO', 'FL', 'GA', 'IL', 'IN', 'KY', 'LA',
-        'MI', 'MO', 'MS', 'NC', 'NJ', 'NY', 'OH', 'OK', 'PA', 'SC',
-        'TN', 'TX', 'VA', 'WA',
+        'MI', 'MN', 'MO', 'MS', 'NC', 'NJ', 'NY', 'OH', 'OK', 'PA',
+        'SC', 'TN', 'TX', 'UT', 'VA', 'WA', 'WI',
       ].sort(),
     );
     for (const code of Object.keys(OSOW_JURISDICTIONS)) {
@@ -3912,7 +3929,7 @@ describe('the registry after Phase 9', () => {
     // The registry must never name a jurisdiction ahead of its dataset, and the
     // count is asserted separately so a stray import cannot pass by matching a
     // list someone updated in the same edit.
-    expect(Object.keys(OSOW_JURISDICTIONS)).toHaveLength(24);
+    expect(Object.keys(OSOW_JURISDICTIONS)).toHaveLength(27);
   });
 });
 
@@ -3993,7 +4010,27 @@ describe('every per-mile fee note reconciles to its own amount', () => {
     const addAfter = addM ? Number(addM[1] as string) : 0;
 
     let amount = round2(rate * billed * units + addAfter);
-    if (/rounded up to the whole dollar/.test(head)) amount = Math.ceil(amount);
+    /**
+     * `PerMileRate.roundDollarsTo` generalises the whole-dollar boolean to any
+     * step in any direction, and Utah is the state that needed it: § 72-7-406
+     * (7)(c)(iii) rounds "the dollar amount used to calculate the fee ... to the
+     * nearest $10 increment", where a $184 fee becomes $180 rather than $190.
+     * The parser reads the clause the note prints, so a rounding that is priced
+     * and not described still fails here.
+     */
+    const stepM = head.match(/rounded (to the nearest|up to the next|down to the next) \$([\d,.]+)/);
+    if (stepM) {
+      const step = Number((stepM[2] as string).replace(/,/g, ''));
+      const q = amount / step;
+      const mode = stepM[1] as string;
+      const stepped =
+        mode === 'up to the next'
+          ? Math.ceil(q)
+          : mode === 'down to the next'
+            ? Math.floor(q)
+            : Math.round(q);
+      amount = round2(stepped * step);
+    } else if (/rounded up to the whole dollar/.test(head)) amount = Math.ceil(amount);
     else if (/rounded to the nearest whole dollar/.test(head)) amount = Math.round(amount);
 
     const minM = head.match(/minimum \$([\d.]+)/);
