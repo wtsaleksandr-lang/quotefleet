@@ -19,6 +19,7 @@
 import { describe, it, expect, beforeAll, afterAll } from 'vitest';
 import http from 'node:http';
 import express from 'express';
+import { OSOW_JURISDICTIONS } from '../../calc/osow/jurisdictions/index.js';
 import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import {
@@ -407,7 +408,10 @@ describe('the coverage endpoint', () => {
         permitsOnlyTool: string;
         coveredStates: unknown[];
       };
-      expect(body.coveredStates.length).toBe(24);
+      // Derived from the registry, not pinned. A literal here goes stale the
+      // day a state is encoded, and says nothing useful in the meantime: what
+      // matters is that the endpoint publishes exactly what the engine holds.
+      expect(body.coveredStates.length).toBe(Object.keys(OSOW_JURISDICTIONS).length);
       expect(body.mileageTiers.filed?.mayPriceStates).toBe(true);
       expect(body.mileageTiers.scalar?.mayPriceStates).toBe(false);
       // Tier 1 is now REACHABLE: routed in process over the federal

@@ -80,9 +80,9 @@ describe('hub coverage', () => {
    * each of the three states added, and the two new structural fields must
    * reach the conflicts page rather than being visible only inside a quote.
    */
-  it('renders all twenty-four covered states in every cross-state table', () => {
-    expect(HUB_COVERED_STATES).toHaveLength(24);
-    for (const code of ['MI', 'MS', 'SC']) {
+  it('renders all twenty-seven covered states in every cross-state table', () => {
+    expect(HUB_COVERED_STATES).toHaveLength(27);
+    for (const code of ['MI', 'MS', 'SC', 'WI', 'MN', 'UT']) {
       expect(HUB_COVERED_STATES.some((s) => s.code === code), code).toBe(true);
       const limits = legalLimitRows(ASOF).find((r) => r.state.code === code)!;
       expect(limits.width.text, `${code} width`).not.toBeNull();

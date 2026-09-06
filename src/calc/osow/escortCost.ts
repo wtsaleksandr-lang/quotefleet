@@ -557,7 +557,7 @@ export interface NoPublishedPoliceRate {
   finding: string;
 }
 
-/** The seventeen jurisdictions that publish no law-enforcement escort rate. */
+/** The twenty jurisdictions that publish no law-enforcement escort rate. */
 export const NO_PUBLISHED_POLICE_ESCORT_RATE: ReadonlyArray<NoPublishedPoliceRate> = [
   {
     jurisdiction: 'AR',
@@ -616,6 +616,13 @@ export const NO_PUBLISHED_POLICE_ESCORT_RATE: ReadonlyArray<NoPublishedPoliceRat
       'Mississippi requires two blue-light escorts at 300,000 lb or more and contemplates a discretionary police escort by width, and neither MDOT nor the Mississippi Department of Public Safety publishes an hourly rate, minimum hours, officer minimum, mileage rate or cancellation charge. The Manual says only that "The Mississippi Department of Public Safety (DPS) is authorized to enforce Mississippi laws relating to commercial vehicles".',
   },
   {
+    jurisdiction: 'MN',
+    kind: 'notPublished',
+    escortRuleId: 'mn-centerline-peace-officer',
+    finding:
+      'Minnesota requires a lead LICENSED PEACE OFFICER whenever a load crosses the centerline on an undivided roadway, and publishes no rate for one. Minn. Stat. § 169.812, § 299D.085, Minn. R. 7455, the MnDOT escorts page and the May 2025 superload guide were all read; the only price in the scheme is Minn. R. 7455.0300 subp. 1(A) sets $180 initial and $90 renewal for the CIVILIAN certification course. MnDOT devolves the escort to three tiers of agency — State Patrol, county sheriffs, city police — and says "individual agency requirements may vary". Minnesota also requires the officer to hold the same § 299D.085 certificate as a civilian, so not every trooper qualifies.',
+  },
+  {
     jurisdiction: 'MO',
     kind: 'notPublished',
     escortRuleId: 'mo-width-over-18',
@@ -665,11 +672,25 @@ export const NO_PUBLISHED_POLICE_ESCORT_RATE: ReadonlyArray<NoPublishedPoliceRat
       'TxDOT may require law-enforcement traffic control, sets no threshold that would let it be predicted, and publishes no officer rate.',
   },
   {
+    jurisdiction: 'UT',
+    kind: 'notPublished',
+    escortRuleId: 'ut-police-escort-no-published-rate',
+    finding:
+      'Utah publishes a real dimensional police trigger — R909-2-14 Table 3 requires "2 pilot escorts and at least 2 police escorts" over 20 ft wide on a freeway, 17 ft on a secondary highway, 175 ft long or 17 ft 6 in high — and no rate at all. R909-2 (all thirty-three sections), Utah Code §§ 72-7-402/404/406/407, three UDOT pages and the Utah Highway Patrol site were searched. R909-2-16(4)(e) says only "the permittee will assume all costs when a certified police escort or escorts are required", and R909-2-14(1)(c) puts the COUNT outside UDOT: "The number of police escorts required is determined by the Utah Highway Patrol." The $40.00 minimum UDOT does publish is for a DEPARTMENT employee and vehicle, not for police, and is itself a floor — "or the full cost ... whichever is greater".',
+  },
+  {
     jurisdiction: 'VA',
     kind: 'noScheduleExists',
     escortRuleId: 'va-police-escort-per-locality',
     finding:
       'Virginia does not have a state police escort rate. 24VAC20-82-60.B.9 requires written authorisation from LOCAL law-enforcement personnel for each locality on the route, negotiated and priced separately with every one of them. There is no published schedule to quote.',
+  },
+  {
+    jurisdiction: 'WI',
+    kind: 'notPublished',
+    escortRuleId: 'wi-police-escort-formula-without-inputs',
+    finding:
+      'Wisconsin publishes the FORMULA and not the rate, which is a different finding from either of the other two kinds. Wis. Admin. Code Trans 320.05(1) lists the fee components — "(a) Duty hours. (b) Rate of pay. (c) Vehicle mileage. (d) Mileage rate. (e) Meal allowance." — and every input is set outside the published code: Trans 320.02(13) defines the rate of pay by "collective bargaining agreement or state of Wisconsin compensation plan", and (6)-(7) define the allowances by reference to the internal departmental manual TAM 8-6, obtainable only by writing to the Division of State Patrol. § 348.26(2) attaches no dimensional trigger at all — a traffic officer is required "whenever the officer or agency issuing such permit deems it necessary". The one fixed figure in the scheme is a $100 surcharge for cancelling with under 24 hours of notice (Trans 320.03(15)).',
   },
   {
     jurisdiction: 'WA',

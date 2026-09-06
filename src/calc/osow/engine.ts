@@ -57,6 +57,7 @@ import {
   type BridgeFormulaResult,
 } from './bridgeFormula.js';
 import {
+  applyFeeAbsorption,
   applyTransactionFee,
   chargedIncrements,
   combinedFeeRulesEqual,
@@ -85,6 +86,7 @@ import {
   type AxleSpacingTableResult,
   type AxleSpacingWeightTable,
   type CombinedFeeRule,
+  type FeeComponent,
   type JurisdictionOsowRules,
   type StateBridgeTable,
   type StateBridgeTableResult,
@@ -407,8 +409,27 @@ function describePerMile(
   if (rate.perIncrementLbs !== null && rate.perIncrementLbs > 0) {
     const exact =
       (grossWeightLbs - (rate.excessBaseLbs ?? 0)) / rate.perIncrementLbs;
+    /**
+     * A WEIGHT ROUNDING THE STATE PUBLISHES MUST BE NAMED, or the increment
+     * count in this sentence has no stated cause. Utah rounds "the pounds used
+     * to calculate the fee" up to the nearest 25,000 lb, which turns 46,000 lb
+     * of excess into fifty charged increments rather than forty-six — and a
+     * reader checking the note against § 72-7-406(7) has to be able to see
+     * where the extra four came from. It also REPLACES the generic
+     * "(part increment charged in full)" clause, which would be true and
+     * useless: the part increment is not what moved the number.
+     */
+    const basis = step.billedPoundsBasis;
+    const poundNote =
+      basis === undefined
+        ? rate.roundIncrementUp && exact !== step.units
+          ? ' (part increment charged in full)'
+          : ''
+        : basis.appliesTo === 'gross'
+          ? ` (the gross weight of ${basis.raw.toLocaleString()} lb rounded up to a multiple of ${(rate.roundPoundsTo?.toMultipleOf ?? 0).toLocaleString()} lb = ${basis.rounded.toLocaleString()} lb)`
+          : ` (${basis.raw.toLocaleString()} lb of excess rounded up to a multiple of ${(rate.roundPoundsTo?.toMultipleOf ?? 0).toLocaleString()} lb = ${basis.rounded.toLocaleString()} lb)`;
     parts.push(
-      `× $${rate.ratePerMileUsd} per mile per ${rate.perIncrementLbs.toLocaleString()} lb over ${(rate.excessBaseLbs ?? 0).toLocaleString()} lb × ${step.units} increment${step.units === 1 ? '' : 's'}${rate.roundIncrementUp && exact !== step.units ? ' (part increment charged in full)' : ''}`,
+      `× $${rate.ratePerMileUsd} per mile per ${rate.perIncrementLbs.toLocaleString()} lb over ${(rate.excessBaseLbs ?? 0).toLocaleString()} lb × ${step.units} increment${step.units === 1 ? '' : 's'}${poundNote}`,
     );
   } else {
     parts.push(`× $${rate.ratePerMileUsd} per mile`);
@@ -416,7 +437,21 @@ function describePerMile(
   if (step.addAfterUsd > 0) {
     parts.push(`plus a $${step.addAfterUsd.toFixed(2)} flat charge inside the rounding`);
   }
-  if (rate.roundDollars === 'up') parts.push('rounded up to the whole dollar');
+  /**
+   * THE GENERAL DOLLAR ROUNDING WINS WHERE BOTH ARE DECLARED, exactly as
+   * `perMileAmountBreakdown` applies them, so the sentence and the arithmetic
+   * cannot describe two different orders of operations.
+   */
+  if (rate.roundDollarsTo !== undefined) {
+    const r = rate.roundDollarsTo;
+    const direction =
+      r.direction === 'nearest'
+        ? 'to the nearest'
+        : r.direction === 'up'
+          ? 'up to the next'
+          : 'down to the next';
+    parts.push(`rounded ${direction} $${r.toMultipleOf.toLocaleString()}`);
+  } else if (rate.roundDollars === 'up') parts.push('rounded up to the whole dollar');
   else if (rate.roundDollars === 'nearest') parts.push('rounded to the nearest whole dollar');
   if (rate.minimumUsd !== null) parts.push(`minimum $${rate.minimumUsd.toFixed(2)}`);
   if (rate.maximumUsd !== null) parts.push(`capped at $${rate.maximumUsd.toFixed(2)}`);
@@ -1818,7 +1853,52 @@ export function calculateOsowForJurisdiction(
     const combineKind = combineRes?.value?.kind ?? 'cumulative';
 
     if (oversizeLine !== null && overweightLine !== null && combineKind !== 'cumulative') {
-      if (combineKind === 'overweightOnly') {
+      if (combineKind === 'absorption') {
+        /**
+         * WISCONSIN, AND THE ARM PHASE 10 DECLARED WITHOUT WIRING.
+         *
+         * Absorption is not a comparison. `greaterOf` asks which fee is bigger;
+         * Wis. Stat. § 348.25(8)(d) says which fee EXISTS — "if the vehicle or
+         * combination of vehicles exceeds weight limitations, no fee in
+         * addition to the fee under par. (a) 3. ... shall be charged if the
+         * vehicle also exceeds length, width or height limitations or any
+         * combination thereof" — so a Wisconsin size fee that happened to
+         * exceed the weight fee is still not charged. Falling through to
+         * `greaterOf` would have priced the larger of the two, which is the
+         * right answer only by accident and the wrong one whenever the size
+         * ladder outruns a light overweight.
+         *
+         * The lattice is DATA and `applyFeeAbsorption` is a pure function over
+         * it, applied to a fixed point so a chain of two absorptions resolves
+         * in one call. Nothing here knows which state it is running for, and no
+         * jurisdiction encoded before Phase 11 declares `absorption`, so this
+         * arm is unreachable for all twenty-four of them.
+         */
+        const charged: FeeComponent[] = ['oversize', 'overweight'];
+        const surviving = new Set(
+          applyFeeAbsorption(charged, combineRes?.value ?? null),
+        );
+        const explanation = combineRes?.value?.explanation ?? '';
+        const withNote = (line: OsowFeeLine, absorbed: OsowFeeLine): OsowFeeLine => ({
+          ...line,
+          note: `${line.note === undefined ? '' : `${line.note}. `}Charged INSTEAD OF the ${
+            absorbed.code === 'osow_oversize' ? 'oversize' : 'overweight'
+          } fee${
+            absorbed.amountUsd === null ? '' : ` of $${absorbed.amountUsd.toFixed(2)}`
+          }, which is absorbed and not billed — ${explanation}`.trim(),
+        });
+        if (surviving.has('overweight') && !surviving.has('oversize')) {
+          lines.push(withNote(overweightLine, oversizeLine));
+        } else if (surviving.has('oversize') && !surviving.has('overweight')) {
+          lines.push(withNote(oversizeLine, overweightLine));
+        } else {
+          // The declared lattice absorbs neither component for this load, so
+          // both stand. Absorption is not a licence to drop a fee the rule does
+          // not name.
+          lines.push(oversizeLine);
+          lines.push(overweightLine);
+        }
+      } else if (combineKind === 'overweightOnly') {
         // Ohio: "only one basic processing fee ... and the applicable
         // overweight surcharge ... will be charged." The oversize surcharge is
         // not billed at all, so it is not printed as a $0 line either.

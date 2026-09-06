@@ -169,8 +169,60 @@
  * identical output across a matrix of loads, dates and route classes — see
  * `scripts/osow-behaviour-snapshot.ts`.
  *
- * Twenty-four are covered: TX, OH, PA, NY, IL, IN, CA, GA, NC, NJ, VA, WA, AL,
- * FL, MO, OK, LA, CO, AR, KY, TN, MI, MS, SC.
+ *
+ * PHASE 11 SPENDS THE ROOM PHASE 10 MADE, AND ADDS NO SCHEMA AT ALL.
+ * -------------------------------------------------------------------------
+ * WISCONSIN, MINNESOTA AND UTAH are encoded from 259 primary-source data
+ * points, and they were chosen first because between them they exercise every
+ * mechanism Phase 10 built:
+ *
+ *   WISCONSIN is the ABSORPTION state. Wis. Stat. § 348.25(8)(c) and (d) make
+ *   the width-or-height fee absorb the length fee and the WEIGHT fee absorb
+ *   every size fee — a MAX over a two-level lattice, not a sum and not a
+ *   comparison — so a load that is over-length, over-width, over-height AND
+ *   overweight pays the weight fee alone. It is also the first jurisdiction
+ *   whose overweight fee is DERIVED rather than tabled ("10 percent of the fee
+ *   specified in par. (b) 3. for an annual permit for the comparable gross
+ *   weight"), the first `reviewRequired` outcome in a real dataset ("All loads
+ *   exceeding 16 feet in width shall have one or more properly equipped
+ *   escorts" — no count), and the first `RouteClassLimitScale` (class "B" is
+ *   sixty per cent of class "A").
+ *
+ *   MINNESOTA is the two-widths state and the frost seam. § 169.812 subd. 2
+ *   measures width at the BOTTOM and at the TOP of the load in one sentence, so
+ *   `widthAtBottomIn` and `widthAtTopIn` finally have a jurisdiction; § 169.86
+ *   subd. 5(e) is the first `perMilePerAxleGroup` fee, summed then multiplied;
+ *   § 169.86 subd. 5(g) adds $120 to a wide single trip only while seasonal
+ *   load restrictions are in effect, which is the first `Sourced.appliesWhen`
+ *   in any dataset and the first time `seasonalStateFor()` reaches a PRICE; and
+ *   § 169.823 subd. 1 is the paved/unpaved split `provenance.ts` named
+ *   Minnesota for when `appliesWhen` was written.
+ *
+ *   UTAH is three roundings on one fee. § 72-7-406(7)(c) rounds miles UP to 50,
+ *   pounds UP to 25,000 and dollars TO THE NEAREST $10 — the case `RoundingRule`
+ *   exists for — and never says whether "the pounds" are the gross or the excess
+ *   over 80,000 lb, which is $180 against $250 on one ordinary lane and is on
+ *   file as two rows neither of which is adopted. R909-2-14(1)(b) takes "the
+ *   most stringent requirement that applies" where Texas is additive, which is
+ *   the first `EscortCountCombination`.
+ *
+ * ONE THING MOVED IN THE ENGINE AND IT IS THE COMBINATOR PHASE 10 DECLARED AND
+ * DID NOT WIRE: `CombinedFeeRule.kind: 'absorption'` reached the fee block and
+ * fell through to the `greaterOf` arm, which is a comparison where absorption
+ * is a statement about which charge exists at all. It now runs
+ * `applyFeeAbsorption` over the components a load actually incurs. No
+ * jurisdiction encoded before this phase declares `absorption`, so the arm is
+ * unreachable for all twenty-four and `scripts/osow-behaviour-snapshot.ts`
+ * checks that rather than asserting it. `describePerMile` also learned to
+ * render `roundPoundsTo` and `roundDollarsTo`, because a modifier that is
+ * priced and not described is a fee line whose note does not reconcile.
+ *
+ * Same terms as every phase before: no evaluator changed its meaning for any
+ * existing state, no condition kind was added, and no `if (state === ...)`
+ * exists anywhere.
+ *
+ * Twenty-seven are covered: TX, OH, PA, NY, IL, IN, CA, GA, NC, NJ, VA, WA, AL,
+ * FL, MO, OK, LA, CO, AR, KY, TN, MI, MS, SC, WI, MN, UT.
  */
 import type { JurisdictionOsowRules } from '../types.js';
 import { TEXAS_OSOW_RULES } from './texas.js';
@@ -197,6 +249,9 @@ import { TENNESSEE_OSOW_RULES } from './tennessee.js';
 import { MICHIGAN_OSOW_RULES } from './michigan.js';
 import { MISSISSIPPI_OSOW_RULES } from './mississippi.js';
 import { SOUTH_CAROLINA_OSOW_RULES } from './southCarolina.js';
+import { WISCONSIN_OSOW_RULES } from './wisconsin.js';
+import { MINNESOTA_OSOW_RULES } from './minnesota.js';
+import { UTAH_OSOW_RULES } from './utah.js';
 
 export const OSOW_JURISDICTIONS: Record<string, JurisdictionOsowRules> = {
   TX: TEXAS_OSOW_RULES,
@@ -223,6 +278,9 @@ export const OSOW_JURISDICTIONS: Record<string, JurisdictionOsowRules> = {
   MI: MICHIGAN_OSOW_RULES,
   MS: MISSISSIPPI_OSOW_RULES,
   SC: SOUTH_CAROLINA_OSOW_RULES,
+  WI: WISCONSIN_OSOW_RULES,
+  MN: MINNESOTA_OSOW_RULES,
+  UT: UTAH_OSOW_RULES,
 };
 
 /** Is there OS/OW coverage for this state/province code? */
@@ -262,4 +320,7 @@ export {
   MICHIGAN_OSOW_RULES,
   MISSISSIPPI_OSOW_RULES,
   SOUTH_CAROLINA_OSOW_RULES,
+  WISCONSIN_OSOW_RULES,
+  MINNESOTA_OSOW_RULES,
+  UTAH_OSOW_RULES,
 };

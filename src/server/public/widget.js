@@ -1318,7 +1318,7 @@
   // server can price every pound under the ceiling.
   //
   // Pinned against the server-side data by src/calc/osow/widgetMirror.test.ts.
-  var OSOW_SUPERLOAD_LBS = { TX: 254300, OH: 120000, PA: 201000, NY: 199999, GA: 180000, NC: 132000, WA: 200000, AL: 300000, MO: 160000, LA: 254000, CO: 200000, AR: 179999, KY: 160000, TN: 165000, SC: 130000 };
+  var OSOW_SUPERLOAD_LBS = { TX: 254300, OH: 120000, PA: 201000, NY: 199999, GA: 180000, NC: 132000, WA: 200000, AL: 300000, MO: 160000, LA: 254000, CO: 200000, AR: 179999, KY: 160000, TN: 165000, SC: 130000, MN: 250000 };
   function maxQuotableWeightLbs(pickup, delivery) {
     var from = String((pickup && pickup.state) || '').trim().toUpperCase();
     var to = String((delivery && delivery.state) || '').trim().toUpperCase();
