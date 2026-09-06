@@ -19,6 +19,8 @@
  */
 import { test, expect, type Page } from '@playwright/test';
 
+import { anUncoveredState } from './_uncovered';
+
 const TOOL_PATH = '/tools/oversize-permits';
 
 interface Leg {
@@ -416,13 +418,15 @@ test.describe('OS/OW calculator — the priced lane', () => {
 
 test.describe('OS/OW calculator — refusals a user can reach', () => {
   test('shows a PARTIAL figure on an uncovered lane, never a lane total', async ({ page }) => {
+    // The uncovered state is read from the engine, never named here: see
+    // ./_uncovered. Mississippi was hardcoded, then encoded, and this test
+    // failed for a reason that had nothing to do with the refusal it guards.
+    const uncoveredState = anUncoveredState();
+
     await openTool(page);
     await calculate(page, REFERENCE_LOAD, [
       { state: 'TX', miles: 215 },
-      // West Virginia, not Mississippi: MS was this suite's canonical uncovered
-      // state until it was encoded, at which point this lane started pricing in
-      // full and the test was asserting a refusal that no longer happens.
-      { state: 'WV', miles: 160 },
+      { state: uncoveredState.code, miles: 160 },
       { state: 'AL', miles: 90 },
     ]);
 
@@ -446,19 +450,19 @@ test.describe('OS/OW calculator — refusals a user can reach', () => {
     expect(Number(value.replace(/[^0-9.]/g, ''))).toBeCloseTo(summed, 2);
 
     // THE REFUSAL IS INTACT. The words "lane total" only ever appear negated,
-    // and Mississippi is named in full rather than folded into the figure.
+    // and the uncovered state is named in full rather than folded into the figure.
     const tsub = (await page.locator('.ow-total .ow-tsub').textContent()) ?? '';
     expect(tsub).toContain('There is no lane total for this lane');
-    expect(tsub).toContain('Mississippi');
+    expect(tsub).toContain(uncoveredState.name);
     const uncovered = page.locator('.ow-note--error');
-    await expect(uncovered).toContainText('Mississippi (MS)');
+    await expect(uncovered).toContainText(`${uncoveredState.name} (${uncoveredState.code})`);
     await expect(uncovered).toContainText('nothing is charged for it and nothing is assumed');
 
-    // Mississippi is a ROW in the summary table too — named, with no zeros.
-    const msRow = page.locator('.ow-sum tbody tr', { hasText: 'Mississippi' });
-    await expect(msRow).toHaveCount(1);
-    await expect(msRow.locator('.ow-st')).toHaveText('Not covered');
-    expect((await msRow.textContent()) ?? '').not.toMatch(/\$/);
+    // It is a ROW in the summary table too — named, with no zeros.
+    const uncoveredRow = page.locator('.ow-sum tbody tr', { hasText: uncoveredState.name });
+    await expect(uncoveredRow).toHaveCount(1);
+    await expect(uncoveredRow.locator('.ow-st')).toHaveText('Not covered');
+    expect((await uncoveredRow.textContent()) ?? '').not.toMatch(/\$/);
     await expect(page.locator('.ow-sumtot td').first()).toHaveText('Priced states only');
     await expect(page.locator('.ow-sumtot .ow-st')).toHaveText('Partial');
 

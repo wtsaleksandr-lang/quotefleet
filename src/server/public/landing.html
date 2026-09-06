@@ -43,6 +43,17 @@
 <link rel="stylesheet" href="/landing-nav-consistency.css">
   <link rel="stylesheet" href="/landing-hero-fixes-v2.css">
   <link rel="stylesheet" href="/landing-hero-composite.css">
+  <!-- THE HEADER COLLAPSE MUST NOT WAIT FOR JAVASCRIPT.
+       nav-ia.css is what turns the homepage header into a burger below 1024px,
+       and landing-motion.js injects it AFTER first paint. Until it lands, the
+       full desktop action cluster is laid out at whatever the viewport is: at
+       320px that is 233px of buttons starting 134px in, so the document scrolls
+       sideways by 47px before the sheet arrives and the header visibly snaps.
+       Linking it here makes the collapse render-blocking. landing-motion.js
+       still injects it afterwards, which is what keeps its late cascade
+       position for everything else in the file — this copy only ensures the
+       first paint is already collapsed. -->
+  <link rel="stylesheet" href="/nav-ia.css">
   <link rel="preload" as="image" href="/marketing/qf-hero-phone-poster.jpg">
   <link rel="icon" href="/favicon.ico" sizes="any">
   <link rel="icon" type="image/png" sizes="32x32" href="/brand/favicon-32.png">
