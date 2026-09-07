@@ -3930,6 +3930,7 @@ describe('the registry after Phase 11', () => {
     'AL', 'AR', 'CA', 'CO', 'DC', 'FL', 'GA', 'IL', 'IN', 'KY',
     'LA', 'MI', 'MN', 'MO', 'MS', 'NC', 'NJ', 'NV', 'NY', 'OH',
     'OK', 'PA', 'SC', 'SD', 'TN', 'TX', 'UT', 'VA', 'WA', 'WI',
+    'WV',
   ];
 
   it('covers exactly the jurisdictions whose datasets exist', () => {

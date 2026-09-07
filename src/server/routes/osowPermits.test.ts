@@ -16,6 +16,7 @@
  * number a human has checked against the states' own published schedules.
  */
 import { describe, it, expect } from 'vitest';
+import { anUncoveredState } from '../../calc/osow/uncoveredState';
 import http from 'node:http';
 import express from 'express';
 import { OSOW_JURISDICTIONS } from '../../calc/osow/jurisdictions/index.js';
@@ -198,24 +199,27 @@ describe('the reference lane', () => {
 });
 
 describe('an uncovered state is a first-class outcome', () => {
+  // ASKED OF THE ENGINE, NOT WRITTEN DOWN — see src/calc/osow/uncoveredState.ts.
+  // This named Mississippi, then West Virginia, and broke both times the named
+  // state was encoded. The OUTCOME for a state with no dataset is what is under
+  // test; which state that is belongs to the roadmap.
+  const missing = anUncoveredState();
+
   const out = priceOsowLane({
     load: { ...REFERENCE_LANE.load },
     legs: [
       { state: 'TX', miles: 215 },
-      { state: 'WV', miles: 160 },
+      { state: missing.code, miles: 160 },
       { state: 'AL', miles: 90 },
     ],
     asOf: ASOF,
   });
 
   it('names the state instead of charging $0 for it', () => {
-    // West Virginia stands in for the uncovered case that Mississippi used to
-    // hold before Phase 9 sourced it. The point of the test is the OUTCOME for a
-    // state with no dataset, not which state that is.
-    expect(out.uncovered).toEqual([{ code: 'WV', name: 'West Virginia' }]);
-    expect(out.quote.uncoveredJurisdictions).toEqual(['WV']);
+    expect(out.uncovered).toEqual([{ code: missing.code, name: missing.name }]);
+    expect(out.quote.uncoveredJurisdictions).toEqual([missing.code]);
     // It must not appear as a priced jurisdiction at any amount, least of all 0.
-    expect(out.quote.jurisdictions.some((j) => j.jurisdiction === 'WV')).toBe(false);
+    expect(out.quote.jurisdictions.some((j) => j.jurisdiction === missing.code)).toBe(false);
   });
 
   it('refuses a lane total rather than quietly excluding it', () => {
@@ -340,11 +344,17 @@ describe('coverage lists', () => {
     expect(codes).toEqual(Object.keys(OSOW_JURISDICTIONS).sort());
   });
 
-  it('still OFFERS the 27 states it cannot price, so choosing one is explicit', () => {
+  it('still OFFERS the states it cannot price, so choosing one is explicit', () => {
+    // The COUNT is derived. "the 27 states it cannot price" was in this title
+    // and the number moved with every research wave, so the test announced a
+    // stale figure long before it failed on one.
     const all = osowStateOptions();
-    expect(all.length).toBe(51); // 50 states + DC
-    expect(all.filter((s) => s.covered).length).toBe(Object.keys(OSOW_JURISDICTIONS).length);
-    expect(all.find((s) => s.code === 'WV')?.covered).toBe(false);
+    expect(all.length).toBe(51); // 50 states + DC — this one really is fixed
+    const coveredCount = Object.keys(OSOW_JURISDICTIONS).length;
+    expect(all.filter((s) => s.covered).length).toBe(coveredCount);
+    expect(all.filter((s) => !s.covered).length).toBe(51 - coveredCount);
+    // And a genuinely uncovered state is offered, and marked uncovered.
+    expect(all.find((s) => s.code === anUncoveredState().code)?.covered).toBe(false);
   });
 
   it('offers exactly four route classes — an even count wraps 2x2, never 3+1', () => {
@@ -404,11 +414,12 @@ describe('the page', () => {
     expect(html).toMatch(/\.ow-flags \{[^}]*grid-template-columns: repeat\(2, minmax\(0, 1fr\)\)/);
     // 1-4 status badges per state -> 2 content-sized columns, padded to even.
     expect(html).toMatch(/\.ow-badges \{[^}]*grid-template-columns: repeat\(2, minmax\(0, max-content\)\)/);
-    // The coverage chips are a FIXED grid whose column count must DIVIDE the
-    // covered-state count exactly, so no chip is ever left alone on a row. It
-    // was 7 across for 21 states and is 6 across for 24. Assert the arithmetic,
-    // not the number, so adding a 25th state fails here rather than shipping a
-    // short last row.
+    // The coverage chips are a grid whose column count is now CHOSEN AT RENDER
+    // TIME by `coverageChipColumns`, because no fixed count survives the corpus
+    // growing from 31 states to 51 — 4 orphans at 33, 5 at 36, 6 at 37, 7 at
+    // 36, 8 at 33. It was a literal 7 for 21 states, a literal 6 for 24, and
+    // stranded a chip again at 31. This assertion still reads the rendered CSS
+    // rather than trusting the helper, so a wrong column count fails here.
     const cols = Number(
       html.match(/\.ow-cov \{[^}]*grid-template-columns: repeat\((\d+), minmax\(0, 1fr\)\)/)?.[1],
     );

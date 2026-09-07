@@ -7,6 +7,7 @@
  * in. Nothing in this file reaches the internet or the database.
  */
 import { describe, it, expect, vi } from 'vitest';
+import { anUncoveredState } from '../osow/uncoveredState';
 import {
   geocodeAddress,
   clearGeocodeCache,
@@ -799,42 +800,47 @@ describe('the same lane with only addresses — tier 4', () => {
 });
 
 describe('a lane touching an uncovered state', () => {
+  /**
+   * ASKED OF THE ENGINE, NOT WRITTEN DOWN. This block named Mississippi until
+   * Mississippi was encoded, then West Virginia until West Virginia was
+   * encoded — thirteen tests across four files failed on that second one, all
+   * of them reporting a broken refusal that was working perfectly. What is
+   * under test is the OUTCOME for a state with no dataset: named, unpriced,
+   * never inferred from a neighbour. Which state that happens to be is the
+   * roadmap's business, not this test's. See src/calc/osow/uncoveredState.ts.
+   */
+  const missing = anUncoveredState();
+
   const out = priceHeavyHaulLane({
     cargo: REFERENCE_CARGO,
     lane: { origin: HOUSTON, destination: BUFFALO },
     filedLegs: [
       { stateCode: 'TX', miles: 200 },
-      { stateCode: 'WV', stateName: 'West Virginia', miles: 180 },
+      { stateCode: missing.code, stateName: missing.name, miles: 180 },
       { stateCode: 'TN', miles: 250 },
     ],
     rates: { linehaulUsdPerMile: 4.85 },
     diesel: DIESEL,
     asOf: ASOF,
-    stateNames: { WV: 'West Virginia' },
+    stateNames: { [missing.code]: missing.name },
   });
 
-  /**
-   * West Virginia stands where Mississippi stood until Phase 9 sourced it. What
-   * is under test is the OUTCOME for a state with no dataset — named, unpriced,
-   * never inferred from a neighbour — not which state happens to be uncovered
-   * this month.
-   */
   it('NAMES IT AND LEAVES IT UNPRICED — never $0, never inferred from a neighbour', () => {
-    expect(out.permits?.uncoveredJurisdictions).toContain('WV');
-    const wv = out.lines.find((l) => l.code === 'permit_WV');
-    expect(wv?.amountUsd).toBeNull();
-    expect(wv?.name).toContain('West Virginia');
-    expect(wv?.note).toMatch(/will not infer one from a neighbouring state/);
+    expect(out.permits?.uncoveredJurisdictions).toContain(missing.code);
+    const line = out.lines.find((l) => l.code === `permit_${missing.code}`);
+    expect(line?.amountUsd).toBeNull();
+    expect(line?.name).toContain(missing.name);
+    expect(line?.note).toMatch(/will not infer one from a neighbouring state/);
   });
 
   it('marks the delivered figure PARTIAL and names the missing state', () => {
     expect(out.partial).toBe(true);
-    expect(out.partialBecause.join(' ')).toContain('WV');
+    expect(out.partialBecause.join(' ')).toContain(missing.code);
   });
 
-  it('takes points off, and the finding names West Virginia', () => {
+  it('takes points off, and the finding names the uncovered state', () => {
     const finding = out.confidence.findings.find((f) => f.code === 'states_uncovered');
-    expect(finding?.headline).toContain('WV');
+    expect(finding?.headline).toContain(missing.code);
     expect(finding?.grounding).toBe('ratio');
   });
 });

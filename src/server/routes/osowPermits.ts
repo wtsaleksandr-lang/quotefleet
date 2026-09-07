@@ -285,6 +285,34 @@ export type OsowRequest = z.infer<typeof OsowRequestSchema>;
  * dates on which part of the corpus is out of effect, which is the exact bug
  * the bound exists to close. One pass over the compiled data at module load.
  */
+/**
+ * HOW MANY COLUMNS THE COVERAGE-CHIP GRID GETS, COMPUTED RATHER THAN WRITTEN
+ * DOWN.
+ *
+ * The design system's rule is NO ORPHAN: a wrapped group never leaves one item
+ * alone on the last row. For a fixed N-column grid holding C chips that means
+ * `C % N !== 1`, and C is the covered-state count, which grows every time a
+ * jurisdiction is encoded.
+ *
+ * This was a literal 6, and before that a literal 7 — it went 7 across for 21
+ * states, 6 for 24, and stranded a chip again at 31 (31 % 6 === 1). Every
+ * research wave has a chance of breaking it, the failure is a real visual
+ * defect rather than a false alarm, and the fix has been the same edit every
+ * time. There is no fixed column count that survives 31 through 51: 4 fails at
+ * 33, 5 at 36, 6 at 37, 7 at 36, 8 at 33.
+ *
+ * So pick at render time. Prefer WIDER grids because the chips are two-letter
+ * codes and a narrow grid wastes the row, and take the first width that leaves
+ * no orphan. A count that somehow orphans in every candidate width falls back
+ * to the narrowest, which cannot orphan for any C above 2.
+ */
+export function coverageChipColumns(chipCount: number): number {
+  for (const cols of [7, 6, 5, 4, 3, 2]) {
+    if (chipCount % cols !== 1) return cols;
+  }
+  return 2;
+}
+
 export const OSOW_ASOF_MIN: string = (() => {
   let latest = '1900-01-01';
   const seen = new Set<unknown>();
@@ -706,7 +734,7 @@ const OSOW_CSS = `
   /* SEVEN COLUMNS BECAUSE THERE ARE 21 COVERED STATES, and 21 = 3 x 7 exactly.
      An auto-fill grid or a flex wrap lands on five columns at some width, where
      21 chips leave ONE alone on a fourth row. A fixed 7 cannot. */
-  .ow-cov { display: grid; grid-template-columns: repeat(6, minmax(0, 1fr)); gap: 4px; margin-top: 8px; }
+  .ow-cov { display: grid; grid-template-columns: repeat(${coverageChipColumns(osowCoveredStates().length)}, minmax(0, 1fr)); gap: 4px; margin-top: 8px; }
   .ow-cov span { font-size: 11px; font-family: var(--font-mono); letter-spacing: 0.04em; padding: 4px; text-align: center; border-radius: var(--radius-pill); border: 1px solid var(--border); color: var(--muted); }
 
   .ow-empty { color: var(--muted); font-size: 14px; line-height: 1.6; margin: 0; }
