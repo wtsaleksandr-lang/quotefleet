@@ -354,6 +354,34 @@ export function applyRounding(value: number, rule: RoundingRule): number {
 export interface PerMileRate {
   minLbs: number;
   maxLbs: number | null;
+  /**
+   * AXLE COUNT SELECTS THE ROW, WHERE THE STATE MAKES IT DO SO. Optional, and
+   * absent on every rate that came before South Dakota.
+   *
+   * ARSD 70:03:01:02 charges "two cents for each ton or fraction of a ton that
+   * its gross weight exceeds the following weight limits" — and then lists SIX
+   * different limits, one per axle count: 40,000 lb at two axles rising to
+   * 95,000 lb at seven or more. The rate is constant; what changes is where
+   * the meter starts.
+   *
+   * `minLbs`/`maxLbs` cannot express that, because they band on the SAME
+   * quantity the threshold applies to. Two loads of identical gross weight and
+   * different axle counts owe different money, so no gross-weight band can
+   * separate them — a seven-axle load at 100,000 lb is charged on 5,000 lb of
+   * excess and a five-axle load at 100,000 lb on 15,000 lb, a 2.7x difference
+   * in the billed tonnage.
+   *
+   * `maxAxleCount: null` is an open top, for "seven axles or more".
+   *
+   * WHEN A RATE DECLARES THESE AND THE LOAD'S AXLE COUNT IS UNKNOWN, THE ROW
+   * MUST NOT BE SELECTED. Guessing a row picks a threshold, and picking a
+   * threshold is picking a price. The engine drops every axle-conditioned row
+   * in that case, which leaves nothing to resolve and sends the figure to
+   * manual review — the correct outcome, because the fee genuinely cannot be
+   * computed without knowing how many axles are under the load.
+   */
+  minAxleCount?: number;
+  maxAxleCount?: number | null;
   /** USD per mile, per increment when `perIncrementLbs` is set. */
   ratePerMileUsd: number;
   /** Pounds per charged increment; `null` = the rate is flat per mile. */

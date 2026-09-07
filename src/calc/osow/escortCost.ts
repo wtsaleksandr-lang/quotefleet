@@ -665,6 +665,13 @@ export const NO_PUBLISHED_POLICE_ESCORT_RATE: ReadonlyArray<NoPublishedPoliceRat
       'The District is the only jurisdiction here where the TRIGGER is contradicted and the RATE is absent at the same time. DDOT publishes two police-escort tables in the same year that disagree on every threshold — OSOWFAQ_2023.pdf at 15 ft wide / 14 ft 6 in high / 150,000 lb and "may be required", overweight_vehicles.pdf at 12 ft wide / 75 ft long / 13 ft 6 in high / 120,000 lb and "Yes for" — and neither document, the DDOT site, nor the Metropolitan Police Department publishes an hourly rate, minimum hours, mileage, per diem or cancellation charge. The DDOT instruction is to email MPD at motorcarrier@dc.gov to find out whether an escort is needed at all. Both DDOT PDFs and DCMR Title 18 chapter 25 were read in full.',
   },
   {
+    jurisdiction: 'SD',
+    kind: 'notPublished',
+    escortRuleId: 'sd-escort-other-trunk-20ft',
+    finding:
+      'Neither the South Dakota Highway Patrol nor the Department of Public Safety publishes an escort fee schedule, hourly rate, mileage rate, administrative fee, minimum hours or cancellation charge for commercial motor carrier escorts. The Motor Carrier Handbook says only that "some permit applications require review by the Department of Transportation or the Highway Patrol" — a review of the APPLICATION, not an escort of the load, and ARSD 70:03:01:20 requires no law-enforcement escort at any width, length, height or weight. The escorts South Dakota does require are civilian pilot cars.',
+  },
+  {
     jurisdiction: 'PA',
     kind: 'notPublished',
     escortRuleId: 'pa-superload-police-conflict',

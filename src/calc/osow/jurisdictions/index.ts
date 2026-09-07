@@ -253,6 +253,7 @@ import { WISCONSIN_OSOW_RULES } from './wisconsin.js';
 import { MINNESOTA_OSOW_RULES } from './minnesota.js';
 import { UTAH_OSOW_RULES } from './utah.js';
 import { DISTRICT_OF_COLUMBIA_OSOW_RULES } from './districtOfColumbia.js';
+import { SOUTH_DAKOTA_OSOW_RULES } from './southDakota.js';
 
 export const OSOW_JURISDICTIONS: Record<string, JurisdictionOsowRules> = {
   TX: TEXAS_OSOW_RULES,
@@ -283,6 +284,7 @@ export const OSOW_JURISDICTIONS: Record<string, JurisdictionOsowRules> = {
   MN: MINNESOTA_OSOW_RULES,
   UT: UTAH_OSOW_RULES,
   DC: DISTRICT_OF_COLUMBIA_OSOW_RULES,
+  SD: SOUTH_DAKOTA_OSOW_RULES,
 };
 
 /** Is there OS/OW coverage for this state/province code? */
@@ -299,6 +301,7 @@ export function osowRulesFor(code: string): JurisdictionOsowRules | null {
 
 export {
   DISTRICT_OF_COLUMBIA_OSOW_RULES,
+  SOUTH_DAKOTA_OSOW_RULES,
   TEXAS_OSOW_RULES,
   OHIO_OSOW_RULES,
   PENNSYLVANIA_OSOW_RULES,
