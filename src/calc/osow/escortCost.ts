@@ -686,6 +686,13 @@ export const NO_PUBLISHED_POLICE_ESCORT_RATE: ReadonlyArray<NoPublishedPoliceRat
       'West Virginia publishes neither half of the question. The TRIGGER is a commodity test plus agency discretion rather than a dimension: 157 CSR 5 § 6.4.k requires police escort of "houses or other similar oversized structures that could cause significant disruptions to the normal flow of traffic", with "The Division of Highways shall determine the need for a police escort based on the information provided in the permit application and knowledge of the roads or highways being traveled." The RATE does not exist in published form — the West Virginia State Police posts no hourly, mileage, minimum-hours or per diem schedule on its site or anywhere in the Code of State Rules, and carriers coordinate directly with the local detachment or the municipal agency with jurisdiction. 157 CSR 5 was read in full.',
   },
   {
+    jurisdiction: 'WY',
+    kind: 'notPublished',
+    escortRuleId: 'wy-escort-rules-not-retrieved',
+    finding:
+      'NOT CHECKED — a gap in our data rather than a finding about Wyoming, and the only row in this dataset of that kind. The research run that produced the Wyoming legal limits and fee schedule terminated mid-sentence partway through the fee section and never reached the escort rules, so neither an escort trigger nor a Highway Patrol rate has been read for this state. Wyoming permits 117,000 lb legal gross over mountain two-lane highways and certainly publishes escort triggers; every Wyoming load over a legal dimension is therefore sent to manual review rather than quoted at zero escorts. Chapter 5 § 5-6(c) separately makes the applicant pay "the cost of sending personnel to accompany load movement" above 250,000 lb, which is a departmental escort charge with no published rate. Remove this row when the escort section is sourced.',
+  },
+  {
     jurisdiction: 'PA',
     kind: 'notPublished',
     escortRuleId: 'pa-superload-police-conflict',

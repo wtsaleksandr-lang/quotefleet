@@ -20,6 +20,7 @@
  *      that would cost the pages their entire differentiator.
  */
 import { describe, expect, it } from 'vitest';
+import { anUncoveredState } from '../../calc/osow/uncoveredState';
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import {
@@ -147,9 +148,10 @@ describe('hub coverage', () => {
    * and not a convention.
    */
   it('resolves a slug only for a state with data behind it', () => {
-    const wy = hubStateBySlug('wyoming');
-    expect(wy).not.toBeNull();
-    expect(wy?.covered).toBe(false);
+    const missing = anUncoveredState();
+    const uncovered = hubStateBySlug(missing.name.toLowerCase().replace(/ /g, '-'));
+    expect(uncovered).not.toBeNull();
+    expect(uncovered?.covered).toBe(false);
     expect(hubStateBySlug('texas')?.covered).toBe(true);
     expect(hubStateBySlug('not-a-state')).toBeNull();
   });
@@ -243,12 +245,13 @@ describe('cells never invent a value', () => {
   });
 
   it('renders an uncovered state as "not yet covered", never as a blank', () => {
-    const wy = legalLimitRows(ASOF).find((r) => r.state.code === 'WY');
-    expect(wy).toBeDefined();
+    const missing = anUncoveredState();
+    const row = legalLimitRows(ASOF).find((r) => r.state.code === missing.code);
+    expect(row).toBeDefined();
     for (const c of LEGAL_LIMIT_COLUMNS) {
-      expect(wy![c.key].text).toBeNull();
-      expect(wy![c.key].absence).toBe('no-data');
-      expect(renderCell(wy![c.key])).toContain('Not yet covered');
+      expect(row![c.key].text).toBeNull();
+      expect(row![c.key].absence).toBe('no-data');
+      expect(renderCell(row![c.key])).toContain('Not yet covered');
     }
   });
 

@@ -1,4 +1,5 @@
 import { describe, it, expect } from 'vitest';
+import { anUncoveredState } from './uncoveredState';
 import {
   calculateOsow,
   calculateOsowForJurisdiction,
@@ -496,22 +497,29 @@ describe('multi-jurisdiction lanes', () => {
    * Phase 1 wrote these three cases against 'OK' and Phase 4 shipped Oklahoma's
    * dataset, which turned "the engine refuses a state it has no data for" into
    * "the engine prices Oklahoma" — a passing behaviour asserted as a failure.
-   * The uncovered-state cases must always name a state the registry genuinely
-   * does not hold, and must be moved again the day that state is added.
+   * They were then moved to Wyoming, and Wyoming was encoded, and they broke
+   * again in exactly the same way.
+   *
+   * THEY NO LONGER NAME A STATE. `anUncoveredState()` asks the registry, so
+   * these cases follow the coverage gap instead of having to be chased after
+   * it. See src/calc/osow/uncoveredState.ts.
    */
+  const missing = anUncoveredState();
   it('refuses to price a lane that leaves Texas — and names the gap', () => {
-    const q = calculateOsow(['TX', 'WY'], load({ grossWeightLbs: 100000, widthIn: ftIn(12), heightIn: ftIn(13) }), ASOF);
-    expect(hasOsowCoverage('WY'), 'WY must still be an uncovered state').toBe(false);
-    expect(q.uncoveredJurisdictions).toEqual(['WY']);
+    const q = calculateOsow(['TX', missing.code], load({ grossWeightLbs: 100000, widthIn: ftIn(12), heightIn: ftIn(13) }), ASOF);
+    expect(hasOsowCoverage(missing.code), `${missing.code} must still be uncovered`).toBe(false);
+    expect(q.uncoveredJurisdictions).toEqual([missing.code]);
     expect(q.totalPermitUsd).toBeNull();
     expect(q.requiresManualReview).toBe(true);
-    expect(q.warnings.join(' ')).toContain('No oversize/overweight permit data is on file for WY');
+    expect(q.warnings.join(' ')).toContain(
+      `No oversize/overweight permit data is on file for ${missing.code}`,
+    );
     // Texas is still fully priced — the gap is isolated to the leg we lack.
     expect(q.jurisdictions[0]?.subtotalUsd).toBe(214.98);
   });
 
   it('never infers one state’s fees from a neighbour', () => {
-    const q = calculateOsow(['WY'], load({ grossWeightLbs: 100000 }), ASOF);
+    const q = calculateOsow([missing.code], load({ grossWeightLbs: 100000 }), ASOF);
     expect(q.jurisdictions).toEqual([]);
     expect(q.totalPermitUsd).toBeNull();
     expect(q.warnings.join(' ')).toContain('cannot be inferred from a neighbouring one');
@@ -530,11 +538,12 @@ describe('multi-jurisdiction lanes', () => {
 });
 
 describe('coverage helpers', () => {
-  it('knows Texas is covered and Wyoming is not', () => {
+  it('knows Texas is covered and an unencoded state is not', () => {
+    const missing = anUncoveredState();
     expect(hasOsowCoverage('TX')).toBe(true);
     expect(hasOsowCoverage('tx')).toBe(true);
-    expect(hasOsowCoverage('WY')).toBe(false);
-    expect(osowRulesFor('WY')).toBeNull();
+    expect(hasOsowCoverage(missing.code)).toBe(false);
+    expect(osowRulesFor(missing.code)).toBeNull();
     expect(osowRulesFor('TX')?.name).toBe('Texas');
     // Oklahoma stood here from Phase 1 until its dataset shipped in Phase 4.
     expect(hasOsowCoverage('OK')).toBe(true);
@@ -3930,7 +3939,7 @@ describe('the registry after Phase 11', () => {
     'AL', 'AR', 'CA', 'CO', 'DC', 'FL', 'GA', 'IL', 'IN', 'KY',
     'LA', 'MI', 'MN', 'MO', 'MS', 'NC', 'NJ', 'NV', 'NY', 'OH',
     'OK', 'PA', 'SC', 'SD', 'TN', 'TX', 'UT', 'VA', 'WA', 'WI',
-    'WV',
+    'WV', 'WY',
   ];
 
   it('covers exactly the jurisdictions whose datasets exist', () => {
