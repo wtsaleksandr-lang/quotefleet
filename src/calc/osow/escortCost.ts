@@ -679,6 +679,13 @@ export const NO_PUBLISHED_POLICE_ESCORT_RATE: ReadonlyArray<NoPublishedPoliceRat
       'Nevada has no police escort rate because it has no police escort requirement to price. No provision in NAC 484D or NRS 484D mandates a Nevada Highway Patrol escort at any dimension or any weight. NAC 484D.640(12) is the only law-enforcement hook in the chapter, and it is a discretion to "coordinate additional utilities escorts and traffic control with the appropriate law enforcement agencies" over 17 ft wide on two or three lanes, over 19 ft on four or more, or over 16 ft high — coordination, not an officer escort. NAC 484D.670(5)(c) does confirm the Highway Patrol runs its own amber-light permit on the pilot car under NRS 484D.185, and publishes no price for that either. NAC 484D.500-695 and the reachable NRS 484D sections were read in full; dot.nv.gov and leg.state.nv.us were both unreachable from the researching network. Claims that every superload requires an NHP escort appear only on commercial permit-service sites and are not adopted.',
   },
   {
+    jurisdiction: 'WV',
+    kind: 'notPublished',
+    escortRuleId: 'wv-police-escort-structures',
+    finding:
+      'West Virginia publishes neither half of the question. The TRIGGER is a commodity test plus agency discretion rather than a dimension: 157 CSR 5 § 6.4.k requires police escort of "houses or other similar oversized structures that could cause significant disruptions to the normal flow of traffic", with "The Division of Highways shall determine the need for a police escort based on the information provided in the permit application and knowledge of the roads or highways being traveled." The RATE does not exist in published form — the West Virginia State Police posts no hourly, mileage, minimum-hours or per diem schedule on its site or anywhere in the Code of State Rules, and carriers coordinate directly with the local detachment or the municipal agency with jurisdiction. 157 CSR 5 was read in full.',
+  },
+  {
     jurisdiction: 'PA',
     kind: 'notPublished',
     escortRuleId: 'pa-superload-police-conflict',
