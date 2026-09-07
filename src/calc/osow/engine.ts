@@ -1714,7 +1714,28 @@ export function calculateOsowForJurisdiction(
               `${rules.code} overweight per-mile rate`,
               rules.overweightPerMile.filter((r) => {
                 const v = r.value;
-                return gross >= v.minLbs && (v.maxLbs === null || gross <= v.maxLbs);
+                if (gross < v.minLbs) return false;
+                if (v.maxLbs !== null && gross > v.maxLbs) return false;
+                // AXLE COUNT SELECTS THE ROW where the state bands on it — see
+                // `PerMileRate.minAxleCount`. South Dakota is the case: one
+                // rate, six different starting thresholds, chosen by axle
+                // count. A rate that declares no axle band is unaffected.
+                if (v.minAxleCount === undefined && v.maxAxleCount === undefined) return true;
+                // AND AN UNKNOWN AXLE COUNT DROPS THE ROW rather than guessing
+                // one. Every axle-conditioned row falling away leaves nothing
+                // to resolve, which routes the figure to manual review — the
+                // honest outcome, because the fee cannot be computed without
+                // knowing how many axles are under the load.
+                if (axleCount === undefined) return false;
+                if (v.minAxleCount !== undefined && axleCount < v.minAxleCount) return false;
+                if (
+                  v.maxAxleCount !== undefined &&
+                  v.maxAxleCount !== null &&
+                  axleCount > v.maxAxleCount
+                ) {
+                  return false;
+                }
+                return true;
               }),
               asOf,
               perMileRatesEqual,
