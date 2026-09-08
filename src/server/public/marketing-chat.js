@@ -247,20 +247,27 @@
       background: #ffffff; flex-shrink: 0;
     }
 
-    /* Full-screen sheet on phones, with a tappable blurred backdrop. */
+    /* Full-screen sheet on phones, with a tappable blurred backdrop.
+       THE LAUNCHER STAYS IN THE CORNER. It used to be lifted 84px on phones to
+       clear a bottom-anchored CTA, and then three separate rules put it back in
+       the corner for landing, for directory pages with an action bar, and for
+       the OS/OW calculator — because on each of those the lift parked it on top
+       of real content instead.
+
+       Three exceptions to one default is a default that is wrong more often
+       than it is right, and the fourth case proved it: on the heavy-haul quote
+       tool the lifted launcher sat over the delivery-address input at 375px,
+       covering 1,330 square pixels of a field the user has to fill in.
+
+       So the lift is gone rather than exception number four. The element it was
+       protecting — the bottom dock nav — is not rendered by any page in this
+       codebase; the .dock rules are dead CSS, so the lift was clearing an
+       obstacle that
+       no longer exists. The launcher now sits snug in the bottom-right corner
+       everywhere, which is where Alex asked for it on each of the three pages
+       that had to ask individually. Pages whose last line would sit under it
+       add their own bottom padding, as the OS/OW tool already does. */
     @media (max-width: 480px) {
-      .qf-mc-fab {
-        bottom: calc(84px + env(safe-area-inset-bottom, 0px));
-      }
-      /* The 84px lift clears the pricing page's bottom-anchored "Start 14-day
-         trial" CTA (#103). On the landing page the primary "Start free" CTA
-         sits mid-hero instead, so that same lift drops the launcher right on
-         top of it. Return the launcher to the conventional bottom-right corner
-         on landing only — it clears the mid-page CTA and leaves pricing and
-         desktop untouched. Scoped to body.landing-v2 (landing page only). */
-      body.landing-v2 .qf-mc-fab {
-        bottom: calc(20px + env(safe-area-inset-bottom, 0px));
-      }
       .qf-mc-panel {
         top: 72px; right: 8px; bottom: calc(8px + env(safe-area-inset-bottom, 0px)); left: 8px;
         width: auto; height: auto; max-width: none; max-height: none;
@@ -268,32 +275,6 @@
       .qf-mc-backdrop.open {
         opacity: 1; visibility: visible; pointer-events: auto;
         transition: opacity 0.18s ease, visibility 0s linear 0s;
-      }
-    }
-
-    /* Directory results carry a sticky bottom action bar (Save / Export / RFQ).
-       Alex wants the launcher in the bottom-right CORNER on these pages too —
-       NOT lifted mid-screen. So the FAB stays snug in the corner (base 12px);
-       the action bar gets right-side clearance in its own CSS (pages.ts) so its
-       rightmost button never sits under the corner FAB. On phones <=480px the
-       generic 84px lift above would push the launcher up — counter it back to
-       the corner on directory pages (body:has(.qf-actionbar)). */
-    @media (max-width: 480px) {
-      body:has(.qf-actionbar) .qf-mc-fab {
-        bottom: calc(12px + env(safe-area-inset-bottom, 0px));
-      }
-    }
-
-    /* The OS/OW permit calculator is a single long column of body text at phone
-       width — over 5,000px of per-state fee lines, escort exclusions and notes.
-       The generic 84px lift above parked the launcher in the middle-right of
-       that column, on top of the pilot-cars paragraph, where it covered the one
-       sentence saying escort COST is not included. Return it to the corner here
-       (the tool's own CSS adds 80px of bottom padding so the last line still
-       clears it) — same fix, same reason, as the directory action bar above. */
-    @media (max-width: 480px) {
-      body:has(.ow-shell) .qf-mc-fab {
-        bottom: calc(12px + env(safe-area-inset-bottom, 0px));
       }
     }
 

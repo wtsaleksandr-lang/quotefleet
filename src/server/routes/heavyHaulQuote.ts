@@ -1079,7 +1079,7 @@ export function renderHeavyHaulToolPage(): string {
   <meta name="twitter:image" content="${SITE}/brand/og-image-1200x630.png">
   ${jsonLd.map((o) => `<script type="application/ld+json">${JSON.stringify(o)}</script>`).join('\n  ')}
 </head>
-<body>
+<body class="qf-mc-hide-sm">
   ${FULL_SITE_HEADER}
   ${body}
   ${PREMIUM_FOOTER}
